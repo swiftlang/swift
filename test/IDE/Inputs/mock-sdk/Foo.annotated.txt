@@ -25,6 +25,8 @@ var <loc>FooEnum1X</loc>: <ref:Struct>FooEnum1</ref> { get }</decl>
 
 <decl:Enum>/// Aaa.  FooComparisonResult.  Bbb.
 enum <loc>FooComparisonResult</loc> : <ref:Struct>Int</ref> {
+  <decl:Constructor><loc>init?(rawValue: <ref:Struct>Int</ref>)</loc></decl>
+  <decl:Var>var <loc>rawValue</loc>: <ref:Struct>Int</ref> { get }</decl>
   <decl:EnumElement>case <loc>OrderedAscending</loc></decl>
   <decl:EnumElement>case <loc>OrderedSame</loc></decl>
   <decl:EnumElement>case <loc>OrderedDescending</loc></decl>

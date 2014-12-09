@@ -1458,11 +1458,17 @@ void SILGenFunction::visitNominalTypeDecl(NominalTypeDecl *ntd) {
 void SILGenModule::emitExternalDefinition(Decl *d) {
   switch (d->getKind()) {
   case DeclKind::Func: {
+    // We'll emit all the members of an enum when we visit the enum.
+    if (isa<EnumDecl>(d->getDeclContext()))
+      break;
     emitFunction(cast<FuncDecl>(d));
     break;
   }
   case DeclKind::Constructor: {
     auto C = cast<ConstructorDecl>(d);
+    // We'll emit all the members of an enum when we visit the enum.
+    if (isa<EnumDecl>(d->getDeclContext()))
+      break;
     // For factories, we don't need to emit a special thunk; the normal
     // foreign-to-native thunk is sufficient.
     if (C->isFactoryInit())

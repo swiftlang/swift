@@ -83,6 +83,8 @@
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingMode.  Bbb.{{$}}
 // FOUNDATION-NEXT: {{^}}enum NSRuncingMode : UInt {{{$}}
+// FOUNDATION-NEXT: {{^}}  init?(rawValue: UInt){{$}}
+// FOUNDATION-NEXT: {{^}}  var rawValue: UInt { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  case Mince{{$}}
 // FOUNDATION-NEXT: {{^}}  case Quince{{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}

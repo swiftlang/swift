@@ -687,6 +687,131 @@ static ConstructorDecl *makeOptionSetDefaultConstructor(StructDecl *optionSetDec
   return ctorDecl;
 }
 
+// Build the init(rawValue:) initializer for an imported NS_ENUM.
+//   enum NSSomeEnum: RawType {
+//     init?(rawValue: RawType) {
+//       self = Builtin.reinterpretCast(rawValue)
+//     }
+//   }
+// Unlike a standard init(rawValue:) enum initializer, this does a reinterpret
+// cast in order to preserve unknown or future cases from C.
+static ConstructorDecl *makeEnumRawValueConstructor(EnumDecl *enumDecl) {
+  ASTContext &C = enumDecl->getASTContext();
+  auto enumTy = enumDecl->getDeclaredTypeInContext();
+  auto metaTy = MetatypeType::get(enumTy);
+  
+  VarDecl *selfDecl = createSelfDecl(enumDecl, false);
+  Pattern *selfPattern = createTypedNamedPattern(selfDecl);
+
+  auto param = new (C) ParamDecl(/*let*/ true,
+                                 SourceLoc(), C.Id_rawValue,
+                                 SourceLoc(), C.Id_rawValue,
+                                 enumDecl->getRawType(),
+                                 enumDecl);
+  Pattern *paramPattern = new (C) NamedPattern(param);
+  paramPattern->setType(enumDecl->getRawType());
+  paramPattern->setImplicit();
+  paramPattern = new (C)
+    TypedPattern(paramPattern, TypeLoc::withoutLoc(enumDecl->getRawType()));
+  paramPattern->setType(enumDecl->getRawType());
+  paramPattern->setImplicit();
+  
+  auto patternElt = TuplePatternElt(paramPattern);
+  paramPattern = TuplePattern::create(C, SourceLoc(), patternElt, SourceLoc());
+  paramPattern->setImplicit();
+  auto typeElt = TupleTypeElt(enumDecl->getRawType(), C.Id_rawValue);
+  auto paramTy = TupleType::get(typeElt, C);
+  paramPattern->setType(paramTy);
+
+  DeclName name(C, C.Id_init, C.Id_rawValue);
+  auto *ctorDecl = new (C) ConstructorDecl(name, enumDecl->getLoc(),
+                                           OTK_Optional, SourceLoc(),
+                                           selfPattern, paramPattern,
+                                           nullptr, enumDecl);
+  ctorDecl->setImplicit();
+  ctorDecl->setAccessibility(Accessibility::Public);
+
+  auto optEnumTy = OptionalType::get(enumTy);
+
+  auto fnTy = FunctionType::get(paramTy, optEnumTy);
+  auto allocFnTy = FunctionType::get(metaTy, fnTy);
+  auto initFnTy = FunctionType::get(enumTy, fnTy);
+  ctorDecl->setType(allocFnTy);
+  ctorDecl->setInitializerType(initFnTy);
+  
+  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
+  auto paramRef = new (C) DeclRefExpr(param, SourceLoc(),
+                                      /*implicit*/ true);
+  auto reinterpretCast
+    = cast<FuncDecl>(getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast")));
+  auto reinterpretCastRef
+    = new (C) DeclRefExpr(reinterpretCast, SourceLoc(), /*implicit*/ true);
+  auto reinterpreted = new (C) CallExpr(reinterpretCastRef, paramRef,
+                                        /*implicit*/ true);
+  auto assign = new (C) AssignExpr(selfRef, SourceLoc(), reinterpreted,
+                                   /*implicit*/ true);
+  auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assign), SourceLoc(),
+                                /*implicit*/ true);
+  
+  ctorDecl->setBody(body);
+  
+  C.addedExternalDecl(ctorDecl);
+  
+  return ctorDecl;
+}
+
+// Build the rawValue getter for an imported NS_ENUM.
+//   enum NSSomeEnum: RawType {
+//     var rawValue: RawType {
+//       return Builtin.reinterpretCast(self)
+//     }
+//   }
+// Unlike a standard init(rawValue:) enum initializer, this does a reinterpret
+// cast in order to preserve unknown or future cases from C.
+static FuncDecl *makeEnumRawValueGetter(EnumDecl *enumDecl,
+                                        VarDecl *rawValueDecl) {
+  ASTContext &C = enumDecl->getASTContext();
+  
+  VarDecl *selfDecl = createSelfDecl(enumDecl, false);
+  Pattern *selfPattern = createTypedNamedPattern(selfDecl);
+  
+  Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
+  auto unitTy = TupleType::getEmpty(C);
+  methodParam->setType(unitTy);
+
+  Pattern *params[] = {selfPattern, methodParam};
+
+  auto fnTy = FunctionType::get(unitTy, enumDecl->getRawType());
+  fnTy = FunctionType::get(selfDecl->getType(), fnTy);
+
+  auto getterDecl =
+    FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
+                     DeclName(), SourceLoc(), nullptr,
+                     Type(), params,
+                     TypeLoc::withoutLoc(enumDecl->getRawType()), enumDecl);
+  getterDecl->setImplicit();
+  getterDecl->setType(fnTy);
+  getterDecl->setBodyResultType(enumDecl->getRawType());
+  getterDecl->setAccessibility(Accessibility::Public);
+
+  rawValueDecl->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
+                             SourceLoc());
+  
+  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
+  auto reinterpretCast
+    = cast<FuncDecl>(getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast")));
+  auto reinterpretCastRef
+    = new (C) DeclRefExpr(reinterpretCast, SourceLoc(), /*implicit*/ true);
+  auto reinterpreted = new (C) CallExpr(reinterpretCastRef, selfRef,
+                                        /*implicit*/ true);
+  auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
+  auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
+                                /*implicit*/ true);
+  
+  getterDecl->setBody(body);
+  C.addedExternalDecl(getterDecl);
+  return getterDecl;
+}
 
 namespace {
   class CFPointeeInfo {
@@ -1512,6 +1637,37 @@ namespace {
         auto delayedProtoList = Impl.SwiftContext.AllocateCopy(
                                                       delayedProtocols);
         enumDecl->setDelayedProtocolDecls(delayedProtoList);
+        
+        // Provide custom implementations of the init(rawValue:) and rawValue
+        // conversions that just do a bitcast. We can't reliably filter a
+        // C enum without additional knowledge that the type has no
+        // undeclared values, and won't ever add cases.
+        auto rawValueConstructor = makeEnumRawValueConstructor(enumDecl);
+
+        auto varName = Impl.SwiftContext.Id_rawValue;
+        auto rawValue = new (Impl.SwiftContext) VarDecl(/*static*/ false,
+                                                   /*IsLet*/ false,
+                                                   SourceLoc(), varName,
+                                                   underlyingType,
+                                                   enumDecl);
+        rawValue->setImplicit();
+        rawValue->setAccessibility(Accessibility::Public);
+        rawValue->setSetterAccessibility(Accessibility::Private);
+        
+        // Create a pattern binding to describe the variable.
+        Pattern *varPattern = createTypedNamedPattern(rawValue);
+        
+        auto rawValueBinding = new (Impl.SwiftContext)
+          PatternBindingDecl(SourceLoc(), StaticSpellingKind::None,
+                             SourceLoc(), varPattern, nullptr,
+                             /*conditional*/ false, enumDecl);
+
+        auto rawValueGetter = makeEnumRawValueGetter(enumDecl, rawValue);
+
+        enumDecl->addMember(rawValueConstructor);
+        enumDecl->addMember(rawValueGetter);
+        enumDecl->addMember(rawValue);
+        enumDecl->addMember(rawValueBinding);
         
         result = enumDecl;
         computeEnumCommonWordPrefix(decl, name);
