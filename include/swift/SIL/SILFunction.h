@@ -395,6 +395,20 @@ public:
   }
 
   //===--------------------------------------------------------------------===//
+  // Argument Helper Methods
+  //===--------------------------------------------------------------------===//
+
+  SILArgument *getArgument(unsigned i) {
+    assert(!empty() && "Can not get argument of a function without a body");
+    return begin()->getBBArg(i);
+  }
+
+  const SILArgument *getArgument(unsigned i) const {
+    assert(!empty() && "Can not get argument of a function without a body");
+    return begin()->getBBArg(i);
+  }
+
+  //===--------------------------------------------------------------------===//
   // Miscellaneous
   //===--------------------------------------------------------------------===//
 

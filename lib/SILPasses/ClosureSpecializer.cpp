@@ -11,13 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "closure-specialization"
+#include "swift/SILPasses/Passes.h"
+#include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILAnalysis/LoopAnalysis.h"
-#include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/SILInliner.h"
 #include "llvm/ADT/Statistic.h"
@@ -274,13 +275,14 @@ struct ClosureSpecializer {
 
 } // end anonymous namespace
 
-static void createName(SILFunction *Callee, SILFunction *Closure,
-                       unsigned ClosureIndex,
+static void createName(SILFunction *Callee, SILArgument *Arg,
+                       PartialApplyInst *PAI,
                        llvm::SmallString<64> &Name) {
   llvm::raw_svector_ostream buffer(Name);
-  buffer << "_TTS";
-  buffer << Closure->getName() << "_as" << ClosureIndex
-         << '_' << Callee->getName();
+  Mangle::Mangler M(buffer);
+  Mangle::FunctionSignatureSpecializationMangler FSSM(M, Callee);
+  FSSM.setArgumentClosureProp(Arg, PAI);
+  FSSM.mangle();
 }
 
 void
@@ -382,12 +384,11 @@ bool ClosureSpecializer::specialize(SILFunction *Caller) {
     if (MultipleClosureAI.count(AD.AI))
       continue;
 
-    auto *ClosureFRI = cast<FunctionRefInst>(AD.PAI->getCallee());
     auto *CalleeFRI = cast<FunctionRefInst>(AD.AI->getCallee());
     auto *Callee = CalleeFRI->getReferencedFunction();
 
     llvm::SmallString<64> NewFName;
-    createName(Callee, ClosureFRI->getReferencedFunction(), AD.ClosureIndex,
+    createName(Callee, Callee->getArgument(AD.ClosureIndex), AD.PAI,
                NewFName);
     DEBUG(llvm::dbgs() << "    Perform optimizations with new name "
                        << NewFName << '\n');

@@ -18,6 +18,7 @@
 #include "swift/Strings.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Punycode.h"
+#include "swift/Basic/UUID.h"
 #include "llvm/ADT/StringRef.h"
 #include <functional>
 #include <ostream>
@@ -187,6 +188,12 @@ static std::string archetypeName(Node::IndexType i) {
 }
 
 namespace {
+  enum class FunctionSigSpecializationParamInfoKind : uint8_t {
+    ClosureProp,
+  };
+} // end anonymous namespace
+
+namespace {
 
 /// A convenient class for parsing characters out of a string.
 class NameSource {
@@ -231,6 +238,9 @@ public:
   /// that there are at least so many characters.
   StringRef slice(size_t len) { return Text.substr(0, len); }
 
+  /// Return the current string ref without claiming any characters.
+  StringRef str() { return Text; }
+
   /// Claim the next len characters.
   void advanceOffset(size_t len) {
     Text = Text.substr(len);
@@ -266,15 +276,13 @@ public:
     if (Mangled.slice(2) != "_T")
       return failure();
 
+    // First demangle any specialization prefixes.
     if (Mangled.hasAtLeast(4) && Mangled.slice(4) == "_TTS") {
       do {
         Mangled.advanceOffset(4);
         auto attr = demangleSpecializedAttribute();
         if (!attr)
           return failure();
-        if (!Mangled.hasAtLeast(2) || Mangled.slice(2) != "_T")
-          return failure();
-        Mangled.advanceOffset(2);
         appendNode(attr);
         // The Substitution header does not share state with the rest of the
         // mangling.
@@ -282,6 +290,12 @@ public:
         ArchetypeCounts.clear();
         ArchetypeCount = 0;
       } while (Mangled.hasAtLeast(4) && Mangled.slice(4) == "_TTS");
+
+      // Then check that we have a global.
+      if (!Mangled.hasAtLeast(2) || Mangled.slice(2) != "_T")
+        return failure();
+      Mangled.advanceOffset(2);
+
     } else if (Mangled.hasAtLeast(4) && Mangled.slice(4) == "_TTo") {
       Mangled.advanceOffset(4);
       appendNode(Node::Kind::ObjCAttribute);
@@ -692,8 +706,11 @@ private:
 
   NodePointer demangleGenericSpecialization() {
     auto specialization = NodeFactory::create(Node::Kind::SpecializedAttribute);
+    auto kind = NodeFactory::create(Node::Kind::SpecializationKind, "generic");
+    specialization->addChild(kind);
+    
     while (!Mangled.nextIf('_')) {
-      NodePointer param = NodeFactory::create(Node::Kind::SpecializationParam);
+      NodePointer param = NodeFactory::create(Node::Kind::GenericSpecializationParam);
       NodePointer type = demangleType();
       if (!type)
         return nullptr;
@@ -709,9 +726,76 @@ private:
     return specialization;
   }
 
+#define FUNCSIGSPEC_CREATE_INFO_KIND(kind) \
+  std::move(NodeFactory::create(Node::Kind::FunctionSignatureSpecializationParamInfo, \
+                                uint8_t(FunctionSigSpecializationParamInfoKind::kind)))
+  NodePointer demangleFunctionSignatureSpecialization() {
+    auto specialization = NodeFactory::create(Node::Kind::SpecializedAttribute);
+    auto kind = NodeFactory::create(Node::Kind::SpecializationKind, "function signature");
+    specialization->addChild(kind);
+
+    unsigned ParameterCount = 0;
+
+    // If we have a '_', eat it and bail. Otherwise continue into the loop.
+    while (!Mangled.nextIf('_')) {
+      // Try to eat an n. If we succeed don't create any nodes and
+      // continue. This is because we do not represent unmodified arguments in
+      // the demangling.
+      if (Mangled.nextIf("n_")) {
+        ParameterCount++;
+        continue;
+      }
+
+      NodePointer param = NodeFactory::create(Node::Kind::FunctionSignatureSpecializationParam,
+                                              ParameterCount);
+
+      // See if we have a cl
+      if (Mangled.nextIf("cl")) {
+        // We don't actually demangle the function or types for now. But we do
+        // want to signal that we specialized a closure.
+        param->addChild(FUNCSIGSPEC_CREATE_INFO_KIND(ClosureProp));
+
+        // First see if we have a UUID.
+        if (Mangled.nextIf("uu")) {
+          // Then advance past all UUID characters.
+          Mangled.advanceOffset(UUID::StringSize);
+        } else {
+          // Otherwise, we have a function name. Find how far we need to go to skip it.
+          StringRef before = Mangled.str();
+          Demangler d(before);
+          bool result = d.demangle();
+          if (!result)
+            return nullptr;
+          NodePointer n = d.getDemangled();
+          unsigned suffixSize = n->getChild(n->getNumChildren()-1)->getText().size();
+
+          Mangled.advanceOffset(before.size() - suffixSize);
+        }
+
+        // Attempt to chop off a '_' and bail if we do. Otherwise, just demangle
+        // types. We do not use this information but need to move forward in the
+        // stream.
+        while (!Mangled.nextIf('_')) {
+          if (!demangleType())
+            return nullptr;
+        }        
+      }
+
+      assert(param->getNumChildren() > 0 && "Param should have children");
+
+      assert(param && "Param should have been set");
+      specialization->addChild(param);
+      ParameterCount++;
+    }
+    return specialization;
+  }
+#undef FUNCSIGSPEC_CREATE_INFO_KIND
+
   NodePointer demangleSpecializedAttribute() {
     if (Mangled.nextIf("g"))
       return demangleGenericSpecialization();
+    if (Mangled.nextIf("f"))
+      return demangleFunctionSignatureSpecialization();
 
     // For now just return a specialized attribute if we don't know what we are
     // demangling. We will assert in a later commit.
@@ -2076,7 +2160,10 @@ private:
     case Node::Kind::ReabstractionThunkHelper:
     case Node::Kind::Setter:
     case Node::Kind::SpecializedAttribute:
-    case Node::Kind::SpecializationParam:
+    case Node::Kind::SpecializationKind:
+    case Node::Kind::GenericSpecializationParam:
+    case Node::Kind::FunctionSignatureSpecializationParam:
+    case Node::Kind::FunctionSignatureSpecializationParamInfo:
     case Node::Kind::Subscript:
     case Node::Kind::Suffix:
     case Node::Kind::TupleElement:
@@ -2452,15 +2539,19 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << "dynamic ";
     return;
   case Node::Kind::SpecializedAttribute:
-    Printer << "specialization <";
-    for (unsigned i = 0, e = pointer->getNumChildren(); i < e; ++i) {
-      if (i >= 1)
+    print(pointer->getChild(0));
+    Printer << " specialization <";
+    for (unsigned i = 1, e = pointer->getNumChildren(); i < e; ++i) {
+      if (i >= 2)
         Printer << ", ";
       print(pointer->getChild(i));
     }
     Printer << "> of ";
     return;
-  case Node::Kind::SpecializationParam:
+  case Node::Kind::SpecializationKind:
+    Printer << pointer->getText();
+    return;
+  case Node::Kind::GenericSpecializationParam:
     print(pointer->getChild(0));
     for (unsigned i = 1, e = pointer->getNumChildren(); i < e; ++i) {
       if (i == 1)
@@ -2470,6 +2561,26 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       print(pointer->getChild(i));
     }
     return;
+  case Node::Kind::FunctionSignatureSpecializationParam: {
+    uint64_t argNum = pointer->getIndex();
+
+    Printer << "Arg[" << argNum << "] = ";
+    print(pointer->getChild(0));
+    for (unsigned i = 1, e = pointer->getNumChildren(); i < e; ++i) {
+      Printer << " and ";
+      print(pointer->getChild(i));
+    }
+    return;
+  }
+  case Node::Kind::FunctionSignatureSpecializationParamInfo: {
+    uint64_t rawKind = pointer->getIndex();
+    switch (FunctionSigSpecializationParamInfoKind(rawKind)) {
+    case FunctionSigSpecializationParamInfoKind::ClosureProp:
+      Printer << "Closure Propagated";
+      break;
+    }
+    return;
+  }
   case Node::Kind::BuiltinTypeName:
     Printer << pointer->getText();
     return;

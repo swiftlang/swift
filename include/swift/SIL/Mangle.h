@@ -28,6 +28,7 @@ namespace Mangle {
 
 enum class SpecializationSourceKind : uint8_t {
   Generic,
+  FunctionSignature,
 };
 
 class SpecializationManglerBase {
@@ -60,6 +61,9 @@ protected:
     switch (Kind) {
     case SpecializationSourceKind::Generic:
       M.Buffer << "g";
+      break;
+    case SpecializationSourceKind::FunctionSignature:
+      M.Buffer << "f";
       break;
     }
   }
@@ -111,6 +115,27 @@ public:
   GenericSpecializationMangler(Mangler &M, SILFunction *F,
                                ArrayRef<Substitution> Subs)
     : SpecializationMangler(SpecializationSourceKind::Generic, M, F), Subs(Subs) {}
+
+private:
+  void mangleSpecialization();
+};
+
+class FunctionSignatureSpecializationMangler
+  : public SpecializationMangler<FunctionSignatureSpecializationMangler> {
+
+  friend class SpecializationMangler<FunctionSignatureSpecializationMangler>;
+
+  enum class ArgumentModifier : uint8_t {
+    Unmodified=0,
+    ClosureProp=4,
+  };
+
+  using ArgInfo = std::pair<uint8_t, NullablePtr<SILInstruction>>;
+  llvm::SmallVector<ArgInfo, 8> Args;
+
+public:
+  FunctionSignatureSpecializationMangler(Mangler &M, SILFunction *F);
+  void setArgumentClosureProp(SILArgument *Arg, PartialApplyInst *PAI);
 
 private:
   void mangleSpecialization();

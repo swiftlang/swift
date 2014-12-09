@@ -740,10 +740,10 @@ Globals
   global ::= 'TR' reabstract-signature   // reabstraction thunk helper function
   global ::= 'Tr' reabstract-signature   // reabstraction thunk
 
-  global ::= 'TS' '_' specializationkind specializationinfo '_' global
-  specializationkind ::= 'g'
-  specializationinfo ::= genericspecializationinfo
-  genericspecializationinfo ::= type protocol-conformance* '_'
+  global ::= 'TS' '_' specializationinfo '_' global
+  specializationinfo ::= 'g' type protocol-conformance* '_'      // Generic specialization info.
+  specializationinfo ::= 'f' funcsigspecializationinfo           // Function signature specialization kind
+  funcsigspecializationinfo ::= 'cl' closurename '_' (type '_')* // Closure specialized with closed over types in argument order.
 
   global ::= 'TW' protocol-conformance entity
                                          // protocol witness thunk

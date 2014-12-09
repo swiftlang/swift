@@ -5,7 +5,7 @@ import Swift
 
 sil @simple_partial_apply_fun : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
 
-// CHECK-LABEL: sil @_TTSsimple_partial_apply_fun_as0_simple_partial_apply_caller : $@thin (Builtin.Int1) -> Builtin.Int1 {
+// CHECK-LABEL: sil @_TTSfclsimple_partial_apply_funBi1___simple_partial_apply_caller : $@thin (Builtin.Int1) -> Builtin.Int1 {
 // CHECK: bb0([[CAPTURED_ARG:%.*]] : $Builtin.Int1):
 // CHECK: [[CLOSED_OVER_FUN:%.*]] = function_ref @simple_partial_apply_fun :
 // CHECK: [[NEW_PAI:%.*]] = partial_apply [[CLOSED_OVER_FUN]]
@@ -168,7 +168,7 @@ bb2:
 }
 
 // CHECK-LABEL: sil @loop_driver : $@thin (Builtin.Int1, Builtin.Int1) -> () {
-// CHECK: [[SPECIALIZED_FUN:%.*]] = function_ref @_TTSsimple_partial_apply_fun_as0_simple_partial_apply_caller : $@thin (Builtin.Int1) -> Builtin.Int1
+// CHECK: [[SPECIALIZED_FUN:%.*]] = function_ref @_TTSfclsimple_partial_apply_funBi1___simple_partial_apply_caller : $@thin (Builtin.Int1) -> Builtin.Int1
 // CHECK: apply [[SPECIALIZED_FUN]]
 
 // We can't call this one b/c it is just a declaration.

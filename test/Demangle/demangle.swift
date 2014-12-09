@@ -160,18 +160,18 @@
 ; CHECK: _TFCSo1Ae ---> ObjectiveC.A.__ivar_initializer
 ; CHECK: _TTWC13call_protocol1CS_1PS_FS1_3fooU_fRQPS1_FT_Si ---> protocol witness for call_protocol.P.foo (inout call_protocol.P.Self)() -> Swift.Int in conformance call_protocol.C : call_protocol.P in call_protocol
 ; CHECK: _TFC12dynamic_self1X1ffDS0_FT_DS0_ ---> dynamic_self.X.f (Self)() -> Self
-; CHECK: _TTSgSi___TFSqCU__fMGSqQ__FT_GSqQ__ ---> specialization <Swift.Int> of Swift.Optional.init <A>(A?.Type)() -> A?
-; CHECK: _TTSgSiSiSs3FooSs_Sf___TFSqCU__fMGSqQ__FT_GSqQ__ ---> specialization <Swift.Int with Swift.Int : Swift.Foo in Swift, Swift.Float> of Swift.Optional.init <A>(A?.Type)() -> A?
-; CHECK: _TTSgSi_Sf___TFSqCU__fMGSqQ__FT_GSqQ__ ---> specialization <Swift.Int, Swift.Float> of Swift.Optional.init <A>(A?.Type)() -> A?
-; CHECK: _TTSgSi_Sf___TFSqCU__fMGSqQ__FT_GSqQ__ ---> specialization <Swift.Int, Swift.Float> of Swift.Optional.init <A>(A?.Type)() -> A?
+; CHECK: _TTSgSi___TFSqCU__fMGSqQ__FT_GSqQ__ ---> generic specialization <Swift.Int> of Swift.Optional.init <A>(A?.Type)() -> A?
+; CHECK: _TTSgSiSiSs3FooSs_Sf___TFSqCU__fMGSqQ__FT_GSqQ__ ---> generic specialization <Swift.Int with Swift.Int : Swift.Foo in Swift, Swift.Float> of Swift.Optional.init <A>(A?.Type)() -> A?
+; CHECK: _TTSgSi_Sf___TFSqCU__fMGSqQ__FT_GSqQ__ ---> generic specialization <Swift.Int, Swift.Float> of Swift.Optional.init <A>(A?.Type)() -> A?
+; CHECK: _TTSgSi_Sf___TFSqCU__fMGSqQ__FT_GSqQ__ ---> generic specialization <Swift.Int, Swift.Float> of Swift.Optional.init <A>(A?.Type)() -> A?
 ; CHECK: _TTSgS ---> _TTSgS
 ; CHECK: _TTSgSi ---> _TTSgSi
 ; CHECK: _TTSgSi_ ---> _TTSgSi_
 ; CHECK: _TTSgSi__ ---> _TTSgSi__
 ; CHECK: _TTSgSiS_ ---> _TTSgSiS_
 ; CHECK: _TTSgSi__xyz ---> _TTSgSi__xyz
-; CHECK: _TTSgSi___TTSgSi___TFSqCU__fMGSqQ__FT_GSqQ__ ---> _TTSgSi___TTSgSi___TFSqCU__fMGSqQ__FT_GSqQ__
-; CHECK: _TTSgVSs5UInt8___TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__ ---> specialization <Swift.UInt8> of specialize.XXX.init <A>(specialize.XXX<A>.Type)(t : A) -> specialize.XXX<A>
+; CHECK: _TTSgSi___TTSgSi___TFSqCU__fMGSqQ__FT_GSqQ__ ---> generic specialization <Swift.Int> of generic specialization <Swift.Int> of Swift.Optional.init <A>(A?.Type)() -> A?
+; CHECK: _TTSgVSs5UInt8___TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__ ---> generic specialization <Swift.UInt8> of specialize.XXX.init <A>(specialize.XXX<A>.Type)(t : A) -> specialize.XXX<A>
 ; CHECK: _TPA__TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_31 ---> partial apply forwarder for reabstraction thunk helper from @callee_owned (@owned Swift.String, @owned Swift.String) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.String, @in Swift.String) -> (@unowned Swift.Bool) with unmangled suffix "31"
 ; CHECK: _TsC4Meow5MyCls9subscriptFT1iSi_Sf ---> Meow.MyCls.subscript (i : Swift.Int) -> Swift.Float
 ; CHECK: _TF8manglingX22egbpdajGbuEbxfgehfvwxnFT_T_ ---> mangling.ليهمابتكلموشعربي؟ () -> ()
@@ -190,3 +190,7 @@
 ; CHECK: _TPA__TFFVSs11GeneratorOfcU__FMGS_Q__USs13GeneratorType__FQ_GS_Qd___U_FT_GSqQd___ ---> partial apply forwarder for Swift.GeneratorOf.(init <A>(Swift.GeneratorOf<A>.Type) -> <B : Swift.GeneratorType>(B) -> Swift.GeneratorOf<A>).(closure #1)
 ; CHECK: _TPA__TFFVSs10SequenceOfcU__FMGS_Q__USs13GeneratorType__FFT_Q_GS_Qd___U_FT_GVSs11GeneratorOfQd___ ---> partial apply forwarder for Swift.SequenceOf.(init <A>(Swift.SequenceOf<A>.Type) -> <B : Swift.GeneratorType>(() -> B) -> Swift.SequenceOf<A>).(closure #1)
 ; CHECK: _TPA__TFFVSs6SinkOfcU__FMGS_Q__USs8SinkType__FQ_GS_Qd___U_FQd__T_ ---> partial apply forwarder for Swift.SinkOf.(init <A>(Swift.SinkOf<A>.Type) -> <B : Swift.SinkType>(B) -> Swift.SinkOf<A>).(closure #1)
+; CHECK: _TTSfcl_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> function signature specialization <Arg[0] = Closure Propagated> of specgen.take_closure ((Swift.Int, Swift.Int) -> ()) -> ()
+; CHECK: _TTSfcluuXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXSi___TF7specgen12take_closureFFTSiSi_T_T_ ---> function signature specialization <Arg[0] = Closure Propagated> of specgen.take_closure ((Swift.Int, Swift.Int) -> ()) -> ()
+; CHECK: _TTSgSi___TTSfcluuXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXSi___TF7specgen12take_closureFFTSiSi_T_T_ ---> generic specialization <Swift.Int> of function signature specialization <Arg[0] = Closure Propagated> of specgen.take_closure ((Swift.Int, Swift.Int) -> ()) -> ()
+; CHECK: _TTSfcluuXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXSi___TTSgSi___TF7specgen12take_closureFFTSiSi_T_T_ ---> function signature specialization <Arg[0] = Closure Propagated> of generic specialization <Swift.Int> of specgen.take_closure ((Swift.Int, Swift.Int) -> ()) -> ()

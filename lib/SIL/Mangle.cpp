@@ -39,6 +39,10 @@
 using namespace swift;
 using namespace Mangle;
 
+//===----------------------------------------------------------------------===//
+//                           Generic Specialization
+//===----------------------------------------------------------------------===//
+
 static void mangleSubstitution(Mangler &M, Substitution Sub) {
   M.mangleType(Sub.getReplacement()->getCanonicalType(),
                ResilienceExpansion::Minimal, 0);
@@ -56,5 +60,72 @@ void GenericSpecializationMangler::mangleSpecialization() {
   for (auto &Sub : Subs) {
     mangleSubstitution(M, Sub);
     Buf << '_';
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                      Function Signature Optimizations
+//===----------------------------------------------------------------------===//
+
+FunctionSignatureSpecializationMangler::
+FunctionSignatureSpecializationMangler(Mangler &M, SILFunction *F)
+  : SpecializationMangler(SpecializationSourceKind::FunctionSignature, M, F) {
+  for (unsigned i : indices(F->getLoweredFunctionType()->getParameters())) {
+    (void)i;
+    Args.push_back({uint8_t(ArgumentModifier::Unmodified), nullptr});
+  }
+}
+
+void
+FunctionSignatureSpecializationMangler::
+setArgumentClosureProp(SILArgument *Arg, PartialApplyInst *PAI) {
+  assert(Arg->getFunction() == getFunction() && "Arg not from function");
+  auto &Info = Args[Arg->getIndex()];
+  Info.first |= uint8_t(ArgumentModifier::ClosureProp);
+  Info.second = PAI;
+}
+
+void FunctionSignatureSpecializationMangler::mangleSpecialization() {
+  Mangler &M = getMangler();
+  llvm::raw_ostream &os = getBuffer();
+
+  for (unsigned i : indices(Args)) {
+    uint8_t ArgMod;
+    NullablePtr<SILInstruction> Inst;
+
+    std::tie(ArgMod, Inst) = Args[i];
+    if (ArgMod == uint8_t(ArgumentModifier::Unmodified)) {
+      os << "n_";
+      continue;
+    }
+
+    if (ArgMod & uint8_t(ArgumentModifier::ClosureProp)) {
+      os << "cl";
+      auto *PAI = cast<PartialApplyInst>(Inst.get());
+
+      // Add in the partial applies function name if we can find one otherwise,
+      // we use a unique UUID since we need *some* name. Using the UUID means
+      // that the function with the specialized partial apply will be unique so
+      // we will have code size increases potentially, but it will be *correct*.
+      if (auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee())) {
+        os << FRI->getReferencedFunction()->getName();
+      } else {
+        llvm::SmallString<UUID::StringBufferSize> Str;
+        UUID::fromTime().toString(Str);
+        os << "uu" << Str;
+      }
+
+      // Then we mangle the types of the arguments that the partial apply is
+      // specializing.
+      for (auto &Op : PAI->getArgumentOperands()) {
+        SILType Ty = Op.get().getType();
+        M.mangleType(Ty.getSwiftRValueType(), ResilienceExpansion::Minimal, 0);
+      }
+
+      os << "_";
+      continue;
+    }
+
+    llvm_unreachable("unknown arg type");
   }
 }
