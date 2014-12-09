@@ -1472,7 +1472,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
       //    x = f()
       //    if condition {
       //      y = assumeNonNegative(x)
-      //    } else {
+      //    } else {
       //      // x might be negative here!
       //    }
       // For simplicity we just enforce that both the load and the builtin must
