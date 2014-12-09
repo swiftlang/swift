@@ -513,7 +513,7 @@ void LifetimeChecker::noteUninitializedMembers(const DIMemoryUse &Use) {
     if (i == TheMemory.NumElements-1 && TheMemory.isDerivedClassSelf())
       continue;
 
-    std::string Name = "self";
+    std::string Name;
     auto *Decl = TheMemory.getPathStringToElement(i, Name);
     SILLocation Loc = Use.Inst->getLoc();
 
@@ -552,17 +552,12 @@ std::string LifetimeChecker::getUninitElementName(const DIMemoryUse &Use) {
 
   // If the definition is a declaration, try to reconstruct a name and
   // optionally an access path to the uninitialized element.
-  std::string Name;
-  if (ValueDecl *VD =
-        dyn_cast_or_null<ValueDecl>(TheMemory.getLoc().getAsASTNode<Decl>()))
-    Name = VD->getName().str();
-  else
-    Name = "<unknown>";
-
+  //
   // TODO: Given that we know the range of elements being accessed, we don't
   // need to go all the way deep into a recursive tuple here.  We could print
   // an error about "v" instead of "v.0" when "v" has tuple type and the whole
   // thing is accessed inappropriately.
+  std::string Name;
   TheMemory.getPathStringToElement(FirstUndefElement, Name);
 
   return Name;
@@ -751,15 +746,13 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
   // If this is a store to a 'let' property in an initializer, then we only
   // allow the assignment if the property was completely uninitialized.
   // Overwrites are not permitted.
-  if (TheMemory.IsSelfOfNonDelegatingInitializer &&
-      (InstInfo.Kind == DIUseKind::PartialStore || !isFullyUninitialized)) {
-
+  if (InstInfo.Kind == DIUseKind::PartialStore || !isFullyUninitialized) {
     for (unsigned i = InstInfo.FirstElement, e = i+InstInfo.NumElements;
          i != e; ++i) {
       if (Liveness.get(i) == DIKind::No || !TheMemory.isElementLetProperty(i))
         continue;
 
-      std::string PropertyName = "self";
+      std::string PropertyName;
       auto *VD = TheMemory.getPathStringToElement(i, PropertyName);
       diagnose(Module, InstInfo.Inst->getLoc(),
                diag::immutable_property_already_initialized, PropertyName);
@@ -813,18 +806,16 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
   // One additional check: 'let' properties may never be passed inout, because
   // they are only allowed to have their initial value set, not a subsequent
   // overwrite.
-  if (TheMemory.IsSelfOfNonDelegatingInitializer) {
-    for (unsigned i = Use.FirstElement, e = i+Use.NumElements;
-         i != e; ++i) {
-      if (!TheMemory.isElementLetProperty(i))
-        continue;
+  for (unsigned i = Use.FirstElement, e = i+Use.NumElements;
+       i != e; ++i) {
+    if (!TheMemory.isElementLetProperty(i))
+      continue;
 
-      std::string PropertyName = "self";
-      (void)TheMemory.getPathStringToElement(i, PropertyName);
-      diagnose(Module, Use.Inst->getLoc(),
-               diag::immutable_property_passed_inout, PropertyName);
-      return;
-    }
+    std::string PropertyName;
+    (void)TheMemory.getPathStringToElement(i, PropertyName);
+    diagnose(Module, Use.Inst->getLoc(),
+             diag::immutable_property_passed_inout, PropertyName);
+    return;
   }
 }
 

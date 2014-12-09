@@ -583,7 +583,7 @@ struct MarkPatternUninitialized
 
   void visitNamedPattern(NamedPattern *P) {
     VarDecl *var = P->getDecl();
-    if ((!var->hasStorage()) || (var->isDebuggerVar()))
+    if (!var->hasStorage() || var->isDebuggerVar())
       return;
 
     // Emit a mark_uninitialized for the variable's storage, and fix up the

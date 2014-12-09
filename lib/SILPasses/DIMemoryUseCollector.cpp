@@ -67,6 +67,12 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
     // want to process the stored members of the struct/class elementwise.
     if (isAnyInitSelf() && !isEnumInitSelf() && !isDelegatingInit())
       IsSelfOfNonDelegatingInitializer = true;
+
+    // If this is a let variable we're initializing, remember this so we don't
+    // allow reassignment.
+    if (MUI->isVar())
+      if (auto *decl = MUI->getLoc().getAsASTNode<VarDecl>())
+        IsLet = decl->isLet();
   }
   
   // Compute the number of elements to track in this memory object.
@@ -201,11 +207,9 @@ emitElementAddress(unsigned EltNo, SILLocation Loc, SILBuilder &B) const {
 
 /// Push the symbolic path name to the specified element number onto the
 /// specified std::string.
-static ValueDecl *getPathStringToElementRec(CanType T, unsigned EltNo,
-                                          bool IsSelfOfNonDelegatingInitializer,
-                                            std::string &Result) {
+static void getPathStringToElementRec(CanType T, unsigned EltNo,
+                                      std::string &Result) {
   if (CanTupleType TT = dyn_cast<TupleType>(T)) {
-    assert(!IsSelfOfNonDelegatingInitializer && "self never has tuple type");
     unsigned FieldNo = 0;
     for (auto &Field : TT->getFields()) {
       CanType FieldTy = Field.getType()->getCanonicalType();
@@ -217,7 +221,7 @@ static ValueDecl *getPathStringToElementRec(CanType T, unsigned EltNo,
           Result += Field.getName().str();
         else
           Result += llvm::utostr(FieldNo);
-        return getPathStringToElementRec(FieldTy, EltNo, false, Result);
+        return getPathStringToElementRec(FieldTy, EltNo, Result);
       }
       
       EltNo -= NumFieldElements;
@@ -227,38 +231,55 @@ static ValueDecl *getPathStringToElementRec(CanType T, unsigned EltNo,
     llvm_unreachable("Element number is out of range for this type!");
   }
 
-  // If this is indexing into a field of 'self', look it up.
-  if (IsSelfOfNonDelegatingInitializer) {
-    auto *NTD = cast<NominalTypeDecl>(T->getAnyNominal());
-    for (auto *VD : NTD->getStoredProperties()) {
-      auto FieldType = VD->getType()->getCanonicalType();
-      unsigned NumFieldElements = getElementCountRec(FieldType, false);
-      if (EltNo < NumFieldElements) {
-        Result += '.';
-        Result += VD->getName().str();
-        getPathStringToElementRec(FieldType, EltNo, false, Result);
-        return VD;
-      }
-      EltNo -= NumFieldElements;
-    }
-  }
-
   // Otherwise, there are no subelements.
   assert(EltNo == 0 && "Element count problem");
-  return nullptr;
 }
 
 ValueDecl *DIMemoryObjectInfo::
 getPathStringToElement(unsigned Element, std::string &Result) const {
-  return getPathStringToElementRec(getType(), Element,
-                                   IsSelfOfNonDelegatingInitializer, Result);
+  if (isAnyInitSelf())
+    Result = "self";
+  else if (ValueDecl *VD =
+        dyn_cast_or_null<ValueDecl>(getLoc().getAsASTNode<Decl>()))
+    Result = VD->getName().str();
+  else
+    Result = "<unknown>";
+
+
+  // If this is indexing into a field of 'self', look it up.
+  if (IsSelfOfNonDelegatingInitializer) {
+    auto *NTD = cast<NominalTypeDecl>(getType()->getAnyNominal());
+    for (auto *VD : NTD->getStoredProperties()) {
+      auto FieldType = VD->getType()->getCanonicalType();
+      unsigned NumFieldElements = getElementCountRec(FieldType, false);
+      if (Element < NumFieldElements) {
+        Result += '.';
+        Result += VD->getName().str();
+        getPathStringToElementRec(FieldType, Element, Result);
+        return VD;
+      }
+      Element -= NumFieldElements;
+    }
+  }
+
+  // Get the path through a tuple, if relevant.
+  getPathStringToElementRec(getType(), Element, Result);
+
+  // If we are analyzing a variable, we can generally get the decl associated
+  // with it.
+  if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
+    if (MUI->isVar())
+      return MUI->getLoc().getAsASTNode<VarDecl>();
+
+  // Otherwise, we can't.
+  return nullptr;
 }
 
 /// If the specified value is a 'let' property in an initializer, return true.
 bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
   // If we aren't representing 'self' in a non-delegating initializer, then we
   // can't have 'let' properties.
-  if (!IsSelfOfNonDelegatingInitializer) return false;
+  if (!IsSelfOfNonDelegatingInitializer) return IsLet;
 
   auto *NTD = cast<NominalTypeDecl>(getType()->getAnyNominal());
   for (auto *VD : NTD->getStoredProperties()) {
