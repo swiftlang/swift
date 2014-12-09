@@ -93,7 +93,7 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
   } else {
     installCommonValueWitnesses(vwtable);
   }
-                       
+
   // If the payload has extra inhabitants left over after the ones we used,
   // forward them as our own.
   if (unusedExtraInhabitants > 0) {
@@ -105,8 +105,8 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
 
 int
 swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
-                                       const Metadata *payload,
-                                       unsigned emptyCases) {
+                                      const Metadata *payload,
+                                      unsigned emptyCases) {
   auto *payloadWitnesses = payload->getValueWitnesses();
   auto payloadSize = payloadWitnesses->getSize();
   auto payloadNumExtraInhabitants = payloadWitnesses->getNumExtraInhabitants();
@@ -119,14 +119,14 @@ swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
     // FIXME: endianness
     memcpy(&extraTagBits, extraTagBitAddr,
            getNumTagBytes(payloadSize, emptyCases-payloadNumExtraInhabitants));
-    
+
     // If the extra tag bits are zero, we have a valid payload or
     // extra inhabitant (checked below). If nonzero, form the case index from
     // the extra tag value and the value stored in the payload.
     if (extraTagBits > 0) {
       unsigned caseIndexFromExtraTagBits = payloadSize >= 4
         ? 0 : (extraTagBits - 1U) << (payloadSize*8U);
-      
+
       // In practice we should need no more than four bytes from the payload
       // area.
       // FIXME: endianness.
@@ -137,14 +137,14 @@ swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
         + payloadNumExtraInhabitants;
     }
   }
-  
+
   // If there are extra inhabitants, see whether the payload is valid.
   if (payloadNumExtraInhabitants > 0) {
     return
       static_cast<const ExtraInhabitantsValueWitnessTable*>(payloadWitnesses)
-        ->getExtraInhabitantIndex(value, payload);
+      ->getExtraInhabitantIndex(value, payload);
   }
-  
+
   // Otherwise, we have always have a valid payload.
   return -1;
 }
