@@ -133,6 +133,17 @@ class DeadFunctionElimination {
     }
   }
   
+  /// Retrieve the visiblity information from the AST accessibility.
+  bool isVisibleExternally(Accessibility accessibility) {
+    SILLinkage linkage;
+    switch (accessibility) {
+      case Accessibility::Private: linkage = SILLinkage::Private; break;
+      case Accessibility::Internal: linkage = SILLinkage::Hidden; break;
+      case Accessibility::Public: linkage = SILLinkage::Public; break;
+    }
+    return isPossiblyUsedExternally(linkage, Module->isWholeModule());
+  }
+  
   /// Find all functions which are alive from the beginning.
   /// For example, functions which may be referenced externally.
   void findAnchors() {
@@ -154,6 +165,10 @@ class DeadFunctionElimination {
             // A conservative approach: if any of the overridden functions is
             // visible externally, we mark the whole method as alive.
             || isPossiblyUsedExternally(F->getLinkage(), Module->isWholeModule())
+            // We also have to check the method declaration's accessibility.
+            // Needed if it's a public base method declared in another
+            // compilation unit (for this we have no SILFunction).
+            || isVisibleExternally(fd->getAccessibility())
             // Declarations are always accessible externally, so they are alive.
             || !F->isDefinition()) {
           ensureAlive(mi);
