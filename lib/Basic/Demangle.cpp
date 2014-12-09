@@ -265,20 +265,23 @@ public:
       return failure();
     if (Mangled.slice(2) != "_T")
       return failure();
+
     if (Mangled.hasAtLeast(4) && Mangled.slice(4) == "_TTS") {
-      Mangled.advanceOffset(4);
-      auto attr = demangleSpecializedAttribute();
-      if (!attr)
-        return failure();
-      if (!Mangled.hasAtLeast(2) || Mangled.slice(2) != "_T")
-        return failure();
-      Mangled.advanceOffset(2);
-      appendNode(attr);
-      // The Substitution header does not share state with the rest of the
-      // mangling.
-      Substitutions.clear();
-      ArchetypeCounts.clear();
-      ArchetypeCount = 0;
+      do {
+        Mangled.advanceOffset(4);
+        auto attr = demangleSpecializedAttribute();
+        if (!attr)
+          return failure();
+        if (!Mangled.hasAtLeast(2) || Mangled.slice(2) != "_T")
+          return failure();
+        Mangled.advanceOffset(2);
+        appendNode(attr);
+        // The Substitution header does not share state with the rest of the
+        // mangling.
+        Substitutions.clear();
+        ArchetypeCounts.clear();
+        ArchetypeCount = 0;
+      } while (Mangled.hasAtLeast(4) && Mangled.slice(4) == "_TTS");
     } else if (Mangled.hasAtLeast(4) && Mangled.slice(4) == "_TTo") {
       Mangled.advanceOffset(4);
       appendNode(Node::Kind::ObjCAttribute);
@@ -687,7 +690,7 @@ private:
     return demangleEntity();
   }
 
-  NodePointer demangleSpecializedAttribute() {
+  NodePointer demangleGenericSpecialization() {
     auto specialization = NodeFactory::create(Node::Kind::SpecializedAttribute);
     while (!Mangled.nextIf('_')) {
       NodePointer param = NodeFactory::create(Node::Kind::SpecializationParam);
@@ -704,6 +707,15 @@ private:
       specialization->addChild(param);
     }
     return specialization;
+  }
+
+  NodePointer demangleSpecializedAttribute() {
+    if (Mangled.nextIf("g"))
+      return demangleGenericSpecialization();
+
+    // For now just return a specialized attribute if we don't know what we are
+    // demangling. We will assert in a later commit.
+    return NodeFactory::create(Node::Kind::SpecializedAttribute);
   }
   
   NodePointer demangleDeclName() {

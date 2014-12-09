@@ -25,7 +25,7 @@ bb0:
   %6 = function_ref @_TTRXFo_dSi_dT__XFo_iSi_dT__ : $@thin (@in Int, @owned @callee_owned (Int) -> ()) -> () // user: %7
   %7 = partial_apply %6(%5) : $@thin (@in Int, @owned @callee_owned (Int) -> ()) -> () // user: %9
   // function_ref specialization <Swift.Int> of capturep.generic <A>(A, (A) -> ()) -> ()
-  %8 = function_ref @_TTSSi___TF8capturep7genericU__FTQ_FQ_T__T_ : $@thin (@in Int, @owned @callee_owned (@in Int) -> ()) -> () // user: %9
+  %8 = function_ref @_TTSgSi___TF8capturep7genericU__FTQ_FQ_T__T_ : $@thin (@in Int, @owned @callee_owned (@in Int) -> ()) -> () // user: %9
   %9 = apply %8(%0#1, %7) : $@thin (@in Int, @owned @callee_owned (@in Int) -> ()) -> ()
 
   %11 = thin_to_thick_function %4 : $@thin (Int) -> () to $@callee_owned (Int) -> () // user: %7
@@ -56,7 +56,7 @@ bb0(%0 : $*Int, %1 : $@callee_owned (Int) -> ()):
 }
 
 // specialization <Swift.Int> of capturep.generic <A>(A, (A) -> ()) -> ()
-sil shared [noinline] @_TTSSi___TF8capturep7genericU__FTQ_FQ_T__T_ : $@thin (@in Int, @owned @callee_owned (@in Int) -> ()) -> () {
+sil shared [noinline] @_TTSgSi___TF8capturep7genericU__FTQ_FQ_T__T_ : $@thin (@in Int, @owned @callee_owned (@in Int) -> ()) -> () {
 bb0(%0 : $*Int, %1 : $@callee_owned (@in Int) -> ()):
   %2 = alloc_stack $Int                           // users: %4, %5, %6
   %3 = load %0 : $*Int                            // user: %4

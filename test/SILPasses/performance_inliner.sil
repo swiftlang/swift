@@ -883,7 +883,7 @@ bb0(%0 : $*C, %1 : $Bool):
 }
 
 // Specialized call to "slowPath" for use in @coldcall_caller
-sil shared [noinline] [transparent] [semantics "slowpath"] @_TTSSbSbSs11BooleanType___TFSs9_slowPathUSs11BooleanType__FQ_Sb : $@thin (@in Bool) -> Bool {
+sil shared [noinline] [transparent] [semantics "slowpath"] @_TTSgSbSbSs11BooleanType___TFSs9_slowPathUSs11BooleanType__FQ_Sb : $@thin (@in Bool) -> Bool {
 bb0(%0 : $*Bool):
   %3 = integer_literal $Builtin.Int1, 0
   %4 = struct $Bool (%3 : $Builtin.Int1)
@@ -906,7 +906,7 @@ bb0(%0 : $Int):
   %5 = builtin "cmp_eq_Word"(%4 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1 // user: %6
   %6 = struct $Bool (%5 : $Builtin.Int1)          // user: %7
   store %6 to %1#1 : $*Bool                       // id: %7
-  %8 = function_ref @_TTSSbSbSs11BooleanType___TFSs9_slowPathUSs11BooleanType__FQ_Sb : $@thin (@in Bool) -> Bool // user: %9
+  %8 = function_ref @_TTSgSbSbSs11BooleanType___TFSs9_slowPathUSs11BooleanType__FQ_Sb : $@thin (@in Bool) -> Bool // user: %9
   %9 = apply [transparent] %8(%1#1) : $@thin (@in Bool) -> Bool // user: %10
   %10 = struct_extract %9 : $Bool, #Bool.value    // user: %12
   dealloc_stack %1#0 : $*@local_storage Bool      // id: %11

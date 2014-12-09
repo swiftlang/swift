@@ -160,18 +160,18 @@
 ; CHECK: _TFCSo1Ae ---> ObjectiveC.A.__ivar_initializer
 ; CHECK: _TTWC13call_protocol1CS_1PS_FS1_3fooU_fRQPS1_FT_Si ---> protocol witness for call_protocol.P.foo (inout call_protocol.P.Self)() -> Swift.Int in conformance call_protocol.C : call_protocol.P in call_protocol
 ; CHECK: _TFC12dynamic_self1X1ffDS0_FT_DS0_ ---> dynamic_self.X.f (Self)() -> Self
-; CHECK: _TTSSi___TFSqCU__fMGSqQ__FT_GSqQ__ ---> specialization <Swift.Int> of Swift.Optional.init <A>(A?.Type)() -> A?
-; CHECK: _TTSSiSiSs3FooSs_Sf___TFSqCU__fMGSqQ__FT_GSqQ__ ---> specialization <Swift.Int with Swift.Int : Swift.Foo in Swift, Swift.Float> of Swift.Optional.init <A>(A?.Type)() -> A?
-; CHECK: _TTSSi_Sf___TFSqCU__fMGSqQ__FT_GSqQ__ ---> specialization <Swift.Int, Swift.Float> of Swift.Optional.init <A>(A?.Type)() -> A?
-; CHECK: _TTSSi_Sf___TFSqCU__fMGSqQ__FT_GSqQ__ ---> specialization <Swift.Int, Swift.Float> of Swift.Optional.init <A>(A?.Type)() -> A?
-; CHECK: _TTSS ---> _TTSS
-; CHECK: _TTSSi ---> _TTSSi
-; CHECK: _TTSSi_ ---> _TTSSi_
-; CHECK: _TTSSi__ ---> _TTSSi__
-; CHECK: _TTSSiS_ ---> _TTSSiS_
-; CHECK: _TTSSi__xyz ---> _TTSSi__xyz
-; CHECK: _TTSSi___TTSSi___TFSqCU__fMGSqQ__FT_GSqQ__ ---> _TTSSi___TTSSi___TFSqCU__fMGSqQ__FT_GSqQ__
-; CHECK: _TTSVSs5UInt8___TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__ ---> specialization <Swift.UInt8> of specialize.XXX.init <A>(specialize.XXX<A>.Type)(t : A) -> specialize.XXX<A>
+; CHECK: _TTSgSi___TFSqCU__fMGSqQ__FT_GSqQ__ ---> specialization <Swift.Int> of Swift.Optional.init <A>(A?.Type)() -> A?
+; CHECK: _TTSgSiSiSs3FooSs_Sf___TFSqCU__fMGSqQ__FT_GSqQ__ ---> specialization <Swift.Int with Swift.Int : Swift.Foo in Swift, Swift.Float> of Swift.Optional.init <A>(A?.Type)() -> A?
+; CHECK: _TTSgSi_Sf___TFSqCU__fMGSqQ__FT_GSqQ__ ---> specialization <Swift.Int, Swift.Float> of Swift.Optional.init <A>(A?.Type)() -> A?
+; CHECK: _TTSgSi_Sf___TFSqCU__fMGSqQ__FT_GSqQ__ ---> specialization <Swift.Int, Swift.Float> of Swift.Optional.init <A>(A?.Type)() -> A?
+; CHECK: _TTSgS ---> _TTSgS
+; CHECK: _TTSgSi ---> _TTSgSi
+; CHECK: _TTSgSi_ ---> _TTSgSi_
+; CHECK: _TTSgSi__ ---> _TTSgSi__
+; CHECK: _TTSgSiS_ ---> _TTSgSiS_
+; CHECK: _TTSgSi__xyz ---> _TTSgSi__xyz
+; CHECK: _TTSgSi___TTSgSi___TFSqCU__fMGSqQ__FT_GSqQ__ ---> _TTSgSi___TTSgSi___TFSqCU__fMGSqQ__FT_GSqQ__
+; CHECK: _TTSgVSs5UInt8___TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__ ---> specialization <Swift.UInt8> of specialize.XXX.init <A>(specialize.XXX<A>.Type)(t : A) -> specialize.XXX<A>
 ; CHECK: _TPA__TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_31 ---> partial apply forwarder for reabstraction thunk helper from @callee_owned (@owned Swift.String, @owned Swift.String) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.String, @in Swift.String) -> (@unowned Swift.Bool) with unmangled suffix "31"
 ; CHECK: _TsC4Meow5MyCls9subscriptFT1iSi_Sf ---> Meow.MyCls.subscript (i : Swift.Int) -> Swift.Float
 ; CHECK: _TF8manglingX22egbpdajGbuEbxfgehfvwxnFT_T_ ---> mangling.ليهمابتكلموشعربي؟ () -> ()

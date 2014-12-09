@@ -11,17 +11,18 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "specialization"
+#include "swift/SILPasses/Passes.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/Mangle.h"
+#include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
-#include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
-#include "swift/AST/ASTContext.h"
-#include "swift/AST/Mangle.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSet.h"
@@ -308,25 +309,10 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
     llvm::SmallString<64> ClonedName;
     {
       llvm::raw_svector_ostream buffer(ClonedName);
-      buffer << "_TTS";
-
-      Mangle::Mangler mangle(buffer);
-
-      for (auto &Sub : Bucket[0]->getSubstitutions()) {
-        DEBUG(llvm::dbgs() << "  Replacement Type: ";
-              Sub.getReplacement()->getCanonicalType().dump());
-        mangle.mangleType(Sub.getReplacement()->getCanonicalType(),
-                          ResilienceExpansion::Minimal, 0);
-        for (auto C : Sub.getConformances()) {
-          if (!C)
-            goto null_conformances;
-          mangle.mangleProtocolConformance(C);
-        }
-      null_conformances:;
-        buffer << '_';
-      }
-
-      buffer << '_' << F->getName();
+      ArrayRef<Substitution> Subs = Bucket[0]->getSubstitutions();
+      Mangle::Mangler M(buffer);
+      Mangle::GenericSpecializationMangler Mangler(M, F, Subs);
+      Mangler.mangle();
     }
 
     SILFunction *NewF;

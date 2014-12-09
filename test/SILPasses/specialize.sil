@@ -7,10 +7,10 @@ import Swift
 
 // CHECK-LABEL: sil @_TF10specialize4exp1FT_T_ : $@thin () -> () {
 // CHECK-NOT: apply
-// CHECK: [[CTOR:%[0-9]+]] = function_ref @_TTSSi___TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__
+// CHECK: [[CTOR:%[0-9]+]] = function_ref @_TTSgSi___TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__
 // CHECK: apply [[CTOR]]
 // CHECK: [[ACCEPTS_INT:%[0-9]+]] = function_ref @_TF10specialize10acceptsIntFSiT_
-// CHECK: [[FOO:%[0-9]+]] = function_ref @_TTSSi___TFV10specialize3XXX3fooU__fRGS0_Q__FT1tQ__Si
+// CHECK: [[FOO:%[0-9]+]] = function_ref @_TTSgSi___TFV10specialize3XXX3fooU__fRGS0_Q__FT1tQ__Si
 // CHECK: apply [[FOO]]
 // CHECK: apply [[ACCEPTS_INT]]
 // CHECK: return

@@ -19,6 +19,7 @@
 #include "swift/AST/ResilienceExpansion.h"
 
 namespace swift {
+
 class AbstractClosureExpr;
 
 namespace Mangle {
@@ -31,6 +32,9 @@ enum class OperatorFixity {
   Prefix,
   Postfix
 };
+
+/// Defined in include/swift/SIL/Mangle.h
+class SpecializationManglerBase;
   
 /// A class for mangling declarations.
 class Mangler {
@@ -48,6 +52,8 @@ class Mangler {
   bool DWARFMangling;
   /// If enabled, non-ASCII names are encoded in modified Punycode.
   bool UsePunycode;
+
+  friend class SpecializationManglerBase;
 
 public:
   /// If set, private declarations will be mangled with a discriminator.

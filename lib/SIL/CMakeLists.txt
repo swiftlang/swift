@@ -23,6 +23,7 @@ add_swift_library(swiftSIL
   SILDeclRef.cpp
   LoopInfo.cpp
   Projection.cpp
+  Mangle.cpp
   DEPENDS swiftAST swiftSerialization)
 
 # Clang dependencies.

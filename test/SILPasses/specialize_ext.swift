@@ -17,4 +17,4 @@ func exp1() {
   J.bar(3)
 }
 //Make sure that we are able to specialize the extension 'bar'
-//CHECK: sil shared @_TTSSi___TFV14specialize_ext3XXX3barU__fRGS0_Q__FQ_T_
+//CHECK: sil shared @_TTSgSi___TFV14specialize_ext3XXX3barU__fRGS0_Q__FQ_T_
