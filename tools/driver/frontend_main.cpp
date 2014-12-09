@@ -491,6 +491,20 @@ int frontend_main(ArrayRef<const char *>Args,
   if (Invocation.parseArgs(Args, Instance.getDiags())) {
     return 1;
   }
+
+  if (Invocation.getFrontendOptions().PrintHelp ||
+      Invocation.getFrontendOptions().PrintHelpHidden) {
+    unsigned IncludedFlagsBitmask = options::FrontendOption;
+    unsigned ExcludedFlagsBitmask =
+      Invocation.getFrontendOptions().PrintHelpHidden ? 0 :
+                                                        llvm::opt::HelpHidden;
+    std::unique_ptr<llvm::opt::OptTable> Options(createSwiftOptTable());
+    Options->PrintHelp(llvm::outs(), displayName(MainExecutablePath).c_str(),
+                       "Swift frontend", IncludedFlagsBitmask,
+                       ExcludedFlagsBitmask);
+    return 0;
+  }
+
   if (Invocation.getFrontendOptions().RequestedAction ==
         FrontendOptions::NoneAction) {
     Instance.getDiags().diagnose(SourceLoc(),
@@ -529,19 +543,6 @@ int frontend_main(ArrayRef<const char *>Args,
 
   if (Invocation.getDiagnosticOptions().UseColor)
     PDC.forceColors();
-
-  if (Invocation.getFrontendOptions().PrintHelp ||
-      Invocation.getFrontendOptions().PrintHelpHidden) {
-    unsigned IncludedFlagsBitmask = options::FrontendOption;
-    unsigned ExcludedFlagsBitmask =
-      Invocation.getFrontendOptions().PrintHelpHidden ? 0 :
-                                                        llvm::opt::HelpHidden;
-    std::unique_ptr<llvm::opt::OptTable> Options(createSwiftOptTable());
-    Options->PrintHelp(llvm::outs(), displayName(MainExecutablePath).c_str(),
-                       "Swift frontend", IncludedFlagsBitmask,
-                       ExcludedFlagsBitmask);
-    return 0;
-  }
 
   if (Invocation.getFrontendOptions().PrintStats) {
     llvm::EnableStatistics();
