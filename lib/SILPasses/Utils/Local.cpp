@@ -357,7 +357,7 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() {
 
   auto Kind =
       llvm::StringSwitch<ArrayCallKind>(F->getSemanticsString())
-          .Case("array.props.isCocoa", ArrayCallKind::kArrayPropsIsCocoa)
+          .Case("array.props.isNative", ArrayCallKind::kArrayPropsIsNative)
           .Case("array.props.needsElementTypeCheck",
                 ArrayCallKind::kArrayPropsNeedsTypeCheck)
           .Case("array.init", ArrayCallKind::kArrayInit)
@@ -422,7 +422,7 @@ bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
     break;
 
   case ArrayCallKind::kCheckIndex:
-  case ArrayCallKind::kArrayPropsIsCocoa:
+  case ArrayCallKind::kArrayPropsIsNative:
   case ArrayCallKind::kArrayPropsNeedsTypeCheck:
   case ArrayCallKind::kGetElementAddress:
     return canHoistArrayArgument(getSelf(), InsertBefore, DT);
@@ -430,17 +430,17 @@ bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
   case ArrayCallKind::kCheckSubscript:
   case ArrayCallKind::kGetElement: {
     if (HaveArrayProperty) {
-      auto IsCocoaArg = getArrayPropertyIsCocoa();
-      ArraySemanticsCall IsCocoa(IsCocoaArg.getDef(),
-                                 "array.props.isCocoa", true);
-      if (!IsCocoa) {
+      auto IsNativeArg = getArrayPropertyIsNative();
+      ArraySemanticsCall IsNative(IsNativeArg.getDef(),
+                                 "array.props.isNative", true);
+      if (!IsNative) {
         // Do we have a constant parameter?
-        auto *SI = dyn_cast<StructInst>(IsCocoaArg);
+        auto *SI = dyn_cast<StructInst>(IsNativeArg);
         if (!SI)
           return false;
         if (!isa<IntegerLiteralInst>(SI->getOperand(0)))
           return false;
-      } else if(!IsCocoa.canHoist(InsertBefore, DT))
+      } else if(!IsNative.canHoist(InsertBefore, DT))
         // Otherwise, we must be able to hoist the function call.
         return false;
 
@@ -510,7 +510,7 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
                                                   bool LeaveOriginal) {
   auto Kind = getKind();
   switch (Kind) {
-  case ArrayCallKind::kArrayPropsIsCocoa:
+  case ArrayCallKind::kArrayPropsIsNative:
   case ArrayCallKind::kArrayPropsNeedsTypeCheck: {
     auto Self = getSelf();
     // Emit matching release if we are removing the original call.
@@ -550,14 +550,14 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
     SILValue NewArrayProps;
     if (HaveArrayProperty && Kind == ArrayCallKind::kCheckSubscript) {
       // Copy the array.props argument call.
-      auto IsCocoaArg = getArrayPropertyIsCocoa();
-      ArraySemanticsCall IsCocoa(IsCocoaArg.getDef(), "array.props.isCocoa",
+      auto IsNativeArg = getArrayPropertyIsNative();
+      ArraySemanticsCall IsNative(IsNativeArg.getDef(), "array.props.isNative",
                                  true);
-      if (!IsCocoa) {
+      if (!IsNative) {
         // Do we have a constant parameter?
-        auto *SI = dyn_cast<StructInst>(IsCocoaArg);
+        auto *SI = dyn_cast<StructInst>(IsNativeArg);
         assert(SI && isa<IntegerLiteralInst>(SI->getOperand(0)) &&
-               "Must have a constant parameter or an array.props.isCocoa call "
+               "Must have a constant parameter or an array.props.isNative call "
                "as argument");
         SI->moveBefore(
             DT->findNearestCommonDominator(InsertBefore->getParent(),
@@ -567,7 +567,7 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
             DT->findNearestCommonDominator(InsertBefore->getParent(),
                                            IL->getParent())->begin());
       } else {
-        NewArrayProps = IsCocoa.copyTo(InsertBefore, DT);
+        NewArrayProps = IsNative.copyTo(InsertBefore, DT);
       }
     }
 
@@ -614,7 +614,7 @@ static bool hasArrayPropertyNeedsTypeCheck(ArrayCallKind Kind,
   }
   return false;
 }
-static bool hasArrayPropertyIsCocoa(ArrayCallKind Kind, unsigned &ArgIdx) {
+static bool hasArrayPropertyIsNative(ArrayCallKind Kind, unsigned &ArgIdx) {
   switch (Kind) {
   default: break;
 
@@ -626,9 +626,9 @@ static bool hasArrayPropertyIsCocoa(ArrayCallKind Kind, unsigned &ArgIdx) {
   return false;
 }
 
-SILValue swift::ArraySemanticsCall::getArrayPropertyIsCocoa() {
+SILValue swift::ArraySemanticsCall::getArrayPropertyIsNative() {
   unsigned ArgIdx = 0;
-  bool HasArg = hasArrayPropertyIsCocoa(getKind(), ArgIdx);
+  bool HasArg = hasArrayPropertyIsNative(getKind(), ArgIdx);
   (void)HasArg;
   assert(HasArg &&
          "Must have an array.props argument");

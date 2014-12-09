@@ -101,7 +101,7 @@ namespace swift {
   /// of the called function.
   enum class ArrayCallKind {
     kNone = 0,
-    kArrayPropsIsCocoa,
+    kArrayPropsIsNative,
     kArrayPropsNeedsTypeCheck,
     kCheckSubscript,
     kCheckIndex,
@@ -142,8 +142,8 @@ namespace swift {
     /// Get the index for operations that have one.
     SILValue getIndex();
 
-    /// Get the array.props.isCocoa argument.
-    SILValue getArrayPropertyIsCocoa();
+    /// Get the array.props.isNative argument.
+    SILValue getArrayPropertyIsNative();
 
     /// Get the array.props.needsElementTypeCheck argument.
     SILValue getArrayPropertyNeedsTypeCheck();

@@ -666,21 +666,21 @@ SILTransform *swift::createCOWArrayOpts() {
 
 namespace {
 /// This optimization specializes loops with calls to
-/// "array.props.isCocoa/needsElementTypeCheck".
+/// "array.props.isNative/needsElementTypeCheck".
 ///
-/// The "array.props.read/needsElementTypeCheck" predicate has the property that
-/// if it is false for the array struct it is false until somebody writes a new
-/// array struct over the memory location. Less abstractly, a fast native swift
-/// array does not transition to a slow array (be it a cocoa array, or be it an
-/// array that needs type checking) except if we store a new array to the
-/// variable that holds it.
+/// The "array.props.isNative/needsElementTypeCheck" predicate has the property
+/// that if it is true/false respectively for the array struct it is true/false
+/// respectively until somebody writes a new array struct over the memory
+/// location. Less abstractly, a fast native swift array does not transition to
+/// a slow array (be it a cocoa array, or be it an array that needs type
+/// checking) except if we store a new array to the variable that holds it.
 ///
 /// Using this property we can hoist the predicate above a region where no such
 /// store can take place.
 ///
 ///  func f(a : A[AClass]) {
 ///     for i in 0..a.count {
-///       let b = a.props.isCocoa()
+///       let b = a.props.isNative()
 ///        .. += _getElement(i, b)
 ///     }
 ///  }
@@ -688,14 +688,14 @@ namespace {
 ///   ==>
 ///
 ///  func f(a : A[AClass]) {
-///    let b = a.props.isCocoa
-///    if (!b) {
+///    let b = a.props.isNative
+///    if (b) {
 ///      for i in 0..a.count {
 ///         .. += _getElement(i, false)
 ///      }
 ///    } else {
 ///      for i in 0..a.count {
-///        let a = a.props.read
+///        let a = a.props.isNative
 ///        .. += _getElement(i, a)
 ///      }
 ///    }
@@ -1224,7 +1224,7 @@ static SILValue createNot(SILBuilder &B, SILLocation Loc, SILValue Opd1) {
 }
 
 /// Create a check over all array.props calls that they have the 'fast native
-/// swift' array value: !isCocoa && !needsElementTypeCheck must be true.
+/// swift' array value: isNative && !needsElementTypeCheck must be true.
 static SILValue
 createFastNativeArraysCheck(SmallVectorImpl<ArraySemanticsCall> &ArrayProps,
                             SILBuilder &B) {
@@ -1237,8 +1237,10 @@ createFastNativeArraysCheck(SmallVectorImpl<ArraySemanticsCall> &ArrayProps,
   for (auto Call : ArrayProps) {
     auto Loc = (*Call).getLoc();
     auto Val = createStructExtract(B, Loc, SILValue(Call, 0), 0);
-
-    Result = createAnd(B, Loc, Result, createNot(B, Loc, Val));
+    if (Call.getKind() == ArrayCallKind::kArrayPropsNeedsTypeCheck)
+      Result = createAnd(B, Loc, Result, createNot(B, Loc, Val));
+    if (Call.getKind() == ArrayCallKind::kArrayPropsIsNative)
+      Result = createAnd(B, Loc, Result, Val);
   }
   return Result;
 }
@@ -1265,18 +1267,24 @@ static void collectArrayPropsCalls(
 }
 
 /// Replace an array.props call by the 'fast swift array' value.
+///
+/// This is true for array.props.isNative and false for
+/// array.props.needsElementTypeCheck.
 static void replaceArrayPropsCall(SILBuilder &B, ArraySemanticsCall C) {
-  assert(C.getKind() == ArrayCallKind::kArrayPropsIsCocoa ||
-         C.getKind() == ArrayCallKind::kArrayPropsNeedsTypeCheck);
+  auto CallKind = C.getKind();
+  assert(CallKind == ArrayCallKind::kArrayPropsIsNative ||
+         CallKind == ArrayCallKind::kArrayPropsNeedsTypeCheck);
   ApplyInst *AI = C;
 
   SILType IntBoolTy = SILType::getBuiltinIntegerType(1, B.getASTContext());
 
   auto BoolTy = AI->getType();
-  auto C0 = B.createIntegerLiteral(AI->getLoc(), IntBoolTy, 0);
-  auto False = B.createStruct(AI->getLoc(), BoolTy, {C0});
+  auto C0 = B.createIntegerLiteral(
+      AI->getLoc(), IntBoolTy,
+      CallKind == ArrayCallKind::kArrayPropsIsNative ? 1 : 0);
+  auto BoolVal = B.createStruct(AI->getLoc(), BoolTy, {C0});
 
-  (*C).replaceAllUsesWith(False);
+  (*C).replaceAllUsesWith(BoolVal);
     // Remove call to array.props.read/write.
   C.replaceByRetainValue();
 }
