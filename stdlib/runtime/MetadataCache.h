@@ -63,11 +63,11 @@ public:
     return true;
   }
 
-  unsigned hash() {
-    unsigned H = 0x56ba80d1 ^ length ;
+  size_t hash() {
+    size_t H = 0x56ba80d1 ^ length ;
     for (unsigned i = 0; i < length; i++) {
-      H = (H >> 10) | (H << 22);
-      H ^= ((size_t)args[i]) ^ ((size_t)args[i] >> 32);
+      H = (H >> 10) | (H << ((sizeof(size_t) * 8) - 10));
+      H ^= ((size_t)args[i]) ^ ((size_t)args[i] >> 19);
     }
     return H * 0x27d4eb2d;
   }
@@ -147,7 +147,7 @@ template <class Entry> class MetadataCache {
   };
 
   /// This collection maps hash codes to a list of entry pairs.
-  typedef ConcurrentMap<unsigned, EntryPair> MDMapTy;
+  typedef ConcurrentMap<size_t, EntryPair> MDMapTy;
 
   /// This map hash codes of entry refs to a list of entry pairs.
   MDMapTy *Map;
@@ -182,7 +182,7 @@ public:
 #endif
 
     EntryRef<Entry> key = EntryRef<Entry>::forArguments(arguments,numArguments);
-    unsigned hash = key.hash();
+    size_t hash = key.hash();
 
 #if SWIFT_DEBUG_RUNTIME
     printf("%s(%p): generated hash %llx\n",
