@@ -741,7 +741,7 @@ Globals
   global ::= 'Tr' reabstract-signature   // reabstraction thunk
 
   global ::= 'TS' '_' specializationkind specializationinfo '_' global
-  specializationkind ::= 'generic'
+  specializationkind ::= 'g'
   specializationinfo ::= genericspecializationinfo
   genericspecializationinfo ::= type protocol-conformance* '_'
 
