@@ -868,6 +868,9 @@ extern "C" id swift_dynamicCastObjCProtocolConditional(id object,
 extern "C" void swift_instantiateObjCClass(Class c) {
   static const objc_image_info ImageInfo = {0, 0};
 
+  // Ensure the superclass is realized.
+  [class_getSuperclass(c) class];
+
   // Register the class.
   Class registered = objc_readClassPair(c, &ImageInfo);
   assert(registered == c
