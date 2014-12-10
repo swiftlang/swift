@@ -273,6 +273,7 @@ public:
 class CopyForwarding {
   // Per-function state.
   PostOrderAnalysis *PostOrder;
+  bool DoGlobalHoisting;
   bool HasChanged;
   bool HasChangedCFG;
 
@@ -285,10 +286,17 @@ class CopyForwarding {
   SmallPtrSet<SILBasicBlock*, 32> DeadInBlocks;
 public:
   CopyForwarding(PostOrderAnalysis *PO):
-    PostOrder(PO), HasChanged(false), HasChangedCFG(false),
-    HasForwardedToCopy(false) {}
+    PostOrder(PO), DoGlobalHoisting(false), HasChanged(false),
+    HasChangedCFG(false), HasForwardedToCopy(false) {}
 
   void reset(SILFunction *F) {
+    // Don't hoist destroy_addr globally in transparent functions. Avoid cloning
+    // destroy_addr instructions and splitting critical edges before mandatory
+    // diagnostic passes. For example, PredictableMemOps can no longer remove
+    // some alloc_stack cases after global destroy hoisting. CopyForwarding will
+    // be reapplied after the transparent function is inlined at which point
+    // global hoisting will be done.
+    DoGlobalHoisting = !F->isTransparent();
     if (HasChangedCFG)
       PostOrder->invalidate(F, SILAnalysis::InvalidationKind::CFG);
     CurrentDef = SILValue();
@@ -634,6 +642,8 @@ bool CopyForwarding::hoistDestroy(SILInstruction *DestroyPoint,
     HasChanged = true;
     return true;
   }
+  if (!DoGlobalHoisting)
+    return false;
   DeadInBlocks.insert(BB);
   return true;
 }
