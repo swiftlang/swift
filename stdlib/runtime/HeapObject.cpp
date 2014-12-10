@@ -376,6 +376,18 @@ void swift::swift_deallocClassInstance(HeapObject *object, size_t allocatedSize,
   swift_deallocObject(object, allocatedSize, allocatedAlignMask);
 }
 
+#if !defined(__APPLE__)
+static inline void memset_pattern8(void *b, const void *pattern8, size_t len) {
+  char *ptr = static_cast<char *>(b);
+  while (len >= 8) {
+    memcpy(ptr, pattern8, 8);
+    ptr += 8;
+    len -= 8;
+  }
+  memcpy(ptr, pattern8, len);
+}
+#endif
+
 void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
                                 size_t allocatedAlignMask) {
   assert(isAlignmentMask(allocatedAlignMask));
