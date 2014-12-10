@@ -341,6 +341,10 @@ bool CopyForwarding::collectUsers() {
   for (auto UI : CurrentDef.getUses()) {
     SILInstruction *UserInst = UI->getUser();
     if (auto *Apply = dyn_cast<ApplyInst>(UserInst)) {
+      /// A call to materializeForSet exposes an address within the parent
+      /// object. However, we can rely on a subsequent mark_dependent
+      /// instruction to take that object as an operand, causing it to escape
+      /// for the purpose of this analysis.
       auto Params = Apply->getSubstCalleeType()->getParameters();
       (void)Params;
       assert(Params[UI->getOperandNumber() - Apply->getArgumentOperandNumber()]
