@@ -291,18 +291,24 @@ extension String {
   }
 }
 
-internal var _128asBuiltinInt63: Builtin.Int63 {
+/// .Small characters are stored in a Int63 with their UTF-8 representation,
+/// with any unused bytes set to 0xFF. ASCII characters will have all bytes set
+/// to 0xFF except for the lowest byte, which will store the ASCII value. Since
+/// 0x7FFFFFFFFFFFFF80 or greater is an invalid UTF-8 sequence, we know if a
+/// value is ASCII by checking if it is greater than or equal to
+/// 0x7FFFFFFFFFFFFF00.
+internal var _minASCIICharReprBuiltin: Builtin.Int63 {
   @inline(__always) get {
-    let _int128in64: Int64 = 128
-    return Builtin.truncOrBitCast_Int64_Int63(_int128in64.value)
+    let x: Int64 = 0x7FFFFFFFFFFFFF00
+    return Builtin.truncOrBitCast_Int64_Int63(x.value)
   }
 }
 
 public func ==(lhs: Character, rhs: Character) -> Bool {
   switch (lhs._representation, rhs._representation) {
   case let (.Small(lbits), .Small(rbits)) where
-    Bool(Builtin.cmp_ult_Int63(lbits, _128asBuiltinInt63))
-    && Bool(Builtin.cmp_ult_Int63(rbits, _128asBuiltinInt63)):
+    Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
+    && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
     return Bool(Builtin.cmp_eq_Int63(lbits, rbits))
   default:
     // FIXME(performance): constructing two temporary strings is extremely
@@ -316,9 +322,9 @@ public func <(lhs: Character, rhs: Character) -> Bool {
   case let (.Small(lbits), .Small(rbits)) where
     // Note: This is consistent with Foundation but unicode incorrect.
     // See String._lessThanASCII.
-    Bool(Builtin.cmp_ult_Int63(lbits, _128asBuiltinInt63))
-    && Bool(Builtin.cmp_ult_Int63(rbits, _128asBuiltinInt63)):
-    return Bool(Builtin.cmp_ult_Int63(lbits, _128asBuiltinInt63))
+    Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
+    && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
+    return Bool(Builtin.cmp_ult_Int63(lbits, rbits))
   default:
     // FIXME(performance): constructing two temporary strings is extremely
     // wasteful and inefficient.
