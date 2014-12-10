@@ -520,17 +520,21 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
   return !requirement->isMutating() && witnessMutating;
 }
 
-
 /// \brief Match the given witness to the given requirement.
 ///
 /// \returns the result of performing the match.
 static RequirementMatch
 matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
-             DeclContext *dc, ValueDecl *req, ValueDecl *witness) {
+             DeclContext *dc, ValueDecl *req, ValueDecl *witness,
+             const std::function<
+                     std::tuple<Optional<RequirementMatch>, Type, Type>(void)> 
+               &setup,
+             const std::function<Optional<RequirementMatch>(Type, Type)> 
+               &matchTypes,
+             const std::function<RequirementMatch(bool)> &finalize) {
   assert(!req->isInvalid() && "Cannot have an invalid requirement here");
 
   auto protocol = conformance->getProtocol();
-  auto model = conformance->getType();
 
   /// Make sure the witness is of the same kind as the requirement.
   if (req->getKind() != witness->getKind())
@@ -628,50 +632,16 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     ignoreReturnType = true;
   }
 
-  // Construct a constraint system to use to solve the equality between
-  // the required type and the witness type.
-  constraints::ConstraintSystem cs(tc, dc,
-                                   constraints::ConstraintSystemOptions());
-
-  // Open up the witness type.
-  Type witnessType = witness->getInterfaceType();
-  Type openWitnessType;
-  Type openedFullWitnessType;
-  llvm::DenseMap<TypeVariableType *, CanType> openedWitnessTypeVars;
-  WitnessTypeOpener witnessOpener(tc.Context, openedWitnessTypeVars);
-  // FIXME: witness as a base locator?
-  auto locator = cs.getConstraintLocator(nullptr);
-  if (witness->getDeclContext()->isTypeContext()) {
-    std::tie(openedFullWitnessType, openWitnessType) 
-      = cs.getTypeOfMemberReference(model, witness,
-                                    /*isTypeReference=*/false,
-                                    /*isDynamicResult=*/false,
-                                    locator,
-                                    &witnessOpener);
-  } else {
-    std::tie(openedFullWitnessType, openWitnessType) 
-      = cs.getTypeOfReference(witness,
-                              /*isTypeReference=*/false,
-                              /*isDynamicResult=*/false,
-                              locator,
-                              &witnessOpener);
+  // Set up the match, determining the requirement and witness types
+  // in the process.
+  Type reqType, witnessType;
+  {
+    Optional<RequirementMatch> result;
+    std::tie(result, reqType, witnessType) = setup();
+    if (result) {
+      return *result;
+    }
   }
-  openWitnessType = openWitnessType->getRValueType();
-
-  // Open up the type of the requirement. We only truly open 'Self' and
-  // its associated types (recursively); inner generic type parameters get
-  // mapped to their archetypes directly.
-  llvm::DenseMap<TypeVariableType *, AssociatedTypeDecl *> openedAssocTypes;
-  DeclContext *reqDC = req->getPotentialGenericDeclContext();
-  RequirementTypeOpener reqTypeOpener(conformance, reqDC, openedAssocTypes);
-  Type reqType, openedFullReqType;
-  std::tie(openedFullReqType, reqType)
-    = cs.getTypeOfMemberReference(model, req,
-                                  /*isTypeReference=*/false,
-                                  /*isDynamicResult=*/false,
-                                  locator,
-                                  &reqTypeOpener);
-  reqType = reqType->getRValueType();
 
   bool anyRenaming = false;
   if (decomposeFunctionType) {
@@ -679,18 +649,18 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     auto reqInputType = reqType->castTo<AnyFunctionType>()->getInput();
     auto reqResultType = reqType->castTo<AnyFunctionType>()->getResult()
                            ->getRValueType();
-    auto witnessInputType = openWitnessType->castTo<AnyFunctionType>()
+    auto witnessInputType = witnessType->castTo<AnyFunctionType>()
                               ->getInput();
-    auto witnessResultType = openWitnessType->castTo<AnyFunctionType>()
+    auto witnessResultType = witnessType->castTo<AnyFunctionType>()
                                ->getResult()->getRValueType();
 
     // Result types must match.
     // FIXME: Could allow (trivial?) subtyping here.
     if (!ignoreReturnType) {
       auto typePair = getTypesToCompare(req, reqResultType, witnessResultType);
-      cs.addConstraint(constraints::ConstraintKind::Equal,
-                       typePair.first, typePair.second, locator);
-      // FIXME: Check whether this has already failed.
+      if (auto result = matchTypes(typePair.first, typePair.second)) {
+        return *result;
+      }
     }
 
     // Parameter types and kinds must match. Start by decomposing the input
@@ -719,6 +689,7 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
         // significant.
         // FIXME: Specialize the match failure kind.
         // FIXME: Constructors care about the first name.
+        // FIXME: This should be dead code.
         if (protocol->isObjC() && i > 0)
           return RequirementMatch(witness, MatchKind::TypeConflict,
                                   witnessType);
@@ -730,58 +701,136 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
                                         witnessParams[i].getType());
 
       // Check whether the parameter types match.
-      cs.addConstraint(constraints::ConstraintKind::Equal,
-                       typePair.first, typePair.second, locator);
-      // FIXME: Check whether this failed.
+      if (auto result = matchTypes(typePair.first, typePair.second)) {
+        return *result;
+      }
 
       // FIXME: Consider default arguments here?
     }
   } else {
     // Simple case: add the constraint.
-    auto typePair = getTypesToCompare(req, reqType, openWitnessType);
-    cs.addConstraint(constraints::ConstraintKind::Equal,
-                     typePair.first, typePair.second, locator);
+    auto typePair = getTypesToCompare(req, reqType, witnessType);
+    if (auto result = matchTypes(typePair.first, typePair.second)) {
+      return *result;
+    }
   }
 
-  // Try to solve the system.
-  SmallVector<constraints::Solution, 1> solutions;
-  if (cs.solve(solutions, FreeTypeVariableBinding::Allow)) {
-    return RequirementMatch(witness, MatchKind::TypeConflict,
-                            witnessType);
-  }
-  auto &solution = solutions.front();
+  // Now finalize the match.
+  return finalize(anyRenaming);
+}
+
+static RequirementMatch
+matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
+             DeclContext *dc, ValueDecl *req, ValueDecl *witness) {
+  // Initialized by the setup operation.
+  Optional<constraints::ConstraintSystem> cs;
+  constraints::ConstraintLocator *locator = nullptr;
+  Type witnessType, openWitnessType;
+  Type openedFullWitnessType;
+  Type reqType, openedFullReqType;
+  llvm::DenseMap<TypeVariableType *, AssociatedTypeDecl *> openedAssocTypes;
   
-  // Success. Form the match result.
-  RequirementMatch result(witness,
-                          anyRenaming? MatchKind::RenamedMatch
-                                     : MatchKind::ExactMatch,
-                          witnessType);
+  // Set up the constraint system for matching.
+  auto setup = [&]() -> std::tuple<Optional<RequirementMatch>, Type, Type> {
+    // Construct a constraint system to use to solve the equality between
+    // the required type and the witness type.
+    cs.emplace(tc, dc, constraints::ConstraintSystemOptions());
+    
+    auto model = conformance->getType();
 
-  // For any associated types for which we deduced replacement types,
-  // record them now.
-  for (const auto &opened : openedAssocTypes) {
-    auto replacement = solution.simplifyType(tc, opened.first);
+    // Open up the witness type.
+    witnessType = witness->getInterfaceType();
+    llvm::DenseMap<TypeVariableType *, CanType> openedWitnessTypeVars;
+    WitnessTypeOpener witnessOpener(tc.Context, openedWitnessTypeVars);
+    // FIXME: witness as a base locator?
+    locator = cs->getConstraintLocator(nullptr);
+    if (witness->getDeclContext()->isTypeContext()) {
+      std::tie(openedFullWitnessType, openWitnessType) 
+        = cs->getTypeOfMemberReference(model, witness,
+                                      /*isTypeReference=*/false,
+                                      /*isDynamicResult=*/false,
+                                      locator,
+                                      &witnessOpener);
+    } else {
+      std::tie(openedFullWitnessType, openWitnessType) 
+      = cs->getTypeOfReference(witness,
+                              /*isTypeReference=*/false,
+                              /*isDynamicResult=*/false,
+                              locator,
+                              &witnessOpener);
+    }
+    openWitnessType = openWitnessType->getRValueType();
+    
+    // Open up the type of the requirement. We only truly open 'Self' and
+    // its associated types (recursively); inner generic type parameters get
+    // mapped to their archetypes directly.
+    DeclContext *reqDC = req->getPotentialGenericDeclContext();
+    RequirementTypeOpener reqTypeOpener(conformance, reqDC, openedAssocTypes);
+    std::tie(openedFullReqType, reqType)
+      = cs->getTypeOfMemberReference(model, req,
+                                     /*isTypeReference=*/false,
+                                     /*isDynamicResult=*/false,
+                                     locator,
+                                     &reqTypeOpener);
+    reqType = reqType->getRValueType();
 
-    // If any type variables remain in the replacement, we couldn't
-    // fully deduce it.
-    if (replacement->hasTypeVariable())
-      continue;
+    return { None, reqType, openWitnessType };
+  };
 
-    result.AssociatedTypeDeductions.push_back({opened.second, replacement});
-  }
+  // Match a type in the requirement to a type in the witness.
+  auto matchTypes = [&](Type reqType, Type witnessType) 
+                      -> Optional<RequirementMatch> {
+    cs->addConstraint(constraints::ConstraintKind::Equal, reqType, witnessType,
+                      locator);
+    // FIXME: Check whether this has already failed.
+    return None;
+  };
 
-  if (openedFullWitnessType->hasTypeVariable()) {
-    // Figure out the context we're substituting into.
-    auto witnessDC = witness->getPotentialGenericDeclContext();
+  // Finalize the match.
+  auto finalize = [&](bool anyRenaming) -> RequirementMatch {
+    // Try to solve the system.
+    SmallVector<constraints::Solution, 1> solutions;
+    if (cs->solve(solutions, FreeTypeVariableBinding::Allow)) {
+      return RequirementMatch(witness, MatchKind::TypeConflict,
+                              witnessType);
+    }
+    auto &solution = solutions.front();
+    
+    // Success. Form the match result.
+    RequirementMatch result(witness,
+                            anyRenaming? MatchKind::RenamedMatch
+                                       : MatchKind::ExactMatch,
+                            witnessType);
 
-    // Compute the set of substitutions we'll need for the witness.
-    solution.computeSubstitutions(witness->getInterfaceType(),
-                                  witnessDC,
-                                  openedFullWitnessType,
-                                  result.WitnessSubstitutions);
-  }
+    // For any associated types for which we deduced replacement types,
+    // record them now.
+    for (const auto &opened : openedAssocTypes) {
+      auto replacement = solution.simplifyType(tc, opened.first);
+      
+      // If any type variables remain in the replacement, we couldn't
+      // fully deduce it.
+      if (replacement->hasTypeVariable())
+        continue;
+      
+      result.AssociatedTypeDeductions.push_back({opened.second, replacement});
+    }
+    
+    if (openedFullWitnessType->hasTypeVariable()) {
+      // Figure out the context we're substituting into.
+      auto witnessDC = witness->getPotentialGenericDeclContext();
+      
+      // Compute the set of substitutions we'll need for the witness.
+      solution.computeSubstitutions(witness->getInterfaceType(),
+                                    witnessDC,
+                                    openedFullWitnessType,
+                                    result.WitnessSubstitutions);
+    }
+    
+    return result;
+  };
 
-  return result;
+  return matchWitness(tc, conformance, dc, req, witness, setup, matchTypes,
+                      finalize);
 }
 
 /// \brief Determine whether one requirement match is better than the other.
