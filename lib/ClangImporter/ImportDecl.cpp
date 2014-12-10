@@ -2558,10 +2558,25 @@ namespace {
         result->setDynamicSelf(true);
         resultTy = result->getDynamicSelf();
         assert(resultTy && "failed to get dynamic self");
+
         Type interfaceSelfTy = result->getDynamicSelfInterface();
-        resultTy = ImplicitlyUnwrappedOptionalType::get(resultTy);
-        interfaceSelfTy = ImplicitlyUnwrappedOptionalType::get(interfaceSelfTy);
-        
+        OptionalTypeKind nullability = OTK_ImplicitlyUnwrappedOptional;
+        if (auto typeNullability = decl->getReturnType()->getNullability(
+                                     Impl.getClangASTContext())) {
+          // If the return type has nullability, use it.
+          nullability = Impl.translateNullability(*typeNullability);
+        } else if (auto known = Impl.getKnownObjCMethod(decl)) {
+          // If the method is known to have nullability information for
+          // its return type, use that.
+          if (known->NullabilityAudited) {
+            nullability = Impl.translateNullability(known->getReturnTypeInfo());
+          }
+        }
+        if (nullability != OTK_None) {
+          resultTy = OptionalType::get(nullability, resultTy);
+          interfaceSelfTy = OptionalType::get(nullability, interfaceSelfTy);
+        }
+
         // Update the method type with the new result type.
         auto methodTy = type->castTo<FunctionType>();
         type = FunctionType::get(methodTy->getInput(), resultTy, 
@@ -2910,11 +2925,18 @@ namespace {
       // Determine the failability of this initializer.
       OptionalTypeKind failability = OTK_ImplicitlyUnwrappedOptional;
         
-      // If the method is known to have nullability information for
-      // its return type, use that.
-      if (auto known = Impl.getKnownObjCMethod(objcMethod)) {
-        if (known->NullabilityAudited) {
-          failability = Impl.translateNullability(known->getReturnTypeInfo());
+      // If the return type provides nullability inforomation, map it
+      // to failability information.
+      if (auto nullability = objcMethod->getReturnType()->getNullability(
+                               Impl.getClangASTContext())) {
+        failability = Impl.translateNullability(*nullability);
+      } else {
+        // If the method is known to have nullability information for
+        // its return type, use that.
+        if (auto known = Impl.getKnownObjCMethod(objcMethod)) {
+          if (known->NullabilityAudited) {
+            failability = Impl.translateNullability(known->getReturnTypeInfo());
+          }
         }
       }
 

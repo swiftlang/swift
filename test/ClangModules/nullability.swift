@@ -25,4 +25,17 @@ func testSomeClass(sc: SomeClass, osc: SomeClass?) {
   sc.methodG(sc, second: sc)
   sc.methodG(osc, second: sc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}}
   sc.methodG(sc, second: osc) 
+
+  let ci: CInt = 1
+  var sc2 = SomeClass(int: ci)
+  var sc2a: SomeClass = sc2
+  if sc2 == nil { } // expected-error{{binary operator '==' cannot be applied operands of type 'SomeClass' and 'nil'}}
+
+  var sc3 = SomeClass(double: 1.5)
+  if sc3 == nil { } // okay
+  var sc3a: SomeClass = sc3 // expected-error{{value of optional type 'SomeClass?' not unwrapped}}
+
+  var sc4 = sc.returnMe()
+  var sc4a: SomeClass = sc4
+  if sc4 == nil { } // expected-error{{binary operator '==' cannot be applied operands of type 'SomeClass' and 'nil'}}
 }
