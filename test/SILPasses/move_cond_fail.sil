@@ -19,6 +19,9 @@ bb0:
   %6 = apply %5() : $@cc(cdecl) @thin () -> Double
   store %6 to %0 : $*Double
   %8 = integer_literal $Builtin.Word, 1000000000
+  // CHECK: integer_literal $Builtin.Word, 1
+  // CHECK: integer_literal $Builtin.Int1, -1
+  // CHECK: struct_element_addr {{.*}} : $*Int, #Int.value
   br bb2(%2 : $Builtin.Word)
 
 // CHECK: bb1:
@@ -28,9 +31,7 @@ bb1:
 
 // CHECK: bb2(
 bb2(%13 : $Builtin.Word):
-  // CHECK-NEXT: integer_literal
   %14 = integer_literal $Builtin.Word, 1
-  // CHECK-NEXT: integer_literal
   %16 = integer_literal $Builtin.Int1, -1
   // CHECK-NEXT: builtin
   %17 = builtin "sadd_with_overflow_Word"(%13 : $Builtin.Word, %14 : $Builtin.Word, %16 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
@@ -39,7 +40,6 @@ bb2(%13 : $Builtin.Word):
   // CHECK-NEXT: tuple_extract
   %19 = tuple_extract %17 : $(Builtin.Word, Builtin.Int1), 1
   cond_fail %19 : $Builtin.Int1
-  // CHECK-NEXT: struct_element_addr
   %21 = struct_element_addr %1 : $*Int, #Int.value
   // CHECK-NEXT: load
   %22 = load %21 : $*Builtin.Word

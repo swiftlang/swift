@@ -211,12 +211,6 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
     }
   }
 
-  // We found no read give up.
-  if (Reads.empty()) {
-    DEBUG(llvm::dbgs() << " not hoisting - no reads found\n");
-    return false;
-  }
-
   bool Changed = false;
   // Traverse the dominator tree starting at the loop header. Hoisting
   // instructions as we go.
