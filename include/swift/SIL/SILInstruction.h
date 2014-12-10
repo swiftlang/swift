@@ -257,7 +257,8 @@ public:
 // Allocation Instructions
 //===----------------------------------------------------------------------===//
 
-/// Abstract base class for literal instructions.
+/// Abstract base class for allocation instructions, like alloc_stack, alloc_box
+/// and alloc_ref, etc.
 class AllocationInst : public SILInstruction {
 protected:
   AllocationInst(ValueKind Kind, SILLocation Loc, SILType Ty)
