@@ -774,7 +774,7 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
                                      &reqTypeOpener);
     reqType = reqType->getRValueType();
 
-    return { None, reqType, openWitnessType };
+    return std::make_tuple(None, reqType, openWitnessType);
   };
 
   // Match a type in the requirement to a type in the witness.
