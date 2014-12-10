@@ -3596,19 +3596,17 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // Emit a local variable for 'self'.
   // FIXME: The (potentially partially initialized) variable would need to be
   // cleaned up on an error unwind.
-  emitLocalVariable(selfDecl);
-  
+  emitLocalVariable(selfDecl,
+                    isDelegating ? MarkUninitializedInst::DelegatingSelf
+                                 : MarkUninitializedInst::RootSelf);
+
   // Mark self as being uninitialized so that DI knows where it is and how to
   // check for it.
   SILValue selfLV, selfBox;
   {
     auto &SelfVarLoc = VarLocs[selfDecl];
     selfBox = SelfVarLoc.box;
-    
-    auto MUKind = isDelegating ? MarkUninitializedInst::DelegatingSelf
-                               : MarkUninitializedInst::RootSelf;
-    selfLV = B.createMarkUninitialized(selfDecl,SelfVarLoc.getAddress(),MUKind);
-    SelfVarLoc = VarLoc::getAddress(selfLV, SelfVarLoc.box);
+    selfLV = SelfVarLoc.getAddress();
   }
 
   // FIXME: Handle 'self' along with the other body patterns.
@@ -4074,9 +4072,28 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     cast<ClassDecl>(selfTypeContext->getNominalOrBoundGenericNominal());
   bool NeedsBoxForSelf = isDelegating ||
     (selfClassDecl->hasSuperclass() && !ctor->hasStubImplementation());
+  bool usesObjCAllocator = Lowering::usesObjCAllocator(selfClassDecl);
+
+  // If needed, mark 'self' as uninitialized so that DI knows to
+  // enforce its DI properties on stored properties.
+  MarkUninitializedInst::Kind MUKind;
+
+  if (isDelegating)
+    MUKind = MarkUninitializedInst::DelegatingSelf;
+  else if (selfClassDecl->requiresStoredPropertyInits() &&
+           usesObjCAllocator) {
+    // Stored properties will be initialized in a separate
+    // .cxx_construct method called by the Objective-C runtime.
+    assert(selfClassDecl->hasSuperclass() &&
+           "Cannot use ObjC allocation without a superclass");
+    MUKind = MarkUninitializedInst::DerivedSelfOnly;
+  } else if (selfClassDecl->hasSuperclass())
+    MUKind = MarkUninitializedInst::DerivedSelf;
+  else
+    MUKind = MarkUninitializedInst::RootSelf;
 
   if (NeedsBoxForSelf)
-    emitLocalVariable(selfDecl);
+    emitLocalVariable(selfDecl, MUKind);
 
   // Emit the prolog for the non-self arguments.
   // FIXME: Handle self along with the other body patterns.
@@ -4092,35 +4109,15 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     B.createDebugValue(PrologueLoc, selfArg);
   }
   
-  bool usesObjCAllocator = Lowering::usesObjCAllocator(selfClassDecl);
   if (!ctor->hasStubImplementation()) {
-    // If needed, mark 'self' as uninitialized so that DI knows to
-    // enforce its DI properties on stored properties.
-    MarkUninitializedInst::Kind MUKind;
-  
-    if (isDelegating)
-      MUKind = MarkUninitializedInst::DelegatingSelf;
-    else if (selfClassDecl->requiresStoredPropertyInits() && 
-             usesObjCAllocator) {
-      // Stored properties will be initialized in a separate
-      // .cxx_construct method called by the Objective-C runtime.
-      assert(selfClassDecl->hasSuperclass() &&
-             "Cannot use ObjC allocation without a superclass");
-      MUKind = MarkUninitializedInst::DerivedSelfOnly;
-    } else if (selfClassDecl->hasSuperclass())
-      MUKind = MarkUninitializedInst::DerivedSelf;
-    else
-      MUKind = MarkUninitializedInst::RootSelf;
-
-    selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
-    assert(selfTy.hasReferenceSemantics() && 
+    assert(selfTy.hasReferenceSemantics() &&
            "can't emit a value type ctor here");
-
     if (NeedsBoxForSelf) {
       SILLocation prologueLoc = RegularLocation(ctor);
       prologueLoc.markAsPrologue();
       B.createStore(prologueLoc, selfArg, VarLocs[selfDecl].getAddress());
     } else {
+      selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
       VarLocs[selfDecl] = VarLoc::getConstant(selfArg);
     }
   }

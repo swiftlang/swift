@@ -1144,7 +1144,8 @@ void SwitchEmission::bindVariable(SILLocation loc, VarDecl *var,
                                   bool isIrrefutable) {
   // Initialize the variable value.
   InitializationPtr init
-    = SGF.emitInitializationForVarDecl(var, /*isArgument*/false, Type());
+    = SGF.emitInitializationForVarDecl(var, SILGenFunction::PK_InitVarDecl,
+                                       Type());
 
   RValue rv(SGF, loc, formalValueType, value.getFinalManagedValue());
   if (shouldTake(value, isIrrefutable)) {

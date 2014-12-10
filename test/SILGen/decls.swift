@@ -32,8 +32,8 @@ func MRV() -> (Int, Float, (), Double) {}
 func tuple_patterns() {
   var (a, b) : (Int, Float)
   // CHECK: [[AADDR1:%[0-9]+]] = alloc_box $Int
-  // CHECK: [[BADDR1:%[0-9]+]] = alloc_box $Float
   // CHECK: [[AADDR:%[0-9]+]] = mark_uninitialized [var] [[AADDR1]]#1
+  // CHECK: [[BADDR1:%[0-9]+]] = alloc_box $Float
   // CHECK: [[BADDR:%[0-9]+]] = mark_uninitialized [var] [[BADDR1]]#1
 
   var (c, d) = (a, b)

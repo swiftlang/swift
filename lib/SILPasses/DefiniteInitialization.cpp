@@ -1171,8 +1171,8 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
       // since the pointer it contains will be manually cleaned up.
       if (isa<AllocBoxInst>(Pointer))
         Pointer = SILValue(Pointer.getDef(), 1);
-        
-      if (!isa<MarkUninitializedInst>(Pointer))
+
+      if (Pointer.getType().isAddress())
         Pointer = B.createLoad(Release->getLoc(), Pointer);
       auto Dealloc = B.createDeallocRef(Release->getLoc(), Pointer);
       
@@ -1497,8 +1497,8 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
       // since the pointer it contains will be manually cleaned up.
       if (isa<AllocBoxInst>(Pointer))
         Pointer = SILValue(Pointer.getDef(), 1);
-      
-      if (!isa<MarkUninitializedInst>(Pointer))
+
+      if (Pointer.getType().isAddress())
         Pointer = B.createLoad(Release->getLoc(), Pointer);
       B.createDeallocRef(Release->getLoc(), Pointer);
       

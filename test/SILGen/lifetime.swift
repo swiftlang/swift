@@ -600,10 +600,10 @@ class D : B {
   // CHECK-LABEL: sil hidden @_TFC8lifetime1Dc{{.*}} : $@cc(method) @thin (Int, Int, @owned D) -> @owned D
   // CHECK: bb0([[X:%[0-9]+]] : $Int, [[Y:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $D):
   init(var x:Int, var y:Int) {
-    // CHECK: [[THISADDR:%[0-9]+]] = alloc_box $D
+    // CHECK: [[THISADDR1:%[0-9]+]] = alloc_box $D
+    // CHECK: [[THISADDR:%[0-9]+]] = mark_uninitialized [derivedself] [[THISADDR1]]
     // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
     // CHECK: [[YADDR:%[0-9]+]] = alloc_box $Int
-    // CHECK: [[THIS:%[0-9]+]] = mark_uninitialized [derivedself]
     // CHECK: store [[THIS]] to [[THISADDR]]
 
     super.init(y: y)

@@ -89,17 +89,17 @@ class C1 {
   convenience init(x: X) {
     // CHECK: bb0([[X:%[0-9]+]] : $X, [[ORIG_SELF:%[0-9]+]] : $C1):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $C1
-    // CHECK:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[ORIG_SELF]] : $C1
-    // CHECK:   store [[SELF]] to [[SELF_BOX]]#1 : $*C1
-    // CHECK:   [[SELF_FROM_BOX:%[0-9]+]] = load [[SELF_BOX]]#1 : $*C1
+    // CHECK:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*C1
+    // CHECK:   store [[ORIG_SELF]] to [[SELF]] : $*C1
+    // CHECK:   [[SELF_FROM_BOX:%[0-9]+]] = load [[SELF]] : $*C1
 
     // CHECK:   [[DELEG_INIT:%[0-9]+]] = class_method [[SELF_FROM_BOX]] : $C1, #C1.init!initializer.1 : C1.Type -> (x1: X, x2: X) -> C1 , $@cc(method) @thin (X, X, @owned C1) -> @owned C1
-    // CHECK:   [[SELF:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF_FROM_BOX]]) : $@cc(method) @thin (X, X, @owned C1) -> @owned C1
-    // CHECK:   store [[SELF]] to [[SELF_BOX]]#1 : $*C1
-    // CHECK:   [[SELF:%[0-9]+]] = load [[SELF_BOX]]#1 : $*C1
-    // CHECK:   strong_retain [[SELF]] : $C1
+    // CHECK:   [[SELFP:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF_FROM_BOX]]) : $@cc(method) @thin (X, X, @owned C1) -> @owned C1
+    // CHECK:   store [[SELFP]] to [[SELF]] : $*C1
+    // CHECK:   [[SELFP:%[0-9]+]] = load [[SELF]] : $*C1
+    // CHECK:   strong_retain [[SELFP]] : $C1
     // CHECK:   strong_release [[SELF_BOX]]#0 : $Builtin.NativeObject
-    // CHECK:   return [[SELF]] : $C1
+    // CHECK:   return [[SELFP]] : $C1
     self.init(x1: x, x2: x)
   }
 
@@ -113,14 +113,14 @@ class C1 {
   convenience init(x: X) {
     // CHECK: bb0([[X:%[0-9]+]] : $X, [[ORIG_SELF:%[0-9]+]] : $C2):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $C2
-    // CHECK:   [[UNINIT_SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[ORIG_SELF]] : $C2
-    // CHECK:   store [[UNINIT_SELF]] to [[SELF_BOX]]#1 : $*C2
-    // CHECK:   [[SELF:%[0-9]+]] = load [[SELF_BOX]]#1 : $*C2
+    // CHECK:   [[UNINIT_SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*C2
+    // CHECK:   store [[ORIG_SELF]] to [[UNINIT_SELF]] : $*C2
+    // CHECK:   [[SELF:%[0-9]+]] = load [[UNINIT_SELF]] : $*C2
 
     // CHECK:   [[DELEG_INIT:%[0-9]+]] = class_method [[SELF]] : $C2, #C2.init!initializer.1 : C2.Type -> (x1: X, x2: X) -> C2 , $@cc(method) @thin (X, X, @owned C2) -> @owned C2
     // CHECK:   [[REPLACE_SELF:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF]]) : $@cc(method) @thin (X, X, @owned C2) -> @owned C2
-    // CHECK:   store [[REPLACE_SELF]] to [[SELF_BOX]]#1 : $*C2
-    // CHECK:   [[VAR_15:%[0-9]+]] = load [[SELF_BOX]]#1 : $*C2
+    // CHECK:   store [[REPLACE_SELF]] to [[UNINIT_SELF]] : $*C2
+    // CHECK:   [[VAR_15:%[0-9]+]] = load [[UNINIT_SELF]] : $*C2
     // CHECK:   strong_retain [[VAR_15]] : $C2
     // CHECK:   strong_release [[SELF_BOX]]#0 : $Builtin.NativeObject
     // CHECK:   return [[VAR_15]] : $C2

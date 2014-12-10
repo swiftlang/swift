@@ -72,7 +72,7 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
     // allow reassignment.
     if (MUI->isVar())
       if (auto *decl = MUI->getLoc().getAsASTNode<VarDecl>())
-        IsLet = decl->isLet();
+        IsLet = decl->isLet() & false;  // not yet.
   }
   
   // Compute the number of elements to track in this memory object.
@@ -173,11 +173,13 @@ emitElementAddress(unsigned EltNo, SILLocation Loc, SILBuilder &B) const {
       continue;
     }
 
-    // If this is the top level of a 'self' value, we flatten structs and classes.
-    // Stored properties with tuple types are tracked with independent lifetimes
-    // for each of the tuple members.
+    // If this is the top level of a 'self' value, we flatten structs and
+    // classes. Stored properties with tuple types are tracked with independent
+    // lifetimes for each of the tuple members.
     if (IsSelf) {
       auto *NTD = cast<NominalTypeDecl>(PointeeType->getAnyNominal());
+      if (isa<ClassDecl>(NTD) && Ptr.getType().isAddress())
+        Ptr = B.createLoad(Loc, Ptr);
       for (auto *VD : NTD->getStoredProperties()) {
         auto FieldType = VD->getType()->getCanonicalType();
         unsigned NumFieldElements = getElementCountRec(FieldType, false);
@@ -830,18 +832,6 @@ void ElementUseCollector::collectClassSelfUses() {
     return;
   }
 
-  // Otherwise, we have a 'self' init in a derived class, and things are more
-  // complicated.  Because super.init is allows to change self, SILGen is
-  // producing a box for 'self'.  This means that we need to see through this
-  // box to find the uses of 'self'.  We handle this by pattern matching: we
-  // allow only a single use of MUI, which must be a store to an
-  // alloc_box/alloc_stack.
-  assert(MUI->hasOneUse());
-  auto *TheStore = cast<StoreInst>((*MUI->use_begin())->getUser());
-  SILValue SelfBox = TheStore->getOperand(1);
-  assert(isa<MarkUninitializedInst>(SelfBox) || isa<AllocBoxInst>(SelfBox) ||
-         isa<AllocStackInst>(SelfBox));
-
   // Okay, given that we have a proper setup, we walk the use chains of the self
   // box to find any accesses to it.  The possible uses are one of:
   //   1) The initialization store (TheStore).
@@ -850,11 +840,13 @@ void ElementUseCollector::collectClassSelfUses() {
   //   4) Potential escapes after super.init, if self is closed over.
   // Handle each of these in turn.
   //
-  for (auto UI : SelfBox.getDef()->getUses()) {
+  for (auto UI : MUI->getUses()) {
     SILInstruction *User = UI->getUser();
 
-    // Ignore the initialization store.
-    if (User == TheStore) continue;
+    // Stores to self are initializations store or the rebind of self as
+    // part of the super.init call.  Ignore both of these.
+    if (isa<StoreInst>(User) && UI->getOperandNumber() == 1)
+      continue;
 
     // Loads of the box produce self, so collect uses from them.
     if (auto *LI = dyn_cast<LoadInst>(User)) {
@@ -1086,31 +1078,23 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
   // non-field-sensitive value.
   assert(TheMemory.NumElements == 1 && "delegating inits only have 1 bit");
   auto *MUI = cast<MarkUninitializedInst>(TheMemory.MemoryInst);
- 
-  // Because self.init is allows to change self, SILGen is producing a box for
-  // 'self'.  This means that we need to see through this box to find the uses
-  // of 'self'.  We handle this by pattern matching: we allow only a single use
-  // of MUI, which must be a store to an alloc_box/alloc_stack.
-  assert(MUI->hasOneUse());
-  auto *TheStore = cast<StoreInst>((*MUI->use_begin())->getUser());
-  SILValue SelfBox = TheStore->getOperand(1);
-  assert(isa<MarkUninitializedInst>(SelfBox) || isa<AllocBoxInst>(SelfBox) ||
-         isa<AllocStackInst>(SelfBox));
-  
-  // Okay, given that we have a proper setup, we walk the use chains of the self
-  // box to find any accesses to it.  The possible uses are one of:
-  //   1) The initialization store (TheStore).
+
+  // We walk the use chains of the self MUI to find any accesses to it.  The
+  // possible uses are:
+  //   1) The initialization store.
   //   2) Loads of the box, which have uses of self hanging off of them.
   //   3) An assign to the box, which happens at super.init.
   //   4) Potential escapes after super.init, if self is closed over.
   // Handle each of these in turn.
   //
-  for (auto UI : SelfBox.getDef()->getUses()) {
+  for (auto UI : MUI->getUses()) {
     SILInstruction *User = UI->getUser();
-    
-    // Ignore the initialization store.
-    if (User == TheStore) continue;
-    
+
+    // Stores to self are initializations store or the rebind of self as
+    // part of the super.init call.  Ignore both of these.
+    if (isa<StoreInst>(User) && UI->getOperandNumber() == 1)
+      continue;
+
     // Loads of the box produce self, so collect uses from them.
     if (auto *LI = dyn_cast<LoadInst>(User)) {
       
@@ -1170,19 +1154,33 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
     }
    
     // destroyaddr on the box is load+release, which is treated as a release.
-    if (isa<DestroyAddrInst>(User) || isa<StrongReleaseInst>(User)) {
+    if (isa<DestroyAddrInst>(User)) {
       Releases.push_back(User);
       continue;
     }
-    
+
+    // We can safely handle anything else as an escape.  They should all happen
+    // after self.init is invoked.
+    Uses.push_back(DIMemoryUse(User, DIUseKind::Escape, 0, 1));
+  }
+
+  // The MUI must be used on an alloc_box or alloc_stack instruction.  Chase
+  // down the box value to see if there are any releases.
+  auto *AI = cast<AllocationInst>(MUI->getOperand());
+  for (auto UI : SILValue(AI, 0).getUses()) {
+    SILInstruction *User = UI->getUser();
+
+    if (isa<StrongReleaseInst>(User)) {
+      Releases.push_back(User);
+      continue;
+    }
+
     // Ignore the deallocation of the stack box.  Its contents will be
     // uninitialized by the point it executes.
     if (isa<DeallocStackInst>(User))
       continue;
 
-    // We can safely handle anything else as an escape.  They should all happen
-    // after self.init is invoked.
-    Uses.push_back(DIMemoryUse(User, DIUseKind::Escape, 0, 1));
+    assert(0 && "Unknown use of box");
   }
 }
 

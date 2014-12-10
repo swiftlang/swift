@@ -8,14 +8,15 @@ class Foo {
 class Bar: Foo {
   // CHECK-LABEL: sil hidden @_TFC22super_init_refcounting3BarcfMS0_FT_S0_
   // CHECK:         [[SELF_VAR:%.*]] = alloc_box $Bar
-  // CHECK:         [[ORIG_SELF:%.*]] = load [[SELF_VAR]]
+  // CHECK:         [[SELF_MUI:%.*]] =  mark_uninitialized [derivedself] [[SELF_VAR]]#1
+  // CHECK:         [[ORIG_SELF:%.*]] = load [[SELF_MUI]]
   // CHECK-NOT:     strong_retain [[ORIG_SELF]]
   // CHECK:         [[ORIG_SELF_UP:%.*]] = upcast [[ORIG_SELF]]
   // CHECK-NOT:     strong_retain [[ORIG_SELF_UP]]
   // CHECK:         [[SUPER_INIT:%.*]] = function_ref @_TFC22super_init_refcounting3FoocfMS0_FT_S0_
   // CHECK:         [[NEW_SELF:%.*]] = apply [[SUPER_INIT]]([[ORIG_SELF_UP]])
   // CHECK:         [[NEW_SELF_DOWN:%.*]] = unchecked_ref_cast [[NEW_SELF]]
-  // CHECK:         store [[NEW_SELF_DOWN]] to [[SELF_VAR]]
+  // CHECK:         store [[NEW_SELF_DOWN]] to [[SELF_MUI]]
   override init() {
     super.init()
   }
@@ -24,11 +25,12 @@ class Bar: Foo {
 extension Foo {
   // CHECK-LABEL: sil hidden @_TFC22super_init_refcounting3FoocfMS0_FT1xSi_S0_ 
   // CHECK:         [[SELF_VAR:%.*]] = alloc_box $Foo
-  // CHECK:         [[ORIG_SELF:%.*]] = load [[SELF_VAR]]
+  // CHECK:         [[SELF_MUI:%.*]] =  mark_uninitialized [delegatingself] [[SELF_VAR]]#1
+  // CHECK:         [[ORIG_SELF:%.*]] = load [[SELF_MUI]]
   // CHECK-NOT:     strong_retain [[ORIG_SELF]]
   // CHECK:         [[SUPER_INIT:%.*]] = class_method
   // CHECK:         [[NEW_SELF:%.*]] = apply [[SUPER_INIT]]([[ORIG_SELF]])
-  // CHECK:         store [[NEW_SELF]] to [[SELF_VAR]]
+  // CHECK:         store [[NEW_SELF]] to [[SELF_MUI]]
   convenience init(x: Int) {
     self.init()
   }

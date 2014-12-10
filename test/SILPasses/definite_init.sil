@@ -616,27 +616,27 @@ sil @superinit : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootCl
 sil @derived_test1 :  $@cc(method) @thin (@owned DerivedClassWithIVars) -> @owned DerivedClassWithIVars {
 bb0(%0 : $DerivedClassWithIVars):
   %1 = alloc_box $DerivedClassWithIVars
-  %3 = mark_uninitialized [derivedself] %0 : $DerivedClassWithIVars
-  store %3 to %1#1 : $*DerivedClassWithIVars
+  %3 = mark_uninitialized [derivedself] %1#1 : $*DerivedClassWithIVars
+  store %0 to %3 : $*DerivedClassWithIVars
 
   // Get an int
   %5 = function_ref @makesInt : $@thin () -> Int
   %7 = apply [transparent] %5() : $@thin () -> Int
 
   // Initialize the 'a' ivar with the int.
-  %8 = load %1#1 : $*DerivedClassWithIVars
+  %8 = load %3 : $*DerivedClassWithIVars
   %9 = ref_element_addr %8 : $DerivedClassWithIVars, #DerivedClassWithIVars.a
   assign %7 to %9 : $*Int
   
 
-  %11 = load %1#1 : $*DerivedClassWithIVars
+  %11 = load %3 : $*DerivedClassWithIVars
   %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars
   %14 = function_ref @superinit : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
   %15 = apply %14(%13) : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
 
   %16 = unconditional_checked_cast %15 : $RootClassWithIVars to $DerivedClassWithIVars
-  assign %16 to %1#1 : $*DerivedClassWithIVars
-  %18 = load %1#1 : $*DerivedClassWithIVars
+  assign %16 to %3 : $*DerivedClassWithIVars
+  %18 = load %3 : $*DerivedClassWithIVars
   strong_retain %18 : $DerivedClassWithIVars
   strong_release %1#0 : $Builtin.NativeObject
   return %18 : $DerivedClassWithIVars
@@ -645,17 +645,17 @@ bb0(%0 : $DerivedClassWithIVars):
 sil @derived_test2 :  $@cc(method) @thin (@owned DerivedClassWithIVars) -> @owned DerivedClassWithIVars {
 bb0(%0 : $DerivedClassWithIVars):
   %1 = alloc_box $DerivedClassWithIVars
-  %3 = mark_uninitialized [derivedself] %0 : $DerivedClassWithIVars
-  store %3 to %1#1 : $*DerivedClassWithIVars
+  %3 = mark_uninitialized [derivedself] %1#1 : $*DerivedClassWithIVars
+  store %0 to %3 : $*DerivedClassWithIVars
 
-  %11 = load %1#1 : $*DerivedClassWithIVars
+  %11 = load %3 : $*DerivedClassWithIVars
   %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars
   %14 = function_ref @superinit : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
   %15 = apply %14(%13) : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars     // expected-error {{property 'self.a' not initialized at super.init call}}
 
   %16 = unconditional_checked_cast %15 : $RootClassWithIVars to $DerivedClassWithIVars
-  assign %16 to %1#1 : $*DerivedClassWithIVars
-  %18 = load %1#1 : $*DerivedClassWithIVars
+  assign %16 to %3 : $*DerivedClassWithIVars
+  %18 = load %3 : $*DerivedClassWithIVars
   strong_retain %18 : $DerivedClassWithIVars
   strong_release %1#0 : $Builtin.NativeObject
   return %18 : $DerivedClassWithIVars
@@ -775,10 +775,10 @@ bb0(%0 : $RootClassWithNontrivialStoredProperties):
 sil @test_derived_release : $@cc(method) @thin (@owned DerivedClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   %1 = alloc_stack $DerivedClassWithNontrivialStoredProperties
-  %4 = mark_uninitialized [derivedself] %0 : $DerivedClassWithNontrivialStoredProperties
-  store %4 to %1#1 : $*DerivedClassWithNontrivialStoredProperties
+  %4 = mark_uninitialized [derivedself] %1#1 : $*DerivedClassWithNontrivialStoredProperties
+  store %0 to %4 : $*DerivedClassWithNontrivialStoredProperties
 
-  destroy_addr %1#1 : $*DerivedClassWithNontrivialStoredProperties // expected-error{{all stored properties of a class instance must be initialized before returning nil from an initializer}}
+  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties // expected-error{{all stored properties of a class instance must be initialized before returning nil from an initializer}}
   dealloc_stack %1#0 : $*@local_storage DerivedClassWithNontrivialStoredProperties
 
   %13 = tuple ()
@@ -794,7 +794,8 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
 // CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]#1
 // CHECK-NEXT: ref_element_addr [[SELF]]
 // CHECK-NEXT: store
-// CHECK-NEXT: ref_element_addr %0
+// CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]#1
+// CHECK-NEXT: ref_element_addr [[SELF]]
 // CHECK-NEXT: destroy_addr
 // CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]#1
 // CHECK-NEXT: dealloc_ref [[SELF]]
@@ -803,15 +804,15 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
 sil @test_derived_partial_release : $@cc(method) @thin (@owned DerivedClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   %1 = alloc_stack $DerivedClassWithNontrivialStoredProperties
-  %4 = mark_uninitialized [derivedself] %0 : $DerivedClassWithNontrivialStoredProperties
-  store %4 to %1#1 : $*DerivedClassWithNontrivialStoredProperties
+  %4 = mark_uninitialized [derivedself] %1#1 : $*DerivedClassWithNontrivialStoredProperties
+  store %0 to %4 : $*DerivedClassWithNontrivialStoredProperties
 
   %8 = alloc_ref $SomeClass
-  %9 = load %1#1 : $*DerivedClassWithNontrivialStoredProperties
+  %9 = load %4 : $*DerivedClassWithNontrivialStoredProperties
   %10 = ref_element_addr %9 : $DerivedClassWithNontrivialStoredProperties, #DerivedClassWithNontrivialStoredProperties.a
   assign %8 to %10 : $*SomeClass
 
-  destroy_addr %1#1 : $*DerivedClassWithNontrivialStoredProperties // expected-error{{all stored properties of a class instance must be initialized before returning nil from an initializer}}
+  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties // expected-error{{all stored properties of a class instance must be initialized before returning nil from an initializer}}
   dealloc_stack %1#0 : $*@local_storage DerivedClassWithNontrivialStoredProperties
 
   %13 = tuple ()
@@ -828,8 +829,8 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
 sil @test_delegating_release : $@cc(method) @thin (@owned RootClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : $RootClassWithNontrivialStoredProperties):
   %2 = alloc_box $RootClassWithNontrivialStoredProperties
-  %4 = mark_uninitialized [delegatingself] %0 : $RootClassWithNontrivialStoredProperties
-  store %4 to %2#1 : $*RootClassWithNontrivialStoredProperties
+  %4 = mark_uninitialized [delegatingself] %2#1 : $*RootClassWithNontrivialStoredProperties
+  store %0 to %4 : $*RootClassWithNontrivialStoredProperties
   strong_release %2#0 : $Builtin.NativeObject  // expected-error {{all stored properties of a class instance must be initialized before returning nil from an initializer}}
 
   %13 = tuple ()
@@ -846,10 +847,10 @@ bb0(%0 : $RootClassWithNontrivialStoredProperties):
 sil @test_delegating_derived_release : $@cc(method) @thin (@owned DerivedClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   %2 = alloc_stack $DerivedClassWithNontrivialStoredProperties
-  %4 = mark_uninitialized [delegatingself] %0 : $DerivedClassWithNontrivialStoredProperties
-  store %4 to %2#1 : $*DerivedClassWithNontrivialStoredProperties
+  %4 = mark_uninitialized [delegatingself] %2#1 : $*DerivedClassWithNontrivialStoredProperties
+  store %0 to %4 : $*DerivedClassWithNontrivialStoredProperties
 
-  destroy_addr %2#1 : $*DerivedClassWithNontrivialStoredProperties // expected-error{{all stored properties of a class instance must be initialized before returning nil from an initializer}}
+  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties // expected-error{{all stored properties of a class instance must be initialized before returning nil from an initializer}}
   dealloc_stack %2#0 : $*@local_storage DerivedClassWithNontrivialStoredProperties
 
   %13 = tuple ()
@@ -861,22 +862,22 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
 sil @super_init_out_of_order :  $@cc(method) @thin (@owned DerivedClassWithIVars, Int) -> @owned DerivedClassWithIVars {
 bb0(%0 : $DerivedClassWithIVars, %i : $Int):
   %1 = alloc_box $DerivedClassWithIVars
-  %3 = mark_uninitialized [derivedself] %0 : $DerivedClassWithIVars
-  store %3 to %1#1 : $*DerivedClassWithIVars
+  %3 = mark_uninitialized [derivedself] %1#1 : $*DerivedClassWithIVars
+  store %0 to %3 : $*DerivedClassWithIVars
 
   // Initialize properties in derived class.
-  %8 = load %1#1 : $*DerivedClassWithIVars
+  %8 = load %3 : $*DerivedClassWithIVars
   %9 = ref_element_addr %8 : $DerivedClassWithIVars, #DerivedClassWithIVars.a
   assign %i to %9 : $*Int
 
 
   // Get the super.init function information, but don't apply it.
-  %11 = load %1#1 : $*DerivedClassWithIVars
+  %11 = load %3 : $*DerivedClassWithIVars
   %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars
   %14 = function_ref @superinit : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
 
   // Access a super property before super.init is called.
-  %a = load %1#1 : $*DerivedClassWithIVars
+  %a = load %3 : $*DerivedClassWithIVars
   %b = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars  // expected-error {{use of 'self' in property access 'x' before super.init initializes self}}
   %c = ref_element_addr %b : $RootClassWithIVars, #RootClassWithIVars.x
   load %c : $*Int
@@ -885,8 +886,8 @@ bb0(%0 : $DerivedClassWithIVars, %i : $Int):
   %15 = apply %14(%13) : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
 
   %16 = unconditional_checked_cast %15 : $RootClassWithIVars to $DerivedClassWithIVars
-  assign %16 to %1#1 : $*DerivedClassWithIVars
-  %18 = load %1#1 : $*DerivedClassWithIVars
+  assign %16 to %3 : $*DerivedClassWithIVars
+  %18 = load %3 : $*DerivedClassWithIVars
   strong_retain %18 : $DerivedClassWithIVars
   strong_release %1#0 : $Builtin.NativeObject
   return %18 : $DerivedClassWithIVars

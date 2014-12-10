@@ -258,13 +258,13 @@ class RootClass {
   // CHECK-LABEL: sil hidden @_TFC21failable_initializers9RootClasscfMS0_FT16delegatesOptNormSb_GSqS0__
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box $RootClass
   // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [delegatingself]
-  // CHECK:         store [[SELF_MARKED]] to [[SELF_BOX]]
-  // CHECK:         [[SELF_TAKEN:%.*]] = load [[SELF_BOX]]
+  // CHECK:         store %1 to [[SELF_MARKED]]
+  // CHECK:         [[SELF_TAKEN:%.*]] = load [[SELF_MARKED]]
   // CHECK:         [[INIT:%.*]] = class_method [[SELF_TAKEN]] : $RootClass, #RootClass.init
   // CHECK:         [[NEW_SELF:%.*]] = apply [[INIT]]({{.*}}, [[SELF_TAKEN]])
-  // CHECK:         store [[NEW_SELF]] to [[SELF_BOX]]
+  // CHECK:         store [[NEW_SELF]] to [[SELF_MARKED]]
 
-  // CHECK:         [[RESULT_SELF:%.*]] = load [[SELF_BOX]]
+  // CHECK:         [[RESULT_SELF:%.*]] = load [[SELF_MARKED]]
   // CHECK:         strong_retain [[RESULT_SELF]]
   // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         [[SOME:%.*]] = enum $Optional<RootClass>, #Optional.Some!enumelt.1, [[RESULT_SELF]]
@@ -279,8 +279,8 @@ class RootClass {
   // CHECK-LABEL: sil hidden @_TFC21failable_initializers9RootClasscfMS0_FT15delegatesOptOptSb_GSqS0__
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box $RootClass
   // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [delegatingself]
-  // CHECK:         store [[SELF_MARKED]] to [[SELF_BOX]]
-  // CHECK:         [[SELF_TAKEN:%.*]] = load [[SELF_BOX]]
+  // CHECK:         store %1 to [[SELF_MARKED]]
+  // CHECK:         [[SELF_TAKEN:%.*]] = load [[SELF_MARKED]]
   // CHECK:         [[INIT:%.*]] = class_method [[SELF_TAKEN]] : $RootClass, #RootClass.init
   // CHECK:         [[NEW_SELF_OPT:%.*]] = apply [[INIT]]({{.*}}, [[SELF_TAKEN]])
   // CHECK:         [[NEW_SELF_OPT_MAT:%.*]] = alloc_stack $Optional<RootClass>
@@ -305,11 +305,11 @@ class RootClass {
   // CHECK:         [[TMP:%.*]] = alloc_stack $RootClass
   // CHECK:         apply [transparent] [[GET_OPTIONAL_VALUE]]<RootClass>([[TMP]]#1, [[NEW_SELF_OPT_MAT]]#1)
   // CHECK:         [[NEW_SELF:%.*]] = load [[TMP]]
-  // CHECK:         store [[NEW_SELF]] to [[SELF_BOX]]
+  // CHECK:         store [[NEW_SELF]] to [[SELF_MARKED]]
   // CHECK:         dealloc_stack [[TMP]]
   // CHECK:         dealloc_stack [[NEW_SELF_OPT_MAT]]
 
-  // CHECK:         [[SELF_RESULT:%.*]] = load [[SELF_BOX]]
+  // CHECK:         [[SELF_RESULT:%.*]] = load [[SELF_MARKED]]
   // CHECK:         strong_retain [[SELF_RESULT]]
   // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         [[SOME:%.*]] = enum $Optional<RootClass>, #Optional.Some!enumelt.1, [[SELF_RESULT]]
