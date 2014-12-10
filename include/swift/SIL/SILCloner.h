@@ -1234,6 +1234,22 @@ SILCloner<ImplClass>::visitMarkDependenceInst(MarkDependenceInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitStrongPinInst(StrongPinInst *Inst) {
+  doPostProcess(Inst,
+    getBuilder().createStrongPin(getOpLocation(Inst->getLoc()),
+                                 getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitStrongUnpinInst(StrongUnpinInst *Inst) {
+  doPostProcess(Inst,
+    getBuilder().createStrongUnpin(getOpLocation(Inst->getLoc()),
+                                   getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitStrongReleaseInst(StrongReleaseInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createStrongRelease(getOpLocation(Inst->getLoc()),

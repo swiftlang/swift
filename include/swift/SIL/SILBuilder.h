@@ -785,6 +785,12 @@ public:
   createStrongRetainAutoreleased(SILLocation Loc, SILValue Operand) {
     return insert(new (F.getModule()) StrongRetainAutoreleasedInst(Loc, Operand));
   }
+  StrongPinInst *createStrongPin(SILLocation Loc, SILValue Operand) {
+    return insert(new (F.getModule()) StrongPinInst(Loc, Operand));
+  }
+  StrongUnpinInst *createStrongUnpin(SILLocation Loc, SILValue Operand) {
+    return insert(new (F.getModule()) StrongUnpinInst(Loc, Operand));
+  }
   StrongRetainUnownedInst *createStrongRetainUnowned(SILLocation Loc,
                                                      SILValue Operand) {
     return insert(new (F.getModule()) StrongRetainUnownedInst(Loc, Operand));

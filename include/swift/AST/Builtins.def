@@ -165,6 +165,14 @@ BUILTIN_SIL_OPERATION(Release, "release", Special)
 /// autorelease: T -> ()
 BUILTIN_SIL_OPERATION(Autorelease, "autorelease", Special)
 
+// The pin operations return T only because Optional isn't intrinsic.
+
+/// tryPin: Builtin.NativeObject -> T
+BUILTIN_SIL_OPERATION(TryPin, "tryPin", Special)
+
+/// unpin: T -> ()
+BUILTIN_SIL_OPERATION(Unpin, "unpin", Special)
+
 /// Load has type (Builtin.RawPointer) -> T
 BUILTIN_SIL_OPERATION(Load, "load", Special)
 

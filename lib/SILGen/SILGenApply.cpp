@@ -2346,7 +2346,54 @@ namespace {
     gen.B.createAutoreleaseValue(loc, args[0].getValue());
     return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
   }
+
+  static bool requireIsOptionalNativeObject(SILGenFunction &gen,
+                                             SILLocation loc,
+                                             Type type) {
+    if (auto valueType = type->getOptionalObjectType())
+      if (valueType->is<BuiltinNativeObjectType>())
+        return true;
+
+    gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
+                "type of pin handle must be Optional<Builtin.NativeObject>");
+    return false;
+  }
   
+  static ManagedValue emitBuiltinTryPin(SILGenFunction &gen,
+                                        SILLocation loc,
+                                        ArrayRef<Substitution> subs,
+                                        ArrayRef<ManagedValue> args,
+                                        SGFContext C) {
+    assert(args.size() == 1);
+
+    if (!requireIsOptionalNativeObject(gen, loc, subs[0].getReplacement())) {
+      return gen.emitUndef(loc, subs[0].getReplacement());
+    }
+
+    // The value was produced at +1, but pinning is only a conditional
+    // retain, so we have to leave the cleanup in place.  TODO: try to
+    // emit the argument at +0.
+    SILValue result = gen.B.createStrongPin(loc, args[0].getValue());
+
+    // The handle, if non-null, is effectively +1.
+    return gen.emitManagedRValueWithCleanup(result);
+  }
+
+  static ManagedValue emitBuiltinUnpin(SILGenFunction &gen,
+                                       SILLocation loc,
+                                       ArrayRef<Substitution> subs,
+                                       ArrayRef<ManagedValue> args,
+                                       SGFContext C) {
+    assert(args.size() == 1);
+
+    if (requireIsOptionalNativeObject(gen, loc, subs[0].getReplacement())) {
+      // Unpinning takes responsibility for the +1 handle.
+      gen.B.createStrongUnpin(loc, args[0].forward(gen));
+    }
+
+    return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
+  }
+
   /// Specialized emitter for Builtin.load and Builtin.take.
   static ManagedValue emitBuiltinLoadOrTake(SILGenFunction &gen,
                                             SILLocation loc,

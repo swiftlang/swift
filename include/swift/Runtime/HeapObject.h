@@ -170,13 +170,13 @@ extern "C" bool swift_isDeallocating(HeapObject *object);
 /// The standard protocol is that the caller is responsible for
 /// calling swift_unpin on the return value.
 ///
-/// The object reference may be nil.
+/// The object reference may not be nil.
 extern "C" HeapObject *swift_tryPin(HeapObject *object);
 
 /// Given that an object is pinned, atomically unpin it and decrement
 /// the reference count.
 ///
-/// The object reference may be nil.
+/// The object reference may be nil (to simplify the protocol).
 extern "C" void swift_unpin(HeapObject *object);
   
 /// Atomically decrements the retain count of an object.  If the

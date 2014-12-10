@@ -303,7 +303,7 @@ void swift::swift_weakRelease(HeapObject *object) {
 }
 
 HeapObject *swift::swift_tryPin(HeapObject *object) {
-  if (!object) return nullptr;
+  assert(object);
 
   // Try to set the flag.  If this succeeds, the caller will be
   // responsible for clearing it.

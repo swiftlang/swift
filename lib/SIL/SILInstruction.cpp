@@ -1071,8 +1071,14 @@ MarkFunctionEscapeInst::MarkFunctionEscapeInst(SILLocation Loc,
     Operands(this, Elems) {
 }
 
+static SILType getPinResultType(SILType operandType) {
+  return SILType::getPrimitiveObjectType(
+    OptionalType::get(operandType.getSwiftRValueType())->getCanonicalType());
+}
 
-
+StrongPinInst::StrongPinInst(SILLocation loc, SILValue operand)
+  : UnaryInstructionBase(loc, operand, getPinResultType(operand.getType())) {
+}
 
 StoreWeakInst::StoreWeakInst(SILLocation loc, SILValue value, SILValue dest,
                              IsInitialization_t isInit)

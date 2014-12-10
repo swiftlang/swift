@@ -939,6 +939,21 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
   return getBuiltinFunction(Id, InFields, OutTy);
 }
 
+static ValueDecl *getTryPinOperation(ASTContext &ctx, Identifier name) {
+  // <T> NativeObject -> T
+  // (T must actually be NativeObject?)
+
+  TupleTypeElt params[] = { ctx.TheNativeObjectType };
+
+  Type genericTy;
+  Type archetypeTy;
+  GenericParamList *paramList;
+  std::tie(genericTy, archetypeTy, paramList) = getGenericParam(ctx);
+
+  return getBuiltinGenericFunction(name, params, params,
+                                   genericTy, archetypeTy, paramList);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -1336,10 +1351,14 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 #define BUILTIN_CAST_OR_BITCAST_OPERATION(id, name, attrs)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
     return getCastOperation(Context, Id, BV, Types);
-      
+
+  case BuiltinValueKind::TryPin:
+    return getTryPinOperation(Context, Id);
+
   case BuiltinValueKind::Retain:
   case BuiltinValueKind::Release:
   case BuiltinValueKind::Autorelease:
+  case BuiltinValueKind::Unpin:
     if (!Types.empty()) return nullptr;
     return getRefCountingOperation(Context, Id);
       

@@ -190,6 +190,8 @@ public:
   void emitRetainCall(llvm::Value *value);
   void emitRelease(llvm::Value *value);
   void emitRetainUnowned(llvm::Value *value);
+  llvm::Value *emitTryPin(llvm::Value *object);
+  void emitUnpin(llvm::Value *handle);
   void emitUnownedRetain(llvm::Value *value);
   void emitUnownedRelease(llvm::Value *value);
   void emitFixLifetime(llvm::Value *value);

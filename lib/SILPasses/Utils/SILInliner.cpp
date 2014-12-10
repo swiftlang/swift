@@ -345,10 +345,12 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::RefToUnownedInst:
     case ValueKind::StoreInst:
     case ValueKind::StoreWeakInst:
+    case ValueKind::StrongPinInst:
     case ValueKind::StrongReleaseInst:
     case ValueKind::StrongRetainAutoreleasedInst:
     case ValueKind::StrongRetainInst:
     case ValueKind::StrongRetainUnownedInst:
+    case ValueKind::StrongUnpinInst:
     case ValueKind::SuperMethodInst:
     case ValueKind::SwitchEnumAddrInst:
     case ValueKind::SwitchEnumInst:

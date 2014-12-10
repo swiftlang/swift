@@ -790,9 +790,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::MarkUninitializedInst:
   case ValueKind::FixLifetimeInst:
   case ValueKind::CopyBlockInst:
+  case ValueKind::StrongPinInst:
   case ValueKind::StrongReleaseInst:
   case ValueKind::StrongRetainInst:
   case ValueKind::StrongRetainAutoreleasedInst:
+  case ValueKind::StrongUnpinInst:
   case ValueKind::AutoreleaseReturnInst:
   case ValueKind::StrongRetainUnownedInst:
   case ValueKind::UnownedRetainInst:

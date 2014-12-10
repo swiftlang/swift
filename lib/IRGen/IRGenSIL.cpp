@@ -628,6 +628,8 @@ public:
   void visitFixLifetimeInst(FixLifetimeInst *i);
   void visitMarkDependenceInst(MarkDependenceInst *i);
   void visitCopyBlockInst(CopyBlockInst *i);
+  void visitStrongPinInst(StrongPinInst *i);
+  void visitStrongUnpinInst(StrongUnpinInst *i);
   void visitStrongRetainInst(StrongRetainInst *i);
   void visitStrongReleaseInst(StrongReleaseInst *i);
   void visitStrongRetainAutoreleasedInst(StrongRetainAutoreleasedInst *i);
@@ -2760,6 +2762,22 @@ void IRGenSILFunction::visitCopyBlockInst(CopyBlockInst *i) {
   Explosion result;
   result.add(copied);
   setLoweredExplosion(SILValue(i, 0), result);
+}
+
+void IRGenSILFunction::visitStrongPinInst(swift::StrongPinInst *i) {
+  Explosion lowered = getLoweredExplosion(i->getOperand());
+  llvm::Value *object = lowered.claimNext();
+  llvm::Value *pinHandle = emitTryPin(object);
+
+  Explosion result;
+  result.add(pinHandle);
+  setLoweredExplosion(i, result);
+}
+
+void IRGenSILFunction::visitStrongUnpinInst(swift::StrongUnpinInst *i) {
+  Explosion lowered = getLoweredExplosion(i->getOperand());
+  llvm::Value *pinHandle = lowered.claimNext();
+  emitUnpin(pinHandle);
 }
 
 void IRGenSILFunction::visitStrongRetainInst(swift::StrongRetainInst *i) {

@@ -709,6 +709,25 @@ void IRGenFunction::emitBridgeRelease(llvm::Value *value) {
   emitUnaryRefCountCall(*this, IGM.getBridgeObjectReleaseFn(), value);
 }
 
+llvm::Value *IRGenFunction::emitTryPin(llvm::Value *value) {
+  llvm::CallInst *call = Builder.CreateCall(IGM.getTryPinFn(), value);
+  call->setCallingConv(IGM.RuntimeCC);
+  call->setDoesNotThrow();
+
+  // Builtin.NativeObject? has representation i32/i64.
+  llvm::Value *handle = Builder.CreatePtrToInt(value, IGM.IntPtrTy);
+  return handle;
+}
+
+void IRGenFunction::emitUnpin(llvm::Value *value) {
+  // Builtin.NativeObject? has representation i32/i64.
+  value = Builder.CreateIntToPtr(value, IGM.RefCountedPtrTy);
+
+  llvm::CallInst *call = Builder.CreateCall(IGM.getUnpinFn(), value);
+  call->setCallingConv(IGM.RuntimeCC);
+  call->setDoesNotThrow();
+}
+
 #define DEFINE_VALUE_OP(ID)                                           \
 void IRGenFunction::emit##ID(llvm::Value *value) {                    \
   if (doesNotRequireRefCounting(value)) return;                       \

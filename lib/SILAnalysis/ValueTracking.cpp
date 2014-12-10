@@ -75,9 +75,11 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::StringLiteralInst:
   case ValueKind::CopyBlockInst:
   case ValueKind::StrongReleaseInst:
+  case ValueKind::StrongPinInst: // Pin handle is independently managed
   case ValueKind::StrongRetainAutoreleasedInst:
   case ValueKind::StrongRetainInst:
   case ValueKind::StrongRetainUnownedInst:
+  case ValueKind::StrongUnpinInst:
   case ValueKind::UnownedReleaseInst:
   case ValueKind::UnownedRetainInst:
   case ValueKind::InjectEnumAddrInst:
@@ -264,7 +266,7 @@ static bool valueMayBeCaptured(SILValue V, CaptureException Exception) {
     // RefCountOperations don't capture.
     //
     // The release case is true since Swift does not allow destructors to
-    // resurrent objects. This is enforced via a runtime failure.
+    // resurrect objects. This is enforced via a runtime failure.
     if (isa<RefCountingInst>(Inst))
       continue;
 

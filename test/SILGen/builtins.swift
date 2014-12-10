@@ -445,3 +445,24 @@ func castBitPatternFromBridgeObject(bo: Builtin.BridgeObject) -> Builtin.Word {
 func markDependence(v: Pointer, base: ClassProto) -> Pointer {
   return Builtin.markDependence(v, base)
 }
+
+// CHECK-LABEL: sil hidden @_TF8builtins8pinUnpinFBoT_ :
+// CHECK-NEXT:  bb0(%0 : $Builtin.NativeObject):
+// CHECK-NEXT:    debug_value
+func pinUnpin(object : Builtin.NativeObject) {
+// CHECK-NEXT:    strong_retain %0 : $Builtin.NativeObject
+// CHECK-NEXT:    [[HANDLE:%.*]] = strong_pin %0 : $Builtin.NativeObject
+// CHECK-NEXT:    debug_value
+// CHECK-NEXT:    strong_release %0 : $Builtin.NativeObject
+  let handle : Builtin.NativeObject? = Builtin.tryPin(object)
+
+// CHECK-NEXT:    retain_value [[HANDLE]] : $Optional<Builtin.NativeObject>
+// CHECK-NEXT:    strong_unpin [[HANDLE]] : $Optional<Builtin.NativeObject>
+  Builtin.unpin(handle)
+
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    release_value [[HANDLE]] : $Optional<Builtin.NativeObject>
+// CHECK-NEXT:    strong_release %0 : $Builtin.NativeObject
+// CHECK-NEXT:    [[T0:%.*]] = tuple ()
+// CHECK-NEXT:    return [[T0]] : $()
+}

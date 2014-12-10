@@ -6547,3 +6547,17 @@ ManagedValue SILGenFunction::emitRValueAsSingleValue(Expr *E, SGFContext C) {
   if (rv.isUsed()) return ManagedValue::forInContext();
   return std::move(rv).getAsSingleValue(*this, E);
 }
+
+static ManagedValue emitUndef(SILGenFunction &gen, SILLocation loc,
+                              const TypeLowering &undefTL) {
+  SILValue undef = SILUndef::get(undefTL.getLoweredType(), gen.SGM.M);
+  return gen.emitManagedRValueWithCleanup(undef, undefTL);
+}
+
+ManagedValue SILGenFunction::emitUndef(SILLocation loc, Type type) {
+  return ::emitUndef(*this, loc, getTypeLowering(type));
+}
+
+ManagedValue SILGenFunction::emitUndef(SILLocation loc, SILType type) {
+  return ::emitUndef(*this, loc, getTypeLowering(type));
+}

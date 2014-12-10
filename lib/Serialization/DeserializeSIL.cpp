@@ -1106,6 +1106,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(Return)
   UNARY_INSTRUCTION(FixLifetime)
   UNARY_INSTRUCTION(CopyBlock)
+  UNARY_INSTRUCTION(StrongPin)
+  UNARY_INSTRUCTION(StrongUnpin)
   UNARY_INSTRUCTION(StrongRetain)
   UNARY_INSTRUCTION(StrongRelease)
   UNARY_INSTRUCTION(StrongRetainAutoreleased)

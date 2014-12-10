@@ -1679,6 +1679,32 @@ public:
     : UnaryInstructionBase(loc, operand) {}
 };
 
+/// StrongPinInst - Ensure that the operand is retained and pinned, if
+/// not by this operation then by some enclosing pin.
+///
+/// Transformations must not do anything which reorders pin and unpin
+/// operations.  (This should generally be straightforward, as pin and
+/// unpin may be conservatively assumed to have arbitrary
+/// side-effects.)
+class StrongPinInst
+  : public UnaryInstructionBase<ValueKind::StrongPinInst, SILInstruction,
+                                /*HasResult*/ true>
+{
+public:
+  StrongPinInst(SILLocation loc, SILValue operand);
+};
+
+/// StrongUnpinInst - Given that the operand is the result of a
+/// strong_pin instruction, unpin it.
+class StrongUnpinInst
+  : public UnaryInstructionBase<ValueKind::StrongUnpinInst, SILInstruction,
+                                /*HasResult*/ false>
+{
+public:
+  StrongUnpinInst(SILLocation loc, SILValue operand)
+    : UnaryInstructionBase(loc, operand) {}
+};
+
 /// TupleInst - Represents a constructed loadable tuple.
 class TupleInst : public SILInstruction {
   TailAllocatedOperandList<0> Operands;

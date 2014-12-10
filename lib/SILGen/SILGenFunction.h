@@ -634,6 +634,10 @@ public:
   /// Emit the given expression as an r-value, then (if it is a tuple), combine
   /// it together into a single ManagedValue.
   ManagedValue emitRValueAsSingleValue(Expr *E, SGFContext C = SGFContext());
+
+  /// Emit 'undef' in a particular formal type.
+  ManagedValue emitUndef(SILLocation loc, Type type);
+  ManagedValue emitUndef(SILLocation loc, SILType type);
   
   std::pair<ManagedValue, SILValue>
   emitUninitializedArrayAllocation(Type ArrayTy,

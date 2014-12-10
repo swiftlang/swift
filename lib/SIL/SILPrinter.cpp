@@ -1109,6 +1109,12 @@ public:
   void visitStrongReleaseInst(StrongReleaseInst *RI) {
     OS << "strong_release " << getIDAndType(RI->getOperand());
   }
+  void visitStrongPinInst(StrongPinInst *PI) {
+    OS << "strong_pin " << getIDAndType(PI->getOperand());
+  }
+  void visitStrongUnpinInst(StrongUnpinInst *UI) {
+    OS << "strong_unpin " << getIDAndType(UI->getOperand());
+  }
   void visitStrongRetainUnownedInst(StrongRetainUnownedInst *RI) {
     OS << "strong_retain_unowned " << getIDAndType(RI->getOperand());
   }
