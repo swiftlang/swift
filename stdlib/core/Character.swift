@@ -291,7 +291,7 @@ extension String {
   }
 }
 
-/// .Small characters are stored in a Int63 with their UTF-8 representation,
+/// .Small characters are stored in an Int63 with their UTF-8 representation,
 /// with any unused bytes set to 0xFF. ASCII characters will have all bytes set
 /// to 0xFF except for the lowest byte, which will store the ASCII value. Since
 /// 0x7FFFFFFFFFFFFF80 or greater is an invalid UTF-8 sequence, we know if a
