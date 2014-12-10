@@ -85,6 +85,13 @@ class DeadFunctionElimination {
     return entry;
   }
   
+  /// Adds a function which implements a vtable or witness method.
+  void addImplementingFunction(MethodInfo *mi, SILFunction *F) {
+    if (mi->isAlive)
+      ensureAlive(F);
+    mi->implementingFunctions.push_back(F);
+  }
+
   /// Returns true if a function is marked as alive.
   bool isAlive(SILFunction *F) {
     return AliveFunctions.count(F) != 0;
@@ -94,6 +101,7 @@ class DeadFunctionElimination {
   void ensureAlive(SILFunction *F) {
     if (!isAlive(F)) {
       AliveFunctions.insert(F);
+      assert(F && "function does not exist");
       Worklist.insert(F);
     }
   }
@@ -133,15 +141,26 @@ class DeadFunctionElimination {
     }
   }
   
-  /// Retrieve the visiblity information from the AST accessibility.
-  bool isVisibleExternally(Accessibility accessibility) {
+  /// Retrieve the visiblity information from the AST.
+  bool isVisibleExternally(ValueDecl *decl) {
+    Accessibility accessibility = decl->getAccessibility();
     SILLinkage linkage;
     switch (accessibility) {
       case Accessibility::Private: linkage = SILLinkage::Private; break;
       case Accessibility::Internal: linkage = SILLinkage::Hidden; break;
       case Accessibility::Public: linkage = SILLinkage::Public; break;
     }
-    return isPossiblyUsedExternally(linkage, Module->isWholeModule());
+    if (isPossiblyUsedExternally(linkage, Module->isWholeModule()))
+      return true;
+    
+    // If a vtable or witness table (method) is only visible in another module
+    // it can be accessed inside that module and we don't see this access.
+    // We hit this case e.g. if a table is imported from the stdlib.
+    if (decl->getDeclContext()->getParentModule() !=
+        Module->getAssociatedContext()->getParentModule())
+      return true;
+    
+    return false;
   }
   
   /// Find all functions which are alive from the beginning.
@@ -155,10 +174,7 @@ class DeadFunctionElimination {
         auto *fd = dyn_cast<AbstractFunctionDecl>(entry.first.getDecl());
         fd = getBase(fd);
         MethodInfo *mi = getMethodInfo(fd);
-        if (mi->isAlive) {
-          ensureAlive(F);
-        }
-        mi->implementingFunctions.push_back(F);
+        addImplementingFunction(mi, F);
         
         if (// Destructors are alive because they are called from swift_release
             entry.first.isDestructor()
@@ -168,7 +184,7 @@ class DeadFunctionElimination {
             // We also have to check the method declaration's accessibility.
             // Needed if it's a public base method declared in another
             // compilation unit (for this we have no SILFunction).
-            || isVisibleExternally(fd->getAccessibility())
+            || isVisibleExternally(fd)
             // Declarations are always accessible externally, so they are alive.
             || !F->isDefinition()) {
           ensureAlive(mi);
@@ -178,14 +194,20 @@ class DeadFunctionElimination {
     
     // Check witness methods.
     for (SILWitnessTable &WT : Module->getWitnessTableList()) {
+      bool tableIsAlive = isVisibleExternally(WT.getConformance()->getProtocol());
       for (const SILWitnessTable::Entry &entry : WT.getEntries()) {
         if (entry.getKind() == SILWitnessTable::Method) {
           auto methodWitness = entry.getMethodWitness();
           auto *fd = dyn_cast<AbstractFunctionDecl>(methodWitness.Requirement.
                                                     getDecl());
           assert(fd == getBase(fd) && "key in witness table is overridden");
-          MethodInfo *mi = getMethodInfo(fd);
-          mi->implementingFunctions.push_back(methodWitness.Witness);
+          SILFunction *F = methodWitness.Witness;
+          if (F) {
+            MethodInfo *mi = getMethodInfo(fd);
+            addImplementingFunction(mi, F);
+            if (tableIsAlive || !F->isDefinition())
+              ensureAlive(mi);
+          }
         }
       }
     }
