@@ -450,6 +450,10 @@ number of ways:
 
   - A ``@guaranteed`` parameter is a guaranteed direct parameter.
 
+  - An ``@in_guaranteed`` parameter is indirect.  The address must be of an
+    initialized object; both the caller and callee promise not to mutate the
+    pointee, allowing the callee to read it.
+
   - Otherwise, the parameter is an unowned direct parameter.
 
 - A SIL function type declares the convention for its direct result.
