@@ -1,3 +1,5 @@
+// a ==> b --> c ==> d | e ==> c
+
 // RUN: rm -rf %t && cp -r %S/Inputs/private/ %t
 // RUN: touch -t 201401240005 %t/*
 

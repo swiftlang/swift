@@ -1,3 +1,6 @@
+/// other --> main ==> yet-another
+/// other ==>+ main ==> yet-another
+
 // RUN: rm -rf %t && cp -r %S/Inputs/chained-private-after/ %t
 // RUN: touch -t 201401240005 %t/*.swift
 // RUN: touch -t 201401240006 %t/*.o

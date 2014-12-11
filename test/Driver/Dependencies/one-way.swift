@@ -1,3 +1,5 @@
+/// other ==> main
+
 // RUN: rm -rf %t && cp -r %S/Inputs/one-way/ %t
 // RUN: touch -t 201401240005 %t/*
 

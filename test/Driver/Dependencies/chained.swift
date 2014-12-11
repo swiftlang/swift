@@ -1,3 +1,5 @@
+// other ==> main ==> yet-another
+
 // RUN: rm -rf %t && cp -r %S/Inputs/chained/ %t
 // RUN: touch -t 201401240005 %t/*
 
