@@ -54,6 +54,9 @@ extension String {
           _asciiUpperCaseTable >>
           UInt64(((value &- 1) & 0b0111_1111) >> 1)
         let add = (isUpper & 0x1) << 5
+        // Since we are left with either 0x0 or 0x20, we can safely truncate to
+        // a UInt8 and add to our ASCII value (this will not overflow numbers in
+        // the ASCII range).
         dest[i] = value &+ UInt8(truncatingBitPattern: add)
       }
       return String(_storage: buffer)
