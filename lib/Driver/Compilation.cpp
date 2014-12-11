@@ -146,6 +146,8 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
     switch (Condition) {
     case Job::Condition::Always:
       scheduleCommandIfNecessaryAndPossible(Cmd);
+      if (!NeedToRunEverything && !DependenciesFile.empty())
+        DepGraph.markIntransitive(Cmd);
       break;
     case Job::Condition::CheckDependencies:
       DeferredCommands.insert(Cmd);
@@ -232,6 +234,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
         Output.getAdditionalOutputForType(types::TY_SwiftDeps);
       if (!DependenciesFile.empty()) {
         SmallVector<const Job *, 16> Dependents;
+        bool wasNonPrivate = DepGraph.isMarked(FinishedCmd);
 
         switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
         case DependencyGraphImpl::LoadResult::HadError:
@@ -244,7 +247,8 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
         case DependencyGraphImpl::LoadResult::NeedsRebuilding:
           llvm_unreachable("currently unused");
         case DependencyGraphImpl::LoadResult::Valid:
-          DepGraph.markTransitive(Dependents, FinishedCmd);
+          if (wasNonPrivate)
+            DepGraph.markTransitive(Dependents, FinishedCmd);
           break;
         }
 

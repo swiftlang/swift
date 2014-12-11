@@ -56,11 +56,14 @@ public:
   };
 
 private:
+  enum class DependencyFlags : uint8_t;
   using DependencyMaskTy = OptionSet<DependencyKind>;
+  using DependencyFlagsTy = OptionSet<DependencyFlags>;
 
   struct DependencyEntryTy {
     const void *node;
     DependencyMaskTy kindMask;
+    DependencyFlagsTy flags;
   };
   static_assert(std::is_move_constructible<DependencyEntryTy>::value, "");
 
@@ -101,6 +104,10 @@ protected:
   LoadResult loadFromPath(const void *node, StringRef path);
   void markTransitive(SmallVectorImpl<const void *> &visited,
                       const void *node);
+  bool markIntransitive(const void *node) {
+    assert(Provides.count(node) && "node is not in the graph");
+    return Marked.insert(node).second;
+  }
 
   bool isMarked(const void *node) const {
     assert(Provides.count(node) && "node is not in the graph");
@@ -116,10 +123,7 @@ protected:
 /// different kinds of dependencies. A node's "provides" set is matched up
 /// with other nodes' "depends" sets to form a traversable directed graph.
 /// Information on a particular node can be updated at any time, which will
-/// affect any following operations.
-///
-/// The graph supports a transitive "mark" operation, whose interpretation is
-/// up to the client.
+/// affect any following operations. The "depends" entries can be "private".
 template <typename T>
 class DependencyGraph : public DependencyGraphImpl {
   using Traits = llvm::PointerLikeTypeTraits<T>;
@@ -152,8 +156,12 @@ public:
   /// that get transitively marked into \p visited.
   ///
   /// Nodes that have been previously marked are not included in \p newlyMarked,
-  /// nor are their successors traversed, <em>even if the node's "provides" set
-  /// has been updated since it was marked.</em>
+  /// nor are their successors traversed, <em>even if their "provides" set has
+  /// been updated since it was marked.</em> (However, nodes that depend on the
+  /// given \p node are always traversed.)
+  ///
+  /// Nodes that are only reachable through "private" edges are added to the
+  /// \p visited set, but are \em not added to the graph's marked set.
   template <unsigned N>
   void markTransitive(SmallVector<T, N> &visited, T node) {
     SmallVector<const void *, N> rawMarked;
@@ -166,6 +174,16 @@ public:
       void *rawNode = const_cast<void *>(constRawNode);
       visited.push_back(Traits::getFromVoidPointer(rawNode));
     }
+  }
+
+  /// Marks \p node without marking any dependencies.
+  ///
+  /// \returns true if the node is newly marked, false if not.
+  ///
+  /// \sa #markTransitive
+  bool markIntransitive(T node) {
+    return
+        DependencyGraphImpl::markIntransitive(Traits::getAsVoidPointer(node));
   }
 
   /// Returns true if \p node has been marked (directly or transitively).

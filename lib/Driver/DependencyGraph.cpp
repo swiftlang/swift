@@ -25,10 +25,13 @@ enum class DependencyGraphImpl::DependencyKind : uint8_t {
   Name = 1 << 0,
   Type = 1 << 1
 };
+enum class DependencyGraphImpl::DependencyFlags : uint8_t {
+  IsNonPrivate = 1 << 0
+};
 
 using LoadResult = DependencyGraphImpl::LoadResult;
 using DependencyKind = DependencyGraphImpl::DependencyKind;
-using DependencyCallbackTy = LoadResult(StringRef, DependencyKind);
+using DependencyCallbackTy = LoadResult(StringRef, DependencyKind, bool);
 
 static LoadResult
 parseDependencyFile(llvm::MemoryBuffer &buffer,
@@ -84,7 +87,8 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
         (dirAndKind.second == DependencyDirection::Depends) ? dependsCallback
                                                             : providesCallback;
 
-      switch (callback(entry->getValue(scratch), dirAndKind.first)) {
+      switch (callback(entry->getValue(scratch), dirAndKind.first,
+                       entry->getRawTag() == "!private")) {
       case LoadResult::HadError:
         return LoadResult::HadError;
       case LoadResult::Valid:
@@ -116,8 +120,8 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
                                                llvm::MemoryBuffer &buffer) {
   auto &provides = Provides[node];
 
-  auto dependsCallback = [this, node](StringRef name,
-                                      DependencyKind kind) -> LoadResult {
+  auto dependsCallback = [this, node](StringRef name, DependencyKind kind,
+                                      bool isPrivate) -> LoadResult {
 
     auto &entries = Dependencies[name];
     auto iter = std::find_if(entries.begin(), entries.end(),
@@ -125,10 +129,16 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
       return node == entry.node;
     });
 
-    if (iter == entries.end())
-      entries.push_back({node, kind});
-    else
+    DependencyFlagsTy flags;
+    if (!isPrivate)
+      flags |= DependencyFlags::IsNonPrivate;
+
+    if (iter == entries.end()) {
+      entries.push_back({node, kind, flags});
+    } else {
       iter->kindMask |= kind;
+      iter->flags |= flags;
+    }
 
     // FIXME: This should return NeedsRebuilding if the dependency has already
     // been marked.
@@ -136,8 +146,9 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
   };
 
   auto providesCallback =
-      [this, node, &provides](StringRef name,
-                              DependencyKind kind) -> LoadResult {
+      [this, node, &provides](StringRef name, DependencyKind kind,
+                              bool isPrivate) -> LoadResult {
+    assert(!isPrivate);
     auto iter = std::find_if(provides.begin(), provides.end(),
                              [name](const ProvidesEntryTy &entry) -> bool {
       return name == entry.name;
@@ -158,7 +169,7 @@ void
 DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
                                     const void *node) {
   assert(Provides.count(node) && "node is not in the graph");
-  SmallVector<const void *, 16> worklist;
+  SmallVector<std::pair<const void *, bool>, 16> worklist;
 
   auto addDependentsToWorklist = [&](const void *next) {
     auto allProvided = Provides.find(next);
@@ -175,20 +186,29 @@ DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
           continue;
         if (isMarked(dependent.node))
           continue;
-        worklist.push_back(dependent.node);
+        bool isNonPrivate{dependent.flags & DependencyFlags::IsNonPrivate};
+        worklist.push_back({ dependent.node, isNonPrivate });
       }
     }
   };
 
   // Always mark through the starting node, even if it's already marked.
-  Marked.insert(node);
+  markIntransitive(node);
   addDependentsToWorklist(node);
 
   while (!worklist.empty()) {
-    const void *next = worklist.pop_back_val();
-    if (!Marked.insert(next).second)
+    auto next = worklist.pop_back_val();
+
+    // Is this a private dependency?
+    if (!next.second) {
+      if (!isMarked(next.first))
+        visited.push_back(next.first);
       continue;
-    visited.push_back(next);
-    addDependentsToWorklist(next);
+    }
+
+    addDependentsToWorklist(next.first);
+    if (!markIntransitive(next.first))
+      continue;
+    visited.push_back(next.first);
   }
 }
