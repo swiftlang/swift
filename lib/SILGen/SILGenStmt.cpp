@@ -625,13 +625,14 @@ void SILGenFunction::visitFailStmt(FailStmt *S) {
   // Clean up 'self', which may be constant or variable depending on whether
   // the initializer delegates.
   auto &selfLoc = VarLocs[FailSelfDecl];
-  if (selfLoc.isConstant()) {
-    // Release the 'self' value.
-    B.createStrongRelease(S, selfLoc.getConstant());
-  } else {
+  if (selfLoc.box.isValid()) {
     // Release the box containing 'self'.
-    assert(selfLoc.box.isValid() && "no box for non-constant self?!");
     B.createStrongRelease(S, selfLoc.box);
+  } else {
+    assert(!selfLoc.value.getType().isAddress() &&
+           "Pointer shouldn't be an address");
+    // Release the 'self' value.
+    B.createStrongRelease(S, selfLoc.value);
   }
   
   // Jump to the failure block.

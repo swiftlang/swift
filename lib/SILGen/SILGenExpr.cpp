@@ -438,7 +438,7 @@ static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,
   auto *silG = gen.SGM.getSILGlobalVariable(var, NotForDefinition);
   SILValue addr = B.createGlobalAddr(var, silG);
 
-  gen.VarLocs[var] = SILGenFunction::VarLoc::getAddress(addr);
+  gen.VarLocs[var] = SILGenFunction::VarLoc::get(addr);
   return ManagedValue::forLValue(addr);
 }
 
@@ -451,25 +451,21 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
   // For local decls, use the address we allocated or the value if we have it.
   auto It = VarLocs.find(var);
   if (It != VarLocs.end()) {
-    // If this is a mutable lvalue, return it as an LValue.
-    if (It->second.isAddress())
-      return ManagedValue::forLValue(It->second.getAddress());
-    
-    // If this is an address-only 'let', return its address as an lvalue.
-    if (It->second.getConstant().getType().isAddress())
-      return ManagedValue::forLValue(It->second.getConstant());
+    // If this has an address, return it.  By-value let's have no address.
+    SILValue ptr = It->second.value;
+    if (ptr.getType().isAddress())
+      return ManagedValue::forLValue(ptr);
     
     // Otherwise, it is an RValue let.
     return ManagedValue();
   }
 
   switch (var->getAccessStrategy(semantics, accessKind)) {
-  case AccessStrategy::Storage: {
+  case AccessStrategy::Storage:
     // The only kind of stored variable that should make it to here is
     // a global variable.  Just invoke its accessor function to get its
     // address.
     return emitGlobalVariableRef(*this, loc, var);
-  }
 
   case AccessStrategy::Addressor: {
     LValue lvalue =
@@ -553,11 +549,10 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
     auto It = VarLocs.find(decl);
     if (It != VarLocs.end()) {
       // Mutable lvalue and address-only 'let's are LValues.
-      assert(!It->second.isAddress() &&
-             !It->second.getConstant().getType().isAddress() &&
+      assert(!It->second.value.getType().isAddress() &&
              "LValue cases should be handled above");
 
-      SILValue Scalar = It->second.getConstant();
+      SILValue Scalar = It->second.value;
 
       // For weak and unowned types, convert the reference to the right
       // pointer.
@@ -2858,19 +2853,16 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 
       // Non-address-only constants are passed at +1.
       auto &tl = getTypeLowering(vd->getType()->getReferenceStorageReferent());
-      
+      SILValue Val = Entry.value;
+
       if (tl.isLoadable()) {
-        SILValue Val;
-        if (Entry.isConstant()) {
-          assert(!Entry.getConstant().getType().isAddress());
-          
-          Val = Entry.getConstant();
+        if (!Val.getType().isAddress()) {
+          // Just retain a by-val let.
           B.emitRetainValueOperation(loc, Val);
         } else {
           // If we have a mutable binding for a 'let', such as 'self' in an
           // 'init' method, load it.
-          Val = emitLoad(loc, Entry.getAddress(), tl, SGFContext(), IsNotTake)
-            .forward(*this);
+          Val = emitLoad(loc, Val, tl, SGFContext(), IsNotTake).forward(*this);
         }
         
         // Use an RValue to explode Val if it is a tuple.
@@ -2890,8 +2882,6 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
         break;
       }
       
-      SILValue Val =
-        Entry.isConstant() ? Entry.getConstant() : Entry.getAddress();
       assert(Val.getType().isAddress());
 
       // Address only values are passed by box.  This isn't great, in that a
@@ -2912,11 +2902,10 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
       assert(VarLocs.count(vd) && "no location for captured var!");
       VarLoc vl = VarLocs[vd];
       assert(vl.box && "no box for captured var!");
-      assert(vl.isAddress() && vl.getAddress() &&
-             "no address for captured var!");
+      assert(vl.value.getType().isAddress() && "no address for captured var!");
       B.createStrongRetain(loc, vl.box);
       capturedArgs.push_back(vl.box);
-      capturedArgs.push_back(vl.getAddress());
+      capturedArgs.push_back(vl.value);
       break;
     }
     case CaptureKind::LocalFunction: {
@@ -3607,7 +3596,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   {
     auto &SelfVarLoc = VarLocs[selfDecl];
     selfBox = SelfVarLoc.box;
-    selfLV = SelfVarLoc.getAddress();
+    selfLV = SelfVarLoc.value;
   }
 
   // FIXME: Handle 'self' along with the other body patterns.
@@ -4116,10 +4105,10 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     if (NeedsBoxForSelf) {
       SILLocation prologueLoc = RegularLocation(ctor);
       prologueLoc.markAsPrologue();
-      B.createStore(prologueLoc, selfArg, VarLocs[selfDecl].getAddress());
+      B.createStore(prologueLoc, selfArg, VarLocs[selfDecl].value);
     } else {
       selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
-      VarLocs[selfDecl] = VarLoc::getConstant(selfArg);
+      VarLocs[selfDecl] = VarLoc::get(selfArg);
     }
   }
 
@@ -4201,7 +4190,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     if (Expr *SI = ctor->getSuperInitCall())
       emitRValue(SI);
 
-    selfArg = B.createLoad(cleanupLoc, VarLocs[selfDecl].getAddress());
+    selfArg = B.createLoad(cleanupLoc, VarLocs[selfDecl].value);
     SILValue selfBox = VarLocs[selfDecl].box;
     assert(selfBox);
 
@@ -4242,14 +4231,10 @@ ManagedValue SILGenFunction::emitSelfForDirectPropertyInConstructor(
                                                     VarDecl *selfDecl) {
   assert(selfDecl->getType()->hasReferenceSemantics()
          && "this method only applies to classes");
-  SILValue value;
   auto &selfLoc = VarLocs[selfDecl];
-  if (selfLoc.isAddress()) {
-    auto addr = selfLoc.getAddress();
-    value = B.createLoad(loc, addr);
-  } else {
-    value = selfLoc.getConstant();
-  }
+  SILValue value = selfLoc.value;
+  if (value.getType().isAddress())
+    value = B.createLoad(loc, value);
   return ManagedValue::forUnmanaged(value);
 }
 
@@ -4347,7 +4332,7 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
   selfArg = B.createMarkUninitialized(selfDecl, selfArg,
                                       MarkUninitializedInst::RootSelf);
   assert(selfTy.hasReferenceSemantics() && "can't emit a value type ctor here");
-  VarLocs[selfDecl] = VarLoc::getConstant(selfArg);
+  VarLocs[selfDecl] = VarLoc::get(selfArg);
 
   auto cleanupLoc = CleanupLocation::getCleanupLocation(loc);
   prepareEpilog(TupleType::getEmpty(getASTContext()), cleanupLoc);

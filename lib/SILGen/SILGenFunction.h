@@ -174,42 +174,38 @@ public:
   /// having to put the definition of LValueWriteback in this header.
   void freeWritebackStack();
 
-  /// VarLoc - representation of an emitted local variable.  Local variables can
-  /// either have a singular constant value that is always returned (in which
-  /// case VarLoc holds that value), or may be emitted into a box.  If they are
-  /// emitted into a box, the retainable pointer is also stored.
+  /// VarLoc - representation of an emitted local variable or constant.  There
+  /// are three scenarios here:
+  ///
+  ///  1) This could be a simple "var" or "let" emitted into an alloc_box.  In
+  ///     this case, 'value' contains a pointer (it is always an address) to the
+  ///     value, and 'box' contains a pointer to the retain count for the box.
+  ///  2) This could be a simple non-address-only "let" represented directly. In
+  ///     this case, 'value' is the value of the let and is never of address
+  ///     type.  'box' is always nil.
+  ///  3) This could be an address-only "let" emitted into an alloc_stack, or
+  ///     passed in from somewhere else that has guaranteed lifetime (e.g. an
+  ///     incoming argument of 'in_guaranteed' convention).  In this case,
+  ///     'value' is a pointer to the memory (and thus, its type is always an
+  ///     address) and the 'box' is nil.
+  ///
+  /// Generally, code shouldn't be written to enumerate these three cases, it
+  /// should just handle the case of "box or not" or "address or not", depending
+  /// on what the code cares about.
   struct VarLoc {
-    /// addressOrValue - the address at which the variable is stored, or the
-    /// value of the decl if it is a constant.
-    llvm::PointerIntPair<SILValue, 1, bool> addressOrValue;
-  public:
-    /// box - For a non-constant value, this is the retainable box for the
-    /// variable.  It may be invalid if no box was made for the value (e.g.,
-    /// because it was an inout value, or constant).
+    /// value - the value of the variable, or the address the variable is
+    /// stored at (if "value.getType().isAddress()" is true).
+    SILValue value;
+
+    /// box - This is the retainable box for something emitted to an alloc_box.
+    /// It may be invalid if no box was made for the value (e.g., because it was
+    /// an inout value, or constant emitted to an alloc_stack).
     SILValue box;
 
-    bool isConstant() const { return addressOrValue.getInt(); }
-    bool isAddress() const { return !isConstant(); }
-
-    SILValue getAddress() const {
-      assert(isAddress() && "Can't get the address of a constant");
-      return addressOrValue.getPointer();
-    }
-
-    SILValue getConstant() const {
-      assert(isConstant() && "Emit a load to get the value of an address");
-      return addressOrValue.getPointer();
-    }
-
-    static VarLoc getConstant(SILValue Val) {
+    static VarLoc get(SILValue value, SILValue box = SILValue()) {
       VarLoc Result;
-      Result.addressOrValue.setPointerAndInt(Val, true);
-      return Result;
-    }
-    static VarLoc getAddress(SILValue Addr, SILValue Box = SILValue()) {
-      VarLoc Result;
-      Result.addressOrValue.setPointerAndInt(Addr, false);
-      Result.box = Box;
+      Result.value = value;
+      Result.box = box;
       return Result;
     }
   };

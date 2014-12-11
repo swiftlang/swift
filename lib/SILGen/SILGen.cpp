@@ -432,13 +432,16 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
     SmallVector<SILValue, 4> Captures;
 
     for (auto Capture : AFD->getCaptureInfo().getCaptures()) {
+      // Decls captured by value don't escape.
+      if (auto *CaptureVD = dyn_cast<VarDecl>(Capture))
+        if (CaptureVD->isLet())
+          continue;
+
       auto It = TopLevelSGF->VarLocs.find(Capture);
-      if (It == TopLevelSGF->VarLocs.end() ||
-          // Decls captured by value don't escape.
-          It->second.isConstant())
+      if (It == TopLevelSGF->VarLocs.end())
         continue;
 
-      Captures.push_back(It->second.getAddress());
+      Captures.push_back(It->second.value);
     }
 
     if (!Captures.empty())
