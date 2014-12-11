@@ -1685,12 +1685,14 @@ ManagedValue SILGenFunction::emitApply(
       }
       break;
         
+    case ParameterConvention::Indirect_In_Guaranteed:
     case swift::ParameterConvention::Indirect_In:
     case swift::ParameterConvention::Indirect_Inout:
     case swift::ParameterConvention::Indirect_Out:
       // We may need to support this at some point, but currently only imported
       // objc methods are returns_inner_pointer.
-      llvm_unreachable("indirect self argument to method that returns_inner_pointer?!");
+      llvm_unreachable("indirect self argument to method that"
+                       " returns_inner_pointer?!");
     }
   }
   
@@ -3179,6 +3181,7 @@ RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
       // If the accessor wants the value 'inout', always pass the
       // address we were given.  This is semantically required.
       case ParameterConvention::Indirect_Inout:
+      case ParameterConvention::Indirect_In_Guaranteed:
         return false;
 
       // If the accessor wants the value 'in', we have to copy if the

@@ -1024,6 +1024,7 @@ void SignatureExpansion::expand(SILParameterInfo param) {
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_Out:
+  case ParameterConvention::Indirect_In_Guaranteed:
     if (param.isIndirectResult()) {
       assert(ParamIRTypes.empty());
       addIndirectReturnAttributes(IGM, Attrs);

@@ -3880,6 +3880,7 @@ namespace {
       case ParameterConvention::Indirect_In:
         return SourceKind::None;
 
+      case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_Inout:
         if (auto nomTy = dyn_cast<NominalType>(type)) {
           considerNominalType(nomTy, 0);
@@ -3896,10 +3897,12 @@ namespace {
         if (auto classTy = dyn_cast<ClassType>(type)) {
           considerNominalType(classTy, 0);
           return SourceKind::ClassPointer;
-        } else if (auto boundTy = dyn_cast<BoundGenericClassType>(type)) {
+        }
+          if (auto boundTy = dyn_cast<BoundGenericClassType>(type)) {
           considerBoundGenericType(boundTy, 0);
           return SourceKind::ClassPointer;
-        } else if (auto metatypeTy = dyn_cast<MetatypeType>(type)) {
+        }
+        if (auto metatypeTy = dyn_cast<MetatypeType>(type)) {
           CanType objTy = metatypeTy.getInstanceType();
           if (auto nomTy = dyn_cast<ClassType>(objTy)) {
             considerNominalType(nomTy, 0);

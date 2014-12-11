@@ -220,6 +220,8 @@ public:
     switch (getAddressArgConvention(Apply, Address, Oper)) {
     case ParameterConvention::Indirect_Out:
       return true;
+    case ParameterConvention::Indirect_In_Guaranteed:
+      // FIXME: may be overconservative.
     case ParameterConvention::Indirect_Inout:
       return false;
     case ParameterConvention::Indirect_In:

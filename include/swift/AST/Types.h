@@ -2187,6 +2187,11 @@ enum class ParameterConvention {
   /// address does not alias any valid object.
   Indirect_In,
 
+  /// This argument is passed indirectly, i.e. by directly passing the address
+  /// of an object in memory.  The callee may not modify and does not destroy
+  /// the object.
+  Indirect_In_Guaranteed,
+
   /// This argument is passed indirectly, i.e. by directly passing
   /// the address of an object in memory.  The object is
   /// instantaneously valid on entry, and it must be instantaneously
@@ -2228,6 +2233,7 @@ inline bool isConsumedParameter(ParameterConvention conv) {
   case ParameterConvention::Indirect_Out:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
+  case ParameterConvention::Indirect_In_Guaranteed:
     return false;
   }
   llvm_unreachable("bad convention kind");
@@ -2239,6 +2245,7 @@ inline bool isConsumedParameter(ParameterConvention conv) {
 inline bool isGuaranteedParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Direct_Guaranteed:
+  case ParameterConvention::Indirect_In_Guaranteed:
     return true;
 
   case ParameterConvention::Indirect_Inout:
@@ -2271,6 +2278,11 @@ public:
   bool isIndirect() const {
     return isIndirectParameter(getConvention());
   }
+
+  bool isIndirectInGuaranteed() const {
+    return getConvention() == ParameterConvention::Indirect_In_Guaranteed;
+  }
+
   bool isIndirectInOut() const {
     return getConvention() == ParameterConvention::Indirect_Inout;
   }

@@ -1272,7 +1272,8 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
       // We need to independently retain the value.
       mv = gen.emitManagedRetain(loc, v);
       break;
-        
+
+    case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_Out:

@@ -147,6 +147,7 @@ enum class ParameterConvention : uint8_t {
   Direct_Owned,
   Direct_Unowned,
   Direct_Guaranteed,
+  Indirect_In_Guaranteed,
 };
 using ParameterConventionField = BCFixed<3>;
 
