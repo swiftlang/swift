@@ -293,7 +293,7 @@ protocol LabeledRequirement {
 }
 
 struct UnlabeledWitness : LabeledRequirement {
-  // CHECK-LABEL: sil hidden @_TTWV9witnesses16UnlabeledWitnessS_18LabeledRequirementS_FS1_6methodUS1___fRQPS1_FT1xVS_8Loadable_T_ : $@cc(witness_method) @thin (Loadable, @inout UnlabeledWitness) -> ()
+  // CHECK-LABEL: sil hidden @_TTWV9witnesses16UnlabeledWitnessS_18LabeledRequirementS_FS1_6methodUS1___fQPS1_FT1xVS_8Loadable_T_ : $@cc(witness_method) @thin (Loadable, @in_guaranteed UnlabeledWitness) -> ()
   func method(x _: Loadable) {}
 }
 
@@ -302,7 +302,7 @@ protocol LabeledSelfRequirement {
 }
 
 struct UnlabeledSelfWitness : LabeledSelfRequirement {
-  // CHECK-LABEL: sil hidden @_TTWV9witnesses20UnlabeledSelfWitnessS_22LabeledSelfRequirementS_FS1_6methodUS1___fRQPS1_FT1xS2__T_ : $@cc(witness_method) @thin (@in UnlabeledSelfWitness, @inout UnlabeledSelfWitness) -> ()
+  // CHECK-LABEL: sil hidden @_TTWV9witnesses20UnlabeledSelfWitnessS_22LabeledSelfRequirementS_FS1_6methodUS1___fQPS1_FT1xS2__T_ : $@cc(witness_method) @thin (@in UnlabeledSelfWitness, @in_guaranteed UnlabeledSelfWitness) -> ()
   func method(x _: UnlabeledSelfWitness) {}
 }
 
@@ -311,7 +311,7 @@ protocol UnlabeledRequirement {
 }
 
 struct LabeledWitness : UnlabeledRequirement {
-  // CHECK-LABEL: sil hidden @_TTWV9witnesses14LabeledWitnessS_20UnlabeledRequirementS_FS1_6methodUS1___fRQPS1_FT1xVS_8Loadable_T_ : $@cc(witness_method) @thin (Loadable, @inout LabeledWitness) -> ()
+  // CHECK-LABEL: sil hidden @_TTWV9witnesses14LabeledWitnessS_20UnlabeledRequirementS_FS1_6methodUS1___fQPS1_FT1xVS_8Loadable_T_ : $@cc(witness_method) @thin (Loadable, @in_guaranteed LabeledWitness) -> ()
   func method(#x: Loadable) {}
 }
 
@@ -320,7 +320,7 @@ protocol UnlabeledSelfRequirement {
 }
 
 struct LabeledSelfWitness : UnlabeledSelfRequirement {
-  // CHECK-LABEL: sil hidden @_TTWV9witnesses18LabeledSelfWitnessS_24UnlabeledSelfRequirementS_FS1_6methodUS1___fRQPS1_FS2_T_ : $@cc(witness_method) @thin (@in LabeledSelfWitness, @inout LabeledSelfWitness) -> ()
+  // CHECK-LABEL: sil hidden @_TTWV9witnesses18LabeledSelfWitnessS_24UnlabeledSelfRequirementS_FS1_6methodUS1___fQPS1_FS2_T_ : $@cc(witness_method) @thin (@in LabeledSelfWitness, @in_guaranteed LabeledSelfWitness) -> ()
   func method(x: LabeledSelfWitness) {}
 }
 

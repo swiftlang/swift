@@ -1503,15 +1503,13 @@ static SILValue getWitnessFunctionRef(SILGenFunction &gen,
                                       ProtocolConformance *conformance,
                                       SILDeclRef witness,
                                       bool isFree,
-                                      SmallVectorImpl<ManagedValue> &origParams,
+                                   SmallVectorImpl<ManagedValue> &witnessParams,
                                       SILType witnessSILTy, SILLocation loc) {
   SILGenModule &SGM = gen.SGM;
   
   // Free functions are always statically dispatched...
   if (isFree)
     return gen.emitGlobalFunctionRef(loc, witness);
-
-  ManagedValue &selfParam = origParams.back();
 
   // If we have a non-class, non-objc method or a class, objc method that is
   // final, we do not dynamic dispatch.
@@ -1543,7 +1541,8 @@ static SILValue getWitnessFunctionRef(SILGenFunction &gen,
     return gen.emitGlobalFunctionRef(loc, witness);
 
   // Otherwise emit a class method.
-  return gen.B.createClassMethod(loc, selfParam.getValue(), witness,
+  SILValue selfPtr = witnessParams.back().getValue();
+  return gen.B.createClassMethod(loc, selfPtr, witness,
                                  SGM.getConstantType(witness),
                                  /*volatile*/ false);
 }
@@ -1589,17 +1588,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   // WAY SPECULATIVE TODO: What if 'self' comprised multiple SIL-level params?
   if (isFree)
     origParams.pop_back();
-  
-  // If there is an inout difference in self, load the inout self parameter.
-  if (inOutSelf) {
-    ManagedValue &selfParam = origParams.back();
-    SILValue selfAddr = selfParam.getUnmanagedValue();
-    selfParam = emitLoad(loc, selfAddr,
-                         getTypeLowering(conformance->getType()),
-                         SGFContext(),
-                         IsNotTake);
-  }
-  
+
   // Get the type of the witness.
   auto witnessInfo = getConstantInfo(witness);
   CanAnyFunctionType witnessFormalTy = witnessInfo.LoweredType;
@@ -1636,6 +1625,25 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   auto witnessSubstInputTys = stripInputTupleLabels(witnessSubstTy.getInput());
   
   if (!isFree) {
+    // If the requirement has a self parameter passed as an indirect +0 value,
+    // and the witness takes it as a non-inout value, we must load and retain
+    // the self pointer coming in.  This happens when class witnesses implement
+    // non-mutating protocol requirements.
+    auto reqConvention = thunkTy->getSelfParameter().getConvention();
+    auto witnessConvention =witnessSubstFTy->getSelfParameter().getConvention();
+
+    if (isIndirectParameter(reqConvention) &&
+        !isConsumedParameter(reqConvention) &&
+        isConsumedParameter(witnessConvention)) {
+      // If there is an inout difference in self, load the inout self parameter.
+      ManagedValue &selfParam = origParams.back();
+      SILValue selfAddr = selfParam.getUnmanagedValue();
+      selfParam = emitLoad(loc, selfAddr,
+                           getTypeLowering(conformance->getType()),
+                           SGFContext(),
+                           IsNotTake);
+    }
+
     // Check whether we need to upcast 'self' in order to invoke a base class
     // method.
     ManagedValue &selfOrigParam = origParams.back();
@@ -1708,7 +1716,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   // TODO: Collect forwarding substitutions from outer context of method.
   SILValue witnessFnRef = getWitnessFunctionRef(*this, conformance,
                                                 witness, isFree,
-                                                origParams, witnessSILTy, loc);
+                                                witnessParams, witnessSILTy, loc);
   SILValue witnessResultValue = B.createApply(
       loc, witnessFnRef, witnessSILTy,
       witnessFTy->getResult().getSILType(), witnessSubs, args,

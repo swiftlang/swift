@@ -272,33 +272,33 @@ func testBrokenConformances1() {
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/Super:              FooBaseDefaultedTypeB{{$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/Super:              DeducedTypeCommonA{{$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/Super:              DeducedTypeCommonB{{$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonA({#self: &Self#})[#() -> DeducedTypeCommonA#]{{$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonB({#self: &Self#})[#() -> DeducedTypeCommonB#]{{$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseB({#self: &Self#})[#() -> Int#]{{$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonA({#self: Self#})[#() -> DeducedTypeCommonA#]{{$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonB({#self: Self#})[#() -> DeducedTypeCommonB#]{{$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseB({#self: Self#})[#() -> Int#]{{$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/Super:              FooDefaultedType{{$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/Super:              FooDeducedTypeB{{$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/Super:              FooDeducedTypeC{{$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/Super:              FooDeducedTypeD{{$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooB({#self: &Self#})[#() -> FooDeducedTypeB#]{{$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooC({#self: &Self#})[#() -> FooDeducedTypeC#]{{$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooD({#self: &Self#})[#() -> FooDeducedTypeD#]{{$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooB({#self: Self#})[#() -> FooDeducedTypeB#]{{$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooC({#self: Self#})[#() -> FooDeducedTypeC#]{{$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooD({#self: Self#})[#() -> FooDeducedTypeD#]{{$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/Super:              DefaultedTypeCommonC{{$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/Super:              DefaultedTypeCommonD{{$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/Super:              FooBaseDefaultedTypeA{{$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/Super:              FooBaseDefaultedTypeC{{$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/Super:              DeducedTypeCommonC{{$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/Super:              DeducedTypeCommonD{{$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonA({#self: &Self#})[#() -> DeducedTypeCommonA#]{{$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonB({#self: &Self#})[#() -> DeducedTypeCommonB#]{{$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonC({#self: &Self#})[#() -> DeducedTypeCommonC#]{{$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonD({#self: &Self#})[#() -> DeducedTypeCommonD#]{{$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonA({#self: Self#})[#() -> DeducedTypeCommonA#]{{$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonB({#self: Self#})[#() -> DeducedTypeCommonB#]{{$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonC({#self: Self#})[#() -> DeducedTypeCommonC#]{{$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonD({#self: Self#})[#() -> DeducedTypeCommonD#]{{$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/Super:              FooBaseDeducedTypeA{{$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/Super:              FooBaseDeducedTypeB{{$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/Super:              FooBaseDeducedTypeC{{$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/Super:              FooBaseDeducedTypeD{{$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseA({#self: &Self#})[#() -> FooBaseDeducedTypeA#]{{$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseB({#self: &Self#})[#() -> FooBaseDeducedTypeB#]{{$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseC({#self: &Self#})[#() -> FooBaseDeducedTypeC#]{{$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseD({#self: &Self#})[#() -> FooBaseDeducedTypeD#]{{$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseA({#self: Self#})[#() -> FooBaseDeducedTypeA#]{{$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseB({#self: Self#})[#() -> FooBaseDeducedTypeB#]{{$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseC({#self: Self#})[#() -> FooBaseDeducedTypeC#]{{$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseD({#self: Self#})[#() -> FooBaseDeducedTypeD#]{{$}}
 // BROKEN_CONFORMANCE_1: End completions
 

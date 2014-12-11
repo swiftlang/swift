@@ -872,4 +872,29 @@ struct LetProperties {
 }
 
 
+// <rdar://problem/19215313> let properties don't work with protocol method dispatch
+protocol TestMutabilityProtocol {
+  func toIntMax()
+  mutating func changeToIntMax()
+}
+ 
+class C<T : TestMutabilityProtocol> {
+  let x : T
+  let y : T
+  
+  init(a : T) {
+    x = a; y = a
+    x.toIntMax()
+    y.changeToIntMax()  // expected-error {{immutable property 'self.y' may not be passed to an inout argument}}
+  }
+}
+
+struct MyMutabilityImplementation : TestMutabilityProtocol {
+  func toIntMax() {
+  }
+  
+  mutating func changeToIntMax() {
+  }
+}
+
 

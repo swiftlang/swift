@@ -70,7 +70,7 @@ class GenericClass {
 protocol Prot {
   // CHECK: [[@LINE+1]]:13 s:P14swift_ide_test4Prot5Blarg{{$}}
   typealias Blarg
-  // CHECK: [[@LINE+1]]:8 s:FP14swift_ide_test4Prot8protMethUS0__U__FRQPS0_FQS1_5BlargS2_{{$}}
+  // CHECK: [[@LINE+1]]:8 s:FP14swift_ide_test4Prot8protMethUS0__U__FQPS0_FQS1_5BlargS2_{{$}}
   func protMeth(x: Blarg) -> Blarg
   // CHECK: [[@LINE+2]]:7 s:vP14swift_ide_test4Prot17protocolProperty1Si{{$}}
   // CHECK: [[@LINE+1]]:32 s:FP14swift_ide_test4Protg17protocolProperty1Si{{$}}

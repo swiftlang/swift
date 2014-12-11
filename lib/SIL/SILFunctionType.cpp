@@ -188,15 +188,19 @@ namespace {
       Inputs.push_back(SILParameterInfo(loweredType, convention));
     }
 
-    void visitSelfType(CanType origType, CanType substType) {
+    void visitSelfType(CanType origType, CanType substType, AbstractCC CC) {
       auto &substTL =
         M.Types.getTypeLowering(AbstractionPattern(origType), substType);
       ParameterConvention convention;
       if (isa<InOutType>(origType)) {
         convention = ParameterConvention::Indirect_Inout;
       } else if (isPassedIndirectly(origType, substType, substTL)) {
-        convention = Convs.getIndirectSelfParameter(origType);
+        if (CC == AbstractCC::WitnessMethod)
+          convention = ParameterConvention::Indirect_In_Guaranteed;
+        else
+          convention = Convs.getIndirectSelfParameter(origType);
         assert(isIndirectParameter(convention));
+
       } else if (substTL.isTrivial()) {
         convention = ParameterConvention::Direct_Unowned;
       } else {
@@ -211,11 +215,12 @@ namespace {
     /// This is a special entry point that allows destructure inputs to handle
     /// self correctly.
     void visitTopLevelType(CanType origType, CanType substType,
-                           bool hasSelfParam) {
+                           AnyFunctionType::ExtInfo extInfo) {
+      bool hasSelfParam = extInfo.hasSelfParam();
       // If we don't have a tuple type, then we have a one element argument.
       if (!isa<TupleType>(origType)) {       
         if (hasSelfParam) {
-          visitSelfType(origType, substType);
+          visitSelfType(origType, substType, extInfo.getCC());
           return;
         }
         
@@ -243,7 +248,8 @@ namespace {
 
       // Otherwise, process the self parameter.
       visitSelfType(origTupleType.getElementType(numNonSelfParams),
-                    substTupleType.getElementType(numNonSelfParams));
+                    substTupleType.getElementType(numNonSelfParams),
+                    extInfo.getCC());
     }
   };
 
@@ -457,7 +463,7 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
     DestructureInputs InputDestructurer(M, conventions, inputs);
     InputDestructurer.visitTopLevelType(origFnType.getInput(),
                                         substFnInterfaceType.getInput(),
-                                        extInfo.hasSelfParam());
+                                        extInfo);
   } else {
     DestructureGeneralizedInputs InputDestructurer(M,
                                                    AbstractionPattern(origType),

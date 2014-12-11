@@ -25,7 +25,7 @@ protocol ReturnsFunction {
 }
 
 struct ConformsToReturnsFunction : ReturnsFunction {
-  // CHECK-LABEL: sil hidden @_TTWV18result_abstraction25ConformsToReturnsFunctionS_15ReturnsFunctionS_FS1_7getFuncUS1__U___fRQPS1_FT_FQS2_3ArgQS2_6Result : $@cc(witness_method) @thin (@inout ConformsToReturnsFunction) -> @owned @callee_owned (@out R, @in S) -> ()
+  // CHECK-LABEL: sil hidden @_TTWV18result_abstraction25ConformsToReturnsFunctionS_15ReturnsFunctionS_FS1_7getFuncUS1__U___fQPS1_FT_FQS2_3ArgQS2_6Result : $@cc(witness_method) @thin (@in_guaranteed ConformsToReturnsFunction) -> @owned @callee_owned (@out R, @in S) -> ()
   // CHECK:         function_ref @_TTRXFo_dV18result_abstraction1S_dVS_1R_XFo_iS0__iS1__ : $@thin (@out R, @in S, @owned @callee_owned (S) -> R) -> ()
   func getFunc() -> S -> R {
     return {s in R()}

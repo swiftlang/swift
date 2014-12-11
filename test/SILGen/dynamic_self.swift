@@ -56,9 +56,9 @@ func testDynamicSelfDispatchGeneric(gy: GY<Int>) {
 // CHECK-LABEL: sil hidden @_TF12dynamic_self21testArchetypeDispatch{{.*}} : $@thin <T where T : P> (@in T) -> ()
 func testArchetypeDispatch<T: P>(t: T) {
   // CHECK: bb0([[T:%[0-9]+]] : $*T):
-  // CHECK:   [[ARCHETYPE_F:%[0-9]+]] = witness_method $T, #P.f!1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @inout τ_0_0) -> ()
+  // CHECK:   [[ARCHETYPE_F:%[0-9]+]] = witness_method $T, #P.f!1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @in_guaranteed τ_0_0) -> ()
   // CHECK:   [[T_RESULT:%[0-9]+]] = alloc_stack $T
-  // CHECK:   [[SELF_RESULT:%[0-9]+]] = apply [[ARCHETYPE_F]]<T>([[T_RESULT]]#1, [[T]]) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @inout τ_0_0) -> ()
+  // CHECK:   [[SELF_RESULT:%[0-9]+]] = apply [[ARCHETYPE_F]]<T>([[T_RESULT]]#1, [[T]]) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @in_guaranteed τ_0_0) -> ()
   t.f()
 }
 
@@ -70,8 +70,8 @@ func testExistentialDispatch(p: P) {
 // CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential [[PCOPY]]#1 : $*P to $*@opened([[N:".*"]]) P
 // CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $P
 // CHECK:   [[P_RESULT_ADDR:%[0-9]+]] = init_existential [[P_RESULT]]#1 : $*P, $@opened([[N]]) P
-// CHECK:   [[P_F_METHOD:%[0-9]+]] = witness_method $@opened([[N]]) P, #P.f!1, [[PCOPY_ADDR]]{{.*}} : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @inout τ_0_0) -> ()
-// CHECK:   apply [[P_F_METHOD]]<@opened([[N]]) P>([[P_RESULT_ADDR]], [[PCOPY_ADDR]]) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @inout τ_0_0) -> ()
+// CHECK:   [[P_F_METHOD:%[0-9]+]] = witness_method $@opened([[N]]) P, #P.f!1, [[PCOPY_ADDR]]{{.*}} : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @in_guaranteed τ_0_0) -> ()
+// CHECK:   apply [[P_F_METHOD]]<@opened([[N]]) P>([[P_RESULT_ADDR]], [[PCOPY_ADDR]]) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @in_guaranteed τ_0_0) -> ()
 // CHECK:   destroy_addr [[P_RESULT]]#1 : $*P
 // CHECK:   destroy_addr [[PCOPY_ADDR]] : $*@opened([[N]]) P
 // CHECK:   dealloc_stack [[P_RESULT]]#0 : $*@local_storage P
@@ -156,7 +156,7 @@ func testOptionalResult(v : OptionalResultInheritor) {
 // CHECK-NEXT: init_enum_data_addr
 
 // CHECK-LABEL: sil_witness_table hidden X: P module dynamic_self {
-// CHECK: method #P.f!1: @_TTWC12dynamic_self1XS_1PS_FS1_1fUS1___fRQPS1_FT_S2_
+// CHECK: method #P.f!1: @_TTWC12dynamic_self1XS_1PS_FS1_1fUS1___fQPS1_FT_S2_
 
 // CHECK-LABEL: sil_witness_table hidden X: CP module dynamic_self {
 // CHECK: method #CP.f!1: @_TTWC12dynamic_self1XS_2CPS_FS1_1fUS1___fQPS1_FT_S2_
