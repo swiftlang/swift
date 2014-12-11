@@ -128,8 +128,11 @@ class FunctionSignatureSpecializationMangler
 
   enum class ArgumentModifier : uint8_t {
     Unmodified=0,
+    Dead=1,
     ConstantProp=2,
     ClosureProp=4,
+    OwnedToGuaranteed=8,
+    SROA=16,
   };
 
   using ArgInfo = std::pair<uint8_t, NullablePtr<SILInstruction>>;
@@ -139,6 +142,9 @@ public:
   FunctionSignatureSpecializationMangler(Mangler &M, SILFunction *F);
   void setArgumentConstantProp(unsigned ArgNo, LiteralInst *LI);
   void setArgumentClosureProp(SILArgument *Arg, PartialApplyInst *PAI);
+  void setArgumentDead(unsigned ArgNo);
+  void setArgumentOwnedToGuaranteed(unsigned ArgNo);
+  void setArgumentSROA(unsigned ArgNo);
 
 private:
   void mangleSpecialization();

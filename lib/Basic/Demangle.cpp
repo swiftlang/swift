@@ -188,13 +188,19 @@ static std::string archetypeName(Node::IndexType i) {
 }
 
 namespace {
-  enum class FunctionSigSpecializationParamInfoKind : uint8_t {
-    ConstantPropFunction,
-    ConstantPropGlobal,
-    ConstantPropInteger,
-    ConstantPropFloat,
-    ConstantPropString,
-    ClosureProp,
+  enum class FunctionSigSpecializationParamInfoKind : unsigned {
+    // Normal Flags
+    Dead=0,
+    ConstantPropFunction=1,
+    ConstantPropGlobal=2,
+    ConstantPropInteger=3,
+    ConstantPropFloat=4,
+    ConstantPropString=5,
+    ClosureProp=6,
+
+    // Option Set Flags must be a power of 2.
+    OwnedToGuaranteed=8,
+    SROA=16,
   };
 } // end anonymous namespace
 
@@ -756,7 +762,7 @@ private:
 
 #define FUNCSIGSPEC_CREATE_INFO_KIND(kind) \
   NodeFactory::create(Node::Kind::FunctionSignatureSpecializationParamInfo, \
-                      uint8_t(FunctionSigSpecializationParamInfoKind::kind))
+                      unsigned(FunctionSigSpecializationParamInfoKind::kind))
 
   NodePointer demangleFuncSigSpecializationConstantProp() {
     // Then figure out what was actually constant propagated. First check if
@@ -842,20 +848,43 @@ private:
                             paramCount);
 
       // Check if this parameter was constant propagated.
-      if (Mangled.nextIf("cp")) {
+      if (Mangled.nextIf("d_")) {
+        auto result = FUNCSIGSPEC_CREATE_INFO_KIND(Dead);
+        if (!result)
+          return nullptr;
+        param->addChild(result);
+      } else if (Mangled.nextIf("cp")) {
         auto result = demangleFuncSigSpecializationConstantProp();
         if (!result)
           return nullptr;
         param->addChild(result);
-        //if (!Mangled.nextIf('_'))
-        //  return nullptr;
       } else if (Mangled.nextIf("cl")) {
         auto result = demangleFuncSigSpecializationClosureProp();
         if (!result)
           return nullptr;
         param->addChild(result);
-        //if (!Mangled.nextIf('_'))
-        //return nullptr;
+      } else {
+        unsigned Value = 0;
+        if (Mangled.nextIf('g')) {
+          Value |=
+            unsigned(FunctionSigSpecializationParamInfoKind::OwnedToGuaranteed);
+        }
+
+        if (Mangled.nextIf('s')) {
+          Value |= unsigned(FunctionSigSpecializationParamInfoKind::SROA);
+        }
+
+        if (!Mangled.nextIf("_"))
+          return nullptr;
+
+        if (!Value)
+          return nullptr;
+
+        auto result = NodeFactory::create(Node::Kind::FunctionSignatureSpecializationParamInfo,
+                                          Value);
+        if (!result)
+          return nullptr;
+        param->addChild(result);
       }
 
       if (!param || param->getNumChildren() == 0) {
@@ -2651,8 +2680,28 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   }
   case Node::Kind::FunctionSignatureSpecializationParamInfo: {
-    uint64_t rawKind = pointer->getIndex();
-    switch (FunctionSigSpecializationParamInfoKind(rawKind)) {
+    uint64_t raw = pointer->getIndex();
+
+    bool convertedToGuaranteed =
+      raw & uint64_t(FunctionSigSpecializationParamInfoKind::OwnedToGuaranteed);
+    if (convertedToGuaranteed) {
+      Printer << "Owned To Guaranteed";
+    }
+
+    if (raw & uint64_t(FunctionSigSpecializationParamInfoKind::SROA)) {
+      if (convertedToGuaranteed)
+        Printer << " and ";
+      Printer << "Exploded";
+      return;
+    }
+
+    if (convertedToGuaranteed)
+      return;
+
+    switch (FunctionSigSpecializationParamInfoKind(raw)) {
+    case FunctionSigSpecializationParamInfoKind::Dead:
+      Printer << "Dead";
+      break;
     case FunctionSigSpecializationParamInfoKind::ConstantPropFunction:
     case FunctionSigSpecializationParamInfoKind::ConstantPropGlobal:
     case FunctionSigSpecializationParamInfoKind::ConstantPropInteger:
@@ -2663,6 +2712,9 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     case FunctionSigSpecializationParamInfoKind::ClosureProp:
       Printer << "Closure Propagated";
       break;
+    case FunctionSigSpecializationParamInfoKind::OwnedToGuaranteed:
+    case FunctionSigSpecializationParamInfoKind::SROA:
+      unreachable("option sets should have been handled earlier");
     }
     return;
   }

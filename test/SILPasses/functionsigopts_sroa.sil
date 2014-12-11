@@ -106,7 +106,7 @@ sil @tuple_user : $@thin ((Builtin.Int32, Builtin.Int16, S1)) ->  ()
 /// dead.
 // CHECK-LABEL: sil [fragile] @single_level_dead_root_callee : $@thin (S1) -> Builtin.Int32 {
 // CHECK: bb0([[INPUT:%[0-9]+]] : $S1):
-// CHECK: [[FN:%[0-9]+]] = function_ref @_TTOS_s_single_level_dead_root_callee : $@thin (Builtin.Int32) -> Builtin.Int32
+// CHECK: [[FN:%[0-9]+]] = function_ref @_TTSfs__single_level_dead_root_callee : $@thin (Builtin.Int32) -> Builtin.Int32
 // CHECK: [[ARG:%.*]] = struct_extract [[INPUT]] : $S1, #S1.f2
 // CHECK: apply [[FN]]([[ARG]])
 sil [fragile] @single_level_dead_root_callee : $@thin (S1) -> Builtin.Int32 {
@@ -117,7 +117,7 @@ bb0(%0 : $S1):
 
 // CHECK-LABEL: sil [fragile] @single_level_dead_root_caller : $@thin (S1) -> () {
 // CHECK: bb0([[INPUT:%[0-9]+]] : $S1):
-// CHECK: [[FN:%[0-9]+]] = function_ref @_TTOS_s_single_level_dead_root_callee : $@thin (Builtin.Int32) -> Builtin.Int32
+// CHECK: [[FN:%[0-9]+]] = function_ref @_TTSfs__single_level_dead_root_callee : $@thin (Builtin.Int32) -> Builtin.Int32
 // CHECK: [[ARG:%.*]] = struct_extract [[INPUT]] : $S1, #S1.f2
 // CHECK: apply [[FN]]([[ARG]])
 sil [fragile] @single_level_dead_root_caller : $@thin (S1) -> () {
@@ -130,7 +130,7 @@ bb0(%0 : $S1):
 
 // CHECK-LABEL: sil [fragile] @single_level_live_root_callee : $@thin (S1) -> Builtin.Int32 {
 // CHECK: bb0([[INPUT:%[0-9]+]] : $S1):
-// CHECK: [[FN:%[0-9]+]] = function_ref @_TTOS_s_single_level_live_root_callee : $@thin (Builtin.Int16, Builtin.Int32) -> Builtin.Int32
+// CHECK: [[FN:%[0-9]+]] = function_ref @_TTSfs__single_level_live_root_callee : $@thin (Builtin.Int16, Builtin.Int32) -> Builtin.Int32
 // CHECK: [[ARG2:%.*]] = struct_extract [[INPUT]] : $S1, #S1.f2
 // CHECK: [[ARG1:%.*]] = struct_extract [[INPUT]] : $S1, #S1.f1
 // CHECK: apply [[FN]]([[ARG1]], [[ARG2]])
@@ -144,7 +144,7 @@ bb0(%0 : $S1):
 
 // CHECK-LABEL: sil [fragile] @single_level_live_root_caller : $@thin (S1) -> () {
 // CHECK: bb0([[INPUT:%[0-9]+]] : $S1):
-// CHECK: [[FN:%[0-9]+]] = function_ref @_TTOS_s_single_level_live_root_callee : $@thin (Builtin.Int16, Builtin.Int32) -> Builtin.Int32
+// CHECK: [[FN:%[0-9]+]] = function_ref @_TTSfs__single_level_live_root_callee : $@thin (Builtin.Int16, Builtin.Int32) -> Builtin.Int32
 // CHECK: [[ARG2:%.*]] = struct_extract [[INPUT]] : $S1, #S1.f2
 // CHECK: [[ARG1:%.*]] = struct_extract [[INPUT]] : $S1, #S1.f1
 // CHECK: apply [[FN]]([[ARG1]], [[ARG2]])
@@ -161,7 +161,7 @@ bb0(%0 : $S1):
 // everything, but we should not "reform" the aggregate.
 // CHECK-LABEL: sil [fragile] @multiple_level_all_root_fields_used_callee : $@thin (S2) -> (Builtin.Int16, Builtin.Int64) {
 // CHECK: bb0([[INPUT:%.*]] : $S2):
-// CHECK: [[FN:%.*]] = function_ref @_TTOS_s_multiple_level_all_root_fields_used_callee : $@thin (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfs__multiple_level_all_root_fields_used_callee : $@thin (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
 // CHECK: [[EXT1:%.*]] = struct_extract [[INPUT]] : $S2, #S2.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[INPUT]] : $S2, #S2.f1
 // CHECK: [[EXT3:%.*]] = struct_extract [[EXT2]] : $S1, #S1.f1
@@ -177,7 +177,7 @@ bb0(%0 : $S2):
 
 // CHECK-LABEL: sil [fragile] @multiple_level_all_root_fields_used_caller : $@thin (S2) -> () {
 // CHECK: bb0([[INPUT:%.*]] : $S2):
-// CHECK: [[FN:%.*]] = function_ref @_TTOS_s_multiple_level_all_root_fields_used_callee : $@thin (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfs__multiple_level_all_root_fields_used_callee : $@thin (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
 // CHECK: [[EXT1:%.*]] = struct_extract [[INPUT]] : $S2, #S2.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[INPUT]] : $S2, #S2.f1
 // CHECK: [[EXT3:%.*]] = struct_extract [[EXT2]] : $S1, #S1.f1
@@ -193,7 +193,7 @@ bb0(%0 : $S2):
 /// This test checks a multiple level hierarchy where the root has no fields used.
 // CHECK-LABEL: sil [fragile] @multiple_level_no_root_fields_have_direct_uses_callee : $@thin (S3) -> (Builtin.Int16, Builtin.Int64) {
 // CHECK: bb0([[IN:%.*]] : $S3):
-// CHECK: [[FN:%.*]] = function_ref @_TTOS_s_multiple_level_no_root_fields_have_direct_uses_callee : $@thin (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfs__multiple_level_no_root_fields_have_direct_uses_callee : $@thin (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S3, #S3.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN]] : $S3, #S3.f1
 // CHECK: [[EXT3:%.*]] = struct_extract [[EXT2]] : $S2, #S2.f2
@@ -212,7 +212,7 @@ bb0(%0 : $S3):
 
 // CHECK-LABEL: sil [fragile] @multiple_level_no_root_fields_have_direct_uses_caller : $@thin (S3) -> () {
 // CHECK: bb0([[IN:%.*]] : $S3):
-// CHECK: [[FN:%.*]] = function_ref @_TTOS_s_multiple_level_no_root_fields_have_direct_uses_callee : $@thin (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfs__multiple_level_no_root_fields_have_direct_uses_callee : $@thin (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S3, #S3.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN]] : $S3, #S3.f1
 // CHECK: [[EXT3:%.*]] = struct_extract [[EXT2]] : $S2, #S2.f2
@@ -231,7 +231,7 @@ bb0(%0 : $S3):
 // and needs to be reformed via a struct.
 // CHECK-LABEL: sil [fragile] @multiple_level_root_must_be_reformed_callee : $@thin (S3) -> (Builtin.Int16, Builtin.Int64) {
 // CHECK: bb0([[IN:%.*]] : $S3):
-// CHECK: [[FN:%.*]] = function_ref @_TTOS_s_multiple_level_root_must_be_reformed_callee : $@thin (Builtin.Int16, Builtin.Int32, Builtin.Int64, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int64)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfs__multiple_level_root_must_be_reformed_callee : $@thin (Builtin.Int16, Builtin.Int32, Builtin.Int64, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int64)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S3, #S3.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN]] : $S3, #S3.f1
 // CHECK: [[EXT3:%.*]] = struct_extract [[EXT2]] : $S2, #S2.f2
@@ -255,7 +255,7 @@ bb0(%0 : $S3):
 
 // CHECK-LABEL: sil [fragile] @multiple_level_root_must_be_reformed_caller : $@thin (S3) -> () {
 // CHECK: bb0([[IN:%.*]] : $S3):
-// CHECK: [[FN:%.*]] = function_ref @_TTOS_s_multiple_level_root_must_be_reformed_callee : $@thin (Builtin.Int16, Builtin.Int32, Builtin.Int64, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int64)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfs__multiple_level_root_must_be_reformed_callee : $@thin (Builtin.Int16, Builtin.Int32, Builtin.Int64, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int64)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S3, #S3.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN]] : $S3, #S3.f1
 // CHECK: [[EXT3:%.*]] = struct_extract [[EXT2]] : $S2, #S2.f2
@@ -278,7 +278,7 @@ bb0(%0 : $S3):
 // only has leaf uses.
 // CHECK-LABEL: sil [fragile] @three_level_dead_root_reform_two_fields_use_leafs_of_third_callee : $@thin (S6) -> (Builtin.Int32, Builtin.Int16, Builtin.Int16, Builtin.Int32) {
 // CHECK: bb0([[IN:%.*]] : $S6):
-// CHECK: [[FN:%.*]] = function_ref @_TTOS_s_three_level_dead_root_reform_two_fields_use_leafs_of_third_callee : $@thin (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32, Builtin.Int32, Builtin.Int16, Builtin.Int16, Builtin.Int32) -> (Builtin.Int32, Builtin.Int16, Builtin.Int16, Builtin.Int32)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfs__three_level_dead_root_reform_two_fields_use_leafs_of_third_callee : $@thin (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32, Builtin.Int32, Builtin.Int16, Builtin.Int16, Builtin.Int32) -> (Builtin.Int32, Builtin.Int16, Builtin.Int16, Builtin.Int32)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S6, #S6.f3
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN]] : $S6, #S6.f2
 // CHECK: [[EXT3:%.*]] = struct_extract [[IN]] : $S6, #S6.f1
@@ -313,7 +313,7 @@ bb0(%0 : $S6):
 
 // CHECK-LABEL: sil [fragile] @three_level_dead_root_reform_two_fields_use_leafs_of_third_caller : $@thin (S6) -> () {
 // CHECK: bb0([[IN:%.*]] : $S6):
-// CHECK: [[FN:%.*]] = function_ref @_TTOS_s_three_level_dead_root_reform_two_fields_use_leafs_of_third_callee : $@thin (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32, Builtin.Int32, Builtin.Int16, Builtin.Int16, Builtin.Int32) -> (Builtin.Int32, Builtin.Int16, Builtin.Int16, Builtin.Int32)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfs__three_level_dead_root_reform_two_fields_use_leafs_of_third_callee : $@thin (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32, Builtin.Int32, Builtin.Int16, Builtin.Int16, Builtin.Int32) -> (Builtin.Int32, Builtin.Int16, Builtin.Int16, Builtin.Int32)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S6, #S6.f3
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN]] : $S6, #S6.f2
 // CHECK: [[EXT3:%.*]] = struct_extract [[IN]] : $S6, #S6.f1
@@ -338,7 +338,7 @@ bb0(%0 : $S6):
 // This test checks if we can handle @owned structs correctly
 // CHECK-LABEL: sil [fragile] @owned_struct_1_callee : $@thin (@owned S5) -> (Builtin.Int16, Builtin.Int64) {
 // CHECK: bb0([[IN:%.*]] : $S5):
-// CHECK: [[FN:%.*]] = function_ref @_TTOS_o2gs_owned_struct_1_callee : $@thin (@guaranteed Builtin.NativeObject, Builtin.Int16, Builtin.Int32, Builtin.Int64, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int64)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfgs__owned_struct_1_callee : $@thin (@guaranteed Builtin.NativeObject, Builtin.Int16, Builtin.Int32, Builtin.Int64, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int64)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S5, #S5.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN]] : $S5, #S5.f1
 // CHECK: [[EXT3:%.*]] = struct_extract [[EXT2]] : $S4, #S4.f1
@@ -366,7 +366,7 @@ bb0(%0 : $S5):
 
 // CHECK-LABEL: sil [fragile] @owned_struct_1_caller : $@thin (S5) -> () {
 // CHECK: bb0([[IN:%.*]] : $S5):
-// CHECK: [[FN:%.*]] = function_ref @_TTOS_o2gs_owned_struct_1_callee : $@thin (@guaranteed Builtin.NativeObject, Builtin.Int16, Builtin.Int32, Builtin.Int64, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int64)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfgs__owned_struct_1_callee : $@thin (@guaranteed Builtin.NativeObject, Builtin.Int16, Builtin.Int32, Builtin.Int64, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int64)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S5, #S5.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN]] : $S5, #S5.f1
 // CHECK: [[EXT3:%.*]] = struct_extract [[EXT2]] : $S4, #S4.f1
@@ -391,7 +391,7 @@ bb0(%0 : $S5):
 // This test checks if we can properly insert arguments in between dead arguments.
 // CHECK-LABEL: sil [fragile] @owned_struct_2_callee : $@thin (Builtin.Int256, Builtin.Int256, @owned S5, Builtin.Int128, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int64, Builtin.Int128) {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int256, [[IN2:%.*]] : $Builtin.Int256, [[IN3:%.*]] : $S5, [[IN4:%.*]] : $Builtin.Int128, [[IN5:%.*]] : $Builtin.Int128):
-// CHECK: [[FN:%.*]] = function_ref @_TTOS_ndo2gsdn_owned_struct_2_callee : $@thin (Builtin.Int256, @guaranteed Builtin.NativeObject, Builtin.Int16, Builtin.Int32, Builtin.Int64, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int64, Builtin.Int128)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfn_d_gs_d_n__owned_struct_2_callee : $@thin (Builtin.Int256, @guaranteed Builtin.NativeObject, Builtin.Int16, Builtin.Int32, Builtin.Int64, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int64, Builtin.Int128)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN3]] : $S5, #S5.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN3]] : $S5, #S5.f1
 // CHECK: [[EXT3:%.*]] = struct_extract [[EXT2]] : $S4, #S4.f1
@@ -420,7 +420,7 @@ bb0(%0 : $Builtin.Int256, %1 : $Builtin.Int256, %2 : $S5, %3 : $Builtin.Int128, 
 
 // CHECK-LABEL: sil [fragile] @owned_struct_2_caller : $@thin (Builtin.Int256, S5, Builtin.Int128) -> () {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int256, [[IN2:%.*]] : $S5, [[IN3:%.*]] : $Builtin.Int128):
-// CHECK: [[FN:%.*]] = function_ref @_TTOS_ndo2gsdn_owned_struct_2_callee : $@thin (Builtin.Int256, @guaranteed Builtin.NativeObject, Builtin.Int16, Builtin.Int32, Builtin.Int64, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int64, Builtin.Int128)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfn_d_gs_d_n__owned_struct_2_callee : $@thin (Builtin.Int256, @guaranteed Builtin.NativeObject, Builtin.Int16, Builtin.Int32, Builtin.Int64, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int64, Builtin.Int128)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN2]] : $S5, #S5.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN2]] : $S5, #S5.f1
 // CHECK: [[EXT3:%.*]] = struct_extract [[EXT2]] : $S4, #S4.f1
@@ -444,7 +444,7 @@ bb0(%0 : $Builtin.Int256, %1 : $S5, %2 : $Builtin.Int128):
 /// This test makes sure that we ignore pointer arguments for now.
 // CHECK-LABEL: sil [fragile] @ignore_ptrs_callee : $@thin (@in S1, S0, S0) -> (Builtin.Int16, Builtin.Int16) {
 // CHECK: bb0([[IN1:%.*]] : $*S1, [[IN2:%.*]] : $S0, [[IN3:%.*]] : $S0):
-// CHECK: [[FN:%.*]] = function_ref @_TTOS_sss_ignore_ptrs_callee : $@thin (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfn_s_s__ignore_ptrs_callee : $@thin (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN2]] : $S0, #S0.f
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN3]] : $S0, #S0.f
 // CHECK: apply [[FN]]([[IN1]], [[EXT1]], [[EXT2]]) : $@thin (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16)
@@ -460,7 +460,7 @@ bb0(%0 : $*S1, %1 : $S0, %2 : $S0):
 
 // CHECK-LABEL: sil [fragile] @ignore_ptrs_caller : $@thin (@in S1, S0, S0) -> () {
 // CHECK: bb0([[IN1:%.*]] : $*S1, [[IN2:%.*]] : $S0, [[IN3:%.*]] : $S0):
-// CHECK: [[FN:%.*]] = function_ref @_TTOS_sss_ignore_ptrs_callee : $@thin (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfn_s_s__ignore_ptrs_callee : $@thin (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN2]] : $S0, #S0.f
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN3]] : $S0, #S0.f
 // CHECK: apply [[FN]]([[IN1]], [[EXT1]], [[EXT2]]) : $@thin (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16)
@@ -475,7 +475,7 @@ bb0(%0 : $*S1, %1 : $S0, %2 : $S0):
 // This test makes sure that we can handle multiple SROA arguments.
 // CHECK-LABEL: sil [fragile] @multiple_sroa_callee : $@thin (FakeStaticString, @owned FakeString, FakeStaticString) -> () {
 // CHECK: bb0([[IN1:%.*]] : $FakeStaticString, [[IN2:%.*]] : $FakeString, [[IN3:%.*]] : $FakeStaticString):
-// CHECK: [[FN:%.*]] = function_ref @_TTOS_sss_multiple_sroa_callee : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Word, Builtin.RawPointer, Builtin.Word, @owned FakeOptional<FakeAnyObject>, Builtin.RawPointer, Builtin.Word, Builtin.Word) -> ()
+// CHECK: [[FN:%.*]] = function_ref @_TTSfs_s_s__multiple_sroa_callee : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Word, Builtin.RawPointer, Builtin.Word, @owned FakeOptional<FakeAnyObject>, Builtin.RawPointer, Builtin.Word, Builtin.Word) -> ()
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN1]] : $FakeStaticString, #FakeStaticString.f3
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN1]] : $FakeStaticString, #FakeStaticString.f2
 // CHECK: [[EXT3:%.*]] = struct_extract [[IN1]] : $FakeStaticString, #FakeStaticString.f1
@@ -502,7 +502,7 @@ bb0(%0 : $FakeStaticString, %1 : $FakeString, %2 : $FakeStaticString):
 
 // CHECK-LABEL: sil [fragile] @multiple_sroa_caller : $@thin (FakeStaticString, @owned FakeString, FakeStaticString) -> () {
 // CHECK: bb0([[IN1:%.*]] : $FakeStaticString, [[IN2:%.*]] : $FakeString, [[IN3:%.*]] : $FakeStaticString):
-// CHECK: [[FN:%.*]] = function_ref @_TTOS_sss_multiple_sroa_callee : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Word, Builtin.RawPointer, Builtin.Word, @owned FakeOptional<FakeAnyObject>, Builtin.RawPointer, Builtin.Word, Builtin.Word) -> ()
+// CHECK: [[FN:%.*]] = function_ref @_TTSfs_s_s__multiple_sroa_callee : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Word, Builtin.RawPointer, Builtin.Word, @owned FakeOptional<FakeAnyObject>, Builtin.RawPointer, Builtin.Word, Builtin.Word) -> ()
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN1]] : $FakeStaticString, #FakeStaticString.f3
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN1]] : $FakeStaticString, #FakeStaticString.f2
 // CHECK: [[EXT3:%.*]] = struct_extract [[IN1]] : $FakeStaticString, #FakeStaticString.f1
@@ -529,7 +529,7 @@ bb0(%0 : $FakeStaticString, %1 : $FakeString, %2 : $FakeStaticString):
 // structure.
 // CHECK-LABEL: sil [fragile] @check_out_of_order_uses_callee : $@thin (S1) -> () {
 // CHECK: bb0([[IN:%.*]] : $S1):
-// CHECK: [[FN:%.*]] = function_ref @_TTOS_s_check_out_of_order_uses_callee : $@thin (Builtin.Int16, Builtin.Int32) -> ()
+// CHECK: [[FN:%.*]] = function_ref @_TTSfs__check_out_of_order_uses_callee : $@thin (Builtin.Int16, Builtin.Int32) -> ()
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S1, #S1.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN]] : $S1, #S1.f1
 // CHECK: apply [[FN]]([[EXT2]], [[EXT1]]) : $@thin (Builtin.Int16, Builtin.Int32) -> ()
@@ -547,7 +547,7 @@ bb0(%0 : $S1):
 
 // CHECK-LABEL: sil [fragile] @check_out_of_order_uses_caller : $@thin (S1) -> () {
 // CHECK: bb0([[IN:%.*]] : $S1):
-// CHECK: [[FN:%.*]] = function_ref @_TTOS_s_check_out_of_order_uses_callee : $@thin (Builtin.Int16, Builtin.Int32) -> ()
+// CHECK: [[FN:%.*]] = function_ref @_TTSfs__check_out_of_order_uses_callee : $@thin (Builtin.Int16, Builtin.Int32) -> ()
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S1, #S1.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN]] : $S1, #S1.f1
 // CHECK: apply [[FN]]([[EXT2]], [[EXT1]]) : $@thin (Builtin.Int16, Builtin.Int32) -> ()
@@ -562,7 +562,7 @@ bb0(%0 : $S1):
 // Make sure that we do not SROA classes.
 // CHECK-LABEL: sil [fragile] @class_callee_1 : $@thin (@owned C1, Builtin.Int32) -> Builtin.Int32 {
 // CHECK: bb0([[IN1:%.*]] : $C1, [[IN2:%.*]] : $Builtin.Int32):
-// CHECK: [[FN:%.*]] = function_ref @_TTOS_o2gn_class_callee_1 : $@thin (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
+// CHECK: [[FN:%.*]] = function_ref @_TTSfg_n__class_callee_1 : $@thin (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
 // CHECK: apply [[FN]]([[IN1]], [[IN2]]) : $@thin (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
 // CHECK: fix_lifetime [[IN1]]
 // CHECK: release_value [[IN1]]
@@ -574,7 +574,7 @@ bb0(%0 : $C1, %1 : $Builtin.Int32):
 
 // CHECK-LABEL: sil [fragile] @class_caller_1 : $@thin (@owned C1, Builtin.Int32) -> Builtin.Int32 {
 // CHECK: bb0([[IN1:%.*]] : $C1, [[IN2:%.*]] : $Builtin.Int32):
-// CHECK: [[FN:%.*]] = function_ref @_TTOS_o2gn_class_callee_1 : $@thin (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
+// CHECK: [[FN:%.*]] = function_ref @_TTSfg_n__class_callee_1 : $@thin (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
 // CHECK: apply [[FN]]([[IN1]], [[IN2]]) : $@thin (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
 // CHECK: fix_lifetime [[IN1]]
 // CHECK: release_value [[IN1]]
@@ -587,13 +587,13 @@ bb0(%0 : $C1, %1 : $Builtin.Int32):
 
 // Check Statements for generated code.
 
-// CHECK-LABEL: sil [fragile] @_TTOS_s_single_level_dead_root_callee : $@thin (Builtin.Int32) -> Builtin.Int32 {
+// CHECK-LABEL: sil [fragile] @_TTSfs__single_level_dead_root_callee : $@thin (Builtin.Int32) -> Builtin.Int32 {
 // CHECK: bb0([[IN:%.*]] : $Builtin.Int32):
 // CHECK-NEXT: struct_extract undef : $S1, #S1.f2
 // CHECK-NEXT: return [[IN]] : $Builtin.Int32
 
 
-// CHECK-LABEL: sil [fragile] @_TTOS_s_single_level_live_root_callee : $@thin (Builtin.Int16, Builtin.Int32) -> Builtin.Int32 {
+// CHECK-LABEL: sil [fragile] @_TTSfs__single_level_live_root_callee : $@thin (Builtin.Int16, Builtin.Int32) -> Builtin.Int32 {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int16, [[IN2:%.*]] : $Builtin.Int32):
 // CHECK: [[STRUCT:%.*]] = struct $S1 ([[IN1]] : $Builtin.Int16, [[IN2]] : $Builtin.Int32)
 // CHECK: struct_extract undef : $S1, #S1.f2
@@ -602,7 +602,7 @@ bb0(%0 : $C1, %1 : $Builtin.Int32):
 // CHECK: return [[IN2]]
 
 
-// CHECK-LABEL: sil [fragile] @_TTOS_s_multiple_level_all_root_fields_used_callee : $@thin (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64) {
+// CHECK-LABEL: sil [fragile] @_TTSfs__multiple_level_all_root_fields_used_callee : $@thin (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64) {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int16, [[IN2:%.*]] : $Builtin.Int64):
 // CHECK: struct_extract undef : $S2, #S2.f1
 // CHECK: struct_extract undef : $S2, #S2.f2
@@ -610,14 +610,14 @@ bb0(%0 : $C1, %1 : $Builtin.Int32):
 // CHECK: return [[OUT]]
 
 
-// CHECK-LABEL: sil [fragile] @_TTOS_s_multiple_level_no_root_fields_have_direct_uses_callee : $@thin (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64) {
+// CHECK-LABEL: sil [fragile] @_TTSfs__multiple_level_no_root_fields_have_direct_uses_callee : $@thin (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64) {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int16, [[IN2:%.*]] : $Builtin.Int64):
 // CHECK: struct_extract undef : $S3, #S3.f1
 // CHECK: [[OUT:%.*]] = tuple ([[IN1]] : $Builtin.Int16, [[IN2]] : $Builtin.Int64)
 // CHECK: return [[OUT]]
 
 
-// CHECK-LABEL: sil [fragile] @_TTOS_s_multiple_level_root_must_be_reformed_callee : $@thin (Builtin.Int16, Builtin.Int32, Builtin.Int64, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int64) {
+// CHECK-LABEL: sil [fragile] @_TTSfs__multiple_level_root_must_be_reformed_callee : $@thin (Builtin.Int16, Builtin.Int32, Builtin.Int64, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int64) {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int16, [[IN2:%.*]] : $Builtin.Int32, [[IN3:%.*]] : $Builtin.Int64, [[IN4:%.*]] : $Builtin.Int16, [[IN5:%.*]] : $Builtin.Int32):
 // CHECK: [[STRUCT1:%.*]] = struct $S1 ([[IN4]] : $Builtin.Int16, [[IN5]] : $Builtin.Int32)
 // CHECK: [[STRUCT2:%.*]] = struct $S1 ([[IN1]] : $Builtin.Int16, [[IN2]] : $Builtin.Int32)
@@ -630,7 +630,7 @@ bb0(%0 : $C1, %1 : $Builtin.Int32):
 // CHECK: return [[OUT]] : $(Builtin.Int16, Builtin.Int64)
 
 
-// CHECK-LABEL: sil [fragile] @_TTOS_s_three_level_dead_root_reform_two_fields_use_leafs_of_third_callee : $@thin (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32, Builtin.Int32, Builtin.Int16, Builtin.Int16, Builtin.Int32) -> (Builtin.Int32, Builtin.Int16, Builtin.Int16, Builtin.Int32) {
+// CHECK-LABEL: sil [fragile] @_TTSfs__three_level_dead_root_reform_two_fields_use_leafs_of_third_callee : $@thin (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32, Builtin.Int32, Builtin.Int16, Builtin.Int16, Builtin.Int32) -> (Builtin.Int32, Builtin.Int16, Builtin.Int16, Builtin.Int32) {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int16, [[IN2:%.*]] : $Builtin.Int32, [[IN3:%.*]]: $Builtin.Int16, [[IN4:%.*]] : $Builtin.Int32, [[IN5:%.*]] : $Builtin.Int32, [[IN6:%.*]] : $Builtin.Int16, [[IN7:%.*]] : $Builtin.Int16, [[IN8:%.*]] : $Builtin.Int32):
 // CHECK: [[STRUCT1:%.*]] = struct $S1 ([[IN7]] : $Builtin.Int16, [[IN8]] : $Builtin.Int32)
 // CHECK: [[STRUCT2:%.*]] = struct $S1 ([[IN3]]: $Builtin.Int16, [[IN4]] : $Builtin.Int32)
@@ -648,7 +648,7 @@ bb0(%0 : $C1, %1 : $Builtin.Int32):
 // CHECK: return [[OUT]] : $(Builtin.Int32, Builtin.Int16, Builtin.Int16, Builtin.Int32)
 
 
-// CHECK-LABEL: sil [fragile] @_TTOS_o2gs_owned_struct_1_callee : $@thin (@guaranteed Builtin.NativeObject, Builtin.Int16, Builtin.Int32, Builtin.Int64, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int64) {
+// CHECK-LABEL: sil [fragile] @_TTSfgs__owned_struct_1_callee : $@thin (@guaranteed Builtin.NativeObject, Builtin.Int16, Builtin.Int32, Builtin.Int64, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int64) {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.NativeObject, [[IN2:%.*]]: $Builtin.Int16, [[IN3:%.*]] : $Builtin.Int32, [[IN4:%.*]] : $Builtin.Int64, [[IN5:%.*]] : $Builtin.Int16, [[IN6:%.*]] : $Builtin.Int32):
 // CHECK: [[STRUCT1:%.*]] = struct $S1 ([[IN5]] : $Builtin.Int16, [[IN6]] : $Builtin.Int32)
 // CHECK: [[STRUCT2:%.*]] = struct $S1 ([[IN2]]: $Builtin.Int16, [[IN3]] : $Builtin.Int32)
@@ -660,7 +660,7 @@ bb0(%0 : $C1, %1 : $Builtin.Int32):
 // CHECK: [[OUT:%.*]] = tuple ([[IN2]]: $Builtin.Int16, [[IN4]] : $Builtin.Int64)
 // CHECK: return [[OUT]] : $(Builtin.Int16, Builtin.Int64)
 
-// CHECK-LABEL: sil [fragile] @_TTOS_ndo2gsdn_owned_struct_2_callee : $@thin (Builtin.Int256, @guaranteed Builtin.NativeObject, Builtin.Int16, Builtin.Int32, Builtin.Int64, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int64, Builtin.Int128) {
+// CHECK-LABEL: sil [fragile] @_TTSfn_d_gs_d_n__owned_struct_2_callee : $@thin (Builtin.Int256, @guaranteed Builtin.NativeObject, Builtin.Int16, Builtin.Int32, Builtin.Int64, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int64, Builtin.Int128) {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int256, [[IN2:%.*]] : $Builtin.NativeObject, [[IN3:%.*]] : $Builtin.Int16, [[IN4:%.*]]: $Builtin.Int32, [[IN5:%.*]] : $Builtin.Int64, [[IN6:%.*]] : $Builtin.Int16, [[IN7:%.*]] : $Builtin.Int32, [[IN8:%.*]] : $Builtin.Int128):
 // CHECK: [[STRUCT1:%.*]] = struct $S1 ([[IN6]] : $Builtin.Int16, [[IN7]] : $Builtin.Int32)
 // CHECK: [[STRUCT2:%.*]] = struct $S1 ([[IN3]] : $Builtin.Int16, [[IN4]]: $Builtin.Int32)
@@ -675,7 +675,7 @@ bb0(%0 : $C1, %1 : $Builtin.Int32):
 // CHECK: [[OUT]] : $(Builtin.Int256, Builtin.Int16, Builtin.Int64, Builtin.Int128)
 
 
-// CHECK-LABEL: sil [fragile] @_TTOS_sss_ignore_ptrs_callee : $@thin (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16) {
+// CHECK-LABEL: sil [fragile] @_TTSfn_s_s__ignore_ptrs_callee : $@thin (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16) {
 // CHECK: bb0([[IN1:%.*]] : $*S1, [[IN2:%.*]] : $Builtin.Int16, [[IN3:%.*]] : $Builtin.Int16):
 // CHECK: [[FN:%.*]] = function_ref @s1_ptr_user : $@thin (@in S1) -> ()
 // CHECK: apply [[FN]]([[IN1]]) : $@thin (@in S1) -> ()
@@ -685,7 +685,7 @@ bb0(%0 : $C1, %1 : $Builtin.Int32):
 // CHECK: return [[OUT]] : $(Builtin.Int16, Builtin.Int16)
 
 
-// CHECK-LABEL: sil [fragile] @_TTOS_sss_multiple_sroa_callee : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Word, Builtin.RawPointer, Builtin.Word, @owned FakeOptional<FakeAnyObject>, Builtin.RawPointer, Builtin.Word, Builtin.Word) -> () {
+// CHECK-LABEL: sil [fragile] @_TTSfs_s_s__multiple_sroa_callee : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Word, Builtin.RawPointer, Builtin.Word, @owned FakeOptional<FakeAnyObject>, Builtin.RawPointer, Builtin.Word, Builtin.Word) -> () {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.RawPointer, [[IN2:%.*]] : $Builtin.Word, [[IN3:%.*]] : $Builtin.Word, [[IN4:%.*]] : $Builtin.RawPointer, [[IN5:%.*]] : $Builtin.Word, [[IN6:%.*]] : $FakeOptional<FakeAnyObject>, [[IN7:%.*]] : $Builtin.RawPointer, [[IN8:%.*]] : $Builtin.Word, [[IN9:%.*]] : $Builtin.Word):
 // CHECK: [[STRUCT1:%.*]] = struct $FakeStaticString ([[IN1]] : $Builtin.RawPointer, [[IN2]] : $Builtin.Word, [[IN3]] : $Builtin.Word)
 // CHECK: [[STRUCT2:%.*]] = struct $FakeUWord ([[IN5]] : $Builtin.Word)
@@ -700,7 +700,7 @@ bb0(%0 : $C1, %1 : $Builtin.Int32):
 // CHECK: apply [[FN1]]([[STRUCT6]]) : $@thin (FakeStaticString) -> ()
 
 
-// CHECK-LABEL: sil [fragile] @_TTOS_s_check_out_of_order_uses_callee : $@thin (Builtin.Int16, Builtin.Int32) -> () {
+// CHECK-LABEL: sil [fragile] @_TTSfs__check_out_of_order_uses_callee : $@thin (Builtin.Int16, Builtin.Int32) -> () {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int16, [[IN2:%.*]] : $Builtin.Int32):
 // CHECK: struct_extract undef : $S1, #S1.f2
 // CHECK: [[FN1:%.*]] = function_ref @i32_user : $@thin (Builtin.Int32) -> ()
@@ -710,6 +710,6 @@ bb0(%0 : $C1, %1 : $Builtin.Int32):
 // CHECK: apply [[FN2]]([[IN1]]) : $@thin (Builtin.Int16) -> ()
 
 
-// CHECK-LABEL: sil [fragile] @_TTOS_o2gn_class_callee_1 : $@thin (@guaranteed C1, Builtin.Int32) -> Builtin.Int32 {
+// CHECK-LABEL: sil [fragile] @_TTSfg_n__class_callee_1 : $@thin (@guaranteed C1, Builtin.Int32) -> Builtin.Int32 {
 // CHECK: bb0({{%.*}} : $C1, [[IN:%.*]] : $Builtin.Int32):
 // CHECK: return [[IN]] : $Builtin.Int32

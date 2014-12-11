@@ -20,6 +20,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/Range.h"
+#include "swift/SIL/Mangle.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILCloner.h"
@@ -449,77 +450,33 @@ createEmptyFunctionWithOptimizedSig(llvm::SmallString<64> &NewFName) {
 //                                  Mangling
 //===----------------------------------------------------------------------===//
 
-static bool isSpecializedFunction(SILFunction &F) {
-  return F.getName().startswith("_TTOS");
-}
-
 llvm::SmallString<64> FunctionAnalyzer::getOptimizedName() {
   llvm::SmallString<64> Name;
 
   {
     llvm::raw_svector_ostream buffer(Name);
-    // OS for optimized signature.
-    buffer << "_TTOS_";
+    Mangle::Mangler M(buffer);
+    Mangle::FunctionSignatureSpecializationMangler FSSM(M, F);
 
-    // For every argument, put in what we are going to do to that arg in the
-    // signature. The key is:
-    //
-    // 'n'   => We did nothing to the argument.
-    // 'd'   => The argument was dead and will be removed.
-    // 'a2v' => Was a loadable address and we promoted it to a value.
-    // 'o2g' => Was an @owned argument, but we changed it to be a guaranteed
-    //          parameter.
-    // 's'   => Was a loadable value that we exploded into multiple arguments.
-    // 'a2s' => Was a loadable address and we promoted it to a value which we
-    //          exploded into multiple arguments.
-    //
-    // Currently we only emit functions that use:
-    //
-    // 1. 'n',
-    // 2. 'd',
-    // 3. 'o2g'
-    //
-    // since we do not perform any other of the optimizations.
-    //
-    // *NOTE* The guaranteed optimization requires knowledge to be taught to the
-    // ARC optimizer among other passes in order to guarantee safety. That or
-    // you need to insert a fix_lifetime call to make sure we do not eliminate
-    // the retain, release surrounding the call site in the caller.
-    //
-    // Additionally we use a packed signature since at this point we don't need
-    // any '_'. The fact that we can run this optimization multiple times makes
-    // me worried about long symbol names so I am trying to keep the symbol
-    // names as short as possible especially in light of this being applied to
-    // specialized functions.
-
-    for (const ArgumentDescriptor &Arg : ArgDescList) {
-      // If this arg is dead, add 'd' to the packed signature and continue.
+    for (unsigned i : indices(ArgDescList)) {
+      const ArgumentDescriptor &Arg = ArgDescList[i];
       if (Arg.IsDead) {
-        buffer << 'd';
+        FSSM.setArgumentDead(i);
         continue;
       }
 
-      bool WillOptimize = false;
       // If we have an @owned argument and found a callee release for it,
       // convert the argument to guaranteed.
       if (Arg.CalleeRelease) {
-        WillOptimize = true;
-        buffer << "o2g";
+        FSSM.setArgumentOwnedToGuaranteed(i);
       }
 
-      if (Arg.ProjTree.canExplodeValue()) {
-        WillOptimize = true;
-        buffer << "s";
+      if (Arg.canExplodeValue()) {
+        FSSM.setArgumentSROA(i);
       }
-
-      if (WillOptimize)
-        continue;
-
-      // Otherwise we are doing nothing so add 'n' to the packed signature.
-      buffer << 'n';
     }
 
-    buffer << '_' << F->getName();
+    FSSM.mangle();
   }
 
   return Name;
@@ -758,10 +715,6 @@ static bool canSpecializeFunction(SILFunction &F) {
   // own module. We will inline the original function as a thunk. The thunk will
   // call the specialized function.
   if (F.isAvailableExternally())
-    return false;
-
-  // Do not specialize functions that we already specialized.
-  if (isSpecializedFunction(F))
     return false;
 
   // Do not specialize the signature of transparent functions or always inline

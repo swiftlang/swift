@@ -80,6 +80,12 @@ FunctionSignatureSpecializationMangler(Mangler &M, SILFunction *F)
 
 void
 FunctionSignatureSpecializationMangler::
+setArgumentDead(unsigned ArgNo) {
+  Args[ArgNo].first = uint8_t(ArgumentModifier::Dead);
+}
+
+void
+FunctionSignatureSpecializationMangler::
 setArgumentClosureProp(SILArgument *Arg, PartialApplyInst *PAI) {
   assert(Arg->getFunction() == getFunction() && "Arg not from function");
   auto &Info = Args[Arg->getIndex()];
@@ -93,6 +99,19 @@ setArgumentConstantProp(unsigned ArgNo, LiteralInst *LI) {
   auto &Info = Args[ArgNo];
   Info.first |= uint8_t(ArgumentModifier::ConstantProp);
   Info.second = LI;
+}
+
+
+void
+FunctionSignatureSpecializationMangler::
+setArgumentOwnedToGuaranteed(unsigned ArgNo) {
+  Args[ArgNo].first |= uint8_t(ArgumentModifier::OwnedToGuaranteed);
+}
+
+void
+FunctionSignatureSpecializationMangler::
+setArgumentSROA(unsigned ArgNo) {
+  Args[ArgNo].first |= uint8_t(ArgumentModifier::SROA);
 }
 
 void
@@ -175,13 +194,37 @@ FunctionSignatureSpecializationMangler::
 mangleArgument(uint8_t ArgMod, NullablePtr<SILInstruction> Inst) {
   if (ArgMod & uint8_t(ArgumentModifier::ConstantProp)) {
     mangleConstantProp(cast<LiteralInst>(Inst.get()));
-  } else if (ArgMod & uint8_t(ArgumentModifier::ClosureProp)) {
-    mangleClosureProp(cast<PartialApplyInst>(Inst.get()));
-  } else if (ArgMod == uint8_t(ArgumentModifier::Unmodified)) {
-    getBuffer() << "n";
-  } else {
-    llvm_unreachable("unknown arg type");
+    return;
   }
+
+  if (ArgMod & uint8_t(ArgumentModifier::ClosureProp)) {
+    mangleClosureProp(cast<PartialApplyInst>(Inst.get()));
+    return;
+  }
+
+  llvm::raw_ostream &os = getBuffer();
+
+  if (ArgMod == uint8_t(ArgumentModifier::Unmodified)) {
+    os << "n";
+    return;
+  }
+
+  if (ArgMod == uint8_t(ArgumentModifier::Dead)) {
+    os << "d";
+    return;
+  }
+
+  bool hasSomeMod = false;
+  if (ArgMod & uint8_t(ArgumentModifier::OwnedToGuaranteed)) {
+    os << "g";
+    hasSomeMod = true;
+  }
+  if (ArgMod & uint8_t(ArgumentModifier::SROA)) {
+    os << "s";
+    hasSomeMod = true;
+  }
+
+  assert(hasSomeMod && "Unknown modifier");
 }
 
 void FunctionSignatureSpecializationMangler::mangleSpecialization() {
