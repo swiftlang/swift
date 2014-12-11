@@ -3552,7 +3552,7 @@ cond_br
                                  false_label (%x : $X, %y : $Y, ...)
   // %0 must be of $Builtin.Int1 type
   // `true_label` and `false_label` must refer to block labels within the
-  //   current function
+  //   current function and must not be identical
   // %a, %b, etc. must be of the types of `true_label`'s arguments
   // %x, %y, etc. must be of the types of `false_label`'s arguments
 

@@ -389,14 +389,20 @@ bb4(%3 : $Builtin.Int1):
   return %3 : $Builtin.Int1
 }
 
+// CHECK-LABEL: sil @same_destination_unused_arg
 sil @same_destination_unused_arg : $@thin (Optional<Int>) -> Optional<Int> {
 bb0(%0 : $Optional<Int>):
   %t = integer_literal $Builtin.Int1, 1
   %f = integer_literal $Builtin.Int1, 0
+// CHECK: select_enum
+// CHECK-NEXT: return
   %1 = select_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: %t, default %f : $Builtin.Int1
-  cond_br %1, bb1(%0 : $Optional<Int>), bb1(%0 : $Optional<Int>)
+  cond_br %1, bb1(%0 : $Optional<Int>), bb2(%0 : $Optional<Int>)
 
 bb1(%2 : $Optional<Int>):
+  br bb2(%2 : $Optional<Int>)
+
+bb2(%3 : $Optional<Int>):
   return %0 : $Optional<Int>
 }
 

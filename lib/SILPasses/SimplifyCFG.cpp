@@ -1800,7 +1800,8 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
 
   // If the destination block is a simple trampoline (jump to another block)
   // then jump directly.
-  if (SILBasicBlock *TrueTrampolineDest = getTrampolineDest(TrueSide)) {
+  SILBasicBlock *TrueTrampolineDest = getTrampolineDest(TrueSide);
+  if (TrueTrampolineDest && TrueTrampolineDest != FalseSide) {
     SILBuilderWithScope<1>(BI)
       .createCondBranch(BI->getLoc(), BI->getCondition(),
                         TrueTrampolineDest, TrueArgs,
@@ -1814,7 +1815,8 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     return true;
   }
 
-  if (SILBasicBlock *FalseTrampolineDest = getTrampolineDest(FalseSide)) {
+  SILBasicBlock *FalseTrampolineDest = getTrampolineDest(FalseSide);
+  if (FalseTrampolineDest && FalseTrampolineDest != TrueSide) {
     SILBuilderWithScope<1>(BI)
       .createCondBranch(BI->getLoc(), BI->getCondition(),
                         TrueSide, TrueArgs,
@@ -1829,8 +1831,10 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
 
   // Simplify cond_br where both sides jump to the same blocks with the same
   // args.
-  if (TrueSide == FalseSide && TrueArgs == FalseArgs) {
-    SILBuilderWithScope<1>(BI).createBranch(BI->getLoc(), TrueSide, TrueArgs);
+  if (TrueArgs == FalseArgs && (TrueSide == FalseTrampolineDest ||
+                                FalseSide == TrueTrampolineDest)) {
+    SILBuilderWithScope<1>(BI).createBranch(BI->getLoc(),
+                      TrueTrampolineDest ? FalseSide : TrueSide, TrueArgs);
     BI->eraseFromParent();
     addToWorklist(ThisBB);
     addToWorklist(TrueSide);

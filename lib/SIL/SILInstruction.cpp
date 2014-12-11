@@ -1196,6 +1196,7 @@ CondBranchInst::CondBranchInst(SILLocation Loc, SILValue Condition,
 {
   assert(Args.size() == (NumTrueArgs + NumFalseArgs) &&
          "Invalid number of args");
+  assert(TrueBB != FalseBB && "Identical destinations");
 }
 
 CondBranchInst *CondBranchInst::create(SILLocation Loc, SILValue Condition,

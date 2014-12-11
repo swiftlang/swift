@@ -2118,6 +2118,8 @@ public:
 
     require(CBI->getTrueArgs().size() == CBI->getTrueBB()->bbarg_size(),
             "true branch has wrong number of arguments for dest bb");
+    require(CBI->getTrueBB() != CBI->getFalseBB(),
+            "identical destinations");
     require(std::equal(CBI->getTrueArgs().begin(), CBI->getTrueArgs().end(),
                       CBI->getTrueBB()->bbarg_begin(),
                       [](SILValue branchArg, SILArgument *bbArg) {
