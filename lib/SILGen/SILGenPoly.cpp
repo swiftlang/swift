@@ -1558,14 +1558,10 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
                                SILDeclRef requirement,
                                SILDeclRef witness,
                                ArrayRef<Substitution> witnessSubs,
-                               IsFreeFunctionWitness_t isFree,
-                               HasInOutSelfAbstractionDifference_t inOutSelf) {
+                               IsFreeFunctionWitness_t isFree) {
   // FIXME: Disable checks that the protocol witness carries debug info.
   // Should we carry debug info for witnesses?
   F.setBare(IsBare);
-  
-  assert((!isFree || !inOutSelf)
-         && "free functions cannot have an inout self abstraction difference");
   
   SILLocation loc(witness.getDecl());
   FullExpr scope(Cleanups, CleanupLocation::getCleanupLocation(loc));

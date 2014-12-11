@@ -2404,7 +2404,6 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   auto requirementInfo = Types.getConstantInfo(requirement);
   auto requirementTy
     = cast<PolymorphicFunctionType>(requirementInfo.FormalType);
-  auto witnessOrigTy = Types.getConstantFormalType(witness);
   unsigned witnessUncurryLevel = witness.uncurryLevel;
 
   // Substitute the 'self' type into the requirement to get the concrete
@@ -2454,20 +2453,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
 
   // The witness SIL function has the type of the AST-level witness, at the
   // abstraction level of the original protocol requirement.
-  assert(requirement.uncurryLevel == witnessUncurryLevel
-         && "uncurry level of requirement and witness do not match");
-
-  // In addition to the usual bevy of abstraction differences, protocol
-  // witnesses have potential differences in inout-ness of self. mutating
-  // value type methods may reassign 'self' as an inout parameter, but may be
-  // conformed to by nonmutating or class methods that cannot.
-  // Handle this special case in the witness type before applying the
-  // abstraction change.
-  auto inOutSelf = DoesNotHaveInOutSelfAbstractionDifference;
-  if (!isa<InOutType>(witnessOrigTy.getInput()) &&
-      isa<InOutType>(requirementTy.getInput())) {
-    inOutSelf = HasInOutSelfAbstractionDifference;
-  }
+  assert(requirement.uncurryLevel == witnessUncurryLevel &&
+         "uncurry level of requirement and witness do not match");
 
   // Work out the interface type for the witness.
   auto reqtIfaceTy
@@ -2580,8 +2567,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
 
   // Create the witness.
   SILGenFunction(*this, *f)
-    .emitProtocolWitness(conformance, requirement, witness, witnessSubs,
-                         isFree, inOutSelf);
+    .emitProtocolWitness(conformance, requirement, witness, witnessSubs,isFree);
 
   f->verify();
 

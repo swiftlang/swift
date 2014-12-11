@@ -456,8 +456,7 @@ public:
                            SILDeclRef requirement,
                            SILDeclRef witness,
                            ArrayRef<Substitution> witnessSubs,
-                           IsFreeFunctionWitness_t isFree,
-                           HasInOutSelfAbstractionDifference_t inOutSelf);
+                           IsFreeFunctionWitness_t isFree);
   
   /// Convert a block to a native function with a thunk.
   ManagedValue emitBlockToFunc(SILLocation loc,

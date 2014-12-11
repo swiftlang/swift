@@ -36,14 +36,6 @@ enum IsFreeFunctionWitness_t : bool {
   IsNotFreeFunctionWitness = false,
   IsFreeFunctionWitness = true,
 };
-  
-/// An enum to indicate whether a protocol method requirement is satisfied by a
-/// method with an abstraction difference in the inout-ness of its self
-/// parameter.
-enum HasInOutSelfAbstractionDifference_t : bool {
-  DoesNotHaveInOutSelfAbstractionDifference = false,
-  HasInOutSelfAbstractionDifference = true,
-};
 
 /// An ASTVisitor for generating SIL from top-level declarations in a module.
 class LLVM_LIBRARY_VISIBILITY SILGenModule : public ASTVisitor<SILGenModule> {
