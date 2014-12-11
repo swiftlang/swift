@@ -945,6 +945,7 @@ which are juxtaposed and terminated with a trailing underscore.
   impl-convention ::= 'g'                     // direct, guaranteed
   impl-convention ::= 'i'                     // indirect, ownership transfer
   impl-convention ::= 'l'                     // indirect, inout
+  impl-convention ::= 'G'                     // indirect, guaranteed
   impl-convention ::= 'o'                     // direct, ownership transfer
   impl-function-attribute ::= 'Cb'            // compatible with C block invocation function
   impl-function-attribute ::= 'Cc'            // compatible with C global function

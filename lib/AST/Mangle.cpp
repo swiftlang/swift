@@ -915,7 +915,8 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     // <impl-convention> ::= 'g'                      // direct, guaranteed
     // <impl-convention> ::= 'i'                      // indirect, ownership transfer
     // <impl-convention> ::= 'l'                      // indirect, inout
-    // <impl-convention> ::= 'o'                      // direct, ownership transfer
+    // <impl-convention> ::= 'g'                      // direct, guaranteed
+    // <impl-convention> ::= 'G'                      // indirect, guaranteed
     // <impl-function-attribute> ::= 'Cb'             // block invocation function
     // <impl-function-attribute> ::= 'Cc'             // C global function
     // <impl-function-attribute> ::= 'Cm'             // Swift method
@@ -934,7 +935,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
       case ParameterConvention::Indirect_In: return 'i';
       case ParameterConvention::Indirect_Out: return 'i';
       case ParameterConvention::Indirect_Inout: return 'l';
-      case ParameterConvention::Indirect_In_Guaranteed: return 'l';
+      case ParameterConvention::Indirect_In_Guaranteed: return 'G';
       case ParameterConvention::Direct_Owned: return 'o';
       case ParameterConvention::Direct_Unowned: return 'd';
       case ParameterConvention::Direct_Guaranteed: return 'g';
