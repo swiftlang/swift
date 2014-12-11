@@ -21,23 +21,19 @@
 
 using namespace swift;
 
-namespace {
-  using DependencyMaskTy = DependencyGraphImpl::DependencyMaskTy;
-  enum class DependencyKind : DependencyMaskTy {
-    Name = 1 << 0,
-    Type = 1 << 1
-  };
+enum class DependencyGraphImpl::DependencyKind : uint8_t {
+  Name = 1 << 0,
+  Type = 1 << 1
+};
 
-  enum class DependencyDirection : bool {
-    Depends,
-    Provides
-  };
-} // end anonymous namespace
+using LoadResult = DependencyGraphImpl::LoadResult;
+using DependencyKind = DependencyGraphImpl::DependencyKind;
+using DependencyCallbackTy = LoadResult(StringRef, DependencyKind);
 
-static bool
-parseDependencyFile(llvm::MemoryBuffer &buffer, bool providesOnly,
-                    llvm::function_ref<void(StringRef, DependencyKind,
-                                            DependencyDirection)> callback) {
+static LoadResult
+parseDependencyFile(llvm::MemoryBuffer &buffer,
+                    llvm::function_ref<DependencyCallbackTy> providesCallback,
+                    llvm::function_ref<DependencyCallbackTy> dependsCallback) {
   using namespace llvm;
 
   // FIXME: Switch to a format other than YAML.
@@ -45,12 +41,16 @@ parseDependencyFile(llvm::MemoryBuffer &buffer, bool providesOnly,
   yaml::Stream stream(buffer.getMemBufferRef(), SM);
   auto I = stream.begin();
   if (I == stream.end() || !I->getRoot())
-    return true;
+    return LoadResult::HadError;
 
   auto *topLevelMap = dyn_cast<yaml::MappingNode>(I->getRoot());
-  if (!topLevelMap)
-    return !isa<yaml::NullNode>(I->getRoot());
+  if (!topLevelMap) {
+    if (isa<yaml::NullNode>(I->getRoot()))
+      return LoadResult::Valid;
+    return LoadResult::HadError;
+  }
 
+  LoadResult result = LoadResult::Valid;
   SmallString<64> scratch;
   // FIXME: LLVM's YAML support does incremental parsing in such a way that
   // for-range loops break.
@@ -60,6 +60,10 @@ parseDependencyFile(llvm::MemoryBuffer &buffer, bool providesOnly,
 
     auto *key = cast<yaml::ScalarNode>(i->getKey());
 
+    enum class DependencyDirection : bool {
+      Depends,
+      Provides
+    };
     using KindPair = std::pair<DependencyKind, DependencyDirection>;
 
     KindPair dirAndKind = llvm::StringSwitch<KindPair>(key->getValue(scratch))
@@ -72,71 +76,86 @@ parseDependencyFile(llvm::MemoryBuffer &buffer, bool providesOnly,
       .Case("nominals", std::make_pair(DependencyKind::Type,
                                        DependencyDirection::Provides));
 
-    if (providesOnly && dirAndKind.second != DependencyDirection::Provides)
-      continue;
-
     auto *entries = cast<yaml::SequenceNode>(i->getValue());
     for (const yaml::Node &rawEntry : *entries) {
       auto *entry = cast<yaml::ScalarNode>(&rawEntry);
-      callback(entry->getValue(scratch), dirAndKind.first, dirAndKind.second);
+
+      auto &callback =
+        (dirAndKind.second == DependencyDirection::Depends) ? dependsCallback
+                                                            : providesCallback;
+
+      switch (callback(entry->getValue(scratch), dirAndKind.first)) {
+      case LoadResult::HadError:
+        return LoadResult::HadError;
+      case LoadResult::Valid:
+        break;
+      case LoadResult::NeedsRebuilding:
+        result = LoadResult::NeedsRebuilding;
+        break;
+      }
     }
   }
   
-  return false;
+  return result;
 }
 
-bool DependencyGraphImpl::loadFromPath(const void *node, StringRef path) {
+LoadResult DependencyGraphImpl::loadFromPath(const void *node, StringRef path) {
   auto buffer = llvm::MemoryBuffer::getFile(path);
   if (!buffer)
-    return true;
+    return LoadResult::HadError;
   return loadFromBuffer(node, *buffer.get());
 }
 
-bool DependencyGraphImpl::loadFromString(const void *node, StringRef data) {
+LoadResult
+DependencyGraphImpl::loadFromString(const void *node, StringRef data) {
   auto buffer = llvm::MemoryBuffer::getMemBuffer(data);
   return loadFromBuffer(node, *buffer);
 }
 
-bool DependencyGraphImpl::loadFromBuffer(const void *node,
-                                         llvm::MemoryBuffer &buffer) {
+LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
+                                               llvm::MemoryBuffer &buffer) {
   auto &provides = Provides[node];
-  provides.clear();
-  return parseDependencyFile(buffer, /*providesOnly=*/isMarked(node),
-                             [this, node, &provides](StringRef name,
-                                                     DependencyKind kind,
-                                                     DependencyDirection dir) {
-    auto kindAsMask = static_cast<DependencyMaskTy>(kind);
-    switch (dir) {
-    case DependencyDirection::Depends: {
-      auto &entries = Dependencies[name];
-      auto iter = std::find_if(entries.begin(), entries.end(),
-                               [node](const DependencyPairTy &entry) -> bool {
-        return node == entry.second;
-      });
-      if (iter == entries.end())
-        entries.emplace_back(kindAsMask, node);
-      else
-        iter->first |= kindAsMask;
-      break;
-    }
 
-    case DependencyDirection::Provides: {
-      auto iter = std::find_if(provides.begin(), provides.end(),
-                               [name](const ProvidesPairTy &entry) -> bool {
-        return name == entry.second;
-      });
-      if (iter == provides.end())
-        provides.emplace_back(kindAsMask, name);
-      else
-        iter->first |= kindAsMask;
-      break;
-    }
-    }
-  });
+  auto dependsCallback = [this, node](StringRef name,
+                                      DependencyKind kind) -> LoadResult {
+
+    auto &entries = Dependencies[name];
+    auto iter = std::find_if(entries.begin(), entries.end(),
+                             [node](const DependencyEntryTy &entry) -> bool {
+      return node == entry.node;
+    });
+
+    if (iter == entries.end())
+      entries.push_back({node, kind});
+    else
+      iter->kindMask |= kind;
+
+    // FIXME: This should return NeedsRebuilding if the dependency has already
+    // been marked.
+    return LoadResult::Valid;
+  };
+
+  auto providesCallback =
+      [this, node, &provides](StringRef name,
+                              DependencyKind kind) -> LoadResult {
+    auto iter = std::find_if(provides.begin(), provides.end(),
+                             [name](const ProvidesEntryTy &entry) -> bool {
+      return name == entry.name;
+    });
+
+    if (iter == provides.end())
+      provides.push_back({name, kind});
+    else
+      iter->kindMask |= kind;
+
+    return LoadResult::Valid;
+  };
+
+  return parseDependencyFile(buffer, providesCallback, dependsCallback);
 }
 
 void
-DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &newlyMarked,
+DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
                                     const void *node) {
   assert(Provides.count(node) && "node is not in the graph");
   SmallVector<const void *, 16> worklist;
@@ -147,16 +166,16 @@ DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &newlyMarked,
       return;
 
     for (const auto &provided : allProvided->second) {
-      auto allDependents = Dependencies.find(provided.second);
+      auto allDependents = Dependencies.find(provided.name);
       if (allDependents == Dependencies.end())
         continue;
 
       for (const auto &dependent : allDependents->second) {
-        if ((provided.first & dependent.first) == 0)
+        if (!(provided.kindMask & dependent.kindMask))
           continue;
-        if (isMarked(dependent.second))
+        if (isMarked(dependent.node))
           continue;
-        worklist.push_back(dependent.second);
+        worklist.push_back(dependent.node);
       }
     }
   };
@@ -169,7 +188,7 @@ DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &newlyMarked,
     const void *next = worklist.pop_back_val();
     if (!Marked.insert(next).second)
       continue;
-    newlyMarked.push_back(next);
+    visited.push_back(next);
     addDependentsToWorklist(next);
   }
 }

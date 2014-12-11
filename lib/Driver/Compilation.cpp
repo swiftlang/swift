@@ -131,10 +131,16 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
     StringRef DependenciesFile =
       Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
     if (!DependenciesFile.empty()) {
-      if (DepGraph.loadFromPath(Cmd, DependenciesFile))
+      switch (DepGraph.loadFromPath(Cmd, DependenciesFile)) {
+      case DependencyGraphImpl::LoadResult::HadError:
         NeedToRunEverything = true;
-      else
+        break;
+      case DependencyGraphImpl::LoadResult::Valid:
         Condition = Cmd->getCondition();
+        break;
+      case DependencyGraphImpl::LoadResult::NeedsRebuilding:
+        llvm_unreachable("we haven't marked anything in this graph yet");
+      }
     }
 
     switch (Condition) {
@@ -226,20 +232,25 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
         Output.getAdditionalOutputForType(types::TY_SwiftDeps);
       if (!DependenciesFile.empty()) {
         SmallVector<const Job *, 16> Dependents;
-        DepGraph.markTransitive(Dependents, FinishedCmd);
 
-        if (DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
+        switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
+        case DependencyGraphImpl::LoadResult::HadError:
           NeedToRunEverything = true;
           for (const Job *Cmd : DeferredCommands)
             scheduleCommandIfNecessaryAndPossible(Cmd);
           DeferredCommands.clear();
-
-        } else {
+          Dependents.clear();
+          break;
+        case DependencyGraphImpl::LoadResult::NeedsRebuilding:
+          llvm_unreachable("currently unused");
+        case DependencyGraphImpl::LoadResult::Valid:
           DepGraph.markTransitive(Dependents, FinishedCmd);
-          for (const Job *Cmd : Dependents) {
-            DeferredCommands.erase(Cmd);
-            scheduleCommandIfNecessaryAndPossible(Cmd);
-          }
+          break;
+        }
+
+        for (const Job *Cmd : Dependents) {
+          DeferredCommands.erase(Cmd);
+          scheduleCommandIfNecessaryAndPossible(Cmd);
         }
       }
     }

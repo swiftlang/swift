@@ -14,6 +14,7 @@
 #define SWIFT_DRIVER_DEPENDENCYGRAPH_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringMap.h"
@@ -33,15 +34,41 @@ namespace swift {
 /// \see DependencyGraph
 class DependencyGraphImpl {
 public:
-  /// A mask of possible dependency kinds ORed together.
+  /// Possible dependency kinds.
   ///
   /// Clients of DependencyGraph should have no reason to use this type.
   /// It is only used in the implementation.
-  using DependencyMaskTy = uint8_t;
+  enum class DependencyKind : uint8_t;
+
+  /// Describes the result of loading a dependency file for a particular node.
+  enum class LoadResult {
+    /// There was an error loading the file; the entire graph should be
+    /// considered suspect.
+    HadError,
+
+    /// The file was loaded successfully; with current information the node
+    /// does not need to be rebuilt.
+    Valid,
+
+    /// The file was loaded successfully; with current information the node
+    /// should be marked and rebuilt.
+    NeedsRebuilding
+  };
 
 private:
-  using DependencyPairTy = std::pair<DependencyMaskTy, const void *>;
-  using ProvidesPairTy = std::pair<DependencyMaskTy, std::string>;
+  using DependencyMaskTy = OptionSet<DependencyKind>;
+
+  struct DependencyEntryTy {
+    const void *node;
+    DependencyMaskTy kindMask;
+  };
+  static_assert(std::is_move_constructible<DependencyEntryTy>::value, "");
+
+  struct ProvidesEntryTy {
+    std::string name;
+    DependencyMaskTy kindMask;
+  };
+  static_assert(std::is_move_constructible<ProvidesEntryTy>::value, "");
 
   /// The "outgoing" edge map. This lists all outgoing (kind, string) edges
   /// representing satisified dependencies from a particular node.
@@ -50,7 +77,7 @@ private:
   /// into one field.
   ///
   /// \sa DependencyMaskTy
-  llvm::DenseMap<const void *, std::vector<ProvidesPairTy>> Provides;
+  llvm::DenseMap<const void *, std::vector<ProvidesEntryTy>> Provides;
 
   /// The "incoming" edge map. Semantically this maps incoming (kind, string)
   /// edges representing dependencies to the nodes that depend on them.
@@ -62,17 +89,17 @@ private:
   /// field.
   ///
   /// \sa DependencyMaskTy
-  llvm::StringMap<std::vector<DependencyPairTy>> Dependencies;
+  llvm::StringMap<std::vector<DependencyEntryTy>> Dependencies;
 
   /// The set of marked nodes.
   llvm::SmallPtrSet<const void *, 16> Marked;
 
-  bool loadFromBuffer(const void *node, llvm::MemoryBuffer &buffer);
+  LoadResult loadFromBuffer(const void *node, llvm::MemoryBuffer &buffer);
 
 protected:
-  bool loadFromString(const void *node, StringRef data);
-  bool loadFromPath(const void *node, StringRef path);
-  void markTransitive(SmallVectorImpl<const void *> &newlyMarked,
+  LoadResult loadFromString(const void *node, StringRef data);
+  LoadResult loadFromPath(const void *node, StringRef path);
+  void markTransitive(SmallVectorImpl<const void *> &visited,
                       const void *node);
 
   bool isMarked(const void *node) const {
@@ -94,7 +121,7 @@ protected:
 /// The graph supports a transitive "mark" operation, whose interpretation is
 /// up to the client.
 template <typename T>
-class DependencyGraph : DependencyGraphImpl {
+class DependencyGraph : public DependencyGraphImpl {
   using Traits = llvm::PointerLikeTypeTraits<T>;
   static_assert(Traits::NumLowBitsAvailable >= 0, "not a pointer-like type");
 public:
@@ -106,9 +133,7 @@ public:
   /// ("depends") are not cleared; new dependencies are considered additive.
   ///
   /// If \p node has already been marked, only its outgoing edges are updated.
-  ///
-  /// \returns true if an error occurred
-  bool loadFromPath(T node, StringRef path) {
+  LoadResult loadFromPath(T node, StringRef path) {
     return DependencyGraphImpl::loadFromPath(Traits::getAsVoidPointer(node),
                                              path);
   }
@@ -118,28 +143,28 @@ public:
   /// This is only intended for testing purposes.
   ///
   /// \sa loadFromPath
-  bool loadFromString(T node, StringRef data) {
+  LoadResult loadFromString(T node, StringRef data) {
     return DependencyGraphImpl::loadFromString(Traits::getAsVoidPointer(node),
                                                data);
   }
 
   /// Marks \p node and all nodes that depend on \p node, and places any nodes
-  /// that get transitively marked into \p newlyMarked.
+  /// that get transitively marked into \p visited.
   ///
   /// Nodes that have been previously marked are not included in \p newlyMarked,
   /// nor are their successors traversed, <em>even if the node's "provides" set
   /// has been updated since it was marked.</em>
   template <unsigned N>
-  void markTransitive(SmallVector<T, N> &newlyMarked, T node) {
+  void markTransitive(SmallVector<T, N> &visited, T node) {
     SmallVector<const void *, N> rawMarked;
     DependencyGraphImpl::markTransitive(rawMarked,
                                         Traits::getAsVoidPointer(node));
 
     // FIXME: How can we avoid this copy?
-    newlyMarked.reserve(newlyMarked.size() + rawMarked.size());
+    visited.reserve(visited.size() + rawMarked.size());
     for (const void *constRawNode : rawMarked) {
       void *rawNode = const_cast<void *>(constRawNode);
-      newlyMarked.push_back(Traits::getFromVoidPointer(rawNode));
+      visited.push_back(Traits::getFromVoidPointer(rawNode));
     }
   }
 
