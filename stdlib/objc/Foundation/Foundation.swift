@@ -960,6 +960,15 @@ extension NSSet : SequenceType {
   }
 }
 
+extension NSOrderedSet : SequenceType {
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
+  public func generate() -> NSFastGenerator {
+    return NSFastGenerator(self)
+  }
+}
+
 // FIXME: right now the following is O(n), not O(1).
 
 /// The entry point for bridging `Set` to `NSSet` in bridge
@@ -1341,3 +1350,14 @@ extension NSSet {
   }
 }
 
+extension NSSet : ArrayLiteralConvertible {
+  public required convenience init(arrayLiteral elements: AnyObject...) {
+    self.init(array: elements)
+  }
+}
+
+extension NSOrderedSet : ArrayLiteralConvertible {
+  public required convenience init(arrayLiteral elements: AnyObject...) {
+    self.init(array: elements)
+  }
+}

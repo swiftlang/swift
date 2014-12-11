@@ -10,16 +10,24 @@ NSSetAPI.test("SequenceType") {
   isSequenceType(result)
 }
 
+private func compareAnythingAtAll(x: AnyObject, y: AnyObject)
+  -> ExpectedComparisonResult {
+  switch (x.description < y.description, x.description == y.description) {
+  case (true, _): return .LT
+  case (_, true): return .EQ
+  default: return .GT
+  }
+}
+
 NSSetAPI.test("initWithObjects") {
   let result = NSSet(objects: 1, "two")
-  // using the descriptions of 1 and "two" are fine for this test.
-  expectEqualsUnordered([1, "two"], result) {
-    switch ($0.description < $1.description, $0.description == $1.description) {
-    case (true, _): return .LT
-    case (_, true): return .EQ
-    default: return .GT
-    }
-  }
+  // using the descriptions of 1 and "two" are fine for these tests.
+  expectEqualsUnordered([1, "two"], result, compareAnythingAtAll)
+}
+
+NSSetAPI.test("ArrayLiteralConvertible") {
+  let result: NSSet = [1, "two"]
+  expectEqualsUnordered([1, "two"], result, compareAnythingAtAll)
 }
 
 NSSetAPI.test("Printable") {
@@ -29,5 +37,26 @@ NSSetAPI.test("Printable") {
 }
 
 var NSOrderedSetAPI = TestSuite("NSOrderedSetAPI")
+
+NSOrderedSetAPI.test("SequenceType") {
+  let result = NSOrderedSet()
+  isSequenceType(result)
+}
+
+NSOrderedSetAPI.test("initWithObjects") {
+  let result = NSOrderedSet(objects: 1, "two")
+  expectEqualsUnordered([1, "two"], result, compareAnythingAtAll)
+}
+
+NSOrderedSetAPI.test("ArrayLiteralConvertible") {
+  let result: NSOrderedSet = [1, "two"]
+  expectEqualsUnordered([1, "two"], result, compareAnythingAtAll)
+}
+
+NSOrderedSetAPI.test("Printable") {
+  let result = toString(NSOrderedSet(objects:"a", "b", "c", "42"))
+  let expect = "{(\n    a,\n    b,\n    c,\n    42\n)}"
+  expectEqual(expect, result)
+}
 
 runAllTests()
