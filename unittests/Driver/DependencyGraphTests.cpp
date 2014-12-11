@@ -493,3 +493,61 @@ TEST(DependencyGraph, DependencyLoops) {
   EXPECT_TRUE(graph.isMarked(1));
   EXPECT_TRUE(graph.isMarked(2));
 }
+
+TEST(DependencyGraph, MarkIntransitive) {
+  DependencyGraph<uintptr_t> graph;
+
+  EXPECT_EQ(graph.loadFromString(0, "provides: [a, b, c]"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(graph.loadFromString(1, "top-level: [x, b, z]"),
+            LoadResult::UpToDate);
+
+  EXPECT_TRUE(graph.markIntransitive(0));
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_FALSE(graph.isMarked(1));
+
+  SmallVector<uintptr_t, 4> marked;
+
+  graph.markTransitive(marked, 0);
+  EXPECT_EQ(1u, marked.size());
+  EXPECT_EQ(1u, marked.front());
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+}
+
+TEST(DependencyGraph, MarkIntransitiveTwice) {
+  DependencyGraph<uintptr_t> graph;
+
+  EXPECT_EQ(graph.loadFromString(0, "provides: [a, b, c]"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(graph.loadFromString(1, "top-level: [x, b, z]"),
+            LoadResult::UpToDate);
+
+  EXPECT_TRUE(graph.markIntransitive(0));
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_FALSE(graph.isMarked(1));
+
+  EXPECT_FALSE(graph.markIntransitive(0));
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_FALSE(graph.isMarked(1));
+}
+
+TEST(DependencyGraph, MarkIntransitiveThenIndirect) {
+  DependencyGraph<uintptr_t> graph;
+
+  EXPECT_EQ(graph.loadFromString(0, "provides: [a, b, c]"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(graph.loadFromString(1, "top-level: [x, b, z]"),
+            LoadResult::UpToDate);
+
+  EXPECT_TRUE(graph.markIntransitive(1));
+  EXPECT_FALSE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+
+  SmallVector<uintptr_t, 4> marked;
+
+  graph.markTransitive(marked, 0);
+  EXPECT_EQ(0u, marked.size());
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+}
