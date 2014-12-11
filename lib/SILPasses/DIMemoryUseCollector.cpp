@@ -72,7 +72,7 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
     // allow reassignment.
     if (MUI->isVar())
       if (auto *decl = MUI->getLoc().getAsASTNode<VarDecl>())
-        IsLet = decl->isLet() & false;  // not yet.
+        IsLet = decl->isLet();
   }
   
   // Compute the number of elements to track in this memory object.
