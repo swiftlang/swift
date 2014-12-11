@@ -49,11 +49,11 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
   auto *topLevelMap = dyn_cast<yaml::MappingNode>(I->getRoot());
   if (!topLevelMap) {
     if (isa<yaml::NullNode>(I->getRoot()))
-      return LoadResult::Valid;
+      return LoadResult::UpToDate;
     return LoadResult::HadError;
   }
 
-  LoadResult result = LoadResult::Valid;
+  LoadResult result = LoadResult::UpToDate;
   SmallString<64> scratch;
   // FIXME: LLVM's YAML support does incremental parsing in such a way that
   // for-range loops break.
@@ -91,10 +91,10 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
                        entry->getRawTag() == "!private")) {
       case LoadResult::HadError:
         return LoadResult::HadError;
-      case LoadResult::Valid:
+      case LoadResult::UpToDate:
         break;
-      case LoadResult::NeedsRebuilding:
-        result = LoadResult::NeedsRebuilding;
+      case LoadResult::AffectsDownstream:
+        result = LoadResult::AffectsDownstream;
         break;
       }
     }
@@ -124,7 +124,7 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
                                       bool isPrivate) -> LoadResult {
 
     auto &entries = Dependencies[name];
-    auto iter = std::find_if(entries.begin(), entries.end(),
+    auto iter = std::find_if(entries.first.begin(), entries.first.end(),
                              [node](const DependencyEntryTy &entry) -> bool {
       return node == entry.node;
     });
@@ -133,16 +133,16 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
     if (!isPrivate)
       flags |= DependencyFlags::IsNonPrivate;
 
-    if (iter == entries.end()) {
-      entries.push_back({node, kind, flags});
+    if (iter == entries.first.end()) {
+      entries.first.push_back({node, kind, flags});
     } else {
       iter->kindMask |= kind;
       iter->flags |= flags;
     }
 
-    // FIXME: This should return NeedsRebuilding if the dependency has already
-    // been marked.
-    return LoadResult::Valid;
+    if (!isPrivate && (entries.second & kind))
+      return LoadResult::AffectsDownstream;
+    return LoadResult::UpToDate;
   };
 
   auto providesCallback =
@@ -159,7 +159,7 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
     else
       iter->kindMask |= kind;
 
-    return LoadResult::Valid;
+    return LoadResult::UpToDate;
   };
 
   return parseDependencyFile(buffer, providesCallback, dependsCallback);
@@ -181,7 +181,10 @@ DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
       if (allDependents == Dependencies.end())
         continue;
 
-      for (const auto &dependent : allDependents->second) {
+      // Record that we've traversed this dependency.
+      allDependents->second.second |= provided.kindMask;
+
+      for (const auto &dependent : allDependents->second.first) {
         if (!(provided.kindMask & dependent.kindMask))
           continue;
         if (isMarked(dependent.node))

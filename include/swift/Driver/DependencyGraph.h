@@ -48,11 +48,11 @@ public:
 
     /// The file was loaded successfully; with current information the node
     /// does not need to be rebuilt.
-    Valid,
+    UpToDate,
 
-    /// The file was loaded successfully; with current information the node
-    /// should be marked and rebuilt.
-    NeedsRebuilding
+    /// The file was loaded successfully; anything that depends on the node
+    /// should be considered out of date.
+    AffectsDownstream
   };
 
 private:
@@ -83,16 +83,18 @@ private:
   llvm::DenseMap<const void *, std::vector<ProvidesEntryTy>> Provides;
 
   /// The "incoming" edge map. Semantically this maps incoming (kind, string)
-  /// edges representing dependencies to the nodes that depend on them.
+  /// edges representing dependencies to the nodes that depend on them, as
+  /// well as a flag marking whether that (kind, string) pair has been marked
+  /// dirty.
   ///
-  /// The representation is a map from strings to kind mask / node pairs. This
-  /// is because it is unusual (though not impossible) for dependencies of
-  /// different kinds to have the same strings. In the case of multiple
-  /// incoming edges with the same string, the kinds are combined into the one
-  /// field.
+  /// The representation is a map from strings to kind mask / node pairs, plus
+  /// a mask of kinds that have been marked dirty. This is because it is
+  /// unusual (though not impossible) for dependencies of different kinds to
+  /// have the same strings. In the case of multiple incoming edges with the
+  /// same string, the kinds are combined into the one field.
   ///
   /// \sa DependencyMaskTy
-  llvm::StringMap<std::vector<DependencyEntryTy>> Dependencies;
+  llvm::StringMap<std::pair<std::vector<DependencyEntryTy>, DependencyMaskTy>> Dependencies;
 
   /// The set of marked nodes.
   llvm::SmallPtrSet<const void *, 16> Marked;
@@ -124,6 +126,9 @@ protected:
 /// with other nodes' "depends" sets to form a traversable directed graph.
 /// Information on a particular node can be updated at any time, which will
 /// affect any following operations. The "depends" entries can be "private".
+///
+/// The graph also supports a "mark" operation, which is intended to track
+/// nodes that have been not just visited but transitively marked through.
 template <typename T>
 class DependencyGraph : public DependencyGraphImpl {
   using Traits = llvm::PointerLikeTypeTraits<T>;

@@ -14,6 +14,7 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Driver/Action.h"
@@ -135,10 +136,10 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
       case DependencyGraphImpl::LoadResult::HadError:
         NeedToRunEverything = true;
         break;
-      case DependencyGraphImpl::LoadResult::Valid:
+      case DependencyGraphImpl::LoadResult::UpToDate:
         Condition = Cmd->getCondition();
         break;
-      case DependencyGraphImpl::LoadResult::NeedsRebuilding:
+      case DependencyGraphImpl::LoadResult::AffectsDownstream:
         llvm_unreachable("we haven't marked anything in this graph yet");
       }
     }
@@ -244,11 +245,12 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
           DeferredCommands.clear();
           Dependents.clear();
           break;
-        case DependencyGraphImpl::LoadResult::NeedsRebuilding:
-          llvm_unreachable("currently unused");
-        case DependencyGraphImpl::LoadResult::Valid:
-          if (wasNonPrivate)
-            DepGraph.markTransitive(Dependents, FinishedCmd);
+        case DependencyGraphImpl::LoadResult::UpToDate:
+          if (!wasNonPrivate)
+            break;
+          SWIFT_FALLTHROUGH;
+        case DependencyGraphImpl::LoadResult::AffectsDownstream:
+          DepGraph.markTransitive(Dependents, FinishedCmd);
           break;
         }
 

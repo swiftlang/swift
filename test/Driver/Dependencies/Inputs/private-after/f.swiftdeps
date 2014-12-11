@@ -1,0 +1,3 @@
+# Dependencies before compilation:
+nominals: [f]
+member-access: [!private e]
