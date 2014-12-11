@@ -1674,32 +1674,31 @@ bool SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
   return Simplified;
 }
 
-/// \return True if this basic blocks has a single instruction that is the
-/// terminator that jumps to another basic block passing all of the arguments
-/// in the original order.
-static bool isTrampolineBlock(SILBasicBlock *SBB) {
+/// \return If this basic blocks has a single br instruction passing all of the
+/// arguments in the original order, then returns the destination of that br.
+static SILBasicBlock *getTrampolineDest(SILBasicBlock *SBB) {
   // Ignore blocks with more than one instruction.
   if (SBB->getTerminator() != SBB->begin())
-    return false;
+    return nullptr;
 
   BranchInst *BI = dyn_cast<BranchInst>(SBB->getTerminator());
   if (!BI)
-    return false;
+    return nullptr;
 
   // Disallow infinite loops.
   if (BI->getDestBB() == SBB)
-    return false;
+    return nullptr;
 
   auto BrArgs = BI->getArgs();
   if (BrArgs.size() != SBB->getNumBBArg())
-    return false;
+    return nullptr;
 
   // Check that the arguments are the same and in the right order.
   for (int i = 0, e = SBB->getNumBBArg(); i < e; ++i)
     if (BrArgs[i] != SBB->getBBArg(i))
-      return false;
+      return nullptr;
 
-  return true;
+  return BI->getDestBB();
 }
 
 /// simplifyBranchBlock - Simplify a basic block that ends with an unconditional
@@ -1743,16 +1742,15 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
 
   // If the destination block is a simple trampoline (jump to another block)
   // then jump directly.
-  if (isTrampolineBlock(DestBB)) {
-    BranchInst* Br = dyn_cast<BranchInst>(DestBB->getTerminator());
-    SILBuilderWithScope<1>(BI).createBranch(BI->getLoc(), Br->getDestBB(),
+  if (SILBasicBlock *TrampolineDest = getTrampolineDest(DestBB)) {
+    SILBuilderWithScope<1>(BI).createBranch(BI->getLoc(), TrampolineDest,
                                             BI->getArgs());
     // Eliminating the trampoline can expose opportuntities to improve the
     // new block we branch to.
     if (LoopHeaders.count(DestBB))
       LoopHeaders.insert(BB);
 
-    addToWorklist(Br->getDestBB());
+    addToWorklist(TrampolineDest);
     BI->eraseFromParent();
     removeIfDead(DestBB);
     addToWorklist(BB);
@@ -1802,11 +1800,10 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
 
   // If the destination block is a simple trampoline (jump to another block)
   // then jump directly.
-  if (isTrampolineBlock(TrueSide)) {
-    BranchInst* Br = cast<BranchInst>(TrueSide->getTerminator());
+  if (SILBasicBlock *TrueTrampolineDest = getTrampolineDest(TrueSide)) {
     SILBuilderWithScope<1>(BI)
       .createCondBranch(BI->getLoc(), BI->getCondition(),
-                        Br->getDestBB(), TrueArgs,
+                        TrueTrampolineDest, TrueArgs,
                         FalseSide, FalseArgs);
     BI->eraseFromParent();
 
@@ -1817,12 +1814,11 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     return true;
   }
 
-  if (isTrampolineBlock(FalseSide)) {
-    BranchInst* Br = cast<BranchInst>(FalseSide->getTerminator());
+  if (SILBasicBlock *FalseTrampolineDest = getTrampolineDest(FalseSide)) {
     SILBuilderWithScope<1>(BI)
       .createCondBranch(BI->getLoc(), BI->getCondition(),
                         TrueSide, TrueArgs,
-                        Br->getDestBB(), FalseArgs);
+                        FalseTrampolineDest, FalseArgs);
     BI->eraseFromParent();
     if (LoopHeaders.count(FalseSide))
       LoopHeaders.insert(ThisBB);
