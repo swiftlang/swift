@@ -3898,7 +3898,7 @@ namespace {
           considerNominalType(classTy, 0);
           return SourceKind::ClassPointer;
         }
-          if (auto boundTy = dyn_cast<BoundGenericClassType>(type)) {
+        if (auto boundTy = dyn_cast<BoundGenericClassType>(type)) {
           considerBoundGenericType(boundTy, 0);
           return SourceKind::ClassPointer;
         }

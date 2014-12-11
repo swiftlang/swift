@@ -1669,13 +1669,13 @@ ManagedValue SILGenFunction::emitApply(
     lifetimeExtendedSelf = selfMV.getValue();
     
     switch (substFnType->getParameters().back().getConvention()) {
-    case swift::ParameterConvention::Direct_Owned:
+    case ParameterConvention::Direct_Owned:
       // If the callee will consume the 'self' parameter, let's retain it so we
       // can keep it alive.
       B.emitRetainValueOperation(loc, lifetimeExtendedSelf);
       break;
-    case swift::ParameterConvention::Direct_Guaranteed:
-    case swift::ParameterConvention::Direct_Unowned:
+    case ParameterConvention::Direct_Guaranteed:
+    case ParameterConvention::Direct_Unowned:
       // We'll manually manage the argument's lifetime after the
       // call. Disable its cleanup, forcing a copy if it was emitted +0.
       if (selfMV.hasCleanup()) {
@@ -1686,9 +1686,9 @@ ManagedValue SILGenFunction::emitApply(
       break;
         
     case ParameterConvention::Indirect_In_Guaranteed:
-    case swift::ParameterConvention::Indirect_In:
-    case swift::ParameterConvention::Indirect_Inout:
-    case swift::ParameterConvention::Indirect_Out:
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_Out:
       // We may need to support this at some point, but currently only imported
       // objc methods are returns_inner_pointer.
       llvm_unreachable("indirect self argument to method that"
