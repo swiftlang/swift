@@ -11,12 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "capture-prop"
+#include "swift/SILPasses/Passes.h"
 #include "swift/Basic/Demangle.h"
+#include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILAnalysis/ColdBlockInfo.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
-#include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/MapVector.h"
@@ -45,30 +46,38 @@ protected:
 };
 } // namespace
 
-// TODO: peek past casts and such. See Devirtualizer's findOrigin.
-static bool isConstant(SILValue V) {
+static LiteralInst *getConstant(SILValue V) {
   if (auto I = dyn_cast<ThinToThickFunctionInst>(V))
-    return isConstant(I->getOperand());
-
-  if (isa<LiteralInst>(V))
-    return true;
-
-  return false;
+    return getConstant(I->getOperand());
+  return dyn_cast<LiteralInst>(V);
 }
 
-/// FIXME: This and all the other specializations should be fixed to use a
-/// proper mangling scheme. Then we can lookup and reuse existing
-/// specializations.
-static std::string getClonedName(SILFunction *F) {
-  // Suffix the function name with "_constpropX", where X is the first integer
-  // that does not result in a conflict.
-  unsigned Counter = 0;
-  std::string ClonedName;
-  do {
-    ClonedName.clear();
-    llvm::raw_string_ostream buffer(ClonedName);
-    buffer << F->getName() << "_constprop" << Counter++;
-  } while (F->getModule().lookUpFunction(ClonedName));
+static bool isOptimizableConstant(SILValue V) {
+  // We do not optimize string literals of length > 32 since we would need to
+  // encode them into the symbol name for uniqueness.
+  if (auto *SLI = dyn_cast<StringLiteralInst>(V))
+    return SLI->getValue().size() <= 32;
+  return true;
+}
+
+static bool isConstant(SILValue V) {
+  V = getConstant(V);
+  return V && isOptimizableConstant(V);
+}
+
+static llvm::SmallString<64> getClonedName(PartialApplyInst *PAI,
+                                           SILFunction *F) {
+  llvm::SmallString<64> ClonedName;
+
+  llvm::raw_svector_ostream buffer(ClonedName);
+  Mangle::Mangler M(buffer);
+  Mangle::FunctionSignatureSpecializationMangler Mangler(M, F);
+
+  // We know that all arguments are literal insts.
+  auto Args = PAI->getArguments();
+  for (unsigned i : indices(Args))
+    Mangler.setArgumentConstantProp(i, getConstant(Args[i]));
+  Mangler.mangle();
 
   return ClonedName;
 }
@@ -204,6 +213,16 @@ void CapturePropagationCloner::cloneBlocks(
 /// function body.
 SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
                                                         SILFunction *OrigF) {
+  llvm::SmallString<64> Name = getClonedName(PAI, OrigF);
+
+  // See if we already have a version of this function in the module. If so,
+  // just return it.
+  if (auto *NewF = OrigF->getModule().lookUpFunction(Name.str())) {
+    DEBUG(llvm::dbgs() << "  Found an already specialized version of the callee: ";
+          NewF->printName(llvm::dbgs()); llvm::dbgs() << "\n");
+    return NewF;
+  }
+
   // The new partial_apply will no longer take any arguments--they are all
   // expressed as literals. So its callee signature will be the same as its
   // return signature.
@@ -216,7 +235,7 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
                              // of specialized reabstraction thunks in different
                              // files.
                              SILLinkage::Private,
-                             getClonedName(OrigF),
+                             Name,
                              NewFTy,
                              /*contextGenericParams*/nullptr,
                              OrigF->getLocation(),

@@ -14,6 +14,7 @@
 #define SWIFT_SIL_MANGLE_H
 
 #include "llvm/ADT/DenseMap.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/ResilienceExpansion.h"
@@ -127,6 +128,7 @@ class FunctionSignatureSpecializationMangler
 
   enum class ArgumentModifier : uint8_t {
     Unmodified=0,
+    ConstantProp=2,
     ClosureProp=4,
   };
 
@@ -135,10 +137,14 @@ class FunctionSignatureSpecializationMangler
 
 public:
   FunctionSignatureSpecializationMangler(Mangler &M, SILFunction *F);
+  void setArgumentConstantProp(unsigned ArgNo, LiteralInst *LI);
   void setArgumentClosureProp(SILArgument *Arg, PartialApplyInst *PAI);
 
 private:
   void mangleSpecialization();
+  void mangleConstantProp(LiteralInst *LI);
+  void mangleClosureProp(PartialApplyInst *PAI);
+  void mangleArgument(uint8_t ArgMod, NullablePtr<SILInstruction> Inst);
 };
 
 } // end namespace Mangle

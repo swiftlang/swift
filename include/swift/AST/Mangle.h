@@ -147,6 +147,9 @@ public:
   /// globalinit_token.
   void mangleGlobalInit(const VarDecl *decl, int counter, bool isInitFunc);
 
+  void mangleIdentifier(StringRef ref,
+                        OperatorFixity fixity = OperatorFixity::NotOperator,
+                        bool isOperator=false);
 private:
   void mangleFunctionType(AnyFunctionType *fn, ResilienceExpansion expansion,
                           unsigned uncurryingLevel);

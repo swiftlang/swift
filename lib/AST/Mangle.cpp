@@ -85,11 +85,9 @@ static bool isNonAscii(StringRef str) {
   return false;
 }
 
-/// Mangle an identifier into the buffer.
-void Mangler::mangleIdentifier(Identifier ident, OperatorFixity fixity) {
-  StringRef str = ident.str();
-  assert(!str.empty() && "mangling an empty identifier!");
-
+/// Mangle a StringRef as an identifier into a buffer.
+void Mangler::mangleIdentifier(StringRef str, OperatorFixity fixity,
+                               bool isOperator) {
   std::string punycodeBuf;
   if (UsePunycode) {
     // If the identifier contains non-ASCII character, we mangle 
@@ -105,7 +103,7 @@ void Mangler::mangleIdentifier(Identifier ident, OperatorFixity fixity) {
   //   count identifier-char+
   // where the count is the number of characters in the identifier,
   // and where individual identifier characters represent themselves.
-  if (!ident.isOperator()) {
+  if (!isOperator) {
     Buffer << str.size() << str;
     return;
   }
@@ -137,6 +135,13 @@ void Mangler::mangleIdentifier(Identifier ident, OperatorFixity fixity) {
   for (char c : str) {
     Buffer << mangleOperatorChar(c);
   }
+}
+
+/// Mangle an identifier into the buffer.
+void Mangler::mangleIdentifier(Identifier ident, OperatorFixity fixity) {
+  StringRef str = ident.str();
+  assert(!str.empty() && "mangling an empty identifier!");
+  return mangleIdentifier(str, fixity, ident.isOperator());
 }
 
 bool Mangler::tryMangleSubstitution(const void *ptr) {

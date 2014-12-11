@@ -3,7 +3,7 @@
 import Builtin
 import Swift
 
-// CHECK-LABEL: sil [noinline] @_TTSfcl_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ : $@thin (Int) -> () {
+// CHECK-LABEL: sil [noinline] @_TTSfcl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ : $@thin (Int) -> () {
 // CHECK-NEXT: bb0(%0 : $Int)
 // CHECK: function_ref @_TFF7specgen6callerFSiT_U_FTSiSi_T_
 // CHECK: partial_apply
@@ -89,7 +89,7 @@ bb0(%0 : $Int, %1 : $Int, %2 : $Int):
 }
 
 // CHECK-LABEL: sil @_TF7specgen6callerFSiT_ : $@thin (Int) -> () {
-// CHECK: [[ID1:%[0-9]+]] = function_ref @_TTSfcl_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ : $@thin (Int) -> ()
+// CHECK: [[ID1:%[0-9]+]] = function_ref @_TTSfcl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ : $@thin (Int) -> ()
 // CHECK-NEXT: apply [[ID1]](%0) : $@thin (Int) -> ()
 
 // specgen.caller (Swift.Int) -> ()

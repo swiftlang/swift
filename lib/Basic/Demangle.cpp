@@ -189,6 +189,11 @@ static std::string archetypeName(Node::IndexType i) {
 
 namespace {
   enum class FunctionSigSpecializationParamInfoKind : uint8_t {
+    ConstantPropFunction,
+    ConstantPropGlobal,
+    ConstantPropInteger,
+    ConstantPropFloat,
+    ConstantPropString,
     ClosureProp,
   };
 } // end anonymous namespace
@@ -223,6 +228,12 @@ public:
   /// character.
   bool nextIf(char c) {
     if (isEmpty() || peek() != c) return false;
+    advanceOffset(1);
+    return true;
+  }
+
+  bool nextIfNot(char c) {
+    if (isEmpty() || peek() == c) return false;
     advanceOffset(1);
     return true;
   }
@@ -708,85 +719,152 @@ private:
     auto specialization = NodeFactory::create(Node::Kind::SpecializedAttribute);
     auto kind = NodeFactory::create(Node::Kind::SpecializationKind, "generic");
     specialization->addChild(kind);
-    
+
     while (!Mangled.nextIf('_')) {
+      // Otherwise, we have another parameter. Demangle the type.
       NodePointer param = NodeFactory::create(Node::Kind::GenericSpecializationParam);
       NodePointer type = demangleType();
       if (!type)
         return nullptr;
       param->addChild(type);
-      while (!Mangled.nextIf('_')) {
-        NodePointer conformance = demangleProtocolConformance();
-        if (!conformance)
-          return nullptr;
+
+      // Then parse any conformances until we find an underscore. Pop off the
+      // underscore since it serves as the end of our mangling list.
+      while (NodePointer conformance = demangleProtocolConformance()) {
         param->addChild(conformance);
       }
+
+      // Add the parameter to our specialization list.
       specialization->addChild(param);
     }
+
     return specialization;
   }
 
+  bool skipGlobal() {
+    // Find how far we need to go to skip the global.
+    StringRef before = Mangled.str();
+    Demangler d(before);
+    bool result = d.demangle();
+    if (!result)
+      return false;
+    NodePointer n = d.getDemangled();
+    unsigned suffixSize = n->getChild(n->getNumChildren()-1)->getText().size();
+    Mangled.advanceOffset(before.size() - suffixSize);
+    return true;
+  }
+
 #define FUNCSIGSPEC_CREATE_INFO_KIND(kind) \
-  std::move(NodeFactory::create(Node::Kind::FunctionSignatureSpecializationParamInfo, \
-                                uint8_t(FunctionSigSpecializationParamInfoKind::kind)))
+  NodeFactory::create(Node::Kind::FunctionSignatureSpecializationParamInfo, \
+                      uint8_t(FunctionSigSpecializationParamInfoKind::kind))
+
+  NodePointer demangleFuncSigSpecializationConstantProp() {
+    // Then figure out what was actually constant propagated. First check if
+    // we have a function.
+    if (Mangled.nextIf("fr")) {
+      // Demangle the identifier
+      if (!demangleIdentifier() || !Mangled.nextIf('_')) {
+        return nullptr;
+      }
+      return FUNCSIGSPEC_CREATE_INFO_KIND(ConstantPropFunction);
+    } else if (Mangled.nextIf('g')) {
+      if (!demangleIdentifier() || !Mangled.nextIf('_')) {
+        return nullptr;
+      }
+      return FUNCSIGSPEC_CREATE_INFO_KIND(ConstantPropGlobal);
+    } else if (Mangled.nextIf('i')) {
+      // Skip over the integer, we don't care about it.
+      while (Mangled.nextIfNot('_'))
+        continue;
+      if (!Mangled.nextIf('_'))
+        return nullptr;
+      return FUNCSIGSPEC_CREATE_INFO_KIND(ConstantPropInteger);
+    } else if (Mangled.nextIf("fl")) {
+      // Skip over the float, we don't care about it.
+      while (Mangled.nextIfNot('_'))
+        continue;
+      if (!Mangled.nextIf('_'))
+        return nullptr;
+      return FUNCSIGSPEC_CREATE_INFO_KIND(ConstantPropFloat);
+    } else if (Mangled.nextIf("s")) {
+      // Skip: 'e' encoding 'v' hash. encoding is a 0 or 1 and hash is a 32
+      // bit hex MD5 sum of the contents.
+      Mangled.advanceOffset(3);      
+      if (!demangleIdentifier())
+        return nullptr;
+      if (!Mangled.nextIf('_'))
+        return nullptr;
+      return FUNCSIGSPEC_CREATE_INFO_KIND(ConstantPropString);
+    }
+
+    unreachable("Unknown constant prop specialization");
+  }
+
+  NodePointer demangleFuncSigSpecializationClosureProp() {
+    // We don't actually demangle the function or types for now. But we do want
+    // to signal that we specialized a closure.
+
+    // If we don't, we must have a global. Skip it.
+    if (!demangleIdentifier()) {
+      return nullptr;
+    }
+
+    // Then demangle types until we fail.
+    while (Mangled.peek() != '_' && demangleType()) {}
+
+    // Eat last '_'
+    if (!Mangled.nextIf('_'))
+      return nullptr;
+
+    return FUNCSIGSPEC_CREATE_INFO_KIND(ClosureProp);
+  }
+
   NodePointer demangleFunctionSignatureSpecialization() {
     auto specialization = NodeFactory::create(Node::Kind::SpecializedAttribute);
     auto kind = NodeFactory::create(Node::Kind::SpecializationKind, "function signature");
     specialization->addChild(kind);
 
-    unsigned ParameterCount = 0;
+    unsigned paramCount = 0;
 
-    // If we have a '_', eat it and bail. Otherwise continue into the loop.
+    // Until we hit the last '_' in our specialization info...
     while (!Mangled.nextIf('_')) {
       // Try to eat an n. If we succeed don't create any nodes and
       // continue. This is because we do not represent unmodified arguments in
       // the demangling.
       if (Mangled.nextIf("n_")) {
-        ParameterCount++;
+        paramCount++;
         continue;
       }
 
-      NodePointer param = NodeFactory::create(Node::Kind::FunctionSignatureSpecializationParam,
-                                              ParameterCount);
+      // Create the parameter.
+      NodePointer param =
+        NodeFactory::create(Node::Kind::FunctionSignatureSpecializationParam,
+                            paramCount);
 
-      // See if we have a cl
-      if (Mangled.nextIf("cl")) {
-        // We don't actually demangle the function or types for now. But we do
-        // want to signal that we specialized a closure.
-        param->addChild(FUNCSIGSPEC_CREATE_INFO_KIND(ClosureProp));
-
-        // First see if we have a UUID.
-        if (Mangled.nextIf("uu")) {
-          // Then advance past all UUID characters.
-          Mangled.advanceOffset(UUID::StringSize);
-        } else {
-          // Otherwise, we have a function name. Find how far we need to go to skip it.
-          StringRef before = Mangled.str();
-          Demangler d(before);
-          bool result = d.demangle();
-          if (!result)
-            return nullptr;
-          NodePointer n = d.getDemangled();
-          unsigned suffixSize = n->getChild(n->getNumChildren()-1)->getText().size();
-
-          Mangled.advanceOffset(before.size() - suffixSize);
-        }
-
-        // Attempt to chop off a '_' and bail if we do. Otherwise, just demangle
-        // types. We do not use this information but need to move forward in the
-        // stream.
-        while (!Mangled.nextIf('_')) {
-          if (!demangleType())
-            return nullptr;
-        }        
+      // Check if this parameter was constant propagated.
+      if (Mangled.nextIf("cp")) {
+        auto result = demangleFuncSigSpecializationConstantProp();
+        if (!result)
+          return nullptr;
+        param->addChild(result);
+        //if (!Mangled.nextIf('_'))
+        //  return nullptr;
+      } else if (Mangled.nextIf("cl")) {
+        auto result = demangleFuncSigSpecializationClosureProp();
+        if (!result)
+          return nullptr;
+        param->addChild(result);
+        //if (!Mangled.nextIf('_'))
+        //return nullptr;
       }
 
-      assert(param->getNumChildren() > 0 && "Param should have children");
-
-      assert(param && "Param should have been set");
+      if (!param || param->getNumChildren() == 0) {
+        return nullptr;
+      }
       specialization->addChild(param);
-      ParameterCount++;
+      paramCount++;
     }
+
     return specialization;
   }
 #undef FUNCSIGSPEC_CREATE_INFO_KIND
@@ -2575,6 +2653,13 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::FunctionSignatureSpecializationParamInfo: {
     uint64_t rawKind = pointer->getIndex();
     switch (FunctionSigSpecializationParamInfoKind(rawKind)) {
+    case FunctionSigSpecializationParamInfoKind::ConstantPropFunction:
+    case FunctionSigSpecializationParamInfoKind::ConstantPropGlobal:
+    case FunctionSigSpecializationParamInfoKind::ConstantPropInteger:
+    case FunctionSigSpecializationParamInfoKind::ConstantPropFloat:
+    case FunctionSigSpecializationParamInfoKind::ConstantPropString:
+      Printer << "Constant Propagated";
+      break;
     case FunctionSigSpecializationParamInfoKind::ClosureProp:
       Printer << "Closure Propagated";
       break;

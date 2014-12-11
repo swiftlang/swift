@@ -10,7 +10,7 @@ import Swift
 sil @capture_helper_2 : $@thin (Int) -> ()
 
 // CHECK-LABEL: test_capture_propagation
-// CHECK: %[[FR:[0-9]+]] = function_ref @_TTRXFo_dSi_dT__XFo_iSi_dT___constprop0 : $@thin (@in Int) -> ()
+// CHECK: %[[FR:[0-9]+]] = function_ref @_TTSfcpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_dT__XFo_iSi_dT__ : $@thin (@in Int) -> ()
 // CHECK: partial_apply %[[FR]]() : $@thin (@in Int) -> ()
 sil private @test_capture_propagation : $@thin () -> () {
 bb0:
@@ -67,3 +67,49 @@ bb0(%0 : $*Int, %1 : $@callee_owned (@in Int) -> ()):
   return %7 : $()                                 // id: %8
 }
 
+/*
+// reabstraction thunk helper from @callee_owned (@unowned Swift.Int) -> (@unowned ()) to @callee_owned (@in Swift.Int) -> (@unowned ())
+sil shared [transparent] @_TTRXFo_dSi_dT__XFo_iSi_dT__ : $@thin (@in Int, @owned @callee_owned (Int) -> ()) -> () {
+bb0(%0 : $*Int, %1 : $@callee_owned (Int) -> ()):
+  %2 = load %0 : $*Int                            // user: %3
+  %3 = apply %1(%2) : $@callee_owned (Int) -> ()  // user: %4
+  return %3 : $()                                 // id: %4
+}
+*/
+
+sil @_TFtest_capture_propagation2_closure : $@thin (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> () {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.FPIEEE32, %2 : $Builtin.RawPointer, %3 : $*Builtin.Word):
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil_global [fragile] @globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8 : $Builtin.Word
+
+sil @test_capture_propagation2_caller : $@thin () -> () {
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = float_literal $Builtin.FPIEEE32, 0
+  %2 = string_literal utf8 "123"
+  %3 = global_addr @globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8 : $*Builtin.Word
+  %4 = function_ref @_TFtest_capture_propagation2_closure : $@thin (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()
+  %5 = thin_to_thick_function %4 : $@thin (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> () to $@callee_owned (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()
+  %6 = function_ref @test_capture_propagation2_callee : $@thin (@owned @callee_owned () -> ()) -> ()
+  %7 = function_ref @test_capture_propagation2_thunk : $@thin (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word, @owned @callee_owned (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()) -> ()
+  %8 = partial_apply %7(%0, %1, %2, %3, %5) : $@thin (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word, @owned @callee_owned (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()) -> ()
+  apply %6(%8) : $@thin (@owned @callee_owned () -> ()) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil shared @test_capture_propagation2_thunk : $@thin (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word, @owned @callee_owned (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()) -> () {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.FPIEEE32, %2 : $Builtin.RawPointer, %3 : $*Builtin.Word, %4 : $@callee_owned (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()):
+  apply %4(%0, %1, %2, %3) : $@callee_owned (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil shared @test_capture_propagation2_callee : $@thin (@owned @callee_owned () -> ()) -> () {
+bb0(%0 : $@callee_owned () -> ()):
+  apply %0() : $@callee_owned () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}

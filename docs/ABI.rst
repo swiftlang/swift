@@ -740,10 +740,17 @@ Globals
   global ::= 'TR' reabstract-signature   // reabstraction thunk helper function
   global ::= 'Tr' reabstract-signature   // reabstraction thunk
 
-  global ::= 'TS' specializationinfo '_' global
-  specializationinfo ::= 'g' type protocol-conformance* '_'      // Generic specialization info.
-  specializationinfo ::= 'f' funcsigspecializationinfo           // Function signature specialization kind
-  funcsigspecializationinfo ::= 'cl' closurename '_' (type '_')* // Closure specialized with closed over types in argument order.
+  global ::= 'TS' specializationinfo '_' mangled-name
+  specializationinfo ::= 'g' (type protocol-conformance* '_')+                // Generic specialization info.
+  specializationinfo ::= 'f' (funcspecializationarginfo '_')+                 // Function signature specialization kind
+  funcsigspecializationarginfo ::= 'cl' closurename type*                     // Closure specialized with closed over types in argument order.
+  funcsigspecializationarginfo ::= 'n'                                        // Unmodified argument
+  funcsigspecializationarginfo ::= 'cp' funcsigspecializationconstantpropinfo
+  funcsigspecializationconstantpropinfo ::= 'fr' mangled-name
+  funcsigspecializationconstantpropinfo ::= 'g' mangled-name
+  funcsigspecializationconstantpropinfo ::= 'i' 64-bit-integer
+  funcsigspecializationconstantpropinfo ::= 'fl' float-as-64-bit-integer
+  funcsigspecializationconstantpropinfo ::= 'se' stringencoding 'v' md5hash
 
   global ::= 'TW' protocol-conformance entity
                                          // protocol witness thunk

@@ -32,7 +32,9 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/MD5.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -85,47 +87,111 @@ setArgumentClosureProp(SILArgument *Arg, PartialApplyInst *PAI) {
   Info.second = PAI;
 }
 
-void FunctionSignatureSpecializationMangler::mangleSpecialization() {
+void
+FunctionSignatureSpecializationMangler::
+setArgumentConstantProp(unsigned ArgNo, LiteralInst *LI) {
+  auto &Info = Args[ArgNo];
+  Info.first |= uint8_t(ArgumentModifier::ConstantProp);
+  Info.second = LI;
+}
+
+void
+FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
   Mangler &M = getMangler();
+  llvm::raw_ostream &os = getBuffer();
+
+  // Append the prefix for constant propagation 'cp'.
+  os << "cp";
+
+  // Then append the unique identifier of our literal.
+  switch (LI->getKind()) {
+  default:
+    llvm_unreachable("unknown literal");
+  case ValueKind::FunctionRefInst: {
+    SILFunction *F = cast<FunctionRefInst>(LI)->getReferencedFunction();
+    os << "fr";
+    M.mangleIdentifier(F->getName());
+    break;
+  }
+  case ValueKind::GlobalAddrInst: {
+    SILGlobalVariable *G = cast<GlobalAddrInst>(LI)->getReferencedGlobal();
+    os << "g";
+    M.mangleIdentifier(G->getName());
+    break;
+  }
+  case ValueKind::IntegerLiteralInst: {
+    APInt apint = cast<IntegerLiteralInst>(LI)->getValue();
+    os << "i" << apint;
+    break;
+  }
+  case ValueKind::FloatLiteralInst: {
+    APInt apint = cast<FloatLiteralInst>(LI)->getBits();
+    os << "fl" << apint;
+    break;
+  }
+  case ValueKind::StringLiteralInst: {
+    StringLiteralInst *SLI = cast<StringLiteralInst>(LI);
+    StringRef V = SLI->getValue();
+
+    assert(V.size() <= 32 && "Can not encode string of length > 32");
+
+    llvm::SmallString<33> Str;
+    Str += "u";
+    Str += V;
+
+    auto Encoding = uint8_t(SLI->getEncoding());
+    os << "se" << unsigned(Encoding) << "v";
+    M.mangleIdentifier(Str);
+    break;
+  }
+  }
+}
+
+void
+FunctionSignatureSpecializationMangler::
+mangleClosureProp(PartialApplyInst *PAI) {
+  Mangler &M = getMangler();
+  llvm::raw_ostream &os = getBuffer();
+
+  os << "cl";
+
+  // Add in the partial applies function name if we can find one. Assert
+  // otherwise. The reason why this is ok to do is currently we only perform
+  // closure specialization if we know the function_ref in question. When this
+  // restriction is removed, the assert here will fire.
+  auto *FRI = cast<FunctionRefInst>(PAI->getCallee());
+  M.mangleIdentifier(FRI->getReferencedFunction()->getName());
+
+  // Then we mangle the types of the arguments that the partial apply is
+  // specializing.
+  for (auto &Op : PAI->getArgumentOperands()) {
+    SILType Ty = Op.get().getType();
+    M.mangleType(Ty.getSwiftRValueType(), ResilienceExpansion::Minimal, 0);
+  }
+}
+
+void
+FunctionSignatureSpecializationMangler::
+mangleArgument(uint8_t ArgMod, NullablePtr<SILInstruction> Inst) {
+  if (ArgMod & uint8_t(ArgumentModifier::ConstantProp)) {
+    mangleConstantProp(cast<LiteralInst>(Inst.get()));
+  } else if (ArgMod & uint8_t(ArgumentModifier::ClosureProp)) {
+    mangleClosureProp(cast<PartialApplyInst>(Inst.get()));
+  } else if (ArgMod == uint8_t(ArgumentModifier::Unmodified)) {
+    getBuffer() << "n";
+  } else {
+    llvm_unreachable("unknown arg type");
+  }
+}
+
+void FunctionSignatureSpecializationMangler::mangleSpecialization() {
   llvm::raw_ostream &os = getBuffer();
 
   for (unsigned i : indices(Args)) {
     uint8_t ArgMod;
     NullablePtr<SILInstruction> Inst;
-
     std::tie(ArgMod, Inst) = Args[i];
-    if (ArgMod == uint8_t(ArgumentModifier::Unmodified)) {
-      os << "n_";
-      continue;
-    }
-
-    if (ArgMod & uint8_t(ArgumentModifier::ClosureProp)) {
-      os << "cl";
-      auto *PAI = cast<PartialApplyInst>(Inst.get());
-
-      // Add in the partial applies function name if we can find one otherwise,
-      // we use a unique UUID since we need *some* name. Using the UUID means
-      // that the function with the specialized partial apply will be unique so
-      // we will have code size increases potentially, but it will be *correct*.
-      if (auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee())) {
-        os << FRI->getReferencedFunction()->getName();
-      } else {
-        llvm::SmallString<UUID::StringBufferSize> Str;
-        UUID::fromTime().toString(Str);
-        os << "uu" << Str;
-      }
-
-      // Then we mangle the types of the arguments that the partial apply is
-      // specializing.
-      for (auto &Op : PAI->getArgumentOperands()) {
-        SILType Ty = Op.get().getType();
-        M.mangleType(Ty.getSwiftRValueType(), ResilienceExpansion::Minimal, 0);
-      }
-
-      os << "_";
-      continue;
-    }
-
-    llvm_unreachable("unknown arg type");
+    mangleArgument(ArgMod, Inst);
+    os << "_";
   }
 }
