@@ -400,8 +400,10 @@ bb0(%0 : $Builtin.NativeObject, %1 : $*Int):
   return %5 : $Int                                // id: %8
 }
 
+// CHECK-LABEL: sil @closure
 sil @closure : $@thin (@owned Builtin.NativeObject, @inout Int) -> ()
 
+// CHECK-LABEL: sil @no_final_release
 sil @no_final_release : $@thin (Int) -> Bool {
 bb0(%0 : $Int):
   %1 = alloc_box $Int
@@ -414,4 +416,59 @@ bb0(%0 : $Int):
   %7 = apply %5() : $@callee_owned () -> ()
   strong_release %5 : $@callee_owned () -> ()
   unreachable
+}
+
+// CHECK-LABEL: sil [transparent] [fragile] @mightApply : $@thin <U where U : P> (@owned @callee_owned (@out U) -> ()) -> ()
+sil [transparent] [fragile] @mightApply : $@thin <U where U : P> (@owned @callee_owned (@out U) -> ()) -> () {
+// CHECK: bb0
+bb0(%0 : $@callee_owned (@out U) -> ()):
+  debug_value %0 : $@callee_owned (@out U) -> ()
+  strong_retain %0 : $@callee_owned (@out U) -> ()
+  %3 = alloc_stack $U
+  %4 = apply [transparent] %0(%3#1) : $@callee_owned (@out U) -> ()
+  destroy_addr %3#1 : $*U
+  dealloc_stack %3#0 : $*@local_storage U
+  strong_release %0 : $@callee_owned (@out U) -> ()
+  %8 = tuple ()
+// CHECK: return
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil @callWithAutoclosure
+sil @callWithAutoclosure : $@thin <T where T : P> (@in T) -> () {
+// CHECK-NEXT: bb0
+bb0(%0 : $*T):
+  // CHECK: [[STACK:%[0-9a-zA-Z_]+]] = alloc_stack $T
+  // CHECK: debug_value_addr
+  debug_value_addr %0 : $*T
+  // CHECK: function_ref @mightApply
+  %2 = function_ref @mightApply : $@thin <τ_0_0 where τ_0_0 : P> (@owned @callee_owned (@out τ_0_0) -> ()) -> ()
+  %3 = function_ref @closure_to_specialize : $@thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @owned Builtin.NativeObject, @inout τ_0_0) -> ()
+  // CHECK-NOT: alloc_box
+  %4 = alloc_box $T
+  // CHECK: copy_addr %0 to [initialization] [[STACK]]#1 : $*T
+  copy_addr %0 to [initialization] %4#1 : $*T
+  // CHECK: destroy_addr [[STACK]]#1 : $*T
+  // CHECK: [[CLOSURE:%[0-9a-zA-Z]+]] = function_ref @closure_to_specialize{{.*}}
+  // CHECK: partial_apply [[CLOSURE]]<T>([[STACK]]#1)
+  %6 = partial_apply %3<T>(%4#0, %4#1) : $@thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @owned Builtin.NativeObject, @inout τ_0_0) -> ()
+  %7 = apply [transparent] %2<T>(%6) : $@thin <τ_0_0 where τ_0_0 : P> (@owned @callee_owned (@out τ_0_0) -> ()) -> ()
+  destroy_addr %0 : $*T
+  %9 = tuple ()
+ // CHECK: dealloc_stack [[STACK]]#0 : $*@local_storage T
+ // CHECK: return
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil shared @closure_to_specialize_specialized0 : $@thin <T where T : P> (@out T, @inout T) -> ()
+sil shared @closure_to_specialize : $@thin <T where T : P> (@out T, @owned Builtin.NativeObject, @inout T) -> () {
+// CHECK: bb0
+bb0(%0 : $*T, %1 : $Builtin.NativeObject, %2 : $*T):
+// CHECK-NEXT: copy_addr
+  copy_addr %2 to [initialization] %0 : $*T
+  // CHECK-NOT: strong_release
+  strong_release %1 : $Builtin.NativeObject
+  %5 = tuple ()
+  // CHECK: return
+  return %5 : $()
 }
