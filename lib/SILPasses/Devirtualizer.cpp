@@ -123,9 +123,18 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
   // generics. Thus construct our subst callee type for F.
   SILModule &M = F->getModule();
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
+  // Apply instruction substitutions are for the Member.
+  // F may have a different set of generic parameters!
+  // For example, Member may have no substs at all whereas
+  // F may have some.
+  auto ClassInstanceType = ClassInstance.getType();
+  ArrayRef<Substitution> Substitutions = AI->getSubstitutions();
+  if (Substitutions.empty() && !Class->getGenericParamTypes().empty())
+    // Take the parameters from the type of the ClassInstance.
+    Substitutions = ClassInstanceType.gatherAllSubstitutions(AI->getModule());
+
   CanSILFunctionType SubstCalleeType =
-    GenCalleeType->substGenericArgs(M, M.getSwiftModule(),
-                                             AI->getSubstitutions());
+    GenCalleeType->substGenericArgs(M, M.getSwiftModule(), Substitutions);
 
 
   // If F's this pointer has a different type from CMI's operand and the
@@ -149,9 +158,17 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
 
   // Then compare the two types and if they are unequal...
   if (FuncSelfTy != OriginTy) {
-    assert(FuncSelfTy.isSuperclassOf(OriginTy) && "Can not call a class method"
-           " on a non-subclass of the class_methods class.");
-
+    if (ClassInstance.stripUpCasts().getType().getAs<MetatypeType>()) {
+      auto &Module = AI->getModule();
+      assert(FuncSelfTy.getMetatypeInstanceType(Module).
+             isSuperclassOf(OriginTy.getMetatypeInstanceType(Module)) &&
+             "Can not call a class method"
+             " on a non-subclass of the class_methods class.");
+    } else {
+      assert(FuncSelfTy.isSuperclassOf(OriginTy) &&
+             "Can not call a class method"
+             " on a non-subclass of the class_methods class.");
+    }
     // Otherwise, upcast origin to the appropriate type.
     ClassInstance = B.createUpcast(AI->getLoc(), ClassInstance, FuncSelfTy);
   }
@@ -208,7 +225,7 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
   SILType SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
   ApplyInst *NewAI =
       B.createApply(AI->getLoc(), FRI, SubstCalleeSILType, ReturnType,
-                    AI->getSubstitutions(), NewArgs);
+                    Substitutions, NewArgs);
 
   // If our return type differs from AI's return type, then we know that we have
   // a covariant return type. Cast it before we RAUW. This can not happen 
@@ -315,14 +332,13 @@ bool WitnessMethodDevirtualizer::devirtualize() {
   /// If we dont and do not have any substitutions, we must then have a pure
   /// inherited protocol conformance.
   if (Subs.empty()) {
-#if 0
-    // Disable inherited protocol conformance for seed 5.
-    return false;
-#else
     assert(isa<InheritedProtocolConformance>(C) &&
            "At this point C must be an inherited protocol conformance.");
     return processInheritedProtocolConformance();
-#endif
+  }
+
+  if (isa<InheritedProtocolConformance>(C)) {
+    return processInheritedProtocolConformance();
   }
 
   /// If we have substitutions, we must have some sort of specialized protocol
@@ -428,6 +444,19 @@ bool WitnessMethodDevirtualizer::processInheritedProtocolConformance() {
   Self = AI->getSelfArgument();
   CanType Ty = WT->getConformance()->getType()->getCanonicalType();
   SILType SILTy = SILType::getPrimitiveType(Ty, Self->getType().getCategory());
+
+  if (!Subs.empty()) {
+    TypeSubstitutionMap SubstMap;
+    for (auto Sub : Subs) {
+      SubstMap[Sub.getArchetype()] = Sub.getReplacement();
+    }
+    // We need to perform substitution
+    SILTy = SILTy.subst(AI->getModule(), AI->getModule().getSwiftModule(),
+                        SubstMap);
+    Ty = Ty.subst(AI->getModule().getSwiftModule(), SubstMap, false, nullptr)
+             ->getCanonicalType();
+  }
+
   SILType SelfTy = Self->getType();
   (void)SelfTy;
 
@@ -694,6 +723,16 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   if (!Method)
     return nullptr;
 
+  bool IsValueMetatype = false;
+  SILType RealSubClassTy = SubClassTy;
+
+  if (isa<ValueMetatypeInst>(ClassInstance.stripUpCasts())) {
+    SILType MetaTy = Lowering::TypeConverter(AI->getModule())
+                         .getLoweredLoadableType(CD->getType());
+    RealSubClassTy = MetaTy;
+    IsValueMetatype = true;
+  }
+
   // Create a diamond shaped control flow and a checked_cast_branch
   // instruction that checks the exact type of the object.
   // This cast selects between two paths: one that calls the slow dynamic
@@ -706,17 +745,19 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   SILBasicBlock *Iden = F->createBasicBlock();
   // Virt is the block containing the slow virtual call.
   SILBasicBlock *Virt = F->createBasicBlock();
-  Iden->createBBArg(SubClassTy);
+  Iden->createBBArg(RealSubClassTy);
 
   SILBasicBlock *Continue = Entry->splitBasicBlock(It);
 
   SILBuilderWithScope<> Builder(Entry, AI->getDebugScope());
   // Create the checked_cast_branch instruction that checks at runtime if the
   // class instance is identical to the SILType.
-  assert(SubClassTy.getClassOrBoundGenericClass() &&
-         "Dest type must be a class type");
+  if (!IsValueMetatype)
+    assert(SubClassTy.getClassOrBoundGenericClass() &&
+           "Dest type must be a class type");
+
   It = Builder.createCheckedCastBranch(AI->getLoc(), /*exact*/ true,
-                                       ClassInstance, SubClassTy, Iden, Virt);
+                                       ClassInstance, RealSubClassTy, Iden, Virt);
 
   SILBuilder VirtBuilder(Virt);
   SILBuilder IdenBuilder(Iden);
@@ -873,8 +914,15 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   // Is either the class of the instance itself or one of its superclasses.
   // Therefore, strip all upcasts to get the real static type
   // of the instance.
+  // Specifically, only the upcast to the static class which method belongs to
+  // should be stripped.
   SILType InstanceType = ClassInstance.stripUpCasts().getType();
   ClassDecl *CD = InstanceType.getClassOrBoundGenericClass();
+
+  if (auto *VMTI = dyn_cast<ValueMetatypeInst>(ClassInstance.stripUpCasts())) {
+    CanType InstTy = VMTI->getType().castTo<MetatypeType>().getInstanceType();
+    CD = InstTy.getClassOrBoundGenericClass();
+  }
 
   // Check if it is legal to insert inline caches.
   if (!CD || CMI->isVolatile())

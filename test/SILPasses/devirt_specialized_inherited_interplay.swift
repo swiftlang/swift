@@ -1,7 +1,7 @@
 // RUN: %swift -sil-verify-all -O %s -emit-sil | FileCheck %s
 
 // Turn on this test when rdar://r16847192 is completed.
-// REQUIRES: r16847192
+// REQUIRED: r16847192
 
 // This file consists of tests for making sure that protocol conformances and
 // inherited conformances work well together when applied to each other. The
@@ -11,7 +11,7 @@
 // *NOTE* If something like templated protocols is ever implemented this file
 // needs to be updated.
 
-// CHECK-LABEL: sil private @top_level_code : $@thin () -> () {
+// CHECK-LABEL: sil @_TF38devirt_specialized_inherited_interplay6driverFT_T_ : $@thin () -> () {
 // CHECK: bb0:
 // CHECK-NEXT: alloc_ref $A4<S>
 // CHECK-NEXT: alloc_ref $B2<S>
@@ -19,11 +19,11 @@
 // CHECK-NEXT: function_ref @unknown3 : $@thin () -> ()
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
-// CHECK-NEXT: strong_release
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref @unknown5 : $@thin () -> ()
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
+// CHECK-NEXT: strong_release
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
@@ -97,7 +97,7 @@ func WhatShouldIDo2(p : P) {
   p.doSomething()
 }
 
-func driver() {
+public func driver() {
   var a = A4<S>()
   var b = B2<S>()
 
@@ -107,5 +107,3 @@ func driver() {
   WhatShouldIDo(b)
   WhatShouldIDo2(b)
 }
-
-driver()

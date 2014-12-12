@@ -879,14 +879,17 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
     LastArg = IER->getOperand();
   }
 
-  // Generic classes and structs are not supported yet.
-  if (auto *CD = LookupType.getClassOrBoundGenericClass())
-    if (!CD->getGenericParamTypes().empty())
+  auto ConcreteTypeSubsts = ConcreteType->gatherAllSubstitutions(
+      AI->getModule().getSwiftModule(), nullptr);
+  if (!ConcreteTypeSubsts.empty()) {
+    // Bail if any generic types parameters of the concrete type are unbound.
+    if (hasUnboundGenericTypes(ConcreteTypeSubsts))
       return nullptr;
+    // At this point we know that all replacements use concrete types
+    // and therefore the whole Lookup type is concrete. So, we can
+    // propagate it, because we know how to devirtualize it.
+  }
 
-  if (auto *SD = LookupType.getStructOrBoundGenericStruct())
-    if (!SD->getGenericParamTypes().empty())
-      return nullptr;
 
   if (Conformances.empty())
     return nullptr;
