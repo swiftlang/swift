@@ -42,7 +42,7 @@ llvm::cl::opt<std::string>
       "Print out the sil before and after passes which contain this string"));
 
 static bool doPrintBefore(SILTransform *T, SILFunction *F) {
-  if (!SILPrintOnlyFun.empty() && (!F || F->getName() != SILPrintOnlyFun))
+  if (!SILPrintOnlyFun.empty() && F && F->getName() != SILPrintOnlyFun)
     return false;
 
   if (!SILPrintBefore.empty() &&
@@ -57,7 +57,7 @@ static bool doPrintBefore(SILTransform *T, SILFunction *F) {
 }
 
 static bool doPrintAfter(SILTransform *T, SILFunction *F, bool Default) {
-  if (!SILPrintOnlyFun.empty() && (!F || F->getName() != SILPrintOnlyFun))
+  if (!SILPrintOnlyFun.empty() && F && F->getName() != SILPrintOnlyFun)
     return false;
   
   if (!SILPrintAfter.empty() &&
@@ -69,6 +69,17 @@ static bool doPrintAfter(SILTransform *T, SILFunction *F, bool Default) {
     return true;
 
   return Default;
+}
+
+static void printModule(SILModule *Mod) {
+  if (SILPrintOnlyFun.empty()) {
+    Mod->dump();
+    return;
+  }
+  for (auto &F : *Mod) {
+    if (F.getName().str() == SILPrintOnlyFun)
+      F.dump();
+  }
 }
 
 bool SILPassManager::
@@ -131,19 +142,9 @@ void SILPassManager::runOneIteration() {
 
   DEBUG(llvm::dbgs() << "*** Optimizing the module *** \n");
   if (Options.PrintAll && NumOptimizationIterations == 0) {
-    if (SILPrintOnlyFun.empty()) {
-      llvm::dbgs() << "*** SIL module before transformation ("
-                   << NumOptimizationIterations << ") ***\n";
-      Mod->dump();
-    } else {
-      for (auto &F : *Mod) {
-        if (F.getName().str() == SILPrintOnlyFun) {
-          llvm::dbgs() << "*** SIL function before transformation ("
-                       << NumOptimizationIterations << ") ***\n";
-          F.dump();
-        }
-      }
-    }
+    llvm::dbgs() << "*** SIL module before transformation ("
+                 << NumOptimizationIterations << ") ***\n";
+    printModule(Mod);
   }
   NumOptzIterations++;
   NumOptimizationIterations++;
@@ -177,7 +178,7 @@ void SILPassManager::runOneIteration() {
       if (doPrintBefore(SMT, nullptr)) {
         llvm::dbgs() << "*** SIL module before " << SMT->getName() << " ("
                      << NumOptimizationIterations << ") ***\n";
-        Mod->dump();
+        printModule(Mod);
       }
     
       llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
@@ -200,7 +201,7 @@ void SILPassManager::runOneIteration() {
                        CompleteFuncs->hasChanged() && Options.PrintAll)) {
         llvm::dbgs() << "*** SIL module after " << SMT->getName() << " ("
                      << NumOptimizationIterations << ") ***\n";
-        Mod->dump();
+        printModule(Mod);
       }
       if (CompleteFuncs->hasChanged() && Options.VerifyAll) {
         Mod->verify();
