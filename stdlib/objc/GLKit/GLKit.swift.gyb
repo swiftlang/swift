@@ -21,10 +21,12 @@
 // types.
 
 %{
+# Each element of the array is a tuple of the element labels and the minimum
+# vector length at which to apply them.
 vectorElementNames = [
-  ['x', 'y', 'z', 'w'],
-  ['s', 't', 'p', 'q'],
-  ['r', 'g', 'b', 'a'],
+  (['x', 'y', 'z', 'w'], 2),
+  (['s', 't', 'p', 'q'], 2),
+  (['r', 'g', 'b', 'a'], 3),
 ]
 }%
 
@@ -76,8 +78,8 @@ extension GLKVector${size} {
     @inline(__always) get { return unsafeBitCast(self, _Tuple.self) }
   }
 
-  % for names in vectorElementNames:
-  %   for i in xrange(0, size):
+  % for (names, minSize) in vectorElementNames:
+  %   for i in xrange(0, size if size >= minSize else 0):
   public var ${names[i]}: Float {
     @inline(__always) get { return _tuple.${i} }
   }
@@ -95,15 +97,27 @@ extension GLKQuaternion {
     @inline(__always) get { return unsafeBitCast(self, _Tuple.self) }
   }
   
-  /*
   public var v: GLKVector3 {
     @inline(__always) get {
       let (i, j, k, _) = _tuple
       return GLKVector3Make(i, j, k)
     }
   }
-   */
+
   public var s: Float {
+    @inline(__always) get { return _tuple.3 }
+  }
+
+  public var x: Float {
+    @inline(__always) get { return _tuple.0 }
+  }
+  public var y: Float {
+    @inline(__always) get { return _tuple.1 }
+  }
+  public var z: Float {
+    @inline(__always) get { return _tuple.2 }
+  }
+  public var w: Float {
     @inline(__always) get { return _tuple.3 }
   }
 
