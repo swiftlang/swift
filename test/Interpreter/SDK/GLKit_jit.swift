@@ -1,6 +1,5 @@
 // Test GLKit.swift in JIT mode.
-// RUN: %swift -interpret -sdk %sdk %S/GLKit.swift | FileCheck %S/GLKit.swift
-// FIXME: broken on iOS
-// REQUIRES: OS=macosx
+// -module-name is necessary because of rdar://problem/14483032
+// RUN: %swift -interpret -module-name=main -sdk %sdk %S/GLKit.swift | FileCheck %S/GLKit.swift
 // REQUIRES: sdk
 // REQUIRES: swift_interpreter
