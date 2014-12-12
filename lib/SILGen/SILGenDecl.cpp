@@ -326,27 +326,38 @@ class LetValueInitialization : public Initialization {
 public:
   LetValueInitialization(VarDecl *vd, SILGenFunction::PatternKind_t PatternKind,
                          SILGenFunction &gen)
-    : Initialization(Initialization::Kind::LetValue), vd(vd) {
-
+    : Initialization(Initialization::Kind::LetValue), vd(vd)
+  {
     auto &lowering = gen.getTypeLowering(vd->getType());
 
-    // If this is an address-only let declaration for a real let declaration
-    // (not a function argument), create a buffer to bind the expression value
-    // assigned into this slot.
-    bool needsTemporaryBuffer = lowering.isAddressOnly();
-
-    // If this is a function argument, we don't usually need a temporary buffer
-    // because the incoming pointer can be directly bound as our let buffer.
-    // However, if this VarDecl has tuple type, then it will be passed to the
-    // SILFunction as multiple SILArguments, and those *do* need to be rebound
-    // into a temporary buffer.
-    if (PatternKind == SILGenFunction::PK_ParamDecl &&
-        !vd->getType()->is<TupleType>())
-      needsTemporaryBuffer = false;
+    // Decide whether we need a temporary stack buffer to evaluate this 'let'.
+    bool needsTemporaryBuffer;
+    switch (PatternKind) {
+    case SILGenFunction::PK_UninitVarDecl:
+      // If this is a let-value without an initializer, then we need a temporary
+      // buffer.  DI will make sure it is only assigned to once.
+      needsTemporaryBuffer = true;
+      break;
+    case SILGenFunction::PK_InitVarDecl:
+      // If this is a let with an initializer, we only need a buffer if the type
+      // is address only.
+      needsTemporaryBuffer = lowering.isAddressOnly();
+      break;
+    case SILGenFunction::PK_ParamDecl:
+      // If this is a function argument, we don't usually need a temporary
+      // buffer because the incoming pointer can be directly bound as our let
+      // buffer.  However, if this VarDecl has tuple type, then it will be
+      // passed to the SILFunction as multiple SILArguments which will need to
+      // be rebound to something of tuple type.  If the type is address only,
+      // that rebound tuple will need to be in memory.
+      needsTemporaryBuffer = vd->getType()->is<TupleType>() &&
+                             lowering.isAddressOnly();
+      break;
+    }
 
     if (needsTemporaryBuffer) {
       address = gen.emitTemporaryAllocation(vd, lowering.getLoweredType());
-      gen.enterDormantTemporaryCleanup(address, lowering);
+      DestroyCleanup = gen.enterDormantTemporaryCleanup(address, lowering);
       if (PatternKind == SILGenFunction::PK_UninitVarDecl)
         address = gen.B.createMarkUninitializedVar(vd, address);
       gen.VarLocs[vd] = SILGenFunction::VarLoc::get(address);
@@ -356,8 +367,8 @@ public:
       // before the value is bound, we don't want to destroy the value.
       gen.Cleanups.pushCleanupInState<DestroyLocalVariable>(
                                                     CleanupState::Dormant, vd);
+      DestroyCleanup = gen.Cleanups.getTopCleanup();
     }
-    DestroyCleanup = gen.Cleanups.getTopCleanup();
   }
 
   ~LetValueInitialization() override {
@@ -369,14 +380,13 @@ public:
     // lifetime.
     SILLocation PrologueLoc(vd);
     PrologueLoc.markAsPrologue();
-    if (!v.getType().isAddress())
-      gen.B.createDebugValue(PrologueLoc, v);
-    else
+    if (address.isValid())
       gen.B.createDebugValueAddr(PrologueLoc, v);
+    else
+      gen.B.createDebugValue(PrologueLoc, v);
   }
 
   SILValue getAddressOrNull() const override {
-    // We only have an address for address-only lets.
     return address;
   }
   ArrayRef<InitializationPtr> getSubInitializations() const override {
@@ -385,6 +395,11 @@ public:
 
   void bindValue(SILValue value, SILGenFunction &gen) override {
     assert(!gen.VarLocs.count(vd) && "Already emitted this vardecl?");
+    // If we're binding an address to this let value, then we can use it as an
+    // address later.  This happens when binding an address only parameter to
+    // an argument, for example.
+    if (value.getType().isAddress())
+      address = value;
     gen.VarLocs[vd] = SILGenFunction::VarLoc::get(value);
 
     emitDebugValue(value, gen);
@@ -394,7 +409,8 @@ public:
     assert(!DidFinish &&
            "called LetValueInit::finishInitialization twice!");
     assert(gen.VarLocs.count(vd) && "Didn't bind a value to this let!");
-    gen.Cleanups.setCleanupState(DestroyCleanup, CleanupState::Active);
+    if (DestroyCleanup != CleanupHandle::invalid())
+      gen.Cleanups.setCleanupState(DestroyCleanup, CleanupState::Active);
     DidFinish = true;
   }
 };
@@ -694,7 +710,7 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
 
 InitializationPtr
 SILGenFunction::emitPatternBindingInitialization(Pattern *P) {
-  return InitializationForPattern(*this, PK_UninitVarDecl).visit(P);
+  return InitializationForPattern(*this, PK_InitVarDecl).visit(P);
 }
 
 /// Enter a cleanup to deallocate the given location.

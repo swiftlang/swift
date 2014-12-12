@@ -58,7 +58,8 @@ public:
   /// an non-delegating initializer (one that does not call "self.init").
   bool IsSelfOfNonDelegatingInitializer;
 
-  /// This is true of the memory being analyzed is an immutable let.
+  /// True if the memory object being analyzed represents a 'let', which is
+  /// initialize-only (reassignments are not allowed).
   bool IsLet = false;
 
   /// This is the count of elements being analyzed.  For memory objects that are
