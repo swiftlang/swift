@@ -285,9 +285,12 @@ class SILPerformanceInlinerPass : public SILModuleTransform {
   /// Specifies which functions not to inline, based on @semantics and
   /// global_init attributes.
   InlineSelection WhatToInline;
+  std::string PassName;
 public:
-  SILPerformanceInlinerPass(InlineSelection WhatToInline):
-      WhatToInline(WhatToInline) {}
+  SILPerformanceInlinerPass(InlineSelection WhatToInline, StringRef LevelName):
+    WhatToInline(WhatToInline), PassName(LevelName) {
+    PassName.append(" Performance Inliner");
+  }
 
   void run() {
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
@@ -318,24 +321,25 @@ public:
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
   }
 
-  StringRef getName() override { return "Performance Inliner"; }
+  StringRef getName() override { return PassName; }
 };
 } // end anonymous namespace
 
 /// Create an inliner pass that does not inline functions that are marked with
 /// the @semantics, @effects or global_init attributes.
 SILTransform *swift::createEarlyInliner() {
-  return new SILPerformanceInlinerPass(InlineSelection::NoSemanticsAndGlobalInit);
+  return new SILPerformanceInlinerPass(
+    InlineSelection::NoSemanticsAndGlobalInit, "Early");
 }
 
 /// Create an inliner pass that does not inline functions that are marked with
 /// the global_init attribute.
 SILTransform *swift::createPerfInliner() {
-  return new SILPerformanceInlinerPass(InlineSelection::NoGlobalInit);
+  return new SILPerformanceInlinerPass(InlineSelection::NoGlobalInit, "Middle");
 }
 
 /// Create an inliner pass that inlines all functions that are marked with
 /// the @semantics, @effects or global_init attributes.
 SILTransform *swift::createLateInliner() {
-  return new SILPerformanceInlinerPass(InlineSelection::Everything);
+  return new SILPerformanceInlinerPass(InlineSelection::Everything, "Late");
 }
