@@ -3,7 +3,9 @@
 
 // RUN: mkdir -p %t/Empty.framework/Modules/Empty.swiftmodule
 // RUN: %swift -target x86_64-apple-macosx10.9 -emit-module-path %t/Empty.framework/Modules/Empty.swiftmodule/x86_64.swiftmodule %S/../Inputs/empty.swift -module-name Empty
-// RUN: %swift -target x86_64-apple-macosx10.9 -sdk %S/Inputs -primary-file %s -F %t -DIMPORT_EMPTY -emit-ir | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 -sdk %S/Inputs -primary-file %s -F %t -DIMPORT_EMPTY -emit-ir > %t.ll
+// RUN: FileCheck %s < %t.ll
+// RUN: FileCheck -check-prefix=NEGATIVE %s < %t.ll
 
 #if IMPORT_EMPTY
 import Empty
@@ -30,17 +32,21 @@ func testExtern() -> CInt {
 }
 
 // CHECK: define hidden i32 @_TF12clang_inline16testAlwaysInlineFT_VSs5Int32() [[SSP:#[0-9]+]] {
-// CHECK-NOT: @alwaysInlineNumber
+// NEGATIVE-NOT: @alwaysInlineNumber
 // CHECK:   ret i32 17
-// CHECK-NOT: @alwaysInlineNumber
 func testAlwaysInline() -> CInt {
   return alwaysInlineNumber()
 }
 
-// CHECK-NOT: @alwaysInlineNumber
+// CHECK: define hidden i32 @_TF12clang_inline20testInlineRedeclaredFT_VSs5Int32() {
+// CHECK: define internal i32 @wrappedZeroRedeclared() #0 {
+func testInlineRedeclared() -> CInt {
+  return wrappedZeroRedeclared()
+}
+
 // CHECK: define internal i32 @innerZero() [[INNER_ZERO_ATTR:#[0-9]+]] {
 // CHECK: declare i32 @getInt() [[GET_INT_ATTR:#[0-9]+]]
-// CHECK-NOT: @alwaysInlineNumber
+// CHECK: define internal i32 @zeroRedeclared() #{{[0-9]+}} {
 
 // CHECK: attributes [[SSP]] = { ssp }
 // CHECK: attributes [[INNER_ZERO_ATTR]] = { inlinehint nounwind ssp 

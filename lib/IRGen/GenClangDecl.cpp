@@ -60,8 +60,10 @@ void IRGenModule::emitLocalDecls(clang::Decl *decl) {
     auto *next = const_cast<clang::Decl *>(stack.pop_back_val());
     if (auto fn = dyn_cast<clang::FunctionDecl>(next)) {
       const clang::FunctionDecl *definition;
-      if (fn->hasBody(definition))
+      if (fn->hasBody(definition)) {
         refFinder.TraverseDecl(const_cast<clang::FunctionDecl *>(definition));
+        next = const_cast<clang::FunctionDecl *>(definition);
+      }
     }
     ClangCodeGen->HandleTopLevelDecl(clang::DeclGroupRef(next));
   }

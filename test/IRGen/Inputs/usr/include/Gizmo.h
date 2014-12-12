@@ -51,6 +51,10 @@ static inline int alwaysInlineNumber(void) __attribute__((always_inline)) {
 extern int getInt(void);
 static inline int wrappedGetInt(void) { return getInt(); }
 
+static inline int zeroRedeclared(void);
+static inline int wrappedZeroRedeclared(void) { return zeroRedeclared(); }
+static inline int zeroRedeclared(void) { return innerZero(); }
+
 @interface NSView : NSObject
 - (struct NSRect) convertRectFromBase: (struct NSRect) r;
 @end
