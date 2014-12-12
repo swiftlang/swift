@@ -40,7 +40,10 @@ namespace swift {
 
     /// A list of registered analysis.
     llvm::SmallVector<SILAnalysis*, 4> Analysis;
-    
+
+    // Name of the current optimization stage for diagnostics.
+    std::string StageName;
+
     /// The number of passes run so far.
     unsigned NumPassesRun = 0;
 
@@ -49,8 +52,8 @@ namespace swift {
 
   public:
     /// C'tor
-    SILPassManager(SILModule *M) :
-      anotherIteration(false), Mod(M) {
+    SILPassManager(SILModule *M, llvm::StringRef Stage = "") :
+      anotherIteration(false), Mod(M), StageName(Stage) {
       registerAnalysis(new CompleteFunctions(Mod));
     }
 
@@ -103,7 +106,7 @@ namespace swift {
 
     /// \brief Reset the state of the pass manager and remove all transformation
     /// owned by the pass manager. Anaysis passes will be kept.
-    void resetAndRemoveTransformations();
+    void resetAndRemoveTransformations(llvm::StringRef NextStage = "");
 
     /// D'tor.
     ~SILPassManager();

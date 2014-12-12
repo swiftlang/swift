@@ -97,12 +97,14 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
       SFT->injectFunction(&F);
 
       if (Options.PrintPassName)
-        llvm::dbgs() << "#" << NumPassesRun << " Pass: " << SFT->getName()
+        llvm::dbgs() << "#" << NumPassesRun << " Stage: " << StageName
+                     << " Pass: " << SFT->getName()
                      << ", Function: " << F.getName() << "\n";
 
       if (doPrintBefore(SFT, &F)) {
-        llvm::dbgs() << "*** SIL function before " << SFT->getName() << " ("
-                    << NumOptimizationIterations << ") ***\n";
+        llvm::dbgs() << "*** SIL function before " << StageName << " "
+                     << SFT->getName() << " (" << NumOptimizationIterations
+                     << ") ***\n";
         F.dump();
       }
       
@@ -124,8 +126,9 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
       // If this pass invalidated anything, print and verify.
       if (doPrintAfter(SFT, &F,
                        CompleteFuncs->hasChanged() && Options.PrintAll)) {
-        llvm::dbgs() << "*** SIL function after " << SFT->getName() << " ("
-                     << NumOptimizationIterations << ") ***\n";
+        llvm::dbgs() << "*** SIL function after " << StageName << " "
+                     << SFT->getName() << " (" << NumOptimizationIterations
+                     << ") ***\n";
         F.dump();
       }
       if (CompleteFuncs->hasChanged() && Options.VerifyAll) {
@@ -140,10 +143,12 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
 void SILPassManager::runOneIteration() {
   const SILOptions &Options = getOptions();
 
-  DEBUG(llvm::dbgs() << "*** Optimizing the module *** \n");
+  DEBUG(llvm::dbgs() << "*** Optimizing the module (" << StageName
+        << ") *** \n");
   if (Options.PrintAll && NumOptimizationIterations == 0) {
-    llvm::dbgs() << "*** SIL module before transformation ("
-                 << NumOptimizationIterations << ") ***\n";
+    llvm::dbgs() << "*** SIL module before "  << StageName
+                 << " transformation (" << NumOptimizationIterations
+                 << ") ***\n";
     printModule(Mod);
   }
   NumOptzIterations++;
@@ -172,12 +177,13 @@ void SILPassManager::runOneIteration() {
       SMT->injectModule(Mod);
 
       if (Options.PrintPassName)
-        llvm::dbgs() << "#" << NumPassesRun << " Pass: " << SMT->getName()
-                     << " (module pass)\n";
+        llvm::dbgs() << "#" << NumPassesRun << " Stage: " << StageName
+                     << " Pass: " << SMT->getName() << " (module pass)\n";
 
       if (doPrintBefore(SMT, nullptr)) {
-        llvm::dbgs() << "*** SIL module before " << SMT->getName() << " ("
-                     << NumOptimizationIterations << ") ***\n";
+        llvm::dbgs() << "*** SIL module before " << StageName << " "
+                     << SMT->getName() << " (" << NumOptimizationIterations
+                     << ") ***\n";
         printModule(Mod);
       }
     
@@ -199,8 +205,9 @@ void SILPassManager::runOneIteration() {
       // If this pass invalidated anything, print and verify.
       if (doPrintAfter(SMT, nullptr,
                        CompleteFuncs->hasChanged() && Options.PrintAll)) {
-        llvm::dbgs() << "*** SIL module after " << SMT->getName() << " ("
-                     << NumOptimizationIterations << ") ***\n";
+        llvm::dbgs() << "*** SIL module after " << StageName << " "
+                     << SMT->getName() << " (" << NumOptimizationIterations
+                     << ") ***\n";
         printModule(Mod);
       }
       if (CompleteFuncs->hasChanged() && Options.VerifyAll) {
@@ -262,7 +269,7 @@ SILPassManager::~SILPassManager() {
 
 /// \brief Reset the state of the pass manager and remove all transformation
 /// owned by the pass manager. Anaysis passes will be kept.
-void SILPassManager::resetAndRemoveTransformations() {
+void SILPassManager::resetAndRemoveTransformations(StringRef NextStage) {
   for (auto T : Transformations)
     delete T;
 
@@ -271,6 +278,7 @@ void SILPassManager::resetAndRemoveTransformations() {
   anotherIteration = false;
   CompleteFunctions *CompleteFuncs = getAnalysis<CompleteFunctions>();
   CompleteFuncs->reset();
+  StageName = NextStage;
 }
 
 const SILOptions &SILPassManager::getOptions() const {
