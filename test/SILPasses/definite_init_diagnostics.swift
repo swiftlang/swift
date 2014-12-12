@@ -882,8 +882,8 @@ struct LetProperties {
     u.mutate()  // expected-error {{mutating method 'mutate' may not be used on immutable value 'self.u'}}
     
     arr = []
-    arr += []      // expected-error {{immutable value 'self.arr' may not be passed to an inout argument}}
-    arr.append(4)  // expected-error {{immutable value 'self.arr' may not be passed to an inout argument}}
+    arr += []      // expected-error {{mutating operator '+=' may not be used on immutable value 'self.arr'}}
+    arr.append(4)  // expected-error {{mutating method 'append' may not be used on immutable value 'self.arr'}}
     arr[12] = 17   // expected-error {{immutable value 'self.arr' may not be assigned to}}
   }
 }

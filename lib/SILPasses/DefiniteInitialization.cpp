@@ -832,8 +832,22 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
           FD = SILLoc.getAsASTNode<FuncDecl>();
         }
       }
-      if (Apply->getLoc().getAsASTNode<AssignExpr>())
-        isAssignment = true;
+      
+      // If we failed to find the decl a clean and principled way, try hacks:
+      // map back to the AST and look for some common patterns.
+      if (!FD) {
+        if (Apply->getLoc().getAsASTNode<AssignExpr>())
+          isAssignment = true;
+        else if (auto *CE = Apply->getLoc().getAsASTNode<ApplyExpr>()) {
+          if (auto *DSCE = dyn_cast<SelfApplyExpr>(CE->getFn()))
+            // Normal method calls are curried, so they are:
+            // (call_expr (dot_syntax_call_expr (decl_ref_expr METHOD)))
+            FD = dyn_cast<FuncDecl>(DSCE->getCalledValue());
+          else
+            // Operators and normal function calls are just (CallExpr DRE)
+            FD = dyn_cast<FuncDecl>(CE->getCalledValue());
+        }
+      }
     }
     
     // If we were able to find a method or function call, emit a diagnostic
