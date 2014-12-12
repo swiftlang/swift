@@ -208,7 +208,8 @@ clang::CanQualType GenClangType::visitClassType(CanClassType type) {
     auto *CDecl = clang::ObjCInterfaceDecl::Create(
                           clangCtx, clangCtx.getTranslationUnitDecl(),
                           clang::SourceLocation(), ForwardClassId,
-                          0/*PrevIDecl*/, clang::SourceLocation());
+                          /*typeParamList*/nullptr, /*PrevDecl=*/nullptr,
+                          clang::SourceLocation());
     auto clangType  = clangCtx.getObjCInterfaceType(CDecl);
     auto ptrTy = clangCtx.getObjCObjectPointerType(clangType);
     return clangCtx.getCanonicalType(ptrTy);
