@@ -6,7 +6,7 @@ else()
   set(SWIFTGLKIT_UI swiftUIKit)
 endif()
 
-add_swift_library(swiftGLKit INSTALL TARGET_LIBRARY
+add_swift_library(swiftGLKit INSTALL
   GLKit.swift.gyb
   DEPENDS ${SWIFTGLKIT_UI}
   FRAMEWORK_DEPENDS GLKit)
