@@ -4,11 +4,19 @@
 
 import GLKit
 
+func printV4(v: GLKVector4) {
+  println("<\(v.x) \(v.y) \(v.z) \(v.w)>")
+}
+
 let x = GLKVector4Make(1, 0, 0, 0)
 let y = GLKVector4Make(0, 1, 0, 0)
 let z = GLKVector4Make(0, 0, 1, 0)
 
-println(GLKVector4DotProduct(x, y)) // CHECK: 0.0
+printV4(x) // CHECK:      <1.0 0.0 0.0 0.0>
+printV4(y) // CHECK-NEXT: <0.0 1.0 0.0 0.0>
+printV4(z) // CHECK-NEXT: <0.0 0.0 1.0 0.0>
+
+println(GLKVector4DotProduct(x, y)) // CHECK-NEXT: 0.0
 
 let z2 = GLKVector4CrossProduct(x, y)
 println(GLKVector4AllEqualToVector4(z, z2)) // CHECK-NEXT: true
@@ -28,10 +36,22 @@ func ==(x: GLKVector4, y: GLKVector4) -> Bool {
 println(x • y) // CHECK-NEXT: 0.0
 println(x ⨉ y == z) // CHECK-NEXT: true
 
+func printM4(m: GLKMatrix4) {
+  println("⎡\(m.m00) \(m.m01) \(m.m02) \(m.m03)⎤")
+  println("⎢\(m.m10) \(m.m11) \(m.m12) \(m.m13)⎥")
+  println("⎢\(m.m20) \(m.m21) \(m.m22) \(m.m23)⎥")
+  println("⎣\(m.m30) \(m.m31) \(m.m32) \(m.m33)⎦")
+}
+
 let flipXY = GLKMatrix4Make(0, 1, 0, 0,
                             1, 0, 0, 0,
                             0, 0, 1, 0,
                             0, 0, 0, 1)
+// CHECK-NEXT: ⎡0.0 1.0 0.0 0.0⎤
+// CHECK-NEXT: ⎢1.0 0.0 0.0 0.0⎥
+// CHECK-NEXT: ⎢0.0 0.0 1.0 0.0⎥
+// CHECK-NEXT: ⎣0.0 0.0 0.0 1.0⎦
+printM4(flipXY)
 // FIXME: GLKMatrix4MakeWithArray takes mutable pointer arguments for no
 // good reason. rdar://problem/19124355
 var flipYZElements: [Float] = [1, 0, 0, 0,
@@ -39,8 +59,18 @@ var flipYZElements: [Float] = [1, 0, 0, 0,
                                0, 1, 0, 0,
                                0, 0, 0, 1]
 let flipYZ = GLKMatrix4MakeWithArray(&flipYZElements)
+// CHECK-NEXT: ⎡1.0 0.0 0.0 0.0⎤
+// CHECK-NEXT: ⎢0.0 0.0 1.0 0.0⎥
+// CHECK-NEXT: ⎢0.0 1.0 0.0 0.0⎥
+// CHECK-NEXT: ⎣0.0 0.0 0.0 1.0⎦
+printM4(flipYZ)
 
 let rotateXYZ = GLKMatrix4Multiply(flipYZ, flipXY)
+// CHECK-NEXT: ⎡0.0 0.0 1.0 0.0⎤
+// CHECK-NEXT: ⎢1.0 0.0 0.0 0.0⎥
+// CHECK-NEXT: ⎢0.0 1.0 0.0 0.0⎥
+// CHECK-NEXT: ⎣0.0 0.0 0.0 1.0⎦
+printM4(rotateXYZ)
 
 let y3 = GLKMatrix4MultiplyVector4(flipXY, x)
 println(y == y3) // CHECK-NEXT: true

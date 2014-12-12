@@ -10,6 +10,7 @@ add_subdirectory(ObjectiveC)
 add_subdirectory(Security)
 add_subdirectory(SpriteKit)
 add_subdirectory(XCTest)
+add_subdirectory(GLKit)
 
 if (SWIFT_SDKS)
   add_subdirectory(AppKit)
