@@ -1,10 +1,3 @@
-# FIXME: The CMake-with-Xcode build puts things in a different
-# directly layout than the autoconf build, which makes relative paths
-# for finding the Clang location pretty horrible. Work around it.
-if (XCODE)
-  add_definitions(-DSWIFT_BUILT_WITH_CMAKE)
-endif ()
-
 add_swift_library(swiftClangImporter
   ClangDiagnosticConsumer.cpp
   ClangImporter.cpp
