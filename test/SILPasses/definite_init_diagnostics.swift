@@ -817,9 +817,15 @@ struct rdar17207456Struct {
   }
 }
 
+extension Int {
+  mutating func mutate() {}
+  func inspect() {}
+}
+
 
 // <rdar://problem/19035287> let properties should only be initializable, not reassignable
 struct LetProperties {
+  let arr : [Int]
   let (u, v) : (Int, Int)
   let w : (Int, Int)
   let x = 42    // expected-note{{initial value already provided in 'let' declaration}}
@@ -841,6 +847,7 @@ struct LetProperties {
     }
     w.1 = 19
     z = nil
+    arr = []
   }
 
   // Multiple initializations are an error.
@@ -860,6 +867,8 @@ struct LetProperties {
     w.0 = a  // expected-error {{immutable property 'self.w.0' may only be initialized once}}
     w.1 = a  // expected-error {{immutable property 'self.w.1' may only be initialized once}}
 
+    arr = []
+    arr = [] // expected-error {{immutable property 'self.arr' may only be initialized once}}
   }  // expected-error {{return from initializer without initializing all stored properties}}
 
   // inout uses of let properties are an error.
@@ -867,7 +876,15 @@ struct LetProperties {
     u = 1; v = 13; w = (1,2); y = 1 ; z = u
 
     var variable = 42
-    swap(&u, &variable)  // expected-error {{immutable property 'self.u' may not be passed to an inout argument}}
+    swap(&u, &variable)  // expected-error {{immutable value 'self.u' may not be passed to an inout argument}}
+    
+    u.inspect()  // ok, non mutating.
+    u.mutate()  // expected-error {{mutating method 'mutate' may not be used on immutable value 'self.u'}}
+    
+    arr = []
+    arr += []      // expected-error {{immutable value 'self.arr' may not be passed to an inout argument}}
+    arr.append(4)  // expected-error {{immutable value 'self.arr' may not be passed to an inout argument}}
+    arr[12] = 17   // expected-error {{immutable value 'self.arr' may not be assigned to}}
   }
 }
 
@@ -885,7 +902,7 @@ class C<T : TestMutabilityProtocol> {
   init(a : T) {
     x = a; y = a
     x.toIntMax()
-    y.changeToIntMax()  // expected-error {{immutable property 'self.y' may not be passed to an inout argument}}
+    y.changeToIntMax()  // expected-error {{mutating method 'changeToIntMax' may not be used on immutable value 'self.y'}}
   }
 }
 

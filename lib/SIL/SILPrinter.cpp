@@ -1021,19 +1021,19 @@ public:
     OS << " , ";
     OS << AMI->getType();
   }
-  void visitWitnessMethodInst(WitnessMethodInst *AMI) {
+  void visitWitnessMethodInst(WitnessMethodInst *WMI) {
     OS << "witness_method ";
-    if (AMI->isVolatile())
+    if (WMI->isVolatile())
       OS << "[volatile] ";
     OS << "$";
-    AMI->getLookupType().print(OS);
+    WMI->getLookupType().print(OS);
     OS << ", ";
-    AMI->getMember().print(OS);
-    if (AMI->hasOperand()) {
+    WMI->getMember().print(OS);
+    if (WMI->hasOperand()) {
       OS << ", ";
-      OS << getIDAndType(AMI->getOperand());
+      OS << getIDAndType(WMI->getOperand());
     }
-    OS << " : " << AMI->getType(0);
+    OS << " : " << WMI->getType(0);
   }
   void visitDynamicMethodInst(DynamicMethodInst *DMI) {
     printMethodInst(DMI, DMI->getOperand(), "dynamic_method");

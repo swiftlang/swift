@@ -813,8 +813,56 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
 
     std::string PropertyName;
     (void)TheMemory.getPathStringToElement(i, PropertyName);
-    diagnose(Module, Use.Inst->getLoc(),
-             diag::immutable_property_passed_inout, PropertyName);
+    
+    // Try to produce a specific error message about the inout use.  If this is
+    // a call to a method or a mutating property access, indicate that.
+    // Otherwise, we produce a generic error.
+    FuncDecl *FD = nullptr;
+    bool isAssignment = false;
+    
+    if (auto *Apply = dyn_cast<ApplyInst>(Use.Inst)) {
+      // If this is a method application, produce a nice, specific, error.
+      if (auto *WMI = dyn_cast<MethodInst>(Apply->getOperand(0)))
+        FD = dyn_cast<FuncDecl>(WMI->getMember().getDecl());
+      
+      // If this is a direct/devirt method application, check the location info.
+      if (auto *FRI = dyn_cast<FunctionRefInst>(Apply->getOperand(0))) {
+        if (FRI->getReferencedFunction()->hasLocation()) {
+          auto SILLoc = FRI->getReferencedFunction()->getLocation();
+          FD = SILLoc.getAsASTNode<FuncDecl>();
+        }
+      }
+      if (Apply->getLoc().getAsASTNode<AssignExpr>())
+        isAssignment = true;
+    }
+    
+    // If we were able to find a method or function call, emit a diagnostic
+    // about the method.  The magic numbers used by the diagnostic are:
+    // 0 -> method, 1 -> property, 2 -> subscript, 3 -> operator.
+    unsigned Case = ~0;
+    Identifier MethodName;
+    if (FD && FD->isAccessor()) {
+      MethodName = FD->getAccessorStorageDecl()->getName();
+      Case = isa<SubscriptDecl>(FD->getAccessorStorageDecl()) ? 2 : 1;
+    } else if (FD && FD->isOperator()) {
+      MethodName = FD->getName();
+      Case = 3;
+    } else if (FD && FD->isInstanceMember()) {
+      MethodName = FD->getName();
+      Case = 0;
+    }
+    
+    if (Case != ~0U) {
+      diagnose(Module, Use.Inst->getLoc(),
+               diag::mutating_method_called_on_immutable_value,
+               MethodName, Case, PropertyName);
+    } else if (isAssignment) {
+      diagnose(Module, Use.Inst->getLoc(),
+               diag::assignment_to_immutable_value, PropertyName);
+    } else {
+      diagnose(Module, Use.Inst->getLoc(),
+               diag::immutable_value_passed_inout, PropertyName);
+    }
     return;
   }
 }
@@ -830,11 +878,29 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
                                            bool IsSuperInitComplete) {
   SILInstruction *Inst = Use.Inst;
 
-  // If this is a load with a single user that is a return, then this is a
-  // return in the enum init case, and we haven't stored to self.   Emit a
-  // specific diagnostic.
-  if (auto *LI = dyn_cast<LoadInst>(Inst))
-    if (LI->hasOneUse() && isa<ReturnInst>((*LI->use_begin())->getUser())) {
+  // If this is a load with a single user that is a return (and optionally a
+  // retain_value for non-trivial structs/enums), then this is a return in the
+  // enum/struct init case, and we haven't stored to self.   Emit a specific
+  // diagnostic.
+  if (auto *LI = dyn_cast<LoadInst>(Inst)) {
+    bool hasReturnUse = false, hasUnknownUses = false;
+    
+    for (auto LoadUse : LI->getUses()) {
+      auto *User = LoadUse->getUser();
+      
+      // Ignore retains of the struct/enum before the return.
+      if (isa<RetainValueInst>(User))
+        continue;
+      if (isa<ReturnInst>(User)) {
+        hasReturnUse = true;
+        continue;
+      }
+      
+      hasUnknownUses = true;
+      break;
+    }
+    
+    if (hasReturnUse && !hasUnknownUses) {
       if (TheMemory.isEnumInitSelf()) {
         if (!shouldEmitError(Inst)) return;
         diagnose(Module, Inst->getLoc(),
@@ -849,6 +915,7 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
         return;
       }
     }
+  }
 
   // Check to see if we're returning self in a class initializer before all the
   // ivars/super.init are set up.
@@ -926,8 +993,10 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
 
     // If this is a direct/devirt method application, check the location info.
     if (auto *FRI = dyn_cast<FunctionRefInst>(Inst->getOperand(0))) {
-      auto SILLoc = FRI->getReferencedFunction()->getLocation();
-      Method = SILLoc.getAsASTNode<FuncDecl>();
+      if (FRI->getReferencedFunction()->hasLocation()) {
+        auto SILLoc = FRI->getReferencedFunction()->getLocation();
+        Method = SILLoc.getAsASTNode<FuncDecl>();
+      }
     }
   }
 

@@ -142,8 +142,15 @@ ERROR(immutable_property_already_initialized,sil_analysis,none,
       (StringRef))
 NOTE(initial_value_provided_in_let_decl,sil_analysis,none,
      "initial value already provided in 'let' declaration", ())
-ERROR(immutable_property_passed_inout,sil_analysis,none,
-      "immutable property '%0' may not be passed to an inout argument",
+ERROR(mutating_method_called_on_immutable_value,sil_analysis,none,
+      "mutating %select{method|property access|subscript|operator}1 %0 may not"
+      " be used on immutable value '%2'",
+      (Identifier, unsigned, StringRef))
+ERROR(immutable_value_passed_inout,sil_analysis,none,
+      "immutable value '%0' may not be passed to an inout argument",
+      (StringRef))
+ERROR(assignment_to_immutable_value,sil_analysis,none,
+      "immutable value '%0' may not be assigned to",
       (StringRef))
 
 
