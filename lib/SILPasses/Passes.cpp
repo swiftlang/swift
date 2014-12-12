@@ -249,8 +249,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.add(createDevirtualization());
   PM.add(createInlineCaches());
 
-  // Optimize function signatures if we are asked to. This is disabled by
-  // default.
+  // Optimize function signatures if we are asked to.
   //
   // We do this late since it is a pass like the inline caches that we only want
   // to run once very late. Make sure to run at least one round of the ARC
