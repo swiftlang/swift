@@ -866,16 +866,16 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
                                                     SILType InstanceType) {
   // Replace this witness_method by a more concrete one
   ArrayRef<ProtocolConformance*> Conformances;
-  CanType LookupType;
+  CanType ConcreteType;
   SILValue LastArg;
 
   if (auto IE = dyn_cast<InitExistentialInst>(InitExistential)) {
     Conformances = IE->getConformances();
-    LookupType = IE->getFormalConcreteType();
+    ConcreteType = IE->getFormalConcreteType();
     LastArg = IE;
   } else if (auto IER = dyn_cast<InitExistentialRefInst>(InitExistential)) {
     Conformances = IER->getConformances();
-    LookupType = IER->getFormalConcreteType();
+    ConcreteType = IER->getFormalConcreteType();
     LastArg = IER->getOperand();
   }
 
@@ -904,7 +904,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
       SILValue OptionalExistential =
           WMI->hasOperand() ? WMI->getOperand() : SILValue();
       auto *NewWMI = Builder->createWitnessMethod(
-          WMI->getLoc(), LookupType, Conformance, WMI->getMember(),
+          WMI->getLoc(), ConcreteType, Conformance, WMI->getMember(),
           WMI->getType(), OptionalExistential, WMI->isVolatile());
 
       replaceInstUsesWith(*WMI, NewWMI, 0);
@@ -913,7 +913,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
       SmallVector<Substitution, 8> Substitutions;
       for (auto Subst : AI->getSubstitutions()) {
         if (Subst.getArchetype()->isSelfDerived()) {
-          Substitution NewSubst(Subst.getArchetype(), LookupType,
+          Substitution NewSubst(Subst.getArchetype(), ConcreteType,
                                 Subst.getConformances());
           Substitutions.push_back(NewSubst);
         } else
@@ -922,7 +922,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
 
       SILType SubstCalleeType = AI->getSubstCalleeSILType();
       TypeSubstitutionMap TypeSubstitutions;
-      TypeSubstitutions[InstanceType.getSwiftType().getPointer()] = LookupType;
+      TypeSubstitutions[InstanceType.getSwiftType().getPointer()] = ConcreteType;
 
       SILType NewSubstCalleeType;
 
