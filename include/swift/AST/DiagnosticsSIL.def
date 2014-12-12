@@ -147,7 +147,7 @@ ERROR(mutating_method_called_on_immutable_value,sil_analysis,none,
       " be used on immutable value '%2'",
       (Identifier, unsigned, StringRef))
 ERROR(immutable_value_passed_inout,sil_analysis,none,
-      "immutable value '%0' may not be passed to an inout argument",
+      "immutable value '%0' may not be passed inout",
       (StringRef))
 ERROR(assignment_to_immutable_value,sil_analysis,none,
       "immutable value '%0' may not be assigned to",

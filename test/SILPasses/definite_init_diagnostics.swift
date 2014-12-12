@@ -876,7 +876,7 @@ struct LetProperties {
     u = 1; v = 13; w = (1,2); y = 1 ; z = u
 
     var variable = 42
-    swap(&u, &variable)  // expected-error {{immutable value 'self.u' may not be passed to an inout argument}}
+    swap(&u, &variable)  // expected-error {{immutable value 'self.u' may not be passed inout}}
     
     u.inspect()  // ok, non mutating.
     u.mutate()  // expected-error {{mutating method 'mutate' may not be used on immutable value 'self.u'}}
