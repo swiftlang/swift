@@ -70,3 +70,15 @@ println(y == rotateXYZ • z) // CHECK-NEXT: true
 println(z == flipYZ • flipXY • x) // CHECK-NEXT: true
 println(x == flipYZ • flipXY • y) // CHECK-NEXT: true
 println(y == flipYZ • flipXY • z) // CHECK-NEXT: true
+
+let xxx = GLKVector3Make(1, 0, 0)
+let yyy = GLKVector3Make(0, 1, 0)
+let zzz = GLKVector3Make(0, 0, 1)
+
+println(GLKVector3DotProduct(xxx, yyy)) // CHECK-NEXT: 0.0
+println(GLKVector3AllEqualToVector3(GLKVector3CrossProduct(xxx, yyy), zzz)) // CHECK-NEXT: true
+
+let xx = GLKVector2Make(1, 0)
+let yy = GLKVector2Make(0, 1)
+println(GLKVector2DotProduct(xx, yy)) // CHECK-NEXT: 0.0
+

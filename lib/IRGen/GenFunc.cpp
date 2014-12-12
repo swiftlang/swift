@@ -2543,8 +2543,8 @@ llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
   }
 
   // Otherwise we need to store, bitcast, and load.
-  assert(DL.getTypeSizeInBits(fromTy) == DL.getTypeSizeInBits(toTy)
-         && "Coerced types should not differ in size!");
+  assert(DL.getTypeSizeInBits(fromTy) >= DL.getTypeSizeInBits(toTy)
+         && "Coerced type should not be smaller!");
 
   auto address = createAlloca(fromTy, Alignment(0),
                               value->getName() + ".coerced");
