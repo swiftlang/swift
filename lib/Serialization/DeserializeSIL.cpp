@@ -295,7 +295,8 @@ static SILFunction *createBogusSILFunction(SILModule &M,
   return SILFunction::create(M, SILLinkage::Private, name,
                              type.castTo<SILFunctionType>(),
                              nullptr, SILFileLocation(loc), IsNotBare,
-                             IsNotTransparent, IsNotFragile);
+                             IsNotTransparent, IsNotFragile,
+                             SILFunction::NotRelevant);
 }
 
 /// Helper function to find a SILFunction, given its name and type.
@@ -438,6 +439,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
                              nullptr, loc,
                              IsNotBare, IsTransparent_t(isTransparent == 1),
                              IsFragile_t(isFragile == 1),
+                             SILFunction::NotRelevant,
                              (Inline_t)inlineStrategy);
     fn->setGlobalInit(isGlobal == 1);
     fn->setEffectsInfo((EffectsKind)effect);

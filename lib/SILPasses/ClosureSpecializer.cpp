@@ -129,6 +129,7 @@ SILFunction *ClosureSpecCloner::initCloned(SILFunction *PAIUser,
                                 PAIUser->getContextGenericParams(),
                                 PAIUser->getLocation(), IsBare,
                                 PAIUser->isTransparent(), PAIUser->isFragile(),
+                                PAIUser->getClassVisibility(),
                                 PAIUser->getInlineStrategy(),
                                 PAIUser->getEffectsInfo(),
                                 PAIUser, PAIUser->getDebugScope());

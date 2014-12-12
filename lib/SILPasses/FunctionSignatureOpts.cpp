@@ -438,7 +438,7 @@ createEmptyFunctionWithOptimizedSig(llvm::SmallString<64> &NewFName) {
   SILFunction *NewF = SILFunction::create(
       M, F->getLinkage(), NewFName, NewFTy, nullptr, F->getLocation(),
       F->isBare(), F->isTransparent(), F->isFragile(),
-      F->getInlineStrategy(), F->getEffectsInfo(), 0,
+      F->getClassVisibility(), F->getInlineStrategy(), F->getEffectsInfo(), 0,
       NewDebugScope, F->getDeclContext());
   NewF->setSemanticsAttr(F->getSemanticsAttr());
   NewDebugScope->SILFn = NewF;

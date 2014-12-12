@@ -9,7 +9,7 @@ public class Base1 {
 // CHECK-LABEL: sil @_TFC19devirt_default_case5Base15outerfS0_FT_T_
 // CHECK: class_method 
 // CHECK: }
-  func outer() { 
+  public func outer() { 
     middle() 
   }
 }
@@ -142,7 +142,7 @@ class Derived4 : Base4 {
 
 public class Base5 {
   @inline(never)
-  func test() { 
+  public func test() { 
 // Check that call to foo() does not use class_method, because
 // it is a final method.
 //

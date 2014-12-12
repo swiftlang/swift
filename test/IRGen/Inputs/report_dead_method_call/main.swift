@@ -12,8 +12,31 @@ func testClass(c: ClassContainer) {
 	c.p.def()
 }
 
-if Process.argc == 1 {
-	callProto()
-} else {
+public class PublicDerived : PublicBase {
+	// The vtable of PublicDerived contains a reference to PublicBase.ghi()
+}
+
+@inline(never)
+func callPublicClass() {
+	testPublicClass(PublicDerived())
+}
+
+@inline(never)
+func testPublicClass(c: PublicBase) {
+	// call the dead private vtable method ghi()
+	c.ghi()
+}
+
+switch Process.argc {
+case 1:
 	callClass()
+
+case 2:
+	callProto()
+
+case 3:
+	callPublicClass()
+
+default:
+	break;
 }

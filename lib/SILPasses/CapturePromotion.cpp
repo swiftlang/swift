@@ -344,6 +344,7 @@ ClosureCloner::initCloned(SILFunction *Orig,
                                 Orig->getContextGenericParams(),
                                 Orig->getLocation(), Orig->isBare(),
                                 IsNotTransparent, Orig->isFragile(),
+                                Orig->getClassVisibility(),
                                 Orig->getInlineStrategy(),
                                 Orig->getEffectsInfo(),
                                 Orig, Orig->getDebugScope());

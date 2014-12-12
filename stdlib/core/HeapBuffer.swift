@@ -42,7 +42,8 @@ public struct HeapBuffer<Value,Element> {}
 /// construct and---if necessary---destroy Elements there yourself,
 /// either in a derived class, or it can be in some manager object
 /// that owns the _HeapBuffer.
-internal class _HeapBufferStorage<Value,Element> : NonObjectiveCBase {
+public // @testable (test/Prototypes/MutableIndexableDict.swift)
+class _HeapBufferStorage<Value,Element> : NonObjectiveCBase {
   /// The type used to actually manage instances of
   /// `_HeapBufferStorage<Value,Element>`
   typealias Buffer = _HeapBuffer<Value, Element>

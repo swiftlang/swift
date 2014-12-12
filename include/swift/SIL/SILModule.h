@@ -267,6 +267,9 @@ public:
     return {functions.begin(), functions.end()};
   }
 
+  const_iterator zombies_begin() const { return zombieFunctions.begin(); }
+  const_iterator zombies_end() const { return zombieFunctions.end(); }
+
   using vtable_iterator = VTableListType::iterator;
   using vtable_const_iterator = VTableListType::const_iterator;
   VTableListType &getVTableList() { return vtables; }
@@ -365,7 +368,9 @@ public:
                                    CanSILFunctionType type,
                                    IsBare_t isBareSILFunction,
                                    IsTransparent_t isTransparent,
-                                   IsFragile_t isFragile);
+                                   IsFragile_t isFragile,
+                                   SILFunction::ClassVisibility_t CV =
+                                           SILFunction::NotRelevant);
 
   /// Look up the SILWitnessTable representing the lowering of a protocol
   /// conformance, and collect the substitutions to apply to the referenced

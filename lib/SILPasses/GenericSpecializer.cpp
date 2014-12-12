@@ -99,6 +99,7 @@ SILFunction *SpecializingCloner::initCloned(SILFunction *Orig,
                         NewName, FTy, nullptr,
                         Orig->getLocation(), Orig->isBare(),
                         Orig->isTransparent(), Orig->isFragile(),
+                        Orig->getClassVisibility(),
                         Orig->getInlineStrategy(),
                         Orig->getEffectsInfo(), Orig,
                         Orig->getDebugScope(), Orig->getDeclContext());

@@ -43,6 +43,13 @@ func testClasses(b: Base) {
 	b.aliveMethod()
 }
 
+// Check if dead methods of classes with higher visibility are removed.
+
+public class PublicClass {
+	func publicClassMethod() {
+	}
+}
+
 // Check if unused witness table methods are removed.
 
 protocol Prot {
@@ -77,6 +84,7 @@ public func callTest() {
 // CHECK-NOT: sil {{.*}}inCycleB
 // CHECK-NOT: sil {{.*}}deadMethod
 // CHECK-NOT: sil {{.*}}deadWitness
+// CHECK-NOT: sil {{.*}}publicClassMethod
 
 // CHECK-LABEL: sil_vtable Base
 // CHECK-NOT: deadMethod

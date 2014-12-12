@@ -493,6 +493,7 @@ public:
   void emitGlobalTopLevel();
   void emitRuntimeRegistration();
   void emitLazyDefinitions();
+  void emitVTableStubs();
 private:
   void emitGlobalDecl(Decl *D);
   void emitExternalDefinition(Decl *D);

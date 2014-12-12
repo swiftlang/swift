@@ -247,7 +247,8 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
                                             CanSILFunctionType type,
                                             IsBare_t isBareSILFunction,
                                             IsTransparent_t isTransparent,
-                                            IsFragile_t isFragile) {
+                                            IsFragile_t isFragile,
+                                            SILFunction::ClassVisibility_t CV) {
   if (auto fn = lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == type);
     assert(fn->getLinkage() == linkage);
@@ -255,7 +256,8 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
   }
 
   auto fn = SILFunction::create(*this, linkage, name, type, nullptr,
-                                loc, isBareSILFunction, isTransparent, isFragile);
+                                loc, isBareSILFunction, isTransparent,
+                                isFragile, CV);
   fn->setDebugScope(new (*this) SILDebugScope(loc, *fn));
   return fn;
 }
@@ -267,7 +269,8 @@ SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
                                                   IsTransparent_t isTransparent,
                                                   IsFragile_t isFragile) {
   return getOrCreateFunction(loc, name, SILLinkage::Shared,
-                             type, isBareSILFunction, isTransparent, isFragile);
+                             type, isBareSILFunction, isTransparent, isFragile,
+                             SILFunction::NotRelevant);
 }
 
 ArrayRef<SILType> ValueBase::getTypes() const {
@@ -702,7 +705,7 @@ void SILModule::invalidateSILLoaderCaches() {
 void SILModule::eraseFunction(SILFunction *F) {
 
   assert(! F->isZombie() && "zombie function is in list of alive functions");
-  if (F->isInlined()) {
+  if (F->isInlined() || F->isExternallyUsedSymbol()) {
     
     // The owner of the function's Name is the FunctionTable key. As we remove
     // the function from the table we have to store the name string elsewhere:
@@ -711,14 +714,14 @@ void SILModule::eraseFunction(SILFunction *F) {
     FunctionTable.erase(F->getName());
     F->Name = copiedName;
     
-    // The function is dead, but as it is inlined we need it later (at IRGen)
-    // for debug info generation. So we move it into the zombie list.
+    // The function is dead, but we need it later (at IRGen) for debug info
+    // or vtable stub generation. So we move it into the zombie list.
     getFunctionList().remove(F);
     zombieFunctions.push_back(F);
     F->markAsZombie();
 
     // This opens dead-function-removal opportunities for called functions.
-    // (References are not needed for debug info generation.)
+    // (References are not needed anymore.)
     F->dropAllReferences();
   } else {
     FunctionTable.erase(F->getName());

@@ -174,8 +174,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   // FIXME: @objc declarations should be too, but we currently have no way
   // of marking them "used" other than making them external. 
   ValueDecl *d = getDecl();
-  DeclContext *context = d->getDeclContext();
-  DeclContext *moduleContext = context;
+  DeclContext *moduleContext = d->getDeclContext();
   while (!moduleContext->isModuleScopeContext()) {
     if (!isForeign && moduleContext->isLocalContext())
       return getLinkageForLocalContext(moduleContext);
@@ -207,25 +206,8 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
         return ClangLinkage;
   }
   
-  auto *classType = context->isClassOrClassExtensionContext();
-  auto accessibility = d->getAccessibility();
-  
-  // If this decleration is a function which goes into a vtable, then it must
-  // be as visible as its class. Derived classes even have to put all
-  // less visible methods of the base class into their vtables.
-  // Note: methods from extensions don't go into vtables (yet).
-  if (classType && !classType->isFinal() && !context->isExtensionContext()) {
-    if (auto *FD = dyn_cast<AbstractFunctionDecl>(d)) {
-      if (!FD->isFinal() || FD->getOverriddenDecl()) {
-        assert(accessibility <= classType->getAccessibility() &&
-               "class must be as visible as its members");
-        accessibility = classType->getAccessibility();
-      }
-    }
-  }
-
   // Otherwise, we have external linkage.
-  switch (accessibility) {
+  switch (d->getAccessibility()) {
     case Accessibility::Private:
       return (forDefinition ? SILLinkage::Private : SILLinkage::PrivateExternal);
 

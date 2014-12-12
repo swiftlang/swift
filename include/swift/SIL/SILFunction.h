@@ -43,20 +43,23 @@ class SILFunction
 public:
   typedef llvm::iplist<SILBasicBlock> BlockListType;
 
+  /// The visibility of this method's class (if any).
+  enum ClassVisibility_t {
+    
+    /// This is a method in the vtable of a public class.
+    PublicClass,
+    
+    /// This is a method in the vtable of an internal class.
+    InternalClass,
+    
+    /// All other cases (e.g. this function is not a method).
+    NotRelevant
+  };
+    
 private:
   friend class SILBasicBlock;
   friend class SILModule;
     
-  enum class InlineState : uint8_t {
-    // The function is not inlined.
-    NotInlined,
-    // The function is inlined (at least once).
-    Inlined,
-    // The function is inlined and dead.
-    // We just need to keep it for debug info generation.
-    Zombie
-  };
-
   /// Module - The SIL module that the function belongs to.
   SILModule &Module;
 
@@ -96,6 +99,10 @@ private:
   /// functions in the stdlib.
   unsigned Fragile : 1;
 
+  /// The visiblity of the parent class, if this is a method which is contained
+  /// in the vtable of that class.
+  unsigned ClassVisibility : 2;
+    
   /// The function's global_init attribute.
   unsigned GlobalInitFlag : 1;
 
@@ -115,8 +122,17 @@ private:
   /// The function's effects attribute.
   EffectsKind EK;
     
-  // The function's state regarding inlining and dead-function removal.
-  InlineState State;
+  /// True if this function is inlined at least once. This means that the
+  /// debug info keeps a pointer to this function.
+  bool inlined = false;
+    
+  /// True if this function is a zombie function. This means that the function
+  /// is dead and not referenced from anywhere inside the SIL. But it is kept
+  /// for other purposes:
+  /// *) It is inlined and the debug info keeps a reference to the function.
+  /// *) It is a dead method of a class which has higher visibility than the
+  ///    method itself. In this case we need to create a vtable stub for it.
+  bool zombie = false;
 
   SILFunction(SILModule &module, SILLinkage linkage,
               StringRef mangledName, CanSILFunctionType loweredType,
@@ -125,6 +141,7 @@ private:
               IsBare_t isBareSILFunction,
               IsTransparent_t isTrans,
               IsFragile_t isFragile,
+              ClassVisibility_t classVisibility,
               Inline_t inlineStrategy, EffectsKind E,
               SILFunction *insertBefore,
               SILDebugScope *debugScope,
@@ -138,6 +155,7 @@ public:
                              IsBare_t isBareSILFunction,
                              IsTransparent_t isTrans,
                              IsFragile_t isFragile,
+                             ClassVisibility_t classVisibility = NotRelevant,
                              Inline_t inlineStrategy = InlineDefault,
                              EffectsKind EK = EffectsKind::Unspecified,
                              SILFunction *InsertBefore = nullptr,
@@ -185,23 +203,23 @@ public:
   /// Notify that this function was inlined. This implies that it is still
   /// needed for debug info generation, even if it is removed afterwards.
   void markAsInlined() {
-    assert(State != InlineState::Zombie && "Can't inline a zombie function");
-    State = InlineState::Inlined;
+    assert(!isZombie() && "Can't inline a zombie function");
+    inlined = true;
   }
-  
+
   /// Returns true if this function was inlined.
-  bool isInlined() const { return State >= InlineState::Inlined; }
-  
+  bool isInlined() const { return inlined; }
+
   /// Mark this function as removed from the module's function list, but kept
-  /// as "zombie" for debug info generation.
+  /// as "zombie" for debug info or vtable stub generation.
   void markAsZombie() {
-    assert(State == InlineState::Inlined &&
-          "Not inlined function should be deleted instead of getting a zombie");
-    State = InlineState::Zombie;
+    assert((isInlined() || isExternallyUsedSymbol())  &&
+          "Function should be deleted instead of getting a zombie");
+    zombie = true;
   }
   
-  /// Returns true if this function is dead, but kept for debug info generation.
-  bool isZombie() const { return State == InlineState::Zombie; }
+  /// Returns true if this function is dead, but kept in the module's zombie list.
+  bool isZombie() const { return zombie; }
     
   /// Returns the calling convention used by this entry point.
   AbstractCC getAbstractCC() const {
@@ -224,6 +242,28 @@ public:
   SILLinkage getLinkage() const { return SILLinkage(Linkage); }
   void setLinkage(SILLinkage linkage) { Linkage = unsigned(linkage); }
 
+  /// Get's the effective linkage which is used to derive the llvm linkage.
+  /// Usually this is the same as getLinkage(), except in one case: if this
+  /// function is a method in a class which has higher visiblity than the
+  /// method itself, the function can be referenced from vtables of derived
+  /// classes in other compilation units.
+  SILLinkage getEffectiveSymbolLinkage() const {
+    SILLinkage L = getLinkage();
+    switch (getClassVisibility()) {
+      case NotRelevant:
+        break;
+      case InternalClass:
+        if (L == SILLinkage::Private)
+          return SILLinkage::Hidden;
+        break;
+      case PublicClass:
+        if (L == SILLinkage::Private || L == SILLinkage::Hidden)
+          return SILLinkage::Public;
+        break;
+    }
+    return L;
+  }
+    
   /// Helper method which returns true if this function has "external" linkage.
   bool isAvailableExternally() const {
     return swift::isAvailableExternally(getLinkage());
@@ -233,6 +273,11 @@ public:
   /// indicates that the objects definition might be required outside the
   /// current SILModule.
   bool isPossiblyUsedExternally() const;
+
+  /// In addition to isPossiblyUsedExternally() it returns also true if this
+  /// is a (private or internal) vtable method which can be referenced by
+  /// vtables of derived classes outside the compilation unit.
+  bool isExternallyUsedSymbol() const;
 
   /// Get the DeclContext of this function. (Debug info only).
   DeclContext *getDeclContext() const { return DeclCtx; }
@@ -291,6 +336,11 @@ public:
   /// Get this function's fragile attribute.
   IsFragile_t isFragile() const { return IsFragile_t(Fragile); }
   void setFragile(IsFragile_t isFrag) { Fragile = isFrag; }
+  
+  /// Get the class visibility (relevant for class methods).
+  ClassVisibility_t getClassVisibility() const {
+    return ClassVisibility_t(ClassVisibility);
+  }
     
   /// Get this function's noinline attribute.
   Inline_t getInlineStrategy() const { return Inline_t(InlineStrategy); }

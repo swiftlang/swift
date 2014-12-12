@@ -174,6 +174,9 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   // Okay, emit any definitions that we suddenly need.
   IGM.emitLazyDefinitions();
 
+  // Emit symbols for eliminated dead methods.
+  IGM.emitVTableStubs();
+
   // Register our info with the runtime if needed.
   if (Opts.UseJIT)
     IGM.emitRuntimeRegistration();

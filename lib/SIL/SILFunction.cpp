@@ -32,6 +32,7 @@ SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
                                  IsBare_t isBareSILFunction,
                                  IsTransparent_t isTrans,
                                  IsFragile_t isFragile,
+                                 ClassVisibility_t classVisibility,
                                  Inline_t inlineStrategy, EffectsKind E,
                                  SILFunction *insertBefore,
                                  SILDebugScope *debugScope,
@@ -48,7 +49,8 @@ SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
   auto fn = new (M) SILFunction(M, linkage, name,
                                 loweredType, contextGenericParams, loc,
                                 isBareSILFunction, isTrans, isFragile,
-                                inlineStrategy, E, insertBefore, debugScope, DC);
+                                classVisibility, inlineStrategy, E,
+                                insertBefore, debugScope, DC);
 
   if (entry) entry->setValue(fn);
   return fn;
@@ -61,6 +63,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
                          IsBare_t isBareSILFunction,
                          IsTransparent_t isTrans,
                          IsFragile_t isFragile,
+                         ClassVisibility_t classVisibility,
                          Inline_t inlineStrategy, EffectsKind E,
                          SILFunction *InsertBefore,
                          SILDebugScope *DebugScope,
@@ -76,9 +79,11 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
     Bare(isBareSILFunction),
     Transparent(isTrans),
     Fragile(isFragile),
+    ClassVisibility(classVisibility),
     GlobalInitFlag(false),
     InlineStrategy(inlineStrategy),
-    Linkage(unsigned(Linkage)), EK(E), State(InlineState::NotInlined) {
+    Linkage(unsigned(Linkage)),
+    EK(E) {
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
   else
@@ -422,3 +427,9 @@ SILFunction::isPossiblyUsedExternally() const {
   return swift::isPossiblyUsedExternally(getLinkage(),
                                          getModule().isWholeModule());
 }
+
+bool SILFunction::isExternallyUsedSymbol() const {
+  return swift::isPossiblyUsedExternally(getEffectiveSymbolLinkage(),
+                                         getModule().isWholeModule());
+}
+

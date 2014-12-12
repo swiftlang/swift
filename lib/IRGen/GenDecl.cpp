@@ -32,6 +32,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/TypeBuilder.h"
 #include "llvm/IR/Value.h"
+#include "llvm/IR/GlobalAlias.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/ConvertUTF.h"
@@ -755,6 +756,35 @@ void IRGenModule::emitLazyDefinitions() {
   }
 }
 
+/// Emit symbols for eliminated dead methods, which can still be referenced
+/// from other modules. This happens e.g. if a public class contains a (dead)
+/// private method.
+void IRGenModule::emitVTableStubs() {
+  llvm::Function *stub = nullptr;
+  for (auto I = SILMod->zombies_begin(); I != SILMod->zombies_end(); ++I) {
+    const SILFunction &F = *I;
+    if (! F.isExternallyUsedSymbol())
+      continue;
+    
+    if (!stub) {
+      // Create a single stub function which calls swift_reportMissingMethod().
+      stub = llvm::Function::Create(llvm::FunctionType::get(VoidTy, false),
+                                    llvm::GlobalValue::LinkOnceODRLinkage,
+                                    "_swift_dead_method_stub");
+      Module.getFunctionList().push_back(stub);
+      stub->setVisibility(llvm::GlobalValue::HiddenVisibility);
+      stub->setCallingConv(RuntimeCC);
+      auto *entry = llvm::BasicBlock::Create(getLLVMContext(), "entry", stub);
+      auto *errorFunc = getDeadMethodErrorFn();
+      llvm::CallInst::Create(errorFunc, ArrayRef<llvm::Value *>(), "", entry);
+      new llvm::UnreachableInst(getLLVMContext(), entry);
+    }
+    // For each eliminated method symbol create an alias to the stub.
+    llvm::GlobalAlias::create(llvm::GlobalValue::ExternalLinkage, F.getName(),
+                              stub);
+  }
+}
+
 /// Get SIL-linkage for something that's not required to be visible
 /// and doesn't actually need to be uniqued.
 static SILLinkage getNonUniqueSILLinkage(FormalLinkage linkage,
@@ -828,7 +858,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return SILLinkage::Private;
   
   case Kind::SILFunction:
-    return getSILFunction()->getLinkage();
+    return getSILFunction()->getEffectiveSymbolLinkage();
       
   case Kind::SILGlobalVariable:
     return getSILGlobalVariable()->getLinkage();

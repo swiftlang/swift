@@ -294,11 +294,50 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
 
   return SILFunction::create(M, SILLinkage::Public,
                              SWIFT_ENTRY_POINT_FUNCTION, topLevelType, nullptr,
-                             Loc, IsBare, IsNotTransparent, IsNotFragile);
+                             Loc, IsBare, IsNotTransparent, IsNotFragile,
+                             SILFunction::NotRelevant);
 }
 
 SILType SILGenModule::getConstantType(SILDeclRef constant) {
   return Types.getConstantType(constant);
+}
+
+static SILFunction::ClassVisibility_t getClassVisibility(SILDeclRef constant) {
+  if (!constant.hasDecl())
+    return SILFunction::NotRelevant;
+
+  // If this decleration is a function which goes into a vtable, then it's
+  // symbol must be as visible as its class. Derived classes even have to put
+  // all less visible methods of the base class into their vtables.
+
+  auto *FD = dyn_cast<AbstractFunctionDecl>(constant.getDecl());
+  if (!FD)
+    return SILFunction::NotRelevant;
+
+  DeclContext *context = FD->getDeclContext();
+
+  // Methods from extensions don't go into vtables (yet).
+  if (context->isExtensionContext())
+    return SILFunction::NotRelevant;
+  
+  auto *classType = context->isClassOrClassExtensionContext();
+  if (!classType || classType->isFinal())
+    return SILFunction::NotRelevant;
+
+  if (FD->isFinal() && !FD->getOverriddenDecl())
+    return SILFunction::NotRelevant;
+
+  assert(FD->getAccessibility() <= classType->getAccessibility() &&
+         "class must be as visible as its members");
+    
+  switch (classType->getAccessibility()) {
+    case Accessibility::Private:
+      return SILFunction::NotRelevant;
+    case Accessibility::Internal:
+      return SILFunction::InternalClass;
+    case Accessibility::Public:
+      return SILFunction::PublicClass;
+  }
 }
 
 SILFunction *SILGenModule::getFunction(SILDeclRef constant,
@@ -347,6 +386,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
   auto *F = SILFunction::create(M, linkage, constant.mangle(buffer),
                                 constantType, nullptr,
                                 None, IsNotBare, IsTrans, IsFrag,
+                                getClassVisibility(constant),
                                 inlineStrategy, EK);
 
   F->setGlobalInit(constant.isGlobal());
@@ -667,8 +707,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
     SILFunction::create(M, SILLinkage::Private, funcName,
                         initSILType, nullptr, SILLocation(binding),
                         IsNotBare, IsNotTransparent,
-                        makeModuleFragile ? IsFragile : IsNotFragile,
-                        InlineDefault);
+                        makeModuleFragile ? IsFragile : IsNotFragile);
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(binding->getInit()), *f));
   f->setLocation(binding);
