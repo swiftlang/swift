@@ -723,6 +723,16 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringNFDHashValue/NoLeak") {
   expectEqual(0, nsStringCanaryCount)
 }
 
+RuntimeFoundationWrappers.test("_stdlib_NSStringASCIIHashValue/NoLeak") {
+  nsStringCanaryCount = 0
+  if true {
+    let a = NSStringCanary()
+    expectEqual(1, nsStringCanaryCount)
+    _stdlib_NSStringASCIIHashValue(a)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
 RuntimeFoundationWrappers.test("_stdlib_NSStringHasPrefixNFD/NoLeak") {
   nsStringCanaryCount = 0
   if true {

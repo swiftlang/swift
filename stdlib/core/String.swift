@@ -388,6 +388,9 @@ extension String {
 #if _runtime(_ObjC)
 @asmname("swift_stdlib_NSStringNFDHashValue")
 func _stdlib_NSStringNFDHashValue(str: AnyObject) -> Int
+
+@asmname("swift_stdlib_NSStringASCIIHashValue")
+func _stdlib_NSStringASCIIHashValue(str: AnyObject) -> Int
 #endif
 
 extension String : Hashable {
@@ -411,7 +414,12 @@ extension String : Hashable {
     // wasteful and inefficient.
     let cocoaString =
       unsafeBitCast(self._bridgeToObjectiveCImpl(), _NSStringCoreType.self)
-    return hashOffset ^ _stdlib_NSStringNFDHashValue(cocoaString)
+    // If we have an ASCII string, we do not need to normalize.
+    if self._core.isASCII {
+      return hashOffset ^ _stdlib_NSStringASCIIHashValue(cocoaString)
+    } else {
+      return hashOffset ^ _stdlib_NSStringNFDHashValue(cocoaString)
+    }
 #else
     // FIXME: Actually implement. For now, all strings have the same hash.
     // rdar://problem/18878343

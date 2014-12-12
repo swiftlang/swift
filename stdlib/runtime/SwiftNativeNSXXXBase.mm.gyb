@@ -132,6 +132,13 @@ extern "C" size_t swift_stdlib_NSStringNFDHashValue(NSString *str) {
   return Result;
 }
 
+// For strings we know only have ASCII
+extern "C" size_t swift_stdlib_NSStringASCIIHashValue(NSString *str) {
+  int Result = str.hash;
+  swift_unknownRelease(str);
+  return Result;
+}
+
 extern "C" bool swift_stdlib_NSStringHasPrefixNFD(NSString *theString,
                                                   NSString *prefix) {
   auto Length = CFStringGetLength((__bridge CFStringRef)theString);
