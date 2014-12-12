@@ -921,8 +921,6 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
       }
 
       SILType SubstCalleeType = AI->getSubstCalleeSILType();
-      TypeSubstitutionMap TypeSubstitutions;
-      TypeSubstitutions[InstanceType.getSwiftType().getPointer()] = ConcreteType;
 
       SILType NewSubstCalleeType;
 
@@ -934,10 +932,13 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
             SILType::getPrimitiveObjectType(FnTy->substGenericArgs(
                 AI->getModule(), AI->getModule().getSwiftModule(),
                 Substitutions));
-      else
+      else {
+        TypeSubstitutionMap TypeSubstitutions;
+        TypeSubstitutions[InstanceType.getSwiftType().getPointer()] = ConcreteType;
         NewSubstCalleeType = SubstCalleeType.subst(
             AI->getModule(), AI->getModule().getSwiftModule(),
             TypeSubstitutions);
+      }
 
       auto NewAI = Builder->createApply(
           AI->getLoc(), AI->getCallee(), NewSubstCalleeType,
