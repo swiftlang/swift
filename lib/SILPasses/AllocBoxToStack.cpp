@@ -261,16 +261,14 @@ static size_t getParameterIndexForOperand(Operand *O) {
 
 /// Given an operand of a direct apply or partial_apply of a function,
 /// return the parameter used in the body of the function to represent
-/// this operand. For non-direct calls and for functions that we
-/// cannot examine the body of, return an empty SILValue.
-static SILValue getParameterForOperand(SILFunction *F, Operand *O) {
+/// this operand.
+static SILArgument *getParameterForOperand(SILFunction *F, Operand *O) {
   assert(F && !F->empty() && "Expected a function with a body!");
 
   auto &Entry = F->front();
   size_t ParamIndex = getParameterIndexForOperand(O);
 
-  auto *Param = Entry.getBBArg(ParamIndex);
-  return SILValue(Param);
+  return Entry.getBBArg(ParamIndex);
 }
 
 /// Return a pointer to the SILFunction called by Call if we can
@@ -295,7 +293,7 @@ static bool partialApplyArgumentEscapes(Operand *O) {
 
   // Check the uses of the operand, but do not recurse down into other
   // apply instructions.
-  auto Param = getParameterForOperand(F, O);
+  auto Param = SILValue(getParameterForOperand(F, O));
   return partialApplyEscapes(Param, /* examineApply = */ false);
 }
 
@@ -312,7 +310,7 @@ static bool checkPartialApplyBody(Operand *O) {
   // We don't actually use these because we're not recursively
   // rewriting the partial applies we find.
   llvm::SmallVector<Operand *, 1> ElidedOperands;
-  auto Param = getParameterForOperand(F, O);
+  auto Param = SILValue(getParameterForOperand(F, O));
   return !findUnexpectedBoxUse(Param, /* examinePartialApply = */ false,
                                /* inAppliedFunction = */ true,
                                ElidedOperands);
@@ -624,15 +622,29 @@ static PartialApplyInst *specializePartialApply(PartialApplyInst *PartialApply,
   // Now create the new partial_apply using the cloned function.
   llvm::SmallVector<SILValue, 16> Args;
 
+  SILBuilderWithScope<2> Builder(PartialApply);
+
   // Only use the arguments that are not dead.
   for (auto &O : PartialApply->getArgumentOperands()) {
     auto ParamIndex = getParameterIndexForOperand(&O);
-    if (!DeadParamIndices.count(ParamIndex))
+    if (!DeadParamIndices.count(ParamIndex)) {
       Args.push_back(O.get());
+      continue;
+    }
+
+    // If this argument is marked dead, it is a box that we're
+    // removing from the partial_apply because we've proven we can
+    // keep this value on the stack. The partial_apply has ownership
+    // of this box so we must now release it explicitly.
+    assert(cast<AllocBoxInst>(O.get())->getContainerResult() == O.get() &&
+           "Expected dead param to be an alloc_box container!");
+    assert(getParameterForOperand(F, &O)->getParameterInfo().isConsumed() &&
+           "Expected alloc_box container to be consumed by partial_apply!");
+
+    Builder.emitStrongRelease(PartialApply->getLoc(), O.get());
   }
 
   // Build the function_ref and partial_apply.
-  SILBuilderWithScope<2> Builder(PartialApply);
   SILValue FunctionRef = Builder.createFunctionRef(PartialApply->getLoc(),
                                                    Cloner.getCloned());
   CanSILFunctionType CanFnTy = Cloner.getCloned()->getLoweredFunctionType();
