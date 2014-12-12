@@ -160,6 +160,7 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
   if (FuncSelfTy != OriginTy) {
     if (ClassInstance.stripUpCasts().getType().getAs<MetatypeType>()) {
       auto &Module = AI->getModule();
+      (void) Module;
       assert(FuncSelfTy.getMetatypeInstanceType(Module).
              isSuperclassOf(OriginTy.getMetatypeInstanceType(Module)) &&
              "Can not call a class method"

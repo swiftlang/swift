@@ -1080,6 +1080,7 @@ protected:
     if (BB == StartBB) {
       // The cloned start node shares the same dominator as the original node.
       auto *ClonedNode = DomTree.addNewBlock(ClonedBB, OrigDom->getBlock());
+      (void) ClonedNode;
       assert(ClonedNode);
     } else {
       // Otherwise, map the dominator structure using the mapped block.
