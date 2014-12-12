@@ -300,7 +300,8 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
       } else {
         convention = ParameterConvention::Direct_Owned;
       }
-      ClonedInterfaceArgTys.push_back(SILParameterInfo(param.getType(), convention));
+      ClonedInterfaceArgTys.push_back(SILParameterInfo(param.getType(),
+                                                       convention));
     } else if (!PromotableIndices.count(Index)) {
       ClonedInterfaceArgTys.push_back(param);
     }
