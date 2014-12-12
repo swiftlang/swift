@@ -16,7 +16,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
-#include "swift/SIL/SILCloner.h"
+#include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILPasses/Transforms.h"
 
 #include <tuple>
@@ -154,12 +154,15 @@ private:
 namespace {
 /// \brief A SILCloner subclass which clones a closure function while converting
 /// one or more captures from 'inout' (by-reference) to by-value.
-class ClosureCloner : public SILClonerWithScopes<ClosureCloner> {
+class ClosureCloner : public TypeSubstCloner<ClosureCloner> {
 public:
   friend class SILVisitor<ClosureCloner>;
   friend class SILCloner<ClosureCloner>;
 
-  ClosureCloner(SILFunction *Orig, IndicesSet &PromotableIndices);
+  ClosureCloner(SILFunction *Orig, TypeSubstitutionMap &InterfaceSubs,
+                TypeSubstitutionMap &ContextSubs,
+                ArrayRef<Substitution> ApplySubs,
+                IndicesSet &PromotableIndices);
 
   void populateCloned();
 
@@ -167,6 +170,7 @@ public:
 
 private:
   static SILFunction *initCloned(SILFunction *Orig,
+                                 TypeSubstitutionMap &InterfaceSubs,
                                  IndicesSet &PromotableIndices);
 
   void visitStrongReleaseInst(StrongReleaseInst *Inst);
@@ -257,8 +261,14 @@ ReachabilityInfo::isReachable(SILBasicBlock *From, SILBasicBlock *To) {
   return FromSet.test(FI->second);
 }
 
-ClosureCloner::ClosureCloner(SILFunction *Orig, IndicesSet &PromotableIndices)
-  : SILClonerWithScopes<ClosureCloner>(*initCloned(Orig, PromotableIndices)),
+ClosureCloner::ClosureCloner(SILFunction *Orig,
+                             TypeSubstitutionMap &InterfaceSubs,
+                             TypeSubstitutionMap &ContextSubs,
+                             ArrayRef<Substitution> ApplySubs,
+                             IndicesSet &PromotableIndices)
+  : TypeSubstCloner<ClosureCloner>(
+                           *initCloned(Orig, InterfaceSubs, PromotableIndices),
+                           *Orig, ContextSubs, ApplySubs),
     Orig(Orig), PromotableIndices(PromotableIndices) {
 }
 
@@ -269,7 +279,9 @@ ClosureCloner::ClosureCloner(SILFunction *Orig, IndicesSet &PromotableIndices)
 /// the address of the box's contents is the argument immediately following each
 /// box argument); does not actually clone the body of the function
 SILFunction*
-ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
+ClosureCloner::initCloned(SILFunction *Orig,
+                          TypeSubstitutionMap &InterfaceSubs,
+                          IndicesSet &PromotableIndices) {
   SILModule &M = Orig->getModule();
 
   // Suffix the function name with "_promoteX", where X is the first integer
@@ -308,6 +320,8 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
     ++Index;
   }
 
+  Module *SM = M.getSwiftModule();
+
   // Create the thin function type for the cloned closure.
   auto ClonedTy =
     SILFunctionType::get(OrigFTI->getGenericSignature(),
@@ -316,6 +330,9 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
                          ClonedInterfaceArgTys,
                          OrigFTI->getResult(),
                          M.getASTContext());
+
+  auto SubstTy = SILType::substFuncType(M, SM, InterfaceSubs, ClonedTy,
+                                        /* dropGenerics = */ true);
   
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");
@@ -323,7 +340,7 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
          && "SILFunction missing DebugScope");
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
   // This inserts the new cloned function before the original function.
-  auto Fn = SILFunction::create(M, Orig->getLinkage(), ClonedName, ClonedTy,
+  auto Fn = SILFunction::create(M, Orig->getLinkage(), ClonedName, SubstTy,
                                 Orig->getContextGenericParams(),
                                 Orig->getLocation(), Orig->isBare(),
                                 IsNotTransparent, Orig->isFragile(),
@@ -568,6 +585,17 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
   return false;
 }
 
+static bool signatureHasDependentTypes(SILFunctionType &CalleeTy) {
+  if (CalleeTy.getSemanticResultSILType().isDependentType())
+    return true;
+
+  for (auto ParamTy : CalleeTy.getParameterSILTypesWithoutIndirectResult())
+    if (ParamTy.isDependentType())
+      return true;
+
+  return false;
+}
+
 /// \brief Examine an alloc_box instruction, returning true if at least one
 /// capture of the boxed variable is promotable.  If so, then the pair of the
 /// partial_apply instruction and the index of the box argument in the closure's
@@ -600,18 +628,22 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       if (PAI->getOperand(OpNo - 1) != SILValue(ABI, 0))
         return false;
 
-      auto closureType = PAI->getType().castTo<SILFunctionType>();
+      auto Callee = PAI->getCallee();
+      auto CalleeTy = Callee.getType().castTo<SILFunctionType>();
 
-      // TODO: We currently can only handle non-polymorphic closures.
-      if (PAI->hasSubstitutions() || closureType->isPolymorphic())
+      // Bail if the signature has any dependent types as we do not
+      // currently support these.
+      if (signatureHasDependentTypes(*CalleeTy))
         return false;
+
+      auto closureType = PAI->getType().castTo<SILFunctionType>();
 
       // Calculate the index into the closure's argument list of the captured
       // box pointer (the captured address is always the immediately following
       // index so is not stored separately);
       unsigned Index = OpNo - 2 + closureType->getParameters().size();
 
-      auto *Fn = getFunctionDefinition(PAI->getCallee());
+      auto *Fn = getFunctionDefinition(Callee);
       if (!Fn)
         return false;
 
@@ -695,7 +727,22 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   // Clone the closure with the given promoted captures.
   SILFunction *ClonedFn;
   {
-    ClosureCloner cloner(FRI->getReferencedFunction(), PromotableIndices);
+    auto *F = PAI->getFunction();
+
+    // Create the substitution maps.
+    TypeSubstitutionMap InterfaceSubs;
+    auto ApplySubs = PAI->getSubstitutions();
+    auto *genericSig = F->getLoweredFunctionType()->getGenericSignature();
+    if (genericSig)
+      InterfaceSubs = genericSig->getSubstitutionMap(ApplySubs);
+
+    TypeSubstitutionMap ContextSubs;
+    auto *genericParams = F->getContextGenericParams();
+    if (genericParams)
+      ContextSubs = genericParams->getSubstitutionMap(ApplySubs);
+
+    ClosureCloner cloner(FRI->getReferencedFunction(), InterfaceSubs,
+                         ContextSubs, ApplySubs, PromotableIndices);
     cloner.populateCloned();
     ClonedFn = cloner.getCloned();
   }
