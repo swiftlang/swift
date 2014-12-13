@@ -3795,8 +3795,7 @@ public:
         if (varDC->isModuleScopeContext() &&
             !varDC->getParentSourceFile()->isScriptMode()) {
           TC.diagnose(var->getLoc(),
-                      var->isLet() ? diag::global_let_requires_initializer :
-                      diag::global_var_requires_initializer);
+                      diag::global_requires_initializer, var->isLet());
           PBD->setInvalid();
           var->setInvalid();
           var->overwriteType(ErrorType::get(TC.Context));
