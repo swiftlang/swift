@@ -340,9 +340,14 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned IsStatic : 1;
 
     /// \brief Whether this is a 'let' property, which can only be initialized
-    /// in its declaration, and never assigned to, making it immutable.
+    /// once (either in its declaration, or once later), making it immutable.
     unsigned IsLet : 1;
 
+    /// \brief Whether this vardecl has an initial value bound to it in a way
+    /// that isn't represented in the AST with an initializer in the pattern
+    /// binding.  This happens in cases like "for i in ...", switch cases, etc.
+    unsigned HasNonPatternBindingInit : 1;
+    
     /// \brief Whether this is a property used in expressions in the debugger.
     /// It is up to the debugger to instruct SIL how to access this variable.
     unsigned IsDebuggerVar : 1;
@@ -3754,6 +3759,7 @@ protected:
     VarDeclBits.IsStatic = IsStatic;
     VarDeclBits.IsLet = IsLet;
     VarDeclBits.IsDebuggerVar = false;
+    VarDeclBits.HasNonPatternBindingInit = false;
     setType(Ty);
   }
 
@@ -3803,6 +3809,16 @@ public:
   bool isLet() const { return VarDeclBits.IsLet; }
   void setLet(bool IsLet) { VarDeclBits.IsLet = IsLet; }
 
+  /// Return true if this vardecl has an initial value bound to it in a way
+  /// that isn't represented in the AST with an initializer in the pattern
+  /// binding.  This happens in cases like "for i in ...", switch cases, etc.
+  bool hasNonPatternBindingInit() const {
+    return VarDeclBits.HasNonPatternBindingInit;
+  }
+  void setHasNonPatternBindingInit(bool V = true) {
+    VarDeclBits.HasNonPatternBindingInit = V;
+  }
+  
   /// Is this a special debugger variable?
   bool isDebuggerVar() const { return VarDeclBits.IsDebuggerVar; }
   void setDebuggerVar(bool IsDebuggerVar) {

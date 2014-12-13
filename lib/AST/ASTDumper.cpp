@@ -511,6 +511,8 @@ namespace {
         OS << " type";
       if (VD->isLet())
         OS << " let";
+      if (VD->hasNonPatternBindingInit())
+        OS << " non_pattern_init";
       OS << " storage_kind=" << getStorageKindName(VD->getStorageKind());
       if (VD->getAttrs().hasAttribute<LazyAttr>())
         OS << " lazy";

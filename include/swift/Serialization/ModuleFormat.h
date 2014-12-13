@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 161; // Last change: witness_method serialization
+const uint16_t VERSION_MINOR = 162; // Last change: HasNonPatternBindingInit
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -752,6 +752,7 @@ namespace decls_block {
     BCFixed<1>,   // explicitly objc?
     BCFixed<1>,   // static?
     BCFixed<1>,   // isLet?
+    BCFixed<1>,   // HasNonPatternBindingInit?
     StorageKindField,   // StorageKind
     TypeIDField,  // type
     TypeIDField,  // interface type

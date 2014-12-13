@@ -1270,6 +1270,9 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
     // Recover by creating a "_" pattern.
     Pattern = makeParserErrorResult(new (Context) AnyPattern(SourceLoc()));
 
+  // Bound variables all get their initial values from the generator.
+  Pattern.get()->markHasNonPatternBindingInit();
+  
   SourceLoc InLoc;
   parseToken(tok::kw_in, InLoc, diag::expected_foreach_in);
 
@@ -1434,9 +1437,9 @@ namespace {
 class CollectVarsAndAddToScope : public ASTWalker {
 public:
   Parser &TheParser;
-  SmallVectorImpl<Decl *> &Decls;
+  SmallVectorImpl<VarDecl*> &Decls;
 
-  CollectVarsAndAddToScope(Parser &P, SmallVectorImpl<Decl *> &Decls)
+  CollectVarsAndAddToScope(Parser &P, SmallVectorImpl<VarDecl*> &Decls)
       : TheParser(P), Decls(Decls) {}
 
   Pattern *walkToPatternPost(Pattern *P) override {
@@ -1453,7 +1456,7 @@ public:
 
 static ParserStatus parseStmtCase(Parser &P, SourceLoc &CaseLoc,
                                   SmallVectorImpl<CaseLabelItem> &LabelItems,
-                                  SmallVectorImpl<Decl *> &BoundDecls,
+                                  SmallVectorImpl<VarDecl *> &BoundDecls,
                                   SourceLoc &ColonLoc) {
   ParserStatus Status;
 
@@ -1491,6 +1494,10 @@ static ParserStatus parseStmtCase(Parser &P, SourceLoc &CaseLoc,
       // represents tuples and var patterns as tupleexprs and
       // unresolved_pattern_expr nodes, instead of as proper pattern nodes.
       CasePattern.get()->walk(CollectVarsAndAddToScope(P, BoundDecls));
+      
+      // Now that we have them, mark them as being initialized without a PBD.
+      for (auto VD : BoundDecls)
+        VD->setHasNonPatternBindingInit();
     }
 
     // Parse an optional 'where' guard.
@@ -1558,7 +1565,7 @@ ParserResult<CaseStmt> Parser::parseStmtCase() {
   ParserStatus Status;
 
   SmallVector<CaseLabelItem, 2> CaseLabelItems;
-  SmallVector<Decl *, 4> BoundDecls;
+  SmallVector<VarDecl *, 4> BoundDecls;
 
   SourceLoc CaseLoc;
   SourceLoc ColonLoc;

@@ -2063,15 +2063,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::VAR_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    bool isImplicit, isObjC, isStatic, isLet;
+    bool isImplicit, isObjC, isStatic, isLet, hasNonPatternBindingInit;
     uint8_t storageKind, rawAccessLevel, rawSetterAccessLevel;
     TypeID typeID, interfaceTypeID;
     DeclID getterID, setterID, materializeForSetID, willSetID, didSetID;
     DeclID addressorID, mutableAddressorID, overriddenID;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID, isImplicit,
-                                       isObjC, isStatic,
-                                       isLet, storageKind, typeID,
+                                       isObjC, isStatic, isLet,
+                                       hasNonPatternBindingInit, storageKind, typeID,
                                        interfaceTypeID, getterID, setterID,
                                        materializeForSetID,
                                        addressorID, mutableAddressorID,
@@ -2088,7 +2088,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto var = createDecl<VarDecl>(isStatic, isLet, SourceLoc(),
                                    getIdentifier(nameID), type, DC);
-
+    var->setHasNonPatternBindingInit(hasNonPatternBindingInit);
     declOrOffset = var;
 
     if (auto interfaceType = getType(interfaceTypeID))

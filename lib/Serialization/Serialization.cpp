@@ -1870,6 +1870,7 @@ void Serializer::writeDecl(const Decl *D) {
                           var->isObjC(),
                           var->isStatic(),
                           var->isLet(),
+                          var->hasNonPatternBindingInit(),
                           (unsigned) accessors.Kind,
                           addTypeRef(type),
                           addTypeRef(var->getInterfaceType()),

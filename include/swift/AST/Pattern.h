@@ -146,6 +146,15 @@ public:
     const_cast<Pattern *>(this)->forEachNode(f2);
   }
 
+  /// \brief Mark all vardecls in this pattern as having non-pattern initial
+  /// values bound into them.
+  void markHasNonPatternBindingInit() {
+    forEachVariable([&](VarDecl *VD) {
+      VD->setHasNonPatternBindingInit();
+    });
+  }
+  
+  
   /// Return the number of "top-level" variables in the given pattern,
   /// which looks into one level of tuple pattern to determine the #
   /// of variables. If the pattern is not a tuple, the result is one.
