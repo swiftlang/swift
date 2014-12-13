@@ -665,6 +665,11 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
                                                  /*isConditional*/ true,
                                                  /*parent*/ CurDeclContext);
     
+    Pattern.get()->forEachVariable([&](VarDecl *VD) {
+      VD->setParentPattern(Condition.get<PatternBindingDecl*>());
+    });
+
+    
     // Introduce variables to the current scope.
     addPatternVariablesToScope(Pattern.get());
 

@@ -687,7 +687,7 @@ public:
                                        MaybeLoadInitExpr,
                                        false, // is conditional
                                        TypeCheckDC);
-
+    VD->setParentPattern(PBD);
     PBD->setImplicit();
 
     return std::make_pair(PBD, VD);

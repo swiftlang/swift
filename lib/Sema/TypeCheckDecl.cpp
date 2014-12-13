@@ -2410,6 +2410,7 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
                                                Tmp1PBDPattern, Tmp1Init,
                                                /*isConditional*/false,
                                                Get);
+  Tmp1VD->setParentPattern(Tmp1PBD);
   Body.push_back(Tmp1PBD);
   Body.push_back(Tmp1VD);
 
@@ -2466,6 +2467,7 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
                                                /*isConditional*/false,
                                                Get);
   Tmp2PBD->setInit(InitValue, /*already type checked*/wasChecked);
+  Tmp2VD->setParentPattern(Tmp2PBD);
   Body.push_back(Tmp2PBD);
   Body.push_back(Tmp2VD);
 
