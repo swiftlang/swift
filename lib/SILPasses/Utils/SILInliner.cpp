@@ -302,6 +302,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::AllocRefInst:
     case ValueKind::AllocRefDynamicInst:
     case ValueKind::AllocStackInst:
+    case ValueKind::AllocValueBufferInst:
     case ValueKind::ValueMetatypeInst:
     case ValueKind::WitnessMethodInst:
     case ValueKind::AssignInst:
@@ -318,8 +319,10 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::DeallocBoxInst:
     case ValueKind::DeallocRefInst:
     case ValueKind::DeallocStackInst:
+    case ValueKind::DeallocValueBufferInst:
     case ValueKind::DeinitExistentialInst:
     case ValueKind::DestroyAddrInst:
+    case ValueKind::ProjectValueBufferInst:
     case ValueKind::ReleaseValueInst:
     case ValueKind::AutoreleaseValueInst:
     case ValueKind::DynamicMethodBranchInst:

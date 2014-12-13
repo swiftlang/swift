@@ -871,6 +871,7 @@ Types
 
 ::
 
+  type ::= 'Bb'                              // Builtin.UnsafeValueBuffer
   type ::= 'Bf' natural '_'                  // Builtin.Float<n>
   type ::= 'Bi' natural '_'                  // Builtin.Int<n>
   type ::= 'BO'                              // Builtin.ObjCPointer

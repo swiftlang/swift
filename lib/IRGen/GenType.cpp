@@ -32,6 +32,7 @@
 #include "Explosion.h"
 #include "GenOpaque.h"
 #include "HeapTypeInfo.h"
+#include "IndirectTypeInfo.h"
 #include "Linking.h"
 #include "ProtocolInfo.h"
 #include "ReferenceTypeInfo.h"
@@ -738,6 +739,43 @@ namespace {
                       Alignment align)
       : PODSingleScalarTypeInfo(storage, size, std::move(spareBits), align) {}
   };
+
+  /// A TypeInfo implementation for address-only types which can never
+  /// be copied.
+  class ImmovableTypeInfo :
+    public IndirectTypeInfo<ImmovableTypeInfo, FixedTypeInfo> {
+  public:
+    ImmovableTypeInfo(llvm::Type *storage, Size size,
+                      llvm::BitVector &&spareBits,
+                      Alignment align)
+      : IndirectTypeInfo(storage, size, std::move(spareBits), align,
+                         IsNotPOD, IsNotBitwiseTakable) {}
+
+    void assignWithCopy(IRGenFunction &IGF, Address dest,
+                        Address src, SILType T) const override {
+      llvm_unreachable("cannot opaquely manipulate immovable types!");
+    }
+
+    void assignWithTake(IRGenFunction &IGF, Address dest,
+                        Address src, SILType T) const override {
+      llvm_unreachable("cannot opaquely manipulate immovable types!");
+    }
+
+    void initializeWithTake(IRGenFunction &IGF, Address destAddr,
+                            Address srcAddr, SILType T) const override {
+      llvm_unreachable("cannot opaquely manipulate immovable types!");
+    }
+
+    void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
+                            Address srcAddr, SILType T) const override {
+      llvm_unreachable("cannot opaquely manipulate immovable types!");
+    }
+
+    void destroy(IRGenFunction &IGF, Address address,
+                 SILType T) const override {
+      llvm_unreachable("cannot opaquely manipulate immovable types!");
+    }
+  };
 }
 
 /// Constructs a type info which performs simple loads and stores of
@@ -761,7 +799,14 @@ TypeConverter::createPrimitiveForAlignedPointer(llvm::PointerType *type,
     spareBits.set(bit);
   }
 
-  return new PrimitiveTypeInfo(type, size, std::move(spareBits), align);
+  return new PrimitiveTypeInfo(type, size, {}, align);
+}
+
+/// Constructs a fixed-size type info which asserts if you try to copy
+/// or destroy it.
+const FixedTypeInfo *
+TypeConverter::createImmovable(llvm::Type *type, Size size, Alignment align) {
+  return new ImmovableTypeInfo(type, size, {}, align);
 }
 
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
@@ -1307,6 +1352,10 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
     return &getUnknownObjectTypeInfo();
   case TypeKind::BuiltinBridgeObject:
     return &getBridgeObjectTypeInfo();
+  case TypeKind::BuiltinUnsafeValueBuffer:
+    return createImmovable(IGM.getFixedBufferTy(),
+                           getFixedBufferSize(IGM),
+                           getFixedBufferAlignment(IGM));
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinInteger:

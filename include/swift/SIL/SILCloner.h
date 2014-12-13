@@ -456,6 +456,15 @@ SILCloner<ImplClass>::visitAllocBoxInst(AllocBoxInst *Inst) {
     getBuilder().createAllocBox(getOpLocation(Inst->getLoc()),
                                 getOpType(Inst->getElementType())));
 }
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitAllocValueBufferInst(AllocValueBufferInst *inst) {
+  doPostProcess(inst,
+    getBuilder().createAllocValueBuffer(getOpLocation(inst->getLoc()),
+                                        getOpType(inst->getValueType()),
+                                        getOpValue(inst->getOperand())));
+}
   
 template<typename ImplClass>
 void
@@ -1298,6 +1307,15 @@ SILCloner<ImplClass>::visitDeallocRefInst(DeallocRefInst *Inst) {
 }
 
 template<typename ImplClass>
+void SILCloner<ImplClass>::visitDeallocValueBufferInst(
+                                              DeallocValueBufferInst *inst) {
+  doPostProcess(inst,
+    getBuilder().createDeallocValueBuffer(getOpLocation(inst->getLoc()),
+                                          getOpType(inst->getValueType()),
+                                          getOpValue(inst->getOperand())));
+}
+
+template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitDeallocBoxInst(DeallocBoxInst *Inst) {
   doPostProcess(Inst,
@@ -1312,6 +1330,15 @@ SILCloner<ImplClass>::visitDestroyAddrInst(DestroyAddrInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createDestroyAddr(getOpLocation(Inst->getLoc()),
                                    getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+void SILCloner<ImplClass>::visitProjectValueBufferInst(
+                                              ProjectValueBufferInst *inst) {
+  doPostProcess(inst,
+    getBuilder().createProjectValueBuffer(getOpLocation(inst->getLoc()),
+                                          getOpType(inst->getValueType()),
+                                          getOpValue(inst->getOperand())));
 }
 
 template<typename ImplClass>

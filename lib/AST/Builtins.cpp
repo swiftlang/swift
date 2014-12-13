@@ -76,6 +76,8 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
     return Context.TheUnknownObjectType;
   if (Name == "BridgeObject")
     return Context.TheBridgeObjectType;
+  if (Name == "UnsafeValueBuffer")
+    return Context.TheUnsafeValueBufferType;
   
   if (Name == "FPIEEE32")
     return Context.TheIEEE32Type;

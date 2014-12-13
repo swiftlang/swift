@@ -792,6 +792,25 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinUnknownObjectType, BuiltinType);
 
+/// BuiltinUnsafeValueBufferType - The builtin opaque fixed-size value
+/// buffer type, into which storage for an arbitrary value can be
+/// allocated using Builtin.allocateValueBuffer.
+///
+/// This type is unsafe because it does not permit ordinary value
+/// operations.  It is essentially an Any without any type
+/// information.  It should only be used in narrow circumstances in
+/// carefully-written SIL.
+class BuiltinUnsafeValueBufferType : public BuiltinType {
+  friend class ASTContext;
+  BuiltinUnsafeValueBufferType(const ASTContext &C)
+    : BuiltinType(TypeKind::BuiltinUnsafeValueBuffer, C) {}
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinUnsafeValueBuffer;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinUnsafeValueBufferType, BuiltinType);
+
 /// \brief A builtin vector type.
 class BuiltinVectorType : public BuiltinType, public llvm::FoldingSetNode {
   Type elementType;

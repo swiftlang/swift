@@ -182,6 +182,13 @@ public:
     return insert(new (F.getModule()) AllocRefDynamicInst(loc, operand, type, 
                                                           objc));
   }
+
+  AllocValueBufferInst *createAllocValueBuffer(SILLocation loc,
+                                               SILType valueType,
+                                               SILValue operand) {
+    return insert(new (F.getModule())
+                    AllocValueBufferInst(loc, valueType, operand));
+  }
   
   AllocBoxInst *createAllocBox(SILLocation Loc, SILType ElementType) {
     Loc.markAsPrologue();
@@ -828,8 +835,21 @@ public:
                                    SILValue operand) {
     return insert(new (F.getModule()) DeallocBoxInst(loc, eltType, operand));
   }
+  DeallocValueBufferInst *createDeallocValueBuffer(SILLocation loc,
+                                                   SILType valueType,
+                                                   SILValue operand) {
+    return insert(new (F.getModule())
+                    DeallocValueBufferInst(loc, valueType, operand));
+  }  
   DestroyAddrInst *createDestroyAddr(SILLocation Loc, SILValue Operand) {
     return insert(new (F.getModule()) DestroyAddrInst(Loc, Operand));
+  }
+
+  ProjectValueBufferInst *createProjectValueBuffer(SILLocation loc,
+                                                   SILType valueType,
+                                                   SILValue operand) {
+    return insert(new (F.getModule())
+                    ProjectValueBufferInst(loc, valueType, operand));
   }
   
   //===--------------------------------------------------------------------===//

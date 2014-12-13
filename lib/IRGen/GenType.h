@@ -51,6 +51,7 @@ namespace irgen {
   class Alignment;
   class ProtocolInfo;
   class Size;
+  class FixedTypeInfo;
   class LoadableTypeInfo;
   class TypeInfo;
   class UnownedTypeInfo;
@@ -94,6 +95,8 @@ private:
   const LoadableTypeInfo *createPrimitiveForAlignedPointer(llvm::PointerType *T,
                                                    Size size, Alignment align,
                                                    Alignment pointerAlignment);
+  const FixedTypeInfo *createImmovable(llvm::Type *T,
+                                       Size size, Alignment align);
 
   void addForwardDecl(TypeBase *key, llvm::Type *type);
 

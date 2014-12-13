@@ -1813,6 +1813,15 @@ static Address emitProjectBuffer(IRGenFunction &IGF,
   llvm_unreachable("bad packing!");
 
 }
+namespace swift { namespace irgen { using ::emitProjectBuffer; } }
+
+/// Project to the address of a value in a value buffer.
+Address irgen::emitProjectBuffer(IRGenFunction &IGF, SILType valueType,
+                                 Address buffer) {
+  const TypeInfo &valueTI = IGF.getTypeInfo(valueType);
+  FixedPacking packing = valueTI.getFixedPacking(IGF.IGM);
+  return ::emitProjectBuffer(IGF, valueType, valueTI, packing, buffer);
+}
 
 /// Emit an 'allocateBuffer' operation.  Always returns a T*.
 static Address emitAllocateBuffer(IRGenFunction &IGF,
@@ -1841,6 +1850,15 @@ static Address emitAllocateBuffer(IRGenFunction &IGF,
   }
   llvm_unreachable("bad packing!");
 }
+namespace swift { namespace irgen { using ::emitAllocateBuffer; } }
+
+/// Allocate space for a value in a value buffer.
+Address irgen::emitAllocateBuffer(IRGenFunction &IGF, SILType valueType,
+                                  Address buffer) {
+  const TypeInfo &valueTI = IGF.getTypeInfo(valueType);
+  FixedPacking packing = valueTI.getFixedPacking(IGF.IGM);
+  return emitAllocateBuffer(IGF, valueType, valueTI, packing, buffer);
+}
 
 /// Emit a 'deallocateBuffer' operation.
 static void emitDeallocateBuffer(IRGenFunction &IGF,
@@ -1866,6 +1884,15 @@ static void emitDeallocateBuffer(IRGenFunction &IGF,
     return emitForDynamicPacking(IGF, &emitDeallocateBuffer, T, type, buffer);
   }
   llvm_unreachable("bad packing!");
+}
+namespace swift { namespace irgen { using ::emitDeallocateBuffer; } }
+
+/// Deallocate space for a value in a value buffer.
+void irgen::emitDeallocateBuffer(IRGenFunction &IGF, SILType valueType,
+                                 Address buffer) {
+  const TypeInfo &valueTI = IGF.getTypeInfo(valueType);
+  FixedPacking packing = valueTI.getFixedPacking(IGF.IGM);
+  emitDeallocateBuffer(IGF, valueType, valueTI, packing, buffer);
 }
 
 /// Emit a 'destroyBuffer' operation.

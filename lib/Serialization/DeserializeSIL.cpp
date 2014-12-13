@@ -745,6 +745,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONETYPE_ONEOPERAND_INST(DeallocBox)
   ONETYPE_ONEOPERAND_INST(ValueMetatype)
   ONETYPE_ONEOPERAND_INST(ExistentialMetatype)
+  ONETYPE_ONEOPERAND_INST(AllocValueBuffer)
+  ONETYPE_ONEOPERAND_INST(ProjectValueBuffer)
+  ONETYPE_ONEOPERAND_INST(DeallocValueBuffer)
 #undef ONETYPE_ONEOPERAND_INST
 #define ONEOPERAND_ONETYPE_INST(ID)           \
   case ValueKind::ID##Inst:                   \

@@ -180,6 +180,18 @@ namespace irgen {
 
   /// True if the protocol requires a witness table for method dispatch.
   bool requiresProtocolWitnessTable(ProtocolDecl *protocol);
+
+  /// Allocate space for a value in a value buffer.
+  Address emitAllocateBuffer(IRGenFunction &IGF, SILType valueType,
+                             Address buffer);
+
+  /// Project to the address of a value in a value buffer.
+  Address emitProjectBuffer(IRGenFunction &IGF, SILType valueType,
+                            Address buffer);
+
+  /// Deallocate space for a value in a value buffer.
+  void emitDeallocateBuffer(IRGenFunction &IGF, SILType valueType,
+                            Address buffer);
   
 } // end namespace irgen
 } // end namespace swift

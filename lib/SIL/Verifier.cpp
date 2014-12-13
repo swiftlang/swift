@@ -738,6 +738,27 @@ public:
     require(I->getOperand().getType() == I->getType(),
             "result of copy_block should be same type as operand");
   }
+
+  void checkAllocValueBufferInst(AllocValueBufferInst *I) {
+    require(I->getOperand().getType().isAddress(),
+            "Operand value should be an address");
+    require(I->getOperand().getType().is<BuiltinUnsafeValueBufferType>(),
+            "Operand value should be a Builtin.UnsafeValueBuffer");
+  }
+
+  void checkProjectValueBufferInst(ProjectValueBufferInst *I) {
+    require(I->getOperand().getType().isAddress(),
+            "Operand value should be an address");
+    require(I->getOperand().getType().is<BuiltinUnsafeValueBufferType>(),
+            "Operand value should be a Builtin.UnsafeValueBuffer");
+  }
+
+  void checkDeallocValueBufferInst(DeallocValueBufferInst *I) {
+    require(I->getOperand().getType().isAddress(),
+            "Operand value should be an address");
+    require(I->getOperand().getType().is<BuiltinUnsafeValueBufferType>(),
+            "Operand value should be a Builtin.UnsafeValueBuffer");
+  }
   
   void checkStructInst(StructInst *SI) {
     auto *structDecl = SI->getType().getStructOrBoundGenericStruct();

@@ -241,6 +241,7 @@ namespace {
     IMPL(BuiltinNativeObject, Reference)
     IMPL(BuiltinBridgeObject, Reference)
     IMPL(BuiltinUnknownObject, Reference)
+    IMPL(BuiltinUnsafeValueBuffer, AddressOnly)
     IMPL(BuiltinVector, Trivial)
     IMPL(Class, Reference)
     IMPL(BoundGenericClass, Reference)
@@ -944,6 +945,30 @@ namespace {
       llvm_unreachable("type is not loadable!");
     }
   };
+
+  /// A class for Builtin.UnsafeValueBuffer.  The only purpose here is
+  /// to catch obviously broken attempts to copy or destroy the buffer.
+  class UnsafeValueBufferTypeLowering : public AddressOnlyTypeLowering {
+  public:
+    UnsafeValueBufferTypeLowering(SILType type)
+      : AddressOnlyTypeLowering(type) {}
+
+    void emitCopyInto(SILBuilder &B, SILLocation loc,
+                      SILValue src, SILValue dest, IsTake_t isTake,
+                      IsInitialization_t isInit) const override {
+      llvm_unreachable("cannot copy an UnsafeValueBuffer!");
+    }
+
+    void emitDestroyAddress(SILBuilder &B, SILLocation loc,
+                            SILValue addr) const override {
+      llvm_unreachable("cannot destroy an UnsafeValueBuffer!");
+    }
+
+    void emitDestroyRValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      llvm_unreachable("cannot destroy an UnsafeValueBuffer!");
+    }
+  };
   
   /// A class that acts as a stand-in for improperly recursive types.
   class RecursiveErrorTypeLowering : public AddressOnlyTypeLowering {
@@ -988,6 +1013,12 @@ namespace {
     const TypeLowering *visitUnownedStorageType(CanUnownedStorageType type) {
       return new (TC, Dependent) UnownedTypeLowering(
                                       SILType::getPrimitiveObjectType(OrigType));
+    }
+
+    const TypeLowering *
+    visitBuiltinUnsafeValueBufferType(CanBuiltinUnsafeValueBufferType type) {
+      auto silType = SILType::getPrimitiveAddressType(OrigType);
+      return new (TC, Dependent) UnsafeValueBufferTypeLowering(silType);
     }
 
     const TypeLowering *visitTupleType(CanTupleType tupleType) {

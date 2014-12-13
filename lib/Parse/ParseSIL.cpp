@@ -1144,6 +1144,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("alloc_stack", ValueKind::AllocStackInst)
     .Case("alloc_ref", ValueKind::AllocRefInst)
     .Case("alloc_ref_dynamic", ValueKind::AllocRefDynamicInst)
+    .Case("alloc_value_buffer", ValueKind::AllocValueBufferInst)
     .Case("value_metatype", ValueKind::ValueMetatypeInst)
     .Case("witness_method", ValueKind::WitnessMethodInst)
     .Case("apply", ValueKind::ApplyInst)
@@ -1165,6 +1166,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("dealloc_box", ValueKind::DeallocBoxInst)
     .Case("dealloc_ref", ValueKind::DeallocRefInst)
     .Case("dealloc_stack", ValueKind::DeallocStackInst)
+    .Case("dealloc_value_buffer", ValueKind::DeallocValueBufferInst)
     .Case("debug_value", ValueKind::DebugValueInst)
     .Case("debug_value_addr", ValueKind::DebugValueAddrInst)
     .Case("deinit_existential", ValueKind::DeinitExistentialInst)
@@ -1203,6 +1205,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("partial_apply", ValueKind::PartialApplyInst)
     .Case("pointer_to_address", ValueKind::PointerToAddressInst)
     .Case("project_block_storage", ValueKind::ProjectBlockStorageInst)
+    .Case("project_value_buffer", ValueKind::ProjectValueBufferInst)
     .Case("existential_metatype", ValueKind::ExistentialMetatypeInst)
     .Case("raw_pointer_to_ref", ValueKind::RawPointerToRefInst)
     .Case("ref_element_addr", ValueKind::RefElementAddrInst)
@@ -1698,6 +1701,34 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     StringRef string = P.L->getEncodedStringSegment(rawString, stringBuffer);
     ResultVal = B.createStringLiteral(InstLoc, string, encoding);
     P.consumeToken(tok::string_literal);
+    break;
+  }
+
+  case ValueKind::AllocValueBufferInst: {
+    SILType Ty;
+    if (parseSILType(Ty) ||
+        parseVerbatim("in") ||
+        parseTypedValueRef(Val))
+      return true;
+    ResultVal = B.createAllocValueBuffer(InstLoc, Ty, Val);
+    break;
+  }
+  case ValueKind::ProjectValueBufferInst: {
+    SILType Ty;
+    if (parseSILType(Ty) ||
+        parseVerbatim("in") ||
+        parseTypedValueRef(Val))
+      return true;
+    ResultVal = B.createProjectValueBuffer(InstLoc, Ty, Val);
+    break;
+  }
+  case ValueKind::DeallocValueBufferInst: {
+    SILType Ty;
+    if (parseSILType(Ty) ||
+        parseVerbatim("in") ||
+        parseTypedValueRef(Val))
+      return true;
+    ResultVal = B.createDeallocValueBuffer(InstLoc, Ty, Val);
     break;
   }
       

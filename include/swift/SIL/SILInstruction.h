@@ -340,6 +340,20 @@ public:
   bool isObjC() const { return ObjC; }
 };
 
+/// AllocValueBufferInst - Allocate memory in a value buffer.
+class AllocValueBufferInst :
+  public UnaryInstructionBase<ValueKind::AllocValueBufferInst,
+                              AllocationInst> {
+public:
+  AllocValueBufferInst(SILLocation loc, SILType valueType,
+                       SILValue operand)
+      : UnaryInstructionBase(loc, operand, valueType.getAddressType()) {
+    assert(valueType.isObject());
+  }
+
+  SILType getValueType() const { return getType().getObjectType(); }
+};
+
 /// This represents the allocation of a heap box for a Swift value of some type.
 /// The instruction returns two values.  The first return value is the object
 /// pointer with Builtin.NativeObject type.  The second return value
@@ -2757,6 +2771,22 @@ public:
     : UnaryInstructionBase(Loc, Operand) {}
 };
 
+/// DeallocValueBufferInst - Deallocate memory allocated for a unsafe
+/// value buffer.
+class DeallocValueBufferInst :
+  public UnaryInstructionBase<ValueKind::DeallocValueBufferInst,
+                              DeallocationInst, /*HAS_RESULT*/ true> {
+  SILType ValueType;
+public:
+  DeallocValueBufferInst(SILLocation loc, SILType valueType,
+                         SILValue operand)
+      : UnaryInstructionBase(loc, operand), ValueType(valueType) {
+    assert(valueType.isObject());
+  }
+
+  SILType getValueType() const { return ValueType; }
+};
+
 /// DeallocBoxInst - Deallocate memory allocated for a boxed value,
 /// as might have been created by an AllocBoxInst. It is undefined
 /// behavior if the type of the boxed type does not match the
@@ -2789,6 +2819,22 @@ public:
   DestroyAddrInst(SILLocation Loc, SILValue Operand)
     : UnaryInstructionBase(Loc, Operand) {}
 };
+
+/// ProjectValueBufferInst - Project out the address of the value
+/// stored in the given Builtin.UnsafeValueBuffer.
+class ProjectValueBufferInst :
+  public UnaryInstructionBase<ValueKind::ProjectValueBufferInst,
+                              SILInstruction, /*HasResult*/ true> {
+public:
+  ProjectValueBufferInst(SILLocation loc, SILType valueType,
+                         SILValue operand)
+      : UnaryInstructionBase(loc, operand, valueType.getAddressType()) {
+    assert(valueType.isObject());
+  }
+
+  SILType getValueType() const { return getType().getObjectType(); }
+};
+
 
 //===----------------------------------------------------------------------===//
 // Runtime failure

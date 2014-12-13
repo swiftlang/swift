@@ -536,6 +536,13 @@ namespace {
       return emitDirectMetadataRef(type);
     }
 
+    llvm::Value *visitBuiltinUnsafeValueBufferType(
+                                        CanBuiltinUnsafeValueBufferType type) {
+      IGF.unimplemented(SourceLoc(),
+                        "metadata ref for Builtin.UnsafeValueBuffer");
+      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+    }
+
     llvm::Value *visitNominalType(CanNominalType type) {
       assert(!type->isExistentialType());
       return emitNominalMetadataRef(IGF, type->getDecl(), type);

@@ -60,6 +60,7 @@ public:
     case TypeKind::BuiltinBridgeObject:
     case TypeKind::BuiltinUnknownObject:
     case TypeKind::BuiltinRawPointer:
+    case TypeKind::BuiltinUnsafeValueBuffer:
     case TypeKind::BuiltinVector:
     case TypeKind::Class: // FIXME: not a leaf because of the parent type
     case TypeKind::Module:

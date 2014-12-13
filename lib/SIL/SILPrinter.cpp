@@ -602,6 +602,11 @@ public:
     OS << getIDAndType(ARDI->getOperand());
     OS << ", " << ARDI->getType();
   }
+
+  void visitAllocValueBufferInst(AllocValueBufferInst *AVBI) {
+    OS << "alloc_value_buffer " << AVBI->getValueType()
+       << " in " << getIDAndType(AVBI->getOperand());
+  }
   
   void visitAllocBoxInst(AllocBoxInst *ABI) {
     OS << "alloc_box " << ABI->getElementType();
@@ -1130,12 +1135,20 @@ public:
   void visitDeallocRefInst(DeallocRefInst *DI) {
     OS << "dealloc_ref " << getIDAndType(DI->getOperand());
   }
+  void visitDeallocValueBufferInst(DeallocValueBufferInst *DVBI) {
+    OS << "dealloc_value_buffer " << DVBI->getValueType()
+       << " in " << getIDAndType(DVBI->getOperand());
+  }
   void visitDeallocBoxInst(DeallocBoxInst *DI) {
     OS << "dealloc_box " << DI->getElementType() << ", "
        << getIDAndType(DI->getOperand());
   }
   void visitDestroyAddrInst(DestroyAddrInst *DI) {
     OS << "destroy_addr " << getIDAndType(DI->getOperand());
+  }
+  void visitProjectValueBufferInst(ProjectValueBufferInst *PVBI) {
+    OS << "project_value_buffer " << PVBI->getValueType()
+       << " in " << getIDAndType(PVBI->getOperand());
   }
   
   void visitCondFailInst(CondFailInst *FI) {

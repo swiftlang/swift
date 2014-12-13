@@ -2166,6 +2166,7 @@ void Serializer::writeType(Type ty) {
   case TypeKind::BuiltinNativeObject:
   case TypeKind::BuiltinBridgeObject:
   case TypeKind::BuiltinUnknownObject:
+  case TypeKind::BuiltinUnsafeValueBuffer:
   case TypeKind::BuiltinVector: {
     TypeAliasDecl *typeAlias =
       findTypeAliasForBuiltin(M->Ctx, ty->castTo<BuiltinType>());

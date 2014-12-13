@@ -653,6 +653,7 @@ static void mangleMetatypeRepresentation(raw_ostream &Buffer,
 /// Type manglings should never start with [0-9d_] or end with [0-9].
 ///
 /// <type> ::= A <natural> <type>    # fixed-sized arrays
+/// <type> ::= Bb                    # Builtin.UnsafeValueBuffer
 /// <type> ::= Bf <natural> _        # Builtin.Float
 /// <type> ::= Bi <natural> _        # Builtin.Integer
 /// <type> ::= BO                    # Builtin.UnknownObject
@@ -736,6 +737,9 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     return;
   case TypeKind::BuiltinUnknownObject:
     Buffer << "BO";
+    return;
+  case TypeKind::BuiltinUnsafeValueBuffer:
+    Buffer << "Bb";
     return;
   case TypeKind::BuiltinVector:
     Buffer << "Bv" << cast<BuiltinVectorType>(tybase)->getNumElements();

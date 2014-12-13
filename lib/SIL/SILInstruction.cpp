@@ -218,6 +218,11 @@ namespace {
       return false;
     }
 
+    bool visitProjectValueBufferInst(const ProjectValueBufferInst *RHS) {
+      auto *X = cast<ProjectValueBufferInst>(LHS);
+      return X->getValueType() == RHS->getValueType();
+    }
+
     bool visitStrongReleaseInst(const StrongReleaseInst *RHS) {
       return true;
     }

@@ -2025,6 +2025,10 @@ public:
     Printer << "Builtin.BridgeObject";
   }
   
+  void visitBuiltinUnsafeValueBufferType(BuiltinUnsafeValueBufferType *T) {
+    Printer << "Builtin.UnsafeValueBuffer";
+  }
+
   void visitBuiltinVectorType(BuiltinVectorType *T) {
     llvm::SmallString<32> UnderlyingStrVec;
     StringRef UnderlyingStr;

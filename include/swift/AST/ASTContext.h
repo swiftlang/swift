@@ -496,6 +496,7 @@ public:
   const CanType TheBridgeObjectType; /// Builtin.BridgeObject
   const CanType TheUnknownObjectType; /// Builtin.UnknownObject
   const CanType TheRawPointerType;  /// Builtin.RawPointer
+  const CanType TheUnsafeValueBufferType; /// Builtin.UnsafeValueBuffer
   
   const CanType TheIEEE32Type;     /// TheIEEE32Type  - 32-bit IEEE floating point
   const CanType TheIEEE64Type;     /// TheIEEE64Type  - 64-bit IEEE floating point

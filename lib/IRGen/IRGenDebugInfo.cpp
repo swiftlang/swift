@@ -1812,6 +1812,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::TypeVariable:
   case TypeKind::Module:
   case TypeKind::SILBlockStorage:
+  case TypeKind::BuiltinUnsafeValueBuffer:
 
     DEBUG(llvm::errs() << "Unhandled type: "; DbgTy.getType()->dump();
           llvm::errs() << "\n");
