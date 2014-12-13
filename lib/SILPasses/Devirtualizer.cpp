@@ -128,10 +128,23 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
   // method) may have a different set of generic parameters! For example, Member
   // may have no substitutions at all, whereas F may have some.
   auto ClassInstanceType = ClassInstance.getType();
-  ArrayRef<Substitution> Substitutions = AI->getSubstitutions();
-  if (Substitutions.empty() && !Class->getGenericParamTypes().empty())
+  ArrayRef<Substitution> Substitutions;
+  // Prefer substitutions from the type of the ClassInstance.
+  if (!CD->getGenericParamTypes().empty())
     // Take the parameters from the type of the ClassInstance.
-    Substitutions = ClassInstanceType.gatherAllSubstitutions(AI->getModule());
+    if (!ClassInstanceType.is<MetatypeType>())
+      Substitutions = ClassInstanceType.gatherAllSubstitutions(AI->getModule());
+  if (Substitutions.empty())
+    Substitutions = AI->getSubstitutions();
+
+  // Bail if the number of generic parameters of the callee does not match
+  // the number of substitutions, because we don't know how to handle this.
+  unsigned CalleeGenericParamsNum = 0;
+  if (GenCalleeType->isPolymorphic())
+    CalleeGenericParamsNum = GenCalleeType->getGenericSignature()
+                                          ->getGenericParams().size();
+  if (CalleeGenericParamsNum != Substitutions.size())
+    return false;
 
   CanSILFunctionType SubstCalleeType =
     GenCalleeType->substGenericArgs(M, M.getSwiftModule(), Substitutions);
