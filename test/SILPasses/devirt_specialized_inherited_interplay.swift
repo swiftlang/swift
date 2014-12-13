@@ -1,8 +1,5 @@
 // RUN: %swift -sil-verify-all -O %s -emit-sil | FileCheck %s
 
-// Turn on this test when rdar://r16847192 is completed.
-// REQUIRED: r16847192
-
 // This file consists of tests for making sure that protocol conformances and
 // inherited conformances work well together when applied to each other. The
 // check works by making sure we can blow through a long class hierarchy and
@@ -13,16 +10,53 @@
 
 // CHECK-LABEL: sil @_TF38devirt_specialized_inherited_interplay6driverFT_T_ : $@thin () -> () {
 // CHECK: bb0:
+// CHECK-NEXT: alloc_ref $A3<S>
 // CHECK-NEXT: alloc_ref $A4<S>
+// CHECK-NEXT: alloc_ref $A5<S>
+// CHECK-NEXT: alloc_ref $B1<S>
 // CHECK-NEXT: alloc_ref $B2<S>
+// CHECK-NEXT: alloc_ref $B3<S>
+// CHECK-NEXT: alloc_ref $B4<S>
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref @unknown0 : $@thin () -> ()
+// CHECK-NEXT: apply
+// CHECK-NEXT: apply
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref @unknown1 : $@thin () -> ()
+// CHECK-NEXT: apply
+// CHECK-NEXT: apply
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref @unknown2 : $@thin () -> ()
+// CHECK-NEXT: apply
+// CHECK-NEXT: apply
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref @unknown3 : $@thin () -> ()
+// CHECK-NEXT: apply
+// CHECK-NEXT: apply
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref @unknown4 : $@thin () -> ()
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref @unknown5 : $@thin () -> ()
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref @unknown6 : $@thin () -> ()
+// CHECK-NEXT: apply
+// CHECK-NEXT: apply
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref @unknown7 : $@thin () -> ()
+// CHECK-NEXT: apply
+// CHECK-NEXT: apply
+// Check that B4.doSomething cannot be completely devirtualized
+// CHECK-NEXT: upcast
+// CHECK-NEXT: class_method
+// CHECK-NEXT: checked_cast_br
+// CHECK: strong_release
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: strong_release
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple
@@ -40,9 +74,21 @@ func unknown3() -> ()
 func unknown4() -> ()
 @asmname("unknown5")
 func unknown5() -> ()
+@asmname("unknown6")
+func unknown6() -> ()
+@asmname("unknown7")
+func unknown7() -> ()
+@asmname("unknown8")
+func unknown8() -> ()
 
+protocol P1 {
+   func foo()
+}
 
-struct S {}
+struct S:P1 {
+   func foo() {
+   }
+}
 
 protocol P {
   func doSomething()
@@ -76,17 +122,36 @@ class A4<T> : A3<T> {
   }
 }
 
+class A5<E>: A3<Array<E>> {
+  override func doSomething() {
+    unknown4()
+  }
+}
+
 // Specialized conformance from P
 class B1<T> : P {
   func doSomething() {
-    unknown4()
+    unknown5()
   }
 }
 
 // Inherited Specialized conformance from P
 class B2<T> : B1<T> {
   override func doSomething() {
-    unknown5()
+    unknown6()
+  }
+}
+
+class B3<E>: B2<Array<E>> {
+  override func doSomething() {
+    unknown7()
+  }
+}
+
+class B4<F>: B3<Array<Array<Int>>> {
+  // Free generic arguments -> cannot be devirtualized.
+  override func doSomething<X,Y,Z>() {
+    unknown8()
   }
 }
 
@@ -97,13 +162,53 @@ func WhatShouldIDo2(p : P) {
   p.doSomething()
 }
 
-public func driver() {
-  var a = A4<S>()
-  var b = B2<S>()
-
-  WhatShouldIDo(a)
-  WhatShouldIDo2(a)
-
+public func driver1<X>(x:X) {
+  var b = B3<X>()
   WhatShouldIDo(b)
   WhatShouldIDo2(b)
+}
+
+public func driver2() {
+  driver1(S())
+}
+
+
+public func driver() {
+  var a1 = A1()
+  var a2 = A2()
+  var a3 = A3<S>()
+  var a4 = A4<S>()
+  var a5 = A5<S>()
+  var b1 = B1<S>()
+  var b2 = B2<S>()
+  var b3 = B3<S>()
+  var b4 = B4<S>()
+
+  WhatShouldIDo(a1)
+  WhatShouldIDo2(a1)
+
+  WhatShouldIDo(a2)
+  WhatShouldIDo2(a2)
+
+  WhatShouldIDo(a3)
+  WhatShouldIDo2(a3)
+
+  WhatShouldIDo(a4)
+  WhatShouldIDo2(a4)
+
+  WhatShouldIDo(a5)
+  WhatShouldIDo2(a5)
+
+
+  WhatShouldIDo(b1)
+  WhatShouldIDo2(b1)
+  
+  WhatShouldIDo(b2)
+  WhatShouldIDo2(b2)
+  
+  WhatShouldIDo(b3)
+  WhatShouldIDo2(b3)
+
+  WhatShouldIDo(b4)
+  WhatShouldIDo2(b4)
 }
