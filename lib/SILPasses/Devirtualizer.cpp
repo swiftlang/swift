@@ -96,19 +96,19 @@ static ClassDecl *getClassFromConstructor(SILValue S) {
 ///    reference (such as downcasted class reference).
 /// \p KnownClass (can be null) is a specific class type to devirtualize to.
 static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
-                         SILValue ClassInstance, ClassDecl *Class) {
+                         SILValue ClassInstance, ClassDecl *CD) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
 
   // First attempt to lookup the origin for our class method. The origin should
   // either be a metatype or an alloc_ref.
   DEBUG(llvm::dbgs() << "        Origin: " << ClassInstance);
 
-  assert(Class && "Invalid class type");
+  assert(CD && "Invalid class type");
 
   // Otherwise lookup from the module the least derived implementing method from
   // the module vtables.
   SILModule &Mod = AI->getModule();
-  SILFunction *F = Mod.lookUpSILFunctionFromVTable(Class, Member);
+  SILFunction *F = Mod.lookUpSILFunctionFromVTable(CD, Member);
 
   // If we do not find any such function, we have no function to devirtualize
   // to... so bail.
@@ -123,10 +123,10 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
   // generics. Thus construct our subst callee type for F.
   SILModule &M = F->getModule();
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
-  // Apply instruction substitutions are for the Member.
-  // F may have a different set of generic parameters!
-  // For example, Member may have no substs at all whereas
-  // F may have some.
+  // *NOTE*:
+  // Apply instruction substitutions are for the Member. F (the implementing
+  // method) may have a different set of generic parameters! For example, Member
+  // may have no substitutions at all, whereas F may have some.
   auto ClassInstanceType = ClassInstance.getType();
   ArrayRef<Substitution> Substitutions = AI->getSubstitutions();
   if (Substitutions.empty() && !Class->getGenericParamTypes().empty())
@@ -728,9 +728,9 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   SILType RealSubClassTy = SubClassTy;
 
   if (isa<ValueMetatypeInst>(ClassInstance.stripUpCasts())) {
-    SILType MetaTy = Lowering::TypeConverter(AI->getModule())
-                         .getLoweredLoadableType(CD->getType());
-    RealSubClassTy = MetaTy;
+    // Convert this type to its metatype type.
+    Lowering::TypeConverter TC(AI->getModule());
+    RealSubClassTy = TC.getLoweredLoadableType(CD->getType());
     IsValueMetatype = true;
   }
 
