@@ -1499,6 +1499,7 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                          rhsType,
                                          DC);
   EP->setMatchVar(matchVar);
+  matchVar->setHasNonPatternBindingInit();
   
   // Find '~=' operators for the match.
   UnqualifiedLookup matchLookup(Context.Id_MatchOperator, DC, this,
