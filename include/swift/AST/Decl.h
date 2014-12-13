@@ -352,7 +352,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// It is up to the debugger to instruct SIL how to access this variable.
     unsigned IsDebuggerVar : 1;
   };
-  enum { NumVarDeclBits = NumAbstractStorageDeclBits + 3 };
+  enum { NumVarDeclBits = NumAbstractStorageDeclBits + 4 };
   static_assert(NumVarDeclBits <= 32, "fits in an unsigned");
   
   class EnumElementDeclBitfields {
