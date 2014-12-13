@@ -209,6 +209,8 @@ public:
     getExplosion(IGF, e);
     return e;
   }
+
+  llvm::Value *getSingletonExplosion() const;
   
   const StaticFunction &getStaticFunction() const {
     assert(kind == Kind::StaticFunction && "not a static function");
@@ -402,6 +404,12 @@ public:
   /// SIL value.
   Explosion getLoweredExplosion(SILValue v) {
     return getLoweredValue(v).getExplosion(*this);
+  }
+
+  /// Return the single member of the lowered explosion for the
+  /// given SIL value.
+  llvm::Value *getLoweredSingletonExplosion(SILValue v) {
+    return getLoweredValue(v).getSingletonExplosion();
   }
   
   LoweredBB &getLoweredBB(SILBasicBlock *bb) {
@@ -719,6 +727,12 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
   }
 }
 
+llvm::Value *LoweredValue::getSingletonExplosion() const {
+  assert(kind == Kind::Explosion);
+  assert(explosion.values.size() == 1);
+  return explosion.values[0];
+}
+
 IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
                                    SILFunction *f)
   : IRGenFunction(IGM, IGM.getAddrOfSILFunction(f, ForDefinition),
@@ -951,8 +965,13 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   }
   
   // Bind polymorphic arguments.
-  if (hasPolymorphicParameters(funcTy))
-    emitPolymorphicParameters(IGF, *IGF.CurSILFn, allParamValues);
+  if (hasPolymorphicParameters(funcTy)) {
+    emitPolymorphicParameters(IGF, *IGF.CurSILFn, allParamValues,
+      [&](unsigned paramIndex) -> llvm::Value* {
+        SILValue parameter = entry->getBBArgs()[paramIndex];
+        return IGF.getLoweredSingletonExplosion(parameter);
+      });
+  }
 }
 
 /// Emit entry point arguments for the parameters of a C function, or the

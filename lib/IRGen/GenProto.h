@@ -114,11 +114,14 @@ namespace irgen {
                                   CanSILFunctionType type,
                                   SmallVectorImpl<llvm::Type*> &types);
 
+  using GetParameterFn = std::function<llvm::Value*(unsigned)>;
+
   /// In the prelude of a generic function, perform the bindings for a
   /// generics clause.
   void emitPolymorphicParameters(IRGenFunction &IGF,
                                  SILFunction &Fn,
-                                 Explosion &args);
+                                 Explosion &args,
+                                 const GetParameterFn &getParameter);
   
   /// Perform the metadata bindings necessary to emit a generic value witness.
   void emitPolymorphicParametersForGenericValueWitness(IRGenFunction &IGF,

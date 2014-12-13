@@ -3720,7 +3720,11 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
 namespace {
   struct Fulfillment {
     Fulfillment() = default;
-    Fulfillment(unsigned depth, unsigned index) : Depth(depth), Index(index) {}
+    Fulfillment(unsigned sourceIndex, unsigned depth, unsigned index)
+      : SourceIndex(sourceIndex), Depth(depth), Index(index) {}
+
+    /// The source index.
+    unsigned SourceIndex;
 
     /// The distance up the metadata chain.
     /// 0 is the origin metadata, 1 is the parent of that, etc.
@@ -3737,9 +3741,6 @@ namespace {
   class PolymorphicConvention {
   public:
     enum class SourceKind {
-      /// There is no source of additional information.
-      None,
-
       /// The polymorphic arguments are derived from a source class
       /// pointer.
       ClassPointer,
@@ -3761,10 +3762,38 @@ namespace {
       WitnessExtraData,
     };
 
+    static bool requiresSourceIndex(SourceKind kind) {
+      return (kind == SourceKind::ClassPointer ||
+              kind == SourceKind::Metadata ||
+              kind == SourceKind::GenericLValueMetadata);
+    }
+
+    enum : unsigned { InvalidSourceIndex = ~0U };
+
+    class Source {
+      /// The kind of source this is.
+      SourceKind Kind;
+
+      /// The parameter index, for ClassPointer and Metadata sources.
+      unsigned Index;
+
+    public:
+      SmallVector<NominalTypeDecl*, 2> TypesForDepths;
+
+      Source(SourceKind kind, unsigned index) : Kind(kind), Index(index) {
+        assert(index != InvalidSourceIndex || !requiresSourceIndex(kind));
+      }
+
+      SourceKind getKind() const { return Kind; }
+      unsigned getParamIndex() const {
+        assert(requiresSourceIndex(getKind()));
+        return Index;
+      }
+    };
+
   protected:
     CanSILFunctionType FnType;
-    SourceKind TheSourceKind = SourceKind::None;
-    SmallVector<NominalTypeDecl*, 4> TypesForDepths;
+    SmallVector<Source, 2> Sources;
 
     llvm::DenseMap<FulfillmentKey, Fulfillment> Fulfillments;
 
@@ -3805,18 +3834,19 @@ namespace {
         // self argument.
         switch (fnType->getRepresentation()) {
         case AnyFunctionType::Representation::Thin:
-          TheSourceKind = SourceKind::WitnessSelf;
+          Sources.emplace_back(SourceKind::WitnessSelf,
+                               InvalidSourceIndex);
           break;
         case AnyFunctionType::Representation::Thick:
-          TheSourceKind = SourceKind::WitnessExtraData;
+          Sources.emplace_back(SourceKind::WitnessExtraData,
+                               InvalidSourceIndex);
           break;
         case AnyFunctionType::Representation::Block:
           llvm_unreachable("witnesses cannot be blocks");
         }
 
         // Testify to generic parameters in the Self type.
-        auto params = fnType->getParameters();
-        CanType selfTy = params.back().getType();
+        CanType selfTy = fnType->getSelfParameter().getType();
         if (auto metaTy = dyn_cast<AnyMetatypeType>(selfTy))
           selfTy = metaTy.getInstanceType();
 
@@ -3836,18 +3866,22 @@ namespace {
       }
 
       // We don't need to pass anything extra as long as all of the
-      // archetypes (and their requirements) are producible from the
-      // class-pointer argument.
-
-      // Just consider the 'self' parameter for now.
+      // archetypes (and their requirements) are producible from
+      // arguments.
       auto params = fnType->getParameters();
-      if (params.empty()) return;
-      SourceKind source = considerParameter(params.back());
+      unsigned selfIndex = ~0U;
 
-      // If we didn't fulfill anything, there's no source.
-      if (Fulfillments.empty()) return;
+      // Consider 'self' first.
+      if (fnType->hasSelfArgument()) {
+        selfIndex = params.size() - 1;
+        considerParameter(params[selfIndex], selfIndex, true);
+      }
 
-      TheSourceKind = source;
+      // Now consider the rest of the parameters.
+      for (auto index : indices(params)) {
+        if (index != selfIndex)
+          considerParameter(params[index], index, false);
+      }
     }
 
     /// Extract dependent type metadata for a value witness function of the given
@@ -3856,7 +3890,7 @@ namespace {
       : FnType(getNotionalFunctionType(ntd)),
         ParamArchetypes(M, M.getASTContext().Diags)
     {
-      TheSourceKind = SourceKind::Metadata;
+      Sources.emplace_back(SourceKind::Metadata, 0);
 
       // Build archetypes from the generic signature so we can consult the
       // protocol requirements on the parameters and dependent types.
@@ -3868,7 +3902,7 @@ namespace {
       considerBoundGenericType(cast<BoundGenericType>(paramType), 0);
     }
 
-    SourceKind getSourceKind() const { return TheSourceKind; }
+    ArrayRef<Source> getSources() const { return Sources; }
 
     GenericSignatureWitnessIterator getAllDependentTypes() const {
       if (auto gs = FnType->getGenericSignature())
@@ -3896,50 +3930,78 @@ namespace {
                                   param, result, ctx);
     }
 
-    SourceKind considerParameter(SILParameterInfo param) {
+    template <class T>
+    void considerNewSource(SourceKind kind, unsigned paramIndex,
+                           const T &consider) {
+      // Remember how many fulfillments we currently have.
+      auto numFulfillments = Fulfillments.size();
+
+      // Prospectively add a source.
+      Sources.emplace_back(kind, paramIndex);
+
+      // Consider the source.
+      consider();
+
+      // If we didn't add anything, remove the source.
+      if (Fulfillments.size() == numFulfillments)
+        Sources.pop_back();
+    }
+
+    void considerNewTypeSource(SourceKind kind, unsigned paramIndex,
+                               CanType type) {
+      if (auto nomTy = dyn_cast<NominalType>(type)) {
+        considerNewSource(kind, paramIndex,
+                          [&] { considerNominalType(nomTy, 0); });
+      } else if (auto boundTy = dyn_cast<BoundGenericType>(type)) {
+        considerNewSource(kind, paramIndex,
+                          [&] { considerBoundGenericType(boundTy, 0); });
+      }
+    }
+
+    void considerParameter(SILParameterInfo param, unsigned paramIndex,
+                           bool isSelfParameter) {
       auto type = param.getType();
       switch (param.getConvention()) {
       // Out-parameters don't give us a value we can use.
       case ParameterConvention::Indirect_Out:
-        return SourceKind::None;
+        return;
 
-      // In-parameters do, but right now we don't bother, for no good reason.
+      // In-parameters do, but right now we don't bother, for no good
+      // reason. But if this is 'self', consider passing an extra
+      // metatype.
       case ParameterConvention::Indirect_In:
-        return SourceKind::None;
-
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_Inout:
-        if (auto nomTy = dyn_cast<NominalType>(type)) {
-          considerNominalType(nomTy, 0);
-          return SourceKind::GenericLValueMetadata;
-        } else if (auto boundTy = dyn_cast<BoundGenericType>(type)) {
-          considerBoundGenericType(boundTy, 0);
-          return SourceKind::GenericLValueMetadata;
-        }
-        return SourceKind::None;
+        if (!isSelfParameter) return;
+        considerNewTypeSource(SourceKind::GenericLValueMetadata,
+                              paramIndex, type);
+        return;
 
       case ParameterConvention::Direct_Owned:
       case ParameterConvention::Direct_Unowned:
       case ParameterConvention::Direct_Guaranteed:
+        // Classes are sources of metadata.
         if (auto classTy = dyn_cast<ClassType>(type)) {
-          considerNominalType(classTy, 0);
-          return SourceKind::ClassPointer;
+          considerNewSource(SourceKind::ClassPointer, paramIndex,
+                            [&] { considerNominalType(classTy, 0); });
+          return;
+        } else if (auto boundTy = dyn_cast<BoundGenericClassType>(type)) {
+          considerNewSource(SourceKind::ClassPointer, paramIndex,
+                            [&] { considerBoundGenericType(boundTy, 0); });
+          return;
         }
-        if (auto boundTy = dyn_cast<BoundGenericClassType>(type)) {
-          considerBoundGenericType(boundTy, 0);
-          return SourceKind::ClassPointer;
-        }
+
+        // Thick metatypes are sources of metadata.
         if (auto metatypeTy = dyn_cast<MetatypeType>(type)) {
+          if (metatypeTy->getRepresentation() != MetatypeRepresentation::Thick)
+            return;
+
           CanType objTy = metatypeTy.getInstanceType();
-          if (auto nomTy = dyn_cast<ClassType>(objTy)) {
-            considerNominalType(nomTy, 0);
-            return SourceKind::Metadata;
-          } else if (auto boundTy = dyn_cast<BoundGenericClassType>(objTy)) {
-            considerBoundGenericType(boundTy, 0);
-            return SourceKind::Metadata;
-          }
+          considerNewTypeSource(SourceKind::Metadata, paramIndex, objTy);
+          return;
         }
-        return SourceKind::None;
+
+        return;
       }
       llvm_unreachable("bad parameter convention");
     }
@@ -3957,8 +4019,8 @@ namespace {
     }
 
     void considerNominalType(NominalType *type, unsigned depth) {
-      assert(TypesForDepths.size() == depth);
-      TypesForDepths.push_back(type->getDecl());
+      assert(Sources.back().TypesForDepths.size() == depth);
+      Sources.back().TypesForDepths.push_back(type->getDecl());
 
       // Nominal types add no generic arguments themselves, but they
       // may have the arguments of their parents.
@@ -3966,8 +4028,8 @@ namespace {
     }
 
     void considerBoundGenericType(BoundGenericType *type, unsigned depth) {
-      assert(TypesForDepths.size() == depth);
-      TypesForDepths.push_back(type->getDecl());
+      assert(Sources.back().TypesForDepths.size() == depth);
+      Sources.back().TypesForDepths.push_back(type->getDecl());
 
       auto params = type->getDecl()->getGenericParams()->getAllArchetypes();
       auto substitutions = type->getSubstitutions(/*FIXME:*/nullptr, nullptr);
@@ -4078,11 +4140,15 @@ namespace {
     /// Testify that there's a fulfillment at the given depth and level.
     void addFulfillment(Type arg, ProtocolDecl *proto,
                         unsigned depth, unsigned index) {
-      // Only add a fulfillment if it's not enough information otherwise.
+      assert(!Sources.empty() && "adding fulfillment without source?");
+      auto sourceIndex = Sources.size() - 1;
+
+      // Only add a fulfillment if we don't have any previous
+      // fulfillment for that value.
       assert(arg->isDependentType() && "fulfilling non-dependent type?!");
       auto key = FulfillmentKey(arg, proto);
-      if (!Fulfillments.count(key))
-        Fulfillments.insert(std::make_pair(key, Fulfillment(depth, index)));
+      Fulfillments.insert(std::make_pair(key,
+                                   Fulfillment(sourceIndex, depth, index)));
     }
   };
 
@@ -4090,7 +4156,12 @@ namespace {
   class EmitPolymorphicParameters : public PolymorphicConvention {
     IRGenFunction &IGF;
     GenericParamList *ContextParams;
-    SmallVector<llvm::Value*, 4> MetadataForDepths;
+
+    struct SourceValue {
+      SmallVector<llvm::Value*, 4> MetadataForDepths;
+    };
+
+    SmallVector<SourceValue, 4> SourceValues;
 
   public:
     EmitPolymorphicParameters(IRGenFunction &IGF,
@@ -4099,7 +4170,7 @@ namespace {
                               *IGF.IGM.SILMod->getSwiftModule()),
         IGF(IGF), ContextParams(Fn.getContextGenericParams()) {}
 
-    void emit(Explosion &in);
+    void emit(Explosion &in, const GetParameterFn &getParameter);
 
     /// Emit polymorphic parameters for a generic value witness.
     EmitPolymorphicParameters(IRGenFunction &IGF, NominalTypeDecl *ntd)
@@ -4110,35 +4181,37 @@ namespace {
 
   private:
     // Emit metadata bindings after the source, if any, has been bound.
-    void emitWithSourceBound(Explosion &in);
+    void emitWithSourcesBound(Explosion &in);
 
-    CanType getArgTypeInContext() const {
+    CanType getArgTypeInContext(unsigned paramIndex) const {
       return ArchetypeBuilder::mapTypeIntoContext(
                             IGF.IGM.SILMod->getSwiftModule(), ContextParams,
-                            FnType->getParameters().back().getType())
+                            FnType->getParameters()[paramIndex].getType())
         ->getCanonicalType();
     }
 
     /// Emit the source value for parameters.
-    llvm::Value *emitSourceForParameters(Explosion &in) {
-      switch (getSourceKind()) {
-      case SourceKind::None:
-        return nullptr;
-
+    llvm::Value *emitSourceForParameters(const Source &source,
+                                         Explosion &in,
+                                         const GetParameterFn &getParameter) {
+      switch (source.getKind()) {
       case SourceKind::Metadata:
-        return in.getLastClaimed();
+        return getParameter(source.getParamIndex());
 
-      case SourceKind::ClassPointer:
-        return emitHeapMetadataRefForHeapObject(IGF, in.getLastClaimed(),
-                                                getArgTypeInContext(),
-                                                /*suppress cast*/ true);
+      case SourceKind::ClassPointer: {
+        unsigned paramIndex = source.getParamIndex();
+        llvm::Value *instanceRef = getParameter(paramIndex);
+        SILType instanceType =
+          SILType::getPrimitiveObjectType(getArgTypeInContext(paramIndex));
+        return emitDynamicTypeOfHeapObject(IGF, instanceRef, instanceType);
+      }
 
       case SourceKind::GenericLValueMetadata: {
         llvm::Value *metatype = in.claimNext();
         metatype->setName("Self");
 
         // Mark this as the cached metatype for the l-value's object type.
-        CanType argTy = getArgTypeInContext();
+        CanType argTy = getArgTypeInContext(source.getParamIndex());
         IGF.setUnscopedLocalTypeData(argTy, LocalTypeData::Metatype, metatype);
         return metatype;
       }
@@ -4159,25 +4232,46 @@ namespace {
 
     /// Produce the metadata value for the given depth, using the
     /// given cache.
-    llvm::Value *getMetadataForDepth(unsigned depth) {
-      assert(!MetadataForDepths.empty());
-      while (depth >= MetadataForDepths.size()) {
-        auto child = MetadataForDepths.back();
-        auto childDecl = TypesForDepths[MetadataForDepths.size()];
+    llvm::Value *getMetadataForDepth(unsigned sourceIndex, unsigned depth) {
+      auto &source = getSources()[sourceIndex];
+      auto &sourceValue = SourceValues[sourceIndex];
+      assert(!sourceValue.MetadataForDepths.empty());
+
+      // Drill down until we get to that depth.
+      while (depth >= sourceValue.MetadataForDepths.size()) {
+        auto child = sourceValue.MetadataForDepths.back();
+        auto childDecl =
+          source.TypesForDepths[sourceValue.MetadataForDepths.size()];
         auto parent = emitParentMetadataRef(IGF, childDecl, child);
-        MetadataForDepths.push_back(parent);
+        sourceValue.MetadataForDepths.push_back(parent);
       }
-      return MetadataForDepths[depth];
+      return sourceValue.MetadataForDepths[depth];
+    }
+
+    /// Produce the base metadata value and declaration for the given
+    /// fulfillment.
+    std::pair<llvm::Value*, NominalTypeDecl *>
+    getAncestorForFulfillment(const Fulfillment &fulfillment) {
+      auto ancestor = getMetadataForDepth(fulfillment.SourceIndex,
+                                          fulfillment.Depth);
+      auto ancestorDecl =
+        Sources[fulfillment.SourceIndex].TypesForDepths[fulfillment.Depth];
+      return std::make_pair(ancestor, ancestorDecl);
     }
   };
 };
 
 /// Emit a polymorphic parameters clause, binding all the metadata necessary.
-void EmitPolymorphicParameters::emit(Explosion &in) {
-  // Compute the first source metadata.
-  MetadataForDepths.push_back(emitSourceForParameters(in));
+void EmitPolymorphicParameters::emit(Explosion &in,
+                                     const GetParameterFn &getParameter) {
+  SourceValues.reserve(getSources().size());
+  for (const Source &source : getSources()) {
+    llvm::Value *value = emitSourceForParameters(source, in, getParameter);
+    SourceValues.emplace_back();
+    SourceValues.back().MetadataForDepths.push_back(value);
+  }
 
-  emitWithSourceBound(in);
+  emitWithSourcesBound(in);
 }
 
 /// Emit a polymorphic parameters clause for a generic value witness, binding
@@ -4185,15 +4279,17 @@ void EmitPolymorphicParameters::emit(Explosion &in) {
 void
 EmitPolymorphicParameters::emitForGenericValueWitness(llvm::Value *selfMeta) {
   // We get the source metadata verbatim from the value witness signature.
-  MetadataForDepths.push_back(selfMeta);
+  assert(getSources().size() == 1);
+  SourceValues.emplace_back();
+  SourceValues.back().MetadataForDepths.push_back(selfMeta);
 
   // All our archetypes should be satisfiable from the source.
   Explosion empty;
-  emitWithSourceBound(empty);
+  emitWithSourcesBound(empty);
 }
 
 void
-EmitPolymorphicParameters::emitWithSourceBound(Explosion &in) {
+EmitPolymorphicParameters::emitWithSourcesBound(Explosion &in) {
   for (auto depTy : getAllDependentTypes()) {
     // Get the corresponding context archetype.
     auto contextTy
@@ -4210,10 +4306,10 @@ EmitPolymorphicParameters::emitWithSourceBound(Explosion &in) {
     auto it = Fulfillments.find(FulfillmentKey(depTy, nullptr));
     if (it != Fulfillments.end()) {
       auto &fulfillment = it->second;
-      auto ancestor = getMetadataForDepth(fulfillment.Depth);
-      auto ancestorDecl = TypesForDepths[fulfillment.Depth];
-      metadata = emitArgumentMetadataRef(IGF, ancestorDecl,
-                                         fulfillment.Index, ancestor);
+      auto ancestorAndDecl = getAncestorForFulfillment(fulfillment);
+      metadata = emitArgumentMetadataRef(IGF, ancestorAndDecl.second,
+                                         fulfillment.Index,
+                                         ancestorAndDecl.first);
 
     // Otherwise, it's just next in line.
     } else {
@@ -4232,11 +4328,10 @@ EmitPolymorphicParameters::emitWithSourceBound(Explosion &in) {
       auto it = Fulfillments.find(FulfillmentKey(depTy, protocol));
       if (it != Fulfillments.end()) {
         auto &fulfillment = it->second;
-        auto ancestor = getMetadataForDepth(fulfillment.Depth);
-        auto ancestorDecl = TypesForDepths[fulfillment.Depth];
-        wtable = emitArgumentWitnessTableRef(IGF, ancestorDecl,
+        auto ancestorAndDecl = getAncestorForFulfillment(fulfillment);
+        wtable = emitArgumentWitnessTableRef(IGF, ancestorAndDecl.second,
                                              fulfillment.Index, protocol,
-                                             ancestor);
+                                             ancestorAndDecl.first);
 
       // Otherwise, it's just next in line.
       } else {
@@ -4251,8 +4346,9 @@ EmitPolymorphicParameters::emitWithSourceBound(Explosion &in) {
 /// Perform all the bindings necessary to emit the given declaration.
 void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
                                       SILFunction &Fn,
-                                      Explosion &in) {
-  EmitPolymorphicParameters(IGF, Fn).emit(in);
+                                      Explosion &in,
+                                      const GetParameterFn &getParameter) {
+  EmitPolymorphicParameters(IGF, Fn).emit(in, getParameter);
 }
 
 /// Perform the metadata bindings necessary to emit a generic value witness.
@@ -4532,25 +4628,32 @@ namespace {
               Explosion &out);
 
   private:
-    void emitSource(CanType substInputType, Explosion &out) {
-      switch (getSourceKind()) {
-      case SourceKind::None: return;
-      case SourceKind::ClassPointer: return;
-      case SourceKind::Metadata: return;
-      case SourceKind::GenericLValueMetadata: {
-        out.add(IGF.emitTypeMetadataRef(substInputType));
-        return;
-      }
-      case SourceKind::WitnessSelf:
-        // The 'Self' argument(s) are added as a special case in
+    void emitEarlySources(CanType substInputType, Explosion &out) {
+      for (auto &source : getSources()) {
+        switch (source.getKind()) {
+        // Already accounted for in the parameters.
+        case SourceKind::ClassPointer:
+        case SourceKind::Metadata:
+          continue;
+
+        // Needs a special argument.
+        case SourceKind::GenericLValueMetadata: {
+          out.add(IGF.emitTypeMetadataRef(substInputType));
+          continue;
+        }
+
+        // Witness 'Self' argument(s) are added as a special case in
         // EmitPolymorphicArguments::emit.
-        return;
-      case SourceKind::WitnessExtraData:
-        // The 'Self' argument(s) are added implicitly from ExtraData of the
-        // function value.
-        return;
+        case SourceKind::WitnessSelf:
+          continue;
+
+        // The 'Self' argument(s) are added implicitly from ExtraData
+        // of the function value.
+        case SourceKind::WitnessExtraData:
+          continue;
+        }
+        llvm_unreachable("bad source kind!");
       }
-      llvm_unreachable("bad source kind!");
     }
   };
 }
@@ -4591,7 +4694,8 @@ static void emitPolymorphicArgumentsWithInput(IRGenFunction &IGF,
 void EmitPolymorphicArguments::emit(CanType substInputType,
                                     ArrayRef<Substitution> subs,
                                     Explosion &out) {
-  emitSource(substInputType, out);
+  // Add all the early sources.
+  emitEarlySources(substInputType, out);
 
   // For now, treat all archetypes independently.
   // FIXME: Later, we'll want to emit only the minimal set of archetypes,
@@ -4662,11 +4766,29 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
          && "did not use all substitutions?!");
 
   // For a witness call, add the Self argument metadata arguments last.
-  if (getSourceKind() == SourceKind::WitnessSelf) {
-    auto self = IGF.emitTypeMetadataRef(substInputType);
-    out.add(self);
-    // TODO: Should also provide the protocol witness table,
-    // for default implementations.
+  for (auto &source : getSources()) {
+    switch (source.getKind()) {
+    case SourceKind::Metadata:
+    case SourceKind::ClassPointer:
+      // Already accounted for in the arguments.
+      continue;
+
+    case SourceKind::GenericLValueMetadata:
+      // Added in the early phase.
+      continue;
+
+    case SourceKind::WitnessSelf: {
+      auto self = IGF.emitTypeMetadataRef(substInputType);
+      out.add(self);
+      continue;
+    }
+
+    case SourceKind::WitnessExtraData:
+      // The 'Self' argument(s) are added implicitly from ExtraData of the
+      // function value.
+      continue;
+    }
+    llvm_unreachable("bad source kind");
   }
 }
 
@@ -4679,7 +4801,8 @@ namespace {
       : PolymorphicConvention(fn, *IGM.SILMod->getSwiftModule()), IGM(IGM) {}
 
     void expand(SmallVectorImpl<llvm::Type*> &out) {
-      addSource(out);
+      for (auto &source : getSources())
+        addEarlySource(source, out);
 
       for (auto depTy : getAllDependentTypes()) {
         // Only emit parameters for independent parameters that haven't been
@@ -4706,18 +4829,20 @@ namespace {
       }
 
       // For a witness method, add the 'self' parameter.
-      if (getSourceKind() == SourceKind::WitnessSelf) {
-        out.push_back(IGM.TypeMetadataPtrTy);
-        // TODO: Should also provide the protocol witness table,
-        // for default implementations.
+      for (auto &source : getSources()) {
+        if (source.getKind() == SourceKind::WitnessSelf) {
+          out.push_back(IGM.TypeMetadataPtrTy);
+          // TODO: Should also provide the protocol witness table,
+          // for default implementations.
+        }
       }
     }
 
   private:
     /// Add signature elements for the source metadata.
-    void addSource(SmallVectorImpl<llvm::Type*> &out) {
-      switch (getSourceKind()) {
-      case SourceKind::None: return;
+    void addEarlySource(const Source &source,
+                        SmallVectorImpl<llvm::Type*> &out) {
+      switch (source.getKind()) {
       case SourceKind::ClassPointer: return; // already accounted for
       case SourceKind::Metadata: return; // already accounted for
       case SourceKind::GenericLValueMetadata:
