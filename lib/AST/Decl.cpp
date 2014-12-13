@@ -2484,30 +2484,52 @@ static bool isSettable(const AbstractStorageDecl *decl) {
 /// is either because it is a stored var, because it has a custom setter, or
 /// is a let member in an initializer.
 bool VarDecl::isSettable(DeclContext *UseDC) const {
-  // 'let' properties are generally immutable, unless they are a 'let' ivar
-  // and we are in the init() for the type that holds the ivar.
+  // 'let' properties are immutable, but enforcement of this is enforced by
+  // SIL level passes.  If the 'let' property has an initializer, it can never
+  // be reassigned, so we model it as not settable here.
   if (isLet()) {
-    if (auto *CD = dyn_cast_or_null<ConstructorDecl>(UseDC)) {
-      auto *DC = getDeclContext();
-      auto *CDC = CD->getDeclContext();
+    // If the decl has an explicitly written initializer with a pattern binding,
+    // then it isn't settable.
+    if (auto *P = getParentPattern())
+      if (P->hasInit())
+        return false;
+
+    // If the decl has a value bound to it but has no PBD, then it is
+    // initialized.
+    if (hasNonPatternBindingInit())
+      return false;
+    
+    // 'let' parameters are never settable.
+    if (isa<ParamDecl>(this))
+      return false;
+    
+    // Properties in structs/classes are only ever mutable in their designated
+    // initializer.
+    if (getDeclContext()->isTypeContext()) {
+      auto *CD = dyn_cast_or_null<ConstructorDecl>(UseDC);
+      if (!CD) return false;
       
+      auto *CDC = CD->getDeclContext();
+        
       // If this init is defined inside of the same type (or in an extension
       // thereof) as the let property, then it is mutable.
-      if (CDC->isTypeContext() && DC->isTypeContext() &&
+      if (CDC->isTypeContext() &&
           CDC->getDeclaredTypeInContext()->getAnyNominal() ==
-            getDeclContext()->getDeclaredTypeInContext()->getAnyNominal()) {
+          getDeclContext()->getDeclaredTypeInContext()->getAnyNominal()) {
         // If this is a convenience initializer (i.e. one that calls
         // self.init), then let properties are never mutable in it.  They are
         // only mutable in designated initializers.
         if (CD->getDelegatingOrChainedInitKind(nullptr) ==
             ConstructorDecl::BodyInitKind::Delegating)
           return false;
-
         return true;
       }
+    } else {
+      // Normal variables (e.g. globals) are only mutable in the context of the
+      // declaration.
+      if (getDeclContext() != UseDC)
+        return false;
     }
-
-    return false;
   }
 
   return ::isSettable(this);

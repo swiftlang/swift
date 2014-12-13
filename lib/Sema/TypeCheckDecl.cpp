@@ -2443,6 +2443,7 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
                                    VD->getType(), Get);
   Tmp2VD->setImplicit();
 
+
   // Take the initializer from the PatternBindingDecl for VD.
   // TODO: This doesn't work with complicated patterns like:
   //   lazy var (a,b) = foo()
@@ -3769,19 +3770,6 @@ public:
 
         auto *varDC = var->getDeclContext();
 
-        // Let declarations require an initializer, unless they are a property
-        // (in which case they get set during the init method of the enclosing
-        // type).
-        // The debugger will also need to emulate let variables which have been
-        // initialized in a previous expression, so they don't need initializers.
-        if (var->isLet() && !var->isDebuggerVar() && !isTypeContext) {
-          TC.diagnose(var->getLoc(), diag::let_requires_initializer);
-          PBD->setInvalid();
-          var->setInvalid();
-          var->overwriteType(ErrorType::get(TC.Context));
-          return;
-        }
-        
         // Non-member observing properties need an initializer.
         if (var->getStorageKind() == VarDecl::StoredWithObservers &&
             !isTypeContext) {
@@ -3806,7 +3794,9 @@ public:
         // Global variables require an initializer (except in top level code).
         if (varDC->isModuleScopeContext() &&
             !varDC->getParentSourceFile()->isScriptMode()) {
-          TC.diagnose(var->getLoc(), diag::global_requires_initializer);
+          TC.diagnose(var->getLoc(),
+                      var->isLet() ? diag::global_let_requires_initializer :
+                      diag::global_var_requires_initializer);
           PBD->setInvalid();
           var->setInvalid();
           var->overwriteType(ErrorType::get(TC.Context));

@@ -27,21 +27,21 @@ class var gvu8: Int { // expected-error {{class properties may only be declared 
 
 
 static let glu1: Int // expected-error {{static properties may only be declared on a type}}{{1-7=}}
-    // expected-error@-1 {{'let' declarations require an initializer expression}}
+    // expected-error@-1 {{global 'let' declaration requires an initializer expression}}
 class let glu2: Int // expected-error {{class properties may only be declared on a type}}{{1-6=}}
-    // expected-error@-1 {{'let' declarations require an initializer expression}}
+    // expected-error@-1 {{global 'let' declaration requires an initializer expression}}
 override static let glu3: Int // expected-error {{static properties may only be declared on a type}}{{10-16=}}
     // expected-error@-1 {{'override' can only be specified on class members}}{{1-9=}}
-    // expected-error@-2 {{'let' declarations require an initializer expression}}
+    // expected-error@-2 {{global 'let' declaration requires an initializer expression}}
 override class let glu4: Int // expected-error {{class properties may only be declared on a type}}{{10-15=}}
     // expected-error@-1 {{'override' can only be specified on class members}}{{1-9=}}
-    // expected-error@-2 {{'let' declarations require an initializer expression}}
+    // expected-error@-2 {{global 'let' declaration requires an initializer expression}}
 static override let glu5: Int // expected-error {{static properties may only be declared on a type}}{{1-7=}}
     // expected-error@-1 {{'override' can only be specified on class members}}{{8-16=}}
-    // expected-error@-2 {{'let' declarations require an initializer expression}}
+    // expected-error@-2 {{global 'let' declaration requires an initializer expression}}
 class override let glu6: Int // expected-error {{class properties may only be declared on a type}}{{1-6=}}
     // expected-error@-1 {{'override' can only be specified on class members}}{{7-15=}}
-    // expected-error@-2 {{'let' declarations require an initializer expression}}
+    // expected-error@-2 {{global 'let' declaration requires an initializer expression}}
 
 
 static var gvi1: Int = 0 // expected-error {{static properties may only be declared on a type}}{{1-7=}}

@@ -72,5 +72,5 @@ let a = b ; let b = a // expected-error{{could not infer type for 'a'}} expected
 
 
 // <rdar://problem/17501765> Swift should warn about immutable default initialized values
-let uselessValue : String? // expected-error {{'let' declarations require an initializer expression}}
+let uselessValue : String?
 

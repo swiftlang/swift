@@ -11,7 +11,7 @@ let bad_property_2: Int = 0 {
   }
 }
 
-let no_initializer : Int    // expected-error {{'let' declarations require an initializer expression}}
+let no_initializer : Int
 
 
 
@@ -310,7 +310,7 @@ func updateInt(inout x : Int) {}
 // rdar://15785677 - allow 'let' declarations in structs/classes be initialized in init()
 class LetClassMembers {
   let a : Int
-  let b = 42
+  let b : Int
 
   init(arg : Int) {
     a = arg             // ok, a is mutable in init()
@@ -326,7 +326,7 @@ class LetClassMembers {
 }
 struct LetStructMembers {
   let a : Int
-  let b = 42
+  let b : Int
 
   init(arg : Int) {
     a = arg             // ok, a is mutable in init()
@@ -355,7 +355,7 @@ func QoI() {
 
 // <rdar://problem/17051675> Structure initializers in an extension cannot assign to constant properties
 struct rdar17051675_S {
-  let x = 0
+  let x : Int
   init(newX: Int) {
     x = 42
   }
@@ -368,7 +368,7 @@ extension rdar17051675_S {
 }
 
 struct rdar17051675_S2<T> {
-  let x = 0
+  let x : Int
   init(newX: Int) {
     x = 42
   }
@@ -383,7 +383,7 @@ extension rdar17051675_S2 {
 
 // <rdar://problem/17400366> let properties should not be mutable in convenience initializers
 class ClassWithConvenienceInit {
-  let x = 0
+  let x : Int
   init(newX: Int) {
     x = 42
   }

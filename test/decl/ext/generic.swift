@@ -62,7 +62,7 @@ struct LValueCheck<T> {
 
 extension LValueCheck<A> { // expected-error{{generic arguments are not allowed on an extension}}
   init(newY: Int) {
-    x = 42
+    x = 42   // expected-error {{cannot assign to 'x' in 'self'}}
   }
 }
 

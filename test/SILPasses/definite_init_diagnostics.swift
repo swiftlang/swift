@@ -695,7 +695,7 @@ class rdar18414728Base {
     if let p1 = prop { // expected-error {{use of 'self' in property access 'prop' before all stored properties are initialized}}
       aaaaa = p1
     }
-    aaaaa = "foo"  // expected-error {{immutable property 'self.aaaaa' may only be initialized once}}
+    aaaaa = "foo"  // expected-error {{immutable value 'self.aaaaa' may only be initialized once}}
   }
 
   init(a : ()) {
@@ -726,7 +726,7 @@ class rdar18414728Derived : rdar18414728Base {
     if let p1 = prop2 {  // expected-error {{use of 'self' in property access 'prop2' before super.init initializes self}}
       aaaaa2 = p1
     }
-    aaaaa2 = "foo"    // expected-error {{immutable property 'self.aaaaa2' may only be initialized once}}
+    aaaaa2 = "foo"    // expected-error {{immutable value 'self.aaaaa2' may only be initialized once}}
     super.init()
   }
 
@@ -744,7 +744,7 @@ class rdar18414728Derived : rdar18414728Base {
 
   override init(c : ()) {
     super.init()        // expected-error {{property 'self.aaaaa2' not initialized at super.init call}}
-    aaaaa2 = "foo"      // expected-error {{immutable property 'self.aaaaa2' may only be initialized once}}
+    aaaaa2 = "foo"      // expected-error {{immutable value 'self.aaaaa2' may only be initialized once}}
     method2()
   }
 
@@ -828,7 +828,7 @@ struct LetProperties {
   let arr : [Int]
   let (u, v) : (Int, Int)
   let w : (Int, Int)
-  let x = 42    // expected-note{{initial value already provided in 'let' declaration}}
+  let x = 42
   let y : Int
   let z : Int?  // expected-note{{'self.z' not initialized}}
 
@@ -852,23 +852,22 @@ struct LetProperties {
 
   // Multiple initializations are an error.
   init(a : Int) {
-    x = a   // expected-error {{immutable property 'self.x' may only be initialized once}}
     y = a
-    y = a   // expected-error {{immutable property 'self.y' may only be initialized once}}
+    y = a   // expected-error {{immutable value 'self.y' may only be initialized once}}
 
     u = a
     v = a
-    u = a   // expected-error {{immutable property 'self.u' may only be initialized once}}
-    v = a   // expected-error {{immutable property 'self.v' may only be initialized once}}
+    u = a   // expected-error {{immutable value 'self.u' may only be initialized once}}
+    v = a   // expected-error {{immutable value 'self.v' may only be initialized once}}
 
     w.0 = a
     w.1 = a
 
-    w.0 = a  // expected-error {{immutable property 'self.w.0' may only be initialized once}}
-    w.1 = a  // expected-error {{immutable property 'self.w.1' may only be initialized once}}
+    w.0 = a  // expected-error {{immutable value 'self.w.0' may only be initialized once}}
+    w.1 = a  // expected-error {{immutable value 'self.w.1' may only be initialized once}}
 
     arr = []
-    arr = [] // expected-error {{immutable property 'self.arr' may only be initialized once}}
+    arr = [] // expected-error {{immutable value 'self.arr' may only be initialized once}}
   }  // expected-error {{return from initializer without initializing all stored properties}}
 
   // inout uses of let properties are an error.
@@ -914,4 +913,37 @@ struct MyMutabilityImplementation : TestMutabilityProtocol {
   }
 }
 
+
+// <rdar://problem/16181314> don't require immediate initialization of 'let' values
+func testLocalProperties(b : Int) -> Int {
+  let x : Int
+  let y : Int // never assigned is ok
+
+  x = b
+  x = b    // expected-error {{immutable value 'x' may only be initialized once}}
+
+  // This is ok, since it is assigned multiple times on different paths.
+  let z : Int
+  if true || false {
+    z = b
+  } else {
+    z = b
+  }
+
+  return x
+}
+
+// Should be rejected as multiple assignment.
+func testAddressOnlyProperty<T>(b : T) -> T {
+  let x : T
+  let y : T
+  let z : T   // never assigned is ok.
+  x = b
+  y = b
+  x = b   // expected-error {{immutable value 'x' may only be initialized once}}
+
+  var tmp = b
+  swap(&x, &tmp)   // expected-error {{immutable value 'x' may not be passed inout}}
+  return y
+}
 

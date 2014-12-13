@@ -288,4 +288,25 @@ class TestCaptureList {
   }
 }
 
+class ClassWithIntProperty { final var x = 42 }
+
+func closeOverLetLValue() {
+  let a : ClassWithIntProperty
+  a = ClassWithIntProperty()
+  
+  takeClosure { a.x }
+}
+
+// The let property needs to be captured into a temporary stack slot so that it
+// is loadable even though we capture the value.
+// CHECK: sil shared @_TFF8closures18closeOverLetLValueFT_T_U_FT_Si
+// CHECK-NEXT: bb0(%0 : $ClassWithIntProperty):
+// CHECK-NEXT: [[TMP:%.*]] = alloc_stack $ClassWithIntProperty  // let a
+// CHECK-NEXT: store %0 to [[TMP]]#1 : $*ClassWithIntProperty
+// CHECK-NEXT: {{.*}} = load [[TMP]]#1 : $*ClassWithIntProperty
+// CHECK-NEXT: {{.*}} = ref_element_addr {{.*}} : $ClassWithIntProperty, #ClassWithIntProperty.x
+// CHECK-NEXT: {{.*}} = load {{.*}} : $*Int
+// CHECK-NEXT: destroy_addr [[TMP]]#1 : $*ClassWithIntProperty
+// CHECK-NEXT: dealloc_stack %1#0 : $*@local_storage ClassWithIntProperty
+// CHECK-NEXT:  return
 

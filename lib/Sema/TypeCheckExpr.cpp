@@ -391,6 +391,7 @@ static bool doesStorageProduceLValue(TypeChecker &TC,
   // Unsettable storage decls always produce rvalues.
   if (!storage->isSettable(useDC))
     return false;
+  
   if (TC.Context.LangOpts.EnableAccessControl &&
       !storage->isSetterAccessibleFrom(useDC))
     return false;
@@ -429,7 +430,7 @@ static bool doesStorageProduceLValue(TypeChecker &TC,
   case AbstractStorageDecl::ComputedWithMutableAddress:
   case AbstractStorageDecl::Computed:
     return !storage->getGetter()->isMutating() &&
-           !storage->getSetter()->isMutating();
+           (!storage->getSetter() || !storage->getSetter()->isMutating());
   }
   llvm_unreachable("bad storage kind");
 }

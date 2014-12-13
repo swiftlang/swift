@@ -329,7 +329,7 @@ public:
     : Initialization(Initialization::Kind::LetValue), vd(vd)
   {
     auto &lowering = gen.getTypeLowering(vd->getType());
-
+    
     // Decide whether we need a temporary stack buffer to evaluate this 'let'.
     bool needsTemporaryBuffer;
     switch (PatternKind) {
@@ -337,6 +337,9 @@ public:
       // If this is a let-value without an initializer, then we need a temporary
       // buffer.  DI will make sure it is only assigned to once.
       needsTemporaryBuffer = true;
+        
+      assert(!vd->hasNonPatternBindingInit() &&
+             "Why generate a temp buffer for this?");
       break;
     case SILGenFunction::PK_InitVarDecl:
       // If this is a let with an initializer, we only need a buffer if the type
@@ -961,13 +964,26 @@ static void emitCaptureArguments(SILGenFunction &gen,
     break;
 
   case CaptureKind::Constant: {
-    if (!gen.getTypeLowering(VD->getType()).isAddressOnly()) {
+    auto &lowering = gen.getTypeLowering(VD->getType());
+    if (!lowering.isAddressOnly()) {
       // Constant decls are captured by value.  If the captured value is a tuple
       // value, we need to reconstitute it before sticking it in VarLocs.
-      SILType ty = gen.getLoweredType(VD->getType());
+      SILType ty = lowering.getLoweredType();
       SILValue val = emitReconstitutedConstantCaptureArguments(ty, VD, gen);
+
+      // If the original variable was settable, then Sema will have treated the
+      // VarDecl as an lvalue, even in the closure's use.  As such, we need to
+      // allow formation of the address for this captured value.  Create a
+      // temporary within the closure to provide this address.
+      if (VD->isSettable(VD->getDeclContext())) {
+        auto addr = gen.emitTemporaryAllocation(VD, lowering.getLoweredType());
+        gen.B.createStore(VD, val, addr);
+        val = addr;
+      }
+
       gen.VarLocs[VD] = SILGenFunction::VarLoc::get(val);
-      gen.enterDestroyCleanup(val);
+      if (!lowering.isTrivial())
+        gen.enterDestroyCleanup(val);
       break;
     }
     // Address-only values we capture by-box since partial_apply doesn't work

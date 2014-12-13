@@ -138,7 +138,7 @@ ERROR(struct_not_fully_initialized,sil_analysis,none,
       "struct '%0' must be completely initialized before a member is stored to",
       (StringRef))
 ERROR(immutable_property_already_initialized,sil_analysis,none,
-      "immutable property '%0' may only be initialized once",
+      "immutable value '%0' may only be initialized once",
       (StringRef))
 NOTE(initial_value_provided_in_let_decl,sil_analysis,none,
      "initial value already provided in 'let' declaration", ())
