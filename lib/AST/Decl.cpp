@@ -878,6 +878,18 @@ bool PatternBindingDecl::hasStorage() const {
   return HasStorage;
 }
 
+void PatternBindingDecl::setPattern(Pattern *P) {
+  Pat = P;
+  
+  // Make sure that any VarDecl's contained within the pattern know about this
+  // PatternBindingDecl as their parent.
+  if (P)
+    P->forEachVariable([&](VarDecl *VD) {
+      VD->setParentPattern(this);
+    });
+}
+
+
 VarDecl *PatternBindingDecl::getSingleVar() const {
   return getPattern()->getSingleVar();
 }

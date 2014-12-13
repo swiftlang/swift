@@ -1706,12 +1706,13 @@ public:
                      bool isConditional,
                      DeclContext *Parent)
     : Decl(DeclKind::PatternBinding, Parent),
-      StaticLoc(StaticLoc), VarLoc(VarLoc), Pat(Pat),
+      StaticLoc(StaticLoc), VarLoc(VarLoc), Pat(nullptr),
       InitAndChecked(E, false) {
     PatternBindingDeclBits.IsStatic = StaticLoc.isValid();
     PatternBindingDeclBits.StaticSpelling =
         static_cast<unsigned>(StaticSpelling);
     PatternBindingDeclBits.Conditional = isConditional;
+    setPattern(Pat);
   }
 
   SourceLoc getStartLoc() const {
@@ -1722,7 +1723,7 @@ public:
 
   Pattern *getPattern() { return Pat; }
   const Pattern *getPattern() const { return Pat; }
-  void setPattern(Pattern *P) { Pat = P; }
+  void setPattern(Pattern *P);
 
   bool hasInit() const { return InitAndChecked.getPointer(); }
   Expr *getInit() const { return InitAndChecked.getPointer(); }

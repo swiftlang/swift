@@ -3089,7 +3089,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     // Configure all vars with attributes, 'static' and parent pattern.
     pattern.get()->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
-      VD->setParentPattern(PBD);
       VD->getAttrs() = Attributes;
       Decls.push_back(VD);
     });
