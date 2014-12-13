@@ -425,10 +425,11 @@ static SILValue upcastArgument(SILValue Arg, SILType SuperTy, ApplyInst *AI) {
     // In case of metatypes passed as parameters, we need to upcast to a
     // metatype of a superclass.
     auto &Module = AI->getModule();
-    assert(SuperTy.isSuperclassOf(ArgTy.getMetatypeInstanceType(Module)) &&
+    assert (SuperTy.getSwiftRValueType()->is<AnyMetatypeType>() &&
+           "super type should be a metatype");
+    assert(SuperTy.getMetatypeInstanceType(Module)
+           .isSuperclassOf(ArgTy.getMetatypeInstanceType(Module)) &&
            "Should only create upcasts for sub class devirtualization.");
-    SuperTy = Lowering::TypeConverter(Module).getLoweredLoadableType(
-        SuperTy.getClassOrBoundGenericClass()->getType());
   } else {
     assert(SuperTy.isSuperclassOf(ArgTy) &&
            "Should only create upcasts for sub class devirtualization.");
