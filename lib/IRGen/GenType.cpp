@@ -799,7 +799,7 @@ TypeConverter::createPrimitiveForAlignedPointer(llvm::PointerType *type,
     spareBits.set(bit);
   }
 
-  return new PrimitiveTypeInfo(type, size, {}, align);
+  return new PrimitiveTypeInfo(type, size, std::move(spareBits), align);
 }
 
 /// Constructs a fixed-size type info which asserts if you try to copy
