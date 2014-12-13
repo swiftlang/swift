@@ -1694,7 +1694,7 @@ heap object must have been fully uninitialized or destroyed before
 ``dealloc_ref`` is applied.
 
 dealloc_value_buffer
-``````````````````
+````````````````````
 
 ::
 
@@ -1711,7 +1711,7 @@ type operand.
 The type operand must be a lowered object type.
 
 project_value_buffer
-``````````````````
+````````````````````
 
 ::
 
