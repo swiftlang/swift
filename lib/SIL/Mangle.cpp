@@ -74,21 +74,21 @@ FunctionSignatureSpecializationMangler(Mangler &M, SILFunction *F)
   : SpecializationMangler(SpecializationSourceKind::FunctionSignature, M, F) {
   for (unsigned i : indices(F->getLoweredFunctionType()->getParameters())) {
     (void)i;
-    Args.push_back({uint8_t(ArgumentModifier::Unmodified), nullptr});
+    Args.push_back({ArgumentModifierIntBase(ArgumentModifier::Unmodified), nullptr});
   }
 }
 
 void
 FunctionSignatureSpecializationMangler::
 setArgumentDead(unsigned ArgNo) {
-  Args[ArgNo].first = uint8_t(ArgumentModifier::Dead);
+  Args[ArgNo].first = ArgumentModifierIntBase(ArgumentModifier::Dead);
 }
 
 void
 FunctionSignatureSpecializationMangler::
 setArgumentClosureProp(unsigned ArgNo, PartialApplyInst *PAI) {
   auto &Info = Args[ArgNo];
-  Info.first = uint8_t(ArgumentModifier::ClosureProp);
+  Info.first = ArgumentModifierIntBase(ArgumentModifier::ClosureProp);
   Info.second = PAI;
 }
 
@@ -96,21 +96,20 @@ void
 FunctionSignatureSpecializationMangler::
 setArgumentConstantProp(unsigned ArgNo, LiteralInst *LI) {
   auto &Info = Args[ArgNo];
-  Info.first |= uint8_t(ArgumentModifier::ConstantProp);
+  Info.first = ArgumentModifierIntBase(ArgumentModifier::ConstantProp);
   Info.second = LI;
 }
-
 
 void
 FunctionSignatureSpecializationMangler::
 setArgumentOwnedToGuaranteed(unsigned ArgNo) {
-  Args[ArgNo].first |= uint8_t(ArgumentModifier::OwnedToGuaranteed);
+  Args[ArgNo].first |= ArgumentModifierIntBase(ArgumentModifier::OwnedToGuaranteed);
 }
 
 void
 FunctionSignatureSpecializationMangler::
 setArgumentSROA(unsigned ArgNo) {
-  Args[ArgNo].first |= uint8_t(ArgumentModifier::SROA);
+  Args[ArgNo].first |= ArgumentModifierIntBase(ArgumentModifier::SROA);
 }
 
 void
@@ -157,7 +156,7 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
     Str += "u";
     Str += V;
 
-    auto Encoding = uint8_t(SLI->getEncoding());
+    auto Encoding = ArgumentModifierIntBase(SLI->getEncoding());
     os << "se" << unsigned(Encoding) << "v";
     M.mangleIdentifier(Str);
     break;
@@ -190,35 +189,35 @@ mangleClosureProp(PartialApplyInst *PAI) {
 
 void
 FunctionSignatureSpecializationMangler::
-mangleArgument(uint8_t ArgMod, NullablePtr<SILInstruction> Inst) {
-  if (ArgMod & uint8_t(ArgumentModifier::ConstantProp)) {
+mangleArgument(ArgumentModifierIntBase ArgMod, NullablePtr<SILInstruction> Inst) {
+  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::ConstantProp)) {
     mangleConstantProp(cast<LiteralInst>(Inst.get()));
     return;
   }
 
-  if (ArgMod & uint8_t(ArgumentModifier::ClosureProp)) {
+  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::ClosureProp)) {
     mangleClosureProp(cast<PartialApplyInst>(Inst.get()));
     return;
   }
 
   llvm::raw_ostream &os = getBuffer();
 
-  if (ArgMod == uint8_t(ArgumentModifier::Unmodified)) {
+  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::Unmodified)) {
     os << "n";
     return;
   }
 
-  if (ArgMod == uint8_t(ArgumentModifier::Dead)) {
+  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::Dead)) {
     os << "d";
     return;
   }
 
   bool hasSomeMod = false;
-  if (ArgMod & uint8_t(ArgumentModifier::OwnedToGuaranteed)) {
+  if (ArgMod & ArgumentModifierIntBase(ArgumentModifier::OwnedToGuaranteed)) {
     os << "g";
     hasSomeMod = true;
   }
-  if (ArgMod & uint8_t(ArgumentModifier::SROA)) {
+  if (ArgMod & ArgumentModifierIntBase(ArgumentModifier::SROA)) {
     os << "s";
     hasSomeMod = true;
   }
@@ -230,7 +229,7 @@ void FunctionSignatureSpecializationMangler::mangleSpecialization() {
   llvm::raw_ostream &os = getBuffer();
 
   for (unsigned i : indices(Args)) {
-    uint8_t ArgMod;
+    ArgumentModifierIntBase ArgMod;
     NullablePtr<SILInstruction> Inst;
     std::tie(ArgMod, Inst) = Args[i];
     mangleArgument(ArgMod, Inst);

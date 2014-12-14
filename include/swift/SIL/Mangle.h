@@ -126,16 +126,25 @@ class FunctionSignatureSpecializationMangler
 
   friend class SpecializationMangler<FunctionSignatureSpecializationMangler>;
 
-  enum class ArgumentModifier : uint8_t {
+  // We use this private typealias to make it easy to expand ArgumentModifier's
+  // size if we need to.
+  using ArgumentModifierIntBase = uint16_t;
+  enum class ArgumentModifier : ArgumentModifierIntBase {
+    // Option Space 4 bits (i.e. 16 options).
     Unmodified=0,
     Dead=1,
     ConstantProp=2,
-    ClosureProp=4,
-    OwnedToGuaranteed=8,
-    SROA=16,
+    ClosureProp=3,
+    First_Option=0, Last_Option=31,
+
+    // Option Set Space. 12 bits (i.e. 12 option).
+    OwnedToGuaranteed=32,
+    SROA=64,
+    First_OptionSetEntry=32, LastOptionSetEntry=32768,
   };
 
-  using ArgInfo = std::pair<uint8_t, NullablePtr<SILInstruction>>;
+  using ArgInfo = std::pair<ArgumentModifierIntBase,
+                            NullablePtr<SILInstruction>>;
   llvm::SmallVector<ArgInfo, 8> Args;
 
 public:
@@ -150,7 +159,8 @@ private:
   void mangleSpecialization();
   void mangleConstantProp(LiteralInst *LI);
   void mangleClosureProp(PartialApplyInst *PAI);
-  void mangleArgument(uint8_t ArgMod, NullablePtr<SILInstruction> Inst);
+  void mangleArgument(ArgumentModifierIntBase ArgMod,
+                      NullablePtr<SILInstruction> Inst);
 };
 
 } // end namespace Mangle

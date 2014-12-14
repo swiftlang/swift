@@ -188,8 +188,11 @@ static std::string archetypeName(Node::IndexType i) {
 }
 
 namespace {
-  enum class FunctionSigSpecializationParamInfoKind : unsigned {
-    // Normal Flags
+using FunctionSigSpecializationParamInfoKindIntBase = unsigned;
+  enum class FunctionSigSpecializationParamInfoKind
+    : FunctionSigSpecializationParamInfoKindIntBase {
+    // Option Flags use bits 0-5. This give us 6 bits implying 64 entries to
+    // work with.
     Dead=0,
     ConstantPropFunction=1,
     ConstantPropGlobal=2,
@@ -198,9 +201,10 @@ namespace {
     ConstantPropString=5,
     ClosureProp=6,
 
-    // Option Set Flags must be a power of 2.
-    OwnedToGuaranteed=8,
-    SROA=16,
+    // Option Set Flags use bits 6-31. This gives us 26 bits to use for option
+    // flags.
+    OwnedToGuaranteed=1 << 6,
+    SROA=1 << 7,
   };
 } // end anonymous namespace
 
@@ -760,9 +764,12 @@ private:
     return true;
   }
 
-#define FUNCSIGSPEC_CREATE_INFO_KIND(kind) \
-  NodeFactory::create(Node::Kind::FunctionSignatureSpecializationParamInfo, \
-                      unsigned(FunctionSigSpecializationParamInfoKind::kind))
+/// TODO: This is an atrocity. Come up with a shorter name.
+#define FUNCSIGSPEC_CREATE_INFO_KIND(kind)                              \
+  NodeFactory::create(                                                  \
+    Node::Kind::FunctionSignatureSpecializationParamInfo,               \
+      FunctionSigSpecializationParamInfoKindIntBase(                    \
+        FunctionSigSpecializationParamInfoKind::kind))
 
   NodePointer demangleFuncSigSpecializationConstantProp() {
     // Then figure out what was actually constant propagated. First check if
@@ -847,7 +854,7 @@ private:
         NodeFactory::create(Node::Kind::FunctionSignatureSpecializationParam,
                             paramCount);
 
-      // Check if this parameter was constant propagated.
+      // First handle options.
       if (Mangled.nextIf("d_")) {
         auto result = FUNCSIGSPEC_CREATE_INFO_KIND(Dead);
         if (!result)
@@ -864,6 +871,7 @@ private:
           return nullptr;
         param->addChild(result);
       } else {
+        // Otherwise handle option sets.
         unsigned Value = 0;
         if (Mangled.nextIf('g')) {
           Value |=
