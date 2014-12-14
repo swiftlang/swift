@@ -86,10 +86,9 @@ setArgumentDead(unsigned ArgNo) {
 
 void
 FunctionSignatureSpecializationMangler::
-setArgumentClosureProp(SILArgument *Arg, PartialApplyInst *PAI) {
-  assert(Arg->getFunction() == getFunction() && "Arg not from function");
-  auto &Info = Args[Arg->getIndex()];
-  Info.first |= uint8_t(ArgumentModifier::ClosureProp);
+setArgumentClosureProp(unsigned ArgNo, PartialApplyInst *PAI) {
+  auto &Info = Args[ArgNo];
+  Info.first = uint8_t(ArgumentModifier::ClosureProp);
   Info.second = PAI;
 }
 

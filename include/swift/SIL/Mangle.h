@@ -141,7 +141,7 @@ class FunctionSignatureSpecializationMangler
 public:
   FunctionSignatureSpecializationMangler(Mangler &M, SILFunction *F);
   void setArgumentConstantProp(unsigned ArgNo, LiteralInst *LI);
-  void setArgumentClosureProp(SILArgument *Arg, PartialApplyInst *PAI);
+  void setArgumentClosureProp(unsigned ArgNo, PartialApplyInst *PAI);
   void setArgumentDead(unsigned ArgNo);
   void setArgumentOwnedToGuaranteed(unsigned ArgNo);
   void setArgumentSROA(unsigned ArgNo);
