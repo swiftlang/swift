@@ -188,6 +188,7 @@ static std::string archetypeName(Node::IndexType i) {
 }
 
 namespace {
+
 using FunctionSigSpecializationParamInfoKindIntBase = unsigned;
   enum class FunctionSigSpecializationParamInfoKind
     : FunctionSigSpecializationParamInfoKindIntBase {
@@ -913,10 +914,20 @@ private:
 #undef FUNCSIGSPEC_CREATE_INFO_KIND
 
   NodePointer demangleSpecializedAttribute() {
-    if (Mangled.nextIf("g"))
+    if (Mangled.nextIf("g")) {
+      // Eat the pass id. We don't care about it.
+      Mangled.next();
+
+      // And then mangle the generic specialization.
       return demangleGenericSpecialization();
-    if (Mangled.nextIf("f"))
+    }
+    if (Mangled.nextIf("f")) {
+      // Eat the pass id. We don't care about it.
+      Mangled.next();
+
+      // Then perform the function signature specialization.
       return demangleFunctionSignatureSpecialization();
+    }
 
     // For now just return a specialized attribute if we don't know what we are
     // demangling. We will assert in a later commit.

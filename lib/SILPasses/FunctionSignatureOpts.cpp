@@ -456,7 +456,8 @@ llvm::SmallString<64> FunctionAnalyzer::getOptimizedName() {
   {
     llvm::raw_svector_ostream buffer(Name);
     Mangle::Mangler M(buffer);
-    Mangle::FunctionSignatureSpecializationMangler FSSM(M, F);
+    auto P = Mangle::SpecializationPass::FunctionSignatureOpts;
+    Mangle::FunctionSignatureSpecializationMangler FSSM(P, M, F);
 
     for (unsigned i : indices(ArgDescList)) {
       const ArgumentDescriptor &Arg = ArgDescList[i];

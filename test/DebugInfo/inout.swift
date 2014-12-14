@@ -12,7 +12,7 @@ typealias MyFloat = Float
 // CHECK:  call void @llvm.dbg.declare(metadata !{{{.*}} %[[ALLOCA]]}, metadata
 
 // Closure with promoted capture.
-// CHECK: define {{.*}}@_TTSfd_i___TFF5inout13modifyFooHeapFTRSiSf_T_U_FT_Si
+// CHECK: define {{.*}}@_TTSf2d_i___TFF5inout13modifyFooHeapFTRSiSf_T_U_FT_Si
 // CHECK: call void @llvm.dbg.declare(metadata !{i64* %{{.*}}}, metadata ![[A1:[0-9]+]], metadata ![[EMPTY_EXPR:[0-9]+]])
 
 // Inout reference type.

@@ -49,7 +49,7 @@ bb0:
   store %15 to %11#1 : $*Int
 
 // CHECK-NOT: function_ref @closure0 :
-// CHECK: [[CLOSURE_PROMOTE:%.*]] = function_ref @_TTSfd_i_d_i_d_i__closure0
+// CHECK: [[CLOSURE_PROMOTE:%.*]] = function_ref @_TTSf2d_i_d_i_d_i__closure0
 // CHECK-NOT: function_ref @closure0 :
 
 // The three strong retains are removed
@@ -82,7 +82,7 @@ bb0:
   return %21 : $@callee_owned () -> Int
 }
 
-// CHECK-LABEL: sil private @_TTSfd_i_d_i_d_i__closure0 : $@thin (@owned Foo, @owned Baz, Int) -> Int
+// CHECK-LABEL: sil private @_TTSf2d_i_d_i_d_i__closure0 : $@thin (@owned Foo, @owned Baz, Int) -> Int
 // CHECK: [[DUMMY_FUNC:%.*]] = function_ref @dummy_func : $@thin (Int, Int, Int) -> Int
 
 // The load of %1 is removed, and its uses replaced with the Foo argument
@@ -173,7 +173,7 @@ bb0(%0 : $*Int, %1 : $*Int):
   %4 = alloc_box $Int
   copy_addr %1 to [initialization] %4#1 : $*Int
   %6 = function_ref @apply : $@thin (@owned @callee_owned () -> ()) -> ()
-  // CHECK: [[PROMOTED:%[0-9a-zA-Z]+]] = function_ref @_TTSfn_n_d_i__closureWithGenericSignature : $@thin (@owned Builtin.NativeObject, @inout Int, Int) -> ()
+  // CHECK: [[PROMOTED:%[0-9a-zA-Z]+]] = function_ref @_TTSf2n_n_d_i__closureWithGenericSignature : $@thin (@owned Builtin.NativeObject, @inout Int, Int) -> ()
   %7 = function_ref @closureWithGenericSignature : $@thin <τ_0_0> (@owned Builtin.NativeObject, @inout Int, @owned Builtin.NativeObject, @inout Int) -> ()
   strong_retain %4#0 : $Builtin.NativeObject
   strong_retain %2#0 : $Builtin.NativeObject
@@ -188,7 +188,7 @@ bb0(%0 : $*Int, %1 : $*Int):
   return %16 : $()
 }
 
-// CHECK: sil @_TTSfn_n_d_i__closureWithGenericSignature : $@thin (@owned Builtin.NativeObject, @inout Int, Int) -> ()
+// CHECK: sil @_TTSf2n_n_d_i__closureWithGenericSignature : $@thin (@owned Builtin.NativeObject, @inout Int, Int) -> ()
 sil @closureWithGenericSignature : $@thin <T> (@owned Builtin.NativeObject, @inout Int, @owned Builtin.NativeObject, @inout Int) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $*Int, %2 : $Builtin.NativeObject, %3 : $*Int):
   %4 = function_ref @_TFSsoi1pFTSiSi_Si : $@thin (Int, Int) -> Int

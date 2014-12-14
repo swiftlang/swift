@@ -71,7 +71,8 @@ static llvm::SmallString<64> getClonedName(PartialApplyInst *PAI,
 
   llvm::raw_svector_ostream buffer(ClonedName);
   Mangle::Mangler M(buffer);
-  Mangle::FunctionSignatureSpecializationMangler Mangler(M, F);
+  auto P = Mangle::SpecializationPass::CapturePropagation;
+  Mangle::FunctionSignatureSpecializationMangler Mangler(P, M, F);
 
   // We know that all arguments are literal insts.
   auto Args = PAI->getArguments();

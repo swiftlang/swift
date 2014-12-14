@@ -70,8 +70,9 @@ void GenericSpecializationMangler::mangleSpecialization() {
 //===----------------------------------------------------------------------===//
 
 FunctionSignatureSpecializationMangler::
-FunctionSignatureSpecializationMangler(Mangler &M, SILFunction *F)
-  : SpecializationMangler(SpecializationSourceKind::FunctionSignature, M, F) {
+FunctionSignatureSpecializationMangler(SpecializationPass P, Mangler &M,
+                                       SILFunction *F)
+  : SpecializationMangler(SpecializationKind::FunctionSignature, P, M, F) {
   for (unsigned i : indices(F->getLoweredFunctionType()->getParameters())) {
     (void)i;
     Args.push_back({ArgumentModifierIntBase(ArgumentModifier::Unmodified), nullptr});

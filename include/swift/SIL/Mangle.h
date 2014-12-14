@@ -27,14 +27,33 @@ class AbstractClosureExpr;
 
 namespace Mangle {
 
-enum class SpecializationSourceKind : uint8_t {
+enum class SpecializationKind : uint8_t {
   Generic,
   FunctionSignature,
 };
 
+/// The pass that caused the specialization to occur. We use this to make sure
+/// that two passes that generate similar mangling changes do not have
+/// overriding types.
+///
+/// TODO: Can this actually happen?
+enum class SpecializationPass : uint8_t {
+  AllocBoxToStack,
+  ClosureSpecializer,
+  CapturePromotion,
+  CapturePropagation,
+  FunctionSignatureOpts,
+  GenericSpecializer,
+};
+
+static inline char encodeSpecializationPass(SpecializationPass Pass) {
+  return char(uint8_t(Pass)) + 48;
+}
+
 class SpecializationManglerBase {
 protected:
-  SpecializationSourceKind Kind;
+  SpecializationKind Kind;
+  SpecializationPass Pass;
   Mangler &M;
   SILFunction *Function;
 
@@ -51,8 +70,9 @@ public:
   friend class SpecializationMangler;
 
 protected:
-  SpecializationManglerBase(SpecializationSourceKind K, Mangler &M, SILFunction *F)
-    : Kind(K), M(M), Function(F) {}
+  SpecializationManglerBase(SpecializationKind K, SpecializationPass P,
+                            Mangler &M, SILFunction *F)
+    : Kind(K), Pass(P), M(M), Function(F) {}
 
   llvm::raw_ostream &getBuffer() { return M.Buffer; }
   SILFunction *getFunction() const { return Function; }
@@ -60,13 +80,17 @@ protected:
 
   void mangleKind() {
     switch (Kind) {
-    case SpecializationSourceKind::Generic:
+    case SpecializationKind::Generic:
       M.Buffer << "g";
       break;
-    case SpecializationSourceKind::FunctionSignature:
+    case SpecializationKind::FunctionSignature:
       M.Buffer << "f";
       break;
     }
+  }
+
+  void manglePass() {
+    M.Buffer << encodeSpecializationPass(Pass);
   }
 
   void mangleSpecializationPrefix() {
@@ -96,13 +120,15 @@ public:
   void mangle() {
     mangleSpecializationPrefix();
     mangleKind();
+    manglePass();
     asImpl()->mangleSpecialization();
     mangleFunctionName();
   }
 
 protected:
-  SpecializationMangler(SpecializationSourceKind K, Mangler &M, SILFunction *F)
-    : SpecializationManglerBase(K, M, F) {}
+  SpecializationMangler(SpecializationKind K, SpecializationPass P, Mangler &M,
+                        SILFunction *F)
+    : SpecializationManglerBase(K, P, M, F) {}
 };
 
 class GenericSpecializationMangler :
@@ -115,7 +141,9 @@ class GenericSpecializationMangler :
 public:
   GenericSpecializationMangler(Mangler &M, SILFunction *F,
                                ArrayRef<Substitution> Subs)
-    : SpecializationMangler(SpecializationSourceKind::Generic, M, F), Subs(Subs) {}
+    : SpecializationMangler(SpecializationKind::Generic,
+                            SpecializationPass::GenericSpecializer,
+                            M, F), Subs(Subs) {}
 
 private:
   void mangleSpecialization();
@@ -149,7 +177,8 @@ class FunctionSignatureSpecializationMangler
   llvm::SmallVector<ArgInfo, 8> Args;
 
 public:
-  FunctionSignatureSpecializationMangler(Mangler &M, SILFunction *F);
+  FunctionSignatureSpecializationMangler(SpecializationPass Pass,
+                                         Mangler &M, SILFunction *F);
   void setArgumentConstantProp(unsigned ArgNo, LiteralInst *LI);
   void setArgumentClosureProp(unsigned ArgNo, PartialApplyInst *PAI);
   void setArgumentDead(unsigned ArgNo);

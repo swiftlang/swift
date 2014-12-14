@@ -43,7 +43,7 @@ bb1:
 
 bb2:
   %14 = alloc_box $@callee_owned () -> Builtin.Int64
-  // CHECK: [[CLOSURE0_PROMOTE0:%.*]] = function_ref @_TTSfd_i__closure0 :
+  // CHECK: [[CLOSURE0_PROMOTE0:%.*]] = function_ref @_TTSf2d_i__closure0 :
   %15 = function_ref @closure0 : $@thin (@owned Builtin.NativeObject, @inout Builtin.Int64) -> Builtin.Int64
   strong_retain %4#0 : $Builtin.NativeObject
   // CHECK: partial_apply [[CLOSURE0_PROMOTE0]]({{%.*}})
@@ -53,7 +53,7 @@ bb2:
   cond_br %19, bb3, bb4
 
 bb3:
-  // CHECK: [[CLOSURE1_PROMOTE0:%.*]] = function_ref @_TTSfd_i__closure1 :
+  // CHECK: [[CLOSURE1_PROMOTE0:%.*]] = function_ref @_TTSf2d_i__closure1 :
   %21 = function_ref @closure1 : $@thin (@owned Builtin.NativeObject, @inout Builtin.Int64) -> Builtin.Int64
   strong_retain %4#0 : $Builtin.NativeObject
   // CHECK: partial_apply [[CLOSURE1_PROMOTE0]]({{%.*}})
@@ -129,7 +129,7 @@ bb2:
   cond_br %19, bb3, bb4
 
 bb3:
-  // CHECK: [[CLOSURE3_PROMOTE0:%.*]] = function_ref @_TTSfd_i__closure3 :
+  // CHECK: [[CLOSURE3_PROMOTE0:%.*]] = function_ref @_TTSf2d_i__closure3 :
   %21 = function_ref @closure3 : $@thin (@owned Builtin.NativeObject, @inout Builtin.Int64) -> Builtin.Int64
   strong_retain %4#0 : $Builtin.NativeObject
   // CHECK: partial_apply [[CLOSURE3_PROMOTE0]]({{%.*}})

@@ -281,7 +281,8 @@ static void createName(SILFunction *Callee, SILArgument *Arg,
                        llvm::SmallString<64> &Name) {
   llvm::raw_svector_ostream buffer(Name);
   Mangle::Mangler M(buffer);
-  Mangle::FunctionSignatureSpecializationMangler FSSM(M, Callee);
+  auto P = Mangle::SpecializationPass::ClosureSpecializer;
+  Mangle::FunctionSignatureSpecializationMangler FSSM(P, M, Callee);
   FSSM.setArgumentClosureProp(Arg->getIndex(), PAI);
   FSSM.mangle();
 }

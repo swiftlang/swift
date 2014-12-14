@@ -10,7 +10,7 @@ import Swift
 sil @capture_helper_2 : $@thin (Int) -> ()
 
 // CHECK-LABEL: test_capture_propagation
-// CHECK: %[[FR:[0-9]+]] = function_ref @_TTSfcpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_dT__XFo_iSi_dT__ : $@thin (@in Int) -> ()
+// CHECK: %[[FR:[0-9]+]] = function_ref @_TTSf3cpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_dT__XFo_iSi_dT__ : $@thin (@in Int) -> ()
 // CHECK: partial_apply %[[FR]]() : $@thin (@in Int) -> ()
 sil private @test_capture_propagation : $@thin () -> () {
 bb0:
