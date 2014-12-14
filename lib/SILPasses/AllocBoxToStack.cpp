@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "allocbox-to-stack"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
@@ -31,7 +32,11 @@ STATISTIC(NumStackPromoted, "Number of alloc_box's promoted to the stack");
 //                           alloc_box Promotion
 //===----------------------------------------------------------------------===//
 
-typedef llvm::SmallSet<unsigned int, 4> ParamIndexSet;
+/// This is a list we use to store a set of indices. We create the set by
+/// sorting, uniqueing at the appropriate time. The reason why it makes sense to
+/// just use a sorted vector with std::count is because generally functions do
+/// not have that many arguments and even less dead arguments.
+using ParamIndexList = llvm::SmallVector<unsigned, 8>;
 
 static SILInstruction* findUnexpectedBoxUse(SILValue Box,
                                             bool examinePartialApply,
@@ -460,7 +465,7 @@ class DeadParamCloner : public SILClonerWithScopes<DeadParamCloner> {
   friend class SILVisitor<DeadParamCloner>;
   friend class SILCloner<DeadParamCloner>;
 
-  DeadParamCloner(SILFunction *Orig, ParamIndexSet &DeadParamIndices);
+  DeadParamCloner(SILFunction *Orig, ParamIndexList &DeadParamIndices);
 
   void populateCloned();
 
@@ -468,13 +473,13 @@ class DeadParamCloner : public SILClonerWithScopes<DeadParamCloner> {
 
   private:
   static SILFunction *initCloned(SILFunction *Orig,
-                                 ParamIndexSet &DeadParamIndices);
+                                 ParamIndexList &DeadParamIndices);
 
   void visitStrongReleaseInst(StrongReleaseInst *Inst);
   void visitStrongRetainInst(StrongRetainInst *Inst);
 
   SILFunction *Orig;
-  ParamIndexSet &DeadParamIndices;
+  ParamIndexList &DeadParamIndices;
 
   // The values in the original function that are either dead or only
   // used in retains and releases.
@@ -483,9 +488,21 @@ class DeadParamCloner : public SILClonerWithScopes<DeadParamCloner> {
 } // end anonymous namespace.
 
 DeadParamCloner::DeadParamCloner(SILFunction *Orig,
-                                 ParamIndexSet &DeadParamIndices)
+                                 ParamIndexList &DeadParamIndices)
   : SILClonerWithScopes<DeadParamCloner>(*initCloned(Orig, DeadParamIndices)),
     Orig(Orig), DeadParamIndices(DeadParamIndices) {
+}
+
+static void getClonedName(SILFunction *F,
+                          ParamIndexList &DeadParamIndices,
+                          llvm::SmallString<64> &Name) {
+  llvm::raw_svector_ostream buffer(Name);
+  Mangle::Mangler M(buffer);
+  auto P = Mangle::SpecializationPass::AllocBoxToStack;
+  Mangle::FunctionSignatureSpecializationMangler FSSM(P, M, F);
+  for (unsigned i : DeadParamIndices)
+    FSSM.setArgumentDead(i);
+  FSSM.mangle();
 }
 
 /// \brief Create the function corresponding to the clone of the
@@ -493,20 +510,14 @@ DeadParamCloner::DeadParamCloner(SILFunction *Orig,
 /// parameters (which are specified by DeadParamIndices).
 SILFunction*
 DeadParamCloner::initCloned(SILFunction *Orig,
-                            ParamIndexSet &DeadParamIndices) {
+                            ParamIndexList &DeadParamIndices) {
   SILModule &M = Orig->getModule();
 
-  // Suffix the function name with "_specializedX", where X is the first integer
-  // that does not result in a conflict.
-  // TODO: come up with a good mangling for this transformation and
-  // use shared linkage.
-  unsigned Counter = 0;
-  std::string ClonedName;
-  do {
-    ClonedName.clear();
-    llvm::raw_string_ostream buffer(ClonedName);
-    buffer << Orig->getName() << "_specialized" << Counter++;
-  } while (M.lookUpFunction(ClonedName));
+  llvm::SmallString<64> ClonedName;
+  getClonedName(Orig, DeadParamIndices, ClonedName);
+
+  if (auto *PrevFn = M.lookUpFunction(ClonedName))
+    return PrevFn;
 
   SmallVector<SILParameterInfo, 4> ClonedInterfaceArgTys;
 
@@ -514,7 +525,7 @@ DeadParamCloner::initCloned(SILFunction *Orig,
   SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
   unsigned Index = 0;
   for (auto &param : OrigFTI->getParameters()) {
-    if (!DeadParamIndices.count(Index))
+    if (!std::count(DeadParamIndices.begin(), DeadParamIndices.end(), Index))
       ClonedInterfaceArgTys.push_back(param);
     ++Index;
   }
@@ -534,7 +545,7 @@ DeadParamCloner::initCloned(SILFunction *Orig,
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getDebugScope())
          && "SILFunction missing DebugScope");
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
-  auto Fn = SILFunction::create(M, Orig->getLinkage(), ClonedName, ClonedTy,
+  auto Fn = SILFunction::create(M, SILLinkage::Shared, ClonedName, ClonedTy,
                                 Orig->getContextGenericParams(),
                                 Orig->getLocation(), Orig->isBare(),
                                 IsNotTransparent, Orig->isFragile(),
@@ -559,7 +570,7 @@ DeadParamCloner::populateCloned() {
   unsigned ArgNo = 0;
   auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
   while (I != E) {
-    if (!DeadParamIndices.count(ArgNo)) {
+    if (!std::count(DeadParamIndices.begin(), DeadParamIndices.end(), ArgNo)) {
       // Create a new argument which copies the original argument.
       SILValue MappedValue =
         new (M) SILArgument(ClonedEntryBB, (*I)->getType(), (*I)->getDecl());
@@ -609,8 +620,9 @@ DeadParamCloner::visitStrongRetainInst(StrongRetainInst *Inst) {
 /// Specialize a partial_apply by removing the parameters indicated by
 /// indices. We expect these parameters to be either dead, or used
 /// only by retains and releases.
-static PartialApplyInst *specializePartialApply(PartialApplyInst *PartialApply,
-                                              ParamIndexSet &DeadParamIndices) {
+static PartialApplyInst *
+specializePartialApply(PartialApplyInst *PartialApply,
+                       ParamIndexList &DeadParamIndices) {
   auto *FRI = cast<FunctionRefInst>(PartialApply->getCallee());
   assert(FRI && "Expected a direct partial_apply!");
   auto *F = FRI->getReferencedFunction();
@@ -628,7 +640,8 @@ static PartialApplyInst *specializePartialApply(PartialApplyInst *PartialApply,
   // Only use the arguments that are not dead.
   for (auto &O : PartialApply->getArgumentOperands()) {
     auto ParamIndex = getParameterIndexForOperand(&O);
-    if (!DeadParamIndices.count(ParamIndex)) {
+    if (!std::count(DeadParamIndices.begin(), DeadParamIndices.end(),
+                    ParamIndex)) {
       Args.push_back(O.get());
       continue;
     }
@@ -662,8 +675,8 @@ static PartialApplyInst *specializePartialApply(PartialApplyInst *PartialApply,
 
 static void
 rewritePartialApplies(llvm::SmallVectorImpl<Operand *> &ElidedOperands) {
-  llvm::DenseMap<PartialApplyInst *, ParamIndexSet> IndexMap;
-  ParamIndexSet Indices;
+  llvm::DenseMap<PartialApplyInst *, ParamIndexList> IndexMap;
+  ParamIndexList Indices;
 
   // Build a map from partial_apply to the indices of the operands
   // that will not be in our rewritten version.
@@ -671,15 +684,15 @@ rewritePartialApplies(llvm::SmallVectorImpl<Operand *> &ElidedOperands) {
     auto ParamIndexNumber = getParameterIndexForOperand(O);
 
     Indices.clear();
-    Indices.insert(ParamIndexNumber);
+    Indices.push_back(ParamIndexNumber);
 
     auto *PartialApply = cast<PartialApplyInst>(O->getUser());
-    llvm::DenseMap<PartialApplyInst *, ParamIndexSet>::iterator It;
+    llvm::DenseMap<PartialApplyInst *, ParamIndexList>::iterator It;
     bool Inserted;
     std::tie(It, Inserted) = IndexMap.insert(std::make_pair(PartialApply,
                                                             Indices));
     if (!Inserted)
-      It->second.insert(ParamIndexNumber);
+      It->second.push_back(ParamIndexNumber);
   }
 
   // Clone the referenced function of each partial_apply, removing the
@@ -688,6 +701,11 @@ rewritePartialApplies(llvm::SmallVectorImpl<Operand *> &ElidedOperands) {
   for (auto &It : IndexMap) {
     auto *PartialApply = It.first;
     auto &Indices = It.second;
+
+    // Sort the indices and unique them.
+    std::sort(Indices.begin(), Indices.end());
+    Indices.erase(std::unique(Indices.begin(), Indices.end()), Indices.end());
+
     auto *Replacement = specializePartialApply(PartialApply, Indices);
     PartialApply->replaceAllUsesWith(Replacement);
 

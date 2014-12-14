@@ -335,7 +335,7 @@ bb0(%0 : $Int):
   store %0 to %2#1 : $*Int                        // id: %3
   // function_ref struct.apply (f : () -> Swift.Int) -> Swift.Int
   %4 = function_ref @_TF6struct5applyFT1fFT_Si_Si : $@thin (@owned @callee_owned () -> Int) -> Int // user: %8
-  // CHECK: [[FUNC:%[a-zA-Z0-9]+]] = function_ref @_TFF6struct8useStackFT1tSi_T_U_FT_Si_specialized0
+  // CHECK: [[FUNC:%[a-zA-Z0-9]+]] = function_ref @_TTSf0d_n___TFF6struct8useStackFT1tSi_T_U_FT_Si
   // function_ref struct.(useStack (t : Swift.Int) -> ()).(closure #1)
   %5 = function_ref @_TFF6struct8useStackFT1tSi_T_U_FT_Si : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int // user: %7
   strong_retain %2#0 : $Builtin.NativeObject     // id: %6
@@ -347,7 +347,7 @@ bb0(%0 : $Int):
   return %10 : $()                                // id: %11
 }
 
-// CHECK-LABEL: sil private @_TFF6struct8useStackFT1tSi_T_U_FT_Si_specialized0
+// CHECK-LABEL: sil shared @_TTSf0d_n___TFF6struct8useStackFT1tSi_T_U_FT_Si
 // CHECK-LABEL: sil private @_TFF6struct8useStackFT1tSi_T_U_FT_Si
 // struct.(useStack (t : Swift.Int) -> ()).(closure #1)
 sil private @_TFF6struct8useStackFT1tSi_T_U_FT_Si : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int {
@@ -449,7 +449,7 @@ bb0(%0 : $*T):
   // CHECK: copy_addr %0 to [initialization] [[STACK]]#1 : $*T
   copy_addr %0 to [initialization] %4#1 : $*T
   // CHECK: destroy_addr [[STACK]]#1 : $*T
-  // CHECK: [[CLOSURE:%[0-9a-zA-Z]+]] = function_ref @closure_to_specialize{{.*}}
+  // CHECK: [[CLOSURE:%[0-9a-zA-Z]+]] = function_ref @_TTSf0n_d_n__closure_to_specialize
   // CHECK: partial_apply [[CLOSURE]]<T>([[STACK]]#1)
   %6 = partial_apply %3<T>(%4#0, %4#1) : $@thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @owned Builtin.NativeObject, @inout τ_0_0) -> ()
   %7 = apply [transparent] %2<T>(%6) : $@thin <τ_0_0 where τ_0_0 : P> (@owned @callee_owned (@out τ_0_0) -> ()) -> ()
@@ -460,7 +460,7 @@ bb0(%0 : $*T):
   return %9 : $()
 }
 
-// CHECK-LABEL: sil shared @closure_to_specialize_specialized0 : $@thin <T where T : P> (@out T, @inout T) -> ()
+// CHECK-LABEL: sil shared @_TTSf0n_d_n__closure_to_specialize : $@thin <T where T : P> (@out T, @inout T) -> ()
 sil shared @closure_to_specialize : $@thin <T where T : P> (@out T, @owned Builtin.NativeObject, @inout T) -> () {
 // CHECK: bb0
 bb0(%0 : $*T, %1 : $Builtin.NativeObject, %2 : $*T):
