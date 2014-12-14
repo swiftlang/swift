@@ -9,22 +9,52 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// Promotes captures from 'inout' (i.e. by-reference) to by-value
+// ==============================================================
+//
+// Swift's closure model is that all local variables are capture by reference.
+// This produces a very simple programming model which is great to use, but
+// relies on the optimizer to promote by-ref captures to by-value (i.e. by-copy)
+// captures for decent performance. Consider this simple example:
+//
+//   func foo(a : () -> ()) {} // assume this has an unknown body
+//
+//   func bar() {
+//     var x = 42
+//
+//     foo({ print(x) })
+//   }
+//
+// Since x is captured by-ref by the closure, x must live on the heap. By
+// looking at bar without any knowledge of foo, we can know that it is safe to
+// promote this to a by-value capture, allowing x to live on the stack under the
+// following conditions:
+//
+// 1. If x is not modified in the closure body and is only loaded.
+// 2. If we can prove that all mutations to x occur before the closure is
+//    formed.
+//
+// Under these conditions if x is loadable then we can even load the given value
+// and pass it as a scalar instead of an address.
+//
+//===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "capture-promotion"
+#define DEBUG_TYPE "sil-capture-promotion"
 #include "swift/SILPasses/Passes.h"
+#include "swift/SIL/Mangle.h"
+#include "swift/SIL/SILCloner.h"
+#include "swift/SIL/TypeSubstCloner.h"
+#include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
-#include "swift/SIL/TypeSubstCloner.h"
-#include "swift/SILPasses/Transforms.h"
-
 #include <tuple>
 
 using namespace swift;
 
 typedef llvm::SmallSet<unsigned, 4> IndicesSet;
-typedef llvm::DenseMap<PartialApplyInst*, unsigned> PartialApplyIndexMap;
 typedef llvm::DenseMap<PartialApplyInst*, IndicesSet> PartialApplyIndicesMap;
 
 STATISTIC(NumCapturesPromoted, "Number of captures promoted");
@@ -272,12 +302,80 @@ ClosureCloner::ClosureCloner(SILFunction *Orig,
     Orig(Orig), PromotableIndices(PromotableIndices) {
 }
 
+/// Compute the SILParameterInfo list for the new cloned closure.
+///
+/// SILGen always closes over boxes such that the container address is
+/// first. Thus we know that:
+///
+/// 1. By assumption, all indices that is a box container value is in
+///    PromotableIndices.
+/// 2. All box address values must have the box container value previous to
+///    it implying that PromotableIndices.count(ParamIndex - 1) will be true.
+/// 3. The first parameter can *never* be a box address value since there
+///    does not exist any previous box container that is able to be
+///    associated with it.
+///
+/// Our goal as a result of this transformation is to:
+///
+/// 1. Let through all arguments not related to a promotable box.
+/// 2. Do not add any container box value arguments to the cloned closure.
+/// 3. Add the address box value argument to the cloned closure with the
+///    appropriate transformations.
+static void
+computeNewArgInterfaceTypes(SILFunction *F,
+                            IndicesSet &PromotableIndices,
+                            SmallVectorImpl<SILParameterInfo> &OutTys) {
+  auto Parameters = F->getLoweredFunctionType()->getParameters();
+
+  DEBUG(llvm::dbgs() << "Preparing New Args!\n");
+
+  // For each parameter in the old function...
+  for (unsigned Index : indices(Parameters)) {
+    auto &param = Parameters[Index];
+
+    DEBUG(llvm::dbgs() << "Index: " << Index << "; PromotableIndices: "
+          << (PromotableIndices.count(Index)?"yes":"no")
+          << " Param: "; param.dump());
+
+    // With that in mind, first check if we do not have a box address value...
+    if (Index == 0 || !PromotableIndices.count(Index - 1)) {
+
+      // If we do not have a box address value, if we have a box container
+      // value, continue so we do not add it to the new closure's function type.
+      if (PromotableIndices.count(Index))
+        continue;
+
+      // Otherwise, we have a function argument not related to a promotable
+      // box. Just add it to the new signature and continue.
+      OutTys.push_back(param);
+      continue;
+    }
+
+    // Otherwise, we have an address value of the box. Perform the proper
+    // conversions and then add it to the new parameter list for the type.
+    assert(param.getConvention() == ParameterConvention::Indirect_Inout);
+    auto &paramTL = F->getModule().Types.getTypeLowering(param.getSILType());
+    ParameterConvention convention;
+    if (paramTL.isPassedIndirectly()) {
+      convention = ParameterConvention::Indirect_In;
+    } else if (paramTL.isTrivial()) {
+      convention = ParameterConvention::Direct_Unowned;
+    } else {
+      convention = ParameterConvention::Direct_Owned;
+    }
+    OutTys.push_back(SILParameterInfo(param.getType(), convention));
+  }
+}
+
 /// \brief Create the function corresponding to the clone of the original
 /// closure with the signature modified to reflect promotable captures (which
 /// are givien by PromotableIndices, such that each entry in the set is the
 /// index of the box containing the variable in the closure's argument list, and
 /// the address of the box's contents is the argument immediately following each
 /// box argument); does not actually clone the body of the function
+///
+/// *NOTE* PromotableIndices only contains the container value of the box, not
+/// the address value.
 SILFunction*
 ClosureCloner::initCloned(SILFunction *Orig,
                           TypeSubstitutionMap &InterfaceSubs,
@@ -296,31 +394,12 @@ ClosureCloner::initCloned(SILFunction *Orig,
     buffer << Orig->getName() << "_promote" << Counter++;
   } while (M.lookUpFunction(ClonedName));
 
+  // Compute the arguments for our new function.
   SmallVector<SILParameterInfo, 4> ClonedInterfaceArgTys;
-
-  SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
-  unsigned Index = 0;
-  for (auto &param : OrigFTI->getParameters()) {
-    if (Index && PromotableIndices.count(Index - 1)) {
-      assert(param.getConvention() == ParameterConvention::Indirect_Inout);
-      auto &paramTL = M.Types.getTypeLowering(param.getSILType());
-      ParameterConvention convention;
-      if (paramTL.isPassedIndirectly()) {
-        convention = ParameterConvention::Indirect_In;
-      } else if (paramTL.isTrivial()) {
-        convention = ParameterConvention::Direct_Unowned;
-      } else {
-        convention = ParameterConvention::Direct_Owned;
-      }
-      ClonedInterfaceArgTys.push_back(SILParameterInfo(param.getType(),
-                                                       convention));
-    } else if (!PromotableIndices.count(Index)) {
-      ClonedInterfaceArgTys.push_back(param);
-    }
-    ++Index;
-  }
+  computeNewArgInterfaceTypes(Orig, PromotableIndices, ClonedInterfaceArgTys);
 
   Module *SM = M.getSwiftModule();
+  SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
 
   // Create the thin function type for the cloned closure.
   auto ClonedTy =
@@ -603,17 +682,17 @@ static bool signatureHasDependentTypes(SILFunctionType &CalleeTy) {
 /// argument list is added to IM.
 static bool
 examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
-                    PartialApplyIndexMap &IM) {
+                    llvm::DenseMap<PartialApplyInst*, unsigned> &IM) {
   SmallVector<SILInstruction*, 32> Mutations;
   
   // If the AllocBox is used by a mark_uninitialized, scan the MUI for
   // interesting uses.
-  SILValue Addr(ABI, 1);
+  SILValue Addr = ABI->getAddressResult();
   if (Addr.hasOneUse())
     if (auto MUI = dyn_cast<MarkUninitializedInst>(Addr.use_begin()->getUser()))
-      Addr = SILValue(MUI, 0);
+      Addr = SILValue(MUI);
   
-  for (auto *O : Addr.getUses()) {
+  for (Operand *O : Addr.getUses()) {
     if (auto *PAI = dyn_cast<PartialApplyInst>(O->getUser())) {
       unsigned OpNo = O->getOperandNumber();
       assert(OpNo != 0 && "Alloc box used as callee of partial apply?");
@@ -626,7 +705,7 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
 
       // Verify that the previous operand of the partial apply is the refcount
       // result of the alloc_box.
-      if (PAI->getOperand(OpNo - 1) != SILValue(ABI, 0))
+      if (PAI->getOperand(OpNo - 1) != SILValue(ABI))
         return false;
 
       auto Callee = PAI->getCallee();
@@ -803,28 +882,36 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
 }
 
 static void
-processFunction(SILFunction *F, SmallVectorImpl<SILFunction*> &Worklist) {
+constructMapFromPartialApplyToPromoteableIndices(SILFunction *F,
+                                                 PartialApplyIndicesMap &Map) {
   ReachabilityInfo RS(F);
-
-  // This is a map from each partial apply to a set of indices of promotable
-  // box variables.
-  PartialApplyIndicesMap IndicesMap;
 
   // This is a map from each partial apply to a single index which is a
   // promotable box variable for the alloc_box currently being considered.
-  PartialApplyIndexMap IndexMap;
+  llvm::DenseMap<PartialApplyInst*, unsigned> IndexMap;
 
   // Consider all alloc_box instructions in the function.
-  for (auto &BB : *F)
-    for (auto &I : BB)
+  for (auto &BB : *F) {
+    for (auto &I : BB) {
       if (auto *ABI = dyn_cast<AllocBoxInst>(&I)) {
         IndexMap.clear();
-        if (examineAllocBoxInst(ABI, RS, IndexMap))
+        if (examineAllocBoxInst(ABI, RS, IndexMap)) {
           // If we are able to promote at least one capture of the alloc_box,
           // then add the promotable indices to the main map.
           for (auto &IndexPair : IndexMap)
-            IndicesMap[IndexPair.first].insert(IndexPair.second);
+            Map[IndexPair.first].insert(IndexPair.second);
+        }
       }
+    }
+  }
+}
+
+static void
+processFunction(SILFunction *F, SmallVectorImpl<SILFunction*> &Worklist) {
+  // This is a map from each partial apply to a set of indices of promotable
+  // box variables.
+  PartialApplyIndicesMap IndicesMap;
+  constructMapFromPartialApplyToPromoteableIndices(F, IndicesMap);
 
   // Do the actual promotions; all promotions on a single partial_apply are
   // handled together.
