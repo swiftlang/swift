@@ -1,4 +1,4 @@
-// RUN: %swift -parse -sdk %sdk %s -verify
+// RUN: %target-build-swift -parse %s -Xfrontend -verify
 // REQUIRES: sdk
 
 import GLKit
