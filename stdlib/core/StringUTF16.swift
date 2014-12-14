@@ -13,10 +13,15 @@
 extension String {
   /// A collection of UTF-16 code units that encodes a `String` value.
   public struct UTF16View : Sliceable, Reflectable {
+    public struct Index {
+      internal init(_ offset: Int) { _offset = offset }
+      internal let _offset: Int
+    }
+    
     /// The position of the first code unit if the `String` is
     /// non-empty; identical to `endIndex` otherwise.
-    public var startIndex: Int {
-      return 0
+    public var startIndex: Index {
+      return Index(0)
     }
     
     /// The "past the end" position.
@@ -24,8 +29,8 @@ extension String {
     /// `endIndex` is not a valid argument to `subscript`, and is always
     /// reachable from `startIndex` by zero or more applications of
     /// `successor()`.
-    public var endIndex: Int {
-      return _length
+    public var endIndex: Index {
+      return Index(_length)
     }
 
     func _toInternalIndex(i: Int) -> Int {
@@ -57,7 +62,8 @@ extension String {
     ///
     /// Requires: `position` is a valid position in `self` and
     /// `position != endIndex`.
-    public subscript(position: Int) -> Generator.Element {
+    public subscript(i: Index) -> Generator.Element {
+      let position = i._offset
       _precondition(position >= 0 && position < _length,
           "out-of-range access on a UTF16View")
 
@@ -93,8 +99,9 @@ extension String {
     ///
     /// Complexity: O(1) unless bridging from Objective-C requires an
     /// O(N) conversion.
-    public subscript(subRange: Range<Int>) -> UTF16View {
-      return UTF16View(_core, offset: _toInternalIndex(subRange.startIndex),
+    public subscript(subRange: Range<Index>) -> UTF16View {
+      return UTF16View(
+        _core, offset: _toInternalIndex(subRange.startIndex._offset),
           length: subRange.endIndex - subRange.startIndex)
     }
 
@@ -125,3 +132,25 @@ extension String {
     return UTF16View(_core)
   }
 }
+
+extension String.UTF16View.Index : RandomAccessIndexType {
+  public func successor() -> String.UTF16View.Index {
+    return String.UTF16View.Index(_offset.successor())
+  }
+  public func predecessor() -> String.UTF16View.Index {
+    return String.UTF16View.Index(_offset.predecessor())
+  }
+  public func distanceTo(x: String.UTF16View.Index) -> Int {
+    return x._offset - _offset
+  }
+  public func advancedBy(x: Int) -> String.UTF16View.Index {
+    return String.UTF16View.Index(_offset + x)
+  }
+}
+
+public func == (
+  lhs: String.UTF16View.Index, rhs: String.UTF16View.Index
+) -> Bool {
+  return lhs._offset == rhs._offset
+}
+
