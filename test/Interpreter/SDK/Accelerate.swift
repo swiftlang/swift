@@ -1,4 +1,8 @@
-// RUN: %target-run-simple-swift 
+// RUN: %target-run-simple-swift
+//
+// vU1024Divide() is only available on OS X.
+// REQUIRES: OS=macosx
+
 import Accelerate
 
 extension vU1024: IntegerLiteralConvertible, Printable, Equatable {
