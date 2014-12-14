@@ -14,8 +14,11 @@ extension String {
   /// A collection of UTF-16 code units that encodes a `String` value.
   public struct UTF16View : Sliceable, Reflectable {
     public struct Index {
+      // Foundation needs access to these fields so it can expose
+      // random access 
+      public init(_offset: Int) { self._offset = _offset }
       internal init(_ offset: Int) { _offset = offset }
-      internal let _offset: Int
+      public let _offset: Int
     }
     
     /// The position of the first code unit if the `String` is
@@ -102,7 +105,7 @@ extension String {
     public subscript(subRange: Range<Index>) -> UTF16View {
       return UTF16View(
         _core, offset: _toInternalIndex(subRange.startIndex._offset),
-          length: subRange.endIndex - subRange.startIndex)
+          length: subRange.endIndex._offset - subRange.startIndex._offset)
     }
 
     internal init(_ _core: _StringCore) {
@@ -133,18 +136,12 @@ extension String {
   }
 }
 
-extension String.UTF16View.Index : RandomAccessIndexType {
+extension String.UTF16View.Index : BidirectionalIndexType {
   public func successor() -> String.UTF16View.Index {
     return String.UTF16View.Index(_offset.successor())
   }
   public func predecessor() -> String.UTF16View.Index {
     return String.UTF16View.Index(_offset.predecessor())
-  }
-  public func distanceTo(x: String.UTF16View.Index) -> Int {
-    return x._offset - _offset
-  }
-  public func advancedBy(x: Int) -> String.UTF16View.Index {
-    return String.UTF16View.Index(_offset + x)
   }
 }
 

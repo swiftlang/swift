@@ -87,3 +87,12 @@ extension String {
     return _ns.uppercaseString
   }
 }
+
+extension String.UTF16View.Index : RandomAccessIndexType {
+  public func distanceTo(x: String.UTF16View.Index) -> Int {
+    return x._offset - _offset
+  }
+  public func advancedBy(x: Int) -> String.UTF16View.Index {
+    return String.UTF16View.Index(_offset: _offset + x)
+  }
+}
