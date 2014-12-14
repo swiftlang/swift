@@ -200,6 +200,7 @@ using FunctionSigSpecializationParamInfoKindIntBase = unsigned;
     ConstantPropFloat=4,
     ConstantPropString=5,
     ClosureProp=6,
+    InOutToValue=7,
 
     // Option Set Flags use bits 6-31. This gives us 26 bits to use for option
     // flags.
@@ -867,6 +868,11 @@ private:
         param->addChild(result);
       } else if (Mangled.nextIf("cl")) {
         auto result = demangleFuncSigSpecializationClosureProp();
+        if (!result)
+          return nullptr;
+        param->addChild(result);
+      } else if (Mangled.nextIf("i_")) {
+        auto result = FUNCSIGSPEC_CREATE_INFO_KIND(InOutToValue);
         if (!result)
           return nullptr;
         param->addChild(result);
@@ -2709,6 +2715,9 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     switch (FunctionSigSpecializationParamInfoKind(raw)) {
     case FunctionSigSpecializationParamInfoKind::Dead:
       Printer << "Dead";
+      break;
+    case FunctionSigSpecializationParamInfoKind::InOutToValue:
+      Printer << "Value Promoted from InOut";
       break;
     case FunctionSigSpecializationParamInfoKind::ConstantPropFunction:
     case FunctionSigSpecializationParamInfoKind::ConstantPropGlobal:

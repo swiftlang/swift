@@ -22,11 +22,11 @@ func test_capture_promotion() -> () -> Int {
 
 // CHECK-NOT: alloc_box
 
-// CHECK: [[CLOSURE0_PROMOTE0:%.*]] = function_ref @_TFF17capture_promotion22test_capture_promotionFT_FT_SiU_FT_Si_promote0
+// CHECK: [[CLOSURE0_PROMOTE0:%.*]] = function_ref @_TTSfd_i_d_i_d_i___TFF17capture_promotion22test_capture_promotionFT_FT_SiU_FT_Si
 // CHECK: partial_apply [[CLOSURE0_PROMOTE0]]({{%[0-9]*}}, {{%[0-9]*}}, {{%[0-9]*}})
 
   return { x + y.foo() + z.x }
 }
 
-// CHECK: sil shared @_TFF17capture_promotion22test_capture_promotionFT_FT_SiU_FT_Si_promote0 : $@thin (Int, @owned Foo, @owned Baz) -> Int
+// CHECK: sil shared @_TTSfd_i_d_i_d_i___TFF17capture_promotion22test_capture_promotionFT_FT_SiU_FT_Si : $@thin (Int, @owned Foo, @owned Baz) -> Int
 

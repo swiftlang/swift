@@ -9,7 +9,7 @@ func a(var #i: Int) -> (Int) -> Int {
 }
 
 // -- Closure entry point
-// CHECK: define linkonce_odr hidden i64 @[[CLOSURE:_TFF7closure1aFT1iSi_FSiSiU_FSiSi_promote0]](i64, i64)
+// CHECK: define linkonce_odr hidden i64 @[[CLOSURE:_TTSfn_d_i___TFF7closure1aFT1iSi_FSiSiU_FSiSi]](i64, i64)
 
 // -- partial_apply stub
 // CHECK: define internal i64 @_TPA_[[CLOSURE]](i64, %swift.refcounted*) {

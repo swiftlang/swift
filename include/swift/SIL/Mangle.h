@@ -135,6 +135,7 @@ class FunctionSignatureSpecializationMangler
     Dead=1,
     ConstantProp=2,
     ClosureProp=3,
+    InOutToValue=4,
     First_Option=0, Last_Option=31,
 
     // Option Set Space. 12 bits (i.e. 12 option).
@@ -154,6 +155,7 @@ public:
   void setArgumentDead(unsigned ArgNo);
   void setArgumentOwnedToGuaranteed(unsigned ArgNo);
   void setArgumentSROA(unsigned ArgNo);
+  void setArgumentInOutToValue(unsigned ArgNo);
 
 private:
   void mangleSpecialization();

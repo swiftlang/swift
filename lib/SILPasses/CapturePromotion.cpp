@@ -189,7 +189,8 @@ public:
   friend class SILVisitor<ClosureCloner>;
   friend class SILCloner<ClosureCloner>;
 
-  ClosureCloner(SILFunction *Orig, TypeSubstitutionMap &InterfaceSubs,
+  ClosureCloner(SILFunction *Orig, StringRef ClonedName,
+                TypeSubstitutionMap &InterfaceSubs,
                 TypeSubstitutionMap &ContextSubs,
                 ArrayRef<Substitution> ApplySubs,
                 IndicesSet &PromotableIndices);
@@ -199,7 +200,7 @@ public:
   SILFunction *getCloned() { return &getBuilder().getFunction(); }
 
 private:
-  static SILFunction *initCloned(SILFunction *Orig,
+  static SILFunction *initCloned(SILFunction *Orig, StringRef ClonedName,
                                  TypeSubstitutionMap &InterfaceSubs,
                                  IndicesSet &PromotableIndices);
 
@@ -291,13 +292,14 @@ ReachabilityInfo::isReachable(SILBasicBlock *From, SILBasicBlock *To) {
   return FromSet.test(FI->second);
 }
 
-ClosureCloner::ClosureCloner(SILFunction *Orig,
+ClosureCloner::ClosureCloner(SILFunction *Orig, StringRef ClonedName,
                              TypeSubstitutionMap &InterfaceSubs,
                              TypeSubstitutionMap &ContextSubs,
                              ArrayRef<Substitution> ApplySubs,
                              IndicesSet &PromotableIndices)
   : TypeSubstCloner<ClosureCloner>(
-                           *initCloned(Orig, InterfaceSubs, PromotableIndices),
+                           *initCloned(Orig, ClonedName, InterfaceSubs,
+                                       PromotableIndices),
                            *Orig, ContextSubs, ApplySubs),
     Orig(Orig), PromotableIndices(PromotableIndices) {
 }
@@ -367,6 +369,34 @@ computeNewArgInterfaceTypes(SILFunction *F,
   }
 }
 
+static llvm::SmallString<64> getSpecializedName(SILFunction *F,
+                                                IndicesSet &PromotableIndices) {
+  llvm::SmallString<64> Name;
+
+  {
+    llvm::raw_svector_ostream buffer(Name);
+    Mangle::Mangler M(buffer);
+    Mangle::FunctionSignatureSpecializationMangler FSSM(M, F);
+    CanSILFunctionType FTy = F->getLoweredFunctionType();
+
+    ArrayRef<SILParameterInfo> Parameters = FTy->getParameters();
+    for (unsigned Index : indices(Parameters)) {
+      if (Index == 0 || !PromotableIndices.count(Index - 1)) {
+        if (!PromotableIndices.count(Index))
+          continue;
+        FSSM.setArgumentDead(Index);
+        continue;
+      }
+
+      FSSM.setArgumentInOutToValue(Index);
+    }
+
+    FSSM.mangle();
+  }
+
+  return Name;
+}
+
 /// \brief Create the function corresponding to the clone of the original
 /// closure with the signature modified to reflect promotable captures (which
 /// are givien by PromotableIndices, such that each entry in the set is the
@@ -377,22 +407,10 @@ computeNewArgInterfaceTypes(SILFunction *F,
 /// *NOTE* PromotableIndices only contains the container value of the box, not
 /// the address value.
 SILFunction*
-ClosureCloner::initCloned(SILFunction *Orig,
+ClosureCloner::initCloned(SILFunction *Orig, StringRef ClonedName,
                           TypeSubstitutionMap &InterfaceSubs,
                           IndicesSet &PromotableIndices) {
   SILModule &M = Orig->getModule();
-
-  // Suffix the function name with "_promoteX", where X is the first integer
-  // that does not result in a conflict.
-  // TODO: come up with a good mangling for this transformation and
-  // use shared linkage.
-  unsigned Counter = 0;
-  std::string ClonedName;
-  do {
-    ClonedName.clear();
-    llvm::raw_string_ostream buffer(ClonedName);
-    buffer << Orig->getName() << "_promote" << Counter++;
-  } while (M.lookUpFunction(ClonedName));
 
   // Compute the arguments for our new function.
   SmallVector<SILParameterInfo, 4> ClonedInterfaceArgTys;
@@ -418,7 +436,7 @@ ClosureCloner::initCloned(SILFunction *Orig,
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getDebugScope())
          && "SILFunction missing DebugScope");
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
-  // This inserts the new cloned function before the original function.
+
   auto Fn = SILFunction::create(M, Orig->getLinkage(), ClonedName, SubstTy,
                                 Orig->getContextGenericParams(),
                                 Orig->getLocation(), Orig->isBare(),
@@ -791,6 +809,36 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
   return true;
 }
 
+static SILFunction *
+constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
+                        IndicesSet &PromotableIndices) {
+  SILFunction *F = PAI->getFunction();
+
+  // Create the substitution maps.
+  TypeSubstitutionMap InterfaceSubs;
+  ArrayRef<Substitution> ApplySubs = PAI->getSubstitutions();
+  if (auto *genericSig = F->getLoweredFunctionType()->getGenericSignature())
+    InterfaceSubs = genericSig->getSubstitutionMap(ApplySubs);
+
+  TypeSubstitutionMap ContextSubs;
+  if (auto *genericParams = F->getContextGenericParams())
+    ContextSubs = genericParams->getSubstitutionMap(ApplySubs);
+
+  // Create the Cloned Name for the function.
+  SILFunction *Orig = FRI->getReferencedFunction();
+  auto ClonedName = getSpecializedName(Orig, PromotableIndices);
+
+  // If we already have such a cloned function in the module then just use it.
+  if (auto *PrevF = F->getModule().lookUpFunction(ClonedName))
+    return PrevF;
+
+  // Otherwise, create a new clone.
+  ClosureCloner cloner(Orig, ClonedName, InterfaceSubs,
+                       ContextSubs, ApplySubs, PromotableIndices);
+  cloner.populateCloned();
+  return cloner.getCloned();
+}
+
 /// \brief Given a partial_apply instruction and a set of promotable indices,
 /// clone the closure with the promoted captures and replace the partial_apply
 /// with a partial_apply of the new closure, fixing up reference counting as
@@ -805,28 +853,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   assert(FRI && PAI->getCallee().getResultNumber() == 0);
 
   // Clone the closure with the given promoted captures.
-  SILFunction *ClonedFn;
-  {
-    auto *F = PAI->getFunction();
-
-    // Create the substitution maps.
-    TypeSubstitutionMap InterfaceSubs;
-    auto ApplySubs = PAI->getSubstitutions();
-    auto *genericSig = F->getLoweredFunctionType()->getGenericSignature();
-    if (genericSig)
-      InterfaceSubs = genericSig->getSubstitutionMap(ApplySubs);
-
-    TypeSubstitutionMap ContextSubs;
-    auto *genericParams = F->getContextGenericParams();
-    if (genericParams)
-      ContextSubs = genericParams->getSubstitutionMap(ApplySubs);
-
-    ClosureCloner cloner(FRI->getReferencedFunction(), InterfaceSubs,
-                         ContextSubs, ApplySubs, PromotableIndices);
-    cloner.populateCloned();
-    ClonedFn = cloner.getCloned();
-  }
-
+  SILFunction *ClonedFn = constructClonedFunction(PAI, FRI, PromotableIndices);
   Worklist.push_back(ClonedFn);
 
   // Initialize a SILBuilder and create a function_ref referencing the cloned

@@ -113,6 +113,12 @@ setArgumentSROA(unsigned ArgNo) {
 }
 
 void
+FunctionSignatureSpecializationMangler::
+setArgumentInOutToValue(unsigned ArgNo) {
+  Args[ArgNo].first = ArgumentModifierIntBase(ArgumentModifier::InOutToValue);
+}
+
+void
 FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
   Mangler &M = getMangler();
   llvm::raw_ostream &os = getBuffer();
@@ -209,6 +215,11 @@ mangleArgument(ArgumentModifierIntBase ArgMod, NullablePtr<SILInstruction> Inst)
 
   if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::Dead)) {
     os << "d";
+    return;
+  }
+
+  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::InOutToValue)) {
+    os << "i";
     return;
   }
 
