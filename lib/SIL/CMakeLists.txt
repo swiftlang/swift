@@ -10,6 +10,7 @@ add_swift_library(swiftSIL
   SILFunctionType.cpp
   SILGlobalVariable.cpp
   SILInstruction.cpp
+  SILInstructions.cpp
   SILLocation.cpp
   SILModule.cpp
   SILPrinter.cpp
