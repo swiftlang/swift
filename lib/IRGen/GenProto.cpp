@@ -3793,7 +3793,7 @@ namespace {
 
   protected:
     CanSILFunctionType FnType;
-    SmallVector<Source, 2> Sources;
+    std::vector<Source> Sources;
 
     llvm::DenseMap<FulfillmentKey, Fulfillment> Fulfillments;
 
