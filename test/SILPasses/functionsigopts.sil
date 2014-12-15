@@ -6,8 +6,8 @@ import Builtin
 // We do this check separately to ensure that this does not occur anywhere in
 // the output for the file. (Maybe this is an interesting enough feature to add to FileCheck?).
 
-// CHECK-NEGATIVE-NOT: sil [fragile] @_TTOS_dn_dead_arg_no_callsites : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
-// CHECK-NEGATIVE-NOT: sil [fragile] @_TTOS_o2g_owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@thin (@owned Builtin.NativeObject) -> () {
+// CHECK-NEGATIVE-NOT: sil [fragile] @_TTSf4d_n__dead_arg_no_callsites : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK-NEGATIVE-NOT: sil [fragile] @_TTSf4g__owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@thin (@owned Builtin.NativeObject) -> () {
 
 sil [fragile] @user : $@thin (Builtin.NativeObject) -> ()
 sil [fragile] @create_object : $@thin () -> Builtin.NativeObject

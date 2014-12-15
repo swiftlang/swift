@@ -387,7 +387,7 @@ FunctionAnalyzer::analyze() {
       }
     }
 
-    if (A.ProjTree.canExplodeValue()) {
+    if (A.canExplodeValue()) {
       ShouldOptimize = true;
       ++NumSROAArguments;
     }
