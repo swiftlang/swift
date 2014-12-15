@@ -15,8 +15,9 @@ extension String {
   public struct UTF16View : Sliceable, Reflectable {
     public struct Index {
       // Foundation needs access to these fields so it can expose
-      // random access 
-      public init(_offset: Int) { self._offset = _offset }
+      // random access
+      public // SPI(Foundation)
+      init(_offset: Int) { self._offset = _offset }
       internal init(_ offset: Int) { _offset = offset }
       public let _offset: Int
     }
