@@ -39,6 +39,18 @@ Because Swift does not yet support a notion of SPI, any implementation
 details that are shared across the stdlib's various sub-modules must
 also be public.  These names, too, use the `leading underscore rule`_.
 
+To document the reason for marking symbols public, we use comments:
+
+* symbols used in tests::
+
+    public // @testable
+    func _foo() { ... }
+
+* symbols that are SPIs for the module X::
+
+    public // SPI(X)
+    public _foo() { ... }
+
 `internal`
 ==========
 
