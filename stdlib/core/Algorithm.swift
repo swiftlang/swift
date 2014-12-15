@@ -161,7 +161,7 @@ public func split<S: Sliceable, R:BooleanType>(
 
 /// Return true iff the the initial elements of `s` are equal to `prefix`.
 public func startsWith<
-  S0: SequenceType, S1: SequenceType
+  S0 : SequenceType, S1 : SequenceType
   where
     S0.Generator.Element == S1.Generator.Element,
     S0.Generator.Element : Equatable
@@ -184,7 +184,7 @@ public func startsWith<
 /// `isEquivalent` is an `equivalence relation
 /// <http://en.wikipedia.org/wiki/Equivalence_relation>`_
 public func startsWith<
-  S0: SequenceType, S1: SequenceType
+  S0 : SequenceType, S1 : SequenceType
   where
     S0.Generator.Element == S1.Generator.Element
 >(s: S0, prefix: S1,
@@ -259,9 +259,7 @@ public struct EnumerateGenerator<
 ///
 /// Note:: idiomatic usage is to call `enumerate` instead of
 /// constructing an `EnumerateSequence` directly.
-public struct EnumerateSequence<
-  Base: SequenceType
-> : SequenceType {
+public struct EnumerateSequence<Base : SequenceType> : SequenceType {
   var base: Base
 
   /// Construct from a `Base` sequence
@@ -415,7 +413,7 @@ public func lexicographicalCompare<
 
 /// Return `true` iff an element in `seq` satisfies `predicate`.
 public func contains<
-  S: SequenceType, L: BooleanType
+  S : SequenceType, L : BooleanType
 >(seq: S, predicate: (S.Generator.Element)->L) -> Bool {
   for a in seq {
     if predicate(a) {
@@ -427,7 +425,7 @@ public func contains<
 
 /// Return `true` iff `x` is in `seq`.
 public func contains<
-  S: SequenceType where S.Generator.Element: Equatable
+  S : SequenceType where S.Generator.Element : Equatable
 >(seq: S, x: S.Generator.Element) -> Bool {
   return contains(seq, { $0 == x })
 }
@@ -435,7 +433,7 @@ public func contains<
 /// Return the result of repeatedly calling `combine` with an
 /// accumulated value initialized to `initial` and each element of
 /// `sequence`, in turn.
-public func reduce<S: SequenceType, U>(
+public func reduce<S : SequenceType, U>(
   sequence: S, initial: U, combine: (U, S.Generator.Element)->U
 ) -> U {
   var result = initial

@@ -221,7 +221,7 @@ public func XCTAssertFalse(expression: @autoclosure () -> BooleanType, _ message
   }
 }
 
-public func XCTAssertEqual<T: Equatable>(expression1: @autoclosure () -> T, expression2: @autoclosure () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertEqual<T : Equatable>(expression1: @autoclosure () -> T, expression2: @autoclosure () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Equal
   
   // evaluate each expression exactly once
@@ -260,9 +260,9 @@ public func XCTAssertEqual<T: Equatable>(expression1: @autoclosure () -> T, expr
 //  ContiguousArray<T>
 //  Slice<T>
 //  Array<T>
-//  Dictionary<T,U>
+//  Dictionary<T, U>
 
-public func XCTAssertEqual<T: Equatable>(expression1: @autoclosure () -> Slice<T>, expression2: @autoclosure () -> Slice<T>, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertEqual<T : Equatable>(expression1: @autoclosure () -> Slice<T>, expression2: @autoclosure () -> Slice<T>, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Equal
   
   // evaluate each expression exactly once
@@ -297,7 +297,7 @@ public func XCTAssertEqual<T: Equatable>(expression1: @autoclosure () -> Slice<T
   }
 }
 
-public func XCTAssertEqual<T: Equatable>(expression1: @autoclosure () -> ContiguousArray<T>, expression2: @autoclosure () -> ContiguousArray<T>, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertEqual<T : Equatable>(expression1: @autoclosure () -> ContiguousArray<T>, expression2: @autoclosure () -> ContiguousArray<T>, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Equal
   
   // evaluate each expression exactly once
@@ -332,12 +332,12 @@ public func XCTAssertEqual<T: Equatable>(expression1: @autoclosure () -> Contigu
   }
 }
 
-public func XCTAssertEqual<T: Equatable>(expression1: @autoclosure () -> Array<T>, expression2: @autoclosure () -> Array<T>, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertEqual<T : Equatable>(expression1: @autoclosure () -> [T], expression2: @autoclosure () -> [T], _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Equal
   
   // evaluate each expression exactly once
-  var expressionValue1Optional: Array<T>?
-  var expressionValue2Optional: Array<T>?
+  var expressionValue1Optional: [T]?
+  var expressionValue2Optional: [T]?
   
   let result = _XCTRunThrowableBlock {
     expressionValue1Optional = expression1()
@@ -346,8 +346,8 @@ public func XCTAssertEqual<T: Equatable>(expression1: @autoclosure () -> Array<T
   
   switch result {
   case .Success:
-    let expressionValue1: Array<T> = expressionValue1Optional!
-    let expressionValue2: Array<T> = expressionValue2Optional!
+    let expressionValue1: [T] = expressionValue1Optional!
+    let expressionValue2: [T] = expressionValue2Optional!
     
     if expressionValue1 != expressionValue2 {
       // TODO: @auto_string expression1
@@ -367,12 +367,12 @@ public func XCTAssertEqual<T: Equatable>(expression1: @autoclosure () -> Array<T
   }
 }
 
-public func XCTAssertEqual<T, U: Equatable>(expression1: @autoclosure () -> Dictionary<T, U>, expression2: @autoclosure () -> Dictionary<T, U>, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertEqual<T, U : Equatable>(expression1: @autoclosure () -> [T: U], expression2: @autoclosure () -> [T: U], _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Equal
   
   // evaluate each expression exactly once
-  var expressionValue1Optional: Dictionary<T, U>?
-  var expressionValue2Optional: Dictionary<T, U>?
+  var expressionValue1Optional: [T: U]?
+  var expressionValue2Optional: [T: U]?
   
   let result = _XCTRunThrowableBlock {
     expressionValue1Optional = expression1()
@@ -381,8 +381,8 @@ public func XCTAssertEqual<T, U: Equatable>(expression1: @autoclosure () -> Dict
   
   switch result {
   case .Success:
-    let expressionValue1: Dictionary<T, U> = expressionValue1Optional!
-    let expressionValue2: Dictionary<T, U> = expressionValue2Optional!
+    let expressionValue1: [T: U] = expressionValue1Optional!
+    let expressionValue2: [T: U] = expressionValue2Optional!
     
     if expressionValue1 != expressionValue2 {
       // TODO: @auto_string expression1
@@ -402,7 +402,7 @@ public func XCTAssertEqual<T, U: Equatable>(expression1: @autoclosure () -> Dict
   }
 }
 
-public func XCTAssertNotEqual<T: Equatable>(expression1: @autoclosure () -> T, expression2: @autoclosure () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotEqual<T : Equatable>(expression1: @autoclosure () -> T, expression2: @autoclosure () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqual
   
   // evaluate each expression exactly once
@@ -441,9 +441,9 @@ public func XCTAssertNotEqual<T: Equatable>(expression1: @autoclosure () -> T, e
 //  ContiguousArray<T>
 //  Slice<T>
 //  Array<T>
-//  Dictionary<T,U>
+//  Dictionary<T, U>
 
-public func XCTAssertNotEqual<T: Equatable>(expression1: @autoclosure () -> ContiguousArray<T>, expression2: @autoclosure () -> ContiguousArray<T>, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotEqual<T : Equatable>(expression1: @autoclosure () -> ContiguousArray<T>, expression2: @autoclosure () -> ContiguousArray<T>, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqual
   
   // evaluate each expression exactly once
@@ -478,7 +478,7 @@ public func XCTAssertNotEqual<T: Equatable>(expression1: @autoclosure () -> Cont
   }
 }
 
-public func XCTAssertNotEqual<T: Equatable>(expression1: @autoclosure () -> Slice<T>, expression2: @autoclosure () -> Slice<T>, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotEqual<T : Equatable>(expression1: @autoclosure () -> Slice<T>, expression2: @autoclosure () -> Slice<T>, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqual
   
   // evaluate each expression exactly once
@@ -513,12 +513,12 @@ public func XCTAssertNotEqual<T: Equatable>(expression1: @autoclosure () -> Slic
   }
 }
 
-public func XCTAssertNotEqual<T: Equatable>(expression1: @autoclosure () -> Array<T>, expression2: @autoclosure () -> Array<T>, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotEqual<T : Equatable>(expression1: @autoclosure () -> [T], expression2: @autoclosure () -> [T], _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqual
   
   // evaluate each expression exactly once
-  var expressionValue1Optional: Array<T>?
-  var expressionValue2Optional: Array<T>?
+  var expressionValue1Optional: [T]?
+  var expressionValue2Optional: [T]?
   
   let result = _XCTRunThrowableBlock {
     expressionValue1Optional = expression1()
@@ -527,8 +527,8 @@ public func XCTAssertNotEqual<T: Equatable>(expression1: @autoclosure () -> Arra
   
   switch result {
   case .Success:
-    let expressionValue1: Array<T> = expressionValue1Optional!
-    let expressionValue2: Array<T> = expressionValue2Optional!
+    let expressionValue1: [T] = expressionValue1Optional!
+    let expressionValue2: [T] = expressionValue2Optional!
     
     if expressionValue1 == expressionValue2 {
       // TODO: @auto_string expression1
@@ -548,12 +548,12 @@ public func XCTAssertNotEqual<T: Equatable>(expression1: @autoclosure () -> Arra
   }
 }
 
-public func XCTAssertNotEqual<T, U: Equatable>(expression1: @autoclosure () -> Dictionary<T,U>, expression2: @autoclosure () -> Dictionary<T,U>, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotEqual<T, U : Equatable>(expression1: @autoclosure () -> [T: U], expression2: @autoclosure () -> [T: U], _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqual
   
   // evaluate each expression exactly once
-  var expressionValue1Optional: Dictionary<T,U>?
-  var expressionValue2Optional: Dictionary<T,U>?
+  var expressionValue1Optional: [T: U]?
+  var expressionValue2Optional: [T: U]?
   
   let result = _XCTRunThrowableBlock {
     expressionValue1Optional = expression1()
@@ -562,8 +562,8 @@ public func XCTAssertNotEqual<T, U: Equatable>(expression1: @autoclosure () -> D
   
   switch result {
   case .Success:
-    let expressionValue1: Dictionary<T,U> = expressionValue1Optional!
-    let expressionValue2: Dictionary<T,U> = expressionValue2Optional!
+    let expressionValue1: [T: U] = expressionValue1Optional!
+    let expressionValue2: [T: U] = expressionValue2Optional!
     
     if expressionValue1 == expressionValue2 {
       // TODO: @auto_string expression1

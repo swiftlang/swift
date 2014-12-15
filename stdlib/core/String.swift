@@ -289,7 +289,7 @@ public func _stdlib_compareNSStringDeterministicUnicodeCollation(
 )-> Int32
 #endif
 
-extension String: Equatable {
+extension String : Equatable {
 }
 
 public func ==(lhs: String, rhs: String) -> Bool {

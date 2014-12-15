@@ -106,18 +106,18 @@ func _getOptionalValue<T>(v: T?) -> T {
 
 @transparent
 public // COMPILER_INTRINSIC
-func _injectValueIntoOptional<T>(v: T) -> Optional<T> {
+func _injectValueIntoOptional<T>(v: T) -> T? {
   return .Some(v)
 }
 
 @transparent
 public // COMPILER_INTRINSIC
-func _injectNothingIntoOptional<T>() -> Optional<T> {
+func _injectNothingIntoOptional<T>() -> T? {
   return .None
 }
 
 // Comparisons
-public func == <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
+public func == <T : Equatable> (lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
   case (.Some(let l), .Some(let r)):
     return l == r
@@ -128,7 +128,7 @@ public func == <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
   }
 }
 
-public func != <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
+public func != <T : Equatable> (lhs: T?, rhs: T?) -> Bool {
   return !(lhs == rhs)
 }
 

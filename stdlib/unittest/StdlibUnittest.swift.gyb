@@ -1174,7 +1174,7 @@ public func checkComparable<T : Comparable>(
 
 public func checkGenerator<
   G : GeneratorType, ${genericParam}
-  where ${Element} == G.Element, ${Element}: Equatable
+  where ${Element} == G.Element, ${Element} : Equatable
 >(
     expected: ${Expected},
     generator: G, stackTrace: SourceLocStack
@@ -1196,7 +1196,7 @@ public func checkGenerator<
 
 public func checkSequence<
   ${genericParam}, S : SequenceType
-    where S.Generator.Element == ${Element}, ${Element}: Equatable
+    where S.Generator.Element == ${Element}, ${Element} : Equatable
 >(
   expected: ${Expected},
   sequence: S, stackTrace: SourceLocStack
@@ -1208,7 +1208,7 @@ public func checkSequence<
 
 public func checkCollection<
     ${genericParam}, C : CollectionType
-  where C.Generator.Element == ${Element}, ${Element}: Equatable
+  where C.Generator.Element == ${Element}, ${Element} : Equatable
 >(
       expected: ${Expected},
       collection: C, stackTrace: SourceLocStack
@@ -1299,7 +1299,7 @@ public func checkRangeReplaceable<
   C: RangeReplaceableCollectionType,
   N: CollectionType
 where
-  C.Generator.Element: Equatable, C.Generator.Element == N.Generator.Element
+  C.Generator.Element : Equatable, C.Generator.Element == N.Generator.Element
 >(
   makeCollection: ()->C,
   makeNewValues: (Int)->N
@@ -1359,8 +1359,8 @@ where
 public func expectEqualSequence<
   Expected: SequenceType,
   Actual: SequenceType
-  where Expected.Generator.Element == Actual.Generator.Element, 
-     Expected.Generator.Element: Equatable
+  where Expected.Generator.Element == Actual.Generator.Element,
+     Expected.Generator.Element : Equatable
 >(
     expected: Expected, actual: Actual,
     stackTrace: SourceLocStack? = nil,

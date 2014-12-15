@@ -1115,7 +1115,7 @@ func _arrayAppendSequence<
 // Slice<Int> and Array<Int>.
 
 /// Returns true if these arrays contain the same elements.
-public func ==<T: Equatable>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
+public func ==<T : Equatable>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
   let lhsCount = lhs.count
   if lhsCount != rhs.count {
     return false
@@ -1142,7 +1142,7 @@ public func ==<T: Equatable>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
 }
 
 /// Returns true if the arrays do not contain the same elements.
-public func !=<T: Equatable>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
+public func !=<T : Equatable>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
   return !(lhs == rhs)
 }
 %end
