@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Random access for String.UTF16View, only when Foundation is
+// imported.  Making this API dependent on Foundation decouples the
+// Swift core from a UTF16 representation.
 extension String.UTF16View.Index : RandomAccessIndexType {
   public func distanceTo(x: String.UTF16View.Index) -> Int {
     return x._offset - _offset
