@@ -67,6 +67,14 @@ public:
     return getFunction()->getLoweredFunctionType()->getParameters()[getIndex()];
   }
 
+  /// Returns the incoming SILValue from the \p BBIndex predecessor of this
+  /// argument's parent BB. If the routine fails, it returns an empty SILValue.
+  SILValue getIncomingValue(unsigned BBIndex);
+
+  /// Returns the incoming SILValue for this argument from BB. If the routine
+  /// fails, it returns an empty SILValue.
+  SILValue getIncomingValue(SILBasicBlock *BB);
+
   /// Returns true if we were able to find incoming values for each predecessor
   /// of this arguments basic block. The found values are stored in OutArray.
   bool getIncomingValues(llvm::SmallVectorImpl<SILValue> &OutArray);

@@ -96,6 +96,89 @@ bool SILArgument::getIncomingValues(llvm::SmallVectorImpl<SILValue> &OutArray) {
   return true;
 }
 
+SILValue SILArgument::getIncomingValue(unsigned BBIndex) {
+  SILBasicBlock *Parent = getParent();
+
+  if (Parent->pred_empty())
+    return SILValue();
+
+  unsigned Index = getIndex();
+
+  // We could do an early check if the size of the pred list is <= BBIndex, but
+  // that would involve walking the linked list anyways, so we just iterate once
+  // over the loop.
+
+  // We use this funky loop since predecessors are stored in a linked list but
+  // we want array like semantics.
+  unsigned BBCount = 0;
+  for (SILBasicBlock *Pred : Parent->getPreds()) {
+    // If BBCount is not BBIndex, continue.
+    if (BBCount < BBIndex) {
+      BBCount++;
+      continue;
+    }
+
+    TermInst *TI = Pred->getTerminator();
+
+    if (auto *BI = dyn_cast<BranchInst>(TI))
+      return BI->getArg(Index);
+
+    if (auto *CBI = dyn_cast<CondBranchInst>(TI))
+      return CBI->getArgForDestBB(Parent, this);
+
+    if (auto *CCBI = dyn_cast<CheckedCastBranchInst>(TI))
+      return CCBI->getOperand();
+
+    if (auto *SWEI = dyn_cast<SwitchEnumInst>(TI))
+      return SWEI->getOperand();
+
+    // Return an empty SILValue since we ran into something we were unable to
+    // understand.
+    return SILValue();
+  }
+
+  return SILValue();
+}
+
+SILValue SILArgument::getIncomingValue(SILBasicBlock *BB) {
+  SILBasicBlock *Parent = getParent();
+
+  assert(!Parent->pred_empty() && "Passed in non-predecessor BB!");
+  unsigned Index = getIndex();
+
+  // We could do an early check if the size of the pred list is <= BBIndex, but
+  // that would involve walking the linked list anyways, so we just iterate once
+  // over the loop.
+
+  // We use this funky loop since predecessors are stored in a linked list but
+  // we want array like semantics.
+  for (SILBasicBlock *Pred : Parent->getPreds()) {
+    // If BBCount is not BBIndex, continue.
+    if (Pred != BB)
+      continue;
+
+    TermInst *TI = Pred->getTerminator();
+
+    if (auto *BI = dyn_cast<BranchInst>(TI))
+      return BI->getArg(Index);
+
+    if (auto *CBI = dyn_cast<CondBranchInst>(TI))
+      return CBI->getArgForDestBB(Parent, this);
+
+    if (auto *CCBI = dyn_cast<CheckedCastBranchInst>(TI))
+      return CCBI->getOperand();
+
+    if (auto *SWEI = dyn_cast<SwitchEnumInst>(TI))
+      return SWEI->getOperand();
+
+    // Return an empty SILValue since we ran into something we were unable to
+    // understand.
+    return SILValue();
+  }
+
+  return SILValue();
+}
+
 bool SILArgument::isSelf() const {
   // First make sure that we are actually a function argument. We use an assert
   // boolean return here since in release builds we want to conservatively
