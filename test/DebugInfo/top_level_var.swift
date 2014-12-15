@@ -5,4 +5,4 @@ println(a)
 // global variable.
 // CHECK: ![[MAIN:.*]] ={{.*}}; [ DW_TAG_subprogram ] [line 1] [def] [scope 0] [main]
 // CHECK: ![[MOD:.*]] ={{.*}}; [ DW_TAG_module ] [top_level_var]
-// CHECK: metadata ![[MOD]],{{.*}}; [ DW_TAG_variable ] [a] [line 2] [def]
+// CHECK: ![[MOD]],{{.*}}; [ DW_TAG_variable ] [a] [line 2] [def]

@@ -531,5 +531,5 @@ func zeroInitializerEmpty() {
   return Builtin.zeroInitializer()
 }
 
-// CHECK: ![[R]] = metadata !{i64 0, i64 9223372036854775807}
+// CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}
 

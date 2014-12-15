@@ -35,10 +35,10 @@ class MyObject : NSObject {
   var MyArr = NSArray()
 // Capture the pointer size from type Int
 // IMPORT-CHECK: %Si = type <{ i[[PTRSIZE:[0-9]+]] }>
-// IMPORT-CHECK-DAG: metadata ![[FOUNDATION:[0-9]+]], {{[^,]+}}, {{[^,]+}}, null, null, metadata ![[NSARRAY:.*]]} ; [ DW_TAG_structure_type ] [NSArray]
-// IMPORT-CHECK-DAG: [[FOUNDATION]] = {{.*}}metadata ![[FOUNDATION_FILE:[0-9]+]], null} ; [ DW_TAG_module ] [Foundation]
-// IMPORT-CHECK-DAG: metadata ![[NSARRAY]]} ; [ DW_TAG_member ] [MyArr] [line 0, size [[PTRSIZE]], align [[PTRSIZE]], offset 0] [from _TtCSo7NSArray]
-// IMPORT-CHECK-DAG: metadata ![[FOUNDATION]]} ; [ DW_TAG_imported_module ]
+// IMPORT-CHECK-DAG: ![[FOUNDATION:[0-9]+]], {{[^,]+}}, {{[^,]+}}, null, null, ![[NSARRAY:.*]]} ; [ DW_TAG_structure_type ] [NSArray]
+// IMPORT-CHECK-DAG: [[FOUNDATION]] = {{.*}}![[FOUNDATION_FILE:[0-9]+]], null} ; [ DW_TAG_module ] [Foundation]
+// IMPORT-CHECK-DAG: ![[NSARRAY]]} ; [ DW_TAG_member ] [MyArr] [line 0, size [[PTRSIZE]], align [[PTRSIZE]], offset 0] [from _TtCSo7NSArray]
+// IMPORT-CHECK-DAG: ![[FOUNDATION]]} ; [ DW_TAG_imported_module ]
 // IMPORT-CHECK-DAG: ![[FOUNDATION_FILE]] = {{.*}}Foundation
 
   // Force the use of Int.
@@ -88,7 +88,7 @@ func date() {
 // IMPORT-CHECK-DAG: [ DW_TAG_module ] [ObjectiveC]
 
 // LOC-CHECK: ![[THUNK:.*]] = {{.*}}_TToFC4main8MyObjectg5MyArrCSo7NSArray{{.*}} ; [ DW_TAG_subprogram ] [line 0] [def]
-// LOC-CHECK: ![[DBG]] = metadata !{i32 0, i32 0, metadata ![[THUNK]], null}
+// LOC-CHECK: ![[DBG]] = !{i32 0, i32 0, ![[THUNK]], null}
 
 // These debug locations should all be in ordered by increasing line number.
 // LOC-CHECK: ![[L1]] =

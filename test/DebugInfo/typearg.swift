@@ -8,8 +8,8 @@ class AClass : AProtocol {
 }
 
 // CHECK: define hidden void @{{.*}}aFunction
-// CHECK:  call void @llvm.dbg.declare(metadata !{%swift.type** %{{.*}}}, metadata ![[TYPEARG:.*]], metadata !{{[0-9]+}}),
-// CHECK: ![[TYPEARG]] = metadata !{metadata !"{{.*}}$swift.type.T\000\0064", metadata !{{[^,]+}}, metadata !{{[^,]+}}, metadata ![[SWIFTMETATYPE:.*]]} ; [ DW_TAG_auto_variable ] [$swift.type.T]
+// CHECK:  call void @llvm.dbg.declare(metadata %swift.type** %{{.*}}, metadata ![[TYPEARG:.*]], metadata !{{[0-9]+}}),
+// CHECK: ![[TYPEARG]] = !{!"{{.*}}$swift.type.T\000\0064", !{{[^,]+}}, !{{[^,]+}}, ![[SWIFTMETATYPE:.*]]} ; [ DW_TAG_auto_variable ] [$swift.type.T]
 // CHECK: ![[SWIFTMETATYPE]] = {{.*}} ; [ DW_TAG_typedef ] [$swift.type] [line 0, size 0, align 0, offset 0] [from _TtBp]
 func aFunction<T : AProtocol>(x: T) {
     println("I am in aFunction: \(x.f())")

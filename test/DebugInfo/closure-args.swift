@@ -15,7 +15,7 @@ func main() -> Void
     // The shadow copying should happen in the prologue, because the
     // stack pointer will be decremented after it.
     // CHECK-NOT: !dbg
-    // CHECK-NEXT: call void @llvm.dbg.declare(metadata !{%SS** %[[RHS_ADDR]]}, metadata !{{.*}}, metadata !{{[0-9]+}}), !dbg
+    // CHECK-NEXT: call void @llvm.dbg.declare(metadata %SS** %[[RHS_ADDR]], metadata !{{.*}}, metadata !{{[0-9]+}}), !dbg
     // CHECK-DAG: [ DW_TAG_arg_variable ] [lhs] [line [[@LINE+5]]]
     // CHECK-DAG: [ DW_TAG_arg_variable ] [rhs] [line [[@LINE+4]]]
     // CHECK-DAG: [ DW_TAG_arg_variable ] [random_string] [line 7]
@@ -26,7 +26,7 @@ func main() -> Void
                || count(rhs.unicodeScalars) == random_int
             {
             // Ensure the two local_vars are in different lexical scopes.
-            // CHECK-DAG: metadata !"0x100\00local_var\00[[@LINE+2]]\000", metadata ![[THENSCOPE:[0-9]+]], {{.*}}} ; [ DW_TAG_auto_variable ] [local_var] [line [[@LINE+2]]]
+            // CHECK-DAG: !"0x100\00local_var\00[[@LINE+2]]\000", ![[THENSCOPE:[0-9]+]], {{.*}}} ; [ DW_TAG_auto_variable ] [local_var] [line [[@LINE+2]]]
             // CHECK-DAG: ![[THENSCOPE]] = {{.*}}\00[[@LINE-3]]\00{{.*}}} ; [ DW_TAG_lexical_block ]
                 var local_var : Int = 10
                 print ("I have an int here \(local_var).\n")
@@ -34,7 +34,7 @@ func main() -> Void
             }
             else
             {
-            // CHECK-DAG: metadata !"0x100\00local_var\00[[@LINE+2]]\000", metadata ![[ELSESCOPE:[0-9]+]], {{.*}}} ; [ DW_TAG_auto_variable ] [local_var] [line [[@LINE+2]]]
+            // CHECK-DAG: !"0x100\00local_var\00[[@LINE+2]]\000", ![[ELSESCOPE:[0-9]+]], {{.*}}} ; [ DW_TAG_auto_variable ] [local_var] [line [[@LINE+2]]]
             // CHECK-DAG: ![[ELSESCOPE]] = {{.*}}\00[[@LINE-2]]\00{{.*}}} ; [ DW_TAG_lexical_block ]
                 var local_var : String = "g"
                 print ("I have another string here \(local_var).\n")

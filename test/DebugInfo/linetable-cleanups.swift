@@ -24,6 +24,6 @@ func main() {
 // CHECK:  call void {{.*}}elease({{.*}}) {{#[0-9]+}}, !dbg ![[CLEANUPS:.*]]
 // CHECK-NEXT:  !dbg ![[CLEANUPS]]
 // CHECK-NEXT:  ret void, !dbg ![[CLEANUPS]]
-// CHECK: ![[CLEANUPS]] = metadata !{i32 [[@LINE+1]], i32 1,
+// CHECK: ![[CLEANUPS]] = !{i32 [[@LINE+1]], i32 1,
 }
 main()

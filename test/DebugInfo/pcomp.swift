@@ -26,7 +26,7 @@ class SomeOtherClass : SomeClass {
 	override func f() -> Int { return 1 }
 }
 // This is an indirect value.
-// CHECK-DAG: \0030{{.*}}metadata !"_TtP5pcomp9SomeProto_"} ; [ DW_TAG_structure_type ] [SomeProto]
+// CHECK-DAG: \0030{{.*}}!"_TtP5pcomp9SomeProto_"} ; [ DW_TAG_structure_type ] [SomeProto]
 func main() {
 	var p : SomeProto = SomeOtherClass()
 	println("\(p.f())")

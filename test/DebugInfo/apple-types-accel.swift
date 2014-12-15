@@ -16,7 +16,7 @@
 // CHECK-DWARF-NEXT: AT_linkage_name( "_TtC4main3foo" )
 
 // Verify the IR interface:
-// CHECK: metadata !"_TtC4main3foo"} ; [ DW_TAG_structure_type ] [foo] [line [[@LINE+1]],
+// CHECK: !"_TtC4main3foo"} ; [ DW_TAG_structure_type ] [foo] [line [[@LINE+1]],
 class foo {
 	var x : Int = 1
 }

@@ -24,16 +24,16 @@
 
 import someModule
 
-// CHECK: !{{[0-9]+}} = metadata !{i32 6, metadata !"Linker Options", metadata ![[LINK_LIST:[0-9]+]]}
-// CHECK: ![[LINK_LIST]] = metadata !{
-// CHECK-DAG: !{{[0-9]+}} = metadata !{metadata !"-lmagic"}
-// CHECK-DAG: !{{[0-9]+}} = metadata !{metadata !"-lmodule"}
+// CHECK: !{{[0-9]+}} = !{i32 6, !"Linker Options", ![[LINK_LIST:[0-9]+]]}
+// CHECK: ![[LINK_LIST]] = !{
+// CHECK-DAG: !{{[0-9]+}} = !{!"-lmagic"}
+// CHECK-DAG: !{{[0-9]+}} = !{!"-lmodule"}
 
-// FRAMEWORK: !{{[0-9]+}} = metadata !{i32 6, metadata !"Linker Options", metadata ![[LINK_LIST:[0-9]+]]}
-// FRAMEWORK: ![[LINK_LIST]] = metadata !{
-// FRAMEWORK-DAG: !{{[0-9]+}} = metadata !{metadata !"-lmagic"}
-// FRAMEWORK-DAG: !{{[0-9]+}} = metadata !{metadata !"-lmodule"}
-// FRAMEWORK-DAG: !{{[0-9]+}} = metadata !{metadata !"-framework", metadata !"someModule"}
+// FRAMEWORK: !{{[0-9]+}} = !{i32 6, !"Linker Options", ![[LINK_LIST:[0-9]+]]}
+// FRAMEWORK: ![[LINK_LIST]] = !{
+// FRAMEWORK-DAG: !{{[0-9]+}} = !{!"-lmagic"}
+// FRAMEWORK-DAG: !{{[0-9]+}} = !{!"-lmodule"}
+// FRAMEWORK-DAG: !{{[0-9]+}} = !{!"-framework", !"someModule"}
 
 // NO-FORCE-LOAD-NOT: FORCE_LOAD
 // FORCE-LOAD: @"_swift_FORCE_LOAD_$_module" = weak constant i1 false

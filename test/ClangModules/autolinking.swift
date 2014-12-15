@@ -17,15 +17,15 @@ import UsesSubmodule
 var _ = LinkFramework.IComeFromLinkFramework
 UsesSubmodule.useSomethingFromSubmodule()
 
-// CHECK: !{{[0-9]+}} = metadata !{i32 6, metadata !"Linker Options", metadata ![[LINK_LIST:[0-9]+]]}
-// CHECK: ![[LINK_LIST]] = metadata !{
+// CHECK: !{{[0-9]+}} = !{i32 6, !"Linker Options", ![[LINK_LIST:[0-9]+]]}
+// CHECK: ![[LINK_LIST]] = !{
 
-// CHECK-DAG: !{{[0-9]+}} = metadata !{metadata !"-lLock"}
-// CHECK-DAG: !{{[0-9]+}} = metadata !{metadata !"-lStock"}
-// CHECK-DAG: !{{[0-9]+}} = metadata !{metadata !"-framework", metadata !"Barrel"}
-// CHECK-DAG: !{{[0-9]+}} = metadata !{metadata !"-framework", metadata !"LinkFramework"}
-// CHECK-DAG: !{{[0-9]+}} = metadata !{metadata !"-lUnderlyingClangLibrary"}
-// CHECK-DAG: !{{[0-9]+}} = metadata !{metadata !"-framework", metadata !"Indirect"}
-// CHECK-DAG: !{{[0-9]+}} = metadata !{metadata !"-framework", metadata !"HasSubmodule"}
+// CHECK-DAG: !{{[0-9]+}} = !{!"-lLock"}
+// CHECK-DAG: !{{[0-9]+}} = !{!"-lStock"}
+// CHECK-DAG: !{{[0-9]+}} = !{!"-framework", !"Barrel"}
+// CHECK-DAG: !{{[0-9]+}} = !{!"-framework", !"LinkFramework"}
+// CHECK-DAG: !{{[0-9]+}} = !{!"-lUnderlyingClangLibrary"}
+// CHECK-DAG: !{{[0-9]+}} = !{!"-framework", !"Indirect"}
+// CHECK-DAG: !{{[0-9]+}} = !{!"-framework", !"HasSubmodule"}
 
-// CHECK-WITH-SWIFT: !{{[0-9]+}} = metadata !{metadata !"-lSwiftAdapter"}
+// CHECK-WITH-SWIFT: !{{[0-9]+}} = !{!"-lSwiftAdapter"}

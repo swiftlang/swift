@@ -1,6 +1,6 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
 // FIXME: Should be DW_TAG_interface_type
-// CHECK: metadata ![[PT:[^,]+]]} ; [ DW_TAG_structure_type ] [IGiveOutInts]
+// CHECK: ![[PT:[^,]+]]} ; [ DW_TAG_structure_type ] [IGiveOutInts]
 protocol IGiveOutInts {
 	func callMe() -> Int
 }
@@ -23,7 +23,7 @@ class AFancierImplementor : IGiveOutInts {
 }
 
 func printSomeNumbers(var gen: IGiveOutInts) {
-  // CHECK: metadata ![[PT]]} ; [ DW_TAG_arg_variable ] [gen] [line [[@LINE-1]]]
+  // CHECK: ![[PT]]} ; [ DW_TAG_arg_variable ] [gen] [line [[@LINE-1]]]
 	var i = 1
 	while i < 3 {
 		println("\(gen.callMe())")

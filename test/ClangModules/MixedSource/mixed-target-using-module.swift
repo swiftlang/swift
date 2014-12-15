@@ -2,8 +2,8 @@
 // RUN: %swift %clang-importer-sdk -target x86_64-apple-macosx10.9 -F %S/Inputs/mixed-target/ -module-name Mixed -import-underlying-module -emit-ir %S/../../Inputs/empty.swift - | FileCheck -check-prefix=CHECK-AUTOLINK %s
 // RUN: not %swift %clang-importer-sdk -target x86_64-apple-macosx10.9 -F %S/Inputs/mixed-target/ -module-name WrongName -import-underlying-module -parse %s 2>&1 | FileCheck -check-prefix=CHECK-WRONG-NAME %s
 
-// CHECK-AUTOLINK: !{{[0-9]+}} = metadata !{i32 {{[0-9]+}}, metadata !"Linker Options", metadata ![[LINK_LIST:[0-9]+]]}
-// CHECK-AUTOLINK: ![[LINK_LIST]] = metadata !{
+// CHECK-AUTOLINK: !{{[0-9]+}} = !{i32 {{[0-9]+}}, !"Linker Options", ![[LINK_LIST:[0-9]+]]}
+// CHECK-AUTOLINK: ![[LINK_LIST]] = !{
 // CHECK-AUTOLINK-NOT: metadata !"-framework", metadata !"Mixed"
 
 // CHECK-WRONG-NAME: underlying Objective-C module 'WrongName' not found

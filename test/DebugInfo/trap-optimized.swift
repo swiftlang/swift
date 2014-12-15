@@ -11,4 +11,4 @@ func fn() {
 // CHECK-NOT: }
 // CHECK: tail call void @llvm.trap(), !dbg ![[LOC:.*]]
 // CHECK-NEXT: unreachable, !dbg ![[LOC]]
-// CHECK: ![[LOC]] = metadata !{i32 0, i32 0,
+// CHECK: ![[LOC]] = !{i32 0, i32 0,

@@ -19,9 +19,9 @@ class AppDelegate {
       // Verify that all debug line table entries for the expression
       // below are in the same scope.
       //
-      // CHECK-DAG: !{{.*}} = metadata !{i32 [[@LINE+3]], i32 33, metadata ![[S:.*]], null}
-      // CHECK-DAG: !{{.*}} = metadata !{i32 [[@LINE+2]], i32 46, metadata ![[S]], null}
-      // CHECK-DAG: !{{.*}} = metadata !{i32 [[@LINE+1]], i32 11, metadata ![[S]], null}
+      // CHECK-DAG: !{{.*}} = !{i32 [[@LINE+3]], i32 33, ![[S:.*]], null}
+      // CHECK-DAG: !{{.*}} = !{i32 [[@LINE+2]], i32 46, ![[S]], null}
+      // CHECK-DAG: !{{.*}} = !{i32 [[@LINE+1]], i32 11, ![[S]], null}
       let splitViewController = self.window!.rootViewController as UISplitViewController
     }
     return true

@@ -1,6 +1,6 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
 
-// CHECK-DAG: \0030"{{.*}}, null, metadata ![[TY0:.*]]} ; [ DW_TAG_structure_type ] [{{.*}}ObjCClass{{.*}}] [line [[@LINE+1]]
+// CHECK-DAG: \0030"{{.*}}, null, ![[TY0:.*]]} ; [ DW_TAG_structure_type ] [{{.*}}ObjCClass{{.*}}] [line [[@LINE+1]]
 @objc class ObjCClass {
       @IBAction func click(_: AnyObject?) -> () {}
 }
@@ -18,7 +18,7 @@ class SwiftClass {
 // an artificial variable.
 // DISABLED: [ DW_TAG_variable ] [OBJC_METACLASS_$__TtC10attributes9ObjCClass]
 
-// CHECK-DAG: metadata !{metadata !"0x34\00strongRef0\00{{.*}}\00[[@LINE+1]]\000\001"{{, [^,]+, [^,]+}}, metadata ![[TY0]], {{.*}}[ DW_TAG_variable ] [{{.*}}strongRef0{{.*}}]
+// CHECK-DAG:  !"0x34\00strongRef0\00{{.*}}\00[[@LINE+1]]\000\001"{{, [^,]+, [^,]+}}, ![[TY0]], {{.*}}[ DW_TAG_variable ] [{{.*}}strongRef0{{.*}}]
 var strongRef0 : ObjCClass
 var strongRef1 : SwiftClass = SwiftClass()
 
