@@ -2048,6 +2048,42 @@ public:
   }
 };
 
+/// Select on a value of a builtin integer type.
+class SelectValueInst : public SelectInstBase<SelectValueInst, SILValue> {
+  SelectValueInst(SILLocation Loc, SILValue Operand,
+                  SILType Type,
+                  SILValue DefaultResult,
+                  ArrayRef<SILValue> CaseValuesAndResults);
+
+  OperandValueArrayRef getCaseBuf() const {
+    return Operands.getDynamicValuesAsArray();
+  }
+
+public:
+  ~SelectValueInst();
+
+  static SelectValueInst *
+  create(SILLocation Loc, SILValue Operand, SILType Type,
+         SILValue DefaultValue,
+         ArrayRef<std::pair<SILValue, SILValue>> CaseValues,
+         SILFunction &F);
+
+  std::pair<SILValue, SILValue>
+  getCase(unsigned i) const {
+    assert(i < NumCases && "case out of bounds");
+    return {getCaseBuf()[i*2], getCaseBuf()[i*2+1]};
+  }
+
+  SILValue getDefaultResult() const {
+    assert(HasDefault && "doesn't have a default");
+    return getCaseBuf()[NumCases*2];
+  }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::SelectValueInst;
+  }
+};
+
 /// MetatypeInst - Represents the production of an instance of a given metatype
 /// named statically.
 class MetatypeInst : public SILInstruction {
@@ -3124,42 +3160,6 @@ public:
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::CondBranchInst;
-  }
-};
-
-/// Select on a value of a builtin integer type.
-class SelectValueInst : public SelectInstBase<SelectValueInst, SILValue> {
-  SelectValueInst(SILLocation Loc, SILValue Operand,
-                  SILType Type,
-                  SILValue DefaultResult,
-                  ArrayRef<SILValue> CaseValuesAndResults);
-
-  OperandValueArrayRef getCaseBuf() const {
-    return Operands.getDynamicValuesAsArray();
-  }
-
-public:
-  ~SelectValueInst();
-
-  static SelectValueInst *
-  create(SILLocation Loc, SILValue Operand, SILType Type,
-         SILValue DefaultValue,
-         ArrayRef<std::pair<SILValue, SILValue>> CaseValues,
-         SILFunction &F);
-
-  std::pair<SILValue, SILValue>
-  getCase(unsigned i) const {
-    assert(i < NumCases && "case out of bounds");
-    return {getCaseBuf()[i*2], getCaseBuf()[i*2+1]};
-  }
-
-  SILValue getDefaultResult() const {
-    assert(HasDefault && "doesn't have a default");
-    return getCaseBuf()[NumCases*2];
-  }
-
-  static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::SelectValueInst;
   }
 };
 
