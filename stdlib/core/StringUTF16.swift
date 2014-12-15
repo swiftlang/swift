@@ -98,6 +98,24 @@ extension String {
       return 0xfffd
     }
 
+#if _runtime(_ObjC)
+    // These may become less important once <rdar://problem/19255291> is addressed.
+
+    @availability(
+      *, unavailable,
+      message="Indexing a String's UTF16View requires a String.UTF16View.Index, which can be constructed from Int when Foundation is imported")
+    public subscript(i: Int) -> Generator.Element {
+      return self[Index(_offset: i)]
+    }
+
+    @availability(
+      *, unavailable,
+      message="Slicing a String's UTF16View requires a Range<String.UTF16View.Index>, String.UTF16View.Index can be constructed from Int when Foundation is imported")
+    public subscript(subRange: Range<Int>) -> UTF16View {
+      return self[Index(_offset: subRange.startIndex)..<Index(_offset: subRange.endIndex)]
+    }
+#endif
+    
     /// Access the elements delimited by the given half-open range of
     /// indices.
     ///
