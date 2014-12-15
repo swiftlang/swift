@@ -33,8 +33,8 @@ func foo(var a: Int, var b: Int) -> Int {
      // CHECK-DAG: store i64 %1, i64* [[BVAL:.*]], align 8
      // CHECK-DAG: [[AVAL]] = getelementptr inbounds [[AMEM:.*]], i32 0, i32 0
      // CHECK-DAG: [[BVAL]] = getelementptr inbounds [[BMEM:.*]], i32 0, i32 0
-     // CHECK-DAG: call void @llvm.dbg.declare(metadata !{[[AMEM]]}, metadata ![[AARG:.*]], metadata !{{[0-9]+}}), !dbg ![[ASCOPE]]
-     // CHECK-DAG: call void @llvm.dbg.declare(metadata !{[[BMEM]]}, metadata ![[BARG:.*]], metadata !{{[0-9]+}})
+     // CHECK-DAG: call void @llvm.dbg.declare(metadata [[AMEM]], metadata ![[AARG:.*]], metadata !{{[0-9]+}}), !dbg ![[ASCOPE]]
+     // CHECK-DAG: call void @llvm.dbg.declare(metadata [[BMEM]], metadata ![[BARG:.*]], metadata !{{[0-9]+}})
      // CHECK-DAG: ![[AARG]] ={{.*}}[ DW_TAG_arg_variable ] [a]
      // CHECK-DAG: ![[BARG]] ={{.*}}[ DW_TAG_arg_variable ] [b]
      if b != 0 {
@@ -74,7 +74,7 @@ func foo(var a: Int, var b: Int) -> Int {
 // CHECK-DAG: ![[SWIFTMODULE]] = {{.*}}[ DW_TAG_module ] [Swift]
 
 // Filenames
-// CHECK-DAG: {metadata !"basic.swift", metadata !"{{.*}}DebugInfo"}
+// CHECK-DAG: {!"basic.swift", !"{{.*}}DebugInfo"}
 
 // DWARF Version
 // CHECK-DAG:  i32 2, !"Dwarf Version", i32 3}

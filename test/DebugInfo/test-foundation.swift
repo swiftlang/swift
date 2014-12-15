@@ -57,8 +57,8 @@ extension MyObject {
   }
 }
 
-// SANITY-DAG: metadata !"_TtCSo8NSObject"} ; [ DW_TAG_structure_type ] [NSObject]
-// SANITY-DAG: metadata !"_TtCSo8NSObject", {{.*}} [ DW_TAG_variable ] [NsObj] [line [[@LINE+1]]] [def]
+// SANITY-DAG: !"_TtCSo8NSObject"} ; [ DW_TAG_structure_type ] [NSObject]
+// SANITY-DAG: !"_TtCSo8NSObject", {{.*}} [ DW_TAG_variable ] [NsObj] [line [[@LINE+1]]] [def]
 var NsObj: NSObject
 NsObj = MyObject()
 var MyObj: MyObject

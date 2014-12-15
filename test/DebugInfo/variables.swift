@@ -58,7 +58,7 @@ var g = foo(1.0);
 // Tuple types.
 var tuple: (Int, Bool) = (1, true)
 // CHECK-DAG: _Tv{{9variables|4main}}5tupleTSiSb_{{[^,]+}},{{[^,]+}}, {{[^,]+}}, ![[TUPTY:[^,]+]], {{.*}}} ; [ DW_TAG_variable ] [tuple] [line [[@LINE-1]]]
-// CHECK-DAG: metadata ![[ELEMS:[0-9]+]], null, null, metadata ![[TUPTY]]}
+// CHECK-DAG: ![[ELEMS:[0-9]+]], null, null, ![[TUPTY]]}
 // CHECK-DAG: ![[ELEMS]] = !{![[MI64:[0-9]+]], ![[MB:[0-9]+]]}
 // CHECK-DAG: ![[MI64]] = {{.*}}[ DW_TAG_member ]{{.*}}[from _TtSi]
 // CHECK-DAG: ![[MB]] = {{.*}}![[B]]} {{.*}}DW_TAG_member

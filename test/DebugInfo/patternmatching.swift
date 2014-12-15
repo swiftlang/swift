@@ -31,15 +31,15 @@ func classifyPoint2(p: (Double, Double)) {
           // SIL-CHECK-NEXT:  br{{.*}}line:[[@LINE-3]]:54:cleanup
         case (var x, var y) where x == -y:
           // Verify that all variables end up in the appropriate scopes.
-          // CHECK-SCOPES: ", metadata ![[SCOPE1:[0-9]+]], {{.*}} ; [ DW_TAG_auto_variable ] [x] {{.}}line [[@LINE-2]]
+          // CHECK-SCOPES: ", ![[SCOPE1:[0-9]+]], {{.*}} ; [ DW_TAG_auto_variable ] [x] {{.}}line [[@LINE-2]]
           // CHECK-SCOPES: ![[SCOPE1]] = {{.*}}; [ DW_TAG_lexical_block ]
           println("on the - diagonal")
         case (var x, var y) where x >= -10 && x < 10 && y >= -10 && y < 10:
-          // CHECK-SCOPES: ", metadata ![[SCOPE2:[0-9]+]], {{.*}} ; [ DW_TAG_auto_variable ] [x] {{.}}line [[@LINE-1]]
+          // CHECK-SCOPES: ", ![[SCOPE2:[0-9]+]], {{.*}} ; [ DW_TAG_auto_variable ] [x] {{.}}line [[@LINE-1]]
           // CHECK-SCOPES: ![[SCOPE2]] = {{.*}}; [ DW_TAG_lexical_block ]
           println("near the origin")
         case (var x, var y):
-          // CHECK-SCOPES: ", metadata ![[SCOPE3:[0-9]+]], {{.*}} ; [ DW_TAG_auto_variable ] [x] {{.}}line [[@LINE-1]]
+          // CHECK-SCOPES: ", ![[SCOPE3:[0-9]+]], {{.*}} ; [ DW_TAG_auto_variable ] [x] {{.}}line [[@LINE-1]]
           // CHECK-SCOPES: ![[SCOPE3]] = {{.*}} ; [ DW_TAG_lexical_block ]
           println("sqrt(\(x*x + y*y)) units from the origin")
         }

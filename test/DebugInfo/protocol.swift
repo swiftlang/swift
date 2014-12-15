@@ -25,7 +25,7 @@ class Point : PointUtils {
 func main() -> Int {
     var pt = Point(_x: 2.5, _y: 4.25)
 // CHECK: [[LOC2D:%[a-zA-Z0-9]+]] = alloca %P8protocol10PointUtils_, align 8
-// CHECK: call void @llvm.dbg.declare(metadata !{{{.*}} [[LOC2D]]}, metadata ![[LOC:.*]], metadata !{{[0-9]+}})
+// CHECK: call void @llvm.dbg.declare(metadata {{.*}} [[LOC2D]], metadata ![[LOC:.*]], metadata !{{[0-9]+}})
     var loc2d : protocol<PointUtils> = pt
     var distance = loc2d.distanceFromOrigin()
     print("hello") // Set breakpoint here

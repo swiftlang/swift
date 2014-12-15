@@ -8,8 +8,8 @@ typealias MyFloat = Float
 // CHECK: %[[ALLOCB:.*]] = alloca
 // CHECK: %[[ALLOCA:.*]] = alloca
 // CHECK: %[[ALLOCABOX:.*]] = alloca
-// CHECK:  call void @llvm.dbg.declare(metadata !{{{.*}} %[[ALLOCB]]}, metadata ![[B:.*]], metadata !{{[0-9]+}})
-// CHECK:  call void @llvm.dbg.declare(metadata !{{{.*}} %[[ALLOCA]]}, metadata
+// CHECK:  call void @llvm.dbg.declare(metadata {{.*}} %[[ALLOCB]], metadata ![[B:.*]], metadata !{{[0-9]+}})
+// CHECK:  call void @llvm.dbg.declare(metadata {{.*}} %[[ALLOCA]], metadata
 
 // Closure with promoted capture.
 // CHECK: define {{.*}}@_TTSf2d_i___TFF5inout13modifyFooHeapFTRSiSf_T_U_FT_Si
