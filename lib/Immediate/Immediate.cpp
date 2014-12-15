@@ -1119,7 +1119,7 @@ private:
 
     stripPreviouslyGenerated(*NewModule);
 
-   if (!linkLLVMModules(&DumpModule, SaveLineModule.get()
+    if (!linkLLVMModules(&DumpModule, SaveLineModule.get()
                          // TODO: reactivate the linker mode if it is
                          // supported in llvm again. Otherwise remove the
                          // commented code completely.
