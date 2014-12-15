@@ -912,6 +912,16 @@ mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
 //                           Top Level Entry Point
 //===----------------------------------------------------------------------===//
 
+static inline unsigned roundPostOrderSize(unsigned PostOrderSize) {
+  // NextPowerOf2 operates on uint64_t, so we can not overflow since our input
+  // is a 32 bit value. But we need to make sure if the next power of 2 is
+  // greater than the representable UINT_MAX, we just pass in (1 << 31)
+  uint64_t SizeRoundedToPow2 = llvm::NextPowerOf2(PostOrderSize);
+  if (SizeRoundedToPow2 > uint64_t(UINT_MAX))
+    return 1 << 31;
+  return unsigned(SizeRoundedToPow2);
+}
+
 namespace {
 
 class GlobalLoadStoreOpts : public SILFunctionTransform {
@@ -929,19 +939,13 @@ class GlobalLoadStoreOpts : public SILFunctionTransform {
     auto *PDI = DA->getPostDomInfo(F);
 
     auto ReversePostOrder = POTA->getReversePostOrder(F);
-    unsigned PostOrderSize = std::distance(ReversePostOrder.begin(),
-                                           ReversePostOrder.end());
-
-    // NextPowerOf2 operates on uint64_t, so we can not overflow since our input
-    // is a 32 bit value. But we need to make sure if the next power of 2 is
-    // greater than the representable UINT_MAX, we just pass in (1 << 31)
-    uint64_t SizeRoundedToPow2 = llvm::NextPowerOf2(PostOrderSize);
-    if (SizeRoundedToPow2 > uint64_t(UINT_MAX))
-      SizeRoundedToPow2 = 1 << 31;
+    unsigned PostOrderSize =
+      roundPostOrderSize(std::distance(ReversePostOrder.begin(),
+                                       ReversePostOrder.end()));
 
     // TODO: Each block does not need its own LSBBForwarder instance. Only
     // the set of reaching loads and stores is specific to the block.
-    llvm::DenseMap<SILBasicBlock *, unsigned> BBToBBIDMap(SizeRoundedToPow2);
+    llvm::DenseMap<SILBasicBlock *, unsigned> BBToBBIDMap(PostOrderSize);
     std::vector<LSBBForwarder> BBIDToForwarderMap(PostOrderSize);
 
     for (SILBasicBlock *BB : ReversePostOrder) {
