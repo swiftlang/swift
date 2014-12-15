@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "XMLValidator.h"
+#include "ModuleAPIDiff.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
@@ -74,6 +75,8 @@ enum class ActionType {
   PrintUSRs,
   ParseReST,
   TestCreateCompilerInvocation,
+  GenerateModuleAPIDescription,
+  DiffModuleAPI,
 };
 
 class NullDebuggerClient : public DebuggerClient {
@@ -156,6 +159,12 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "Test swift::driver::createCompilerInvocation using the "
                       "arguments passed to swift-ide-test (must be specified "
                       "before all other arguments)"),
+           clEnumValN(ActionType::GenerateModuleAPIDescription,
+                      "generate-module-api-description",
+                      "Generate a machine-readable description of module API"),
+           clEnumValN(ActionType::DiffModuleAPI,
+                      "diff-module-api",
+                      "Compare machine-readable descriptions of module API"),
            clEnumValEnd));
 
 static llvm::cl::opt<std::string>
@@ -1860,6 +1869,18 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  if (options::Action == ActionType::GenerateModuleAPIDescription) {
+    return doGenerateModuleAPIDescription(
+        llvm::sys::fs::getMainExecutable(
+            argv[0], reinterpret_cast<void *>(&anchorForGetMainExecutable)),
+        options::InputFilenames);
+  }
+
+  if (options::Action == ActionType::GenerateModuleAPIDescription) {
+    llvm::errs() << "unimplemented\n";
+    return 1;
+  }
+
   if (options::SourceFilename.empty()) {
     llvm::errs() << "source file required\n";
     llvm::cl::PrintHelpMessage();
@@ -1925,6 +1946,8 @@ int main(int argc, char *argv[]) {
   switch (options::Action) {
   case ActionType::None:
   case ActionType::TestCreateCompilerInvocation:
+  case ActionType::GenerateModuleAPIDescription:
+  case ActionType::DiffModuleAPI:
     llvm_unreachable("should be handled above");
 
   case ActionType::CodeCompletion:
