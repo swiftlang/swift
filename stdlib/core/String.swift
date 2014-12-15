@@ -467,9 +467,10 @@ public func += (inout lhs: String, rhs: String) {
 }
 
 extension String {
+  /// Constructs a `String` in `resultStorage` containing the given UTF-8.
+  ///
   /// Low-level construction interface used by introspection
-  /// implementation in the runtime library.  Constructs a String in
-  /// resultStorage containing the given UTF-8.
+  /// implementation in the runtime library.
   @asmname("swift_stringFromUTF8InRawMemory")
   public // COMPILER_INTRINSIC
   static func _fromUTF8InRawMemory(
@@ -830,3 +831,106 @@ extension String : RangeReplaceableCollectionType {
     Swift.removeAll(&self, keepCapacity: keepCapacity)
   }
 }
+
+#if _runtime(_ObjC)
+@asmname("swift_stdlib_NSStringLowercaseString")
+func _stdlib_NSStringLowercaseString(str: AnyObject) -> _CocoaStringType
+
+@asmname("swift_stdlib_NSStringUppercaseString")
+func _stdlib_NSStringUppercaseString(str: AnyObject) -> _CocoaStringType
+#endif
+
+// Unicode algorithms
+extension String {
+  // FIXME: implement case folding without relying on Foundation.
+  // <rdar://problem/17550602> [unicode] Implement case folding
+
+  /// A "table" for which ASCII characters need to be upper cased.
+  /// To determine which bit corresponds to which ASCII character, subtract 1
+  /// from the ASCII value of that character and divide by 2. The bit is set iff
+  /// that character is a lower case character.
+  internal var _asciiLowerCaseTable: UInt64 {
+    @inline(__always)
+    get {
+      return 0b0001_1111_1111_1111_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000
+    }
+  }
+
+  /// The same table for upper case characters.
+  internal var _asciiUpperCaseTable: UInt64 {
+    @inline(__always)
+    get {
+      return 0b0000_0000_0000_0000_0001_1111_1111_1111_0000_0000_0000_0000_0000_0000_0000_0000
+    }
+  }
+
+  public var lowercaseString: String {
+    if self._core.isASCII {
+      let length = self._core.count
+      let source = self._core.startASCII
+      var buffer = _StringBuffer(
+        capacity: length, initialSize: length, elementWidth: 1)
+      var dest = UnsafeMutablePointer<UInt8>(buffer.start)
+      for i in 0..<length {
+        // For each character in the string, we lookup if it should be shifted
+        // in our ascii table, then we return 0x20 if it should, 0x0 if not.
+        // This code is equivalent to:
+        // switch source[i] {
+        // case let x where (x >= 0x41 && x <= 0x5a):
+        //   dest[i] = x &+ 0x20
+        // case let x:
+        //   dest[i] = x
+        // }
+        let value = source[i]
+        let isUpper =
+          _asciiUpperCaseTable >>
+          UInt64(((value &- 1) & 0b0111_1111) >> 1)
+        let add = (isUpper & 0x1) << 5
+        // Since we are left with either 0x0 or 0x20, we can safely truncate to
+        // a UInt8 and add to our ASCII value (this will not overflow numbers in
+        // the ASCII range).
+        dest[i] = value &+ UInt8(truncatingBitPattern: add)
+      }
+      return String(_storage: buffer)
+    }
+
+#if _runtime(_ObjC)
+    return _cocoaStringToSwiftString_NonASCII(
+      _stdlib_NSStringLowercaseString(self._bridgeToObjectiveCImpl()))
+#else
+    // FIXME: Actually implement.  For now, don't change case.
+    // rdar://problem/18878343
+    return self
+#endif
+  }
+
+  public var uppercaseString: String {
+    if self._core.isASCII {
+      let length = self._core.count
+      let source = self._core.startASCII
+      var buffer = _StringBuffer(
+        capacity: length, initialSize: length, elementWidth: 1)
+      var dest = UnsafeMutablePointer<UInt8>(buffer.start)
+      for i in 0..<length {
+        // See the comment above in lowercaseString.
+        let value = source[i]
+        let isLower =
+          _asciiLowerCaseTable >>
+          UInt64(((value &- 1) & 0b0111_1111) >> 1)
+        let add = (isLower & 0x1) << 5
+        dest[i] = value &- UInt8(truncatingBitPattern: add)
+      }
+      return String(_storage: buffer)
+    }
+
+#if _runtime(_ObjC)
+    return _cocoaStringToSwiftString_NonASCII(
+      _stdlib_NSStringUppercaseString(self._bridgeToObjectiveCImpl()))
+#else
+    // FIXME: Actually implement.  For now, don't change case.
+    // rdar://problem/18878343
+    return self
+#endif
+  }
+}
+

@@ -335,7 +335,7 @@ extension String {
     }
 
     self._core = _StringCore(
-      baseAddress: unsafeBitCast(start, COpaquePointer.self),
+      baseAddress: COpaquePointer(start),
       count: length,
       elementShift: isUTF16 ? 1 : 0,
       hasCocoaBuffer: true,

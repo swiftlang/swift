@@ -20,6 +20,32 @@
 /// Foundation.
 @objc public protocol _CocoaStringType {}
 
+@asmname("swift_stdlib_CFStringCreateCopy")
+func _stdlib_CFStringCreateCopy(source: _CocoaStringType) -> _CocoaStringType
+
+@asmname("swift_stdlib_CFStringGetLength")
+func _stdlib_CFStringGetLength(source: _CocoaStringType)
+  -> Int
+
+@asmname("swift_stdlib_CFStringGetCharactersPtr")
+func _stdlib_CFStringGetCharactersPtr(source: _CocoaStringType)
+  -> UnsafeMutablePointer<UTF16.CodeUnit>
+
+/// Bridges a `source` to `Swift.String`, assuming that `source` has non-ASCII
+/// characters (does not apply ASCII optimizations).
+func _cocoaStringToSwiftString_NonASCII(source: _CocoaStringType) -> String {
+  let cfImmutableValue = _stdlib_CFStringCreateCopy(source)
+  let length = _stdlib_CFStringGetLength(cfImmutableValue)
+  let start = _stdlib_CFStringGetCharactersPtr(cfImmutableValue)
+
+  return String(_StringCore(
+    baseAddress: COpaquePointer(start),
+    count: length,
+    elementShift: 1,
+    hasCocoaBuffer: true,
+    owner: unsafeBitCast(cfImmutableValue, Optional<AnyObject>.self)))
+}
+
 /// Loading Foundation initializes these function variables
 /// with useful values
 

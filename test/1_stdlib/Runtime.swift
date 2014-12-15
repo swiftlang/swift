@@ -755,6 +755,56 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringHasSuffixNFD/NoLeak") {
   expectEqual(0, nsStringCanaryCount)
 }
 
+RuntimeFoundationWrappers.test("_stdlib_NSStringLowercaseString/NoLeak") {
+  nsStringCanaryCount = 0
+  if true {
+    let a = NSStringCanary()
+    expectEqual(1, nsStringCanaryCount)
+    _stdlib_NSStringLowercaseString(a)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
+RuntimeFoundationWrappers.test("_stdlib_NSStringUppercaseString/NoLeak") {
+  nsStringCanaryCount = 0
+  if true {
+    let a = NSStringCanary()
+    expectEqual(1, nsStringCanaryCount)
+    _stdlib_NSStringUppercaseString(a)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
+RuntimeFoundationWrappers.test("_stdlib_CFStringCreateCopy/NoLeak") {
+  nsStringCanaryCount = 0
+  if true {
+    let a = NSStringCanary()
+    expectEqual(1, nsStringCanaryCount)
+    _stdlib_CFStringCreateCopy(a)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
+RuntimeFoundationWrappers.test("_stdlib_CFStringGetLength/NoLeak") {
+  nsStringCanaryCount = 0
+  if true {
+    let a = NSStringCanary()
+    expectEqual(1, nsStringCanaryCount)
+    _stdlib_CFStringGetLength(a)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
+RuntimeFoundationWrappers.test("_stdlib_CFStringGetCharactersPtr/NoLeak") {
+  nsStringCanaryCount = 0
+  if true {
+    let a = NSStringCanary()
+    expectEqual(1, nsStringCanaryCount)
+    _stdlib_CFStringGetCharactersPtr(a)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
 var Reflection = TestSuite("Reflection")
 
 Reflection.test("dumpToAStream") {

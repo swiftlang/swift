@@ -31,6 +31,7 @@
 //===----------------------------------------------------------------------===//
 
 #import <Foundation/Foundation.h>
+#import <CoreFoundation/CoreFoundation.h>
 #include <objc/NSObject.h>
 #include <objc/runtime.h>
 #if __has_include(<objc/objc-internal.h>)
@@ -160,6 +161,38 @@ extern "C" bool swift_stdlib_NSStringHasSuffixNFD(NSString *theString,
       kCFCompareAnchored | kCFCompareBackwards | kCFCompareNonliteral, nullptr);
   swift_unknownRelease(theString);
   swift_unknownRelease(suffix);
+  return Result;
+}
+
+extern "C" NSString *swift_stdlib_NSStringLowercaseString(NSString *str) {
+  NSString *Result = str.lowercaseString;
+  swift_unknownRelease(str);
+  return Result;
+}
+
+extern "C" NSString *swift_stdlib_NSStringUppercaseString(NSString *str) {
+  NSString *Result = str.uppercaseString;
+  swift_unknownRelease(str);
+  return Result;
+}
+
+extern "C" NSString *swift_stdlib_CFStringCreateCopy(NSString *str) {
+  NSString *Result =
+      (__bridge NSString *)CFStringCreateCopy(nil, (__bridge CFStringRef)str);
+  swift_unknownRelease(str);
+  return Result;
+}
+
+extern "C" size_t swift_stdlib_CFStringGetLength(NSString *str) {
+  size_t Result = CFStringGetLength((__bridge CFStringRef)str);
+  swift_unknownRelease(str);
+  return Result;
+}
+
+extern "C" const uint16_t *
+swift_stdlib_CFStringGetCharactersPtr(NSString *str) {
+  const uint16_t *Result = CFStringGetCharactersPtr((__bridge CFStringRef)str);
+  swift_unknownRelease(str);
   return Result;
 }
 
