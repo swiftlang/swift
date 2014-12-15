@@ -1100,6 +1100,10 @@ private:
     
     if (CI.getASTContext().hadError())
       return false;
+
+    // LineModule will get destroy by the following link process.
+    // Make a copy of it to be able to correct produce DumpModule.
+    std::unique_ptr<llvm::Module> SaveLineModule(CloneModule(LineModule.get()));
     
     if (!linkLLVMModules(Module, LineModule.get()
                          // TODO: reactivate the linker mode if it is
@@ -1115,7 +1119,7 @@ private:
 
     stripPreviouslyGenerated(*NewModule);
 
-    if (!linkLLVMModules(&DumpModule, LineModule.get()
+   if (!linkLLVMModules(&DumpModule, SaveLineModule.get()
                          // TODO: reactivate the linker mode if it is
                          // supported in llvm again. Otherwise remove the
                          // commented code completely.
