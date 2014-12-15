@@ -51,3 +51,5 @@ let magnitude: Magnitude = .k2
 let magnitude2: MagnitudeWords = .Two
 
 let objcABI: objc_abi = .v2
+let underscoreSuffix: ALL_CAPS_ENUM = .ENUM_CASE_ONE
+let underscoreSuffix2: ALL_CAPS_ENUM2 = .CASE_TWO
