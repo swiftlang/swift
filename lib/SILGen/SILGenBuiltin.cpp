@@ -12,6 +12,7 @@
 
 #include "SpecializedEmitter.h"
 
+#include "Initialization.h"
 #include "RValue.h"
 #include "SILGenFunction.h"
 #include "swift/AST/ASTContext.h"
@@ -23,6 +24,41 @@
 
 using namespace swift;
 using namespace Lowering;
+
+/// Break down an expression that's the formal argument expression to
+/// a builtin function, returning its individualized arguments.
+///
+/// Because these are builtin operations, we can make some structural
+/// assumptions about the expression used to call them.
+static ArrayRef<Expr*> decomposeArguments(SILGenFunction &gen,
+                                          Expr *arg,
+                                          unsigned expectedCount) {
+  assert(expectedCount >= 2);
+  assert(arg->getType()->is<TupleType>());
+  assert(arg->getType()->castTo<TupleType>()->getNumElements()
+           == expectedCount);
+
+  auto tuple = dyn_cast<TupleExpr>(arg->getSemanticsProvidingExpr());
+  if (tuple && tuple->getElements().size() == expectedCount) {
+    return tuple->getElements();
+  }
+
+  gen.SGM.diagnose(arg, diag::invalid_sil_builtin,
+                   "argument to builtin should be a literal tuple");
+
+  auto tupleTy = arg->getType()->castTo<TupleType>();
+
+  // This is well-typed but may cause code to be emitted redundantly.
+  auto &ctxt = gen.getASTContext();
+  SmallVector<Expr*, 4> args;
+  for (auto index : indices(tupleTy->getElementTypes())) {
+    Expr *projection = new (ctxt) TupleElementExpr(arg, SourceLoc(),
+                                                   index, SourceLoc(),
+                                          tupleTy->getElementType(index));
+    args.push_back(projection);
+  }
+  return ctxt.AllocateCopy(args);
+}
 
 static ManagedValue emitBuiltinRetain(SILGenFunction &gen,
                                        SILLocation loc,
@@ -174,13 +210,11 @@ static ManagedValue emitBuiltinDestroy(SILGenFunction &gen,
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
 }
 
-/// Specialized emitter for Builtin.assign and Builtin.init.
-static ManagedValue emitBuiltinAssignOrInit(SILGenFunction &gen,
+static ManagedValue emitBuiltinAssign(SILGenFunction &gen,
                                       SILLocation loc,
                                       ArrayRef<Substitution> substitutions,
                                       ArrayRef<ManagedValue> args,
-                                      SGFContext C,
-                                      bool isInitialization) {
+                                      SGFContext C) {
   assert(args.size() >= 2 && "assign should have two arguments");
   assert(substitutions.size() == 1 &&
          "assign should have a single substitution");
@@ -198,29 +232,31 @@ static ManagedValue emitBuiltinAssignOrInit(SILGenFunction &gen,
   ManagedValue src = RValue(args.slice(0, args.size() - 1), assignFormalType)
     .getAsSingleValue(gen, loc);
   
-  if (isInitialization)
-    src.forwardInto(gen, loc, addr);
-  else
-    src.assignInto(gen, loc, addr);
+  src.assignInto(gen, loc, addr);
+
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
 }
 
-static ManagedValue emitBuiltinAssign(SILGenFunction &gen,
-                                      SILLocation loc,
-                                      ArrayRef<Substitution> substitutions,
-                                      ArrayRef<ManagedValue> args,
-                                      SGFContext C) {
-  return emitBuiltinAssignOrInit(gen, loc, substitutions, args, C,
-                                 /*isInitialization*/ false);
-}
-
+/// Emit Builtin.initialize by evaluating the operand directly into
+/// the address.
 static ManagedValue emitBuiltinInit(SILGenFunction &gen,
                                     SILLocation loc,
                                     ArrayRef<Substitution> substitutions,
-                                    ArrayRef<ManagedValue> args,
+                                    Expr *tuple,
                                     SGFContext C) {
-  return emitBuiltinAssignOrInit(gen, loc, substitutions, args, C,
-                                 /*isInitialization*/ true);
+  auto args = decomposeArguments(gen, tuple, 2);
+
+  CanType formalType = substitutions[0].getReplacement()->getCanonicalType();
+  auto &formalTL = gen.getTypeLowering(formalType);
+
+  SILValue addr = gen.emitRValueAsSingleValue(args[1]).getUnmanagedValue();
+  addr = gen.B.createPointerToAddress(loc, addr,
+                                 formalTL.getLoweredType().getAddressType());
+
+  TemporaryInitialization init(addr, CleanupHandle::invalid());
+  gen.emitExprInto(args[0], &init);
+  
+  return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
 }
 
 /// Specialized emitter for Builtin.fixLifetime.

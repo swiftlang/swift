@@ -9,9 +9,9 @@ class Base {
 
 // CHECK: sil hidden [transparent] @_TFC17materializeForSet4Basem8computedSi : $@cc(method) @thin (Builtin.RawPointer, @owned Base) -> (Builtin.RawPointer, Builtin.Int1) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[SELF:%.*]] : $Base):
+// CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to $*Int
 // CHECK:   [[T0:%.*]] = function_ref @_TFC17materializeForSet4Baseg8computedSi
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[SELF]])
-// CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to $*Int
 // CHECK:   store [[T1]] to [[T2]] : $*Int
 // CHECK:   [[T3:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, [[T3]] : $Builtin.Int1)
@@ -44,9 +44,9 @@ class HasDidSet : Base {
 
 // SILGEN: sil hidden [transparent] @_TFC17materializeForSet9HasDidSetm6storedSi : $@cc(method) @thin (Builtin.RawPointer, @owned HasDidSet) -> (Builtin.RawPointer, Builtin.Int1) {
 // SILGEN: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[SELF:%.*]] : $HasDidSet):
+// SILGEN:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to $*Int
 // SILGEN:   [[T0:%.*]] = function_ref @_TFC17materializeForSet9HasDidSetg6storedSi
 // SILGEN:   [[T1:%.*]] = apply [[T0]]([[SELF]])
-// SILGEN:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to $*Int
 // SILGEN:   store [[T1]] to [[T2]] : $*Int
 // SILGEN:   [[T3:%.*]] = integer_literal $Builtin.Int1, -1
 // SILGEN:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, [[T3]] : $Builtin.Int1)
@@ -60,9 +60,9 @@ class HasDidSet : Base {
 
 // CHECK: sil hidden [transparent] @_TFC17materializeForSet9HasDidSetm8computedSi : $@cc(method) @thin (Builtin.RawPointer, @owned HasDidSet) -> (Builtin.RawPointer, Builtin.Int1) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[SELF:%.*]] : $HasDidSet):
+// CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to $*Int
 // CHECK:   [[T0:%.*]] = function_ref @_TFC17materializeForSet9HasDidSetg8computedSi
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[SELF]])
-// CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to $*Int
 // CHECK:   store [[T1]] to [[T2]] : $*Int
 // CHECK:   [[T3:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, [[T3]] : $Builtin.Int1)
@@ -75,9 +75,9 @@ class HasWeak {
 }
 // CHECK: sil hidden [transparent] @_TFC17materializeForSet7HasWeakm7weakvarXwGSqS0__ : $@cc(method) @thin (Builtin.RawPointer, @owned HasWeak) -> (Builtin.RawPointer, Builtin.Int1) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[SELF:%.*]] : $HasWeak):
+// CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to $*Optional<HasWeak>
 // CHECK:   [[T0:%.*]] = ref_element_addr [[SELF]] : $HasWeak, #HasWeak.weakvar
 // CHECK:   [[T1:%.*]] = load_weak [[T0]] : $*@sil_weak Optional<HasWeak>
-// CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to $*Optional<HasWeak>
 // CHECK:   store [[T1]] to [[T2]] : $*Optional<HasWeak>
 // CHECK:   [[T3:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, [[T3]] : $Builtin.Int1)
