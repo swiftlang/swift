@@ -4183,8 +4183,6 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   if (!maybeReturnValue)
     return;
 
-  auto cleanupLoc = CleanupLocation::getCleanupLocation(ctor);
-
   // If we're using a box for self, reload the value at the end of the init
   // method.
   if (NeedsBoxForSelf) {
@@ -4192,6 +4190,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     if (Expr *SI = ctor->getSuperInitCall())
       emitRValue(SI);
 
+    auto cleanupLoc = CleanupLocation(ctor);
     selfArg = B.createLoad(cleanupLoc, VarLocs[selfDecl].value);
     SILValue selfBox = VarLocs[selfDecl].box;
     assert(selfBox);
