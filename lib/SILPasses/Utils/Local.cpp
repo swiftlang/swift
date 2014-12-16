@@ -361,6 +361,7 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() {
           .Case("array.props.needsElementTypeCheck",
                 ArrayCallKind::kArrayPropsNeedsTypeCheck)
           .Case("array.init", ArrayCallKind::kArrayInit)
+          .Case("array.uninitialized", ArrayCallKind::kArrayUninitialized)
           .Case("array.check_subscript", ArrayCallKind::kCheckSubscript)
           .Case("array.check_index", ArrayCallKind::kCheckIndex)
           .Case("array.get_count", ArrayCallKind::kGetCount)

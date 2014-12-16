@@ -111,7 +111,8 @@ namespace swift {
     kGetElementAddress,
     kMakeMutable,
     kMutateUnknown,
-    kArrayInit
+    kArrayInit,
+    kArrayUninitialized
   };
 
   /// Wrapper around array semantic calls.

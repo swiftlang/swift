@@ -140,6 +140,13 @@ array.init
   may act as a guard to other potentially mutating operations, such as
   ``get_element_address``.
 
+array.uninitialized(count: Builtin.Word) -> (Array<T>, Builtin.RawPointer)
+
+  Creates an array with the specified number of elements. It initializes
+  the storage descriptor but not the array elements. The returned tuple
+  contains the new array and a raw pointer to the element storage.
+  The caller is responsible for writing the elements to the element storage.
+
 array.props.isCocoa/needsElementTypeCheck -> Bool
   Reads storage descriptors properties (isCocoa, needsElementTypeCheck).
   This is not control dependent or guarded. The optimizer has
