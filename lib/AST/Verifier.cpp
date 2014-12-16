@@ -1442,6 +1442,12 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(PatternBindingDecl *binding) {
+      // Look at all of the VarDecls being bound.
+      if (auto *P = binding->getPattern())
+        P->forEachVariable([&](VarDecl *VD) {
+          // ParamDecls never get PBD's.
+          assert(!isa<ParamDecl>(VD) && "ParamDecl has a PatternBindingDecl?");
+        });
     }
 
     void verifyChecked(AbstractStorageDecl *ASD) {

@@ -2251,10 +2251,9 @@ static void synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
     Expr *OldValueExpr
       = createPropertyLoadOrCallSuperclassGetter(Set, VD, TC);
     
-    OldValue = new (Ctx) ParamDecl(/*isLet*/ true,
-                                   SourceLoc(), Identifier(),
-                                   SourceLoc(), Ctx.getIdentifier("tmp"),
-                                   Type(), Set);
+    OldValue = new (Ctx) VarDecl(/*isStatic*/false, /*isLet*/ true,
+                                 SourceLoc(), Ctx.getIdentifier("tmp"),
+                                 Type(), Set);
     OldValue->setImplicit();
     auto *tmpPattern = new (Ctx) NamedPattern(OldValue, /*implicit*/ true);
     auto tmpPBD = new (Ctx) PatternBindingDecl(SourceLoc(),
