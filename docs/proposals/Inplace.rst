@@ -178,7 +178,9 @@ We propose to allow method overload pairs of the form:
 
 The second overload is known as an **assignment method**, [#getset]_
 and overloads of this form without the ``@assignment`` attribute are
-rejected as ill-formed.
+rejected as ill-formed.  Together these overloads are known as an
+**assignment method pair**.  This concept generalizes in obvious ways
+to pairs of generic methods, details open for discussion.
 
 An assignment method is only accessible via a special syntax, for
 example:
@@ -198,13 +200,28 @@ target is ``self``::
     }
   }
 
+Assignment Operator Pairs
+-------------------------
+
+Similarly, a pair of overloaded operators of the form:
+
+.. parsed-literal::
+
+  func *op*\ (**X**, Y) -> **X**
+
+  **@assignment**
+  func *op*\ =(**inout X**, Y) -> **Void**
+
+is known as an **assignment operator pair**, and similar
+generalization to pairs of generic operators is possible.
+
 Eliminating Tedious Boilerplate
 ===============================
 
 Generating the In-Place Form
 ----------------------------
 
-Given an ordinary method of a value type ``X``:
+Given an ordinary method of a type ``X``:
 
 .. parsed-literal::
 
@@ -269,23 +286,75 @@ as though it were written:
     return y
   }(x)
 
+Generating Operator Forms
+-------------------------
+
+If only one member of an assignment operator pair is defined, similar
+rules allow the generation of code using the other member.  E.g.
+
+we can compile
+
+.. parsed-literal::
+
+  x *op*\ **=** *expression*
+
+as though it were written:
+  
+.. parsed-literal::
+
+  x **=** x *op* (*expression*)
+
+or
+
+.. parsed-literal::
+
+  x *op* *expression*
+
+as though it were written:
+  
+.. parsed-literal::
+
+  { 
+    (var y: X)->X in
+    y *op*\ **=**\ *expression*
+    return y
+  }(x)
+
 Enabling Optimization
 =====================
 
-By requiring that explicitly-written assignment method pairs obey the
-laws of implicit generation laid out above, we can allow the compiler
-to use rvalues (and lvalues whose last use is the current expression)
-as "scratch space," thus avoiding expensive temporaries.
+By requiring that explicitly-written assignment operator and method
+pairs obey the laws of implicit generation laid out above, we can
+allow the compiler to use rvalues (and lvalues whose last use is the
+current expression) as "scratch space," thus avoiding expensive
+temporaries.
 
-Specifically, we must require that the following two lines are
-equivalent:
+Basic Optimizations
+-------------------
+
+Specifically, for *assignment method pairs*, we must require that the
+following two lines are equivalent:
 
 .. parsed-literal::
 
   **x = x.**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*) // form 1
   **x.=**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)    // form 2
 
-With that requirement in place, the compiler can rewrite form 1 as form 2, and
+and for *assignment operator pairs*, that the following two lines are
+equivalent:
+
+.. parsed-literal::
+
+  **x = x** *op* *expression*   // form 1
+  **x** *op*\ **=** *expression*      // form 2
+
+With those requirements in place, the compiler can rewrite form 1 as form 2
+thereby avoiding the creation of temporaries.
+
+Chained Optimizations
+---------------------
+
+The compiler can also avoid temporaries by rewriting
 
 .. parsed-literal::
 
@@ -302,22 +371,78 @@ as
     return __t
   }()
 
-thereby avoiding the creation of temporaries.
+Extending “chained” rewrites to *assignment operator pairs* requires
+an additional declaration that the operator is associative.  We
+propose an ``@associative`` attribute for that purpose, to be applied to
+on a case-by-case basis to ``func`` declarations, rather than tying
+associativity to the ``operator`` declaration.
 
-These same optimizations can and should be extended to assignment
-operator pairs such as ``+`` and ``+=`` by making similiar
-requirements on their semantic relationship.
+Supporting Class Types
+======================
 
-Supporting Reference Types
-==========================
+Assignment and operators are generally applied to value types, but
+it's reasonable to ask how to apply them to class types.  The first
+and most obvious requirement, in our opinion, is that immutable class
+types, which are fundamentally values, should work properly.
 
-This system can be generalized to cover classes, at some cost in
-complexity.  Assignment methods would of course not be labeled
-``mutating`` (unless we decided to eventually support a C++-\
-``const``\ -style semantics for classes), and would have reference
-semantics.  It would probably be best to guarantee that the compiler
-will not make optimizations based on expected semantic relationships
-between assignment method pairs.
+An assignment operator for an immutable class ``X`` always has the form:
+
+.. parsed-literal::
+
+  @assignment
+  func *op*\ **=** (**inout** lhs: X, rhs: Y) {
+    lhs = *expression creating a new X object*
+  }
+
+or, with COW optimization:
+
+.. parsed-literal::
+
+  @assignment
+  func *op*\ **=** (**inout** lhs: X, rhs: Y) {
+    if isUniquelyReferenced(&lhs) {
+      lhs.\ *mutateInPlace*\ (rhs)
+    }
+    else {
+      lhs = *expression creating a new X object*
+    }
+  }
+
+Notice that compiling either form depends on an assignment to ``lhs``.
+
+A method of a class, however, cannot assign to ``self``, so no
+explicitly-written assignment method can work properly for an
+immutable class.  That said, given an explicitly-written
+non-assignment method that produces a new instance, the rules given
+above for implicitly-generated assignment method semantics work just
+fine.  Therefore, at *least* until there is a way to reseat ``self``
+in a method, explicitly-written assignment methods must be banned for
+class types.
+
+The alternative is to say that explicitly-written assignment methods
+cannot work properly for immutable classes and “work” with reference
+semantics on other classes.  We consider this approach indefensible,
+especially when one considers that operators encourage writing
+algorithms that can only work properly with value semantics and will
+show up in protocols.
+
+Assignment Methods and Operators In Protocols
+=============================================
+
+The presence of an ``@assignment`` signature in the protocol implies
+the corresponding non-assignment signature is available.  An
+``@assignment`` method in a protocol generates two witness table
+slots, one for each version of the implied pair.  If the
+``@assignment`` signature is provided in the protocol, any
+corresponding non-``@assignment`` signature is ignored.  A type can
+satisfy the protocol requirement by providing either or both members
+of the pair; a thunk for the missing member of the pair is generated
+as needed.
+
+When only the non-``@assignment`` member of a pair appears in the
+protocol, it generates only one witness table slot.  The assignment
+signature is implicitly available on existentials and archetypes, with
+the usual implicitly-generated semantics.
 
 ----------
 
