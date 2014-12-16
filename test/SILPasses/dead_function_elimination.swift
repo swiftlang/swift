@@ -105,6 +105,13 @@ class FailableInitThatFailsReallyHard {
 }
 
 
+class BaseClass {}
+final class DerivedClass : BaseClass {
+  init(x : ()) {
+    fatalError("bad")  // no diagnostics.
+  }
+}
+
 
 
 

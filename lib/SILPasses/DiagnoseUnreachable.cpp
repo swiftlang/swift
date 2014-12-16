@@ -378,8 +378,17 @@ static bool isUserCode(const SILInstruction *I) {
   
   // If the instruction corresponds to user-written return or some other
   // statement, we know it corresponds to user code.
-  if (Loc.is<RegularLocation>() || Loc.is<ReturnLocation>())
+  if (Loc.is<RegularLocation>() || Loc.is<ReturnLocation>()) {
+    if (auto *E = Loc.getAsASTNode<Expr>())
+      return !E->isImplicit();
+    if (auto *D = Loc.getAsASTNode<Decl>())
+      return !D->isImplicit();
+    if (auto *S = Loc.getAsASTNode<Decl>())
+      return !S->isImplicit();
+    if (auto *P = Loc.getAsASTNode<Decl>())
+      return !P->isImplicit();
     return true;
+  }
   return false;
 }
 
