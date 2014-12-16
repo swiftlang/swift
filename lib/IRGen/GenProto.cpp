@@ -4161,7 +4161,7 @@ namespace {
       SmallVector<llvm::Value*, 4> MetadataForDepths;
     };
 
-    SmallVector<SourceValue, 4> SourceValues;
+    std::vector<SourceValue> SourceValues;
 
   public:
     EmitPolymorphicParameters(IRGenFunction &IGF,
