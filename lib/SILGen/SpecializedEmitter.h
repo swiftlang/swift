@@ -21,6 +21,7 @@
 #include "swift/AST/Identifier.h"
 
 namespace swift {
+class Expr;
 struct SILDeclRef;
 class SILLocation;
 class SILModule;
@@ -28,7 +29,6 @@ class Substitution;
   
 namespace Lowering {
 class ManagedValue;
-class RValueSource;
 class SGFContext;
 class SILGenFunction;
 class SILGenModule;
@@ -41,7 +41,7 @@ public:
   using EarlyEmitter = ManagedValue (SILGenFunction &,
                                      SILLocation,
                                      ArrayRef<Substitution>,
-                                     RValueSource &&argument,
+                                     Expr *argument,
                                      SGFContext);
 
   /// A special function for emitting a call after the arguments

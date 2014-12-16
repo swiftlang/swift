@@ -2181,9 +2181,12 @@ namespace {
         claimNextParamClause(origFormalType);
         claimNextParamClause(formalType);
 
+        // We should be able to enforce that these arguments are
+        // always still expressions.
+        Expr *argument = std::move(uncurriedSites[0]).forward().asKnownExpr();
         result = emitter(gen, uncurriedLoc,
                          callee.getSubstitutions(),
-                         std::move(uncurriedSites[0]).forward(),
+                         argument,
                          uncurriedContext);
 
       // Otherwise, emit the uncurried arguments now and perform
