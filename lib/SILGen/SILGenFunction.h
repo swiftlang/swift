@@ -1030,16 +1030,9 @@ public:
     // We handle these in pattern binding.
   }
 
-  // This indicates what we're emitting the pattern for: a ParamDecl, a VarDecl
-  // with an initializer, or a VarDecl without one.
-  enum PatternKind_t {
-    PK_ParamDecl, PK_InitVarDecl, PK_UninitVarDecl
-  };
-
   /// Emit an Initialization for a 'var' or 'let' decl in a pattern.
   std::unique_ptr<Initialization>
-  emitInitializationForVarDecl(VarDecl *vd, PatternKind_t PatternKind,
-                               Type patternType);
+  emitInitializationForVarDecl(VarDecl *vd, Type patternType);
   
   /// Emit the allocation for a local variable. Returns the address of the
   /// value. Does not register a cleanup.

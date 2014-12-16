@@ -324,8 +324,7 @@ class LetValueInitialization : public Initialization {
   bool DidFinish = false;
 
 public:
-  LetValueInitialization(VarDecl *vd, SILGenFunction::PatternKind_t PatternKind,
-                         SILGenFunction &gen)
+  LetValueInitialization(VarDecl *vd, SILGenFunction &gen)
     : Initialization(Initialization::Kind::LetValue), vd(vd)
   {
     auto &lowering = gen.getTypeLowering(vd->getType());
@@ -525,11 +524,8 @@ struct InitializationForPattern
   : public PatternVisitor<InitializationForPattern, InitializationPtr>
 {
   SILGenFunction &Gen;
-  SILGenFunction::PatternKind_t PatternKind;
 
-  InitializationForPattern(SILGenFunction &Gen,
-                           SILGenFunction::PatternKind_t PatternKind)
-    : Gen(Gen), PatternKind(PatternKind) {}
+  InitializationForPattern(SILGenFunction &Gen) : Gen(Gen) {}
 
   // Paren, Typed, and Var patterns are noops, just look through them.
   InitializationPtr visitParenPattern(ParenPattern *P) {
@@ -557,8 +553,8 @@ struct InitializationForPattern
       return InitializationPtr(new BlackHoleInitialization());
     }
 
-    return Gen.emitInitializationForVarDecl(P->getDecl(), PatternKind,
-                                          P->hasType() ? P->getType() : Type());
+    auto Ty = P->hasType() ? P->getType() : Type();
+    return Gen.emitInitializationForVarDecl(P->getDecl(), Ty);
   }
 
   // Bind a tuple pattern by aggregating the component variables into a
@@ -640,9 +636,7 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
 }
 
 InitializationPtr
-SILGenFunction::emitInitializationForVarDecl(VarDecl *vd,
-                                     SILGenFunction::PatternKind_t PatternKind,
-                                             Type patternType) {
+SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, Type patternType) {
   // If this is a computed variable, we don't need to do anything here.
   // We'll generate the getter and setter when we see their FuncDecls.
   if (!vd->hasStorage())
@@ -669,22 +663,26 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd,
   // let binding, which stores the initialization value into VarLocs directly.
   if (vd->isLet() && vd->getDeclContext()->isLocalContext() &&
       !isa<ReferenceStorageType>(varType))
-    return InitializationPtr(new LetValueInitialization(vd, PatternKind,*this));
+    return InitializationPtr(new LetValueInitialization(vd, *this));
 
-
+  // If the variable has no initial value, emit a mark_uninitialized instruction
+  // so that DI tracks and enforces validity of it.
+  bool isUninitialized =
+    vd->getParentPattern() && !vd->getParentPattern()->hasInit();
+  
   // If this is a global variable, initialize it without allocations or
   // cleanups.
   InitializationPtr Result;
   if (!vd->getDeclContext()->isLocalContext()) {
     auto *silG = SGM.getSILGlobalVariable(vd, NotForDefinition);
     SILValue addr = B.createGlobalAddr(vd, silG);
-    if (PatternKind == PK_UninitVarDecl)
+    if (isUninitialized)
       addr = B.createMarkUninitializedVar(vd, addr);
 
     VarLocs[vd] = SILGenFunction::VarLoc::get(addr);
     Result = InitializationPtr(new GlobalInitialization(addr));
   } else {
-    Result = emitLocalVariableWithCleanup(vd, PatternKind == PK_UninitVarDecl);
+    Result = emitLocalVariableWithCleanup(vd, isUninitialized);
   }
 
   // If we're initializing a weak or unowned variable, this requires a change in
@@ -698,10 +696,8 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd,
 void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
   // Allocate the variables and build up an Initialization over their
   // allocated storage.
-  auto InitKind = D->getInit() ? PK_InitVarDecl : PK_UninitVarDecl;
   InitializationPtr initialization =
-    InitializationForPattern(*this, InitKind)
-      .visit(D->getPattern());
+    InitializationForPattern(*this).visit(D->getPattern());
 
   // If an initial value expression was specified by the decl, emit it into
   // the initialization. Otherwise, mark it uninitialized for DI to resolve.
@@ -715,7 +711,7 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
 
 InitializationPtr
 SILGenFunction::emitPatternBindingInitialization(Pattern *P) {
-  return InitializationForPattern(*this, PK_InitVarDecl).visit(P);
+  return InitializationForPattern(*this).visit(P);
 }
 
 /// Enter a cleanup to deallocate the given location.
@@ -1072,8 +1068,7 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
   // Emit the argument variables in calling convention order.
   for (Pattern *p : reversed(paramPatterns)) {
     // Allocate the local mutable argument storage and set up an Initialization.
-    InitializationPtr argInit =
-      InitializationForPattern(*this, PK_ParamDecl).visit(p);
+    InitializationPtr argInit = InitializationForPattern(*this).visit(p);
     // Add the SILArguments and use them to initialize the local argument
     // values.
     ArgumentInitVisitor(*this, F).visit(p, argInit.get());
