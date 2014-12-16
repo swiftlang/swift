@@ -5,6 +5,7 @@ add_swift_library(swiftSILGen
   RValue.cpp
   SILGen.cpp
   SILGenApply.cpp
+  SILGenBuiltin.cpp
   SILGenDecl.cpp
   SILGenExpr.cpp
   SILGenLValue.cpp

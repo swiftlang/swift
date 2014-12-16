@@ -14,14 +14,13 @@
 #include "RValue.h"
 #include "Scope.h"
 #include "Initialization.h"
+#include "SpecializedEmitter.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILUndef.h"
 #include "swift/SIL/PrettyStackTrace.h"
 
 using namespace swift;
@@ -211,12 +210,6 @@ public:
 
   const Kind kind;
 
-  using SpecializedEmitter = ManagedValue (*)(SILGenFunction &,
-                                              SILLocation,
-                                              ArrayRef<Substitution>,
-                                              ArrayRef<ManagedValue>,
-                                              SGFContext);
-
   // Move, don't copy.
   Callee(const Callee &) = delete;
   Callee &operator=(const Callee &) = delete;
@@ -243,9 +236,6 @@ private:
 public:
   void setTransparent(bool T) { isTransparent = T; }
 private:
-
-  static SpecializedEmitter getSpecializedEmitterForSILBuiltin(SILDeclRef c,
-                                                               SILModule &M);
 
   Callee(ManagedValue indirectValue,
          CanType origFormalType,
@@ -726,11 +716,7 @@ public:
     
     switch (kind) {
     case Kind::StandaloneFunction: {
-      if (SpecializedEmitter e
-            = getSpecializedEmitterForSILBuiltin(standaloneFunction, SGM.M)) {
-        return e;
-      }
-      SWIFT_FALLTHROUGH;
+      return SpecializedEmitter::forDecl(SGM, standaloneFunction);
     }
     case Kind::IndirectValue:
     case Kind::ClassMethod:
@@ -738,34 +724,6 @@ public:
     case Kind::WitnessMethod:
     case Kind::DynamicMethod:
       return None;
-    }
-    llvm_unreachable("bad callee kind");
-  }
-  
-  /// Return the builtin identifier, if the callee is a builtin.
-  Identifier
-  getBuiltinIdentifier(SILGenModule &SGM,
-                       unsigned uncurryLevel) const {
-    switch (kind) {
-    case Kind::StandaloneFunction: {
-      auto decl = standaloneFunction.getDecl();
-      if (!isa<BuiltinUnit>(decl->getDeclContext()))
-        return Identifier();
-      
-      if (!isa<BuiltinUnit>(decl->getDeclContext()))
-        return Identifier();
-
-      // Currently we have no curried builtins.
-      assert(uncurryLevel == 0 && "curried builtin?!");
-
-      return decl->getName();
-    }
-    case Kind::IndirectValue:
-    case Kind::ClassMethod:
-    case Kind::SuperMethod:
-    case Kind::WitnessMethod:
-    case Kind::DynamicMethod:
-      return Identifier();
     }
     llvm_unreachable("bad callee kind");
   }
@@ -2120,6 +2078,10 @@ namespace {
       ArgEmitter emitter(gen, lowering.CC, params, args);
       emitter.emit(std::move(ArgValue), origParamType);
     }
+
+    RValueSource &&forward() && {
+      return std::move(ArgValue);
+    }
   };
 
   class CallEmission {
@@ -2176,8 +2138,11 @@ namespace {
 
       // Get either the specialized emitter for a known function, or the
       // function value for a normal callee.
-      Callee::SpecializedEmitter specializedEmitter = nullptr;
-      Identifier builtinName;
+
+      // Check for a specialized emitter.
+      Optional<SpecializedEmitter> specializedEmitter =
+        callee.getSpecializedEmitter(gen.SGM, uncurryLevel);
+
       CanSILFunctionType substFnType;
       ManagedValue mv;
       bool transparent;
@@ -2185,15 +2150,7 @@ namespace {
       AbstractionPattern origFormalType(callee.getOrigFormalType());
       CanAnyFunctionType formalType = callee.getSubstFormalType();
 
-      // Check for a specialized emitter.
-      auto maybeEmitter = callee.getSpecializedEmitter(gen.SGM, uncurryLevel);
-      if (maybeEmitter) {
-        specializedEmitter = maybeEmitter.getValue();
-      } else {
-        builtinName = callee.getBuiltinIdentifier(gen.SGM, uncurryLevel);
-      }
-      
-      if (maybeEmitter || builtinName.get()) {
+      if (specializedEmitter) {
         // We want to emit the arguments as fully-substituted values
         // because that's what the specialized emitters expect.
         origFormalType = AbstractionPattern(formalType);
@@ -2205,65 +2162,90 @@ namespace {
           callee.getAtUncurryLevel(gen, uncurryLevel);
       }
 
-      // Emit the arguments.
-      Optional<SILLocation> uncurriedLoc;
-      SmallVector<SmallVector<ManagedValue, 4>, 2> args;
-      args.reserve(uncurriedSites.size());
-      {
-        ParamLowering paramLowering(substFnType);
-       
-        // Collect the arguments to the uncurried call.
-        for (auto &site : uncurriedSites) {
-          AbstractionPattern origParamType =
-            claimNextParamClause(origFormalType);
-          claimNextParamClause(formalType);
-          uncurriedLoc = site.Loc;
-          args.push_back({});
-          std::move(site).emit(gen, origParamType, paramLowering, args.back());
-        }
-      }
-      assert(uncurriedLoc);
+      // Emit the first level of call.
+      ManagedValue result;
 
-      // Uncurry the arguments in calling convention order.
-      SmallVector<ManagedValue, 4> uncurriedArgs;
-      for (auto &argSet : reversed(args))
-        uncurriedArgs.append(argSet.begin(), argSet.end());
-      args = {};
-      
-      // We use the context emit-into initialization only for the outermost
-      // call.
+      // We use the context emit-into initialization only for the
+      // outermost call.
       SGFContext uncurriedContext =
         (extraSites.empty() ? C : SGFContext());
 
-      // Emit the uncurried call.
-      ManagedValue result;
+      // If we have an early emitter, just let it take over for the
+      // uncurried call site.
+      if (specializedEmitter &&
+          specializedEmitter->isEarlyEmitter()) {
+        auto emitter = specializedEmitter->getEarlyEmitter();
 
-      if (specializedEmitter) {
-        result = specializedEmitter(gen,
-                                    uncurriedLoc.getValue(),
-                                    callee.getSubstitutions(),
-                                    uncurriedArgs,
-                                    uncurriedContext);
-      } else if (builtinName.get()) {
-        SmallVector<SILValue, 4> consumedArgs;
-        for (auto arg : uncurriedArgs) {
-          consumedArgs.push_back(arg.forward(gen));
-        }
-        auto resultVal =
-          gen.B.createBuiltin(uncurriedLoc.getValue(), builtinName,
-                              substFnType->getResult().getSILType(),
-                              callee.getSubstitutions(),
-                              consumedArgs);
-        result = gen.emitManagedRValueWithCleanup(resultVal);
+        assert(uncurriedSites.size() == 1);
+        SILLocation uncurriedLoc = uncurriedSites[0].Loc;
+        claimNextParamClause(origFormalType);
+        claimNextParamClause(formalType);
+
+        result = emitter(gen, uncurriedLoc,
+                         callee.getSubstitutions(),
+                         std::move(uncurriedSites[0]).forward(),
+                         uncurriedContext);
+
+      // Otherwise, emit the uncurried arguments now and perform
+      // the call.
       } else {
-        result = gen.emitApply(uncurriedLoc.getValue(), mv,
+        // Emit the arguments.
+        Optional<SILLocation> uncurriedLoc;
+        SmallVector<SmallVector<ManagedValue, 4>, 2> args;
+        args.reserve(uncurriedSites.size());
+        {
+          ParamLowering paramLowering(substFnType);
+       
+          // Collect the arguments to the uncurried call.
+          for (auto &site : uncurriedSites) {
+            AbstractionPattern origParamType =
+              claimNextParamClause(origFormalType);
+            claimNextParamClause(formalType);
+            uncurriedLoc = site.Loc;
+            args.push_back({});
+            std::move(site).emit(gen, origParamType, paramLowering,
+                                 args.back());
+          }
+        }
+        assert(uncurriedLoc);
+
+        // Uncurry the arguments in calling convention order.
+        SmallVector<ManagedValue, 4> uncurriedArgs;
+        for (auto &argSet : reversed(args))
+          uncurriedArgs.append(argSet.begin(), argSet.end());
+        args = {};
+      
+        // Emit the uncurried call.
+        if (!specializedEmitter) {
+          result = gen.emitApply(uncurriedLoc.getValue(), mv,
+                                 callee.getSubstitutions(),
+                                 uncurriedArgs,
+                                 substFnType,
+                                 origFormalType,
+                                 uncurriedSites.back().getSubstResultType(),
+                                 transparent, None,
+                                 uncurriedContext);
+        } else if (specializedEmitter->isLateEmitter()) {
+          auto emitter = specializedEmitter->getLateEmitter();
+          result = emitter(gen,
+                           uncurriedLoc.getValue(),
                            callee.getSubstitutions(),
                            uncurriedArgs,
-                           substFnType,
-                           origFormalType,
-                           uncurriedSites.back().getSubstResultType(),
-                           transparent, None,
                            uncurriedContext);
+        } else {
+          assert(specializedEmitter->isNamedBuiltin());
+          auto builtinName = specializedEmitter->getBuiltinName();
+          SmallVector<SILValue, 4> consumedArgs;
+          for (auto arg : uncurriedArgs) {
+            consumedArgs.push_back(arg.forward(gen));
+          }
+          auto resultVal =
+            gen.B.createBuiltin(uncurriedLoc.getValue(), builtinName,
+                                substFnType->getResult().getSILType(),
+                                callee.getSubstitutions(),
+                                consumedArgs);
+          result = gen.emitManagedRValueWithCleanup(resultVal);
+        }
       }
       
       // End the initial writeback scope, if any.
@@ -2277,17 +2259,17 @@ namespace {
         auto substFnType = result.getType().castTo<SILFunctionType>();
         ParamLowering paramLowering(substFnType);
 
-        uncurriedArgs.clear();
+        SmallVector<ManagedValue, 4> siteArgs;
 
         // The result function has already been reabstracted to the substituted
         // type, so use the substituted formal type as the abstraction pattern
         // for argument passing now.
         AbstractionPattern origParamType(claimNextParamClause(formalType));
         std::move(extraSites[i]).emit(gen, origParamType, paramLowering,
-                                      uncurriedArgs);
+                                      siteArgs);
         SGFContext context = i == size - 1 ? C : SGFContext();
         SILLocation loc = extraSites[i].Loc;
-        result = gen.emitApply(loc, result, {}, uncurriedArgs,
+        result = gen.emitApply(loc, result, {}, siteArgs,
                            substFnType,
                            origFormalType,
                            extraSites[i].getSubstResultType(),
@@ -2314,610 +2296,6 @@ namespace {
     CallEmission(const CallEmission &) = delete;
     CallEmission &operator=(const CallEmission &) = delete;
   };
-
-  static ManagedValue emitBuiltinRetain(SILGenFunction &gen,
-                                         SILLocation loc,
-                                         ArrayRef<Substitution> substitutions,
-                                         ArrayRef<ManagedValue> args,
-                                         SGFContext C) {
-    // The value was produced at +1; we can produce an unbalanced
-    // retain simply by disabling the cleanup.
-    args[0].forward(gen);
-    return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
-  }
-
-  static ManagedValue emitBuiltinRelease(SILGenFunction &gen,
-                                         SILLocation loc,
-                                         ArrayRef<Substitution> substitutions,
-                                         ArrayRef<ManagedValue> args,
-                                         SGFContext C) {
-    // The value was produced at +1, so to produce an unbalanced
-    // release we need to leave the cleanup intact and then do a *second*
-    // release.
-    gen.B.createReleaseValue(loc, args[0].getValue());
-    return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
-  }
-
-  static ManagedValue emitBuiltinAutorelease(SILGenFunction &gen,
-                                             SILLocation loc,
-                                             ArrayRef<Substitution> substitutions,
-                                             ArrayRef<ManagedValue> args,
-                                             SGFContext C) {
-    // The value was produced at +1, so to produce an unbalanced
-    // autorelease we need to leave the cleanup intact.
-    gen.B.createAutoreleaseValue(loc, args[0].getValue());
-    return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
-  }
-
-  static bool requireIsOptionalNativeObject(SILGenFunction &gen,
-                                             SILLocation loc,
-                                             Type type) {
-    if (auto valueType = type->getOptionalObjectType())
-      if (valueType->is<BuiltinNativeObjectType>())
-        return true;
-
-    gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
-                "type of pin handle must be Optional<Builtin.NativeObject>");
-    return false;
-  }
-  
-  static ManagedValue emitBuiltinTryPin(SILGenFunction &gen,
-                                        SILLocation loc,
-                                        ArrayRef<Substitution> subs,
-                                        ArrayRef<ManagedValue> args,
-                                        SGFContext C) {
-    assert(args.size() == 1);
-
-    if (!requireIsOptionalNativeObject(gen, loc, subs[0].getReplacement())) {
-      return gen.emitUndef(loc, subs[0].getReplacement());
-    }
-
-    // The value was produced at +1, but pinning is only a conditional
-    // retain, so we have to leave the cleanup in place.  TODO: try to
-    // emit the argument at +0.
-    SILValue result = gen.B.createStrongPin(loc, args[0].getValue());
-
-    // The handle, if non-null, is effectively +1.
-    return gen.emitManagedRValueWithCleanup(result);
-  }
-
-  static ManagedValue emitBuiltinUnpin(SILGenFunction &gen,
-                                       SILLocation loc,
-                                       ArrayRef<Substitution> subs,
-                                       ArrayRef<ManagedValue> args,
-                                       SGFContext C) {
-    assert(args.size() == 1);
-
-    if (requireIsOptionalNativeObject(gen, loc, subs[0].getReplacement())) {
-      // Unpinning takes responsibility for the +1 handle.
-      gen.B.createStrongUnpin(loc, args[0].forward(gen));
-    }
-
-    return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
-  }
-
-  /// Specialized emitter for Builtin.load and Builtin.take.
-  static ManagedValue emitBuiltinLoadOrTake(SILGenFunction &gen,
-                                            SILLocation loc,
-                                            ArrayRef<Substitution> substitutions,
-                                            ArrayRef<ManagedValue> args,
-                                            SGFContext C,
-                                            IsTake_t isTake) {
-    assert(substitutions.size() == 1 && "load should have single substitution");
-    assert(args.size() == 1 && "load should have a single argument");
-    
-    // The substitution gives the type of the load.  This is always a
-    // first-class type; there is no way to e.g. produce a @weak load
-    // with this builtin.
-    auto &rvalueTL = gen.getTypeLowering(substitutions[0].getReplacement());
-    SILType loadedType = rvalueTL.getLoweredType();
-
-    // Convert the pointer argument to a SIL address.
-    SILValue addr = gen.B.createPointerToAddress(loc, args[0].getUnmanagedValue(),
-                                                 loadedType.getAddressType());
-    // Perform the load.
-    return gen.emitLoad(loc, addr, rvalueTL, C, isTake);
-  }
-  
-  static ManagedValue emitBuiltinLoad(SILGenFunction &gen,
-                                      SILLocation loc,
-                                      ArrayRef<Substitution> substitutions,
-                                      ArrayRef<ManagedValue> args,
-                                      SGFContext C) {
-    return emitBuiltinLoadOrTake(gen, loc, substitutions, args, C, IsNotTake);
-  }
-
-  static ManagedValue emitBuiltinTake(SILGenFunction &gen,
-                                      SILLocation loc,
-                                      ArrayRef<Substitution> substitutions,
-                                      ArrayRef<ManagedValue> args,
-                                      SGFContext C) {
-    return emitBuiltinLoadOrTake(gen, loc, substitutions, args, C, IsTake);
-  }
-
-  /// Specialized emitter for Builtin.destroy.
-  static ManagedValue emitBuiltinDestroy(SILGenFunction &gen,
-                                         SILLocation loc,
-                                         ArrayRef<Substitution> substitutions,
-                                         ArrayRef<ManagedValue> args,
-                                         SGFContext C) {
-    assert(args.size() == 2 && "destroy should have two arguments");
-    assert(substitutions.size() == 1 &&
-           "destroy should have a single substitution");
-    // The substitution determines the type of the thing we're destroying.
-    auto &ti = gen.getTypeLowering(substitutions[0].getReplacement());
-    
-    // Destroy is a no-op for trivial types.
-    if (ti.isTrivial())
-      return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
-    
-    SILType destroyType = ti.getLoweredType();
-
-    // Convert the pointer argument to a SIL address.
-    SILValue addr =
-      gen.B.createPointerToAddress(loc, args[1].getUnmanagedValue(),
-                                   destroyType.getAddressType());
-    
-    // Destroy the value indirectly. Canonicalization will promote to loads
-    // and releases if appropriate.
-    gen.B.emitDestroyAddr(loc, addr);
-    
-    return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
-  }
-
-  /// Specialized emitter for Builtin.assign and Builtin.init.
-  static ManagedValue emitBuiltinAssignOrInit(SILGenFunction &gen,
-                                        SILLocation loc,
-                                        ArrayRef<Substitution> substitutions,
-                                        ArrayRef<ManagedValue> args,
-                                        SGFContext C,
-                                        bool isInitialization) {
-    assert(args.size() >= 2 && "assign should have two arguments");
-    assert(substitutions.size() == 1 &&
-           "assign should have a single substitution");
-
-    // The substitution determines the type of the thing we're destroying.
-    CanType assignFormalType = substitutions[0].getReplacement()->getCanonicalType();
-    SILType assignType = gen.getLoweredType(assignFormalType);
-    
-    // Convert the destination pointer argument to a SIL address.
-    SILValue addr = gen.B.createPointerToAddress(loc,
-                                                 args.back().getUnmanagedValue(),
-                                                 assignType.getAddressType());
-    
-    // Build the value to be assigned, reconstructing tuples if needed.
-    ManagedValue src = RValue(args.slice(0, args.size() - 1), assignFormalType)
-      .getAsSingleValue(gen, loc);
-    
-    if (isInitialization)
-      src.forwardInto(gen, loc, addr);
-    else
-      src.assignInto(gen, loc, addr);
-    return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
-  }
-
-  static ManagedValue emitBuiltinAssign(SILGenFunction &gen,
-                                        SILLocation loc,
-                                        ArrayRef<Substitution> substitutions,
-                                        ArrayRef<ManagedValue> args,
-                                        SGFContext C) {
-    return emitBuiltinAssignOrInit(gen, loc, substitutions, args, C,
-                                   /*isInitialization*/ false);
-  }
-
-  static ManagedValue emitBuiltinInit(SILGenFunction &gen,
-                                      SILLocation loc,
-                                      ArrayRef<Substitution> substitutions,
-                                      ArrayRef<ManagedValue> args,
-                                      SGFContext C) {
-    return emitBuiltinAssignOrInit(gen, loc, substitutions, args, C,
-                                   /*isInitialization*/ true);
-  }
-  
-  /// Specialized emitter for Builtin.fixLifetime.
-  static ManagedValue emitBuiltinFixLifetime(SILGenFunction &gen,
-                                             SILLocation loc,
-                                             ArrayRef<Substitution> substitutions,
-                                             ArrayRef<ManagedValue> args,
-                                             SGFContext C) {
-    for (auto arg : args) {
-      gen.B.createFixLifetime(loc, arg.getValue());
-    }
-    return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
-  }
-
-  /// Specialized emitter for Builtin.castToNativeObject.
-  static ManagedValue emitBuiltinCastToNativeObject(SILGenFunction &gen,
-                                           SILLocation loc,
-                                           ArrayRef<Substitution> substitutions,
-                                           ArrayRef<ManagedValue> args,
-                                           SGFContext C) {
-    assert(args.size() == 1 && "cast should have a single argument");
-    assert(substitutions.size() == 1 && "cast should have a type substitution");
-    
-    // Take the reference type argument and cast it to NativeObject.
-    SILType objPointerType = SILType::getNativeObjectType(gen.F.getASTContext());
-
-    // Bail if the source type is not a class reference of some kind.
-    if (!substitutions[0].getReplacement()->mayHaveSuperclass() &&
-        !substitutions[0].getReplacement()->isClassExistentialType()) {
-      gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
-                       "castToNativeObject source must be a class");
-      SILValue undef = SILUndef::get(objPointerType, gen.SGM.M);
-      return ManagedValue::forUnmanaged(undef);
-    }
-    
-    // Save the cleanup on the argument so we can forward it onto the cast
-    // result.
-    auto cleanup = args[0].getCleanup();
-    
-    SILValue arg = args[0].getValue();
-
-    // If the argument is existential, open it.
-    if (substitutions[0].getReplacement()->isClassExistentialType()) {
-      Type openedTy
-        = ArchetypeType::getOpened(substitutions[0].getReplacement());
-      SILType loweredOpenedTy = gen.getLoweredLoadableType(openedTy);
-      arg = gen.B.createOpenExistentialRef(loc, arg, loweredOpenedTy);
-    }
-
-    SILValue result = gen.B.createUncheckedRefCast(loc, arg, objPointerType);
-    // Return the cast result with the original cleanup.
-    return ManagedValue(result, cleanup);
-  }
-
-  /// Specialized emitter for Builtin.castFromNativeObject.
-  static ManagedValue emitBuiltinCastFromNativeObject(SILGenFunction &gen,
-                                           SILLocation loc,
-                                           ArrayRef<Substitution> substitutions,
-                                           ArrayRef<ManagedValue> args,
-                                           SGFContext C) {
-    assert(args.size() == 1 && "cast should have a single argument");
-    assert(substitutions.size() == 1 &&
-           "cast should have a single substitution");
-
-    // The substitution determines the destination type.
-    SILType destType = gen.getLoweredType(substitutions[0].getReplacement());
-    
-    // Bail if the source type is not a class reference of some kind.
-    if (!substitutions[0].getReplacement()->isBridgeableObjectType()
-        || !destType.isObject()) {
-      gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
-                       "castFromNativeObject dest must be an object type");
-      // Recover by propagating an undef result.
-      SILValue result = SILUndef::get(destType, gen.SGM.M);
-      return ManagedValue::forUnmanaged(result);
-    }
-    
-    // Save the cleanup on the argument so we can forward it onto the cast
-    // result.
-    auto cleanup = args[0].getCleanup();
-
-    // Take the reference type argument and cast it.
-    SILValue result = gen.B.createUncheckedRefCast(loc, args[0].getValue(),
-                                                     destType);
-    // Return the cast result with the original cleanup.
-    return ManagedValue(result, cleanup);
-  }
-
-  /// Specialized emitter for Builtin.bridgeToRawPointer.
-  static ManagedValue emitBuiltinBridgeToRawPointer(SILGenFunction &gen,
-                                          SILLocation loc,
-                                          ArrayRef<Substitution> substitutions,
-                                          ArrayRef<ManagedValue> args,
-                                          SGFContext C) {
-    assert(args.size() == 1 && "bridge should have a single argument");
-    
-    // Take the reference type argument and cast it to RawPointer.
-    // RawPointers do not have ownership semantics, so the cleanup on the
-    // argument remains.
-    SILType rawPointerType = SILType::getRawPointerType(gen.F.getASTContext());
-    SILValue result = gen.B.createRefToRawPointer(loc, args[0].getValue(),
-                                                  rawPointerType);
-    return ManagedValue::forUnmanaged(result);
-  }
-
-  /// Specialized emitter for Builtin.bridgeFromRawPointer.
-  static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &gen,
-                                          SILLocation loc,
-                                          ArrayRef<Substitution> substitutions,
-                                          ArrayRef<ManagedValue> args,
-                                          SGFContext C) {
-    assert(substitutions.size() == 1 &&
-           "bridge should have a single substitution");
-    assert(args.size() == 1 && "bridge should have a single argument");
-    
-    // The substitution determines the destination type.
-    // FIXME: Archetype destination type?
-    auto &destLowering = gen.getTypeLowering(substitutions[0].getReplacement());
-    assert(destLowering.isLoadable());
-    SILType destType = destLowering.getLoweredType();
-
-    // Take the raw pointer argument and cast it to the destination type.
-    SILValue result = gen.B.createRawPointerToRef(loc, args[0].getUnmanagedValue(),
-                                                  destType);
-    // The result has ownership semantics, so retain it with a cleanup.
-    return gen.emitManagedRetain(loc, result, destLowering);
-  }
-
-  /// Specialized emitter for Builtin.addressof.
-  static ManagedValue emitBuiltinAddressOf(SILGenFunction &gen,
-                                           SILLocation loc,
-                                           ArrayRef<Substitution> substitutions,
-                                           ArrayRef<ManagedValue> args,
-                                           SGFContext C) {
-    assert(args.size() == 1 && "addressof should have a single argument");
-    
-    // Take the address argument and cast it to RawPointer.
-    SILType rawPointerType = SILType::getRawPointerType(gen.F.getASTContext());
-    SILValue result = gen.B.createAddressToPointer(loc,
-                                                   args[0].getUnmanagedValue(),
-                                                   rawPointerType);
-    return ManagedValue::forUnmanaged(result);
-  }
-
-  /// Specialized emitter for Builtin.gep.
-  static ManagedValue emitBuiltinGep(SILGenFunction &gen,
-                                     SILLocation loc,
-                                     ArrayRef<Substitution> substitutions,
-                                     ArrayRef<ManagedValue> args,
-                                     SGFContext C) {
-    assert(args.size() == 2 && "gep should be given two arguments");
-    
-    SILValue offsetPtr = gen.B.createIndexRawPointer(loc,
-                                                   args[0].getUnmanagedValue(),
-                                                   args[1].getUnmanagedValue());
-    return ManagedValue::forUnmanaged(offsetPtr);
-  }
-  
-  /// Specialized emitter for Builtin.condfail.
-  static ManagedValue emitBuiltinCondFail(SILGenFunction &gen,
-                                          SILLocation loc,
-                                          ArrayRef<Substitution> substitutions,
-                                          ArrayRef<ManagedValue> args,
-                                          SGFContext C) {
-    assert(args.size() == 1 && "condfail should be given one argument");
-    
-    gen.B.createCondFail(loc, args[0].getUnmanagedValue());
-    return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
-  }
-  
-  /// Specialized emitter for Builtin.reinterpretCast.
-  static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
-                                           SILLocation loc,
-                                           ArrayRef<Substitution> substitutions,
-                                           ArrayRef<ManagedValue> args,
-                                           SGFContext C) {
-    assert(args.size() == 1 && "reinterpretCast should be given one argument");
-    assert(substitutions.size() == 2 && "reinterpretCast should have two subs");
-    
-    auto &fromTL = gen.getTypeLowering(substitutions[0].getReplacement());
-    auto &toTL = gen.getTypeLowering(substitutions[1].getReplacement());
-    
-    // If casting between address-only types, cast the address.
-    if (!fromTL.isLoadable() || !toTL.isLoadable()) {
-      SILValue fromAddr;
-      
-      // If the from value is loadable, move it to a buffer.
-      if (fromTL.isLoadable()) {
-        fromAddr = gen.emitTemporaryAllocation(loc, args[0].getValue().getType());
-        gen.B.createStore(loc, args[0].getValue(), fromAddr);
-      } else {
-        fromAddr = args[0].getValue();
-      }
-      
-      auto toAddr = gen.B.createUncheckedAddrCast(loc, fromAddr,
-                                        toTL.getLoweredType().getAddressType());
-      
-      SILValue toValue;
-      // Load the destination value if it's loadable.
-      if (toTL.isLoadable()) {
-        toValue = gen.B.createLoad(loc, toAddr);
-      } else {
-        toValue = toAddr;
-      }
-      
-      // Forward it along with the original cleanup.
-      // TODO: Could try to pick which of the original or destination types has
-      // a cheaper cleanup.
-      if (toTL.isTrivial())
-        return ManagedValue::forUnmanaged(toValue);
-      
-      return ManagedValue(toValue, args[0].getCleanup());
-    }
-    
-    // If the destination is trivial, do a trivial bitcast, leaving the cleanup
-    // on the original value intact.
-    // TODO: Could try to pick which of the original or destination types has
-    // a cheaper cleanup.
-    if (toTL.isTrivial()) {
-      SILValue in = args[0].getValue();
-      SILValue out = gen.B.createUncheckedTrivialBitCast(loc, in,
-                                                         toTL.getLoweredType());
-      return ManagedValue::forUnmanaged(out);
-    }
-    
-    // Otherwise, do a reference-counting-identical bitcast, forwarding the
-    // cleanup onto the new value.
-    SILValue in = args[0].getValue();
-    SILValue out = gen.B.createUncheckedRefBitCast(loc, in,
-                                                   toTL.getLoweredType());
-    return ManagedValue(out, args[0].getCleanup());
-  }
-
-  /// Specialized emitter for Builtin.castToBridgeObject.
-  static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &gen,
-                                                    SILLocation loc,
-                                                    ArrayRef<Substitution> subs,
-                                                    ArrayRef<ManagedValue> args,
-                                                    SGFContext C) {
-    assert(args.size() == 2 && "cast should have two arguments");
-    assert(subs.size() == 1 && "cast should have a type substitution");
-    
-    // Take the reference type argument and cast it to BridgeObject.
-    SILType objPointerType = SILType::getBridgeObjectType(gen.F.getASTContext());
-
-    // Bail if the source type is not a class reference of some kind.
-    if (!subs[0].getReplacement()->mayHaveSuperclass() &&
-        !subs[0].getReplacement()->isClassExistentialType()) {
-      gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
-                       "castToNativeObject source must be a class");
-      SILValue undef = SILUndef::get(objPointerType, gen.SGM.M);
-      return ManagedValue::forUnmanaged(undef);
-    }
-    
-    // Save the cleanup on the argument so we can forward it onto the cast
-    // result.
-    auto refCleanup = args[0].getCleanup();
-    SILValue ref = args[0].getValue();
-    SILValue bits = args[1].getUnmanagedValue();
-    
-    // If the argument is existential, open it.
-    if (subs[0].getReplacement()->isClassExistentialType()) {
-      Type openedTy
-        = ArchetypeType::getOpened(subs[0].getReplacement());
-      SILType loweredOpenedTy = gen.getLoweredLoadableType(openedTy);
-      ref = gen.B.createOpenExistentialRef(loc, ref, loweredOpenedTy);
-    }
-    
-    SILValue result = gen.B.createRefToBridgeObject(loc, ref, bits);
-    return ManagedValue(result, refCleanup);
-  }
-  
-  /// Specialized emitter for Builtin.castReferenceFromBridgeObject.
-  static ManagedValue emitBuiltinCastReferenceFromBridgeObject(
-                                                    SILGenFunction &gen,
-                                                    SILLocation loc,
-                                                    ArrayRef<Substitution> subs,
-                                                    ArrayRef<ManagedValue> args,
-                                                    SGFContext C) {
-    assert(args.size() == 1 && "cast should have one argument");
-    assert(subs.size() == 1 && "cast should have a type substitution");
-
-    // The substitution determines the destination type.
-    SILType destType = gen.getLoweredType(subs[0].getReplacement());
-    
-    // Bail if the source type is not a class reference of some kind.
-    if (!subs[0].getReplacement()->isBridgeableObjectType()
-        || !destType.isObject()) {
-      gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
-                   "castReferenceFromBridgeObject dest must be an object type");
-      // Recover by propagating an undef result.
-      SILValue result = SILUndef::get(destType, gen.SGM.M);
-      return ManagedValue::forUnmanaged(result);
-    }
-    
-    SILValue result = gen.B.createBridgeObjectToRef(loc, args[0].forward(gen),
-                                                    destType);
-    return gen.emitManagedRValueWithCleanup(result);
-  }
-  static ManagedValue emitBuiltinCastBitPatternFromBridgeObject(
-                                                    SILGenFunction &gen,
-                                                    SILLocation loc,
-                                                    ArrayRef<Substitution> subs,
-                                                    ArrayRef<ManagedValue> args,
-                                                    SGFContext C) {
-    assert(args.size() == 1 && "cast should have one argument");
-    assert(subs.empty() && "cast should not have subs");
-
-    SILType wordType = SILType::getBuiltinWordType(gen.getASTContext());
-    SILValue result = gen.B.createBridgeObjectToWord(loc, args[0].getValue(),
-                                                     wordType);
-    return ManagedValue::forUnmanaged(result);
-  }
-
-  static ManagedValue emitBuiltinMarkDependence(SILGenFunction &gen,
-                                                SILLocation loc,
-                                                ArrayRef<Substitution> subs,
-                                                ArrayRef<ManagedValue> args,
-                                                SGFContext C) {
-    assert(args.size() == 2 && "markDependence should have two value args");
-    assert(subs.size() == 2 && "markDependence should have two generic args");
-
-    SILValue result =
-      gen.B.createMarkDependence(loc, args[0].forward(gen), args[1].getValue());
-    return gen.emitManagedRValueWithCleanup(result);
-  }
-  
-  /// Specialized emitter for type traits.
-  template<TypeTraitResult (TypeBase::*Trait)(),
-           BuiltinValueKind Kind>
-  static ManagedValue emitBuiltinTypeTrait(SILGenFunction &gen,
-                                          SILLocation loc,
-                                          ArrayRef<Substitution> substitutions,
-                                          ArrayRef<ManagedValue> args,
-                                          SGFContext C) {
-    assert(substitutions.size() == 1
-           && "type trait should take a single type parameter");
-    assert(args.size() == 1
-           && "type trait should take a single argument");
-    
-    unsigned result;
-    
-    auto traitTy = substitutions[0].getReplacement()->getCanonicalType();
-    
-    switch ((traitTy.getPointer()->*Trait)()) {
-    // If the type obviously has or lacks the trait, emit a constant result.
-    case TypeTraitResult::IsNot:
-      result = 0;
-      break;
-    case TypeTraitResult::Is:
-      result = 1;
-      break;
-        
-    // If not, emit the builtin call normally. Specialization may be able to
-    // eliminate it later, or we'll lower it away at IRGen time.
-    case TypeTraitResult::CanBe: {
-      auto &C = gen.getASTContext();
-      auto int8Ty = BuiltinIntegerType::get(8, C)->getCanonicalType();
-      auto apply = gen.B.createBuiltin(loc,
-                                       C.getIdentifier(getBuiltinName(Kind)),
-                                       SILType::getPrimitiveObjectType(int8Ty),
-                                       substitutions, args[0].getValue());
-      
-      return ManagedValue::forUnmanaged(apply);
-    }
-    }
-    
-    // Produce the result as an integer literal constant.
-    auto val = gen.B.createIntegerLiteral(
-        loc, SILType::getBuiltinIntegerType(8, gen.getASTContext()),
-        (uintmax_t)result);
-    return ManagedValue::forUnmanaged(val);
-  }
-  
-  Callee::SpecializedEmitter
-  Callee::getSpecializedEmitterForSILBuiltin(SILDeclRef function,
-                                             SILModule &SILM) {
-    // Filter out non-function members and non-builtin modules.
-
-    if (function.kind != SILDeclRef::Kind::Func)
-      return nullptr;
-    if (!function.hasDecl())
-      return nullptr;
-    
-    ValueDecl *decl = function.getDecl();
-    
-    if (!isa<BuiltinUnit>(decl->getDeclContext()))
-      return nullptr;
-
-    const BuiltinInfo &Builtin = SILM.getBuiltinInfo(decl->getName());
-
-    // Match SIL builtins to their emitters.
-    #define BUILTIN(Id, Name, Attrs)
-    #define BUILTIN_SIL_OPERATION(Id, Name, Overload) \
-      if (Builtin.ID == BuiltinValueKind::Id) \
-        return &emitBuiltin##Id;
-    
-    // Lower away type trait builtins when they're trivially solvable.
-    #define BUILTIN_TYPE_TRAIT_OPERATION(Id, Name) \
-      if (Builtin.ID == BuiltinValueKind::Id) \
-        return &emitBuiltinTypeTrait<&TypeBase::Name, BuiltinValueKind::Id>;
-    
-    #include "swift/AST/Builtins.def"
-    
-    return nullptr;
-  }
 } // end anonymous namespace
 
 static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
