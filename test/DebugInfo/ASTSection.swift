@@ -16,10 +16,6 @@
 
 // REQUIRES: ld-add_ast_path
 
-// FIXME: lldb-moduleimport-test does not support 32-bit executables
-// rdar://16244944
-// XFAIL: PTRSIZE=32
-//
 // Test ASTSection_linker.swift builds this code 
 // with separate compile and link steps.
 

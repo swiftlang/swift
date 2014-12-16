@@ -19,15 +19,16 @@
 #include "swift/Basic/Dwarf.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
+#include "llvm/Object/MachO.h"
+#include "llvm/Object/ObjectFile.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
-#include "llvm/Support/Path.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/MachO.h"
 #include <fstream>
 #include <sstream>
 
@@ -87,95 +88,68 @@ int main(int argc, char **argv) {
   if (CI.setup(Invocation))
     return 1;
 
+  std::vector<llvm::object::OwningBinary<llvm::object::ObjectFile>> ObjFiles;
+
   // Fetch the serialized module bitstreams from the Mach-O files and
   // register them with the module loader.
   for (std::string name : InputNames) {
-    // We assume Macho-O 64 bit.
-    std::ifstream macho(name);
-    if (!macho.good()) {
-      llvm::outs() << "Cannot read from " << name << "\n";
+    auto OF = llvm::object::ObjectFile::createObjectFile(name);
+    if (!OF) {
+      llvm::outs() << name << " is not an object file.\n";
       exit(1);
     }
-    struct mach_header_64 h;
-    macho.read((char*)&h, sizeof(h));
-    assert(h.magic == MH_MAGIC_64);
-    // Load command.
-    for (uint32_t i = 0; i < h.ncmds; ++i) {
-      struct load_command lc;
-      macho.read((char*)&lc, sizeof(lc));
-      if (lc.cmd == LC_SYMTAB) {
-        macho.seekg(-sizeof(lc), macho.cur);
-        symtab_command symtab;
-        macho.read((char*)&symtab, sizeof(symtab));
-        macho.seekg(symtab.symoff);
-
-        for (auto i = symtab.nsyms; i != 0; --i) {
-          nlist_64 nlistEntry;
-          macho.read((char *)&nlistEntry, sizeof(nlistEntry));
-          if (nlistEntry.n_type != N_AST)
-            continue;
-
-          assert(nlistEntry.n_strx);
-          assert(nlistEntry.n_strx < symtab.strsize);
-          auto currentOffset = macho.tellg();
-          macho.seekg(symtab.stroff + nlistEntry.n_strx);
-
-          std::stringbuf pathBuf;
-          macho.get(pathBuf, '\0');
-
-          auto fileBuf = llvm::MemoryBuffer::getFile(pathBuf.str());
-          if (!fileBuf) {
-            llvm::outs() << "Cannot read from '" << pathBuf.str() << "': "
-                         << fileBuf.getError().message();
-            exit(1);
-          }
-
-          if (!parseASTSection(CI.getSerializedModuleLoader(),
-                               fileBuf.get()->getBuffer(),
-                               modules)) {
-            exit(1);
-          }
-          // Deliberately leak the llvm::MemoryBuffer. We can't delete it
-          // while it's in use anyway.
-          fileBuf.get().release();
-
-          for (auto path : modules)
-            llvm::outs() << "Loaded module " << path << " from " << name
-                         << "\n";
-          macho.seekg(currentOffset);
-        }
-      } else if (lc.cmd == LC_SEGMENT_64) {
-        macho.seekg(-sizeof(lc), macho.cur);
-        struct segment_command_64 sc;
-        macho.read((char*)&sc, sizeof(sc));
-        // Sections.
-        for (uint32_t j = 0; j < sc.nsects; ++j) {
-          struct section_64 section;
-          macho.read((char*)&section, sizeof(section));
-          if (llvm::StringRef(swift::MachOASTSectionName) == section.sectname) {
-            // Pass the __ast section to the module loader.
-            macho.seekg(section.offset, macho.beg);
-            assert(macho.good());
-
-            // We can delete this memory only after the
-            // SerializedModuleLoader has performed its duty.
-            auto data = new char[section.size];
-            macho.read(data, section.size);
-
-            if (!parseASTSection(CI.getSerializedModuleLoader(),
-                                 llvm::StringRef(data, section.size),
-                                 modules)) {
-              exit(1);
-            }
-
-            for (auto path : modules)
-              llvm::outs() << "Loaded module " << path << " from " << name
-                           << "\n";
-          }
-        }
-      } else
-        macho.seekg(lc.cmdsize-sizeof(lc), macho.cur);
+    auto Obj = llvm::dyn_cast<llvm::object::MachOObjectFile>(OF->getBinary());
+    if (!Obj) {
+      llvm::outs() << name << " is not a Mach-O file.\n";
+      exit(1);
     }
+
+    for (auto &Symbol : Obj->symbols()) {
+      auto RawSym = Symbol.getRawDataRefImpl();
+      llvm::MachO::nlist nlist = Obj->getSymbolTableEntry(RawSym);
+      if (nlist.n_type == N_AST) {
+        llvm::StringRef Path;
+        if (Obj->getSymbolName(RawSym, Path)) {
+          llvm::outs() << "Cannot get symbol name\n;";
+          exit(1);
+        }
+
+        auto fileBuf = llvm::MemoryBuffer::getFile(Path);
+        if (!fileBuf) {
+          llvm::outs() << "Cannot read from '" << Path << "': "
+                       << fileBuf.getError().message();
+          exit(1);
+        }
+
+        if (!parseASTSection(CI.getSerializedModuleLoader(),
+                             fileBuf.get()->getBuffer(),
+                             modules)) {
+          exit(1);
+        }
+        // Deliberately leak the llvm::MemoryBuffer. We can't delete it
+        // while it's in use anyway.
+        fileBuf.get().release();
+
+        for (auto path : modules)
+          llvm::outs() << "Loaded module " << path << " from " << name
+                       << "\n";
+      }
+    }
+    for (auto &Section : Obj->sections()) {
+      llvm::StringRef Name;
+      Section.getName(Name);
+      if (Name == swift::MachOASTSectionName) {
+        llvm::StringRef Buf;
+        Section.getContents(Buf);
+        if (!parseASTSection(CI.getSerializedModuleLoader(), Buf, modules))
+          exit(1);
+
+        for (auto path : modules)
+          llvm::outs() << "Loaded module " << path << " from " << name
+                       << "\n";
+      }
+    }
+    ObjFiles.push_back(std::move(*OF));
   }
 
   // Attempt to import all modules we found.
