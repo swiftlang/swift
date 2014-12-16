@@ -164,14 +164,15 @@ swift::swift_getGenericMetadata(GenericMetadata *pattern,
   auto genericArgs = (const void * const *) arguments;
   size_t numGenericArgs = pattern->NumKeyArguments;
 
-  auto lambda = [&]() -> GenericCacheEntry* {
+  auto entry = getCache(pattern).findOrAdd(genericArgs, numGenericArgs,
+    [&]() -> GenericCacheEntry* {
       // Create new metadata to cache.
       auto metadata = pattern->CreateFunction(pattern, arguments);
       auto entry = GenericCacheEntry::getFromMetadata(pattern, metadata);
       entry->Value = metadata;
       return entry;
-    };
-  auto entry = getCache(pattern).findOrAdd(genericArgs, numGenericArgs, lambda);
+    });
+
   return entry->Value;
 }
 
@@ -244,7 +245,8 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
 
   const size_t numGenericArgs = 1;
   const void *args[] = { theClass };
-  auto lambda = [&]() -> ObjCClassCacheEntry* {
+  auto entry = ObjCClassWrappers.findOrAdd(args, numGenericArgs,
+    [&]() -> ObjCClassCacheEntry* {
       // Create a new entry for the cache.
       auto entry = ObjCClassCacheEntry::allocate(args, numGenericArgs, 0);
 
@@ -254,9 +256,8 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
       metadata->Class = theClass;
 
       return entry;
-    };
+    });
 
-  auto entry = ObjCClassWrappers.findOrAdd(args, numGenericArgs, lambda);
   return entry->getData();
 #else
   fatalError("swift_getObjCClassMetadata: no Objective-C interop");
@@ -309,7 +310,8 @@ namespace {
 
     // N argument types (with inout bit set)
     // and 1 result type (a tuple with M elements)
-    auto lambda = [&]() -> FunctionCacheEntry* {
+    auto entry = Cache.findOrAdd(argsAndResult, numArguments + 1,
+      [&]() -> FunctionCacheEntry* {
         // Create a new entry for the cache.
         auto entry = FunctionCacheEntry::allocate(
           argsAndResult,
@@ -330,8 +332,8 @@ namespace {
         }
 
         return entry;
-      };
-    auto entry = Cache.findOrAdd(argsAndResult, numArguments + 1, lambda);
+      });
+
     return entry->getData();
   }
 }
@@ -950,7 +952,8 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
 
   // FIXME: include labels when uniquing!
   auto genericArgs = (const void * const *) elements;
-  auto lambda = [&]() -> TupleCacheEntry* {
+  auto entry = TupleTypes.findOrAdd(genericArgs, numElements,
+    [&]() -> TupleCacheEntry* {
       // Create a new entry for the cache.
 
       typedef TupleTypeMetadata::Element Element;
@@ -1025,8 +1028,8 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
       }
 
       return entry;
-    };
-  auto entry = TupleTypes.findOrAdd(genericArgs, numElements, lambda);
+    });
+
   return entry->getData();
 }
 
@@ -1516,7 +1519,8 @@ swift::swift_getMetatypeMetadata(const Metadata *instanceMetadata) {
   // Search the cache.
   const size_t numGenericArgs = 1;
   const void *args[] = { instanceMetadata };
-  auto lambda = [&]() -> MetatypeCacheEntry* {
+  auto entry = MetatypeTypes.findOrAdd(args, numGenericArgs,
+    [&]() -> MetatypeCacheEntry* {
       // Create a new entry for the cache.
       auto entry = MetatypeCacheEntry::allocate(args, numGenericArgs, 0);
 
@@ -1526,8 +1530,8 @@ swift::swift_getMetatypeMetadata(const Metadata *instanceMetadata) {
       metadata->InstanceType = instanceMetadata;
 
       return entry;
-    };
-  auto entry = MetatypeTypes.findOrAdd(args, numGenericArgs, lambda);
+    });
+
   return entry->getData();
 }
 
@@ -1620,7 +1624,8 @@ swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
   // Search the cache.
   const size_t numGenericArgs = 1;
   const void *args[] = { instanceMetadata };
-  auto lambda = [&]() -> ExistentialMetatypeCacheEntry* {
+  auto entry = ExistentialMetatypeTypes.findOrAdd(args, numGenericArgs,
+    [&]() -> ExistentialMetatypeCacheEntry* {
       // Create a new entry for the cache.
       auto entry =
         ExistentialMetatypeCacheEntry::allocate(args, numGenericArgs, 0);
@@ -1641,9 +1646,8 @@ swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
       metadata->Flags = flags;
 
       return entry;
-    };
+    });
 
-  auto entry = ExistentialMetatypeTypes.findOrAdd(args, numGenericArgs, lambda);
   return entry->getData();
 }
 
@@ -1872,7 +1876,8 @@ swift::swift_getExistentialTypeMetadata(size_t numProtocols,
 
   auto protocolArgs = reinterpret_cast<const void * const *>(protocols);
 
-  auto lambda =  [&]() -> ExistentialCacheEntry* {
+  auto entry = ExistentialTypes.findOrAdd(protocolArgs, numProtocols,
+    [&]() -> ExistentialCacheEntry* {
       // Create a new entry for the cache.
       auto entry = ExistentialCacheEntry::allocate(protocolArgs, numProtocols,
                              sizeof(const ProtocolDescriptor *) * numProtocols);
@@ -1888,8 +1893,7 @@ swift::swift_getExistentialTypeMetadata(size_t numProtocols,
         metadata->Protocols[i] = protocols[i];
 
       return entry;
-    };
-  auto entry = ExistentialTypes.findOrAdd(protocolArgs, numProtocols, lambda);
+    });
   return entry->getData();
 }
 

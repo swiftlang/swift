@@ -170,9 +170,8 @@ public:
 
   /// Look up a cached metadata entry. If a cache match exists, return it.
   /// Otherwise, call entryBuilder() and add that to the cache.
-  template <class F> const Entry *findOrAdd(const void * const *arguments,
-                                            size_t numArguments,
-                                            F &entryBuilder) {
+  const Entry *findOrAdd(const void * const *arguments, size_t numArguments,
+                         std::function<Entry *()> entryBuilder) {
 
 #if SWIFT_DEBUG_RUNTIME
     printf("%s(%p): looking for entry with %zu arguments:\n",
