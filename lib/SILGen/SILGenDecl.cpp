@@ -331,22 +331,12 @@ public:
     auto &lowering = gen.getTypeLowering(vd->getType());
     
     // Decide whether we need a temporary stack buffer to evaluate this 'let'.
+    // There are three cases we need to handle here: parameters, initialized (or
+    // bound) decls, and uninitialized ones.
     bool needsTemporaryBuffer;
-    switch (PatternKind) {
-    case SILGenFunction::PK_UninitVarDecl:
-      // If this is a let-value without an initializer, then we need a temporary
-      // buffer.  DI will make sure it is only assigned to once.
-      needsTemporaryBuffer = true;
-        
-      assert(!vd->hasNonPatternBindingInit() &&
-             "Why generate a temp buffer for this?");
-      break;
-    case SILGenFunction::PK_InitVarDecl:
-      // If this is a let with an initializer, we only need a buffer if the type
-      // is address only.
-      needsTemporaryBuffer = lowering.isAddressOnly();
-      break;
-    case SILGenFunction::PK_ParamDecl:
+    bool isUninitialized = false;
+
+    if (isa<ParamDecl>(vd)) {
       // If this is a function argument, we don't usually need a temporary
       // buffer because the incoming pointer can be directly bound as our let
       // buffer.  However, if this VarDecl has tuple type, then it will be
@@ -355,13 +345,25 @@ public:
       // that rebound tuple will need to be in memory.
       needsTemporaryBuffer = vd->getType()->is<TupleType>() &&
                              lowering.isAddressOnly();
-      break;
+    } else if (vd->getParentPattern() && !vd->getParentPattern()->hasInit()) {
+      // This value is uninitialized (and unbound) if it has a pattern binding
+      // decl, with no initializer value.
+      assert(!vd->hasNonPatternBindingInit() && "Bound values aren't uninit!");
+      
+      // If this is a let-value without an initializer, then we need a temporary
+      // buffer.  DI will make sure it is only assigned to once.
+      needsTemporaryBuffer = true;
+      isUninitialized = true;
+    } else {
+      // If this is a let with an initializer or bound value, we only need a
+      // buffer if the type is address only.
+      needsTemporaryBuffer = lowering.isAddressOnly();
     }
-
+   
     if (needsTemporaryBuffer) {
       address = gen.emitTemporaryAllocation(vd, lowering.getLoweredType());
       DestroyCleanup = gen.enterDormantTemporaryCleanup(address, lowering);
-      if (PatternKind == SILGenFunction::PK_UninitVarDecl)
+      if (isUninitialized)
         address = gen.B.createMarkUninitializedVar(vd, address);
       gen.VarLocs[vd] = SILGenFunction::VarLoc::get(address);
     } else {
