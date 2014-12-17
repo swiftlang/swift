@@ -1,4 +1,5 @@
 add_swift_library(swiftSema
+  CodeSynthesis.cpp
   Constraint.cpp
   ConstraintGraph.cpp
   ConstraintLocator.cpp

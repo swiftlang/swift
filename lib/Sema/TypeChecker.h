@@ -559,6 +559,8 @@ public:
   void checkDeclAttributesEarly(Decl *D);
   void checkDeclAttributes(Decl *D);
 
+  void computeAccessibility(ValueDecl *D);
+
   virtual void resolveAccessibility(ValueDecl *VD) override {
     validateAccessibility(VD);
   }
