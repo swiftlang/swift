@@ -737,6 +737,13 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
 
       auto closureType = PAI->getType().castTo<SILFunctionType>();
 
+      // FIXME: Work-around rdar://problem/19264143 by bailing out
+      //        even if there are no dependent types in the signature
+      //        if there are substitutions or the result of the
+      //        partial_apply is polymorphic.
+      if (PAI->hasSubstitutions() || closureType->isPolymorphic())
+        return false;
+
       // Calculate the index into the closure's argument list of the captured
       // box pointer (the captured address is always the immediately following
       // index so is not stored separately);
