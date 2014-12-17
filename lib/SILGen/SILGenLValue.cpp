@@ -1095,11 +1095,26 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind) {
   // Non-lvalue types (references, values, metatypes, etc) form the root of a
   // logical l-value.
   if (!e->getType()->is<LValueType>() && !e->getType()->is<InOutType>()) {
+    // Decide if we can evaluate this expression at +0 for the rest of the
+    // lvalue.
+    SGFContext Ctx;
+    
     // Calls through opaque protocols can be done with +0 rvalues.  This allows
     // us to avoid materializing copies of existentials.
-    SGFContext Ctx;
     if (gen.SGM.Types.isIndirectPlusZeroSelfParameter(e->getType()))
       Ctx = SGFContext::AllowPlusZero;
+    else if (auto *DRE = dyn_cast<DeclRefExpr>(e)) {
+      // Any reference to "self" can be done at +0 so long as it is a direct
+      // access, since we know it is guaranteed.
+      // TODO: it would be great to factor this even lower into SILGen to the
+      // point where we can see that the parameter is +0 guaranteed.  Note that
+      // this handles the case in initializers where there is actually a stack
+      // allocation for it as well.
+      if (isa<ParamDecl>(DRE->getDecl()) &&
+          DRE->getDecl()->getName().str() == "self" &&
+          DRE->getDecl()->isImplicit())
+        Ctx = SGFContext::AllowPlusZero;
+    }
     
     ManagedValue rv = gen.emitRValueAsSingleValue(e, Ctx);
     auto typeData = getValueTypeData(rv.getValue());
@@ -1263,31 +1278,8 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   AccessStrategy strategy =
     var->getAccessStrategy(e->getAccessSemantics(), accessKind);
 
-  LValue lv = [&]{
-    // If we're emitting an initializer, the base is a reference to 'self', and
-    // we're doing direct property access, emit a +0 reference to self to avoid
-    // retain/release traffic that breaks brittle custom r/r implementations in
-    // ObjC.
-    if (gen.EmittingClassInitializer
-        && e->getAccessSemantics() == AccessSemantics::DirectToStorage) {
-      if (auto baseDeclRef = dyn_cast<DeclRefExpr>(e->getBase())) {
-        if (baseDeclRef->getDecl()->getName() == gen.getASTContext().Id_self) {
-          auto *selfDecl = cast<VarDecl>(baseDeclRef->getDecl());
-          ManagedValue self =
-            gen.emitRValueForDecl(e->getBase(), selfDecl, selfDecl->getType(),
-                                  AccessSemantics::DirectToStorage,
-                                  SGFContext::AllowPlusZero);
-          auto typeData = getValueTypeData(self.getValue());
-          LValue valueLV;
-          valueLV.add<ValueComponent>(self, typeData);
-          return valueLV;
-        }
-      }
-    }
-
-    return visitRec(e->getBase(), getBaseAccessKind(var, accessKind, strategy));
-  }();
-
+  LValue lv = visitRec(e->getBase(),
+                       getBaseAccessKind(var, accessKind, strategy));
   LValueTypeData typeData = getMemberTypeData(gen, var->getType(), e);
 
   // Use the property accessors if the variable has accessors and this isn't a

@@ -153,10 +153,7 @@ public:
 
   /// \brief True if a non-void return is required in this function.
   bool NeedsReturn : 1;
-  
-  /// True if we're emitting a class initializing constructor.
-  bool EmittingClassInitializer = false;
-  
+    
   /// \brief The SIL location corresponding to the AST node being processed.
   SILLocation CurrentSILLoc;
 

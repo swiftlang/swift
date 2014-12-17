@@ -896,9 +896,31 @@ class r19254812Derived: r19254812Base{
 // CHECK:  [[SELF:%[0-9]+]] = load [[SELFMUI]] : $*r19254812Derived
 // CHECK-NEXT:  [[PIPTR:%[0-9]+]] = ref_element_addr [[SELF]] : $r19254812Derived, #r19254812Derived.pi
 // CHECK-NEXT:  {{.*}} = load [[PIPTR]] : $*Double
-  
+// CHECK: return
 }
 
+
+class RedundantSelfRetains {
+  final var f : RedundantSelfRetains
+  
+  init() {
+    f = RedundantSelfRetains()
+  }
+  
+  // <rdar://problem/19275047> Extraneous retains/releases of self are bad
+  func testMethod1() {
+    f = RedundantSelfRetains()
+  }
+  // CHECK-LABEL: sil hidden @_TFC10properties20RedundantSelfRetains11testMethod1fS0_FT_T_
+  // CHECK-NEXT: bb0(%0 : $RedundantSelfRetains):
+
+  // CHECK-NOT: strong_retain
+  
+  // CHECK: [[FPTR:%[0-9]+]] = ref_element_addr %0 : $RedundantSelfRetains, #RedundantSelfRetains.f
+  // CHECK-NEXT: assign {{.*}} to [[FPTR]] : $*RedundantSelfRetains
+
+  // CHECK: return
+}
 
 
 

@@ -4029,7 +4029,6 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 
 void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   MagicFunctionName = getMagicFunctionName(ctor);
-  EmittingClassInitializer = true;
   
   assert(ctor->getBody() && "Class constructor without a body?");
 

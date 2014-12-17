@@ -6,8 +6,6 @@ class Person {
 }
 
 func main() {
-  // The inlined release for Person should share the location with the instruction before it.
-  // CHECK: call void @swift_retain_noresult{{.*}}, !dbg ![[LOC:.*]]
     var person = Person()
     var b = [0,1,13]
     for element in b {
