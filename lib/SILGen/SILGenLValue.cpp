@@ -1451,6 +1451,9 @@ LValue SILGenLValue::visitInOutExpr(InOutExpr *e, AccessKind accessKind) {
   return visitRec(e->getSubExpr(), accessKind);
 }
 
+/// Emit an lvalue that directly refers to the given instance variable
+/// (without going through getters or setters).   This is designed to work with
+/// ManagedValue 'base's that are either +0 or +1.
 LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, ManagedValue base,
                                             VarDecl *ivar,
                                             AccessKind accessKind) {
@@ -1508,7 +1511,7 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
     // If the client is cool with a +0 rvalue, the decl has an address-only
     // type, and there are no conversions, then we can return this as a +0
     // address RValue.
-    if (C.isPlusZeroOk() && rvalueTL.getLoweredType() ==addrTL.getLoweredType())
+    if (C.isPlusZeroOk() && rvalueTL.getLoweredType()==addrTL.getLoweredType())
       return ManagedValue::forUnmanaged(addr);
         
     // Copy the address-only value.

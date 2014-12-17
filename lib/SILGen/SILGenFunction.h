@@ -1087,8 +1087,8 @@ public:
                                                 AccessKind accessKind,
                                                 AccessSemantics semantics);
 
-  /// Emit an lvalue that directly refers to the given instance
-  /// variable (without going through getters or setters).
+  /// Emit an lvalue that directly refers to the given instance variable
+  /// (without going through getters or setters).
   LValue emitDirectIVarLValue(SILLocation loc, ManagedValue base, VarDecl *var,
                               AccessKind accessKind);
 

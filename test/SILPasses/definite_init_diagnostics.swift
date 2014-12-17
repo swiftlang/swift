@@ -947,3 +947,13 @@ func testAddressOnlyProperty<T>(b : T) -> T {
   return y
 }
 
+
+// <rdar://problem/19254812> DI bug when referencing let member of a class
+class r19254812Base {}
+class r19254812Derived: r19254812Base{
+  let pi = 3.14159265359
+  
+  init(x : ()) {
+    println(pi)  // ok, no diagnostic expected.
+  }
+}

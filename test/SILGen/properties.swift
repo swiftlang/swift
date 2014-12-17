@@ -869,3 +869,36 @@ class ClassWithLetProperty {
 // CHECK-LABEL: sil hidden @_TFC10properties20ClassWithLetProperty21ReturnDynamicConstantfS0_FT_Si
 // CHECK: class_method [volatile] %0 : $ClassWithLetProperty, #ClassWithLetProperty.q!getter.1.foreign
 }
+
+
+// <rdar://problem/19254812> DI bug when referencing let member of a class
+class r19254812Base {}
+class r19254812Derived: r19254812Base{
+  let pi = 3.14159265359
+  
+  init(x : ()) {
+    println(pi)
+  }
+  
+// Accessing the "pi" property should not retain/release self.
+// CHECK-LABEL: sil hidden @_TFC10properties16r19254812DerivedcfMS0_FT1xT__S0_
+// CHECK: [[SELFMUI:%[0-9]+]] = mark_uninitialized [derivedself] 
+
+// Initialization of the pi field: no retains/releases.
+// CHECK:  [[SELF:%[0-9]+]] = load [[SELFMUI]] : $*r19254812Derived
+// CHECK-NEXT:  [[PIPTR:%[0-9]+]] = ref_element_addr [[SELF]] : $r19254812Derived, #r19254812Derived.pi
+// CHECK-NEXT:  assign {{.*}} to [[PIPTR]] : $*Double
+
+// CHECK-NOT: strong_release
+// CHECK-NOT: strong_retain
+
+// Load of the pi field: no retains/releases.
+// CHECK:  [[SELF:%[0-9]+]] = load [[SELFMUI]] : $*r19254812Derived
+// CHECK-NEXT:  [[PIPTR:%[0-9]+]] = ref_element_addr [[SELF]] : $r19254812Derived, #r19254812Derived.pi
+// CHECK-NEXT:  {{.*}} = load [[PIPTR]] : $*Double
+  
+}
+
+
+
+
