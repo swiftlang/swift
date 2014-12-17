@@ -208,8 +208,11 @@ decl-attributes ::=
 //
 // It is fine to shadow names from the 'swift' namespace in 'swift::sma'.
 //
-// Don't use any AST types in 'swift::sma'.
+// Don't use any AST types in 'swift::sma'.  Only use simple types like
+// 'std::string', 'std::vector', 'std::map' etc.
 
+/// Define a type 'swift::sma::TYPE_NAME' that is a "strong typedef" for
+/// 'std::string'.
 #define DEFINE_SMA_STRING_STRONG_TYPEDEF(TYPE_NAME, STRING_MEMBER_NAME)        \
   namespace swift {                                                            \
   namespace sma {                                                              \
@@ -291,6 +294,7 @@ struct FuncDecl;
 struct InitDecl;
 struct DeinitDecl;
 
+/// A container for declarations contained in some declaration context.
 struct NestedDecls {
   std::vector<std::shared_ptr<StructDecl>> Structs;
   std::vector<std::shared_ptr<EnumDecl>> Enums;
