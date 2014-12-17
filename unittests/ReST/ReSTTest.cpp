@@ -2326,7 +2326,7 @@ struct ExtractBriefTestData ExtractBriefTests_UnicodeSubstitutions[] = {
     "</paragraph>"
   }, // Correct.
 
-  // HYperlink reference.
+  // Hyperlink reference.
   { { "``_" }, "``_", "<paragraph>``_</paragraph>" }, // Correct.
   { { "`X`_" }, "`X`_",
     "<paragraph><reference>X</reference></paragraph>" }, // Correct.
