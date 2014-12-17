@@ -94,6 +94,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
 
   DependencyGraph<const Job *> DepGraph;
   SmallPtrSet<const Job *, 16> DeferredCommands;
+  SmallVector<const Job *, 16> InitialOutOfDateCommands;
 
   // Set up scheduleCommandIfNecessaryAndPossible.
   // This will only schedule the given command if it has not been scheduled
@@ -136,6 +137,9 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
       switch (DepGraph.loadFromPath(Cmd, DependenciesFile)) {
       case DependencyGraphImpl::LoadResult::HadError:
         disableIncrementalBuild();
+        for (const Job *Cmd : DeferredCommands)
+          scheduleCommandIfNecessaryAndPossible(Cmd);
+        DeferredCommands.clear();
         break;
       case DependencyGraphImpl::LoadResult::UpToDate:
         Condition = Cmd->getCondition();
@@ -149,7 +153,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
     case Job::Condition::Always:
       scheduleCommandIfNecessaryAndPossible(Cmd);
       if (getIncrementalBuildEnabled() && !DependenciesFile.empty())
-        DepGraph.markIntransitive(Cmd);
+        InitialOutOfDateCommands.push_back(Cmd);
       break;
     case Job::Condition::CheckDependencies:
       DeferredCommands.insert(Cmd);
@@ -157,10 +161,19 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
     }
   }
 
-  if (!getIncrementalBuildEnabled()) {
-    for (const Job *Cmd : DeferredCommands)
-      scheduleCommandIfNecessaryAndPossible(Cmd);
-    DeferredCommands.clear();
+  if (getIncrementalBuildEnabled()) {
+    // We scheduled all of the files that have actually changed. Now add the
+    // files that haven't changed, so that they'll get built in parallel if
+    // possible and after the first set of files if it's not.
+    SmallVector<const Job *, 16> AdditionalOutOfDateCommands;
+    for (auto *Cmd : InitialOutOfDateCommands)
+      DepGraph.markTransitive(AdditionalOutOfDateCommands, Cmd);
+    for (auto *AdditionalCmd : AdditionalOutOfDateCommands) {
+      if (!DeferredCommands.count(AdditionalCmd))
+        continue;
+      scheduleCommandIfNecessaryAndPossible(AdditionalCmd);
+      DeferredCommands.erase(AdditionalCmd);
+    }
   }
 
   int Result = 0;

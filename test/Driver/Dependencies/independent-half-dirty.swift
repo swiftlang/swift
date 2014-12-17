@@ -17,9 +17,5 @@
 // RUN: rm %t/other.swiftdeps
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-THIRD %s
 
-// The order is reversed here because:
-// 1. We see that main.swift isn't dirty itself.
-// 2. We try to load other.swift's swiftdeps and fail.
-// 3. And then we reschedule main.swift.
-// CHECK-THIRD: Handled other.swift
 // CHECK-THIRD: Handled main.swift
+// CHECK-THIRD: Handled other.swift
