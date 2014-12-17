@@ -41,11 +41,13 @@ Compilation::Compilation(const Driver &D, const ToolChain &DefaultToolChain,
                          std::unique_ptr<InputArgList> InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
                          unsigned NumberOfParallelCommands,
+                         bool EnableIncrementalBuild,
                          bool SkipTaskExecution)
   : TheDriver(D), DefaultToolChain(DefaultToolChain), Diags(Diags),
     Level(Level), Jobs(new JobList), InputArgs(std::move(InputArgs)),
     TranslatedArgs(std::move(TranslatedArgs)),
     NumberOfParallelCommands(NumberOfParallelCommands),
+    EnableIncrementalBuild(EnableIncrementalBuild),
     SkipTaskExecution(SkipTaskExecution) {
 };
 
@@ -92,7 +94,6 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
 
   DependencyGraph<const Job *> DepGraph;
   SmallPtrSet<const Job *, 16> DeferredCommands;
-  bool NeedToRunEverything = false;
 
   // Set up scheduleCommandIfNecessaryAndPossible.
   // This will only schedule the given command if it has not been scheduled
@@ -119,7 +120,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
     if (res != 0)
       return res;
 
-    if (NeedToRunEverything) {
+    if (!getIncrementalBuildEnabled()) {
       scheduleCommandIfNecessaryAndPossible(Cmd);
       continue;
     }
@@ -134,7 +135,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
     if (!DependenciesFile.empty()) {
       switch (DepGraph.loadFromPath(Cmd, DependenciesFile)) {
       case DependencyGraphImpl::LoadResult::HadError:
-        NeedToRunEverything = true;
+        disableIncrementalBuild();
         break;
       case DependencyGraphImpl::LoadResult::UpToDate:
         Condition = Cmd->getCondition();
@@ -147,7 +148,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
     switch (Condition) {
     case Job::Condition::Always:
       scheduleCommandIfNecessaryAndPossible(Cmd);
-      if (!NeedToRunEverything && !DependenciesFile.empty())
+      if (getIncrementalBuildEnabled() && !DependenciesFile.empty())
         DepGraph.markIntransitive(Cmd);
       break;
     case Job::Condition::CheckDependencies:
@@ -156,7 +157,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
     }
   }
 
-  if (NeedToRunEverything) {
+  if (!getIncrementalBuildEnabled()) {
     for (const Job *Cmd : DeferredCommands)
       scheduleCommandIfNecessaryAndPossible(Cmd);
     DeferredCommands.clear();
@@ -229,7 +230,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
 
     // In order to handle both old dependencies that have disappeared and new
     // dependencies that have arisen, we need to reload the dependency file.
-    if (!NeedToRunEverything) {
+    if (getIncrementalBuildEnabled()) {
       const CommandOutput &Output = FinishedCmd->getOutput();
       StringRef DependenciesFile =
         Output.getAdditionalOutputForType(types::TY_SwiftDeps);
@@ -239,7 +240,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
 
         switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
         case DependencyGraphImpl::LoadResult::HadError:
-          NeedToRunEverything = true;
+          disableIncrementalBuild();
           for (const Job *Cmd : DeferredCommands)
             scheduleCommandIfNecessaryAndPossible(Cmd);
           DeferredCommands.clear();

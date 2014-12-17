@@ -84,12 +84,16 @@ class Compilation {
   /// parallel.
   unsigned NumberOfParallelCommands;
 
-  /// \brief Indicates whether this Compilation should use skip execution of
+  /// Indicates whether this Compilation should use skip execution of
   /// subtasks during performJobs() by using a dummy TaskQueue.
   ///
   /// \note For testing purposes only; similar user-facing features should be
   /// implemented separately, as the dummy TaskQueue may provide faked output.
   bool SkipTaskExecution;
+
+  /// Indicates whether tasks should only be executed if their output is out
+  /// of date.
+  bool EnableIncrementalBuild;
 
 public:
   Compilation(const Driver &D, const ToolChain &DefaultToolChain,
@@ -97,6 +101,7 @@ public:
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
               unsigned NumberOfParallelCommands = 1,
+              bool EnableIncrementalBuild = false,
               bool SkipTaskExecution = false);
   ~Compilation();
 
@@ -116,6 +121,13 @@ public:
 
   unsigned getNumberOfParallelCommands() const {
     return NumberOfParallelCommands;
+  }
+
+  bool getIncrementalBuildEnabled() const {
+    return EnableIncrementalBuild;
+  }
+  void disableIncrementalBuild() {
+    EnableIncrementalBuild = false;
   }
 
   /// Asks the Compilation to perform the Jobs which it knows about.

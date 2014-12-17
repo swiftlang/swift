@@ -140,6 +140,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   bool DriverPrintJobs = ArgList->hasArg(options::OPT_driver_print_jobs);
   bool DriverSkipExecution =
     ArgList->hasArg(options::OPT_driver_skip_execution);
+  bool Incremental = ArgList->hasArg(options::OPT_incremental);
 
   std::unique_ptr<DerivedArgList> TranslatedArgList(
     translateInputArgs(*ArgList));
@@ -229,6 +230,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
                                                  std::move(ArgList),
                                                  std::move(TranslatedArgList),
                                                  NumberOfParallelCommands,
+                                                 Incremental,
                                                  DriverSkipExecution));
 
   buildJobs(Actions, OI, OFM.get(), *C);
@@ -1357,7 +1359,7 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
     if (C.getArgs().hasArg(options::OPT_emit_dependencies)) {
       addAuxiliaryOutput(*Output, types::TY_Dependencies, OI, OutputMap);
     }
-    if (C.getArgs().hasArg(options::OPT_incremental)) {
+    if (C.getIncrementalBuildEnabled()) {
       addAuxiliaryOutput(*Output, types::TY_SwiftDeps, OI, OutputMap);
     }
   }
