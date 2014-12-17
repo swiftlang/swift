@@ -208,13 +208,8 @@ public:
                     ActionList &Actions) const;
 
   /// Construct the OutputFileMap for the driver from the given arguments.
-  ///
-  /// \param Args The input arguments.
-  /// \param[out] OFM a unique_ptr which, upon return, will point to the
-  /// OutputFileMap for this driver, or nullptr if one does not exist
-  /// (or could not be constructed).
-  void buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
-                          std::unique_ptr<OutputFileMap> &OFM) const;
+  std::unique_ptr<OutputFileMap>
+  buildOutputFileMap(const llvm::opt::DerivedArgList &Args) const;
 
   /// Add top-level Jobs to Compilation \p C for the given \p Actions and
   /// OutputInfo.

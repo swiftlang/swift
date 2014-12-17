@@ -47,8 +47,8 @@ Compilation::Compilation(const Driver &D, const ToolChain &DefaultToolChain,
     Level(Level), Jobs(new JobList), InputArgs(std::move(InputArgs)),
     TranslatedArgs(std::move(TranslatedArgs)),
     NumberOfParallelCommands(NumberOfParallelCommands),
-    EnableIncrementalBuild(EnableIncrementalBuild),
-    SkipTaskExecution(SkipTaskExecution) {
+    SkipTaskExecution(SkipTaskExecution),
+    EnableIncrementalBuild(EnableIncrementalBuild) {
 };
 
 using CommandSet = llvm::DenseSet<const Job *>;

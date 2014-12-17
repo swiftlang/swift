@@ -201,8 +201,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     }
   }
 
-  std::unique_ptr<OutputFileMap> OFM;
-  buildOutputFileMap(*TranslatedArgList, OFM);
+  std::unique_ptr<OutputFileMap> OFM = buildOutputFileMap(*TranslatedArgList);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -934,19 +933,19 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
   return true;
 }
 
-void
-Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
-                           std::unique_ptr<OutputFileMap> &OFM) const {
-  if (const Arg *A = Args.getLastArg(options::OPT_output_file_map)) {
-    // TODO: perform some preflight checks to ensure the file exists.
-    OFM = OutputFileMap::loadFromPath(A->getValue());
-    if (!OFM)
-      // TODO: emit diagnostic with error string
-      Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map);
-  } else {
-    // We don't have an OutputFileMap, so reset the unique_ptr.
-    OFM.reset();
+std::unique_ptr<OutputFileMap>
+Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args) const {
+  const Arg *A = Args.getLastArg(options::OPT_output_file_map);
+  if (!A)
+    return nullptr;
+
+  // TODO: perform some preflight checks to ensure the file exists.
+  auto OFM = OutputFileMap::loadFromPath(A->getValue());
+  if (!OFM) {
+    // TODO: emit diagnostic with error string
+    Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map);
   }
+  return std::move(OFM);
 }
 
 void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
