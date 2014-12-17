@@ -30,6 +30,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/YAMLParser.h"
 
 using namespace swift;
 using namespace swift::sys;
@@ -67,6 +68,12 @@ struct Compilation::PerformJobsState {
   ///
   /// The blocked jobs should be scheduled as soon as possible.
   llvm::DenseMap<const Job *, TinyPtrVector<const Job *>> BlockingCommands;
+
+  /// A map from commands that didn't get to run to whether or not they affect
+  /// downstream commands.
+  ///
+  /// Only intended for source files.
+  llvm::DenseMap<const Job *, bool> UnfinishedCommands;
 };
 
 Compilation::~Compilation() = default;
@@ -324,6 +331,26 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
   if (Result == 0) {
     assert(State.BlockingCommands.empty() &&
            "some blocking commands never finished properly");
+  } else {
+    // Make sure we record any files that haven't been touched but nonetheless
+    // need to be rebuilt.
+    for (const Job *Cmd : JL) {
+      switch (Cmd->getCondition()) {
+      case Job::Condition::Always:
+        // Don't worry about files that would be rebuilt anyway.
+        continue;
+      case Job::Condition::CheckDependencies:
+        break;
+      }
+
+      // Don't worry about commands that finished or weren't going to run.
+      if (State.FinishedCommands.count(Cmd))
+        continue;
+      if (!State.ScheduledCommands.count(Cmd))
+        continue;
+
+      State.UnfinishedCommands.insert({Cmd, DepGraph.isMarked(Cmd)});
+    }
   }
 
   return Result;
@@ -364,6 +391,44 @@ int Compilation::performSingleCommand(const Job *Cmd) {
   return ExecuteInPlace(ExecPath, argv);
 }
 
+static void writeCompilationRecord(
+    StringRef path,
+    const llvm::DenseMap<const Job *, bool> &unfinishedCommands,
+    const llvm::opt::ArgList &args) {
+  llvm::DenseMap<const llvm::opt::Arg *, bool> unfinishedInputs;
+  for (auto &entry : unfinishedCommands) {
+    ArrayRef<Action *> actionInputs = entry.first->getSource().getInputs();
+    assert(actionInputs.size() == 1);
+    auto inputFile = cast<InputAction>(actionInputs.front());
+    unfinishedInputs[&inputFile->getInputArg()] = entry.second;
+  }
+
+  std::error_code error;
+  llvm::raw_fd_ostream out(path, error, llvm::sys::fs::F_None);
+  if (out.has_error()) {
+    // FIXME: How should we report this error?
+    out.clear_error();
+    return;
+  }
+
+  for (auto &inputArg : args) {
+    if (inputArg->getOption().getKind() != llvm::opt::Option::InputClass)
+      continue;
+    out << "- ";
+
+    auto unfinishedIter = unfinishedInputs.find(inputArg);
+    if (unfinishedIter == unfinishedInputs.end()) {
+      /* do nothing */
+    } else if (unfinishedIter->second) {
+      out << "!dirty ";
+    } else {
+      out << "!private ";
+    }
+
+    out << "\"" << llvm::yaml::escape(inputArg->getValue()) << "\"\n";
+  }
+}
+
 int Compilation::performJobs() {
   // We require buffered output if Parseable output was requested.
   bool RequiresBufferedOutput = (Level == OutputLevel::Parseable);
@@ -378,6 +443,11 @@ int Compilation::performJobs() {
 
   PerformJobsState State;
   int result = performJobsInList(*Jobs, State);
+
+  if (!CompilationRecordPath.empty()) {
+    writeCompilationRecord(CompilationRecordPath, State.UnfinishedCommands,
+                           getArgs());
+  }
 
   // FIXME: Do we want to be deleting temporaries even when a child process
   // crashes?

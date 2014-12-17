@@ -234,6 +234,10 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
 
   buildJobs(Actions, OI, OFM.get(), *C);
 
+  if (OFM)
+    if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput())
+      C->setCompilationRecordPath(masterOutputMap->lookup(types::TY_SwiftDeps));
+
   if (Diags.hadAnyError())
     return nullptr;
 

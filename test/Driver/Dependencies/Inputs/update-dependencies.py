@@ -12,9 +12,9 @@
 # actually stick *the new dependencies* in the input file, and copy that over
 # the old dependencies (if present).
 
-import sys
 import os
 import shutil
+import sys
 
 assert sys.argv[1] == '-frontend'
 

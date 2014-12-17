@@ -80,6 +80,11 @@ class Compilation {
   /// These apply whether the compilation succeeds or fails.
   std::vector<std::string> TempFilePaths;
 
+  /// Write information about this compilation to this file.
+  ///
+  /// This is used for incremental builds.
+  std::string CompilationRecordPath;
+
   /// The number of commands which this compilation should attempt to run in
   /// parallel.
   unsigned NumberOfParallelCommands;
@@ -128,6 +133,11 @@ public:
   }
   void disableIncrementalBuild() {
     EnableIncrementalBuild = false;
+  }
+
+  void setCompilationRecordPath(StringRef path) {
+    assert(CompilationRecordPath.empty() && "already set");
+    CompilationRecordPath = path;
   }
 
   /// Asks the Compilation to perform the Jobs which it knows about.
