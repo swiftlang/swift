@@ -1,4 +1,6 @@
-// RUN: %swift-ide-test -generate-module-api-description -- %s | FileCheck %s
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+// RUN: %swift-ide-test -generate-module-api-description -- -module-cache-path %t %s | FileCheck %s
 
 public struct Struct1 {}
 
