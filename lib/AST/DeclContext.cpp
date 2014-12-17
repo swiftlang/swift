@@ -346,7 +346,8 @@ bool DeclContext::isInnermostContextGeneric() const {
   llvm_unreachable("bad DeclContextKind");
 }
 
-bool DeclContext::isNonCascadingContextForLookup(bool functionsArePrivate) const {
+bool
+DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
   // FIXME: This is explicitly checking for attributes in some cases because
   // it can be called before accessibility is computed.
   switch (getContextKind()) {
@@ -356,47 +357,47 @@ bool DeclContext::isNonCascadingContextForLookup(bool functionsArePrivate) const
   case DeclContextKind::Initializer:
     // Default arguments still require a type.
     if (isa<DefaultArgumentInitializer>(this))
-      return true;
+      return false;
     break;
 
   case DeclContextKind::TopLevelCodeDecl:
     // FIXME: Pattern initializers at top-level scope end up here.
-    return false;
+    return true;
 
   case DeclContextKind::AbstractFunctionDecl: {
-    if (functionsArePrivate)
-      return true;
+    if (functionsAreNonCascading)
+      return false;
     auto *AFD = cast<AbstractFunctionDecl>(this);
     if (AFD->hasAccessibility())
-      return AFD->getAccessibility() == Accessibility::Private;
+      return AFD->getAccessibility() > Accessibility::Private;
     break;
   }
 
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
-    return false;
+    return true;
 
   case DeclContextKind::NominalTypeDecl: {
     auto *nominal = cast<NominalTypeDecl>(this);
     if (nominal->hasAccessibility())
-      return nominal->getAccessibility() == Accessibility::Private;
+      return nominal->getAccessibility() > Accessibility::Private;
     break;
   }
 
   case DeclContextKind::ExtensionDecl: {
     auto *extension = cast<ExtensionDecl>(this);
     if (extension->hasDefaultAccessibility())
-      return extension->getDefaultAccessibility() == Accessibility::Private;
+      return extension->getDefaultAccessibility() > Accessibility::Private;
     // FIXME: duplicated from computeDefaultAccessibility in TypeCheckDecl.cpp.
     if (auto *AA = extension->getAttrs().getAttribute<AccessibilityAttr>())
-      return AA->getAccess() == Accessibility::Private;
+      return AA->getAccess() > Accessibility::Private;
     if (Type extendedTy = extension->getExtendedType())
-      return extendedTy->getAnyNominal()->isNonCascadingContextForLookup(true);
+      return extendedTy->getAnyNominal()->isCascadingContextForLookup(true);
     break;
   }
   }
 
-  return getParent()->isNonCascadingContextForLookup(true);
+  return getParent()->isCascadingContextForLookup(true);
 }
 
 bool DeclContext::walkContext(ASTWalker &Walker) {

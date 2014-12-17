@@ -4894,20 +4894,20 @@ public:
     if (FD->isUnaryOperator()) {
       if (FD->getAttrs().hasAttribute<PrefixAttr>()) {
         op = SF.lookupPrefixOperator(operatorName,
-                                     !FD->isNonCascadingContextForLookup(false),
+                                     FD->isCascadingContextForLookup(false),
                                      FD->getLoc());
       } else if (FD->getAttrs().hasAttribute<PostfixAttr>()) {
         op = SF.lookupPostfixOperator(operatorName,
-                                      !FD->isNonCascadingContextForLookup(false),
+                                      FD->isCascadingContextForLookup(false),
                                       FD->getLoc());
       } else {
         auto prefixOp =
             SF.lookupPrefixOperator(operatorName,
-                                    !FD->isNonCascadingContextForLookup(false),
+                                    FD->isCascadingContextForLookup(false),
                                     FD->getLoc());
         auto postfixOp =
             SF.lookupPostfixOperator(operatorName,
-                                     !FD->isNonCascadingContextForLookup(false),
+                                     FD->isCascadingContextForLookup(false),
                                      FD->getLoc());
 
         // If we found both prefix and postfix, or neither prefix nor postfix,
@@ -4958,7 +4958,7 @@ public:
       }
     } else if (FD->isBinaryOperator()) {
       op = SF.lookupInfixOperator(operatorName,
-                                  !FD->isNonCascadingContextForLookup(false),
+                                  FD->isCascadingContextForLookup(false),
                                   FD->getLoc());
     } else {
       TC.diagnose(FD, diag::invalid_arg_count_for_operator);

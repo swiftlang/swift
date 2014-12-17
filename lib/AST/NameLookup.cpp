@@ -445,15 +445,15 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   const SourceManager &SM = Ctx.SourceMgr;
   DebuggerClient *DebugClient = M.getDebugClient();
 
-  Optional<bool> isNonCascadingUse;
+  Optional<bool> isCascadingUse;
   if (IsKnownNonCascading)
-    isNonCascadingUse = true;
+    isCascadingUse = false;
 
   // Never perform local lookup for operators.
   if (Name.isOperator()) {
-    if (!isNonCascadingUse.hasValue()) {
-      isNonCascadingUse =
-          DC->isNonCascadingContextForLookup(/*includeFunctions=*/true);
+    if (!isCascadingUse.hasValue()) {
+      isCascadingUse =
+        DC->isCascadingContextForLookup(/*excludeFunctions=*/true);
     }
     DC = DC->getModuleScopeContext();
 
@@ -473,9 +473,9 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         // FIXME: when we can parse and typecheck the function body partially
         // for code completion, AFD->getBody() check can be removed.
         if (Loc.isValid() && AFD->getBody()) {
-          if (!isNonCascadingUse.hasValue()) {
-            isNonCascadingUse =
-                SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc);
+          if (!isCascadingUse.hasValue()) {
+            isCascadingUse =
+                !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc);
           }
 
           FindLocalVal localVal(SM, Loc, Name);
@@ -489,8 +489,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             return;
           }
         }
-        if (!isNonCascadingUse.hasValue() || !isNonCascadingUse.getValue())
-          isNonCascadingUse = AFD->isNonCascadingContextForLookup(false);
+        if (!isCascadingUse.hasValue() || isCascadingUse.getValue())
+          isCascadingUse = AFD->isCascadingContextForLookup(false);
 
         if (AFD->getExtensionType()) {
           ExtendedType = AFD->getExtensionType();
@@ -529,30 +529,30 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             }
           }
         }
-        if (!isNonCascadingUse.hasValue())
-          isNonCascadingUse = ACE->isNonCascadingContextForLookup(false);
+        if (!isCascadingUse.hasValue())
+          isCascadingUse = ACE->isCascadingContextForLookup(false);
       } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(DC)) {
         ExtendedType = ED->getExtendedType();
         BaseDecl = ExtendedType->getNominalOrBoundGenericNominal();
         MetaBaseDecl = BaseDecl;
-        if (!isNonCascadingUse.hasValue())
-          isNonCascadingUse = ED->isNonCascadingContextForLookup(false);
+        if (!isCascadingUse.hasValue())
+          isCascadingUse = ED->isCascadingContextForLookup(false);
       } else if (NominalTypeDecl *ND = dyn_cast<NominalTypeDecl>(DC)) {
         ExtendedType = ND->getDeclaredType();
         BaseDecl = ND;
         MetaBaseDecl = BaseDecl;
-        if (!isNonCascadingUse.hasValue())
-          isNonCascadingUse = ND->isNonCascadingContextForLookup(false);
+        if (!isCascadingUse.hasValue())
+          isCascadingUse = ND->isCascadingContextForLookup(false);
       } else if (auto I = dyn_cast<DefaultArgumentInitializer>(DC)) {
         // In a default argument, skip immediately out of both the
         // initializer and the function.
-        isNonCascadingUse = true;
+        isCascadingUse = false;
         DC = I->getParent()->getParent();
         continue;
       } else {
         assert(isa<TopLevelCodeDecl>(DC) || isa<Initializer>(DC));
-        if (!isNonCascadingUse.hasValue())
-          isNonCascadingUse = DC->isNonCascadingContextForLookup(false);
+        if (!isCascadingUse.hasValue())
+          isCascadingUse = DC->isCascadingContextForLookup(false);
       }
 
       // Check the generic parameters for something with the given name.
@@ -571,10 +571,10 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           TypeResolver->resolveDeclSignature(BaseDecl);
 
         unsigned options = NL_UnqualifiedDefault;
-        if (isNonCascadingUse.getValue())
-          options |= NL_KnownNonCascadingDependency;
-        else
+        if (isCascadingUse.getValue())
           options |= NL_KnownCascadingDependency;
+        else
+          options |= NL_KnownNonCascadingDependency;
 
         SmallVector<ValueDecl *, 4> Lookup;
         DC->lookupQualified(ExtendedType, Name, options, TypeResolver, Lookup);
@@ -659,8 +659,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       DC = DC->getParent();
     }
 
-    if (!isNonCascadingUse.hasValue())
-      isNonCascadingUse = false;
+    if (!isCascadingUse.hasValue())
+      isCascadingUse = true;
   }
 
   if (auto SF = dyn_cast<SourceFile>(DC)) {
@@ -683,7 +683,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                                    Loc, IsTypeLookup, Results))
     return;
 
-  recordLookupOfTopLevelName(DC, Name, !isNonCascadingUse.getValue());
+  recordLookupOfTopLevelName(DC, Name, isCascadingUse.getValue());
 
   // Add private imports to the extra search list.
   SmallVector<Module::ImportedModule, 8> extraImports;
@@ -1138,14 +1138,14 @@ bool DeclContext::lookupQualified(Type type,
   if (type->is<ErrorType>())
     return false;
 
-  auto checkLookupNonCascading = [this, options]() -> Optional<bool> {
+  auto checkLookupCascading = [this, options]() -> Optional<bool> {
     switch (options & NL_KnownDependencyMask) {
     case 0:
-      return isNonCascadingContextForLookup(/*includeFunctions=*/false);
+      return isCascadingContextForLookup(/*excludeFunctions=*/false);
     case NL_KnownNonCascadingDependency:
-      return true;
-    case NL_KnownCascadingDependency:
       return false;
+    case NL_KnownCascadingDependency:
+      return true;
     case NL_KnownNoDependency:
       return None;
     default:
@@ -1175,7 +1175,7 @@ bool DeclContext::lookupQualified(Type type,
     Module *module = moduleTy->getModule();
     auto topLevelScope = getModuleScopeContext();
     if (module == topLevelScope->getParentModule()) {
-      if (auto maybeLookupCascade = checkLookupNonCascading()) {
+      if (auto maybeLookupCascade = checkLookupCascading()) {
         recordLookupOfTopLevelName(topLevelScope, member,
                                    maybeLookupCascade.getValue());
       }
@@ -1313,10 +1313,10 @@ bool DeclContext::lookupQualified(Type type,
   if (auto containingSourceFile = dyn_cast<SourceFile>(getModuleScopeContext()))
     tracker = containingSourceFile->getReferencedNameTracker();
 
-  bool isLookupNonCascading;
+  bool isLookupCascading;
   if (tracker) {
-    if (auto maybeLookupCascade = checkLookupNonCascading())
-      isLookupNonCascading = maybeLookupCascade.getValue();
+    if (auto maybeLookupCascade = checkLookupCascading())
+      isLookupCascading = maybeLookupCascade.getValue();
     else
       tracker = nullptr;
   }
@@ -1329,7 +1329,7 @@ bool DeclContext::lookupQualified(Type type,
     stack.pop_back();
 
     if (tracker)
-      tracker->addUsedNominal(current, !isLookupNonCascading);
+      tracker->addUsedNominal(current, isLookupCascading);
 
     // Make sure we've resolved implicit constructors, if we need them.
     if (member.getBaseName() == ctx.Id_init && typeResolver)

@@ -88,7 +88,7 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
                                                             : providesCallback;
 
       switch (callback(entry->getValue(scratch), dirAndKind.first,
-                       entry->getRawTag() == "!private")) {
+                       entry->getRawTag() != "!private")) {
       case LoadResult::HadError:
         return LoadResult::HadError;
       case LoadResult::UpToDate:
@@ -121,7 +121,7 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
   auto &provides = Provides[node];
 
   auto dependsCallback = [this, node](StringRef name, DependencyKind kind,
-                                      bool isNonCascading) -> LoadResult {
+                                      bool isCascading) -> LoadResult {
 
     auto &entries = Dependencies[name];
     auto iter = std::find_if(entries.first.begin(), entries.first.end(),
@@ -130,7 +130,7 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
     });
 
     DependencyFlagsTy flags;
-    if (!isNonCascading)
+    if (isCascading)
       flags |= DependencyFlags::IsCascading;
 
     if (iter == entries.first.end()) {
@@ -140,15 +140,15 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
       iter->flags |= flags;
     }
 
-    if (!isNonCascading && (entries.second & kind))
+    if (isCascading && (entries.second & kind))
       return LoadResult::AffectsDownstream;
     return LoadResult::UpToDate;
   };
 
   auto providesCallback =
       [this, node, &provides](StringRef name, DependencyKind kind,
-                              bool isNonCascading) -> LoadResult {
-    assert(!isNonCascading);
+                              bool isCascading) -> LoadResult {
+    assert(isCascading);
     auto iter = std::find_if(provides.begin(), provides.end(),
                              [name](const ProvidesEntryTy &entry) -> bool {
       return name == entry.name;

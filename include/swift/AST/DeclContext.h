@@ -231,13 +231,13 @@ public:
   /// Determine whether the innermost context is generic.
   bool isInnermostContextGeneric() const;
 
-  /// Returns true if lookups within this context can't affect downstream files.
+  /// Returns true if lookups within this context could affect downstream files.
   ///
   /// \param functionsAreNonCascading If true, functions are considered non-
   /// cascading contexts. If false, functions are considered non-cascading only
   /// if implicitly or explicitly marked private. When concerned only with a
   /// function's body, pass true.
-  bool isNonCascadingContextForLookup(bool functionsAreNonCascading) const;
+  bool isCascadingContextForLookup(bool functionsAreNonCascading) const;
 
   /// Look for the set of declarations with the given name within a type,
   /// its extensions and, optionally, its supertypes.
