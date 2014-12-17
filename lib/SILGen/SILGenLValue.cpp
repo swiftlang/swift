@@ -1272,8 +1272,11 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
         && e->getAccessSemantics() == AccessSemantics::DirectToStorage) {
       if (auto baseDeclRef = dyn_cast<DeclRefExpr>(e->getBase())) {
         if (baseDeclRef->getDecl()->getName() == gen.getASTContext().Id_self) {
-          ManagedValue self = gen.emitSelfForDirectPropertyInConstructor(
-                             e->getBase(), cast<VarDecl>(baseDeclRef->getDecl()));
+          auto *selfDecl = cast<VarDecl>(baseDeclRef->getDecl());
+          ManagedValue self =
+            gen.emitRValueForDecl(e->getBase(), selfDecl, selfDecl->getType(),
+                                  AccessSemantics::DirectToStorage,
+                                  SGFContext::AllowPlusZero);
           auto typeData = getValueTypeData(self.getValue());
           LValue valueLV;
           valueLV.add<ValueComponent>(self, typeData);
