@@ -36,4 +36,7 @@ extern "C" _SwiftEmptyArrayStorage _swiftEmptyArrayStorage = {
   }
 };
 
+extern "C"
+uint64_t _swift_stdlib_HashingDetail_fixedSeedOverride = 0;
+
 }

@@ -21,11 +21,20 @@
 // ensure that hash values differ between executions.
 //
 
+import SwiftShims
+
 public // @testable
 struct _HashingDetail {
 
   public // @testable
-  static var fixedSeedOverride: UInt64 = 0
+  static var fixedSeedOverride: UInt64 {
+    get {
+      return _swift_stdlib_HashingDetail_fixedSeedOverride
+    }
+    set {
+      _swift_stdlib_HashingDetail_fixedSeedOverride = newValue
+    }
+  }
 
   @transparent
   static func getExecutionSeed() -> UInt64 {
