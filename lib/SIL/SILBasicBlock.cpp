@@ -51,7 +51,8 @@ void SILBasicBlock::eraseFromParent() {
 
 /// Replace the ith BB argument with a new one with type Ty (and optional
 /// ValueDecl D).
-SILArgument *SILBasicBlock::replaceBBArg(unsigned i, SILType Ty, ValueDecl *D) {
+SILArgument *SILBasicBlock::replaceBBArg(unsigned i, SILType Ty,
+                                         const ValueDecl *D) {
   SILModule &M = getParent()->getModule();
   assert(BBArgList[i]->use_empty() && "Expected no uses of the old BB arg!");
 

@@ -956,6 +956,44 @@ static ValueDecl *getTryPinOperation(ASTContext &ctx, Identifier name) {
                                    genericTy, archetypeTy, paramList);
 }
 
+static ValueDecl *
+getMakeMaterializeForSetCallbackOperation(ASTContext &ctx, Identifier name) {
+  // <T> ((Builtin.RawPointer,
+  //       Builtin.RawPointer,
+  //       inout T,
+  //       T.Type) -> ()) -> Builtin.RawPointer
+
+  Type genericTy;
+  Type archetypeTy;
+  GenericParamList *paramList;
+  std::tie(genericTy, archetypeTy, paramList) = getGenericParam(ctx);
+
+  TupleTypeElt callbackParams[] = {
+    ctx.TheRawPointerType,
+    ctx.TheRawPointerType,
+    InOutType::get(genericTy),
+    MetatypeType::get(genericTy),
+  };
+  TupleTypeElt callbackBodyParams[] = {
+    ctx.TheRawPointerType,
+    ctx.TheRawPointerType,
+    InOutType::get(archetypeTy),
+    MetatypeType::get(archetypeTy),
+  };
+  Type emptyTupleTy = TupleType::getEmpty(ctx);
+
+  TupleTypeElt params[] = {
+    FunctionType::get(TupleType::get(callbackParams, ctx), emptyTupleTy),
+  };
+  TupleTypeElt bodyParams[] = {
+    FunctionType::get(TupleType::get(callbackBodyParams, ctx), emptyTupleTy),
+  };
+
+  return getBuiltinGenericFunction(name, params, bodyParams,
+                                   ctx.TheRawPointerType, ctx.TheRawPointerType,
+                                   paramList);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -1421,6 +1459,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::ReinterpretCast:
     if (!Types.empty()) return nullptr;
     return getReinterpretCastOperation(Context, Id);
+
+  case BuiltinValueKind::MakeMaterializeForSetCallback:
+    if (!Types.empty()) return nullptr;
+    return getMakeMaterializeForSetCallbackOperation(Context, Id);
       
   case BuiltinValueKind::AddressOf:
     if (!Types.empty()) return nullptr;

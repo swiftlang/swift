@@ -1,5 +1,21 @@
-// RUN: %swift -emit-sil %s | FileCheck %s
-// RUN: %swift -emit-silgen %s | FileCheck %s -check-prefix=SILGEN
+// RUN: %swift -emit-sil -parse-stdlib %s | FileCheck %s
+// RUN: %swift -emit-silgen -parse-stdlib %s | FileCheck %s -check-prefix=SILGEN
+
+import Swift
+
+func test_callback() -> Builtin.RawPointer? {
+  return Builtin.makeMaterializeForSetCallback
+    {(value:Builtin.RawPointer, storage:Builtin.RawPointer,
+      inout selfV: Int, type) -> () in ()}
+}
+// CHECK: sil hidden @_TF17materializeForSet13test_callbackFT_GSqBp_ : $@thin () -> Optional<Builtin.RawPointer>
+// CHECK:   [[T0:%.*]] = function_ref @_TFF17materializeForSet13test_callbackFT_GSqBp_U_FTBpBpRSiMSi_T_ : $@thin (Builtin.RawPointer, Builtin.RawPointer, @inout Int, @thick Int.Type) -> ()
+// CHECK:   thin_function_to_pointer [[T0]] : $@thin (Builtin.RawPointer, Builtin.RawPointer, @inout Int, @thick Int.Type) -> () to $Builtin.RawPointer
+
+// CHECK: sil shared @_TFF17materializeForSet13test_callbackFT_GSqBp_U_FTBpBpRSiMSi_T_ : $@thin (Builtin.RawPointer, Builtin.RawPointer, @inout Int, @thick Int.Type) -> () {
+// CHECK:  bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $*Int, %3 : $@thick Int.Type):
+// CHECK:    [[T0:%.*]] = metatype $@thin Int.Type
+// CHECK:    debug_value [[T0]] : $@thin Int.Type
 
 class Base {
   var stored: Int = 0

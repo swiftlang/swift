@@ -172,6 +172,18 @@ public:
     return LoweredType;
   }
 
+  /// Unsafely rewrite the lowered type of this function.
+  ///
+  /// This routine does not touch the entry block arguments
+  /// or return instructions; you need to do that yourself
+  /// if you care.
+  ///
+  /// This is a hack and should be removed!
+  void rewriteLoweredTypeUnsafe(CanSILFunctionType newType) {
+    assert(canBeDeleted());
+    LoweredType = newType;
+  }
+
   bool canBeDeleted() const {
     return !getRefCount() && !isZombie();
   }

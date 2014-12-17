@@ -582,12 +582,13 @@ void SILGenModule::emitEnumConstructor(EnumElementDecl *decl) {
   postEmitFunction(constant, f);
 }
 
-void SILGenModule::emitClosure(AbstractClosureExpr *ce) {
+SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *ce) {
   SILDeclRef constant(ce);
   SILFunction *f = preEmitFunction(constant, ce, ce);
   PrettyStackTraceSILFunction X("silgen closureexpr", f);
   SILGenFunction(*this, *f).emitClosure(ce);
   postEmitFunction(constant, f);
+  return f;
 }
 
 /// Determine whether the given class requires a separate instance

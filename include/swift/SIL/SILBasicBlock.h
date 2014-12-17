@@ -138,7 +138,7 @@ public:
 
   /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and ValueDecl
   /// \p D.
-  SILArgument *replaceBBArg(unsigned i, SILType Ty, ValueDecl *D=nullptr);
+  SILArgument *replaceBBArg(unsigned i, SILType Ty, const ValueDecl *D=nullptr);
 
   /// Erase a specific argument from the arg list.
   void eraseBBArg(int Index) { BBArgList.erase(BBArgList.begin() + Index); }

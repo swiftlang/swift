@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 
 using namespace swift;
@@ -584,6 +585,100 @@ static ManagedValue emitBuiltinMarkDependence(SILGenFunction &gen,
   return gen.emitManagedRValueWithCleanup(result);
 }
 
+static CanType makeThick(CanMetatypeType oldMetatype) {
+  return CanMetatypeType::get(oldMetatype.getInstanceType(),
+                              MetatypeRepresentation::Thick);
+}
+
+static SILFunction *
+adjustMetatypeArgumentToThick(SILGenModule &SGM, SILFunction *fn) {
+  assert(fn->canBeDeleted() && "cannot adjust type of function with uses!");
+  auto oldLoweredType = fn->getLoweredFunctionType();
+
+  auto oldMetatypeParam = oldLoweredType->getParameters().back();
+  assert(oldMetatypeParam.getConvention()
+           == ParameterConvention::Direct_Unowned);
+  auto oldMetatypeType = cast<MetatypeType>(oldMetatypeParam.getType());
+
+  switch (oldMetatypeType->getRepresentation()) {
+  // If the metatype is already thick, we're fine.
+  case MetatypeRepresentation::Thick:
+    return fn;
+
+  // If it's thin, we need to rewrite it to be thick.
+  case MetatypeRepresentation::Thin:
+    break;
+
+  case MetatypeRepresentation::ObjC:
+    llvm_unreachable("unexpected objc metatype!");
+  }
+
+  SmallVector<SILParameterInfo, 4> newParamTypes;
+  newParamTypes.append(oldLoweredType->getParameters().begin(),
+                       oldLoweredType->getParameters().end());
+  newParamTypes.back() =
+    SILParameterInfo(makeThick(oldMetatypeType),
+                     ParameterConvention::Direct_Unowned);
+
+  // Unsafely replace the old lowered type.
+  CanSILFunctionType newLoweredType =
+    SILFunctionType::get(oldLoweredType->getGenericSignature(),
+                         oldLoweredType->getExtInfo(),
+                         oldLoweredType->getCalleeConvention(),
+                         newParamTypes,
+                         oldLoweredType->getResult(),
+                         SGM.getASTContext());
+  fn->rewriteLoweredTypeUnsafe(newLoweredType);
+
+  // Replace the old BB argument.
+  SILBasicBlock *entryBB = &fn->front();
+  auto argIndex = entryBB->bbarg_size() - 1;
+  SILArgument *oldArg = entryBB->getBBArg(argIndex);
+  SILType oldArgType = oldArg->getType();
+  const ValueDecl *oldArgDecl = oldArg->getDecl();
+  SILType newArgType = SILType::getPrimitiveObjectType(
+    makeThick(cast<MetatypeType>(oldArgType.getSwiftRValueType())));
+  // If we need a thin metatype anywhere, synthesize it.
+  if (!oldArg->use_empty()) {
+    SILLocation loc = const_cast<ValueDecl*>(oldArgDecl);
+    loc.markAsPrologue();
+
+    SILBuilder builder(entryBB, entryBB->begin());
+    auto newThinMetatype = builder.createMetatype(loc, oldArgType);
+    oldArg->replaceAllUsesWith(newThinMetatype);
+  }
+  entryBB->replaceBBArg(argIndex, newArgType, oldArgDecl);
+
+  return fn;
+}
+
+static ManagedValue
+emitBuiltinMakeMaterializeForSetCallback(SILGenFunction &gen,
+                                         SILLocation loc,
+                                         ArrayRef<Substitution> subs,
+                                         Expr *arg,
+                                         SGFContext C) {
+  assert(subs.size() == 1);
+
+  // The argument must be a closure.  This should also catch the
+  // possibility of captures.
+  auto closure = dyn_cast<ClosureExpr>(arg->getSemanticsProvidingExpr());
+  if (!closure) {
+    gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
+      "argument to Builtin.makeMaterializeForSetCallback must be a closure.");
+    return gen.emitUndef(loc, gen.getASTContext().TheRawPointerType);
+  }
+
+  // FIXME: just emit the closure with a specific abstraction pattern.
+  SILFunction *fn = gen.SGM.emitClosure(closure);
+  fn = adjustMetatypeArgumentToThick(gen.SGM, fn);
+
+  SILValue result = gen.B.createFunctionRef(loc, fn);
+  SILType resultType = SILType::getRawPointerType(gen.getASTContext());
+  result = gen.B.createThinFunctionToPointer(loc, result, resultType);
+  return ManagedValue::forUnmanaged(result);
+}
+
 /// Specialized emitter for type traits.
 template<TypeTraitResult (TypeBase::*Trait)(),
          BuiltinValueKind Kind>
@@ -629,7 +724,7 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &gen,
       loc, SILType::getBuiltinIntegerType(8, gen.getASTContext()),
       (uintmax_t)result);
   return ManagedValue::forUnmanaged(val);
-}  
+}
 
 Optional<SpecializedEmitter>
 SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
