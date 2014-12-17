@@ -471,6 +471,6 @@ class LoopRotation : public SILFunctionTransform {
 
 } // end anonymous namespace
 
-SILTransform *swift::createLoopRotatePass() {
+SILTransform *swift::createLoopRotate() {
   return new LoopRotation();
 }

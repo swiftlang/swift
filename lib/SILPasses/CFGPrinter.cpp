@@ -46,4 +46,6 @@ class SILCFGPrinter : public SILFunctionTransform {
 };
 } // end anonymous namespace
 
-SILTransform *swift::createSILCFGPrinter() { return new SILCFGPrinter(); }
+SILTransform *swift::createCFGPrinter() {
+  return new SILCFGPrinter();
+}

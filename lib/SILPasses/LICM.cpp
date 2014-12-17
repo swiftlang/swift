@@ -407,6 +407,6 @@ public:
 };
 }
 
-SILTransform *swift::createLICMPass() {
+SILTransform *swift::createLICM() {
   return new LICM();
 }

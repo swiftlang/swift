@@ -110,7 +110,7 @@ void AddSimplifyCFGSILCombine(SILPassManager &PM) {
 /// Perform semantic annotation/loop base optimizations.
 void AddHighLevelLoopOptPasses(SILPassManager &PM) {
   // Perform classsic SSA optimizations for cleanup.
-  PM.add(createLowerAggregate());
+  PM.add(createLowerAggregateInstrs());
   PM.add(createSILCombine());
   PM.add(createSROA());
   PM.add(createMem2Reg());
@@ -119,7 +119,7 @@ void AddHighLevelLoopOptPasses(SILPassManager &PM) {
   AddSimplifyCFGSILCombine(PM);
 
   // Run high-level loop opts.
-  PM.add(createLoopRotatePass());
+  PM.add(createLoopRotate());
 
   // Cleanup.
   PM.add(createDCE());
@@ -136,7 +136,7 @@ void AddHighLevelLoopOptPasses(SILPassManager &PM) {
 }
 
 void AddLowLevelLoopOptPasses(SILPassManager &PM) {
-  PM.add(createLICMPass());
+  PM.add(createLICM());
   PM.add(createDCE());
   PM.add(createCSE());
   PM.add(createSILCombine());
@@ -147,7 +147,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   AddSimplifyCFGSILCombine(PM);
   PM.add(createAllocBoxToStack());
   PM.add(createCopyForwarding());
-  PM.add(createLowerAggregate());
+  PM.add(createLowerAggregateInstrs());
   PM.add(createSILCombine());
   PM.add(createSROA());
   PM.add(createMem2Reg());
@@ -165,7 +165,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.add(createGlobalARCOpts());
 
   // Devirtualize.
-  PM.add(createDevirtualization());
+  PM.add(createDevirtualizer());
   PM.add(createGenericSpecializer());
   PM.add(createSILLinker());
 
@@ -246,7 +246,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.add(createClosureSpecializer());
 
   // Insert inline caches for virtual calls.
-  PM.add(createDevirtualization());
+  PM.add(createDevirtualizer());
   PM.add(createInlineCaches());
 
   // Optimize function signatures if we are asked to.
@@ -274,14 +274,14 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // Gather instruction counts if we are asked to do so.
   if (Module.getOptions().PrintInstCounts) {
     SILPassManager PrinterPM(&Module);
-    PrinterPM.add(createSILInstCount());
+    PrinterPM.add(createInstCount());
     PrinterPM.runOneIteration();
   }
 
   // Call the CFG viewer.
   if (SILViewCFG) {
     PM.resetAndRemoveTransformations();
-    PM.add(createSILCFGPrinter());
+    PM.add(createCFGPrinter());
     PM.runOneIteration();
   }
 

@@ -45,63 +45,17 @@ namespace swift {
   /// \brief Cleanup instructions/builtin calls not suitable for IRGen.
   void performSILCleanup(SILModule *M);
 
-  // Diagnostics transformations.
-  SILTransform *createCapturePromotion();
-  SILTransform *createInOutDeshadowing();
-  SILTransform *createCopyForwarding();
-  SILTransform *createDefiniteInitialization();
-  SILTransform *createPredictableMemoryOptimizations();
-  SILTransform *createDiagnosticConstantPropagation();
-  SILTransform *createNoReturnFolding();
-  SILTransform *createDiagnoseUnreachable();
-  SILTransform *createMandatoryInlining();
-  SILTransform *createSILCleanup();
-  SILTransform *createEmitDFDiagnostics();
+  /// \brief Identifiers for all passes. Used to procedurally create passes from
+  /// lists of passes.
+  enum class PassKind {
+#define PASS(Id, ...) Id,
+#define PASS_RANGE(Id, Start, End) Id##_First = Start, Id##_Last = End,
+#include "Passes.def"
+  };
 
-  // Performance transformations.
-  SILTransform *createSILCombine();
-  SILTransform *createDeadFunctionElimination();
-  SILTransform *createGlobalOpt();
-  SILTransform *createLowerAggregate();
-  SILTransform *createSROA();
-  SILTransform *createMem2Reg();
-  SILTransform *createCSE();
-  SILTransform *createCodeMotion(bool HoistReleases);
-  SILTransform *createPerfInliner();
-  SILTransform *createEarlyInliner();
-  SILTransform *createLateInliner();
-  SILTransform *createGenericSpecializer();
-  SILTransform *createClosureSpecializer();
-  SILTransform *createARCOpts();
-  SILTransform *createSimplifyCFG();
-  SILTransform *createDevirtualization();
-  SILTransform *createInlineCaches();
-  SILTransform *createAllocBoxToStack();
-  SILTransform *createDeadObjectElimination();
-  SILTransform *createGlobalLoadStoreOpts();
-  SILTransform *createPerformanceConstantPropagation();
-  SILTransform *createGlobalARCOpts();
-  SILTransform *createDCE();
-  SILTransform *createEnumSimplification();
-  SILTransform *createFunctionSignatureOpts();
-  SILTransform *createLICMPass();
-  SILTransform *createCOWArrayOpts();
-  SILTransform *createABCOpt();
-  SILTransform *createCapturePropagation();
-  SILTransform *createCopyForwarding();
-  SILTransform *createSwiftArrayOpts();
+#define PASS(Id, ...) SILTransform *create##Id(__VA_ARGS__);
+#include "Passes.def"
 
-  // Utilities
-  SILTransform *createStripDebug();
-  SILTransform *createSILInstCount();
-  SILTransform *createSILAADumper();
-  SILTransform *createSILLinker();
-  SILTransform *createLoopInfoPrinter();
-  SILTransform *createIVInfoPrinter();
-  SILTransform *createSILCFGPrinter();
-  SILTransform *createLoopRotatePass();
-  SILTransform *createSplitAllCriticalEdges();
-  SILTransform *createSplitNonCondBrCriticalEdges();
 } // end namespace swift
 
 #endif

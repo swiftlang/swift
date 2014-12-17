@@ -48,6 +48,6 @@ class StripDebugInfo : public swift::SILFunctionTransform {
 } // end anonymous namespace
 
 
-SILTransform *swift::createStripDebug() {
+SILTransform *swift::createStripDebugInfo() {
   return new StripDebugInfo();
 }

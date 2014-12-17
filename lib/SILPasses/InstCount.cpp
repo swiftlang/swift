@@ -68,7 +68,7 @@ public:
 //===----------------------------------------------------------------------===//
 
 namespace {
-class SILInstCount : public SILFunctionTransform {
+class InstCount : public SILFunctionTransform {
   InstCountVisitor V;
 
   StringRef getName() override { return "SIL Inst Count"; }
@@ -81,7 +81,7 @@ class SILInstCount : public SILFunctionTransform {
 } // end anonymous namespace
 
 
-SILTransform *swift::createSILInstCount() {
-  return new SILInstCount();
+SILTransform *swift::createInstCount() {
+  return new InstCount();
 }
 

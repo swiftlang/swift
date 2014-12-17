@@ -527,7 +527,7 @@ public:
 
 } // end anonymous namespace
 
-SILTransform *swift::createDevirtualization() {
+SILTransform *swift::createDevirtualizer() {
   return new SILDevirtualizationPass();
 }
 

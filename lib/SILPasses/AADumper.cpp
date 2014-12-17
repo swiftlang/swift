@@ -99,4 +99,4 @@ class SILAADumper : public SILFunctionTransform {
 
 } // end anonymous namespace
 
-SILTransform *swift::createSILAADumper() { return new SILAADumper(); }
+SILTransform *swift::createAADumper() { return new SILAADumper(); }

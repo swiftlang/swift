@@ -35,55 +35,6 @@ using namespace swift;
 
 namespace {
 
-enum class PassKind {
-  AllocBoxToStack,
-  CapturePromotion,
-  DiagnosticCCP,
-  PerformanceCCP,
-  CSE,
-  DefiniteInit,
-  NoReturn,
-  DiagnoseUnreachable,
-  DataflowDiagnostics,
-  GlobalOpt,
-  InOutDeshadowing,
-  MandatoryInlining,
-  PredictableMemoryOpt,
-  SILCleanup,
-  SILMem2Reg,
-  SILCombine,
-  SILDeadFunctionElimination,
-  SILSpecialization,
-  SILDevirt,
-  SILInlineCaches,
-  SimplifyCFG,
-  PerformanceInlining,
-  EarlyInlining,
-  CodeMotion,
-  LowerAggregateInstrs,
-  SROA,
-  StripDebugInfo,
-  DeadObjectElimination,
-  InstCount,
-  AADumper,
-  SILLinker,
-  GlobalARCOpts,
-  DCE,
-  LoopInfoPrinter,
-  FunctionSignatureOpts,
-  ViewCFG,
-  LoopRotate,
-  LICM,
-  IVInfoPrinter,
-  GlobalLoadStoreOpts,
-  COWArrayOpts,
-  ABCOpts,
-  ClosureSpecialization,
-  CapturePropagation,
-  CopyForwarding,
-  SplitAllCriticalEdges,
-};
-
 enum class OptGroup {
   Unknown, Diagnostics, Performance
 };
@@ -133,16 +84,16 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::CapturePromotion,
                                    "capture-promotion",
                                    "Promote closure capture variables"),
-                        clEnumValN(PassKind::SILMem2Reg,
+                        clEnumValN(PassKind::Mem2Reg,
                                    "mem2reg",
                                    "Promote stack allocations to registers"),
                         clEnumValN(PassKind::SILCleanup,
                                    "cleanup",
                                    "Cleanup SIL in preparation for IRGen"),
-                        clEnumValN(PassKind::DiagnosticCCP,
+                        clEnumValN(PassKind::DiagnosticConstantPropagation,
                                    "diagnostic-constant-propagation",
                                    "Propagate constants and emit diagnostics"),
-                        clEnumValN(PassKind::PerformanceCCP,
+                        clEnumValN(PassKind::PerformanceConstantPropagation,
                                    "performance-constant-propagation",
                                    "Propagate constants and do not emit"
                                    " diagnostics"),
@@ -150,16 +101,16 @@ Passes(llvm::cl::desc("Passes:"),
                                    "cse",
                                    "Perform constant subexpression "
                                    "elimination."),
-                        clEnumValN(PassKind::DataflowDiagnostics,
+                        clEnumValN(PassKind::EmitDFDiagnostics,
                                    "dataflow-diagnostics",
                                    "Emit SIL diagnostics"),
-                        clEnumValN(PassKind::NoReturn,
+                        clEnumValN(PassKind::NoReturnFolding,
                                    "noreturn-folding",
                                    "Add 'unreachable' after noreturn calls"),
                         clEnumValN(PassKind::DiagnoseUnreachable,
                                    "diagnose-unreachable",
                                    "Diagnose unreachable code"),
-                        clEnumValN(PassKind::DefiniteInit,
+                        clEnumValN(PassKind::DefiniteInitialization,
                                    "definite-init","definitive initialization"),
                         clEnumValN(PassKind::InOutDeshadowing,
                                    "inout-deshadow",
@@ -170,33 +121,33 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::MandatoryInlining,
                                    "mandatory-inlining",
                                    "Inline transparent functions"),
-                        clEnumValN(PassKind::SILSpecialization,
+                        clEnumValN(PassKind::GenericSpecializer,
                                    "specialize",
                                    "Specialize generic functions"),
-                        clEnumValN(PassKind::SILDevirt,
+                        clEnumValN(PassKind::Devirtualizer,
                                    "devirtualize",
                                    "Devirtualize virtual calls"),
-                        clEnumValN(PassKind::SILInlineCaches,
+                        clEnumValN(PassKind::InlineCaches,
                                    "inlinecaches",
                                    "Create inline caches for virtual calls"),
-                        clEnumValN(PassKind::PredictableMemoryOpt,
+                        clEnumValN(PassKind::PredictableMemoryOptimizations,
                                    "predictable-memopt",
                                    "Predictable early memory optimization"),
                         clEnumValN(PassKind::SILCombine,
                                    "sil-combine",
                                    "Perform small peepholes and combine"
                                    " operations."),
-                        clEnumValN(PassKind::SILDeadFunctionElimination,
+                        clEnumValN(PassKind::DeadFunctionElimination,
                                    "sil-deadfuncelim",
                                    "Remove private unused functions"),
                         clEnumValN(PassKind::SimplifyCFG,
                                    "simplify-cfg",
                                    "Clean up the CFG of SIL functions"),
-                        clEnumValN(PassKind::PerformanceInlining,
+                        clEnumValN(PassKind::PerfInliner,
                                    "inline",
                                    "Inline functions which are determined to be"
                                    " less than a pre-set cost."),
-                        clEnumValN(PassKind::EarlyInlining,
+                        clEnumValN(PassKind::EarlyInliner,
                                    "early-inline",
                                    "Inline functions that are not marked as "
                                    "having special semantics."),
@@ -242,7 +193,7 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::FunctionSignatureOpts,
                                    "function-signature-opts",
                                    "Optimize function signatures."),
-                        clEnumValN(PassKind::ViewCFG,
+                        clEnumValN(PassKind::CFGPrinter,
                                    "view-cfg",
                                    "View the CFG of all passed in functions."),
                         clEnumValN(PassKind::LoopRotate,
@@ -260,10 +211,10 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::COWArrayOpts,
                                    "cowarray-opt",
                                    "COW Array optimizations"),
-                        clEnumValN(PassKind::ABCOpts,
+                        clEnumValN(PassKind::ABCOpt,
                                    "abcopts",
                                    "Array bounds check opts."),
-                        clEnumValN(PassKind::ClosureSpecialization,
+                        clEnumValN(PassKind::ClosureSpecializer,
                                    "closure-specialize",
                                    "Closure specialization."),
                         clEnumValN(PassKind::CapturePropagation,
@@ -348,144 +299,11 @@ static void runCommandLineSelectedPasses(SILModule *Module) {
 
   for (auto Pass : Passes) {
     switch (Pass) {
-    case PassKind::AllocBoxToStack:
-      PM.add(createAllocBoxToStack());
-      break;
-    case PassKind::CapturePromotion:
-      PM.add(createCapturePromotion());
-      break;
-    case PassKind::DiagnosticCCP:
-      PM.add(createDiagnosticConstantPropagation());
-      break;
-    case PassKind::PerformanceCCP:
-      PM.add(createPerformanceConstantPropagation());
-      break;
-    case PassKind::CSE:
-      PM.add(createCSE());
-      break;
-    case PassKind::NoReturn:
-      PM.add(createNoReturnFolding());
-      break;
-    case PassKind::DiagnoseUnreachable:
-      PM.add(createDiagnoseUnreachable());
-      break;
-    case PassKind::DefiniteInit:
-      PM.add(createDefiniteInitialization());
-      break;
-    case PassKind::DataflowDiagnostics:
-      PM.add(createEmitDFDiagnostics());
-      break;
-    case PassKind::InOutDeshadowing:
-      PM.add(createInOutDeshadowing());
-      break;
-    case PassKind::GlobalOpt:
-      PM.add(createGlobalOpt());
-      break;
-    case PassKind::MandatoryInlining:
-      PM.add(createMandatoryInlining());
-      break;
-    case PassKind::PredictableMemoryOpt:
-      PM.add(createPredictableMemoryOptimizations());
-      break;
-    case PassKind::SILCleanup:
-      PM.add(createSILCleanup());
-      break;
-    case PassKind::SILMem2Reg:
-      PM.add(createMem2Reg());
-      break;
-    case PassKind::SILCombine:
-      PM.add(createSILCombine());
-      break;
-    case PassKind::SILDeadFunctionElimination:
-      PM.add(createDeadFunctionElimination());
-      break;
-    case PassKind::SILSpecialization:
-      PM.add(createGenericSpecializer());
-      break;
-    case PassKind::SILDevirt:
-      PM.add(createDevirtualization());
-      break;
-    case PassKind::SILInlineCaches:
-      PM.add(createInlineCaches());
-      break;
-    case PassKind::SimplifyCFG:
-      PM.add(createSimplifyCFG());
-      break;
-    case PassKind::PerformanceInlining:
-      PM.add(createPerfInliner());
-      break;
-    case PassKind::EarlyInlining:
-      PM.add(createEarlyInliner());
-      break;
-    case PassKind::CodeMotion:
-      PM.add(createCodeMotion(true));
-      break;
-    case PassKind::LowerAggregateInstrs:
-      PM.add(createLowerAggregate());
-      break;
-    case PassKind::SROA:
-      PM.add(createSROA());
-      break;
-    case PassKind::StripDebugInfo:
-      PM.add(createStripDebug());
-      break;
-    case PassKind::DeadObjectElimination:
-      PM.add(createDeadObjectElimination());
-      break;
-    case PassKind::InstCount:
-      PM.add(createSILInstCount());
-      break;
-    case PassKind::AADumper:
-      PM.add(createSILAADumper());
-      break;
-    case PassKind::SILLinker:
-      PM.add(createSILLinker());
-      break;
-    case PassKind::GlobalARCOpts:
-      PM.add(createGlobalARCOpts());
-      break;
-    case PassKind::DCE:
-      PM.add(createDCE());
-      break;
-    case PassKind::LoopInfoPrinter:
-      PM.add(createLoopInfoPrinter());
-      break;
-    case PassKind::FunctionSignatureOpts:
-      PM.add(createFunctionSignatureOpts());
-      break;
-    case PassKind::ViewCFG:
-      PM.add(createSILCFGPrinter());
-      break;
-    case PassKind::LoopRotate:
-      PM.add(createLoopRotatePass());
-      break;
-    case PassKind::LICM:
-      PM.add(createLICMPass());
-      break;
-    case PassKind::IVInfoPrinter:
-      PM.add(createIVInfoPrinter());
-      break;
-    case PassKind::GlobalLoadStoreOpts:
-      PM.add(createGlobalLoadStoreOpts());
-      break;
-    case PassKind::COWArrayOpts:
-      PM.add(createCOWArrayOpts());
-      break;
-    case PassKind::ABCOpts:
-      PM.add(createABCOpt());
-      break;
-    case PassKind::ClosureSpecialization:
-      PM.add(createClosureSpecializer());
-      break;
-    case PassKind::CapturePropagation:
-      PM.add(createCapturePropagation());
-      break;
-    case PassKind::CopyForwarding:
-      PM.add(createCopyForwarding());
-      break;
-    case PassKind::SplitAllCriticalEdges:
-      PM.add(createSplitAllCriticalEdges());
-      break;
+#define PASS(Id, ...)                           \
+  case PassKind::Id:                            \
+    PM.add(create##Id());                       \
+    break;
+#include "swift/SILPasses/Passes.def"
     }
   }
   PM.run();

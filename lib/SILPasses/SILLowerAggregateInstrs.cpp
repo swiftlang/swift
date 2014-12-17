@@ -268,6 +268,6 @@ class SILLowerAggregate : public SILFunctionTransform {
 } // end anonymous namespace
 
 
-SILTransform *swift::createLowerAggregate() {
+SILTransform *swift::createLowerAggregateInstrs() {
   return new SILLowerAggregate();
 }
