@@ -45,13 +45,13 @@
 // CHECK-SECOND: {{^{$}}
 // CHECK-SECOND: "kind": "finished"
 // CHECK-SECOND: "name": "compile"
-// CHECK-SECOND: "output": "Handled other.swift\n"
+// CHECK-SECOND: "output": "Handled {{other.swift|main.swift}}\n"
 // CHECK-SECOND: {{^}$}}
 
 // CHECK-SECOND: {{^{$}}
 // CHECK-SECOND: "kind": "finished"
 // CHECK-SECOND: "name": "compile"
-// CHECK-SECOND: "output": "Handled main.swift\n"
+// CHECK-SECOND: "output": "Handled {{main.swift|other.swift}}\n"
 // CHECK-SECOND: {{^}$}}
 
 // CHECK-SECOND-NOT: "skipped"
