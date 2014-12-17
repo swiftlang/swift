@@ -28,9 +28,8 @@
 #include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "swift/Subsystems.h"
 
-#include "llvm/Support/RandomNumberGenerator.h"
-
 #include <forward_list>
+#include <random>
 
 using namespace swift;
 
@@ -42,7 +41,7 @@ namespace {
 
 class Instrumenter {
 private:
-  llvm::RandomNumberGenerator &RNG;
+  std::mt19937_64 &RNG;
   ASTContext &Context;
   DeclContext *TypeCheckDC;
   unsigned TmpNameIndex = 0;
@@ -152,7 +151,7 @@ private:
   ClosureFinder CF;
 
 public:
-  Instrumenter (ASTContext &C, DeclContext *DC, llvm::RandomNumberGenerator &_RNG) :
+  Instrumenter (ASTContext &C, DeclContext *DC, std::mt19937_64 &_RNG) :
     RNG(_RNG), Context(C), TypeCheckDC(DC), CF(*this) { }
     
   Stmt *transformStmt(Stmt *S) { 
@@ -702,7 +701,8 @@ public:
 
     const size_t buf_size = 11;
     char * const id_buf = (char*)Context.Allocate(buf_size, 1);
-    const unsigned int id_num = (unsigned int)RNG.next(0x100000000ull);
+    std::uniform_int_distribution<unsigned int> Distribution(0, 0xffffffffu);
+    const unsigned int id_num = Distribution(RNG);
     ::snprintf(id_buf, buf_size, "%u", id_num);
     Expr *IDExpr = new (Context) IntegerLiteralExpr(id_buf, 
                                                     SR.End, true);
@@ -822,10 +822,8 @@ public:
 void swift::performPlaygroundTransform(SourceFile &SF) {
   class ExpressionFinder : public ASTWalker {
   private:
-    llvm::RandomNumberGenerator RNG;
+    std::mt19937_64 RNG;
   public:
-    ExpressionFinder() : ASTWalker(), RNG("PlaygroundTransform") {
-    }
     virtual bool walkToDeclPre(Decl *D) {
       if (AbstractFunctionDecl *FD = llvm::dyn_cast<AbstractFunctionDecl>(D)) {
         if (!FD->isImplicit()) {
