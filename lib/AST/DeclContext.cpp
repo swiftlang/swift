@@ -346,7 +346,7 @@ bool DeclContext::isInnermostContextGeneric() const {
   llvm_unreachable("bad DeclContextKind");
 }
 
-bool DeclContext::isPrivateContextForLookup(bool functionsArePrivate) const {
+bool DeclContext::isNonCascadingContextForLookup(bool functionsArePrivate) const {
   // FIXME: This is explicitly checking for attributes in some cases because
   // it can be called before accessibility is computed.
   switch (getContextKind()) {
@@ -391,12 +391,12 @@ bool DeclContext::isPrivateContextForLookup(bool functionsArePrivate) const {
     if (auto *AA = extension->getAttrs().getAttribute<AccessibilityAttr>())
       return AA->getAccess() == Accessibility::Private;
     if (Type extendedTy = extension->getExtendedType())
-      return extendedTy->getAnyNominal()->isPrivateContextForLookup(true);
+      return extendedTy->getAnyNominal()->isNonCascadingContextForLookup(true);
     break;
   }
   }
 
-  return getParent()->isPrivateContextForLookup(true);
+  return getParent()->isNonCascadingContextForLookup(true);
 }
 
 bool DeclContext::walkContext(ASTWalker &Walker) {

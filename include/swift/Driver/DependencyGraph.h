@@ -125,7 +125,9 @@ protected:
 /// different kinds of dependencies. A node's "provides" set is matched up
 /// with other nodes' "depends" sets to form a traversable directed graph.
 /// Information on a particular node can be updated at any time, which will
-/// affect any following operations. The "depends" entries can be "private".
+/// affect any following operations. The "depends" entries can be "cascading"
+/// or "non-cascading", which describes whether or not downstream nodes should
+/// be traversed after following a particular dependency edge.
 ///
 /// The graph also supports a "mark" operation, which is intended to track
 /// nodes that have been not just visited but transitively marked through.
@@ -165,8 +167,8 @@ public:
   /// been updated since it was marked.</em> (However, nodes that depend on the
   /// given \p node are always traversed.)
   ///
-  /// Nodes that are only reachable through "private" edges are added to the
-  /// \p visited set, but are \em not added to the graph's marked set.
+  /// Nodes that are only reachable through "non-cascading" edges are added to
+  /// the \p visited set, but are \em not added to the graph's marked set.
   template <unsigned N>
   void markTransitive(SmallVector<T, N> &visited, T node) {
     SmallVector<const void *, N> rawMarked;

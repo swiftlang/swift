@@ -233,11 +233,11 @@ public:
 
   /// Returns true if lookups within this context can't affect downstream files.
   ///
-  /// \param functionsArePrivate If true, functions are considered private
-  /// contexts. If false, functions are considered private only if implicitly
-  /// or explicitly marked private. When concerned only with a function's body,
-  /// pass true.
-  bool isPrivateContextForLookup(bool functionsArePrivate) const;
+  /// \param functionsAreNonCascading If true, functions are considered non-
+  /// cascading contexts. If false, functions are considered non-cascading only
+  /// if implicitly or explicitly marked private. When concerned only with a
+  /// function's body, pass true.
+  bool isNonCascadingContextForLookup(bool functionsAreNonCascading) const;
 
   /// Look for the set of declarations with the given name within a type,
   /// its extensions and, optionally, its supertypes.

@@ -463,7 +463,7 @@ static Expr *
 getOperatorRef(ASTContext &C, Identifier name) {
   // FIXME: This is hideous!
   UnqualifiedLookup lookup(name, C.getStdlibModule(), nullptr,
-                           /*private=*/true);
+                           /*non-cascading=*/true);
   if (!lookup.isSuccess())
     return nullptr;
   

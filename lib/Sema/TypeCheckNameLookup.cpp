@@ -36,7 +36,7 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
   LookupResult result;
   unsigned options = NL_QualifiedDefault;
   if (isKnownPrivate)
-    options |= NL_KnownPrivateDependency;
+    options |= NL_KnownNonCascadingDependency;
   if (allowDynamicLookup)
     options |= NL_DynamicLookup;
 
@@ -115,7 +115,7 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
   SmallVector<ValueDecl *, 4> decls;
   unsigned options = NL_QualifiedDefault | NL_ProtocolMembers;
   if (isKnownPrivate)
-    options |= NL_KnownPrivateDependency;
+    options |= NL_KnownNonCascadingDependency;
   if (!dc->lookupQualified(type, name, options, this, decls))
     return result;
 

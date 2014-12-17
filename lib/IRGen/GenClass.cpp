@@ -614,7 +614,7 @@ static bool getInstanceSizeByMethod(IRGenFunction &IGF,
   FuncDecl *fn; {
     auto name = IGF.IGM.Context.getIdentifier("__getInstanceSizeAndAlignMask");
     SmallVector<ValueDecl*, 4> results;
-    selfClass->lookupQualified(selfType, name, NL_KnownPrivateDependency,
+    selfClass->lookupQualified(selfType, name, NL_KnownNonCascadingDependency,
                                nullptr, results);
     if (results.size() != 1)
       return false;

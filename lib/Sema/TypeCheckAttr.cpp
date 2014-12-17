@@ -906,7 +906,8 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   ProtocolDecl *ApplicationDelegateProto = nullptr;
   if (KitModule) {
     UnqualifiedLookup lookup(Id_ApplicationDelegate, KitModule, nullptr,
-                             /*Private=*/true, SourceLoc(), /*IsType=*/true);
+                             /*NonCascading=*/true, SourceLoc(),
+                             /*IsType=*/true);
     ApplicationDelegateProto = dyn_cast_or_null<ProtocolDecl>(
                                    lookup.getSingleTypeResult());
   }
@@ -930,7 +931,8 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   
   // Check that we have the needed symbols in the frameworks.
   UnqualifiedLookup lookupMain(Id_ApplicationMain, KitModule, nullptr,
-                               /*Private=*/true, SourceLoc(), /*IsType=*/false);
+                               /*NonCascading=*/true, SourceLoc(),
+                               /*IsType=*/false);
   for (const auto &result : lookupMain.Results) {
     if (result.hasValueDecl())
       TC.validateDecl(result.getValueDecl());
@@ -938,7 +940,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   auto Foundation = TC.Context.getLoadedModule(C.getIdentifier("Foundation"));
   if (Foundation) {
     UnqualifiedLookup lookupString(C.getIdentifier("NSStringFromClass"),
-                                   Foundation, nullptr, /*Private=*/true,
+                                   Foundation, nullptr, /*NonCascading=*/true,
                                    SourceLoc(), /*IsType=*/false);
     for (const auto &result : lookupString.Results) {
       if (result.hasValueDecl())

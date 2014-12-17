@@ -1337,7 +1337,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     UnqualifiedLookup lookup(requirement->getName(),
                              DC->getModuleScopeContext(),
                              &TC,
-                             DC->isPrivateContextForLookup(false));
+                             DC->isNonCascadingContextForLookup(false));
 
     if (lookup.isSuccess()) {
       for (auto candidate : lookup.Results) {
@@ -2629,7 +2629,7 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
         return;
 
     tracker->addUsedNominal(nominal,
-                            !DC->isPrivateContextForLookup(InExpression));
+                            !DC->isNonCascadingContextForLookup(InExpression));
   };
 
   // Check whether we have already cached an answer to this query.

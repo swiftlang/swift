@@ -223,7 +223,7 @@ enum TypeResolutionFlags {
   TR_InExpression = 0x2000,
   
   /// Whether this type resolution is guaranteed not to affect downstream files.
-  TR_KnownPrivateDependency = 0x4000,
+  TR_KnownNonCascadingDependency = 0x4000,
 
   /// Whether we should allow references to unavailable types.
   TR_AllowUnavailable = 0x8000,

@@ -424,19 +424,19 @@ static void filterForDiscriminator(SmallVectorImpl<Result> &results,
 
 static void recordLookupOfTopLevelName(DeclContext *topLevelContext,
                                        DeclName name,
-                                       bool isNonPrivateUse) {
+                                       bool isCascading) {
   auto SF = dyn_cast<SourceFile>(topLevelContext);
   if (!SF)
     return;
   auto *nameTracker = SF->getReferencedNameTracker();
   if (!nameTracker)
     return;
-  nameTracker->addTopLevelName(name.getBaseName(), isNonPrivateUse);
+  nameTracker->addTopLevelName(name.getBaseName(), isCascading);
 }
 
 UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                      LazyResolver *TypeResolver,
-                                     bool IsKnownPrivate,
+                                     bool IsKnownNonCascading,
                                      SourceLoc Loc, bool IsTypeLookup) {
   typedef UnqualifiedLookupResult Result;
 
@@ -445,15 +445,18 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   const SourceManager &SM = Ctx.SourceMgr;
   DebuggerClient *DebugClient = M.getDebugClient();
 
-  Optional<bool> isPrivateUse;
-  if (IsKnownPrivate)
-    isPrivateUse = true;
+  Optional<bool> isNonCascadingUse;
+  if (IsKnownNonCascading)
+    isNonCascadingUse = true;
 
   // Never perform local lookup for operators.
   if (Name.isOperator()) {
-    if (!isPrivateUse.hasValue())
-      isPrivateUse = DC->isPrivateContextForLookup(/*includeFunctions=*/true);
+    if (!isNonCascadingUse.hasValue()) {
+      isNonCascadingUse =
+          DC->isNonCascadingContextForLookup(/*includeFunctions=*/true);
+    }
     DC = DC->getModuleScopeContext();
+
   } else {
     // If we are inside of a method, check to see if there are any ivars in
     // scope, and if so, whether this is a reference to one of them.
@@ -467,11 +470,11 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
         // Look for local variables; normally, the parser resolves these
         // for us, but it can't do the right thing inside local types.
-        // FIXME: when we can parse and typecheck the function body partially for
-        // code completion, AFD->getBody() check can be removed.
+        // FIXME: when we can parse and typecheck the function body partially
+        // for code completion, AFD->getBody() check can be removed.
         if (Loc.isValid() && AFD->getBody()) {
-          if (!isPrivateUse.hasValue()) {
-            isPrivateUse =
+          if (!isNonCascadingUse.hasValue()) {
+            isNonCascadingUse =
                 SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc);
           }
 
@@ -486,8 +489,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             return;
           }
         }
-        if (!isPrivateUse.hasValue() || !isPrivateUse.getValue())
-          isPrivateUse = AFD->isPrivateContextForLookup(false);
+        if (!isNonCascadingUse.hasValue() || !isNonCascadingUse.getValue())
+          isNonCascadingUse = AFD->isNonCascadingContextForLookup(false);
 
         if (AFD->getExtensionType()) {
           ExtendedType = AFD->getExtensionType();
@@ -526,30 +529,30 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             }
           }
         }
-        if (!isPrivateUse.hasValue())
-          isPrivateUse = ACE->isPrivateContextForLookup(false);
+        if (!isNonCascadingUse.hasValue())
+          isNonCascadingUse = ACE->isNonCascadingContextForLookup(false);
       } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(DC)) {
         ExtendedType = ED->getExtendedType();
         BaseDecl = ExtendedType->getNominalOrBoundGenericNominal();
         MetaBaseDecl = BaseDecl;
-        if (!isPrivateUse.hasValue())
-          isPrivateUse = ED->isPrivateContextForLookup(false);
+        if (!isNonCascadingUse.hasValue())
+          isNonCascadingUse = ED->isNonCascadingContextForLookup(false);
       } else if (NominalTypeDecl *ND = dyn_cast<NominalTypeDecl>(DC)) {
         ExtendedType = ND->getDeclaredType();
         BaseDecl = ND;
         MetaBaseDecl = BaseDecl;
-        if (!isPrivateUse.hasValue())
-          isPrivateUse = ND->isPrivateContextForLookup(false);
+        if (!isNonCascadingUse.hasValue())
+          isNonCascadingUse = ND->isNonCascadingContextForLookup(false);
       } else if (auto I = dyn_cast<DefaultArgumentInitializer>(DC)) {
         // In a default argument, skip immediately out of both the
         // initializer and the function.
-        isPrivateUse = true;
+        isNonCascadingUse = true;
         DC = I->getParent()->getParent();
         continue;
       } else {
         assert(isa<TopLevelCodeDecl>(DC) || isa<Initializer>(DC));
-        if (!isPrivateUse.hasValue())
-          isPrivateUse = DC->isPrivateContextForLookup(false);
+        if (!isNonCascadingUse.hasValue())
+          isNonCascadingUse = DC->isNonCascadingContextForLookup(false);
       }
 
       // Check the generic parameters for something with the given name.
@@ -568,10 +571,10 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           TypeResolver->resolveDeclSignature(BaseDecl);
 
         unsigned options = NL_UnqualifiedDefault;
-        if (isPrivateUse.getValue())
-          options |= NL_KnownPrivateDependency;
+        if (isNonCascadingUse.getValue())
+          options |= NL_KnownNonCascadingDependency;
         else
-          options |= NL_KnownNonPrivateDependency;
+          options |= NL_KnownCascadingDependency;
 
         SmallVector<ValueDecl *, 4> Lookup;
         DC->lookupQualified(ExtendedType, Name, options, TypeResolver, Lookup);
@@ -656,8 +659,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       DC = DC->getParent();
     }
 
-    if (!isPrivateUse.hasValue())
-      isPrivateUse = false;
+    if (!isNonCascadingUse.hasValue())
+      isNonCascadingUse = false;
   }
 
   if (auto SF = dyn_cast<SourceFile>(DC)) {
@@ -680,7 +683,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                                    Loc, IsTypeLookup, Results))
     return;
 
-  recordLookupOfTopLevelName(DC, Name, !isPrivateUse.getValue());
+  recordLookupOfTopLevelName(DC, Name, !isNonCascadingUse.getValue());
 
   // Add private imports to the extra search list.
   SmallVector<Module::ImportedModule, 8> extraImports;
@@ -1135,21 +1138,20 @@ bool DeclContext::lookupQualified(Type type,
   if (type->is<ErrorType>())
     return false;
 
-  auto checkLookupPrivate = [this, options]() -> Optional<bool> {
+  auto checkLookupNonCascading = [this, options]() -> Optional<bool> {
     switch (options & NL_KnownDependencyMask) {
     case 0:
-      return isPrivateContextForLookup(/*includeFunctions=*/false);
-      break;
-    case NL_KnownPrivateDependency:
+      return isNonCascadingContextForLookup(/*includeFunctions=*/false);
+    case NL_KnownNonCascadingDependency:
       return true;
-      break;
-    case NL_KnownNonPrivateDependency:
+    case NL_KnownCascadingDependency:
       return false;
-      break;
     case NL_KnownNoDependency:
       return None;
-      break;
     default:
+      // FIXME: Use llvm::CountPopulation_64 when that's declared constexpr.
+      static_assert(__builtin_popcountll(NL_KnownDependencyMask) == 2,
+                    "mask should only include four values");
       llvm_unreachable("mask only includes four values");
     }
   };
@@ -1173,9 +1175,9 @@ bool DeclContext::lookupQualified(Type type,
     Module *module = moduleTy->getModule();
     auto topLevelScope = getModuleScopeContext();
     if (module == topLevelScope->getParentModule()) {
-      if (auto lookupPrivacy = checkLookupPrivate()) {
+      if (auto maybeLookupCascade = checkLookupNonCascading()) {
         recordLookupOfTopLevelName(topLevelScope, member,
-                                   lookupPrivacy.getValue());
+                                   maybeLookupCascade.getValue());
       }
       lookupInModule(module, /*accessPath=*/{}, member, decls,
                      NLKind::QualifiedLookup, ResolutionKind::Overloadable,
@@ -1311,10 +1313,10 @@ bool DeclContext::lookupQualified(Type type,
   if (auto containingSourceFile = dyn_cast<SourceFile>(getModuleScopeContext()))
     tracker = containingSourceFile->getReferencedNameTracker();
 
-  bool isLookupPrivate;
+  bool isLookupNonCascading;
   if (tracker) {
-    if (auto lookupPrivacy = checkLookupPrivate())
-      isLookupPrivate = lookupPrivacy.getValue();
+    if (auto maybeLookupCascade = checkLookupNonCascading())
+      isLookupNonCascading = maybeLookupCascade.getValue();
     else
       tracker = nullptr;
   }
@@ -1327,7 +1329,7 @@ bool DeclContext::lookupQualified(Type type,
     stack.pop_back();
 
     if (tracker)
-      tracker->addUsedNominal(current, !isLookupPrivate);
+      tracker->addUsedNominal(current, !isLookupNonCascading);
 
     // Make sure we've resolved implicit constructors, if we need them.
     if (member.getBaseName() == ctx.Id_init && typeResolver)

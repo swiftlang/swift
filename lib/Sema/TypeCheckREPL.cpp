@@ -54,7 +54,8 @@ struct REPLContext {
         PrintDecls.push_back(Result.getValueDecl());
     }
     {
-      UnqualifiedLookup Lookup(Id_debugDebugPrintln, TC.getStdlibModule(&SF), &TC);
+      UnqualifiedLookup Lookup(Id_debugDebugPrintln, TC.getStdlibModule(&SF),
+                               &TC);
       if (!Lookup.isSuccess())
         return true;
       for (auto Result : Lookup.Results)

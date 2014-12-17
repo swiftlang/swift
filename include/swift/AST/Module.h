@@ -100,32 +100,33 @@ enum NameLookupOptions {
   /// This option is not valid when performing lookup into a module.
   NL_IgnoreAccessibility = 0x20,
 
-  /// This lookup is known to be a private dependency, i.e. one that does not
-  /// affect downstream files.
+  /// This lookup is known to be a non-cascading dependency, i.e. one that does
+  /// not affect downstream files.
   ///
   /// \see NL_KnownDependencyMask
-  NL_KnownPrivateDependency = 0x40,
+  NL_KnownNonCascadingDependency = 0x40,
 
-  /// This lookup is known to be a non-private dependency, i.e. one that does
+  /// This lookup is known to be a cascading dependency, i.e. one that can
   /// affect downstream files.
   ///
   /// \see NL_KnownDependencyMask
-  NL_KnownNonPrivateDependency = 0x80,
+  NL_KnownCascadingDependency = 0x80,
 
   /// This lookup is known to not add any additional dependencies to the
   /// primary source file.
   ///
   /// \see NL_KnownDependencyMask
-  NL_KnownNoDependency = NL_KnownPrivateDependency|NL_KnownNonPrivateDependency,
+  NL_KnownNoDependency =
+      NL_KnownNonCascadingDependency|NL_KnownCascadingDependency,
 
   /// A mask of all options controlling how a lookup should be recorded as a
   /// dependency.
   ///
-  /// This offers three possible options: NL_KnownPrivateDependency,
-  /// NL_KnownNonPrivateDependency, NL_KnownNoDependency, as well as a default
+  /// This offers three possible options: NL_KnownNonCascadingDependency,
+  /// NL_KnownCascadingDependency, NL_KnownNoDependency, as well as a default
   /// "unspecified" value (0). If the dependency kind is unspecified, the
-  /// lookup function will attempt to infer whether it is a private or
-  /// non-private dependency from the decl context.
+  /// lookup function will attempt to infer whether it is a cascading or
+  /// non-cascading dependency from the decl context.
   NL_KnownDependencyMask = NL_KnownNoDependency,
 
   /// The default set of options used for qualified name lookup.
@@ -840,13 +841,13 @@ public:
   /// The file must be name-bound already. If the operator is not found, or if
   /// there is an ambiguity, returns null.
   ///
-  /// \param isNonPrivate If true, the lookup of this operator may affect
+  /// \param isCascading If true, the lookup of this operator may affect
   /// downstream files.
-  InfixOperatorDecl *lookupInfixOperator(Identifier name, bool isNonPrivate,
+  InfixOperatorDecl *lookupInfixOperator(Identifier name, bool isCascading,
                                          SourceLoc diagLoc = {});
-  PrefixOperatorDecl *lookupPrefixOperator(Identifier name, bool isNonPrivate,
+  PrefixOperatorDecl *lookupPrefixOperator(Identifier name, bool isCascading,
                                            SourceLoc diagLoc = {});
-  PostfixOperatorDecl *lookupPostfixOperator(Identifier name, bool isNonPrivate,
+  PostfixOperatorDecl *lookupPostfixOperator(Identifier name, bool isCascading,
                                              SourceLoc diagLoc = {});
   /// @}
 

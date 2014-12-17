@@ -297,7 +297,7 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
 
   // Perform standard value name lookup.
   UnqualifiedLookup Lookup(Name, Context, &TC,
-                           /*Private=*/isa<AbstractFunctionDecl>(Context),
+                           /*NonCascading=*/isa<AbstractFunctionDecl>(Context),
                            UDRE->getLoc());
 
   if (!Lookup.isSuccess()) {
@@ -1503,7 +1503,7 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   
   // Find '~=' operators for the match.
   UnqualifiedLookup matchLookup(Context.Id_MatchOperator, DC, this,
-                                /*Private=*/true);
+                                /*NonCascading=*/true);
 
   if (!matchLookup.isSuccess()) {
     diagnose(EP->getLoc(), diag::no_match_operator);

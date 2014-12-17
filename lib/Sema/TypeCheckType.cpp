@@ -526,7 +526,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       // Resolve the first component, which is the only one that requires
       // unqualified name lookup.
       UnqualifiedLookup Globals(comp->getIdentifier(), DC, &TC,
-                                options.contains(TR_KnownPrivateDependency),
+                                options.contains(TR_KnownNonCascadingDependency),
                                 comp->getIdLoc(), /*TypeLookup*/true);
 
       // Process the names we found.
@@ -656,13 +656,14 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         }
         
         // Look for member types with the given name.
-        bool isKnownPrivate = options.contains(TR_KnownPrivateDependency);
-        if (!isKnownPrivate && options.contains(TR_InExpression)) {
+        bool isKnownNonCascading =
+            options.contains(TR_KnownNonCascadingDependency);
+        if (!isKnownNonCascading && options.contains(TR_InExpression)) {
           // Expressions cannot affect a function's signature.
-          isKnownPrivate = isa<AbstractFunctionDecl>(DC);
+          isKnownNonCascading = isa<AbstractFunctionDecl>(DC);
         }
         auto memberTypes = TC.lookupMemberType(parentTy, comp->getIdentifier(),
-                                               DC, isKnownPrivate);
+                                               DC, isKnownNonCascading);
 
         // Name lookup was ambiguous. Complain.
         // FIXME: Could try to apply generic arguments first, and see whether

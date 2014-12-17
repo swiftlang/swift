@@ -1795,7 +1795,7 @@ static ProtocolDecl *getNSCopyingProtocol(TypeChecker &TC,
   SmallVector<ValueDecl *, 2> results;
   DC->lookupQualified(ModuleType::get(foundation),
                       ctx.getIdentifier("NSCopying"),
-                      NL_QualifiedDefault | NL_KnownPrivateDependency,
+                      NL_QualifiedDefault | NL_KnownNonCascadingDependency,
                       /*resolver=*/nullptr,
                       results);
 
@@ -3954,7 +3954,7 @@ public:
       if (!TAD->getDeclContext()->isTypeContext())
         options |= TR_GlobalTypeAlias;
       if (TAD->getAccessibility() == Accessibility::Private)
-        options |= TR_KnownPrivateDependency;
+        options |= TR_KnownNonCascadingDependency;
       
       if (TC.validateType(TAD->getUnderlyingTypeLoc(), TAD->getDeclContext(),
                           options)) {
@@ -4894,20 +4894,20 @@ public:
     if (FD->isUnaryOperator()) {
       if (FD->getAttrs().hasAttribute<PrefixAttr>()) {
         op = SF.lookupPrefixOperator(operatorName,
-                                     !FD->isPrivateContextForLookup(false),
+                                     !FD->isNonCascadingContextForLookup(false),
                                      FD->getLoc());
       } else if (FD->getAttrs().hasAttribute<PostfixAttr>()) {
         op = SF.lookupPostfixOperator(operatorName,
-                                      !FD->isPrivateContextForLookup(false),
+                                      !FD->isNonCascadingContextForLookup(false),
                                       FD->getLoc());
       } else {
         auto prefixOp =
             SF.lookupPrefixOperator(operatorName,
-                                    !FD->isPrivateContextForLookup(false),
+                                    !FD->isNonCascadingContextForLookup(false),
                                     FD->getLoc());
         auto postfixOp =
             SF.lookupPostfixOperator(operatorName,
-                                     !FD->isPrivateContextForLookup(false),
+                                     !FD->isNonCascadingContextForLookup(false),
                                      FD->getLoc());
 
         // If we found both prefix and postfix, or neither prefix nor postfix,
@@ -4958,7 +4958,7 @@ public:
       }
     } else if (FD->isBinaryOperator()) {
       op = SF.lookupInfixOperator(operatorName,
-                                  !FD->isPrivateContextForLookup(false),
+                                  !FD->isNonCascadingContextForLookup(false),
                                   FD->getLoc());
     } else {
       TC.diagnose(FD, diag::invalid_arg_count_for_operator);

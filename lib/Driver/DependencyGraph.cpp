@@ -26,7 +26,7 @@ enum class DependencyGraphImpl::DependencyKind : uint8_t {
   Type = 1 << 1
 };
 enum class DependencyGraphImpl::DependencyFlags : uint8_t {
-  IsNonPrivate = 1 << 0
+  IsCascading = 1 << 0
 };
 
 using LoadResult = DependencyGraphImpl::LoadResult;
@@ -121,7 +121,7 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
   auto &provides = Provides[node];
 
   auto dependsCallback = [this, node](StringRef name, DependencyKind kind,
-                                      bool isPrivate) -> LoadResult {
+                                      bool isNonCascading) -> LoadResult {
 
     auto &entries = Dependencies[name];
     auto iter = std::find_if(entries.first.begin(), entries.first.end(),
@@ -130,8 +130,8 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
     });
 
     DependencyFlagsTy flags;
-    if (!isPrivate)
-      flags |= DependencyFlags::IsNonPrivate;
+    if (!isNonCascading)
+      flags |= DependencyFlags::IsCascading;
 
     if (iter == entries.first.end()) {
       entries.first.push_back({node, kind, flags});
@@ -140,15 +140,15 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
       iter->flags |= flags;
     }
 
-    if (!isPrivate && (entries.second & kind))
+    if (!isNonCascading && (entries.second & kind))
       return LoadResult::AffectsDownstream;
     return LoadResult::UpToDate;
   };
 
   auto providesCallback =
       [this, node, &provides](StringRef name, DependencyKind kind,
-                              bool isPrivate) -> LoadResult {
-    assert(!isPrivate);
+                              bool isNonCascading) -> LoadResult {
+    assert(!isNonCascading);
     auto iter = std::find_if(provides.begin(), provides.end(),
                              [name](const ProvidesEntryTy &entry) -> bool {
       return name == entry.name;
@@ -189,8 +189,8 @@ DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
           continue;
         if (isMarked(dependent.node))
           continue;
-        bool isNonPrivate{dependent.flags & DependencyFlags::IsNonPrivate};
-        worklist.push_back({ dependent.node, isNonPrivate });
+        bool isCascading{dependent.flags & DependencyFlags::IsCascading};
+        worklist.push_back({ dependent.node, isCascading });
       }
     }
   };
@@ -202,7 +202,7 @@ DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
   while (!worklist.empty()) {
     auto next = worklist.pop_back_val();
 
-    // Is this a private dependency?
+    // Is this a non-cascading dependency?
     if (!next.second) {
       if (!isMarked(next.first))
         visited.push_back(next.first);

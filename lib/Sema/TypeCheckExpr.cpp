@@ -130,7 +130,7 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
   } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     SourceFile *SF = DC->getParentSourceFile();
     Identifier name = DRE->getDecl()->getName();
-    bool isPrivate = DC->isPrivateContextForLookup(true);
+    bool isPrivate = DC->isNonCascadingContextForLookup(true);
     if (InfixOperatorDecl *op = SF->lookupInfixOperator(name, !isPrivate,
                                                         E->getLoc()))
       return op->getInfixData();
@@ -138,7 +138,7 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
   } else if (OverloadedDeclRefExpr *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
     SourceFile *SF = DC->getParentSourceFile();
     Identifier name = OO->getDecls()[0]->getName();
-    bool isPrivate = DC->isPrivateContextForLookup(true);
+    bool isPrivate = DC->isNonCascadingContextForLookup(true);
     if (InfixOperatorDecl *op = SF->lookupInfixOperator(name, !isPrivate,
                                                         E->getLoc()))
       return op->getInfixData();
@@ -497,7 +497,7 @@ static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,
   UnqualifiedLookup lookup(TC.Context.getIdentifier(name),
                            dc->getModuleScopeContext(),
                            nullptr,
-                           /*private=*/isa<AbstractFunctionDecl>(dc));
+                           /*non-cascading=*/isa<AbstractFunctionDecl>(dc));
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
     return Type();

@@ -256,7 +256,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
         Output.getAdditionalOutputForType(types::TY_SwiftDeps);
       if (!DependenciesFile.empty()) {
         SmallVector<const Job *, 16> Dependents;
-        bool wasNonPrivate = DepGraph.isMarked(FinishedCmd);
+        bool wasCascading = DepGraph.isMarked(FinishedCmd);
 
         switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
         case DependencyGraphImpl::LoadResult::HadError:
@@ -267,7 +267,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
           Dependents.clear();
           break;
         case DependencyGraphImpl::LoadResult::UpToDate:
-          if (!wasNonPrivate)
+          if (!wasCascading)
             break;
           SWIFT_FALLTHROUGH;
         case DependencyGraphImpl::LoadResult::AffectsDownstream:

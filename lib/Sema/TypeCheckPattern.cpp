@@ -29,7 +29,7 @@ using namespace swift;
 static EnumElementDecl *
 lookupUnqualifiedEnumMemberElement(TypeChecker &TC, DeclContext *DC,
                                    Identifier name) {
-  UnqualifiedLookup lookup(name, DC, &TC, /*private=*/true,
+  UnqualifiedLookup lookup(name, DC, &TC, /*non-cascading=*/true,
                            SourceLoc(), /*typeLookup*/false);
   
   if (!lookup.isSuccess())
@@ -1073,9 +1073,10 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
           continue;
         VarDecl *prop = nullptr;
         SmallVector<ValueDecl *, 4> members;
+        unsigned lookupOptions =
+            NL_QualifiedDefault | NL_KnownNonCascadingDependency;
         if (!dc->lookupQualified(type, elt.getPropertyName(),
-                                 NL_QualifiedDefault|NL_KnownPrivateDependency,
-                                 this, members)) {
+                                 lookupOptions, this, members)) {
           diagnose(elt.getSubPattern()->getLoc(),
                    diag::nominal_type_pattern_property_not_found,
                    elt.getPropertyName().str(), patTy);

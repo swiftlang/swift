@@ -24,16 +24,16 @@ class ReferencedNameTracker {
   llvm::DenseMap<Identifier, bool> TopLevelNames;
   llvm::DenseMap<const NominalTypeDecl *, bool> UsedNominals;
 public:
-  void addTopLevelName(Identifier name, bool isNonPrivateUse) {
-    TopLevelNames[name] |= isNonPrivateUse;
+  void addTopLevelName(Identifier name, bool isCascadingUse) {
+    TopLevelNames[name] |= isCascadingUse;
   }
 
   const llvm::DenseMap<Identifier, bool> &getTopLevelNames() const {
     return TopLevelNames;
   }
 
-  void addUsedNominal(const NominalTypeDecl *nominal, bool isNonPrivateUse) {
-    UsedNominals[nominal] |= isNonPrivateUse;
+  void addUsedNominal(const NominalTypeDecl *nominal, bool isCascadingUse) {
+    UsedNominals[nominal] |= isCascadingUse;
   }
 
   const llvm::DenseMap<const NominalTypeDecl *, bool> &getUsedNominals() const {

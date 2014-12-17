@@ -1131,7 +1131,7 @@ Module::lookup##Kind##Operator(Identifier name, SourceLoc loc) { \
   return result ? *result : nullptr; \
 } \
 Kind##OperatorDecl * \
-SourceFile::lookup##Kind##Operator(Identifier name, bool isNonPrivate, \
+SourceFile::lookup##Kind##Operator(Identifier name, bool isCascading, \
                                    SourceLoc loc) { \
   auto result = lookupOperatorDeclForName(*this, loc, name, true, \
                                           &SourceFile::Kind##Operators); \
@@ -1140,7 +1140,7 @@ SourceFile::lookup##Kind##Operator(Identifier name, bool isNonPrivate, \
   if (ReferencedNames) {\
     if (!result.getValue() || \
         result.getValue()->getDeclContext()->getModuleScopeContext() != this) {\
-      ReferencedNames->addTopLevelName(name, isNonPrivate); \
+      ReferencedNames->addTopLevelName(name, isCascading); \
     } \
   } \
   if (!result.getValue()) { \
