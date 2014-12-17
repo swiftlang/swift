@@ -145,8 +145,10 @@ bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
       types::ID Kind =
         types::lookupTypeForName(KindNode->getValue(KindStorage));
 
+      // Ignore unknown types, so that an older swiftc can be used with a newer
+      // build system.
       if (Kind == types::TY_INVALID)
-        return true;
+        continue;
 
       llvm::SmallString<128> PathStorage;
       OutputMap.insert(
