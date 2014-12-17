@@ -145,8 +145,8 @@ private:
   ClosureFinder CF;
 
 public:
-  Instrumenter(ASTContext &C, DeclContext *DC, std::mt19937_64 &RNG)
-      : RNG(RNG), Context(C), TypeCheckDC(DC), CF(*this) {}
+  Instrumenter(ASTContext &C, DeclContext *DC, std::mt19937_64 &_RNG)
+      : RNG(_RNG), Context(C), TypeCheckDC(DC), CF(*this) {}
 
   Stmt *transformStmt(Stmt *S) {
     switch (S->getKind()) {
@@ -301,9 +301,9 @@ public:
   }
 
   std::string digForName(Expr *E) {
-    Expr *RE = nullptr;
+    Expr *_RE = nullptr;
     ValueDecl *VD = nullptr;
-    std::tie(RE, VD) = digForVariable(E);
+    std::tie(_RE, VD) = digForVariable(E);
     if (VD) {
       return VD->getName().str();
     } else {
@@ -566,8 +566,8 @@ public:
         VD->getSourceRange(), VD->getName().str().str().c_str());
   }
 
-  Expr *logDeclOrMemberRef(Expr *RE) {
-    if (DeclRefExpr *DRE = llvm::dyn_cast<DeclRefExpr>(RE)) {
+  Expr *logDeclOrMemberRef(Expr *_RE) {
+    if (DeclRefExpr *DRE = llvm::dyn_cast<DeclRefExpr>(_RE)) {
       VarDecl *VD = llvm::cast<VarDecl>(DRE->getDecl());
 
       if (llvm::dyn_cast<ConstructorDecl>(TypeCheckDC) &&
@@ -581,7 +581,7 @@ public:
           DeclRefExpr(ConcreteDeclRef(VD), SourceLoc(),
                       /*Implicit=*/true, AccessSemantics::Ordinary, Type()),
           DRE->getSourceRange(), VD->getName().str().str().c_str());
-    } else if (MemberRefExpr *MRE = llvm::dyn_cast<MemberRefExpr>(RE)) {
+    } else if (MemberRefExpr *MRE = llvm::dyn_cast<MemberRefExpr>(_RE)) {
       Expr *B = MRE->getBase();
       ConcreteDeclRef M = MRE->getMember();
 
