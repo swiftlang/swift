@@ -1204,6 +1204,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("open_existential_ref", ValueKind::OpenExistentialRefInst)
     .Case("partial_apply", ValueKind::PartialApplyInst)
     .Case("pointer_to_address", ValueKind::PointerToAddressInst)
+    .Case("pointer_to_thin_function", ValueKind::PointerToThinFunctionInst)
     .Case("project_block_storage", ValueKind::ProjectBlockStorageInst)
     .Case("project_value_buffer", ValueKind::ProjectValueBufferInst)
     .Case("existential_metatype", ValueKind::ExistentialMetatypeInst)
@@ -1243,6 +1244,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("unchecked_ref_cast", ValueKind::UncheckedRefCastInst)
     .Case("unchecked_take_enum_data_addr", ValueKind::UncheckedTakeEnumDataAddrInst)
     .Case("thick_to_objc_metatype", ValueKind::ThickToObjCMetatypeInst)
+    .Case("thin_function_to_pointer", ValueKind::ThinFunctionToPointerInst)
     .Case("thin_to_thick_function", ValueKind::ThinToThickFunctionInst)
     .Case("tuple", ValueKind::TupleInst)
     .Case("tuple_element_addr", ValueKind::TupleElementAddrInst)
@@ -1891,7 +1893,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createMarkDependence(InstLoc, Val, Base);
     break;
   }
-      
+
     // Conversion instructions.
   case ValueKind::UncheckedRefCastInst:
   case ValueKind::UncheckedAddrCastInst:
@@ -1908,6 +1910,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::UnownedToRefInst:
   case ValueKind::RefToUnmanagedInst:
   case ValueKind::UnmanagedToRefInst:
+  case ValueKind::ThinFunctionToPointerInst:
+  case ValueKind::PointerToThinFunctionInst:
   case ValueKind::ThinToThickFunctionInst:
   case ValueKind::ThickToObjCMetatypeInst:
   case ValueKind::ObjCToThickMetatypeInst:
@@ -1977,6 +1981,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       break;
     case ValueKind::UnmanagedToRefInst:
       ResultVal = B.createUnmanagedToRef(InstLoc, Val, Ty);
+      break;
+    case ValueKind::ThinFunctionToPointerInst:
+      ResultVal = B.createThinFunctionToPointer(InstLoc, Val, Ty);
+      break;
+    case ValueKind::PointerToThinFunctionInst:
+      ResultVal = B.createPointerToThinFunction(InstLoc, Val, Ty);
       break;
     case ValueKind::ThinToThickFunctionInst:
       ResultVal = B.createThinToThickFunction(InstLoc, Val, Ty);

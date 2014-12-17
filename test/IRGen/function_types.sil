@@ -69,4 +69,20 @@ bb0(%0 : $() -> ()):
   return %3 : $Builtin.Int1                                 // id: %5
 }
 
+// CHECK-LABEL: define i8* @test_function_to_pointer(i8*)
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    ret i8* %0
+sil @test_function_to_pointer : $@thin (@thin () -> ()) -> Builtin.RawPointer {
+bb0(%0 : $@thin () -> ()):
+  %1 = thin_function_to_pointer %0 : $@thin () -> () to $Builtin.RawPointer
+  return %1 : $Builtin.RawPointer
+}
 
+// CHECK-LABEL: define i8* @test_pointer_to_function(i8*)
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    ret i8* %0
+sil @test_pointer_to_function : $@thin (Builtin.RawPointer) -> @thin () -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = pointer_to_thin_function %0 : $Builtin.RawPointer to $@thin () -> ()
+  return %1 : $@thin () -> ()
+}

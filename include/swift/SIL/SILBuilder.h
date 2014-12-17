@@ -333,6 +333,16 @@ public:
     return insert(new (F.getModule()) ConvertFunctionInst(Loc, Op, Ty));
   }
 
+  ThinFunctionToPointerInst *
+  createThinFunctionToPointer(SILLocation Loc, SILValue Op, SILType Ty) {
+    return insert(new (F.getModule()) ThinFunctionToPointerInst(Loc, Op, Ty));
+  }
+
+  PointerToThinFunctionInst *
+  createPointerToThinFunction(SILLocation Loc, SILValue Op, SILType Ty) {
+    return insert(new (F.getModule()) PointerToThinFunctionInst(Loc, Op, Ty));
+  }
+
   UpcastInst *createUpcast(SILLocation Loc, SILValue Op, SILType Ty) {
     return insert(new (F.getModule()) UpcastInst(Loc, Op, Ty));
   }

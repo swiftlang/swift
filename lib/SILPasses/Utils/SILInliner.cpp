@@ -247,6 +247,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::UpcastInst:
 
     case ValueKind::ThinToThickFunctionInst:
+    case ValueKind::ThinFunctionToPointerInst:
+    case ValueKind::PointerToThinFunctionInst:
     case ValueKind::ConvertFunctionInst:
 
     case ValueKind::BridgeObjectToWordInst:

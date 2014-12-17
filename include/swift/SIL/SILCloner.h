@@ -653,6 +653,24 @@ SILCloner<ImplClass>::visitConvertFunctionInst(ConvertFunctionInst *Inst) {
 }
 
 template<typename ImplClass>
+void SILCloner<ImplClass>::visitThinFunctionToPointerInst(
+                                           ThinFunctionToPointerInst *Inst) {
+  doPostProcess(Inst,
+    getBuilder().createThinFunctionToPointer(getOpLocation(Inst->getLoc()),
+                                             getOpValue(Inst->getOperand()),
+                                             getOpType(Inst->getType())));
+}
+
+template<typename ImplClass>
+void SILCloner<ImplClass>::visitPointerToThinFunctionInst(
+                                           PointerToThinFunctionInst *Inst) {
+  doPostProcess(Inst,
+    getBuilder().createPointerToThinFunction(getOpLocation(Inst->getLoc()),
+                                             getOpValue(Inst->getOperand()),
+                                             getOpType(Inst->getType())));
+}
+
+template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitUpcastInst(UpcastInst *Inst) {
   doPostProcess(Inst,

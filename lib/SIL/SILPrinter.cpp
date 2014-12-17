@@ -813,6 +813,14 @@ public:
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "convert_function");
   }
+  void visitThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand(),
+                                 "thin_function_to_pointer");
+  }
+  void visitPointerToThinFunctionInst(PointerToThinFunctionInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand(),
+                                 "pointer_to_thin_function");
+  }
   void visitUpcastInst(UpcastInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "upcast");
   }

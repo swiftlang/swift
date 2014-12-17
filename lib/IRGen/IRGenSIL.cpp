@@ -658,6 +658,8 @@ public:
   void visitCondFailInst(CondFailInst *i);
   
   void visitConvertFunctionInst(ConvertFunctionInst *i);
+  void visitThinFunctionToPointerInst(ThinFunctionToPointerInst *i);
+  void visitPointerToThinFunctionInst(PointerToThinFunctionInst *i);
   void visitUpcastInst(UpcastInst *i);
   void visitAddressToPointerInst(AddressToPointerInst *i);
   void visitPointerToAddressInst(PointerToAddressInst *i);
@@ -2970,6 +2972,26 @@ void IRGenSILFunction::visitConvertFunctionInst(swift::ConvertFunctionInst *i) {
   // This instruction is specified to be a no-op.
   Explosion temp = getLoweredExplosion(i->getOperand());
   setLoweredExplosion(SILValue(i, 0), temp);
+}
+
+void IRGenSILFunction::visitThinFunctionToPointerInst(
+                                          swift::ThinFunctionToPointerInst *i) {
+  Explosion in = getLoweredExplosion(i->getOperand());
+  llvm::Value *fn = in.claimNext();
+  fn = Builder.CreateBitCast(fn, IGM.Int8PtrTy);
+  Explosion out;
+  out.add(fn);
+  setLoweredExplosion(i, out);
+}
+
+void IRGenSILFunction::visitPointerToThinFunctionInst(
+                                          swift::PointerToThinFunctionInst *i) {
+  Explosion in = getLoweredExplosion(i->getOperand());
+  llvm::Value *fn = in.claimNext();
+  fn = Builder.CreateBitCast(fn, IGM.FunctionPtrTy);
+  Explosion out;
+  out.add(fn);
+  setLoweredExplosion(i, out);
 }
 
 void IRGenSILFunction::visitAddressToPointerInst(swift::AddressToPointerInst *i)

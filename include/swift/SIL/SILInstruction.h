@@ -1231,14 +1231,36 @@ public:
   }
 };
 
-/// ConvertFunctionInst - Change the type of some value without affecting how it
-/// will codegen.
+/// ConvertFunctionInst - Change the type of a function value without
+/// affecting how it will codegen.
 class ConvertFunctionInst
   : public UnaryInstructionBase<ValueKind::ConvertFunctionInst, ConversionInst>
 {
 public:
   ConvertFunctionInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+
+/// ThinFunctionToPointerInst - Convert a thin function pointer to a
+/// Builtin.RawPointer.
+class ThinFunctionToPointerInst
+  : public UnaryInstructionBase<ValueKind::ThinFunctionToPointerInst,
+                                ConversionInst>
+{
+public:
+  ThinFunctionToPointerInst(SILLocation loc, SILValue operand, SILType ty)
+    : UnaryInstructionBase(loc, operand, ty) {}
+};
+
+/// PointerToThinFunctionInst - Convert a Builtin.RawPointer to a thin
+/// function pointer.
+class PointerToThinFunctionInst
+  : public UnaryInstructionBase<ValueKind::PointerToThinFunctionInst,
+                                ConversionInst>
+{
+public:
+  PointerToThinFunctionInst(SILLocation loc, SILValue operand, SILType ty)
+    : UnaryInstructionBase(loc, operand, ty) {}
 };
 
 /// UpcastInst - Perform a conversion of a class instance to a supertype.

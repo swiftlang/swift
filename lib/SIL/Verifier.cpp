@@ -1837,7 +1837,7 @@ public:
     auto opTI = requireObjectType(SILFunctionType, ICI->getOperand(),
                                   "convert_function operand");
     auto resTI = requireObjectType(SILFunctionType, ICI,
-                                   "convert_function operand");
+                                   "convert_function result");
 
     // convert_function is required to be a no-op conversion.
 
@@ -1845,6 +1845,26 @@ public:
             "convert_function cannot change function cc");
     require(opTI->getRepresentation() == resTI->getRepresentation(),
             "convert_function cannot change function representation");
+  }
+
+  void checkThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
+    auto opTI = requireObjectType(SILFunctionType, CI->getOperand(),
+                                  "thin_function_to_pointer operand");
+    requireObjectType(BuiltinRawPointerType, CI,
+                      "thin_function_to_pointer result");
+
+    require(opTI->getRepresentation() == FunctionType::Representation::Thin,
+            "thin_function_to_pointer only works on thin functions");
+  }
+
+  void checkPointerToThinFunctionInst(PointerToThinFunctionInst *CI) {
+    auto resultTI = requireObjectType(SILFunctionType, CI,
+                                      "pointer_to_thin_function result");
+    requireObjectType(BuiltinRawPointerType, CI->getOperand(),
+                      "pointer_to_thin_function operand");
+
+    require(resultTI->getRepresentation() == FunctionType::Representation::Thin,
+            "pointer_to_thin_function only works on thin functions");
   }
 
   void checkCondFailInst(CondFailInst *CFI) {

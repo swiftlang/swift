@@ -126,6 +126,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::OpenExistentialRefInst:
   case ValueKind::PartialApplyInst:
   case ValueKind::PointerToAddressInst:
+  case ValueKind::PointerToThinFunctionInst:
   case ValueKind::ProjectBlockStorageInst:
   case ValueKind::ExistentialMetatypeInst:
   case ValueKind::RawPointerToRefInst:
@@ -146,6 +147,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::UncheckedEnumDataInst:
   case ValueKind::UncheckedTakeEnumDataAddrInst:
   case ValueKind::ThickToObjCMetatypeInst:
+  case ValueKind::ThinFunctionToPointerInst:
   case ValueKind::ThinToThickFunctionInst:
   case ValueKind::TupleElementAddrInst:
   case ValueKind::TupleExtractInst:
