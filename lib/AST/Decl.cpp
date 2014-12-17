@@ -624,17 +624,10 @@ ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
                                SourceLoc KindLoc,
                                ArrayRef<AccessPathElement> Path,
                                const clang::Module *ClangMod) {
-  static_assert(alignof(ImportDecl) <= alignof(void*),
-                "adding ClangNode violates alignment");
   assert(!Path.empty());
   assert(Kind == ImportKind::Module || Path.size() > 1);
   size_t Size = sizeof(ImportDecl) + Path.size() * sizeof(AccessPathElement);
-  if (ClangMod)
-    Size += sizeof(void*);
-  void *buffer = Ctx.Allocate(Size, alignof(ImportDecl));
-  void *ptr = buffer;
-  if (ClangMod)
-    ptr = reinterpret_cast<void **>(buffer) + 1;
+  void *ptr = allocateMemoryForDecl<ImportDecl>(Ctx, Size, ClangMod != nullptr);
   auto D = new (ptr) ImportDecl(DC, ImportLoc, Kind, KindLoc, Path);
   if (ClangMod)
     D->setClangNode(ClangMod);
@@ -784,15 +777,9 @@ ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
   // Determine how much storage we require for this declaration.
   unsigned size = sizeof(ExtensionDecl)
                 + refComponents.size() * sizeof(RefComponent);
-  if (clangNode)
-    size += sizeof(void *);
 
-  // Allocate memory for the declaration, and adjust the point if we have a
-  // Clang node associated with this extension.
-  void *mem = ctx.Allocate(size, alignof(ExtensionDecl));
-  void *declPtr = mem;
-  if (clangNode)
-    declPtr = reinterpret_cast<void **>(mem) + 1;
+  void *declPtr = allocateMemoryForDecl<ExtensionDecl>(ctx, size,
+                                                       !clangNode.isNull());
 
   // Construct the extension.
   auto result = ::new (declPtr) ExtensionDecl(extensionLoc, refComponents,
@@ -3033,16 +3020,10 @@ FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                Type Ty, unsigned NumParamPatterns,
                                DeclContext *Parent,
                                ClangNode ClangN) {
-  static_assert(alignof(FuncDecl) <= alignof(void*),
-                "adding ClangNode violates alignment");
   assert(NumParamPatterns > 0);
   size_t Size = sizeof(FuncDecl) + NumParamPatterns * sizeof(Pattern *);
-  if (ClangN)
-    Size += sizeof(void*);
-  void *Mem = Context.Allocate(Size, alignof(FuncDecl));
-  void *DeclPtr = Mem;
-  if (ClangN)
-    DeclPtr = reinterpret_cast<void **>(Mem) + 1;
+  void *DeclPtr = allocateMemoryForDecl<FuncDecl>(Context, Size,
+                                                  !ClangN.isNull());
   auto D = ::new (DeclPtr)
       FuncDecl(StaticLoc, StaticSpelling, FuncLoc, Name, NameLoc,
                NumParamPatterns, GenericParams, Ty, Parent);

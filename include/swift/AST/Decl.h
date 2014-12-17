@@ -828,6 +828,26 @@ public:
   }
 };
 
+/// \brief Allocates memory for a Decl with the given \p baseSize. If necessary,
+/// it includes additional space immediately preceding the Decl for a ClangNode.
+/// \note \p baseSize does not need to include space for a ClangNode if
+/// requested -- the necessary space will be added automatically.
+template <typename DeclTy, typename AllocatorTy>
+void *allocateMemoryForDecl(AllocatorTy &allocator, size_t baseSize,
+                            bool includeSpaceForClangNode) {
+  static_assert(alignof(DeclTy) >= sizeof(void *),
+                "A pointer must fit in the alignment of the DeclTy!");
+
+  size_t size = baseSize;
+  if (includeSpaceForClangNode)
+    size += alignof(DeclTy);
+
+  void *mem = allocator.Allocate(size, alignof(DeclTy));
+  if (includeSpaceForClangNode)
+    mem = reinterpret_cast<char *>(mem) + alignof(DeclTy);
+  return mem;
+}
+
 /// \brief A single requirement in a 'where' clause, which places additional
 /// restrictions on the generic parameters or associated types of a generic
 /// function, type, or protocol.

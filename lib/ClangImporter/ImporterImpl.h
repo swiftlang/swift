@@ -944,12 +944,9 @@ public:
 
   template <typename DeclTy, typename ...Targs>
   DeclTy *createDeclWithClangNode(ClangNode ClangN, Targs &&... Args) {
-    static_assert(alignof(DeclTy) <= alignof(void*),
-                  "adding ClangNode violates alignment");
     assert(ClangN);
-    void *Mem = SwiftContext.Allocate(sizeof(DeclTy) + sizeof(void *),
-                                      alignof(DeclTy));
-    void *DeclPtr = reinterpret_cast<void **>(Mem) + 1;
+    void *DeclPtr = allocateMemoryForDecl<DeclTy>(SwiftContext, sizeof(DeclTy),
+                                                  true);
     auto D = ::new (DeclPtr) DeclTy(std::forward<Targs>(Args)...);
     D->setClangNode(ClangN);
     D->setEarlyAttrValidation(true);
