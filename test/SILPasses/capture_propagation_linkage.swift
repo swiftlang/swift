@@ -6,8 +6,10 @@
 
 // Capture propagation specializes the reabstraction thunk for createInstance
 // and for main.createNil().
-// Both specialized thunks have the same name and therefore they must be private.
-// Otherwise the wrong thunk will be called.
+//
+// We used to have a problem which caused us to mark these as private
+// since both would produce the same name. Now we no longer have this
+// problem due to the new mangler.
 
 func createSome() -> MyClass? {
 	return genericCaller(createInstance)

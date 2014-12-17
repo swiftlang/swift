@@ -232,10 +232,7 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
                                  FunctionType::Representation::Thin);
   SILFunction *NewF =
          SILFunction::create(*getModule(),
-                             // The linkage must be private to avoid collision
-                             // of specialized reabstraction thunks in different
-                             // files.
-                             SILLinkage::Private,
+                             SILLinkage::Shared,
                              Name,
                              NewFTy,
                              /*contextGenericParams*/nullptr,
