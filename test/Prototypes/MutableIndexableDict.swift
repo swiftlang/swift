@@ -330,9 +330,11 @@ struct Dictionary<Key: Hashable, Value> : CollectionType, SequenceType {
 
   func _find(k: Key, startBucket: Int) -> (Index,Bool) {
     var bucket = startBucket
+    
 
     // The invariant guarantees there's always a hole, so we just loop
-    // until we find one
+    // until we find one.
+    assert(count < capacity)
     while true {
       var keyVal = _buffer[bucket]
       if (keyVal == nil) || keyVal!.key == k {
