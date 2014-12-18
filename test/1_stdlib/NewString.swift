@@ -403,14 +403,16 @@ do {
       expectEquality(u8i0a, u8i1, true)
 
       // Also check some positions between unicode scalars
+      var u8i0b = u8i0a
       for n0 in 0..<8 {
-        let u8i0b = advance(u8i0a, n0)
-        for n1 in n0..<8 {
-          let u8i1b = advance(u8i1, n1)
+        var u8i1b = u8i1
+        for n1 in 0..<8 {
           expectEquality(u8i0b, u8i1b, n0 == n1)
           if u8i1b == u8.endIndex { break }
+          ++u8i1b
         }
         if u8i0b == u8.endIndex { break }
+        ++u8i0b
       }
     }
   }
