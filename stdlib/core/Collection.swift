@@ -190,7 +190,7 @@ public struct IndexingGenerator<
     ? .None : .Some(_elements[_position++])
   }
   
-  var _elements: C
+  let _elements: C
   var _position: C.Index
 }
 
