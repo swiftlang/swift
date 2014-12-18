@@ -472,3 +472,119 @@ bb0(%0 : $*T, %1 : $Builtin.NativeObject, %2 : $*T):
   // CHECK: return
   return %5 : $()
 }
+
+protocol Count {
+  var count: Int { get }
+}
+
+struct Q : Count {
+  var count: Int { get }
+  init()
+}
+
+struct S<T : Count> {
+  @sil_stored var t: T
+  var count: Int { get }
+  func test(i: Int) -> Bool
+  init(t: T)
+}
+
+// CHECK-LABEL: sil [noinline] @inner
+sil [noinline] @inner : $@thin (@owned @callee_owned () -> Bool) -> Bool {
+// CHECK: bb0
+bb0(%0 : $@callee_owned () -> Bool):
+  debug_value %0 : $@callee_owned () -> Bool
+  strong_retain %0 : $@callee_owned () -> Bool
+  %3 = apply [transparent] %0() : $@callee_owned () -> Bool
+  strong_release %0 : $@callee_owned () -> Bool
+// CHECK: return
+  return %3 : $Bool
+}
+
+// CHECK-LABEL: sil [noinline] @outer
+sil [noinline] @outer : $@thin (@owned @callee_owned () -> Bool) -> Bool {
+// CHECK: bb0
+bb0(%0 : $@callee_owned () -> Bool):
+  debug_value %0 : $@callee_owned () -> Bool
+  strong_retain %0 : $@callee_owned () -> Bool
+  %3 = apply [transparent] %0() : $@callee_owned () -> Bool
+  strong_release %0 : $@callee_owned () -> Bool
+// CHECK: return
+  return %3 : $Bool
+}
+
+// CHECK-LABEL: sil @get
+sil @get : $@cc(method) @thin <T where T : Count> (@in S<T>) -> Int
+
+// CHECK-LABEL: sil shared @specialized
+sil shared @specialized : $@cc(method) @thin (Int, @in S<Q>) -> Bool {
+// CHECK: bb0
+bb0(%0 : $Int, %1 : $*S<Q>):
+  debug_value %0 : $Int
+  debug_value_addr %1 : $*S<Q>
+  %4 = function_ref @outer : $@thin (@owned @callee_owned () -> Bool) -> Bool
+  %5 = function_ref @closure1 : $@thin <τ_0_0 where τ_0_0 : Count> (Int, @owned Builtin.NativeObject, @inout S<τ_0_0>) -> Bool
+  %6 = alloc_box $S<Q>
+  copy_addr %1 to [initialization] %6#1 : $*S<Q>
+  %8 = partial_apply %5<Q>(%0, %6#0, %6#1) : $@thin <τ_0_0 where τ_0_0 : Count> (Int, @owned Builtin.NativeObject, @inout S<τ_0_0>) -> Bool
+  %9 = apply %4(%8) : $@thin (@owned @callee_owned () -> Bool) -> Bool
+  destroy_addr %1 : $*S<Q>
+// CHECK: return
+  return %9 : $Bool
+}
+
+// CHECK-LABEL: sil @unspecialized
+sil @unspecialized : $@cc(method) @thin <T where T : Count> (Int, @in S<T>) -> Bool {
+// CHECK: bb0
+bb0(%0 : $Int, %1 : $*S<T>):
+  debug_value %0 : $Int
+  debug_value_addr %1 : $*S<T>
+  %4 = function_ref @outer : $@thin (@owned @callee_owned () -> Bool) -> Bool
+  %5 = function_ref @closure1 : $@thin <τ_0_0 where τ_0_0 : Count> (Int, @owned Builtin.NativeObject, @inout S<τ_0_0>) -> Bool
+  %6 = alloc_box $S<T>
+  copy_addr %1 to [initialization] %6#1 : $*S<T>
+  %8 = partial_apply %5<T>(%0, %6#0, %6#1) : $@thin <τ_0_0 where τ_0_0 : Count> (Int, @owned Builtin.NativeObject, @inout S<τ_0_0>) -> Bool
+  %9 = apply %4(%8) : $@thin (@owned @callee_owned () -> Bool) -> Bool
+  destroy_addr %1 : $*S<T>
+// CHECK: return
+  return %9 : $Bool
+}
+
+// CHECK-LABEL: sil shared @closure1
+sil shared @closure1 : $@thin <T where T : Count> (Int, @owned Builtin.NativeObject, @inout S<T>) -> Bool {
+// CHECK: bb0
+bb0(%0 : $Int, %1 : $Builtin.NativeObject, %2 : $*S<T>):
+  %3 = function_ref @inner : $@thin (@owned @callee_owned () -> Bool) -> Bool
+  %4 = function_ref @closure2 : $@thin <τ_0_0 where τ_0_0 : Count> (Int, @owned Builtin.NativeObject, @inout S<τ_0_0>) -> Bool
+  %5 = alloc_box $S<T>
+  copy_addr %2 to [initialization] %5#1 : $*S<T>
+  %7 = partial_apply %4<T>(%0, %5#0, %5#1) : $@thin <τ_0_0 where τ_0_0 : Count> (Int, @owned Builtin.NativeObject, @inout S<τ_0_0>) -> Bool
+  %8 = apply %3(%7) : $@thin (@owned @callee_owned () -> Bool) -> Bool
+  strong_release %1 : $Builtin.NativeObject
+// CHECK: return
+  return %8 : $Bool
+}
+
+// CHECK-LABEL: sil shared @_TTSf0n_d_n__closure2
+// CHECK: bb0
+// CHECK: return
+// CHECK-NOT: bb1
+
+// CHECK-LABEL: sil shared @closure2
+sil shared @closure2 : $@thin <T where T : Count> (Int, @owned Builtin.NativeObject, @inout S<T>) -> Bool {
+// CHECK: bb0
+bb0(%0 : $Int, %1 : $Builtin.NativeObject, %2 : $*S<T>):
+  %3 = function_ref @binary : $@thin (Int, Int) -> Bool
+  %4 = alloc_stack $S<T>
+  copy_addr %2 to [initialization] %4#1 : $*S<T>
+  %6 = function_ref @get : $@cc(method) @thin <τ_0_0 where τ_0_0 : Count> (@in S<τ_0_0>) -> Int
+  %7 = apply %6<T>(%4#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : Count> (@in S<τ_0_0>) -> Int
+  %8 = apply [transparent] %3(%0, %7) : $@thin (Int, Int) -> Bool
+  dealloc_stack %4#0 : $*@local_storage S<T>
+  strong_release %1 : $Builtin.NativeObject
+// CHECK: return
+  return %8 : $Bool
+}
+
+// CHECK-LABEL: sil [transparent] [fragile] @binary
+sil [transparent] [fragile] @binary : $@thin (Int, Int) -> Bool

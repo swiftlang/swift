@@ -465,7 +465,8 @@ class DeadParamCloner : public SILClonerWithScopes<DeadParamCloner> {
   friend class SILVisitor<DeadParamCloner>;
   friend class SILCloner<DeadParamCloner>;
 
-  DeadParamCloner(SILFunction *Orig, ParamIndexList &DeadParamIndices);
+  DeadParamCloner(SILFunction *Orig, ParamIndexList &DeadParamIndices,
+                  llvm::StringRef ClonedName);
 
   void populateCloned();
 
@@ -473,7 +474,8 @@ class DeadParamCloner : public SILClonerWithScopes<DeadParamCloner> {
 
   private:
   static SILFunction *initCloned(SILFunction *Orig,
-                                 ParamIndexList &DeadParamIndices);
+                                 ParamIndexList &DeadParamIndices,
+                                 llvm::StringRef ClonedName);
 
   void visitStrongReleaseInst(StrongReleaseInst *Inst);
   void visitStrongRetainInst(StrongRetainInst *Inst);
@@ -488,8 +490,10 @@ class DeadParamCloner : public SILClonerWithScopes<DeadParamCloner> {
 } // end anonymous namespace.
 
 DeadParamCloner::DeadParamCloner(SILFunction *Orig,
-                                 ParamIndexList &DeadParamIndices)
-  : SILClonerWithScopes<DeadParamCloner>(*initCloned(Orig, DeadParamIndices)),
+                                 ParamIndexList &DeadParamIndices,
+                                 llvm::StringRef ClonedName)
+  : SILClonerWithScopes<DeadParamCloner>(*initCloned(Orig, DeadParamIndices,
+                                                     ClonedName)),
     Orig(Orig), DeadParamIndices(DeadParamIndices) {
 }
 
@@ -510,14 +514,9 @@ static void getClonedName(SILFunction *F,
 /// parameters (which are specified by DeadParamIndices).
 SILFunction*
 DeadParamCloner::initCloned(SILFunction *Orig,
-                            ParamIndexList &DeadParamIndices) {
+                            ParamIndexList &DeadParamIndices,
+                            llvm::StringRef ClonedName) {
   SILModule &M = Orig->getModule();
-
-  llvm::SmallString<64> ClonedName;
-  getClonedName(Orig, DeadParamIndices, ClonedName);
-
-  if (auto *PrevFn = M.lookUpFunction(ClonedName))
-    return PrevFn;
 
   SmallVector<SILParameterInfo, 4> ClonedInterfaceArgTys;
 
@@ -628,9 +627,20 @@ specializePartialApply(PartialApplyInst *PartialApply,
   auto *F = FRI->getReferencedFunction();
   assert(F && "Expected a referenced function!");
 
-  // Clone the function the existing partial_apply references.
-  DeadParamCloner Cloner(F, DeadParamIndices);
-  Cloner.populateCloned();
+  llvm::SmallString<64> ClonedName;
+  getClonedName(F, DeadParamIndices, ClonedName);
+
+  auto &M = PartialApply->getModule();
+
+  SILFunction *ClonedFn;
+  if (auto *PrevFn = M.lookUpFunction(ClonedName)) {
+    ClonedFn = PrevFn;
+  } else {
+    // Clone the function the existing partial_apply references.
+    DeadParamCloner Cloner(F, DeadParamIndices, ClonedName);
+    Cloner.populateCloned();
+    ClonedFn = Cloner.getCloned();
+  }
 
   // Now create the new partial_apply using the cloned function.
   llvm::SmallVector<SILValue, 16> Args;
@@ -660,9 +670,8 @@ specializePartialApply(PartialApplyInst *PartialApply,
 
   // Build the function_ref and partial_apply.
   SILValue FunctionRef = Builder.createFunctionRef(PartialApply->getLoc(),
-                                                   Cloner.getCloned());
-  CanSILFunctionType CanFnTy = Cloner.getCloned()->getLoweredFunctionType();
-  auto &M = PartialApply->getModule();
+                                                   ClonedFn);
+  CanSILFunctionType CanFnTy = ClonedFn->getLoweredFunctionType();
   auto const &Subs = PartialApply->getSubstitutions();
   CanSILFunctionType SubstCalleeTy = CanFnTy->substGenericArgs(M,
                                                              M.getSwiftModule(),
