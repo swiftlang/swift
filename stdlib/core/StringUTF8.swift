@@ -314,3 +314,12 @@ extension String.UTF8Index {
     self.init(utf8._core, _utf16Offset: sourceIndex._base._position)
   }
 }
+
+// Index conversions
+extension String.UTF8View.Index {
+  public func samePositionIn(
+    otherView: String.UTF16View
+  ) -> String.UTF16View.Index? {
+    return String.UTF16View.Index(self, within: otherView)
+  }
+}

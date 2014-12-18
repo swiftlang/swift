@@ -221,6 +221,35 @@ public func ~> (
 
 // Index conversions
 extension String.UTF16View.Index {
+  public init?(
+    _ sourceIndex: String.UTF8Index, within utf16: String.UTF16View
+  ) {
+    let core = utf16._core
+    let sourceView = String.UTF8View(core)
+    
+    _precondition(
+      sourceIndex._coreIndex >= 0 && (
+        sourceIndex._coreIndex < core.endIndex
+        || sourceIndex._coreIndex == core.endIndex
+           && sourceIndex._isOnUnicodeScalarBoundary
+      ), "Invalid String.UTF8Index for this UTF-16 view")
+
+    // Detect positions that have no corresponding index.
+    if !sourceIndex._isOnUnicodeScalarBoundary {
+      return nil
+    }
+    self.init(sourceIndex._coreIndex)
+  }
+  
+  public init(
+    _ sourceIndex: String.UnicodeScalarIndex, within utf16: String.UTF16View) {
+    self.init(sourceIndex._position)
+  }
+  
+  public init(_ sourceIndex: String.Index, within utf16: String.UTF16View) {
+    self.init(sourceIndex._utf16Index)
+  }
+
   public func samePositionIn(
     otherView: String.UTF8View
   ) -> String.UTF8View.Index? {

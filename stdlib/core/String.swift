@@ -941,4 +941,9 @@ extension String.Index {
   ) -> String.UTF8View.Index {
     return String.UTF8View.Index(self, within: otherView)
   }
+  public func samePositionIn(
+    otherView: String.UTF16View
+  ) -> String.UTF16View.Index {
+    return String.UTF16View.Index(self, within: otherView)
+  }
 }
