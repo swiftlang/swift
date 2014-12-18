@@ -138,8 +138,25 @@ extension String {
     /// A type whose instances can produce the elements of this
     /// sequence, in order.
     public struct Generator : GeneratorType {
-      init(_ _base: _StringCore.Generator) {
-        self._base = _base
+      init(_ _base: _StringCore) {
+        if _base.hasContiguousStorage {
+            self._baseSet = true
+          if _base.isASCII {
+            self._ascii = true
+            self._asciiBase = UnsafeBufferPointer<UInt8>(
+              start: UnsafePointer(_base._baseAddress),
+              count: _base.count).generate()
+          } else {
+            self._ascii = false
+            self._base = UnsafeBufferPointer<UInt16>(
+              start: UnsafePointer(_base._baseAddress),
+              count: _base.count).generate()
+          }
+        } else {
+          self._ascii = false
+          self._baseSet = false
+          self._generator = _base.generate()
+        }
       }
 
       /// Advance to the next element and return it, or `nil` if no next
@@ -148,7 +165,22 @@ extension String {
       /// Requires: no preceding call to `self.next()` has returned
       /// `nil`.
       public mutating func next() -> UnicodeScalar? {
-        switch _decoder.decode(&self._base) {
+        var result: UnicodeDecodingResult
+        if _baseSet {
+          if _ascii {
+            switch self._asciiBase.next() {
+            case let .Some(x):
+              result = .Result(UnicodeScalar(x))
+            case .None:
+              result = .EmptyInput
+            }
+          } else {
+            result = _decoder.decode(&(self._base!))
+          }
+        } else {
+          result = _decoder.decode(&(self._generator!))
+        }
+        switch result {
         case .Result(let us):
           return us
         case .EmptyInput:
@@ -158,7 +190,11 @@ extension String {
         }
       }
       var _decoder: UTF16 = UTF16()
-      var _base: _StringCore.Generator
+      let _baseSet: Bool
+      let _ascii: Bool
+      var _asciiBase: UnsafeBufferPointerGenerator<UInt8>!
+      var _base: UnsafeBufferPointerGenerator<UInt16>!
+      var _generator: IndexingGenerator<_StringCore>!
     }
 
     /// Return a *generator* over the `UnicodeScalar`\ s that comprise
@@ -166,7 +202,7 @@ extension String {
     ///
     /// Complexity: O(1)
     public func generate() -> Generator {
-      return Generator(_core.generate())
+      return Generator(_core)
     }
 
     /// Returns a mirror that reflects `self`.
