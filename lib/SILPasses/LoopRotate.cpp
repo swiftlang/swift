@@ -229,6 +229,126 @@ static void updateDomTree(DominanceInfo *DT, SILBasicBlock *Preheader,
     DT->changeImmediateDominator(HeaderN, DT->getNode(Latch));
 }
 
+/// \brief Try to create a unique loop preheader.
+///
+/// FIXME: We should handle merging multiple loop predecessors.
+static SILBasicBlock* insertPreheader(SILLoop *L, DominanceInfo *DT,
+                                      SILLoopInfo *LI) {
+  assert(!L->getLoopPreheader() && "Expect multiple preheaders");
+
+  SILBasicBlock *Header = L->getHeader();
+  SILBasicBlock *Preheader = nullptr;
+  if (auto LoopPred = getSingleOutsideLoopPredecessor(L, Header)) {
+    if (isa<CondBranchInst>(LoopPred->getTerminator())) {
+      Preheader = splitIfCriticalEdge(LoopPred, Header, DT, LI);
+      assert(Preheader && "Must have a preheader now");
+    }
+  }
+  return Preheader;
+}
+
+/// \brief Convert a loop with multiple backedges to a single backedge loop.
+///
+/// Create a new block as a common target for all the current loop backedges.
+static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,
+                                          SILLoopInfo *LI) {
+  assert(!L->getLoopLatch() && "Must have > 1 backedge.");
+
+  // For simplicity, assume a single preheader
+  SILBasicBlock *Preheader = L->getLoopPreheader();
+  if (!Preheader)
+    return nullptr;
+
+  SILBasicBlock *Header = L->getHeader();
+  SILFunction *F = Header->getParent();
+
+  // Figure out which basic blocks contain back-edges to the loop header.
+  SmallVector<SILBasicBlock*, 4> BackedgeBlocks;
+  for (auto *Pred : Header->getPreds()) {
+    if (Pred == Preheader)
+      continue;
+    // Branches can be handled trivially and CondBranch edges can be split.
+    if (!isa<BranchInst>(Pred->getTerminator())
+        && !isa<CondBranchInst>(Pred->getTerminator())) {
+      return nullptr;
+    }
+    BackedgeBlocks.push_back(Pred);
+  }
+
+  // Create and insert the new backedge block...
+  SILBasicBlock *BEBlock =
+    new (F->getModule()) SILBasicBlock(F, BackedgeBlocks.back());
+
+  DEBUG(llvm::dbgs() << "  Inserting unique backedge block " << *BEBlock
+        << "\n");
+
+  // Now that the block has been inserted into the function, create PHI nodes in
+  // the backedge block which correspond to any PHI nodes in the header block.
+  SmallVector<SILValue, 6> BBArgs;
+  for (auto *BBArg : Header->getBBArgs()) {
+    BBArgs.push_back(BEBlock->createBBArg(BBArg->getType(), /*Decl=*/nullptr));
+  }
+
+  // Arbitrarily pick one of the predecessor's branch locations.
+  SILLocation BranchLoc = BackedgeBlocks.back()->getTerminator()->getLoc();
+
+  // Create an unconditional branch that propagates the newly created BBArgs.
+  BranchInst *Branch = BranchInst::create(BranchLoc, Header, BBArgs, *F);
+  BEBlock->getInstList().insert(BEBlock->getInstList().end(), Branch);
+
+  // Redirect the backedge blocks to BEBlock instead of Header.
+  for (auto *Pred : BackedgeBlocks) {
+    auto *Terminator = Pred->getTerminator();
+
+    if (auto *Branch = dyn_cast<BranchInst>(Terminator))
+      changeBranchTarget(Branch, 0, BEBlock, /*PreserveArgs=*/true);
+    else if (auto *CondBranch = dyn_cast<CondBranchInst>(Terminator)) {
+      unsigned EdgeIdx = (CondBranch->getTrueBB() == Header)
+        ? CondBranchInst::TrueIdx : CondBranchInst::FalseIdx;
+      changeBranchTarget(CondBranch, EdgeIdx, BEBlock, /*PreserveArgs=*/true);
+    }
+    else {
+      llvm_unreachable("Expected a branch terminator.");
+    }
+  }
+
+  // Update Loop Information - we know that this block is now in the current
+  // loop and all parent loops.
+  L->addBasicBlockToLoop(BEBlock, LI->getBase());
+
+  // Update dominator information
+  SILBasicBlock *DomBB = BackedgeBlocks.back();
+  for (auto BBIter = BackedgeBlocks.begin(),
+         BBEnd = std::prev(BackedgeBlocks.end());
+       BBIter != BBEnd; ++BBIter) {
+    DomBB = DT->findNearestCommonDominator(DomBB, *BBIter);
+  }
+  DT->addNewBlock(BEBlock, DomBB);
+
+  return BEBlock;
+}
+
+
+/// Canonicalize the loop for rotation and downstream passes.
+///
+/// Create a single preheader and single latch block.
+///
+/// FIXME: We should identify nested loops with a common header and separate
+/// them before merging the latch. See LLVM's separateNestedLoop.
+static bool simplifyLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI) {
+  bool ChangedCFG = false;
+  if (!L->getLoopPreheader()) {
+    if (insertPreheader(L, DT, LI))
+      ChangedCFG = true;
+    else
+      return ChangedCFG; // Skip further simplification with no preheader.
+  }
+  if (!L->getLoopLatch())
+    ChangedCFG |= (insertBackedgeBlock(L, DT, LI) != nullptr);
+
+  return ChangedCFG;
+}
+
 static bool rotateLoopAtMostUpToLatch(SILLoop *L, DominanceInfo *DT,
                                       SILLoopInfo *LI, bool ShouldVerify) {
   auto *Latch = L->getLoopLatch();
@@ -236,10 +356,6 @@ static bool rotateLoopAtMostUpToLatch(SILLoop *L, DominanceInfo *DT,
     DEBUG(llvm::dbgs() << *L << " does not have a single latch block\n");
     return false;
   }
-
-  // Rotate single basic block loops.
-  if (!ShouldRotate)
-    return false;
 
   bool DidRotate = rotateLoop(L, DT, LI, false /* RotateSingleBlockLoops */,
                               Latch, ShouldVerify);
@@ -276,39 +392,27 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
   // We need a preheader - this is also a cannonicalization for follow-up
   // passes.
   auto *Preheader = L->getLoopPreheader();
-  bool ChangedCFG = false;
   if (!Preheader) {
-    // Try to create a preheader.
-    if (auto LoopPred = getSingleOutsideLoopPredecessor(L, Header))
-      if (isa<CondBranchInst>(LoopPred->getTerminator())) {
-        Preheader = splitIfCriticalEdge(LoopPred, Header, DT, LI);
-        ChangedCFG = true;
-        assert(Preheader && "Must have a preheader now");
-      }
-
-    if (!Preheader) {
-      DEBUG(llvm::dbgs() << *L << " no preheader\n");
-      DEBUG(L->getHeader()->getParent()->dump());
-      return false;
-    }
+    DEBUG(llvm::dbgs() << *L << " no preheader\n");
+    DEBUG(L->getHeader()->getParent()->dump());
+    return false;
   }
 
-
   if (!RotateSingleBlockLoops && Header == UpTo)
-    return ChangedCFG;
+    return false;
 
   assert(RotateSingleBlockLoops || L->getBlocks().size() != 1);
 
   // Need a conditional branch that guards the entry into the loop.
   auto *LoopEntryBranch = dyn_cast<CondBranchInst>(Header->getTerminator());
   if (!LoopEntryBranch)
-    return ChangedCFG;
+    return false;
 
   // The header needs to exit the loop.
   if (!L->isLoopExiting(Header)) {
     DEBUG(llvm::dbgs() << *L << " not a exiting header\n");
     DEBUG(L->getHeader()->getParent()->dump());
-    return ChangedCFG;
+    return false;
   }
 
   // We need a single backedge and the latch must not exit the loop if it is
@@ -316,14 +420,14 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
   auto *Latch = L->getLoopLatch();
   if (!Latch) {
     DEBUG(llvm::dbgs() << *L << " no single latch\n");
-    return ChangedCFG;
+    return false;
   }
 
   // Make sure we can duplicate the header.
   SmallVector<SILInstruction *, 8> MoveToPreheader;
   if (!canDuplicateOrMoveToPreheader(L, Preheader, Header, MoveToPreheader)) {
     DEBUG(llvm::dbgs() << *L << " instructions in header preventing rotating\n");
-    return ChangedCFG;
+    return false;
   }
 
   auto *NewHeader = LoopEntryBranch->getTrueBB();
@@ -337,7 +441,7 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
   // into one. This can be turned into an assert again once we have guaranteed
   // preheader insertions.
   if (!NewHeader->getSinglePredecessor() && Header != Latch)
-    return ChangedCFG;
+    return false;
 
   // Now that we know we can perform the rotation - move the instructions that
   // need moving.
@@ -434,7 +538,11 @@ class LoopRotation : public SILFunctionTransform {
       DEBUG(llvm::dbgs() << "No loops in " << F->getName() << "\n");
       return;
     }
-
+    if (!ShouldRotate) {
+      DEBUG(llvm::dbgs() << "Skipping loop rotation in " << F->getName()
+            << "\n");
+      return;
+    }
     DEBUG(llvm::dbgs() << "Rotating loops in " << F->getName() << "\n");
     bool ShouldVerify = getOptions().VerifyAll;
 
@@ -450,8 +558,9 @@ class LoopRotation : public SILFunctionTransform {
       }
 
       while (!Worklist.empty()) {
-        Changed |= rotateLoopAtMostUpToLatch(Worklist.pop_back_val(), DT, LI,
-                                             ShouldVerify);
+        SILLoop *Loop = Worklist.pop_back_val();
+        Changed |= simplifyLoop(Loop, DT, LI);
+        Changed |= rotateLoopAtMostUpToLatch(Loop, DT, LI, ShouldVerify);
       }
     }
 
