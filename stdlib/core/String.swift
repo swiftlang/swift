@@ -934,3 +934,11 @@ extension String {
   }
 }
 
+// Index conversions
+extension String.Index {
+  public func samePositionIn(
+    otherView: String.UTF8View
+  ) -> String.UTF8View.Index {
+    return String.UTF8View.Index(self, within: otherView)
+  }
+}

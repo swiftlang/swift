@@ -254,6 +254,84 @@ printHexSequence(summer.utf8)
 // CHECK-NEXT: [73 63 68 6f 6f 6c 27 73 20 6f 75 74 21]
 printHexSequence(summer.utf16)
 
+func utf8GraphemeClusterIndices(s: String) -> [String.UTF8Index] {
+  return indices(s).map { $0.samePositionIn(s.utf8) }
+}
+
+func utf8UnicodeScalarIndices(s: String) -> [String.UTF8Index] {
+  return indices(s.unicodeScalars).map { $0.samePositionIn(s.utf8) }
+}
+
+func utf8UTF16Indices(s: String) -> [String.UTF8Index?] {
+  return indices(s.utf16).map { $0.samePositionIn(s.utf8) }
+}
+
+// winter UTF8 grapheme clusters ([]) and unicode scalars (|)
+// [f0 9f 8f 82] [e2 98 83] [e2 9d 85] [e2 9d 86] [e2 9d 84 | ef b8 8e]
+// [e2 9b 84 | ef b8 8f]    [e2 9d 84 | ef b8 8f]
+
+// Print the first four utf8 code units at the start of each grapheme
+// cluster
+//
+// CHECK-NEXT: [f0 9f 8f 82]
+// CHECK-NEXT: [e2 98 83 e2]
+// CHECK-NEXT: [e2 9d 85 e2]
+// CHECK-NEXT: [e2 9d 86 e2]
+// CHECK-NEXT: [e2 9d 84 ef]
+// CHECK-NEXT: [e2 9b 84 ef]
+// CHECK-NEXT: [e2 9d 84 ef]
+for i in utf8GraphemeClusterIndices(winter) {
+  printHexSequence((0..<4).map { winter.utf8[advance(i, $0)] })
+}
+
+// CHECK-NEXT: [73 63 68 6f 6f 6c 27 73 20 6f 75 74 21]
+printHexSequence(utf8GraphemeClusterIndices(summer).map { summer.utf8[$0] })
+
+// Print the first three utf8 code units at the start of each unicode
+// scalar
+//
+// CHECK-NEXT: [f0 9f 8f]
+// CHECK-NEXT: [e2 98 83]
+// CHECK-NEXT: [e2 9d 85]
+// CHECK-NEXT: [e2 9d 86]
+// CHECK-NEXT: [e2 9d 84]
+// CHECK-NEXT: [ef b8 8e]
+// CHECK-NEXT: [e2 9b 84]
+// CHECK-NEXT: [ef b8 8f]
+// CHECK-NEXT: [e2 9d 84]
+// CHECK-NEXT: [ef b8 8f]
+for i in utf8UnicodeScalarIndices(winter) {
+  printHexSequence((0..<3).map { winter.utf8[advance(i, $0)] })
+}
+
+// CHECK-NEXT: [73 63 68 6f 6f 6c 27 73 20 6f 75 74 21]
+printHexSequence(utf8UnicodeScalarIndices(summer).map { summer.utf8[$0] })
+
+// Print the first three utf8 code units at the start of each utf16
+// code unit, or invalid when between code units
+//
+// CHECK-NEXT: [f0 9f 8f]
+// CHECK-NEXT: invalid
+// CHECK-NEXT: [e2 98 83]
+// CHECK-NEXT: [e2 9d 85]
+// CHECK-NEXT: [e2 9d 86]
+// CHECK-NEXT: [e2 9d 84]
+// CHECK-NEXT: [ef b8 8e]
+// CHECK-NEXT: [e2 9b 84]
+// CHECK-NEXT: [ef b8 8f]
+// CHECK-NEXT: [e2 9d 84]
+// CHECK-NEXT: [ef b8 8f]
+for i16 in indices(winter.utf16) {
+  if let i8 = i16.samePositionIn(winter.utf8) {
+    printHexSequence((0..<3).map { winter.utf8[advance(i8, $0)] })
+  }
+  else {
+    println("invalid")
+  }
+}
+// CHECK-NEXT: [73 63 68 6f 6f 6c 27 73 20 6f 75 74 21]
+printHexSequence(utf8UTF16Indices(summer).map { summer.utf8[$0!] })
+
 // ===---------- Done --------===
 // CHECK-NEXT: Done.
 println("Done.")

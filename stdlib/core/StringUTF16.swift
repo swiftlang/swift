@@ -219,3 +219,11 @@ public func ~> (
     _offset: advance(start._offset, n, end._offset))
 }
 
+// Index conversions
+extension String.UTF16View.Index {
+  public func samePositionIn(
+    otherView: String.UTF8View
+  ) -> String.UTF8View.Index? {
+    return String.UTF8View.Index(self, within: otherView)
+  }
+}

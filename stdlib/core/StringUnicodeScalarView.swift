@@ -335,3 +335,12 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
     Swift.removeAll(&self, keepCapacity: keepCapacity)
   }
 }
+
+// Index conversions
+extension String.UnicodeScalarView.Index {
+  public func samePositionIn(
+    otherView: String.UTF8View
+  ) -> String.UTF8View.Index {
+    return String.UTF8View.Index(self, within: otherView)
+  }
+}

@@ -124,7 +124,7 @@ extension String {
       let _coreIndex: Int
       let _buffer: _StringCore.UTF8Chunk
     }
-  
+
     /// The position of the first code unit if the `String` is
     /// non-empty; identical to `endIndex` otherwise.
     public var startIndex: Index {
@@ -196,4 +196,33 @@ extension String {
 public
 func == (lhs: String.UTF8View.Index, rhs: String.UTF8View.Index) -> Bool {
   return lhs._coreIndex == rhs._coreIndex && lhs._buffer == rhs._buffer
+}
+
+extension String.UTF8Index {
+  internal init(_ core: _StringCore, _utf16Offset: Int) {
+      let (coreIndex, buffer) = core._encodeSomeUTF8(_utf16Offset)
+      self.init(core, coreIndex, buffer)
+  }
+  
+  public init?(_ sourceIndex: String.UTF16Index, within utf8: String.UTF8View) {
+    let sourceView = String.UTF16View(utf8._core)
+    if sourceIndex != sourceView.startIndex
+      && sourceIndex != sourceView.endIndex {
+      // Detect invalid positions
+      if UTF16.isTrailSurrogate(sourceView[sourceIndex])
+        && UTF16.isLeadSurrogate(sourceView[sourceIndex.predecessor()]) {
+        return nil
+      }
+    }
+    self.init(utf8._core, _utf16Offset: sourceIndex._offset)
+  }
+  
+  public init(
+    _ sourceIndex: String.UnicodeScalarIndex, within utf8: String.UTF8View) {
+    self.init(utf8._core, _utf16Offset: sourceIndex._position)
+  }
+  
+  public init(_ sourceIndex: String.Index, within utf8: String.UTF8View) {
+    self.init(utf8._core, _utf16Offset: sourceIndex._base._position)
+  }
 }

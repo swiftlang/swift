@@ -877,6 +877,14 @@ extension UTF16 {
     ) + 0xDC00
   }
 
+  public static func isLeadSurrogate(x: CodeUnit) -> Bool {
+    return 0xD800...0xDBFF ~= x
+  }
+
+  public static func isTrailSurrogate(x: CodeUnit) -> Bool {
+    return 0xDC00...0xDFFF ~= x
+  }
+
   public // @testable
   static func _copy<T : _StringElementType, U : _StringElementType>(
     source: UnsafeMutablePointer<T>,
