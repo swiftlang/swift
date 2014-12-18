@@ -9,6 +9,6 @@ func fn() {
 // All traps should be coalesced at the end.
 // CHECK: ret
 // CHECK-NOT: define
-// CHECK: tail call void @llvm.trap(), !dbg ![[LOC:.*]]
+// CHECK: call void @llvm.trap(), !dbg ![[LOC:.*]]
 // CHECK-NEXT: unreachable, !dbg ![[LOC]]
 // CHECK: ![[LOC]] = !{i32 0, i32 0,
