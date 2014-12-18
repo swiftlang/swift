@@ -1643,10 +1643,11 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // Essentially a %swift.opaque pointer.
     unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
     unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
-    auto DITy = DBuilder.createStructType(
-        Scope, MangledName, File, L.Line, PtrSize, PtrAlign, Flags,
-        DerivedFrom, llvm::DIArray(), llvm::dwarf::DW_LANG_Swift,
-        llvm::DIType(), MangledName);
+
+    auto FwdDecl = DBuilder.createReplaceableForwardDecl(
+      llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, L.Line,
+        llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits);
+
     // Emit the protocols the archetypes conform to.
     SmallVector<llvm::Metadata *, 4> Protocols;
     for (auto *ProtocolDecl : Archetype->getConformsTo()) {
@@ -1654,9 +1655,15 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                      .getSwiftRValueType();
       auto PDbgTy = DebugTypeInfo(ProtocolDecl, IGM.getTypeInfoForLowered(PTy));
       auto PDITy = getOrCreateType(PDbgTy);
-      Protocols.push_back(DBuilder.createInheritance(DITy, PDITy, 0, Flags));
+      Protocols.push_back(DBuilder.createInheritance(FwdDecl, PDITy, 0, Flags));
     }
-    DITy.setArrays(DBuilder.getOrCreateArray(Protocols));
+    auto DITy = DBuilder.createStructType(
+        Scope, MangledName, File, L.Line, PtrSize, PtrAlign, Flags,
+        DerivedFrom, DBuilder.getOrCreateArray(Protocols),
+        llvm::dwarf::DW_LANG_Swift, llvm::DIType(), MangledName);
+
+    cast<llvm::MDNodeFwdDecl>(FwdDecl.get())->replaceAllUsesWith(DITy);
+    llvm::MDNode::deleteTemporary(FwdDecl);
     return DITy;
   }
 
