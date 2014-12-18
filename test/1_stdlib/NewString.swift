@@ -342,7 +342,7 @@ println(
   String.UTF8Index(abc.startIndex, within: abc.utf8).successor()
   == String.UTF8Index(abc.startIndex.successor(), within: abc.utf8))
 
-func expectEqual<T: Equatable>(x: T, y: T, expected: Bool) {
+func expectEquality<T: Equatable>(x: T, y: T, expected: Bool) {
   let actual = x == y
   if expected != actual {
     let op = actual ? "==" : "!="
@@ -353,12 +353,12 @@ func expectEqual<T: Equatable>(x: T, y: T, expected: Bool) {
   }
 }
 
+func expectNil<T>(x: T?) {
+  if x != nil { println("unexpected non-nil") }
+}
 extension String.UTF8View.Index : Printable {
   public var description: String {
     return "[\(_coreIndex):\(hex(_buffer))]"
-  }
-  
-  internal func expectEqual(other: String.UTF8View.Index, _ expected: Bool) {
   }
 }
 
@@ -368,43 +368,46 @@ do {
   let u8 = diverseCharacters.utf8
   let u16 = diverseCharacters.utf16
   
-  for (sn0, si0) in enumerate(indices(s)) {
-    for (_sn1, si1) in enumerate(si0..<s.endIndex) {
-      let sn1 = sn0 + _sn1
+  for si0 in indices(s) {
+    for (ds, si1) in enumerate(si0..<s.endIndex) {
       
       // Map those unicode scalar indices into utf8 indices
       let u8i1 = si1.samePositionIn(u8)
       let u8i0 = si0.samePositionIn(u8)
 
       var u8i0a = u8i0 // an index to advance
-      var sn0a = sn0   // count unicode scalars while doing so
+      var dsa = 0      // count unicode scalars while doing so
       
       // Advance u8i0a to the same unicode scalar as u8i1.  The scalar
       // number will increase each time we move off a scalar's leading
       // byte, so we need to keep going through any continuation bytes
-      while (sn0a < sn1 || UTF8.isContinuation(u8[u8i0a])) {
-        expectEqual(u8i0a, u8i1, false)
-        if !UTF8.isContinuation(u8[u8i0a]) {
-          ++sn0a
+      while (dsa < ds || UTF8.isContinuation(u8[u8i0a])) {
+        expectEquality(u8i0a, u8i1, false)
+        let b = u8[u8i0a]
+        if !UTF8.isContinuation(b) {
+          ++dsa
           // On a unicode scalar boundary we should be able to round-trip through UTF16
-          expectEqual(u8i0a, u8i0a.samePositionIn(u16)!.samePositionIn(u8)!, true)
+          let u16i0a = u8i0a.samePositionIn(u16)!
+          expectEquality(u8i0a, u16i0a.samePositionIn(u8)!, true)
+          if UTF16.isLeadSurrogate(u16[u16i0a]) {
+            // utf16 indices of trailing surrogates should not convert to utf8
+            expectNil(u16i0a.successor().samePositionIn(u8))
+          }
         }
         else {
           // Between unicode scalars we should not be able to convert to UTF16
-          if (u8i0a.samePositionIn(u16) != nil) {
-            println("unexpected successful utf8->utf16 index conversion")
-          }
+          expectNil(u8i0a.samePositionIn(u16))
         }
         ++u8i0a
       }
-      expectEqual(u8i0a, u8i1, true)
+      expectEquality(u8i0a, u8i1, true)
 
       // Also check some positions between unicode scalars
       for n0 in 0..<8 {
         let u8i0b = advance(u8i0a, n0)
         for n1 in n0..<8 {
           let u8i1b = advance(u8i1, n1)
-          expectEqual(u8i0b, u8i1b, n0 == n1)
+          expectEquality(u8i0b, u8i1b, n0 == n1)
           if u8i1b == u8.endIndex { break }
         }
         if u8i0b == u8.endIndex { break }
