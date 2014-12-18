@@ -154,22 +154,6 @@ TermInst *swift::changeEdgeValue(TermInst *Branch, SILBasicBlock *Dest,
   llvm_unreachable("Unhandled terminator leading to merge block");
 }
 
-/// \brief Check if the edge from the terminator is critical.
-bool swift::isCriticalEdge(TermInst *T, unsigned EdgeIdx) {
-  assert(T->getSuccessors().size() > EdgeIdx && "Not enough successors");
-
-  auto SrcSuccs = T->getSuccessors();
-  if (SrcSuccs.size() <= 1)
-    return false;
-
-  SILBasicBlock *DestBB = SrcSuccs[EdgeIdx];
-  assert(!DestBB->pred_empty() && "There should be a predecessor");
-  if (DestBB->getSinglePredecessor())
-    return false;
-
-  return true;
-}
-
 template <class SwitchEnumTy, class SwitchEnumCaseTy>
 SILBasicBlock *replaceSwitchDest(SwitchEnumTy *S,
                                      SmallVectorImpl<SwitchEnumCaseTy> &Cases,
@@ -185,32 +169,43 @@ SILBasicBlock *replaceSwitchDest(SwitchEnumTy *S,
     return DefaultBB;
 }
 
-static void changeBranchTargetAndStripArgs(TermInst *T, unsigned EdgeIdx,
-                                           SILBasicBlock *NewDest) {
+void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
+                               SILBasicBlock *NewDest, bool PreserveArgs) {
   SILBuilderWithScope<8> B(T);
 
+  // Only Branch and CondBranch may have arguments.
   if (auto Br = dyn_cast<BranchInst>(T)) {
-    B.createBranch(T->getLoc(), NewDest);
+    SmallVector<SILValue, 8> Args;
+    if (PreserveArgs) {
+      for (auto Arg : Br->getArgs())
+        Args.push_back(Arg);
+    }
+    B.createBranch(T->getLoc(), NewDest, Args);
     Br->dropAllReferences();
     Br->eraseFromParent();
     return;
   }
 
   if (auto CondBr = dyn_cast<CondBranchInst>(T)) {
-    if (EdgeIdx) {
-      SmallVector<SILValue, 8> Args;
+    SmallVector<SILValue, 8> TrueArgs;
+    if (EdgeIdx == CondBranchInst::FalseIdx || PreserveArgs) {
       for (auto Arg : CondBr->getTrueArgs())
-        Args.push_back(Arg);
-      B.createCondBranch(CondBr->getLoc(), CondBr->getCondition(),
-                         CondBr->getTrueBB(), Args, NewDest,
-                         llvm::None);
-    } else {
-      SmallVector<SILValue, 8> Args;
-      for (auto Arg : CondBr->getFalseArgs())
-        Args.push_back(Arg);
-      B.createCondBranch(CondBr->getLoc(), CondBr->getCondition(), NewDest,
-                         llvm::None, CondBr->getFalseBB(), Args);
+        TrueArgs.push_back(Arg);
     }
+    SmallVector<SILValue, 8> FalseArgs;
+    if (EdgeIdx == CondBranchInst::TrueIdx || PreserveArgs) {
+      for (auto Arg : CondBr->getFalseArgs())
+        FalseArgs.push_back(Arg);
+    }
+    SILBasicBlock *TrueDest = CondBr->getTrueBB();
+    SILBasicBlock *FalseDest = CondBr->getFalseBB();
+    if (EdgeIdx == CondBranchInst::TrueIdx)
+      TrueDest = NewDest;
+    else
+      FalseDest = NewDest;
+
+    B.createCondBranch(CondBr->getLoc(), CondBr->getCondition(),
+                       TrueDest, TrueArgs, FalseDest, FalseArgs);
     CondBr->dropAllReferences();
     CondBr->eraseFromParent();
     return;
@@ -273,6 +268,22 @@ static void changeBranchTargetAndStripArgs(TermInst *T, unsigned EdgeIdx,
   }
 
   llvm_unreachable("Missing implementation");
+}
+
+/// \brief Check if the edge from the terminator is critical.
+bool swift::isCriticalEdge(TermInst *T, unsigned EdgeIdx) {
+  assert(T->getSuccessors().size() > EdgeIdx && "Not enough successors");
+
+  auto SrcSuccs = T->getSuccessors();
+  if (SrcSuccs.size() <= 1)
+    return false;
+
+  SILBasicBlock *DestBB = SrcSuccs[EdgeIdx];
+  assert(!DestBB->pred_empty() && "There should be a predecessor");
+  if (DestBB->getSinglePredecessor())
+    return false;
+
+  return true;
 }
 
 template<class SwitchInstTy>
@@ -405,7 +416,7 @@ SILBasicBlock *swift::splitCriticalEdge(TermInst *T, unsigned EdgeIdx,
                   BranchInst::create(T->getLoc(), DestBB, Args, *Fn));
 
   // Strip the arguments and rewire the branch in the source block.
-  changeBranchTargetAndStripArgs(T, EdgeIdx, EdgeBB);
+  changeBranchTarget(T, EdgeIdx, EdgeBB, /*PreserveArgs=*/false);
 
   if (!DT && !LI)
     return EdgeBB;

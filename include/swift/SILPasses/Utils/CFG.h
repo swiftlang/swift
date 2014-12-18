@@ -44,6 +44,15 @@ TermInst *addNewEdgeValueToBranch(TermInst *Branch, SILBasicBlock *Dest,
 TermInst *changeEdgeValue(TermInst *Branch, SILBasicBlock *Dest, size_t Idx,
                           SILValue Val);
 
+/// \brief Replace a branch target.
+///
+/// \param T The terminating instruction to modify.
+/// \param EdgeIdx The successor edges index that will be replaced.
+/// \param NewDest The new target block.
+/// \param PreserveArgs If set, preserve arguments on the replaced edge.
+void changeBranchTarget(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewDest,
+                        bool PreserveArgs);
+
 /// \brief Check if the edge from the terminator is critical.
 bool isCriticalEdge(TermInst *T, unsigned EdgeIdx);
 

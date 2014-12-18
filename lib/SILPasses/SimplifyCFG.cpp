@@ -561,100 +561,6 @@ static SILBasicBlock *replaceSwitchDest(SwitchEnumTy *S,
     return DefaultBB;
 }
 
-/// Change a branch target to point to a new destination.
-static void changeBranchTarget(TermInst *T, unsigned EdgeIdx,
-                               SILBasicBlock *NewDest) {
-  SILBuilderWithScope<8> B(T);
-
-  if (auto *Br = dyn_cast<BranchInst>(T)) {
-    SmallVector<SILValue, 8> Args;
-    for (auto Arg : Br->getArgs())
-      Args.push_back(Arg);
-    B.createBranch(T->getLoc(), NewDest, Args);
-    Br->dropAllReferences();
-    Br->eraseFromParent();
-    return;
-  }
-
-  if (auto *CondBr = dyn_cast<CondBranchInst>(T)) {
-    SmallVector<SILValue, 8> TrueArgs;
-    for (auto Arg : CondBr->getTrueArgs())
-      TrueArgs.push_back(Arg);
-    SmallVector<SILValue, 8> FalseArgs;
-    for (auto Arg : CondBr->getFalseArgs())
-      FalseArgs.push_back(Arg);
-    if (EdgeIdx) {
-      B.createCondBranch(CondBr->getLoc(), CondBr->getCondition(),
-                         CondBr->getTrueBB(), TrueArgs, NewDest,
-                         FalseArgs);
-    } else {
-      B.createCondBranch(CondBr->getLoc(), CondBr->getCondition(), NewDest,
-                         TrueArgs, CondBr->getFalseBB(), FalseArgs);
-    }
-    CondBr->dropAllReferences();
-    CondBr->eraseFromParent();
-    return;
-  }
-
-  if (auto *SII = dyn_cast<SwitchValueInst>(T)) {
-    SmallVector<std::pair<SILValue, SILBasicBlock *>, 8> Cases;
-    auto *DefaultBB = replaceSwitchDest(SII, Cases, EdgeIdx, NewDest);
-    B.createSwitchValue(SII->getLoc(), SII->getOperand(), DefaultBB, Cases);
-    SII->eraseFromParent();
-    return;
-  }
-
-  if (auto *SEI = dyn_cast<SwitchEnumInst>(T)) {
-    SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
-    auto *DefaultBB = replaceSwitchDest(SEI, Cases, EdgeIdx, NewDest);
-    B.createSwitchEnum(SEI->getLoc(), SEI->getOperand(), DefaultBB, Cases);
-    SEI->eraseFromParent();
-    return;
-  }
-
-  if (auto *SEI = dyn_cast<SwitchEnumAddrInst>(T)) {
-    SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
-    auto *DefaultBB = replaceSwitchDest(SEI, Cases, EdgeIdx, NewDest);
-    B.createSwitchEnumAddr(SEI->getLoc(), SEI->getOperand(), DefaultBB, Cases);
-    SEI->eraseFromParent();
-    return;
-  }
-
-  if (auto *DMBI = dyn_cast<DynamicMethodBranchInst>(T)) {
-    assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
-    auto HasMethodBB = !EdgeIdx ? NewDest : DMBI->getHasMethodBB();
-    auto NoMethodBB = EdgeIdx ? NewDest : DMBI->getNoMethodBB();
-    B.createDynamicMethodBranch(DMBI->getLoc(), DMBI->getOperand(),
-                                DMBI->getMember(), HasMethodBB, NoMethodBB);
-    DMBI->eraseFromParent();
-    return;
-  }
-
-  if (auto *CBI = dyn_cast<CheckedCastBranchInst>(T)) {
-    assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
-    auto SuccessBB = !EdgeIdx ? NewDest : CBI->getSuccessBB();
-    auto FailureBB = EdgeIdx ? NewDest : CBI->getFailureBB();
-    B.createCheckedCastBranch(CBI->getLoc(), CBI->isExact(), CBI->getOperand(),
-                              CBI->getCastType(), SuccessBB, FailureBB);
-    CBI->eraseFromParent();
-    return;
-  }
-
-  if (auto *CBI = dyn_cast<CheckedCastAddrBranchInst>(T)) {
-    assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
-    auto SuccessBB = !EdgeIdx ? NewDest : CBI->getSuccessBB();
-    auto FailureBB = EdgeIdx ? NewDest : CBI->getFailureBB();
-    B.createCheckedCastAddrBranch(CBI->getLoc(), CBI->getConsumptionKind(),
-                                  CBI->getSrc(), CBI->getSourceType(),
-                                  CBI->getDest(), CBI->getTargetType(),
-                                  SuccessBB, FailureBB);
-    CBI->eraseFromParent();
-    return;
-  }
-
-  llvm_unreachable("Missing implementation");
-}
-
 /// Find a nearest common dominator for a given set of basic blocks.
 static DominanceInfoNode *findCommonDominator(ArrayRef<SILBasicBlock *> BBs,
                                               DominanceInfo *DT) {
@@ -1011,7 +917,8 @@ void CheckedCastBrJumpThreading::modifyCFGForFailurePreds() {
   for (auto *Pred : FailurePreds) {
     TermInst *TI = Pred->getTerminator();
     // Replace branch to BB by branch to TargetFailureBB.
-    changeBranchTarget(TI, 0, TargetFailureBB);
+    // FIXME: Why is it valid to assume EdgeIdx=0 here?
+    changeBranchTarget(TI, 0, TargetFailureBB, /*PreserveArgs=*/true);
     Pred = nullptr;
   }
 }
@@ -1039,7 +946,8 @@ void CheckedCastBrJumpThreading::modifyCFGForSuccessPreds() {
       for (auto *Pred : SuccessPreds) {
         TermInst *TI = Pred->getTerminator();
         // Replace branch to BB by branch to TargetSuccessBB.
-        changeBranchTarget(TI, 0, TargetSuccessBB);
+        // FIXME: Why is it valid to assume EdgeIdx=0 here?
+        changeBranchTarget(TI, 0, TargetSuccessBB, /*PreserveArgs=*/true);
         SuccessBBArgs.push_back(DomSuccessBB->getBBArg(0));
         Pred = nullptr;
       }

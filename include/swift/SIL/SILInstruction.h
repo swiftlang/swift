@@ -3108,11 +3108,17 @@ public:
 
 /// A conditional branch.
 class CondBranchInst : public TermInst {
+public:
   enum {
     /// The operand index of the condition value used for the branch.
     ConditionIdx
   };
-
+  enum {
+    // Map branch targets to block sucessor indices.
+    TrueIdx,
+    FalseIdx
+  };
+private:
   SILSuccessor DestBBs[2];
   // The number of arguments for the True branch.
   unsigned NumTrueArgs;
