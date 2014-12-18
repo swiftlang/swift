@@ -84,53 +84,103 @@ extension _StringCore {
 extension String {
   /// A collection of UTF-8 code units that encodes a `String` value.
   public struct UTF8View : CollectionType, Reflectable {
-    let _core: _StringCore
-    
+    internal let _core: _StringCore
+
     init(_ _core: _StringCore) {
       self._core = _core
     }
 
     /// A position in a `String.UTF8View`
     public struct Index : ForwardIndexType {
+      internal typealias Buffer = _StringCore.UTF8Chunk
+      
       init(_ _core: _StringCore, _ _coreIndex: Int, 
-           _ _buffer: _StringCore.UTF8Chunk) {
+           _ _buffer: Buffer) {
         self._core = _core
         self._coreIndex = _coreIndex
         self._buffer = _buffer
         _sanityCheck(_coreIndex >= 0)
         _sanityCheck(_coreIndex <= _core.count)
       }
-      
+
       /// Returns the next consecutive value after `self`.
       ///
       /// Requires: the next value is representable.
       public func successor() -> Index {
-        let newBuffer0 = (_buffer >> 8) | (
-          0xFF << numericCast((sizeofValue(_buffer) &- 1) &* 8)
-        )
-        if _fastPath(newBuffer0 != ~0) {
-          return Index(_core, _coreIndex, newBuffer0)
+        let currentUnit = UTF8.CodeUnit(truncatingBitPattern: _buffer)
+        let hiNibble = currentUnit >> 4
+        // Map the high nibble of the current code unit into the
+        // amount by which to increment the utf16 index.  Only when
+        // the high nibble is 1111 do we have a surrogate pair.
+        let u16Increments = 
+        // 1111 1110 1101 1100 1011 1010 1001 1000 0111 0110 0101 0100 0011 0010 0001 0000
+           0b10___01___01___01___00___00___00___00___01___01___01___01___01___01___01___01
+        let increment = (u16Increments >> numericCast(hiNibble << 1)) & 0x3
+        let nextCoreIndex = _coreIndex &+ increment        
+        let nextBuffer = Index._nextBuffer(_buffer)
+
+        // if the nextBuffer is non-empty, we have all we need
+        if _fastPath(nextBuffer != Index._emptyBuffer) {
+          return Index(_core, nextCoreIndex, nextBuffer)
         }
-        if _fastPath(_coreIndex != _core.endIndex) {
-          let (newCoreIndex, newBuffer1) = _core._encodeSomeUTF8(_coreIndex)
-          _sanityCheck(newCoreIndex > _coreIndex)
-          return Index(_core, newCoreIndex, newBuffer1)
+        // If the underlying UTF16 isn't exhausted, fill a new buffer
+        else if _fastPath(nextCoreIndex < _core.endIndex) {
+          let (_, freshBuffer) = _core._encodeSomeUTF8(nextCoreIndex)
+          return Index(_core, nextCoreIndex, freshBuffer)
         }
-        _precondition(_buffer & 0xFF != 0xFE, "can not increment endIndex")
-        return Index(_core, _coreIndex, ~1)
+        else {
+          // Produce the endIndex
+          _precondition(
+            nextCoreIndex == _core.endIndex,
+            "Can't increment past endIndex of String.UTF8View")
+          return Index(_core, nextCoreIndex, nextBuffer)
+        }
+      }
+
+      /// True iff the index is at the end of its view or if the next
+      /// byte begins a new UnicodeScalar.
+      internal var _isOnUnicodeScalarBoundary : Bool {
+        let next = UTF8.CodeUnit(truncatingBitPattern: _buffer)
+        return UTF8._numTrailingBytes(next) != 4 || _isAtEnd
       }
       
-      let _core: _StringCore
-      let _coreIndex: Int
-      let _buffer: _StringCore.UTF8Chunk
+      /// True iff the index is at the end of its view
+      internal var _isAtEnd : Bool {
+        return _coreIndex == _core.endIndex
+      }
+
+      /// The value of the buffer when it is empty
+      internal static var _emptyBuffer: Buffer {
+        return ~0
+      }
+
+      /// A Buffer value with the high byte set
+      internal static var _bufferHiByte: Buffer {
+        return 0xFF << numericCast((sizeof(Buffer.self) &- 1) &* 8)
+      }
+
+      /// Consume a byte of the given buffer: shift out the low byte
+      /// and put FF in the high byte
+      internal static func _nextBuffer(thisBuffer: Buffer) -> Buffer {
+        return (thisBuffer >> 8) | _bufferHiByte
+      }
+
+      /// The underlying buffer we're presenting as UTF8
+      internal let _core: _StringCore
+      /// The position of `self`, rounded up to the nearest unicode
+      /// scalar boundary, in the underlying UTF16.
+      internal let _coreIndex: Int
+      /// If `self` is at the end of its `_core`, has the value `_endBuffer`.
+      /// Otherwise, the low byte contains the value of 
+      internal let _buffer: Buffer
     }
 
     /// The position of the first code unit if the `String` is
     /// non-empty; identical to `endIndex` otherwise.
     public var startIndex: Index {
       if _fastPath(_core.count != 0) {
-        let (coreIndex, buffer) = _core._encodeSomeUTF8(0)
-        return Index(_core, coreIndex, buffer)
+        let (_, buffer) = _core._encodeSomeUTF8(0)
+        return Index(_core, 0, buffer)
       }
       return endIndex
     }
@@ -141,7 +191,7 @@ extension String {
     /// reachable from `startIndex` by zero or more applications of
     /// `successor()`.
     public var endIndex: Index {
-      return Index(_core, _core.endIndex, ~1)
+      return Index(_core, _core.endIndex, Index._emptyBuffer)
     }
 
     /// Access the element at `position`.
@@ -150,7 +200,7 @@ extension String {
     /// `position != endIndex`.
     public subscript(position: Index) -> UTF8.CodeUnit {
       let result: UTF8.CodeUnit = numericCast(position._buffer & 0xFF)
-      _precondition(result != 0xFE, "can not subscript using endIndex")
+      _precondition(result != 0xFF, "can not subscript using endIndex")
       return result
     }
 
@@ -195,20 +245,58 @@ extension String {
 
 public
 func == (lhs: String.UTF8View.Index, rhs: String.UTF8View.Index) -> Bool {
-  return lhs._coreIndex == rhs._coreIndex && lhs._buffer == rhs._buffer
+  // If the underlying UTF16 index differs, they're unequal
+  if lhs._coreIndex != rhs._coreIndex {
+    return false
+  }
+  
+  // Match up bytes in the buffer
+  var buffer = (lhs._buffer, rhs._buffer)
+  var isContinuation: Bool
+  do {
+    let unit = (
+      UTF8.CodeUnit(truncatingBitPattern: buffer.0), 
+      UTF8.CodeUnit(truncatingBitPattern: buffer.1))
+    
+    isContinuation = UTF8.isContinuation(unit.0)
+    if !isContinuation {
+      // We don't check for unit equality in this case because one of
+      // the units might be an 0xFF read from the end of the buffer.
+      return !UTF8.isContinuation(unit.1)
+    }
+    // Continuation bytes must match exactly
+    else if unit.0 != unit.1 {
+      return false
+    }
+    
+    // Move the buffers along.
+    buffer = (
+      String.UTF8Index._nextBuffer(buffer.0),
+      String.UTF8Index._nextBuffer(buffer.1))
+  }
+  while true
 }
 
 extension String.UTF8Index {
   internal init(_ core: _StringCore, _utf16Offset: Int) {
-      let (coreIndex, buffer) = core._encodeSomeUTF8(_utf16Offset)
-      self.init(core, coreIndex, buffer)
+      let (_, buffer) = core._encodeSomeUTF8(_utf16Offset)
+      self.init(core, _utf16Offset, buffer)
   }
   
   public init?(_ sourceIndex: String.UTF16Index, within utf8: String.UTF8View) {
     let sourceView = String.UTF16View(utf8._core)
+    
     if sourceIndex != sourceView.startIndex
-      && sourceIndex != sourceView.endIndex {
-      // Detect invalid positions
+    && sourceIndex != sourceView.endIndex {
+      _precondition(
+        sourceIndex >= sourceView.startIndex
+        && sourceIndex <= sourceView.endIndex,
+        "Invalid String.UTF16Index for this UTF-8 view")
+      
+      // Detect positions that have no corresponding index.  Note that
+      // we have to check before and after, because an unpaired
+      // surrogate will be decoded as a single replacement character,
+      // thus making the corresponding position valid in UTF8.
       if UTF16.isTrailSurrogate(sourceView[sourceIndex])
         && UTF16.isLeadSurrogate(sourceView[sourceIndex.predecessor()]) {
         return nil

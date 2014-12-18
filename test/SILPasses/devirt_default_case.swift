@@ -1,3 +1,4 @@
+// XFAIL:*
 // RUN: %swift -O  -module-name devirt_default_case -disable-func-sig-opts -emit-sil %s | FileCheck %s
 
 // public class

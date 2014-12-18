@@ -2,11 +2,12 @@
 
 import Foundation
 import Swift
-
 // ==== Tests =====
 
+func hex(x: UInt64) -> String { return String(x, radix:16) }
+
 func hexAddrVal<T>(x: T) -> String {
-  return "@0x" + String(UInt64(unsafeBitCast(x, Word.self)), radix: 16)
+  return "@0x" + hex(UInt64(unsafeBitCast(x, Word.self)))
 }
 
 func hexAddr(x: AnyObject?) -> String {
@@ -331,6 +332,73 @@ for i16 in indices(winter.utf16) {
 }
 // CHECK-NEXT: [73 63 68 6f 6f 6c 27 73 20 6f 75 74 21]
 printHexSequence(utf8UTF16Indices(summer).map { summer.utf8[$0!] })
+
+// Make sure that equivalent UTF8 indices computed in different ways
+// are still equal.
+//
+// CHECK-NEXT: true
+let abc = "abcdefghijklmnop"
+println(
+  String.UTF8Index(abc.startIndex, within: abc.utf8).successor()
+  == String.UTF8Index(abc.startIndex.successor(), within: abc.utf8))
+
+extension String.UTF8View.Index : Printable {
+  public var description: String {
+    return "[\(_coreIndex):\(hex(_buffer))]"
+  }
+  
+  internal func expectEqual(other: String.UTF8View.Index, _ expected: Bool) {
+    let actual = self == other
+    if expected != actual {
+      let op = actual ? "==" : "!="
+      println("unexpectedly, \(self) \(op) \(other)")
+    }
+    if actual != (other == self) {
+      println("equality is asymmetric")
+    }
+  }
+}
+
+do {
+  let diverseCharacters = summer + winter + winter + summer
+  let s = diverseCharacters.unicodeScalars
+  let u8 = diverseCharacters.utf8
+  
+  for (sn0, si0) in enumerate(indices(s)) {
+    for (_sn1, si1) in enumerate(si0..<s.endIndex) {
+      let sn1 = sn0 + _sn1
+      
+      // Map those unicode scalar indices into utf8 indices
+      let u8i1 = si1.samePositionIn(u8)
+      let u8i0 = si0.samePositionIn(u8)
+
+      var u8i0a = u8i0 // an index to advance
+      var sn0a = sn0   // count unicode scalars while doing so
+      
+      // Advance u8i0a to the same unicode scalar as u8i1.  The scalar
+      // number will increase each time we move off a scalar's leading
+      // byte, so we need to keep going through any continuation bytes
+      while (sn0a < sn1 || UTF8.isContinuation(u8[u8i0a])) {
+        u8i0a.expectEqual(u8i1, false)
+        if !UTF8.isContinuation(u8[u8i0a]) { ++sn0a }
+        ++u8i0a
+      }
+      u8i0a.expectEqual(u8i1, true)
+
+      // Also check some positions between unicode scalars
+      for n0 in 0..<8 {
+        let u8i0b = advance(u8i0a, n0)
+        for n1 in n0..<8 {
+          let u8i1b = advance(u8i1, n1)
+          u8i0b.expectEqual(u8i1b, n0 == n1)
+          if u8i1b == u8.endIndex { break }
+        }
+        if u8i0b == u8.endIndex { break }
+      }
+    }
+  }
+}
+while false
 
 // ===---------- Done --------===
 // CHECK-NEXT: Done.

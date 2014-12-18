@@ -480,6 +480,12 @@ public struct UTF8 : UnicodeCodecType {
     output.put(buf3)
   }
 
+  /// Return true if `byte` is a continuation byte of the form
+  /// `0b10xxxxxx`
+  public static func isContinuation(byte: CodeUnit) -> Bool {
+    return byte & 0b11_00__0000 == 0b10_00__0000
+  }
+
   var _value =  UInt8()
 }
 
