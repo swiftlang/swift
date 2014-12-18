@@ -17,6 +17,6 @@
 // CHECK-SECOND-NOT: Handled main.swift
 // CHECK-SECOND-NOT: Handled other.swift
 
-// CHECK-RECORD-DAG: - "./bad.swift"
+// CHECK-RECORD-DAG: - !dirty "./bad.swift"
 // CHECK-RECORD-DAG: - !dirty "./main.swift"
 // CHECK-RECORD-DAG: - !private "./other.swift"

@@ -158,9 +158,11 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
 
     switch (Condition) {
     case Job::Condition::Always:
-      scheduleCommandIfNecessaryAndPossible(Cmd);
       if (getIncrementalBuildEnabled() && !DependenciesFile.empty())
         InitialOutOfDateCommands.push_back(Cmd);
+      SWIFT_FALLTHROUGH;
+    case Job::Condition::RunWithoutCascading:
+      scheduleCommandIfNecessaryAndPossible(Cmd);
       break;
     case Job::Condition::CheckDependencies:
       DeferredCommands.insert(Cmd);
@@ -332,22 +334,20 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
     assert(State.BlockingCommands.empty() &&
            "some blocking commands never finished properly");
   } else {
-    // Make sure we record any files that haven't been touched but nonetheless
-    // need to be rebuilt.
+    // Make sure we record any files that still need to be rebuilt.
     for (const Job *Cmd : JL) {
-      switch (Cmd->getCondition()) {
-      case Job::Condition::Always:
-        // Don't worry about files that would be rebuilt anyway.
+      // Skip files that don't use dependency analysis.
+      StringRef DependenciesFile =
+          Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
+      if (DependenciesFile.empty())
         continue;
-      case Job::Condition::CheckDependencies:
-        break;
-      }
 
       // Don't worry about commands that finished or weren't going to run.
       if (State.FinishedCommands.count(Cmd))
         continue;
       if (!State.ScheduledCommands.count(Cmd))
         continue;
+
 
       State.UnfinishedCommands.insert({Cmd, DepGraph.isMarked(Cmd)});
     }
@@ -373,6 +373,7 @@ int Compilation::performSingleCommand(const Job *Cmd) {
   switch (Cmd->getCondition()) {
   case Job::Condition::CheckDependencies:
     return 0;
+  case Job::Condition::RunWithoutCascading:
   case Job::Condition::Always:
     break;
   }

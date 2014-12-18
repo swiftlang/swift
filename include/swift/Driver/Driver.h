@@ -202,10 +202,12 @@ public:
   /// \param Args The input arguments.
   /// \param Inputs The inputs for which Actions should be generated.
   /// \param OI The OutputInfo for which Actions should be generated.
+  /// \param OFM The OutputFileMap for the compilation; used to find any
+  /// cross-build information.
   /// \param[out] Actions The list in which to store the resulting Actions.
   void buildActions(const ToolChain &TC, const llvm::opt::DerivedArgList &Args,
                     const InputList &Inputs, const OutputInfo &OI,
-                    ActionList &Actions) const;
+                    const OutputFileMap *OFM, ActionList &Actions) const;
 
   /// Construct the OutputFileMap for the driver from the given arguments.
   std::unique_ptr<OutputFileMap>

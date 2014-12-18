@@ -37,7 +37,7 @@ static LoadResult
 parseDependencyFile(llvm::MemoryBuffer &buffer,
                     llvm::function_ref<DependencyCallbackTy> providesCallback,
                     llvm::function_ref<DependencyCallbackTy> dependsCallback) {
-  using namespace llvm;
+  namespace yaml = llvm::yaml;
 
   // FIXME: Switch to a format other than YAML.
   llvm::SourceMgr SM;

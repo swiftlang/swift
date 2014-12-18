@@ -180,9 +180,22 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     // REPL mode expects no input files, so suppress the error.
     SuppressNoInputFilesError = true;
 
+  std::unique_ptr<OutputFileMap> OFM = buildOutputFileMap(*TranslatedArgList);
+
+  if (Diags.hadAnyError())
+    return nullptr;
+
+  if (DriverPrintOutputFileMap) {
+    if (OFM)
+      OFM->dump(llvm::errs(), true);
+    else
+      Diags.diagnose(SourceLoc(), diag::error_no_output_file_map_specified);
+    return nullptr;
+  }
+
   // Construct the graph of Actions.
   ActionList Actions;
-  buildActions(TC, *TranslatedArgList, Inputs, OI, Actions);
+  buildActions(TC, *TranslatedArgList, Inputs, OI, OFM.get(), Actions);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -199,19 +212,6 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
                      A->getAsString(*ArgList), A->getValue());
       return nullptr;
     }
-  }
-
-  std::unique_ptr<OutputFileMap> OFM = buildOutputFileMap(*TranslatedArgList);
-
-  if (Diags.hadAnyError())
-    return nullptr;
-
-  if (DriverPrintOutputFileMap) {
-    if (OFM)
-      OFM->dump(llvm::errs(), true);
-    else
-      Diags.diagnose(SourceLoc(), diag::error_no_output_file_map_specified);
-    return nullptr;
   }
 
   OutputLevel Level = OutputLevel::Normal;
@@ -773,13 +773,99 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
   }
 }
 
+using OutOfDateMap =
+    llvm::SmallDenseMap<const Arg *, CompileJobAction::BuildState, 16>;
+
+static bool populateOutOfDateMap(OutOfDateMap &map,
+                                 const Driver::InputList &inputs,
+                                 StringRef buildRecordPath) {
+  // Treat a missing file as "no previous build".
+  auto buffer = llvm::MemoryBuffer::getFile(buildRecordPath);
+  if (!buffer)
+    return false;
+
+  namespace yaml = llvm::yaml;
+
+  llvm::SourceMgr SM;
+  yaml::Stream stream(buffer.get()->getMemBufferRef(), SM);
+
+  auto I = stream.begin();
+  if (I == stream.end() || !I->getRoot())
+    return true;
+
+  auto *topLevelList = dyn_cast<yaml::SequenceNode>(I->getRoot());
+  if (!topLevelList)
+    return true;
+
+  using BuildState = CompileJobAction::BuildState;
+  llvm::StringMap<BuildState> previousInputs;
+  SmallString<64> scratch;
+
+  for (const yaml::Node &rawEntry : *topLevelList) {
+    auto *entry = dyn_cast<yaml::ScalarNode>(&rawEntry);
+    if (!entry)
+      return true;
+
+    auto previousBuildState =
+      llvm::StringSwitch<Optional<BuildState>>(entry->getRawTag())
+        .Case("", BuildState::UpToDate)
+        .Case("!dirty", BuildState::NeedsCascadingBuild)
+        .Case("!private", BuildState::NeedsNonCascadingBuild)
+        .Default(None);
+
+    if (!previousBuildState)
+      return true;
+    previousInputs[entry->getValue(scratch)] = *previousBuildState;
+  }
+
+  size_t numInputsFromPrevious = 0;
+  for (auto &inputPair : inputs) {
+    auto iter = previousInputs.find(inputPair.second->getValue());
+    if (iter == previousInputs.end())
+      continue;
+    ++numInputsFromPrevious;
+
+    switch (iter->getValue()) {
+    case BuildState::UpToDate:
+      break;
+    case BuildState::NeedsCascadingBuild:
+    case BuildState::NeedsNonCascadingBuild:
+      map[inputPair.second] = iter->getValue();
+      break;
+    }
+  }
+
+  // If a file was removed, we've lost its dependency info. Rebuild everything.
+  // FIXME: Can we do better?
+  return numInputsFromPrevious != previousInputs.size();
+}
+
 void Driver::buildActions(const ToolChain &TC,
                           const DerivedArgList &Args,
-                          const InputList &Inputs, const OutputInfo &OI,
+                          const InputList &Inputs,
+                          const OutputInfo &OI,
+                          const OutputFileMap *OFM,
                           ActionList &Actions) const {
   if (!SuppressNoInputFilesError && Inputs.empty()) {
     Diags.diagnose(SourceLoc(), diag::error_no_input_files);
     return;
+  }
+
+  OutOfDateMap outOfDateMap;
+  bool rebuildEverything = false;
+  static_assert(CompileJobAction::BuildState() ==
+                  CompileJobAction::BuildState::UpToDate,
+                "relying on default-initialization");
+  // FIXME: This should work without an output file map. We should have another
+  // way to specify a build record.
+  if (OFM && Args.hasArg(options::OPT_incremental)) {
+    if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput()) {
+      if (populateOutOfDateMap(outOfDateMap, Inputs,
+                               masterOutputMap->lookup(types::TY_SwiftDeps))) {
+        // FIXME: Distinguish errors from "file removed".
+        rebuildEverything = true;
+      }
+    }
   }
 
   ActionList CompileActions;
@@ -792,11 +878,17 @@ void Driver::buildActions(const ToolChain &TC,
       std::unique_ptr<Action> Current(new InputAction(*InputArg, InputType));
       switch (InputType) {
       case types::TY_Swift:
-      case types::TY_SIL:
+      case types::TY_SIL: {
         // Source inputs always need to be compiled.
+        auto previousBuildState =
+          CompileJobAction::BuildState::NeedsCascadingBuild;
+        if (!rebuildEverything)
+          previousBuildState = outOfDateMap.lookup(InputArg);
         Current.reset(new CompileJobAction(Current.release(),
-                                           OI.CompilerOutputType));
+                                           OI.CompilerOutputType,
+                                           previousBuildState));
         break;
+      }
       case types::TY_SwiftModuleFile:
       case types::TY_SwiftModuleDocFile:
         // Module inputs are okay if generating a module or linking.
@@ -1410,9 +1502,21 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
 
   // If we track dependencies for this job, we may be able to avoid running it.
   if (!J->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps).empty()) {
-    if (A->getInputs().size() == 1 &&
+    if (InputActions.size() == 1 &&
         inputIsOlderThanOutput(BaseInput, OutputFile)) {
-      J->setCondition(Job::Condition::CheckDependencies);
+      Job::Condition condition;
+      switch (cast<CompileJobAction>(A)->getPreviousBuildState()) {
+      case CompileJobAction::BuildState::UpToDate:
+        condition = Job::Condition::CheckDependencies;
+        break;
+      case CompileJobAction::BuildState::NeedsCascadingBuild:
+        condition = Job::Condition::Always;
+        break;
+      case CompileJobAction::BuildState::NeedsNonCascadingBuild:
+        condition = Job::Condition::RunWithoutCascading;
+        break;
+      }
+      J->setCondition(condition);
     }
   }
 
@@ -1458,8 +1562,12 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
     switch (J->getCondition()) {
     case Job::Condition::Always:
       break;
+    case Job::Condition::RunWithoutCascading:
+      llvm::outs() << ", condition: run-without-cascading";
+      break;
     case Job::Condition::CheckDependencies:
       llvm::outs() << ", condition: check-dependencies";
+      break;
     }
 
     llvm::outs() << '\n';

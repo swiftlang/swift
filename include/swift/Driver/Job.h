@@ -105,6 +105,7 @@ class Job {
 public:
   enum class Condition {
     Always,
+    RunWithoutCascading,
     CheckDependencies
   };
 
@@ -114,7 +115,7 @@ private:
 
   /// The tool which created this Job, and the conditions under which it must
   /// be run.
-  llvm::PointerIntPair<const Tool *, 1, Condition> CreatorAndCondition;
+  llvm::PointerIntPair<const Tool *, 2, Condition> CreatorAndCondition;
 
   /// The list of other Jobs which are inputs to this Job.
   std::unique_ptr<JobList> Inputs;

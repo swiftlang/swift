@@ -113,12 +113,30 @@ public:
 };
 
 class CompileJobAction : public JobAction {
+public:
+  enum class BuildState {
+    UpToDate,
+    NeedsCascadingBuild,
+    NeedsNonCascadingBuild
+  };
+
+private:
   virtual void anchor();
+  BuildState PreviousBuildState;
+
 public:
   CompileJobAction(types::ID OutputType)
-      : JobAction(Action::CompileJob, llvm::None, OutputType) {}
-  CompileJobAction(Action *Input, types::ID OutputType)
-      : JobAction(Action::CompileJob, Input, OutputType) {}
+      : JobAction(Action::CompileJob, llvm::None, OutputType),
+        PreviousBuildState(BuildState::UpToDate) {}
+
+  CompileJobAction(Action *Input, types::ID OutputType,
+                   BuildState previousState)
+      : JobAction(Action::CompileJob, Input, OutputType),
+        PreviousBuildState(previousState) {}
+
+  BuildState getPreviousBuildState() const {
+    return PreviousBuildState;
+  }
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::CompileJob;
