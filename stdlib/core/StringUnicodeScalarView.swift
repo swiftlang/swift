@@ -212,6 +212,8 @@ extension String {
 
     var _core: _StringCore
   }
+
+  public typealias UnicodeScalarIndex = UnicodeScalarView.Index
 }
 
 extension String {

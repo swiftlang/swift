@@ -153,6 +153,8 @@ extension String {
   public var utf16: UTF16View {
     return UTF16View(_core)
   }
+
+  public typealias UTF16Index = UTF16View.Index
 }
 
 // Conformance to RandomAccessIndexType intentionally only appears

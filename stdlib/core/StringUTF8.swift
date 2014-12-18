@@ -189,6 +189,8 @@ extension String {
     result.append(0)
     return result
   }
+
+  public typealias UTF8Index = UTF8View.Index
 }
 
 public
