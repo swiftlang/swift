@@ -26,17 +26,16 @@ func test0(ref: A) {
 // CHECK: bb0(%0 : $A):
 // CHECK-NEXT: debug_value
 //   Formal evaluation of LHS.
-// CHECK-NEXT: strong_retain %0
 // CHECK-NEXT: // function_ref accessors.index0 () -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_TF9accessors6index0FT_Si
 // CHECK-NEXT: [[INDEX0:%.*]] = apply [[T0]]()
 //   Formal evaluation of RHS.
-// CHECK-NEXT: strong_retain %0
 // CHECK-NEXT: // function_ref accessors.index1 () -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_TF9accessors6index1FT_Si
 // CHECK-NEXT: [[INDEX1:%.*]] = apply [[T0]]()
 //   Formal access to RHS.
 // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $OrdinarySub
+// CHECK-NEXT: strong_retain %0
 // CHECK-NEXT: [[T0:%.*]] = class_method %0 : $A, #A.array!getter.1
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]](%0)
 // CHECK-NEXT: store [[T1]] to [[TEMP]]
@@ -53,13 +52,12 @@ func test0(ref: A) {
 // CHECK-NEXT: [[T3:%.*]] = tuple_extract [[T2]] {{.*}}, 0
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[SHOULD_WRITEBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
-// CHECK-NEXT: [[TEMP2:%.*]] = mark_dependence [[T4]] : $*OrdinarySub on %0 : $A
 // CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.setter (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_TFV9accessors11OrdinarySubs9subscriptFSiSi
-// CHECK-NEXT: apply [[T0]]([[VALUE]], [[INDEX0]], [[TEMP2]])
+// CHECK-NEXT: apply [[T0]]([[VALUE]], [[INDEX0]], [[T4]])
 // CHECK-NEXT: cond_br [[SHOULD_WRITEBACK]], [[WRITEBACK:bb[0-9]+]], [[CONT:bb[0-9]+]]
 // CHECK:    [[WRITEBACK]]:
-// CHECK-NEXT: [[T0:%.*]] = load [[TEMP2]] : $*OrdinarySub
+// CHECK-NEXT: [[T0:%.*]] = load [[T4]] : $*OrdinarySub
 // CHECK-NEXT: strong_retain %0
 // CHECK-NEXT: [[T1:%.*]] = class_method %0 : $A, #A.array!setter.1
 // CHECK-NEXT: apply [[T1]]([[T0]], %0)
@@ -67,8 +65,6 @@ func test0(ref: A) {
 // CHECK:    [[CONT]]:
 // CHECK-NEXT: dealloc_stack [[BUFFER]]
 // CHECK-NEXT: dealloc_stack [[TEMP]]
-//   Balance out the +1 which preserved %0 until the writeback.
-// CHECK-NEXT: strong_release %0
 //   Balance out the +1 from the function parameter.
 // CHECK-NEXT: strong_release %0
 // CHECK-NEXT: tuple ()
@@ -91,12 +87,10 @@ func test1(ref: B) {
 // CHECK:    bb0(%0 : $B):
 // CHECK-NEXT: debug_value
 //   Formal evaluation of LHS.
-// CHECK-NEXT: strong_retain %0
 // CHECK-NEXT: // function_ref accessors.index0 () -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_TF9accessors6index0FT_Si
 // CHECK-NEXT: [[INDEX0:%.*]] = apply [[T0]]()
 //   Formal evaluation of RHS.
-// CHECK-NEXT: strong_retain %0
 // CHECK-NEXT: // function_ref accessors.index1 () -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_TF9accessors6index1FT_Si
 // CHECK-NEXT: [[INDEX1:%.*]] = apply [[T0]]()
@@ -109,13 +103,12 @@ func test1(ref: B) {
 // CHECK-NEXT: [[T3:%.*]] = tuple_extract [[T2]] {{.*}}, 0
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[SHOULD_WRITEBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
-// CHECK-NEXT: [[TEMP:%.*]] = mark_dependence [[T4]] : $*MutatingSub on %0 : $B
 // CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.getter (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_TFV9accessors11MutatingSubg9subscriptFSiSi : $@cc(method) @thin (Int, @inout MutatingSub) -> Int 
-// CHECK-NEXT: [[VALUE:%.*]] = apply [[T0]]([[INDEX1]], [[TEMP]])
+// CHECK-NEXT: [[VALUE:%.*]] = apply [[T0]]([[INDEX1]], [[T4]])
 // CHECK-NEXT: cond_br [[SHOULD_WRITEBACK]], [[WRITEBACK:bb[0-9]+]], [[CONT:bb[0-9]+]]
 // CHECK:    [[WRITEBACK]]:
-// CHECK-NEXT: [[T0:%.*]] = load [[TEMP]] : $*MutatingSub
+// CHECK-NEXT: [[T0:%.*]] = load [[T4]] : $*MutatingSub
 // CHECK-NEXT: strong_retain %0
 // CHECK-NEXT: [[T1:%.*]] = class_method %0 : $B, #B.array!setter.1
 // CHECK-NEXT: apply [[T1]]([[T0]], %0)
@@ -130,13 +123,12 @@ func test1(ref: B) {
 // CHECK-NEXT: [[T3:%.*]] = tuple_extract [[T2]] {{.*}}, 0
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[SHOULD_WRITEBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
-// CHECK-NEXT: [[TEMP:%.*]] = mark_dependence [[T4]] : $*MutatingSub on %0 : $B
 // CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.setter (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_TFV9accessors11MutatingSubs9subscriptFSiSi : $@cc(method) @thin (Int, Int, @inout MutatingSub) -> () 
-// CHECK-NEXT: apply [[T0]]([[VALUE]], [[INDEX0]], [[TEMP]])
+// CHECK-NEXT: apply [[T0]]([[VALUE]], [[INDEX0]], [[T4]])
 // CHECK-NEXT: cond_br [[SHOULD_WRITEBACK]], [[WRITEBACK:bb[0-9]+]], [[CONT:bb[0-9]+]]
 // CHECK:    [[WRITEBACK]]:
-// CHECK-NEXT: [[T0:%.*]] = load [[TEMP]] : $*MutatingSub
+// CHECK-NEXT: [[T0:%.*]] = load [[T4]] : $*MutatingSub
 // CHECK-NEXT: strong_retain %0
 // CHECK-NEXT: [[T1:%.*]] = class_method %0 : $B, #B.array!setter.1
 // CHECK-NEXT: apply [[T1]]([[T0]], %0)
@@ -144,10 +136,6 @@ func test1(ref: B) {
 // CHECK:    [[CONT]]:
 // CHECK-NEXT: dealloc_stack [[BUFFER2]]
 // CHECK-NEXT: dealloc_stack [[BUFFER]]
-//   Balance out the +1 which preserved %0 until the second writeback.
-// CHECK-NEXT: strong_release %0
-//   Balance out the +1 which preserved %0 until the first writeback.
-// CHECK-NEXT: strong_release %0
 //   Balance out the +1 from the function parameter.
 // CHECK-NEXT: strong_release %0
 // CHECK-NEXT: tuple ()

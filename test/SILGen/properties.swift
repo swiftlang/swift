@@ -922,5 +922,22 @@ class RedundantSelfRetains {
   // CHECK: return
 }
 
+class RedundantRetains {
+  final var field = 0
+}
+
+func testRedundantRetains() {
+  let a = RedundantRetains()
+  a.field = 4  // no retain/release of a necessary here.
+}
+
+// CHECK-LABEL: sil hidden @_TF10properties20testRedundantRetainsFT_T_ : $@thin () -> () {
+// CHECK: [[A:%[0-9]+]] = apply
+// CHECK-NOT: strong_retain
+// CHECK: strong_release [[A]] : $RedundantRetains
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: return
+
 
 

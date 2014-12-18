@@ -12,8 +12,7 @@ class Base {}
 
 // CHECK-LABEL: sil hidden @_TF25protocol_class_refinement12getObjectUIDUS_9ObjectUID__FQ_TSiSi_
 // CHECK:       bb0([[X:%.*]] : $T):
-//   (This retain is for the setter, later.)
-// CHECK:         strong_retain [[X]]
+// CHECK-NOT:         strong_retain [[X]]
 // -- call x.uid()
 // CHECK:         [[TMP:%.*]] = alloc_stack $T
 // CHECK:         store [[X]] to [[TMP]]
@@ -25,7 +24,7 @@ class Base {}
 // CHECK:         store [[X]] to [[TMP]]
 // CHECK:         [[SET_CLSID:%.*]] = witness_method $T, #UID.clsid!setter
 // CHECK:         apply [[SET_CLSID]]<T>([[UID_VALUE]], [[TMP]]#1)
-// CHECK:         destroy_addr [[TMP]]#1
+// CHECK:         dealloc_stack [[TMP]]#0
 // -- call x.iid.getter
 // CHECK-NOT:     strong_retain [[X]]
 // CHECK:         [[TMP:%.*]] = alloc_stack $T
@@ -34,12 +33,12 @@ class Base {}
 // CHECK:         apply [[GET_IID]]<T>([[TMP]]#1)
 // CHECK-NOT:     strong_release [[X]]
 // -- call x.clsid.getter (TODO: avoid r/r here)
-// CHECK:         strong_retain [[X]]
+// CHECK-NOT:         strong_retain [[X]]
 // CHECK:         [[TMP:%.*]] = alloc_stack $T
 // CHECK:         store [[X]] to [[TMP]]
 // CHECK:         [[GET_CLSID:%.*]] = witness_method $T, #UID.clsid!getter
 // CHECK:         apply [[GET_CLSID]]<T>([[TMP]]#1)
-// CHECK:         destroy_addr [[TMP]]#1
+// CHECK:         dealloc_stack [[TMP]]#0
 // -- done
 // CHECK:         strong_release [[X]]
 
@@ -50,8 +49,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int) {
 
 // CHECK-LABEL: sil hidden @_TF25protocol_class_refinement16getBaseObjectUIDUS_3UID__FQ_TSiSi_
 // CHECK:       bb0([[X:%.*]] : $T):
-//   (This retain is for the setter, later.)
-// CHECK:         strong_retain [[X]]
+// CHECK-NOT:         strong_retain [[X]]
 // -- call x.uid()
 // CHECK:         [[TMP:%.*]] = alloc_stack $T
 // CHECK:         store [[X]] to [[TMP]]
@@ -64,7 +62,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int) {
 // CHECK:         [[SET_CLSID:%.*]] = witness_method $T, #UID.clsid!setter
 // CHECK:         apply [[SET_CLSID]]<T>([[UID_VALUE]], [[TMP]]#1)
 // CHECK-NOT:     strong_release [[X]]
-// CHECK:         destroy_addr [[TMP]]#1
+// CHECK:         dealloc_stack [[TMP]]#0
 // CHECK-NOT:     strong_release [[X]]
 // -- call x.iid.getter
 // CHECK-NOT:     strong_retain [[X]]
@@ -75,14 +73,12 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int) {
 // CHECK-NOT:     strong_release [[X]]
 // CHECK-NOT:     destroy_addr [[TMP0]]
 // -- call x.clsid.getter (TODO: avoid r/r here)
-// CHECK:         strong_retain [[X]]
 // CHECK:         [[TMP1:%.*]] = alloc_stack $T
 // CHECK:         store [[X]] to [[TMP1]]
 // CHECK:         [[GET_CLSID:%.*]] = witness_method $T, #UID.clsid!getter
 // CHECK:         apply [[GET_CLSID]]<T>([[TMP1]]#1)
 // CHECK-NOT:     strong_release [[X]]
 // CHECK-NOT:     destroy_addr [[TMP0]]
-// CHECK:         destroy_addr [[TMP1]]#1
 // CHECK-NOT:     strong_release [[X]]
 // CHECK-NOT:     destroy_addr [[TMP0]]
 // CHECK:         dealloc_stack [[TMP1]]#0

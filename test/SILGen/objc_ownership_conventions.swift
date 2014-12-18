@@ -198,8 +198,8 @@ func innerPointerMethod(g: Gizmo) {
 
 // CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions20innerPointerProperty
 // CHECK:         [[USE:%.*]] = function_ref @_TF26objc_ownership_conventions15useInnerPointer
-// CHECK:         strong_retain %0
 // CHECK:         [[METHOD:%.*]] = class_method [volatile] %0 : $Gizmo, #Gizmo.innerProperty!getter.1.foreign : Gizmo -> () -> UnsafeMutablePointer<()> , $@cc(objc_method) @thin (Gizmo) -> @unowned_inner_pointer UnsafeMutablePointer<()>
+// CHECK:         strong_retain %0
 // CHECK:         [[PTR:%.*]] = apply [[METHOD]](%0)
 // CHECK:         autorelease_value %0
 // CHECK:         apply [[USE]]([[PTR]])

@@ -1112,8 +1112,15 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind) {
       // allocation for it as well.
       if (isa<ParamDecl>(DRE->getDecl()) &&
           DRE->getDecl()->getName().str() == "self" &&
-          DRE->getDecl()->isImplicit())
+          DRE->getDecl()->isImplicit()) {
         Ctx = SGFContext::AllowPlusZero;
+      } else if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+        // All let values are guaranteed to be held alive across their lifetime,
+        // and won't change once initialized.  Any loaded value is good for the
+        // duration of this expression evaluation.
+        if (VD->isLet())
+          Ctx = SGFContext::AllowPlusZero;
+      }
     }
     
     ManagedValue rv = gen.emitRValueAsSingleValue(e, Ctx);

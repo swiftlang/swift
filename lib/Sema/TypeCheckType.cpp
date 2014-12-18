@@ -1156,8 +1156,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     TAK_callee_owned, TAK_callee_guaranteed
   };
   
-  // Function representation attributes other than @objc_block are not yet
-  // supported at source level; only SIL currently knows how to handle them.
+  // Some function representation attributes are not supported at source level;
+  // only SIL knows how to handle them.  Reject them unless this is a SIL input.
   if (!(options & TR_SILType)) {
     for (auto silOnlyAttr : {TAK_cc, TAK_thin, TAK_thick,
                              TAK_callee_owned, TAK_callee_guaranteed})
