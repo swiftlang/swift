@@ -353,8 +353,8 @@ func expectEquality<T: Equatable>(x: T, y: T, expected: Bool) {
   }
 }
 
-func expectNil<T>(x: T?) {
-  if x != nil { println("unexpected non-nil") }
+func expectNil<T>(x: T?, _ message: String = "unexpected non-nil") {
+  if x != nil { println(message) }
 }
 extension String.UTF8View.Index : Printable {
   public var description: String {
@@ -367,7 +367,11 @@ do {
   let s = diverseCharacters.unicodeScalars
   let u8 = diverseCharacters.utf8
   let u16 = diverseCharacters.utf16
-  
+
+
+  //===--- nested for...in loops ------------------------------------------===//
+  // Test all valid subranges si0..<si1 of positions in s.  ds is
+  // always distance(si0, si1)
   for si0 in indices(s) {
     for (ds, si1) in enumerate(si0..<s.endIndex) {
       
@@ -375,34 +379,44 @@ do {
       let u8i1 = si1.samePositionIn(u8)
       let u8i0 = si0.samePositionIn(u8)
 
-      var u8i0a = u8i0 // an index to advance
-      var dsa = 0      // count unicode scalars while doing so
+      //===--- while loop -------------------------------------------------===//
+      // Advance an index from u8i0 over ds Unicode scalars (thus
+      // reaching u8i1) by counting leading bytes traversed
+      var u8i0a = u8i0
+      var dsa = 0      // number of Unicode scalars it has advanced over
       
-      // Advance u8i0a to the same unicode scalar as u8i1.  The scalar
-      // number will increase each time we move off a scalar's leading
-      // byte, so we need to keep going through any continuation bytes
-      while (dsa < ds || UTF8.isContinuation(u8[u8i0a])) {
-        expectEquality(u8i0a, u8i1, false)
+      while true {
+        //===--- loop condition -------------------------------------------===//
         let b = u8[u8i0a]
-        if !UTF8.isContinuation(b) {
-          ++dsa
-          // On a unicode scalar boundary we should be able to round-trip through UTF16
+        let isLeadingByte = !UTF8.isContinuation(b)
+        if dsa == ds && isLeadingByte { break } // 
+        //===--------------------------------------------------------------===//
+        
+        expectEquality(u8i0a, u8i1, false) // We're not there yet
+
+        if isLeadingByte { // On a unicode scalar boundary?
           let u16i0a = u8i0a.samePositionIn(u16)!
+           // we should be able to round-trip through UTF16
           expectEquality(u8i0a, u16i0a.samePositionIn(u8)!, true)
+
           if UTF16.isLeadSurrogate(u16[u16i0a]) {
-            // utf16 indices of trailing surrogates should not convert to utf8
+            // We only have well-formed UTF16 in this string, so the
+            // successor points to a trailing surrogate of a pair and
+            // thus shouldn't convert to a UTF8 position
             expectNil(u16i0a.successor().samePositionIn(u8))
           }
+          
+          ++dsa // we're moving off the beginning of a new Unicode scalar
         }
         else {
-          // Between unicode scalars we should not be able to convert to UTF16
           expectNil(u8i0a.samePositionIn(u16))
         }
         ++u8i0a
       }
-      expectEquality(u8i0a, u8i1, true)
 
-      // Also check some positions between unicode scalars
+      expectEquality(u8i0a, u8i1, true) // We should be there now
+
+      // Also check some UTF8 positions between unicode scalars for equality
       var u8i0b = u8i0a
       for n0 in 0..<8 {
         var u8i1b = u8i1
