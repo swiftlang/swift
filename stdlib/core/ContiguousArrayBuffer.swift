@@ -533,9 +533,6 @@ public func ~> <
   return _copyCollectionToNativeArrayBuffer(source)
 }
 
-// FIXME: This routine is critical enough to explicitly mark readonly,
-// but ideally the optimizer should deduce this fact.
-@effects(readonly)
 func _copyCollectionToNativeArrayBuffer<
   C: protocol<_CollectionType, _Sequence_Type>
   where C._Element == C.Generator.Element
