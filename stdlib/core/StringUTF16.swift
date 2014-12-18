@@ -155,7 +155,11 @@ extension String {
   }
 }
 
+// Conformance to RandomAccessIndexType intentionally only appears
+// when Foundation is loaded
 extension String.UTF16View.Index : BidirectionalIndexType {
+  public typealias Distance = Int
+
   public func successor() -> String.UTF16View.Index {
     return String.UTF16View.Index(_offset.successor())
   }
@@ -168,5 +172,48 @@ public func == (
   lhs: String.UTF16View.Index, rhs: String.UTF16View.Index
 ) -> Bool {
   return lhs._offset == rhs._offset
+}
+
+extension String.UTF16View.Index : Comparable {}
+
+public func < (
+  lhs: String.UTF16View.Index, rhs: String.UTF16View.Index
+) -> Bool {
+  return lhs._offset < rhs._offset
+}
+
+// We can do some things more efficiently, even if we don't promise to
+// by conforming to RandomAccessIndexType.
+
+/// Do not use this operator directly; call distance(start, end) instead
+@inline(__always)
+public func ~> (
+  start: String.UTF16View.Index, rest:(_Distance, (String.UTF16View.Index))
+) -> String.UTF16View.Index.Distance {
+  let end = rest.1
+  return start._offset.distanceTo(end._offset)
+}
+
+/// Do not use this operator directly; call advance(start, n) instead
+@inline(__always)
+public func ~> (
+  start: String.UTF16View.Index,
+  rest: (_Advance, (String.UTF16View.Index.Distance))
+) -> String.UTF16View.Index {
+  let n = rest.1
+  return String.UTF16View.Index(_offset: start._offset.advancedBy(n))
+}
+
+/// Do not use this operator directly; call advance(start, n, end) instead
+@inline(__always)
+public func ~> (
+  start: String.UTF16View.Index,
+  rest: (_Advance, (String.UTF16View.Index.Distance, String.UTF16View.Index))
+) -> String.UTF16View.Index {
+  let n = rest.1.0
+  let end = rest.1.1
+
+  return String.UTF16View.Index(
+    _offset: advance(start._offset, n, end._offset))
 }
 
