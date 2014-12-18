@@ -3109,8 +3109,8 @@ public:
 /// A conditional branch.
 class CondBranchInst : public TermInst {
   enum {
-    /// The condition value used for the branch.
-    Condition
+    /// The operand index of the condition value used for the branch.
+    ConditionIdx
   };
 
   SILSuccessor DestBBs[2];
@@ -3144,9 +3144,9 @@ public:
                                 ArrayRef<SILValue> FalseArgs,
                                 SILFunction &F);
 
-  SILValue getCondition() const { return Operands[Condition].get(); }
+  SILValue getCondition() const { return Operands[ConditionIdx].get(); }
   void setCondition(SILValue newCondition) {
-    Operands[Condition].set(newCondition);
+    Operands[ConditionIdx].set(newCondition);
   }
 
   SuccessorListTy getSuccessors() {
