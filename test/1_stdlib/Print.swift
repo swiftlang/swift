@@ -758,16 +758,16 @@ test_DictionaryPrinting()
 
 func test_SetPrinting() {
   var sI = Set<Int>()
-  printedIs(sI, "{}")
-  debugPrintedIs(sI, "{}")
+  printedIs(sI, "Set([])")
+  debugPrintedIs(sI, "Set([])")
 
   sI = Set<Int>([11, 22])
-  printedIs(sI, "{11, 22}", expected2: "{22, 11}")
-  debugPrintedIs(sI, "{11, 22}", expected2: "{22, 11}")
+  printedIs(sI, "Set([11, 22])", expected2: "Set([22, 11])")
+  debugPrintedIs(sI, "Set([11, 22])", expected2: "Set([22, 11])")
 
   let sS = Set<String>(["Hello", "world"])
-  printedIs(sS, "{Hello, world}", expected2: "{world, Hello}")
-  debugPrintedIs(sS, "{\"Hello\", \"world\"}", expected2: "{\"world\", \"Hello\"}")
+  printedIs(sS, "Set([Hello, world])", expected2: "Set([world, Hello])")
+  debugPrintedIs(sS, "Set([\"Hello\", \"world\"])", expected2: "Set([\"world\", \"Hello\"])")
 
   println("test_SetPrinting done")
 }

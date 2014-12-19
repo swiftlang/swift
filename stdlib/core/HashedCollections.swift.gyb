@@ -731,12 +731,14 @@ public func == <T : Hashable>(lhs: Set<T>, rhs: Set<T>) -> Bool {
 }
 
 extension Set: Printable, DebugPrintable {
-  internal func _makeDescription(#isDebug: Bool) -> String {
-    if count == 0 {
-      return "{}"
-    }
+  /// A textual representation of `self`.
+  public var description: String {
+    return debugDescription
+  }
 
-    var result = "{"
+  /// A textual representation of `self`, suitable for debugging.
+  public var debugDescription: String {
+    var result = "Set(["
     var first = true
     for member in self {
       if first {
@@ -744,25 +746,10 @@ extension Set: Printable, DebugPrintable {
       } else {
         result += ", "
       }
-
-      if isDebug {
-        debugPrint(member, &result)
-      } else {
-        print(member, &result)
-      }
+      debugPrint(member, &result)
     }
-    result += "}"
+    result += "])"
     return result
-  }
-
-  /// A textual representation of `self`.
-  public var description: String {
-    return _makeDescription(isDebug: false)
-  }
-
-  /// A textual representation of `self`, suitable for debugging.
-  public var debugDescription: String {
-    return _makeDescription(isDebug: true)
   }
 }
 
