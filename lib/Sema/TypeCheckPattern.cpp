@@ -746,13 +746,14 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       var->overwriteType(ErrorType::get(Context));
     else
       var->overwriteType(type);
-    if (auto *attr = var->getAttrs().getAttribute<OwnershipAttr>()) {
-      checkOwnershipAttr(var, attr);
-      type = getTypeOfRValue(var, true);
-    }
 
+    checkTypeModifyingDeclAttributes(var);
     if (type->is<InOutType>())
       NP->getDecl()->setLet(false);
+    if (var->getAttrs().hasAttribute<OwnershipAttr>())
+      type = getTypeOfRValue(var, true);
+    else if (!var->isInvalid())
+      type = var->getType();
     P->setType(type);
     
     // If we are inferring a variable to have type AnyObject, AnyObject.Type,

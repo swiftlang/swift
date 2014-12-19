@@ -68,7 +68,6 @@ namespace {
   /// the constructor that only takes a DeclKind, and it will be moved
   /// unconditionally.  Otherwise pass in the Name and DeclKind and the
   /// DebuggerClient will be asked whether to move it or not.
-
   class DebuggerContextChange {
   protected:
     Parser &P;

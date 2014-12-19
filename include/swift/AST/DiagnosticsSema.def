@@ -1048,15 +1048,25 @@ ERROR(member_cannot_be_final,sema_tcd,none,
       ())
 
 ERROR(final_not_allowed_here,sema_tcd,none,
-      "final may only be applied to classes, properties, methods, and "
+      "'final' may only be applied to classes, properties, methods, and "
       "subscripts", ())
 
 ERROR(final_not_on_accessors,sema_tcd,none,
-      "final cannot be applied to accessors, it must be put on the "
+      "'final' cannot be applied to accessors, it must be put on the "
       "%select{var|let|subscript}0", (unsigned))
 
 ERROR(override_noreturn_with_return,sema_tcd,none,
       "an override of a 'noreturn' method should also be 'noreturn'", ())
+
+ERROR(inconsistent_autoclosure,sema_tcd,none,
+      "'autoclosure' attribute must be consistent between a method and its"
+      " override", ())
+ERROR(autoclosure_function_type,attribute_parsing,none,
+      "'autoclosure' attribute may only be applied to values of function type",
+      ())
+ERROR(autoclosure_function_input_nonunit,attribute_parsing,none,
+      "autoclosure argument type must be '()'", ())
+
 
 // NSManaged attribute
 ERROR(attr_NSManaged_not_property,sema_tcd,none,
@@ -1608,8 +1618,6 @@ ERROR(attribute_requires_function_type,attribute_parsing,none,
       "attribute only applies to syntactic function types", ())
 ERROR(first_class_generic_function,type_parsing,PointsToFirstBadToken,
       "generic types cannot be used as first-class types", ())
-ERROR(autoclosure_function_input_nonunit,attribute_parsing,none,
-      "autoclosure argument type must be '()'", ())
 ERROR(objc_block_cannot_be_thin,attribute_parsing,none,
       "@objc_block function type cannot be @thin", ())
 ERROR(attribute_not_supported,attribute_parsing,none,

@@ -555,9 +555,12 @@ public:
 
   void typeCheckDecl(Decl *D, bool isFirstPass);
 
-  void checkOwnershipAttr(VarDecl *D, OwnershipAttr *attr);
   void checkDeclAttributesEarly(Decl *D);
   void checkDeclAttributes(Decl *D);
+  void checkTypeModifyingDeclAttributes(VarDecl *var);
+
+  void checkAutoClosureAttr(VarDecl *D, AutoClosureAttr *attr);
+  void checkOwnershipAttr(VarDecl *D, OwnershipAttr *attr);
 
   void computeAccessibility(ValueDecl *D);
 

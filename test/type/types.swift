@@ -9,7 +9,6 @@ func test() {
 
 var b : Int -> Int = {$0}
 
-@autoclosure var c1 : () -> Int  // expected-error {{attribute can only be applied to types, not declarations}}
 var c2 : (field : @autoclosure Int)  // expected-error {{attribute only applies to syntactic function types}}
 // expected-error @-1{{cannot create a single-element tuple with an element label}}{{11-19=}}
 var c3 : (field : @autoclosure Int -> Int)  // expected-error {{autoclosure argument type must be '()'}}

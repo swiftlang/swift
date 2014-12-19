@@ -74,6 +74,9 @@ public:
   IGNORED_ATTR(RequiresStoredPropertyInits)
 #undef IGNORED_ATTR
 
+  void visitAutoClosureAttr(AutoClosureAttr *attr) {
+    TC.checkAutoClosureAttr(cast<VarDecl>(D), attr);
+  }
   void visitTransparentAttr(TransparentAttr *attr);
   void visitMutationAttr(DeclAttribute *attr);
   void visitMutatingAttr(MutatingAttr *attr) { visitMutationAttr(attr); }
@@ -97,6 +100,7 @@ public:
   void visitSILStoredAttr(SILStoredAttr *attr);
 };
 } // end anonymous namespace
+
 
 
 void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
@@ -528,6 +532,7 @@ public:
 #define IGNORED_ATTR(CLASS)                                              \
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
+    IGNORED_ATTR(AutoClosure)
     IGNORED_ATTR(Asmname)
     IGNORED_ATTR(Dynamic)
     IGNORED_ATTR(Exported)
@@ -1103,6 +1108,41 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
     if (attr->isValid())
       Checker.visit(attr);
   }
+}
+
+void TypeChecker::checkTypeModifyingDeclAttributes(VarDecl *var) {
+  if (auto *attr = var->getAttrs().getAttribute<OwnershipAttr>())
+    checkOwnershipAttr(var, attr);
+  if (auto *attr = var->getAttrs().getAttribute<AutoClosureAttr>())
+    checkAutoClosureAttr(var, attr);
+}
+
+
+
+void TypeChecker::checkAutoClosureAttr(VarDecl *VD, AutoClosureAttr *attr) {
+  // The vardecl should have function type, and we restrict it to functions
+  // taking ().
+  auto *FTy = VD->getType()->getAs<FunctionType>();
+  if (FTy == 0) {
+    diagnose(attr->getLocation(), diag::autoclosure_function_type);
+    attr->setInvalid();
+    return;
+  }
+
+  // Just stop if we've already applied this attribute.
+  if (FTy->isAutoClosure())
+    return;
+
+  auto *FuncTyInput = FTy->getInput()->getAs<TupleType>();
+  if (!FuncTyInput || FuncTyInput->getNumElements() != 0) {
+    diagnose(attr->getLocation(), diag::autoclosure_function_input_nonunit);
+    attr->setInvalid();
+    return;
+  }
+
+  // Change the type to include the autoclosure bit.
+  VD->overwriteType(FunctionType::get(FuncTyInput, FTy->getResult(),
+                                    FTy->getExtInfo().withIsAutoClosure(true)));
 }
 
 void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
