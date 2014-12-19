@@ -959,7 +959,7 @@ static ValueDecl *getTryPinOperation(ASTContext &ctx, Identifier name) {
 static ValueDecl *
 getMakeMaterializeForSetCallbackOperation(ASTContext &ctx, Identifier name) {
   // <T> ((Builtin.RawPointer,
-  //       Builtin.RawPointer,
+  //       inout Builtin.UnsafeValueBuffer,
   //       inout T,
   //       T.Type) -> ()) -> Builtin.RawPointer
 
@@ -968,15 +968,17 @@ getMakeMaterializeForSetCallbackOperation(ASTContext &ctx, Identifier name) {
   GenericParamList *paramList;
   std::tie(genericTy, archetypeTy, paramList) = getGenericParam(ctx);
 
+  auto bufferType = InOutType::get(ctx.TheUnsafeValueBufferType);
+
   TupleTypeElt callbackParams[] = {
     ctx.TheRawPointerType,
-    ctx.TheRawPointerType,
+    bufferType,
     InOutType::get(genericTy),
     MetatypeType::get(genericTy),
   };
   TupleTypeElt callbackBodyParams[] = {
     ctx.TheRawPointerType,
-    ctx.TheRawPointerType,
+    bufferType,
     InOutType::get(archetypeTy),
     MetatypeType::get(archetypeTy),
   };

@@ -480,6 +480,17 @@ public:
 
   void bindAddress(SILValue address, SILGenFunction &gen,
                    SILLocation loc) override {
+    CanType objectType =
+      cast<InOutType>(vd->getType()->getCanonicalType()).getObjectType();
+
+    // As a special case, don't introduce a local variable for
+    // Builtin.UnsafeValueBuffer, which is not copyable.
+    if (isa<BuiltinUnsafeValueBufferType>(objectType)) {
+      // FIXME: mark a debug location?
+      gen.VarLocs[vd] = SILGenFunction::VarLoc::get(address);
+      return;
+    }
+
     // Allocate the local variable for the inout.
     auto initVar = gen.emitLocalVariableWithCleanup(vd, false);
 
@@ -656,8 +667,9 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, Type patternType) {
   CanType varType = vd->getType()->getCanonicalType();
 
   // If this is an inout parameter, set up the writeback variable.
-  if (isa<InOutType>(varType))
+  if (isa<InOutType>(varType)) {
     return InitializationPtr(new InOutInitialization(vd));
+  }
 
   // If this is a 'let' initialization for a non-global, set up a
   // let binding, which stores the initialization value into VarLocs directly.

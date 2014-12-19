@@ -192,11 +192,14 @@ BUILTIN_SIL_OPERATION(Init, "initialize", Special)
 BUILTIN_SIL_OPERATION(MarkDependence, "markDependence", Special)
 
 /// MakeMaterializeForSetCallback has type
-///   ((Builtin.RawPointer, Builtin.RawPointer, inout T, T.Type) -> ())
+///   ((Builtin.RawPointer,
+///     inout Builtin.UnsafeValueBuffer,
+///     inout T,
+///     T.Type) -> ())
 ///     -> Builtin.RawPointer
 ///
 /// The first argument is the address returned from materializeForSet.
-/// The second argument is the address of the Builtin.UnsafeValueBuffer
+/// The second argument is the same Builtin.UnsafeValueBuffer
 /// that was passed to materializeForSet.
 /// The third argument is self.
 /// The last argument is the metatype for self.
