@@ -240,6 +240,7 @@ extension String {
     return result
   }
 
+  /// The index type for subscripting a `String`\ 's `.utf8` view.
   public typealias UTF8Index = UTF8View.Index
 }
 

@@ -213,6 +213,8 @@ extension String {
     var _core: _StringCore
   }
 
+  /// The index type for subscripting a `String`\ 's `.unicodeScalars`
+  /// view.
   public typealias UnicodeScalarIndex = UnicodeScalarView.Index
 }
 
