@@ -45,8 +45,6 @@
 // CHECK-NEXT: function_ref @unknown6 : $@thin () -> ()
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
-// CHECK-NEXT: function_ref
-// CHECK-NEXT: function_ref @unknown7 : $@thin () -> ()
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
 // Check that B4.doSomething cannot be completely devirtualized
@@ -88,6 +86,10 @@ protocol P1 {
 struct S:P1 {
    func foo() {
    }
+}
+
+
+public final class G1<T> {
 }
 
 protocol P {
@@ -136,16 +138,13 @@ class B1<T> : P {
 }
 
 // Inherited Specialized conformance from P
-class B2<T> : B1<T> {
+class B2<T> : B1<G1<T>> {
   override func doSomething() {
     unknown6()
   }
 }
 
 class B3<E>: B2<Array<E>> {
-  override func doSomething() {
-    unknown7()
-  }
 }
 
 class B4<F>: B3<Array<Array<Int>>> {
@@ -169,7 +168,7 @@ public func driver1<X>(x:X) {
 }
 
 public func driver2() {
-  driver1(S())
+  driver1(G1<S>())
 }
 
 

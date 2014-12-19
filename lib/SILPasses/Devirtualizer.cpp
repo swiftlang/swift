@@ -86,6 +86,43 @@ static ClassDecl *getClassFromConstructor(SILValue S) {
   return instTy.getClassOrBoundGenericClass();
 }
 
+/// Return bound generic type for the unbound type Superclass,
+/// which is a superclass of a bound generic type BoundDerived
+/// (Base may be also the same as BoundDerived).
+static SILType bindSuperclass(Module *Module,
+                              CanType Superclass,
+                              SILType BoundDerived,
+                              ArrayRef<Substitution>& Subs) {
+  SILType BoundSuperclass = BoundDerived;
+
+  while (true) {
+    auto CanBoundSuperclass = BoundSuperclass.getSwiftRValueType();
+    // Get declaration of the superclass.
+    auto *Decl = CanBoundSuperclass.getNominalOrBoundGenericNominal();
+    // Obtain the unbound variant of the current superclass
+    CanType UnboundSuperclass = Decl->getDeclaredType()->getCanonicalType();
+    // Check if we found a superclass we are looking for.
+    if (UnboundSuperclass == Superclass) {
+      auto BoundBaseType = dyn_cast<BoundGenericType>(CanBoundSuperclass);
+      if (BoundBaseType)
+        // If it is a bound generic type, look up its substitutions
+        Subs = BoundBaseType->getSubstitutions(Module,
+                                               nullptr);
+      else
+        // If it is a non-bound type, there are no substitutions.
+        Subs.empty();
+      return BoundSuperclass;
+    }
+    // Get the superclass of current one
+    BoundSuperclass = BoundSuperclass.getSuperclass(nullptr);
+    // Stop iteration if there is no superclass.
+    if (!BoundSuperclass)
+      return SILType();
+  }
+
+  return SILType();
+}
+
 /// \brief Devirtualize an Apply instruction and a class member obtained
 /// using the class_method instruction into a direct call to a specific
 /// member of a specific class.
@@ -108,6 +145,7 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
   // Otherwise lookup from the module the least derived implementing method from
   // the module vtables.
   SILModule &Mod = AI->getModule();
+  // Find the implementation of the member which should be invoked.
   SILFunction *F = Mod.lookUpSILFunctionFromVTable(CD, Member);
 
   // If we do not find any such function, we have no function to devirtualize
@@ -118,32 +156,102 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
     return false;
   }
 
-  // Ok, we found a function F that we can devirtualization our class method
+  // Ok, we found a function F that we can devirtualize our class method
   // to. We want to do everything on the substituted type in the case of
   // generics. Thus construct our subst callee type for F.
   SILModule &M = F->getModule();
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
-  // *NOTE*:
-  // Apply instruction substitutions are for the Member. F (the implementing
-  // method) may have a different set of generic parameters! For example, Member
-  // may have no substitutions at all, whereas F may have some.
-  auto ClassInstanceType = ClassInstance.getType();
-  ArrayRef<Substitution> Substitutions;
-  // Prefer substitutions from the type of the ClassInstance.
-  if (!CD->getGenericParamTypes().empty())
-    // Take the parameters from the type of the ClassInstance.
-    if (!ClassInstanceType.is<MetatypeType>())
-      Substitutions = ClassInstanceType.gatherAllSubstitutions(AI->getModule());
-  if (Substitutions.empty())
-    Substitutions = AI->getSubstitutions();
-
-  // Bail if the number of generic parameters of the callee does not match
-  // the number of substitutions, because we don't know how to handle this.
   unsigned CalleeGenericParamsNum = 0;
   if (GenCalleeType->isPolymorphic())
     CalleeGenericParamsNum = GenCalleeType->getGenericSignature()
                                           ->getGenericParams().size();
-  if (CalleeGenericParamsNum != Substitutions.size())
+  // Class F belongs to.
+  CanType FSelfClass = F->getLoweredFunctionType()->getSelfParameter().getType();
+  SILType ClassInstanceType = ClassInstance.getType();
+
+  // *NOTE*:
+  // Apply instruction substitutions are for the Member from a protocol or
+  // class B, where this member was first defined, before it got overridden by
+  // derived classes.
+  //
+  // The implementation F (the implementing method) which was found may have
+  // a different set of generic parameters, e.g. because it is implemented by a
+  // class D1 derived from B.
+  //
+  // ClassInstanceType may have a type different from both the type B
+  // the Member belongs to and from the ClassInstanceType, e.g. if
+  // ClassInstance is of a class D2, which is derived from D1, but does not
+  // override the Member.
+  //
+  // As a result, substitutions provided by AI are for Member, whereas
+  // substitutions in ClassInstanceType are for D2. And substitutions for D1
+  // are not available directly in a general case. Therefore, they have to
+  // be computed.
+  //
+  // What we know for sure:
+  //   B is a superclass of D1
+  //   D1 is a superclass of D2.
+  // D1 can be the same as D2. D1 can be the same as B.
+  //
+  // So, substitutions from AI are for class B.
+  // Substitutions for class D1 by means of bindSuperclass(), which starts
+  // with a bound type ClassInstanceType and checks its superclasses until it
+  // finds a bound superclass matching D1 and returns its substitutions.
+
+  ArrayRef<Substitution> Substitutions;
+  SILType FSelfSubstType;
+
+  if (GenCalleeType->isPolymorphic()) {
+    // Declaration of the class F belongs to.
+    if (auto *FSelfTypeDecl = FSelfClass.getNominalOrBoundGenericNominal()) {
+      // Get the unbound generic type F belongs to.
+      CanType FSelfGenericType =
+          FSelfTypeDecl->getDeclaredType()->getCanonicalType();
+
+      assert((isa<BoundGenericType>(ClassInstanceType.getSwiftRValueType()) ||
+              isa<NominalType>(ClassInstanceType.getSwiftRValueType())) &&
+              "Self type should be either a bound generic type"
+              "or a non-generic type");
+
+      assert((isa<UnboundGenericType>(FSelfGenericType) ||
+              isa<NominalType>(FSelfGenericType)) &&
+              "Method implementation self type should be generic");
+
+      // We know that ClassInstanceType is derived from FSelfGenericType.
+      // We need to determine the proper substitutions for FGenericSILClass
+      // based on the bound generic type of ClassInstanceType.
+      FSelfSubstType = bindSuperclass(AI->getModule().getSwiftModule(),
+                                      FSelfGenericType,
+                                      ClassInstanceType,
+                                      Substitutions);
+
+      // Bail if it was not possible to determine the bound generic class.
+      if (FSelfSubstType == SILType()) {
+        return false;
+      }
+
+      if (!isa<BoundGenericType>(ClassInstanceType.getSwiftRValueType()) &&
+          CalleeGenericParamsNum &&
+          Substitutions.empty())
+        // If ClassInstance is not a bound generic type, try to derive
+        // substitutions from the apply instruction.
+        Substitutions = AI->getSubstitutions();
+    } else {
+      // It is not a type or bound type.
+      // It could be that GenCalleeType is generic, but its arguments cannot
+      // be derived from the type of self. In this case, we can try to
+      // approach it from another end and take the AI substitutions.
+      Substitutions = AI->getSubstitutions();
+    }
+  }
+
+  // If implementing method is not polymorphic, there is no need to
+  // use any substitutions.
+  if (CalleeGenericParamsNum == 0 && !Substitutions.empty())
+    Substitutions = {};
+  else if (CalleeGenericParamsNum != Substitutions.size())
+    // Bail if the number of generic parameters of the callee does not match
+    // the number of substitutions, because we don't know how to handle this.
     return false;
 
   CanSILFunctionType SubstCalleeType =
