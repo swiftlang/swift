@@ -451,3 +451,7 @@ func testNullarySelectorPieces(obj: AnyObject) {
   obj.foo(1, 2, bar: 3) // expected-error{{'AnyObject' does not have a member named 'foo(_:_:bar:)'}}
 }
 
+func testFactoryMethodAvailability() {
+  let _ = DeprecatedFactoryMethod() // expected-error{{'init()' is unavailable: use something newer}}
+}
+

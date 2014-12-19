@@ -2443,6 +2443,9 @@ namespace {
                                       /*required=*/false, selector, initName,
                                       {decl->param_begin(), decl->param_size()},
                                       decl->isVariadic(), redundant);
+      if (result)
+        Impl.importAttributes(decl, result);
+
       if ((result || redundant) && member) {
         ++NumFactoryMethodsAsInitializers;
 

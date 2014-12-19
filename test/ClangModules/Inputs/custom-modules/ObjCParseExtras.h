@@ -88,3 +88,7 @@ __weak id globalWeakVar;
 @interface ExtraSelectors
 - (void)foo:(int)a bar:(int)b :(int)c;
 @end
+
+@interface DeprecatedFactoryMethod
++ (instancetype)deprecatedFactoryMethod __attribute__((deprecated("use something newer")));
+@end
