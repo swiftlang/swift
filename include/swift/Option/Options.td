@@ -221,7 +221,8 @@ def framework : Separate<["-"], "framework">, Flags<[FrontendOption]>,
   Group<linker_option_Group>,
   HelpText<"Specifies a framework which should be linked against">;
 
-def L : JoinedOrSeparate<["-"], "L">, Group<linker_option_Group>,
+def L : JoinedOrSeparate<["-"], "L">, Flags<[FrontendOption]>,
+  Group<linker_option_Group>,
   HelpText<"Add directory to library link search path">;
 def L_EQ : Joined<["-"], "L=">, Alias<L>;
 

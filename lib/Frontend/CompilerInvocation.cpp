@@ -718,6 +718,11 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     Opts.FrameworkSearchPaths.push_back(A->getValue());
   }
 
+  for (const Arg *A : make_range(Args.filtered_begin(OPT_L),
+                                 Args.filtered_end())) {
+    Opts.LibrarySearchPaths.push_back(A->getValue());
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_sdk))
     Opts.SDKPath = A->getValue();
 

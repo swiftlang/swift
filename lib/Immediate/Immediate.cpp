@@ -185,27 +185,40 @@ static bool loadSwiftRuntime(StringRef runtimeLibPath) {
 static bool tryLoadLibrary(LinkLibrary linkLib,
                            SearchPathOptions searchPathOpts,
                            DiagnosticEngine &diags) {
-  // If we have an absolute path, just try to load it now.
   llvm::SmallString<128> path = linkLib.getName();
   bool success;
-  if (llvm::sys::path::is_absolute(path.str())) {
+
+  // If we have an absolute or relative path, just try to load it now.
+  if (llvm::sys::path::has_parent_path(path.str())) {
     success = dlopen(path.c_str(), 0);
   } else {
     switch (linkLib.getKind()) {
     case LibraryKind::Library: {
-      // FIXME: Try the appropriate extension for the current platform?
-      llvm::SmallString<32> stem{"lib"};
-      stem += llvm::sys::path::stem(path);
-      llvm::sys::path::remove_filename(path);
-      llvm::sys::path::append(path, stem.str());
-      path += ".dylib";
+      llvm::SmallString<32> stem;
+      if (llvm::sys::path::has_extension(path.str())) {
+        stem = std::move(path);
+      } else {
+        // FIXME: Try the appropriate extension for the current platform?
+        stem = "lib";
+        stem += path;
+        stem += ".dylib";
+      }
+
+      // Try user-provided library search paths first.
+      for (auto &libDir : searchPathOpts.LibrarySearchPaths) {
+        path = libDir;
+        llvm::sys::path::append(path, stem.str());
+        success = dlopen(path.c_str(), 0);
+        if (success)
+          break;
+      }
 
       // Let dlopen determine the best search paths.
-      success = dlopen(path.c_str(), 0);
+      success = dlopen(stem.c_str(), 0);
 
       // If that fails, try our runtime library path.
       if (!success)
-        success = loadRuntimeLib(path, searchPathOpts.RuntimeLibraryPath);
+        success = loadRuntimeLib(stem, searchPathOpts.RuntimeLibraryPath);
       break;
     }
     case LibraryKind::Framework: {

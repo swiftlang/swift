@@ -6,5 +6,5 @@
 
 import someModule
 
-// CHECK-DAG: error: could not load shared library 'libmagic'
-// CHECK-DAG: error: could not load shared library 'libmodule'
+// CHECK-DAG: error: could not load shared library 'magic'
+// CHECK-DAG: error: could not load shared library 'module'

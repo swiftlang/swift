@@ -266,10 +266,21 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     Arguments.push_back("-parse-as-library");
 
   Args.AddLastArg(Arguments, options::OPT_parse_sil);
-  Args.AddAllArgs(Arguments, options::OPT_l, options::OPT_framework);
 
   Arguments.push_back("-module-name");
   Arguments.push_back(Args.MakeArgString(OI.ModuleName));
+
+  // Mode-specific arguments.
+  switch (OI.CompilerMode) {
+  case OutputInfo::Mode::StandardCompile:
+  case OutputInfo::Mode::SingleCompile:
+    break;
+  case OutputInfo::Mode::Immediate:
+  case OutputInfo::Mode::REPL:
+    Args.AddAllArgs(Arguments, options::OPT_l, options::OPT_framework,
+                    options::OPT_L);
+    break;
+  }
 
   const std::string &ModuleOutputPath =
     Output->getAdditionalOutputForType(types::ID::TY_SwiftModuleFile);
@@ -397,6 +408,8 @@ Job *LLDB::constructJob(const JobAction &JA,
   // Squash important frontend options into a single argument for LLDB.
   ArgStringList FrontendArgs;
   addCommonFrontendArgs(getToolChain(), OI, Output.get(), Args, FrontendArgs);
+  Args.AddAllArgs(FrontendArgs, options::OPT_l, options::OPT_framework,
+                  options::OPT_L);
 
   std::string SingleArg = "--repl=";
   {

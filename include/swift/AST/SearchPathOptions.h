@@ -30,6 +30,11 @@ public:
   /// Path(s) which should be searched for frameworks.
   std::vector<std::string> FrameworkSearchPaths;
 
+  /// Path(s) which should be searched for libraries.
+  ///
+  /// This is used in immediate modes.
+  std::vector<std::string> LibrarySearchPaths;
+
   /// Path to search for compiler-relative header files.
   std::string RuntimeResourcePath;
 
