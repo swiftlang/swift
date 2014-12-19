@@ -106,6 +106,14 @@ public:
         return true;
     return false;
   }
+  
+  // True if the memory object is the 'self' argument of a struct initializer.
+  bool isStructInitSelf() const {
+    if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
+      if (MUI->isRootSelf() && isa<StructDecl>(getType()->getAnyNominal()))
+        return true;
+    return false;
+  }
 
   // True if the memory object is the 'self' argument of a class initializer.
   bool isClassInitSelf() const {

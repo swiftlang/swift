@@ -957,3 +957,32 @@ class r19254812Derived: r19254812Base{
     println(pi)  // ok, no diagnostic expected.
   }
 }
+
+
+// <rdar://problem/19259730> Using mutating methods in a struct initializer with a let property is rejected
+struct StructMutatingMethodTest {
+  let a, b: String  // expected-note 2 {{'self.b' not initialized}}
+  
+  init(x: String, y: String) {
+    a = x
+    b = y
+    mutate()   // ok
+  }
+  
+  init(x: String) {
+    a = x
+    mutate() // expected-error {{'self' used before all stored properties are initialized}}
+    b = x
+  }
+
+  init() {
+    a = ""
+    nonmutate() // expected-error {{'self' used before all stored properties are initialized}}
+    b = ""
+  }
+
+  mutating func mutate() {}
+  func nonmutate() {}
+}
+
+

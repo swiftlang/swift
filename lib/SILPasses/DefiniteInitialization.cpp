@@ -673,7 +673,13 @@ void LifetimeChecker::doIt() {
                        diag::return_from_init_without_self_init);
             break;
           }
-          
+        } else if (isa<ApplyInst>(Inst) && TheMemory.isStructInitSelf()) {
+          if (shouldEmitError(Inst)) {
+            diagnose(Module, Inst->getLoc(),
+                     diag::use_of_self_before_fully_init);
+            noteUninitializedMembers(Use);
+          }
+          break;
         } else if (isa<MarkFunctionEscapeInst>(Inst))
           DiagMessage = diag::global_variable_function_use_uninit;
         else if (isa<AddressToPointerInst>(Inst))
