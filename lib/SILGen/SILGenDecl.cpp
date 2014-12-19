@@ -1212,9 +1212,6 @@ public:
         if (auto *asd = ovFD->getAccessorStorageDecl()) {
           if (asd->hasClangNode())
             goto not_overridden;
-
-          if (asd->getAttrs().hasAttribute<NSManagedAttr>())
-            goto not_overridden;
         }
 
       // If we overrode a decl from an extension, it won't be in a vtable
@@ -1254,15 +1251,6 @@ public:
     // vtable.
     if (member.getDecl()->getAttrs().hasAttribute<DynamicAttr>())
       return;
-
-    // @NSManaged property getters/setters don't have vtable entries, because
-    // they are only accessible via the @objc entry points.
-    if (auto func = dyn_cast<FuncDecl>(member.getDecl())) {
-      if (auto ads = func->getAccessorStorageDecl()) {
-        if (ads->getAttrs().hasAttribute<NSManagedAttr>())
-          return;
-      }
-    }
 
     // Otherwise, introduce a new vtable entry.
     vtableEntries.emplace_back(member, getVtableEntryFn());

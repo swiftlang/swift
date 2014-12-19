@@ -1542,7 +1542,7 @@ class HasNSManaged {
 
   @NSManaged
   var goodManaged: Class_ObjC1
-  // CHECK-LABEL: {{^}}  @NSManaged @objc var goodManaged: Class_ObjC1
+  // CHECK-LABEL: {{^}}  @NSManaged @objc dynamic var goodManaged: Class_ObjC1
 
   @NSManaged
   var badManaged: PlainStruct

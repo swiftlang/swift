@@ -1,5 +1,8 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen | FileCheck %s
+// RUN: %swift -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen | FileCheck %s
 
+// This file is also used by objc_attr_NSManaged_multi.swift.
+
+import Foundation
 import gizmo
 
 @objc class X { 
@@ -25,8 +28,21 @@ class SwiftGizmo : Gizmo {
   }
 }
 
+final class FinalGizmo : SwiftGizmo {
+  @NSManaged var y: String
+}
+
+// CHECK-LABEL: sil hidden @_TF19objc_attr_NSManaged9testFinalFCS_10FinalGizmoSS : $@thin (@owned FinalGizmo) -> @owned String {
+func testFinal(obj: FinalGizmo) -> String {
+  // CHECK: class_method [volatile] %0 : $FinalGizmo, #FinalGizmo.y!getter.1.foreign : FinalGizmo -> () -> String , $@cc(objc_method) @thin (FinalGizmo) -> @autoreleased NSString
+  // CHECK: return
+  return obj.y
+}
+
+
 // CHECK-NOT: sil hidden @_TToFC19objc_attr_NSManaged10SwiftGizmog1xCS_1X : $@cc(objc_method) @thin (SwiftGizmo) -> @autoreleased X
 // CHECK-NOT: sil hidden @_TToFC19objc_attr_NSManaged10SwiftGizmos1xCS_1X
+// CHECK-NOT: sil hidden @_TToFC19objc_attr_NSManaged10FinalGizmog1y
 
 
 // The vtable should not contain any entry points for getters and setters.
@@ -35,4 +51,11 @@ class SwiftGizmo : Gizmo {
 // CHECK-NEXT:  #SwiftGizmo.deinit!deallocator:
 // CHECK-NEXT:  #SwiftGizmo.init!initializer.1: _TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT_GSQS0__
 // CHECK-NEXT:   #SwiftGizmo.init!initializer.1: _TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT7bellsOnSi_GSQS0__
+// CHECK-NEXT: }
+
+// CHECK-LABEL: sil_vtable FinalGizmo {
+// CHECK-NEXT:   #SwiftGizmo.modifyX!1: _TFC19objc_attr_NSManaged10SwiftGizmo7modifyXfS0_FT_T_
+// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: _TFC19objc_attr_NSManaged10FinalGizmocfMS0_FT_GSQS0__
+// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: _TFC19objc_attr_NSManaged10FinalGizmocfMS0_FT7bellsOnSi_GSQS0__
+// CHECK-NEXT:   #FinalGizmo.deinit!deallocator: _TFC19objc_attr_NSManaged10FinalGizmoD
 // CHECK-NEXT: }

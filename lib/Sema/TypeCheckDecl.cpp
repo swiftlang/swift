@@ -2133,9 +2133,12 @@ static bool isImplicitlyObjC(const ValueDecl *VD, bool allowImplicit = false) {
 
 /// If we need to infer 'dynamic', do so now.
 ///
-/// FIXME: This is a workaround for the fact that we cannot dynamically
-/// dispatch to methods introduced in extensions, because they aren't
-/// available in the class vtable.
+/// This occurs when
+/// - it is implied by an attribute like @NSManaged
+/// - we need to dynamically dispatch to a method in an extension.
+///
+/// FIXME: The latter reason is a hack. We should figure out how to safely
+/// put extension methods into the class vtable.
 static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
   // If we can't infer dynamic here, don't.
   if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, D))
@@ -2145,10 +2148,16 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
   if (!D->isObjC() || D->hasClangNode())
     return;
 
-  // Only introduce 'dynamic' on declarations in extensions that don't
-  // override other declarations.
-  if (!isa<ExtensionDecl>(D->getDeclContext()) || D->getOverriddenDecl())
-    return;
+  // Only introduce 'dynamic' on declarations...
+  if (isa<ExtensionDecl>(D->getDeclContext())) {
+    // ...in extensions that don't override other declarations.
+    if (D->getOverriddenDecl())
+      return;
+  } else {
+    // ...and in classes on decls marked @NSManaged.
+    if (!D->getAttrs().hasAttribute<NSManagedAttr>())
+      return;
+  }
 
   // The presence of 'dynamic' or 'final' blocks the inference of 'dynamic'.
   if (D->isDynamic() || D->isFinal())
@@ -3895,7 +3904,8 @@ public:
     if (auto contextType = FD->getDeclContext()->getDeclaredTypeInContext()) {
       // If this is a class member, mark it final if the class is final.
       if (auto cls = contextType->getClassOrBoundGenericClass()) {
-        if (cls->isFinal() && !FD->isFinal()) {
+        if (cls->isFinal() && !FD->isAccessor() &&
+            !FD->isFinal() && !FD->isDynamic()) {
           makeFinal(TC.Context, FD);
         }
       }
@@ -5563,15 +5573,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
       // Properties need some special validation logic.
       if (Type contextType = VD->getDeclContext()->getDeclaredTypeInContext()) {
-        // If this variable is a class member, mark it final if the
-        // class is final, or if it was declared with 'let'.
-        if (auto cls = contextType->getClassOrBoundGenericClass()) {
-          if (!VD->isFinal() && !VD->isDynamic() &&
-              (cls->isFinal() || VD->isLet())) {
-            makeFinal(Context, VD);
-          }
-        }
-
         // If this is a property, check if it needs to be exposed to Objective-C.
         auto protocolContext = dyn_cast<ProtocolDecl>(VD->getDeclContext());
         ObjCReason reason = ObjCReason::DontDiagnose;
@@ -5592,9 +5593,19 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
           isObjC = isRepresentableInObjC(VD, reason);
 
         markAsObjC(*this, VD, isObjC);
-      }
 
-      inferDynamic(Context, VD);
+        inferDynamic(Context, VD);
+
+        // If this variable is a class member, mark it final if the
+        // class is final, or if it was declared with 'let'.
+        if (auto cls = contextType->getClassOrBoundGenericClass()) {
+          if (cls->isFinal() || VD->isLet()) {
+            if (!VD->isFinal() && !VD->isDynamic()) {
+              makeFinal(Context, VD);
+            }
+          }
+        }
+      }
 
       if (!DeclChecker::checkOverrides(*this, VD)) {
         // If a property has an override attribute but does not override
