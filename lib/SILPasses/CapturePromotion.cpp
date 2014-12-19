@@ -817,13 +817,20 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
 
   // Create the substitution maps.
   TypeSubstitutionMap InterfaceSubs;
-  ArrayRef<Substitution> ApplySubs = PAI->getSubstitutions();
-  if (auto *genericSig = F->getLoweredFunctionType()->getGenericSignature())
-    InterfaceSubs = genericSig->getSubstitutionMap(ApplySubs);
-
   TypeSubstitutionMap ContextSubs;
-  if (auto *genericParams = F->getContextGenericParams())
+
+  ArrayRef<Substitution> ApplySubs = PAI->getSubstitutions();
+  auto *genericSig = F->getLoweredFunctionType()->getGenericSignature();
+  auto *genericParams = F->getContextGenericParams();
+
+  if (ApplySubs.size()) {
+    InterfaceSubs = genericSig->getSubstitutionMap(ApplySubs);
     ContextSubs = genericParams->getSubstitutionMap(ApplySubs);
+  } else {
+    assert(!genericSig && "Function type has Unexpected generic signature!");
+    assert(!genericParams &&
+           "Function definition has unexpected generic params!");
+  }
 
   // Create the Cloned Name for the function.
   SILFunction *Orig = FRI->getReferencedFunction();
