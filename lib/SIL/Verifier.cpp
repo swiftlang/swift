@@ -2448,6 +2448,10 @@ public:
     if (FTy->isPolymorphic()) {
       require(F->getContextGenericParams(),
               "generic function definition must have context archetypes");
+    } else {
+      require(!F->getContextGenericParams(),
+              "non-generic function definitions cannot have context "
+              "archetypes");
     }
 
     verifySILFunctionType(FTy);

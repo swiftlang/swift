@@ -430,7 +430,7 @@ ClosureCloner::initCloned(SILFunction *Orig, StringRef ClonedName,
                          M.getASTContext());
 
   auto SubstTy = SILType::substFuncType(M, SM, InterfaceSubs, ClonedTy,
-                                        /* dropGenerics = */ true);
+                                        /* dropGenerics = */ false);
   
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");
@@ -737,13 +737,6 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
 
       auto closureType = PAI->getType().castTo<SILFunctionType>();
 
-      // FIXME: Work-around rdar://problem/19264143 by bailing out
-      //        even if there are no dependent types in the signature
-      //        if there are substitutions or the result of the
-      //        partial_apply is polymorphic.
-      if (PAI->hasSubstitutions() || closureType->isPolymorphic())
-        return false;
-
       // Calculate the index into the closure's argument list of the captured
       // box pointer (the captured address is always the immediately following
       // index so is not stored separately);
@@ -904,8 +897,11 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
     ++OpNo;
   }
 
+  auto SubstFnTy = FnTy.substGenericArgs(M, PAI->getSubstitutions());
+
   // Create a new partial apply with the new arguments.
-  auto *NewPAI = B.createPartialApply(PAI->getLoc(), FnVal, FnTy, {}, Args,
+  auto *NewPAI = B.createPartialApply(PAI->getLoc(), FnVal, SubstFnTy,
+                                      PAI->getSubstitutions(), Args,
                                       PAI->getType());
   SILValue(PAI, 0).replaceAllUsesWith(NewPAI);
   PAI->eraseFromParent();
