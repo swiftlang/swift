@@ -48,12 +48,12 @@ namespace swift {
   /// \brief Identifiers for all passes. Used to procedurally create passes from
   /// lists of passes.
   enum class PassKind {
-#define PASS(Id, ...) Id,
-#define PASS_RANGE(Id, Start, End) Id##_First = Start, Id##_Last = End,
+#define PASS(ID, ARGS) ID,
+#define PASS_RANGE(ID, START, END) ID##_First = START, ID##_Last = END,
 #include "Passes.def"
   };
 
-#define PASS(Id, ...) SILTransform *create##Id(__VA_ARGS__);
+#define PASS(ID, ARGS) SILTransform *create##ID ARGS;
 #include "Passes.def"
 
 } // end namespace swift
