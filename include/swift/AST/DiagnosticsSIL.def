@@ -92,9 +92,6 @@ ERROR(variable_escape_before_initialized,sil_analysis,none,
 ERROR(self_use_before_init_in_delegatinginit,sil_analysis,none,
       "use of '%0' in delegating initializer before self.init is called",
       (StringRef))
-ERROR(self_use_before_init_in_structinit,sil_analysis,none,
-      "use of '%0' in delegating initializer before self.init is called",
-(StringRef))
 
 ERROR(variable_addrtaken_before_initialized,sil_analysis,none,
       "address of variable '%0' taken before it is initialized",
