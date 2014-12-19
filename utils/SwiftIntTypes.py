@@ -74,3 +74,29 @@ def should_define_truncating_bit_pattern_init(src_ty, dst_ty):
 
     return False
 
+def all_integer_type_names():
+    return [self_ty.stdlib_name for self_ty in all_integer_types(0)]
+
+def all_real_number_type_names():
+    return ['Float', 'Double']  #TODO Float80 for i386 & x86_64
+
+def all_numeric_type_names():
+    return all_integer_type_names() + all_real_number_type_names()
+
+# Swift_Programming_Language/Expressions.html
+
+def all_integer_binary_operator_names():
+    return ['<<', '>>', '&*', '&/', '&%', '&', '&+', '&-', '|', '^']
+    
+def all_integer_or_real_binary_operator_names():
+    return ['*', '/', '%', '+', '-', '..<', '...']
+    
+def all_arithmetic_comparison_operator_names():
+    return ['<', '<=', '>', '>=', '==', '!=']
+    
+def all_integer_assignment_operator_names():
+    return ['<<=', '>>=', '&=', '^=', '|=']
+    
+def all_integer_or_real_assignment_operator_names():
+    return ['=', '*=', '/=', '%=', '+=', '-=']
+    
