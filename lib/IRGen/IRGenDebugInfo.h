@@ -139,6 +139,13 @@ public:
     std::tie(LastDebugLoc, LastScope) = LocationStack.pop_back_val();
   }
 
+  /// Emit the final line 0 location for the unified trap block at the
+  /// end of the function.
+  void setArtificialTrapLocation(IRBuilder &Builder, SILDebugScope *Scope) {
+    auto DL = llvm::DebugLoc::get(0, 0, getOrCreateScope(Scope));
+    Builder.SetCurrentDebugLocation(DL);
+  }
+
   /// Emit debug info for an import declaration.
   void emitImport(ImportDecl *D);
 

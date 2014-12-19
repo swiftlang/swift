@@ -513,7 +513,9 @@ public:
     assert(FailBB && "no failure BB");
     // Any line number we would put on a unified trap block would be
     // misleading. Let's be blunt about this and use an artificial location.
-    ArtificialLocation(IGM.DebugInfo, Builder);
+    if (IGM.DebugInfo)
+      IGM.DebugInfo->setArtificialTrapLocation(Builder,
+                                               CurSILFn->getDebugScope());
     CurFn->getBasicBlockList().push_back(FailBB);
     Builder.SetInsertPoint(FailBB);
     llvm::Function *trapIntrinsic = llvm::Intrinsic::getDeclaration(&IGM.Module,
