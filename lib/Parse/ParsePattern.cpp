@@ -161,6 +161,9 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
     unsigned defaultArgIndex = defaultArgs? defaultArgs->NextIndex++ : 0;
 
+    // Attributes.
+    parseDeclAttributeList(param.Attrs, /*stop at type attributes*/true);
+
     // ('inout' | 'let' | 'var')?
     if (Tok.is(tok::kw_inout)) {
       param.LetVarInOutLoc = consumeToken();
@@ -342,7 +345,8 @@ mapParsedParameters(Parser &parser,
                         Parser::ParsedParameter::SpecifierKindTy &specifierKind,
                                 Identifier argName, SourceLoc argNameLoc,
                                 Identifier paramName, SourceLoc paramNameLoc,
-                                TypeRepr *type) -> Pattern * {
+                                TypeRepr *type,
+                                const DeclAttributes &Attrs) -> Pattern * {
     // Create the parameter based on the name.
     Pattern *param;
     ParamDecl *var = nullptr;
@@ -351,6 +355,7 @@ mapParsedParameters(Parser &parser,
                               argNameLoc, argName,
                               paramNameLoc, paramName, Type(),
                               parser.CurDeclContext);
+    var->getAttrs() = Attrs;
     if (argNameLoc.isInvalid() && paramNameLoc.isInvalid())
       var->setImplicit();
     param = new (ctx) NamedPattern(var);
@@ -481,7 +486,7 @@ mapParsedParameters(Parser &parser,
       pattern = createParamPattern(param.LetVarInOutLoc, param.SpecifierKind,
                                    argName, param.FirstNameLoc,
                                    paramName, param.SecondNameLoc,
-                                   param.Type);
+                                   param.Type, param.Attrs);
 
       // If the first name is empty and this parameter would not have been
       // an API name by default, complain.
@@ -512,7 +517,7 @@ mapParsedParameters(Parser &parser,
       pattern = createParamPattern(param.LetVarInOutLoc, param.SpecifierKind,
                                    argName, SourceLoc(),
                                    param.FirstName, param.FirstNameLoc,
-                                   param.Type);
+                                   param.Type, param.Attrs);
     }
 
     // If this parameter had an ellipsis, check whether it's the last parameter.

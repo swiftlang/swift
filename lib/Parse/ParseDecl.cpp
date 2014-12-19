@@ -1188,9 +1188,21 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
 ///   attribute-list-clause:
 ///     '@' attribute
 /// \endverbatim
-bool Parser::parseDeclAttributeList(DeclAttributes &Attributes) {
+bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
+                                    bool StopAtTypeAttributes) {
   while (Tok.is(tok::at_sign)) {
     SourceLoc AtLoc = Tok.getLoc();
+
+    // If StopAtTypeAttributes is true, then we sniff to see if the following
+    // attribute is a type attribute.  If so, we stop here, instead of producing
+    // an error on it.
+    if (StopAtTypeAttributes) {
+      Token next = peekToken();
+      auto Kind = TypeAttributes::getAttrKindFromString(next.getText());
+      if (Kind != TAK_Count && Kind != TAK_autoclosure)
+        return false;
+    }
+
     consumeToken();
     if (parseDeclAttribute(Attributes, AtLoc))
       return true;

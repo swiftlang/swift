@@ -7,6 +7,17 @@
 @autoclosure var v1 : Int = 4 // expected-error {{'autoclosure' attribute may only be applied to values of function type}}
 
 
+func func2(@autoclosure fp : () -> Int) { func2(4)}
+
+func func3(@autoclosure fp fpx : () -> Int) {func3(fp: 0)}
+func func4(@autoclosure #fp : () -> Int) {func4(fp: 0)}
+func func5(@autoclosure var #fp : () -> Int) {func5(fp: 0)}
+func func6(@autoclosure () -> Int) {func6(0)}
+
+// declattr and typeattr on the argument.
+func func7(@autoclosure @noreturn () -> Int) {func7(0)}
+
+
 struct SomeStruct {
   @autoclosure let property : () -> Int  // autoclosures work as an property as well.
 

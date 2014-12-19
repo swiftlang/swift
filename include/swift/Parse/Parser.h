@@ -655,7 +655,8 @@ public:
   void setLocalDiscriminator(ValueDecl *D);
 
   /// Parse the optional attributes before a declaration.
-  bool parseDeclAttributeList(DeclAttributes &Attributes);
+  bool parseDeclAttributeList(DeclAttributes &Attributes,
+                              bool StopAtTypeAttributes = false);
 
   /// Parse a specific attribute.
   bool parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
@@ -864,6 +865,9 @@ public:
 
   /// Describes a parsed parameter.
   struct ParsedParameter {
+    /// Any declaration attributes attached to the parameter.
+    DeclAttributes Attrs;
+
     /// The location of the 'let', 'var', or 'inout' keyword, if present.
     ///
     SourceLoc LetVarInOutLoc;
