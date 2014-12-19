@@ -450,24 +450,6 @@ createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   return { archetype, genericParam };
 }
 
-/// Create a generic parameter list with a single generic parameter.
-///
-/// \returns a tuple (interface type, body type, parameter list) that contains
-/// the interface type for the generic parameter (i.e.,
-/// a GenericTypeParamType*), the body type for the generic parameter (i.e.,
-/// an ArchetypeType*), and the generic parameter list.
-static std::tuple<Type, Type, GenericParamList*>
-getGenericParam(ASTContext &Context) {
-  auto archetypeAndParam = createGenericParam(Context, GenericParamNames[0], 0);
-  ArchetypeType *archetypes[] = { archetypeAndParam.first };
-  auto param = archetypeAndParam.second;
-  auto paramList = GenericParamList::create(Context, SourceLoc(),
-                                            param, SourceLoc());
-  paramList->setAllArchetypes(Context.AllocateCopy(archetypes));
-  return std::make_tuple(param->getDeclaredType(), archetypes[0],
-                         paramList);
-}
-
 /// Create a generic parameter list with multiple generic parameters.
 static GenericParamList *getGenericParams(ASTContext &ctx,
                                           unsigned numParameters,
@@ -488,115 +470,197 @@ static GenericParamList *getGenericParams(ASTContext &ctx,
   return paramList;
 }
 
+namespace {
+  class GenericSignatureBuilder {
+  public:
+    ASTContext &Context;
+
+  private:
+    GenericParamList *TheGenericParamList;
+
+    SmallVector<GenericTypeParamDecl*, 2> GenericTypeParams;
+    SmallVector<ArchetypeType*, 2> Archetypes;
+
+    SmallVector<TupleTypeElt, 4> InterfaceParams;
+    SmallVector<TupleTypeElt, 4> BodyParams;
+
+    Type InterfaceResult;
+    Type BodyResult;
+
+  public:
+    GenericSignatureBuilder(ASTContext &ctx, unsigned numGenericParams = 1)
+        : Context(ctx) {
+      TheGenericParamList = getGenericParams(ctx, numGenericParams,
+                                             Archetypes, GenericTypeParams);
+    }
+
+    template <class G>
+    void addParameter(const G &generator) {
+      InterfaceParams.push_back(generator.build(*this, false));
+      BodyParams.push_back(generator.build(*this, true));
+    }
+
+    template <class G>
+    void setResult(const G &generator) {
+      InterfaceResult = generator.build(*this, false);
+      BodyResult = generator.build(*this, true);
+    }
+
+    ValueDecl *build(Identifier name) {
+      return getBuiltinGenericFunction(name, InterfaceParams, BodyParams,
+                                       InterfaceResult, BodyResult,
+                                       TheGenericParamList);
+    }
+
+    // Don't use these generator classes directly; call the make{...}
+    // functions which follow this class.
+
+    struct ConcreteGenerator {
+      Type TheType;
+      Type build(GenericSignatureBuilder &builder, bool forBody) const {
+        return TheType;
+      }
+    };
+    struct ParameterGenerator {
+      unsigned Index;
+      Type build(GenericSignatureBuilder &builder, bool forBody) const {
+        return (forBody ? builder.Archetypes[Index]
+                        : builder.GenericTypeParams[Index]->getDeclaredType());
+      }
+    };
+    struct LambdaGenerator {
+      std::function<Type(GenericSignatureBuilder &,bool)> TheFunction;
+      Type build(GenericSignatureBuilder &builder, bool forBody) const {
+        return TheFunction(builder, forBody);
+      }
+    };
+    template <class T, class U>
+    struct FunctionGenerator {
+      T Arg;
+      U Result;
+      Type build(GenericSignatureBuilder &builder, bool forBody) const {
+        return FunctionType::get(Arg.build(builder, forBody),
+                                 Result.build(builder, forBody));
+      }
+    };
+    template <class T>
+    struct InOutGenerator {
+      T Object;
+      Type build(GenericSignatureBuilder &builder, bool forBody) const {
+        return InOutType::get(Object.build(builder, forBody));
+      }
+    };
+    template <class T>
+    struct MetatypeGenerator {
+      T Object;
+      Type build(GenericSignatureBuilder &builder, bool forBody) const {
+        return MetatypeType::get(Object.build(builder, forBody));
+      }
+    };
+  };
+}
+
+static GenericSignatureBuilder::ConcreteGenerator
+makeConcrete(Type type) {
+  return { type };
+}
+
+static GenericSignatureBuilder::ParameterGenerator
+makeGenericParam(unsigned index = 0) {
+  return { index };
+}
+
+template <class... Gs>
+static GenericSignatureBuilder::LambdaGenerator
+makeTuple(const Gs & ...elementGenerators) {
+  return {
+    [=](GenericSignatureBuilder &builder, bool forBody) -> Type {
+      TupleTypeElt elts[] = {
+        elementGenerators.build(builder, forBody)...
+      };
+      return TupleType::get(elts, builder.Context);
+    }
+  };
+}
+
+template <class T, class U>
+static GenericSignatureBuilder::FunctionGenerator<T,U>
+makeFunction(const T &arg, const U &result) {
+  return { arg, result };
+}
+
+template <class T>
+static GenericSignatureBuilder::InOutGenerator<T>
+makeInOut(const T &object) {
+  return { object };
+}
+
+template <class T>
+static GenericSignatureBuilder::MetatypeGenerator<T>
+makeMetatype(const T &object) {
+  return { object };
+}
+
 /// Create a function with type <T> T -> ().
 static ValueDecl *getRefCountingOperation(ASTContext &Context, Identifier Id) {
-  Type GenericTy;
-  Type ArchetypeTy;
-  GenericParamList *ParamList;
-  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
-
-  TupleTypeElt ParamElts[] = { GenericTy };
-  TupleTypeElt BodyElts[] = { ArchetypeTy };
-  Type ResultTy = TupleType::getEmpty(Context);
-  return getBuiltinGenericFunction(Id, ParamElts, BodyElts,
-                                   ResultTy, ResultTy, ParamList);
+  GenericSignatureBuilder builder(Context);
+  builder.addParameter(makeGenericParam());
+  builder.setResult(makeConcrete(TupleType::getEmpty(Context)));
+  return builder.build(Id);
 }
 
 static ValueDecl *getLoadOperation(ASTContext &Context, Identifier Id) {
-  Type GenericTy;
-  Type ArchetypeTy;
-  GenericParamList *ParamList;
-  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
-
-  TupleTypeElt ArgElts[] = { Context.TheRawPointerType };
-  Type ResultTy = GenericTy;
-  Type BodyResultTy = ArchetypeTy;
-  return getBuiltinGenericFunction(Id, ArgElts, ArgElts,
-                                   ResultTy, BodyResultTy, ParamList);
+  GenericSignatureBuilder builder(Context);
+  builder.addParameter(makeConcrete(Context.TheRawPointerType));
+  builder.setResult(makeGenericParam());
+  return builder.build(Id);
 }
 
 static ValueDecl *getStoreOperation(ASTContext &Context, Identifier Id) {
-  Type GenericTy;
-  Type ArchetypeTy;
-  GenericParamList *ParamList;
-  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
-
-  TupleTypeElt ArgParamElts[] = { GenericTy, Context.TheRawPointerType };
-  TupleTypeElt ArgBodyElts[] = { ArchetypeTy, Context.TheRawPointerType };
-  Type ResultTy = TupleType::getEmpty(Context);
-  return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
-                                   ResultTy, ResultTy, ParamList);
+  GenericSignatureBuilder builder(Context);
+  builder.addParameter(makeGenericParam());
+  builder.addParameter(makeConcrete(Context.TheRawPointerType));
+  builder.setResult(makeConcrete(TupleType::getEmpty(Context)));
+  return builder.build(Id);
 }
 
 static ValueDecl *getDestroyOperation(ASTContext &Context, Identifier Id) {
-  Type GenericTy;
-  Type ArchetypeTy;
-  GenericParamList *ParamList;
-  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
-
-  TupleTypeElt ArgParamElts[] = { MetatypeType::get(GenericTy),
-                                  Context.TheRawPointerType };
-  TupleTypeElt ArgBodyElts[] = { MetatypeType::get(ArchetypeTy),
-                                 Context.TheRawPointerType };
-  Type ResultTy = TupleType::getEmpty(Context);
-  return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
-                                   ResultTy, ResultTy, ParamList);
+  GenericSignatureBuilder builder(Context);
+  builder.addParameter(makeMetatype(makeGenericParam()));
+  builder.addParameter(makeConcrete(Context.TheRawPointerType));
+  builder.setResult(makeConcrete(TupleType::getEmpty(Context)));
+  return builder.build(Id);
 }
 
 static ValueDecl *getDestroyArrayOperation(ASTContext &Context, Identifier Id) {
-  Type GenericTy;
-  Type ArchetypeTy;
-  GenericParamList *ParamList;
-  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
-  
   auto wordType = BuiltinIntegerType::get(BuiltinIntegerWidth::pointer(),
                                           Context);
-  
-  TupleTypeElt ArgParamElts[] = { MetatypeType::get(GenericTy),
-                                  Context.TheRawPointerType,
-                                  wordType };
-  TupleTypeElt ArgBodyElts[] = { MetatypeType::get(ArchetypeTy),
-                                 Context.TheRawPointerType,
-                                 wordType };
-  Type ResultTy = TupleType::getEmpty(Context);
-  return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
-                                   ResultTy, ResultTy, ParamList);
+  GenericSignatureBuilder builder(Context);
+  builder.addParameter(makeMetatype(makeGenericParam()));
+  builder.addParameter(makeConcrete(Context.TheRawPointerType));
+  builder.addParameter(makeConcrete(wordType));
+  builder.setResult(makeConcrete(TupleType::getEmpty(Context)));
+  return builder.build(Id);
 }
 
 static ValueDecl *getTransferArrayOperation(ASTContext &Context, Identifier Id){
-  Type GenericTy;
-  Type ArchetypeTy;
-  GenericParamList *ParamList;
-  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
-  
   auto wordType = BuiltinIntegerType::get(BuiltinIntegerWidth::pointer(),
                                           Context);
-  
-  TupleTypeElt ArgParamElts[] = { MetatypeType::get(GenericTy),
-                                  Context.TheRawPointerType,
-                                  Context.TheRawPointerType,
-                                  wordType };
-  TupleTypeElt ArgBodyElts[] = { MetatypeType::get(ArchetypeTy),
-                                 Context.TheRawPointerType,
-                                 Context.TheRawPointerType,
-                                 wordType };
-  Type ResultTy = TupleType::getEmpty(Context);
-  return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
-                                   ResultTy, ResultTy, ParamList);
+  GenericSignatureBuilder builder(Context);
+  builder.addParameter(makeMetatype(makeGenericParam()));
+  builder.addParameter(makeConcrete(Context.TheRawPointerType));
+  builder.addParameter(makeConcrete(Context.TheRawPointerType));
+  builder.addParameter(makeConcrete(wordType));
+  builder.setResult(makeConcrete(TupleType::getEmpty(Context)));
+  return builder.build(Id);
 }
 
 static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context,
                                             Identifier Id) {
-  Type GenericTy;
-  Type ArchetypeTy;
-  GenericParamList *ParamList;
-  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
-
-  TupleTypeElt ArgParamElts[] = { MetatypeType::get(GenericTy) };
-  TupleTypeElt ArgBodyElts[] = { MetatypeType::get(ArchetypeTy) };
-  Type ResultTy = BuiltinIntegerType::getWordType(Context);
-  return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
-                                   ResultTy, ResultTy, ParamList);
+  GenericSignatureBuilder builder(Context);
+  builder.addParameter(makeMetatype(makeGenericParam()));
+  builder.setResult(makeConcrete(BuiltinIntegerType::getWordType(Context)));
+  return builder.build(Id);
 }
 
 static ValueDecl *getAllocOperation(ASTContext &Context, Identifier Id) {
@@ -635,11 +699,6 @@ static ValueDecl *getAtomicRMWOperation(ASTContext &Context, Identifier Id,
 
 static ValueDecl *getNativeObjectCast(ASTContext &Context, Identifier Id,
                                        BuiltinValueKind BV) {
-  Type GenericTy;
-  Type ArchetypeTy;
-  GenericParamList *ParamList;
-  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
-
   Type BuiltinTy;
   if (BV == BuiltinValueKind::BridgeToRawPointer ||
       BV == BuiltinValueKind::BridgeFromRawPointer)
@@ -647,39 +706,27 @@ static ValueDecl *getNativeObjectCast(ASTContext &Context, Identifier Id,
   else
     BuiltinTy = Context.TheNativeObjectType;
 
-  Type ArgParam, ArgBody, ResultTy, BodyResultTy;
+  GenericSignatureBuilder builder(Context);
   if (BV == BuiltinValueKind::CastToNativeObject ||
       BV == BuiltinValueKind::BridgeToRawPointer) {
-    ArgParam = GenericTy;
-    ArgBody = ArchetypeTy;
-    ResultTy = BuiltinTy;
-    BodyResultTy = BuiltinTy;
+    builder.addParameter(makeGenericParam());
+    builder.setResult(makeConcrete(BuiltinTy));
   } else {
-    ArgParam = BuiltinTy;
-    ArgBody = BuiltinTy;
-    ResultTy = GenericTy;
-    BodyResultTy = ArchetypeTy;
+    builder.addParameter(makeConcrete(BuiltinTy));
+    builder.setResult(makeGenericParam());
   }
-
-  TupleTypeElt ArgParamElts[] = { ArgParam };
-  TupleTypeElt ArgBodyElts[] = { ArgBody };
-  return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
-                                   ResultTy, BodyResultTy, ParamList);
+  return builder.build(Id);
 }
 
 static ValueDecl *getCastToBridgeObjectOperation(ASTContext &C,
                                                  Identifier Id) {
-  Type GenericTy;
-  Type ArchetypeTy;
-  GenericParamList *ParamList;
-  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(C);
-
-  Type BridgeTy = C.TheBridgeObjectType;
-  Type WordTy = BuiltinIntegerType::get(BuiltinIntegerWidth::pointer(), C);
-  TupleTypeElt ArgParamElts[] = { GenericTy, WordTy };
-  TupleTypeElt ArgBodyElts[] = { ArchetypeTy, WordTy };
-  return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
-                                   BridgeTy, BridgeTy, ParamList);
+  auto wordType = BuiltinIntegerType::get(BuiltinIntegerWidth::pointer(),
+                                          C);
+  GenericSignatureBuilder builder(C);
+  builder.addParameter(makeGenericParam());
+  builder.addParameter(makeConcrete(wordType));
+  builder.setResult(makeConcrete(C.TheBridgeObjectType));
+  return builder.build(Id);
 }
 
 static ValueDecl *getCastFromBridgeObjectOperation(ASTContext &C,
@@ -690,12 +737,10 @@ static ValueDecl *getCastFromBridgeObjectOperation(ASTContext &C,
   
   switch (BV) {
   case BuiltinValueKind::CastReferenceFromBridgeObject: {
-    Type GenericTy;
-    Type ArchetypeTy;
-    GenericParamList *ParamList;
-    std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(C);
-    return getBuiltinGenericFunction(Id, ArgElts, ArgElts,
-                                     GenericTy, ArchetypeTy, ParamList);
+    GenericSignatureBuilder builder(C);
+    builder.addParameter(makeConcrete(BridgeTy));
+    builder.setResult(makeGenericParam());
+    return builder.build(Id);
   }
 
   case BuiltinValueKind::CastBitPatternFromBridgeObject: {
@@ -708,90 +753,48 @@ static ValueDecl *getCastFromBridgeObjectOperation(ASTContext &C,
   }
 }
 
-static ValueDecl *getReinterpretCastOperation(ASTContext &Context,
-                                              Identifier Id) {
+static ValueDecl *getReinterpretCastOperation(ASTContext &ctx,
+                                              Identifier name) {
   // <T, U> T -> U
   // SILGen and IRGen check additional constraints during lowering.
-  
-  // Create the generic parameters.
-  SmallVector<ArchetypeType *, 2> Archetypes;
-  SmallVector<GenericTypeParamDecl *, 2> GenericParams;
-  auto ParamList = getGenericParams(Context, 2, Archetypes, GenericParams);
-  
-  TupleTypeElt Params(GenericParams[0]->getDeclaredType());
-  TupleTypeElt BodyArgs(Archetypes[0]);
-  
-  return getBuiltinGenericFunction(Id, Params, BodyArgs,
-                                   GenericParams[1]->getDeclaredType(),
-                                   Archetypes[1], ParamList);
+  GenericSignatureBuilder builder(ctx, 2);
+  builder.addParameter(makeGenericParam(0));
+  builder.setResult(makeGenericParam(1));
+  return builder.build(name);
 }
 
 static ValueDecl *getMarkDependenceOperation(ASTContext &ctx, Identifier name) {
   // <T,U> (T,U) -> T
-
-  // Create the generic parameters.
-  SmallVector<ArchetypeType *, 2> archetypes;
-  SmallVector<GenericTypeParamDecl *, 2> genericParams;
-  auto paramList = getGenericParams(ctx, 2, archetypes, genericParams);
-
-  TupleTypeElt paramTypes[] = {
-    genericParams[0]->getDeclaredType(),
-    genericParams[1]->getDeclaredType(),
-  };
-  TupleTypeElt bodyParamTypes[] = {
-    archetypes[0],
-    archetypes[1],
-  };
-
-  Type resultType = genericParams[0]->getDeclaredType();
-  Type bodyResultType = archetypes[0];
-
-  return getBuiltinGenericFunction(name, paramTypes, bodyParamTypes,
-                                   resultType, bodyResultType, paramList);
+  GenericSignatureBuilder builder(ctx, 2);
+  builder.addParameter(makeGenericParam(0));
+  builder.addParameter(makeGenericParam(1));
+  builder.setResult(makeGenericParam(0));
+  return builder.build(name);
 }
 
 static ValueDecl *getZeroInitializerOperation(ASTContext &Context,
                                              Identifier Id) {
   // <T> () -> T
-  Type GenericTy;
-  Type ArchetypeTy;
-  GenericParamList *ParamList;
-  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
-
-  return getBuiltinGenericFunction(Id, {}, {}, GenericTy, ArchetypeTy,
-                                   ParamList);
+  GenericSignatureBuilder builder(Context);
+  builder.setResult(makeGenericParam());
+  return builder.build(Id);
 }
 
 static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
   // <T> (@inout T) -> RawPointer
-  Type GenericTy;
-  Type ArchetypeTy;
-  GenericParamList *ParamList;
-  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
-
-  TupleTypeElt ArgParamElts(InOutType::get(GenericTy));
-  TupleTypeElt ArgBodyElts(InOutType::get(ArchetypeTy));
-  Type ResultTy = Context.TheRawPointerType;
-  return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
-                                   ResultTy, ResultTy, ParamList);
+  GenericSignatureBuilder builder(Context);
+  builder.addParameter(makeInOut(makeGenericParam()));
+  builder.setResult(makeConcrete(Context.TheRawPointerType));
+  return builder.build(Id);
 }
 
 static ValueDecl *getCanBeObjCClassOperation(ASTContext &Context,
-                                          Identifier Id) {
+                                             Identifier Id) {
   // <T> T.Type -> Builtin.Int8
-  Type GenericTy;
-  Type ArchetypeTy;
-  GenericParamList *ParamList;
-  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
-  
-  GenericTy = MetatypeType::get(GenericTy);
-  ArchetypeTy = MetatypeType::get(ArchetypeTy);
-  
-  TupleTypeElt ArgParamElts[] = { GenericTy };
-  TupleTypeElt ArgBodyElts[] = { ArchetypeTy };
-  Type ResultTy = BuiltinIntegerType::get(8, Context);
-  return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
-                                   ResultTy, ResultTy, ParamList);
+  GenericSignatureBuilder builder(Context);
+  builder.addParameter(makeMetatype(makeGenericParam()));
+  builder.setResult(makeConcrete(BuiltinIntegerType::get(8, Context)));
+  return builder.build(Id);
 }
 
 static ValueDecl *getCondFailOperation(ASTContext &C, Identifier Id) {
@@ -812,16 +815,10 @@ static ValueDecl *getAssertConfOperation(ASTContext &C, Identifier Id) {
 
 static ValueDecl *getFixLifetimeOperation(ASTContext &C, Identifier Id) {
   // <T> T -> ()
-  Type GenericTy;
-  Type ArchetypeTy;
-  GenericParamList *ParamList;
-  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(C);
-  
-  TupleTypeElt ArgParam[] = { GenericTy };
-  TupleTypeElt ArgBody[] = { ArchetypeTy };
-  Type Void = TupleType::getEmpty(C);
-  
-  return getBuiltinGenericFunction(Id, ArgParam,ArgBody, Void,Void, ParamList);
+  GenericSignatureBuilder builder(C);
+  builder.addParameter(makeGenericParam());
+  builder.setResult(makeConcrete(TupleType::getEmpty(C)));
+  return builder.build(Id);
 }
 
 static ValueDecl *getExtractElementOperation(ASTContext &Context, Identifier Id,
@@ -944,16 +941,12 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
 static ValueDecl *getTryPinOperation(ASTContext &ctx, Identifier name) {
   // <T> NativeObject -> T
   // (T must actually be NativeObject?)
+  GenericSignatureBuilder builder(ctx);
+  builder.addParameter(makeConcrete(ctx.TheNativeObjectType));
+  builder.setResult(makeGenericParam());
+  return builder.build(name);
 
-  TupleTypeElt params[] = { ctx.TheNativeObjectType };
 
-  Type genericTy;
-  Type archetypeTy;
-  GenericParamList *paramList;
-  std::tie(genericTy, archetypeTy, paramList) = getGenericParam(ctx);
-
-  return getBuiltinGenericFunction(name, params, params,
-                                   genericTy, archetypeTy, paramList);
 }
 
 static ValueDecl *
@@ -962,38 +955,16 @@ getMakeMaterializeForSetCallbackOperation(ASTContext &ctx, Identifier name) {
   //       inout Builtin.UnsafeValueBuffer,
   //       inout T,
   //       T.Type) -> ()) -> Builtin.RawPointer
-
-  Type genericTy;
-  Type archetypeTy;
-  GenericParamList *paramList;
-  std::tie(genericTy, archetypeTy, paramList) = getGenericParam(ctx);
-
-  auto bufferType = InOutType::get(ctx.TheUnsafeValueBufferType);
-
-  TupleTypeElt callbackParams[] = {
-    ctx.TheRawPointerType,
-    bufferType,
-    InOutType::get(genericTy),
-    MetatypeType::get(genericTy),
-  };
-  TupleTypeElt callbackBodyParams[] = {
-    ctx.TheRawPointerType,
-    bufferType,
-    InOutType::get(archetypeTy),
-    MetatypeType::get(archetypeTy),
-  };
-  Type emptyTupleTy = TupleType::getEmpty(ctx);
-
-  TupleTypeElt params[] = {
-    FunctionType::get(TupleType::get(callbackParams, ctx), emptyTupleTy),
-  };
-  TupleTypeElt bodyParams[] = {
-    FunctionType::get(TupleType::get(callbackBodyParams, ctx), emptyTupleTy),
-  };
-
-  return getBuiltinGenericFunction(name, params, bodyParams,
-                                   ctx.TheRawPointerType, ctx.TheRawPointerType,
-                                   paramList);
+  GenericSignatureBuilder builder(ctx);
+  builder.addParameter(
+    makeFunction(
+      makeTuple(makeConcrete(ctx.TheRawPointerType),
+                makeConcrete(InOutType::get(ctx.TheUnsafeValueBufferType)),
+                makeInOut(makeGenericParam()),
+                makeMetatype(makeGenericParam())),
+      makeConcrete(TupleType::getEmpty(ctx))));
+  builder.setResult(makeConcrete(ctx.TheRawPointerType));
+  return builder.build(name);
 }
 
 /// An array of the overloaded builtin kinds.
