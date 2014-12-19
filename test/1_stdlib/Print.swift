@@ -766,7 +766,7 @@ func test_SetPrinting() {
   debugPrintedIs(sI, "Set([11, 22])", expected2: "Set([22, 11])")
 
   let sS = Set<String>(["Hello", "world"])
-  printedIs(sS, "Set([Hello, world])", expected2: "Set([world, Hello])")
+  printedIs(sS, "Set([\"Hello\", \"world\"])", expected2: "Set([\"world\", \"Hello\"])")
   debugPrintedIs(sS, "Set([\"Hello\", \"world\"])", expected2: "Set([\"world\", \"Hello\"])")
 
   println("test_SetPrinting done")
