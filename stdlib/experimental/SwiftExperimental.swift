@@ -44,26 +44,6 @@ public func ∘<T, U, V>(g: U -> V, f: T -> U) -> (T -> V) {
   return { g(f($0)) }
 }
 
-/// The flip function.
-///
-/// ::
-///
-///   flip(f)(b)(a) == f(a)(b)
-///
-public func flip<T, U, V>(f: T -> U -> V) -> U -> T -> V {
-  return { (u: U) -> T -> V in { f($0)(u) } }
-}
-
-/// The identity function.
-///
-/// ::
-///
-///   id(a) = a
-///
-public func identity<T>(value: T) -> T {
-  return value
-}
-
 infix operator ∖ { associativity left precedence 140 }
 infix operator ∖= { associativity right precedence 90 assignment }
 infix operator ∪ { associativity left precedence 140 }
