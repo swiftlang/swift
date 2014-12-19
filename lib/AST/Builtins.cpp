@@ -945,8 +945,28 @@ static ValueDecl *getTryPinOperation(ASTContext &ctx, Identifier name) {
   builder.addParameter(makeConcrete(ctx.TheNativeObjectType));
   builder.setResult(makeGenericParam());
   return builder.build(name);
+}
 
+static ValueDecl *getProjectValueBufferOperation(ASTContext &ctx,
+                                                 Identifier name) {
+  // <T> (inout Builtin.UnsafeValueBuffer, T.Type) -> Builtin.RawPointer
+  GenericSignatureBuilder builder(ctx);
+  builder.addParameter(makeConcrete(
+                              InOutType::get(ctx.TheUnsafeValueBufferType)));
+  builder.addParameter(makeMetatype(makeGenericParam()));
+  builder.setResult(makeConcrete(ctx.TheRawPointerType));
+  return builder.build(name);
+}
 
+static ValueDecl *getDeallocValueBufferOperation(ASTContext &ctx,
+                                                 Identifier name) {
+  // <T> (inout Builtin.UnsafeValueBuffer, T.Type) -> ()
+  GenericSignatureBuilder builder(ctx);
+  builder.addParameter(makeConcrete(
+                              InOutType::get(ctx.TheUnsafeValueBufferType)));
+  builder.addParameter(makeMetatype(makeGenericParam()));
+  builder.setResult(makeConcrete(ctx.TheRawPointerType));
+  return builder.build(name);
 }
 
 static ValueDecl *
@@ -1432,6 +1452,15 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::ReinterpretCast:
     if (!Types.empty()) return nullptr;
     return getReinterpretCastOperation(Context, Id);
+
+  case BuiltinValueKind::AllocValueBuffer:
+  case BuiltinValueKind::ProjectValueBuffer:
+    if (!Types.empty()) return nullptr;
+    return getProjectValueBufferOperation(Context, Id);
+
+  case BuiltinValueKind::DeallocValueBuffer:
+    if (!Types.empty()) return nullptr;
+    return getDeallocValueBufferOperation(Context, Id);
 
   case BuiltinValueKind::MakeMaterializeForSetCallback:
     if (!Types.empty()) return nullptr;

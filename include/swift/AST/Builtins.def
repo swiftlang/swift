@@ -191,6 +191,18 @@ BUILTIN_SIL_OPERATION(Init, "initialize", Special)
 /// MarkDependence has type (T, U) -> T
 BUILTIN_SIL_OPERATION(MarkDependence, "markDependence", Special)
 
+/// allocValueBuffer : <T> (inout Builtin.UnsafeValueBuffer, T.Type)
+///                           -> Builtin.RawPointer
+BUILTIN_SIL_OPERATION(AllocValueBuffer, "allocValueBuffer", Special)
+
+/// projectValueBuffer : <T> (inout Builtin.UnsafeValueBuffer, T.Type)
+///                             -> Builtin.RawPointer
+BUILTIN_SIL_OPERATION(ProjectValueBuffer, "projectValueBuffer", Special)
+
+/// deallocValueBuffer : <T> (inout Builtin.UnsafeValueBuffer, T.Type)
+///                           -> ()
+BUILTIN_SIL_OPERATION(DeallocValueBuffer, "deallocValueBuffer", Special)
+
 /// MakeMaterializeForSetCallback has type
 ///   ((Builtin.RawPointer,
 ///     inout Builtin.UnsafeValueBuffer,

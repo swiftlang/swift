@@ -12,8 +12,11 @@
 
 #include "SpecializedEmitter.h"
 
+#include "Cleanup.h"
 #include "Initialization.h"
+#include "LValue.h"
 #include "RValue.h"
+#include "Scope.h"
 #include "SILGenFunction.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
@@ -583,6 +586,94 @@ static ManagedValue emitBuiltinMarkDependence(SILGenFunction &gen,
   SILValue result =
     gen.B.createMarkDependence(loc, args[0].forward(gen), args[1].getValue());
   return gen.emitManagedRValueWithCleanup(result);
+}
+
+
+using ValueBufferOperation =
+  llvm::function_ref<ManagedValue(SILValue bufferAddr,
+                                  SILType valueType)>;
+
+static ManagedValue
+emitValueBufferOperation(SILGenFunction &gen,
+                         SILLocation loc,
+                         ArrayRef<Substitution> subs,
+                         Expr *tupleArg,
+                         SGFContext C,
+                         const ValueBufferOperation &operation) {
+
+  assert(subs.size() == 1);
+  auto args = decomposeArguments(gen, tupleArg, 2);
+
+  // It's really not safe if we ever need to do writeback for this,
+  // but go ahead and satisfy the rules, and bound the cleanups while
+  // we're at it.
+  FullExpr fullExpr(gen.Cleanups, CleanupLocation::getCleanupLocation(loc));
+  WritebackScope writebackScope(gen);
+
+  LValue bufferLV = gen.emitLValue(args[0], AccessKind::ReadWrite);
+
+  // Ignore the metatype argument.
+  gen.emitIgnoredExpr(args[1]);
+
+  ManagedValue bufferAddr =
+    gen.emitAddressOfLValue(args[0], std::move(bufferLV),
+                            AccessKind::ReadWrite);
+
+  // Like Builtin.load/initialize, we use the current abstraction level.
+  // (This is crucial, because we expect the result to be passed to
+  // those builtins!)
+  SILType valueTy = gen.getLoweredType(subs[0].getReplacement());
+
+  return operation(bufferAddr.getValue(), valueTy);
+}
+
+
+static ManagedValue
+emitBuiltinAllocValueBuffer(SILGenFunction &gen,
+                            SILLocation loc,
+                            ArrayRef<Substitution> subs,
+                            Expr *tupleArg,
+                            SGFContext C) {
+  return emitValueBufferOperation(gen, loc, subs, tupleArg, C,
+    [&](SILValue bufferAddr, SILType valueTy)
+          -> ManagedValue {
+      SILValue result =
+        gen.B.createAllocValueBuffer(loc, valueTy, bufferAddr);
+      result = gen.B.createAddressToPointer(loc, result,
+                             SILType::getRawPointerType(gen.getASTContext()));
+      return ManagedValue::forUnmanaged(result);
+    });
+}
+
+static ManagedValue
+emitBuiltinProjectValueBuffer(SILGenFunction &gen,
+                              SILLocation loc,
+                              ArrayRef<Substitution> subs,
+                              Expr *tupleArg,
+                              SGFContext C) {
+  return emitValueBufferOperation(gen, loc, subs, tupleArg, C,
+    [&](SILValue bufferAddr, SILType valueTy)
+          -> ManagedValue {
+      SILValue result =
+        gen.B.createProjectValueBuffer(loc, valueTy, bufferAddr);
+      result = gen.B.createAddressToPointer(loc, result,
+                             SILType::getRawPointerType(gen.getASTContext()));
+      return ManagedValue::forUnmanaged(result);
+    });
+}
+
+static ManagedValue
+emitBuiltinDeallocValueBuffer(SILGenFunction &gen,
+                              SILLocation loc,
+                              ArrayRef<Substitution> subs,
+                              Expr *tupleArg,
+                              SGFContext C) {
+  return emitValueBufferOperation(gen, loc, subs, tupleArg, C,
+    [&](SILValue bufferAddr, SILType valueTy)
+          -> ManagedValue {
+      gen.B.createDeallocValueBuffer(loc, valueTy, bufferAddr);
+      return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
+    });
 }
 
 static CanType makeThick(CanMetatypeType oldMetatype) {
