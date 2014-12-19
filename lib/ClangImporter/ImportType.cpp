@@ -1287,15 +1287,18 @@ Type ClangImporter::Implementation::getNamedSwiftType(Module *module,
   SmallVector<ValueDecl *, 2> results;
   module->lookupValue({ }, SwiftContext.getIdentifier(name),
                       NLKind::UnqualifiedLookup, results);
-  if (results.size() == 1) {
-    if (auto type = dyn_cast<TypeDecl>(results.front())) {
-      if (typeResolver)
-        typeResolver->resolveDeclSignature(type);
-      return type->getDeclaredType();
-    }
-  }
+  if (results.size() != 1)
+    return Type();
 
-  return Type();
+  auto type = dyn_cast<TypeDecl>(results.front());
+  if (!type)
+    return Type();
+
+  assert(!type->hasClangNode() && "picked up the original type?");
+
+  if (typeResolver)
+    typeResolver->resolveDeclSignature(type);
+  return type->getDeclaredType();
 }
 
 Type
