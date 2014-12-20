@@ -264,41 +264,41 @@ func fence_test() {
 func cmpxchg_test(ptr: Builtin.RawPointer, a: Builtin.Int32, b: Builtin.Int32) {
   // rdar://12939803 - ER: support atomic cmpxchg/xchg with pointers
 
-  // CHECK: cmpxchg i32* {{.*}}, i32 {{.*}}, i32 {{.*}} acquire acquire
-  // CHECK: extractvalue { i32, i1 } {{.*}}, 0
-  // CHECK: extractvalue { i32, i1 } {{.*}}, 1
-  // CHECK: store i32 {{.*}}, i32* %z, align 4
-  // CHECK: store i1 {{.*}}, i1* %zSuccess, align 1
+  // CHECK: [[Z_RES:%.*]] = cmpxchg i32* {{.*}}, i32 {{.*}}, i32 {{.*}} acquire acquire
+  // CHECK: [[Z_VAL:%.*]] = extractvalue { i32, i1 } [[Z_RES]], 0
+  // CHECK: [[Z_SUCCESS:%.*]] = extractvalue { i32, i1 } [[Z_RES]], 1
+  // CHECK: store i32 [[Z_VAL]], i32* {{.*}}, align 4
+  // CHECK: store i1 [[Z_SUCCESS]], i1* {{.*}}, align 1
   var (z, zSuccess) = Builtin.cmpxchg_acquire_acquire_Int32(ptr, a, b)
 
-  // CHECK: cmpxchg volatile i32* {{.*}}, i32 {{.*}}, i32 {{.*}} monotonic monotonic
-  // CHECK: extractvalue { i32, i1 } {{.*}}, 0
-  // CHECK: extractvalue { i32, i1 } {{.*}}, 1
-  // CHECK: store i32 {{.*}}, i32* %y, align 4
-  // CHECK: store i1 {{.*}}, i1* %ySuccess, align 1
+  // CHECK: [[Y_RES:%.*]] = cmpxchg volatile i32* {{.*}}, i32 {{.*}}, i32 {{.*}} monotonic monotonic
+  // CHECK: [[Y_VAL:%.*]] = extractvalue { i32, i1 } [[Y_RES]], 0
+  // CHECK: [[Y_SUCCESS:%.*]] = extractvalue { i32, i1 } [[Y_RES]], 1
+  // CHECK: store i32 [[Y_VAL]], i32* {{.*}}, align 4
+  // CHECK: store i1 [[Y_SUCCESS]], i1* {{.*}}, align 1
   var (y, ySuccess) = Builtin.cmpxchg_monotonic_monotonic_volatile_Int32(ptr, a, b)
 
-  // CHECK: cmpxchg volatile i32* {{.*}}, i32 {{.*}}, i32 {{.*}} singlethread acquire monotonic
-  // CHECK: extractvalue { i32, i1 } {{.*}}, 0
-  // CHECK: extractvalue { i32, i1 } {{.*}}, 1
-  // CHECK: store i32 {{.*}}, i32* %x, align 4
-  // CHECK: store i1 {{.*}}, i1* %xSuccess, align 1
+  // CHECK: [[X_RES:%.*]] = cmpxchg volatile i32* {{.*}}, i32 {{.*}}, i32 {{.*}} singlethread acquire monotonic
+  // CHECK: [[X_VAL:%.*]] = extractvalue { i32, i1 } [[X_RES]], 0
+  // CHECK: [[X_SUCCESS:%.*]] = extractvalue { i32, i1 } [[X_RES]], 1
+  // CHECK: store i32 [[X_VAL]], i32* {{.*}}, align 4
+  // CHECK: store i1 [[X_SUCCESS]], i1* {{.*}}, align 1
   var (x, xSuccess) = Builtin.cmpxchg_acquire_monotonic_volatile_singlethread_Int32(ptr, a, b)
 
-  // CHECK: cmpxchg volatile i64* {{.*}}, i64 {{.*}}, i64 {{.*}} seq_cst seq_cst
-  // CHECK: extractvalue { i64, i1 } {{.*}}, 0
-  // CHECK: extractvalue { i64, i1 } {{.*}}, 1
-  // CHECK: inttoptr i64 {{.*}} to i8*
-  // CHECK: store i8* {{.*}}, i8** %w, align 8
-  // CHECK: store i1 {{.*}}, i1* %wSuccess, align 1
+  // CHECK: [[W_RES:%.*]] = cmpxchg volatile i64* {{.*}}, i64 {{.*}}, i64 {{.*}} seq_cst seq_cst
+  // CHECK: [[W_VAL:%.*]] = extractvalue { i64, i1 } {{.*}}, 0
+  // CHECK: [[W_SUCCESS:%.*]] = extractvalue { i64, i1 } {{.*}}, 1
+  // CHECK: [[W_VAL_PTR:%.*]] = inttoptr i64 [[W_VAL]] to i8*
+  // CHECK: store i8* [[W_VAL_PTR]], i8** {{.*}}, align 8
+  // CHECK: store i1 [[W_SUCCESS]], i1* {{.*}}, align 1
   var (w, wSuccess) = Builtin.cmpxchg_seqcst_seqcst_volatile_singlethread_RawPointer(ptr, ptr, ptr)
 
-  // CHECK: cmpxchg weak volatile i64* {{.*}}, i64 {{.*}}, i64 {{.*}} seq_cst seq_cst
-  // CHECK: extractvalue { i64, i1 } {{.*}}, 0
-  // CHECK: extractvalue { i64, i1 } {{.*}}, 1
-  // CHECK: inttoptr i64 {{.*}} to i8*
-  // CHECK: store i8* {{.*}}, i8** %v, align 8
-  // CHECK: store i1 {{.*}}, i1* %vSuccess, align 1
+  // CHECK: [[W_RES:%.*]] = cmpxchg weak volatile i64* {{.*}}, i64 {{.*}}, i64 {{.*}} seq_cst seq_cst
+  // CHECK: [[W_VAL:%.*]] = extractvalue { i64, i1 } {{.*}}, 0
+  // CHECK: [[W_SUCCESS:%.*]] = extractvalue { i64, i1 } {{.*}}, 1
+  // CHECK: [[W_VAL_PTR:%.*]] = inttoptr i64 [[W_VAL]] to i8*
+  // CHECK: store i8* [[W_VAL_PTR]], i8** {{.*}}, align 8
+  // CHECK: store i1 [[W_SUCCESS]], i1* {{.*}}, align 1
   var (v, vSuccess) = Builtin.cmpxchg_seqcst_seqcst_weak_volatile_singlethread_RawPointer(ptr, ptr, ptr)
 }
 
