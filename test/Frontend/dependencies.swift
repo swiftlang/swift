@@ -1,6 +1,9 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
 
+// <rdar://problem/19318312> test/Frontend/dependencies.swift fails when assertions are disabled
+// XFAIL: no_asserts
+
 // RUN: %swift -emit-dependencies-path - -parse %S/../Inputs/empty.swift | FileCheck -check-prefix=CHECK-BASIC %s
 
 // CHECK-BASIC-LABEL: - :
