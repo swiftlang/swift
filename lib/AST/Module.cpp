@@ -268,6 +268,11 @@ void SourceLookupCache::lookupClassMembers(AccessPathTy accessPath,
   
   if (!accessPath.empty()) {
     for (auto &member : ClassMembers) {
+      // Non-simple names are also stored under their simple name, so make
+      // sure to only report them once.
+      if (!member.first.isSimpleName())
+        continue;
+
       for (ValueDecl *vd : member.second) {
         Type ty = vd->getDeclContext()->getDeclaredTypeOfContext();
         if (auto nominal = ty->getAnyNominal())
@@ -279,6 +284,11 @@ void SourceLookupCache::lookupClassMembers(AccessPathTy accessPath,
   }
 
   for (auto &member : ClassMembers) {
+    // Non-simple names are also stored under their simple name, so make sure to
+    // only report them once.
+    if (!member.first.isSimpleName())
+      continue;
+
     for (ValueDecl *vd : member.second)
       consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup);
   }
