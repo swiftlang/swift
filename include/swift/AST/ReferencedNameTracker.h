@@ -21,24 +21,22 @@ namespace swift {
 class NominalTypeDecl;
 
 class ReferencedNameTracker {
-  llvm::DenseMap<Identifier, bool> TopLevelNames;
-  llvm::DenseMap<const NominalTypeDecl *, bool> UsedNominals;
-public:
-  void addTopLevelName(Identifier name, bool isCascadingUse) {
-    TopLevelNames[name] |= isCascadingUse;
+#define TRACKED_SET(KIND, NAME) \
+private: \
+  llvm::DenseMap<KIND, bool> NAME##s; \
+public: \
+  void add##NAME(KIND new##NAME, bool isCascadingUse) { \
+    NAME##s[new##NAME] |= isCascadingUse; \
+  } \
+  const decltype(NAME##s) &get##NAME##s() const { \
+    return NAME##s; \
   }
 
-  const llvm::DenseMap<Identifier, bool> &getTopLevelNames() const {
-    return TopLevelNames;
-  }
+  TRACKED_SET(Identifier, TopLevelName)
+  TRACKED_SET(Identifier, DynamicLookupName)
+  TRACKED_SET(const NominalTypeDecl *, UsedNominal)
 
-  void addUsedNominal(const NominalTypeDecl *nominal, bool isCascadingUse) {
-    UsedNominals[nominal] |= isCascadingUse;
-  }
-
-  const llvm::DenseMap<const NominalTypeDecl *, bool> &getUsedNominals() const {
-    return UsedNominals;
-  }
+#undef TRACKED_SET
 };
 
 } // end namespace swift

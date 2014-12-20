@@ -1401,6 +1401,9 @@ bool DeclContext::lookupQualified(Type type,
 
   // If we want to perform lookup into all classes, do so now.
   if (wantLookupInAllClasses) {
+    if (tracker)
+      tracker->addDynamicLookupName(member.getBaseName(), isLookupCascading);
+
     // Collect all of the visible declarations.
     SmallVector<ValueDecl *, 4> allDecls;
     forAllVisibleModules(this, [&](Module::ImportedModule import) {

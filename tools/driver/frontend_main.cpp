@@ -41,8 +41,9 @@
 #include "llvm/Option/OptTable.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/YAMLParser.h"
 
 #include <memory>
 
@@ -101,6 +102,10 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     return true;
   }
 
+  auto escape = [](Identifier name) -> std::string {
+    return llvm::yaml::escape(name.str());
+  };
+
   out << "### Swift dependencies file v0 ###\n";
 
   SmallVector<const NominalTypeDecl *, 16> extendedNominals;
@@ -127,7 +132,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     case DeclKind::InfixOperator:
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
-      out << "- \"" << cast<OperatorDecl>(D)->getName() << "\"\n";
+      out << "- \"" << escape(cast<OperatorDecl>(D)->getName()) << "\"\n";
       break;
 
     case DeclKind::Enum:
@@ -139,7 +144,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
           NTD->getAccessibility() == Accessibility::Private) {
         break;
       }
-      out << "- \"" << NTD->getName() << "\"\n";
+      out << "- \"" << escape(NTD->getName()) << "\"\n";
       extendedNominals.push_back(NTD);
       findNominals(extendedNominals, NTD->getMembers());
       break;
@@ -153,7 +158,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
           VD->getAccessibility() == Accessibility::Private) {
         break;
       }
-      out << "- \"" << VD->getName() << "\"\n";
+      out << "- \"" << escape(VD->getName()) << "\"\n";
       break;
     }
 
@@ -191,7 +196,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     out << "- ";
     if (!entry.second)
       out << "!private ";
-    out << "\"" << entry.first << "\"\n";
+    out << "\"" << escape(entry.first) << "\"\n";
   }
 
   // FIXME: Sort these?
@@ -208,6 +213,15 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     out << "\"";
     mangler.mangleContext(entry.first, Mangle::Mangler::BindGenerics::None);
     out << "\"\n";
+  }
+
+  // FIXME: Sort these?
+  out << "dynamic-lookup:\n";
+  for (auto &entry : tracker->getDynamicLookupNames()) {
+    out << "- ";
+    if (!entry.second)
+      out << "!private ";
+    out << "\"" << escape(entry.first) << "\"\n";
   }
 
   return false;
