@@ -91,6 +91,9 @@ public:
 
   /// Should we emit self as a guaranteed parameter. Disabled by default.
   bool EnableGuaranteedSelf = false;
+
+  /// Should we use a pass pipeline passed in via a json file? Null by default.
+  StringRef ExternalPassPipelineFilename;
 };
 
 } // end namespace swift

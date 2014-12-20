@@ -298,13 +298,7 @@ static void runCommandLineSelectedPasses(SILModule *Module) {
   PM.registerAnalysis(createDestructorAnalysis(Module));
 
   for (auto Pass : Passes) {
-    switch (Pass) {
-#define PASS(Id, ...)                           \
-  case PassKind::Id:                            \
-    PM.add(create##Id());                       \
-    break;
-#include "swift/SILPasses/Passes.def"
-    }
+    PM.add(createPass(Pass));
   }
   PM.run();
 }

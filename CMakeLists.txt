@@ -229,6 +229,9 @@ set(SWIFT_ASAN_BUILD OFF CACHE BOOL "This is an AddressSanitizer build")
 set(SWIFT_EXTRA_FLAGS "" CACHE STRING
   "Extra flags to pass when compiling swift files")
 
+set(SWIFT_STDLIB_CORE_EXTRA_FLAGS "" CACHE STRING
+  "Extra flags to pass when compiling stdlib core")
+
 set(SWIFT_DISTCC "" CACHE PATH
   "Path to distcc executable for distributed builds")
 
@@ -471,7 +474,7 @@ function(compile_swift_files)
     list(APPEND swift_flags -parse-as-library)
   endif()
   if(SWIFTFILE_IS_STDLIB_CORE)
-    list(APPEND swift_flags -nostdimport -parse-stdlib -module-name "Swift" -Xfrontend -sil-serialize-all)
+    list(APPEND swift_flags -nostdimport -parse-stdlib -module-name "Swift" -Xfrontend -sil-serialize-all ${SWIFT_STDLIB_CORE_EXTRA_FLAGS})
   endif()
 
   set(objfile ${SWIFTFILE_OUTPUT})

@@ -397,7 +397,13 @@ static bool performCompile(CompilerInstance &Instance,
   // These may change across compiler versions.
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
   if (IRGenOpts.Optimize) {
-    runSILOptimizationPasses(*SM);
+    StringRef CustomPipelinePath =
+      Invocation.getSILOptions().ExternalPassPipelineFilename;
+    if (!CustomPipelinePath.empty()) {
+      runSILOptimizationPassesWithFileSpecification(*SM, CustomPipelinePath);
+    } else {
+      runSILOptimizationPasses(*SM);
+    }
     SM->verify();
   }
 
@@ -456,8 +462,8 @@ static bool performCompile(CompilerInstance &Instance,
 
   // Cleanup instructions/builtin calls not suitable for IRGen.
   performSILCleanup(SM.get());
-  
-  // TODO: remove once the frontend understands what action it should perform  
+
+  // TODO: remove once the frontend understands what action it should perform
   switch (Action) {
   case FrontendOptions::EmitIR:
     IRGenOpts.OutputKind = IRGenOutputKind::LLVMAssembly;
@@ -517,7 +523,7 @@ int frontend_main(ArrayRef<const char *>Args,
     Instance.getDiags().diagnose(SourceLoc(), diag::error_no_frontend_args);
     return 1;
   }
-  
+
   CompilerInvocation Invocation;
   std::string MainExecutablePath = llvm::sys::fs::getMainExecutable(Argv0,
                                                                     MainAddr);
@@ -610,6 +616,6 @@ int frontend_main(ArrayRef<const char *>Args,
       HadError = true;
     }
   }
-  
+
   return HadError;
 }

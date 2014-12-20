@@ -244,4 +244,8 @@ def interpret : Flag<["-"], "interpret">, HelpText<"Immediate mode">, ModeOpt;
 def enable_guaranteed_self : Flag<["-"], "enable-guaranteed-self">,
   HelpText<"Enable the passing of self as a guaranteed parameter">;
 
+def external_pass_pipeline_filename : Separate<["-"], "external-pass-pipeline-filename">,
+    HelpText<"Use the pass pipeline defined by <pass_pipeline_file>">,
+    MetaVarName<"<pass_pipeline_file>">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

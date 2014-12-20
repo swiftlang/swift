@@ -31,6 +31,9 @@ namespace swift {
   /// \brief Run all the SIL performance optimization passes on \p M.
   void runSILOptimizationPasses(SILModule &M);
 
+  void runSILOptimizationPassesWithFileSpecification(SILModule &Module,
+                                                     StringRef FileName);
+
   /// \brief Detect and remove unreachable code. Diagnose provably unreachable
   /// user code.
   void performSILDiagnoseUnreachable(SILModule *M);
@@ -52,6 +55,7 @@ namespace swift {
 #define PASS_RANGE(ID, START, END) ID##_First = START, ID##_Last = END,
 #include "Passes.def"
   };
+  SILTransform *createPass(PassKind Kind);
 
 #define PASS(ID, ARGS) SILTransform *create##ID ARGS;
 #include "Passes.def"
