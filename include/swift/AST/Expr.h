@@ -2765,7 +2765,7 @@ public:
 /// when an scalar expression is converted to @autoclosure function type.
 /// For example:
 /// \code
-///   var x : @autoclosure () -> int = 4
+///   @autoclosure var x : () -> Int = 4
 /// \endcode
 class AutoClosureExpr : public AbstractClosureExpr {
   BraceStmt *Body;
