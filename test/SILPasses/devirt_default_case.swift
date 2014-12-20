@@ -1,8 +1,12 @@
 // RUN: %swift -O  -module-name devirt_default_case -disable-func-sig-opts -emit-sil %s | FileCheck %s
 
+
+@asmname("action")
+func action(n:Int)->()
+
 // public class
 public class Base1 {
-  @inline(never) func inner() { println("Base")}
+  @inline(never) func inner() { action(1)}
   func middle() { inner() }
 // Check that call to Base1.middle cannot be devirtualized
 //
@@ -16,20 +20,20 @@ public class Base1 {
 
 // public class
 public class Derived1 : Base1 {
-  override func inner() { println("Derived1") }
+  override func inner() { action(2) }
   @inline(never) final override func middle() { inner() }
 }
 
 // private class
 private class Base2 {
-  @inline(never) func inner() { println("Base")}
+  @inline(never) func inner() { action(3)}
   func middle() { inner() }
   func outer() { middle() }
 }
 
 // private class
 private class Derived2 : Base2 {
-  override func inner() { println("Derived1") }
+  override func inner() { action(4) }
   @inline(never) final override func middle() { inner() }
 }
 
@@ -57,7 +61,7 @@ public func callOuter(x: Int) -> Int {
 
 // internl class
 class Base3 {
-  @inline(never) func inner() { println("Base")}
+  @inline(never) func inner() { action(5)}
   @inline(never) func middle() { inner() }
 // Check that call to Base3.middle can be devirtualized
 // 
@@ -73,7 +77,7 @@ class Base3 {
 
 // private class
 private class Derived3 : Base3 {
-  override func inner() { println("Derived1") }
+  override func inner() { action(6) }
   @inline(never) final override func middle() { inner() }
   override func outer() {
   }
@@ -96,7 +100,9 @@ func foo(a: A2) -> Int {
   return a.f()
 }
 
-println("foo(E()) = \(foo(E2()))")
+public func testfoo1() -> Int {
+  return foo(E2())
+}
 
 class A3 { @inline(never) func f() -> Int { return 0 } }
 class B3 : A3 { @inline(never) override func f() -> Int { return 1 }}
@@ -118,7 +124,9 @@ func foo(a: A3) -> Int {
   return a.f()
 }
 
-println("foo(E()) = \(foo(E3()))")
+public func testfoo3() -> Int {
+  return foo(E3())
+}
 
 class Base4 {
   @inline(never)
@@ -179,7 +187,9 @@ func check_static_class_devirt(c: C6) -> Int {
   return c.bar() 
 }
 
-println(check_static_class_devirt(D6()))
+public func test_check_static_class_devirt() -> Int {
+  return check_static_class_devirt(D6())
+}
 
 
 class A7 { @inline(never) func foo() -> Bool { return false } }
@@ -205,7 +215,9 @@ func check_call_on_downcasted_instance(a: A7) -> Bool {
   return a.foo()
 }
 
-println(check_call_on_downcasted_instance(B7()))
+public func test_check_call_on_downcasted_instance() -> Bool {
+  return check_call_on_downcasted_instance(B7())
+}
 
 @inline(never)
 func callIt(b3: Base3, b4: Base4, b5: Base5) {
