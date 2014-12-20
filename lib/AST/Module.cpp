@@ -192,6 +192,8 @@ void SourceLookupCache::populateMemberCache(const SourceFile &SF) {
       addToMemberCache(ED->getMembers());
     }
   }
+
+  MemberCachePopulated = true;
 }
 
 void SourceLookupCache::addToMemberCache(DeclRange decls) {
