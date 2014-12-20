@@ -21,6 +21,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
@@ -187,6 +188,22 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     mangler.mangleContext(nominal, Mangle::Mangler::BindGenerics::None);
     out << "\"\n";
   }
+
+  out << "class-members:\n";
+  class ValueDeclPrinter : public VisibleDeclConsumer {
+  private:
+    raw_ostream &out;
+    std::string (*escape)(Identifier);
+  public:
+    ValueDeclPrinter(raw_ostream &out, decltype(escape) escape)
+      : out(out), escape(escape) {}
+
+    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+      out << "- \"" << escape(VD->getName()) << "\"\n";
+    }
+  };
+  ValueDeclPrinter printer(out, escape);
+  SF->lookupClassMembers({}, printer);
 
   ReferencedNameTracker *tracker = SF->getReferencedNameTracker();
 

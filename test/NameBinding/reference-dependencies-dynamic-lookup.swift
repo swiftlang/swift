@@ -6,14 +6,26 @@
 
 import Foundation
 
+// CHECK-LABEL: class-members:
+
 @objc class Base {
+  // CHECK-DAG: - "foo"
   func foo() {}
+
+  // CHECK-DAG: - "bar"
   func bar(x: Int, y: Int) {}
+  
+  // FIXME: We don't really need this twice, but de-duplicating is effort.
+  // CHECK-DAG: - "bar"
   func bar(str: String) {}
     
+  // CHECK-DAG: - "prop"
   var prop: String?
+
+  // CHECK-DAG: - "unusedProp"
   var unusedProp: Int = 0
   
+  // CHECK-DAG: - "classFunc"
   class func classFunc() {}
 }
 
