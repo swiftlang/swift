@@ -22,8 +22,9 @@
 using namespace swift;
 
 enum class DependencyGraphImpl::DependencyKind : uint8_t {
-  Name = 1 << 0,
-  Type = 1 << 1
+  TopLevelName = 1 << 0,
+  DynamicLookupName = 1 << 1,
+  NominalType = 1 << 2,
 };
 enum class DependencyGraphImpl::DependencyFlags : uint8_t {
   IsCascading = 1 << 0
@@ -70,14 +71,18 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
     using KindPair = std::pair<DependencyKind, DependencyDirection>;
 
     KindPair dirAndKind = llvm::StringSwitch<KindPair>(key->getValue(scratch))
-      .Case("top-level", std::make_pair(DependencyKind::Name,
+      .Case("top-level", std::make_pair(DependencyKind::TopLevelName,
                                         DependencyDirection::Depends))
-      .Case("member-access", std::make_pair(DependencyKind::Type,
+      .Case("member-access", std::make_pair(DependencyKind::NominalType,
                                             DependencyDirection::Depends))
-      .Case("provides", std::make_pair(DependencyKind::Name,
+      .Case("dynamic-lookup", std::make_pair(DependencyKind::DynamicLookupName,
+                                             DependencyDirection::Depends))
+      .Case("provides", std::make_pair(DependencyKind::TopLevelName,
                                        DependencyDirection::Provides))
-      .Case("nominals", std::make_pair(DependencyKind::Type,
-                                       DependencyDirection::Provides));
+      .Case("nominals", std::make_pair(DependencyKind::NominalType,
+                                       DependencyDirection::Provides))
+      .Case("class-members", std::make_pair(DependencyKind::DynamicLookupName,
+                                            DependencyDirection::Provides));
 
     auto *entries = cast<yaml::SequenceNode>(i->getValue());
     for (const yaml::Node &rawEntry : *entries) {

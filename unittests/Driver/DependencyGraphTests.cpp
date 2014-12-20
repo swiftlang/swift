@@ -16,6 +16,10 @@ TEST(DependencyGraph, BasicLoad) {
             LoadResult::UpToDate);
   EXPECT_EQ(graph.loadFromString(i++, "nominals: [g, h]"),
             LoadResult::UpToDate);
+  EXPECT_EQ(graph.loadFromString(i++, "class-members: [i, j]"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(graph.loadFromString(i++, "dynamic-lookup: [k, l]"),
+            LoadResult::UpToDate);
 
   EXPECT_EQ(graph.loadFromString(i++,
                                  "nominals: [a, b]\n"
@@ -216,6 +220,29 @@ TEST(DependencyGraph, SimpleDependent5) {
   EXPECT_EQ(graph.loadFromString(0, "nominals: [a]\nprovides: [a]"),
             LoadResult::UpToDate);
   EXPECT_EQ(graph.loadFromString(1, "member-access: [a]\ntop-level: [a]"),
+            LoadResult::UpToDate);
+
+  SmallVector<uintptr_t, 4> marked;
+
+  graph.markTransitive(marked, 0);
+  EXPECT_EQ(1u, marked.size());
+  EXPECT_EQ(1u, marked.front());
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+
+  marked.clear();
+  graph.markTransitive(marked, 0);
+  EXPECT_EQ(0u, marked.size());
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+}
+
+TEST(DependencyGraph, SimpleDependent6) {
+  DependencyGraph<uintptr_t> graph;
+
+  EXPECT_EQ(graph.loadFromString(0, "class-members: [a, b, c]"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(graph.loadFromString(1, "dynamic-lookup: [x, b, z]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;

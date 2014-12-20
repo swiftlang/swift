@@ -189,21 +189,26 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     out << "\"\n";
   }
 
-  out << "class-members:\n";
-  class ValueDeclPrinter : public VisibleDeclConsumer {
-  private:
-    raw_ostream &out;
-    std::string (*escape)(Identifier);
-  public:
-    ValueDeclPrinter(raw_ostream &out, decltype(escape) escape)
-      : out(out), escape(escape) {}
+  if (SF->getASTContext().LangOpts.EnableObjCInterop) {
+    // FIXME: This requires a traversal of the whole file to compute.
+    // We should (a) see if there's a cheaper way to keep it up to date,
+    // and/or (b) see if we can fast-path cases where there's no ObjC involved.
+    out << "class-members:\n";
+    class ValueDeclPrinter : public VisibleDeclConsumer {
+    private:
+      raw_ostream &out;
+      std::string (*escape)(Identifier);
+    public:
+      ValueDeclPrinter(raw_ostream &out, decltype(escape) escape)
+        : out(out), escape(escape) {}
 
-    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-      out << "- \"" << escape(VD->getName()) << "\"\n";
-    }
-  };
-  ValueDeclPrinter printer(out, escape);
-  SF->lookupClassMembers({}, printer);
+      void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+        out << "- \"" << escape(VD->getName()) << "\"\n";
+      }
+    };
+    ValueDeclPrinter printer(out, escape);
+    SF->lookupClassMembers({}, printer);
+  }
 
   ReferencedNameTracker *tracker = SF->getReferencedNameTracker();
 
