@@ -1340,14 +1340,6 @@ extension NSSet {
   convenience init(objects elements: AnyObject...) {
     self.init(array: elements)
   }
-
-  // Using the actual `getObjects` causes an infinite recursion
-  // because NSSet calls CFSetGetValues but NSSet.getObjects
-  // isn't exposed as public API.
-  func copyObjectPointers(buffer: UnsafeMutablePointer<AnyObject>) {
-    CFSetGetValues(self as CFSet,
-      unsafeBitCast(buffer, UnsafeMutablePointer<UnsafePointer<Void>>.self))
-  }
 }
 
 extension NSSet : ArrayLiteralConvertible {

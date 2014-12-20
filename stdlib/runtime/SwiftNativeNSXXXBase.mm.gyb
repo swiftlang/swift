@@ -196,6 +196,11 @@ swift_stdlib_CFStringGetCharactersPtr(NSString *str) {
   return Result;
 }
 
+extern "C" void swift_stdlib_CFSetGetValues(NSSet *set, const void **values) {
+  CFSetGetValues((__bridge CFSetRef)set, values);
+  swift_unknownRelease(set);
+}
+
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

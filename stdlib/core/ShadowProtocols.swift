@@ -153,7 +153,6 @@ public protocol _NSSetCoreType :
 /// supplies.
 @unsafe_no_objc_tagged_pointer @objc
 public protocol _NSSetType : _NSSetCoreType {
-  func copyObjectPointers(objects: UnsafeMutablePointer<AnyObject>)
 }
 
 #endif

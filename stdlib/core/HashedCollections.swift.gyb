@@ -754,6 +754,9 @@ extension Set: Printable, DebugPrintable {
 }
 
 #if _runtime(_ObjC)
+@asmname("swift_stdlib_CFSetGetValues")
+func _stdlib_CFSetGetValues(nss: _NSSetType, UnsafeMutablePointer<AnyObject>)
+
 /// Equivalent to `NSSet.allObjects`, but does not leave objects on the
 /// autorelease pool.
 internal func _stdlib_NSSet_allObjects(nss: _NSSetType) ->
@@ -761,7 +764,7 @@ internal func _stdlib_NSSet_allObjects(nss: _NSSetType) ->
   let count = nss.count
   var buffer = _HeapBuffer<Int, AnyObject>(
     _HeapBufferStorage<Int, AnyObject>.self, count, count)
-  nss.copyObjectPointers(buffer.baseAddress)
+  _stdlib_CFSetGetValues(nss, buffer.baseAddress)
   return buffer
 }
 #endif
