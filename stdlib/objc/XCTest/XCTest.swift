@@ -78,7 +78,7 @@ public func XCTFail(_ message: String = "", file: String = __FILE__, line: UInt 
   _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, "" as NSString), message, file, line)
 }
 
-public func XCTAssertNil(expression: @autoclosure () -> AnyObject?, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNil(@autoclosure expression: () -> AnyObject?, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Nil
   
   // evaluate the expression exactly once
@@ -119,7 +119,7 @@ public func XCTAssertNil(expression: @autoclosure () -> AnyObject?, _ message: S
   }
 }
 
-public func XCTAssertNotNil(expression: @autoclosure () -> AnyObject?, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotNil(@autoclosure expression: () -> AnyObject?, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotNil
   
   // evaluate the expression exactly once
@@ -160,12 +160,12 @@ public func XCTAssertNotNil(expression: @autoclosure () -> AnyObject?, _ message
   }
 }
 
-public func XCTAssert(expression: @autoclosure () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)  -> Void {
+public func XCTAssert( @autoclosure expression: () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)  -> Void {
   // XCTAssert is just a cover for XCTAssertTrue.
   XCTAssertTrue(expression, message, file: file, line: line);
 }
 
-public func XCTAssertTrue(expression: @autoclosure () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertTrue(@autoclosure expression: () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.True
   
   // evaluate the expression exactly once
@@ -193,7 +193,7 @@ public func XCTAssertTrue(expression: @autoclosure () -> BooleanType, _ message:
   }
 }
 
-public func XCTAssertFalse(expression: @autoclosure () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)  -> Void {
+public func XCTAssertFalse(@autoclosure expression: () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)  -> Void {
   let assertionType = _XCTAssertionType.False
   
   // evaluate the expression exactly once
@@ -221,7 +221,7 @@ public func XCTAssertFalse(expression: @autoclosure () -> BooleanType, _ message
   }
 }
 
-public func XCTAssertEqual<T : Equatable>(expression1: @autoclosure () -> T, expression2: @autoclosure () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> T, @autoclosure expression2: () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Equal
   
   // evaluate each expression exactly once
@@ -262,7 +262,7 @@ public func XCTAssertEqual<T : Equatable>(expression1: @autoclosure () -> T, exp
 //  Array<T>
 //  Dictionary<T, U>
 
-public func XCTAssertEqual<T : Equatable>(expression1: @autoclosure () -> Slice<T>, expression2: @autoclosure () -> Slice<T>, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> Slice<T>, @autoclosure expression2: () -> Slice<T>, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Equal
   
   // evaluate each expression exactly once
@@ -297,7 +297,7 @@ public func XCTAssertEqual<T : Equatable>(expression1: @autoclosure () -> Slice<
   }
 }
 
-public func XCTAssertEqual<T : Equatable>(expression1: @autoclosure () -> ContiguousArray<T>, expression2: @autoclosure () -> ContiguousArray<T>, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> ContiguousArray<T>, @autoclosure expression2: () -> ContiguousArray<T>, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Equal
   
   // evaluate each expression exactly once
@@ -332,7 +332,7 @@ public func XCTAssertEqual<T : Equatable>(expression1: @autoclosure () -> Contig
   }
 }
 
-public func XCTAssertEqual<T : Equatable>(expression1: @autoclosure () -> [T], expression2: @autoclosure () -> [T], _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> [T], @autoclosure expression2: () -> [T], _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Equal
   
   // evaluate each expression exactly once
@@ -367,7 +367,7 @@ public func XCTAssertEqual<T : Equatable>(expression1: @autoclosure () -> [T], e
   }
 }
 
-public func XCTAssertEqual<T, U : Equatable>(expression1: @autoclosure () -> [T: U], expression2: @autoclosure () -> [T: U], _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertEqual<T, U : Equatable>(@autoclosure expression1: () -> [T: U], @autoclosure expression2: () -> [T: U], _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Equal
   
   // evaluate each expression exactly once
@@ -402,7 +402,7 @@ public func XCTAssertEqual<T, U : Equatable>(expression1: @autoclosure () -> [T:
   }
 }
 
-public func XCTAssertNotEqual<T : Equatable>(expression1: @autoclosure () -> T, expression2: @autoclosure () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> T, @autoclosure expression2: () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqual
   
   // evaluate each expression exactly once
@@ -443,7 +443,7 @@ public func XCTAssertNotEqual<T : Equatable>(expression1: @autoclosure () -> T, 
 //  Array<T>
 //  Dictionary<T, U>
 
-public func XCTAssertNotEqual<T : Equatable>(expression1: @autoclosure () -> ContiguousArray<T>, expression2: @autoclosure () -> ContiguousArray<T>, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> ContiguousArray<T>, @autoclosure expression2: () -> ContiguousArray<T>, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqual
   
   // evaluate each expression exactly once
@@ -478,7 +478,7 @@ public func XCTAssertNotEqual<T : Equatable>(expression1: @autoclosure () -> Con
   }
 }
 
-public func XCTAssertNotEqual<T : Equatable>(expression1: @autoclosure () -> Slice<T>, expression2: @autoclosure () -> Slice<T>, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> Slice<T>, @autoclosure expression2: () -> Slice<T>, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqual
   
   // evaluate each expression exactly once
@@ -513,7 +513,7 @@ public func XCTAssertNotEqual<T : Equatable>(expression1: @autoclosure () -> Sli
   }
 }
 
-public func XCTAssertNotEqual<T : Equatable>(expression1: @autoclosure () -> [T], expression2: @autoclosure () -> [T], _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> [T], @autoclosure expression2: () -> [T], _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqual
   
   // evaluate each expression exactly once
@@ -548,7 +548,7 @@ public func XCTAssertNotEqual<T : Equatable>(expression1: @autoclosure () -> [T]
   }
 }
 
-public func XCTAssertNotEqual<T, U : Equatable>(expression1: @autoclosure () -> [T: U], expression2: @autoclosure () -> [T: U], _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotEqual<T, U : Equatable>(@autoclosure expression1: () -> [T: U], @autoclosure expression2: () -> [T: U], _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqual
   
   // evaluate each expression exactly once
@@ -598,7 +598,7 @@ func _XCTCheckEqualWithAccuracy_CGFloat(value1: CGFloat, value2: CGFloat, accura
     && (abs(value1 - value2) <= accuracy)
 }
 
-public func XCTAssertEqualWithAccuracy<T: FloatingPointType>(expression1: @autoclosure () -> T, expression2: @autoclosure () -> T, accuracy: T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertEqualWithAccuracy<T: FloatingPointType>(@autoclosure expression1: () -> T, @autoclosure expression2: () -> T, accuracy: T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.EqualWithAccuracy
   
   // evaluate each expression exactly once
@@ -666,7 +666,7 @@ func _XCTCheckNotEqualWithAccuracy_CGFloat(value1: CGFloat, value2: CGFloat, acc
     || (abs(value1 - value2) > accuracy)
 }
 
-public func XCTAssertNotEqualWithAccuracy<T: FloatingPointType>(expression1: @autoclosure () -> T, expression2: @autoclosure () -> T, accuracy: T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotEqualWithAccuracy<T: FloatingPointType>(@autoclosure expression1: () -> T, @autoclosure expression2: () -> T, accuracy: T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqualWithAccuracy
   
   // evaluate each expression exactly once
@@ -719,7 +719,7 @@ public func XCTAssertNotEqualWithAccuracy<T: FloatingPointType>(expression1: @au
   }
 }
 
-public func XCTAssertGreaterThan<T: Comparable>(expression1: @autoclosure () -> T, expression2: @autoclosure () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertGreaterThan<T: Comparable>(@autoclosure expression1: () -> T, @autoclosure expression2: () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.GreaterThan
   
   // evaluate each expression exactly once
@@ -754,7 +754,7 @@ public func XCTAssertGreaterThan<T: Comparable>(expression1: @autoclosure () -> 
   }
 }
 
-public func XCTAssertGreaterThanOrEqual<T: Comparable>(expression1: @autoclosure () -> T, expression2: @autoclosure () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)
+public func XCTAssertGreaterThanOrEqual<T: Comparable>(@autoclosure expression1: () -> T, @autoclosure expression2: () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)
 {
   let assertionType = _XCTAssertionType.GreaterThanOrEqual
   
@@ -790,7 +790,7 @@ public func XCTAssertGreaterThanOrEqual<T: Comparable>(expression1: @autoclosure
   }
 }
 
-public func XCTAssertLessThan<T: Comparable>(expression1: @autoclosure () -> T, expression2: @autoclosure () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertLessThan<T: Comparable>(@autoclosure expression1: () -> T, @autoclosure expression2: () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.LessThan
   
   // evaluate each expression exactly once
@@ -825,7 +825,7 @@ public func XCTAssertLessThan<T: Comparable>(expression1: @autoclosure () -> T, 
   }
 }
 
-public func XCTAssertLessThanOrEqual<T: Comparable>(expression1: @autoclosure () -> T, expression2: @autoclosure () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)
+public func XCTAssertLessThanOrEqual<T: Comparable>(@autoclosure expression1: () -> T, @autoclosure expression2: () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)
 {
   let assertionType = _XCTAssertionType.LessThanOrEqual
   
@@ -864,37 +864,37 @@ public func XCTAssertLessThanOrEqual<T: Comparable>(expression1: @autoclosure ()
 #if XCTEST_ENABLE_EXCEPTION_ASSERTIONS
 // --- Currently-Unsupported Assertions ---
 
-public func XCTAssertThrows(expression: @autoclosure () -> Any?, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertThrows(@autoclosure expression: () -> Any?, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Assertion_Throws
   
   // FIXME: Unsupported
 }
 
-public func XCTAssertThrowsSpecific(expression: @autoclosure () -> Any?, exception: Any, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertThrowsSpecific(@autoclosure expression: () -> Any?, exception: Any, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Assertion_ThrowsSpecific
   
   // FIXME: Unsupported
 }
 
-public func XCTAssertThrowsSpecificNamed(expression: @autoclosure () -> Any?, exception: Any, name: String, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertThrowsSpecificNamed(@autoclosure expression: () -> Any?, exception: Any, name: String, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Assertion_ThrowsSpecificNamed
   
   // FIXME: Unsupported
 }
 
-public func XCTAssertNoThrow(expression: @autoclosure () -> Any?, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNoThrow(@autoclosure expression: () -> Any?, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Assertion_NoThrow
   
   // FIXME: Unsupported
 }
 
-public func XCTAssertNoThrowSpecific(expression: @autoclosure () -> Any?, exception: Any, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNoThrowSpecific(@autoclosure expression: () -> Any?, exception: Any, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Assertion_NoThrowSpecific
   
   // FIXME: Unsupported
 }
 
-public func XCTAssertNoThrowSpecificNamed(expression: @autoclosure () -> Any?, exception: Any, name: String, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNoThrowSpecificNamed(@autoclosure expression: () -> Any?, exception: Any, name: String, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Assertion_NoThrowSpecificNamed
   
   // FIXME: Unsupported
