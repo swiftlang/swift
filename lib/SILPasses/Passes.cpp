@@ -32,6 +32,8 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorOr.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/YAMLParser.h"
 
 llvm::cl::opt<bool>
