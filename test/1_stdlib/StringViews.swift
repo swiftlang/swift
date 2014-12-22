@@ -65,22 +65,11 @@ tests.test("decoding") {
   )
 }
 
-func utf8GraphemeClusterIndices(s: String) -> [String.UTF8Index] {
-  return indices(s).map { $0.samePositionIn(s.utf8) }
-}
-
-func utf8UnicodeScalarIndices(s: String) -> [String.UTF8Index] {
-  return indices(s.unicodeScalars).map { $0.samePositionIn(s.utf8) }
-}
-
-func utf8UTF16Indices(s: String) -> [String.UTF8Index?] {
-  return indices(s.utf16).map { $0.samePositionIn(s.utf8) }
-}
-  
 // winter UTF8 grapheme clusters ([]) and unicode scalars (|)
 // [f0 9f 8f 82] [e2 98 83] [e2 9d 85] [e2 9d 86] [e2 9d 84 | ef b8 8e]
 // [e2 9b 84 | ef b8 8f]    [e2 9d 84 | ef b8 8f]
 
+//===--- To UTF8 ----------------------------------------------------------===//
 tests.test("index-mapping/character-to-utf8") {
   // the first four utf8 code units at the start of each grapheme
   // cluster
@@ -93,16 +82,18 @@ tests.test("index-mapping/character-to-utf8") {
       [0xe2, 0x9d, 0x84, 0xef],
       [0xe2, 0x9b, 0x84, 0xef],
       [0xe2, 0x9d, 0x84, 0xef]] as [[UTF8.CodeUnit]],
-    
-    map(utf8GraphemeClusterIndices(winter)) {
-      i in (0..<4).map { winter.utf8[advance(i, $0)] }
+
+    indices(winter).map { 
+      i in (0..<4).map {
+        winter.utf8[advance(i.samePositionIn(winter.utf8), $0)]
+      }
     }, ==)
 
   expectEqual(winter.utf8.endIndex, winter.endIndex.samePositionIn(winter.utf8))
   
   expectEqualSequence(
     summerBytes,
-    utf8GraphemeClusterIndices(summer).map { summer.utf8[$0] }
+    indices(summer).map { summer.utf8[$0.samePositionIn(summer.utf8)] }
   )
   
   expectEqual(summer.utf8.endIndex, summer.endIndex.samePositionIn(summer.utf8))
@@ -125,8 +116,10 @@ tests.test("index-mapping/unicode-scalar-to-utf8") {
       [0xef, 0xb8, 0x8f]
     ] as [[UTF8.CodeUnit]],
     
-    map(utf8UnicodeScalarIndices(winter)) {
-      i in (0..<3).map { winter.utf8[advance(i, $0)] }
+    indices(winter.unicodeScalars).map {
+      i in (0..<3).map {
+        winter.utf8[advance(i.samePositionIn(winter.utf8), $0)]
+      }
     }, ==)
 
   expectEqual(
@@ -135,7 +128,9 @@ tests.test("index-mapping/unicode-scalar-to-utf8") {
   
   expectEqualSequence(
     summerBytes,
-    utf8UnicodeScalarIndices(summer).map { summer.utf8[$0] }
+    indices(summer.unicodeScalars).map {
+      summer.utf8[$0.samePositionIn(summer.utf8)]
+    }
   )
 
   expectEqual(
@@ -160,7 +155,7 @@ tests.test("index-mapping/utf16-to-utf8") {
       [0xe2, 0x9d, 0x84],
       [0xef, 0xb8, 0x8f]
     ] as [[UTF8.CodeUnit]],
-    map(indices(winter.utf16)) {
+    indices(winter.utf16).map {
       i16 in i16.samePositionIn(winter.utf8).map {
         i8 in (0..<3).map { winter.utf8[advance(i8, $0)] }
       } ?? []
@@ -173,7 +168,9 @@ tests.test("index-mapping/utf16-to-utf8") {
   
   expectEqualSequence(
     summerBytes,
-    utf8UTF16Indices(summer).map { summer.utf8[$0!] }
+    indices(summer.utf16).map {
+      summer.utf8[$0.samePositionIn(summer.utf8)!]
+    }
   )
   
   expectNotEmpty(summer.utf16.endIndex.samePositionIn(summer.utf8))
@@ -224,19 +221,252 @@ tests.test("index-mapping/utf8-to-unicode-scalar") {
     summer.utf8.endIndex.samePositionIn(summer.unicodeScalars)!)
 }
 
-func expectEquality<T: Equatable>(x: T, y: T, expected: Bool) {
-  let actual = x == y
-  if expected != actual {
-    let op = actual ? "==" : "!="
-    println("unexpectedly, \(x) \(op) \(y)")
-  }
-  if actual != (y == x) {
-    println("equality is asymmetric")
-  }
+tests.test("index-mapping/utf16-to-unicode-scalar") {
+  let winterUtf16UnicodeScalars: [UnicodeScalar?] = [
+    UnicodeScalar(0x1f3c2), nil,
+    UnicodeScalar(0x2603), 
+    UnicodeScalar(0x2745), 
+    UnicodeScalar(0x2746), 
+    UnicodeScalar(0x2744), UnicodeScalar(0xfe0e),
+    UnicodeScalar(0x26c4), UnicodeScalar(0xfe0f),
+    UnicodeScalar(0x2744), UnicodeScalar(0xfe0f)
+  ]
+  
+  expectEqualSequence(
+    winterUtf16UnicodeScalars,
+    map(indices(winter.utf16)) {
+      i in i.samePositionIn(winter.unicodeScalars).map {
+        winter.unicodeScalars[$0]
+      }
+    }, ==
+  )
+
+  expectNotEmpty(winter.utf16.endIndex.samePositionIn(winter.unicodeScalars))
+  expectEqual(
+    winter.unicodeScalars.endIndex,
+    winter.utf16.endIndex.samePositionIn(winter.unicodeScalars)!)
+  
+  expectEqualSequence(
+    map(summerBytes) { UnicodeScalar($0) as UnicodeScalar? },
+    map(indices(summer.utf16)) {
+      i in i.samePositionIn(summer.unicodeScalars).map {
+        summer.unicodeScalars[$0]
+      }
+    }, ==
+  )
+
+  expectNotEmpty(summer.utf16.endIndex.samePositionIn(summer.unicodeScalars))
+  expectEqual(
+    summer.unicodeScalars.endIndex,
+    summer.utf16.endIndex.samePositionIn(summer.unicodeScalars)!)
 }
 
-func expectNil<T>(x: T?, _ message: String = "unexpected non-nil") {
-  if x != nil { println(message) }
+//===--- To UTF16 ----------------------------------------------------------===//
+tests.test("index-mapping/character-to-utf16") {
+  expectEqualSequence(
+    [
+      0xd83c, // 0xdfc2,
+      0x2603,
+      0x2745,
+      0x2746,
+      0x2744, // 0xfe0e,
+      0x26c4, // 0xfe0f,
+      0x2744, // 0xfe0f
+    ] as [UTF16.CodeUnit],
+    
+    indices(winter).map {
+      winter.utf16[$0.samePositionIn(winter.utf16)]
+    }, ==)
+
+  expectEqual(winter.utf16.endIndex, winter.endIndex.samePositionIn(winter.utf16))
+  
+  expectEqualSequence(
+    summerBytes.map { UTF16.CodeUnit($0) },
+    indices(summer).map { summer.utf16[$0.samePositionIn(summer.utf16)] }
+  )
+  
+  expectEqual(summer.utf16.endIndex, summer.endIndex.samePositionIn(summer.utf16))
+}
+
+tests.test("index-mapping/unicode-scalar-to-utf16") {
+  // the first three utf16 code units at the start of each unicode
+  // scalar
+  expectEqualSequence(
+    [
+      0xd83c, // 0xdfc2,
+      0x2603,
+      0x2745,
+      0x2746,
+      0x2744, 0xfe0e,
+      0x26c4, 0xfe0f,
+      0x2744, 0xfe0f
+    ] as [UTF16.CodeUnit],
+    
+    indices(winter.unicodeScalars).map {
+      winter.utf16[$0.samePositionIn(winter.utf16)]
+    })
+
+  expectEqual(
+    winter.utf16.endIndex,
+    winter.unicodeScalars.endIndex.samePositionIn(winter.utf16))
+  
+  expectEqualSequence(
+    summerBytes.map { UTF16.CodeUnit($0) },
+    indices(summer.unicodeScalars).map {
+      summer.utf16[$0.samePositionIn(summer.utf16)]
+    }
+  )
+
+  expectEqual(
+    summer.utf16.endIndex,
+    summer.unicodeScalars.endIndex.samePositionIn(summer.utf16))
+}
+
+tests.test("index-mapping/utf8-to-utf16") {
+  expectEqualSequence(
+    [
+      0xd83c, nil, nil, nil,
+      0x2603, nil, nil,
+      0x2745, nil, nil,
+      0x2746, nil, nil,
+      0x2744, nil, nil,
+      0xfe0e, nil, nil,
+      0x26c4, nil, nil,
+      0xfe0f, nil, nil,
+      0x2744, nil, nil,
+      0xfe0f, nil, nil
+    ] as [UTF16.CodeUnit?],
+
+    indices(winter.utf8).map {
+      $0.samePositionIn(winter.utf16).map {
+        winter.utf16[$0]
+      }
+    }, ==)
+
+  expectNotEmpty(winter.utf8.endIndex.samePositionIn(winter.utf16))
+  expectEqual(
+    winter.utf16.endIndex,
+    winter.utf8.endIndex.samePositionIn(winter.utf16)!)
+  
+  expectEqualSequence(
+    summerBytes.map { UTF16.CodeUnit($0) },
+    indices(summer.utf8).map { summer.utf16[$0.samePositionIn(summer.utf16)!] }
+  )
+  
+  expectNotEmpty(summer.utf8.endIndex.samePositionIn(summer.utf16))
+  expectEqual(
+    summer.utf16.endIndex,
+    summer.utf8.endIndex.samePositionIn(summer.utf16)!)
+}
+
+//===--- To UnicodeScalar -------------------------------------------------===//
+tests.test("index-mapping/character-to-unicode-scalar") {
+  let winterCharacterUnicodeScalars: [UnicodeScalar] = [
+    UnicodeScalar(0x1f3c2),
+    UnicodeScalar(0x2603),
+    UnicodeScalar(0x2745),
+    UnicodeScalar(0x2746),
+    UnicodeScalar(0x2744), // 0xfe0e,
+    UnicodeScalar(0x26c4), // 0xfe0f,
+    UnicodeScalar(0x2744), // 0xfe0f
+  ]
+  
+  expectEqualSequence(
+    winterCharacterUnicodeScalars,
+    indices(winter).map {
+      winter.unicodeScalars[$0.samePositionIn(winter.unicodeScalars)]
+    })
+
+  expectEqual(winter.unicodeScalars.endIndex, winter.endIndex.samePositionIn(winter.unicodeScalars))
+  
+  expectEqualSequence(
+    summerBytes.map { UnicodeScalar($0) },
+    indices(summer).map { summer.unicodeScalars[$0.samePositionIn(summer.unicodeScalars)] }
+  )
+  
+  expectEqual(summer.unicodeScalars.endIndex, summer.endIndex.samePositionIn(summer.unicodeScalars))
+}
+
+tests.test("index-mapping/utf8-to-unicode-scalar") {
+  // Define expectation separately to help the type-checker, which
+  // otherwise runs out of time solving.
+  let winterUtf8UnicodeScalars: [UnicodeScalar?] = [
+    UnicodeScalar(0x1f3c2), nil, nil, nil,
+    UnicodeScalar(0x2603), nil, nil,
+    UnicodeScalar(0x2745), nil, nil,
+    UnicodeScalar(0x2746), nil, nil,
+    UnicodeScalar(0x2744), nil, nil, UnicodeScalar(0xfe0e), nil, nil,
+    UnicodeScalar(0x26c4), nil, nil, UnicodeScalar(0xfe0f), nil, nil,
+    UnicodeScalar(0x2744), nil, nil, UnicodeScalar(0xfe0f), nil, nil
+  ]
+  
+  expectEqualSequence(
+    winterUtf8UnicodeScalars,
+    map(indices(winter.utf8)) {
+      i in i.samePositionIn(winter.unicodeScalars).map {
+        winter.unicodeScalars[$0]
+      }
+    }, ==
+  )
+
+  expectNotEmpty(winter.utf8.endIndex.samePositionIn(winter.unicodeScalars))
+  expectEqual(
+    winter.unicodeScalars.endIndex,
+    winter.utf8.endIndex.samePositionIn(winter.unicodeScalars)!)
+  
+  expectEqualSequence(
+    map(summerBytes) { UnicodeScalar($0) as UnicodeScalar? },
+    map(indices(summer.utf8)) {
+      i in i.samePositionIn(summer.unicodeScalars).map {
+        summer.unicodeScalars[$0]
+      }
+    }, ==
+  )
+
+  expectNotEmpty(summer.utf8.endIndex.samePositionIn(summer.unicodeScalars))
+  expectEqual(
+    summer.unicodeScalars.endIndex,
+    summer.utf8.endIndex.samePositionIn(summer.unicodeScalars)!)
+}
+
+tests.test("index-mapping/utf16-to-unicode-scalar") {
+  let winterUtf16UnicodeScalars: [UnicodeScalar?] = [
+    UnicodeScalar(0x1f3c2), nil,
+    UnicodeScalar(0x2603), 
+    UnicodeScalar(0x2745), 
+    UnicodeScalar(0x2746), 
+    UnicodeScalar(0x2744), UnicodeScalar(0xfe0e),
+    UnicodeScalar(0x26c4), UnicodeScalar(0xfe0f),
+    UnicodeScalar(0x2744), UnicodeScalar(0xfe0f)
+  ]
+  
+  expectEqualSequence(
+    winterUtf16UnicodeScalars,
+    map(indices(winter.utf16)) {
+      i in i.samePositionIn(winter.unicodeScalars).map {
+        winter.unicodeScalars[$0]
+      }
+    }, ==
+  )
+
+  expectNotEmpty(winter.utf16.endIndex.samePositionIn(winter.unicodeScalars))
+  expectEqual(
+    winter.unicodeScalars.endIndex,
+    winter.utf16.endIndex.samePositionIn(winter.unicodeScalars)!)
+  
+  expectEqualSequence(
+    map(summerBytes) { UnicodeScalar($0) as UnicodeScalar? },
+    map(indices(summer.utf16)) {
+      i in i.samePositionIn(summer.unicodeScalars).map {
+        summer.unicodeScalars[$0]
+      }
+    }, ==
+  )
+
+  expectNotEmpty(summer.utf16.endIndex.samePositionIn(summer.unicodeScalars))
+  expectEqual(
+    summer.unicodeScalars.endIndex,
+    summer.utf16.endIndex.samePositionIn(summer.unicodeScalars)!)
 }
 
 // These are rather complicated due to their internal buffers, so
@@ -281,7 +511,7 @@ tests.test("UTF8 indexes") {
         if dsa == ds && isLeadingByte { break } // 
         //===--------------------------------------------------------------===//
         
-        expectEquality(u8i0a, u8i1, false) // We're not there yet
+        expectNotEqual(u8i0a, u8i1) // We're not there yet
 
         if isLeadingByte { // On a unicode scalar boundary?
           let u16i0a = u8i0a.samePositionIn(u16)!
