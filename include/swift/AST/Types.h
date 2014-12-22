@@ -230,8 +230,9 @@ protected:
     unsigned : NumTypeBaseBits;
     unsigned ExtInfo : 16;
     unsigned CalleeConvention : 3;
-    unsigned NumParameters : 32 - 19 - NumTypeBaseBits;
   };
+  enum { NumSILFunctionTypeBits = NumTypeBaseBits + 16+3 };
+  static_assert(NumSILFunctionTypeBits <= 32, "fits in an unsigned");
 
   struct AnyMetatypeTypeBitfields {
     unsigned : NumTypeBaseBits;
@@ -2488,6 +2489,8 @@ public:
   typedef AnyFunctionType::Representation Representation;
   
 private:
+  unsigned NumParameters;
+
   CanGenericSignature GenericSig;
 
   /// TODO: Permit an arbitrary number of results.
@@ -2496,12 +2499,10 @@ private:
   /// TODO: Retire in favor of InterfaceParameters.
   MutableArrayRef<SILParameterInfo> getMutableParameters() {
     auto ptr = reinterpret_cast<SILParameterInfo*>(this + 1);
-    unsigned n = SILFunctionTypeBits.NumParameters;
-    return MutableArrayRef<SILParameterInfo>(ptr, n);
+    return MutableArrayRef<SILParameterInfo>(ptr, NumParameters);
   }
 
-  SILFunctionType(GenericSignature *genericSig,
-                  ExtInfo ext,
+  SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
                   ParameterConvention calleeConvention,
                   ArrayRef<SILParameterInfo> interfaceParams,
                   SILResultInfo interfaceResult,

@@ -2466,7 +2466,7 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig,
     GenericSig(genericSig),
     InterfaceResult(interfaceResult) {
   SILFunctionTypeBits.ExtInfo = ext.Bits;
-  SILFunctionTypeBits.NumParameters = interfaceParams.size();
+  NumParameters = interfaceParams.size();
   assert(!isIndirectParameter(calleeConvention));
   SILFunctionTypeBits.CalleeConvention = unsigned(calleeConvention);
   memcpy(getMutableParameters().data(), interfaceParams.data(),
