@@ -279,5 +279,61 @@ FixedPointArithmeticTraps.test("${description}/${IntTy}/Max") {
 
 % end
 
+// FIXME: these tests should be more thorough, and test all combinations of
+// types and error conditions.
+var FixedPointTruncationTraps = TestSuite("FixedPointTruncationTraps")
+
+FixedPointTruncationTraps.test("SignedToSignedTruncation/dest=sign-overflow") {
+  // Test that we check if we overflow on the sign bit.
+  var x = getInt16(128)
+  expectCrashLater()
+  Int8(x)
+}
+
+FixedPointTruncationTraps.test("SignedToUnsignedTruncation/src=-1") {
+  var x = getInt32(-1)
+  expectCrashLater()
+  UInt8(x)
+}
+
+FixedPointTruncationTraps.test("SignedToUnignedSameSize/src=min") {
+  var x = getInt8(-128)
+  expectCrashLater()
+  UInt16(x)
+}
+
+
+FixedPointTruncationTraps.test("SignedToUnsignedTruncation/src=max") {
+  var x = getInt32(0xFFFFFFF)
+  expectCrashLater()
+  UInt16(x)
+}
+
+FixedPointTruncationTraps.test("UnsignedToSignedTruncation/dest=sign-overflow") {
+  // Test that we check if we overflow on the sign bit.
+  var x = getUInt16(128)
+  expectCrashLater()
+  Int8(x)
+}
+
+FixedPointTruncationTraps.test("UnsignedToUnsignedTruncation/src=max") {
+  var x = getUInt32(0xFFFFFFFF)
+  expectCrashLater()
+  UInt16(x)
+}
+
+// Same size conversions.
+FixedPointTruncationTraps.test("SignedToUnsignedSameSize") {
+  var x = getInt8(-2)
+  expectCrashLater()
+  UInt8(x)
+}
+
+FixedPointTruncationTraps.test("UnsignedToSignedSameSize") {
+  var x = getUInt8(128)
+  expectCrashLater()
+  Int8(x)
+}
+
 runAllTests()
 
