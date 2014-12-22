@@ -9,19 +9,14 @@ func test() {
 
 var b : Int -> Int = {$0}
 
-var c2 : (field : @autoclosure Int)  // expected-error {{attribute only applies to syntactic function types}}
-// expected-error @-1{{cannot create a single-element tuple with an element label}}{{11-19=}}
-var c3 : (field : @autoclosure Int -> Int)  // expected-error {{autoclosure argument type must be '()'}}
-// expected-error @-1{{cannot create a single-element tuple with an element label}}{{11-19=}}
+var c2 : (field : Int)  // expected-error {{cannot create a single-element tuple with an element label}}{{11-19=}}
 
-var d1 : (field : @autoclosure () -> Int)
-// expected-error @-1{{cannot create a single-element tuple with an element label}}{{11-19=}}
-var d2 : @autoclosure () -> Int = 4
+@autoclosure var d2 : () -> Int = 4
 
-var d3 : @autoclosure () -> Float =
+@autoclosure var d3 : () -> Float =
    4
 
-var d4 : @autoclosure () -> Int =
+@autoclosure var d4 : () -> Int =
    d2 // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}}
 
 var e0 : [Int]

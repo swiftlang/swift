@@ -370,7 +370,7 @@ func member_ref_abstraction_change(let x: GenericFunctionStruct<Int, Int>) -> In
 
 // CHECK-LABEL: sil hidden @{{.*}}call_auto_closure
 // CHECK: apply [transparent] %0()
-func call_auto_closure(let x: @autoclosure () -> Bool) -> Bool {
+func call_auto_closure(@autoclosure let x: () -> Bool) -> Bool {
   return x()  // Calls of autoclosures should be marked transparent.
 }
 

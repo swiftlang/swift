@@ -53,7 +53,7 @@ func eggs(x: Int) -> Int {
   // CHECK: apply
   // CHECK: return
 
-@transparent func call_auto_closure(x: @autoclosure () -> Bool) -> Bool {
+@transparent func call_auto_closure(@autoclosure x: () -> Bool) -> Bool {
   return x()
 }
 
@@ -112,7 +112,7 @@ infix operator ||| {
   precedence 110
 }
 
-@transparent func &&& (lhs: Bool, rhs: @autoclosure ()->Bool) -> Bool {
+@transparent func &&& (lhs: Bool, @autoclosure rhs: ()->Bool) -> Bool {
   if lhs {
     return rhs()
   }
@@ -120,7 +120,7 @@ infix operator ||| {
   return false
 }
 
-@transparent func ||| (lhs: Bool, rhs: @autoclosure ()->Bool) -> Bool {
+@transparent func ||| (lhs: Bool, @autoclosure rhs: ()->Bool) -> Bool {
   if lhs {
     return true
   }
@@ -158,7 +158,7 @@ func testInlineUnionElement() -> X {
 
 
 @transparent
-func call_let_auto_closure(let x: @autoclosure () -> Bool) -> Bool {
+func call_let_auto_closure(@autoclosure let x: () -> Bool) -> Bool {
   return x()
 }
 

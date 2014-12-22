@@ -111,7 +111,7 @@ struct HasVarInit {
 // function type.
 
 // CHECK-LABEL: sil hidden @_TF8mangling19autoClosureOverloadFT1fKT_Si_T_ : $@thin (@owned @callee_owned () -> Int) -> () {
-func autoClosureOverload(#f: @autoclosure () -> Int) {}
+func autoClosureOverload(@autoclosure #f: () -> Int) {}
 // CHECK-LABEL: sil hidden @_TF8mangling19autoClosureOverloadFT1fFT_Si_T_ : $@thin (@owned @callee_owned () -> Int) -> () {
 func autoClosureOverload(#f: () -> Int) {}
 

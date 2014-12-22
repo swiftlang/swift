@@ -1,6 +1,5 @@
 // RUN: %swift -parse %s -verify
 
-var func4 : (fn : @autoclosure () -> ()) -> ()
 var func6 : (fn : (Int,Int) -> Int) -> ()
 var func6a : ((Int, Int) -> Int) -> ()
 var func6b : (Int, (Int, Int) -> Int) -> ()
@@ -9,7 +8,7 @@ func func6c(f: (Int, Int) -> Int, _ n: Int = 0) {}
 
 // Expressions can be auto-closurified, so that they can be evaluated separately
 // from their definition.
-var closure1 : @autoclosure () -> Int = 4  // Function producing 4 whenever it is called.
+@autoclosure var closure1 : () -> Int = 4  // Function producing 4 whenever it is called.
 var closure2 : (Int,Int) -> Int = { 4 } // FIXME: expected-error{{tuple types '(Int, Int)' and '()' have a different number of elements (2 vs. 0)}}
 var closure3a : ()->()->(Int,Int) = {{ (4, 2) }} // multi-level closing.
 var closure3b : (Int,Int)->(Int)->(Int,Int) = {{ (4, 2) }} // FIXME: expected-error{{different number of elements}}
@@ -133,9 +132,6 @@ class ExplicitSelfRequiredTest {
     // explicit closure requires an explicit "self." base.
     doStuff({ ++self.x })
     doStuff({ ++x })    // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}}
-
-    // autoclosure use is ok.
-    func4(fn: print(x))
 
     // Methods follow the same rules as properties, uses of 'self' must be marked with "self."
     doStuff { method() }  // expected-error {{call to method 'method' in closure requires explicit 'self.' to make capture semantics explicit}}

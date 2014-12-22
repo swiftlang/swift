@@ -123,7 +123,7 @@ protocol Fooable {
 }
 
 // <rdar://problem/16399018>
-func shmassert(f: @autoclosure () -> Bool) {}
+func shmassert(@autoclosure f: () -> Bool) {}
 
 // CHECK-LABEL: sil hidden @_TF16generic_closures21capture_generic_param
 func capture_generic_param<A: Fooable>(x: A) {

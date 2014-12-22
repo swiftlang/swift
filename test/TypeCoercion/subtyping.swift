@@ -21,9 +21,9 @@ func fp_to_p(fp: FormattedPrintable) -> Printable { return fp; }
 func p_to_fp(p: Printable) -> FormattedPrintable { }
 func p_to_ip1(p: Printable) -> IsPrintable1 { }
 
-func protocolConformance(ac1: @autoclosure () -> Printable,
-                         ac2: @autoclosure () -> FormattedPrintable,
-                         ip1: @autoclosure () -> IsPrintable1) {
+func protocolConformance(@autoclosure ac1: () -> Printable,
+                         @autoclosure ac2: () -> FormattedPrintable,
+                         @autoclosure ip1: () -> IsPrintable1) {
   var f1 : (fp : FormattedPrintable) -> Printable = fp_to_p
   var f2 : (p : Printable) -> FormattedPrintable = p_to_fp
   var f3 : (p : Printable) -> IsPrintable1 = p_to_ip1
