@@ -84,8 +84,8 @@ SourceLoc Expr::getLoc() const {
 }
 
 Expr *Expr::getSemanticsProvidingExpr() {
-  if (IdentityExpr *PE = dyn_cast<IdentityExpr>(this))
-    return PE->getSubExpr()->getSemanticsProvidingExpr();
+  if (IdentityExpr *IE = dyn_cast<IdentityExpr>(this))
+    return IE->getSubExpr()->getSemanticsProvidingExpr();
 
   if (DefaultValueExpr *DE = dyn_cast<DefaultValueExpr>(this))
     return DE->getSubExpr()->getSemanticsProvidingExpr();

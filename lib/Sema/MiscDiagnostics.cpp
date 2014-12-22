@@ -406,6 +406,17 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
              DRE->getDecl()->getName().str() == "self";
     }
 
+    /// Return true if this is a closure expression that will require "self."
+    /// qualification of member references.
+    static bool isClosureRequiringSelfQualification(const Expr *E) {
+      if (!isa<ClosureExpr>(E)) return false;
+
+      // If the closure's type was inferred to be nocapture, then it doesn't
+      // need qualification.
+      return !E->getType()->castTo<FunctionType>()->isNoCapture();
+    }
+
+
     // Don't walk into nested decls.
     bool walkToDeclPre(Decl *D) override {
       return false;
@@ -415,7 +426,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
 
       // If this is an explicit closure expression - not an autoclosure - then
       // we keep track of the fact that recursive walks are within the closure.
-      if (isa<ClosureExpr>(E))
+      if (isClosureRequiringSelfQualification(E))
         ++InClosure;
 
       // If we aren't in a closure, no diagnostics will be produced.
@@ -455,7 +466,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
     }
     
     Expr *walkToExprPost(Expr *E) {
-      if (isa<ClosureExpr>(E)) {
+      if (isClosureRequiringSelfQualification(E)) {
         assert(InClosure);
         --InClosure;
       }
