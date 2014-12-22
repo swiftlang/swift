@@ -240,7 +240,7 @@ public:
     /// kind and (potentially) a value.
     ///
     /// The current storage involves a two-bit "storage kind", which selects
-    /// amount the possible value stores. The value stores can either be an
+    /// among the possible value stores. The value stores can either be an
     /// archetype (for archetype path elements) or an unsigned value that
     /// stores both the specific kind and the (optional) numeric value of that
     /// kind. Use \c encodeStorage and \c decodeStorage to work with this value.
