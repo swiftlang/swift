@@ -487,12 +487,13 @@ extension String {
 extension String : CollectionType {
   /// A character position in a `String`
   public struct Index : BidirectionalIndexType, Comparable, Reflectable {
-    public init(_ _base: UnicodeScalarView.Index) {
+    public // SPI(Foundation)
+    init(_base: UnicodeScalarView.Index) {
       self._base = _base
       self._lengthUTF16 = Index._measureExtendedGraphemeClusterForward(_base)
     }
 
-    init(_ _base: UnicodeScalarView.Index, _ _lengthUTF16: Int) {
+    internal init(_base: UnicodeScalarView.Index, _lengthUTF16: Int) {
       self._base = _base
       self._lengthUTF16 = _lengthUTF16
     }
@@ -502,7 +503,7 @@ extension String : CollectionType {
     /// Requires: the next value is representable.
     public func successor() -> Index {
       _precondition(_base != _base._viewEndIndex, "can not increment endIndex")
-      return Index(_endBase)
+      return Index(_base: _endBase)
     }
 
   /// Returns the previous consecutive value before `self`.
@@ -513,7 +514,8 @@ extension String : CollectionType {
           "can not decrement startIndex")
       let predecessorLengthUTF16 =
           Index._measureExtendedGraphemeClusterBackward(_base)
-      return Index(UnicodeScalarView.Index(
+      return Index(
+        _base: UnicodeScalarView.Index(
           _utf16Index - predecessorLengthUTF16, _base._core))
     }
 
@@ -619,7 +621,7 @@ extension String : CollectionType {
   /// The position of the first `Character` if the `String` is
   /// non-empty; identical to `endIndex` otherwise.
   public var startIndex: Index {
-    return Index(unicodeScalars.startIndex)
+    return Index(_base: unicodeScalars.startIndex)
   }
 
   /// The `String`\ 's "past the end" position.
@@ -628,7 +630,7 @@ extension String : CollectionType {
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
   public var endIndex: Index {
-    return Index(unicodeScalars.endIndex)
+    return Index(_base: unicodeScalars.endIndex)
   }
 
   /// Access the `Character` at `position`.
@@ -936,6 +938,44 @@ extension String {
 
 // Index conversions
 extension String.Index {
+  public init?(
+    _ sourceIndex: String.UnicodeScalarIndex,
+    within characters: String
+  ) {
+    if !sourceIndex._isOnGraphemeClusterBoundary {
+      return nil
+    }
+    self.init(_base: sourceIndex)
+  }
+
+  public init?(
+    _ sourceIndex: String.UTF16Index,
+    within characters: String
+  ) {
+    if let me = sourceIndex.samePositionIn(
+      characters.unicodeScalars
+    )?.samePositionIn(characters) {
+      self = me
+    }
+    else {
+      return nil
+    }
+  }
+  
+  public init?(
+    _ sourceIndex: String.UTF8Index,
+    within characters: String
+  ) {
+    if let me = sourceIndex.samePositionIn(
+      characters.unicodeScalars
+    )?.samePositionIn(characters) {
+      self = me
+    }
+    else {
+      return nil
+    }
+  }
+  
   public func samePositionIn(
     otherView: String.UTF8View
   ) -> String.UTF8View.Index {

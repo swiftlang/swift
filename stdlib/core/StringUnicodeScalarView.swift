@@ -399,4 +399,31 @@ extension String.UnicodeScalarIndex {
   ) -> String.UTF16View.Index {
     return String.UTF16View.Index(self, within: otherView)
   }
+  public func samePositionIn(characters: String) -> String.Index? {
+    return String.Index(self, within: characters)
+  }
+
+  internal var _isOnGraphemeClusterBoundary: Bool {
+    let scalars = String.UnicodeScalarView(_core)
+    if self == scalars.startIndex || self == scalars.endIndex {
+      return true
+    }
+    let precedingScalar = scalars[self.predecessor()]
+    
+    let graphemeClusterBreakProperty =
+      _UnicodeGraphemeClusterBreakPropertyTrie()
+    let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
+    
+    let gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
+      precedingScalar.value)
+    
+    if segmenter.isBoundaryAfter(gcb0) {
+      return true
+    }
+    
+    let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
+      scalars[self].value)
+
+    return segmenter.isBoundary(gcb0, gcb1)
+  }
 }
