@@ -249,7 +249,8 @@ public:
                          2, StoredKind> storage;
 
     /// \brief Encode a path element kind and a value into the storage format.
-    static KindAndValueStorage encodeStorage(PathElementKind kind, unsigned value) {
+    static KindAndValueStorage encodeStorage(PathElementKind kind,
+                                             unsigned value) {
       unsigned result = (value << 8) | (unsigned)kind;
       return result;
     }
