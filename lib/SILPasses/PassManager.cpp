@@ -111,11 +111,6 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
       llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
       SFT->run();
 
-      ++NumPassesRun;
-      if (Mod->getStage() == SILStage::Canonical
-          && NumPassesRun >= Options.NumOptPassesToRun)
-        return false;
-
       if (Options.TimeTransforms) {
         auto Delta = llvm::sys::TimeValue::now().nanoseconds() -
           StartTime.nanoseconds();
@@ -134,6 +129,11 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
       if (CompleteFuncs->hasChanged() && Options.VerifyAll) {
         F.verify();
       }
+
+      ++NumPassesRun;
+      if (Mod->getStage() == SILStage::Canonical
+          && NumPassesRun >= Options.NumOptPassesToRun)
+        return false;
     }
   }
 
@@ -189,12 +189,6 @@ void SILPassManager::runOneIteration() {
     
       llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
       SMT->run();
-      ++NumPassesRun;
-
-      if (Mod->getStage() == SILStage::Canonical
-          && NumPassesRun >= Options.NumOptPassesToRun) {
-        return;
-      }
 
       if (Options.TimeTransforms) {
         auto Delta = llvm::sys::TimeValue::now().nanoseconds() -
@@ -210,8 +204,15 @@ void SILPassManager::runOneIteration() {
                      << ") ***\n";
         printModule(Mod);
       }
+
       if (CompleteFuncs->hasChanged() && Options.VerifyAll) {
         Mod->verify();
+      }
+
+      ++NumPassesRun;
+      if (Mod->getStage() == SILStage::Canonical
+          && NumPassesRun >= Options.NumOptPassesToRun) {
+        return;
       }
       
       continue;
