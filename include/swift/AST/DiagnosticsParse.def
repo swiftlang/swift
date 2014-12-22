@@ -190,6 +190,11 @@ ERROR(convenience_invalid,sema_tcd,none,
 ERROR(decl_already_static,decl_parsing,none,
       "%0 specified twice", (StaticSpellingKind))
 
+ERROR(autoclosure_is_decl_attribute,attribute_parsing,none,
+      "'autoclosure' attribute is now an attribute of the parameter "
+      "declaration, not its type", ())
+
+
 // Variable getters/setters
 ERROR(static_var_decl_global_scope,decl_parsing,none,
       "%select{ERROR|static properties|class properties}0 may only be declared on a type",

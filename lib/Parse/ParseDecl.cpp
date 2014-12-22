@@ -1199,7 +1199,7 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
     if (StopAtTypeAttributes) {
       Token next = peekToken();
       auto Kind = TypeAttributes::getAttrKindFromString(next.getText());
-      if (Kind != TAK_Count && Kind != TAK_autoclosure)
+      if (Kind != TAK_Count)
         return false;
     }
 

@@ -17,6 +17,24 @@ func func6(@autoclosure () -> Int) {func6(0)}
 // declattr and typeattr on the argument.
 func func7(@autoclosure @noreturn () -> Int) {func7(0)}
 
+// autoclosure + inout don't make sense.
+func func8(@autoclosure inout x: () -> Bool) -> Bool {  // expected-error {{'autoclosure' attribute may only be applied to values of function type}}
+}
+
+
+// Should have good QoI:
+func migrate1(fp fpx : @autoclosure () -> Int) {}   // expected-error {{'autoclosure' attribute is now an attribute of the parameter declaration, not its type}}
+struct MethodHolder {
+  func migrate2(a : Int, _ fp : @autoclosure () -> Int) {}    // expected-error {{'autoclosure' attribute is now an attribute of the parameter declaration, not its type}}
+}
+func migrate3(#fp : @autoclosure () -> Int) {}    // expected-error {{'autoclosure' attribute is now an attribute of the parameter declaration, not its type}}
+public func || <T: BooleanType>(
+  lhs: T, rhs: @autoclosure () -> Bool    // expected-error {{'autoclosure' attribute is now an attribute of the parameter declaration, not its type}}
+  ) -> Bool {
+    return lhs.boolValue ? true : rhs().boolValue
+}
+
+
 
 struct SomeStruct {
   @autoclosure let property : () -> Int  // autoclosures work as an property as well.

@@ -265,6 +265,20 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       // (':' type)?
       if (Tok.is(tok::colon)) {
         param.ColonLoc = consumeToken();
+
+        // Special case handling of @autoclosure attribute on the type, which
+        // was supported in Swift 1.0 and 1.1, but removed in Swift 1.2 (moved
+        // to a decl attribute).
+        if (Tok.is(tok::at_sign) &&
+            peekToken().isContextualKeyword("autoclosure")) {
+          SourceLoc AtLoc = consumeToken(tok::at_sign);
+          SourceLoc ACLoc = consumeToken(tok::identifier);
+          diagnose(AtLoc, diag::autoclosure_is_decl_attribute)
+            .fixItRemove(SourceRange(AtLoc, ACLoc))
+            .fixItInsert(StartLoc, "@autoclosure ");
+          param.Attrs.add(new (Context) AutoClosureAttr(StartLoc));
+        }
+
         auto type = parseType(diag::expected_parameter_type);
         status |= type;
         param.Type = type.getPtrOrNull();

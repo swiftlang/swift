@@ -31,7 +31,6 @@
 #endif
 
 // Type attributes
-TYPE_ATTR(autoclosure)
 TYPE_ATTR(cc)
 TYPE_ATTR(noreturn)
 TYPE_ATTR(objc_block)
