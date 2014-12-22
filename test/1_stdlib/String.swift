@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift
 // XFAIL: interpret
+// REQUIRES: long_tests
 
 import StdlibUnittest
 import Foundation

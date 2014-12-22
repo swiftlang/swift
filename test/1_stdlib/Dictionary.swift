@@ -1,3 +1,4 @@
+// REQUIRES: long_tests
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 //
