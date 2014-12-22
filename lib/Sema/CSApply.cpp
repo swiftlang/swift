@@ -4031,7 +4031,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   if (knownRestriction != solution.ConstraintRestrictions.end()) {
     switch (knownRestriction->second) {
     case ConversionRestrictionKind::TupleToTuple: {
-      auto fromTuple = expr->getType()->castTo<TupleType>();
+      auto fromTuple = fromType->castTo<TupleType>();
       auto toTuple = toType->castTo<TupleType>();
       SmallVector<int, 4> sources;
       SmallVector<unsigned, 4> variadicArgs;
@@ -4151,9 +4151,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     case ConversionRestrictionKind::ArrayUpcast: {
       // Look through implicitly unwrapped optionals.
-      if (auto objTy
-              = cs.lookThroughImplicitlyUnwrappedOptionalType(
-                                                          expr->getType())) {
+      if (auto objTy= cs.lookThroughImplicitlyUnwrappedOptionalType(fromType)) {
         expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
         if (!expr) return nullptr;
       }
@@ -4230,7 +4228,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return forceBridgeFromObjectiveC(expr, toType);
 
     case ConversionRestrictionKind::CFTollFreeBridgeToObjC: {
-      auto foreignClass = expr->getType()->getClassOrBoundGenericClass();
+      auto foreignClass = fromType->getClassOrBoundGenericClass();
       auto objcType = foreignClass->getAttrs().getAttribute<ObjCBridgedAttr>()
                         ->getObjCClass()->getDeclaredInterfaceType();
       auto asObjCClass = new (tc.Context) ForeignObjectConversionExpr(expr,
@@ -4339,8 +4337,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         }
 
         // Coercion from subclass to superclass.
-        expr = new (tc.Context) DerivedToBaseExpr(expr, toType);
-        return expr;
+        return new (tc.Context) DerivedToBaseExpr(expr, toType);
       }
     }
   }
@@ -4414,8 +4411,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // We'll emit a diagnostic here, rather than induce a solver failure, so that
   // a more specific diagnostic can be displayed.
   if (fromType->is<ExistentialMetatypeType>() && toType->is<MetatypeType>()) {
-    tc.diagnose(expr->getLoc(),
-                diag::cannot_convert_existential_to_metatype,
+    tc.diagnose(expr->getLoc(), diag::cannot_convert_existential_to_metatype,
                 fromType);
     return expr;
   }
