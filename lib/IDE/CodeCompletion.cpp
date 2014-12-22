@@ -517,7 +517,7 @@ struct CodeCompletionCacheImpl {
   void getResults(
       const Key &K, CodeCompletionResultSink &TargetSink, bool OnlyTypes,
       const Module *TheModule,
-      std::function<void(CodeCompletionCacheImpl &, Key,
+      std::function<ValueRefCntPtr(CodeCompletionCacheImpl &, Key,
                          const Module *)> FillCacheCallback);
 
   ValueRefCntPtr getResultSinkFor(const Key &K);
@@ -568,14 +568,13 @@ struct CacheValueCostInfo<swift::ide::CodeCompletionCacheImpl::Value> {
 void CodeCompletionCacheImpl::getResults(
     const Key &K, CodeCompletionResultSink &TargetSink, bool OnlyTypes,
     const Module *TheModule,
-    std::function<void(CodeCompletionCacheImpl &, Key, const Module *)>
-        FillCacheCallback) {
+    std::function<ValueRefCntPtr(
+        CodeCompletionCacheImpl &, Key, const Module *)> FillCacheCallback) {
   // FIXME(thread-safety): lock the whole AST context.  We might load a module.
   llvm::Optional<ValueRefCntPtr> V = TheCache.get(K);
   if (!V.hasValue()) {
     // No cached results found.  Fill the cache.
-    FillCacheCallback(*this, K, TheModule);
-    V = TheCache.get(K);
+    V = FillCacheCallback(*this, K, TheModule);
   } else {
     llvm::sys::fs::file_status ModuleStatus;
     if (llvm::sys::fs::status(K.ModuleFilename, ModuleStatus) ||
@@ -583,8 +582,7 @@ void CodeCompletionCacheImpl::getResults(
             ModuleStatus.getLastModificationTime()) {
       // Cache is stale.  Update the cache.
       TheCache.remove(K);
-      FillCacheCallback(*this, K, TheModule);
-      V = TheCache.get(K);
+      V = FillCacheCallback(*this, K, TheModule);
     }
   }
   assert(V.hasValue());
@@ -2525,6 +2523,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.getVisibleDeclsOfModule(TheModule, K.AccessPath,
                                      K.ResultsHaveLeadingDot);
       Cache.storeResults(K, V);
+      return V;
     };
 
     auto &Request = Lookup.RequestedCachedResults.getValue();
