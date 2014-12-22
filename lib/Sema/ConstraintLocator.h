@@ -20,6 +20,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Fixnum.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -32,7 +33,6 @@
 
 namespace swift {
 
-class ArchetypeType;
 class Expr;
 class SourceManager;
 
@@ -234,7 +234,7 @@ public:
     };
 
     /// \brief The type of storage used for a kind and numeric value.
-    typedef llvm::Fixnum<52> KindAndValueStorage;
+    typedef llvm::Fixnum<62> KindAndValueStorage;
 
     /// \brief The actual storage for the path element, which involves both a
     /// kind and (potentially) a value.
@@ -244,9 +244,13 @@ public:
     /// archetype (for archetype path elements) or an unsigned value that
     /// stores both the specific kind and the (optional) numeric value of that
     /// kind. Use \c encodeStorage and \c decodeStorage to work with this value.
-    llvm::PointerIntPair<llvm::PointerUnion<ArchetypeType *,
-                                            KindAndValueStorage>,
-                         2, StoredKind> storage;
+    ///
+    /// \note The "storage kind" is stored in the  \c storedKind field.
+    uint64_t storage : 62;
+
+    /// \brief The kind of value stored in \c storage. Valid values are those
+    /// from the StoredKind enum.
+    uint64_t storedKind : 2;
 
     /// \brief Encode a path element kind and a value into the storage format.
     static KindAndValueStorage encodeStorage(PathElementKind kind,
@@ -262,14 +266,15 @@ public:
     }
 
     PathElement(PathElementKind kind, unsigned value)
-      : storage(encodeStorage(kind, value), StoredKindAndValue)
+      : storage(encodeStorage(kind, value)), storedKind(StoredKindAndValue)
     {
       assert(numNumericValuesInPathElement(kind) == 1 &&
              "Path element kind does not require 1 value");
     }
 
     PathElement(PathElementKind kind, unsigned value1, unsigned value2)
-      : storage(encodeStorage(kind, value1 << 16 | value2), StoredKindAndValue)
+      : storage(encodeStorage(kind, value1 << 16 | value2)),
+        storedKind(StoredKindAndValue)
     {
       assert(numNumericValuesInPathElement(kind) == 2 &&
              "Path element kind does not require 2 values");
@@ -279,14 +284,20 @@ public:
     
   public:
     PathElement(PathElementKind kind)
-      : storage(encodeStorage(kind, 0), StoredKindAndValue)
+      : storage(encodeStorage(kind, 0)), storedKind(StoredKindAndValue)
     {
       assert(numNumericValuesInPathElement(kind) == 0 &&
              "Path element requires value");
     }
 
     PathElement(ArchetypeType *archetype)
-      : storage(archetype, StoredArchetype) { }
+      : storage((reinterpret_cast<uintptr_t>(archetype) >> 2)),
+        storedKind(StoredArchetype)
+    {
+      static_assert(alignof(ArchetypeType) >= 4,
+                    "archetypes insufficiently aligned");
+      assert(getArchetype() == archetype);
+    }
 
     /// \brief Retrieve a path element for a tuple element referred to by
     /// its position.
@@ -320,13 +331,12 @@ public:
 
     /// \brief Retrieve the kind of path element.
     PathElementKind getKind() const {
-      switch (storage.getInt()) {
+      switch (static_cast<StoredKind>(storedKind)) {
       case StoredArchetype:
         return Archetype;
 
       case StoredKindAndValue:
-        return decodeStorage(storage.getPointer().get<KindAndValueStorage>())
-                 .first;
+        return decodeStorage(storage).first;
       }
     }
 
@@ -336,8 +346,7 @@ public:
       unsigned numValues = numNumericValuesInPathElement(getKind());
       assert(numValues > 0 && "No value in path element!");
 
-      auto value = decodeStorage(
-                                 storage.getPointer().get<KindAndValueStorage>()).second;
+      auto value = decodeStorage(storage).second;
       if (numValues == 1) {
         return value;
       }
@@ -352,15 +361,14 @@ public:
       (void)numValues;
       assert(numValues == 2 && "No second value in path element!");
 
-      auto value = decodeStorage(
-                     storage.getPointer().get<KindAndValueStorage>()).second;
+      auto value = decodeStorage(storage).second;
       return value & 0x00FFFF;
     }
 
     /// \brief Retrieve the actual archetype for an archetype path element.
     ArchetypeType *getArchetype() const {
       assert(getKind() == Archetype && "Not an archetype path element");
-      return storage.getPointer().get<ArchetypeType *>();
+      return reinterpret_cast<ArchetypeType *>(storage << 2);
     }
 
     /// \brief Return the summary flags for this particular element.
