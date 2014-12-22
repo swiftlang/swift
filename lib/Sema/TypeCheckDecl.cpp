@@ -4627,7 +4627,16 @@ public:
     void visitAutoClosureAttr(AutoClosureAttr *attr) {
       if (Base->getAttrs().hasAttribute<AutoClosureAttr>() !=
           Override->getAttrs().hasAttribute<AutoClosureAttr>()) {
-        TC.diagnose(Override, diag::inconsistent_autoclosure);
+        TC.diagnose(Override, diag::inconsistent_attribute_override,
+                    attr->getAttrName());
+        TC.diagnose(Base, diag::overridden_here);
+      }
+    }
+    void visitNoCaptureAttr(NoCaptureAttr *attr) {
+      if (Base->getAttrs().hasAttribute<NoCaptureAttr>() !=
+          Override->getAttrs().hasAttribute<NoCaptureAttr>()) {
+        TC.diagnose(Override, diag::inconsistent_attribute_override,
+                    attr->getAttrName());
         TC.diagnose(Base, diag::overridden_here);
       }
     }

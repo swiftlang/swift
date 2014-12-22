@@ -77,6 +77,10 @@ public:
   void visitAutoClosureAttr(AutoClosureAttr *attr) {
     TC.checkAutoClosureAttr(cast<VarDecl>(D), attr);
   }
+  void visitNoCaptureAttr(NoCaptureAttr *attr) {
+    TC.checkNoCaptureAttr(cast<ParamDecl>(D), attr);
+  }
+
   void visitTransparentAttr(TransparentAttr *attr);
   void visitMutationAttr(DeclAttribute *attr);
   void visitMutatingAttr(MutatingAttr *attr) { visitMutationAttr(attr); }
@@ -100,8 +104,6 @@ public:
   void visitSILStoredAttr(SILStoredAttr *attr);
 };
 } // end anonymous namespace
-
-
 
 void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
@@ -506,6 +508,8 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
       OnlyKind = "init";
     else if (PossibleDeclKinds == DeclAttribute::OnProtocol)
       OnlyKind = "protocol";
+    else if (PossibleDeclKinds == DeclAttribute::OnParam)
+      OnlyKind = "parameter";
 
     if (!OnlyKind.empty())
       Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_only_one_decl_kind,
@@ -545,6 +549,7 @@ public:
     IGNORED_ATTR(Lazy)      // checked early.
     IGNORED_ATTR(LLDBDebuggerFunction)
     IGNORED_ATTR(Mutating)
+    IGNORED_ATTR(NoCapture)
     IGNORED_ATTR(NonMutating)
     IGNORED_ATTR(NoReturn)
     IGNORED_ATTR(NSManaged) // checked early.
@@ -1115,6 +1120,15 @@ void TypeChecker::checkTypeModifyingDeclAttributes(VarDecl *var) {
     checkOwnershipAttr(var, attr);
   if (auto *attr = var->getAttrs().getAttribute<AutoClosureAttr>())
     checkAutoClosureAttr(var, attr);
+  if (auto *attr = var->getAttrs().getAttribute<NoCaptureAttr>()) {
+    if (auto *pd = dyn_cast<ParamDecl>(var))
+      checkNoCaptureAttr(pd, attr);
+    else {
+      AttributeEarlyChecker Checker(*this, var);
+      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_only_one_decl_kind,
+                                    attr, "parameter");
+    }
+  }
 }
 
 
@@ -1144,6 +1158,25 @@ void TypeChecker::checkAutoClosureAttr(VarDecl *VD, AutoClosureAttr *attr) {
   VD->overwriteType(FunctionType::get(FuncTyInput, FTy->getResult(),
                                     FTy->getExtInfo().withIsAutoClosure(true)));
 }
+
+void TypeChecker::checkNoCaptureAttr(ParamDecl *PD, NoCaptureAttr *attr) {
+  // The paramdecl should have function type.
+  auto *FTy = PD->getType()->getAs<FunctionType>();
+  if (FTy == 0) {
+    diagnose(attr->getLocation(), diag::nocapture_function_type);
+    attr->setInvalid();
+    return;
+  }
+
+  // Just stop if we've already applied this attribute.
+  if (FTy->isNoCapture())
+    return;
+
+  // Change the type to include the autoclosure bit.
+  PD->overwriteType(FunctionType::get(FTy->getInput(), FTy->getResult(),
+                                      FTy->getExtInfo().withNoCapture(true)));
+}
+
 
 void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
   Type type = var->getType();

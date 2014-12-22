@@ -32,7 +32,8 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   auto extInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
                                         SILFunctionType::Representation::Thick,
                                         /*noreturn*/ FTI->isNoReturn(),
-                                        /*autoclosure*/ false);
+                                        /*autoclosure*/ false,
+                                          /*nocapture*/ FTI->isNoCapture());
   
   auto appliedFnType = SILFunctionType::get(nullptr, extInfo,
                                             ParameterConvention::Direct_Owned,

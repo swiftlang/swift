@@ -1058,14 +1058,17 @@ ERROR(final_not_on_accessors,sema_tcd,none,
 ERROR(override_noreturn_with_return,sema_tcd,none,
       "an override of a 'noreturn' method should also be 'noreturn'", ())
 
-ERROR(inconsistent_autoclosure,sema_tcd,none,
-      "'autoclosure' attribute must be consistent between a method and its"
-      " override", ())
+ERROR(inconsistent_attribute_override,sema_tcd,none,
+      "'%0' attribute must be consistent between a method and its"
+      " override", (StringRef))
 ERROR(autoclosure_function_type,attribute_parsing,none,
       "'autoclosure' attribute may only be applied to values of function type",
       ())
 ERROR(autoclosure_function_input_nonunit,attribute_parsing,none,
       "autoclosure argument type must be '()'", ())
+ERROR(nocapture_function_type,attribute_parsing,none,
+      "'nocapture' attribute may only be applied to parameters of function type",
+      ())
 
 
 // NSManaged attribute

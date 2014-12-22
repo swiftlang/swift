@@ -212,9 +212,9 @@ protected:
 
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
-    unsigned ExtInfo : 8;
+    unsigned ExtInfo : 16;
   };
-  enum { NumAnyFunctionTypeBits = NumTypeBaseBits + 8 };
+  enum { NumAnyFunctionTypeBits = NumTypeBaseBits + 16 };
   static_assert(NumAnyFunctionTypeBits <= 32, "fits in an unsigned");
 
   struct TypeVariableTypeBitfields {
@@ -1866,17 +1866,18 @@ public:
   /// \brief A class which abstracts out some details necessary for
   /// making a call.
   class ExtInfo {
-    // Feel free to rearrange or add bits, but if you go over 7,
+    // Feel free to rearrange or add bits, but if you go over 15,
     // you'll need to adjust both the Bits field below and
     // BaseType::AnyFunctionTypeBits.
 
-    //   |  CC  |representation|isAutoClosure|noReturn|
-    //   |0 .. 3|    4 .. 5    |      6      |   7    |
+    //   |  CC  |representation|isAutoClosure|noReturn|noCapture|
+    //   |0 .. 3|    4 .. 5    |      6      |   7    |    8    |
     //
-    enum : uint16_t { CallConvMask = 0xF };
-    enum : uint16_t { RepresentationMask = 0x30, RepresentationShift = 4 };
-    enum : uint16_t { AutoClosureMask = 0x40 };
-    enum : uint16_t { NoReturnMask = 0x80 };
+    enum : uint16_t { CallConvMask       = 0x00F };
+    enum : uint16_t { RepresentationMask = 0x030, RepresentationShift = 4 };
+    enum : uint16_t { AutoClosureMask    = 0x040 };
+    enum : uint16_t { NoReturnMask       = 0x080 };
+    enum : uint16_t { NoCaptureMask      = 0x100 };
 
     uint16_t Bits;
 
@@ -1900,9 +1901,10 @@ public:
 
     // Constructor with no defaults.
     ExtInfo(AbstractCC CC, Representation Rep, bool IsNoReturn,
-            bool IsAutoClosure) : ExtInfo(CC, Rep, IsNoReturn){
-      Bits = Bits |
-             (IsAutoClosure ? AutoClosureMask : 0);
+            bool IsAutoClosure, bool IsNoCapture)
+      : ExtInfo(CC, Rep, IsNoReturn) {
+      Bits |= (IsAutoClosure ? AutoClosureMask : 0);
+      Bits |= (IsNoCapture ? NoCaptureMask : 0);
     }
 
     explicit ExtInfo(AbstractCC CC) : Bits(0) {
@@ -1912,6 +1914,7 @@ public:
     AbstractCC getCC() const { return AbstractCC(Bits & CallConvMask); }
     bool isNoReturn() const { return Bits & NoReturnMask; }
     bool isAutoClosure() const { return Bits & AutoClosureMask; }
+    bool isNoCapture() const { return Bits & NoCaptureMask; }
     Representation getRepresentation() const {
       return Representation((Bits & RepresentationMask) >> RepresentationShift);
     }
@@ -1960,7 +1963,13 @@ public:
       else
         return ExtInfo(Bits & ~AutoClosureMask);
     }
-    
+    ExtInfo withNoCapture(bool NoCapture) const {
+      if (NoCapture)
+        return ExtInfo(Bits | NoCaptureMask);
+      else
+        return ExtInfo(Bits & ~NoCaptureMask);
+    }
+
     char getFuncAttrKey() const {
       return Bits;
     }
@@ -2009,7 +2018,14 @@ public:
   bool isAutoClosure() const {
     return getExtInfo().isAutoClosure();
   }
-  
+
+  /// \brief True if the parameter declaration it is attached to is guaranteed
+  /// to not persist the closure for longer than the duration of the call.
+  bool isNoCapture() const {
+    return getExtInfo().isNoCapture();
+  }
+
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_AnyFunctionType &&
@@ -2592,6 +2608,9 @@ public:
   
   bool isNoReturn() const {
     return getExtInfo().isNoReturn();
+  }
+  bool isNoCapture() const {
+    return getExtInfo().isNoCapture();
   }
 
   CanSILFunctionType substGenericArgs(SILModule &silModule,

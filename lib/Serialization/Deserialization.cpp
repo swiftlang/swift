@@ -2988,16 +2988,14 @@ Type ModuleFile::getType(TypeID TID) {
     TypeID inputID;
     TypeID resultID;
     uint8_t rawCallingConvention;
-    bool autoClosure;
-    bool thin;
-    bool noreturn;
-    bool blockCompatible;
+    bool autoClosure, thin, noreturn, blockCompatible, nocapture;
 
     decls_block::FunctionTypeLayout::readRecord(scratch, inputID, resultID,
                                                 rawCallingConvention,
                                                 autoClosure, thin,
                                                 noreturn,
-                                                blockCompatible);
+                                                blockCompatible,
+                                                nocapture);
     auto callingConvention = getActualCC(rawCallingConvention);
     if (!callingConvention.hasValue()) {
       error();
@@ -3006,8 +3004,7 @@ Type ModuleFile::getType(TypeID TID) {
     
     auto Info = FunctionType::ExtInfo(callingConvention.getValue(),
                                 getFunctionRepresentation(thin, blockCompatible),
-                                noreturn,
-                                autoClosure);
+                                noreturn, autoClosure, nocapture);
     
     typeOrOffset = FunctionType::get(getType(inputID), getType(resultID),
                                      Info);

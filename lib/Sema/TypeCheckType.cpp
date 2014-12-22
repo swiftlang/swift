@@ -1206,7 +1206,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                     : AbstractCC::Freestanding,
                                   rep,
                                   attrs.has(TAK_noreturn),
-                                  /*autoclosure is a decl attr*/false);
+                                  /*autoclosure is a decl attr*/false,
+                                  /*nocapture is a decl attr*/false);
 
     auto calleeConvention = ParameterConvention::Direct_Unowned;
     if (attrs.has(TAK_callee_owned)) {
