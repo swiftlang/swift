@@ -228,9 +228,9 @@ protected:
 
   struct SILFunctionTypeBitfields {
     unsigned : NumTypeBaseBits;
-    unsigned ExtInfo : 8;
+    unsigned ExtInfo : 16;
     unsigned CalleeConvention : 3;
-    unsigned NumParameters : 32 - 11 - NumTypeBaseBits;
+    unsigned NumParameters : 32 - 19 - NumTypeBaseBits;
   };
 
   struct AnyMetatypeTypeBitfields {
@@ -1970,7 +1970,7 @@ public:
         return ExtInfo(Bits & ~NoCaptureMask);
     }
 
-    char getFuncAttrKey() const {
+    uint16_t getFuncAttrKey() const {
       return Bits;
     }
 

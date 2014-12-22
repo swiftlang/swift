@@ -179,7 +179,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<std::pair<Type,char>, MetatypeType*> MetatypeTypes;
     llvm::DenseMap<std::pair<Type,char>,
                    ExistentialMetatypeType*> ExistentialMetatypeTypes;
-    llvm::DenseMap<std::pair<Type,std::pair<Type,char>>, FunctionType*>
+    llvm::DenseMap<std::pair<Type,std::pair<Type,unsigned>>, FunctionType*>
       FunctionTypes;
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
     llvm::DenseMap<std::pair<Type, Type>, DictionaryType *> DictionaryTypes;
@@ -2298,7 +2298,7 @@ FunctionType *FunctionType::get(Type Input, Type Result,
                                 const ExtInfo &Info) {
   auto properties = getFunctionRecursiveProperties(Input, Result);
   auto arena = getArena(properties);
-  char attrKey = Info.getFuncAttrKey();
+  uint16_t attrKey = Info.getFuncAttrKey();
 
   const ASTContext &C = Input->getASTContext();
 

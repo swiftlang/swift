@@ -6,8 +6,8 @@ func f(@__nocapture fn : () -> Int) {
   f { 4 }  // ok
 }
 
-class SomemClass {
-  var x = 42
+class SomeClass {
+  final var x = 42
 
   // TODO: We should be able to eliminate this.
   func test() {
