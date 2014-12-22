@@ -339,7 +339,56 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
 }
 
 // Index conversions
-extension String.UnicodeScalarView.Index {
+extension String.UnicodeScalarIndex {
+  public init?(
+    _ sourceIndex: String.UTF16Index,
+    within unicodeScalars: String.UnicodeScalarView
+  ) {
+    let sourceView = String.UTF16View(unicodeScalars._core)
+    
+    if sourceIndex != sourceView.startIndex
+    && sourceIndex != sourceView.endIndex {
+      _precondition(
+        sourceIndex >= sourceView.startIndex
+        && sourceIndex <= sourceView.endIndex,
+        "Invalid String.UTF16Index for this UnicodeScalar view")
+      
+      // Detect positions that have no corresponding index.  Note that
+      // we have to check before and after, because an unpaired
+      // surrogate will be decoded as a single replacement character,
+      // thus making the corresponding position valid.
+      if UTF16.isTrailSurrogate(sourceView[sourceIndex])
+        && UTF16.isLeadSurrogate(sourceView[sourceIndex.predecessor()]) {
+        return nil
+      }
+    }
+    self.init(sourceIndex._offset, unicodeScalars._core)
+  }
+  
+  public init?(
+    _ sourceIndex: String.UTF8Index,
+    within unicodeScalars: String.UnicodeScalarView
+  ) {
+    let core = unicodeScalars._core
+    
+    _precondition(
+      sourceIndex._coreIndex >= 0 && sourceIndex._coreIndex <= core.endIndex,
+      "Invalid String.UTF8Index for this UnicodeScalar view")
+
+    // Detect positions that have no corresponding index.
+    if !sourceIndex._isOnUnicodeScalarBoundary {
+      return nil
+    }
+    self.init(sourceIndex._coreIndex, core)
+  }
+  
+  public init(
+    _ sourceIndex: String.Index,
+    within unicodeScalars: String.UnicodeScalarView
+  ) {
+    self.init(sourceIndex._base._position, unicodeScalars._core)
+  }
+
   public func samePositionIn(
     otherView: String.UTF8View
   ) -> String.UTF8View.Index {

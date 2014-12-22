@@ -146,7 +146,8 @@ extension String {
       
       /// True iff the index is at the end of its view
       internal var _isAtEnd : Bool {
-        return _coreIndex == _core.endIndex
+        return _buffer == Index._emptyBuffer
+          && _coreIndex == _core.endIndex
       }
 
       /// The value of the buffer when it is empty
@@ -322,5 +323,10 @@ extension String.UTF8View.Index {
     otherView: String.UTF16View
   ) -> String.UTF16View.Index? {
     return String.UTF16View.Index(self, within: otherView)
+  }
+  public func samePositionIn(
+    otherView: String.UnicodeScalarView
+  ) -> String.UnicodeScalarIndex? {
+    return String.UnicodeScalarIndex(self, within: otherView)
   }
 }

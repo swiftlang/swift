@@ -226,14 +226,10 @@ extension String.UTF16View.Index {
     _ sourceIndex: String.UTF8Index, within utf16: String.UTF16View
   ) {
     let core = utf16._core
-    let sourceView = String.UTF8View(core)
     
     _precondition(
-      sourceIndex._coreIndex >= 0 && (
-        sourceIndex._coreIndex < core.endIndex
-        || sourceIndex._coreIndex == core.endIndex
-           && sourceIndex._isOnUnicodeScalarBoundary
-      ), "Invalid String.UTF8Index for this UTF-16 view")
+      sourceIndex._coreIndex >= 0 && sourceIndex._coreIndex <= core.endIndex,
+      "Invalid String.UTF8Index for this UTF-16 view")
 
     // Detect positions that have no corresponding index.
     if !sourceIndex._isOnUnicodeScalarBoundary {
@@ -255,5 +251,11 @@ extension String.UTF16View.Index {
     otherView: String.UTF8View
   ) -> String.UTF8View.Index? {
     return String.UTF8View.Index(self, within: otherView)
+  }
+
+  public func samePositionIn(
+    otherView: String.UnicodeScalarView
+  ) -> String.UnicodeScalarIndex? {
+    return String.UnicodeScalarIndex(self, within: otherView)
   }
 }
