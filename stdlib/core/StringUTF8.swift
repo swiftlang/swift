@@ -1,4 +1,4 @@
-//===--- StringUTF8.swift - A UTF8 view of _StringCore ---------------------===//
+//===--- StringUTF8.swift - A UTF8 view of _StringCore --------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -324,9 +324,16 @@ extension String.UTF8View.Index {
   ) -> String.UTF16View.Index? {
     return String.UTF16View.Index(self, within: otherView)
   }
+  
   public func samePositionIn(
     otherView: String.UnicodeScalarView
   ) -> String.UnicodeScalarIndex? {
     return String.UnicodeScalarIndex(self, within: otherView)
+  }
+  
+  public func samePositionIn(
+    characters: String
+  ) -> String.Index? {
+    return String.Index(self, within: characters)
   }
 }

@@ -20,7 +20,7 @@ println("testing...")
 // This string contains a variety of non-ASCII characters, including
 // Unicode scalars that must be represented with a surrogate pair in UTF16
 // grapheme clusters composed of multiple
-let winter = "🏂☃❅❆❄︎⛄️❄️" 
+let winter = "🏂☃❅❆❄︎⛄️❄️"
 let summer = "school's out!"
 let summerBytes: [UInt8] = [
   0x73, 0x63, 0x68, 0x6f, 0x6f, 0x6c, 0x27, 0x73, 0x20, 0x6f, 0x75, 0x74, 0x21]
@@ -469,6 +469,104 @@ tests.test("index-mapping/utf16-to-unicode-scalar") {
     summer.utf16.endIndex.samePositionIn(summer.unicodeScalars)!)
 }
 
+//===--- To Character -------------------------------------------------===//
+tests.test("index-mapping/unicode-scalar-to-character") {
+  let winterUnicodeScalarCharacters: [Character?] = [
+    "🏂", "☃", "❅", "❆", "❄︎", nil, "⛄️", nil, "❄️", nil
+  ]
+  
+  expectEqualSequence(
+    winterUnicodeScalarCharacters,
+    
+    indices(winter.unicodeScalars).map {
+      i in i.samePositionIn(winter).map {
+        winter[$0]
+      }
+    },
+    ==
+  )
+
+  expectEqual(winter.endIndex, winter.unicodeScalars.endIndex.samePositionIn(winter)!)
+  
+  expectEqualSequence(
+    summerBytes.map { Character(UnicodeScalar($0)) },
+    indices(summer.unicodeScalars).map { summer[$0.samePositionIn(summer)!] }
+  )
+  
+  expectEqual(summer.endIndex, summer.unicodeScalars.endIndex.samePositionIn(summer)!)
+}
+
+tests.test("index-mapping/utf8-to-character") {
+  // Define expectation separately to help the type-checker, which
+  // otherwise runs out of time solving.
+  let winterUtf8Characters: [Character?] = [
+    "🏂", nil, nil, nil,
+    "☃", nil, nil,
+    "❅", nil, nil,
+    "❆", nil, nil,
+    "❄︎", nil, nil, nil, nil, nil,
+    "⛄️", nil, nil, nil, nil, nil,
+    "❄️", nil, nil, nil, nil, nil
+  ]
+
+  expectEqualSequence(
+    winterUtf8Characters,
+    indices(winter.utf8).map {
+      (i:String.UTF8Index)->Character? in i.samePositionIn(winter).map {
+        winter[$0]
+      }
+    }, ==
+  )
+
+  expectNotEmpty(winter.utf8.endIndex.samePositionIn(winter))
+  expectEqual(
+    winter.endIndex,
+    winter.utf8.endIndex.samePositionIn(winter)!)
+  
+  expectEqualSequence(
+    map(summerBytes) { Character(UnicodeScalar($0)) },
+    indices(summer.utf8).map { summer[$0.samePositionIn(summer)!] }
+  )
+
+  expectNotEmpty(summer.utf8.endIndex.samePositionIn(summer))
+  expectEqual(
+    summer.endIndex,
+    summer.utf8.endIndex.samePositionIn(summer)!)
+}
+
+tests.test("index-mapping/utf16-to-character") {
+  let winterUtf16Characters: [Character?] = [
+    "🏂", nil, "☃", "❅", "❆", "❄︎", nil, "⛄️", nil, "❄️", nil
+  ]
+  
+  expectEqualSequence(
+    winterUtf16Characters,
+    map(indices(winter.utf16)) {
+      i in i.samePositionIn(winter).map {
+        winter[$0]
+      }
+    }, ==
+  )
+
+  expectNotEmpty(winter.utf16.endIndex.samePositionIn(winter))
+  expectEqual(
+    winter.endIndex,
+    winter.utf16.endIndex.samePositionIn(winter)!)
+  
+  expectEqualSequence(
+    map(summerBytes) { Character(UnicodeScalar($0)) },
+    map(indices(summer.utf16)) {
+      summer[$0.samePositionIn(summer)!]
+    }
+  )
+
+  expectNotEmpty(summer.utf16.endIndex.samePositionIn(summer))
+  expectEqual(
+    summer.endIndex,
+    summer.utf16.endIndex.samePositionIn(summer)!)
+}
+
+//===----------------------------------------------------------------------===//
 // These are rather complicated due to their internal buffers, so
 // rigorous tests are required
 tests.test("UTF8 indexes") {

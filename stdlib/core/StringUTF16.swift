@@ -258,4 +258,10 @@ extension String.UTF16View.Index {
   ) -> String.UnicodeScalarIndex? {
     return String.UnicodeScalarIndex(self, within: otherView)
   }
+  
+  public func samePositionIn(
+    characters: String
+  ) -> String.Index? {
+    return String.Index(self, within: characters)
+  }
 }
