@@ -975,6 +975,20 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     }
   }
 
+  // A non-@noescape function type can be a subtype of a @noescape function
+  // type.
+  if (func1->isNoEscape() != func2->isNoEscape()) {
+    if (func1->isNoEscape() || kind < TypeMatchKind::Subtype) {
+      // Record this failure.
+      if (shouldRecordFailures()) {
+        recordFailure(getConstraintLocator(locator),
+                      Failure::FunctionNoEscapeMismatch, func1, func2);
+      }
+
+      return SolutionKind::Error;
+    }
+  }
+
   // Determine how we match up the input/result types.
   TypeMatchKind subKind;
   switch (kind) {

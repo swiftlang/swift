@@ -370,6 +370,9 @@ ERROR(unbound_generic_parameter,sema_tcc,none,
 ERROR(generic_parameter_binds_to_non_objc_existential,sema_tcc,none,
       "generic parameter %0 cannot be bound to non-@objc protocol type %1",
       (Type, Type))
+ERROR(noescape_functiontype_mismatch,sema_tcc,none,
+      "invalid use of non-escaping function in escaping context %0",
+      (Type))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations

@@ -355,6 +355,8 @@ public:
     FunctionAutoclosureMismatch,
     /// \brief Noreturn attribute function type mismatch.
     FunctionNoReturnMismatch,
+    /// \brief NoEscape attribute function type mismatch.
+    FunctionNoEscapeMismatch,
     /// \brief Types are not the same.
     TypesNotEqual,
     /// \brief Types are not subtypes.
@@ -466,6 +468,7 @@ public:
     case FunctionTypesMismatch:
     case FunctionAutoclosureMismatch:
     case FunctionNoReturnMismatch:
+    case FunctionNoEscapeMismatch:
     case TupleNameMismatch:
     case TupleNamePositionMismatch:
     case TupleSizeMismatch:

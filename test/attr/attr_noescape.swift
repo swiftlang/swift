@@ -4,6 +4,9 @@
 
 func doesEscape(fn : () -> Int) {}
 
+func takesGenericClosure<T>(a : Int, @__noescape fn : () -> T) {}
+
+
 func takesNoEscapeClosure(@__noescape fn : () -> Int) {
   takesNoEscapeClosure { 4 }  // ok
 
@@ -22,6 +25,11 @@ func takesNoEscapeClosure(@__noescape fn : () -> Int) {
     fn()   // expected-error {{declaration closing over @noescape argument 'fn' may allow it to escape}}
   }
 
+  takesNoEscapeClosure(fn)  // ok
+
+  doesEscape(fn)                 // expected-error {{invalid use of non-escaping function in escaping context '() -> Int'}}
+  takesGenericClosure(4, fn)     // ok
+  takesGenericClosure(4) { 4 }   // obviously ok.
 }
 
 class SomeClass {
@@ -34,9 +42,5 @@ class SomeClass {
     // Since 'takesClosure' doesn't escape its closure, it doesn't require
     // "self." qualification of member references.
     takesNoEscapeClosure { x }
-
-
   }
-
-
 }

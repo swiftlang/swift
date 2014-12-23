@@ -110,6 +110,7 @@ static void diagUnreachableCode(TypeChecker &TC, const Stmt *S) {
 static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
   class DiagnoseWalker : public ASTWalker {
     SmallPtrSet<Expr*, 4> AlreadyDiagnosedMetatypes;
+    SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedNoEscapes;
   public:
     TypeChecker &TC;
 
@@ -120,9 +121,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
       if (auto *ME = dyn_cast<ModuleExpr>(E))
         checkUseOfModuleExpr(ME);
 
-      // Diagnose metatype values that don't appear as part of a property,
-      // method, or constructor reference.
-      
       // See through implicit conversions of the expression.  We want to be able
       // to associate the parent of this expression with the ultimate callee.
       auto Base = E;
@@ -135,9 +133,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
           checkUseOfMetaTypeName(Base);
 
         // Verify noescape parameter uses.
-        if (auto *PD = dyn_cast<ParamDecl>(DRE->getDecl()))
-          if (PD->getAttrs().hasAttribute<NoEscapeAttr>())
-            checkNoEscapeParameterUse(DRE);
+        checkNoEscapeParameterUse(DRE, nullptr);
       }
       if (auto *MRE = dyn_cast<MemberRefExpr>(Base))
         if (isa<TypeDecl>(MRE->getMember().getDecl()))
@@ -147,6 +143,29 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
 
       if (auto *CE = dyn_cast<ClosureExpr>(E))
         checkNoEscapeClosureCaptures(CE);
+
+      // Check function calls, looking through implicit conversions on the
+      // function and inspecting the arguments directly.
+      if (auto *Call = dyn_cast<ApplyExpr>(E)) {
+        // Check the callee.
+        if (auto *DRE = dyn_cast<DeclRefExpr>(Call->getFn()))
+          checkNoEscapeParameterUse(DRE, Call);
+
+        // The argument is either a ParenExpr or TupleExpr.
+        ArrayRef<Expr*> arguments;
+        if (auto *PE = dyn_cast<ParenExpr>(Call->getArg()))
+          arguments = PE->getSubExpr();
+        else if (auto *TE = dyn_cast<TupleExpr>(Call->getArg()))
+          arguments = TE->getElements();
+        else
+          arguments = Call->getArg();
+
+        // Check each argument.
+        for (auto arg : arguments) {
+          if (auto *DRE = dyn_cast<DeclRefExpr>(arg))
+            checkNoEscapeParameterUse(DRE, Call);
+        }
+      }
 
       return { true, E };
     }
@@ -166,13 +185,22 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
 
     /// The DRE argument is a reference to a noescape parameter.  Verify that
     /// its uses are ok.
-    void checkNoEscapeParameterUse(DeclRefExpr *DRE) {
-      // The only valid use of the noescape parameter is an immediate call.
-      // TODO: this could be generalized in various ways, for example to allow
-      // passing the decl off as an argument to a noescape call.  Start simple.
-      if (auto *ParentExpr = Parent.getAsExpr())
-        if (isa<CallExpr>(ParentExpr)) // param()
-          return;
+    void checkNoEscapeParameterUse(DeclRefExpr *DRE, Expr *ParentExpr=nullptr) {
+      // This only cares about declarations marked noescape.
+      if (!DRE->getDecl()->getAttrs().hasAttribute<NoEscapeAttr>())
+        return;
+
+      // Only diagnose this once.  If we check and accept this use higher up in
+      // the AST, don't recheck here.
+      if (!AlreadyDiagnosedNoEscapes.insert(DRE).second)
+        return;
+
+      // The only valid use of the noescape parameter is an immediate call,
+      // either as the callee or as an argument (in which case, the typechecker
+      // validates that the noescape bit didn't get stripped off).
+      if (ParentExpr && isa<ApplyExpr>(ParentExpr)) // param()
+        return;
+
       TC.diagnose(DRE->getStartLoc(), diag::invalid_noescape_use,
                   DRE->getDecl()->getName());
     }
@@ -195,6 +223,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
                       CapVD->getName());
     }
 
+    // Diagnose metatype values that don't appear as part of a property,
+    // method, or constructor reference.
     void checkUseOfMetaTypeName(Expr *E) {
       // If we've already checked this at a higher level, we're done.
       if (!AlreadyDiagnosedMetatypes.insert(E).second)
