@@ -16,6 +16,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Types.h"
 #include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
@@ -98,6 +99,20 @@ public:
   AbstractClosureExpr *getAbstractClosureExpr() const {
     return TheFunction.dyn_cast<AbstractClosureExpr*>();
   }
+
+  /// Return true if this closure is passed as an argument to a function and is
+  /// known not to escape from that function.  In this case, captures can be
+  /// more efficient.
+  bool isKnownNoEscape() const {
+    if (TheFunction.is<AbstractFunctionDecl *>())
+      return false;
+
+    auto *CE = TheFunction.get<AbstractClosureExpr *>();
+    if (!CE->getType() || CE->getType()->is<ErrorType>())
+      return false;
+    return CE->getType()->castTo<FunctionType>()->isNoEscape();
+  }
+
 };
 
 } // namespace swift

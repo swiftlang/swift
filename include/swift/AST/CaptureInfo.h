@@ -36,6 +36,9 @@ public:
   ArrayRef<ValueDecl *> getCaptures() const { return Captures; }
   void setCaptures(ArrayRef<ValueDecl *> C) { Captures = C; }
 
+  /// LocalCaptureTy includes both the declaration being captured, along with a
+  /// bit that indicates 'isDirect'.  This is set when a VarDecl with storage
+  /// *and* accessors is captured by its storage address.
   typedef llvm::PointerIntPair<ValueDecl*, 1, bool> LocalCaptureTy;
 
   /// \brief Return a filtered list of the captures for this function,

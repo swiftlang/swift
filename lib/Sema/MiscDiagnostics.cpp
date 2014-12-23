@@ -208,12 +208,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
     /// Check the specified closure to make sure it doesn't capture a noescape
     /// value, or that it is itself noescape if so.
     void checkNoEscapeClosureCaptures(ClosureExpr *CE) {
-      if (!CE->getType() || CE->getType()->is<ErrorType>())
-        return; // Ignore errorneous code.
-      auto Ty = CE->getType()->castTo<FunctionType>();
-
       // If this closure is used in a noescape context, it can do anything.
-      if (Ty->isNoEscape()) return;
+      if (AnyFunctionRef(CE).isKnownNoEscape()) return;
 
       // Otherwise, check the capture list to make sure it isn't escaping
       // something.
@@ -388,15 +384,15 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
 
     /// Return true if this is a closure expression that will require "self."
     /// qualification of member references.
-    static bool isClosureRequiringSelfQualification(const Expr *E) {
-      if (!isa<ClosureExpr>(E)) return false;
+    static bool isClosureRequiringSelfQualification(Expr *E) {
+      if (auto *CE = dyn_cast<ClosureExpr>(E))
+        // If the closure's type was inferred to be noescape, then it doesn't
+        // need qualification.
+        return !AnyFunctionRef(CE).isKnownNoEscape();
 
-      // If the closure's type was inferred to be noescape, then it doesn't
-      // need qualification.
-      if (E->getType())
-        if (auto *FT = E->getType()->getAs<FunctionType>())
-          return !FT->isNoEscape();
-      return true;
+
+      // Not a closure?
+      return false;
     }
 
 

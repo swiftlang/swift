@@ -31,6 +31,7 @@ namespace swift {
   class SILBuilder;
   class SILLocation;
   class SILModule;
+  class AnyFunctionRef;
 
 namespace Lowering {
 
@@ -93,8 +94,10 @@ enum class CaptureKind {
   GetterSetter
 };
   
-/// Return the CaptureKind to use when capturing a decl.
-CaptureKind getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture);
+/// Return the CaptureKind to use when capturing a decl into the specified
+/// closure.
+CaptureKind getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture,
+                               AnyFunctionRef TheClosure);
   
 /// Flag used to place context-dependent TypeLowerings in their own arena which
 /// can be disposed when a generic context is exited.
@@ -654,11 +657,11 @@ public:
   /// Get a function type curried with its capture context.
   CanAnyFunctionType getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
                                  ArrayRef<CaptureInfo::LocalCaptureTy> captures,
-                                                 DeclContext *parentContext);
+                                                 AnyFunctionRef closure);
   CanAnyFunctionType getFunctionInterfaceTypeWithCaptures(
                                                  CanAnyFunctionType funcType,
                                  ArrayRef<CaptureInfo::LocalCaptureTy> captures,
-                                                 DeclContext *parentContext);
+                                                 AnyFunctionRef closure);
   
   /// Map an AST-level type to the corresponding foreign representation type we
   /// implicitly convert to for a given calling convention.

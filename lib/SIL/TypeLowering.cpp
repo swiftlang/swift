@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "libsil"
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
@@ -148,7 +149,8 @@ AbstractionPattern TypeConverter::getMostGeneralAbstraction() {
   return AbstractionPattern(MostGeneralArchetype);
 }
 
-CaptureKind Lowering::getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture) {
+CaptureKind Lowering::getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture,
+                                         AnyFunctionRef TheClosure) {
   if (VarDecl *var = dyn_cast<VarDecl>(capture.getPointer())) {
     // If captured directly, the variable is captured by box.
     if (capture.getInt()) {
@@ -1818,7 +1820,8 @@ TypeConverter::getEffectiveGenericSignatureForContext(DeclContext *dc) {
 CanAnyFunctionType
 TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
                                  ArrayRef<CaptureInfo::LocalCaptureTy> captures,
-                                           DeclContext *parentContext) {
+                                           AnyFunctionRef theClosure) {
+  auto parentContext = theClosure.getAsDeclContext()->getParent();
   // Capture generic parameters from the enclosing context.
   GenericParamList *genericParams
     = getEffectiveGenericParamsForContext(parentContext);
@@ -1847,7 +1850,7 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
     auto captureType =
       VD->getType()->getLValueOrInOutObjectType()->getCanonicalType();
 
-    switch (getDeclCaptureKind(capture)) {
+    switch (getDeclCaptureKind(capture, theClosure)) {
     case CaptureKind::None:
       break;
         
@@ -1901,7 +1904,9 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
 CanAnyFunctionType
 TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
                                  ArrayRef<CaptureInfo::LocalCaptureTy> captures,
-                                           DeclContext *context) {
+                                           AnyFunctionRef theClosure) {
+  auto context = theClosure.getAsDeclContext();
+
   // Capture generic parameters from the enclosing context.
   CanGenericSignature genericSig
     = getEffectiveGenericSignatureForContext(context);
@@ -1930,7 +1935,7 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
     auto captureType =
       vd->getType()->getLValueOrInOutObjectType()->getCanonicalType();
 
-    switch (getDeclCaptureKind(capture)) {
+    switch (getDeclCaptureKind(capture, theClosure)) {
     case CaptureKind::None:
       break;
         
@@ -2021,8 +2026,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
                            getInterfaceTypeOutOfContext(funcTy, ACE->getParent()));
       if (!withCaptures) return funcTy;
       ACE->getCaptureInfo().getLocalCaptures(nullptr, captures);
-      return getFunctionInterfaceTypeWithCaptures(funcTy, captures,
-                                                  ACE->getParent());
+      return getFunctionInterfaceTypeWithCaptures(funcTy, captures, ACE);
     }
 
     FuncDecl *func = cast<FuncDecl>(vd);
@@ -2034,8 +2038,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
     funcTy = cast<AnyFunctionType>(replaceDynamicSelfWithSelf(funcTy));
     if (!withCaptures) return funcTy;
     func->getLocalCaptures(captures);
-    return getFunctionInterfaceTypeWithCaptures(funcTy, captures,
-                                                func);
+    return getFunctionInterfaceTypeWithCaptures(funcTy, captures, func);
   }
 
   case SILDeclRef::Kind::Allocator:
@@ -2147,7 +2150,7 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
       auto funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
       if (!withCaptures) return funcTy;
       ACE->getCaptureInfo().getLocalCaptures(nullptr, captures);
-      return getFunctionTypeWithCaptures(funcTy, captures, ACE->getParent());
+      return getFunctionTypeWithCaptures(funcTy, captures, ACE);
     }
 
     FuncDecl *func = cast<FuncDecl>(vd);
@@ -2155,8 +2158,7 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
     funcTy = cast<AnyFunctionType>(replaceDynamicSelfWithSelf(funcTy));
     if (!withCaptures) return funcTy;
     func->getLocalCaptures(captures);
-    return getFunctionTypeWithCaptures(funcTy, captures,
-                                       func->getDeclContext());
+    return getFunctionTypeWithCaptures(funcTy, captures, func);
   }
 
   case SILDeclRef::Kind::Allocator:
