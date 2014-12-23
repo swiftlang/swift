@@ -1913,10 +1913,8 @@ static int _addImageProtocolConformances(struct dl_phdr_info *info,
 }
 #endif
 
-const WitnessTable *swift::swift_conformsToProtocol(const Metadata *type,
-                                            const ProtocolDescriptor *protocol){
+static void installCallbacksToInspectDylib() {
   // TODO: Generic types, subclasses, foreign classes
-
   std::call_once(InstallProtocolConformanceAddImageCallbackOnce, [](){
 #if defined(__APPLE__) && defined(__MACH__)
     // Install our dyld callback if we haven't already.
@@ -1933,6 +1931,11 @@ const WitnessTable *swift::swift_conformsToProtocol(const Metadata *type,
 #error No known mechanism to inspect loaded dynamic libraries on this platform.
 #endif
   });
+}
+
+const WitnessTable *swift::swift_conformsToProtocol(const Metadata *type,
+                                            const ProtocolDescriptor *protocol){
+  installCallbacksToInspectDylib();
 
   auto origType = type;
   
