@@ -1,31 +1,13 @@
-// These tests should crash.
+// RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/CatchCrashes.cpp -c -o %t/CatchCrashes.o
-// RUN: %target-build-swift %s -Xlinker %t/CatchCrashes.o -o %t/a.out
+// RUN: %target-build-swift %s -o %t/a.out_Debug
+// RUN: %target-build-swift %s -o %t/a.out_Release -O
 //
-// RUN: %target-run %t/a.out DuplicateKeys1 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out DuplicateKeys2 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out DuplicateKeys3 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out RemoveInvalidIndex1 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out RemoveInvalidIndex2 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out RemoveInvalidIndex3 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out RemoveInvalidIndex4 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out BridgedKeyIsNotNSCopyable1 2>&1 | FileCheck %s -check-prefix=CHECK-UNRECOGNIZED-SELECTOR
-// RUN: %target-run %t/a.out BridgedKeyIsNotNSCopyable2 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out Downcast1 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out Downcast2 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug
+// RUN: %target-run %t/a.out_Release
 
-// CHECK: OK
-// CHECK: CRASHED: SIG{{ILL|TRAP|ABRT}}
-
-// CHECK-UNRECOGNIZED-SELECTOR: OK
-// CHECK-UNRECOGNIZED-SELECTOR: unrecognized selector sent to instance
-// CHECK-UNRECOGNIZED-SELECTOR: CRASHED: SIGABRT
-
+import StdlibUnittest
 import Foundation
-
-// Interpret the command line arguments.
-var arg = Process.arguments[1]
 
 struct NotBridgedKeyTy : Equatable, Hashable {
   init(_ value: Int) {
@@ -64,57 +46,65 @@ func == (lhs: BridgedVerbatimRefTy, rhs: BridgedVerbatimRefTy) -> Bool {
 assert(_isBridgedToObjectiveC(BridgedVerbatimRefTy.self))
 assert(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefTy.self))
 
-if true {
+var DictionaryTraps = TestSuite("DictionaryTraps")
+
+DictionaryTraps.test("sanity") {
   // Sanity checks.  This code should not trap.
   var d = Dictionary<BridgedVerbatimRefTy, BridgedVerbatimRefTy>()
   var nsd: NSDictionary = d
 }
 
-if arg == "DuplicateKeys1" {
-  println("OK")
-  Dictionary(dictionaryLiteral: 
+DictionaryTraps.test("DuplicateKeys1") {
+  expectCrashLater()
+  let d = Dictionary(dictionaryLiteral:
     (10, 1010), (20, 1020), (30, 1030), (10, 0))
+  _blackHole(d)
 }
 
-if arg == "DuplicateKeys2" {
-  println("OK")
-  Dictionary(dictionaryLiteral: 
+DictionaryTraps.test("DuplicateKeys2") {
+  expectCrashLater()
+  let d = Dictionary(dictionaryLiteral:
     (10, 1010), (20, 1020), (30, 1030), (10, 1010))
+  _blackHole(d)
 }
 
-if arg == "DuplicateKeys3" {
-  println("OK")
-  var d = [ 10: 1010, 10: 0 ]
+DictionaryTraps.test("DuplicateKeys3") {
+  expectCrashLater()
+  let d = [ 10: 1010, 10: 0 ]
+  _blackHole(d)
 }
 
-if arg == "RemoveInvalidIndex1" {
+DictionaryTraps.test("RemoveInvalidIndex1") {
   var d = Dictionary<Int, Int>()
   let index = d.startIndex
-  println("OK")
+  expectCrashLater()
   d.removeAtIndex(index)
 }
 
-if arg == "RemoveInvalidIndex2" {
+DictionaryTraps.test("RemoveInvalidIndex2") {
   var d = Dictionary<Int, Int>()
   let index = d.endIndex
-  println("OK")
+  expectCrashLater()
   d.removeAtIndex(index)
 }
 
-if arg == "RemoveInvalidIndex3" {
+DictionaryTraps.test("RemoveInvalidIndex3") {
   var d = [ 10: 1010, 20: 1020, 30: 1030 ]
   let index = d.endIndex
-  println("OK")
+  expectCrashLater()
   d.removeAtIndex(index)
 }
 
-if arg == "RemoveInvalidIndex4" {
+DictionaryTraps.test("RemoveInvalidIndex4") {
+  // <rdar://problem/19331717> Optimizer breaks Set<T> and Dictionary<K, V>
+  /*
   var d = [ 10: 1010 ]
   let index = d.indexForKey(10)!
   d.removeAtIndex(index)
-  assert(d[10] == nil)
-  println("OK")
+  expectEmpty(d[10])
+  expectCrashLater()
   d.removeAtIndex(index)
+  */
 }
 
 class TestObjCKeyTy : NSObject {
@@ -142,7 +132,7 @@ struct TestBridgedKeyTy : Hashable, _ObjectiveCBridgeable {
   static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
-  
+
   init(_ value: Int) { self.value = value }
 
   var hashValue: Int { return value }
@@ -177,28 +167,28 @@ func ==(x: TestBridgedKeyTy, y: TestBridgedKeyTy) -> Bool {
   return x.value == y.value
 }
 
-
-if arg == "BridgedKeyIsNotNSCopyable1" {
+DictionaryTraps.test("BridgedKeyIsNotNSCopyable1")
+  .crashOutputMatches("unrecognized selector sent to instance").code {
   // This Dictionary is bridged in O(1).
   var d = [ TestObjCKeyTy(10): NSObject() ]
   var nsd: NSDictionary = d
-  println("OK")
+  expectCrashLater()
   nsd.mutableCopy()
 }
 
-if arg == "BridgedKeyIsNotNSCopyable2" {
+DictionaryTraps.test("BridgedKeyIsNotNSCopyable2") {
   // This Dictionary is bridged in O(1).
   var d = [ TestObjCKeyTy(10): 10 ]
   var nsd: NSDictionary = d
-  println("OK")
+  expectCrashLater()
   nsd.mutableCopy()
 }
 
-if arg == "Downcast1" {
-  let d: Dictionary<NSObject, NSObject> = [ TestObjCKeyTy(10): NSObject(), 
+DictionaryTraps.test("Downcast1") {
+  let d: Dictionary<NSObject, NSObject> = [ TestObjCKeyTy(10): NSObject(),
                                             NSObject() : NSObject() ]
   let d2: Dictionary<TestObjCKeyTy, NSObject> = _dictionaryDownCast(d)
-  println("OK")
+  expectCrashLater()
   let v1 = d2[TestObjCKeyTy(10)]
   let v2 = d2[TestObjCKeyTy(20)]
 
@@ -206,15 +196,16 @@ if arg == "Downcast1" {
   for (k, v) in d2 { }
 }
 
-if arg == "Downcast2" {
-  let d: Dictionary<NSObject, NSObject> = [ TestObjCKeyTy(10): NSObject(), 
+DictionaryTraps.test("Downcast2") {
+  let d: Dictionary<NSObject, NSObject> = [ TestObjCKeyTy(10): NSObject(),
                                             NSObject() : NSObject() ]
+
+  expectCrashLater()
   println("OK")
-  let d2: Dictionary<TestBridgedKeyTy, NSObject> 
+  let d2: Dictionary<TestBridgedKeyTy, NSObject>
     = _dictionaryBridgeFromObjectiveC(d)
   let v1 = d2[TestBridgedKeyTy(10)]
 }
 
-println("BUSTED: should have crashed already")
-exit(1)
+runAllTests()
 

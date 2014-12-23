@@ -1,30 +1,13 @@
-// These tests should crash.
+// RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/CatchCrashes.cpp -c -o %t/CatchCrashes.o
-// RUN: %target-build-swift %s -Xlinker %t/CatchCrashes.o -o %t/a.out
+// RUN: %target-build-swift %s -o %t/a.out_Debug
+// RUN: %target-build-swift %s -o %t/a.out_Release -O
 //
-// RUN: %target-run %t/a.out RemoveInvalidIndex1 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out RemoveInvalidIndex2 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out RemoveInvalidIndex3 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out RemoveInvalidIndex4 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out RemoveFirstFromEmpty 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug
+// RUN: %target-run %t/a.out_Release
 
-// FIXME: <rdar://problem/18853078> Implement Set<T> up and downcasting
-// R/UN: %target-run %t/a.out BridgedKeyIsNotNSCopyable1 2>&1 | FileCheck %s -check-prefix=CHECK-UNRECOGNIZED-SELECTOR
-// R/UN: %target-run %t/a.out Downcast1 2>&1 | FileCheck %s -check-prefix=CHECK
-// R/UN: %target-run %t/a.out Downcast2 2>&1 | FileCheck %s -check-prefix=CHECK
-
-// CHECK: OK
-// CHECK: CRASHED: SIG{{ILL|TRAP|ABRT}}
-
-// CHECK-UNRECOGNIZED-SELECTOR: OK
-// CHECK-UNRECOGNIZED-SELECTOR: unrecognized selector sent to instance
-// CHECK-UNRECOGNIZED-SELECTOR: CRASHED: SIGABRT
-
+import StdlibUnittest
 import Foundation
-
-// Interpret the command line arguments.
-var arg = Process.arguments[1]
 
 struct NotBridgedKeyTy : Equatable, Hashable {
   init(_ value: Int) {
@@ -63,45 +46,50 @@ func == (lhs: BridgedVerbatimRefTy, rhs: BridgedVerbatimRefTy) -> Bool {
 assert(_isBridgedToObjectiveC(BridgedVerbatimRefTy.self))
 assert(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefTy.self))
 
-if true {
+var SetTraps = TestSuite("SetTraps")
+
+SetTraps.test("sanity") {
   // Sanity checks.  This code should not trap.
   var s = Set<BridgedVerbatimRefTy>()
   var nss: NSSet = s
 }
 
-if arg == "RemoveInvalidIndex1" {
+SetTraps.test("RemoveInvalidIndex1") {
   var s = Set<Int>()
   let index = s.startIndex
-  println("OK")
+  expectCrashLater()
   s.removeAtIndex(index)
 }
 
-if arg == "RemoveInvalidIndex2" {
+SetTraps.test("RemoveInvalidIndex2") {
   var s = Set<Int>()
   let index = s.endIndex
-  println("OK")
+  expectCrashLater()
   s.removeAtIndex(index)
 }
 
-if arg == "RemoveInvalidIndex3" {
+SetTraps.test("RemoveInvalidIndex3") {
   var s: Set<Int> = [ 10, 20, 30 ]
   let index = s.endIndex
-  println("OK")
+  expectCrashLater()
   s.removeAtIndex(index)
 }
 
-if arg == "RemoveInvalidIndex4" {
+SetTraps.test("RemoveInvalidIndex4") {
+  // <rdar://problem/19331717> Optimizer breaks Set<T> and Dictionary<K, V>
+  /*
   var s: Set<Int> = [ 10 ]
   let index = s.indexOf(10)!
   s.removeAtIndex(index)
-  assert(!s.contains(10))
-  println("OK")
+  expectFalse(s.contains(10))
+  expectCrashLater()
   s.removeAtIndex(index)
+  */
 }
 
-if arg == "RemoveFirstFromEmpty" {
+SetTraps.test("RemoveFirstFromEmpty") {
   var s = Set<Int>()
-  println("OK")
+  expectCrashLater()
   s.removeFirst()
 }
 
@@ -166,18 +154,19 @@ func ==(x: TestBridgedKeyTy, y: TestBridgedKeyTy) -> Bool {
 }
 
 // FIXME: <rdar://problem/18853078> Implement Set<T> up and downcasting
-//if arg == "BridgedKeyIsNotNSCopyable1" {
+//if arg == "BridgedKeyIsNotNSCopyable1"
+//  .crashOutputMatches("unrecognized selector sent to instance") {
 //  // This Set is bridged in O(1).
 //  var s = Set([ TestObjCKeyTy(10) ])
 //  var nss: NSSet = s
-//  println("OK")
+//  expectCrashLater()
 //  nss.mutableCopy()
 //}
 //
 //if arg == "Downcast1" {
 //  let s: Set<NSObject> = [ NSObject(), NSObject() ]
 //  let s2: Set<TestObjCKeyTy> = _setDownCast(s)
-//  println("OK")
+//  expectCrashLater()
 //  let v1 = s2.member(TestObjCKeyTy(10))
 //  let v2 = s2.member(TestObjCKeyTy(20))
 //
@@ -187,11 +176,10 @@ func ==(x: TestBridgedKeyTy, y: TestBridgedKeyTy) -> Bool {
 //
 //if arg == "Downcast2" {
 //  let s: Set<NSObject> = [ TestObjCKeyTy(10), NSObject() ]
-//  println("OK")
+//  expectCrashLater()
 //  let s2: Set<TestBridgedKeyTy> = _setBridgeFromObjectiveC(s)
 //  let v1 = s2.member(TestBridgedKeyTy(10))
 //}
-//
-//println("BUSTED: should have crashed already")
-//exit(1)
+
+runAllTests()
 
