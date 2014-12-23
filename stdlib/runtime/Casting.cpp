@@ -1947,8 +1947,9 @@ recur_inside_cache_lock:
   return std::make_pair(nullptr, false);
 }
 
-const WitnessTable *swift::swift_conformsToProtocol(const Metadata *type,
-                                            const ProtocolDescriptor *protocol){
+const WitnessTable *
+swift::swift_conformsToProtocol(const Metadata *type,
+                                const ProtocolDescriptor *protocol){
   installCallbacksToInspectDylib();
   auto origType = type;
 
