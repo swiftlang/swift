@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Concurrent.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/Fallthrough.h"
@@ -1723,40 +1724,10 @@ namespace {
     }
   };
   
-  struct ConformanceCacheKey {
-  private:
-    // The type or generic pattern that the cached witness table applies to.
-    const void *Type;
-    // The protocol the witness table witnesses.
-    const ProtocolDescriptor *Protocol;
-    
-    friend struct llvm::DenseMapInfo<ConformanceCacheKey>;
-  public:
-    ConformanceCacheKey() = default;
-    
-    // Create a conformance cache key for a witness table that applies to a
-    // specific type.
-    ConformanceCacheKey(const Metadata *type, const ProtocolDescriptor *proto)
-      : Type(type), Protocol(proto)
-    {}
-    
-    // Create a conformance cache key for a witness table that can apply to any
-    // instance of a generic type.
-    ConformanceCacheKey(const GenericMetadata *generic,
-                        const ProtocolDescriptor *proto)
-      : Type(generic), Protocol(proto)
-    {}
-    
-    bool operator==(ConformanceCacheKey other) {
-      return Type == other.Type && Protocol == other.Protocol;
-    }
-    bool operator!=(ConformanceCacheKey other) {
-      return Type != other.Type || Protocol != other.Protocol;
-    }
-  };
-  
   struct ConformanceCacheEntry {
   private:
+    const void *Type; 
+    const ProtocolDescriptor *Proto;
     uintptr_t Data;
     // All Darwin 64-bit platforms reserve the low 2^32 of address space, which
     // is more than enough invalid pointer values for any realistic generation
@@ -1765,26 +1736,25 @@ namespace {
   #if !__LP64__
     bool Success;
   #endif
-    
-    ConformanceCacheEntry(uintptr_t Data, bool Success)
-      : Data(Data)
+ 
+  public:
+    ConformanceCacheEntry(const void *type,
+                          const ProtocolDescriptor *proto,
+                          uintptr_t Data, bool Success)
+      : Type(type), Proto(proto), Data(Data)
     #if !__LP64__
         , Success(Success)
     #endif
     {}
     
-  public:
     ConformanceCacheEntry() = default;
-    
-    /// Cache entry for a successful lookup.
-    static ConformanceCacheEntry success(const WitnessTable *value) {
-      return ConformanceCacheEntry((uintptr_t)value, true);
+   
+    /// \returns true if the entry represents an entry for the pair \p type
+    /// and \p proto.
+    bool matches(const void *type, const ProtocolDescriptor *proto) {
+      return type == Type && Proto == proto;
     }
-    /// Cache entry for a failed lookup.
-    static ConformanceCacheEntry failure(unsigned generation) {
-      return ConformanceCacheEntry((uintptr_t)generation, false);
-    }
-    
+   
     bool isSuccessful() const {
     #if __LP64__
       return Data > 0xFFFFFFFFU;
@@ -1807,30 +1777,8 @@ namespace {
   };
 }
 
-namespace llvm {
-  template<>
-  struct DenseMapInfo<ConformanceCacheKey> {
-    static ConformanceCacheKey getEmptyKey() {
-      return {(Metadata*)nullptr, nullptr};
-    }
-    static ConformanceCacheKey getTombstoneKey() {
-      return {(Metadata*)1, nullptr};
-    }
-    static unsigned getHashValue(ConformanceCacheKey value) {
-      return llvm::combineHashValue(
-                            DenseMapInfo<void*>::getHashValue(value.Type),
-                            DenseMapInfo<void*>::getHashValue(value.Protocol));
-    }
-    static bool isEqual(ConformanceCacheKey a, ConformanceCacheKey b) {
-      return a == b;
-    }
-  };
-}
-
 // Found conformances.
-static pthread_rwlock_t ConformanceCacheLock = PTHREAD_RWLOCK_INITIALIZER;
-static llvm::DenseMap<ConformanceCacheKey,
-                      ConformanceCacheEntry> ConformanceCache;
+static ConcurrentMap<size_t, ConformanceCacheEntry> ConformanceCache;
 unsigned ConformanceCacheGeneration = 0;
 
 // Conformance sections pending a scan.
@@ -1933,6 +1881,12 @@ static void installCallbacksToInspectDylib() {
   });
 }
 
+static size_t hashTypeProtocolPair(const void *type,
+                                   const ProtocolDescriptor *protocol) {
+  // A simple hash function for the conformance pair.
+  return (size_t)type + ((size_t)protocol >> 2);
+}
+
 /// Search the witness table in the ConformanceCache. \returns a pair of the
 /// WitnessTable pointer and a boolean value True if a definitive value is
 /// found. \returns false if the type or its superclasses were not found in
@@ -1942,16 +1896,22 @@ std::pair<const WitnessTable *, bool>
 searchInConformanceCache(const Metadata *type,
                          const ProtocolDescriptor *protocol){
 recur_inside_cache_lock:
-  auto found = ConformanceCache.find({type, protocol});
-  if (found != ConformanceCache.end()) {
-    auto entry = found->second;
 
-    if (entry.isSuccessful()) {
-      return std::make_pair(entry.getWitnessTable(), true);
+  // Hash and lookup the type-protocol pair in the cache.
+  size_t hash = hashTypeProtocolPair(type, protocol);
+  ConcurrentList<ConformanceCacheEntry> &Bucket =
+    ConformanceCache.findOrAllocateNode(hash);
+
+  // See if we have a cached conformance. Try the specific type first.
+  for (auto &Entry : Bucket) {
+    if (!Entry.matches(type, protocol)) continue;
+
+    if (Entry.isSuccessful()) {
+      return std::make_pair(Entry.getWitnessTable(), true);
     }
 
     // If we got a cached negative response, check the generation number.
-    if (entry.getFailureGeneration() == ProtocolConformanceGeneration) {
+    if (Entry.getFailureGeneration() == ProtocolConformanceGeneration) {
       return std::make_pair(nullptr, true);
     }
   }
@@ -1959,11 +1919,15 @@ recur_inside_cache_lock:
   // If the type is generic, see if there's a shared nondependent witness table
   // for its instances.
   if (auto generic = type->getGenericPattern()) {
-    found = ConformanceCache.find({generic, protocol});
-    if (found != ConformanceCache.end()) {
-      auto entry = found->second;
-      if (entry.isSuccessful()) {
-        return std::make_pair(entry.getWitnessTable(), true);
+    // Hash and lookup the type-protocol pair in the cache.
+    size_t hash = hashTypeProtocolPair(generic, protocol);
+    ConcurrentList<ConformanceCacheEntry> &Bucket =
+      ConformanceCache.findOrAllocateNode(hash);
+
+    for (auto &Entry : Bucket) {
+      if (!Entry.matches(generic, protocol)) continue;
+      if (Entry.isSuccessful()) {
+        return std::make_pair(Entry.getWitnessTable(), true);
       }
       // We don't try to cache negative responses for generic
       // patterns.
@@ -1990,21 +1954,15 @@ const WitnessTable *swift::swift_conformsToProtocol(const Metadata *type,
 
 recur:
   // See if we have a cached conformance.
-  // Try the specific type first.
-  pthread_rwlock_rdlock(&ConformanceCacheLock);
-
   auto FoundConformance =  searchInConformanceCache(type, protocol);
   if (FoundConformance.second) {
-    pthread_rwlock_unlock(&ConformanceCacheLock);
     return FoundConformance.first;
   }
 
   unsigned failedGeneration = ConformanceCacheGeneration;
-  pthread_rwlock_unlock(&ConformanceCacheLock);
 
   // If we didn't have an up-to-date cache entry, scan the conformance records.
   pthread_mutex_lock(&SectionsToScanLock);
-  pthread_rwlock_wrlock(&ConformanceCacheLock);
 
   // If we have no new information to pull in (and nobody else pulled in
   // new information while we waited on the lock), we're done.
@@ -2012,16 +1970,19 @@ recur:
     if (failedGeneration != ConformanceCacheGeneration) {
       // Someone else pulled in new conformances while we were waiting.
       // Start over with our newly-populated cache.
-      pthread_rwlock_unlock(&ConformanceCacheLock);
       pthread_mutex_unlock(&SectionsToScanLock);
       type = origType;
       goto recur;
     }
 
-    // Cache the negative result.
-    ConformanceCache[{type, protocol}]
-      = ConformanceCacheEntry::failure(ProtocolConformanceGeneration);
-    pthread_rwlock_unlock(&ConformanceCacheLock);
+
+    // Hash and lookup the type-protocol pair in the cache.
+    size_t hash = hashTypeProtocolPair(type, protocol);
+    ConcurrentList<ConformanceCacheEntry> &Bucket =
+      ConformanceCache.findOrAllocateNode(hash);
+    Bucket.push_front(ConformanceCacheEntry(type, protocol,
+                                            ProtocolConformanceGeneration,
+                                            false));
     pthread_mutex_unlock(&SectionsToScanLock);
     return nullptr;
   }
@@ -2034,15 +1995,22 @@ recur:
     for (const auto &record : section) {
       // If the record applies to a specific type, cache it.
       if (auto metadata = record.getCanonicalTypeMetadata()) {
-        auto witness = record.getWitnessTable(metadata);
-        ConformanceCacheEntry cacheEntry;
-        if (witness)
-          cacheEntry = ConformanceCacheEntry::success(witness);
-        else
-          cacheEntry
-            = ConformanceCacheEntry::failure(ProtocolConformanceGeneration);
+        auto P = record.getProtocol();
 
-        ConformanceCache[{metadata, record.getProtocol()}] = cacheEntry;
+        // Hash and lookup the type-protocol pair in the cache.
+        size_t hash = hashTypeProtocolPair(metadata, P);
+        ConcurrentList<ConformanceCacheEntry> &Bucket =
+          ConformanceCache.findOrAllocateNode(hash);
+
+        auto witness = record.getWitnessTable(metadata);
+        if (witness)
+          Bucket.push_front(ConformanceCacheEntry(metadata, P,
+                                                  (uintptr_t)witness, true));
+        else
+          Bucket.push_front(ConformanceCacheEntry(metadata, P, 
+                                                  ProtocolConformanceGeneration,
+                                                  false));
+
       // If the record provides a nondependent witness table for all instances
       // of a generic type, cache it for the generic pattern.
       // TODO: "Nondependent witness table" probably deserves its own flag.
@@ -2052,14 +2020,21 @@ recur:
                    == ProtocolConformanceTypeKind::UniqueGenericPattern
                  && record.getConformanceKind()
                    == ProtocolConformanceReferenceKind::WitnessTable) {
-        ConformanceCache[{record.getGenericPattern(), record.getProtocol()}]
-          = ConformanceCacheEntry::success(record.getStaticWitnessTable());
+
+        auto R = record.getGenericPattern();
+        auto P = record.getProtocol();
+
+        // Hash and lookup the type-protocol pair in the cache.
+        size_t hash = hashTypeProtocolPair(R, P);
+        ConcurrentList<ConformanceCacheEntry> &Bucket =
+          ConformanceCache.findOrAllocateNode(hash);
+          Bucket.push_front(ConformanceCacheEntry(R, P,
+                                                  (uintptr_t) record.getStaticWitnessTable() , true));
       }
     }
   }
   ++ConformanceCacheGeneration;
 
-  pthread_rwlock_unlock(&ConformanceCacheLock);
   pthread_mutex_unlock(&SectionsToScanLock);
   // Start over with our newly-populated cache.
   type = origType;
