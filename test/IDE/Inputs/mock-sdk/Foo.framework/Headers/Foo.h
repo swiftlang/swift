@@ -260,4 +260,27 @@ struct _InternalStruct {
 typedef struct __FooCFType *FooCFTypeRef;
 void FooCFTypeRelease(FooCFTypeRef);
 
+
+@interface FooRepeatedMembers : FooClassBase
+- (void)repeatedMethod;
+- (void)anotherMethod;
+- (void)repeatedMethod;
+
+@property int repeatedPropertyInCategory;
+- (void)repeatedMethodInCategory;
+@end
+
+@interface FooRepeatedMembers (Category)
+@property int repeatedPropertyInCategory;
+- (void)repeatedMethodInCategory;
+
+@property int repeatedPropertyFromCategory;
+- (void)repeatedMethodFromCategory;
+@end
+
+@interface FooRepeatedMembers (AnotherCategory)
+@property int repeatedPropertyFromCategory;
+- (void)repeatedMethodFromCategory;
+@end
+
 #endif /* ! __FOO_H__ */

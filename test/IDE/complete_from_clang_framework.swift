@@ -144,7 +144,7 @@ func testCompleteModuleQualifiedFoo2() {
   Foo#^CLANG_QUAL_FOO_2^#
 // If the number of results below changes, then you need to add a result to the
 // list below.
-// CLANG_QUAL_FOO_2: Begin completions, 61 items
+// CLANG_QUAL_FOO_2: Begin completions, 62 items
 // CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule:        .FooClassBase[#FooClassBase#]{{$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule:        .FooClassDerived[#FooClassDerived#]{{$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule:        .ClassWithInternalProt[#ClassWithInternalProt#]{{$}}
@@ -206,6 +206,7 @@ func testCompleteModuleQualifiedFoo2() {
 // CLANG_QUAL_FOO_2-DAG:  Decl[Class]/OtherModule:            .FooUnavailableMembers[#FooUnavailableMembers#]
 // CLANG_QUAL_FOO_2-DAG: Decl[TypeAlias]/OtherModule:    .FooTypedef1[#Int32#]{{$}}
 // CLANG_QUAL_FOO_2-DAG:   Decl[TypeAlias]/OtherModule:        .FooCFTypeRef[#FooCFType#]{{$}}
+// CLANG_QUAL_FOO_2-DAG:  Decl[Class]/OtherModule: .FooRepeatedMembers[#FooRepeatedMembers#]{{$}}
 // CLANG_QUAL_FOO_2: End completions
 }
 

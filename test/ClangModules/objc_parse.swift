@@ -455,3 +455,7 @@ func testFactoryMethodAvailability() {
   let _ = DeprecatedFactoryMethod() // expected-error{{'init()' is unavailable: use something newer}}
 }
 
+func testRepeatedMembers(obj: RepeatedMembers) {
+  obj.repeatedMethod()
+}
+

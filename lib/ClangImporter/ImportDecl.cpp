@@ -3848,7 +3848,7 @@ namespace {
       for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
            m != mEnd; ++m) {
         auto nd = dyn_cast<clang::NamedDecl>(*m);
-        if (!nd)
+        if (!nd || nd != nd->getCanonicalDecl())
           continue;
 
         auto member = Impl.importDecl(nd);
@@ -3865,11 +3865,6 @@ namespace {
           continue;
         }
 
-        // If this member is a method that is a getter or setter for a property
-        // that was imported, don't add it to the list of members so it won't
-        // be found by name lookup. This eliminates the ambiguity between
-        // property names and getter names (by choosing to only have a
-        // variable).
         if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd)) {
           // If there is a special declaration associated with this member,
           // add it now.
@@ -3906,6 +3901,11 @@ namespace {
           // Import explicit properties as instance properties, not as separate
           // getter and setter methods.
           if (!Impl.isAccessibilityDecl(objcMethod)) {
+            // If this member is a method that is a getter or setter for a
+            // propertythat was imported, don't add it to the list of members
+            // so it won't be found by name lookup. This eliminates the
+            // ambiguity between property names and getter names (by choosing
+            // to only have a variable).
             if (objcMethod->isPropertyAccessor()) {
               auto prop = objcMethod->findPropertyDecl(/*checkOverrides=*/false);
               assert(prop);

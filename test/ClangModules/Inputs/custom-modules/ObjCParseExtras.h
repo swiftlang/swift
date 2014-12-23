@@ -92,3 +92,10 @@ __weak id globalWeakVar;
 @interface DeprecatedFactoryMethod
 + (instancetype)deprecatedFactoryMethod __attribute__((deprecated("use something newer")));
 @end
+
+
+@interface RepeatedMembers : NSObject
+- (void)repeatedMethod;
+- (void)anotherMethod;
+- (void)repeatedMethod __attribute__((deprecated("use something newer")));
+@end

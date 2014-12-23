@@ -308,3 +308,21 @@ class FooUnavailableMembers : FooClassBase {
 typealias FooCFTypeRef = FooCFType
 @availability(*, unavailable, message="Core Foundation objects are automatically memory managed")
 func FooCFTypeRelease(_: FooCFType!)
+
+class FooRepeatedMembers : FooClassBase {
+  func repeatedMethod()
+  func anotherMethod()
+  init!()
+  convenience init!(float f: Float)
+}
+
+extension FooRepeatedMembers {
+  var repeatedPropertyInCategory: Int32
+  func repeatedMethodInCategory()
+  
+  var repeatedPropertyFromCategory: Int32
+  func repeatedMethodFromCategory()
+}
+
+extension FooRepeatedMembers {
+}
