@@ -1962,7 +1962,10 @@ swift::swift_conformsToProtocol(const Metadata *type,
   auto origType = type;
 
 recur:
-  // See if we have a cached conformance.
+  // See if we have a cached conformance. The ConcurrentMap data structure
+  // allows us to insert and search the map concurrently without locking.
+  // We do lock the slow path because the SectionsToScan data structure is not
+  // concurrent.
   auto FoundConformance = searchInConformanceCache(type, protocol);
   if (FoundConformance.second) {
     return FoundConformance.first;
