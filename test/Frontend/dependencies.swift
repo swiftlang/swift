@@ -1,18 +1,11 @@
-// RUN: rm -rf %t
-// RUN: mkdir %t
-
-// <rdar://problem/19318312> test/Frontend/dependencies.swift fails when assertions are disabled
-// XFAIL: no_asserts
+// RUN: rm -rf %t && mkdir %t
 
 // RUN: %swift -emit-dependencies-path - -parse %S/../Inputs/empty.swift | FileCheck -check-prefix=CHECK-BASIC %s
 
 // CHECK-BASIC-LABEL: - :
 // CHECK-BASIC: Inputs/empty.swift
 // CHECK-BASIC: Swift.swiftmodule
-// CHECK-BASIC-DAG: shims/{{.*}}.h
-// CHECK-BASIC-DAG: shims/module.map
 // CHECK-BASIC-NOT: :
-// CHECK-BASIC-NOT: /
 
 // RUN: %swift -emit-dependencies-path - -emit-module %S/../Inputs/empty.swift -o %t/empty.swiftmodule -emit-module-doc-path %t/empty.swiftdoc -emit-objc-header-path %t/empty.h | FileCheck -check-prefix=CHECK-MULTIPLE-OUTPUTS %s
 
@@ -31,10 +24,9 @@
 
 // CHECK-IMPORT-LABEL: - :
 // CHECK-IMPORT: dependencies.swift
+// CHECK-IMPORT-DAG: Inputs/dependencies/$$$$$$$$$$.h
 // CHECK-IMPORT-DAG: Inputs/dependencies/extra-header.h
 // CHECK-IMPORT-DAG: Swift.swiftmodule
-// CHECK-IMPORT-DAG: shims/{{.*}}.h
-// CHECK-IMPORT-DAG: shims/module.map
 // CHECK-IMPORT-DAG: Foundation.swift
 // CHECK-IMPORT-DAG: ObjectiveC.swift
 // CHECK-IMPORT-DAG: CoreGraphics.swift
