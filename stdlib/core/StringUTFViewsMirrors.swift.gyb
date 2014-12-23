@@ -32,7 +32,7 @@ extension String {
         return ("[\(i)]", reflect(_value[advance(_value.startIndex, i)]))
       }
 
-      var summary: String { return String(_value._core) }
+      var summary: String { return _value.description }
 
       var quickLookObject: QuickLookObject? { return .Some(.Text(summary)) }
   }

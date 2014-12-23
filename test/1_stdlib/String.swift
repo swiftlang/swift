@@ -964,5 +964,40 @@ StringTests.test("uppercaseString") {
   expectEqual("\u{0046}\u{0049}", "\u{fb01}".uppercaseString)
 }
 
+StringTests.test("unicodeViews") {
+  // Check the UTF views work with slicing
+
+  // U+FFFD REPLACEMENT CHARACTER
+  // U+1F3C2 SNOWBOARDER
+  // U+2603 SNOWMAN
+  let winter = "\u{1F3C2}\u{2603}"
+
+  // slices
+  // It is 4 bytes long, so it should return a replacement character.
+  expectEqual("\u{FFFD}", toString(winter.utf8[winter.utf8.startIndex ..<
+    winter.utf8.startIndex.successor().successor()]))
+  expectEqual("\u{1F3C2}", toString(winter.utf8[winter.utf8.startIndex ..<
+    advance(winter.utf8.startIndex, 4)]))
+
+  expectEqual("\u{1F3C2}", toString(winter.utf16[winter.utf16.startIndex ..<
+    advance(winter.utf16.startIndex, 2)]))
+  expectEqual("\u{1F3C2}", toString(winter.unicodeScalars[
+    winter.unicodeScalars.startIndex ..<
+    winter.unicodeScalars.startIndex.successor()]))
+
+  // views
+  expectEqual(winter, toString(winter.utf8[winter.utf8.startIndex ..<
+    advance(winter.utf8.startIndex, 7)]))
+  expectEqual(winter, toString(winter.utf16[winter.utf16.startIndex ..<
+    advance(winter.utf16.startIndex, 3)]))
+  expectEqual(winter, toString(
+    winter.unicodeScalars[winter.unicodeScalars.startIndex ..<
+    advance(winter.unicodeScalars.startIndex, 2)]))
+
+  let ga = "\u{304b}\u{3099}"
+  expectEqual(ga, toString(ga.utf8[ga.utf8.startIndex ..<
+    advance(ga.utf8.startIndex, 6)]))
+}
+
 runAllTests()
 

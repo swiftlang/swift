@@ -83,11 +83,28 @@ extension _StringCore {
 
 extension String {
   /// A collection of UTF-8 code units that encodes a `String` value.
-  public struct UTF8View : CollectionType, Reflectable {
+  public struct UTF8View : CollectionType, Reflectable, Printable,
+    DebugPrintable {
     internal let _core: _StringCore
+    // These are optional as a work around for a compiler segfault.
+    internal let _startIndex: Index!
+    internal let _endIndex: Index!
 
     init(_ _core: _StringCore) {
       self._core = _core
+      self._endIndex = Index(_core, _core.endIndex, Index._emptyBuffer)
+      if _fastPath(_core.count != 0) {
+        let (_, buffer) = _core._encodeSomeUTF8(0)
+        self._startIndex = Index(_core, 0, buffer)
+      } else {
+        self._startIndex = self._endIndex
+      }
+    }
+
+    init(_ _core: _StringCore, _ s: Index, _ e: Index) {
+      self._core = _core
+      self._startIndex = s
+      self._endIndex = e
     }
 
     /// A position in a `String.UTF8View`
@@ -179,11 +196,7 @@ extension String {
     /// The position of the first code unit if the `String` is
     /// non-empty; identical to `endIndex` otherwise.
     public var startIndex: Index {
-      if _fastPath(_core.count != 0) {
-        let (_, buffer) = _core._encodeSomeUTF8(0)
-        return Index(_core, 0, buffer)
-      }
-      return endIndex
+      return self._startIndex
     }
     
     /// The "past the end" position.
@@ -192,7 +205,7 @@ extension String {
     /// reachable from `startIndex` by zero or more applications of
     /// `successor()`.
     public var endIndex: Index {
-      return Index(_core, _core.endIndex, Index._emptyBuffer)
+      return self._endIndex
     }
 
     /// Access the element at `position`.
@@ -203,6 +216,15 @@ extension String {
       let result: UTF8.CodeUnit = numericCast(position._buffer & 0xFF)
       _precondition(result != 0xFF, "can not subscript using endIndex")
       return result
+    }
+
+    /// Access the elements delimited by the given half-open range of
+    /// indices.
+    ///
+    /// Complexity: O(1) unless bridging from Objective-C requires an
+    /// O(N) conversion.
+    public subscript(subRange: Range<Index>) -> UTF8View {
+      return UTF8View(_core, subRange.startIndex, subRange.endIndex)
     }
 
     /// Return a *generator* over the code points that comprise this
@@ -216,6 +238,14 @@ extension String {
     /// Returns a mirror that reflects `self`.
     public func getMirror() -> MirrorType {
       return _UTF8ViewMirror(self)
+    }
+    
+    public var description: String {
+      return String._fromCodeUnitSequenceWithRepair(UTF8.self, input: self).0
+    }
+
+    public var debugDescription: String {
+      return "UTF8View(\(self.description.debugDescription))"
     }
   }
 

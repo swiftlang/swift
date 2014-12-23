@@ -28,7 +28,8 @@ extension String {
   /// A collection of `Unicode scalar values
   /// <http://www.unicode.org/glossary/#unicode_scalar_value>`_ that
   /// encode a `String` .
-  public struct UnicodeScalarView : Sliceable, SequenceType, Reflectable {
+  public struct UnicodeScalarView : Sliceable, SequenceType, Reflectable,
+    Printable, DebugPrintable {
     init(_ _core: _StringCore) {
       self._core = _core
     }
@@ -208,6 +209,14 @@ extension String {
     /// Returns a mirror that reflects `self`.
     public func getMirror() -> MirrorType {
       return _UnicodeScalarViewMirror(self)
+    }
+
+    public var description: String {
+      return String(_core[self.startIndex._position..<self.endIndex._position])
+    }
+
+    public var debugDescription: String {
+      return "StringUnicodeScalarView(\(self.description.debugDescription))"
     }
 
     var _core: _StringCore

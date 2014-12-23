@@ -12,7 +12,7 @@
 
 extension String {
   /// A collection of UTF-16 code units that encodes a `String` value.
-  public struct UTF16View : Sliceable, Reflectable {
+  public struct UTF16View : Sliceable, Reflectable, Printable, DebugPrintable {
     public struct Index {
       // Foundation needs access to these fields so it can expose
       // random access
@@ -142,6 +142,16 @@ extension String {
     /// Returns a mirror that reflects `self`.
     public func getMirror() -> MirrorType {
       return _UTF16ViewMirror(self)
+    }
+
+    public var description: String {
+      let start = _toInternalIndex(0)
+      let end = _toInternalIndex(_length)
+      return String(_core[start..<end])
+    }
+
+    public var debugDescription: String {
+      return "StringUTF16(\(self.description.debugDescription))"
     }
 
     var _offset: Int
