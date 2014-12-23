@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Runtime/Metadata.h"
@@ -103,6 +104,17 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
   }
 }
 
+
+/// This is a small and fast implementation of memcpy with a constant count. It
+/// should be a performance win for small constant values where the function
+/// can be inlined, the loop unrolled and the memory accesses merged.
+template <unsigned count> static void small_memcpy(void *dest, const void *src) {
+  uint8_t *d8 = (uint8_t*)dest, *s8 = (uint8_t*)src;
+  for (unsigned int i = 0; i < count; i++) {
+    *d8++ = *s8++;
+  }
+}
+
 int
 swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
                                       const Metadata *payload,
@@ -119,7 +131,19 @@ swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
     // FIXME: endianness
     unsigned numBytes = getNumTagBytes(payloadSize,
                                        emptyCases-payloadNumExtraInhabitants);
-    memcpy(&extraTagBits, extraTagBitAddr, numBytes);
+
+    // This is specialization of the memcpy line below with
+    // specialization for values of 1, 2 and 4.
+    // memcpy(&extraTagBits, extraTagBitAddr, numBytes);
+    if (numBytes == 1) {
+      small_memcpy<1>(&extraTagBits, extraTagBitAddr);
+    } else if (numBytes == 2) {
+      small_memcpy<2>(&extraTagBits, extraTagBitAddr);
+    } else if (numBytes == 4) {
+      small_memcpy<4>(&extraTagBits, extraTagBitAddr);
+    } else {
+      llvm_unreachable("Tagbyte values should be 1, 2 or 4.");
+    }
 
     // If the extra tag bits are zero, we have a valid payload or
     // extra inhabitant (checked below). If nonzero, form the case index from
