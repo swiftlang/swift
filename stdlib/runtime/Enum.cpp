@@ -19,6 +19,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Enum.h"
+#include "Debug.h"
 #include "Private.h"
 #include <cstring>
 #include <algorithm>
@@ -142,7 +143,7 @@ swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
     } else if (numBytes == 4) {
       small_memcpy<4>(&extraTagBits, extraTagBitAddr);
     } else {
-      llvm_unreachable("Tagbyte values should be 1, 2 or 4.");
+      crash("Tagbyte values should be 1, 2 or 4.");
     }
 
     // If the extra tag bits are zero, we have a valid payload or
