@@ -1936,12 +1936,11 @@ static void installCallbacksToInspectDylib() {
 /// Search the witness table in the ConformanceCache. \returns a pair of the
 /// WitnessTable pointer and a boolean value True if a definitive value is
 /// found. \returns false if the type or its superclasses were not found in
-/// the cache. 
-static 
+/// the cache.
+static
 std::pair<const WitnessTable *, bool>
-searchInConformanceCache(const Metadata *type, 
+searchInConformanceCache(const Metadata *type,
                          const ProtocolDescriptor *protocol){
- 
 recur_inside_cache_lock:
   auto found = ConformanceCache.find({type, protocol});
   if (found != ConformanceCache.end()) {
