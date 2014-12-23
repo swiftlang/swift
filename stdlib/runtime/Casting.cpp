@@ -1777,8 +1777,10 @@ namespace {
   };
 }
 
-// Found conformances.
+// Conformance Cache.
 static ConcurrentMap<size_t, ConformanceCacheEntry> ConformanceCache;
+// This variable is used to signal when a cache was generated and
+// it is correct to avild a new scan.
 unsigned ConformanceCacheGeneration = 0;
 
 // Conformance sections pending a scan.
@@ -1897,12 +1899,14 @@ searchInConformanceCache(const Metadata *type,
                          const ProtocolDescriptor *protocol){
 recur_inside_cache_lock:
 
+  // See if we have a cached conformance. Try the specific type first.
+
   // Hash and lookup the type-protocol pair in the cache.
   size_t hash = hashTypeProtocolPair(type, protocol);
   ConcurrentList<ConformanceCacheEntry> &Bucket =
     ConformanceCache.findOrAllocateNode(hash);
 
-  // See if we have a cached conformance. Try the specific type first.
+  // Check if the type-protocol entry exists in the cache entry that we found.
   for (auto &Entry : Bucket) {
     if (!Entry.matches(type, protocol)) continue;
 
@@ -1912,6 +1916,7 @@ recur_inside_cache_lock:
 
     // If we got a cached negative response, check the generation number.
     if (Entry.getFailureGeneration() == ProtocolConformanceGeneration) {
+      // We found an entry with a negative value.
       return std::make_pair(nullptr, true);
     }
   }
@@ -1944,18 +1949,21 @@ recur_inside_cache_lock:
     }
   }
 
+  // We did not find an entry.
   return std::make_pair(nullptr, false);
 }
 
 const WitnessTable *
 swift::swift_conformsToProtocol(const Metadata *type,
                                 const ProtocolDescriptor *protocol){
+  // Install callbacks for tracking when a new dylib is loaded so we can 
+  // scan it.
   installCallbacksToInspectDylib();
   auto origType = type;
 
 recur:
   // See if we have a cached conformance.
-  auto FoundConformance =  searchInConformanceCache(type, protocol);
+  auto FoundConformance = searchInConformanceCache(type, protocol);
   if (FoundConformance.second) {
     return FoundConformance.first;
   }
@@ -2030,7 +2038,8 @@ recur:
         ConcurrentList<ConformanceCacheEntry> &Bucket =
           ConformanceCache.findOrAllocateNode(hash);
           Bucket.push_front(ConformanceCacheEntry(R, P,
-                                                  (uintptr_t) record.getStaticWitnessTable() , true));
+                              (uintptr_t) record.getStaticWitnessTable(),
+                              true));
       }
     }
   }
