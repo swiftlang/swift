@@ -117,8 +117,9 @@ swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
     auto *extraTagBitAddr = valueAddr + payloadSize;
     unsigned extraTagBits = 0;
     // FIXME: endianness
-    memcpy(&extraTagBits, extraTagBitAddr,
-           getNumTagBytes(payloadSize, emptyCases-payloadNumExtraInhabitants));
+    unsigned numBytes = getNumTagBytes(payloadSize,
+                                       emptyCases-payloadNumExtraInhabitants);
+    memcpy(&extraTagBits, extraTagBitAddr, numBytes);
 
     // If the extra tag bits are zero, we have a valid payload or
     // extra inhabitant (checked below). If nonzero, form the case index from
