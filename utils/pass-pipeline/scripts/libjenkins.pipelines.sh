@@ -1,7 +1,7 @@
 #!/bin/bash
 
-set -x
-set -u
+set +x
+set +u
 
 # This is a file which defines helper routines based off of libjenkins for
 # working with pipelines. You must source libjenkins before you call this.
@@ -73,16 +73,5 @@ build_bni_with_individual_passes_disabled() {
     done
 }
 
-PIPELINE_SCRIPT=$PWD/swift/src/tools/swift/utils/pass-pipeline/scripts/normal_pipeline.py
-OUTPUT_DIR=$PWD/pipeline_dir
-rm -rfv $OUTPUT_DIR
-mkdir -p $OUTPUT_DIR
-
-build_bni_with_slice_pipelines_disabled "$PIPELINE_SCRIPT" "$OUTPUT_DIR"
-build_bni_with_individual_pipelines_disabled "$PIPELINE_SCRIPT" "$OUTPUT_DIR"
-build_bni_with_individual_passes_disabled "$PIPELINE_SCRIPT" "$OUTPUT_DIR"
-
-time clear_workspace
-
-set +u
-set +x
+set -u
+set -x
