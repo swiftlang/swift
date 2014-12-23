@@ -27,11 +27,14 @@ add_swift_library(swiftIRGen
   SwiftTargetInfo.cpp
   StructLayout.cpp
   UnimplementedTypeInfo.cpp
-  DEPENDS LLVMMC LLVMProfileData LLVMSupport LLVMCore LLVMObjCARCOpts
-  swiftAST swiftLLVMPasses)
+  LINK_LIBRARIES
+    swiftAST
+    swiftLLVMPasses
 
-# Clang dependencies.
-# FIXME: Clang should really export these in some reasonable manner.
-target_link_libraries(swiftIRGen
-  clangCodeGen)
+    # Clang dependencies.
+    # FIXME: Clang should really export these in some reasonable manner.
+    clangCodeGen)
+
+llvm_config(swiftIRGen
+    profiledata)
 

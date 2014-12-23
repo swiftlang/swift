@@ -1,5 +1,4 @@
-set(SHARED_LIBRARY ON)
-
-add_swift_library(swiftObjectiveC INSTALL TARGET_LIBRARY
+add_swift_library(swiftObjectiveC IS_SDK_OVERLAY
   ObjectiveC.swift
-  DEPENDS swiftCore swiftDarwin)
+  SWIFT_MODULE_DEPENDS Darwin)
+

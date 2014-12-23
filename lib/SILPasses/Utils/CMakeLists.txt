@@ -3,5 +3,5 @@ add_swift_library(swiftSILPassesUtils
   Local.cpp
   SILInliner.cpp
   SILSSAUpdater.cpp
-  DEPENDS swiftSIL)
+  LINK_LIBRARIES swiftSIL)
 

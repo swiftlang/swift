@@ -684,7 +684,9 @@ Job *linux::Linker::constructJob(const JobAction &JA,
 
   // Add the linker script that coalesces protocol conformance sections.
   Arguments.push_back("-Xlinker");
-  Arguments.push_back("-Tswift.ld");
+  Arguments.push_back("-T");
+  Arguments.push_back(
+      Args.MakeArgString(Twine(RuntimeLibPath) + "/linux/x86_64/swift.ld"));
 
   // This should be the last option, for convenience in checking output.
   Arguments.push_back("-o");

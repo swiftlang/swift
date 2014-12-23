@@ -1,9 +1,11 @@
 add_swift_executable(lldb-moduleimport-test
   lldb-moduleimport-test.cpp
-  DEPENDS swiftASTSectionImporter swiftFrontend swiftClangImporter
-  COMPONENT_DEPENDS bitreader bitwriter support ${LLVM_TARGETS_TO_BUILD})
+  LINK_LIBRARIES
+    swiftASTSectionImporter swiftFrontend swiftClangImporter
+  COMPONENT_DEPENDS
+    bitreader bitwriter option support ${LLVM_TARGETS_TO_BUILD})
 
-target_link_libraries(swift)
+swift_install_in_component(testsuite-tools
+    TARGETS lldb-moduleimport-test
+    RUNTIME DESTINATION "bin")
 
-install(TARGETS lldb-moduleimport-test
-  RUNTIME DESTINATION bin)

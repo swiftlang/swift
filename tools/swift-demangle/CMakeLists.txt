@@ -1,7 +1,9 @@
 add_swift_executable(swift-demangle
   swift-demangle.cpp
-  DEPENDS swiftBasic
+  LINK_LIBRARIES swiftBasic
   COMPONENT_DEPENDS support ${LLVM_TARGETS_TO_BUILD})
 
-install(TARGETS swift-demangle
-  RUNTIME DESTINATION bin)
+swift_install_in_component(compiler
+    TARGETS swift-demangle
+    RUNTIME DESTINATION "bin")
+

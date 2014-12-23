@@ -12,58 +12,68 @@ set(sources
   )
 set(output_dir "${SWIFTLIB_DIR}/shims")
 
-set(commands)
-set(outputs)
+set(commands
+    COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${output_dir}")
+set(outputs "${output_dir}")
 foreach(input ${sources})
-  list(APPEND outputs "${output_dir}/${input}")
   list(APPEND commands
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${input}"
-    "${output_dir}/${input}")
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_if_different"
+        "${CMAKE_CURRENT_SOURCE_DIR}/${input}"
+        "${output_dir}/${input}")
+  list(APPEND outputs "${output_dir}/${input}")
 endforeach()
 
-add_custom_command(OUTPUT "${output_dir}" ${outputs}
-  COMMAND ${CMAKE_COMMAND} -E make_directory "${output_dir}"
-  ${commands}
-  DEPENDS ${sources}
-  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-  COMMENT "Copying SwiftShims module to ${output_dir}"
-  )
-
-add_custom_target(
-  copy_shim_headers
-  DEPENDS "${output_dir}" ${outputs}
-  SOURCES ${sources}
-  )
+add_custom_command_target(unused_var
+    ${commands}
+    CUSTOM_TARGET_NAME "copy_shim_headers"
+    OUTPUT "${outputs}"
+    DEPENDS "${sources}"
+    COMMENT "Copying SwiftShims module to ${output_dir}")
 
 # Symlink in the Clang headers.
-add_custom_command(TARGET copy_shim_headers POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E create_symlink
-    "${SWIFT_PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib/clang"
-    "${SWIFTLIB_DIR}/clang"
-  COMMENT "Symlinking Clang resource headers into ${SWIFTLIB_DIR}/clang")
+add_custom_command_target(unused_var
+    COMMAND
+      "${CMAKE_COMMAND}" "-E" "make_directory" "${SWIFTLIB_DIR}"
+    COMMAND
+      "${CMAKE_COMMAND}" "-E" "create_symlink"
+      "${SWIFT_PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib/clang"
+      "${SWIFTLIB_DIR}/clang"
+    CUSTOM_TARGET_NAME "symlink_clang_headers"
+    OUTPUT "${SWIFTLIB_DIR}/clang"
+    COMMENT "Symlinking Clang resource headers into ${SWIFTLIB_DIR}/clang")
+add_dependencies(copy_shim_headers symlink_clang_headers)
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+include(SwiftDarwin)
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   # Symlink in arclite from the XcodeDefault toolchain.
-  execute_process(COMMAND xcrun --toolchain XcodeDefault -find clang 
-    OUTPUT_VARIABLE toolchain_dir 
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-  string(LENGTH "${toolchain_dir}" len)
-  math(EXPR len "${len} - 14")  # "/usr/bin/clang"
-  string(SUBSTRING "${toolchain_dir}" 0 ${len} toolchain_dir)
+  get_default_toolchain_dir(toolchain_dir)
+  add_custom_command_target(unused_var
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "make_directory"
+        "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib"
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "create_symlink"
+        "${toolchain_dir}/usr/lib/arc"
+        "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/arc"
+      CUSTOM_TARGET_NAME "symlink_arclite"
+      OUTPUT "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/arc"
+      COMMENT "Symlinking toolchain's arclite into ${SWIFTLIB_DIR}/arc")
+  add_dependencies(copy_shim_headers symlink_arclite)
 
-  add_custom_command(TARGET copy_shim_headers POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E create_symlink
-      "${toolchain_dir}/usr/lib/arc"
-      "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/arc"
-    COMMENT "Symlinking toolchain's arclite into ${SWIFTLIB_DIR}/arc")
+  swift_install_in_component(arclite-symlink
+      DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/arc"
+      DESTINATION "lib")
 endif()
 
-install(FILES ${sources} DESTINATION "lib/swift/shims")
+swift_install_in_component(compiler
+    FILES ${sources}
+    DESTINATION "lib/swift/shims")
 
 # Install Clang headers under the Swift library so that an installed swift's
 # module importer can find the compiler headers corresponding to its clang.
-install(
-  DIRECTORY "${SWIFT_PATH_TO_CLANG_BUILD}/lib/clang"
-  DESTINATION "lib/swift"
-  PATTERN "*.h")
+swift_install_in_component(clang-builtin-headers
+    DIRECTORY "${SWIFT_PATH_TO_CLANG_BUILD}/lib/clang"
+    DESTINATION "lib/swift"
+    PATTERN "*.h")
 

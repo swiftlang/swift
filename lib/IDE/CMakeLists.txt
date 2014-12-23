@@ -6,7 +6,9 @@ add_swift_library(swiftIDE
   SourceEntityWalker.cpp
   SyntaxModel.cpp
   Utils.cpp
-  DEPENDS
-  swiftAST swiftParse swiftSema swiftClangImporter
-  )
+  LINK_LIBRARIES
+    swiftClangImporter
+    swiftParse
+    swiftSema
+    swiftAST)
 

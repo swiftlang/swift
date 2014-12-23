@@ -29,4 +29,7 @@ add_swift_library(swiftSema
   TypeCheckREPL.cpp
   TypeCheckStmt.cpp
   TypeCheckType.cpp
-  DEPENDS swiftAST swiftParse)
+  LINK_LIBRARIES
+    swiftParse
+    swiftAST)
+

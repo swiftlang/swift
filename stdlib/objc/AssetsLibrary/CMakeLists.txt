@@ -1,8 +1,6 @@
-set(SHARED_LIBRARY ON)
-
-add_swift_library(swiftAssetsLibrary INSTALL TARGET_LIBRARY
+add_swift_library(swiftAssetsLibrary IS_SDK_OVERLAY
   AssetsLibrary.swift
   TARGET_SDKS IOS IOS_SIMULATOR
-  DEPENDS swiftCore swiftObjectiveC swiftFoundation swiftCoreGraphics
+  SWIFT_MODULE_DEPENDS ObjectiveC Foundation CoreGraphics
   FRAMEWORK_DEPENDS AssetsLibrary)
 

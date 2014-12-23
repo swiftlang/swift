@@ -1,8 +1,5 @@
-set(SHARED_LIBRARY ON)
-
-add_swift_library(swiftSecurity
+add_swift_library(swiftSecurity IS_SDK_OVERLAY
   Security.swift
-  INSTALL TARGET_LIBRARY
-  FRAMEWORK_DEPENDS Security
-  DEPENDS swiftCore swiftObjectiveC swiftDispatch swiftDarwin)
+  SWIFT_MODULE_DEPENDS ObjectiveC Dispatch Darwin
+  FRAMEWORK_DEPENDS Security)
 

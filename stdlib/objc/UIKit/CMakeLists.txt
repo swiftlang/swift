@@ -1,7 +1,7 @@
-set(SHARED_LIBRARY ON)
-add_swift_library(swiftUIKit INSTALL TARGET_LIBRARY
+add_swift_library(swiftUIKit IS_SDK_OVERLAY
   DesignatedInitializers.mm
   UIKit.swift
   TARGET_SDKS IOS IOS_SIMULATOR
-  DEPENDS swiftCore swiftObjectiveC swiftFoundation swiftCoreImage
+  SWIFT_MODULE_DEPENDS ObjectiveC Foundation CoreImage
   FRAMEWORK_DEPENDS UIKit)
+

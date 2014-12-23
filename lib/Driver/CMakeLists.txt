@@ -13,4 +13,5 @@ add_swift_library(swiftDriver
   ToolChains.cpp
   Types.cpp
   Util.cpp
-  DEPENDS swiftAST swiftBasic swiftFrontend swiftOption)
+  DEPENDS SwiftOptions
+  LINK_LIBRARIES swiftAST swiftBasic swiftFrontend swiftOption)

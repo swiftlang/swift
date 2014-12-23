@@ -6,4 +6,11 @@ add_swift_library(swiftFrontend
   FrontendOptions.cpp
   PrintingDiagnosticConsumer.cpp
   SerializedDiagnosticConsumer.cpp
-  DEPENDS swiftAST swiftOption swiftParse swiftSema swiftSerialization swiftSIL)
+  DEPENDS SwiftOptions
+  LINK_LIBRARIES
+    swiftSIL
+    swiftOption
+    swiftParse
+    swiftSema
+    swiftSerialization)
+

@@ -114,46 +114,54 @@ set(SWIFTLIB_SOURCES
   Zip.swift
   )
 
+set(swift_core_link_flags)
+set(swift_core_framework_depends)
+set(swift_core_private_link_libraries)
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  set(LINK_FLAGS "-all_load -Xlinker -reexport-lobjc")
-  set(RUNTIME_DEPENDENCY swiftRuntime)
+  list(APPEND swift_core_link_flags
+      "-all_load" "-Xlinker" "-reexport-lobjc")
+  list(APPEND swift_core_private_link_libraries swiftRuntime)
+  list(APPEND swift_core_framework_depends Foundation)
 else()
-  set(LINK_FLAGS)
   # With the GNU linker the equivalent of -all_load is to tell the linker
   # --whole-archive before the archive and --no-whole-archive after (without
   # the second, it causes errors when the system libraries are told to
   # include everything). The best way to get it in there, according to the
-  # documentation, is to put the flags in the target_link_Libraries setting.
+  # documentation, is to put the flags in the target_link_libraries setting.
 
   # TODO: However, for the moment this actually makes things explode with an
   # incomplete runtime. This should be turned back on when more of the porting
   # effort has been completed.
   #set(LINK_FLAGS
   #  -Wl,--whole-archive swiftRuntime -Wl,--no-whole-archive)
-  set(RUNTIME_DEPENDENCY swiftRuntime)
+  list(APPEND swift_core_private_link_libraries swiftRuntime)
 endif()
 
-set(SWIFT_CHECK_ESSENTIAL_STDLIB NO CACHE BOOL
-  "Check core standard library layering by linking its essential subset")
+if(SWIFT_HAVE_CRASH_REPORTER_CLIENT)
+  list(APPEND swift_core_private_link_libraries "CrashReporterClient")
+endif()
+
+option(SWIFT_CHECK_ESSENTIAL_STDLIB
+    "Check core standard library layering by linking its essential subset"
+    FALSE)
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
- add_swift_library(swift_stdlib_essential IS_STDLIB_CORE TARGET_LIBRARY
-   ${SWIFTLIB_ESSENTIAL}
-   )
+  add_swift_library(swift_stdlib_essential SHARED IS_STDLIB IS_STDLIB_CORE
+      ${SWIFTLIB_ESSENTIAL})
   target_link_libraries(swift_stdlib_essential ${RUNTIME_DEPENDENCY})
 endif()
 
-set(SHARED_LIBRARY ON)
-add_swift_library(swiftCore INSTALL IS_STDLIB_CORE TARGET_LIBRARY
+add_swift_library(swiftCore SHARED IS_STDLIB IS_STDLIB_CORE
   ${SWIFTLIB_SOURCES}
   # The copy_shim_headers target dependency is required to let the
-  # Makefile build know that there's a rule to produce the shims
-  # directory, but is not sufficient to cause Swift.o to be rebuilt
+  # build system know that there's a rule to produce the shims
+  # directory, but is not sufficient to cause the object file to be rebuilt
   # when the shim header changes.  Therefore, we pass both the target
-  # and the generated directory as dependencies
+  # and the generated directory as dependencies.
   FILE_DEPENDS
-    copy_shim_headers ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/shims
-  LINK_FLAGS ${LINK_FLAGS}
-  DEPENDS ${RUNTIME_DEPENDENCY}
-  )
-add_dependencies(swiftCore swift)
+    copy_shim_headers "${SWIFTLIB_DIR}/shims"
+  LINK_FLAGS ${swift_core_link_flags}
+  PRIVATE_LINK_LIBRARIES ${swift_core_private_link_libraries}
+  FRAMEWORK_DEPENDS ${swift_core_framework_depends}
+  INSTALL_IN_COMPONENT stdlib)
+

@@ -6,4 +6,6 @@ add_swift_library(swiftSerialization
   SerializedModuleLoader.cpp
   SerializedSILLoader.cpp
   SerializeSIL.cpp
-  DEPENDS swiftAST swiftClangImporter LLVMBitReader LLVMBitWriter LLVMCore)
+  LINK_LIBRARIES
+    swiftClangImporter)
+

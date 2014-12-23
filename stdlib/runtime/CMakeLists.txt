@@ -1,32 +1,25 @@
-if (SWIFT_OPTIMIZED)
-  set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS_DEFAULT OFF)
-else()
-  set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS_DEFAULT ON)
-endif()
+set(swift_runtime_compile_flags)
 
-set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
-  ${SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS_DEFAULT}
-  CACHE BOOL "Overwrite memory for deallocated Swift objects")
-
-set(SWIFT_RUNTIME_COMPILE_FLAGS)
 if(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
-  list(APPEND SWIFT_RUNTIME_COMPILE_FLAGS "-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=1")
+  list(APPEND swift_runtime_compile_flags
+      "-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=1")
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  set(SWIFT_RUNTIME_OBJC_SOURCES
-    Availability.mm
-    SwiftObject.mm
-    SwiftNativeNSXXXBase.mm.gyb
-    Reflection.mm)
-
-  set(FRAMEWORKS Foundation)
-else()
-  set(SWIFT_RUNTIME_OBJC_SOURCES)
-  set(FRAMEWORKS)
+if(SWIFT_HAVE_CRASH_REPORTER_CLIENT)
+  list(APPEND swift_runtime_compile_flags
+      "-DSWIFT_HAVE_CRASHREPORTERCLIENT=1")
 endif()
 
-add_swift_library(swiftRuntime
+set(swift_runtime_objc_sources)
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  set(swift_runtime_objc_sources
+      Availability.mm
+      SwiftObject.mm
+      SwiftNativeNSXXXBase.mm.gyb
+      Reflection.mm)
+endif()
+
+add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
   Casting.cpp
   Demangle.cpp
   GlobalObjects.cpp
@@ -41,24 +34,18 @@ add_swift_library(swiftRuntime
   Heap.cpp
   Errors.cpp
   UnicodeExtendedGraphemeClusters.cpp.gyb
-  ${SWIFT_RUNTIME_OBJC_SOURCES}
-  C_COMPILE_FLAGS ${SWIFT_RUNTIME_COMPILE_FLAGS}
-  TARGET_LIBRARY INSTALL
-  FRAMEWORK_DEPENDS ${FRAMEWORKS})
+  ${swift_runtime_objc_sources}
+  C_COMPILE_FLAGS ${swift_runtime_compile_flags}
+  INSTALL_IN_COMPONENT stdlib)
 
-if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-  # FIXME: This is probably not flexible enough to deal with 32bit builds,
-  # but SWIFTLIB_DIR isn't available in this cmake file and duplicating
-  # the logic seems wrong. rdar://problem/19035586
-  configure_file(swift.ld ${CMAKE_BINARY_DIR}/lib/swift/swift.ld COPYONLY)
-  target_link_libraries(swiftRuntime "-lpthread" "-ldl")
-endif()
+foreach(sdk ${SWIFTLIB_TARGET_SDKS})
+  if("${sdk}" STREQUAL "LINUX")
+  foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+    set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
 
-list(APPEND CMAKE_FIND_ROOT_PATH "${CMAKE_OSX_SYSROOT}")
-find_library(CRASHREPORTERCLIENT CrashReporterClient ONLY_CMAKE_FIND_ROOT_PATH)
+    # FIXME: We will need a different linker script for 32-bit builds.
+    configure_file(
+        "swift.ld" "${SWIFTLIB_DIR}/${arch_subdir}/swift.ld" COPYONLY)
+  endforeach()
+endforeach()
 
-if (CRASHREPORTERCLIENT)
-  target_link_libraries(swiftRuntime "-lCrashReporterClient")
-  set_property(TARGET swiftRuntime APPEND_STRING PROPERTY
-    COMPILE_FLAGS " -DSWIFT_HAVE_CRASHREPORTERCLIENT=1")
-endif()

@@ -1,6 +1,6 @@
-set(SHARED_LIBRARY ON)
-add_swift_library(swiftAppKit INSTALL TARGET_LIBRARY
+add_swift_library(swiftAppKit IS_SDK_OVERLAY
   AppKit.swift
-  TARGET_SDKS "OSX"
-  DEPENDS swiftCore swiftObjectiveC swiftFoundation swiftQuartzCore
+  TARGET_SDKS OSX
+  SWIFT_MODULE_DEPENDS ObjectiveC Foundation QuartzCore
   FRAMEWORK_DEPENDS AppKit QuartzCore)
+

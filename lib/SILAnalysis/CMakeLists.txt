@@ -13,4 +13,4 @@ add_swift_library(swiftSILAnalysis
   SimplifyInstruction.cpp
   RCIdentityAnalysis.cpp
   DestructorAnalysis.cpp
-  DEPENDS swiftSILPassesUtils)
+  LINK_LIBRARIES swiftSILPassesUtils)

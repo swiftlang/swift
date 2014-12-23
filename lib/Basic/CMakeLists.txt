@@ -1,7 +1,5 @@
 find_package(UUID REQUIRED)
 
-set(UNICODE_TABLES UnicodeExtendedGraphemeClusters.cpp.gyb)
-
 add_swift_library(swiftBasic
   Cache.cpp
   Demangle.cpp
@@ -31,11 +29,10 @@ add_swift_library(swiftBasic
   # Platform-agnostic fallback TaskQueue implementation
   Default/TaskQueue.inc
 
-  ${UNICODE_TABLES}
+  UnicodeExtendedGraphemeClusters.cpp.gyb
 
   C_COMPILE_FLAGS "-I${UUID_INCLUDE_DIRS}"
-  DEPENDS ${UUID_LIBRARIES}
-  )
+  LINK_LIBRARIES ${UUID_LIBRARIES})
 
 set(SWIFT_VERSION "1.1")
 message(STATUS "Swift version: ${SWIFT_VERSION}")

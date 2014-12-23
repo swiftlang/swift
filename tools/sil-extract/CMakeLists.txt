@@ -1,8 +1,15 @@
 add_swift_executable(sil-extract
   SILExtract.cpp
-  DEPENDS swiftSIL swiftSILGen swiftSILPasses swiftSerialization
-          swiftFrontend swiftClangImporter
-  COMPONENT_DEPENDS option bitreader bitwriter support ${LLVM_TARGETS_TO_BUILD})
+  LINK_LIBRARIES
+    swiftFrontend
+    swiftSILGen
+    swiftSILPasses
+    swiftSerialization
+    swiftClangImporter
+  COMPONENT_DEPENDS
+    option bitreader bitwriter support ${LLVM_TARGETS_TO_BUILD})
 
-install(TARGETS sil-extract
-  RUNTIME DESTINATION bin)
+swift_install_in_component(tools
+    TARGETS sil-extract
+    RUNTIME DESTINATION "bin")
+

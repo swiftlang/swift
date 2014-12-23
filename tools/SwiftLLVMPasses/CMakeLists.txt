@@ -1,3 +1,7 @@
+if(NOT SWIFT_INSTALL_TESTSUITE_TOOLS)
+  # Prevent SwiftLLVMPasses from being installed.
+  set(LLVM_INSTALL_TOOLCHAIN_ONLY TRUE)
+endif()
 
 add_llvm_loadable_module(SwiftLLVMPasses
   SwiftLLVMPasses.cpp
@@ -9,15 +13,11 @@ set_target_properties(SwiftLLVMPasses PROPERTIES
 
 foreach(config ${CMAKE_CONFIGURATION_TYPES})
   string(TOUPPER ${config} config_upper)
-  # Hack to deal with the fact that ${SWIFTLIB_DIR} contains the build-time
-  # variable $(CONFIGURATION). Note that this fix is Xcode-specific.
-  # You might think you could just replace ${CMAKE_CFG_INTDIR} here, but
-  # that can actually have other things mangled into it besides just the
-  # configuration. This at least doesn't pretend to do the right thing
-  # outside of Xcode.
-  string(REPLACE "$(CONFIGURATION)" ${config} config_lib_dir
-        "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib")
+  apply_xcode_substitutions(
+      "${config}"
+      "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib"
+      config_lib_dir)
   set_target_properties(SwiftLLVMPasses PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}
-    ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir})
+      LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}
+      ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir})
 endforeach()

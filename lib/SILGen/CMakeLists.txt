@@ -12,5 +12,5 @@ add_swift_library(swiftSILGen
   SILGenPattern.cpp
   SILGenPoly.cpp
   SILGenStmt.cpp
-  DEPENDS swiftSIL)
+  LINK_LIBRARIES swiftSIL)
 

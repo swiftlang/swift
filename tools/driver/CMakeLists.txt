@@ -1,44 +1,49 @@
 add_swift_executable(swift
   driver.cpp
   frontend_main.cpp
-  DEPENDS swiftDriver swiftIRGen swiftSIL swiftSILGen swiftSILPasses swiftImmediate
-          swiftSerialization swiftFrontend swiftClangImporter swiftPrintAsObjC
-          swiftIDE swiftOption
-  COMPONENT_DEPENDS bitreader bitwriter codegen ipo linker mcjit asmparser
-                    selectiondag ${LLVM_TARGETS_TO_BUILD})
+  LINK_LIBRARIES
+    swiftDriver swiftIRGen swiftSIL swiftSILGen swiftSILPasses
+    swiftImmediate
+    swiftSerialization
+    swiftPrintAsObjC
+    swiftFrontend
+    swiftClangImporter
+    swiftIDE
+    swiftOption
+  COMPONENT_DEPENDS
+    bitreader bitwriter codegen ipo linker mcjit asmparser selectiondag
+    objcarcopts option support ${LLVM_TARGETS_TO_BUILD})
 
 target_link_libraries(swift edit)
 
+add_custom_command(TARGET swift POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" "-E" "create_symlink" "swift" "swiftc"
+    WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+
 # If building as part of clang, make sure the headers are installed.
-if(SWIFT_PATH_TO_CLANG_BUILD STREQUAL ${CMAKE_BINARY_DIR})
+if(NOT SWIFT_BUILT_STANDALONE)
   add_dependencies(swift clang-headers)
 endif()
 
 # Platforms that have a REPL need extra libraries to be linked into the 'swift'
 # binary.
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+include(SwiftDarwin)
+if(SWIFT_HOST_VARIANT STREQUAL "macosx")
   # Link in CoreFoundation on Darwin.
   find_library(CORE_FOUNDATION NAMES CoreFoundation)
   target_link_libraries(swift ${CORE_FOUNDATION})
 
   # Link in arclite on Darwin.
-  execute_process(
-    COMMAND xcrun --toolchain default -f clang
-    OUTPUT_VARIABLE default_toolchain_compiler)
-  get_filename_component(ARCLITE_BASE ${default_toolchain_compiler} PATH)
-  get_filename_component(ARCLITE_BASE ${ARCLITE_BASE} PATH)
-  set(SWIFT_REPL_ARCLITE "${ARCLITE_BASE}/lib/arc/libarclite_${SWIFT_DEPLOYMENT_OS}.a")
-  if (SWIFT_REPL_ARCLITE)
-    set_property(TARGET swift APPEND_STRING PROPERTY
+  get_default_toolchain_dir(toolchain_dir)
+  set(SWIFT_REPL_ARCLITE "${toolchain_dir}/usr/lib/arc/libarclite_${SWIFT_HOST_VARIANT}.a")
+  set_property(TARGET swift APPEND_STRING PROPERTY
       LINK_FLAGS " -lobjc -Wl,-force_load,\"${SWIFT_REPL_ARCLITE}\"")
-  endif()
 endif()
 
-install(TARGETS swift
-  RUNTIME DESTINATION bin)
+swift_install_in_component(compiler
+    TARGETS swift
+    RUNTIME DESTINATION "bin")
+swift_install_in_component(compiler
+    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc"
+    DESTINATION "bin")
 
-add_custom_command(TARGET swift POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E create_symlink swift swiftc
-    WORKING_DIRECTORY ${SWIFT_RUNTIME_OUTPUT_INTDIR})
-
-install(CODE "execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink swift swiftc WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin)")

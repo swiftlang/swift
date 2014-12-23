@@ -1,9 +1,7 @@
-set(SHARED_LIBRARY ON)
-
-add_swift_library(swiftCoreGraphics 
+add_swift_library(swiftCoreGraphics IS_SDK_OVERLAY
   CoreGraphics.swift
   CGFloat.swift.gyb
   CoreGraphicsMirrors.swift.gyb
-  INSTALL TARGET_LIBRARY
-  DEPENDS swiftCore swiftObjectiveC swiftDispatch swiftDarwin
+  SWIFT_MODULE_DEPENDS ObjectiveC Dispatch Darwin
   FRAMEWORK_DEPENDS CoreGraphics)
+

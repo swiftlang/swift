@@ -1,5 +1,6 @@
 add_swift_library(swiftOption
   Options.cpp
-  DEPENDS swiftBasic)
+  DEPENDS SwiftOptions
+  LINK_LIBRARIES swiftBasic
+  FILE_DEPENDS SwiftOptions)
 
-add_dependencies(swiftOption SwiftOptions)

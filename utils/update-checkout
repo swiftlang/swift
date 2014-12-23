@@ -1,0 +1,116 @@
+#!/usr/bin/python
+#===--- update-checkout - Utility to update your local checkouts -----------===#
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See http://swift.org/LICENSE.txt for license information
+# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+#===------------------------------------------------------------------------===#
+
+from __future__ import print_function
+
+import getopt
+import os
+import shutil
+import string
+import sys
+
+sys.path.append(os.path.dirname(__file__))
+
+from SwiftBuildSupport import *
+
+
+def usage():
+    print("""
+Usage:
+  update-checkout [options]
+
+  source repositories.
+
+  By default, updates your checkouts of Swift, SourceKit and LLDB.
+
+Options:
+
+  -a, --all   update your checkouts of LLVM, Clang and Swift,
+              SourceKit and LLDB
+""")
+
+
+class WorkingDirectory(object):
+    def __init__(self, new_cwd):
+        self.new_cwd = new_cwd
+
+    def __enter__(self):
+        self.old_cwd = os.getcwd()
+        os.chdir(self.new_cwd)
+
+    def __exit__(self, type, value, traceback):
+        os.chdir(self.old_cwd)
+
+
+def update_git_svn(repo_path):
+    with WorkingDirectory(repo_path):
+        use_stash = (check_output([ "git", "status", "--porcelain" ]) != "")
+        if use_stash:
+            check_call([ "git", "stash", "save", "--all"])
+
+        # Try first to pull from an upstream Git repo, assuming there is one
+        if check_output([ "git", "remote" ]) != "":
+            check_call([ "git", "pull", "--rebase" ])
+            check_call([ "git", "svn", "rebase", "-l" ])
+        else:
+            check_call([ "git", "svn", "rebase" ])
+
+        if use_stash:
+            check_call([ "git", "stash", "pop" ])
+
+
+def update_working_copy(repo_path):
+    if not os.path.isdir(repo_path):
+        return
+
+    with WorkingDirectory(repo_path):
+        if os.path.isdir(os.path.join(".git", "svn")):
+            update_git_svn(repo_path)
+        elif os.path.isdir(".git"):
+            check_call([ "git", "pull" ])
+        else:
+            check_call([ "svn", "update" ])
+
+
+def main():
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "a",
+            [ "all" ])
+    except getopt.GetoptError as err:
+        bad_usage(str(err))
+
+    opt_update_all = False
+
+    for o, a in opts:
+        if o == "--all":
+            opt_update_all = True
+        else:
+            assert False, "unhandled option " + o
+
+    if args != []:
+        bad_usage("extra arguments: " + args)
+
+    if opt_update_all:
+        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llvm"))
+        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "clang"))
+
+    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift"))
+    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "SourceKit"))
+    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "lldb"))
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+

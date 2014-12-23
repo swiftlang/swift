@@ -1,6 +1,9 @@
-set(GENERATED_TESTS UnicodeGraphemeBreakTest.cpp.gyb)
+set(generated_tests UnicodeGraphemeBreakTest.cpp.gyb)
 
-handle_gyb_sources(${CMAKE_SIZEOF_VOID_P} GENERATED_TESTS)
+handle_gyb_sources(
+    gyb_dependency_targets
+    generated_tests
+    ${SWIFT_HOST_VARIANT_ARCH})
 
 add_swift_unittest(SwiftBasicTests
   Demangle.cpp
@@ -10,8 +13,10 @@ add_swift_unittest(SwiftBasicTests
   SuccessorMapTest.cpp
   Unicode.cpp
 
-  ${GENERATED_TESTS}
+  ${generated_tests}
   )
+
+add_dependencies(SwiftBasicTests "${gyb_dependency_targets}")
 
 target_link_libraries(SwiftBasicTests
   swiftBasic

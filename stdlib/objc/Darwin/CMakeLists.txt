@@ -1,8 +1,6 @@
-set(SHARED_LIBRARY ON)
-
-add_swift_library(swiftDarwin INSTALL TARGET_LIBRARY
+add_swift_library(swiftDarwin IS_SDK_OVERLAY
   Darwin.swift
   Misc.mm
   tgmath.swift.gyb
-  DEPENDS swiftCore
   API_NOTES_NON_OVERLAY)
+

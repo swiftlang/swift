@@ -22,20 +22,18 @@ if(SPHINX_EXECUTABLE)
     COMMENT "Building HTML documentation")
 
   # Selectively install docs intended for general consumption.
-  install(
-    FILES
-      ${CMAKE_BINARY_DIR}/docs/html/LangRef.html
-    DESTINATION share/swift/docs/html)
+  swift_install_in_component(lang-docs
+      FILES "${CMAKE_BINARY_DIR}/docs/html/LangRef.html"
+      DESTINATION "share/swift/docs/html")
 
-  install(
-    DIRECTORY
-      ${CMAKE_BINARY_DIR}/docs/html/_static
-      ${CMAKE_BINARY_DIR}/docs/html/whitepaper
-    DESTINATION share/swift/docs/html)
-
-else(SPHINX_EXECUTABLE)
+  swift_install_in_component(lang-docs
+      DIRECTORY
+        "${CMAKE_BINARY_DIR}/docs/html/_static"
+        "${CMAKE_BINARY_DIR}/docs/html/whitepaper"
+      DESTINATION "share/swift/docs/html")
+else()
   message(WARNING "Unable to find sphinx-build program. Not building docs")
-endif(SPHINX_EXECUTABLE)
+endif()
 
 ## Example testing
 
@@ -98,21 +96,20 @@ if(LITRE_EXECUTABLE)
   # Only update the real top-level CMakeLists.txt if something  changed
   add_custom_command(
     OUTPUT
-      litre-tests/CMakeLists.txt
+      "litre-tests/CMakeLists.txt"
     COMMAND
-      ${CMAKE_COMMAND} -E copy_if_different litre-top-CMakeLists.cmake litre-tests/CMakeLists.txt
+      "${CMAKE_COMMAND}" "-E" "copy_if_different"
+      "litre-top-CMakeLists.cmake" "litre-tests/CMakeLists.txt"
     DEPENDS
-      litre-top-CMakeLists.cmake
+      "litre-top-CMakeLists.cmake"
     COMMENT
       "Updating top-level LitRe CMakeLists.txt"
-    VERBATIM
-      )
+    VERBATIM)
 
   # Create a build directory
   add_custom_command(
-    OUTPUT litre-tests/build 
-    COMMAND ${CMAKE_COMMAND} -E make_directory litre-tests/build
-    )
+    OUTPUT "litre-tests/build"
+    COMMAND "${CMAKE_COMMAND}" "-E" "make_directory" "litre-tests/build")
 
   # Run CMake itself to configure/build the tests
   add_custom_command(
@@ -184,13 +181,12 @@ if (DOXYGEN_FOUND)
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Generating swift doxygen documentation." VERBATIM)  
 
-  if (LLVM_BUILD_DOCS)
+  if(LLVM_BUILD_DOCS)
     add_dependencies(doxygen doxygen-swift)
   endif()
 
-  if (NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
-    install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doxygen/html
-      DESTINATION docs/html)
-  endif()
+  swift_install_in_component(dev
+      DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/doxygen/html"
+      DESTINATION "docs/html")
 endif()
 endif()

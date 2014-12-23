@@ -31,5 +31,8 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   if (triple.isMacOSX())
     return "macosx";
 
+  if (triple.isOSLinux())
+    return "linux";
+
   return "";
 }

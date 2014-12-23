@@ -1,6 +1,6 @@
-set(SHARED_LIBRARY ON)
-add_swift_library(swiftCoreImage INSTALL TARGET_LIBRARY
+add_swift_library(swiftCoreImage IS_SDK_OVERLAY
   CoreImage.swift
   TARGET_SDKS IOS IOS_SIMULATOR
-  DEPENDS swiftCore swiftFoundation swiftObjectiveC
+  SWIFT_MODULE_DEPENDS Foundation ObjectiveC
   FRAMEWORK_DEPENDS CoreImage)
+

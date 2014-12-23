@@ -1,6 +1,4 @@
-set(SHARED_LIBRARY ON)
-
-add_swift_library(swiftFoundation INSTALL TARGET_LIBRARY
+add_swift_library(swiftFoundation IS_SDK_OVERLAY
   Foundation.swift
   FoundationMirrors.swift.gyb
   ExtraStringAPIs.swift
@@ -8,5 +6,6 @@ add_swift_library(swiftFoundation INSTALL TARGET_LIBRARY
   MixedStringNSStringOperations.swift.gyb
   NSStringAPI.swift
   NSValue.swift
-  DEPENDS swiftCore swiftObjectiveC swiftCoreGraphics swiftDispatch swiftSecurity
+  SWIFT_MODULE_DEPENDS ObjectiveC CoreGraphics Dispatch Security
   FRAMEWORK_DEPENDS Foundation)
+

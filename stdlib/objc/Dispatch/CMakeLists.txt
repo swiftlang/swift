@@ -1,7 +1,5 @@
-set(SHARED_LIBRARY ON)
-
-add_swift_library(swiftDispatch 
+add_swift_library(swiftDispatch IS_SDK_OVERLAY
   Dispatch.swift
   Dispatch.mm
-  INSTALL TARGET_LIBRARY
-  DEPENDS swiftCore swiftObjectiveC)
+  SWIFT_MODULE_DEPENDS ObjectiveC)
+

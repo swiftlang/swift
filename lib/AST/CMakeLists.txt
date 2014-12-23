@@ -34,13 +34,34 @@ add_swift_library(swiftAST
   TypeWalker.cpp
   USRGeneration.cpp
   Verifier.cpp
-  DEPENDS swiftBasic swiftReST
-  clangIndex
-  clangFormat
-  clangToolingCore
-  LLVMCore
-  )
+  LINK_LIBRARIES
+    swiftReST
+    swiftBasic
 
-if( NOT SWIFT_BUILT_STANDALONE )
+    # Clang dependencies.
+    # FIXME: Clang should really export these in some reasonable manner.
+    clangIndex
+    clangFormat
+    clangToolingCore
+    clangFrontendTool
+    clangFrontend
+    clangDriver
+    clangSerialization
+    clangParse
+    clangSema
+    clangAnalysis
+    clangEdit
+    clangRewriteFrontend
+    clangRewrite
+    clangAST
+    clangLex
+    clangAPINotes
+    clangBasic)
+
+llvm_config(swiftAST
+    profiledata object mc mcparser bitreader option core support)
+
+if(NOT SWIFT_BUILT_STANDALONE)
   add_dependencies(swiftAST intrinsics_gen)
 endif()
+

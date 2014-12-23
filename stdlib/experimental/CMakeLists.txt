@@ -1,11 +1,8 @@
-set(SHARED_LIBRARY ON)
-
-add_swift_library(swiftSwiftExperimental INSTALL TARGET_LIBRARY
+add_swift_library(swiftSwiftExperimental SHARED IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the
   # filename.
   SwiftExperimental.swift
 
   SWIFT_COMPILE_FLAGS -Xfrontend -sil-serialize-all
-
-  DEPENDS swiftCore)
+  INSTALL_IN_COMPONENT stdlib-experimental)
 
