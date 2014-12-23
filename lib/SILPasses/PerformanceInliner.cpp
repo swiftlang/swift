@@ -42,8 +42,6 @@ namespace {
     // Links between loaded and stored values.
     llvm::DenseMap<SILValue, SILValue> links;
     
-    typedef llvm::SmallVector<Projection, 8> ProjectionStack;
-
     // The constant tracker of the caller function (null if this is the
     // tracker of the callee).
     ConstantTracker *callerTracker;
@@ -53,10 +51,7 @@ namespace {
     ApplyInst *AI;
     
     // Gets the estimated constant of a value.
-    SILInstruction *getConst(SILValue val, ProjectionStack &projStack);
-
-    // Get's the struct/tuple member based on the top of the projection stack.
-    static SILValue getMember(SILInstruction *inst, ProjectionStack &projStack);
+    SILInstruction *getConst(SILValue val, ProjectionPath &projStack);
 
   public:
     
@@ -73,7 +68,7 @@ namespace {
     
     // Gets the estimated constant of a value.
     SILInstruction *getConst(SILValue val) {
-      ProjectionStack projStack;
+      ProjectionPath projStack;
       return getConst(val, projStack);
     }
   };
@@ -132,26 +127,17 @@ void ConstantTracker::trackInst(SILInstruction *inst) {
   }
 }
 
-SILValue ConstantTracker::getMember(SILInstruction *inst,
-                                    ProjectionStack &projStack) {
+// Get the aggregate member based on the top of the projection stack.
+static SILValue getMember(SILInstruction *inst, ProjectionPath &projStack) {
   if (!projStack.empty()) {
     const Projection &proj = projStack.back();
-    switch (proj.getKind()) {
-      case ProjectionKind::Struct:
-        if (StructInst *SI = dyn_cast<StructInst>(inst)) {
-          return SI->getOperand(proj.getDeclIndex());
-        }
-        break;
-      default:
-        // TODO: not yet supported
-        break;
-    }
+    return proj.getOperandForAggregate(inst);
   }
   return SILValue();
 }
 
 SILInstruction *ConstantTracker::getConst(SILValue val,
-                                          ProjectionStack &projStack) {
+                                          ProjectionPath &projStack) {
   
   // Track the value up the dominator tree.
   // The val can also be an address value. In this case it refers to the
@@ -173,22 +159,11 @@ SILInstruction *ConstantTracker::getConst(SILValue val,
       default:
         break;
       }
-      if (Projection::isValueProjection(inst)) {
-        // Extract a member from a struct/tuple.
-        auto proj = Projection::valueProjectionForInstruction(inst);
-        if (proj) {
-          projStack.push_back(proj.getValue());
-          val = inst->getOperand(0);
-          continue;
-        }
-      } else if (Projection::isAddrProjection(inst)) {
-        // Extract a member address from a struct/tuple address.
-        auto proj = Projection::addressProjectionForInstruction(inst);
-        if (proj) {
-          projStack.push_back(proj.getValue());
-          val = inst->getOperand(0);
-          continue;
-        }
+      if (auto proj = Projection::projectionForInstruction(inst)) {
+        // Extract a member from a struct/tuple/enum.
+        projStack.push_back(proj.getValue());
+        val = inst->getOperand(0);
+        continue;
       } else if (SILValue member = getMember(inst, projStack)) {
         // The opposite of a projection instruction: composing a struct/tuple.
         projStack.pop_back();

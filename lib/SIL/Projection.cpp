@@ -239,6 +239,31 @@ createAddrProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const {
   }
 }
 
+SILValue Projection::getOperandForAggregate(SILInstruction *I) const {
+  switch (getKind()) {
+    case ProjectionKind::Struct:
+      if (isa<StructInst>(I))
+        return I->getOperand(getDeclIndex());
+      break;
+    case ProjectionKind::Tuple:
+      if (isa<TupleInst>(I))
+        return I->getOperand(getIndex());
+      break;
+    case ProjectionKind::Enum:
+      if (EnumInst *EI = dyn_cast<EnumInst>(I)) {
+        if (EI->getElement() == Decl) {
+          assert(EI->hasOperand() && "expected data operand");
+          return EI->getOperand();
+        }
+      }
+      break;
+    case ProjectionKind::Class:
+      // There is no SIL instruction to create a class by aggregating values.
+      break;
+  }
+  return SILValue();
+}
+
 //===----------------------------------------------------------------------===//
 //                              Projection Path
 //===----------------------------------------------------------------------===//

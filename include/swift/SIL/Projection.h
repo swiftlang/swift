@@ -223,6 +223,11 @@ public:
     }
   }
 
+  /// Returns the operand of a struct, tuple or enum instruction which is
+  /// associated with this projection. Returns an invalid SILValue if \p I is
+  /// not a matching aggregate instruction.
+  SILValue getOperandForAggregate(SILInstruction *I) const;
+
 private:
   Projection(ProjectionKind Kind, SILType Type, ValueDecl *Decl,
              unsigned Index)
@@ -274,13 +279,11 @@ public:
 private:
   PathTy Path;
 
-  /// This is private since in all cases where we construct a projection path we
-  /// can fail. That implies that we only want to allow ProjectionPaths to be
-  /// created from static factory methods that can return an rvalue of a
-  /// projection path.
+public:
+  /// Create an empty path which serves as a stack. Use push_back() to populate
+  /// the stack with members.
   ProjectionPath() : Path() {}
 
-public:
   ~ProjectionPath() = default;
 
   /// Do not allow copy construction. The only way to get one of these is from
@@ -316,6 +319,15 @@ public:
   bool
   findMatchingValueProjectionPaths(SILInstruction *I,
                                    SmallVectorImpl<SILInstruction *> &T) const;
+
+  /// Pushes an element to the path.
+  void push_back(const Projection &Proj) { Path.push_back(Proj); }
+
+  /// Removes the last element from the path.
+  void pop_back() { Path.pop_back(); }
+
+  /// Returns the last element of the path.
+  const Projection &back() const { return Path.back(); }
 
   /// Returns true if LHS and RHS have all the same projections in the same
   /// order.

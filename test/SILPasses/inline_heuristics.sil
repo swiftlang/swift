@@ -18,6 +18,16 @@ struct Cont {
 	var cl: (Int) -> Int
 }
 
+struct Cont2 {
+	var tp: (Int, (Int) -> Int)
+}
+
+enum E {
+	case A
+	case B((Int) -> Int)
+}
+
+
 // CHECK-LABEL: sil @testDirectClosure
 // CHECK: [[C:%[0-9]+]] = thin_to_thick_function
 // CHECK: apply [[C]](
@@ -30,7 +40,7 @@ struct Cont {
 sil @testDirectClosure : $@thin () -> Int {
 bb0:
   %0 = function_ref @takeDirectClosure : $@thin (@owned @callee_owned (Int) -> Int) -> Int
-  %1 = function_ref @directClosure : $@thin (Int) -> Int
+  %1 = function_ref @closure : $@thin (Int) -> Int
   %2 = thin_to_thick_function %1 : $@thin (Int) -> Int to $@callee_owned (Int) -> Int
   %3 = apply %0(%2) : $@thin (@owned @callee_owned (Int) -> Int) -> Int
   return %3 : $Int
@@ -44,18 +54,6 @@ bb0(%0 : $@callee_owned (Int) -> Int):
   return %3 : $Int
 }
 
-sil shared @directClosure : $@thin (Int) -> Int {
-bb0(%0 : $Int):
-  %1 = integer_literal $Builtin.Word, 1
-  %2 = struct_extract %0 : $Int, #Int.value
-  %3 = integer_literal $Builtin.Int1, -1
-  %4 = builtin "sadd_with_overflow_Word"(%2 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %5 = tuple_extract %4 : $(Builtin.Word, Builtin.Int1), 0
-  %6 = tuple_extract %4 : $(Builtin.Word, Builtin.Int1), 1
-  cond_fail %6 : $Builtin.Int1
-  %8 = struct $Int (%5 : $Builtin.Word)
-  return %8 : $Int
-}
 
 // CHECK-LABEL: sil @testStructClosure
 // CHECK: [[C:%[0-9]+]] = struct_extract
@@ -69,7 +67,7 @@ bb0(%0 : $Int):
 sil @testStructClosure : $@thin () -> Int {
 bb0:
   %0 = function_ref @takeStructClosure : $@thin (@owned Cont) -> Int
-  %1 = function_ref @structClosure : $@thin (Int) -> Int
+  %1 = function_ref @closure : $@thin (Int) -> Int
   %2 = thin_to_thick_function %1 : $@thin (Int) -> Int to $@callee_owned (Int) -> Int
   %3 = struct $Cont (%2 : $@callee_owned (Int) -> Int)
   %4 = apply %0(%3) : $@thin (@owned Cont) -> Int
@@ -85,18 +83,6 @@ bb0(%0 : $Cont):
   return %4 : $Int
 }
 
-sil shared @structClosure : $@thin (Int) -> Int {
-bb0(%0 : $Int):
-  %1 = integer_literal $Builtin.Word, 1
-  %2 = struct_extract %0 : $Int, #Int.value
-  %3 = integer_literal $Builtin.Int1, -1
-  %4 = builtin "sadd_with_overflow_Word"(%2 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %5 = tuple_extract %4 : $(Builtin.Word, Builtin.Int1), 0
-  %6 = tuple_extract %4 : $(Builtin.Word, Builtin.Int1), 1
-  cond_fail %6 : $Builtin.Int1
-  %8 = struct $Int (%5 : $Builtin.Word)
-  return %8 : $Int
-}
 
 // CHECK-LABEL: sil @testStructAddrClosure
 // CHECK: [[C:%[0-9]+]] = load
@@ -110,7 +96,7 @@ bb0(%0 : $Int):
 sil @testStructAddrClosure : $@thin () -> Int {
 bb0:
   %0 = alloc_stack $Cont
-  %1 = function_ref @structAddrClosure : $@thin (Int) -> Int
+  %1 = function_ref @closure : $@thin (Int) -> Int
   %2 = thin_to_thick_function %1 : $@thin (Int) -> Int to $@callee_owned (Int) -> Int
   %3 = struct $Cont (%2 : $@callee_owned (Int) -> Int)
   store %3 to %0#1 : $*Cont
@@ -134,7 +120,70 @@ bb0(%0 : $*Cont):
   return %6 : $Int
 }
 
-sil shared @structAddrClosure : $@thin (Int) -> Int {
+
+// CHECK-LABEL: sil @testTupleClosure
+// CHECK: [[C:%[0-9]+]] = tuple_extract
+// CHECK: apply [[C]](
+// CHECK: return
+
+// LOG-LABEL: Visiting Function: testTupleClosure
+// LOG: Eligible callee: takeTupleClosure
+// LOG: Boost: apply const function
+
+sil @takeTupleClosure : $@thin (@owned Cont2) -> Int {
+bb0(%0 : $Cont2):
+  %1 = struct_extract %0 : $Cont2, #Cont2.tp
+  %2 = tuple_extract %1 : $(Int, @callee_owned (Int) -> Int), 1
+  %3 = integer_literal $Builtin.Word, 27
+  %4 = struct $Int (%3 : $Builtin.Word)
+  %5 = apply %2(%4) : $@callee_owned (Int) -> Int
+  return %5 : $Int
+}
+
+sil @testTupleClosure : $@thin () -> Int {
+bb0:
+  %0 = function_ref @takeTupleClosure : $@thin (@owned Cont2) -> Int
+  %1 = integer_literal $Builtin.Word, 27
+  %2 = struct $Int (%1 : $Builtin.Word)
+  %3 = function_ref @closure : $@thin (Int) -> Int
+  %4 = thin_to_thick_function %3 : $@thin (Int) -> Int to $@callee_owned (Int) -> Int
+  %5 = tuple (%2 : $Int, %4 : $@callee_owned (Int) -> Int)
+  %6 = struct $Cont2 (%5 : $(Int, @callee_owned (Int) -> Int))
+  %7 = apply %0(%6) : $@thin (@owned Cont2) -> Int
+  return %7 : $Int
+}
+
+
+// CHECK-LABEL: sil @testEnumClosure
+// CHECK: [[C:%[0-9]+]] = unchecked_enum_data
+// CHECK: apply [[C]](
+// CHECK: return
+
+// LOG-LABEL: Visiting Function: testEnumClosure
+// LOG: Eligible callee: takeEnumClosure
+// LOG: Boost: apply const function
+
+sil @takeEnumClosure : $@thin (@owned E) -> Int {
+bb0(%0 : $E):
+  %1 = unchecked_enum_data %0 : $E, #E.B!enumelt.1
+  %2 = integer_literal $Builtin.Word, 27
+  %3 = struct $Int (%2 : $Builtin.Word)
+  %4 = apply %1(%3) : $@callee_owned (Int) -> Int
+  return %4 : $Int
+}
+
+sil @testEnumClosure : $@thin () -> Int {
+bb0:
+  %0 = function_ref @takeEnumClosure : $@thin (@owned E) -> Int
+  %1 = function_ref @closure : $@thin (Int) -> Int
+  %2 = thin_to_thick_function %1 : $@thin (Int) -> Int to $@callee_owned (Int) -> Int
+  %3 = enum $E, #E.B!enumelt.1, %2 : $@callee_owned (Int) -> Int
+  %4 = apply %0(%3) : $@thin (@owned E) -> Int
+  return %4 : $Int
+}
+
+
+sil shared @closure : $@thin (Int) -> Int {
 bb0(%0 : $Int):
   %1 = integer_literal $Builtin.Word, 1
   %2 = struct_extract %0 : $Int, #Int.value
