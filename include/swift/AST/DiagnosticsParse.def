@@ -216,13 +216,14 @@ NOTE(previous_accessor,decl_parsing,none,
      "previous definition of %select{getter|setter|willSet|didSet}0 is here",
      (unsigned))
 ERROR(expected_accessor_name,decl_parsing,none,
-      "expected the name of the %select{setter|willSet}0 value",(unsigned))
+      "expected %select{GETTER|setter|willSet|didSet}0 parameter name",
+      (unsigned))
 ERROR(expected_rparen_set_name,decl_parsing,none,
-      "expected ')' after setter value name",())
+      "expected ')' after setter parameter name",())
 ERROR(expected_rparen_willSet_name,decl_parsing,none,
-      "expected ')' after willSet value name",())
+      "expected ')' after willSet parameter name",())
 ERROR(expected_rparen_didSet_name,decl_parsing,none,
-      "expected ')' after didSet value name",())
+      "expected ')' after didSet parameter name",())
 ERROR(expected_lbrace_accessor,decl_parsing,PointsToFirstBadToken,
       "expected '{' to start %select{getter|setter|willSet|didSet}0 definition",
      (unsigned))

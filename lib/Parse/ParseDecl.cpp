@@ -2390,8 +2390,7 @@ parseOptionalAccessorArgument(SourceLoc SpecifierLoc, TypeLoc ElementTy,
   if (SpecifierLoc.isValid() && P.Tok.is(tok::l_paren)) {
     StartLoc = P.consumeToken(tok::l_paren);
     if (P.Tok.isNot(tok::identifier)) {
-      P.diagnose(P.Tok, diag::expected_accessor_name,
-                 Kind != AccessorKind::IsSetter);
+      P.diagnose(P.Tok, diag::expected_accessor_name, (unsigned)Kind);
       P.skipUntil(tok::r_paren, tok::l_brace);
       if (P.Tok.is(tok::r_paren))
         P.consumeToken();

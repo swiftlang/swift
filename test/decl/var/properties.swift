@@ -307,13 +307,19 @@ var x9: X {
 }
 
 var x10: X {
-  set ( : ) { // expected-error{{expected the name of the setter value}}
+  set ( : ) { // expected-error{{expected setter parameter name}}
   }
   get {}
 }
 
 var x11 : X {
   set { // expected-error{{variable with a setter must also have a getter}}
+  }
+}
+
+var x12: X {
+  set(newValue %) { // expected-error {{expected ')' after setter parameter name}} expected-note {{to match this opening '('}}
+  // expected-error@-1 {{expected '{' to start setter definition}}
   }
 }
 
@@ -665,6 +671,20 @@ struct WillSetDidSetProperties {
     set { // expected-error {{willSet variable may not also have a set specifier}}
       return 4
     }
+  }
+
+  var f: Int {
+    willSet(5) {} // expected-error {{expected willSet parameter name}}
+    didSet(^) {} // expected-error {{expected didSet parameter name}}
+  }
+
+  var g: Int {
+    willSet(newValue 5) {} // expected-error {{expected ')' after willSet parameter name}} expected-note {{to match this opening '('}}
+    // expected-error@-1 {{expected '{' to start willSet definition}}
+  }
+  var h: Int {
+    didSet(oldValue ^) {} // expected-error {{expected ')' after didSet parameter name}} expected-note {{to match this opening '('}}
+    // expected-error@-1 {{expected '{' to start didSet definition}}
   }
 
   // didSet/willSet with initializers.
