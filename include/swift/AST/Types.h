@@ -1952,19 +1952,19 @@ public:
       return ExtInfo((Bits & ~RepresentationMask)
                      | (unsigned)Rep << RepresentationShift);
     }
-    ExtInfo withIsNoReturn(bool IsNoReturn) const {
+    ExtInfo withIsNoReturn(bool IsNoReturn = true) const {
       if (IsNoReturn)
         return ExtInfo(Bits | NoReturnMask);
       else
         return ExtInfo(Bits & ~NoReturnMask);
     }
-    ExtInfo withIsAutoClosure(bool IsAutoClosure) const {
+    ExtInfo withIsAutoClosure(bool IsAutoClosure = true) const {
       if (IsAutoClosure)
         return ExtInfo(Bits | AutoClosureMask);
       else
         return ExtInfo(Bits & ~AutoClosureMask);
     }
-    ExtInfo withNoEscape(bool NoEscape) const {
+    ExtInfo withNoEscape(bool NoEscape = true) const {
       if (NoEscape)
         return ExtInfo(Bits | NoEscapeMask);
       else
