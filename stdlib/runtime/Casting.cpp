@@ -1933,31 +1933,27 @@ static void installCallbacksToInspectDylib() {
   });
 }
 
-const WitnessTable *swift::swift_conformsToProtocol(const Metadata *type,
-                                            const ProtocolDescriptor *protocol){
-  installCallbacksToInspectDylib();
-
-  auto origType = type;
-
-recur:
-  // See if we have a cached conformance.
-  // Try the specific type first.
-  pthread_rwlock_rdlock(&ConformanceCacheLock);
-
+/// Search the witness table in the ConformanceCache. \returns a pair of the
+/// WitnessTable pointer and a boolean value True if a definitive value is
+/// found. \returns false if the type or its superclasses were not found in
+/// the cache. 
+static 
+std::pair<const WitnessTable *, bool>
+searchInConformanceCache(const Metadata *type, 
+                         const ProtocolDescriptor *protocol){
+ 
 recur_inside_cache_lock:
   auto found = ConformanceCache.find({type, protocol});
   if (found != ConformanceCache.end()) {
     auto entry = found->second;
 
     if (entry.isSuccessful()) {
-      pthread_rwlock_unlock(&ConformanceCacheLock);
-      return entry.getWitnessTable();
+      return std::make_pair(entry.getWitnessTable(), true);
     }
 
     // If we got a cached negative response, check the generation number.
     if (entry.getFailureGeneration() == ProtocolConformanceGeneration) {
-      pthread_rwlock_unlock(&ConformanceCacheLock);
-      return nullptr;
+      return std::make_pair(nullptr, true);
     }
   }
 
@@ -1968,8 +1964,7 @@ recur_inside_cache_lock:
     if (found != ConformanceCache.end()) {
       auto entry = found->second;
       if (entry.isSuccessful()) {
-        pthread_rwlock_unlock(&ConformanceCacheLock);
-        return entry.getWitnessTable();
+        return std::make_pair(entry.getWitnessTable(), true);
       }
       // We don't try to cache negative responses for generic
       // patterns.
@@ -1984,6 +1979,25 @@ recur_inside_cache_lock:
         goto recur_inside_cache_lock;
       }
     }
+  }
+
+  return std::make_pair(nullptr, false);
+}
+
+const WitnessTable *swift::swift_conformsToProtocol(const Metadata *type,
+                                            const ProtocolDescriptor *protocol){
+  installCallbacksToInspectDylib();
+  auto origType = type;
+
+recur:
+  // See if we have a cached conformance.
+  // Try the specific type first.
+  pthread_rwlock_rdlock(&ConformanceCacheLock);
+
+  auto FoundConformance =  searchInConformanceCache(type, protocol);
+  if (FoundConformance.second) {
+    pthread_rwlock_unlock(&ConformanceCacheLock);
+    return FoundConformance.first;
   }
 
   unsigned failedGeneration = ConformanceCacheGeneration;
