@@ -27,9 +27,9 @@ func takesNoEscapeClosure(@__noescape fn : () -> Int) {
 
   takesNoEscapeClosure(fn)  // ok
 
-  doesEscape(fn)                 // expected-error {{invalid use of non-escaping function in escaping context '() -> Int'}}
-  takesGenericClosure(4, fn)     // ok
-  takesGenericClosure(4) { 4 }   // obviously ok.
+  doesEscape(fn)                   // expected-error {{invalid use of non-escaping function in escaping context '() -> Int'}}
+  takesGenericClosure(4, fn)       // ok
+  takesGenericClosure(4) { fn() }  // ok.
 }
 
 class SomeClass {
