@@ -153,33 +153,33 @@ func ==(x: TestBridgedKeyTy, y: TestBridgedKeyTy) -> Bool {
   return x.value == y.value
 }
 
-// FIXME: <rdar://problem/18853078> Implement Set<T> up and downcasting
-//if arg == "BridgedKeyIsNotNSCopyable1"
-//  .crashOutputMatches("unrecognized selector sent to instance") {
-//  // This Set is bridged in O(1).
-//  var s = Set([ TestObjCKeyTy(10) ])
-//  var nss: NSSet = s
-//  expectCrashLater()
-//  nss.mutableCopy()
-//}
-//
-//if arg == "Downcast1" {
-//  let s: Set<NSObject> = [ NSObject(), NSObject() ]
-//  let s2: Set<TestObjCKeyTy> = _setDownCast(s)
-//  expectCrashLater()
-//  let v1 = s2.member(TestObjCKeyTy(10))
-//  let v2 = s2.member(TestObjCKeyTy(20))
-//
-//  // This triggers failure.
-//  for m in s2 { }
-//}
-//
-//if arg == "Downcast2" {
-//  let s: Set<NSObject> = [ TestObjCKeyTy(10), NSObject() ]
-//  expectCrashLater()
-//  let s2: Set<TestBridgedKeyTy> = _setBridgeFromObjectiveC(s)
-//  let v1 = s2.member(TestBridgedKeyTy(10))
-//}
+SetTraps.test("BridgedKeyIsNotNSCopyable1") {
+  // This Set is bridged in O(1).
+  var s: Set<TestObjCKeyTy> = [ TestObjCKeyTy(10) ]
+  var nss: NSSet = s
+
+  // Unlike NSDictionary, NSSet does not require NSCopying from its element
+  // type.
+  expectEqual(10, (nss.mutableCopy().anyObject as TestObjCKeyTy).value)
+}
+
+SetTraps.test("Downcast1") {
+  let s: Set<NSObject> = [ NSObject(), NSObject() ]
+  let s2: Set<TestObjCKeyTy> = _setDownCast(s)
+  expectCrashLater()
+  let v1 = s2.contains(TestObjCKeyTy(10))
+  let v2 = s2.contains(TestObjCKeyTy(20))
+
+  // This triggers failure.
+  for m in s2 { }
+}
+
+SetTraps.test("Downcast2") {
+  let s: Set<NSObject> = [ TestObjCKeyTy(10), NSObject() ]
+  expectCrashLater()
+  let s2: Set<TestBridgedKeyTy> = _setBridgeFromObjectiveC(s)
+  let v1 = s2.contains(TestBridgedKeyTy(10))
+}
 
 runAllTests()
 
