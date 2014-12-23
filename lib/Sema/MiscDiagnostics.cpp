@@ -105,6 +105,7 @@ static void diagUnreachableCode(TypeChecker &TC, const Stmt *S) {
 ///   - Module values may only occur as part of qualification.
 ///   - Metatype names cannot generally be used as values: they need a "T.self"
 ///     qualification unless used in narrow case (e.g. T() for construction).
+///   - NoEscape parameters are only allowed to be called, not copied around.
 ///
 static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
   class DiagnoseWalker : public ASTWalker {
@@ -122,19 +123,30 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
       // Diagnose metatype values that don't appear as part of a property,
       // method, or constructor reference.
       
-      // See through implicit conversions.  We want to treat things like:
-      /// (apply_expr (metatype_cvt (typeexpr metatype)) (4)) as an apply.
+      // See through implicit conversions of the expression.  We want to be able
+      // to associate the parent of this expression with the ultimate callee.
       auto Base = E;
       while (auto Conv = dyn_cast<ImplicitConversionExpr>(Base))
         Base = Conv->getSubExpr();
-      if (auto *DRE = dyn_cast<DeclRefExpr>(Base))
+
+      if (auto *DRE = dyn_cast<DeclRefExpr>(Base)) {
+        // Verify metatype uses.
         if (isa<TypeDecl>(DRE->getDecl()))
           checkUseOfMetaTypeName(Base);
+
+        // Verify noescape parameter uses.
+        if (auto *PD = dyn_cast<ParamDecl>(DRE->getDecl()))
+          if (PD->getAttrs().hasAttribute<NoEscapeAttr>())
+            checkNoEscapeParameterUse(DRE);
+      }
       if (auto *MRE = dyn_cast<MemberRefExpr>(Base))
         if (isa<TypeDecl>(MRE->getMember().getDecl()))
           checkUseOfMetaTypeName(Base);
       if (isa<TypeExpr>(Base))
         checkUseOfMetaTypeName(Base);
+
+      if (auto *CE = dyn_cast<ClosureExpr>(E))
+        checkNoEscapeClosureCaptures(CE);
 
       return { true, E };
     }
@@ -150,6 +162,37 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
       }
 
       TC.diagnose(E->getStartLoc(), diag::value_of_module_type);
+    }
+
+    /// The DRE argument is a reference to a noescape parameter.  Verify that
+    /// its uses are ok.
+    void checkNoEscapeParameterUse(DeclRefExpr *DRE) {
+      // The only valid use of the noescape parameter is an immediate call.
+      // TODO: this could be generalized in various ways, for example to allow
+      // passing the decl off as an argument to a noescape call.  Start simple.
+      if (auto *ParentExpr = Parent.getAsExpr())
+        if (isa<CallExpr>(ParentExpr)) // param()
+          return;
+      TC.diagnose(DRE->getStartLoc(), diag::invalid_noescape_use,
+                  DRE->getDecl()->getName());
+    }
+
+    /// Check the specified closure to make sure it doesn't capture a noescape
+    /// value, or that it is itself noescape if so.
+    void checkNoEscapeClosureCaptures(ClosureExpr *CE) {
+      if (!CE->getType() || CE->getType()->is<ErrorType>())
+        return; // Ignore errorneous code.
+      auto Ty = CE->getType()->castTo<FunctionType>();
+
+      // If this closure is used in a noescape context, it can do anything.
+      if (Ty->isNoEscape()) return;
+
+      // Otherwise, check the capture list to make sure it isn't escaping
+      // something.
+      for (auto CapVD : CE->getCaptureInfo().getCaptures())
+        if (CapVD->getAttrs().hasAttribute<NoEscapeAttr>())
+          TC.diagnose(CE->getStartLoc(), diag::closure_noescape_use,
+                      CapVD->getName());
     }
 
     void checkUseOfMetaTypeName(Expr *E) {

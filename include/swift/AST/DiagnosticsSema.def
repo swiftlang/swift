@@ -1432,6 +1432,15 @@ NOTE(add_self_to_type,tce_sema,none,
 
 ERROR(type_of_metatype,tce_sema,none,
       "'.dynamicType' is not allowed after a type name", ())
+ERROR(invalid_noescape_use,tce_sema,none,
+      "@noescape argument %0 may only be called", (Identifier))
+
+ERROR(closure_noescape_use,tce_sema,none,
+      "closure use of @noescape argument %0 may allow it to escape",
+      (Identifier))
+ERROR(decl_closure_noescape_use,tce_sema,none,
+      "declaration closing over @noescape argument %0 may allow it to escape",
+      (Identifier))
 
 //------------------------------------------------------------------------------
 // Type Check Statements

@@ -614,15 +614,14 @@ namespace {
   class FindCapturedVars : public ASTWalker {
     TypeChecker &TC;
     llvm::SetVector<ValueDecl*> &captures;
-    DeclContext *CurExprAsDC;
+    DeclContext *CurDC;
     SourceLoc CaptureLoc;
     llvm::SmallPtrSet<ValueDecl *, 2> Diagnosed;
 
   public:
-    FindCapturedVars(TypeChecker &tc,
-                     llvm::SetVector<ValueDecl*> &captures,
+    FindCapturedVars(TypeChecker &tc, llvm::SetVector<ValueDecl*> &captures,
                      AnyFunctionRef AFR)
-        : TC(tc), captures(captures), CurExprAsDC(AFR.getAsDeclContext()) {
+        : TC(tc), captures(captures), CurDC(AFR.getAsDeclContext()) {
       if (auto AFD = AFR.getAbstractFunctionDecl())
         CaptureLoc = AFD->getLoc();
       else {
@@ -642,20 +641,26 @@ namespace {
       S->walk(*this);
     }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-        return walkToDeclRefExpr(DRE);
+    /// Add the specified capture to the closure's capture list, diagnosing it
+    /// if invalid.
+    void addCapture(ValueDecl *VD, SourceLoc Loc) {
+      captures.insert(VD);
 
-      // Don't recur into child closures. They should already have a capture
-      // list computed; we just propagate it, filtering out stuff that they
-      // capture from us.
-      if (auto *SubCE = dyn_cast<AbstractClosureExpr>(E)) {
-        for (auto D : SubCE->getCaptureInfo().getCaptures())
-          if (D->getDeclContext() != CurExprAsDC)
-            captures.insert(D);
-        return { false, E };
-      }
-      return { true, E };
+      // If VD is a noescape decl, then the closure we're computing this for
+      // must also be noescape.
+      if (!VD->getAttrs().hasAttribute<NoEscapeAttr>())
+        return;
+
+      // Closure expressions are processed as part of expression checking.
+      if (isa<AbstractClosureExpr>(CurDC))
+        return;
+
+      // Don't repeatedly diagnose the same thing.
+      if (!Diagnosed.insert(VD).second)
+        return;
+
+      // Otherwise, diagnose this as an invalid capture.
+      TC.diagnose(Loc, diag::decl_closure_noescape_use, VD->getName());
     }
 
     std::pair<bool, Expr *> walkToDeclRefExpr(DeclRefExpr *DRE) {
@@ -663,7 +668,7 @@ namespace {
 
       // Decl references that are within the Capture are local references, ones
       // from parent context are captures.
-      if (!CurExprAsDC->isChildContextOf(D->getDeclContext()))
+      if (!CurDC->isChildContextOf(D->getDeclContext()))
         return { false, DRE };
 
       // Only capture var decls at global scope.  Other things can be captured
@@ -688,7 +693,7 @@ namespace {
       if (auto FD = dyn_cast<FuncDecl>(D)) {
         // TODO: Local functions cannot be recursive, because SILGen
         // cannot handle it yet.
-        if (CurExprAsDC == FD) {
+        if (CurDC == FD) {
           TC.diagnose(DRE->getLoc(), 
                       diag::unsupported_recursive_local_function);
           return { false, DRE };
@@ -704,10 +709,25 @@ namespace {
           TC.LocalFunctionCaptures.push_back({FD, DRE->getLoc()});
       }
       
-      captures.insert(D);
+      addCapture(D, DRE->getStartLoc());
       return { false, DRE };
     }
 
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (auto *DRE = dyn_cast<DeclRefExpr>(E))
+        return walkToDeclRefExpr(DRE);
+
+      // Don't recurse into child closures. They should already have a capture
+      // list computed; we just propagate it, filtering out stuff that they
+      // capture from us.
+      if (auto *SubCE = dyn_cast<AbstractClosureExpr>(E)) {
+        for (auto D : SubCE->getCaptureInfo().getCaptures())
+          if (D->getDeclContext() != CurDC)
+            addCapture(D, E->getStartLoc());
+        return { false, E };
+      }
+      return { true, E };
+    }
   };
 }
 

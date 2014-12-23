@@ -2,17 +2,40 @@
 
 @__noescape var fn : () -> Int = { 4 }  // expected-error {{'__noescape' may only be used on 'parameter' declarations}}
 
-func takesClosure(@__noescape fn : () -> Int) {
-  takesClosure { 4 }  // ok
+func doesEscape(fn : () -> Int) {}
+
+func takesNoEscapeClosure(@__noescape fn : () -> Int) {
+  takesNoEscapeClosure { 4 }  // ok
+
+  fn()  // ok
+
+  var x = fn  // expected-error {{@noescape argument 'fn' may only be called}}
+
+  // This is ok, because the closure itself is noescape.
+  takesNoEscapeClosure { fn() }
+
+  // This is not ok, because it escapes the 'fn' closure.
+  doesEscape { fn() }   // expected-error {{closure use of @noescape argument 'fn' may allow it to escape}}
+
+  // This is not ok, because it escapes the 'fn' closure.
+  func nested_function() {
+    fn()   // expected-error {{declaration closing over @noescape argument 'fn' may allow it to escape}}
+  }
+
 }
 
 class SomeClass {
   final var x = 42
 
   func test() {
+    // This should require "self."
+    doesEscape { x }  // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}}
+
     // Since 'takesClosure' doesn't escape its closure, it doesn't require
     // "self." qualification of member references.
-    takesClosure { x }
+    takesNoEscapeClosure { x }
+
+
   }
 
 
