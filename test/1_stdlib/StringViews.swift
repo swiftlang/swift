@@ -17,10 +17,23 @@ import StdlibUnittest
 // CHECK: testing...
 println("testing...")
 
+let replacementUTF16: UTF16.CodeUnit = 0xFFFD
+let replacementUTF8: [UTF8.CodeUnit] = [0xEF, 0xBF, 0xBD]
+let replacementScalar = UnicodeScalar(replacementUTF16)
+let replacementCharacter = Character(replacementScalar)
+
 // This string contains a variety of non-ASCII characters, including
-// Unicode scalars that must be represented with a surrogate pair in UTF16
-// grapheme clusters composed of multiple
-let winter = "🏂☃❅❆❄︎⛄️❄️"
+// Unicode scalars that must be represented with a surrogate pair in
+// UTF16, grapheme clusters composed of multiple Unicode scalars, and
+// invalid UTF16 that should be replaced with replacement characters.
+let winter = String("🏂☃❅❆❄︎⛄️❄️"._core + [0xD83C, 0x0020, 0xDF67, 0xD83C])
+let winterInvalidUTF8: [UTF8.CodeUnit] = replacementUTF8 + ([0x20] as [UTF8.CodeUnit]) + replacementUTF8 + replacementUTF8
+let winterUTF8: [UTF8.CodeUnit] = [
+  0xf0, 0x9f, 0x8f, 0x82, 0xe2, 0x98, 0x83, 0xe2, 0x9d, 0x85, 0xe2,
+  0x9d, 0x86, 0xe2, 0x9d, 0x84, 0xef, 0xb8, 0x8e, 0xe2, 0x9b, 0x84,
+  0xef, 0xb8, 0x8f, 0xe2, 0x9d, 0x84, 0xef, 0xb8, 0x8f
+] + winterInvalidUTF8
+
 let summer = "school's out!"
 let summerBytes: [UInt8] = [
   0x73, 0x63, 0x68, 0x6f, 0x6f, 0x6c, 0x27, 0x73, 0x20, 0x6f, 0x75, 0x74, 0x21]
@@ -42,16 +55,16 @@ var tests = TestSuite("StringViews")
 
 tests.test("decoding") {
   expectEqualSequence(
-    [0xf0, 0x9f, 0x8f, 0x82, 0xe2, 0x98, 0x83, 0xe2, 0x9d, 0x85, 0xe2,
-    0x9d, 0x86, 0xe2, 0x9d, 0x84, 0xef, 0xb8, 0x8e, 0xe2, 0x9b, 0x84,
-    0xef, 0xb8, 0x8f, 0xe2, 0x9d, 0x84, 0xef, 0xb8, 0x8f],
+    winterUTF8,
     winter.utf8
   )
   
   expectEqualSequence(
     [0xd83c, 0xdfc2, 0x2603, 0x2745, 0x2746, 0x2744, 0xfe0e, 0x26c4,
-      0xfe0f, 0x2744, 0xfe0f],
-      winter.utf16
+      0xfe0f, 0x2744, 0xfe0f,
+      replacementUTF16, 0x0020, replacementUTF16, replacementUTF16
+    ],
+    winter.utf16
   )
 
   expectEqualSequence(
@@ -71,20 +84,25 @@ tests.test("decoding") {
 
 //===--- To UTF8 ----------------------------------------------------------===//
 tests.test("index-mapping/character-to-utf8") {
-  // the first four utf8 code units at the start of each grapheme
+  // the first three utf8 code units at the start of each grapheme
   // cluster
   expectEqualSequence(
     [
-      [0xf0, 0x9f, 0x8f, 0x82],
-      [0xe2, 0x98, 0x83, 0xe2],
-      [0xe2, 0x9d, 0x85, 0xe2],
-      [0xe2, 0x9d, 0x86, 0xe2],
-      [0xe2, 0x9d, 0x84, 0xef],
-      [0xe2, 0x9b, 0x84, 0xef],
-      [0xe2, 0x9d, 0x84, 0xef]] as [[UTF8.CodeUnit]],
+      [0xf0, 0x9f, 0x8f],
+      [0xe2, 0x98, 0x83],
+      [0xe2, 0x9d, 0x85],
+      [0xe2, 0x9d, 0x86],
+      [0xe2, 0x9d, 0x84],
+      [0xe2, 0x9b, 0x84],
+      [0xe2, 0x9d, 0x84],
+      replacementUTF8,
+      [0x20] + replacementUTF8[0..<2],
+      replacementUTF8,
+      replacementUTF8
+    ] as [[UTF8.CodeUnit]],
 
     indices(winter).map { 
-      i in (0..<4).map {
+      i in (0..<3).map {
         winter.utf8[advance(i.samePositionIn(winter.utf8), $0)]
       }
     }, ==)
@@ -113,7 +131,11 @@ tests.test("index-mapping/unicode-scalar-to-utf8") {
       [0xe2, 0x9b, 0x84],
       [0xef, 0xb8, 0x8f],
       [0xe2, 0x9d, 0x84],
-      [0xef, 0xb8, 0x8f]
+      [0xef, 0xb8, 0x8f],
+      replacementUTF8,
+      [0x20] + replacementUTF8[0..<2],
+      replacementUTF8,
+      replacementUTF8
     ] as [[UTF8.CodeUnit]],
     
     indices(winter.unicodeScalars).map {
@@ -153,7 +175,11 @@ tests.test("index-mapping/utf16-to-utf8") {
       [0xe2, 0x9b, 0x84],
       [0xef, 0xb8, 0x8f],
       [0xe2, 0x9d, 0x84],
-      [0xef, 0xb8, 0x8f]
+      [0xef, 0xb8, 0x8f],
+      replacementUTF8,
+      [0x20] + replacementUTF8[0..<2],
+      replacementUTF8,
+      replacementUTF8
     ] as [[UTF8.CodeUnit]],
     indices(winter.utf16).map {
       i16 in i16.samePositionIn(winter.utf8).map {
@@ -271,7 +297,8 @@ tests.test("index-mapping/character-to-utf16") {
       0x2746,
       0x2744, // 0xfe0e,
       0x26c4, // 0xfe0f,
-      0x2744, // 0xfe0f
+      0x2744, // 0xfe0f,
+      replacementUTF16, 0x20, replacementUTF16, replacementUTF16
     ] as [UTF16.CodeUnit],
     
     indices(winter).map {
@@ -289,8 +316,6 @@ tests.test("index-mapping/character-to-utf16") {
 }
 
 tests.test("index-mapping/unicode-scalar-to-utf16") {
-  // the first three utf16 code units at the start of each unicode
-  // scalar
   expectEqualSequence(
     [
       0xd83c, // 0xdfc2,
@@ -299,7 +324,8 @@ tests.test("index-mapping/unicode-scalar-to-utf16") {
       0x2746,
       0x2744, 0xfe0e,
       0x26c4, 0xfe0f,
-      0x2744, 0xfe0f
+      0x2744, 0xfe0f,
+      replacementUTF16, 0x20, replacementUTF16, replacementUTF16
     ] as [UTF16.CodeUnit],
     
     indices(winter.unicodeScalars).map {
@@ -334,7 +360,11 @@ tests.test("index-mapping/utf8-to-utf16") {
       0x26c4, nil, nil,
       0xfe0f, nil, nil,
       0x2744, nil, nil,
-      0xfe0f, nil, nil
+      0xfe0f, nil, nil,
+      replacementUTF16, nil, nil,
+      0x20,
+      replacementUTF16, nil, nil,
+      replacementUTF16, nil, nil
     ] as [UTF16.CodeUnit?],
 
     indices(winter.utf8).map {
@@ -369,6 +399,7 @@ tests.test("index-mapping/character-to-unicode-scalar") {
     UnicodeScalar(0x2744), // 0xfe0e,
     UnicodeScalar(0x26c4), // 0xfe0f,
     UnicodeScalar(0x2744), // 0xfe0f
+    replacementScalar, UnicodeScalar(0x20), replacementScalar, replacementScalar
   ]
   
   expectEqualSequence(
@@ -397,7 +428,11 @@ tests.test("index-mapping/utf8-to-unicode-scalar") {
     UnicodeScalar(0x2746), nil, nil,
     UnicodeScalar(0x2744), nil, nil, UnicodeScalar(0xfe0e), nil, nil,
     UnicodeScalar(0x26c4), nil, nil, UnicodeScalar(0xfe0f), nil, nil,
-    UnicodeScalar(0x2744), nil, nil, UnicodeScalar(0xfe0f), nil, nil
+    UnicodeScalar(0x2744), nil, nil, UnicodeScalar(0xfe0f), nil, nil,
+    replacementScalar, nil, nil,
+    UnicodeScalar(0x20),
+    replacementScalar, nil, nil,
+    replacementScalar, nil, nil
   ]
   
   expectEqualSequence(
@@ -437,7 +472,8 @@ tests.test("index-mapping/utf16-to-unicode-scalar") {
     UnicodeScalar(0x2746), 
     UnicodeScalar(0x2744), UnicodeScalar(0xfe0e),
     UnicodeScalar(0x26c4), UnicodeScalar(0xfe0f),
-    UnicodeScalar(0x2744), UnicodeScalar(0xfe0f)
+    UnicodeScalar(0x2744), UnicodeScalar(0xfe0f),
+    replacementScalar, UnicodeScalar(0x20), replacementScalar, replacementScalar
   ]
   
   expectEqualSequence(
@@ -472,7 +508,8 @@ tests.test("index-mapping/utf16-to-unicode-scalar") {
 //===--- To Character -------------------------------------------------===//
 tests.test("index-mapping/unicode-scalar-to-character") {
   let winterUnicodeScalarCharacters: [Character?] = [
-    "🏂", "☃", "❅", "❆", "❄︎", nil, "⛄️", nil, "❄️", nil
+    "🏂", "☃", "❅", "❆", "❄︎", nil, "⛄️", nil, "❄️", nil,
+    replacementCharacter, "\u{20}", replacementCharacter, replacementCharacter
   ]
   
   expectEqualSequence(
@@ -506,7 +543,11 @@ tests.test("index-mapping/utf8-to-character") {
     "❆", nil, nil,
     "❄︎", nil, nil, nil, nil, nil,
     "⛄️", nil, nil, nil, nil, nil,
-    "❄️", nil, nil, nil, nil, nil
+    "❄️", nil, nil, nil, nil, nil,
+    replacementCharacter, nil, nil,
+    "\u{20}",
+    replacementCharacter, nil, nil,
+    replacementCharacter, nil, nil,
   ]
 
   expectEqualSequence(
@@ -536,7 +577,8 @@ tests.test("index-mapping/utf8-to-character") {
 
 tests.test("index-mapping/utf16-to-character") {
   let winterUtf16Characters: [Character?] = [
-    "🏂", nil, "☃", "❅", "❆", "❄︎", nil, "⛄️", nil, "❄️", nil
+    "🏂", nil, "☃", "❅", "❆", "❄︎", nil, "⛄️", nil, "❄️", nil,
+    replacementCharacter, "\u{20}", replacementCharacter, replacementCharacter
   ]
   
   expectEqualSequence(
