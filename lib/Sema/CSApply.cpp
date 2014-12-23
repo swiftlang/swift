@@ -4013,6 +4013,27 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
   return shuffle;
 }
 
+/// If the expression is an explicit closure expression (potentially wrapped in
+/// IdentityExprs), change the type of the closure and identities to the
+/// specified type and return true.  Otherwise, return false with no effect.
+static bool applyTypeToClosureExpr(Expr *expr, Type toType) {
+  // Look through identity expressions, like parens.
+  if (auto IE = dyn_cast<IdentityExpr>(expr)) {
+    if (!applyTypeToClosureExpr(IE->getSubExpr(), toType)) return false;
+    IE->setType(toType);
+    return true;
+  }
+
+  // If we found an explicit ClosureExpr, update its type.
+  if (auto CE = dyn_cast<ClosureExpr>(expr)) {
+    CE->setType(toType);
+    return true;
+  }
+  // Otherwise fail.
+  return false;
+}
+
+
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  ConstraintLocatorBuilder locator) {
   auto &tc = cs.getTypeChecker();
@@ -4370,8 +4391,24 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     // Coercion from one function type to another.
-    auto fromFunc = fromType->getAs<FunctionType>();
-    if (fromFunc) {
+    if (auto fromFunc = fromType->getAs<FunctionType>()) {
+      // If the input and output types match, then the difference is a change
+      // in the ExtInfo bits.
+      if (fromFunc->getInput()->isEqual(toFunc->getInput()) &&
+          fromFunc->getResult()->isEqual(toFunc->getResult())) {
+        // If the only difference is in the noreturn or noescape bits, try to
+        // propagate them into the expression.
+        auto fromEI = fromFunc->getExtInfo(), toEI = toFunc->getExtInfo();
+        if (fromEI.withIsNoReturn(false).withNoEscape(false) ==
+            toEI.withIsNoReturn(false).withNoEscape(false) &&
+            // Adding - not stripping off - the bits.
+            (!fromEI.isNoReturn() || toEI.isNoReturn()) &&
+            (!fromEI.isNoEscape() || toEI.isNoEscape())) {
+          if (applyTypeToClosureExpr(expr, toType))
+            return expr;
+        }
+      }
+
       return new (tc.Context) FunctionConversionExpr(expr, toType);
     }
   }
