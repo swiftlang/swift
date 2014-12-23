@@ -29,3 +29,10 @@ func unnamed() {
   takeIntToInt({_ in return 1})
   takeIntIntToInt({_, _ in return 1})
 }
+
+// Regression tests.
+
+var nestedClosuresWithBrokenInference = { f: Int in {} }
+    // expected-error@-1 {{unable to infer closure type in the current context}}
+    // expected-error@-2 {{consecutive statements on a line must be separated by ';'}}
+    // expected-error@-3 {{expected expression}}
