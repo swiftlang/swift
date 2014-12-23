@@ -4632,9 +4632,9 @@ public:
         TC.diagnose(Base, diag::overridden_here);
       }
     }
-    void visitNoCaptureAttr(NoCaptureAttr *attr) {
-      if (Base->getAttrs().hasAttribute<NoCaptureAttr>() !=
-          Override->getAttrs().hasAttribute<NoCaptureAttr>()) {
+    void visitNoEscapeAttr(NoEscapeAttr *attr) {
+      if (Base->getAttrs().hasAttribute<NoEscapeAttr>() !=
+          Override->getAttrs().hasAttribute<NoEscapeAttr>()) {
         TC.diagnose(Override, diag::inconsistent_attribute_override,
                     attr->getAttrName());
         TC.diagnose(Base, diag::overridden_here);

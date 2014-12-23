@@ -1,8 +1,8 @@
 // RUN: %swift -parse %s -verify
 
-@__nocapture var fn : () -> Int = { 4 }  // expected-error {{'__nocapture' may only be used on 'parameter' declarations}}
+@__noescape var fn : () -> Int = { 4 }  // expected-error {{'__noescape' may only be used on 'parameter' declarations}}
 
-func f(@__nocapture fn : () -> Int) {
+func f(@__noescape fn : () -> Int) {
   f { 4 }  // ok
 }
 

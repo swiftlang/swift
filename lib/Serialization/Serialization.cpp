@@ -2381,7 +2381,7 @@ void Serializer::writeType(Type ty) {
            fnTy->getRepresentation() == AnyFunctionType::Representation::Thin,
            fnTy->isNoReturn(),
            fnTy->getRepresentation() == AnyFunctionType::Representation::Block,
-                                   fnTy->isNoCapture());
+                                   fnTy->isNoEscape());
     break;
   }
 

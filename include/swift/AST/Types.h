@@ -1871,14 +1871,14 @@ public:
     // you'll need to adjust both the Bits field below and
     // BaseType::AnyFunctionTypeBits.
 
-    //   |  CC  |representation|isAutoClosure|noReturn|noCapture|
-    //   |0 .. 3|    4 .. 5    |      6      |   7    |    8    |
+    //   |  CC  |representation|isAutoClosure|noReturn|NoEscape|
+    //   |0 .. 3|    4 .. 5    |      6      |   7    |    8   |
     //
     enum : uint16_t { CallConvMask       = 0x00F };
     enum : uint16_t { RepresentationMask = 0x030, RepresentationShift = 4 };
     enum : uint16_t { AutoClosureMask    = 0x040 };
     enum : uint16_t { NoReturnMask       = 0x080 };
-    enum : uint16_t { NoCaptureMask      = 0x100 };
+    enum : uint16_t { NoEscapeMask      = 0x100 };
 
     uint16_t Bits;
 
@@ -1902,10 +1902,10 @@ public:
 
     // Constructor with no defaults.
     ExtInfo(AbstractCC CC, Representation Rep, bool IsNoReturn,
-            bool IsAutoClosure, bool IsNoCapture)
+            bool IsAutoClosure, bool IsNoEscape)
       : ExtInfo(CC, Rep, IsNoReturn) {
       Bits |= (IsAutoClosure ? AutoClosureMask : 0);
-      Bits |= (IsNoCapture ? NoCaptureMask : 0);
+      Bits |= (IsNoEscape ? NoEscapeMask : 0);
     }
 
     explicit ExtInfo(AbstractCC CC) : Bits(0) {
@@ -1915,7 +1915,7 @@ public:
     AbstractCC getCC() const { return AbstractCC(Bits & CallConvMask); }
     bool isNoReturn() const { return Bits & NoReturnMask; }
     bool isAutoClosure() const { return Bits & AutoClosureMask; }
-    bool isNoCapture() const { return Bits & NoCaptureMask; }
+    bool isNoEscape() const { return Bits & NoEscapeMask; }
     Representation getRepresentation() const {
       return Representation((Bits & RepresentationMask) >> RepresentationShift);
     }
@@ -1964,11 +1964,11 @@ public:
       else
         return ExtInfo(Bits & ~AutoClosureMask);
     }
-    ExtInfo withNoCapture(bool NoCapture) const {
-      if (NoCapture)
-        return ExtInfo(Bits | NoCaptureMask);
+    ExtInfo withNoEscape(bool NoEscape) const {
+      if (NoEscape)
+        return ExtInfo(Bits | NoEscapeMask);
       else
-        return ExtInfo(Bits & ~NoCaptureMask);
+        return ExtInfo(Bits & ~NoEscapeMask);
     }
 
     uint16_t getFuncAttrKey() const {
@@ -2022,8 +2022,8 @@ public:
 
   /// \brief True if the parameter declaration it is attached to is guaranteed
   /// to not persist the closure for longer than the duration of the call.
-  bool isNoCapture() const {
-    return getExtInfo().isNoCapture();
+  bool isNoEscape() const {
+    return getExtInfo().isNoEscape();
   }
 
 
@@ -2610,8 +2610,8 @@ public:
   bool isNoReturn() const {
     return getExtInfo().isNoReturn();
   }
-  bool isNoCapture() const {
-    return getExtInfo().isNoCapture();
+  bool isNoEscape() const {
+    return getExtInfo().isNoEscape();
   }
 
   CanSILFunctionType substGenericArgs(SILModule &silModule,

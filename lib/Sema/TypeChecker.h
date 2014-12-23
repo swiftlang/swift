@@ -560,7 +560,7 @@ public:
   void checkTypeModifyingDeclAttributes(VarDecl *var);
 
   void checkAutoClosureAttr(VarDecl *D, AutoClosureAttr *attr);
-  void checkNoCaptureAttr(ParamDecl *D, NoCaptureAttr *attr);
+  void checkNoEscapeAttr(ParamDecl *D, NoEscapeAttr *attr);
   void checkOwnershipAttr(VarDecl *D, OwnershipAttr *attr);
 
   void computeAccessibility(ValueDecl *D);

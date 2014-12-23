@@ -77,8 +77,8 @@ public:
   void visitAutoClosureAttr(AutoClosureAttr *attr) {
     TC.checkAutoClosureAttr(cast<VarDecl>(D), attr);
   }
-  void visitNoCaptureAttr(NoCaptureAttr *attr) {
-    TC.checkNoCaptureAttr(cast<ParamDecl>(D), attr);
+  void visitNoEscapeAttr(NoEscapeAttr *attr) {
+    TC.checkNoEscapeAttr(cast<ParamDecl>(D), attr);
   }
 
   void visitTransparentAttr(TransparentAttr *attr);
@@ -549,7 +549,7 @@ public:
     IGNORED_ATTR(Lazy)      // checked early.
     IGNORED_ATTR(LLDBDebuggerFunction)
     IGNORED_ATTR(Mutating)
-    IGNORED_ATTR(NoCapture)
+    IGNORED_ATTR(NoEscape)
     IGNORED_ATTR(NonMutating)
     IGNORED_ATTR(NoReturn)
     IGNORED_ATTR(NSManaged) // checked early.
@@ -1120,9 +1120,9 @@ void TypeChecker::checkTypeModifyingDeclAttributes(VarDecl *var) {
     checkOwnershipAttr(var, attr);
   if (auto *attr = var->getAttrs().getAttribute<AutoClosureAttr>())
     checkAutoClosureAttr(var, attr);
-  if (auto *attr = var->getAttrs().getAttribute<NoCaptureAttr>()) {
+  if (auto *attr = var->getAttrs().getAttribute<NoEscapeAttr>()) {
     if (auto *pd = dyn_cast<ParamDecl>(var))
-      checkNoCaptureAttr(pd, attr);
+      checkNoEscapeAttr(pd, attr);
     else {
       AttributeEarlyChecker Checker(*this, var);
       Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_only_one_decl_kind,
@@ -1159,22 +1159,22 @@ void TypeChecker::checkAutoClosureAttr(VarDecl *VD, AutoClosureAttr *attr) {
                                     FTy->getExtInfo().withIsAutoClosure(true)));
 }
 
-void TypeChecker::checkNoCaptureAttr(ParamDecl *PD, NoCaptureAttr *attr) {
+void TypeChecker::checkNoEscapeAttr(ParamDecl *PD, NoEscapeAttr *attr) {
   // The paramdecl should have function type.
   auto *FTy = PD->getType()->getAs<FunctionType>();
   if (FTy == 0) {
-    diagnose(attr->getLocation(), diag::nocapture_function_type);
+    diagnose(attr->getLocation(), diag::noescape_function_type);
     attr->setInvalid();
     return;
   }
 
   // Just stop if we've already applied this attribute.
-  if (FTy->isNoCapture())
+  if (FTy->isNoEscape())
     return;
 
   // Change the type to include the autoclosure bit.
   PD->overwriteType(FunctionType::get(FTy->getInput(), FTy->getResult(),
-                                      FTy->getExtInfo().withNoCapture(true)));
+                                      FTy->getExtInfo().withNoEscape(true)));
 }
 
 

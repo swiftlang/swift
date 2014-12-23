@@ -1066,8 +1066,8 @@ ERROR(autoclosure_function_type,attribute_parsing,none,
       ())
 ERROR(autoclosure_function_input_nonunit,attribute_parsing,none,
       "autoclosure argument type must be '()'", ())
-ERROR(nocapture_function_type,attribute_parsing,none,
-      "'nocapture' attribute may only be applied to parameters of function type",
+ERROR(noescape_function_type,attribute_parsing,none,
+      "'noescape' attribute may only be applied to parameters of function type",
       ())
 
 
