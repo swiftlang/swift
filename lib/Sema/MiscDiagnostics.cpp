@@ -101,9 +101,14 @@ static void diagUnreachableCode(TypeChecker &TC, const Stmt *S) {
 }
 
 
-/// Diagnose use of module or metatype values outside of dot expressions.
-static void diagModuleOrMetatypeValue(TypeChecker &TC, const Expr *E) {
+/// Diagnose syntactic restrictions of expressions:
+///   - Module values may only occur as part of qualification.
+///   - Metatype names cannot generally be used as values: they need a "T.self"
+///     qualification unless used in narrow case (e.g. T() for construction).
+///
+static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
   class DiagnoseWalker : public ASTWalker {
+    SmallPtrSet<Expr*, 4> AlreadyDiagnosedMetatypes;
   public:
     TypeChecker &TC;
 
@@ -111,178 +116,80 @@ static void diagModuleOrMetatypeValue(TypeChecker &TC, const Expr *E) {
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       // Diagnose module values that don't appear as part of a qualification.
-      if (auto *ME = dyn_cast<ModuleExpr>(E)) {
-        bool Diagnose = true;
-        if (auto *ParentExpr = Parent.getAsExpr()) {
-          // Allow module values as a part of:
-          // - ignored base expressions;
-          // - expressions that failed to type check.
-          if (isa<DotSyntaxBaseIgnoredExpr>(ParentExpr) ||
-              isa<UnresolvedDotExpr>(ParentExpr))
-            Diagnose = false;
-        }
-        if (Diagnose)
-          TC.diagnose(ME->getStartLoc(), diag::value_of_module_type);
-        return { true, E };
-      }
-      
+      if (auto *ME = dyn_cast<ModuleExpr>(E))
+        checkUseOfModuleExpr(ME);
+
       // Diagnose metatype values that don't appear as part of a property,
       // method, or constructor reference.
       
-      // See through implicit conversions.
+      // See through implicit conversions.  We want to treat things like:
+      /// (apply_expr (metatype_cvt (typeexpr metatype)) (4)) as an apply.
       auto Base = E;
       while (auto Conv = dyn_cast<ImplicitConversionExpr>(Base))
         Base = Conv->getSubExpr();
-      
-      auto *DRE = dyn_cast<DeclRefExpr>(Base);
-      auto *MRE = dyn_cast<MemberRefExpr>(Base);
-      if ((DRE && isa<TypeDecl>(DRE->getDecl())) ||
-          (MRE && isa<TypeDecl>(MRE->getMember().getDecl())) ||
-          isa<TypeExpr>(Base)) {
-        // Allow references to types as a part of:
-        // - member references T.foo, T.Type, T.self, etc. (but *not* T.type)
-        // - constructor calls T()
-        
-        enum class Diagnostic {
-          None, // OK
-          UnqualifiedMetatypeValue, // type named without being accessed
-          TypeOfMetatypeValue, // .type applied to a type
-        } Diagnose;
-        
-        if (auto *ParentExpr = Parent.getAsExpr()) {
-          switch (ParentExpr->getKind()) {
-          case ExprKind::Error:
-          case ExprKind::Call:
-          case ExprKind::MemberRef:
-          case ExprKind::DotSelf:
-          case ExprKind::DotSyntaxCall:
-          case ExprKind::ConstructorRefCall:
-          case ExprKind::UnresolvedMember:
-          case ExprKind::UnresolvedDot:
-          case ExprKind::UnresolvedSelector:
-          case ExprKind::UnresolvedSpecialize:
-          case ExprKind::DotSyntaxBaseIgnored:
-            Diagnose = Diagnostic::None;
-            break;
-              
-          case ExprKind::DynamicType:
-            Diagnose = Diagnostic::TypeOfMetatypeValue;
-            break;
-              
-          case ExprKind::NilLiteral:
-          case ExprKind::IntegerLiteral:
-          case ExprKind::FloatLiteral:
-          case ExprKind::BooleanLiteral:
-          case ExprKind::CharacterLiteral:
-          case ExprKind::StringLiteral:
-          case ExprKind::InterpolatedStringLiteral:
-          case ExprKind::MagicIdentifierLiteral:
-          case ExprKind::DiscardAssignment:
-          case ExprKind::DeclRef:
-          case ExprKind::SuperRef:
-          case ExprKind::Type:
-          case ExprKind::OtherConstructorDeclRef:
-          case ExprKind::UnresolvedConstructor:
-          case ExprKind::OverloadedDeclRef:
-          case ExprKind::OverloadedMemberRef:
-          case ExprKind::UnresolvedDeclRef:
-          case ExprKind::DynamicMemberRef:
-          case ExprKind::DynamicSubscript:
-          case ExprKind::Sequence:
-          case ExprKind::Paren:
-          case ExprKind::Tuple:
-          case ExprKind::Array:
-          case ExprKind::Dictionary:
-          case ExprKind::Subscript:
-          case ExprKind::TupleElement:
-          case ExprKind::CaptureList:
-          case ExprKind::Closure:
-          case ExprKind::AutoClosure:
-          case ExprKind::Module:
-          case ExprKind::InOut:
-          case ExprKind::RebindSelfInConstructor:
-          case ExprKind::OpaqueValue:
-          case ExprKind::BindOptional:
-          case ExprKind::OptionalEvaluation:
-          case ExprKind::ClassMetatypeToObject:
-          case ExprKind::ProtocolMetatypeToObject:
-          case ExprKind::ExistentialMetatypeToObject:
-          case ExprKind::ForceValue:
-          case ExprKind::OpenExistential:
-          case ExprKind::PrefixUnary:
-          case ExprKind::PostfixUnary:
-          case ExprKind::Binary:
-          case ExprKind::Load:
-          case ExprKind::TupleShuffle:
-          case ExprKind::FunctionConversion:
-          case ExprKind::CovariantFunctionConversion:
-          case ExprKind::CovariantReturnConversion:
-          case ExprKind::MetatypeConversion:
-          case ExprKind::CollectionUpcastConversion:
-          case ExprKind::Erasure:
-          case ExprKind::MetatypeErasure:
-          case ExprKind::DerivedToBase:
-          case ExprKind::ArchetypeToSuper:
-          case ExprKind::ScalarToTuple:
-          case ExprKind::InjectIntoOptional:
-          case ExprKind::UnavailableToOptional:
-          case ExprKind::LValueToPointer:
-          case ExprKind::UnresolvedCheckedCast:
-          case ExprKind::ForcedCheckedCast:
-          case ExprKind::ConditionalCheckedCast:
-          case ExprKind::Isa:
-          case ExprKind::Coerce:
-          case ExprKind::If:
-          case ExprKind::Assign:
-          case ExprKind::DefaultValue:
-          case ExprKind::UnresolvedPattern:
-          case ExprKind::InOutToPointer:
-          case ExprKind::StringToPointer:
-          case ExprKind::ArrayToPointer:
-          case ExprKind::PointerToPointer:
-          case ExprKind::ForeignObjectConversion:
-          case ExprKind::AvailabilityQuery:
-            Diagnose = Diagnostic::UnqualifiedMetatypeValue;
-            break;
-          }
-        } else {
-          Diagnose = Diagnostic::UnqualifiedMetatypeValue;
-        }
-        
-        switch (Diagnose) {
-        case Diagnostic::None:
-          break;
-            
-        case Diagnostic::UnqualifiedMetatypeValue: {
-          TC.diagnose(E->getStartLoc(), diag::value_of_metatype_type);
-          // Add fixits to insert '()' or '.self'.
-          auto endLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
-                                                   E->getEndLoc());
-          TC.diagnose(endLoc, diag::add_parens_to_type)
-            .fixItInsert(endLoc, "()");
-          TC.diagnose(endLoc, diag::add_self_to_type)
-            .fixItInsert(endLoc, ".self");
-          break;
-        }
-            
-        case Diagnostic::TypeOfMetatypeValue: {
-          TC.diagnose(E->getStartLoc(), diag::type_of_metatype);
-          // Add a fixit to replace '.type' with '.self'.
-          auto metaExpr = cast<DynamicTypeExpr>(Parent.getAsExpr());
-          auto endLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
-                                                   metaExpr->getMetatypeLoc());
-          
-          TC.diagnose(metaExpr->getMetatypeLoc(),
-                      diag::add_self_to_type)
-            .fixItReplaceChars(metaExpr->getMetatypeLoc(),
-                               endLoc, "self");
-          break;
-        }
-        }
-        // We don't need to visit the children of a type member reference.
-        return { false, E };
-      }
+      if (auto *DRE = dyn_cast<DeclRefExpr>(Base))
+        if (isa<TypeDecl>(DRE->getDecl()))
+          checkUseOfMetaTypeName(Base);
+      if (auto *MRE = dyn_cast<MemberRefExpr>(Base))
+        if (isa<TypeDecl>(MRE->getMember().getDecl()))
+          checkUseOfMetaTypeName(Base);
+      if (isa<TypeExpr>(Base))
+        checkUseOfMetaTypeName(Base);
+
       return { true, E };
+    }
+
+    void checkUseOfModuleExpr(ModuleExpr *E) {
+      // Allow module values as a part of:
+      // - ignored base expressions;
+      // - expressions that failed to type check.
+      if (auto *ParentExpr = Parent.getAsExpr()) {
+        if (isa<DotSyntaxBaseIgnoredExpr>(ParentExpr) ||
+            isa<UnresolvedDotExpr>(ParentExpr))
+          return;
+      }
+
+      TC.diagnose(E->getStartLoc(), diag::value_of_module_type);
+    }
+
+    void checkUseOfMetaTypeName(Expr *E) {
+      // If we've already checked this at a higher level, we're done.
+      if (!AlreadyDiagnosedMetatypes.insert(E).second)
+        return;
+
+      // Allow references to types as a part of:
+      // - member references T.foo, T.Type, T.self, etc. (but *not* T.type)
+      // - constructor calls T()
+      if (auto *ParentExpr = Parent.getAsExpr()) {
+        // Reject use of "T.dynamicType", it should be written as "T.self".
+        if (auto metaExpr = dyn_cast<DynamicTypeExpr>(ParentExpr)) {
+          // Add a fixit to replace '.dynamicType' with '.self'.
+          TC.diagnose(E->getStartLoc(), diag::type_of_metatype)
+            .fixItReplace(metaExpr->getMetatypeLoc(), "self");
+          return;
+        }
+
+        // This is the white-list of accepted syntactic forms.
+        if (isa<ErrorExpr>(ParentExpr) ||
+            isa<DotSelfExpr>(ParentExpr) ||               // T.self
+            isa<CallExpr>(ParentExpr) ||                  // T()
+            isa<MemberRefExpr>(ParentExpr) ||             // T.foo
+            isa<UnresolvedMemberExpr>(ParentExpr) ||
+            isa<SelfApplyExpr>(ParentExpr) ||             // T.foo()  T()
+            isa<UnresolvedDotExpr>(ParentExpr) ||
+            isa<DotSyntaxBaseIgnoredExpr>(ParentExpr) ||
+            isa<UnresolvedSelectorExpr>(ParentExpr) ||
+            isa<UnresolvedSpecializeExpr>(ParentExpr)) {
+          return;
+        }
+      }
+
+      TC.diagnose(E->getStartLoc(), diag::value_of_metatype_type);
+      // Add fixits to insert '()' or '.self'.
+      auto endLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                               E->getEndLoc());
+      TC.diagnose(endLoc, diag::add_parens_to_type).fixItInsert(endLoc, "()");
+      TC.diagnose(endLoc, diag::add_self_to_type).fixItInsert(endLoc, ".self");
     }
   };
 
@@ -574,7 +481,7 @@ static void diagAvailability(TypeChecker &TC, const Expr *E,
 void swift::performExprDiagnostics(TypeChecker &TC, const Expr *E,
                                    const DeclContext *DC) {
   diagSelfAssignment(TC, E);
-  diagModuleOrMetatypeValue(TC, E);
+  diagSyntacticUseRestrictions(TC, E);
   diagRecursivePropertyAccess(TC, E, DC);
   diagnoseImplicitSelfUseInClosure(TC, E);
   diagAvailability(TC, E, DC);
