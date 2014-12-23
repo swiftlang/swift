@@ -31,8 +31,8 @@ public struct ObjectIdentifier : Hashable, Comparable {
 
   /// Convert to a `UInt` that captures the full value of `self`.
   ///
-  /// Axiom: `a.uintValue() == b.uintValue()` iff `a == b`
-  public func uintValue() -> UInt {
+  /// Axiom: `a.uintValue == b.uintValue` iff `a == b`
+  public var uintValue: UInt {
     return UInt(Builtin.ptrtoint_Word(value))
   }
 
@@ -60,7 +60,7 @@ public struct ObjectIdentifier : Hashable, Comparable {
 }
 
 public func <(lhs: ObjectIdentifier, rhs: ObjectIdentifier) -> Bool {
-  return lhs.uintValue() < rhs.uintValue()
+  return lhs.uintValue < rhs.uintValue
 }
 
 public func ==(x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
