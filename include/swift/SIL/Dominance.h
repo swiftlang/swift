@@ -65,6 +65,61 @@ public:
   }
 };
 
+/// Helper class for visiting basic blocks in dominance order, based on a
+/// worklist algorithm. Example usage:
+/// \code
+///   DominanceOrder DomOrder(Function->front(), DominanceInfo);
+///   while (SILBasicBlock *block = DomOrder.getNext()) {
+///     doSomething(block);
+///     domOrder.pushChildren(block);
+///   }
+/// \endcode
+class DominanceOrder {
+  
+  SmallVector<SILBasicBlock *, 16> buffer;
+  DominanceInfo *DT;
+  size_t srcIdx = 0;
+  
+public:
+  
+  /// Constructor.
+  /// \p entry The root of the dominator (sub-)tree.
+  /// \p DT The dominance info of the function.
+  /// \p capacity Should be the number of basic blocks in the dominator tree to
+  ///             reduce memory allocation.
+  DominanceOrder(SILBasicBlock *root, DominanceInfo *DT, int capacity = 0) :
+            DT(DT) {
+     buffer.reserve(capacity);
+     buffer.push_back(root);
+  }
+
+  /// Gets the next block from the worklist.
+  ///
+  SILBasicBlock *getNext() {
+    if (srcIdx == buffer.size())
+      return nullptr;
+    return buffer[srcIdx++];
+  }
+
+  /// Pushes the dominator children of a block onto the worklist.
+  void pushChildren(SILBasicBlock *block) {
+    pushChildrenIf(block, [] (SILBasicBlock *) { return true; });
+  }
+
+  /// Conditionally pushes the dominator children of a block onto the worklist.
+  /// \p pred Takes a block (= a dominator child) as argument and returns true
+  ///         if it should be added to the worklist.
+  ///
+  template <typename Pred> void pushChildrenIf(SILBasicBlock *block, Pred pred) {
+    DominanceInfoNode *DINode = DT->getNode(block);
+    for (auto *DIChild : *DINode) {
+      SILBasicBlock *child = DIChild->getBlock();
+      if (pred(child))
+        buffer.push_back(DIChild->getBlock());
+    }
+  }
+};
+
 /// A class for computing basic post-dominance information.
 class PostDominanceInfo : public llvm::DominatorTreeBase<SILBasicBlock> {
 public:
