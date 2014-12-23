@@ -413,7 +413,9 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
 
       // If the closure's type was inferred to be nocapture, then it doesn't
       // need qualification.
-      return !E->getType()->castTo<FunctionType>()->isNoCapture();
+      if (auto *FT = E->getType()->getAs<FunctionType>())
+        return !FT->isNoCapture();
+      return true;
     }
 
 
