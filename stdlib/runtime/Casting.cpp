@@ -1938,29 +1938,29 @@ const WitnessTable *swift::swift_conformsToProtocol(const Metadata *type,
   installCallbacksToInspectDylib();
 
   auto origType = type;
-  
+
 recur:
   // See if we have a cached conformance.
   // Try the specific type first.
   pthread_rwlock_rdlock(&ConformanceCacheLock);
-  
+
 recur_inside_cache_lock:
   auto found = ConformanceCache.find({type, protocol});
   if (found != ConformanceCache.end()) {
     auto entry = found->second;
-    
+
     if (entry.isSuccessful()) {
       pthread_rwlock_unlock(&ConformanceCacheLock);
       return entry.getWitnessTable();
     }
-    
+
     // If we got a cached negative response, check the generation number.
     if (entry.getFailureGeneration() == ProtocolConformanceGeneration) {
       pthread_rwlock_unlock(&ConformanceCacheLock);
       return nullptr;
     }
   }
-  
+
   // If the type is generic, see if there's a shared nondependent witness table
   // for its instances.
   if (auto generic = type->getGenericPattern()) {
@@ -1975,7 +1975,7 @@ recur_inside_cache_lock:
       // patterns.
     }
   }
-  
+
   // If the type is a class, try its superclass.
   if (const ClassMetadata *classType = type->getClassObject()) {
     if (auto super = classType->SuperClass) {
@@ -1985,14 +1985,14 @@ recur_inside_cache_lock:
       }
     }
   }
-  
+
   unsigned failedGeneration = ConformanceCacheGeneration;
   pthread_rwlock_unlock(&ConformanceCacheLock);
-  
+
   // If we didn't have an up-to-date cache entry, scan the conformance records.
   pthread_mutex_lock(&SectionsToScanLock);
   pthread_rwlock_wrlock(&ConformanceCacheLock);
-  
+
   // If we have no new information to pull in (and nobody else pulled in
   // new information while we waited on the lock), we're done.
   if (SectionsToScan.empty()) {
@@ -2012,11 +2012,11 @@ recur_inside_cache_lock:
     pthread_mutex_unlock(&SectionsToScanLock);
     return nullptr;
   }
-  
+
   while (!SectionsToScan.empty()) {
     auto section = SectionsToScan.front();
     SectionsToScan.pop_front();
-    
+
     // Eagerly pull records for nondependent witnesses into our cache.
     for (const auto &record : section) {
       // If the record applies to a specific type, cache it.
@@ -2028,7 +2028,7 @@ recur_inside_cache_lock:
         else
           cacheEntry
             = ConformanceCacheEntry::failure(ProtocolConformanceGeneration);
-        
+
         ConformanceCache[{metadata, record.getProtocol()}] = cacheEntry;
       // If the record provides a nondependent witness table for all instances
       // of a generic type, cache it for the generic pattern.
@@ -2045,7 +2045,7 @@ recur_inside_cache_lock:
     }
   }
   ++ConformanceCacheGeneration;
-  
+
   pthread_rwlock_unlock(&ConformanceCacheLock);
   pthread_mutex_unlock(&SectionsToScanLock);
   // Start over with our newly-populated cache.
