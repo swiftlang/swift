@@ -173,14 +173,16 @@ struct D : Subscriptable {
 
 // materializeForSet.
 // CHECK: sil hidden [transparent] @_TFV10addressors1Dm9subscriptFSiSi
-// CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[I:%.*]] : $Int, [[SELF:%.*]] : $*D):
+// CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[I:%.*]] : $Int, [[SELF:%.*]] : $*D):
 // CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Da9subscriptFSiSi
 // CHECK:   [[PTR:%.*]] = apply [[T0]]([[I]], [[SELF]])
 // CHECK:   [[T0:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int>,
 // CHECK:   [[ADDR:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int
 // CHECK:   [[T0:%.*]] = address_to_pointer [[ADDR]] : $*Int to $Builtin.RawPointer
-// CHECK:   [[T1:%.*]] = integer_literal $Builtin.Int1, 0
-// CHECK:   [[T2:%.*]] = tuple ([[T0]] : $Builtin.RawPointer, [[T1]] : $Builtin.Int1)
+// CHECK:   [[TMP:%.*]] = alloc_stack $Optional<Builtin.RawPointer>
+// CHECK:   inject_enum_addr [[TMP]]#1 : $*Optional<Builtin.RawPointer>, #Optional.None
+// CHECK:   [[T1:%.*]] = load [[TMP]]#1
+// CHECK:   [[T2:%.*]] = tuple ([[T0]] : $Builtin.RawPointer, [[T1]] : $Optional<Builtin.RawPointer>)
 // CHECK:   return [[T2]] :
 
 func make_int() -> Int { return 0 }

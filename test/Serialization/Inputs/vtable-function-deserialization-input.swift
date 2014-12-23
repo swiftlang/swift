@@ -1,3 +1,14 @@
+// All of this is required in order to produce materializeForSet
+// declarations for A's properties.
+public protocol NilLiteralConvertible {
+  init(nilLiteral: ())
+}
+public enum Optional<T>: NilLiteralConvertible {
+  case Some(T)
+  case None
+
+  public init(nilLiteral: ()) { self = .None }
+}
 
 public struct Y {}
 

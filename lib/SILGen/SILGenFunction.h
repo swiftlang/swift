@@ -722,7 +722,7 @@ public:
                                 RValueSource &&optionalSelfValue,
                                 bool isSuper, bool isDirectAccessorUse,
                                 RValue &&optionalSubscripts,
-                                SILValue buffer);
+                                SILValue buffer, SILValue callbackStorage);
 
   SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
                                  AccessKind accessKind,

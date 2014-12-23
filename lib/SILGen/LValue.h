@@ -228,7 +228,7 @@ public:
   /// \param base - always an address, but possibly an r-value
   virtual void writeback(SILGenFunction &gen, SILLocation loc,
                          ManagedValue base, Materialize temporary,
-                         SILValue otherInfo) &&;
+                         ArrayRef<SILValue> otherInfo) &&;
 };
 
 inline LogicalPathComponent &PathComponent::asLogical() {

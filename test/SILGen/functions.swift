@@ -1,5 +1,7 @@
 // RUN: %swift -parse-stdlib -parse-as-library -emit-silgen %s | FileCheck %s
 
+import Swift // just for Optional
+
 typealias Int = Builtin.Int64
 typealias Int64 = Builtin.Int64
 typealias Bool = Builtin.Int1

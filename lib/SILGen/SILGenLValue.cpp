@@ -25,6 +25,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/Support/raw_ostream.h"
 #include "ASTVisitor.h"
@@ -42,7 +43,7 @@ struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
   std::unique_ptr<LogicalPathComponent> component;
   ManagedValue base;
   Materialize temp;
-  SILValue ExtraInfo;
+  SmallVector<SILValue, 2> ExtraInfo;
 
   ~LValueWriteback() {}
   LValueWriteback(LValueWriteback&&) = default;
@@ -51,9 +52,10 @@ struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
   LValueWriteback() = default;
   LValueWriteback(SILLocation loc,
                   std::unique_ptr<LogicalPathComponent> &&comp,
-                  ManagedValue base, Materialize temp, SILValue extraInfo)
-    : loc(loc), component(std::move(comp)), base(base), temp(temp),
-      ExtraInfo(extraInfo) {
+                  ManagedValue base, Materialize temp,
+                  ArrayRef<SILValue> extraInfo)
+    : loc(loc), component(std::move(comp)), base(base), temp(temp) {
+    ExtraInfo.append(extraInfo.begin(), extraInfo.end());
   }
 
   void diagnoseConflict(const LValueWriteback &rhs, SILGenFunction &SGF) const {
@@ -229,13 +231,14 @@ ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
   gen.getWritebackStack().emplace_back(loc, std::move(clonedComponent), base,
                                        Materialize{temporary.getValue(),
                                                    temporary.getCleanup()},
-                                       SILValue());
+                                       ArrayRef<SILValue>());
   return temporary.borrow();
 }
 
 void LogicalPathComponent::writeback(SILGenFunction &gen, SILLocation loc,
                                      ManagedValue base, Materialize temporary,
-                                     SILValue otherInfo) && {
+                                     ArrayRef<SILValue> otherInfo) && {
+  assert(otherInfo.empty() && "unexpected otherInfo parameter!");
   ManagedValue mv = temporary.claim(gen, loc);
   std::move(*this).set(gen, loc, RValue(gen, loc, getSubstFormalType(), mv),
                        base);
@@ -253,19 +256,6 @@ ManagedValue Materialize::claim(SILGenFunction &gen, SILLocation loc) {
 
   if (valueCleanup.isValid())
     gen.Cleanups.forwardCleanup(valueCleanup);
-  return gen.emitLoad(loc, address, addressTL, SGFContext(), IsTake);
-}
-
-static ManagedValue claimValueInMemory(SILGenFunction &gen, SILLocation loc,
-                                       SILValue address) {
-  auto &addressTL = gen.getTypeLowering(address.getType());
-  if (addressTL.isAddressOnly()) {
-    // We can use the temporary as an address-only rvalue directly.
-    return gen.emitManagedBufferWithCleanup(address, addressTL);
-  }
-
-  // A materialized temporary is always its own type-of-rvalue because
-  // we did a semantic load to produce it in the first place.
   return gen.emitLoad(loc, address, addressTL, SGFContext(), IsTake);
 }
 
@@ -753,6 +743,11 @@ namespace {
       assert(gen.InWritebackScope &&
              "materializing l-value for modification without writeback scope");
 
+      // Allocate opaque storage for the callback to use.
+      SILValue callbackStorage = gen.emitTemporaryAllocation(loc,
+        SILType::getPrimitiveObjectType(
+                                gen.getASTContext().TheUnsafeValueBufferType));
+
       // Allocate a temporary.
       SILValue buffer =
         gen.emitTemporaryAllocation(loc, getTypeOfRValue().getObjectType());
@@ -761,26 +756,54 @@ namespace {
       // prepareAccessorArgs will copy it if necessary.
       ManagedValue borrowedBase = (base ? base.borrow() : ManagedValue());
 
-      auto clonedComponent = clone(gen, loc);
+      // Clone the component without cloning the indices.  We don't actually
+      // consume them in writeback().
+      std::unique_ptr<LogicalPathComponent> clonedComponent(
+          [&]() -> LogicalPathComponent* {
+        // Steal the subscript values without copying them so that we
+        // can peek at them in diagnoseWritebackConflict.
+        //
+        // This is *amazingly* unprincipled.
+        RValue borrowedSubscripts;
+        RValue *optSubscripts = nullptr;
+        if (subscripts) {
+          CanType type = subscripts.getType();
+          SmallVector<ManagedValue, 4> values;
+          std::move(subscripts).getAll(values);
+          subscripts = RValue(values, type);
+          borrowedSubscripts = RValue(values, type);
+          optSubscripts = &borrowedSubscripts;
+        }
+        return new GetterSetterComponent(decl, IsSuper, IsDirectAccessorUse,
+                                         substitutions, getTypeData(),
+                                         subscriptIndexExpr, optSubscripts);
+      }());
 
       SILDeclRef materializeForSet =
         gen.getMaterializeForSetDeclRef(decl, IsDirectAccessorUse);
 
       auto args = std::move(*this).prepareAccessorArgs(gen, loc, borrowedBase,
                                                        materializeForSet);
-      auto addressAndNeedsWriteback =
+      auto addressAndCallback =
         gen.emitMaterializeForSetAccessor(loc, materializeForSet, substitutions,
                                           std::move(args.base), IsSuper,
                                           IsDirectAccessorUse,
                                           std::move(args.subscripts),
-                                          buffer);
+                                          buffer, callbackStorage);
 
-      SILValue address = addressAndNeedsWriteback.first;
+      SILValue address = addressAndCallback.first;
 
-      // Mark a value-dependence on the base.
-      if (base && base.hasCleanup()) {
+      // Mark a value-dependence on the base.  We do this regardless
+      // of whether the base is trivial because even a trivial base
+      // may be value-dependent on something non-trivial.
+      if (base) {
         address = gen.B.createMarkDependence(loc, address, base.getValue());
       }
+
+      SILValue extraInfo[] = {
+        addressAndCallback.second,
+        callbackStorage,
+      };
 
       // TODO: maybe needsWriteback should be a thin function pointer
       // to which we pass the base?  That would let us use direct
@@ -789,45 +812,153 @@ namespace {
                                            base,
                                            Materialize{address,
                                                        CleanupHandle::invalid()},
-                                           addressAndNeedsWriteback.second);
+                                           extraInfo);
 
       return ManagedValue::forLValue(address);
     }
 
+    static CanSILFunctionType getCallbackType(SILGenModule &SGM,
+                                              FuncDecl *materializeForSet,
+                                              ManagedValue baseValue) {
+      auto extInfo = SILFunctionType::ExtInfo()
+        .withRepresentation(AnyFunctionType::Representation::Thin);
+
+      ASTContext &ctx = SGM.getASTContext();
+
+      // Use () as the base type if the storage isn't in a type context.
+      // Always pass the base indirectly, but we can use in_guaranteed if
+      // materializeForSet isn't mutating.
+      Type contextType =
+        materializeForSet->getDeclContext()->getDeclaredTypeInContext();
+
+      CanType formalBaseType;
+      CanType loweredBaseType;
+      ParameterConvention baseConvention;
+      if (contextType) {
+        assert(baseValue);
+        loweredBaseType = baseValue.getType().getSwiftRValueType();
+
+        // FIXME: this only works under the assumption that methods can
+        // only be declared on types that are invariant w.r.t. lowering.
+        formalBaseType = loweredBaseType;
+
+        if (formalBaseType->mayHaveSuperclass() ||
+            materializeForSet->isStatic() ||
+            !materializeForSet->isMutating())
+          baseConvention = ParameterConvention::Indirect_In_Guaranteed;
+        else
+          baseConvention = ParameterConvention::Indirect_Inout;
+
+      // Otherwise, just pretend that () is the base type.  This may
+      // block us from sensibly implementing materializeForSet in
+      // non-type generic contexts, but it's not clear when we would
+      // ever need to do that.
+      } else {
+        formalBaseType = TupleType::getEmpty(ctx);
+        loweredBaseType = formalBaseType;
+        baseConvention = ParameterConvention::Indirect_In_Guaranteed;
+      }
+
+      auto baseMetatypeType =
+        CanMetatypeType::get(formalBaseType, MetatypeRepresentation::Thick);
+
+      SILParameterInfo params[] = {
+        { ctx.TheRawPointerType, ParameterConvention::Direct_Unowned },
+        { ctx.TheUnsafeValueBufferType, ParameterConvention::Indirect_Inout },
+        { loweredBaseType, baseConvention },
+        { baseMetatypeType, ParameterConvention::Direct_Unowned },
+      };
+
+      SILResultInfo result(TupleType::getEmpty(ctx),
+                           ResultConvention::Unowned);
+
+      return SILFunctionType::get(nullptr, extInfo,
+                                  ParameterConvention::Direct_Unowned,
+                                  params, result, ctx);
+    }
+
     void writeback(SILGenFunction &gen, SILLocation loc,
                    ManagedValue base, Materialize temporary,
-                   SILValue otherInfo) && {
+                   ArrayRef<SILValue> extraInfo) && {
       // If we don't have otherInfo, we don't have to conditionalize
       // the writeback.
-      if (!otherInfo) {
+      if (extraInfo.empty()) {
         std::move(*this).LogicalPathComponent::writeback(gen, loc, base,
-                                                         temporary, otherInfo);
+                                                         temporary, extraInfo);
         return;
       }
 
-      // Otherwise, otherInfo is a flag indicating whether we need to
-      // write back.
-      SILValue needsWriteback = otherInfo;
+      // Otherwise, extraInfo holds an optional callback and the
+      // callback storage.
+      assert(extraInfo.size() == 2);
+      SILValue optionalCallback = extraInfo[0];
+      SILValue callbackStorage = extraInfo[1];
 
       // Mark the writeback as auto-generated so that we don't get
       // warnings if we manage to devirtualize materializeForSet.
       loc.markAutoGenerated();
 
+      ASTContext &ctx = gen.getASTContext();
+
       SILBasicBlock *writebackBB = gen.createBasicBlock(gen.B.getInsertionBB());
       SILBasicBlock *contBB = gen.createBasicBlock();
-      gen.B.createCondBranch(loc, needsWriteback, writebackBB, contBB);
+      gen.B.createSwitchEnum(loc, optionalCallback, /*defaultDest*/ nullptr,
+                             { { ctx.getOptionalSomeDecl(), writebackBB },
+                               { ctx.getOptionalNoneDecl(), contBB } });
 
       // The writeback block.
       gen.B.setInsertionPoint(writebackBB); {
         FullExpr scope(gen.Cleanups, CleanupLocation::getCleanupLocation(loc));
 
-        // We need to borrow the base here.  We can't just consume it
-        // because we're in conditionally-executed code.
-        if (base) base = base.borrow();
+        auto emptyTupleTy =
+          SILType::getPrimitiveObjectType(TupleType::getEmpty(ctx));
 
-        ManagedValue mv = claimValueInMemory(gen, loc, temporary.address);
-        RValue writebackValue(gen, loc, getSubstFormalType(), mv);
-        std::move(*this).set(gen, loc, std::move(writebackValue), base);
+        // The callback is a BB argument from the switch_enum.
+        SILValue callback =
+          writebackBB->createBBArg(SILType::getRawPointerType(ctx));
+
+        FuncDecl *materializeForSet = decl->getMaterializeForSetFunc();
+        CanSILFunctionType callbackType =
+          getCallbackType(gen.SGM, materializeForSet, base);
+        SILType callbackSILType = SILType::getPrimitiveObjectType(callbackType);
+        callback = gen.B.createPointerToThinFunction(loc, callback,
+                                                     callbackSILType);
+
+        SILType metatypeType = callbackType->getParameters().back().getSILType();
+
+        // We need to borrow the base here.  We can't just consume it
+        // because we're in conditionally-executed code.  We also need
+        // to pass it indirectly.
+        SILValue baseAddress;
+        SILValue baseMetatype;
+        if (base) {
+          if (base.getType().isAddress()) {
+            baseAddress = base.getValue();
+          } else {
+            assert(callbackType->getParameters()[2].isIndirectInGuaranteed() &&
+                   "passing base as inout parameter but base is scalar?");
+            baseAddress = gen.emitTemporaryAllocation(loc, base.getType());
+            gen.B.createStore(loc, base.getValue(), baseAddress);
+          }
+          baseMetatype = gen.B.createMetatype(loc, metatypeType);
+
+        // Otherwise, we have to pass something; use an empty tuple
+        // and an undef metatype.
+        } else {
+          baseAddress = SILUndef::get(emptyTupleTy.getAddressType(), gen.SGM.M);
+          baseMetatype = SILUndef::get(metatypeType, gen.SGM.M);
+        }
+
+        SILValue temporaryPointer =
+          gen.B.createAddressToPointer(loc, temporary.address,
+                                       SILType::getRawPointerType(ctx));
+
+        gen.B.createApply(loc, callback, {
+                            temporaryPointer,
+                            callbackStorage,
+                            baseAddress,
+                            baseMetatype
+                          });
       }
 
       // Continue.

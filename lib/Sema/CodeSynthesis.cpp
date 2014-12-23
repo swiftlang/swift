@@ -40,10 +40,14 @@ static void addMemberToContextIfNeeded(Decl *D, DeclContext *DC,
            "Unknown declcontext");
 }
 
-static VarDecl *getFirstParamDecl(FuncDecl *fn) {
+static VarDecl *getParamDeclAtIndex(FuncDecl *fn, unsigned index) {
   auto params = cast<TuplePattern>(fn->getBodyParamPatterns().back());
-  auto firstParamPattern = params->getFields().front().getPattern();
+  auto firstParamPattern = params->getFields()[index].getPattern();
   return firstParamPattern->getSingleVar();    
+}
+
+static VarDecl *getFirstParamDecl(FuncDecl *fn) {
+  return getParamDeclAtIndex(fn, 0);
 };
 
 /// \brief Build an implicit 'self' parameter for the specified DeclContext.
@@ -56,13 +60,12 @@ static Pattern *buildImplicitSelfParameter(SourceLoc Loc, DeclContext *DC) {
   return new (Ctx) TypedPattern(P, TypeLoc());
 }
 
-static Pattern *buildLetArgumentPattern(SourceLoc loc, DeclContext *DC,
-                                        StringRef name, Type type,
-                                        VarDecl **paramDecl,
-                                        TypeChecker &TC) {
-  auto &Context = TC.Context;
-  auto *param = new (Context) ParamDecl(/*IsLet*/true,
-                                        SourceLoc(), Identifier(),
+static TuplePatternElt buildArgumentPattern(SourceLoc loc, DeclContext *DC,
+                                            StringRef name, Type type,
+                                            bool isLet,
+                                            VarDecl **paramDecl,
+                                            ASTContext &Context) {
+  auto *param = new (Context) ParamDecl(isLet, SourceLoc(), Identifier(),
                                         loc, Context.getIdentifier(name),
                                         Type(), DC);
   if (paramDecl) *paramDecl = param;
@@ -73,11 +76,23 @@ static Pattern *buildLetArgumentPattern(SourceLoc loc, DeclContext *DC,
                                  TypeLoc::withoutLoc(type));
   valuePattern->setImplicit();
   
-  TuplePatternElt valueElt(valuePattern);
-  Pattern *valueParamsPattern
-    = TuplePattern::create(Context, loc, valueElt, loc);
-  valueParamsPattern->setImplicit();
-  return valueParamsPattern;
+  return TuplePatternElt(valuePattern);
+}
+
+static TuplePatternElt buildLetArgumentPattern(SourceLoc loc, DeclContext *DC,
+                                               StringRef name, Type type,
+                                               VarDecl **paramDecl,
+                                               ASTContext &ctx) {
+  return buildArgumentPattern(loc, DC, name, type,
+                              /*isLet*/ true, paramDecl, ctx);
+}
+
+static TuplePatternElt buildInOutArgumentPattern(SourceLoc loc, DeclContext *DC,
+                                                 StringRef name, Type type,
+                                                 VarDecl **paramDecl,
+                                                 ASTContext &ctx) {
+  return buildArgumentPattern(loc, DC, name, InOutType::get(type),
+                              /*isLet*/ false, paramDecl, ctx);
 }
 
 static Type getTypeOfStorage(AbstractStorageDecl *storage,
@@ -92,41 +107,39 @@ static Type getTypeOfStorage(AbstractStorageDecl *storage,
   }
 }
 
-static Pattern *buildSetterValueArgumentPattern(AbstractStorageDecl *storage,
-                                                VarDecl **valueDecl,
-                                                TypeChecker &TC) {
+static TuplePatternElt
+buildSetterValueArgumentPattern(AbstractStorageDecl *storage,
+                                VarDecl **valueDecl, TypeChecker &TC) {
   auto storageType = getTypeOfStorage(storage, TC);
-  return buildLetArgumentPattern(storage->getLoc(), storage->getDeclContext(),
-                                 "value", storageType, valueDecl, TC);
+  return buildLetArgumentPattern(storage->getLoc(),
+                                 storage->getDeclContext(),
+                                 "value", storageType, valueDecl, TC.Context);
 }
 
 /// Build a pattern which can forward the formal index parameters of a
 /// declaration.
 ///
-/// \param firstPattern an optional pattern which, if present, will be
-///   used as a source for initial arguments
+/// \param prefix optional arguments to be prefixed onto the index
+///   forwarding pattern
 static Pattern *buildIndexForwardingPattern(AbstractStorageDecl *storage,
-                                            Pattern *firstPattern,
+                                     MutableArrayRef<TuplePatternElt> prefix,
                                             TypeChecker &TC) {
   auto subscript = dyn_cast<SubscriptDecl>(storage);
 
   // Fast path: if this isn't a subscript, and we have a first
   // pattern, we can just use that.
   if (!subscript) {
-    if (firstPattern) return firstPattern;
-
-    return TuplePattern::createSimple(TC.Context, SourceLoc(), {},
-                                      SourceLoc());
+    auto tuple = TuplePattern::createSimple(TC.Context, SourceLoc(), prefix,
+                                            SourceLoc());
+    tuple->setImplicit();
+    return tuple;
   }
 
   // Otherwise, we need to build up a new TuplePattern.
   SmallVector<TuplePatternElt, 4> elements;
 
   // Start with the fields from the first pattern, if there are any.
-  if (firstPattern) {
-    auto fields = cast<TuplePattern>(firstPattern)->getFields();
-    elements.append(fields.begin(), fields.end());
-  }
+  elements.append(prefix.begin(), prefix.end());
 
   // Clone index patterns in a manner that allows them to be
   // perfectly forwarded.
@@ -164,7 +177,7 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
                   buildImplicitSelfParameter(loc, storage->getDeclContext()));
     
   // Add an index-forwarding clause.
-  getterParams.push_back(buildIndexForwardingPattern(storage, nullptr, TC));
+  getterParams.push_back(buildIndexForwardingPattern(storage, {}, TC));
 
   SourceLoc staticLoc;
   if (auto var = dyn_cast<VarDecl>(storage)) {
@@ -230,7 +243,8 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   }
 
   // Add a "(value : T, indices...)" pattern.
-  auto valuePattern = buildSetterValueArgumentPattern(storage, &valueDecl, TC);
+  TuplePatternElt valuePattern =
+    buildSetterValueArgumentPattern(storage, &valueDecl, TC);
   params.push_back(buildIndexForwardingPattern(storage, valuePattern, TC));
 
   Type setterRetTy = TupleType::getEmpty(TC.Context);
@@ -289,16 +303,29 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   if (DC->isTypeContext())
     params.push_back(buildImplicitSelfParameter(loc, DC));
 
-  //  - The buffer parameter, (buffer: Builtin.RawPointer, indices...).
-  auto bufferPattern = buildLetArgumentPattern(loc, DC, "buffer",
-                                               ctx.TheRawPointerType,
-                                               &bufferParamDecl, TC);
-  params.push_back(buildIndexForwardingPattern(storage, bufferPattern, TC));
+  //  - The buffer parameter, (buffer: Builtin.RawPointer,
+  //                           inout storage: Builtin.UnsafeValueBuffer,
+  //                           indices...).
+  TuplePatternElt bufferElements[] = {
+    buildLetArgumentPattern(loc, DC, "buffer", ctx.TheRawPointerType,
+                            &bufferParamDecl, TC.Context),
+    buildInOutArgumentPattern(loc, DC, "callbackStorage",
+                              ctx.TheUnsafeValueBufferType,
+                              nullptr, TC.Context),
+  };
+  params.push_back(buildIndexForwardingPattern(storage, bufferElements, TC));
 
-  // The accessor returns (Builtin.RawPointer, Builtin.Int1)
+  // Try to construct Builtin.RawPointer?.  Don't crash if it doesn't
+  // work, though.
+  auto optRawPointerType = TC.getOptionalType(loc, ctx.TheRawPointerType);
+  if (!optRawPointerType) optRawPointerType = ctx.TheRawPointerType;
+
+  // The accessor returns (Builtin.RawPointer, Builtin.RawPointer?),
+  // where the first pointer is the materialized address and the
+  // second is an optional callback.
   TupleTypeElt retElts[] = {
     { ctx.TheRawPointerType },
-    { BuiltinIntegerType::get(1, ctx) },
+    { optRawPointerType },
   };
   Type retTy = TupleType::get(retElts, ctx);
 
@@ -378,7 +405,15 @@ static Expr *buildSubscriptIndexReference(ASTContext &ctx, FuncDecl *accessor) {
   // parameter in accessors that have one.
   auto paramTuple = cast<TuplePattern>(accessor->getBodyParamPatterns().back());
   auto params = paramTuple->getFields();
-  if (accessor->getAccessorKind() != AccessorKind::IsGetter)
+
+  auto accessorKind = accessor->getAccessorKind();
+
+  // Ignore the value/buffer parameter.
+  if (accessorKind != AccessorKind::IsGetter)
+    params = params.slice(1);
+
+  // Ignore the materializeForSet callback storage parameter.
+  if (accessorKind == AccessorKind::IsMaterializeForSet)
     params = params.slice(1);
 
   // Look for formal subscript labels.
@@ -415,15 +450,49 @@ static Expr *buildSelfReference(VarDecl *selfDecl,
   llvm_unreachable("bad self access kind");
 }
 
+namespace {
+  /// A simple helper interface for buildStorageReference.
+  class StorageReferenceContext {
+    StorageReferenceContext(const StorageReferenceContext &) = delete;
+  public:
+    StorageReferenceContext() = default;
+
+    /// Returns the declaration of the entity to use as the base of
+    /// the access, or nil if no base is required.
+    virtual VarDecl *getSelfDecl() const = 0;
+
+    /// Returns an expression producing the index value, assuming that
+    /// the storage is a subscript declaration.
+    virtual Expr *getIndexRefExpr(ASTContext &ctx,
+                                  SubscriptDecl *subscript) const = 0;
+  };
+
+  /// A reference to storage from within an accessor.
+  class AccessorStorageReferenceContext : public StorageReferenceContext {
+    FuncDecl *Accessor;
+  public:
+    AccessorStorageReferenceContext(FuncDecl *accessor) : Accessor(accessor) {}
+
+    VarDecl *getSelfDecl() const override {
+      return Accessor->getImplicitSelfDecl();
+    }
+    Expr *getIndexRefExpr(ASTContext &ctx,
+                          SubscriptDecl *subscript) const override {
+      return buildSubscriptIndexReference(ctx, Accessor);
+    }
+  };
+}
+
 /// Build an l-value for the storage of a declaration.
-static Expr *buildStorageReference(FuncDecl *accessor,
+static Expr *buildStorageReference(
+                             const StorageReferenceContext &referenceContext,
                                    AbstractStorageDecl *storage,
                                    AccessSemantics semantics,
                                    SelfAccessKind selfAccessKind,
                                    TypeChecker &TC) {
   ASTContext &ctx = TC.Context;
 
-  VarDecl *selfDecl = accessor->getImplicitSelfDecl();
+  VarDecl *selfDecl = referenceContext.getSelfDecl();
   if (!selfDecl) {
     return new (ctx) DeclRefExpr(storage, SourceLoc(), IsImplicit, semantics);
   }
@@ -441,8 +510,8 @@ static Expr *buildStorageReference(FuncDecl *accessor,
 
   Expr *selfDRE = buildSelfReference(selfDecl, selfAccessKind, TC);
 
-  if (isa<SubscriptDecl>(storage)) {
-    Expr *indices = buildSubscriptIndexReference(ctx, accessor);
+  if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
+    Expr *indices = referenceContext.getIndexRefExpr(ctx, subscript);
     return new (ctx) SubscriptExpr(selfDRE, indices, ConcreteDeclRef(),
                                    IsImplicit, semantics);
   }
@@ -452,6 +521,15 @@ static Expr *buildStorageReference(FuncDecl *accessor,
   // should also redefine materializeForSet.
   return new (ctx) MemberRefExpr(selfDRE, SourceLoc(), storage,
                                  SourceLoc(), IsImplicit, semantics);
+}
+
+static Expr *buildStorageReference(FuncDecl *accessor,
+                                   AbstractStorageDecl *storage,
+                                   AccessSemantics semantics,
+                                   SelfAccessKind selfAccessKind,
+                                   TypeChecker &TC) {
+  return buildStorageReference(AccessorStorageReferenceContext(accessor),
+                               storage, semantics, selfAccessKind, TC);
 }
 
 /// Load the value of VD.  If VD is an @override of another value, we call the
@@ -628,18 +706,14 @@ static void synthesizeTrivialSetter(FuncDecl *setter,
 /// Build the result expression of a materializeForSet accessor.
 ///
 /// \param address an expression yielding the address to return
-/// \param usingBuffer true if the value was written into the
-///   parameter buffer (and hence must be destroyed there by the caller)
+/// \param callbackFn an optional closure expression for the callback
 static Expr *buildMaterializeForSetResult(ASTContext &ctx, Expr *address,
-                                          bool usingBuffer) {
-  // To form 0 or 1 as a Builtin.Int1, we have to do this, which is dumb.
-  auto usingBufferExpr =
-    new (ctx) IntegerLiteralExpr(usingBuffer ? "1" : "0",
-                                 SourceLoc(), IsImplicit);
-  
-  usingBufferExpr->setType(BuiltinIntegerType::get(1, ctx));
+                                          Expr *callbackFn) {
+  if (!callbackFn) {
+    callbackFn = new (ctx) NilLiteralExpr(SourceLoc(), IsImplicit);
+  }
 
-  return TupleExpr::create(ctx, SourceLoc(), { address, usingBufferExpr },
+  return TupleExpr::create(ctx, SourceLoc(), { address, callbackFn },
                            { Identifier(), Identifier() },
                            { SourceLoc(), SourceLoc() },
                            SourceLoc(), false, IsImplicit);
@@ -668,7 +742,7 @@ static void synthesizeStoredMaterializeForSet(FuncDecl *materializeForSet,
                                        SelfAccessKind::Peer, TC);
   result = new (ctx) InOutExpr(SourceLoc(), result, Type(), IsImplicit);
   result = buildCallToBuiltin(ctx, "addressof", result);
-  result = buildMaterializeForSetResult(ctx, result, /*using buffer*/ false);
+  result = buildMaterializeForSetResult(ctx, result, /*callback*/ nullptr);
 
   ASTNode returnStmt = new (ctx) ReturnStmt(SourceLoc(), result, IsImplicit);
 
@@ -822,6 +896,128 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
   return;
 }
 
+using CallbackGenerator =
+  llvm::function_ref<void(SmallVectorImpl<ASTNode> &callbackBody,
+                          VarDecl *selfDecl, VarDecl *bufferDecl,
+                          VarDecl *callbackStorageDecl)>;
+
+/// Build a materializeForSet callback function.
+/// It should have type
+///   (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer,
+///    inout T, T.Type) -> ()
+static Expr *buildMaterializeForSetCallback(ASTContext &ctx,
+                                            FuncDecl *materializeForSet,
+                                            AbstractStorageDecl *storage,
+                                      const CallbackGenerator &generator) {
+
+  auto DC = storage->getDeclContext();
+  SourceLoc loc = storage->getLoc();
+
+  // Get a self type.  If we don't have a meaningful direct self type,
+  // just use something meaningless and hope it doesn't matter.
+  Type selfType = DC->getDeclaredTypeInContext();
+  if (!selfType) {
+    // This restriction is theoretically liftable by writing the necessary
+    // contextual information into the callback storage.
+    assert(!DC->isGenericContext() &&
+           "no enclosing type for generic materializeForSet; callback "
+           "will not be able to bind type arguments!");
+    selfType = TupleType::getEmpty(ctx);
+  } else if (materializeForSet->isStatic()) {
+    selfType = MetatypeType::get(selfType, ctx);
+  }
+
+  // Build the parameters pattern.
+  //
+  // Unexpected subtlety: it actually important to call the inout self
+  // parameter something other than 'self' so that we don't trigger
+  // the "implicit use of self" diagnostic.
+  VarDecl *bufferDecl;
+  VarDecl *callbackStorageDecl;
+  VarDecl *selfDecl;
+  TuplePatternElt argPatterns[] = {
+    buildLetArgumentPattern(loc, DC, "buffer", ctx.TheRawPointerType,
+                            &bufferDecl, ctx),
+    buildInOutArgumentPattern(loc, DC, "callbackStorage",
+                              ctx.TheUnsafeValueBufferType,
+                              &callbackStorageDecl, ctx),
+    buildInOutArgumentPattern(loc, DC, "selfValue", selfType, &selfDecl, ctx),
+    buildLetArgumentPattern(loc, DC, "selfType", MetatypeType::get(selfType),
+                            nullptr, ctx),
+  };
+  auto args = TuplePattern::createSimple(ctx, SourceLoc(), argPatterns,
+                                         SourceLoc());
+  args->setImplicit();
+
+  // Create the closure expression itself.
+  auto closure = new (ctx) ClosureExpr(args, SourceLoc(), SourceLoc(),
+                                       TypeLoc(), /*discriminator*/ 0,
+                                       materializeForSet);
+
+  // Generate the body of the closure.
+  SmallVector<ASTNode, 4> body;
+  generator(body, selfDecl, bufferDecl, callbackStorageDecl);
+  closure->setBody(BraceStmt::create(ctx, SourceLoc(), body, SourceLoc(),
+                                     IsImplicit),
+                   /*isSingleExpression*/ false);
+  closure->setImplicit(IsImplicit);
+
+  // Call our special builtin to turn that into an opaque thin function.
+  auto result = buildCallToBuiltin(ctx, "makeMaterializeForSetCallback",
+                                   { closure });
+  return result;
+}
+
+/// Build a builtin operation on a Builtin.UnsafeValueBuffer.
+static Expr *buildValueBufferOperation(ASTContext &ctx, StringRef builtinName,
+                                       VarDecl *bufferDecl, Type valueType) {
+  // &buffer
+  Expr *bufferRef = new (ctx) DeclRefExpr(bufferDecl, SourceLoc(), IsImplicit);
+  bufferRef = new (ctx) InOutExpr(SourceLoc(), bufferRef, Type(), IsImplicit);
+
+  // T.self
+  Expr *metatypeRef = TypeExpr::createImplicit(valueType, ctx);
+  metatypeRef = new (ctx) DotSelfExpr(metatypeRef, SourceLoc(), SourceLoc());
+  metatypeRef->setImplicit(IsImplicit);
+
+  // Builtin.whatever(&buffer, T.self)
+  return buildCallToBuiltin(ctx, builtinName, { bufferRef, metatypeRef });
+}
+
+/// Build a call to Builtin.take.
+static Expr *buildBuiltinTake(ASTContext &ctx, Expr *address,
+                              Type valueType) {
+  // Builtin.take(address) as ValueType
+  Expr *result = buildCallToBuiltin(ctx, "take", { address });
+  result = new (ctx) UnresolvedCheckedCastExpr(result, SourceLoc(),
+                                               TypeLoc::withoutLoc(valueType));
+  result->setImplicit(IsImplicit);
+  return result;
+}
+
+namespace {
+  /// A reference to storage from the context of a materializeForSet
+  /// callback.
+  class CallbackStorageReferenceContext : public StorageReferenceContext {
+    VarDecl *Self;
+    VarDecl *CallbackStorage;
+  public:
+    CallbackStorageReferenceContext(VarDecl *self, VarDecl *callbackStorage)
+      : Self(self), CallbackStorage(callbackStorage) {}
+
+    VarDecl *getSelfDecl() const override {
+      return Self;
+    }
+    Expr *getIndexRefExpr(ASTContext &ctx,
+                          SubscriptDecl *subscript) const override {
+      Expr *address =
+        buildValueBufferOperation(ctx, "projectValueBuffer", CallbackStorage,
+                                  subscript->getIndicesType());
+      return buildBuiltinTake(ctx, address, subscript->getIndicesType());
+    }
+  };
+}
+
 /// Synthesize the body of a materializeForSet accessor for a
 /// computed property.
 static void synthesizeComputedMaterializeForSet(FuncDecl *materializeForSet,
@@ -830,23 +1026,68 @@ static void synthesizeComputedMaterializeForSet(FuncDecl *materializeForSet,
                                                 TypeChecker &TC) {
   ASTContext &ctx = TC.Context;
 
+  SmallVector<ASTNode, 4> body;
+
   // Builtin.initialize(self.property, buffer)
   Expr *curValue = buildStorageReference(materializeForSet, storage,
                                          AccessSemantics::DirectToAccessor,
                                          SelfAccessKind::Peer, TC);
   Expr *bufferRef = new (ctx) DeclRefExpr(bufferDecl, SourceLoc(), IsImplicit);
-  ASTNode assignment = buildCallToBuiltin(ctx, "initialize",
-                                          { curValue, bufferRef });
+  body.push_back(buildCallToBuiltin(ctx, "initialize",
+                                    { curValue, bufferRef }));
 
-  // return (buffer, true)
+  // If this is a subscript, preserve the index value:
+  if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
+    // let allocatedCallbackStorage =
+    //   Builtin.allocateValueBuffer(&callbackStorage, IndexType.self))
+    VarDecl *callbackStorageDecl = getParamDeclAtIndex(materializeForSet, 1);
+    Expr *allocatedCallbackStorage =
+      buildValueBufferOperation(ctx, "allocValueBuffer", callbackStorageDecl,
+                                subscript->getIndicesType());
+
+    // Builtin.initialize(indexArgs, allocatedCallbackStorage)
+    Expr *indices = buildSubscriptIndexReference(ctx, materializeForSet);
+    body.push_back(buildCallToBuiltin(ctx, "initialize",
+                                      { indices, allocatedCallbackStorage }));
+  }
+
+  // Build the callback.
+  Expr *callback =
+    buildMaterializeForSetCallback(ctx, materializeForSet, storage,
+      [&](SmallVectorImpl<ASTNode> &body,
+          VarDecl *selfDecl, VarDecl *bufferDecl,
+          VarDecl *callbackStorageDecl) {
+      // self.property = Builtin.take(buffer)
+      Expr *bufferRef =
+        new (ctx) DeclRefExpr(bufferDecl, SourceLoc(), IsImplicit);
+      Expr *value = buildBuiltinTake(ctx, bufferRef,
+                                     getTypeOfStorage(storage, TC));
+
+      Expr *storageRef =
+        buildStorageReference(
+               CallbackStorageReferenceContext{selfDecl, callbackStorageDecl},
+                              storage, AccessSemantics::DirectToAccessor,
+                              SelfAccessKind::Peer, TC);
+      body.push_back(new (ctx) AssignExpr(storageRef, SourceLoc(),
+                                          value, IsImplicit));
+
+      // If this is a subscript, deallocate the subscript buffer:
+      if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
+        // Builtin.deallocValueBuffer(&callbackStorage, IndexType.self)
+        body.push_back(buildValueBufferOperation(ctx, "deallocValueBuffer",
+                                                 callbackStorageDecl,
+                                                 subscript->getIndicesType()));
+      }
+    });
+
+  // return (buffer, callback)
   Expr *result = new (ctx) DeclRefExpr(bufferDecl, SourceLoc(), IsImplicit);
 
-  result = buildMaterializeForSetResult(ctx, result, true);
-  ASTNode returnStmt = new (ctx) ReturnStmt(SourceLoc(), result, IsImplicit);
+  result = buildMaterializeForSetResult(ctx, result, callback);
+  body.push_back(new (ctx) ReturnStmt(SourceLoc(), result, IsImplicit));
 
   SourceLoc loc = storage->getLoc();
-  materializeForSet->setBody(
-      BraceStmt::create(ctx, loc, { assignment, returnStmt }, loc));
+  materializeForSet->setBody(BraceStmt::create(ctx, loc, body, loc));
 
   // Mark it transparent, there is no user benefit to this actually existing.
   materializeForSet->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));

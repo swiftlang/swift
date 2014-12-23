@@ -355,13 +355,19 @@ func logical_lvalue_lifetime(var r: RefWithProp, var i: Int, var v: Val) {
   r.aleph_prop.b = v
   // CHECK: [[R2:%[0-9]+]] = load [[RADDR]]
   // CHECK: retain [[R2]]
+  // CHECK: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
   // CHECK: [[ALEPH_PROP_TEMP:%[0-9]+]] = alloc_stack $Aleph
   // CHECK: retain [[R2]]
   // CHECK: [[T0:%.*]] = address_to_pointer [[ALEPH_PROP_TEMP]]#1
   // CHECK: [[MATERIALIZE_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.aleph_prop!materializeForSet.1 :
-  // CHECK: apply [[MATERIALIZE_METHOD]]([[T0]], [[R2]])
-  // CHECK: [[SETTER_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.aleph_prop!setter.1 : RefWithProp -> (Aleph) -> ()
-  // CHECK: apply [[SETTER_METHOD]]({{.*}}, [[R2]])
+  // CHECK: [[MATERIALIZE:%.*]] = apply [[MATERIALIZE_METHOD]]([[T0]], [[STORAGE]]#1, [[R2]])
+  // CHECK: [[PTR:%.*]] = tuple_extract [[MATERIALIZE]] : {{.*}}, 0
+  // CHECK: [[ADDR:%.*]] = pointer_to_address [[PTR]]
+  // CHECK: [[MARKED_ADDR:%.*]] = mark_dependence [[ADDR]] : $*Aleph on [[R2]]
+  // CHECK: [[CALLBACK:%[0-9]+]] = pointer_to_thin_function
+  // CHECK: [[TEMP:%.*]] = alloc_stack $RefWithProp
+  // CHECK: store [[R2]] to [[TEMP]]#1
+  // CHECK: apply [[CALLBACK]]({{.*}}, [[STORAGE]]#1, [[TEMP]]#1, {{%.*}})
 }
 
 func bar() -> Int {}

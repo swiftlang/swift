@@ -2371,12 +2371,12 @@ struct ASTNodeBase {};
     void checkSourceRanges(Pattern *P) {
       PrettyStackTracePattern debugStack(Ctx, "verifying ranges", P);
 
-      if (!P->getSourceRange().isValid()) {
-        // We don't care about source ranges on implicitly-generated
-        // patterns.
-        if (P->isImplicit())
-          return;
+      // We don't care about source ranges on implicitly-generated
+      // patterns.
+      if (P->isImplicit())
+        return;
 
+      if (!P->getSourceRange().isValid()) {
         Out << "invalid source range for pattern: ";
         P->print(Out);
         Out << "\n";

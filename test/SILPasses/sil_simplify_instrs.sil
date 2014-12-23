@@ -1,6 +1,7 @@
 // RUN: %sil-opt %s -sil-combine -verify | FileCheck %s
 
 import Builtin
+import Swift
 
 // Simplify arithmetic where one operand is a zero and the other is not a constant
 sil @fold_add_with_overflow_zeros : $@thin (Builtin.Int64) -> Builtin.Int64 {

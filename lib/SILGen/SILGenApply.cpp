@@ -2715,7 +2715,8 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                               ArrayRef<Substitution> substitutions,
                               RValueSource &&selfValue,
                               bool isSuper, bool isDirectUse,
-                              RValue &&subscripts, SILValue buffer) {
+                              RValue &&subscripts, SILValue buffer,
+                              SILValue callbackStorage) {
 
   Callee callee = emitSpecializedAccessorFunctionRef(*this, loc,
                                                      materializeForSet,
@@ -2730,37 +2731,36 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
 
-  ManagedValue mbuffer = {
-    B.createAddressToPointer(loc, buffer,
-                             SILType::getRawPointerType(getASTContext())),
-    CleanupHandle::invalid()
-  };
-
-  // (buffer)  or (buffer, indices) ->
+  // (buffer, callbackStorage)  or (buffer, callbackStorage, indices) ->
   RValue args = [&] {
+    SmallVector<ManagedValue, 4> elts;
+
+    auto bufferPtr =
+      B.createAddressToPointer(loc, buffer,
+                               SILType::getRawPointerType(getASTContext()));
+    elts.push_back(ManagedValue::forUnmanaged(bufferPtr));
+
+    elts.push_back(ManagedValue::forLValue(callbackStorage));
+
     if (subscripts) {
-      SmallVector<ManagedValue, 4> elts;
-      elts.push_back(mbuffer);
       std::move(subscripts).getAll(elts);
-      return RValue(elts, accessType.getInput());
-    } else {
-      return RValue(mbuffer, accessType.getInput());
     }
+    return RValue(elts, accessType.getInput());
   }();
   emission.addCallSite(loc, RValueSource(loc, std::move(args)),
                        accessType.getResult());
-  // (buffer, i1)
-  SILValue pointerAndNeedsWriteback = emission.apply().getUnmanagedValue();
+  // (buffer, optionalCallback)
+  SILValue pointerAndOptionalCallback = emission.apply().getUnmanagedValue();
 
   // Project out the materialized address.
-  SILValue address = B.createTupleExtract(loc, pointerAndNeedsWriteback, 0);
+  SILValue address = B.createTupleExtract(loc, pointerAndOptionalCallback, 0);
   address = B.createPointerToAddress(loc, address, buffer.getType());
 
-  // Project out the needsWriteback flag.
-  SILValue needsWriteback =
-    B.createTupleExtract(loc, pointerAndNeedsWriteback, 1);
+  // Project out the optional callback.
+  SILValue optionalCallback =
+    B.createTupleExtract(loc, pointerAndOptionalCallback, 1);
 
-  return { address, needsWriteback };
+  return { address, optionalCallback };
 }
 
 SILDeclRef SILGenFunction::getAddressorDeclRef(AbstractStorageDecl *storage,

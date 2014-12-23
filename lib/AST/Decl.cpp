@@ -2821,7 +2821,7 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
     if (auto afd = func->getAccessorStorageDecl()) {
       auto &ctx = getASTContext();
       auto subscript = dyn_cast<SubscriptDecl>(afd);
-      switch (func->getAccessorKind()) {
+      switch (auto accessorKind = func->getAccessorKind()) {
         case AccessorKind::NotAccessor:
           break;
 
@@ -2839,6 +2839,10 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
           SmallVector<Identifier, 4> argNames;
           // The implicit value/buffer parameter.
           argNames.push_back(Identifier());
+          // The callback storage parameter on materializeForSet.
+          if (accessorKind  == AccessorKind::IsMaterializeForSet)
+            argNames.push_back(Identifier());
+          // The subscript index parameters.
           if (subscript) {
             argNames.append(subscript->getFullName().getArgumentNames().begin(),
                             subscript->getFullName().getArgumentNames().end());
