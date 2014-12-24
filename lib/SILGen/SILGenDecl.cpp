@@ -1014,6 +1014,13 @@ static void emitCaptureArguments(SILGenFunction &gen,
     gen.Cleanups.pushCleanup<StrongReleaseCleanup>(box);
     break;
   }
+  case CaptureKind::NoEscape: {
+    // Non-escaping stored decls are captured as the address of the value.
+    SILType ty = gen.getLoweredType(type).getAddressType();
+    SILValue addr = new (gen.SGM.M) SILArgument(gen.F.begin(), ty, VD);
+    gen.VarLocs[VD] = SILGenFunction::VarLoc::get(addr);
+    break;
+  }
   case CaptureKind::LocalFunction: {
     // Local functions are captured by value.
     assert(!type->is<LValueType>() && !type->is<InOutType>() &&

@@ -2892,6 +2892,16 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
       break;
     }
 
+    case CaptureKind::NoEscape: {
+      // No-escaping stored declarations are captured as the
+      // address of the value.
+      assert(VarLocs.count(vd) && "no location for captured var!");
+      VarLoc vl = VarLocs[vd];
+      assert(vl.value.getType().isAddress() && "no address for captured var!");
+      capturedArgs.push_back(vl.value);
+      break;
+    }
+
     case CaptureKind::Box: {
       // LValues are captured as both the box owning the value and the
       // address of the value.
@@ -4386,6 +4396,14 @@ static void forwardCaptureArgs(SILGenFunction &gen,
       .getAddressType();
     // Forward the captured owning NativeObject.
     addSILArgument(SILType::getNativeObjectType(c), vd);
+    // Forward the captured value address.
+    addSILArgument(ty, vd);
+    break;
+  }
+
+  case CaptureKind::NoEscape: {
+    SILType ty = gen.getLoweredType(vd->getType()->getRValueType())
+      .getAddressType();
     // Forward the captured value address.
     addSILArgument(ty, vd);
     break;

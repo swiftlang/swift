@@ -152,10 +152,11 @@ AbstractionPattern TypeConverter::getMostGeneralAbstraction() {
 CaptureKind Lowering::getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture,
                                          AnyFunctionRef TheClosure) {
   if (VarDecl *var = dyn_cast<VarDecl>(capture.getPointer())) {
-    // If captured directly, the variable is captured by box.
+    // If captured directly, the variable is captured by box or pointer.
     if (capture.getInt()) {
       assert(var->hasStorage());
-      return CaptureKind::Box;
+      return TheClosure.isKnownNoEscape() ?
+         CaptureKind::NoEscape : CaptureKind::Box;
     }
 
     switch (var->getStorageKind()) {
@@ -179,9 +180,21 @@ CaptureKind Lowering::getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture,
       return CaptureKind::GetterSetter;
 
     case VarDecl::Stored:
+      // If we're capturing into a non-escaping closure, we can generally just
+      // capture the address of the value as no-escape.  The exception to this
+      // is non-address-only let constants, which have no address.
+#if 0 // not yet.
+      if (TheClosure.isKnownNoEscape()) {
+        if (var->isLet() && !getTypeLowering(VD->getType()).isAddressOnly())
+          return CaptureKind::NoEscape;
+      }
+#endif
+
       if (var->isLet())
         return CaptureKind::Constant;
-      return CaptureKind::Box;
+
+      return TheClosure.isKnownNoEscape() ?
+        CaptureKind::NoEscape : CaptureKind::Box;
     }
     llvm_unreachable("bad storage kind");
   }
@@ -1834,6 +1847,8 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
     auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::Freestanding,
                                             FunctionType::Representation::Thin,
                                             /*noreturn*/ false);
+    if (funcType->isNoEscape())
+      extInfo = extInfo.withNoEscape();
 
     return CanPolymorphicFunctionType::get(funcType.getInput(),
                                            funcType.getResult(),
@@ -1870,6 +1885,12 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
       inputFields.push_back(TupleTypeElt(getterTy));
       break;
     }
+
+    case CaptureKind::NoEscape:
+      // No-escape stored decls are captured by their raw address.
+      inputFields.push_back(TupleTypeElt(CanInOutType::get(captureType)));
+      break;
+
     case CaptureKind::Constant:
       if (!getTypeLowering(captureType).isAddressOnly()) {
         // Capture the value directly, unless it is address only.
@@ -1893,6 +1914,8 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
   auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::Freestanding,
                                           FunctionType::Representation::Thin,
                                           /*noreturn*/ false);
+  if (funcType->isNoEscape())
+    extInfo = extInfo.withNoEscape();
 
   if (genericParams)
     return CanPolymorphicFunctionType::get(capturedInputs, funcType,
@@ -1957,6 +1980,11 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
       inputFields.push_back(TupleTypeElt(getterTy));
       break;
     }
+    case CaptureKind::NoEscape:
+      // No-escape stored decls are captured by their raw address.
+      inputFields.push_back(TupleTypeElt(CanInOutType::get(captureType)));
+      break;
+
     case CaptureKind::Constant:
       if (!getTypeLowering(captureType).isAddressOnly()) {
         // Capture the value directly, unless it is address only.

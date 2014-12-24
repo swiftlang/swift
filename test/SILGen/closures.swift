@@ -299,7 +299,7 @@ func closeOverLetLValue() {
 
 // The let property needs to be captured into a temporary stack slot so that it
 // is loadable even though we capture the value.
-// CHECK: sil shared @_TFF8closures18closeOverLetLValueFT_T_U_FT_Si
+// CHECK-LABEL: sil shared @_TFF8closures18closeOverLetLValueFT_T_U_FT_Si
 // CHECK-NEXT: bb0(%0 : $ClassWithIntProperty):
 // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $ClassWithIntProperty  // let a
 // CHECK-NEXT: store %0 to [[TMP]]#1 : $*ClassWithIntProperty
@@ -310,3 +310,30 @@ func closeOverLetLValue() {
 // CHECK-NEXT: dealloc_stack %1#0 : $*@local_storage ClassWithIntProperty
 // CHECK-NEXT:  return
 
+
+
+// Use an external function so inout deshadowing cannot see its body.
+@asmname("takesNoEscapeClosure")
+func takesNoEscapeClosure(@__noescape fn : () -> Int)
+
+struct StructWithMutatingMethod {
+  var x = 42
+
+  mutating func mutatingMethod() {
+    // This should not capture the refcount of the self shadow.
+    takesNoEscapeClosure { x = 42; return x }
+  }
+}
+
+// Check that the address of self is passed in, but not the refcount pointer.
+
+// CHECK-LABEL: sil hidden @_TFV8closures24StructWithMutatingMethod14mutatingMethodfRS0_FT_T_
+// CHECK-NEXT: bb0(%0 : $*StructWithMutatingMethod):
+// CHECK-NEXT: %1 = alloc_box $StructWithMutatingMethod  // var self // users: %2, %5, %7, %8
+// CHECK-NEXT: copy_addr %0 to [initialization] %1#1 : $*StructWithMutatingMethod // id: %2
+// CHECK: [[CLOSURE:%[0-9]+]] = function_ref @_TFFV8closures24StructWithMutatingMethod14mutatingMethodFRS0_FT_T_U_FT_Si : $@__noescape @thin (@inout StructWithMutatingMethod) -> Int
+// CHECK: partial_apply [[CLOSURE]](%1#1) : $@__noescape @thin (@inout StructWithMutatingMethod) -> Int
+
+// Check that the closure body only takes the pointer.
+// CHECK-LABEL: sil shared @_TFFV8closures24StructWithMutatingMethod14mutatingMethodFRS0_FT_T_U_FT_Si : $@__noescape @thin (@inout StructWithMutatingMethod) -> Int {
+// CHECK-NEXT:  bb0(%0 : $*StructWithMutatingMethod):

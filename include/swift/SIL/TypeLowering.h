@@ -84,6 +84,8 @@ enum class CaptureKind {
   None,
   /// A local value captured as a mutable box.
   Box,
+  /// A local value captured into no-escape closure as a single pointer.
+  NoEscape,
   // A local value captures as a constant.
   Constant,
   /// A local function captured by value.
