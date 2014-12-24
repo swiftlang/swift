@@ -24,6 +24,9 @@ println(zero.successor().rawValue)
 // CHECK-NEXT: 0
 println(one.predecessor().rawValue)
 
+// CHECK-NEXT: 0
+println((one &+ one).rawValue)
+
 // CHECK: done.
 println("done.")
 
