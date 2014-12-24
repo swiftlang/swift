@@ -215,14 +215,14 @@ let NO = ObjCBool(false)
 // for ObjCBool
 @transparent
 public func && <T: BooleanType>(
-  lhs: T, @__noescape @autoclosure rhs: () -> ObjCBool
+  lhs: T, @autoclosure rhs: () -> ObjCBool
 ) -> Bool {
   return lhs.boolValue ? rhs().boolValue : false
 }
 
 @transparent
 public func || <T: BooleanType>(
-  lhs: T, @__noescape @autoclosure rhs: () -> ObjCBool
+  lhs: T, @autoclosure rhs: () -> ObjCBool
 ) -> Bool {
   return lhs.boolValue ? true : rhs().boolValue
 }

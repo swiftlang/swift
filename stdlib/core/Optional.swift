@@ -262,7 +262,7 @@ public func >= <T: _Comparable>(lhs: T?, rhs: T?) -> Bool {
 }
 
 @transparent
-public func ?? <T> (optional: T?, @__noescape @autoclosure defaultValue: () -> T) -> T {
+public func ?? <T> (optional: T?, @autoclosure defaultValue: () -> T) -> T {
   switch optional {
   case .Some(let value):
     return value
@@ -272,7 +272,7 @@ public func ?? <T> (optional: T?, @__noescape @autoclosure defaultValue: () -> T
 }
 
 @transparent
-public func ?? <T> (optional: T?, @__noescape @autoclosure defaultValue: () -> T?) -> T? {
+public func ?? <T> (optional: T?, @autoclosure defaultValue: () -> T?) -> T? {
   switch optional {
   case .Some(let value):
     return value

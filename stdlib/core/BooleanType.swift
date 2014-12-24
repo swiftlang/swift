@@ -21,7 +21,7 @@ public prefix func !<T : BooleanType>(a: T) -> Bool {
 /// return its `boolValue`.
 @inline(__always)
 public func && <T: BooleanType, U: BooleanType>(
-  lhs: T, @__noescape @autoclosure rhs: () -> U
+  lhs: T, @autoclosure rhs: () -> U
 ) -> Bool {
   return lhs.boolValue ? rhs().boolValue : false
 }
@@ -30,7 +30,7 @@ public func && <T: BooleanType, U: BooleanType>(
 /// return its `boolValue`.
 @inline(__always)
 public func || <T: BooleanType, U: BooleanType>(
-  lhs: T, @__noescape @autoclosure rhs: () -> U
+  lhs: T, @autoclosure rhs: () -> U
 ) -> Bool {
   return lhs.boolValue ? true : rhs().boolValue
 }
@@ -40,14 +40,14 @@ public func || <T: BooleanType, U: BooleanType>(
 // for Bool.  We've done the same for ObjCBool
 @transparent
 public func && <T: BooleanType>(
-  lhs: T, @__noescape @autoclosure rhs: () -> Bool
+  lhs: T, @autoclosure rhs: () -> Bool
 ) -> Bool {
   return lhs.boolValue ? rhs().boolValue : false
 }
 
 @transparent
 public func || <T: BooleanType>(
-  lhs: T, @__noescape @autoclosure rhs: () -> Bool
+  lhs: T, @autoclosure rhs: () -> Bool
 ) -> Bool {
   return lhs.boolValue ? true : rhs().boolValue
 }
