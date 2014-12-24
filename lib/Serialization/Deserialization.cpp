@@ -3456,6 +3456,7 @@ Type ModuleFile::getType(TypeID TID) {
     uint8_t rawCalleeConvention;
     bool thin, block;
     bool noreturn = false;
+    bool noescape = false;
     unsigned numGenericParams;
     ArrayRef<uint64_t> paramIDs;
 
@@ -3464,9 +3465,8 @@ Type ModuleFile::getType(TypeID TID) {
                                                    rawInterfaceResultConvention,
                                                    rawCalleeConvention,
                                                    rawCallingConvention,
-                                                   thin,
-                                                   block,
-                                                   noreturn,
+                                                   thin, block,
+                                                   noreturn, noescape,
                                                    numGenericParams,
                                                    paramIDs);
 
@@ -3478,7 +3478,7 @@ Type ModuleFile::getType(TypeID TID) {
     }
     SILFunctionType::ExtInfo extInfo(callingConvention.getValue(),
                                      getFunctionRepresentation(thin, block),
-                                     noreturn);
+                                     noreturn, /*autoclosure*/false, noescape);
 
     // Process the result.
     auto interfaceResultConvention
