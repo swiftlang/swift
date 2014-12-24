@@ -27,8 +27,8 @@
 /// `condition` is true.
 @transparent
 public func assert(
-  @autoclosure condition: () -> Bool,
-  @autoclosure _ message: () -> String = String(),
+  @__noescape @autoclosure condition: () -> Bool,
+  @__noescape @autoclosure _ message: () -> String = String(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only assert in debug mode.
@@ -46,8 +46,8 @@ public func assert(
 /// In unchecked mode the optimizer can assume that the `condition` is true.
 @transparent
 public func precondition(
-  @autoclosure condition: () -> Bool,
-  @autoclosure _ message: () -> String = String(),
+  @__noescape @autoclosure condition: () -> Bool,
+  @__noescape @autoclosure _ message: () -> String = String(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only check in debug and release mode.  In release mode just trap.
@@ -65,7 +65,7 @@ public func precondition(
 /// optimized builds this is a noop.
 @transparent @noreturn
 public func assertionFailure(
-  @autoclosure _ message: () -> String = String(),
+  @__noescape @autoclosure _ message: () -> String = String(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   if _isDebugAssertConfiguration() {
@@ -79,7 +79,7 @@ public func assertionFailure(
 /// optimizer can still assume that the call is unreachable.
 @transparent @noreturn
 public func preconditionFailure(
-  @autoclosure _ message: () -> String = String(),
+  @__noescape @autoclosure _ message: () -> String = String(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only check in debug and release mode.  In release mode just trap.
@@ -95,7 +95,7 @@ public func preconditionFailure(
 /// optimized and unchecked modes.
 @transparent @noreturn
 public func fatalError(
-  @autoclosure _ message: () -> String = String(),
+  @__noescape @autoclosure _ message: () -> String = String(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   _assertionFailed("fatal error", message(), file, line)
@@ -109,7 +109,7 @@ public func fatalError(
 /// and abort.
 @transparent
 public func _precondition(
-  @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
+  @__noescape @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only check in debug and release mode. In release mode just trap.
@@ -162,7 +162,7 @@ public func _overflowChecked<T>(
 /// all possible errors.
 @transparent
 public func _debugPrecondition(
-  @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
+  @__noescape @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only check in debug mode.
@@ -191,7 +191,7 @@ public func _debugPreconditionFailure(
 /// call to this function is a noop.
 @transparent
 public func _sanityCheck(
-  @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
+  @__noescape @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
 #if INTERNAL_CHECKS_ENABLED
