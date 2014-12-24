@@ -75,8 +75,8 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
   // If we are asked do debug serialization, instead of running all diagnostic
   // passes, just run mandatory inlining with dead transparent function cleanup
   // disabled.
+  PM.add(createMandatoryInlining());
   if (Module.getOptions().DebugSerialization) {
-    PM.add(createMandatoryInlining());
     PM.run();
     return Ctx.hadError();
   }
@@ -87,8 +87,6 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
   PM.add(createInOutDeshadowing());
   PM.add(createNoReturnFolding());
   PM.add(createDefiniteInitialization());
-
-  PM.add(createMandatoryInlining());
   PM.add(createPredictableMemoryOptimizations());
   PM.add(createDiagnosticConstantPropagation());
   PM.add(createDiagnoseUnreachable());

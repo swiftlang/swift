@@ -985,18 +985,4 @@ struct StructMutatingMethodTest {
   func nonmutate() {}
 }
 
- // <rdar://problem/19268443> DI should reject this call to transparent function
- class TransparentFunction {
-  let x : Int
-  let y : Int
-  init() {
-    x = 42
-    ++x     // expected-error {{mutating operator '++' may not be used on immutable value 'self.x'}}
 
-    y = 12
-    myTransparentFunction(&y)  // expected-error {{immutable value 'self.y' may not be passed inout}}
-  }
-}
-
-@transparent
-func myTransparentFunction(inout x : Int) {}
