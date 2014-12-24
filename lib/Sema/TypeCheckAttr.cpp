@@ -1157,17 +1157,6 @@ void TypeChecker::checkAutoClosureAttr(VarDecl *VD, AutoClosureAttr *attr) {
   // Change the type to include the autoclosure bit.
   VD->overwriteType(FunctionType::get(FuncTyInput, FTy->getResult(),
                                     FTy->getExtInfo().withIsAutoClosure(true)));
-
-  // Autoclosure implies noescape, so add a noescape attribute if this is a
-  // function parameter.
-  if (auto *PD = dyn_cast<ParamDecl>(VD))
-    if (!VD->getAttrs().hasAttribute<NoEscapeAttr>() &&
-        // Limit this to the stdlib until @__noescape is a public feature.
-        VD->getDeclContext()->getParentModule()->isStdlibModule()) {
-      auto *newAttr = new (Context) NoEscapeAttr(/*isImplicit*/true);
-      VD->getAttrs().add(newAttr);
-      checkNoEscapeAttr(PD, newAttr);
-    }
 }
 
 void TypeChecker::checkNoEscapeAttr(ParamDecl *PD, NoEscapeAttr *attr) {
