@@ -1528,6 +1528,63 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
                                   CBI->getTrueBB(), OrigTrueArgs,
                                   *CBI->getFunction());
   }
+
+  // cond_br (select_enum) -> switch_enum
+  // This pattern often occurs as a result of using optionals.
+  if (auto *SEI = dyn_cast<SelectEnumInst>(CBI->getCondition())) {
+    // No bb args should be passed
+    if (!CBI->getTrueArgs().empty() || !CBI->getFalseArgs().empty())
+      return nullptr;
+    auto EnumOperandTy = SEI->getEnumOperand().getType();
+    // Type should be loadable
+    if (!EnumOperandTy.isLoadable(SEI->getModule()))
+      return nullptr;
+
+    // Result of the selec_enum should be a boolean.
+    if (SEI->getType() != CBI->getCondition().getType())
+      return nullptr;
+
+    // If any of cond_br edges are critical edges, do not perform
+    // the transformation, as SIL in canonical form may
+    // only have critical edges that are originating from cond_br
+    // instructions.
+    if (!CBI->getTrueBB()->getSinglePredecessor())
+      return nullptr;
+
+    if (!CBI->getFalseBB()->getSinglePredecessor())
+      return nullptr;
+
+    SILBasicBlock *Default = nullptr;
+
+    match_integer<0> Zero;
+
+    if (SEI->hasDefault()) {
+      bool isFalse = match(SEI->getDefaultResult(), Zero);
+      Default = isFalse ? CBI->getFalseBB() : Default = CBI->getTrueBB();
+    }
+
+    // We can now convert cond_br(select_enum) into switch_enum
+    SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 8> Cases;
+    for (int i = 0, e = SEI->getNumCases(); i < e; ++i) {
+      auto Pair = SEI->getCase(i);
+      if (isa<IntegerLiteralInst>(Pair.second)) {
+        bool isFalse = match(Pair.second, Zero);
+        if (!isFalse && Default != CBI->getTrueBB()) {
+          Cases.push_back(std::make_pair(Pair.first, CBI->getTrueBB()));
+        }
+        if (isFalse && Default != CBI->getFalseBB()) {
+          Cases.push_back(std::make_pair(Pair.first, CBI->getFalseBB()));
+        }
+        continue;
+      }
+
+      return nullptr;
+    }
+
+    return SwitchEnumInst::create(SEI->getLoc(), SEI->getEnumOperand(), Default,
+                                  Cases, *SEI->getParent()->getParent());
+  }
+
   return nullptr;
 }
 
