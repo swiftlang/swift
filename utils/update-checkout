@@ -106,6 +106,8 @@ def main():
         update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "clang"))
 
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift"))
+    update_working_copy(
+        os.path.join(SWIFT_SOURCE_ROOT, "swift", "benchmark", "PerfTestSuite"))
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "SourceKit"))
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "lldb"))
 
