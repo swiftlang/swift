@@ -44,3 +44,11 @@ class SomeClass {
     takesNoEscapeClosure { x }
   }
 }
+
+
+// Implicit conversions (in this case to @objc_block) are ok.
+@asmname("whatever")
+func takeNoEscapeAsObjCBlock(@__noescape @objc_block () -> Void)
+func takeNoEscapeTest2(@__noescape fn : () -> ()) {
+  takeNoEscapeAsObjCBlock(fn)
+}

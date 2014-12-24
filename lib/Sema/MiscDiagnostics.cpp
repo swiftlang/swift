@@ -147,8 +147,11 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
       // Check function calls, looking through implicit conversions on the
       // function and inspecting the arguments directly.
       if (auto *Call = dyn_cast<ApplyExpr>(E)) {
-        // Check the callee.
-        if (auto *DRE = dyn_cast<DeclRefExpr>(Call->getFn()))
+        // Check the callee, looking through implicit conversions.
+        auto Base = Call->getFn();
+        while (auto Conv = dyn_cast<ImplicitConversionExpr>(Base))
+          Base = Conv->getSubExpr();
+        if (auto *DRE = dyn_cast<DeclRefExpr>(Base))
           checkNoEscapeParameterUse(DRE, Call);
 
         // The argument is either a ParenExpr or TupleExpr.
@@ -162,6 +165,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
 
         // Check each argument.
         for (auto arg : arguments) {
+          while (auto conv = dyn_cast<ImplicitConversionExpr>(arg))
+            arg = conv->getSubExpr();
           if (auto *DRE = dyn_cast<DeclRefExpr>(arg))
             checkNoEscapeParameterUse(DRE, Call);
         }
