@@ -23,13 +23,13 @@ func func8(@autoclosure inout x: () -> Bool) -> Bool {  // expected-error {{'aut
 
 
 // Should have good QoI:
-func migrate1(fp fpx : @autoclosure () -> Int) {}   // expected-error {{'autoclosure' attribute is now an attribute of the parameter declaration, not its type}}
+func migrate1(fp fpx : @autoclosure () -> Int) {}   // expected-error {{'autoclosure' attribute is now an attribute of the parameter declaration, not its type}} {{15-15=@autoclosure }} {{24-36=}}
 struct MethodHolder {
-  func migrate2(a : Int, _ fp : @autoclosure () -> Int) {}    // expected-error {{'autoclosure' attribute is now an attribute of the parameter declaration, not its type}}
+  func migrate2(a : Int, _ fp : @autoclosure () -> Int) {}    // expected-error {{'autoclosure' attribute is now an attribute of the parameter declaration, not its type}} {{26-26=@autoclosure }} {{33-45=}}
 }
-func migrate3(#fp : @autoclosure () -> Int) {}    // expected-error {{'autoclosure' attribute is now an attribute of the parameter declaration, not its type}}
+func migrate3(#fp : @autoclosure () -> Int) {}    // expected-error {{'autoclosure' attribute is now an attribute of the parameter declaration, not its type}} {{15-15=@autoclosure }} {{21-33=}}
 public func || <T: BooleanType>(
-  lhs: T, rhs: @autoclosure () -> Bool    // expected-error {{'autoclosure' attribute is now an attribute of the parameter declaration, not its type}}
+  lhs: T, rhs: @autoclosure () -> Bool    // expected-error {{'autoclosure' attribute is now an attribute of the parameter declaration, not its type}} {{11-11=@autoclosure }} {{16-28=}}
   ) -> Bool {
     return lhs.boolValue ? true : rhs().boolValue
 }
