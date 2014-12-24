@@ -78,29 +78,7 @@ inline CanSILFunctionType adjustFunctionType(CanSILFunctionType t,
                                          : ParameterConvention::Direct_Unowned);
 }
   
-/// Different ways in which a function can capture context.
-enum class CaptureKind {
-  /// No context arguments are necessary.
-  None,
-  /// A local value captured as a mutable box.
-  Box,
-  /// A local value captured into no-escape closure as a single pointer.
-  NoEscape,
-  // A local value captures as a constant.
-  Constant,
-  /// A local function captured by value.
-  LocalFunction,
-  /// A getter-only property.
-  Getter,
-  /// A settable property.
-  GetterSetter
-};
-  
-/// Return the CaptureKind to use when capturing a decl into the specified
-/// closure.
-CaptureKind getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture,
-                               AnyFunctionRef TheClosure);
-  
+
 /// Flag used to place context-dependent TypeLowerings in their own arena which
 /// can be disposed when a generic context is exited.
 enum IsDependent_t : unsigned {
@@ -406,7 +384,26 @@ struct SILConstantInfo {
   }
 };
 SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
-  
+
+/// Different ways in which a function can capture context.
+enum class CaptureKind {
+  /// No context arguments are necessary.
+  None,
+  /// A local value captured as a mutable box.
+  Box,
+  /// A local value captured into no-escape closure as a single pointer.
+  NoEscape,
+  // A local value captures as a constant.
+  Constant,
+  /// A local function captured by value.
+  LocalFunction,
+  /// A getter-only property.
+  Getter,
+  /// A settable property.
+  GetterSetter
+};
+
+
 /// TypeConverter - helper class for creating and managing TypeLowerings.
 class TypeConverter {
   friend class TypeLowering;
@@ -509,6 +506,11 @@ public:
   ~TypeConverter();
   TypeConverter(TypeConverter const &) = delete;
   TypeConverter &operator=(TypeConverter const &) = delete;
+
+  /// Return the CaptureKind to use when capturing a decl into the specified
+  /// closure.
+  CaptureKind getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture,
+                                 AnyFunctionRef TheClosure);
 
   /// Return a most-general-possible abstraction pattern.
   AbstractionPattern getMostGeneralAbstraction();

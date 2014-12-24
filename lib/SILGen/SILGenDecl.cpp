@@ -970,36 +970,31 @@ static void emitCaptureArguments(SILGenFunction &gen,
 
   auto *VD = capture.getPointer();
   auto type = VD->getType();
-  switch (getDeclCaptureKind(capture, theClosure)) {
+  switch (gen.SGM.Types.getDeclCaptureKind(capture, theClosure)) {
   case CaptureKind::None:
     break;
 
   case CaptureKind::Constant: {
     auto &lowering = gen.getTypeLowering(VD->getType());
-    if (!lowering.isAddressOnly()) {
-      // Constant decls are captured by value.  If the captured value is a tuple
-      // value, we need to reconstitute it before sticking it in VarLocs.
-      SILType ty = lowering.getLoweredType();
-      SILValue val = emitReconstitutedConstantCaptureArguments(ty, VD, gen);
+    // Constant decls are captured by value.  If the captured value is a tuple
+    // value, we need to reconstitute it before sticking it in VarLocs.
+    SILType ty = lowering.getLoweredType();
+    SILValue val = emitReconstitutedConstantCaptureArguments(ty, VD, gen);
 
-      // If the original variable was settable, then Sema will have treated the
-      // VarDecl as an lvalue, even in the closure's use.  As such, we need to
-      // allow formation of the address for this captured value.  Create a
-      // temporary within the closure to provide this address.
-      if (VD->isSettable(VD->getDeclContext())) {
-        auto addr = gen.emitTemporaryAllocation(VD, lowering.getLoweredType());
-        gen.B.createStore(VD, val, addr);
-        val = addr;
-      }
-
-      gen.VarLocs[VD] = SILGenFunction::VarLoc::get(val);
-      if (!lowering.isTrivial())
-        gen.enterDestroyCleanup(val);
-      break;
+    // If the original variable was settable, then Sema will have treated the
+    // VarDecl as an lvalue, even in the closure's use.  As such, we need to
+    // allow formation of the address for this captured value.  Create a
+    // temporary within the closure to provide this address.
+    if (VD->isSettable(VD->getDeclContext())) {
+      auto addr = gen.emitTemporaryAllocation(VD, ty);
+      gen.B.createStore(VD, val, addr);
+      val = addr;
     }
-    // Address-only values we capture by-box since partial_apply doesn't work
-    // with @in for address-only types.
-    SWIFT_FALLTHROUGH;
+
+    gen.VarLocs[VD] = SILGenFunction::VarLoc::get(val);
+    if (!lowering.isTrivial())
+      gen.enterDestroyCleanup(val);
+    break;
   }
 
   case CaptureKind::Box: {

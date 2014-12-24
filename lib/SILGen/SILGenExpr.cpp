@@ -2822,7 +2822,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   for (auto capture : captures) {
     auto *vd = capture.getPointer();
     
-    switch (getDeclCaptureKind(capture, TheClosure)) {
+    switch (SGM.Types.getDeclCaptureKind(capture, TheClosure)) {
     case CaptureKind::None:
       break;
 
@@ -2830,65 +2830,33 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
       // let declarations.
       auto Entry = VarLocs[vd];
 
-#if 0
-      assert(Entry.isConstant() && vd->isLet() &&
-             "only let decls captured by constant");
-      SILValue Val = Entry.getConstant();
-      // FIXME: This should work for both paths.  partial_apply hasn't been
-      // taught how to work with @in address only values yet.
-      auto MV = ManagedValue::forUnmanaged(Entry.getConstant())
-      .copyUnmanaged(*this, loc);
-      MV.forward(*this);
-      MV = ManagedValue::forUnmanaged(MV.getValue());
-
-      // Use an RValue to explode Val if it is a tuple.
-      RValue RV(*this, loc, capture->getType()->getCanonicalType(), MV);
-      std::move(RV).forwardAll(*this, capturedArgs);
-      break;
-#endif
-
       // Non-address-only constants are passed at +1.
       auto &tl = getTypeLowering(vd->getType()->getReferenceStorageReferent());
       SILValue Val = Entry.value;
 
-      if (tl.isLoadable()) {
-        if (!Val.getType().isAddress()) {
-          // Just retain a by-val let.
-          B.emitRetainValueOperation(loc, Val);
-        } else {
-          // If we have a mutable binding for a 'let', such as 'self' in an
-          // 'init' method, load it.
-          Val = emitLoad(loc, Val, tl, SGFContext(), IsNotTake).forward(*this);
-        }
-        
-        // Use an RValue to explode Val if it is a tuple.
-        RValue RV(*this, loc, vd->getType()->getCanonicalType(),
-                  ManagedValue::forUnmanaged(Val));
-
-        // If we're capturing an unowned pointer by value, we will have just
-        // loaded it into a normal retained class pointer, but we capture it as
-        // an unowned pointer.  Convert back now.
-        if (vd->getType()->is<ReferenceStorageType>()) {
-          auto type = getTypeLowering(vd->getType()).getLoweredType();
-          auto val = std::move(RV).forwardAsSingleStorageValue(*this, type,loc);
-          capturedArgs.push_back(val);
-         } else {
-           std::move(RV).forwardAll(*this, capturedArgs);
-         }
-        break;
+      if (!Val.getType().isAddress()) {
+        // Just retain a by-val let.
+        B.emitRetainValueOperation(loc, Val);
+      } else {
+        // If we have a mutable binding for a 'let', such as 'self' in an
+        // 'init' method, load it.
+        Val = emitLoad(loc, Val, tl, SGFContext(), IsNotTake).forward(*this);
       }
       
-      assert(Val.getType().isAddress());
+      // Use an RValue to explode Val if it is a tuple.
+      RValue RV(*this, loc, vd->getType()->getCanonicalType(),
+                ManagedValue::forUnmanaged(Val));
 
-      // Address only values are passed by box.  This isn't great, in that a
-      // variable captured by multiple closures will be boxed for each one, 
-      AllocBoxInst *allocBox = B.createAllocBox(loc,
-                                                Val.getType().getObjectType());
-      auto boxAddress = SILValue(allocBox, 1);
-      B.createCopyAddr(loc, Val, boxAddress, IsNotTake, IsInitialization);
-      capturedArgs.push_back(SILValue(allocBox, 0));
-      capturedArgs.push_back(boxAddress);
-
+      // If we're capturing an unowned pointer by value, we will have just
+      // loaded it into a normal retained class pointer, but we capture it as
+      // an unowned pointer.  Convert back now.
+      if (vd->getType()->is<ReferenceStorageType>()) {
+        auto type = getTypeLowering(vd->getType()).getLoweredType();
+        auto val = std::move(RV).forwardAsSingleStorageValue(*this, type,loc);
+        capturedArgs.push_back(val);
+      } else {
+        std::move(RV).forwardAll(*this, capturedArgs);
+      }
       break;
     }
 
@@ -2907,11 +2875,27 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
       // address of the value.
       assert(VarLocs.count(vd) && "no location for captured var!");
       VarLoc vl = VarLocs[vd];
-      assert(vl.box && "no box for captured var!");
       assert(vl.value.getType().isAddress() && "no address for captured var!");
-      B.createStrongRetain(loc, vl.box);
-      capturedArgs.push_back(vl.box);
-      capturedArgs.push_back(vl.value);
+
+      // If this is a boxed variable, we can use it directly.
+      if (vl.box) {
+        B.createStrongRetain(loc, vl.box);
+        capturedArgs.push_back(vl.box);
+        capturedArgs.push_back(vl.value);
+      } else {
+        // Address only 'let' values are passed by box.  This isn't great, in
+        // that a variable captured by multiple closures will be boxed for each
+        // one.  This could be improved by doing an "isCaptured" analysis when
+        // emitting address-only let constants, and emit them into a alloc_box
+        // like a variable instead of into an alloc_stack.
+        AllocBoxInst *allocBox =
+          B.createAllocBox(loc, vl.value.getType().getObjectType());
+        auto boxAddress = SILValue(allocBox, 1);
+        B.createCopyAddr(loc, vl.value, boxAddress, IsNotTake,IsInitialization);
+        capturedArgs.push_back(SILValue(allocBox, 0));
+        capturedArgs.push_back(boxAddress);
+      }
+
       break;
     }
     case CaptureKind::LocalFunction: {
@@ -4380,16 +4364,13 @@ static void forwardCaptureArgs(SILGenFunction &gen,
 
   auto *vd = capture.getPointer();
   
-  switch (getDeclCaptureKind(capture, theClosure)) {
+  switch (gen.SGM.Types.getDeclCaptureKind(capture, theClosure)) {
   case CaptureKind::None:
     break;
 
   case CaptureKind::Constant:
-    if (!gen.getTypeLowering(vd->getType()).isAddressOnly()) {
-      addSILArgument(gen.getLoweredType(vd->getType()), vd);
-      break;
-    }
-    SWIFT_FALLTHROUGH;
+    addSILArgument(gen.getLoweredType(vd->getType()), vd);
+    break;
 
   case CaptureKind::Box: {
     SILType ty = gen.getLoweredType(vd->getType()->getRValueType())

@@ -149,8 +149,9 @@ AbstractionPattern TypeConverter::getMostGeneralAbstraction() {
   return AbstractionPattern(MostGeneralArchetype);
 }
 
-CaptureKind Lowering::getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture,
-                                         AnyFunctionRef TheClosure) {
+CaptureKind TypeConverter::
+getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture,
+                   AnyFunctionRef TheClosure) {
   if (VarDecl *var = dyn_cast<VarDecl>(capture.getPointer())) {
     // If captured directly, the variable is captured by box or pointer.
     if (capture.getInt()) {
@@ -180,19 +181,14 @@ CaptureKind Lowering::getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture,
       return CaptureKind::GetterSetter;
 
     case VarDecl::Stored:
-      // If we're capturing into a non-escaping closure, we can generally just
-      // capture the address of the value as no-escape.  The exception to this
-      // is non-address-only let constants, which have no address.
-#if 0 // not yet.
-      if (TheClosure.isKnownNoEscape()) {
-        if (var->isLet() && !getTypeLowering(VD->getType()).isAddressOnly())
-          return CaptureKind::NoEscape;
-      }
-#endif
-
-      if (var->isLet())
+      // If this is a non-address-only stored 'let' constant, we can capture it
+      // by value.  If it is address-only, then we can't load it, so capture it
+      // by its address (like a var) instead.
+      if (var->isLet() && !getTypeLowering(var->getType()).isAddressOnly())
         return CaptureKind::Constant;
 
+      // If we're capturing into a non-escaping closure, we can generally just
+      // capture the address of the value as no-escape.
       return TheClosure.isKnownNoEscape() ?
         CaptureKind::NoEscape : CaptureKind::Box;
     }
@@ -1892,12 +1888,9 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
       break;
 
     case CaptureKind::Constant:
-      if (!getTypeLowering(captureType).isAddressOnly()) {
-        // Capture the value directly, unless it is address only.
-        inputFields.push_back(TupleTypeElt(captureType));
-        break;
-      }
-      SWIFT_FALLTHROUGH;
+      // Capture the value directly.
+      inputFields.push_back(TupleTypeElt(captureType));
+      break;
     case CaptureKind::Box: {
       // Capture the owning NativeObject and the address of the value.
       inputFields.push_back(Context.TheNativeObjectType);
@@ -1986,12 +1979,9 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
       break;
 
     case CaptureKind::Constant:
-      if (!getTypeLowering(captureType).isAddressOnly()) {
-        // Capture the value directly, unless it is address only.
-        inputFields.push_back(TupleTypeElt(captureType));
-        break;
-      }
-      SWIFT_FALLTHROUGH;
+      // Capture the value directly.
+      inputFields.push_back(TupleTypeElt(captureType));
+      break;
     case CaptureKind::Box: {
       // Capture the owning NativeObject and the address of the value.
       inputFields.push_back(Context.TheNativeObjectType);
