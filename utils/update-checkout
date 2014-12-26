@@ -13,31 +13,13 @@
 
 from __future__ import print_function
 
-import getopt
+import argparse
 import os
-import shutil
-import string
 import sys
 
 sys.path.append(os.path.dirname(__file__))
 
 from SwiftBuildSupport import *
-
-
-def usage():
-    print("""
-Usage:
-  update-checkout [options]
-
-  source repositories.
-
-  By default, updates your checkouts of Swift, SourceKit and LLDB.
-
-Options:
-
-  -a, --all   update your checkouts of LLVM, Clang and Swift,
-              SourceKit and LLDB
-""")
 
 
 class WorkingDirectory(object):
@@ -84,24 +66,18 @@ def update_working_copy(repo_path):
 
 
 def main():
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], "a",
-            [ "all" ])
-    except getopt.GetoptError as err:
-        bad_usage(str(err))
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="""
+repositories.
 
-    opt_update_all = False
+By default, updates your checkouts of Swift, SourceKit and LLDB.""")
+    parser.add_argument("-a", "--all",
+        help="update your checkouts of LLVM, Clang and Swift, SourceKit and LLDB",
+        action="store_true")
+    args = parser.parse_args()
 
-    for o, a in opts:
-        if o == "--all":
-            opt_update_all = True
-        else:
-            assert False, "unhandled option " + o
-
-    if args != []:
-        bad_usage("extra arguments: " + args)
-
-    if opt_update_all:
+    if args.all:
         update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llvm"))
         update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "clang"))
 
