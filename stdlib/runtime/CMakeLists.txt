@@ -38,14 +38,15 @@ add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
   C_COMPILE_FLAGS ${swift_runtime_compile_flags}
   INSTALL_IN_COMPONENT stdlib)
 
-foreach(sdk ${SWIFTLIB_TARGET_SDKS})
+foreach(sdk ${SWIFT_CONFIGURED_SDKS})
   if("${sdk}" STREQUAL "LINUX")
-  foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
-    set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
+    foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+      set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
 
-    # FIXME: We will need a different linker script for 32-bit builds.
-    configure_file(
-        "swift.ld" "${SWIFTLIB_DIR}/${arch_subdir}/swift.ld" COPYONLY)
-  endforeach()
+      # FIXME: We will need a different linker script for 32-bit builds.
+      configure_file(
+          "swift.ld" "${SWIFTLIB_DIR}/${arch_subdir}/swift.ld" COPYONLY)
+    endforeach()
+  endif()
 endforeach()
 
