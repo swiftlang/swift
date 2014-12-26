@@ -118,7 +118,7 @@ def get_preset_options(substitutions, preset_file_names, preset_name):
     (build_script_opts, build_script_impl_opts) = \
         get_preset_options_impl(config, substitutions, preset_name)
     if build_script_opts is None:
-        print_with_argv0("preset '" + preset_name + "'not found")
+        print_with_argv0("preset '" + preset_name + "' not found")
         sys.exit(1)
 
     return build_script_opts + [ "--" ] + build_script_impl_opts
