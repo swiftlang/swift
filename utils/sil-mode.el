@@ -111,7 +111,10 @@
                     "thick_to_objc_metatype" "objc_to_thick_metatype"
                     "thin_to_thick_function" "is_nonnull"
                     "unchecked_ref_bit_cast" "unchecked_trivial_bit_cast"
-                    "objc_existential_metatype_to_object")
+                    "objc_existential_metatype_to_object"
+                    "bridge_object_to_word" "bridge_object_to_ref"
+                    "word_to_bridge_object" "ref_to_bridge_object"
+                    )
                   'words) . font-lock-keyword-face)
    ;; Checked Conversions
    `(,(regexp-opt '("unconditional_checked_cast" "unconditional_checked_cast_addr")
