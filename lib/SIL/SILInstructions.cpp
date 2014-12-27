@@ -27,6 +27,7 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -675,15 +676,12 @@ SwitchValueInst *SwitchValueInst::create(
   return ::new (buf) SwitchValueInst(Loc, Operand, DefaultBB, Cases, BBs);
 }
 
-SelectValueInst::SelectValueInst(SILLocation Loc, SILValue Operand, SILType Type,
-                                 SILValue DefaultResult,
-                                 ArrayRef<SILValue> CaseValuesAndResults)
-    : SelectInstBase(ValueKind::SelectValueInst,
-                     Loc,
-                     Type,
-                     CaseValuesAndResults.size() / 2,
-                     bool(DefaultResult),
-                     CaseValuesAndResults, Operand) {
+SelectValueInst::
+SelectValueInst(SILLocation Loc, SILValue Operand, SILType Type,
+                bool HasDefaultResult, ArrayRef<SILValue> Cases,
+                ArrayRef<SILValue> Values)
+  : SelectInstBase(ValueKind::SelectValueInst, Loc, Operand, Type,
+                   HasDefaultResult, Cases, Values) {
 
   unsigned OperandBitWidth = 0;
 
@@ -691,13 +689,15 @@ SelectValueInst::SelectValueInst(SILLocation Loc, SILValue Operand, SILType Type
     OperandBitWidth = OperandTy->getGreatestWidth();
   }
 
-  for (unsigned i = 0; i < NumCases; ++i) {
-    auto *IL = dyn_cast<IntegerLiteralInst>(CaseValuesAndResults[i * 2]);
+#ifndef NDEBUG
+  for (SILValue Key : Cases) {
+    auto *IL = dyn_cast<IntegerLiteralInst>(Key);
     assert(IL && "select_value case value should be of an integer type");
     assert(IL->getValue().getBitWidth() == OperandBitWidth &&
            "select_value case value is not same bit width as operand");
     (void)IL;
   }
+#endif
 }
 
 SelectValueInst::~SelectValueInst() {
@@ -708,27 +708,14 @@ SelectValueInst::create(SILLocation Loc, SILValue Operand, SILType Type,
                         SILValue DefaultResult,
                         ArrayRef<std::pair<SILValue, SILValue>> CaseValues,
                         SILFunction &F) {
-  // Allocate enough room for the instruction with tail-allocated data for all
-  // the case values and the SILSuccessor arrays. There are `CaseBBs.size()`
-  // SILValuues and `CaseBBs.size() + (DefaultBB ? 1 : 0)` successors.
-  SmallVector<SILValue, 8> CaseValuesAndResults;
-  for (auto pair : CaseValues) {
-    CaseValuesAndResults.push_back(pair.first);
-    CaseValuesAndResults.push_back(pair.second);
-  }
-
-  if ((bool)DefaultResult)
-    CaseValuesAndResults.push_back(DefaultResult);
-
-  size_t bufSize = sizeof(SelectValueInst) + decltype(Operands)::getExtraSize(
-                                               CaseValuesAndResults.size());
-  void *buf = F.getModule().allocate(bufSize, alignof(SelectValueInst));
-  return ::new (buf)
-      SelectValueInst(Loc, Operand, Type, DefaultResult, CaseValuesAndResults);
+  auto *S = createSelectInst<SelectValueInst>(Loc, Operand, Type, DefaultResult,
+                                              CaseValues, F);
+  return S;
 }
 
+template <class CaseTy>
 static SmallVector<SILValue, 4>
-getCaseOperands(ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues,
+getCaseOperands(ArrayRef<std::pair<CaseTy, SILValue>> CaseValues,
                 SILValue DefaultValue) {
   SmallVector<SILValue, 4> result;
 
@@ -740,44 +727,58 @@ getCaseOperands(ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues,
   return result;
 }
 
-SelectEnumInstBase::SelectEnumInstBase(
-    ValueKind Kind, SILLocation Loc, SILValue Operand, SILType Ty,
-    SILValue DefaultValue,
-    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues)
-    : SelectInstBase(Kind, Loc, Ty, CaseValues.size(), bool(DefaultValue),
-                     getCaseOperands(CaseValues, DefaultValue), Operand) {
-  // Initialize the case and successor arrays.
-  auto *cases = getCaseBuf();
-  for (unsigned i = 0, size = CaseValues.size(); i < size; ++i) {
-    cases[i] = CaseValues[i].first;
-  }
+template <class CaseTy>
+SelectInstBase<CaseTy>::
+SelectInstBase(ValueKind Kind, SILLocation Loc, SILValue Operand, SILType Ty,
+               bool HasDefaultValue, ArrayRef<CaseTy> C,
+               ArrayRef<SILValue> V)
+  : SelectInst(Kind, Loc, Ty, C.size(), HasDefaultValue, V, Operand) {
+  // Initialize the case array.
+  MutableArrayRef<CaseTy> Cases = getCases();
+  std::copy(C.begin(), C.end(), Cases.begin());
 }
 
-template<typename SELECT_ENUM_INST>
-SELECT_ENUM_INST *
-SelectEnumInstBase::createSelectEnum(SILLocation Loc, SILValue Operand,
-                 SILType Ty,
+template <class CaseTy>
+template <class DerivedClass>
+DerivedClass *
+SelectInstBase<CaseTy>::
+createSelectInst(SILLocation Loc, SILValue Operand, SILType Ty,
                  SILValue DefaultValue,
-                 ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues,
+                 ArrayRef<std::pair<CaseTy,
+                                    SILValue>> CaseValues,
                  SILFunction &F) {
   // Allocate enough room for the instruction with tail-allocated
   // EnumElementDecl and operand arrays. There are `CaseBBs.size()` decls
   // and `CaseBBs.size() + (DefaultBB ? 1 : 0)` values.
+  bool hasDefault = bool(DefaultValue);
   unsigned numCases = CaseValues.size();
+  unsigned numOps = numCases + unsigned(hasDefault);
+  unsigned operandBytes = TailAllocatedOperandList<1>::getExtraSize(numOps);
+  unsigned caseBytes = sizeof(CaseTy) * numCases;
+  unsigned numBytes = sizeof(DerivedClass) + operandBytes + caseBytes;
 
-  void *buf = F.getModule().allocate(
-    sizeof(SELECT_ENUM_INST) + sizeof(EnumElementDecl*) * numCases
-     + TailAllocatedOperandList<1>::getExtraSize(numCases + (bool)DefaultValue),
-    alignof(SELECT_ENUM_INST));
-  return ::new (buf) SELECT_ENUM_INST(Loc,Operand,Ty,DefaultValue,CaseValues);
+  void *buf = F.getModule().allocate(numBytes, alignof(DerivedClass));
+
+  llvm::SmallVector<CaseTy, 8> Cases;
+  llvm::SmallVector<SILValue, 8> Values;
+  for (unsigned i : indices(CaseValues)) {
+    auto &P = CaseValues[i];
+    Cases.push_back(P.first);
+    Values.push_back(P.second);
+  }
+
+  if (DefaultValue)
+    Values.push_back(DefaultValue);
+
+  return ::new (buf) DerivedClass(Loc, Operand, Ty, hasDefault, Cases, Values);
 }
 
 SelectEnumInst *
 SelectEnumInst::create(SILLocation Loc, SILValue Operand, SILType Type,
-                    SILValue DefaultValue,
-                    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-                    SILFunction &F) {
-  return createSelectEnum<SelectEnumInst>(Loc, Operand, Type, DefaultValue,
+                       SILValue DefaultValue,
+                       ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
+                       SILFunction &F) {
+  return createSelectInst<SelectEnumInst>(Loc, Operand, Type, DefaultValue,
                                           CaseValues, F);
 }
 
@@ -786,7 +787,7 @@ SelectEnumAddrInst::create(SILLocation Loc, SILValue Operand, SILType Type,
                     SILValue DefaultValue,
                     ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
                     SILFunction &F) {
-  return createSelectEnum<SelectEnumAddrInst>(Loc, Operand, Type, DefaultValue,
+  return createSelectInst<SelectEnumAddrInst>(Loc, Operand, Type, DefaultValue,
                                               CaseValues, F);
 }
 

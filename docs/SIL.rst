@@ -2979,6 +2979,9 @@ also been invalidated.
 For the first payloaded case of an enum, ``unchecked_take_enum_data_addr``
 is guaranteed to have no side effects; the enum value will not be invalidated.
 
+Select Operations
+~~~~~~~~~~~~~~~~~
+
 select_enum
 ```````````
 ::
@@ -3039,6 +3042,45 @@ select_enum_addr
 Selects one of the "case" or "default" operands based on the case of the
 referenced enum value. This is the address-only counterpart to
 `select_enum`_.
+
+select_value
+````````````
+::
+
+  sil-instruction ::= 'select_value' sil-operand sil-select-value-case*
+                      (',' 'default' sil-value)?
+                      ':' sil-type
+  sil-selct-value-case ::= 'case' sil-value ':' sil-value
+
+
+  %n = select_value %0 : $U, \
+    case %c1: %r1,           \
+    case %c2: %r2, /* ... */ \
+    default %r3 : $T
+
+  // $U must be a builtin type. Only integers types are supported currently.
+  // c1, c2, etc must be of type $U
+  // %r1, %r2, %r3, etc. must have type $T
+  // %n has type $T
+
+Selects one of the "case" or "default" operands based on the case of an
+value. This is equivalent to a trivial `switch_value`_ branch sequence::
+
+  entry:
+    switch_value %0 : $U,            \
+      case %c1: bb1,           \
+      case %c2: bb2, /* ... */ \
+      default bb_default
+  bb1:
+    br cont(%r1 : $T) // value for %c1
+  bb2:
+    br cont(%r2 : $T) // value for %c2
+  bb_default:
+    br cont(%r3 : $T) // value for default
+  cont(%n : $T):
+    // use argument %n
+
+but turns the control flow dependency into a data flow dependency.
 
 Protocol and Protocol Composition Types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3645,45 +3687,6 @@ values of the instruction, control is transferred to the corresponding basic
 block. If there is a ``default`` basic block, control is transferred to it if
 the value does not match any of the ``case`` values. It is undefined behavior
 if the value does not match any cases and no ``default`` branch is provided.
-
-select_value
-````````````
-::
-
-  sil-instruction ::= 'select_value' sil-operand sil-select-value-case*
-                      (',' 'default' sil-value)?
-                      ':' sil-type
-  sil-selct-value-case ::= 'case' sil-value ':' sil-value
-
-
-  %n = select_value %0 : $U, \
-    case %c1: %r1,           \
-    case %c2: %r2, /* ... */ \
-    default %r3 : $T
-
-  // $U must be a builtin type. Only integers types are supported currently.
-  // c1, c2, etc must be of type $U
-  // %r1, %r2, %r3, etc. must have type $T
-  // %n has type $T
-
-Selects one of the "case" or "default" operands based on the case of an
-value. This is equivalent to a trivial `switch_value`_ branch sequence::
-
-  entry:
-    switch_value %0 : $U,            \
-      case %c1: bb1,           \
-      case %c2: bb2, /* ... */ \
-      default bb_default
-  bb1:
-    br cont(%r1 : $T) // value for %c1
-  bb2:
-    br cont(%r2 : $T) // value for %c2
-  bb_default:
-    br cont(%r3 : $T) // value for default
-  cont(%n : $T):
-    // use argument %n
-
-but turns the control flow dependency into a data flow dependency.
 
 switch_enum
 ```````````
