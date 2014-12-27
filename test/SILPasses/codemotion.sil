@@ -1427,18 +1427,38 @@ class F {}
 class G {}
 
 // CHECK-LABEL: sil @cast_consumption
+// CHECK: store
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: unconditional_checked_cast_addr
+// CHECK-NEXT: strong_release
 sil @cast_consumption : $@thin (@owned F) -> () {
 bb0(%0 : $F):
   %1 = alloc_stack $F
-// CHECK: store
   store %0 to %1#1 : $*F
-// CHECK-NEXT: strong_retain
   strong_retain %0 : $F
-// CHECK-NEXT: unconditional_checked_cast_addr
   unconditional_checked_cast_addr take_always F in %1#1 : $*F to G in %1#1 : $*F
-// CHECK-NEXT: strong_release
   strong_release %0 : $F
   dealloc_stack %1#0 : $*@local_storage F
   %2 = tuple ()
   return %2 : $()
+}
+
+// This is not the real signature. We pattern match off the prefix _swift_isUniquelyReferenced
+sil @_swift_isUniquelyReferenced_2 : $@thin (Builtin.RawPointer) -> ()
+
+// Make sure that isUniquelyReferenced stops code motion.
+// CHECK-LABEL: sil @is_uniquelyreferenced_stops_codemotion : $@thin (@owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[IN:%[0-9]+]] : $Builtin.NativeObject):
+// CHECK: [[CAST_RESULT:%[0-9]+]] = unchecked_trivial_bit_cast [[IN]]
+// CHECK: [[FN:%[0-9]+]] = function_ref @_swift_isUniquelyReferenced_2 : $@thin (Builtin.RawPointer) -> ()
+// CHECK: strong_retain [[IN]] : $Builtin.NativeObject
+// CHECK: apply [[FN]]([[CAST_RESULT]]) : $@thin (Builtin.RawPointer) -> ()
+sil @is_uniquelyreferenced_stops_codemotion : $@thin (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  %1 = unchecked_trivial_bit_cast %0 : $Builtin.NativeObject to $Builtin.RawPointer
+  %2 = function_ref @_swift_isUniquelyReferenced_2 : $@thin (Builtin.RawPointer) -> ()
+  apply %2(%1) : $@thin (Builtin.RawPointer) -> ()
+  %9999 = tuple()
+  return %9999 : $()
 }

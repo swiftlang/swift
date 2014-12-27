@@ -35,16 +35,3 @@ func arrelt(inout s: S) {
     s.a[i] = 0
   }
 }
-
-// Check that we have an explicit retain before calling isUniquelyReferenced.
-// <rdar:18109082> ARC: make _isUniquelyReferenced a barrier
-// CHECK-LABEL: sil hidden @_TF13array_mutable7arrcopyFRGSaSi_Si
-// CHECK: %[[FR:[0-9]+]] = function_ref @_swift_isUniquelyReferenced
-// CHECK: {{retain_value|strong_retain}}
-// CHECK: apply %[[FR]]
-// CHECK: {{^bb1}}
-func arrcopy(inout a: [Int]) -> Int {
-  var b = a
-  b[0] = 3
-  return a[0] + b[0]
-}
