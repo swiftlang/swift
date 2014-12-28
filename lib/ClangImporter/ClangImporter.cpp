@@ -2437,19 +2437,19 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
   // FIXME: Does not include methods from protocols.
   auto importMethodsImpl = [&](const clang::ObjCMethodList &start) {
     for (auto *list = &start; list != nullptr; list = list->getNext()) {
-      if (list->Method->isUnavailable())
+      if (list->getMethod()->isUnavailable())
         continue;
 
       // If the method is a property accessor, we want the property.
-      const clang::NamedDecl *searchForDecl = list->Method;
-      if (list->Method->isPropertyAccessor() &&
-          !Impl.isAccessibilityDecl(list->Method)) {
-        if (auto property = list->Method->findPropertyDecl()) {
+      const clang::NamedDecl *searchForDecl = list->getMethod();
+      if (list->getMethod()->isPropertyAccessor() &&
+          !Impl.isAccessibilityDecl(list->getMethod())) {
+        if (auto property = list->getMethod()->findPropertyDecl()) {
           // ... unless we are enumerating all decls.  In this case, if we see
           // a getter, return a property.  If we see a setter, we know that
           // there is a getter, and we will visit it and return a property at
           // that time.
-          if (!name && list->Method->param_size() != 0)
+          if (!name && list->getMethod()->param_size() != 0)
             continue;
           searchForDecl = property;
         }
@@ -2481,9 +2481,9 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
   };
 
   auto importMethods = [=](const clang::Sema::GlobalMethods &methodListPair) {
-    if (methodListPair.first.Method)
+    if (methodListPair.first.getMethod())
       importMethodsImpl(methodListPair.first);
-    if (methodListPair.second.Method)
+    if (methodListPair.second.getMethod())
       importMethodsImpl(methodListPair.second);
   };
 
