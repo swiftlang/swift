@@ -157,15 +157,11 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(EnumInst, SILInstruction, None)
   INST(UncheckedEnumDataInst, SILInstruction, None)
   INST(InitEnumDataAddrInst, SILInstruction, None)
-  INST(InjectEnumAddrInst, SILInstruction, MayWrite)
   INST(UncheckedTakeEnumDataAddrInst, SILInstruction, MayWrite)
-
-  // Selects.
-  ABSTRACT_VALUE(SelectInst, SILInstruction)
-    INST(SelectValueInst, SelectInst, None)
-    INST(SelectEnumInst, SelectInst, None)
-    INST(SelectEnumAddrInst, SelectInst, MayRead)
-    VALUE_RANGE(SelectInst, SelectValueInst, SelectEnumAddrInst)
+  INST(InjectEnumAddrInst, SILInstruction, MayWrite)
+  INST(SelectEnumInst, SILInstruction, None)
+  INST(SelectEnumAddrInst, SILInstruction, MayRead)
+  INST(SelectValueInst, SILInstruction, None)
 
   // Protocol and Protocol Composition Types
   INST(InitExistentialInst, SILInstruction, MayWrite)
