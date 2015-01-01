@@ -70,6 +70,9 @@ public:
   using iterator = std::vector<SILBasicBlock *>::iterator;
   using reverse_iterator = std::vector<SILBasicBlock *>::reverse_iterator;
 
+  using range = Range<iterator>;
+  using reverse_range = Range<reverse_iterator>;
+
   Range<iterator> getPostOrder(SILFunction *F) {
     FunctionPOTInfo &POTInfo = FunctionToPOTMap[F];
     if (POTInfo.IsInvalidated)
