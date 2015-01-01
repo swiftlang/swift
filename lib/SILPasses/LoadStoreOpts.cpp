@@ -276,7 +276,51 @@ static SILValue tryToForwardAddressValueToLoad(SILValue Address,
 }
 
 //===----------------------------------------------------------------------===//
-//                     Actual Load Store Forwarding Impl
+//                            LSContext Interface
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class LSBBForwarder;
+
+/// This class stores global state that we use when processing and also drives
+/// the computation. We put its interface at the top for use in other parts of
+/// the pass which may want to use this global information.
+class LSContext {
+  /// The alias analysis that we will use during all computations.
+  AliasAnalysis *AA;
+
+  /// The post dominance analysis that we use for dead store elimination.
+  PostDominanceInfo *PDI;
+
+  /// The range that we use to iterate over the reverse post order of the given
+  /// function.
+  PostOrderAnalysis::reverse_range ReversePostOrder;
+
+  /// A map from each BasicBlock to its index in the BBIDToForwarderMap.
+  ///
+  /// TODO: Each block does not need its own LSBBForwarder instance. Only
+  /// the set of reaching loads and stores is specific to the block.
+  llvm::DenseMap<SILBasicBlock *, unsigned> BBToBBIDMap;
+
+  /// A "map" from a BBID (which is just an index) to an LSBBForwarder.
+  std::vector<LSBBForwarder> BBIDToForwarderMap;
+
+public:
+  LSContext(AliasAnalysis *AA, PostDominanceInfo *PDI,
+            PostOrderAnalysis::reverse_range RPOT);
+
+  LSContext(const LSContext &) = delete;
+  LSContext(LSContext &&) = default;
+  ~LSContext() = default;
+
+  bool runIteration();
+
+  AliasAnalysis *getAA() const { return AA; }
+  PostDominanceInfo *getPDI() const { return PDI; }
+};
+
+} // end anonymous namespace
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -314,8 +358,8 @@ public:
     BB = NewBB;
   }
 
-  bool optimize(AliasAnalysis *AA, PostDominanceInfo *PDI,
-                CoveredStoreMap &StoreMap, PredOrderInStoreList &PredOrder);
+  bool optimize(LSContext &Ctx, CoveredStoreMap &StoreMap,
+                PredOrderInStoreList &PredOrder);
 
   SILBasicBlock *getBB() const { return BB; }
 
@@ -368,7 +412,8 @@ public:
   }
 
   /// Invalidate any loads that we can not prove that Inst does not write to.
-  void invalidateAliasingLoads(SILInstruction *Inst, AliasAnalysis *AA) {
+  void invalidateAliasingLoads(LSContext &Ctx, SILInstruction *Inst) {
+    AliasAnalysis *AA = Ctx.getAA();
     llvm::SmallVector<LoadInst *, 4> InvalidatedLoadList;
     for (auto *LI : Loads)
       if (AA->mayWriteToMemory(Inst, LI->getOperand()))
@@ -381,8 +426,9 @@ public:
   }
 
   /// Invalidate our store if Inst writes to the destination location.
-  void invalidateWriteToStores(SILInstruction *Inst, AliasAnalysis *AA,
+  void invalidateWriteToStores(LSContext &Ctx, SILInstruction *Inst,
                                CoveredStoreMap &StoreMap) {
+    AliasAnalysis *AA = Ctx.getAA();
     llvm::SmallVector<StoreInst *, 4> InvalidatedStoreList;
     for (auto *SI : Stores)
       if (AA->mayWriteToMemory(Inst, SI->getDest()))
@@ -395,8 +441,9 @@ public:
   }
 
   /// Invalidate our store if Inst reads from the destination location.
-  void invalidateReadFromStores(SILInstruction *Inst, AliasAnalysis *AA,
+  void invalidateReadFromStores(LSContext &Ctx, SILInstruction *Inst,
                                 CoveredStoreMap &StoreMap) {
+    AliasAnalysis *AA = Ctx.getAA();
     llvm::SmallVector<StoreInst *, 4> InvalidatedStoreList;
     for (auto *SI : Stores)
       if (AA->mayReadFromMemory(Inst, SI->getDest()))
@@ -411,13 +458,12 @@ public:
 
   /// Try to prove that SI is a dead store updating all current state. If SI is
   /// dead, eliminate it.
-  bool tryToEliminateDeadStores(StoreInst *SI, AliasAnalysis *AA,
-                                PostDominanceInfo *PDI,
+  bool tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
                                 CoveredStoreMap &StoreMap);
 
   /// Try to find a previously known value that we can forward to LI. This
   /// includes from stores and loads.
-  bool tryToForwardLoad(LoadInst *LI, AliasAnalysis *AA,
+  bool tryToForwardLoad(LSContext &Ctx, LoadInst *LI,
                         CoveredStoreMap &StoreMap,
                         PredOrderInStoreList &PredOrder);
 
@@ -439,9 +485,10 @@ private:
 
 } // end anonymous namespace
 
-bool LSBBForwarder::tryToEliminateDeadStores(StoreInst *SI, AliasAnalysis *AA,
-                                             PostDominanceInfo *PDI,
+bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
                                              CoveredStoreMap &StoreMap) {
+  PostDominanceInfo *PDI = Ctx.getPDI();
+
   // If we are storing a value that is available in the load list then we
   // know that no one clobbered that address and the current store is
   // redundant and we can remove it.
@@ -457,7 +504,7 @@ bool LSBBForwarder::tryToEliminateDeadStores(StoreInst *SI, AliasAnalysis *AA,
 
   // Invalidate any load that we can not prove does not read from the stores
   // destination.
-  invalidateAliasingLoads(SI, AA);
+  invalidateAliasingLoads(Ctx, SI);
 
   // If we are storing to a previously stored address that this store post
   // dominates, delete the old store.
@@ -565,7 +612,7 @@ static SILValue fixPhiPredBlocks(SmallVectorImpl<StoreInst *> &Stores,
   return PhiValue;
 }
 
-bool LSBBForwarder::tryToForwardLoad(LoadInst *LI, AliasAnalysis *AA,
+bool LSBBForwarder::tryToForwardLoad(LSContext &Ctx, LoadInst *LI,
                                      CoveredStoreMap &StoreMap,
                                      PredOrderInStoreList &PredOrder) {
   // If we are loading a value that we just stored, forward the stored value.
@@ -612,7 +659,7 @@ bool LSBBForwarder::tryToForwardLoad(LoadInst *LI, AliasAnalysis *AA,
     // that could be replaced with PrevLI, this means that there could not have
     // been a store to LI in between LI and PrevLI since then the store would
     // have invalidated PrevLI.
-    if (AA->isPartialAlias(LI->getOperand(), PrevLI->getOperand())) {
+    if (Ctx.getAA()->isPartialAlias(LI->getOperand(), PrevLI->getOperand())) {
       tryToSubstitutePartialAliasLoad(LI, PrevLI);
     }
   }
@@ -651,7 +698,7 @@ bool LSBBForwarder::tryToForwardLoad(LoadInst *LI, AliasAnalysis *AA,
 
 /// \brief Promote stored values to loads, remove dead stores and merge
 /// duplicated loads.
-bool LSBBForwarder::optimize(AliasAnalysis *AA, PostDominanceInfo *PDI,
+bool LSBBForwarder::optimize(LSContext &Ctx,
                              CoveredStoreMap &StoreMap,
                              PredOrderInStoreList &PredOrder) {
   auto II = BB->begin(), E = BB->end();
@@ -662,14 +709,14 @@ bool LSBBForwarder::optimize(AliasAnalysis *AA, PostDominanceInfo *PDI,
 
     // This is a StoreInst. Let's see if we can remove the previous stores.
     if (StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
-      Changed |= tryToEliminateDeadStores(SI, AA, PDI, StoreMap);
+      Changed |= tryToEliminateDeadStores(Ctx, SI, StoreMap);
       continue;
     }
 
     // This is a LoadInst. Let's see if we can find a previous loaded, stored
     // value to use instead of this load.
     if (LoadInst *LI = dyn_cast<LoadInst>(Inst)) {
-      Changed |= tryToForwardLoad(LI, AA, StoreMap, PredOrder);
+      Changed |= tryToForwardLoad(Ctx, LI, StoreMap, PredOrder);
       continue;
     }
 
@@ -690,7 +737,7 @@ bool LSBBForwarder::optimize(AliasAnalysis *AA, PostDominanceInfo *PDI,
     // All other instructions that read from the memory location of the store
     // invalidates the store.
     if (Inst->mayReadFromMemory()) {
-      invalidateReadFromStores(Inst, AA, StoreMap);
+      invalidateReadFromStores(Ctx, Inst, StoreMap);
     }
 
     // If we have an instruction that may write to memory and we can not prove
@@ -699,10 +746,10 @@ bool LSBBForwarder::optimize(AliasAnalysis *AA, PostDominanceInfo *PDI,
     if (Inst->mayWriteToMemory()) {
       // Invalidate any load that we can not prove does not read from one of the
       // writing instructions operands.
-      invalidateAliasingLoads(Inst, AA);
+      invalidateAliasingLoads(Ctx, Inst);
 
       // Invalidate our store if Inst writes to the destination location.
-      invalidateWriteToStores(Inst, AA, StoreMap);
+      invalidateWriteToStores(Ctx, Inst, StoreMap);
     }
   }
 
@@ -909,10 +956,12 @@ mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
 }
 
 //===----------------------------------------------------------------------===//
-//                           Top Level Entry Point
+//                          LSContext Implementation
 //===----------------------------------------------------------------------===//
 
-static inline unsigned roundPostOrderSize(unsigned PostOrderSize) {
+static inline unsigned roundPostOrderSize(PostOrderAnalysis::reverse_range R) {
+  unsigned PostOrderSize = std::distance(R.begin(), R.end());
+
   // NextPowerOf2 operates on uint64_t, so we can not overflow since our input
   // is a 32 bit value. But we need to make sure if the next power of 2 is
   // greater than the representable UINT_MAX, we just pass in (1 << 31) if the
@@ -922,6 +971,53 @@ static inline unsigned roundPostOrderSize(unsigned PostOrderSize) {
     return 1 << 31;
   return unsigned(SizeRoundedToPow2);
 }
+
+LSContext::LSContext(AliasAnalysis *AA, PostDominanceInfo *PDI,
+                     PostOrderAnalysis::reverse_range RPOT)
+  : AA(AA), PDI(PDI), ReversePostOrder(RPOT),
+    BBToBBIDMap(roundPostOrderSize(RPOT)),
+    BBIDToForwarderMap(roundPostOrderSize(RPOT)) {
+  for (SILBasicBlock *BB : ReversePostOrder) {
+    unsigned count = BBToBBIDMap.size();
+    BBToBBIDMap[BB] = count;
+    BBIDToForwarderMap[count].init(BB);
+  }
+}
+
+bool
+LSContext::runIteration() {
+  bool Changed = false;
+
+  for (SILBasicBlock *BB : ReversePostOrder) {
+    auto IDIter = BBToBBIDMap.find(BB);
+    assert(IDIter != BBToBBIDMap.end() && "We just constructed this!?");
+    unsigned ID = IDIter->second;
+    LSBBForwarder &Forwarder = BBIDToForwarderMap[ID];
+    assert(Forwarder.getBB() == BB && "We just constructed this!?");
+
+    DEBUG(llvm::dbgs() << "Visiting BB #" << ID << "\n");
+
+    CoveredStoreMap StoreMap;
+    PredOrderInStoreList PredOrder;
+
+    // Merge the predecessors. After merging, LSBBForwarder now contains
+    // lists of stores|loads that reach the beginning of the basic block
+    // along all paths.
+    Forwarder.mergePredecessorStates(BBToBBIDMap, BBIDToForwarderMap,
+                                     StoreMap, PredOrder);
+
+    // Remove dead stores, merge duplicate loads, and forward stores to
+    // loads. We also update lists of stores|loads to reflect the end
+    // of the basic block.
+    Changed |= Forwarder.optimize(*this, StoreMap, PredOrder);
+  }
+
+  return Changed;
+}
+
+//===----------------------------------------------------------------------===//
+//                           Top Level Entry Point
+//===----------------------------------------------------------------------===//
 
 namespace {
 
@@ -939,51 +1035,11 @@ class GlobalLoadStoreOpts : public SILFunctionTransform {
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
     auto *PDI = DA->getPostDomInfo(F);
 
-    auto ReversePostOrder = POTA->getReversePostOrder(F);
-    unsigned PostOrderSize =
-      roundPostOrderSize(std::distance(ReversePostOrder.begin(),
-                                       ReversePostOrder.end()));
-
-    // TODO: Each block does not need its own LSBBForwarder instance. Only
-    // the set of reaching loads and stores is specific to the block.
-    llvm::DenseMap<SILBasicBlock *, unsigned> BBToBBIDMap(PostOrderSize);
-    std::vector<LSBBForwarder> BBIDToForwarderMap(PostOrderSize);
-
-    for (SILBasicBlock *BB : ReversePostOrder) {
-      unsigned count = BBToBBIDMap.size();
-      BBToBBIDMap[BB] = count;
-      BBIDToForwarderMap[count].init(BB);
-    }
+    LSContext Ctx(AA, PDI, POTA->getReversePostOrder(F));
 
     bool Changed = false;
-    bool ChangedDuringIteration = false;
-    do {
-      ChangedDuringIteration = false;
-      for (SILBasicBlock *BB : ReversePostOrder) {
-        auto IDIter = BBToBBIDMap.find(BB);
-        assert(IDIter != BBToBBIDMap.end() && "We just constructed this!?");
-        unsigned ID = IDIter->second;
-        LSBBForwarder &Forwarder = BBIDToForwarderMap[ID];
-        assert(Forwarder.getBB() == BB && "We just constructed this!?");
-
-        DEBUG(llvm::dbgs() << "Visiting BB #" << ID << "\n");
-
-        CoveredStoreMap StoreMap;
-        PredOrderInStoreList PredOrder;
-        // Merge the predecessors. After merging, LSBBForwarder now contains
-        // lists of stores|loads that reach the beginning of the basic block
-        // along all paths.
-        Forwarder.mergePredecessorStates(BBToBBIDMap, BBIDToForwarderMap,
-                                         StoreMap, PredOrder);
-
-        // Remove dead stores, merge duplicate loads, and forward stores to
-        // loads. We also update lists of stores|loads to reflect the end
-        // of the basic block.
-        ChangedDuringIteration |= Forwarder.optimize(AA, PDI, StoreMap,
-                                                     PredOrder);
-        Changed |= ChangedDuringIteration;
-      }
-    } while (ChangedDuringIteration);
+    while (Ctx.runIteration())
+      Changed = true;
 
     if (Changed)
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
