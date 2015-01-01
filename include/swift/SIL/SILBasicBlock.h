@@ -189,6 +189,18 @@ public:
   const_succ_iterator succ_begin() const { return getSuccs().begin(); }
   const_succ_iterator succ_end() const { return getSuccs().end(); }
 
+  SILBasicBlock *getSingleSuccessor() {
+    if (succ_empty() || std::next(succ_begin()) != succ_end())
+      return nullptr;
+    return *succ_begin();
+  }
+
+  const SILBasicBlock *getSingleSuccessor() const {
+    if (succ_empty() || std::next(succ_begin()) != succ_end())
+      return nullptr;
+    return *succ_begin();
+  }
+
   typedef SILSuccessorIterator pred_iterator;
 
   bool pred_empty() const { return PredList == nullptr; }
@@ -201,12 +213,6 @@ public:
     if (pred_empty() || std::next(pred_begin()) != pred_end())
       return nullptr;
     return *pred_begin();
-  }
-
-  SILBasicBlock *getSingleSuccessor() {
-    if (succ_empty() || std::next(succ_begin()) != succ_end())
-      return nullptr;
-    return *succ_begin();
   }
 
   const SILBasicBlock *getSinglePredecessor() const {
