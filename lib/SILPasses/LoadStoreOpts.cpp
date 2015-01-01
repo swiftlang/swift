@@ -915,7 +915,8 @@ mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
 static inline unsigned roundPostOrderSize(unsigned PostOrderSize) {
   // NextPowerOf2 operates on uint64_t, so we can not overflow since our input
   // is a 32 bit value. But we need to make sure if the next power of 2 is
-  // greater than the representable UINT_MAX, we just pass in (1 << 31)
+  // greater than the representable UINT_MAX, we just pass in (1 << 31) if the
+  // next power of 2 is (1 << 32).
   uint64_t SizeRoundedToPow2 = llvm::NextPowerOf2(PostOrderSize);
   if (SizeRoundedToPow2 > uint64_t(UINT_MAX))
     return 1 << 31;
