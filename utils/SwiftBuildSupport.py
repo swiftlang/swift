@@ -51,11 +51,18 @@ def quote_shell_command(args):
 def check_call(args, verbose=False):
     try:
         return subprocess.check_call(args)
-    except:
+    except subprocess.CalledProcessError as e:
         if verbose:
-            print_with_argv0("failed command: " + quote_shell_command(args))
+            print_with_argv0(e.strerror)
         else:
-            print_with_argv0("command terminated with a non-zero exit status, aborting build")
+            print_with_argv0(
+                "command terminated with a non-zero exit status " +
+                e.returncode + ", aborting")
+        sys.stdout.flush()
+        sys.exit(1)
+    except OSError as e:
+        print_with_argv0("could not execute '" + quote_shell_command(args) +
+            "': " + e.strerror)
         sys.stdout.flush()
         sys.exit(1)
 
@@ -63,11 +70,18 @@ def check_call(args, verbose=False):
 def check_output(args, verbose=False):
     try:
         return subprocess.check_output(args)
-    except:
+    except subprocess.CalledProcessError as e:
         if verbose:
-            print_with_argv0("failed command: " + quote_shell_command(args))
+            print_with_argv0(e.strerror)
         else:
-            print_with_argv0("command terminated with a non-zero exit status, aborting build")
+            print_with_argv0(
+                "command terminated with a non-zero exit status " +
+                e.returncode + ", aborting")
+        sys.stdout.flush()
+        sys.exit(1)
+    except OSError as e:
+        print_with_argv0("could not execute '" + quote_shell_command(args) +
+            "': " + e.strerror)
         sys.stdout.flush()
         sys.exit(1)
 
