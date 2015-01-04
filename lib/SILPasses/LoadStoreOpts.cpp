@@ -145,6 +145,13 @@ canForwardAddrToUncheckedAddrToLd(SILValue Address,
     return llvm::NoneType::None;
   }
 
+  // The structs could have different size. We have code in the stdlib that
+  // casts pointers to differently sized integer types. This code prevents
+  // that we bitcast the values.
+  if (OutputTy.getStructOrBoundGenericStruct() &&
+      InputTy.getStructOrBoundGenericStruct())
+    return llvm::NoneType::None;
+
   SILValue LdAddr = LI->getOperand();
   auto P = ProjectionPath::getAddrProjectionPath(UADCI, LdAddr);
   if (!P)
@@ -190,17 +197,8 @@ forwardAddrToUncheckedCastToLd(SILValue Address, SILValue StoredValue,
 
   // If the output is trivial, we have a trivial bit cast.
   if (OutputIsTrivial) {
-
-    // The structs could have different size. We have code in the stdlib that
-    // casts pointers to differently sized integer types. This code prevents
-    // that we bitcast the values.
-    SILType InputTy = UADCI->getOperand().getType();
-    if (OutputTy.getStructOrBoundGenericStruct() &&
-        InputTy.getStructOrBoundGenericStruct())
-      return SILValue();
-
-    CastValue =  B.createUncheckedTrivialBitCast(UADCI->getLoc(), StoredValue,
-                                                 OutputTy.getObjectType());
+    CastValue = B.createUncheckedTrivialBitCast(UADCI->getLoc(), StoredValue,
+                                                OutputTy.getObjectType());
   } else {
     // Otherwise, both must have some sort of reference counts on them. Insert
     // the ref count cast.
