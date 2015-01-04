@@ -122,12 +122,7 @@ bool computeARCMatchingSet(ARCMatchingSetComputationContext *Ctx,
 ///
 /// TODO: This really needs a better name.
 class ConsumedArgToEpilogueReleaseMatcher {
-  using ArgInstMapTy =
-    llvm::MapVector<SILArgument *, SILInstruction *,
-                    llvm::SmallDenseMap<SILArgument *, unsigned, 8>,
-                    llvm::SmallVector<std::pair<SILArgument *,
-                                                SILInstruction *>, 8>>;
-  ArgInstMapTy ArgInstMap;
+  llvm::SmallMapVector<SILArgument *, SILInstruction *, 8> ArgInstMap;
 
 public:
   ConsumedArgToEpilogueReleaseMatcher(RCIdentityAnalysis *RCIA,
