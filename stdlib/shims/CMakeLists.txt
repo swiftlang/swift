@@ -32,12 +32,29 @@ add_custom_command_target(unused_var
     COMMENT "Copying SwiftShims module to ${output_dir}")
 
 # Symlink in the Clang headers.
+set(clang_headers_locations
+    "${LLVM_LIBRARY_DIR}/clang"
+
+    # FIXME: if we want to support separate Clang builds and mix different
+    # build configurations of Clang and Swift, this line should be adjusted.
+    "${SWIFT_PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib/clang")
+
+set(clang_headers_location)
+foreach(loc ${clang_headers_locations})
+  if("${clang_headers_location}" STREQUAL "" AND EXISTS "${loc}")
+    set(clang_headers_location "${loc}")
+  endif()
+endforeach()
+if("${clang_headers_location}" STREQUAL "")
+  message(FATAL_ERROR "Clang headers were not found")
+endif()
+
 add_custom_command_target(unused_var
     COMMAND
       "${CMAKE_COMMAND}" "-E" "make_directory" "${SWIFTLIB_DIR}"
     COMMAND
       "${CMAKE_COMMAND}" "-E" "create_symlink"
-      "${SWIFT_PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib/clang"
+      "${clang_headers_location}"
       "${SWIFTLIB_DIR}/clang"
     CUSTOM_TARGET_NAME "symlink_clang_headers"
     OUTPUT "${SWIFTLIB_DIR}/clang"

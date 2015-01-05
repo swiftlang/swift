@@ -234,13 +234,17 @@ if(SWIFT_BUILT_STANDALONE)
     NO_DEFAULT_PATH)
 
   set(LLVM_CMAKE_PATH "${LLVM_BINARY_DIR}/share/llvm/cmake")
+  list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_PATH}")
+
   set(LLVMCONFIG_FILE "${LLVM_CMAKE_PATH}/LLVMConfig.cmake")
-  if(EXISTS ${LLVMCONFIG_FILE})
-    list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_PATH}")
-    include(${LLVMCONFIG_FILE})
-  else()
+  if(NOT EXISTS ${LLVMCONFIG_FILE})
     message(FATAL_ERROR "Not found: ${LLVMCONFIG_FILE}")
   endif()
+
+  # Save and restore LLVM_TOOLS_BINARY_DIR.
+  set(LLVM_TOOLS_BINARY_DIR_saved "${LLVM_TOOLS_BINARY_DIR}")
+  include(${LLVMCONFIG_FILE})
+  set(LLVM_TOOLS_BINARY_DIR "${LLVM_TOOLS_BINARY_DIR_saved}")
 
   # Clang
   set(SWIFT_PATH_TO_LLVM_SOURCE "${LLVM_MAIN_SRC_DIR}")
@@ -270,7 +274,7 @@ if(SWIFT_BUILT_STANDALONE)
   endif()
   if(CLANG_MAIN_INCLUDE_DIR)
     get_filename_component(CLANG_MAIN_SRC_DIR ${SWIFT_PATH_TO_CLANG_SOURCE}
-    ABSOLUTE)
+      ABSOLUTE)
   endif()
 
   list(APPEND CMAKE_MODULE_PATH "${SWIFT_PATH_TO_LLVM_BUILD}/share/llvm/cmake")
@@ -303,8 +307,11 @@ if(SWIFT_BUILT_STANDALONE)
                       "${LLVM_MAIN_INCLUDE_DIR}"
                       "${CLANG_BUILD_INCLUDE_DIR}"
                       "${CLANG_MAIN_INCLUDE_DIR}")
-  link_directories("${LLVM_LIBRARY_DIR}"
-                   "${PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib")
+  link_directories(
+      "${LLVM_LIBRARY_DIR}"
+      # FIXME: if we want to support separate Clang builds and mix different
+      # build configurations of Clang and Swift, this line should be adjusted.
+      "${PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib")
 
   set(LIT_ARGS_DEFAULT "-sv")
   if(MSVC OR XCODE)
@@ -340,8 +347,11 @@ if(NOT EXISTS "${CLANG_MAIN_INCLUDE_DIR}/clang/AST/Decl.h")
   message(FATAL_ERROR "Clang is missing from llvm/tools subdirectory.")
 endif()
 
-set(LLVM_RUNTIME_OUTPUT_INTDIR "${PATH_TO_LLVM_BUILD}/${CMAKE_CFG_INTDIR}/bin")
-set(LLVM_LIBRARY_OUTPUT_INTDIR "${PATH_TO_LLVM_BUILD}/${CMAKE_CFG_INTDIR}/lib")
+# This could be computed using ${CMAKE_CFG_INTDIR} if we want to link Swift
+# against a mathing LLVM build configuration.  However, we usually want to be
+# flexible and allow linking a debug Swift against optimized LLVM.
+set(LLVM_RUNTIME_OUTPUT_INTDIR "${LLVM_BINARY_DIR}")
+set(LLVM_LIBRARY_OUTPUT_INTDIR "${LLVM_LIBRARY_DIR}")
 
 set(SWIFT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(SWIFT_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
