@@ -86,7 +86,7 @@ def check_output(args, verbose=False):
         sys.exit(1)
 
 
-def get_preset_options_impl(config, substitutions, preset_name):
+def _get_preset_options_impl(config, substitutions, preset_name):
     section_name = "preset: " + preset_name
     if section_name not in config.sections():
         return (None, None)
@@ -104,7 +104,7 @@ def get_preset_options_impl(config, substitutions, preset_name):
             mixins = filter(None, [m.strip() for m in a.splitlines()])
             for mixin in mixins:
                 (base_build_script_opts, base_build_script_impl_opts) = \
-                    get_preset_options_impl(config, substitutions, mixin)
+                    _get_preset_options_impl(config, substitutions, mixin)
                 build_script_opts += base_build_script_opts
                 build_script_impl_opts += base_build_script_impl_opts
         elif o == "dash-dash":
@@ -130,7 +130,7 @@ def get_preset_options(substitutions, preset_file_names, preset_name):
         sys.exit(1)
 
     (build_script_opts, build_script_impl_opts) = \
-        get_preset_options_impl(config, substitutions, preset_name)
+        _get_preset_options_impl(config, substitutions, preset_name)
     if build_script_opts is None:
         print_with_argv0("preset '" + preset_name + "' not found")
         sys.exit(1)
