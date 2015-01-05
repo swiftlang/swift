@@ -39,6 +39,8 @@
 #include <unordered_map>
 #if SWIFT_OBJC_INTEROP
 #import <CoreFoundation/CFBase.h> // for CFTypeID
+#include <malloc/malloc.h>
+#include <dispatch/dispatch.h>
 #endif
 
 #if SWIFT_OBJC_INTEROP
