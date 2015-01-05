@@ -56,9 +56,9 @@ add_swift_library(swiftAST
     clangAST
     clangLex
     clangAPINotes
-    clangBasic)
+    clangBasic
 
-llvm_config(swiftAST
+  COMPONENT_DEPENDS
     profiledata object mc mcparser bitreader option core support)
 
 if(NOT SWIFT_BUILT_STANDALONE)
