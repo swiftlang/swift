@@ -1641,8 +1641,9 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                            ? llvm::DIType()
                            : getOrCreateDesugaredType(Superclass, DbgTy);
     // Essentially a %swift.opaque pointer.
-    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
-    unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
+    unsigned SizeInBits = DbgTy.StorageType->isSized()
+      ? IGM.DataLayout.getTypeSizeInBits(DbgTy.StorageType)
+      : IGM.DataLayout.getPointerSizeInBits();
 
     auto FwdDecl = DBuilder.createReplaceableForwardDecl(
       llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, L.Line,
@@ -1658,9 +1659,10 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       Protocols.push_back(DBuilder.createInheritance(FwdDecl, PDITy, 0, Flags));
     }
     auto DITy = DBuilder.createStructType(
-        Scope, MangledName, File, L.Line, PtrSize, PtrAlign, Flags,
+        Scope, MangledName, File, L.Line, SizeInBits, AlignInBits, Flags,
         DerivedFrom, DBuilder.getOrCreateArray(Protocols),
-        llvm::dwarf::DW_LANG_Swift, llvm::DIType(), MangledName);
+        llvm::dwarf::DW_LANG_Swift, llvm::DIType(),
+        StringRef() /*don't unique*/);
 
     cast<llvm::MDNodeFwdDecl>(FwdDecl.get())->replaceAllUsesWith(DITy);
     llvm::MDNode::deleteTemporary(FwdDecl);
@@ -1892,6 +1894,11 @@ llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
   llvm::DIScope Scope = getOrCreateContext(Context);
   llvm::DIType DITy = createType(DbgTy, MangledName, Scope, getFile(Scope));
   DITy.Verify();
+
+  // Archetypes may have different storage types so we can't cache
+  // them based on their Swift type.
+  if (DbgTy.getType()->getKind() == TypeKind::Archetype)
+    return DITy;
 
   // Incrementally build the DIRefMap.
   if (DITy.isCompositeType()) {
