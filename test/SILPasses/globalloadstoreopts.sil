@@ -23,6 +23,10 @@ enum Optional<T> {
 
 class E : B { }
 
+struct C {
+  var i : Builtin.Int16
+}
+
 sil @use : $@thin (Builtin.Int32) -> ()
 
 // CHECK-LABEL: sil @store_promotion
@@ -630,10 +634,6 @@ bb1:
 bb2:
   %9999 = tuple()
   return %9999 : $()
-}
-
-struct C {
-  var i : Builtin.Int16
 }
 
 // Don't bitcast differently sized structs.
