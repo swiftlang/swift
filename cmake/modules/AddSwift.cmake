@@ -549,7 +549,6 @@ endfunction()
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
 #     [IS_SDK_OVERLAY]
-#     [NO_LLVM_COMMON_LIBS]
 #     INSTALL_IN_COMPONENT comp
 #     source1 [source2 source3 ...])
 #
@@ -604,9 +603,6 @@ endfunction()
 # IS_SDK_OVERLAY
 #   Treat the library as a part of the Swift SDK overlay.
 #
-# NO_LLVM_COMMON_LIBS
-#   Turn off linking of LLVM Common Libs.
-#
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
 #
@@ -614,7 +610,7 @@ endfunction()
 #   Sources to add into this library
 function(_add_swift_library_single target name)
   set(SWIFTLIB_SINGLE_options
-      SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY NO_LLVM_COMMON_LIBS
+      SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY
       API_NOTES_NON_OVERLAY)
   parse_arguments(SWIFTLIB_SINGLE
     "DEPENDS;LINK_LIBRARIES;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;LINK_FLAGS;PRIVATE_LINK_LIBRARIES;FILE_DEPENDS;SDK;ARCHITECTURE;INSTALL_IN_COMPONENT"
@@ -858,12 +854,6 @@ function(_add_swift_library_single target name)
     endforeach()
   endforeach()
 
-  if(NOT NO_LLVM_COMMON_LIBS)
-    target_link_libraries("${target}" ${LLVM_COMMON_LIBS})
-    if(target_static AND LLVM_COMMON_LIBS)
-      add_dependencies("${target_static}" ${LLVM_COMMON_LIBS})
-    endif()
-  endif()
   llvm_config(${target} ${SWIFTLIB_SINGLE_COMPONENT_DEPENDS})
 
   # Collect compile and link flags for the static and non-static targets.
@@ -978,7 +968,6 @@ endfunction()
 #     [INSTALL]
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
-#     [NO_LLVM_COMMON_LIBS]
 #     [TARGET_LIBRARY]
 #     INSTALL_IN_COMPONENT comp
 #     source1 [source2 source3 ...])
@@ -1040,9 +1029,6 @@ endfunction()
 #   Treat the library as a part of the Swift SDK overlay.
 #   IS_SDK_OVERLAY implies TARGET_LIBRARY and IS_STDLIB.
 #
-# NO_LLVM_COMMON_LIBS
-#   Turn off linking of LLVM Common Libs.
-#
 # TARGET_LIBRARY
 #   Build library for the target SDKs.
 #
@@ -1053,8 +1039,8 @@ endfunction()
 #   Sources to add into this library.
 function(add_swift_library name)
   set(SWIFTLIB_options
-      SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY NO_LLVM_COMMON_LIBS
-      TARGET_LIBRARY API_NOTES_NON_OVERLAY)
+      SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY TARGET_LIBRARY
+      API_NOTES_NON_OVERLAY)
   parse_arguments(SWIFTLIB
       "DEPENDS;LINK_LIBRARIES;SWIFT_MODULE_DEPENDS;SWIFT_MODULE_DEPENDS_OSX;SWIFT_MODULE_DEPENDS_IOS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;LINK_FLAGS;PRIVATE_LINK_LIBRARIES;INSTALL_IN_COMPONENT"
       "${SWIFTLIB_options}"
@@ -1164,7 +1150,6 @@ function(add_swift_library name)
           ${SWIFTLIB_IS_STDLIB_keyword}
           ${SWIFTLIB_IS_STDLIB_CORE_keyword}
           ${SWIFTLIB_IS_SDK_OVERLAY_keyword}
-          ${SWIFTLIB_NO_LLVM_COMMON_LIBS_keyword}
           INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}")
 
         # Add dependencies on the (not-yet-created) custom lipo target.
@@ -1289,7 +1274,6 @@ function(add_swift_library name)
       ${SWIFTLIB_IS_STDLIB_keyword}
       ${SWIFTLIB_IS_STDLIB_CORE_keyword}
       ${SWIFTLIB_IS_SDK_OVERLAY_keyword}
-      ${SWIFTLIB_NO_LLVM_COMMON_LIBS_keyword}
       INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}")
   endif()
 endfunction()
@@ -1428,9 +1412,7 @@ function(_add_swift_executable_single name)
       PROPERTIES
       HEADER_FILE_ONLY true)
 
-  target_link_libraries("${name}"
-      ${LLVM_COMMON_LIBS}
-      ${SWIFTEXE_SINGLE_LINK_LIBRARIES})
+  target_link_libraries("${name}" ${SWIFTEXE_SINGLE_LINK_LIBRARIES})
   llvm_config(${name} ${SWIFTEXE_SINGLE_COMPONENT_DEPENDS})
 
   set_target_properties(${name}
