@@ -125,15 +125,16 @@ function(add_custom_command_target dependency_out_var_name)
     # Use a hash so that the file name does not push the OS limits for filename
     # length.
     list(GET ACCT_OUTPUT 0 output_filename)
-    string(MD5 ACCT_CUSTOM_TARGET_NAME
+    string(MD5 target_md5
         "add_custom_command_target${CMAKE_CURRENT_BINARY_DIR}/${output_filename}")
     get_filename_component(output_filename_basename "${output_filename}" NAME)
-    set(ACCT_CUSTOM_TARGET_NAME
-        "add_custom_command_target-${ACCT_CUSTOM_TARGET_NAME}-${output_filename_basename}")
+    set(target_name
+        "add_custom_command_target-${target_md5}-${output_filename_basename}")
+  else()
+    set(target_name "${ACCT_CUSTOM_TARGET_NAME}")
   endif()
 
-  if((NOT ACCT_IDEMPOTENT) OR
-     (ACCT_IDEMPOTENT AND NOT TARGET "${ACCT_CUSTOM_TARGET_NAME}"))
+  if((NOT ACCT_IDEMPOTENT) OR (ACCT_IDEMPOTENT AND NOT TARGET "${target_name}"))
     # For each keyword argument k that was passed to this function, set
     # ${k}_keyword to ${k}.  That will allow us to use the incantation
     # '${${k}_keyword} ${ACCT_${k}}' to forward the arguments on.
@@ -146,17 +147,38 @@ function(add_custom_command_target dependency_out_var_name)
       IMPLICIT_DEPENDS WORKING_DIRECTORY COMMENT VERBATIM APPEND)
     add_custom_command(${ACCT_COMMANDS} ${args})
 
-    _make_acct_argument_list(ALL WORKING_DIRECTORY SOURCES)
-    add_custom_target(
-        "${ACCT_CUSTOM_TARGET_NAME}" ${args}
-        DEPENDS ${ACCT_OUTPUT}
-        COMMENT "${ACCT_OUTPUT}")
-    set_target_properties(
-        "${ACCT_CUSTOM_TARGET_NAME}" PROPERTIES
-        FOLDER "add_custom_command_target artifacts")
+    # Skip generating the target if we are generating an Xcode project only
+    # for IDE use. The volume of dependencies here causes performance problems
+    # in Xcode that make it impractical to use.
+    if(NOT (SWIFT_XCODE_GENERATE_FOR_IDE_ONLY
+            AND "${ACCT_CUSTOM_TARGET_NAME}" STREQUAL ""))
+      _make_acct_argument_list(ALL WORKING_DIRECTORY SOURCES)
+      add_custom_target(
+          "${target_name}" ${args}
+          DEPENDS ${ACCT_OUTPUT}
+          COMMENT "${ACCT_OUTPUT}")
+      set_target_properties(
+          "${target_name}" PROPERTIES
+          FOLDER "add_custom_command_target artifacts")
+    endif()
   endif()
 
   # "Return" the name of the custom target
-  set("${dependency_out_var_name}" "${ACCT_CUSTOM_TARGET_NAME}" PARENT_SCOPE)
+  if(SWIFT_XCODE_GENERATE_FOR_IDE_ONLY
+     AND "${ACCT_CUSTOM_TARGET_NAME}" STREQUAL "")
+    set("${dependency_out_var_name}" xcode_generate_for_ide_only_dummy
+        PARENT_SCOPE)
+  else()
+    set("${dependency_out_var_name}" "${target_name}" PARENT_SCOPE)
+  endif()
 endfunction()
 
+# A dummy target for XCODE_GENERATE_FOR_IDE_ONLY targets that stands in for
+# the targets we don't generate in that mode.
+if(SWIFT_XCODE_GENERATE_FOR_IDE_ONLY)
+  add_custom_command(OUTPUT xcode_generate_for_ide_only_dummy.txt
+      COMMAND echo "This Xcode project is configured for IDE use only and cannot build Swift."
+      COMMAND false)
+  add_custom_target(xcode_generate_for_ide_only_dummy ALL
+      DEPENDS xcode_generate_for_ide_only_dummy.txt)
+endif()
