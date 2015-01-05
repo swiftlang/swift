@@ -32,6 +32,13 @@ STATISTIC(NumFunctionsInlined, "Number of functions inlined");
 
 namespace {
 
+  // Threshold for deterministic testing of the inline heuristic.
+  // It specifies an instruction cost limit where a simplified model is used
+  // for the instruction costs: only builtin instructions have a cost of exactly
+  // 1.
+  llvm::cl::opt<int> TestThreshold("sil-inline-test-threshold",
+                                        llvm::cl::init(-1), llvm::cl::Hidden);
+  
   // Tracks constants in the caller and callee to get an estimation of what
   // values get constant if the callee is inlined.
   // This can be seen as a "simulation" of several optimizations: SROA, mem2reg
@@ -267,6 +274,17 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(ApplyInst *AI) {
   return Callee;
 }
 
+// Gets the cost of an instruction by using the simplified test-model: only
+// builtin instructions have a cost and that's exactly 1.
+static unsigned testCost(SILInstruction *I) {
+  switch (I->getKind()) {
+    case ValueKind::BuiltinInst:
+      return 1;
+    default:
+      return 0;
+  }
+}
+
 /// Return true if inlining this call site is profitable.
 bool SILPerformanceInliner::isProfitableToInline(ApplyInst *AI,
                                               DominanceAnalysis *DA,
@@ -292,6 +310,7 @@ bool SILPerformanceInliner::isProfitableToInline(ApplyInst *AI,
   // Calculate the inlining cost of the callee.
   unsigned CalleeCost = 0;
   unsigned BoostFactor = 1;
+  int testThreshold = TestThreshold;
 
   while (SILBasicBlock *block = domOrder.getNext()) {
     for (SILInstruction &I : *block) {
@@ -301,7 +320,13 @@ bool SILPerformanceInliner::isProfitableToInline(ApplyInst *AI,
       if (ICost == InlineCost::CannotBeInlined)
         return false;
       
-      CalleeCost += unsigned(ICost);
+      if (testThreshold >= 0) {
+        // We are in test-mode: use a simplified cost model.
+        CalleeCost += testCost(&I);
+      } else {
+        // Use the regular cost model.
+        CalleeCost += unsigned(ICost);
+      }
       
       if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
         
@@ -317,7 +342,9 @@ bool SILPerformanceInliner::isProfitableToInline(ApplyInst *AI,
     domOrder.pushChildren(block);
   }
 
-  unsigned Threshold = InlineCostThreshold * BoostFactor;
+  unsigned Threshold = (testThreshold >= 0 ? (unsigned)testThreshold :
+                        InlineCostThreshold);
+  Threshold *= BoostFactor;
   if (CalleeCost > Threshold) {
     DEBUG(llvm::dbgs() << "        FAIL: Function too big to inline, "
           "callee cost: " << CalleeCost << ", threshold: " << Threshold << "\n");

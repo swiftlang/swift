@@ -1,5 +1,5 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %sil-opt %s -inline -debug-only=sil-inliner 2>%t/log | FileCheck %s
+// RUN: %sil-opt %s -inline -debug-only=sil-inliner -sil-inline-test-threshold=1 2>%t/log | FileCheck %s
 // RUN: FileCheck -check-prefix=LOG %s <%t/log
 // REQUIRES: asserts
 
@@ -48,6 +48,10 @@ bb0:
 
 sil @takeDirectClosure : $@thin (@owned @callee_owned (Int) -> Int) -> Int {
 bb0(%0 : $@callee_owned (Int) -> Int):
+  // make inline costs = 2
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+
   %1 = integer_literal $Builtin.Word, 27
   %2 = struct $Int (%1 : $Builtin.Word)
   %3 = apply %0(%2) : $@callee_owned (Int) -> Int
@@ -76,6 +80,10 @@ bb0:
 
 sil @takeStructClosure : $@thin (@owned Cont) -> Int {
 bb0(%0 : $Cont):
+  // make inline costs = 2
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+
   %1 = struct_extract %0 : $Cont, #Cont.cl
   %2 = integer_literal $Builtin.Word, 27
   %3 = struct $Int (%2 : $Builtin.Word)
@@ -111,6 +119,10 @@ bb0:
 
 sil @takeStructAddrClosure : $@thin (@inout Cont) -> Int {
 bb0(%0 : $*Cont):
+  // make inline costs = 2
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+
   %1 = struct_element_addr %0 : $*Cont, #Cont.cl
   %2 = load %1 : $*@callee_owned (Int) -> Int
   %3 = integer_literal $Builtin.Word, 27
@@ -130,16 +142,6 @@ bb0(%0 : $*Cont):
 // LOG: Eligible callee: takeTupleClosure
 // LOG: Boost: apply const function
 
-sil @takeTupleClosure : $@thin (@owned Cont2) -> Int {
-bb0(%0 : $Cont2):
-  %1 = struct_extract %0 : $Cont2, #Cont2.tp
-  %2 = tuple_extract %1 : $(Int, @callee_owned (Int) -> Int), 1
-  %3 = integer_literal $Builtin.Word, 27
-  %4 = struct $Int (%3 : $Builtin.Word)
-  %5 = apply %2(%4) : $@callee_owned (Int) -> Int
-  return %5 : $Int
-}
-
 sil @testTupleClosure : $@thin () -> Int {
 bb0:
   %0 = function_ref @takeTupleClosure : $@thin (@owned Cont2) -> Int
@@ -154,6 +156,20 @@ bb0:
 }
 
 
+sil @takeTupleClosure : $@thin (@owned Cont2) -> Int {
+bb0(%0 : $Cont2):
+  // make inline costs = 2
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %1 = struct_extract %0 : $Cont2, #Cont2.tp
+  %2 = tuple_extract %1 : $(Int, @callee_owned (Int) -> Int), 1
+  %3 = integer_literal $Builtin.Word, 27
+  %4 = struct $Int (%3 : $Builtin.Word)
+  %5 = apply %2(%4) : $@callee_owned (Int) -> Int
+  return %5 : $Int
+}
+
 // CHECK-LABEL: sil @testEnumClosure
 // CHECK: [[C:%[0-9]+]] = unchecked_enum_data
 // CHECK: apply [[C]](
@@ -162,15 +178,6 @@ bb0:
 // LOG-LABEL: Visiting Function: testEnumClosure
 // LOG: Eligible callee: takeEnumClosure
 // LOG: Boost: apply const function
-
-sil @takeEnumClosure : $@thin (@owned E) -> Int {
-bb0(%0 : $E):
-  %1 = unchecked_enum_data %0 : $E, #E.B!enumelt.1
-  %2 = integer_literal $Builtin.Word, 27
-  %3 = struct $Int (%2 : $Builtin.Word)
-  %4 = apply %1(%3) : $@callee_owned (Int) -> Int
-  return %4 : $Int
-}
 
 sil @testEnumClosure : $@thin () -> Int {
 bb0:
@@ -182,6 +189,21 @@ bb0:
   return %4 : $Int
 }
 
+
+sil @takeEnumClosure : $@thin (@owned E) -> Int {
+bb0(%0 : $E):
+  // make inline costs = 2
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %1 = unchecked_enum_data %0 : $E, #E.B!enumelt.1
+  %2 = integer_literal $Builtin.Word, 27
+  %3 = struct $Int (%2 : $Builtin.Word)
+  %4 = apply %1(%3) : $@callee_owned (Int) -> Int
+  return %4 : $Int
+}
+
+// The closure which is used by all tests above.
 
 sil shared @closure : $@thin (Int) -> Int {
 bb0(%0 : $Int):
