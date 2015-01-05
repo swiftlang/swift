@@ -380,6 +380,8 @@ public:
         ForwardingValue(getForwardingValueForLS(NewInst)) {}
 
   LSValue(SILBasicBlock *NewParentBB, ArrayRef<SILInstruction *> NewInsts);
+  LSValue(SILBasicBlock *NewParentBB, ArrayRef<LoadInst *> NewInsts);
+  LSValue(SILBasicBlock *NewParentBB, ArrayRef<StoreInst *> NewInsts);
 
   bool operator==(const LSValue &Other) const;
 
@@ -449,6 +451,22 @@ protected:
 
 LSValue::LSValue(SILBasicBlock *NewParentBB,
                  ArrayRef<SILInstruction *> NewInsts)
+    : ParentBB(NewParentBB), Insts(), ForwardingValue() {
+  std::copy(NewInsts.begin(), NewInsts.end(), Insts.begin());
+  // Sort Insts so we can trivially compare two LSValues.
+  std::sort(Insts.begin(), Insts.end());
+}
+
+LSValue::LSValue(SILBasicBlock *NewParentBB,
+                 ArrayRef<LoadInst *> NewInsts)
+    : ParentBB(NewParentBB), Insts(), ForwardingValue() {
+  std::copy(NewInsts.begin(), NewInsts.end(), Insts.begin());
+  // Sort Insts so we can trivially compare two LSValues.
+  std::sort(Insts.begin(), Insts.end());
+}
+
+LSValue::LSValue(SILBasicBlock *NewParentBB,
+                 ArrayRef<StoreInst *> NewInsts)
     : ParentBB(NewParentBB), Insts(), ForwardingValue() {
   std::copy(NewInsts.begin(), NewInsts.end(), Insts.begin());
   // Sort Insts so we can trivially compare two LSValues.
@@ -527,7 +545,7 @@ public:
 
   /// TODO: Add constructor to TinyPtrVector that takes in an ArrayRef.
   LSLoad(SILBasicBlock *NewParentBB, ArrayRef<LoadInst *> NewLoads)
-      : LSValue(NewParentBB, ArrayRef<SILInstruction *>(NewLoads)) {}
+      : LSValue(NewParentBB, NewLoads) {}
 };
 
 } // end anonymous namespace
