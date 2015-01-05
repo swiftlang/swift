@@ -32,7 +32,8 @@ add_swift_library(swiftBasic
   UnicodeExtendedGraphemeClusters.cpp.gyb
 
   C_COMPILE_FLAGS "-I${UUID_INCLUDE_DIRS}"
-  LINK_LIBRARIES ${UUID_LIBRARIES})
+  LINK_LIBRARIES ${UUID_LIBRARIES}
+  COMPONENT_DEPENDS support)
 
 set(SWIFT_VERSION "1.1")
 message(STATUS "Swift version: ${SWIFT_VERSION}")

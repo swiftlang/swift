@@ -1,8 +1,7 @@
 add_swift_library(functionNameDemangle SHARED
   FunctionNameDemangle.cpp
   MangleHack.cpp
-  LINK_LIBRARIES swiftBasic
-  COMPONENT_DEPENDS support)
+  LINK_LIBRARIES swiftBasic)
 
 swift_install_in_component(compiler
     TARGETS functionNameDemangle
