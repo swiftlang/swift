@@ -57,7 +57,7 @@ def check_call(args, verbose=False):
         else:
             print_with_argv0(
                 "command terminated with a non-zero exit status " +
-                e.returncode + ", aborting")
+                str(e.returncode) + ", aborting")
         sys.stdout.flush()
         sys.exit(1)
     except OSError as e:
@@ -76,7 +76,7 @@ def check_output(args, verbose=False):
         else:
             print_with_argv0(
                 "command terminated with a non-zero exit status " +
-                e.returncode + ", aborting")
+                str(e.returncode) + ", aborting")
         sys.stdout.flush()
         sys.exit(1)
     except OSError as e:
