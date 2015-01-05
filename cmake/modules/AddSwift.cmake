@@ -341,7 +341,7 @@ function(_compile_swift_files dependency_target_out_var_name)
   compute_library_subdir(library_subdir
       "${SWIFTFILE_SDK}" "${SWIFTFILE_ARCHITECTURE}")
 
-  get_filename_component(objdir "${SWIFTFILE_OUTPUT}" NAME)
+  get_filename_component(objdir "${SWIFTFILE_OUTPUT}" PATH)
   set(command_create_dirs
       COMMAND "${CMAKE_COMMAND}" -E make_directory "${objdir}")
 
