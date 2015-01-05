@@ -86,8 +86,19 @@ def check_output(args, verbose=False):
         sys.exit(1)
 
 
+def _load_preset_files_impl(preset_file_names, substitutions={}):
+    config = ConfigParser.SafeConfigParser(substitutions, allow_no_value=True)
+    if config.read(preset_file_names) == []:
+        print_with_argv0(
+            "preset file not found (tried " + str(preset_file_names) + ")")
+        sys.exit(1)
+    return config
+    
+
+_PRESET_PREFIX = "preset: "
+
 def _get_preset_options_impl(config, substitutions, preset_name):
-    section_name = "preset: " + preset_name
+    section_name = _PRESET_PREFIX + preset_name
     if section_name not in config.sections():
         return (None, None)
 
@@ -123,11 +134,7 @@ def _get_preset_options_impl(config, substitutions, preset_name):
 
 
 def get_preset_options(substitutions, preset_file_names, preset_name):
-    config = ConfigParser.SafeConfigParser(substitutions, allow_no_value=True)
-    if config.read(preset_file_names) == []:
-        print_with_argv0(
-            "preset file not found (tried " + str(preset_file_names) + ")")
-        sys.exit(1)
+    config = _load_preset_files_impl(preset_file_names, substitutions)
 
     (build_script_opts, build_script_impl_opts) = \
         _get_preset_options_impl(config, substitutions, preset_name)
@@ -138,3 +145,7 @@ def get_preset_options(substitutions, preset_file_names, preset_name):
     return build_script_opts + [ "--" ] + build_script_impl_opts
 
 
+def get_all_preset_names(preset_file_names):
+    config = _load_preset_files_impl(preset_file_names)
+    return [ name[len(_PRESET_PREFIX):] for name in config.sections()
+             if name.startswith(_PRESET_PREFIX) ]
