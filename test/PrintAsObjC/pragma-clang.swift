@@ -5,7 +5,6 @@
 // RUN: FileCheck %s < %t/pragma-clang.h
 
 // CHECK: #pragma clang diagnostic push
-// CHECK-NOT: clang diagnostic pop
 // CHECK: #pragma clang diagnostic ignored "-Wproperty-attribute-mismatch"
 // CHECK: @interface Test
 @objc class Test : TestProto {

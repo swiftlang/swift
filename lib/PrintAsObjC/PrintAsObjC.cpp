@@ -605,52 +605,55 @@ private:
       return false;
 
     if (SD == ctx.getArrayDecl()) {
-      os << "NSArray";
-
 #ifndef SWIFT_DISABLE_OBJC_GENERIC
       if (!BGT->getGenericArgs()[0]->isAnyObject()) {
-        os << "<";
+        os << "NS_ARRAY(";
         visitPart(BGT->getGenericArgs()[0], OTK_ImplicitlyUnwrappedOptional);
-        os << ">";
+        os << ")";
+      } else {
+        os << "NSArray *";
       }
+#else
+      os << "NSArray *";
 #endif
 
-      os << " *";
       printNullability(optionalKind);
       return true;
     }
 
     if (SD == ctx.getDictionaryDecl()) {
-      os << "NSDictionary";
-
 #ifndef SWIFT_DISABLE_OBJC_GENERIC
       if (!isNSObject(BGT->getGenericArgs()[0]) ||
           !BGT->getGenericArgs()[1]->isAnyObject()) {
-        os << "<";
+        os << "NS_DICTIONARY(";
         visitPart(BGT->getGenericArgs()[0], OTK_ImplicitlyUnwrappedOptional);
         os << ", ";
         visitPart(BGT->getGenericArgs()[1], OTK_ImplicitlyUnwrappedOptional);
-        os << ">";
+        os << ")";
+      } else {
+        os << "NSDictionary *";
       }
+#else
+      os << "NSDictionary *";
 #endif
 
-      os << " *";
       printNullability(optionalKind);
       return true;
     }
 
     if (SD == ctx.getSetDecl()) {
-      os << "NSSet";
-
 #ifndef SWIFT_DISABLE_OBJC_GENERIC
       if (!isNSObject(BGT->getGenericArgs()[0])) {
-        os << "<";
+        os << "NS_SET(";
         visitPart(BGT->getGenericArgs()[0], OTK_ImplicitlyUnwrappedOptional);
-        os << ">";
+        os << ")";
+      } else {
+        os << "NSSet *";
       }
+#else
+      os << "NSSet *";
 #endif
 
-      os << " *";
       printNullability(optionalKind);
       return true;
     }
@@ -1363,6 +1366,29 @@ public:
       else
         out << "#import \"" << bridgingHeader << "\"\n\n";
     }
+
+#ifndef SWIFT_DISABLE_OBJC_GENERIC
+    // Once we've printed out the imports, deal with Foundations that
+    // don't provide NS_ARRAY/NS_DICTIONARY/NS_SET.
+    out << "#ifndef NS_ARRAY\n"
+           "#  pragma clang diagnostic push\n"
+           "#  pragma clang diagnostic ignored \"-Wvariadic-macros\"\n"
+           "#  define NS_ARRAY(...) NSArray *\n"
+           "#  pragma clang diagnostic pop\n"
+           "#endif\n"
+           "#ifndef NS_DICTIONARY\n"
+           "#  pragma clang diagnostic push\n"
+           "#  pragma clang diagnostic ignored \"-Wvariadic-macros\"\n"
+           "#  define NS_DICTIONARY(...) NSDictionary *\n"
+           "#  pragma clang diagnostic pop\n"
+           "#endif\n"
+           "#ifndef NS_SET\n"
+           "#  pragma clang diagnostic push\n"
+           "#  pragma clang diagnostic ignored \"-Wvariadic-macros\"\n"
+           "  #define NS_SET(...) NSSet *\n"
+           "#  pragma clang diagnostic pop\n"
+           "#endif\n";
+#endif
   }
 
   bool writeToStream(raw_ostream &out) {
