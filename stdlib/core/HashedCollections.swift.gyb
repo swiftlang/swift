@@ -2319,11 +2319,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   internal func deinitializeHeapBufferBridged() {
     // Perform a non-atomic store because storage should be
     // uniquely-referenced.
-    let ptr = UnsafeMutablePointer<COpaquePointer>(_heapBufferBridgedPtr).memory
-    if ptr != nil {
-      Unmanaged<AnyObject>.fromOpaque(ptr).takeRetainedValue()
-      _heapBufferBridgedPtr.memory = nil
-    }
+    _heapBufferBridgedPtr.memory = nil
   }
 
   /// Returns the bridged ${Self} values.
