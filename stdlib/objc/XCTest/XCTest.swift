@@ -43,7 +43,7 @@ func _XCTFailureDescription(assertionType: _XCTAssertionType, formatIndex: UInt,
 
 // --- Exception Support ---
 
-@asmname("_XCTRunThrowableBlockBridge") func _XCTRunThrowableBlockBridge(@__noescape @objc_block () -> Void) -> NSDictionary
+@asmname("_XCTRunThrowableBlockBridge") func _XCTRunThrowableBlockBridge(@noescape @objc_block () -> Void) -> NSDictionary
 
 /// The Swift-style result of evaluating a block which may throw an exception.
 enum _XCTThrowableBlockResult {
@@ -54,7 +54,7 @@ enum _XCTThrowableBlockResult {
 
 /// Asks some Objective-C code to evaluate a block which may throw an exception,
 /// and if it does consume the exception and return information about it.
-func _XCTRunThrowableBlock(@__noescape block: () -> Void) -> _XCTThrowableBlockResult {
+func _XCTRunThrowableBlock(@noescape block: () -> Void) -> _XCTThrowableBlockResult {
   let d = _XCTRunThrowableBlockBridge(block)
   
   if d.count > 0 {

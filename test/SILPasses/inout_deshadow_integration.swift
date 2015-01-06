@@ -74,7 +74,7 @@ func exploded_nontrivial_type_stored_returned(inout a: String) -> String {
 
 // Use an external function so inout deshadowing cannot see its body.
 @asmname("takesNoEscapeClosure")
-func takesNoEscapeClosure(@__noescape fn : () -> Int)
+func takesNoEscapeClosure(@noescape fn : () -> Int)
 
 struct StructWithMutatingMethod {
   var x = 42

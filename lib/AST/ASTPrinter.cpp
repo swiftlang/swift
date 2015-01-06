@@ -2231,7 +2231,7 @@ public:
     if (info.isAutoClosure())
       Printer << "@autoclosure ";
     else if (info.isNoEscape())    // autoclosure implies noescape.
-      Printer << "@__noescape ";
+      Printer << "@noescape ";
     
     switch (info.getCC()) {
     case AbstractCC::Freestanding: break;

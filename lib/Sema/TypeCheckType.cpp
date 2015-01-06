@@ -1153,7 +1153,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // function-type creator.
   static const TypeAttrKind FunctionAttrs[] = {
     TAK_objc_block, TAK_cc, TAK_thin, TAK_noreturn,
-    TAK_callee_owned, TAK_callee_guaranteed, TAK___noescape
+    TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape
   };
   
   // Some function representation attributes are not supported at source level;
@@ -1200,7 +1200,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     else
       rep = FunctionType::Representation::Thick;
 
-    bool isNoEscape = attrs.has(TAK___noescape);
+    bool isNoEscape = attrs.has(TAK_noescape);
 
     // Resolve the function type directly with these attributes.
     FunctionType::ExtInfo extInfo(attrs.hasCC()

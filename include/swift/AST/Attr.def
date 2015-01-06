@@ -47,7 +47,7 @@ TYPE_ATTR(out)
 TYPE_ATTR(in)
 TYPE_ATTR(inout)
 TYPE_ATTR(in_guaranteed)
-TYPE_ATTR(__noescape)  // Only valid in sil mode.
+TYPE_ATTR(noescape)  // Only valid in sil mode.
 TYPE_ATTR(owned)
 TYPE_ATTR(unowned_inner_pointer)
 TYPE_ATTR(guaranteed)
@@ -150,7 +150,7 @@ SIMPLE_DECL_ATTR(requires_stored_property_inits, RequiresStoredPropertyInits,
                  OnClass, 27)
 SIMPLE_DECL_ATTR(autoclosure, AutoClosure,
                  OnVar|OnParam, 28)
-SIMPLE_DECL_ATTR(__noescape, NoEscape, OnParam, 29)
+SIMPLE_DECL_ATTR(noescape, NoEscape, OnParam, 29)
 
 // Non-serialized attributes.
 

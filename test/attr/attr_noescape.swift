@@ -1,13 +1,13 @@
 // RUN: %swift -parse %s -verify
 
-@__noescape var fn : () -> Int = { 4 }  // expected-error {{'__noescape' may only be used on 'parameter' declarations}}
+@noescape var fn : () -> Int = { 4 }  // expected-error {{'noescape' may only be used on 'parameter' declarations}}
 
 func doesEscape(fn : () -> Int) {}
 
-func takesGenericClosure<T>(a : Int, @__noescape fn : () -> T) {}
+func takesGenericClosure<T>(a : Int, @noescape fn : () -> T) {}
 
 
-func takesNoEscapeClosure(@__noescape fn : () -> Int) {
+func takesNoEscapeClosure(@noescape fn : () -> Int) {
   takesNoEscapeClosure { 4 }  // ok
 
   fn()  // ok
@@ -48,8 +48,8 @@ class SomeClass {
 
 // Implicit conversions (in this case to @objc_block) are ok.
 @asmname("whatever")
-func takeNoEscapeAsObjCBlock(@__noescape @objc_block () -> Void)
-func takeNoEscapeTest2(@__noescape fn : () -> ()) {
+func takeNoEscapeAsObjCBlock(@noescape @objc_block () -> Void)
+func takeNoEscapeTest2(@noescape fn : () -> ()) {
   takeNoEscapeAsObjCBlock(fn)
 }
 
