@@ -2230,8 +2230,9 @@ public:
   void printFunctionExtInfo(AnyFunctionType::ExtInfo info) {
     if (info.isAutoClosure())
       Printer << "@autoclosure ";
-    if (info.isNoEscape())
+    else if (info.isNoEscape())    // autoclosure implies noescape.
       Printer << "@__noescape ";
+    
     switch (info.getCC()) {
     case AbstractCC::Freestanding: break;
     case AbstractCC::Method:
