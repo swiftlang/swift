@@ -12,17 +12,17 @@ func takesNoEscapeClosure(@__noescape fn : () -> Int) {
 
   fn()  // ok
 
-  var x = fn  // expected-error {{@noescape argument 'fn' may only be called}}
+  var x = fn  // expected-error {{@noescape parameter 'fn' may only be called}}
 
   // This is ok, because the closure itself is noescape.
   takesNoEscapeClosure { fn() }
 
   // This is not ok, because it escapes the 'fn' closure.
-  doesEscape { fn() }   // expected-error {{closure use of @noescape argument 'fn' may allow it to escape}}
+  doesEscape { fn() }   // expected-error {{closure use of @noescape parameter 'fn' may allow it to escape}}
 
   // This is not ok, because it escapes the 'fn' closure.
   func nested_function() {
-    fn()   // expected-error {{declaration closing over @noescape argument 'fn' may allow it to escape}}
+    fn()   // expected-error {{declaration closing over @noescape parameter 'fn' may allow it to escape}}
   }
 
   takesNoEscapeClosure(fn)  // ok
@@ -52,3 +52,10 @@ func takeNoEscapeAsObjCBlock(@__noescape @objc_block () -> Void)
 func takeNoEscapeTest2(@__noescape fn : () -> ()) {
   takeNoEscapeAsObjCBlock(fn)
 }
+
+// Autoclosure implies noescape, but produce nice diagnostics so people know
+// why noescape problems happen.
+func testAutoclosure(@autoclosure a : () -> Int) { // expected-note{{parameter 'a' is implicitly @noescape because it was declared @autoclosure}}
+  doesEscape { a() }  // expected-error {{closure use of @noescape parameter 'a' may allow it to escape}}
+}
+

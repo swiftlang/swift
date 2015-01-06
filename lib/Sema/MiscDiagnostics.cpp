@@ -208,6 +208,10 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
 
       TC.diagnose(DRE->getStartLoc(), diag::invalid_noescape_use,
                   DRE->getDecl()->getName());
+      if (DRE->getDecl()->getAttrs().hasAttribute<AutoClosureAttr>() &&
+          DRE->getDecl()->getAttrs().getAttribute<NoEscapeAttr>()->isImplicit())
+        TC.diagnose(DRE->getDecl()->getLoc(), diag::noescape_autoclosure,
+                    DRE->getDecl()->getName());
     }
 
     /// Check the specified closure to make sure it doesn't capture a noescape
@@ -219,9 +223,15 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
       // Otherwise, check the capture list to make sure it isn't escaping
       // something.
       for (auto CapVD : CE->getCaptureInfo().getCaptures())
-        if (CapVD->getAttrs().hasAttribute<NoEscapeAttr>())
+        if (CapVD->getAttrs().hasAttribute<NoEscapeAttr>()) {
           TC.diagnose(CE->getStartLoc(), diag::closure_noescape_use,
                       CapVD->getName());
+
+          if (CapVD->getAttrs().hasAttribute<AutoClosureAttr>() &&
+              CapVD->getAttrs().getAttribute<NoEscapeAttr>()->isImplicit())
+            TC.diagnose(CapVD->getLoc(), diag::noescape_autoclosure,
+                        CapVD->getName());
+        }
     }
 
     // Diagnose metatype values that don't appear as part of a property,

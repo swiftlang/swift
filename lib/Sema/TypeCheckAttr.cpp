@@ -1161,9 +1161,7 @@ void TypeChecker::checkAutoClosureAttr(VarDecl *VD, AutoClosureAttr *attr) {
   // Autoclosure implies noescape, so add a noescape attribute if this is a
   // function parameter.
   if (auto *PD = dyn_cast<ParamDecl>(VD))
-    if (!VD->getAttrs().hasAttribute<NoEscapeAttr>() &&
-        // Limit this to the stdlib until @__noescape is a public feature.
-        VD->getDeclContext()->getParentModule()->isStdlibModule()) {
+    if (!VD->getAttrs().hasAttribute<NoEscapeAttr>()) {
       auto *newAttr = new (Context) NoEscapeAttr(/*isImplicit*/true);
       VD->getAttrs().add(newAttr);
       checkNoEscapeAttr(PD, newAttr);

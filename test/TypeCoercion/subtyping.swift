@@ -14,8 +14,8 @@ struct IsPrintable1 : Printable {
   func print() {}
 }
 
-func accept_creates_Printable (_: () -> Printable) {}
-func accept_creates_FormattedPrintable (_: () -> FormattedPrintable) {}
+func accept_creates_Printable (@__noescape _: () -> Printable) {}
+func accept_creates_FormattedPrintable (@__noescape _: () -> FormattedPrintable) {}
 
 func fp_to_p(fp: FormattedPrintable) -> Printable { return fp; }
 func p_to_fp(p: Printable) -> FormattedPrintable { }
@@ -35,9 +35,9 @@ func protocolConformance(@autoclosure ac1: () -> Printable,
   accept_creates_Printable(ac1)
   accept_creates_Printable(ac2)
   accept_creates_Printable(ip1)
-  accept_creates_FormattedPrintable(ac1) // expected-error{{cannot invoke 'accept_creates_FormattedPrintable' with an argument list of type '(@autoclosure () -> Printable)'}} expected-note{{expected an argument list of type '(() -> FormattedPrintable)'}}
+  accept_creates_FormattedPrintable(ac1) // expected-error{{cannot invoke 'accept_creates_FormattedPrintable' with an argument list of type '(@autoclosure () -> Printable)'}} expected-note{{expected an argument list of type '(@__noescape () -> FormattedPrintable)'}}
   accept_creates_FormattedPrintable(ac2)
-  accept_creates_FormattedPrintable(ip1) // expected-error{{cannot invoke 'accept_creates_FormattedPrintable' with an argument list of type '(@autoclosure () -> IsPrintable1)'}} expected-note{{expected an argument list of type '(() -> FormattedPrintable)'}}
+  accept_creates_FormattedPrintable(ip1) // expected-error{{cannot invoke 'accept_creates_FormattedPrintable' with an argument list of type '(@autoclosure () -> IsPrintable1)'}} expected-note{{expected an argument list of type '(@__noescape () -> FormattedPrintable)'}}
 }
 
 func p_gen_to_fp(_: () -> Printable) -> FormattedPrintable {}

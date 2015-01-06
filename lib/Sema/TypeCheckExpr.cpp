@@ -661,6 +661,12 @@ namespace {
 
       // Otherwise, diagnose this as an invalid capture.
       TC.diagnose(Loc, diag::decl_closure_noescape_use, VD->getName());
+
+      if (VD->getAttrs().hasAttribute<AutoClosureAttr>() &&
+          VD->getAttrs().getAttribute<NoEscapeAttr>()->isImplicit())
+        TC.diagnose(VD->getLoc(), diag::noescape_autoclosure,
+                    VD->getName());
+
     }
 
     std::pair<bool, Expr *> walkToDeclRefExpr(DeclRefExpr *DRE) {
