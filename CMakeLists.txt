@@ -234,6 +234,9 @@ if(SWIFT_BUILT_STANDALONE)
   set(LLVM_BINARY_DIR ${LLVM_OBJ_ROOT} CACHE PATH "Path to LLVM build tree")
   set(LLVM_MAIN_SRC_DIR ${MAIN_SRC_DIR} CACHE PATH "Path to LLVM source tree")
 
+  find_program(LLVM_TABLEGEN_EXE "llvm-tblgen" ${LLVM_TOOLS_BINARY_DIR}
+    NO_DEFAULT_PATH)
+
   set(LLVM_CMAKE_PATH "${LLVM_BINARY_DIR}/share/llvm/cmake")
   list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_PATH}")
 
