@@ -1013,6 +1013,10 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   // Determine which attribute it is, and diagnose it if unknown.
   TypeAttrKind attr = TypeAttributes::getAttrKindFromString(Tok.getText());
 
+  // __noescape is only valid as a type attribute in SIL mode.
+  if (attr == TAK___noescape && !isInSILMode())
+    attr = TAK_Count;
+
   if (attr == TAK_Count) {
     if (justChecking) return true;
 
@@ -1199,6 +1203,12 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
     if (StopAtTypeAttributes) {
       Token next = peekToken();
       auto Kind = TypeAttributes::getAttrKindFromString(next.getText());
+
+      // __noescape is only valid as a decl attribute and type attribute (in SIL
+      // mode) but we disambiguate it as a decl attribute.
+      if (Kind == TAK___noescape)
+        Kind = TAK_Count;
+
       if (Kind != TAK_Count)
         return false;
     }

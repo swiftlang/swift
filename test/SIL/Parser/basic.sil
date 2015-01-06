@@ -1241,6 +1241,15 @@ entry:
   return %m : $@thick (() -> ()).Type
 }
 
+// Test noescape as a function attribute in SIL mode.
+sil hidden_external @takesNoEscapeClosure : $@thin (@owned @__noescape @callee_owned () -> Int) -> ()
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+
+
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.1: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
 // CHECK: #Foo.subscript!setter.1: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis
