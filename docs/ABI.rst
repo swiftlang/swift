@@ -887,9 +887,11 @@ Types
   type ::= 'f' type type                     // uncurried function type
   type ::= 'G' type <type>+ '_'              // generic type application
   type ::= 'K' type type                     // @auto_closure function type
-  type ::= 'M' type                          // metatype
+  type ::= 'M' type                          // metatype without representation
+  type ::= 'XM' metatype-repr type           // metatype with representation
   type ::= 'P' protocol-list '_'             // protocol type
-  type ::= 'PM' type                         // existential metatype
+  type ::= 'PM' type                         // existential metatype without representation
+  type ::= 'XPM' metatype-repr type          // existential metatype with representation
   type ::= archetype
   type ::= 'R' type                          // inout
   type ::= 'T' tuple-element* '_'            // tuple
@@ -915,6 +917,9 @@ Types
   qualified-archetype ::= 'Qq' index context   // archetype+context (DWARF only)
   protocol-context ::= 'P' protocol
   tuple-element ::= identifier? type
+  metatype-repr ::= 't'                      // Thin metatype representation
+  metatype-repr ::= 'T'                      // Thick metatype representation
+  metatype-repr ::= 'o'                      // ObjC metatype representation
 
   type ::= 'u' generic-signature type        // generic type (new)
   type ::= 'q' index                         // dependent generic parameter

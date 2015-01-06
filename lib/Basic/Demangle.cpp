@@ -1495,6 +1495,19 @@ private:
     
     return sig;
   }
+
+  NodePointer demangleMetatypeRepresentation() {
+    if (Mangled.nextIf('t'))
+      return NodeFactory::create(Node::Kind::MetatypeRepresentation, "@thin");
+
+    if (Mangled.nextIf('T'))
+      return NodeFactory::create(Node::Kind::MetatypeRepresentation, "@thick");
+
+    if (Mangled.nextIf('o'))
+      return NodeFactory::create(Node::Kind::MetatypeRepresentation, "@objc");
+
+    unreachable("Unhandled metatype representation");
+  }
   
   NodePointer demangleGenericRequirement() {
     if (Mangled.nextIf('P')) {
@@ -1810,6 +1823,20 @@ private:
       metatype->addChild(type);
       return metatype;
     }
+    if (c == 'X') {
+      if (Mangled.nextIf('M')) {
+        NodePointer metatypeRepr = demangleMetatypeRepresentation();
+        if (!metatypeRepr) return nullptr;
+
+        NodePointer type = demangleType();
+        if (!type)
+          return nullptr;
+        NodePointer metatype = NodeFactory::create(Node::Kind::Metatype);
+        metatype->addChild(metatypeRepr);
+        metatype->addChild(type);
+        return metatype;
+      }
+    }
     if (c == 'P') {
       if (Mangled.nextIf('M')) {
         NodePointer type = demangleType();
@@ -1820,6 +1847,25 @@ private:
       }
 
       return demangleProtocolList();
+    }
+
+    if (c == 'X') {
+      if (Mangled.nextIf('P')) {
+        if (Mangled.nextIf('M')) {
+          NodePointer metatypeRepr = demangleMetatypeRepresentation();
+          if (!metatypeRepr) return nullptr;
+
+          NodePointer type = demangleType();
+          if (!type) return nullptr;
+
+          auto metatype = NodeFactory::create(Node::Kind::ExistentialMetatype);
+          metatype->addChild(metatypeRepr);
+          metatype->addChild(type);
+          return metatype;
+        }
+
+        return demangleProtocolList();
+      }
     }
     if (c == 'Q') {
       return demangleArchetypeType();
@@ -2211,6 +2257,7 @@ private:
     case Node::Kind::ErrorType:
     case Node::Kind::ExistentialMetatype:
     case Node::Kind::Metatype:
+    case Node::Kind::MetatypeRepresentation:
     case Node::Kind::Module:
     case Node::Kind::NonVariadicTuple:
     case Node::Kind::Protocol:
@@ -2882,7 +2929,14 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   }
   case Node::Kind::Metatype: {
-    NodePointer type = pointer->getChild(0);
+    unsigned Idx = 0;
+    if (pointer->getNumChildren() == 2) {
+      NodePointer repr = pointer->getChild(Idx);
+      print(repr);
+      Printer << " ";
+      Idx++;
+    }
+    NodePointer type = pointer->getChild(Idx);
     print(type);
     if (isExistentialType(type)) {
       Printer << ".Protocol";
@@ -2892,9 +2946,21 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   }
   case Node::Kind::ExistentialMetatype: {
-    NodePointer type = pointer->getChild(0);
+    unsigned Idx = 0;
+    if (pointer->getNumChildren() == 2) {
+      NodePointer repr = pointer->getChild(Idx);
+      print(repr);
+      Printer << " ";
+      Idx++;
+    }
+
+    NodePointer type = pointer->getChild(Idx);
     print(type);
     Printer << ".Type";
+    return;
+  }
+  case Node::Kind::MetatypeRepresentation: {
+    Printer << pointer->getText();
     return;
   }
   case Node::Kind::ArchetypeRef:
