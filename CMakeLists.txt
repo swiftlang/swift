@@ -360,7 +360,7 @@ if (CLANG_OBJC_TYPE_PARAM_DECL)
   set(CLANG_OBJC_GENERICS TRUE)
 else()
   message(STATUS "Underlying Clang does NOT support Objective-C generics")
-  add_definitions(-DSWIFT_DISABLE_OBJC_GENERICS)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSWIFT_DISABLE_OBJC_GENERICS")
   set(CLANG_OBJC_GENERICS FALSE)
 endif()
 

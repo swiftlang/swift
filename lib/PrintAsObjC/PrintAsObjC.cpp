@@ -32,7 +32,7 @@
 
 using namespace swift;
 
-#ifndef SWIFT_DISABLE_OBJC_GENERIC
+#ifndef SWIFT_DISABLE_OBJC_GENERICS
 static bool isNSObject(Type type) {
   if (auto classDecl = type->getClassOrBoundGenericClass()) {
     return !classDecl->getName().empty() &&
@@ -605,7 +605,7 @@ private:
       return false;
 
     if (SD == ctx.getArrayDecl()) {
-#ifndef SWIFT_DISABLE_OBJC_GENERIC
+#ifndef SWIFT_DISABLE_OBJC_GENERICS
       if (!BGT->getGenericArgs()[0]->isAnyObject()) {
         os << "NS_ARRAY(";
         visitPart(BGT->getGenericArgs()[0], OTK_ImplicitlyUnwrappedOptional);
@@ -622,7 +622,7 @@ private:
     }
 
     if (SD == ctx.getDictionaryDecl()) {
-#ifndef SWIFT_DISABLE_OBJC_GENERIC
+#ifndef SWIFT_DISABLE_OBJC_GENERICS
       if (!isNSObject(BGT->getGenericArgs()[0]) ||
           !BGT->getGenericArgs()[1]->isAnyObject()) {
         os << "NS_DICTIONARY(";
@@ -642,7 +642,7 @@ private:
     }
 
     if (SD == ctx.getSetDecl()) {
-#ifndef SWIFT_DISABLE_OBJC_GENERIC
+#ifndef SWIFT_DISABLE_OBJC_GENERICS
       if (!isNSObject(BGT->getGenericArgs()[0])) {
         os << "NS_SET(";
         visitPart(BGT->getGenericArgs()[0], OTK_ImplicitlyUnwrappedOptional);
@@ -1367,7 +1367,7 @@ public:
         out << "#import \"" << bridgingHeader << "\"\n\n";
     }
 
-#ifndef SWIFT_DISABLE_OBJC_GENERIC
+#ifndef SWIFT_DISABLE_OBJC_GENERICS
     // Once we've printed out the imports, deal with Foundations that
     // don't provide NS_ARRAY/NS_DICTIONARY/NS_SET.
     out << "#ifndef NS_ARRAY\n"

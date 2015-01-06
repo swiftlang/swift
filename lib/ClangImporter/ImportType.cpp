@@ -603,7 +603,7 @@ namespace {
         }
 
         if (imported->hasName() && imported->getName().str() == "NSArray") {
-#ifndef SWIFT_DISABLE_OBJC_GENERIC
+#ifndef SWIFT_DISABLE_OBJC_GENERICS
           // If we have type arguments, import them.
           ArrayRef<clang::QualType> typeArgs = type->getTypeArgs();
           if (typeArgs.size() == 1) {
@@ -620,7 +620,7 @@ namespace {
         }
 
         if (imported->hasName() && imported->getName().str() == "NSDictionary") {
-#ifndef SWIFT_DISABLE_OBJC_GENERIC
+#ifndef SWIFT_DISABLE_OBJC_GENERICS
           // If we have type arguments, import them.
           ArrayRef<clang::QualType> typeArgs = type->getTypeArgs();
           if (typeArgs.size() == 2) {
@@ -647,7 +647,7 @@ namespace {
         }
 
         if (imported->hasName() && imported->getName().str() == "NSSet") {
-#ifndef SWIFT_DISABLE_OBJC_GENERIC
+#ifndef SWIFT_DISABLE_OBJC_GENERICS
           // If we have type arguments, import them.
           ArrayRef<clang::QualType> typeArgs = type->getTypeArgs();
           if (typeArgs.size() == 1) {
