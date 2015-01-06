@@ -3458,6 +3458,24 @@ DictionaryTestSuite.test("misc") {
   }
 }
 
+DictionaryTestSuite.test("dropsBridgedCache") {
+  // rdar://problem/18544533
+  // Previously this code would segfault due to a double free in the Dictionary
+  // implementation.
+  // This test will only fail in address sanitizer.
+  var dict = [0:10]
+  if true {
+    var bridged: NSDictionary = dict
+    expectEqual(10, bridged[0])
+  }
+
+  dict[0] = 11
+  if true {
+    var bridged: NSDictionary = dict
+    expectEqual(11, bridged[0])
+  }
+}
+
 DictionaryTestSuite.setUp {
   resetLeaksOfDictionaryKeysValues()
 }
