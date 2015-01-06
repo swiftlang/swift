@@ -456,7 +456,7 @@ namespace {
     StorageReferenceContext(const StorageReferenceContext &) = delete;
   public:
     StorageReferenceContext() = default;
-    virtual ~StorageReferenceContext() {}
+    virtual ~StorageReferenceContext() = default;
 
     /// Returns the declaration of the entity to use as the base of
     /// the access, or nil if no base is required.
@@ -473,7 +473,7 @@ namespace {
     FuncDecl *Accessor;
   public:
     AccessorStorageReferenceContext(FuncDecl *accessor) : Accessor(accessor) {}
-    virtual ~AccessorStorageReferenceContext() {}
+    virtual ~AccessorStorageReferenceContext() = default;
 
     VarDecl *getSelfDecl() const override {
       return Accessor->getImplicitSelfDecl();
@@ -1006,7 +1006,7 @@ namespace {
   public:
     CallbackStorageReferenceContext(VarDecl *self, VarDecl *callbackStorage)
       : Self(self), CallbackStorage(callbackStorage) {}
-    virtual ~CallbackStorageReferenceContext() {}
+    virtual ~CallbackStorageReferenceContext() = default;
 
     VarDecl *getSelfDecl() const override {
       return Self;
