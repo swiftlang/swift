@@ -496,9 +496,6 @@ should take action to reclaim that autorelease with
   corresponds to the LLVM "nocapture" attribute in terms of semantics (but is
   limited to only work with parameters of function type in Swift).
 
-argument of a SIL function may have a SIL function type with the
-   @noescape
-
 Properties of Types
 ```````````````````
 
