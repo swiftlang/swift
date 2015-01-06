@@ -1,0 +1,112 @@
+#if __has_feature(modules)
+@import ObjectiveC;
+@import CoreFoundation;
+@import CoreGraphics;
+#else
+#import <objc/NSObject.h>
+#import <CoreFoundation.h>
+#import <CoreGraphics.h>
+#endif
+
+typedef struct objc_object { void *isa; } *id;
+
+typedef struct _NSZone NSZone;
+void *allocate(NSZone *zone);
+
+typedef double NSTimeInterval;
+
+@class NSString, NSArray, NSDictionary, NSSet, NSEnumerator;
+
+@interface NSArray<ObjectType> : NSObject
+- (ObjectType)objectAtIndexedSubscript:(NSUInteger)idx;
+- description;
++ (instancetype)arrayWithObjects:(const ObjectType[])objects count:(NSUInteger)count;
+- (void)makeObjectsPerformSelector:(SEL)aSelector;
+- (void)makeObjectsPerformSelector:(SEL)aSelector withObject:(ObjectType)anObject;
+@end
+
+@interface NSCoder : NSObject
+@end
+
+@protocol NSCoding
+- (instancetype)initWithCoder:(NSCoder *)aCoder;
+@end
+
+@protocol NSSecureCoding <NSCoding>
+@end
+
+@protocol NSCopying
+- (id)copyWithZone:(NSZone *)zone;
+@end
+
+@interface NSDictionary<KeyType : id<NSCopying>, ObjectType> : NSObject /*<NSCopying, NSMutableCopying, NSSecureCoding, NSFastEnumeration>*/
+@property (readonly) NSUInteger count;
+- (ObjectType)objectForKey:(KeyType)aKey;
+- (NSEnumerator *)keyEnumerator;
+@end
+@interface NSDictionary<KeyType, ObjectType> (NSExtendedDictionary)
+- (ObjectType)objectForKeyedSubscript:(KeyType)key;
+@end
+
+@interface NSDictionary (Inits)
+- (instancetype)init;
+@end
+
+@interface NSMutableDictionary<KeyType : id<NSCopying>, ObjectType> : NSDictionary<KeyType, ObjectType>
+- (void)removeObjectForKey:(KeyType)aKey;
+- (void)setObject:(ObjectType)anObject forKey:(KeyType)aKey;
+@end
+
+@interface NSMutableDictionary<KeyType, ObjectType> (NSExtendedMutableDictionary)
+- (void)setObject:(ObjectType)obj forKeyedSubscript:(KeyType)key;
+@end
+
+@interface NSSet<KeyType> : NSObject
+- (instancetype)init;
+- (NSUInteger)count;
+- (KeyType)anyObject;
+@end
+
+@interface NSMutableSet<KeyType> : NSSet<KeyType>
+- (void)addObject:(id)obj;
+- (void)removeObject:(id)obj;
+@end
+
+@interface NSNumber : NSObject
+@end
+
+@interface NSDecimalNumber : NSObject
++ (instancetype)initWithMantissa:(unsigned long long)mantissa exponent:(short)exponent isNegative:(BOOL)isNegative;
++ (NSDecimalNumber *)decimalNumberWithMantissa:(unsigned long long)mantissa exponent:(short)exponent isNegative:(BOOL)isNegative;
+@end
+
+@interface NSError : NSObject
+@end
+
+@interface NSString : NSObject <NSSecureCoding, NSCopying>
+- (void)onlyOnNSString;
++ (instancetype)stringWithContentsOfFile:(NSString*)path error:(NSError**)error;
++ (instancetype)stringWithContentsOfFile:(NSString*)path encoding:(int)encoding error:(NSError**)error;
+@end
+
+@interface Bee : NSObject
+-(void)buzz;
+@end
+
+@interface Hive : NSObject {
+  Bee *queen;
+}
+- init;
+
+@property (nonnull) NSArray<Bee *> *bees;
+@property (nullable) NSDictionary<NSString *, Bee *> *beesByName;
+@property NSSet<Bee *> *allBees;
+
++ (instancetype)hiveWithQueen:(Bee *)queen;
+
+- (instancetype)visit;
+@end
+
+@interface NSMutableString : NSString
+@end
+

@@ -46,42 +46,91 @@ static bool isImportedCFPointer(clang::QualType clangType, Type type) {
 namespace {
   /// Various types that we want to do something interesting to after
   /// importing them.
-  enum class ImportHint {
-    /// There is nothing special about the source type.
-    None,
+  struct ImportHint {
+    enum ImportHintKind {
+      /// There is nothing special about the source type.
+      None,
 
-    /// The source type is 'void'.
-    Void,
+      /// The source type is 'void'.
+      Void,
 
-    /// The source type is 'BOOL'.
-    BOOL,
+      /// The source type is 'BOOL'.
+      BOOL,
 
-    /// The source type is 'NSString'.
-    NSString,
+      /// The source type is 'NSString'.
+      NSString,
 
-    /// The source type is 'NSArray'.
-    NSArray,
+      /// The source type is 'NSArray'.
+      NSArray,
 
-    /// The source type is 'NSDictionary'.
-    NSDictionary,
+      /// The source type is 'NSDictionary'.
+      NSDictionary,
 
-    /// The source type is 'NSSet'.
-    NSSet,
+      /// The source type is 'NSSet'.
+      NSSet,
 
-    /// The source type is 'NSUInteger'.
-    NSUInteger,
+      /// The source type is 'NSUInteger'.
+      NSUInteger,
 
-    /// The source type is an Objective-C object pointer type.
-    ObjCPointer,
+      /// The source type is an Objective-C object pointer type.
+      ObjCPointer,
 
-    /// The source type is a CF object pointer type.
-    CFPointer,
+      /// The source type is a CF object pointer type.
+      CFPointer,
 
-    /// The source type is a C++ reference type.
-    Reference,
+      /// The source type is a C++ reference type.
+      Reference,
 
-    /// The source type is a block pointer type.
-    Block,
+      /// The source type is a block pointer type.
+      Block,
+    };
+
+    ImportHintKind Kind;
+
+    // Type arguments, if provided.
+    Type TypeArgs[2];
+
+    /// Allow conversion from an import hint to an import hint kind,
+    /// which is useful for switches and comparisons.
+    operator ImportHintKind() const { return Kind; }
+
+    /// Determine the number of type arguments we expect.
+    static unsigned getNumTypeArgs(ImportHintKind kind) {
+      switch (kind) {
+      case None:
+      case Void:
+      case BOOL:
+      case NSString:
+      case NSUInteger:
+      case ObjCPointer:
+      case CFPointer:
+      case Reference:
+      case Block:
+        return 0;
+
+      case NSArray:
+      case NSSet:
+        return 1;
+
+      case NSDictionary:
+        return 2;
+      }
+    }
+
+    ImportHint(ImportHintKind kind) : Kind(kind) {
+      assert(getNumTypeArgs(kind) == 0 && "Wrong number of arguments");
+    }
+
+    ImportHint(ImportHintKind kind, Type typeArg1) : Kind(kind) {
+      assert(getNumTypeArgs(kind) == 1 && "Wrong number of arguments");
+      TypeArgs[0] = typeArg1;
+    }
+
+    ImportHint(ImportHintKind kind, Type typeArg1, Type typeArg2) : Kind(kind) {
+      assert(getNumTypeArgs(kind) == 2 && "Wrong number of arguments");
+      TypeArgs[0] = typeArg1;
+      TypeArgs[1] = typeArg2;
+    }
   };
 
   bool canImportAsOptional(ImportHint hint) {
@@ -533,63 +582,88 @@ namespace {
     }
 
     ImportResult VisitObjCObjectType(const clang::ObjCObjectType *type) {
-      // If this is id<P> , turn this into a protocol type.
-      // FIXME: What about Class<P>?
-      if (type->isObjCQualifiedId()) {
-        SmallVector<Type, 4> protocols;
-        for (auto cp = type->qual_begin(), cpEnd = type->qual_end();
-             cp != cpEnd; ++cp) {
-          auto proto = cast_or_null<ProtocolDecl>(Impl.importDecl(*cp));
-          if (!proto)
-            return Type();
-
-          protocols.push_back(proto->getDeclaredType());
-        }
-
-        return { ProtocolCompositionType::get(Impl.SwiftContext, protocols),
-                 ImportHint::ObjCPointer };
-      }
-
-      // FIXME: Swift cannot express qualified object pointer types, e.g.,
-      // NSObject<Proto>, so we drop the <Proto> part.
-      return Visit(type->getBaseType());
-    }
-
-    ImportResult VisitObjCInterfaceType(const clang::ObjCInterfaceType *type) {
-      auto imported = cast_or_null<ClassDecl>(Impl.importDecl(type->getDecl()));
-      if (!imported)
-        return nullptr;
-
-      Type importedType = imported->getDeclaredType();
-
-      if (imported->hasName() &&
-          imported->getName().str() == "NSString") {
-        return { importedType, ImportHint::NSString };
-      }
-
-      if (imported->hasName() && imported->getName().str() == "NSArray") {
-        return { importedType, ImportHint::NSArray };
-      }
-
-      if (imported->hasName() && imported->getName().str() == "NSDictionary") {
-        return { importedType, ImportHint::NSDictionary };
-      }
-
-      if (imported->hasName() && imported->getName().str() == "NSSet") {
-        return { importedType, ImportHint::NSSet };
-      }
-
-      return { importedType, ImportHint::ObjCPointer };
+      // We only handle pointers to objects.
+      return nullptr;
     }
 
     ImportResult
     VisitObjCObjectPointerType(const clang::ObjCObjectPointerType *type) {
       // If this object pointer refers to an Objective-C class (possibly
       // qualified),
-      if (auto interface = type->getInterfaceType()) {
-        // FIXME: Swift cannot express qualified object pointer types, e.g.,
-        // NSObject<Proto>, so we drop the <Proto> part.
-        return VisitObjCInterfaceType(interface);
+      if (auto objcClass = type->getInterfaceDecl()) {
+        auto imported = cast_or_null<ClassDecl>(Impl.importDecl(objcClass));
+        if (!imported)
+          return nullptr;
+
+        Type importedType = imported->getDeclaredType();
+
+        if (imported->hasName() &&
+            imported->getName().str() == "NSString") {
+          return { importedType, ImportHint::NSString };
+        }
+
+        if (imported->hasName() && imported->getName().str() == "NSArray") {
+#ifndef SWIFT_DISABLE_OBJC_GENERIC
+          // If we have type arguments, import them.
+          ArrayRef<clang::QualType> typeArgs = type->getTypeArgs();
+          if (typeArgs.size() == 1) {
+            Type elementType = Impl.importType(typeArgs[0],
+                                               ImportTypeKind::BridgedValue,
+                                               IsUsedInSystemModule,
+                                               OTK_None);
+            return { importedType,
+                     ImportHint(ImportHint::NSArray, elementType) };
+          }
+#endif
+
+          return { importedType, ImportHint(ImportHint::NSArray, Type()) };
+        }
+
+        if (imported->hasName() && imported->getName().str() == "NSDictionary") {
+#ifndef SWIFT_DISABLE_OBJC_GENERIC
+          // If we have type arguments, import them.
+          ArrayRef<clang::QualType> typeArgs = type->getTypeArgs();
+          if (typeArgs.size() == 2) {
+            Type keyType = Impl.importType(typeArgs[0],
+                                           ImportTypeKind::BridgedValue,
+                                           IsUsedInSystemModule,
+                                           OTK_None);
+            Type objectType = Impl.importType(typeArgs[1],
+                                              ImportTypeKind::BridgedValue,
+                                              IsUsedInSystemModule,
+                                              OTK_None);
+            if (keyType.isNull() != objectType.isNull()) {
+              keyType = nullptr;
+              objectType = nullptr;
+            }
+
+            return { importedType,
+                     ImportHint(ImportHint::NSDictionary,
+                                keyType, objectType) };
+          }
+#endif
+          return { importedType,
+                   ImportHint(ImportHint::NSDictionary, Type(), Type()) };
+        }
+
+        if (imported->hasName() && imported->getName().str() == "NSSet") {
+#ifndef SWIFT_DISABLE_OBJC_GENERIC
+          // If we have type arguments, import them.
+          ArrayRef<clang::QualType> typeArgs = type->getTypeArgs();
+          if (typeArgs.size() == 1) {
+            Type elementType = Impl.importType(typeArgs[0],
+                                               ImportTypeKind::BridgedValue,
+                                               IsUsedInSystemModule,
+                                               OTK_None);
+            return { importedType,
+                     ImportHint(ImportHint::NSSet, elementType) };
+          }
+#endif
+
+          return { importedType, ImportHint(ImportHint::NSSet, Type()) };
+        }
+
+        return { importedType, ImportHint::ObjCPointer };
       }
 
       // If this is id<P>, turn this into a protocol type.
@@ -645,6 +719,7 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
   case ImportTypeKind::Parameter:
   case ImportTypeKind::Property:
   case ImportTypeKind::PropertyAccessor:
+  case ImportTypeKind::BridgedValue:
     return true;
   }
 }
@@ -654,6 +729,7 @@ static bool isCFAudited(ImportTypeKind importKind) {
   switch (importKind) {
   case ImportTypeKind::Abstract:
   case ImportTypeKind::Value:
+  case ImportTypeKind::BridgedValue:
   case ImportTypeKind::Variable:
   case ImportTypeKind::Result:
   case ImportTypeKind::Pointee:
@@ -799,34 +875,41 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   // result type, map it to [AnyObject].
   if (hint == ImportHint::NSArray && canBridgeTypes(importKind) &&
       impl.tryLoadFoundationModule()) {
-    Type anyObject = impl.getNamedSwiftType(impl.getStdlibModule(), 
-                                            "AnyObject");
-    importedType = ArraySliceType::get(anyObject);
+    Type elementType = hint.TypeArgs[0];
+    if (elementType.isNull())
+      elementType = impl.getNamedSwiftType(impl.getStdlibModule(), "AnyObject");
+    importedType = ArraySliceType::get(elementType);
   }
 
   // When NSDictionary* is the type of a function parameter or a function
   // result type, map it to [NSObject : AnyObject].
   if (hint == ImportHint::NSDictionary && canBridgeTypes(importKind) &&
       impl.tryLoadFoundationModule()) {
-    importedType = DictionaryType::get(
-                     impl.getNSObjectType(),
-                     impl.getNamedSwiftType(impl.getStdlibModule(),
-                                            "AnyObject"));
+    Type keyType = hint.TypeArgs[0];
+    Type objectType = hint.TypeArgs[1];
+    if (keyType.isNull()) {
+      keyType = impl.getNSObjectType();
+      objectType = impl.getNamedSwiftType(impl.getStdlibModule(), "AnyObject");
+    }
+
+    importedType = DictionaryType::get(keyType, objectType);
   }
 
   // When NSSet* is the type of a function parameter or a function
   // result type, map it to Set<NSObject>.
   if (hint == ImportHint::NSSet && canBridgeTypes(importKind) &&
       impl.tryLoadFoundationModule()) {
+    Type elementType = hint.TypeArgs[0];
+    if (elementType.isNull())
+      elementType = impl.getNSObjectType();
     importedType = impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
                                                         "Set",
-                                                        impl.getNSObjectType());
+                                                        elementType);
   }
 
   // Wrap class, class protocol, function, and metatype types in an
   // optional type.
-  if (canImportAsOptional(hint) &&
-      !clangType->getNullability(impl.getClangASTContext())) {
+  if (canImportAsOptional(hint)) {
     importedType = getOptionalType(importedType, importKind, optKind);
   }
 

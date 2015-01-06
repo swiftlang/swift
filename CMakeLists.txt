@@ -84,7 +84,7 @@ option(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT_REQUIRED
     FALSE)
 
 #
-# User-configurable debugging opitons.
+# User-configurable debugging options.
 #
 
 option(SWIFT_VERIFY_ALL
@@ -349,6 +349,19 @@ endif()
 
 if(NOT EXISTS "${CLANG_MAIN_INCLUDE_DIR}/clang/AST/Decl.h")
   message(FATAL_ERROR "Clang is missing from llvm/tools subdirectory.")
+endif()
+
+# If the underlying Clang does not have support for Objective-C
+# generics, disable support for them in Swift.
+file(STRINGS "${CLANG_MAIN_INCLUDE_DIR}/clang/AST/DeclObjC.h"
+  CLANG_OBJC_TYPE_PARAM_DECL REGEX "ObjCTypeParamDecl")
+if (CLANG_OBJC_TYPE_PARAM_DECL)
+  message(STATUS "Underlying Clang supports Objective-C generics")
+  set(CLANG_OBJC_GENERICS TRUE)
+else()
+  message(STATUS "Underlying Clang does NOT support Objective-C generics")
+  add_definitions(-DSWIFT_DISABLE_OBJC_GENERICS)
+  set(CLANG_OBJC_GENERICS FALSE)
 endif()
 
 # This could be computed using ${CMAKE_CFG_INTDIR} if we want to link Swift

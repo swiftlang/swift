@@ -1,0 +1,12 @@
+module CoreGraphics {
+  header "CoreGraphics.h"
+  export *
+}
+module CoreFoundation {
+  header "CoreFoundation.h" 
+  export *
+}
+module Foundation {
+  header "Foundation.h" 
+  export *
+}
