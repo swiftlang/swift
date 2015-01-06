@@ -1242,8 +1242,8 @@ entry:
 }
 
 // Test noescape as a function attribute in SIL mode.
-sil hidden_external @takesNoEscapeClosure : $@thin (@owned @__noescape @callee_owned () -> Int) -> ()
-bb0:
+sil hidden_external @takesNoEscapeClosure : $(@__noescape @callee_owned () -> Int) -> () {
+bb0(%a : $(@__noescape @callee_owned () -> Int)):
   %0 = tuple ()
   return %0 : $()
 }
