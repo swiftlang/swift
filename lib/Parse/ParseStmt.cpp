@@ -629,50 +629,50 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
                                         Diag<> ID) {
   ParserStatus Status;
   Condition = StmtCondition();
-  if (Tok.is(tok::kw_var) || Tok.is(tok::kw_let)) {
-    // We're parsing a conditional binding.
-    assert(CurDeclContext->isLocalContext()
-           && "conditional binding in non-local context?!");
-    
-    bool IsLet = Tok.is(tok::kw_let);
-    SourceLoc VarLoc = consumeToken();
-    
-    auto Pattern = parsePattern(IsLet);
-    Status |= Pattern;
-    if (Pattern.isNull() || Pattern.hasCodeCompletion())
-      return Status;
-
-    Expr *Init;
-    // Conditional bindings must have an initializer.
-    if (consumeIf(tok::equal)) {
-      ParserResult<Expr> InitExpr
-        = parseExprBasic(diag::expected_expr_conditional_var);
-      Status |= InitExpr;
-      if (InitExpr.isNull() || InitExpr.hasCodeCompletion())
-        return Status;
-      Init = InitExpr.get();
-    } else {
-      // Although we require an initializer, recover by parsing as if it were
-      // merely omitted.
-      diagnose(Tok, diag::conditional_var_initializer_required);
-      Init = new (Context) ErrorExpr(Tok.getLoc());
-    }
-    
-    Condition = new (Context) PatternBindingDecl(SourceLoc(),
-                                                 StaticSpellingKind::None,
-                                                 VarLoc, Pattern.get(),
-                                                 Init,
-                                                 /*isConditional*/ true,
-                                                 /*parent*/ CurDeclContext);
-    
-    // Introduce variables to the current scope.
-    addPatternVariablesToScope(Pattern.get());
-
-  } else {
+  if (Tok.isNot(tok::kw_var) && Tok.isNot(tok::kw_let)) {
     ParserResult<Expr> Expr = parseExprBasic(ID);
     Status |= Expr;
     Condition = Expr.getPtrOrNull();
+    return Status;
   }
+
+  // We're parsing a conditional binding.
+  assert(CurDeclContext->isLocalContext() &&
+         "conditional binding in non-local context?!");
+  
+  bool IsLet = Tok.is(tok::kw_let);
+  SourceLoc VarLoc = consumeToken();
+  
+  auto Pattern = parsePattern(IsLet);
+  Status |= Pattern;
+  if (Pattern.isNull() || Pattern.hasCodeCompletion())
+    return Status;
+
+  Expr *Init;
+  // Conditional bindings must have an initializer.
+  if (consumeIf(tok::equal)) {
+    ParserResult<Expr> InitExpr
+      = parseExprBasic(diag::expected_expr_conditional_var);
+    Status |= InitExpr;
+    if (InitExpr.isNull() || InitExpr.hasCodeCompletion())
+      return Status;
+    Init = InitExpr.get();
+  } else {
+    // Although we require an initializer, recover by parsing as if it were
+    // merely omitted.
+    diagnose(Tok, diag::conditional_var_initializer_required);
+    Init = new (Context) ErrorExpr(Tok.getLoc());
+  }
+  
+  Condition = new (Context) PatternBindingDecl(SourceLoc(),
+                                               StaticSpellingKind::None,
+                                               VarLoc, Pattern.get(),
+                                               Init,
+                                               /*isConditional*/ true,
+                                               /*parent*/ CurDeclContext);
+  
+  // Introduce variables to the current scope.
+  addPatternVariablesToScope(Pattern.get());
   return Status;
 }
 
