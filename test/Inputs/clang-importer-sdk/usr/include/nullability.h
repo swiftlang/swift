@@ -1,6 +1,8 @@
 #ifndef NULLABILITY_H
 #define NULLABILITY_H
 
+@import Foundation;
+
 typedef __nonnull id nonnull_id;
 
 __nullable id getId1(void);
@@ -17,6 +19,8 @@ extern __nullable id global_id;
 - (void)methodE:(SomeClass *) __attribute__((nonnull)) obj;
 - (void)methodF:(SomeClass *)obj second:(SomeClass *)obj2 __attribute__((nonnull));
 - (void)methodG:(SomeClass *)obj second:(SomeClass *)obj2 __attribute__((nonnull(1)));
+-(nonnull NSString *)stringMethod;
+-(nullable NSArray *)optArrayMethod;
 
 +(nonnull instancetype)someClassWithInt:(int)x;
 +(nullable SomeClass*)someClassWithDouble:(double)x;

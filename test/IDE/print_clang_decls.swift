@@ -137,13 +137,15 @@
 
 // CHECK-NULLABILITY: typealias nonnull_id = AnyObject
 // CHECK-NULLABILITY: func getId1() -> AnyObject?
-// CHECK-NULLABILITY: func getId2() -> AnyObject?
+// CHECK-NULLABILITY: func getId2() -> nonnull_id?
 // CHECK-NULLABILITY: var global_id: AnyObject?
 // CHECK-NULLABILITY: class SomeClass {
 // CHECK-NULLABILITY:   class func methodA(obj: SomeClass?) -> AnyObject{{$}}
 // CHECK-NULLABILITY:   func methodA(obj: SomeClass?) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   class func methodB(block: (@objc_block (Int32, Int32) -> Int32)?) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   func methodB(block: (@objc_block (Int32, Int32) -> Int32)?) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   func methodC() -> AnyObject?
-// CHECK-NULLABILITY:   var property: AnyObject?
+// CHECK-NULLABILITY:   class func methodB(block: ((Int32, Int32) -> Int32)?) -> nonnull_id{{$}}
+// CHECK-NULLABILITY:   func methodB(block: ((Int32, Int32) -> Int32)?) -> nonnull_id{{$}}
+// CHECK-NULLABILITY:   func methodC() -> nonnull_id?
+// CHECK-NULLABILITY:   var property: nonnull_id?
+// CHECK-NULLABILITY:   func stringMethod() -> String{{$}}
+// CHECK-NULLABILITY:   func optArrayMethod() -> [AnyObject]?
 // CHECK-NULLABILITY: }

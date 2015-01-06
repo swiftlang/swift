@@ -485,33 +485,6 @@ namespace {
     SUGAR_TYPE(PackExpansion)
 
     ImportResult VisitAttributedType(const clang::AttributedType *type) {
-      // If the type has a nullability specifier, translate that into an
-      // optional type.
-      if (auto nullability = type->getImmediateNullability()) {
-        clang::ASTContext &clangCtx = Impl.getClangASTContext();
-
-        // Strip off additional levels of nullability so we don't get
-        // extra nested optionals.
-        clang::QualType underlyingType(type, 0);
-        do {
-          if (auto attributed
-                = dyn_cast<clang::AttributedType>(underlyingType.getTypePtr()))
-            underlyingType = attributed->getModifiedType();
-          else
-            underlyingType = underlyingType.getDesugaredType(clangCtx);
-        } while (underlyingType->getNullability(clangCtx));
-          underlyingType = clangCtx.getCanonicalType(underlyingType);
-
-        ImportResult underlying = Visit(underlyingType);
-        if (canImportAsOptional(underlying.Hint)) {
-          return getOptionalType(underlying.AbstractType,
-                                 ImportTypeKind::Abstract,
-                                 Impl.translateNullability(*nullability));
-        }
-
-        return underlying;
-      }
-
       return Visit(type->desugar());
     }
 
@@ -895,6 +868,12 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
       type = clangContext.getObjCSelType();
   }
   
+  // If nullability is provided as part of the type, that overrides
+  // optionality provided externally.
+  if (auto nullability = type->getNullability(clangContext)) {
+    optionality = translateNullability(*nullability);
+  }
+
   // Perform abstract conversion, ignoring how the type is actually used.
   SwiftTypeConverter converter(*this, isUsedInSystemModule);
   auto importResult = converter.Visit(type);
