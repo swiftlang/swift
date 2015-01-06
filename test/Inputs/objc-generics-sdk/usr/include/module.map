@@ -10,3 +10,8 @@ module Foundation {
   header "Foundation.h" 
   export *
 }
+
+module AppKit {
+  header "AppKit.h" 
+  export *
+}

@@ -32,6 +32,19 @@
 
 using namespace swift;
 
+#ifndef SWIFT_DISABLE_OBJC_GENERIC
+static bool isNSObject(Type type) {
+  if (auto classDecl = type->getClassOrBoundGenericClass()) {
+    return !classDecl->getName().empty() &&
+           classDecl->getName().str() == "NSObject" &&
+           !classDecl->getModuleContext()->Name.empty() &&
+           classDecl->getModuleContext()->Name.str() == "ObjectiveC";
+  }
+
+  return false;
+}
+#endif
+
 namespace {
 class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
                     private TypeVisitor<ObjCPrinter, void, OptionalTypeKind> {
@@ -592,21 +605,52 @@ private:
       return false;
 
     if (SD == ctx.getArrayDecl()) {
-      // FIXME: It'd be nice to put the element type here as well.
-      os << "NSArray *";
+      os << "NSArray";
+
+#ifndef SWIFT_DISABLE_OBJC_GENERIC
+      if (!BGT->getGenericArgs()[0]->isAnyObject()) {
+        os << "<";
+        visitPart(BGT->getGenericArgs()[0], OTK_ImplicitlyUnwrappedOptional);
+        os << ">";
+      }
+#endif
+
+      os << " *";
       printNullability(optionalKind);
       return true;
     }
 
     if (SD == ctx.getDictionaryDecl()) {
-      // FIXME: IT'd be nice to put the element type here as well.
-      os << "NSDictionary *";
+      os << "NSDictionary";
+
+#ifndef SWIFT_DISABLE_OBJC_GENERIC
+      if (!isNSObject(BGT->getGenericArgs()[0]) ||
+          !BGT->getGenericArgs()[1]->isAnyObject()) {
+        os << "<";
+        visitPart(BGT->getGenericArgs()[0], OTK_ImplicitlyUnwrappedOptional);
+        os << ", ";
+        visitPart(BGT->getGenericArgs()[1], OTK_ImplicitlyUnwrappedOptional);
+        os << ">";
+      }
+#endif
+
+      os << " *";
       printNullability(optionalKind);
       return true;
     }
 
     if (SD == ctx.getSetDecl()) {
-      os << "NSSet *";
+      os << "NSSet";
+
+#ifndef SWIFT_DISABLE_OBJC_GENERIC
+      if (!isNSObject(BGT->getGenericArgs()[0])) {
+        os << "<";
+        visitPart(BGT->getGenericArgs()[0], OTK_ImplicitlyUnwrappedOptional);
+        os << ">";
+      }
+#endif
+
+      os << " *";
       printNullability(optionalKind);
       return true;
     }

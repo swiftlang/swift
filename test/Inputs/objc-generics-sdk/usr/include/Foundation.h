@@ -8,6 +8,8 @@
 #import <CoreGraphics.h>
 #endif
 
+#define NS_DESIGNATED_INITIALIZER __attribute__((objc_designated_initializer))
+
 typedef struct objc_object { void *isa; } *id;
 
 typedef struct _NSZone NSZone;
@@ -72,7 +74,7 @@ typedef double NSTimeInterval;
 - (void)removeObject:(id)obj;
 @end
 
-@interface NSNumber : NSObject
+@interface NSNumber : NSObject <NSCopying>
 @end
 
 @interface NSDecimalNumber : NSObject
@@ -110,3 +112,22 @@ typedef double NSTimeInterval;
 @interface NSMutableString : NSString
 @end
 
+@interface NSURL : NSObject
++ (instancetype)URLWithString:(NSString *)URLString;
+@end
+
+@interface NSAttributedString : NSString
+- (NSAttributedString *)sliceAttributedString:(NSInteger)startIndex;
+@end
+
+typedef CGPoint NSPoint;
+typedef CGSize NSSize;
+typedef CGRect NSRect;
+
+#define NS_ENUM(_type, _name) CF_ENUM(_type, _name)
+#define NS_OPTIONS(_type, _name) CF_OPTIONS(_type, _name)
+
+typedef NS_ENUM(NSUInteger, NSRuncingMode) {
+  NSRuncingMince,
+  NSRuncingQuince
+};

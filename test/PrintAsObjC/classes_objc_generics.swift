@@ -1,29 +1,26 @@
 // Please keep this file in alphabetical order!
-// REQUIRES: objc_no_generics
+// Note: this is equivalent to classes.swift, but with Objective-C generics
+// REQUIRES: objc_generics
 
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift %clang-importer-sdk -enable-source-import -emit-module -o %t  %s
-// RUN: %swift %clang-importer-sdk -parse-as-library %t/classes.swiftmodule -parse -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h
+// RUN: %swift -sdk %S/../Inputs/objc-generics-sdk -I %S/../Inputs/objc-generics-sdk/swift-modules -enable-source-import -emit-module -o %t  %s
+// RUN: %swift -sdk %S/../Inputs/objc-generics-sdk -I %S/../Inputs/objc-generics-sdk/swift-modules -enable-source-import -parse-as-library %t/classes_objc_generics.swiftmodule -parse -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h
 // RUN: FileCheck %s < %t/classes.h
 // RUN: FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
-// RUN: %check-in-clang %t/classes.h
-// RUN: not %check-in-clang -fno-modules %t/classes.h
-// RUN: %check-in-clang -fno-modules %t/classes.h -include Foundation.h -include ctypes.h -include CoreFoundation.h
+// RUN: %check-in-clang-objc-generics %t/classes.h
+// RUN: not %check-in-clang-objc-generics -fno-modules %t/classes.h
+// RUN: %check-in-clang-objc-generics -fno-modules %t/classes.h -include Foundation.h -include CoreFoundation.h
 
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Properties;
 // CHECK-NOT: Swift;
 // CHECK-LABEL: @import Foundation;
 // CHECK-NEXT: @import CoreGraphics;
-// CHECK-NEXT: @import ctypes;
 // CHECK-NOT: AppKit;
-// CHECK-NOT: Properties;
 // CHECK-NOT: Swift;
 import Foundation
 import AppKit // only used in implementations
-import ctypes
-import Properties // completely unused
 import CoreFoundation
 
 // CHECK-LABEL: @interface A1{{$}}
@@ -100,12 +97,12 @@ class NotObjC {}
 // CHECK-NEXT: - (void)testParens:(NSInteger)a;
 // CHECK-NEXT: - (void)testIgnoredParam:(NSInteger)_;
 // CHECK-NEXT: - (void)testIgnoredParams:(NSInteger)_ again:(NSInteger)_;
-// CHECK-NEXT: - (void)testArrayBridging:(NSArray * __nonnull)a;
+// CHECK-NEXT: - (void)testArrayBridging:(NSArray<Methods *> * __nonnull)a;
 // CHECK-NEXT: - (void)testArrayBridging2:(NSArray * __nonnull)a;
-// CHECK-NEXT: - (void)testArrayBridging3:(NSArray * __nonnull)a;
+// CHECK-NEXT: - (void)testArrayBridging3:(NSArray<NSString *> * __nonnull)a;
 // CHECK-NEXT: - (void)testDictionaryBridging:(NSDictionary * __nonnull)a;
-// CHECK-NEXT: - (void)testDictionaryBridging2:(NSDictionary * __nonnull)a;
-// CHECK-NEXT: - (void)testDictionaryBridging3:(NSDictionary * __nonnull)a;
+// CHECK-NEXT: - (void)testDictionaryBridging2:(NSDictionary<NSNumber *, Methods *> * __nonnull)a;
+// CHECK-NEXT: - (void)testDictionaryBridging3:(NSDictionary<NSString *, NSString *> * __nonnull)a;
 // CHECK-NEXT: - (void)testSetBridging:(NSSet * __nonnull)a;
 // CHECK-NEXT: - (IBAction)actionMethod:(id __nonnull)_;
 // CHECK-NEXT: init
@@ -167,9 +164,6 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: - (NSArray * __nullable)maybeArray;
 // CHECK-NEXT: - (enum NSRuncingMode)someEnum;
 // CHECK-NEXT: - (NSZone *)zone;
-// CHECK-NEXT: - (struct FooStruct1)tagStruct;
-// CHECK-NEXT: - (enum Tribool)tagEnum;
-// CHECK-NEXT: - (FooStructTypedef2)anonStructTypedef;
 // CHECK-NEXT: - (CFTypeRef)cf:(CFTreeRef)x str:(CFStringRef)str str2:(CFMutableStringRef)str2;
 // CHECK-NEXT: - (void)appKitInImplementation;
 // CHECK-NEXT: - (NSURL * __nullable)returnsURL;
@@ -186,10 +180,6 @@ typealias AliasForNSRect = NSRect
   func someEnum() -> NSRuncingMode { return .Mince }
 
   func zone() -> NSZone { return nil }
-
-  func tagStruct() -> FooStruct1 { return FooStruct1(x: 0, y: 0) }
-  func tagEnum() -> Tribool { return True }
-  func anonStructTypedef() -> FooStructTypedef2 { return FooStructTypedef2(x: 0, y: 0) }
 
   func cf(x: CFTree, str: CFString, str2: CFMutableString) -> CFTypeRef? { return nil }
 
@@ -319,11 +309,11 @@ private class Private : A1 {}
 // CHECK-NEXT: @property (nonatomic) IBOutlet Properties * typedOutlet;
 // CHECK-NEXT: @property (nonatomic, copy) NSString * __nonnull string;
 // CHECK-NEXT: @property (nonatomic, copy) NSArray * __nonnull array;
-// CHECK-NEXT: @property (nonatomic, copy) NSDictionary * __nonnull dictionary;
-// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray * outletCollection;
-// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray * __nullable outletCollectionOptional;
+// CHECK-NEXT: @property (nonatomic, copy) NSDictionary<NSString *, NSString *> * __nonnull dictionary;
+// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray<Properties *> * outletCollection;
+// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray<Properties *> * __nullable outletCollectionOptional;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * __nullable outletCollectionAnyObject;
-// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * __nullable outletCollectionProto;
+// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray<id <NSObject>> * __nullable outletCollectionProto;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Properties {
@@ -368,11 +358,11 @@ private class Private : A1 {}
 }
 
 // CHECK-LABEL: @interface PropertiesOverridden
-// CHECK-NEXT: @property (nonatomic, copy, getter=bees, setter=setBees:) NSArray * bees;
+// CHECK-NEXT: @property (nonatomic, copy, getter=bees, setter=setBees:) NSArray<Bee *> * __nonnull bees;
 // CHECK-NEXT: - (instancetype)init
 // CHECK-NEXT: @end
 @objc class PropertiesOverridden : Hive {
-  override var bees : [AnyObject]! {
+  override var bees : [Bee] {
     get {
       return super.bees
     }
@@ -385,7 +375,7 @@ private class Private : A1 {}
 // CHECK-LABEL: @interface ReversedOrder2{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-// CHECK: SWIFT_CLASS("_TtC7classes14ReversedOrder1")
+// CHECK: SWIFT_CLASS("_TtC21classes_objc_generics14ReversedOrder1")
 // CHECK-NEXT: @interface ReversedOrder1 : ReversedOrder2
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
@@ -413,7 +403,7 @@ private class Private : A1 {}
 // CHECK-NEXT: - (void)setObject:(Subscripts2 * __nonnull)newValue atIndexedSubscript:(int16_t)i;
 // CHECK-NEXT: - (NSObject * __nonnull)objectForKeyedSubscript:(NSObject * __nonnull)o;
 // CHECK-NEXT: - (void)setObject:(NSObject * __nonnull)newValue forKeyedSubscript:(NSObject * __nonnull)o;
-// CHECK-NEXT: @property (nonatomic, copy) NSArray * __nonnull cardPaths;
+// CHECK-NEXT: @property (nonatomic, copy) NSArray<NSString *> * __nonnull cardPaths;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Subscripts2 {
