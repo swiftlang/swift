@@ -1385,7 +1385,7 @@ public:
            "#ifndef NS_SET\n"
            "#  pragma clang diagnostic push\n"
            "#  pragma clang diagnostic ignored \"-Wvariadic-macros\"\n"
-           "  #define NS_SET(...) NSSet *\n"
+           "#  define NS_SET(...) NSSet *\n"
            "#  pragma clang diagnostic pop\n"
            "#endif\n";
 #endif
