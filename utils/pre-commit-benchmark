@@ -2,7 +2,7 @@
 
 # Note: it doesn't matter what directory you invoke this in; it uses
 # your SWIFT_BUILD_ROOT and SWIFT_SOURCE_ROOT settings, just like
-# build-script.sh
+# build-script
 
 # Note2: To avoid expensive rebuilds, it's often better to develop
 # this script somewhere outside the source tree and then move it back
@@ -20,8 +20,8 @@ SWIFT_SOURCE_ROOT = os.environ.get('SWIFT_SOURCE_ROOT', os.path.join(HOME, 'src'
 SWIFT_BUILD_ROOT = os.environ.get('SWIFT_BUILD_ROOT', os.path.join(HOME, 'build', 'swift'))
 VERBOSE = False
 
-variantDir = os.path.join(SWIFT_BUILD_ROOT, 'Ninja-Release')
-buildDir = os.path.join(variantDir, 'swift')
+variantDir = os.path.join(SWIFT_BUILD_ROOT, 'Ninja-ReleaseAssert')
+buildDir = os.path.join(variantDir, 'swift-macosx-x86_64')
 binDir = os.path.join(buildDir, 'bin')
 benchDir = os.path.join(variantDir, 'bench')
 sourceDir = os.path.join(SWIFT_SOURCE_ROOT, 'swift')
@@ -72,8 +72,8 @@ def buildBenchmarks(cacheDir):
         check_call(['cmake', '.'] + configArgs, cwd=buildDir)
 
     check_call(
-        [ os.path.join(sourceDir, 'utils', 'build-script.sh'),
-          '-R', '--', '--config-args=%s' % ' '.join(configArgs)
+        [ os.path.join(sourceDir, 'utils', 'build-script'),
+          '-R', '--no-swift-stdlib-assertions'
       ])
 
     # Doing this requires copying or linking all the libraries to the
