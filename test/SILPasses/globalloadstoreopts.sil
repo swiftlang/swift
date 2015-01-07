@@ -730,3 +730,30 @@ bb3:
   return %9999 : $()
 
 }
+
+/// Make sure we don't ignore aliasing stores.
+// CHECK-LABEL: sil @aliasing_store
+// CHECK:  [[ALLOC:%.*]] = alloc_stack $A
+// CHECK:  [[CONST0:%.*]] = integer_literal $Builtin.Int32, 0
+// CHECK:  [[STRUCT:%.*]] = struct $A ([[CONST0]] : $Builtin.Int32)
+// CHECK:  store [[STRUCT]] to [[ALLOC]]#1 : $*A
+// CHECK:  [[STRUCTADDR:%.*]] = struct_element_addr [[ALLOC]]#1 : $*A, #A.i
+// CHECK:  [[CONST1:%.*]] = integer_literal $Builtin.Int32, 1
+// CHECK:  store [[CONST1]] to [[STRUCTADDR]] : $*Builtin.Int32
+// CHECK:  [[LD:%.*]] = load [[ALLOC]]#1 : $*A
+// CHECK:  store [[LD]] to %0 : $*A
+sil @aliasing_store : $@thin (@inout A) -> () {
+bb0(%0: $*A):
+  %1 = alloc_stack $A
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = struct $A (%2 : $Builtin.Int32)
+  store %3 to %1#1 : $*A
+  %4 = struct_element_addr %1#1 : $*A, #A.i
+  %5 = integer_literal $Builtin.Int32, 1
+  store  %5 to %4 : $*Builtin.Int32
+  %6 = load %1#1 : $*A
+  store %6 to %0: $*A
+  dealloc_stack %1#0 : $*@local_storage A
+  %7 = tuple()
+  return %7 : $()
+}

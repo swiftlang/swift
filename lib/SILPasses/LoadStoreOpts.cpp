@@ -829,6 +829,7 @@ private:
 bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
                                              CoveredStoreMap &StoreMap) {
   PostDominanceInfo *PDI = Ctx.getPDI();
+  AliasAnalysis *AA = Ctx.getAA();
 
   // If we are storing a value that is available in the load list then we
   // know that no one clobbered that address and the current store is
@@ -855,8 +856,21 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
   llvm::SmallVector<SILValue, 4> StoresToStopTracking;
   bool Changed = false;
   for (auto &P : Stores) {
-    if (SI->getDest() != P.first)
+    if (!P.second.aliasingWrite(AA, SI))
       continue;
+
+    // We know that the locations might alias. Check whether it is a must alias.
+    bool IsStoreToSameLocation = AA->isMustAlias(SI->getDest(),  P.first);
+
+    // If this store may alias but is not known to be to the same location, we
+    // cannot eliminate it. We need to remove it from the store list and start
+    // tracking the new store, though.
+    if (!IsStoreToSameLocation) {
+      StoresToStopTracking.push_back(P.first);
+      DEBUG(llvm::dbgs() << "        Found an aliasing store... But we don't "
+            "know that it must alias... Can't remove it but will track it.");
+      continue;
+    }
 
     // If this store does not post dominate prev store, we can not eliminate
     // it. But do remove prev store from the store list and start tracking the
