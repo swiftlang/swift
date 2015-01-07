@@ -285,6 +285,84 @@ bb4(%6 : $Int64):
   return %6 : $Int64
 }
 
+// Make sure the cond_br is not simplified as it would create
+// a crticial edge.
+// CHECK-LABEL: @elim_trampoline4
+// CHECK: cond_br %0, bb1, bb2
+// CHECK: bb1:
+// CHECK-NEXT: br bb3
+// CHECK: bb2:
+// CHECK: br bb3
+// CHECK: bb3
+// CHECK: return
+// CHECK: }
+
+sil @external_f : $@thin ()->()
+
+sil @elim_trampoline4 : $@thin (Builtin.Int1, Int64, Int64) -> Int64 {
+bb0(%0 : $Builtin.Int1, %1 : $Int64, %2 : $Int64):
+  cond_br %0, bb1, bb2
+
+bb1:
+  br bb3(%1 : $Int64)
+
+bb2:
+  br bb4(%2 : $Int64)
+  
+bb4(%4 : $Int64):
+  %55 = function_ref @external_f : $@thin ()->()
+  apply %55() : $@thin ()->()
+  br bb5(%4: $Int64)
+
+bb3(%5 : $Int64):
+  br bb5(%5 : $Int64)
+
+bb5(%6 : $Int64):
+  return %6 : $Int64
+}
+
+// Make sure that a conditional branch to a trampoline without parameters
+// gets eliminated by branching to a target of this trampoline.
+// CHECK-LABEL: @elim_trampoline5
+// CHECK: cond_br
+// CHECK: cond_br
+// CHECK: bb4
+// Last cond_br should branch directly to the target of a trampoline
+// instead of the original bb3
+// CHECK: cond_br {{.*}}, bb3({{.*}}), bb4({{.*}})
+// CHECK-NOT: bb5
+// CHECK: }
+sil @elim_trampoline5 : $@thin (Int) -> () {
+bb0(%0 : $Int):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = struct_extract %0 : $Int, #Int.value
+  %3 = builtin "cmp_eq_Word"(%1 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %3, bb1, bb2(%1 : $Builtin.Word)
+
+bb1:
+  %5 = tuple ()
+  return %5 : $()
+
+bb2(%7 : $Builtin.Word):
+  %8 = integer_literal $Builtin.Word, 1
+  %9 = integer_literal $Builtin.Int1, 0
+  %10 = integer_literal $Builtin.Word, 2
+  br bb5(%1 : $Builtin.Word)
+
+bb3:
+  br bb4(%8 : $Builtin.Word)
+
+bb4(%13 : $Builtin.Word):
+  %14 = builtin "cmp_eq_Word"(%13 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %14, bb1, bb2(%13 : $Builtin.Word)
+
+bb5(%16 : $Builtin.Word):
+  %17 = builtin "sadd_with_overflow_Word"(%16 : $Builtin.Word, %8 : $Builtin.Word, %9 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %18 = tuple_extract %17 : $(Builtin.Word, Builtin.Int1), 0
+  %19 = builtin "cmp_eq_Word"(%18 : $Builtin.Word, %10 : $Builtin.Word) : $Builtin.Int1
+  cond_br %19, bb3, bb5(%18 : $Builtin.Word)
+}
+
 // CHECK-LABEL: @elim_trampoline_loop
 // Make sure we are not crashing on this one.
 // CHECK: return

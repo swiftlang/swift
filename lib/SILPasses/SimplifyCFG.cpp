@@ -1609,6 +1609,27 @@ static SILBasicBlock *getTrampolineDest(SILBasicBlock *SBB) {
   return BI->getDestBB();
 }
 
+/// \return If this is a basic block without any arguments and it has
+/// a single br instruction, return this br.
+static BranchInst *getTrampolineWithoutBBArgsTerminator(SILBasicBlock *SBB) {
+  if (!SBB->bbarg_empty())
+    return nullptr;
+
+  // Ignore blocks with more than one instruction.
+  if (SBB->getTerminator() != SBB->begin())
+    return nullptr;
+
+  BranchInst *BI = dyn_cast<BranchInst>(SBB->getTerminator());
+  if (!BI)
+    return nullptr;
+
+  // Disallow infinite loops.
+  if (BI->getDestBB() == SBB)
+    return nullptr;
+
+  return BI;
+}
+
 /// simplifyBranchBlock - Simplify a basic block that ends with an unconditional
 /// branch.
 bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
@@ -1674,6 +1695,21 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
 
   return Simplified;
 }
+
+/// \brief Check if replacing an existing edge of the terminator by another
+/// one which has a DestBB as its destination would create a critical edge.
+static bool wouldIntroduceCriticalEdge(TermInst *T, SILBasicBlock *DestBB) {
+  auto SrcSuccs = T->getSuccessors();
+  if (SrcSuccs.size() <= 1)
+    return false;
+
+  assert(!DestBB->pred_empty() && "There should be a predecessor");
+  if (DestBB->getSinglePredecessor())
+    return false;
+
+  return true;
+}
+
 
 /// simplifyCondBrBlock - Simplify a basic block that ends with a conditional
 /// branch.
@@ -1750,6 +1786,37 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     return true;
   }
 
+  auto *TrueTrampolineBr = getTrampolineWithoutBBArgsTerminator(TrueSide);
+  if (TrueTrampolineBr &&
+      !wouldIntroduceCriticalEdge(BI, TrueTrampolineBr->getDestBB())) {
+    SILBuilderWithScope<1>(BI).createCondBranch(
+        BI->getLoc(), BI->getCondition(),
+        TrueTrampolineBr->getDestBB(), TrueTrampolineBr->getArgs(),
+        FalseSide, FalseArgs);
+    BI->eraseFromParent();
+
+    if (LoopHeaders.count(TrueSide))
+      LoopHeaders.insert(ThisBB);
+    removeIfDead(TrueSide);
+    addToWorklist(ThisBB);
+    return true;
+  }
+
+  auto *FalseTrampolineBr = getTrampolineWithoutBBArgsTerminator(FalseSide);
+  if (FalseTrampolineBr &&
+      !wouldIntroduceCriticalEdge(BI, FalseTrampolineBr->getDestBB())) {
+    ThisBB->getParent()->dump();
+    SILBuilderWithScope<1>(BI).createCondBranch(
+        BI->getLoc(), BI->getCondition(),
+        TrueSide, TrueArgs,
+        FalseTrampolineBr->getDestBB(), FalseTrampolineBr->getArgs());
+    BI->eraseFromParent();
+    if (LoopHeaders.count(FalseSide))
+      LoopHeaders.insert(ThisBB);
+    removeIfDead(FalseSide);
+    addToWorklist(ThisBB);
+    return true;
+  }
   // If we have a (cond (select_enum)) on a two element enum, always have the
   // first case as our checked tag. If we have the second, create a new
   // select_enum with the first case and swap our operands. This simplifies
