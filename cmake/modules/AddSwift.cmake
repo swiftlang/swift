@@ -1402,15 +1402,6 @@ function(_add_swift_executable_single name)
         "-Xlinker" "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
   endif()
 
-  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    # ASan does not play well with exported_symbol option. This should be fixed soon.
-    if(NOT SWIFT_ASAN_BUILD)
-      if (NOT SWIFTEXE_SINGLE_DONT_STRIP_NON_MAIN_SYMBOLS)
-        list(APPEND link_flags "-Xlinker" "-exported_symbol" "-Xlinker" "_main")
-      endif()
-    endif()
-  endif()
-
   # Find the names of dependency library targets.
   #
   # We don't add the ${ARCH} to the target suffix because we want to link
