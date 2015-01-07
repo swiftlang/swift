@@ -1531,9 +1531,19 @@ Type FailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
   
   if (!isa<ClosureExpr>(subExpr) &&
       typeIsNotSpecialized(subExpr->getType())) {
+    
+    // Store off the sub-expression, in case a new one is provided via the
+    // type check operation.
+    Expr *preCheckedExpr = subExpr;
+    
     CS->TC.eraseTypeData(subExpr);
 
     CS->TC.typeCheckExpression(subExpr, CS->DC, Type(), Type(), false);
+ 
+    // Reset the type of the previous expression. This prevents stale type
+    // variable data from being leaked out of the temporary constraint system.
+    if (preCheckedExpr != subExpr)
+      preCheckedExpr->setType(subExpr->getType());
   }
   
   assert(subExpr->getType());
