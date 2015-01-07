@@ -1365,7 +1365,7 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   
   Body.push_back(new (Ctx) IfStmt(SourceLoc(), HasValueExpr, Return,
                                   /*elseloc*/SourceLoc(), /*else*/nullptr,
-                                  /*implicit*/ true));
+                                  /*implicit*/ true, Ctx));
 
 
   auto *Tmp2VD = new (Ctx) VarDecl(/*isStatic*/false, /*isLet*/true,

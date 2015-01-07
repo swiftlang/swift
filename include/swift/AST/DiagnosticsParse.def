@@ -696,6 +696,8 @@ ERROR(expected_expr_return,stmt_parsing,PointsToFirstBadToken,
 // If/While Conditions
 ERROR(expected_expr_conditional_var,stmt_parsing,PointsToFirstBadToken,
       "expected expression after '=' in conditional binding", ())
+ERROR(expected_expr_conditional_where,stmt_parsing,PointsToFirstBadToken,
+      "expected expression in conditional binding 'where' clause", ())
 ERROR(conditional_var_initializer_required,stmt_parsing,none,
       "variable binding in a condition requires an initializer", ())
 

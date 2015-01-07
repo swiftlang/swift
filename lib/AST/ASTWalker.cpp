@@ -698,33 +698,31 @@ public:
     return P;
   }
   
-  StmtCondition doIt(StmtCondition C) {
-    if (auto E = C.dyn_cast<Expr*>()) {
-      // Walk an expression condition normally.
-      E = doIt(E);
-      if (E)
-        return E;
-      return StmtCondition();
-    }
-    
-    if (auto CB = C.dyn_cast<PatternBindingDecl*>()) {
-      // Walk the binding pattern and initializer expression.
-      if (auto P = doIt(CB->getPattern()))
-        CB->setPattern(P);
-      else
-        return StmtCondition();
-      
-      if (CB->getInit()) {
-        if (auto E = doIt(CB->getInit()))
-          CB->setInit(E, CB->wasInitChecked());
+  bool doIt(StmtCondition C) {
+    for (auto &elt : C) {
+      if (auto E = elt.getCondition()) {
+        // Walk an expression condition normally.
+        E = doIt(E);
+        if (!E)
+          return true;
+        elt.setCondition(E);
+      } else if (auto CB = elt.getBinding()) {
+        // Walk the binding pattern and initializer expression.
+        if (auto P = doIt(CB->getPattern()))
+          CB->setPattern(P);
         else
-          return StmtCondition();
-      }
+          return true;
       
-      return CB;
+        if (CB->getInit()) {
+          if (auto E = doIt(CB->getInit()))
+            CB->setInit(E, CB->wasInitChecked());
+          else
+            return true;
+        }
+      }
     }
     
-    llvm_unreachable("unhandled condition");
+    return false;
   }
 
   /// Returns true on failure.
@@ -798,9 +796,7 @@ Stmt *Traversal::visitReturnStmt(ReturnStmt *RS) {
 }
 
 Stmt *Traversal::visitIfStmt(IfStmt *IS) {
-  if (StmtCondition E2 = doIt(IS->getCond()))
-    IS->setCond(E2);
-  else
+  if (doIt(IS->getCond()))
     return nullptr;
 
   if (Stmt *S2 = doIt(IS->getThenStmt()))
@@ -825,9 +821,7 @@ Stmt *Traversal::visitIfConfigStmt(IfConfigStmt *ICS) {
 }
 
 Stmt *Traversal::visitWhileStmt(WhileStmt *WS) {
-  if (StmtCondition E2 = doIt(WS->getCond()))
-    WS->setCond(E2);
-  else
+  if (doIt(WS->getCond()))
     return nullptr;
 
   if (Stmt *S2 = doIt(WS->getBody()))

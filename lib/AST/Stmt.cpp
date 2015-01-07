@@ -95,6 +95,17 @@ SourceRange ReturnStmt::getSourceRange() const {
   return SourceRange(Start, End);
 }
 
+static StmtCondition exprToCond(Expr *C, ASTContext &Ctx) {
+  StmtConditionElement Arr[] = { StmtConditionElement(C) };
+  return Ctx.AllocateCopy(Arr);
+}
+
+IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
+               Stmt *Else, Optional<bool> implicit, ASTContext &Ctx)
+  : IfStmt(IfLoc, exprToCond(Cond, Ctx), Then, ElseLoc, Else, implicit) {
+}
+
+
 SourceRange IfStmt::getSourceRange() const {
   SourceLoc End;
   if (Else)

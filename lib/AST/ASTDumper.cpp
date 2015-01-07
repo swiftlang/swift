@@ -934,12 +934,10 @@ public:
     PrintPattern(OS, Indent+2).visit(const_cast<Pattern *>(P));
   }
   
-  void printRec(StmtCondition C) {
-    if (auto E = C.dyn_cast<Expr*>())
-      return printRec(E);
-    if (auto CB = C.dyn_cast<PatternBindingDecl*>())
-      return printRec(CB);
-    llvm_unreachable("unknown condition");
+  void printRec(StmtConditionElement C) {
+    if (C.isCondition())
+      return printRec(C.getCondition());
+    return printRec(C.getBinding());
   }
   
   void visitBraceStmt(BraceStmt *S) {
@@ -971,7 +969,8 @@ public:
 
   void visitIfStmt(IfStmt *S) {
     OS.indent(Indent) << "(if_stmt\n";
-    printRec(S->getCond());
+    for (auto elt : S->getCond())
+      printRec(elt);
     OS << '\n';
     printRec(S->getThenStmt());
     if (S->getElseStmt()) {
@@ -1001,7 +1000,8 @@ public:
 
   void visitWhileStmt(WhileStmt *S) {
     OS.indent(Indent) << "(while_stmt\n";
-    printRec(S->getCond());
+    for (auto elt : S->getCond())
+      printRec(elt);
     OS << '\n';
     printRec(S->getBody());
     OS << ')';

@@ -1468,22 +1468,23 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
 }
 
 bool TypeChecker::typeCheckCondition(StmtCondition &cond, DeclContext *dc) {
-  if (auto E = cond.dyn_cast<Expr*>()) {
-    bool r = typeCheckCondition(E, dc);
-    cond = E;
-    return r;
-  }
-  if (auto CB = cond.dyn_cast<PatternBindingDecl*>()) {
-    assert(CB->isConditional()
-           && "non-conditional pattern binding in condition?!");
-    if (typeCheckConditionalPatternBinding(CB, dc)) {
-      cond = StmtCondition();
-      return true;
+  for (auto &elt : cond) {
+    if (auto E = elt.getCondition()) {
+      bool r = typeCheckCondition(E, dc);
+      elt.setCondition(E);
+      if (r) return true;
+    } else {
+      auto CB = elt.getBinding();
+      assert(CB && CB->isConditional() &&
+             "non-conditional pattern binding in condition?!");
+      if (typeCheckConditionalPatternBinding(CB, dc)) {
+        elt = StmtConditionElement();
+        return true;
+      }
+      elt.setBinding(CB);
     }
-    cond = CB;
-    return false;
   }
-  llvm_unreachable("unknown condition");
+  return false;
 }
 
 /// Find the '~=` operator that can compare an expression inside a pattern to a

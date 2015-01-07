@@ -693,9 +693,10 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   void visitFallthroughStmt(FallthroughStmt *) {}
   void visitFailStmt(FailStmt *) {}
   void visitReturnStmt(ReturnStmt *) {}
-  void visitIfStmt(IfStmt * S) {
-    if (auto *PBD = S->getCond().dyn_cast<PatternBindingDecl *>())
-      checkPattern(PBD->getPattern(), DeclVisibilityKind::LocalVariable);
+  void visitIfStmt(IfStmt *S) {
+    for (auto entry : S->getCond())
+      if (auto *PBD = entry.getBinding())
+        checkPattern(PBD->getPattern(), DeclVisibilityKind::LocalVariable);
     visit(S->getThenStmt());
     if (S->getElseStmt())
       visit(S->getElseStmt());
@@ -705,8 +706,9 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     // need to walk anything within.
   }
   void visitWhileStmt(WhileStmt *S) {
-    if (auto *PBD = S->getCond().dyn_cast<PatternBindingDecl *>())
-      checkPattern(PBD->getPattern(), DeclVisibilityKind::LocalVariable);
+    for (auto entry : S->getCond())
+      if (auto *PBD = entry.getBinding())
+        checkPattern(PBD->getPattern(), DeclVisibilityKind::LocalVariable);
     visit(S->getBody());
   }
   void visitDoWhileStmt(DoWhileStmt *S) {

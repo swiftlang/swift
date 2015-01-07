@@ -170,10 +170,55 @@ public:
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Return;}
 };
 
-/// Either a conditional PatternBindingDecl or a boolean Expr can appear as the
-/// condition of an 'if' or 'while' statement.
-using StmtCondition = llvm::PointerUnion<PatternBindingDecl*, Expr*>;
   
+/// This represents an entry in an "if" or "while" condition.  Pattern bindings
+/// can bind any number of names in the pattern binding decl, and may have an
+/// associated where clause.  When "if let" is involved, an arbitrary number of
+/// pattern bindings and conditional expressions are permitted, e.g.:
+///
+///   if let x = ..., y = ... where x > y,
+///      let z = ...
+/// which would be represented as four StmtConditionElement entries, one for
+/// the "x" binding, one for the "y" binding, one for the where clause, one for
+/// "z"'s binding.  A simple "if" statement is represented as a single binding.
+///
+class StmtConditionElement {
+  /// This is either a PBD for a variable binding or an expression for a boolean
+  /// condition.
+  llvm::PointerUnion<PatternBindingDecl*, Expr*> Data;
+public:
+  StmtConditionElement() : Data() {}
+  StmtConditionElement(PatternBindingDecl *PBD) : Data(PBD) {}
+  StmtConditionElement(Expr *cond) : Data(cond) {}
+
+  bool isCondition() const {
+    return Data.is<Expr*>();
+  }
+
+  bool isBinding() const {
+    return Data.is<PatternBindingDecl*>();
+  }
+
+  Expr *getCondition() const {
+    return Data.dyn_cast<Expr*>();
+  }
+  void setCondition(Expr *E) {
+    Data = E;
+  }
+  
+  PatternBindingDecl *getBinding() const {
+    return Data.dyn_cast<PatternBindingDecl*>();
+  }
+  void setBinding(PatternBindingDecl *D) {
+    Data = D;
+  }
+};
+
+
+/// Either an "if let" case or a simple boolean expression can appear as the
+/// condition of an 'if' or 'while' statement.
+using StmtCondition = MutableArrayRef<StmtConditionElement>;
+
 /// IfStmt - if/then/else statement.  If no 'else' is specified, then the
 /// ElseLoc location is not specified and the Else statement is null. After
 /// type-checking, the condition is of type Builtin.Int1.
@@ -189,6 +234,9 @@ public:
          Stmt *Else, Optional<bool> implicit = None)
   : Stmt(StmtKind::If, getDefaultImplicitFlag(implicit, IfLoc)),
     IfLoc(IfLoc), ElseLoc(ElseLoc), Cond(Cond), Then(Then), Else(Else) {}
+
+  IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
+         Stmt *Else, Optional<bool> implicit, ASTContext &Ctx);
 
   SourceLoc getIfLoc() const { return IfLoc; }
   SourceLoc getElseLoc() const { return ElseLoc; }

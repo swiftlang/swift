@@ -692,34 +692,39 @@ struct ASTNodeBase {};
       }
     }
 
-    void checkCondition(StmtCondition C) {
-      if (auto E = C.dyn_cast<Expr*>()) {
+    void checkConditionElement(StmtConditionElement elt) {
+      if (auto E = elt.getCondition()) {
         checkSameType(E->getType(), BuiltinIntegerType::get(1, Ctx),
                       "condition type");
         return;
       }
-      if (auto CB = C.dyn_cast<PatternBindingDecl*>()) {
-        PrettyStackTraceDecl debugStack("verifying condition binding", CB);
-        if (!CB->isConditional()) {
-          Out << "condition binding is not conditional\n";
-          CB->print(Out);
-          abort();
-        }
-        if (!CB->getInit()) {
-          Out << "conditional binding does not have initializer\n";
-          CB->print(Out);
-          abort();
-        }
-        auto initOptionalType = CB->getInit()->getType();
-        auto initType = initOptionalType->getAnyOptionalObjectType();
-        if (!initType) {
-          Out << "conditional binding is not of optional type\n";
-          CB->print(Out);
-          abort();
-        }
-        checkSameType(CB->getPattern()->getType(), initType,
-                      "conditional binding type");
+      auto CB = elt.getBinding();
+
+      PrettyStackTraceDecl debugStack("verifying condition binding", CB);
+      if (!CB->isConditional()) {
+        Out << "condition binding is not conditional\n";
+        CB->print(Out);
+        abort();
       }
+      if (!CB->getInit()) {
+        Out << "conditional binding does not have initializer\n";
+        CB->print(Out);
+        abort();
+      }
+      auto initOptionalType = CB->getInit()->getType();
+      auto initType = initOptionalType->getAnyOptionalObjectType();
+      if (!initType) {
+        Out << "conditional binding is not of optional type\n";
+        CB->print(Out);
+        abort();
+      }
+      checkSameType(CB->getPattern()->getType(), initType,
+                    "conditional binding type");
+    }
+    
+    void checkCondition(StmtCondition C) {
+      for (auto elt : C)
+        checkConditionElement(elt);
     }
     
     void verifyChecked(IfStmt *S) {

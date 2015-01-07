@@ -879,7 +879,12 @@ private:
   /// of this node.
   bool buildIfStmtRefinementContext(IfStmt *IS) {
     // We don't refine for if let.
-    auto CondExpr = IS->getCond().dyn_cast<Expr *>();
+    // FIXME: Should this refine for 'where' clauses?
+    if (IS->getCond().size() != 1 ||
+        !IS->getCond()[0].isCondition())
+      return false;
+    
+    auto CondExpr = IS->getCond()[0].getCondition();
     if (!CondExpr)
       return false;
 

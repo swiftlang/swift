@@ -79,7 +79,9 @@ struct ConditionalBinding {
 static std::unique_ptr<TemporaryInitialization>
 emitConditionalBindingBuffer(SILGenFunction &gen,
                              StmtCondition cond) {
-  if (auto CB = cond.dyn_cast<PatternBindingDecl*>()) {
+  assert(cond.size() == 1 && "General conditions are not handled yet");
+  
+  if (auto CB = cond[0].getBinding()) {
     assert(CB->isConditional());
     assert(CB->getInit());
 
@@ -143,13 +145,14 @@ static std::pair<Condition, Optional<ConditionalBinding>>
 emitStmtCondition(SILGenFunction &gen, StmtCondition C,
                   std::unique_ptr<TemporaryInitialization> temp,
                    bool hasFalseCode) {
-  if (auto E = C.dyn_cast<Expr*>()) {
+  assert(C.size() == 1 && "General conditions are not handled yet");
+  
+  auto elt = C[0];
+  if (auto E = elt.getCondition())
     return {gen.emitCondition(E, hasFalseCode), None};
-  }
-  if (auto CB = C.dyn_cast<PatternBindingDecl*>()) {
-    return emitConditionalBinding(gen, CB, std::move(temp), hasFalseCode);
-  }
-  llvm_unreachable("unknown condition");
+
+  auto CB = elt.getBinding();
+  return emitConditionalBinding(gen, CB, std::move(temp), hasFalseCode);
 }
 
 Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
@@ -277,14 +280,17 @@ void SILGenFunction::visitReturnStmt(ReturnStmt *S) {
 
 void SILGenFunction::visitIfStmt(IfStmt *S) {
   Scope condBufferScope(Cleanups, S);
-  auto condBuffer = emitConditionalBindingBuffer(*this, S->getCond());
   
   // We need a false branch if we have an 'else' block or if we have a
   // pattern binding, to clean up the unconsumed optional value.
-  bool hasBindings = condBuffer.get();
+  bool needsFalseBranch = S->getElseStmt() != nullptr;
+  // If there is any PBD, the first one will be.  The only case without a
+  // pattern is the simple "if cond" case.
+  needsFalseBranch |= S->getCond()[0].getBinding() != nullptr;
+
+  auto condBuffer = emitConditionalBindingBuffer(*this, S->getCond());
   auto CondPair = emitStmtCondition(*this, S->getCond(), std::move(condBuffer),
-                                    S->getElseStmt() != nullptr
-                                      || hasBindings);
+                                    needsFalseBranch);
   auto &Cond = CondPair.first;
   auto &CondBinding = CondPair.second;
   

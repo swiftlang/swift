@@ -53,3 +53,9 @@ var opt: Int? = .None
 
 if let x = opt {}
 if var x = opt {}
+
+// Test multiple clauses on "if let".
+if let x = opt, y = opt where x != y,
+   let a = opt, var b = opt {
+}
+
