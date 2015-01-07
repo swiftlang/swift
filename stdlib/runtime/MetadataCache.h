@@ -168,6 +168,45 @@ public:
   MetadataCache(const MetadataCache &other) = delete;
   MetadataCache &operator=(const MetadataCache &other) = delete;
 
+  /// Call entryBuilder() and add the generated metadata to the cache.
+  /// \p key is the key used by the cache and \p Bucket is the cache
+  /// entry to place the new metadata entry.
+  __attribute__ ((noinline))
+  const Entry *addMetadataEntry(EntryRef<Entry> key,
+                                ConcurrentList<EntryPair> &Bucket,
+                                llvm::function_ref<Entry *()> entryBuilder) {
+    // Hold a lock to prevent the modification of the cache by multiple threads.
+    std::unique_lock<std::mutex> ConstructionGuard(*Lock);
+
+    // Some other thread may have setup the value we are about to construct
+    // while we were asleep so do a search before constructing a new value.
+    for (auto &A : Bucket) {
+      if (A.Key == key) return A.Value;
+    }
+
+    // Build the new cache entry.
+    // For some cache types this call may re-entrantly perform additional
+    // cache lookups.
+    // Notice that the entry is completly constructed before it is inserted
+    // into the map, and that only one entry can be constructed at once
+    // because of the lock above.
+    Entry *entry = entryBuilder();
+    assert(entry);
+
+    // Update the linked list.
+    entry->Next = Head;
+    Head = entry;
+
+    key = EntryRef<Entry>::forEntry(entry, entry->getNumArguments());
+    Bucket.push_front(EntryPair(key, entry));
+
+#if SWIFT_DEBUG_RUNTIME
+    printf("%s(%p): created %p\n",
+           Entry::getName(), this, entry);
+#endif
+    return key.getEntry();
+  }
+
   /// Look up a cached metadata entry. If a cache match exists, return it.
   /// Otherwise, call entryBuilder() and add that to the cache.
   const Entry *findOrAdd(const void * const *arguments, size_t numArguments,
@@ -198,37 +237,7 @@ public:
     }
 
     // We did not find a key so we will need to create one and store it.
-    {
-      std::unique_lock<std::mutex> ConstructionGuard(*Lock);
-
-      // Some other thread may have setup the value we are about to construct
-      // while we were asleep so do a search before constructing a new value.
-      for (auto &A : Bucket) {
-        if (A.Key == key) return A.Value;
-      }
-
-      // Build the new cache entry.
-      // For some cache types this call may re-entrantly perform additional
-      // cache lookups.
-      // Notice that the entry is completly constructed before it is inserted
-      // into the map, and that only one entry can be constructed at once
-      // because of the lock above.
-      Entry *entry = entryBuilder();
-      assert(entry);
-
-      // Update the linked list.
-      entry->Next = Head;
-      Head = entry;
-
-      key = EntryRef<Entry>::forEntry(entry, entry->getNumArguments());
-      Bucket.push_front(EntryPair(key, entry));
-
-#if SWIFT_DEBUG_RUNTIME
-      printf("%s(%p): created %p\n",
-             Entry::getName(), this, entry);
-#endif
-      return key.getEntry();
-    }
+    return addMetadataEntry(key, Bucket, entryBuilder);
   }
 };
 
