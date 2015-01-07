@@ -28,6 +28,9 @@ option(SWIFT_STDLIB_ASSERTIONS
     "Enable internal checks for the Swift standard library (useful for debugging the library itself, does not affect checks required for safety)"
     "${SWIFT_STDLIB_ASSERTIONS_default}")
 
+set(SWIFT_STDLIB_CORE_EXTRA_FLAGS "" CACHE STRING
+  "Extra flags to pass when compiling stdlib core")
+
 option(SWIFT_BUILD_STDLIB
     "Build Swift standard library and SDK overlays"
     TRUE)
