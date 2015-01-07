@@ -1,8 +1,8 @@
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/main.swift
 // RUN: %S/../../utils/line-directive %t/main.swift -- %target-build-swift -parse -Xfrontend -verify %t/main.swift
 
-% from SwiftIntTypes import all_numeric_type_names, all_integer_type_names, \
-%   all_integer_binary_operator_names, all_integer_or_real_binary_operator_names, \
+% from SwiftIntTypes import all_numeric_type_names, numeric_type_names_Macintosh_only,  \
+%   all_integer_type_names,all_integer_binary_operator_names, all_integer_or_real_binary_operator_names, \
 %   all_arithmetic_comparison_operator_names, all_integer_assignment_operator_names, \
 %   all_integer_or_real_assignment_operator_names
 
@@ -10,7 +10,7 @@
 % arith_ops = all_integer_or_real_binary_operator_names() + \
 %   all_arithmetic_comparison_operator_names() + all_integer_or_real_assignment_operator_names()
 
-//TODO: Better error regex, verify the type of the result, Float80 for i386 & x86_64
+//TODO: Verify the type of the result
 
 func testIteratedOperations() {
 % for typesToTest, operatorsToTest in zip([all_integer_type_names(), all_numeric_type_names()], \
@@ -20,6 +20,8 @@ func testIteratedOperations() {
 // typesToTest: ${typesToTest}, operatorsToTest: ${operatorsToTest}
   % for T1 in typesToTest:
     % for T2 in typesToTest:
+      ${ "\n\n#if arch(i386) || arch(x86_64)\n" if T1 in numeric_type_names_Macintosh_only() 
+        or T2 in numeric_type_names_Macintosh_only() else "" }
       % for op in operatorsToTest:
     if true {
       var x1_${T1}: ${T1} = 0
@@ -27,6 +29,8 @@ func testIteratedOperations() {
       x1_${T1} ${op} x2_${T2}  ${ "// expected-error{{ }}" if T1 != T2 else "" }
     }
       %end
+      ${ "\n#endif //arch(i386) || arch(x86_64)\n\n" if T1 in numeric_type_names_Macintosh_only() 
+        or T2 in numeric_type_names_Macintosh_only() else "" }
     %end
   %end
 %end
