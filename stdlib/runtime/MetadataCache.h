@@ -171,6 +171,9 @@ public:
   /// Call entryBuilder() and add the generated metadata to the cache.
   /// \p key is the key used by the cache and \p Bucket is the cache
   /// entry to place the new metadata entry.
+  /// This method is marked as 'noinline' because it is infrequently executed
+  /// and marking it as such generates better code that is easier to analyze
+  /// and profile.
   __attribute__ ((noinline))
   const Entry *addMetadataEntry(EntryRef<Entry> key,
                                 ConcurrentList<EntryPair> &Bucket,
