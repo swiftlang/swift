@@ -193,8 +193,18 @@ swift::swift_storeEnumTagSinglePayload(OpaqueValue *value,
   // For payload or extra inhabitant cases, zero-initialize the extra tag bits,
   // if any.
   if (whichCase < (int)payloadNumExtraInhabitants) {
-    memset(extraTagBitAddr, 0, numExtraTagBytes);
-    
+    // The two most common values for numExtraTagBytes are zero and one.
+    // Try to avoid calling bzero by specializing for these values.
+    if (numExtraTagBytes != 0) {
+      if (numExtraTagBytes == 1) {
+        // Zero a single byte.
+        *((char*)(extraTagBitAddr)) = 0;
+      } else {
+        // Zero the buffer.
+        memset(extraTagBitAddr, 0, numExtraTagBytes);
+      }
+    }
+
     // If this is the payload case, we're done.
     if (whichCase == -1)
       return;
