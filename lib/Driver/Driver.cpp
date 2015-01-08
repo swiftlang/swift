@@ -579,6 +579,11 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     } else if (driverKind != DriverKind::Interactive) {
       OI.LinkAction = LinkKind::Executable;
     }
+  } else if (Args.hasArg(options::OPT_update_code)) {
+    OI.UseUpdateCodeTool = true;
+    OI.CompilerMode = OutputInfo::Mode::StandardCompile;
+    OI.CompilerOutputType = types::TY_Remapping;
+    OI.LinkAction = LinkKind::None;
   } else {
     diagnoseOutputModeArg(Diags, OutputModeArg, !Inputs.empty(), Args,
                           driverKind == DriverKind::Interactive, Name);
@@ -910,6 +915,7 @@ void Driver::buildActions(const ToolChain &TC,
       case types::TY_ObjCHeader:
       case types::TY_ClangModuleFile:
       case types::TY_SwiftDeps:
+      case types::TY_Remapping:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unknown_file_type,

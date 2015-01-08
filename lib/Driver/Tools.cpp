@@ -144,9 +144,15 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   ArgStringList Arguments;
 
   const char *Exec = getToolChain().getDriver().getSwiftProgramPath().c_str();
-  
-  // Invoke ourselves in -frontend mode.
-  Arguments.push_back("-frontend");
+
+  if (OI.UseUpdateCodeTool) {
+    SmallString<128> SwiftUpdatePath = llvm::sys::path::parent_path(Exec);
+    llvm::sys::path::append(SwiftUpdatePath, "swift-update");
+    Exec = Args.MakeArgString(SwiftUpdatePath.str());
+  } else {
+    // Invoke ourselves in -frontend mode.
+    Arguments.push_back("-frontend");
+  }
 
   // Determine the frontend mode option.
   const char *FrontendModeOption = nullptr;
@@ -175,6 +181,9 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     case types::TY_SwiftModuleFile:
       // Since this is our primary output, we need to specify the option here.
       FrontendModeOption = "-emit-module";
+      break;
+    case types::TY_Remapping:
+      FrontendModeOption = "-parse";
       break;
     case types::TY_Nothing:
       // We were told to output nothing, so get the last mode option and use that.

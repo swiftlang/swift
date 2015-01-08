@@ -100,6 +100,9 @@ public:
   /// The path to the SDK against which to build.
   /// (If empty, this implies no SDK.)
   std::string SDKPath;
+
+  /// Invoke swift-update with the compiler frontend options.
+  bool UseUpdateCodeTool = false;
 };
 
 class Driver {

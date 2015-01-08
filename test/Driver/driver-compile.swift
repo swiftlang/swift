@@ -35,6 +35,9 @@
 // RUN: cp %s %t
 // RUN: not %swiftc_driver -driver-print-jobs -c -target x86_64-apple-macosx10.9 %s %t/driver-compile.swift 2>&1 | FileCheck -check-prefix DUPLICATE-NAME %s
 
+// RUN: %swiftc_driver -driver-print-jobs --update-code -c -target x86_64-apple-macosx10.9 %s 2>&1 > %t.upd.txt
+// RUN: FileCheck -check-prefix UPDATE-CODE %s < %t.upd.txt
+
 // REQUIRES: X86
 
 
@@ -82,3 +85,7 @@
 
 // DUPLICATE-NAME: error: filename "driver-compile.swift" used twice: '{{.*}}test/Driver/driver-compile.swift' and '{{.*}}driver-compile.swift'
 // DUPLICATE-NAME: note: filenames are used to distinguish private declarations with the same name
+
+// UPDATE-CODE: bin/swift-update
+// UPDATE-CODE: -parse
+// UPDATE-CODE: -o {{.+}}.remap

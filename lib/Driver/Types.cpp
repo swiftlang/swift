@@ -84,6 +84,7 @@ bool types::isTextual(ID Id) {
   case types::TY_ClangModuleFile:
   case types::TY_SwiftDeps:
   case types::TY_Nothing:
+  case types::TY_Remapping:
     return false;
   case types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");
