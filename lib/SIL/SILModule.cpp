@@ -805,7 +805,7 @@ static ClassDecl *getClassDeclSuperClass(ClassDecl *Class) {
 
 SILFunction *
 SILModule::
-lookUpSILFunctionFromVTable(ClassDecl *Class, SILDeclRef Member) {
+lookUpFunctionFromVTable(ClassDecl *Class, SILDeclRef Member) {
   // Until we reach the top of the class hierarchy...
   while (Class) {
     // Try to lookup a VTable for Class from the module...
