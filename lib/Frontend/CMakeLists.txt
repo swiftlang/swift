@@ -1,6 +1,5 @@
 add_swift_library(swiftFrontend
   CompilerInvocation.cpp
-  DependencyFileGenerator.cpp
   DiagnosticVerifier.cpp
   Frontend.cpp
   FrontendOptions.cpp

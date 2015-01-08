@@ -20,6 +20,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
@@ -31,13 +32,28 @@ class NominalTypeDecl;
 
 enum class KnownProtocolKind : uint8_t;
 
+/// Records dependencies on files outside of the current module.
 class DependencyTracker {
-  virtual void anchor();
-protected:
-  DependencyTracker() = default;
+  llvm::SetVector<std::string, std::vector<std::string>> paths;
+
 public:
-  virtual ~DependencyTracker() = default;
-  virtual void addDependency(StringRef file) {}
+  /// Adds a file as a dependency.
+  ///
+  /// The contents of \p file are taken literally, and should be appropriate
+  /// for appearing in a list of dependencies suitable for tooling like Make.
+  /// No path canonicalization is done.
+  void addDependency(StringRef file) {
+    paths.insert(file);
+  }
+
+  /// Fetches the list of dependencies.
+  ArrayRef<std::string> getDependencies() const {
+    if (paths.empty())
+      return None;
+    assert((&paths[0]) + (paths.size() - 1) == &paths.back() &&
+           "elements not stored contiguously");
+    return llvm::makeArrayRef(&paths[0], paths.size());
+  }
 };
 
 /// \brief Abstract interface that loads named modules into the AST.

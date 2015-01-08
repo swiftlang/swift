@@ -25,7 +25,6 @@
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Frontend/DependencyFileGenerator.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -57,23 +56,54 @@ static std::string displayName(StringRef MainExecutablePath) {
 }
 
 /// Emits a Make-style dependencies file.
-static bool emitMakeDependencies(DiagnosticEngine &Diags,
-                                 DependencyFileGenerator &DFG,
+static bool emitMakeDependencies(DiagnosticEngine &diags,
+                                 DependencyTracker &depTracker,
                                  const FrontendOptions &opts) {
-  opts.forAllOutputPaths([&DFG](StringRef target) { DFG.addTarget(target); });
-
   std::error_code EC;
   llvm::raw_fd_ostream out(opts.DependenciesFilePath, EC,
                            llvm::sys::fs::F_None);
 
   if (out.has_error() || EC) {
-    Diags.diagnose(SourceLoc(), diag::error_opening_output,
+    diags.diagnose(SourceLoc(), diag::error_opening_output,
                    opts.DependenciesFilePath, EC.message());
     out.clear_error();
     return true;
   }
 
-  DFG.writeToStream(out);
+  // Declare a helper for escaping file names for use in Makefiles.
+  llvm::SmallString<256> pathBuf;
+  auto escape = [&](StringRef raw) -> StringRef {
+    pathBuf.clear();
+
+    static const char badChars[] = " $#:\n";
+    size_t prev = 0;
+    for (auto index = raw.find_first_of(badChars); index != StringRef::npos;
+         index = raw.find_first_of(badChars, index+1)) {
+      pathBuf.append(raw.slice(prev, index));
+      if (raw[index] == '$')
+        pathBuf.push_back('$');
+      else
+        pathBuf.push_back('\\');
+      prev = index;
+    }
+    pathBuf.append(raw.substr(prev));
+    return pathBuf;
+  };
+
+  // FIXME: Xcode can't currently handle multiple targets in a single
+  // dependency line.
+  opts.forAllOutputPaths([&](StringRef targetName) {
+    out << targetName << " :";
+    // Print dependencies we've picked up during compilation.
+    for (StringRef path : depTracker.getDependencies())
+      out << ' ' << escape(path);
+    // Also include all other files in the module. Make-style dependencies
+    // need to be conservative!
+    for (StringRef path : opts.InputFilenames)
+      out << ' ' << escape(path);
+    out << '\n';
+  });
+
   return false;
 }
 
@@ -342,10 +372,8 @@ static bool performCompile(CompilerInstance &Instance,
   if (opts.PrintClangStats && Context.getClangModuleLoader())
     Context.getClangModuleLoader()->printStatistics();
 
-  if (DependencyTracker *DT = Instance.getDependencyTracker()) {
-    auto &DFG = *static_cast<DependencyFileGenerator*>(DT);
-    (void)emitMakeDependencies(Context.Diags, DFG, opts);
-  }
+  if (DependencyTracker *DT = Instance.getDependencyTracker())
+    (void)emitMakeDependencies(Context.Diags, *DT, opts);
 
   if (shouldTrackReferences)
     emitReferenceDependencies(Context.Diags, Instance.getPrimarySourceFile(),
@@ -594,9 +622,9 @@ int frontend_main(ArrayRef<const char *>Args,
     enableDiagnosticVerifier(Instance.getSourceMgr());
   }
 
-  DependencyFileGenerator DFG;
+  DependencyTracker depTracker;
   if (!Invocation.getFrontendOptions().DependenciesFilePath.empty())
-    Instance.setDependencyTracker(&DFG);
+    Instance.setDependencyTracker(&depTracker);
 
   if (Instance.setup(Invocation)) {
     return 1;
