@@ -300,10 +300,8 @@ internal struct _Stdout : OutputStreamType {
 }
 
 extension String : OutputStreamType {
-  public mutating
-  
   /// Append `other` to this stream.
-  func write(other: String) {
+  public mutating func write(other: String) {
     self += other
   }
 }
