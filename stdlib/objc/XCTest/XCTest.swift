@@ -58,10 +58,10 @@ func _XCTRunThrowableBlock(@noescape block: () -> Void) -> _XCTThrowableBlockRes
   let d = _XCTRunThrowableBlockBridge(block)
   
   if d.count > 0 {
-    let t: String = d["type"] as String
+    let t: String = d["type"] as! String
     
     if t == "objc" {
-      return .FailedWithException(className: d["className"] as String, name: d["name"] as String, reason: d["reason"] as String)
+      return .FailedWithException(className: d["className"] as! String, name: d["name"] as! String, reason: d["reason"] as! String)
     } else {
       return .FailedWithUnknownException
     }

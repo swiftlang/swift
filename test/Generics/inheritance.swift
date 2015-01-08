@@ -33,7 +33,7 @@ func f0<T : A>(obji: T, ai: A, bi: B) {
   a = obj as A
 
   // Downcasts
-  b = obj as B
+  b = obj as! B
 }
 
 func call_f0(a: A, b: B, other: Other) {

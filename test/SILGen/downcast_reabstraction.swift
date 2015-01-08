@@ -20,5 +20,5 @@ func condFunctionFromAny(x: Any) {
 // CHECK:         [[SUBST_VAL:%.*]] = partial_apply [[REABSTRACT]]([[ORIG_VAL]])
 // CHECK:         apply [[SUBST_VAL]]()
 func uncondFunctionFromAny(x: Any) {
-  (x as () -> ())()
+  (x as! () -> ())()
 }

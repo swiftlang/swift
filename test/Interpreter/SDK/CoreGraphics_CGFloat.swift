@@ -127,7 +127,7 @@ CGFloatTestSuite.test("bridging") {
     expectEqual("4.125", "\(nsnum)")
 
     // NSNumber -> CGFloat
-    let bridgedBack: CGFloat = nsnum as CGFloat
+    let bridgedBack: CGFloat = nsnum as! CGFloat
     expectEqual(flt, bridgedBack)
   }
 
@@ -142,7 +142,7 @@ CGFloatTestSuite.test("bridging") {
     expectEqual("10.625", "\(nsarr[1])")
 
     // NSArray -> Array
-    expectEqualSequence(originalArray, nsarr as [CGFloat])
+    expectEqualSequence(originalArray, nsarr as! [CGFloat])
   }
 }
 

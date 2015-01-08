@@ -295,6 +295,9 @@ WARNING(isa_is_always_true,sema_tcc,none,
 ERROR(conditional_downcast_coercion,sema_tcc,none,
       "conditional downcast from %0 to %1 always succeeds",
       (Type, Type))
+ERROR(forced_downcast_coercion,sema_tcc,none,
+      "forced downcast from %0 to %1 always succeeds",
+      (Type, Type))
 ERROR(downcast_same_type,sema_tcc,none,
       "downcast from %0 to %1 only unwraps optionals; did you mean to use "
       "'%2'?",
@@ -331,8 +334,8 @@ ERROR(missing_unwrap_optional,sema_tcc,none,
       "or '?'?",
      (Type))
 ERROR(missing_forced_downcast,sema_tcc,none,
-      "type %0 cannot be implicitly downcast to %1; did you mean to use 'as' "
-      "to force downcast?", (Type, Type))
+      "%0 is not convertible to %1; "
+      "did you mean to use 'as!' to force downcast?", (Type, Type))
 ERROR(missing_address_of,sema_tcc,none,
       "passing value of type %0 to an inout parameter requires explicit '&'",
       (Type))

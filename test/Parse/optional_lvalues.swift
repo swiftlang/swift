@@ -62,4 +62,4 @@ class C {}
 class D: C {}
 
 let c = C()
-let d = (c as D)! // expected-error{{forced downcast already produces a non-optional value}}
+let d = (c as! D)! // expected-error{{forced downcast already produces a non-optional value}}

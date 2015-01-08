@@ -5,4 +5,4 @@
 @objc class C {}
 
 let c = C()
-let unrelated = c as Unrelated
+let unrelated = c as! Unrelated

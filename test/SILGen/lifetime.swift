@@ -629,7 +629,7 @@ class D : B {
 // CHECK-LABEL: sil hidden @_TF8lifetime8downcast
 func downcast(var b: B) {
   // CHECK: [[BADDR:%[0-9]+]] = alloc_box $B
-  (b as D).foo()
+  (b as! D).foo()
   // CHECK: [[B:%[0-9]+]] = load [[BADDR]]
   // CHECK: retain [[B]]
   // CHECK: [[D:%[0-9]+]] = unconditional_checked_cast [[B]] : {{.*}} to $D

@@ -260,11 +260,11 @@ Runtime.test("_canBeClass") {
 Runtime.test("bridgeToObjectiveC") {
   expectEmpty(_bridgeToObjectiveC(NotBridgedValueType()))
 
-  expectEqual(42, (_bridgeToObjectiveC(BridgedValueType(value: 42)) as ClassA).value)
+  expectEqual(42, (_bridgeToObjectiveC(BridgedValueType(value: 42)) as! ClassA).value)
 
-  expectEqual(42, (_bridgeToObjectiveC(BridgedLargeValueType(value: 42)) as ClassA).value)
+  expectEqual(42, (_bridgeToObjectiveC(BridgedLargeValueType(value: 42)) as! ClassA).value)
 
-  expectEqual(42, (_bridgeToObjectiveC(ConditionallyBridgedValueType<Int>(value: 42)) as ClassA).value)
+  expectEqual(42, (_bridgeToObjectiveC(ConditionallyBridgedValueType<Int>(value: 42)) as! ClassA).value)
 
   expectEmpty(_bridgeToObjectiveC(ConditionallyBridgedValueType<String>(value: 42)))
 
@@ -279,15 +279,15 @@ Runtime.test("bridgeToObjectiveC/NoLeak") {
 
   withSwiftObjectCanary(
     { BridgedValueType(value: 42) },
-    { expectEqual(42, (_bridgeToObjectiveC($0) as ClassA).value) })
+    { expectEqual(42, (_bridgeToObjectiveC($0) as! ClassA).value) })
 
   withSwiftObjectCanary(
     { BridgedLargeValueType(value: 42) },
-    { expectEqual(42, (_bridgeToObjectiveC($0) as ClassA).value) })
+    { expectEqual(42, (_bridgeToObjectiveC($0) as! ClassA).value) })
 
   withSwiftObjectCanary(
     { ConditionallyBridgedValueType<Int>(value: 42) },
-    { expectEqual(42, (_bridgeToObjectiveC($0) as ClassA).value) })
+    { expectEqual(42, (_bridgeToObjectiveC($0) as! ClassA).value) })
 
   withSwiftObjectCanary(
     { ConditionallyBridgedValueType<String>(value: 42) },
@@ -504,23 +504,23 @@ Runtime.test("dynamicCasting with as") {
   expectTrue((someP1Ref as P1).boolValue)
   expectTrue((someP1Ref2 as P1).boolValue)
 
-  expectTrue(((someP1Value as Q1) as P1).boolValue)
-  expectTrue(((someP1Value2 as Q1) as P1).boolValue)
-  expectEqual("10 20 30 40", ((someP2Value as Q1) as P2).description)
+  expectTrue(((someP1Value as Q1) as! P1).boolValue)
+  expectTrue(((someP1Value2 as Q1) as! P1).boolValue)
+  expectEqual("10 20 30 40", ((someP2Value as Q1) as! P2).description)
   expectEqual("10 20 30 40 50 60 70 80",
-    ((someP2Value2 as Q1) as P2).description)
-  expectTrue(((someP1Ref as Q1) as P1).boolValue)
-  expectTrue(((someP1Ref2 as Q1) as P1).boolValue)
+    ((someP2Value2 as Q1) as! P2).description)
+  expectTrue(((someP1Ref as Q1) as! P1).boolValue)
+  expectTrue(((someP1Ref2 as Q1) as! P1).boolValue)
 
-  expectTrue(((someP1Value as Any) as P1).boolValue)
-  expectTrue(((someP1Value2 as Any) as P1).boolValue)
-  expectEqual("10 20 30 40", ((someP2Value as Any) as P2).description)
+  expectTrue(((someP1Value as Any) as! P1).boolValue)
+  expectTrue(((someP1Value2 as Any) as! P1).boolValue)
+  expectEqual("10 20 30 40", ((someP2Value as Any) as! P2).description)
   expectEqual("10 20 30 40 50 60 70 80",
-    ((someP2Value2 as Any) as P2).description)
-  expectTrue(((someP1Ref as Any) as P1).boolValue)
-  expectTrue(((someP1Ref2 as Any) as P1).boolValue)
+    ((someP2Value2 as Any) as! P2).description)
+  expectTrue(((someP1Ref as Any) as! P1).boolValue)
+  expectTrue(((someP1Ref2 as Any) as! P1).boolValue)
 
-  expectTrue(((someP1Ref as AnyObject) as P1).boolValue)
+  expectTrue(((someP1Ref as AnyObject) as! P1).boolValue)
 
   expectEmpty((someNotP1Value as? P1))
   expectEmpty((someNotP1Ref as? P1))

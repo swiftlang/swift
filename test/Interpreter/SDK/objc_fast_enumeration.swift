@@ -44,7 +44,7 @@ autoreleasepool {
 
   // CHECK: 1
   for x: AnyObject in b {
-    (x as Canary).chirp()
+    (x as! Canary).chirp()
     break
   }
 
@@ -88,7 +88,7 @@ for x: AnyObject in s_m {
 // CHECK: 2
 // CHECK: 1
 var a2 = [3, 2, 1]
-var nsa2 = (a2._buffer._asCocoaArray() as AnyObject) as NSArray
+var nsa2 = (a2._buffer._asCocoaArray() as AnyObject) as! NSArray
 for x: AnyObject in nsa2 {
   println(x.description!)
 }

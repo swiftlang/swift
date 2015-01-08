@@ -156,13 +156,13 @@ func newConstruction(a: A, aproxy: AProxy) {
 // Indexed subscripting
 func indexedSubscripting(b: B, idx: Int, a: A) {
   b[idx] = a
-  var a2 = b[idx] as A
+  var a2 = b[idx] as! A
 }
 
 // Keyed subscripting
 func keyedSubscripting(b: B, idx: A, a: A) {
   b[a] = a
-  var a2 = b[a] as A
+  var a2 = b[a] as! A
 
   let dict = NSMutableDictionary()
   dict[NSString()] = a
@@ -174,7 +174,7 @@ func keyedSubscripting(b: B, idx: A, a: A) {
 
 // Typed indexed subscripting
 func checkHive(hive: Hive, b: B) {
-  var b2 = hive.bees[5] as B
+  var b2 = hive.bees[5] as! B
   b2.method(1, withFloat:1.5)
 }
 

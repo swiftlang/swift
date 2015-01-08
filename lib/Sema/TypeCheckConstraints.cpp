@@ -1127,6 +1127,10 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
       // Add a conversion constraint between the types.
       cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
                        InitType, Locator);
+
+      // The expression has been pre-checked; save it in case we fail later.
+      Binding->setInit(expr, /*checked=*/false);
+
       return false;
     }
 
@@ -1299,6 +1303,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       // and the type of the element pattern.
       cs.addConstraint(ConstraintKind::Conversion, elementType, InitType,
                        Locator);
+      
+      Stmt->setSequence(expr);
       return false;
     }
 
@@ -1907,7 +1913,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                  SourceLoc diagLoc,
                                  SourceRange diagFromRange,
                                  SourceRange diagToRange,
-                                 std::function<bool (Type)> convertToType) {
+                                 std::function<bool (Type)> convertToType,
+                                 bool suppressDiagnostics) {
   // If the from/to types are equivalent or implicitly convertible,
   // this is a coercion.
   if (fromType->isEqual(toType) || isConvertibleTo(fromType, toType, dc)) {
@@ -1925,10 +1932,12 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     // relationship.
     auto fromValueType = fromType->getAnyOptionalObjectType();
     if (!fromValueType) {
-      diagnose(diagLoc, diag::downcast_to_more_optional,
-               origFromType, origToType)
-        .highlight(diagFromRange)
-        .highlight(diagToRange);
+      if (!suppressDiagnostics) {
+        diagnose(diagLoc, diag::downcast_to_more_optional,
+                 origFromType, origToType)
+          .highlight(diagFromRange)
+          .highlight(diagToRange);
+      }
       return CheckedCastKind::Unresolved;
     }
 
@@ -1949,10 +1958,12 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     assert(extraFromOptionals > 0 && "No extra 'from' optionals?");
     
     // FIXME: Add a Fix-It, when the caller provides us with enough information.
-    diagnose(diagLoc, diag::downcast_same_type,
-             origFromType, origToType, std::string(extraFromOptionals, '!'))
-      .highlight(diagFromRange)
-      .highlight(diagToRange);
+    if (!suppressDiagnostics) {
+      diagnose(diagLoc, diag::downcast_same_type,
+               origFromType, origToType, std::string(extraFromOptionals, '!'))
+        .highlight(diagFromRange)
+        .highlight(diagToRange);
+    }
     return CheckedCastKind::Unresolved;
   }
 
@@ -2054,6 +2065,9 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // one.
   auto clas = toType->getClassOrBoundGenericClass();
   if (!clas || !clas->isForeign()) {
+    if (suppressDiagnostics) {
+      return CheckedCastKind::Unresolved;
+    }
     diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
       .highlight(diagFromRange)
       .highlight(diagToRange);
@@ -2084,9 +2098,6 @@ ExplicitCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   // Simple case: forced checked cast.
   if (auto forced = dyn_cast<ForcedCheckedCastExpr>(expr)) {
     return forced;
-  }
-  if (auto unresolved = dyn_cast<UnresolvedCheckedCastExpr>(expr)) {
-    return unresolved;
   }
 
   // If we have an implicit force, look through it.
@@ -2122,16 +2133,14 @@ ExplicitCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   
   // If we have an explicit cast, we're done.
   if (isa<ForcedCheckedCastExpr>(sub) || 
-      isa<ConditionalCheckedCastExpr>(sub) ||
-      isa<UnresolvedCheckedCastExpr>(sub))
+      isa<ConditionalCheckedCastExpr>(sub))
     return cast<ExplicitCastExpr>(sub);
 
   // Otherwise, try to look through an implicit _forceBridgeFromObjectiveC() call.
   if (auto arg = lookThroughBridgeFromObjCCall(ctx, sub)) {
     sub = skipOptionalEvalAndBinds(arg);
     if (isa<ForcedCheckedCastExpr>(sub) || 
-        isa<ConditionalCheckedCastExpr>(sub) ||
-        isa<UnresolvedCheckedCastExpr>(sub))
+        isa<ConditionalCheckedCastExpr>(sub))
       return cast<ExplicitCastExpr>(sub);
   }
 

@@ -5459,8 +5459,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     break;
 
   case ConstantConvertKind::Downcast: {
-    expr = new (context) UnresolvedCheckedCastExpr(expr, SourceLoc(),
-                                                   TypeLoc::withoutLoc(type));
+    expr = new (context) ForcedCheckedCastExpr(expr, SourceLoc(), SourceLoc(),
+                                               TypeLoc::withoutLoc(type));
     expr->setImplicit();
     break;
   }

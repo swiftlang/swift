@@ -1307,7 +1307,7 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
 
-    Type visitUnresolvedCheckedCastExpr(UnresolvedCheckedCastExpr *expr) {
+    Type visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
       auto &tc = CS.getTypeChecker();
       
       // Validate the resulting type.
@@ -1322,27 +1322,39 @@ namespace {
                                 CS.getConstraintLocator(expr));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
+      auto fromType = expr->getSubExpr()->getType();
       auto locator = CS.getConstraintLocator(expr,
                                      ConstraintLocator::CheckedCastOperand);
 
-      // Form the disjunction of the two possible type checks.
-      auto fromType = expr->getSubExpr()->getType();
-      Constraint *constraints[2] = {
-        // The source type can be coerced to the destination type.
-        Constraint::create(CS, ConstraintKind::Conversion, fromType, toType,
-                           Identifier(), locator),
-        // The source type can be downcast to the destination type.
-        Constraint::create(CS, ConstraintKind::CheckedCast, fromType, toType,
-                           Identifier(), locator),
-      };
-      CS.addConstraint(Constraint::createDisjunction(CS, constraints, locator,
-                                                     RememberChoice));
+      // The source type can be checked-cast to the destination type.
+      CS.addConstraint(ConstraintKind::CheckedCast, fromType, toType, locator);
 
       return toType;
     }
 
-    Type visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
-      llvm_unreachable("Already type checked");
+    Type visitCoerceExpr(CoerceExpr *expr) {
+      auto &tc = CS.getTypeChecker();
+      
+      // Validate the resulting type.
+      TypeResolutionOptions options = TR_AllowUnboundGenerics;
+      options |= TR_InExpression;
+      if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
+        return nullptr;
+
+      // Open the type we're casting to.
+      // FIXME: Locator for the cast type?
+      auto toType = CS.openType(expr->getCastTypeLoc().getType(),
+                                CS.getConstraintLocator(expr));
+      expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+
+      auto fromType = expr->getSubExpr()->getType();
+      auto locator = CS.getConstraintLocator(expr,
+                                     ConstraintLocator::CheckedCastOperand);
+
+      // The source type can be converted to the destination type.
+      CS.addConstraint(ConstraintKind::Conversion, fromType, toType, locator);
+
+      return toType;
     }
 
     Type visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
@@ -1389,10 +1401,6 @@ namespace {
 
       // The result is Bool.
       return CS.getTypeChecker().lookupBoolType(CS.DC);
-    }
-
-    Type visitCoerceExpr(CoerceExpr *expr) {
-      llvm_unreachable("Already type-checked");
     }
 
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
@@ -1554,16 +1562,6 @@ namespace {
         }
       }
 
-      if (auto forced = dyn_cast<ForcedCheckedCastExpr>(expr)) {
-        expr = new (TC.Context) UnresolvedCheckedCastExpr(
-                                  forced->getSubExpr(),
-                                  forced->getLoc(),
-                                  forced->getCastTypeLoc());
-        if (forced->isImplicit())
-          expr->setImplicit();
-        return expr;
-      }
-     
       return expr;
     }
 

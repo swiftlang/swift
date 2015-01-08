@@ -67,13 +67,15 @@ func testForcedDowncastBridge() {
   var setD = Set<DerivesObjC>()
   var setB = Set<BridgedToObjC>()
 
-  setR as Set<BridgedToObjC>
-  setO as Set<BridgedToObjC>
-  setD as Set<BridgedToObjC> // expected-error {{'Set<DerivesObjC>' is not convertible to 'Set<BridgedToObjC>'}}
+  setR as! Set<BridgedToObjC>
+  setO as! Set<BridgedToObjC>
+  setD as! Set<BridgedToObjC> // expected-error {{'ObjC' is not a subtype of 'DerivesObjC'}}
 
-  setB as Set<Root>
-  setB as Set<ObjC>
-  setB as Set<DerivesObjC> // expected-error {{'Set<BridgedToObjC>' is not convertible to 'Set<DerivesObjC>'}}
+  // TODO: the diagnostic for the below two examples should indicate that 'as'
+  // should be used instead of 'as!'
+  setB as! Set<Root> // expected-error {{'Root' is not a subtype of 'BridgedToObjC'}}
+  setB as! Set<ObjC> // expected-error {{'ObjC' is not a subtype of 'BridgedToObjC'}}
+  setB as! Set<DerivesObjC> // expected-error {{'DerivesObjC' is not a subtype of 'BridgedToObjC'}}
 }
 
 func testConditionalDowncastBridge() {

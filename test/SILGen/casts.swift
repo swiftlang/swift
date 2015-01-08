@@ -11,7 +11,7 @@ func upcast(d: D) -> B {
 // CHECK-LABEL: sil hidden @_TF5casts8downcast
 func downcast(b: B) -> D {
   // CHECK: {{%.*}} = unconditional_checked_cast
-  return b as D
+  return b as! D
 }
 
 // CHECK-LABEL: sil hidden @_TF5casts3isa
@@ -39,7 +39,7 @@ func upcast_archetype_metatype<T : B>(t: T.Type) -> B.Type {
 // CHECK-LABEL: sil hidden @_TF5casts18downcast_archetype
 func downcast_archetype<T : B>(b: B) -> T {
   // CHECK: {{%.*}} = unconditional_checked_cast
-  return b as T
+  return b as! T
 }
 
 // CHECK-LABEL: sil hidden @_TF5casts12is_archetype

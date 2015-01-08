@@ -1188,7 +1188,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
   var members = [Int]()
   for var i = startIndex; i != endIndex; ++i {
     var foundMember: AnyObject = s[i]
-    let member = foundMember as TestObjCKeyTy
+    let member = foundMember as! TestObjCKeyTy
     members.append(member.value)
   }
   expectTrue(equalsUnordered(members, [1010, 2020, 3030]))
@@ -1216,7 +1216,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
   var members = [Int]()
   for var i = startIndex; i != endIndex; ++i {
     var foundMember: AnyObject = s[i]
-    let member = foundMember as TestObjCKeyTy
+    let member = foundMember as! TestObjCKeyTy
     members.append(member.value)
   }
   expectTrue(equalsUnordered(members, [1010, 2020, 3030]))
@@ -1688,7 +1688,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
   var gen = s.generate()
   var members = Array<Int>()
   while let (member: AnyObject) = gen.next() {
-    members.append((member as TestObjCKeyTy).value)
+    members.append((member as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered(members, [1010, 2020, 3030]))
   // The following is not required by the GeneratorType protocol, but
@@ -1756,7 +1756,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
   var gen = s.generate()
   var members = [Int]()
   while let member: AnyObject = gen.next() {
-    members.append((member as TestObjCKeyTy).value)
+    members.append((member as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered(members, hugeNumberArray))
   // The following is not required by the GeneratorType protocol, but
@@ -1775,7 +1775,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
   var gen = s.generate()
   var members = [Int]()
   while let member: AnyObject = gen.next() {
-    members.append((member as TestBridgedKeyTy).value)
+    members.append((member as! TestBridgedKeyTy).value)
   }
   expectTrue(equalsUnordered(members, hugeNumberArray))
   // The following is not required by the GeneratorType protocol, but
@@ -1870,13 +1870,13 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfSets") {
         getAsNSSet([ 1 + i,  2 + i, 3 + i ]))
   }
 
-  var a = nsa as [AnyObject] as [Set<NSObject>]
+  var a = nsa as [AnyObject] as! [Set<NSObject>]
   for i in 0..<3 {
     var s = a[i]
     var gen = s.generate()
     var items = Array<Int>()
     while let value: AnyObject = gen.next() {
-      let v = (value as TestObjCKeyTy).value
+      let v = (value as! TestObjCKeyTy).value
       items.append(v)
     }
     var expectedItems = [ 1 + i, 2 + i, 3 + i ]
@@ -1891,7 +1891,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfSets") {
         getAsNSSet([ 1 + i, 2 + i, 3 + i ]))
   }
 
-  var a = nsa as [AnyObject] as [Set<TestBridgedKeyTy>]
+  var a = nsa as [AnyObject] as! [Set<TestBridgedKeyTy>]
   for i in 0..<3 {
     var d = a[i]
     var gen = d.generate()
@@ -1934,7 +1934,7 @@ SetTestSuite.test("BridgingRoundtrip") {
 
   var items = Array<Int>()
   while let value: AnyObject = enumerator.nextObject() {
-    let v = (value as TestObjCKeyTy).value
+    let v = (value as! TestObjCKeyTy).value
     items.append(v)
   }
   expectTrue(equalsUnordered([ 1010, 2020, 3030 ], items))
@@ -1946,7 +1946,7 @@ SetTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration.UseFr
   checkSetFastEnumerationFromSwift(
     [ 1010, 2020, 3030 ],
     s, { s.objectEnumerator() },
-    { ($0 as TestObjCKeyTy).value })
+    { ($0 as! TestObjCKeyTy).value })
 
   expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
@@ -1957,7 +1957,7 @@ SetTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration.UseFr
   checkSetFastEnumerationFromObjC(
     [ 1010, 2020, 3030 ],
     s, { s.objectEnumerator() },
-    { ($0 as TestObjCKeyTy).value })
+    { ($0 as! TestObjCKeyTy).value })
 
   expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
@@ -1967,11 +1967,11 @@ SetTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration_Empty
 
   checkSetFastEnumerationFromSwift(
     [], s, { s.objectEnumerator() },
-    { ($0 as TestObjCKeyTy).value })
+    { ($0 as! TestObjCKeyTy).value })
 
   checkSetFastEnumerationFromObjC(
     [], s, { s.objectEnumerator() },
-    { ($0 as TestObjCKeyTy).value })
+    { ($0 as! TestObjCKeyTy).value })
 }
 
 SetTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFromObjC") {
@@ -1980,7 +1980,7 @@ SetTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFrom
   checkSetFastEnumerationFromObjC(
     [ 1010, 2020, 3030 ],
     s, { s.objectEnumerator() },
-    { ($0 as TestObjCKeyTy).value })
+    { ($0 as! TestObjCKeyTy).value })
 
   expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
@@ -1991,7 +1991,7 @@ SetTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFrom
   checkSetFastEnumerationFromSwift(
     [ 1010, 2020, 3030 ],
     s, { s.objectEnumerator() },
-    { ($0 as TestObjCKeyTy).value })
+    { ($0 as! TestObjCKeyTy).value })
 
   expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
@@ -2002,7 +2002,7 @@ SetTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration.UseFromSwift") {
   checkSetFastEnumerationFromSwift(
     [ 1010, 2020, 3030 ],
     s, { s },
-    { ($0 as TestObjCKeyTy).value })
+    { ($0 as! TestObjCKeyTy).value })
 }
 
 SetTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration.UseFromObjC") {
@@ -2011,7 +2011,7 @@ SetTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration.UseFromObjC") {
   checkSetFastEnumerationFromObjC(
     [ 1010, 2020, 3030 ],
     s, { s },
-    { ($0 as TestObjCKeyTy).value })
+    { ($0 as! TestObjCKeyTy).value })
 }
 
 SetTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration_Empty") {
@@ -2019,11 +2019,11 @@ SetTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration_Empty") {
 
   checkSetFastEnumerationFromSwift(
     [], s, { s },
-    { ($0 as TestObjCKeyTy).value })
+    { ($0 as! TestObjCKeyTy).value })
 
   checkSetFastEnumerationFromObjC(
     [], s, { s },
-    { ($0 as TestObjCKeyTy).value })
+    { ($0 as! TestObjCKeyTy).value })
 }
 
 SetTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromSwift") {
@@ -2032,7 +2032,7 @@ SetTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromSwift") {
   checkSetFastEnumerationFromSwift(
     [ 1010, 2020, 3030 ],
     s, { s },
-    { ($0 as TestObjCKeyTy).value })
+    { ($0 as! TestObjCKeyTy).value })
 }
 
 SetTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromObjC") {
@@ -2041,7 +2041,7 @@ SetTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromObjC") {
   checkSetFastEnumerationFromObjC(
     [ 1010, 2020, 3030 ],
     s, { s },
-    { ($0 as TestObjCKeyTy).value })
+    { ($0 as! TestObjCKeyTy).value })
 }
 
 SetTestSuite.test("BridgedToObjC.Custom.FastEnumeration_Empty") {
@@ -2050,11 +2050,11 @@ SetTestSuite.test("BridgedToObjC.Custom.FastEnumeration_Empty") {
 
   checkSetFastEnumerationFromSwift(
     [], s, { s },
-    { ($0 as TestObjCKeyTy).value })
+    { ($0 as! TestObjCKeyTy).value })
 
   checkSetFastEnumerationFromObjC(
     [], s, { s },
-    { ($0 as TestObjCKeyTy).value })
+    { ($0 as! TestObjCKeyTy).value })
 }
 
 SetTestSuite.test("BridgedToObjC.Count") {
@@ -2068,7 +2068,7 @@ SetTestSuite.test("BridgedToObjC.ObjectEnumerator.NextObject") {
 
   var members = [Int]()
   while let nextObject: AnyObject = enumerator.nextObject() {
-    members.append((nextObject as TestObjCKeyTy).value)
+    members.append((nextObject as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered([1010, 2020, 3030], members))
 
@@ -2098,7 +2098,7 @@ SetTestSuite.test("BridgedToObjC.MemberTypesCustomBridged") {
 
   var members = [Int]()
   while let nextObject: AnyObject = enumerator.nextObject() {
-    members.append((nextObject as TestObjCKeyTy).value)
+    members.append((nextObject as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered([ 1010, 2020, 3030 ], members))
 
@@ -2115,7 +2115,7 @@ SetTestSuite.test("BridgingRoundTrip") {
 
   var members = [Int]()
   while let nextObject: AnyObject = enumerator.nextObject() {
-    members.append((nextObject as TestObjCKeyTy).value)
+    members.append((nextObject as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered([1010, 2020, 3030] ,members))
 }
@@ -2136,7 +2136,7 @@ SetTestSuite.test("NSSetToSetConversion") {
 
   var members = [Int]()
   for member: AnyObject in s {
-    members.append((member as TestObjCKeyTy).value)
+    members.append((member as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered(members, [1010, 2020, 3030]))
 }
@@ -2259,7 +2259,7 @@ SetTestSuite.test("SetDowncast") {
   }
 
   // Successful downcast.
-  let sCC = s as Set<TestObjCKeyTy>
+  let sCC = s as! Set<TestObjCKeyTy>
   expectEqual(3, sCC.count)
   expectTrue(sCC.contains(TestObjCKeyTy(1010)))
   expectTrue(sCC.contains(TestObjCKeyTy(2020)))
@@ -2338,7 +2338,7 @@ SetTestSuite.test("SetBridgeFromObjectiveC") {
   }
 
   // Successful downcast.
-  let sCV = s as Set<TestObjCKeyTy>
+  let sCV = s as! Set<TestObjCKeyTy>
   if true {
     expectEqual(3, sCV.count)
     expectTrue(sCV.contains(TestObjCKeyTy(1010)))
@@ -2347,7 +2347,7 @@ SetTestSuite.test("SetBridgeFromObjectiveC") {
   }
 
   // Successful downcast.
-  let sVC = s as Set<TestBridgedKeyTy>
+  let sVC = s as! Set<TestBridgedKeyTy>
   if true {
     expectEqual(3, sVC.count)
     expectTrue(sVC.contains(TestBridgedKeyTy(1010)))

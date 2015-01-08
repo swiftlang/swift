@@ -231,7 +231,7 @@ public:
   Pattern *visitSequenceExpr(SequenceExpr *E) {
     if (E->getElements().size() != 3)
       return nullptr;
-    auto cast = dyn_cast<UnresolvedCheckedCastExpr>(E->getElement(1));
+    auto cast = dyn_cast<CoerceExpr>(E->getElement(1));
     if (!cast)
       return nullptr;
     
@@ -935,7 +935,8 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       = typeCheckCheckedCast(type, IP->getCastTypeLoc().getType(), dc,
                              IP->getLoc(),
                              IP->getLoc(),IP->getCastTypeLoc().getSourceRange(),
-                             [](Type) { return false; });
+                             [](Type) { return false; },
+                             /*suppressDiagnostics=*/ false);
     switch (castKind) {
     case CheckedCastKind::Unresolved:
       return nullptr;

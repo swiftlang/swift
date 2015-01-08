@@ -8,23 +8,23 @@ var rootView = View()
 var v = [View(), View()]
 rootView.subviews = v
 
-rootView.subviews as [View]
+rootView.subviews as! [View]
 
-for view in rootView.subviews as [View] {
+for view in rootView.subviews as! [View] {
 	println("found subview")
 }
 
 // FIXME: Somewhat misleading diagnostic here.
-for view:View in rootView.subviews { // expected-error{{type 'Array<AnyObject>!' cannot be implicitly downcast to 'View'; did you mean to use 'as' to force downcast?}}
+for view:View in rootView.subviews { // expected-error{{'Array<AnyObject>!' is not convertible to 'View'; did you mean to use 'as!' to force downcast?}}
 	println("found subview")
 }
 
-(rootView.subviews!) as [View]
+(rootView.subviews!) as! [View]
 
-(rootView.subviews) as [View]
+(rootView.subviews) as! [View]
 
 var ao: [AnyObject] = []
-ao as [View] // works
+ao as! [View] // works
 
 
 var b = Array<(String, Int)>()

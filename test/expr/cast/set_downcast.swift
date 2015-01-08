@@ -26,13 +26,13 @@ var setC = Set<C>()
 var setD = Set<D>()
 
 // Test set forced downcasts
-setD = setC as Set<D>
+setD = setC as! Set<D>
 
 // Test set conditional downcasts
 if let setD = setC as? Set<D> { }
 
 // Test set downcasts to unrelated types.
-setC as Set<U> // expected-error{{'Set<C>' is not convertible to 'Set<U>'}}
+setC as! Set<U> // expected-error{{'U' is not a subtype of 'C'}}
 
 // Test set conditional downcasts to unrelated types
 if let setU = setC as? Set<U> { } // expected-error{{'U' is not a subtype of 'C'}}

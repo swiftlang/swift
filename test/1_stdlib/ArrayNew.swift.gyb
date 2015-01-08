@@ -372,15 +372,15 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/objectAtIndex") {
   let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3)
 
   var v: AnyObject = a.objectAtIndex(0)
-  expectEqual(10, (v as TestObjCValueTy).value)
+  expectEqual(10, (v as! TestObjCValueTy).value)
   let idValue0 = unsafeBitCast(v, UWord.self)
 
   v = a.objectAtIndex(1)
-  expectEqual(20, (v as TestObjCValueTy).value)
+  expectEqual(20, (v as! TestObjCValueTy).value)
   let idValue1 = unsafeBitCast(v, UWord.self)
 
   v = a.objectAtIndex(2)
-  expectEqual(30, (v as TestObjCValueTy).value)
+  expectEqual(30, (v as! TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, UWord.self)
 
   for i in 0..<3 {
@@ -432,15 +432,15 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects") {
     AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
 
   var v: AnyObject = buffer[0]
-  expectEqual(10, (v as TestObjCValueTy).value)
+  expectEqual(10, (v as! TestObjCValueTy).value)
   let idValue0 = unsafeBitCast(v, UWord.self)
 
   v = buffer[1]
-  expectEqual(20, (v as TestObjCValueTy).value)
+  expectEqual(20, (v as! TestObjCValueTy).value)
   let idValue1 = unsafeBitCast(v, UWord.self)
 
   v = buffer[2]
-  expectEqual(30, (v as TestObjCValueTy).value)
+  expectEqual(30, (v as! TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, UWord.self)
 
   for i in 0..<3 {
@@ -466,7 +466,7 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/FastEnumeration/UseFromSwift/Empty")
 
   checkArrayFastEnumerationFromSwift(
     [], a, { a },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCValueTy).value })
 }
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/FastEnumeration/UseFromSwift/3") {
@@ -475,7 +475,7 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/FastEnumeration/UseFromSwift/3") {
   checkArrayFastEnumerationFromSwift(
     [ 10, 20, 30 ],
     a, { a },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCValueTy).value })
 }
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/FastEnumeration/UseFromSwift/7") {
@@ -484,7 +484,7 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/FastEnumeration/UseFromSwift/7") {
   checkArrayFastEnumerationFromSwift(
     [ 10, 20, 30, 40, 50, 60, 70 ],
     a, { a },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCValueTy).value })
 }
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/FastEnumeration/UseFromObjC/Empty") {
@@ -492,7 +492,7 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/FastEnumeration/UseFromObjC/Empty") 
 
   checkArrayFastEnumerationFromObjC(
     [], a, { a },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCValueTy).value })
 }
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/FastEnumeration/UseFromObjC") {
@@ -501,7 +501,7 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/FastEnumeration/UseFromObjC") {
   checkArrayFastEnumerationFromObjC(
     [ 10, 20, 30 ],
     a, { a },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCValueTy).value })
 }
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/ObjectEnumerator/FastEnumeration/UseFromSwift/Empty") {
@@ -509,7 +509,7 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/ObjectEnumerator/FastEnumeration/Use
 
   checkArrayFastEnumerationFromSwift(
     [], a, { a.objectEnumerator() },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCValueTy).value })
 }
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/ObjectEnumerator/FastEnumeration/UseFromSwift") {
@@ -518,7 +518,7 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/ObjectEnumerator/FastEnumeration/Use
   checkArrayFastEnumerationFromSwift(
     [ 10, 20, 30 ],
     a, { a.objectEnumerator() },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCValueTy).value })
 }
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/ObjectEnumerator/FastEnumeration/UseFromSwift/Partial") {
@@ -527,7 +527,7 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/ObjectEnumerator/FastEnumeration/Use
   checkArrayEnumeratorPartialFastEnumerationFromSwift(
     [ 10, 20, 30, 40, 50, 60, 70, 80, 90 ],
     a, maxFastEnumerationItems: 5,
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCValueTy).value })
 }
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/ObjectEnumerator/FastEnumeration/UseFromObjC") {
@@ -536,22 +536,22 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/ObjectEnumerator/FastEnumeration/Use
   checkArrayFastEnumerationFromObjC(
     [ 10, 20, 30 ],
     a, { a.objectEnumerator() },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCValueTy).value })
 }
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Reallocate") {
   let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3)
 
   var v: AnyObject = a[0]
-  expectEqual(10, (v as TestObjCValueTy).value)
+  expectEqual(10, (v as! TestObjCValueTy).value)
   let idValue0 = unsafeBitCast(v, UWord.self)
 
   v = a[1]
-  expectEqual(20, (v as TestObjCValueTy).value)
+  expectEqual(20, (v as! TestObjCValueTy).value)
   let idValue1 = unsafeBitCast(v, UWord.self)
 
   v = a[2]
-  expectEqual(30, (v as TestObjCValueTy).value)
+  expectEqual(30, (v as! TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, UWord.self)
 
   // Bridge back to native array.
@@ -631,15 +631,15 @@ ArrayTestSuite.test("BridgedToObjC/Custom/objectAtIndex") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3)
 
   var v: AnyObject = a.objectAtIndex(0)
-  expectEqual(10, (v as TestObjCValueTy).value)
+  expectEqual(10, (v as! TestObjCValueTy).value)
   let idValue0 = unsafeBitCast(v, UWord.self)
 
   v = a.objectAtIndex(1)
-  expectEqual(20, (v as TestObjCValueTy).value)
+  expectEqual(20, (v as! TestObjCValueTy).value)
   let idValue1 = unsafeBitCast(v, UWord.self)
 
   v = a.objectAtIndex(2)
-  expectEqual(30, (v as TestObjCValueTy).value)
+  expectEqual(30, (v as! TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, UWord.self)
 
   for i in 0..<3 {
@@ -692,15 +692,15 @@ ArrayTestSuite.test("BridgedToObjC/Custom/getObjects") {
     AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
 
   var v: AnyObject = buffer[0]
-  expectEqual(10, (v as TestObjCValueTy).value)
+  expectEqual(10, (v as! TestObjCValueTy).value)
   let idValue0 = unsafeBitCast(v, UWord.self)
 
   v = buffer[1]
-  expectEqual(20, (v as TestObjCValueTy).value)
+  expectEqual(20, (v as! TestObjCValueTy).value)
   let idValue1 = unsafeBitCast(v, UWord.self)
 
   v = buffer[2]
-  expectEqual(30, (v as TestObjCValueTy).value)
+  expectEqual(30, (v as! TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, UWord.self)
 
   for i in 0..<3 {
@@ -727,7 +727,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/FastEnumeration/UseFromSwift/Empty") {
 
   checkArrayFastEnumerationFromSwift(
     [], a, { a },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCValueTy).value })
 
   expectEqual(0, TestBridgedValueTy.bridgeOperations)
 }
@@ -738,7 +738,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/FastEnumeration/UseFromSwift/3") {
   checkArrayFastEnumerationFromSwift(
     [ 10, 20, 30 ],
     a, { a },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCValueTy).value })
 
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
 }
@@ -749,7 +749,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/FastEnumeration/UseFromSwift/7") {
   checkArrayFastEnumerationFromSwift(
     [ 10, 20, 30, 40, 50, 60, 70 ],
     a, { a },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCValueTy).value })
 
   expectEqual(7, TestBridgedValueTy.bridgeOperations)
 }
@@ -759,7 +759,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/FastEnumeration/UseFromObjC/Empty") {
 
   checkArrayFastEnumerationFromObjC(
     [], a, { a },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCValueTy).value })
 
   expectEqual(0, TestBridgedValueTy.bridgeOperations)
 }
@@ -770,7 +770,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/FastEnumeration/UseFromObjC") {
   checkArrayFastEnumerationFromObjC(
     [ 10, 20, 30 ],
     a, { a },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCValueTy).value })
 
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
 }
@@ -780,7 +780,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/ObjectEnumerator/FastEnumeration/UseFr
 
   checkArrayFastEnumerationFromSwift(
     [], a, { a.objectEnumerator() },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCValueTy).value })
 
   expectEqual(0, TestBridgedValueTy.bridgeOperations)
 }
@@ -791,7 +791,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/ObjectEnumerator/FastEnumeration/UseFr
   checkArrayFastEnumerationFromSwift(
     [ 10, 20, 30 ],
     a, { a.objectEnumerator() },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCValueTy).value })
 
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
 }
@@ -802,7 +802,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/ObjectEnumerator/FastEnumeration/UseFr
   checkArrayEnumeratorPartialFastEnumerationFromSwift(
     [ 10, 20, 30, 40, 50, 60, 70, 80, 90 ],
     a, maxFastEnumerationItems: 5,
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCValueTy).value })
 
   expectEqual(9, TestBridgedValueTy.bridgeOperations)
 }
@@ -813,7 +813,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/ObjectEnumerator/FastEnumeration/UseFr
   checkArrayFastEnumerationFromObjC(
     [ 10, 20, 30 ],
     a, { a.objectEnumerator() },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCValueTy).value })
 
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
 }
@@ -822,15 +822,15 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Cast") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3)
 
   var v: AnyObject = a[0]
-  expectEqual(10, (v as TestObjCValueTy).value)
+  expectEqual(10, (v as! TestObjCValueTy).value)
   let idValue0 = unsafeBitCast(v, UWord.self)
 
   v = a[1]
-  expectEqual(20, (v as TestObjCValueTy).value)
+  expectEqual(20, (v as! TestObjCValueTy).value)
   let idValue1 = unsafeBitCast(v, UWord.self)
 
   v = a[2]
-  expectEqual(30, (v as TestObjCValueTy).value)
+  expectEqual(30, (v as! TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, UWord.self)
 
   // Bridge back to native array with a cast.
@@ -856,15 +856,15 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Reallocate") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3)
 
   var v: AnyObject = a[0]
-  expectEqual(10, (v as TestObjCValueTy).value)
+  expectEqual(10, (v as! TestObjCValueTy).value)
   let idValue0 = unsafeBitCast(v, UWord.self)
 
   v = a[1]
-  expectEqual(20, (v as TestObjCValueTy).value)
+  expectEqual(20, (v as! TestObjCValueTy).value)
   let idValue1 = unsafeBitCast(v, UWord.self)
 
   v = a[2]
-  expectEqual(30, (v as TestObjCValueTy).value)
+  expectEqual(30, (v as! TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, UWord.self)
 
   // Bridge back to native array.

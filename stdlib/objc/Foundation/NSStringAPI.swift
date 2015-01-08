@@ -1044,7 +1044,7 @@ extension String {
   /// Returns an array of NSString objects containing, in
   /// order, each path component of the `String`.
   public var pathComponents: [String] {
-    return _ns.pathComponents as [String]
+    return _ns.pathComponents as! [String]
   }
 
   // @property NSString* pathExtension;
@@ -1086,7 +1086,7 @@ extension String {
   /// values found in the `String`.
   public
   func propertyListFromStringsFileFormat() -> [String : String] {
-    return _ns.propertyListFromStringsFileFormat() as [String : String]
+    return _ns.propertyListFromStringsFileFormat() as! [String : String]
   }
 
   // - (NSRange)rangeOfCharacterFromSet:(NSCharacterSet *)aSet
@@ -1413,7 +1413,7 @@ extension String {
   /// Returns an array of strings made by separately appending
   /// to the `String` each string in in a given array.
   public func stringsByAppendingPaths(paths: [String]) -> [String] {
-    return _ns.stringsByAppendingPaths(paths) as [String]
+    return _ns.stringsByAppendingPaths(paths) as! [String]
   }
 
   // - (NSString *)substringFromIndex:(NSUInteger)anIndex

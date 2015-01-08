@@ -62,7 +62,7 @@ extension MyObject {
 var NsObj: NSObject
 NsObj = MyObject()
 var MyObj: MyObject
-MyObj = NsObj as MyObject
+MyObj = NsObj as! MyObject
 MyObj.blah()
 
 func err() {

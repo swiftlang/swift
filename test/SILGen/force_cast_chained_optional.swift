@@ -26,5 +26,5 @@ class D: C {}
 // CHECK:         function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
 // CHECK:         unconditional_checked_cast {{%.*}} : $C to $D
 func test(x: Foo) -> D {
-  return x.bar?.bas as D
+  return x.bar?.bas as! D
 }

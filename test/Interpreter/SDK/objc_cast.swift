@@ -22,8 +22,8 @@ func genericCast<T>(x: AnyObject, _: T.Type) -> T? {
 // Test instance of Swift subclass of Objective-C class
 
 obj = SwiftSubPort()
-_ = obj as SwiftSubPort
-_ = obj as SwiftSuperPort
+_ = obj as! SwiftSubPort
+_ = obj as! SwiftSuperPort
 _ = (obj as? NSPort)
 _ = (obj as? NSObject)!
 if (obj as? SwiftSubPort) == nil    { abort() }
@@ -35,9 +35,9 @@ if (obj as? SwiftSub) != nil        { abort() }
 if (obj as? SwiftSuper) != nil      { abort() }
 
 obj = SwiftSuperPort()
-_ = obj as SwiftSuperPort
-_ = obj as NSPort
-_ = obj as NSObject
+_ = obj as! SwiftSuperPort
+_ = obj as! NSPort
+_ = obj as! NSObject
 if (obj as? SwiftSubPort) != nil   { abort() }
 if (obj as? SwiftSuperPort) == nil { abort() }
 if (obj as? NSPort) == nil         { abort() }
@@ -49,8 +49,8 @@ if (obj as? SwiftSuper) != nil     { abort() }
 // Test instance of Objective-C class that has Swift subclass
 
 obj = NSPort()
-_ = obj as NSPort
-_ = obj as NSObject
+_ = obj as! NSPort
+_ = obj as! NSObject
 if (obj as? SwiftSubPort) != nil    { abort() }
 if (obj as? SwiftSuperPort) !=  nil { abort() }
 if (obj as? NSPort) == nil          { abort() }
@@ -72,7 +72,7 @@ if genericCast(obj, SwiftSub.self) != nil       { abort() }
 if genericCast(obj, SwiftSuper.self) != nil     { abort() }
 
 obj = NSObject()
-_ = obj as NSObject
+_ = obj as! NSObject
 if  (obj as? SwiftSubPort) != nil   { abort() }
 if  (obj as? SwiftSuperPort) != nil { abort() }
 if  (obj as? NSPort) != nil         { abort() }
@@ -86,10 +86,10 @@ if  (obj as? SwiftObjCProto) != nil { abort() }
 // Test instance of a tagged pointer type
 
 obj = NSNumber(int: 1234567)
-_ = obj as NSNumber
-_ = obj as NSValue
-_ = obj as NSObject
-_ = obj as NSCopying
+_ = obj as! NSNumber
+_ = obj as! NSValue
+_ = obj as! NSObject
+_ = obj as! NSCopying
 if  (obj as? SwiftSubPort) != nil   { abort() }
 if  (obj as? SwiftSuperPort) != nil { abort() }
 if  (obj as? NSNumber) == nil       { abort() }
@@ -103,8 +103,8 @@ if  (obj as? SwiftSuper) != nil     { abort() }
 // Test instance of a Swift class with no Objective-C inheritance
 
 obj = SwiftSub()
-_ = obj as SwiftSub
-_ = obj as SwiftSuper
+_ = obj as! SwiftSub
+_ = obj as! SwiftSuper
 if  (obj as? SwiftSubPort) != nil   { abort() }
 if  (obj as? SwiftSuperPort) != nil { abort() }
 if  (obj as? NSObject) != nil       { abort() }
@@ -113,7 +113,7 @@ if  (obj as? SwiftSub) == nil       { abort() }
 if  (obj as? SwiftSuper) == nil     { abort() }
 
 obj = SwiftSuper()
-_ = obj as SwiftSuper
+_ = obj as! SwiftSuper
 if  (obj as? SwiftSubPort) != nil   { abort() }
 if  (obj as? SwiftSuperPort) != nil { abort() }
 if  (obj as? NSObject) != nil       { abort() }
@@ -123,11 +123,11 @@ if  (obj as? SwiftSuper) == nil     { abort() }
 
 // Test optional and non-optional bridged conversions
 var ao: AnyObject = "s"
-ao as String
+ao as! String
 ao is String
 
 var auo: AnyObject! = "s"
-var s: String = auo as String
+var s: String = auo as! String
 
 var auoo: AnyObject? = "s"
 auoo! as? String
@@ -143,7 +143,7 @@ if let str = obj as? String {
 
 // Forced cast using context
 // CHECK-NEXT: Forced to string hello
-let forcedStr: String = obj as String
+let forcedStr: String = obj as! String
 println("Forced to string \(forcedStr)")
 
 // CHECK-NEXT: Downcast to Swift
@@ -156,7 +156,7 @@ if let str = objOpt as? String {
 
 // Forced cast using context
 // CHECK-NEXT: Forced to string Swift
-let forcedStrOpt: String = objOpt as String
+let forcedStrOpt: String = objOpt as! String
 println("Forced to string \(forcedStrOpt)")
 
 // CHECK-NEXT: Downcast to world
@@ -169,7 +169,7 @@ if let str = objImplicitOpt as? String {
 
 // Forced cast using context
 // CHECK-NEXT: Forced to string world
-let forcedStrImplicitOpt: String = objImplicitOpt as String
+let forcedStrImplicitOpt: String = objImplicitOpt as! String
 println("Forced to string \(forcedStrImplicitOpt)")
 
 // CHECK-NEXT: Downcast correctly failed due to nil
@@ -301,19 +301,19 @@ if nsobj is [String] {
 
 // Forced downcast based on context.
 // CHECK-NEXT: Forced to string array [Hello, Swift, World]
-var forcedStrArray: [String] = obj as [String]
+var forcedStrArray: [String] = obj as! [String]
 println("Forced to string array \(forcedStrArray)")
 
 // CHECK-NEXT: Forced NSArray to string array [Hello, Swift, World]
-forcedStrArray = nsarr as [String]
+forcedStrArray = nsarr as! [String]
 println("Forced NSArray to string array \(forcedStrArray)")
 
 // CHECK-NEXT: Forced NSArray? to string array [Hello, Swift, World]
-forcedStrArray = nsarrOpt as [String]
+forcedStrArray = nsarrOpt as! [String]
 println("Forced NSArray? to string array \(forcedStrArray)")
 
 // CHECK-NEXT: Forced NSArray! to string array [Hello, Swift, World]
-forcedStrArray = nsarrImplicitOpt as [String]
+forcedStrArray = nsarrImplicitOpt as! [String]
 println("Forced NSArray! to string array \(forcedStrArray)")
 
 // CHECK-NEXT: Object-to-array cast produced [Hello, Swift, World]
@@ -348,7 +348,7 @@ if let strArr = objOpt as? [String] {
 
 // Forced downcast based on context.
 // CHECK-NEXT: Forced to string array [Hello, Swift, World]
-let forcedStrArrayOpt: [String] = objOpt as [String]
+let forcedStrArrayOpt: [String] = objOpt as! [String]
 println("Forced to string array \(forcedStrArrayOpt)")
 
 // CHECK-NEXT: Object-to-array cast produced [Hello, Swift, World]
@@ -384,7 +384,7 @@ if let strArr = objImplicitOpt as? [String] {
 
 // Forced downcast based on context.
 // CHECK-NEXT: Forced to string array [Hello, Swift, World]
-let forcedStrArrayImplicitOpt: [String] = objImplicitOpt as [String]
+let forcedStrArrayImplicitOpt: [String] = objImplicitOpt as! [String]
 println("Forced to string array \(forcedStrArrayImplicitOpt)")
 
 // CHECK-NEXT: Object-to-array cast produced [Hello, Swift, World]

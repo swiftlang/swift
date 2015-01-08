@@ -24,7 +24,7 @@ var i = 0
 
 // Dynamic casting
 var f = foo((Int, Int).self)
-var g = f as (Int, Int) -> Int
+var g = f as! (Int, Int) -> Int
 println(g(1010, 2020))
 // CHECK: 6060
 
@@ -47,7 +47,7 @@ func fooInOut<T>(t: T.Type) -> Any {
 }
 
 var fio = fooInOut((Int, Int).self)
-var gio = fio as (inout (Int, Int)) -> ()
+var gio = fio as! (inout (Int, Int)) -> ()
 var xy = (0, 0)
 gio(&xy)
 println(xy)

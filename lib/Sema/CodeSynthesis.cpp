@@ -621,8 +621,8 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
 
   // If we're working with non-optional types, we're forcing the cast.
   if (!isOptional) {
-    Call = new (Ctx) UnresolvedCheckedCastExpr(Call, SourceLoc(),
-                                          TypeLoc::withoutLoc(UnderlyingType));
+    Call = new (Ctx) ForcedCheckedCastExpr(Call, SourceLoc(), SourceLoc(),
+                                           TypeLoc::withoutLoc(UnderlyingType));
     Call->setImplicit();
     return Call;
   }
@@ -991,8 +991,8 @@ static Expr *buildBuiltinTake(ASTContext &ctx, Expr *address,
                               Type valueType) {
   // Builtin.take(address) as ValueType
   Expr *result = buildCallToBuiltin(ctx, "take", { address });
-  result = new (ctx) UnresolvedCheckedCastExpr(result, SourceLoc(),
-                                               TypeLoc::withoutLoc(valueType));
+  result = new (ctx) CoerceExpr(result, SourceLoc(),
+                                TypeLoc::withoutLoc(valueType));
   result->setImplicit(IsImplicit);
   return result;
 }

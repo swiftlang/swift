@@ -976,7 +976,7 @@ NSStringAPIs.test("precomposedStringWithCompatibilityMapping") {
 
 NSStringAPIs.test("propertyList()") {
   expectEqual([ "foo", "bar" ],
-      "(\"foo\", \"bar\")".propertyList() as [String])
+      "(\"foo\", \"bar\")".propertyList() as! [String])
 }
 
 NSStringAPIs.test("propertyListFromStringsFileFormat()") {

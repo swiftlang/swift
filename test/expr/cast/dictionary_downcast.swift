@@ -24,9 +24,9 @@ func == (x: U, y: U) -> Bool { return true }
 
 // Test dictionary forced downcasts
 var dictCC = Dictionary<C, C>()
-var dictCD = dictCC as Dictionary<C, D>
-var dictDC = dictCC as Dictionary<D, C>
-var dictDD = dictCC as Dictionary<D, D>
+var dictCD = dictCC as! Dictionary<C, D>
+var dictDC = dictCC as! Dictionary<D, C>
+var dictDD = dictCC as! Dictionary<D, D>
 
 // Test dictionary conditional downcasts
 if let dictCD = dictCC as? Dictionary<C, D> { }

@@ -1168,6 +1168,10 @@ private:
   /// Diagnose the specific case of addressing an immutable value, or one
   /// without a setter.
   bool diagnoseFailureForInOutExpr();
+
+  /// Diagnose a failed coerce expression, considering the possibility that it
+  /// should be a forced downcast instead.
+  bool diagnoseFailureForCoerceExpr();
 };
 
 /// An intrusive, doubly-linked list of constraints.

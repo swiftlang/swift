@@ -43,12 +43,12 @@ func testCFToAnyObject(cfStr: CFString, cfMutableStr: CFMutableString,
 }
 
 func testAnyObjectToCF(anyObject: AnyObject) {
-  var cfStr: CFString = anyObject as CFString
-  var cfMutableStr: CFMutableString = anyObject as CFMutableString
-  var cfTree: CFTree = anyObject as CFTree
+  var cfStr: CFString = anyObject as! CFString
+  var cfMutableStr: CFMutableString = anyObject as! CFMutableString
+  var cfTree: CFTree = anyObject as! CFTree
 
   // No implicit conversions.
-  cfStr = anyObject // expected-error{{type 'AnyObject' cannot be implicitly downcast to 'CFString'; did you mean to use 'as' to force downcast?}}
+  cfStr = anyObject // expected-error{{'AnyObject' is not convertible to 'CFString'; did you mean to use 'as!' to force downcast?}}
 }
 
 func testUncheckableCasts(anyObject: AnyObject, nsObject: NSObject,

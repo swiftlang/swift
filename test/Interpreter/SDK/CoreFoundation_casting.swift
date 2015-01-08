@@ -10,7 +10,7 @@ func genericCast<T>(x: AnyObject, _: T.Type) -> T? {
 }
 
 func genericCastUnconditional<T>(x: AnyObject, _: T.Type) -> T {
-  return x as T
+  return x as! T
 }
 
 // Check _cfTypeID() on a Swift class
@@ -34,7 +34,7 @@ func testCFStringAnyObject() {
   println(anyObject)
 
   // Convert it back to a CFString
-  let cfStr2 = anyObject as CFString
+  let cfStr2 = anyObject as! CFString
 
   // CHECK: Swift
   println(cfStr2)
@@ -74,7 +74,7 @@ func testCFStringAnyObjectType() {
   println(anyObjectType)
 
   // Convert back to CFString.Type
-  let cfStrType2 = anyObjectType as CFString.Type
+  let cfStrType2 = anyObjectType as! CFString.Type
   // CHECK: [[STRING_CLASS]]
   println(cfStrType2)
 

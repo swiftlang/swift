@@ -194,7 +194,7 @@ func _cocoaStringToContiguousImpl(
 func _cocoaStringLengthImpl(source: _CocoaStringType) -> Int {
   // FIXME: Not ultra-fast, but reliable... but we're counting on an
   // early demise for this function anyhow
-  return (source as NSString).length
+  return (source as! NSString).length
 }
 
 func _cocoaStringSliceImpl(
@@ -1056,7 +1056,7 @@ extension NSDictionary : SequenceType {
   final public class Generator : GeneratorType {
     var _fastGenerator: NSFastGenerator
     var _dictionary: NSDictionary {
-      return _fastGenerator.enumerable as NSDictionary
+      return _fastGenerator.enumerable as! NSDictionary
     }
 
     public func next() -> (key: AnyObject, value: AnyObject)? {

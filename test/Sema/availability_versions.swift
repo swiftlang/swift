@@ -325,7 +325,7 @@ func classAvailability() {
 }
 
 func castingUnavailableClass(o : AnyObject) {
-  let _ = o as ClassAvailableOn10_10 // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+  let _ = o as! ClassAvailableOn10_10 // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
   let _ = o as? ClassAvailableOn10_10 // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
   let _ = o is ClassAvailableOn10_10 // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
 }

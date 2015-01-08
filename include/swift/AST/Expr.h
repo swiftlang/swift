@@ -3156,38 +3156,24 @@ public:
   }
 };
 
-/// Represents an parsed cast "x as T" on which we have not yet performed
-/// semantic analysis. Spelled 'a as T' and produces a value of type 'T'.
-class UnresolvedCheckedCastExpr : public CheckedCastExpr {
-public:
-  UnresolvedCheckedCastExpr(Expr *sub, SourceLoc asLoc, TypeLoc type)
-    : CheckedCastExpr(ExprKind::UnresolvedCheckedCast,
-                      sub, asLoc, type, type.getType())
-  { }
-
-  UnresolvedCheckedCastExpr(SourceLoc asLoc, TypeLoc type)
-    : UnresolvedCheckedCastExpr(nullptr, asLoc, type)
-  {}
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::UnresolvedCheckedCast;
-  }
-};
-
 /// Represents an explicit forced checked cast, which converts
 /// from a value of some type to some specified subtype and fails dynamically
 /// if the value does not have that type.
-/// Spelled 'a as T' and produces a value of type 'T'.
+/// Spelled 'a as! T' and produces a value of type 'T'.
 class ForcedCheckedCastExpr : public CheckedCastExpr {
+  SourceLoc ExclaimLoc;
+
 public:
-  ForcedCheckedCastExpr(Expr *sub, SourceLoc asLoc, TypeLoc type)
+  ForcedCheckedCastExpr(Expr *sub, SourceLoc asLoc, SourceLoc exclaimLoc,
+                        TypeLoc type)
     : CheckedCastExpr(ExprKind::ForcedCheckedCast,
-                      sub, asLoc, type, type.getType())
+                      sub, asLoc, type, type.getType()),
+      ExclaimLoc(exclaimLoc)
   {
   }
 
-  ForcedCheckedCastExpr(SourceLoc asLoc, TypeLoc type)
-    : ForcedCheckedCastExpr(nullptr, asLoc, type)
+  ForcedCheckedCastExpr(SourceLoc asLoc, SourceLoc exclaimLoc, TypeLoc type)
+    : ForcedCheckedCastExpr(nullptr, asLoc, exclaimLoc, type)
   {
   }
 
@@ -3252,6 +3238,10 @@ class CoerceExpr : public ExplicitCastExpr {
 public:
   CoerceExpr(Expr *sub, SourceLoc asLoc, TypeLoc type)
     : ExplicitCastExpr(ExprKind::Coerce, sub, asLoc, type, type.getType())
+  { }
+
+  CoerceExpr(SourceLoc asLoc, TypeLoc type)
+    : CoerceExpr(nullptr, asLoc, type)
   { }
 
   static bool classof(const Expr *E) {

@@ -691,6 +691,13 @@ static bool diagnoseFailure(ConstraintSystem &cs,
         isa<InOutExpr>(expr) ||
         isa<AssignExpr>(expr))
       return false;
+
+    // Diagnose CoerceExprs that might need to be converted to
+    // ForcedCheckedCastExprs below.
+    if (isa<CoerceExpr>(expr) &&
+        failure.getKind() == Failure::TypesNotConvertible) {
+      return false;
+    }
     
     tc.diagnose(loc, diag::invalid_relation,
                 failure.getKind() - Failure::TypesNotEqual,
@@ -1043,11 +1050,14 @@ Constraint *getComponentConstraint(Constraint *constraint) {
 /// based diagnostic.
 static Type getDiagnosticTypeFromExpr(Expr *expr) {
   
-  // For an unresolved checked cast expression, use the type of the
-  // sub-expression.
-  if (auto ucc = dyn_cast<UnresolvedCheckedCastExpr>(expr)) {
-    auto subExpr = ucc->getSubExpr();
-    
+  // For a forced checked cast expression or coerce expression, use the type of
+  // the sub-expression.
+  if (auto fcc = dyn_cast<ForcedCheckedCastExpr>(expr)) {
+    auto subExpr = fcc->getSubExpr();
+    return subExpr->getType();
+  }
+  if (auto coerceExpr = dyn_cast<CoerceExpr>(expr)) {
+    auto subExpr = coerceExpr->getSubExpr();
     return subExpr->getType();
   }
   
@@ -2009,6 +2019,52 @@ bool FailureDiagnosis::diagnoseFailureForInOutExpr() {
     return true;
   }
   
+  return diagnoseGeneralFailure();
+}
+
+bool FailureDiagnosis::diagnoseFailureForCoerceExpr() {
+  assert(expr->getKind() == ExprKind::Coerce);
+  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
+  CoerceExpr *coerceExpr = dyn_cast<CoerceExpr>(expr);
+
+  std::pair<Type, Type> conversionTypes(nullptr, nullptr);
+  if (conversionConstraint) {
+    conversionTypes = getBoundTypesFromConstraint(CS, coerceExpr,
+                                                       conversionConstraint);
+  } else {
+    conversionTypes.first = coerceExpr->getSubExpr()->getType();
+    conversionTypes.second = coerceExpr->getType();
+  }
+
+  // See if changing the 'as' expression to 'as!' fixes things.
+  Expr *forceExpr = new (CS->getASTContext()) ForcedCheckedCastExpr(
+    coerceExpr->getSubExpr(), coerceExpr->getLoc(), SourceLoc(),
+    coerceExpr->getCastTypeLoc());
+  class NoDiagnosticsListener : public ExprTypeCheckListener {
+  public:
+    bool suppressDiagnostics() const override { return true; }
+  } listener;
+  CS->TC.eraseTypeData(forceExpr);
+  if (!CS->TC.typeCheckExpression(forceExpr, CS->DC, Type(), Type(), false,
+                                  FreeTypeVariableBinding::Disallow,
+                                  &listener)) {
+    if (conversionTypes.first && conversionTypes.second) {
+      CS->TC.diagnose(coerceExpr->getLoc(), diag::missing_forced_downcast,
+                      conversionTypes.first, conversionTypes.second)
+        .highlight(coerceExpr->getSourceRange())
+        .fixItReplace(coerceExpr->getLoc(), "as!");
+      return true;
+    }
+  }
+
+  if (conversionTypes.first && conversionTypes.second) {
+    CS->TC.diagnose(coerceExpr->getLoc(), diag::invalid_relation,
+                    Failure::TypesNotConvertible - Failure::TypesNotEqual,
+                    conversionTypes.first, conversionTypes.second)
+      .highlight(coerceExpr->getSourceRange());
+    return true;
+  }
+
   return diagnoseGeneralFailure();
 }
 

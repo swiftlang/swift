@@ -784,6 +784,9 @@ public:
   /// \param diagToRange    The source range of the destination type.
   /// \param convertToType  A callback called when an implicit conversion
   ///                       to an intermediate type is needed.
+  /// \param suppressDiagnostics
+  ///                       True if the type check should simply fail instead
+  ///                       of printing diagnostics.
   ///
   /// \returns a CheckedCastKind indicating the semantics of the cast. If the
   /// cast is invald, Unresolved is returned. If the cast represents an implicit
@@ -794,7 +797,8 @@ public:
                                        SourceLoc diagLoc,
                                        SourceRange diagFromRange,
                                        SourceRange diagToRange,
-                                       std::function<bool(Type)> convertToType);
+                                       std::function<bool(Type)> convertToType,
+                                       bool suppressDiagnostics);
   
   /// Retrieves the Objective-C type to which the given value type is
   /// bridged.

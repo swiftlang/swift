@@ -872,7 +872,7 @@ func checkArrayEnumeratorPartialFastEnumerationFromSwift(
     { (a, fe, sinkFunction) in
       var sink = SinkOf<AnyObject> { sinkFunction($0) }
       slurpFastEnumerationOfNSEnumeratorFromSwift(
-        a, fe as NSEnumerator, &sink,
+        a, fe as! NSEnumerator, &sink,
         maxFastEnumerationItems: maxFastEnumerationItems)
     },
     convertValue)
@@ -1072,7 +1072,7 @@ func checkSetEnumeratorPartialFastEnumerationFromSwift(
     { (s, fe, sinkFunction) in
       var sink = SinkOf<AnyObject> { sinkFunction($0) }
       slurpFastEnumerationOfNSEnumeratorFromSwift(
-        s, fe as NSEnumerator, &sink,
+        s, fe as! NSEnumerator, &sink,
         maxFastEnumerationItems: maxFastEnumerationItems)
     },
     convertMember)
@@ -1236,7 +1236,7 @@ func checkDictionaryEnumeratorPartialFastEnumerationFromSwift(
     { (d, fe, sinkFunction) in
       var sink = SinkOf<AnyObjectTuple2> { sinkFunction($0) }
       slurpFastEnumerationOfNSEnumeratorFromSwift(
-        d, fe as NSEnumerator, &sink,
+        d, fe as! NSEnumerator, &sink,
         maxFastEnumerationItems: maxFastEnumerationItems)
     },
     convertKey, convertValue)

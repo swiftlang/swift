@@ -143,5 +143,5 @@ var i1: Int = 1.5 * 3.5 // expected-error{{binary operator '*' cannot be applied
 
 // rdar://problem/18330319
 func rdar18330319(s: String, d: [String : AnyObject]) {
-  let t = d[s] as String?
+  let t = d[s] as! String?
 }

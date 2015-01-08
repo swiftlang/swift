@@ -255,7 +255,7 @@ class D : B {
 
 // CHECK-LABEL: sil hidden @_TF11expressions8downcast
 func downcast(x: B) -> D {
-  return x as D
+  return x as! D
   // CHECK: unconditional_checked_cast %{{[0-9]+}} : {{.*}} to $D
 }
 
@@ -274,7 +274,7 @@ func generic_upcast<T : B>(x: T) -> B {
 
 // CHECK-LABEL: sil hidden @_TF11expressions16generic_downcast
 func generic_downcast<T : B>(x: T, y: B) -> T {
-  return y as T
+  return y as! T
   // CHECK: unconditional_checked_cast %{{[0-9]+}} : {{.*}} to $T
   // CHECK: return
 }

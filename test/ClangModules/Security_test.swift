@@ -15,7 +15,7 @@ func testIntegration() {
   
   if status == errSecSuccess {
     if let filledRef = dataTypeRef {
-      let str: NSString = filledRef.takeRetainedValue() as NSString
+      let str: NSString = filledRef.takeRetainedValue() as! NSString
       println("Got: \(str)")
     }
   }

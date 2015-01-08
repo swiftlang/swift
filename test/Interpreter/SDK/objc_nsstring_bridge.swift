@@ -55,7 +55,7 @@ printDescription(s5) // CHECK: NSRangeException
 // Check conversions to AnyObject
 var s6: NSString = "foo"
 var ao: AnyObject = s6.copy()
-var s7 = ao as NSString
+var s7 = ao as! NSString
 var s8 = ao as? String
 
 

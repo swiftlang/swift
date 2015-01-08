@@ -27,7 +27,7 @@ class D : C { }
 
 
 func prefer_coercion(inout c: C) {
-  var d = c as D
+  var d = c as! D
   c = d
 }
 
@@ -61,7 +61,12 @@ strImplicitOpt as? String // expected-error{{conditional downcast from 'String!'
 
 class C3 {}
 class C4 : C3 {}
+class C5 {}
 
 var c: AnyObject = C3()
 
-if let castX = c as C4? {} // expected-error {{cannot downcast from 'AnyObject' to a more optional type 'C4?'}}
+if let castX = c as! C4? {} // expected-error {{cannot downcast from 'AnyObject' to a more optional type 'C4?'}}
+
+// Only suggest replacing 'as' with 'as!' if it would fix the error.
+C3() as C4 // expected-error {{'C3' is not convertible to 'C4'; did you mean to use 'as!' to force downcast?}}
+C3() as C5 // expected-error {{'C3' is not convertible to 'C5'}}

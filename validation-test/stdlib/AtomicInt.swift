@@ -477,7 +477,7 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
       observation.uw1 = wonRace ? 1 : 0
       if let ref: AnyObject =
         _stdlib_atomicLoadARCRef(object: raceData.atomicReferencePtr) {
-        let dummy = ref as DummyObject
+        let dummy = ref as! DummyObject
         observation.uw2 = unsafeBitCast(ref, UWord.self)
         observation.uw3 = dummy.payload
       }

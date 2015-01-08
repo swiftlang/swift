@@ -2642,7 +2642,8 @@ namespace {
                         expr->getCastTypeLoc().getSourceRange(),
                         [&](Type commonTy) -> bool {
                           return tc.convertToType(sub, commonTy, cs.DC);
-                        });
+                        },
+                        SuppressDiagnostics);
 
       switch (castKind) {
       case CheckedCastKind::Unresolved:
@@ -2838,25 +2839,61 @@ namespace {
       return result;
     }
 
-    Expr *visitUnresolvedCheckedCastExpr(UnresolvedCheckedCastExpr *expr) {
+    Expr *visitCoerceExpr(CoerceExpr *expr) {
       // Simplify the type we're casting to.
       auto toType = simplifyType(expr->getCastTypeLoc().getType());
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
-      // Determine whether we performed a coercion or a downcast.
-      auto locator
-        = cs.getConstraintLocator(expr, ConstraintLocator::CheckedCastOperand);
-      unsigned choice = solution.getDisjunctionChoice(locator);
-      assert(choice <= 1 && "checked cast choices not synced with disjunction");
-
       auto &tc = cs.getTypeChecker();
       auto sub = tc.coerceToRValue(expr->getSubExpr());
 
-      // Choice 0 is coercion.
-      if (choice == 0) {
-        // The subexpression is always an rvalue.
-        if (!sub)
+      // The subexpression is always an rvalue.
+      if (!sub)
+        return nullptr;
+
+      // Convert the subexpression.
+      bool failed = tc.convertToType(sub, toType, cs.DC);
+      (void)failed;
+      assert(!failed && "Not convertible?");
+
+      expr->setSubExpr(sub);
+      expr->setType(toType);
+      return expr;
+    }
+
+    Expr *visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
+      // Simplify the type we're casting to.
+      auto toType = simplifyType(expr->getCastTypeLoc().getType());
+      expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+
+      // The subexpression is always an rvalue.
+      auto &tc = cs.getTypeChecker();
+      auto sub = tc.coerceToRValue(expr->getSubExpr());
+      if (!sub)
+        return nullptr;
+      expr->setSubExpr(sub);
+
+      auto fromType = sub->getType();
+      auto castKind = tc.typeCheckCheckedCast(
+                        fromType, toType, cs.DC,
+                        expr->getLoc(),
+                        sub->getSourceRange(),
+                        expr->getCastTypeLoc().getSourceRange(),
+                        [&](Type commonTy) -> bool {
+                          return tc.convertToType(sub, commonTy,
+                                                 cs.DC);
+                        },
+                        SuppressDiagnostics);
+      switch (castKind) {
+        /// Invalid cast.
+      case CheckedCastKind::Unresolved:
+        return nullptr;
+      case CheckedCastKind::Coercion: {
+        if (SuppressDiagnostics)
           return nullptr;
+
+        tc.diagnose(expr->getLoc(), diag::forced_downcast_coercion,
+                    sub->getType(), toType);
 
         // Convert the subexpression.
         bool failed = tc.convertToType(sub, toType, cs.DC);
@@ -2872,25 +2909,6 @@ namespace {
         return result;
       }
 
-      // Choice 1 is downcast.
-      assert(choice == 1);
-      auto fromType = sub->getType();
-      auto castKind = tc.typeCheckCheckedCast(
-                        fromType, toType, cs.DC,
-                        expr->getLoc(),
-                        sub->getSourceRange(),
-                        expr->getCastTypeLoc().getSourceRange(),
-                        [&](Type commonTy) -> bool {
-                          return tc.convertToType(sub, commonTy,
-                                                 cs.DC);
-                        });
-      switch (castKind) {
-        /// Invalid cast.
-      case CheckedCastKind::Unresolved:
-        return nullptr;
-      case CheckedCastKind::Coercion:
-        llvm_unreachable("Coercions handled above");
-
       // Valid casts.
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
@@ -2899,24 +2917,12 @@ namespace {
       case CheckedCastKind::SetDowncastBridged:
       case CheckedCastKind::ValueCast:
       case CheckedCastKind::BridgeFromObjectiveC:
+        expr->setCastKind(castKind);
         break;
       }
       
-      auto *cast = new (tc.Context) ForcedCheckedCastExpr(
-                                      sub,
-                                      expr->getLoc(),
-                                      expr->getCastTypeLoc());
-      cast->setType(toType);
-      cast->setCastKind(castKind);
-      if (expr->isImplicit())
-        cast->setImplicit();
-
-      return handleOptionalBindings(cast, simplifyType(expr->getType()),
+      return handleOptionalBindings(expr, simplifyType(expr->getType()),
                                     /*conditionalCast=*/false);
-    }
-
-    Expr *visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
-      llvm_unreachable("Already type-checked");
     }
 
     Expr *visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
@@ -2940,7 +2946,8 @@ namespace {
                         [&](Type commonTy) -> bool {
                           return tc.convertToType(sub, commonTy,
                                                  cs.DC);
-                        });
+                        },
+                        SuppressDiagnostics);
       switch (castKind) {
         /// Invalid cast.
       case CheckedCastKind::Unresolved:
@@ -2984,10 +2991,6 @@ namespace {
       
       return handleOptionalBindings(expr, simplifyType(expr->getType()),
                                     /*conditionalCast=*/true);
-    }
-
-    Expr *visitCoerceExpr(CoerceExpr *expr) {
-      return expr;
     }
 
     Expr *visitAssignExpr(AssignExpr *expr) {
@@ -5104,7 +5107,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
                                        affected->getEndLoc());
 
         llvm::SmallString<32> asCastStr;
-        asCastStr += " as ";
+        asCastStr += " as! ";
         asCastStr += toType.getString();
         TC.diagnose(affected->getLoc(), diag::missing_forced_downcast, fromType,
                     toType)

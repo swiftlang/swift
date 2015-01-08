@@ -46,5 +46,5 @@ func $builtin_println<T>(object: T) -> AnyObject? {
 
 func $builtin_send_data(object:AnyObject?, sl: Int, el: Int, sc: Int, ec: Int) {
   let loc = "[\(sl):\(sc)-\(el):\(ec)]"
-  println(loc + " " + (object as LogRecord).text)
+  println(loc + " " + (object as! LogRecord).text)
 }

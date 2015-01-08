@@ -135,7 +135,7 @@ func _bridgeNonVerbatimToObjectiveC<T>(x: T) -> AnyObject?
 /// - otherwise, trap
 public func _forceBridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
-    return x as T
+    return x as! T
   }
 
   var result: T?

@@ -21,7 +21,7 @@ class AppDelegate {
       //
       // CHECK-DAG: !{{.*}} = !{i32 [[@LINE+2]], i32 46, ![[S:.*]], null}
       // CHECK-DAG: !{{.*}} = !{i32 [[@LINE+1]], i32 11, ![[S]], null}
-      let splitViewController = self.window!.rootViewController as UISplitViewController
+      let splitViewController = self.window!.rootViewController as! UISplitViewController
     }
     return true
   }

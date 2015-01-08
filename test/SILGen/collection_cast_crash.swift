@@ -20,7 +20,7 @@ func arrayUpCast<Ct: MyClass>(arr: [Ct]) -> [MyClass] {
 // CHECK-LABEL: sil hidden @{{.*}}arrayDownCast{{.*}} <Ct where Ct : MyClass>
 func arrayDownCast<Ct: MyClass>(arr: [MyClass]) -> [Ct] {
   // CHECK: apply %{{[0-9]*}}<MyClass, Ct>(%{{[0-9]*}})
-  return arr as [Ct]
+  return arr as! [Ct]
   // CHECK: return	  
 }
 
@@ -34,7 +34,7 @@ func dictUpCast<Ct: MyClass>(dict: [KeyClass:Ct]) -> [KeyClass:MyClass] {
 // CHECK-LABEL: sil hidden @{{.*}}dictDownCast{{.*}} <Ct where Ct : MyClass>
 func dictDownCast<Ct: MyClass>(dict: [KeyClass:MyClass]) -> [KeyClass:Ct] {
   // CHECK: apply %{{[0-9]*}}<KeyClass, MyClass, KeyClass, Ct>(%{{[0-9]*}})
-  return dict as [KeyClass:Ct]
+  return dict as! [KeyClass:Ct]
   // CHECK: return	  
 }
 
@@ -46,7 +46,7 @@ func setUpCast<Ct: KeyClass>(s: Set<Ct>) -> Set<KeyClass> {
 
 func setDownCast<Ct : KeyClass>(s : Set<KeyClass>) -> Set<Ct> {
   // CHECK: apply %{{[0-9]*}}<KeyClass, Ct>(%{{[0-9]*}})
-  return s as Set<Ct>
+  return s as! Set<Ct>
   // CHECK: return	  
 }
 

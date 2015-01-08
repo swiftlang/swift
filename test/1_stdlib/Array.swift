@@ -101,7 +101,7 @@ testArrayOfVoid()
 
 func testMutableArray() {
   var m = NSMutableArray(array: ["fu", "bar", "buzz"])
-  let a = m as NSArray as [NSString]
+  let a = m as NSArray as! [NSString]
   println(a) // CHECK-NEXT: [fu, bar, buzz]
   m.addObject("goop")
   println(a) // CHECK-NEXT: [fu, bar, buzz]

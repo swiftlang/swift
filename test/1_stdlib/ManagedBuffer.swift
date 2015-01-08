@@ -29,7 +29,7 @@ final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity,T> {
       CountAndCapacity(
         count: LifetimeTracked(0), capacity: $0.allocatedElementCount)
     }
-    return r as TestManagedBuffer
+    return r as! TestManagedBuffer
   }
 
   var count: Int {
@@ -197,7 +197,7 @@ tests.test("ManagedBufferPointer") {
     expectEqual(mgr.value.count.value, 0)
     expectEqual(mgr.value.capacity, 99)
 
-    let s2 = mgr.buffer as MyBuffer<LifetimeTracked>
+    let s2 = mgr.buffer as! MyBuffer<LifetimeTracked>
     expectFalse(mgr.holdsUniqueReference())
     
     let val = mgr.withUnsafeMutablePointerToValue { $0 }.memory

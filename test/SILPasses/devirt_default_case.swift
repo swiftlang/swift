@@ -210,7 +210,7 @@ class B7 : A7 { @inline(never) override func foo() -> Bool { return true } }
 @inline(never)
 func check_call_on_downcasted_instance(a: A7) -> Bool {
   if a is B7 {
-    return (a as B7).foo()
+    return (a as! B7).foo()
   }
   return a.foo()
 }

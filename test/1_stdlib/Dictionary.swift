@@ -1329,7 +1329,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
   var pairs = Array<(Int, Int)>()
   for var i = startIndex; i != endIndex; ++i {
     var (key, value: AnyObject) = d[i]
-    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs += [kv]
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
@@ -1412,13 +1412,13 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithKey") {
   assert(isCocoaDictionary(d))
 
   // Read existing key-value pairs.
-  var v = d[TestObjCKeyTy(10)] as TestObjCValueTy
+  var v = d[TestObjCKeyTy(10)] as! TestObjCValueTy
   assert(v.value == 1010)
 
-  v = d[TestObjCKeyTy(20)] as TestObjCValueTy
+  v = d[TestObjCKeyTy(20)] as! TestObjCValueTy
   assert(v.value == 1020)
 
-  v = d[TestObjCKeyTy(30)] as TestObjCValueTy
+  v = d[TestObjCKeyTy(30)] as! TestObjCValueTy
   assert(v.value == 1030)
 
   assert(identity1 == unsafeBitCast(d, Word.self))
@@ -1430,16 +1430,16 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithKey") {
   assert(isNativeDictionary(d))
   assert(d.count == 4)
 
-  v = d[TestObjCKeyTy(10)] as TestObjCValueTy
+  v = d[TestObjCKeyTy(10)] as! TestObjCValueTy
   assert(v.value == 1010)
 
-  v = d[TestObjCKeyTy(20)] as TestObjCValueTy
+  v = d[TestObjCKeyTy(20)] as! TestObjCValueTy
   assert(v.value == 1020)
 
-  v = d[TestObjCKeyTy(30)] as TestObjCValueTy
+  v = d[TestObjCKeyTy(30)] as! TestObjCValueTy
   assert(v.value == 1030)
 
-  v = d[TestObjCKeyTy(40)] as TestObjCValueTy
+  v = d[TestObjCKeyTy(40)] as! TestObjCValueTy
   assert(v.value == 2040)
 
   // Overwrite value in existing binding.
@@ -1448,16 +1448,16 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithKey") {
   assert(isNativeDictionary(d))
   assert(d.count == 4)
 
-  v = d[TestObjCKeyTy(10)] as TestObjCValueTy
+  v = d[TestObjCKeyTy(10)] as! TestObjCValueTy
   assert(v.value == 2010)
 
-  v = d[TestObjCKeyTy(20)] as TestObjCValueTy
+  v = d[TestObjCKeyTy(20)] as! TestObjCValueTy
   assert(v.value == 1020)
 
-  v = d[TestObjCKeyTy(30)] as TestObjCValueTy
+  v = d[TestObjCKeyTy(30)] as! TestObjCValueTy
   assert(v.value == 1030)
 
-  v = d[TestObjCKeyTy(40)] as TestObjCValueTy
+  v = d[TestObjCKeyTy(40)] as! TestObjCValueTy
   assert(v.value == 2040)
 }
 
@@ -1545,7 +1545,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.UpdateValueForKey") {
 
     var oldValue: AnyObject? =
         d.updateValue(TestObjCValueTy(2010), forKey: TestObjCKeyTy(10))
-    assert((oldValue as TestObjCValueTy).value == 1010)
+    assert((oldValue as! TestObjCValueTy).value == 1010)
 
     var identity2 = unsafeBitCast(d, Word.self)
     assert(identity1 != identity2)
@@ -1949,7 +1949,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
   while let (key, value: AnyObject) = gen.next() {
-    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
@@ -2026,7 +2026,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
   while let (key, value: AnyObject) = gen.next() {
-    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
   var expectedPairs = Array<(Int, Int)>()
@@ -2079,7 +2079,7 @@ autoreleasepool {
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
   while let (key, value: AnyObject) = gen.next() {
-    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
   var expectedPairs = [ (10, 1111), (20, 1111), (30, 1111), (40, 1111) ]
@@ -2264,13 +2264,13 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfDictionaries") {
         getAsNSDictionary([ 10: 1010 + i, 20: 1020 + i, 30: 1030 + i ]))
   }
 
-  var a = nsa as [AnyObject] as [Dictionary<NSObject, AnyObject>]
+  var a = nsa as [AnyObject] as! [Dictionary<NSObject, AnyObject>]
   for i in 0..<3 {
     var d = a[i]
     var gen = d.generate()
     var pairs = Array<(Int, Int)>()
     while let (key, value: AnyObject) = gen.next() {
-      let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+      let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
       pairs.append(kv)
     }
     var expectedPairs = [ (10, 1010 + i), (20, 1020 + i), (30, 1030 + i) ]
@@ -2285,7 +2285,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfDictionaries") {
         getAsNSDictionary([ 10: 1010 + i, 20: 1020 + i, 30: 1030 + i ]))
   }
 
-  var a = nsa as [AnyObject] as [Dictionary<TestBridgedKeyTy, TestBridgedValueTy>]
+  var a = nsa as [AnyObject] as! [Dictionary<TestBridgedKeyTy, TestBridgedValueTy>]
   for i in 0..<3 {
     var d = a[i]
     var gen = d.generate()
@@ -2316,15 +2316,15 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.ObjectForKey") {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
   var v: AnyObject? = d.objectForKey(TestObjCKeyTy(10))
-  expectEqual(1010, (v as TestObjCValueTy).value)
+  expectEqual(1010, (v as! TestObjCValueTy).value)
   let idValue10 = unsafeBitCast(v, UWord.self)
 
   v = d.objectForKey(TestObjCKeyTy(20))
-  expectEqual(1020, (v as TestObjCValueTy).value)
+  expectEqual(1020, (v as! TestObjCValueTy).value)
   let idValue20 = unsafeBitCast(v, UWord.self)
 
   v = d.objectForKey(TestObjCKeyTy(30))
-  expectEqual(1030, (v as TestObjCValueTy).value)
+  expectEqual(1030, (v as! TestObjCValueTy).value)
   let idValue30 = unsafeBitCast(v, UWord.self)
 
   expectEmpty(d.objectForKey(TestObjCKeyTy(40)))
@@ -2357,7 +2357,7 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.NextObject") {
       let value: AnyObject = d.objectForKey(key)!
 
       let dataPair =
-        ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+        ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
       dataPairs.append(dataPair)
 
       let identityPair =
@@ -2396,8 +2396,8 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration.U
   checkDictionaryFastEnumerationFromSwift(
     [ (10, 1010), (20, 1020), (30, 1030) ],
     d, { d.keyEnumerator() },
-    { ($0 as TestObjCKeyTy).value },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCKeyTy).value },
+    { ($0 as! TestObjCValueTy).value })
 
   expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
@@ -2408,8 +2408,8 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration.U
   checkDictionaryFastEnumerationFromObjC(
     [ (10, 1010), (20, 1020), (30, 1030) ],
     d, { d.keyEnumerator() },
-    { ($0 as TestObjCKeyTy).value },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCKeyTy).value },
+    { ($0 as! TestObjCValueTy).value })
 
   expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
@@ -2419,13 +2419,13 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration_E
 
   checkDictionaryFastEnumerationFromSwift(
     [], d, { d.keyEnumerator() },
-    { ($0 as TestObjCKeyTy).value },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCKeyTy).value },
+    { ($0 as! TestObjCValueTy).value })
 
   checkDictionaryFastEnumerationFromObjC(
     [], d, { d.keyEnumerator() },
-    { ($0 as TestObjCKeyTy).value },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCKeyTy).value },
+    { ($0 as! TestObjCValueTy).value })
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration.UseFromSwift") {
@@ -2434,8 +2434,8 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration.UseFromSwift") 
   checkDictionaryFastEnumerationFromSwift(
     [ (10, 1010), (20, 1020), (30, 1030) ],
     d, { d },
-    { ($0 as TestObjCKeyTy).value },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCKeyTy).value },
+    { ($0 as! TestObjCValueTy).value })
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
@@ -2446,8 +2446,8 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration.UseFromObjC") {
   checkDictionaryFastEnumerationFromObjC(
     [ (10, 1010), (20, 1020), (30, 1030) ],
     d, { d },
-    { ($0 as TestObjCKeyTy).value },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCKeyTy).value },
+    { ($0 as! TestObjCValueTy).value })
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
@@ -2457,13 +2457,13 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration_Empty") {
 
   checkDictionaryFastEnumerationFromSwift(
     [], d, { d },
-    { ($0 as TestObjCKeyTy).value },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCKeyTy).value },
+    { ($0 as! TestObjCValueTy).value })
 
   checkDictionaryFastEnumerationFromObjC(
     [], d, { d },
-    { ($0 as TestObjCKeyTy).value },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCKeyTy).value },
+    { ($0 as! TestObjCValueTy).value })
 }
 
 //===---
@@ -2479,7 +2479,7 @@ DictionaryTestSuite.test("BridgedToObjC.KeyValue_ValueTypesCustomBridged") {
   var pairs = Array<(Int, Int)>()
   while let key: AnyObject = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)!
-    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
@@ -2493,8 +2493,8 @@ DictionaryTestSuite.test("BridgedToObjC.Custom.KeyEnumerator.FastEnumeration.Use
   checkDictionaryFastEnumerationFromSwift(
     [ (10, 1010), (20, 1020), (30, 1030) ],
     d, { d.keyEnumerator() },
-    { ($0 as TestObjCKeyTy).value },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCKeyTy).value },
+    { ($0 as! TestObjCValueTy).value })
 
   expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
@@ -2507,8 +2507,8 @@ DictionaryTestSuite.test("BridgedToObjC.Custom.KeyEnumerator.FastEnumeration.Use
     [ (10, 1010), (20, 1020), (30, 1030), (40, 1040), (50, 1050),
       (60, 1060), (70, 1070), (80, 1080), (90, 1090) ],
     d, maxFastEnumerationItems: 5,
-    { ($0 as TestObjCKeyTy).value },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCKeyTy).value },
+    { ($0 as! TestObjCValueTy).value })
 
   expectAutoreleasedKeysAndValues(unopt: (9, 9))
 }
@@ -2519,8 +2519,8 @@ DictionaryTestSuite.test("BridgedToObjC.Custom.KeyEnumerator.FastEnumeration.Use
   checkDictionaryFastEnumerationFromObjC(
     [ (10, 1010), (20, 1020), (30, 1030) ],
     d, { d.keyEnumerator() },
-    { ($0 as TestObjCKeyTy).value },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCKeyTy).value },
+    { ($0 as! TestObjCValueTy).value })
 
   expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
@@ -2531,8 +2531,8 @@ DictionaryTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromSwift") {
   checkDictionaryFastEnumerationFromSwift(
     [ (10, 1010), (20, 1020), (30, 1030) ],
     d, { d },
-    { ($0 as TestObjCKeyTy).value },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCKeyTy).value },
+    { ($0 as! TestObjCValueTy).value })
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
@@ -2543,8 +2543,8 @@ DictionaryTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromObjC") {
   checkDictionaryFastEnumerationFromObjC(
     [ (10, 1010), (20, 1020), (30, 1030) ],
     d, { d },
-    { ($0 as TestObjCKeyTy).value },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCKeyTy).value },
+    { ($0 as! TestObjCValueTy).value })
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
@@ -2555,13 +2555,13 @@ DictionaryTestSuite.test("BridgedToObjC.Custom.FastEnumeration_Empty") {
 
   checkDictionaryFastEnumerationFromSwift(
     [], d, { d },
-    { ($0 as TestObjCKeyTy).value },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCKeyTy).value },
+    { ($0 as! TestObjCValueTy).value })
 
   checkDictionaryFastEnumerationFromObjC(
     [], d, { d },
-    { ($0 as TestObjCKeyTy).value },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCKeyTy).value },
+    { ($0 as! TestObjCValueTy).value })
 }
 
 func getBridgedNSDictionaryOfKey_ValueTypeCustomBridged() -> NSDictionary {
@@ -2586,7 +2586,7 @@ DictionaryTestSuite.test("BridgedToObjC.Key_ValueTypeCustomBridged") {
   var pairs = Array<(Int, Int)>()
   while let key: AnyObject = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)!
-    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
@@ -2616,7 +2616,7 @@ DictionaryTestSuite.test("BridgedToObjC.Value_ValueTypeCustomBridged") {
   var pairs = Array<(Int, Int)>()
   while let key: AnyObject = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)!
-    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
@@ -2659,7 +2659,7 @@ DictionaryTestSuite.test("BridgingRoundtrip") {
   var pairs = Array<(Int, Int)>()
   while let key: AnyObject = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)!
-    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
@@ -2686,7 +2686,7 @@ DictionaryTestSuite.test("NSDictionaryToDictionaryCoversion") {
 
   var pairs = Array<(Int, Int)>()
   for (key, value: AnyObject) in d {
-    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
@@ -2702,8 +2702,8 @@ DictionaryTestSuite.test("DictionaryToNSDictionaryCoversion") {
   checkDictionaryFastEnumerationFromSwift(
     [ (10, 1010), (20, 1020), (30, 1030) ],
     d, { d },
-    { ($0 as TestObjCKeyTy).value },
-    { ($0 as TestObjCValueTy).value })
+    { ($0 as! TestObjCKeyTy).value },
+    { ($0 as! TestObjCValueTy).value })
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
@@ -2722,13 +2722,13 @@ DictionaryTestSuite.test("DictionaryUpcastEntryPoint") {
 
   assert(dAsAnyObject.count == 3)
   var v: AnyObject? = dAsAnyObject[TestObjCKeyTy(10)]
-  assert((v! as TestObjCValueTy).value == 1010)
+  assert((v! as! TestObjCValueTy).value == 1010)
 
   v = dAsAnyObject[TestObjCKeyTy(20)]
-  assert((v! as TestObjCValueTy).value == 1020)
+  assert((v! as! TestObjCValueTy).value == 1020)
 
   v = dAsAnyObject[TestObjCKeyTy(30)]
-  assert((v! as TestObjCValueTy).value == 1030)
+  assert((v! as! TestObjCValueTy).value == 1030)
 }
 
 DictionaryTestSuite.test("DictionaryUpcast") {
@@ -2741,13 +2741,13 @@ DictionaryTestSuite.test("DictionaryUpcast") {
 
   assert(dAsAnyObject.count == 3)
   var v: AnyObject? = dAsAnyObject[TestObjCKeyTy(10)]
-  assert((v! as TestObjCValueTy).value == 1010)
+  assert((v! as! TestObjCValueTy).value == 1010)
 
   v = dAsAnyObject[TestObjCKeyTy(20)]
-  assert((v! as TestObjCValueTy).value == 1020)
+  assert((v! as! TestObjCValueTy).value == 1020)
 
   v = dAsAnyObject[TestObjCKeyTy(30)]
-  assert((v! as TestObjCValueTy).value == 1030)
+  assert((v! as! TestObjCValueTy).value == 1030)
 }
 
 DictionaryTestSuite.test("DictionaryUpcastBridgedEntryPoint") {
@@ -2761,13 +2761,13 @@ DictionaryTestSuite.test("DictionaryUpcastBridgedEntryPoint") {
 
     assert(dOO.count == 3)
     var v: AnyObject? = dOO[TestObjCKeyTy(10)]
-    assert((v! as TestBridgedValueTy).value == 1010)
+    assert((v! as! TestBridgedValueTy).value == 1010)
 
     v = dOO[TestObjCKeyTy(20)]
-    assert((v! as TestBridgedValueTy).value == 1020)
+    assert((v! as! TestBridgedValueTy).value == 1020)
 
     v = dOO[TestObjCKeyTy(30)]
-    assert((v! as TestBridgedValueTy).value == 1030)
+    assert((v! as! TestBridgedValueTy).value == 1030)
   }
 
   if true {
@@ -2791,13 +2791,13 @@ DictionaryTestSuite.test("DictionaryUpcastBridgedEntryPoint") {
 
     assert(dVO.count == 3)
     var v: AnyObject? = dVO[TestBridgedKeyTy(10)]
-    assert((v! as TestBridgedValueTy).value == 1010)
+    assert((v! as! TestBridgedValueTy).value == 1010)
 
     v = dVO[TestBridgedKeyTy(20)]
-    assert((v! as TestBridgedValueTy).value == 1020)
+    assert((v! as! TestBridgedValueTy).value == 1020)
 
     v = dVO[TestBridgedKeyTy(30)]
-    assert((v! as TestBridgedValueTy).value == 1030)
+    assert((v! as! TestBridgedValueTy).value == 1030)
   }
 }
 
@@ -2812,13 +2812,13 @@ DictionaryTestSuite.test("DictionaryUpcastBridged") {
 
     assert(dOO.count == 3)
     var v: AnyObject? = dOO[TestObjCKeyTy(10)]
-    assert((v! as TestBridgedValueTy).value == 1010)
+    assert((v! as! TestBridgedValueTy).value == 1010)
 
     v = dOO[TestObjCKeyTy(20)]
-    assert((v! as TestBridgedValueTy).value == 1020)
+    assert((v! as! TestBridgedValueTy).value == 1020)
 
     v = dOO[TestObjCKeyTy(30)]
-    assert((v! as TestBridgedValueTy).value == 1030)
+    assert((v! as! TestBridgedValueTy).value == 1030)
   }
 
   if true {
@@ -2840,13 +2840,13 @@ DictionaryTestSuite.test("DictionaryUpcastBridged") {
 
     assert(dVO.count == 3)
     var v: AnyObject? = dVO[TestBridgedKeyTy(10)]
-    assert((v! as TestBridgedValueTy).value == 1010)
+    assert((v! as! TestBridgedValueTy).value == 1010)
 
     v = dVO[TestBridgedKeyTy(20)]
-    assert((v! as TestBridgedValueTy).value == 1020)
+    assert((v! as! TestBridgedValueTy).value == 1020)
 
     v = dVO[TestBridgedKeyTy(30)]
-    assert((v! as TestBridgedValueTy).value == 1030)
+    assert((v! as! TestBridgedValueTy).value == 1030)
   }
 }
 
@@ -2882,7 +2882,7 @@ DictionaryTestSuite.test("DictionaryDowncast") {
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
 
   // Successful downcast.
-  let dCC = d as Dictionary<TestObjCKeyTy, TestObjCValueTy>
+  let dCC = d as! Dictionary<TestObjCKeyTy, TestObjCValueTy>
   assert(dCC.count == 3)
   var v = dCC[TestObjCKeyTy(10)]
   assert(v!.value == 1010)
@@ -3013,7 +3013,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveC") {
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
 
   // Successful downcast.
-  let dCV = d as Dictionary<TestObjCKeyTy, TestBridgedValueTy>
+  let dCV = d as! Dictionary<TestObjCKeyTy, TestBridgedValueTy>
   if true {
     assert(dCV.count == 3)
     var v = dCV[TestObjCKeyTy(10)]
@@ -3027,7 +3027,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveC") {
   }
 
   // Successful downcast.
-  let dVC = d as Dictionary<TestBridgedKeyTy, TestObjCValueTy>
+  let dVC = d as! Dictionary<TestBridgedKeyTy, TestObjCValueTy>
   if true {
     assert(dVC.count == 3)
     var v = dVC[TestBridgedKeyTy(10)]
@@ -3041,7 +3041,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveC") {
   }
 
   // Successful downcast.
-  let dVV = d as Dictionary<TestBridgedKeyTy, TestBridgedValueTy>
+  let dVV = d as! Dictionary<TestBridgedKeyTy, TestBridgedValueTy>
   if true {
     assert(dVV.count == 3)
     var v = dVV[TestBridgedKeyTy(10)]

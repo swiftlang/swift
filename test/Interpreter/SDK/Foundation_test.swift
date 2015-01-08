@@ -64,14 +64,14 @@ FoundationTestSuite.test("NSArray") {
   assert(nsArr.count == 3)
 
   // Subscripting
-  expectEqual(1, Int(nsArr[0] as NSNumber))
-  expectEqual(2.5, Double(nsArr[1] as NSNumber))
-  expectTrue((nsArr[2] as NSString).isEqual("Hello"))
+  expectEqual(1, Int(nsArr[0] as! NSNumber))
+  expectEqual(2.5, Double(nsArr[1] as! NSNumber))
+  expectTrue((nsArr[2] as! NSString).isEqual("Hello"))
 
   // Iteration
   var result = [String]()
   for x: AnyObject in nsArr {
-    result.append((x as NSObject).description)
+    result.append((x as! NSObject).description)
   }
   expectEqualSequence([ "1", "2.5", "Hello" ], result)
 }
@@ -81,8 +81,8 @@ FoundationTestSuite.test("NSMutableArray") {
   nsMutableArr[0] = "Inconstant"
 
   expectEqual(2, nsMutableArr.count)
-  expectEqual("Inconstant", nsMutableArr[0] as NSString)
-  expectEqual("Moon", nsMutableArr[1] as NSString)
+  expectEqual("Inconstant", nsMutableArr[0] as! NSString)
+  expectEqual("Moon", nsMutableArr[1] as! NSString)
 }
 
 FoundationTestSuite.test("NSArrayVariadicInit") {
@@ -114,8 +114,8 @@ FoundationTestSuite.test("arrayConversions") {
 
 FoundationTestSuite.test("NSDictionary") {
   var nsDict : NSDictionary = [1 : "Hello", 2 : "World"]
-  assert((nsDict[1]! as NSString).isEqual("Hello"))
-  assert((nsDict[2]! as NSString).isEqual("World"))
+  assert((nsDict[1]! as! NSString).isEqual("Hello"))
+  assert((nsDict[2]! as! NSString).isEqual("World"))
 
   let nsMutableDict: NSMutableDictionary = ["Hello" : 1, "World" : 2]
   assert(nsMutableDict["Hello"]!.isEqual(1))
@@ -181,7 +181,7 @@ FoundationTestSuite.test("rdar://17584531") {
   // <rdar://problem/17584531>
   // Type checker used to be confused by this.
   var dict: NSDictionary = [ "status": 200, "people": [ [ "id": 255, "name": [ "first": "John", "last": "Appleseed" ] ] ] ]
-  var dict2 = dict["people"]?[0] as NSDictionary
+  var dict2 = dict["people"]?[0] as! NSDictionary
   expectEqual("Optional(255)", toString(dict2["id"]))
 }
 

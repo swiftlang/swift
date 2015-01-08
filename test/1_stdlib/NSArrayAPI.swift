@@ -9,12 +9,12 @@ NSArrayAPI.test("mixed types with AnyObject") {
   if true {
     let result: AnyObject = [1, "two"]
     let expect: NSArray = [1, "two"]
-    expectEqual(expect, result as NSArray)
+    expectEqual(expect, result as! NSArray)
   }
   if true {
     let result: AnyObject = [1, 2]
     let expect: NSArray = [1, 2]
-    expectEqual(expect, result as NSArray)
+    expectEqual(expect, result as! NSArray)
   }
 }
 

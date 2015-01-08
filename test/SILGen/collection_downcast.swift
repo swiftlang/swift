@@ -41,21 +41,21 @@ func == (x: BridgedSwift, y: BridgedSwift) -> Bool { return true }
 func testArrayDowncast(array: [AnyObject]) -> [BridgedObjC] {
   // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFSs15_arrayForceCastU___FGSaQ__GSaQ0__ : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Array<τ_0_1>
   // CHECK: apply [[DOWNCAST_FN]]<AnyObject, BridgedObjC>([[ARRAY]]) : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Array<τ_0_1>
-  return array as [BridgedObjC]
+  return array as! [BridgedObjC]
 }
 
 // CHECK-LABEL: sil hidden @_TF19collection_downcast27testArrayDowncastFromObject
 // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
 func testArrayDowncastFromObject(obj: AnyObject) -> [BridgedObjC] {
   // CHECK: unconditional_checked_cast_addr take_always AnyObject in [[OBJECT_ALLOC:%[0-9]+]]#1 : $*AnyObject to Array<BridgedObjC> in [[VALUE_ALLOC:%[0-9]+]]#1 : $*Array<BridgedObjC>
-  return obj as [BridgedObjC]
+  return obj as! [BridgedObjC]
 }
 
 // CHECK-LABEL: sil hidden @_TF19collection_downcast28testArrayDowncastFromNSArray
 // CHECK: bb0([[NSARRAY_OBJ:%[0-9]+]] : $NSArray):
 func testArrayDowncastFromNSArray(obj: NSArray) -> [BridgedObjC] {
   // CHECK: unconditional_checked_cast_addr take_always NSArray in [[OBJECT_ALLOC:%[0-9]+]]#1 : $*NSArray to Array<BridgedObjC> in [[VALUE_ALLOC:%[0-9]+]]#1 : $*Array<BridgedObjC>
-  return obj as [BridgedObjC]
+  return obj as! [BridgedObjC]
 }
 
 // CHECK-LABEL: sil hidden @_TF19collection_downcast28testArrayDowncastConditional
@@ -79,7 +79,7 @@ func testArrayIsa(array: [AnyObject]) -> Bool {
 func testArrayDowncastBridged(array: [AnyObject]) -> [BridgedSwift] {
   // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFSs15_arrayForceCastU___FGSaQ__GSaQ0__ : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Array<τ_0_1>
   // CHECK-NEXT: apply [[BRIDGE_FN]]<AnyObject, BridgedSwift>([[ARRAY]]) : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Array<τ_0_1>
-  return array as [BridgedSwift]
+  return array as! [BridgedSwift]
 }
 
 // CHECK-LABEL: sil hidden @_TF19collection_downcast35testArrayDowncastBridgedConditional
@@ -103,7 +103,7 @@ func testArrayIsaBridged(array: [AnyObject]) -> Bool {
 func testDictionaryDowncastFromObject(obj: AnyObject) 
        -> Dictionary<BridgedObjC, BridgedObjC> {
   // CHECK: unconditional_checked_cast_addr take_always AnyObject in [[OBJECT_ALLOC:%[0-9]+]]#1 : $*AnyObject to Dictionary<BridgedObjC, BridgedObjC> in [[VALUE_ALLOC:%[0-9]+]]#1 : $*Dictionary<BridgedObjC, BridgedObjC>
-  return obj as Dictionary<BridgedObjC, BridgedObjC>
+  return obj as! Dictionary<BridgedObjC, BridgedObjC>
 }
 
 // CHECK-LABEL: sil hidden @_TF19collection_downcast22testDictionaryDowncast
@@ -112,7 +112,7 @@ func testDictionaryDowncast(dict: Dictionary<NSObject, AnyObject>)
        -> Dictionary<BridgedObjC, BridgedObjC> {
   // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFSs19_dictionaryDownCastUSs8Hashable__S____FGVSs10DictionaryQ_Q0__GS0_Q1_Q2__ : $@thin <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
   // CHECK-NEXT: apply [[DOWNCAST_FN]]<NSObject, AnyObject, BridgedObjC, BridgedObjC>([[DICT]]) : $@thin <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
-  return dict as Dictionary<BridgedObjC, BridgedObjC>
+  return dict as! Dictionary<BridgedObjC, BridgedObjC>
 }
 
 // CHECK-LABEL: sil hidden @_TF19collection_downcast33testDictionaryDowncastConditional
@@ -148,7 +148,7 @@ func testDictionaryDowncastBridgedKV(dict: Dictionary<NSObject, AnyObject>)
        -> Dictionary<BridgedSwift, BridgedSwift> {
   // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFSs31_dictionaryBridgeFromObjectiveCUSs8Hashable__S____FGVSs10DictionaryQ_Q0__GS0_Q1_Q2__ : $@thin <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
   // CHECK-NEXT: apply [[BRIDGE_FN]]<NSObject, AnyObject, BridgedSwift, BridgedSwift>([[DICT]]) : $@thin <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
-  return dict as Dictionary<BridgedSwift, BridgedSwift>
+  return dict as! Dictionary<BridgedSwift, BridgedSwift>
 }
 
 // CHECK-LABEL: sil hidden @_TF19collection_downcast42testDictionaryDowncastBridgedKVConditional
@@ -165,7 +165,7 @@ func testDictionaryDowncastBridgedKVConditional(dict: Dictionary<NSObject, AnyOb
 func testSetDowncastFromObject(obj: AnyObject) 
        -> Set<BridgedObjC> {
   // CHECK: unconditional_checked_cast_addr take_always AnyObject in [[OBJECT_ALLOC:%[0-9]+]]#1 : $*AnyObject to Set<BridgedObjC> in [[VALUE_ALLOC:%[0-9]+]]#1 : $*Set<BridgedObjC>
-  return obj as Set<BridgedObjC>
+  return obj as! Set<BridgedObjC>
 }
 
 // CHECK-LABEL: sil hidden @_TF19collection_downcast15testSetDowncast
@@ -174,7 +174,7 @@ func testSetDowncast(dict: Set<NSObject>)
        -> Set<BridgedObjC> {
   // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFSs12_setDownCastUSs8Hashable_S___FGVSs3SetQ__GS0_Q0__ : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Set<τ_0_1>
   // CHECK-NEXT: apply [[DOWNCAST_FN]]<NSObject, BridgedObjC>([[SET]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Set<τ_0_1>
-  return dict as Set<BridgedObjC>
+  return dict as! Set<BridgedObjC>
 }
 
 // CHECK-LABEL: sil hidden @_TF19collection_downcast26testSetDowncastConditional
@@ -192,7 +192,7 @@ func testSetDowncastBridged(dict: Set<NSObject>)
        -> Set<BridgedSwift> {
   // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFSs24_setBridgeFromObjectiveCUSs8Hashable_S___FGVSs3SetQ__GS0_Q0__ : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Set<τ_0_1>
   // CHECK-NEXT: apply [[DOWNCAST_FN]]<NSObject, BridgedSwift>([[SET]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Set<τ_0_1>
-  return dict as Set<BridgedSwift>
+  return dict as! Set<BridgedSwift>
 }
 
 // CHECK-LABEL: sil hidden @_TF19collection_downcast33testSetDowncastBridgedConditional
