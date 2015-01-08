@@ -355,7 +355,7 @@ endif()
 # generics, disable support for them in Swift.
 file(STRINGS "${CLANG_MAIN_INCLUDE_DIR}/clang/AST/DeclObjC.h"
   CLANG_OBJC_TYPE_PARAM_DECL REGEX "ObjCTypeParamDecl")
-if (CLANG_OBJC_TYPE_PARAM_DECL)
+if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND CLANG_OBJC_TYPE_PARAM_DECL)
   message(STATUS "Underlying Clang supports Objective-C generics")
   set(CLANG_OBJC_GENERICS TRUE)
 else()
