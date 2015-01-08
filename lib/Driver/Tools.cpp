@@ -670,6 +670,8 @@ Job *linux::Linker::constructJob(const JobAction &JA,
     llvm::sys::path::remove_filename(RuntimeLibPath); // remove /bin
     llvm::sys::path::append(RuntimeLibPath, "lib", "swift");
   }
+  llvm::sys::path::append(RuntimeLibPath,
+                          getPlatformNameForTriple(TC.getTriple()));
   Arguments.push_back("-L");
   Arguments.push_back(Args.MakeArgString(RuntimeLibPath));
 
@@ -686,7 +688,7 @@ Job *linux::Linker::constructJob(const JobAction &JA,
   Arguments.push_back("-Xlinker");
   Arguments.push_back("-T");
   Arguments.push_back(
-      Args.MakeArgString(Twine(RuntimeLibPath) + "/linux/x86_64/swift.ld"));
+      Args.MakeArgString(Twine(RuntimeLibPath) + "/x86_64/swift.ld"));
 
   // This should be the last option, for convenience in checking output.
   Arguments.push_back("-o");
