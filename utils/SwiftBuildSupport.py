@@ -70,7 +70,9 @@ def quote_shell_command(args):
     return " ".join([ pipes.quote(a) for a in args ])
 
 
-def check_call(args, verbose=False):
+def check_call(args, print_command=False, verbose=False):
+    if print_command:
+        print(os.getcwd() + "$ " + quote_shell_command(args))
     try:
         return subprocess.check_call(args)
     except subprocess.CalledProcessError as e:
@@ -89,7 +91,9 @@ def check_call(args, verbose=False):
         sys.exit(1)
 
 
-def check_output(args, verbose=False):
+def check_output(args, print_command=False, verbose=False):
+    if print_command:
+        print(os.getcwd() + "$ " + quote_shell_command(args))
     try:
         return subprocess.check_output(args)
     except subprocess.CalledProcessError as e:
@@ -115,7 +119,7 @@ def _load_preset_files_impl(preset_file_names, substitutions={}):
             "preset file not found (tried " + str(preset_file_names) + ")")
         sys.exit(1)
     return config
-    
+
 
 _PRESET_PREFIX = "preset: "
 
