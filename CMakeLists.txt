@@ -127,8 +127,8 @@ option(SWIFT_STDLIB_USE_ASSERT_CONFIG_RELEASE
     FALSE)
 
 option(SWIFT_XCODE_GENERATE_FOR_IDE_ONLY
-       "Generate an Xcode project suitable for IDE use, but which cannot build"
-       FALSE)
+    "Generate an Xcode project suitable for IDE use, but which cannot build"
+    FALSE)
 
 #
 # End of user-configurable options.
