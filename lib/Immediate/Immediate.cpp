@@ -41,6 +41,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Config/config.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DiagnosticInfo.h"
@@ -65,17 +66,19 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include <cmath>
+#include <wchar.h>
+#include <dlfcn.h>
+
 #if defined(__APPLE__)
 // FIXME: We need a more library-neutral way for frameworks to take ownership of
 // the main loop.
 #include <CoreFoundation/CoreFoundation.h>
 
-#include <cmath>
 #include <thread>
-#include <wchar.h>
 #include <histedit.h>
-#include <dlfcn.h>
 #include <system_error>
+#endif
 
 using namespace swift;
 
@@ -175,11 +178,11 @@ static bool loadRuntimeLib(StringRef sharedLibName, StringRef runtimeLibPath) {
   // FIXME: Need error-checking.
   llvm::SmallString<128> Path = runtimeLibPath;
   llvm::sys::path::append(Path, sharedLibName);
-  return dlopen(Path.c_str(), 0);
+  return dlopen(Path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
 }
 
 static bool loadSwiftRuntime(StringRef runtimeLibPath) {
-  return loadRuntimeLib("libswiftCore.dylib", runtimeLibPath);
+  return loadRuntimeLib("libswiftCore" LTDL_SHLIB_EXT, runtimeLibPath);
 }
 
 static bool tryLoadLibrary(LinkLibrary linkLib,
@@ -201,7 +204,7 @@ static bool tryLoadLibrary(LinkLibrary linkLib,
         // FIXME: Try the appropriate extension for the current platform?
         stem = "lib";
         stem += path;
-        stem += ".dylib";
+        stem += LTDL_SHLIB_EXT;
       }
 
       // Try user-provided library search paths first.
@@ -454,6 +457,7 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   EE->runFunctionAsMain(EntryFn, CmdLine, 0);
 }
 
+#if defined(__APPLE__)
 /// An arbitrary, otherwise-unused char value that editline interprets as
 /// entering/leaving "literal mode", meaning it passes prompt characters through
 /// to the terminal without affecting the line state. This prevents color
@@ -1557,10 +1561,5 @@ void swift::REPLRunLoop(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
 void swift::REPLRunLoop(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
                         bool ParseStdlib) {
   llvm::report_fatal_error("REPL Unimplemented for this platform");
-}
-
-void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
-                           IRGenOptions &IRGenOpts, const SILOptions &SILOpts) {
-  llvm::report_fatal_error("RunImmediately Unimplemented for this platform");
 }
 #endif
