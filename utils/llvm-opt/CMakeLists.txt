@@ -1,6 +1,6 @@
 swift_get_configuration_types(configs)
 foreach(config ${configs})
-  set(OPT "${PATH_TO_LLVM_BUILD}/${config}/bin/opt")
+  set(OPT "${LLVM_TOOLS_BINARY_DIR}/opt")
   set(SWIFT_LLVM_DYLIB
       "${CMAKE_BINARY_DIR}/${config}/lib/SwiftLLVMPasses${CMAKE_SHARED_LIBRARY_SUFFIX}")
   configure_file(
