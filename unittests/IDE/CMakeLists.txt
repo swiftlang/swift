@@ -4,5 +4,3 @@ add_swift_unittest(SwiftIDETests
 target_link_libraries(SwiftIDETests
   swiftIDE
 )
-swift_llvm_config(SwiftIDETests
-    bitreader bitwriter support ${LLVM_TARGETS_TO_BUILD})
