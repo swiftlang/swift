@@ -218,6 +218,25 @@ function(_add_variant_link_flags
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
 
+# Look up extra flags for a module that matches a regexp.
+function(_add_extra_swift_flags_for_module module_name result_var_name)
+  set(result_list)
+  list(LENGTH SWIFT_EXPERIMENTAL_EXTRA_REGEXP_FLAGS listlen)
+  if (${listlen} GREATER 0)
+    math(EXPR listlen "${listlen}-1")
+    foreach(i RANGE 0 ${listlen} 2)
+      list(GET SWIFT_EXPERIMENTAL_EXTRA_REGEXP_FLAGS ${i} regex)
+      if (module_name MATCHES "${regex}")
+        math(EXPR ip1 "${i}+1")
+        list(GET SWIFT_EXPERIMENTAL_EXTRA_REGEXP_FLAGS ${ip1} flags)
+        list(APPEND result_list ${flags})
+        message(STATUS "Matched '${regex}' to module '${module_name}'. Compiling ${module_name} with special flags: ${flags}")
+      endif()
+    endforeach()
+  endif()
+  set("${result_var_name}" ${result_list} PARENT_SCOPE)
+endfunction()
+
 # Compile a swift file into an object file (as a library).
 #
 # Usage:
@@ -326,10 +345,7 @@ function(_compile_swift_files dependency_target_out_var_name)
     list(APPEND swift_flags "-autolink-force-load")
   endif()
 
-  list(APPEND swift_flags ${SWIFT_EXTRA_EXPERIMENTAL_FLAGS})
-  if(SWIFTFILE_IS_STDLIB_CORE)
-    list(APPEND swift_flags ${SWIFT_EXTRA_EXPERIMENTAL_FLAGS_STDLIB_CORE})
-  endif()
+  list(APPEND swift_flags ${SWIFT_EXPERIMENTAL_EXTRA_FLAGS})
 
   if(SWIFTFILE_OPT_FLAGS)
     list(APPEND swift_flags ${SWIFTFILE_OPT_FLAGS})
@@ -367,6 +383,16 @@ function(_compile_swift_files dependency_target_out_var_name)
 
     list(APPEND command_create_dirs
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${module_dir}")
+
+    # If we have extra regexp flags, check if we match any of the regexps. If so
+    # add the relevant flags to our swift_flags.
+    if (SWIFT_EXPERIMENTAL_EXTRA_REGEXP_FLAGS)
+      set(extra_swift_flags_for_module)
+      _add_extra_swift_flags_for_module("${module_name}" extra_swift_flags_for_module)
+      if (extra_swift_flags_for_module)
+        list(APPEND swift_flags ${extra_swift_flags_for_module})
+      endif()
+    endif()
   endif()
 
   swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"

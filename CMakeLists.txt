@@ -113,11 +113,11 @@ option(SWIFT_SPLIT_OBJC_SELECTORS
     "Split Objective-C selectors when building the standard library"
     FALSE)
 
-set(SWIFT_EXTRA_EXPERIMENTAL_FLAGS "" CACHE STRING
+set(SWIFT_EXPERIMENTAL_EXTRA_FLAGS "" CACHE STRING
     "Extra flags to pass when compiling swift files.  Use this option *only* for one-off experiments")
 
-set(SWIFT_EXTRA_EXPERIMENTAL_FLAGS_STDLIB_CORE "" CACHE STRING
-    "Extra flags to pass when compiling stdlib core.  Use this option *only* for one-off experiments")
+set(SWIFT_EXPERIMENTAL_EXTRA_REGEXP_FLAGS "" CACHE STRING
+    "A list of [module_regexp1,flags1,module_regexp2,flags2,...] which can be used to apply specific flags to modules that match a cmake regexp. It always applies the first regexp that matches.")
 
 option(SWIFT_STDLIB_USE_ASSERT_CONFIG_RELEASE
     "Should the stdlib be build with assert config set to release"
