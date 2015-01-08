@@ -811,11 +811,9 @@ lookUpSILFunctionFromVTable(ClassDecl *Class, SILDeclRef Member) {
     // Try to lookup a VTable for Class from the module...
     auto *Vtbl = lookUpVTable(Class);
 
-    // If the lookup fails, skip Class and attempt to resolve the method in
-    // the VTable of the super class of Class if it exists...
+    // Bail, if the lookup of VTable fails.
     if (!Vtbl) {
-      Class = getClassDeclSuperClass(Class);
-      continue;
+      return nullptr;
     }
 
     // Ok, we have a VTable. Try to lookup the SILFunction implementation from
