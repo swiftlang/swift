@@ -671,7 +671,7 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   // Early exit guarantees that we do not create two
   // basic blocks which both perform virtual calls of a method.
   auto &Mod = AI->getModule();
-  auto *Method = Mod.lookUpSILFunctionFromVTable(CD, CMI->getMember());
+  auto *Method = Mod.lookUpFunctionFromVTable(CD, CMI->getMember());
   if (!Method)
     return nullptr;
 
