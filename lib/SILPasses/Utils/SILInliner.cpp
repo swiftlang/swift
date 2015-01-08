@@ -288,17 +288,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::ReturnInst:
       return InlineCost::Free;
 
-    // TODO
-    case ValueKind::ApplyInst: {
-      // Don't inline functions that contain recursions.
-      ApplyInst *AI = cast<ApplyInst>(&I);
-      auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
-      if (FRI && FRI->getReferencedFunction() == AI->getFunction())
-        return InlineCost::CannotBeInlined;
-
-      return InlineCost::Expensive;
-    }
-
+    case ValueKind::ApplyInst:
     case ValueKind::BuiltinInst:
     case ValueKind::AllocBoxInst:
     case ValueKind::AllocRefInst:

@@ -56,7 +56,8 @@ public:
       SwiftMod(From.getModule().getSwiftModule()),
       SubsMap(ContextSubs),
       Original(From),
-      ApplySubs(ApplySubs) { }
+      ApplySubs(ApplySubs),
+      Inlining(Inlining) { }
 
 protected:
   SILType remapType(SILType Ty) {
@@ -122,17 +123,19 @@ protected:
 
     // Handle recursions by replacing the apply to the callee with an apply to
     // the newly specialized function.
-    SILValue CalleeVal = Inst->getCallee();
-    FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
     SILBuilder &Builder = getBuilder();
-    if (FRI && FRI->getReferencedFunction() == Inst->getFunction()) {
-      FRI = Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
-                                      &Builder.getFunction());
-      ApplyInst *NAI =
-        Builder.createApply(getOpLocation(Inst->getLoc()), FRI, Args,
-                            Inst->isTransparent());
-      doPostProcess(Inst, NAI);
-      return;
+    SILValue CalleeVal = Inst->getCallee();
+    if (!Inlining) {
+      FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
+      if (FRI && FRI->getReferencedFunction() == Inst->getFunction()) {
+        FRI = Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
+                                        &Builder.getFunction());
+        ApplyInst *NAI =
+          Builder.createApply(getOpLocation(Inst->getLoc()), FRI, Args,
+                              Inst->isTransparent());
+        doPostProcess(Inst, NAI);
+        return;
+      }
     }
 
     SmallVector<Substitution, 16> TempSubstList;
@@ -153,17 +156,19 @@ protected:
     // Handle recursions by replacing the apply to the callee with an apply to
     // the newly specialized function.
     SILValue CalleeVal = Inst->getCallee();
-    FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
     SILBuilderWithPostProcess<TypeSubstCloner, 4> Builder(this, Inst);
-    if (FRI && FRI->getReferencedFunction() == Inst->getFunction()) {
-      FRI = Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
-                                      &Builder.getFunction());
-      Builder.createPartialApply(getOpLocation(Inst->getLoc()), FRI,
-                                 getOpType(Inst->getSubstCalleeSILType()),
-                                 ArrayRef<Substitution>(),
-                                 Args,
-                                 getOpType(Inst->getType()));
-      return;
+    if (!Inlining) {
+      FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
+      if (FRI && FRI->getReferencedFunction() == Inst->getFunction()) {
+        FRI = Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
+                                        &Builder.getFunction());
+        Builder.createPartialApply(getOpLocation(Inst->getLoc()), FRI,
+                                   getOpType(Inst->getSubstCalleeSILType()),
+                                   ArrayRef<Substitution>(),
+                                   Args,
+                                   getOpType(Inst->getType()));
+        return;
+      }
     }
 
     SmallVector<Substitution, 16> TempSubstList;
@@ -436,6 +441,8 @@ protected:
   SILFunction &Original;
   /// The substiutions used at the call site.
   ArrayRef<Substitution> ApplySubs;
+  /// True, if used for inlining.
+  bool Inlining;
 };
 
 } // end namespace swift
