@@ -146,7 +146,7 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
   // the module vtables.
   SILModule &Mod = AI->getModule();
   // Find the implementation of the member which should be invoked.
-  SILFunction *F = Mod.lookUpSILFunctionFromVTable(CD, Member);
+  SILFunction *F = Mod.lookUpFunctionFromVTable(CD, Member);
 
   // If we do not find any such function, we have no function to devirtualize
   // to... so bail.
