@@ -99,10 +99,8 @@ class DCE : public SILFunctionTransform {
       return;
 
     markLive(*F);
-    if (removeDead(*F)) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    if (removeDead(*F))
       invalidateAnalysis(SILAnalysis::InvalidationKind::CFG);
-    }
   }
 
   bool precomputeControlInfo(SILFunction &F);
