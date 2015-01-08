@@ -319,7 +319,7 @@ function(_compile_swift_files dependency_target_out_var_name)
   if(SWIFTFILE_IS_STDLIB_CORE)
     list(APPEND swift_flags
         "-nostdimport" "-parse-stdlib" "-module-name" "Swift"
-        "-Xfrontend" "-sil-serialize-all" ${SWIFT_STDLIB_CORE_EXTRA_FLAGS})
+        "-Xfrontend" "-sil-serialize-all")
   endif()
 
   if(SWIFTFILE_IS_SDK_OVERLAY)
