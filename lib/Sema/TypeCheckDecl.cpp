@@ -1185,22 +1185,18 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   
   binding->setIsBeingTypeChecked();
 
-  // Validate 'static'/'class' on properties in extensions.
+  // Validate 'static'/'class' on properties in nominal type decls.
   auto StaticSpelling = binding->getStaticSpelling();
   if (StaticSpelling != StaticSpellingKind::None &&
       binding->getDeclContext()->isExtensionContext()) {
     if (Type T = binding->getDeclContext()->getDeclaredTypeInContext()) {
       if (auto NTD = T->getAnyNominal()) {
-        if (isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD)) {
-          if (StaticSpelling == StaticSpellingKind::KeywordStatic) {
-            tc.diagnose(binding, diag::static_var_in_class)
-                .fixItReplace(binding->getStaticLoc(), "class");
+        if (!isa<ClassDecl>(NTD)) {
+          if (StaticSpelling == StaticSpellingKind::KeywordClass) {
+            tc.diagnose(binding, diag::class_var_not_in_class)
+              .fixItReplace(binding->getStaticLoc(), "static");
             tc.diagnose(NTD, diag::extended_type_declared_here);
           }
-        } else if (StaticSpelling == StaticSpellingKind::KeywordClass) {
-          tc.diagnose(binding, diag::class_var_in_struct)
-              .fixItReplace(binding->getStaticLoc(), "static");
-          tc.diagnose(NTD, diag::extended_type_declared_here);
         }
       }
     }
@@ -3809,16 +3805,12 @@ public:
         FD->getDeclContext()->isExtensionContext()) {
       if (Type T = FD->getDeclContext()->getDeclaredTypeInContext()) {
         if (auto NTD = T->getAnyNominal()) {
-          if (isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD)) {
-            if (StaticSpelling == StaticSpellingKind::KeywordStatic) {
-              TC.diagnose(FD, diag::static_func_in_class)
-                  .fixItReplace(FD->getStaticLoc(), "class");
+          if (!isa<ClassDecl>(NTD)) {
+            if (StaticSpelling == StaticSpellingKind::KeywordClass) {
+              TC.diagnose(FD, diag::class_func_not_in_class)
+                  .fixItReplace(FD->getStaticLoc(), "static");
               TC.diagnose(NTD, diag::extended_type_declared_here);
             }
-          } else if (StaticSpelling == StaticSpellingKind::KeywordClass) {
-            TC.diagnose(FD, diag::class_func_in_struct)
-                .fixItReplace(FD->getStaticLoc(), "static");
-            TC.diagnose(NTD, diag::extended_type_declared_here);
           }
         }
       }
@@ -3903,6 +3895,10 @@ public:
             !FD->isFinal() && !FD->isDynamic()) {
           makeFinal(TC.Context, FD);
         }
+        // static func declarations in classes are synonyms
+        // for `class final func` declarations.
+        if (FD->getStaticSpelling() == StaticSpellingKind::KeywordStatic)
+          makeFinal(TC.Context, FD);
       }
 
       // A method is ObjC-compatible if:
@@ -5616,6 +5612,10 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
               makeFinal(Context, VD);
             }
           }
+          // static var/let declarations in classes are synonyms
+          // for `class final var/let` declarations.
+          if (VD->getParentPattern()->getStaticSpelling() == StaticSpellingKind::KeywordStatic)
+            makeFinal(Context, VD);
         }
       }
 

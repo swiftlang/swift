@@ -31,8 +31,8 @@ struct InMemberFunc {
 struct DuplicateStatic {
   static static func f1() {} // expected-error{{'static' specified twice}}{{10-16=}}
   static class func f2() {} // expected-error{{'class' specified twice}}{{10-15=}}
-  class static func f3() {} // expected-error{{'static' specified twice}}{{9-15=}} expected-error{{class methods are only allowed within classes and protocols; use 'static' to declare a static method}}{{3-8=static}}
-  class class func f4() {} // expected-error{{'class' specified twice}}{{9-14=}} expected-error{{class methods are only allowed within classes and protocols; use 'static' to declare a static method}}{{3-8=static}}
+  class static func f3() {} // expected-error{{'static' specified twice}}{{9-15=}} expected-error{{class methods are only allowed within classes; use 'static' to declare a static method}}{{3-8=static}}
+  class class func f4() {} // expected-error{{'class' specified twice}}{{9-14=}} expected-error{{class methods are only allowed within classes; use 'static' to declare a static method}}{{3-8=static}}
   override static static func f5() {} // expected-error{{'static' specified twice}}{{19-25=}} expected-error{{'override' can only be specified on class members}}
   static override static func f6() {} // expected-error{{'static' specified twice}}{{19-25=}} expected-error{{'override' can only be specified on class members}}
   static static override func f7() {} // expected-error{{'static' specified twice}}{{10-16=}} expected-error{{'override' can only be specified on class members}}
@@ -40,26 +40,26 @@ struct DuplicateStatic {
 
 struct S { // expected-note {{extended type declared here}}
   static func f1() {}
-  class func f2() {} // expected-error {{class methods are only allowed within classes and protocols; use 'static' to declare a static method}}{{3-8=static}}
+  class func f2() {} // expected-error {{class methods are only allowed within classes; use 'static' to declare a static method}}
 }
 
 extension S {
   static func ef1() {}
-  class func ef2() {} // expected-error {{class methods are only allowed within classes and protocols; use 'static' to declare a static method}}{{3-8=static}}
+  class func ef2() {} // expected-error {{class methods are only allowed within classes; use 'static' to declare a static method}}
 }
 
 enum E { // expected-note {{extended type declared here}}
   static func f1() {}
-  class func f2() {} // expected-error {{class methods are only allowed within classes and protocols; use 'static' to declare a static method}}{{3-8=static}}
+  class func f2() {} // expected-error {{class methods are only allowed within classes; use 'static' to declare a static method}}
 }
 
 extension E {
   static func f3() {}
-  class func f4() {} // expected-error {{class methods are only allowed within classes and protocols; use 'static' to declare a static method}}{{3-8=static}}
+  class func f4() {} // expected-error {{class methods are only allowed within classes; use 'static' to declare a static method}}
 }
 
-class C { // expected-note {{extended type declared here}}
-  static func f1() {} // expected-error {{static methods are only allowed within structs and enums; use 'class' to declare a class method}}{{3-9=class}}
+class C {
+  static func f1() {} // expected-note {{overridden declaration is here}}
   class func f2() {}
   class func f3() {}
   class func f4() {} // expected-note {{overridden declaration is here}}
@@ -67,7 +67,7 @@ class C { // expected-note {{extended type declared here}}
 }
 
 extension C {
-  static func ef1() {} // expected-error {{static methods are only allowed within structs and enums; use 'class' to declare a class method}}{{3-9=class}}
+  static func ef1() {}
   class func ef2() {} // expected-note {{overridden declaration is here}}
   class func ef3() {} // expected-note {{overridden declaration is here}}
   class func ef4() {} // expected-note {{overridden declaration is here}}
@@ -75,6 +75,7 @@ extension C {
 }
 
 class C_Derived : C {
+  override static func f1() {} // expected-error {{class method overrides a 'final' class method}}
   override class func f2() {}
   class override func f3() {}
 
@@ -91,8 +92,9 @@ extension C_Derived {
 }
 
 protocol P {
-  static func f1() // expected-error {{static methods are only allowed within structs and enums; use 'class' to declare a class method}}{{3-9=class}}
-  class func f2() {} // expected-error {{protocol methods may not have bodies}}
+  static func f1()
+  static func f2()
+  static func f3() {} // expected-error {{protocol methods may not have bodies}}
 }
 
 extension P { // expected-error {{protocol 'P' cannot be extended}}

@@ -4,7 +4,7 @@
 // Test case submitted to project by http://github.com/valfer (Valerio Ferrucci)
 
 protocol C {
-    class func c(o: AnyObject) -> Self?
+    static func c(o: AnyObject) -> Self?
 }
 func d<A,B>(a : A, f : A -> B) -> B {
 } // expected-error {{missing return in a function expected to return 'B'}}

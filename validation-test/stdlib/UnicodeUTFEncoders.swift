@@ -8,8 +8,8 @@ import Foundation
 
 protocol TestableUnicodeCodec : UnicodeCodecType {
   typealias CodeUnit : IntegerType
-  class func encodingId() -> NSStringEncoding
-  class func name() -> NSString
+  static func encodingId() -> NSStringEncoding
+  static func name() -> NSString
 }
 
 extension UTF8 : TestableUnicodeCodec {

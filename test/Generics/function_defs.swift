@@ -159,7 +159,7 @@ func subscripting<T : protocol<Subscriptable, IntSubscriptable>>(t: T) {
 // Static functions
 //===----------------------------------------------------------------------===//
 protocol StaticEq {
-  class func isEqual(x: Self, y: Self) -> Bool
+  static func isEqual(x: Self, y: Self) -> Bool
 }
 
 func staticEqCheck<T : StaticEq, U : StaticEq>(t: T, u: U) {

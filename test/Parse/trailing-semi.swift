@@ -28,6 +28,6 @@ extension S {
 protocol P {
   var a : Int { get };
   func b ();
-  class func c ();
+  static func c ();
 }
 

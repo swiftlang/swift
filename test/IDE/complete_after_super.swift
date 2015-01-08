@@ -125,7 +125,7 @@ class SuperBaseA {
     }
   }
 
-  // expected-error@+1 {{class variables not yet supported}}
+  // expected-error@+1 {{class stored properties not yet supported}}
   class var baseStaticVar: Int = 0
 
   class var baseStaticProp: Int {
@@ -156,7 +156,7 @@ extension SuperBaseA {
 
   func baseExtFunc0() {}
 
-  // expected-error@+1 {{class variables not yet supported}}
+  // expected-error@+1 {{class stored properties not yet supported}}
   class var baseExtStaticVar: Int = 0
 
   class func baseExtStaticFunc0() {}
@@ -291,7 +291,7 @@ class SuperBaseB {
     }
   }
 
-  // expected-error@+1 {{class variables not yet supported}}
+  // expected-error@+1 {{class stored properties not yet supported}}
   class var baseStaticVar: Int = 0
 
   class var baseStaticProp: Int {
@@ -322,7 +322,7 @@ extension SuperBaseB {
 
   func baseExtFunc0() {}
 
-  // expected-error@+1 {{class variables not yet supported}}
+  // expected-error@+1 {{class stored properties not yet supported}}
   class var baseExtStaticVar: Int = 0
 
   class var baseExtStaticProp: Int {

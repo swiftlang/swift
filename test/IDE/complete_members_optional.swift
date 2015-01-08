@@ -7,10 +7,10 @@
 @objc
 protocol HasOptionalMembers1 {
   optional func optionalInstanceFunc() -> Int
-  optional class func optionalClassFunc() -> Int
+  optional static func optionalClassFunc() -> Int
 
   optional var optionalInstanceProperty: Int { get }
-  optional class var optionalClassProperty: Int { get }
+  optional static var optionalClassProperty: Int { get }
 }
 
 func sanityCheck1(a: HasOptionalMembers1) {

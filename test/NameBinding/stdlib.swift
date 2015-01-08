@@ -8,11 +8,11 @@ struct X {
 typealias MaxBuiltinFloatType = Builtin.FPIEEE64
 
 protocol _BuiltinFloatLiteralConvertible {
-  class func _convertFromBuiltinFloatLiteral(
+  static func _convertFromBuiltinFloatLiteral(
                 value: MaxBuiltinFloatType) -> Self
 }
 
 protocol FloatLiteralConvertible {
   typealias FloatLiteralType : _BuiltinFloatLiteralConvertible
-  class func convertFromFloatLiteral(value: FloatLiteralType) -> Self
+  static func convertFromFloatLiteral(value: FloatLiteralType) -> Self
 }

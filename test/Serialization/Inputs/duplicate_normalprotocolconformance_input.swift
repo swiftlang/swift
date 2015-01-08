@@ -1,10 +1,10 @@
 
 public protocol A {
-  class func a()
+  static func a()
 }
 
 public protocol B : A {
-  class func b()
+  static func b()
 }
 
 public struct S { public init() {} }

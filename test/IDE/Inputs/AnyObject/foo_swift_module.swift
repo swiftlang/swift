@@ -25,7 +25,7 @@ public class Foo_TopLevelClass {
 
 @objc public protocol Foo_TopLevelObjcProtocol {
   func foo_TopLevelObjcProtocol_InstanceFunc1()
-  class func foo_TopLevelObjcProtocol_ClassFunc1()
+  static func foo_TopLevelObjcProtocol_ClassFunc1()
   subscript(i: Foo_TopLevelObjcProtocol) -> Int { get set }
   var foo_TopLevelObjcProtocol_Property1: Int { get }
 }

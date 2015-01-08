@@ -68,7 +68,7 @@ static protocol StaticProtocol {} // expected-error {{declaration cannot be mark
 static typealias StaticTypealias = Int // expected-error {{declaration cannot be marked 'static'}}
 
 class ClassWithStaticDecls {
-  class var a = 42 // expected-error {{class variables not yet supported}}
+  class var a = 42 // expected-error {{class stored properties not yet supported}}
 }
 
 //===--- Recovery for missing controlling expression in statements.

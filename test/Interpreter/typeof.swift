@@ -1,6 +1,6 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
-protocol Fooable { class func foo() }
+protocol Fooable { static func foo() }
 
 class B : Fooable {
   class func foo() { println("Beads?!") }

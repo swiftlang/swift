@@ -5,7 +5,7 @@
 
 protocol P {
   func concrete_method()
-  class func concrete_static_method()
+  static func concrete_static_method()
   func generic_method<Z>(x: Z)
 }
 

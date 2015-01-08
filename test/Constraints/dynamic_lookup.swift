@@ -86,7 +86,7 @@ class Z : Y {
 @objc protocol P2 {
   func wonka()
   var protoProp : Int { get }
-  class func staticWibble()
+  static func staticWibble()
 
   subscript (idx : A) -> Int { get set }
 }

@@ -58,7 +58,7 @@ func ==(lhs: FloatingPointClassification, rhs: FloatingPointClassification) -> B
 /// A set of common requirements for Swift's floating point types.
 public protocol FloatingPointType : Strideable {
   typealias _BitsType
-  class func _fromBitPattern(bits: _BitsType) -> Self
+  static func _fromBitPattern(bits: _BitsType) -> Self
   func _toBitPattern() -> _BitsType
 
 % for src_ty in all_integer_types(word_bits):
@@ -69,13 +69,13 @@ public protocol FloatingPointType : Strideable {
 % end
 
   /// The positive infinity.
-  class var infinity: Self { get }
+  static var infinity: Self { get }
 
   /// A quiet NaN.
-  class var NaN: Self { get }
+  static var NaN: Self { get }
 
   /// A quiet NaN.
-  class var quietNaN: Self { get }
+  static var quietNaN: Self { get }
 
   /// @{
   /// IEEE 754-2008 Non-computational operations.

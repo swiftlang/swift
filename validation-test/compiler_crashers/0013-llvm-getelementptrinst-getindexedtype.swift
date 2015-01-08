@@ -5,7 +5,7 @@
 // http://www.openradar.me/17359448
 
 protocol a {
-    class func c()
+    static func c()
 }
 class b: a {
     class func c() { }

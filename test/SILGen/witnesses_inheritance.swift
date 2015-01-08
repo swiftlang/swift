@@ -2,12 +2,12 @@
 
 protocol Fooable {
   func foo()
-  class func class_foo()
+  static func class_foo()
 }
 
 protocol Barrable : Fooable {
   func bar()
-  class func class_bar()
+  static func class_bar()
 }
 
 class X : Fooable {

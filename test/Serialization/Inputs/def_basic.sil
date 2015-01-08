@@ -226,7 +226,7 @@ protocol Runcible {
   var free:Int { get }
 
   func free_method() -> Int
-  class func static_method()
+  static func static_method()
 }
 
 //sil @_TF4arch20archetype_member_refUS_8Runcible___FT1xQ__T_ : $@thin <T : Runcible> (T) -> () {
@@ -1157,7 +1157,7 @@ protocol AnyProtocol {
   typealias AssocType
   typealias AssocWithReqt : AssocReqt
   func assocTypesMethod(x: AssocType, y: AssocWithReqt)
-  class func staticMethod(x: Self)
+  static func staticMethod(x: Self)
 }
 class SomeAssoc {
 }

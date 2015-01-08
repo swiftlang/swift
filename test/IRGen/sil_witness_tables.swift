@@ -12,7 +12,7 @@ protocol A {}
 protocol P {
   typealias Assoc: A
 
-  class func staticMethod()
+  static func staticMethod()
   func instanceMethod()
 }
 

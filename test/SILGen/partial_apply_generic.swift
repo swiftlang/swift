@@ -1,7 +1,7 @@
 // RUN: %swift -emit-silgen %s | FileCheck %s
 
 protocol Foo {
-  class func foo()
+  static func foo()
 }
 
 func getFoo<T: Foo>(t: T.Type) -> () -> () {

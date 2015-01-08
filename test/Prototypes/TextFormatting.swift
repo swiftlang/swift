@@ -159,7 +159,7 @@ protocol XPrintableInteger : IntegerLiteralConvertible, Comparable, SignedNumber
 
   // FIXME: Stand-in for constructor pending <rdar://problem/13695680>
   // (Constructor requirements in protocols)
-  class func fromInt(x: Int) -> Self
+  static func fromInt(x: Int) -> Self
   func toInt() -> Int
 }
 

@@ -24,7 +24,7 @@ protocol P {
   func g1(value: Int)
   func g2(value: Int, other: Int)
   func g3(value: Int, other: Int, third: Int) // expected-note{{requirement 'g3(_:other:third:)' declared here}}
-  class func g4(value: Int)
+  static func g4(value: Int)
 }
 
 class PX : P {

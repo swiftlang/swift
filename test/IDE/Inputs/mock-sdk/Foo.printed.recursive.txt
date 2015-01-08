@@ -130,7 +130,7 @@ protocol FooProtocolBase {
    * Ccc.
    */
   func fooProtoFuncWithExtraIndentation2()
-  class func fooProtoClassFunc()
+  static func fooProtoClassFunc()
   var fooProperty1: Int32 { get set }
   var fooProperty2: Int32 { get set }
   var fooProperty3: Int32 { get }

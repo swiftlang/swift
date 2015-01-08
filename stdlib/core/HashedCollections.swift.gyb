@@ -215,7 +215,7 @@ internal protocol _HashStorageType {
   mutating func removeAll(#keepCapacity: Bool)
   var count: Int { get }
 
-  class func fromArray(elements: Array<SequenceElement>) -> Self
+  static func fromArray(elements: Array<SequenceElement>) -> Self
 }
 
 /// The inverse of the default hash table load factor.  Factored out so that it

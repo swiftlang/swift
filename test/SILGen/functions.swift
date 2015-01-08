@@ -121,7 +121,7 @@ func SomeClassWithBenefits() -> SomeClass.Type {
 
 protocol SomeProtocol {
   func method(x: Int)
-  class func static_method(x: Int)
+  static func static_method(x: Int)
 }
 
 struct ConformsToSomeProtocol : SomeProtocol {

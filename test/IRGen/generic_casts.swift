@@ -56,8 +56,8 @@ func anyToInt(x: protocol<>) -> Int {
 }
 
 @objc protocol ObjCProto1 {
-  class func forClass()
-  class func forInstance()
+  static func forClass()
+  static func forInstance()
 
   var prop: NSObject { get }
 }

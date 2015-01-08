@@ -6,7 +6,7 @@ protocol C : class { func c() }
 @objc protocol O { func o() }
 @objc protocol OPT { 
   optional func opt()
-  optional class func static_opt()
+  optional static func static_opt()
 
   optional var prop: O { get }
   optional subscript (x: O) -> O { get }

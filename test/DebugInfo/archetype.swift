@@ -1,12 +1,12 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s -emit-ir -g -o - | FileCheck %s
 
 protocol IntegerArithmeticType {
-  class func uncheckedSubtract(lhs: Self, rhs: Self) -> (Self, Bool)
+  static func uncheckedSubtract(lhs: Self, rhs: Self) -> (Self, Bool)
 }
 
 protocol RandomAccessIndexType : IntegerArithmeticType {
   typealias Distance : IntegerArithmeticType
-  class func uncheckedSubtract(lhs: Self, rhs: Self) -> (Distance, Bool)
+  static func uncheckedSubtract(lhs: Self, rhs: Self) -> (Distance, Bool)
 }
 
 // CHECK: ![[TT:[^,]+]]} ; [ DW_TAG_structure_type ] [_TtTQQq_F9archetype16ExistentialTuple{{.*}}]

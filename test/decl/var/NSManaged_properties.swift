@@ -17,7 +17,7 @@ class SwiftGizmo : A {
   @NSManaged let c: Int  // expected-error {{'NSManaged' attribute not allowed on a 'let' property}}
 
   @NSManaged class var d: Int = 4  // expected-error {{'NSManaged' attribute only allowed on a property in a class}} \
-            // expected-error {{class variables not yet supported}}
+            // expected-error {{class stored properties not yet supported}}
 
 
   @NSManaged var e: Int { return 4 } // expected-error {{'NSManaged' not allowed on computed properties}}

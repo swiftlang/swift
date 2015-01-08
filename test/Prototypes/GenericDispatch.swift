@@ -78,7 +78,7 @@ func distance<T: F>(x: T, y: T) -> Int {
 protocol R_ : F_ {
   // Non-defaulted requirements of R go here, e.g. something to
   // measure the distance in O(1)
-  class func sub(x: Self, y: Self)
+  static func sub(x: Self, y: Self)
 }
 
 protocol R : F, R_ {}

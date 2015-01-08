@@ -26,7 +26,7 @@ protocol AnyProtocol {
 
   func assocTypesMethod(#x: AssocType, y: AssocWithReqt)
 
-  class func staticMethod(#x: Self)
+  static func staticMethod(#x: Self)
 
   func <~>(x: Self, y: Self)
 }
@@ -40,14 +40,14 @@ protocol ClassProtocol : class {
 
   func assocTypesMethod(#x: AssocType, y: AssocWithReqt)
 
-  class func staticMethod(#x: Self)
+  static func staticMethod(#x: Self)
 
   func <~>(x: Self, y: Self)
 }
 
 @objc protocol ObjCProtocol {
   func method(#x: ObjCClass)
-  class func staticMethod(#y: ObjCClass)
+  static func staticMethod(#y: ObjCClass)
 }
 
 class SomeAssoc {}

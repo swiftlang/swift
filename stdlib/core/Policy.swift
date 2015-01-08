@@ -281,7 +281,7 @@ public protocol BitwiseOperationsType {
   /// `^`, and the `fixed point
   /// <http://en.wikipedia.org/wiki/Fixed_point_(mathematics)>`_ for
   /// `&`.
-  class var allZeros: Self { get }
+  static var allZeros: Self { get }
 }
 
 public func |= <T: BitwiseOperationsType>(inout lhs: T, rhs: T) {

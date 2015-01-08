@@ -16,14 +16,14 @@ protocol Test {
   var major : Int { get }
   var minor : Int { get }
   var subminor : Int  // expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
-  class var staticProperty: Int // expected-error{{class variables not yet supported in generic types}} expected-error{{property in protocol must have explicit { get } or { get set } specifier}}
+  static var staticProperty: Int // expected-error{{static stored properties not yet supported in generic types}} expected-error{{property in protocol must have explicit { get } or { get set } specifier}}
 }
 
 protocol Test2 {
   var property: Int { get }
 
   var title: String = "The Art of War" { get } // expected-error{{initial value is not allowed here}}
-  class var title2: String = "The Art of War" // expected-error{{initial value is not allowed here}}
+  static var title2: String = "The Art of War" // expected-error{{initial value is not allowed here}}
 
   typealias mytype
   typealias mybadtype = Int
@@ -290,7 +290,7 @@ func testSubscripting(iis: IntIntSubscriptable, i_s: IntSubscriptable) { // expe
 // Static methods
 //===----------------------------------------------------------------------===//
 protocol StaticP {
-  class func f()
+  static func f()
 }
 protocol InstanceP {
   func f() // expected-note{{protocol requires function 'f()' with type '() -> ()'}}

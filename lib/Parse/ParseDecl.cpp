@@ -3028,13 +3028,10 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       diagnose(Tok, diag::static_var_decl_global_scope, StaticSpelling)
           .fixItRemove(StaticLoc);
       StaticLoc = SourceLoc();
-    } else if (Flags.contains(PD_InProtocol) || Flags.contains(PD_InClass)) {
-      if (StaticSpelling == StaticSpellingKind::KeywordStatic)
-        diagnose(Tok, diag::static_var_in_class)
-            .fixItReplace(StaticLoc, "class");
-    } else if (!Flags.contains(PD_InExtension)) {
+    } else if (Flags.contains(PD_InStruct) || Flags.contains(PD_InEnum) ||
+               Flags.contains(PD_InProtocol)) {
       if (StaticSpelling == StaticSpellingKind::KeywordClass)
-        diagnose(Tok, diag::class_var_in_struct)
+        diagnose(Tok, diag::class_var_not_in_class)
             .fixItReplace(StaticLoc, "static");
     }
   }
@@ -3280,13 +3277,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
       diagnose(Tok, diag::static_func_decl_global_scope, StaticSpelling)
           .fixItRemove(StaticLoc);
       StaticLoc = SourceLoc();
-    } else if (Flags.contains(PD_InProtocol) || Flags.contains(PD_InClass)) {
-      if (StaticSpelling == StaticSpellingKind::KeywordStatic)
-        diagnose(Tok, diag::static_func_in_class)
-            .fixItReplace(StaticLoc, "class");
-    } else if (!Flags.contains(PD_InExtension)) {
+    } else if (Flags.contains(PD_InStruct) || Flags.contains(PD_InEnum) ||
+               Flags.contains(PD_InProtocol)) {
       if (StaticSpelling == StaticSpellingKind::KeywordClass)
-        diagnose(Tok, diag::class_func_in_struct)
+        diagnose(Tok, diag::class_func_not_in_class)
             .fixItReplace(StaticLoc, "static");
     }
   }
@@ -3537,7 +3531,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   } else {
     ContextChange CC(*this, UD);
     Scope S(this, ScopeKind::ClassBody);
-    ParseDeclOptions Options(PD_HasContainerType | PD_AllowEnumElement);
+    ParseDeclOptions Options(PD_HasContainerType | PD_AllowEnumElement | PD_InEnum);
     if (parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
                                 diag::expected_rbrace_enum,
                                 Options))
@@ -3791,9 +3785,10 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
     // Parse the body.
     ContextChange CC(*this, SD);
     Scope S(this, ScopeKind::StructBody);
+    ParseDeclOptions Options(PD_HasContainerType | PD_InStruct);
     if (parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
                                 diag::expected_rbrace_struct,
-                                PD_HasContainerType))
+                                Options))
       Status.setIsParseError();
   }
 

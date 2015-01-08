@@ -71,7 +71,7 @@ public protocol UnicodeCodecType {
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`\ s by `put`\
   /// 'ing each `CodeUnit` to `output`.
-  class func encode<
+  static func encode<
     S : SinkType where S.Element == CodeUnit
   >(input: UnicodeScalar, inout output: S)
 }
@@ -822,8 +822,8 @@ internal func _transcodeSomeUTF16AsUTF8<
 /// representation.
 public // @testable
 protocol _StringElementType {
-  class func _toUTF16CodeUnit(_: Self) -> UTF16.CodeUnit
-  class func _fromUTF16CodeUnit(utf16: UTF16.CodeUnit) -> Self
+  static func _toUTF16CodeUnit(_: Self) -> UTF16.CodeUnit
+  static func _fromUTF16CodeUnit(utf16: UTF16.CodeUnit) -> Self
 }
 
 extension UTF16.CodeUnit : _StringElementType {

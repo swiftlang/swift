@@ -300,13 +300,13 @@ protocol Runcible {
 
   func free_method() -> Int
   mutating func associated_method() -> U.Type
-  class func static_method()
+  static func static_method()
 }
 
 protocol Mincible {
   var free:Int { get }
   func free_method() -> Int
-  class func static_method()
+  static func static_method()
 }
 
 protocol Bendable { }

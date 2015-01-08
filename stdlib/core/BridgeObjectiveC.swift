@@ -25,14 +25,14 @@ public protocol _ObjectiveCBridgeable {
   /// successfully to `Self`; for example, an `NSArray` will only
   /// convert successfully to `[String]` if it contains only
   /// `NSString`\ s.
-  class func _isBridgedToObjectiveC() -> Bool
+  static func _isBridgedToObjectiveC() -> Bool
   
   // _getObjectiveCType is a workaround: right now protocol witness
   // tables don't include associated types, so we can not find
   // '_ObjectiveCType.self' from them.
   
   /// Must return `_ObjectiveCType.self`.
-  class func _getObjectiveCType() -> Any.Type
+  static func _getObjectiveCType() -> Any.Type
 
   /// Convert `self` to Objective-C
   func _bridgeToObjectiveC() -> _ObjectiveCType
@@ -47,7 +47,7 @@ public protocol _ObjectiveCBridgeable {
   ///
   /// :param: result The location where the result is written. The optional
   /// will always contain a value.
-  class func _forceBridgeFromObjectiveC(
+  static func _forceBridgeFromObjectiveC(
     source: _ObjectiveCType,
     inout result: Self?
   )
@@ -66,7 +66,7 @@ public protocol _ObjectiveCBridgeable {
   /// information is provided for the convenience of the runtime's dynamic_cast
   /// implementation, so that it need not look into the optional representation
   /// to determine success.
-  class func _conditionallyBridgeFromObjectiveC(
+  static func _conditionallyBridgeFromObjectiveC(
     source: _ObjectiveCType,
     inout result: Self?
   ) -> Bool

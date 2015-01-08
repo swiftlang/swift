@@ -47,8 +47,8 @@ protocol TestProtocol {
   func doesReturn()
 
   // expected-note@+1 {{protocol requires function 'neverReturnsStatic()' with type '@noreturn () -> ()'}}
-  @noreturn class func neverReturnsStatic()
-  class func doesReturnStatic()
+  @noreturn static func neverReturnsStatic()
+  static func doesReturnStatic()
 }
 // expected-error@+1 {{type 'ConformsToProtocolA' does not conform to protocol 'TestProtocol'}}
 struct ConformsToProtocolA : TestProtocol {

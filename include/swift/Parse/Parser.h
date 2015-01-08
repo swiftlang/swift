@@ -611,6 +611,8 @@ public:
     PD_InProtocol           = 1 << 8,
     PD_InClass              = 1 << 9,
     PD_InExtension          = 1 << 10,
+    PD_InStruct             = 1 << 11,
+    PD_InEnum               = 1 << 12
   };
 
   /// Options that control the parsing of declarations.

@@ -64,7 +64,7 @@ any.1 // expected-error{{'Any' does not have a member named '1'}}
 
 // Fun with tuples
 protocol PosixErrorReturn {
-  class func errorReturnValue() -> Self
+  static func errorReturnValue() -> Self
 }
 
 extension Int : PosixErrorReturn {

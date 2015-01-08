@@ -240,7 +240,7 @@ protocol Runcible {
   var free:Int { get }
 
   func free_method() -> Int
-  class func static_method()
+  static func static_method()
 }
 
 /* SIL parsing of substitutions in apply insts is totally busted.

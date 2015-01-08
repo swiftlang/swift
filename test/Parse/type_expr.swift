@@ -21,7 +21,7 @@ protocol Zim {
 
   init()
   // TODO class var prop: Int { get }
-  class func meth() {} // expected-error{{protocol methods may not have bodies}}
+  static func meth() {} // expected-error{{protocol methods may not have bodies}}
   func instMeth() {} // expected-error{{protocol methods may not have bodies}}
 }
 

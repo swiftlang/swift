@@ -839,7 +839,7 @@ static StaticSpellingKind getCorrectStaticSpellingForDecl(const Decl *D) {
   auto StaticSpelling = StaticSpellingKind::KeywordStatic;
   if (Type T = D->getDeclContext()->getDeclaredTypeInContext()) {
     if (auto NTD = T->getAnyNominal()) {
-      if (isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD))
+      if (isa<ClassDecl>(NTD))
         StaticSpelling = StaticSpellingKind::KeywordClass;
     }
   }

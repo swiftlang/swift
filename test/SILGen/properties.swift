@@ -801,7 +801,7 @@ class ObservedDerived : ObservedBase {
 
 /// <rdar://problem/16953517> Class properties should be allowed in protocols, even without stored class properties
 protocol ProtoWithClassProp {
-  class var x: Int { get }
+  static var x: Int { get }
 }
 
 class ClassWithClassProp : ProtoWithClassProp {

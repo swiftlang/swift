@@ -38,7 +38,7 @@ import Foundation
 // CHECK-NEXT: @end
 @objc protocol Methods {
   func test()
-  class func test2()
+  static func test2()
 
   func testRawAnyTypes(any: AnyObject, other: AnyObject.Type)
 

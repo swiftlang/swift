@@ -130,7 +130,7 @@ protocol <loc>FooProtocolBase</loc> {
    * Ccc.
    */
   func <loc>fooProtoFuncWithExtraIndentation2()</loc></decl>
-  <decl:Func>class func <loc>fooProtoClassFunc()</loc></decl>
+  <decl:Func>static func <loc>fooProtoClassFunc()</loc></decl>
   <decl:Var>var <loc>fooProperty1</loc>: <ref:Struct>Int32</ref> { get set }</decl>
   <decl:Var>var <loc>fooProperty2</loc>: <ref:Struct>Int32</ref> { get set }</decl>
   <decl:Var>var <loc>fooProperty3</loc>: <ref:Struct>Int32</ref> { get }</decl>

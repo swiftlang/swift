@@ -24,7 +24,7 @@ func archetype_associated_type_method<T: WithAssocType>(#x: T, #y: T.AssocType) 
   return x.useAssocType(x: y)
 }
 
-protocol StaticMethod { class func staticMethod() }
+protocol StaticMethod { static func staticMethod() }
 
 // CHECK-LABEL: sil hidden @_TF9witnesses23archetype_static_methodUS_12StaticMethod__FT1xQ__T_ : $@thin <T where T : StaticMethod> (@in T) -> ()
 func archetype_static_method<T: StaticMethod>(#x: T) {
@@ -325,7 +325,7 @@ struct LabeledSelfWitness : UnlabeledSelfRequirement {
 }
 
 protocol ReadOnlyRequirement {
-  class var prop: String { get }
+  static var prop: String { get }
 }
 
 struct ImmutableModel: ReadOnlyRequirement {

@@ -119,7 +119,7 @@ func local_properties<T>(inout t: T) {
 }
 
 protocol Fooable {
-  class func foo() -> Bool
+  static func foo() -> Bool
 }
 
 // <rdar://problem/16399018>

@@ -2,7 +2,7 @@
 
 protocol Fooable: class {
   func foo()
-  class func bar()
+  static func bar()
   init()
 }
 

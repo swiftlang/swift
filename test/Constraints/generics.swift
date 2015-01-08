@@ -28,7 +28,7 @@ extension UnicodeScalar {
 }
 
 protocol P {
-  class func foo(arg: Self) -> Self
+  static func foo(arg: Self) -> Self
 }
 struct S : P {
   static func foo(arg: S) -> S {
