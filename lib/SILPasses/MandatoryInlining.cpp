@@ -395,16 +395,6 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
       TypeSubstitutionMap ContextSubs;
       std::vector<Substitution> ApplySubs(InnerAI->getSubstitutions());
 
-      // FIXME: Check for unbound generic types *before* adding the
-      //        substitutions from the partial apply. We currently
-      //        have code in the stdlib that appears to rely on
-      //        inlining apply of a partial_apply where the
-      //        partial_apply takes unbound generics.
-      if (hasUnboundGenericTypes(ApplySubs)) {
-        I = InnerAI;
-        continue;
-      }
-
       if (PAI) {
         auto PAISubs = PAI->getSubstitutions();
         ApplySubs.insert(ApplySubs.end(), PAISubs.begin(), PAISubs.end());

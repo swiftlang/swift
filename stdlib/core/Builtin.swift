@@ -81,6 +81,7 @@ func _roundUpToAlignment(offset: Int, alignment: Int) -> Int {
 
 /// Returns a tri-state of 0 = no, 1 = yes, 2 = maybe.
 @transparent
+public // @testable
 func _canBeClass<T>(_: T.Type) -> Int8 {
   return Int8(Builtin.canBeClass(T.self))
 }

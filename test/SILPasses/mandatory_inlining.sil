@@ -637,13 +637,13 @@ sil [transparent] @middle : $@thin <T> (@out T, Int, @in T) -> () {
 bb0(%0 : $*T, %1 : $Int, %2 : $*T):
   debug_value %1 : $Int
   debug_value_addr %2 : $*T
-  // CHECK: [[REF:%[a-zA-Z0-9]+]] = function_ref @inner
+  // CHECK-NOT: [[REF:%[a-zA-Z0-9]+]] = function_ref @inner
   %5 = function_ref @inner : $@thin <τ_0_0, τ_0_1> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
   %6 = alloc_stack $Int
   store %1 to %6#1 : $*Int
   %8 = alloc_stack $T
   copy_addr %2 to [initialization] %8#1 : $*T
-  // CHECK: apply [transparent] [[REF]]
+  // CHECK-NOT: apply [transparent]
   %10 = apply [transparent] %5<Int, T>(%0, %6#1, %8#1) : $@thin <τ_0_0, τ_0_1> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
   dealloc_stack %8#0 : $*@local_storage T
   dealloc_stack %6#0 : $*@local_storage Int
@@ -698,4 +698,79 @@ bb0(%0 : $Foo):
   strong_release %0 : $Foo
   %6 = tuple ()
   return %6 : $()
+}
+
+// CHECK-LABEL: sil [transparent] @identity
+sil [transparent] @identity : $@thin <T> (@out T, @in T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  debug_value_addr %1 : $*T
+  copy_addr [take] %1 to [initialization] %0 : $*T
+  %4 = tuple ()
+  // CHECK: return
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil @applyIdentity
+sil @applyIdentity : $@thin <T> (@out T, @in T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  debug_value_addr %1 : $*T
+  %3 = function_ref @identity : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+  %4 = alloc_stack $T
+  copy_addr %1 to [initialization] %4#1 : $*T
+  // CHECK-NOT: apply
+  %6 = apply [transparent] %3<T>(%0, %4#1) : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+  dealloc_stack %4#0 : $*@local_storage T
+  destroy_addr %1 : $*T
+  %9 = tuple ()
+  // CHECK: return
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil [transparent] @partial
+sil [transparent] @partial : $@thin <T, U> (@out U, @in T, @owned @callee_owned (@out U, @in T) -> ()) -> () {
+bb0(%0 : $*U, %1 : $*T, %2 : $@callee_owned (@out U, @in T) -> ()):
+  debug_value_addr %1 : $*T
+  debug_value %2 : $@callee_owned (@out U, @in T) -> ()
+  strong_retain %2 : $@callee_owned (@out U, @in T) -> ()
+  %6 = alloc_stack $T
+  copy_addr %1 to [initialization] %6#1 : $*T
+  // CHECK: apply %2
+  %8 = apply %2(%0, %6#1) : $@callee_owned (@out U, @in T) -> ()
+  dealloc_stack %6#0 : $*@local_storage T
+  strong_release %2 : $@callee_owned (@out U, @in T) -> ()
+  destroy_addr %1 : $*T
+  %12 = tuple ()
+  // CHECK: return
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil @applyPartial
+sil @applyPartial : $@thin <U> (@out U, Builtin.Int32, @owned @callee_owned (@out U, Builtin.Int32) -> ()) -> () {
+bb0(%0 : $*U, %1 : $Builtin.Int32, %2 : $@callee_owned (@out U, Builtin.Int32) -> ()):
+  debug_value %1 : $Builtin.Int32
+  debug_value %2 : $@callee_owned (@out U, Builtin.Int32) -> ()
+  %5 = function_ref @partial : $@thin <τ_0_0, τ_0_1> (@out τ_0_1, @in τ_0_0, @owned @callee_owned (@out τ_0_1, @in τ_0_0) -> ()) -> ()
+  %6 = alloc_stack $Builtin.Int32
+  store %1 to %6#1 : $*Builtin.Int32
+  strong_retain %2 : $@callee_owned (@out U, Builtin.Int32) -> ()
+  %9 = function_ref @reabstractionThunk : $@thin <τ_0_0> (@out τ_0_0, @in Builtin.Int32, @owned @callee_owned (@out τ_0_0, Builtin.Int32) -> ()) -> ()
+  // CHECK: [[PARTIAL:%[0-9a-zA-Z]+]] = partial_apply
+  %10 = partial_apply %9<U>(%2) : $@thin <τ_0_0> (@out τ_0_0, @in Builtin.Int32, @owned @callee_owned (@out τ_0_0, Builtin.Int32) -> ()) -> ()
+  // CHECK-NOT: apply [transparent]
+  // CHECK: apply [[PARTIAL]]
+  %11 = apply [transparent] %5<Builtin.Int32, U>(%0, %6#1, %10) : $@thin <τ_0_0, τ_0_1> (@out τ_0_1, @in τ_0_0, @owned @callee_owned (@out τ_0_1, @in τ_0_0) -> ()) -> ()
+  dealloc_stack %6#0 : $*@local_storage Builtin.Int32
+  strong_release %2 : $@callee_owned (@out U, Builtin.Int32) -> ()
+  %14 = tuple ()
+  // CHECK: return
+  return %14 : $()
+}
+
+// CHECK-LABEL: sil [transparent] @reabstractionThunk
+sil [transparent] @reabstractionThunk : $@thin <U> (@out U, @in Builtin.Int32, @owned @callee_owned (@out U, Builtin.Int32) -> ()) -> () {
+bb0(%0 : $*U, %1 : $*Builtin.Int32, %2 : $@callee_owned (@out U, Builtin.Int32) -> ()):
+  %3 = load %1 : $*Builtin.Int32
+  %4 = apply %2(%0, %3) : $@callee_owned (@out U, Builtin.Int32) -> ()
+  // CHECK: return
+  return %4 : $()
 }
