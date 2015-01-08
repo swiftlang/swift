@@ -29,7 +29,8 @@ namespace swift {
   public:
     /// The invalidation Lattice.
     /// This is a hierarchy of invalidation messages that are sent to analysis
-    /// objects. Every invalidation kind invalidates the levels below it.
+    /// objects. Every invalidation kind invalidates the levels before it. For
+    /// example, CFG invalidates Instructions and CFG.
     enum class InvalidationKind {
       Instructions,  // Invalidate instruction-related analysis.
       CFG,           // The control flow changes.
