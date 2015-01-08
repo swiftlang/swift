@@ -46,7 +46,11 @@ foreach(loc ${clang_headers_locations})
   endif()
 endforeach()
 if("${clang_headers_location}" STREQUAL "")
-  message(FATAL_ERROR "Clang headers were not found")
+  if(SWIFT_BUILT_STANDALONE)
+    message(FATAL_ERROR "Clang headers were not found")
+  else()
+    set(clang_headers_location "${LLVM_LIBRARY_DIR}/clang")
+  endif()
 endif()
 
 add_custom_command_target(unused_var
