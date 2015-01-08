@@ -241,7 +241,7 @@ static void rewriteApplyInst(ArgDescriptor &AD, SILFunction *NewF) {
     NewArgs.push_back(Arg);
 
   SILType LoweredType = NewF->getLoweredType();
-  SILType ResultType = LoweredType.castTo<SILFunctionType>()->getSILResult();
+  SILType ResultType = LoweredType.getFunctionInterfaceResultType();
   ApplyInst *NewAI = Builder.createApply(AD.AI->getLoc(), FRI, LoweredType,
                                          ResultType, ArrayRef<Substitution>(),
                                          NewArgs, NewF->isTransparent());
