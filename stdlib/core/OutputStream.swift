@@ -101,6 +101,7 @@ func _adHocPrint<T, TargetStream : OutputStreamType>(
 ///
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
+@inline(never)
 public func print<T, TargetStream : OutputStreamType>(
     object: T, inout target: TargetStream
 ) {
@@ -131,6 +132,7 @@ public func print<T, TargetStream : OutputStreamType>(
 ///
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
+@inline(never)
 public func println<T, TargetStream : OutputStreamType>(
     object: T, inout target: TargetStream
 ) {
@@ -160,6 +162,7 @@ public func print<T>(object: T) {
 ///
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
+@inline(never)
 public func println<T>(object: T) {
   var stdoutStream = _Stdout()
   print(object, &stdoutStream)
@@ -167,12 +170,14 @@ public func println<T>(object: T) {
 }
 
 /// Writes a single newline character into the standard output.
+@inline(never)
 public func println() {
   var stdoutStream = _Stdout()
   stdoutStream.write("\n")
 }
 
 /// Returns the result of `print`\ 'ing `x` into a `String`
+@inline(never)
 public func toString<T>(x: T) -> String {
   var result = ""
   print(x, &result)
@@ -218,6 +223,7 @@ public func toDebugString<T>(x: T) -> String {
 /// * Otherwise, fall back to a default textual representation.
 ///
 /// See also: `debugPrintln(x, &target)`
+@inline(never)
 public func debugPrint<T, TargetStream : OutputStreamType>(
     object: T, inout target: TargetStream
 ) {
@@ -248,6 +254,7 @@ public func debugPrint<T, TargetStream : OutputStreamType>(
 /// * Otherwise, fall back to a default textual representation.
 ///
 /// See also: `debugPrint(x, &target)`
+@inline(never)
 public func debugPrintln<T, TargetStream : OutputStreamType>(
     x: T, inout target: TargetStream
 ) {
@@ -264,6 +271,7 @@ public func debugPrintln<T, TargetStream : OutputStreamType>(
 /// * Otherwise, fall back to a default textual representation.
 ///
 /// See also: `debugPrintln(x)`
+@inline(never)
 public func debugPrint<T>(x: T) {
   var stdoutStream = _Stdout()
   debugPrint(x, &stdoutStream)
@@ -278,6 +286,7 @@ public func debugPrint<T>(x: T) {
 /// * Otherwise, fall back to a default textual representation.
 ///
 /// See also: `debugPrint(x)`
+@inline(never)
 public func debugPrintln<T>(x: T) {
   var stdoutStream = _Stdout()
   debugPrint(x, &stdoutStream)
