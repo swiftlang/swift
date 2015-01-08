@@ -50,7 +50,6 @@ namespace {
 
 /// Promotes a single AllocStackInst into registers..
 class StackAllocationPromoter {
-  typedef SmallVector<SILBasicBlock *, 16> BlockList;
   typedef llvm::DomTreeNodeBase<SILBasicBlock> DomTreeNode;
   typedef llvm::DenseSet<SILBasicBlock *> BlockSet;
   typedef llvm::DenseMap<SILBasicBlock *, SILInstruction *> BlockToInstMap;
