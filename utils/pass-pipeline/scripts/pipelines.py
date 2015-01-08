@@ -8,28 +8,34 @@ import argparse
 PIPELINES = ["PreSpecialize", "HighLevel", "EarlyLoopOpt", "MidLevelOpt", "Lower", "LowLevel", "LateLoopOpt"]
 PASSES = ["ABCOpt", "AllocBoxToStack", "COWArrayOpts", "CSE", "CapturePromotion", "CapturePropagation", "ClosureSpecializer", "CodeMotion", "CopyForwarding", "DCE", "DeadFunctionElimination", "DeadObjectElimination", "Devirtualizer", "EarlyInliner", "FunctionSignatureOpts", "GenericSpecializer", "GlobalARCOpts", "GlobalLoadStoreOpts", "GlobalOpt", "InlineCaches", "InstCount", "LICM", "LateInliner", "LoopRotate", "LowerAggregateInstrs", "MandatoryInlining", "Mem2Reg", "NoReturnFolding", "PerfInliner", "PerformanceConstantPropagation", "SILCleanup", "SILCombine", "SILLinker", "SROA", "SimplifyCFG", "SwiftArrayOpts"]
 
-DEFAULT_PRESENTS = "--preset=buildbot_incremental,tools=RA,stdlib=RA"
+DEFAULT_PRESENTS = "--preset=buildbot_incremental_extra_swift_args,tools=RA,stdlib=RD"
 
 def run_build_script_with_data_file(build_script, data_file):
-    build_script_args = [build_script, DEFAULT_PRESENTS, "--extra-swift-args='^Swift$;-Xfrontend\;-external-pass-pipeline-filename\;-Xfrontend\;%s'" % data_file]
+    build_script_args = [build_script, DEFAULT_PRESENTS, 'extra_swift_args=^Swift$;-Xfrontend\;-external-pass-pipeline-filename\;-Xfrontend\;%s' % data_file]
     sys.stdout.write("Running build script with: %s\n" % ' '.join(build_script_args))
     subprocess.check_call(build_script_args)
 
 def build_disable_slice_pipelines(pipeline_script, build_script, output_dir):
     pipeline_range = range(len(PIPELINES))
+
+    def get_pipeline_args(script, iter):
+        result = [script]
+        for j in iter:
+            result.extend(['--disable-passpipeline', PIPELINES[j]])
+        return result
+
     for i in pipeline_range:
-        # Create a list consisting of ['--disable-passpipeline', pipeline_range[0], '--disable-passpipeline', pipeline_range[1]
-        pipeline_args = [pipeline_script] + zip(['--disable-passpipeline']*(i+1), pipeline_range[:i+1])
+        pipeline_args = get_pipeline_args(pipeline_script, pipeline_range[:i+1])
         data_file = os.path.join(output_dir, "pipeline-slice-%.2d-disabled-pipeline.json" % i)
         with open(data_file, 'w') as f:
-            subprocess.check_call(pipeline_args, stdout=f)
+            f.write(subprocess.check_output(pipeline_args))
         run_build_script_with_data_file(build_script, data_file)
 
 def build_disable_individual_passes(pipeline_script, build_script, output_dir):
     for p in PASSES:
         data_file = os.path.join(output_dir, "%s-disabled-pass.json" % p)
         with open(data_file, 'w') as f:
-            subprocess.check_call([pipeline_script, '--disable-pass', p], stdout=f)
+            f.write(subprocess.check_output([pipeline_script, '--disable-pass', p]))
         run_build_script_with_data_file(build_script, data_file)
 
 def main():
