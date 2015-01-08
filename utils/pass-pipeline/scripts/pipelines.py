@@ -12,10 +12,10 @@ DEFAULT_PRESENTS = "--preset=buildbot_incremental,tools=RA,stdlib=RA"
 
 def run_build_script_with_data_file(build_script, data_file):
     build_script_args = [build_script, DEFAULT_PRESENTS, "--extra-swift-args='^Swift$;-Xfrontend\;-external-pass-pipeline-filename\;-Xfrontend\;%s'" % data_file]
-    print("Running build script with: %s" % ' '.join(build_script_args))
+    sys.stdout.write("Running build script with: %s\n" % ' '.join(build_script_args))
     subprocess.check_call(build_script_args)
 
-def build_disabling_slice_pipelines(pipeline_script, build_script, output_dir):
+def build_disable_slice_pipelines(pipeline_script, build_script, output_dir):
     pipeline_range = range(len(PIPELINES))
     for i in pipeline_range:
         # Create a list consisting of ['--disable-passpipeline', pipeline_range[0], '--disable-passpipeline', pipeline_range[1]
@@ -25,11 +25,11 @@ def build_disabling_slice_pipelines(pipeline_script, build_script, output_dir):
             subprocess.check_call(pipeline_args, stdout=f)
         run_build_script_with_data_file(build_script, data_file)
 
-def build_disabling_slice_pipelines(pipeline_script, build_script, output_dir):
+def build_disable_individual_passes(pipeline_script, build_script, output_dir):
     for p in PASSES:
         data_file = os.path.join(output_dir, "%s-disabled-pass.json" % p)
         with open(data_file, 'w') as f:
-            subprocess.check_call([pipeline_script, '--disable-pass', p, stdout=f)
+            subprocess.check_call([pipeline_script, '--disable-pass', p], stdout=f)
         run_build_script_with_data_file(build_script, data_file)
 
 def main():
@@ -43,9 +43,9 @@ def main():
 
     # TODO: I think I can get argparse to do this for me.
     if args.action == "disable_slice_pipelines":
-        build_disabling_slice_pipelines(args.pipeline_script, args.build_script, args.output_dir)
+        build_disable_slice_pipelines(args.pipeline_script, args.build_script, args.output_dir)
     elif args.action == "disable_individual_passes":
-        build_disabling_individual_passes(args.pipeline_script, args.build_script, args.output_dir)
+        build_disable_individual_passes(args.pipeline_script, args.build_script, args.output_dir)
     raise RuntimeError("Out of sync with choices")
 
 if __name__ == "__main__":
