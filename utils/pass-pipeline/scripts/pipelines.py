@@ -18,7 +18,7 @@ def run_build_script_with_data_file(build_script, data_file):
 def build_disabling_slice_pipelines(pipeline_script, build_script, output_dir):
     pipeline_range = range(len(PIPELINES))
     for i in pipeline_range:
-        # Create a list consisting of ['--disable-passpipeline', pipeline_range[0], '--disable-passpipeline', pipeline_range[1]        
+        # Create a list consisting of ['--disable-passpipeline', pipeline_range[0], '--disable-passpipeline', pipeline_range[1]
         pipeline_args = [pipeline_script] + zip(['--disable-passpipeline']*(i+1), pipeline_range[:i+1])
         data_file = os.path.join(output_dir, "pipeline-slice-%.2d-disabled-pipeline.json" % i)
         with open(data_file, 'w') as f:
