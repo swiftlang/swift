@@ -1805,7 +1805,6 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   auto *FalseTrampolineBr = getTrampolineWithoutBBArgsTerminator(FalseSide);
   if (FalseTrampolineBr &&
       !wouldIntroduceCriticalEdge(BI, FalseTrampolineBr->getDestBB())) {
-    ThisBB->getParent()->dump();
     SILBuilderWithScope<1>(BI).createCondBranch(
         BI->getLoc(), BI->getCondition(),
         TrueSide, TrueArgs,
