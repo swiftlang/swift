@@ -21,6 +21,19 @@
 
 using namespace swift;
 
+ClusteredBitVector ClusteredBitVector::fromAPInt(const llvm::APInt &bits) {
+  // This is not a very efficient algorithm.
+  ClusteredBitVector result;
+  for (unsigned i = 0, e = bits.getBitWidth(); i != e; ++i) {
+    if (bits[i]) {
+      result.appendSetBits(1);
+    } else {
+      result.appendClearBits(1);
+    }
+  }
+  return result;
+}
+
 llvm::APInt ClusteredBitVector::asAPInt() const {
   if (isInlineAndAllClear()) {
     return llvm::APInt(size(), 0);
@@ -36,7 +49,7 @@ void ClusteredBitVector::reallocate(size_t newCapacityInChunks) {
   // will still apply, and we just need to copy the old data into
   // the new allocation.
   if (hasOutOfLineData()) {
-    auto oldData = getOutOfLineData();
+    auto oldData = getOutOfLineChunksPtr();
     allocateAndCopyFrom(oldData, newCapacityInChunks, getLengthInChunks());
     delete[] (oldData - 1);
     return;
@@ -80,7 +93,7 @@ void ClusteredBitVector::appendReserved(size_t numBits,
   // Check whether the current end of the vector is a clean multiple
   // of the chunk size.
   auto offset = LengthInBits % ChunkSizeInBits;
-  ChunkType *nextChunk = &getData()[LengthInBits / ChunkSizeInBits];
+  ChunkType *nextChunk = &getChunksPtr()[LengthInBits / ChunkSizeInBits];
 
   // Now we can go ahead and add in the right number of extra bits.
   LengthInBits += numBits;

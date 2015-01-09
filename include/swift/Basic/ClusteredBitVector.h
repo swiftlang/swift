@@ -115,14 +115,27 @@ class ClusteredBitVector {
   /// Return true if this vector is not using out-of-line storage and
   /// does not have any bits set.  This is a special-case representation
   /// where the capacity can be smaller than the length.
+  ///
+  /// This is a necessary condition for hasSufficientChunkStorage(),
+  /// and it's quicker to test, so a lot of routines in this class
+  /// that need to work on chunk data in the general case test this
+  /// first.
   bool isInlineAndAllClear() const {
     assert(!hasOutOfLineData() || Data != 0);
     return Data == 0;
   }
 
+  /// Return true if this vector is not in the special case where the
+  /// capacity is smaller than the length.  If this is true, then
+  /// it's safe to call routines like getChunks().
+  bool hasSufficientChunkStorage() const {
+    return !(isInlineAndAllClear() && LengthInBits > ChunkSizeInBits);
+  }
+
   /// Return the number of chunks required in order to store the full
   /// length (not capacity) of this bit vector.  This may be greater
-  /// than the capacity in exactly one case, (2a).
+  /// than the capacity in exactly one case, (2a), i.e.
+  /// !hasSufficientChunkStorage().
   size_t getLengthInChunks() const {
     return getNumChunksForBits(LengthInBits);
   }
@@ -147,7 +160,7 @@ class ClusteredBitVector {
   /// that it's using out-of-line storage.
   size_t getOutOfLineCapacityInBits() const {
     assert(hasOutOfLineData());
-    return (size_t) getOutOfLineData()[-1];
+    return (size_t) getOutOfLineChunksPtr()[-1];
   }
 
   /// Return the current capacity of this bit vector, in chunks, given
@@ -157,36 +170,38 @@ class ClusteredBitVector {
   }
 
   /// Return a pointer to the data storage of this bit vector.
-  ChunkType *getData() {
-    return (hasOutOfLineData() ? getOutOfLineData() : &Data);
+  ChunkType *getChunksPtr() {
+    assert(hasSufficientChunkStorage());
+    return (hasOutOfLineData() ? getOutOfLineChunksPtr() : &Data);
   }
-  const ChunkType *getData() const {
-    return (hasOutOfLineData() ? getOutOfLineData() : &Data);
+  const ChunkType *getChunksPtr() const {
+    assert(hasSufficientChunkStorage());
+    return (hasOutOfLineData() ? getOutOfLineChunksPtr() : &Data);
   }
 
   MutableArrayRef<ChunkType> getChunks() {
-    assert(!isInlineAndAllClear());
-    return { getData(), getLengthInChunks() };
+    assert(hasSufficientChunkStorage());
+    return { getChunksPtr(), getLengthInChunks() };
   }
   ArrayRef<ChunkType> getChunks() const {
-    assert(!isInlineAndAllClear());
-    return { getData(), getLengthInChunks() };
+    assert(hasSufficientChunkStorage());
+    return { getChunksPtr(), getLengthInChunks() };
   }
 
   MutableArrayRef<ChunkType> getOutOfLineChunks() {
-    return { getOutOfLineData(), getLengthInChunks() };
+    return { getOutOfLineChunksPtr(), getLengthInChunks() };
   }
   ArrayRef<ChunkType> getOutOfLineChunks() const {
-    return { getOutOfLineData(), getLengthInChunks() };
+    return { getOutOfLineChunksPtr(), getLengthInChunks() };
   }
 
   /// Return a pointer to the data storage of this bit vector, given
   /// that it's using out-of-line storage.
-  ChunkType *getOutOfLineData() {
+  ChunkType *getOutOfLineChunksPtr() {
     assert(hasOutOfLineData());
     return reinterpret_cast<ChunkType*>(Data);
   }
-  const ChunkType *getOutOfLineData() const {
+  const ChunkType *getOutOfLineChunksPtr() const {
     assert(hasOutOfLineData());
     return reinterpret_cast<const ChunkType*>(Data);
   }
@@ -232,10 +247,10 @@ public:
       if (otherLengthInChunks <= getOutOfLineCapacityInChunks()) {
         LengthInBits = other.LengthInBits;
         if (other.isInlineAndAllClear()) {
-          memset(getOutOfLineData(), 0,
+          memset(getOutOfLineChunksPtr(), 0,
                  otherLengthInChunks * sizeof(ChunkType));
         } else {
-          memcpy(getOutOfLineData(), other.getData(),
+          memcpy(getOutOfLineChunksPtr(), other.getChunksPtr(),
                  otherLengthInChunks * sizeof(ChunkType));
         }
         return *this;
@@ -288,10 +303,6 @@ public:
   /// Reserve space for an extra N bits.  This may unnecessarily force
   /// the vector to use an out-of-line representation.
   void reserveExtra(size_t numBits) {
-    // Other parts of the implementation rely on this method putting
-    // the vector in a state where getData() can be safely assigned
-    // into.
-
     auto requiredBits = LengthInBits + numBits;
     if (requiredBits > getCapacityInBits()) {
       auto requiredChunks = getNumChunksForBits(requiredBits);
@@ -307,6 +318,7 @@ public:
 
       reallocate(chunkCount);
     }
+    // Postcondition: hasSufficientChunkStorage().
   }
 
   /// Reserve space for a total of N bits.  This may unnecessarily
@@ -315,6 +327,7 @@ public:
     if (requiredSize > getCapacityInBits()) {
       reallocate(getNumChunksForBits(requiredSize));
     }
+    // Postcondition: hasSufficientChunkStorage().
   }
 
   /// Append the bits from the given vector to this one.
@@ -347,7 +360,7 @@ public:
     if (other.isInlineAndAllClear()) {
       appendConstantBitsReserved(other.size(), 0);
     } else {
-      appendReserved(other.size(), other.getData());
+      appendReserved(other.size(), other.getChunksPtr());
     }
   }
 
@@ -382,6 +395,13 @@ public:
     appendConstantBitsReserved(numBits, 0);
   }
 
+  /// Extend the vector out to the given length with clear bits.
+  void extendWithClearBits(size_t newSize) {
+    assert(newSize >= size());
+    appendClearBits(newSize - size());
+  }
+
+
   /// Append a number of set bits to this vector.
   void appendSetBits(size_t numBits) {
     if (numBits == 0) return;
@@ -389,19 +409,25 @@ public:
     appendConstantBitsReserved(numBits, 1);
   }
 
+  /// Extend the vector out to the given length with set bits.
+  void extendWithSetBits(size_t newSize) {
+    assert(newSize >= size());
+    appendSetBits(newSize - size());
+  }
+
   /// Test whether a particular bit is set.
   bool operator[](size_t i) const {
     assert(i < size());
     if (isInlineAndAllClear()) return false;
-    return getData()[i / ChunkSizeInBits]
+    return getChunks()[i / ChunkSizeInBits]
              & (ChunkType(1) << (i % ChunkSizeInBits));
   }
 
-  /// Intersect two vectors of the same size.
+  /// Intersect a bit-vector of the same size into this vector.
   ClusteredBitVector &operator&=(const ClusteredBitVector &other) {
     assert(size() == other.size());
 
-    // If this vector is currently all-clear, this is a no-op.
+    // If this vector is all-clear, this is a no-op.
     if (isInlineAndAllClear())
       return *this;
 
@@ -414,9 +440,31 @@ public:
 
     // Otherwise, &= the chunks pairwise.
     auto chunks = getChunks();
-    auto oi = other.getData();
+    auto oi = other.getChunksPtr();
     for (auto i = chunks.begin(), e = chunks.end(); i != e; ++i, ++oi) {
       *i &= *oi;
+    }
+    return *this;
+  }
+
+  /// Union a bit-vector of the same size into this vector.
+  ClusteredBitVector &operator|=(const ClusteredBitVector &other) {
+    assert(size() == other.size());
+
+    // If the other vector is all-clear, this is a no-op.
+    if (other.isInlineAndAllClear())
+      return *this;
+
+    // If this vector is all-clear, we just copy the other.
+    if (isInlineAndAllClear()) {
+      return (*this = other);
+    }
+
+    // Otherwise, |= the chunks pairwise.
+    auto chunks = getChunks();
+    auto oi = other.getChunksPtr();
+    for (auto i = chunks.begin(), e = chunks.end(); i != e; ++i, ++oi) {
+      *i |= *oi;
     }
     return *this;
   }
@@ -427,14 +475,37 @@ public:
     if (isInlineAndAllClear()) {
       reserve(LengthInBits);
     }
-    getData()[i / ChunkSizeInBits] |= (ChunkType(1) << (i % ChunkSizeInBits));
+    getChunks()[i / ChunkSizeInBits] |= (ChunkType(1) << (i % ChunkSizeInBits));
   }
 
   /// Clear bit i.
   void clearBit(size_t i) {
     assert(i < size());
     if (isInlineAndAllClear()) return;
-    getData()[i / ChunkSizeInBits] |= (ChunkType(1) << (i % ChunkSizeInBits));
+    getChunksPtr()[i / ChunkSizeInBits] &= ~(ChunkType(1) << (i % ChunkSizeInBits));
+  }
+
+  /// Toggle bit i.
+  void flipBit(size_t i) {
+    assert(i < size());
+    if (isInlineAndAllClear()) {
+      reserve(LengthInBits);
+    }
+    getChunksPtr()[i / ChunkSizeInBits] ^= (ChunkType(1) << (i % ChunkSizeInBits));
+  }
+
+  /// Toggle all the bits in this vector.
+  void flipAll() {
+    if (empty()) return;
+    if (isInlineAndAllClear()) {
+      reserve(LengthInBits);
+    }
+    for (auto &chunk : getChunks()) {
+      chunk = ~chunk;
+    }
+    if (auto tailBits = size() % ChunkSizeInBits) {
+      getChunks().back() &= ((ChunkType(1) << tailBits) - 1);
+    }
   }
 
   /// Set the length of this vector to zero, but do not release any capacity.
@@ -482,7 +553,7 @@ public:
         CurChunkIndex = 0;
         NumChunks = 0;
       } else {
-        Chunks = vector.getData();
+        Chunks = vector.getChunksPtr();
         CurChunk = Chunks[0];
         CurChunkIndex = 0;
         NumChunks = vector.getLengthInChunks();
@@ -534,6 +605,9 @@ public:
   /// the least significant bits of the number.
   llvm::APInt asAPInt() const;
 
+  /// Construct a bit-vector from an APInt.
+  static ClusteredBitVector fromAPInt(const llvm::APInt &value);
+
   /// Pretty-print the vector.
   void print(llvm::raw_ostream &out) const;
   void dump() const;
@@ -545,7 +619,7 @@ private:
   void makeIndependentCopy() {
     assert(hasOutOfLineData());
     auto lengthToCopy = getLengthInChunks();
-    allocateAndCopyFrom(getOutOfLineData(), lengthToCopy, lengthToCopy);
+    allocateAndCopyFrom(getOutOfLineChunksPtr(), lengthToCopy, lengthToCopy);
   }
 
   /// Reallocate this vector, copying the current data into the new space.
@@ -578,7 +652,7 @@ private:
   /// Destroy the out of line data currently stored in this object.
   void destroy() {
     assert(hasOutOfLineData());
-    delete[] (getOutOfLineData() - 1);
+    delete[] (getOutOfLineChunksPtr() - 1);
   }
 
   /// Append a certain number of constant bits to this vector, given

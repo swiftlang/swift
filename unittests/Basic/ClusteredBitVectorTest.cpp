@@ -152,3 +152,59 @@ TEST(ClusteredBitVector, Enumeration) {
   EXPECT_EQ(Opt(), enumerator.findNext());
   EXPECT_EQ(Opt(), enumerator.findNext());
 }
+
+TEST(ClusteredBitVector, SetClearBit) {
+  ClusteredBitVector vec;
+  vec.appendClearBits(64);
+  vec.setBit(3);
+  vec.setBit(7);
+  vec.setBit(7);
+  vec.setBit(63);
+  EXPECT_EQ(3u, vec.count());
+  EXPECT_EQ(true, vec[3]);
+  EXPECT_EQ(true, vec[7]);
+  EXPECT_EQ(true, vec[63]);
+  EXPECT_EQ(false, vec[0]);
+  EXPECT_EQ(false, vec[14]);
+  EXPECT_EQ(false, vec[62]);
+
+  vec.clearBit(63);
+  EXPECT_EQ(2u, vec.count());
+  EXPECT_EQ(false, vec[63]);
+}
+
+TEST(ClusteredBitVector, FlipAllSmall) {
+  ClusteredBitVector vec;
+  vec.appendClearBits(48);
+  EXPECT_EQ(false, vec[12]);
+  EXPECT_EQ(0u, vec.count());
+  vec.flipAll();
+  EXPECT_EQ(true, vec[12]);
+  EXPECT_EQ(48u, vec.count());
+  vec.clearBit(7);
+  EXPECT_EQ(true, vec[12]);
+  EXPECT_EQ(false, vec[7]);
+  EXPECT_EQ(47u, vec.count());
+  vec.flipAll();
+  EXPECT_EQ(false, vec[12]);
+  EXPECT_EQ(true, vec[7]);
+  EXPECT_EQ(1u, vec.count());
+}
+
+TEST(ClusteredBitVector, FlipAllBig) {
+  ClusteredBitVector vec;
+  vec.appendClearBits(163);
+  EXPECT_EQ(false, vec[12]);
+  EXPECT_EQ(0u, vec.count());
+  vec.flipAll();
+  EXPECT_EQ(true, vec[12]);
+  EXPECT_EQ(163u, vec.count());
+  vec.clearBit(7);
+  EXPECT_EQ(true, vec[12]);
+  EXPECT_EQ(false, vec[7]);
+  EXPECT_EQ(162u, vec.count());
+  vec.flipAll();
+  EXPECT_EQ(false, vec[12]);
+  EXPECT_EQ(true, vec[7]);
+  EXPECT_EQ(1u, vec.count());
+}
