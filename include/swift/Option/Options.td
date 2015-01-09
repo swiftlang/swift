@@ -81,7 +81,7 @@ def driver_use_frontend_path : Separate<["-"], "driver-use-frontend-path">,
   HelpText<"Use the given executable to perform compilations">;
 
 def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
-  HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;
+  HelpText<"Set the driver mode to either 'swift' or 'swiftc' or 'swift-update'">;
 
 def help : Flag<["-", "--"], "help">, Flags<[FrontendOption]>,
   HelpText<"Display available options">;

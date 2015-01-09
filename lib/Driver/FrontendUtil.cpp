@@ -46,7 +46,7 @@ swift::driver::createCompilerInvocation(ArrayRef<const char *> ArgList,
   Args.push_back("-force-single-frontend-invocation");
 
   // Force the driver into batch mode by specifying "swiftc" as the name.
-  Driver TheDriver("swiftc", "swiftc", Diags);
+  Driver TheDriver("swiftc", "swiftc", Args, Diags);
 
   // Don't check for the existence of input files, since the user of the
   // CompilerInvocation may wish to remap inputs to source buffers.

@@ -1,4 +1,4 @@
-//===--- swift-update.cpp - Swift code updating ---------------------------===//
+//===--- update-main.cpp - Swift code updating ----------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -19,8 +19,6 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/PrettyStackTrace.h"
-#include "llvm/Support/Signals.h"
 
 using namespace swift;
 
@@ -110,29 +108,17 @@ private:
 
 } // anonymous namespace
 
-// This function isn't referenced outside its translation unit, but it
-// can't use the "static" keyword because its address is used for
-// getMainExecutable (since some platforms don't support taking the
-// address of main, and some platforms can't implement getMainExecutable
-// without being given the address of a function in the main executable).
-void anchorForGetMainExecutable() {}
-
-int main(int argc, char *argv[]) {
-  // Print a stack trace if we signal out.
-  llvm::sys::PrintStackTraceOnErrorSignal();
-  llvm::PrettyStackTraceProgram X(argc, argv);
-
+int update_main(ArrayRef<const char *> Args, const char *Argv0, void *MainAddr){
   CompilerInstance Instance;
   PrintingDiagnosticConsumer PDC;
   Instance.addDiagnosticConsumer(&PDC);
 
   CompilerInvocation Invocation;
-  std::string MainExecutablePath = llvm::sys::fs::getMainExecutable(
-                argv[0], reinterpret_cast<void *>(&anchorForGetMainExecutable));
+  std::string MainExecutablePath = llvm::sys::fs::getMainExecutable(Argv0,
+                                                                    MainAddr);
   Invocation.setMainExecutablePath(MainExecutablePath);
 
   // Parse arguments.
-  ArrayRef<const char *> Args(argv+1, argc-1);
   if (Invocation.parseArgs(Args, Instance.getDiags())) {
     return 1;
   }

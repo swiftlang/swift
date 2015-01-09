@@ -1,6 +1,7 @@
 add_swift_executable(swift
   driver.cpp
   frontend_main.cpp
+  update_main.cpp
   LINK_LIBRARIES
     swiftDriver swiftIRGen swiftSIL swiftSILGen swiftSILPasses
     swiftImmediate
@@ -18,6 +19,10 @@ target_link_libraries(swift edit)
 
 add_custom_command(TARGET swift POST_BUILD
     COMMAND "${CMAKE_COMMAND}" "-E" "create_symlink" "swift" "swiftc"
+    WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+
+add_custom_command(TARGET swift POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" "-E" "create_symlink" "swift" "swift-update"
     WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 
 # If building as part of clang, make sure the headers are installed.
@@ -46,4 +51,6 @@ swift_install_in_component(compiler
 swift_install_in_component(compiler
     FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc"
     DESTINATION "bin")
-
+swift_install_in_component(compiler
+    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-update"
+    DESTINATION "bin")

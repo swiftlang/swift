@@ -57,10 +57,16 @@ using namespace llvm::opt;
 
 Driver::Driver(StringRef DriverExecutable,
                StringRef Name,
+               ArrayRef<const char *> Args,
                DiagnosticEngine &Diags)
   : Opts(createSwiftOptTable()), Diags(Diags),
     Name(Name), DriverExecutable(DriverExecutable),
-    DefaultTargetTriple(llvm::sys::getDefaultTargetTriple()) {}
+    DefaultTargetTriple(llvm::sys::getDefaultTargetTriple()) {
+      
+  // The driver kind must be parsed prior to parsing arguments, since that
+  // affects how argumens are parsed.
+  parseDriverKind(Args.slice(1));
+}
 
 Driver::~Driver() {
   llvm::DeleteContainerSeconds(ToolChains);
@@ -68,33 +74,43 @@ Driver::~Driver() {
 
 void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   // The default driver kind is determined by Name.
-  if (Name.find("swiftc") != std::string::npos) {
-    driverKind = DriverKind::Batch;
-  } else {
-    driverKind = DriverKind::Interactive;
-  }
+  StringRef DriverName = Name;
 
+  std::string OptName;
   // However, the driver kind may be overridden if the first argument is
   // --driver-mode.
   if (Args.size() > 0) {
-    const std::string OptName =
-    getOpts().getOption(options::OPT_driver_mode).getPrefixedName();
+    OptName = getOpts().getOption(options::OPT_driver_mode).getPrefixedName();
 
     StringRef FirstArg(Args[0]);
-    if (FirstArg.startswith(OptName)) {
-      StringRef Value = FirstArg.drop_front(OptName.size());
-      Optional<DriverKind> Kind =
-      llvm::StringSwitch<Optional<DriverKind>>(Value)
-      .Case("swift", DriverKind::Interactive)
-      .Case("swiftc", DriverKind::Batch)
-      .Default(None);
-
-      if (Kind.hasValue())
-        driverKind = Kind.getValue();
-      else
-        Diags.diagnose({}, diag::error_invalid_arg_value, OptName, Value);
-    }
+    if (FirstArg.startswith(OptName))
+      DriverName = FirstArg.drop_front(OptName.size());
   }
+
+  Optional<DriverKind> Kind =
+  llvm::StringSwitch<Optional<DriverKind>>(DriverName)
+  .Case("swift", DriverKind::Interactive)
+  .Case("swiftc", DriverKind::Batch)
+  .Case("swift-update", DriverKind::UpdateCode)
+  .Default(None);
+  
+  if (Kind.hasValue())
+    driverKind = Kind.getValue();
+  else if (!OptName.empty())
+    Diags.diagnose({}, diag::error_invalid_arg_value, OptName, DriverName);
+}
+
+ArrayRef<const char *> Driver::getArgsWithoutProgramNameAndDriverMode(
+                                      ArrayRef<const char *> Args) const {
+  Args = Args.slice(1);
+  if (Args.empty())
+    return Args;
+
+  const std::string OptName =
+    getOpts().getOption(options::OPT_driver_mode).getPrefixedName();
+  if (StringRef(Args[0]).startswith(OptName))
+    Args = Args.slice(1);
+  return Args;
 }
 
 static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
@@ -121,10 +137,6 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
 std::unique_ptr<Compilation> Driver::buildCompilation(
     ArrayRef<const char *> Args) {
   llvm::PrettyStackTraceString CrashInfo("Compilation construction");
-
-  // The driver kind must be parsed prior to parsing arguments, since that
-  // affects how argumens are parsed.
-  parseDriverKind(Args.slice(1));
 
   std::unique_ptr<InputArgList> ArgList(parseArgStrings(Args.slice(1)));
   if (Diags.hadAnyError())
@@ -1649,6 +1661,7 @@ void Driver::printHelp(bool ShowHidden) const {
     ExcludedFlagsBitmask |= options::NoInteractiveOption;
     break;
   case DriverKind::Batch:
+  case DriverKind::UpdateCode:
     ExcludedFlagsBitmask |= options::NoBatchOption;
     break;
   }

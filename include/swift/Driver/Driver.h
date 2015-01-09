@@ -106,6 +106,16 @@ public:
 };
 
 class Driver {
+public:
+  /// DriverKind determines how later arguments are parsed, as well as the
+  /// allowable OutputInfo::Mode values.
+  enum class DriverKind {
+    Interactive, // swift
+    Batch,       // swiftc
+    UpdateCode,  // swift-update
+  };
+
+private:
   std::unique_ptr<llvm::opt::OptTable> Opts;
 
   DiagnosticEngine &Diags;
@@ -116,14 +126,7 @@ class Driver {
   /// The original path to the executable.
   std::string DriverExecutable;
 
-  /// DriverKind determines how later arguments are parsed, as well as the
-  /// allowable OutputInfo::Mode values.
-  enum class DriverKind {
-    Interactive, // swift
-    Batch        // swiftc
-  };
-
-  DriverKind driverKind;
+  DriverKind driverKind = DriverKind::Interactive;
 
   /// Default target triple.
   std::string DefaultTargetTriple;
@@ -148,7 +151,8 @@ public:
   typedef std::pair<types::ID, const llvm::opt::Arg *> InputPair;
   typedef SmallVector<InputPair, 16> InputList;
 
-  Driver(StringRef DriverExecutable, StringRef Name, DiagnosticEngine &Diags);
+  Driver(StringRef DriverExecutable, StringRef Name,
+         ArrayRef<const char *> Args, DiagnosticEngine &Diags);
   ~Driver();
 
   const llvm::opt::OptTable &getOpts() const { return *Opts; }
@@ -158,6 +162,11 @@ public:
   const std::string &getSwiftProgramPath() const {
     return DriverExecutable;
   }
+  
+  DriverKind getDriverKind() const { return driverKind; }
+  
+  ArrayRef<const char *> getArgsWithoutProgramNameAndDriverMode(
+                                            ArrayRef<const char *> Args) const;
 
   bool getCheckInputFilesExist() const { return CheckInputFilesExist; }
 
