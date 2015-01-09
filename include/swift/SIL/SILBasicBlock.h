@@ -62,10 +62,11 @@ public:
 
   SILModule &getModule() const;
 
-  /// eraseFromParent - This method unlinks 'self' from the containing
-  /// SILFunction and deletes it.
-  ///
+  /// This method unlinks 'self' from the containing SILFunction and deletes it.
   void eraseFromParent();
+
+  /// This method unlinks 'self' from the containing SILFunction.
+  void removeFromParent();
 
   //===--------------------------------------------------------------------===//
   // SILInstruction List Inspection and Manipulation

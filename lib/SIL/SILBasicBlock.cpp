@@ -42,12 +42,16 @@ SILModule &SILBasicBlock::getModule() const {
   return getParent()->getModule();
 }
 
-/// eraseFromParent - This method unlinks 'self' from the containing SIL and
-/// deletes it.
-///
+/// This method unlinks 'self' from the containing SILFunction and deletes it.
 void SILBasicBlock::eraseFromParent() {
   getParent()->getBlocks().erase(this);
 }
+
+/// This method unlinks 'self' from the containing SILFunction.
+void SILBasicBlock::removeFromParent() {
+  getParent()->getBlocks().remove(this);
+}
+
 
 /// Replace the ith BB argument with a new one with type Ty (and optional
 /// ValueDecl D).
