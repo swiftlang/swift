@@ -19,8 +19,8 @@
 #define SWIFT_IRGEN_IRGENMODULE_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/SuccessorMap.h"
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -209,11 +209,7 @@ public:
   
   /// Return the spare bit mask to use for types that comprise heap object
   /// pointers.
-  const SpareBitVector &getHeapObjectSpareBits() const;
-
-  const SpareBitVector &getFunctionPointerSpareBits() const;
-  SpareBitVector getWeakReferenceSpareBits() const;
-  const SpareBitVector &getWitnessTablePtrSpareBits() const;
+  const llvm::BitVector &getHeapObjectSpareBits() const;
 
   Size getWeakReferenceSize() const { return PtrSize; }
   Alignment getWeakReferenceAlignment() const { return getPointerAlignment(); }
@@ -232,7 +228,7 @@ private:
 
   llvm::Type *ValueWitnessTys[MaxNumValueWitnesses];
   
-  llvm::DenseMap<llvm::Type *, SpareBitVector> SpareBitsForTypes;
+  llvm::DenseMap<llvm::Type *, llvm::BitVector> SpareBitsForTypes;
   
   std::unique_ptr<const EnumImplStrategy> TheUnimplementedEnumImplStrategy;
 
@@ -282,7 +278,7 @@ public:
 
   bool isResilient(Decl *decl, ResilienceScope scope);
 
-  SpareBitVector getSpareBitsForType(llvm::Type *scalarTy);
+  llvm::BitVector getSpareBitsForType(llvm::Type *scalarTy);
   
 private:
   TypeConverter &Types;
@@ -403,7 +399,7 @@ private:                            \
   llvm::Constant *Id##Fn = nullptr;
 #include "RuntimeFunctions.def"
 
-  mutable Optional<SpareBitVector> HeapPointerSpareBits;
+  mutable Optional<llvm::BitVector> HeapPointerSpareBits;
   
 //--- Generic ---------------------------------------------------------------
 public:

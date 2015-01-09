@@ -155,18 +155,16 @@ namespace {
     }
         
     // This is dead code in NonFixedTupleTypeInfo.
-    SpareBitVector getFixedExtraInhabitantMask(IRGenModule &IGM) const {
+    llvm::BitVector getFixedExtraInhabitantMask(IRGenModule &IGM) const {
       if (asImpl().getFields().empty())
         return {};
       
       const FixedTypeInfo &fieldTI
         = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
       
-      SpareBitVector mask;
-      auto firstFieldSize = fieldTI.getFixedSize().getValueInBits();
-      mask.appendSetBits(firstFieldSize);
-      mask.appendClearBits(asImpl().getFixedSize().getValueInBits()
-                             - firstFieldSize);
+      llvm::BitVector mask(fieldTI.getFixedSize().getValueInBits(), true);
+      
+      mask.resize(asImpl().getFixedSize().getValueInBits(), false);
       return mask;
     }
 
@@ -200,7 +198,7 @@ namespace {
     LoadableTupleTypeInfo(ArrayRef<TupleFieldInfo> fields,
                           unsigned explosionSize,
                           llvm::Type *ty,
-                          Size size, SpareBitVector &&spareBits,
+                          Size size, llvm::BitVector &&spareBits,
                           Alignment align, IsPOD_t isPOD)
       : TupleTypeInfoBase(fields, explosionSize,
                           ty, size, std::move(spareBits), align, isPOD)
@@ -223,7 +221,7 @@ namespace {
   public:
     // FIXME: Spare bits between tuple elements.
     FixedTupleTypeInfo(ArrayRef<TupleFieldInfo> fields, llvm::Type *ty,
-                       Size size, SpareBitVector &&spareBits, Alignment align,
+                       Size size, llvm::BitVector &&spareBits, Alignment align,
                        IsPOD_t isPOD, IsBitwiseTakable_t isBT)
       : TupleTypeInfoBase(fields, ty, size, std::move(spareBits), align,
                           isPOD, isBT)

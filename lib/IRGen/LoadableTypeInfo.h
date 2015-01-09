@@ -35,7 +35,7 @@ namespace irgen {
 class LoadableTypeInfo : public FixedTypeInfo {
 protected:
   LoadableTypeInfo(llvm::Type *type, Size size,
-                   const SpareBitVector &spareBits,
+                   const llvm::BitVector &spareBits,
                    Alignment align,
                    IsPOD_t pod, SpecialTypeInfoKind stik = STIK_Loadable)
       : FixedTypeInfo(type, size, spareBits, align, pod,
@@ -45,7 +45,7 @@ protected:
   }
 
   LoadableTypeInfo(llvm::Type *type, Size size,
-                   SpareBitVector &&spareBits,
+                   llvm::BitVector &&spareBits,
                    Alignment align,
                    IsPOD_t pod, SpecialTypeInfoKind stik = STIK_Loadable)
       : FixedTypeInfo(type, size, std::move(spareBits), align, pod,

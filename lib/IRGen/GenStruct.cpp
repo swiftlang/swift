@@ -199,18 +199,16 @@ namespace {
     }
        
     // This is dead code in NonFixedStructTypeInfo.
-    SpareBitVector getFixedExtraInhabitantMask(IRGenModule &IGM) const {
+    llvm::BitVector getFixedExtraInhabitantMask(IRGenModule &IGM) const {
       if (asImpl().getFields().empty())
         return {};
       
       const FixedTypeInfo &fieldTI
         = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
-      auto firstFieldSize = fieldTI.getFixedSize().getValueInBits();
-
-      SpareBitVector mask;
-      mask.appendSetBits(firstFieldSize);
-      mask.appendClearBits(asImpl().getFixedSize().getValueInBits()
-                             - firstFieldSize);
+      
+      llvm::BitVector mask(fieldTI.getFixedSize().getValueInBits(), true);
+      
+      mask.resize(asImpl().getFixedSize().getValueInBits(), false);
       return mask;
     }
 
@@ -244,7 +242,7 @@ namespace {
     ClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
                         unsigned explosionSize,
                         llvm::Type *storageType, Size size,
-                        SpareBitVector &&spareBits, Alignment align)
+                        llvm::BitVector &&spareBits, Alignment align)
       : StructTypeInfoBase(StructTypeInfoKind::ClangRecordTypeInfo,
                            fields, explosionSize,
                            storageType, size, std::move(spareBits),
@@ -275,7 +273,7 @@ namespace {
     LoadableStructTypeInfo(ArrayRef<StructFieldInfo> fields,
                            unsigned explosionSize,
                            llvm::Type *storageType, Size size,
-                           SpareBitVector &&spareBits,
+                           llvm::BitVector &&spareBits,
                            Alignment align, IsPOD_t isPOD)
       : StructTypeInfoBase(StructTypeInfoKind::LoadableStructTypeInfo,
                            fields, explosionSize,
@@ -304,7 +302,7 @@ namespace {
   public:
     // FIXME: Spare bits between struct members.
     FixedStructTypeInfo(ArrayRef<StructFieldInfo> fields, llvm::Type *T,
-                        Size size, SpareBitVector &&spareBits,
+                        Size size, llvm::BitVector &&spareBits,
                         Alignment align, IsPOD_t isPOD, IsBitwiseTakable_t isBT)
       : StructTypeInfoBase(StructTypeInfoKind::FixedStructTypeInfo,
                            fields, T, size, std::move(spareBits), align,
@@ -512,7 +510,7 @@ class ClangRecordLowering {
   const Size TotalStride;
   Size TotalSize;
   const Alignment TotalAlignment;
-  SpareBitVector SpareBits;
+  llvm::BitVector SpareBits;
 
   SmallVector<llvm::Type *, 8> LLVMFields;
   SmallVector<ClangFieldInfo, 8> FieldInfos;
@@ -693,7 +691,22 @@ private:
            ClangFieldInfo(swiftField, layout, explosionBegin, explosionEnd));
     LLVMFields.push_back(fieldType.getStorageType());
     NextOffset += fieldType.getFixedSize();
-    SpareBits.append(fieldType.getSpareBits());
+
+    // Default to marking all the new storage as used.
+    auto bitStorageSize = fieldType.getFixedSize().getValue() * 8;
+    unsigned oldSize = SpareBits.size();
+    SpareBits.resize(oldSize + bitStorageSize);
+
+    // Go back and mark any spare bits in the value.
+    auto &spareBits = fieldType.getSpareBits();
+    assert(spareBits.size() == bitStorageSize || spareBits.empty());
+
+    // This is absurdly inefficient.  Can't BitVector have an append
+    // method or something?
+    for (int next = spareBits.find_first();
+          next != -1; next = spareBits.find_next((unsigned) next)) {
+      SpareBits.set((unsigned) next);
+    }
   }
 
   /// Add padding to get up to the given offset.
@@ -702,7 +715,7 @@ private:
     Size count = offset - NextOffset;
     LLVMFields.push_back(llvm::ArrayType::get(IGM.Int8Ty, count.getValue()));
     NextOffset = offset;
-    SpareBits.appendSetBits(count.getValueInBits());
+    SpareBits.resize(SpareBits.size() + offset.getValue() * 8, true);
   }
 };
 

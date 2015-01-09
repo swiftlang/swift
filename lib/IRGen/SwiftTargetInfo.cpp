@@ -26,17 +26,23 @@ using namespace swift;
 using namespace irgen;
 
 /// Initialize a bit vector to be equal to the given bit-mask.
-static void setToMask(SpareBitVector &bits, unsigned size, uint64_t mask) {
-  bits.clear();
-  bits.add(size, mask);
+static void setToMask(llvm::BitVector &bits, uint64_t mask) {
+  // This is a ridiculously inefficient way of doing this.
+  for (unsigned i = 0, e = bits.size(); i != e; ++i) {
+    if (mask & (1ULL << i)) {
+      bits.set(i);
+    } else {
+      bits.reset(i);
+    }
+  }
 }
 
 /// Configures target-specific information for arm64 platforms.
 static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
                            SwiftTargetInfo &target) {
-  setToMask(target.PointerSpareBits, 64,
+  setToMask(target.PointerSpareBits,
             SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK);
-  setToMask(target.ObjCPointerReservedBits, 64,
+  setToMask(target.ObjCPointerReservedBits,
             SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK);
   
   if (triple.isOSDarwin()) {
@@ -64,9 +70,9 @@ static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
 /// Configures target-specific information for x86-64 platforms.
 static void configureX86_64(IRGenModule &IGM, const llvm::Triple &triple,
                             SwiftTargetInfo &target) {
-  setToMask(target.PointerSpareBits, 64,
+  setToMask(target.PointerSpareBits,
             SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK);
-  setToMask(target.ObjCPointerReservedBits, 64,
+  setToMask(target.ObjCPointerReservedBits,
             SWIFT_ABI_X86_64_OBJC_RESERVED_BITS_MASK);
   
   if (triple.isOSDarwin()) {
@@ -110,15 +116,15 @@ SwiftTargetInfo::SwiftTargetInfo(
   llvm::Triple::ObjectFormatType outputObjectFormat,
   unsigned numPointerBits)
   : OutputObjectFormat(outputObjectFormat),
+    PointerSpareBits(numPointerBits, false),
+    ObjCPointerReservedBits(numPointerBits, true),
     HeapObjectAlignment(numPointerBits / 8),
     LeastValidPointerValue(SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER)
 {
-  setToMask(PointerSpareBits, numPointerBits,
+  setToMask(PointerSpareBits,
             SWIFT_ABI_DEFAULT_SWIFT_SPARE_BITS_MASK);
-  setToMask(ObjCPointerReservedBits, numPointerBits,
+  setToMask(ObjCPointerReservedBits,
             SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK);
-  setToMask(FunctionPointerSpareBits, numPointerBits,
-            SWIFT_ABI_DEFAULT_FUNCTION_SPARE_BITS_MASK);
 }
 
 SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {

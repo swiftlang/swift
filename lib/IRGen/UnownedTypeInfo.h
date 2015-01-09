@@ -28,13 +28,8 @@ namespace irgen {
 class UnownedTypeInfo : public LoadableTypeInfo {
 protected:
   UnownedTypeInfo(llvm::Type *type, Size size,
-                  const SpareBitVector &spareBits, Alignment align)
+                  const llvm::BitVector &spareBits, Alignment align)
     : LoadableTypeInfo(type, size, spareBits, align, IsNotPOD, STIK_Unowned) {}
-
-  UnownedTypeInfo(llvm::Type *type, Size size,
-                  SpareBitVector &&spareBits, Alignment align)
-    : LoadableTypeInfo(type, size, std::move(spareBits), align,
-                       IsNotPOD, STIK_Unowned) {}
 
 public:
   // No API yet.

@@ -625,8 +625,7 @@ namespace {
     // pointers.
     OpaqueExistentialTypeInfo(ArrayRef<ProtocolEntry> protocols,
                               llvm::Type *ty, Size size, Alignment align)
-      : super(protocols, ty, size,
-              SpareBitVector::getConstant(size.getValueInBits(), false), align,
+      : super(protocols, ty, size, llvm::BitVector{}, align,
               IsNotPOD, IsNotBitwiseTakable) {}
 
   public:
@@ -705,9 +704,8 @@ namespace {
                IndirectTypeInfo<WeakClassExistentialTypeInfo, WeakTypeInfo>>;
   public:
     WeakClassExistentialTypeInfo(ArrayRef<ProtocolEntry> protocols,
-                                 llvm::Type *ty, Size size, Alignment align,
-                                 SpareBitVector &&spareBits)
-      : super(protocols, ty, size, align, std::move(spareBits)) {
+                                 llvm::Type *ty, Size size, Alignment align)
+      : super(protocols, ty, size, align) {
     }
 
     Address projectWitnessTable(IRGenFunction &IGF, Address container,
@@ -1125,7 +1123,7 @@ namespace {
   public:
     UnownedClassExistentialTypeInfo(ArrayRef<ProtocolEntry> storedProtocols,
                                     llvm::Type *ty,
-                                    const SpareBitVector &spareBits,
+                                    const llvm::BitVector &spareBits,
                                     Size size, Alignment align)
       : ScalarExistentialTypeInfoBase(storedProtocols, ty, size,
                                       spareBits, align) {}
@@ -1155,7 +1153,7 @@ namespace {
   public:
     UnmanagedClassExistentialTypeInfo(ArrayRef<ProtocolEntry> storedProtocols,
                                       llvm::Type *ty,
-                                      const SpareBitVector &spareBits,
+                                      const llvm::BitVector &spareBits,
                                       Size size, Alignment align)
       : ScalarExistentialTypeInfoBase(storedProtocols, ty, size,
                                       spareBits, align, IsPOD) {}
@@ -1191,7 +1189,7 @@ namespace {
     ClassExistentialTypeInfo(ArrayRef<ProtocolEntry> protocols,
                              llvm::Type *ty,
                              Size size,
-                             SpareBitVector &&spareBits,
+                             llvm::BitVector &&spareBits,
                              Alignment align)
       : ScalarExistentialTypeInfoBase(protocols, ty, size,
                                       std::move(spareBits), align)
@@ -1292,13 +1290,8 @@ namespace {
       fieldTys.resize(getNumStoredProtocols() + 1, TC.IGM.WitnessTablePtrTy);
       auto storageTy = llvm::StructType::get(TC.IGM.getLLVMContext(), fieldTys);
 
-      SpareBitVector spareBits = TC.IGM.getWeakReferenceSpareBits();
-      for (unsigned i = 0, e = getNumStoredProtocols(); i != e; ++i)
-        spareBits.append(TC.IGM.getWitnessTablePtrSpareBits());
-
       return WeakClassExistentialTypeInfo::create(getStoredProtocols(),
-                                                  storageTy, size, align,
-                                                  std::move(spareBits));
+                                                  storageTy, size, align);
     }
   };
 
@@ -1311,7 +1304,7 @@ namespace {
     friend ExistentialTypeInfoBase;
     ExistentialMetatypeTypeInfo(ArrayRef<ProtocolEntry> storedProtocols,
                                 llvm::Type *ty, Size size,
-                                SpareBitVector &&spareBits,
+                                llvm::BitVector &&spareBits,
                                 Alignment align,
                                 const LoadableTypeInfo &metatypeTI)
       : ScalarExistentialTypeInfoBase(storedProtocols, ty, size,
@@ -1521,7 +1514,7 @@ namespace {
     ReferenceCounting RefCount;
 
     ClassArchetypeTypeInfo(llvm::PointerType *storageType,
-                           Size size, const SpareBitVector &spareBits,
+                           Size size, llvm::BitVector spareBits,
                            Alignment align,
                            ArrayRef<ProtocolEntry> protocols,
                            ReferenceCounting refCount)
@@ -1532,7 +1525,7 @@ namespace {
 
   public:
     static const ClassArchetypeTypeInfo *create(llvm::PointerType *storageType,
-                                           Size size, const SpareBitVector &spareBits,
+                                           Size size, llvm::BitVector spareBits,
                                            Alignment align,
                                            ArrayRef<ProtocolEntry> protocols,
                                            ReferenceCounting refCount) {
@@ -3474,6 +3467,19 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // direct, lazily initialized, or runtime instantiated template.
 }
 
+/// Append a bunch of bits to a bit vector. This should really be
+/// provided by llvm::BitVector.
+static llvm::BitVector &operator+=(llvm::BitVector &lhs,
+                                   const llvm::BitVector &rhs) {
+  auto lSize = lhs.size(), rSize = rhs.size();
+  lhs.resize(lSize + rSize);
+
+  for (unsigned i = 0; i < rSize; ++i) {
+    lhs[lSize + i] = rhs[i];
+  }
+  return lhs;
+}
+
 static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
                                                  llvm::StructType *type,
                                         ArrayRef<ProtocolDecl*> protocols) {
@@ -3525,19 +3531,20 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
     Alignment align = IGM.getPointerAlignment();
     Size size = classFields.size() * IGM.getPointerSize();
 
-    SpareBitVector spareBits;
+    llvm::BitVector spareBits;
 
     // The class pointer is an unknown heap object, so it may be a tagged
     // pointer, if the platform has those.
     if (allowsTaggedPointers && IGM.TargetInfo.hasObjCTaggedPointers()) {
-      spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
+      spareBits.resize(IGM.getPointerSize().getValueInBits(), /*value*/ false);
     } else {
       // If the platform doesn't use ObjC tagged pointers, we can go crazy.
-      spareBits.append(IGM.getHeapObjectSpareBits());
+      spareBits += IGM.getHeapObjectSpareBits();
     }
 
+    // The witness table fields are pointers and have pointer spare bits.
     for (unsigned i = 1, e = classFields.size(); i < e; ++i) {
-      spareBits.append(IGM.getWitnessTablePtrSpareBits());
+      spareBits += IGM.TargetInfo.PointerSpareBits;
     }
 
     return ClassExistentialTypeInfo::create(entries, type,
@@ -3584,13 +3591,13 @@ TypeConverter::convertExistentialMetatypeType(ExistentialMetatypeType *T) {
   SmallVector<ProtocolEntry, 4> entries;
   SmallVector<llvm::Type*, 4> fields;
 
-  SpareBitVector spareBits;
+  llvm::BitVector spareBits;
 
   assert(T->getRepresentation() != MetatypeRepresentation::Thin &&
          "existential metatypes cannot have thin representation");
   auto &baseTI = getMetatypeTypeInfo(T->getRepresentation());
   fields.push_back(baseTI.getStorageType());
-  spareBits.append(baseTI.getSpareBits());
+  spareBits += baseTI.getSpareBits();
 
   for (auto protocol : protocols) {
     if (!requiresProtocolWitnessTable(protocol))
@@ -3602,7 +3609,7 @@ TypeConverter::convertExistentialMetatypeType(ExistentialMetatypeType *T) {
 
     // Each protocol gets a witness table.
     fields.push_back(IGM.WitnessTablePtrTy);
-    spareBits.append(IGM.getWitnessTablePtrSpareBits());
+    spareBits += IGM.TargetInfo.PointerSpareBits;
   }
 
   llvm::StructType *type = llvm::StructType::get(IGM.getLLVMContext(), fields);
@@ -3647,12 +3654,9 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
     // As a hack, assume class archetypes never have spare bits. There's a
     // corresponding hack in MultiPayloadEnumImplStrategy::completeEnumTypeLayout
     // to ignore spare bits of dependent-typed payloads.
-    auto spareBits =
-      SpareBitVector::getConstant(IGM.getPointerSize().getValueInBits(), false);
-
     return ClassArchetypeTypeInfo::create(reprTy,
                                       IGM.getPointerSize(),
-                                      spareBits,
+                                      {},
                                       IGM.getPointerAlignment(),
                                       protocols, refcount);
   }

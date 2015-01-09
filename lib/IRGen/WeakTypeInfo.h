@@ -27,14 +27,9 @@ namespace irgen {
 /// ReferenceStorageType with [weak] ownership.
 class WeakTypeInfo : public FixedTypeInfo {
 protected:
-  WeakTypeInfo(llvm::Type *type, Size size, Alignment align,
-               const SpareBitVector &spareBits)
-    : FixedTypeInfo(type, size, spareBits, align, IsNotPOD,
-                    IsNotBitwiseTakable, STIK_Weak) {}
-
-  WeakTypeInfo(llvm::Type *type, Size size, Alignment align,
-               SpareBitVector &&spareBits)
-    : FixedTypeInfo(type, size, std::move(spareBits), align, IsNotPOD,
+  // FIXME: Weak types could have spare bits.
+  WeakTypeInfo(llvm::Type *type, Size size, Alignment align)
+    : FixedTypeInfo(type, size, {}, align, IsNotPOD,
                     IsNotBitwiseTakable, STIK_Weak) {}
 
 public:

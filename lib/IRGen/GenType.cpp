@@ -433,20 +433,28 @@ unsigned FixedTypeInfo::getSpareBitExtraInhabitantCount() const {
   return ((1U << spareBitCount) - 1U) << inhabitedBitCount;
 }
 
-void FixedTypeInfo::applyFixedSpareBitsMask(SpareBitVector &mask) const {
-  // If the mask is no longer than the stored spare bits, we can just
-  // apply the stored spare bits.
-  if (mask.size() <= SpareBits.size()) {
-    // Grow the mask out if necessary; the tail padding is all spare bits.
-    mask.extendWithSetBits(SpareBits.size());
-    mask &= SpareBits;
-
-  // Otherwise, we have to grow out the stored spare bits before we
-  // can intersect.
-  } else {
+void FixedTypeInfo::applyFixedSpareBitsMask(llvm::BitVector &bits) const {
+  auto numBits = StorageSize.getValueInBits();
+  
+  // Grow the mask with one bits if needed.
+  if (bits.size() < numBits) {
+    bits.resize(numBits, true);
+  }
+  
+  // If there are no SpareBits, mask out the range.
+  if (SpareBits.empty()) {
+    bits.reset(0, numBits);
+    return;
+  }
+  
+  // Apply the mask.
+  if (SpareBits.size() < bits.size()) {
+    // Pad mask with one bits so we don't disturb bits unused by the type.
     auto paddedSpareBits = SpareBits;
-    paddedSpareBits.extendWithSetBits(mask.size());
-    mask &= paddedSpareBits;
+    paddedSpareBits.resize(bits.size(), true);
+    bits &= paddedSpareBits;
+  } else {
+    bits &= SpareBits;
   }
 }
 
@@ -459,7 +467,8 @@ FixedTypeInfo::getSpareBitFixedExtraInhabitantValue(IRGenModule &IGM,
   unsigned occupiedIndex, spareIndex = 0;
   
   unsigned spareBitCount = SpareBits.count();
-  unsigned occupiedBitCount = SpareBits.size() - spareBitCount;
+  unsigned occupiedBitCount
+    = getFixedSize().getValueInBits() - spareBitCount;
   
   if (occupiedBitCount >= 31) {
     occupiedIndex = index;
@@ -481,7 +490,7 @@ FixedTypeInfo::getSpareBitFixedExtraInhabitantValue(IRGenModule &IGM,
 llvm::Value *
 FixedTypeInfo::getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
                                                Address src) const {
-  assert(!SpareBits.none() && "no spare bits");
+  assert(!SpareBits.empty() && "no spare bits");
   
   auto &C = IGF.IGM.getLLVMContext();
   
@@ -493,7 +502,7 @@ FixedTypeInfo::getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
   // If the spare bits are all zero, then we have a valid value and not an
   // extra inhabitant.
   auto spareBitsMask
-    = llvm::ConstantInt::get(C, SpareBits.asAPInt());
+    = llvm::ConstantInt::get(C, getAPIntFromBitVector(SpareBits));
   auto valSpareBits = IGF.Builder.CreateAnd(val, spareBitsMask);
   auto isValid = IGF.Builder.CreateICmpEQ(valSpareBits,
                                           llvm::ConstantInt::get(payloadTy, 0));
@@ -507,7 +516,7 @@ FixedTypeInfo::getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
   
   // Gather the occupied bits.
   auto OccupiedBits = SpareBits;
-  OccupiedBits.flipAll();
+  OccupiedBits.flip();
   llvm::Value *idx = emitGatherSpareBits(IGF, OccupiedBits, val, 0, 31);
   
   // See if spare bits fit into the 31 bits of the index.
@@ -539,14 +548,14 @@ void
 FixedTypeInfo::storeSpareBitExtraInhabitant(IRGenFunction &IGF,
                                             llvm::Value *index,
                                             Address dest) const {
-  assert(!SpareBits.none() && "no spare bits");
+  assert(!SpareBits.empty() && "no spare bits");
   
   auto &C = IGF.IGM.getLLVMContext();
 
   auto payloadTy = llvm::IntegerType::get(C, StorageSize.getValueInBits());
 
   unsigned numSpareBits = SpareBits.count();
-  unsigned numOccupiedBits = SpareBits.size() - numSpareBits;
+  unsigned numOccupiedBits = StorageSize.getValueInBits() - numSpareBits;
   llvm::Value *spareBitValue;
   llvm::Value *occupiedBitValue;
   
@@ -575,7 +584,7 @@ FixedTypeInfo::storeSpareBitExtraInhabitant(IRGenFunction &IGF,
   
   // Scatter the occupied bits.
   auto OccupiedBits = SpareBits;
-  OccupiedBits.flipAll();
+  OccupiedBits.flip();
   llvm::Value *occupied = emitScatterSpareBits(IGF, OccupiedBits,
                                                occupiedBitValue, 0);
   
@@ -591,10 +600,9 @@ FixedTypeInfo::storeSpareBitExtraInhabitant(IRGenFunction &IGF,
 }
 
 static unsigned getNumLowObjCReservedBits(IRGenModule &IGM) {
-  // Get the index of the first non-reserved bit.
-  SpareBitVector ObjCMask = IGM.TargetInfo.ObjCPointerReservedBits;
-  ObjCMask.flipAll();
-  return ObjCMask.enumerateSetBits().findNext().getValue();
+  llvm::BitVector ObjCMask = IGM.TargetInfo.ObjCPointerReservedBits;
+  ObjCMask.flip();
+  return ObjCMask.find_first();
 }
 
 unsigned irgen::getHeapObjectExtraInhabitantCount(IRGenModule &IGM) {
@@ -654,7 +662,8 @@ llvm::Value *irgen::getHeapObjectExtraInhabitantIndex(IRGenFunction &IGF,
   IGF.Builder.emitBlock(invalidBB);
   // Check if the inhabitant has any ObjC-reserved bits set.
   // FIXME: This check is unneeded if the type is known to be pure Swift.
-  APInt objcMaskInt = IGF.IGM.TargetInfo.ObjCPointerReservedBits.asAPInt();
+  APInt objcMaskInt = getAPIntFromBitVector(
+                                    IGF.IGM.TargetInfo.ObjCPointerReservedBits);
   auto objcMask = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), objcMaskInt);
   llvm::Value *masked = IGF.Builder.CreateAnd(val, objcMask);
   llvm::Value *maskedZero = IGF.Builder.CreateICmpEQ(masked,
@@ -699,7 +708,7 @@ namespace {
   /// A TypeInfo implementation for empty types.
   struct EmptyTypeInfo : ScalarTypeInfo<EmptyTypeInfo, LoadableTypeInfo> {
     EmptyTypeInfo(llvm::Type *ty)
-      : ScalarTypeInfo(ty, Size(0), SpareBitVector{}, Alignment(1), IsPOD) {}
+      : ScalarTypeInfo(ty, Size(0), llvm::BitVector{}, Alignment(1), IsPOD) {}
     unsigned getExplosionSize() const { return 0; }
     void getSchema(ExplosionSchema &schema) const {}
     void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e) const {}
@@ -726,7 +735,7 @@ namespace {
     public PODSingleScalarTypeInfo<PrimitiveTypeInfo, LoadableTypeInfo> {
   public:
     PrimitiveTypeInfo(llvm::Type *storage, Size size,
-                      SpareBitVector &&spareBits,
+                      llvm::BitVector &&spareBits,
                       Alignment align)
       : PODSingleScalarTypeInfo(storage, size, std::move(spareBits), align) {}
   };
@@ -737,7 +746,7 @@ namespace {
     public IndirectTypeInfo<ImmovableTypeInfo, FixedTypeInfo> {
   public:
     ImmovableTypeInfo(llvm::Type *storage, Size size,
-                      SpareBitVector &&spareBits,
+                      llvm::BitVector &&spareBits,
                       Alignment align)
       : IndirectTypeInfo(storage, size, std::move(spareBits), align,
                          IsNotPOD, IsNotBitwiseTakable) {}
@@ -785,9 +794,9 @@ TypeConverter::createPrimitiveForAlignedPointer(llvm::PointerType *type,
                                                 Size size,
                                                 Alignment align,
                                                 Alignment pointerAlignment) {
-  SpareBitVector spareBits = IGM.TargetInfo.PointerSpareBits;
+  llvm::BitVector spareBits = IGM.TargetInfo.PointerSpareBits;
   for (unsigned bit = 0; Alignment(1 << bit) != pointerAlignment; ++bit) {
-    spareBits.setBit(bit);
+    spareBits.set(bit);
   }
 
   return new PrimitiveTypeInfo(type, size, std::move(spareBits), align);
@@ -797,8 +806,7 @@ TypeConverter::createPrimitiveForAlignedPointer(llvm::PointerType *type,
 /// or destroy it.
 const FixedTypeInfo *
 TypeConverter::createImmovable(llvm::Type *type, Size size, Alignment align) {
-  auto spareBits = SpareBitVector::getConstant(size.getValueInBits(), false);
-  return new ImmovableTypeInfo(type, size, std::move(spareBits), align);
+  return new ImmovableTypeInfo(type, size, {}, align);
 }
 
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
@@ -874,11 +882,6 @@ const LoadableTypeInfo &TypeConverter::getWitnessTablePtrTypeInfo() {
   WitnessTablePtrTI->NextConverted = FirstType;
   FirstType = WitnessTablePtrTI;
   return *WitnessTablePtrTI;
-}
-
-const SpareBitVector &IRGenModule::getWitnessTablePtrSpareBits() const {
-  // Witness tables are pointers and have pointer spare bits.
-  return TargetInfo.PointerSpareBits;
 }
 
 const TypeInfo &IRGenModule::getTypeMetadataPtrTypeInfo() {
@@ -1248,8 +1251,7 @@ TypeConverter::getOpaqueStorageTypeInfo(Size size) {
     llvm::IntegerType::get(IGM.LLVMContext, size.getValue() * 8);
 
   // There are no spare bits in an opaque storage type.
-  auto type = new PrimitiveTypeInfo(intType, size,
-                    SpareBitVector::getConstant(size.getValueInBits(), false),
+  auto type = new PrimitiveTypeInfo(intType, size, llvm::BitVector(),
                                     Alignment(1));
   type->NextConverted = FirstType;
   FirstType = type;
@@ -1896,10 +1898,9 @@ ObjectSize IRGenModule::classifyTypeSize(SILType type, ResilienceScope scope) {
   return ClassifyTypeSize(*this, scope).visitSILType(type);
 }
 
-SpareBitVector IRGenModule::getSpareBitsForType(llvm::Type *scalarTy) {
-  auto it = SpareBitsForTypes.find(scalarTy);
-  if (it != SpareBitsForTypes.end())
-    return it->second;
+llvm::BitVector IRGenModule::getSpareBitsForType(llvm::Type *scalarTy) {
+  if (SpareBitsForTypes.count(scalarTy))
+    return SpareBitsForTypes[scalarTy];
   
   {
     // FIXME: Currently we only implement spare bits for single-element
@@ -1918,19 +1919,21 @@ SpareBitVector IRGenModule::getSpareBitsForType(llvm::Type *scalarTy) {
     // to the target data layout.
     unsigned allocBits = DataLayout.getTypeAllocSizeInBits(intTy);
     assert(allocBits >= intTy->getBitWidth());
+    // Integer types get rounded up to the next power-of-two size in our layout,
+    // so non-power-of-two integer types get spare bits up to that power of two.
+    if (allocBits == intTy->getBitWidth())
+      goto no_spare_bits;
         
     // FIXME: Endianness.
-    SpareBitVector &result = SpareBitsForTypes[scalarTy];
-    result.appendClearBits(intTy->getBitWidth());
-    result.extendWithSetBits(allocBits);
+    llvm::BitVector &result = SpareBitsForTypes[scalarTy];
+    result.resize(intTy->getBitWidth(), false);
+    result.resize(allocBits, true);
     return result;
   }
   
 no_spare_bits:
-  unsigned allocBits = DataLayout.getTypeAllocSizeInBits(scalarTy);
-  SpareBitVector &result = SpareBitsForTypes[scalarTy];
-  result.appendClearBits(allocBits);
-  return result;
+  SpareBitsForTypes[scalarTy] = {};
+  return {};
 }
 
 unsigned IRGenModule::getBuiltinIntegerWidth(BuiltinIntegerType *t) {

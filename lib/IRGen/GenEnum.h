@@ -34,6 +34,7 @@
 
 namespace llvm {
   class BasicBlock;
+  class BitVector;
   class ConstantInt;
   class StructType;
   class Type;
@@ -161,21 +162,24 @@ void emitStoreEnumTagToAddress(IRGenFunction &IGF,
                                 Address enumAddr,
                                 EnumElementDecl *theCase);
   
+/// Convert a BitVector to an APInt.
+APInt getAPIntFromBitVector(const llvm::BitVector &bits);
+  
 /// Interleave the occupiedValue and spareValue bits, taking a bit from one
 /// or the other at each position based on the spareBits mask.
 APInt
-interleaveSpareBits(IRGenModule &IGM, const SpareBitVector &spareBits,
+interleaveSpareBits(IRGenModule &IGM, const llvm::BitVector &spareBits,
                     unsigned bits, unsigned spareValue, unsigned occupiedValue);
 
 /// Gather spare bits into the low bits of a smaller integer value.
 llvm::Value *emitGatherSpareBits(IRGenFunction &IGF,
-                                 const SpareBitVector &spareBitMask,
+                                 const llvm::BitVector &spareBitMask,
                                  llvm::Value *spareBits,
                                  unsigned resultLowBit,
                                  unsigned resultBitWidth);
 /// Scatter spare bits from the low bits of a smaller integer value.
 llvm::Value *emitScatterSpareBits(IRGenFunction &IGF,
-                                  const SpareBitVector &spareBitMask,
+                                  const llvm::BitVector &spareBitMask,
                                   llvm::Value *packedBits,
                                   unsigned packedLowBit);
   
@@ -223,7 +227,7 @@ protected:
   
   /// Constructs a TypeInfo for an enum of the best possible kind for its
   /// layout, FixedEnumTypeInfo or LoadableEnumTypeInfo.
-  TypeInfo *getFixedEnumTypeInfo(llvm::StructType *T, Size S, SpareBitVector SB,
+  TypeInfo *getFixedEnumTypeInfo(llvm::StructType *T, Size S, llvm::BitVector SB,
                                  Alignment A, IsPOD_t isPOD,
                                  IsBitwiseTakable_t isBT);
   
@@ -287,15 +291,15 @@ public:
   /// These bits are populated in increasing value according to the order of
   /// the getElementsWithPayload() array, starting from zero for the first
   /// element with payload.
-  virtual ClusteredBitVector getTagBitsForPayloads(IRGenModule &IGM) const = 0;
+  virtual llvm::BitVector getTagBitsForPayloads(IRGenModule &IGM) const = 0;
   
   /// Return the bit pattern used for the given no-payload case.
-  virtual ClusteredBitVector
+  virtual llvm::BitVector
   getBitPatternForNoPayloadElement(IRGenModule &IGM,
                                    EnumElementDecl *theCase) const = 0;
 
   /// Return the bit mask used to test for no-payload cases.
-  virtual ClusteredBitVector
+  virtual llvm::BitVector
   getBitMaskForNoPayloadElements(IRGenModule &IGM) const = 0;
   
   /// \group Indirect enum operations

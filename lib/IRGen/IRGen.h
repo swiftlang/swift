@@ -29,15 +29,10 @@ namespace llvm {
 
 namespace swift {
   class CanType;
-  class ClusteredBitVector;
   enum ForDefinition_t : bool;
   
 namespace irgen {
   using Lowering::AbstractionPattern;
-
-/// In IRGen, we use Swift's ClusteredBitVector data structure to
-/// store vectors of spare bits.
-using SpareBitVector = ClusteredBitVector;
 
 class Size;
 

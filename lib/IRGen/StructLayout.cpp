@@ -88,7 +88,7 @@ StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
   } else {
     MinimumAlign = builder.getAlignment();
     MinimumSize = builder.getSize();
-    SpareBits = std::move(builder.getSpareBits());
+    SpareBits = getSpareBitsFromBuilder(builder);
     IsFixedLayout = builder.isFixedLayout();
     IsKnownPOD = builder.isKnownPOD();
     IsKnownBitwiseTakable = builder.isKnownBitwiseTakable();
@@ -225,7 +225,7 @@ void StructLayoutBuilder::addFixedSizeElement(ElementLayout &elt) {
       StructFields.push_back(paddingTy);
       
       // The padding can be used as spare bits by enum layout.
-      CurSpareBits.appendSetBits(Size(paddingRequired).getValueInBits());
+      CurSpareBits.resize(CurSize.getValueInBits(), true);
     }
   }
 
@@ -276,7 +276,14 @@ void StructLayoutBuilder::addElementAtFixedOffset(ElementLayout &elt) {
   StructFields.push_back(elt.getType().getStorageType());
   
   // Carry over the spare bits from the element.
-  CurSpareBits.append(eltTI.getSpareBits());
+  unsigned startBit = CurSize.getValueInBits();
+  unsigned eltBits = eltTI.getFixedSize().getValueInBits();
+  CurSpareBits.resize(startBit + eltBits);
+  if (!eltTI.getSpareBits().empty()) {
+    for (unsigned i = 0; i < eltBits; ++i) {
+      CurSpareBits[startBit + i] = eltTI.getSpareBits()[i];
+    }
+  }
 }
 
 /// Add an element at a non-fixed offset to the aggregate.

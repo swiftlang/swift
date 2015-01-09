@@ -181,7 +181,7 @@ namespace {
     : public HeapTypeInfo<BuiltinNativeObjectTypeInfo> {
   public:
     BuiltinNativeObjectTypeInfo(llvm::PointerType *storage,
-                                 Size size, SpareBitVector spareBits,
+                                 Size size, llvm::BitVector spareBits,
                                  Alignment align)
     : HeapTypeInfo(storage, size, spareBits, align) {}
 
@@ -207,7 +207,7 @@ namespace {
                                      LoadableTypeInfo> {
   public:
     UnmanagedReferenceTypeInfo(llvm::Type *type,
-                               const SpareBitVector &spareBits,
+                               const llvm::BitVector &spareBits,
                                Size size, Alignment alignment)
       : PODSingleScalarTypeInfo(type, size, spareBits, alignment) {}
   
@@ -256,7 +256,7 @@ namespace {
                                   UnownedTypeInfo> {
   public:
     SwiftUnownedReferenceTypeInfo(llvm::Type *type,
-                                  const SpareBitVector &spareBits,
+                                  const llvm::BitVector &spareBits,
                                   Size size, Alignment alignment)
       : SingleScalarTypeInfo(type, size, spareBits, alignment) {}
 
@@ -284,10 +284,8 @@ namespace {
   public:
     SwiftWeakReferenceTypeInfo(llvm::Type *valueType,
                                llvm::Type *weakType,
-                               Size size, Alignment alignment,
-                               SpareBitVector &&spareBits)
-      : IndirectTypeInfo(weakType, size, alignment, std::move(spareBits)),
-        ValueType(valueType) {}
+                               Size size, Alignment alignment)
+      : IndirectTypeInfo(weakType, size, alignment), ValueType(valueType) {}
 
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
                             Address srcAddr, SILType T) const override {
@@ -365,16 +363,7 @@ TypeConverter::createSwiftWeakStorageType(llvm::Type *valueType) {
   return new SwiftWeakReferenceTypeInfo(valueType,
                                     IGM.WeakReferencePtrTy->getElementType(),
                                         IGM.getWeakReferenceSize(),
-                                        IGM.getWeakReferenceAlignment(),
-                                        IGM.getWeakReferenceSpareBits());
-}
-
-SpareBitVector IRGenModule::getWeakReferenceSpareBits() const {
-  // The runtime needs to be able to freely manipulate live weak
-  // references without worrying about us mucking around with their
-  // bits, so weak references are completely opaque.
-  return SpareBitVector::getConstant(getWeakReferenceSize().getValueInBits(),
-                                     false);
+                                        IGM.getWeakReferenceAlignment());
 }
 
 namespace {
@@ -385,7 +374,7 @@ namespace {
                                   UnownedTypeInfo> {
   public:
     UnknownUnownedReferenceTypeInfo(llvm::Type *type,
-                                    const SpareBitVector &spareBits,
+                                    const llvm::BitVector &spareBits,
                                     Size size, Alignment alignment)
       : SingleScalarTypeInfo(type, size, spareBits, alignment) {}
 
@@ -415,10 +404,8 @@ namespace {
   public:
     UnknownWeakReferenceTypeInfo(llvm::Type *valueType,
                                  llvm::Type *weakType,
-                                 Size size, Alignment alignment,
-                                 SpareBitVector &&spareBits)
-      : IndirectTypeInfo(weakType, size, alignment, std::move(spareBits)),
-        ValueType(valueType) {}
+                                 Size size, Alignment alignment)
+      : IndirectTypeInfo(weakType, size, alignment), ValueType(valueType) {}
 
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
                             Address srcAddr, SILType T) const override {
@@ -496,8 +483,7 @@ TypeConverter::createUnknownWeakStorageType(llvm::Type *valueType) {
   return new UnknownWeakReferenceTypeInfo(valueType,
                                       IGM.WeakReferencePtrTy->getElementType(),
                                           IGM.getWeakReferenceSize(),
-                                          IGM.getWeakReferenceAlignment(),
-                                          IGM.getWeakReferenceSpareBits());
+                                          IGM.getWeakReferenceAlignment());
 }
 
 /// Does the given value superficially not require reference-counting?

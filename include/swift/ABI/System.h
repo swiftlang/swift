@@ -37,9 +37,6 @@
 /// that the null representation is available.
 #define SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER 4096
 
-/// The bitmask of spare bits in a function pointer.
-#define SWIFT_ABI_DEFAULT_FUNCTION_SPARE_BITS_MASK 0
-
 /// The bitmask of spare bits in a Swift heap object pointer.  A Swift
 /// heap object allocation will never set any of these bits.
 #define SWIFT_ABI_DEFAULT_SWIFT_SPARE_BITS_MASK 0

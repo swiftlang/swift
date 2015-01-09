@@ -21,7 +21,7 @@
 
 #include "Address.h"
 #include "TypeInfo.h"
-#include "swift/Basic/ClusteredBitVector.h"
+#include "llvm/ADT/BitVector.h"
 #include "swift/SIL/SILType.h"
 
 namespace llvm {
@@ -42,26 +42,24 @@ private:
   
   /// The spare bit mask for this type. SpareBits[0] is the LSB of the first
   /// byte. This may be empty if the type has no spare bits.
-  SpareBitVector SpareBits;
+  llvm::BitVector SpareBits;
   
 protected:
   FixedTypeInfo(llvm::Type *type, Size size,
-                const SpareBitVector &spareBits,
+                const llvm::BitVector &spareBits,
                 Alignment align, IsPOD_t pod, IsBitwiseTakable_t bt,
                 SpecialTypeInfoKind stik = STIK_Fixed)
       : TypeInfo(type, align, pod, bt, stik), StorageSize(size),
         SpareBits(spareBits) {
-    assert(SpareBits.size() == size.getValueInBits());
     assert(isFixedSize());
   }
 
   FixedTypeInfo(llvm::Type *type, Size size,
-                SpareBitVector &&spareBits,
+                llvm::BitVector &&spareBits,
                 Alignment align, IsPOD_t pod, IsBitwiseTakable_t bt,
                 SpecialTypeInfoKind stik = STIK_Fixed)
       : TypeInfo(type, align, pod, bt, stik), StorageSize(size),
         SpareBits(std::move(spareBits)) {
-    assert(SpareBits.size() == size.getValueInBits());
     assert(isFixedSize());
   }
 
@@ -153,9 +151,8 @@ public:
   }
   
   /// Get the bit mask that must be applied before testing an extra inhabitant.
-  virtual SpareBitVector getFixedExtraInhabitantMask(IRGenModule &IGM) const {
-    return SpareBitVector::getConstant(getFixedSize().getValueInBits(),
-                                           true);
+  virtual llvm::BitVector getFixedExtraInhabitantMask(IRGenModule &IGM) const {
+    return llvm::BitVector(getFixedSize().getValueInBits(), true);
   }
 
   /// Create a constant of the given bit width holding one of the extra
@@ -199,7 +196,7 @@ public:
                                     Address dest) const;
   
   /// Get the spare bit mask for the type.
-  const SpareBitVector &getSpareBits() const { return SpareBits; }
+  const llvm::BitVector &getSpareBits() const { return SpareBits; }
   
   /// True if the type representation has statically "spare" unused bits.
   bool hasFixedSpareBits() const {
@@ -216,13 +213,13 @@ public:
   /// The intent is that, for all the data types of an enum, you should be able
   /// to do this:
   ///
-  ///   SpareBitVector spareBits;
+  ///   llvm::BitVector spareBits;
   ///   for (EnumElementDecl *elt : u->getAllElements())
   ///     getFragileTypeInfo(elt->getArgumentType())
   ///       .applyFixedSpareBitsMask(spareBits, 0);
   ///
   /// and end up with a spare bits mask for the entire enum.
-  void applyFixedSpareBitsMask(SpareBitVector &bits) const;
+  void applyFixedSpareBitsMask(llvm::BitVector &bits) const;
   
   /// Fixed-size types never need dynamic value witness table instantiation.
   void initializeMetadata(IRGenFunction &IGF,
