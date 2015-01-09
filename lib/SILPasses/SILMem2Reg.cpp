@@ -48,9 +48,11 @@ STATISTIC(NumPhiPlaced,          "Number of Phi blocks placed");
 
 namespace {
 
+typedef llvm::DomTreeNodeBase<SILBasicBlock> DomTreeNode;
+typedef llvm::DenseMap<DomTreeNode *, unsigned> DomTreeLevelMap;
+
 /// Promotes a single AllocStackInst into registers..
 class StackAllocationPromoter {
-  typedef llvm::DomTreeNodeBase<SILBasicBlock> DomTreeNode;
   typedef llvm::DenseSet<SILBasicBlock *> BlockSet;
   typedef llvm::DenseMap<SILBasicBlock *, SILInstruction *> BlockToInstMap;
 
@@ -70,6 +72,9 @@ class StackAllocationPromoter {
   /// Dominator info.
   DominanceInfo *DT;
 
+  /// Map from dominator tree node to tree level.
+  DomTreeLevelMap &DomTreeLevels;
+
   /// The builder used to create new instructions during register promotion.
   SILBuilder &B;
 
@@ -78,8 +83,9 @@ class StackAllocationPromoter {
   BlockToInstMap LastStoreInBlock;
 public:
   /// C'tor.
-  StackAllocationPromoter(AllocStackInst *Asi, DominanceInfo *Di, SILBuilder &B)
-      : ASI(Asi), DSI(0), DT(Di), B(B) {
+  StackAllocationPromoter(AllocStackInst *Asi, DominanceInfo *Di,
+                          DomTreeLevelMap &DomTreeLevels, SILBuilder &B)
+      : ASI(Asi), DSI(0), DT(Di), DomTreeLevels(DomTreeLevels), B(B) {
         // Scan the users in search of a deallocation instruction.
         for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI)
           if (DeallocStackInst *D = dyn_cast<DeallocStackInst>(UI->getUser())) {
@@ -554,13 +560,9 @@ void StackAllocationPromoter::pruneAllocStackUsage() {
   DEBUG(llvm::dbgs() << "*** Finished pruning : " << *ASI);
 }
 
-void StackAllocationPromoter::promoteAllocationToPhi() {
-  DEBUG(llvm::dbgs() << "*** Placing Phis for : " << *ASI);
-
-  /// Maps dom tree nodes to their dom tree levels.
-  llvm::DenseMap<DomTreeNode *, unsigned> DomTreeLevels;
-
-  // Assign tree levels to dom tree nodes.
+/// Compute the dominator tree levels for DT.
+static void computeDomTreeLevels(DominanceInfo *DT,
+                                 DomTreeLevelMap &DomTreeLevels) {
   // TODO: This should happen once per function.
   SmallVector<DomTreeNode *, 32> Worklist;
   DomTreeNode *Root = DT->getRootNode();
@@ -574,6 +576,10 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
       Worklist.push_back(*CI);
     }
   }
+}
+
+void StackAllocationPromoter::promoteAllocationToPhi() {
+  DEBUG(llvm::dbgs() << "*** Placing Phis for : " << *ASI);
 
   // A list of blocks that will require new Phi values.
   BlockSet PhiBlocks;
@@ -598,6 +604,8 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
 
   // A list of nodes for which we already calculated the dominator frontier.
   llvm::SmallPtrSet<DomTreeNode *, 32> Visited;
+
+  SmallVector<DomTreeNode *, 32> Worklist;
 
   // Scan all of the definitions in the function bottom-up using the priority
   // queue.
@@ -688,6 +696,11 @@ bool MemoryToRegisters::run() {
   bool Changed = false;
 
   Changed = splitAllCriticalEdges(F, true, DT, nullptr);
+
+  // Compute dominator tree node levels for the function.
+  DomTreeLevelMap DomTreeLevels;
+  computeDomTreeLevels(DT, DomTreeLevels);
+
   for (auto &BB : F) {
     auto I = BB.begin(), E = BB.end();
     while (I != E) {
@@ -737,7 +750,7 @@ bool MemoryToRegisters::run() {
       DEBUG(llvm::dbgs() << "*** Need to insert Phis for " << *ASI);
 
       // Promote this allocation.
-      StackAllocationPromoter(ASI, DT, B).run();
+      StackAllocationPromoter(ASI, DT, DomTreeLevels, B).run();
 
       // Make sure that all of the allocations were promoted into registers.
       assert(isWriteOnlyAllocation(ASI, /* Promoted =*/ true) &&
