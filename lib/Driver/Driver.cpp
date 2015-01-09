@@ -580,8 +580,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.LinkAction = LinkKind::Executable;
     }
   } else if (Args.hasArg(options::OPT_update_code)) {
-    OI.UseUpdateCodeTool = true;
-    OI.CompilerMode = OutputInfo::Mode::StandardCompile;
+    OI.CompilerMode = OutputInfo::Mode::UpdateCode;
     OI.CompilerOutputType = types::TY_Remapping;
     OI.LinkAction = LinkKind::None;
   } else {
@@ -875,7 +874,8 @@ void Driver::buildActions(const ToolChain &TC,
 
   ActionList CompileActions;
   switch (OI.CompilerMode) {
-  case OutputInfo::Mode::StandardCompile: {
+  case OutputInfo::Mode::StandardCompile:
+  case OutputInfo::Mode::UpdateCode: {
     for (const InputPair &Input : Inputs) {
       types::ID InputType = Input.first;
       const Arg *InputArg = Input.second;

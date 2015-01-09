@@ -145,7 +145,7 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
 
   const char *Exec = getToolChain().getDriver().getSwiftProgramPath().c_str();
 
-  if (OI.UseUpdateCodeTool) {
+  if (OI.CompilerMode == OutputInfo::Mode::UpdateCode) {
     SmallString<128> SwiftUpdatePath = llvm::sys::path::parent_path(Exec);
     llvm::sys::path::append(SwiftUpdatePath, "swift-update");
     Exec = Args.MakeArgString(SwiftUpdatePath.str());
@@ -182,9 +182,6 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
       // Since this is our primary output, we need to specify the option here.
       FrontendModeOption = "-emit-module";
       break;
-    case types::TY_Remapping:
-      FrontendModeOption = "-parse";
-      break;
     case types::TY_Nothing:
       // We were told to output nothing, so get the last mode option and use that.
       if (const Arg *A = Args.getLastArg(options::OPT_modes_Group))
@@ -202,6 +199,7 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     case types::TY_ObjCHeader:
     case types::TY_Image:
     case types::TY_SwiftDeps:
+    case types::TY_Remapping:
       llvm_unreachable("Output type can never be primary output.");
     case types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
@@ -214,6 +212,9 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   case OutputInfo::Mode::REPL:
     FrontendModeOption = "-repl";
     break;
+  case OutputInfo::Mode::UpdateCode:
+    FrontendModeOption = "-parse";
+    break;
   }
 
   assert(FrontendModeOption != nullptr && "No frontend mode option specified!");
@@ -225,7 +226,8 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
 
   // Add input arguments.
   switch (OI.CompilerMode) {
-  case OutputInfo::Mode::StandardCompile: {
+  case OutputInfo::Mode::StandardCompile:
+  case OutputInfo::Mode::UpdateCode: {
     assert(InputActions.size() == 1 &&
            "The Swift frontend expects exactly one input (the primary file)!");
 
@@ -283,6 +285,7 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   switch (OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::SingleCompile:
+  case OutputInfo::Mode::UpdateCode:
     break;
   case OutputInfo::Mode::Immediate:
   case OutputInfo::Mode::REPL:
