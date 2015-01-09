@@ -2220,6 +2220,17 @@ internal struct _BridgedNative${Self}Storage {
         state, objects: objects, count: count, dummy: ())
   }
 
+  @objc
+  internal func getObjects(objects: UnsafeMutablePointer<AnyObject>,
+    andKeys keys: UnsafeMutablePointer<AnyObject>) {
+    bridgedAllKeysAndValues(objects, keys)
+  }
+
+  @objc
+  internal func bridgedAllKeysAndValues(objects: UnsafeMutablePointer<AnyObject>,
+    _ keys: UnsafeMutablePointer<AnyObject>) {
+    _sanityCheckFailure("'bridgedAllKeysAndValues' should be overridden")
+  }
 %end
 
 }
@@ -2399,6 +2410,54 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     }
     bridgeEverything()
     return bridgedNativeStorage.assertingGet(i.offset).1
+  }
+
+  internal override func bridgedAllKeysAndValues(
+    objects: UnsafeMutablePointer<AnyObject>,
+    _ keys: UnsafeMutablePointer<AnyObject>) {
+    bridgeEverything()
+    // the user is expected to provide a buffer of the correct size
+    var i = 0 // position in the input buffer
+    var position = 0 // position in the dictionary storage
+    let count = bridgedNativeStorage.capacity
+    let unmanagedKeys = _UnmanagedAnyObjectArray(keys)
+    let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
+
+    if keys == UnsafeMutablePointer.null() {
+      if objects == UnsafeMutablePointer.null() {
+        // do nothing, both are null
+      } else {
+        // keys null, objects nonnull
+        while position < count {
+          if let elem = bridgedNativeStorage[position] {
+            unmanagedObjects[i] = elem.value
+            i++
+          }
+          position++
+        }
+      }
+    } else {
+      if objects == UnsafeMutablePointer.null() {
+        // keys nonnull, objects null
+        while position < count {
+          if let elem = bridgedNativeStorage[position] {
+            unmanagedKeys[i] = elem.key
+            i++
+          }
+          position++
+        }
+      } else {
+        // keys nonnull, objects nonnull
+        while position < count {
+          if let elem = bridgedNativeStorage[position] {
+            unmanagedObjects[i] = elem.value
+            unmanagedKeys[i] = elem.key
+            i++
+          }
+          position++
+        }
+      }
+    }
   }
 
 %end

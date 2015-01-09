@@ -3475,6 +3475,29 @@ DictionaryTestSuite.test("dropsBridgedCache") {
   }
 }
 
+DictionaryTestSuite.test("getObjects:andKeys:") {
+  let d = ([1: "one", 2: "two"] as Dictionary<Int, String>) as NSDictionary
+  var keys = UnsafeMutableBufferPointer(
+    start: UnsafeMutablePointer<NSNumber>.alloc(2), count: 2)
+  var values = UnsafeMutableBufferPointer(
+    start: UnsafeMutablePointer<NSString>.alloc(2), count: 2)
+  var kp = AutoreleasingUnsafeMutablePointer<AnyObject?>(keys.baseAddress)
+  var vp = AutoreleasingUnsafeMutablePointer<AnyObject?>(values.baseAddress)
+  var null = AutoreleasingUnsafeMutablePointer<AnyObject?>.null()
+
+  d.getObjects(null, andKeys: null) // don't segfault
+
+  d.getObjects(null, andKeys: kp)
+  expectEqual([2, 1] as [NSNumber], Array(keys))
+
+  d.getObjects(vp, andKeys: null)
+  expectEqual(["two", "one"] as [NSString], Array(values))
+
+  d.getObjects(vp, andKeys: kp)
+  expectEqual([2, 1] as [NSNumber], Array(keys))
+  expectEqual(["two", "one"] as [NSString], Array(values))
+}
+
 DictionaryTestSuite.setUp {
   resetLeaksOfDictionaryKeysValues()
 }

@@ -95,6 +95,9 @@ public protocol _NSDictionaryCoreType :
 
   func copyWithZone(zone: _SwiftNSZone) -> AnyObject
 
+  func getObjects(objects: UnsafeMutablePointer<AnyObject>,
+    andKeys keys: UnsafeMutablePointer<AnyObject>)
+
   func countByEnumeratingWithState(
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>, count: Int
@@ -111,6 +114,8 @@ public protocol _NSDictionaryCoreType :
 /// supplies.
 @unsafe_no_objc_tagged_pointer @objc
 public protocol _NSDictionaryType : _NSDictionaryCoreType {
+  // Note! This API's type is different from what is imported by the clang
+  // importer.
   func getObjects(objects: UnsafeMutablePointer<AnyObject>,
       andKeys keys: UnsafeMutablePointer<AnyObject>)
 }
