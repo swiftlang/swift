@@ -4,6 +4,7 @@ import os
 import sys
 import subprocess
 import argparse
+import textwrap
 
 # Append the src dir
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src'))
@@ -21,7 +22,7 @@ def run_build_script_with_data_file(build_script, data_file):
     sys.stdout.write("Running build script with: %s\n" % ' '.join(build_script_args))
     subprocess.check_call(build_script_args)
 
-def build_disable_slice_pipelines(pipeline_script, build_script, output_dir):
+def build_disable_slice_pipelines(**kwargs):
     pipeline_range = range(len(PIPELINES))
 
     def get_pipeline_args(script, iter):
@@ -31,37 +32,60 @@ def build_disable_slice_pipelines(pipeline_script, build_script, output_dir):
         return result
 
     for i in pipeline_range:
-        pipeline_args = get_pipeline_args(pipeline_script, pipeline_range[:i+1])
-        data_file = os.path.join(output_dir, "pipeline-slice-%.2d-disabled-pipeline.json" % i)
+        pipeline_args = get_pipeline_args(kwargs['pipeline_script'], pipeline_range[:i+1])
+        data_file = os.path.join(kwargs['output_dir'], "pipeline-slice-%.2d-disabled-pipeline.json" % i)
         with open(data_file, 'w') as f:
             f.write(subprocess.check_output(pipeline_args))
-        run_build_script_with_data_file(build_script, data_file)
+        run_build_script_with_data_file(kwargs['build_script'], data_file)
 
-def build_disable_individual_pass(pass_name, pipeline_script, build_script, output_dir):
-    data_file = os.path.join(output_dir, "%s-disabled-pass.json" % pass_name)
+def build_disable_individual_pass(**kwargs):
+    pass_name = kwargs['pass_name']
+    data_file = os.path.join(kwargs['output_dir'], "%s-disabled-pass.json" % pass_name)
     with open(data_file, 'w') as f:
-        f.write(subprocess.check_output([pipeline_script, '--disable-pass', pass_name]))
-    run_build_script_with_data_file(build_script, data_file)
+        f.write(subprocess.check_output([kwargs['pipeline_script'], '--disable-pass', pass_name]))
+    run_build_script_with_data_file(kwargs['build_script'], data_file)
 
-def build_disable_individual_passes(pipeline_script, build_script, output_dir):
+def build_disable_individual_passes(**kwargs):
     for p in PASSES:
-        build_disable_individual_pass(p, pipeline_script, build_script, output_dir)
+        d = dict(kwargs)
+        d['pass_name'] = p
+        build_disable_individual_pass(**d)
 
 def main():
     parser = argparse.ArgumentParser(description="Run build-script with various passes disabled")
-    parser.add_argument('action', choices=['disable_slice_pipelines', 'disable_individual_passes'])
-    parser.add_argument('pipeline_script')
-    parser.add_argument('build_script')
-    parser.add_argument('output_dir')
+    subparsers = parser.add_subparsers(help="The specific action to perform")
+
+    slice_pipeline_parser = subparsers.add_parser('disable_slice_pipelines', description=textwrap.dedent("""
+    Go through all predefined pass pipelines and run build_script with only specific slices enabled.
+
+    Currently what this means is that we perform the normal pipeline order, stopping after N pipelines have run.
+    """))
+    slice_pipeline_parser.set_defaults(func=build_disable_slice_pipelines)
+
+    disable_individual_passes_parser = subparsers.add_parser('disable_individual_passes', description=textwrap.dedent("""
+    Loop over all predefines passes and run build_script once for each pass with that pass disabled.
+    """))
+    disable_individual_passes_parser.set_defaults(func=build_disable_individual_passes)
+
+    disable_individual_pass_parser = subparsers.add_parser('disable_individual_pass', description=textwrap.dedent("""
+    Run build-script disabling only the specified passes.
+    """))
+    disable_individual_pass_parser.add_argument('pass_name', help="The pass to disable",
+                                                choices=PASSES, type=str)
+    disable_individual_pass_parser.set_defaults(func=build_disable_individual_pass)
+
+    parser.add_argument('pipeline_script', help=textwrap.dedent("""
+    The path to normal_pipeline.py. In the future could be generalized to take other files.
+    """))
+    parser.add_argument('build_script', help=textwrap.dedent("""
+    The path to build-script.
+    """))
+    parser.add_argument('output_dir', help=textwrap.dedent("""
+    The output directory to use.
+    """))
 
     args = parser.parse_args()
-
-    # TODO: I think I can get argparse to do this for me.
-    if args.action == "disable_slice_pipelines":
-        build_disable_slice_pipelines(args.pipeline_script, args.build_script, args.output_dir)
-    elif args.action == "disable_individual_passes":
-        build_disable_individual_passes(args.pipeline_script, args.build_script, args.output_dir)
-    raise RuntimeError("Out of sync with choices")
+    args.func(**vars(args))
 
 if __name__ == "__main__":
     main()
