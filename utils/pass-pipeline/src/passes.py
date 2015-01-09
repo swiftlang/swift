@@ -1,6 +1,8 @@
 
 from pass_pipeline import Pass
 
+# TODO: This should not be hard coded. Create a tool in the compiler that knows
+# how to dump the passes and the pipelines themselves.
 AADumper = Pass('AADumper')
 ABCOpt = Pass('ABCOpt')
 AllocBoxToStack = Pass('AllocBoxToStack')

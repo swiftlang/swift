@@ -5,9 +5,15 @@ import sys
 import subprocess
 import argparse
 
-PIPELINES = ["PreSpecialize", "HighLevel", "EarlyLoopOpt", "MidLevelOpt", "Lower", "LowLevel", "LateLoopOpt"]
-PASSES = ["ABCOpt", "AllocBoxToStack", "COWArrayOpts", "CSE", "CapturePromotion", "CapturePropagation", "ClosureSpecializer", "CodeMotion", "CopyForwarding", "DCE", "DeadFunctionElimination", "DeadObjectElimination", "Devirtualizer", "EarlyInliner", "FunctionSignatureOpts", "GenericSpecializer", "GlobalARCOpts", "GlobalLoadStoreOpts", "GlobalOpt", "InlineCaches", "InstCount", "LICM", "LateInliner", "LoopRotate", "LowerAggregateInstrs", "MandatoryInlining", "Mem2Reg", "NoReturnFolding", "PerfInliner", "PerformanceConstantPropagation", "SILCleanup", "SILCombine", "SILLinker", "SROA", "SimplifyCFG", "SwiftArrayOpts"]
+# Append the src dir
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src'))
 
+import pass_pipeline_library
+import passes
+
+# TODO: This should not be hard coded.
+PIPELINES = ["PreSpecialize", "HighLevel", "EarlyLoopOpt", "MidLevelOpt", "Lower", "LowLevel", "LateLoopOpt"]
+PASSES = [p.name for p in passes.PASSES]
 DEFAULT_PRESENTS = "--preset=buildbot_incremental_extra_swift_args,tools=RA,stdlib=RD"
 
 def run_build_script_with_data_file(build_script, data_file):
