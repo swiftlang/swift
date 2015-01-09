@@ -1600,7 +1600,8 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> {
   }
 }
 
-internal struct _Native${Self}Storage<${TypeParametersDecl}> :
+public // @testable
+struct _Native${Self}Storage<${TypeParametersDecl}> :
   _HashStorageType, Printable {
   internal typealias Owner = _Native${Self}StorageOwner<${TypeParameters}>
   internal typealias StorageImpl = _Native${Self}StorageImpl<${TypeParameters}>
@@ -1650,7 +1651,8 @@ internal struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @transparent
-  internal var capacity: Int {
+  public // @testable
+  var capacity: Int {
     get {
       return body.capacity
     }
@@ -1777,7 +1779,8 @@ internal struct _Native${Self}Storage<${TypeParametersDecl}> :
 %end
 
   /// A textual representation of `self`.
-  internal var description: String {
+  public // @testable
+  var description: String {
     var result = ""
 #if INTERNAL_CHECKS_ENABLED
     for var i = 0; i != capacity; ++i {
