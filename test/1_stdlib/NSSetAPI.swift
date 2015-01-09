@@ -59,4 +59,18 @@ NSOrderedSetAPI.test("Printable") {
   expectEqual(expect, result)
 }
 
+var NSIndexSetAPI = TestSuite("NSIndexSetAPI")
+
+NSIndexSetAPI.test("SequenceType") {
+  let result = NSIndexSet()
+  isSequenceType(result)
+  let s = NSIndexSet(indexesInRange: NSMakeRange(1, 1))
+  var g = s.generate()
+  // FIXME: Compiler doesn't accept these terms.
+  // expectEqual(Optional<Int>.Some(1), g.next())
+  // expectEqual(Optional<Int>.None, g.next())
+  expectOptionalEqual(1, g.next())
+  expectEmpty(g.next())
+}
+
 runAllTests()

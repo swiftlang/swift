@@ -969,6 +969,44 @@ extension NSOrderedSet : SequenceType {
   }
 }
 
+// FIXME: move inside NSIndexSet when the compiler supports this.
+public struct NSIndexSetGenerator : GeneratorType {
+  public typealias Element = Int
+
+  internal let _set: NSIndexSet
+  internal var _first: Bool = true
+  internal var _current: Int?
+
+  internal init(set: NSIndexSet) {
+    self._set = set
+    self._current = nil
+  }
+
+  public mutating func next() -> Int? {
+    if _first {
+      _current = _set.firstIndex
+      _first = false
+    } else if let c = _current {
+      _current = _set.indexGreaterThanIndex(c)
+      if _current == NSNotFound {
+        _current = nil
+      }
+    } else {
+      // current is already nil
+    }
+    return _current
+  }
+}
+
+extension NSIndexSet : SequenceType {
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
+  public func generate() -> NSIndexSetGenerator {
+    return NSIndexSetGenerator(set: self)
+  }
+}
+
 // FIXME: right now the following is O(n), not O(1).
 
 /// The entry point for bridging `Set` to `NSSet` in bridge
