@@ -1629,7 +1629,8 @@ void LifetimeChecker::
 putIntoWorkList(SILBasicBlock *BB, WorkListType &WorkList) {
   LiveOutBlockState &State = getBlockInfo(BB);
   if (!State.isInWorkList && State.OutAvailability.containsUnknownElements()) {
-    DEBUG(llvm::dbgs() << "    add block " << BB->getID() << " to worklist\n");
+    DEBUG(llvm::dbgs() << "    add block " << BB->getDebugID()
+          << " to worklist\n");
     WorkList.push_back(BB);
     State.isInWorkList = true;
   }
@@ -1637,7 +1638,7 @@ putIntoWorkList(SILBasicBlock *BB, WorkListType &WorkList) {
 
 void LifetimeChecker::
 getPredsLiveOut(SILBasicBlock *BB, AvailabilitySet &Result) {
-  DEBUG(llvm::dbgs() << "  Get liveness for block " << BB->getID() << "\n");
+  DEBUG(llvm::dbgs() << "  Get liveness for block " << BB->getDebugID() << "\n");
   
   // Collect blocks for which we have to calculate the out-availability.
   // These are the pathes from blocks with known out-availability to the BB.
@@ -1675,8 +1676,8 @@ getPredsLiveOut(SILBasicBlock *BB, AvailabilitySet &Result) {
       for (auto Pred : WorkBB->getPreds()) {
         changed |= BBState.mergeFromPred(getBlockInfo(Pred));
       }
-      DEBUG(llvm::dbgs() << "      Block " << WorkBB->getID() << " out: " <<
-            BBState.OutAvailability << "\n");
+      DEBUG(llvm::dbgs() << "      Block " << WorkBB->getDebugID() << " out: "
+            << BBState.OutAvailability << "\n");
 
       // Clear the worklist-flag for the next call to getPredsLiveOut().
       // This could be moved out of the outer loop, but doing it here avoids

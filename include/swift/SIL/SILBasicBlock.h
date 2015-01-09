@@ -58,10 +58,11 @@ public:
   ~SILBasicBlock();
 
   /// Gets the ID (= index in the function's block list) of the block.
+  ///
   /// Returns -1 if the block is not contained in a function.
   /// Warning: This function is slow. Therefore it should only be used for
   ///          debug output.
-  int getID();
+  int getDebugID();
 
   SILFunction *getParent() { return Parent; }
   const SILFunction *getParent() const { return Parent; }

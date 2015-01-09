@@ -38,7 +38,7 @@ SILBasicBlock::~SILBasicBlock() {
   // iplist's destructor is going to destroy the InstList.
 }
 
-int SILBasicBlock::getID() {
+int SILBasicBlock::getDebugID() {
   if (!getParent())
     return -1;
   int idx = 0;
