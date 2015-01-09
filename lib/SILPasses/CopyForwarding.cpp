@@ -47,12 +47,15 @@ static bool isIdentifiedObject(SILValue Def, SILFunction *F) {
     // no aliases accessible within this function scope. We may be able to just
     // assert this.
     ParameterConvention Conv =  Arg->getParameterInfo().getConvention();
-    if (Conv != ParameterConvention::Indirect_In
-        && Conv != ParameterConvention::Indirect_Inout) {
+    switch (Conv) {
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Guaranteed:
+    case ParameterConvention::Indirect_Inout:
+      return true;
+    default:
       DEBUG(llvm::dbgs() << "  Skipping Def: Not an @in argument!\n");
       return false;
     }
-    return true;
   }
   else if (isa<AllocStackInst>(Def))
     return true;
@@ -129,6 +132,7 @@ public:
     switch (getAddressArgConvention(Apply, Address, Oper)) {
     case ParameterConvention::Indirect_In:
       return true;
+    case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_Inout:
       return false;
     case ParameterConvention::Indirect_Out:
@@ -220,11 +224,10 @@ public:
     switch (getAddressArgConvention(Apply, Address, Oper)) {
     case ParameterConvention::Indirect_Out:
       return true;
-    case ParameterConvention::Indirect_In_Guaranteed:
-      // FIXME: may be overconservative.
     case ParameterConvention::Indirect_Inout:
       return false;
     case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Guaranteed:
       llvm_unreachable("copy_addr not destroyed before reinitialization");
     default:
       llvm_unreachable("unexpected calling convention for copy_addr user");
