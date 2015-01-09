@@ -1,4 +1,3 @@
-// REQUIRES: long_tests
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 //
@@ -3466,13 +3465,13 @@ DictionaryTestSuite.test("dropsBridgedCache") {
   var dict = [0:10]
   if true {
     var bridged: NSDictionary = dict
-    expectEqual(10, bridged[0])
+    expectEqual(10, bridged[0] as! Int)
   }
 
   dict[0] = 11
   if true {
     var bridged: NSDictionary = dict
-    expectEqual(11, bridged[0])
+    expectEqual(11, bridged[0] as! Int)
   }
 }
 
