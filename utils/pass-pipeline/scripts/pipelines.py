@@ -37,12 +37,15 @@ def build_disable_slice_pipelines(pipeline_script, build_script, output_dir):
             f.write(subprocess.check_output(pipeline_args))
         run_build_script_with_data_file(build_script, data_file)
 
+def build_disable_individual_pass(pass_name, pipeline_script, build_script, output_dir):
+    data_file = os.path.join(output_dir, "%s-disabled-pass.json" % pass_name)
+    with open(data_file, 'w') as f:
+        f.write(subprocess.check_output([pipeline_script, '--disable-pass', pass_name]))
+    run_build_script_with_data_file(build_script, data_file)
+
 def build_disable_individual_passes(pipeline_script, build_script, output_dir):
     for p in PASSES:
-        data_file = os.path.join(output_dir, "%s-disabled-pass.json" % p)
-        with open(data_file, 'w') as f:
-            f.write(subprocess.check_output([pipeline_script, '--disable-pass', p]))
-        run_build_script_with_data_file(build_script, data_file)
+        build_disable_individual_pass(p, pipeline_script, build_script, output_dir)
 
 def main():
     parser = argparse.ArgumentParser(description="Run build-script with various passes disabled")
