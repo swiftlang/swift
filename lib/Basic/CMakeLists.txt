@@ -2,6 +2,7 @@ find_package(UUID REQUIRED)
 
 add_swift_library(swiftBasic
   Cache.cpp
+  ClusteredBitVector.cpp
   Demangle.cpp
   DemangleWrappers.cpp
   DiagnosticConsumer.cpp
