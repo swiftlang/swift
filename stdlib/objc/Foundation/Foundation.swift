@@ -988,11 +988,11 @@ public struct NSIndexSetGenerator : GeneratorType {
       _first = false
     } else if let c = _current {
       _current = _set.indexGreaterThanIndex(c)
-      if _current == NSNotFound {
-        _current = nil
-      }
     } else {
       // current is already nil
+    }
+    if _current == NSNotFound {
+      _current = nil
     }
     return _current
   }

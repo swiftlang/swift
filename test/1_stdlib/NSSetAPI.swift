@@ -71,6 +71,9 @@ NSIndexSetAPI.test("SequenceType") {
   // expectEqual(Optional<Int>.None, g.next())
   expectOptionalEqual(1, g.next())
   expectEmpty(g.next())
+  let empty = NSIndexSet(indexesInRange: NSMakeRange(1, 0))
+  var emptyGen = empty.generate()
+  expectEmpty(emptyGen.next())
 }
 
 runAllTests()
