@@ -1094,7 +1094,10 @@ void IRGenDebugInfo::emitVariableDeclaration(
       Piece = llvm::ConstantInt::get(llvm::Type::getInt64Ty(M.getContext()), 0);
 
     if (IsPiece) {
-      assert(!Indirection && "indirect pieces are not supported");
+      if (Indirection)
+        // Indirect pieces are not supported by LLVM.
+        return;
+
       // Try to get the size from the type if possible.
       auto Dim = EltSizes.getNext();
       auto StorageSize = getSizeFromExplosionValue(CI.getTargetInfo(), Piece);

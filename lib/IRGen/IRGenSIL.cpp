@@ -1265,10 +1265,10 @@ getLoweredArgValue(llvm::SmallVectorImpl<llvm::Value *> &Vals,
     return IndirectValue;
   } else if (LoweredArg.kind == LoweredValue::Kind::Explosion) {
     Explosion e = LoweredArg.getExplosion(*this);
-    auto vals = e.claimAll();
-    for (auto val : vals)
+    for (auto val : e.claimAll())
       Vals.push_back(val);
-  }
+  } else
+    llvm_unreachable("unhandled argument kind");
   return DirectValue;
 }
 
@@ -1313,11 +1313,6 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
 
       Deref |= getLoweredArgValue(Vals, *Next, Name);
     }
-    if (Deref && Vals.size() > 1)
-      // FIXME. <rdar://problem/19417227>
-      continue;
-    assert((Deref ? Vals.size() == 1 : true)
-           && "indirect argument found inside of an explosion");
     if (DTI.getType()->getKind() == TypeKind::InOut) {
       if (!Deref) {
         // If the value was promoted, unwrap the type.
