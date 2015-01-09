@@ -1,5 +1,8 @@
 // RUN: %target-run-simple-swift
 // XFAIL: interpret
+// REQUIRES: long_tests
+// FIXME: move to validation suite.
+
 
 import StdlibUnittest
 import Foundation

@@ -11,6 +11,9 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
 
+// FIXME: move to validation suite.
+// REQUIRES: long_tests
+
 import Swift
 import StdlibUnittest
 

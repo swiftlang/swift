@@ -1,3 +1,6 @@
+// REQUIRES: long_tests
+// FIXME: move to validation suite.
+
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 //
