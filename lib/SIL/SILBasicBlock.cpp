@@ -38,6 +38,18 @@ SILBasicBlock::~SILBasicBlock() {
   // iplist's destructor is going to destroy the InstList.
 }
 
+int SILBasicBlock::getID() {
+  if (!getParent())
+    return -1;
+  int idx = 0;
+  for (const SILBasicBlock &B : *getParent()) {
+    if (&B == this)
+      return idx;
+    idx++;
+  }
+  llvm_unreachable("block not in function's block list");
+}
+
 SILModule &SILBasicBlock::getModule() const {
   return getParent()->getModule();
 }
