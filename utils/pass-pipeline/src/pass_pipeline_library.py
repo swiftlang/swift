@@ -1,108 +1,108 @@
 
 import pass_pipeline as ppipe
-import passes
+import passes as p
 
 def diagnostic_passlist():
     return ppipe.PassList([
-        passes.CapturePromotion,
-        passes.AllocBoxToStack,
-        passes.InOutDeshadowing,
-        passes.NoReturnFolding,
-        passes.DefiniteInitialization,
-        passes.PredictableMemoryOptimizations,
-        passes.DiagnosticConstantPropagation,
-        passes.DiagnoseUnreachable,
-        passes.EmitDFDiagnostics,
-        passes.SplitNonCondBrCriticalEdges,
+        p.CapturePromotion,
+        p.AllocBoxToStack,
+        p.InOutDeshadowing,
+        p.NoReturnFolding,
+        p.DefiniteInitialization,
+        p.PredictableMemoryOptimizations,
+        p.DiagnosticConstantPropagation,
+        p.DiagnoseUnreachable,
+        p.EmitDFDiagnostics,
+        p.SplitNonCondBrCriticalEdges,
     ])
 
 def simplifycfg_silcombine_passlist():
     return ppipe.PassList([
-        passes.SimplifyCFG,
-        passes.SILCombine,
-        passes.SimplifyCFG,
+        p.SimplifyCFG,
+        p.SILCombine,
+        p.SimplifyCFG,
     ])
 
 def highlevel_loopopt_passlist():
     return ppipe.PassList([
-        passes.LowerAggregateInstrs,
-        passes.SILCombine,
-        passes.SROA,
-        passes.Mem2Reg,
-        passes.DCE,
-        passes.SILCombine,
+        p.LowerAggregateInstrs,
+        p.SILCombine,
+        p.SROA,
+        p.Mem2Reg,
+        p.DCE,
+        p.SILCombine,
         simplifycfg_silcombine_passlist(),
-        passes.LoopRotate,
-        passes.DCE,
-        passes.CSE,
-        passes.SILCombine,
-        passes.SimplifyCFG,
-        passes.ABCOpt,
-        passes.DCE,
-        passes.COWArrayOpts,
-        passes.DCE,
-        passes.SwiftArrayOpts,
+        p.LoopRotate,
+        p.DCE,
+        p.CSE,
+        p.SILCombine,
+        p.SimplifyCFG,
+        p.ABCOpt,
+        p.DCE,
+        p.COWArrayOpts,
+        p.DCE,
+        p.SwiftArrayOpts,
     ])
 
 def lowlevel_loopopt_passlist():
     return ppipe.PassList([
-        passes.LICM,
-        passes.DCE,
-        passes.CSE,
-        passes.SILCombine,
-        passes.SimplifyCFG,
+        p.LICM,
+        p.DCE,
+        p.CSE,
+        p.SILCombine,
+        p.SimplifyCFG,
     ])
 
 def inliner_for_optlevel(optlevel):
     if optlevel == 'high':
-        return passes.EarlyInliner
+        return p.EarlyInliner
     elif optlevel == 'mid':
-        return passes.PerfInliner
+        return p.PerfInliner
     elif optlevel == 'low':
-        return passes.LateInliner
+        return p.LateInliner
     else:
         raise RuntimeError('Unknown opt level')
 
 def ssapass_passlist(optlevel):
     return ppipe.PassList([
         simplifycfg_silcombine_passlist(),
-        passes.AllocBoxToStack,
-        passes.CopyForwarding,
-        passes.LowerAggregateInstrs,
-        passes.SILCombine,
-        passes.SROA,
-        passes.Mem2Reg,
-        passes.PerformanceConstantPropagation,
-        passes.DCE,
-        passes.CSE,
-        passes.SILCombine,
+        p.AllocBoxToStack,
+        p.CopyForwarding,
+        p.LowerAggregateInstrs,
+        p.SILCombine,
+        p.SROA,
+        p.Mem2Reg,
+        p.PerformanceConstantPropagation,
+        p.DCE,
+        p.CSE,
+        p.SILCombine,
         simplifycfg_silcombine_passlist(),
-        passes.GlobalLoadStoreOpts,
-        passes.CodeMotion, # Need to add proper argument here
-        passes.GlobalARCOpts,
-        passes.Devirtualizer,
-        passes.GenericSpecializer,
-        passes.SILLinker,
+        p.GlobalLoadStoreOpts,
+        p.CodeMotion, # Need to add proper argument here
+        p.GlobalARCOpts,
+        p.Devirtualizer,
+        p.GenericSpecializer,
+        p.SILLinker,
         inliner_for_optlevel(optlevel),
-        passes.SimplifyCFG,
-        passes.CodeMotion,
-        passes.GlobalARCOpts,
+        p.SimplifyCFG,
+        p.CodeMotion,
+        p.GlobalARCOpts,
     ])
 
 def lower_passlist():
     return ppipe.PassList([
-        passes.DeadFunctionElimination,
-        passes.DeadObjectElimination,
-        passes.GlobalOpt,
-        passes.CapturePropagation,
-        passes.ClosureSpecializer,
-        passes.Devirtualizer,
-        passes.InlineCaches,
-        passes.FunctionSignatureOpts,
+        p.DeadFunctionElimination,
+        p.DeadObjectElimination,
+        p.GlobalOpt,
+        p.CapturePropagation,
+        p.ClosureSpecializer,
+        p.Devirtualizer,
+        p.InlineCaches,
+        p.FunctionSignatureOpts,
     ])
         
 def specialization_passlist():
-    return ppipe.PassList([passes.SILLinker, passes.GenericSpecializer])
+    return ppipe.PassList([p.SILLinker, p.GenericSpecializer])
 
 def normal_passpipelines():
     result = []
@@ -132,7 +132,7 @@ def normal_passpipelines():
     result.append(x)
 
     x = ppipe.PassPipeline('LateLoopOpt', {'name' : 'run_n_times', 'count' : 1})
-    x.addPass([lowlevel_loopopt_passlist(), passes.DeadFunctionElimination])
+    x.addPass([lowlevel_loopopt_passlist(), p.DeadFunctionElimination])
     result.append(x)
 
     return result
