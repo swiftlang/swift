@@ -1,5 +1,6 @@
 // RUN: %swift %s -verify
 //
+// <rdar://problem/19422945> Parse/keyword_in_pattern_recovery.swift is XFAIL'ed and it regressed
 // XFAIL: *
 //
 // Test recovery for the case when keywords are used as identifiers
