@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir
-
-// Distributed under the terms of the MIT license
+// RUN: not --crash %target-swift-frontend %s -emit-ir
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // rdar://17240924
 

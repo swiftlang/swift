@@ -109,5 +109,5 @@ func inferSameType2<T : P3, U : P4 where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc>
 // CHECK-NEXT:   T[.PCommonAssoc1].CommonAssoc witness marker
 // CHECK-NEXT:   T[.PCommonAssoc1].CommonAssoc : P1 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:61]
 // CHECK-NEXT:   T[.PCommonAssoc2].CommonAssoc == T[.PCommonAssoc1].CommonAssoc [inferred @ {{.*}}requirement_inference.swift:{{.*}}:69]
-// CHECK-NEXT: eneric signature
+// CHECK-NEXT: Generic signature
 func inferSameType3<T : PCommonAssoc1 where T.CommonAssoc : P1, T : PCommonAssoc2>() { }

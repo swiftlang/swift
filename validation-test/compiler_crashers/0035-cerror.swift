@@ -9,7 +9,7 @@ protocol a {
   typealias e = d
   typealias f = d
 }
-class b<h : c, i : c where h.g == i> : a { // expected-note {{'b' previously declared here}} expected-error {{type 'b<h, h.g>' does not conform to protocol 'a'}}
+class b<h : c, i : c where h.g == i> : a { // expected-note {{'b' previously declared here}} expected-error {{type 'b<h, i>' does not conform to protocol 'a'}}
 }
 class b<h, i> { // expected-error {{invalid redeclaration of 'b'}}
 }

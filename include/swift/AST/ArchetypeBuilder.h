@@ -158,13 +158,10 @@ private:
   /// Enumerate the requirements that describe the signature of this
   /// archetype builder.
   ///
-  /// \param canonicalize Whether to canonicalize the conformance
-  /// requirements, which both minimizes and sorts them.
-  ///
   /// \param f A function object that will be passed each requirement
   /// and requirement source.
   template<typename F>
-  void enumerateRequirements(bool canonicalize, F f);
+  void enumerateRequirements(F f);
 
 public:
   ArchetypeBuilder(Module &mod, DiagnosticEngine &diags);
@@ -278,14 +275,6 @@ public:
   ///
   /// \returns true if an error occurs, false otherwse.
   bool finalize(SourceLoc loc);
-
-  /// Retrieve the generic signature described by the provided set of
-  /// constraints.
-  ///
-  /// \param params The generic parameters to use in the generic
-  /// signature.
-  GenericSignature *getGenericSignature(
-                      ArrayRef<GenericTypeParamType *> params);
 
   /// \brief Resolve the given type to the potential archetype it names.
   ///

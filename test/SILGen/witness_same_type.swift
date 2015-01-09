@@ -16,3 +16,18 @@ struct Foo: Fooable {
 
   func foo<T: Fooable where T.Bar == X>(#x: T) -> X { return X() }
 }
+
+// rdar://problem/19049566
+// CHECK-LABEL: sil @_TTWUSs12SequenceType__USs13GeneratorType__GV17witness_same_type14LazySequenceOfQ_Q0__Ss14_Sequence_TypeS1_FS3_8generateUS3__US0____fQPS3_FT_QS4_9Generator
+public struct LazySequenceOf<SS : SequenceType, A where SS.Generator.Element == A> : SequenceType {
+	public func generate() -> GeneratorOf<A> { 
+    var opt: GeneratorOf<A>?
+    return opt!
+  }
+	public subscript(i : Int) -> A { 
+    get { 
+      var opt: A?
+      return opt!
+    } 
+  }
+}

@@ -2002,76 +2002,20 @@ GenericSignature::getSubstitutionMap(ArrayRef<Substitution> args) const {
   for (auto sub : args) {
     subs[sub.getArchetype()] = sub.getReplacement();
   }
-
-  /// Retrieve the substitutable type.
-  auto getSubstitutableType = [](Type type) -> TypeBase *{
-    if (auto subTy = type->getAs<SubstitutableType>()) {
-      return subTy;
-    }
-    if (auto dTy = type->getAs<DependentMemberType>()) {
-      return dTy;
-    }
-
-    return nullptr;
-  };
-
+  
   for (auto depTy : getAllDependentTypes()) {
     auto replacement = args.front().getReplacement();
     args = args.slice(1);
     
-    if (auto subTy = getSubstitutableType(depTy)) {
+    if (auto subTy = depTy->getAs<SubstitutableType>()) {
       subs[subTy] = replacement;
+    }
+    else if (auto dTy = depTy->getAs<DependentMemberType>()) {
+      subs[dTy] = replacement;
     }
   }
   
   assert(args.empty() && "did not use all substitutions?!");
-
-  // For any same-type requirement, map the dependent type that
-  // doesn't have an entry in the substitutions to the replacement
-  // type for the other.
-  auto handleSameTypeReq = [&](const Requirement &req) -> bool {
-    auto firstSubsType = getSubstitutableType(req.getFirstType());
-    auto secondSubsType = getSubstitutableType(req.getSecondType());
-
-    if (firstSubsType && secondSubsType) {
-      auto firstKnown = subs.find(firstSubsType);
-      if (firstKnown != subs.end()) {
-        subs[secondSubsType] = firstKnown->second;
-        return true;
-      }
-
-      auto secondKnown = subs.find(secondSubsType);
-      if (secondKnown != subs.end()) {
-        subs[firstSubsType] = secondKnown->second;
-        return true;
-      }
-
-      return false;
-    }
-
-    return true; // nothing to do here
-  };
-
-  SmallVector<Requirement, 4> extraSameTypeReqs;
-  for (const auto &req : getRequirements()) {
-    if (req.getKind() == RequirementKind::SameType) {
-      if (!handleSameTypeReq(req))
-        extraSameTypeReqs.push_back(req);
-    }
-  }
-
-  // Handle mapping when the same-type requirements aren't in a
-  // sensible order. This is really ridiculous.
-  while (!extraSameTypeReqs.empty()) {
-    unsigned prevSize = extraSameTypeReqs.size();
-    extraSameTypeReqs.erase(std::remove_if(extraSameTypeReqs.begin(),
-                                           extraSameTypeReqs.end(),
-                                           handleSameTypeReq),
-                            extraSameTypeReqs.end());
-    if (prevSize == extraSameTypeReqs.size())
-      break;
-  }
-
   return subs;
 }
 

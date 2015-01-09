@@ -246,24 +246,6 @@ std::string ArchetypeBuilder::PotentialArchetype::getDebugName() const {
   return result.str().str();
 }
 
-/// Produces a tuple used to order potential archetypes, which
-/// consists of (base generic parameter depth, base generic parameter
-/// index, depth).
-static std::tuple<unsigned, unsigned, unsigned>
-getArchetypeDiscriminator(ArchetypeBuilder::PotentialArchetype *archetype) {
-  if (auto parent = archetype->getParent()) {
-    // Get the parent discriminator.
-    auto result = getArchetypeDiscriminator(parent);
-
-    // Increase depth.
-    ++std::get<2>(result);
-    return result;
-  }
-
-  auto genericParam = archetype->getGenericParam();
-  return std::make_tuple(genericParam->getDepth(), genericParam->getIndex(), 0);
-}
-
 unsigned ArchetypeBuilder::PotentialArchetype::getNestingDepth() const {
   unsigned Depth = 0;
   for (auto P = getParent(); P; P = P->getParent())
@@ -779,8 +761,7 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   // associated type.
   unsigned T1Depth = T1->getNestingDepth();
   unsigned T2Depth = T2->getNestingDepth();
-  if (getArchetypeDiscriminator(T2) < getArchetypeDiscriminator(T1) || 
-      (T1->isInvalid() && !T2->isInvalid()))
+  if (T2Depth < T1Depth || (T1->isInvalid() && !T2->isInvalid()))
     std::swap(T1, T2);
   
   // Don't allow two generic parameters to be equivalent, because then we
@@ -1210,7 +1191,6 @@ bool ArchetypeBuilder::finalize(SourceLoc loc) {
 
       // Typo correction failed; a diagnostic will be emitted later.
       if (correction.empty()) {
-        pa->setInvalid();
         invalid = true;
         return;
       }
@@ -1241,83 +1221,6 @@ bool ArchetypeBuilder::finalize(SourceLoc loc) {
   }
 
   return invalid;
-}
-
-/// Retrieve the dependent type for the given potential archetype
-/// under a specific generic type parameter mapping.
-static Type getDependentType(
-              ASTContext &context,
-              ArchetypeBuilder::PotentialArchetype *archetype,
-              const DenseMap<GenericTypeParamKey, GenericTypeParamType *> 
-                &mapping) {
-  if (auto parent = archetype->getParent()) {
-    Type parentType = getDependentType(context, parent, mapping);
-
-    // If we've resolved to an associated type, use it.
-    if (auto assocType = archetype->getResolvedAssociatedType())
-      return DependentMemberType::get(parentType, assocType, context);
-
-    return DependentMemberType::get(parentType, archetype->getName(), context);
-  }
-
-  auto known = mapping.find(
-                 GenericTypeParamKey::forType(archetype->getGenericParam()));
-
-  // FIXME: The case below should never happen.
-  if (known == mapping.end())
-    return archetype->getGenericParam();
-
-  return known->second;
-}
-
-GenericSignature *ArchetypeBuilder::getGenericSignature(
-                    ArrayRef<GenericTypeParamType *> params) {
-  // Establish the generic type parameter mapping.
-  DenseMap<GenericTypeParamKey, GenericTypeParamType *> mapping;
-  for (auto param : params) {
-    mapping[GenericTypeParamKey::forType(param)] = param;
-  }
-
-  SmallVector<Requirement, 4> requirements;
-  enumerateRequirements(true,
-                        [&](RequirementKind kind, 
-                            PotentialArchetype *archetype,
-                            llvm::PointerUnion<Type, PotentialArchetype *> type,
-                            RequirementSource source) {
-    auto archetypeType = getDependentType(Context, archetype, mapping);
-    switch (kind) {
-    case RequirementKind::Conformance:
-      requirements.push_back(Requirement(kind, archetypeType, 
-                                         type.get<Type>()));
-      break;
-
-    case RequirementKind::SameType:
-      // FIXME: Skip these for now.
-      break;
-
-    case RequirementKind::WitnessMarker:
-      assert(!archetypeType.isNull());
-      requirements.push_back(Requirement(kind, archetypeType, Type()));
-      break;
-    }
-  });
-
-  // FIXME: Gather same-type requirements above rather than appending
-  // the set we've been building.
-  for (const auto &req : Impl->SameTypeRequirements) {
-    auto firstType = getDependentType(Context, req.first, mapping);
-    Type secondType;
-    if (auto concrete = req.second.dyn_cast<Type>())
-      secondType = concrete;
-    else
-      secondType = getDependentType(Context, 
-                                    req.second.get<PotentialArchetype *>(),
-                                    mapping);
-    requirements.push_back(Requirement(RequirementKind::SameType, firstType,
-                                       secondType));
-  }
-
-  return GenericSignature::get(params, requirements);
 }
 
 ArchetypeType *
@@ -1420,35 +1323,22 @@ namespace {
 }
 
 template<typename F>
-void ArchetypeBuilder::enumerateRequirements(bool canonicalize, F f) {
-  /// The potential archetypes we have already visited.
-  llvm::SmallPtrSet<PotentialArchetype *, 4> visitedPAs;
-
-  // FIXME: Temporary, until we've dealt with recursion properly.
-  llvm::SmallPtrSet<PotentialArchetype *, 4> visitedNested;
-
+void ArchetypeBuilder::enumerateRequirements(F f) {
   // Local function to visit a potential archetype, enumerating its
   // requirements.
   auto visitPA = [&](PotentialArchetype *archetype) {
-    // If this is not the representative, produce a same-type
-    // constraint to the representative.
-    auto rep = archetype->getRepresentative();
-    if (rep != archetype) {
-      f(RequirementKind::SameType, archetype, archetype->getRepresentative(),
-        archetype->getSameTypeSource());
-
-      // Otherwise, continue with the representative.
-      archetype = rep;
-    }
-
     // Invalid archetypes are never representatives in well-formed or corrected
     // signature, so we don't need to visit them.
     if (archetype->isInvalid())
       return;
 
-    // If we have already visited the representative, we're done.
-    if (!visitedPAs.insert(archetype).second)
+    // If this is not the representative, produce a same-type
+    // constraint to the representative.
+    if (archetype->getRepresentative() != archetype) {
+      f(RequirementKind::SameType, archetype, archetype->getRepresentative(),
+        archetype->getSameTypeSource());
       return;
+    }
 
     // If we have a concrete type, produce a same-type requirement.
     if (archetype->isConcreteType()) {
@@ -1479,12 +1369,9 @@ void ArchetypeBuilder::enumerateRequirements(bool canonicalize, F f) {
       protocolSources.insert({conforms.first, conforms.second});
     }
 
-    // Sort the protocols in canonical order, canonicalizing them if requested.
-    if (canonicalize)
-      ProtocolType::canonicalizeProtocols(protocols);
-    else
-      llvm::array_pod_sort(protocols.begin(), protocols.end(), 
-                           ProtocolType::compareProtocols);
+    // Sort the protocols in canonical order.
+    llvm::array_pod_sort(protocols.begin(), protocols.end(), 
+                         ProtocolType::compareProtocols);
 
     // Enumerate the conformance requirements.
     for (auto proto : protocols) {
@@ -1499,11 +1386,6 @@ void ArchetypeBuilder::enumerateRequirements(bool canonicalize, F f) {
   // given potential archetype.
   std::function<void(PotentialArchetype *archetype)> visitNested 
     = [&](PotentialArchetype *archetype) {
-    // Make sure we don't visit the nested archetypes of an archetype
-    // twice.
-    if (!visitedNested.insert(archetype).second)
-      return;
-
     // Collect the nested types, sorted by name.
     SmallVector<std::pair<Identifier, PotentialArchetype*>, 16> nestedTypes;
     for (const auto &nested : archetype->getNestedTypes()) {
@@ -1535,24 +1417,12 @@ void ArchetypeBuilder::enumerateRequirements(bool canonicalize, F f) {
          (nextPrimaryIter != primaryIterEnd && 
           nextPrimaryIter->first.Depth == depth);
          ++nextPrimaryIter) {
-      // Skip any "primary" archetypes that actually get aliased to
-      // non-primary archetypes. They'll be handled later.
-      auto rep = nextPrimaryIter->second->getRepresentative();
-      if (rep->getParent())
-        continue;
-
       visitPA(nextPrimaryIter->second);
     }
 
     // For each of the primary potential archetypes, add the nested
     // requirements.
     for (; primaryIter != nextPrimaryIter; ++primaryIter) {
-      // Skip any "primary" archetypes that actually get aliased to
-      // non-primary archetypes. They'll be handled later.
-      auto rep = primaryIter->second->getRepresentative();
-      if (rep->getParent())
-        continue;
-
       visitNested(primaryIter->second);
     }
   }
@@ -1564,8 +1434,7 @@ void ArchetypeBuilder::dump() {
 
 void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
   out << "Requirements:";
-  enumerateRequirements(false,
-                        [&](RequirementKind kind, 
+  enumerateRequirements([&](RequirementKind kind, 
                             PotentialArchetype *archetype,
                             llvm::PointerUnion<Type, PotentialArchetype *> type,
                             RequirementSource source) {
