@@ -1,5 +1,6 @@
 // RUN: %swift %s -verify
 //
+// <rdar://problem/19422987> test/Parse/self_keyword_recovery.swift is XFAIL'ed and it regressed
 // XFAIL: *
 //
 // Test recovery for 'self' and 'Self' keywords used in inappropriate places.
