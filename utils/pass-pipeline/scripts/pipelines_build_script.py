@@ -19,8 +19,16 @@ DEFAULT_PRESENTS = "--preset=buildbot_incremental_extra_swift_args,tools=RA,stdl
 
 def run_build_script_with_data_file(build_script, data_file):
     build_script_args = [build_script, DEFAULT_PRESENTS, 'extra_swift_args=^Swift$;-Xfrontend\;-external-pass-pipeline-filename\;-Xfrontend\;%s' % data_file]
-    sys.stdout.write("Running build script with: %s\n" % ' '.join(build_script_args))
-    subprocess.check_call(build_script_args)
+    sys.stdout.write("Running build script with: %s..." % ' '.join(build_script_args))
+    sys.stdout.flush()
+    p = subprocess.Popen(build_script_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output = p.stdout.readlines()
+    status = p.wait()
+    if status == 0:
+        sys.stdout.write(" Success!\n")
+    else:
+        sys.stdout.write(" Failure:\n")
+    sys.stdout.write(output)
 
 def build_disable_slice_pipelines(**kwargs):
     pipeline_range = range(len(PIPELINES))
