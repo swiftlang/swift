@@ -26,3 +26,32 @@ bb0(%0 : $*P, %1 : $Int):
   destroy_addr %0 : $*P
   return %8 : $Int
 }
+
+// Test a specialized closure's indirect result type.
+// SIL verification should catch the incorrect type.
+// rdar:://19321284
+
+sil hidden [fragile] @callee : $@thin (Builtin.Word) -> () {
+bb0(%0 : $Builtin.Word):
+  unreachable
+}
+
+sil hidden [fragile] @thunk : $@thin (@out (), @owned @callee_owned ()->()) -> () {
+bb0(%0 : $*(), %1 : $@callee_owned () -> ()):
+  unreachable
+}
+
+// CHECK-LABEL: @test_closure_propagation : $@thin () -> () {
+// CHECK-NOT: partial_apply
+sil hidden [fragile] @test_closure_propagation : $@thin () -> () {
+bb0:
+  %f1 = function_ref @callee : $@thin (Builtin.Word) -> ()
+  %i1 = integer_literal $Builtin.Word, 24
+  %p1 = partial_apply %f1(%i1) : $@thin (Builtin.Word) -> ()
+
+  %f2 = function_ref @thunk : $@thin (@out (), @owned @callee_owned () -> ()) -> ()
+  %s1 = alloc_stack $()
+  %a1 = apply [transparent] %f2(%s1#1, %p1) : $@thin (@out (), @owned @callee_owned () -> ()) -> ()
+  dealloc_stack %s1#0 : $*@local_storage ()
+  unreachable
+}
