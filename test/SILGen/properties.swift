@@ -943,5 +943,26 @@ func testRedundantRetains() {
 // CHECK-NOT: strong_release
 // CHECK: return
 
+struct AddressOnlyNonmutatingSet<T> {
+  var x: T
+  init(x: T) { self.x = x }
+  var prop: Int {
+    get { return 0 }
+    nonmutating set { }
+  }
+}
 
-
+func addressOnlyNonmutatingProperty<T>(x: AddressOnlyNonmutatingSet<T>)
+-> Int {
+  x.prop = 0
+  return x.prop
+}
+// CHECK-LABEL: sil hidden @_TF10properties30addressOnlyNonmutatingPropertyU__FGVS_25AddressOnlyNonmutatingSetQ__Si : $@thin <T> (@in AddressOnlyNonmutatingSet<T>) -> Int {
+// CHECK:         [[SET:%.*]] = function_ref @_TFV10properties25AddressOnlyNonmutatingSets4propSi
+// CHECK:         apply [[SET]]<T>({{%.*}}, [[TMP:%.*]]#1)
+// CHECK-NOT:     destroy_addr [[TMP]]
+// CHECK:         dealloc_stack [[TMP]]
+// CHECK:         [[GET:%.*]] = function_ref @_TFV10properties25AddressOnlyNonmutatingSetg4propSi
+// CHECK:         apply [[GET]]<T>([[TMP:%.*]]#1)
+// CHECK-NOT:     destroy_addr [[TMP]]
+// CHECK:         dealloc_stack [[TMP]]

@@ -345,10 +345,9 @@ void PathComponent::dump() const {
 
 /// Return the LValueTypeData for a value whose type is its own
 /// lowering.
-static LValueTypeData getValueTypeData(SILValue value) {
+static LValueTypeData getValueTypeData(SILValue value, SILModule &M) {
   assert(value.getType().isObject() ||
-         value.getType().getSwiftRValueType()->isExistentialType() ||
-         value.getType().getSwiftRValueType()->is<ArchetypeType>());
+         value.getType().isAddressOnly(M));
   return {
     AbstractionPattern(value.getType().getSwiftRValueType()),
     value.getType().getSwiftRValueType(),
@@ -1255,7 +1254,7 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind) {
     }
     
     ManagedValue rv = gen.emitRValueAsSingleValue(e, Ctx);
-    auto typeData = getValueTypeData(rv.getValue());
+    auto typeData = getValueTypeData(rv.getValue(), gen.SGM.M);
     LValue lv;
     lv.add<ValueComponent>(rv, typeData);
     return lv;
