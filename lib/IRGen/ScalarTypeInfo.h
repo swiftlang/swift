@@ -205,7 +205,7 @@ class PODSingleScalarTypeInfo : public SingleScalarTypeInfo<Derived, Base> {
 protected:
   template <class StorageType, class... T> 
   PODSingleScalarTypeInfo(StorageType *storage, Size size,
-                          llvm::BitVector spareBits,
+                          SpareBitVector spareBits,
                           Alignment align, T &&...args)
     : SingleScalarTypeInfo<Derived, Base>(storage, size, spareBits, align, IsPOD,
                                           ::std::forward<T>(args)...) {}

@@ -19,7 +19,7 @@
 #define SWIFT_IRGEN_STRUCTLAYOUT_H
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/BitVector.h"
+#include "swift/Basic/ClusteredBitVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 #include "IRGen.h"
@@ -218,7 +218,7 @@ private:
   SmallVector<llvm::Type*, 8> StructFields;
   Size CurSize = Size(0);
   Alignment CurAlignment = Alignment(1);
-  llvm::BitVector CurSpareBits;
+  SpareBitVector CurSpareBits;
   unsigned NextNonFixedOffsetIndex = 0;
   bool IsFixedLayout = true;
   IsPOD_t IsKnownPOD = IsPOD;
@@ -264,10 +264,10 @@ public:
   Alignment getAlignment() const { return CurAlignment; }
   
   /// Return the spare bit mask of the structure built so far.
-  const llvm::BitVector &getSpareBits() const { return CurSpareBits; }
+  const SpareBitVector &getSpareBits() const { return CurSpareBits; }
 
   /// Return the spare bit mask of the structure built so far.
-  llvm::BitVector &getSpareBits() { return CurSpareBits; }
+  SpareBitVector &getSpareBits() { return CurSpareBits; }
 
   /// Build the current elements as a new anonymous struct type.
   llvm::StructType *getAsAnonStruct() const;
@@ -294,7 +294,7 @@ class StructLayout {
   Size MinimumSize;
   
   /// The statically-known spare bit mask.
-  llvm::BitVector SpareBits;
+  SpareBitVector SpareBits;
 
   /// Whether this layout is fixed in size.  If so, the size and
   /// alignment are exact.
@@ -308,14 +308,6 @@ class StructLayout {
   llvm::Type *Ty;
   SmallVector<ElementLayout, 8> Elements;
 
-  /// Use the spare bit mask from the builder if there are any fixed spare bits to
-  /// speak of.
-  static llvm::BitVector getSpareBitsFromBuilder(const StructLayoutBuilder &b) {
-    return b.isFixedLayout() && b.getSpareBits().any()
-      ? b.getSpareBits()
-      : llvm::BitVector{};
-  }
-  
 public:
   /// Create a structure layout.
   ///
@@ -335,7 +327,7 @@ public:
                ArrayRef<ElementLayout> elements)
     : MinimumAlign(builder.getAlignment()),
       MinimumSize(builder.getSize()),
-      SpareBits(getSpareBitsFromBuilder(builder)),
+      SpareBits(builder.getSpareBits()),
       IsFixedLayout(builder.isFixedLayout()),
       IsKnownPOD(builder.isKnownPOD()),
       IsKnownBitwiseTakable(builder.isKnownBitwiseTakable()),
@@ -348,8 +340,8 @@ public:
   llvm::Type *getType() const { return Ty; }
   Size getSize() const { return MinimumSize; }
   Alignment getAlignment() const { return MinimumAlign; }
-  const llvm::BitVector &getSpareBits() const { return SpareBits; }
-  llvm::BitVector &getSpareBits() { return SpareBits; }
+  const SpareBitVector &getSpareBits() const { return SpareBits; }
+  SpareBitVector &getSpareBits() { return SpareBits; }
   bool isKnownEmpty() const { return isFixedLayout() && MinimumSize.isZero(); }
   IsPOD_t isKnownPOD() const { return IsKnownPOD; }
   IsBitwiseTakable_t isKnownBitwiseTakable() const {
