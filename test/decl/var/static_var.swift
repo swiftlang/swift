@@ -132,24 +132,28 @@ extension E {
 
 class C {
   static var v1: Int = 0
-  class var v2: Int = 0 // expected-error {{class stored properties not yet supported}}
+  class final var v3: Int = 0 // expected-error {{class stored properties not yet supported}}
+  class var v4: Int = 0 // expected-error {{class stored properties not yet supported}}
 
-  static var v3: Int { return 0 }
-  class var v4: Int { return 0 }
+  static var v5: Int { return 0 }
+  class var v6: Int { return 0 }
 
   static let l1: Int = 0
-  class let l2: Int = 0
+  class let l2: Int = 0 // expected-error {{class stored properties not yet supported}}
+  class final let l3: Int = 0 // expected-error {{class stored properties not yet supported}}
 }
 
 extension C {
   static var ev1: Int = 0
-  class var ev2: Int = 0 // expected-error {{class stored properties not yet supported}}
+  class final var ev2: Int = 0 // expected-error {{class stored properties not yet supported}}
+  class var ev3: Int = 0 // expected-error {{class stored properties not yet supported}}
 
-  static var ev3: Int { return 0 }
-  class var ev4: Int { return 0 }
+  static var ev4: Int { return 0 }
+  class var ev5: Int { return 0 }
 
   static let el1: Int = 0
-  class let el2: Int = 0
+  class let el2: Int = 0 // expected-error {{class stored properties not yet supported}}
+  class final let el3: Int = 0 // expected-error {{class stored properties not yet supported}}
 }
 
 protocol P {

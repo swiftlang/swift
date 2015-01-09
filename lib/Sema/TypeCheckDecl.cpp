@@ -1300,6 +1300,10 @@ static void validatePatternBindingDecl(TypeChecker &tc,
       // occur once per instantiation, which we don't yet handle.
       } else if (dc->isGenericContext()) {
         unimplementedStatic(GenericTypes);
+      } else if (dc->isClassOrClassExtensionContext()) {
+        auto staticSpelling = binding->getStaticSpelling();
+        if (staticSpelling != StaticSpellingKind::KeywordStatic)
+          unimplementedStatic(Classes);
       }
     }
   }
@@ -5607,11 +5611,11 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
               makeFinal(Context, VD);
             }
           }
-          if (VD->getParentPattern()->getStaticSpelling() == StaticSpellingKind::KeywordStatic)
-            makeFinal(Context, VD);
-          if (VD->isStatic() && VD->hasStorage() && !VD->isFinal())
-            diagnose(VD->getLoc(), diag::unimplemented_nonfinal_type_var)
-              .highlight(VD->getLoc());
+          if (VD->isStatic()) {
+            auto staticSpelling = VD->getParentPattern()->getStaticSpelling();
+            if (staticSpelling == StaticSpellingKind::KeywordStatic)
+              makeFinal(Context, VD);
+          }
         }
       }
 

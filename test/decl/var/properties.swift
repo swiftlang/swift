@@ -397,11 +397,11 @@ extension StructWithExtension1 {
 
 class ClassWithExtension1 {
   var foo: Int = 0
-  class var fooStatic = 4 // expected-error {{non-final class stored properties not yet supported}}
+  class var fooStatic = 4 // expected-error {{class stored properties not yet supported in classes}}
 }
 extension ClassWithExtension1 {
   var fooExt: Int // expected-error {{extensions may not contain stored properties}}
-  class var fooExtStatic = 4 // expected-error {{non-final class stored properties not yet supported}}
+  class var fooExtStatic = 4 // expected-error {{class stored properties not yet supported in classes}}
 }
 
 enum EnumWithExtension1 {

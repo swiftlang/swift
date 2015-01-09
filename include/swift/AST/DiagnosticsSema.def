@@ -554,11 +554,9 @@ NOTE(variadic_superclass_init_here,sema_tcd,none,
 
 // Variables (var and let).
 ERROR(unimplemented_type_var,decl_parsing,none,
-     "%select{ERROR|static|class}1 stored properties not yet supported"
+     "%select{ERROR|static|class|protocol}1 stored properties not yet supported"
      "%select{ in this context| in generic types| in classes| in protocols}0",
      (unsigned, StaticSpellingKind))
-ERROR(unimplemented_nonfinal_type_var,sema_tcd,none,
-     "non-final class stored properties not yet supported", ())
 ERROR(observingprop_requires_initializer,decl_parsing,none,
       "non-member observing properties require an initializer", ())
 ERROR(global_requires_initializer,decl_parsing,none,
