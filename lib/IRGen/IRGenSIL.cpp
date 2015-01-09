@@ -3385,8 +3385,7 @@ void IRGenSILFunction::visitBridgeObjectToRefInst(
   llvm::Value *boBits = nullptr;
   if (IGM.TargetInfo.hasObjCTaggedPointers()) {
     boBits = Builder.CreatePtrToInt(bo, IGM.SizeTy);
-    APInt maskValue
-      = getAPIntFromBitVector(IGM.TargetInfo.ObjCPointerReservedBits);
+    APInt maskValue = IGM.TargetInfo.ObjCPointerReservedBits.asAPInt();
     llvm::Value *mask = llvm::ConstantInt::get(IGM.getLLVMContext(), maskValue);
     llvm::Value *reserved = Builder.CreateAnd(boBits, mask);
     llvm::Value *cond = Builder.CreateICmpEQ(reserved,
@@ -3409,7 +3408,7 @@ void IRGenSILFunction::visitBridgeObjectToRefInst(
   auto &spareBits = IGM.getHeapObjectSpareBits();
   llvm::Value *result;
   if (spareBits.any()) {
-    APInt maskValue = ~getAPIntFromBitVector(spareBits);
+    APInt maskValue = ~spareBits.asAPInt();
     
     if (!boBits)
       boBits = Builder.CreatePtrToInt(bo, IGM.SizeTy);

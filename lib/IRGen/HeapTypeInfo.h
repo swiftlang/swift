@@ -123,7 +123,7 @@ class HeapTypeInfo : public SingleScalarTypeInfo<Impl, ReferenceTypeInfo> {
 protected:
   using super::asDerived;
 public:
-  HeapTypeInfo(llvm::PointerType *storage, Size size, llvm::BitVector spareBits,
+  HeapTypeInfo(llvm::PointerType *storage, Size size, SpareBitVector spareBits,
                Alignment align)
     : super(storage, size, spareBits, align) {}
 

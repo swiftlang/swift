@@ -32,7 +32,7 @@ class TypeConverter;
 class ReferenceTypeInfo : public LoadableTypeInfo {
 protected:
   // FIXME: Get spare bits for pointers from a TargetInfo-like structure.
-  ReferenceTypeInfo(llvm::Type *type, Size size, llvm::BitVector spareBits,
+  ReferenceTypeInfo(llvm::Type *type, Size size, SpareBitVector spareBits,
                     Alignment align)
     : LoadableTypeInfo(type, size, spareBits, align, IsNotPOD, STIK_Reference)
   {}

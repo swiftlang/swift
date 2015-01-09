@@ -200,7 +200,7 @@ namespace {
   class ObjCTypeInfo : public HeapTypeInfo<ObjCTypeInfo> {
   public:
     ObjCTypeInfo(llvm::PointerType *storageType, Size size,
-                 llvm::BitVector spareBits, Alignment align)
+                 SpareBitVector spareBits, Alignment align)
       : HeapTypeInfo(storageType, size, spareBits, align) {
     }
 
@@ -222,7 +222,7 @@ namespace {
   class BridgeObjectTypeInfo : public HeapTypeInfo<BridgeObjectTypeInfo> {
   public:
     BridgeObjectTypeInfo(llvm::PointerType *storageType, Size size,
-                 llvm::BitVector spareBits, Alignment align)
+                 SpareBitVector spareBits, Alignment align)
       : HeapTypeInfo(storageType, size, spareBits, align) {
     }
 
@@ -268,7 +268,7 @@ namespace {
 
 const LoadableTypeInfo *TypeConverter::convertBuiltinBridgeObject() {
   return new BridgeObjectTypeInfo(IGM.BridgeObjectPtrTy, IGM.getPointerSize(),
-                                  /*spare bits*/ {},
+      SpareBitVector::getConstant(IGM.getPointerSize().getValueInBits(), false),
                                   IGM.getPointerAlignment());
 }
 

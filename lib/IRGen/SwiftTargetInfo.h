@@ -18,7 +18,7 @@
 #ifndef __SWIFT_IRGEN_TARGET_INFO_H__
 #define __SWIFT_IRGEN_TARGET_INFO_H__
 
-#include "llvm/ADT/BitVector.h"
+#include "swift/Basic/ClusteredBitVector.h"
 #include "llvm/ADT/Triple.h"
 #include "IRGen.h"
 
@@ -48,13 +48,16 @@ public:
   
   /// The spare bit mask for pointers. Bits set in this mask are unused by
   /// pointers of any alignment.
-  llvm::BitVector PointerSpareBits;
+  SpareBitVector PointerSpareBits;
+
+  /// The spare bit mask for (ordinary C) thin function pointers.
+  SpareBitVector FunctionPointerSpareBits;
   
   /// The reserved bit mask for Objective-C pointers. Pointer values with
   /// bits from this mask set are reserved by the ObjC runtime and cannot be
   /// used for Swift value layout when a reference type may reference ObjC
   /// objects.
-  llvm::BitVector ObjCPointerReservedBits;
+  SpareBitVector ObjCPointerReservedBits;
   
   /// The alignment of heap objects.  By default, assume pointer alignment.
   Alignment HeapObjectAlignment;

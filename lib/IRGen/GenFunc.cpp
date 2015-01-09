@@ -355,9 +355,9 @@ namespace {
   class FuncTypeInfo : public ScalarTypeInfo<FuncTypeInfo, ReferenceTypeInfo>,
                        public FuncSignatureInfo {
     FuncTypeInfo(CanSILFunctionType formalType, llvm::Type *storageType,
-                 Size size, Alignment align, ExtraData extraDataKind)
-      // FIXME: Spare bits.
-      : ScalarTypeInfo(storageType, size, llvm::BitVector{}, align),
+                 Size size, Alignment align, SpareBitVector &&spareBits,
+                 ExtraData extraDataKind)
+      : ScalarTypeInfo(storageType, size, std::move(spareBits), align),
         FuncSignatureInfo(formalType, extraDataKind)
     {
     }
@@ -377,9 +377,10 @@ namespace {
     static const FuncTypeInfo *create(CanSILFunctionType formalType,
                                       llvm::Type *storageType,
                                       Size size, Alignment align,
+                                      SpareBitVector &&spareBits,
                                       ExtraData extraDataKind) {
       return new FuncTypeInfo(formalType, storageType, size, align,
-                              extraDataKind);
+                              std::move(spareBits), extraDataKind);
     }
     
     // Function types do not satisfy allowsOwnership.
@@ -653,7 +654,7 @@ namespace {
   public:
     BlockTypeInfo(CanSILFunctionType ty,
                   llvm::PointerType *storageType,
-                  Size size, llvm::BitVector spareBits, Alignment align)
+                  Size size, SpareBitVector spareBits, Alignment align)
       : HeapTypeInfo(storageType, size, spareBits, align),
         FuncSignatureInfo(ty, ExtraData::Block)
     {
@@ -673,8 +674,9 @@ namespace {
     Size CaptureOffset;
   public:
     BlockStorageTypeInfo(llvm::Type *type, Size size, Alignment align,
+                         SpareBitVector &&spareBits,
                          IsPOD_t pod, IsBitwiseTakable_t bt, Size captureOffset)
-      : IndirectTypeInfo(type, size, llvm::BitVector{}, align, pod, bt),
+      : IndirectTypeInfo(type, size, std::move(spareBits), align, pod, bt),
         CaptureOffset(captureOffset)
     {}
     
@@ -721,6 +723,8 @@ const TypeInfo *TypeConverter::convertBlockStorageType(SILBlockStorageType *T) {
   Size captureOffset(
     IGM.DataLayout.getStructLayout(IGM.ObjCBlockStructTy)->getSizeInBytes());
   Size size = captureOffset;
+  SpareBitVector spareBits =
+    SpareBitVector::getConstant(size.getValueInBits(), false);
   IsPOD_t pod = IsNotPOD;
   IsBitwiseTakable_t bt = IsNotBitwiseTakable;
   if (!fixedCapture) {
@@ -730,7 +734,9 @@ const TypeInfo *TypeConverter::convertBlockStorageType(SILBlockStorageType *T) {
     fixedCaptureTy = cast<FixedTypeInfo>(capture).getStorageType();
     align = std::max(align, fixedCapture->getFixedAlignment());
     captureOffset = captureOffset.roundUpToAlignment(align);
+    spareBits.extendWithSetBits(captureOffset.getValueInBits());
     size = captureOffset + fixedCapture->getFixedSize();
+    spareBits.append(fixedCapture->getSpareBits());
     pod = fixedCapture->isPOD(ResilienceScope::Component);
     bt = fixedCapture->isBitwiseTakable(ResilienceScope::Component);
   }
@@ -742,7 +748,8 @@ const TypeInfo *TypeConverter::convertBlockStorageType(SILBlockStorageType *T) {
   
   auto storageTy = llvm::StructType::get(IGM.getLLVMContext(), storageElts,
                                          /*packed*/ false);
-  return new BlockStorageTypeInfo(storageTy, size, align, pod, bt, captureOffset);
+  return new BlockStorageTypeInfo(storageTy, size, align, std::move(spareBits),
+                                  pod, bt, captureOffset);
 }
 
 Address irgen::projectBlockStorageCapture(IRGenFunction &IGF,
@@ -764,23 +771,32 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
   case AnyFunctionType::Representation::Thin:
   case AnyFunctionType::Representation::Thick:
     CanSILFunctionType ct(T);
+    SpareBitVector spareBits;
+    // FIXME: use function pointer spare bits
+    spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
+    //spareBits.append(IGM.getFunctionPointerSpareBits());
+
     auto extraDataKind = getExtraDataKind(IGM, ct);
     llvm::Type *ty;
+    Size size;
     switch (extraDataKind) {
     case ExtraData::None:
       ty = IGM.FunctionPtrTy;
+      size = IGM.getPointerSize();
       break;
     case ExtraData::Retainable:
       ty = IGM.FunctionPairTy;
+      size = IGM.getPointerSize() * 2;
+      // FIXME
+      spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
+      // spareBits.append(IGM.getHeapObjectSpareBits());
       break;
     case ExtraData::Block:
       llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
     }
     
-    return FuncTypeInfo::create(ct, ty,
-                                IGM.getPointerSize() * 2,
-                                IGM.getPointerAlignment(),
-                                extraDataKind);
+    return FuncTypeInfo::create(ct, ty, size, IGM.getPointerAlignment(),
+                                std::move(spareBits), extraDataKind);
   }
 }
 
