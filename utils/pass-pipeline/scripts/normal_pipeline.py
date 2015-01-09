@@ -37,4 +37,4 @@ normal_pipeline_generated = [x.generate() for x in normal_pipeline if not x.iden
 for i in range(len(normal_pipeline_generated)):
     normal_pipeline_generated[i] = [x for x in normal_pipeline_generated[i] if x not in disabled_passes]
 
-json.dump(normal_pipeline_generated, sys.stdout)
+json.dump(normal_pipeline_generated, sys.stdout, sort_keys=True, indent=4, separators=(',', ': '))
