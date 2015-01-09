@@ -43,7 +43,7 @@ func passClosure() {
 
 
 class FooClass {
-  class let type_let = 5  // TODO: expected-error {{class stored properties not yet supported in classes}}
+  class let type_let = 5
 
 
   init() {

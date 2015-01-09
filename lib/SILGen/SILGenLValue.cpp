@@ -1449,10 +1449,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
     (void)baseMeta;
     assert(!baseMeta->is<BoundGenericType>() &&
            "generic static stored properties not implemented");
-    assert((baseMeta->getStructOrBoundGenericStruct() ||
-            baseMeta->getEnumOrBoundGenericEnum()) &&
-           "static stored properties for classes/protocols not implemented");
-    
+
     return emitLValueForNonMemberVarDecl(gen, e, var,
                                          getSubstFormalRValueType(e),
                                          accessKind, e->getAccessSemantics());

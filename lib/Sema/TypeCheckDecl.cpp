@@ -1278,7 +1278,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
         auto staticLoc = binding->getStaticLoc();
         tc.diagnose(staticLoc, diag::unimplemented_type_var,
                     diagSel, binding->getStaticSpelling())
-          .highlight(SourceRange(staticLoc));
+          .highlight(staticLoc);
       };
 
       assert(dc->isTypeContext());
@@ -1300,11 +1300,6 @@ static void validatePatternBindingDecl(TypeChecker &tc,
       // occur once per instantiation, which we don't yet handle.
       } else if (dc->isGenericContext()) {
         unimplementedStatic(GenericTypes);
-
-      // Stored type variables in a class context need to be created
-      // once per subclass, which we don't yet handle.
-      } else if (isa<ClassDecl>(nominal)) {
-        unimplementedStatic(Classes);
       }
     }
   }
@@ -5612,10 +5607,11 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
               makeFinal(Context, VD);
             }
           }
-          // static var/let declarations in classes are synonyms
-          // for `class final var/let` declarations.
           if (VD->getParentPattern()->getStaticSpelling() == StaticSpellingKind::KeywordStatic)
             makeFinal(Context, VD);
+          if (VD->isStatic() && VD->hasStorage() && !VD->isFinal())
+            diagnose(VD->getLoc(), diag::unimplemented_nonfinal_type_var)
+              .highlight(VD->getLoc());
         }
       }
 

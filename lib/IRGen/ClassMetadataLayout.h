@@ -165,7 +165,7 @@ private:
     asImpl().noteStartOfFieldOffsets(theClass);
     for (auto member : theClass->getMembers()) {
       if (auto field = dyn_cast<VarDecl>(member))
-        if (field->hasStorage())
+        if (field->hasStorage() && !(field->isStatic() && field->isFinal()))
           addFieldEntries(field);
     }
     asImpl().noteEndOfFieldOffsets(theClass);

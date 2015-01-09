@@ -776,9 +776,10 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
     (void)baseMeta;
     assert(!baseMeta->is<BoundGenericType>() &&
            "generic static stored properties not implemented");
-    assert((baseMeta->getStructOrBoundGenericStruct() ||
-            baseMeta->getEnumOrBoundGenericEnum()) &&
-           "static stored properties for classes/protocols not implemented");
+    if (field->getDeclContext()->isClassOrClassExtensionContext() &&
+        field->hasStorage())
+      // FIXME: don't need to check hasStorage, already done above
+      assert(field->isFinal() && "non-final class stored properties not implemented");
 
     return emitRValueForDecl(loc, field, propTy, semantics, C);
   }

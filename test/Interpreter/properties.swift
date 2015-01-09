@@ -264,4 +264,16 @@ func test_r17226384() {
 }
 test_r17226384()
 
+class A {}
+class HasStaticVar {
+  static var a = A()
+  static var i = 1010
+  static let j = 2020
+}
 
+class DerivesHasStaticVar : HasStaticVar {}
+
+assert(HasStaticVar.a === DerivesHasStaticVar.a)
+assert(HasStaticVar.i == DerivesHasStaticVar.i)
+HasStaticVar.i = 2020
+assert(HasStaticVar.i == DerivesHasStaticVar.i)

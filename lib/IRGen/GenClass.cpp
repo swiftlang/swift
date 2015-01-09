@@ -1416,7 +1416,7 @@ namespace {
   public:
     /// Variables might be stored or computed.
     void visitVarDecl(VarDecl *var) {
-      if (var->hasStorage())
+      if (var->hasStorage() && !var->isStatic())
         visitStoredVar(var);
       else
         visitProperty(var);

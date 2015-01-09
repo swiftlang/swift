@@ -1331,8 +1331,9 @@ static void emitTypeMemberGlobalVariable(SILGenModule &SGM,
                                          NominalTypeDecl *theType,
                                          VarDecl *var) {
   assert(!generics && "generic static properties not implemented");
-  assert((isa<StructDecl>(theType) || isa<EnumDecl>(theType)) &&
-         "only value type static properties are implemented");
+  if (var->getDeclContext()->isClassOrClassExtensionContext()) {
+    assert(var->isFinal() && "only 'static' ('class final') stored properties are implemented in classes");
+  }
 
   SGM.addGlobalVariable(var);
 }
@@ -2080,9 +2081,6 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd) {
     auto theType = pd->getDeclContext()->getDeclaredTypeInContext();
     assert(!theType->is<BoundGenericType>()
            && "generic static properties not implemented");
-    assert((theType->getStructOrBoundGenericStruct()
-            || theType->getEnumOrBoundGenericEnum())
-           && "only value type static properties are implemented");
     (void)theType;
   }
 

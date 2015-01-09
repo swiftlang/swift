@@ -131,25 +131,25 @@ extension E {
 }
 
 class C {
-  static var v1: Int = 0 // expected-error {{static stored properties not yet supported in classes}}
-  class var v2: Int = 0 // expected-error {{class stored properties not yet supported in classes}}
+  static var v1: Int = 0
+  class var v2: Int = 0 // expected-error {{class stored properties not yet supported}}
 
   static var v3: Int { return 0 }
   class var v4: Int { return 0 }
 
-  static let l1: Int = 0 // expected-error {{static stored properties not yet supported in classes}}
-  class let l2: Int = 0 // expected-error {{class stored properties not yet supported in classes}}
+  static let l1: Int = 0
+  class let l2: Int = 0
 }
 
 extension C {
-  static var ev1: Int = 0 // expected-error {{static stored properties not yet supported in classes}}
-  class var ev2: Int = 0 // expected-error {{class stored properties not yet supported in classes}}
+  static var ev1: Int = 0
+  class var ev2: Int = 0 // expected-error {{class stored properties not yet supported}}
 
   static var ev3: Int { return 0 }
   class var ev4: Int { return 0 }
 
-  static let el1: Int = 0 // expected-error {{static stored properties not yet supported in classes}}
-  class let el2: Int = 0 // expected-error {{class stored properties not yet supported in classes}}
+  static let el1: Int = 0
+  class let el2: Int = 0
 }
 
 protocol P {
@@ -182,12 +182,12 @@ enum E1 {
 }
 
 class C1 {
-  class var x: Int // expected-error {{class stored properties not yet supported in classes}} expected-error {{'class var' declaration requires an initializer expression or getter/setter specifier}}
+  class var x: Int // expected-error {{class stored properties not yet supported}} expected-error {{'class var' declaration requires an initializer expression or getter/setter specifier}}
 }
 
 class C2 {
   var x: Int = 19
-  class var x: Int = 17 // expected-error{{class stored properties not yet supported in classes}}
+  class var x: Int = 17 // expected-error{{class stored properties not yet supported}}
 
   func xx() -> Int { return self.x + C2.x }
 }

@@ -19,7 +19,7 @@ class IBOutletWrapperTy {
   @IBOutlet
   class var staticValue: IBOutletWrapperTy = 52  // expected-error {{'Int' is not convertible to 'IBOutletWrapperTy'}}
   // expected-error@-2 {{only instance properties can be declared 'IBOutlet'}}
-  // expected-error@-2 {{class stored properties not yet supported in classes}}
+  // expected-error@-2 {{class stored properties not yet supported}}
 
   @IBOutlet // expected-error {{'IBOutlet' may only be used on 'var' declarations}}
   func click() -> () {}
