@@ -250,7 +250,29 @@ namespace {
       for (unsigned i = 0, e = size(); i != e; ++i)
         set(i, mergeKinds(getConditional(i), RHS.getConditional(i)));
     }
+
+    void dump(llvm::raw_ostream &OS) const {
+      OS << '(';
+      for (unsigned i = 0, e = size(); i != e; ++i) {
+        if (Optional<DIKind> Elt = getConditional(i)) {
+          switch (Elt.getValue()) {
+            case DIKind::No:      OS << 'n'; break;
+            case DIKind::Yes:     OS << 'y'; break;
+            case DIKind::Partial: OS << 'p'; break;
+          }
+        } else {
+          OS << '.';
+        }
+      }
+      OS << ')';
+    }
   };
+  
+  inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                       const AvailabilitySet &AS) {
+    AS.dump(OS);
+    return OS;
+  }
 }
 
 
@@ -263,60 +285,64 @@ namespace {
     /// this block.
     bool HasNonLoadUse : 1;
 
-    /// Keep track of whether the element is live out of this block or not. This
-    /// is only fully set when LOState==IsKnown.  In other states, this may only
-    /// contain local availability information.
-    ///
-    AvailabilitySet Availability;
-
-    enum LiveOutStateTy {
-      IsUnknown,
-      IsComputingLiveOut,
-      IsKnown
-    } LOState : 2;
+    /// Helper flag used during building the worklist for the dataflow analysis.
+    bool isInWorkList : 1;
+    
+    /// Availability of elements within the block.
+    /// Not "empty" for all blocks which have non-load uses or contain the
+    /// definition of the memory object.
+    AvailabilitySet LocalAvailability;
+    
+    /// The live out information of the block. This is the LocalAvailability
+    /// plus the information merged-in from the predecessor blocks.
+    AvailabilitySet OutAvailability;
 
     LiveOutBlockState(unsigned NumElements)
       : HasNonLoadUse(false),
-        Availability(NumElements), LOState(IsUnknown) {
+        isInWorkList(false),
+        LocalAvailability(NumElements),
+        OutAvailability(NumElements) {
     }
 
-    AvailabilitySet &getAvailabilitySet() {
-      return Availability;
+    /// Sets all unknown elements to not-available.
+    void setUnknownToNotAvailable() {
+      LocalAvailability.changeUnsetElementsTo(DIKind::No);
+      OutAvailability.changeUnsetElementsTo(DIKind::No);
     }
 
-    DIKind getAvailability(unsigned Elt) {
-      return Availability.get(Elt);
+    /// Merge the state from a predecessor block into the OutAvailability.
+    /// Returns true if the l
+    bool mergeFromPred(const LiveOutBlockState &Pred) {
+      bool changed = false;
+      for (unsigned i = 0, e = OutAvailability.size(); i != e; ++i) {
+        const Optional<DIKind> out = OutAvailability.getConditional(i);
+        const Optional<DIKind> local = LocalAvailability.getConditional(i);
+        Optional<DIKind> result;
+        if (local.hasValue()) {
+          // A local availibility overrides the incoming value.
+          result = local;
+        } else {
+          result = mergeKinds(out, Pred.OutAvailability.getConditional(i));
+        }
+        if (result.hasValue() &&
+            (!out.hasValue() || result.getValue() != out.getValue())) {
+          changed = true;
+          OutAvailability.set(i, result);
+        }
+      }
+      return changed;
     }
 
-    Optional<DIKind> getAvailabilityConditional(unsigned Elt) {
-      return Availability.getConditional(Elt);
-    }
-
-    void setBlockAvailability(const AvailabilitySet &AV) {
-      assert(LOState != IsKnown &&"Changing live out state of computed block?");
-      assert(!AV.containsUnknownElements() && "Set block to unknown value?");
-      Availability = AV;
-      LOState = LiveOutBlockState::IsKnown;
-    }
-
-    void setBlockAvailability1(DIKind K) {
-      assert(LOState != IsKnown &&"Changing live out state of computed block?");
-      assert(Availability.size() == 1 && "Not 1 element case");
-      Availability.set(0, K);
-      LOState = LiveOutBlockState::IsKnown;
-    }
-
+    /// Sets the elements of a use to available.
     void markAvailable(const DIMemoryUse &Use) {
       // If the memory object has nothing in it (e.g., is an empty tuple)
       // ignore.
-      if (Availability.empty()) return;
+      if (LocalAvailability.empty()) return;
       
-      // Peel the first iteration of the 'set' loop since there is almost always
-      // a single tuple element touched by a DIMemoryUse.
-      Availability.set(Use.FirstElement, DIKind::Yes);
-                         
-      for (unsigned i = 1; i != Use.NumElements; ++i)
-        Availability.set(Use.FirstElement+i, DIKind::Yes);
+      for (unsigned i = 0; i != Use.NumElements; ++i) {
+        LocalAvailability.set(Use.FirstElement+i, DIKind::Yes);
+        OutAvailability.set(Use.FirstElement+i, DIKind::Yes);
+      }
     }
   };
 } // end anonymous namespace
@@ -384,10 +410,9 @@ namespace {
     SILValue handleConditionalInitAssign();
     void handleConditionalDestroys(SILValue ControlVariableAddr);
 
-    Optional<DIKind> getLiveOut1(SILBasicBlock *BB);
-    void getPredsLiveOut1(SILBasicBlock *BB, Optional<DIKind> &Result);
-    AvailabilitySet getLiveOutN(SILBasicBlock *BB);
-    void getPredsLiveOutN(SILBasicBlock *BB, AvailabilitySet &Result);
+    typedef SmallVector<SILBasicBlock *, 16> WorkListType;
+    void putIntoWorkList(SILBasicBlock *BB, WorkListType &WorkList);
+    void getPredsLiveOut(SILBasicBlock *BB, AvailabilitySet &Result);
 
     bool shouldEmitError(SILInstruction *Inst);
     std::string getUninitElementName(const DIMemoryUse &Use);
@@ -426,11 +451,6 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     // they are live-in or a full element store.  This means that the block they
     // are in should be treated as a live out for cross-block analysis purposes.
     BBInfo.markAvailable(Use);
-    
-    // If all of the tuple elements are available in the block, then it is known
-    // to be live-out.  This is the norm for non-tuple memory objects.
-    if (BBInfo.getAvailabilitySet().isAllYes())
-      BBInfo.LOState = LiveOutBlockState::IsKnown;
   }
 
   // If isn't really a use, but we account for the alloc_box/mark_uninitialized
@@ -443,9 +463,7 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
   // memory object itself.  Its live-out properties are whatever are trivially
   // locally inferred by the loop above.  Mark any unset elements as not
   // available.
-  MemBBInfo.getAvailabilitySet().changeUnsetElementsTo(DIKind::No);
-    
-  MemBBInfo.LOState = LiveOutBlockState::IsKnown;
+  MemBBInfo.setUnknownToNotAvailable();
 }
 
 /// Determine whether the specified block is reachable from the entry of the
@@ -1607,127 +1625,72 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
   }
 }
 
-Optional<DIKind> LifetimeChecker::getLiveOut1(SILBasicBlock *BB) {
-  LiveOutBlockState *BBState = &getBlockInfo(BB);
-  switch (BBState->LOState) {
-  case LiveOutBlockState::IsKnown:
-    return BBState->getAvailability(0);
-  case LiveOutBlockState::IsComputingLiveOut:
-    // In cyclic cases we contribute no information, allow other nodes feeding
-    // in to define the successors liveness.
-    return None;
-  case LiveOutBlockState::IsUnknown:
-    // Otherwise, process this block.
-    break;
+void LifetimeChecker::
+putIntoWorkList(SILBasicBlock *BB, WorkListType &WorkList) {
+  LiveOutBlockState &State = getBlockInfo(BB);
+  if (!State.isInWorkList && State.OutAvailability.containsUnknownElements()) {
+    DEBUG(llvm::dbgs() << "    add block " << BB->getID() << " to worklist\n");
+    WorkList.push_back(BB);
+    State.isInWorkList = true;
   }
-
-  // Anything that our initial pass knew as a definition is still a definition
-  // live out of this block.  Something known to be not-defined in a predecessor
-  // does not drop it to "partial".
-  auto LocalAV = BBState->getAvailabilityConditional(0);
-  if (LocalAV.hasValue() && LocalAV.getValue() == DIKind::Yes) {
-    BBState->setBlockAvailability1(LocalAV.getValue());
-    return LocalAV;
-  }
-
-  // Set the block's state to reflect that we're currently processing it.  This
-  // is required to handle cycles properly.
-  BBState->LOState = LiveOutBlockState::IsComputingLiveOut;
-
-  // Compute the liveness of our predecessors value.
-  Optional<DIKind> Result = BBState->getAvailabilityConditional(0);
-  getPredsLiveOut1(BB, Result);
-
-  // Computing predecessor live-out information may invalidate BBState.
-  // Refresh it.
-  BBState = &getBlockInfo(BB);
-
-  // Finally, cache and return our result.
-  if (Result) {
-    BBState->setBlockAvailability1(Result.getValue());
-  } else {
-    // If the result is still unknown, then do not cache the result.  This
-    // can happen in cyclic cases where a predecessor is being recursively
-    // analyzed.  Not caching here means that this block will have to be
-    // reanalyzed again if a future query for it comes along.
-    //
-    // In principle this algorithm should be rewritten to use standard dense RPO
-    // bitvector algorithms someday.
-    BBState->LOState = LiveOutBlockState::IsUnknown;
-  }
-
-  // Otherwise, we're golden.  Return success.
-  return Result;
-}
-
-void LifetimeChecker::getPredsLiveOut1(SILBasicBlock *BB,
-                                       Optional<DIKind> &Result) {
-  // Recursively processes all of our predecessor blocks and merge the dataflow
-  // facts together.
-  for (auto P : BB->getPreds())
-    Result = mergeKinds(Result, getLiveOut1(P));
-}
-
-/// Compute the set of live-outs for the specified basic block, which merges
-/// together local liveness information along with information from
-/// predecessors for non-local liveness.
-AvailabilitySet LifetimeChecker::getLiveOutN(SILBasicBlock *BB) {
-  LiveOutBlockState *BBState = &getBlockInfo(BB);
-  switch (BBState->LOState) {
-  case LiveOutBlockState::IsKnown:
-    return BBState->getAvailabilitySet();
-  case LiveOutBlockState::IsComputingLiveOut:
-    // In cyclic cases we contribute no information, allow other nodes feeding
-    // in to define the successors liveness.
-    return AvailabilitySet(TheMemory.NumElements);
-  case LiveOutBlockState::IsUnknown:
-    // Otherwise, process this block.
-    break;
-  }
-  
-  // Set the block's state to reflect that we're currently processing it.  This
-  // is required to handle cycles properly.
-  BBState->LOState = LiveOutBlockState::IsComputingLiveOut;
-
-  auto Result = AvailabilitySet(TheMemory.NumElements);
-  getPredsLiveOutN(BB, Result);
-
-  // Computing predecessor live-out information may invalidate BBState.
-  // Refresh it.
-  BBState = &getBlockInfo(BB);
-  
-  // Anything that our initial pass knew as a definition is still a definition
-  // live out of this block.  Something known to be not-defined in a predecessor
-  // does not drop it to "partial".
-  auto &LocalAV = BBState->getAvailabilitySet();
-  for (unsigned i = 0, e = TheMemory.NumElements; i != e; ++i) {
-    auto EV = LocalAV.getConditional(i);
-    if (EV.hasValue() && EV.getValue() == DIKind::Yes)
-      Result.set(i, DIKind::Yes);
-  }
-
-  // Finally, cache and return our result.
-  if (!Result.containsUnknownElements()) {
-    BBState->setBlockAvailability(Result);
-  } else {
-    // If any elements are still unknown, then do not cache the result.  This
-    // can happen in cyclic cases where a predecessor is being recursively
-    // analyzed.  Not caching here means that this block will have to be
-    // reanalyzed again if a future query for it comes along.
-    //
-    // In principle this algorithm should be rewritten to use standard dense RPO
-    // bitvector algorithms someday.
-    BBState->LOState = LiveOutBlockState::IsUnknown;
-  }
-  return Result;
 }
 
 void LifetimeChecker::
-getPredsLiveOutN(SILBasicBlock *BB, AvailabilitySet &Result) {
-  // Recursively processes all of our predecessor blocks and merge the dataflow
-  // facts together.
-  for (auto P : BB->getPreds())
-    Result.mergeIn(getLiveOutN(P));
+getPredsLiveOut(SILBasicBlock *BB, AvailabilitySet &Result) {
+  DEBUG(llvm::dbgs() << "  Get liveness for block " << BB->getID() << "\n");
+  
+  // Collect blocks for which we have to calculate the out-availability.
+  // These are the pathes from blocks with known out-availability to the BB.
+  WorkListType WorkList;
+  for (auto Pred : BB->getPreds()) {
+    putIntoWorkList(Pred, WorkList);
+  }
+  size_t idx = 0;
+  while (idx < WorkList.size()) {
+    SILBasicBlock *WorkBB = WorkList[idx++];
+    for (auto Pred : WorkBB->getPreds()) {
+      putIntoWorkList(Pred, WorkList);
+    }
+  }
+
+  // Solve the dataflow problem.
+#ifndef NDEBUG
+  int iteration = 0;
+  int upperIterationLimit = WorkList.size() * 2 + 10; // More than enough.
+#endif
+  bool changed;
+  do {
+    assert(iteration < upperIterationLimit &&
+           "Infinite loop in dataflow analysis?");
+    DEBUG(llvm::dbgs() << "    Iteration " << iteration++ << "\n");
+    
+    changed = false;
+    // We collected the blocks in reverse order. Since it is a forward dataflow-
+    // problem, it is faster to go through the worklist in reverse order.
+    for (auto iter = WorkList.rbegin(); iter != WorkList.rend(); ++iter) {
+      SILBasicBlock *WorkBB = *iter;
+      LiveOutBlockState &BBState = getBlockInfo(WorkBB);
+
+      // Merge from the predecessor blocks.
+      for (auto Pred : WorkBB->getPreds()) {
+        changed |= BBState.mergeFromPred(getBlockInfo(Pred));
+      }
+      DEBUG(llvm::dbgs() << "      Block " << WorkBB->getID() << " out: " <<
+            BBState.OutAvailability << "\n");
+
+      // Clear the worklist-flag for the next call to getPredsLiveOut().
+      // This could be moved out of the outer loop, but doing it here avoids
+      // another loop with getBlockInfo() calls.
+      BBState.isInWorkList = false;
+    }
+  } while (changed);
+
+  // Finally merge to the result (= state at BB's entry).
+  for (auto Pred : BB->getPreds()) {
+    Result.mergeIn(getBlockInfo(Pred).OutAvailability);
+  }
+  DEBUG(llvm::dbgs() << "    Result: " << Result << "\n");
+
 }
 
 /// getLivenessAtInst - Compute the liveness state for any number of tuple
@@ -1736,6 +1699,9 @@ getPredsLiveOutN(SILBasicBlock *BB, AvailabilitySet &Result) {
 /// computed correctly.
 AvailabilitySet LifetimeChecker::
 getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
+  DEBUG(llvm::dbgs() << "Get liveness " << FirstElt << ", #" << NumElts <<
+        " at " << *Inst);
+
   AvailabilitySet Result(TheMemory.NumElements);
 
   // Empty tuple queries return a completely "unknown" vector, since they don't
@@ -1771,15 +1737,14 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
       }
     }
 
-    Optional<DIKind> ResultVal = None;
-    getPredsLiveOut1(InstBB, ResultVal);
+    getPredsLiveOut(InstBB, Result);
 
     // If the result element wasn't computed, we must be analyzing code within
     // an unreachable cycle that is not dominated by "TheMemory".  Just force
     // the unset element to yes so that clients don't have to handle this.
-    if (!ResultVal) ResultVal = DIKind::Yes;
+    if (!Result.getConditional(0))
+      Result.set(0, DIKind::Yes);
 
-    Result.set(0, ResultVal);
     return Result;
   }
 
@@ -1824,7 +1789,7 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
   }
 
   // Compute the liveness of each element according to our predecessors.
-  getPredsLiveOutN(InstBB, Result);
+  getPredsLiveOut(InstBB, Result);
   
   // If any of the elements was locally satisfied, make sure to mark them.
   for (unsigned i = FirstElt, e = i+NumElts; i != e; ++i) {
