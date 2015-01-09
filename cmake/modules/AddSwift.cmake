@@ -844,7 +844,6 @@ function(_add_swift_library_single target name)
     # library.
     add_library(${target_static} STATIC
         ${SWIFTLIB_SINGLE_SOURCES}
-        ${SWIFTLIB_SINGLE_STATIC_EXTERNAL_SOURCES}
 
         # Note: the dummy.c source file provides no definitions. However,
         # it forces Xcode to properly link the static library.
