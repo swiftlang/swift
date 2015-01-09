@@ -1313,6 +1313,9 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
 
       Deref |= getLoweredArgValue(Vals, *Next, Name);
     }
+    if (Deref && Vals.size() > 1)
+      // FIXME. <rdar://problem/19417227>
+      continue;
     assert((Deref ? Vals.size() == 1 : true)
            && "indirect argument found inside of an explosion");
     if (DTI.getType()->getKind() == TypeKind::InOut) {
