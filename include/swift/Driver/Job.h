@@ -16,12 +16,13 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/Types.h"
 #include "swift/Driver/Util.h"
+#include "llvm/Option/Option.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Option/Option.h"
+#include "llvm/Support/TimeValue.h"
 
 #include <memory>
 
@@ -130,6 +131,9 @@ private:
   /// which will be the Executable).
   llvm::opt::ArgStringList Arguments;
 
+  /// An estimate of the latest possible time this job was previously run.
+  llvm::sys::TimeValue MaxPreviousBuildTime = llvm::sys::TimeValue::MinTime();
+
 public:
   Job(const Action &Source, const Tool &Creator,
       std::unique_ptr<JobList> Inputs, std::unique_ptr<CommandOutput> Output,
@@ -152,6 +156,20 @@ public:
   }
   void setCondition(Condition Cond) {
     CreatorAndCondition.setInt(Cond);
+  }
+
+  /// Updates the estimated timestamp of the previous execution of this job.
+  ///
+  /// \returns true if the new time value is later than the old time value.
+  bool updatePreviousBuildTime(llvm::sys::TimeValue NewTime) {
+    if (MaxPreviousBuildTime >= NewTime)
+      return false;
+    MaxPreviousBuildTime = NewTime;
+    return true;
+  }
+
+  llvm::sys::TimeValue getPreviousBuildTime() const {
+    return MaxPreviousBuildTime;
   }
 
   /// Print the command line for this Job to the given \p stream,

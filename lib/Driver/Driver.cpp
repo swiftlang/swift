@@ -1304,18 +1304,37 @@ static void addAuxiliaryOutput(CommandOutput &output, types::ID outputType,
 /// than the file at \p output.
 ///
 /// If there is any error (such as either file not existing), returns false.
-static bool inputIsOlderThanOutput(StringRef input, StringRef output) {
-  if (input.empty() || output.empty())
-    return false;
+static void
+handleCompileJobCondition(Job *J,
+                          CompileJobAction::BuildState previousBuildState,
+                          StringRef input,
+                          StringRef output) {
+  llvm::sys::fs::file_status inputStatus;
+  if (llvm::sys::fs::status(input, inputStatus))
+    return;
 
-  llvm::sys::fs::file_status inputStatus, outputStatus;
-  if (llvm::sys::fs::status(input, inputStatus) ||
-      llvm::sys::fs::status(output, outputStatus)) {
-    return false;
+  J->updatePreviousBuildTime(inputStatus.getLastModificationTime());
+
+  llvm::sys::fs::file_status outputStatus;
+  if (llvm::sys::fs::status(output, outputStatus))
+    return;
+
+  if (!J->updatePreviousBuildTime(outputStatus.getLastModificationTime()))
+    return;
+
+  Job::Condition condition;
+  switch (previousBuildState) {
+  case CompileJobAction::BuildState::UpToDate:
+    condition = Job::Condition::CheckDependencies;
+    break;
+  case CompileJobAction::BuildState::NeedsCascadingBuild:
+    condition = Job::Condition::Always;
+    break;
+  case CompileJobAction::BuildState::NeedsNonCascadingBuild:
+    condition = Job::Condition::RunWithoutCascading;
+    break;
   }
-
-  return inputStatus.getLastModificationTime() <
-  outputStatus.getLastModificationTime();
+  J->setCondition(condition);
 }
 
 Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
@@ -1520,21 +1539,10 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
 
   // If we track dependencies for this job, we may be able to avoid running it.
   if (!J->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps).empty()) {
-    if (InputActions.size() == 1 &&
-        inputIsOlderThanOutput(BaseInput, OutputFile)) {
-      Job::Condition condition;
-      switch (cast<CompileJobAction>(A)->getPreviousBuildState()) {
-      case CompileJobAction::BuildState::UpToDate:
-        condition = Job::Condition::CheckDependencies;
-        break;
-      case CompileJobAction::BuildState::NeedsCascadingBuild:
-        condition = Job::Condition::Always;
-        break;
-      case CompileJobAction::BuildState::NeedsNonCascadingBuild:
-        condition = Job::Condition::RunWithoutCascading;
-        break;
-      }
-      J->setCondition(condition);
+    if (InputActions.size() == 1) {
+      auto compileJob = cast<CompileJobAction>(A);
+      handleCompileJobCondition(J, compileJob->getPreviousBuildState(),
+                                BaseInput, OutputFile);
     }
   }
 
