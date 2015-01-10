@@ -749,15 +749,16 @@ public:
   SILBasicBlock *parent;
   SILLocation loc;
   bool functionArgs;
-  ParameterConvention convention;
+  ArrayRef<SILParameterInfo> &parameters;
 
   EmitBBArguments(SILGenFunction &gen, SILBasicBlock *parent,
                   SILLocation l, bool functionArgs,
-                  ParameterConvention convention)
+                  ArrayRef<SILParameterInfo> &parameters)
     : gen(gen), parent(parent), loc(l), functionArgs(functionArgs),
-      convention(convention) {}
+      parameters(parameters) {}
 
-  ManagedValue &&getManagedValue(SILValue arg, CanType t) const {
+  ManagedValue &&getManagedValue(SILValue arg, CanType t,
+                                 SILParameterInfo parameterInfo) const {
     if (isa<InOutType>(t))
       return std::move(ManagedValue::forLValue(arg));
 
@@ -766,16 +767,24 @@ public:
     // and release it at the end of the function to ensure the lifetime of the
     // operand last the entire lifetime of the function. If the parameter is a
     // let since it can not be reassigned, we do not need to retain it.
-    if (isGuaranteedParameter(convention))
+    if (isGuaranteedParameter(parameterInfo.getConvention()))
       return std::move(gen.emitManagedRetain(loc, arg));
 
     return std::move(gen.emitManagedRValueWithCleanup(arg));
   }
 
   RValue visitType(CanType t) {
+    auto argType = gen.getLoweredType(t);
+    // Pop the next parameter info.
+    auto parameterInfo = parameters.front();
+    parameters = parameters.slice(1);
+    assert(argType == parent->getParent()
+                            ->mapTypeIntoContext(parameterInfo.getSILType()) &&
+           "argument does not have same type as specified by parameter info");
+    
     SILValue arg = new (gen.SGM.M)
-      SILArgument(parent, gen.getLoweredType(t), loc.getAsASTNode<ValueDecl>());
-    ManagedValue mv = getManagedValue(arg, t);
+      SILArgument(parent, argType, loc.getAsASTNode<ValueDecl>());
+    ManagedValue mv = getManagedValue(arg, t, parameterInfo);
 
     // If the value is a (possibly optional) ObjC block passed into the entry
     // point of the function, then copy it so we can treat the value reliably
@@ -815,30 +824,26 @@ struct ArgumentInitVisitor :
   SILFunction &f;
   SILBuilder &initB;
 
-  /// An ArrayRef that we use in our SILParameterList queue. This just saves us
-  /// having to lookup the parameters over and over again stfrom the SILType.
+  /// An ArrayRef that we use in our SILParameterList queue. Parameters are
+  /// sliced off of the front as they're emitted.
   ArrayRef<SILParameterInfo> parameters;
-
-  /// This gives us the next index in the SILParameterList queue.
-  unsigned nextParameterIndex;
 
   ArgumentInitVisitor(SILGenFunction &gen, SILFunction &f)
     : gen(gen), f(f), initB(gen.B),
-      parameters(f.getLoweredFunctionType()->getParameters()),
-      nextParameterIndex(0) {
+      parameters(f.getLoweredFunctionType()->getParameters()) {
     // If we have an out parameter, skip it.
     if (parameters.size() && parameters[0].isIndirectResult())
-      nextParameterIndex++;
+      parameters = parameters.slice(1);
   }
-
+  
   RValue makeArgument(Type ty, SILBasicBlock *parent, SILLocation l) {
     assert(ty && "no type?!");
 
     // Create an RValue by emitting destructured arguments into a basic block.
     CanType canTy = ty->getCanonicalType();
-    SILParameterInfo parameterInfo = parameters[nextParameterIndex++];
+    
     return EmitBBArguments(gen, parent, l, /*functionArgs*/ true,
-                           parameterInfo.getConvention()).visit(canTy);
+                           parameters).visit(canTy);
   }
 
   /// Create a SILArgument and store its value into the given Initialization,
@@ -1081,12 +1086,13 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
   }
 
   // Emit the argument variables in calling convention order.
+  ArgumentInitVisitor argVisitor(*this, F);
   for (Pattern *p : reversed(paramPatterns)) {
     // Allocate the local mutable argument storage and set up an Initialization.
     InitializationPtr argInit = InitializationForPattern(*this).visit(p);
     // Add the SILArguments and use them to initialize the local argument
     // values.
-    ArgumentInitVisitor(*this, F).visit(p, argInit.get());
+    argVisitor.visit(p, argInit.get());
   }
 }
 
