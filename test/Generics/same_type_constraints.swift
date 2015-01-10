@@ -94,3 +94,14 @@ func <- <
 {
   return nil
 }
+
+// rdar://problem/17855378
+struct Pair<T, U> {
+    typealias Type_ = (T, U)
+}
+
+protocol Seq {
+  typealias Element
+
+  func zip<OtherSeq: Seq, ResultSeq: Seq where ResultSeq.Element == Pair<Element, OtherSeq.Element>.Type_> (otherSeq: OtherSeq) -> ResultSeq
+}
