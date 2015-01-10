@@ -90,6 +90,9 @@ public:
   /// \brief Whether we should run LLVM ARC optimizations after IRGen.
   unsigned DisableLLVMARCOpts : 1;
 
+  /// \brief Whether we should run LLVM SLP vectorizer.
+  unsigned DisableLLVMSLPVectorizer : 1;
+
   /// Disable frame pointer elimination?
   unsigned DisableFPElim : 1;
 
@@ -103,6 +106,7 @@ public:
                    Optimize(false), DebugInfoKind(IRGenDebugInfoKind::None),
                    UseJIT(false), EnableDynamicValueTypeLayout(false),
                    DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
+                   DisableLLVMSLPVectorizer(false),
                    DisableFPElim(true), HasUnderlyingModule(false),
                    Playground(false) {}
 };

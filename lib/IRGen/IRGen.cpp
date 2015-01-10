@@ -278,7 +278,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   if (Opts.Optimize && !Opts.DisableLLVMOptzns) {
     PMBuilder.OptLevel = 3;
     PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
-    PMBuilder.SLPVectorize = true;
+    PMBuilder.SLPVectorize = !Opts.DisableLLVMSLPVectorizer;
     PMBuilder.LoopVectorize = true;
   } else {
     PMBuilder.OptLevel = 0;

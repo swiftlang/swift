@@ -133,6 +133,9 @@ def disable_llvm_optzns : Flag<["-"], "disable-llvm-optzns">,
 def disable_llvm_arc_opts : Flag<["-"], "disable-llvm-arc-opts">,
   HelpText<"Don't run LLVM ARC optimization passes.">;
 
+def disable_llvm_slp_vectorizer : Flag<["-"], "disable-llvm-slp-vectorizer">,
+  HelpText<"Don't run LLVM SLP vectorizer">;
+
 def disable_llvm_verify : Flag<["-"], "disable-llvm-verify">,
   HelpText<"Don't run the LLVM IR verifier.">;
 
