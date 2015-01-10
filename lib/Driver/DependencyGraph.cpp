@@ -25,6 +25,7 @@ enum class DependencyGraphImpl::DependencyKind : uint8_t {
   TopLevelName = 1 << 0,
   DynamicLookupName = 1 << 1,
   NominalType = 1 << 2,
+  ExternalFile = 1 << 3,
 };
 enum class DependencyGraphImpl::DependencyFlags : uint8_t {
   IsCascading = 1 << 0
@@ -77,6 +78,8 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
                                             DependencyDirection::Depends))
       .Case("dynamic-lookup", std::make_pair(DependencyKind::DynamicLookupName,
                                              DependencyDirection::Depends))
+      .Case("cross-module", std::make_pair(DependencyKind::ExternalFile,
+                                           DependencyDirection::Depends))
       .Case("provides", std::make_pair(DependencyKind::TopLevelName,
                                        DependencyDirection::Provides))
       .Case("nominals", std::make_pair(DependencyKind::NominalType,
@@ -127,6 +130,8 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
 
   auto dependsCallback = [this, node](StringRef name, DependencyKind kind,
                                       bool isCascading) -> LoadResult {
+    if (kind == DependencyKind::ExternalFile)
+      ExternalDependencies.insert(name);
 
     auto &entries = Dependencies[name];
     auto iter = std::find_if(entries.first.begin(), entries.first.end(),
@@ -168,6 +173,23 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
   };
 
   return parseDependencyFile(buffer, providesCallback, dependsCallback);
+}
+
+void DependencyGraphImpl::markExternal(SmallVectorImpl<const void *> &visited,
+                                       StringRef externalDependency) {
+  auto allDependents = Dependencies.find(externalDependency);
+  assert(allDependents != Dependencies.end() && "not a dependency!");
+  allDependents->second.second |= DependencyKind::ExternalFile;
+
+  for (const auto &dependent : allDependents->second.first) {
+    if (!dependent.kindMask.contains(DependencyKind::ExternalFile))
+      continue;
+    if (isMarked(dependent.node))
+      continue;
+    assert(dependent.flags & DependencyFlags::IsCascading);
+    visited.push_back(dependent.node);
+    markTransitive(visited, dependent.node);
+  }
 }
 
 void

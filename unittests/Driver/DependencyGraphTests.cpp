@@ -20,6 +20,8 @@ TEST(DependencyGraph, BasicLoad) {
             LoadResult::UpToDate);
   EXPECT_EQ(graph.loadFromString(i++, "dynamic-lookup: [k, l]"),
             LoadResult::UpToDate);
+  EXPECT_EQ(graph.loadFromString(i++, "cross-module: [/foo, /bar]"),
+            LoadResult::UpToDate);
 
   EXPECT_EQ(graph.loadFromString(i++,
                                  "nominals: [a, b]\n"
@@ -577,4 +579,111 @@ TEST(DependencyGraph, MarkIntransitiveThenIndirect) {
   EXPECT_EQ(0u, marked.size());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
+}
+
+TEST(DependencyGraph, SimpleExternal) {
+  DependencyGraph<uintptr_t> graph;
+
+  EXPECT_EQ(graph.loadFromString(0, "cross-module: [/foo, /bar]"),
+            LoadResult::UpToDate);
+
+  EXPECT_TRUE(contains(graph.getExternalDependencies(), "/foo"));
+  EXPECT_TRUE(contains(graph.getExternalDependencies(), "/bar"));
+
+  SmallVector<uintptr_t, 4> marked;
+  graph.markExternal(marked, "/foo");
+  EXPECT_EQ(1u, marked.size());
+  EXPECT_TRUE(graph.isMarked(0));
+
+  marked.clear();
+  graph.markExternal(marked, "/foo");
+  EXPECT_EQ(0u, marked.size());
+  EXPECT_TRUE(graph.isMarked(0));
+}
+
+TEST(DependencyGraph, SimpleExternal2) {
+  DependencyGraph<uintptr_t> graph;
+
+  EXPECT_EQ(graph.loadFromString(0, "cross-module: [/foo, /bar]"),
+            LoadResult::UpToDate);
+
+  SmallVector<uintptr_t, 4> marked;
+  graph.markExternal(marked, "/bar");
+  EXPECT_EQ(1u, marked.size());
+  EXPECT_TRUE(graph.isMarked(0));
+
+  marked.clear();
+  graph.markExternal(marked, "/bar");
+  EXPECT_EQ(0u, marked.size());
+  EXPECT_TRUE(graph.isMarked(0));
+}
+
+TEST(DependencyGraph, ChainedExternal) {
+  DependencyGraph<uintptr_t> graph;
+
+  EXPECT_EQ(graph.loadFromString(0, "cross-module: [/foo]\nprovides: [a]"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(graph.loadFromString(1, "cross-module: [/bar]\ntop-level: [a]"),
+            LoadResult::UpToDate);
+
+  EXPECT_TRUE(contains(graph.getExternalDependencies(), "/foo"));
+  EXPECT_TRUE(contains(graph.getExternalDependencies(), "/bar"));
+
+  SmallVector<uintptr_t, 4> marked;
+  graph.markExternal(marked, "/foo");
+  EXPECT_EQ(2u, marked.size());
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+
+  marked.clear();
+  graph.markExternal(marked, "/foo");
+  EXPECT_EQ(0u, marked.size());
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+}
+
+TEST(DependencyGraph, ChainedExternalReverse) {
+  DependencyGraph<uintptr_t> graph;
+
+  EXPECT_EQ(graph.loadFromString(0, "cross-module: [/foo]\nprovides: [a]"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(graph.loadFromString(1, "cross-module: [/bar]\ntop-level: [a]"),
+            LoadResult::UpToDate);
+
+  SmallVector<uintptr_t, 4> marked;
+  graph.markExternal(marked, "/bar");
+  EXPECT_EQ(1u, marked.size());
+  EXPECT_EQ(1u, marked.front());
+  EXPECT_FALSE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+
+  marked.clear();
+  graph.markExternal(marked, "/bar");
+  EXPECT_EQ(0u, marked.size());
+  EXPECT_FALSE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+
+  marked.clear();
+  graph.markExternal(marked, "/foo");
+  EXPECT_EQ(1u, marked.size());
+  EXPECT_EQ(0u, marked.front());
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+}
+
+TEST(DependencyGraph, ChainedExternalPreMarked) {
+  DependencyGraph<uintptr_t> graph;
+
+  EXPECT_EQ(graph.loadFromString(0, "cross-module: [/foo]\nprovides: [a]"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(graph.loadFromString(1, "cross-module: [/bar]\ntop-level: [a]"),
+            LoadResult::UpToDate);
+
+  graph.markIntransitive(0);
+
+  SmallVector<uintptr_t, 4> marked;
+  graph.markExternal(marked, "/foo");
+  EXPECT_EQ(0u, marked.size());
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_FALSE(graph.isMarked(1));
 }

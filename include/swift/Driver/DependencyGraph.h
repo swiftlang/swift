@@ -15,10 +15,13 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/iterator_range.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
 #include <string>
 #include <vector>
@@ -99,21 +102,55 @@ private:
   /// The set of marked nodes.
   llvm::SmallPtrSet<const void *, 16> Marked;
 
+  /// A list of all "external" dependencies that cannot be resolved just from
+  /// this dependency graph.
+  llvm::StringSet<> ExternalDependencies;
+
   LoadResult loadFromBuffer(const void *node, llvm::MemoryBuffer &buffer);
+
+  // FIXME: We should be able to use llvm::mapped_iterator for this, but
+  // StringMapConstIterator isn't quite an InputIterator (no ->).
+  class StringSetIterator {
+    llvm::StringSet<>::const_iterator I;
+  public:
+    /*implicit*/ StringSetIterator(llvm::StringSet<>::const_iterator base)
+       : I(base) {}
+
+    StringSetIterator &operator++() {
+      ++I;
+      return *this;
+    }
+
+    StringRef operator*() const {
+      return I->getKey();
+    }
+
+    bool operator==(StringSetIterator other) const { return I == other.I; }
+    bool operator!=(StringSetIterator other) const { return I != other.I; }
+  };
 
 protected:
   LoadResult loadFromString(const void *node, StringRef data);
   LoadResult loadFromPath(const void *node, StringRef path);
+
   void markTransitive(SmallVectorImpl<const void *> &visited,
                       const void *node);
   bool markIntransitive(const void *node) {
     assert(Provides.count(node) && "node is not in the graph");
     return Marked.insert(node).second;
   }
+  void markExternal(SmallVectorImpl<const void *> &visited,
+                    StringRef externalDependency);
 
   bool isMarked(const void *node) const {
     assert(Provides.count(node) && "node is not in the graph");
     return Marked.count(node);
+  }
+
+public:
+  llvm::iterator_range<StringSetIterator> getExternalDependencies() const {
+    return llvm::make_range(StringSetIterator(ExternalDependencies.begin()),
+                            StringSetIterator(ExternalDependencies.end()));
   }
 };
 
@@ -135,6 +172,16 @@ template <typename T>
 class DependencyGraph : public DependencyGraphImpl {
   using Traits = llvm::PointerLikeTypeTraits<T>;
   static_assert(Traits::NumLowBitsAvailable >= 0, "not a pointer-like type");
+
+  static void copyBack(SmallVectorImpl<T> &result,
+                       ArrayRef<const void *> rawNodes) {
+    result.reserve(result.size() + rawNodes.size());
+    std::transform(rawNodes.begin(), rawNodes.end(), std::back_inserter(result),
+                   [](const void *rawNode) {
+      return Traits::getFromVoidPointer(const_cast<void *>(rawNode));
+    });
+  }
+
 public:
   /// Load "depends" and "provides" data for \p node from the file at the given
   /// path.
@@ -174,13 +221,16 @@ public:
     SmallVector<const void *, N> rawMarked;
     DependencyGraphImpl::markTransitive(rawMarked,
                                         Traits::getAsVoidPointer(node));
-
     // FIXME: How can we avoid this copy?
-    visited.reserve(visited.size() + rawMarked.size());
-    for (const void *constRawNode : rawMarked) {
-      void *rawNode = const_cast<void *>(constRawNode);
-      visited.push_back(Traits::getFromVoidPointer(rawNode));
-    }
+    copyBack(visited, rawMarked);
+  }
+
+  template <unsigned N>
+  void markExternal(SmallVector<T, N> &visited, StringRef externalDependency) {
+    SmallVector<const void *, N> rawMarked;
+    DependencyGraphImpl::markExternal(rawMarked, externalDependency);
+    // FIXME: How can we avoid this copy?
+    copyBack(visited, rawMarked);
   }
 
   /// Marks \p node without marking any dependencies.
