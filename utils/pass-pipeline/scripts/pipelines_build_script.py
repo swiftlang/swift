@@ -69,6 +69,21 @@ def build_disable_individual_passes(**kwargs):
         d['pass_name'] = p
         build_disable_individual_pass(**d)
 
+def add_default_parser_args(p):
+    p.add_argument('pipeline_script', help=textwrap.dedent("""
+    The path to normal_pipeline.py. In the future could be generalized to take other files.
+    """))
+    p.add_argument('build_script', help=textwrap.dedent("""
+    The path to build-script.
+    """))
+    p.add_argument('output_dir', help=textwrap.dedent("""
+    The output directory to use.
+    """))
+    p.add_argument('-v', action='store_true', dest='verbose', help=textwrap.dedent("""
+    Emit verbose output from build-script.
+    """))
+
+
 def main():
     parser = argparse.ArgumentParser(description="Run build-script with various passes disabled")
     subparsers = parser.add_subparsers(help="The specific action to perform")
@@ -79,11 +94,13 @@ def main():
     Currently what this means is that we perform the normal pipeline order, stopping after N pipelines have run.
     """))
     slice_pipeline_parser.set_defaults(func=build_disable_slice_pipelines)
+    add_default_parser_args(slice_pipeline_parser)
 
     disable_individual_passes_parser = subparsers.add_parser('disable_individual_passes', description=textwrap.dedent("""
     Loop over all predefines passes and run build_script once for each pass with that pass disabled.
     """))
     disable_individual_passes_parser.set_defaults(func=build_disable_individual_passes)
+    add_default_parser_args(disable_individual_passes_parser)
 
     disable_individual_pass_parser = subparsers.add_parser('disable_individual_pass', description=textwrap.dedent("""
     Run build-script disabling only the specified passes.
@@ -91,19 +108,7 @@ def main():
     disable_individual_pass_parser.add_argument('pass_name', help="The pass to disable",
                                                 choices=PASSES, type=str)
     disable_individual_pass_parser.set_defaults(func=build_disable_individual_pass)
-
-    parser.add_argument('pipeline_script', help=textwrap.dedent("""
-    The path to normal_pipeline.py. In the future could be generalized to take other files.
-    """))
-    parser.add_argument('build_script', help=textwrap.dedent("""
-    The path to build-script.
-    """))
-    parser.add_argument('output_dir', help=textwrap.dedent("""
-    The output directory to use.
-    """))
-    parser.add_argument('-v', action='store_true', dest='verbose', help=textwrap.dedent("""
-    Emit verbose output from build-script.
-    """))
+    add_default_parser_args(disable_individual_pass_parser)
 
     args = parser.parse_args()
     args.func(**vars(args))
