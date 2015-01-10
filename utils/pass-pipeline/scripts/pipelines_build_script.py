@@ -101,7 +101,7 @@ def main():
     parser.add_argument('output_dir', help=textwrap.dedent("""
     The output directory to use.
     """))
-    parser.add_argument('-v', help=textwrap.dedent("""
+    parser.add_argument('-v', action='store_true', dest='verbose', help=textwrap.dedent("""
     Emit verbose output from build-script.
     """))
 
