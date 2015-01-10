@@ -1,9 +1,10 @@
 Many of the tests in this directory are set up to model particular dependency graphs, which are set up via the folders in the Inputs/ directory. Most of these tests describe the dependency graph in ASCII art form at the top of the file.
 
-a | b     Independent files 'a' and 'b'
-a ==> b   File 'b' depends on file 'a'
-a <==> b  File 'a' and file 'b' depend on each other
-a --> b   File 'b' privately depends on file 'a' (normal dependencies cascade)
+a | b           Independent files 'a' and 'b'
+a ==> b         File 'b' depends on file 'a'
+a <==> b        File 'a' and file 'b' depend on each other
+a --> b         File 'b' privately depends on file 'a' (normal dependencies cascade)
+"./file" ==> a  File 'a' depends on external, non-source file './file'
 
 Because of the way the tests are set up, the dependency information is put into the .swift files; any such test needs to start by "building" everything to copy that information into .swiftdeps files. To avoid timestamp issues, most of these tests start with:
 

@@ -102,6 +102,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
   DependencyGraph<const Job *> DepGraph;
   SmallPtrSet<const Job *, 16> DeferredCommands;
   SmallVector<const Job *, 16> InitialOutOfDateCommands;
+  auto MinPreviousBuildTime = llvm::sys::TimeValue::MaxTime();
 
   // Set up scheduleCommandIfNecessaryAndPossible.
   // This will only schedule the given command if it has not been scheduled
@@ -132,6 +133,9 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
       scheduleCommandIfNecessaryAndPossible(Cmd);
       continue;
     }
+
+    MinPreviousBuildTime = std::min(MinPreviousBuildTime,
+                                    Cmd->getPreviousBuildTime());
 
     // Try to load the dependencies file for this job. If there isn't one, we
     // always have to run the job, but it doesn't affect any other jobs. If
@@ -171,12 +175,27 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
   }
 
   if (getIncrementalBuildEnabled()) {
+    SmallVector<const Job *, 16> AdditionalOutOfDateCommands;
+
     // We scheduled all of the files that have actually changed. Now add the
     // files that haven't changed, so that they'll get built in parallel if
     // possible and after the first set of files if it's not.
-    SmallVector<const Job *, 16> AdditionalOutOfDateCommands;
     for (auto *Cmd : InitialOutOfDateCommands)
       DepGraph.markTransitive(AdditionalOutOfDateCommands, Cmd);
+
+    // Check all cross-module dependencies as well.
+    for (StringRef dependency : DepGraph.getExternalDependencies()) {
+      llvm::sys::fs::file_status depStatus;
+      if (!llvm::sys::fs::status(dependency, depStatus))
+        if (depStatus.getLastModificationTime() < MinPreviousBuildTime)
+          continue;
+
+      // If the dependency has been modified since the oldest built file,
+      // or if we can't stat it for some reason (perhaps it's been deleted?),
+      // trigger rebuilds through the dependency graph.
+      DepGraph.markExternal(AdditionalOutOfDateCommands, dependency);
+    }
+
     for (auto *AdditionalCmd : AdditionalOutOfDateCommands) {
       if (!DeferredCommands.count(AdditionalCmd))
         continue;
