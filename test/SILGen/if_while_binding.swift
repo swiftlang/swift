@@ -116,8 +116,8 @@ func while_loop_generic<T>(source: () -> T?) {
 // <rdar://problem/19382942> Improve 'if let' to avoid optional pyramid of doom
 // CHECK-LABEL: sil hidden @_TF16if_while_binding16while_loop_multiFT_T_
 func while_loop_multi() {
-  // CHECK: [[OPT_BUF1:%.*]] = alloc_stack $Optional<String>
-  // CHECK: [[OPT_BUF2:%.*]] = alloc_stack $Optional<String>
+  // CHECK:   [[OPT_BUF1:%.*]] = alloc_stack $Optional<String>
+  // CHECK:   [[OPT_BUF2:%.*]] = alloc_stack $Optional<String>
   // CHECK:   br [[LOOP_ENTRY:bb[0-9]+]]
   // CHECK: [[LOOP_ENTRY]]:
   // CHECK:   [[HAS_VALUE1:%.*]] = select_enum_addr [[OPT_BUF1]]#1
@@ -144,5 +144,66 @@ func while_loop_multi() {
   // CHECK:   dealloc_stack [[OPT_BUF1]]#0
 }
 
+// CHECK-LABEL: sil hidden @_TF16if_while_binding8if_multiFT_T_
+func if_multi() {
+  // CHECK:   [[OPT_BUF1:%.*]] = alloc_stack $Optional<String>
+  // CHECK:   [[OPT_BUF2:%.*]] = alloc_stack $Optional<String>
+  // CHECK:   [[HAS_VALUE1:%.*]] = select_enum_addr [[OPT_BUF1]]#1
+  // CHECK:   cond_br [[HAS_VALUE1]], [[CHECKBUF2:bb[0-9]+]], [[IF_EXIT1:bb[0-9]+]]
+  // CHECK: [[CHECKBUF2]]:
+  // CHECK:   [[HAS_VALUE2:%.*]] = select_enum_addr [[OPT_BUF2]]#1
+  // CHECK:   cond_br [[HAS_VALUE2]], [[IF_BODY:bb[0-9]+]], [[IF_EXIT2:bb[0-9]+]]
+  // CHECK: [[IF_BODY]]:
+  if let a = foo(), var b = bar() {
+    // CHECK:   [[VAL_BUF1:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF1]]#1
+    // CHECK:   debug_value {{.*}} : $String  // let a
+    // CHECK:   alloc_box $String // var b
+    // CHECK:   [[VAL_BUF2:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF2]]#1
+    // CHECK:   debug_value {{.*}} : $String  // let c
+    // CHECK:   br [[IF_DONE:bb[0-9]+]]
+    let c = a
+  }
+  // CHECK: [[IF_EXIT2]]:
+  // CHECK:   destroy_addr [[OPT_BUF2]]#1
+  // CHECK:   br [[IF_EXIT1]]
+  // CHECK: [[IF_EXIT1]]:
+  // CHECK:   destroy_addr [[OPT_BUF1]]#1
+  // CHECK:   br [[IF_DONE]]
+  // CHECK: [[IF_DONE]]:
+  // CHECK:   dealloc_stack [[OPT_BUF2]]#0
+  // CHECK:   dealloc_stack [[OPT_BUF1]]#0
+}
 
+// CHECK-LABEL: sil hidden @_TF16if_while_binding13if_multi_elseFT_T_
+func if_multi_else() {
+  // CHECK:   [[OPT_BUF1:%.*]] = alloc_stack $Optional<String>
+  // CHECK:   [[OPT_BUF2:%.*]] = alloc_stack $Optional<String>
+  // CHECK:   [[HAS_VALUE1:%.*]] = select_enum_addr [[OPT_BUF1]]#1
+  // CHECK:   cond_br [[HAS_VALUE1]], [[CHECKBUF2:bb[0-9]+]], [[IF_EXIT1:bb[0-9]+]]
+  // CHECK: [[CHECKBUF2]]:
+  // CHECK:   [[HAS_VALUE2:%.*]] = select_enum_addr [[OPT_BUF2]]#1
+  // CHECK:   cond_br [[HAS_VALUE2]], [[IF_BODY:bb[0-9]+]], [[IF_EXIT2:bb[0-9]+]]
+  // CHECK: [[IF_BODY]]:
+  if let a = foo(), var b = bar() {
+    // CHECK:   [[VAL_BUF1:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF1]]#1
+    // CHECK:   debug_value {{.*}} : $String  // let a
+    // CHECK:   alloc_box $String // var b
+    // CHECK:   [[VAL_BUF2:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF2]]#1
+    // CHECK:   debug_value {{.*}} : $String  // let c
+    // CHECK:   br [[IF_DONE:bb[0-9]+]]
+    let c = a
+  } else {
+    let d = 0
+    // CHECK: [[IF_EXIT2]]:
+    // CHECK:   destroy_addr [[OPT_BUF2]]#1
+    // CHECK:   br [[IF_EXIT1]]
+    // CHECK: [[IF_EXIT1]]:
+    // CHECK:   destroy_addr [[OPT_BUF1]]#1
+    // CHECK: debug_value {{.*}} : $Int  // let d
+    // CHECK:   br [[IF_DONE]]
+ }
+  // CHECK: [[IF_DONE]]:
+  // CHECK:   dealloc_stack [[OPT_BUF2]]#0
+  // CHECK:   dealloc_stack [[OPT_BUF1]]#0
+}
 
