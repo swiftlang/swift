@@ -10,8 +10,6 @@ sil_stage canonical
 // CHECK-NEXT:  }
 sil @thin_func_value : $@thin (@thin () -> ()) -> @thin () -> () {
 entry(%x : $@thin () -> ()):
-  strong_retain %x : $@thin () -> ()
-  strong_release %x : $@thin () -> ()
   return %x : $@thin () -> ()
 }
 
@@ -36,8 +34,6 @@ entry(%x : $() -> ()):
 // CHECK-NEXT:  }
 sil @thin_witness_value : $@thin (@thin @cc(witness_method) () -> ()) -> @thin @cc(witness_method) () -> () {
 entry(%x : $@thin @cc(witness_method) () -> ()):
-  strong_retain %x : $@thin @cc(witness_method) () -> ()
-  strong_release %x : $@thin @cc(witness_method) () -> ()
   return %x : $@thin @cc(witness_method) () -> ()
 }
 

@@ -660,7 +660,10 @@ extern "C" const ExtraInhabitantsValueWitnessTable _TWVBO; // Builtin.UnknownObj
 #endif
 
 // The () -> () table can be used for arbitrary function types.
-extern "C" const ValueWitnessTable _TWVFT_T_;     // () -> ()
+extern "C" const ExtraInhabitantsValueWitnessTable _TWVFT_T_;     // () -> ()
+
+// The @thin () -> () table can be used for arbitrary thin function types.
+extern "C" const ExtraInhabitantsValueWitnessTable _TWVXfT_T_;     // @thin () -> ()
 
 // The () table can be used for arbitrary empty types.
 extern "C" const ValueWitnessTable _TWVT_;        // ()
@@ -839,6 +842,7 @@ public:
     case MetadataKind::Opaque:
     case MetadataKind::Tuple:
     case MetadataKind::Function:
+    case MetadataKind::ThinFunction:
     case MetadataKind::PolyFunction:
     case MetadataKind::Existential:
     case MetadataKind::Metatype:
@@ -866,6 +870,7 @@ public:
     case MetadataKind::Opaque:
     case MetadataKind::Tuple:
     case MetadataKind::Function:
+    case MetadataKind::ThinFunction:
     case MetadataKind::PolyFunction:
     case MetadataKind::HeapLocalVariable:
       return false;
@@ -1505,6 +1510,7 @@ struct FunctionTypeMetadata : public Metadata {
 
   static bool classof(const Metadata *metadata) {
     return metadata->getKind() == MetadataKind::Function ||
+           metadata->getKind() == MetadataKind::ThinFunction ||
            metadata->getKind() == MetadataKind::Block;
   }
 };
@@ -2118,6 +2124,29 @@ swift_getFunctionTypeMetadata3(const void *arg0,
                                const void *arg2,
                                const Metadata *resultMetadata);
 
+/// \brief Fetch a uniqued metadata for a thin function type.
+extern "C" const FunctionTypeMetadata *
+swift_getThinFunctionTypeMetadata(size_t numArguments,
+                                  const void * argsAndResult []);
+
+extern "C" const FunctionTypeMetadata *
+swift_getThinFunctionTypeMetadata0(const Metadata *resultMetadata);
+
+extern "C" const FunctionTypeMetadata *
+swift_getThinFunctionTypeMetadata1(const void *arg0,
+                                   const Metadata *resultMetadata);
+
+extern "C" const FunctionTypeMetadata *
+swift_getThinFunctionTypeMetadata2(const void *arg0,
+                                   const void *arg1,
+                                   const Metadata *resultMetadata);
+
+extern "C" const FunctionTypeMetadata *
+swift_getThinFunctionTypeMetadata3(const void *arg0,
+                                   const void *arg1,
+                                   const void *arg2,
+                                   const Metadata *resultMetadata);
+
 
 #if SWIFT_OBJC_INTEROP
 /// \brief Fetch a uniqued metadata for a block type.
@@ -2409,15 +2438,82 @@ OpaqueValue *swift_assignExistentialWithCopy0(OpaqueValue *dest,
 OpaqueValue *swift_assignExistentialWithCopy1(OpaqueValue *dest,
                                               const OpaqueValue *src,
                                               const Metadata *type);
-  
+
 /// Calculate the numeric index of an extra inhabitant of a heap object
 /// pointer in memory.
-int swift_getHeapObjectExtraInhabitantIndex(HeapObject * const* src);
+inline int swift_getHeapObjectExtraInhabitantIndex(HeapObject * const* src) {
+  // This must be consistent with the getHeapObjectExtraInhabitantIndex
+  // implementation in IRGen's ExtraInhabitants.cpp.
+
+  using namespace heap_object_abi;
+
+  uintptr_t value = reinterpret_cast<uintptr_t>(*src);
+  if (value >= LeastValidPointerValue)
+    return -1;
+
+  // Check for tagged pointers on appropriate platforms.  Knowing that
+  // value < LeastValidPointerValue tells us a lot.
+#if SWIFT_OBJC_INTEROP
+  if (value & ((uintptr_t(1) << ObjCReservedLowBits) - 1))
+    return -1;
+#endif
+
+  return (int) (value >> ObjCReservedLowBits);
+}
   
 /// Store an extra inhabitant of a heap object pointer to memory,
 /// in the style of a value witness.
-void swift_storeHeapObjectExtraInhabitant(HeapObject **dest, int index);
+inline void swift_storeHeapObjectExtraInhabitant(HeapObject **dest, int index) {
+  // This must be consistent with the storeHeapObjectExtraInhabitant
+  // implementation in IRGen's ExtraInhabitants.cpp.
+
+  auto value = uintptr_t(index) << heap_object_abi::ObjCReservedLowBits;
+  *dest = reinterpret_cast<HeapObject*>(value);
+}
+
+/// Return the number of extra inhabitants in a heap object pointer.
+inline constexpr unsigned swift_getHeapObjectExtraInhabitantCount() {
+  // This must be consistent with the getHeapObjectExtraInhabitantCount
+  // implementation in IRGen's ExtraInhabitants.cpp.
+
+  using namespace heap_object_abi;
+
+  // The runtime needs no more than INT_MAX inhabitants.
+  return (LeastValidPointerValue >> ObjCReservedLowBits) > INT_MAX
+    ? (unsigned)INT_MAX
+    : (unsigned)(LeastValidPointerValue >> ObjCReservedLowBits);
+}  
+
+/// Calculate the numeric index of an extra inhabitant of a function
+/// pointer in memory.
+inline int swift_getFunctionPointerExtraInhabitantIndex(void * const* src) {
+  // This must be consistent with the getFunctionPointerExtraInhabitantIndex
+  // implementation in IRGen's ExtraInhabitants.cpp.
+  uintptr_t value = reinterpret_cast<uintptr_t>(*src);
+  return (value < heap_object_abi::LeastValidPointerValue
+            ? (int) value : -1);
+}
   
+/// Store an extra inhabitant of a function pointer to memory, in the
+/// style of a value witness.
+inline void swift_storeFunctionPointerExtraInhabitant(void **dest, int index) {
+  // This must be consistent with the storeFunctionPointerExtraInhabitantIndex
+  // implementation in IRGen's ExtraInhabitants.cpp.
+  *dest = reinterpret_cast<void*>((unsigned) index);
+}
+
+/// Return the number of extra inhabitants in a function pointer.
+inline constexpr unsigned swift_getFunctionPointerExtraInhabitantCount() {
+  // This must be consistent with the getFunctionPointerExtraInhabitantCount
+  // implementation in IRGen's ExtraInhabitants.cpp.
+
+  using namespace heap_object_abi;
+
+  // The runtime needs no more than INT_MAX inhabitants.
+  return (LeastValidPointerValue) > INT_MAX
+    ? (unsigned)INT_MAX
+    : (unsigned)(LeastValidPointerValue);
+}
   
 /// \brief Check whether a type conforms to a given native Swift protocol,
 /// visible from the named module.
@@ -2437,20 +2533,6 @@ const WitnessTable *swift_conformsToProtocol(const Metadata *type,
 extern "C"
 void swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
                                         const ProtocolConformanceRecord *end);
-  
-/// Return the number of extra inhabitants in a heap object pointer.
-extern "C"
-inline constexpr unsigned swift_getHeapObjectExtraInhabitantCount() {
-  // This must be consistent with the getHeapObjectExtraInhabitantCount
-  // implementation in IRGen's GenType.cpp.
-  
-  using namespace heap_object_abi;
-  
-  // The runtime needs no more than INT_MAX inhabitants.
-  return (LeastValidPointerValue >> ObjCReservedLowBits) > INT_MAX
-    ? (unsigned)INT_MAX
-    : (unsigned)(LeastValidPointerValue >> ObjCReservedLowBits);
-}
   
 /// FIXME: This doesn't belong in the runtime.
 extern "C" void swift_printAny(OpaqueValue *value, const Metadata *type);

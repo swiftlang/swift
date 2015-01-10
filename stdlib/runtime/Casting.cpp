@@ -236,6 +236,19 @@ static void _buildNameForMetadata(const Metadata *type,
       result += ")";
     return;
   }
+  case MetadataKind::ThinFunction: {
+    if (level >= TypeSyntaxLevel::TypeSimple)
+      result += "(";
+
+    result += "@thin ";
+
+    auto func = static_cast<const FunctionTypeMetadata *>(type);
+    _buildFunctionTypeName(func, result);
+
+    if (level >= TypeSyntaxLevel::TypeSimple)
+      result += ")";
+    return;
+  }
   case MetadataKind::Function: {
     if (level >= TypeSyntaxLevel::TypeSimple)
       result += "(";
@@ -458,6 +471,7 @@ static bool _conformsToProtocol(const OpaqueValue *value,
       
     case MetadataKind::ExistentialMetatype: // FIXME
     case MetadataKind::Function:
+    case MetadataKind::ThinFunction:
     case MetadataKind::Block: // FIXME
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
@@ -518,6 +532,7 @@ static bool _conformsToProtocol(const OpaqueValue *value,
   case MetadataKind::Existential: // FIXME
   case MetadataKind::ExistentialMetatype: // FIXME
   case MetadataKind::Function:
+  case MetadataKind::ThinFunction:
   case MetadataKind::Block: // FIXME
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
@@ -613,6 +628,7 @@ static void findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
 
   // Non-polymorphic types.
   case MetadataKind::Function:
+  case MetadataKind::ThinFunction:
   case MetadataKind::Block:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Enum:
@@ -662,6 +678,7 @@ static void deallocateDynamicValue(OpaqueValue *value, const Metadata *type) {
   case MetadataKind::Metatype:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
+  case MetadataKind::ThinFunction:
   case MetadataKind::Block:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Enum:
@@ -730,6 +747,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
       break;
 
     case MetadataKind::Function:
+    case MetadataKind::ThinFunction:
     case MetadataKind::Block:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Opaque:
@@ -839,6 +857,7 @@ swift::swift_dynamicCastUnknownClass(const void *object,
   }
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
+  case MetadataKind::ThinFunction:
   case MetadataKind::Block:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
@@ -894,6 +913,7 @@ swift::swift_dynamicCastUnknownClassUnconditional(const void *object,
       
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
+  case MetadataKind::ThinFunction:
   case MetadataKind::Block:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
@@ -948,6 +968,7 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
+    case MetadataKind::ThinFunction:
     case MetadataKind::Block:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
@@ -978,6 +999,7 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
+    case MetadataKind::ThinFunction:
     case MetadataKind::Block:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
@@ -993,6 +1015,7 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
+  case MetadataKind::ThinFunction:
   case MetadataKind::Block:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
@@ -1049,6 +1072,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
+    case MetadataKind::ThinFunction:
     case MetadataKind::Block:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
@@ -1080,6 +1104,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
+    case MetadataKind::ThinFunction:
     case MetadataKind::Block:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
@@ -1094,6 +1119,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
+  case MetadataKind::ThinFunction:
   case MetadataKind::Block:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
@@ -1302,6 +1328,7 @@ static bool _dynamicCastToMetatype(OpaqueValue *dest,
   }
 
   case MetadataKind::Function:
+  case MetadataKind::ThinFunction:
   case MetadataKind::Block:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Enum:
@@ -1442,6 +1469,7 @@ static bool _dynamicCastToExistentialMetatype(OpaqueValue *dest,
   case MetadataKind::ObjCClassWrapper:
   case MetadataKind::ForeignClass:
   case MetadataKind::Function:
+  case MetadataKind::ThinFunction:
   case MetadataKind::Block:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Enum:
@@ -1503,6 +1531,7 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
 
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
+    case MetadataKind::ThinFunction:
     case MetadataKind::Block:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
@@ -1558,6 +1587,7 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
+    case MetadataKind::ThinFunction:
     case MetadataKind::Block:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
@@ -1572,6 +1602,7 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
 
   // The non-polymorphic types.
   case MetadataKind::Function:
+  case MetadataKind::ThinFunction:
   case MetadataKind::Block:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Opaque:

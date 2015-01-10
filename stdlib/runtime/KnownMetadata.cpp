@@ -78,46 +78,6 @@ const ValueWitnessTable swift::_TWVBi64_ =
 const ValueWitnessTable swift::_TWVBi128_ =
   ValueWitnessTableForBox<NativeBox<int128_like, 16>>::table;
 
-/// Store an invalid pointer value as an extra inhabitant of a heap object.
-void swift::swift_storeHeapObjectExtraInhabitant(HeapObject **dest,
-                                                 int index) {
-  using namespace heap_object_abi;
-  
-  // This must be consistent with the storeHeapObjectExtraInhabitant
-  // implementation in IRGen's GenType.cpp.
-  
-  // FIXME: We could use high spare bits to produce extra inhabitants, but we
-  // probably won't need to.
-  *dest = (HeapObject*)((uintptr_t)index << ObjCReservedLowBits);
-}
-
-/// Return the extra inhabitant index for an invalid pointer value, or -1 if
-/// the pointer is valid.
-int swift::swift_getHeapObjectExtraInhabitantIndex(HeapObject * const* src) {
-  using namespace heap_object_abi;
-
-  // This must be consistent with the getHeapObjectExtraInhabitant
-  // implementation in IRGen's GenType.cpp.
-
-  uintptr_t val = (uintptr_t)*src;
-
-  // Return -1 for valid pointers.
-  // FIXME: We could use high spare bits to produce extra inhabitants, but we
-  // probably won't need to.
-  if (val >= LeastValidPointerValue)
-    return -1;
-
-#if SWIFT_OBJC_INTEROP
-  // Return -1 for ObjC tagged pointers.
-  // FIXME: This check is unnecessary for known-Swift types.
-  if (isObjCTaggedPointer((const void*) val))
-    return -1;
-#endif
-
-  return (int)(val >> ObjCReservedLowBits);
-}
-
-
 /// The basic value-witness table for Swift object pointers.
 const ExtraInhabitantsValueWitnessTable swift::_TWVBo =
   ValueWitnessTableForBox<SwiftRetainableBox>::table;
@@ -143,10 +103,30 @@ const ExtraInhabitantsValueWitnessTable swift::_TWVBO =
 
 /*** Functions ***************************************************************/
 
+namespace {
+  struct ThickFunctionBox
+    : AggregateBox<FunctionPointerBox, SwiftRetainableBox> {
+
+    static constexpr unsigned numExtraInhabitants =
+      FunctionPointerBox::numExtraInhabitants;
+
+    static void storeExtraInhabitant(char *dest, int index) {
+      FunctionPointerBox::storeExtraInhabitant((void**) dest, index);
+    }
+
+    static int getExtraInhabitantIndex(const char *src) {
+      return FunctionPointerBox::getExtraInhabitantIndex((void * const *) src);
+    }
+  };
+}
+
 /// The basic value-witness table for function types.
-const ValueWitnessTable swift::_TWVFT_T_ =
-  ValueWitnessTableForBox<AggregateBox<NativeBox<void*>,
-                                       SwiftRetainableBox>>::table;
+const ExtraInhabitantsValueWitnessTable swift::_TWVFT_T_ =
+  ValueWitnessTableForBox<ThickFunctionBox>::table;
+
+/// The basic value-witness table for thin function types.
+const ExtraInhabitantsValueWitnessTable swift::_TWVXfT_T_ =
+  ValueWitnessTableForBox<FunctionPointerBox>::table;
 
 /*** Empty tuples ************************************************************/
 

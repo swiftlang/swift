@@ -1,0 +1,66 @@
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -gnone -emit-ir | FileCheck %s
+
+sil_stage canonical
+
+import Swift
+
+sil hidden @test_helper : $@thin () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK:  define hidden void @test1(i128)
+sil hidden @test1 : $@thin (@owned Optional<() -> ()>) -> () {
+bb0(%0 : $Optional<() -> ()>):
+  // CHECK: [[T0:%.*]] = trunc i128 [[FN:%0]] to i64
+  // CHECK: [[T1:%.*]] = zext i64 [[T0]] to i128
+  // CHECK: switch i128 [[T1]],
+  // CHECK:   i128 0, label
+  // CHECK: [[T0:%.*]] = trunc i128 [[FN]] to i64
+  // CHECK: [[FNPTR:%.*]] = inttoptr i64 [[T0]] to i8*
+  // CHECK: [[T0:%.*]] = lshr i128 [[FN]], 64
+  // CHECK: [[T1:%.*]] = trunc i128 [[T0]] to i64
+  // CHECK: [[CTX:%.*]] = inttoptr i64 [[T1]] to %swift.refcounted*
+  // CHECK: call void @swift_retain_noresult(%swift.refcounted* [[CTX]])
+  // CHECK: br label
+  retain_value %0 : $Optional<() -> ()>
+  
+  // CHECK: [[T0:%.*]] = trunc i128 [[FN]] to i64
+  // CHECK: [[T1:%.*]] = zext i64 [[T0]] to i128
+  // CHECK: switch i128 [[T1]],
+  // CHECK:   i128 0, label
+  switch_enum %0 : $Optional<() -> ()>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: bb2
+
+  // CHECK: [[T0:%.*]] = trunc i128 [[FN]] to i64
+  // CHECK: [[FNPTR:%.*]] = inttoptr i64 [[T0]] to i8*
+  // CHECK: [[T0:%.*]] = lshr i128 [[FN]], 64
+  // CHECK: [[T1:%.*]] = trunc i128 [[T0]] to i64
+  // CHECK: [[CTX:%.*]] = inttoptr i64 [[T1]] to %swift.refcounted*
+  // CHECK: br label
+  // CHECK: [[FNPTR2:%.*]] = phi i8* [ [[FNPTR]], {{%.*}} ]
+  // CHECK: [[CTX2:%.*]] = phi %swift.refcounted* [ [[CTX]], {{%.*}} ]
+bb1(%1 : $@callee_owned (@out (), @in ()) -> ()):
+  %2 = alloc_stack $()
+  %3 = alloc_stack $()
+
+  // CHECK: [[FNPTR3:%.*]] = bitcast i8* [[FNPTR2]] to void (%swift.opaque*, %swift.opaque*, %swift.refcounted*)*
+  // CHECK: call void [[FNPTR3]](%swift.opaque* noalias sret undef, %swift.opaque* undef, %swift.refcounted* [[CTX2]])
+  apply %1(%3#1, %2#1) : $@callee_owned (@out (), @in ()) -> ()
+  dealloc_stack %3#0 : $*@local_storage ()
+  dealloc_stack %2#0 : $*@local_storage ()
+  // CHECK: br label [[CONT:%[0-9]+]]
+  br bb3
+
+bb2:
+  %4 = function_ref @test_helper : $@thin () -> ()
+  apply %4() : $@thin () -> ()
+  // CHECK: call void @test_helper()
+  // CHECK: br label [[CONT]]
+  br bb3
+
+bb3:
+  %5 = tuple ()
+  // CHECK: ret void
+  return %5 : $()
+}

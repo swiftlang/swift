@@ -67,6 +67,9 @@ enum class MetadataKind : uintptr_t {
   /// An Objective-C block type.
   Block = 17,
 
+  /// A thin function type.
+  ThinFunction = 18,
+
   // Array types?
   // L-value types?
 

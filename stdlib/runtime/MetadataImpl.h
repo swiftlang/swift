@@ -18,6 +18,7 @@
 //   - NativeBox derives a box from a C++ type
 //   - SwiftRetainableBox is a box for Swift object pointers which uses
 //     swift_{retain,release}.
+//   - FunctionPointerBox is a box for function pointers.
 //   - ObjCRetainableBox is a box for Objective-C object pointers,
 //     using objc_{retain,release}.
 //   - UnknownRetainableBox is a box for void* using
@@ -354,6 +355,22 @@ struct PointerPointerBox : NativeBox<void**> {
 
   static int getExtraInhabitantIndex(void ** const *src) {
     return swift_getHeapObjectExtraInhabitantIndex((HeapObject* const *) src);
+  }
+};
+
+/// A box implementation class for unmanaged function pointers.
+/// @thin functions have this layout, as do the first elements of
+/// Swift thick functions.
+struct FunctionPointerBox : NativeBox<void*> {
+  static constexpr unsigned numExtraInhabitants =
+    swift_getFunctionPointerExtraInhabitantCount();
+
+  static void storeExtraInhabitant(void **dest, int index) {
+    swift_storeFunctionPointerExtraInhabitant(dest, index);
+  }
+
+  static int getExtraInhabitantIndex(void * const *src) {
+    return swift_getFunctionPointerExtraInhabitantIndex(src);
   }
 };
 

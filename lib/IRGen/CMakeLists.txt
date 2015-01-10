@@ -1,5 +1,6 @@
 add_swift_library(swiftIRGen
   DebugTypeInfo.cpp
+  ExtraInhabitants.cpp
   GenCast.cpp
   GenClangDecl.cpp
   GenClangType.cpp

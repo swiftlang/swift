@@ -901,6 +901,7 @@ Types
   type ::= 'Xu' type                         // @unowned(unsafe) type
   type ::= 'Xw' type                         // @weak type
   type ::= 'XF' impl-function-type           // function implementation type
+  type ::= 'Xf' type type                    // @thin function type
   nominal-type ::= known-nominal-type
   nominal-type ::= substitution
   nominal-type ::= nominal-type-kind declaration-name

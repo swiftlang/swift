@@ -154,8 +154,7 @@ public:
   
   /// Get the bit mask that must be applied before testing an extra inhabitant.
   virtual SpareBitVector getFixedExtraInhabitantMask(IRGenModule &IGM) const {
-    return SpareBitVector::getConstant(getFixedSize().getValueInBits(),
-                                           true);
+    return SpareBitVector::getConstant(getFixedSize().getValueInBits(), true);
   }
 
   /// Create a constant of the given bit width holding one of the extra

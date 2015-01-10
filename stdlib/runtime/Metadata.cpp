@@ -296,6 +296,7 @@ namespace {
 /// The uniquing structure for function type metadata.
 namespace {
   MetadataCache<FunctionCacheEntry> FunctionTypes;
+  MetadataCache<FunctionCacheEntry> ThinFunctionTypes;
 #if SWIFT_OBJC_INTEROP
   MetadataCache<FunctionCacheEntry> BlockTypes;
 #endif
@@ -338,6 +339,50 @@ namespace {
   }
 }
 
+/// A macro to define convenience accessors for 0, 1, 2, and
+/// 3-argument function metadata.
+#define DEFINE_FUNCTION_CONVENIENCE_ACCESSORS(KIND)                     \
+  const FunctionTypeMetadata *                                          \
+  swift::swift_get##KIND##Metadata0(const Metadata *result) {           \
+    const void *argsAndResult[] = {                                     \
+      static_cast<const void *>(result)                                 \
+    };                                                                  \
+    return swift_get##KIND##Metadata(0, argsAndResult);                 \
+  }                                                                     \
+  const FunctionTypeMetadata *                                          \
+  swift::swift_get##KIND##Metadata1(const void *arg0,                   \
+                                    const Metadata *result) {           \
+    const void *argsAndResult[] = {                                     \
+      arg0,                                                             \
+      static_cast<const void *>(result)                                 \
+    };                                                                  \
+    return swift_get##KIND##Metadata(1, argsAndResult);                 \
+  }                                                                     \
+  const FunctionTypeMetadata *                                          \
+  swift::swift_get##KIND##Metadata2(const void *arg0,                   \
+                                    const void *arg1,                   \
+                                    const Metadata *result) {           \
+    const void *argsAndResult[] = {                                     \
+      arg0,                                                             \
+      arg1,                                                             \
+      static_cast<const void *>(result)                                 \
+    };                                                                  \
+    return swift_get##KIND##Metadata(2, argsAndResult);                 \
+  }                                                                     \
+  const FunctionTypeMetadata *                                          \
+  swift::swift_get##KIND##Metadata3(const void *arg0,                   \
+                                    const void *arg1,                   \
+                                    const void *arg2,                   \
+                                    const Metadata *result) {           \
+    const void *argsAndResult[] = {                                     \
+      arg0,                                                             \
+      arg1,                                                             \
+      arg2,                                                             \
+      static_cast<const void *>(result)                                 \
+    };                                                                  \
+    return swift_get##KIND##Metadata(3, argsAndResult);                 \
+  }
+
 const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata(size_t numArguments,
                                      const void *argsAndResult[]) {
@@ -349,48 +394,24 @@ swift::swift_getFunctionTypeMetadata(size_t numArguments,
                                   _TWVFT_T_);
 }
 
-const FunctionTypeMetadata *
-swift::swift_getFunctionTypeMetadata1(const void *arg0,
-                                      const Metadata *resultMetadata) {
-  const void * argsAndResult[] = {
-    arg0,
-    static_cast<const void *>(resultMetadata)
-  };
-  return swift_getFunctionTypeMetadata(1, argsAndResult);
-}
+DEFINE_FUNCTION_CONVENIENCE_ACCESSORS(FunctionType)
 
 const FunctionTypeMetadata *
-swift::swift_getFunctionTypeMetadata2(const void *arg0,
-                                      const void *arg1,
-                                      const Metadata *resultMetadata) {
-  const void * argsAndResult[] = {
-    arg0, arg1,
-    static_cast<const void *>(resultMetadata)
-  };
-  return _getFunctionTypeMetadata(2,
+swift::swift_getThinFunctionTypeMetadata(size_t numArguments,
+                                         const void *argsAndResult[]) {
+
+  return _getFunctionTypeMetadata(numArguments,
                                   argsAndResult,
-                                  MetadataKind::Function,
-                                  FunctionTypes,
-                                  _TWVFT_T_);
+                                  MetadataKind::ThinFunction,
+                                  ThinFunctionTypes,
+                                  _TWVXfT_T_);
 }
 
-const FunctionTypeMetadata *
-swift::swift_getFunctionTypeMetadata3(const void *arg0,
-                                      const void *arg1,
-                                      const void *arg2,
-                                      const Metadata *resultMetadata) {
-  const void * argsAndResult[] = {
-    arg0, arg1, arg2,
-    static_cast<const void *>(resultMetadata)
-  };
-  return _getFunctionTypeMetadata(3,
-                                  argsAndResult,
-                                  MetadataKind::Function,
-                                  FunctionTypes,
-                                  _TWVFT_T_);
-}
+DEFINE_FUNCTION_CONVENIENCE_ACCESSORS(ThinFunctionType)
 
+// Only define the block-type accessors if we need ObjC interop.
 #if SWIFT_OBJC_INTEROP
+
 const FunctionTypeMetadata *
 swift::swift_getBlockTypeMetadata(size_t numArguments,
                                   const void *argsAndResult[]) {
@@ -401,51 +422,12 @@ swift::swift_getBlockTypeMetadata(size_t numArguments,
                                   _TWVBO);
 }
 
-const FunctionTypeMetadata *
-swift::swift_getBlockTypeMetadata1(const void *arg0,
-                                   const Metadata *resultMetadata) {
-  const void * argsAndResult[] = {
-    arg0,
-    static_cast<const void *>(resultMetadata)
-  };
-  return _getFunctionTypeMetadata(1,
-                                  argsAndResult,
-                                  MetadataKind::Block,
-                                  BlockTypes,
-                                  _TWVBO);
-}
+DEFINE_FUNCTION_CONVENIENCE_ACCESSORS(BlockType)
 
-const FunctionTypeMetadata *
-swift::swift_getBlockTypeMetadata2(const void *arg0,
-                                   const void *arg1,
-                                   const Metadata *resultMetadata) {
-  const void * argsAndResult[] = {
-    arg0, arg1,
-    static_cast<const void *>(resultMetadata)
-  };
-  return _getFunctionTypeMetadata(2,
-                                  argsAndResult,
-                                  MetadataKind::Block,
-                                  BlockTypes,
-                                  _TWVBO);
-}
+#endif // SWIFT_OBJC_INTEROP
 
-const FunctionTypeMetadata *
-swift::swift_getBlockTypeMetadata3(const void *arg0,
-                                   const void *arg1,
-                                   const void *arg2,
-                                   const Metadata *resultMetadata) {
-  const void * argsAndResult[] = {
-    arg0, arg1, arg2,
-    static_cast<const void *>(resultMetadata)
-};
-  return _getFunctionTypeMetadata(3,
-                                  argsAndResult,
-                                  MetadataKind::Block,
-                                  BlockTypes,
-                                  _TWVBO);
-}
-#endif
+#undef DEFINE_FUNCTION_CONVENIENCE_ACCESSORS
+
 
 /*** Tuples ****************************************************************/
 
@@ -2012,6 +1994,7 @@ Metadata::getNominalTypeDescriptor() const {
   case MetadataKind::Opaque:
   case MetadataKind::Tuple:
   case MetadataKind::Function:
+  case MetadataKind::ThinFunction:
   case MetadataKind::Block:
   case MetadataKind::PolyFunction:
   case MetadataKind::Existential:
@@ -2050,6 +2033,7 @@ Metadata::getClassObject() const {
   case MetadataKind::Opaque:
   case MetadataKind::Tuple:
   case MetadataKind::Function:
+  case MetadataKind::ThinFunction:
   case MetadataKind::Block:
   case MetadataKind::PolyFunction:
   case MetadataKind::Existential:

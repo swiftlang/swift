@@ -696,38 +696,32 @@ namespace {
       if (inputTuple && !inputTuple->isMaterializable())
         numArguments = inputTuple->getNumElements();
 
-      llvm::Constant *getMetadataFn = nullptr;
-
-      switch (type->getRepresentation()) {
+      llvm::Constant *getMetadataFn = [&] {
+        switch (type->getRepresentation()) {
         case AnyFunctionType::Representation::Thin:
-          // TODO: Provide metadata for thin function types. This should not come
-          // up yet because thin types aren't allowed in the AST.
-          llvm_unreachable("thin function types aren't allowed in the AST");
+          switch (numArguments) {
+          case 1: return IGF.IGM.getGetThinFunctionMetadata1Fn();
+          case 2: return IGF.IGM.getGetThinFunctionMetadata2Fn();
+          case 3: return IGF.IGM.getGetThinFunctionMetadata3Fn();
+          default: return IGF.IGM.getGetThinFunctionMetadataFn();
+          }
         case AnyFunctionType::Representation::Thick:
           switch (numArguments) {
-            case 1:
-              getMetadataFn = IGF.IGM.getGetFunctionMetadata1Fn(); break;
-            case 2:
-              getMetadataFn = IGF.IGM.getGetFunctionMetadata2Fn(); break;
-            case 3:
-              getMetadataFn = IGF.IGM.getGetFunctionMetadata3Fn(); break;
-            default:
-              getMetadataFn = IGF.IGM.getGetFunctionMetadataFn();
+          case 1: return IGF.IGM.getGetFunctionMetadata1Fn();
+          case 2: return IGF.IGM.getGetFunctionMetadata2Fn();
+          case 3: return IGF.IGM.getGetFunctionMetadata3Fn();
+          default: return IGF.IGM.getGetFunctionMetadataFn();
           }
-          break;
         case AnyFunctionType::Representation::Block:
           switch (numArguments) {
-            case 1:
-              getMetadataFn = IGF.IGM.getGetBlockMetadata1Fn(); break;
-            case 2:
-              getMetadataFn = IGF.IGM.getGetBlockMetadata2Fn(); break;
-            case 3:
-              getMetadataFn = IGF.IGM.getGetBlockMetadata3Fn(); break;
-            default:
-              getMetadataFn = IGF.IGM.getGetBlockMetadataFn();
+          case 1: return IGF.IGM.getGetBlockMetadata1Fn();
+          case 2: return IGF.IGM.getGetBlockMetadata2Fn();
+          case 3: return IGF.IGM.getGetBlockMetadata3Fn();
+          default: return IGF.IGM.getGetBlockMetadataFn();
           }
-          break;
-      }
+        }
+        llvm_unreachable("bad function representation");
+      }();
 
       switch (numArguments) {
         case 1: {

@@ -281,40 +281,6 @@ namespace {
     }
   };
 
-  /// Calculate the extra data kind for a function type.
-  static ExtraData getExtraDataKind(IRGenModule &IGM,
-                                    CanSILFunctionType formalType) {
-    switch (formalType->getRepresentation()) {
-    case AnyFunctionType::Representation::Thin:
-      return ExtraData::None;
-        
-    case AnyFunctionType::Representation::Block:
-      return ExtraData::Block;
-        
-    case AnyFunctionType::Representation::Thick:
-      // The extra data for native functions depends on the calling convention.
-      switch (formalType->getAbstractCC()) {
-      case AbstractCC::Freestanding:
-      case AbstractCC::Method:
-        // For non-witness methods, 'thick' always indicates a retainable context
-        // pointer.
-        return ExtraData::Retainable;
-
-      case AbstractCC::WitnessMethod:
-        // TODO: This should fall into the "retainable" bucket, but we
-        // historically abused thick witness methods for other purposes.
-        // Fail here as a safety against miscompiling code that tries to
-        // work the old way.
-        llvm_unreachable("thick witness method not supported");
-          
-      case AbstractCC::C:
-      case AbstractCC::ObjCMethod:
-        llvm_unreachable("thick foreign functions should be lowered to a "
-                         "block type");
-      }
-    }
-  }
-  
   /// Information about the IR-level signature of a function type.
   class FuncSignatureInfo {
   private:
@@ -350,37 +316,71 @@ namespace {
     Signature getSignature(IRGenModule &IGM, ExtraData extraData) const;
 
   };
-  
-  /// The type-info class.
-  class FuncTypeInfo : public ScalarTypeInfo<FuncTypeInfo, ReferenceTypeInfo>,
-                       public FuncSignatureInfo {
-    FuncTypeInfo(CanSILFunctionType formalType, llvm::Type *storageType,
-                 Size size, Alignment align, SpareBitVector &&spareBits,
-                 ExtraData extraDataKind)
-      : ScalarTypeInfo(storageType, size, std::move(spareBits), align),
-        FuncSignatureInfo(formalType, extraDataKind)
+
+  /// The @thin function type-info class.
+  class ThinFuncTypeInfo : public PODSingleScalarTypeInfo<ThinFuncTypeInfo,
+                                                          LoadableTypeInfo>,
+                           public FuncSignatureInfo {
+    ThinFuncTypeInfo(CanSILFunctionType formalType, llvm::Type *storageType,
+                     Size size, Alignment align,
+                     const SpareBitVector &spareBits)
+      : PODSingleScalarTypeInfo(storageType, size, spareBits, align),
+        FuncSignatureInfo(formalType, ExtraData::None)
     {
     }
 
-    bool hasExtraData() const {
-      switch (getExtraDataKind()) {
-      case ExtraData::None:
-        return false;
-      case ExtraData::Retainable:
-        return true;
-      case ExtraData::Block:
-        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
-      }
+  public:
+    static const ThinFuncTypeInfo *create(CanSILFunctionType formalType,
+                                          llvm::Type *storageType,
+                                          Size size, Alignment align,
+                                          const SpareBitVector &spareBits) {
+      return new ThinFuncTypeInfo(formalType, storageType, size, align,
+                                  spareBits);
     }
-    
+
+    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+      return true;
+    }
+
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+      return getFunctionPointerExtraInhabitantCount(IGM);
+    }
+
+    llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                                  unsigned bits,
+                                                  unsigned index) const override {
+      return getFunctionPointerFixedExtraInhabitantValue(IGM, bits, index, 0);
+    }
+
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
+                                         SILType T)
+    const override {
+      return getFunctionPointerExtraInhabitantIndex(IGF, src);
+    }
+
+    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                              Address dest, SILType T) const override {
+      return storeFunctionPointerExtraInhabitant(IGF, index, dest);
+    }
+  };
+
+  /// The @thick function type-info class.
+  class FuncTypeInfo : public ScalarTypeInfo<FuncTypeInfo, ReferenceTypeInfo>,
+                       public FuncSignatureInfo {
+    FuncTypeInfo(CanSILFunctionType formalType, llvm::StructType *storageType,
+                 Size size, Alignment align, SpareBitVector &&spareBits)
+      : ScalarTypeInfo(storageType, size, std::move(spareBits), align),
+        FuncSignatureInfo(formalType, ExtraData::Retainable)
+    {
+    }
+
   public:
     static const FuncTypeInfo *create(CanSILFunctionType formalType,
-                                      llvm::Type *storageType,
+                                      llvm::StructType *storageType,
                                       Size size, Alignment align,
-                                      SpareBitVector &&spareBits,
-                                      ExtraData extraDataKind) {
+                                      SpareBitVector &&spareBits) {
       return new FuncTypeInfo(formalType, storageType, size, align,
-                              std::move(spareBits), extraDataKind);
+                              std::move(spareBits));
     }
     
     // Function types do not satisfy allowsOwnership.
@@ -397,33 +397,26 @@ namespace {
       llvm_unreachable("@unowned(unsafe) function type");
     }
 
+    llvm::StructType *getStorageType() const {
+      return cast<llvm::StructType>(TypeInfo::getStorageType());
+    }
+
     unsigned getExplosionSize() const override {
-      return hasExtraData() ? 2 : 1;
+      return 2;
     }
 
     void getSchema(ExplosionSchema &schema) const {
-      llvm::Type *storageTy = getStorageType();
-      llvm::StructType *structTy = dyn_cast<llvm::StructType>(storageTy);
-      
-      if (structTy) {
-        assert(structTy->getNumElements() == 2);
-        schema.add(ExplosionSchema::Element::forScalar(structTy->getElementType(0)));
-        schema.add(ExplosionSchema::Element::forScalar(structTy->getElementType(1)));
-      } else {
-        schema.add(ExplosionSchema::Element::forScalar(storageTy));
-      }
+      llvm::StructType *structTy = cast<llvm::StructType>(getStorageType());
+      schema.add(ExplosionSchema::Element::forScalar(structTy->getElementType(0)));
+      schema.add(ExplosionSchema::Element::forScalar(structTy->getElementType(1)));
     }
 
     Address projectFunction(IRGenFunction &IGF, Address address) const {
-      if (hasExtraData()) {
-        return IGF.Builder.CreateStructGEP(address, 0, Size(0),
-                                           address->getName() + ".fn");
-      }
-      return address;
+      return IGF.Builder.CreateStructGEP(address, 0, Size(0),
+                                         address->getName() + ".fn");
     }
 
     Address projectData(IRGenFunction &IGF, Address address) const {
-      assert(hasExtraData() && "no data");
       return IGF.Builder.CreateStructGEP(address, 1, IGF.IGM.getPointerSize(),
                                          address->getName() + ".data");
     }
@@ -433,18 +426,8 @@ namespace {
       Address fnAddr = projectFunction(IGF, address);
       e.add(IGF.Builder.CreateLoad(fnAddr, fnAddr->getName()+".load"));
 
-      // Load the data, if any.
-      switch (getExtraDataKind()) {
-      case ExtraData::None:
-        break;
-      case ExtraData::Retainable: {
-        Address dataAddr = projectData(IGF, address);
-        IGF.emitLoadAndRetain(dataAddr, e);
-        break;
-      }
-      case ExtraData::Block:
-        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
-      }
+      Address dataAddr = projectData(IGF, address);
+      IGF.emitLoadAndRetain(dataAddr, e);
     }
 
     void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
@@ -452,11 +435,8 @@ namespace {
       Address fnAddr = projectFunction(IGF, addr);
       e.add(IGF.Builder.CreateLoad(fnAddr));
 
-      // Load the data, if any.
-      if (hasExtraData()) {
-        Address dataAddr = projectData(IGF, addr);
-        e.add(IGF.Builder.CreateLoad(dataAddr));
-      }
+      Address dataAddr = projectData(IGF, addr);
+      e.add(IGF.Builder.CreateLoad(dataAddr));
     }
 
     void assign(IRGenFunction &IGF, Explosion &e, Address address) const {
@@ -464,18 +444,8 @@ namespace {
       Address fnAddr = projectFunction(IGF, address);
       IGF.Builder.CreateStore(e.claimNext(), fnAddr);
 
-      // Store the data pointer, if any.
-      switch (getExtraDataKind()) {
-      case ExtraData::None:
-        break;
-      case ExtraData::Retainable: {
-        Address dataAddr = projectData(IGF, address);
-        IGF.emitAssignRetained(e.claimNext(), dataAddr);
-        break;
-      }
-      case ExtraData::Block:
-        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
-      }
+      Address dataAddr = projectData(IGF, address);
+      IGF.emitAssignRetained(e.claimNext(), dataAddr);
     }
 
     void initialize(IRGenFunction &IGF, Explosion &e, Address address) const {
@@ -484,138 +454,54 @@ namespace {
       IGF.Builder.CreateStore(e.claimNext(), fnAddr);
 
       // Store the data pointer, if any, transferring the +1.
-      switch (getExtraDataKind()) {
-      case ExtraData::None:
-        break;
-      case ExtraData::Retainable: {
-        Address dataAddr = projectData(IGF, address);
-        IGF.emitInitializeRetained(e.claimNext(), dataAddr);
-        break;
-      }
-      case ExtraData::Block:
-        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
-      }
+      Address dataAddr = projectData(IGF, address);
+      IGF.emitInitializeRetained(e.claimNext(), dataAddr);
     }
 
     void copy(IRGenFunction &IGF, Explosion &src,
               Explosion &dest) const override {
       src.transferInto(dest, 1);
       
-      switch (getExtraDataKind()) {
-      case ExtraData::None:
-        break;
-      case ExtraData::Retainable:
-        IGF.emitRetain(src.claimNext(), dest);
-        break;
-      case ExtraData::Block:
-        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
-          
-      }
+      IGF.emitRetain(src.claimNext(), dest);
     }
     
     void consume(IRGenFunction &IGF, Explosion &src) const override {
       src.claimNext();
-      
-      switch (getExtraDataKind()) {
-      case ExtraData::None:
-        break;
-      case ExtraData::Retainable:
-        IGF.emitRelease(src.claimNext());
-        break;
-      case ExtraData::Block:
-        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
-      }
+      IGF.emitRelease(src.claimNext());
     }
 
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
       src.claimNext();      
-      switch (getExtraDataKind()) {
-      case ExtraData::None:
-        break;
-      case ExtraData::Retainable:
-        IGF.emitFixLifetime(src.claimNext());
-        break;
-      case ExtraData::Block:
-        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
-      }
+      IGF.emitFixLifetime(src.claimNext());
     }
 
     void retain(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
-      
-      switch (getExtraDataKind()) {
-      case ExtraData::None:
-        break;
-      case ExtraData::Retainable:
-        IGF.emitRetainCall(e.claimNext());
-        break;
-      case ExtraData::Block:
-        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
-      }
+      IGF.emitRetainCall(e.claimNext());
     }
     
     void release(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
-      switch (getExtraDataKind()) {
-      case ExtraData::None:
-        break;
-      case ExtraData::Retainable:
-        IGF.emitRelease(e.claimNext());
-        break;
-      case ExtraData::Block:
-        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
-      }
+      IGF.emitRelease(e.claimNext());
     }
 
     void retainUnowned(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
-      switch (getExtraDataKind()) {
-      case ExtraData::None:
-        break;
-      case ExtraData::Retainable:
-        IGF.emitRetainUnowned(e.claimNext());
-        break;
-      case ExtraData::Block:
-        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
-      }
+      IGF.emitRetainUnowned(e.claimNext());
     }
     
     void unownedRetain(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
-      switch (getExtraDataKind()) {
-      case ExtraData::None:
-        break;
-      case ExtraData::Retainable:
-        IGF.emitUnownedRetain(e.claimNext());
-        break;
-      case ExtraData::Block:
-        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
-      }
+      IGF.emitUnownedRetain(e.claimNext());
     }
 
     void unownedRelease(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
-      switch (getExtraDataKind()) {
-      case ExtraData::None:
-        break;
-      case ExtraData::Retainable:
-        IGF.emitUnownedRelease(e.claimNext());
-        break;
-      case ExtraData::Block:
-        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
-      }
+      IGF.emitUnownedRelease(e.claimNext());
     }
     
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const {
-      switch (getExtraDataKind()) {
-      case ExtraData::None:
-        break;
-      case ExtraData::Retainable:
-        IGF.emitRelease(IGF.Builder.CreateLoad(projectData(IGF, addr)));
-        break;
-      case ExtraData::Block:
-        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
-      }
+      IGF.emitRelease(IGF.Builder.CreateLoad(projectData(IGF, addr)));
     }
     
     llvm::Value *packEnumPayload(IRGenFunction &IGF,
@@ -624,8 +510,7 @@ namespace {
                                   unsigned offset) const override {
       PackEnumPayload pack(IGF, bitWidth);
       pack.addAtOffset(src.claimNext(), offset);
-      if (hasExtraData())
-        pack.add(src.claimNext());
+      pack.add(src.claimNext());
       return pack.get();
     }
     
@@ -635,14 +520,52 @@ namespace {
                             unsigned offset) const override {
       UnpackEnumPayload unpack(IGF, payload);
       auto storageTy = getStorageType();
-      if (hasExtraData()) {
-        auto structTy = cast<llvm::StructType>(storageTy);
-        dest.add(unpack.claimAtOffset(structTy->getElementType(0),
-                                      offset));
-        dest.add(unpack.claim(structTy->getElementType(1)));
-      } else {
-        dest.add(unpack.claimAtOffset(storageTy, offset));
-      }
+      dest.add(unpack.claimAtOffset(storageTy->getElementType(0),
+                                    offset));
+      dest.add(unpack.claim(storageTy->getElementType(1)));
+    }
+
+    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+      return true;
+    }
+
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+      return getFunctionPointerExtraInhabitantCount(IGM);
+    }
+
+    llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                                    unsigned bits,
+                                                    unsigned index) const override {
+      return getFunctionPointerFixedExtraInhabitantValue(IGM, bits, index, 0);
+    }
+
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
+                                         SILType T) const override {
+      src = projectFunction(IGF, src);
+      return getFunctionPointerExtraInhabitantIndex(IGF, src);
+    }
+
+    SpareBitVector
+    getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
+      SpareBitVector mask;
+      mask.appendSetBits(IGM.getPointerSize().getValueInBits());
+      mask.appendClearBits(IGM.getPointerSize().getValueInBits());
+      return mask;
+    }
+
+    llvm::Value *maskFixedExtraInhabitant(IRGenFunction &IGF,
+                                          llvm::Value *bits) const override {
+      // Truncate down to the function-pointer type and zext back again.
+      llvm::Type *originalType = bits->getType();
+      bits = IGF.Builder.CreateTrunc(bits, IGF.IGM.IntPtrTy);
+      bits = IGF.Builder.CreateZExt(bits, originalType);
+      return bits;
+    }
+
+    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                              Address dest, SILType T) const override {
+      dest = projectFunction(IGF, dest);
+      return storeFunctionPointerExtraInhabitant(IGF, index, dest);
     }
   };
 
@@ -769,35 +692,47 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
                              IGM.getPointerAlignment());
       
   case AnyFunctionType::Representation::Thin:
-  case AnyFunctionType::Representation::Thick:
-    CanSILFunctionType ct(T);
-    SpareBitVector spareBits;
-    // FIXME: use function pointer spare bits
-    spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
-    //spareBits.append(IGM.getFunctionPointerSpareBits());
+    return ThinFuncTypeInfo::create(CanSILFunctionType(T),
+                                    IGM.FunctionPtrTy,
+                                    IGM.getPointerSize(),
+                                    IGM.getPointerAlignment(),
+                                    IGM.getFunctionPointerSpareBits());
 
-    auto extraDataKind = getExtraDataKind(IGM, ct);
-    llvm::Type *ty;
-    Size size;
-    switch (extraDataKind) {
-    case ExtraData::None:
-      ty = IGM.FunctionPtrTy;
-      size = IGM.getPointerSize();
+  case AnyFunctionType::Representation::Thick: {
+#ifndef NDEBUG
+    // For non-witness methods, 'thick' always indicates a retainable context
+    // pointer.
+    switch (T->getAbstractCC()) {
+    case AbstractCC::Freestanding:
+    case AbstractCC::Method:
       break;
-    case ExtraData::Retainable:
-      ty = IGM.FunctionPairTy;
-      size = IGM.getPointerSize() * 2;
-      // FIXME
-      spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
-      // spareBits.append(IGM.getHeapObjectSpareBits());
-      break;
-    case ExtraData::Block:
-      llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
+
+    case AbstractCC::WitnessMethod:
+      // TODO: This should fall into the "retainable" bucket, but we
+      // historically abused thick witness methods for other purposes.
+      // Fail here as a safety against miscompiling code that tries to
+      // work the old way.
+      llvm_unreachable("thick witness method not supported");
+
+    case AbstractCC::C:
+    case AbstractCC::ObjCMethod:
+      llvm_unreachable("thick foreign functions should be lowered to a "
+                       "block type");
     }
+#endif
+
+    SpareBitVector spareBits;
+    spareBits.append(IGM.getFunctionPointerSpareBits());
+    spareBits.append(IGM.getHeapObjectSpareBits());
     
-    return FuncTypeInfo::create(ct, ty, size, IGM.getPointerAlignment(),
-                                std::move(spareBits), extraDataKind);
+    return FuncTypeInfo::create(CanSILFunctionType(T),
+                                IGM.FunctionPairTy,
+                                IGM.getPointerSize() * 2,
+                                IGM.getPointerAlignment(),
+                                std::move(spareBits));
   }
+  }
+  llvm_unreachable("bad function type representation");
 }
 
 void irgen::addIndirectReturnAttributes(IRGenModule &IGM,
@@ -1173,9 +1108,11 @@ getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
   case AnyFunctionType::Representation::Block:
     return ti.as<BlockTypeInfo>();
   case AnyFunctionType::Representation::Thin:
+    return ti.as<ThinFuncTypeInfo>();
   case AnyFunctionType::Representation::Thick:
     return ti.as<FuncTypeInfo>();
   }
+  llvm_unreachable("bad function type representation");
 }
 
 llvm::FunctionType *

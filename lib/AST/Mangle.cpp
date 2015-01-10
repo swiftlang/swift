@@ -1293,13 +1293,33 @@ void Mangler::mangleFunctionType(AnyFunctionType *fn,
   // type ::= 'F' type type (curried)
   // type ::= 'f' type type (uncurried)
   // type ::= 'b' type type (objc block)
+  // type ::= 'Xf' type type (thin)
   // type ::= 'K' type type (auto closure)
-  if (fn->getRepresentation() == AnyFunctionType::Representation::Block)
+  //
+  // Note that we do not currently use thin representations in the AST
+  // for the types of function decls.  This may need to change at some
+  // point, in which case the uncurry logic can probably migrate to that
+  // case.
+  //
+  // It would have been cleverer if we'd used 'f' for thin functions
+  // and something else for uncurried functions, but oh well.
+  //
+  // Or maybe we can change the mangling at the same time we make
+  // changes to better support thin functions.
+  switch (fn->getRepresentation()) {
+  case AnyFunctionType::Representation::Block:
     Buffer << 'b';
-  else if (fn->isAutoClosure())
-    Buffer << 'K';
-  else
-    Buffer << (uncurryLevel > 0 ? 'f' : 'F');
+    break;
+  case AnyFunctionType::Representation::Thin:
+    Buffer << "Xf";
+    break;
+  case AnyFunctionType::Representation::Thick:
+    if (fn->isAutoClosure())
+      Buffer << 'K';
+    else
+      Buffer << (uncurryLevel > 0 ? 'f' : 'F');
+    break;
+  }
   mangleType(fn->getInput(), explosion, 0);
   mangleType(fn->getResult(), explosion,
              (uncurryLevel > 0 ? uncurryLevel - 1 : 0));

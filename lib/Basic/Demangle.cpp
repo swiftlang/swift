@@ -1915,6 +1915,9 @@ private:
       return genericType;
     }
     if (c == 'X') {
+      if (Mangled.nextIf('f')) {
+        return demangleFunctionType(Node::Kind::ThinFunctionType);
+      }
       if (Mangled.nextIf('o')) {
         NodePointer type = demangleType();
         if (!type)
@@ -2345,6 +2348,7 @@ private:
     case Node::Kind::FunctionSignatureSpecializationParamInfo:
     case Node::Kind::Subscript:
     case Node::Kind::Suffix:
+    case Node::Kind::ThinFunctionType:
     case Node::Kind::TupleElement:
     case Node::Kind::TypeMetadata:
     case Node::Kind::TypeMetadataAccessFunction:
@@ -2622,6 +2626,10 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::AutoClosureType:
     Printer << "@autoclosure ";
+    printChildren(pointer);
+    return;
+  case Node::Kind::ThinFunctionType:
+    Printer << "@thin ";
     printChildren(pointer);
     return;
   case Node::Kind::FunctionType:

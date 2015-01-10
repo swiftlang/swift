@@ -302,6 +302,9 @@ void swift_MagicMirrorData_summary(const Metadata *T, String *result) {
     case MetadataKind::Function:
       new (result) String("(Function)");
       break;
+    case MetadataKind::ThinFunction:
+      new (result) String("(Thin Function)");
+      break;
     case MetadataKind::PolyFunction:
       new (result) String("(Polymorphic Function)");
       break;
@@ -951,6 +954,7 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   /// TODO: Implement specialized mirror witnesses for all kinds.
   case MetadataKind::Enum:
   case MetadataKind::Function:
+  case MetadataKind::ThinFunction:
   case MetadataKind::Block:
   case MetadataKind::Existential:
     return std::make_tuple(
@@ -1005,6 +1009,7 @@ getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
   case MetadataKind::Opaque:
   case MetadataKind::Enum:
   case MetadataKind::Function:
+  case MetadataKind::ThinFunction:
   case MetadataKind::Block:
   case MetadataKind::Metatype:
     break;
@@ -1162,6 +1167,7 @@ static void swift_stdlib_getDemangledTypeNameImpl(OpaqueValue *value,
   case MetadataKind::Enum:
   case MetadataKind::Opaque:
   case MetadataKind::Function:
+  case MetadataKind::ThinFunction:
   case MetadataKind::Block:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Metatype:
