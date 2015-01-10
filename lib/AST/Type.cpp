@@ -2068,7 +2068,7 @@ static Type getMemberForBaseType(Module *module,
   // If we know the associated type, look in the witness table.
   if (assocType) {
     // If the parent is dependent, create a dependent member type.
-    if (substBase->isDependentType()) {
+    if (substBase->is<GenericTypeParamType>() || substBase->is<DependentMemberType>()) {
       return DependentMemberType::get(substBase, assocType,
                                       substBase->getASTContext());
     }
@@ -2113,7 +2113,8 @@ Type DependentMemberType::substBaseType(Module *module,
     return this;
 
   // If the base remains dependent after substitution, so do we.
-  if (substBase->isDependentType()) {
+  if (substBase->is<GenericTypeParamType>() ||
+      substBase->is<DependentMemberType>()) {
     if (getAssocType())
       return DependentMemberType::get(substBase, getAssocType(),
                                       getASTContext());
@@ -2150,8 +2151,10 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
         
         // Substitute archtypes for generic type parameters to prevent
         // dependent types from leaking.
+        // FIXME: This should never be necessary.
         if (auto GTPT = r->getAs<GenericTypeParamType>()) {
-          return GTPT->getDecl()->getArchetype();
+          if (GTPT->getDecl())
+            return GTPT->getDecl()->getArchetype();
         }
         return r;
       }

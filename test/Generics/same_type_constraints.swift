@@ -42,3 +42,55 @@ struct SatisfySameTypeAssocTypeRequirementDependent<T>
   typealias Assoc = T
   func foo<F3: Fooable where F3.Foo == T>(f: F3) {}
 }
+
+// rdar://problem/19009056
+public struct LazySequenceOf<S : SequenceType, A where S.Generator.Element == A> : SequenceType {
+  public func generate() -> GeneratorOf<A> { 
+    return GeneratorOf<A>({ return nil })
+  }
+  public subscript(i : A) -> A { return i }
+}
+
+public func iterate<A>(f : A -> A)(x : A) -> LazySequenceOf<Iterate<A>, A>? {
+  return nil
+}
+
+public final class Iterate<A> : SequenceType {
+  typealias GeneratorType = IterateGenerator<A>
+  public func generate() -> IterateGenerator<A> {
+    return IterateGenerator<A>()
+  }
+}
+
+public final class IterateGenerator<A> : GeneratorType {
+  public func next() -> A? {
+    return nil
+  }
+}
+
+// rdar://problem/18475138
+public protocol Observable : class {
+    typealias Output
+    func addObserver(obj : Output->Void)
+}
+
+public protocol Bindable : class {
+    typealias Input
+    func foo()
+}
+
+class SideEffect<In> : Bindable {
+  typealias Input = In
+  func foo() { }
+}
+
+struct Composed<Left: Bindable, Right: Observable where Left.Input == Right.Output> { }
+
+infix operator <- { associativity right precedence 90 }
+
+func <- <
+    Right : Observable
+    >(lhs:Right.Output -> Void, rhs: Right) -> Composed<SideEffect<Right>, Right>?
+{
+  return nil
+}
