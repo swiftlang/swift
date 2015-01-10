@@ -46,8 +46,9 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Process.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Signals.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/raw_ostream.h"
 #include <system_error>
 
 #include <string>
@@ -1844,6 +1845,7 @@ int main(int argc, char *argv[]) {
   // Print a stack trace if we signal out.
   llvm::sys::PrintStackTraceOnErrorSignal();
   llvm::PrettyStackTraceProgram X(argc, argv);
+  llvm::InitializeAllTargets();
 
   if (argc > 1) {
     // Handle integrated test tools which do not use
