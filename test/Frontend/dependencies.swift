@@ -1,11 +1,22 @@
 // RUN: rm -rf %t && mkdir %t
 
 // RUN: %swift -emit-dependencies-path - -parse %S/../Inputs/empty.swift | FileCheck -check-prefix=CHECK-BASIC %s
+// RUN: %swift -emit-reference-dependencies-path - -parse -primary-file %S/../Inputs/empty.swift | FileCheck -check-prefix=CHECK-BASIC-YAML %s
+
+// RUN: %swift -emit-dependencies-path %t.d -emit-reference-dependencies-path %t.swiftdeps -parse -primary-file %S/../Inputs/empty.swift
+// FileCheck -check-prefix=CHECK-BASIC < %t.d
+// FileCheck -check-prefix=CHECK-BASIC-YAML < %t.swiftdeps
 
 // CHECK-BASIC-LABEL: - :
 // CHECK-BASIC: Inputs/empty.swift
 // CHECK-BASIC: Swift.swiftmodule
 // CHECK-BASIC-NOT: :
+
+// CHECK-BASIC-YAML-LABEL: cross-module:
+// CHECK-BASIC-YAML-NOT: empty.swift
+// CHECK-BASIC-YAML: "{{.*}}/Swift.swiftmodule"
+// CHECK-BASIC-YAML-NOT: {{:$}}
+
 
 // RUN: %swift -emit-dependencies-path - -emit-module %S/../Inputs/empty.swift -o %t/empty.swiftmodule -emit-module-doc-path %t/empty.swiftdoc -emit-objc-header-path %t/empty.h | FileCheck -check-prefix=CHECK-MULTIPLE-OUTPUTS %s
 
@@ -21,6 +32,7 @@
 // CHECK-MULTIPLE-OUTPUTS-NOT: :
 
 // RUN: %swift %clang-importer-sdk -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-dependencies-path - -parse %s | FileCheck -check-prefix=CHECK-IMPORT %s
+// RUN: %swift %clang-importer-sdk -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-reference-dependencies-path - -parse -primary-file %s | FileCheck -check-prefix=CHECK-IMPORT-YAML %s
 
 // CHECK-IMPORT-LABEL: - :
 // CHECK-IMPORT: dependencies.swift
@@ -33,6 +45,19 @@
 // CHECK-IMPORT-DAG: Inputs/dependencies/UserClangModule.h
 // CHECK-IMPORT-DAG: Inputs/dependencies/module.modulemap
 // CHECK-IMPORT-NOT: :
+
+// CHECK-IMPORT-YAML-LABEL: cross-module:
+// CHECK-IMPORT-YAML-NOT: dependencies.swift
+// CHECK-IMPORT-YAML-DAG: "{{.*}}Inputs/dependencies/$$$$$.h"
+// CHECK-IMPORT-YAML-DAG: "{{.*}}Inputs/dependencies/extra-header.h"
+// CHECK-IMPORT-YAML-DAG: "{{.*}}/Swift.swiftmodule"
+// CHECK-IMPORT-YAML-DAG: "{{.*}}/Foundation.swift"
+// CHECK-IMPORT-YAML-DAG: "{{.*}}/ObjectiveC.swift"
+// CHECK-IMPORT-YAML-DAG: "{{.*}}/CoreGraphics.swift"
+// CHECK-IMPORT-YAML-DAG: "{{.*}}Inputs/dependencies/UserClangModule.h"
+// CHECK-IMPORT-YAML-DAG: "{{.*}}Inputs/dependencies/module.modulemap"
+// CHECK-IMPORT-YAML-NOT: {{^-}}
+// CHECK-IMPORT-YAML-NOT: {{:$}}
 
 import Foundation
 import UserClangModule

@@ -94,12 +94,12 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
   // dependency line.
   opts.forAllOutputPaths([&](StringRef targetName) {
     out << targetName << " :";
-    // Print dependencies we've picked up during compilation.
-    for (StringRef path : depTracker.getDependencies())
-      out << ' ' << escape(path);
-    // Also include all other files in the module. Make-style dependencies
+    // First include all other files in the module. Make-style dependencies
     // need to be conservative!
     for (StringRef path : opts.InputFilenames)
+      out << ' ' << escape(path);
+    // Then print dependencies we've picked up during compilation.
+    for (StringRef path : depTracker.getDependencies())
       out << ' ' << escape(path);
     out << '\n';
   });
@@ -121,6 +121,7 @@ static void findNominals(SmallVectorImpl<const NominalTypeDecl *> &list,
 /// Emits a Swift-style dependencies file.
 static bool emitReferenceDependencies(DiagnosticEngine &diags,
                                       SourceFile *SF,
+                                      DependencyTracker &depTracker,
                                       const FrontendOptions &opts) {
   std::error_code EC;
   llvm::raw_fd_ostream out(opts.ReferenceDependenciesFilePath, EC,
@@ -276,6 +277,11 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     out << "\"" << escape(entry.first) << "\"\n";
   }
 
+  out << "cross-module:\n";
+  for (auto &entry : depTracker.getDependencies()) {
+    out << "- \"" << llvm::yaml::escape(entry) << "\"\n";
+  }
+
   return false;
 }
 
@@ -319,8 +325,7 @@ static bool performCompile(CompilerInstance &Instance,
   FrontendOptions::ActionType Action = opts.RequestedAction;
 
   ReferencedNameTracker nameTracker;
-  bool shouldTrackReferences =
-    !Invocation.getFrontendOptions().ReferenceDependenciesFilePath.empty();
+  bool shouldTrackReferences = !opts.ReferenceDependenciesFilePath.empty();
   if (shouldTrackReferences)
     Instance.setReferencedNameTracker(&nameTracker);
 
@@ -372,12 +377,13 @@ static bool performCompile(CompilerInstance &Instance,
   if (opts.PrintClangStats && Context.getClangModuleLoader())
     Context.getClangModuleLoader()->printStatistics();
 
-  if (DependencyTracker *DT = Instance.getDependencyTracker())
-    (void)emitMakeDependencies(Context.Diags, *DT, opts);
+  if (!opts.DependenciesFilePath.empty())
+    (void)emitMakeDependencies(Context.Diags, *Instance.getDependencyTracker(),
+                               opts);
 
   if (shouldTrackReferences)
     emitReferenceDependencies(Context.Diags, Instance.getPrimarySourceFile(),
-                              opts);
+                              *Instance.getDependencyTracker(), opts);
 
   // We've just been told to perform a parse, so we can return now.
   if (Action == FrontendOptions::Parse) {
@@ -623,8 +629,10 @@ int frontend_main(ArrayRef<const char *>Args,
   }
 
   DependencyTracker depTracker;
-  if (!Invocation.getFrontendOptions().DependenciesFilePath.empty())
+  if (!Invocation.getFrontendOptions().DependenciesFilePath.empty() ||
+      !Invocation.getFrontendOptions().ReferenceDependenciesFilePath.empty()) {
     Instance.setDependencyTracker(&depTracker);
+  }
 
   if (Instance.setup(Invocation)) {
     return 1;

@@ -147,9 +147,6 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   for (unsigned i = 0, e = Invocation.getInputFilenames().size(); i != e; ++i) {
     auto &File = Invocation.getInputFilenames()[i];
 
-    if (DepTracker)
-      DepTracker->addDependency(File);
-
     // FIXME: Working with filenames is fragile, maybe use the real path
     // or have some kind of FileManager.
     using namespace llvm::sys::path;
