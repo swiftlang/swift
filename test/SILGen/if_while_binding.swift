@@ -94,8 +94,6 @@ func while_loop() {
   }
   // CHECK: [[LOOP_EXIT]]:
   // CHECK:   destroy_addr [[OPT_BUF]]
-  // CHECK:   br [[LOOP_END]]
-  // CHECK: [[LOOP_END]]:
   // CHECK:   dealloc_stack [[OPT_BUF]]
 }
 
@@ -114,3 +112,37 @@ func while_loop_generic<T>(source: () -> T?) {
   while let x = source() {
   }
 }
+
+// <rdar://problem/19382942> Improve 'if let' to avoid optional pyramid of doom
+// CHECK-LABEL: sil hidden @_TF16if_while_binding16while_loop_multiFT_T_
+func while_loop_multi() {
+  // CHECK: [[OPT_BUF1:%.*]] = alloc_stack $Optional<String>
+  // CHECK: [[OPT_BUF2:%.*]] = alloc_stack $Optional<String>
+  // CHECK:   br [[LOOP_ENTRY:bb[0-9]+]]
+  // CHECK: [[LOOP_ENTRY]]:
+  // CHECK:   [[HAS_VALUE1:%.*]] = select_enum_addr [[OPT_BUF1]]#1
+  // CHECK:   cond_br [[HAS_VALUE1]], [[CHECKBUF2:bb[0-9]+]], [[LOOP_EXIT1:bb[0-9]+]]
+  // CHECK: [[CHECKBUF2]]:
+  // CHECK:   [[HAS_VALUE2:%.*]] = select_enum_addr [[OPT_BUF2]]#1
+  // CHECK:   cond_br [[HAS_VALUE2]], [[LOOP_BODY:bb[0-9]+]], [[LOOP_EXIT2:bb[0-9]+]]
+  // CHECK: [[LOOP_BODY]]:
+  while let a = foo(), b = bar() {
+    // CHECK:   [[VAL_BUF1:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF1]]#1
+    // CHECK:   debug_value {{.*}} : $String  // let a
+    // CHECK:   [[VAL_BUF2:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF2]]#1
+    // CHECK:   debug_value {{.*}} : $String  // let b
+    // CHECK:   debug_value {{.*}} : $String  // let c
+    // CHECK:   br [[LOOP_ENTRY]]
+    let c = a
+  }
+  // CHECK: [[LOOP_EXIT2]]:
+  // CHECK:   destroy_addr [[OPT_BUF2]]#1
+  // CHECK:   br [[LOOP_EXIT1]]
+  // CHECK: [[LOOP_EXIT1]]:
+  // CHECK:   destroy_addr [[OPT_BUF1]]#1
+  // CHECK:   dealloc_stack [[OPT_BUF2]]#0
+  // CHECK:   dealloc_stack [[OPT_BUF1]]#0
+}
+
+
+
