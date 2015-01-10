@@ -640,7 +640,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
   ParserStatus Status;
   Condition = StmtCondition();
 
-  SmallVector<StmtConditionElement, 2> result;
+  SmallVector<StmtConditionElement, 4> result;
   if (Tok.isNot(tok::kw_var) && Tok.isNot(tok::kw_let)) {
     ParserResult<Expr> Expr = parseExprBasic(ID);
     Status |= Expr;

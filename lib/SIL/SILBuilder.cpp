@@ -60,8 +60,7 @@ BranchInst *SILBuilder::createBranch(SILLocation Loc,
 void SILBuilder::emitBlock(SILBasicBlock *BB) {
   assert(!hasValidInsertionPoint());
 
-  // We don't have an insertion point, insert the block at the end of the
-  // function.
+  // Move the block at the end of the function to provide an ordering.
   SILFunction::iterator IP = BB->getParent()->end();
 
   // Start inserting into that block.
