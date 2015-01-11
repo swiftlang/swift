@@ -37,6 +37,7 @@
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
+#include "llvm/Analysis/CFG.h"
 
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
@@ -1406,6 +1407,44 @@ namespace {
     virtual llvm::Value *emitValueCaseTest(IRGenFunction &IGF,
                                            Explosion &value,
                                            EnumElementDecl *Case) const {
+      // If we're testing for the payload element, we cannot directly check to
+      // see whether it is present (in full generality) without doing a switch.
+      // Try some easy cases, then bail back to the general case.
+      if (Case == getPayloadElement()) {
+        // If the Enum only contains two cases, test for the non-payload case
+        // and invert the result.
+        assert(ElementsWithPayload.size() == 1 && "Should have one payload");
+        if (ElementsWithNoPayload.size() == 1 &&
+            ElementsWithRecursivePayload.empty()) {
+          auto *InvertedResult = emitValueCaseTest(IGF, value,
+                                                   ElementsWithNoPayload[0].decl);
+          return IGF.Builder.CreateNot(InvertedResult);
+        }
+        
+        // Otherwise, just fall back to emitting a switch to decide.  Maybe LLVM
+        // will be able to simplify it further.
+        auto &C = IGF.IGM.getLLVMContext();
+        auto caseBlock = llvm::BasicBlock::Create(C);
+        auto contBlock = llvm::BasicBlock::Create(C);
+        emitValueSwitch(IGF, value, {{Case, caseBlock}}, contBlock);
+        
+        // Emit the case block.
+        IGF.Builder.emitBlock(caseBlock);
+        IGF.Builder.CreateBr(contBlock);
+        
+        // Emit the continuation block and generate a PHI to produce the value.
+        IGF.Builder.emitBlock(contBlock);
+        auto Phi = IGF.Builder.CreatePHI(IGF.IGM.Int1Ty, 2);
+        Phi->addIncoming(IGF.Builder.getInt1(true), caseBlock);
+        for (auto I = llvm::pred_begin(contBlock),
+             E = llvm::pred_end(contBlock); I != E; ++I)
+          if (*I != caseBlock)
+            Phi->addIncoming(IGF.Builder.getInt1(false), *I);
+        return Phi;
+      }
+
+      assert(Case != getPayloadElement());
+
       // Destructure the value into its payload + tag bit components, each is
       // optional.
       llvm::Value *payload = nullptr;
@@ -1424,34 +1463,17 @@ namespace {
       llvm::Value *tagBits = nullptr;
       if (ExtraTagBitCount > 0)
         tagBits = value.claimNext();
-      
+
+
       llvm::Value *payloadResult = nullptr;
-      
       
       // Non-payload cases use extra inhabitants, if any, or are discriminated
       // by setting the tag bits.
       llvm::ConstantInt *extraTag = nullptr;
-      if (Case != getPayloadElement()) {
-        llvm::Value *payloadTag;
-        std::tie(payloadTag, extraTag) = getNoPayloadCaseValue(IGF.IGM, Case);
-        if (payloadTag)
-          payloadResult = IGF.Builder.CreateICmpEQ(payload, payloadTag);
-
-      } else {
-        // The payload case gets its native representation, with tag bits of
-        // zero and inhabitants of zero.  If we have extra inhabitants, then the
-        // payload element matches by not being any of the valid elements.
-        if (extraInhabitantCount) {
-          unsigned payloadSize
-            = getFixedPayloadTypeInfo().getFixedSize().getValueInBits();
-
-          auto *minTag = IGF.Builder.getIntN(payloadSize,
-                                             extraInhabitantCount-1);
-          payloadResult = IGF.Builder.CreateICmpUGT(payload, minTag);
-        }
-        if (ExtraTagBitCount)
-          extraTag = getZeroExtraTagConstant(IGF.IGM);
-      }
+      llvm::Value *payloadTag;
+      std::tie(payloadTag, extraTag) = getNoPayloadCaseValue(IGF.IGM, Case);
+      if (payloadTag)
+        payloadResult = IGF.Builder.CreateICmpEQ(payload, payloadTag);
       
       // If any tag bits are present, they must match.
       llvm::Value *tagResult = nullptr;
@@ -1466,7 +1488,6 @@ namespace {
           tagResult = IGF.Builder.CreateICmpEQ(tagBits, extraTag);
         }
       }
-
       
       if (tagResult && payloadResult)
         return IGF.Builder.CreateAnd(tagResult, payloadResult);
@@ -2746,7 +2767,6 @@ namespace {
                                            Explosion &value,
                                            EnumElementDecl *Case) const {
       auto &C = IGF.IGM.getLLVMContext();
-
       llvm::Value *payload = value.claimNext();
       llvm::Value *extraTagBits = nullptr;
       if (ExtraTagBitCount > 0)
