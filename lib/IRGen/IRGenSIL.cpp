@@ -2276,10 +2276,11 @@ IRGenSILFunction::visitSwitchEnumAddrInst(SwitchEnumAddrInst *inst) {
 template<class C, class T>
 static llvm::BasicBlock *
 emitBBMapForSelect(IRGenSILFunction &IGF,
-           Explosion &resultPHI,
-           SmallVectorImpl<std::pair<T, llvm::BasicBlock*>> &BBs,
-           llvm::BasicBlock *&defaultBB,
-           SelectInstBase<C, T> *inst) {
+                   Explosion &resultPHI,
+                   SmallVectorImpl<std::pair<T, llvm::BasicBlock*>> &BBs,
+                   llvm::BasicBlock *&defaultBB,
+                   SelectInstBase<C, T> *inst) {
+  
   auto origBB = IGF.Builder.GetInsertBlock();
 
   // Set up a continuation BB and phi nodes to receive the result value.
@@ -2287,8 +2288,8 @@ emitBBMapForSelect(IRGenSILFunction &IGF,
   IGF.Builder.SetInsertPoint(contBB);
 
   // Emit an explosion of phi node(s) to receive the value.
-  auto &ti = IGF.getTypeInfo(inst->getType());
   SmallVector<llvm::Value*, 4> phis;
+  auto &ti = IGF.getTypeInfo(inst->getType());
   emitPHINodesForType(IGF, inst->getType(), ti,
                       inst->getNumCases() + inst->hasDefault(),
                       phis);
@@ -2339,7 +2340,7 @@ emitBBMapForSelect(IRGenSILFunction &IGF,
 }
 
 // Try to map the value of a select_enum directly to an int type with a simple
-// cast from the tag value to the result type. Optinally also by adding a
+// cast from the tag value to the result type. Optionally also by adding a
 // constant offset.
 // This is useful, e.g. for rawValue or hashValue of C-like enums.
 static llvm::Value *
@@ -2421,12 +2422,68 @@ getLoweredValueForSelect(IRGenSILFunction &IGF,
   return LoweredValue(result);
 }
 
+static void emitSingleEnumMemberSelectResult(IRGenSILFunction &IGF,
+                                             SelectEnumInstBase *inst,
+                                             llvm::Value *isTrue,
+                                             Explosion &result) {
+  assert((inst->getNumCases() == 1 && inst->hasDefault()) ||
+         (inst->getNumCases() == 2 && !inst->hasDefault()));
+  
+  // Extract the true values.
+  auto trueValue = inst->getCase(0).second;
+  SmallVector<llvm::Value*, 4> TrueValues;
+  if (trueValue.getType().isAddress()) {
+    TrueValues.push_back(IGF.getLoweredAddress(trueValue).getAddress());
+  } else {
+    Explosion ex = IGF.getLoweredExplosion(trueValue);
+    while (!ex.empty())
+      TrueValues.push_back(ex.claimNext());
+  }
+    
+  // Extract the false values.
+  auto falseValue =
+    inst->hasDefault() ? inst->getDefaultResult() : inst->getCase(1).second;
+  SmallVector<llvm::Value*, 4> FalseValues;
+  if (falseValue.getType().isAddress()) {
+    FalseValues.push_back(IGF.getLoweredAddress(falseValue).getAddress());
+  } else {
+    Explosion ex = IGF.getLoweredExplosion(falseValue);
+    while (!ex.empty())
+      FalseValues.push_back(ex.claimNext());
+  }
+  
+  assert(TrueValues.size() == FalseValues.size() &&
+         "explosions didn't produce same element count?");
+  for (unsigned i = 0, e = FalseValues.size(); i != e; ++i) {
+    auto *TV = TrueValues[i], *FV = FalseValues[i];
+    // It is pretty common to select between zero and 1 as the result of the
+    // select.  Instead of emitting an obviously dumb select, emit nothing or
+    // a zext.
+    if (auto *TC = dyn_cast<llvm::ConstantInt>(TV))
+      if (auto *FC = dyn_cast<llvm::ConstantInt>(FV))
+        if (TC->isOne() && FC->isZero()) {
+          result.add(IGF.Builder.CreateZExtOrBitCast(isTrue, TV->getType()));
+          continue;
+        }
+        
+    result.add(IGF.Builder.CreateSelect(isTrue, TV, FalseValues[i]));
+  }
+}
+
+
 void IRGenSILFunction::visitSelectEnumInst(SelectEnumInst *inst) {
   auto &EIS = getEnumImplStrategy(IGM, inst->getEnumOperand().getType());
   Explosion result;
 
   if (llvm::Value *R = mapTriviallyToInt(*this, EIS, inst)) {
     result.add(R);
+  } else if ((inst->getNumCases() == 1 && inst->hasDefault()) ||
+             (inst->getNumCases() == 2 && !inst->hasDefault())) {
+    // If this is testing for one case, do simpler codegen.  This is
+    // particularly common when testing optionals.
+    Explosion value = getLoweredExplosion(inst->getEnumOperand());
+    auto isTrue = EIS.emitValueCaseTest(*this, value, inst->getCase(0).first);
+    emitSingleEnumMemberSelectResult(*this, inst, isTrue, result);
   } else {
     Explosion value = getLoweredExplosion(inst->getEnumOperand());
 
@@ -2449,24 +2506,32 @@ void IRGenSILFunction::visitSelectEnumInst(SelectEnumInst *inst) {
 
 void IRGenSILFunction::visitSelectEnumAddrInst(SelectEnumAddrInst *inst) {
   Address value = getLoweredAddress(inst->getEnumOperand());
-
-  // FIXME: We could lower this to LLVM "select" in a lot of cases.
-  // For now, just emit a switch and phi nodes, like a chump.
-  
-  // Map the SIL dest bbs to their LLVM bbs.
-  SmallVector<std::pair<EnumElementDecl*, llvm::BasicBlock*>, 4> dests;
-  llvm::BasicBlock *defaultDest;
   Explosion result;
-  llvm::BasicBlock *contBB
-    = emitBBMapForSelect(*this, result, dests, defaultDest, inst);
-  
-  // Emit the dispatch.
-  emitSwitchAddressOnlyEnumDispatch(*this, inst->getEnumOperand().getType(),
-                                    value, dests, defaultDest);
-  
-  // emitBBMapForSelectEnum set up a phi node to receive the result.
-  Builder.SetInsertPoint(contBB);
 
+  if ((inst->getNumCases() == 1 && inst->hasDefault()) ||
+      (inst->getNumCases() == 2 && !inst->hasDefault())) {
+    auto &EIS = getEnumImplStrategy(IGM, inst->getEnumOperand().getType());
+    // If this is testing for one case, do simpler codegen.  This is
+    // particularly common when testing optionals.
+    auto isTrue = EIS.emitIndirectCaseTest(*this,
+                                           inst->getEnumOperand().getType(),
+                                           value, inst->getCase(0).first);
+    emitSingleEnumMemberSelectResult(*this, inst, isTrue, result);
+  } else {
+      // Map the SIL dest bbs to their LLVM bbs.
+    SmallVector<std::pair<EnumElementDecl*, llvm::BasicBlock*>, 4> dests;
+    llvm::BasicBlock *defaultDest;
+    llvm::BasicBlock *contBB
+      = emitBBMapForSelect(*this, result, dests, defaultDest, inst);
+    
+    // Emit the dispatch.
+    emitSwitchAddressOnlyEnumDispatch(*this, inst->getEnumOperand().getType(),
+                                      value, dests, defaultDest);
+    
+    // emitBBMapForSelectEnum set up a phi node to receive the result.
+    Builder.SetInsertPoint(contBB);
+  }
+  
   setLoweredValue(SILValue(inst, 0),
                   getLoweredValueForSelect(*this, result, inst));
 }
