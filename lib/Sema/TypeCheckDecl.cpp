@@ -1271,13 +1271,12 @@ static void validatePatternBindingDecl(TypeChecker &tc,
         Misc,
         GenericTypes,
         Classes,
-        Protocols,
       };
-        
       auto unimplementedStatic = [&](unsigned diagSel) {
         auto staticLoc = binding->getStaticLoc();
         tc.diagnose(staticLoc, diag::unimplemented_type_var,
-                    diagSel, binding->getStaticSpelling())
+                    diagSel, binding->getStaticSpelling(),
+                    diagSel == Classes)
           .highlight(staticLoc);
       };
 
@@ -3896,8 +3895,17 @@ public:
         }
         // static func declarations in classes are synonyms
         // for `class final func` declarations.
-        if (FD->getStaticSpelling() == StaticSpellingKind::KeywordStatic)
+        if (FD->getStaticSpelling() == StaticSpellingKind::KeywordStatic) {
+          auto finalAttr = FD->getAttrs().getAttribute<FinalAttr>();
+          if (finalAttr) {
+            auto finalRange = finalAttr->getRange();
+            if (finalRange.isValid())
+              TC.diagnose(finalRange.Start, diag::decl_already_final)
+                .highlight(finalRange)
+                .fixItRemove(finalRange);
+          }
           makeFinal(TC.Context, FD);
+        }
       }
 
       // A method is ObjC-compatible if:
@@ -5613,8 +5621,17 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
           }
           if (VD->isStatic()) {
             auto staticSpelling = VD->getParentPattern()->getStaticSpelling();
-            if (staticSpelling == StaticSpellingKind::KeywordStatic)
+            if (staticSpelling == StaticSpellingKind::KeywordStatic) {
+              auto finalAttr = VD->getAttrs().getAttribute<FinalAttr>();
+              if (finalAttr) {
+                auto finalRange = finalAttr->getRange();
+                if (finalRange.isValid())
+                  diagnose(finalRange.Start, diag::decl_already_final)
+                  .highlight(finalRange)
+                  .fixItRemove(finalRange);
+              }
               makeFinal(Context, VD);
+            }
           }
         }
       }

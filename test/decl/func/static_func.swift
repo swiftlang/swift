@@ -36,6 +36,7 @@ struct DuplicateStatic {
   override static static func f5() {} // expected-error{{'static' specified twice}}{{19-25=}} expected-error{{'override' can only be specified on class members}}
   static override static func f6() {} // expected-error{{'static' specified twice}}{{19-25=}} expected-error{{'override' can only be specified on class members}}
   static static override func f7() {} // expected-error{{'static' specified twice}}{{10-16=}} expected-error{{'override' can only be specified on class members}}
+  static final func f8() {} // expected-error {{only classes and class members may be marked with 'final'}}
 }
 
 struct S { // expected-note {{extended type declared here}}
@@ -51,11 +52,12 @@ extension S {
 enum E { // expected-note {{extended type declared here}}
   static func f1() {}
   class func f2() {} // expected-error {{class methods are only allowed within classes; use 'static' to declare a static method}}
+  static final func f3() {} // expected-error {{only classes and class members may be marked with 'final'}}
 }
 
 extension E {
-  static func f3() {}
-  class func f4() {} // expected-error {{class methods are only allowed within classes; use 'static' to declare a static method}}
+  static func f4() {}
+  class func f5() {} // expected-error {{class methods are only allowed within classes; use 'static' to declare a static method}}
 }
 
 class C {
@@ -64,6 +66,7 @@ class C {
   class func f3() {}
   class func f4() {} // expected-note {{overridden declaration is here}}
   class func f5() {} // expected-note {{overridden declaration is here}}
+  static final func f6() {} // expected-error {{static declarations are already final}}
 }
 
 extension C {
@@ -95,6 +98,7 @@ protocol P {
   static func f1()
   static func f2()
   static func f3() {} // expected-error {{protocol methods may not have bodies}}
+  static final func f4() // expected-error {{only classes and class members may be marked with 'final'}}
 }
 
 extension P { // expected-error {{protocol 'P' cannot be extended}}

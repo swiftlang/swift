@@ -92,9 +92,11 @@ struct S { // expected-note 3{{extended type declared here}}
 
   static var v3: Int { return 0 }
   class var v4: Int { return 0 } // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}}
+  static final var v5 = 1 // expected-error {{only classes and class members may be marked with 'final'}}
 
   static let l1: Int = 0
   class let l2: Int = 0 // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}}
+  static final let l3 = 1 // expected-error {{only classes and class members may be marked with 'final'}}
 }
 
 extension S {
@@ -115,8 +117,11 @@ enum E { // expected-note 3{{extended type declared here}}
   static var v3: Int { return 0 }
   class var v4: Int { return 0 } // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}}
 
+  static final var v5 = 1 // expected-error {{only classes and class members may be marked with 'final'}}
+
   static let l1: Int = 0
   class let l2: Int = 0 // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}}
+  static final let l3 = 1 // expected-error {{only classes and class members may be marked with 'final'}}
 }
 
 extension E {
@@ -137,10 +142,12 @@ class C {
 
   static var v5: Int { return 0 }
   class var v6: Int { return 0 }
+  static final var v7: Int = 0 // expected-error {{static declarations are already final}}
 
   static let l1: Int = 0
-  class let l2: Int = 0 // expected-error {{class stored properties not yet supported}}
+  class let l2: Int = 0 // expected-error {{class stored properties not yet supported in classes; did you mean 'static'?}}
   class final let l3: Int = 0 // expected-error {{class stored properties not yet supported}}
+  static final let l4 = 2 // expected-error {{static declarations are already final}}
 }
 
 extension C {
@@ -150,16 +157,19 @@ extension C {
 
   static var ev4: Int { return 0 }
   class var ev5: Int { return 0 }
+  static final var ev6: Int = 0 // expected-error {{static declarations are already final}}
 
   static let el1: Int = 0
-  class let el2: Int = 0 // expected-error {{class stored properties not yet supported}}
-  class final let el3: Int = 0 // expected-error {{class stored properties not yet supported}}
+  class let el2: Int = 0 // expected-error {{class stored properties not yet supported in classes; did you mean 'static'?}}
+  class final let el3: Int = 0 // expected-error {{class stored properties not yet supported in classes; did you mean 'static'?}}
+  static final let el4: Int = 0 // expected-error {{static declarations are already final}}
 }
 
 protocol P {
   // Both `static` and `class` property requirements are equivalent in protocols rdar://problem/17198298
   static var v1: Int { get }
   class var v2: Int { get } // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}}
+  static final var v3: Int { get } // expected-error {{only classes and class members may be marked with 'final'}}
 
   static let l1: Int // expected-error {{static stored properties not yet supported in generic types}} expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
   class let l2: Int // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} expected-error {{class stored properties not yet supported in generic types}} expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
@@ -168,7 +178,6 @@ protocol P {
 struct S1 {
   // rdar://15626843
   static var x: Int  // expected-error {{'static var' declaration requires an initializer expression or getter/setter specifier}}
-
   var y = 1
 
   static var z = 5

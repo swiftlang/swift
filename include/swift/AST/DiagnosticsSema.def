@@ -554,9 +554,10 @@ NOTE(variadic_superclass_init_here,sema_tcd,none,
 
 // Variables (var and let).
 ERROR(unimplemented_type_var,decl_parsing,none,
-     "%select{ERROR|static|class|protocol}1 stored properties not yet supported"
-     "%select{ in this context| in generic types| in classes| in protocols}0",
-     (unsigned, StaticSpellingKind))
+      "%select{ERROR|static|class}1 stored properties not yet supported"
+      "%select{ in this context| in generic types| in classes}0"
+      "%select{|; did you mean 'static'?}2",
+      (unsigned, StaticSpellingKind, unsigned))
 ERROR(observingprop_requires_initializer,decl_parsing,none,
       "non-member observing properties require an initializer", ())
 ERROR(global_requires_initializer,decl_parsing,none,
@@ -926,7 +927,8 @@ ERROR(override_mutable_covariant_property,sema_tcd,none,
 ERROR(override_mutable_covariant_subscript,sema_tcd,none,
       "cannot override mutable subscript of type %0 with covariant type %1",
       (Type, Type))
-
+ERROR(decl_already_final,sema_tcd,none,
+"static declarations are already final", ())
 ERROR(decl_no_default_init,sema_tcd,none,
       "cannot default-initialize variable of type %0", (Type))
 ERROR(decl_no_default_init_ivar_hole,sema_tcd,none,

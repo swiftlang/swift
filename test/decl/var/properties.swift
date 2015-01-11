@@ -397,11 +397,11 @@ extension StructWithExtension1 {
 
 class ClassWithExtension1 {
   var foo: Int = 0
-  class var fooStatic = 4 // expected-error {{class stored properties not yet supported in classes}}
+  class var fooStatic = 4 // expected-error {{class stored properties not yet supported in classes; did you mean 'static'?}}
 }
 extension ClassWithExtension1 {
   var fooExt: Int // expected-error {{extensions may not contain stored properties}}
-  class var fooExtStatic = 4 // expected-error {{class stored properties not yet supported in classes}}
+  class var fooExtStatic = 4 // expected-error {{class stored properties not yet supported in classes; did you mean 'static'?}}
 }
 
 enum EnumWithExtension1 {
@@ -535,7 +535,7 @@ struct GenStruct<T> {
 }
 
 class MonoClass {
-  class var foo: Int = 0 // expected-error{{class stored properties not yet supported}}
+  class var foo: Int = 0 // expected-error{{class stored properties not yet supported in classes; did you mean 'static'?}}
 }
 
 protocol Proto {
