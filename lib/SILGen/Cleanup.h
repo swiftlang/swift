@@ -144,6 +144,11 @@ public:
   /// return from the function.
   void emitCleanupsForReturn(CleanupLocation loc);
   
+  /// Emit active cleanups in the specified range.
+  void emitActiveCleanups(CleanupHandle from, CleanupHandle to,
+                          CleanupLocation Loc);
+  
+  
   /// pushCleanup - Push a new cleanup.
   template<class T, class... A>
   T &pushCleanupInState(CleanupState state,

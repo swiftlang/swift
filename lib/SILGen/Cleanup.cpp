@@ -102,9 +102,7 @@ void CleanupManager::emitBranchAndCleanups(JumpDest Dest,
   assert(B.hasValidInsertionPoint() && "Inserting branch in invalid spot");
   auto depth = Dest.getDepth();
   auto end = Stack.find(depth);
-  for (auto cleanup = Stack.begin();
-       cleanup != end;
-       ++cleanup) {
+  for (auto cleanup = Stack.begin(); cleanup != end; ++cleanup) {
     if (cleanup->isActive()) {
       cleanup->emit(Gen, Dest.getCleanupLocation());
     }
@@ -112,6 +110,19 @@ void CleanupManager::emitBranchAndCleanups(JumpDest Dest,
 
   B.createBranch(BranchLoc, Dest.getBlock(), Args);
 }
+
+/// Emit active cleanups in the specified range.
+void CleanupManager::emitActiveCleanups(CleanupHandle from, CleanupHandle to,
+                                        CleanupLocation Loc) {
+  assert(Gen.getBuilder().hasValidInsertionPoint() &&
+         "Inserting branch in invalid spot");
+
+  for (auto cleanup = Stack.find(to), e = Stack.find(from);
+       cleanup != e; ++cleanup)
+    if (cleanup->isActive())
+      cleanup->emit(Gen, Loc);
+}
+
 
 void CleanupManager::emitCleanupsForReturn(CleanupLocation Loc) {
   for (auto &cleanup : Stack)
