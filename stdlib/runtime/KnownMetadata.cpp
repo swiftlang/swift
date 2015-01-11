@@ -90,6 +90,12 @@ const ExtraInhabitantsValueWitnessTable swift::_TWVMBo =
 const ExtraInhabitantsValueWitnessTable swift::_TWVBb =
   ValueWitnessTableForBox<BridgeObjectBox>::table;
 
+/// The value-witness table for UnsafeValueBuffer.  You can do layout
+/// with this, but the type isn't copyable, so most of the value
+/// operations are meaningless.
+static const ValueWitnessTable _TWVBB =
+  ValueWitnessTableForBox<NativeBox<ValueBuffer>>::table;
+
 #if SWIFT_OBJC_INTEROP
 /*** Objective-C pointers ****************************************************/
 
@@ -149,6 +155,7 @@ OPAQUE_METADATA(Bi64_)
 OPAQUE_METADATA(Bi128_)
 OPAQUE_METADATA(Bo)
 OPAQUE_METADATA(Bb)
+OPAQUE_METADATA(BB)
 #if SWIFT_OBJC_INTEROP
 OPAQUE_METADATA(BO)
 #endif

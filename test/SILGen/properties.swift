@@ -193,11 +193,11 @@ func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
   // CHECK: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
   // CHECK: [[VAL_REF_VAL_PROP_TEMP:%.*]] = alloc_stack $Val
   // CHECK: [[T0:%.*]] = address_to_pointer [[VAL_REF_VAL_PROP_TEMP]]#1 : $*Val to $Builtin.RawPointer
-  // CHECK: [[MAT_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!materializeForSet.1 : Ref -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?)
+  // CHECK: [[MAT_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!materializeForSet.1 : Ref -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, (@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ())?)
   // CHECK: [[MAT_RESULT:%[0-9]+]] = apply [[MAT_VAL_PROP_METHOD]]([[T0]], [[STORAGE]]#1, [[VAL_REF]])
-  // CHECK: [[T0:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 0
+  // CHECK: [[T0:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>), 0
   // CHECK: [[T1:%[0-9]+]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Val
-  // CHECK: [[OPT_CALLBACK:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 1  
+  // CHECK: [[OPT_CALLBACK:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>), 1  
   // CHECK: [[VAL_REF_VAL_PROP_MAT:%.*]] = mark_dependence [[T1]] : $*Val on [[VAL_REF]]
   // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)
   // CHECK: [[LD:%[0-9]+]] = load [[VAL_REF_VAL_PROP_MAT]]
@@ -214,9 +214,8 @@ func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
   // CHECK: [[SET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals7z_tupleT
   // CHECK: apply [[SET_Z_TUPLE_METHOD]]({{%[0-9]+, %[0-9]+}}, [[VAL_REF_VAL_PROP_MAT]])
   // -- writeback to val.ref.val_prop
-  // CHECK: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.Some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.None!enumelt: [[CONT:bb[0-9]+]]
-  // CHECK: [[WRITEBACK]]([[T0:%.*]] : $Builtin.RawPointer):
-  // CHECK: [[CALLBACK:%.*]] = pointer_to_thin_function [[T0]] : $Builtin.RawPointer to $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed Ref, @thick Ref.Type) -> ()
+  // CHECK: switch_enum [[OPT_CALLBACK]] : $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>, case #Optional.Some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.None!enumelt: [[CONT:bb[0-9]+]]
+  // CHECK: [[WRITEBACK]]([[CALLBACK:%.*]] : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Ref, @thick Ref.Type) -> ()):
   // CHECK: [[REF_MAT:%.*]] = alloc_stack $Ref
   // CHECK: store [[VAL_REF]] to [[REF_MAT]]#1
   // CHECK: [[T0:%.*]] = metatype $@thick Ref.Type

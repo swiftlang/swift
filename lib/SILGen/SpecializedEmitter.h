@@ -19,6 +19,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Types.h"
 
 namespace swift {
 class Expr;
@@ -42,6 +43,7 @@ public:
                                      SILLocation,
                                      ArrayRef<Substitution>,
                                      Expr *argument,
+                                     CanFunctionType formalApplyType,
                                      SGFContext);
 
   /// A special function for emitting a call after the arguments
@@ -50,6 +52,7 @@ public:
                                     SILLocation,
                                     ArrayRef<Substitution>,
                                     ArrayRef<ManagedValue>,
+                                    CanFunctionType formalApplyType,
                                     SGFContext);
 
   enum class Kind {

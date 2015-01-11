@@ -538,9 +538,11 @@ namespace {
     struct FunctionGenerator {
       T Arg;
       U Result;
+      FunctionType::ExtInfo ExtInfo;
       Type build(GenericSignatureBuilder &builder, bool forBody) const {
         return FunctionType::get(Arg.build(builder, forBody),
-                                 Result.build(builder, forBody));
+                                 Result.build(builder, forBody),
+                                 ExtInfo);
       }
     };
     template <class T>
@@ -553,8 +555,9 @@ namespace {
     template <class T>
     struct MetatypeGenerator {
       T Object;
+      Optional<MetatypeRepresentation> Repr;
       Type build(GenericSignatureBuilder &builder, bool forBody) const {
-        return MetatypeType::get(Object.build(builder, forBody));
+        return MetatypeType::get(Object.build(builder, forBody), Repr);
       }
     };
   };
@@ -585,8 +588,9 @@ makeTuple(const Gs & ...elementGenerators) {
 
 template <class T, class U>
 static GenericSignatureBuilder::FunctionGenerator<T,U>
-makeFunction(const T &arg, const U &result) {
-  return { arg, result };
+makeFunction(const T &arg, const U &result,
+             FunctionType::ExtInfo extInfo = FunctionType::ExtInfo()) {
+  return { arg, result, extInfo };
 }
 
 template <class T>
@@ -597,8 +601,8 @@ makeInOut(const T &object) {
 
 template <class T>
 static GenericSignatureBuilder::MetatypeGenerator<T>
-makeMetatype(const T &object) {
-  return { object };
+makeMetatype(const T &object, Optional<MetatypeRepresentation> repr = None) {
+  return { object, repr };
 }
 
 /// Create a function with type <T> T -> ().
@@ -971,10 +975,15 @@ static ValueDecl *getDeallocValueBufferOperation(ASTContext &ctx,
 
 static ValueDecl *
 getMakeMaterializeForSetCallbackOperation(ASTContext &ctx, Identifier name) {
-  // <T> ((Builtin.RawPointer,
-  //       inout Builtin.UnsafeValueBuffer,
-  //       inout T,
-  //       T.Type) -> ()) -> Builtin.RawPointer
+  // <T>    ((Builtin.RawPointer,
+  //          inout Builtin.UnsafeValueBuffer,
+  //          inout T,
+  //          T.Type) -> ())
+  //      ->
+  //  @thin ((Builtin.RawPointer,
+  //          inout Builtin.UnsafeValueBuffer,
+  //          inout T,
+  //          @thick T.Type) -> ())
   GenericSignatureBuilder builder(ctx);
   builder.addParameter(
     makeFunction(
@@ -983,7 +992,15 @@ getMakeMaterializeForSetCallbackOperation(ASTContext &ctx, Identifier name) {
                 makeInOut(makeGenericParam()),
                 makeMetatype(makeGenericParam())),
       makeConcrete(TupleType::getEmpty(ctx))));
-  builder.setResult(makeConcrete(ctx.TheRawPointerType));
+  builder.setResult(
+    makeFunction(
+      makeTuple(makeConcrete(ctx.TheRawPointerType),
+                makeConcrete(InOutType::get(ctx.TheUnsafeValueBufferType)),
+                makeInOut(makeGenericParam()),
+                makeMetatype(makeGenericParam(), MetatypeRepresentation::Thick)),
+      makeConcrete(TupleType::getEmpty(ctx)),
+      FunctionType::ExtInfo()
+        .withRepresentation(FunctionType::Representation::Thin)));
   return builder.build(name);
 }
 

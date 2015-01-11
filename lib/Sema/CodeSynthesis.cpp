@@ -289,6 +289,35 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   return setter;
 }
 
+/// Returns the type of the self argument of a materializeForSet
+/// callback.  If we don't have a meaningful direct self type, just
+/// use something meaningless and hope it doesn't matter.
+static Type getSelfTypeForMaterializeForSetCallback(ASTContext &ctx,
+                                                    DeclContext *DC,
+                                                    bool isStatic) {
+  Type selfType = DC->getDeclaredTypeInContext();
+  if (!selfType) {
+    // This restriction is theoretically liftable by writing the necessary
+    // contextual information into the callback storage.
+    assert(!DC->isGenericContext() &&
+           "no enclosing type for generic materializeForSet; callback "
+           "will not be able to bind type arguments!");
+    return TupleType::getEmpty(ctx);
+  }
+
+  // If we're in a protocol, we want to actually use the Self type.
+  if (auto protocolType = selfType->getAs<ProtocolType>()) {
+    selfType = protocolType->getDecl()->getSelf()->getArchetype();
+  }
+
+  // Use the metatype if this is a static member.
+  if (isStatic) {
+    return MetatypeType::get(selfType, ctx);
+  } else {
+    return selfType;
+  }
+}
+
 static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
                                                   VarDecl *&bufferParamDecl,
                                                   TypeChecker &TC) {
@@ -315,17 +344,32 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   };
   params.push_back(buildIndexForwardingPattern(storage, bufferElements, TC));
 
-  // Try to construct Builtin.RawPointer?.  Don't crash if it doesn't
-  // work, though.
-  auto optRawPointerType = TC.getOptionalType(loc, ctx.TheRawPointerType);
-  if (!optRawPointerType) optRawPointerType = ctx.TheRawPointerType;
+  // Construct the callback type.
+  Type callbackSelfType =
+    getSelfTypeForMaterializeForSetCallback(ctx, DC, storage->isStatic());
+  TupleTypeElt callbackArgs[] = {
+    ctx.TheRawPointerType,
+    InOutType::get(ctx.TheUnsafeValueBufferType),
+    InOutType::get(callbackSelfType),
+    MetatypeType::get(callbackSelfType, MetatypeRepresentation::Thick),
+  };
+  auto callbackExtInfo = FunctionType::ExtInfo()
+    .withRepresentation(FunctionType::Representation::Thin);
+  auto callbackType = FunctionType::get(TupleType::get(callbackArgs, ctx),
+                                        TupleType::getEmpty(ctx),
+                                        callbackExtInfo);
 
-  // The accessor returns (Builtin.RawPointer, Builtin.RawPointer?),
+  // Try to make the callback type optional.  Don't crash if it doesn't
+  // work, though.
+  auto optCallbackType = TC.getOptionalType(loc, callbackType);
+  if (!optCallbackType) optCallbackType = callbackType;
+
+  // The accessor returns (Builtin.RawPointer, (@thin (...) -> ())?),
   // where the first pointer is the materialized address and the
   // second is an optional callback.
   TupleTypeElt retElts[] = {
     { ctx.TheRawPointerType },
-    { optRawPointerType },
+    { optCallbackType },
   };
   Type retTy = TupleType::get(retElts, ctx);
 
@@ -915,19 +959,9 @@ static Expr *buildMaterializeForSetCallback(ASTContext &ctx,
   auto DC = storage->getDeclContext();
   SourceLoc loc = storage->getLoc();
 
-  // Get a self type.  If we don't have a meaningful direct self type,
-  // just use something meaningless and hope it doesn't matter.
-  Type selfType = DC->getDeclaredTypeInContext();
-  if (!selfType) {
-    // This restriction is theoretically liftable by writing the necessary
-    // contextual information into the callback storage.
-    assert(!DC->isGenericContext() &&
-           "no enclosing type for generic materializeForSet; callback "
-           "will not be able to bind type arguments!");
-    selfType = TupleType::getEmpty(ctx);
-  } else if (materializeForSet->isStatic()) {
-    selfType = MetatypeType::get(selfType, ctx);
-  }
+  Type selfType =
+    getSelfTypeForMaterializeForSetCallback(ctx, DC,
+                                            materializeForSet->isStatic());
 
   // Build the parameters pattern.
   //

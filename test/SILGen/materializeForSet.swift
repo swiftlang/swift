@@ -3,15 +3,14 @@
 
 import Swift
 
-func test_callback() -> Builtin.RawPointer? {
-  return Builtin.makeMaterializeForSetCallback
+func test_callback() {
+  let callback = Builtin.makeMaterializeForSetCallback
     {(value, storage, inout selfV: Int, type) -> () in ()}
 }
-// CHECK: sil hidden @_TF17materializeForSet13test_callbackFT_GSqBp_ : $@thin () -> Optional<Builtin.RawPointer>
-// CHECK:   [[T0:%.*]] = function_ref @_TFF17materializeForSet13test_callbackFT_GSqBp_U_FTBpRBbRSiMSi_T_ : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Int, @thick Int.Type) -> ()
-// CHECK:   thin_function_to_pointer [[T0]] : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Int, @thick Int.Type) -> () to $Builtin.RawPointer
+// CHECK: sil hidden @_TF17materializeForSet13test_callbackFT_T_ : $@thin () -> ()
+// CHECK:   [[T0:%.*]] = function_ref @_TFF17materializeForSet13test_callbackFT_T_U_FTBpRBBRSiMSi_T_ : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Int, @thick Int.Type) -> ()
 
-// CHECK: sil shared @_TFF17materializeForSet13test_callbackFT_GSqBp_U_FTBpRBbRSiMSi_T_ : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Int, @thick Int.Type) -> () {
+// CHECK: sil shared @_TFF17materializeForSet13test_callbackFT_T_U_FTBpRBBRSiMSi_T_ : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Int, @thick Int.Type) -> () {
 // CHECK:  bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Int, %3 : $@thick Int.Type):
 // CHECK-NOT: alloc_box $Builtin.UnsafeValueBuffer
 // CHECK:    [[T0:%.*]] = metatype $@thin Int.Type
@@ -23,23 +22,22 @@ class Base {
 // The ordering here is unfortunate: we generate the property
 // getters and setters after we've processed the decl.
 
-// CHECK: sil hidden [transparent] @_TFC17materializeForSet4Basem8computedSi : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @owned Base) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK: sil hidden [transparent] @_TFC17materializeForSet4Basem8computedSi : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @owned Base) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Base, @thick Base.Type) -> ()>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $Base):
 // CHECK:   [[ADDR:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to $*Int
 // CHECK:   [[T0:%.*]] = function_ref @_TFC17materializeForSet4Baseg8computedSi
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[SELF]])
 // CHECK:   store [[T1]] to [[ADDR]] : $*Int
-// CHECK:   [[VALTEMP:%.*]] = init_enum_data_addr [[OPTTEMP:%.*]]#1 : $*Optional<Builtin.RawPointer>, #Optional.Some
-// CHECK:   [[T0:%.*]] = function_ref @_TFFC17materializeForSet4Basem8computedSiU_FTBpRBbRS0_MS0__T_ : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Base, @thick Base.Type) -> ()
-// CHECK:   [[T1:%.*]] = thin_function_to_pointer [[T0]] : {{.*}} to $Builtin.RawPointer
-// CHECK:   store [[T1]] to [[VALTEMP:%.*]] : $*
+// CHECK:   [[VALTEMP:%.*]] = init_enum_data_addr [[OPTTEMP:%.*]]#1 : $*Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Base, @thick Base.Type) -> ()>, #Optional.Some
+// CHECK:   [[T0:%.*]] = function_ref @_TFFC17materializeForSet4Basem8computedSiU_FTBpRBBRS0_MS0__T_ : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Base, @thick Base.Type) -> ()
+// CHECK:   store [[T0]] to [[VALTEMP:%.*]] : $*
 // CHECK:   inject_enum_addr [[OPTTEMP]]#1
 // CHECK:   [[T2:%.*]] = load [[OPTTEMP]]#1
-// CHECK:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, [[T2]] : $Optional<Builtin.RawPointer>)
-// CHECK:   return [[T4]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, [[T2]] : $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Base, @thick Base.Type) -> ()>)
+// CHECK:   return [[T4]] : $(Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Base, @thick Base.Type) -> ()>)
 // CHECK: }
 
-// CHECK: sil @_TFFC17materializeForSet4Basem8computedSiU_FTBpRBbRS0_MS0__T_ : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Base, @thick Base.Type) -> () {
+// CHECK: sil @_TFFC17materializeForSet4Basem8computedSiU_FTBpRBBRS0_MS0__T_ : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Base, @thick Base.Type) -> () {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $*Base, [[SELFTYPE:%.*]] : $@thick Base.Type):
 // CHECK:   [[T0:%.*]] = load [[SELF]]
 // CHECK:   strong_retain [[T0]]
@@ -48,14 +46,14 @@ class Base {
 // CHECK:   [[SETTER:%.*]] = function_ref @_TFC17materializeForSet4Bases8computedSi
 // CHECK:   apply [[SETTER]]([[T2]], [[T0]])
 
-// CHECK: sil hidden [transparent] @_TFC17materializeForSet4Basem6storedSi : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @owned Base) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK: sil hidden [transparent] @_TFC17materializeForSet4Basem6storedSi : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @owned Base) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Base, @thick Base.Type) -> ()>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $Base):
 // CHECK:   [[T0:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.stored
 // CHECK:   [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
-// CHECK:   inject_enum_addr [[TMP:%.*]]#1 : $*Optional<Builtin.RawPointer>, #Optional.None
+// CHECK:   inject_enum_addr [[TMP:%.*]]#1 : $*Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Base, @thick Base.Type) -> ()>, #Optional.None
 // CHECK:   [[T2:%.*]] = load [[TMP]]#1
-// CHECK:   [[T3:%.*]] = tuple ([[T1]] : $Builtin.RawPointer, [[T2]] : $Optional<Builtin.RawPointer>)
-// CHECK:   return [[T3]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK:   [[T3:%.*]] = tuple ([[T1]] : $Builtin.RawPointer, [[T2]] : $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Base, @thick Base.Type) -> ()>)
+// CHECK:   return [[T3]] : $(Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Base, @thick Base.Type) -> ()>)
 // CHECK: }
 
   var computed: Int {
@@ -73,15 +71,15 @@ class HasDidSet : Base {
 // Checking this after silgen, but before mandatory inlining, lets us
 // test the intent much better.
 
-// SILGEN: sil hidden [transparent] @_TFC17materializeForSet9HasDidSetm6storedSi : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @owned HasDidSet) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// SILGEN: sil hidden [transparent] @_TFC17materializeForSet9HasDidSetm6storedSi : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @owned HasDidSet) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout HasDidSet, @thick HasDidSet.Type) -> ()>) {
 // SILGEN: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $HasDidSet):
 // SILGEN:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to $*Int
 // SILGEN:   [[T0:%.*]] = function_ref @_TFC17materializeForSet9HasDidSetg6storedSi
 // SILGEN:   [[T1:%.*]] = apply [[T0]]([[SELF]])
 // SILGEN:   store [[T1]] to [[T2]] : $*Int
-// SILGEN:   [[T0:%.*]] = function_ref @_TFFC17materializeForSet9HasDidSetm8computedSiU_FTBpRBbRS0_MS0__T_ : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasDidSet, @thick HasDidSet.Type) -> ()
-// SILGEN:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, {{.*}} : $Optional<Builtin.RawPointer>)
-// SILGEN:   return [[T4]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// SILGEN:   [[T0:%.*]] = function_ref @_TFFC17materializeForSet9HasDidSetm8computedSiU_FTBpRBBRS0_MS0__T_ : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasDidSet, @thick HasDidSet.Type) -> ()
+// SILGEN:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, {{.*}} : $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout HasDidSet, @thick HasDidSet.Type) -> ()>)
+// SILGEN:   return [[T4]] : $(Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout HasDidSet, @thick HasDidSet.Type) -> ()>)
 // SILGEN: }
 
   override var computed: Int {
@@ -89,30 +87,30 @@ class HasDidSet : Base {
     set(value) {}
   }
 
-// CHECK: sil hidden [transparent] @_TFC17materializeForSet9HasDidSetm8computedSi : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @owned HasDidSet) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK: sil hidden [transparent] @_TFC17materializeForSet9HasDidSetm8computedSi : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @owned HasDidSet) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout HasDidSet, @thick HasDidSet.Type) -> ()>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $HasDidSet):
 // CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to $*Int
 // CHECK:   [[T0:%.*]] = function_ref @_TFC17materializeForSet9HasDidSetg8computedSi
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[SELF]])
 // CHECK:   store [[T1]] to [[T2]] : $*Int
-// CHECK:   [[T0:%.*]] = function_ref @_TFFC17materializeForSet9HasDidSetm8computedSiU_FTBpRBbRS0_MS0__T_ : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasDidSet, @thick HasDidSet.Type) -> ()
-// CHECK:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, {{.*}} : $Optional<Builtin.RawPointer>)
-// CHECK:   return [[T4]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK:   [[T0:%.*]] = function_ref @_TFFC17materializeForSet9HasDidSetm8computedSiU_FTBpRBBRS0_MS0__T_ : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasDidSet, @thick HasDidSet.Type) -> ()
+// CHECK:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, {{.*}} : $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout HasDidSet, @thick HasDidSet.Type) -> ()>)
+// CHECK:   return [[T4]] : $(Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout HasDidSet, @thick HasDidSet.Type) -> ()>)
 // CHECK: }
 }
 
 class HasWeak {
   weak var weakvar: HasWeak? = nil
 }
-// CHECK: sil hidden [transparent] @_TFC17materializeForSet7HasWeakm7weakvarXwGSqS0__ : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @owned HasWeak) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK: sil hidden [transparent] @_TFC17materializeForSet7HasWeakm7weakvarXwGSqS0__ : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @owned HasWeak) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout HasWeak, @thick HasWeak.Type) -> ()>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $HasWeak):
 // CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to $*Optional<HasWeak>
 // CHECK:   [[T0:%.*]] = ref_element_addr [[SELF]] : $HasWeak, #HasWeak.weakvar
 // CHECK:   [[T1:%.*]] = load_weak [[T0]] : $*@sil_weak Optional<HasWeak>
 // CHECK:   store [[T1]] to [[T2]] : $*Optional<HasWeak>
-// CHECK:   [[T0:%.*]] = function_ref @_TFFC17materializeForSet7HasWeakm7weakvarXwGSqS0__U_FTBpRBbRS0_MS0__T_ : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasWeak, @thick HasWeak.Type) -> () 
-// CHECK:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, {{.*}} : $Optional<Builtin.RawPointer>)
-// CHECK:   return [[T4]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK:   [[T0:%.*]] = function_ref @_TFFC17materializeForSet7HasWeakm7weakvarXwGSqS0__U_FTBpRBBRS0_MS0__T_ : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasWeak, @thick HasWeak.Type) -> () 
+// CHECK:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, {{.*}} : $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout HasWeak, @thick HasWeak.Type) -> ()>)
+// CHECK:   return [[T4]] : $(Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout HasWeak, @thick HasWeak.Type) -> ()>)
 // CHECK: }
 
 protocol Totalled {
@@ -123,17 +121,17 @@ struct Bill : Totalled {
   var total: Int
 }
 
-// CHECK: sil hidden [transparent] @_TFV17materializeForSet4Billm5totalSi : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Bill) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK: sil hidden [transparent] @_TFV17materializeForSet4Billm5totalSi : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Bill) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $*Bill):
 // CHECK:   [[T0:%.*]] = struct_element_addr [[SELF]] : $*Bill, #Bill.total
 // CHECK:   [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
-// CHECK:   inject_enum_addr [[TMP:%.*]]#1 : $*Optional<Builtin.RawPointer>, #Optional.None
+// CHECK:   inject_enum_addr [[TMP:%.*]]#1 : $*Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>, #Optional.None
 // CHECK:   [[T2:%.*]] = load [[TMP]]#1
-// CHECK:   [[T3:%.*]] = tuple ([[T1]] : $Builtin.RawPointer, [[T2]] : $Optional<Builtin.RawPointer>)
-// CHECK:   return [[T3]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK:   [[T3:%.*]] = tuple ([[T1]] : $Builtin.RawPointer, [[T2]] : $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>)
+// CHECK:   return [[T3]] : $(Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>)
 // CHECK: }
 
-// CHECK:  sil hidden @_TTWV17materializeForSet4BillS_8TotalledS_FS1_m5totalSi : $@cc(witness_method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Bill) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK:  sil hidden @_TTWV17materializeForSet4BillS_8TotalledS_FS1_m5totalSi : $@cc(witness_method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Bill) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>) {
 // CHECK:  bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $*Bill):
 // CHECK:    [[T0:%.*]] = function_ref @_TFV17materializeForSet4Billm5totalSi
 // CHECK:    [[T1:%.*]] = apply [[T0]]([[BUFFER]], [[STORAGE]], [[SELF]])

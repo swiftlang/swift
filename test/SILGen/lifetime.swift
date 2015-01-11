@@ -363,8 +363,9 @@ func logical_lvalue_lifetime(var r: RefWithProp, var i: Int, var v: Val) {
   // CHECK: [[MATERIALIZE:%.*]] = apply [[MATERIALIZE_METHOD]]([[T0]], [[STORAGE]]#1, [[R2]])
   // CHECK: [[PTR:%.*]] = tuple_extract [[MATERIALIZE]] : {{.*}}, 0
   // CHECK: [[ADDR:%.*]] = pointer_to_address [[PTR]]
+  // CHECK: [[OPTCALLBACK:%.*]] = tuple_extract [[MATERIALIZE]] : {{.*}}, 1
   // CHECK: [[MARKED_ADDR:%.*]] = mark_dependence [[ADDR]] : $*Aleph on [[R2]]
-  // CHECK: [[CALLBACK:%[0-9]+]] = pointer_to_thin_function
+  // CHECK: {{.*}}([[CALLBACK:%.*]] : 
   // CHECK: [[TEMP:%.*]] = alloc_stack $RefWithProp
   // CHECK: store [[R2]] to [[TEMP]]#1
   // CHECK: apply [[CALLBACK]]({{.*}}, [[STORAGE]]#1, [[TEMP]]#1, {{%.*}})

@@ -538,9 +538,7 @@ namespace {
 
     llvm::Value *visitBuiltinUnsafeValueBufferType(
                                         CanBuiltinUnsafeValueBufferType type) {
-      IGF.unimplemented(SourceLoc(),
-                        "metadata ref for Builtin.UnsafeValueBuffer");
-      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+      return emitDirectMetadataRef(type);
     }
 
     llvm::Value *visitNominalType(CanNominalType type) {

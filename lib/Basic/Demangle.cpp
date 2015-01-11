@@ -1664,6 +1664,12 @@ private:
       if (!Mangled)
         return nullptr;
       c = Mangled.next();
+      if (c == 'b')
+        return NodeFactory::create(Node::Kind::BuiltinTypeName,
+                                     "Builtin.BridgeObject");
+      if (c == 'B')
+        return NodeFactory::create(Node::Kind::BuiltinTypeName,
+                                     "Builtin.UnsafeValueBuffer");
       if (c == 'f') {
         Node::IndexType size;
         if (demangleBuiltinSize(size)) {
@@ -1716,9 +1722,6 @@ private:
       if (c == 'o')
         return NodeFactory::create(Node::Kind::BuiltinTypeName,
                                      "Builtin.NativeObject");
-      if (c == 'b')
-        return NodeFactory::create(Node::Kind::BuiltinTypeName,
-                                     "Builtin.BridgeObject");
       if (c == 'p')
         return NodeFactory::create(Node::Kind::BuiltinTypeName,
                                      "Builtin.RawPointer");

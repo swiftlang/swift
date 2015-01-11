@@ -3496,6 +3496,10 @@ protected:
   }
 public:
 
+  /// \brief Determine whether this storage is a static member, if it
+  /// is a member.  Currently only variables can be static.
+  inline bool isStatic() const; // defined in this header
+
   /// \brief Determine whether this variable is computed, which means it
   /// has no storage but does have a user-defined getter or setter.
   ///
@@ -5143,6 +5147,15 @@ AbstractStorageDecl::overwriteSetterAccessibility(Accessibility accessLevel) {
     setter->overwriteAccessibility(accessLevel);
   if (auto materializeForSet = getMaterializeForSetFunc())
     materializeForSet->overwriteAccessibility(accessLevel);
+}
+
+inline bool AbstractStorageDecl::isStatic() const {
+  if (auto var = dyn_cast<VarDecl>(this)) {
+    return var->isStatic();
+  }
+
+  // Currently, subscripts are never static.
+  return false;
 }
 
 inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getBodyParamBuffer() {

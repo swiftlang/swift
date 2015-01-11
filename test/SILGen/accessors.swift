@@ -57,9 +57,8 @@ func test0(ref: A) {
 // CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.setter (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_TFV9accessors11OrdinarySubs9subscriptFSiSi
 // CHECK-NEXT: apply [[T0]]([[VALUE]], [[INDEX0]], [[ADDR]])
-// CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.Some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.None!enumelt: [[CONT:bb[0-9]+]]
-// CHECK:    [[WRITEBACK]]([[T0:%.*]] : $Builtin.RawPointer):
-// CHECK-NEXT: [[CALLBACK:%.*]] = pointer_to_thin_function [[T0]] : $Builtin.RawPointer to $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed A, @thick A.Type) -> ()
+// CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout A, @thick A.Type) -> ()>, case #Optional.Some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.None!enumelt: [[CONT:bb[0-9]+]]
+// CHECK:    [[WRITEBACK]]([[CALLBACK:%.*]] : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout A, @thick A.Type) -> ()):
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $A
 // CHECK-NEXT: store %0 to [[TEMP2]]#1 : $*A
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thick A.Type
@@ -114,9 +113,8 @@ func test1(ref: B) {
 // CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.getter (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_TFV9accessors11MutatingSubg9subscriptFSiSi : $@cc(method) @thin (Int, @inout MutatingSub) -> Int 
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[T0]]([[INDEX1]], [[ADDR]])
-// CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.Some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.None!enumelt: [[CONT:bb[0-9]+]]
-// CHECK:    [[WRITEBACK]]([[T0:%.*]] : $Builtin.RawPointer):
-// CHECK-NEXT: [[CALLBACK:%.*]] = pointer_to_thin_function [[T0]] : $Builtin.RawPointer to $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed B, @thick B.Type) -> ()
+// CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout B, @thick B.Type) -> ()>, case #Optional.Some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.None!enumelt: [[CONT:bb[0-9]+]]
+// CHECK:    [[WRITEBACK]]([[CALLBACK:%.*]] : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout B, @thick B.Type) -> ()):
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $B
 // CHECK-NEXT: store %0 to [[TEMP2]]#1 : $*B
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thick B.Type
@@ -139,9 +137,8 @@ func test1(ref: B) {
 // CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.setter (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_TFV9accessors11MutatingSubs9subscriptFSiSi : $@cc(method) @thin (Int, Int, @inout MutatingSub) -> () 
 // CHECK-NEXT: apply [[T0]]([[VALUE]], [[INDEX0]], [[ADDR]])
-// CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.Some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.None!enumelt: [[CONT:bb[0-9]+]]
-// CHECK:    [[WRITEBACK]]([[T0:%.*]] : $Builtin.RawPointer):
-// CHECK-NEXT: [[CALLBACK:%.*]] = pointer_to_thin_function [[T0]] : $Builtin.RawPointer to $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed B, @thick B.Type) -> ()
+// CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout B, @thick B.Type) -> ()>, case #Optional.Some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.None!enumelt: [[CONT:bb[0-9]+]]
+// CHECK:    [[WRITEBACK]]([[CALLBACK:%.*]] : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout B, @thick B.Type) -> ()):
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $B
 // CHECK-NEXT: store %0 to [[TEMP2]]#1 : $*B
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thick B.Type

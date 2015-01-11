@@ -43,5 +43,5 @@ class HasComputedProperty: ProtocolWithProperty {
     set {}
   }
 }
-// CHECK-LABEL: sil hidden [transparent] @_TFC10multi_file19HasComputedPropertym3fooSi : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @owned HasComputedProperty) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK-LABEL: sil hidden @_TTWC10multi_file19HasComputedPropertyS_20ProtocolWithPropertyS_FS1_m3fooSi : $@cc(witness_method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasComputedProperty) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_TFC10multi_file19HasComputedPropertym3fooSi : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @owned HasComputedProperty) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout HasComputedProperty, @thick HasComputedProperty.Type) -> ()>) {
+// CHECK-LABEL: sil hidden @_TTWC10multi_file19HasComputedPropertyS_20ProtocolWithPropertyS_FS1_m3fooSi : $@cc(witness_method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasComputedProperty) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout HasComputedProperty, @thick HasComputedProperty.Type) -> ()>) {

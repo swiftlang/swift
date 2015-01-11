@@ -179,10 +179,10 @@ struct D : Subscriptable {
 // CHECK:   [[T0:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int>,
 // CHECK:   [[ADDR:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int
 // CHECK:   [[T0:%.*]] = address_to_pointer [[ADDR]] : $*Int to $Builtin.RawPointer
-// CHECK:   [[TMP:%.*]] = alloc_stack $Optional<Builtin.RawPointer>
-// CHECK:   inject_enum_addr [[TMP]]#1 : $*Optional<Builtin.RawPointer>, #Optional.None
+// CHECK:   [[TMP:%.*]] = alloc_stack $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>
+// CHECK:   inject_enum_addr [[TMP]]#1 : $*Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>, #Optional.None
 // CHECK:   [[T1:%.*]] = load [[TMP]]#1
-// CHECK:   [[T2:%.*]] = tuple ([[T0]] : $Builtin.RawPointer, [[T1]] : $Optional<Builtin.RawPointer>)
+// CHECK:   [[T2:%.*]] = tuple ([[T0]] : $Builtin.RawPointer, [[T1]] : $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>)
 // CHECK:   return [[T2]] :
 
 func make_int() -> Int { return 0 }

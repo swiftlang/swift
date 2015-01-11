@@ -245,6 +245,17 @@ namespace {
     RetTy visit##TYPE##Type(Can##TYPE##Type type) {     \
       return asImpl().handle##LOWERING(type);        \
     }
+#define FUNCTION_IMPL(TYPE)                             \
+    RetTy visit##TYPE##Type(Can##TYPE##Type type) {     \
+      switch (type->getRepresentation()) {              \
+      case AnyFunctionType::Representation::Thick:      \
+      case AnyFunctionType::Representation::Block:      \
+        return asImpl().handleReference(type);          \
+      case AnyFunctionType::Representation::Thin:       \
+        return asImpl().handleTrivial(type);            \
+      }                                                 \
+      llvm_unreachable("bad function representation");  \
+    }
 
     IMPL(BuiltinInteger, Trivial)
     IMPL(BuiltinFloat, Trivial)
@@ -257,10 +268,11 @@ namespace {
     IMPL(Class, Reference)
     IMPL(BoundGenericClass, Reference)
     IMPL(AnyMetatype, Trivial)
-    IMPL(AnyFunction, Reference)
-    IMPL(SILFunction, Reference)
+    FUNCTION_IMPL(AnyFunction)
+    FUNCTION_IMPL(SILFunction)
     IMPL(Module, Trivial)
 
+#undef FUNCTION_IMPL
 #undef IMPL
 
     RetTy visitLValueType(CanLValueType type) {
@@ -1388,26 +1400,8 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
     auto substLoweredType =
       getLoweredASTFunctionType(substFnType, uncurryLevel, None);
 
-    bool canReabstract;
-    switch (substLoweredType->getAbstractCC()) {
-    case AbstractCC::C:
-    case AbstractCC::ObjCMethod:
-      // C functions cannot be reabstracted; if we were to call them
-      // generically, we'd have to dynamically form an invocation in their
-      // original calling convention.
-      canReabstract = false;
-      break;
-        
-    case AbstractCC::Freestanding:
-    case AbstractCC::Method:
-    case AbstractCC::WitnessMethod:
-      // Native functions can be reabstracted freely.
-      canReabstract = true;
-      break;
-    }
-
     AbstractionPattern origLoweredType = [&] {
-      if (!canReabstract || substType == origType.getAsType()) {
+      if (substType == origType.getAsType()) {
         return AbstractionPattern(substLoweredType);
       } else if (origType.isOpaque()) {
         return origType;

@@ -912,17 +912,15 @@ namespace {
         auto emptyTupleTy =
           SILType::getPrimitiveObjectType(TupleType::getEmpty(ctx));
 
+        SILType callbackSILType = gen.getLoweredType(
+                  optionalCallback.getType().getSwiftRValueType()
+                                            .getAnyOptionalObjectType());
+
         // The callback is a BB argument from the switch_enum.
         SILValue callback =
-          writebackBB->createBBArg(SILType::getRawPointerType(ctx));
+          writebackBB->createBBArg(callbackSILType);
 
-        FuncDecl *materializeForSet = decl->getMaterializeForSetFunc();
-        CanSILFunctionType callbackType =
-          getCallbackType(gen.SGM, materializeForSet, base);
-        SILType callbackSILType = SILType::getPrimitiveObjectType(callbackType);
-        callback = gen.B.createPointerToThinFunction(loc, callback,
-                                                     callbackSILType);
-
+        auto callbackType = callbackSILType.castTo<SILFunctionType>();
         SILType metatypeType = callbackType->getParameters().back().getSILType();
 
         // We need to borrow the base here.  We can't just consume it
@@ -934,8 +932,6 @@ namespace {
           if (base.getType().isAddress()) {
             baseAddress = base.getValue();
           } else {
-            assert(callbackType->getParameters()[2].isIndirectInGuaranteed() &&
-                   "passing base as inout parameter but base is scalar?");
             baseAddress = gen.emitTemporaryAllocation(loc, base.getType());
             gen.B.createStore(loc, base.getValue(), baseAddress);
           }

@@ -1155,21 +1155,30 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     TAK_objc_block, TAK_cc, TAK_thin, TAK_noreturn,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape
   };
+
+  auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
+    if (attrs.has(attr)) {
+      TC.diagnose(attrs.getLoc(attr), diag::attribute_not_supported);
+      attrs.clearAttribute(attr);
+    }
+  };
   
   // Some function representation attributes are not supported at source level;
   // only SIL knows how to handle them.  Reject them unless this is a SIL input.
   if (!(options & TR_SILType)) {
-    for (auto silOnlyAttr : {TAK_cc, TAK_thin, TAK_thick,
-                             TAK_callee_owned, TAK_callee_guaranteed})
-    {
-      if (attrs.has(silOnlyAttr)) {
-        TC.diagnose(attrs.getLoc(silOnlyAttr),
-                    diag::attribute_not_supported);
-        attrs.clearAttribute(silOnlyAttr);
-      }
+    for (auto silOnlyAttr : {TAK_callee_owned, TAK_callee_guaranteed}) {
+      checkUnsupportedAttr(silOnlyAttr);
     }
-  }
-  
+  }  
+
+  // Other function representation attributes are not normally supported at
+  // source level, but we want to support them there in SIL files.
+  auto SF = DC->getParentSourceFile();
+  if (!SF || SF->Kind != SourceFileKind::SIL) {
+    for (auto silOnlyAttr : {TAK_cc, TAK_thin, TAK_thick}) {
+      checkUnsupportedAttr(silOnlyAttr);
+    }
+  }  
   
   bool hasFunctionAttr = false;
   for (auto i : FunctionAttrs)

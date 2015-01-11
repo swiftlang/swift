@@ -2177,6 +2177,7 @@ namespace {
         auto emitter = specializedEmitter->getEarlyEmitter();
 
         assert(uncurriedSites.size() == 1);
+        CanFunctionType formalApplyType = cast<FunctionType>(formalType);
         SILLocation uncurriedLoc = uncurriedSites[0].Loc;
         claimNextParamClause(origFormalType);
         claimNextParamClause(formalType);
@@ -2187,6 +2188,7 @@ namespace {
         result = emitter(gen, uncurriedLoc,
                          callee.getSubstitutions(),
                          argument,
+                         formalApplyType,
                          uncurriedContext);
 
       // Otherwise, emit the uncurried arguments now and perform
@@ -2195,6 +2197,7 @@ namespace {
         // Emit the arguments.
         Optional<SILLocation> uncurriedLoc;
         SmallVector<SmallVector<ManagedValue, 4>, 2> args;
+        CanFunctionType formalApplyType;
         args.reserve(uncurriedSites.size());
         {
           ParamLowering paramLowering(substFnType);
@@ -2203,6 +2206,7 @@ namespace {
           for (auto &site : uncurriedSites) {
             AbstractionPattern origParamType =
               claimNextParamClause(origFormalType);
+            formalApplyType = cast<FunctionType>(formalType);
             claimNextParamClause(formalType);
             uncurriedLoc = site.Loc;
             args.push_back({});
@@ -2211,6 +2215,7 @@ namespace {
           }
         }
         assert(uncurriedLoc);
+        assert(formalApplyType);
 
         // Uncurry the arguments in calling convention order.
         SmallVector<ManagedValue, 4> uncurriedArgs;
@@ -2234,6 +2239,7 @@ namespace {
                            uncurriedLoc.getValue(),
                            callee.getSubstitutions(),
                            uncurriedArgs,
+                           formalApplyType,
                            uncurriedContext);
         } else {
           assert(specializedEmitter->isNamedBuiltin());

@@ -167,7 +167,6 @@ protocol Frobable {
 // CHECK-LABEL: sil hidden @_TF9writeback12test_genericUS_8Runcible_US_8Frobable___FT5runceRQ_4anseQQQ_4Frob4Anse_T_ 
 // CHECK:         witness_method $Runce, #Runcible.frob!materializeForSet.1
 // CHECK:         witness_method $Runce.Frob, #Frobable.anse!setter.1
-// CHECK:         pointer_to_thin_function
 func test_generic<Runce: Runcible>(inout #runce: Runce, #anse: Runce.Frob.Anse) {
   runce.frob.anse = anse
 }

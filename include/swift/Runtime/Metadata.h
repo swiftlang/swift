@@ -670,7 +670,7 @@ extern "C" const ValueWitnessTable _TWVT_;        // ()
 
 // The table for aligned-pointer-to-pointer types.
 extern "C" const ExtraInhabitantsValueWitnessTable _TWVMBo; // Builtin.NativeObject.Type
-  
+
 /// Return the value witnesses for unmanaged pointers.
 static inline const ValueWitnessTable &getUnmanagedPointerValueWitnesses() {
 #ifdef __LP64__
@@ -950,6 +950,7 @@ extern "C" const FullOpaqueMetadata _TMdBi64_;     // Builtin.Int64
 extern "C" const FullOpaqueMetadata _TMdBi128_;    // Builtin.Int128
 extern "C" const FullOpaqueMetadata _TMdBo;        // Builtin.NativeObject
 extern "C" const FullOpaqueMetadata _TMdBb;        // Builtin.BridgeObject
+extern "C" const FullOpaqueMetadata _TMdBB;        // Builtin.UnsafeValueBuffer
 #if SWIFT_OBJC_INTEROP
 extern "C" const FullOpaqueMetadata _TMdBO;        // Builtin.UnknownObject
 #endif

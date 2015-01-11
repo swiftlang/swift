@@ -366,6 +366,37 @@ namespace {
 /// Create the appropriate SIL function type for the given formal type
 /// and conventions.
 ///
+/// The lowering of function types is generally sensitive to the
+/// declared abstraction pattern.  We want to be able to take
+/// advantage of declared type information in order to, say, pass
+/// arguments separately and directly; but we also want to be able to
+/// call functions from generic code without completely embarrassing
+/// performance.  Therefore, different abstraction patterns induce
+/// different argument-passing conventions, and we must introduce
+/// implicit reabstracting conversions where necessary to map one
+/// convention to another.
+///
+/// However, we actually can't reabstract arbitrary thin function
+/// values while still leaving them thin, at least without costly
+/// page-mapping tricks. Therefore, the representation must remain
+/// consistent across all abstraction patterns.
+///
+/// We could reabstract block functions in theory, but (1) we don't
+/// really need to and (2) doing so would be problematic because
+/// stuffing something in an Optional currently forces it to be
+/// reabstracted to the most general type, which means that we'd
+/// expect the wrong abstraction conventions on bridged block function
+/// types.
+///
+/// Therefore, we only honor abstraction patterns on thick or
+/// polymorphic functions.
+///
+/// FIXME: we shouldn't just drop the original abstraction pattern
+/// when we can't reabstract.  Instead, we should introduce
+/// dynamic-indirect argument-passing conventions and map opaque
+/// archetypes to that, then respect those conventions in IRGen by
+/// using runtime call construction.
+///
 /// \param conventions - conventions as expressed for the original type
 static CanSILFunctionType getSILFunctionType(SILModule &M,
                                              CanType origType,
@@ -380,6 +411,13 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   assert(origFnType
          || isa<SubstitutableType>(origType)
          || isa<DependentMemberType>(origType));
+
+  // Per above, use reabstraction only on thick or polymorphic functions.
+  if (substFnOldType->getRepresentation()
+        != AnyFunctionType::Representation::Thick &&
+      (!origFnType || isa<FunctionType>(origFnType))) {
+    origFnType = substFnOldType;
+  }
 
   // Get an abstraction pattern to apply against the result.
   // If the unsubstituted type is dependent, use the most general type for

@@ -739,7 +739,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     Buffer << "BO";
     return;
   case TypeKind::BuiltinUnsafeValueBuffer:
-    Buffer << "Bb";
+    Buffer << "BB";
     return;
   case TypeKind::BuiltinVector:
     Buffer << "Bv" << cast<BuiltinVectorType>(tybase)->getNumElements();
