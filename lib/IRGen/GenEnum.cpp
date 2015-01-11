@@ -122,6 +122,18 @@ namespace {
       return Address(llvm::UndefValue::get(IGF.IGM.OpaquePtrTy), Alignment(1));
     }
 
+    virtual llvm::Value *emitValueCaseTest(IRGenFunction &IGF,
+                                           Explosion &value,
+                                           EnumElementDecl *Case) const {
+      value.claim(getExplosionSize());
+      return llvm::UndefValue::get(IGF.IGM.Int1Ty);
+    }
+    virtual llvm::Value *emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
+                                              Address enumAddr,
+                                              EnumElementDecl *Case) const {
+      return llvm::UndefValue::get(IGF.IGM.Int1Ty);
+    }
+
     void emitIndirectSwitch(IRGenFunction &IGF,
                             SILType T,
                             Address enumAddr,
@@ -309,6 +321,18 @@ namespace {
                                       SILType Type,
                                       EnumDecl *theEnum,
                                       llvm::StructType *enumTy) override;
+
+    virtual llvm::Value *emitValueCaseTest(IRGenFunction &IGF,
+                                           Explosion &value,
+                                           EnumElementDecl *Case) const {
+      value.claim(getExplosionSize());
+      return IGF.Builder.getInt1(true);
+    }
+    virtual llvm::Value *emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
+                                              Address enumAddr,
+                                              EnumElementDecl *Case) const {
+      return IGF.Builder.getInt1(true);
+    }
 
     void emitSingletonSwitch(IRGenFunction &IGF,
                     ArrayRef<std::pair<EnumElementDecl*,
@@ -662,6 +686,24 @@ namespace {
       assert(!ElementsWithNoPayload.empty());
     }
 
+    llvm::Value *emitValueCaseTest(IRGenFunction &IGF,
+                                   Explosion &value,
+                                   EnumElementDecl *Case) const {
+      // True if the discriminator matches the specified element.
+      llvm::Value *discriminator = value.claimNext();
+      return IGF.Builder.CreateICmpEQ(discriminator,
+                                      getDiscriminatorIdxConst(Case));
+    }
+
+    
+    llvm::Value *emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
+                                      Address enumAddr,
+                                      EnumElementDecl *Case) const {
+      Explosion value;
+      loadAsTake(IGF, enumAddr, value);
+      return emitValueCaseTest(IGF, value, Case);
+    }
+    
     void emitValueSwitch(IRGenFunction &IGF,
                          Explosion &value,
                          ArrayRef<std::pair<EnumElementDecl*,
@@ -1331,6 +1373,110 @@ namespace {
       }
     }
 
+    virtual llvm::Value *emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
+                                              Address enumAddr,
+                                              EnumElementDecl *Case) const {
+      if (TIK >= Fixed) {
+        // Load the fixed-size representation and switch directly.
+        Explosion value;
+        loadForSwitch(IGF, enumAddr, value);
+        return emitValueCaseTest(IGF, value, Case);
+      }
+
+      // Just fall back to emitting a switch.
+      // FIXME: This could likely be implemented directly.
+      auto &C = IGF.IGM.getLLVMContext();
+      auto curBlock = IGF.Builder.GetInsertBlock();
+      auto caseBlock = llvm::BasicBlock::Create(C);
+      auto contBlock = llvm::BasicBlock::Create(C);
+      emitIndirectSwitch(IGF, T, enumAddr, {{Case, caseBlock}}, contBlock);
+      
+      // Emit the case block.
+      IGF.Builder.emitBlock(caseBlock);
+      IGF.Builder.CreateBr(contBlock);
+
+      // Emit the continuation block and generate a PHI to produce the value.
+      IGF.Builder.emitBlock(contBlock);
+      auto Phi = IGF.Builder.CreatePHI(IGF.IGM.Int1Ty, 2);
+      Phi->addIncoming(IGF.Builder.getInt1(true), caseBlock);
+      Phi->addIncoming(IGF.Builder.getInt1(false), curBlock);
+      return Phi;
+    }
+
+    virtual llvm::Value *emitValueCaseTest(IRGenFunction &IGF,
+                                           Explosion &value,
+                                           EnumElementDecl *Case) const {
+      // Destructure the value into its payload + tag bit components, each is
+      // optional.
+      llvm::Value *payload = nullptr;
+      if (payloadTy)
+        payload = value.claimNext();
+      unsigned extraInhabitantCount = getNumExtraInhabitantTagValues();
+
+      // If any payload inhabitants are present, they must match.
+      if (extraInhabitantCount > 0) {
+        assert(payload && "extra inhabitants with empty payload?!");
+        payload =
+          getFixedPayloadTypeInfo().maskFixedExtraInhabitant(IGF, payload);
+      }
+
+      // If there are extra tag bits, test them first.
+      llvm::Value *tagBits = nullptr;
+      if (ExtraTagBitCount > 0)
+        tagBits = value.claimNext();
+      
+      llvm::Value *payloadResult = nullptr;
+      
+      
+      // Non-payload cases use extra inhabitants, if any, or are discriminated
+      // by setting the tag bits.
+      llvm::ConstantInt *extraTag = nullptr;
+      if (Case != getPayloadElement()) {
+        llvm::Value *payloadTag;
+        std::tie(payloadTag, extraTag) = getNoPayloadCaseValue(IGF.IGM, Case);
+        if (payloadTag)
+          payloadResult = IGF.Builder.CreateICmpEQ(payload, payloadTag);
+
+      } else {
+        // The payload case gets its native representation, with tag bits of
+        // zero and inhabitants of zero.  If we have extra inhabitants, then the
+        // payload element matches by not being any of the valid elements.
+        if (extraInhabitantCount) {
+          unsigned payloadSize
+            = getFixedPayloadTypeInfo().getFixedSize().getValueInBits();
+
+          auto *minTag = IGF.Builder.getIntN(payloadSize,
+                                             extraInhabitantCount-1);
+          payloadResult = IGF.Builder.CreateICmpUGT(payload, minTag);
+        }
+        if (ExtraTagBitCount)
+          extraTag = getZeroExtraTagConstant(IGF.IGM);
+      }
+      
+      // If any tag bits are present, they must match.
+      llvm::Value *tagResult = nullptr;
+      if (tagBits) {
+        if (ExtraTagBitCount == 1) {
+          if (extraTag->isOne())
+            tagResult = tagBits;
+          else
+            tagResult = IGF.Builder.CreateNot(tagBits);
+          
+        } else {
+          tagResult = IGF.Builder.CreateICmpEQ(tagBits, extraTag);
+        }
+      }
+
+      
+      if (tagResult && payloadResult)
+        return IGF.Builder.CreateAnd(tagResult, payloadResult);
+      if (tagResult)
+        return tagResult;
+      assert(payloadResult && "No tag or payload?");
+      return payloadResult;
+    }
+
+    
     void emitValueSwitch(IRGenFunction &IGF,
                          Explosion &value,
                          ArrayRef<std::pair<EnumElementDecl*,
@@ -2581,6 +2727,64 @@ namespace {
       return llvm::ConstantInt::get(IGM.getLLVMContext(), v);
     }
   public:
+    
+    virtual llvm::Value *emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
+                                              Address enumAddr,
+                                              EnumElementDecl *Case) const {
+      if (TIK >= Fixed) {
+        // Load the fixed-size representation and switch directly.
+        Explosion value;
+        loadForSwitch(IGF, enumAddr, value);
+        return emitValueCaseTest(IGF, value, Case);
+      }
+      
+      // Use the runtime to dynamically switch.
+      llvm_unreachable("dynamic switch for multi-payload enum not implemented");
+    }
+    
+    virtual llvm::Value *emitValueCaseTest(IRGenFunction &IGF,
+                                           Explosion &value,
+                                           EnumElementDecl *Case) const {
+      auto &C = IGF.IGM.getLLVMContext();
+
+      llvm::Value *payload = value.claimNext();
+      llvm::Value *extraTagBits = nullptr;
+      if (ExtraTagBitCount > 0)
+        extraTagBits = value.claimNext();
+      
+      // Extract the tag bits so we can compare them.
+      llvm::Value *tag = extractPayloadTag(IGF, payload, extraTagBits);
+      unsigned numTagBits
+        = cast<llvm::IntegerType>(tag->getType())->getBitWidth();
+
+      llvm::Value *caseValue = nullptr;
+      if (Case->hasArgumentType()) {
+        // Cases with payloads are numbered consecutively, scan until we find
+        // the right one.
+        unsigned tagIndex = 0;
+        for (auto &payloadCasePair : ElementsWithPayload) {
+          if (payloadCasePair.decl == Case) {
+            caseValue = llvm::ConstantInt::get(C, APInt(numTagBits,tagIndex));
+            break;
+          }
+          ++tagIndex;
+        }
+      } else {
+        // Elements without payloads are numbered after the payload elts.
+        unsigned tagIndex = ElementsWithPayload.size();
+        for (auto &elt : ElementsWithNoPayload) {
+          if (elt.decl == Case) {
+            caseValue = llvm::ConstantInt::get(C,APInt(numTagBits, tagIndex));
+            break;
+          }
+          ++tagIndex;
+        }
+      }
+      assert(caseValue && "Didn't find case decl");
+      return IGF.Builder.CreateICmpEQ(tag, caseValue);
+    }
+    
+
     void emitValueSwitch(IRGenFunction &IGF,
                          Explosion &value,
                          ArrayRef<std::pair<EnumElementDecl*,

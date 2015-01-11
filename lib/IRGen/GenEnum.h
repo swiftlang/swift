@@ -297,7 +297,7 @@ public:
   /// Return the bit mask used to test for no-payload cases.
   virtual ClusteredBitVector
   getBitMaskForNoPayloadElements(IRGenModule &IGM) const = 0;
-  
+
   /// \group Indirect enum operations
   
   /// Project the address of the data for a case. Does not check or modify
@@ -322,6 +322,13 @@ public:
   virtual Address destructiveProjectDataForLoad(IRGenFunction &IGF,
                                                 EnumElementDecl *elt,
                                                 Address enumAddr) const = 0;
+
+  /// Return an i1 value that indicates whether the specified indirect enum
+  /// value holds the specified case.  This is a light-weight form of a switch.
+  virtual llvm::Value *emitIndirectCaseTest(IRGenFunction &IGF,
+                                            SILType T,
+                                            Address enumAddr,
+                                            EnumElementDecl *Case) const = 0;
   
   /// Emit a branch on the case contained by an enum explosion.
   /// Performs the branching for a SIL 'switch_enum_addr'
@@ -349,6 +356,12 @@ public:
                                   Explosion &params,
                                   Explosion &out) const = 0;
   
+  /// Return an i1 value that indicates whether the specified loadable enum
+  /// value holds the specified case.  This is a light-weight form of a switch.
+  virtual llvm::Value *emitValueCaseTest(IRGenFunction &IGF,
+                                         Explosion &value,
+                                         EnumElementDecl *Case) const = 0;
+
   /// Emit a branch on the case contained by an enum explosion.
   /// Performs the branching for a SIL 'switch_enum' instruction.
   virtual void emitValueSwitch(IRGenFunction &IGF,
