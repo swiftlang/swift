@@ -728,7 +728,6 @@ bb3:
   dealloc_stack %2#0 : $*@local_storage A
   %9999 = tuple()
   return %9999 : $()
-
 }
 
 /// Make sure we don't ignore aliasing stores.
@@ -756,4 +755,30 @@ bb0(%0: $*A):
   dealloc_stack %1#0 : $*@local_storage A
   %7 = tuple()
   return %7 : $()
+}
+
+/// Make sure that we properly invalidate %3 in the following situation.
+///
+/// 1. We store %3 into the load map.
+/// 2. We see that we are storing in %4 something we just loaded meaning that we
+/// would have a dead store. We delete that store and through recursion delete %3
+/// since %3's only use is %4.
+/// 3. When we delete %3, we do not remove it from the load list.
+/// 4. %5 can write to memory, so we try to check if it can alias %0#1. We look
+/// up the load that was erased and will use it in a memory unsafe way.
+//
+// CHECK-LABEL: sil @invalidate_dead_loads_with_only_store_user_correctly : $@thin () -> () {
+// CHECK-NOT: load
+// CHECK-NOT: store
+sil @invalidate_dead_loads_with_only_store_user_correctly : $@thin () -> () {
+bb0:
+  %0 = alloc_stack $Optional<Builtin.Int32>
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = enum $Optional<Builtin.Int32>, #Optional.Some!enumelt.1, %1 : $Builtin.Int32
+  %3 = load %0#1 : $*Optional<Builtin.Int32>
+  store %3 to %0#1 : $*Optional<Builtin.Int32>
+  %5 = unchecked_take_enum_data_addr %0#1 : $*Optional<Builtin.Int32>, #Optional.Some!enumelt.1
+  dealloc_stack %0#0 : $*@local_storage Optional<Builtin.Int32>
+  %9999 = tuple()
+  return %9999 : $()
 }
