@@ -332,10 +332,11 @@ public:
 
   /// \return True if all of the users of the AllocStack instruction \p ASI are
   /// inside the same basic block.
-  static bool isSingleBlockUsage(AllocStackInst *ASI) {
+  static bool isSingleBlockUsage(AllocStackInst *ASI, DominanceInfo *Dominance){
     SILBasicBlock *BB = ASI->getParent();
     for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI)
-      if (UI->getUser()->getParent() != BB)
+      if (UI->getUser()->getParent() != BB &&
+          Dominance->isReachableFromEntry(UI->getUser()->getParent()))
         return false;
 
     return true;
@@ -371,7 +372,7 @@ public:
     // If the AllocStackInst is also deallocated inside the allocation block
     // then make sure that all the users are inside that block.
     if (!Allocated) {
-      require(isSingleBlockUsage(AI),
+      require(isSingleBlockUsage(AI, Dominance),
               "AllocStack has users in other basic blocks after allocation");
     }
   }
