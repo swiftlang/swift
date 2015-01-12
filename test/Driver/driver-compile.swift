@@ -35,7 +35,7 @@
 // RUN: cp %s %t
 // RUN: not %swiftc_driver -driver-print-jobs -c -target x86_64-apple-macosx10.9 %s %t/driver-compile.swift 2>&1 | FileCheck -check-prefix DUPLICATE-NAME %s
 
-// RUN: %swiftc_driver -driver-print-jobs --update-code -c -target x86_64-apple-macosx10.9 %s 2>&1 > %t.upd.txt
+// RUN: %swiftc_driver -driver-print-jobs -update-code -c -target x86_64-apple-macosx10.9 %s 2>&1 > %t.upd.txt
 // RUN: FileCheck -check-prefix UPDATE-CODE %s < %t.upd.txt
 
 // REQUIRES: X86

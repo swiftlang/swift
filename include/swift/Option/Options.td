@@ -307,8 +307,8 @@ def c : Flag<["-"], "c">, Alias<emit_object>,
 def S: Flag<["-"], "S">, Alias<emit_assembly>,
   Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
 
-def update_code : Flag<["--"], "update-code">, HelpText<"Update Swift code">,
-  Flags<[NoInteractiveOption]>, ModeOpt;
+def update_code : Flag<["-"], "update-code">, HelpText<"Update Swift code">,
+  Flags<[HelpHidden, NoInteractiveOption]>, ModeOpt;
 
 // No Output Modes
 def parse : Flag<["-"], "parse">, HelpText<"Parse input file(s)">,
