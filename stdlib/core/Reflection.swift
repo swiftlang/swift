@@ -86,8 +86,11 @@ public enum QuickLookObject {
   /// An unsigned integer numeric value.
   case UInt(UInt64)
 
-  /// A floating-point numeric value.
-  case Float(Double)
+  /// A single precision floating-point numeric value.
+  case Float(Float32)
+
+  /// A double precision floating-point numeric value.
+  case Double(Float64)
 
   // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   /// An image.
@@ -111,15 +114,15 @@ public enum QuickLookObject {
   
   /// A rectangle
   /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
-  case Rectangle(Double,Double,Double,Double)
+  case Rectangle(Float64,Float64,Float64,Float64)
   
   /// A point
   /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
-  case Point(Double,Double)
+  case Point(Float64,Float64)
   
   /// A size
   /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
-  case Size(Double,Double)
+  case Size(Float64,Float64)
   
   /// A logical value
   case Logical(Bool)

@@ -309,9 +309,17 @@ case _:
   println("got something else")
 }
 
-// CHECK-NEXT: got the expected quick look float
+// CHECK-NEXT: got the expected quick look double
 switch reflect(22.5 as NSNumber).quickLookObject {
-case .Some(.Float(22.5)):
+case .Some(.Double(22.5)):
+  println("got the expected quick look double")
+case _:
+  println("got something else")
+}
+
+// CHECK-NEXT: got the expected quick look float
+switch reflect(Float32(1.25)).quickLookObject {
+case .Some(.Float(1.25)):
   println("got the expected quick look float")
 case _:
   println("got something else")
