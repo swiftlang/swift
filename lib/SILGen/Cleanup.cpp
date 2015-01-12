@@ -111,13 +111,13 @@ void CleanupManager::emitBranchAndCleanups(JumpDest Dest,
   B.createBranch(BranchLoc, Dest.getBlock(), Args);
 }
 
-/// Emit active cleanups in the specified range.
-void CleanupManager::emitActiveCleanups(CleanupHandle from, CleanupHandle to,
+/// Emit active cleanups from the specified point to the top of stack.
+void CleanupManager::emitActiveCleanups(CleanupHandle from,
                                         CleanupLocation Loc) {
   assert(Gen.getBuilder().hasValidInsertionPoint() &&
          "Inserting branch in invalid spot");
 
-  for (auto cleanup = Stack.find(to), e = Stack.find(from);
+  for (auto cleanup = Stack.begin(), e = Stack.find(from);
        cleanup != e; ++cleanup)
     if (cleanup->isActive())
       cleanup->emit(Gen, Loc);

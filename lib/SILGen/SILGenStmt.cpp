@@ -173,9 +173,14 @@ emitStmtConditionWithBodyRec(StmtCondition C, Stmt *Body,
   
   // Now that we evaluated some thing into the optional buffer, we need to
   // clean it up on condition failure path.  On the true dest, we'll consume the
-  // buffer when extracting the value out of it.
+  // buffer when extracting the value out of it.  This cleanup is destroying an
+  // optional known to be nil, so we can avoid the destroy_addr when it is
+  // trivial or known to be a class type).
   SILBasicBlock *FalseDest = CleanupBlocks.back();
-  if (!gen.getTypeLowering(PBD->getInit()->getType()).isTrivial()) {
+  auto OptionalPayloadType = PBD->getInit()->getType();
+  if (!OptionalPayloadType->is<ClassType>() &&
+      !OptionalPayloadType->isClassExistentialType() &&
+      !gen.getTypeLowering(OptionalPayloadType).isTrivial()) {
     FalseDest = gen.createBasicBlock();
     SILBuilder(FalseDest).createDestroyAddr(PBD, buffer.OptAddr->getAddress());
     SILBuilder(FalseDest).createBranch(PBD, CleanupBlocks.back());
@@ -194,14 +199,13 @@ emitStmtConditionWithBodyRec(StmtCondition C, Stmt *Body,
   // into temporaries that the pattern is bound to, and consume the buffers.
   emitConditionalPatternBinding(gen, buffers.front());
 
-  auto cleanupTo = gen.Cleanups.getCleanupsDepth();
-
   // If emission of the value to the pattern produced any cleanups, we need to
   // run them in a new failure block.
-  if (gen.Cleanups.hasAnyActiveCleanups(cleanupFrom, cleanupTo)) {
+  if (gen.Cleanups.hasAnyActiveCleanups(cleanupFrom,
+                                        gen.Cleanups.getCleanupsDepth())) {
     SILBasicBlock *CleanupBB = gen.createBasicBlock();
     gen.B.setInsertionPoint(CleanupBB);
-    gen.Cleanups.emitActiveCleanups(cleanupFrom, cleanupTo, PBD);
+    gen.Cleanups.emitActiveCleanups(cleanupFrom, PBD);
     if (CleanupBB->empty()) {
       CleanupBB->eraseFromParent();
     } else {
