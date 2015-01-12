@@ -467,7 +467,7 @@ func pinUnpin(object : Builtin.NativeObject) {
 // CHECK-NEXT:    return [[T0]] : $()
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins19allocateValueBufferFRBbBp : $@thin (@inout Builtin.UnsafeValueBuffer) -> Builtin.RawPointer
+// CHECK-LABEL: sil hidden @_TF8builtins19allocateValueBufferFRBBBp : $@thin (@inout Builtin.UnsafeValueBuffer) -> Builtin.RawPointer
 // CHECK-NEXT:  bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
 // CHECK-NEXT:    metatype $@thin Int.Type
 // CHECK-NEXT:    [[T0:%.*]] = alloc_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer
@@ -477,7 +477,7 @@ func allocateValueBuffer(inout buffer: Builtin.UnsafeValueBuffer) -> Builtin.Raw
   return Builtin.allocValueBuffer(&buffer, Int.self)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins18projectValueBufferFRBbBp : $@thin (@inout Builtin.UnsafeValueBuffer) -> Builtin.RawPointer
+// CHECK-LABEL: sil hidden @_TF8builtins18projectValueBufferFRBBBp : $@thin (@inout Builtin.UnsafeValueBuffer) -> Builtin.RawPointer
 // CHECK-NEXT:  bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
 // CHECK-NEXT:    metatype $@thin Int.Type
 // CHECK-NEXT:    [[T0:%.*]] = project_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer
@@ -487,7 +487,7 @@ func projectValueBuffer(inout buffer: Builtin.UnsafeValueBuffer) -> Builtin.RawP
   return Builtin.projectValueBuffer(&buffer, Int.self)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins18deallocValueBufferFRBbT_ : $@thin (@inout Builtin.UnsafeValueBuffer) -> ()
+// CHECK-LABEL: sil hidden @_TF8builtins18deallocValueBufferFRBBT_ : $@thin (@inout Builtin.UnsafeValueBuffer) -> ()
 // CHECK-NEXT:  bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
 // CHECK-NEXT:    metatype $@thin Int.Type
 // CHECK-NEXT:    dealloc_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer
