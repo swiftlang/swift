@@ -362,17 +362,32 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
 static ManagedValue manageParam(SILGenFunction &gen,
                                 SILLocation loc,
                                 SILValue paramValue,
-                                SILParameterInfo info) {
+                                SILParameterInfo info,
+                                bool allowPlusZero) {
   switch (info.getConvention()) {
-  case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
+    if (allowPlusZero)
+      return ManagedValue::forUnmanaged(paramValue);
+    SWIFT_FALLTHROUGH;
+  // Unowned parameters are only guaranteed at the instant of the call, so we
+  // must retain them even if we're in a context that can accept a +0 value.
+  case ParameterConvention::Direct_Unowned:
     gen.getTypeLowering(paramValue.getType())
-                    .emitRetainValue(gen.B, loc, paramValue);
+          .emitRetainValue(gen.B, loc, paramValue);
     SWIFT_FALLTHROUGH;
   case ParameterConvention::Direct_Owned:
     return gen.emitManagedRValueWithCleanup(paramValue);
 
   case ParameterConvention::Indirect_In_Guaranteed:
+    // FIXME: Avoid a behavior change while guaranteed self is disabled by
+    // default.
+    if (allowPlusZero || !gen.SGM.M.getOptions().EnableGuaranteedSelf) {
+      return ManagedValue::forUnmanaged(paramValue);
+    } else {
+      auto copy = gen.emitTemporaryAllocation(loc, paramValue.getType());
+      gen.B.createCopyAddr(loc, paramValue, copy, IsNotTake, IsInitialization);
+      return gen.emitManagedBufferWithCleanup(copy);
+    }
   case ParameterConvention::Indirect_Inout:
     return ManagedValue::forLValue(paramValue);
   case ParameterConvention::Indirect_In:
@@ -385,7 +400,8 @@ static ManagedValue manageParam(SILGenFunction &gen,
 
 static void collectParams(SILGenFunction &gen,
                           SILLocation loc,
-                          SmallVectorImpl<ManagedValue> &params) {
+                          SmallVectorImpl<ManagedValue> &params,
+                          bool allowPlusZero) {
   auto paramTypes =
     gen.F.getLoweredFunctionType()->getParametersWithoutIndirectResult();
   for (auto param : paramTypes) {
@@ -393,7 +409,7 @@ static void collectParams(SILGenFunction &gen,
     auto paramValue = new (gen.SGM.M) SILArgument(gen.F.begin(),
                                                   paramTy);
                                       
-    params.push_back(manageParam(gen, loc, paramValue, param));
+    params.push_back(manageParam(gen, loc, paramValue, param, allowPlusZero));
   }
 }
 
@@ -896,7 +912,9 @@ static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
   }
 
   SmallVector<ManagedValue, 8> params;
-  collectParams(gen, loc, params);
+  // TODO: Could accept +0 arguments here when forwardFunctionArguments/
+  // emitApply can.
+  collectParams(gen, loc, params, /*allowPlusZero*/ false);
 
   ManagedValue fnValue = params.pop_back_val();
   auto fnType = fnValue.getType().castTo<SILFunctionType>();
@@ -1577,7 +1595,9 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   }
 
   SmallVector<ManagedValue, 8> origParams;
-  collectParams(*this, loc, origParams);
+  // TODO: Should be able to accept +0 values here, once
+  // forwardFunctionArguments/emitApply are able to.
+  collectParams(*this, loc, origParams, /*allowPlusZero*/ false);
   
   // Handle special abstraction differences in "self".
   // If the witness is a free function, drop it completely.
@@ -1627,10 +1647,21 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
     // non-mutating protocol requirements.
     auto reqConvention = thunkTy->getSelfParameter().getConvention();
     auto witnessConvention =witnessSubstFTy->getSelfParameter().getConvention();
+    
+    bool inoutDifference;
+    
+    if (SGM.M.getOptions().EnableGuaranteedSelf) {
+      inoutDifference = reqConvention == ParameterConvention::Indirect_Inout &&
+                      witnessConvention != ParameterConvention::Indirect_Inout;
+    } else {
+      // TODO: Avoid a behavior change while guaranteed self is disabled
+      // by default; preserve the old, incorrect condition here.
+      inoutDifference = isIndirectParameter(reqConvention) &&
+                        !isConsumedParameter(reqConvention) &&
+                        isConsumedParameter(witnessConvention);
+    }
 
-    if (isIndirectParameter(reqConvention) &&
-        !isConsumedParameter(reqConvention) &&
-        isConsumedParameter(witnessConvention)) {
+    if (inoutDifference) {
       // If there is an inout difference in self, load the inout self parameter.
       ManagedValue &selfParam = origParams.back();
       SILValue selfAddr = selfParam.getUnmanagedValue();

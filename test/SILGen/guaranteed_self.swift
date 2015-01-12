@@ -6,6 +6,8 @@ protocol Fooable {
   mutating func bar()
   mutating func bas()
 
+  prefix func +(x: Self)
+
   var prop1: Int { get set }
   var prop2: Int { get set }
   var prop3: Int { get nonmutating set }
@@ -16,6 +18,8 @@ protocol Barrable: class {
   func foo(x: Int)
   func bar()
   func bas()
+
+  prefix func +(x: Self)
 
   var prop1: Int { get set }
   var prop2: Int { get set }
@@ -110,12 +114,18 @@ struct S: Fooable {
   // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 }
 
+prefix func +(x: S) {}
+
 // Witness thunk for nonmutating 'foo'
 // CHECK-LABEL: sil hidden @_TTWV15guaranteed_self1SS_7FooableS_FS1_3fooUS1___fQPS1_FSiT_ : $@cc(witness_method) @thin (Int, @in_guaranteed S) -> () {
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
-// CHECK:         [[SELF:%.*]] = load [[SELF_ADDR]]
+// CHECK:         [[SELF_COPY:%.*]] = alloc_stack $S
+// CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY]]
+// CHECK:         [[SELF:%.*]] = load [[SELF_COPY]]
+// CHECK:         release_value [[SELF]]
+// CHECK-NOT:     release_value [[SELF]]
+// CHECK-NOT:     destroy_addr [[SELF_COPY]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
-// FIXME-NOT:     release_value [[SELF]]
 
 // Witness thunk for mutating 'bar'
 // CHECK-LABEL: sil hidden @_TTWV15guaranteed_self1SS_7FooableS_FS1_3barUS1___fRQPS1_FT_T_ : $@cc(witness_method) @thin (@inout S) -> () {
@@ -128,15 +138,20 @@ struct S: Fooable {
 // CHECK-LABEL: sil hidden @_TTWV15guaranteed_self1SS_7FooableS_FS1_3basUS1___fRQPS1_FT_T_ : $@cc(witness_method) @thin (@inout S) -> ()
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
 // CHECK:         [[SELF:%.*]] = load [[SELF_ADDR]]
-// CHECK-NOT:     destroy_addr [[SELF_ADDR]]
-// FIXME-NOT:     release_value [[SELF]]
+// CHECK:         retain_value [[SELF]]
+// CHECK:         release_value [[SELF]]
+// CHECK-NOT:     release_value [[SELF]]
 
 // Witness thunk for prop1 getter
 // CHECK-LABEL: sil hidden @_TTWV15guaranteed_self1SS_7FooableS_FS1_g5prop1Si : $@cc(witness_method) @thin (@in_guaranteed S) -> Int
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
-// CHECK:         [[SELF:%.*]] = load [[SELF_ADDR]]
+// CHECK:         [[SELF_COPY:%.*]] = alloc_stack $S
+// CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY]]
+// CHECK:         [[SELF:%.*]] = load [[SELF_COPY]]
+// CHECK:         release_value [[SELF]]
+// CHECK-NOT:     release_value [[SELF]]
+// CHECK-NOT:     destroy_addr [[SELF_COPY]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
-// FIXME-NOT:     release_value [[SELF]]
 
 // Witness thunk for prop1 setter
 // CHECK-LABEL: sil hidden @_TTWV15guaranteed_self1SS_7FooableS_FS1_s5prop1Si : $@cc(witness_method) @thin (Int, @inout S) -> () {
@@ -151,9 +166,13 @@ struct S: Fooable {
 // Witness thunk for prop2 getter
 // CHECK-LABEL: sil hidden @_TTWV15guaranteed_self1SS_7FooableS_FS1_g5prop2Si : $@cc(witness_method) @thin (@in_guaranteed S) -> Int
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
-// CHECK:         [[SELF:%.*]] = load [[SELF_ADDR]]
+// CHECK:         [[SELF_COPY:%.*]] = alloc_stack $S
+// CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY]]
+// CHECK:         [[SELF:%.*]] = load [[SELF_COPY]]
+// CHECK:         release_value [[SELF]]
+// CHECK-NOT:     release_value [[SELF]]
+// CHECK-NOT:     destroy_addr [[SELF_COPY]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
-// FIXME-NOT:     release_value [[SELF]]
 
 // Witness thunk for prop2 setter
 // CHECK-LABEL: sil hidden @_TTWV15guaranteed_self1SS_7FooableS_FS1_s5prop2Si : $@cc(witness_method) @thin (Int, @inout S) -> () {
@@ -168,23 +187,32 @@ struct S: Fooable {
 // Witness thunk for prop3 getter
 // CHECK-LABEL: sil hidden @_TTWV15guaranteed_self1SS_7FooableS_FS1_g5prop3Si : $@cc(witness_method) @thin (@in_guaranteed S) -> Int
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
-// CHECK:         [[SELF:%.*]] = load [[SELF_ADDR]]
+// CHECK:         [[SELF_COPY:%.*]] = alloc_stack $S
+// CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY]]
+// CHECK:         [[SELF:%.*]] = load [[SELF_COPY]]
+// CHECK:         release_value [[SELF]]
+// CHECK-NOT:     release_value [[SELF]]
+// CHECK-NOT:     destroy_addr [[SELF_COPY]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
-// FIXME-NOT:     release_value [[SELF]]
 
 // Witness thunk for prop3 nonmutating setter
 // CHECK-LABEL: sil hidden @_TTWV15guaranteed_self1SS_7FooableS_FS1_s5prop3Si : $@cc(witness_method) @thin (Int, @in_guaranteed S) -> ()
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
-// CHECK:         [[SELF:%.*]] = load [[SELF_ADDR]]
+// CHECK:         [[SELF_COPY:%.*]] = alloc_stack $S
+// CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY]]
+// CHECK:         [[SELF:%.*]] = load [[SELF_COPY]]
+// CHECK:         release_value [[SELF]]
+// CHECK-NOT:     release_value [[SELF]]
+// CHECK-NOT:     destroy_addr [[SELF_COPY]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
-// FIXME-NOT:     release_value [[SELF]]
 
 // Witness thunk for prop3 nonmutating materializeForSet
 // CHECK-LABEL: sil hidden @_TTWV15guaranteed_self1SS_7FooableS_FS1_m5prop3Si : $@cc(witness_method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout S, @thick S.Type) -> ()>)
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
 // CHECK:         [[SELF:%.*]] = load [[SELF_ADDR]]
-// CHECK-NOT:     destroy_addr [[SELF_ADDR]]
-// FIXME-NOT:     release_value [[SELF]]
+// CHECK:         retain_value [[SELF]]
+// CHECK:         release_value [[SELF]]
+// CHECK-NOT:     release_value [[SELF]]
 // CHECK:       }
 
 //
@@ -216,6 +244,8 @@ struct AO<T>: Fooable {
   }
 }
 
+prefix func +<T>(x: AO<T>) {}
+
 enum E: Fooable {
   case A, B(C)
   init() { self = .A }
@@ -245,6 +275,8 @@ enum E: Fooable {
   }
 }
 
+prefix func +(x: E) {}
+
 class C: Fooable, Barrable {
   required init() {}
   @objc func foo(x: Int) {
@@ -268,3 +300,4 @@ class C: Fooable, Barrable {
   }
 }
 
+prefix func +(x: C) {}
