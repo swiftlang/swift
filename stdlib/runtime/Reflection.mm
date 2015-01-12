@@ -126,7 +126,8 @@ struct QuickLookObject {
     String TextOrURL;
     int64_t Int;
     uint64_t UInt;
-    double Float;
+    float Float;
+    double Double;
     Any Any;
     RawData Raw;
     Rectangle Rect;
@@ -708,7 +709,7 @@ OptionalQuickLookObject swift_ClassMirror_quickLookObject(HeapObject *owner,
     
     switch ([n objCType][0]) {
     case 'd': // double
-      result.payload.Float = [n doubleValue];
+      result.payload.Double = [n doubleValue];
       result.payload.Kind = QuickLookObject::Tag::Double;
       break;
     case 'f': // float
