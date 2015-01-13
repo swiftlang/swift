@@ -39,6 +39,7 @@ static llvm::cl::opt<bool> EnableDestroyHoisting("enable-destroyhoisting",
 /// (this def uniquely identifies the object).
 ///
 /// (1) An "in" argument.
+///     (inouts are also nonaliased, but won't be destroyed in scope)
 ///
 /// (2) A local alloc_stack variable.
 static bool isIdentifiedObject(SILValue Def, SILFunction *F) {
@@ -50,7 +51,6 @@ static bool isIdentifiedObject(SILValue Def, SILFunction *F) {
     switch (Conv) {
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_In_Guaranteed:
-    case ParameterConvention::Indirect_Inout:
       return true;
     default:
       DEBUG(llvm::dbgs() << "  Skipping Def: Not an @in argument!\n");
