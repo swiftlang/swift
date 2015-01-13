@@ -25,8 +25,7 @@ class AppDelegate {
         // Verify that the branch's location is >= the cleanup's location.
         // ( The implicit false block of the conditional
         //   below inherits the location from the condition. )
-        // CHECK: destroy_addr{{.*}}Optional<NSURL>{{.*}}line:[[@LINE+2]]
-        // CHECK-NEXT: br{{.*}}line:[[@LINE+1]]
+        // CHECK: br{{.*}}line:[[@LINE+1]]
         if let url = item.URL
         {
           LogStr( "There is a url" )
