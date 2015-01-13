@@ -309,37 +309,6 @@ static SmallVector<TupleTypeElt, 4> decomposeIntoTupleElements(Type type) {
 }
 
 namespace {
-  /// Dependent type opener that keeps track of the type variables to which
-  /// generic parameters and dependent member types were opened while
-  /// opening up the type of a witness.
-  class WitnessTypeOpener : public constraints::DependentTypeOpener {
-    ASTContext &Context;
-    llvm::DenseMap<TypeVariableType *, CanType> &Opened;
-
-  public:
-    WitnessTypeOpener(ASTContext &context,
-                      llvm::DenseMap<TypeVariableType *, CanType> &opened)
-      : Context(context), Opened(opened) { }
-
-    virtual void openedGenericParameter(GenericTypeParamType *param,
-                                        TypeVariableType *typeVar,
-                                        Type &replacementType) {
-      Opened[typeVar] = param->getCanonicalType();
-    }
-
-    virtual bool shouldBindAssociatedType(Type baseType,
-                                          TypeVariableType *baseTypeVar,
-                                          AssociatedTypeDecl *assocType,
-                                          TypeVariableType *memberTypeVar,
-                                          Type &replacementType) {
-      Opened[memberTypeVar] = DependentMemberType::get(baseType, assocType,
-                                                       Context)
-                                ->getCanonicalType();
-      return true;
-    }
-
-  };
-
   /// Dependent type opener that maps the type of a requirement, replacing
   /// already-known associated types to their type witnesses and inner generic
   /// parameters to their archetypes.
@@ -740,8 +709,6 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
 
     // Open up the witness type.
     witnessType = witness->getInterfaceType();
-    llvm::DenseMap<TypeVariableType *, CanType> openedWitnessTypeVars;
-    WitnessTypeOpener witnessOpener(tc.Context, openedWitnessTypeVars);
     // FIXME: witness as a base locator?
     locator = cs->getConstraintLocator(nullptr);
     if (witness->getDeclContext()->isTypeContext()) {
@@ -750,14 +717,14 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
                                       /*isTypeReference=*/false,
                                       /*isDynamicResult=*/false,
                                       locator,
-                                      &witnessOpener);
+                                      /*opener=*/nullptr);
     } else {
       std::tie(openedFullWitnessType, openWitnessType) 
       = cs->getTypeOfReference(witness,
                               /*isTypeReference=*/false,
                               /*isDynamicResult=*/false,
                               locator,
-                              &witnessOpener);
+                              /*opener=*/nullptr);
     }
     openWitnessType = openWitnessType->getRValueType();
     
