@@ -210,11 +210,12 @@ ERROR(getset_nontrivial_pattern,decl_parsing,none,
 ERROR(expected_rbrace_in_getset,decl_parsing,none,
       "expected '}' at end of variable get/set clause", ())
 ERROR(duplicate_property_accessor,decl_parsing,none,
-      "duplicate definition of %select{getter|setter|willSet|didSet}0",
-      (unsigned))
+      "duplicate definition of %0", (StringRef))
 NOTE(previous_accessor,decl_parsing,none,
-     "previous definition of %select{getter|setter|willSet|didSet}0 is here",
-     (unsigned))
+     "previous definition of %0 is here", (StringRef))
+ERROR(conflicting_property_addressor,decl_parsing,none,
+      "%select{variable|subscript}0 already has a "
+      "%select{addressor|mutable addressor}1", (unsigned, unsigned))
 ERROR(expected_accessor_name,decl_parsing,none,
       "expected %select{GETTER|setter|willSet|didSet}0 parameter name",
       (unsigned))
@@ -225,8 +226,7 @@ ERROR(expected_rparen_willSet_name,decl_parsing,none,
 ERROR(expected_rparen_didSet_name,decl_parsing,none,
       "expected ')' after didSet parameter name",())
 ERROR(expected_lbrace_accessor,decl_parsing,PointsToFirstBadToken,
-      "expected '{' to start %select{getter|setter|willSet|didSet}0 definition",
-     (unsigned))
+      "expected '{' to start %0 definition", (StringRef))
 ERROR(expected_accessor_kw,decl_parsing,none,
       "expected 'get', 'set', 'willSet', or 'didSet' keyword to "
       "start an accessor definition",())

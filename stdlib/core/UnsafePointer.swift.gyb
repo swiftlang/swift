@@ -135,14 +135,14 @@ public struct ${Self}<T>
   /// setting values.
   public var memory : T {
 %  if mutable:
-    @transparent address {
+    @transparent unsafeAddress {
       return UnsafePointer(self)
     }
-    @transparent nonmutating mutableAddress {
+    @transparent nonmutating unsafeMutableAddress {
       return self
     }
 %  else:
-    @transparent address {
+    @transparent unsafeAddress {
       return self
     }    
 %  end
@@ -311,16 +311,16 @@ public struct ${Self}<T>
   public subscript (i : Int) -> T {
 %  if mutable:
     @transparent
-    address {
+    unsafeAddress {
       return UnsafePointer(self + i)
     }
     @transparent
-    nonmutating mutableAddress {
+    nonmutating unsafeMutableAddress {
       return self + i
     }
 %  else:
     @transparent
-    address {
+    unsafeAddress {
       return self + i
     }
 %  end

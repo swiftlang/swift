@@ -1039,6 +1039,53 @@ namespace {
     }
   };
 
+  class UnpinPseudoComponent : public LogicalPathComponent {
+  public:
+    UnpinPseudoComponent(const LValueTypeData &typeData)
+      : LogicalPathComponent(typeData, WritebackPseudoKind) {}
+
+  private:
+    AccessKind getBaseAccessKind(SILGenFunction &SGF,
+                                 AccessKind accessKind) const override {
+      llvm_unreachable("called getBaseAccessKind on pseudo-component");
+    }
+    std::unique_ptr<LogicalPathComponent>
+    clone(SILGenFunction &gen, SILLocation l) const override {
+      llvm_unreachable("called clone on pseudo-component");
+    }
+
+    ManagedValue get(SILGenFunction &gen, SILLocation loc,
+                     ManagedValue base, SGFContext c) && override {
+      llvm_unreachable("called get on a pseudo-component");
+    }
+    void set(SILGenFunction &gen, SILLocation loc,
+             RValue &&value, ManagedValue base) && override {
+      llvm_unreachable("called set on a pseudo-component");
+    }
+    ManagedValue getMaterialized(SILGenFunction &gen, SILLocation loc,
+                                 ManagedValue base,
+                                 AccessKind accessKind) && override {
+      llvm_unreachable("called getMaterialized on a pseudo-component");
+    }
+
+    void diagnoseWritebackConflict(LogicalPathComponent *rhs,
+                                   SILLocation loc1, SILLocation loc2,
+                                   SILGenFunction &gen) override {
+      // do nothing
+    }
+
+    void writeback(SILGenFunction &gen, SILLocation loc,
+                   ManagedValue base, Materialize temporary,
+                   ArrayRef<SILValue> otherInfo) && override {
+      assert(otherInfo.size() == 1);
+      gen.B.createStrongUnpin(loc, base.forward(gen));
+    }
+
+    void print(raw_ostream &OS) const override {
+      OS << "UnpinPseudoComponent";
+    }
+  };
+
   /// A physical component which involves calling addressors.
   class AddressorComponent
       : public AccessorBasedComponent<PhysicalPathComponent> {
@@ -1068,11 +1115,36 @@ namespace {
                                                      IsDirectAccessorUse);
       auto args =
         std::move(*this).prepareAccessorArgs(gen, loc, base, addressor);
-      return gen.emitAddressorAccessor(loc, addressor, substitutions,
-                                       std::move(args.base), IsSuper,
-                                       IsDirectAccessorUse,
-                                       std::move(args.subscripts),
-                                       SubstFieldType);
+      auto result = gen.emitAddressorAccessor(loc, addressor, substitutions,
+                                              std::move(args.base), IsSuper,
+                                              IsDirectAccessorUse,
+                                              std::move(args.subscripts),
+                                              SubstFieldType);
+      switch (cast<FuncDecl>(addressor.getDecl())->getAddressorKind()) {
+      case AddressorKind::NotAddressor:
+        llvm_unreachable("not an addressor!");
+
+      // For unsafe addressors, we have no owner pointer to manage.
+      case AddressorKind::Unsafe:
+        assert(!result.second);
+        return result.first;
+
+      // For owning addressors, we can just let the owner get released
+      // at an appropriate point.
+      case AddressorKind::Owning:
+        return result.first;
+
+      // For pinning addressors, we have to push a writeback.
+      case AddressorKind::Pinning: {
+        std::unique_ptr<LogicalPathComponent>
+          component(new UnpinPseudoComponent(getTypeData()));
+        gen.getWritebackStack().emplace_back(loc, std::move(component),
+                                             result.second, Materialize(),
+                                             ArrayRef<SILValue>());
+        return result.first;
+      }
+      }
+      llvm_unreachable("bad addressor kind");
     }
 
     void print(raw_ostream &OS) const override {

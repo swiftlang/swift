@@ -9,10 +9,10 @@ import Swift
 // is not a proper addressor. But at least we can parse
 // "[global_init]".
 //
-// CHECK-LABEL: g.MyVar.mutableAddressor : Swift.Int
-// CHECK-NEXT: sil [global_init] @_TF1ga5MyVarSi
+// CHECK-LABEL: g.MyVar.unsafeMutableAddressor : Swift.Int
+// CHECK-NEXT: sil [global_init] @_TF1gau5MyVarSi
 
-sil [global_init] @_TF1ga5MyVarSi : $@thin () -> Builtin.RawPointer {
+sil [global_init] @_TF1gau5MyVarSi : $@thin () -> Builtin.RawPointer {
 bb0:
   %b = alloc_box $Int
   %p = address_to_pointer %b#1 : $*Int to $Builtin.RawPointer

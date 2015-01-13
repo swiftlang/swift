@@ -2238,7 +2238,9 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
                                     TypeLoc ElementTy,
                                     Pattern *Indices, SourceLoc StaticLoc,
                                     Parser::ParseDeclOptions Flags,
-                                    AccessorKind Kind, Parser *P) {
+                                    AccessorKind Kind,
+                                    AddressorKind addressorKind,
+                                    Parser *P) {
   // First task, set up the value argument pattern.  This is the NamePattern
   // (for setters) followed by the index list (for subscripts).  For
   // non-subscript getters, this degenerates down to "()".
@@ -2305,9 +2307,12 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
   if (Kind == AccessorKind::IsGetter) {
     ReturnType = ElementTy.clone(P->Context);
 
-  // Addressors return Unsafe{,Mutable}Pointer<T>.
+  // Addressors return Unsafe{,Mutable}Pointer<T>, plus sometimes an
+  // owner or pinned owner.
   } else if (Kind == AccessorKind::IsAddressor ||
              Kind == AccessorKind::IsMutableAddressor) {
+    // Construct "Unsafe{,Mutable}Pointer<T>".
+    
     TypeRepr *args[] = { ElementTy.clone(P->Context).getTypeRepr() };
 
     // FIXME: the fact that this could resolve in the local scope is dumb.
@@ -2315,9 +2320,48 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
     Identifier name = P->Context.getIdentifier(
                     isMutable ? "UnsafeMutablePointer" : "UnsafePointer");
 
-    ReturnType = new (P->Context) GenericIdentTypeRepr(SourceLoc(), name,
+    TypeRepr *resultType =
+      new (P->Context) GenericIdentTypeRepr(SourceLoc(), name,
                                             P->Context.AllocateCopy(args),
-                                                       SourceRange());
+                                            SourceRange());
+
+    auto makeNativeObjectType = [&]() -> TypeRepr* {
+      auto result =
+        new (P->Context) SimpleIdentTypeRepr(SourceLoc(),
+                                    P->Context.getIdentifier("NativePointer"));
+      result->setValue(P->Context.TheNativeObjectType);
+      return result;
+    };
+    auto makePairType = [&](TypeRepr *fst, TypeRepr *snd) -> TypeRepr* {
+      return TupleTypeRepr::create(P->Context, {fst, snd}, SourceRange(),
+                                   SourceLoc());
+    };
+
+    switch (addressorKind) {
+    case AddressorKind::NotAddressor:
+      llvm_unreachable("not an addressor!");
+
+    // For unsafe addressors, that's all we've got.
+    case AddressorKind::Unsafe:
+      break;
+
+    // For owning addressors, the return type is actually
+    //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject)
+    case AddressorKind::Owning:
+      resultType = makePairType(resultType, makeNativeObjectType());
+      break;
+
+    // For pinning addressors, the return type is actually
+    //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject?)
+    case AddressorKind::Pinning: {
+      auto optNativePtr = 
+        new (P->Context) OptionalTypeRepr(makeNativeObjectType(), SourceLoc());
+      resultType = makePairType(resultType, optNativePtr);
+      break;
+    }
+    }
+
+    ReturnType = resultType;
 
   // Everything else returns ().
   } else {
@@ -2334,12 +2378,18 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
   // default to mutating.  get/address default to non-mutating.
   if (!D->isStatic()) {
     switch (Kind) {
-    case AccessorKind::IsGetter:
     case AccessorKind::IsAddressor:
+      D->setAddressorKind(addressorKind);
       break;
 
-    case AccessorKind::IsSetter:
+    case AccessorKind::IsGetter:
+      break;
+
     case AccessorKind::IsMutableAddressor:
+      D->setAddressorKind(addressorKind);
+      SWIFT_FALLTHROUGH;
+
+    case AccessorKind::IsSetter:
     case AccessorKind::IsWillSet:
     case AccessorKind::IsDidSet:
       D->setMutating();
@@ -2474,6 +2524,85 @@ void Parser::consumeGetSetBody(AbstractFunctionDecl *AFD,
   }
 }
 
+static AddressorKind getImmutableAddressorKind(Token &tok) {
+  if (tok.isContextualKeyword("unsafeAddress")) {
+    return AddressorKind::Unsafe;
+  } else if (tok.isContextualKeyword("addressWithOwner")) {
+    return AddressorKind::Owning;
+  } else if (tok.isContextualKeyword("addressWithPinnedOwner")) {
+    return AddressorKind::Pinning;
+  } else {
+    return AddressorKind::NotAddressor;
+  }
+}
+static AddressorKind getMutableAddressorKind(Token &tok) {
+  if (tok.isContextualKeyword("unsafeMutableAddress")) {
+    return AddressorKind::Unsafe;
+  } else if (tok.isContextualKeyword("mutableAddressWithOwner")) {
+    return AddressorKind::Owning;
+  } else if (tok.isContextualKeyword("mutableAddressWithPinnedOwner")) {
+    return AddressorKind::Pinning;
+  } else {
+    return AddressorKind::NotAddressor;
+  }
+}
+
+/// Returns an accessor kind that 
+static StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind,
+                                              AddressorKind addressorKind) {
+  switch (accessorKind) {
+  case AccessorKind::NotAccessor: llvm_unreachable("invalid");
+  case AccessorKind::IsGetter: return "getter";
+  case AccessorKind::IsSetter: return "setter";
+  case AccessorKind::IsDidSet: return "didSet";
+  case AccessorKind::IsWillSet: return "willSet";
+  case AccessorKind::IsMaterializeForSet: return "materializeForSet";
+  case AccessorKind::IsAddressor:
+    switch (addressorKind) {
+    case AddressorKind::NotAddressor: llvm_unreachable("invalid");
+    case AddressorKind::Unsafe: return "unsafeAddress";
+    case AddressorKind::Owning: return "addressWithOwner";
+    case AddressorKind::Pinning: return "addressWithPinnedOwner";
+    }
+    llvm_unreachable("bad addressor kind");
+  case AccessorKind::IsMutableAddressor:
+    switch (addressorKind) {
+    case AddressorKind::NotAddressor: llvm_unreachable("invalid");
+    case AddressorKind::Unsafe: return "unsafeMutableAddress";
+    case AddressorKind::Owning: return "mutableAddressWithOwner";
+    case AddressorKind::Pinning: return "mutableAddressWithPinnedOwner";
+    }
+    llvm_unreachable("bad addressor kind");
+  }
+  llvm_unreachable("bad accessor kind");  
+}
+
+static void diagnoseRedundantAccessors(Parser &P, SourceLoc loc,
+                                       AccessorKind accessorKind,
+                                       AddressorKind addressorKind,
+                                       bool isSubscript,
+                                       FuncDecl *previousDecl) {
+  // Different addressor safety kinds still count as the same addressor.
+  if (previousDecl->getAddressorKind() != addressorKind) {
+    assert(accessorKind == AccessorKind::IsAddressor ||
+           accessorKind == AccessorKind::IsMutableAddressor);
+    P.diagnose(loc, diag::conflicting_property_addressor,
+               unsigned(isSubscript),
+               unsigned(accessorKind == AccessorKind::IsMutableAddressor));
+
+    // Be less specific about the previous definition.
+    P.diagnose(previousDecl->getLoc(), diag::previous_accessor,
+               accessorKind == AccessorKind::IsMutableAddressor
+                 ? "mutable addressor" : "addressor");
+    return;
+  }
+
+  P.diagnose(loc, diag::duplicate_property_accessor,
+             getAccessorNameForDiagnostic(accessorKind, addressorKind));
+  P.diagnose(previousDecl->getLoc(), diag::previous_accessor,
+             getAccessorNameForDiagnostic(accessorKind, addressorKind));
+}
+
 /// \brief Parse a get-set clause, optionally containing a getter, setter,
 /// willSet, and/or didSet clauses.  'Indices' is a paren or tuple pattern,
 /// specifying the index list for a subscript.
@@ -2503,6 +2632,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
       }
 
       AccessorKind Kind;
+      AddressorKind addressorKind = AddressorKind::NotAddressor;
       FuncDecl **TheDeclPtr;
       if (Tok.isContextualKeyword("get")) {
         Kind = AccessorKind::IsGetter;
@@ -2511,11 +2641,13 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
         Kind = AccessorKind::IsSetter;
         TheDeclPtr = &accessors.Set;
       } else if (!Flags.contains(PD_InProtocol) &&
-                 Tok.isContextualKeyword("address")) {
+                 (addressorKind = getImmutableAddressorKind(Tok))
+                   != AddressorKind::NotAddressor) {
         Kind = AccessorKind::IsAddressor;
         TheDeclPtr = &accessors.Addressor;
       } else if (!Flags.contains(PD_InProtocol) &&
-                 Tok.isContextualKeyword("mutableAddress")) {
+                 (addressorKind = getMutableAddressorKind(Tok))
+                   != AddressorKind::NotAddressor) {
         Kind = AccessorKind::IsMutableAddressor;
         TheDeclPtr = &accessors.MutableAddressor;
       } else {
@@ -2528,8 +2660,9 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
 
       // Have we already parsed this kind of clause?
       if (TheDecl) {
-        diagnose(Loc, diag::duplicate_property_accessor, (unsigned)Kind);
-        diagnose(TheDecl->getLoc(), diag::previous_accessor, (unsigned)Kind);
+        diagnoseRedundantAccessors(*this, Loc, Kind, addressorKind,
+                                   /*subscript*/Indices != nullptr, TheDecl);
+
         // Forget the previous decl.
         Decls.erase(std::find(Decls.begin(), Decls.end(), TheDecl));
         TheDecl = nullptr;  // Forget the previous decl.
@@ -2545,7 +2678,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
 
       // Set up a function declaration.
       TheDecl = createAccessorFunc(Loc, ValueNamePattern, ElementTy, Indices,
-                                   StaticLoc, Flags, Kind, this);
+                                   StaticLoc, Flags, Kind, addressorKind, this);
       TheDecl->getAttrs() = Attributes;
       
       Decls.push_back(TheDecl);
@@ -2592,6 +2725,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
     
     bool isImplicitGet = false;
     AccessorKind Kind;
+    AddressorKind addressorKind = AddressorKind::NotAddressor;
     FuncDecl **TheDeclPtr;
     if (Tok.isContextualKeyword("get")) {
       Kind = AccessorKind::IsGetter;
@@ -2605,10 +2739,12 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
     } else if (Tok.isContextualKeyword("didSet")) {
       Kind = AccessorKind::IsDidSet;
       TheDeclPtr = &accessors.DidSet;
-    } else if (Tok.isContextualKeyword("address")) {
+    } else if ((addressorKind = getImmutableAddressorKind(Tok))
+                 != AddressorKind::NotAddressor) {
       Kind = AccessorKind::IsAddressor;
       TheDeclPtr = &accessors.Addressor;
-    } else if (Tok.isContextualKeyword("mutableAddress")) {
+    } else if ((addressorKind = getMutableAddressorKind(Tok))
+                 != AddressorKind::NotAddressor) {
       Kind = AccessorKind::IsMutableAddressor;
       TheDeclPtr = &accessors.MutableAddressor;
     } else {
@@ -2640,8 +2776,9 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
 
     // Have we already parsed this kind of clause?
     if (TheDecl) {
-      diagnose(Loc, diag::duplicate_property_accessor, (unsigned)Kind);
-      diagnose(TheDecl->getLoc(), diag::previous_accessor, (unsigned)Kind);
+      diagnoseRedundantAccessors(*this, Loc, Kind, addressorKind,
+                                 /*subscript*/Indices != nullptr, TheDecl);
+
       // Forget the previous decl.
       Decls.erase(std::find(Decls.begin(), Decls.end(), TheDecl));
       TheDecl = nullptr;
@@ -2659,7 +2796,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
     if (!isImplicitGet && !consumeIf(tok::l_brace)) {
       // asmname'd accessors don't need bodies.
       if (!Attributes.hasAttribute<AsmnameAttr>()) {
-        diagnose(Tok, diag::expected_lbrace_accessor, (unsigned)Kind);
+        diagnose(Tok, diag::expected_lbrace_accessor,
+                 getAccessorNameForDiagnostic(Kind, addressorKind));
         return true;
       }
       ExternalAsmName = true;
@@ -2667,7 +2805,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
 
     // Set up a function declaration.
     TheDecl = createAccessorFunc(Loc, ValueNamePattern, ElementTy, Indices,
-                                 StaticLoc, Flags, Kind, this);
+                                 StaticLoc, Flags, Kind, addressorKind, this);
     TheDecl->getAttrs() = Attributes;
 
     // Parse the body, if any.
@@ -2860,10 +2998,11 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
 
   // Create an implicit accessor declaration.
   auto createImplicitAccessor =
-  [&](AccessorKind kind, TypedPattern *argPattern) -> FuncDecl* {
+  [&](AccessorKind kind, AddressorKind addressorKind,
+      TypedPattern *argPattern) -> FuncDecl* {
     auto accessor = createAccessorFunc(SourceLoc(), argPattern,
                                        elementTy, indices, staticLoc, flags,
-                                       kind, &P);
+                                       kind, addressorKind, &P);
     accessor->setImplicit();
     decls.push_back(accessor);
     return accessor;
@@ -2880,7 +3019,9 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
                  diag::mutableaddressor_without_address,
                  isa<SubscriptDecl>(storage));
 
-      Addressor = createImplicitAccessor(AccessorKind::IsAddressor, nullptr);
+      Addressor = createImplicitAccessor(AccessorKind::IsAddressor,
+                                         AddressorKind::Unsafe,
+                                         nullptr);
 
     // Don't allow both.
     } else if (Addressor && Get) {
@@ -2932,7 +3073,8 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
                    diag::observingproperty_without_mutableaddress,
                    bool(DidSet));
         MutableAddressor =
-          createImplicitAccessor(AccessorKind::IsMutableAddressor, nullptr);
+          createImplicitAccessor(AccessorKind::IsMutableAddressor,
+                                 AddressorKind::Unsafe, nullptr);
       }
 
       storage->makeAddressedWithObservers(LBLoc, Addressor, MutableAddressor,
@@ -2945,14 +3087,16 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
 
     // Observing properties will have getters and setters synthesized by sema.
     // Create their prototypes now.
-    Get = createImplicitAccessor(AccessorKind::IsGetter, nullptr);
+    Get = createImplicitAccessor(AccessorKind::IsGetter,
+                                 AddressorKind::NotAddressor, nullptr);
 
     auto argFunc = (WillSet ? WillSet : DidSet);
     auto argLoc = argFunc->getBodyParamPatterns().back()->getLoc();
 
     auto argPattern = createSetterAccessorArgument(argLoc, Identifier(),
                                         elementTy, AccessorKind::IsSetter, P);
-    Set = createImplicitAccessor(AccessorKind::IsSetter, argPattern);
+    Set = createImplicitAccessor(AccessorKind::IsSetter,
+                                 AddressorKind::NotAddressor, argPattern);
 
     storage->setObservingAccessors(Get, Set, nullptr);
     return;
@@ -2981,7 +3125,8 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
     auto argPattern =
       createSetterAccessorArgument(MutableAddressor->getLoc(), Identifier(),
                                    elementTy, AccessorKind::IsSetter, P);
-    Set = createImplicitAccessor(AccessorKind::IsSetter, argPattern);
+    Set = createImplicitAccessor(AccessorKind::IsSetter,
+                                 AddressorKind::NotAddressor, argPattern);
 
     storage->makeComputedWithMutableAddress(LBLoc, Get, Set, nullptr,
                                             MutableAddressor, RBLoc);
@@ -2995,7 +3140,8 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
     // purely stored.
     if (isa<SubscriptDecl>(storage)) {
       if (!invalid) P.diagnose(LBLoc, diag::subscript_without_get);
-      Get = createImplicitAccessor(AccessorKind::IsGetter, nullptr);
+      Get = createImplicitAccessor(AccessorKind::IsGetter,
+                                   AddressorKind::NotAddressor, nullptr);
     } else if (Set) {
       if (!invalid) P.diagnose(Set->getLoc(), diag::var_set_without_get);
     }

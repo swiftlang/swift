@@ -2780,7 +2780,11 @@ SILDeclRef SILGenFunction::getAddressorDeclRef(AbstractStorageDecl *storage,
 }
 
 /// Emit a call to an addressor.
-ManagedValue SILGenFunction::
+///
+/// The first return value is the address, which will always be an
+/// l-value managed value.  The second return value is the owner
+/// pointer, if applicable.
+std::pair<ManagedValue, ManagedValue> SILGenFunction::
 emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                       ArrayRef<Substitution> substitutions,
                       RValueSource &&selfValue, bool isSuper, bool isDirectUse,
@@ -2805,8 +2809,26 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
   emission.addCallSite(loc, RValueSource(loc, std::move(subscripts)),
                        accessType.getResult());
 
-  // Unsafe{Mutable}Pointer<T>
-  SILValue pointer = emission.apply().getUnmanagedValue();
+  // Unsafe{Mutable}Pointer<T> or
+  // (Unsafe{Mutable}Pointer<T>, Builtin.NativePointer) or
+  // (Unsafe{Mutable}Pointer<T>, Builtin.NativePointer?) or  
+  SILValue result = emission.apply().forward(*this);
+
+  SILValue pointer;
+  ManagedValue owner;
+  switch (cast<FuncDecl>(addressor.getDecl())->getAddressorKind()) {
+  case AddressorKind::NotAddressor:
+    llvm_unreachable("not an addressor!");
+  case AddressorKind::Unsafe:
+    pointer = result;
+    owner = ManagedValue();
+    break;
+  case AddressorKind::Owning:
+  case AddressorKind::Pinning:
+    pointer = B.createTupleExtract(loc, result, 0);
+    owner = emitManagedRValueWithCleanup(B.createTupleExtract(loc, result, 1));
+    break;
+  }
 
   // Drill down to the raw pointer using intrinsic knowledge of those types.
   auto pointerType =
@@ -2819,8 +2841,22 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                                   SILType::getRawPointerType(getASTContext()));
 
   // Convert to the appropriate address type and return.
-  auto address = B.createPointerToAddress(loc, pointer, addressType);
-  return ManagedValue::forLValue(address);
+  SILValue address = B.createPointerToAddress(loc, pointer, addressType);
+
+  // Mark dependence as necessary.
+  switch (cast<FuncDecl>(addressor.getDecl())->getAddressorKind()) {
+  case AddressorKind::NotAddressor:
+    llvm_unreachable("not an addressor!");
+  case AddressorKind::Unsafe:
+    // TODO: we should probably mark dependence on the base.
+    break;
+  case AddressorKind::Owning:
+  case AddressorKind::Pinning:
+    address = B.createMarkDependence(loc, address, owner.getValue());
+    break;
+  }
+
+  return { ManagedValue::forLValue(address), owner };
 }
 
 

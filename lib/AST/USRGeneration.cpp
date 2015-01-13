@@ -94,10 +94,23 @@ bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
                            llvm::raw_ostream &OS) {
   using namespace Mangle;
 
+  // AccKind should always be either IsGetter or IsSetter here, based
+  // on whether a reference is a mutating or non-mutating use.  USRs
+  // aren't supposed to reflect implementation differences like stored
+  // vs. addressed vs. observing.
+  //
+  // On the other side, the implementation indexer should be
+  // registering the getter/setter USRs independently of how they're
+  // actually implemented.  So a stored variable should still have
+  // getter/setter USRs (pointing to the variable declaration), and an
+  // addressed variable should have its "getter" point at the
+  // addressor.
+
   AbstractStorageDecl *SD = const_cast<AbstractStorageDecl*>(D);
   OS << getUSRSpacePrefix();
   Mangler Mangler(OS);
-  Mangler.mangleAccessorEntity(AccKind, SD, ResilienceExpansion::Minimal);
+  Mangler.mangleAccessorEntity(AccKind, AddressorKind::NotAddressor,
+                               SD, ResilienceExpansion::Minimal);
   return false;
 }
 

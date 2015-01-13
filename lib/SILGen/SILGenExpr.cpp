@@ -718,11 +718,12 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
   auto &storageTL = SGF.getTypeLowering(origFormalType, substFormalType);
   SILType storageType = storageTL.getLoweredType().getAddressType();
 
-  SILValue address =
+  auto addressorResult =
     SGF.emitAddressorAccessor(loc, accessor, substitutions,
                               std::move(baseRV), isSuper, isDirectUse,
-                              std::move(subscriptRV), storageType)
-    .getLValueAddress();
+                              std::move(subscriptRV), storageType);
+
+  SILValue address = addressorResult.first.getLValueAddress();
 
   SILType loweredSubstType =
     SGF.getLoweredType(substFormalType).getAddressType();
@@ -735,6 +736,22 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
     result = SGF.emitOrigToSubstValue(loc, result, origFormalType,
                                       substFormalType, C);
   }
+
+  switch (cast<FuncDecl>(accessor.getDecl())->getAddressorKind()) {
+  case AddressorKind::NotAddressor: llvm_unreachable("inconsistent");
+  case AddressorKind::Unsafe:
+    // Nothing to do.
+    break;
+  case AddressorKind::Owning:
+    // Emit the release immediately.
+    SGF.B.emitStrongRelease(loc, addressorResult.second.forward(SGF));
+    break;
+  case AddressorKind::Pinning:
+    // Emit the unpin immediately.
+    SGF.B.createStrongUnpin(loc, addressorResult.second.forward(SGF));
+    break;
+  }
+  
   return result;
 }
 

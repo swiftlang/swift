@@ -2566,6 +2566,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
       auto accessorKind = requiredDecl->getAccessorKind();
       if (accessorKind != AccessorKind::NotAccessor) {
         mangler.mangleAccessorEntity(accessorKind,
+                                     requiredDecl->getAddressorKind(),
                                      requiredDecl->getAccessorStorageDecl(),
                                      ResilienceExpansion::Minimal);
       } else {

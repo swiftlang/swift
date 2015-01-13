@@ -1371,27 +1371,44 @@ void Mangler::mangleIVarInitDestroyEntity(const ClassDecl *decl,
   Buffer << (isDestroyer ? 'E' : 'e');
 }
 
-static char getCodeForAccessorKind(AccessorKind kind) {
+static StringRef getCodeForAccessorKind(AccessorKind kind,
+                                        AddressorKind addressorKind) {
   switch (kind) {
   case AccessorKind::NotAccessor: llvm_unreachable("bad accessor kind!");
-  case AccessorKind::IsGetter:    return 'g';
-  case AccessorKind::IsSetter:    return 's';
-  case AccessorKind::IsWillSet:   return 'w';
-  case AccessorKind::IsDidSet:    return 'W';
-  case AccessorKind::IsAddressor: return 'l'; // "location"? 'A' was taken
-  case AccessorKind::IsMutableAddressor:  return 'a';
-  case AccessorKind::IsMaterializeForSet: return 'm';
+  case AccessorKind::IsGetter:    return "g";
+  case AccessorKind::IsSetter:    return "s";
+  case AccessorKind::IsWillSet:   return "w";
+  case AccessorKind::IsDidSet:    return "W";
+  case AccessorKind::IsAddressor:
+    // 'l' is for location. 'A' was taken.
+    switch (addressorKind) {
+    case AddressorKind::NotAddressor: llvm_unreachable("bad combo");
+    case AddressorKind::Unsafe: return "lu";
+    case AddressorKind::Owning: return "lo";
+    case AddressorKind::Pinning: return "lp";
+    }
+    llvm_unreachable("bad addressor kind");
+  case AccessorKind::IsMutableAddressor:
+    switch (addressorKind) {
+    case AddressorKind::NotAddressor: llvm_unreachable("bad combo");
+    case AddressorKind::Unsafe: return "au";
+    case AddressorKind::Owning: return "ao";
+    case AddressorKind::Pinning: return "ap";
+    }
+    llvm_unreachable("bad addressor kind");
+  case AccessorKind::IsMaterializeForSet: return "m";
   }
   llvm_unreachable("bad accessor kind");
 }
 
 void Mangler::mangleAccessorEntity(AccessorKind kind,
+                                   AddressorKind addressorKind,
                                    const AbstractStorageDecl *decl,
                                    ResilienceExpansion explosion) {
   assert(kind != AccessorKind::NotAccessor);
   Buffer << 'F';
   mangleContextOf(decl, BindGenerics::All);
-  Buffer << getCodeForAccessorKind(kind);
+  Buffer << getCodeForAccessorKind(kind, addressorKind);
   mangleDeclName(decl);
   mangleDeclType(decl, explosion, 0);
 }
@@ -1399,7 +1416,7 @@ void Mangler::mangleAccessorEntity(AccessorKind kind,
 void Mangler::mangleAddressorEntity(const ValueDecl *decl) {
   Buffer << 'F';
   mangleContextOf(decl, BindGenerics::All);
-  Buffer << 'a';
+  Buffer << "au";
   mangleDeclName(decl);
   mangleDeclType(decl, ResilienceExpansion::Minimal, 0);
 }
@@ -1437,7 +1454,8 @@ void Mangler::mangleEntity(const ValueDecl *decl,
   if (auto func = dyn_cast<FuncDecl>(decl)) {
     auto accessorKind = func->getAccessorKind();
     if (accessorKind != AccessorKind::NotAccessor)
-      return mangleAccessorEntity(accessorKind, func->getAccessorStorageDecl(),
+      return mangleAccessorEntity(accessorKind, func->getAddressorKind(),
+                                  func->getAccessorStorageDecl(),
                                   explosion);
   }
   

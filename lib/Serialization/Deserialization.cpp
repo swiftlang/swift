@@ -1458,6 +1458,22 @@ getActualOptionalTypeKind(uint8_t raw) {
   return None;
 }
 
+static Optional<swift::AddressorKind>
+getActualAddressorKind(uint8_t raw) {
+  switch (serialization::AddressorKind(raw)) {
+  case serialization::AddressorKind::NotAddressor:
+    return swift::AddressorKind::NotAddressor;
+  case serialization::AddressorKind::Unsafe:
+    return swift::AddressorKind::Unsafe;
+  case serialization::AddressorKind::Owning:
+    return swift::AddressorKind::Owning;
+  case serialization::AddressorKind::Pinning:
+    return swift::AddressorKind::Pinning;
+  }
+
+  return None;
+}
+
 void ModuleFile::configureStorage(AbstractStorageDecl *decl,
                                   unsigned rawStorageKind,
                                   serialization::DeclID getter,
@@ -2161,7 +2177,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclID contextID;
     bool isImplicit;
     bool isStatic;
-    uint8_t rawStaticSpelling, rawAccessLevel;
+    uint8_t rawStaticSpelling, rawAccessLevel, rawAddressorKind;
     bool isObjC, isMutating, hasDynamicSelf;
     unsigned numParamPatterns;
     TypeID signatureID;
@@ -2178,8 +2194,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                         numParamPatterns, signatureID,
                                         interfaceTypeID, associatedDeclID,
                                         overriddenID, accessorStorageDeclID,
-                                        hasCompoundName, rawAccessLevel,
-                                        nameIDs);
+                                        hasCompoundName, rawAddressorKind,
+                                        rawAccessLevel, nameIDs);
     
     // Resolve the name ids.
     SmallVector<Identifier, 2> names;
@@ -2220,6 +2236,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
       fn->setAccessibility(*accessLevel);
+    } else {
+      error();
+      return nullptr;
+    }
+
+    if (auto addressorKind = getActualAddressorKind(rawAddressorKind)) {
+      if (*addressorKind != AddressorKind::NotAddressor)
+        fn->setAddressorKind(*addressorKind);
     } else {
       error();
       return nullptr;

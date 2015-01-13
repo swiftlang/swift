@@ -1297,11 +1297,27 @@ private:
     } else if (Mangled.nextIf('c')) {
       entityKind = Node::Kind::Constructor;
     } else if (Mangled.nextIf('a')) {
-      entityKind = Node::Kind::MutableAddressor;
+      if (Mangled.nextIf('o')) {
+        entityKind = Node::Kind::OwningMutableAddressor;
+      } else if (Mangled.nextIf('p')) {
+        entityKind = Node::Kind::PinningMutableAddressor;
+      } else if (Mangled.nextIf('u')) {
+        entityKind = Node::Kind::UnsafeMutableAddressor;
+      } else {
+        return nullptr;
+      }
       name = demangleDeclName();
       if (!name) return nullptr;
     } else if (Mangled.nextIf('l')) {
-      entityKind = Node::Kind::Addressor;
+      if (Mangled.nextIf('o')) {
+        entityKind = Node::Kind::OwningAddressor;
+      } else if (Mangled.nextIf('p')) {
+        entityKind = Node::Kind::PinningAddressor;
+      } else if (Mangled.nextIf('u')) {
+        entityKind = Node::Kind::UnsafeAddressor;
+      } else {
+        return nullptr;
+      }
       name = demangleDeclName();
       if (!name) return nullptr;
     } else if (Mangled.nextIf('g')) {
@@ -2280,7 +2296,6 @@ private:
       return true;
 
     case Node::Kind::Failure:
-    case Node::Kind::Addressor:
     case Node::Kind::Allocator:
     case Node::Kind::ArgumentTuple:
     case Node::Kind::AutoClosureType:
@@ -2327,14 +2342,17 @@ private:
     case Node::Kind::PrivateDeclName:
     case Node::Kind::MaterializeForSet:
     case Node::Kind::Metaclass:
-    case Node::Kind::MutableAddressor:
     case Node::Kind::NominalTypeDescriptor:
     case Node::Kind::NonObjCAttribute:
     case Node::Kind::Number:
     case Node::Kind::ObjCAttribute:
     case Node::Kind::ObjCBlock:
+    case Node::Kind::OwningAddressor:
+    case Node::Kind::OwningMutableAddressor:
     case Node::Kind::PartialApplyForwarder:
     case Node::Kind::PartialApplyObjCForwarder:
+    case Node::Kind::PinningAddressor:
+    case Node::Kind::PinningMutableAddressor:
     case Node::Kind::PostfixOperator:
     case Node::Kind::PrefixOperator:
     case Node::Kind::ProtocolConformance:
@@ -2360,6 +2378,8 @@ private:
     case Node::Kind::Unknown:
     case Node::Kind::Unmanaged:
     case Node::Kind::Unowned:
+    case Node::Kind::UnsafeAddressor:
+    case Node::Kind::UnsafeMutableAddressor:
     case Node::Kind::ValueWitness:
     case Node::Kind::ValueWitnessTable:
     case Node::Kind::Variable:
@@ -3022,11 +3042,23 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     print(fct_type);
     return;
   }
-  case Node::Kind::Addressor:
-    printEntity(true, true, ".addressor");
+  case Node::Kind::OwningAddressor:
+    printEntity(true, true, ".owningAddressor");
     return;
-  case Node::Kind::MutableAddressor:
-    printEntity(true, true, ".mutableAddressor");
+  case Node::Kind::OwningMutableAddressor:
+    printEntity(true, true, ".owningMutableAddressor");
+    return;
+  case Node::Kind::PinningAddressor:
+    printEntity(true, true, ".pinningAddressor");
+    return;
+  case Node::Kind::PinningMutableAddressor:
+    printEntity(true, true, ".pinningMutableAddressor");
+    return;
+  case Node::Kind::UnsafeAddressor:
+    printEntity(true, true, ".unsafeAddressor");
+    return;
+  case Node::Kind::UnsafeMutableAddressor:
+    printEntity(true, true, ".unsafeMutableAddressor");
     return;
   case Node::Kind::GlobalGetter:
     printEntity(true, true, ".getter");

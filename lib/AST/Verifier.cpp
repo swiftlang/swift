@@ -1987,6 +1987,35 @@ struct ASTNodeBase {};
             abort();
           }
         }
+
+        auto storedAccessor =
+          storageDecl->getAccessorFunction(FD->getAccessorKind());
+        if (storedAccessor != FD) {
+          Out << "storage declaration has different accessor for this kind\n";
+          abort();
+        }
+
+        switch (FD->getAccessorKind()) {
+        case AccessorKind::NotAccessor: llvm_unreachable("bad kind");
+        case AccessorKind::IsGetter:
+        case AccessorKind::IsSetter:
+        case AccessorKind::IsWillSet:
+        case AccessorKind::IsDidSet:
+        case AccessorKind::IsMaterializeForSet:
+          if (FD->getAddressorKind() != AddressorKind::NotAddressor) {
+            Out << "non-addressor accessor has an addressor kind";
+            abort();
+          }
+          break;
+
+        case AccessorKind::IsAddressor:
+        case AccessorKind::IsMutableAddressor:
+          if (FD->getAddressorKind() == AddressorKind::NotAddressor) {
+            Out << "addressor does not have an addressor kind";
+            abort();
+          }
+          break;
+        }
       }
 
       verifyCheckedBase(FD);

@@ -13,19 +13,19 @@
 // CHECK:   ret void
 // CHECK: }
 
-// CHECK: define hidden i8* @_TF12lazy_globalsa1xSi() {
+// CHECK: define hidden i8* @_TF12lazy_globalsau1xSi() {
 // CHECK: entry:
 // CHECK:   call void @swift_once(i64* @globalinit_[[T]]_token0, i8* bitcast (void ()* @globalinit_[[T]]_func0 to i8*), %swift.refcounted* null)
 // CHECK:   ret i8* bitcast (%Si* @_Tv12lazy_globals1xSi to i8*)
 // CHECK: }
 
-// CHECK: define hidden i8* @_TF12lazy_globalsa1ySi() {
+// CHECK: define hidden i8* @_TF12lazy_globalsau1ySi() {
 // CHECK: entry:
 // CHECK:   call void @swift_once(i64* @globalinit_[[T]]_token0, i8* bitcast (void ()* @globalinit_[[T]]_func0 to i8*), %swift.refcounted* null)
 // CHECK:   ret i8* bitcast (%Si* @_Tv12lazy_globals1ySi to i8*)
 // CHECK: }
 
-// CHECK: define hidden i8* @_TF12lazy_globalsa1zSi() {
+// CHECK: define hidden i8* @_TF12lazy_globalsau1zSi() {
 // CHECK: entry:
 // CHECK:   call void @swift_once(i64* @globalinit_[[T]]_token0, i8* bitcast (void ()* @globalinit_[[T]]_func0 to i8*), %swift.refcounted* null)
 // CHECK:   ret i8* bitcast (%Si* @_Tv12lazy_globals1zSi to i8*)
@@ -34,7 +34,7 @@ var (x, y, z) = (1, 2, 3)
 
 // CHECK: define hidden i64 @_TF12lazy_globals4getXFT_Si() {
 // CHECK: entry:
-// CHECK:   %0 = call i8* @_TF12lazy_globalsa1xSi()
+// CHECK:   %0 = call i8* @_TF12lazy_globalsau1xSi()
 // CHECK:   %1 = bitcast i8* %0 to %Si*
 // CHECK:   %.value = getelementptr inbounds %Si* %1, i32 0, i32 0
 // CHECK:   %2 = load i64* %.value, align 8

@@ -1,10 +1,12 @@
-// RUN: %swift -parse %s -verify
+// RUN: %swift -parse-stdlib -parse %s -verify
+
+import Swift
 
 struct ValidImmutable {
   var base: UnsafePointer<Int> = nil
 
   subscript(index: Int) -> Int {
-    address {
+    unsafeAddress {
       return base
     }
   }
@@ -14,10 +16,10 @@ struct ValidBoth {
   var base: UnsafeMutablePointer<Int> = nil
 
   subscript(index: Int) -> Int {
-    address {
+    unsafeAddress {
       return UnsafePointer(base)
     }
-    mutableAddress {
+    unsafeMutableAddress {
       return base
     }
   }
@@ -27,7 +29,7 @@ struct OnlyMutable {
   var base: UnsafeMutablePointer<Int> = nil
 
   subscript(index: Int) -> Int {
-    mutableAddress { // expected-error {{subscript must provide either a getter or 'address' if it provides 'mutableAddress'}}
+    unsafeMutableAddress { // expected-error {{subscript must provide either a getter or 'address' if it provides 'mutableAddress'}}
       return base
     }
   }
@@ -37,10 +39,10 @@ struct Repeated {
   var base: UnsafeMutablePointer<Int> = nil
 
   subscript(index: Int) -> Int {
-    address { // expected-note {{previous definition}}
+    unsafeAddress { // expected-note {{previous definition}}
       return UnsafePointer(base)
     }
-    address { // expected-error {{duplicate definition}}
+    unsafeAddress { // expected-error {{duplicate definition}}
       return base // expected-error {{'UnsafeMutablePointer<Int>' is not convertible to 'UnsafePointer<Int>'}}
     }
   }
@@ -50,13 +52,13 @@ struct RepeatedMutable {
   var base: UnsafeMutablePointer<Int> = nil
 
   subscript(index: Int) -> Int {
-    address {
+    unsafeAddress {
       return UnsafePointer(base)
     }
-    mutableAddress { // expected-note {{previous definition}}
+    unsafeMutableAddress { // expected-note {{previous definition}}
       return base
     }
-    mutableAddress { // expected-error {{duplicate definition}}
+    unsafeMutableAddress { // expected-error {{duplicate definition}}
       return base
     }
   }
@@ -66,7 +68,7 @@ struct AddressorAndGet {
   var base: UnsafePointer<Int> = nil
 
   subscript(index: Int) -> Int {
-    address { // expected-error {{subscript cannot provide both 'address' and a getter}}
+    unsafeAddress { // expected-error {{subscript cannot provide both 'address' and a getter}}
       return UnsafePointer(base)
     }
     get {
@@ -79,7 +81,7 @@ struct AddressorAndSet {
   var base: UnsafePointer<Int> = nil
 
   subscript(index: Int) -> Int {
-    address {
+    unsafeAddress {
       return UnsafePointer(base)
     }
     set { // expected-error {{subscript cannot provide both 'address' and a setter; use an ordinary getter instead}}
@@ -91,7 +93,7 @@ struct MutableAddressorAndGet {
   var base: UnsafeMutablePointer<Int> = nil
 
   subscript(index: Int) -> Int {
-    mutableAddress {
+    unsafeMutableAddress {
       return base
     }
     get {
@@ -109,20 +111,20 @@ protocol HasMutableSubscript {
 
 struct DisobedientImmutableAddressor: HasMutableSubscript { // expected-error {{does not conform}}
   subscript(index: Int) -> Int { // expected-note {{candidate is not settable}}
-    address { return nil }
+    unsafeAddress { return nil }
   }
 }
 
 struct ObedientImmutableAddressor: HasImmutableSubscript {
   subscript(index: Int) -> Int {
-    address { return nil }
+    unsafeAddress { return nil }
   }
 }
 
 struct ObedientMutableAddressor: HasMutableSubscript {
   subscript(index: Int) -> Int {
-    address { return nil }
-    mutableAddress { return nil }
+    unsafeAddress { return nil }
+    unsafeMutableAddress { return nil }
   }
 }
 
@@ -137,20 +139,20 @@ protocol HasMutatingMutableSubscript {
 
 struct DisobedientImmutableAddressor2: HasMutatingMutableSubscript { // expected-error {{does not conform}}
   subscript(index: Int) -> Int { // expected-note {{candidate is not settable}}
-    address { return nil }
+    unsafeAddress { return nil }
   }
 }
 
 struct ObedientImmutableAddressor2: HasMutatingImmutableSubscript {
   subscript(index: Int) -> Int {
-    address { return nil }
+    unsafeAddress { return nil }
   }
 }
 
 struct ObedientMutableAddressor2: HasMutatingMutableSubscript {
   subscript(index: Int) -> Int {
-    address { return nil }
-    mutableAddress { return nil }
+    unsafeAddress { return nil }
+    unsafeMutableAddress { return nil }
   }
 }
 
@@ -162,14 +164,63 @@ protocol HasNonMutatingMutableSubscript {
 
 struct DisobedientNonMutatingMutableAddressor: HasNonMutatingMutableSubscript { // expected-error {{does not conform}}
   subscript(index: Int) -> Int {
-    address { return nil }
-    mutableAddress { return nil } // expected-note {{candidate is marked 'mutating' but protocol does not allow it}}
+    unsafeAddress { return nil }
+    unsafeMutableAddress { return nil } // expected-note {{candidate is marked 'mutating' but protocol does not allow it}}
   }
 }
 
 struct ObedientNonMutatingMutableAddressor: HasNonMutatingMutableSubscript {
   subscript(index: Int) -> Int {
-    address { return nil }
-    nonmutating mutableAddress { return nil }
+    unsafeAddress { return nil }
+    nonmutating unsafeMutableAddress { return nil }
+  }
+}
+
+// FIXME: Actually plumb the work to fix the grammar in these
+// diagnostics if/when we productize them.  ("a addressor")
+struct RedundantAddressors1 {
+  var owner : Builtin.NativeObject
+  subscript(index: Int) -> Int {
+    unsafeAddress { return nil } // expected-note {{previous definition of addressor is here}}
+    addressWithOwner { return (nil, owner)  } // expected-error {{subscript already has a addressor}}
+  }
+}
+struct RedundantAddressors2 {
+  var owner : Builtin.NativeObject
+  subscript(index: Int) -> Int {
+    unsafeAddress { return nil } // expected-note {{previous definition of addressor is here}}
+    addressWithPinnedOwner { return (nil, owner)  } // expected-error {{subscript already has a addressor}}
+  }
+}
+struct RedundantAddressors3 {
+  var owner : Builtin.NativeObject
+  subscript(index: Int) -> Int {
+    addressWithOwner { return nil } // expected-note {{previous definition of addressor is here}}
+    addressWithPinnedOwner { return (nil, owner)  } // expected-error {{subscript already has a addressor}}
+  }
+}
+
+struct RedundantMutableAddressors1 {
+  var owner : Builtin.NativeObject
+  subscript(index: Int) -> Int {
+    unsafeAddress { return nil }
+    unsafeMutableAddress { return nil } // expected-note {{previous definition of mutable addressor is here}}
+    mutableAddressWithOwner { return (nil, owner)  } // expected-error {{subscript already has a mutable addressor}}
+  }
+}
+struct RedundantMutableAddressors2 {
+  var owner : Builtin.NativeObject
+  subscript(index: Int) -> Int {
+    unsafeAddress { return nil }
+    unsafeMutableAddress { return nil } // expected-note {{previous definition of mutable addressor is here}}
+    mutableAddressWithOwner { return (nil, owner)  } // expected-error {{subscript already has a mutable addressor}}
+  }
+}
+struct RedundantMutableAddressors3 {
+  var owner : Builtin.NativeObject
+  subscript(index: Int) -> Int {
+    unsafeAddress { return nil }
+    unsafeMutableAddress { return nil } // expected-note {{previous definition of mutable addressor is here}}
+    mutableAddressWithOwner { return (nil, owner)  } // expected-error {{subscript already has a mutable addressor}}
   }
 }

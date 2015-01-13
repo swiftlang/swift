@@ -726,13 +726,14 @@ public:
 
   SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
                                  AccessKind accessKind,
-                                 bool isDirectAccessorUse);  
-  ManagedValue emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
-                                     ArrayRef<Substitution> substitutions,
-                                     RValueSource &&optionalSelfValue,
-                                     bool isSuper, bool isDirectAccessorUse,
-                                     RValue &&optionalSubscripts,
-                                     SILType addressType);
+                                 bool isDirectAccessorUse);
+  std::pair<ManagedValue,ManagedValue>
+  emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
+                        ArrayRef<Substitution> substitutions,
+                        RValueSource &&optionalSelfValue,
+                        bool isSuper, bool isDirectAccessorUse,
+                        RValue &&optionalSubscripts,
+                        SILType addressType);
 
   ManagedValue emitApplyConversionFunction(SILLocation loc,
                                            Expr *funcExpr,

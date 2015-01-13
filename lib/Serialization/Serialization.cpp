@@ -601,6 +601,20 @@ static uint8_t getRawStableMetatypeRepresentation(AnyMetatypeType *metatype) {
   llvm_unreachable("bad representation");
 }
 
+static uint8_t getRawStableAddressorKind(swift::AddressorKind kind) {
+  switch (kind) {
+  case swift::AddressorKind::NotAddressor:
+    return uint8_t(serialization::AddressorKind::NotAddressor);
+  case swift::AddressorKind::Unsafe:
+    return uint8_t(serialization::AddressorKind::Unsafe);
+  case swift::AddressorKind::Owning:
+    return uint8_t(serialization::AddressorKind::Owning);
+  case swift::AddressorKind::Pinning:
+    return uint8_t(serialization::AddressorKind::Pinning);
+  }
+  llvm_unreachable("bad addressor kind");
+}
+
 void Serializer::writePattern(const Pattern *pattern) {
   using namespace decls_block;
 
@@ -1918,6 +1932,8 @@ void Serializer::writeDecl(const Decl *D) {
 
     uint8_t rawAccessLevel =
       getRawStableAccessibility(fn->getAccessibility());
+    uint8_t rawAddressorKind =
+      getRawStableAddressorKind(fn->getAddressorKind());
 
     FuncLayout::emitRecord(Out, ScratchRecord, abbrCode,
                            addDeclRef(DC),
@@ -1934,6 +1950,7 @@ void Serializer::writeDecl(const Decl *D) {
                            addDeclRef(fn->getOverriddenDecl()),
                            addDeclRef(fn->getAccessorStorageDecl()),
                            !fn->getFullName().isSimpleName(),
+                           rawAddressorKind,
                            rawAccessLevel,
                            nameComponents);
 

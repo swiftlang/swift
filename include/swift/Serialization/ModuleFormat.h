@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 164; // Last change: silfntype noescape
+const uint16_t VERSION_MINOR = 165; // Last change: FuncDecl addressor kind
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -167,6 +167,13 @@ enum MetatypeRepresentation : uint8_t {
   MR_None, MR_Thin, MR_Thick, MR_ObjC
 };
 using MetatypeRepresentationField = BCFixed<2>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum class AddressorKind : uint8_t {
+  NotAddressor, Unsafe, Owning, Pinning
+};
+using AddressorKindField = BCFixed<2>;
 
 /// Translates an operator DeclKind to a Serialization fixity, whose values are
 /// guaranteed to be stable.
@@ -796,6 +803,7 @@ namespace decls_block {
     DeclIDField,  // overridden function
     DeclIDField,  // AccessorStorageDecl
     BCFixed<1>,   // name is compound?
+    AddressorKindField, // addressor kind
     AccessibilityKindField, // accessibility
     BCArray<IdentifierIDField> // name components
     // The record is trailed by:

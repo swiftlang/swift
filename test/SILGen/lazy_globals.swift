@@ -3,7 +3,7 @@
 // CHECK: sil private @globalinit_[[T:.*]]_func0 : $@thin () -> () {
 // CHECK:   [[XADDR:%.*]] = global_addr @_Tv12lazy_globals1xSi : $*Int
 // CHECK:   store {{%.*}} to [[XADDR]] : $*Int
-// CHECK: sil hidden [global_init] @_TF12lazy_globalsa1xSi : $@thin () -> Builtin.RawPointer {
+// CHECK: sil hidden [global_init] @_TF12lazy_globalsau1xSi : $@thin () -> Builtin.RawPointer {
 // CHECK:   [[TOKEN_ADDR:%.*]] = global_addr @globalinit_[[T]]_token0 : $*Builtin.Word
 // CHECK:   [[TOKEN_PTR:%.*]] = address_to_pointer [[TOKEN_ADDR]] : $*Builtin.Word to $Builtin.RawPointer
 // CHECK:   [[INIT_FUNC:%.*]] = function_ref @globalinit_[[T]]_func0 : $@thin () -> ()
@@ -16,7 +16,7 @@
 var x: Int = 0
 
 struct Foo {
-// CHECK: sil hidden [global_init] @_TFV12lazy_globals3Fooa3fooSi : $@thin () -> Builtin.RawPointer {
+// CHECK: sil hidden [global_init] @_TFV12lazy_globals3Fooau3fooSi : $@thin () -> Builtin.RawPointer {
   static var foo: Int = 22
 
   static var computed: Int {
@@ -27,7 +27,7 @@ struct Foo {
 }
 
 enum Bar {
-// CHECK: sil hidden [global_init] @_TFO12lazy_globals3Bara3barSi : $@thin () -> Builtin.RawPointer {
+// CHECK: sil hidden [global_init] @_TFO12lazy_globals3Barau3barSi : $@thin () -> Builtin.RawPointer {
   static var bar: Int = 33
 }
 
@@ -38,10 +38,10 @@ func f() -> (Int, Int) { return (1, 2) }
 
 // CHECK: sil private @globalinit_[[T]]_func4 : $@thin () -> () {
 // CHECK:   function_ref @_TF12lazy_globals1fFT_TSiSi_ : $@thin () -> (Int, Int)
-// CHECK: sil hidden [global_init] @_TF12lazy_globalsa2a1Si : $@thin () -> Builtin.RawPointer
+// CHECK: sil hidden [global_init] @_TF12lazy_globalsau2a1Si : $@thin () -> Builtin.RawPointer
 // CHECK:   function_ref @globalinit_[[T]]_func4 : $@thin () -> ()
 // CHECK:   global_addr @_Tv12lazy_globals2a1Si : $*Int
-// CHECK: sil hidden [global_init] @_TF12lazy_globalsa2b1Si : $@thin () -> Builtin.RawPointer {
+// CHECK: sil hidden [global_init] @_TF12lazy_globalsau2b1Si : $@thin () -> Builtin.RawPointer {
 // CHECK:   function_ref @globalinit_[[T]]_func4 : $@thin () -> ()
 // CHECK:   global_addr @_Tv12lazy_globals2b1Si : $*Int
 var (a1, b1) = f()

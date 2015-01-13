@@ -193,12 +193,12 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
       return _getElement(index)
     }
 %else:
-    address {
+    unsafeAddress {
       _checkSubscript(index)
       return UnsafePointer(_buffer.baseAddress + index)
     }
 %end
-    mutableAddress {
+    unsafeMutableAddress {
       _makeMutableAndUnique()
       _checkSubscript(index)
       return _getElementAddress(index)

@@ -272,7 +272,7 @@ struct StaticLetMember {
 // CHECK-LABEL: sil hidden @{{.*}}testStaticLetMember
 func testStaticLetMember() -> Int {
 
-  // CHECK: function_ref @{{.*}}StaticLetMembera1xSi
+  // CHECK: function_ref @{{.*}}StaticLetMemberau1xSi
   // CHECK: load {{.*}} : $*Int
   // CHECK-NEXT: return
   return StaticLetMember.x

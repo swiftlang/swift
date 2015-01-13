@@ -394,6 +394,7 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// Whether this function is a 'mutating' method.
     unsigned Mutating : 1;
+
     /// Whether this function has a dynamic Self return type.
     unsigned HasDynamicSelf : 1;
   };
@@ -3319,10 +3320,26 @@ enum class AccessorKind {
   IsDidSet = 3,
   /// \brief This is a materializeForSet accessor for a property.
   IsMaterializeForSet = 4,
-  /// \brief This is an address accessor for a property or subscript.
+  /// \brief This is an address-family accessor for a property or
+  /// subscript.  It also has an addressor kind.
   IsAddressor = 5,
-  /// \brief This is a mutableAddress accessor for a property or subscript.
+  /// \brief This is a mutableAddress-family accessor for a property
+  /// or subscript.  It also has an addressor kind.
   IsMutableAddressor = 6,
+};
+
+/// The safety semantics of this addressor.
+enum class AddressorKind : unsigned char {
+  /// \brief This is not an addressor.
+  NotAddressor,
+  /// \brief This is an unsafe addressor; it simply returns an address.
+  Unsafe,
+  /// \brief This is an owning addressor; it returns a Builtin.NativeObject
+  /// which should be released when the caller is done with the object.
+  Owning,
+  /// \brief This is a pinning addressor; it returns a Builtin.NativeObject?
+  /// which should be unpinned when the caller is done with the object.
+  Pinning,
 };
 
 /// Whether an access to storage is for reading, writing, or both.
@@ -4290,7 +4307,7 @@ class FuncDecl : public AbstractFunctionDecl {
   /// which property and what kind of accessor.
   llvm::PointerIntPair<AbstractStorageDecl*, 3, AccessorKind> AccessorDecl;
   llvm::PointerUnion<FuncDecl *, NominalTypeDecl*> OverriddenOrDerivedForDecl;
-  OperatorDecl *Operator;
+  llvm::PointerIntPair<OperatorDecl *, 2, AddressorKind> OperatorAndAddressorKind;
 
   FuncDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
            SourceLoc FuncLoc, DeclName Name,
@@ -4299,7 +4316,8 @@ class FuncDecl : public AbstractFunctionDecl {
     : AbstractFunctionDecl(DeclKind::Func, Parent, Name, NameLoc,
                            NumParamPatterns, GenericParams),
       StaticLoc(StaticLoc), FuncLoc(FuncLoc),
-      OverriddenOrDerivedForDecl(), Operator(nullptr) {
+      OverriddenOrDerivedForDecl(),
+      OperatorAndAddressorKind(nullptr, AddressorKind::NotAddressor) {
     FuncDeclBits.IsStatic = StaticLoc.isValid() || getName().isOperator();
     FuncDeclBits.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     assert(NumParamPatterns > 0 && "Must have at least an empty tuple arg");
@@ -4429,6 +4447,12 @@ public:
     AccessorDecl.setPointerAndInt(D, Kind);
   }
 
+  /// Set the addressor kind of this address or mutableAddress declaration.
+  void setAddressorKind(AddressorKind kind) {
+    assert(kind != AddressorKind::NotAddressor);
+    OperatorAndAddressorKind.setInt(kind);
+  }
+
   AbstractStorageDecl *getAccessorStorageDecl() const {
     return AccessorDecl.getPointer();
   }
@@ -4437,6 +4461,10 @@ public:
     if (AccessorDecl.getPointer() == nullptr)
       return AccessorKind::NotAccessor;
     return AccessorDecl.getInt();
+  }
+
+  AddressorKind getAddressorKind() const {
+    return OperatorAndAddressorKind.getInt();
   }
 
   bool isGetter() const { return getAccessorKind() == AccessorKind::IsGetter; }
@@ -4507,10 +4535,12 @@ public:
     OverriddenOrDerivedForDecl = ntd;
   }
   
-  OperatorDecl *getOperatorDecl() const { return Operator; }
+  OperatorDecl *getOperatorDecl() const {
+    return OperatorAndAddressorKind.getPointer();
+  }
   void setOperatorDecl(OperatorDecl *o) {
     assert(isOperator() && "can't set an OperatorDecl for a non-operator");
-    Operator = o;
+    OperatorAndAddressorKind.setPointer(o);
   }
 
   /// Returns true if a function declaration overrides a given

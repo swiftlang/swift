@@ -64,8 +64,12 @@
 ; CHECK: _Ttu0_RPq_PSs8Runcible__Fq_qq_5Mince ---> <T_0_0 where T_0_0: Swift.Runcible> (T_0_0) -> T_0_0.Mince
 ; CHECK: _Ttu0_RPq_PSs8Runcible_Eqq_5Minceq__Fq_q_ ---> <T_0_0 where T_0_0: Swift.Runcible, T_0_0.Mince == T_0_0> (T_0_0) -> T_0_0
 ; CHECK: _Tv3foo3barSi ---> foo.bar : Swift.Int
-; CHECK: _TF3fooa3barSi ---> foo.bar.mutableAddressor : Swift.Int
-; CHECK: _TF3fool3barSi ---> foo.bar.addressor : Swift.Int
+; CHECK: _TF3fooau3barSi ---> foo.bar.unsafeMutableAddressor : Swift.Int
+; CHECK: _TF3foolu3barSi ---> foo.bar.unsafeAddressor : Swift.Int
+; CHECK: _TF3fooao3barSi ---> foo.bar.owningMutableAddressor : Swift.Int
+; CHECK: _TF3foolo3barSi ---> foo.bar.owningAddressor : Swift.Int
+; CHECK: _TF3fooap3barSi ---> foo.bar.pinningMutableAddressor : Swift.Int
+; CHECK: _TF3foolp3barSi ---> foo.bar.pinningAddressor : Swift.Int
 ; CHECK: _TF3foog3barSi ---> foo.bar.getter : Swift.Int
 ; CHECK: _TF3foos3barSi ---> foo.bar.setter : Swift.Int
 ; CHECK: _TFC3foo3bar3basfS0_FT3zimCS_3zim_T_ ---> foo.bar.bas (foo.bar)(zim : foo.zim) -> ()

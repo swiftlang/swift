@@ -107,7 +107,8 @@ public:
                                unsigned uncurryingLevel);
   void mangleDestructorEntity(const DestructorDecl *decl, bool isDeallocating);
   void mangleIVarInitDestroyEntity(const ClassDecl *decl, bool isDestroyer);
-  void mangleAccessorEntity(AccessorKind kind, const AbstractStorageDecl *decl,
+  void mangleAccessorEntity(AccessorKind kind, AddressorKind addressorKind,
+                            const AbstractStorageDecl *decl,
                             ResilienceExpansion expansion);
   void mangleAddressorEntity(const ValueDecl *decl);
   void mangleGlobalGetterEntity(ValueDecl *decl);

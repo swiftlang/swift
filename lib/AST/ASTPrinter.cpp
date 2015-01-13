@@ -663,6 +663,36 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     }
   };
 
+  auto PrintAddressor = [&](FuncDecl *accessor) {
+    if (!accessor) return;
+    switch (accessor->getAddressorKind()) {
+    case AddressorKind::NotAddressor:
+      llvm_unreachable("addressor claims not to be an addressor");
+    case AddressorKind::Unsafe:
+      return PrintAccessor(accessor, "unsafeAddress");
+    case AddressorKind::Owning:
+      return PrintAccessor(accessor, "addressWithOwner");
+    case AddressorKind::Pinning:
+      return PrintAccessor(accessor, "addressWithPinnedOwner");
+    }
+    llvm_unreachable("bad addressor kind");
+  };
+
+  auto PrintMutableAddressor = [&](FuncDecl *accessor) {
+    if (!accessor) return;
+    switch (accessor->getAddressorKind()) {
+    case AddressorKind::NotAddressor:
+      llvm_unreachable("addressor claims not to be an addressor");
+    case AddressorKind::Unsafe:
+      return PrintAccessor(accessor, "unsafeMutableAddress");
+    case AddressorKind::Owning:
+      return PrintAccessor(accessor, "mutableAddressWithOwner");
+    case AddressorKind::Pinning:
+      return PrintAccessor(accessor, "mutableAddressWithPinnedOwner");
+    }
+    llvm_unreachable("bad addressor kind");
+  };
+
   Printer << " {";
   switch (ASD->getStorageKind()) {
   case AbstractStorageDecl::Stored:
@@ -683,8 +713,8 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   case AbstractStorageDecl::Addressed:
   case AbstractStorageDecl::AddressedWithTrivialAccessors:
   case AbstractStorageDecl::AddressedWithObservers:
-    PrintAccessor(ASD->getAddressor(), "address");
-    PrintAccessor(ASD->getMutableAddressor(), "mutableAddress");
+    PrintAddressor(ASD->getAddressor());
+    PrintMutableAddressor(ASD->getMutableAddressor());
     if (ASD->hasObservers()) {
       PrintAccessor(ASD->getWillSetFunc(), "willSet");
       PrintAccessor(ASD->getDidSetFunc(), "didSet");
@@ -693,7 +723,7 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
 
   case AbstractStorageDecl::ComputedWithMutableAddress:
     PrintAccessor(ASD->getGetter(), "get");
-    PrintAccessor(ASD->getMutableAddressor(), "mutableAddress");
+    PrintMutableAddressor(ASD->getMutableAddressor());
     break;
   }
   if (PrintAccessorBody) {

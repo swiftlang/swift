@@ -183,10 +183,10 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
   }
 
   var value : Value {
-    address {
+    unsafeAddress {
       return UnsafePointer(_value)
     }
-    nonmutating mutableAddress {
+    nonmutating unsafeMutableAddress {
       return _value
     }
   }
@@ -197,10 +197,10 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
   }
 
   subscript(i: Int) -> Element {
-    address {
+    unsafeAddress {
       return UnsafePointer(baseAddress + i)
     }
-    nonmutating mutableAddress {
+    nonmutating unsafeMutableAddress {
       return baseAddress + i
     }
   }

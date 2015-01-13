@@ -765,14 +765,14 @@ Globals
   entity-kind ::= 'I'                    // initializer
   entity-name ::= decl-name type         // named declaration
   entity-name ::= 'A' index              // default argument generator
-  entity-name ::= 'a' decl-name type     // mutable addressor
+  entity-name ::= 'a' addressor-kind decl-name type     // mutable addressor
   entity-name ::= 'C' type               // allocating constructor
   entity-name ::= 'c' type               // non-allocating constructor
   entity-name ::= 'D'                    // deallocating destructor; untyped
   entity-name ::= 'd'                    // non-deallocating destructor; untyped
   entity-name ::= 'g' decl-name type     // getter
   entity-name ::= 'i'                    // non-local variable initializer
-  entity-name ::= 'l' decl-name type     // non-mutable addressor
+  entity-name ::= 'l' addressor-kind decl-name type     // non-mutable addressor
   entity-name ::= 'm' decl-name type     // materializeForSet
   entity-name ::= 's' decl-name type     // setter
   entity-name ::= 'U' index type         // explicit anonymous closure expression
@@ -785,6 +785,9 @@ Globals
   local-decl-name ::= 'L' index identifier  // locally-discriminated declaration
   private-decl-name ::= 'P' identifier identifier  // file-discriminated declaration
   reabstract-signature ::= ('G' generic-signature)? type type
+  addressor-kind ::= 'u'                 // unsafe addressor
+  addressor-kind ::= 'o'                 // owning addressor
+  addressor-kind ::= 'p'                 // pinning addressor
 
 An ``entity`` starts with a ``nominal-type-kind`` (``[COPV]``), a
 substitution (``[S]``) of a nominal type, or an ``entity-kind``

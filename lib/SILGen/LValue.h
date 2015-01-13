@@ -81,6 +81,7 @@ public:
     OrigToSubstKind,            // generic type substitution
     OwnershipKind,              // weak pointer remapping
     AutoreleasingWritebackKind, // autorelease pointer on set
+    WritebackPseudoKind,        // a fake component to customize writeback
 
     FirstLogicalKind = GetterSetterKind
   };
