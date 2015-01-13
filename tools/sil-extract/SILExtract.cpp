@@ -59,6 +59,15 @@ ModuleName("module-name", llvm::cl::desc("The name of the module if processing"
 static llvm::cl::opt<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"));
 
+static llvm::cl::opt<std::string>
+ResourceDir("resource-dir",
+            llvm::cl::desc("The directory that holds the compiler resource files"));
+
+static llvm::cl::opt<std::string>
+SDKPath("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
+                              "importer."),
+        llvm::cl::init(""));
+
 // This function isn't referenced outside its translation unit, but it
 // can't use the "static" keyword because its address is used for
 // getMainExecutable (since some platforms don't support taking the
@@ -84,6 +93,16 @@ int main(int argc, char **argv) {
 
   // Give the context the list of search paths to use for modules.
   Invocation.setImportSearchPaths(ImportPaths);
+  // Set the SDK path and target if given.
+  if (SDKPath.getNumOccurrences() == 0) {
+    const char *SDKROOT = getenv("SDKROOT");
+    if (SDKROOT)
+      SDKPath = SDKROOT;
+  }
+  if (!SDKPath.empty())
+    Invocation.setSDKPath(SDKPath);
+  if (!ResourceDir.empty())
+    Invocation.setRuntimeResourcePath(ResourceDir);
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.setParseStdlib();
   Invocation.getLangOptions().EnableAccessControl = false;
