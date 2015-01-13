@@ -11,7 +11,7 @@ func ifexpr() -> Int {
   // CHECK-LABEL: sil hidden  @_TF13sil_locations6ifexprFT_Si
   // CHECK: apply {{.*}} line:[[@LINE-5]]:6
   // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-6]]:6
-  // CHECK: br [[FALSE_BB]] // {{.*}} line:[[@LINE-5]]:3
+  // CHECK: br [[FALSE_BB]] // {{.*}} line:[[@LINE-6]]:6
   // CHECK: return {{.*}} // {{.*}} line:[[@LINE-5]]:3:return
 }
 
@@ -26,9 +26,9 @@ func ifelseexpr() -> Int {
   // CHECK-LABEL: sil hidden  @_TF13sil_locations10ifelseexprFT_Si
   // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-7]]:6
   // CHECK: [[TRUE_BB]]:
-  // CHECK: br bb{{[0-9]+}} // {{.*}} line:[[@LINE-7]]:3
+  // CHECK: br bb{{[0-9]+}} // {{.*}} line:[[@LINE-8]]:6
   // CHECK: [[FALSE_BB]]:
-  // CHECK: br bb{{[0-9]+}} // {{.*}} line:[[@LINE-7]]:3
+  // CHECK: br bb{{[0-9]+}} // {{.*}} line:[[@LINE-8]]:6
   // CHECK: return {{.*}} // {{.*}} line:[[@LINE-7]]:3:return
 }
 
