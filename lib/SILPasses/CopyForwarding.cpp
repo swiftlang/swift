@@ -369,18 +369,28 @@ bool CopyForwarding::collectUsers() {
       continue;
     }
     switch (UserInst->getKind()) {
-    case ValueKind::UncheckedTakeEnumDataAddrInst:
     case ValueKind::ExistentialMetatypeInst:
     case ValueKind::InjectEnumAddrInst:
     case ValueKind::LoadInst:
     case ValueKind::StoreInst:
-    case ValueKind::InitEnumDataAddrInst:
     case ValueKind::DebugValueAddrInst:
       SrcUserInsts.insert(UserInst);
       break;
     default:
-      // Likely to be OpenExistentialInst or StructElementAddrInst.
-      // TODO: we could peak through struct element users like COWArrayOpts.
+      // Most likely one of:
+      //   init_enum_data_addr
+      //   open_existential
+      //   partial_apply
+      //   struct_element_addr
+      //   unchecked_take_enum_data_addr
+      //
+      // TODO: Peek through struct element users like COWArrayOpts.
+      //
+      // TODO: Attempt to analyze partial applies or run closure propagation
+      // first.
+      //
+      // TODO: assert that this list is consistent with
+      // isTransitiveEscapeInst().
       DEBUG(llvm::dbgs() << "  Skipping copy: use exposes def" << *UserInst);
       return false;
     }
