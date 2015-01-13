@@ -410,10 +410,12 @@ bool CopyForwarding::propagateCopy(CopyAddrInst *CopyInst) {
       DestUserInsts.insert(UI->getUser());
   }
   // Note that DestUserInsts is likely empty when the dest is an 'out' argument,
-  // allowing to go straight to backward propagation.
+  // allowing us to go straight to backward propagation.
   if (forwardPropagateCopy(CopyInst, DestUserInsts)) {
     DEBUG(llvm::dbgs() << "  Forwarding Copy:" << *CopyInst);
     if (!CopyInst->isInitializationOfDest()) {
+      // Replace the original copy with a destroy. We may be able to hoist it
+      // more in another pass but don't currently iterate.
       SILBuilder(CopyInst).createDestroyAddr(CopyInst->getLoc(),
                                              CopyInst->getDest())
         ->setDebugScope(CopyInst->getDebugScope());
@@ -512,7 +514,9 @@ bool CopyForwarding::forwardPropagateCopy(
     return false;
 
   // Convert a reinitialization of this address into a destroy, followed by an
-  // initialization.
+  // initialization. Replacing a copy with a destroy+init is not by itself
+  // profitable. However, it does allow eliminating the earlier copy, and we may
+  // later be able to elimimate this initialization copy.
   if (auto Copy = dyn_cast<CopyAddrInst>(&*SI)) {
     if (Copy->getDest() == CopyDest) {
       assert(!Copy->isInitializationOfDest() && "expected a deinit");
@@ -579,7 +583,9 @@ bool CopyForwarding::backwardPropagateCopy(
     return false;
 
   // Convert a reinitialization of this address into a destroy, followed by an
-  // initialization.
+  // initialization. Replacing a copy with a destroy+init is not by itself
+  // profitable. However, it does allow us to eliminate the later copy, and the
+  // init copy may be eliminater later.
   if (auto Copy = dyn_cast<CopyAddrInst>(&*SI)) {
     if (Copy->getDest() == CopySrc && !Copy->isInitializationOfDest()) {
       SILBuilder(SI).createDestroyAddr(Copy->getLoc(), CopySrc)
