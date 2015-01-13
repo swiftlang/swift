@@ -1,4 +1,5 @@
 // RUN: not --crash %target-swift-frontend %s -emit-ir
+// XFAIL: no_asserts
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // rdar://17240924
 
