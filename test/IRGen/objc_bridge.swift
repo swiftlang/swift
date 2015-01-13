@@ -7,10 +7,10 @@ import Foundation
 // CHECK: [[GETTER_SIGNATURE:@.*]] = private unnamed_addr constant [8 x i8] c"@16@0:8\00"
 // CHECK: [[SETTER_SIGNATURE:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8@16\00"
 
-// CHECK: @_INSTANCE_METHODS__TtC20objc_nsstring_bridge3Bas = private constant { i32, i32, [15 x { i8*, i8*, i8* }] } {
+// CHECK: @_INSTANCE_METHODS__TtC20objc_nsstring_bridge3Bas = private constant { i32, i32, [17 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24,
-// CHECK:   i32 15,
-// CHECK:   [15 x { i8*, i8*, i8* }] [
+// CHECK:   i32 17,
+// CHECK:   [17 x { i8*, i8*, i8* }] [
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([12 x i8]* @"\01L_selector_data(strRealProp)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
@@ -81,6 +81,11 @@ import Foundation
 // CHECK:       i8* getelementptr inbounds ([11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*)* @_TToFC20objc_nsstring_bridge3BasD to i8*)
 // CHECK:     },
+// CHECK:     { i8*, i8*, i8* } {
+// CHECK:       i8* getelementptr inbounds ([11 x i8]* @"\01L_selector_data(acceptSet:)", i64 0, i64 0), 
+// CHECK:       i8* getelementptr inbounds ([11 x i8]* @7, i64 0, i64 0), 
+// CHECK:       i8* bitcast (void (%3*, i8*, %4*)* @_TToFC20objc_nsstring_bridge3Bas9acceptSetfS0_FGVSs3SetS0__T_ to i8*) 
+// CHECK:     }
 // CHECK:     { i8*, i8*, i8* } { 
 // CHECK:       i8* getelementptr inbounds ([14 x i8]* @"\01L_selector_data(.cxx_destruct)", i64 0, i64 0), 
 // CHECK:       i8* getelementptr inbounds ([3 x i8]* @{{.*}}, i64 0, i64 0),
@@ -89,7 +94,7 @@ import Foundation
 // CHECK:   ]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
-// CHECK: @_PROPERTIES__TtC20objc_nsstring_bridge3Bas = private constant { i32, i32, [4 x { i8*, i8* }] } {
+// CHECK: @_PROPERTIES__TtC20objc_nsstring_bridge3Bas = private constant { i32, i32, [5 x { i8*, i8* }] } {
 
 func getDescription(o: NSObject) -> String {
   return o.description
@@ -134,7 +139,7 @@ extension NSString {
   func nsstrArg(#s: NSString) { }
 }
 
-class Bas : NSObject {
+class Bas : NSObject, Hashable {
   // CHECK: define internal [[OPAQUE:.*]]* @_TToFC20objc_nsstring_bridge3Basg11strRealPropSS([[OPAQUE:.*]]*, i8*) unnamed_addr {
   // CHECK: define internal void @_TToFC20objc_nsstring_bridge3Bass11strRealPropSS([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {
   var strRealProp : String
@@ -178,5 +183,10 @@ class Bas : NSObject {
   }
 
   deinit { var x = 10 }
+
+  var hashValue: Int { return 0 }
+
+  func acceptSet(set: Set<Bas>) { }
 }
 
+func ==(lhs: Bas, rhs: Bas) -> Bool { return true }

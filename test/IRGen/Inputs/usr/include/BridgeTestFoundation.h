@@ -13,6 +13,12 @@
 @interface NSMutableArray : NSObject
 @end
 
+@interface NSSet : NSObject
+@end
+
+@interface NSMutableSet : NSObject
+@end
+
 @interface NSNumber : NSObject
 @end
 

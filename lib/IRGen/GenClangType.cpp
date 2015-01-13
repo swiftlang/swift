@@ -243,6 +243,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     AutoreleasingUnsafeMutablePointer,
     Array,
     Dictionary,
+    Set,
     Unmanaged,
     CFunctionPointer,
   } kind = llvm::StringSwitch<StructKind>(swiftStructDecl->getName().str())
@@ -253,6 +254,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
         StructKind::AutoreleasingUnsafeMutablePointer)
     .Case("Array", StructKind::Array)
     .Case("Dictionary", StructKind::Dictionary)
+    .Case("Set", StructKind::Set)
     .Case("Unmanaged", StructKind::Unmanaged)
     .Case("CFunctionPointer", StructKind::CFunctionPointer)
     .Default(StructKind::Invalid);
@@ -283,6 +285,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
 
   case StructKind::Array:
   case StructKind::Dictionary:
+  case StructKind::Set:
     return getClangIdType(getClangASTContext());
       
   case StructKind::CFunctionPointer: {
