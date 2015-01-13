@@ -216,10 +216,13 @@ public:
   /// \param OI The OutputInfo for which Actions should be generated.
   /// \param OFM The OutputFileMap for the compilation; used to find any
   /// cross-build information.
+  /// \param ArgsHash A hash of the input arguments, to decide if we need a full
+  /// rebuild.
   /// \param[out] Actions The list in which to store the resulting Actions.
   void buildActions(const ToolChain &TC, const llvm::opt::DerivedArgList &Args,
                     const InputList &Inputs, const OutputInfo &OI,
-                    const OutputFileMap *OFM, ActionList &Actions) const;
+                    const OutputFileMap *OFM, StringRef ArgsHash,
+                    ActionList &Actions) const;
 
   /// Construct the OutputFileMap for the driver from the given arguments.
   std::unique_ptr<OutputFileMap>

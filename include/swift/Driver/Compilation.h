@@ -85,6 +85,9 @@ class Compilation {
   /// This is used for incremental builds.
   std::string CompilationRecordPath;
 
+  /// A hash representing all the arguments that could trigger a full rebuild.
+  std::string ArgsHash;
+
   /// The number of commands which this compilation should attempt to run in
   /// parallel.
   unsigned NumberOfParallelCommands;
@@ -105,6 +108,7 @@ public:
               DiagnosticEngine &Diags, OutputLevel Level,
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
+              StringRef ArgsHash,
               unsigned NumberOfParallelCommands = 1,
               bool EnableIncrementalBuild = false,
               bool SkipTaskExecution = false);

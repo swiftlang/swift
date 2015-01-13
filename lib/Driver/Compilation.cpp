@@ -17,6 +17,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/TaskQueue.h"
+#include "swift/Basic/Version.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/DependencyGraph.h"
 #include "swift/Driver/Driver.h"
@@ -41,12 +42,13 @@ Compilation::Compilation(const Driver &D, const ToolChain &DefaultToolChain,
                          DiagnosticEngine &Diags, OutputLevel Level,
                          std::unique_ptr<InputArgList> InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
+                         StringRef ArgsHash,
                          unsigned NumberOfParallelCommands,
                          bool EnableIncrementalBuild,
                          bool SkipTaskExecution)
   : TheDriver(D), DefaultToolChain(DefaultToolChain), Diags(Diags),
     Level(Level), Jobs(new JobList), InputArgs(std::move(InputArgs)),
-    TranslatedArgs(std::move(TranslatedArgs)),
+    TranslatedArgs(std::move(TranslatedArgs)), ArgsHash(ArgsHash),
     NumberOfParallelCommands(NumberOfParallelCommands),
     SkipTaskExecution(SkipTaskExecution),
     EnableIncrementalBuild(EnableIncrementalBuild) {
@@ -412,7 +414,7 @@ int Compilation::performSingleCommand(const Job *Cmd) {
 }
 
 static void writeCompilationRecord(
-    StringRef path,
+    StringRef path, StringRef argsHash,
     const llvm::DenseMap<const Job *, bool> &unfinishedCommands,
     const llvm::opt::ArgList &args) {
   llvm::DenseMap<const llvm::opt::Arg *, bool> unfinishedInputs;
@@ -430,6 +432,11 @@ static void writeCompilationRecord(
     out.clear_error();
     return;
   }
+
+  out << "version: \"" << llvm::yaml::escape(version::getSwiftFullVersion())
+      << "\"\n";
+  out << "options: \"" << llvm::yaml::escape(argsHash) << "\"\n";
+  out << "inputs: \n";
 
   for (auto &inputArg : args) {
     if (inputArg->getOption().getKind() != llvm::opt::Option::InputClass)
@@ -465,8 +472,8 @@ int Compilation::performJobs() {
   int result = performJobsInList(*Jobs, State);
 
   if (!CompilationRecordPath.empty()) {
-    writeCompilationRecord(CompilationRecordPath, State.UnfinishedCommands,
-                           getArgs());
+    writeCompilationRecord(CompilationRecordPath, ArgsHash,
+                           State.UnfinishedCommands, getArgs());
   }
 
   // FIXME: Do we want to be deleting temporaries even when a child process

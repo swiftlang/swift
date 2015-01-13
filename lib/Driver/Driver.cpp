@@ -45,6 +45,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Host.h"
+#include "llvm/Support/MD5.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/raw_ostream.h"
@@ -134,6 +135,34 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
   }
 }
 
+static void computeArgsHash(SmallString<32> &out, const DerivedArgList &args) {
+  SmallVector<const Arg *, 32> interestingArgs;
+  interestingArgs.reserve(args.size());
+  std::copy_if(args.begin(), args.end(), std::back_inserter(interestingArgs),
+               [](const Arg *arg) {
+    return !arg->getOption().hasFlag(options::DoesNotAffectIncrementalBuild);
+  });
+
+  llvm::array_pod_sort(interestingArgs.begin(), interestingArgs.end(),
+                       [](const Arg * const *lhs, const Arg * const *rhs)->int {
+    auto cmpID = (*lhs)->getOption().getID() - (*rhs)->getOption().getID();
+    if (cmpID != 0)
+      return cmpID;
+    return (*lhs)->getIndex() - (*rhs)->getIndex();
+  });
+
+  llvm::MD5 hash;
+  for (const Arg *arg : interestingArgs) {
+    hash.update(arg->getOption().getID());
+    for (const char *value : const_cast<Arg *>(arg)->getValues())
+      hash.update(value);
+  }
+
+  llvm::MD5::MD5Result hashBuf;
+  hash.final(hashBuf);
+  llvm::MD5::stringifyResult(hashBuf, out);
+}
+
 std::unique_ptr<Compilation> Driver::buildCompilation(
     ArrayRef<const char *> Args) {
   llvm::PrettyStackTraceString CrashInfo("Compilation construction");
@@ -205,9 +234,13 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     return nullptr;
   }
 
+  SmallString<32> ArgsHash;
+  computeArgsHash(ArgsHash, *TranslatedArgList);
+
   // Construct the graph of Actions.
   ActionList Actions;
-  buildActions(TC, *TranslatedArgList, Inputs, OI, OFM.get(), Actions);
+  buildActions(TC, *TranslatedArgList, Inputs, OI, OFM.get(), ArgsHash,
+               Actions);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -240,6 +273,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   std::unique_ptr<Compilation> C(new Compilation(*this, TC, Diags, Level,
                                                  std::move(ArgList),
                                                  std::move(TranslatedArgList),
+                                                 ArgsHash,
                                                  NumberOfParallelCommands,
                                                  Incremental,
                                                  DriverSkipExecution));
@@ -792,7 +826,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 using OutOfDateMap =
     llvm::SmallDenseMap<const Arg *, CompileJobAction::BuildState, 16>;
 
-static bool populateOutOfDateMap(OutOfDateMap &map,
+static bool populateOutOfDateMap(OutOfDateMap &map, StringRef argsHashStr,
                                  const Driver::InputList &inputs,
                                  StringRef buildRecordPath) {
   // Treat a missing file as "no previous build".
@@ -801,6 +835,7 @@ static bool populateOutOfDateMap(OutOfDateMap &map,
     return false;
 
   namespace yaml = llvm::yaml;
+  using BuildState = CompileJobAction::BuildState;
 
   llvm::SourceMgr SM;
   yaml::Stream stream(buffer.get()->getMemBufferRef(), SM);
@@ -809,30 +844,60 @@ static bool populateOutOfDateMap(OutOfDateMap &map,
   if (I == stream.end() || !I->getRoot())
     return true;
 
-  auto *topLevelList = dyn_cast<yaml::SequenceNode>(I->getRoot());
-  if (!topLevelList)
+  auto *topLevelMap = dyn_cast<yaml::MappingNode>(I->getRoot());
+  if (!topLevelMap)
     return true;
-
-  using BuildState = CompileJobAction::BuildState;
-  llvm::StringMap<BuildState> previousInputs;
   SmallString<64> scratch;
 
-  for (const yaml::Node &rawEntry : *topLevelList) {
-    auto *entry = dyn_cast<yaml::ScalarNode>(&rawEntry);
-    if (!entry)
-      return true;
+  llvm::StringMap<BuildState> previousInputs;
+  bool versionValid = false;
+  bool optionsMatch = true;
 
-    auto previousBuildState =
-      llvm::StringSwitch<Optional<BuildState>>(entry->getRawTag())
-        .Case("", BuildState::UpToDate)
-        .Case("!dirty", BuildState::NeedsCascadingBuild)
-        .Case("!private", BuildState::NeedsNonCascadingBuild)
-        .Default(None);
+  // FIXME: LLVM's YAML support does incremental parsing in such a way that
+  // for-range loops break.
+  for (auto i = topLevelMap->begin(), e = topLevelMap->end(); i != e; ++i) {
+    auto *key = cast<yaml::ScalarNode>(i->getKey());
+    StringRef keyStr = key->getValue(scratch);
 
-    if (!previousBuildState)
-      return true;
-    previousInputs[entry->getValue(scratch)] = *previousBuildState;
+    if (keyStr == "version") {
+      auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
+      if (!value)
+        return true;
+      versionValid =
+          (value->getValue(scratch) == version::getSwiftFullVersion());
+
+    } else if (keyStr == "options") {
+      auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
+      if (!value)
+        return true;
+      optionsMatch = (argsHashStr == value->getValue(scratch));
+
+    } else if (keyStr == "inputs") {
+      auto *inputList = dyn_cast<yaml::SequenceNode>(i->getValue());
+      if (!inputList)
+        return true;
+
+      for (const yaml::Node &rawEntry : *inputList) {
+        auto *entry = dyn_cast<yaml::ScalarNode>(&rawEntry);
+        if (!entry)
+          return true;
+
+        auto previousBuildState =
+            llvm::StringSwitch<Optional<BuildState>>(entry->getRawTag())
+              .Case("", BuildState::UpToDate)
+              .Case("!dirty", BuildState::NeedsCascadingBuild)
+              .Case("!private", BuildState::NeedsNonCascadingBuild)
+              .Default(None);
+
+        if (!previousBuildState)
+          return true;
+        previousInputs[entry->getValue(scratch)] = *previousBuildState;
+      }
+    }
   }
+
+  if (!versionValid || !optionsMatch)
+    return true;
 
   size_t numInputsFromPrevious = 0;
   for (auto &inputPair : inputs) {
@@ -861,6 +926,7 @@ void Driver::buildActions(const ToolChain &TC,
                           const InputList &Inputs,
                           const OutputInfo &OI,
                           const OutputFileMap *OFM,
+                          StringRef ArgsHash,
                           ActionList &Actions) const {
   if (!SuppressNoInputFilesError && Inputs.empty()) {
     Diags.diagnose(SourceLoc(), diag::error_no_input_files);
@@ -876,7 +942,7 @@ void Driver::buildActions(const ToolChain &TC,
   // way to specify a build record.
   if (OFM && Args.hasArg(options::OPT_incremental)) {
     if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput()) {
-      if (populateOutOfDateMap(outOfDateMap, Inputs,
+      if (populateOutOfDateMap(outOfDateMap, ArgsHash, Inputs,
                                masterOutputMap->lookup(types::TY_SwiftDeps))) {
         // FIXME: Distinguish errors from "file removed".
         rebuildEverything = true;

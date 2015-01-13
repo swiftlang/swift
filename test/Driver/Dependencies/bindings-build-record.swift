@@ -15,7 +15,7 @@
 // NO-EXEC: inputs: ["./yet-another.swift"], output: {{[{].*[}]}}, condition: check-dependencies
 
 
-// RUN: echo '["./main.swift", !private "./other.swift", !dirty "./yet-another.swift"]' > %t/main~buildrecord.swiftdeps
+// RUN: echo '{version: "'$(%swiftc_driver_plain -version | head -n1)'", inputs: ["./main.swift", !private "./other.swift", !dirty "./yet-another.swift"]}' > %t/main~buildrecord.swiftdeps
 // RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 | FileCheck %s -check-prefix=BUILD-RECORD
 
 // BUILD-RECORD: inputs: ["./main.swift"], output: {{[{].*[}]}}, condition: check-dependencies{{$}}
@@ -34,3 +34,6 @@
 // FILE-REMOVED: inputs: ["./other.swift"], output: {{[{].*[}]$}}
 // FILE-REMOVED-NOT: yet-another.swift
 
+
+// RUN: echo '{version: "bogus", inputs: ["./main.swift", !private "./other.swift", !dirty "./yet-another.swift"]}' > %t/main~buildrecord.swiftdeps
+// RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 | FileCheck %s -check-prefix=MUST-EXEC

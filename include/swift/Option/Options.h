@@ -30,6 +30,7 @@ namespace options {
     NoDriverOption = (1 << 5),
     NoInteractiveOption = (1 << 6),
     NoBatchOption = (1 << 7),
+    DoesNotAffectIncrementalBuild = (1 << 8)
   };
 
   enum ID {

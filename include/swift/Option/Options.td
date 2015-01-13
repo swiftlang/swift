@@ -31,8 +31,8 @@ def NoDriverOption : OptionFlag;
 def NoInteractiveOption : OptionFlag;
 def NoBatchOption : OptionFlag;
 
-/////////
-// Groups
+// The option should not force a full rebuild if added, changed, or removed.
+def DoesNotAffectIncrementalBuild : OptionFlag;
 
 /////////
 // Options
@@ -62,7 +62,7 @@ def internal_debug_Group :
   Group<internal_Group>, HelpText<"DEBUG/DEVELOPMENT OPTIONS">;
 
 class InternalDebugOpt : Group<internal_debug_Group>,
-  Flags<[HelpHidden]>;
+  Flags<[HelpHidden, DoesNotAffectIncrementalBuild]>;
 
 def driver_print_actions : Flag<["-"], "driver-print-actions">,
   InternalDebugOpt, HelpText<"Dump list of actions to perform">;
@@ -96,18 +96,18 @@ def version : Flag<["-", "--"], "version">,
   HelpText<"Print version information and exit">;
 
 def parseable_output : Flag<["-"], "parseable-output">,
-  Flags<[NoInteractiveOption]>,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit textual output in a parseable format">;
 
 // Standard Options
 def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
-  Flags<[FrontendOption]>;
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>;
 
 def o : JoinedOrSeparate<["-"], "o">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
-def j : JoinedOrSeparate<["-"], "j">,
+def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Number of commands to execute in parallel">, MetaVarName<"<n>">;
 
 def sdk : Separate<["-"], "sdk">, Flags<[FrontendOption]>,
@@ -129,12 +129,12 @@ def import_underlying_module : Flag<["-"], "import-underlying-module">,
   HelpText<"Implicitly imports the Objective-C half of a module">;
 
 def import_objc_header : Separate<["-"], "import-objc-header">,
-  Flags<[FrontendOption,HelpHidden]>,
+  Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Implicitly imports an Objective-C header file">;
 
-// FIXME: Unhide this once it's solid.
+// FIXME: Unhide this once it doesn't depend on an output file map.
 def incremental : Flag<["-"], "incremental">,
-  Flags<[NoInteractiveOption, HelpHidden]>,
+  Flags<[NoInteractiveOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Perform an incremental build if possible">;
 
 def nostdimport : Flag<["-"], "nostdimport">, Flags<[FrontendOption]>,
@@ -151,15 +151,15 @@ def save_temps : Flag<["-"], "save-temps">, Flags<[NoInteractiveOption]>,
   HelpText<"Save intermediate compilation results">;
 
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
-  Flags<[FrontendOption, NoInteractiveOption]>,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit basic Make-compatible dependencies files">;
 
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
-  Flags<[FrontendOption, NoInteractiveOption]>,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Serialize diagnostics in a binary format">;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Specifies the Clang module cache path">;
 
 def module_name : Separate<["-"], "module-name">, Flags<[FrontendOption]>,
@@ -177,21 +177,21 @@ def autolink_force_load : Flag<["-"], "autolink-force-load">,
   HelpText<"Force ld to link against this module even if no symbols are used">;
 
 def emit_module : Flag<["-"], "emit-module">,
-  Flags<[FrontendOption, NoInteractiveOption]>,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit an importable module">;
 def emit_module_path : Separate<["-"], "emit-module-path">,
-  Flags<[FrontendOption, NoInteractiveOption]>,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit an importable module to <path>">,
   MetaVarName<"<path>">;
 def emit_module_path_EQ : Joined<["-"], "emit-module-path=">,
   Flags<[FrontendOption, NoInteractiveOption]>, Alias<emit_module_path>;
 
 def emit_objc_header : Flag<["-"], "emit-objc-header">,
-  Flags<[FrontendOption, NoInteractiveOption]>,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit an Objective-C header file">;
 def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
-  Flags<[FrontendOption, NoInteractiveOption]>, MetaVarName<"<path>">,
-  HelpText<"Emit an Objective-C header file to <path>">;
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  MetaVarName<"<path>">, HelpText<"Emit an Objective-C header file to <path>">;
 
 def split_objc_selectors : Flag<["-"], "split-objc-selectors">,
   Flags<[FrontendOption, HelpHidden]>,
@@ -202,7 +202,7 @@ def import_cf_types : Flag<["-"], "import-cf-types">,
   HelpText<"Recognize and import CF types as class types">;
 
 def solver_memory_threshold : Separate<["-"], "solver-memory-threshold">,
-  Flags<[FrontendOption, HelpHidden]>,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;   
 
 // Platform options.
@@ -214,24 +214,26 @@ def enable_app_extension : Flag<["-"], "application-extension">,
 
 def linker_option_Group : OptionGroup<"<linker-specific options>">;
 
-def l : Joined<["-"], "l">, Flags<[FrontendOption]>,
-  Group<linker_option_Group>,
-  HelpText<"Specifies a library which should be linked against">;
-def framework : Separate<["-"], "framework">, Flags<[FrontendOption]>,
-  Group<linker_option_Group>,
+def l : Joined<["-"], "l">, Group<linker_option_Group>,
+    Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+    HelpText<"Specifies a library which should be linked against">;
+def framework : Separate<["-"], "framework">, Group<linker_option_Group>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Specifies a framework which should be linked against">;
 
-def L : JoinedOrSeparate<["-"], "L">, Flags<[FrontendOption]>,
-  Group<linker_option_Group>,
+def L : JoinedOrSeparate<["-"], "L">, Group<linker_option_Group>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Add directory to library link search path">;
 def L_EQ : Joined<["-"], "L=">, Alias<L>;
 
-def link_objc_runtime : Flag<["-"], "link-objc-runtime">;
+def link_objc_runtime : Flag<["-"], "link-objc-runtime">,
+  Flags<[DoesNotAffectIncrementalBuild]>;
 def no_link_objc_runtime : Flag<["-"], "no-link-objc-runtime">,
-  Flags<[HelpHidden]>,
+  Flags<[HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Don't link in additions to the Objective-C runtime">;
 
 def Xlinker : Separate<["-"], "Xlinker">,
+  Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Specifies an option which should be passed to the linker">;
 
 // Optimization levels
@@ -282,46 +284,53 @@ class ModeOpt : Group<modes_Group>;
 
 // Output Modes
 def emit_executable : Flag<["-"], "emit-executable">,
-  HelpText<"Emit a linked executable">, Flags<[NoInteractiveOption]>, ModeOpt;
+  HelpText<"Emit a linked executable">, ModeOpt,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def emit_library : Flag<["-"], "emit-library">,
-  HelpText<"Emit a linked library">, Flags<[NoInteractiveOption]>, ModeOpt;
+  HelpText<"Emit a linked library">, ModeOpt,
+  Flags<[NoInteractiveOption]>;
 def emit_object : Flag<["-"], "emit-object">,
-  Flags<[FrontendOption, NoInteractiveOption]>,
-  HelpText<"Emit object file(s) (-c)">, ModeOpt;
+  HelpText<"Emit object file(s) (-c)">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def emit_assembly : Flag<["-"], "emit-assembly">,
-  Flags<[FrontendOption, NoInteractiveOption]>,
-  HelpText<"Emit assembly file(s) (-S)">, ModeOpt;
+  HelpText<"Emit assembly file(s) (-S)">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def emit_bc : Flag<["-"], "emit-bc">,
-  HelpText<"Emit LLVM BC file(s)">,
-  Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
+  HelpText<"Emit LLVM BC file(s)">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def emit_ir : Flag<["-"], "emit-ir">,
-  HelpText<"Emit LLVM IR file(s)">,
-  Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
-def emit_sil : Flag<["-"], "emit-sil">, HelpText<"Emit canonical SIL file(s)">,
-  Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
-def emit_silgen : Flag<["-"], "emit-silgen">, HelpText<"Emit raw SIL file(s)">,
-  Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
+  HelpText<"Emit LLVM IR file(s)">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_sil : Flag<["-"], "emit-sil">,
+  HelpText<"Emit canonical SIL file(s)">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_silgen : Flag<["-"], "emit-silgen">,
+  HelpText<"Emit raw SIL file(s)">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 def c : Flag<["-"], "c">, Alias<emit_object>,
   Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
 def S: Flag<["-"], "S">, Alias<emit_assembly>,
   Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
 
-def update_code : Flag<["-"], "update-code">, HelpText<"Update Swift code">,
-  Flags<[HelpHidden, NoInteractiveOption]>, ModeOpt;
+def update_code : Flag<["-"], "update-code">,
+  HelpText<"Update Swift code">, ModeOpt,
+  Flags<[HelpHidden, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 // No Output Modes
-def parse : Flag<["-"], "parse">, HelpText<"Parse input file(s)">,
-  Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
+def parse : Flag<["-"], "parse">,
+  HelpText<"Parse input file(s)">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_parse : Flag<["-"], "dump-parse">,
-  Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt,
-  HelpText<"Parse input file(s) and dump AST(s)">;
+  HelpText<"Parse input file(s) and dump AST(s)">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_ast : Flag<["-"], "dump-ast">,
-  Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt,
-  HelpText<"Parse and type-check input file(s) and dump AST(s)">;
+  HelpText<"Parse and type-check input file(s) and dump AST(s)">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def print_ast : Flag<["-"], "print-ast">,
-  Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt,
-  HelpText<"Parse and type-check input file(s) and pretty print AST(s)">;
+  HelpText<"Parse and type-check input file(s) and pretty print AST(s)">,
+  ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 // Other Modes
 def repl : Flag<["-"], "repl">,
