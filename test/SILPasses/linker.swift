@@ -4,5 +4,12 @@
 // RUN: %swift %s -O -I=%t -sil-debug-serialization -o - -emit-sil | FileCheck %s
 
 // CHECK: sil public_external [fragile] @_TFSs11doSomethingFT_T_ : $@thin () -> () {
-
 doSomething()
+
+// Make sure we are not linking doSomethign2 because it is marked with 'noimport'
+
+// CHECK: sil [semantics "stdlib.noimport"] @_TFSs12doSomething2FT_T_ : $@thin () -> ()
+// CHECK-NOT: return
+doSomething2()
+
+// CHECK: sil @unknown

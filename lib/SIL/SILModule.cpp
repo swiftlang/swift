@@ -363,6 +363,17 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
   return Info;
 }
 
+/// \return True if the function \p F should be imported into the current
+/// module.
+static bool shouldImportFunction(SILFunction *F) {
+  // Skip functions that are marked with the 'no import' tag. These
+  // are functions that we don't want to copy from the module.
+  if (F->hasSemanticsString("stdlib.noimport"))
+    return false;
+
+  return true;
+}
+
 namespace {
 
 /// Visitor that knows how to link in dependencies of SILInstructions.
@@ -398,6 +409,9 @@ public:
   /// Process F, recursively deserializing any thing F may reference.
   bool processFunction(SILFunction *F) {
     if (Mode == LinkingMode::LinkNone)
+      return false;
+
+    if (!shouldImportFunction(F))
       return false;
 
     // If F is a declaration, first deserialize it.
@@ -637,11 +651,19 @@ private:
     bool Result = false;
     while (!Worklist.empty()) {
       auto Fn = Worklist.pop_back_val();
+
+      if (!shouldImportFunction(Fn))
+        continue;
+
       for (auto &BB : *Fn) {
         for (auto &I : BB) {
           // Should we try linking?
           if (visit(&I)) {
             for (auto F : FunctionDeserializationWorklist) {
+
+              if (!shouldImportFunction(F))
+                continue;
+
               // The ExternalSource may wish to rewrite non-empty bodies.
               if (!F->empty() && ExternalSource)
                 if (auto NewFn = ExternalSource->lookupSILFunction(F)) {
