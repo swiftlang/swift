@@ -171,13 +171,24 @@ emitStmtConditionWithBodyRec(StmtCondition C, Stmt *Body,
   SILValue hasValue =
     gen.emitDoesOptionalHaveValue(PBD, buffer.OptAddr->getAddress());
   
+  // Now that we evaluated some thing into the optional buffer, we need to
+  // clean it up on condition failure path.  On the true dest, we'll consume the
+  // buffer when extracting the value out of it.  This cleanup is destroying an
+  // optional known to be nil, so we can avoid the destroy_addr when it is
+  // trivial or known to be a class type).
+  SILBasicBlock *FalseDest = CleanupBlocks.back();
+  auto OptionalPayloadType = PBD->getInit()->getType();
+  if (!OptionalPayloadType->is<ClassType>() &&
+      !OptionalPayloadType->isClassExistentialType() &&
+      !gen.getTypeLowering(OptionalPayloadType).isTrivial()) {
+    FalseDest = gen.createBasicBlock();
+    SILBuilder(FalseDest).createDestroyAddr(PBD, buffer.OptAddr->getAddress());
+    SILBuilder(FalseDest).createBranch(PBD, CleanupBlocks.back());
+  }
+  
   // Emit the continuation block and the conditional branch to the FalseDest.
   SILBasicBlock *ContBB = gen.createBasicBlock();
-
-  // On the failure path, the optional is known to be nil, and we know that nil
-  // optionals are always trivial, os it is safe to elide the destroy_addr for
-  // the buffer on that path.
-  gen.B.createCondBranch(PBD, hasValue, ContBB, CleanupBlocks.back());
+  gen.B.createCondBranch(PBD, hasValue, ContBB, FalseDest);
   
   // Continue on the success path as the current block.
   gen.B.emitBlock(ContBB);

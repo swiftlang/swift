@@ -14,7 +14,10 @@ func if_no_else() {
   // CHECK:   [[OPT_RES:%.*]] = apply [[FOO]]()
   // CHECK:   store [[OPT_RES]] to [[OPT_BUF]]#1
   // CHECK:   [[HAS_VALUE:%.*]] = select_enum_addr [[OPT_BUF]]#1
-  // CHECK:   cond_br [[HAS_VALUE]], [[YES:bb[0-9]+]], [[CONT:bb[0-9]+]]
+  // CHECK:   cond_br [[HAS_VALUE]], [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
+  // CHECK: [[NO]]:
+  // CHECK:   destroy_addr [[OPT_BUF]]
+  // CHECK:   br [[CONT:bb[0-9]+]]
   if let x = foo() {
   // CHECK: [[YES]]:
   // CHECK:   [[VAL_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF]]
@@ -49,18 +52,19 @@ func if_else_chain() {
   // CHECK:   br [[CONT_X:bb[0-9]+]]
     a(x)
   // CHECK: [[NOX]]:
+  // CHECK:   destroy_addr [[OPT_BUF]]
   // CHECK:   [[OPT_BUF_2:%.*]] = alloc_stack $Optional<String>
-  // CHECK:   cond_br {{%.*}}, [[YESY:bb[0-9]+]], [[ELSE:bb[0-9]+]]
+  // CHECK:   cond_br {{%.*}}, [[YESY:bb[0-9]+]], [[NOY:bb[0-9]+]]
   } else if var y = bar() {
   // CHECK: [[YESY]]:
-  // CHECK:   alloc_box $String   // var y
+  // CHECK:   alloc_box $String
   // CHECK:   br [[CONT_Y:bb[0-9]+]]
     b(y)
   } else {
-    // CHECK: [[ELSE]]:
-    // CHECK: function_ref if_while_binding.c
+  // CHECK: [[NOY]]:
+  // CHECK:   destroy_addr [[OPT_BUF_2]]
+  // CHECK:   br [[CONT_Y]]
     c("")
-    // CHECK:   br [[CONT_Y]]
   }
 
   // CHECK: [[CONT_Y]]:
@@ -76,7 +80,10 @@ func while_loop() {
   // CHECK:   br [[LOOP_ENTRY:bb[0-9]+]]
   // CHECK: [[LOOP_ENTRY]]:
   // CHECK:   [[HAS_VALUE:%.*]] = select_enum_addr [[OPT_BUF]]#1
-  // CHECK:   cond_br [[HAS_VALUE]], [[LOOP_BODY:bb[0-9]+]], [[LOOP_EXIT:bb[0-9]+]]
+  // CHECK:   cond_br [[HAS_VALUE]], [[LOOP_BODY:bb[0-9]+]], [[LOOP_EXIT1:bb[0-9]+]]
+  // CHECK: [[LOOP_EXIT1]]:
+  // CHECK:   destroy_addr [[OPT_BUF]]
+  // CHECK:   br [[LOOP_EXIT:bb[0-9]+]]
 
   while let x = foo() {
   // CHECK: [[LOOP_BODY]]:
@@ -119,13 +126,19 @@ func while_loop_multi() {
   // CHECK:   br [[LOOP_ENTRY:bb[0-9]+]]
   // CHECK: [[LOOP_ENTRY]]:
   // CHECK:   [[HAS_VALUE1:%.*]] = select_enum_addr [[OPT_BUF1]]#1
-  // CHECK:   cond_br [[HAS_VALUE1]], [[CHECKBUF2:bb[0-9]+]], [[LOOP_EXIT0:bb[0-9]+]]
+  // CHECK:   cond_br [[HAS_VALUE1]], [[CHECKBUF2:bb[0-9]+]], [[LOOP_EXIT1:bb[0-9]+]]
+  // CHECK: [[LOOP_EXIT1]]:
+  // CHECK:   destroy_addr [[OPT_BUF1]]#1
+  // CHECK:   br [[LOOP_EXIT0:bb[0-9]+]]
 
   // CHECK: [[CHECKBUF2]]:
   // CHECK:   [[VAL_BUF1:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF1]]#1
   // CHECK:   debug_value {{.*}} : $String  // let a
   // CHECK:   [[HAS_VALUE2:%.*]] = select_enum_addr [[OPT_BUF2]]#1
-  // CHECK:   cond_br [[HAS_VALUE2]], [[LOOP_BODY:bb[0-9]+]], [[LOOP_EXIT2a:bb[0-9]+]]
+  // CHECK:   cond_br [[HAS_VALUE2]], [[LOOP_BODY:bb[0-9]+]], [[LOOP_EXIT2:bb[0-9]+]]
+  // CHECK: [[LOOP_EXIT2]]:
+  // CHECK:   destroy_addr [[OPT_BUF2]]#1
+  // CHECK:   br [[LOOP_EXIT2a:bb[0-9]+]]
   // CHECK: [[LOOP_BODY]]:
   while let a = foo(), b = bar() {
     // CHECK:   [[VAL_BUF2:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF2]]#1
@@ -147,13 +160,20 @@ func if_multi() {
   // CHECK:   [[OPT_BUF1:%.*]] = alloc_stack $Optional<String>
   // CHECK:   [[OPT_BUF2:%.*]] = alloc_stack $Optional<String>
   // CHECK:   [[HAS_VALUE1:%.*]] = select_enum_addr [[OPT_BUF1]]#1
-  // CHECK:   cond_br [[HAS_VALUE1]], [[CHECKBUF2:bb[0-9]+]], [[IF_DONE:bb[0-9]+]]
+  // CHECK:   cond_br [[HAS_VALUE1]], [[CHECKBUF2:bb[0-9]+]], [[IF_EXIT1:bb[0-9]+]]
+  // CHECK: [[IF_EXIT1]]:
+  // CHECK:   destroy_addr [[OPT_BUF1]]#1
+  // CHECK:   br [[IF_DONE:bb[0-9]+]]
 
   // CHECK: [[CHECKBUF2]]:
   // CHECK:   [[VAL_BUF1:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF1]]#1
   // CHECK:   debug_value {{.*}} : $String  // let a
   // CHECK:   [[HAS_VALUE2:%.*]] = select_enum_addr [[OPT_BUF2]]#1
-  // CHECK:   cond_br [[HAS_VALUE2]], [[IF_BODY:bb[0-9]+]], [[IF_EXIT1a:bb[0-9]+]]
+  // CHECK:   cond_br [[HAS_VALUE2]], [[IF_BODY:bb[0-9]+]], [[IF_EXIT2:bb[0-9]+]]
+
+  // CHECK: [[IF_EXIT2]]:
+  // CHECK:   destroy_addr [[OPT_BUF2]]#1
+  // CHECK:   br [[IF_EXIT1a:bb[0-9]+]]
 
   // CHECK: [[IF_BODY]]:
   if let a = foo(), var b = bar() {
@@ -177,12 +197,18 @@ func if_multi_else() {
   // CHECK:   [[OPT_BUF1:%.*]] = alloc_stack $Optional<String>
   // CHECK:   [[OPT_BUF2:%.*]] = alloc_stack $Optional<String>
   // CHECK:   [[HAS_VALUE1:%.*]] = select_enum_addr [[OPT_BUF1]]#1
-  // CHECK:   cond_br [[HAS_VALUE1]], [[CHECKBUF2:bb[0-9]+]], [[ELSE:bb[0-9]+]]
+  // CHECK:   cond_br [[HAS_VALUE1]], [[CHECKBUF2:bb[0-9]+]], [[IF_EXIT1:bb[0-9]+]]
+  // CHECK: [[IF_EXIT1]]:
+  // CHECK:   destroy_addr [[OPT_BUF1]]#1
+  // CHECK:   br [[ELSE:bb[0-9]+]]
   // CHECK: [[CHECKBUF2]]:
   // CHECK:   [[VAL_BUF1:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF1]]#1
   // CHECK:   debug_value {{.*}} : $String  // let a
   // CHECK:   [[HAS_VALUE2:%.*]] = select_enum_addr [[OPT_BUF2]]#1
-  // CHECK:   cond_br [[HAS_VALUE2]], [[IF_BODY:bb[0-9]+]], [[IF_EXIT2a:bb[0-9]+]]
+  // CHECK:   cond_br [[HAS_VALUE2]], [[IF_BODY:bb[0-9]+]], [[IF_EXIT2:bb[0-9]+]]
+  // CHECK: [[IF_EXIT2]]:
+  // CHECK:   destroy_addr [[OPT_BUF2]]#1
+  // CHECK:   br [[IF_EXIT2a:bb[0-9]+]]
   // CHECK: [[IF_BODY]]:
   if let a = foo(), var b = bar() {
     // CHECK:   alloc_box $String // var b
@@ -210,12 +236,18 @@ func if_multi_where() {
   // CHECK:   [[OPT_BUF1:%.*]] = alloc_stack $Optional<String>
   // CHECK:   [[OPT_BUF2:%.*]] = alloc_stack $Optional<String>
   // CHECK:   [[HAS_VALUE1:%.*]] = select_enum_addr [[OPT_BUF1]]#1
-  // CHECK:   cond_br [[HAS_VALUE1]], [[CHECKBUF2:bb[0-9]+]], [[IF_DONE:bb[0-9]+]]
+  // CHECK:   cond_br [[HAS_VALUE1]], [[CHECKBUF2:bb[0-9]+]], [[IF_EXIT1:bb[0-9]+]]
+  // CHECK: [[IF_EXIT1]]:
+  // CHECK:   destroy_addr [[OPT_BUF1]]#1
+  // CHECK:   br [[IF_DONE:bb[0-9]+]]
   // CHECK: [[CHECKBUF2]]:
   // CHECK:   [[VAL_BUF1:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF1]]#1
   // CHECK:   debug_value [[AVAL:%[0-9]+]] : $String  // let a
   // CHECK:   [[HAS_VALUE2:%.*]] = select_enum_addr [[OPT_BUF2]]#1
-  // CHECK:   cond_br [[HAS_VALUE2]], [[CHECK_WHERE:bb[0-9]+]], [[IF_EXIT2a:bb[0-9]+]]
+  // CHECK:   cond_br [[HAS_VALUE2]], [[CHECK_WHERE:bb[0-9]+]], [[IF_EXIT2:bb[0-9]+]]
+  // CHECK: [[IF_EXIT2]]:
+  // CHECK:   destroy_addr [[OPT_BUF2]]#1
+  // CHECK:   br [[IF_EXIT2a:bb[0-9]+]]
   // CHECK: [[CHECK_WHERE]]:
   // CHECK:   [[BBOX:%[0-9]+]] = alloc_box $String // var b
   // CHECK:   [[VAL_BUF2:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF2]]#1
