@@ -40,7 +40,8 @@ class SILLinker : public SILModuleTransform {
 
   /// The entry point to the transformation.
   void run() {
-    // Remove dead stores, merge duplicate loads, and forward stores to loads.
+    // Copies code from the standard library into the user program to enable
+    // optimizations.
     bool Changed = false;
     SILModule &M = *getModule();
     for (auto &Fn : M)
