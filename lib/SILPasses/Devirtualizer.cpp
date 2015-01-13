@@ -384,6 +384,7 @@ static SILValue upcastArgument(SILValue Arg, SILType SuperTy, ApplyInst *AI) {
     // In case of metatypes passed as parameters, we need to upcast to a
     // metatype of a superclass.
     auto &Module = AI->getModule();
+    (void) Module;
     assert (SuperTy.getSwiftRValueType()->is<AnyMetatypeType>() &&
            "super type should be a metatype");
     assert(SuperTy.getMetatypeInstanceType(Module)
