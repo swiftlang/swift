@@ -75,6 +75,44 @@ SDKPath("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
 // without being given the address of a function in the main executable).
 void anchorForGetMainExecutable() {}
 
+void
+removeUnwantedFunctions(SILModule *M, llvm::StringRef Name) {
+  assert(!Name.empty() && "Expected name of function we want to retain!");
+  assert(M && "Expected a SIL module to extract from.");
+
+  std::vector<SILFunction *> DeadFunctions;
+  for (auto &F : M->getFunctionList()) {
+    if (Name != F.getName().str()) {
+      if (F.size()) {
+        SILBasicBlock &BB = F.front();
+
+        SILLocation Loc = BB.getInstList().back().getLoc();
+        BB.splitBasicBlock(BB.begin());
+        // Make terminator unreachable.
+        BB.getInstList().push_front(new (*M) UnreachableInst(Loc));
+
+        DeadFunctions.push_back(&F);
+      }
+    }
+  }
+  // After running this pass all of the functions we will remove
+  // should consist only of one basic block terminated by
+  // UnreachableInst.
+  performSILDiagnoseUnreachable(M);
+
+  // Now mark all of these functions as public and remove their bodies.
+  for (auto &F : DeadFunctions) {
+    F->setLinkage(SILLinkage::PublicExternal);
+    F->getBlocks().clear();
+  }
+
+  // Remove dead functions.
+  SILPassManager PM(M);
+  PM.registerAnalysis(createCallGraphAnalysis(M));
+  PM.add(createDeadFunctionElimination());
+  PM.run();
+}
+
 int main(int argc, char **argv) {
   // Print a stack trace if we signal out.
   llvm::sys::PrintStackTraceOnErrorSignal();
@@ -155,42 +193,8 @@ int main(int argc, char **argv) {
     SL->getAll();
   }
 
-  assert(CI.hasSILModule() && "CI must have a sil module to extract from.\n");
-
-  SILModule *M = CI.getSILModule();
-
-  std::vector<SILFunction *> DeadFunctions;
-  for (auto &F : M->getFunctionList()) {
-    if (FunctionName != F.getName().str()) {
-      if (F.size()) {
-        SILBasicBlock &BB = F.front();
-
-        SILLocation Loc = BB.getInstList().back().getLoc();
-        BB.splitBasicBlock(BB.begin());
-        // Make terminator unreachable.
-        BB.getInstList().push_front(new (*M) UnreachableInst(Loc));
-
-        DeadFunctions.push_back(&F);
-      }
-    }
-  }
-
-  // After running this pass all of the functions we will remove
-  // should consist only of one basic block terminated by
-  // UnreachableInst.
-  performSILDiagnoseUnreachable(M);
-
-  // Now mark all of these functions as public and remove their bodies.
-  for (auto &F : DeadFunctions) {
-    F->setLinkage(SILLinkage::PublicExternal);
-    F->getBlocks().clear();
-  }
-
-  // Remove dead functions.
-  SILPassManager PM(M);
-  PM.registerAnalysis(createCallGraphAnalysis(M));
-  PM.add(createDeadFunctionElimination());
-  PM.run();
+  if (!FunctionName.empty())
+    removeUnwantedFunctions(CI.getSILModule(), FunctionName);
 
   std::error_code EC;
   llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::F_None);
