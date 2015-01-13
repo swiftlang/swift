@@ -31,9 +31,9 @@ using namespace swift;
 
 // Temporary debugging flag until this pass is better tested.
 static llvm::cl::opt<bool> EnableCopyForwarding("enable-copyforwarding",
-                                                llvm::cl::init(false));
+                                                llvm::cl::init(true));
 static llvm::cl::opt<bool> EnableDestroyHoisting("enable-destroyhoisting",
-                                                llvm::cl::init(false));
+                                                llvm::cl::init(true));
 
 /// \return true of the given object can only be accessed via the given def
 /// (this def uniquely identifies the object).
