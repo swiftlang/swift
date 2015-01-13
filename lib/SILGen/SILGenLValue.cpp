@@ -1077,7 +1077,6 @@ namespace {
     void writeback(SILGenFunction &gen, SILLocation loc,
                    ManagedValue base, Materialize temporary,
                    ArrayRef<SILValue> otherInfo) && override {
-      assert(otherInfo.size() == 1);
       gen.B.createStrongUnpin(loc, base.forward(gen));
     }
 

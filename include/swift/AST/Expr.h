@@ -94,15 +94,17 @@ enum class CheckedCastKind : unsigned {
 };
 
 enum class AccessSemantics : unsigned char {
-  /// This is a direct access to the underlying storage of a stored
-  /// property or subscript.
+  /// On a property or subscript reference, this is a direct access to
+  /// the underlying storage.  On a function reference, this is a
+  /// non-polymorphic access to a particular implementation.
   DirectToStorage,
 
-  /// This is a direct, non-polymorphic access to the getter/setter
-  /// accessors of a property or subscript.
+  /// On a property or subscript reference, this is a direct,
+  /// non-polymorphic access to the getter/setter accessors.
   DirectToAccessor,
 
-  /// This is an ordinary access to a member.
+  /// This is an ordinary access to a declaration, using whatever
+  /// polymorphism is expected.
   Ordinary,
 };
   
@@ -191,6 +193,21 @@ class alignas(8) Expr {
   enum { NumSubscriptExprBits = NumExprBits + 3 };
   static_assert(NumSubscriptExprBits <= 32, "fits in an unsigned");
 
+  class OverloadSetRefExprBitfields {
+    friend class OverloadSetRefExpr;
+    unsigned : NumExprBits;
+  };
+  enum { NumOverloadSetRefExprBits = NumExprBits };
+  static_assert(NumOverloadSetRefExprBits <= 32, "fits in an unsigned");
+
+  class OverloadedMemberRefExprBitfields {
+    friend class OverloadedMemberRefExpr;
+    unsigned : NumOverloadSetRefExprBits;
+    unsigned Semantics : 2; // an AccessSemantics
+  };
+  enum { NumOverloadedMemberRefExprBits = NumOverloadSetRefExprBits + 2 };
+  static_assert(NumOverloadedMemberRefExprBits <= 32, "fits in an unsigned");
+
   class BooleanLiteralExprBitfields {
     friend class BooleanLiteralExpr;
     unsigned : NumLiteralExprBits;
@@ -271,6 +288,8 @@ protected:
     TupleExprBitfields TupleExprBits;
     MemberRefExprBitfields MemberRefExprBits;
     SubscriptExprBitfields SubscriptExprBits;
+    OverloadSetRefExprBitfields OverloadSetRefExprBits;
+    OverloadedMemberRefExprBitfields OverloadedMemberRefExprBits;
     BooleanLiteralExprBitfields BooleanLiteralExprBits;
     MagicIdentifierLiteralExprBitfields MagicIdentifierLiteralExprBits;
     AbstractClosureExprBitfields AbstractClosureExprBits;
@@ -991,9 +1010,12 @@ class OverloadedMemberRefExpr : public OverloadSetRefExpr {
 public:
   OverloadedMemberRefExpr(Expr *SubExpr, SourceLoc DotLoc,
                           ArrayRef<ValueDecl *> Decls, SourceLoc MemberLoc,
-                          bool Implicit, Type Ty = Type())
+                          bool Implicit, Type Ty = Type(),
+                          AccessSemantics semantics = AccessSemantics::Ordinary)
     : OverloadSetRefExpr(ExprKind::OverloadedMemberRef, Decls, Implicit, Ty),
-      SubExpr(SubExpr), DotLoc(DotLoc), MemberLoc(MemberLoc) { }
+      SubExpr(SubExpr), DotLoc(DotLoc), MemberLoc(MemberLoc) {
+    OverloadedMemberRefExprBits.Semantics = unsigned(semantics);
+  }
 
   SourceLoc getDotLoc() const { return DotLoc; }
   SourceLoc getMemberLoc() const { return MemberLoc; }
@@ -1007,6 +1029,10 @@ public:
   SourceLoc getEndLoc() const { return MemberLoc; }
   SourceRange getSourceRange() const {
     return SourceRange(getStartLoc(), MemberLoc);
+  }
+
+  AccessSemantics getAccessSemantics() const {
+    return AccessSemantics(OverloadedMemberRefExprBits.Semantics);
   }
 
   static bool classof(const Expr *E) {

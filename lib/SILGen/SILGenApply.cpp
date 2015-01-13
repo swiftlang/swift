@@ -922,13 +922,17 @@ public:
       bool requiresAllocRefDynamic = false;
       
       // Determine whether the method is dynamically dispatched.
-      switch (gen.getMethodDispatch(afd)) {
-      case MethodDispatch::Class:
-        isDynamicallyDispatched = true;
-        break;
-      case MethodDispatch::Static:
+      if (e->getAccessSemantics() != AccessSemantics::Ordinary) {
         isDynamicallyDispatched = false;
-        break;
+      } else {
+        switch (gen.getMethodDispatch(afd)) {
+        case MethodDispatch::Class:
+          isDynamicallyDispatched = true;
+          break;
+        case MethodDispatch::Static:
+          isDynamicallyDispatched = false;
+          break;
+        }
       }
 
       if (isa<FuncDecl>(afd) && isDynamicallyDispatched) {

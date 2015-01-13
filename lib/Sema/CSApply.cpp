@@ -753,11 +753,9 @@ namespace {
         return result;
       }
       
-      assert(semantics == AccessSemantics::Ordinary &&
-             "Direct property access doesn't make sense for this");
-      
       // Handle all other references.
-      Expr *ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit);
+      Expr *ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit,
+                                            semantics);
       ref->setType(refTy);
 
       // If the reference needs to be converted, do so now.
@@ -2046,7 +2044,7 @@ namespace {
                             selected.choice.getDecl(), expr->getMemberLoc(),
                             selected.openedType,
                             cs.getConstraintLocator(expr),
-                            expr->isImplicit(), AccessSemantics::Ordinary);
+                            expr->isImplicit(), expr->getAccessSemantics());
     }
 
     Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {

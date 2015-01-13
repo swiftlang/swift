@@ -1,4 +1,6 @@
-// RUN: %swift -emit-sil %s | FileCheck %s
+// RUN: %swift -parse-stdlib -emit-sil %s | FileCheck %s
+
+import Swift
 
 struct A {
   var base: UnsafeMutablePointer<Int> = nil
@@ -230,3 +232,276 @@ struct E {
 func test_e(e: E) {
   e.value = 0
 }
+
+class F {
+  var data: UnsafeMutablePointer<Int> = UnsafeMutablePointer.alloc(100)
+
+  final var value: Int {
+    addressWithOwner {
+      return (UnsafePointer(data), Builtin.castToNativeObject(self))
+    }
+    mutableAddressWithOwner {
+      return (data, Builtin.castToNativeObject(self))
+    }
+  }
+}
+
+// CHECK: sil hidden @_TFC10addressors1Flo5valueSi : $@cc(method) @thin (@owned F) -> @owned (UnsafePointer<Int>, Builtin.NativeObject) {
+// CHECK: sil hidden @_TFC10addressors1Fao5valueSi : $@cc(method) @thin (@owned F) -> @owned (UnsafeMutablePointer<Int>, Builtin.NativeObject) {
+
+func test_f0(f: F) -> Int {
+  return f.value
+}
+// CHECK: sil hidden @_TF10addressors7test_f0FCS_1FSi : $@thin (@owned F) -> Int {
+// CHECK: bb0([[SELF:%0]] : $F):
+// CHECK:   strong_retain [[SELF]] : $F
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Flo5valueSi : $@cc(method) @thin (@owned F) -> @owned (UnsafePointer<Int>, Builtin.NativeObject)
+// CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
+// CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int>, Builtin.NativeObject), 0
+// CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int>, Builtin.NativeObject), 1
+// CHECK:   [[T0:%.*]] = struct_extract [[PTR]]
+// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int
+// CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int on [[OWNER]] : $Builtin.NativeObject
+// CHECK:   [[VALUE:%.*]] = load [[T2]] : $*Int
+// CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
+// CHECK:   strong_release [[SELF]] : $F
+// CHECK:   return [[VALUE]] : $Int
+
+func test_f1(f: F) {
+  f.value = 14
+}
+// CHECK: sil hidden @_TF10addressors7test_f1FCS_1FT_ : $@thin (@owned F) -> () {
+// CHECK: bb0([[SELF:%0]] : $F):
+// CHECK:   [[T0:%.*]] = integer_literal $Builtin.Word, 14
+// CHECK:   [[VALUE:%.*]] = struct $Int ([[T0]] : $Builtin.Word)
+// CHECK:   strong_retain [[SELF]] : $F
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Fao5valueSi : $@cc(method) @thin (@owned F) -> @owned (UnsafeMutablePointer<Int>, Builtin.NativeObject)
+// CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
+// CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int>, Builtin.NativeObject), 0
+// CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int>, Builtin.NativeObject), 1
+// CHECK:   [[T0:%.*]] = struct_extract [[PTR]]
+// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int
+// CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int on [[OWNER]] : $Builtin.NativeObject
+// CHECK:   store [[VALUE]] to [[T2]] : $*Int
+// CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
+// CHECK:   strong_release [[SELF]] : $F
+
+class G {
+  var data: UnsafeMutablePointer<Int> = UnsafeMutablePointer.alloc(100)
+
+  var value: Int {
+    addressWithOwner {
+      return (UnsafePointer(data), Builtin.castToNativeObject(self))
+    }
+    mutableAddressWithOwner {
+      return (data, Builtin.castToNativeObject(self))
+    }
+  }
+}
+// CHECK: sil hidden [transparent] @_TFC10addressors1Gg5valueSi : $@cc(method) @thin (@owned G) -> Int {
+// CHECK: bb0([[SELF:%0]] : $G):
+// CHECK:   strong_retain [[SELF]]
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Glo5valueSi : $@cc(method) @thin (@owned G) -> @owned (UnsafePointer<Int>, Builtin.NativeObject)
+// CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
+// CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int>, Builtin.NativeObject), 0
+// CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int>, Builtin.NativeObject), 1
+// CHECK:   [[T0:%.*]] = struct_extract [[PTR]]
+// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int
+// CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int on [[OWNER]] : $Builtin.NativeObject
+// CHECK:   [[VALUE:%.*]] = load [[T2]] : $*Int
+// CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
+// CHECK:   strong_release [[SELF]] : $G
+// CHECK:   return [[VALUE]] : $Int
+
+// CHECK: sil hidden [transparent] @_TFC10addressors1Gs5valueSi : $@cc(method) @thin (Int, @owned G) -> () {
+// CHECK: bb0([[VALUE:%0]] : $Int, [[SELF:%1]] : $G):
+// CHECK:   strong_retain [[SELF]] : $G
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Gao5valueSi : $@cc(method) @thin (@owned G) -> @owned (UnsafeMutablePointer<Int>, Builtin.NativeObject)
+// CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
+// CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int>, Builtin.NativeObject), 0
+// CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int>, Builtin.NativeObject), 1
+// CHECK:   [[T0:%.*]] = struct_extract [[PTR]]
+// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int
+// CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int on [[OWNER]] : $Builtin.NativeObject
+// CHECK:   store [[VALUE]] to [[T2]] : $*Int
+// CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
+// CHECK:   strong_release [[SELF]] : $G
+
+//   materializeForSet for G.value
+// CHECK: sil hidden [transparent] @_TFC10addressors1Gm5valueSi : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @owned G) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>) {
+// CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $G):
+//   Call the addressor.
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Gao5valueSi : $@cc(method) @thin (@owned G) -> @owned (UnsafeMutablePointer<Int>, Builtin.NativeObject)
+// CHECK:   strong_retain [[SELF]] : $G
+// CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
+// CHECK:   [[T1:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int>, Builtin.NativeObject), 0
+// CHECK:   [[T2:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int>, Builtin.NativeObject), 1
+// CHECK:   [[TUPLE:%.*]] = tuple ([[T1]] : $UnsafeMutablePointer<Int>, [[T2]] : $Builtin.NativeObject)
+//   Initialize the callback storage with the owner.
+// CHECK:   [[T0:%.*]] = alloc_value_buffer $Builtin.NativeObject in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
+// CHECK:   [[T1:%.*]] = address_to_pointer [[T0]]
+// CHECK:   [[T2:%.*]] = pointer_to_address [[T1]]
+// CHECK:   retain_value [[TUPLE]]
+// CHECK:   [[T3:%.*]] = tuple_extract [[TUPLE]] : $(UnsafeMutablePointer<Int>, Builtin.NativeObject), 1
+// CHECK:   store [[T3]] to [[T2]] : $*Builtin.NativeObject
+//   Pull out the address.
+// CHECK:   [[T0:%.*]] = tuple_extract [[TUPLE]] : $(UnsafeMutablePointer<Int>, Builtin.NativeObject), 0
+// CHECK:   [[PTR:%.*]] = struct_extract [[T0]] :
+//   Set up the callback.
+// CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>
+// CHECK:   [[T0:%.*]] = init_enum_data_addr [[TEMP]]#1 : $*Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>, #Optional.Some!enumelt.1
+// CHECK:   [[T1:%.*]] = function_ref @_TFFC10addressors1Gm5valueSiU_FTBpRBBRS0_MS0__T_ :
+// CHECK:   store [[T1]] to [[T0]] :
+// CHECK:   inject_enum_addr [[TEMP]]#1 : $*Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>, #Optional.Some!enumelt.1
+// CHECK:   [[CALLBACK:%.*]] = load [[TEMP]]#1 :
+//   Epilogue.
+// CHECK:   [[RESULT:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>)
+// CHECK:   release_value [[TUPLE]]
+// CHECK:   strong_release [[SELF]]
+// CHECK:   return [[RESULT]]
+
+//   materializeForSet callback for G.value
+// CHECK: sil @_TFFC10addressors1Gm5valueSiU_FTBpRBBRS0_MS0__T_ : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout G, @thick G.Type) -> () {
+// CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $*G, [[SELFTYPE:%3]] : $@thick G.Type):
+// CHECK:   [[T0:%.*]] = project_value_buffer $Builtin.NativeObject in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
+// CHECK:   [[T1:%.*]] = address_to_pointer [[T0]]
+// CHECK:   [[T2:%.*]] = pointer_to_address [[T1]]
+// CHECK:   [[OWNER:%.*]] = load [[T2]]
+// CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
+// CHECK:   dealloc_value_buffer $Builtin.NativeObject in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
+
+class H {
+  var data: UnsafeMutablePointer<Int> = UnsafeMutablePointer.alloc(100)
+
+  final var value: Int {
+    addressWithPinnedOwner {
+      return (UnsafePointer(data), Builtin.tryPin(Builtin.castToNativeObject(self)))
+    }
+    mutableAddressWithPinnedOwner {
+      return (data, Builtin.tryPin(Builtin.castToNativeObject(self)))
+    }
+  }
+}
+
+// CHECK: sil hidden @_TFC10addressors1Hlp5valueSi : $@cc(method) @thin (@owned H) -> @owned (UnsafePointer<Int>, Optional<Builtin.NativeObject>) {
+// CHECK: sil hidden @_TFC10addressors1Hap5valueSi : $@cc(method) @thin (@owned H) -> @owned (UnsafeMutablePointer<Int>, Optional<Builtin.NativeObject>) {
+
+func test_h0(f: H) -> Int {
+  return f.value
+}
+// CHECK: sil hidden @_TF10addressors7test_h0FCS_1HSi : $@thin (@owned H) -> Int {
+// CHECK: bb0([[SELF:%0]] : $H):
+// CHECK:   strong_retain [[SELF]] : $H
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Hlp5valueSi : $@cc(method) @thin (@owned H) -> @owned (UnsafePointer<Int>, Optional<Builtin.NativeObject>)
+// CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
+// CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int>, Optional<Builtin.NativeObject>), 0
+// CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int>, Optional<Builtin.NativeObject>), 1
+// CHECK:   [[T0:%.*]] = struct_extract [[PTR]]
+// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int
+// CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int on [[OWNER]] : $Optional<Builtin.NativeObject>
+// CHECK:   [[VALUE:%.*]] = load [[T2]] : $*Int
+// CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
+// CHECK:   strong_release [[SELF]] : $H
+// CHECK:   return [[VALUE]] : $Int
+
+func test_h1(f: H) {
+  f.value = 14
+}
+// CHECK: sil hidden @_TF10addressors7test_h1FCS_1HT_ : $@thin (@owned H) -> () {
+// CHECK: bb0([[SELF:%0]] : $H):
+// CHECK:   [[T0:%.*]] = integer_literal $Builtin.Word, 14
+// CHECK:   [[VALUE:%.*]] = struct $Int ([[T0]] : $Builtin.Word)
+// CHECK:   strong_retain [[SELF]] : $H
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Hap5valueSi : $@cc(method) @thin (@owned H) -> @owned (UnsafeMutablePointer<Int>, Optional<Builtin.NativeObject>)
+// CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
+// CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int>, Optional<Builtin.NativeObject>), 0
+// CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int>, Optional<Builtin.NativeObject>), 1
+// CHECK:   [[T0:%.*]] = struct_extract [[PTR]]
+// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int
+// CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int on [[OWNER]] : $Optional<Builtin.NativeObject>
+// CHECK:   store [[VALUE]] to [[T2]] : $*Int
+// CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
+// CHECK:   strong_release [[SELF]] : $H
+
+class I {
+  var data: UnsafeMutablePointer<Int> = UnsafeMutablePointer.alloc(100)
+
+  var value: Int {
+    addressWithPinnedOwner {
+      return (UnsafePointer(data), Builtin.tryPin(Builtin.castToNativeObject(self)))
+    }
+    mutableAddressWithPinnedOwner {
+      return (data, Builtin.tryPin(Builtin.castToNativeObject(self)))
+    }
+  }
+}
+// CHECK: sil hidden [transparent] @_TFC10addressors1Ig5valueSi : $@cc(method) @thin (@owned I) -> Int {
+// CHECK: bb0([[SELF:%0]] : $I):
+// CHECK:   strong_retain [[SELF]]
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Ilp5valueSi : $@cc(method) @thin (@owned I) -> @owned (UnsafePointer<Int>, Optional<Builtin.NativeObject>)
+// CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
+// CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int>, Optional<Builtin.NativeObject>), 0
+// CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int>, Optional<Builtin.NativeObject>), 1
+// CHECK:   [[T0:%.*]] = struct_extract [[PTR]]
+// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int
+// CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int on [[OWNER]] : $Optional<Builtin.NativeObject>
+// CHECK:   [[VALUE:%.*]] = load [[T2]] : $*Int
+// CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
+// CHECK:   strong_release [[SELF]] : $I
+// CHECK:   return [[VALUE]] : $Int
+
+// CHECK: sil hidden [transparent] @_TFC10addressors1Is5valueSi : $@cc(method) @thin (Int, @owned I) -> () {
+// CHECK: bb0([[VALUE:%0]] : $Int, [[SELF:%1]] : $I):
+// CHECK:   strong_retain [[SELF]] : $I
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Iap5valueSi : $@cc(method) @thin (@owned I) -> @owned (UnsafeMutablePointer<Int>, Optional<Builtin.NativeObject>)
+// CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
+// CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int>, Optional<Builtin.NativeObject>), 0
+// CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int>, Optional<Builtin.NativeObject>), 1
+// CHECK:   [[T0:%.*]] = struct_extract [[PTR]]
+// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int
+// CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int on [[OWNER]] : $Optional<Builtin.NativeObject>
+// CHECK:   store [[VALUE]] to [[T2]] : $*Int
+// CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
+// CHECK:   strong_release [[SELF]] : $I
+
+// CHECK: sil hidden [transparent] @_TFC10addressors1Im5valueSi : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @owned I) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout I, @thick I.Type) -> ()>) {
+// CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $I):
+//   Call the addressor.
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Iap5valueSi : $@cc(method) @thin (@owned I) -> @owned (UnsafeMutablePointer<Int>, Optional<Builtin.NativeObject>)
+// CHECK:   strong_retain [[SELF]] : $I
+// CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
+// CHECK:   [[T1:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int>, Optional<Builtin.NativeObject>), 0
+// CHECK:   [[T2:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int>, Optional<Builtin.NativeObject>), 1
+// CHECK:   [[TUPLE:%.*]] = tuple ([[T1]] : $UnsafeMutablePointer<Int>, [[T2]] : $Optional<Builtin.NativeObject>)
+//   Initialize the callback storage with the owner.
+// CHECK:   [[T0:%.*]] = alloc_value_buffer $Optional<Builtin.NativeObject> in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
+// CHECK:   [[T1:%.*]] = address_to_pointer [[T0]]
+// CHECK:   [[T2:%.*]] = pointer_to_address [[T1]]
+// CHECK:   retain_value [[TUPLE]]
+// CHECK:   [[T3:%.*]] = tuple_extract [[TUPLE]] : $(UnsafeMutablePointer<Int>, Optional<Builtin.NativeObject>), 1
+// CHECK:   store [[T3]] to [[T2]] : $*Optional<Builtin.NativeObject>
+//   Pull out the address.
+// CHECK:   [[T0:%.*]] = tuple_extract [[TUPLE]] : $(UnsafeMutablePointer<Int>, Optional<Builtin.NativeObject>), 0
+// CHECK:   [[PTR:%.*]] = struct_extract [[T0]] :
+//   Set up the callback.
+// CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout I, @thick I.Type) -> ()>
+// CHECK:   [[T0:%.*]] = init_enum_data_addr [[TEMP]]#1 : $*Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout I, @thick I.Type) -> ()>, #Optional.Some!enumelt.1
+// CHECK:   [[T1:%.*]] = function_ref @_TFFC10addressors1Im5valueSiU_FTBpRBBRS0_MS0__T_ :
+// CHECK:   store [[T1]] to [[T0]] :
+// CHECK:   inject_enum_addr [[TEMP]]#1 : $*Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout I, @thick I.Type) -> ()>, #Optional.Some!enumelt.1
+// CHECK:   [[CALLBACK:%.*]] = load [[TEMP]]#1 :
+//   Epilogue.
+// CHECK:   [[RESULT:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout I, @thick I.Type) -> ()>)
+// CHECK:   release_value [[TUPLE]]
+// CHECK:   strong_release [[SELF]]
+// CHECK:   return [[RESULT]]
+
+//   materializeForSet callback for I.value
+// CHECK: sil @_TFFC10addressors1Im5valueSiU_FTBpRBBRS0_MS0__T_ : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout I, @thick I.Type) -> () {
+// CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $*I, [[SELFTYPE:%3]] : $@thick I.Type):
+// CHECK:   [[T0:%.*]] = project_value_buffer $Optional<Builtin.NativeObject> in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
+// CHECK:   [[T1:%.*]] = address_to_pointer [[T0]]
+// CHECK:   [[T2:%.*]] = pointer_to_address [[T1]]
+// CHECK:   [[OWNER:%.*]] = load [[T2]]
+// CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
+// CHECK:   dealloc_value_buffer $Optional<Builtin.NativeObject> in [[STORAGE]] : $*Builtin.UnsafeValueBuffer

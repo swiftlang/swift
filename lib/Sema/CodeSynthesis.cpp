@@ -1159,7 +1159,7 @@ static Expr *buildCallToAddressor(FuncDecl *materializeForSet,
                                   FuncDecl *addressor,
                                   ASTContext &ctx) {
   // Build a direct reference to the addressor.
-  Expr *fn = new (ctx) DeclRefExpr(addressor, SourceLoc(), IsImplicit);
+  Expr *fn;
 
   // Apply the self argument if applicable.
   if (auto self = materializeForSet->getImplicitSelfDecl()) {
@@ -1167,8 +1167,15 @@ static Expr *buildCallToAddressor(FuncDecl *materializeForSet,
     // if (addressor->computeSelfType(nullptr)->is<LValueType>()) {
     //   selfRef = new (ctx) InOutExpr(SourceLoc(), selfRef, Type(), IsImplicit);
     // }
-    fn = new (ctx) DotSyntaxCallExpr(fn, SourceLoc(), selfRef);
-    fn->setImplicit(IsImplicit);
+
+    ValueDecl *localMembers[] = { addressor };
+    fn = new (ctx) OverloadedMemberRefExpr(selfRef, SourceLoc(),
+                                           ctx.AllocateCopy(localMembers),
+                                           SourceLoc(), IsImplicit, Type(),
+                                           AccessSemantics::DirectToStorage);
+  } else {
+    fn = new (ctx) DeclRefExpr(addressor, SourceLoc(), IsImplicit,
+                               AccessSemantics::DirectToStorage);
   }
 
   // Apply the rest of the addressor arguments.
@@ -1233,8 +1240,8 @@ static void synthesizeAddressedMaterializeForSet(FuncDecl *materializeForSet,
     // We need to bind the result to a temporary variable.
     //   let temporary = addressor(self)(indices)
     auto tempDecl = new (ctx) VarDecl(/*static*/ false, /*let*/ true,
-                                      SourceLoc(), Identifier(), Type(),
-                                      materializeForSet);
+                                      SourceLoc(), ctx.getIdentifier("tmp"),
+                                      Type(), materializeForSet);
     tempDecl->setImplicit(IsImplicit);
     auto bindingPattern = new (ctx) NamedPattern(tempDecl, IsImplicit);
     auto bindingDecl = new (ctx) PatternBindingDecl(/*static*/ SourceLoc(),
@@ -1246,10 +1253,21 @@ static void synthesizeAddressedMaterializeForSet(FuncDecl *materializeForSet,
                                                     materializeForSet);
     bindingDecl->setImplicit(IsImplicit);
     body.push_back(bindingDecl);
+    body.push_back(tempDecl);
 
     // This should be Builtin.NativePointer or something like it.
-    Type ownerType = addressor->getBodyResultType()
-                              ->castTo<TupleType>()->getElementType(1);
+    Type ownerType = [&]() -> Type {
+      switch (addressor->getAddressorKind()){
+      case AddressorKind::NotAddressor:
+      case AddressorKind::Unsafe:
+        llvm_unreachable("filtered out");
+      case AddressorKind::Owning:
+        return ctx.TheNativeObjectType;
+      case AddressorKind::Pinning:
+        return OptionalType::get(ctx.TheNativeObjectType);
+      }
+      llvm_unreachable("bad addressor kind");
+    }();
 
     // Initialize the callback storage with the owner value, which is
     // the second elemenet of the addressor result.
@@ -1262,8 +1280,9 @@ static void synthesizeAddressedMaterializeForSet(FuncDecl *materializeForSet,
 
     // The result is the first element of the addressor result.
     result = new (ctx) DeclRefExpr(tempDecl, SourceLoc(), IsImplicit);
-    result = new (ctx) TupleElementExpr(owner, SourceLoc(), /*field index*/ 0,
+    result = new (ctx) TupleElementExpr(result, SourceLoc(), /*field index*/ 0,
                                         SourceLoc(), Type());
+    result->setImplicit(IsImplicit);
     result = buildUnsafeMutablePointerToRawPointer(result, ctx);
 
     // Build the callback.
@@ -1760,7 +1779,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
 
   // Class instance variables also need accessors, because it affects
   // vtable layout.
-  if (var->hasStorage() && !var->isImplicit() &&
+  if (!var->hasAccessorFunctions() && !var->isImplicit() &&
       var->getDeclContext()->isClassOrClassExtensionContext()) {
     if (var->getAttrs().hasAttribute<NSManagedAttr>()) {
       var->setIsBeingTypeChecked();
