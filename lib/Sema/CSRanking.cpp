@@ -223,33 +223,16 @@ namespace {
   /// archetype in the given context.
   class ArchetypeOpener : public constraints::DependentTypeOpener {
     DeclContext *DC;
-    llvm::DenseMap<TypeVariableType *, Type> Mapped;
 
   public:
     explicit ArchetypeOpener(DeclContext *dc) : DC(dc) { }
 
-    virtual void openedGenericParameter(GenericTypeParamType *param,
-                                        TypeVariableType *typeVar,
-                                        Type &replacementType) {
-      replacementType = ArchetypeBuilder::mapTypeIntoContext(DC, param);
-
-      Mapped[typeVar] = param;
+    virtual Type mapGenericTypeParamType(GenericTypeParamType *param) {
+      return ArchetypeBuilder::mapTypeIntoContext(DC, param);
     }
 
-    virtual bool shouldBindAssociatedType(Type baseType,
-                                          TypeVariableType *baseTypeVar,
-                                          AssociatedTypeDecl *assocType,
-                                          TypeVariableType *memberTypeVar,
-                                          Type &replacementType) {
-      assert(Mapped.count(baseTypeVar) && "Missing base mapping?");
-      auto memberType = DependentMemberType::get(Mapped[baseTypeVar],
-                                                 assocType,
-                                                 DC->getASTContext());
-      replacementType = ArchetypeBuilder::mapTypeIntoContext(DC, memberType);
-
-      // Record this mapping.
-      Mapped[memberTypeVar] = memberType;
-      return true;
+    virtual Type mapDependentMemberType(DependentMemberType *memberType) {
+      return ArchetypeBuilder::mapTypeIntoContext(DC, memberType);
     }
   };
 }

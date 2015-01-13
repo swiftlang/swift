@@ -1027,6 +1027,18 @@ class DependentTypeOpener {
 public:
   virtual ~DependentTypeOpener() { }
 
+  /// Directly map a generic type parameter to a type, or return null if
+  /// the type parameter should be opened.
+  virtual Type mapGenericTypeParamType(GenericTypeParamType *param) {
+    return Type();
+  }
+
+  /// Directly map a dependent member type to a type, or return null if
+  /// the dependent member type should be opened.
+  virtual Type mapDependentMemberType(DependentMemberType *memberType) {
+    return Type();
+  }
+
   /// Invoked when a generic type parameter is opened to a type variable.
   ///
   /// \param param The generic type parameter.

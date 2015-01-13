@@ -567,6 +567,13 @@ namespace {
 
       // Replace a generic type parameter with its corresponding type variable.
       if (auto genericParam = type->getAs<GenericTypeParamType>()) {
+        if (opener) {
+          // If we have a mapping for this type parameter, there's nothing else to do.
+          if (Type replacement = opener->mapGenericTypeParamType(genericParam)){
+            return replacement;
+          }
+        }
+
         auto known = replacements.find(genericParam->getCanonicalType());
         
         if (known == replacements.end())
@@ -578,6 +585,14 @@ namespace {
       // Replace a dependent member with a fresh type variable and make it a
       // member of its base type.
       if (auto dependentMember = type->getAs<DependentMemberType>()) {
+        if (opener) {
+          // If we have a mapping for this type parameter, there's nothing else to do.
+          if (Type replacement
+                = opener->mapDependentMemberType(dependentMember)) {
+            return replacement;
+          }
+        }
+
         // Check whether we've already dealt with this dependent member.
         auto known = replacements.find(dependentMember->getCanonicalType());
         if (known != replacements.end())
@@ -852,6 +867,11 @@ void ConstraintSystem::openGeneric(
 
   // Create the type variables for the generic parameters.
   for (auto gp : params) {
+    // If we have a mapping for this type parameter, there's nothing else to do.
+    if (opener && opener->mapGenericTypeParamType(gp)) {
+      continue;
+    }
+
     ArchetypeType *archetype = ArchetypeBuilder::mapTypeIntoContext(dc, gp)
                                  ->castTo<ArchetypeType>();
     auto typeVar = createTypeVariable(getConstraintLocator(
