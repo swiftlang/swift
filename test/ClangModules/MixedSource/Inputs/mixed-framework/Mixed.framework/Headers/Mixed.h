@@ -7,7 +7,7 @@ struct PureClangType {
 #  define SWIFT_CLASS_EXTRA
 #endif
 
-#ifndef SWIFT_CLASS(SWIFT_NAME)
+#ifndef SWIFT_CLASS
 #  define SWIFT_CLASS(SWIFT_NAME) SWIFT_CLASS_EXTRA
 #endif
 
