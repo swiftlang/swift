@@ -46,13 +46,17 @@ class DeadFunctionElimination {
   };
 
   SILModule *Module;
-  
+
+  // If set, this pass is running very late in the pipeline.
+  bool isLate;
+
   llvm::DenseMap<AbstractFunctionDecl *, MethodInfo *> MethodInfos;
   llvm::SpecificBumpPtrAllocator<MethodInfo> MethodInfoAllocator;
   
   llvm::SmallSetVector<SILFunction *, 16> Worklist;
   
   llvm::SmallPtrSet<SILFunction *, 100> AliveFunctions;
+  llvm::SmallPtrSet<SILFunction *, 100> GlobalInitFunctions;
   
   /// Checks is a function is alive, e.g. because it is visible externally.
   bool isAnchorFunction(SILFunction *F) {
@@ -222,6 +226,7 @@ class DeadFunctionElimination {
     for (SILGlobalVariable &G : Module->getSILGlobalList()) {
       if (SILFunction *initFunc = G.getInitializer()) {
         ensureAlive(initFunc);
+        GlobalInitFunctions.insert(initFunc);
       }
     }
   }
@@ -252,10 +257,87 @@ class DeadFunctionElimination {
       });
     }
   }
-  
+
+  // Try to convert definition into declaration.
+  // Returns true if function was erased from the module.
+  bool tryToConvertExtenralDefinitionIntoDeclaration(SILFunction *F) {
+    bool FunctionWasErased = false;
+    // Bail if it is a declaration already
+    if (!F->isDefinition())
+      return false;
+    // Bail if there is no external implementation of this function.
+    if (!F->isAvailableExternally())
+      return false;
+    // Bail if has a shared visibility, as there are no guarantees
+    // that an implementation is available elsewhere.
+    if (hasSharedVisibility(F->getLinkage()))
+      return false;
+    // Make this definition a declaration by removing the body of a function.
+    F->dropAllReferences();
+    auto &Blocks = F->getBlocks();
+    Blocks.clear();
+    assert(F->isExternalDeclaration() &&
+           "Function should be an external declaration");
+    if (F->getRefCount() == 0) {
+      Module->eraseFunction(F);
+      FunctionWasErased = true;
+    }
+    DEBUG(llvm::dbgs() << "  removed external function " << F->getName()
+                       << "\n");
+    return FunctionWasErased;
+  }
+
+  // Eliminate external function definitions by removing their bodies and
+  // converting them into declarations. It is safe, because such functions are
+  // defined elsewhere and where required only for analysis/optimization
+  // purposes.
+  //
+  // This reduces the amount of SIL code to be processed by IRRegn. And it may
+  // also reduce the code size of the final object file.
+  //
+  // Returns true if callgraph was changed.
+  bool removeExternalDefinitions() {
+    bool CallGraphChanged = false;
+
+    for (SILVTable &vTable : Module->getVTableList()) {
+      for (auto &pair : vTable.getEntries()) {
+        auto *F = pair.second;
+        tryToConvertExtenralDefinitionIntoDeclaration(F);
+      }
+    }
+
+    auto &WitnessTables = Module->getWitnessTableList();
+    for (auto WI = WitnessTables.begin(), EI = WitnessTables.end(); WI != EI;) {
+      SILWitnessTable *WT = WI++;
+      for (auto &entry : WT->getEntries()) {
+        if (entry.getKind() != SILWitnessTable::WitnessKind::Method)
+          continue;
+        auto *F = entry.getMethodWitness().Witness;
+        if (!F)
+          continue;
+        tryToConvertExtenralDefinitionIntoDeclaration(F);
+      }
+    }
+
+    // Get rid of definitions for global functions that are externally available.
+    for (auto FI = Module->begin(), EI = Module->end(); FI != EI;) {
+      SILFunction *F = FI++;
+      // If this function is dead already, no need to remove it
+      // again.
+      if (F->isZombie())
+        continue;
+      // Do not remove definitions of global initializers.
+      if (GlobalInitFunctions.count(F))
+        continue;
+      CallGraphChanged |= tryToConvertExtenralDefinitionIntoDeclaration(F);
+    }
+
+    return CallGraphChanged;
+  }
+
 public:
-  
-  DeadFunctionElimination(SILModule *module) : Module(module) {}
+  DeadFunctionElimination(SILModule *module, bool late)
+      : Module(module), isLate(late) {}
   
   /// The main entry point of the optimization.
   bool eliminateDeadFunctions() {
@@ -283,7 +365,8 @@ public:
         F.dropAllReferences();
       }
     }
-    // Last step: delete all dead functions.
+
+    // Next step: delete all dead functions.
     bool CallGraphChanged = false;
     for (auto FI = Module->begin(), EI = Module->end(); FI != EI;) {
       SILFunction *F = FI++;
@@ -294,6 +377,11 @@ public:
         CallGraphChanged = true;
       }
     }
+
+    // If this pass running as a late pass, remove external definitions.
+    if (isLate)
+      CallGraphChanged |= removeExternalDefinitions();
+
     return CallGraphChanged;
   }
 };
@@ -305,12 +393,18 @@ public:
 namespace {
 
 class SILDeadFuncElimination : public SILModuleTransform {
+  // If set, this pass is running very late in the pipeline.
+  bool isLate;
 
   void run() override {
+
+    DEBUG(llvm::dbgs() << "Running DeadFuncElimination (isLate = " << isLate
+                       << ")\n");
+
     // Avoid that Deserializers keep references to functions in their caches.
     getModule()->invalidateSILLoaderCaches();
 
-    DeadFunctionElimination deadFunctionElimination(getModule());
+    DeadFunctionElimination deadFunctionElimination(getModule(), isLate);
     bool changed = deadFunctionElimination.eliminateDeadFunctions();
     
     if (changed)
@@ -318,10 +412,22 @@ class SILDeadFuncElimination : public SILModuleTransform {
   }
   
   StringRef getName() override { return "Dead Function Elimination"; }
+
+public:
+  SILDeadFuncElimination(bool late) : isLate(late) {}
 };
 
 } // end anonymous namespace
 
 SILTransform *swift::createDeadFunctionElimination() {
-  return new SILDeadFuncElimination();
+  return new SILDeadFuncElimination(false);
+}
+
+// This pass is an extension of the dead function elimination, which
+// additionally performs removal of external function definitions for a sake of
+// reducing the amount of code to run through IRGen. It is supposed to run very
+// late in the pipeline, after devirtualization, inlining and all specialization
+// passes.
+SILTransform *swift::createLateDeadFunctionElimination() {
+  return new SILDeadFuncElimination(true);
 }

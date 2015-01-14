@@ -274,7 +274,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   PM.resetAndRemoveTransformations("LateLoopOpt");
   AddLowLevelLoopOptPasses(PM);
-  PM.add(createDeadFunctionElimination());
+  PM.add(createLateDeadFunctionElimination());
   PM.runOneIteration();
 
   // Gather instruction counts if we are asked to do so.
