@@ -262,6 +262,25 @@ struct AO<T>: Fooable {
 
 prefix func +<T>(x: AO<T>) {}
 
+// Witness for nonmutating 'foo'
+// CHECK-LABEL: sil hidden @_TTWU__GV15guaranteed_self2AOQ__S_7FooableS_FS1_3fooUS1___fQPS1_FSiT_ : $@cc(witness_method) @thin <T> (Int, @in_guaranteed AO<T>) -> ()
+// CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*AO<T>):
+// TODO: This copy isn't necessary.
+// CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY:%.*]]#1
+// CHECK:         apply {{.*}} [[SELF_COPY]]
+// CHECK:         destroy_addr [[SELF_COPY]]
+// CHECK-NOT:     destroy_addr [[SELF_ADDR]]
+
+// Witness for 'bar', which is mutating in protocol but nonmutating in impl
+// CHECK-LABEL: sil hidden @_TTWU__GV15guaranteed_self2AOQ__S_7FooableS_FS1_3barUS1___fRQPS1_FT_T_ : $@cc(witness_method) @thin <T> (@inout AO<T>) -> ()
+// CHECK:       bb0([[SELF_ADDR:%.*]] : $*AO<T>):
+// -- NB: This copy *is* necessary, unless we're willing to assume an inout
+//        parameter is not mutably aliased.
+// CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY:%.*]]#1
+// CHECK:         apply {{.*}} [[SELF_COPY]]
+// CHECK:         destroy_addr [[SELF_COPY]]
+// CHECK-NOT:     destroy_addr [[SELF_ADDR]]
+
 enum E: Fooable {
   case A, B(C)
   init() { self = .A }
