@@ -178,12 +178,14 @@ private:
   bool doDecrementShouldDeallocate() {
     // If we're being asked to clear the pinned flag, we can assume
     // it's already set.
-    uint32_t quantum = (ClearPinnedFlag ? RC_ONE + RC_PINNED_FLAG : RC_ONE);
+    constexpr uint32_t quantum =
+      (ClearPinnedFlag ? RC_ONE + RC_PINNED_FLAG : RC_ONE);
     uint32_t newval = __atomic_sub_fetch(&refCount, quantum, __ATOMIC_RELEASE);
 
-    assert((newval >= RC_ONE || !(newval & RC_PINNED_FLAG)) &&
-           "RC_PINNED_FLAG is set on unreferenced object or "
-           "was previously unset");
+    assert((!ClearPinnedFlag || !(newval & RC_PINNED_FLAG)) &&
+           "unpinning reference that was not pinned");
+    assert(newval + quantum >= RC_ONE &&
+           "releasing reference with a refcount of zero");
 
     // If we didn't drop the reference count to zero, or if the
     // deallocating flag is already set, we're done; don't start
