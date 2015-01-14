@@ -88,7 +88,7 @@ func date() {
 // IMPORT-CHECK-DAG: [ DW_TAG_module ] [ObjectiveC]
 
 // LOC-CHECK: ![[THUNK:.*]] = {{.*}}_TToFC4main8MyObjectg5MyArrCSo7NSArray{{.*}} ; [ DW_TAG_subprogram ] [line 0] [def]
-// LOC-CHECK: ![[DBG]] = !{i32 0, i32 0, ![[THUNK]], null}
+// LOC-CHECK: ![[DBG]] = !MDLocation(line: 0, scope: ![[THUNK]])
 
 // These debug locations should all be in ordered by increasing line number.
 // LOC-CHECK: ![[L1]] =

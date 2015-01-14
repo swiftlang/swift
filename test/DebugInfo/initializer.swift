@@ -11,7 +11,7 @@ protocol Named {
 // CHECK: define hidden %C11initializer6Person* @_TFC11initializer6PersonCfMS0_FT_S0_(%swift.type*) {
 // CHECK:  call %C11initializer6Person* @_TFC11initializer6PersoncfMS0_FT_S0_(%C11initializer6Person* %3), !dbg ![[ALLOCATING_INIT:.*]]
 
-// CHECK-DAG: ![[ALLOCATING_INIT]] = !{i32 0, i32 0
+// CHECK-DAG: ![[ALLOCATING_INIT]]  = !MDLocation(line: 0, scope
 class Person : Named {
     var name : String { get { return "No Name" } }
     var age = 0

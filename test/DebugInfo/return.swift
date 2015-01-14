@@ -15,5 +15,5 @@ func ifelseexpr() -> Int {
   }
   // CHECK:  @swift_release {{.*}}1X{{.*}}, !dbg ![[RET:.*]]
   // CHECK:  ret{{.*}}, !dbg ![[RET]]
-  return x.x; // CHECK: ![[RET]] = !{i32 [[@LINE]],
+  return x.x; // CHECK: ![[RET]] = !MDLocation(line: [[@LINE]],
 }

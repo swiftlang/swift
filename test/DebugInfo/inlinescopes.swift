@@ -9,12 +9,12 @@
 // CHECK: tail call { i64, i1 } @llvm.smul.with.overflow.i64(i64 %[[C:.*]], i64 %[[C]]), !dbg ![[MULSCOPE:.*]]
 // CHECK-DAG: ![[TOPLEVEL:.*]] = {{.*}}; [ DW_TAG_file_type ] [{{.*}}/inlinescopes.swift]
 // CHECK-DAG: ![[MAIN:.*]] = {{.*}}\00main\00{{.*}}[ DW_TAG_subprogram ]
-// CHECK-DAG: ![[INLINED_TOPLEVEL:.*]] = !{i32 0, i32 0, ![[MAIN:.*]], null}
+// CHECK-DAG: ![[INLINED_TOPLEVEL:.*]] = !MDLocation(line: 0, scope: ![[MAIN:.*]])
 
 import FooBar
 
 func square(x : Int) -> Int {
-// CHECK-DAG: ![[MULSCOPE]] = !{i32 [[@LINE+2]], i32 {{.*}}, ![[MUL:.*]], ![[INLINED:.*]]}
+// CHECK-DAG: ![[MULSCOPE]] = !MDLocation(line: [[@LINE+2]], column: {{.*}}, scope: ![[MUL:.*]], inlinedAt: ![[INLINED:.*]])
 // CHECK-DAG: ![[MUL:.*]] = {{.*}}[ DW_TAG_lexical_block ]
   let res = x * x
 // *(Int, Int) is a transparent function and should not show up in the debug info.
@@ -22,7 +22,7 @@ func square(x : Int) -> Int {
   return res
 }
 let c = Int(x)
-// CHECK-DAG ![[INLINED]] = !{i32 [[@LINE+1]], i32 {{.*}}, !{{.*}}, ![[INLINED_TOPLEVEL:.*]]}
+// CHECK-DAG ![[INLINED]] = !MDLocation(line: [[@LINE+1]], column: {{.*}}, scope: !{{.*}}, inlinedAt: ![[INLINED_TOPLEVEL:.*]])
 // CHECK-DAG: ![[TOPLEVEL]]{{.*}} ; [ DW_TAG_variable ] [y] [line [[@LINE+1]]]
 let y = square(c)
 println(y)

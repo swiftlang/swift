@@ -27,7 +27,7 @@
 public
 func foo(var a: Int, var b: Int) -> Int {
      // CHECK-DAG: !"0xb\00[[@LINE-1]]\0041\000"{{, [^,]+}}, ![[FOO]]} ; [ DW_TAG_lexical_block ]
-     // CHECK-DAG: ![[ASCOPE:.*]] = !{i32 [[@LINE-2]], i32 14, ![[FOO]], null}
+     // CHECK-DAG: ![[ASCOPE:.*]] = !MDLocation(line: [[@LINE-2]], column: 14, scope: ![[FOO]])
      // Check that a is the first and b is the second argument.
      // CHECK-DAG: store i64 %0, i64* [[AVAL:.*]], align 8
      // CHECK-DAG: store i64 %1, i64* [[BVAL:.*]], align 8
@@ -41,10 +41,10 @@ func foo(var a: Int, var b: Int) -> Int {
        // CHECK-DAG: \00[[@LINE-1]]\00{{.*}}DW_TAG_lexical_block
        // Transparent inlined multiply:
        // CHECK-DAG: smul{{.*}}, !dbg ![[MUL:[0-9]+]]
-       // CHECK-DAG: [[MUL]] = !{i32 [[@LINE+4]], i32 16,
+       // CHECK-DAG: [[MUL]] = !MDLocation(line: [[@LINE+4]], column: 16,
        // Runtime call to multiply function:
        // CHECK-NOSIL: @_TFSsoi1mFTSiSi_Si{{.*}}, !dbg ![[MUL:[0-9]+]]
-       // CHECK-NOSIL: [[MUL]] = !{i32 [[@LINE+1]], i32 16,
+       // CHECK-NOSIL: [[MUL]]  = !MDLocation(line: [[@LINE+1]], column: 16,
        return a*b
      } else {
        // CHECK-DAG: [[PARENT:[0-9]+]] = {{.*}}\00[[@LINE-1]]\0013\00{{.*}}DW_TAG_lexical_block

@@ -13,8 +13,8 @@ func none(inout a: Int) {
   // CHECK_NONE: !dbg ![[NONE_INIT:.*]]
   a -= 2;
   // CHECK_NONE: ret {{.*}}, !dbg ![[NONE_RET:.*]]
-  // CHECK_NONE: ![[NONE_INIT]] = !{i32 [[@LINE-2]], i32
-  // CHECK_NONE: ![[NONE_RET]] = !{i32 [[@LINE+1]], i32 1,
+  // CHECK_NONE: ![[NONE_INIT]] = !MDLocation(line: [[@LINE-2]], column:
+  // CHECK_NONE: ![[NONE_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
 // RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_EMPTY
@@ -22,16 +22,16 @@ func none(inout a: Int) {
 func empty(inout a: Int) {
   if a > 24 {
       // CHECK-DAG_EMPTY: br {{.*}}, !dbg ![[EMPTY_RET1:.*]]
-      // CHECK-DAG_EMPTY_RET1: ![[EMPTY_RET1]] = !{i32 [[@LINE+1]], i32 6,
+      // CHECK-DAG_EMPTY_RET1: ![[EMPTY_RET1]] = !MDLocation(line: [[@LINE+1]], column: 6,
       return
   }
 
   a -= 2;
   // CHECK-DAG_EMPTY: br {{.*}}, !dbg ![[EMPTY_RET2:.*]]
-  // CHECK-DAG_EMPTY_RET2: ![[EMPTY_RET]] = !{i32 [[@LINE+1]], i32 3,
+  // CHECK-DAG_EMPTY_RET2: ![[EMPTY_RET]] = !MDLocation(line: [[@LINE+1]], column: 3,
   return
   // CHECK-DAG_EMPTY: ret {{.*}}, !dbg ![[EMPTY_RET:.*]]
-  // CHECK-DAG_EMPTY: ![[EMPTY_RET]] = !{i32 [[@LINE+1]], i32 1,
+  // CHECK-DAG_EMPTY: ![[EMPTY_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
 // RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_EMPTY_NONE
@@ -43,7 +43,7 @@ func empty_none(inout a: Int) {
 
   a -= 2;
   // CHECK_EMPTY_NONE: ret {{.*}}, !dbg ![[EMPTY_NONE_RET:.*]]
-  // CHECK_EMPTY_NONE: ![[EMPTY_NONE_RET]] = !{i32 [[@LINE+1]], i32 1,
+  // CHECK_EMPTY_NONE: ![[EMPTY_NONE_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
 // RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_SIMPLE_RET
@@ -54,7 +54,7 @@ func simple(a: Int) -> Int {
   }
   return 1
   // CHECK_SIMPLE_RET: ret i{{.*}}, !dbg ![[SIMPLE_RET:.*]]
-  // CHECK_SIMPLE_RET: ![[SIMPLE_RET]] = !{i32 [[@LINE+1]], i32 1,
+  // CHECK_SIMPLE_RET: ![[SIMPLE_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
 // RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_COMPLEX_RET
@@ -65,7 +65,7 @@ func complex(a: Int) -> Int {
   }
   return a/2
   // CHECK_COMPLEX_RET: ret i{{.*}}, !dbg ![[COMPLEX_RET:.*]]
-  // CHECK_COMPLEX_RET: ![[COMPLEX_RET]] = !{i32 [[@LINE+1]], i32 1,
+  // CHECK_COMPLEX_RET: ![[COMPLEX_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
 // RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_COMPLEX_SIMPLE
@@ -76,7 +76,7 @@ func complex_simple(a: Int) -> Int {
   }
   return 2
   // CHECK_COMPLEX_SIMPLE: ret i{{.*}}, !dbg ![[COMPLEX_SIMPLE_RET:.*]]
-  // CHECK_COMPLEX_SIMPLE: ![[COMPLEX_SIMPLE_RET]] = !{i32 [[@LINE+1]], i32 1,
+  // CHECK_COMPLEX_SIMPLE: ![[COMPLEX_SIMPLE_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
 // RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_SIMPLE_COMPLEX
@@ -87,7 +87,7 @@ func simple_complex(a: Int) -> Int {
   }
   return 2
   // CHECK_SIMPLE_COMPLEX: ret {{.*}}, !dbg ![[SIMPLE_COMPLEX_RET:.*]]
-  // CHECK_SIMPLE_COMPLEX: ![[SIMPLE_COMPLEX_RET]] = !{i32 [[@LINE+1]], i32 1,
+  // CHECK_SIMPLE_COMPLEX: ![[SIMPLE_COMPLEX_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
 
@@ -99,7 +99,7 @@ func simple_complex(a: Int) -> Int {
 func cleanup_none(inout a: NSString) {
   a = "empty"
   // CHECK_CLEANUP_NONE: ret void, !dbg ![[CLEANUP_NONE_RET:.*]]
-  // CHECK_CLEANUP_NONE: ![[CLEANUP_NONE_RET]] = !{i32 [[@LINE+1]], i32 1,
+  // CHECK_CLEANUP_NONE: ![[CLEANUP_NONE_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
 // RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_CLEANUP_EMPTY
@@ -112,7 +112,7 @@ func cleanup_empty(inout a: NSString) {
   a = "empty"
   return
   // CHECK_CLEANUP_EMPTY: ret void, !dbg ![[CLEANUP_EMPTY_RET:.*]]
-  // CHECK_CLEANUP_EMPTY: ![[CLEANUP_EMPTY_RET]] = !{i32 [[@LINE+1]], i32 1,
+  // CHECK_CLEANUP_EMPTY: ![[CLEANUP_EMPTY_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
 // RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_CLEANUP_EMPTY_NONE
@@ -124,7 +124,7 @@ func cleanup_empty_none(inout a: NSString) {
 
   a = "empty"
   // CHECK_CLEANUP_EMPTY_NONE: ret {{.*}}, !dbg ![[CLEANUP_EMPTY_NONE_RET:.*]]
-  // CHECK_CLEANUP_EMPTY_NONE: ![[CLEANUP_EMPTY_NONE_RET]] = !{i32 [[@LINE+1]], i32 1,
+  // CHECK_CLEANUP_EMPTY_NONE: ![[CLEANUP_EMPTY_NONE_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
 // RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_CLEANUP_SIMPLE_RET
@@ -136,7 +136,7 @@ func cleanup_simple(a: NSString) -> Int {
 
   return 1
   // CHECK_CLEANUP_SIMPLE_RET: ret {{.*}}, !dbg ![[CLEANUP_SIMPLE_RET:.*]]
-  // CHECK_CLEANUP_SIMPLE_RET: ![[CLEANUP_SIMPLE_RET]] = !{i32 [[@LINE+1]], i32 1,
+  // CHECK_CLEANUP_SIMPLE_RET: ![[CLEANUP_SIMPLE_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
 // RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_CLEANUP_COMPLEX
@@ -148,7 +148,7 @@ func cleanup_complex(a: NSString) -> Int {
 
   return a.length/2
   // CHECK_CLEANUP_COMPLEX: ret i{{.*}}, !dbg ![[CLEANUP_COMPLEX_RET:.*]]
-  // CHECK_CLEANUP_COMPLEX: ![[CLEANUP_COMPLEX_RET]] = !{i32 [[@LINE+1]], i32 1,
+  // CHECK_CLEANUP_COMPLEX: ![[CLEANUP_COMPLEX_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
 // RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_CLEANUP_COMPLEX_SIMPLE
@@ -160,7 +160,7 @@ func cleanup_complex_simple(a: NSString) -> Int {
 
   return 2
   // CHECK_CLEANUP_COMPLEX_SIMPLE: ret {{.*}}, !dbg ![[CLEANUP_COMPLEX_SIMPLE_RET:.*]]
-  // CHECK_CLEANUP_COMPLEX_SIMPLE: ![[CLEANUP_COMPLEX_SIMPLE_RET]] = !{i32 [[@LINE+1]], i32 1,
+  // CHECK_CLEANUP_COMPLEX_SIMPLE: ![[CLEANUP_COMPLEX_SIMPLE_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
 // RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_CLEANUP_SIMPLE_COMPLEX
@@ -171,7 +171,7 @@ func cleanup_simple_complex(a: NSString) -> Int {
   }
   return 2
   // CHECK_CLEANUP_SIMPLE_COMPLEX: ret {{.*}}, !dbg ![[CLEANUP_SIMPLE_COMPLEX_RET:.*]]
-  // CHECK_CLEANUP_SIMPLE_COMPLEX: ![[CLEANUP_SIMPLE_COMPLEX_RET]] = !{i32 [[@LINE+1]], i32 1,
+  // CHECK_CLEANUP_SIMPLE_COMPLEX: ![[CLEANUP_SIMPLE_COMPLEX_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
 // ---------------------------------------------------------------------

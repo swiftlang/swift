@@ -19,8 +19,8 @@ class AppDelegate {
       // Verify that all debug line table entries for the expression
       // below are in the same scope.
       //
-      // CHECK-DAG: !{{.*}} = !{i32 [[@LINE+2]], i32 46, ![[S:.*]], null}
-      // CHECK-DAG: !{{.*}} = !{i32 [[@LINE+1]], i32 11, ![[S]], null}
+      // CHECK-DAG: !{{.*}} = !MDLocation(line: [[@LINE+2]], column: 46, scope: ![[S:.*]])
+      // CHECK-DAG: !{{.*}} = !MDLocation(line: [[@LINE+1]], column: 11, scope: ![[S]])
       let splitViewController = self.window!.rootViewController as! UISplitViewController
     }
     return true

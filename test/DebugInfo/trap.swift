@@ -5,11 +5,11 @@ import Swift
 func f(x : Int) -> Int {
   if x < 23 {
     // CHECK-DAG: call void @llvm.trap(), !dbg ![[LOC1:.*]]
-    // CHECK-DAG: ![[LOC1]] = !{i32 [[@LINE+1]],
+    // CHECK-DAG: ![[LOC1]] = !MDLocation(line: [[@LINE+1]],
     Builtin.int_trap()
   }
   if x > 42 {
-    // CHECK-DAG: ![[LOC2:.*]] = !{i32 [[@LINE+1]],
+    // CHECK-DAG: ![[LOC2:.*]] = !MDLocation(line: [[@LINE+1]],
     Builtin.int_trap()
     // CHECK-DAG: call void @llvm.trap(), !dbg ![[LOC2]]
   }

@@ -6,8 +6,8 @@ func foo(a : Int, b : Int) -> Int {
 // CHECK: call {{.*}}foo{{.*}}, !dbg ![[ARG1:.*]]
 // CHECK: call {{.*}}foo{{.*}}, !dbg ![[ARG2:.*]]
 // CHECK: call {{.*}}foo{{.*}}, !dbg ![[OUTER:.*]]
-let r = foo(foo(1, 23), // CHECK: ![[ARG1]] = !{i32 [[@LINE]],
-            foo(2, 42)  // CHECK: ![[ARG2]] = !{i32 [[@LINE]],
-           )            // CHECK: ![[OUTER]] = !{i32 [[@LINE]],
+let r = foo(foo(1, 23), // CHECK: ![[ARG1]] = !MDLocation(line: [[@LINE]],
+            foo(2, 42)  // CHECK: ![[ARG2]] = !MDLocation(line: [[@LINE]],
+           )            // CHECK: ![[OUTER]] = !MDLocation(line: [[@LINE]],
 println(r)
 

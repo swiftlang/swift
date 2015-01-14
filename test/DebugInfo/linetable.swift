@@ -35,7 +35,7 @@ func main(x: Int) -> Void
             print ("Here is something you might consider doing: \(result).\n")
 // CHECK: call {{.*}} @swift_release {{.*}}, !dbg ![[CLOSURE_END:.*]]
 // CHECK-NEXT: ret void, !dbg ![[CLOSURE_END]]
-// CHECK: ![[CLOSURE_END]] = !{i32 [[@LINE+1]]
+// CHECK: ![[CLOSURE_END]] = !MDLocation(line: [[@LINE+1]],
         }
     )
 

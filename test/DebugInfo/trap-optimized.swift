@@ -11,4 +11,4 @@ func fn() {
 // CHECK-NOT: define
 // CHECK: call void @llvm.trap(), !dbg ![[LOC:.*]]
 // CHECK-NEXT: unreachable, !dbg ![[LOC]]
-// CHECK: ![[LOC]] = !{i32 0, i32 0,
+// CHECK: ![[LOC]] = !MDLocation(line: 0, scope

@@ -23,7 +23,7 @@ func call_me(var input: Int) -> Void {
 // An autoclosure should have a line number in the debug info and a scope line of 0.
 // CHECK-DAG: \00_TFF11autoclosure7call_meFSiT_u_KT_PSs11BooleanType_{{.*}} [ DW_TAG_subprogram ] [line [[@LINE+3]]] [def] [scope 0]
 // But not in the line table.
-// CHECK-DAG: ![[DBG]] = !{i32 [[@LINE+1]], i32
+// CHECK-DAG: ![[DBG]] = !MDLocation(line: [[@LINE+1]],
     if input != 0 &&&&& ( get_truth (input * 2 + 1) > 0 )
     {
         println ("Whew, passed that test.")
