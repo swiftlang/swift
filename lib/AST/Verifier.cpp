@@ -467,6 +467,7 @@ struct ASTNodeBase {};
       case DeclContextKind::TopLevelCodeDecl:
       case DeclContextKind::Initializer:
       case DeclContextKind::AbstractClosureExpr:
+      case DeclContextKind::LocalDecl:
         return nullptr;
 
       case DeclContextKind::AbstractFunctionDecl:
@@ -618,7 +619,9 @@ struct ASTNodeBase {};
 
     void verifyCheckedAlways(ValueDecl *D) {
       if (D->hasName())
-        checkMangling(D);
+        if (D->getKind() != DeclKind::Param &&
+            D->getKind() != DeclKind::GenericTypeParam)
+          checkMangling(D);
 
       if (D->hasType())
         verifyChecked(D->getType());

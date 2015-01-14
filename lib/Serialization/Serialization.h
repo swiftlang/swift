@@ -146,7 +146,9 @@ private:
   SmallVector<DeclID, 2> KnownProtocolAdopters[NumKnownProtocols];
 
   /// The last assigned DeclID for decls from this module.
-  DeclID LastDeclID = 0;
+  /// 0 represents a placeholder for the module itself, and 1 represents
+  /// a placeholder for local decls.
+  DeclID LastDeclID = 1;
 
   /// The last assigned DeclID for types from this module.
   TypeID LastTypeID = 0;
@@ -295,6 +297,14 @@ public:
   ///
   /// \returns The ID for the given Decl in this module.
   DeclID addDeclRef(const Decl *D, bool forceSerialization = false);
+
+  /// Records the use of the given DeclContext as a Decl.
+  ///
+  /// The Decl will be scheduled for serialization if necessary.
+  ///
+  /// \ returns the ID for the given Decl in this module.
+  DeclID addDeclRefForContext(const DeclContext *DC,
+                              bool forceSerialization = false);
 
   /// Records the use of the given module.
   ///

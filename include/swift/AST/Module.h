@@ -27,10 +27,13 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/MD5.h"
+#include "llvm/Support/Path.h"
 
 namespace clang {
   class Module;
@@ -66,6 +69,7 @@ namespace swift {
   class Type;
   class TypeRefinementContext;
   class ValueDecl;
+  class TypeDecl;
   class VarDecl;
   class VisibleDeclConsumer;
   
@@ -282,6 +286,13 @@ public:
   void lookupValue(AccessPathTy AccessPath, DeclName Name, NLKind LookupKind,
                    SmallVectorImpl<ValueDecl*> &Result) const;
 
+  /// Look up a type that was defined in a local scope.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  TypeDecl *lookupLocalType(StringRef FileHash,
+                            unsigned LocalDiscriminator,
+                            StringRef Name) const ;
+
   /// Find ValueDecls in the module and pass them to the given consumer object.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
@@ -368,6 +379,12 @@ public:
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const;
+
+  /// Finds all local decls of this module.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  void getLocalTypeDecls(SmallVectorImpl<Decl*> &Results) const;
 
   /// Finds all top-level decls that should be displayed to a client of this
   /// module.
@@ -502,9 +519,21 @@ class FileUnit : public DeclContext {
   // FIXME: Stick this in a PointerIntPair.
   const FileUnitKind Kind;
 
+  /// A unique identifier representing this file; used to mark private decls
+  /// within the file to keep them from conflicting with other files in the
+  /// same module.
+  mutable Identifier Discriminator;
+
+  /// A map holding the next discriminator for declarations with
+  /// various identifiers.
+  llvm::DenseMap<Identifier, unsigned> LocalDiscriminators;
+
+  DummyLocalContext LocalContext;
+
 protected:
   FileUnit(FileUnitKind kind, Module &M)
-    : DeclContext(DeclContextKind::FileUnit, &M), Kind(kind) {
+    : DeclContext(DeclContextKind::FileUnit, &M), Kind(kind),
+      LocalContext(this) {
   }
 
   virtual ~FileUnit() = default;
@@ -512,6 +541,19 @@ protected:
 public:
   FileUnitKind getKind() const {
     return Kind;
+  }
+
+  virtual StringRef getFilename() const {
+    return "";
+  }
+
+  /// Return a number that'll be unique in this context across all
+  /// declarations with the given name.
+  unsigned claimNextNamedDiscriminator(Identifier name) {
+    assert(!name.empty() &&
+           "setting a local discriminator on an anonymous decl; "
+           "maybe the name hasn't been set yet?");
+    return LocalDiscriminators[name]++;
   }
 
   /// Look up a (possibly overloaded) value set at top-level scope
@@ -522,6 +564,12 @@ public:
   virtual void lookupValue(Module::AccessPathTy accessPath, DeclName name,
                            NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const = 0;
+
+  virtual TypeDecl *lookupLocalType(StringRef FileHash,
+                                    unsigned LocalDiscriminator,
+                                    StringRef Name) const {
+    return nullptr;
+  }
 
   /// Find ValueDecls in the module and pass them to the given consumer object.
   ///
@@ -553,6 +601,16 @@ public:
     return None;
   }
 
+  /// Returns an implementation-defined "discriminator" representing this file's
+  /// basename.
+  Identifier getDiscriminator() const;
+
+  /// Returns a placeholder contexts for local declarations that appeared
+  /// somewhere in this file.
+  DeclContext *getDummyLocalContext() {
+    return &LocalContext;
+  }
+
   /// Returns an implementation-defined "discriminator" for \p D, which
   /// distinguishes \p D from other declarations in the same module with the
   /// same name.
@@ -562,11 +620,28 @@ public:
   virtual Identifier
   getDiscriminatorForPrivateValue(const ValueDecl *D) const = 0;
 
+  /// Returns an implementation-defined "discriminator" for \p D, which
+  /// distinguishes \p D from other local declarations in the same module with
+  /// the same name.
+  ///
+  /// Since this value is used in name mangling, it should be a valid ASCII-only
+  /// identifier.
+  virtual Identifier
+  getDiscriminatorForLocalValue(const ValueDecl *D) const {
+    return getDiscriminator();
+  }
+
   /// Finds all top-level decls in this file.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {}
+
+  /// Finds all local type declarations in this file.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  virtual void getLocalTypeDecls(SmallVectorImpl<Decl*> &results) const {}
 
   /// Adds all top-level decls to the given vector.
   ///
@@ -735,11 +810,6 @@ private:
   /// This is filled in by the Name Binding phase.
   ArrayRef<std::pair<Module::ImportedModule, bool>> Imports;
 
-  /// A unique identifier representing this file; used to mark private decls
-  /// within the file to keep them from conflicting with other files in the
-  /// same module.
-  mutable Identifier PrivateDiscriminator;
-
   /// \brief The ID for the memory buffer containing this file's source.
   ///
   /// May be -1, to indicate no association with a buffer.
@@ -750,12 +820,15 @@ private:
 
   /// If non-null, used to track name lookups that happen within this file.
   ReferencedNameTracker *ReferencedNames = nullptr;
-  
+
   friend ASTContext;
   ~SourceFile();
 public:
   /// The list of top-level declarations in the source file.
   std::vector<Decl*> Decls;
+
+  /// The list of type declarations in a local context.
+  std::vector<Decl*> LocalTypeDecls;
 
   /// The first location where an @objc attribute appeared.
   Optional<SourceLoc> FirstObjCAttrLoc;
@@ -820,7 +893,10 @@ public:
   lookupClassMember(Module::AccessPathTy accessPath, DeclName name,
                     SmallVectorImpl<ValueDecl*> &results) const override;
 
-  virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
+  void getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const;
+
+  virtual void
+  getLocalTypeDecls(SmallVectorImpl<Decl*> &Results) const override;
 
   virtual void
   getImportedModules(SmallVectorImpl<Module::ImportedModule> &imports,
@@ -830,7 +906,6 @@ public:
   collectLinkLibraries(Module::LinkLibraryCallback callback) const override;
 
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
-  Identifier getPrivateDiscriminator() const { return PrivateDiscriminator; }
 
   virtual bool walk(ASTWalker &walker) override;
 
@@ -869,7 +944,7 @@ public:
 
   /// If this buffer corresponds to a file on disk, returns the path.
   /// Otherwise, return an empty string.
-  StringRef getFilename() const;
+  StringRef getFilename() const override;
 
   void dump() const;
   void dump(raw_ostream &os) const;
@@ -967,11 +1042,6 @@ protected:
   }
 
 public:
-  /// Returns an arbitrary string representing the storage backing this file.
-  ///
-  /// This is usually a filesystem path.
-  virtual StringRef getFilename() const;
-
   /// Look up an operator declaration.
   ///
   /// \param name The operator name ("+", ">>", etc.)

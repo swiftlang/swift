@@ -158,7 +158,7 @@
 ; CHECK: _TTRXFo_dSc_dSb_XFo_iSc_iSb_ ---> reabstraction thunk helper from @callee_owned (@unowned Swift.UnicodeScalar) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.UnicodeScalar) -> (@out Swift.Bool)
 ; CHECK: _TTRXFo_dSi_dGSqSi__XFo_iSi_iGSqSi__ ---> reabstraction thunk helper from @callee_owned (@unowned Swift.Int) -> (@unowned Swift.Int?) to @callee_owned (@in Swift.Int) -> (@out Swift.Int?)
 ; CHECK: _TTRG0_R_XFo_iV18switch_abstraction1A_iq__XFo_dS0__iq__ ---> reabstraction thunk helper <T_0_0> from @callee_owned (@in switch_abstraction.A) -> (@out T_0_0) to @callee_owned (@unowned switch_abstraction.A) -> (@out T_0_0)
-; CHECK: _TFCF5types1gFT1bSb_T_L0_10Collection3zimfS0_FT_T_ ---> types.(g (b : Swift.Bool) -> ()).(Collection #2).zim (types.(g (b : Swift.Bool) -> ()).(Collection #2))() -> ()
+; CHECK: _TFF4test8functionFT_T_L33_14D8911971AEF9FF0249450A14E8B990_8functionFT_T_ ---> test.(function () -> ()).(function #1 in _14D8911971AEF9FF0249450A14E8B990) () -> ()
 ; CHECK: _TFF17capture_promotion22test_capture_promotionFT_FT_SiU_FT_Si_promote0 ---> capture_promotion.(test_capture_promotion () -> () -> Swift.Int).(closure #1) with unmangled suffix "_promote0"
 ; CHECK: _TFIVSs8_Processi10_argumentsGSaSS_U_FT_GSaSS_ ---> Swift._Process.(variable initialization expression)._arguments : [Swift.String] with unmangled suffix "U_FT_GSaSS_"
 ; CHECK: _TFIvVSs8_Process10_argumentsGSaSS_iU_FT_GSaSS_ ---> Swift._Process.(_arguments : [Swift.String]).(variable initialization expression).(closure #1)

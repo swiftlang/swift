@@ -3,7 +3,6 @@
 import Foundation
 
 func foo() {
-  // CHECK-LABEL: sil private [transparent] @_TToFCF10objc_local3fooFT_T_L_3Foog1xSi
-  // CHECK-LABEL: sil private [transparent] @_TToFCF10objc_local3fooFT_T_L_3Foos1xSi
+  // CHECK-LABEL: sil private [transparent] @_TToFC10objc_localL33_A955410181627128E3785E314285BB18_3Foog1xSi
   @objc class Foo { @objc var x: Int = 0 }
 }

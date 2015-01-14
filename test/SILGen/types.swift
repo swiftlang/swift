@@ -40,7 +40,7 @@ struct S {
 
 func f() {
   class FC {
-    // CHECK-LABEL: sil shared @_TFCF5types1fFT_T_L_2FC3zimfS0_FT_T_
+    // CHECK-LABEL: sil shared @_TFC5typesL33_92C453E47D5C73E45C8465DFD20D0D6B_2FC3zimfS0_FT_T_
     func zim() {}
   }
 }
@@ -48,12 +48,12 @@ func f() {
 func g(#b : Bool) {
   if (b) {
     class FC {
-      // CHECK-LABEL: sil shared @_TFCF5types1gFT1bSb_T_L_2FC3zimfS0_FT_T_
+      // CHECK-LABEL: sil shared @_TFC5typesL33_92C453E47D5C73E45C8465DFD20D0D6B0_2FC3zimfS0_FT_T_
       func zim() {}
     }
   } else {
     class FC {
-      // CHECK-LABEL: sil shared @_TFCF5types1gFT1bSb_T_L0_2FC3zimfS0_FT_T_
+      // CHECK-LABEL: sil shared @_TFC5typesL33_92C453E47D5C73E45C8465DFD20D0D6B1_2FC3zimfS0_FT_T_
       func zim() {}
     }
   }

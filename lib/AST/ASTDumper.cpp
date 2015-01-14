@@ -854,6 +854,10 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
     }
     break;
 
+  case DeclContextKind::LocalDecl:
+    os << "local decl";
+    break;
+
   case DeclContextKind::TopLevelCodeDecl:
     os << "top-level code";
     break;

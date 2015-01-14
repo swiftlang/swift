@@ -9,7 +9,7 @@ func return_local_generic_function_without_captures<A, R>() -> A -> R {
   func f(_: A) -> R {
     Builtin.int_trap()
   }
-  // CHECK:  [[FN:%.*]] = function_ref @_TFF8closures46return_local_generic_function_without_capturesU___FT_FQ_Q0_L_1fFQ_Q0_ : $@thin <τ_0_0, τ_0_1> (@out τ_0_1, @in τ_0_0) -> ()
+  // CHECK:  [[FN:%.*]] = function_ref @_TFF8closures46return_local_generic_function_without_capturesU___FT_FQ_Q0_L33_AA42AF98307949D75035787F4C29B3BB_1fFQ_Q0_ : $@thin <τ_0_0, τ_0_1> (@out τ_0_1, @in τ_0_0) -> ()
   // CHECK:  [[FN_WITH_GENERIC_PARAMS:%.*]] = partial_apply [[FN]]<A, R>() : $@thin <τ_0_0, τ_0_1> (@out τ_0_1, @in τ_0_0) -> ()
   // CHECK:  return [[FN_WITH_GENERIC_PARAMS]] : $@callee_owned (@out R, @in A) -> ()
   return f

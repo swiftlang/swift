@@ -446,6 +446,7 @@ void DiagnosticEngine::flushActiveDiagnostic() {
             case DeclContextKind::Initializer:
             case DeclContextKind::AbstractClosureExpr:
             case DeclContextKind::AbstractFunctionDecl:
+            case DeclContextKind::LocalDecl:
               break;
             }
 

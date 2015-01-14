@@ -672,7 +672,7 @@ func propertyWithDidSetTakingOldValue() {
   p = zero
 }
 
-// CHECK: // properties.(propertyWithDidSetTakingOldValue () -> ()).(p #1).setter : Swift.Int
+// CHECK: // properties.(propertyWithDidSetTakingOldValue () -> ()).(p #1 in _60FBBC3641E782237B57A8AA5BED21F1).setter : Swift.Int
 // CHECK-NEXT: sil {{.*}} @_TFF10properties32propertyWithDidSetTakingOldValue
 // CHECK-NEXT: bb0(%0 : $Int, %1 : $Builtin.NativeObject, %2 : $*Int, %3 : $@callee_owned (Int) -> ()):
 // CHECK-NEXT:  debug_value %0 : $Int  // let newValue

@@ -264,6 +264,12 @@ DeclContext *Decl::getInnermostDeclContext() {
 
 }
 
+const DeclContext *Decl::getDeclContextForSerialization() const {
+  if (Context->isLocalContext())
+    return Context->getParentSourceFile()->getLocalContext();
+  return Context;
+}
+
 void Decl::setDeclContext(DeclContext *DC) { 
   Context = DC;
 }

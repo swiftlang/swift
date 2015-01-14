@@ -399,6 +399,12 @@ void SerializedASTFile::lookupValue(Module::AccessPathTy accessPath,
   File.lookupValue(name, results);
 }
 
+TypeDecl *SerializedASTFile::lookupLocalType(llvm::StringRef FileHash,
+                                             unsigned int LocalDiscriminator,
+                                             llvm::StringRef Name) const {
+  return File.lookupLocalType(FileHash, LocalDiscriminator, Name);
+}
+
 OperatorDecl *SerializedASTFile::lookupOperator(Identifier name,
                                                 DeclKind fixity) const {
   return File.lookupOperator(name, fixity);
@@ -431,6 +437,10 @@ void SerializedASTFile::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const{
   File.getTopLevelDecls(results);
 }
 
+void SerializedASTFile::getLocalTypeDecls(SmallVectorImpl<Decl*> &results) const {
+  return File.getLocalTypeDecls(results);
+}
+
 void SerializedASTFile::getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
   File.getDisplayDecls(results);
 }
@@ -448,6 +458,13 @@ const clang::Module *SerializedASTFile::getUnderlyingClangModule() {
 Identifier
 SerializedASTFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   Identifier discriminator = File.getDiscriminatorForPrivateValue(D);
+  assert(!discriminator.empty() && "no discriminator found for value");
+  return discriminator;
+}
+
+Identifier
+SerializedASTFile::getDiscriminatorForLocalValue(const ValueDecl *D) const {
+  Identifier discriminator = File.getDiscriminatorForLocalValue(D);
   assert(!discriminator.empty() && "no discriminator found for value");
   return discriminator;
 }

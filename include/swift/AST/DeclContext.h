@@ -45,18 +45,20 @@ namespace swift {
   class GenericTypeParamType;
   class Requirement;
   class SourceFile;
+  class FileUnit;
   class Type;
   class Module;
   class ValueDecl;
   class Initializer;
   class ClassDecl;
 
-enum class DeclContextKind : uint8_t {
+enum class DeclContextKind : uint16_t {
   AbstractClosureExpr,
   Initializer,
   TopLevelCodeDecl,
   AbstractFunctionDecl,
-  Last_LocalDeclContextKind = AbstractFunctionDecl,
+  LocalDecl,
+  Last_LocalDeclContextKind = LocalDecl,
 
   Module,
   FileUnit,
@@ -223,6 +225,9 @@ public:
   /// Returns the source file that contains this context, or null if this
   /// is not within a source file.
   SourceFile *getParentSourceFile() const;
+
+  /// Returns the file that contains this context.
+  FileUnit *getParentFileUnit() const;
 
   /// Determine whether this declaration context is generic, meaning that it or
   /// any of its parents have generic parameters.
@@ -393,6 +398,13 @@ private:
   /// This is used internally when loading members, because loading a
   /// member is an invisible addition.
   void addMemberSilently(Decl *member, Decl *hint = nullptr) const;
+};
+
+class DummyLocalContext : public DeclContext {
+public:
+  DummyLocalContext(DeclContext *Parent)
+    : DeclContext(DeclContextKind::LocalDecl, Parent) {
+  }
 };
   
 } // end namespace swift

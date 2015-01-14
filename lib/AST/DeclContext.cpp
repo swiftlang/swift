@@ -58,6 +58,7 @@ Type DeclContext::getDeclaredTypeOfContext() const {
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::LocalDecl:
   case DeclContextKind::Initializer:
     return Type();
 
@@ -86,6 +87,7 @@ Type DeclContext::getDeclaredTypeInContext() const {
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::LocalDecl:
   case DeclContextKind::Initializer:
     return Type();
 
@@ -105,6 +107,7 @@ Type DeclContext::getDeclaredInterfaceType() const {
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::LocalDecl:
   case DeclContextKind::Initializer:
     return Type();
 
@@ -124,6 +127,7 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
   switch (getContextKind()) {
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
+  case DeclContextKind::LocalDecl:
   case DeclContextKind::TopLevelCodeDecl:
     return nullptr;
 
@@ -169,6 +173,7 @@ GenericSignature *DeclContext::getGenericSignatureOfContext() const {
   case DeclContextKind::FileUnit:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::LocalDecl:
   case DeclContextKind::Initializer:
     return nullptr;
 
@@ -237,6 +242,7 @@ AbstractFunctionDecl *DeclContext::getInnermostMethodContext() {
     case DeclContextKind::FileUnit:
     case DeclContextKind::Module:
     case DeclContextKind::NominalTypeDecl:
+    case DeclContextKind::LocalDecl:
     case DeclContextKind::TopLevelCodeDecl:
       // Not in a method context.
       return nullptr;
@@ -251,6 +257,7 @@ DeclContext *DeclContext::getInnermostTypeContext() {
     case DeclContextKind::AbstractClosureExpr:
     case DeclContextKind::Initializer:
     case DeclContextKind::TopLevelCodeDecl:
+    case DeclContextKind::LocalDecl:
     case DeclContextKind::AbstractFunctionDecl:
       Result = Result->getParent();
       continue;
@@ -280,6 +287,14 @@ SourceFile *DeclContext::getParentSourceFile() const {
   return const_cast<SourceFile *>(dyn_cast<SourceFile>(DC));
 }
 
+FileUnit *DeclContext::getParentFileUnit() const {
+  const DeclContext *DC = this;
+  while (DC->getContextKind() != DeclContextKind::FileUnit) {
+    DC = DC->getParent();
+  }
+  return const_cast<FileUnit *>(dyn_cast<FileUnit>(DC));
+}
+
 DeclContext *DeclContext::getModuleScopeContext() const {
   const DeclContext *DC = this;
   while (true) {
@@ -298,6 +313,7 @@ DeclContext *DeclContext::getModuleScopeContext() const {
 bool DeclContext::isGenericContext() const {
   for (const DeclContext *dc = this; ; dc = dc->getParent() ) {
     switch (dc->getContextKind()) {
+    case DeclContextKind::LocalDecl:
     case DeclContextKind::Module:
     case DeclContextKind::FileUnit:
       return false;
@@ -351,6 +367,7 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
   // FIXME: This is explicitly checking for attributes in some cases because
   // it can be called before accessibility is computed.
   switch (getContextKind()) {
+  case DeclContextKind::LocalDecl:
   case DeclContextKind::AbstractClosureExpr:
     break;
 
@@ -416,6 +433,7 @@ bool DeclContext::walkContext(ASTWalker &Walker) {
     return cast<TopLevelCodeDecl>(this)->walk(Walker);
   case DeclContextKind::AbstractFunctionDecl:
     return cast<AbstractFunctionDecl>(this)->walk(Walker);
+  case DeclContextKind::LocalDecl:
   case DeclContextKind::Initializer:
     // Is there any point in trying to walk the expression?
     return false;
@@ -441,6 +459,7 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
 
   const char *Kind;
   switch (getContextKind()) {
+  case DeclContextKind::LocalDecl:        Kind = "Local"; break;
   case DeclContextKind::Module:           Kind = "Module"; break;
   case DeclContextKind::FileUnit:         Kind = "FileUnit"; break;
   case DeclContextKind::AbstractClosureExpr:
@@ -465,6 +484,9 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
   OS.indent(Depth*2) << "0x" << (void*)this << " " << Kind;
 
   switch (getContextKind()) {
+  case DeclContextKind::LocalDecl:
+    OS << " local";
+    break;
   case DeclContextKind::Module:
     OS << " name=" << cast<Module>(this)->Name;
     break;

@@ -936,19 +936,22 @@ private:
   
   NodePointer demangleDeclName() {
     // decl-name ::= local-decl-name
-    // local-decl-name ::= 'L' index identifier
+    // local-decl-name ::= 'L' filehash index identifier
     if (Mangled.nextIf('L')) {
+      NodePointer fileHash = demangleIdentifier();
+      if (!fileHash) return nullptr;
+
       NodePointer discriminator = demangleIndexAsNode();
       if (!discriminator) return nullptr;
 
       NodePointer name = demangleIdentifier();
       if (!name) return nullptr;
 
-      NodePointer localName = NodeFactory::create(Node::Kind::LocalDeclName);
-      localName->addChild(std::move(discriminator));
-      localName->addChild(std::move(name));
-      return localName;
-
+      NodePointer localDecl = NodeFactory::create(Node::Kind::LocalDeclName);
+      localDecl->addChild(std::move(fileHash));
+      localDecl->addChild(std::move(discriminator));
+      localDecl->addChild(std::move(name));
+      return localDecl;
     } else if (Mangled.nextIf('P')) {
       NodePointer discriminator = demangleIdentifier();
       if (!discriminator) return nullptr;
@@ -2641,8 +2644,11 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::LocalDeclName:
     Printer << '(';
-    print(pointer->getChild(1));
-    Printer << " #" << (pointer->getChild(0)->getIndex() + 1) << ')';
+    print(pointer->getChild(2));
+    Printer << " #" << (pointer->getChild(1)->getIndex() + 1);
+    Printer << " in ";
+    print(pointer->getChild(0));
+    Printer << ')';
     return;
   case Node::Kind::PrivateDeclName:
     Printer << '(';

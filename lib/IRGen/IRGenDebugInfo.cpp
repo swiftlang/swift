@@ -602,6 +602,7 @@ llvm::DIScope IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
   case DeclContextKind::AbstractFunctionDecl:
 
   // We don't model these in DWARF.
+  case DeclContextKind::LocalDecl:
   case DeclContextKind::Initializer:
   case DeclContextKind::ExtensionDecl:
     return getOrCreateContext(DC->getParent());

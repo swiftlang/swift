@@ -1,6 +1,7 @@
 // RUN: %swift -parse -verify %clang-importer-sdk %s
 // RUN: %swift-ide-test -print-usrs -source-filename %s %clang-importer-sdk | FileCheck %s -strict-whitespace
 
+import Foundation
 import macros
 
 // CHECK: [[@LINE+1]]:8 s:V14swift_ide_test1S{{$}}
@@ -16,9 +17,9 @@ typealias MyGInt = Int
 class MyCls {
   // CHECK: [[@LINE+1]]:13 s:C14swift_ide_test5MyCls2TA{{$}}
   typealias TA = Int
-  // CHECK: [[@LINE+1]]:7 s:vC14swift_ide_test5MyCls3wwwSi{{$}}
+  // CHECK: [[@LINE+2]]:7 s:vC14swift_ide_test5MyCls3wwwSi{{$}}
+  // CHECK: [[@LINE+1]]:19 s:FSicFMSiFT22_builtinIntegerLiteralBi2048__Si{{$}}
   var www : Int = 0
-  // CHECK: [[@LINE+1]]:8 s:FC14swift_ide_test5MyCls3fooFS0_FSiT_{{$}}
   func foo(x : Int) {}
   // CHECK: [[@LINE+1]]:3 s:sC14swift_ide_test5MyCls9subscriptFSiSf{{$}}
   subscript(i: Int) -> Float {
@@ -41,7 +42,7 @@ class GenericClass {
   // CHECK: [[@LINE+1]]:8 s:FC14swift_ide_test12GenericClass12instanceFuncFS0_FT_T_{{$}}
   func instanceFunc() {
     // CHECK: [[@LINE+2]]:18 s:FC14swift_ide_test12GenericClass9classFuncFMS0_FS0_T_{{$}}
-    // CHECK: [[@LINE+1]]:28 s:vFC14swift_ide_test12GenericClass12instanceFuncFS0_FT_T_L_4selfS0_{{$}}
+    // CHECK: [[@LINE+1]]:28 s:vFC14swift_ide_test12GenericClass12instanceFuncFS0_FT_T_L33_32FE8F7EF2DE2FC69E75F86A8A3935D3_4selfS0_{{$}}
     GenericClass.classFunc(self)
   }
 
@@ -62,7 +63,7 @@ class GenericClass {
   }
 
   // CHECK: [[@LINE+2]]:14 s:FC14swift_ide_test12GenericClass9classFuncFMS0_FS0_T_{{$}}
-  // CHECK: [[@LINE+1]]:24 s:vFC14swift_ide_test12GenericClass9classFuncFMS0_FS0_T_L_1aS0_{{$}}
+  // CHECK: [[@LINE+1]]:24 s:vFC14swift_ide_test12GenericClass9classFuncFMS0_FS0_T_L33_32FE8F7EF2DE2FC69E75F86A8A3935D3_1aS0_{{$}}
   class func classFunc(a: GenericClass) {}
 }
 
@@ -70,9 +71,9 @@ class GenericClass {
 protocol Prot {
   // CHECK: [[@LINE+1]]:13 s:P14swift_ide_test4Prot5Blarg{{$}}
   typealias Blarg
-  // CHECK: [[@LINE+1]]:8 s:FP14swift_ide_test4Prot8protMethUS0__U__FQPS0_FQS1_5BlargS2_{{$}}
+  // CHECK: [[@LINE+2]]:8 s:FP14swift_ide_test4Prot8protMethUS0__U__FQPS0_FQS1_5BlargS2_{{$}}
+  // CHECK: [[@LINE+1]]:17 s:vFP14swift_ide_test4Prot8protMethUS0__U__FQPS0_FQS1_5BlargS2_L33_32FE8F7EF2DE2FC69E75F86A8A3935D3_1xS2_{{$}}
   func protMeth(x: Blarg) -> Blarg
-  // CHECK: [[@LINE+2]]:7 s:vP14swift_ide_test4Prot17protocolProperty1Si{{$}}
   // CHECK: [[@LINE+1]]:32 s:FP14swift_ide_test4Protg17protocolProperty1Si{{$}}
   var protocolProperty1: Int { get }
 }
@@ -81,7 +82,7 @@ protocol Prot2 {}
 class SubCls : MyCls, Prot {
   // CHECK: [[@LINE+1]]:13 s:C14swift_ide_test6SubCls5Blarg{{$}}
   typealias Blarg = Prot2
-  // CHECK: [[@LINE+1]]:8 s:FC14swift_ide_test6SubCls8protMethFS0_FPS_5Prot2_PS1__{{$}}
+  // CHECK: [[@LINE+1]]:17 s:vFC14swift_ide_test6SubCls8protMethFS0_FPS_5Prot2_PS1__L33_32FE8F7EF2DE2FC69E75F86A8A3935D3_1xPS1__{{$}}
   func protMeth(x: Blarg) -> Blarg {}
   // CHECK: [[@LINE+1]]:7 s:vC14swift_ide_test6SubCls17protocolProperty1Si{{$}}
   var protocolProperty1 = 0
@@ -90,7 +91,7 @@ class SubCls : MyCls, Prot {
 // CHECK: [[@LINE+1]]:6 s:F14swift_ide_test5genFnUS_4Prot_US_5Prot2__FQ_Si{{$}}
 func genFn<T : Prot where T.Blarg : Prot2>(p : T) -> Int {}
 
-// CHECK: [[@LINE+1]]:6 s:F14swift_ide_test3barFSiTSiSf_{{$}}
+// CHECK: [[@LINE+1]]:10 s:vF14swift_ide_test3barFSiTSiSf_L33_32FE8F7EF2DE2FC69E75F86A8A3935D3_1xSi{{$}}
 func bar(x: Int) -> (Int, Float) {}
 
 // CHECK: [[@LINE+1]]:7 s:C14swift_ide_test6GenCls{{$}}
@@ -144,9 +145,9 @@ class Observers {
 // CHECK: [[@LINE+2]]:7 s:C14swift_ide_test10ObjCClass1{{$}}
 @objc
 class ObjCClass1 {
-  // CHECK: [[@LINE+1]]:8 s:FC14swift_ide_test10ObjCClass113instanceFunc1FS0_FSiT_{{$}}
+  // CHECK: [[@LINE+1]]:22 s:vFC14swift_ide_test10ObjCClass113instanceFunc1FS0_FSiT_L33_32FE8F7EF2DE2FC69E75F86A8A3935D3_1aSi{{$}}
   func instanceFunc1(a: Int) {}
-  // CHECK: [[@LINE+1]]:14 s:FC14swift_ide_test10ObjCClass111staticFunc1FMS0_FSiT_{{$}}
+  // CHECK: [[@LINE+1]]:26 s:vFC14swift_ide_test10ObjCClass111staticFunc1FMS0_FSiT_L33_32FE8F7EF2DE2FC69E75F86A8A3935D3_1aSi{{$}}
   class func staticFunc1(a: Int) {}
 }
 

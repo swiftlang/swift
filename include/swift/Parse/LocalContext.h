@@ -26,10 +26,6 @@ namespace swift {
 
 /// Information associated with parsing a local context.
 class LocalContext {
-  /// A map holding the next discriminator for declarations with
-  /// various identifiers.
-  llvm::DenseMap<Identifier, unsigned> LocalDiscriminators;
-
   /// The next discriminator for an explicit closure expression.
   unsigned NextClosureDiscriminator = 0;
 
@@ -38,15 +34,6 @@ class LocalContext {
 
 public:
   LocalContext() = default;
-
-  /// Return a number that'll be unique in this context across all
-  /// declarations with the given name.
-  unsigned claimNextNamedDiscriminator(Identifier name) {
-    assert(!name.empty() &&
-           "setting a local discriminator on an anonymous decl; "
-           "maybe the name hasn't been set yet?");
-    return LocalDiscriminators[name]++;
-  }
 
   /// Return a number that'll be unique in this context across all
   /// explicit anonymous closure expressions.
