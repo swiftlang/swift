@@ -89,6 +89,8 @@ std::vector<LValueWriteback> &SILGenFunction::getWritebackStack() {
 }
 
 void SILGenFunction::freeWritebackStack() {
+  assert((!WritebackStack || WritebackStack->empty()) &&
+         "entries remaining on writeback stack at end of function!");
   delete WritebackStack;
 }
 
@@ -1110,6 +1112,9 @@ namespace {
 
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
+      assert(gen.InWritebackScope &&
+             "offsetting l-value for modification without writeback scope");
+
       SILDeclRef addressor = gen.getAddressorDeclRef(decl, accessKind, 
                                                      IsDirectAccessorUse);
       auto args =
