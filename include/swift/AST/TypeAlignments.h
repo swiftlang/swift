@@ -24,8 +24,9 @@ namespace swift {
   class AbstractStorageDecl;
   class Decl;
   class DeclContext;
-  class TypeBase;
+  class OperatorDecl;
   class ArchetypeType;
+  class TypeBase;
 
   /// We frequently use three tag bits on all of these types.
   constexpr size_t DeclAlignInBits = 3;
@@ -57,6 +58,7 @@ template <> class PointerLikeTypeTraits<CLASS*>           \
 
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::Decl, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::AbstractStorageDecl, swift::DeclAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::OperatorDecl, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::DeclContext, swift::DeclContextAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::TypeBase, swift::TypeAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ArchetypeType, swift::TypeAlignInBits)

@@ -66,10 +66,12 @@
 ; CHECK: _Tv3foo3barSi ---> foo.bar : Swift.Int
 ; CHECK: _TF3fooau3barSi ---> foo.bar.unsafeMutableAddressor : Swift.Int
 ; CHECK: _TF3foolu3barSi ---> foo.bar.unsafeAddressor : Swift.Int
-; CHECK: _TF3fooao3barSi ---> foo.bar.owningMutableAddressor : Swift.Int
-; CHECK: _TF3foolo3barSi ---> foo.bar.owningAddressor : Swift.Int
-; CHECK: _TF3fooap3barSi ---> foo.bar.pinningMutableAddressor : Swift.Int
-; CHECK: _TF3foolp3barSi ---> foo.bar.pinningAddressor : Swift.Int
+; CHECK: _TF3fooaO3barSi ---> foo.bar.owningMutableAddressor : Swift.Int
+; CHECK: _TF3foolO3barSi ---> foo.bar.owningAddressor : Swift.Int
+; CHECK: _TF3fooao3barSi ---> foo.bar.nativeOwningMutableAddressor : Swift.Int
+; CHECK: _TF3foolo3barSi ---> foo.bar.nativeOwningAddressor : Swift.Int
+; CHECK: _TF3fooap3barSi ---> foo.bar.nativePinningMutableAddressor : Swift.Int
+; CHECK: _TF3foolp3barSi ---> foo.bar.nativePinningAddressor : Swift.Int
 ; CHECK: _TF3foog3barSi ---> foo.bar.getter : Swift.Int
 ; CHECK: _TF3foos3barSi ---> foo.bar.setter : Swift.Int
 ; CHECK: _TFC3foo3bar3basfS0_FT3zimCS_3zim_T_ ---> foo.bar.bas (foo.bar)(zim : foo.zim) -> ()

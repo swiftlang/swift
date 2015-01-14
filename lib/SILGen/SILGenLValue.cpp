@@ -1136,10 +1136,11 @@ namespace {
       // For owning addressors, we can just let the owner get released
       // at an appropriate point.
       case AddressorKind::Owning:
+      case AddressorKind::NativeOwning:
         return result.first;
 
       // For pinning addressors, we have to push a writeback.
-      case AddressorKind::Pinning: {
+      case AddressorKind::NativePinning: {
         std::unique_ptr<LogicalPathComponent>
           component(new UnpinPseudoComponent(getTypeData()));
         gen.getWritebackStack().emplace_back(loc, std::move(component),

@@ -672,8 +672,10 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
       return PrintAccessor(accessor, "unsafeAddress");
     case AddressorKind::Owning:
       return PrintAccessor(accessor, "addressWithOwner");
-    case AddressorKind::Pinning:
-      return PrintAccessor(accessor, "addressWithPinnedOwner");
+    case AddressorKind::NativeOwning:
+      return PrintAccessor(accessor, "addressWithNativeOwner");
+    case AddressorKind::NativePinning:
+      return PrintAccessor(accessor, "addressWithPinnedNativeOwner");
     }
     llvm_unreachable("bad addressor kind");
   };
@@ -687,8 +689,10 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
       return PrintAccessor(accessor, "unsafeMutableAddress");
     case AddressorKind::Owning:
       return PrintAccessor(accessor, "mutableAddressWithOwner");
-    case AddressorKind::Pinning:
-      return PrintAccessor(accessor, "mutableAddressWithPinnedOwner");
+    case AddressorKind::NativeOwning:
+      return PrintAccessor(accessor, "mutableAddressWithNativeOwner");
+    case AddressorKind::NativePinning:
+      return PrintAccessor(accessor, "mutableAddressWithPinnedNativeOwner");
     }
     llvm_unreachable("bad addressor kind");
   };

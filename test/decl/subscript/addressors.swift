@@ -182,21 +182,21 @@ struct RedundantAddressors1 {
   var owner : Builtin.NativeObject
   subscript(index: Int) -> Int {
     unsafeAddress { return nil } // expected-note {{previous definition of addressor is here}}
-    addressWithOwner { return (nil, owner)  } // expected-error {{subscript already has a addressor}}
+    addressWithNativeOwner { return (nil, owner)  } // expected-error {{subscript already has a addressor}}
   }
 }
 struct RedundantAddressors2 {
   var owner : Builtin.NativeObject
   subscript(index: Int) -> Int {
     unsafeAddress { return nil } // expected-note {{previous definition of addressor is here}}
-    addressWithPinnedOwner { return (nil, owner)  } // expected-error {{subscript already has a addressor}}
+    addressWithPinnedNativeOwner { return (nil, owner)  } // expected-error {{subscript already has a addressor}}
   }
 }
 struct RedundantAddressors3 {
   var owner : Builtin.NativeObject
   subscript(index: Int) -> Int {
-    addressWithOwner { return nil } // expected-note {{previous definition of addressor is here}}
-    addressWithPinnedOwner { return (nil, owner)  } // expected-error {{subscript already has a addressor}}
+    addressWithNativeOwner { return nil } // expected-note {{previous definition of addressor is here}}
+    addressWithPinnedNativeOwner { return (nil, owner)  } // expected-error {{subscript already has a addressor}}
   }
 }
 
@@ -205,7 +205,7 @@ struct RedundantMutableAddressors1 {
   subscript(index: Int) -> Int {
     unsafeAddress { return nil }
     unsafeMutableAddress { return nil } // expected-note {{previous definition of mutable addressor is here}}
-    mutableAddressWithOwner { return (nil, owner)  } // expected-error {{subscript already has a mutable addressor}}
+    mutableAddressWithNativeOwner { return (nil, owner)  } // expected-error {{subscript already has a mutable addressor}}
   }
 }
 struct RedundantMutableAddressors2 {
@@ -213,7 +213,7 @@ struct RedundantMutableAddressors2 {
   subscript(index: Int) -> Int {
     unsafeAddress { return nil }
     unsafeMutableAddress { return nil } // expected-note {{previous definition of mutable addressor is here}}
-    mutableAddressWithOwner { return (nil, owner)  } // expected-error {{subscript already has a mutable addressor}}
+    mutableAddressWithNativeOwner { return (nil, owner)  } // expected-error {{subscript already has a mutable addressor}}
   }
 }
 struct RedundantMutableAddressors3 {
@@ -221,6 +221,6 @@ struct RedundantMutableAddressors3 {
   subscript(index: Int) -> Int {
     unsafeAddress { return nil }
     unsafeMutableAddress { return nil } // expected-note {{previous definition of mutable addressor is here}}
-    mutableAddressWithOwner { return (nil, owner)  } // expected-error {{subscript already has a mutable addressor}}
+    mutableAddressWithNativeOwner { return (nil, owner)  } // expected-error {{subscript already has a mutable addressor}}
   }
 }

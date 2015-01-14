@@ -3334,12 +3334,15 @@ enum class AddressorKind : unsigned char {
   NotAddressor,
   /// \brief This is an unsafe addressor; it simply returns an address.
   Unsafe,
-  /// \brief This is an owning addressor; it returns a Builtin.NativeObject
+  /// \brief This is an owning addressor; it returns a Builtin.UnknownObject
   /// which should be released when the caller is done with the object.
   Owning,
+  /// \brief This is an owning addressor; it returns a Builtin.NativeObject
+  /// which should be released when the caller is done with the object.
+  NativeOwning,
   /// \brief This is a pinning addressor; it returns a Builtin.NativeObject?
   /// which should be unpinned when the caller is done with the object.
-  Pinning,
+  NativePinning,
 };
 
 /// Whether an access to storage is for reading, writing, or both.
@@ -4307,7 +4310,7 @@ class FuncDecl : public AbstractFunctionDecl {
   /// which property and what kind of accessor.
   llvm::PointerIntPair<AbstractStorageDecl*, 3, AccessorKind> AccessorDecl;
   llvm::PointerUnion<FuncDecl *, NominalTypeDecl*> OverriddenOrDerivedForDecl;
-  llvm::PointerIntPair<OperatorDecl *, 2, AddressorKind> OperatorAndAddressorKind;
+  llvm::PointerIntPair<OperatorDecl *, 3, AddressorKind> OperatorAndAddressorKind;
 
   FuncDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
            SourceLoc FuncLoc, DeclName Name,

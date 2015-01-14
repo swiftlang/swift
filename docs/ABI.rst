@@ -785,9 +785,10 @@ Globals
   local-decl-name ::= 'L' index identifier  // locally-discriminated declaration
   private-decl-name ::= 'P' identifier identifier  // file-discriminated declaration
   reabstract-signature ::= ('G' generic-signature)? type type
-  addressor-kind ::= 'u'                 // unsafe addressor
-  addressor-kind ::= 'o'                 // owning addressor
-  addressor-kind ::= 'p'                 // pinning addressor
+  addressor-kind ::= 'u'                 // unsafe addressor (no owner)
+  addressor-kind ::= 'O'                 // owning addressor (non-native owner)
+  addressor-kind ::= 'o'                 // owning addressor (native owner)
+  addressor-kind ::= 'p'                 // pinning addressor (native owner)
 
 An ``entity`` starts with a ``nominal-type-kind`` (``[COPV]``), a
 substitution (``[S]``) of a nominal type, or an ``entity-kind``

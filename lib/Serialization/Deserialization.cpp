@@ -1467,8 +1467,10 @@ getActualAddressorKind(uint8_t raw) {
     return swift::AddressorKind::Unsafe;
   case serialization::AddressorKind::Owning:
     return swift::AddressorKind::Owning;
-  case serialization::AddressorKind::Pinning:
-    return swift::AddressorKind::Pinning;
+  case serialization::AddressorKind::NativeOwning:
+    return swift::AddressorKind::NativeOwning;
+  case serialization::AddressorKind::NativePinning:
+    return swift::AddressorKind::NativePinning;
   }
 
   return None;

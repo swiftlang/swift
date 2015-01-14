@@ -1236,7 +1236,8 @@ static void synthesizeAddressedMaterializeForSet(FuncDecl *materializeForSet,
     break;
 
   case AddressorKind::Owning:
-  case AddressorKind::Pinning: {
+  case AddressorKind::NativeOwning:
+  case AddressorKind::NativePinning: {
     // We need to bind the result to a temporary variable.
     //   let temporary = addressor(self)(indices)
     auto tempDecl = new (ctx) VarDecl(/*static*/ false, /*let*/ true,
@@ -1262,8 +1263,10 @@ static void synthesizeAddressedMaterializeForSet(FuncDecl *materializeForSet,
       case AddressorKind::Unsafe:
         llvm_unreachable("filtered out");
       case AddressorKind::Owning:
+        return ctx.TheUnknownObjectType;
+      case AddressorKind::NativeOwning:
         return ctx.TheNativeObjectType;
-      case AddressorKind::Pinning:
+      case AddressorKind::NativePinning:
         return OptionalType::get(ctx.TheNativeObjectType);
       }
       llvm_unreachable("bad addressor kind");
@@ -1294,7 +1297,7 @@ static void synthesizeAddressedMaterializeForSet(FuncDecl *materializeForSet,
         buildTakeFromCallbackStorage(callbackStorageDecl, ownerType, ctx);
 
       // For an owning addressor, we can just drop the value we pulled out.
-      if (addressor->getAddressorKind() == AddressorKind::Owning) {
+      if (addressor->getAddressorKind() != AddressorKind::NativePinning) {
         body.push_back(owner);
 
       // For a pinning addressor, we have to unpin it.

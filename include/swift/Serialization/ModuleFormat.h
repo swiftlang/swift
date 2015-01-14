@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 165; // Last change: FuncDecl addressor kind
+const uint16_t VERSION_MINOR = 166; // Last change: non-native owning addressor
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -171,9 +171,9 @@ using MetatypeRepresentationField = BCFixed<2>;
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
 enum class AddressorKind : uint8_t {
-  NotAddressor, Unsafe, Owning, Pinning
+  NotAddressor, Unsafe, Owning, NativeOwning, NativePinning
 };
-using AddressorKindField = BCFixed<2>;
+using AddressorKindField = BCFixed<3>;
 
 /// Translates an operator DeclKind to a Serialization fixity, whose values are
 /// guaranteed to be stable.

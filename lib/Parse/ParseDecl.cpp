@@ -2325,11 +2325,11 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
                                             P->Context.AllocateCopy(args),
                                             SourceRange());
 
-    auto makeNativeObjectType = [&]() -> TypeRepr* {
+    auto makeKnownType = [&](StringRef name, Type type) -> TypeRepr* {
       auto result =
         new (P->Context) SimpleIdentTypeRepr(SourceLoc(),
-                                    P->Context.getIdentifier("NativePointer"));
-      result->setValue(P->Context.TheNativeObjectType);
+                                             P->Context.getIdentifier(name));
+      result->setValue(type);
       return result;
     };
     auto makePairType = [&](TypeRepr *fst, TypeRepr *snd) -> TypeRepr* {
@@ -2345,17 +2345,26 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
     case AddressorKind::Unsafe:
       break;
 
-    // For owning addressors, the return type is actually
-    //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject)
+    // For non-native owning addressors, the return type is actually
+    //   (Unsafe{,Mutable}Pointer<T>, Builtin.UnknownObject)
     case AddressorKind::Owning:
-      resultType = makePairType(resultType, makeNativeObjectType());
+      resultType = makePairType(resultType,
+          makeKnownType("UnknownObject", P->Context.TheUnknownObjectType));
       break;
 
-    // For pinning addressors, the return type is actually
+    // For native owning addressors, the return type is actually
+    //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject)
+    case AddressorKind::NativeOwning:
+      resultType = makePairType(resultType,
+          makeKnownType("NativeObject", P->Context.TheNativeObjectType));
+      break;
+
+    // For native pinning addressors, the return type is actually
     //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject?)
-    case AddressorKind::Pinning: {
-      auto optNativePtr = 
-        new (P->Context) OptionalTypeRepr(makeNativeObjectType(), SourceLoc());
+    case AddressorKind::NativePinning: {
+      auto optNativePtr = new (P->Context) OptionalTypeRepr(
+          makeKnownType("NativeObject", P->Context.TheNativeObjectType),
+          SourceLoc());
       resultType = makePairType(resultType, optNativePtr);
       break;
     }
@@ -2529,8 +2538,10 @@ static AddressorKind getImmutableAddressorKind(Token &tok) {
     return AddressorKind::Unsafe;
   } else if (tok.isContextualKeyword("addressWithOwner")) {
     return AddressorKind::Owning;
-  } else if (tok.isContextualKeyword("addressWithPinnedOwner")) {
-    return AddressorKind::Pinning;
+  } else if (tok.isContextualKeyword("addressWithNativeOwner")) {
+    return AddressorKind::NativeOwning;
+  } else if (tok.isContextualKeyword("addressWithPinnedNativeOwner")) {
+    return AddressorKind::NativePinning;
   } else {
     return AddressorKind::NotAddressor;
   }
@@ -2540,8 +2551,10 @@ static AddressorKind getMutableAddressorKind(Token &tok) {
     return AddressorKind::Unsafe;
   } else if (tok.isContextualKeyword("mutableAddressWithOwner")) {
     return AddressorKind::Owning;
-  } else if (tok.isContextualKeyword("mutableAddressWithPinnedOwner")) {
-    return AddressorKind::Pinning;
+  } else if (tok.isContextualKeyword("mutableAddressWithNativeOwner")) {
+    return AddressorKind::NativeOwning;
+  } else if (tok.isContextualKeyword("mutableAddressWithPinnedNativeOwner")) {
+    return AddressorKind::NativePinning;
   } else {
     return AddressorKind::NotAddressor;
   }
@@ -2562,7 +2575,8 @@ static StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind,
     case AddressorKind::NotAddressor: llvm_unreachable("invalid");
     case AddressorKind::Unsafe: return "unsafeAddress";
     case AddressorKind::Owning: return "addressWithOwner";
-    case AddressorKind::Pinning: return "addressWithPinnedOwner";
+    case AddressorKind::NativeOwning: return "addressWithNativeOwner";
+    case AddressorKind::NativePinning: return "addressWithPinnedNativeOwner";
     }
     llvm_unreachable("bad addressor kind");
   case AccessorKind::IsMutableAddressor:
@@ -2570,7 +2584,8 @@ static StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind,
     case AddressorKind::NotAddressor: llvm_unreachable("invalid");
     case AddressorKind::Unsafe: return "unsafeMutableAddress";
     case AddressorKind::Owning: return "mutableAddressWithOwner";
-    case AddressorKind::Pinning: return "mutableAddressWithPinnedOwner";
+    case AddressorKind::NativeOwning: return "mutableAddressWithNativeOwner";
+    case AddressorKind::NativePinning: return "mutableAddressWithPinnedNativeOwner";
     }
     llvm_unreachable("bad addressor kind");
   }

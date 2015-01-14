@@ -1384,16 +1384,18 @@ static StringRef getCodeForAccessorKind(AccessorKind kind,
     switch (addressorKind) {
     case AddressorKind::NotAddressor: llvm_unreachable("bad combo");
     case AddressorKind::Unsafe: return "lu";
-    case AddressorKind::Owning: return "lo";
-    case AddressorKind::Pinning: return "lp";
+    case AddressorKind::Owning: return "lO";
+    case AddressorKind::NativeOwning: return "lo";
+    case AddressorKind::NativePinning: return "lp";
     }
     llvm_unreachable("bad addressor kind");
   case AccessorKind::IsMutableAddressor:
     switch (addressorKind) {
     case AddressorKind::NotAddressor: llvm_unreachable("bad combo");
     case AddressorKind::Unsafe: return "au";
-    case AddressorKind::Owning: return "ao";
-    case AddressorKind::Pinning: return "ap";
+    case AddressorKind::Owning: return "aO";
+    case AddressorKind::NativeOwning: return "ao";
+    case AddressorKind::NativePinning: return "ap";
     }
     llvm_unreachable("bad addressor kind");
   case AccessorKind::IsMaterializeForSet: return "m";

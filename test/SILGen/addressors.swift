@@ -237,10 +237,10 @@ class F {
   var data: UnsafeMutablePointer<Int> = UnsafeMutablePointer.alloc(100)
 
   final var value: Int {
-    addressWithOwner {
+    addressWithNativeOwner {
       return (UnsafePointer(data), Builtin.castToNativeObject(self))
     }
-    mutableAddressWithOwner {
+    mutableAddressWithNativeOwner {
       return (data, Builtin.castToNativeObject(self))
     }
   }
@@ -290,10 +290,10 @@ class G {
   var data: UnsafeMutablePointer<Int> = UnsafeMutablePointer.alloc(100)
 
   var value: Int {
-    addressWithOwner {
+    addressWithNativeOwner {
       return (UnsafePointer(data), Builtin.castToNativeObject(self))
     }
-    mutableAddressWithOwner {
+    mutableAddressWithNativeOwner {
       return (data, Builtin.castToNativeObject(self))
     }
   }
@@ -374,10 +374,10 @@ class H {
   var data: UnsafeMutablePointer<Int> = UnsafeMutablePointer.alloc(100)
 
   final var value: Int {
-    addressWithPinnedOwner {
+    addressWithPinnedNativeOwner {
       return (UnsafePointer(data), Builtin.tryPin(Builtin.castToNativeObject(self)))
     }
-    mutableAddressWithPinnedOwner {
+    mutableAddressWithPinnedNativeOwner {
       return (data, Builtin.tryPin(Builtin.castToNativeObject(self)))
     }
   }
@@ -427,10 +427,10 @@ class I {
   var data: UnsafeMutablePointer<Int> = UnsafeMutablePointer.alloc(100)
 
   var value: Int {
-    addressWithPinnedOwner {
+    addressWithPinnedNativeOwner {
       return (UnsafePointer(data), Builtin.tryPin(Builtin.castToNativeObject(self)))
     }
-    mutableAddressWithPinnedOwner {
+    mutableAddressWithPinnedNativeOwner {
       return (data, Builtin.tryPin(Builtin.castToNativeObject(self)))
     }
   }
@@ -517,10 +517,10 @@ struct RecMiddle {
 class RecOuter {
   var data: UnsafeMutablePointer<RecMiddle> = UnsafeMutablePointer.alloc(100)
   final var middle: RecMiddle {
-    addressWithPinnedOwner {
+    addressWithPinnedNativeOwner {
       return (UnsafePointer(data), Builtin.tryPin(Builtin.castToNativeObject(self)))
     }
-    mutableAddressWithPinnedOwner {
+    mutableAddressWithPinnedNativeOwner {
       return (data, Builtin.tryPin(Builtin.castToNativeObject(self)))
     }
   }

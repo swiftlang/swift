@@ -2814,6 +2814,7 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                        accessType.getResult());
 
   // Unsafe{Mutable}Pointer<T> or
+  // (Unsafe{Mutable}Pointer<T>, Builtin.UnknownPointer) or
   // (Unsafe{Mutable}Pointer<T>, Builtin.NativePointer) or
   // (Unsafe{Mutable}Pointer<T>, Builtin.NativePointer?) or  
   SILValue result = emission.apply().forward(*this);
@@ -2828,7 +2829,8 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
     owner = ManagedValue();
     break;
   case AddressorKind::Owning:
-  case AddressorKind::Pinning:
+  case AddressorKind::NativeOwning:
+  case AddressorKind::NativePinning:
     pointer = B.createTupleExtract(loc, result, 0);
     owner = emitManagedRValueWithCleanup(B.createTupleExtract(loc, result, 1));
     break;
@@ -2855,7 +2857,8 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
     // TODO: we should probably mark dependence on the base.
     break;
   case AddressorKind::Owning:
-  case AddressorKind::Pinning:
+  case AddressorKind::NativeOwning:
+  case AddressorKind::NativePinning:
     address = B.createMarkDependence(loc, address, owner.getValue());
     break;
   }
