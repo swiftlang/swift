@@ -165,8 +165,31 @@ func class_to_native_object(c:C) -> Builtin.NativeObject {
   return Builtin.castToNativeObject(c)
 }
 
+// CHECK-LABEL: sil hidden @_TF8builtins23class_to_unknown_object
+func class_to_unknown_object(c:C) -> Builtin.UnknownObject {
+  // CHECK: [[OBJ:%.*]] = unchecked_ref_cast [[C:%.*]] to $Builtin.UnknownObject
+  // CHECK-NOT: release [[C]]
+  // CHECK-NOT: release [[OBJ]]
+  // CHECK: return [[OBJ]]
+  return Builtin.castToUnknownObject(c)
+}
+
+// CHECK-LABEL: sil hidden @_TF8builtins32class_archetype_to_native_object
 func class_archetype_to_native_object<T : C>(t: T) -> Builtin.NativeObject {
+  // CHECK: [[OBJ:%.*]] = unchecked_ref_cast [[C:%.*]] to $Builtin.NativeObject
+  // CHECK-NOT: release [[C]]
+  // CHECK-NOT: release [[OBJ]]
+  // CHECK: return [[OBJ]]
   return Builtin.castToNativeObject(t)
+}
+
+// CHECK-LABEL: sil hidden @_TF8builtins33class_archetype_to_unknown_object
+func class_archetype_to_unknown_object<T : C>(t: T) -> Builtin.UnknownObject {
+  // CHECK: [[OBJ:%.*]] = unchecked_ref_cast [[C:%.*]] to $Builtin.UnknownObject
+  // CHECK-NOT: release [[C]]
+  // CHECK-NOT: release [[OBJ]]
+  // CHECK: return [[OBJ]]
+  return Builtin.castToUnknownObject(t)
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins34class_existential_to_native_object
@@ -174,6 +197,13 @@ func class_existential_to_native_object(t:ClassProto) -> Builtin.NativeObject {
   // CHECK: [[REF:%[0-9]+]] = open_existential_ref [[T:%[0-9]+]] : $ClassProto
   // CHECK: [[PTR:%[0-9]+]] = unchecked_ref_cast [[REF]] : $@opened({{.*}}) ClassProto to $Builtin.NativeObject
   return Builtin.castToNativeObject(t)
+}
+
+// CHECK-LABEL: sil hidden @_TF8builtins35class_existential_to_unknown_object
+func class_existential_to_unknown_object(t:ClassProto) -> Builtin.UnknownObject {
+  // CHECK: [[REF:%[0-9]+]] = open_existential_ref [[T:%[0-9]+]] : $ClassProto
+  // CHECK: [[PTR:%[0-9]+]] = unchecked_ref_cast [[REF]] : $@opened({{.*}}) ClassProto to $Builtin.UnknownObject
+  return Builtin.castToUnknownObject(t)
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins24class_from_native_object
@@ -185,12 +215,49 @@ func class_from_native_object(p: Builtin.NativeObject) -> C {
   return Builtin.castFromNativeObject(p)
 }
 
+// CHECK-LABEL: sil hidden @_TF8builtins25class_from_unknown_object
+func class_from_unknown_object(p: Builtin.UnknownObject) -> C {
+  // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] to $C
+  // CHECK-NOT: release [[C]]
+  // CHECK-NOT: release [[OBJ]]
+  // CHECK: return [[C]]
+  return Builtin.castFromUnknownObject(p)
+}
+
+// CHECK-LABEL: sil hidden @_TF8builtins34class_archetype_from_native_object
 func class_archetype_from_native_object<T : C>(p: Builtin.NativeObject) -> T {
+  // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] : $Builtin.NativeObject to $T
+  // CHECK-NOT: release [[C]]
+  // CHECK-NOT: release [[OBJ]]
+  // CHECK: return [[C]]
   return Builtin.castFromNativeObject(p)
 }
 
+// CHECK-LABEL: sil hidden @_TF8builtins35class_archetype_from_unknown_object
+func class_archetype_from_unknown_object<T : C>(p: Builtin.UnknownObject) -> T {
+  // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] : $Builtin.UnknownObject to $T
+  // CHECK-NOT: release [[C]]
+  // CHECK-NOT: release [[OBJ]]
+  // CHECK: return [[C]]
+  return Builtin.castFromUnknownObject(p)
+}
+
+// CHECK-LABEL: sil hidden @_TF8builtins41objc_class_existential_from_native_object
 func objc_class_existential_from_native_object(p: Builtin.NativeObject) -> AnyObject {
+  // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] : $Builtin.NativeObject to $AnyObject
+  // CHECK-NOT: release [[C]]
+  // CHECK-NOT: release [[OBJ]]
+  // CHECK: return [[C]]
   return Builtin.castFromNativeObject(p)
+}
+
+// CHECK-LABEL: sil hidden @_TF8builtins42objc_class_existential_from_unknown_object
+func objc_class_existential_from_unknown_object(p: Builtin.UnknownObject) -> AnyObject {
+  // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] : $Builtin.UnknownObject to $AnyObject
+  // CHECK-NOT: release [[C]]
+  // CHECK-NOT: release [[OBJ]]
+  // CHECK: return [[C]]
+  return Builtin.castFromUnknownObject(p)
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins20class_to_raw_pointer

@@ -289,19 +289,15 @@ static ManagedValue emitBuiltinFixLifetime(SILGenFunction &gen,
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
 }
 
-/// Specialized emitter for Builtin.castToNativeObject.
-static ManagedValue emitBuiltinCastToNativeObject(SILGenFunction &gen,
-                                         SILLocation loc,
-                                         ArrayRef<Substitution> substitutions,
-                                         ArrayRef<ManagedValue> args,
-                                         CanFunctionType formalApplyType,
-                                         SGFContext C) {
+static ManagedValue emitCastToReferenceType(SILGenFunction &gen,
+                                            SILLocation loc,
+                                            ArrayRef<Substitution> substitutions,
+                                            ArrayRef<ManagedValue> args,
+                                            SGFContext C,
+                                            SILType objPointerType) {
   assert(args.size() == 1 && "cast should have a single argument");
   assert(substitutions.size() == 1 && "cast should have a type substitution");
   
-  // Take the reference type argument and cast it to NativeObject.
-  SILType objPointerType = SILType::getNativeObjectType(gen.F.getASTContext());
-
   // Bail if the source type is not a class reference of some kind.
   if (!substitutions[0].getReplacement()->mayHaveSuperclass() &&
       !substitutions[0].getReplacement()->isClassExistentialType()) {
@@ -330,12 +326,32 @@ static ManagedValue emitBuiltinCastToNativeObject(SILGenFunction &gen,
   return ManagedValue(result, cleanup);
 }
 
-/// Specialized emitter for Builtin.castFromNativeObject.
-static ManagedValue emitBuiltinCastFromNativeObject(SILGenFunction &gen,
+/// Specialized emitter for Builtin.castToNativeObject.
+static ManagedValue emitBuiltinCastToNativeObject(SILGenFunction &gen,
                                          SILLocation loc,
                                          ArrayRef<Substitution> substitutions,
                                          ArrayRef<ManagedValue> args,
                                          CanFunctionType formalApplyType,
+                                         SGFContext C) {
+  return emitCastToReferenceType(gen, loc, substitutions, args, C,
+                        SILType::getNativeObjectType(gen.F.getASTContext()));
+}
+
+/// Specialized emitter for Builtin.castToUnknownObject.
+static ManagedValue emitBuiltinCastToUnknownObject(SILGenFunction &gen,
+                                         SILLocation loc,
+                                         ArrayRef<Substitution> substitutions,
+                                         ArrayRef<ManagedValue> args,
+                                         CanFunctionType formalApplyType,
+                                         SGFContext C) {
+  return emitCastToReferenceType(gen, loc, substitutions, args, C,
+                        SILType::getUnknownObjectType(gen.F.getASTContext()));
+}
+
+static ManagedValue emitCastFromReferenceType(SILGenFunction &gen,
+                                         SILLocation loc,
+                                         ArrayRef<Substitution> substitutions,
+                                         ArrayRef<ManagedValue> args,
                                          SGFContext C) {
   assert(args.size() == 1 && "cast should have a single argument");
   assert(substitutions.size() == 1 &&
@@ -360,9 +376,29 @@ static ManagedValue emitBuiltinCastFromNativeObject(SILGenFunction &gen,
 
   // Take the reference type argument and cast it.
   SILValue result = gen.B.createUncheckedRefCast(loc, args[0].getValue(),
-                                                   destType);
+                                                 destType);
   // Return the cast result with the original cleanup.
   return ManagedValue(result, cleanup);
+}
+
+/// Specialized emitter for Builtin.castFromNativeObject.
+static ManagedValue emitBuiltinCastFromNativeObject(SILGenFunction &gen,
+                                         SILLocation loc,
+                                         ArrayRef<Substitution> substitutions,
+                                         ArrayRef<ManagedValue> args,
+                                         CanFunctionType formalApplyType,
+                                         SGFContext C) {
+  return emitCastFromReferenceType(gen, loc, substitutions, args, C);
+}
+
+/// Specialized emitter for Builtin.castFromUnknownObject.
+static ManagedValue emitBuiltinCastFromUnknownObject(SILGenFunction &gen,
+                                         SILLocation loc,
+                                         ArrayRef<Substitution> substitutions,
+                                         ArrayRef<ManagedValue> args,
+                                         CanFunctionType formalApplyType,
+                                         SGFContext C) {
+  return emitCastFromReferenceType(gen, loc, substitutions, args, C);
 }
 
 /// Specialized emitter for Builtin.bridgeToRawPointer.

@@ -218,6 +218,12 @@ BUILTIN_SIL_OPERATION(DeallocValueBuffer, "deallocValueBuffer", Special)
 BUILTIN_SIL_OPERATION(MakeMaterializeForSetCallback,
                       "makeMaterializeForSetCallback", Special)
 
+/// CastToUnknownObject has type (T) -> Builtin.UnknownObject.
+BUILTIN_SIL_OPERATION(CastToUnknownObject, "castToUnknownObject", Special)
+
+/// CastFromUnknownObject has type (Builtin.UnknownObject) -> T.
+BUILTIN_SIL_OPERATION(CastFromUnknownObject, "castFromUnknownObject", Special)
+
 /// CastToNativeObject has type (T) -> Builtin.NativeObject.
 BUILTIN_SIL_OPERATION(CastToNativeObject, "castToNativeObject", Special)
 

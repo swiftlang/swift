@@ -702,16 +702,20 @@ static ValueDecl *getAtomicRMWOperation(ASTContext &Context, Identifier Id,
 }
 
 static ValueDecl *getNativeObjectCast(ASTContext &Context, Identifier Id,
-                                       BuiltinValueKind BV) {
+                                      BuiltinValueKind BV) {
   Type BuiltinTy;
   if (BV == BuiltinValueKind::BridgeToRawPointer ||
       BV == BuiltinValueKind::BridgeFromRawPointer)
     BuiltinTy = Context.TheRawPointerType;
+  else if (BV == BuiltinValueKind::CastToUnknownObject ||
+           BV == BuiltinValueKind::CastFromUnknownObject)
+    BuiltinTy = Context.TheUnknownObjectType;
   else
     BuiltinTy = Context.TheNativeObjectType;
 
   GenericSignatureBuilder builder(Context);
   if (BV == BuiltinValueKind::CastToNativeObject ||
+      BV == BuiltinValueKind::CastToUnknownObject ||
       BV == BuiltinValueKind::BridgeToRawPointer) {
     builder.addParameter(makeGenericParam());
     builder.setResult(makeConcrete(BuiltinTy));
@@ -1453,6 +1457,8 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::CastToNativeObject:
   case BuiltinValueKind::CastFromNativeObject:
+  case BuiltinValueKind::CastToUnknownObject:
+  case BuiltinValueKind::CastFromUnknownObject:
   case BuiltinValueKind::BridgeToRawPointer:
   case BuiltinValueKind::BridgeFromRawPointer:
     if (!Types.empty()) return nullptr;
