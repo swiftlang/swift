@@ -782,7 +782,7 @@ Globals
   decl-name ::= identifier
   decl-name ::= local-decl-name
   decl-name ::= private-decl-name
-  local-decl-name ::= 'L' index identifier  // locally-discriminated declaration
+  local-decl-name ::= 'L' identifier index identifier  // locally-discriminated declaration
   private-decl-name ::= 'P' identifier identifier  // file-discriminated declaration
   reabstract-signature ::= ('G' generic-signature)? type type
   addressor-kind ::= 'u'                 // unsafe addressor (no owner)
