@@ -1,4 +1,4 @@
-// TEMPORARILY DISABLED BECAUSE OF rdar://problem/18709125. R_U_N: %swift -target x86_64-apple-macosx10.9 -O %s -disable-llvm-optzns -emit-ir -g -o - | FileCheck %s
+// RUN: %swift -Xllvm -debug-values-propagate-liveness -target x86_64-apple-macosx10.9 -O %s -disable-llvm-optzns -emit-ir -g -o - | FileCheck %s
 // CHECK-DAG: ![[A:.*]] = {{.*}} [ DW_TAG_arg_variable ] [a] [line 15]
 // CHECK-DAG: ![[B:.*]] = {{.*}} [ DW_TAG_arg_variable ] [b] [line 15]
 // CHECK-DAG: ![[P1:.*]] = {{.*}}; [ DW_TAG_expression ] [DW_OP_piece offset=0, size=8]
@@ -30,10 +30,9 @@ demo()
 
 // At -O0, we should have a single aggregate argument.
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s --check-prefix=CHECK-O0
+// Verify that a reabstraction thunk does not have a line number.
+// CHECK-O0: _TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_{{.*}}; [ DW_TAG_subprogram ] [line 0]
 // CHECK-O0: [ DW_TAG_arg_variable ] [a] [line 15]
 // CHECK-O0-NOT: piece
 // CHECK-O0: [ DW_TAG_arg_variable ] [b] [line 15]
 // CHECK-O0-NOT: piece
-
-// Verify that a reabstraction thunk does not have a line number.
-// CHECK: _TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_{{.*}}; [ DW_TAG_subprogram ] [line 0]

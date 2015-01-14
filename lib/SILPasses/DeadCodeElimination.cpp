@@ -45,6 +45,10 @@ static bool seemsUseful(SILInstruction *I) {
       isa<UnreachableInst>(I))
     return true;
 
+  if (debugValuesPropagateLiveness() &&
+      (isa<DebugValueInst>(I) || isa<DebugValueAddrInst>(I)))
+    return true;
+
   return false;
 }
 

@@ -18,6 +18,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/Support/CommandLine.h"
 #include <deque>
 
 using namespace swift;
@@ -67,6 +68,18 @@ bool swift::isReadNone(FunctionRefInst *FR) {
   return F->getEffectsInfo() == EffectsKind::ReadNone;
 }
 
+llvm::cl::opt<bool>
+DebugValuesPropagateLiveness("debug-values-propagate-liveness",
+                             llvm::cl::init(false));
+
+bool swift::debugValuesPropagateLiveness() {
+#ifndef NDEBUG
+  return DebugValuesPropagateLiveness;
+#else
+  return false;
+#endif
+}
+
 /// \brief Perform a fast local check to see if the instruction is dead.
 ///
 /// This routine only examines the state of the instruction at hand.
@@ -96,6 +109,10 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
 
   // mark_uninitialized is never dead.
   if (isa<MarkUninitializedInst>(I))
+    return false;
+
+  if (debugValuesPropagateLiveness() &&
+      (isa<DebugValueInst>(I) || isa<DebugValueAddrInst>(I)))
     return false;
 
   // These invalidate enums so "write" memory, but that is not an essential

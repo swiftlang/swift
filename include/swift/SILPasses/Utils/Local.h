@@ -46,6 +46,13 @@ namespace swift {
     bool Force = false,
     std::function<void(SILInstruction *)> C = [](SILInstruction *){});
 
+  /// Returns true if debug values propagate liveness.
+  ///
+  /// TODO: Once all passes have been audited to handle debug values correctly
+  /// in their white lists, this will no longer be necessary and should be
+  /// removed.
+  bool debugValuesPropagateLiveness();
+
   /// \brief Perform a fast local check to see if the instruction is dead.
   ///
   /// This routine only examines the state of the instruction at hand.
