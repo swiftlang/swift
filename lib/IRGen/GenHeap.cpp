@@ -729,7 +729,7 @@ llvm::Value *IRGenFunction::emitTryPin(llvm::Value *value) {
   call->setDoesNotThrow();
 
   // Builtin.NativeObject? has representation i32/i64.
-  llvm::Value *handle = Builder.CreatePtrToInt(value, IGM.IntPtrTy);
+  llvm::Value *handle = Builder.CreatePtrToInt(call, IGM.IntPtrTy);
   return handle;
 }
 
