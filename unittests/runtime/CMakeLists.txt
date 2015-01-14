@@ -4,6 +4,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
   add_swift_unittest(SwiftRuntimeTests
     Metadata.cpp
     Enum.cpp
+    Refcounting.cpp
     )
 
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
