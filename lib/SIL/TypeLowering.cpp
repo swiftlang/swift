@@ -2321,8 +2321,12 @@ SILType TypeConverter::getSubstitutedStorageType(ValueDecl *value,
     origType = value->getType()->getCanonicalType();
   }
 
-  CanType substType
-    = cast<LValueType>(lvalueType->getCanonicalType()).getObjectType();
+  CanType substType = lvalueType->getCanonicalType();
+
+  // Remove a layer of l-value type if present.
+  if (auto substLVType = dyn_cast<LValueType>(substType))
+    substType = substLVType.getObjectType();
+
   SILType silSubstType
     = getLoweredType(AbstractionPattern(origType), substType).getAddressType();
   substType = silSubstType.getSwiftRValueType();

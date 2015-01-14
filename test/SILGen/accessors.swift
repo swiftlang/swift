@@ -155,3 +155,39 @@ func test1(ref: B) {
 // CHECK-NEXT: strong_release %0
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
+
+struct RecInner {
+  subscript(i: Int) -> Int {
+    get { return i }
+  }
+}
+struct RecOuter {
+  var inner : RecInner {
+    unsafeAddress { return nil }
+    unsafeMutableAddress { return nil }
+  }
+}
+func test_rec(inout outer: RecOuter) -> Int {
+  return outer.inner[0]
+}
+// This uses the immutable addressor.
+// CHECK: sil hidden @_TF9accessors8test_recFRVS_8RecOuterSi : $@thin (@inout RecOuter) -> Int {
+// CHECK:   function_ref @_TFV9accessors8RecOuterlu5innerVS_8RecInner : $@cc(method) @thin (RecOuter) -> UnsafePointer<RecInner>
+
+struct Rec2Inner {
+  subscript(i: Int) -> Int {
+    mutating get { return i }
+  }
+}
+struct Rec2Outer {
+  var inner : Rec2Inner {
+    unsafeAddress { return nil }
+    unsafeMutableAddress { return nil }
+  }
+}
+func test_rec2(inout outer: Rec2Outer) -> Int {
+  return outer.inner[0]
+}
+// This uses the mutable addressor.
+// CHECK: sil hidden @_TF9accessors9test_rec2FRVS_9Rec2OuterSi : $@thin (@inout Rec2Outer) -> Int {
+// CHECK:   function_ref @_TFV9accessors9Rec2Outerau5innerVS_9Rec2Inner : $@cc(method) @thin (@inout Rec2Outer) -> UnsafeMutablePointer<Rec2Inner>

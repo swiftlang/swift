@@ -1671,7 +1671,7 @@ LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, ManagedValue base,
 
   // Find the substituted storage type.
   SILType varStorageType =
-    SGM.Types.getSubstitutedStorageType(ivar, LValueType::get(substFormalType));
+    SGM.Types.getSubstitutedStorageType(ivar, substFormalType);
 
   if (baseType->hasReferenceSemantics())
     lv.add<RefElementComponent>(ivar, varStorageType, typeData);

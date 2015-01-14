@@ -2415,6 +2415,8 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
     return SGF.emitApplyExpr(E, C);
   }
 
+  // TODO: unify the rest of this with l-value emission.
+
   auto FieldDecl = cast<VarDecl>(E->getMember().getDecl());
 
   // Evaluate the base of the member reference.  Since emitRValueForPropertyLoad
@@ -2441,43 +2443,11 @@ visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E, SGFContext C) {
 }
 
 RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
-  // rvalue subscript expressions are produced for get-only subscript
-  // operations.
-  auto subscript = cast<SubscriptDecl>(E->getDecl().getDecl());
+  // Any writebacks for this access are tightly scoped.
+  WritebackScope scope(SGF);
 
-  AccessSemantics semantics = E->getAccessSemantics();
-  AccessStrategy strategy =
-    subscript->getAccessStrategy(semantics, AccessKind::Read);
-
-  SILDeclRef accessor = getRValueAccessorDeclRef(SGF, subscript, strategy);
-  CanSILFunctionType accessorFnType =
-    SGF.SGM.Types.getConstantFunctionType(accessor);
-
-  // Peephole: emit self at +0 if the parameter isn't +1.
-  // FIXME: what if the subscript expression modifies the base?
-  // FIXME: mutating getters: what if this is an l-value?
-  SGFContext SubContext;
-  if (!accessorFnType->getSelfParameter().isConsumed()) {
-    SubContext = SGFContext::AllowPlusZero;
-  }
-
-  // Emit the base.
-  ManagedValue base = SGF.emitRValueAsSingleValue(E->getBase(), SubContext);
-  RValueSource baseRV = SGF.prepareAccessorBaseArg(E, base, accessor);
-
-  // Emit the indices.
-  RValue subscriptRV = SGF.emitRValue(E->getIndex());
-
-  AbstractionPattern origFormalType(subscript->getElementType());
-  CanType substFormalType = E->getType()->getCanonicalType();
-
-  auto result = emitRValueWithAccessor(SGF, E, subscript,
-                                       E->getDecl().getSubstitutions(),
-                                       std::move(baseRV),
-                                       std::move(subscriptRV),
-                                       E->isSuper(), strategy, accessor,
-                                       origFormalType, substFormalType, C);
-  return RValue(SGF, E, result);
+  LValue lv = SGF.emitLValue(E, AccessKind::Read);
+  return RValue(SGF, E, SGF.emitLoadOfLValue(E, std::move(lv), C));
 }
 
 RValue RValueEmitter::visitDynamicSubscriptExpr(

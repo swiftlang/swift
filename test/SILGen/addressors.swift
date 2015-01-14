@@ -505,3 +505,31 @@ class I {
 // CHECK:   [[OWNER:%.*]] = load [[T2]]
 // CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
 // CHECK:   dealloc_value_buffer $Optional<Builtin.NativeObject> in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
+
+struct RecInner {
+  subscript(i: Int) -> Int {
+    mutating get { return i }
+  }
+}
+struct RecMiddle {
+  var inner: RecInner
+}
+class RecOuter {
+  var data: UnsafeMutablePointer<RecMiddle> = UnsafeMutablePointer.alloc(100)
+  final var middle: RecMiddle {
+    addressWithPinnedOwner {
+      return (UnsafePointer(data), Builtin.tryPin(Builtin.castToNativeObject(self)))
+    }
+    mutableAddressWithPinnedOwner {
+      return (data, Builtin.tryPin(Builtin.castToNativeObject(self)))
+    }
+  }
+}
+func test_rec(outer: RecOuter) -> Int {
+  return outer.middle.inner[0]
+}
+// This uses the mutable addressor.
+// CHECK: sil hidden @_TF10addressors8test_recFCS_8RecOuterSi : $@thin (@owned RecOuter) -> Int {
+// CHECK:   function_ref @_TFC10addressors8RecOuterap6middleVS_9RecMiddle
+// CHECK:   struct_element_addr {{.*}} : $*RecMiddle, #RecMiddle.inner
+// CHECK:   function_ref @_TFV10addressors8RecInnerg9subscriptFSiSi 
