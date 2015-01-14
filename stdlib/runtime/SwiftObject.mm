@@ -1019,6 +1019,30 @@ bool swift::_swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
 #endif
 }
 
+/// Return true if the given bits of a Builtin.BridgeObject refer to a
+/// native swift object whose strong reference count is 1.
+bool swift::_swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject(
+  __swift_uintptr_t bits
+) {
+  auto bridgeObject = (void*)bits;
+
+  if (isObjCTaggedPointer(bridgeObject))
+    return false;
+
+  const auto object = toPlainObject_unTagged_bridgeObject(bridgeObject);
+
+  // Note: we could just return false if all spare bits are set,
+  // but in that case the cost of a deeper check for a unique native
+  // object is going to be a negligible cost for a possible big win.
+#if SWIFT_OBJC_INTEROP
+  if (isNonNative_unTagged_bridgeObject(bridgeObject))
+    return _swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(object);
+#endif
+  return _swift_isUniquelyReferencedOrPinned_nonNull_native(
+                                                   (const HeapObject *)object);
+}
+
+
 /// Given a non-nil object reference, return true if the object is a
 /// native swift object and either its strong reference count is 1 or
 /// its pinned flag is set.
@@ -1031,6 +1055,16 @@ bool swift::_swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(
 #endif 
     _swift_isUniquelyReferencedOrPinned_nonNull_native(
                                                     (const HeapObject*)object);
+}
+
+// Given a non-@objc object reference, return true iff the
+// object is non-nil and either has a strong reference count of 1
+// or is pinned.
+bool swift::_swift_isUniquelyReferencedOrPinned_native(
+  const HeapObject* object
+) {
+  return object != nullptr
+    && _swift_isUniquelyReferencedOrPinned_nonNull_native(object);
 }
 
 /// Given a non-nil native swift object reference, return true if
