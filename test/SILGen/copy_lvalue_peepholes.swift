@@ -14,8 +14,8 @@ func init_var_from_lvalue(var x: Int) {
 }
 
 // CHECK-LABEL: sil hidden @_TF21copy_lvalue_peepholes22assign_var_from_lvalue
-// CHECK:   [[Y:%.*]] = alloc_box $Builtin.Int64
 // CHECK:   [[X:%.*]] = alloc_box $Builtin.Int64
+// CHECK:   [[Y:%.*]] = alloc_box $Builtin.Int64
 // CHECK:   copy_addr [[Y]]#1 to [[X]]#1
 func assign_var_from_lvalue(inout x: Int, var y: Int) {
   x = y

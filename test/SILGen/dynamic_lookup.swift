@@ -137,8 +137,8 @@ func opt_to_property(var obj: AnyObject) {
 func direct_to_subscript(var obj: AnyObject, var i: Int) {
   // CHECK-NEXT: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
   // CHECK-NEXT: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
-  // CHECK-NEXT: [[I_BOX:%[0-9]+]] = alloc_box $Int
   // CHECK-NEXT: store [[OBJ]] to [[OBJ_BOX]]#1 : $*AnyObject
+  // CHECK-NEXT: [[I_BOX:%[0-9]+]] = alloc_box $Int
   // CHECK-NEXT: store [[I]] to [[I_BOX]]#1 : $*Int
   // CHECK-NEXT: alloc_box $Int
   // CHECK-NEXT: [[UNKNOWN_USE:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<Int>
@@ -164,8 +164,8 @@ func direct_to_subscript(var obj: AnyObject, var i: Int) {
 func opt_to_subscript(var obj: AnyObject, var i: Int) {
   // CHECK-NEXT: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
   // CHECK-NEXT: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
-  // CHECK-NEXT: [[I_BOX:%[0-9]+]] = alloc_box $Int
   // CHECK-NEXT: store [[OBJ]] to [[OBJ_BOX]]#1 : $*AnyObject
+  // CHECK-NEXT: [[I_BOX:%[0-9]+]] = alloc_box $Int
   // CHECK-NEXT: store [[I]] to [[I_BOX]]#1 : $*Int
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[OBJ_BOX]]#1 : $*AnyObject
   // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject

@@ -203,16 +203,16 @@ func address_only_assignment_from_temp(inout dest: Unloadable) {
 // CHECK-LABEL: sil hidden @_TF18address_only_types31address_only_assignment_from_lv
 func address_only_assignment_from_lv(inout dest: Unloadable, var v: Unloadable) {
   // CHECK: bb0([[DEST:%[0-9]+]] : $*Unloadable, [[VARG:%[0-9]+]] : $*Unloadable):
-  // CHECK: [[VBOX:%.*]] = alloc_box $Unloadable
   // CHECK: [[DEST_LOCAL:%.*]] = alloc_box $Unloadable
   // CHECK: copy_addr [[DEST]] to [initialization] [[DEST_LOCAL]]#1
+  // CHECK: [[VBOX:%.*]] = alloc_box $Unloadable
   // CHECK: copy_addr [take] [[VARG]] to [initialization] [[VBOX]]#1
   dest = v
   // FIXME: emit into?
   // CHECK: copy_addr [[VBOX]]#1 to [[DEST_LOCAL]]#1 :
+  // CHECK: release [[VBOX]]#0
   // CHECK: copy_addr [[DEST_LOCAL]]#1 to [[DEST]]
   // CHECK: release [[DEST_LOCAL]]#0
-  // CHECK: release [[VBOX]]#0
 }
 
 var global_prop : Unloadable {

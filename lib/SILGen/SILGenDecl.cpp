@@ -742,7 +742,7 @@ CleanupHandle SILGenFunction::enterDestroyCleanup(SILValue valueOrAddr) {
 namespace {
 
 class EmitBBArguments : public CanTypeVisitor<EmitBBArguments,
-                                              /*RetTy*/ RValue>
+                                              /*RetTy*/ ManagedValue>
 {
 public:
   SILGenFunction &gen;
@@ -757,23 +757,38 @@ public:
     : gen(gen), parent(parent), loc(l), functionArgs(functionArgs),
       parameters(parameters) {}
 
-  ManagedValue &&getManagedValue(SILValue arg, CanType t,
+  ManagedValue getManagedValue(SILValue arg, CanType t,
                                  SILParameterInfo parameterInfo) const {
-    if (isa<InOutType>(t))
-      return std::move(ManagedValue::forLValue(arg));
-
-    // If we have a guaranteed parameter, it is passed in at +0. If the
-    // parameter is not a let, we have to for safety reasons retain the argument
-    // and release it at the end of the function to ensure the lifetime of the
-    // operand last the entire lifetime of the function. If the parameter is a
-    // let since it can not be reassigned, we do not need to retain it.
-    if (isGuaranteedParameter(parameterInfo.getConvention()))
+    switch (parameterInfo.getConvention()) {
+    case ParameterConvention::Direct_Guaranteed:
+    case ParameterConvention::Indirect_In_Guaranteed:
+      // If we have a guaranteed parameter, it is passed in at +0, and its
+      // lifetime is guaranteed. We can potentially use the argument as-is
+      // if the parameter is bound as a 'let' without cleaning up.
+      return ManagedValue::forUnmanaged(arg);
+      
+    case ParameterConvention::Direct_Unowned:
+      // An unowned parameter is passed at +0, like guaranteed, but it isn't
+      // kept alive by the caller, so we need to retain and manage it
+      // regardless.
       return std::move(gen.emitManagedRetain(loc, arg));
-
-    return std::move(gen.emitManagedRValueWithCleanup(arg));
+    
+    case ParameterConvention::Indirect_Inout:
+      // An inout parameter is +0 and guaranteed, but represents an lvalue.
+      return ManagedValue::forLValue(arg);
+      
+    case ParameterConvention::Direct_Owned:
+    case ParameterConvention::Indirect_In:
+      // An owned or 'in' parameter is passed in at +1. We can claim ownership
+      // of the parameter and clean it up when it goes out of scope.
+      return gen.emitManagedRValueWithCleanup(arg);
+      
+    case ParameterConvention::Indirect_Out:
+      llvm_unreachable("should not emit @out parameters here");
+    }
   }
 
-  RValue visitType(CanType t) {
+  ManagedValue visitType(CanType t) {
     auto argType = gen.getLoweredType(t);
     // Pop the next parameter info.
     auto parameterInfo = parameters.front();
@@ -800,25 +815,69 @@ public:
       SILValue blockCopy = gen.B.createCopyBlock(loc, mv.getValue());
       mv = gen.emitManagedRValueWithCleanup(blockCopy);
     }
-    return RValue(gen, loc, t, mv);
+    return mv;
   }
 
-  RValue visitTupleType(CanTupleType t) {
-    RValue rv{t};
+  ManagedValue visitTupleType(CanTupleType t) {
+    SmallVector<ManagedValue, 4> elements;
+    
+    auto &tl = gen.getTypeLowering(t);
+    bool canBeGuaranteed = tl.isLoadable();
 
-    for (auto fieldType : t.getElementTypes())
-      rv.addElement(visit(fieldType));
-
-    return rv;
+    // Collect the exploded elements.
+    for (auto fieldType : t.getElementTypes()) {
+      auto elt = visit(fieldType);
+      // If we can't borrow one of the elements as a guaranteed parameter, then
+      // we have to +1 the tuple.
+      if (elt.hasCleanup())
+        canBeGuaranteed = false;
+      elements.push_back(elt);
+    }
+    
+    if (tl.isLoadable()) {
+      SmallVector<SILValue, 4> elementValues;
+      if (canBeGuaranteed) {
+        // If all of the elements were guaranteed, we can form a guaranteed tuple.
+        for (auto element : elements)
+          elementValues.push_back(element.getUnmanagedValue());
+      } else {
+        // Otherwise, we need to move or copy values into a +1 tuple.
+        for (auto element : elements) {
+          SILValue value = element.hasCleanup()
+            ? element.forward(gen)
+            : element.copyUnmanaged(gen, loc).forward(gen);
+          elementValues.push_back(value);
+        }
+      }
+      auto tupleValue = gen.B.createTuple(loc, tl.getLoweredType(),
+                                          elementValues);
+      return canBeGuaranteed
+        ? ManagedValue::forUnmanaged(tupleValue)
+        : gen.emitManagedRValueWithCleanup(tupleValue);
+    } else {
+      // If the type is address-only, we need to move or copy the elements into
+      // a tuple in memory.
+      // TODO: It would be a bit more efficient to use a preallocated buffer
+      // in this case.
+      auto buffer = gen.emitTemporaryAllocation(loc, tl.getLoweredType());
+      for (auto i : indices(elements)) {
+        auto element = elements[i];
+        auto elementBuffer = gen.B.createTupleElementAddr(loc, buffer,
+                                        i, element.getType().getAddressType());
+        if (element.hasCleanup())
+          element.forwardInto(gen, loc, elementBuffer);
+        else
+          element.copyInto(gen, elementBuffer, loc);
+      }
+      return gen.emitManagedRValueWithCleanup(buffer);
+    }
   }
 };
 
 /// A visitor for traversing a pattern, creating
-/// SILArguments, and initializing the local value for each pattern variable
-/// in a function argument list.
+/// SILArguments, and binding variables to the argument names.
 struct ArgumentInitVisitor :
-  public PatternVisitor<ArgumentInitVisitor, /*RetTy=*/ void,
-                        /*Args...=*/ Initialization*>
+  public PatternVisitor<ArgumentInitVisitor, /*RetTy=*/ void>
 {
   SILGenFunction &gen;
   SILFunction &f;
@@ -836,7 +895,7 @@ struct ArgumentInitVisitor :
       parameters = parameters.slice(1);
   }
   
-  RValue makeArgument(Type ty, SILBasicBlock *parent, SILLocation l) {
+  ManagedValue makeArgument(Type ty, SILBasicBlock *parent, SILLocation l) {
     assert(ty && "no type?!");
 
     // Create an RValue by emitting destructured arguments into a basic block.
@@ -848,99 +907,104 @@ struct ArgumentInitVisitor :
 
   /// Create a SILArgument and store its value into the given Initialization,
   /// if not null.
-  void makeArgumentInto(Type ty, SILBasicBlock *parent,
-                        SILLocation loc, Initialization *I) {
-    assert(I && "no initialization?");
-    assert(ty && "no type?!");
+  void makeArgumentIntoBinding(Type ty, SILBasicBlock *parent, VarDecl *vd) {
+    SILLocation loc(vd);
     loc.markAsPrologue();
 
-    RValue argrv = makeArgument(ty, parent, loc);
+    ManagedValue argrv = makeArgument(ty, parent, loc);
 
-    if (I->kind == Initialization::Kind::AddressBinding) {
-      SILValue arg = std::move(argrv).forwardAsSingleValue(gen, loc);
-      I->bindAddress(arg, gen, loc);
-      // If this is an address-only non-inout argument, we take ownership
-      // of the referenced value.
-      if (!ty->is<InOutType>())
-        gen.enterDestroyCleanup(arg);
-      I->finishInitialization(gen);
+    // Create a shadow copy of inout parameters so they can be captured
+    // by closures. The InOutDeshadowing guaranteed optimization will
+    // eliminate the variable if it is not needed.
+    if (auto inOutTy = vd->getType()->getAs<InOutType>()) {
+      
+      SILValue address = argrv.getUnmanagedValue();
+      
+      CanType objectType = inOutTy->getObjectType()->getCanonicalType();
+
+      // As a special case, don't introduce a local variable for
+      // Builtin.UnsafeValueBuffer, which is not copyable.
+      if (isa<BuiltinUnsafeValueBufferType>(objectType)) {
+        // FIXME: mark a debug location?
+        gen.VarLocs[vd] = SILGenFunction::VarLoc::get(address);
+        return;
+      }
+
+      // Allocate the local variable for the inout.
+      auto initVar = gen.emitLocalVariableWithCleanup(vd, false);
+
+      // Initialize with the value from the inout with an "autogenerated"
+      // copyaddr.
+      loc.markAutoGenerated();
+      gen.B.createCopyAddr(loc, address, initVar->getAddress(),
+                           IsNotTake, IsInitialization);
+      initVar->finishInitialization(gen);
+
+      // Set up a cleanup to write back to the inout.
+      gen.Cleanups.pushCleanup<CleanupWriteBackToInOut>(vd, address);
+    } else if (vd->isLet()) {
+      // If the variable is immutable, we can bind the value as is.
+      // Leave the cleanup on the argument, if any, in place to consume the
+      // argument if we're responsible for it.
+      gen.VarLocs[vd] = SILGenFunction::VarLoc::get(argrv.getValue());
+      if (argrv.getType().isAddress())
+        gen.B.createDebugValueAddr(loc, argrv.getValue());
+      else
+        gen.B.createDebugValue(loc, argrv.getValue());
     } else {
-      std::move(argrv).forwardInto(gen, I, loc);
+      // If the variable is mutable, we need to copy or move the argument
+      // value to local mutable memory.
+
+      auto initVar = gen.emitLocalVariableWithCleanup(vd, false);
+
+      // If we have a cleanup on the value, we can move it into the variable.
+      if (argrv.hasCleanup())
+        argrv.forwardInto(gen, loc, initVar->getAddress());
+      // Otherwise, we need an independently-owned copy.
+      else
+        argrv.copyInto(gen, initVar->getAddress(), loc);
+      
+      initVar->finishInitialization(gen);
+      
     }
   }
 
   // Paren, Typed, and Var patterns are no-ops. Just look through them.
-  void visitParenPattern(ParenPattern *P, Initialization *I) {
-    visit(P->getSubPattern(), I);
+  void visitParenPattern(ParenPattern *P) {
+    visit(P->getSubPattern());
   }
-  void visitTypedPattern(TypedPattern *P, Initialization *I) {
-    visit(P->getSubPattern(), I);
+  void visitTypedPattern(TypedPattern *P) {
+    visit(P->getSubPattern());
   }
-  void visitVarPattern(VarPattern *P, Initialization *I) {
-    visit(P->getSubPattern(), I);
+  void visitVarPattern(VarPattern *P) {
+    visit(P->getSubPattern());
   }
 
-  void visitTuplePattern(TuplePattern *P, Initialization *I) {
-    // If the tuple is empty, so should be our initialization. Just pass an
-    // empty tuple upwards.
-    if (P->getFields().empty()) {
-      switch (I->kind) {
-      case Initialization::Kind::Ignored:
-        break;
-      case Initialization::Kind::Tuple:
-        assert(I->getSubInitializations().empty() &&
-               "empty tuple pattern with non-empty-tuple initializer?!");
-        break;
-      case Initialization::Kind::AddressBinding:
-        llvm_unreachable("empty tuple pattern with inout initializer?!");
-      case Initialization::Kind::LetValue:
-        llvm_unreachable("empty tuple pattern with letvalue initializer?!");
-      case Initialization::Kind::Translating:
-        llvm_unreachable("empty tuple pattern with translating initializer?!");
-
-      case Initialization::Kind::SingleBuffer:
-        assert(I->getAddress().getType().getSwiftRValueType()
-                 == P->getType()->getCanonicalType()
-               && "empty tuple pattern with non-empty-tuple initializer?!");
-        break;
-      }
-      return;
-    }
-
-    // Destructure the initialization into per-element Initializations.
-    SmallVector<InitializationPtr, 2> buf;
-    ArrayRef<InitializationPtr> subInits =
-      I->getSubInitializationsForTuple(gen, P->getType()->getCanonicalType(),
-                                       buf, RegularLocation(P));
-
-    assert(P->getFields().size() == subInits.size() &&
-           "TupleInitialization size does not match tuple pattern size!");
+  void visitTuplePattern(TuplePattern *P) {
+    // Destructure tuples into their elements.
     for (size_t i = 0, size = P->getFields().size(); i < size; ++i)
-      visit(P->getFields()[i].getPattern(), subInits[i].get());
+      visit(P->getFields()[i].getPattern());
   }
 
-  void visitAnyPattern(AnyPattern *P, Initialization *I) {
+  void visitAnyPattern(AnyPattern *P) {
     llvm_unreachable("unnamed parameters should have a ParamDecl");
   }
 
-  void visitNamedPattern(NamedPattern *P, Initialization *I) {
+  void visitNamedPattern(NamedPattern *P) {
     auto PD = P->getDecl();
     if (!PD->hasName()) {
-      assert(I->kind == Initialization::Kind::Ignored &&
-             "unnamed param should match a black-hole Initialization");
       // A value bound to _ is unused and can be immediately released.
-      auto &lowering = gen.getTypeLowering(P->getType());
-      SILValue arg =
-        makeArgument(P->getType(), f.begin(), PD).forwardAsSingleValue(gen, PD);
-      lowering.emitDestroyRValue(gen.B, P, arg);
+      Scope discardScope(gen.Cleanups, CleanupLocation(P));
+      makeArgument(P->getType(), f.begin(), PD);
+      // Popping the scope destroys the value.
     } else {
-      makeArgumentInto(P->getType(), f.begin(), PD, I);
+      makeArgumentIntoBinding(P->getType(), f.begin(), PD);
     }
   }
 
 #define PATTERN(Id, Parent)
 #define REFUTABLE_PATTERN(Id, Parent) \
-  void visit##Id##Pattern(Id##Pattern *, Initialization *) { \
+  void visit##Id##Pattern(Id##Pattern *) { \
     llvm_unreachable("pattern not valid in argument binding"); \
   }
 #include "swift/AST/PatternNodes.def"
@@ -1088,11 +1152,9 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
   // Emit the argument variables in calling convention order.
   ArgumentInitVisitor argVisitor(*this, F);
   for (Pattern *p : reversed(paramPatterns)) {
-    // Allocate the local mutable argument storage and set up an Initialization.
-    InitializationPtr argInit = InitializationForPattern(*this).visit(p);
     // Add the SILArguments and use them to initialize the local argument
     // values.
-    argVisitor.visit(p, argInit.get());
+    argVisitor.visit(p);
   }
 }
 

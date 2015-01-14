@@ -199,9 +199,9 @@ func reftype_call_with_arg(var a: Ref) {
 // CHECK-LABEL: sil hidden @_TF8lifetime16reftype_reassign
 func reftype_reassign(inout a: Ref, var b: Ref) {
     // CHECK: bb0([[AADDR:%[0-9]+]] : $*Ref, [[B1:%[0-9]+]] : $Ref):
-    // CHECK: [[BADDR:%[0-9]+]] = alloc_box $Ref
     // CHECK: [[A_LOCAL:%[0-9]+]] = alloc_box $Ref
     // CHECK: copy_addr [[AADDR]] to [initialization] [[A_LOCAL]]
+    // CHECK: [[BADDR:%[0-9]+]] = alloc_box $Ref
     a = b
     // CHECK: copy_addr [[BADDR]]#1 to [[A_LOCAL]]
     // CHECK: release

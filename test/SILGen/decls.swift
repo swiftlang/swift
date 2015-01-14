@@ -54,7 +54,7 @@ func tuple_patterns() {
   // CHECK: store [[E]] to [[EADDR]]
   // CHECK: store [[F]] to [[FADDR]]
   // CHECK: store [[H]] to [[HADDR]]
-  var (e,f,g,h) = MRV()
+  var (e,f,g:(),h) = MRV()
 
   // CHECK: [[IADDR:%[0-9]+]] = alloc_box $Int
   // CHECK-NOT: alloc_box $Float
@@ -71,14 +71,14 @@ func tuple_patterns() {
   // CHECK: [[J:%[0-9]+]] = tuple_extract {{.*}}, 0
   // CHECK: [[K:%[0-9]+]] = tuple_extract {{.*}}, 2
   // CHECK: store [[J]] to [[JADDR]]
-  var (j,_,k,_) = MRV()
+  var (j,_,k:(),_) = MRV()
 }
 
 // CHECK-LABEL: sil hidden @_TF5decls16simple_arguments
 // CHECK: bb0(%0 : $Int, %1 : $Int):
 // CHECK: [[X:%[0-9]+]] = alloc_box $Int
-// CHECK-NEXT: [[Y:%[0-9]+]] = alloc_box $Int
 // CHECK-NEXT: store %0 to [[X]]
+// CHECK-NEXT: [[Y:%[0-9]+]] = alloc_box $Int
 // CHECK-NEXT: store %1 to [[Y]]
 func simple_arguments(var x: Int, var y: Int) -> Int {
   return x+y
@@ -96,19 +96,17 @@ func curried_arguments(var x: Int)(var y: Int) -> Int {
 
 // CHECK-LABEL: sil hidden @_TF5decls14tuple_argument
 // CHECK: bb0(%0 : $Int, %1 : $Float):
+// CHECK: [[UNIT:%[0-9]+]] = tuple ()
+// CHECK: [[TUPLE:%[0-9]+]] = tuple (%0 : $Int, %1 : $Float, [[UNIT]] : $())
 // CHECK: [[XADDR:%[0-9]+]] = alloc_box $(Int, Float, ())
-// CHECK: [[T0:%[0-9]+]] = tuple_element_addr [[XADDR]]#1  : $*(Int, Float, ()), 0
-// CHECK: [[T1:%[0-9]+]] = tuple_element_addr [[XADDR]]#1  : $*(Int, Float, ()), 1
-// CHECK: [[T2:%[0-9]+]] = tuple_element_addr [[XADDR]]#1  : $*(Int, Float, ()), 2
-// CHECK: store %0 to [[T0]]
-// CHECK: store %1 to [[T1]]
+// CHECK: store [[TUPLE]] to [[XADDR]]
 func tuple_argument(var x: (Int, Float, ())) {
 }
 
 // CHECK-LABEL: sil hidden @_TF5decls14inout_argument
 // CHECK: bb0(%0 : $*Int, %1 : $Int):
-// CHECK: [[YADDR:%[0-9]+]] = alloc_box $Int
 // CHECK: [[X_LOCAL:%[0-9]+]] = alloc_box $Int
+// CHECK: [[YADDR:%[0-9]+]] = alloc_box $Int
 // CHECK: copy_addr [[YADDR]]#1 to [[X_LOCAL]]#1
 func inout_argument(inout x: Int, var y: Int) {
   x = y

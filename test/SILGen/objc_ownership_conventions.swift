@@ -167,9 +167,9 @@ func applyBlock(f: @objc_block Gizmo -> Gizmo, x: Gizmo) -> Gizmo {
   // CHECK:       strong_retain_autoreleased [[RESULT]]
   // CHECK:       strong_release [[ARG]]
   // CHECK:       strong_release [[BLOCK_COPY]]
-  // CHECK:       strong_release [[BLOCK]]
   // CHECK:       strong_release [[ARG]]
   // CHECK:       strong_release [[BLOCK_COPY]]
+  // CHECK:       strong_release [[BLOCK]]
   // CHECK:       return [[RESULT]]
   return f(x)
 }

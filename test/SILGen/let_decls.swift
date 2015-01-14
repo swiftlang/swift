@@ -344,9 +344,10 @@ func testAddressOnlyTupleArgument(let bounds: (start: SimpleProtocol, pastEnd: I
 // CHECK-NEXT:  bb0(%0 : $*SimpleProtocol, %1 : $Int):
 // CHECK-NEXT:    %2 = alloc_stack $(start: SimpleProtocol, pastEnd: Int)  // let bounds
 // CHECK-NEXT:    %3 = tuple_element_addr %2#1 : $*(start: SimpleProtocol, pastEnd: Int), 0
-// CHECK-NEXT:    %4 = tuple_element_addr %2#1 : $*(start: SimpleProtocol, pastEnd: Int), 1
 // CHECK-NEXT:    copy_addr [take] %0 to [initialization] %3 : $*SimpleProtocol
-// CHECK-NEXT:    store %1 to %4 : $*Int
+// CHECK-NEXT:    %5 = tuple_element_addr %2#1 : $*(start: SimpleProtocol, pastEnd: Int), 1
+// CHECK-NEXT:    store %1 to %5 : $*Int
+// CHECK-NEXT:    debug_value_addr %2
 // CHECK-NEXT:    destroy_addr %2#1 : $*(start: SimpleProtocol, pastEnd: Int)
 // CHECK-NEXT:    dealloc_stack %2#0 : $*@local_storage (start: SimpleProtocol, pastEnd: Int)
 }
@@ -437,7 +438,7 @@ struct GenericStruct<T> {
   // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getA
   // CHECK-NEXT: bb0(%0 : $*T, %1 : $*GenericStruct<T>):
   // CHECK-NEXT: debug_value_addr %1 : $*GenericStruct<T>  // let self
-  // CHECK-NEXT:  %3 = struct_element_addr %1 : $*GenericStruct<T>, #GenericStruct.a
+  // CHECK-NEXT: %3 = struct_element_addr %1 : $*GenericStruct<T>, #GenericStruct.a
   // CHECK-NEXT: copy_addr %3 to [initialization] %0 : $*T
   // CHECK-NEXT: destroy_addr %1 : $*GenericStruct<T>
   // CHECK-NEXT: %6 = tuple ()

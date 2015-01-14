@@ -35,8 +35,6 @@ struct S: Fooable {
   // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1S3foofS0_FSiT_ : $@cc(method) @thin (Int, @guaranteed S) -> () {
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $S):
   // CHECK:         retain_value [[SELF]]
-  // CHECK:         retain_value [[SELF]]
-  // CHECK:         release_value [[SELF]]
   // CHECK:         release_value [[SELF]]
   // CHECK-NOT:     release_value [[SELF]]
   func foo(x: Int) {
@@ -56,8 +54,6 @@ struct S: Fooable {
   // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1S3basfS0_FT_T_ : $@cc(method) @thin (@guaranteed S) -> ()
   // CHECK:       bb0([[SELF:%.*]] : $S):
   // CHECK:         retain_value [[SELF]]
-  // CHECK:         retain_value [[SELF]]
-  // CHECK:         release_value [[SELF]]
   // CHECK:         release_value [[SELF]]
   // CHECK-NOT:     release_value [[SELF]]
   func bas() {
@@ -69,8 +65,6 @@ struct S: Fooable {
   var prop2: Int {
     // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1Sg5prop2Si : $@cc(method) @thin (@guaranteed S) -> Int
     // CHECK:       bb0([[SELF:%.*]] : $S):
-    // CHECK:         retain_value [[SELF]]
-    // CHECK:         release_value [[SELF]]
     // CHECK-NOT:     release_value [[SELF]]
     get { return 0 }
     // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1Ss5prop2Si : $@cc(method) @thin (Int, @inout S) -> ()
@@ -81,8 +75,6 @@ struct S: Fooable {
   var prop3: Int {
     // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1Sg5prop3Si : $@cc(method) @thin (@guaranteed S) -> Int
     // CHECK:       bb0([[SELF:%.*]] : $S):
-    // CHECK:         retain_value [[SELF]]
-    // CHECK:         release_value [[SELF]]
     // CHECK-NOT:     release_value [[SELF]]
     get { return 0 }
     // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1Ss5prop3Si : $@cc(method) @thin (Int, @guaranteed S) -> ()
@@ -90,8 +82,6 @@ struct S: Fooable {
     // CHECK-NOT:     release_value [[SELF]]
     // CHECK-LABEL: sil hidden [transparent] @_TFV15guaranteed_self1Sm5prop3Si : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed S) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout S, @thick S.Type) -> ()>)
     // CHECK:       bb0({{.*}} [[SELF:%.*]] : $S):
-    // CHECK:         retain_value [[SELF]]
-    // CHECK:         release_value [[SELF]]
     // CHECK-NOT:     release_value [[SELF]]
     nonmutating set { }
   }
