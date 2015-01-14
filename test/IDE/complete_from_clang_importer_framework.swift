@@ -1,9 +1,12 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s %clang-importer-sdk -target x86_64-apple-macosx10.9 -code-completion-token=CLANG_UNQUAL_1 > %t.compl.txt
 // RUN: FileCheck %s -check-prefix=CLANG_CTYPES < %t.compl.txt
 // RUN: FileCheck %s -check-prefix=CLANG_MACROS < %t.compl.txt
+// RUN: FileCheck %s -check-prefix=CLANG_DARWIN < %t.compl.txt
+// RUN: FileCheck %s -check-prefix=CLANG_DARWIN_NEG < %t.compl.txt
 
 import macros
 import ctypes
+import Darwin
 
 // CLANG_CTYPES: Begin completions
 // CLANG_CTYPES-DAG: Decl[Struct]/OtherModule:    FooStruct1[#FooStruct1#]{{$}}
@@ -19,6 +22,12 @@ import ctypes
 // CLANG_MACROS-DAG: Decl[GlobalVar]/OtherModule: USES_MACRO_FROM_OTHER_MODULE_1[#Int32#]{{$}}
 // CLANG_MACROS: End completions
 
+// CLANG_DARWIN: Begin completions
+// CLANG_DARWIN-DAG: Decl[TypeAlias]/OtherModule: FourCharCode[#UInt32#]{{$}}
+// CLANG_DARWIN_NEG-NOT: FixedPtr
+// CLANG_DARWIN_NEG-NOT: UniCharCoun
+// CLANG_DARWIN: End completions
+
 func testClangModule() {
   #^CLANG_UNQUAL_1^#
 }
@@ -29,7 +38,7 @@ func testCompleteModuleQualifiedMacros1() {
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: A_PI[#CDouble#]{{$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: CF_STRING[#CString#]{{$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: EOF[#Int32#]{{$}}
-// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: GL_FALSE[#Int32#]{{$}}
+// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: GL_FALSE[#Int32#]{{$}`}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: GL_RGBA[#CInt#]{{$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: GL_RGB[#CInt#]{{$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: INT64_MAX[#CLongLong#]{{$}}

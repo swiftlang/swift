@@ -875,7 +875,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     SmallVector<ValueDecl *, 0> moduleResults;
     auto &mutableM = const_cast<Module&>(M);
     lookupVisibleDeclsInModule(&mutableM, {}, moduleResults,
-                               NLKind::QualifiedLookup,
+                               NLKind::UnqualifiedLookup,
                                ResolutionKind::Overloadable,
                                TypeResolver, DC, extraImports);
     for (auto result : moduleResults)

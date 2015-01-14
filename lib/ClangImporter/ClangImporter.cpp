@@ -2094,6 +2094,74 @@ public:
   }
 };
 
+/// A hack to blacklist particular types in the Darwin module on
+/// Apple platforms.
+class DarwinBlacklistDeclConsumer : public swift::VisibleDeclConsumer {
+  swift::VisibleDeclConsumer &NextConsumer;
+  clang::ASTContext &ClangASTContext;
+
+  bool isBlacklisted(ValueDecl *VD) {
+    if (!VD->hasClangNode())
+      return false;
+
+    const clang::Module *clangModule = getClangOwningModule(VD->getClangNode(),
+                                                            ClangASTContext);
+    if (!clangModule)
+      return false;
+
+    if (clangModule->Name == "MacTypes") {
+      return llvm::StringSwitch<bool>(VD->getNameStr())
+          .Cases("OSErr", "OSStatus", "OptionBits", false)
+          .Cases("FourCharCode", "OSType", false)
+          .Case("Boolean", false)
+          .Case("kUnknownType", false)
+          .Cases("UTF32Char", "UniChar", "UTF16Char", "UTF8Char", false)
+          .Case("ProcessSerialNumber", false)
+          .Default(true);
+    }
+
+    if (clangModule->Parent &&
+        clangModule->Parent->Name == "CarbonCore") {
+      return llvm::StringSwitch<bool>(clangModule->Name)
+          .Cases("BackupCore", "DiskSpaceRecovery", "MacErrors", false)
+          .Default(true);
+    }
+
+    if (clangModule->Parent &&
+        clangModule->Parent->Name == "OSServices") {
+      // Note that this is a blacklist rather than a whitelist.
+      // We're more likely to see new, modern headers added to OSServices.
+      return llvm::StringSwitch<bool>(clangModule->Name)
+          .Cases("IconStorage", "KeychainCore", "Power", true)
+          .Cases("SecurityCore", "SystemSound", true)
+          .Cases("WSMethodInvocation", "WSProtocolHandler", "WSTypes", true)
+          .Default(false);
+    }
+
+    return false;
+  }
+
+public:
+  DarwinBlacklistDeclConsumer(swift::VisibleDeclConsumer &consumer,
+                              clang::ASTContext &clangASTContext)
+      : NextConsumer(consumer), ClangASTContext(clangASTContext) {}
+
+  static bool needsBlacklist(const clang::Module *topLevelModule) {
+    if (!topLevelModule)
+      return false;
+    if (topLevelModule->Name == "Darwin")
+      return true;
+    if (topLevelModule->Name == "CoreServices")
+      return true;
+    return false;
+  }
+
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+    if (!isBlacklisted(VD))
+      NextConsumer.foundDecl(VD, Reason);
+  }
+};
+
 } // unnamed namespace
 
 void ClangImporter::lookupVisibleDecls(VisibleDeclConsumer &Consumer) const {
@@ -2152,16 +2220,26 @@ void ClangImporter::lookupVisibleDecls(VisibleDeclConsumer &Consumer) const {
     Consumer.foundDecl(VD, DeclVisibilityKind::VisibleAtTopLevel);
 }
 
-void ClangModuleUnit::lookupVisibleDecls(Module::AccessPathTy AccessPath,
-                                         VisibleDeclConsumer &Consumer,
-                                         NLKind LookupKind) const {
+void ClangModuleUnit::lookupVisibleDecls(Module::AccessPathTy accessPath,
+                                         VisibleDeclConsumer &consumer,
+                                         NLKind lookupKind) const {
   // FIXME: Ignore submodules, which are empty for now.
   if (clangModule && clangModule->isSubModule())
     return;
 
   // FIXME: Respect the access path.
-  FilteringVisibleDeclConsumer filterConsumer(Consumer, this);
-  owner.lookupVisibleDecls(filterConsumer);
+  FilteringVisibleDeclConsumer filterConsumer(consumer, this);
+
+  DarwinBlacklistDeclConsumer darwinBlacklistConsumer(filterConsumer,
+                                                      getClangASTContext());
+
+  swift::VisibleDeclConsumer *actualConsumer = &filterConsumer;
+  if (lookupKind == NLKind::UnqualifiedLookup &&
+      DarwinBlacklistDeclConsumer::needsBlacklist(clangModule)) {
+    actualConsumer = &darwinBlacklistConsumer;
+  }
+
+  owner.lookupVisibleDecls(*actualConsumer);
 }
 
 namespace {
@@ -2178,11 +2256,20 @@ public:
 } // unnamed namespace
 
 void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
-  VectorDeclPtrConsumer Consumer(results);
-  SmallVector<ExtensionDecl *, 16> Extensions;
-  FilteringDeclaredDeclConsumer FilterConsumer(Consumer, Extensions, this);
-  owner.lookupVisibleDecls(FilterConsumer);
-  results.append(Extensions.begin(), Extensions.end());
+  VectorDeclPtrConsumer consumer(results);
+  SmallVector<ExtensionDecl *, 16> extensions;
+  FilteringDeclaredDeclConsumer filterConsumer(consumer, extensions, this);
+  DarwinBlacklistDeclConsumer blacklistConsumer(filterConsumer,
+                                                getClangASTContext());
+
+  const clang::Module *topLevelModule = clangModule->getTopLevelModule();
+  if (DarwinBlacklistDeclConsumer::needsBlacklist(topLevelModule)) {
+    owner.lookupVisibleDecls(blacklistConsumer);
+  } else {
+    owner.lookupVisibleDecls(filterConsumer);
+  }
+
+  results.append(extensions.begin(), extensions.end());
 }
 
 static void getImportDecls(ClangModuleUnit *ClangUnit, const clang::Module *M,
@@ -2241,8 +2328,17 @@ void ClangModuleUnit::lookupValue(Module::AccessPathTy accessPath,
 
   VectorDeclConsumer vectorWriter(results);
   FilteringVisibleDeclConsumer filteringConsumer(vectorWriter, this);
-  
-  owner.lookupValue(name.getBaseName(), filteringConsumer);
+
+  DarwinBlacklistDeclConsumer darwinBlacklistConsumer(filteringConsumer,
+                                                      getClangASTContext());
+
+  swift::VisibleDeclConsumer *consumer = &filteringConsumer;
+  if (lookupKind == NLKind::UnqualifiedLookup &&
+      DarwinBlacklistDeclConsumer::needsBlacklist(clangModule)) {
+    consumer = &darwinBlacklistConsumer;
+  }
+
+  owner.lookupValue(name.getBaseName(), *consumer);
 }
 
 void ClangImporter::loadExtensions(NominalTypeDecl *nominal,

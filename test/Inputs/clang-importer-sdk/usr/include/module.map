@@ -12,6 +12,15 @@ module blocks {
   export *
 }
 
+// Note: The real Darwin includes stdc stuff. This one is just for testing
+// Darwin-specific things.
+module Darwin {
+  module MacTypes {
+    header "MacTypes.h"
+    export *
+  }
+}
+
 module Dispatch {
   header "dispatch.h"
   export *
@@ -29,6 +38,7 @@ module CoreFoundation {
   header "CoreFoundation.h" 
   export *
 }
+
 module Foundation {
   header "Foundation.h" 
   export *

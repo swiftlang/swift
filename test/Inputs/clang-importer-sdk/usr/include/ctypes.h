@@ -1,3 +1,6 @@
+#ifndef __CTYPES__
+#define __CTYPES__
+
 typedef enum { red, green, blue } Color;
 
 enum Tribool {
@@ -199,3 +202,5 @@ typedef struct ModRM {
   unsigned mod: 2;
   unsigned opcode;
 } ModRM;
+
+#endif

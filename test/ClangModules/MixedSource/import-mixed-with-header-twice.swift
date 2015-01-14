@@ -8,7 +8,7 @@
 // RUN: rm %t/mixed-target/header.h
 // RUN: not %swift %clang-importer-sdk -I %t -I %S/../Inputs/custom-modules -parse %s 2>&1 | FileCheck %s -check-prefix=USE-SERIALIZED-HEADER
 
-// USE-SERIALIZED-HEADER: redefinition of 'Point'
+// USE-SERIALIZED-HEADER: redefinition of 'Point2D'
 // USE-SERIALIZED-HEADER: previous definition is here
 
 import MixedWithHeaderAgain

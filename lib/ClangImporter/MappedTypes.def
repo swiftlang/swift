@@ -57,6 +57,12 @@ MAP_STDLIB_TYPE("Float64", FloatIEEEdouble,        64, "Float64", All, false,
 MAP_STDLIB_TYPE("Float80", FloatX87DoubleExtended, 80, "Float80", All, true,
                 DoNothing)
 
+MAP_STDLIB_TYPE("Byte",       UnsignedInt, 8,  "UInt8", All, false, DoNothing)
+MAP_STDLIB_TYPE("SignedByte", SignedInt,   8,  "Int8",  All, false, DoNothing)
+
+MAP_STDLIB_TYPE("UniCharCount", UnsignedWord, 0, "Int", All, false, DoNothing)
+
+
 // stdint.h types.
 MAP_STDLIB_TYPE("uint8_t",  UnsignedInt, 8,  "UInt8",  All, false, DoNothing)
 MAP_STDLIB_TYPE("uint16_t", UnsignedInt, 16, "UInt16", All, false, DoNothing)

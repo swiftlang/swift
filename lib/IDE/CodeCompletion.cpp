@@ -1991,7 +1991,7 @@ public:
     Module *M = CurrDeclContext->getParentModule();
     AccessFilteringDeclConsumer FilteringConsumer(CurrDeclContext, *this,
                                                   TypeResolver.get());
-    M->lookupVisibleDecls({}, FilteringConsumer, NLKind::QualifiedLookup);
+    M->lookupVisibleDecls({}, FilteringConsumer, NLKind::UnqualifiedLookup);
   }
 
   void getVisibleDeclsOfModule(const Module *TheModule,
@@ -2008,7 +2008,7 @@ public:
     AccessFilteringDeclConsumer FilteringConsumer(CurrDeclContext, *this,
                                                   TypeResolver.get());
     TheModule->lookupVisibleDecls(LookupAccessPath, FilteringConsumer,
-                                  NLKind::QualifiedLookup);
+                                  NLKind::UnqualifiedLookup);
   }
 };
 

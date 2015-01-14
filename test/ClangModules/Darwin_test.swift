@@ -1,22 +1,15 @@
-// RUN: %target-swift-frontend -parse %s -verify
+// RUN: %swift %clang-importer-sdk -parse %s -verify
 
 import Darwin
-import ObjectiveC
 
-errno = 0
-assert(errno == 0)
+let _: Fract? = nil // expected-error{{use of undeclared type 'Fract'}}
+let _: Darwin.Fract? = nil // okay
 
-fork() // expected-error{{'fork()' is unavailable}}
-vfork() // expected-error{{'vfork()' is unavailable}}
+let _: OSErr = 0
+let _: OSStatus = noErr // noErr is from the overlay
+let _: UniChar = 0
 
+let _ = ProcessSerialNumber()
 
-// Test YES and NO.
-let x_YES = YES // expected-error {{'YES' is unavailable: Use 'Bool' value 'true' instead}}
-let x_NO = NO // expected-error {{'NO' is unavailable: Use 'Bool' value 'false' instead}}
-
-func test_shadow(flag: Bool) -> Bool {
-  let YES = true
-  let NO = false
-  return flag ? YES : NO
-}
-
+let _: Byte = 0 // expected-error {{use of undeclared type 'Byte'}}
+Darwin.fakeAPIUsingByteInDarwin() as Int // expected-error {{'UInt8' is not convertible to 'Int'}}
