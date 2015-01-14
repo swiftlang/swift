@@ -47,7 +47,21 @@ namespace {
   // For example aliasing information is not taken into account.
   class ConstantTracker {
     // Links between loaded and stored values.
-    llvm::DenseMap<SILValue, SILValue> links;
+    // The key is a load instruction, the value is the corresponding store
+    // instruction which stores the loaded value. Both, key and value can also
+    // be copy_addr instructions.
+    llvm::DenseMap<SILInstruction *, SILInstruction *> links;
+    
+    // The current stored values at memory addresses.
+    // The key is the base address of the memory (after skipping address
+    // projections). The value are store (or copy_addr) instructions, which
+    // store the current value.
+    // This is only an estimation, because e.g. it does not consider potential
+    // aliasing.
+    llvm::DenseMap<SILValue, SILInstruction *> memoryContent;
+
+    // The caller/callee function which is tracked.
+    SILFunction *F;
     
     // The constant tracker of the caller function (null if this is the
     // tracker of the callee).
@@ -57,19 +71,58 @@ namespace {
     // callee).
     ApplyInst *AI;
     
+    // Walks through address projections and (optionally) collects them.
+    // Returns the base address, i.e. the first address which is not a
+    // projection.
+    SILValue scanProjections(SILValue addr,
+                             SmallVectorImpl<Projection> *Result = nullptr);
+    
+    // Get the stored value for a load. The loadInst can be either a real load
+    // or a copy_addr.
+    SILValue getStoredValue(SILInstruction *loadInst,
+                            ProjectionPath &projStack);
+
+    // Gets the parameter in the caller for a function argument.
+    SILValue getParam(SILValue value) {
+      if (SILArgument *arg = dyn_cast<SILArgument>(value)) {
+        if (AI && arg->isFunctionArg() && arg->getFunction() == F) {
+          // Continue at the caller.
+          return AI->getArgument(arg->getIndex());
+        }
+      }
+      return SILValue();
+    }
+    
+    SILInstruction *getMemoryContent(SILValue addr) {
+      // The memory content can be stored in this ConstantTracker or in the
+      // caller's ConstantTracker.
+      SILInstruction *storeInst = memoryContent[addr];
+      if (storeInst)
+        return storeInst;
+      if (callerTracker)
+        return callerTracker->getMemoryContent(addr);
+      return nullptr;
+    }
+    
     // Gets the estimated constant of a value.
     SILInstruction *getConst(SILValue val, ProjectionPath &projStack);
 
   public:
     
     // Constructor for the caller function.
-    ConstantTracker() : callerTracker(nullptr), AI(nullptr) { }
+    ConstantTracker(SILFunction *function) : F(function), callerTracker(nullptr), AI(nullptr) { }
     
     // Constructor for the callee function.
-    ConstantTracker(ConstantTracker *caller, ApplyInst *callerApply) :
-       callerTracker(caller), AI(callerApply)
+    ConstantTracker(SILFunction *function, ConstantTracker *caller, ApplyInst *callerApply) :
+       F(function), callerTracker(caller), AI(callerApply)
     { }
     
+    void beginBlock() {
+      // Currently we don't do any sophisticated dataflow analysis, so we keep
+      // the memoryContent alive only for a single block.
+      memoryContent.clear();
+    }
+
     // Must be called for each instruction visited in dominance order.
     void trackInst(SILInstruction *inst);
     
@@ -119,19 +172,83 @@ namespace {
 
 
 void ConstantTracker::trackInst(SILInstruction *inst) {
-  // Establish a link if a value is loaded or stored (or both).
   if (LoadInst *LI = dyn_cast<LoadInst>(inst)) {
-    SILValue addr = LI->getOperand();
-    links[LI] = addr;
+    SILValue baseAddr = scanProjections(LI->getOperand());
+    if (SILInstruction *loadLink = getMemoryContent(baseAddr))
+       links[LI] = loadLink;
   } else if (StoreInst *SI = dyn_cast<StoreInst>(inst)) {
-    SILValue val = SI->getOperand(0);
-    SILValue addr = SI->getOperand(1);
-    links[addr] = val;
+    SILValue baseAddr = scanProjections(SI->getOperand(1));
+    memoryContent[baseAddr] = SI;
   } else if (CopyAddrInst *CAI = dyn_cast<CopyAddrInst>(inst)) {
     if (!CAI->isTakeOfSrc()) {
-      links[CAI->getOperand(1)] = CAI->getOperand(0);
+      // Treat a copy_addr as a load + store
+      SILValue loadAddr = scanProjections(CAI->getOperand(0));
+      if (SILInstruction *loadLink = getMemoryContent(loadAddr)) {
+        links[CAI] = loadLink;
+        SILValue storeAddr = scanProjections(CAI->getOperand(1));
+        memoryContent[storeAddr] = CAI;
+      }
     }
   }
+}
+
+SILValue ConstantTracker::scanProjections(SILValue addr,
+                                          SmallVectorImpl<Projection> *Result) {
+  for (;;) {
+    if (Projection::isAddrProjection(addr)) {
+      SILInstruction *I = cast<SILInstruction>(addr.getDef());
+      if (Result) {
+        Optional<Projection> P = Projection::addressProjectionForInstruction(I);
+        Result->push_back(P.getValue());
+      }
+      addr = I->getOperand(0);
+      continue;
+    }
+    if (SILValue param = getParam(addr)) {
+      // Go to the caller.
+      addr = param;
+      continue;
+    }
+    // Return the base address = the first address which is not a projection.
+    return addr;
+  }
+}
+
+SILValue ConstantTracker::getStoredValue(SILInstruction *loadInst,
+                                  ProjectionPath &projStack) {
+  SILInstruction *store = links[loadInst];
+  if (!store && callerTracker)
+    store = callerTracker->links[loadInst];
+  if (!store) return SILValue();
+
+  assert(isa<LoadInst>(loadInst) || isa<CopyAddrInst>(loadInst));
+
+  // Push the address projections of the load onto the stack.
+  SmallVector<Projection, 4> loadProjections;
+  scanProjections(loadInst->getOperand(0), &loadProjections);
+  for (const Projection &proj : loadProjections) {
+    projStack.push_back(proj);
+  }
+  
+  //  Pop the address projections of the store from the stack.
+  SmallVector<Projection, 4> storeProjections;
+  scanProjections(store->getOperand(1), &storeProjections);
+  for (auto iter = storeProjections.rbegin(); iter != storeProjections.rend();
+       ++iter) {
+    const Projection &proj = *iter;
+    // The corresponding load-projection must match the store-projection.
+    if (projStack.empty() || projStack.back() != proj)
+      return SILValue();
+    projStack.pop_back();
+  }
+  
+  if (isa<StoreInst>(store))
+    return store->getOperand(0);
+
+  // The copy_addr instruction is both a load and a store. So we follow the link
+  // again.
+  assert(isa<CopyAddrInst>(store));
+  return getStoredValue(store, projStack);
 }
 
 // Get the aggregate member based on the top of the projection stack.
@@ -147,9 +264,6 @@ SILInstruction *ConstantTracker::getConst(SILValue val,
                                           ProjectionPath &projStack) {
   
   // Track the value up the dominator tree.
-  // The val can also be an address value. In this case it refers to the
-  // referenced value of that address. E.g. if it is the address returned by an
-  // alloc_stack, it refers to the value stored at that stack location.
   for (;;) {
     if (SILInstruction *inst = dyn_cast<SILInstruction>(val)) {
       switch (inst->getKind()) {
@@ -166,7 +280,7 @@ SILInstruction *ConstantTracker::getConst(SILValue val,
       default:
         break;
       }
-      if (auto proj = Projection::projectionForInstruction(inst)) {
+      if (auto proj = Projection::valueProjectionForInstruction(inst)) {
         // Extract a member from a struct/tuple/enum.
         projStack.push_back(proj.getValue());
         val = inst->getOperand(0);
@@ -176,17 +290,15 @@ SILInstruction *ConstantTracker::getConst(SILValue val,
         projStack.pop_back();
         val = member;
         continue;
-      } else if (SILValue link = links[val]) {
-        // The value is loaded or stored from/to an address.
-        val = link;
+      } else if (SILValue loadedVal = getStoredValue(inst, projStack)) {
+        // A value loaded from memory.
+        val = loadedVal;
         continue;
       }
-    } else if (SILArgument *arg = dyn_cast<SILArgument>(val)) {
-      if (AI && arg->isFunctionArg()) {
-        // Continue at the caller.
-        SILValue param = AI->getArgument(arg->getIndex());
-        return callerTracker->getConst(param, projStack);
-      }
+    } else if (SILValue param = getParam(val)) {
+      // Continue in the caller.
+      val = param;
+      continue;
     }
     return nullptr;
   }
@@ -299,7 +411,7 @@ bool SILPerformanceInliner::isProfitableToInline(ApplyInst *AI,
   if (Callee->getInlineStrategy() == AlwaysInline)
     return true;
   
-  ConstantTracker constTracker(&callerTracker, AI);
+  ConstantTracker constTracker(Callee, &callerTracker, AI);
   SILFunction *Caller = AI->getFunction();
   
   DominanceInfo *DT = DA->getDomInfo(Callee);
@@ -313,6 +425,7 @@ bool SILPerformanceInliner::isProfitableToInline(ApplyInst *AI,
   int testThreshold = TestThreshold;
 
   while (SILBasicBlock *block = domOrder.getNext()) {
+    constTracker.beginBlock();
     for (SILInstruction &I : *block) {
       constTracker.trackInst(&I);
       
@@ -371,12 +484,13 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
   if (!DT->isValid(Caller))
     DT->recalculate(*Caller);
 
-  ConstantTracker constTracker;
+  ConstantTracker constTracker(Caller);
   DominanceOrder domOrder(&Caller->front(), DT, Caller->size());
 
   // Go through all instructions and find candidates for inlining.
   // We do this in dominance order for the constTracker.
   while (SILBasicBlock *block = domOrder.getNext()) {
+    constTracker.beginBlock();
     for (SILInstruction &I : *block) {
       constTracker.trackInst(&I);
       
