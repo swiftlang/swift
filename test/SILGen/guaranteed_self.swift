@@ -213,23 +213,49 @@ struct AO<T>: Fooable {
   var x: T?
 
   init() {}
+  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self2AO3fooU__fGS0_Q__FSiT_ : $@cc(method) @thin <T> (Int, @in_guaranteed AO<T>) -> ()
+  // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*AO<T>):
+  // TODO: We could avoid the copy/destroy here.
+  // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY:%.*]]#1
+  // CHECK:         apply {{.*}} [[SELF_COPY]]
+  // CHECK:         destroy_addr [[SELF_COPY]]
+  // CHECK:         dealloc_stack [[SELF_COPY]]
+  // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
+  // CHECK:       }
   func foo(x: Int) {
     self.foo(x)
   }
   mutating func bar() {
     self.bar()
   }
+  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self2AO3basU__fGS0_Q__FT_T_ : $@cc(method) @thin <T> (@in_guaranteed AO<T>) -> () 
+  // CHECK:       bb0([[SELF_ADDR:%.*]] : $*AO<T>):
+  // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
   func bas() {
     self.bas()
   }
 
+  
   var prop1: Int = 0
   var prop2: Int {
+    // CHECK-LABEL: sil hidden @_TFV15guaranteed_self2AOg5prop2Si : $@cc(method) @thin <T> (@in_guaranteed AO<T>) -> Int {
+    // CHECK:       bb0([[SELF_ADDR:%.*]] : $*AO<T>):
+    // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
     get { return 0 }
     set { }
   }
   var prop3: Int {
+    // CHECK-LABEL: sil hidden @_TFV15guaranteed_self2AOg5prop3Si : $@cc(method) @thin <T> (@in_guaranteed AO<T>) -> Int
+    // CHECK:       bb0([[SELF_ADDR:%.*]] : $*AO<T>):
+    // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
     get { return 0 }
+    // CHECK-LABEL: sil hidden @_TFV15guaranteed_self2AOs5prop3Si : $@cc(method) @thin <T> (Int, @in_guaranteed AO<T>) -> ()
+    // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*AO<T>):
+    // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
+    // CHECK-LABEL: sil hidden [transparent] @_TFV15guaranteed_self2AOm5prop3Si : $@cc(method) @thin <T> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed AO<T>) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout AO<T>, @thick AO<T>.Type) -> ()>)
+    // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*AO<T>):
+    // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
+    // CHECK:       }
     nonmutating set { }
   }
 }

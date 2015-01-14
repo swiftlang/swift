@@ -556,6 +556,8 @@ namespace {
     }
 
     ParameterConvention getIndirectSelfParameter(CanType type) const override {
+      if (hasGuaranteedSelf)
+        return ParameterConvention::Indirect_In_Guaranteed;
       return ParameterConvention::Indirect_In;
     }    
 
