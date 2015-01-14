@@ -126,10 +126,12 @@ namespace {
     /// Resolve a (non-type) witness via default definition or optional.
     ResolveWitnessResult resolveWitnessViaDefault(ValueDecl *requirement);
 
+  public:
     /// Attempt to resolve a type witness via member name lookup.
     ResolveWitnessResult resolveTypeWitnessViaLookup(
                            AssociatedTypeDecl *assocType);
 
+  private:
     /// Attempt to resolve a type witness via a default definition.
     ResolveWitnessResult resolveTypeWitnessViaDefault(
                            AssociatedTypeDecl *assocType);
@@ -315,7 +317,7 @@ namespace {
   class RequirementTypeOpener : public constraints::DependentTypeOpener {
     /// The type variable that represents the 'Self' type.
     TypeVariableType *SelfTypeVar = nullptr;
-
+    ConformanceChecker &CC;
     NormalProtocolConformance *Conformance;
     DeclContext *DC;
     ProtocolDecl *Proto;
@@ -323,11 +325,13 @@ namespace {
 
   public:
     RequirementTypeOpener(
-        NormalProtocolConformance *conformance,
-        DeclContext *dc,
-        llvm::DenseMap<TypeVariableType *, AssociatedTypeDecl*>
-          &openedAssocTypes)
-      : Conformance(conformance), DC(dc), Proto(conformance->getProtocol()),
+      ConformanceChecker &cc,
+      NormalProtocolConformance *conformance,
+      DeclContext *dc,
+      llvm::DenseMap<TypeVariableType *, AssociatedTypeDecl*>
+        &openedAssocTypes)
+      : CC(cc), Conformance(conformance), DC(dc),
+        Proto(conformance->getProtocol()),
         OpenedAssocTypes(openedAssocTypes)
     {
     }
@@ -351,13 +355,29 @@ namespace {
       // associated type already.
       if (baseTypeVar == SelfTypeVar &&
           cast<ProtocolDecl>(assocType->getDeclContext()) == Proto) {
+        // If we don't have a type witness, see if we can resolve it via
+        // type witnesses.
+        bool hasTypeWitness = Conformance->hasTypeWitness(assocType);
+        if (!hasTypeWitness) {
+          switch (CC.resolveTypeWitnessViaLookup(assocType)) {
+          case ResolveWitnessResult::ExplicitFailed:
+          case ResolveWitnessResult::Missing:
+              break;
+
+          case ResolveWitnessResult::Success:
+            hasTypeWitness = true;
+            break;
+          }
+        }
+
         // If we know about this associated type already, we know its
         // replacement type. Otherwise, record it.
-        if (Conformance->hasTypeWitness(assocType))
+        if (hasTypeWitness) {
           replacementType = Conformance->getTypeWitness(assocType, nullptr)
                               .getReplacement();
-        else
+        } else {
           OpenedAssocTypes[memberTypeVar] = assocType;
+        }
 
         // Let the member type variable float; we don't want to
         // resolve it as a member.
@@ -689,7 +709,8 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
 }
 
 static RequirementMatch
-matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
+matchWitness(ConformanceChecker &cc, TypeChecker &tc,
+             NormalProtocolConformance *conformance,
              DeclContext *dc, ValueDecl *req, ValueDecl *witness) {
   // Initialized by the setup operation.
   Optional<constraints::ConstraintSystem> cs;
@@ -732,7 +753,8 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     // its associated types (recursively); inner generic type parameters get
     // mapped to their archetypes directly.
     DeclContext *reqDC = req->getPotentialGenericDeclContext();
-    RequirementTypeOpener reqTypeOpener(conformance, reqDC, openedAssocTypes);
+    RequirementTypeOpener reqTypeOpener(cc, conformance, reqDC,
+                                        openedAssocTypes);
     std::tie(openedFullReqType, reqType)
       = cs->getTypeOfMemberReference(model, req,
                                      /*isTypeReference=*/false,
@@ -1346,7 +1368,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     if (!witness->hasType())
       TC.validateDecl(witness, true);
 
-    auto match = matchWitness(TC, Conformance, DC, requirement, witness);
+    auto match = matchWitness(*this, TC, Conformance, DC, requirement, witness);
     if (match.isViable()) {
       ++numViable;
       bestIdx = matches.size();
@@ -1630,7 +1652,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
     return ResolveWitnessResult::ExplicitFailed;
 
   // Try to match the derived requirement.
-  auto match = matchWitness(TC, Conformance, DC, requirement, derived);
+  auto match = matchWitness(*this, TC, Conformance, DC, requirement, derived);
   if (match.isViable()) {
     recordWitness(requirement, match);
     return ResolveWitnessResult::Success;
