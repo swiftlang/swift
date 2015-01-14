@@ -47,9 +47,6 @@ public:
     /// This Initialization is for a _ binding or other ignored value; the
     /// corresponding result can be discarded.
     Ignored,
-    /// This Initialization is for an inout or address-only argument binding,
-    /// which is initialized using bindAddress().
-    AddressBinding,
     /// This Initialization is to bind a 'let' declaration into VarLocs
     /// directly.
     LetValue,
@@ -84,13 +81,6 @@ public:
   /// SILValue of that buffer's address. If not, returns an invalid SILValue.
   virtual SILValue getAddressOrNull() const = 0;
   
-  /// Binds an address value to this initialization. Called only on
-  /// initializations with Kind::AddressBinding.
-  virtual void bindAddress(SILValue address, SILGenFunction &gen,
-                           SILLocation loc) {
-    llvm_unreachable("unexpected address value in initialization!");
-  }
-
   /// Provide a value to this initialization.  Called only on
   /// initializations with Kind::Translating.
   virtual void translateValue(SILGenFunction &gen, SILLocation loc,

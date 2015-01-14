@@ -1019,8 +1019,6 @@ static SILValue getAddressForInPlaceInitialization(Initialization *I) {
   
   SILValue address;
   switch (I->kind) {
-  case Initialization::Kind::AddressBinding:
-    llvm_unreachable("can't emit into address binding");
   case Initialization::Kind::LetValue:
     // Emit into the buffer that 'let's produce for address-only values if
     // we have it.
