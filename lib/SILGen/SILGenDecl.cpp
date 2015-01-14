@@ -332,16 +332,9 @@ public:
     bool needsTemporaryBuffer;
     bool isUninitialized = false;
 
-    if (isa<ParamDecl>(vd)) {
-      // If this is a function argument, we don't usually need a temporary
-      // buffer because the incoming pointer can be directly bound as our let
-      // buffer.  However, if this VarDecl has tuple type, then it will be
-      // passed to the SILFunction as multiple SILArguments which will need to
-      // be rebound to something of tuple type.  If the type is address only,
-      // that rebound tuple will need to be in memory.
-      needsTemporaryBuffer = vd->getType()->is<TupleType>() &&
-                             lowering.isAddressOnly();
-    } else if (vd->getParentPattern() && !vd->getParentPattern()->hasInit()) {
+    assert(!isa<ParamDecl>(vd)
+           && "should not bind function params on this path");
+    if (vd->getParentPattern() && !vd->getParentPattern()->hasInit()) {
       // This value is uninitialized (and unbound) if it has a pattern binding
       // decl, with no initializer value.
       assert(!vd->hasNonPatternBindingInit() && "Bound values aren't uninit!");
