@@ -99,8 +99,26 @@ static SILValue getArrayStructPointer(ArrayCallKind K, SILValue Array) {
 ///  %44 = pointer_to_address %43
 ///  store %1 to %44 : $*Int
 static bool isArrayEltStore(StoreInst *SI) {
-  if (auto *PtrToAddr = dyn_cast<PointerToAddressInst>(
-          SI->getDest().stripAddressProjections()))
+  // Strip the MarkDependenceInst (new array implementation) where the above
+  // pattern looks like the following.
+  // %40 = function_ref @getElementAddress
+  // %41 = apply %40(%21, %35)
+  // %42 = struct_element_addr %0 : $*Array<Int>, #Array._buffer
+  // %43 = struct_element_addr %42 : $*_ArrayBuffer<Int>, #_ArrayBuffer._storage
+  // %44 = struct_element_addr %43 : $*_BridgeStorage
+  // %45 = load %44 : $*Builtin.BridgeObject
+  // %46 = unchecked_ref_bit_cast %45 : $... to $_ContiguousArrayStorageBase
+  // %47 = unchecked_ref_cast %46 : $... to $Builtin.NativeObject
+  // %48 = struct_extract %41 : $..., #UnsafeMutablePointer._rawValue
+  // %49 = pointer_to_address %48 : $Builtin.RawPointer to $*Int
+  // %50 = mark_dependence %49 : $*Int on %47 : $Builtin.NativeObject
+  // store %1 to %50 : $*Int
+  SILValue Dest = SI->getDest();
+  if (auto *MD = dyn_cast<MarkDependenceInst>(Dest))
+    Dest = MD->getOperand(0);
+
+  if (auto *PtrToAddr =
+          dyn_cast<PointerToAddressInst>(Dest.stripAddressProjections()))
     if (auto *SEI = dyn_cast<StructExtractInst>(PtrToAddr->getOperand())) {
       ArraySemanticsCall Call(SEI->getOperand().getDef());
       if (Call && Call.getKind() == ArrayCallKind::kGetElementAddress)
