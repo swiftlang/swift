@@ -6,8 +6,6 @@ protocol Fooable {
   mutating func bar()
   mutating func bas()
 
-  prefix func +(x: Self)
-
   var prop1: Int { get set }
   var prop2: Int { get set }
   var prop3: Int { get nonmutating set }
@@ -18,8 +16,6 @@ protocol Barrable: class {
   func foo(x: Int)
   func bar()
   func bas()
-
-  prefix func +(x: Self)
 
   var prop1: Int { get set }
   var prop2: Int { get set }
@@ -103,8 +99,6 @@ struct S: Fooable {
   // CHECK-NOT:     load [[SELF_ADDR]]
   // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 }
-
-prefix func +(x: S) {}
 
 // Witness thunk for nonmutating 'foo'
 // CHECK-LABEL: sil hidden @_TTWV15guaranteed_self1SS_7FooableS_FS1_3fooUS1___fQPS1_FSiT_ : $@cc(witness_method) @thin (Int, @in_guaranteed S) -> () {
@@ -260,8 +254,6 @@ struct AO<T>: Fooable {
   }
 }
 
-prefix func +<T>(x: AO<T>) {}
-
 // Witness for nonmutating 'foo'
 // CHECK-LABEL: sil hidden @_TTWU__GV15guaranteed_self2AOQ__S_7FooableS_FS1_3fooUS1___fQPS1_FSiT_ : $@cc(witness_method) @thin <T> (Int, @in_guaranteed AO<T>) -> ()
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*AO<T>):
@@ -280,37 +272,6 @@ prefix func +<T>(x: AO<T>) {}
 // CHECK:         apply {{.*}} [[SELF_COPY]]
 // CHECK:         destroy_addr [[SELF_COPY]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
-
-enum E: Fooable {
-  case A, B(C)
-  init() { self = .A }
-  init(c: C) { self = .B(c) }
-
-  func foo(x: Int) {
-    self.foo(x)
-  }
-  mutating func bar() {
-    self.bar()
-  }
-  func bas() {
-    self.bas()
-  }
-
-  var prop1: Int {
-    get { return 0 }
-    set { }
-  }
-  var prop2: Int {
-    get { return 0 }
-    set { }
-  }
-  var prop3: Int {
-    get { return 0 }
-    nonmutating set { }
-  }
-}
-
-prefix func +(x: E) {}
 
 class C: Fooable, Barrable {
   required init() {}
@@ -334,5 +295,3 @@ class C: Fooable, Barrable {
     set {}
   }
 }
-
-prefix func +(x: C) {}
