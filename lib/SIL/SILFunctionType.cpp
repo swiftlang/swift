@@ -565,6 +565,22 @@ namespace {
       return C->getKind() == ConventionsKind::Default;
     }
   };
+  
+  /// The default conventions for Swift initializing constructors.
+  struct DefaultInitializerConventions : DefaultConventions {
+    using DefaultConventions::DefaultConventions;
+  
+    /// Initializers must take 'self' at +1, since they will return it back
+    /// at +1, and may chain onto Objective-C initializers that replace the
+    /// instance.
+    ParameterConvention getDirectSelfParameter(CanType type) const override {
+      return ParameterConvention::Direct_Owned;
+    }
+    
+    ParameterConvention getIndirectSelfParameter(CanType type) const override {
+      return ParameterConvention::Indirect_In;
+    }
+  };
 
   /// The default conventions for ObjC blocks.
   struct DefaultBlockConventions : Conventions {
@@ -606,7 +622,8 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
                                            CanType origType,
                                            CanAnyFunctionType substType,
                                            CanAnyFunctionType substInterfaceType,
-                                           AnyFunctionType::ExtInfo extInfo) {
+                                           AnyFunctionType::ExtInfo extInfo,
+                                           SILDeclRef::Kind kind) {
   switch (extInfo.getRepresentation()) {
   case AnyFunctionType::Representation::Block:
     return getSILFunctionType(M, origType, substType, substInterfaceType,
@@ -615,8 +632,25 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
   case AnyFunctionType::Representation::Thin:
   case AnyFunctionType::Representation::Thick: {
     bool enableGuaranteedSelf = M.getOptions().EnableGuaranteedSelf;
-    return getSILFunctionType(M, origType, substType, substInterfaceType,
-                              extInfo, DefaultConventions(enableGuaranteedSelf));
+    switch (kind) {
+    case SILDeclRef::Kind::Initializer:
+      return getSILFunctionType(M, origType, substType, substInterfaceType,
+                  extInfo, DefaultInitializerConventions(enableGuaranteedSelf));
+    
+    case SILDeclRef::Kind::Func:
+    case SILDeclRef::Kind::Allocator:
+    case SILDeclRef::Kind::Destroyer:
+    case SILDeclRef::Kind::Deallocator:
+    case SILDeclRef::Kind::GlobalAccessor:
+    case SILDeclRef::Kind::GlobalGetter:
+    case SILDeclRef::Kind::DefaultArgGenerator:
+    case SILDeclRef::Kind::IVarInitializer:
+    case SILDeclRef::Kind::IVarDestroyer:
+    case SILDeclRef::Kind::EnumElement:
+      return getSILFunctionType(M, origType, substType, substInterfaceType,
+                            extInfo, DefaultConventions(enableGuaranteedSelf));
+      
+    }
   }
   }
 }
@@ -636,7 +670,7 @@ CanSILFunctionType swift::getNativeSILFunctionType(SILModule &M,
     extInfo = substType->getExtInfo();
   }
   return ::getNativeSILFunctionType(M, origType, substType, substInterfaceType,
-                                    extInfo);
+                                    extInfo, SILDeclRef::Kind::Func);
 }
 
 /*****************************************************************************/
@@ -1099,7 +1133,8 @@ getUncachedSILFunctionTypeForConstant(SILModule &M, SILDeclRef constant,
   if (!constant.isForeign) {
     return getNativeSILFunctionType(M, origLoweredType, substLoweredType,
                                     substLoweredInterfaceType,
-                                    extInfo);
+                                    extInfo,
+                                    constant.kind);
   }
 
   // If we have a clang decl associated with the Swift decl, derive its

@@ -274,7 +274,47 @@ struct AO<T>: Fooable {
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 class C: Fooable, Barrable {
-  required init() {}
+  // Allocating initializer
+  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1CCfMS0_FT_S0_ : $@thin (@thick C.Type) -> @owned C
+  // CHECK:         [[SELF1:%.*]] = alloc_ref $C
+  // CHECK-NOT:     [[SELF1]]
+  // CHECK:         [[SELF2:%.*]] = apply {{.*}}([[SELF1]])
+  // CHECK-NOT:     [[SELF2]]
+  // CHECK:         return [[SELF2]]
+
+  // Initializing constructors still have the +1 in, +1 out convention.
+  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1CcfMS0_FT_S0_ : $@cc(method) @thin (@owned C) -> @owned C {
+  // CHECK:       bb0([[SELF:%.*]] : $C):
+  // CHECK:         [[MARKED_SELF:%.*]] = mark_uninitialized [rootself] [[SELF]]
+  // CHECK-NOT:     [[SELF]]
+  // CHECK-NOT:     strong_retain [[MARKED_SELF]]
+  // CHECK-NOT:     strong_release [[MARKED_SELF]]
+  // CHECK:         return [[MARKED_SELF]]
+
+  // @objc thunk for initializing constructor
+  // CHECK-LABEL: sil hidden @_TToFC15guaranteed_self1CcfMS0_FT_S0_ : $@cc(objc_method) @thin (@owned C) -> @owned C
+  // CHECK:       bb0([[SELF:%.*]] : $C):
+  // CHECK-NOT:     retain{{.*}} [[SELF]]
+  // CHECK:         [[SELF2:%.*]] = apply {{%.*}}([[SELF]])
+  // CHECK-NOT:     release{{.*}} [[SELF]]
+  // CHECK-NOT:     release{{.*}} [[SELF2]]
+  // CHECK:         return [[SELF2]]
+  @objc required init() {}
+
+
+  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1C3foofS0_FSiT_ : $@cc(method) @thin (Int, @guaranteed C) -> ()
+  // CHECK:       bb0({{.*}} [[SELF:%.*]] : $C):
+  // CHECK:         retain{{.*}} [[SELF]]
+  // CHECK:         release{{.*}} [[SELF]]
+  // CHECK-NOT:     release{{.*}} [[SELF]]
+
+  // CHECK-LABEL: sil hidden @_TToFC15guaranteed_self1C3foofS0_FSiT_ : $@cc(objc_method) @thin (Int, C) -> () {
+  // TODO: Not balanced
+  // CHECK:       bb0({{.*}} [[SELF:%.*]] : $C):
+  // CHECK:         retain{{.*}} [[SELF]]
+  // CHECK:         apply {{.*}} [[SELF]]
+  // TODO CHECK-NOT:     release{{.*}} [[SELF]]
+  // CHECK:       }
   @objc func foo(x: Int) {
     self.foo(x)
   }
@@ -293,5 +333,11 @@ class C: Fooable, Barrable {
   @objc var prop3: Int {
     get { return 0 }
     set {}
+  }
+}
+
+class D: C {
+  required init() {
+    super.init()
   }
 }
