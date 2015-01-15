@@ -75,6 +75,7 @@ public:
           if (PinDef && AvailablePins.count(PinDef)){
             SmallVector<MarkDependenceInst *, 8> MarkDependentInsts;
             if (areSafePinUsers(PinDef, Unpin, MarkDependentInsts)) {
+              Changed = true;
               auto NewDep = PinDef->getOperand();
               for (auto &MD : MarkDependentInsts)
                 MD->setOperand(1, NewDep);
