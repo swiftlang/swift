@@ -1567,7 +1567,7 @@ static SILValue getWitnessFunctionRef(SILGenFunction &gen,
 
 static bool isTransparent(SILValue v) {
   if (auto fnRef = dyn_cast<FunctionRefInst>(v))
-    return fnRef->getFunction()->isTransparent();
+    return fnRef->getReferencedFunction()->isTransparent();
   
   return false;
 }

@@ -1,4 +1,5 @@
 // RUN: %swift -parse-stdlib -emit-sil %s | FileCheck %s
+// RUN: %swift -parse-stdlib -emit-silgen %s | FileCheck %s -check-prefix=SILGEN
 
 import Swift
 
@@ -165,25 +166,38 @@ struct D : Subscriptable {
   }
 }
 // Setter.
-// CHECK: sil hidden [transparent] @_TFV10addressors1Ds9subscriptFSiSi
-// CHECK: bb0([[VALUE:%.*]] : $Int, [[I:%.*]] : $Int, [[SELF:%.*]] : $*D):
-// CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFSiSi
-// CHECK:   [[PTR:%.*]] = apply [[T0]]([[I]], [[SELF]])
-// CHECK:   [[T0:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int>,
-// CHECK:   [[ADDR:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int
-// CHECK:   store [[VALUE]] to [[ADDR]] : $*Int
+// SILGEN: sil hidden [transparent] @_TFV10addressors1Ds9subscriptFSiSi
+// SILGEN: bb0([[VALUE:%.*]] : $Int, [[I:%.*]] : $Int, [[SELF:%.*]] : $*D):
+// SILGEN:   debug_value [[VALUE]] : $Int
+// SILGEN:   debug_value [[I]] : $Int
+// SILGEN:   [[BOX:%.*]] = alloc_box $D
+// SILGEN:   copy_addr [[SELF]] to [initialization] [[BOX]]#1 : $*D     // id: %6
+// SILGEN:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFSiSi{{.*}}
+// SILGEN:   [[PTR:%.*]] = apply [[T0]]([[I]], [[BOX]]#1)
+// SILGEN:   [[T0:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int>,
+// SILGEN:   [[ADDR:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int
+// SILGEN:   assign [[VALUE]] to [[ADDR]] : $*Int
 
 // materializeForSet.
-// CHECK: sil hidden [transparent] @_TFV10addressors1Dm9subscriptFSiSi
-// CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[I:%.*]] : $Int, [[SELF:%.*]] : $*D):
-// CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFSiSi
-// CHECK:   [[PTR:%.*]] = apply [[T0]]([[I]], [[SELF]])
-// CHECK:   [[ADDR:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int>,
-// CHECK:   [[TMP:%.*]] = alloc_stack $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>
-// CHECK:   inject_enum_addr [[TMP]]#1 : $*Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>, #Optional.None
-// CHECK:   [[T1:%.*]] = load [[TMP]]#1
-// CHECK:   [[T2:%.*]] = tuple ([[ADDR]] : $Builtin.RawPointer, [[T1]] : $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>)
-// CHECK:   return [[T2]] :
+// SILGEN: sil hidden [transparent] @_TFV10addressors1Dm9subscriptFSiSi
+// SILGEN: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[I:%.*]] : $Int, [[SELF:%.*]] : $*D):
+// SILGEN:   debug_value [[BUFFER]]
+// SILGEN:   debug_value [[I]]
+// SILGEN:   [[BOX:%.*]] = alloc_box $D
+// SILGEN:   copy_addr [[SELF]] to [initialization] [[BOX]]#1 : $*D
+// SILGEN:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFSiSi
+// SILGEN:   [[PTR:%.*]] = apply [[T0]]([[I]], [[BOX]]#1)
+// SILGEN:   [[ADDR:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int>,
+// SILGEN:   [[INIT:%.*]] = function_ref @_TFSqCU__fMGSqQ__FT10nilLiteralT__GSqQ__
+// SILGEN:   [[META:%.*]] = metatype $@thin Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>.Type
+// SILGEN:   [[T0:%.*]] = alloc_stack $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>
+// SILGEN:   [[OPT:%.*]] = apply [transparent] [[INIT]]<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>([[T0]]#1, [[META]])
+// SILGEN:   [[T1:%.*]] = load [[T0]]#1
+// SILGEN:   [[T2:%.*]] = tuple ([[ADDR]] : $Builtin.RawPointer, [[T1]] : $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>)
+// SILGEN:   dealloc_stack [[T0]]#0
+// SILGEN:   copy_addr [[BOX]]#1 to [[SELF]]
+// SILGEN:   strong_release [[BOX]]#0
+// SILGEN:   return [[T2]] :
 
 func make_int() -> Int { return 0 }
 func take_int_inout(inout value: Int) {}
