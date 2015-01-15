@@ -309,12 +309,11 @@ class C: Fooable, Barrable {
   // CHECK-NOT:     release{{.*}} [[SELF]]
 
   // CHECK-LABEL: sil hidden @_TToFC15guaranteed_self1C3foofS0_FSiT_ : $@cc(objc_method) @thin (Int, C) -> () {
-  // TODO: Not balanced
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $C):
   // CHECK:         retain{{.*}} [[SELF]]
   // CHECK:         apply {{.*}} [[SELF]]
-  // TODO CHECK-NOT:     release{{.*}} [[SELF]]
-  // CHECK:       }
+  // CHECK:         release{{.*}} [[SELF]]
+  // CHECK-NOT:     release{{.*}} [[SELF]]
   @objc func foo(x: Int) {
     self.foo(x)
   }
@@ -325,6 +324,20 @@ class C: Fooable, Barrable {
     self.bas()
   }
 
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC15guaranteed_self1Cg5prop1Si : $@cc(objc_method) @thin (C) -> Int
+  // CHECK:       bb0([[SELF:%.*]] : $C):
+  // CHECK:         retain{{.*}} [[SELF]]
+  // CHECK:         apply {{.*}}([[SELF]])
+  // CHECK:         release{{.*}} [[SELF]]
+  // CHECK-NOT:     release{{.*}} [[SELF]]
+
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC15guaranteed_self1Cs5prop1Si : $@cc(objc_method) @thin (Int, C) -> ()
+  // CHECK:       bb0({{.*}} [[SELF:%.*]] : $C):
+  // CHECK:         retain{{.*}} [[SELF]]
+  // CHECK:         apply {{.*}} [[SELF]]
+  // CHECK:         release{{.*}} [[SELF]]
+  // CHECK-NOT:     release{{.*}} [[SELF]]
+  // CHECK:       }
   @objc var prop1: Int = 0
   @objc var prop2: Int {
     get { return 0 }
