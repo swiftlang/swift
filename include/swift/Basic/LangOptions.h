@@ -145,6 +145,10 @@ namespace swift {
       return TargetConfigOptions;
     }
 
+    ArrayRef<std::string> getBuildConfigOptions() const {
+      return BuildConfigOptions;
+    }
+
   private:
     llvm::SmallVector<std::pair<std::string, std::string>, 2>
         TargetConfigOptions; 
