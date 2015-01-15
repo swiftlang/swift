@@ -368,7 +368,7 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
 static bool shouldImportFunction(SILFunction *F) {
   // Skip functions that are marked with the 'no import' tag. These
   // are functions that we don't want to copy from the module.
-  if (F->hasSemanticsString("stdlib.noimport"))
+  if (F->hasSemanticsString("stdlib_binary_only"))
     return false;
 
   return true;

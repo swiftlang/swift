@@ -102,7 +102,7 @@ func _adHocPrint<T, TargetStream : OutputStreamType>(
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
 @inline(never)
-@semantics("stdlib.noimport")
+@semantics("stdlib_binary_only")
 public func print<T, TargetStream : OutputStreamType>(
     object: T, inout target: TargetStream
 ) {
@@ -134,7 +134,7 @@ public func print<T, TargetStream : OutputStreamType>(
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
 @inline(never)
-@semantics("stdlib.noimport")
+@semantics("stdlib_binary_only")
 public func println<T, TargetStream : OutputStreamType>(
     object: T, inout target: TargetStream
 ) {
@@ -151,7 +151,7 @@ public func println<T, TargetStream : OutputStreamType>(
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
 @inline(never)
-@semantics("stdlib.noimport")
+@semantics("stdlib_binary_only")
 public func print<T>(object: T) {
   var stdoutStream = _Stdout()
   print(object, &stdoutStream)
@@ -167,7 +167,7 @@ public func print<T>(object: T) {
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
 @inline(never)
-@semantics("stdlib.noimport")
+@semantics("stdlib_binary_only")
 public func println<T>(object: T) {
   var stdoutStream = _Stdout()
   print(object, &stdoutStream)
@@ -176,7 +176,7 @@ public func println<T>(object: T) {
 
 /// Writes a single newline character into the standard output.
 @inline(never)
-@semantics("stdlib.noimport")
+@semantics("stdlib_binary_only")
 public func println() {
   var stdoutStream = _Stdout()
   stdoutStream.write("\n")
