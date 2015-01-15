@@ -342,6 +342,16 @@ public:
   /// The main entry point of the optimization.
   bool eliminateDeadFunctions() {
     
+    bool CallGraphChanged = false;
+
+    // If this pass running as a late pass, remove external definitions.
+    // Doing it before dead functions elimination would also create
+    // more opportunities for dead function removal, because function
+    // references from bodies of external functions do not need to be
+    // taken into account any more.
+    if (isLate)
+      CallGraphChanged |= removeExternalDefinitions();
+
     DEBUG(llvm::dbgs() << "running dead function elimination\n");
     
     // Find everything which may not be eliminated, e.g. because it is accessed
@@ -367,7 +377,6 @@ public:
     }
 
     // Next step: delete all dead functions.
-    bool CallGraphChanged = false;
     for (auto FI = Module->begin(), EI = Module->end(); FI != EI;) {
       SILFunction *F = FI++;
       if (!isAlive(F)) {
@@ -377,10 +386,6 @@ public:
         CallGraphChanged = true;
       }
     }
-
-    // If this pass running as a late pass, remove external definitions.
-    if (isLate)
-      CallGraphChanged |= removeExternalDefinitions();
 
     return CallGraphChanged;
   }
