@@ -240,7 +240,7 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
   public func _asCocoaArray() -> _NSArrayCoreType {
     _sanityCheck(
         _isBridgedToObjectiveC(T.self),
-        "Array element type is not bridged to ObjectiveC")
+        "Array element type is not bridged to Objective-C")
     if count == 0 {
       return _SwiftDeferredNSArray(
         _nativeStorage: _emptyArrayStorage)

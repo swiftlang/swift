@@ -80,7 +80,7 @@ extension _ArrayBuffer {
   public func _asCocoaArray() -> _NSArrayCoreType {
     _sanityCheck(
       _isBridgedToObjectiveC(T.self),
-      "Array element type is not bridged to ObjectiveC")
+      "Array element type is not bridged to Objective-C")
 
     return _fastPath(_isNative) ? _native._asCocoaArray() : _nonNative
   }
