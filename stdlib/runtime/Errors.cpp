@@ -32,6 +32,18 @@
 #include <CrashReporterClient.h>
 #include <malloc/malloc.h>
 
+// Instead of linking to CrashReporterClient.a (because it complicates the
+// build system), define the only symbol from that static archive ourselves.
+//
+// The layout of this struct is CrashReporter ABI, so there are no ABI concerns
+// here.
+extern "C" {
+CRASH_REPORTER_CLIENT_HIDDEN
+struct crashreporter_annotations_t gCRAnnotations
+    __attribute__((section("__DATA," CRASHREPORTER_ANNOTATIONS_SECTION))) = {
+        CRASHREPORTER_ANNOTATIONS_VERSION, 0, 0, 0, 0, 0, 0};
+}
+
 // Report a message to any forthcoming crash log.
 static void
 reportOnCrash(const char *message)

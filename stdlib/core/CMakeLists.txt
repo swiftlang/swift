@@ -137,10 +137,6 @@ else()
   list(APPEND swift_core_private_link_libraries swiftRuntime)
 endif()
 
-if(SWIFT_HAVE_CRASH_REPORTER_CLIENT)
-  list(APPEND swift_core_private_link_libraries "CrashReporterClient")
-endif()
-
 option(SWIFT_CHECK_ESSENTIAL_STDLIB
     "Check core standard library layering by linking its essential subset"
     FALSE)
