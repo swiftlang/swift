@@ -52,6 +52,95 @@ extension Float80 {
 
 var FloatingPoint = TestSuite("FloatingPoint")
 
+// Tests the float and int conversions work correctly. Each case is special.
+FloatingPoint.test("Float/UInt8") {
+  expectEqual(UInt8.min, UInt8(Float(UInt8.min)))
+  expectEqual(UInt8.max, UInt8(Float(UInt8.max)))
+}
+
+FloatingPoint.test("Float/Int8") {
+  expectEqual(Int8.min, Int8(Float(Int8.min)))
+  expectEqual(Int8.max, Int8(Float(Int8.max)))
+}
+
+FloatingPoint.test("Float/UInt16") {
+  expectEqual(UInt16.min, UInt16(Float(UInt16.min)))
+  expectEqual(UInt16.max, UInt16(Float(UInt16.max)))
+}
+
+FloatingPoint.test("Float/Int16") {
+  expectEqual(Int16.min, Int16(Float(Int16.min)))
+  expectEqual(Int16.max, Int16(Float(Int16.max)))
+}
+
+FloatingPoint.test("Float/UInt32") {
+  expectEqual(UInt32.min, UInt32(Float(UInt32.min)))
+  expectCrashLater()
+  expectEqual(UInt32.max, UInt32(Float(UInt32.max)))
+}
+
+FloatingPoint.test("Float/Int32") {
+  expectEqual(Int32.min, Int32(Float(Int32.min)))
+  expectCrashLater()
+  expectEqual(Int32.max, Int32(Float(Int32.max)))
+}
+
+FloatingPoint.test("Float/UInt64") {
+  expectEqual(UInt64.min, UInt64(Float(UInt64.min)))
+  expectCrashLater()
+  expectEqual(UInt64.max, UInt64(Float(UInt64.max)))
+}
+
+FloatingPoint.test("Float/Int64") {
+  expectEqual(Int64.min, Int64(Float(Int64.min)))
+  expectCrashLater()
+  expectEqual(Int64.max, Int64(Float(Int64.max)))
+}
+
+FloatingPoint.test("Double/UInt8") {
+  expectEqual(UInt8.min, UInt8(Double(UInt8.min)))
+  expectEqual(UInt8.max, UInt8(Double(UInt8.max)))
+}
+
+FloatingPoint.test("Double/Int8") {
+  expectEqual(Int8.min, Int8(Double(Int8.min)))
+  expectEqual(Int8.max, Int8(Double(Int8.max)))
+}
+
+FloatingPoint.test("Double/UInt16") {
+  expectEqual(UInt16.min, UInt16(Double(UInt16.min)))
+  expectEqual(UInt16.max, UInt16(Double(UInt16.max)))
+}
+
+FloatingPoint.test("Double/Int16") {
+  expectEqual(Int16.min, Int16(Double(Int16.min)))
+  expectEqual(Int16.max, Int16(Double(Int16.max)))
+}
+
+FloatingPoint.test("Double/UInt32") {
+  expectEqual(UInt32.min, UInt32(Double(UInt32.min)))
+  expectEqual(UInt32.max, UInt32(Double(UInt32.max)))
+}
+
+FloatingPoint.test("Double/Int32") {
+  expectEqual(Int32.min, Int32(Double(Int32.min)))
+  expectEqual(Int32.max, Int32(Double(Int32.max)))
+}
+
+FloatingPoint.test("Double/UInt64") {
+  expectEqual(UInt64.min, UInt64(Double(UInt64.min)))
+  expectCrashLater()
+  expectEqual(UInt64.max, UInt64(Double(UInt64.max)))
+}
+
+FloatingPoint.test("Double/Int64") {
+  expectEqual(Int64.min, Int64(Double(Int64.min)))
+  expectCrashLater()
+  expectEqual(Int64.max, Int64(Double(Int64.max)))
+}
+
+// FIXME: implement Float80 tests after Float80 is implemented.
+
 FloatingPoint.test("Float32/Literals") {
   if true {
     let f: Float32 = 0.0

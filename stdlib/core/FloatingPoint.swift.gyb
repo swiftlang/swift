@@ -113,6 +113,53 @@ def getInfinityExponent(bits):
         return '0x7ff'
     return 'error'
 
+def mantissaOffset(floatBits):
+    if floatBits == 32:
+        return 23
+    if floatBits == 64:
+        return 52
+    if floatBits == 80:
+        return 63
+
+def intFormatFix(bits):
+    if bits == 'Int':
+        return int(CMAKE_SIZEOF_VOID_P) * 8
+    return bits
+
+def positivePrefix(floatBits):
+    return 0b1 << (floatBits - 2)
+
+def positiveExponent(floatBits, intBits):
+    return ((intBits - 3) << mantissaOffset(floatBits))
+
+def mantissaBits(floatBits, intBits):
+    offset = mantissaOffset(floatBits)
+    if intBits > offset:
+        return ((1 << intBits) - 4) >> (intBits - offset)
+    else:
+        return ((1 << intBits) - 4) << (offset - intBits)
+
+def getMaxFloat(floatBits, intBits):
+    maxFloat = (positivePrefix(floatBits) +
+        positiveExponent(floatBits, intBits) + mantissaBits(floatBits, intBits))
+    return "0x%0.x" % maxFloat
+
+def negativePrefix(floatBits):
+    return 0b11 << (floatBits - 2)
+
+def negativeExponent(floatBits, intBits):
+    return ((intBits - 2) << mantissaOffset(floatBits))
+
+def getMinFloat(floatBits, intBits):
+    minFloat = negativePrefix(floatBits) + negativeExponent(floatBits, intBits)
+    return "0x%0.x" % minFloat
+
+def incIfSigned(bits, signed):
+    if not(signed):
+        return bits + 1
+    else:
+        return bits
+
 }%
 
 % for bits in allFloatBits:
@@ -554,11 +601,19 @@ extension ${Self} {
     _precondition(
       other.isFinite,
       "floating point value can not be converted to ${Self} because it is either infinite or NaN")
+    // FIXME: Float80 doesn't have a _fromBitPattern
+    // ${That}(roundTowardsZero: ${Self}.min)
+    // > ${getMinFloat(srcBits, incIfSigned(intFormatFix(bits), signed))}
+    _precondition(other >= ${That}._fromBitPattern(${getMinFloat(srcBits,
+      incIfSigned(intFormatFix(bits), signed))}),
+      "floating point value can not be converted to ${Self} because it is less than ${Self}.min")
+    // ${That}(roundTowardsZero: ${Self}.max)
+    // > ${getMaxFloat(srcBits, incIfSigned(intFormatFix(bits), signed))}
+    _precondition(other <= ${That}._fromBitPattern(${getMaxFloat(srcBits,
+      incIfSigned(intFormatFix(bits), signed))}),
+      "floating point value can not be converted to ${Self} because it is greater than ${Self}.max")
+
 %     end
-    _precondition(other >= ${That}(${Self}.min),
-        "floating point value can not be converted to ${Self} because it is less than ${Self}.min")
-    _precondition(other <= ${That}(${Self}.max),
-        "floating point value can not be converted to ${Self} because it is greater than ${Self}.max")
     value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(other.value)
   }
 
