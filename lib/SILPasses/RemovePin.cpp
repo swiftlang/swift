@@ -114,12 +114,35 @@ public:
     return true;
   }
 
+  /// Certain semantic functions are generally safe because they don't release
+  /// the array in unexpected ways.
+  bool isSafeArraySemanticFunction(SILInstruction *I) {
+    ArraySemanticsCall Call(I);
+    if (!Call)
+      return false;
+    switch (Call.getKind()) {
+    default:
+      return false;
+
+    case ArrayCallKind::kArrayPropsNeedsTypeCheck:
+    case ArrayCallKind::kCheckSubscript:
+    case ArrayCallKind::kCheckIndex:
+    case ArrayCallKind::kGetCount:
+    case ArrayCallKind::kGetCapacity:
+    case ArrayCallKind::kGetElement:
+    case ArrayCallKind::kGetElementAddress:
+    case ArrayCallKind::kMakeMutable:
+      return true;
+    }
+  }
+
   /// Removes available pins that could be released by executing of 'I'.
   void invalidateAvailablePins(SILInstruction *I) {
     // Collect pins that we have to clear because they might have been released.
     SmallVector<SILInstruction *, 16> RemovePin;
     for (auto *P : AvailablePins) {
-      if (arc::canDecrementRefCount(I, P, AA))
+      if (!isSafeArraySemanticFunction(I) &&
+          arc::canDecrementRefCount(I, P, AA))
           RemovePin.push_back(P);
     }
 
