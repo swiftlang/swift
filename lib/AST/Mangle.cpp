@@ -192,14 +192,8 @@ void Mangler::mangleContextOf(const ValueDecl *decl, BindGenerics shouldBind) {
     }
   }
 
-  // Local type declarations can skip up to the module, since they are
-  // already uniqued by the file in which they appear and a file-local counter,
-  // limiting the length of types declared in multiply nested local scopes.
-  if (dyn_cast<TypeDecl>(decl) && decl->getDeclContext()->isLocalContext())
-    mangleContext(decl->getModuleContext(), shouldBind);
-  else
-    // Just mangle the decl's DC.
-    mangleContext(decl->getDeclContext(), shouldBind);
+  // Just mangle the decl's DC.
+  mangleContext(decl->getDeclContext(), shouldBind);
 }
 
 namespace {
@@ -325,8 +319,6 @@ void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {
     }
     llvm_unreachable("bad initializer kind");
 
-  case DeclContextKind::LocalDecl:
-      return mangleModule(ctx->getParentModule());
   case DeclContextKind::TopLevelCodeDecl:
     // Mangle the containing module context.
     return mangleContext(ctx->getParent(), shouldBind);
@@ -436,23 +428,9 @@ static OperatorFixity getDeclFixity(const ValueDecl *decl) {
 
 void Mangler::mangleDeclName(const ValueDecl *decl) {
   if (decl->getDeclContext()->isLocalContext()) {
-    // Mangle local declarations with a hash of the containing
-    // source file's basename and a unique numeric discriminator.
-    // decl-name ::= 'L' identifier index identifier
-
-    auto fileUnit = decl->getDeclContext()->getParentFileUnit();
-    auto discriminator = fileUnit->getDiscriminatorForLocalValue(decl);
-
-    assert(!discriminator.empty());
-    assert(!isNonAscii(discriminator.str()) &&
-           "discriminator contains non-ASCII characters");
-    assert(!clang::isDigit(discriminator.str().front()) &&
-           "not a valid identifier");
-
-    Buffer << 'L';
-    mangleIdentifier(discriminator);
-    Buffer << Index(decl->getLocalDiscriminator());
-
+    // Mangle local declarations with a numeric discriminator.
+    // decl-name ::= 'L' index identifier
+    Buffer << 'L' << Index(decl->getLocalDiscriminator());
     // Fall through to mangle the <identifier>.
 
   } else if (UsePrivateDiscriminators && decl->hasAccessibility() &&

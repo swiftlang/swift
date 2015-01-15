@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 167; // Last change: local type serialization
+const uint16_t VERSION_MINOR = 166; // Last change: non-native owning addressor
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -1242,8 +1242,6 @@ namespace index_block {
     /// Objective-C selectors to the methods/initializers/properties/etc. that
     /// produce Objective-C methods.
     OBJC_METHODS,
-
-    LOCAL_TYPE_DECLS,
   };
 
   using OffsetsLayout = BCGenericRecordLayout<

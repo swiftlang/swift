@@ -672,7 +672,6 @@ public:
   static StringRef getDescriptiveKindName(DescriptiveDeclKind K);
 
   DeclContext *getDeclContext() const { return Context; }
-  const DeclContext *getDeclContextForSerialization() const;
   void setDeclContext(DeclContext *DC);
 
   /// Retrieve the innermost declaration context corresponding to this
@@ -1918,7 +1917,6 @@ public:
   }
 
   bool hasName() const { return bool(Name); }
-
   /// TODO: Rename to getSimpleName?
   Identifier getName() const { return Name.getBaseName(); }
   bool isOperator() const { return Name.isOperator(); }

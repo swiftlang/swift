@@ -38,6 +38,13 @@ private struct PrivateStruct {
   }
 }
 
+func localTypes() {
+  struct LocalStruct {
+    // CHECK-LABEL: sil shared @_TFVF16mangling_private10localTypesFT_T_L_11LocalStruct13privateMethodfMS0_FT_T_
+    private static func privateMethod() {}
+  }
+}
+
 extension PublicStruct {
   // CHECK-LABEL: sil private @_TFV16mangling_private12PublicStructP33_A3CCBB841DB59E79A4AD4EE45865506816extPrivateMethodfS0_FT_T_
   private func extPrivateMethod() {}

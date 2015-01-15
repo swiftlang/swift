@@ -21,7 +21,6 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
-#include "swift/AST/Mangle.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
@@ -33,7 +32,10 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/MD5.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -140,7 +142,7 @@ public:
   
   void lookupValue(AccessPathTy AccessPath, DeclName Name,
                    NLKind LookupKind, SmallVectorImpl<ValueDecl*> &Result);
-
+  
   void lookupVisibleDecls(AccessPathTy AccessPath,
                           VisibleDeclConsumer &Consumer,
                           NLKind LookupKind);
@@ -430,18 +432,6 @@ void Module::lookupValue(AccessPathTy AccessPath, DeclName Name,
   FORWARD(lookupValue, (AccessPath, Name, LookupKind, Result));
 }
 
-TypeDecl *Module::lookupLocalType(StringRef FileHash,
-                                  unsigned LocalDiscriminator,
-                                  StringRef Name) const {
-  for(auto file : getFiles()) {
-    auto localTypeDecl = file->lookupLocalType(FileHash, LocalDiscriminator,
-                                               Name);
-    if (localTypeDecl)
-      return localTypeDecl;
-  }
-  return nullptr;
-}
-
 void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
                           DeclContext *container, DeclName name,
                           Identifier privateDiscriminator) const {
@@ -453,7 +443,6 @@ void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   case DeclContextKind::Initializer:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
-  case DeclContextKind::LocalDecl:
     llvm_unreachable("This context does not support lookup.");
 
   case DeclContextKind::FileUnit:
@@ -605,16 +594,8 @@ void Module::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   FORWARD(getTopLevelDecls, (Results));
 }
 
-void Module::getLocalTypeDecls(SmallVectorImpl<Decl*> &Results) const {
-  FORWARD(getLocalTypeDecls, (Results));
-}
-
 void SourceFile::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   Results.append(Decls.begin(), Decls.end());
-}
-
-void SourceFile::getLocalTypeDecls(SmallVectorImpl<Decl*> &Results) const {
-  Results.append(LocalTypeDecls.begin(), LocalTypeDecls.end());
 }
 
 void Module::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
@@ -1392,48 +1373,6 @@ bool FileUnit::forAllVisibleModules(
   return true;
 }
 
-Identifier FileUnit::getDiscriminator() const {
-  if (Discriminator.get() != nullptr)
-    return Discriminator;
-
-  StringRef name = getFilename();
-  if (name.empty()) {
-    assert(1 == std::count_if(getParentModule()->getFiles().begin(),
-      getParentModule()->getFiles().end(),
-      [](const FileUnit *FU) -> bool {
-        return isa<SourceFile>(FU) && FU->getFilename().empty();
-      }) && "can't promise uniqueness if multiple source files are nameless");
-
-    // We still need a discriminator, so keep going.
-  }
-
-  // Use a hash of the basename of the source file as our discriminator.
-  // This keeps us from leaking information about the original filename
-  // while still providing uniqueness. Using the basename makes the
-  // discriminator invariant across source checkout locations.
-  // FIXME: Use a faster hash here? We don't need security, just uniqueness.
-  llvm::MD5 hash;
-  hash.update(getParentModule()->Name.str());
-  hash.update(llvm::sys::path::filename(name));
-  llvm::MD5::MD5Result result;
-  hash.final(result);
-
-  // Make sure the whole thing is a valid identifier.
-  SmallString<33> buffer{"_"};
-
-  // Write the hash as a hex string.
-  // FIXME: This should go into llvm/ADT/StringExtras.h.
-  // FIXME: And there are more compact ways to encode a 16-byte value.
-  buffer.reserve(buffer.size() + 2*llvm::array_lengthof(result));
-  for (uint8_t byte : result) {
-    buffer.push_back(llvm::hexdigit(byte >> 4, /*lowercase=*/false));
-    buffer.push_back(llvm::hexdigit(byte & 0xF, /*lowercase=*/false));
-  }
-
-  Discriminator = getASTContext().getIdentifier(buffer);
-  return Discriminator;
-}
-
 void Module::collectLinkLibraries(LinkLibraryCallback callback) {
   // FIXME: The proper way to do this depends on the decls used.
   FORWARD(collectLinkLibraries, (callback));
@@ -1596,7 +1535,46 @@ ArtificialMainKind SourceFile::getArtificialMainKind() const {
 Identifier
 SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   assert(D->getDeclContext()->getModuleScopeContext() == this);
-  return getDiscriminator();
+
+  if (!PrivateDiscriminator.empty())
+    return PrivateDiscriminator;
+
+  StringRef name = getFilename();
+  if (name.empty()) {
+    assert(1 == std::count_if(getParentModule()->getFiles().begin(),
+                              getParentModule()->getFiles().end(),
+                              [](const FileUnit *FU) -> bool {
+      return isa<SourceFile>(FU) && cast<SourceFile>(FU)->getFilename().empty();
+    }) && "can't promise uniqueness if multiple source files are nameless");
+
+    // We still need a discriminator, so keep going.
+  }
+
+  // Use a hash of the basename of the source file as our discriminator.
+  // This keeps us from leaking information about the original filename
+  // while still providing uniqueness. Using the basename makes the
+  // discriminator invariant across source checkout locations.
+  // FIXME: Use a faster hash here? We don't need security, just uniqueness.
+  llvm::MD5 hash;
+  hash.update(getParentModule()->Name.str());
+  hash.update(llvm::sys::path::filename(name));
+  llvm::MD5::MD5Result result;
+  hash.final(result);
+
+  // Make sure the whole thing is a valid identifier.
+  SmallString<33> buffer{"_"};
+
+  // Write the hash as a hex string.
+  // FIXME: This should go into llvm/ADT/StringExtras.h.
+  // FIXME: And there are more compact ways to encode a 16-byte value.
+  buffer.reserve(buffer.size() + 2*llvm::array_lengthof(result));
+  for (uint8_t byte : result) {
+    buffer.push_back(llvm::hexdigit(byte >> 4, /*lowercase=*/false));
+    buffer.push_back(llvm::hexdigit(byte & 0xF, /*lowercase=*/false));
+  }
+
+  PrivateDiscriminator = getASTContext().getIdentifier(buffer);
+  return PrivateDiscriminator;
 }
 
 TypeRefinementContext *SourceFile::getTypeRefinementContext() {
@@ -1610,6 +1588,10 @@ TypeRefinementContext *SourceFile::getTypeRefinementContext() {
 void FileUnit::anchor() {}
 void *FileUnit::operator new(size_t Bytes, ASTContext &C, unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
+}
+
+StringRef LoadedFile::getFilename() const {
+  return "";
 }
 
 StringRef ModuleEntity::getName() const {

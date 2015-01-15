@@ -143,7 +143,6 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
       Buffer << cast<Module>(Context)->Name << ".";
     return;
 
-  case DeclContextKind::LocalDecl:
   case DeclContextKind::FileUnit:
     // Ignore the file; just print the module.
     printFullContext(Context->getParent(), Buffer);

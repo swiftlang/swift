@@ -1371,12 +1371,8 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
   if (!CurLocalContext || !D->getDeclContext()->isLocalContext())
     return;
 
-  if (auto type = dyn_cast<TypeDecl>(D))
-    SF.LocalTypeDecls.push_back(type);
-
   Identifier name = D->getName();
-  auto SF = D->getDeclContext()->getParentSourceFile();
-  auto discriminator = SF->claimNextNamedDiscriminator(name);
+  unsigned discriminator = CurLocalContext->claimNextNamedDiscriminator(name);
   D->setLocalDiscriminator(discriminator);
 }
 

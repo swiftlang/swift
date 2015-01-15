@@ -73,7 +73,7 @@ func stringToPointer(s: String) {
   // CHECK: release_value [[OWNER]]
 }
 
-// CHECK-LABEL: sil hidden @_TF18pointer_conversion14inoutToPointerFT_T_
+// CHECK-LABEL: sil hidden @_TF18pointer_conversion14inoutToPointerFT_T_ 
 func inoutToPointer() {
   var int = 0
   // CHECK: [[INT:%.*]] = alloc_box $Int
@@ -90,12 +90,12 @@ func inoutToPointer() {
   }
   takesMutablePointer(&logicalInt)
   // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @_TF18pointer_conversion19takesMutablePointerFGVSs20UnsafeMutablePointerSi_T_
-  // CHECK: [[GETTER:%.*]] = function_ref @_TFF18pointer_conversion14inoutToPointerFT_T_gL33_3150ED568C8675E08D3AC27DE97F7952_10logicalIntSi
+  // CHECK: [[GETTER:%.*]] = function_ref @_TFF18pointer_conversion14inoutToPointerFT_T_gL_10logicalIntSi
   // CHECK: apply [[GETTER]]
   // CHECK: [[CONVERT:%.*]] = function_ref @_TFSs30_convertInOutToPointerArgumentUSs12_PointerType__FBpQ_
   // CHECK: apply [transparent] [[CONVERT]]<UnsafeMutablePointer<Int>>
   // CHECK: apply [[TAKES_MUTABLE]]
-  // CHECK: [[SETTER:%.*]] = function_ref @_TFF18pointer_conversion14inoutToPointerFT_T_sL33_3150ED568C8675E08D3AC27DE97F7952_10logicalIntSi
+  // CHECK: [[SETTER:%.*]] = function_ref @_TFF18pointer_conversion14inoutToPointerFT_T_sL_10logicalIntSi
   // CHECK: apply [[SETTER]]
 }
 

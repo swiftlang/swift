@@ -74,7 +74,6 @@ enum class ActionType {
   PrintModuleComments,
   PrintModuleImports,
   PrintUSRs,
-  PrintLocalTypeDecl,
   ParseReST,
   TestCreateCompilerInvocation,
   GenerateModuleAPIDescription,
@@ -167,9 +166,6 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
            clEnumValN(ActionType::DiffModuleAPI,
                       "diff-module-api",
                       "Compare machine-readable descriptions of module API"),
-           clEnumValN(ActionType::PrintLocalTypeDecl,
-                      "print-local-type-decl",
-                      "prints the AST under a local type"),
            clEnumValEnd));
 
 static llvm::cl::opt<std::string>
@@ -300,11 +296,6 @@ ExplodePatternBindingDecls(
 static llvm::cl::opt<std::string>
 MangledNameToFind("find-mangled",
     llvm::cl::desc("Print the entity with the given mangled name"));
-
-static llvm::cl::list<std::string>
-LocalMangledNames("find-local-mangled",
-              llvm::cl::desc("Print the local decl with the given mangled name"));
-
 
 // Module printing options.
 
@@ -1077,120 +1068,6 @@ static Module *getModuleByFullName(ASTContext &Context, StringRef ModuleName) {
 
 static Module *getModuleByFullName(ASTContext &Context, Identifier ModuleName) {
   return Context.getModule(std::make_pair(ModuleName, SourceLoc()));
-}
-
-static int doPrintLocalTypeDecl(const CompilerInvocation &InitInvok,
-                                const std::vector<std::string> ModulesToPrint) {
-  using NodeKind = Demangle::Node::Kind;
-  CompilerInvocation Invocation(InitInvok);
-  CompilerInstance CI;
-  PrintingDiagnosticConsumer PrintDiags;
-  CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
-    return 1;
-
-  auto &Context = CI.getASTContext();
-
-  // Load standard library so that Clang importer can use it.
-  auto *Stdlib = getModuleByFullName(Context, Context.StdlibModuleName);
-  if (!Stdlib)
-    return EXIT_FAILURE;
-
-  std::unique_ptr<ASTPrinter> Printer;
-  Printer.reset(new StreamPrinter(llvm::outs()));
-
-  int ExitCode = 0;
-
-  for (auto ModuleToPrint : ModulesToPrint) {
-    auto *M = getModuleByFullName(Context, ModuleToPrint);
-    if (!M)
-      return EXIT_FAILURE;
-
-    SmallVector<Decl*, 10> LocalDecls;
-    SmallVector<std::string, 10> LocalMangledNames;
-
-
-    M->getLocalTypeDecls(LocalDecls);
-
-    for (auto a : LocalDecls) {
-      auto count = std::count_if(LocalDecls.begin(), LocalDecls.end(), [&](Decl *b) {
-        return a == b;
-      });
-      assert(count == 1);
-    }
-
-    // Automatically mangle local type decls so we can test the full
-    // mangle -> demangle -> lookup -> remangle lifecycle
-    for (auto D : LocalDecls) {
-      auto typedecl = dyn_cast<TypeDecl>(D);
-      SmallString<64> Name;
-      llvm::raw_svector_ostream Buffer(Name);
-      Mangle::Mangler Mangler(Buffer, true);
-      Mangler.mangleTypeForDebugger(typedecl->getType(), M);
-      std::string mangled = Buffer.str().str();
-      LocalMangledNames.push_back(mangled);
-    }
-
-    for (auto MangledNameToFind : LocalMangledNames) {
-      // Global
-      auto node = demangle_wrappers::demangleSymbolAsNode(MangledNameToFind);
-
-      // Type
-      node = node->getFirstChild();
-
-      // MetaType
-      node = node->getFirstChild();
-
-      // Type
-      node = node->getFirstChild();
-
-      // Nominal Type
-      node = node->getFirstChild();
-
-      switch (node->getKind()) {
-        case NodeKind::Structure:
-        case NodeKind::Class:
-        case NodeKind::Enum:
-          break;
-
-        default:
-          llvm::errs() << "Expected a nominal type node.\n";
-          return EXIT_FAILURE;
-      }
-
-      while (node->getNumChildren() > 1 && node->getNumChildren() != 3)
-        node = node->getChild(1); // local decl name
-
-      // Now look up local type.
-      if (node->getNumChildren() != 3) {
-        llvm::errs() << MangledNameToFind <<
-          " -- nominal type decl name node doesn't have 3 children?\n";
-        break;
-      }
-
-      auto TD = M->lookupLocalType(node->getChild(0)->getText(),
-                                   node->getChild(1)->getIndex(),
-                                   node->getChild(2)->getText());
-
-      if (!TD) {
-        llvm::errs() << "Couldn't find " << MangledNameToFind << "\n";
-        ExitCode = 1;
-        break;
-      }
-
-      llvm::SmallString<64> RemangledName;
-      llvm::raw_svector_ostream Buffer(RemangledName);
-      Mangle::Mangler M(Buffer);
-      M.mangleDeclType(TD, ResilienceExpansion::Minimal, 0);
-      llvm::outs() << "_Tt" << Buffer.str() << "\n";
-
-      PrintOptions Options = PrintOptions::printEverything();
-      Options.PrintAccessibility = false;
-      TD->print(llvm::outs(), Options);
-      llvm::outs() << "\n";
-    }
-  }
-  return ExitCode;
 }
 
 static int doPrintAST(const CompilerInvocation &InitInvok,
@@ -2130,7 +2007,6 @@ int main(int argc, char *argv[]) {
     break;
   }
 
-
   case ActionType::PrintModule: {
     ide::ModuleTraversalOptions TraversalOptions;
     if (options::ModulePrintSubmodules)
@@ -2153,11 +2029,6 @@ int main(int argc, char *argv[]) {
         !options::SkipPrivateStdlibDecls);
     break;
   }
-
-  case ActionType::PrintLocalTypeDecl:
-    ExitCode = doPrintLocalTypeDecl(InitInvok,
-                                    options::ModuleToPrint);
-    break;
 
   case ActionType::PrintTypes:
     ExitCode = doPrintTypes(InitInvok, options::SourceFilename,

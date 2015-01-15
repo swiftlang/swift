@@ -1335,9 +1335,6 @@ DeclContext *ModuleFile::getDeclContext(DeclID DID) {
   if (DID == 0)
     return FileContext;
 
-  if (DID == 1)
-    return FileContext->getDummyLocalContext();
-
   Decl *D = getDecl(DID);
 
   if (auto ND = dyn_cast<NominalTypeDecl>(D))
@@ -1585,11 +1582,11 @@ T *ModuleFile::createDecl(Args &&... args) {
 }
 
 Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
-  if (DID == 0 || DID == 1)
+  if (DID == 0)
     return nullptr;
 
-  assert(DID <= (Decls.size() + 1) && "invalid decl ID");
-  auto &declOrOffset = Decls[DID-2];
+  assert(DID <= Decls.size() && "invalid decl ID");
+  auto &declOrOffset = Decls[DID-1];
 
   if (declOrOffset.isComplete())
     return declOrOffset;
@@ -1632,7 +1629,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     ~DiscriminatorRAII() {
       if (!discriminator.empty() && declOrOffset.isComplete())
         if (auto value = dyn_cast_or_null<ValueDecl>(declOrOffset.get()))
-          moduleFile.DiscriminatorsByValue[value] = discriminator;
+          moduleFile.PrivateDiscriminatorsByValue[value] = discriminator;
     }
   };
   DiscriminatorRAII discriminatorRAII{*this, declOrOffset};

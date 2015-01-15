@@ -190,7 +190,6 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
 
         case DeclContextKind::AbstractClosureExpr:
         case DeclContextKind::AbstractFunctionDecl:
-        case DeclContextKind::LocalDecl:
           continue;
         }
 

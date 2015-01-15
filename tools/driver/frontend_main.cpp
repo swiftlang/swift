@@ -444,7 +444,7 @@ static bool performCompile(CompilerInstance &Instance,
   // Get the main source file's private discriminator and attach it to
   // the compile unit's flags.
   if (PrimarySourceFile) {
-    Identifier PD = PrimarySourceFile->getDiscriminator();
+    Identifier PD = PrimarySourceFile->getPrivateDiscriminator();
     if (!PD.empty())
       IRGenOpts.DWARFDebugFlags += (" -private-discriminator "+PD.str()).str();
   }

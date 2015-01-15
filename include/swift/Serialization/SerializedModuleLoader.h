@@ -166,10 +166,6 @@ public:
                            DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &results) const override;
 
-  virtual TypeDecl *lookupLocalType(llvm::StringRef FileHash,
-                                    unsigned int LocalDiscriminator,
-                                    llvm::StringRef Name) const override;
-
   virtual OperatorDecl *lookupOperator(Identifier name,
                                        DeclKind fixity) const override;
 
@@ -188,8 +184,6 @@ public:
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 
-  virtual void getLocalTypeDecls(SmallVectorImpl<Decl *> &results) const override;
-
   virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results) const override;
 
   virtual void
@@ -200,7 +194,6 @@ public:
   collectLinkLibraries(Module::LinkLibraryCallback callback) const override;
 
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
-  Identifier getDiscriminatorForLocalValue(const ValueDecl *D) const override;
 
   virtual StringRef getFilename() const override;
 

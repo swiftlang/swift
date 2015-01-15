@@ -246,12 +246,7 @@ private:
   using SerializedDeclTable =
       llvm::OnDiskIterableChainedHashTable<DeclTableInfo>;
 
-  class LocalDeclTableInfo;
-  using SerializedLocalDeclTable =
-      llvm::OnDiskIterableChainedHashTable<LocalDeclTableInfo>;
-
   std::unique_ptr<SerializedDeclTable> TopLevelDecls;
-  std::unique_ptr<SerializedLocalDeclTable> LocalTypeDecls;
   std::unique_ptr<SerializedDeclTable> OperatorDecls;
   std::unique_ptr<SerializedDeclTable> ExtensionDecls;
   std::unique_ptr<SerializedDeclTable> ClassMembersByName;
@@ -263,7 +258,7 @@ private:
 
   std::unique_ptr<SerializedObjCMethodTable> ObjCMethods;
 
-  llvm::DenseMap<const ValueDecl *, Identifier> DiscriminatorsByValue;
+  llvm::DenseMap<const ValueDecl *, Identifier> PrivateDiscriminatorsByValue;
 
   TinyPtrVector<Decl *> ImportDecls;
 
@@ -333,11 +328,6 @@ private:
   /// format.
   std::unique_ptr<SerializedDeclTable>
   readDeclTable(ArrayRef<uint64_t> fields, StringRef blobData);
-
-  /// Read an on-disk local decl hash table stored in
-  /// index_block::DeclListLayout.
-  std::unique_ptr<ModuleFile::SerializedLocalDeclTable>
-  readLocalTypeDeclTable(ArrayRef<uint64_t> fields, StringRef blobData);
 
   /// Read an on-disk Objective-C method table stored in
   /// index_block::ObjCMethodTableLayout format.
@@ -449,10 +439,6 @@ public:
   /// Searches the module's top-level decls for the given identifier.
   void lookupValue(DeclName name, SmallVectorImpl<ValueDecl*> &results);
 
-  /// Searches the module's local decls.
-  TypeDecl *lookupLocalType(StringRef FileHash, unsigned LocalDiscriminator,
-                            StringRef Name);
-
   /// Searches the module's operators for one with the given name and fixity.
   ///
   /// If none is found, returns null.
@@ -512,9 +498,6 @@ public:
   /// Adds all top-level decls to the given vector.
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results);
 
-  /// Adds all local decls in this module.
-  void getLocalTypeDecls(SmallVectorImpl<Decl *> &results);
-
   /// Adds all top-level decls to the given vector.
   ///
   /// This includes all decls that should be displayed to clients of the module.
@@ -553,7 +536,6 @@ public:
   Optional<BriefAndRawComment> getCommentForDeclByUSR(StringRef USR);
 
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D);
-  Identifier getDiscriminatorForLocalValue(const ValueDecl *D);
 
   // MARK: Deserialization interface
 

@@ -1449,7 +1449,6 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
     case DeclContextKind::AbstractClosureExpr:
     case DeclContextKind::Initializer:
     case DeclContextKind::TopLevelCodeDecl:
-    case DeclContextKind::LocalDecl:
     case DeclContextKind::AbstractFunctionDecl:
       D->setAccessibility(Accessibility::Private);
       break;
@@ -5377,7 +5376,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     case DeclContextKind::FileUnit:
     case DeclContextKind::TopLevelCodeDecl:
     case DeclContextKind::Initializer:
-    case DeclContextKind::LocalDecl:
       llvm_unreachable("cannot have type params");
 
     case DeclContextKind::NominalTypeDecl: {
