@@ -195,6 +195,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.add(createCodeMotion(OpLevel ==
                           OptimizationLevelKind::LowLevel /* HoistReleases */));
   PM.add(createGlobalARCOpts());
+  PM.add(createRemovePins());
 }
 
 
