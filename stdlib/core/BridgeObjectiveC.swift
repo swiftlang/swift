@@ -12,7 +12,7 @@
 
 #if _runtime(_ObjC)
 /// A Swift Array or Dictionary of types conforming to
-/// `_ObjectiveCBridgeable` can be passed to ObjectiveC as an NSArray or
+/// `_ObjectiveCBridgeable` can be passed to Objective-C as an NSArray or
 /// NSDictionary, respectively.  The elements of the resulting NSArray
 /// or NSDictionary will be the result of calling `_bridgeToObjectiveC`
 /// on each elmeent of the source container.
