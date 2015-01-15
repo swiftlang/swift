@@ -531,6 +531,30 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
     }
     return true;
   }
+
+  // Look for a safe mark_dependence instruction use.
+  // This use looks something like:
+  // %57 = load %56 : $*Builtin.BridgeObject from Array<Int>
+  // %58 = unchecked_ref_bit_cast %57 : $Builtin.BridgeObject to $_ContiguousArr
+  // %59 = unchecked_ref_cast %58 : $_ContiguousArrayStorageBase to $Builtin.Nat
+  // %60 = struct_extract %53 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointe
+  // %61 = pointer_to_address %60 : $Builtin.RawPointer to $*Int
+  // %62 = mark_dependence %61 : $*Int on %59 : $Builtin.NativeObject
+  if (isa<MarkDependenceInst>(UseInst))
+    return true;
+  if (auto *UCRBC = dyn_cast<UncheckedRefBitCastInst>(UseInst)) {
+    for (auto U : UCRBC->getUses())
+      if (!checkSafeArrayElementUse(U->getUser(), ArrayVal))
+        return false;
+    return true;
+  }
+  if (auto *UCRC = dyn_cast<UncheckedRefCastInst>(UseInst)) {
+    for (auto U : UCRC->getUses())
+      if (!checkSafeArrayElementUse(U->getUser(), ArrayVal))
+        return false;
+    return true;
+  }
+
   // Found an unsafe or unknown user. The Array may escape here.
   DEBUG(llvm::dbgs() << "    Skipping Array: unknown Element use!\n"
         << *UseInst);
