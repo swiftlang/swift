@@ -122,6 +122,8 @@ containers such as Array. However, importing code from the standard library can
 increase the binary size. Marking functions with @semantics("stdlib.noimport")
 will prevent the copying of the marked function into the user program.
 
+Notice that this annotation is similar to the resilient annotation that will
+disallow the cloning of code into the user application.
 
 Array
 ~~~~~
