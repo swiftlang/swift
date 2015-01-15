@@ -4564,13 +4564,32 @@ void SILGenFunction::emitForeignThunk(SILDeclRef thunk) {
     
     SILDeclRef original = thunk.asForeign(!thunk.isForeign);
     auto originalInfo = getConstantInfo(original);
+    auto thunkFnTy = ci.getSILType().castTo<SILFunctionType>();
     auto originalFnTy = originalInfo.getSILType().castTo<SILFunctionType>();
     
-    // Bridge all the arguments, which should be at +1 now.
+    // Bridge all the arguments.
     SmallVector<ManagedValue, 8> managedArgs;
     for (unsigned i : indices(args)) {
       auto arg = args[i];
-      auto mv = emitManagedRValueWithCleanup(arg);
+      auto thunkParam = thunkFnTy->getParameters()[i];
+      // Bring the argument to +1.
+      // TODO: Could avoid a retain if the bridged parameter is also +0 and
+      // doesn't require a bridging conversion.
+      ManagedValue mv;
+      switch (thunkParam.getConvention()) {
+      case ParameterConvention::Direct_Owned:
+        mv = emitManagedRValueWithCleanup(arg);
+        break;
+      case ParameterConvention::Direct_Guaranteed:
+      case ParameterConvention::Direct_Unowned:
+        mv = emitManagedRetain(fd, arg);
+        break;
+      case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Guaranteed:
+      case ParameterConvention::Indirect_Out:
+      case ParameterConvention::Indirect_Inout:
+        llvm_unreachable("indirect args in foreign thunked method not implemented");
+      }
       
       auto origArg = originalFnTy->getParameters()[i].getSILType();
       

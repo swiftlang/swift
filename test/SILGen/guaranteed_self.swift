@@ -347,6 +347,7 @@ class C: Fooable, Barrable {
     get { return 0 }
     set {}
   }
+
 }
 
 class D: C {
@@ -386,6 +387,22 @@ class D: C {
   required init() {
     super.init()
   }
+
+  // CHECK-LABEL: sil shared [transparent] @_TTDFC15guaranteed_self1D3foofS0_FSiT_ : $@cc(method) @thin (Int, @guaranteed D) -> ()
+  // CHECK:       bb0({{.*}} [[SELF:%.*]]):
+  // CHECK:         retain{{.*}} [[SELF]]
+  // CHECK:         release{{.*}} [[SELF]]
+  // CHECK-NOT:     release{{.*}} [[SELF]]
+  // CHECK:       }
+  dynamic override func foo(x: Int) {
+    self.foo(x)
+  }
 }
 
+func S_curryThunk(s: S) -> (S -> Int -> ()/*, Int -> ()*/) {
+  return (S.foo /*, s.foo*/)
+}
 
+func AO_curryThunk<T>(ao: AO<T>) -> (AO<T> -> Int -> ()/*, Int -> ()*/) {
+  return (AO.foo /*, ao.foo*/)
+}
