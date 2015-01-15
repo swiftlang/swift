@@ -112,15 +112,16 @@ This section describes the semantic tags that are assigned to data-structures
 in the standard library and the axioms that the optimizer uses.
 
 
-Importing code from the standard library
+Cloning code from the standard library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The Swift compiler can import code from the standard library into the
+The Swift compiler can copy code from the standard library into the
 application. This allows the optimizer to inline calls from stdlib and improve
 the performance of code that uses common operators such as '++' or basic
 containers such as Array. However, importing code from the standard library can
-increase the binary size. Marking functions with @semantics("stdlib.noimport")
-will prevent the copying of the marked function into the user program.
+increase the binary size. Marking functions with @semantics("stdlib_binary_only")
+will prevent the copying of the marked function from the standard library into the
+user program.
 
 Notice that this annotation is similar to the resilient annotation that will
 disallow the cloning of code into the user application.
