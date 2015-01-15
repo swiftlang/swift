@@ -350,7 +350,42 @@ class C: Fooable, Barrable {
 }
 
 class D: C {
+  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1DCfMS0_FT_S0_ : $@thin (@thick D.Type) -> @owned D
+  // CHECK:         [[SELF1:%.*]] = alloc_ref $D
+  // CHECK-NOT:     [[SELF1]]
+  // CHECK:         [[SELF2:%.*]] = apply {{.*}}([[SELF1]])
+  // CHECK-NOT:     [[SELF1]]
+  // CHECK-NOT:     [[SELF2]]
+  // CHECK:         return [[SELF2]]
+
+  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1DcfMS0_FT_S0_ : $@cc(method) @thin (@owned D) -> @owned D
+  // CHECK:       bb0([[SELF:%.*]] : $D):
+  // CHECK:         [[SELF_BOX:%.*]] = alloc_box $D
+  // CHECK-NEXT:    [[SELF_ADDR:%.*]] = mark_uninitialized [derivedself] [[SELF_BOX]]
+  // CHECK-NEXT:    store [[SELF]] to [[SELF_ADDR]]
+  // CHECK-NOT:     [[SELF_ADDR]]
+  // CHECK:         [[SELF1:%.*]] = load [[SELF_ADDR]]
+  // CHECK-NOT:     [[SELF_ADDR]]
+  // CHECK-NOT:     [[SELF1]]
+  // CHECK:         [[SUPER1:%.*]] = upcast [[SELF1]]
+  // CHECK-NOT:     [[SELF_ADDR]]
+  // CHECK-NOT:     [[SELF1]]
+  // CHECK-NOT:     [[SUPER1]]
+  // CHECK:         [[SUPER2:%.*]] = apply {{.*}}([[SUPER1]])
+  // CHECK-NEXT:    [[SELF2:%.*]] = unchecked_ref_cast [[SUPER2]]
+  // CHECK-NEXT:    store [[SELF2]] to [[SELF_ADDR]]
+  // CHECK-NOT:     [[SELF_ADDR]]
+  // CHECK-NOT:     [[SELF1]]
+  // CHECK-NOT:     [[SUPER1]]
+  // CHECK-NOT:     [[SELF2]]
+  // CHECK-NOT:     [[SUPER2]]
+  // CHECK:         [[SELF_FINAL:%.*]] = load [[SELF_ADDR]]
+  // CHECK-NEXT:    retain{{.*}} [[SELF_FINAL]]
+  // CHECK-NEXT:    release{{.*}} [[SELF_BOX]]
+  // CHECK-NEXT:    return [[SELF_FINAL]]
   required init() {
     super.init()
   }
 }
+
+
