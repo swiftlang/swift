@@ -184,8 +184,7 @@ function(_add_variant_swift_compile_flags
   endif()
 
   if(enable_assertions)
-    list(APPEND result
-        "-Xfrontend" "-D" "-Xfrontend" "INTERNAL_CHECKS_ENABLED")
+    list(APPEND result "-D" "INTERNAL_CHECKS_ENABLED")
   endif()
 
   set("${result_var_name}" "${result}" PARENT_SCOPE)
