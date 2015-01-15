@@ -5,10 +5,11 @@ if(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
       "-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=1")
 endif()
 
-if(SWIFT_HAVE_CRASH_REPORTER_CLIENT)
-  list(APPEND swift_runtime_compile_flags
-      "-DSWIFT_HAVE_CRASHREPORTERCLIENT=1")
-endif()
+# fixme rdar://19482263 rdar://19404150
+# if(SWIFT_HAVE_CRASH_REPORTER_CLIENT)
+#   list(APPEND swift_runtime_compile_flags
+#       "-DSWIFT_HAVE_CRASHREPORTERCLIENT=1")
+# endif()
 
 set(swift_runtime_objc_sources)
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
