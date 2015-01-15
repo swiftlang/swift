@@ -78,10 +78,8 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   auto &CGO = Importer->getClangCodeGenOpts();
   CGO.OptimizationLevel = Opts.Optimize ? 3 : 0;
   CGO.DisableFPElim = Opts.DisableFPElim;
-  auto &TO = ClangContext.getTargetInfo().getTargetOpts();
   auto *ClangCodeGen = clang::CreateLLVMCodeGen(ClangContext.getDiagnostics(),
-                                                ModuleName, CGO, TO,
-                                                LLVMContext);
+                                                ModuleName, CGO, LLVMContext);
   ClangCodeGen->Initialize(ClangContext);
 
   return ClangCodeGen;
