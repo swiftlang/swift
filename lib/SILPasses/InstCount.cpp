@@ -27,9 +27,17 @@ using namespace swift;
 //                                 Statistics
 //===----------------------------------------------------------------------===//
 
-STATISTIC(TotalInsts , "Number of instructions (of all types)");
-STATISTIC(TotalBlocks, "Number of basic blocks");
+STATISTIC(TotalInsts, "Number of instructions (of all types) in non-external "
+                      "functions");
+STATISTIC(TotalBlocks, "Number of basic blocks in non-external functions");
 STATISTIC(TotalFuncs , "Number of non-external functions");
+
+STATISTIC(TotalExternalFuncInsts, "Number of instructions (of all types) in "
+                                  "external functions");
+STATISTIC(TotalExternalFuncBlocks, "Number of basic blocks in external "
+                                   "functions");
+STATISTIC(TotalExternalFuncDefs, "Number of external funcs definitions");
+STATISTIC(TotalExternalFuncDecls, "Number of external funcs declarations");
 
 #define INST(Id, Parent, MemBehavior) \
   STATISTIC(Num ## Id, "Number of " #Id);
@@ -37,25 +45,27 @@ STATISTIC(TotalFuncs , "Number of non-external functions");
 
 namespace {
 
-class InstCountVisitor : public SILVisitor<InstCountVisitor> {
-public:
+struct InstCountVisitor : SILVisitor<InstCountVisitor> {
+  // We store these locally so that we do not continually check if the function
+  // is external or not. Instead, we just check once at the end and accumulate.
+  unsigned InstCount = 0;
+  unsigned BlockCount = 0;
 
   void visitSILBasicBlock(SILBasicBlock *BB) {
-    ++TotalBlocks;
+    BlockCount++;
     SILVisitor<InstCountVisitor>::visitSILBasicBlock(BB);
   }
 
   void visitSILFunction(SILFunction *F) {
-    ++TotalFuncs;
     SILVisitor<InstCountVisitor>::visitSILFunction(F);
   }
 
   void visitValueBase(ValueBase *V) { }
 
-#define INST(Id, Parent, MemBehavior)                           \
-  void visit##Id(Id *I) {                                       \
-    ++Num ## Id;                                                \
-    ++TotalInsts;                                               \
+#define INST(Id, Parent, MemBehavior)                                          \
+  void visit##Id(Id *I) {                                                      \
+    ++Num##Id;                                                                 \
+    ++InstCount;                                                               \
   }
 #include "swift/SIL/SILNodes.def"
 
@@ -69,13 +79,27 @@ public:
 
 namespace {
 class InstCount : public SILFunctionTransform {
-  InstCountVisitor V;
 
   StringRef getName() override { return "SIL Inst Count"; }
 
   /// The entry point to the transformation.
   void run() override {
-    V.visitSILFunction(getFunction());
+    SILFunction *F = getFunction();
+    InstCountVisitor V;
+    V.visitSILFunction(F);
+    if (F->isAvailableExternally()) {
+      if (F->isDefinition()) {
+        TotalExternalFuncInsts += V.InstCount;
+        TotalExternalFuncBlocks += V.BlockCount;
+        TotalExternalFuncDefs++;
+      } else {
+        TotalExternalFuncDecls++;
+      }
+    } else {
+      TotalInsts += V.InstCount;
+      TotalBlocks += V.BlockCount;
+      TotalFuncs++;
+    }
   }
 };
 } // end anonymous namespace
