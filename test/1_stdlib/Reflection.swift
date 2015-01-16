@@ -475,11 +475,17 @@ class HasNumberQLO: CanaryBase {
   }
 }
 
+// Hack to build with both older and newer SDKs.
+// rdar://problem/19494514
+extension UInt {
+  static let OBJC_ASSOCIATION_RETAIN_NONATOMIC: UInt = 1
+}
+
 class HasAttributedQLO: CanaryBase {
   @objc var debugQuickLookObject: AnyObject {
     let str = NSAttributedString(string: "attributed string")
     objc_setAssociatedObject(str, &CanaryHandle, CanaryBase(),
-      objc_AssociationPolicy(OBJC_ASSOCIATION_RETAIN_NONATOMIC))
+                             .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
     return str
   }
 }
@@ -488,7 +494,7 @@ class HasStringQLO: CanaryBase {
   @objc var debugQuickLookObject: AnyObject {
     let str = NSString(string: "plain string")
     objc_setAssociatedObject(str, &CanaryHandle, CanaryBase(),
-      objc_AssociationPolicy(OBJC_ASSOCIATION_RETAIN_NONATOMIC))
+                             .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
     return str
   }
 }
