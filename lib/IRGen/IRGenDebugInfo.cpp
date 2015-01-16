@@ -378,7 +378,7 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, SILDebugScope *DS,
   if (Loc && Loc->isInPrologue())
     return;
 
-  assert(DS);
+  assert(DS && "empty scope");
   llvm::DIDescriptor Scope = getOrCreateScope(DS);
   if (!Scope)
     return;
