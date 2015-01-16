@@ -205,7 +205,7 @@ static void addContextParamsAndRequirements(ArchetypeBuilder &builder,
 
   if (auto sig = nominal->getGenericSignature()) {
     // Add generic signature from this context.
-    builder.addGenericSignature(sig);
+    builder.addGenericSignature(sig, false);
   } else if (auto parentDC = dc->getParent()) {
     // Recurse into parent context.
     addContextParamsAndRequirements(builder, parentDC);
@@ -788,6 +788,7 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
 GenericSignature *TypeChecker::validateGenericSignature(
                     GenericParamList *genericParams,
                     DeclContext *dc,
+                    GenericSignature *outerSignature,
                     std::function<bool(ArchetypeBuilder &)> inferRequirements,
                     bool &invalid) {
   assert(genericParams && "Missing generic parameters?");
@@ -795,6 +796,8 @@ GenericSignature *TypeChecker::validateGenericSignature(
   // Create the archetype builder.
   Module *module = dc->getParentModule();
   ArchetypeBuilder builder = createArchetypeBuilder(module);
+  if (outerSignature)
+    builder.addGenericSignature(outerSignature, true);
 
   // Type check the generic parameters, treating all generic type
   // parameters as dependent, unresolved.
@@ -858,7 +861,7 @@ bool TypeChecker::validateGenericTypeSignature(NominalTypeDecl *nominal) {
     nominal->setIsValidatingGenericSignature();
     auto sig = validateGenericSignature(nominal->getGenericParams(),
                                         nominal->getDeclContext(),
-                                        nullptr, invalid);
+                                        nullptr, nullptr, invalid);
     nominal->setGenericSignature(sig);
     nominal->setIsValidatingGenericSignature(false);
   }

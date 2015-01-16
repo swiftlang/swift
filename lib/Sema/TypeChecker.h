@@ -610,6 +610,10 @@ public:
   ///
   /// \param dc The declaration context in which to perform the validation.
   ///
+  /// \param outerSignature The generic signature of the outer
+  /// context, if not available as part of the \c dc argument (used
+  /// for SIL parsing).
+  ///
   /// \param inferRequirements When non-empty, callback that will be invoked
   /// to perform any additional requirement inference that contributes to the
   /// generic signature. Returns true if an error occurred.
@@ -621,6 +625,7 @@ public:
   GenericSignature *validateGenericSignature(
                       GenericParamList *genericParams,
                       DeclContext *dc,
+                      GenericSignature *outerSignature,
                       std::function<bool(ArchetypeBuilder &)> inferRequirements,
                       bool &invalid);
                         

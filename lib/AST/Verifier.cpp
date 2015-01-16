@@ -424,25 +424,38 @@ struct ASTNodeBase {};
           }
 
           // Otherwise, the archetype needs to be from this scope.
-          if (ActiveArchetypes.count(archetype) > 0)
-            return false;
+          if (ActiveArchetypes.count(archetype) == 0) {
+            // FIXME: Make an exception for serialized extensions, which don't
+            // currently have the correct archetypes.
+            if (auto activeScope = Scopes.back().dyn_cast<DeclContext *>()) {
+              do {
+                if (isa<ExtensionDecl>(activeScope) &&
+                    isa<LoadedFile>(activeScope->getModuleScopeContext())) {
+                  return false;
+                }
+                activeScope = activeScope->getParent();
+              } while (!activeScope->isModuleScopeContext());
+            }
 
-          // FIXME: Make an exception for serialized extensions, which don't
-          // currently have the correct archetypes.
-          if (auto activeScope = Scopes.back().dyn_cast<DeclContext *>()) {
-            do {
-              if (isa<ExtensionDecl>(activeScope) &&
-                  isa<LoadedFile>(activeScope->getModuleScopeContext())) {
-                return false;
-              }
-              activeScope = activeScope->getParent();
-            } while (!activeScope->isModuleScopeContext());
+            Out << "AST verification error: archetype " << archetype
+                << " not allowed in this context\n";
+            return true;
           }
 
-          llvm::errs() << "AST verification error: archetype " << archetype
-                       << " not allowed in this context\n";
-          return true;
+          // Make sure that none of the nested types are dependent.
+          for (const auto &nested : archetype->getNestedTypes()) {
+            if (auto nestedType = nested.second.dyn_cast<Type>()) {
+              if (nestedType->isDependentType()) {
+                Out << "Nested type " << nested.first.str()
+                    << " of archetype " << archetype->getString()
+                    << " is dependent type " << nestedType->getString()
+                    << "\n";
+                return true;
+              }
+            }
+          }
         }
+
         return false;
       });
       

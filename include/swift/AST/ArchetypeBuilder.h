@@ -236,7 +236,7 @@ public:
   /// \brief Add all of a generic signature's parameters and requirements.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool addGenericSignature(GenericSignature *sig);
+  bool addGenericSignature(GenericSignature *sig, bool adoptArchetypes);
 
   /// Infer requirements from the given type, recursively.
   ///
@@ -448,6 +448,14 @@ public:
   /// when this potential archetype is an associated type.
   PotentialArchetype *getParent() const { 
     return ParentOrParam.dyn_cast<PotentialArchetype *>(); 
+  }
+
+  /// Retrieve the generic parameter at the root of this potential archetype.
+  GenericTypeParamType *getRootParam() const {
+    if (auto parent = getParent())
+      return parent->getRootParam();
+
+    return getGenericParam();
   }
 
   /// Retrieve the associated type to which this potential archetype

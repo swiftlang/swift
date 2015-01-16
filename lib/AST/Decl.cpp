@@ -481,9 +481,14 @@ ArchetypeType::getAsDependentType(
 
 static Type getAsDependentType(Type t,
                      const llvm::DenseMap<ArchetypeType*, Type> &archetypeMap) {
-  if (auto arch = t->getAs<ArchetypeType>())
-    return arch->getAsDependentType(archetypeMap);
-  return t;
+  if (!t->hasArchetype())
+    return t;
+
+  return t.transform([&](Type type) -> Type {
+    if (auto arch = type->getAs<ArchetypeType>())
+      return arch->getAsDependentType(archetypeMap);
+    return type;
+  });
 }
 
 // A helper to recursively collect the generic parameters from the outer levels
@@ -568,7 +573,7 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
       auto firstType = req.first->getDependentType(*Builder);
       Type secondType;
       if (auto concrete = req.second.dyn_cast<Type>())
-        secondType = concrete;
+        secondType = getAsDependentType(concrete, archetypeMap);
       else if (auto secondPA =
                req.second.dyn_cast<ArchetypeBuilder::PotentialArchetype*>())
         secondType = secondPA->getDependentType(*Builder);

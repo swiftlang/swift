@@ -316,7 +316,7 @@ namespace {
   /// parameters to their archetypes.
   class RequirementTypeOpener : public constraints::DependentTypeOpener {
     /// The type variable that represents the 'Self' type.
-    TypeVariableType *SelfTypeVar = nullptr;
+    constraints::ConstraintSystem &CS;
     ConformanceChecker &CC;
     NormalProtocolConformance *Conformance;
     DeclContext *DC;
@@ -325,12 +325,13 @@ namespace {
 
   public:
     RequirementTypeOpener(
+      constraints::ConstraintSystem &cs,
       ConformanceChecker &cc,
       NormalProtocolConformance *conformance,
       DeclContext *dc,
       llvm::DenseMap<TypeVariableType *, AssociatedTypeDecl*>
         &openedAssocTypes)
-      : CC(cc), Conformance(conformance), DC(dc),
+      : CS(cs), CC(cc), Conformance(conformance), DC(dc),
         Proto(conformance->getProtocol()),
         OpenedAssocTypes(openedAssocTypes)
     {
@@ -341,7 +342,7 @@ namespace {
                                         Type &replacementType) {
       // If this is the 'Self' type, record it.
       if (param->getDepth() == 0 && param->getIndex() == 0)
-        SelfTypeVar = typeVar;
+        CS.SelfTypeVar = typeVar;
       else
         replacementType = ArchetypeBuilder::mapTypeIntoContext(DC, param);
     }
@@ -353,7 +354,7 @@ namespace {
                                           Type &replacementType) {
       // If the base is our 'Self' type, we might have a witness for this
       // associated type already.
-      if (baseTypeVar == SelfTypeVar &&
+      if (baseTypeVar == CS.SelfTypeVar &&
           cast<ProtocolDecl>(assocType->getDeclContext()) == Proto) {
         // If we don't have a type witness, see if we can resolve it via
         // type witnesses.
@@ -741,11 +742,11 @@ matchWitness(ConformanceChecker &cc, TypeChecker &tc,
                                       /*opener=*/nullptr);
     } else {
       std::tie(openedFullWitnessType, openWitnessType) 
-      = cs->getTypeOfReference(witness,
-                              /*isTypeReference=*/false,
-                              /*isDynamicResult=*/false,
-                              locator,
-                              /*opener=*/nullptr);
+        = cs->getTypeOfReference(witness,
+                                /*isTypeReference=*/false,
+                                /*isDynamicResult=*/false,
+                                locator,
+                                /*opener=*/nullptr);
     }
     openWitnessType = openWitnessType->getRValueType();
     
@@ -753,7 +754,7 @@ matchWitness(ConformanceChecker &cc, TypeChecker &tc,
     // its associated types (recursively); inner generic type parameters get
     // mapped to their archetypes directly.
     DeclContext *reqDC = req->getPotentialGenericDeclContext();
-    RequirementTypeOpener reqTypeOpener(cc, conformance, reqDC,
+    RequirementTypeOpener reqTypeOpener(*cs, cc, conformance, reqDC,
                                         openedAssocTypes);
     std::tie(openedFullReqType, reqType)
       = cs->getTypeOfMemberReference(model, req,

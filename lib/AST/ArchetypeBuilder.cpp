@@ -403,6 +403,27 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
   return nested.front();
 }
 
+/// Replace dependent types with their archetypes or concrete types.
+static Type substConcreteTypesForDependentTypes(ArchetypeBuilder &builder,
+                                                Type type) {
+  return type.transform([&](Type type) -> Type {
+      if (auto depMemTy = type->getAs<DependentMemberType>()) {
+        auto newBase = substConcreteTypesForDependentTypes(builder,
+                                                           depMemTy->getBase());
+        return depMemTy->substBaseType(&builder.getModule(), newBase,
+                                       builder.getLazyResolver());
+      }
+
+      if (auto typeParam = type->getAs<GenericTypeParamType>()) {
+        auto potentialArchetype = builder.resolveArchetype(typeParam);
+        return ArchetypeType::getNestedTypeValue(
+                 potentialArchetype->getType(builder));
+      }
+
+      return type;
+  });
+}
+
 ArchetypeType::NestedType
 ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
   // Retrieve the archetype from the representation of this set.
@@ -411,6 +432,14 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
   
   // Return a concrete type or archetype we've already resolved.
   if (ArchetypeOrConcreteType) {
+    // If the concrete type is dependent, substitute dependent types
+    // for archetypes.
+    if (auto concreteType = ArchetypeOrConcreteType.dyn_cast<Type>()) {
+      if (concreteType->isDependentType()) {
+        return substConcreteTypesForDependentTypes(builder, concreteType);
+      }
+    }
+
     return ArchetypeOrConcreteType;
   }
   
@@ -425,8 +454,19 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     if (!parentTy)
       return {};
     ParentArchetype = parentTy.dyn_cast<ArchetypeType*>();
-    if (!ParentArchetype)
+    if (!ParentArchetype) {
+      // We might have an outer archetype as a concrete type here; if so, just
+      // return that.
+      ParentArchetype
+        = ArchetypeType::getNestedTypeValue(parentTy)->getAs<ArchetypeType>();
+      if (ParentArchetype) {
+        ArchetypeOrConcreteType
+          = ParentArchetype->getNestedTypeValue(getName());
+        return ArchetypeOrConcreteType;
+      }
+
       return {};
+    }
 
     assocTypeOrProto = getResolvedAssociatedType();
   }
@@ -455,6 +495,8 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
   for (auto Nested : NestedTypes) {
     FlatNestedTypes.push_back({ Nested.first,
                                 Nested.second.front()->getType(builder) });
+    assert(!FlatNestedTypes.back().second.isNull() &&
+           "Couldn't create nested type'");
   }
   arch->setNestedTypes(mod.getASTContext(), FlatNestedTypes);
   
@@ -754,15 +796,25 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   // equivalent? For example, can two generic parameters T and U be made
   // equivalent? What about a generic parameter and a concrete type?
 
-  // Merge into the potential archetype with the smaller nesting depth. We
-  // prefer lower-depth potential archetypes both for better diagnostics (use
-  // T.A rather than U.B.C. when the two are required to be the same type) and
-  // because we want to select a generic parameter as a representative over an
-  // associated type.
+  // Merge into the potential archetype with the smaller nesting
+  // depth. We prefer lower-depth potential archetypes both for better
+  // diagnostics (use T.A rather than U.B.C. when the two are required
+  // to be the same type) and because we want to select a generic
+  // parameter as a representative over an associated type. When the
+  // depths are equal, prefer outermost, first generic parameters at
+  // the root.
   unsigned T1Depth = T1->getNestingDepth();
   unsigned T2Depth = T2->getNestingDepth();
-  if (T2Depth < T1Depth || (T1->isInvalid() && !T2->isInvalid()))
+  if (T2Depth < T1Depth || (T1->isInvalid() && !T2->isInvalid())) {
     std::swap(T1, T2);
+  } else if (T1Depth == T2Depth) {
+    auto T1Param = T1->getRootParam();
+    auto T2Param = T2->getRootParam();
+    if (T2Param->getDepth() < T1Param->getDepth() ||
+        (T1Param->getDepth() == T2Param->getDepth() &&
+         T2Param->getIndex() < T1Param->getIndex()))
+      std::swap(T1, T2);
+  }
   
   // Don't allow two generic parameters to be equivalent, because then we
   // don't actually have two parameters.
@@ -1237,8 +1289,13 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
   // This should be kept in sync with GenericParamList::deriveAllArchetypes().
   if (Impl->AllArchetypes.empty()) {
     // Collect the primary archetypes first.
+    unsigned depth = Impl->PotentialArchetypes.back().first.Depth;
     llvm::SmallPtrSet<ArchetypeType *, 8> KnownArchetypes;
     for (const auto &Entry : Impl->PotentialArchetypes) {
+      // Skip outer potential archetypes.
+      if (Entry.first.Depth < depth)
+        continue;
+
       PotentialArchetype *PA = Entry.second;
       if (PA->isPrimary()) {
         auto Archetype = PA->getType(*this).get<ArchetypeType *>();
@@ -1250,6 +1307,10 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
 
     // Collect all of the remaining archetypes.
     for (const auto &Entry : Impl->PotentialArchetypes) {
+      // Skip outer potential archetypes.
+      if (Entry.first.Depth < depth)
+        continue;
+
       PotentialArchetype *PA = Entry.second;
       if (!PA->isConcreteType()) {
         auto Archetype = PA->getType(*this).get<ArchetypeType *>();
@@ -1527,11 +1588,31 @@ Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
   });
 }
 
-bool ArchetypeBuilder::addGenericSignature(GenericSignature *sig) {
+bool ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
+                                           bool adoptArchetypes) {
   if (!sig) return false;
   for (auto param : sig->getGenericParams()) {
     if (addGenericParameter(param))
       return true;
+
+    if (adoptArchetypes) {
+      // If this generic parameter has an archetype, use it as the concrete
+      // type.
+      // FIXME: This forces us to re-use archetypes from outer scopes as
+      // concrete types, which is currently important for the layout of the "all
+      // archetypes" list.
+      if (auto gpDecl = param->getDecl()) {
+        if (auto archetype = gpDecl->getArchetype()) {
+          auto key = GenericTypeParamKey::forDecl(gpDecl);
+          assert(Impl->PotentialArchetypes.count(key) && "Missing parameter?");
+          auto *pa = Impl->PotentialArchetypes[key];
+          pa->ArchetypeOrConcreteType = Type(archetype);
+          pa->SameTypeSource = RequirementSource(RequirementSource::OuterScope,
+                                                 SourceLoc());
+        }
+      }
+
+    }
   }
 
   RequirementSource source(RequirementSource::OuterScope, SourceLoc());

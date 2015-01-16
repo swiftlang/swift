@@ -1370,6 +1370,14 @@ public:
   /// that locator.
   llvm::DenseMap<ConstraintLocator *, ArrayRef<Identifier>> ArgumentLabels;
 
+  /// FIXME: This is a workaround for the way we perform protocol
+  /// conformance checking for generic requirements, where we re-use
+  /// the archetypes of the requirement (rather than, say, building
+  /// new archetypes) to match up with the witness. Those archetypes
+  /// can end up with references to the outer archetypes (of the
+  /// associated types), which need to be replaced.
+  TypeVariableType *SelfTypeVar = nullptr;
+
 private:
   unsigned assignTypeVariableID() {
     return TypeCounter++;
@@ -1918,6 +1926,11 @@ public:
                           bool isSpecialized,
                           ConstraintLocatorBuilder locator,
                           DependentTypeOpener *opener = nullptr);
+
+  /// Replace the 'Self' type in the archetype with the appropriate
+  /// type variable, if needed.
+  /// FIXME: See the documentation of SelfTypeVar.
+  Type replaceSelfTypeInArchetype(ArchetypeType *archetype);
 
   /// \brief Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.

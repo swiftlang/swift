@@ -454,23 +454,12 @@ namespace {
                                 
         if (implArchetype->hasNestedType(member->getName())) {
           nestedType = implArchetype->getNestedType(member->getName());
-          archetype = nestedType.dyn_cast<ArchetypeType*>();
+          archetype = ArchetypeType::getNestedTypeValue(nestedType)
+                        ->getAs<ArchetypeType>();
         } else if (implArchetype->isSelfDerived()) {
           archetype = implArchetype;
         }
                                 
-        // The nested type could be a type parameter type. If that's the case,
-        // obtain the archetype from its decl.
-        if (!archetype && !nestedType.isNull()) {
-          auto type = nestedType.get<Type>();
-                    
-          if (auto GTPT = type->getAs<GenericTypeParamType>()) {
-            if (auto gpDecl = GTPT->getDecl()) {
-              archetype = gpDecl->getArchetype();
-            }
-          }
-        }
-
         ConstraintLocator *locator = nullptr;
         if (archetype)
           locator = CS.getConstraintLocator(
@@ -973,6 +962,28 @@ static Type rebuildSelfTypeWithObjectType(Type selfTy, Type objectTy) {
   });
 }
 
+Type ConstraintSystem::replaceSelfTypeInArchetype(ArchetypeType *archetype) {
+  assert(SelfTypeVar && "Meaningless unless there is a type variable for Self");
+  if (auto parent = archetype->getParent()) {
+    // Replace Self in the parent archetype. If nothing changes, we're done.
+    Type newParent = replaceSelfTypeInArchetype(parent);
+    if (newParent->getAs<ArchetypeType>() == parent)
+      return archetype;
+
+    // We expect to get a type variable back.
+    return getMemberType(newParent->castTo<TypeVariableType>(),
+                         archetype->getAssocType(),
+                         ConstraintLocatorBuilder(nullptr),
+                         /*options=*/0);
+  }
+
+  // If the archetype is the same as for the 'Self' type variable,
+  // return the 'Self' type variable.
+  if (SelfTypeVar->getImpl().getArchetype() == archetype)
+    return SelfTypeVar;
+
+  return archetype;
+}
 
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
@@ -1298,22 +1309,20 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     break;
   }
   
-  // If the overload reference type is a dependent member (which could occur
-  // in the case of a conformance check against an associated type rooted off of
-  // "Self"), we'll need to open the type up so as not to short-circuit the
-  // binding constraint against the already bound overload type.
-  if (refType->isDependentType()) {
-    openedFullType = openType(openedFullType, locator,
-                              choice.getDecl()
-                                ->getPotentialGenericDeclContext());
-    refType = openType(refType, locator,
-                       choice.getDecl()->getPotentialGenericDeclContext());
-    
-    if (auto FT = openedFullType->getAs<FunctionType>()) {
-      auto returnType = FT->getResult();
-      addConstraint(ConstraintKind::Bind, returnType, refType, locator);
-    }
+  // If we have a type variable for the 'Self' of a protocol
+  // requirement that's being opened, and the resulting type has an
+  // archetype in it, replace the 'Self' archetype with the
+  // corresponding type variable.
+  // FIXME: See the comment for SelfTypeVar for information about this hack.
+  if (SelfTypeVar && refType->hasArchetype()) {
+    refType = refType.transform([&](Type type) -> Type {
+        if (auto archetype = type->getAs<ArchetypeType>()) {
+          return replaceSelfTypeInArchetype(archetype);
+        }
+        return type;
+      });
   }
+  assert(!refType->isDependentType() && "Cannot have a dependent type here");
 
   // Add the type binding constraint.
   addConstraint(ConstraintKind::Bind, boundType, refType, locator);

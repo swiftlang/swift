@@ -2148,14 +2148,6 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
       
       // Resolve the member relative to the substituted base.
       if (Type r = depMemTy->substBaseType(module, newBase, resolver)) {
-        
-        // Substitute archtypes for generic type parameters to prevent
-        // dependent types from leaking.
-        // FIXME: This should never be necessary.
-        if (auto GTPT = r->getAs<GenericTypeParamType>()) {
-          if (GTPT->getDecl())
-            return GTPT->getDecl()->getArchetype();
-        }
         return r;
       }
       return failed(type);

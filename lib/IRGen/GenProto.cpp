@@ -3818,7 +3818,8 @@ namespace {
       // protocol requirements on the parameters and dependent types.
       //
       // TODO: The ArchetypeBuilder should be cached in the generic signature.
-      ParamArchetypes.addGenericSignature(fnType->getGenericSignature());
+      ParamArchetypes.addGenericSignature(fnType->getGenericSignature(),
+                                          false);
 
       // Protocol witnesses always derive all polymorphic parameter information
       // from the Self argument. We also *cannot* consider other arguments;
@@ -3892,7 +3893,8 @@ namespace {
       // protocol requirements on the parameters and dependent types.
       //
       // TODO: The ArchetypeBuilder should be cached in the generic signature.
-      ParamArchetypes.addGenericSignature(FnType->getGenericSignature());
+      ParamArchetypes.addGenericSignature(FnType->getGenericSignature(),
+                                          false);
 
       auto paramType = FnType->getParameters()[0].getType();
       considerBoundGenericType(cast<BoundGenericType>(paramType), 0);

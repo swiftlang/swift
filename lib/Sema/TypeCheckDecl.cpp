@@ -754,6 +754,26 @@ static void revertDependentPattern(Pattern *pattern) {
   }
 }
 
+/// Add the generic parameters and requirements from the parent context to the
+/// archetype builder.
+static void addContextParamsAndRequirements(ArchetypeBuilder &builder,
+                                            DeclContext *dc) {
+  auto type = dc->getDeclaredTypeOfContext();
+  if (!type || type->is<ErrorType>())
+    return;
+
+  auto nominal = type->getAnyNominal();
+  assert(nominal && "Parent context is not a nominal type?");
+
+  if (auto sig = nominal->getGenericSignature()) {
+    // Add generic signature from this context.
+    builder.addGenericSignature(sig, true);
+  } else if (auto parentDC = dc->getParent()) {
+    // Recurse into parent context.
+    addContextParamsAndRequirements(builder, parentDC);
+  }
+}
+
 /// Check the given generic parameter list, introduce the generic parameters
 /// and requirements into the archetype builder, but don't assign archetypes
 /// yet.
@@ -762,6 +782,9 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
                                   TypeChecker &TC, DeclContext *DC) {
   assert(genericParams && "Missing generic parameters");
   unsigned Depth = genericParams->getDepth();
+
+  // Add outer parameters.
+  addContextParamsAndRequirements(builder, DC);
 
   // Assign archetypes to each of the generic parameters.
   for (auto GP : *genericParams) {
@@ -940,10 +963,21 @@ bool TypeChecker::handleSILGenericParams(
 
   // Since the innermost GenericParamList is in the beginning of the vector,
   // we process in reverse order to handle the outermost list first.
-  for (unsigned i = 0, e = gps.size(); i < e; i++)
-    checkGenericParamList(*builders.rbegin()[i], gps.rbegin()[i], *this, DC);
-  for (unsigned i = 0, e = gps.size(); i < e; i++)
-    finalizeGenericParamList(*builders.rbegin()[i], gps.rbegin()[i], DC, *this);
+  GenericSignature *outerSignature = nullptr;
+  for (unsigned i = 0, e = gps.size(); i < e; i++) {
+    auto &builder = *builders.rbegin()[i];
+
+    auto genericParams = gps.rbegin()[i];
+    bool invalid = false;
+    outerSignature = validateGenericSignature(genericParams, DC, outerSignature,
+                                              nullptr, invalid);
+    if (invalid)
+      return true;
+
+    revertGenericParamList(genericParams);
+    checkGenericParamList(builder, genericParams, *this, DC);
+    finalizeGenericParamList(builder, genericParams, DC, *this);
+  }
   return false;
 }
 
@@ -5823,7 +5857,7 @@ static Type checkExtensionGenericParams(
   // Validate the generic type signature.
   bool invalid = false;
   sig = tc.validateGenericSignature(genericParams, ext->getDeclContext(), 
-                                    inferExtendedTypeReqs, invalid);
+                                    nullptr, inferExtendedTypeReqs, invalid);
   if (invalid) {
     return nullptr;
   }
