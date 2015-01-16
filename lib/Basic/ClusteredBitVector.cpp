@@ -100,7 +100,7 @@ void ClusteredBitVector::appendReserved(size_t numBits,
 
   // If not, we need to combine the generator result with that last chunk.
   if (offset) {
-    auto claimedBits = std::min(numBits, ChunkSizeInBits - offset);
+    auto claimedBits = std::min(numBits, size_t(ChunkSizeInBits - offset));
 
     // The extra bits in data[chunkIndex] are guaranteed to be zero.
     *nextChunk++ |= (getMoreBits(claimedBits) << offset);
