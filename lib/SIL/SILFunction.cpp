@@ -433,3 +433,8 @@ bool SILFunction::isExternallyUsedSymbol() const {
                                          getModule().isWholeModule());
 }
 
+void SILFunction::convertToDeclaration() {
+  assert(isDefinition() && "Can only convert definitions to declarations");
+  dropAllReferences();
+  getBlocks().clear();
+}

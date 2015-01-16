@@ -409,6 +409,9 @@ public:
   /// SILFunction.
   SILType mapTypeIntoContext(SILType type) const;
 
+  /// Converts the given function if it is a definition to a deaclaration.
+  void convertToDeclaration();
+
   //===--------------------------------------------------------------------===//
   // Block List Access
   //===--------------------------------------------------------------------===//

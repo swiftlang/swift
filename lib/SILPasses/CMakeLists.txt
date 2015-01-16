@@ -46,4 +46,5 @@ add_swift_library(swiftSILPasses
   ClosureSpecializer.cpp
   RemovePin.cpp
   SILCombinerVisitors.cpp
+  ExternalDefsToDecls.cpp
   LINK_LIBRARIES swiftSILPassesUtils swiftSILAnalysis)

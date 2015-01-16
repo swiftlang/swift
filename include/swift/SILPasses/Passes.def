@@ -77,7 +77,8 @@ PASS(SplitAllCriticalEdges, ())
 PASS(SplitNonCondBrCriticalEdges, ())
 PASS(StripDebugInfo, ())
 PASS(SwiftArrayOpts, ())
-PASS_RANGE(AllPasses, AADumper, SwiftArrayOpts)
+PASS(ExternalDefsToDecls, ())
+PASS_RANGE(AllPasses, AADumper, ExternalDefsToDecls)
 
 #undef PASS
 #undef PASS_RANGE

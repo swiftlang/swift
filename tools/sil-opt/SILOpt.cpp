@@ -226,6 +226,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::SplitAllCriticalEdges,
                                    "split-critical-edges",
                                    "Split all critical edges"),
+                        clEnumValN(PassKind::ExternalDefsToDecls,
+                                   "external-defs-to-decls",
+                                   "Convert external definitions to decls"),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
