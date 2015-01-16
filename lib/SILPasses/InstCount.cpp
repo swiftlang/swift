@@ -27,11 +27,13 @@ using namespace swift;
 //                                 Statistics
 //===----------------------------------------------------------------------===//
 
+// Local aggregate statistics
 STATISTIC(TotalInsts, "Number of instructions (of all types) in non-external "
                       "functions");
 STATISTIC(TotalBlocks, "Number of basic blocks in non-external functions");
 STATISTIC(TotalFuncs , "Number of non-external functions");
 
+// External aggregate statistics
 STATISTIC(TotalExternalFuncInsts, "Number of instructions (of all types) in "
                                   "external functions");
 STATISTIC(TotalExternalFuncBlocks, "Number of basic blocks in external "
@@ -39,6 +41,17 @@ STATISTIC(TotalExternalFuncBlocks, "Number of basic blocks in external "
 STATISTIC(TotalExternalFuncDefs, "Number of external funcs definitions");
 STATISTIC(TotalExternalFuncDecls, "Number of external funcs declarations");
 
+// Linkage statistics
+STATISTIC(TotalPublicFuncs, "Number of public funcs");
+STATISTIC(TotalHiddenFuncs, "Number of hidden funcs");
+STATISTIC(TotalPrivateFuncs, "Number of private funcs");
+STATISTIC(TotalSharedFuncs, "Number of shared funcs");
+STATISTIC(TotalPublicExternalFuncs, "Number of public external funcs");
+STATISTIC(TotalHiddenExternalFuncs, "Number of hidden external funcs");
+STATISTIC(TotalPrivateExternalFuncs, "Number of private external funcs");
+STATISTIC(TotalSharedExternalFuncs, "Number of shared external funcs");
+
+// Individual instruction statistics
 #define INST(Id, Parent, MemBehavior) \
   STATISTIC(Num ## Id, "Number of " #Id);
 #include "swift/SIL/SILNodes.def"
@@ -99,6 +112,33 @@ class InstCount : public SILFunctionTransform {
       TotalInsts += V.InstCount;
       TotalBlocks += V.BlockCount;
       TotalFuncs++;
+    }
+
+    switch (F->getLinkage()) {
+    case SILLinkage::Public:
+      ++TotalPublicFuncs;
+      break;
+    case SILLinkage::Hidden:
+      ++TotalHiddenFuncs;
+      break;
+    case SILLinkage::Shared:
+      ++TotalSharedFuncs;
+      break;
+    case SILLinkage::Private:
+      ++TotalPrivateFuncs;
+      break;
+    case SILLinkage::PublicExternal:
+      ++TotalPublicExternalFuncs;
+      break;
+    case SILLinkage::HiddenExternal:
+      ++TotalHiddenExternalFuncs;
+      break;
+    case SILLinkage::SharedExternal:
+      ++TotalSharedExternalFuncs;
+      break;
+    case SILLinkage::PrivateExternal:
+      ++TotalPrivateExternalFuncs;
+      break;
     }
   }
 };
