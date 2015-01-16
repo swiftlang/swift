@@ -67,6 +67,9 @@ class ModuleFile : public LazyMemberLoader {
   /// The name of the module.
   StringRef Name;
 
+  /// The target the module was built for.
+  StringRef TargetTriple;
+
   /// The data blob containing all of the module's identifiers.
   StringRef IdentifierData;
 
@@ -284,9 +287,9 @@ private:
     unsigned ComputedImportDecls : 1;
 
     /// Whether this module file can be used, and what's wrong if not.
-    unsigned Status : 3;
+    unsigned Status : 4;
     unsigned : 0;
-  } Bits;
+  } Bits = {};
   static_assert(sizeof(Bits) <= 4, "The bit set should be small");
 
   void setStatus(ModuleStatus status) {
@@ -306,11 +309,12 @@ private:
 public:
   /// Change the status of the current module. Default argument marks the module
   /// as being malformed.
-  void error(ModuleStatus issue = ModuleStatus::Malformed) {
+  ModuleStatus error(ModuleStatus issue = ModuleStatus::Malformed) {
     assert(issue != ModuleStatus::Valid);
     assert((!FileContext || issue != ModuleStatus::Malformed) &&
            "error deserializing an individual record");
     setStatus(issue);
+    return getStatus();
   }
 
   ASTContext &getContext() const {
@@ -394,8 +398,13 @@ public:
   /// Loads a module from the given memory buffer.
   ///
   /// \param moduleInputBuffer A memory buffer containing the serialized module
-  /// data.  The created module takes ownership of the buffer, even if there's
-  /// an error in loading.
+  /// data. The created ModuleFile takes ownership of the buffer, even if
+  /// there's an error in loading.
+  /// \param moduleDocInputBuffer An optional memory buffer containing
+  /// documentation data for the module. The created ModuleFile takes ownership
+  /// of the buffer, even if there's an error in loading.
+  /// \param isFramework If true, this is treated as a framework module for
+  /// linking purposes.
   /// \param[out] theModule The loaded module.
   /// \returns Whether the module was successfully loaded, or what went wrong
   ///          if it was not.
@@ -414,8 +423,9 @@ public:
 
   /// Associates this module file with an AST module.
   ///
-  /// Returns false if the association failed.
-  bool associateWithFileContext(FileUnit *file, SourceLoc diagLoc);
+  /// Returns any error that occurred during association, including validation
+  /// that the module file is compatible with the module it's being loaded as.
+  ModuleStatus associateWithFileContext(FileUnit *file, SourceLoc diagLoc);
 
   /// Checks whether this module can be used.
   ModuleStatus getStatus() const {
@@ -513,6 +523,12 @@ public:
   /// Returns the module name as stored in the serialized data.
   StringRef getModuleName() const {
     return Name;
+  }
+
+  /// Returns the target triple the module was compiled for,
+  /// as stored in the serialized data.
+  StringRef getTargetTriple() const {
+    return TargetTriple;
   }
 
   /// AST-verify imported decls.

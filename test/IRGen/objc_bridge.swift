@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-irgen-test-overlays
-// RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %t -primary-file %s | FileCheck %s
+// RUN: %swift -emit-ir -sdk %S/Inputs -I %t -primary-file %s | FileCheck %s
 
 import Foundation
 

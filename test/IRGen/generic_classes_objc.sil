@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-irgen-test-overlays
-// RUN: %swift -enable-dynamic-value-type-layout -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %t %s -emit-ir | FileCheck %s
+// RUN: %swift -enable-dynamic-value-type-layout -sdk %S/Inputs -I %t %s -emit-ir | FileCheck %s
 
 import Builtin
 import Swift

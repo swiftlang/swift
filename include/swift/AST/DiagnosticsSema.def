@@ -185,6 +185,18 @@ ERROR(serialization_name_mismatch,sema,Fatal,
       "cannot load module '%0' as %1", (StringRef, Identifier))
 ERROR(serialization_name_mismatch_repl,sema,none,
       "cannot load module '%0' as %1", (StringRef, Identifier))
+ERROR(serialization_target_incompatible,sema,Fatal,
+      "module file was created for incompatible target %0: %1",
+      (StringRef, StringRef))
+ERROR(serialization_target_incompatible_repl,sema,none,
+      "module file was created for incompatible target %0: %1",
+      (StringRef, StringRef))
+ERROR(serialization_target_too_new,sema,Fatal,
+      "module file's minimum deployment target is %0 v%1.%2%select{|.%3}3: %4",
+      (StringRef, unsigned, unsigned, unsigned, StringRef))
+ERROR(serialization_target_too_new_repl,sema,none,
+      "module file's minimum deployment target is %0 v%1.%2%select{|.%3}3: %4",
+      (StringRef, unsigned, unsigned, unsigned, StringRef))
 
 ERROR(unknown_name_in_type,sema_nb,none,
       "use of unknown scope %0 in type reference", (Identifier))

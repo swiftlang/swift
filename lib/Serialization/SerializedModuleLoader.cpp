@@ -164,58 +164,108 @@ FileUnit *SerializedModuleLoader::loadAST(
   ModuleStatus err = ModuleFile::load(std::move(moduleInputBuffer),
                                       std::move(moduleDocInputBuffer),
                                       isFramework, loadedModuleFile);
-  switch (err) {
-  case ModuleStatus::Valid:
+  if (err == ModuleStatus::Valid) {
     Ctx.bumpGeneration();
-    break;
-  case ModuleStatus::FormatTooNew:
-    if (diagLoc)
-      Ctx.Diags.diagnose(*diagLoc, diag::serialization_module_too_new,
-                         moduleBufferID);
-    return nullptr;
-  case ModuleStatus::FormatTooOld:
-    if (diagLoc)
-      Ctx.Diags.diagnose(*diagLoc, diag::serialization_module_too_old,
-                         moduleBufferID);
-    return nullptr;
-  case ModuleStatus::Malformed:
-    if (diagLoc)
-      Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module,
-                         moduleBufferID);
-    return nullptr;
-  case ModuleStatus::MalformedDocumentation:
-    assert(moduleDocBufferID);
-    if (diagLoc)
-      Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module,
-                         moduleDocBufferID ? moduleDocBufferID : "");
-    return nullptr;
-  case ModuleStatus::MissingDependency:
-  case ModuleStatus::MissingShadowedModule:
-  case ModuleStatus::NameMismatch:
-    llvm_unreachable("dependencies haven't been loaded yet");
+
+    // We've loaded the file. Now try to bring it into the AST.
+    auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
+    M.addFile(*fileUnit);
+
+    auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
+    err = loadedModuleFile->associateWithFileContext(fileUnit,
+                                                     diagLocOrInvalid);
+    if (err == ModuleStatus::Valid) {
+      LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
+                                     Ctx.getCurrentGeneration());
+      return fileUnit;
+    }
+
+    M.removeFile(*fileUnit);
   }
 
-  // Create the FileUnit wrapper.
-  auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
-  M.addFile(*fileUnit);
-
-  auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
-  if (loadedModuleFile->associateWithFileContext(fileUnit, diagLocOrInvalid)) {
-    LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
-                                   Ctx.getCurrentGeneration());
-    return fileUnit;
-  }
-
-  // We failed to bring the module file into the AST.
-  M.removeFile(*fileUnit);
-  assert(loadedModuleFile->getStatus() == ModuleStatus::NameMismatch ||
-         loadedModuleFile->getStatus() == ModuleStatus::MissingDependency ||
-         loadedModuleFile->getStatus() == ModuleStatus::MissingShadowedModule);
-
+  // This is the failure path. If we have a location, diagnose the issue.
   if (!diagLoc)
     return nullptr;
 
-  if (loadedModuleFile->getStatus() == ModuleStatus::NameMismatch) {
+  switch (loadedModuleFile->getStatus()) {
+  case ModuleStatus::Valid:
+    llvm_unreachable("At this point we know loading has failed");
+
+  case ModuleStatus::FormatTooNew:
+    Ctx.Diags.diagnose(*diagLoc, diag::serialization_module_too_new,
+                       moduleBufferID);
+    break;
+  case ModuleStatus::FormatTooOld:
+    Ctx.Diags.diagnose(*diagLoc, diag::serialization_module_too_old,
+                       moduleBufferID);
+    break;
+  case ModuleStatus::Malformed:
+    Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module,
+                       moduleBufferID);
+    break;
+
+  case ModuleStatus::MalformedDocumentation:
+    assert(moduleDocBufferID);
+    Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module,
+                       moduleDocBufferID ? moduleDocBufferID : "");
+    break;
+
+  case ModuleStatus::MissingDependency: {
+    // Figure out /which/ dependencies are missing.
+    // FIXME: Dependencies should be de-duplicated at serialization time,
+    // not now.
+    llvm::StringMap<bool> duplicates;
+    llvm::SmallVector<ModuleFile::Dependency, 4> missing;
+    std::copy_if(loadedModuleFile->getDependencies().begin(),
+                 loadedModuleFile->getDependencies().end(),
+                 std::back_inserter(missing),
+                 [&duplicates](const ModuleFile::Dependency &dependency)->bool {
+      if (dependency.isLoaded() || dependency.isHeader())
+        return false;
+      bool &seen = duplicates[dependency.RawPath];
+      if (seen)
+        return false;
+      seen = true;
+      return true;
+    });
+
+    // FIXME: only show module part of RawAccessPath
+    assert(!missing.empty() && "unknown missing dependency?");
+    if (missing.size() == 1) {
+      Ctx.Diags.diagnose(*diagLoc,diag::serialization_missing_single_dependency,
+                         missing.front().getPrettyPrintedPath());
+    } else {
+      llvm::SmallString<64> missingNames;
+      missingNames += '\'';
+      interleave(missing,
+                 [&](const ModuleFile::Dependency &next) {
+                   missingNames += next.getPrettyPrintedPath();
+                 },
+                 [&] { missingNames += "', '"; });
+      missingNames += '\'';
+
+      Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_dependencies,
+                         missingNames);
+    }
+
+    if (Ctx.SearchPathOpts.SDKPath.empty()) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
+      Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
+    }
+    break;
+  }
+
+  case ModuleStatus::MissingShadowedModule: {
+    Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_shadowed_module,
+                       M.Name);
+    if (Ctx.SearchPathOpts.SDKPath.empty()) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
+      Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
+    }
+    break;
+  }
+
+  case ModuleStatus::NameMismatch: {
     // FIXME: This doesn't handle a non-debugger REPL, which should also treat
     // this as a non-fatal error.
     auto diagKind = diag::serialization_name_mismatch;
@@ -223,58 +273,43 @@ FileUnit *SerializedModuleLoader::loadAST(
       diagKind = diag::serialization_name_mismatch_repl;
     Ctx.Diags.diagnose(*diagLoc, diagKind,
                        loadedModuleFile->getModuleName(), M.Name);
-    return nullptr;
+    break;
   }
 
-  if (loadedModuleFile->getStatus() == ModuleStatus::MissingShadowedModule) {
-    Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_shadowed_module,
-                       M.Name);
-    if (Ctx.SearchPathOpts.SDKPath.empty()) {
-      Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
-      Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
+  case ModuleStatus::TargetIncompatible: {
+    // FIXME: This doesn't handle a non-debugger REPL, which should also treat
+    // this as a non-fatal error.
+    auto diagKind = diag::serialization_target_incompatible;
+    if (Ctx.LangOpts.DebuggerSupport)
+      diagKind = diag::serialization_target_incompatible_repl;
+    Ctx.Diags.diagnose(*diagLoc, diagKind,
+                       loadedModuleFile->getTargetTriple(), moduleBufferID);
+    break;
+  }
+
+  case ModuleStatus::TargetTooNew: {
+    StringRef moduleTargetTriple = loadedModuleFile->getTargetTriple();
+    llvm::Triple moduleTarget(llvm::Triple::normalize(moduleTargetTriple));
+
+    StringRef osName;
+    unsigned major, minor, micro;
+    if (moduleTarget.isMacOSX()) {
+      osName = swift::prettyPlatformString(PlatformKind::OSX);
+      moduleTarget.getMacOSXVersion(major, minor, micro);
+    } else {
+      osName = moduleTarget.getOSName();
+      moduleTarget.getOSVersion(major, minor, micro);
     }
-    return nullptr;
+
+    // FIXME: This doesn't handle a non-debugger REPL, which should also treat
+    // this as a non-fatal error.
+    auto diagKind = diag::serialization_target_too_new;
+    if (Ctx.LangOpts.DebuggerSupport)
+      diagKind = diag::serialization_target_too_new_repl;
+    Ctx.Diags.diagnose(*diagLoc, diagKind,
+                       osName, major, minor, micro, moduleBufferID);
+    break;
   }
-
-  // Figure out /which/ dependencies are missing.
-  // FIXME: Dependencies should be de-duplicated at serialization time, not now.
-  llvm::StringMap<bool> duplicates;
-  llvm::SmallVector<ModuleFile::Dependency, 4> missing;
-  std::copy_if(loadedModuleFile->getDependencies().begin(),
-               loadedModuleFile->getDependencies().end(),
-               std::back_inserter(missing),
-               [&duplicates](const ModuleFile::Dependency &dependency) -> bool {
-    if (dependency.isLoaded() || dependency.isHeader())
-      return false;
-    bool &seen = duplicates[dependency.RawPath];
-    if (seen)
-      return false;
-    seen = true;
-    return true;
-  });
-
-  // FIXME: only show module part of RawAccessPath
-  assert(!missing.empty() && "unknown missing dependency?");
-  if (missing.size() == 1) {
-    Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_single_dependency,
-                       missing.front().getPrettyPrintedPath());
-  } else {
-    llvm::SmallString<64> missingNames;
-    missingNames += '\'';
-    interleave(missing,
-               [&](const ModuleFile::Dependency &next) {
-                 missingNames += next.getPrettyPrintedPath();
-               },
-               [&] { missingNames += "', '"; });
-    missingNames += '\'';
-
-    Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_dependencies,
-                       missingNames);
-  }
-
-  if (Ctx.SearchPathOpts.SDKPath.empty()) {
-    Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
-    Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
   }
 
   return nullptr;

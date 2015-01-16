@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 166; // Last change: non-native owning addressor
+const uint16_t VERSION_MINOR = 167; // Last change: include target
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -358,7 +358,8 @@ namespace control_block {
   // VERSION_MAJOR.
   enum {
     METADATA = 1,
-    MODULE_NAME
+    MODULE_NAME,
+    TARGET
   };
 
   using MetadataLayout = BCRecordLayout<
@@ -371,6 +372,11 @@ namespace control_block {
   using ModuleNameLayout = BCRecordLayout<
     MODULE_NAME,
     BCBlob
+  >;
+
+  using TargetLayout = BCRecordLayout<
+    TARGET,
+    BCBlob // LLVM triple
   >;
 }
 

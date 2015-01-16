@@ -70,25 +70,28 @@ static bool enterTopLevelModuleBlock(llvm::BitstreamCursor &cursor,
   return true;
 }
 
-static std::pair<ModuleStatus, StringRef>
+static SerializedModuleLoader::ValidationInfo
 validateControlBlock(llvm::BitstreamCursor &cursor,
                      SmallVectorImpl<uint64_t> &scratch) {
   // The control block is malformed until we've at least read a major version
   // number.
-  ModuleStatus result = ModuleStatus::Malformed;
+  SerializedModuleLoader::ValidationInfo result;
   bool versionSeen = false;
-  StringRef name;
 
   auto next = cursor.advance();
   while (next.Kind != llvm::BitstreamEntry::EndBlock) {
-    if (next.Kind == llvm::BitstreamEntry::Error)
-      return { ModuleStatus::Malformed, name };
+    if (next.Kind == llvm::BitstreamEntry::Error) {
+      result.status = ModuleStatus::Malformed;
+      return result;
+    }
 
     if (next.Kind == llvm::BitstreamEntry::SubBlock) {
       // Unknown metadata sub-block, possibly for use by a future version of the
       // module format.
-      if (cursor.SkipBlock())
-        return { ModuleStatus::Malformed, name };
+      if (cursor.SkipBlock()) {
+        result.status = ModuleStatus::Malformed;
+        return result;
+      }
       next = cursor.advance();
       continue;
     }
@@ -99,30 +102,37 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
     switch (kind) {
     case control_block::METADATA: {
       if (versionSeen) {
-        result = ModuleStatus::Malformed;
-      } else {
-        uint16_t versionMajor = scratch[0];
-        if (versionMajor > VERSION_MAJOR)
-          result = ModuleStatus::FormatTooNew;
-        else if (versionMajor < VERSION_MAJOR)
-          result = ModuleStatus::FormatTooOld;
-        else
-          result = ModuleStatus::Valid;
-
-        // Major version 0 does not have stable minor versions.
-        if (versionMajor == 0) {
-          uint16_t versionMinor = scratch[1];
-          if (versionMinor != VERSION_MINOR)
-            result = versionMinor < VERSION_MINOR ? ModuleStatus::FormatTooOld
-                                                  : ModuleStatus::FormatTooNew;
-        }
-
-        versionSeen = true;
+        result.status = ModuleStatus::Malformed;
+        break;
       }
+
+      uint16_t versionMajor = scratch[0];
+      if (versionMajor > VERSION_MAJOR)
+        result.status = ModuleStatus::FormatTooNew;
+      else if (versionMajor < VERSION_MAJOR)
+        result.status = ModuleStatus::FormatTooOld;
+      else
+        result.status = ModuleStatus::Valid;
+
+      // Major version 0 does not have stable minor versions.
+      if (versionMajor == 0) {
+        uint16_t versionMinor = scratch[1];
+        if (versionMinor != VERSION_MINOR) {
+          if (versionMinor < VERSION_MINOR)
+            result.status = ModuleStatus::FormatTooOld;
+          else
+            result.status = ModuleStatus::FormatTooNew;
+        }
+      }
+
+      versionSeen = true;
       break;
     }
     case control_block::MODULE_NAME:
-      name = blobData;
+      result.name = blobData;
+      break;
+    case control_block::TARGET:
+      result.targetTriple = blobData;
       break;
     default:
       // Unknown metadata record, possibly for use by a future version of the
@@ -133,12 +143,12 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
     next = cursor.advance();
   }
 
-  return { result, name };
+  return result;
 }
 
 SerializedModuleLoader::ValidationInfo
 SerializedModuleLoader::validateSerializedAST(StringRef data) {
-  ValidationInfo result = { {}, 0, ModuleStatus::Malformed };
+  ValidationInfo result;
 
   // Check 32-bit alignment.
   if (data.size() % 4 != 0 ||
@@ -158,8 +168,7 @@ SerializedModuleLoader::validateSerializedAST(StringRef data) {
   while (topLevelEntry.Kind == llvm::BitstreamEntry::SubBlock) {
     if (topLevelEntry.ID == CONTROL_BLOCK_ID) {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
-      std::tie(result.status, result.name) =
-        validateControlBlock(cursor, scratch);
+      result = validateControlBlock(cursor, scratch);
       if (result.status == ModuleStatus::Malformed)
         return result;
 
@@ -530,18 +539,55 @@ static const uint8_t *getEndBytePtr(llvm::MemoryBuffer *buffer) {
   return reinterpret_cast<const uint8_t *>(buffer->getBufferEnd());
 }
 
+static bool areCompatibleArchitectures(const llvm::Triple &moduleTarget,
+                                       const llvm::Triple &ctxTarget) {
+  if (moduleTarget.getArch() == ctxTarget.getArch())
+    return true;
+
+  auto archPair = std::minmax(moduleTarget.getArch(), ctxTarget.getArch());
+  if (archPair == std::minmax(llvm::Triple::arm, llvm::Triple::thumb))
+    return true;
+  if (archPair == std::minmax(llvm::Triple::armeb, llvm::Triple::thumbeb))
+    return true;
+
+  return false;
+}
+
+static bool areCompatibleOSs(const llvm::Triple &moduleTarget,
+                             const llvm::Triple &ctxTarget) {
+  if (moduleTarget.getOS() == ctxTarget.getOS())
+    return true;
+
+  auto osPair = std::minmax(moduleTarget.getOS(), ctxTarget.getOS());
+  if (osPair == std::minmax(llvm::Triple::Darwin, llvm::Triple::MacOSX))
+    return true;
+
+  return false;
+}
+
+static bool isTargetTooNew(const llvm::Triple &moduleTarget,
+                           const llvm::Triple &ctxTarget) {
+  unsigned major, minor, micro;
+
+  if (moduleTarget.isMacOSX()) {
+    moduleTarget.getMacOSXVersion(major, minor, micro);
+    return ctxTarget.isMacOSXVersionLT(major, minor, micro);
+  }
+
+  moduleTarget.getOSVersion(major, minor, micro);
+  return ctxTarget.isOSVersionLT(major, minor, micro);
+}
+
 ModuleFile::ModuleFile(
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
     bool isFramework)
-    : FileContext(nullptr),
-      ModuleInputBuffer(std::move(moduleInputBuffer)),
+    : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
       ModuleInputReader(getStartBytePtr(this->ModuleInputBuffer.get()),
                         getEndBytePtr(this->ModuleInputBuffer.get())),
       ModuleDocInputReader(getStartBytePtr(this->ModuleDocInputBuffer.get()),
-                           getEndBytePtr(this->ModuleDocInputBuffer.get())),
-      Bits() {
+                           getEndBytePtr(this->ModuleDocInputBuffer.get())) {
   assert(getStatus() == ModuleStatus::Valid);
   Bits.IsFramework = isFramework;
 
@@ -566,12 +612,13 @@ ModuleFile::ModuleFile(
     case CONTROL_BLOCK_ID: {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
 
-      ModuleStatus err;
-      std::tie(err, Name) = validateControlBlock(cursor, scratch);
-      if (err != ModuleStatus::Valid) {
-        error(err);
+      auto info = validateControlBlock(cursor, scratch);
+      if (info.status != ModuleStatus::Valid) {
+        error(info.status);
         return;
       }
+      Name = info.name;
+      TargetTriple = info.targetTriple;
 
       hasValidControlBlock = true;
       break;
@@ -803,19 +850,27 @@ ModuleFile::ModuleFile(
   }
 }
 
-bool ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
+ModuleStatus ModuleFile::associateWithFileContext(FileUnit *file,
+                                                  SourceLoc diagLoc) {
   PrettyModuleFileDeserialization stackEntry(*this);
 
   assert(getStatus() == ModuleStatus::Valid && "invalid module file");
   assert(!FileContext && "already associated with an AST module");
   FileContext = file;
 
-  if (file->getParentModule()->Name.str() != Name) {
-    error(ModuleStatus::NameMismatch);
-    return false;
-  }
+  if (file->getParentModule()->Name.str() != Name)
+    return error(ModuleStatus::NameMismatch);
 
   ASTContext &ctx = getContext();
+
+  llvm::Triple moduleTarget(llvm::Triple::normalize(TargetTriple));
+  if (!areCompatibleArchitectures(moduleTarget, ctx.LangOpts.Target) ||
+      !areCompatibleOSs(moduleTarget, ctx.LangOpts.Target)) {
+    return error(ModuleStatus::TargetIncompatible);
+  } else if (isTargetTooNew(moduleTarget, ctx.LangOpts.Target)) {
+    return error(ModuleStatus::TargetTooNew);
+  }
+
   bool missingDependency = false;
   for (auto &dependency : Dependencies) {
     assert(!dependency.isLoaded() && "already loaded?");
@@ -858,8 +913,7 @@ bool ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
       // If we're missing the module we're shadowing, treat that specially.
       if (modulePath.size() == 1 &&
           modulePath.front() == file->getParentModule()->Name) {
-        error(ModuleStatus::MissingShadowedModule);
-        return false;
+        return error(ModuleStatus::MissingShadowedModule);
       }
 
       // Otherwise, continue trying to load dependencies, so that we can list
@@ -880,14 +934,13 @@ bool ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
   }
 
   if (missingDependency) {
-    error(ModuleStatus::MissingDependency);
-    return false;
+    return error(ModuleStatus::MissingDependency);
   }
 
   if (Bits.HasUnderlyingModule)
     (void)getModule(FileContext->getParentModule()->Name);
 
-  return getStatus() == ModuleStatus::Valid;
+  return getStatus();
 }
 
 ModuleFile::~ModuleFile() = default;

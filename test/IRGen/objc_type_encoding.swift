@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-irgen-test-overlays
-// RUN: %swift -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %t %s -emit-ir | FileCheck %s
+// RUN: %swift -sdk %S/Inputs -I %t %s -emit-ir | FileCheck %s
 
 import ObjectiveC
 import gizmo

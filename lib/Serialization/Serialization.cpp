@@ -311,6 +311,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK(CONTROL_BLOCK);
   BLOCK_RECORD(control_block, METADATA);
   BLOCK_RECORD(control_block, MODULE_NAME);
+  BLOCK_RECORD(control_block, TARGET);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, SOURCE_FILE);
@@ -409,6 +410,7 @@ void Serializer::writeDocBlockInfoBlock() {
   BLOCK(CONTROL_BLOCK);
   BLOCK_RECORD(control_block, METADATA);
   BLOCK_RECORD(control_block, MODULE_NAME);
+  BLOCK_RECORD(control_block, TARGET);
 
   BLOCK(COMMENT_BLOCK);
   BLOCK_RECORD(comment_block, DECL_COMMENTS);
@@ -422,6 +424,7 @@ void Serializer::writeHeader() {
     BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 3);
     control_block::ModuleNameLayout ModuleName(Out);
     control_block::MetadataLayout Metadata(Out);
+    control_block::TargetLayout Target(Out);
 
     ModuleName.emit(ScratchRecord, M->Name.str());
 
@@ -434,6 +437,8 @@ void Serializer::writeHeader() {
     Metadata.emit(ScratchRecord,
                   VERSION_MAJOR, VERSION_MINOR, EXTRA_VERSION_STRING);
 #undef EXTRA_VERSION_STRING
+
+    Target.emit(ScratchRecord, M->Ctx.LangOpts.Target.str());
   }
 }
 

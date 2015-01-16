@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift -emit-module -parse-stdlib -o %t -module-name someModule -module-link-name module %S/../Inputs/empty.swift
+// RUN: %swift -emit-module -target x86_64-apple-macosx10.9 -parse-stdlib -o %t -module-name someModule -module-link-name module %S/../Inputs/empty.swift
 // RUN: %swift -emit-ir -lmagic %s -I=%t > %t/out.txt
 // RUN: FileCheck %s < %t/out.txt
 // RUN: FileCheck -check-prefix=NO-FORCE-LOAD %s < %t/out.txt

@@ -1,5 +1,6 @@
 // RUN: rm -rf %t && mkdir %t
-// RUN: %build-irgen-test-overlays
+// RUN: %swift -target x86_64-apple-macosx10.9 -emit-module -o %t -sdk %S/Inputs %S/Inputs/ObjectiveC.swift
+// RUN: %swift -target x86_64-apple-macosx10.9 -emit-module -o %t -sdk %S/Inputs %S/Inputs/Foundation.swift
 // RUN: %swift -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %t -primary-file %s -emit-ir | FileCheck -check-prefix=CHECK-10_9 %s
 // RUN: %swift -target x86_64-apple-macosx10.10 -sdk %S/Inputs -I %t -primary-file %s -emit-ir | FileCheck -check-prefix=CHECK-10_10 %s
 

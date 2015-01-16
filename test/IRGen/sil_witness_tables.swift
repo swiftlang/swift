@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %swift -emit-module -o %t %S/sil_witness_tables_external_conformance.swift
-// RUN: %swift -target x86_64-apple-macosx10.9 -I %t -primary-file %s -emit-ir | FileCheck %s
+// RUN: %swift -I %t -primary-file %s -emit-ir | FileCheck %s
 
 import sil_witness_tables_external_conformance
 

@@ -47,7 +47,13 @@ enum class ModuleStatus {
   MalformedDocumentation,
 
   /// The module file's name does not match the module it is being loaded into.
-  NameMismatch
+  NameMismatch,
+
+  /// The module file was built for a different target platform.
+  TargetIncompatible,
+
+  /// The module file was built for a target newer than the current target.
+  TargetTooNew
 };
 
 /// \brief Imports serialized Swift modules into an ASTContext.
@@ -125,9 +131,10 @@ public:
 
   /// \see validateSerializedAST()
   struct ValidationInfo {
-    StringRef name;
-    size_t bytes;
-    ModuleStatus status;
+    StringRef name = {};
+    StringRef targetTriple = {};
+    size_t bytes = 0;
+    ModuleStatus status = ModuleStatus::Malformed;
   };
 
   /// Returns info about the serialized AST in the given data.
