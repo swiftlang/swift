@@ -1044,9 +1044,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
       Scope = llvm::DILexicalBlock(Scope).getContext();
   }
 
-  assert(Scope.Verify() && Scope.isScope());
-  if (!(Scope.Verify() && Scope.isScope()))
-    return;
+  assert(Scope.Verify() && Scope.isScope() && "variable has no scope");
 
   llvm::DIFile Unit = getFile(Scope);
   // FIXME: this should be the scope of the type's declaration.
