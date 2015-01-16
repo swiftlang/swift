@@ -29,6 +29,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/Pattern.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -2940,7 +2941,9 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   auto addr = type.allocateStack(*this,
                                  i->getElementType(),
                                  dbgname);
-  if (IGM.DebugInfo && Decl) {
+  if (IGM.DebugInfo && Decl &&
+      (!Decl->getParentPattern() ||
+       !Decl->getParentPattern()->getPattern()->isImplicit())) {
     // Discard any inout or lvalue qualifiers. Since the object itself
     // is stored in the alloca, emitting it as a reference type would
     // be wrong.
