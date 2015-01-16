@@ -3066,6 +3066,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
   internal mutating func removeAtIndex(index: Index) {
     if _fastPath(guaranteedNative) {
       nativeRemoveAtIndex(index._nativeIndex)
+      return
     }
 
     switch self {
