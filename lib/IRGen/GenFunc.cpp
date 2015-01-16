@@ -2848,7 +2848,6 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   SmallVector<const TypeInfo *, 4> argTypeInfos;
   SmallVector<SILType, 4> argValTypes;
   SmallVector<ParameterConvention, 4> argConventions;
-  bool indirectValue;
   for (auto param : params) {
     SILType argType = param.getSILType();
     
@@ -2861,19 +2860,16 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Direct_Guaranteed:
-      indirectValue = false;
       argLoweringTy = argType.getSwiftRValueType();
       break;
       
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_In_Guaranteed:
-      indirectValue = true;
       argLoweringTy = argType.getSwiftRValueType();
       break;
       
     // Capture inout parameters by pointer.
     case ParameterConvention::Indirect_Inout:
-      indirectValue = false;
       argLoweringTy = argType.getSwiftType();
       break;
       
@@ -2999,12 +2995,24 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       auto &fieldLayout = layout.getElements()[i];
       auto &fieldTy = layout.getElementTypes()[i];
       Address fieldAddr = fieldLayout.project(IGF, dataAddr, offsets);
-      if (indirectValue) {
+      switch (argConventions[i]) {
+      // Take indirect value arguments out of memory.
+      case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Guaranteed: {
         auto addr = fieldLayout.getType().getAddressForPointer(args.claimNext());
         fieldLayout.getType().initializeWithTake(IGF, fieldAddr, addr, fieldTy);
-      } else {
+        break;
+      }
+      // Take direct value arguments and inout pointers by value.
+      case ParameterConvention::Direct_Unowned:
+      case ParameterConvention::Direct_Owned:
+      case ParameterConvention::Direct_Guaranteed:
+      case ParameterConvention::Indirect_Inout:
         cast<LoadableTypeInfo>(fieldLayout.getType())
           .initialize(IGF, args, fieldAddr);
+        break;
+      case ParameterConvention::Indirect_Out:
+        llvm_unreachable("can't capture out params");
       }
     }
   }
