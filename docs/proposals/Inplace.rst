@@ -165,20 +165,19 @@ Methods are a more interesting case, since on mutating methods,
 
   x.union(y) // mutating or non-mutating?
 
-We propose to allow method overload pairs of the form:
+We propose to allow method pairs of the form:
 
 .. parsed-literal::
 
   extension **X** {
     func *f*\ (p₀: T₀, p₁: T₁, p₂: T₂, …p\ *n*: T\ *n*) -> **X**
 
-    **@assignment**
-    mutating func *f*\ (p₀: T₀, p₁: T₁, p₂: T₂, …p\ *n*: T\ *n*) -> **Void**
+    func **=**\ *f*\ (p₀: T₀, p₁: T₁, p₂: T₂, …p\ *n*: T\ *n*) -> **Void**
   }
 
-The second overload is known as an **assignment method**, [#getset]_
-and overloads of this form without the ``@assignment`` attribute are
-rejected as ill-formed.  Together these overloads are known as an
+The second ``=f`` method is known as an **assignment method** [#getset]_.
+Assignment methods are implicitly ``mutating``.
+Together these two methods, ``f`` and ``=f``, are known as an
 **assignment method pair**.  This concept generalizes in obvious ways
 to pairs of generic methods, details open for discussion.
 
@@ -203,17 +202,49 @@ target is ``self``::
 Assignment Operator Pairs
 -------------------------
 
-Similarly, a pair of overloaded operators of the form:
+Many operators have assignment forms, for instance, ``+`` has ``+=``, ``-``
+has ``-=``, and so on. However, not all operators do; ``!=`` is not the
+assignment form of ``!``, nor is ``<=`` the assignment form of ``<``. Operators
+with assignment forms can declare this fact in their ``operator`` declaration:
+
+.. parsed-literal::
+
+  infix operator + {
+    **has_assignment**
+  }
+
+For an operator *op* which ``has_assignment``, a pair of operator definitions
+of the form:
 
 .. parsed-literal::
 
   func *op*\ (**X**, Y) -> **X**
 
-  **@assignment**
   func *op*\ =(**inout X**, Y) -> **Void**
 
 is known as an **assignment operator pair**, and similar
 generalization to pairs of generic operators is possible.
+
+To avoid confusion, the existing ``assignment`` operator modifier, which
+indicates that an operator receives one of its operands implicitly ``inout``,
+shall be renamed ``mutating``, since it can also be applied to non-assignment
+operators:
+
+.. parsed-literal::
+
+  postfix operator ++ {
+    **mutating** // formerly "assignment"
+  }
+
+If an operator ``op`` which ``has_assignment`` is in scope, it is an error to
+declare ``op=`` as an independent operator:
+
+.. parsed-literal::
+
+  operator *☃* { has_assignment }
+
+  // Error: '☃=' is the assignment form of existing operator '☃'
+  operator *☃=* { has_assignment }
 
 Eliminating Tedious Boilerplate
 ===============================
@@ -234,8 +265,7 @@ if there is no corresponding *assignment method* in ``X`` with the signature
 .. parsed-literal::
 
   extension **X** {
-    @assignment
-    mutating func *f*\ (p₀: T₀, p₁: T₁, p₂: T₂, …p\ *n*: T\ *n*) -> **Void**
+    func *=f*\ (p₀: T₀, p₁: T₁, p₂: T₂, …p\ *n*: T\ *n*) -> **Void**
   }
 
 we can compile the statement
@@ -258,8 +288,7 @@ Given an *assignment method* of a value type ``X``:
 .. parsed-literal::
 
   extension **X** {
-    **@assignment**
-    mutating func *f*\ (p₀: T₀, p₁: T₁, p₂: T₂, …p\ *n*: T\ *n*) -> **Void**
+    func *=f*\ (p₀: T₀, p₁: T₁, p₂: T₂, …p\ *n*: T\ *n*) -> **Void**
   }
 
 if there is no method in ``X`` with the signature
@@ -289,7 +318,7 @@ as though it were written:
 Generating Operator Forms
 -------------------------
 
-If only one member of an assignment operator pair is defined, similar
+If only one member of an *assignment operator pair* is defined, similar
 rules allow the generation of code using the other member.  E.g.
 
 we can compile
@@ -320,65 +349,8 @@ as though it were written:
     return y
   }(x)
 
-Enabling Optimization
-=====================
-
-By requiring that explicitly-written assignment operator and method
-pairs obey the laws of implicit generation laid out above, we can
-allow the compiler to use rvalues (and lvalues whose last use is the
-current expression) as "scratch space," thus avoiding expensive
-temporaries.
-
-Basic Optimizations
--------------------
-
-Specifically, for *assignment method pairs*, we must require that the
-following two lines are equivalent:
-
-.. parsed-literal::
-
-  **x = x.**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*) // form 1
-  **x.=**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)    // form 2
-
-and for *assignment operator pairs*, that the following two lines are
-equivalent:
-
-.. parsed-literal::
-
-  **x = x** *op* *expression*   // form 1
-  **x** *op*\ **=** *expression*      // form 2
-
-With those requirements in place, the compiler can rewrite form 1 as form 2
-thereby avoiding the creation of temporaries.
-
-Chained Optimizations
----------------------
-
-The compiler can also avoid temporaries by rewriting
-
-.. parsed-literal::
-
-  x.\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)
-   .\ *f*\ (b₀, p₁: b₁, p₂: b₂, …p\ *n*: b\ *n*)
-
-as
-
-.. parsed-literal::
-
-  { ()->X in 
-    var __t = **x.**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)
-    __t\ **.=**\ *f*\ (b₀, p₁: b₁, p₂: b₂, …p\ *n*: b\ *n*)
-    return __t
-  }()
-
-Extending “chained” rewrites to *assignment operator pairs* requires
-an additional declaration that the operator is associative.  We
-propose an ``@associative`` attribute for that purpose, to be applied to
-on a case-by-case basis to ``func`` declarations, rather than tying
-associativity to the ``operator`` declaration.
-
-Supporting Class Types
-======================
+Class Types
+===========
 
 Assignment and operators are generally applied to value types, but
 it's reasonable to ask how to apply them to class types.  The first
@@ -389,7 +361,6 @@ An assignment operator for an immutable class ``X`` always has the form:
 
 .. parsed-literal::
 
-  @assignment
   func *op*\ **=** (**inout** lhs: X, rhs: Y) {
     lhs = *expression creating a new X object*
   }
@@ -398,7 +369,6 @@ or, with COW optimization:
 
 .. parsed-literal::
 
-  @assignment
   func *op*\ **=** (**inout** lhs: X, rhs: Y) {
     if isUniquelyReferenced(&lhs) {
       lhs.\ *mutateInPlace*\ (rhs)
@@ -429,17 +399,17 @@ show up in protocols.
 Assignment Methods and Operators In Protocols
 =============================================
 
-The presence of an ``@assignment`` signature in the protocol implies
-the corresponding non-assignment signature is available.  An
-``@assignment`` method in a protocol generates two witness table
-slots, one for each version of the implied pair.  If the
-``@assignment`` signature is provided in the protocol, any
-corresponding non-``@assignment`` signature is ignored.  A type can
+The presence of a ``=method`` signature in the protocol implies that
+the corresponding non-assignment signature is available.  Declaring
+``=method`` in a protocol generates two witness table
+slots, one for each method of the implied pair.  If the
+``=method`` signature is provided in the protocol, any
+corresponding non-assignment ``method`` signature is ignored.  A type can
 satisfy the protocol requirement by providing either or both members
 of the pair; a thunk for the missing member of the pair is generated
 as needed.
 
-When only the non-``@assignment`` member of a pair appears in the
+When only the non-assignment ``method`` member of a pair appears in the
 protocol, it generates only one witness table slot.  The assignment
 signature is implicitly available on existentials and archetypes, with
 the usual implicitly-generated semantics.
