@@ -380,8 +380,9 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, SILDebugScope *DS,
 
   assert(DS);
   llvm::DIDescriptor Scope = getOrCreateScope(DS);
-  if (!Scope.Verify())
+  if (!Scope)
     return;
+  assert(Scope.Verify() && "could not verify scope");
 
   Location L = getDebugLocation(SM, Loc);
   auto File = getOrCreateFile(L.Filename);
