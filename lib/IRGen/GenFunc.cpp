@@ -2615,13 +2615,14 @@ static void emitApplyArgument(IRGenFunction &IGF,
 
 /// Emit the forwarding stub function for a partial application.
 static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
-                                       llvm::Function *staticFnPtr,
-                                       llvm::Type *fnTy,
-                                       CanSILFunctionType origType,
-                                       CanSILFunctionType substType,
-                                       CanSILFunctionType outType,
-                                       ArrayRef<Substitution> subs,
-                                       HeapLayout const &layout) {
+                                   llvm::Function *staticFnPtr,
+                                   llvm::Type *fnTy,
+                                   CanSILFunctionType origType,
+                                   CanSILFunctionType substType,
+                                   CanSILFunctionType outType,
+                                   ArrayRef<Substitution> subs,
+                                   HeapLayout const &layout,
+                                   ArrayRef<ParameterConvention> conventions) {
   llvm::AttributeSet attrs;
   ExtraData extraData
     = layout.isKnownEmpty() ? ExtraData::None : ExtraData::Retainable;
@@ -2679,29 +2680,52 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // FIXME: support
   NonFixedOffsets offsets = None;
   
+  bool dependsOnContextLifetime = false;
+  bool consumesContext;
+  
+  switch (outType->getCalleeConvention()) {
+  case ParameterConvention::Direct_Owned:
+    consumesContext = true;
+    break;
+  case ParameterConvention::Direct_Unowned:
+  case ParameterConvention::Direct_Guaranteed:
+    consumesContext = false;
+    break;
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_Out:
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Guaranteed:
+    llvm_unreachable("indirect callables not supported");
+  }
+
   // If there's a data pointer required, grab it (it's always the
   // last parameter) and load out the extra, previously-curried
   // parameters.
+  llvm::Value *rawData = nullptr;
   if (!layout.isKnownEmpty()) {
     // Lower the captured arguments in the original function's generic context.
     GenericContextScope scope(IGM, origType->getGenericSignature());
     
-    llvm::Value *rawData = origParams.takeLast();
+    rawData = origParams.takeLast();
     Address data = layout.emitCastTo(subIGF, rawData);
 
     // Perform the loads.
     unsigned origParamI = outType->getParameters().size();
+    assert(layout.getElements().size() == conventions.size()
+           && "conventions don't match context layout");
+
     for (unsigned i : indices(layout.getElements())) {
       auto &fieldLayout = layout.getElements()[i];
       auto &fieldTy = layout.getElementTypes()[i];
+      auto fieldConvention = conventions[i];
       Address fieldAddr = fieldLayout.project(subIGF, data, offsets);
       auto &fieldTI = fieldLayout.getType();
       
       Explosion param;
-      // If the argument is passed indirectly, copy into a temporary.
-      // (If it were instead passed "const +0", we could pass a reference
-      // to the memory in the data pointer.  But it isn't.)
-      if (fieldTI.isIndirectArgument()) {
+      switch (fieldConvention) {
+      case ParameterConvention::Indirect_In: {
+        // The +1 argument is passed indirectly, so we need to copy into a
+        // temporary.
         auto caddr = fieldTI.allocateStack(subIGF, fieldTy, "arg.temp");
         fieldTI.initializeWithCopy(subIGF, caddr.getAddress(), fieldAddr,
                                    fieldTy);
@@ -2710,9 +2734,34 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         // Remember to deallocate later.
         addressesToDeallocate.push_back(
                   AddressToDeallocate{fieldTy, fieldTI, caddr.getContainer()});
-      } else {
-        // Otherwise, just load out.
+
+        break;
+      }
+      case ParameterConvention::Indirect_In_Guaranteed:
+        // The argument is +0, so we can use the address of the param in
+        // the context directly.
+        param.add(fieldAddr.getAddress());
+        dependsOnContextLifetime = true;
+        break;
+      case ParameterConvention::Indirect_Inout:
+        // Load the address of the inout parameter.
         cast<LoadableTypeInfo>(fieldTI).loadAsCopy(subIGF, fieldAddr, param);
+        break;
+      case ParameterConvention::Direct_Guaranteed:
+      case ParameterConvention::Direct_Unowned:
+        // Load these parameters directly. We can "take" since the parameter is
+        // +0 and the context will keep the parameter alive for us. If the type
+        // is nontrivial, keep the context alive.
+        if (!fieldTI.isPOD(ResilienceScope::Local))
+          dependsOnContextLifetime = true;
+        cast<LoadableTypeInfo>(fieldTI).loadAsTake(subIGF, fieldAddr, param);
+        break;
+      case ParameterConvention::Direct_Owned:
+        // Copy the value out at +1.
+        cast<LoadableTypeInfo>(fieldTI).loadAsCopy(subIGF, fieldAddr, param);
+        break;
+      case ParameterConvention::Indirect_Out:
+        llvm_unreachable("can't partially apply out params");
       }
       
       // Reemit the capture params as unsubstituted.
@@ -2727,10 +2776,11 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       }
     }
     
-    // Kill the allocated data pointer immediately.  The safety of
-    // this assumes that neither this release nor any of the loads
-    // can throw.
-    subIGF.emitRelease(rawData);
+    // If the parameters can live independent of the context, release it now
+    // so we can tail call. The safety of this assumes that neither this release
+    // nor any of the loads can throw.
+    if (consumesContext && !dependsOnContextLifetime)
+      subIGF.emitRelease(rawData);
   }
   
   // If we didn't receive a static function, dig the function pointer
@@ -2753,13 +2803,18 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     call->setAttributes(staticFnPtr->getAttributes());
     call->setCallingConv(staticFnPtr->getCallingConv());
   }
-  call->setTailCall();
+  if (!consumesContext || !dependsOnContextLifetime)
+    call->setTailCall();
 
   // Deallocate everything we allocated above.
   // FIXME: exceptions?
   for (auto &entry : addressesToDeallocate) {
     entry.TI.deallocateStack(subIGF, entry.Addr, entry.Type);
   }
+  
+  // If the parameters depended on the context, consume the context now.
+  if (rawData && consumesContext && dependsOnContextLifetime)
+    subIGF.emitRelease(rawData);
   
   // FIXME: Reabstract the result value as substituted.
 
@@ -2777,7 +2832,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                                            llvm::Value *fnPtr,
                                            llvm::Value *fnContext,
                                            Explosion &args,
-                                           ArrayRef<SILType> argTypes,
+                                           ArrayRef<SILParameterInfo> params,
                                            ArrayRef<Substitution> subs,
                                            CanSILFunctionType origType,
                                            CanSILFunctionType substType,
@@ -2787,13 +2842,46 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   // directly as our closure context without creating a box and thunk.
   enum HasSingleSwiftRefcountedContext { Maybe, Yes, No }
     hasSingleSwiftRefcountedContext = Maybe;
+  Optional<ParameterConvention> singleRefcountedConvention;
   
   // Collect the type infos for the context types.
   SmallVector<const TypeInfo *, 4> argTypeInfos;
   SmallVector<SILType, 4> argValTypes;
-  for (SILType argType : argTypes) {
+  SmallVector<ParameterConvention, 4> argConventions;
+  bool indirectValue;
+  for (auto param : params) {
+    SILType argType = param.getSILType();
+    
     argValTypes.push_back(argType);
-    auto &ti = IGF.getTypeInfoForLowered(argType.getSwiftType());
+    argConventions.push_back(param.getConvention());
+    
+    CanType argLoweringTy;
+    switch (param.getConvention()) {
+    // Capture value parameters by value, consuming them.
+    case ParameterConvention::Direct_Owned:
+    case ParameterConvention::Direct_Unowned:
+    case ParameterConvention::Direct_Guaranteed:
+      indirectValue = false;
+      argLoweringTy = argType.getSwiftRValueType();
+      break;
+      
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Guaranteed:
+      indirectValue = true;
+      argLoweringTy = argType.getSwiftRValueType();
+      break;
+      
+    // Capture inout parameters by pointer.
+    case ParameterConvention::Indirect_Inout:
+      indirectValue = false;
+      argLoweringTy = argType.getSwiftType();
+      break;
+      
+    case ParameterConvention::Indirect_Out:
+      llvm_unreachable("can't partially apply out params");
+    }
+    
+    auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
     argTypeInfos.push_back(&ti);
 
     // Update the single-swift-refcounted check, unless we already ruled that
@@ -2813,22 +2901,27 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       continue;
     }
       
-    if (ti.isSingleSwiftRetainablePointer(ResilienceScope::Local))
+    if (ti.isSingleSwiftRetainablePointer(ResilienceScope::Local)) {
       hasSingleSwiftRefcountedContext = Yes;
-    else
+      singleRefcountedConvention = param.getConvention();
+    } else {
       hasSingleSwiftRefcountedContext = No;
+    }
   }
   
   // Include the context pointer, if any, in the function arguments.
   if (fnContext) {
     args.add(fnContext);
     argValTypes.push_back(SILType::getNativeObjectType(IGF.IGM.Context));
+    argConventions.push_back(origType->getCalleeConvention());
     argTypeInfos.push_back(
          &IGF.getTypeInfoForLowered(IGF.IGM.Context.TheNativeObjectType));
     // If this is the only context argument we end up with, we can just share
     // it.
-    if (args.size() == 1)
+    if (args.size() == 1) {
       hasSingleSwiftRefcountedContext = Yes;
+      singleRefcountedConvention = origType->getCalleeConvention();
+    }
   }
   
   // Collect the polymorphic arguments.
@@ -2845,9 +2938,11 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       // depend on context.
       if (arg->getType() == IGF.IGM.TypeMetadataPtrTy) {
         argValTypes.push_back(SILType());
+        argConventions.push_back(ParameterConvention::Direct_Unowned);
         argTypeInfos.push_back(&metatypeTI);
       } else if (arg->getType() == IGF.IGM.WitnessTablePtrTy) {
         argValTypes.push_back(SILType());
+        argConventions.push_back(ParameterConvention::Direct_Unowned);
         argTypeInfos.push_back(&witnessTI);
       } else
         llvm_unreachable("unexpected polymorphic argument");
@@ -2859,9 +2954,11 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   }
   
   // If we have a single refcounted pointer context (and no polymorphic args
-  // to capture), skip building the box and thunk and just take the pointer as
+  // to capture), and the dest ownership semantics match the parameter's,
+  // skip building the box and thunk and just take the pointer as
   // context.
-  if (args.size() == 1 && hasSingleSwiftRefcountedContext == Yes) {
+  if (args.size() == 1 && hasSingleSwiftRefcountedContext == Yes
+      && outType->getCalleeConvention() == *singleRefcountedConvention) {
     fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
     out.add(fnPtr);
     llvm::Value *ctx = args.claimNext();
@@ -2878,10 +2975,13 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     argValTypes.push_back(SILType::getRawPointerType(IGF.IGM.Context));
     argTypeInfos.push_back(
          &IGF.getTypeInfoForLowered(IGF.IGM.Context.TheRawPointerType));
-
+    argConventions.push_back(ParameterConvention::Direct_Unowned);
   }
 
   // Store the context arguments on the heap.
+  assert(argValTypes.size() == argTypeInfos.size()
+         && argTypeInfos.size() == argConventions.size()
+         && "argument info lists out of sync");
   HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, argValTypes, argTypeInfos);
   llvm::Value *data;
   if (layout.isKnownEmpty()) {
@@ -2899,7 +2999,13 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       auto &fieldLayout = layout.getElements()[i];
       auto &fieldTy = layout.getElementTypes()[i];
       Address fieldAddr = fieldLayout.project(IGF, dataAddr, offsets);
-      fieldLayout.getType().initializeFromParams(IGF, args, fieldAddr, fieldTy);
+      if (indirectValue) {
+        auto addr = fieldLayout.getType().getAddressForPointer(args.claimNext());
+        fieldLayout.getType().initializeWithTake(IGF, fieldAddr, addr, fieldTy);
+      } else {
+        cast<LoadableTypeInfo>(fieldLayout.getType())
+          .initialize(IGF, args, fieldAddr);
+      }
     }
   }
   assert(args.empty() && "unused args in partial application?!");
@@ -2918,7 +3024,8 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                                                               substType,
                                                               outType,
                                                               subs,
-                                                              layout);
+                                                              layout,
+                                                              argConventions);
   llvm::Value *forwarderValue = IGF.Builder.CreateBitCast(forwarder,
                                                           IGF.IGM.Int8PtrTy);
   out.add(forwarderValue);

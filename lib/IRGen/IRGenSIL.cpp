@@ -1879,7 +1879,6 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   params = params.slice(params.size() - args.size(), args.size());
   
   Explosion llArgs;
-  SmallVector<SILType, 8> argTypes;
 
   {
     // Lower the parameters in the callee's generic context.
@@ -1887,9 +1886,6 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
     for (auto index : indices(args)) {
       assert(args[index].getType() == params[index].getSILType());
       emitApplyArgument(*this, args[index], params[index], llArgs);
-      // FIXME: Need to carry the address-ness of each argument alongside
-      // the object type's TypeInfo.
-      argTypes.push_back(args[index].getType());
     }
   }
   
@@ -1929,7 +1925,7 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   // Create the thunk and function value.
   Explosion function;
   emitFunctionPartialApplication(*this, calleeFn, innerContext, llArgs,
-                                 argTypes, i->getSubstitutions(),
+                                 params, i->getSubstitutions(),
                                  origCalleeTy, i->getSubstCalleeType(),
                                  i->getType().castTo<SILFunctionType>(),
                                  function);

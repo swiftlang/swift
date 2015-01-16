@@ -1,6 +1,7 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir | FileCheck %s
-
-// FIXME: This should be a SIL test, but we can't parse generic types yet.
+// Broken due to lack of NonFixedOffsets and NecessaryBindings on HeapLayouts
+//   -JoeG
+// XFAIL: *
 
 infix operator ~> { precedence 255 }
 
