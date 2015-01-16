@@ -551,7 +551,8 @@ SILCombiner::optimizeApplyOfPartialApply(ApplyInst *AI, PartialApplyInst *PAI) {
   }
 
   ApplyInst *NAI = Builder->createApply(AI->getLoc(), FRI, FnType, ResultTy,
-                                        Subs, Args, AI->isTransparent());
+                                        Subs, Args,
+                                 FRI->getReferencedFunction()->isTransparent());
   NAI->setDebugScope(AI->getDebugScope());
 
   // We also need to release the partial_apply instruction itself because it

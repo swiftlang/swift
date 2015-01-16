@@ -809,6 +809,52 @@ bb0(%0 : $Int):
 sil @some_closure : $@thin (Int) -> Int
 sil @print_a_number : $@thin (Int) -> ()
 
+// CHECK-LABEL: sil @applied
+sil @applied : $@thin (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+// CHECK: return
+  return %0 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil @combine_partial_apply_with_apply
+sil @combine_partial_apply_with_apply : $@thin (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  // CHECK: [[APPLIED:%.*]] = function_ref @applied
+  %2 = function_ref @applied : $@thin (Builtin.Int32) -> Builtin.Int32
+  // CHECK: [[THICK:%.*]] = thin_to_thick_function [[APPLIED]]
+  %3 = thin_to_thick_function %2 : $@thin (Builtin.Int32) -> Builtin.Int32 to $@callee_owned (Builtin.Int32) -> Builtin.Int32
+  // CHECK: [[REABSTRACT:%.*]] = function_ref @reabstract
+  %4 = function_ref @reabstract : $@thin (@out Builtin.Int32, Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> Builtin.Int32) -> ()
+  // CHECK-NOT: partial_apply
+  %5 = partial_apply %4(%3) : $@thin (@out Builtin.Int32, Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> Builtin.Int32) -> ()
+  // CHECK: [[TMP:%.*]] = alloc_stack $Builtin.Int32
+  %6 = alloc_stack $Builtin.Int32
+  // CHECK-NOT: strong_retain
+  strong_retain %5 : $@callee_owned (@out Builtin.Int32, Builtin.Int32) -> ()
+  // CHECK: apply [transparent] [[REABSTRACT]]([[TMP]]#1, %0, [[THICK]])
+  %8 = apply %5(%6#1, %0) : $@callee_owned (@out Builtin.Int32, Builtin.Int32) -> ()
+  // CHECK-NOT: strong_release
+  strong_release %5 : $@callee_owned (@out Builtin.Int32, Builtin.Int32) -> ()
+  // CHECK-NOT: tuple
+  %10 = tuple ()
+  // CHECK: [[RESULT:%.*]] = load [[TMP]]#1
+  %11 = load %6#1 : $*Builtin.Int32
+  // CHECK: dealloc_stack [[TMP]]#0
+  dealloc_stack %6#0 : $*@local_storage Builtin.Int32
+  // CHECK: return [[RESULT]]
+  return %11 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil shared [transparent] @reabstract
+sil shared [transparent] @reabstract : $@thin (@out Builtin.Int32, Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> Builtin.Int32) -> () {
+bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32, %2 : $@callee_owned (Builtin.Int32) -> Builtin.Int32):
+  %3 = apply %2(%1) : $@callee_owned (Builtin.Int32) -> Builtin.Int32
+  store %3 to %0 : $*Builtin.Int32
+  %5 = tuple ()
+  // CHECK: return
+  return %5 : $()
+}
+
 //CHECK-LABEL: remove_init_ex
 //CHECK: alloc_stack $Bool
 //CHECK-NOT: init_existential
