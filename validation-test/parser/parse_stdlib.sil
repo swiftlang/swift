@@ -1,5 +1,5 @@
 // Make sure that we can parse the stdlib.sil deserialized from Swift.swiftmodule.
 
 // RUN: rm -f %t.*
-// RUN: %sil-opt -sil-disable-ast-dump -verify %libdir/swift/macosx/Swift.swiftmodule -module-name=Swift -target=%target-triple -o %t.sil
+// RUN: %sil-opt -sil-disable-ast-dump -verify %libdir/swift/%target-sdk-name/$(test "%target-ptrsize" == "64" || echo %target-ptrsize)/Swift.swiftmodule -module-name=Swift -target=%target-triple -o %t.sil
 // RUN: %sil-opt -verify %t.sil > /dev/null
