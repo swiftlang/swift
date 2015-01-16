@@ -151,6 +151,10 @@ NOTE(suggest_partial_overloads,sema,none,
       "Overloads for '%0' exist with these partially matching parameter "
       "lists: %1", (StringRef, StringRef))
 
+ERROR(unsupported_objc_metatype_conversion,sema,none,
+      "converting a metatype to a reference is only supported with an "
+      "Objective-C runtime", ())
+
 //------------------------------------------------------------------------------
 // Name Binding
 //------------------------------------------------------------------------------

@@ -2243,6 +2243,8 @@ ExistentialMetatypeType::ExistentialMetatypeType(Type T,
   if (repr) {
     assert(*repr != MetatypeRepresentation::Thin &&
            "creating a thin existential metatype?");
+    assert(getASTContext().LangOpts.EnableObjCInterop ||
+           *repr != MetatypeRepresentation::ObjC);
   }
 }
 

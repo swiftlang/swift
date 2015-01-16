@@ -1077,16 +1077,20 @@ bool swift::_swift_isUniquelyReferencedOrPinned_nonNull_native(
   return object->refCount.isUniquelyReferencedOrPinned();
 }
 
+#if SWIFT_OBJC_INTEROP
 /// Returns class_getInstanceSize(c)
 ///
 /// That function is otherwise unavailable to the core stdlib.
 size_t swift::_swift_class_getInstancePositiveExtentSize(const void* c) {
-#if SWIFT_OBJC_INTEROP
   return class_getInstanceSize((Class)c);
-#else
-  auto metaData = static_cast<const ClassMetadata*>(c);
-  return metaData->getInstanceSize() - metaData->getInstanceAddressPoint();
+}
 #endif
+
+extern "C" size_t _swift_class_getInstancePositiveExtentSize_native(
+    const Metadata *c) {
+  assert(c && c->isClassObject());
+  auto metaData = c->getClassObject();
+  return metaData->getInstanceSize() - metaData->getInstanceAddressPoint();
 }
 
 const ClassMetadata *swift::getRootSuperclass() {

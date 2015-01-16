@@ -5149,6 +5149,8 @@ void irgen::emitMetatypeOfClassExistential(IRGenFunction &IGF, Explosion &value,
   auto repr = metaTy->getRepresentation();
   assert(repr != MetatypeRepresentation::Thin &&
          "Class metatypes should have a thin representation");
+  assert((IGF.IGM.ObjCInterop || repr != MetatypeRepresentation::ObjC) &&
+         "Class metatypes should not have ObjC representation without runtime");
 
   if (repr == MetatypeRepresentation::Thick) {
     auto dynamicType = emitDynamicTypeOfOpaqueHeapObject(IGF, instance);

@@ -258,11 +258,18 @@ internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 #endif
 }
 
+@asmname("_swift_class_getInstancePositiveExtentSize_native")
+func _swift_class_getInstancePositiveExtentSize_native(theClass: AnyClass) -> UInt
+
 /// Returns: `class_getInstanceSize(theClass)`
 @inline(__always)
 internal func _class_getInstancePositiveExtentSize(theClass: AnyClass) -> Int {
+#if _runtime(_ObjC)
   return Int(_swift_class_getInstancePositiveExtentSize(
       unsafeAddressOf(theClass)))
+#else
+  return Int(_swift_class_getInstancePositiveExtentSize_native(theClass))
+#endif
 }
 
 @asmname("_swift_isClass")
