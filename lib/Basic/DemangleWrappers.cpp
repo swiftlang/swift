@@ -32,6 +32,10 @@ static void printNode(llvm::raw_ostream &Out, const Node *node,
                       unsigned depth) {
   // Indent two spaces per depth.
   Out.indent(depth * 2);
+  if (!node) {
+    Out << "<<NULL>>";
+    return;
+  }
   Out << "kind=" << getNodeKindString(node->getKind());
   if (node->hasText()) {
     Out << ", text=\"" << node->getText() << '\"';

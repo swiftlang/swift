@@ -37,6 +37,10 @@ TreeOnly("tree-only",
            llvm::cl::desc("Tree-only mode (do not show the demangled string)"));
 
 static llvm::cl::opt<bool>
+RemangleMode("remangle",
+           llvm::cl::desc("Remangle mode (show the remangled string)"));
+
+static llvm::cl::opt<bool>
 DisableSugar("no-sugar",
            llvm::cl::desc("No sugar mode (disable common language idioms such as ? and [] from the output)"));
 
@@ -53,6 +57,11 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
   if (ExpandMode || TreeOnly) {
     llvm::outs() << "Demangling for " << name << '\n';
     swift::demangle_wrappers::NodeDumper(pointer).print(llvm::outs());
+  }
+  if (RemangleMode) {
+    llvm::outs() << "Remangling for " << name << " ---> ";
+    llvm::outs() << swift::Demangle::mangleNode(pointer);
+    llvm::outs() << '\n';
   }
   if (!TreeOnly) {
     std::string string = swift::Demangle::nodeToString(pointer, options);

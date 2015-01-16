@@ -17,6 +17,7 @@
 #include <string>
 #include <vector>
 #include <cassert>
+#include <iosfwd>
 
 namespace llvm {
   class raw_ostream;
@@ -34,6 +35,52 @@ struct DemangleOptions {
 
 class Node;
 typedef std::shared_ptr<Node> NodePointer;
+
+enum class FunctionSigSpecializationParamInfoKind : unsigned {
+  // Option Flags use bits 0-5. This give us 6 bits implying 64 entries to
+  // work with.
+  Dead=0,
+  ConstantPropFunction=1,
+  ConstantPropGlobal=2,
+  ConstantPropInteger=3,
+  ConstantPropFloat=4,
+  ConstantPropString=5,
+  ClosureProp=6,
+  InOutToValue=7,
+
+  // Option Set Flags use bits 6-31. This gives us 26 bits to use for option
+  // flags.
+  OwnedToGuaranteed=1 << 6,
+  SROA=1 << 7,
+};
+
+enum class ValueWitnessKind {
+  AllocateBuffer,
+  AssignWithCopy,
+  AssignWithTake,
+  DeallocateBuffer,
+  Destroy,
+  DestroyBuffer,
+  InitializeBufferWithCopyOfBuffer,
+  InitializeBufferWithCopy,
+  InitializeWithCopy,
+  InitializeBufferWithTake,
+  InitializeWithTake,
+  ProjectBuffer,
+  InitializeBufferWithTakeOfBuffer,
+  DestroyArray,
+  InitializeArrayWithCopy,
+  InitializeArrayWithTakeFrontToBack,
+  InitializeArrayWithTakeBackToFront,
+  StoreExtraInhabitant,
+  GetExtraInhabitantIndex,
+  GetEnumTag,
+  InplaceProjectEnumData
+};
+
+enum class Directness {
+  Direct, Indirect
+};
 
 class Node : public std::enable_shared_from_this<Node> {
 public:
@@ -130,19 +177,114 @@ public:
 /// Typical usage:
 /// \code
 ///   NodePointer aDemangledName =
+/// swift::Demangler::demangleSymbolAsNode("SomeSwiftMangledName")
+/// \endcode
+///
+/// \param mangledName The mangled string.
+/// \param options An object encapsulating options to use to perform this demangling.
+///
+///
+/// \returns A parse tree for the demangled string - or a null pointer
+/// on failure.
+///
+NodePointer
+demangleSymbolAsNode(const char *mangledName, size_t mangledNameLength,
+                     const DemangleOptions &options = DemangleOptions());
+
+inline NodePointer
+demangleSymbolAsNode(const std::string &mangledName,
+                     const DemangleOptions &options = DemangleOptions()) {
+  return demangleSymbolAsNode(mangledName.data(), mangledName.size(), options);
+}
+
+/// \brief Demangle the given string as a Swift symbol.
+///
+/// Typical usage:
+/// \code
+///   std::string aDemangledName =
 /// swift::Demangler::demangleSymbol("SomeSwiftMangledName")
 /// \endcode
 ///
-/// \param MangledName The mangled string.
-/// \param Options An object encapsulating options to use to perform this demangling.
+/// \param mangledName The mangled string.
+/// \param options An object encapsulating options to use to perform this demangling.
 ///
 ///
-/// \returns A parse tree for the demangled string - or a Failure node on
-/// failure.
+/// \returns A string representing the demangled name.
+///
+std::string
+demangleSymbolAsString(const char *mangledName, size_t mangledNameLength,
+                       const DemangleOptions &options = DemangleOptions());
+
+inline std::string
+demangleSymbolAsString(const std::string &mangledName,
+                       const DemangleOptions &options = DemangleOptions()) {
+  return demangleSymbolAsString(mangledName.data(), mangledName.size(),
+                                options);
+}
+
+/// \brief Demangle the given string as a Swift type.
+///
+/// Typical usage:
+/// \code
+///   NodePointer aDemangledName =
+/// swift::Demangler::demangleTypeAsNode("SomeSwiftMangledName")
+/// \endcode
+///
+/// \param mangledName The mangled string.
+/// \param options An object encapsulating options to use to perform this demangling.
+///
+///
+/// \returns A parse tree for the demangled string - or a null pointer
+/// on failure.
 ///
 NodePointer
-demangleSymbolAsNode(const char *MangledName, size_t MangledNameLength,
-                     const DemangleOptions &Options = DemangleOptions());
+demangleTypeAsNode(const char *mangledName, size_t mangledNameLength,
+                   const DemangleOptions &options = DemangleOptions());
+
+inline NodePointer
+demangleTypeAsNode(const std::string &mangledName,
+                   const DemangleOptions &options = DemangleOptions()) {
+  return demangleTypeAsNode(mangledName.data(), mangledName.size(), options);
+}
+
+/// \brief Demangle the given string as a Swift type mangling.
+///
+/// \param mangledName The mangled string.
+/// \param options An object encapsulating options to use to perform this demangling.
+///
+///
+/// \returns A string representing the demangled name.
+std::string
+demangleTypeAsString(const char *mangledName, size_t mangledNameLength,
+                     const DemangleOptions &options = DemangleOptions());
+
+inline std::string
+demangleTypeAsString(const std::string &mangledName,
+                     const DemangleOptions &options = DemangleOptions()) {
+  return demangleTypeAsString(mangledName.data(), mangledName.size(), options);
+}
+
+enum class OperatorKind {
+  NotOperator,
+  Prefix,
+  Postfix,
+  Infix
+};
+
+/// \brief Mangle an identifier using Swift's mangling rules.
+void mangleIdentifier(const char *data, size_t length,
+                      OperatorKind operatorKind, std::ostream &out,
+                      bool usePunycode = true);
+
+/// \brief Remangle a demangled parse tree.
+///
+/// This should always round-trip perfectly with demangleSymbolAsNode.
+std::string mangleNode(const NodePointer &root);
+
+/// \brief Write a mangling of the given parse tree into the given stream.
+///
+/// This should always round-trip perfectly with demangleSymbolAsNode.
+void mangleNode(NodePointer root, std::ostream &out);
 
 /// \brief Transform the node structure in a string.
 ///
@@ -159,41 +301,6 @@ demangleSymbolAsNode(const char *MangledName, size_t MangledNameLength,
 ///
 std::string nodeToString(NodePointer Root,
                          const DemangleOptions &Options = DemangleOptions());
-
-/// \brief Demangle the given string as a Swift symbol.
-///
-/// Typical usage:
-/// \code
-///   std::string aDemangledName =
-/// swift::Demangler::demangleSymbol("SomeSwiftMangledName")
-/// \endcode
-///
-/// \param MangledName The mangled string.
-/// \param Options An object encapsulating options to use to perform this demangling.
-///
-///
-/// \returns A string representing the demangled name.
-///
-std::string
-demangleSymbolAsString(const char *MangledName, size_t MangledNameLength,
-                       const DemangleOptions &Options = DemangleOptions());
-
-inline std::string
-demangleSymbolAsString(std::string MangledName,
-                       const DemangleOptions &Options = DemangleOptions()) {
-  return demangleSymbolAsString(MangledName.data(), MangledName.size());
-}
-
-/// \brief Demangle the given string as a Swift type name.
-///
-/// \param MangledName The mangled string.
-/// \param Options An object encapsulating options to use to perform this demangling.
-///
-///
-/// \returns A string representing the demangled name.
-std::string
-demangleTypeAsString(const char *MangledName, size_t MangledNameLength,
-                     const DemangleOptions &Options = DemangleOptions());
 
 } // end namespace Demangle
 } // end namespace swift

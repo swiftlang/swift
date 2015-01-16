@@ -16,6 +16,7 @@ add_swift_library(swiftBasic
   Punycode.cpp
   PunycodeUTF8.cpp
   QuotedString.cpp
+  Remangle.cpp
   SourceLoc.cpp
   StringExtras.cpp
   TaskQueue.cpp

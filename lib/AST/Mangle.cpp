@@ -21,6 +21,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Demangle.h"
 #include "swift/Basic/Punycode.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/AST/Decl.h"
@@ -31,36 +32,19 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
+#include <sstream>
 
 using namespace swift;
 using namespace Mangle;
 
 bool Mangler::UsePrivateDiscriminators = true;
 
-/// Translate the given operator character into its mangled form.
-///
-/// Current operator characters:   @/=-+*%<>!&|^~ and the special operator '..'
-static char mangleOperatorChar(char op) {
-  switch (op) {
-  case '&': return 'a'; // 'and'
-  case '@': return 'c'; // 'commercial at sign'
-  case '/': return 'd'; // 'divide'
-  case '=': return 'e'; // 'equal'
-  case '>': return 'g'; // 'greater'
-  case '<': return 'l'; // 'less'
-  case '*': return 'm'; // 'multiply'
-  case '!': return 'n'; // 'negate'
-  case '|': return 'o'; // 'or'
-  case '+': return 'p'; // 'plus'
-  case '?': return 'q'; // 'question'
-  case '%': return 'r'; // 'remainder'
-  case '-': return 's'; // 'subtract'
-  case '~': return 't'; // 'tilde'
-  case '^': return 'x'; // 'xor'
-  case '.': return 'z'; // 'zperiod' (the z is silent)
-  default:
-    return op;
+static bool isNonAscii(StringRef str) {
+  for (unsigned char c : str) {
+    if (c >= 0x80)
+      return true;
   }
+  return false;
 }
 
 namespace {
@@ -77,64 +61,24 @@ namespace {
   };        
 }
         
-static bool isNonAscii(StringRef str) {
-  for (unsigned char c : str) {
-    if (c >= 0x80)
-      return true;
-  }
-  return false;
-}
-
 /// Mangle a StringRef as an identifier into a buffer.
 void Mangler::mangleIdentifier(StringRef str, OperatorFixity fixity,
                                bool isOperator) {
-  std::string punycodeBuf;
-  if (UsePunycode) {
-    // If the identifier contains non-ASCII character, we mangle 
-    // with an initial X and Punycode the identifier string.
-    if (isNonAscii(str)) {
-      Buffer << 'X';
-      Punycode::encodePunycodeUTF8(str, punycodeBuf);
-      str = punycodeBuf;
+  auto operatorKind = [=]() -> Demangle::OperatorKind {
+    if (!isOperator) return Demangle::OperatorKind::NotOperator;
+    switch (fixity) {
+    case OperatorFixity::NotOperator:return Demangle::OperatorKind::NotOperator;
+    case OperatorFixity::Prefix: return Demangle::OperatorKind::Prefix;
+    case OperatorFixity::Postfix: return Demangle::OperatorKind::Postfix;
+    case OperatorFixity::Infix: return Demangle::OperatorKind::Infix;
     }
-  }
+    llvm_unreachable("invalid operator fixity");
+  }();
 
-  // Mangle normal identifiers as
-  //   count identifier-char+
-  // where the count is the number of characters in the identifier,
-  // and where individual identifier characters represent themselves.
-  if (!isOperator) {
-    Buffer << str.size() << str;
-    return;
-  }
-
-  // Mangle operator identifiers as
-  //   operator ::= 'o' operator-fixity count operator-char+
-  //   operator-fixity ::= 'p' // prefix
-  //   operator-fixity ::= 'P' // postfix
-  //   operator-fixity ::= 'i' // infix
-  // where the count is the number of characters in the operator,
-  // and where the individual operator characters are translated.
-  Buffer << 'o';
-  switch (fixity) {
-  case OperatorFixity::NotOperator:
-    llvm_unreachable("operator mangled without fixity specified!");
-  case OperatorFixity::Infix:
-    Buffer << 'i';
-    break;
-  case OperatorFixity::Prefix:
-    Buffer << 'p';
-    break;
-  case OperatorFixity::Postfix:
-    Buffer << 'P';
-    break;
-  }
-
-  // Mangle ASCII operators directly.
-  Buffer << str.size();
-  for (char c : str) {
-    Buffer << mangleOperatorChar(c);
-  }
+  std::ostringstream stream;
+  Demangle::mangleIdentifier(str.data(), str.size(), operatorKind, stream,
+                             UsePunycode);
+  Buffer << stream.str();
 }
 
 /// Mangle an identifier into the buffer.

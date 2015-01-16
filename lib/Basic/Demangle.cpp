@@ -189,29 +189,6 @@ static std::string archetypeName(Node::IndexType i) {
 
 namespace {
 
-using FunctionSigSpecializationParamInfoKindIntBase = unsigned;
-  enum class FunctionSigSpecializationParamInfoKind
-    : FunctionSigSpecializationParamInfoKindIntBase {
-    // Option Flags use bits 0-5. This give us 6 bits implying 64 entries to
-    // work with.
-    Dead=0,
-    ConstantPropFunction=1,
-    ConstantPropGlobal=2,
-    ConstantPropInteger=3,
-    ConstantPropFloat=4,
-    ConstantPropString=5,
-    ClosureProp=6,
-    InOutToValue=7,
-
-    // Option Set Flags use bits 6-31. This gives us 26 bits to use for option
-    // flags.
-    OwnedToGuaranteed=1 << 6,
-    SROA=1 << 7,
-  };
-} // end anonymous namespace
-
-namespace {
-
 /// A convenient class for parsing characters out of a string.
 class NameSource {
   StringRef Text;
@@ -277,97 +254,72 @@ public:
   }
 };
 
+static StringRef toString(Directness d) {
+  switch (d) {
+  case Directness::Direct:
+    return "direct";
+  case Directness::Indirect:
+    return "indirect";
+  }
+  unreachable("bad directness");
+}
+
+static StringRef toString(ValueWitnessKind k) {
+  switch (k) {
+  case ValueWitnessKind::AllocateBuffer:
+    return "allocateBuffer";
+  case ValueWitnessKind::AssignWithCopy:
+    return "assignWithCopy";
+  case ValueWitnessKind::AssignWithTake:
+    return "assignWithTake";
+  case ValueWitnessKind::DeallocateBuffer:
+    return "deallocateBuffer";
+  case ValueWitnessKind::Destroy:
+    return "destroy";
+  case ValueWitnessKind::DestroyBuffer:
+    return "destroyBuffer";
+  case ValueWitnessKind::InitializeBufferWithCopyOfBuffer:
+    return "initializeBufferWithCopyOfBuffer";
+  case ValueWitnessKind::InitializeBufferWithCopy:
+    return "initializeBufferWithCopy";
+  case ValueWitnessKind::InitializeWithCopy:
+      return "initializeWithCopy";
+  case ValueWitnessKind::InitializeBufferWithTake:
+    return "initializeBufferWithTake";
+  case ValueWitnessKind::InitializeWithTake:
+    return "initializeWithTake";
+  case ValueWitnessKind::ProjectBuffer:
+    return "projectBuffer";
+  case ValueWitnessKind::InitializeBufferWithTakeOfBuffer:
+    return "initializeBufferWithTakeOfBuffer";
+  case ValueWitnessKind::DestroyArray:
+    return "destroyArray";
+  case ValueWitnessKind::InitializeArrayWithCopy:
+    return "initializeArrayWithCopy";
+  case ValueWitnessKind::InitializeArrayWithTakeFrontToBack:
+    return "initializeArrayWithTakeFrontToBack";
+  case ValueWitnessKind::InitializeArrayWithTakeBackToFront:
+    return "initializeArrayWithTakeBackToFront";
+  case ValueWitnessKind::StoreExtraInhabitant:
+    return "storeExtraInhabitant";
+  case ValueWitnessKind::GetExtraInhabitantIndex:
+    return "getExtraInhabitantIndex";
+  case ValueWitnessKind::GetEnumTag:
+    return "getEnumTag";
+  case ValueWitnessKind::InplaceProjectEnumData:
+    return "inplaceProjectEnumData";
+  }
+  unreachable("bad value witness kind");
+}
+
 /// The main class for parsing a demangling tree out of a mangled string.
 class Demangler {
   std::vector<NodePointer> Substitutions;
   std::vector<unsigned> ArchetypeCounts;
   unsigned ArchetypeCount = 0;
   NameSource Mangled;
-  NodePointer RootNode;
 public:  
   Demangler(llvm::StringRef mangled) : Mangled(mangled) {}
-
-  /// Attempt to demangle the source string.  The root node will
-  /// always be a Global.  Extra characters at the end will be
-  /// tolerated (and included as a Suffix node as a child of the
-  /// Global).
-  ///
-  /// \return true if the mangling succeeded
-  bool demangle() {
-    if (!Mangled.hasAtLeast(2))
-      return failure();
-    if (Mangled.slice(2) != "_T")
-      return failure();
-
-    // First demangle any specialization prefixes.
-    if (Mangled.hasAtLeast(4) && Mangled.slice(4) == "_TTS") {
-      do {
-        Mangled.advanceOffset(4);
-        auto attr = demangleSpecializedAttribute();
-        if (!attr)
-          return failure();
-        appendNode(attr);
-        // The Substitution header does not share state with the rest of the
-        // mangling.
-        Substitutions.clear();
-        ArchetypeCounts.clear();
-        ArchetypeCount = 0;
-      } while (Mangled.hasAtLeast(4) && Mangled.slice(4) == "_TTS");
-
-      // Then check that we have a global.
-      if (!Mangled.hasAtLeast(2) || Mangled.slice(2) != "_T")
-        return failure();
-      Mangled.advanceOffset(2);
-
-    } else if (Mangled.hasAtLeast(4) && Mangled.slice(4) == "_TTo") {
-      Mangled.advanceOffset(4);
-      appendNode(Node::Kind::ObjCAttribute);
-    } else if (Mangled.hasAtLeast(4) && Mangled.slice(4) == "_TTO") {
-      Mangled.advanceOffset(4);
-      appendNode(Node::Kind::NonObjCAttribute);
-    } else if (Mangled.hasAtLeast(4) && Mangled.slice(4) == "_TTD") {
-      Mangled.advanceOffset(4);
-      appendNode(Node::Kind::DynamicAttribute);
-    } else {
-      Mangled.advanceOffset(2);
-    }
-    
-    NodePointer global = demangleGlobal();
-    if (!global) return failure();
-    appendNode(std::move(global));
-
-    // Add a suffix node if there's anything left unmangled.
-    if (!Mangled.isEmpty()) {
-      appendNode(Node::Kind::Suffix, Mangled.getString());
-    }
-
-    return true;
-  }
-
-  bool demangleTypeName() {
-    NodePointer global = demangleType();
-    if (!global) return failure();
-    appendNode(std::move(global));
-    return true;
-  }
-  
-  NodePointer getDemangled() { return RootNode; }
-  
-private:
-  NodePointer getRootNode() {
-    if (!RootNode) {
-      RootNode = NodeFactory::create(Node::Kind::Global);
-    }
-    return RootNode;
-  }
-
-  NodePointer appendNode(NodePointer n) {
-    return getRootNode()->addChild(std::move(n));
-  }
-
-  NodePointer appendNode(Node::Kind k, std::string &&t = "") {
-    return appendNode(NodeFactory::create(k, std::move(t)));
-  }
 
 /// Try to demangle a child node of the given kind.  If that fails,
 /// return; otherwise add it to the parent.
@@ -381,11 +333,63 @@ private:
 /// return; otherwise add it to the parent.
 #define DEMANGLE_CHILD_AS_NODE_OR_RETURN(PARENT, CHILD_KIND) do {  \
     auto _kind = demangle##CHILD_KIND();                           \
-    if (_kind == CHILD_KIND::Unknown) return nullptr;              \
+    if (!_kind.hasValue()) return nullptr;                         \
     (PARENT)->addChild(NodeFactory::create(Node::Kind::CHILD_KIND, \
-                                           toString(_kind)));      \
+                                           unsigned(*_kind)));     \
   } while (false)
 
+  /// Attempt to demangle the source string.  The root node will
+  /// always be a Global.  Extra characters at the end will be
+  /// tolerated (and included as a Suffix node as a child of the
+  /// Global).
+  ///
+  /// \return true if the mangling succeeded
+  NodePointer demangleTopLevel() {
+    if (!Mangled.nextIf("_T"))
+      return nullptr;
+
+    NodePointer topLevel = NodeFactory::create(Node::Kind::Global);
+
+    // First demangle any specialization prefixes.
+    if (Mangled.nextIf("TS")) {
+      do {
+        DEMANGLE_CHILD_OR_RETURN(topLevel, SpecializedAttribute);
+
+        // The Substitution header does not share state with the rest
+        // of the mangling.
+        Substitutions.clear();
+        ArchetypeCounts.clear();
+        ArchetypeCount = 0;
+      } while (Mangled.nextIf("_TTS"));
+
+      // Then check that we have a global.
+      if (!Mangled.nextIf("_T"))
+        return nullptr;
+
+    } else if (Mangled.nextIf("To")) {
+      topLevel->addChild(NodeFactory::create(Node::Kind::ObjCAttribute));
+    } else if (Mangled.nextIf("TO")) {
+      topLevel->addChild(NodeFactory::create(Node::Kind::NonObjCAttribute));
+    } else if (Mangled.nextIf("TD")) {
+      topLevel->addChild(NodeFactory::create(Node::Kind::DynamicAttribute));
+    }
+
+    DEMANGLE_CHILD_OR_RETURN(topLevel, Global);
+
+    // Add a suffix node if there's anything left unmangled.
+    if (!Mangled.isEmpty()) {
+      topLevel->addChild(NodeFactory::create(Node::Kind::Suffix,
+                                             Mangled.getString()));
+    }
+
+    return topLevel;
+  }
+
+  NodePointer demangleTypeName() {
+    return demangleType();
+  }
+  
+private:
   enum class IsProtocol {
     yes = true, no = false
   };
@@ -394,33 +398,12 @@ private:
     yes = true, no = false
   };
 
-  enum class Directness {
-    Unknown = 0, Direct, Indirect
-  };
-
-  StringRef toString(Directness d) {
-    switch (d) {
-    case Directness::Direct:
-      return "direct";
-    case Directness::Indirect:
-      return "indirect";
-    case Directness::Unknown:
-      unreachable("shouldn't toString an unknown directness");
-    }
-    unreachable("bad directness");
-  }
-
-  bool failure() {
-    RootNode = NodeFactory::create(Node::Kind::Failure);
-    return false;
-  }
-
-  Directness demangleDirectness() {
+  Optional<Directness> demangleDirectness() {
     if (Mangled.nextIf('d'))
       return Directness::Direct;
     if (Mangled.nextIf('i'))
       return Directness::Indirect;
-    return Directness::Unknown;
+    return None;
   }
 
   bool demangleNatural(Node::IndexType &num) {
@@ -452,87 +435,12 @@ private:
     return false;
   }
 
-  enum class ValueWitnessKind {
-    AllocateBuffer,
-    AssignWithCopy,
-    AssignWithTake,
-    DeallocateBuffer,
-    Destroy,
-    DestroyBuffer,
-    InitializeBufferWithCopyOfBuffer,
-    InitializeBufferWithCopy,
-    InitializeWithCopy,
-    InitializeBufferWithTake,
-    InitializeWithTake,
-    ProjectBuffer,
-    InitializeBufferWithTakeOfBuffer,
-    DestroyArray,
-    InitializeArrayWithCopy,
-    InitializeArrayWithTakeFrontToBack,
-    InitializeArrayWithTakeBackToFront,
-    StoreExtraInhabitant,
-    GetExtraInhabitantIndex,
-    GetEnumTag,
-    InplaceProjectEnumData,
-    Unknown
-  };
-
-  StringRef toString(ValueWitnessKind k) {
-    switch (k) {
-    case ValueWitnessKind::AllocateBuffer:
-      return "allocateBuffer";
-    case ValueWitnessKind::AssignWithCopy:
-      return "assignWithCopy";
-    case ValueWitnessKind::AssignWithTake:
-      return "assignWithTake";
-    case ValueWitnessKind::DeallocateBuffer:
-      return "deallocateBuffer";
-    case ValueWitnessKind::Destroy:
-      return "destroy";
-    case ValueWitnessKind::DestroyBuffer:
-      return "destroyBuffer";
-    case ValueWitnessKind::InitializeBufferWithCopyOfBuffer:
-      return "initializeBufferWithCopyOfBuffer";
-    case ValueWitnessKind::InitializeBufferWithCopy:
-      return "initializeBufferWithCopy";
-    case ValueWitnessKind::InitializeWithCopy:
-      return "initializeWithCopy";
-    case ValueWitnessKind::InitializeBufferWithTake:
-      return "initializeBufferWithTake";
-    case ValueWitnessKind::InitializeWithTake:
-      return "initializeWithTake";
-    case ValueWitnessKind::ProjectBuffer:
-      return "projectBuffer";
-    case ValueWitnessKind::InitializeBufferWithTakeOfBuffer:
-      return "initializeBufferWithTakeOfBuffer";
-    case ValueWitnessKind::DestroyArray:
-      return "destroyArray";
-    case ValueWitnessKind::InitializeArrayWithCopy:
-      return "initializeArrayWithCopy";
-    case ValueWitnessKind::InitializeArrayWithTakeFrontToBack:
-      return "initializeArrayWithTakeFrontToBack";
-    case ValueWitnessKind::InitializeArrayWithTakeBackToFront:
-      return "initializeArrayWithTakeBackToFront";
-    case ValueWitnessKind::StoreExtraInhabitant:
-      return "storeExtraInhabitant";
-    case ValueWitnessKind::GetExtraInhabitantIndex:
-      return "getExtraInhabitantIndex";
-    case ValueWitnessKind::GetEnumTag:
-      return "getEnumTag";
-    case ValueWitnessKind::InplaceProjectEnumData:
-      return "inplaceProjectEnumData";
-    case ValueWitnessKind::Unknown:
-      unreachable("stringifying the unknown value witness kind?");
-    }
-    unreachable("bad value witness kind");
-  }
-
-  ValueWitnessKind demangleValueWitnessKind() {
+  Optional<ValueWitnessKind> demangleValueWitnessKind() {
     if (!Mangled)
-      return ValueWitnessKind::Unknown;
+      return None;
     char c1 = Mangled.next();
     if (!Mangled)
-      return ValueWitnessKind::Unknown;
+      return None;
     char c2 = Mangled.next();
     if (c1 == 'a' && c2 == 'l')
       return ValueWitnessKind::AllocateBuffer;
@@ -576,7 +484,7 @@ private:
       return ValueWitnessKind::GetEnumTag;
     if (c1 == 'u' && c2 == 'p')
       return ValueWitnessKind::InplaceProjectEnumData;
-    return ValueWitnessKind::Unknown;
+    return None;
   }
 
   NodePointer demangleGlobal() {
@@ -634,16 +542,18 @@ private:
 
     // Top-level types, for various consumers.
     if (Mangled.nextIf('t')) {
-      return demangleType();
+      auto type = NodeFactory::create(Node::Kind::TypeMangling);
+      DEMANGLE_CHILD_OR_RETURN(type, Type);
+      return type;
     }
 
     // Value witnesses.
     if (Mangled.nextIf('w')) {
-      ValueWitnessKind w = demangleValueWitnessKind();
-      if (w == ValueWitnessKind::Unknown)
+      Optional<ValueWitnessKind> w = demangleValueWitnessKind();
+      if (!w.hasValue())
         return nullptr;
       auto witness =
-          NodeFactory::create(Node::Kind::ValueWitness, toString(w));
+        NodeFactory::create(Node::Kind::ValueWitness, unsigned(w.getValue()));
       DEMANGLE_CHILD_OR_RETURN(witness, Type);
       return witness;
     }
@@ -728,9 +638,7 @@ private:
   }
 
   NodePointer demangleGenericSpecialization() {
-    auto specialization = NodeFactory::create(Node::Kind::SpecializedAttribute);
-    auto kind = NodeFactory::create(Node::Kind::SpecializationKind, "generic");
-    specialization->addChild(kind);
+    auto specialization = NodeFactory::create(Node::Kind::GenericSpecialization);
 
     while (!Mangled.nextIf('_')) {
       // Otherwise, we have another parameter. Demangle the type.
@@ -753,25 +661,11 @@ private:
     return specialization;
   }
 
-  bool skipGlobal() {
-    // Find how far we need to go to skip the global.
-    StringRef before = Mangled.str();
-    Demangler d(before);
-    bool result = d.demangle();
-    if (!result)
-      return false;
-    NodePointer n = d.getDemangled();
-    unsigned suffixSize = n->getChild(n->getNumChildren()-1)->getText().size();
-    Mangled.advanceOffset(before.size() - suffixSize);
-    return true;
-  }
-
 /// TODO: This is an atrocity. Come up with a shorter name.
 #define FUNCSIGSPEC_CREATE_INFO_KIND(kind)                              \
   NodeFactory::create(                                                  \
     Node::Kind::FunctionSignatureSpecializationParamInfo,               \
-      FunctionSigSpecializationParamInfoKindIntBase(                    \
-        FunctionSigSpecializationParamInfoKind::kind))
+    unsigned(FunctionSigSpecializationParamInfoKind::kind))
 
   NodePointer demangleFuncSigSpecializationConstantProp() {
     // Then figure out what was actually constant propagated. First check if
@@ -835,29 +729,21 @@ private:
   }
 
   NodePointer demangleFunctionSignatureSpecialization() {
-    auto specialization = NodeFactory::create(Node::Kind::SpecializedAttribute);
-    auto kind = NodeFactory::create(Node::Kind::SpecializationKind, "function signature");
-    specialization->addChild(kind);
+    auto specialization = NodeFactory::create(Node::Kind::FunctionSignatureSpecialization);
 
     unsigned paramCount = 0;
 
     // Until we hit the last '_' in our specialization info...
     while (!Mangled.nextIf('_')) {
-      // Try to eat an n. If we succeed don't create any nodes and
-      // continue. This is because we do not represent unmodified arguments in
-      // the demangling.
-      if (Mangled.nextIf("n_")) {
-        paramCount++;
-        continue;
-      }
-
       // Create the parameter.
       NodePointer param =
         NodeFactory::create(Node::Kind::FunctionSignatureSpecializationParam,
                             paramCount);
 
       // First handle options.
-      if (Mangled.nextIf("d_")) {
+      if (Mangled.nextIf("n_")) {
+        // Leave the parameter empty.
+      } else if (Mangled.nextIf("d_")) {
         auto result = FUNCSIGSPEC_CREATE_INFO_KIND(Dead);
         if (!result)
           return nullptr;
@@ -902,9 +788,6 @@ private:
         param->addChild(result);
       }
 
-      if (!param || param->getNumChildren() == 0) {
-        return nullptr;
-      }
       specialization->addChild(param);
       paramCount++;
     }
@@ -929,9 +812,8 @@ private:
       return demangleFunctionSignatureSpecialization();
     }
 
-    // For now just return a specialized attribute if we don't know what we are
-    // demangling. We will assert in a later commit.
-    return NodeFactory::create(Node::Kind::SpecializedAttribute);
+    // We don't know how to handle this specialization.
+    return nullptr;
   }
   
   NodePointer demangleDeclName() {
@@ -965,7 +847,7 @@ private:
     return demangleIdentifier();
   }
 
-  NodePointer demangleIdentifier(Node::Kind kind = Node::Kind::Unknown) {
+  NodePointer demangleIdentifier(Optional<Node::Kind> kind = None) {
     if (!Mangled)
       return nullptr;
     
@@ -985,7 +867,7 @@ private:
       isOperator = true;
       // Operator identifiers aren't valid in the contexts that are
       // building more specific identifiers.
-      if (kind != Node::Kind::Unknown) return nullptr;
+      if (kind.hasValue()) return nullptr;
 
       char op_mode = Mangled.next();
       switch (op_mode) {
@@ -1003,7 +885,7 @@ private:
       }
     }
 
-    if (kind == Node::Kind::Unknown) kind = Node::Kind::Identifier;
+    if (!kind.hasValue()) kind = Node::Kind::Identifier;
 
     Node::IndexType length;
     if (!demangleNatural(length))
@@ -1042,7 +924,7 @@ private:
       identifier = opDecodeBuffer;
     }
     
-    return NodeFactory::create(kind, identifier);
+    return NodeFactory::create(*kind, identifier);
   }
 
   bool demangleIndex(Node::IndexType &natural) {
@@ -1077,7 +959,7 @@ private:
   /// Demangle a <substitution>, given that we've already consumed the 'S'.
   NodePointer demangleSubstitutionIndex() {
     if (!Mangled)
-      return NodeFactory::create(Node::Kind::Failure);
+      return nullptr;
     if (Mangled.nextIf('o'))
       return NodeFactory::create(Node::Kind::Module, "ObjectiveC");
     if (Mangled.nextIf('C'))
@@ -1106,9 +988,9 @@ private:
       return createSwiftType(Node::Kind::Structure, "UInt");
     Node::IndexType index_sub;
     if (!demangleIndex(index_sub))
-      return NodeFactory::create(Node::Kind::Failure);
+      return nullptr;
     if (index_sub >= Substitutions.size())
-      return NodeFactory::create(Node::Kind::Failure);
+      return nullptr;
     return Substitutions[index_sub];
   }
 
@@ -1216,18 +1098,11 @@ private:
     NodePointer proto_list = NodeFactory::create(Node::Kind::ProtocolList);
     NodePointer type_list = NodeFactory::create(Node::Kind::TypeList);
     proto_list->addChild(type_list);
-    if (Mangled.nextIf('_')) {
-      return proto_list;
-    }
-    NodePointer proto = demangleProtocolName();
-    if (!proto)
-      return nullptr;
-    type_list->addChild(proto);
-    while (Mangled.nextIf('_') == false) {
-      proto = demangleProtocolName();
+    while (!Mangled.nextIf('_')) {
+      NodePointer proto = demangleProtocolName();
       if (!proto)
         return nullptr;
-      type_list->addChild(proto);
+      type_list->addChild(std::move(proto));
     }
     return proto_list;
   }
@@ -1406,40 +1281,42 @@ private:
   /// \param C - not really required; just a token to prove that the caller
   ///   has thought to enter a generic context
   NodePointer demangleGenerics(GenericContext &C) {
-    DemanglerPrinter result_printer;
     NodePointer archetypes = NodeFactory::create(Node::Kind::Generics);
-    // FIXME: Swallow the mangled associated type constraints.
-    bool assocTypes = false;
+    Node::Kind nodeKind = Node::Kind::Archetype;
     while (true) {
-      if (!assocTypes && Mangled.nextIf('U')) {
-        assocTypes = true;
+      if (nodeKind == Node::Kind::Archetype && Mangled.nextIf('U')) {
+        nodeKind = Node::Kind::AssociatedType;
         continue;
       }
+
+      NodePointer protocolList;
       if (Mangled.nextIf('_')) {
         if (!Mangled)
           return nullptr;
         char c = Mangled.peek();
         if (c != '_' && c != 'S'
-            && (assocTypes || c != 'U')
+            && (nodeKind == Node::Kind::AssociatedType || c != 'U')
             && !isStartOfIdentifier(c))
           break;
-        if (!assocTypes)
-          archetypes->addChild(NodeFactory::create(
-              Node::Kind::ArchetypeRef, archetypeName(ArchetypeCount)));
       } else {
-        NodePointer proto_list = demangleProtocolList();
-        if (!proto_list)
+        protocolList = demangleProtocolList();
+        if (!protocolList)
           return nullptr;
-        if (assocTypes)
-          continue;
-        NodePointer arch_and_proto =
-            NodeFactory::create(Node::Kind::ArchetypeAndProtocol);
-        arch_and_proto->addChild(NodeFactory::create(
-            Node::Kind::ArchetypeRef, archetypeName(ArchetypeCount)));
-        arch_and_proto->addChild(proto_list);
-        archetypes->addChild(arch_and_proto);
       }
-      ++ArchetypeCount;
+
+      NodePointer archetype;
+      if (nodeKind == Node::Kind::Archetype) {
+        archetype =
+          NodeFactory::create(nodeKind, archetypeName(ArchetypeCount++));
+      } else {
+        archetype = NodeFactory::create(nodeKind);
+      }
+
+      if (protocolList) {
+        archetype->addChild(std::move(protocolList));
+      }
+
+      archetypes->addChild(std::move(archetype));
     }
     return archetypes;
   }
@@ -1800,13 +1677,11 @@ private:
       return block;
     }
     if (c == 'G') {
-      NodePointer type_list = NodeFactory::create(Node::Kind::TypeList);
       NodePointer unboundType = demangleType();
       if (!unboundType)
         return nullptr;
-      if (Mangled.isEmpty())
-        return nullptr;
-      while (Mangled.peek() != '_') {
+      NodePointer type_list = NodeFactory::create(Node::Kind::TypeList);
+      while (!Mangled.nextIf('_')) {
         NodePointer type = demangleType();
         if (!type)
           return nullptr;
@@ -1814,8 +1689,7 @@ private:
         if (Mangled.isEmpty())
           return nullptr;
       }
-      Mangled.next();
-      Node::Kind bound_type_kind = Node::Kind::Unknown;
+      Node::Kind bound_type_kind;
       switch (unboundType->getChild(0)->getKind()) { // look through Type node
         case Node::Kind::Class:
           bound_type_kind = Node::Kind::BoundGenericClass;
@@ -1827,7 +1701,7 @@ private:
           bound_type_kind = Node::Kind::BoundGenericEnum;
           break;
         default:
-          assert(false && "trying to make a generic type application for a non class|struct|enum");
+          return nullptr;
       }
       NodePointer type_application =
           NodeFactory::create(bound_type_kind);
@@ -1983,16 +1857,16 @@ private:
   bool demangleReabstractSignature(NodePointer signature) {
     if (Mangled.nextIf('G')) {
       NodePointer generics = demangleGenericSignature();
-      if (!generics) return failure();
+      if (!generics) return false;
       signature->addChild(std::move(generics));
     }
 
     NodePointer srcType = demangleType();
-    if (!srcType) return failure();
+    if (!srcType) return false;
     signature->addChild(std::move(srcType));
 
     NodePointer destType = demangleType();
-    if (!destType) return failure();
+    if (!destType) return false;
     signature->addChild(std::move(destType));
 
     return true;
@@ -2101,7 +1975,7 @@ private:
       attr = demangleImplConvention(ImplConventionContext::Callee);
     }
     if (attr.empty()) {
-      return failure();
+      return false;
     }
     type->addChild(NodeFactory::create(Node::Kind::ImplConvention, attr));
     return true;
@@ -2161,17 +2035,15 @@ swift::Demangle::demangleSymbolAsNode(const char *MangledName,
                                       size_t MangledNameLength,
                                       const DemangleOptions &Options) {
   Demangler demangler(StringRef(MangledName, MangledNameLength));
-  demangler.demangle();
-  return demangler.getDemangled();
+  return demangler.demangleTopLevel();
 }
 
-static NodePointer
-demangleTypeAsNode(const char *MangledName,
-                   size_t MangledNameLength,
-                   const DemangleOptions &Options) {
+NodePointer
+swift::Demangle::demangleTypeAsNode(const char *MangledName,
+                                    size_t MangledNameLength,
+                                    const DemangleOptions &Options) {
   Demangler demangler(StringRef(MangledName, MangledNameLength));
-  demangler.demangleTypeName();
-  return demangler.getDemangled();
+  return demangler.demangleTypeName();
 }
 
 namespace {
@@ -2267,8 +2139,9 @@ private:
   /// production.
   bool isSimpleType(NodePointer pointer) {
     switch (pointer->getKind()) {
-    case Node::Kind::ArchetypeAndProtocol:
+    case Node::Kind::Archetype:
     case Node::Kind::ArchetypeRef:
+    case Node::Kind::AssociatedType:
     case Node::Kind::AssociatedTypeRef:
     case Node::Kind::BoundGenericClass:
     case Node::Kind::BoundGenericEnum:
@@ -2292,14 +2165,12 @@ private:
     case Node::Kind::SelfTypeRef:
     case Node::Kind::Structure:
     case Node::Kind::TupleElementName:
-    case Node::Kind::TupleElementType:
     case Node::Kind::Type:
     case Node::Kind::TypeAlias:
     case Node::Kind::TypeList:
     case Node::Kind::VariadicTuple:
       return true;
 
-    case Node::Kind::Failure:
     case Node::Kind::Allocator:
     case Node::Kind::ArgumentTuple:
     case Node::Kind::AutoClosureType:
@@ -2321,8 +2192,13 @@ private:
     case Node::Kind::Extension:
     case Node::Kind::FieldOffset:
     case Node::Kind::Function:
+    case Node::Kind::FunctionSignatureSpecialization:
+    case Node::Kind::FunctionSignatureSpecializationParam:
+    case Node::Kind::FunctionSignatureSpecializationParamInfo:
     case Node::Kind::FunctionType:
     case Node::Kind::Generics:
+    case Node::Kind::GenericSpecialization:
+    case Node::Kind::GenericSpecializationParam:
     case Node::Kind::GenericType:
     case Node::Kind::GenericTypeMetadataPattern:
     case Node::Kind::Getter:
@@ -2368,20 +2244,15 @@ private:
     case Node::Kind::ReabstractionThunk:
     case Node::Kind::ReabstractionThunkHelper:
     case Node::Kind::Setter:
-    case Node::Kind::SpecializedAttribute:
-    case Node::Kind::SpecializationKind:
-    case Node::Kind::GenericSpecializationParam:
-    case Node::Kind::FunctionSignatureSpecializationParam:
-    case Node::Kind::FunctionSignatureSpecializationParamInfo:
     case Node::Kind::Subscript:
     case Node::Kind::Suffix:
     case Node::Kind::ThinFunctionType:
     case Node::Kind::TupleElement:
+    case Node::Kind::TypeMangling:
     case Node::Kind::TypeMetadata:
     case Node::Kind::TypeMetadataAccessFunction:
     case Node::Kind::TypeMetadataLazyCache:
     case Node::Kind::UncurriedFunctionType:
-    case Node::Kind::Unknown:
     case Node::Kind::Unmanaged:
     case Node::Kind::Unowned:
     case Node::Kind::UnsafeAddressor:
@@ -2581,10 +2452,8 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
 
   Node::Kind kind = pointer->getKind();
   switch (kind) {
-  case Node::Kind::Failure:
-    return;
   case Node::Kind::Directness:
-    Printer << pointer->getText() << " ";
+    Printer << toString(Directness(pointer->getIndex())) << " ";
     return;
   case Node::Kind::Extension:
     assert(pointer->getNumChildren() == 2 && "Extension expects 2 children.");
@@ -2631,6 +2500,9 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::Type:
     print(pointer->getChild(0), asContext);
+    return;
+  case Node::Kind::TypeMangling:
+    print(pointer->getChild(0));
     return;
   case Node::Kind::Class:
   case Node::Kind::Structure:
@@ -2718,9 +2590,6 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::TupleElementName:
     Printer << pointer->getText() << " : ";
     return;
-  case Node::Kind::TupleElementType:
-    Printer << pointer->getText();
-    return;
   case Node::Kind::ReturnType:
     if (pointer->getNumChildren() == 0)
       Printer << " -> " << pointer->getText();
@@ -2754,19 +2623,26 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::DynamicAttribute:
     Printer << "dynamic ";
     return;
-  case Node::Kind::SpecializedAttribute:
-    print(pointer->getChild(0));
-    Printer << " specialization <";
-    for (unsigned i = 1, e = pointer->getNumChildren(); i < e; ++i) {
-      if (i >= 2)
+  case Node::Kind::FunctionSignatureSpecialization:
+  case Node::Kind::GenericSpecialization: {
+    if (pointer->getKind() == Node::Kind::FunctionSignatureSpecialization) {
+      Printer << "function signature specialization <";
+    } else {
+      Printer << "generic specialization <";
+    }
+    bool hasPrevious = false;
+    for (unsigned i = 0, e = pointer->getNumChildren(); i < e; ++i) {
+      // Ignore empty specializations.
+      if (!pointer->getChild(i)->hasChildren())
+        continue;
+      if (hasPrevious)
         Printer << ", ";
       print(pointer->getChild(i));
+      hasPrevious = true;
     }
     Printer << "> of ";
     return;
-  case Node::Kind::SpecializationKind:
-    Printer << pointer->getText();
-    return;
+  }
   case Node::Kind::GenericSpecializationParam:
     print(pointer->getChild(0));
     for (unsigned i = 1, e = pointer->getNumChildren(); i < e; ++i) {
@@ -2938,7 +2814,8 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     print(pointer->getChild(0));
     return;
   case Node::Kind::ValueWitness:
-    Printer << pointer->getText() << " value witness for ";
+    Printer << toString(ValueWitnessKind(pointer->getIndex()))
+            << " value witness for ";
     print(pointer->getFirstChild());
     return;
   case Node::Kind::ValueWitnessTable:
@@ -3027,10 +2904,27 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     if (pointer->getNumChildren() == 0)
       return;
     Printer << "<";
-    printChildren(pointer, ", ");
+    print(pointer->getChild(0));
+    for (unsigned i = 1, e = pointer->getNumChildren(); i != e; ++i) {
+      auto child = pointer->getChild(i);
+      if (child->getKind() != Node::Kind::Archetype) break;
+      Printer << ", ";
+      print(child);
+    }
     Printer << ">";
     return;
   }
+  case Node::Kind::Archetype: {
+    Printer << pointer->getText();
+    if (pointer->hasChildren()) {
+      Printer << " : ";
+      print(pointer->getChild(0));
+    }
+    return;
+  }
+  case Node::Kind::AssociatedType:
+    // Don't print for now.
+    return;
   case Node::Kind::QualifiedArchetype: {
     if (pointer->getNumChildren() < 2)
       return;
@@ -3122,14 +3016,6 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::TypeList:
     printChildren(pointer);
     return;
-  case Node::Kind::ArchetypeAndProtocol: {
-    NodePointer child0 = pointer->getChild(0);
-    NodePointer child1 = pointer->getChild(1);
-    print(child0);
-    Printer << " : ";
-    print(child1);
-    return;
-  }
   case Node::Kind::ImplConvention:
     Printer << pointer->getText();
     return;
@@ -3142,8 +3028,6 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::ImplFunctionType:
     printImplFunctionType(pointer);
-    return;
-  case Node::Kind::Unknown:
     return;
   case Node::Kind::ErrorType:
     Printer << "<ERROR TYPE>";
@@ -3253,3 +3137,4 @@ std::string Demangle::demangleTypeAsString(const char *MangledName,
     return mangled.str();
   return demangling;
 }
+

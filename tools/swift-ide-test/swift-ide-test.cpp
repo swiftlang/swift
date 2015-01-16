@@ -1129,17 +1129,19 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
     demangle_wrappers::demangleSymbolAsNode(MangledNameToFind);
   using NodeKind = Demangle::Node::Kind;
 
-  if (node->getKind() != NodeKind::Global) {
+  if (!node) {
     llvm::errs() << "Unable to demangle name.\n";
     return EXIT_FAILURE;
   }
   node = node->getFirstChild();
 
   // FIXME: Look up things other than types.
-  if (node->getKind() != NodeKind::Type) {
+  if (node->getKind() != NodeKind::TypeMangling) {
     llvm::errs() << "Name does not refer to a type.\n";
     return EXIT_FAILURE;
   }
+  node = node->getFirstChild();
+  assert(node->getKind() == NodeKind::Type);
   node = node->getFirstChild();
 
   switch (node->getKind()) {
