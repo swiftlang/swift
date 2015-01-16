@@ -1622,59 +1622,6 @@ bool ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
   return false;
 }
 
-/// A type transformer that replaces dependent types with contextual types
-/// from an ArchetypeBuilder.
-static Type substDependentTypes(ArchetypeBuilder &Archetypes, Type ty) {
-  auto &M = Archetypes.getModule();
-  // Resolve generic type parameters to their types.
-  if (auto genType = ty->getAs<GenericTypeParamType>()) {
-    if (auto potentialArchetype = Archetypes.resolveArchetype(genType)) {
-      return ArchetypeType::getNestedTypeValue(
-               potentialArchetype->getType(Archetypes));
-    }
-
-    return genType;
-  }
-  
-  // Resolve dependent member types.
-  if (auto depType = ty->getAs<DependentMemberType>()) {
-    // See if the type directly references an associated archetype.
-    if (auto potentialArchetype = Archetypes.resolveArchetype(depType)) {
-      return ArchetypeType::getNestedTypeValue(
-               potentialArchetype->getType(Archetypes));
-    }
-    
-    // If not, resolve the base type, then look up the associated type in
-    // a conformance.
-    Type base = depType->getBase().transform([&](Type t) -> Type {
-      return substDependentTypes(Archetypes, t);
-    });
-    assert(!base->isDependentType());
-    
-    if (auto baseArch = base->getAs<ArchetypeType>()) {
-      return baseArch->getNestedTypeValue(depType->getName());
-    }
-    
-    auto assocType = depType->getAssocType();
-    auto proto = assocType->getProtocol();
-    auto conformance = M.lookupConformance(base, proto,
-                                           Archetypes.getLazyResolver());
-    switch (conformance.getInt()) {
-    case ConformanceKind::DoesNotConform:
-    case ConformanceKind::UncheckedConforms:
-      llvm_unreachable("substituted base does not conform to protocol?!");
-        
-    case ConformanceKind::Conforms:
-      return conformance.getPointer()->getTypeWitness(
-               assocType, Archetypes.getLazyResolver()).getReplacement();
-    }
-  }
-  
-  return ty;
-}
-
 Type ArchetypeBuilder::substDependentType(Type type) {
-  return type.transform([&](Type t) -> Type {
-    return substDependentTypes(*this, t);
-  });
+  return substConcreteTypesForDependentTypes(*this, type);
 }
