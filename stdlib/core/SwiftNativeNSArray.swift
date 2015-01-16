@@ -112,6 +112,13 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
   @objc internal func copyWithZone(_: _SwiftNSZone) -> AnyObject {
     return self
   }
+
+  @objc class func automaticallyNotifiesObserversForKey(
+    key: AnyObject) -> UInt8 {
+    // At this point, we do not have Bool available to us.
+    // UInt8 and BOOL have the same ABI on all our platforms (2015).
+    return 0
+  }
 }
 
 /// An `NSArray` whose contiguous storage is created and filled, upon
