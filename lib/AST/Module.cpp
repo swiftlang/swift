@@ -1479,7 +1479,8 @@ SourceFile::SourceFile(Module &M, SourceFileKind K,
   // The root type refinement context reflects the fact that all parts of
   // the source file are guaranteed to be executing on at least the minimum
   // platform version.
-  auto VersionRange = VersionRange::allGTE(M.Ctx.LangOpts.MinPlatformVersion);
+  auto VersionRange =
+    VersionRange::allGTE(M.Ctx.LangOpts.getMinPlatformVersion());
   TRC = TypeRefinementContext::createRoot(M.Ctx, this, VersionRange);
 }
 

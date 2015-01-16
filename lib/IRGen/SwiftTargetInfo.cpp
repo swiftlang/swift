@@ -20,6 +20,7 @@
 #include "llvm/ADT/Triple.h"
 #include "llvm/IR/DataLayout.h"
 #include "swift/ABI/System.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
 
 using namespace swift;
@@ -122,7 +123,7 @@ SwiftTargetInfo::SwiftTargetInfo(
 }
 
 SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
-  llvm::Triple triple(IGM.Opts.Triple);
+  const llvm::Triple &triple = IGM.Context.LangOpts.Target;
   auto pointerSize = IGM.DataLayout.getPointerSizeInBits();
 
   /// Prepare generic target information.

@@ -513,7 +513,6 @@ static bool performCompile(CompilerInstance &Instance,
     break;
   case FrontendOptions::Immediate: {
     assert(!PrimarySourceFile && "-i doesn't work in -primary-file mode");
-    IRGenOpts.Triple = llvm::sys::getDefaultTargetTriple();
     IRGenOpts.OutputKind = IRGenOutputKind::Module;
     IRGenOpts.UseJIT = true;
     IRGenOpts.DebugInfoKind = IRGenDebugInfoKind::Normal;

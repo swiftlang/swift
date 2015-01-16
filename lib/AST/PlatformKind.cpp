@@ -67,10 +67,10 @@ bool swift::isPlatformActive(PlatformKind Platform, LangOptions &LangOpts) {
   switch (Platform) {
     case PlatformKind::OSX:
     case PlatformKind::OSXApplicationExtension:
-      return LangOpts.getTargetConfigOption("os") == "OSX";
+      return LangOpts.Target.isMacOSX();
     case PlatformKind::iOS:
     case PlatformKind::iOSApplicationExtension:
-      return LangOpts.getTargetConfigOption("os") == "iOS";
+      return LangOpts.Target.isiOS();
     case PlatformKind::none:
       llvm_unreachable("handled above");
   }
@@ -78,14 +78,17 @@ bool swift::isPlatformActive(PlatformKind Platform, LangOptions &LangOpts) {
 }
 
 PlatformKind swift::targetPlatform(LangOptions &LangOpts) {
-  StringRef OSTargetConfig = LangOpts.getTargetConfigOption("os");
-
-  return llvm::StringSwitch<PlatformKind>(OSTargetConfig)
-  .Case("OSX", (LangOpts.EnableAppExtensionRestrictions
+  if (LangOpts.Target.isMacOSX()) {
+    return (LangOpts.EnableAppExtensionRestrictions
                 ? PlatformKind::OSXApplicationExtension
-                : PlatformKind::OSX))
-  .Case("iOS", (LangOpts.EnableAppExtensionRestrictions
+                : PlatformKind::OSX);
+  }
+
+  if (LangOpts.Target.isiOS()) {
+    return (LangOpts.EnableAppExtensionRestrictions
                 ? PlatformKind::iOSApplicationExtension
-                : PlatformKind::iOS))
-  .Default(PlatformKind::none);
+                : PlatformKind::iOS);
+  }
+
+  return PlatformKind::none;
 }

@@ -92,7 +92,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   // knowledge.
   auto clangImporter =
     ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
-                          Invocation.getIRGenOptions(), DepTracker);
+                          DepTracker);
   if (!clangImporter) {
     Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
     return true;

@@ -172,10 +172,9 @@ namespace {
 
 ClangImporter::ClangImporter(ASTContext &ctx,
                              const ClangImporterOptions &clangImporterOpts,
-                             const llvm::Triple &triple,
                              DependencyTracker *tracker)
   : ClangModuleLoader(tracker),
-    Impl(*new Implementation(ctx, clangImporterOpts, triple))
+    Impl(*new Implementation(ctx, clangImporterOpts))
 {
 }
 
@@ -202,13 +201,12 @@ void ClangImporter::clearTypeResolver() {
 std::unique_ptr<ClangImporter>
 ClangImporter::create(ASTContext &ctx,
                       const ClangImporterOptions &importerOpts,
-                      const IRGenOptions &irGenOpts,
                       DependencyTracker *tracker) {
 
-  llvm::Triple triple(irGenOpts.Triple);
+  const llvm::Triple &triple = ctx.LangOpts.Target;
 
   std::unique_ptr<ClangImporter> importer{
-    new ClangImporter(ctx, importerOpts, triple, tracker)
+    new ClangImporter(ctx, importerOpts, tracker)
   };
 
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
@@ -223,7 +221,7 @@ ClangImporter::create(ASTContext &ctx,
     "-fsyntax-only",
 
     "-femit-all-decls",
-    "-target", irGenOpts.Triple,
+    "-target", triple.str(),
     SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
     "-fretain-comments-from-system-headers",
     "-fmodules-validate-system-headers",
@@ -748,8 +746,7 @@ Module *ClangImporter::getImportedHeaderModule() const {
 }
 
 ClangImporter::Implementation::Implementation(ASTContext &ctx,
-                                              const ClangImporterOptions &opts,
-                                              const llvm::Triple &triple)
+                                              const ClangImporterOptions &opts)
   : SwiftContext(ctx),
     SplitPrepositions(ctx.LangOpts.SplitPrepositions),
     InferImplicitProperties(opts.InferImplicitProperties),
@@ -758,7 +755,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
   // Add filters to determine if a Clang availability attribute
   // applies in Swift, and if so, what is the cutoff for deprecated
   // declarations that are now considered unavailable in Swift.
-  if (triple.isiOS()) {
+  if (ctx.LangOpts.Target.isiOS()) {
     if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
       PlatformAvailabilityFilter =
         [](StringRef Platform) { return Platform == "ios"; };
@@ -775,7 +772,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
     DeprecatedAsUnavailableMessage =
       "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
   }
-  else if (triple.isMacOSX()) {
+  else if (ctx.LangOpts.Target.isMacOSX()) {
     if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
       PlatformAvailabilityFilter =
       [](StringRef Platform) { return Platform == "macosx"; };

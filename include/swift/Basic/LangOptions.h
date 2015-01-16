@@ -19,10 +19,11 @@
 #define SWIFT_LANGOPTIONS_H
 
 #include "swift/Basic/LLVM.h"
+#include "clang/Basic/VersionTuple.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "clang/Basic/VersionTuple.h"
+#include "llvm/ADT/Triple.h"
 #include <string>
 
 namespace swift {
@@ -109,8 +110,32 @@ namespace swift {
     /// behavior; it just affects what the compiler \em thinks will happen.
     bool UsePrivateDiscriminators = true;
     
-    /// The minimum platform version to which code will be deployed.
-    clang::VersionTuple MinPlatformVersion;
+    /// The target we are building for.
+    ///
+    /// This represents the minimum deployment target.
+    llvm::Triple Target;
+
+    /// Sets the target we are building for and updates configuration options
+    /// to match.
+    void setTarget(llvm::Triple triple);
+
+    /// Returns the minimum platform version to which code will be deployed.
+    ///
+    /// This is only implemented on certain OSs. If no target has been
+    /// configured, returns v0.0.0.
+    clang::VersionTuple getMinPlatformVersion() const {
+      unsigned major, minor, revision;
+      if (Target.isMacOSX()) {
+        Target.getMacOSXVersion(major, minor, revision);
+      } else if (Target.isiOS()) {
+        Target.getiOSVersion(major, minor, revision);
+      } else if (Target.isOSLinux() || Target.getTriple().empty()) {
+        major = minor = revision = 0;
+      } else {
+        llvm_unreachable("Unsupported target OS");
+      }
+      return clang::VersionTuple(major, minor, revision);
+    }
 
     /// Implicit target configuration options.  There are currently three
     ///   supported target configuration values:
@@ -128,7 +153,7 @@ namespace swift {
     }
     
     /// Returns the value for the given target configuration or an empty string.
-    StringRef getTargetConfigOption(StringRef Name);
+    StringRef getTargetConfigOption(StringRef Name) const;
     
     /// Explicit build configuration options, initialized via the '-D'
     /// compiler flag.
@@ -138,7 +163,7 @@ namespace swift {
     }
 
     /// Determines if a given build configuration has been defined.
-    bool hasBuildConfigOption(StringRef Name);
+    bool hasBuildConfigOption(StringRef Name) const;
 
     ArrayRef<std::pair<std::string, std::string>>
         getTargetConfigOptions() const {

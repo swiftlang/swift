@@ -60,7 +60,6 @@ private:
   Implementation &Impl;
 
   ClangImporter(ASTContext &ctx, const ClangImporterOptions &clangImporterOpts,
-                const llvm::Triple &triple,
                 DependencyTracker *tracker);
 
 public:
@@ -72,15 +71,13 @@ public:
   ///
   /// \param clangImporterOpts The options to use for the Clang importer.
   ///
-  /// \param irGenOpts The options for Swift's IRGen, to keep them in sync.
-  ///
   /// \param tracker The object tracking files this compilation depends on.
   ///
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   static std::unique_ptr<ClangImporter>
   create(ASTContext &ctx, const ClangImporterOptions &clangImporterOpts,
-         const IRGenOptions &irGenOpts, DependencyTracker *tracker = nullptr);
+         DependencyTracker *tracker = nullptr);
 
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;

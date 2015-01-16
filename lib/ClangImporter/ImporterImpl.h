@@ -222,8 +222,7 @@ public:
     Constants
   };
 
-  Implementation(ASTContext &ctx, const ClangImporterOptions &opts,
-                 const llvm::Triple &triple);
+  Implementation(ASTContext &ctx, const ClangImporterOptions &opts);
   ~Implementation();
 
   /// \brief Swift AST context.

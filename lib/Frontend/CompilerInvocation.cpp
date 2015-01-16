@@ -40,10 +40,9 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
 }
 
 static void updateRuntimeLibraryPath(SearchPathOptions &SearchPathOpts,
-                                     StringRef tripleStr) {
+                                     llvm::Triple &Triple) {
   llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeResourcePath);
 
-  llvm::Triple Triple{tripleStr};
   llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
   SearchPathOpts.RuntimeLibraryPath = LibPath.str();
 
@@ -54,66 +53,12 @@ static void updateRuntimeLibraryPath(SearchPathOptions &SearchPathOpts,
 
 void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
   SearchPathOpts.RuntimeResourcePath = Path;
-  updateRuntimeLibraryPath(SearchPathOpts, getTargetTriple());
-}
-
-static void updateTargetConfigurationOptions(LangOptions &LangOpts,
-                                             StringRef tripleStr) {
-  LangOpts.clearAllTargetConfigOptions();
-  llvm::Triple triple = llvm::Triple(tripleStr);
-
-  // Set the "os" target configuration.
-  if (triple.isMacOSX())
-    LangOpts.addTargetConfigOption("os", "OSX");
-  else if (triple.isiOS())
-    LangOpts.addTargetConfigOption("os", "iOS");
-  else if (triple.isOSLinux())
-    LangOpts.addTargetConfigOption("os", "Linux");
-  else
-    llvm_unreachable("Unsupported target OS");
-
-  // Set the "arch" target configuration.
-  switch (triple.getArch()) {
-  case llvm::Triple::ArchType::arm:
-    LangOpts.addTargetConfigOption("arch", "arm");
-    break;
-  case llvm::Triple::ArchType::aarch64:
-    LangOpts.addTargetConfigOption("arch", "arm64");
-    break;
-  case llvm::Triple::ArchType::x86:
-    LangOpts.addTargetConfigOption("arch", "i386");
-    break;
-  case llvm::Triple::ArchType::x86_64:
-    LangOpts.addTargetConfigOption("arch", "x86_64");
-    break;
-  default:
-    llvm_unreachable("Unsupported target architecture");
-  }
-
-  // Set the "runtime" target configuration.
-  if (LangOpts.EnableObjCInterop)
-    LangOpts.addTargetConfigOption("_runtime", "_ObjC");
-  else
-    LangOpts.addTargetConfigOption("_runtime", "_Native");
-
-  // Set the minimum platform version for deployment.
-  unsigned major, minor, revision;
-  if (triple.isMacOSX()) {
-    triple.getMacOSXVersion(major, minor, revision);
-  } else if (triple.isiOS()) {
-    triple.getiOSVersion(major, minor, revision);
-  } else if (triple.isOSLinux()) {
-    major = minor = revision = 0;
-  } else {
-    llvm_unreachable("Unsupported target OS");
-  }
-  LangOpts.MinPlatformVersion = clang::VersionTuple(major, minor, revision);
+  updateRuntimeLibraryPath(SearchPathOpts, LangOpts.Target);
 }
 
 void CompilerInvocation::setTargetTriple(StringRef Triple) {
-  IRGenOpts.Triple = Triple.str();
-  updateRuntimeLibraryPath(SearchPathOpts, Triple);
-  updateTargetConfigurationOptions(LangOpts, Triple);
+  LangOpts.setTarget(llvm::Triple(Triple));
+  updateRuntimeLibraryPath(SearchPathOpts, LangOpts.Target);
 }
 
 static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
@@ -597,7 +542,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 }
 
 static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
-                          DiagnosticEngine &Diags) {
+                          DiagnosticEngine &Diags, bool isImmediate) {
   using namespace options;
 
   Opts.UseMalloc |= Args.hasArg(OPT_use_malloc);
@@ -676,6 +621,13 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Opts.SplitPrepositions)
     Opts.addBuildConfigOption("OBJC_SELECTOR_SPLITTING");
+
+  // Must be processed after any other language options that could affect
+  // target configuration options.
+  if (const Arg *A = Args.getLastArg(OPT_target))
+    Opts.setTarget(llvm::Triple(A->getValue()));
+  else
+    Opts.setTarget(Opts.Target);
 
   return false;
 }
@@ -959,9 +911,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_autolink_force_load))
     Opts.ForceLoadSymbolName = Args.getLastArgValue(OPT_module_link_name);
 
-  if (const Arg *A = Args.getLastArg(OPT_target))
-    Opts.Triple = llvm::Triple::normalize(A->getValue());
-
   // TODO: investigate whether these should be removed, in favor of definitions
   // in other classes.
   if (FrontendOpts.PrimaryInput && FrontendOpts.PrimaryInput->isFilename()) {
@@ -1013,7 +962,8 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  if (ParseLangArgs(LangOpts, *ParsedArgs, Diags)) {
+  if (ParseLangArgs(LangOpts, *ParsedArgs, Diags,
+                    FrontendOpts.actionIsImmediate())) {
     return true;
   }
 
@@ -1038,8 +988,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  updateRuntimeLibraryPath(SearchPathOpts, getTargetTriple());
-  updateTargetConfigurationOptions(LangOpts, getTargetTriple());
+  updateRuntimeLibraryPath(SearchPathOpts, LangOpts.Target);
 
   return false;
 }

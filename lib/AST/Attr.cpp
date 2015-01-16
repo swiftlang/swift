@@ -80,8 +80,8 @@ const AvailabilityAttr *DeclAttributes::getUnavailable(
       if (!AvAttr->isActivePlatform(ctx))
         continue;
 
-      switch (AvAttr->getMinVersionAvailability(
-                ctx.LangOpts.MinPlatformVersion)) {
+      auto MinVersion = ctx.LangOpts.getMinPlatformVersion();
+      switch (AvAttr->getMinVersionAvailability(MinVersion)) {
       case MinVersionComparison::Available:
       case MinVersionComparison::PotentiallyUnavailable:
         break;

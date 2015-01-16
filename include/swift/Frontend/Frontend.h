@@ -85,7 +85,7 @@ public:
   void setTargetTriple(StringRef Triple);
 
   StringRef getTargetTriple() const {
-    return IRGenOpts.Triple;
+    return LangOpts.Target.str();
   }
 
   void setClangModuleCachePath(StringRef Path) {

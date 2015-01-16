@@ -499,8 +499,8 @@ static void diagAvailability(TypeChecker &TC, const ValueDecl *D,
         .highlight(SourceRange(Loc, Loc));
     }
 
-    switch (Attr->getMinVersionAvailability(
-              TC.Context.LangOpts.MinPlatformVersion)) {
+    auto MinVersion = TC.Context.LangOpts.getMinPlatformVersion();
+    switch (Attr->getMinVersionAvailability(MinVersion)) {
       case MinVersionComparison::Available:
       case MinVersionComparison::PotentiallyUnavailable:
         llvm_unreachable("These aren't considered unavailable");

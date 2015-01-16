@@ -629,8 +629,7 @@ static bool checkObjectOrOptionalObjectType(TypeChecker &TC, Decl *D,
 }
 
 static bool isiOS(TypeChecker &TC) {
-  // FIXME: This is a very ugly way of checking the OS.
-  return TC.getLangOpts().getTargetConfigOption("os") == "iOS";
+  return TC.getLangOpts().Target.isiOS();
 }
 
 void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {

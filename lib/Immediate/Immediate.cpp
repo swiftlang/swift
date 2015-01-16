@@ -1225,7 +1225,6 @@ public:
     EE = builder.create();
 
     IRGenOpts.OutputFilename = "";
-    IRGenOpts.Triple = llvm::sys::getDefaultTargetTriple();
     IRGenOpts.Optimize = false;
     IRGenOpts.OutputKind = IRGenOutputKind::Module;
     IRGenOpts.UseJIT = true;

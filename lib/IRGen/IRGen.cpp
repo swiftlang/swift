@@ -95,13 +95,13 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                                                        SourceFile *SF = nullptr,
                                                        unsigned StartElem = 0) {
   assert(!M->Ctx.hadError());
+  const llvm::Triple &Triple = M->Ctx.LangOpts.Target;
 
   std::string Error;
-  const Target *Target =
-    TargetRegistry::lookupTarget(Opts.Triple, Error);
+  const Target *Target = TargetRegistry::lookupTarget(Triple.str(), Error);
   if (!Target) {
     M->Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
-                          Opts.Triple, Error);
+                          Triple.str(), Error);
     return nullptr;
   }
 
@@ -124,12 +124,12 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 
   // Create a target machine.
   llvm::TargetMachine *TargetMachine
-    = Target->createTargetMachine(Opts.Triple, CPU, targetFeatures,
-                                  TargetOpts, Reloc::PIC_,
+    = Target->createTargetMachine(Triple.str(), CPU,
+                                  targetFeatures, TargetOpts, Reloc::PIC_,
                                   CodeModel::Default, OptLevel);
   if (!TargetMachine) {
     M->Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
-                          Opts.Triple, "no LLVM target machine");
+                          Triple.str(), "no LLVM target machine");
     return nullptr;
   }
 
@@ -143,7 +143,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   auto *Module = IGM.getModule();
   assert(Module && "Expected llvm:Module for IR generation!");
 
-  Module->setTargetTriple(Opts.Triple);
+  Module->setTargetTriple(Triple.str());
   // Set the dwarf version to 3, which is what the Xcode 5.0 tool chain
   // understands.  FIXME: Increase this to 4 once we have a build
   // train that includes the ToT version of ld64.
@@ -241,7 +241,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                         (uint32_t) (swiftVersion << 8));
 
   // Mark iOS simulator images.
-  if (tripleIsiOSSimulator(llvm::Triple(Opts.Triple)))
+  if (tripleIsiOSSimulator(Triple))
     Module->addModuleFlag(llvm::Module::Error, "Objective-C Is Simulated",
                           eImageInfo_ImageIsSimulated);
 
