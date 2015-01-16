@@ -844,9 +844,7 @@ extension ${Self} {
   public mutating func splice<
     S: CollectionType where S.Generator.Element == T
   >(newElements: S, atIndex i: Int) {
-    // FIXME: <rdar://problem/17866066> 
-    // Swift.splice(&self, newElements, atIndex: i)
-    self.replaceRange(i..<i, with: newElements)
+    Swift.splice(&self, newElements, atIndex: i)
   }
 
   /// Remove the indicated `subRange` of elements
