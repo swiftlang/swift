@@ -4450,8 +4450,8 @@ namespace {
 }
 
 /// Initialize this set of necessary bindings.
-NecessaryBindings::NecessaryBindings(IRGenModule &IGM, SILType type) {
-  FindArchetypesToBind(Types).visit(type.getSwiftRValueType());
+NecessaryBindings::NecessaryBindings(IRGenModule &IGM, CanType type) {
+  FindArchetypesToBind(Types).visit(type);
 }
 
 Size NecessaryBindings::getBufferSize(IRGenModule &IGM) const {

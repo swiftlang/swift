@@ -1,4 +1,4 @@
-//===--- NecessaryBindigns.h - Optimizing archetype bindings ----*- C++ -*-===//
+//===--- NecessaryBindings.h - Optimizing archetype bindings ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -38,7 +38,7 @@ class NecessaryBindings {
   llvm::SetVector<ArchetypeType*> Types;
 
 public:
-  NecessaryBindings(IRGenModule &IGM, SILType type);
+  NecessaryBindings(IRGenModule &IGM, CanType type);
 
   /// Is the work to do trivial?
   bool empty() const { return Types.empty(); }
