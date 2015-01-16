@@ -250,7 +250,7 @@ public:
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getObjCClassPtrTypeInfo();
-  const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size size);
+  const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size size, Alignment align);
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
   llvm::Type *getStorageTypeForUnlowered(Type T);

@@ -1127,17 +1127,17 @@ const TypeInfo &TypeConverter::getTypeInfo(ClassDecl *theClass) {
 /// The TypeInfo will completely ignore any type passed to its
 /// implementation methods; it is safe to pass a null type.
 const LoadableTypeInfo &
-IRGenModule::getOpaqueStorageTypeInfo(Size size) {
-  return Types.getOpaqueStorageTypeInfo(size);
+IRGenModule::getOpaqueStorageTypeInfo(Size size, Alignment align) {
+  return Types.getOpaqueStorageTypeInfo(size, align);
 }
 
 const LoadableTypeInfo &
-TypeConverter::getOpaqueStorageTypeInfo(Size size) {
+TypeConverter::getOpaqueStorageTypeInfo(Size size, Alignment align) {
   assert(!size.isZero());
-  auto index = size.getValue();
-  if (index < OpaqueStorageTypes.size())
-    if (auto type = OpaqueStorageTypes[index])
-      return *type;
+  std::pair<unsigned, unsigned> key = {size.getValue(), align.getValue()};
+  auto existing = OpaqueStorageTypes.find(key);
+  if (existing != OpaqueStorageTypes.end())
+    return *existing->second;
 
   llvm::IntegerType *intType =
     llvm::IntegerType::get(IGM.LLVMContext, size.getValue() * 8);
@@ -1145,13 +1145,11 @@ TypeConverter::getOpaqueStorageTypeInfo(Size size) {
   // There are no spare bits in an opaque storage type.
   auto type = new PrimitiveTypeInfo(intType, size,
                     SpareBitVector::getConstant(size.getValueInBits(), false),
-                                    Alignment(1));
+                    align);
   type->NextConverted = FirstType;
   FirstType = type;
 
-  if (index >= OpaqueStorageTypes.size())
-    OpaqueStorageTypes.resize(index + 1);
-  OpaqueStorageTypes[index] = type;
+  OpaqueStorageTypes[key] = type;
 
   return *type;
 }

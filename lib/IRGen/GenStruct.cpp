@@ -662,7 +662,7 @@ private:
     // decls).
     if (fieldSize.isZero()) return;
 
-    auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(fieldSize);
+    auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(fieldSize, Alignment(1));
     addField(nullptr, offset, opaqueTI);
   }
 

@@ -88,7 +88,9 @@ private:
   const LoadableTypeInfo *TypeMetadataPtrTI = nullptr;
   const LoadableTypeInfo *ObjCClassPtrTI = nullptr;
   const LoadableTypeInfo *EmptyTI = nullptr;
-  SmallVector<const LoadableTypeInfo *, 4> OpaqueStorageTypes;
+  
+  llvm::DenseMap<std::pair<unsigned, unsigned>, const LoadableTypeInfo *>
+    OpaqueStorageTypes;
   
   const LoadableTypeInfo *createPrimitive(llvm::Type *T,
                                           Size size, Alignment align);
@@ -137,7 +139,8 @@ public:
   const LoadableTypeInfo &getWitnessTablePtrTypeInfo();
   const LoadableTypeInfo &getEmptyTypeInfo();
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *P);
-  const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size storageSize);
+  const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size storageSize,
+                                                   Alignment storageAlign);
   const LoadableTypeInfo &getMetatypeTypeInfo(MetatypeRepresentation representation);
 
   const WeakTypeInfo *createSwiftWeakStorageType(llvm::Type *valueType);
