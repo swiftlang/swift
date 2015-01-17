@@ -2269,7 +2269,7 @@ namespace {
 
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
                        /*static*/ false,
-                       decl->getType().isConstQualified(),
+                       Impl.shouldImportGlobalAsLet(decl->getType()),
                        Impl.importSourceLoc(decl->getLocation()),
                        name, type, dc);
 

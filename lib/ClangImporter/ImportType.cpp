@@ -780,6 +780,13 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
     return impl.getNamedSwiftType(impl.getStdlibModule(), "Void");
   }
 
+  // Import NSString * globals as String.
+  if (hint == ImportHint::NSString &&
+      (importKind == ImportTypeKind::Variable ||
+       importKind == ImportTypeKind::AuditedVariable)) {
+    return impl.getNamedSwiftType(impl.getStdlibModule(), "String");
+  }
+
   // Reference types are only permitted as function parameter types.
   if (hint == ImportHint::Reference &&
       importKind == ImportTypeKind::Parameter) {
@@ -966,6 +973,24 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
                                      importKind, importResult.Hint,
                                      isUsedInSystemModule,
                                      optionality);
+}
+
+bool ClangImporter::Implementation::shouldImportGlobalAsLet(
+       clang::QualType type)
+{
+  // Const variables should be imported as 'let'.
+  if (type.isConstQualified()) {
+    return true;
+  }
+  // Globals of type NSString * should be imported as 'let'.
+  if (auto ptrType = type->getAs<clang::ObjCObjectPointerType>()) {
+    if (auto interfaceType = ptrType->getInterfaceType()) {
+      if (interfaceType->getDecl()->getName() == "NSString") {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 Type ClangImporter::Implementation::importPropertyType(

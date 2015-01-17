@@ -931,6 +931,10 @@ public:
   /// \brief Look up a name, accepting only typedef results.
   const clang::TypedefNameDecl *lookupTypedef(clang::DeclarationName);
 
+  /// \brief Return whether a global of the given type should be imported as a
+  /// 'let' declaration as opposed to 'var'.
+  bool shouldImportGlobalAsLet(clang::QualType type);
+
   LazyResolver *getTypeResolver() const {
     return typeResolver;
   }

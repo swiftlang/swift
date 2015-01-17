@@ -578,8 +578,15 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
   // Get the linkage for SILGlobalVariable.
   SILLinkage link = getSILLinkage(getDeclLinkage(gDecl), forDef);
 
-  auto silTy = M.Types.getLoweredType(AbstractionPattern(gDecl->getType()),
-                 gDecl->getType()->getCanonicalType()).getObjectType();
+  Type ty = gDecl->getType();
+  // If a NSString * global was imported as a String, emit a SIL global of type
+  // NSString.
+  if (gDecl->getClangDecl() && ty->isEqual(M.Types.getStringType())) {
+    ty = M.Types.getNSStringType();
+  }
+
+  auto silTy = M.Types.getLoweredType(AbstractionPattern(ty),
+                   ty->getCanonicalType()).getObjectType();
 
   auto *silGlobal = SILGlobalVariable::create(M, link,
                                               makeModuleFragile ? IsFragile : IsNotFragile,

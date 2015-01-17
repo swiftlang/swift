@@ -127,8 +127,8 @@
 // APPKIT-NEXT: weak var target: @sil_weak AnyObject
 // APPKIT-NEXT: var action: Selector
 // APPKIT: {{^}}}{{$}}
-// APPKIT: var NSViewFrameDidChangeNotification: NSString
-// APPKIT: var NSViewFocusDidChangeNotification: NSString
+// APPKIT: let NSViewFrameDidChangeNotification: String
+// APPKIT: let NSViewFocusDidChangeNotification: String
 
 // CTYPESBITS-NOT: FooStruct1
 // CTYPESBITS: {{^}}typealias DWORD = Int32{{$}}

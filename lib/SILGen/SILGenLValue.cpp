@@ -1958,6 +1958,14 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
     return result;
   }
 
+  // NSString * must be bridged to String.
+  if (storageType.getSwiftRValueType() == gen.SGM.Types.getNSStringType()) {
+    auto nsstr = gen.B.createLoad(loc, src);
+    auto nsstringToStringFn = gen.emitGlobalFunctionRef(loc, gen.SGM.getNSStringToStringFn());
+    auto str = gen.B.createApply(loc, nsstringToStringFn, ArrayRef<SILValue>(nsstr), IsTransparent);
+    return str;
+  }
+
   llvm_unreachable("unexpected storage type that differs from type-of-rvalue");
 }
 
