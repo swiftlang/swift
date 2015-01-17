@@ -1169,8 +1169,53 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   // dependency in between the enum and its data.
 
   assert(IEAI->getOperand().getType().isAddress() && "Must be an address");
-  if (IEAI->getOperand().getType().isAddressOnly(IEAI->getModule()))
+
+  if (IEAI->getOperand().getType().isAddressOnly(IEAI->getModule())) {
+    // Check for the following pattern inside the current basic block:
+    // inject_enum_addr %payload_allocation, $EnumType.case1
+    // ... no insns storing anything into %payload_allocation
+    // select_enum_addr  %payload_allocation,
+    //                   case $EnumType.case1: %Result1,
+    //                   case case $EnumType.case2: %bResult2
+    //                   ...
+    //
+    // Replace the select_enum_addr by %Result1
+
+    auto *Term = IEAI->getParent()->getTerminator();
+    auto *CBI = dyn_cast<CondBranchInst>(Term);
+    if (!CBI)
+      return nullptr;
+    auto BeforeTerm = prev(prev(IEAI->getParent()->end()));
+    auto *SEAI = dyn_cast<SelectEnumAddrInst>(BeforeTerm);
+    if (!SEAI)
+      return nullptr;
+
+    SILBasicBlock::iterator II = IEAI;
+    StoreInst *SI = nullptr;
+    for (;;) {
+      SILInstruction *CI = II;
+      if (CI == SEAI)
+        break;
+      ++II;
+      SI = dyn_cast<StoreInst>(CI);
+      if (SI) {
+        if (SI->getDest() == IEAI->getOperand())
+          return nullptr;
+      }
+      // Allow all instructions inbetween, which don't have any dependency to
+      // the store.
+      if (AA->mayWriteToMemory(II, IEAI->getOperand()))
+        return nullptr;
+    }
+
+    auto *InjectedEnumElement = IEAI->getElement();
+    auto Result = SEAI->getCaseResult(InjectedEnumElement);
+
+    // Replace select_enum_addr by the result
+    replaceInstUsesWith(*SEAI, Result.getDef());
+
     return nullptr;
+  }
 
   // If the enum does not have a payload create the enum/store since we don't
   // need to worry about payloads.

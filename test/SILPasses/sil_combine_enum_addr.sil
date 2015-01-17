@@ -1,0 +1,40 @@
+// RUN: %sil-opt %s -sil-combine -simplify-cfg -verify | FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: sil  @convert_inject_enum_addr_select_enum_addr_into_cond_br : $@thin (@in Int, @inout _Stdout) -> ()
+// CHECK: unconditional_checked_cast_addr
+// CHECK: inject_enum_addr
+// CHECK-NOT: select_enum_addr
+// CHECK-NOT: bb1
+// CHECK: unchecked_take_enum_data_addr
+// CHECK: return
+sil  @convert_inject_enum_addr_select_enum_addr_into_cond_br : $@thin (@in Int, @inout _Stdout) -> () {
+bb0(%0 : $*Int, %1 : $*_Stdout):
+  %2 = alloc_stack $Printable
+  %3 = alloc_stack $Optional<Printable>
+  %4 = init_enum_data_addr %3#1 : $*Optional<Printable>, #Optional.Some!enumelt.1
+  %5 = alloc_stack $Int
+  %6 = load %0 : $*Int
+  store %6 to %5#1 : $*Int
+  unconditional_checked_cast_addr take_always Int in %5#1 : $*Int to Printable in %4 : $*Printable
+  inject_enum_addr %3#1 : $*Optional<Printable>, #Optional.Some!enumelt.1
+  dealloc_stack %5#0 : $*@local_storage Int
+  %11 = integer_literal $Builtin.Int1, -1
+  %12 = integer_literal $Builtin.Int1, 0
+  %13 = select_enum_addr %3#1 : $*Optional<Printable>, case #Optional.Some!enumelt.1: %11, case #Optional.None!enumelt: %12 : $Builtin.Int1
+  cond_br %13, bb2, bb1
+
+bb1:
+  %15 = tuple ()
+  dealloc_stack %3#0 : $*@local_storage Optional<Printable>
+  dealloc_stack %2#0 : $*@local_storage Printable
+  return %15 : $()
+
+bb2:
+  %19 = unchecked_take_enum_data_addr %3#1 : $*Optional<Printable>, #Optional.Some!enumelt.1
+  copy_addr [take] %19 to [initialization] %2#1 : $*Printable
+  br bb1
+}
