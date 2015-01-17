@@ -38,3 +38,42 @@ bb2:
   copy_addr [take] %19 to [initialization] %2#1 : $*Printable
   br bb1
 }
+
+// Check that a checked_cast_addr_br converting a known type into a protocol type
+// is performed at the compile-time if protocol conformances are statically known.
+//
+// CHECK-LABEL: sil @convert_checked_cast_addr_br_into_unconditional_checked_cast_addr_cond_br : $@thin (@in Int, @inout _Stdout) -> ()
+// CHECK: store
+// CHECK-NOT: checked_cast_addr_br
+// CHECK-NOT: bb1
+// CHECK: inject_enum_addr %{{.*}} : $*Optional<Printable>, #Optional.Some!enumelt.1
+// CHECK: dealloc_stack
+// CHECK: return
+sil @convert_checked_cast_addr_br_into_unconditional_checked_cast_addr_cond_br : $@thin (@in Int, @inout _Stdout) -> () {
+bb0(%0 : $*Int, %1 : $*_Stdout):
+  %2 = alloc_stack $Printable
+  %3 = alloc_stack $Optional<Printable>
+  %4 = init_enum_data_addr %3#1 : $*Optional<Printable>, #Optional.Some!enumelt.1
+  %5 = alloc_stack $Int
+  %6 = load %0 : $*Int
+  store %6 to %5#1 : $*Int
+  checked_cast_addr_br take_always Int in %5#1 : $*Int to Printable in %4 : $*Printable, bb1, bb22
+
+bb1:
+  inject_enum_addr %3#1 : $*Optional<Printable>, #Optional.Some!enumelt.1
+  br bb2
+
+bb2:
+  dealloc_stack %5#0 : $*@local_storage Int
+  dealloc_stack %3#0 : $*@local_storage Optional<Printable>
+  %12 = integer_literal $Builtin.Int1, -1
+  %13 = integer_literal $Builtin.Int1, 0
+  %26 = tuple ()
+  dealloc_stack %2#0 : $*@local_storage Printable
+  return %26 : $()
+
+bb22:
+  inject_enum_addr %3#1 : $*Optional<Printable>, #Optional.None!enumelt
+  br bb2
+}
+

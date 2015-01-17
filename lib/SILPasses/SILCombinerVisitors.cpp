@@ -1786,3 +1786,62 @@ SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *FLI) {
   }
   return nullptr;
 }
+
+SILInstruction *
+SILCombiner::
+visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
+  // Try to determine the outcome of the cast from a known type
+  // to a protocol type at compile-time.
+  if (!CCABI->getTargetType().isAnyExistentialType())
+    return nullptr;
+  auto SILSourceTy = SILType::getPrimitiveObjectType(CCABI->getSourceType());
+  auto SILTargetTy = SILType::getPrimitiveObjectType(CCABI->getTargetType());
+  // Check if we can statically figure out the outcome of this cast.
+  auto *SourceNominalTy = CCABI->getSourceType().getAnyNominal();
+  if (SILSourceTy.isExistentialType() || !SourceNominalTy)
+    return nullptr;
+
+  if (SILTargetTy.isExistentialType()) {
+    auto *TargetProtocol = SILTargetTy.getSwiftRValueType().getAnyNominal();
+    auto SourceProtocols = SourceNominalTy->getProtocols();
+    auto SourceExtensions = SourceNominalTy->getExtensions();
+
+    // Check all protocols implemented by the type.
+    for (auto *Protocol : SourceProtocols) {
+      if (Protocol == TargetProtocol) {
+        auto *UAC = Builder->createUnconditionalCheckedCastAddr(
+            CCABI->getLoc(), CCABI->getConsumptionKind(), CCABI->getSrc(),
+            CCABI->getSourceType(), CCABI->getDest(), CCABI->getTargetType());
+        Builder->createBranch(CCABI->getLoc(), CCABI->getSuccessBB());
+        eraseInstFromFunction(*CCABI);
+        return nullptr;
+      }
+    }
+
+    // Check all protocols implemented by the type extensions.
+    for(auto *Extension: SourceExtensions) {
+      SourceProtocols = Extension->getProtocols();
+      for (auto *Protocol: SourceProtocols) {
+        if (Protocol == TargetProtocol) {
+          auto *UAC = Builder->createUnconditionalCheckedCastAddr(
+              CCABI->getLoc(), CCABI->getConsumptionKind(), CCABI->getSrc(),
+              CCABI->getSourceType(), CCABI->getDest(), CCABI->getTargetType());
+          Builder->createBranch(CCABI->getLoc(), CCABI->getSuccessBB());
+          eraseInstFromFunction(*CCABI);
+          return nullptr;
+        }
+      }
+    }
+
+    // If type is private or internal, its conformances cannot be changed
+    // at run-time. Therefore it is safe to make a negative decision
+    // at compile-time.
+    if (SourceNominalTy->getAccessibility() < Accessibility::Public) {
+      // This cast is always fasle. Replace it with a branch to the
+      // failure block.
+      Builder->createBranch(CCABI->getLoc(), CCABI->getFailureBB());
+      eraseInstFromFunction(*CCABI);
+    }
+  }
+  return nullptr;
+}

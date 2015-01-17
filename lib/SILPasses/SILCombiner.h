@@ -216,6 +216,9 @@ public:
   SILInstruction *visitFixLifetimeInst(FixLifetimeInst *FLI);
   SILInstruction *visitSwitchValueInst(SwitchValueInst *SVI);
   SILInstruction *visitSelectValueInst(SelectValueInst *SVI);
+  SILInstruction *
+  visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI);
+
 
   /// Instruction visitor helpers.
   SILInstruction *optimizeBuiltinCanBeObjCClass(BuiltinInst *AI);
