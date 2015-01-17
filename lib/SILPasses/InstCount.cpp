@@ -16,6 +16,7 @@
 
 #define DEBUG_TYPE "sil-instcount"
 #include "swift/SILPasses/Passes.h"
+#include "swift/SILPasses/PassManager.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
@@ -50,6 +51,10 @@ STATISTIC(TotalPublicExternalFuncs, "Number of public external funcs");
 STATISTIC(TotalHiddenExternalFuncs, "Number of hidden external funcs");
 STATISTIC(TotalPrivateExternalFuncs, "Number of private external funcs");
 STATISTIC(TotalSharedExternalFuncs, "Number of shared external funcs");
+
+// Specialization Statistics
+STATISTIC(TotalSpecializedInsts, "Number of instructions (of all types) in "
+          "specialized functions");
 
 // Individual instruction statistics
 #define INST(Id, Parent, MemBehavior) \
@@ -114,6 +119,10 @@ class InstCount : public SILFunctionTransform {
       TotalFuncs++;
     }
 
+    if (F->getName().count("_TTSg")) {
+      TotalSpecializedInsts += V.InstCount;
+    }
+
     switch (F->getLinkage()) {
     case SILLinkage::Public:
       ++TotalPublicFuncs;
@@ -149,3 +158,8 @@ SILTransform *swift::createInstCount() {
   return new InstCount();
 }
 
+void swift::performSILInstCount(SILModule *M) {
+  SILPassManager PrinterPM(M);
+  PrinterPM.add(createInstCount());
+  PrinterPM.runOneIteration();
+}

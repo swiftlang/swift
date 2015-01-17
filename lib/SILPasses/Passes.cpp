@@ -279,13 +279,6 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.add(createLateDeadFunctionElimination());
   PM.runOneIteration();
 
-  // Gather instruction counts if we are asked to do so.
-  if (Module.getOptions().PrintInstCounts) {
-    SILPassManager PrinterPM(&Module);
-    PrinterPM.add(createInstCount());
-    PrinterPM.runOneIteration();
-  }
-
   // Call the CFG viewer.
   if (SILViewCFG) {
     PM.resetAndRemoveTransformations();

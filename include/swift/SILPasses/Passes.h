@@ -48,6 +48,9 @@ namespace swift {
   /// \brief Cleanup instructions/builtin calls not suitable for IRGen.
   void performSILCleanup(SILModule *M);
 
+  /// \brief Perform SIL Inst Count on M.
+  void performSILInstCount(SILModule *M);
+
   /// \brief Identifiers for all passes. Used to procedurally create passes from
   /// lists of passes.
   enum class PassKind {

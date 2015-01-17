@@ -441,6 +441,11 @@ static bool performCompile(CompilerInstance &Instance,
     SM->verify();
   }
 
+  // Gather instruction counts if we are asked to do so.
+  if (SM->getOptions().PrintInstCounts) {
+    performSILInstCount(&*SM);
+  }
+
   // Get the main source file's private discriminator and attach it to
   // the compile unit's flags.
   if (PrimarySourceFile) {
