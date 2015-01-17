@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -devirtualize -verify | FileCheck %s
+// RUN: %sil-opt %s -devirtualize -dce -verify | FileCheck %s
 sil_stage canonical
 
 import Builtin
@@ -36,5 +36,38 @@ sil_vtable Bar {
   #Bar.foo!1: _TFC4main3Bar3foofS0_FT_T_
 }
 
+private class Node {
+  @sil_stored var index: Int { get set }
+  init(index: Int)
+   deinit
+}
 
+// CHECK-LABEL: sil private @class_method_apply
+sil private @class_method_apply : $@cc(method) @thin (@owned Node) -> Int {
+bb0(%0 : $Node):
+  // CHECK: strong_retain %0
+  strong_retain %0 : $Node
+  // CHECK-NOT: class_method %0
+  // CHECK: [[FUNC:%.*]] = function_ref @transparent_target
+  %3 = class_method %0 : $Node, #Node.index!getter.1 : Node -> () -> Int , $@cc(method) @thin (@owned Node) -> Int
+  // CHECK: [[RESULT:%.*]] = apply [transparent] [[FUNC]](%0)
+  %4 = apply %3(%0) : $@cc(method) @thin (@owned Node) -> Int
+  // CHECK: strong_release %0
+  strong_release %0 : $Node
+  // return [[RESULT]]
+  return %4 : $Int
+}
 
+// CHECK-LABEL: sil private [transparent] @transparent_target
+sil private [transparent] @transparent_target : $@cc(method) @thin (@owned Node) -> Int {
+bb0(%0 : $Node):
+  %2 = ref_element_addr %0 : $Node, #Node.index
+  %3 = load %2 : $*Int
+  strong_release %0 : $Node
+  // CHECK: return
+  return %3 : $Int
+}
+
+sil_vtable Node {
+  #Node.index!getter.1: transparent_target
+}

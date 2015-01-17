@@ -347,7 +347,8 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
   SILType SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
   ApplyInst *NewAI =
       B.createApply(AI->getLoc(), FRI, SubstCalleeSILType, ReturnType,
-                    Substitutions, NewArgs);
+                    Substitutions, NewArgs,
+                    FRI->getReferencedFunction()->isTransparent());
 
   // If our return type differs from AI's return type, then we know that we have
   // a covariant return type. Cast it before we RAUW. This can not happen 
@@ -455,7 +456,8 @@ bool devirtulizeWitness(ApplyInst *AI,
   auto SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeCanType);
   auto ResultSILType = SubstCalleeCanType->getSILResult();
   auto *SAI = Builder.createApply(Loc, FRI, SubstCalleeSILType,
-                                  ResultSILType, NewSubstList, Arguments);
+                                  ResultSILType, NewSubstList, Arguments,
+                                 FRI->getReferencedFunction()->isTransparent());
   AI->replaceAllUsesWith(SAI);
   AI->eraseFromParent();
   NumAMI++;
