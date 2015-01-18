@@ -76,7 +76,11 @@ enum class SyntaxStructureKind : uint8_t {
   FreeFunction,
   InstanceFunction,
   StaticFunction,
+  ClassFunction,
+  GlobalVariable,
   InstanceVariable,
+  StaticVariable,
+  ClassVariable,
   Parameter,
   BraceStatement,
   CallExpression,
@@ -91,6 +95,19 @@ struct SyntaxStructureNode {
   CharSourceRange NameRange;
   CharSourceRange TypeRange;
   std::vector<CharSourceRange> InheritedTypeRanges;
+
+  bool isVariable() const {
+    switch (Kind) {
+    case SyntaxStructureKind::GlobalVariable:
+    case SyntaxStructureKind::InstanceVariable:
+    case SyntaxStructureKind::StaticVariable:
+    case SyntaxStructureKind::ClassVariable:
+    case SyntaxStructureKind::Parameter:
+      return true;
+    default:
+      return false;
+    }
+  }
 };
 
 class SyntaxModelWalker {

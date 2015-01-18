@@ -430,10 +430,14 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       SN.Dcl = D;
       const DeclContext *DC = AFD->getDeclContext();
       if (DC->isTypeContext()) {
-        if (FD && FD->isStatic())
-          SN.Kind = SyntaxStructureKind::StaticFunction;
-        else
+        if (FD && FD->isStatic()) {
+          if (FD->getStaticSpelling() == StaticSpellingKind::KeywordClass)
+            SN.Kind = SyntaxStructureKind::ClassFunction;
+          else
+            SN.Kind = SyntaxStructureKind::StaticFunction;
+        } else {
           SN.Kind = SyntaxStructureKind::InstanceFunction;
+        }
       }
       else
         SN.Kind = SyntaxStructureKind::FreeFunction;
@@ -496,7 +500,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     pushStructureNode(SN, PD);
   } else if (auto *VD = dyn_cast<VarDecl>(D)) {
     const DeclContext *DC = VD->getDeclContext();
-    if (DC->isTypeContext()) {
+    if (DC->isTypeContext() || DC->isModuleScopeContext()) {
       SyntaxStructureNode SN;
       SN.Dcl = D;
       SourceRange SR;
@@ -514,7 +518,21 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       SN.TypeRange = charSourceRangeFromSourceRange(SM,
                                         VD->getTypeSourceRangeForDiagnostics());
 
-      SN.Kind = SyntaxStructureKind::InstanceVariable;
+      if (DC->isTypeContext()) {
+        if (VD->isStatic()) {
+          StaticSpellingKind Spell = StaticSpellingKind::KeywordStatic;
+          if (PatternBindingDecl *PD = VD->getParentPattern())
+            Spell = PD->getStaticSpelling();
+          if (Spell == StaticSpellingKind::KeywordClass)
+            SN.Kind = SyntaxStructureKind::ClassVariable;
+          else
+            SN.Kind = SyntaxStructureKind::StaticVariable;
+        } else {
+          SN.Kind = SyntaxStructureKind::InstanceVariable;
+        }
+      } else {
+        SN.Kind = SyntaxStructureKind::GlobalVariable;
+      }
       SN.Attrs = VD->getAttrs();
       pushStructureNode(SN, VD);
     }
@@ -566,7 +584,7 @@ bool ModelASTWalker::walkToDeclPost(swift::Decl *D) {
 
   } else if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
     const DeclContext *DC = VD->getDeclContext();
-    if (DC->isTypeContext()) {
+    if (DC->isTypeContext() || DC->isModuleScopeContext()) {
       popStructureNode();
     }
 
@@ -797,8 +815,7 @@ bool ModelASTWalker::popStructureNode() {
 
   // VarDecls are popped before we see their TypeRepr, so if we pass the token
   // nodes now they will not change from identifier to a type-identifier.
-  if (Node.Kind != SyntaxStructureKind::InstanceVariable &&
-      Node.Kind != SyntaxStructureKind::Parameter) {
+  if (!Node.isVariable()) {
     if (!passTokenNodesUntil(Node.Range.getEnd(), IncludeNodeAtLocation))
       return false;
   }

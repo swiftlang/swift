@@ -722,12 +722,28 @@ public:
       OS << "Extension ";
       break;
     case swift::ide::SyntaxStructureKind::FreeFunction:
+      OS << "FFunc ";
+      break;
     case swift::ide::SyntaxStructureKind::InstanceFunction:
+      OS << "IFunc ";
+      break;
     case swift::ide::SyntaxStructureKind::StaticFunction:
-      OS << "Func ";
+      OS << "SFunc ";
+      break;
+    case swift::ide::SyntaxStructureKind::ClassFunction:
+      OS << "CFunc ";
+      break;
+    case swift::ide::SyntaxStructureKind::GlobalVariable:
+      OS << "GVar ";
       break;
     case swift::ide::SyntaxStructureKind::InstanceVariable:
       OS << "Property ";
+      break;
+    case swift::ide::SyntaxStructureKind::StaticVariable:
+      OS << "SVar ";
+      break;
+    case swift::ide::SyntaxStructureKind::ClassVariable:
+      OS << "CVar ";
       break;
     case swift::ide::SyntaxStructureKind::Parameter:
       OS << "Parameter ";
