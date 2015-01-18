@@ -339,7 +339,7 @@ extension String {
   /// Returns the result of invoking `compare:options:` with
   /// `NSCaseInsensitiveSearch` as the only option.
   public func caseInsensitiveCompare(aString: String) -> NSComparisonResult {
-    return _ns.caseInsensitiveCompare(aString as NSString)
+    return _ns.caseInsensitiveCompare(aString)
   }
 
   //===--- Omitted by agreement during API review 5/20/2014 ---------------===//
@@ -357,8 +357,7 @@ extension String {
   /// up to the first characters that aren’t equivalent.
   public func commonPrefixWithString(
     aString: String, options: NSStringCompareOptions) -> String {
-    return _ns.commonPrefixWithString(
-      aString as NSString, options: options) as String
+    return _ns.commonPrefixWithString(aString, options: options)
   }
 
   // - (NSComparisonResult)
@@ -435,7 +434,7 @@ extension String {
     }
     
     if let n = nsOutputName {
-      outputName._setIfNonNil { n }
+      outputName._setIfNonNil { n as String }
     }
     return result
   }
@@ -449,7 +448,7 @@ extension String {
     separator: NSCharacterSet
   ) -> [String] {
     // FIXME: two steps due to <rdar://16971181>
-    let nsa = _ns.componentsSeparatedByCharactersInSet(separator)
+    let nsa = _ns.componentsSeparatedByCharactersInSet(separator) as NSArray
     // Since this function is effectively a bridge thunk, use the
     // bridge thunk semantics for the NSArray conversion
     return _convertNSArrayToArray(nsa)
@@ -461,7 +460,7 @@ extension String {
   /// Returns an array containing substrings from the `String`
   /// that have been divided by a given separator.
   public func componentsSeparatedByString(separator: String) -> [String] {
-    let nsa = _ns.componentsSeparatedByString(separator)
+    let nsa = _ns.componentsSeparatedByString(separator) as NSArray
     // Since this function is effectively a bridge thunk, use the
     // bridge thunk semantics for the NSArray conversion
     return _convertNSArrayToArray(nsa)
@@ -806,7 +805,7 @@ extension String {
     utf16CodeUnits: UnsafePointer<unichar>,
     count: Int
   ) {
-    self = NSString(characters: utf16CodeUnits, length: count)
+    self = NSString(characters: utf16CodeUnits, length: count) as String
   }
 
   // - (instancetype)
@@ -824,7 +823,7 @@ extension String {
     self = NSString(
       charactersNoCopy: UnsafeMutablePointer(utf16CodeUnitsNoCopy),
       length: count,
-      freeWhenDone: flag)
+      freeWhenDone: flag) as String
   }
 
   //===--- Initializers that can fail dropped for factory functions -------===//
@@ -903,7 +902,7 @@ extension String {
       "Too many format specifiers (%<letter>) provided for the argument list"
     )
     self = withVaList(arguments) {
-      NSString(format: format, locale: locale, arguments: $0)
+      NSString(format: format, locale: locale, arguments: $0) as String
     }
   }
 
@@ -974,7 +973,7 @@ extension String {
     let result = tokenRanges._withBridgeObject(&nsTokenRanges) {
       self._ns.linguisticTagsInRange(
         _toNSRange(range), scheme: tagScheme, options: opts,
-        orthography: orthography != nil ? orthography! : nil, tokenRanges: $0)
+        orthography: orthography != nil ? orthography! : nil, tokenRanges: $0) as NSArray
     }
     
     if nsTokenRanges != nil {

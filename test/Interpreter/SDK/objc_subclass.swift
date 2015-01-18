@@ -26,7 +26,7 @@ class SuperString : NSString {
 
   override func substringWithRange(r: NSRange) -> String {
     if (r.location == 0) {
-      return SuperString(r.length)
+      return SuperString(r.length) as String
     }
     return super.substringWithRange(r)
   }
@@ -35,7 +35,7 @@ class SuperString : NSString {
 // CHECK: 0123456789
 println(SuperString(10))
 // CHECK: 0123456789
-println(NSString(string: SuperString(10)))
+println(NSString(string: SuperString(10) as String))
 // CHECK: 012
 println(SuperString(10).substringWithRange(NSRange(location: 0, length: 3)))
 // CHECK: 345

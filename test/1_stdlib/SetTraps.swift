@@ -51,7 +51,7 @@ var SetTraps = TestSuite("SetTraps")
 SetTraps.test("sanity") {
   // Sanity checks.  This code should not trap.
   var s = Set<BridgedVerbatimRefTy>()
-  var nss: NSSet = s
+  var nss = s as NSSet
 }
 
 SetTraps.test("RemoveInvalidIndex1") {
@@ -156,7 +156,7 @@ func ==(x: TestBridgedKeyTy, y: TestBridgedKeyTy) -> Bool {
 SetTraps.test("BridgedKeyIsNotNSCopyable1") {
   // This Set is bridged in O(1).
   var s: Set<TestObjCKeyTy> = [ TestObjCKeyTy(10) ]
-  var nss: NSSet = s
+  var nss = s as NSSet
 
   // Unlike NSDictionary, NSSet does not require NSCopying from its element
   // type.

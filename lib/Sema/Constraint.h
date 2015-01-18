@@ -56,6 +56,9 @@ enum class ConstraintKind : char {
   Subtype,
   /// \brief The first type is convertible to the second type.
   Conversion,
+  /// \brief The first type is convertible to the second type using an 'as'
+  /// statement. This differs from 'Conversion' in that it also allows bridging.
+  ExplicitConversion,
   /// \brief The first type is the element of an argument tuple that is
   /// convertible to the second type (which represents the corresponding
   /// parameter type).
@@ -489,6 +492,7 @@ public:
     case ConstraintKind::Equal:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
+    case ConstraintKind::ExplicitConversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::ArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentTupleConversion:

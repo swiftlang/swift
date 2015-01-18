@@ -277,7 +277,7 @@ case _:
 }
 
 // CHECK-NEXT: foobar
-let somesubclassofnsstring: NSString = "foo" + "bar"
+let somesubclassofnsstring = ("foo" + "bar") as NSString
 switch reflect(somesubclassofnsstring).quickLookObject {
   case .Some(.Text(let text)): println(text)
   default: println("not the expected quicklook")

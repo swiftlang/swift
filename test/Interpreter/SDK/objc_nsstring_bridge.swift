@@ -37,20 +37,20 @@ var s1:String = "wa-da-ta"
 // We don't say 'var s2:NSString = "..."' in order to keep this test independent of the
 // ABI of NSString.convertFromStringLiteral.
 var s2s:String = "kappa-chow"
-var s2:NSString = s2s
+var s2 = s2s as NSString
 printDescription(s2) // CHECK: kappa-chow
-printDescription(p.sinePittyOnRunnyKine(s2)) // CHECK: kappa-chow. sa-da-tay
+printDescription(p.sinePittyOnRunnyKine(s2 as String) as NSString) // CHECK: kappa-chow. sa-da-tay
 
 var s3:String = s2.stringByAppendingPathComponent(s1).reallyAString()
-printDescription(s3) // CHECK: kappa-chow/wa-da-ta
+printDescription(s3 as NSString) // CHECK: kappa-chow/wa-da-ta
 
 // Unicode conversion
-var s4 : String = NSString(string: "\u{f8ff}\u{fffd}")
-printDescription(s4) // CHECK: �
+var s4 = NSString(string: "\u{f8ff}\u{fffd}") as String
+printDescription(s4 as NSString) // CHECK: �
 
 // NSCFConstantString conversion
 var s5 : String = NSRangeException
-printDescription(s5) // CHECK: NSRangeException
+printDescription(s5 as NSString) // CHECK: NSRangeException
 
 // Check conversions to AnyObject
 var s6: NSString = "foo"

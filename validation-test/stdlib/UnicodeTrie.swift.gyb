@@ -150,7 +150,7 @@ func checkGraphemeClusterSegmentation(
 func checkGraphemeClusterSegmentation(
     expectedBoundaries: [Int], #scalars: [UInt32], stackTrace: SourceLocStack
 ) {
-  let subject: String = NonContiguousNSString(scalars)
+  let subject = NonContiguousNSString(scalars) as String
   checkGraphemeClusterSegmentation(expectedBoundaries, subject,
       stackTrace.withCurrentLoc())
 }
@@ -158,7 +158,7 @@ func checkGraphemeClusterSegmentation(
 func checkGraphemeClusterSegmentation(
     expectedBoundaries: [Int], #codeUnits: [UInt16], stackTrace: SourceLocStack
 ) {
-  let subject: String = NonContiguousNSString(codeUnits)
+  let subject = NonContiguousNSString(codeUnits) as String
   checkGraphemeClusterSegmentation(expectedBoundaries, subject,
       stackTrace.withCurrentLoc())
 }

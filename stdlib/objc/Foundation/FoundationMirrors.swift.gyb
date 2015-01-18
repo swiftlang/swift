@@ -91,7 +91,7 @@ ${getMirrorDecl("NSSet","MembershipContainer")} {
 
   init(_ x: NSSet) {
     _value = x
-    _a = _value.allObjects
+    _a = _value.allObjects as NSArray
   }
   
   var disposition: MirrorDisposition { return .MembershipContainer }

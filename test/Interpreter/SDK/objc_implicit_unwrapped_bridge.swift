@@ -24,7 +24,7 @@ func getIUO<T>(x: T?) -> T! { return x }
 func testConvertArrayOfImplicitUnwrappedClass() {
   println("Converting array of IOU of class type to NSArray...")
   let classArr1 = [ getIUO(X(value: 1)), getIUO(X(value: 2)) ]
-  let classNSArr1: NSArray = classArr1
+  let classNSArr1 = classArr1 as NSArray
   // CHECK: Class array count = 2
   println("Class array count = \(classNSArr1.count)")
  
@@ -50,7 +50,7 @@ func testConvertArrayOfImplicitUnwrappedValue() {
   println("Converting array of IOU of String to NSArray...")
   var stringArr1: [String!] = ["Hello", "World"]
 
-  let stringNSArr1: NSArray = stringArr1
+  let stringNSArr1 = stringArr1 as NSArray
 
   // CHECK: String array count = 2
   println("String array count = \(stringNSArr1.count)")
@@ -80,7 +80,7 @@ func testConvertArrayOfImplicitUnwrappedArray() {
   stringArrArr.append(getIUO(stringArr1))
   stringArrArr.append(getIUO(stringArr2))
 
-  let nsarr: NSArray = stringArrArr
+  let nsarr = stringArrArr as NSArray
 
   // CHECK: String array array count = 2
   println("String array array count = \(nsarr.count)")

@@ -51,7 +51,7 @@ var DictionaryTraps = TestSuite("DictionaryTraps")
 DictionaryTraps.test("sanity") {
   // Sanity checks.  This code should not trap.
   var d = Dictionary<BridgedVerbatimRefTy, BridgedVerbatimRefTy>()
-  var nsd: NSDictionary = d
+  var nsd = d as NSDictionary
 }
 
 DictionaryTraps.test("DuplicateKeys1") {
@@ -171,7 +171,7 @@ DictionaryTraps.test("BridgedKeyIsNotNSCopyable1")
   .crashOutputMatches("unrecognized selector sent to instance").code {
   // This Dictionary is bridged in O(1).
   var d = [ TestObjCKeyTy(10): NSObject() ]
-  var nsd: NSDictionary = d
+  var nsd = d as NSDictionary
   expectCrashLater()
   nsd.mutableCopy()
 }
@@ -179,7 +179,7 @@ DictionaryTraps.test("BridgedKeyIsNotNSCopyable1")
 DictionaryTraps.test("BridgedKeyIsNotNSCopyable2") {
   // This Dictionary is bridged in O(1).
   var d = [ TestObjCKeyTy(10): 10 ]
-  var nsd: NSDictionary = d
+  var nsd = d as NSDictionary
   expectCrashLater()
   nsd.mutableCopy()
 }

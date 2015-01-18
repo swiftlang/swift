@@ -6,8 +6,8 @@ import StdlibUnittest
 
 var FoundationTestSuite = TestSuite("Foundation")
 
-func asNSString(s: String) -> NSString { return s }
-func asString(ns: NSString) -> String { return ns }
+func asNSString(s: String) -> NSString { return s as NSString }
+func asString(ns: NSString) -> String { return ns as String }
 
 //===----------------------------------------------------------------------===//
 // Strings
@@ -15,11 +15,11 @@ func asString(ns: NSString) -> String { return ns }
 
 FoundationTestSuite.test("NSString") {
   var str = "Hello"
-  var nsStr : NSString = str
+  var nsStr = str as NSString
   assert(nsStr.compare(str).rawValue == NSComparisonResult.OrderedSame.rawValue)
   assert(nsStr.compare(str) == NSComparisonResult.OrderedSame)
   nsStr = "World"
-  str = nsStr
+  str = nsStr as String
   // FIXME: Shouldn't need coercion here to resolve ambiguity. <rdar://problem/14637688>
   assert(str == asString(nsStr))
 }
@@ -34,13 +34,13 @@ FoundationTestSuite.test("NSNumber") {
   var b = true
 
   // Implicit boxing/explicit unboxing
-  var nsNum: NSNumber = i
+  var nsNum: NSNumber = i as NSNumber
   expectEqual(i, Int(nsNum))
 
-  nsNum = d
+  nsNum = d as NSNumber
   expectEqual(d, Double(nsNum))
 
-  nsNum = b
+  nsNum = b as NSNumber
   expectEqual(b, Bool(nsNum))
 
   // Literals
@@ -96,16 +96,16 @@ FoundationTestSuite.test("arrayConversions") {
 
   nsa as Array<AnyObject>
   var nsa2 = NSArray()
-  var aoa2: Array<AnyObject> = nsa2
+  var aoa2 = nsa2 as Array<AnyObject>
 
   var nsaoa = aoa as NSArray
 
   func nsArrayToAnyObjectArray(nsa: NSArray) -> [AnyObject] {
-    return nsa
+    return nsa as [AnyObject]
   }
 
   nsArrayToAnyObjectArray(nsa)
-  nsArrayToAnyObjectArray(aoa)
+  nsArrayToAnyObjectArray(aoa as NSArray)
 }
 
 //===----------------------------------------------------------------------===//

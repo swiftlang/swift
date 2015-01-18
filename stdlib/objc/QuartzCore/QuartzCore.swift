@@ -25,7 +25,7 @@ extension CIFilter {
     for (key, value) in options {
       dict[key] = value
     }
-    return self.apply(k, arguments: args, options: dict)
+    return self.apply(k, arguments: args, options: dict as [NSObject: AnyObject])
   }
 
   convenience init(name: String!,
@@ -34,7 +34,7 @@ extension CIFilter {
         for (key, value) in elements {
             dict[key] = value
         }
-    self.init(name: name, withInputParameters: dict)
+    self.init(name: name, withInputParameters: dict as [NSObject: AnyObject])
   } 
 }
 
@@ -50,6 +50,6 @@ extension CISampler {
         // @objc(initWithImage:options:)
         //   init(image im: CIImage!,
         //        options dict: NSDictionary!)
-        self.init(image: im, options: dict)
+        self.init(image: im, options: dict as [NSObject: AnyObject])
     }
 }

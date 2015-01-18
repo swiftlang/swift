@@ -128,7 +128,7 @@ extension NSString : StringLiteralConvertible {
         length: 4,
         encoding: NSUTF32StringEncoding)!
     }
-    self.init(string: immutableResult)
+    self.init(string: immutableResult as String)
   }
 }
 
@@ -201,7 +201,7 @@ func _cocoaStringSliceImpl(
   target: _StringCore, subRange: Range<Int>) -> _StringCore {
   
   let buffer = _NSOpaqueString(
-    owner: String(target), 
+    owner: String(target) as NSString,
     subRange:
       NSRange(location: subRange.startIndex, length: count(subRange)))
   
@@ -255,27 +255,27 @@ final class _NSOpaqueString : NSString {
     return _NSOpaqueString(
              owner: owner, 
              subRange: NSRange(location: subRange.location + start, 
-                               length: subRange.length - start))
+                               length: subRange.length - start)) as String
   }
 
   override func substringToIndex(end: Int) -> String {
     return _NSOpaqueString(
              owner: owner, 
-             subRange: NSRange(location: subRange.location, length: end))
+             subRange: NSRange(location: subRange.location, length: end)) as String
   }
 
   override func substringWithRange(aRange: NSRange) -> String {
     return _NSOpaqueString(
              owner: owner, 
              subRange: NSRange(location: aRange.location + subRange.location, 
-                               length: aRange.length))
+                               length: aRange.length)) as String
   }
 
   override init() {
     _sanityCheckFailure("init() not implemented for _NSOpaqueString")
   }
 
-  init(owner: String, subRange: NSRange) {
+  init(owner: NSString, subRange: NSRange) {
     self.owner = owner
     self.subRange = subRange
     super.init()
@@ -1293,7 +1293,7 @@ extension NSString {
     // We can't use withVaList because 'self' cannot be captured by a closure
     // before it has been initialized.
     let va_args = getVaList(args)
-    self.init(format: format, arguments: va_args)
+    self.init(format: format as String, arguments: va_args)
   }
   
   public
@@ -1303,7 +1303,7 @@ extension NSString {
     // We can't use withVaList because 'self' cannot be captured by a closure
     // before it has been initialized.
     let va_args = getVaList(args)
-    self.init(format: format, locale: locale, arguments: va_args)
+    self.init(format: format as String, locale: locale, arguments: va_args)
   }
 
   public
@@ -1311,7 +1311,7 @@ extension NSString {
     format: NSString, _ args: CVarArgType...
   ) -> Self {
     return withVaList(args) {
-      self(format: format, locale: NSLocale.currentLocale(), arguments: $0)
+      self(format: format as String, locale: NSLocale.currentLocale(), arguments: $0)
     }
   }
 
@@ -1319,7 +1319,7 @@ extension NSString {
   func stringByAppendingFormat(format: NSString, _ args: CVarArgType...)
   -> NSString {
     return withVaList(args) {
-      self.stringByAppendingString(NSString(format: format, arguments: $0))
+      self.stringByAppendingString(NSString(format: format as String, arguments: $0) as String) as NSString
     }
   }
 }
@@ -1328,7 +1328,7 @@ extension NSMutableString {
   public
   func appendFormat(format: NSString, _ args: CVarArgType...) {
     return withVaList(args) {
-      self.appendString(NSString(format: format, arguments: $0))
+      self.appendString(NSString(format: format as String, arguments: $0) as String)
     }
   }
 }

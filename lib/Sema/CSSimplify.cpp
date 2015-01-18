@@ -604,8 +604,9 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
     subKind = TypeMatchKind::OperatorArgumentConversion;
     break;
 
-  case TypeMatchKind::OperatorArgumentConversion:
   case TypeMatchKind::Conversion:
+  case TypeMatchKind::ExplicitConversion:
+  case TypeMatchKind::OperatorArgumentConversion:
   case TypeMatchKind::ArgumentConversion:
   case TypeMatchKind::BindType:
   case TypeMatchKind::BindToPointerType:
@@ -799,6 +800,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
 
   case TypeMatchKind::OperatorArgumentConversion:
   case TypeMatchKind::ArgumentConversion:
+  case TypeMatchKind::ExplicitConversion:
   case TypeMatchKind::Conversion:
     subKind = TypeMatchKind::Conversion;
     break;
@@ -1000,6 +1002,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   case TypeMatchKind::Subtype:
   case TypeMatchKind::Conversion:
+  case TypeMatchKind::ExplicitConversion:
   case TypeMatchKind::ArgumentConversion:
   case TypeMatchKind::ArgumentTupleConversion:
   case TypeMatchKind::OperatorArgumentTupleConversion:
@@ -1050,6 +1053,7 @@ static Failure::FailureKind getRelationalFailureKind(TypeMatchKind kind) {
     return Failure::TypesNotSubtypes;
 
   case TypeMatchKind::Conversion:
+  case TypeMatchKind::ExplicitConversion:
   case TypeMatchKind::ArgumentConversion:
   case TypeMatchKind::OperatorArgumentConversion:
   case TypeMatchKind::ArgumentTupleConversion:
@@ -1186,6 +1190,9 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
 
   case TypeMatchKind::Conversion:
     return ConstraintKind::Conversion;
+
+  case TypeMatchKind::ExplicitConversion:
+    return ConstraintKind::ExplicitConversion;
       
   case TypeMatchKind::ArgumentConversion:
     return ConstraintKind::ArgumentConversion;
@@ -1217,22 +1224,20 @@ static bool isStringCompatiblePointerBaseType(TypeChecker &TC,
   return false;
 }
 
-/// Determine whether the given type is a value type to which we can implicitly
-/// bridge a value of its corresponding class type, such as 'String' implicitly
-/// bridging from NSString.
-static bool allowsImplicitBridgingFromObjC(TypeChecker &tc, DeclContext *dc,
-                                           Type type) {
+/// Determine whether the given type is a value type to which we can bridge a
+/// value of its corresponding class type, such as 'String' bridging from
+/// NSString.
+static bool allowsBridgingFromObjC(TypeChecker &tc, DeclContext *dc,
+                                   Type type) {
   auto objcType = tc.getBridgedToObjC(dc, true, type);
   if (!objcType)
-    return nullptr;
+    return false;
 
   auto objcClass = objcType->getClassOrBoundGenericClass();
   if (!objcClass)
-    return nullptr;
+    return false;
 
-  // FIXME: As a temporary hack, eliminate implicit bridging from NSNumber. We
-  // want to eventually eliminate all implicit bridging.
-  return objcClass->getName().str() != "NSNumber";
+  return true;
 }
 
 /// Determine whether this type variable represents a "non-trivial"
@@ -1387,6 +1392,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
     case TypeMatchKind::Subtype:
     case TypeMatchKind::Conversion:
+    case TypeMatchKind::ExplicitConversion:
     case TypeMatchKind::ArgumentConversion:
     case TypeMatchKind::ArgumentTupleConversion:
     case TypeMatchKind::OperatorArgumentTupleConversion:
@@ -1735,6 +1741,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
     // Bridging from a value type to an Objective-C class type.
     // FIXME: Banned for operator parameters, like user conversions are.
+
+    // NOTE: The plan for <rdar://problem/18311362> was to make such bridging
+    // conversions illegal except when explicitly converting with the 'as'
+    // operator. But using a String to subscript an [NSObject : AnyObject] is
+    // sufficiently common due to bridging that disallowing such conversions is
+    // not yet feasible, and a more targeted fix in the type checker is hard to
+    // justify.
+
     if (type1->isPotentiallyBridgedValueType() &&
         type1->getAnyNominal() 
           != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
@@ -1755,15 +1769,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
     }
 
-    // Bridging from an Objective-C class type to a value type.
-    // Note that specifically require a class or class-constrained archetype
-    // here, because archetypes cannot be bridged.
-    if (type1->mayHaveSuperclass() && type2->isPotentiallyBridgedValueType() &&
-        type2->getAnyNominal() 
-          != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
-        allowsImplicitBridgingFromObjC(TC, DC, type2) &&
-        !HandlingFavoredConstraint) {
-      conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeFromObjC);
+    if (kind == TypeMatchKind::ExplicitConversion) {
+      // Bridging from an Objective-C class type to a value type.
+      // Note that specifically require a class or class-constrained archetype
+      // here, because archetypes cannot be bridged.
+      if (type1->mayHaveSuperclass() && type2->isPotentiallyBridgedValueType() &&
+          type2->getAnyNominal() 
+            != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
+          allowsBridgingFromObjC(TC, DC, type2) &&
+          !HandlingFavoredConstraint) {
+        conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeFromObjC);
+      }
     }
 
     // Pointer arguments can be converted from pointer-compatible types.
@@ -3408,6 +3424,8 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::Equal: return TypeMatchKind::SameType;
   case ConstraintKind::Subtype: return TypeMatchKind::Subtype;
   case ConstraintKind::Conversion: return TypeMatchKind::Conversion;
+  case ConstraintKind::ExplicitConversion:
+    return TypeMatchKind::ExplicitConversion;
   case ConstraintKind::ArgumentConversion:
     return TypeMatchKind::ArgumentConversion;
   case ConstraintKind::ArgumentTupleConversion:
@@ -4198,6 +4216,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::Equal:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
+  case ConstraintKind::ExplicitConversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:

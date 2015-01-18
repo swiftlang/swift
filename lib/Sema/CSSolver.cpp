@@ -574,6 +574,7 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::Conversion:
+  case ConstraintKind::ExplicitConversion:
   case ConstraintKind::Subtype:
     return true;
   case ConstraintKind::Bind:
@@ -628,6 +629,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     case ConstraintKind::Equal:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
+    case ConstraintKind::ExplicitConversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::ArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentTupleConversion:

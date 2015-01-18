@@ -2,14 +2,12 @@
 
 import Foundation
 
-func asNSString(s: String) -> NSString { return s }
-
 var hello : NSString = "Hello, world!"
 // CHECK: Hello, world!
 println(hello)
 
 // CHECK: ello,
-var helloStr: String = hello
+var helloStr: String = hello as String
 println(String(helloStr._core[NSRange(location: 1, length: 5).toRange()!]))
 
 var upperHello = hello.uppercaseString
@@ -20,17 +18,17 @@ println(upperHello)
 var strings : NSString = "\"A\" = \"Foo\";\n\"B\" = \"Bar\";\n"
 var dict  = strings.propertyListFromStringsFileFormat()!
 
-// Subscripting an NSDictionary. FIXME: The inner NSString casts are annoying.
+// Subscripting an NSDictionary.
 // CHECK: A -> Foo
-println("A -> " + (dict[asNSString("A")] as! NSString))
+println("A -> " + (dict["A"] as! String))
 // CHECK: B -> Bar
-println("B -> " + (dict[asNSString("B")] as! NSString))
+println("B -> " + (dict["B"] as! String))
 
 // Creating and subscripting an NSMutableArray
 var array = NSMutableArray(capacity: 2)
 hello = "Hello"
 array[0] = hello
-array[1] = asNSString("world")
+array[1] = "world" as NSString
 
 // FIXME: NSString string interpolation doesn't work due to lack of
 // overload resolution.
@@ -48,7 +46,7 @@ assert(!NSString.instancesRespondToSelector("wobble"))
 var array2 : NSArray = [hello, hello]
 
 // Switch on strings
-switch asNSString("world").uppercaseString {
+switch ("world" as NSString).uppercaseString {
 case "WORLD":
   print("Found it\n")
 

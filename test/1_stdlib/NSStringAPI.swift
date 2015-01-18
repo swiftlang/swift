@@ -617,7 +617,7 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
   }
   if true {
     // String with unpaired surrogates.
-    let illFormedUTF16: String = NonContiguousNSString([ 0xd800 ])
+    let illFormedUTF16 = NonContiguousNSString([ 0xd800 ]) as String
     let bufferLength = 100
     var buffer = Array(
       count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
@@ -665,7 +665,7 @@ NSStringAPIs.test("getFileSystemRepresentation(_:maxLength:)") {
   }
   if true {
     // String with unpaired surrogates.
-    let illFormedUTF16: String = NonContiguousNSString([ 0xd800 ])
+    let illFormedUTF16 = NonContiguousNSString([ 0xd800 ]) as String
     let bufferLength = 100
     var buffer = Array(
       count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))

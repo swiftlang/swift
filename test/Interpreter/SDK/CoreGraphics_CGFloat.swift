@@ -123,7 +123,7 @@ CGFloatTestSuite.test("bridging") {
     let flt: CGFloat = 4.125
 
     // CGFloat -> NSNumber conversion.
-    let nsnum: NSNumber = flt
+    let nsnum: NSNumber = flt as NSNumber
     expectEqual("4.125", "\(nsnum)")
 
     // NSNumber -> CGFloat
@@ -136,7 +136,7 @@ CGFloatTestSuite.test("bridging") {
     let originalArray: [CGFloat] = [ 4.125, 10.625 ]
 
     // Array -> NSArray
-    let nsarr: NSArray = originalArray
+    let nsarr: NSArray = originalArray as NSArray
     expectEqual(2, nsarr.count)
     expectEqual("4.125", "\(nsarr[0])")
     expectEqual("10.625", "\(nsarr[1])")

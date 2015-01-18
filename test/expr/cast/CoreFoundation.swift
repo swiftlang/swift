@@ -26,13 +26,13 @@ func testObjCToCF(nsStr: NSString, nsMutableStr: NSMutableString) {
 }
 
 func testCFToNative(cfStr: CFString, cfMutableStr: CFMutableString) {
-  var str: String = cfStr
-  str = cfMutableStr
+  var str = cfStr as String
+  str = cfMutableStr as String
 }
 
 func testNativeToCF(str: String) {
-  var cfStr: CFString = str
-  var cfMutableStr: CFMutableString = str // expected-error{{'String' is not convertible to 'CFMutableString'}}
+  var cfStr = str as CFString
+  var cfMutableStr = str as CFMutableString // expected-error{{'String' is not convertible to 'CFMutableString'}}
 }
 
 func testCFToAnyObject(cfStr: CFString, cfMutableStr: CFMutableString,

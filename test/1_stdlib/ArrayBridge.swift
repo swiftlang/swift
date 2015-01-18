@@ -202,14 +202,14 @@ func testBridgedVerbatim() {
   //===--- Implicit conversion to/from NSArray ------------------------------===//
 
   // CHECK-NEXT: Base#1(100)
-  let basesConvertedToNSArray: NSArray = bases
+  let basesConvertedToNSArray = bases as NSArray
   println(basesConvertedToNSArray.objectAtIndex(0) as! Base)
 
   // Create an ordinary NSArray, not a native one
   let nsArrayOfBase: NSArray = NSArray(object: Base(42))
 
-  // NSArray converts implicitly to [AnyObject]...
-  let nsArrayOfBaseConvertedToAnyObjectArray: [AnyObject] = nsArrayOfBase
+  // NSArray can be unconditionally cast to [AnyObject]...
+  let nsArrayOfBaseConvertedToAnyObjectArray = nsArrayOfBase as [AnyObject]
 
   // Capture the representation of the first element
   // CHECK-NEXT: [[base42:Base.*42]]
@@ -329,7 +329,7 @@ func testExplicitlyBridged() {
 
   let bridgedSwifts = [BridgedSwift(42), BridgedSwift(17)]
   
-  let bridgedSwiftsAsNSArray: NSArray = bridgedSwifts
+  let bridgedSwiftsAsNSArray = bridgedSwifts as NSArray
   // CHECK-NEXT: [BridgedObjC#{{[0-9]+}}(42), BridgedObjC#{{[0-9]+}}(17)]
   println("bridgedSwiftsAsNSArray = \(bridgedSwiftsAsNSArray as [AnyObject]))")
 
@@ -342,7 +342,7 @@ func testExplicitlyBridged() {
   println("roundTripBridgedSwifts = \(roundTripBridgedSwifts))")
 
   // Make a real Cocoa NSArray of these...
-  let cocoaBridgedSwifts = NSArray(array: bridgedSwiftsAsNSArray)
+  let cocoaBridgedSwifts = NSArray(array: bridgedSwiftsAsNSArray as [AnyObject])
 
   // ...and bridge *that* back
   let bridgedBackSwifts
@@ -421,7 +421,7 @@ func testExplicitlyBridged() {
   }
 
   // Downcast of Cocoa array to an array of classes.
-  let wrappedCocoaBridgedSwifts: [AnyObject] = cocoaBridgedSwifts
+  let wrappedCocoaBridgedSwifts = cocoaBridgedSwifts as [AnyObject]
   if let downcasted = wrappedCocoaBridgedSwifts as? [BridgedObjC] {
     // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
     println(downcasted[0])

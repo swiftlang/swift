@@ -65,9 +65,9 @@ func testBridgeDowncastSuperclass(obj: NSObject, objOpt: NSObject?,
 
 func testBridgeDowncastExact(obj: BridgedClass, objOpt: BridgedClass?,
                              objImplicitOpt: BridgedClass!) -> BridgedStruct? {
-  var s1Opt = obj as? BridgedStruct // expected-error{{conditional downcast from 'BridgedClass' to 'BridgedStruct' always succeeds}}
+  var s1Opt = obj as? BridgedStruct
   var s2Opt = objOpt as? BridgedStruct
-  var s3Opt = objImplicitOpt as? BridgedStruct // expected-error{{conditional downcast from 'BridgedClass!' to 'BridgedStruct' always succeeds}}
+  var s3Opt = objImplicitOpt as? BridgedStruct
 }
 
 func testExplicitBridging(var object: BridgedClass, var value: BridgedStruct) {

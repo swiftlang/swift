@@ -9,7 +9,7 @@ func vf(params: CVarArgType...) {
 var a: [AnyObject]! = ["a"]
 var s: String! = "s"
 
-vf(a)
+vf(a as NSArray)
 // CHECK: OK
-vf(s)
+vf(s as NSString)
 // CHECK: OK

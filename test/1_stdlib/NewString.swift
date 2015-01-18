@@ -92,7 +92,7 @@ func nonASCII() {
   println("  \(repr(newNSUTF16))")
 
   // CHECK-NEXT: __NSCFString@[[utf16address]] = "🏂☃❅❆❄︎⛄️❄️"
-  var nsRoundTripUTF16: NSString = newNSUTF16
+  var nsRoundTripUTF16 = newNSUTF16 as NSString
   println("  \(repr(nsRoundTripUTF16))")
 
   // CHECK: --- UTF-16 slicing ---
@@ -107,7 +107,7 @@ func nonASCII() {
   // Representing a slice as an NSString requires a new object
   // CHECK-NOT: NSString@[[utf16address]] = "❅❆❄︎⛄️"
   // CHECK-NEXT: _NSContiguousString@[[nsContiguousStringAddress:[x0-9a-f]+]] = "❅❆❄︎⛄️"
-  var nsSliceUTF16: NSString = newNSUTF16[i2..<i8]
+  var nsSliceUTF16 = newNSUTF16[i2..<i8] as NSString
   println("  \(repr(nsSliceUTF16))")
 
   // Check that we can recover the original buffer
@@ -137,7 +137,7 @@ func ascii() {
   // println("  \(repr(newNSASCII))")
 
   // CHECK-NEXT: [[nsstringclass]]@[[asciiaddress]] = "foobar"
-  var nsRoundTripASCII: NSString = newNSASCII
+  var nsRoundTripASCII = newNSASCII as NSString
   println("  \(repr(nsRoundTripASCII))")
 
   // CHECK: --- ASCII slicing ---
@@ -153,7 +153,7 @@ func ascii() {
   // Representing a slice as an NSString requires a new object
   // XCHECK-NOT: NSString@[[asciiaddress]] = "bar"
   // XCHECK-NEXT: _NSOpaqueString@[[nsOpaqueSliceAddress:[x0-9a-f]+]] = "bar"
-  var nsSliceASCII: NSString = newNSASCII[i3..<i6]
+  var nsSliceASCII = newNSASCII[i3..<i6] as NSString
   println("  \(repr(nsSliceASCII))")
 
   // When round-tripped back to Swift, the _NSOpaqueString object is the new owner

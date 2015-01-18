@@ -257,9 +257,9 @@ func objcMethodDispatch() {
   // CHECK: class_method {{%.*}} : $Foo, #Foo.objcProp!setter.1 :
   c.objcProp = x
   // CHECK: class_method {{%.*}} : $Foo, #Foo.subscript!getter.1 :
-  let y = c[objc: 0]
+  let y = c[objc: 0 as NSNumber]
   // CHECK: class_method {{%.*}} : $Foo, #Foo.subscript!setter.1 :
-  c[objc: 0] = y
+  c[objc: 0 as NSNumber] = y
 }
 
 // CHECK-LABEL: sil hidden @_TF7dynamic21dynamicMethodDispatchFT_T_ : $@thin () -> ()

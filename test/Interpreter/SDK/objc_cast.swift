@@ -229,8 +229,10 @@ if objImplicitOpt is String {
   println("Isa correctly failed due to nil")
 }
 
+let words = ["Hello", "Swift", "World"]
+
 // CHECK-NEXT: Object-to-bridged-array cast produced [Hello, Swift, World]
-obj = ["Hello", "Swift", "World"] as [String]
+obj = words as AnyObject
 if let strArr = obj as? [String] {
   println("Object-to-bridged-array cast produced \(strArr)")
 } else {
@@ -239,7 +241,7 @@ if let strArr = obj as? [String] {
 
 // Check downcast from the bridged type itself.
 // CHECK-NEXT: NSArray-to-bridged-array cast produced [Hello, Swift, World]
-var nsarr: NSArray = ["Hello", "Swift", "World"] as [String]
+var nsarr = words as NSArray
 if let strArr = nsarr as? [String] {
   println("NSArray-to-bridged-array cast produced \(strArr)")
 } else {
@@ -247,7 +249,7 @@ if let strArr = nsarr as? [String] {
 }
 
 // CHECK-NEXT: NSArray?-to-bridged-array cast produced [Hello, Swift, World]
-var nsarrOpt: NSArray? = ["Hello", "Swift", "World"] as [String]
+var nsarrOpt = words as NSArray?
 if let strArr = nsarrOpt as? [String] {
   println("NSArray?-to-bridged-array cast produced \(strArr)")
 } else {
@@ -255,7 +257,7 @@ if let strArr = nsarrOpt as? [String] {
 }
 
 // CHECK-NEXT: NSArray!-to-bridged-array cast produced [Hello, Swift, World]
-var nsarrImplicitOpt: NSArray! = ["Hello", "Swift", "World"] as [String]
+var nsarrImplicitOpt = words as NSArray!
 if let strArr = nsarrImplicitOpt as? [String] {
   println("NSArray!-to-bridged-array cast produced \(strArr)")
 } else {
@@ -339,7 +341,7 @@ if obj is [Int] {
 
 // Implicitly unwrapped optional of object to array casts.
 // CHECK-NEXT: Object-to-bridged-array cast produced [Hello, Swift, World]
-objOpt = ["Hello", "Swift", "World"] as [String]
+objOpt = words as AnyObject?
 if let strArr = objOpt as? [String] {
   println("Object-to-bridged-array cast produced \(strArr)")
 } else {
@@ -375,7 +377,7 @@ if let strArr = objOpt as? [String] {
 
 // Optional of object to array casts.
 // CHECK-NEXT: Object-to-bridged-array cast produced [Hello, Swift, World]
-objImplicitOpt = ["Hello", "Swift", "World"] as [String]
+objImplicitOpt = words as AnyObject!
 if let strArr = objImplicitOpt as? [String] {
   println("Object-to-bridged-array cast produced \(strArr)")
 } else {
@@ -411,7 +413,7 @@ if let strArr = objImplicitOpt as? [String] {
 
 // Casting an array of numbers to different numbers.
 // CHECK: Numbers-as-doubles cast produces [3.14159, 2.71828, 0.0]
-obj = [3.14159, 2.71828, 0] as [Double]
+obj = ([3.14159, 2.71828, 0] as [Double]) as AnyObject
 if let doubleArr = obj as? [Double] {
   println("Numbers-as-doubles cast produces \(doubleArr)")
 } else {
@@ -466,7 +468,7 @@ if let derivedArr = obj as? [Derived] {
 }
 
 // CHECK: Dictionary-of-base-base cast produces
-obj = [Derived() : Derived(), Derived() : Base(), Derived() : Derived() ]
+obj = [Derived() : Derived(), Derived() : Base(), Derived() : Derived() ] as AnyObject
 if let baseDict = obj as? Dictionary<Base, Base> {
   println("Dictionary-of-base-base cast produces \(baseDict)")
 } else {

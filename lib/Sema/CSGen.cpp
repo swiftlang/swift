@@ -1351,8 +1351,9 @@ namespace {
       auto locator = CS.getConstraintLocator(expr,
                                      ConstraintLocator::CheckedCastOperand);
 
-      // The source type can be converted to the destination type.
-      CS.addConstraint(ConstraintKind::Conversion, fromType, toType, locator);
+      // The source type can be explicitly converted to the destination type.
+      CS.addConstraint(ConstraintKind::ExplicitConversion, fromType, toType,
+                       locator);
 
       return toType;
     }

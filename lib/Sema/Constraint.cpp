@@ -49,6 +49,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::Equal:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
+  case ConstraintKind::ExplicitConversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:
@@ -146,6 +147,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::Equal:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
+  case ConstraintKind::ExplicitConversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:
@@ -225,6 +227,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::Equal: Out << " == "; break;
   case ConstraintKind::Subtype: Out << " < "; break;
   case ConstraintKind::Conversion: Out << " <c "; break;
+  case ConstraintKind::ExplicitConversion: Out << " <as "; break;
   case ConstraintKind::ArgumentConversion: Out << " <a "; break;
   case ConstraintKind::ArgumentTupleConversion: Out << " <ac "; break;
   case ConstraintKind::OperatorArgumentTupleConversion: Out << " <oac "; break;
@@ -481,6 +484,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::Bind:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::Conversion:
+  case ConstraintKind::ExplicitConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentConversion:

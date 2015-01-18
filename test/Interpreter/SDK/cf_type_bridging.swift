@@ -9,7 +9,7 @@ import UIKit
 
 let foo: [CGColor] = [CGColorCreate(CGColorSpaceCreateDeviceRGB(), [1.0, 0.0, 0.0, 1.0])]
 
-let bar: NSArray = foo
+let bar = foo as NSArray
 
 // CHECK: CGColor
 println(bar[0])

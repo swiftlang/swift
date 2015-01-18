@@ -2108,7 +2108,7 @@ func forStringsWithUnpairedSurrogates(checkClosure: (UTF16Test, String) -> ()) {
   for (name, batch) in UTF16Tests {
     println("Batch: \(name)")
     for test in batch {
-      let subject: String = NonContiguousNSString(test.encoded)
+      let subject = NonContiguousNSString(test.encoded) as String
       checkClosure(test, subject)
     }
   }
@@ -2182,7 +2182,7 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16") {
   for test in UTF8TestsSmokeTest {
     var nss = NonContiguousNSString(test.scalars)
     verifyThatStringIsOpaqueForCoreFoundation(nss)
-    checkUTF8View(test.encoded, nss, test.loc.withCurrentLoc())
+    checkUTF8View(test.encoded, nss as String, test.loc.withCurrentLoc())
   }
 
   for (name, batch) in UTF16Tests {
@@ -2195,7 +2195,7 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16") {
 
       var nss = NonContiguousNSString(test.encoded)
       verifyThatStringIsOpaqueForCoreFoundation(nss)
-      checkUTF8View(expected.array, nss, test.loc.withCurrentLoc())
+      checkUTF8View(expected.array, nss as String, test.loc.withCurrentLoc())
     }
   }
 }
@@ -2261,7 +2261,7 @@ StringCookedViews.test("UTF16") {
     transcode(UTF32.self, UTF16.self, g, &expected, stopOnError: false)
 
     var nss = NonContiguousNSString(test.scalars)
-    checkUTF16View(expected.array, nss, test.loc.withCurrentLoc())
+    checkUTF16View(expected.array, nss as String, test.loc.withCurrentLoc())
   }
 
   forStringsWithUnpairedSurrogates {
@@ -2278,7 +2278,7 @@ StringCookedViews.test("UTF16") {
 StringCookedViews.test("UnicodeScalars") {
   for test in UTF8TestsSmokeTest {
     let expectedScalars = map(test.scalars) { UnicodeScalar($0) }
-    let subject: String = NonContiguousNSString(test.scalars)
+    let subject = NonContiguousNSString(test.scalars) as String
     checkSliceableWithBidirectionalIndex(expectedScalars,
         subject.unicodeScalars, test.loc.withCurrentLoc())
   }

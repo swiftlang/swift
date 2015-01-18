@@ -648,6 +648,10 @@ enum class TypeMatchKind : char {
   /// \brief Requires the first type to be convertible to the second type,
   /// which includes exact matches and both forms of subtyping.
   Conversion,
+  /// \brief Requires the first type to be explicitly convertible to the second
+  /// type, which includes all forms of conversion included in Conversion, in
+  /// addition to bridging conversions.
+  ExplicitConversion,
   /// \brief Requires the first type to be the element of an argument tuple
   /// that is convertible to the second type, which represents the corresponding
   /// element of the parameter tuple.
