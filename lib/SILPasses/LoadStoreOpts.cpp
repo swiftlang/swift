@@ -423,14 +423,7 @@ public:
   /// Returns the set of insts represented by this LSValue.
   ArrayRef<SILInstruction *> getInsts() const { return Insts; }
 
-  MutableArrayRef<SILInstruction *> getInsts() {
-    // TODO: Move this into TinyPtrVector.
-    if (Insts.Val.isNull())
-      return None;
-    if (Insts.Val.is<SILInstruction *>())
-      return *Insts.Val.getAddrOfPtr1();
-    return *Insts.Val.get<decltype(Insts)::VecTy *>();
-  }
+  MutableArrayRef<SILInstruction *> getInsts() { return Insts; }
 
 protected:
   /// Returns true if this LSValue represents a singular inst instruction.
