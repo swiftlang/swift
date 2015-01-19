@@ -159,3 +159,10 @@ let kWorldCenter = kWorldSize / 2
 
 println((kWorldSize - (y * kWorldTileSize)) - kWorldCenter  - kWorldTileSize / 2)
 // CHECK: 1856
+
+let p: [Double] = [0.0, 1.0]
+let q: [Double] = [0.0, 1.0]
+let r: [Double] = [0.0, 1.0]
+let size : Double = (q[0]-p[0])*(r[1]-p[1]) - (q[1]-p[1])*(r[0]-p[0])
+println(size)
+// CHECK: 0.0

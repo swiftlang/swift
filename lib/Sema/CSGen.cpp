@@ -147,8 +147,7 @@ namespace {
           
           if(isa<IntegerLiteralExpr>(indexExpr)) {
             
-            auto outputTy = baseTy->getAs<BoundGenericType>()->
-                              getGenericArgs()[0];
+            outputTy = baseTy->getAs<BoundGenericType>()->getGenericArgs()[0];
             
             if (isLValueBase)
               outputTy = LValueType::get(outputTy);
@@ -159,6 +158,8 @@ namespace {
       if (outputTy.isNull()) {
         outputTy = CS.createTypeVariable(resultLocator,
                                               TVO_CanBindToLValue);
+      } else {
+        CS.setFavoredType(expr, outputTy.getPointer());
       }
 
       auto subscriptMemberLocator
@@ -1556,11 +1557,16 @@ namespace {
       
       // The function subexpression has some rvalue type T1 -> T2 for fresh
       // variables T1 and T2.
-      if (outputTy.isNull())
+      if (outputTy.isNull()) {
         outputTy = CS.createTypeVariable(
                      CS.getConstraintLocator(expr,
                                              ConstraintLocator::ApplyFunction),
                                              /*options=*/0);
+      } else {
+        // Since we know what the output type is, we can set it as the favored
+        // type of this expression.
+        CS.setFavoredType(expr, outputTy.getPointer());
+      }
       
       auto funcTy = FunctionType::get(expr->getArg()->getType(), outputTy);
       
