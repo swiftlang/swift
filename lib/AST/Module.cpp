@@ -1241,8 +1241,8 @@ bool SourceFile::registerMainClass(ClassDecl *mainClass, SourceLoc diagLoc) {
 
 bool Module::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
                                     Optional<ArtificialMainKind> kind) {
-  if (!MainInfo.hasMain()) {
-    MainInfo.setMainFile(file);
+  if (!EntryPointInfo.hasEntryPoint()) {
+    EntryPointInfo.setEntryPointFile(file);
     return false;
   }
 
@@ -1266,7 +1266,7 @@ bool Module::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
     break;
   }
 
-  FileUnit *existingFile = MainInfo.getMainFile();
+  FileUnit *existingFile = EntryPointInfo.getEntryPointFile();
   const ClassDecl *existingClass = existingFile->getMainClass();
   SourceLoc existingDiagLoc;
 
@@ -1280,7 +1280,7 @@ bool Module::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
   }
 
   if (existingClass) {
-    if (MainInfo.markDiagnosedMultipleMainClasses()) {
+    if (EntryPointInfo.markDiagnosedMultipleMainClasses()) {
       // If we already have a main class, and we haven't diagnosed it,
       // do so now.
       if (existingDiagLoc.isValid()) {
@@ -1299,7 +1299,7 @@ bool Module::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
   } else {
     // We don't have an existing class, but we /do/ have a file in script mode.
     // Diagnose that.
-    if (MainInfo.markDiagnosedMainClassWithScript()) {
+    if (EntryPointInfo.markDiagnosedMainClassWithScript()) {
       Ctx.Diags.diagnose(diagLoc, diag::attr_ApplicationMain_with_script,
                          mainClassDiagKind);
 

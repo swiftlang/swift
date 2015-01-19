@@ -300,7 +300,7 @@ static bool writeSIL(SILModule &SM, Module *M, bool EmitVerboseSIL,
 }
 
 static bool printAsObjC(const std::string &path, Module *M,
-                        StringRef bridgingHeader) {
+                        StringRef bridgingHeader, bool moduleIsPublic) {
   std::error_code EC;
   llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
 
@@ -311,8 +311,8 @@ static bool printAsObjC(const std::string &path, Module *M,
     return true;
   }
 
-  auto requiredAccess = bridgingHeader.empty() ? Accessibility::Public
-                                               : Accessibility::Internal;
+  auto requiredAccess = moduleIsPublic ? Accessibility::Public
+                                       : Accessibility::Internal;
   return printAsObjC(out, M, bridgingHeader, requiredAccess);
 }
 
@@ -385,11 +385,17 @@ static bool performCompile(CompilerInstance &Instance,
     emitReferenceDependencies(Context.Diags, Instance.getPrimarySourceFile(),
                               *Instance.getDependencyTracker(), opts);
 
+  // FIXME: This is still a lousy approximation of whether the module file will
+  // be externally consumed.
+  bool moduleIsPublic =
+      !Instance.getMainModule()->hasEntryPoint() &&
+      opts.ImplicitObjCHeaderPath.empty();
+
   // We've just been told to perform a parse, so we can return now.
   if (Action == FrontendOptions::Parse) {
     if (!opts.ObjCHeaderOutputPath.empty())
       return printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
-                         opts.ImplicitObjCHeaderPath);
+                         opts.ImplicitObjCHeaderPath, moduleIsPublic);
     return false;
   }
 
@@ -456,7 +462,7 @@ static bool performCompile(CompilerInstance &Instance,
 
   if (!opts.ObjCHeaderOutputPath.empty()) {
     (void)printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
-                      opts.ImplicitObjCHeaderPath);
+                      opts.ImplicitObjCHeaderPath, moduleIsPublic);
   }
 
   if (!opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty()) {

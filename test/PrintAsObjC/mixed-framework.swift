@@ -1,6 +1,5 @@
-// RUN: rm -rf %t
-// RUN: mkdir %t
-// RUN: %target-swift-frontend %clang-importer-sdk -F %S/Inputs/ -module-name Mixed -import-underlying-module %s -parse -emit-objc-header-path %t/mixed.h
+// RUN: rm -rf %t && mkdir %t
+// RUN: %target-swift-frontend %clang-importer-sdk -F %S/Inputs/ -module-name Mixed -import-underlying-module -parse-as-library %s -parse -emit-objc-header-path %t/mixed.h
 // RUN: FileCheck -check-prefix=CHECK -check-prefix=FRAMEWORK %s < %t/mixed.h
 // RUN: %check-in-clang -F %S/Inputs/ %t/mixed.h
 

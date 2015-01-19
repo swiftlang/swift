@@ -227,24 +227,24 @@ private:
   /// Tracks the file that will generate the module's entry point, either
   /// because it contains a class marked with \@UIApplicationMain
   /// or \@NSApplicationMain, or because it is a script file.
-  class MainInfoTy {
+  class EntryPointInfoTy {
     enum class Flags {
       DiagnosedMultipleMainClasses = 1 << 0,
       DiagnosedMainClassWithScript = 1 << 1
     };
     llvm::PointerIntPair<FileUnit *, 2, OptionSet<Flags>> storage;
   public:
-    MainInfoTy() = default;
+    EntryPointInfoTy() = default;
 
-    FileUnit *getMainFile() const {
+    FileUnit *getEntryPointFile() const {
       return storage.getPointer();
     }
-    void setMainFile(FileUnit *file) {
+    void setEntryPointFile(FileUnit *file) {
       assert(!storage.getPointer());
       storage.setPointer(file);
     }
 
-    bool hasMain() const {
+    bool hasEntryPoint() const {
       return storage.getPointer();
     }
 
@@ -264,8 +264,8 @@ private:
   /// Information about the file responsible for the module's entry point,
   /// if any.
   ///
-  /// \see MainInfoTy
-  MainInfoTy MainInfo;
+  /// \see EntryPointInfoTy
+  EntryPointInfoTy EntryPointInfo;
 
   /// The magic __dso_handle variable.
   VarDecl *DSOHandle = nullptr;
@@ -500,8 +500,15 @@ public:
   bool walk(ASTWalker &Walker);
 
   /// Register the file responsible for generating this module's entry point.
+  ///
+  /// \returns true if there was a problem adding this file.
   bool registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
                               Optional<ArtificialMainKind> kind);
+
+  /// \returns true if this module has a main entry point.
+  bool hasEntryPoint() const {
+    return EntryPointInfo.hasEntryPoint();
+  }
 
   /// Returns the associated clang module if one exists.
   const clang::Module *findUnderlyingClangModule();
