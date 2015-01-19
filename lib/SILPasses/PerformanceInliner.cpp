@@ -330,7 +330,7 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(ApplyInst *AI) {
 
   // Don't inline functions that are marked with the @semantics or @effects
   // attribute if the inliner is asked not to inline them.
-  if (Callee->hasDefinedSemantics() || Callee->hasSpecifiedEffectsInfo()) {
+  if (Callee->hasDefinedSemantics() || Callee->hasEffectsKind()) {
     if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
       DEBUG(llvm::dbgs() << "        FAIL: Function " << Callee->getName()
             << " has special semantics or effects attribute.\n");

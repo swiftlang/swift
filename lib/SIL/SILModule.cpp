@@ -740,7 +740,7 @@ void SILModule::eraseFunction(SILFunction *F) {
     // or vtable stub generation. So we move it into the zombie list.
     getFunctionList().remove(F);
     zombieFunctions.push_back(F);
-    F->markAsZombie();
+    F->setZombie();
 
     // This opens dead-function-removal opportunities for called functions.
     // (References are not needed anymore.)

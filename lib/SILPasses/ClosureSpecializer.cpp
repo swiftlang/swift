@@ -125,14 +125,12 @@ SILFunction *ClosureSpecCloner::initCloned(SILFunction *PAIUser,
 
   // We make this function bare so we don't have to worry about decls in the
   // SILArgument.
-  auto Fn = SILFunction::create(M, PAIUser->getLinkage(), ClonedName, ClonedTy,
-                                PAIUser->getContextGenericParams(),
-                                PAIUser->getLocation(), IsBare,
-                                PAIUser->isTransparent(), PAIUser->isFragile(),
-                                PAIUser->getClassVisibility(),
-                                PAIUser->getInlineStrategy(),
-                                PAIUser->getEffectsInfo(),
-                                PAIUser, PAIUser->getDebugScope());
+  auto Fn = SILFunction::create(
+      M, PAIUser->getLinkage(), ClonedName, ClonedTy,
+      PAIUser->getContextGenericParams(), PAIUser->getLocation(), IsBare,
+      PAIUser->isTransparent(), PAIUser->isFragile(),
+      PAIUser->getClassVisibility(), PAIUser->getInlineStrategy(),
+      PAIUser->getEffectsKind(), PAIUser, PAIUser->getDebugScope());
   Fn->setSemanticsAttr(PAIUser->getSemanticsAttr());
   return Fn;
 }

@@ -74,7 +74,7 @@ bool SILInliner::inlineFunction(ApplyInst *AI, ArrayRef<SILValue> Args) {
 
   // Increment the ref count for the inlined function, so it doesn't
   // get deleted before we can emit abstract debug info for it.
-  CalleeFunction->markAsInlined();
+  CalleeFunction->setInlined();
 
   // If the caller's BB is not the last BB in the calling function, then keep
   // track of the next BB so we always insert new BBs before it; otherwise,

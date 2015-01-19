@@ -250,14 +250,11 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   if (hasSharedVisibility(Linkage))
     Linkage = SILLinkage::Shared;
 
-  SILFunctionLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                toStableSILLinkage(Linkage),
-                                (unsigned)F.isTransparent(),
-                                (unsigned)F.isFragile(),
-                                (unsigned)F.isGlobalInit(),
-                                (unsigned)F.getInlineStrategy(),
-                                (unsigned)F.getEffectsInfo(),
-                                FnID, SemanticsID);
+  SILFunctionLayout::emitRecord(
+      Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
+      (unsigned)F.isTransparent(), (unsigned)F.isFragile(),
+      (unsigned)F.isGlobalInit(), (unsigned)F.getInlineStrategy(),
+      (unsigned)F.getEffectsKind(), FnID, SemanticsID);
 
   if (DeclOnly || isAvailableExternally(Linkage) || F.isExternalDeclaration())
     return;

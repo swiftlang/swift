@@ -230,22 +230,12 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   CanSILFunctionType NewFTy =
     Lowering::adjustFunctionType(PAI->getType().castTo<SILFunctionType>(),
                                  FunctionType::Representation::Thin);
-  SILFunction *NewF =
-         SILFunction::create(*getModule(),
-                             SILLinkage::Shared,
-                             Name,
-                             NewFTy,
-                             /*contextGenericParams*/nullptr,
-                             OrigF->getLocation(),
-                             OrigF->isBare(),
-                             OrigF->isTransparent(),
-                             OrigF->isFragile(),
-                             OrigF->getClassVisibility(),
-                             OrigF->getInlineStrategy(),
-                             OrigF->getEffectsInfo(),
-                             /*InsertBefore*/OrigF,
-                             OrigF->getDebugScope(),
-                             OrigF->getDeclContext());
+  SILFunction *NewF = SILFunction::create(
+      *getModule(), SILLinkage::Shared, Name, NewFTy,
+      /*contextGenericParams*/ nullptr, OrigF->getLocation(), OrigF->isBare(),
+      OrigF->isTransparent(), OrigF->isFragile(), OrigF->getClassVisibility(),
+      OrigF->getInlineStrategy(), OrigF->getEffectsKind(),
+      /*InsertBefore*/ OrigF, OrigF->getDebugScope(), OrigF->getDeclContext());
   DEBUG(llvm::dbgs() << "  Specialize callee as ";
         NewF->printName(llvm::dbgs()); llvm::dbgs() << " " << NewFTy << "\n");
 

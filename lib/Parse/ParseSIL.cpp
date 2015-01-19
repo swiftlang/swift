@@ -3417,7 +3417,7 @@ bool Parser::parseDeclSIL() {
     FunctionState.F->setFragile(IsFragile_t(isFragile));
     FunctionState.F->setGlobalInit(isGlobalInit);
     FunctionState.F->setInlineStrategy(inlineStrategy);
-    FunctionState.F->setEffectsInfo(MRK);
+    FunctionState.F->setEffectsKind(MRK);
     if (!Semantics.empty())
       FunctionState.F->setSemanticsAttr(Semantics);
 

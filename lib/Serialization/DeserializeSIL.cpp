@@ -442,7 +442,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
                              SILFunction::NotRelevant,
                              (Inline_t)inlineStrategy);
     fn->setGlobalInit(isGlobal == 1);
-    fn->setEffectsInfo((EffectsKind)effect);
+    fn->setEffectsKind((EffectsKind)effect);
     if (SemanticsID)
       fn->setSemanticsAttr(MF->getIdentifier(SemanticsID).str());
 

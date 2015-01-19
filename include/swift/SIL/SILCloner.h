@@ -300,7 +300,7 @@ public:
     To.setDebugScope(ClonedScope);
 
     if (OrigScope->SILFn)
-      OrigScope->SILFn->markAsInlined();
+      OrigScope->SILFn->setInlined();
 }
 
 private:

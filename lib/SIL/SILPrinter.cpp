@@ -1426,11 +1426,11 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
     case InlineDefault: break;
   }
 
-  if (getEffectsInfo() == EffectsKind::ReadOnly)
+  if (getEffectsKind() == EffectsKind::ReadOnly)
     OS << "[readonly] ";
-  else if (getEffectsInfo() == EffectsKind::ReadNone)
+  else if (getEffectsKind() == EffectsKind::ReadNone)
       OS << "[readnone] ";
-  if (getEffectsInfo() == EffectsKind::ReadWrite)
+  if (getEffectsKind() == EffectsKind::ReadWrite)
     OS << "[readwrite] ";
 
   if (!getSemanticsAttr().empty())

@@ -94,6 +94,7 @@ private:
   unsigned Transparent : 1; // FIXME: pack this somewhere
 
   /// The function's fragile attribute.
+  ///
   /// Fragile means that the function can be inlined into another module.
   /// Currently this flag is set for public transparent functions and for all
   /// functions in the stdlib.
@@ -124,15 +125,15 @@ private:
     
   /// True if this function is inlined at least once. This means that the
   /// debug info keeps a pointer to this function.
-  bool inlined = false;
-    
+  bool Inlined = false;
+
   /// True if this function is a zombie function. This means that the function
   /// is dead and not referenced from anywhere inside the SIL. But it is kept
   /// for other purposes:
   /// *) It is inlined and the debug info keeps a reference to the function.
   /// *) It is a dead method of a class which has higher visibility than the
   ///    method itself. In this case we need to create a vtable stub for it.
-  bool zombie = false;
+  bool Zombie = false;
 
   SILFunction(SILModule &module, SILLinkage linkage,
               StringRef mangledName, CanSILFunctionType loweredType,
@@ -214,25 +215,25 @@ public:
 
   /// Notify that this function was inlined. This implies that it is still
   /// needed for debug info generation, even if it is removed afterwards.
-  void markAsInlined() {
+  void setInlined() {
     assert(!isZombie() && "Can't inline a zombie function");
-    inlined = true;
+    Inlined = true;
   }
 
   /// Returns true if this function was inlined.
-  bool isInlined() const { return inlined; }
+  bool isInlined() const { return Inlined; }
 
   /// Mark this function as removed from the module's function list, but kept
   /// as "zombie" for debug info or vtable stub generation.
-  void markAsZombie() {
+  void setZombie() {
     assert((isInlined() || isExternallyUsedSymbol())  &&
           "Function should be deleted instead of getting a zombie");
-    zombie = true;
+    Zombie = true;
   }
   
   /// Returns true if this function is dead, but kept in the module's zombie list.
-  bool isZombie() const { return zombie; }
-    
+  bool isZombie() const { return Zombie; }
+
   /// Returns the calling convention used by this entry point.
   AbstractCC getAbstractCC() const {
     return getLoweredFunctionType()->getAbstractCC();
@@ -359,15 +360,13 @@ public:
   void setInlineStrategy(Inline_t inStr) { InlineStrategy = inStr; }
 
   /// \return the function side effects information.
-  EffectsKind getEffectsInfo() const { return EK; }
+  EffectsKind getEffectsKind() const { return EK; }
 
   /// \return True if the function is annotated with the @effects attribute.
-  bool hasSpecifiedEffectsInfo() const {
-    return EK != EffectsKind::Unspecified;
-  }
+  bool hasEffectsKind() const { return EK != EffectsKind::Unspecified; }
 
   /// \brief Set the function side effect information.
-  void setEffectsInfo(EffectsKind E) { EK = E; }
+  void setEffectsKind(EffectsKind E) { EK = E; }
 
   /// Get this function's global_init attribute.
   ///

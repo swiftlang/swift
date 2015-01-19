@@ -968,8 +968,8 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
 
   // Optimize readonly functions with no meaningful users.
   FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
-  if (FRI && FRI->getReferencedFunction()->getEffectsInfo() <
-      EffectsKind::ReadWrite){
+  if (FRI &&
+      FRI->getReferencedFunction()->getEffectsKind() < EffectsKind::ReadWrite) {
     UserListTy Users;
     if (recursivelyCollectARCUsers(Users, AI)) {
       // When deleting Apply instructions make sure to release any owned
@@ -993,7 +993,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
 
   if (FRI) {
     auto *SF = FRI->getReferencedFunction();
-    if (SF->getEffectsInfo() < EffectsKind::ReadWrite) {
+    if (SF->getEffectsKind() < EffectsKind::ReadWrite) {
       // Try to optimize string concatenation.
       if (auto I = optimizeConcatenationOfStringLiterals(AI)) {
         return I;
@@ -1809,9 +1809,10 @@ visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
     // Check all protocols implemented by the type.
     for (auto *Protocol : SourceProtocols) {
       if (Protocol == TargetProtocol) {
-        auto *UAC = Builder->createUnconditionalCheckedCastAddr(
+        auto *UCCA = Builder->createUnconditionalCheckedCastAddr(
             CCABI->getLoc(), CCABI->getConsumptionKind(), CCABI->getSrc(),
             CCABI->getSourceType(), CCABI->getDest(), CCABI->getTargetType());
+        (void)UCCA;
         Builder->createBranch(CCABI->getLoc(), CCABI->getSuccessBB());
         eraseInstFromFunction(*CCABI);
         return nullptr;
@@ -1823,9 +1824,10 @@ visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
       SourceProtocols = Extension->getProtocols();
       for (auto *Protocol: SourceProtocols) {
         if (Protocol == TargetProtocol) {
-          auto *UAC = Builder->createUnconditionalCheckedCastAddr(
+          auto *UCCA = Builder->createUnconditionalCheckedCastAddr(
               CCABI->getLoc(), CCABI->getConsumptionKind(), CCABI->getSrc(),
               CCABI->getSourceType(), CCABI->getDest(), CCABI->getTargetType());
+          (void)UCCA;
           Builder->createBranch(CCABI->getLoc(), CCABI->getSuccessBB());
           eraseInstFromFunction(*CCABI);
           return nullptr;

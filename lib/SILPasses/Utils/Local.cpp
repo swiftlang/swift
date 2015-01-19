@@ -65,7 +65,7 @@ bool swift::isReadNone(FunctionRefInst *FR) {
   auto *F = FR->getReferencedFunction();
   if (!F)
     return false;
-  return F->getEffectsInfo() == EffectsKind::ReadNone;
+  return F->getEffectsKind() == EffectsKind::ReadNone;
 }
 
 llvm::cl::opt<bool>
@@ -722,8 +722,8 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   auto *FRILeftFun = FRILeft->getReferencedFunction();
   auto *FRIRightFun = FRIRight->getReferencedFunction();
 
-  if (FRILeftFun->getEffectsInfo() >= EffectsKind::ReadWrite ||
-      FRIRightFun->getEffectsInfo() >= EffectsKind::ReadWrite)
+  if (FRILeftFun->getEffectsKind() >= EffectsKind::ReadWrite ||
+      FRIRightFun->getEffectsKind() >= EffectsKind::ReadWrite)
     return false;
 
   if (!FRILeftFun->hasDefinedSemantics() ||
