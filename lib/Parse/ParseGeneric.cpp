@@ -159,7 +159,7 @@ GenericParamList *Parser::maybeParseGenericParams() {
 ///     type-identifier ':' type-composition
 ///
 ///   same-type-requirement:
-///     type-identifier '==' type-identifier
+///     type-identifier '==' type
 bool Parser::parseGenericWhereClause(
                SourceLoc &WhereLoc,
                SmallVectorImpl<RequirementRepr> &Requirements) {
@@ -168,7 +168,6 @@ bool Parser::parseGenericWhereClause(
   bool Invalid = false;
   do {
     // Parse the leading type-identifier.
-    // FIXME: Dropping TypeLocs left and right.
     ParserResult<TypeRepr> FirstType = parseTypeIdentifier();
     if (FirstType.isNull() || FirstType.hasCodeCompletion()) {
       Invalid = true;
@@ -205,7 +204,7 @@ bool Parser::parseGenericWhereClause(
       SourceLoc EqualLoc = consumeToken();
 
       // Parse the second type.
-      ParserResult<TypeRepr> SecondType = parseTypeIdentifier();
+      ParserResult<TypeRepr> SecondType = parseType();
       if (SecondType.isNull() || SecondType.hasCodeCompletion()) {
         Invalid = true;
         break;
