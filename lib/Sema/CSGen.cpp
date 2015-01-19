@@ -613,6 +613,11 @@ namespace {
     Type visitParenExpr(ParenExpr *expr) {
       auto &ctx = CS.getASTContext();
       expr->setType(ParenType::get(ctx, expr->getSubExpr()->getType()));
+      
+      if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
+        CS.setFavoredType(expr, favoredTy);
+      }
+      
       return expr->getType();
     }
 
@@ -975,6 +980,9 @@ namespace {
     /// Determine whether the given parameter and argument type should be
     /// "favored" because they match exactly.
     bool isFavoredParamAndArg(Type paramTy, Type argTy) {
+      if (argTy->getAs<LValueType>())
+        argTy = argTy->getLValueOrInOutObjectType();
+      
       // Do the types match exactly?
       if (paramTy->isEqual(argTy))
         return true;
@@ -1088,6 +1096,8 @@ namespace {
         }
 
         SmallVector<Constraint *, 4> favoredConstraints;
+        
+        TypeBase *favoredTy = nullptr;
 
         // Copy over the existing bindings, dividing the constraints up
         // into "favored" and non-favored lists.
@@ -1095,7 +1105,15 @@ namespace {
           auto overloadChoice = oldConstraint->getOverloadChoice();
           if (isFavored(overloadChoice.getDecl())) {
             favoredConstraints.push_back(oldConstraint);
+            
+            favoredTy = overloadChoice.getDecl()->
+                          getType()->getAs<AnyFunctionType>()->
+                            getResult().getPointer();
           }
+        }
+        
+        if (favoredConstraints.size() == 1) {
+          CS.setFavoredType(expr, favoredTy);
         }
 
         // If there might be replacement constraints, get them now.
@@ -1162,12 +1180,83 @@ namespace {
       }
 
     }
+    
+    /// Determine whether or not a given NominalTypeDecl has a failable
+    /// initializer member.
+    bool hasFailableInits(NominalTypeDecl *NTD,
+                          ConstraintSystem *CS) {
+      
+      // TODO: Note that we search manually, rather than invoking lookupMember
+      // on the ConstraintSystem object. Because this is a hot path, this keeps
+      // the overhead of the check low, and is twice as fast.
+      if (!NTD->getSearchedForFailableInits()) {
+        
+        for (auto member : NTD->getMembers()) {
+          if (auto CD = dyn_cast<ConstructorDecl>(member)) {
+            if (CD->getFailability()) {
+              NTD->setHasFailableInits();
+              break;
+            }
+          }
+        }
+        
+        if (!NTD->getHasFailableInits()) {
+          for (auto extension : NTD->getExtensions()) {
+            for (auto member : extension->getMembers()) {
+              if (auto CD = dyn_cast<ConstructorDecl>(member)) {
+                if (CD->getFailability()) {
+                  NTD->setHasFailableInits();
+                  break;
+                }
+              }
+            }
+          }
+          
+          if (!NTD->getHasFailableInits()) {
+            for (auto parentTyLoc : NTD->getInherited()) {
+              if (auto nominalType =
+                  parentTyLoc.getType()->getAs<NominalType>()) {
+                if (hasFailableInits(nominalType->getDecl(), CS)) {
+                  NTD->setHasFailableInits();
+                  break;
+                }
+              }
+            }
+          }
+        }
+        
+        NTD->setSearchedForFailableInits();
+      }
+      
+      return NTD->getHasFailableInits();
+    }
+    
+    Type getInnerParenType(const Type &t) {
+      if (auto parenType = dyn_cast<ParenType>(t.getPointer())) {
+        return getInnerParenType(parenType->getUnderlyingType());
+      }
+      
+      return t;
+    }
 
+    size_t getOperandCount(Type t) {
+      size_t nOperands = 0;
+      
+      if (auto parenTy = dyn_cast<ParenType>(t.getPointer())) {
+        if (parenTy->getDesugaredType())
+          nOperands = 1;
+      } else if (auto tupleTy = t->getAs<TupleType>()) {
+        nOperands = tupleTy->getElementTypes().size();
+      }
+      
+      return nOperands;
+    }
+    
     /// Favor unary operator constraints where we have exact matches
     /// for the operand and contextual type.
     void favorMatchingUnaryOperators(ApplyExpr *expr) {
       // Find the argument type.
-      auto argTy = expr->getArg()->getType();
+      auto argTy = getInnerParenType(expr->getArg()->getType());
 
       // Determine whether the given declaration is favored.
       auto isFavoredDecl = [&](ValueDecl *value) -> bool {
@@ -1191,19 +1280,6 @@ namespace {
       };
 
       favorCallOverloads(expr, isFavoredDecl);
-    }
-
-    size_t getOperandCount(Type t) {
-      size_t nOperands = 0;
-      
-      if (auto parenTy = dyn_cast<ParenType>(t.getPointer())) {
-        if (parenTy->getDesugaredType())
-          nOperands = 1;
-      } else if (auto tupleTy = t->getAs<TupleType>()) {
-        nOperands = tupleTy->getElementTypes().size();
-      }
-      
-      return nOperands;
     }
     
     void favorMatchingOverloadExprs(ApplyExpr *expr) {
@@ -1248,56 +1324,6 @@ namespace {
       
       favorCallOverloads(expr, isFavoredDecl);
     }
-    
-    /// Determine whether or not a given NominalTypeDecl has a failable
-    /// initializer member.
-    bool hasFailableInits(NominalTypeDecl *NTD,
-                          ConstraintSystem *CS) {
-      
-      // TODO: Note that we search manually, rather than invoking lookupMember
-      // on the ConstraintSystem object. Because this is a hot path, this keeps
-      // the overhead of the check low, and is twice as fast.
-      if (!NTD->getSearchedForFailableInits()) {
-        
-        for (auto member : NTD->getMembers()) {
-          if (auto CD = dyn_cast<ConstructorDecl>(member)) {
-            if (CD->getFailability()) {
-              NTD->setHasFailableInits();
-              break;
-            }
-          }
-        }
-        
-        if (!NTD->getHasFailableInits()) {
-          for (auto extension : NTD->getExtensions()) {
-            for (auto member : extension->getMembers()) {
-              if (auto CD = dyn_cast<ConstructorDecl>(member)) {
-                if (CD->getFailability()) {
-                  NTD->setHasFailableInits();
-                  break;
-                }
-              }
-            }
-          }
-        
-          if (!NTD->getHasFailableInits()) {
-            for (auto parentTyLoc : NTD->getInherited()) {
-              if (auto nominalType =
-                  parentTyLoc.getType()->getAs<NominalType>()) {
-                if (hasFailableInits(nominalType->getDecl(), CS)) {
-                  NTD->setHasFailableInits();
-                  break;
-                }
-              }
-            }
-          }
-        }
-        
-        NTD->setSearchedForFailableInits();
-      }
-      
-      return NTD->getHasFailableInits();
-    }
 
     /// Favor binary operator constraints where we have exact matches
     /// for the operands and contextual type.
@@ -1316,8 +1342,21 @@ namespace {
       // Find the argument types.
       auto argTy = expr->getArg()->getType();
       auto argTupleTy = argTy->castTo<TupleType>();
-      Type firstArgTy = argTupleTy->getFields()[0].getType();
-      Type secondArgTy = argTupleTy->getFields()[1].getType();
+      auto argTupleExpr = dyn_cast<TupleExpr>(expr->getArg());
+      Type firstArgTy = getInnerParenType(argTupleTy->getFields()[0].getType());
+      Type secondArgTy =
+              getInnerParenType(argTupleTy->getFields()[1].getType());
+      
+      auto firstFavoredTy = CS.getFavoredType(argTupleExpr->getElements()[0]);
+      auto secondFavoredTy = CS.getFavoredType(argTupleExpr->getElements()[1]);
+      
+      if (firstFavoredTy && firstArgTy->getAs<TypeVariableType>()) {
+        firstArgTy = firstFavoredTy;
+      }
+      
+      if (secondFavoredTy && secondArgTy->getAs<TypeVariableType>()) {
+        secondArgTy = secondFavoredTy;
+      }
 
       // Determine whether the given declaration is favored.
       auto isFavoredDecl = [&](ValueDecl *value) -> bool {
@@ -1341,9 +1380,9 @@ namespace {
         auto contextualTy = CS.getContextualType(expr);
         
         return (isFavoredParamAndArg(firstParamTy, firstArgTy) ||
-                isFavoredParamAndArg(secondParamTy, secondArgTy)) &&
-               firstParamTy->isEqual(secondParamTy) &&
-               (!contextualTy || (*contextualTy)->isEqual(resultTy));
+            isFavoredParamAndArg(secondParamTy, secondArgTy)) &&
+            firstParamTy->isEqual(secondParamTy) &&
+            (!contextualTy || (*contextualTy)->isEqual(resultTy));
       };
 
       auto createReplacements

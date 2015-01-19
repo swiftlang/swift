@@ -1275,6 +1275,7 @@ private:
 
   SmallVector<TypeVariableType *, 16> TypeVariables;
   llvm::DenseMap<Expr *, Type *> ContextualTypes;
+  llvm::DenseMap<Expr *, TypeBase *> FavoredTypes;
 
   /// \brief The set of constraint restrictions used to reach the
   /// current constraint system.
@@ -1518,9 +1519,15 @@ public:
   Type* getContextualType(Expr *E) {
     return this->ContextualTypes[E];
   }
+  TypeBase* getFavoredType(Expr *E) {
+    return this->FavoredTypes[E];
+  }
   
   void setContextualType(Expr *E, Type *T) {
     this->ContextualTypes[E] = T;
+  }
+  void setFavoredType(Expr *E, TypeBase *T) {
+    this->FavoredTypes[E] = T;
   }
 
   /// \brief Retrieve the constraint locator for the given anchor and
