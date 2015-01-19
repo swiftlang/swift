@@ -1,4 +1,5 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+
 import Swift
 
 func main() -> Void
@@ -10,17 +11,17 @@ func main() -> Void
 
     var backward_ptr  =
     // CHECK: define linkonce_odr hidden i1 @_TFF4main4mainFT_T_U_FTSSSS_Sb(
-    // CHECK: %[[RHS_ADDR:.*]] = alloca %SS*, align 8
-    // CHECK: store %SS* %{{.*}}, %SS** %[[RHS_ADDR]], align 8
+    // CHECK: %[[RHS_ADDR:.*]] = alloca %SS*, align {{(4|8)}}
+    // CHECK: store %SS* %{{.*}}, %SS** %[[RHS_ADDR]], align {{(4|8)}}
     // The shadow copying should happen in the prologue, because the
     // stack pointer will be decremented after it.
     // CHECK-NOT: !dbg
     // CHECK-NEXT: call void @llvm.dbg.declare(metadata %SS** %[[RHS_ADDR]], metadata !{{.*}}, metadata !{{[0-9]+}}), !dbg
     // CHECK-DAG: [ DW_TAG_arg_variable ] [lhs] [line [[@LINE+5]]]
     // CHECK-DAG: [ DW_TAG_arg_variable ] [rhs] [line [[@LINE+4]]]
-    // CHECK-DAG: [ DW_TAG_arg_variable ] [random_string] [line 7]
-    // CHECK-DAG: [ DW_TAG_arg_variable ] [random_int] [line 8]
-    // CHECK-DAG: [ DW_TAG_arg_variable ] [out_only] [line 9]
+    // CHECK-DAG: [ DW_TAG_arg_variable ] [random_string] [line 8]
+    // CHECK-DAG: [ DW_TAG_arg_variable ] [random_int] [line 9]
+    // CHECK-DAG: [ DW_TAG_arg_variable ] [out_only] [line 10]
         { (lhs : String, rhs : String) -> Bool in
             if rhs == random_string
                || count(rhs.unicodeScalars) == random_int

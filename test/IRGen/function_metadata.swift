@@ -1,4 +1,6 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -emit-ir -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -primary-file %s | FileCheck %s
+
+// REQUIRES: CPU=x86_64
 
 func arch<F>(f: F) {}
 

@@ -1,4 +1,4 @@
-// RUN: %swift -primary-file %s -O -emit-sil | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -O -emit-sil | FileCheck %s
 
 //CHECK-LABEL: @_TF17unused_containers16empty_array_testFT_T_
 //CHECK: bb0:

@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -module-name Swift -global-load-store-opts -verify | FileCheck %s
+// RUN: %target-sil-opt %s -module-name Swift -global-load-store-opts -verify | FileCheck %s
 
 import Builtin
 

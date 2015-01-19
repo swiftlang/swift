@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify %s
+// RUN: %target-parse-verify-swift
 
 // Types in expression contexts must be followed by a member access or
 // constructor call.

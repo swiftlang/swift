@@ -1,4 +1,5 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
+
 // Don't crash when emitting debug info for anonymous variables.
 // CHECK: variable{{.*}}[_]
 protocol F_ {

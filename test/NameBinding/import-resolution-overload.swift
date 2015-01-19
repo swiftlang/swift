@@ -1,9 +1,9 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %swift -emit-module -o %t %S/Inputs/overload_intFunctions.swift
-// RUN: %swift -emit-module -o %t %S/Inputs/overload_boolFunctions.swift
-// RUN: %swift -emit-module -o %t %S/Inputs/overload_vars.swift
-// RUN: %swift -parse %s -I=%t -sdk "" -verify
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/overload_intFunctions.swift
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/overload_boolFunctions.swift
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/overload_vars.swift
+// RUN: %target-swift-frontend -parse %s -I %t -sdk "" -verify
 
 import overload_intFunctions
 import overload_boolFunctions

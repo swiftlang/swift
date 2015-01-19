@@ -1,4 +1,4 @@
-// RUN: %swift -playground -parse -verify %s
+// RUN: %target-parse-verify-swift -playground
 
 var a = 1, b = 2
 let z = 3

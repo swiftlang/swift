@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 var t1 : Int
 var t2 = 10

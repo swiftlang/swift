@@ -1,6 +1,6 @@
-// RUN: %swift -parse %s %clang-importer-sdk -verify
+// RUN: %target-swift-frontend -parse %s %clang-importer-sdk -verify
 
-import ObjectiveC
+import Foundation
 
 struct NativeStruct {}
 

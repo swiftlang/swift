@@ -1,4 +1,4 @@
-// RUN: %swift -parse -module-name generics %s -verify
+// RUN: %target-parse-verify-swift
 
 protocol P1 { typealias AssocType }
 protocol P2 : P1 { }

@@ -1,4 +1,4 @@
-// RUN: %swift %s -parse -verify
+// RUN: %target-parse-verify-swift
 
 @semantics("foo") // expected-note {{attribute already specified here}}
 @semantics("bar") // expected-error {{duplicate attribute}}

@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify -D FOO
+// RUN: %target-parse-verify-swift -D FOO
 
 // This test is meant to ensure that mixes of top-level declarations, statements
 // and expressions within #if blocks parse correctly

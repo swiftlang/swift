@@ -1,4 +1,5 @@
-// RUN: %swift -parse -verify %s
+// RUN: %target-parse-verify-swift
+// RUN: %target-parse-verify-swift
 
 func unconstrained<T>(x: T) {}
 

@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify %s
+// RUN: %target-parse-verify-swift
 
 // <rdar://problem/15971438> Incomplete switch was parsing to an AST that
 // triggered an assertion failure.

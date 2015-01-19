@@ -2,7 +2,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
 // RUN: %gyb %s > %t/global-arc-opts-loops.sil
-// RUN: %sil-opt -global-arc-opts -verify %t/global-arc-opts-loops.sil | FileCheck %t/global-arc-opts-loops.sil
+// RUN: %target-sil-opt -global-arc-opts -verify %t/global-arc-opts-loops.sil | FileCheck %t/global-arc-opts-loops.sil
 
 %# Ignore the following admonition; it applies to the resulting .sil
 %# test file only.

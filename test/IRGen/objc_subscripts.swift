@@ -1,5 +1,6 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | FileCheck %s
+
+// REQUIRES: CPU=x86_64
 
 // CHECK: @_INSTANCE_METHODS__TtC15objc_subscripts10SomeObject = 
 // CHECK:   private constant { i32, i32, [5 x { i8*, i8*, i8* }] } 

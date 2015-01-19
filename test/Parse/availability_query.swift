@@ -1,4 +1,6 @@
-// RUN: %swift -parse -enable-experimental-availability-checking -target x86_64-apple-macosx10.9 -verify %s
+// RUN: %target-parse-verify-swift -enable-experimental-availability-checking
+
+// REQUIRES: OS=macosx
 
 if #os(OSX >= 10.10) {
 }

@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift -emit-module -o %t %S/Inputs/def_global.swift
-// RUN: %swift -parse-as-library -emit-silgen -I=%t %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_global.swift
+// RUN: %target-swift-frontend -parse-as-library -emit-silgen -I %t %s | FileCheck %s
 //
 // Test that SILGen uses the "global_init" attribute for all global
 // variable addressors.

@@ -1,5 +1,5 @@
-// RUN: not %swift -parse %s -sdk "" 2>&1 | FileCheck -check-prefix=CHECK -check-prefix=NO-MODULE %s
-// RUN: not %swift -parse %s -resource-dir / 2>&1 | FileCheck -check-prefix=CHECK -check-prefix=NO-STDLIB %s
+// RUN: not %target-swift-frontend -parse %s -sdk "" 2>&1 | FileCheck -check-prefix=CHECK -check-prefix=NO-MODULE %s
+// RUN: not %target-swift-frontend -parse %s -resource-dir / 2>&1 | FileCheck -check-prefix=CHECK -check-prefix=NO-STDLIB %s
 
 // NO-MODULE: error: no such module 'NonExistent'
 // NO-MODULE: note: did you forget to set an SDK using -sdk or SDKROOT?

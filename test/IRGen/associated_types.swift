@@ -1,4 +1,7 @@
-// RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -primary-file %s | FileCheck %s
+
+// REQUIRES: CPU=i386_or_x86_64
+
 protocol Runcer {
   typealias Runcee
 }

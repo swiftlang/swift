@@ -1,4 +1,5 @@
-// RUN: %swift %s -O -emit-sil
+// RUN: %target-swift-frontend %s -O -emit-sil
+
 // Make sure we are not crashing on this one.
 
 class X { func ping() {} }

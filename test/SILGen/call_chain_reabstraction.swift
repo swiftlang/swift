@@ -1,4 +1,5 @@
-// RUN: %swift -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+
 struct A {
         func g<U>(recur: (A, U) -> U) -> (A, U) -> U {
                 return { _, x in return x }

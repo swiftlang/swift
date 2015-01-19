@@ -1,4 +1,7 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
+
+// REQUIRES: CPU=x86_64
+
 // Broken due to lack of NonFixedOffsets and NecessaryBindings on HeapLayouts
 //   -JoeG
 // XFAIL: *

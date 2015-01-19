@@ -1,6 +1,7 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+
 // CHECK: @_TFC12generic_arg25Class3foo{{.*}}, %swift.type* %U
-// CHECK: %[[Y:.*]] = call %swift.opaque* %allocateBuffer3([24 x i8]* %{{.*}}, %swift.type* %U)
+// CHECK: %[[Y:.*]] = call %swift.opaque* %allocateBuffer3([{{(24|12)}} x i8]* %{{.*}}, %swift.type* %U)
 // store %swift.opaque* %[[Y]], %swift.opaque** %[[Y_SHADOW:.*]], align
 // CHECK: call void @llvm.dbg.value(metadata %swift.opaque* %[[Y]], {{.*}}metadata ![[U:.*]], metadata !{{[0-9]+}}), !dbg
 // Make sure there is no conflicting dbg.value for this variable.x

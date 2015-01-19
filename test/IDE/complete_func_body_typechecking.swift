@@ -1,29 +1,29 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_1 | FileCheck %s -check-prefix=FOO_STRUCT_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_2 | FileCheck %s -check-prefix=FOO_STRUCT_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_3 | FileCheck %s -check-prefix=ERROR_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_4 | FileCheck %s -check-prefix=FOO_STRUCT_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_5 | FileCheck %s -check-prefix=FOO_STRUCT_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_6 | FileCheck %s -check-prefix=FOO_STRUCT_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_7 | FileCheck %s -check-prefix=ERROR_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_1 | FileCheck %s -check-prefix=FOO_STRUCT_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_2 | FileCheck %s -check-prefix=FOO_STRUCT_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_3 | FileCheck %s -check-prefix=ERROR_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_4 | FileCheck %s -check-prefix=FOO_STRUCT_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_5 | FileCheck %s -check-prefix=FOO_STRUCT_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_6 | FileCheck %s -check-prefix=FOO_STRUCT_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_7 | FileCheck %s -check-prefix=ERROR_COMMON
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IN_CONSTRUCTOR_1 | FileCheck %s -check-prefix=FOO_STRUCT_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IN_CONSTRUCTOR_2 | FileCheck %s -check-prefix=FOO_STRUCT_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IN_CONSTRUCTOR_1 | FileCheck %s -check-prefix=FOO_STRUCT_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IN_CONSTRUCTOR_2 | FileCheck %s -check-prefix=FOO_STRUCT_COMMON
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IN_DESTRUCTOR_1 | FileCheck %s -check-prefix=FOO_STRUCT_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IN_DESTRUCTOR_1 | FileCheck %s -check-prefix=FOO_STRUCT_COMMON
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IF_1 | FileCheck %s -check-prefix=LOCALS_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IF_2 | FileCheck %s -check-prefix=LOCALS_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IF_3 | FileCheck %s -check-prefix=LOCALS_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IF_4 | FileCheck %s -check-prefix=LOCALS_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IF_1 | FileCheck %s -check-prefix=LOCALS_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IF_2 | FileCheck %s -check-prefix=LOCALS_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IF_3 | FileCheck %s -check-prefix=LOCALS_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IF_4 | FileCheck %s -check-prefix=LOCALS_COMMON
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IF_IN_CONSTRUCTOR_1 | FileCheck %s -check-prefix=LOCALS_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IF_IN_DESTRUCTOR_1 | FileCheck %s -check-prefix=LOCALS_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IF_IN_CONSTRUCTOR_1 | FileCheck %s -check-prefix=LOCALS_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IF_IN_DESTRUCTOR_1 | FileCheck %s -check-prefix=LOCALS_COMMON
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_1 | FileCheck %s -check-prefix=LOCALS_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_2 | FileCheck %s -check-prefix=LOCALS_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_1 | FileCheck %s -check-prefix=LOCALS_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_2 | FileCheck %s -check-prefix=LOCALS_COMMON
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_IN_CONSTRUCTOR_1 | FileCheck %s -check-prefix=LOCALS_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_IN_DESTRUCTOR_1 | FileCheck %s -check-prefix=LOCALS_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_IN_CONSTRUCTOR_1 | FileCheck %s -check-prefix=LOCALS_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_IN_DESTRUCTOR_1 | FileCheck %s -check-prefix=LOCALS_COMMON
 
 struct FooStruct {
   var instanceVar = 0

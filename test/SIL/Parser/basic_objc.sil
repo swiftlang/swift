@@ -1,4 +1,6 @@
-// RUN: %swift %clang-importer-sdk %s -emit-silgen -target x86_64-apple-macosx10.9 | FileCheck %s
+// RUN: %target-swift-frontend %clang-importer-sdk %s -emit-silgen | FileCheck %s
+
+// REQUIRES: objc_interop
 
 sil_stage raw // CHECK: sil_stage raw
 

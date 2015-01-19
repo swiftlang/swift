@@ -1,4 +1,4 @@
-// RUN: %swift %s -O -emit-sil | FileCheck %s
+// RUN: %target-swift-frontend %s -O -emit-sil | FileCheck %s
 
 // Check if cycles are removed.
 

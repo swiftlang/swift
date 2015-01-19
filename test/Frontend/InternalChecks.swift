@@ -1,5 +1,5 @@
-// RUN: %swift -O -parse-stdlib -D INTERNAL_CHECKS_ENABLED -primary-file %s -emit-sil | FileCheck %s --check-prefix=CHECKS
-// RUN: %swift -O -parse-stdlib -primary-file %s -emit-sil | FileCheck %s --check-prefix=NOCHECKS
+// RUN: %target-swift-frontend -O -parse-stdlib -D INTERNAL_CHECKS_ENABLED -primary-file %s -emit-sil | FileCheck %s --check-prefix=CHECKS
+// RUN: %target-swift-frontend -O -parse-stdlib -primary-file %s -emit-sil | FileCheck %s --check-prefix=NOCHECKS
 
 import Swift
 

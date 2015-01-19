@@ -1,5 +1,7 @@
-// RUN: %swift -emit-ir %s -disable-access-control -parse-stdlib -o - | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -disable-access-control -parse-stdlib -o - | FileCheck %s
+
 import Swift
+
 class HeapStorage<Value, Element> {
   public final func withUnsafeMutablePointerToElements<R>(
     body: (UnsafeMutablePointer<Element>)->R

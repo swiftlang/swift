@@ -1,4 +1,4 @@
-// RUN: %swift %s -O -emit-sil
+// RUN: %target-swift-frontend %s -O -emit-sil
 
 class A {
   func ping() -> Int { return 1 }

@@ -1,4 +1,4 @@
-// RUN: %swift -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
 
 protocol A {
   typealias B

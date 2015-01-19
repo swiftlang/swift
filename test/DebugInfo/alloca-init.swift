@@ -1,4 +1,5 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+
 class A {
   var a : A?
   // CHECK: define {{.*}}1AcfMS0_FT_S0_

@@ -1,4 +1,6 @@
-// RUN: %swift %clang-importer-sdk -emit-silgen -target x86_64-apple-macosx10.9 %s | FileCheck %s
+// RUN: %target-swift-frontend %clang-importer-sdk -emit-silgen %s | FileCheck %s
+
+// REQUIRES: objc_interop
 
 import Foundation
 

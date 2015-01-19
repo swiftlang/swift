@@ -1,4 +1,6 @@
-// RUN: %swift -parse-as-library -emit-ir -target x86_64-apple-macosx10.9 -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -emit-ir -primary-file %s | FileCheck %s
+
+// REQUIRES: CPU=x86_64
 
 // CHECK: @_Tv12lazy_globals1xSi = global %Si zeroinitializer, align 8
 // CHECK: @_Tv12lazy_globals1ySi = global %Si zeroinitializer, align 8

@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift %clang-importer-sdk -enable-source-import -emit-module -emit-module-doc -o %t  %s
-// RUN: %swift %clang-importer-sdk -parse-as-library %t/enums.swiftmodule -parse -emit-objc-header-path %t/enums.h -import-objc-header %S/../Inputs/empty.h
+// RUN: %target-swift-frontend %clang-importer-sdk -enable-source-import -emit-module -emit-module-doc -o %t %s -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend %clang-importer-sdk -parse-as-library %t/enums.swiftmodule -parse -emit-objc-header-path %t/enums.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: FileCheck %s < %t/enums.h
 // RUN: %check-in-clang %t/enums.h
 // RUN: %check-in-clang -fno-modules %t/enums.h -include Foundation.h -include ctypes.h -include CoreFoundation.h

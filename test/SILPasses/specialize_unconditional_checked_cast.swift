@@ -1,4 +1,4 @@
-// RUN: %swift -emit-sil -o - -O -sil-inline-threshold 0 -disable-func-sig-opts -verify %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -o - -O -sil-inline-threshold 0 -disable-func-sig-opts -verify %s | FileCheck %s
 
 //////////////////
 // Declarations //

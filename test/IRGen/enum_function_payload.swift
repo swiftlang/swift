@@ -1,4 +1,4 @@
-// RUN: %swift -emit-ir %s
+// RUN: %target-swift-frontend -emit-ir %s
 
 enum Singleton {
   case F(Singleton -> ())

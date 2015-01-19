@@ -1,11 +1,11 @@
 // <rdar://problem/15358345> Check that we always use PIC relocations on all
 // platforms.
 
-// RUN: %target-build-swift %s -S -o - | FileCheck -check-prefix=%target-cpu %s
+// RUN: %target-swift-frontend %s -module-name main -S -o - | FileCheck -check-prefix=%target-cpu %s
 
 var global: Int = 0
 
-func use_global() -> Int {
+public func use_global() -> Int {
   return global
 }
 

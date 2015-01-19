@@ -1,8 +1,8 @@
 // This file should not have any syntax or type checker errors.
-// RUN: %swift -parse %s
+// RUN: %target-parse-verify-swift
 
-// RUN: %swift-ide-test -print-types -source-filename %s -fully-qualified-types=false | FileCheck %s -strict-whitespace
-// RUN: %swift-ide-test -print-types -source-filename %s -fully-qualified-types=true | FileCheck %s -check-prefix=FULL -strict-whitespace
+// RUN: %target-swift-ide-test -print-types -source-filename %s -fully-qualified-types=false | FileCheck %s -strict-whitespace
+// RUN: %target-swift-ide-test -print-types -source-filename %s -fully-qualified-types=true | FileCheck %s -check-prefix=FULL -strict-whitespace
 
 typealias MyInt = Int
 // CHECK: TypeAliasDecl '''MyInt''' MyInt.Type{{$}}

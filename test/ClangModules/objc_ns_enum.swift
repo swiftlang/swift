@@ -1,6 +1,6 @@
-// RUN: %swift %clang-importer-sdk -parse -target x86_64-apple-macosx10.9 %s -verify
+// RUN: %target-swift-frontend %clang-importer-sdk -parse %s -verify
 // -- Check that we can successfully round-trip.
-// RUN: %swift %clang-importer-sdk -emit-ir -target x86_64-apple-macosx10.9 %s >/dev/null
+// RUN: %target-swift-frontend %clang-importer-sdk -emit-ir %s >/dev/null
 
 import Foundation
 import user_objc

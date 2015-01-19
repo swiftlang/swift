@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify %s -F %S/Inputs/mock-sdk
+// RUN: %target-parse-verify-swift -F %S/Inputs/mock-sdk
 
 import Foo
 // Don't import 'FooHelper'.

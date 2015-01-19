@@ -1,4 +1,5 @@
-// RUN: %sil-opt %s -enable-static-init -global-opt | FileCheck %s
+// RUN: %target-sil-opt %s -enable-static-init -global-opt | FileCheck %s
+
 import Builtin
 import Swift
 

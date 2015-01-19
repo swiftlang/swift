@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 // Basic test of requirements
 protocol Foo {

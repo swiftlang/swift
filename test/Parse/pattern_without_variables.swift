@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify -parse-as-library %s
+// RUN: %target-parse-verify-swift -parse-as-library
 
 var _ = 1 // expected-error{{global variable declaration does not bind any variables}}
 

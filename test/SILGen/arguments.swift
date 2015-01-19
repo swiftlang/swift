@@ -1,4 +1,4 @@
-// RUN: %swift -module-name=Swift -parse-stdlib -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -module-name Swift -parse-stdlib -emit-silgen %s | FileCheck %s
 
 struct Int {}
 struct Float {}

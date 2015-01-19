@@ -1,4 +1,4 @@
-// RUN: %swift -parse-as-library -sil-serialize-all -module-name witness_tables -emit-module -o - %s -verify | %sil-opt -module-name witness_tables -verify | FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -sil-serialize-all -module-name witness_tables -emit-module -o - %s -verify | %target-sil-opt -module-name witness_tables -verify | FileCheck %s
 
 protocol AssocReqt {
   func requiredMethod()

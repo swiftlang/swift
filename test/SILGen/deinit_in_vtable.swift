@@ -1,7 +1,7 @@
-// RUN: %swift -O -emit-sil %s | FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil %s | FileCheck %s
 
 // The second run tests is it can be compiled without crashes.
-// RUN: %swift -O -S %s
+// RUN: %target-swift-frontend -O -S %s
 
 private class A {
 	func foo() -> Int { return 0 }

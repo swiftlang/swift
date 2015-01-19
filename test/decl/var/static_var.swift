@@ -1,4 +1,4 @@
-// RUN: %swift -parse -parse-as-library %s -verify
+// RUN: %target-parse-verify-swift -parse-as-library
 
 // See also rdar://15626843.
 static var gvu1: Int // expected-error {{static properties may only be declared on a type}}{{1-7=}}

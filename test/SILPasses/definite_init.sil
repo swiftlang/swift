@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -definite-init -verify | FileCheck %s
+// RUN: %target-sil-opt %s -definite-init -verify | FileCheck %s
 
 import Builtin
 import Swift

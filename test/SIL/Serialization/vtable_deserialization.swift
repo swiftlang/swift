@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %swift %S/Inputs/vtable_deserialization_input.swift -o %t/Swift.swiftmodule -emit-module -parse-as-library -parse-stdlib -module-link-name swiftCore -module-name Swift -sil-serialize-all
-// RUN: %swift %s -emit-sil -O -I=%t -o - | FileCheck %s
+// RUN: %target-swift-frontend %S/Inputs/vtable_deserialization_input.swift -o %t/Swift.swiftmodule -emit-module -parse-as-library -parse-stdlib -module-link-name swiftCore -module-name Swift -sil-serialize-all
+// RUN: %target-swift-frontend %s -emit-sil -O -I %t -o - | FileCheck %s
 
 import Swift
 

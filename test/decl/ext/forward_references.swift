@@ -1,5 +1,5 @@
-// RUN: %swift -primary-file %s %S/../../Inputs/forward_extension_reference.swift -target x86_64-apple-macosx10.9 -emit-ir -g -module-name fref
-// RUN: %swift %S/../../Inputs/forward_extension_reference.swift -primary-file %s -target x86_64-apple-macosx10.9 -emit-ir -g -module-name fref
+// RUN: %target-swift-frontend -primary-file %s %S/../../Inputs/forward_extension_reference.swift -emit-ir -g -module-name fref
+// RUN: %target-swift-frontend %S/../../Inputs/forward_extension_reference.swift -primary-file %s -emit-ir -g -module-name fref
 
 struct Foo<T> {
 	func foo(t: T) -> T {

@@ -1,4 +1,6 @@
-// RUN: %swift -gnone -target x86_64-apple-macosx10.9 -sdk %S/Inputs %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -gnone -sdk %S/Inputs %s -emit-ir | FileCheck %s
+
+// REQUIRES: CPU=x86_64
 
 sil_stage canonical
 

@@ -1,22 +1,22 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_IF_1 | FileCheck %s -check-prefix=UNWRAPPED_INT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_IF_2 | FileCheck %s -check-prefix=UNWRAPPED_INT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_IF_3 | FileCheck %s -check-prefix=UNWRAPPED_INT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_IF_4 | FileCheck %s -check-prefix=UNWRAPPED_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_IF_1 | FileCheck %s -check-prefix=UNWRAPPED_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_IF_2 | FileCheck %s -check-prefix=UNWRAPPED_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_IF_3 | FileCheck %s -check-prefix=UNWRAPPED_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_IF_4 | FileCheck %s -check-prefix=UNWRAPPED_INT
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_WHILE_1 | FileCheck %s -check-prefix=UNWRAPPED_INT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_WHILE_2 | FileCheck %s -check-prefix=UNWRAPPED_INT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_WHILE_3 | FileCheck %s -check-prefix=UNWRAPPED_INT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_WHILE_4 | FileCheck %s -check-prefix=UNWRAPPED_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_WHILE_1 | FileCheck %s -check-prefix=UNWRAPPED_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_WHILE_2 | FileCheck %s -check-prefix=UNWRAPPED_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_WHILE_3 | FileCheck %s -check-prefix=UNWRAPPED_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_WHILE_4 | FileCheck %s -check-prefix=UNWRAPPED_INT
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNCTION_IF_1 | FileCheck %s -check-prefix=UNWRAPPED_INT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNCTION_IF_2 | FileCheck %s -check-prefix=UNWRAPPED_INT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNCTION_IF_3 | FileCheck %s -check-prefix=UNWRAPPED_INT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNCTION_IF_4 | FileCheck %s -check-prefix=UNWRAPPED_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNCTION_IF_1 | FileCheck %s -check-prefix=UNWRAPPED_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNCTION_IF_2 | FileCheck %s -check-prefix=UNWRAPPED_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNCTION_IF_3 | FileCheck %s -check-prefix=UNWRAPPED_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNCTION_IF_4 | FileCheck %s -check-prefix=UNWRAPPED_INT
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNCTION_WHILE_1 | FileCheck %s -check-prefix=UNWRAPPED_INT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNCTION_WHILE_2 | FileCheck %s -check-prefix=UNWRAPPED_INT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNCTION_WHILE_3 | FileCheck %s -check-prefix=UNWRAPPED_INT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNCTION_WHILE_4 | FileCheck %s -check-prefix=UNWRAPPED_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNCTION_WHILE_1 | FileCheck %s -check-prefix=UNWRAPPED_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNCTION_WHILE_2 | FileCheck %s -check-prefix=UNWRAPPED_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNCTION_WHILE_3 | FileCheck %s -check-prefix=UNWRAPPED_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNCTION_WHILE_4 | FileCheck %s -check-prefix=UNWRAPPED_INT
 
 // UNWRAPPED_INT: Begin completions
 // UNWRAPPED_INT-DAG: Decl[LocalVar]/Local: unwrapped[#Int#]{{$}}

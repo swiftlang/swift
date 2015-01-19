@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify %s
+// RUN: %target-parse-verify-swift
 
 protocol Fooable { func foo() }
 protocol Barable { func bar() }

@@ -1,4 +1,4 @@
-// RUN: %target-build-swift -parse %s -Xfrontend -verify
+// RUN: %target-parse-verify-swift
 
 @IBAction // expected-error {{'IBAction' may only be used on 'func' declarations}}
 var iboutlet_global: Int

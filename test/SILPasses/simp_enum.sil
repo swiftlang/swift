@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -sil-combine -verify | FileCheck %s
+// RUN: %target-sil-opt %s -sil-combine -verify | FileCheck %s
 
 sil_stage canonical
 

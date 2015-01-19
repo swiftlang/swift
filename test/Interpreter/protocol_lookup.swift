@@ -1,6 +1,6 @@
-// Check both AOT and JIT modes
 // RUN: %target-run-simple-swift | FileCheck %s
-// RUN: %swift -interpret %s | FileCheck %s
+
+// Note: JIT mode is checked in Interpreter/protocol_lookup_jit.swift.
 
 protocol Fooable {
   func foo()

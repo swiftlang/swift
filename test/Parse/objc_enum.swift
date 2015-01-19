@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify %s
+// RUN: %target-parse-verify-swift
 
 @objc enum Foo: Int {
   case Zim, Zang, Zung

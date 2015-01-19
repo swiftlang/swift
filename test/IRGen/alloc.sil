@@ -1,4 +1,12 @@
-// RUN: %target-build-swift %s -emit-ir -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 -module-name main %s -emit-ir -o - | FileCheck %s
+// RUN: %swift -target i386-apple-ios7.0 %s -module-name main -emit-ir -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-ios7.0 %s -module-name main -emit-ir -o - | FileCheck %s
+// RUN: %swift -target armv7-apple-ios7.0 %s -module-name main -emit-ir -o - | FileCheck %s
+// RUN: %swift -target arm64-apple-ios7.0 %s -module-name main -emit-ir -o - | FileCheck %s
+// RUN: %swift -target x86_64-unknown-linux-gnu %s -disable-objc-interop -module-name main -emit-ir -o - | FileCheck %s
+
+// REQUIRES: X86
+// REQUIRES: ARM
 
 import Builtin
 

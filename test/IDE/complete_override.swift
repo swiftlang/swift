@@ -1,84 +1,84 @@
 // RUN: sed -n -e '1,/NO_ERRORS_UP_TO_HERE$/ p' %s > %t_no_errors.swift
-// RUN: %swift -verify -parse %t_no_errors.swift
+// RUN: %target-swift-frontend -parse -verify -disable-objc-attr-requires-foundation-module %t_no_errors.swift
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PA -code-completion-keywords=false > %t.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PA -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=CLASS_PA < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PA_EXT_1 -code-completion-keywords=false > %t.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PA_EXT_1 -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=CLASS_PA < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PA_EXT_2 -code-completion-keywords=false > %t.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PA_EXT_2 -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=CLASS_PA < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PB -code-completion-keywords=false > %t.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PB -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=CLASS_PB < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_PB < %t.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PA_PB -code-completion-keywords=false > %t.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PA_PB -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=CLASS_PA_PB < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_PB < %t.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BA -code-completion-keywords=false > %t.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BA -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=CLASS_BA < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_BA < %t.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BA_PA -code-completion-keywords=false > %t.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BA_PA -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=CLASS_BA_PA < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_BA < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BA_PA_EXT1 -code-completion-keywords=false > %t.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BA_PA_EXT1 -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=CLASS_BA_PA < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_BA < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BA_PA_EXT2 -code-completion-keywords=false > %t.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BA_PA_EXT2 -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=CLASS_BA_PA < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_BA < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BA_PB -code-completion-keywords=false > %t.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BA_PB -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=CLASS_BA_PB < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_BA < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_PB < %t.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BB -code-completion-keywords=false > %t.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BB -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=CLASS_BB < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_BB < %t.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BE -code-completion-keywords=false > %t.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BE -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=CLASS_BE < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_BE < %t.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BE_PA -code-completion-keywords=false > %t.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BE_PA -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=CLASS_BE_PA < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_BE < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BE_PA_PE -code-completion-keywords=false > %t.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BE_PA_PE -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=CLASS_BE_PA_PE < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_BE < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BE_PA_PE_EXT1 -code-completion-keywords=false > %t.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BE_PA_PE_EXT1 -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=CLASS_BE_PA_PE < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_BE < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BE_PA_PE_EXT2 -code-completion-keywords=false > %t.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BE_PA_PE_EXT2 -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=CLASS_BE_PA_PE < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_BE < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PEI_PE -code-completion-keywords=false > %t.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PEI_PE -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=CLASS_PEI_PE < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_PEI < %t.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL -code-completion-keywords=false > %t.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=NESTED_NOMINAL < %t.txt
 
 @objc

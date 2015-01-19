@@ -1,4 +1,4 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=A | FileCheck %s -check-prefix=A
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=A | FileCheck %s -check-prefix=A
 
 // Make sure we don't crash on a function without a closing brace before EOF.
 // Don't add any tests at the end of the file!

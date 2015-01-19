@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -simplify-cfg -cse | FileCheck %s
+// RUN: %target-sil-opt %s -simplify-cfg -cse | FileCheck %s
 
 // Check that jump-threading works for sequences of checked_cast_br instructions produced by the devirtualizer.
 // This allows for simplifications of code like e.g. f.foo() + f.foo()

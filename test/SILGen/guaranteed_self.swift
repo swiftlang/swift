@@ -1,4 +1,4 @@
-// RUN: %swift -emit-silgen -enable-guaranteed-self %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-guaranteed-self %s -disable-objc-attr-requires-foundation-module | FileCheck %s
 
 protocol Fooable {
   init()

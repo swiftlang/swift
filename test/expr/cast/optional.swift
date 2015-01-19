@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 class Base : Hashable { 
   var hashValue: Int { return 0 }

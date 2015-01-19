@@ -1,63 +1,63 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %swift -emit-module -o %t %S/Inputs/AnyObject/foo_swift_module.swift
-// RUN: %swift -emit-module -o %t %S/Inputs/AnyObject/bar_swift_module.swift
+// RUN: %target-swift-frontend -emit-module -disable-objc-attr-requires-foundation-module -o %t %S/Inputs/AnyObject/foo_swift_module.swift
+// RUN: %target-swift-frontend -emit-module -disable-objc-attr-requires-foundation-module -o %t %S/Inputs/AnyObject/bar_swift_module.swift
 // RUN: cp %S/Inputs/AnyObject/baz_clang_module.h %t
 // RUN: cp %S/Inputs/AnyObject/module.map %t
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_FUNC_PARAM_NO_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_FUNC_PARAM_NO_DOT_1 > %t.dl.txt
 // RUN: FileCheck %s -check-prefix=DL_INSTANCE_NO_DOT < %t.dl.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_FUNC_PARAM_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_FUNC_PARAM_DOT_1 > %t.dl.txt
 // RUN: FileCheck %s -check-prefix=DL_INSTANCE_DOT < %t.dl.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_VAR_NO_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_VAR_NO_DOT_1 > %t.dl.txt
 // RUN: FileCheck %s -check-prefix=DL_INSTANCE_NO_DOT < %t.dl.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_VAR_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_VAR_DOT_1 > %t.dl.txt
 // RUN: FileCheck %s -check-prefix=DL_INSTANCE_DOT < %t.dl.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_RETURN_VAL_NO_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_RETURN_VAL_NO_DOT_1 > %t.dl.txt
 // RUN: FileCheck %s -check-prefix=DL_INSTANCE_NO_DOT < %t.dl.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_RETURN_VAL_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_RETURN_VAL_DOT_1 > %t.dl.txt
 // RUN: FileCheck %s -check-prefix=DL_INSTANCE_DOT < %t.dl.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_CALL_RETURN_VAL_NO_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_CALL_RETURN_VAL_NO_DOT_1 > %t.dl.txt
 // RUN: FileCheck %s -check-prefix=TLOC_MEMBERS_NO_DOT < %t.dl.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_CALL_RETURN_VAL_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_CALL_RETURN_VAL_DOT_1 > %t.dl.txt
 // RUN: FileCheck %s -check-prefix=TLOC_MEMBERS_DOT < %t.dl.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_FUNC_NAME_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_FUNC_NAME_1 > %t.dl.txt
 // RUN: FileCheck %s -check-prefix=DL_FUNC_NAME_1 < %t.dl.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_FUNC_NAME_PAREN_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_FUNC_NAME_PAREN_1 > %t.dl.txt
 // RUN: FileCheck %s -check-prefix=DL_FUNC_NAME_PAREN_1 < %t.dl.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_FUNC_NAME_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_FUNC_NAME_DOT_1 > %t.dl.txt
 // RUN: FileCheck %s -check-prefix=DL_FUNC_NAME_DOT_1 < %t.dl.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_FUNC_NAME_BANG_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_FUNC_NAME_BANG_1 > %t.dl.txt
 // RUN: FileCheck %s -check-prefix=DL_FUNC_NAME_BANG_1 < %t.dl.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_CLASS_NO_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_CLASS_NO_DOT_1 > %t.dl.txt
 // RUN: FileCheck %s -check-prefix=DL_CLASS_NO_DOT < %t.dl.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_CLASS_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=DL_CLASS_DOT_1 > %t.dl.txt
 // RUN: FileCheck %s -check-prefix=DL_CLASS_DOT < %t.dl.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 

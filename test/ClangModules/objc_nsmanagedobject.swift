@@ -1,4 +1,4 @@
-// RUN: %swift %clang-importer-sdk -I %S/Inputs/custom-modules -parse -parse-as-library -verify -target x86_64-apple-macosx10.9 %s %S/Inputs/objc_nsmanaged_other.swift
+// RUN: %target-swift-frontend %clang-importer-sdk -I %S/Inputs/custom-modules -parse -parse-as-library -verify %s %S/Inputs/objc_nsmanaged_other.swift
 
 import CoreData
 

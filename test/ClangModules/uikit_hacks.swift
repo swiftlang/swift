@@ -1,4 +1,9 @@
-// RUN: %swift %clang-importer-sdk -parse -verify %s
+// RUN: %target-swift-frontend -parse -verify %s
+
+// REQUIRES: OS=ios
+// FIXME: this test could use the %clang-importer-sdk, but swift tries to
+// deserialize the real UIKit module and match it up with the mock SDK, and
+// crashes.  Another reason to stop using source imports.
 
 import UIKit
 

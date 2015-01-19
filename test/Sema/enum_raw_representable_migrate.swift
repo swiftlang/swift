@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 // Test Fix-Its to migrate fromRaw/toRaw to the failable initializer
 // and rawValue property, respectively.

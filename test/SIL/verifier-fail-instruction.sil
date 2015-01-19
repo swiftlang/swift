@@ -1,4 +1,4 @@
-// RUN: not --crash %sil-opt %s -verify
+// RUN: not --crash %target-sil-opt %s -verify
 // REQUIRES: asserts
 
 class A {

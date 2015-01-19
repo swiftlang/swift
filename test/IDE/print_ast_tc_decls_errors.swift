@@ -1,12 +1,12 @@
 // Verify errors in this file to ensure that parse and type checker errors
 // occur where we expect them.
-// RUN: %swift -parse -verify -show-diagnostics-after-fatal %s
+// RUN: %target-parse-verify-swift -show-diagnostics-after-fatal %s
 
-// RUN: %swift-ide-test -print-ast-typechecked -source-filename %s -prefer-type-repr=false > %t.printed.txt
+// RUN: %target-swift-ide-test -print-ast-typechecked -source-filename %s -prefer-type-repr=false > %t.printed.txt
 // RUN: FileCheck %s -strict-whitespace < %t.printed.txt
 // RUN: FileCheck -check-prefix=NO-TYPEREPR %s -strict-whitespace < %t.printed.txt
 
-// RUN: %swift-ide-test -print-ast-typechecked -source-filename %s -prefer-type-repr=true > %t.printed.txt
+// RUN: %target-swift-ide-test -print-ast-typechecked -source-filename %s -prefer-type-repr=true > %t.printed.txt
 // RUN: FileCheck %s -strict-whitespace < %t.printed.txt
 // RUN: FileCheck -check-prefix=TYPEREPR %s -strict-whitespace < %t.printed.txt
 

@@ -1,4 +1,6 @@
-// RUN: %swift -emit-silgen %s
+// RUN: %target-swift-frontend -emit-silgen %s -disable-objc-attr-requires-foundation-module
+
+// REQUIRES: objc_interop
 
 @objc protocol Unrelated {}
 

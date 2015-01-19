@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -split-critical-edges | FileCheck %s
+// RUN: %target-sil-opt %s -split-critical-edges | FileCheck %s
 
 import Builtin
 import Swift

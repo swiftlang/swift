@@ -1,7 +1,7 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %swift-ide-test -print-ast-typechecked -print-accessibility -source-filename=%s | FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-SRC
-// RUN: %swift -emit-module-path %t/accessibility_print.swiftmodule %s
-// RUN: %swift-ide-test -print-module -print-accessibility -module-to-print=accessibility_print -I %t -source-filename=%s | FileCheck %s
+// RUN: %target-swift-ide-test -print-ast-typechecked -print-accessibility -source-filename=%s | FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-SRC
+// RUN: %target-swift-frontend -emit-module-path %t/accessibility_print.swiftmodule %s
+// RUN: %target-swift-ide-test -print-module -print-accessibility -module-to-print=accessibility_print -I %t -source-filename=%s | FileCheck %s
 
 // This file uses alphabetic prefixes on its declarations because swift-ide-test
 // sorts decls in a module before printing them.

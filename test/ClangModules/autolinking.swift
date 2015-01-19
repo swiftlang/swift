@@ -1,10 +1,10 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %swift %s -sdk %S/Inputs -I %S/Inputs/custom-modules -emit-ir -o %t/without-adapter.ll
+// RUN: %target-swift-frontend %s -sdk %S/Inputs -I %S/Inputs/custom-modules -emit-ir -o %t/without-adapter.ll
 // RUN: FileCheck %s < %t/without-adapter.ll
 
-// RUN: %swift -emit-module %S/Inputs/adapter.swift -sdk %S/Inputs -module-link-name SwiftAdapter -module-name ClangModuleWithAdapter -I=%S/Inputs/custom-modules -o %t
-// RUN: %swift %s -sdk %S/Inputs -I %S/Inputs/custom-modules -I %t -emit-ir -o %t/with-adapter.ll
+// RUN: %target-swift-frontend -emit-module %S/Inputs/adapter.swift -sdk %S/Inputs -module-link-name SwiftAdapter -module-name ClangModuleWithAdapter -I %S/Inputs/custom-modules -o %t
+// RUN: %target-swift-frontend %s -sdk %S/Inputs -I %S/Inputs/custom-modules -I %t -emit-ir -o %t/with-adapter.ll
 // RUN: FileCheck %s < %t/with-adapter.ll
 // RUN: FileCheck --check-prefix=CHECK-WITH-SWIFT %s < %t/with-adapter.ll
 

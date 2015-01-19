@@ -1,4 +1,4 @@
-// RUN: %swift %s -emit-sil -o - -verify | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-sil -o - -verify | FileCheck %s
 
 class Foo {
   func foo() -> Int {

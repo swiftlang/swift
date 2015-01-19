@@ -1,4 +1,4 @@
-// RUN: %swift %clang-importer-sdk -I %S/Inputs/user-module -parse -target x86_64-apple-darwin13 %s -verify
+// RUN: %target-swift-frontend %clang-importer-sdk -I %S/Inputs/user-module -parse %s -verify
 
 // Type checker should not report any errors in the code below.
 

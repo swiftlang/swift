@@ -3,7 +3,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
 
-// RUN: %swift -c -emit-module -o %t %S/ASTSection.swift
+// RUN: %target-swift-frontend -c -emit-module -o %t %S/ASTSection.swift
 
 // Test the inline section mechanism.
 // RUN: ld %t/ASTSection.o -sectcreate __SWIFT __ast %t/ASTSection.swiftmodule -o %t/ASTSection.dylib -L%libdir/swift/macosx -dylib -lSystem

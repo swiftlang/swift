@@ -1,7 +1,5 @@
-// RUN: rm -rf %t  &&  mkdir %t
-// RUN: %target-swift-frontend %s -parse -verify
-// REQUIRES: OS=macosx
-// RUN: %target-swift-frontend %s -dump-ast -verify 2>&1 | FileCheck %s
+// RUN: %target-swift-frontend %clang-importer-sdk -parse %s -verify
+// RUN: %target-swift-frontend %clang-importer-sdk %s -dump-ast -verify 2>&1 | FileCheck %s
 
 import Foundation
 

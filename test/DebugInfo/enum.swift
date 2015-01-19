@@ -1,4 +1,5 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+
 // CHECK: [ DW_TAG_union_type ] [_TtO4enum5Color] [line [[@LINE+1]], size 8, align 8,
 enum Color : UInt {
 // CHECK: [ DW_TAG_member ] [Red] [line 0, size 8, align 8, offset 0] [from _TtSu]
@@ -9,8 +10,8 @@ enum Color : UInt {
 enum MaybeIntPair {
 // CHECK: [ DW_TAG_member ] [None] [line 0, size 136, align 64, offset 0] [from _TtSi]
 case None
-// CHECK: [ DW_TAG_member ] [Just] [line 0, size 136, align 64, offset 0] [from _TtTSiSi_]
-  case Just(Int, Int)
+// CHECK: [ DW_TAG_member ] [Just] [line 0, size 136, align 64, offset 0] [from _TtTVSs5Int64S__]
+  case Just(Int64, Int64)
 }
 
 enum Maybe<T> {

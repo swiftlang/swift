@@ -1,4 +1,4 @@
-// RUN: %swift -parse-stdlib -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | FileCheck %s
 
 import Swift
 

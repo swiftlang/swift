@@ -1,4 +1,4 @@
-// RUN: %sil-opt -inline -verify %s | FileCheck %s
+// RUN: %target-sil-opt -inline -verify %s | FileCheck %s
 
 // Check if cloning of select_value and switch_value works correctly without
 // producing illegal SIL.

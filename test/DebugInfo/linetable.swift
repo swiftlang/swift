@@ -1,5 +1,5 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -S -g -o - | FileCheck %s --check-prefix ASM-CHECK
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -S -g -o - | FileCheck %s --check-prefix ASM-CHECK
 import Swift
 
 class MyClass

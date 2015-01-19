@@ -1,6 +1,6 @@
-// RUN: %swift -module-name OptimizationOptions -disable-func-sig-opts -Onone -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=DEBUG
-// RUN: %swift -module-name OptimizationOptions -disable-func-sig-opts -O -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=RELEASE
-// RUN: %swift -module-name OptimizationOptions -disable-func-sig-opts -Ounchecked -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=UNCHECKED
+// RUN: %target-swift-frontend -module-name OptimizationOptions -disable-func-sig-opts -Onone -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=DEBUG
+// RUN: %target-swift-frontend -module-name OptimizationOptions -disable-func-sig-opts -O -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=RELEASE
+// RUN: %target-swift-frontend -module-name OptimizationOptions -disable-func-sig-opts -Ounchecked -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=UNCHECKED
 
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_stdlib_asserts

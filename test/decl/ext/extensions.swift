@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 extension extension_for_invalid_type_1 { // expected-error {{use of undeclared type 'extension_for_invalid_type_1'}}
   func f() { }

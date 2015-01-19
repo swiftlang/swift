@@ -1,4 +1,5 @@
-// RUN: %swift -parse -verify %s
+// RUN: %target-parse-verify-swift
+
 struct A<B> { // expected-note{{generic type 'A' declared here}}
   init(x:Int) {}
   static func c() {}

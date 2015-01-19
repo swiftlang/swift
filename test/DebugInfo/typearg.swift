@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
 protocol AProtocol {
   func f() -> String;
@@ -29,7 +29,7 @@ class Foo<Bar> {
 }
 
 // Verify that the backend doesn't elide the debug intrinsics.
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -c -g -o %t.o
+// RUN: %target-swift-frontend %s -c -g -o %t.o
 // RUN: llvm-dwarfdump %t.o | FileCheck %s --check-prefix=CHECK-LLVM
 // CHECK-LLVM-DAG:  .debug_str[{{.*}}] = "x"
 // CHECK-LLVM-DAG:  .debug_str[{{.*}}] = "$swift.type.T"

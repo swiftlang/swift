@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 protocol P {
   func foo(i: Int, x: Float) // expected-note 4{{requirement 'foo(_:x:)' declared here}}

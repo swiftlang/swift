@@ -1,4 +1,4 @@
-// RUN: %swift -disable-func-sig-opts -O -emit-sil -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -disable-func-sig-opts -O -emit-sil -primary-file %s | FileCheck %s
 
 // CHECK-LABEL: sil hidden [transparent] @_TF33specialize_dont_touch_transparent22transparentDoSomethingFT_VSs4Int8 : $@thin () -> Int8 {
 // CHECK: bb0:

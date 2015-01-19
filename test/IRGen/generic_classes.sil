@@ -1,6 +1,8 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-irgen-test-overlays
-// RUN: %swift -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %t %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -I %t %s -emit-ir | FileCheck %s
+
+// REQUIRES: CPU=x86_64
 
 import Builtin
 import Swift
@@ -75,7 +77,7 @@ import gizmo
 // CHECK:   i64 ptrtoint (%objc_class* @_TMmC15generic_classes14RootNonGeneric to i64),
 // CHECK:   %objc_class* @"OBJC_CLASS_$_SwiftObject",
 // CHECK:   %swift.opaque* @_objc_empty_cache,
-// CHECK:   %swift.opaque* @_objc_empty_vtable,
+// CHECK:   %swift.opaque* {{(@_objc_empty_vtable|null)}},
 // CHECK:   @_DATA__TtC15generic_classes14RootNonGeneric
 // CHECK:   i32 33,
 // CHECK:   i16 7,

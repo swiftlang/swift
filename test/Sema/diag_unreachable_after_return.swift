@@ -1,4 +1,4 @@
-// RUN: %swift %s -parse -verify
+// RUN: %target-parse-verify-swift
 
 // Warn when the indentation is the same.
 func f_returns_void() {}

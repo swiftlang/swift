@@ -1,6 +1,6 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_VOID_1 | FileCheck %s -check-prefix=RETURN_VOID_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_INT_1 | FileCheck %s -check-prefix=RETURN_INT_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_INT_2 | FileCheck %s -check-prefix=RETURN_INT_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_VOID_1 | FileCheck %s -check-prefix=RETURN_VOID_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_INT_1 | FileCheck %s -check-prefix=RETURN_INT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_INT_2 | FileCheck %s -check-prefix=RETURN_INT_2
 
 struct FooStruct {
   var instanceVar : Int

@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -inout-deshadow | FileCheck %s
+// RUN: %target-sil-opt %s -inout-deshadow | FileCheck %s
 
 sil_stage canonical
 

@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify %s
+// RUN: %target-parse-verify-swift
 
 func test1() {
   var a : Int {

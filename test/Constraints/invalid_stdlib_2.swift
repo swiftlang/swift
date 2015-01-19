@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify %s
+// RUN: %target-parse-verify-swift
 
 class Dictionary<K, V> : DictionaryLiteralConvertible { // expected-error {{type 'Dictionary<K, V>' does not conform to protocol 'DictionaryLiteralConvertible'}}
   typealias Key = K

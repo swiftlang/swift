@@ -1,4 +1,6 @@
-// RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 -o - -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -o - -primary-file %s | FileCheck %s
+
+// REQUIRES: CPU=x86_64
 
 // Currently, this can't be a SIL file because we don't parse
 // conformances correctly.

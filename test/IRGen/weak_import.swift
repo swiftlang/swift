@@ -1,8 +1,13 @@
 // RUN: rm -rf %t && mkdir %t
-// RUN: %swift -target x86_64-apple-macosx10.9 -emit-module -o %t -sdk %S/Inputs %S/Inputs/ObjectiveC.swift
-// RUN: %swift -target x86_64-apple-macosx10.9 -emit-module -o %t -sdk %S/Inputs %S/Inputs/Foundation.swift
-// RUN: %swift -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %t -primary-file %s -emit-ir | FileCheck -check-prefix=CHECK-10_9 %s
-// RUN: %swift -target x86_64-apple-macosx10.10 -sdk %S/Inputs -I %t -primary-file %s -emit-ir | FileCheck -check-prefix=CHECK-10_10 %s
+// RUN: %build-irgen-test-overlays
+//
+// Specify explicit target triples for the deployment target to test weak
+// linking for a symbol introduced in OS X 10.10.
+//
+// RUN: %target-swift-frontend -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %t -primary-file %s -emit-ir | FileCheck -check-prefix=CHECK-10_9 %s
+// RUN: %target-swift-frontend -target x86_64-apple-macosx10.10 -sdk %S/Inputs -I %t -primary-file %s -emit-ir | FileCheck -check-prefix=CHECK-10_10 %s
+
+// REQUIRES: OS=macosx
 
 // FIXME: This test in written in Swift because the SIL parser fails
 // when referencing weak_variable.

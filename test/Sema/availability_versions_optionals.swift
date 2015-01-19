@@ -1,4 +1,7 @@
-// RUN: %swift -parse -enable-experimental-availability-checking -enable-experimental-unavailable-as-optional -target x86_64-apple-macosx10.9 -verify %s
+// RUN: %target-parse-verify-swift -enable-experimental-availability-checking -enable-experimental-unavailable-as-optional
+
+// REQUIRES: OS=macosx
+// REQUIRES: objc_interop
 
 @availability(OSX, introduced=10.9)
 var globalAvailableOn10_9: Int = 9

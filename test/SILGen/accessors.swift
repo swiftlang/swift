@@ -1,4 +1,4 @@
-// RUN: %swift -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 // Hold a reference to do to magically become non-POD.
 class Reference {}

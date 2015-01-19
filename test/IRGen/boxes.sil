@@ -1,4 +1,12 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -emit-ir %s | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 -module-name main %s -emit-ir -o - | FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
+// RUN: %swift -target i386-apple-ios7.0 %s -module-name main -emit-ir -o - | FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s
+// RUN: %swift -target x86_64-apple-ios7.0 %s -module-name main -emit-ir -o - | FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
+// RUN: %swift -target armv7-apple-ios7.0 %s -module-name main -emit-ir -o - | FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s
+// RUN: %swift -target arm64-apple-ios7.0 %s -module-name main -emit-ir -o - | FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
+// RUN: %swift -target x86_64-unknown-linux-gnu -disable-objc-interop %s -module-name main -emit-ir -o - | FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
+
+// REQUIRES: X86
+// REQUIRES: ARM
 
 import Builtin
 
@@ -16,9 +24,13 @@ entry:
   return undef : $()
 }
 
-// CHECK-LABEL: define void @fixed_box_alloc_dealloc() 
-// CHECK:         [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_heapmetadata* @metadata, i32 0, i32 2), i64 24, i64 7)
-// CHECK:         call void @swift_deallocObject(%swift.refcounted* [[BOX]], i64 24, i64 7)
+// CHECK-32-LABEL: define void @fixed_box_alloc_dealloc()
+// CHECK-32:         [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_heapmetadata* @metadata, i32 0, i32 2), i32 16, i32 3)
+// CHECK-32:         call void @swift_deallocObject(%swift.refcounted* [[BOX]], i32 16, i32 3)
+
+// CHECK-64-LABEL: define void @fixed_box_alloc_dealloc()
+// CHECK-64:         [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_heapmetadata* @metadata, i32 0, i32 2), i64 24, i64 7)
+// CHECK-64:         call void @swift_deallocObject(%swift.refcounted* [[BOX]], i64 24, i64 7)
 sil @fixed_box_alloc_dealloc : $@thin () -> () {
 entry:
   %b = alloc_box $Builtin.Word

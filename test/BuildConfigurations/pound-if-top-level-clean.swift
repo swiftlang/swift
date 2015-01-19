@@ -1,4 +1,4 @@
-// RUN: %swift -D FOO %s -verify -parse
+// RUN: %target-parse-verify-swift -D FOO
 
 var x = 0
 

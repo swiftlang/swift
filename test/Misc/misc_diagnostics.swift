@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend %s -parse -verify
+// RUN: %target-parse-verify-swift
+
 import Foundation
 import CoreGraphics
 

@@ -1,4 +1,7 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir | FileCheck %s
+
+// REQUIRES: CPU=x86_64
+// REQUIRES: objc_interop
 
 // CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[OBJC_CLASS:%objc_class]] = type {
@@ -16,7 +19,7 @@
 // CHECK:   i64 ptrtoint ([[OBJC_CLASS]]* @_TMmC8subclass1A to i64),
 // CHECK:   [[OBJC_CLASS]]* @"OBJC_CLASS_$_SwiftObject",
 // CHECK:   [[OPAQUE]]* @_objc_empty_cache,
-// CHECK:   [[OPAQUE]]* @_objc_empty_vtable,
+// CHECK:   [[OPAQUE]]* {{(@_objc_empty_vtable|null)}},
 // CHECK:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1A to i64), i64 1),
 // CHECK:   i64 ([[A]]*)* @_TFC8subclass1A1ffS0_FT_Si,
 // CHECK:   [[A]]* ([[TYPE]]*)* @_TFC8subclass1A1gfMS0_FT_S0_
@@ -28,7 +31,7 @@
 // CHECK:   i64 ptrtoint ([[OBJC_CLASS]]* @_TMmC8subclass1B to i64),
 // CHECK:   [[TYPE]]* getelementptr inbounds ([[FULL_HEAPMETADATA]]* bitcast ([[A_METADATA]]* @_TMdC8subclass1A to [[FULL_HEAPMETADATA]]*), i32 0, i32 2),
 // CHECK:   [[OPAQUE]]* @_objc_empty_cache,
-// CHECK:   [[OPAQUE]]* @_objc_empty_vtable,
+// CHECK:   [[OPAQUE]]* {{(@_objc_empty_vtable|null)}},
 // CHECK:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1B to i64), i64 1),
 // CHECK:   i64 ([[B]]*)* @_TFC8subclass1B1ffS0_FT_Si,
 // CHECK:   [[A]]* ([[TYPE]]*)* @_TFC8subclass1A1gfMS0_FT_S0_

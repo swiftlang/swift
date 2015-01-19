@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 protocol P1 {
   init() // expected-note{{protocol requires initializer 'init()' with type '()'}}

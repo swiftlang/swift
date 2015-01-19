@@ -1,7 +1,7 @@
 // Verifies that we can correctly handle self cycles in control flow.
-// RUN: %sil-opt %s -global-load-store-opts -verify | FileCheck %s
+// RUN: %target-sil-opt %s -global-load-store-opts -verify | FileCheck %s
 // Make sure we can move load of end out of loop even though we have store of start inside loop.
-// RUN: %sil-opt %s -licm -verify | FileCheck %s --check-prefix=LICM
+// RUN: %target-sil-opt %s -licm -verify | FileCheck %s --check-prefix=LICM
 
 import Builtin
 import Swift

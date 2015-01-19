@@ -1,7 +1,8 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: echo "public var x = Int()" | %swift -target x86_64-apple-macosx10.9 -module-name FooBar -emit-module -o %t -
-// RUN: %swift -parse-stdlib -emit-silgen %s -I%t -enable-character-literals -disable-access-control | FileCheck %s
+// RUN: echo "public var x = Int()" | %target-swift-frontend -module-name FooBar -emit-module -o %t -
+// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s -I%t -enable-character-literals -disable-access-control | FileCheck %s
+
 import Swift
 import FooBar
 

@@ -1,4 +1,5 @@
-// RUN: %swift -O -disable-arc-opts -sil-inline-threshold 0 -emit-sil -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -O -disable-arc-opts -sil-inline-threshold 0 -emit-sil -primary-file %s | FileCheck %s
+
 // We can't deserialize apply_inst with subst lists. When radar://14443304
 // is fixed then we should convert this test to a SIL test.
 

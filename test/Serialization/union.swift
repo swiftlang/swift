@@ -1,9 +1,9 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift -emit-module -o %t %S/Inputs/def_union.swift
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_union.swift
 // RUN: llvm-bcanalyzer %t/def_union.swiftmodule | FileCheck %s
-// RUN: %swift -parse -I=%t %s -o /dev/null
-// RUN: %swift -emit-sil -I=%t %s -o /dev/null
+// RUN: %target-swift-frontend -parse -I %t %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -I %t %s -o /dev/null
 
 // CHECK-NOT: UnknownCode
 

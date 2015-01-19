@@ -1,4 +1,6 @@
-// RUN: %swift -emit-silgen -sdk %S/Inputs/ -I %S/Inputs -enable-source-import %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs/ -I %S/Inputs -enable-source-import %s | FileCheck %s
+
+// REQUIRES: objc_interop
 
 import Foundation
 import objc_extensions_helper

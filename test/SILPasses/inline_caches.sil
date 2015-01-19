@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -inlinecaches | FileCheck %s
+// RUN: %target-sil-opt %s -inlinecaches | FileCheck %s
 
 sil_stage canonical
 

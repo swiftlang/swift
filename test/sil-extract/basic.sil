@@ -1,4 +1,4 @@
-// RUN: %sil-extract %s -func=use_before_init | FileCheck %s
+// RUN: %target-sil-extract %s -func=use_before_init | FileCheck %s
 
 import Builtin
 import Swift

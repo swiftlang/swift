@@ -1,6 +1,9 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-irgen-test-overlays
-// RUN: %swift -enable-dynamic-value-type-layout -sdk %S/Inputs -I %t %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -enable-dynamic-value-type-layout -sdk %S/Inputs -I %t %s -emit-ir | FileCheck %s
+
+// REQUIRES: CPU=i386_or_x86_64
+// REQUIRES: objc_interop
 
 import Builtin
 import Swift

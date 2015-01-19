@@ -1,4 +1,5 @@
-// RUN: %sil-opt %s -sil-combine -simplify-cfg -verify | FileCheck %s
+// RUN: %target-sil-opt %s -sil-combine -simplify-cfg -verify | FileCheck %s
+
 sil_stage canonical
 
 import Builtin

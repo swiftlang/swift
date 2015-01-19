@@ -1,4 +1,4 @@
-// RUN: %swift -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen | FileCheck %s
 
 // This file is also used by objc_attr_NSManaged_multi.swift.
 

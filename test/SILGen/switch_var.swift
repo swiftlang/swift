@@ -1,4 +1,4 @@
-// RUN: %swift -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 // TODO: Implement tuple equality in the library.
 // BLOCKED: <rdar://problem/13822406>

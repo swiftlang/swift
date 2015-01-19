@@ -1,4 +1,4 @@
-// RUN: %swift %clang-importer-sdk -parse -verify -target x86_64-apple-macosx10.9 -I %S/Inputs %s
+// RUN: %target-swift-frontend %clang-importer-sdk -parse -verify -I %S/Inputs %s
 
 import cfuncs
 

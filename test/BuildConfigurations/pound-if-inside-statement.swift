@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify -parse
+// RUN: %target-parse-verify-swift
 
 func foo() { // expected-note {{to match this opening '{'}}
   if true {

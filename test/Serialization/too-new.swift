@@ -1,4 +1,4 @@
-// RUN: not %swift %s -parse -I=%S/Inputs -show-diagnostics-after-fatal 2>&1 | FileCheck %s
+// RUN: not %target-swift-frontend %s -parse -I %S/Inputs -show-diagnostics-after-fatal 2>&1 | FileCheck %s
 
 // CHECK: :[[@LINE+1]]:8: error: module file was created by a newer version of the compiler: {{.*}}too_new.swiftmodule{{$}}
 import too_new

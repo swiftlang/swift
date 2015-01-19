@@ -1,4 +1,4 @@
-// RUN: %swift -O -primary-file %s -emit-sil -sil-inline-threshold 1000 -sil-verify-all | FileCheck %s
+// RUN: %target-swift-frontend -O -primary-file %s -emit-sil -sil-inline-threshold 1000 -sil-verify-all | FileCheck %s
 
 // Make sure that we can dig all the way through the class hierarchy and
 // protocol conformances with covariant return types correctly. The verifier

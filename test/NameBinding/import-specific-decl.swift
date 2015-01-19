@@ -1,10 +1,10 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %swift -emit-module -o %t %S/Inputs/asdf.swift
-// RUN: %swift -emit-module -o %t %S/Inputs/abcde.swift
-// RUN: %swift -emit-module -o %t %S/Inputs/aeiou.swift
-// RUN: %swift -parse %s -I=%t -sdk "" -verify
-// RUN: not %swift -parse %s -I=%t -sdk "" 2>&1 | FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/asdf.swift
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/abcde.swift
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/aeiou.swift
+// RUN: %target-swift-frontend -parse %s -I %t -sdk "" -verify
+// RUN: not %target-swift-frontend -parse %s -I %t -sdk "" 2>&1 | FileCheck %s
 
 import struct aeiou.U
 import struct aeiou.E

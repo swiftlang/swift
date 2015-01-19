@@ -1,6 +1,6 @@
-// RUN: %sil-opt %s -diagnostic-constant-propagation -assert-conf-id 1 | FileCheck %s --check-prefix=ONE
-// RUN: %sil-opt %s -diagnostic-constant-propagation -assert-conf-id 4294967295 | FileCheck %s --check-prefix=DISABLED
-// RUN: %sil-opt %s -performance-constant-propagation -assert-conf-id 1 | FileCheck %s --check-prefix=PERFONE
+// RUN: %target-sil-opt %s -diagnostic-constant-propagation -assert-conf-id 1 | FileCheck %s --check-prefix=ONE
+// RUN: %target-sil-opt %s -diagnostic-constant-propagation -assert-conf-id 4294967295 | FileCheck %s --check-prefix=DISABLED
+// RUN: %target-sil-opt %s -performance-constant-propagation -assert-conf-id 1 | FileCheck %s --check-prefix=PERFONE
 
 import Builtin
 

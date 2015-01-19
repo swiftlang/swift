@@ -1,4 +1,4 @@
-// RUN: %swift %s -parse -verify
+// RUN: %target-parse-verify-swift
 
 public protocol PublicProto {
   func publicReq()

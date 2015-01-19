@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 extension Array {
   public func foo() { } // expected-error{{extension of generic type 'Array<T>' from a different module cannot provide public declarations}}

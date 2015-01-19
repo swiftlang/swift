@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify %s
+// RUN: %target-parse-verify-swift
 
 // Leaf expression patterns are matched to corresponding pieces of a switch
 // subject (TODO: or ~= expression) using ~= overload resolution.

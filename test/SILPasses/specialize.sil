@@ -1,4 +1,4 @@
-// RUN: %sil-opt -specialize %s | FileCheck %s
+// RUN: %target-sil-opt -specialize %s | FileCheck %s
 
 sil_stage canonical
 

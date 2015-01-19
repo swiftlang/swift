@@ -1,4 +1,4 @@
-// RUN: %swift -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 class Foo {
   // CHECK-LABEL: sil hidden @_TFC10extensions3Foo3zimfS0_FT_T_

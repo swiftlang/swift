@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
-// This program is so short that it doesn't refer the swift stdlib.
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+
 println("Hello World!")
-// CHECK: [ DW_TAG_file_type ]{{.*}}lib/swift/macosx/Swift.swiftmodule
+// CHECK: [ DW_TAG_file_type ] [{{.*}}/lib/swift/{{[^/]+(/32)?}}/Swift.swiftmodule]

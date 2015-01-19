@@ -1,4 +1,4 @@
-// RUN: %swift -parse -parse-as-library %s -verify
+// RUN: %target-parse-verify-swift -parse-as-library
 
 protocol BaseProto {
   typealias AssocTy

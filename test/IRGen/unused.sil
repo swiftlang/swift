@@ -1,6 +1,8 @@
-// RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 %s > %t
+// RUN: %target-swift-frontend -emit-ir %s > %t
 // RUN: FileCheck %s < %t
 // RUN: FileCheck -check-prefix=NEGATIVE %s < %t
+
+// REQUIRES: CPU=x86_64
 
 sil_stage canonical
 

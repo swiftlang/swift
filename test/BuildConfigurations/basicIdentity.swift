@@ -1,51 +1,53 @@
-// RUN: %swift -parse %s -verify -D FOO -D BAZ -target x86_64-apple-macosx10.9
+// RUN: %swift -parse %s -verify -D FOO -D BAZ -target x86_64-apple-macosx10.9 -parse-stdlib
+
+struct Foo {}
 
 #if FOO
-var a = 0
+var a = Foo()
 #endif
 var b = a
 
 #if !BAR
-var c = 0
+var c = Foo()
 #endif
 var d = c
 
 #if FOO || BAR
-var e = 0
+var e = Foo()
 #endif
 var f = e
 
 #if BAR || FOO
-var g = 0
+var g = Foo()
 #endif
 var h = g
 
 #if FOO && BAZ
-var i = 0
+var i = Foo()
 #endif
 var j = i
 
 #if os(OSX)
-var k = 0
+var k = Foo()
 #endif
 var l = k
 
 #if arch(x86_64)
-var m = 0
+var m = Foo()
 #endif
 var n = m
 
 #if FOO && !BAR && BAZ && os(OSX) && arch(x86_64) && _runtime(_ObjC)
-var o = 0
+var o = Foo()
 #endif
 var p = o
 
 #if FOO && (!BAR && BAZ && os(OSX) && arch(x86_64)) && _runtime(_ObjC)
-var q = 0
+var q = Foo()
 #endif
 var r = q
 
 #if FOO && !(!BAZ && BAZ && os(OSX) && arch(x86_64)) && _runtime(_ObjC)
-var s = 0
+var s = Foo()
 #endif
 var t = s

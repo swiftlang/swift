@@ -1,5 +1,5 @@
 // RUN: rm -rf %t
-// RUN: %swift -parse -sdk "" -I %S/Inputs/custom-modules %s
+// RUN: %target-swift-frontend -parse -sdk "" -I %S/Inputs/custom-modules %s
 
 // Verify that we can still import modules even without an SDK.
 import ExternIntX;

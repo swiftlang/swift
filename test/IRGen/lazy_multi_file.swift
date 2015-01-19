@@ -1,4 +1,6 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s %S/Inputs/lazy_multi_file_helper.swift -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s %S/Inputs/lazy_multi_file_helper.swift -emit-ir | FileCheck %s
+
+// REQUIRES: CPU=i386_or_x86_64
 
 // CHECK: %C15lazy_multi_file8Subclass = type <{ %swift.refcounted, %[[OPTIONAL_INT_TY:Sq[^,]+]], [{{[0-9]+}} x i8], %SS }>
 // CHECK: %[[OPTIONAL_INT_TY]] = type <{ [{{[0-9]+}} x i8], [1 x i8] }>

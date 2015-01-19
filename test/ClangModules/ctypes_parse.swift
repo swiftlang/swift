@@ -1,4 +1,4 @@
-// RUN: %swift %clang-importer-sdk -parse -verify -target x86_64-apple-macosx10.9 %s
+// RUN: %target-parse-verify-swift %clang-importer-sdk
 
 import ctypes
 import CoreGraphics
@@ -22,7 +22,13 @@ func testTribool() {
 func testAnonEnum() {
   var a = AnonConst1
   a = AnonConst2
+#if arch(i386) || arch(arm)
+  var a2: CUnsignedLongLong = a
+#elseif arch(x86_64) || arch(arm64)
   var a2: CUnsignedLong = a
+#else
+  __portMe()
+#endif
 }
 
 func testAnonEnumSmall() {
@@ -137,13 +143,6 @@ func testImportMacTypes() {
 
   var t9_qual : ctypes.Float32 = 0.0  // expected-error {{no type named 'Float32' in module 'ctypes'}}
   var t10_qual : ctypes.Float64 = 0.0 // expected-error {{no type named 'Float64' in module 'ctypes'}}
-
-  // FIXME: this should work.  We cannot map Float80 to 'long double' because
-  // 'long double' has size of 128 bits on SysV ABI, and 80 != 128.  'long
-  // double' is currently not handled by the importer, so it cannot be
-  // imported in normal way either.
-  var t11_unqual : Float80 = Float80_test // expected-error {{use of unresolved identifier 'Float80_test'}}
-  var t11_qual : ctypes.Float80 = 0.0 // expected-error {{no type named 'Float80' in module 'ctypes'}}
 }
 
 var word: Word = 0

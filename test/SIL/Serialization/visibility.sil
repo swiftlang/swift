@@ -1,5 +1,5 @@
-// RUN: %swift %s -parse-sil -sil-serialize-all -emit-module -o - -module-name Swift -module-link-name swiftCore -parse-as-library -parse-stdlib | %sil-opt -verify -module-name Swift | FileCheck %s
-// RUN: %swift %s -parse-sil -sil-serialize-all -emit-module -o - -module-name Swift -module-link-name swiftCore -parse-as-library -parse-stdlib | %sil-opt -verify -module-name Swift | FileCheck --check-prefix=NEG-CHECK %s
+// RUN: %target-swift-frontend %s -parse-sil -sil-serialize-all -emit-module -o - -module-name Swift -module-link-name swiftCore -parse-as-library -parse-stdlib | %target-sil-opt -verify -module-name Swift | FileCheck %s
+// RUN: %target-swift-frontend %s -parse-sil -sil-serialize-all -emit-module -o - -module-name Swift -module-link-name swiftCore -parse-as-library -parse-stdlib | %target-sil-opt -verify -module-name Swift | FileCheck --check-prefix=NEG-CHECK %s
 
 import Builtin
 

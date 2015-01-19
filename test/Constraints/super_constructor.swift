@@ -1,4 +1,4 @@
-// RUN: %swift %s -parse -parse-as-library -verify -enable-character-literals
+// RUN: %target-parse-verify-swift -parse-as-library -enable-character-literals
 
 struct S {
   init() {

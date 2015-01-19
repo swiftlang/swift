@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify %s
+// RUN: %target-parse-verify-swift
 
 struct S<A: CollectionType where A.Index == Int> : CollectionType {
   typealias Element = A.Generator.Element

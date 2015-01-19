@@ -1,4 +1,7 @@
-// RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+
+// REQUIRES: CPU=x86_64
+// REQUIRES: objc_interop
 
 import Builtin
 import Swift
@@ -36,7 +39,7 @@ class C {}
 // \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @_TMmC5class1C to i64),
 // \ CHECK:   [[OBJCCLASS]]* @"OBJC_CLASS_$_SwiftObject",
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_cache,
-// \ CHECK:   [[OPAQUE]]* @_objc_empty_vtable,
+// \ CHECK:   [[OPAQUE]]* {{(@_objc_empty_vtable|null)}},
 // \ CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC5class1C to i64), i64 1)
 // \ CHECK: }
 
@@ -46,7 +49,7 @@ class C {}
 // \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @_TMmC5class1D to i64),
 // \ CHECK:   [[OBJCCLASS]]* @"OBJC_CLASS_$_SwiftObject",
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_cache,
-// \ CHECK:   [[OPAQUE]]* @_objc_empty_vtable,
+// \ CHECK:   [[OPAQUE]]* {{(@_objc_empty_vtable|null)}},
 // \ CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC5class1D to i64), i64 1),
 // \ CHECK:   i32 3,
 // \ CHECK:   i32 0,

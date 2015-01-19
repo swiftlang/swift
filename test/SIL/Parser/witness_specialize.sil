@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -module-name=witness_specialize -verify | %sil-opt -verify -module-name=witness_specialize | FileCheck %s
+// RUN: %target-sil-opt %s -module-name=witness_specialize -verify | %target-sil-opt -verify -module-name=witness_specialize | FileCheck %s
 
 sil_stage raw
 

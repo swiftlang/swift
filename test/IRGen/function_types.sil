@@ -1,4 +1,12 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 -module-name function_types %s -emit-ir -o - | FileCheck %s
+// RUN: %swift -target i386-apple-ios7.1 %s -module-name function_types -emit-ir -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-ios7.1 %s -module-name function_types -emit-ir -o - | FileCheck %s
+// RUN: %swift -target armv7-apple-ios7.1 %s -module-name function_types -emit-ir -o - | FileCheck %s
+// RUN: %swift -target arm64-apple-ios7.1 %s -module-name function_types -emit-ir -o - | FileCheck %s
+// RUN: %swift -target x86_64-unknown-linux-gnu -disable-objc-interop %s -module-name function_types -emit-ir -o - | FileCheck %s
+
+// REQUIRES: X86
+// REQUIRES: ARM
 
 import Builtin
 

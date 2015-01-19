@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify %clang-importer-sdk -I %S/Inputs/custom-modules %s
+// RUN: %target-swift-frontend -parse -verify %clang-importer-sdk -I %S/Inputs/custom-modules %s
 
 // Do not import Foundation! This tests indirect visibility.
 import Redeclaration

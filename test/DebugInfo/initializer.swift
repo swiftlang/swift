@@ -1,4 +1,4 @@
-// RUN: %swift -disable-objc-attr-requires-foundation-module -target x86_64-apple-macosx10.9 %s -import-objc-header %S/Inputs/serialized-objc-header.h -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -import-objc-header %S/Inputs/serialized-objc-header.h -emit-ir -g -o - | FileCheck %s
 
 protocol Named {
     var name : String { get }

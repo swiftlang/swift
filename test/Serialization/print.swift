@@ -1,6 +1,7 @@
-// RUN: rm -rf %t && mkdir %t
-// RUN: %swift %clang-importer-sdk -emit-module -o %t %s
-// RUN: %swift-ide-test -print-module -module-to-print=print -I %t -source-filename=%s %clang-importer-sdk | FileCheck %s
+// RUN: rm -rf %t
+// RUN: mkdir %t
+// RUN: %target-swift-frontend %clang-importer-sdk -emit-module -o %t %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=print -I %t -source-filename=%s %clang-importer-sdk | FileCheck %s
 
 import Foundation
 

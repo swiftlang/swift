@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: cp %s %t/main.swift
-// RUN: %swift -parse -verify -primary-file %t/main.swift %S/Inputs/enum_equatable_hashable_other.swift
+// RUN: %target-swift-frontend -parse -verify -primary-file %t/main.swift %S/Inputs/enum_equatable_hashable_other.swift
 
 enum Foo {
   case A, B

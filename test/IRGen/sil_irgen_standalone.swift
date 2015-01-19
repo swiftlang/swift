@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir
+// RUN: %target-swift-frontend %s -emit-ir
 
 // Smoke test that SIL-IRGen can compile a standalone program offline.
 func f() {}

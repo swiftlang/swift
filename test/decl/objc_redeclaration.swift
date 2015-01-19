@@ -1,4 +1,4 @@
-// RUN: %swift -parse -disable-objc-attr-requires-foundation-module %s -verify
+// RUN: %target-parse-verify-swift
 
 @objc class Redecl1 { // expected-note{{Objective-C method 'dealloc' previously declared by implicit deinitializer here}}
   @objc init() { } // expected-note{{Objective-C method 'init' previously declared by initializer 'init()' here}}

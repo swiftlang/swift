@@ -1,9 +1,10 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift -emit-module -o %t %S/Inputs/def_operator.swift
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_operator.swift
 // RUN: llvm-bcanalyzer %t/def_operator.swiftmodule | FileCheck %s
-// RUN: %swift -parse -I%t %s
-// RUN: %swift -interpret -I=%t -DINTERP %s | FileCheck --check-prefix=OUTPUT %s
+// RUN: %target-swift-frontend -parse -I%t %s
+// RUN: %target-swift-frontend -interpret -I %t -DINTERP %s | FileCheck --check-prefix=OUTPUT %s
+
 // REQUIRES: swift_interpreter
 
 // FIXME: iOS doesn't work because this test needs the interpreter to handle 

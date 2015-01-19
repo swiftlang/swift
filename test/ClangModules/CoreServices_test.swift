@@ -1,4 +1,4 @@
-// RUN: %swift %clang-importer-sdk -parse %s -verify
+// RUN: %target-parse-verify-swift %clang-importer-sdk
 
 import CoreServices
 

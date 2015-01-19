@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -diagnose-unreachable | FileCheck %s
+// RUN: %target-sil-opt %s -diagnose-unreachable | FileCheck %s
 
 import Builtin
 import Swift

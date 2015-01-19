@@ -1,4 +1,4 @@
-// RUN: %swift -primary-file %s -disable-func-sig-opts -parse-as-library -emit-sil -O | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -disable-func-sig-opts -parse-as-library -emit-sil -O | FileCheck %s
 
 private func recFunc(x: Int) -> Int {
   if x > 0 {

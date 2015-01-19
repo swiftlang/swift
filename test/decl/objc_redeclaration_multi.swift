@@ -1,4 +1,4 @@
-// RUN: %swift -parse -disable-objc-attr-requires-foundation-module %s %S/Inputs/objc_redeclaration_multi_2.swift -verify
+// RUN: %target-swift-frontend -parse -disable-objc-attr-requires-foundation-module %s %S/Inputs/objc_redeclaration_multi_2.swift -verify
 
 @objc class Redecl1 {
   @objc init() { } // expected-note{{Objective-C method 'init' previously declared by initializer 'init()' here}}

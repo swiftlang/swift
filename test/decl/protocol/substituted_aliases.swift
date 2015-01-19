@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 struct Q<T: CollectionType> : SequenceType {
   func generate() -> T.Generator {

@@ -1,4 +1,4 @@
-// RUN: %swift -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 // CHECK-LABEL: sil hidden @_TF16generic_literals21genericIntegerLitera
 func genericIntegerLiteral<T : IntegerLiteralConvertible>(var x: T) {

@@ -1,4 +1,4 @@
-// RUN: %swift -parse-stdlib -parse -verify %s
+// RUN: %target-parse-verify-swift -parse-stdlib
 
 var word: Builtin.Word
 var i16: Builtin.Int16

@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 // Inheritable: method with 'Self' in its signature
 protocol P1 {

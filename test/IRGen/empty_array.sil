@@ -1,12 +1,25 @@
-// RUN: %swift -emit-ir %s | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 -module-name main %s -emit-ir -o - | FileCheck -check-prefix=CHECK-64 %s
+// RUN: %swift -target i386-apple-ios7.1 %s -module-name main -emit-ir -o - | FileCheck -check-prefix=CHECK-32 %s
+// RUN: %swift -target x86_64-apple-ios7.1 %s -module-name main -emit-ir -o - | FileCheck -check-prefix=CHECK-64 %s
+// RUN: %swift -target armv7-apple-ios7.1 %s -module-name main -emit-ir -o - | FileCheck -check-prefix=CHECK-32 %s
+// RUN: %swift -target arm64-apple-ios7.1 %s -module-name main -emit-ir -o - | FileCheck -check-prefix=CHECK-64 %s
+// RUN: %swift -target x86_64-unknown-linux-gnu -disable-objc-interop %s -module-name main -emit-ir -o - | FileCheck -check-prefix=CHECK-64 %s
+
+// REQUIRES: X86
+// REQUIRES: ARM
 
 sil_stage canonical
 
 import Builtin
 
-// CHECK-LABEL: define void @empty_array(%swift.opaque* noalias) {
-// CHECK:         %1 = bitcast %swift.opaque* %0 to i8*
-// CHECK:         %2 = getelementptr inbounds i8* %1, i64 0
+// CHECK-32-LABEL: define void @empty_array(%swift.opaque* noalias) {
+// CHECK-32:         %1 = bitcast %swift.opaque* %0 to i8*
+// CHECK-32:         %2 = getelementptr inbounds i8* %1, i32 0
+
+// CHECK-64-LABEL: define void @empty_array(%swift.opaque* noalias) {
+// CHECK-64:         %1 = bitcast %swift.opaque* %0 to i8*
+// CHECK-64:         %2 = getelementptr inbounds i8* %1, i64 0
+
 sil @empty_array : $@thin (@in ()) -> () {
 entry(%0 : $*()):
   %1 = integer_literal $Builtin.Word, 1

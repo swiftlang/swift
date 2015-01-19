@@ -2,5 +2,5 @@
 class Foo {}
 // Check that we diagnose and skip the hashbang at the beginning of the file
 // when compiling in library mode.
-// RUN: %swift -parse -parse-as-library %s -verify
+// RUN: %target-parse-verify-swift -parse-as-library
 

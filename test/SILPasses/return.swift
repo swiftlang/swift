@@ -1,4 +1,4 @@
-// RUN: %swift %s -emit-sil -verify
+// RUN: %target-swift-frontend %s -emit-sil -verify
 
 func singleBlock() -> Int {
   var y = 0 

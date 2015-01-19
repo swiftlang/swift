@@ -1,5 +1,5 @@
-// RUN: %swift -emit-sil -parse-stdlib %s | FileCheck %s
-// RUN: %swift -emit-silgen -parse-stdlib %s | FileCheck %s -check-prefix=SILGEN
+// RUN: %target-swift-frontend -emit-sil -parse-stdlib %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -parse-stdlib %s | FileCheck %s -check-prefix=SILGEN
 
 import Swift
 

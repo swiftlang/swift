@@ -1,9 +1,9 @@
 // RUN: rm -rf %t && mkdir %t
 
-// RUN: %swift -emit-dependencies-path - -parse %S/../Inputs/empty.swift | FileCheck -check-prefix=CHECK-BASIC %s
-// RUN: %swift -emit-reference-dependencies-path - -parse -primary-file %S/../Inputs/empty.swift | FileCheck -check-prefix=CHECK-BASIC-YAML %s
+// RUN: %target-swift-frontend -emit-dependencies-path - -parse %S/../Inputs/empty.swift | FileCheck -check-prefix=CHECK-BASIC %s
+// RUN: %target-swift-frontend -emit-reference-dependencies-path - -parse -primary-file %S/../Inputs/empty.swift | FileCheck -check-prefix=CHECK-BASIC-YAML %s
 
-// RUN: %swift -emit-dependencies-path %t.d -emit-reference-dependencies-path %t.swiftdeps -parse -primary-file %S/../Inputs/empty.swift
+// RUN: %target-swift-frontend -emit-dependencies-path %t.d -emit-reference-dependencies-path %t.swiftdeps -parse -primary-file %S/../Inputs/empty.swift
 // FileCheck -check-prefix=CHECK-BASIC < %t.d
 // FileCheck -check-prefix=CHECK-BASIC-YAML < %t.swiftdeps
 
@@ -18,7 +18,7 @@
 // CHECK-BASIC-YAML-NOT: {{:$}}
 
 
-// RUN: %swift -emit-dependencies-path - -emit-module %S/../Inputs/empty.swift -o %t/empty.swiftmodule -emit-module-doc-path %t/empty.swiftdoc -emit-objc-header-path %t/empty.h | FileCheck -check-prefix=CHECK-MULTIPLE-OUTPUTS %s
+// RUN: %target-swift-frontend -emit-dependencies-path - -emit-module %S/../Inputs/empty.swift -o %t/empty.swiftmodule -emit-module-doc-path %t/empty.swiftdoc -emit-objc-header-path %t/empty.h | FileCheck -check-prefix=CHECK-MULTIPLE-OUTPUTS %s
 
 // CHECK-MULTIPLE-OUTPUTS-LABEL: empty.swiftmodule :
 // CHECK-MULTIPLE-OUTPUTS: Inputs/empty.swift
@@ -31,8 +31,8 @@
 // CHECK-MULTIPLE-OUTPUTS: Swift.swiftmodule
 // CHECK-MULTIPLE-OUTPUTS-NOT: :
 
-// RUN: %swift %clang-importer-sdk -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-dependencies-path - -parse %s | FileCheck -check-prefix=CHECK-IMPORT %s
-// RUN: %swift %clang-importer-sdk -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-reference-dependencies-path - -parse -primary-file %s | FileCheck -check-prefix=CHECK-IMPORT-YAML %s
+// RUN: %target-swift-frontend %clang-importer-sdk -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-dependencies-path - -parse %s | FileCheck -check-prefix=CHECK-IMPORT %s
+// RUN: %target-swift-frontend %clang-importer-sdk -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-reference-dependencies-path - -parse -primary-file %s | FileCheck -check-prefix=CHECK-IMPORT-YAML %s
 
 // CHECK-IMPORT-LABEL: - :
 // CHECK-IMPORT: dependencies.swift

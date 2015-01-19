@@ -1,4 +1,5 @@
-// RUN: %swift -O  -emit-sil %s | FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil %s | FileCheck %s
+
 public protocol Foo { 
   func foo(x:Int)->Int
 }

@@ -1,22 +1,22 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLE_NO_DOT_1 > %t.tuple.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLE_NO_DOT_1 > %t.tuple.txt
 // RUN: FileCheck %s -check-prefix=TUPLE_NO_DOT_1 < %t.tuple.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLE_NO_DOT_2 > %t.tuple.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLE_NO_DOT_2 > %t.tuple.txt
 // RUN: FileCheck %s -check-prefix=TUPLE_NO_DOT_2 < %t.tuple.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLE_NO_DOT_3 > %t.tuple.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLE_NO_DOT_3 > %t.tuple.txt
 // RUN: FileCheck %s -check-prefix=TUPLE_NO_DOT_3 < %t.tuple.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLE_DOT_1 > %t.tuple.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLE_DOT_1 > %t.tuple.txt
 // RUN: FileCheck %s -check-prefix=TUPLE_DOT_1 < %t.tuple.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLE_DOT_2 > %t.tuple.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLE_DOT_2 > %t.tuple.txt
 // RUN: FileCheck %s -check-prefix=TUPLE_DOT_2 < %t.tuple.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLE_DOT_3 > %t.tuple.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLE_DOT_3 > %t.tuple.txt
 // RUN: FileCheck %s -check-prefix=TUPLE_DOT_3 < %t.tuple.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLE_NESTED_1 > %t.tuple.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLE_NESTED_1 > %t.tuple.txt
 // RUN: FileCheck %s -check-prefix=TUPLE_NESTED_1 < %t.tuple.txt
 
 //===---

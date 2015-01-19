@@ -1,4 +1,6 @@
-// RUN: %swift %clang-importer-sdk -I %S/Inputs/custom-modules -target x86_64-apple-macosx10.9 -emit-ir -o - -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend %clang-importer-sdk -I %S/Inputs/custom-modules -emit-ir -o - -primary-file %s | FileCheck %s
+
+// REQUIRES: OS=macosx
 
 // CHECK: [[B:%CSo1B]] = type
 

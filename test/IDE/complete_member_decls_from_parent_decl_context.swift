@@ -1,35 +1,35 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLASS_INSTANCE_METHOD_1 | FileCheck %s -check-prefix=IN_CLASS_INSTANCE_METHOD_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLASS_STATIC_METHOD_1 | FileCheck %s -check-prefix=IN_CLASS_STATIC_METHOD_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLASS_STATIC_METHOD_1 | FileCheck %s -check-prefix=IN_CLASS_STATIC_METHOD_1_NEGATIVE
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLASS_CONSTRUCTOR_1 | FileCheck %s -check-prefix=IN_CLASS_CONSTRUCTOR_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLASS_DESTRUCTOR_1 | FileCheck %s -check-prefix=IN_CLASS_DESTRUCTOR_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLASS_INSTANCE_METHOD_1 | FileCheck %s -check-prefix=IN_CLASS_INSTANCE_METHOD_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLASS_STATIC_METHOD_1 | FileCheck %s -check-prefix=IN_CLASS_STATIC_METHOD_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLASS_STATIC_METHOD_1 | FileCheck %s -check-prefix=IN_CLASS_STATIC_METHOD_1_NEGATIVE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLASS_CONSTRUCTOR_1 | FileCheck %s -check-prefix=IN_CLASS_CONSTRUCTOR_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLASS_DESTRUCTOR_1 | FileCheck %s -check-prefix=IN_CLASS_DESTRUCTOR_1
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_STRUCT_INSTANCE_METHOD_1 | FileCheck %s -check-prefix=IN_STRUCT_INSTANCE_METHOD_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_STRUCT_STATIC_METHOD_1 | FileCheck %s -check-prefix=IN_STRUCT_STATIC_METHOD_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_STRUCT_STATIC_METHOD_1 | FileCheck %s -check-prefix=IN_STRUCT_STATIC_METHOD_1_NEGATIVE
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_STRUCT_CONSTRUCTOR_1 | FileCheck %s -check-prefix=IN_STRUCT_CONSTRUCTOR_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_STRUCT_INSTANCE_METHOD_1 | FileCheck %s -check-prefix=IN_STRUCT_INSTANCE_METHOD_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_STRUCT_STATIC_METHOD_1 | FileCheck %s -check-prefix=IN_STRUCT_STATIC_METHOD_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_STRUCT_STATIC_METHOD_1 | FileCheck %s -check-prefix=IN_STRUCT_STATIC_METHOD_1_NEGATIVE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_STRUCT_CONSTRUCTOR_1 | FileCheck %s -check-prefix=IN_STRUCT_CONSTRUCTOR_1
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_A_1 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_A_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_A_2 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_A_2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_A_3 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_A_3
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_A_4 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_A_4
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_A_5 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_A_5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_A_1 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_A_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_A_2 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_A_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_A_3 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_A_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_A_4 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_A_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_A_5 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_A_5
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_B_1 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_B_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_B_2 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_B_2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_B_3 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_B_3
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_B_4 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_B_4
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_B_5 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_B_5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_B_1 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_B_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_B_2 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_B_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_B_3 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_B_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_B_4 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_B_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_B_5 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_B_5
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_C_1 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_C_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_C_2 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_C_2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_C_3 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_C_3
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_C_4 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_C_4
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_C_5 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_C_5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_C_1 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_C_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_C_2 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_C_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_C_3 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_C_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_C_4 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_C_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_C_5 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_C_5
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_D_1 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_D_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_D_1 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_D_1
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_E_1 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_E_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_E_1 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_E_1
 
 //===---
 //===--- Test that we can code complete in methods, and correctly distinguish

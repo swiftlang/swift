@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify
+// RUN: %target-parse-verify-swift
 //
 // <rdar://problem/19422987> test/Parse/self_keyword_recovery.swift is XFAIL'ed and it regressed
 // XFAIL: *

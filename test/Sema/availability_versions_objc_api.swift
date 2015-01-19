@@ -1,4 +1,7 @@
-// RUN: %swift %clang-importer-sdk -parse -verify -I %S/Inputs/custom-modules -enable-experimental-availability-checking -target x86_64-apple-macosx10.9 %s
+// RUN: %target-parse-verify-swift %clang-importer-sdk -I %S/Inputs/custom-modules -enable-experimental-availability-checking
+
+// REQUIRES: OS=macosx
+// REQUIRES: objc_interop
 
 import Foundation
 

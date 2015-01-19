@@ -1,5 +1,5 @@
-// RUN: %sil-opt %s -diagnostic-constant-propagation | FileCheck %s
-// RUN: %sil-opt %s -performance-constant-propagation | FileCheck %s
+// RUN: %target-sil-opt %s -diagnostic-constant-propagation | FileCheck %s
+// RUN: %target-sil-opt %s -performance-constant-propagation | FileCheck %s
 
 import Builtin
 

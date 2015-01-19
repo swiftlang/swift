@@ -1,4 +1,4 @@
-// RUN: %swift %s -parse -verify
+// RUN: %target-parse-verify-swift
 
 @availability(*, unavailable)
 func unavailable_func() {}

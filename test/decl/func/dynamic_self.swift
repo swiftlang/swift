@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 // ----------------------------------------------------------------------------
 // DynamicSelf is only allowed on the return type of class and

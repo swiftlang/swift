@@ -2,31 +2,31 @@
 // A (no longer) basic test for debug info.
 // --------------------------------------------------------------------
 // Verify that we don't emit any debug info by default.
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -o - | FileCheck %s --check-prefix NDEBUG
+// RUN: %target-swift-frontend %s -emit-ir -o - | FileCheck %s --check-prefix NDEBUG
 // NDEBUG-NOT: !dbg
 // NDEBUG-NOT: DW_TAG
 // --------------------------------------------------------------------
 // Verify that we don't emit any debug info with -gnone.
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -gnone -o - | FileCheck %s --check-prefix NDEBUG
+// RUN: %target-swift-frontend %s -emit-ir -gnone -o - | FileCheck %s --check-prefix NDEBUG
 // --------------------------------------------------------------------
 // Verify that we don't emit any type info with -gline-tables-only.
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -gline-tables-only -o - | FileCheck %s --check-prefix CHECK-LINETABLES
+// RUN: %target-swift-frontend %s -emit-ir -gline-tables-only -o - | FileCheck %s --check-prefix CHECK-LINETABLES
 // CHECK: !dbg
 // CHECK-LINETABLES-NOT: DW_TAG_{{.*}}variable
 // CHECK-LINETABLES-NOT: DW_TAG_structure_type
 // CHECK-LINETABLES-NOT: DW_TAG_basic_type
 // --------------------------------------------------------------------
 // Now check that we do generate line+scope info with -g.
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - -disable-sil-linking | FileCheck %s --check-prefix=CHECK-NOSIL
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - -disable-sil-linking | FileCheck %s --check-prefix=CHECK-NOSIL
 // --------------------------------------------------------------------
 //
 // CHECK: foo
 // CHECK-DAG: ret{{.*}}, !dbg ![[RET:[0-9]+]]
 // CHECK-DAG: ![[FOO:[0-9]+]] ={{.*}}!"0x2e\00{{[^"]+}}\00[[@LINE+2]]"{{, [^,]+, [^,]+}}, ![[FOOTYPE:[0-9]+]],{{.*}} [ DW_TAG_subprogram ] {{.*}} [foo]
 public
-func foo(var a: Int, var b: Int) -> Int {
-     // CHECK-DAG: !"0xb\00[[@LINE-1]]\0041\000"{{, [^,]+}}, ![[FOO]]} ; [ DW_TAG_lexical_block ]
+func foo(var a: Int64, var b: Int64) -> Int64 {
+     // CHECK-DAG: !"0xb\00[[@LINE-1]]\0047\000"{{, [^,]+}}, ![[FOO]]} ; [ DW_TAG_lexical_block ]
      // CHECK-DAG: ![[ASCOPE:.*]] = !MDLocation(line: [[@LINE-2]], column: 14, scope: ![[FOO]])
      // Check that a is the first and b is the second argument.
      // CHECK-DAG: store i64 %0, i64* [[AVAL:.*]], align 8
@@ -43,12 +43,12 @@ func foo(var a: Int, var b: Int) -> Int {
        // CHECK-DAG: smul{{.*}}, !dbg ![[MUL:[0-9]+]]
        // CHECK-DAG: [[MUL]] = !MDLocation(line: [[@LINE+4]], column: 16,
        // Runtime call to multiply function:
-       // CHECK-NOSIL: @_TFSsoi1mFTSiSi_Si{{.*}}, !dbg ![[MUL:[0-9]+]]
-       // CHECK-NOSIL: [[MUL]]  = !MDLocation(line: [[@LINE+1]], column: 16,
+       // CHECK-NOSIL: @_TFSsoi1mFTVSs5Int64S__S_{{.*}}, !dbg ![[MUL:[0-9]+]]
+       // CHECK-NOSIL: [[MUL]] = !MDLocation(line: [[@LINE+1]], column: 16,
        return a*b
      } else {
        // CHECK-DAG: [[PARENT:[0-9]+]] = {{.*}}\00[[@LINE-1]]\0013\00{{.*}}DW_TAG_lexical_block
-       var c = 42
+       var c: Int64 = 42
        if a == 0 {
          // CHECK-DAG: \00[[@LINE-1]]\0018\00{{.*}}, ![[PARENT]]} ; [ DW_TAG_lexical_block ]
          // What about a nested scope?
@@ -57,12 +57,12 @@ func foo(var a: Int, var b: Int) -> Int {
        return c
      }
 }
-// CHECK-DAG: Swift version{{.*}}x86_64-apple-macosx10.9{{.*}}-emit-ir{{.*}} [ DW_TAG_compile_unit ] [{{.*}}basic.swift]
+// CHECK-DAG: Swift version{{.*}}-emit-ir{{.*}} [ DW_TAG_compile_unit ] [{{.*}}basic.swift]
 // CHECK-DAG: \00main\00{{.*}} [ DW_TAG_subprogram ]
 
 // Function type for foo.
 // CHECK-DAG: ![[FOOTYPE]] = {{.*}} ![[PARAMTYPES:[0-9]+]],{{.*}}DW_TAG_subroutine_type
-// CHECK-DAG: ![[PARAMTYPES]] = !{!"_TtSi", !"_TtSi", !"_TtSi"}
+// CHECK-DAG: ![[PARAMTYPES]] = !{!"_TtVSs5Int64", !"_TtVSs5Int64", !"_TtVSs5Int64"}
 // Import of the main module.
 // CHECK-DAG: ![[MAINFILE:[0-9]+]] = {{.*}}DW_TAG_file_type{{.*}}basic.swift
 // CHECK-DAG: \001\00"{{.*}}, ![[MAINFILE]], ![[MAINMODULE:[0-9]+]]} ; [ DW_TAG_imported_module ]

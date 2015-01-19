@@ -1,4 +1,4 @@
-// RUN: %swift -parse -primary-file %s %S/Inputs/accessibility_multi_other.swift -verify -enable-access-control
+// RUN: %target-swift-frontend -parse -primary-file %s %S/Inputs/accessibility_multi_other.swift -verify -enable-access-control
 
 func reset(inout value: Int) { value = 0 }
 

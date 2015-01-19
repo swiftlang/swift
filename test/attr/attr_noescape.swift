@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 @noescape var fn : () -> Int = { 4 }  // expected-error {{'noescape' may only be used on 'parameter' declarations}}
 

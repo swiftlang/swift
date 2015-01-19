@@ -1,4 +1,5 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+
 class DWARF
 {
 // CHECK-DAG: ![[DIEOFFSET:.*]] = {{.*}}[ DW_TAG_typedef ] [_TtaC9typealias5DWARF9DIEOffset] [line [[@LINE+1]], size 0, align 0, offset 0] [from _TtVSs6UInt32]

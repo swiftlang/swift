@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify -debugger-support -parse
+// RUN: %target-parse-verify-swift -debugger-support
 //
 // This test is to make sure the parser allows imports in other than
 // top-level code when debugger support is on.  The test only runs

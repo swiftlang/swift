@@ -1,4 +1,6 @@
-// RUN: %swift %s -emit-silgen -emit-verbose-sil | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-silgen -emit-verbose-sil -disable-objc-attr-requires-foundation-module | FileCheck %s
+
+// REQUIRES: objc_interop
 
 @objc class ObjCClass {}
 

@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify %s
+// RUN: %target-parse-verify-swift
 
 func acceptInt(inout _ : Int) {}
 func acceptDouble(inout _ : Double) {}

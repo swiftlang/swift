@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify %s
+// RUN: %target-parse-verify-swift
 
 final class DictStringInt : DictionaryLiteralConvertible {
   typealias Key = String

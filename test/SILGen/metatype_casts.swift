@@ -1,4 +1,4 @@
-// RUN: %swift -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 // CHECK-LABEL: sil hidden @_TF14metatype_casts6t_is_uU___FT_Sb
 // CHECK:         checked_cast_br {{.*}} $@thick T.Type to $@thick U.Type

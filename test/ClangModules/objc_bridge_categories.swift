@@ -1,4 +1,4 @@
-// RUN: %swift %clang-importer-sdk -parse -I %S/Inputs/custom-modules %s -verify
+// RUN: %target-swift-frontend %clang-importer-sdk -parse -I %S/Inputs/custom-modules %s -verify
 
 // Test the use of Objective-C categories on the value types that
 // bridge to Objective-C class types.

@@ -1,15 +1,15 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_1 | FileCheck %s -check-prefix=TOP_LEVEL_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=OBJ_DOT_1 | FileCheck %s -check-prefix=OBJ_DOT_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FREE_FUNC_1 | FileCheck %s -check-prefix=FREE_FUNC_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FREE_FUNC_2 | FileCheck %s -check-prefix=FREE_FUNC_2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CURRIED_FREE_FUNC_1 | FileCheck %s -check-prefix=CURRIED_FREE_FUNC_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CURRIED_FREE_FUNC_2 | FileCheck %s -check-prefix=CURRIED_FREE_FUNC_2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_1 | FileCheck %s -check-prefix=INIT_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=METHOD_1 | FileCheck %s -check-prefix=METHOD_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=METHOD_2 | FileCheck %s -check-prefix=METHOD_2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_1 | FileCheck %s -check-prefix=SUBSCRIPT_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_FREE_FUNC_1 | FileCheck %s -check-prefix=GENERIC_FREE_FUNC_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INTERESTING_TYPE_1 | FileCheck %s -check-prefix=INTERESTING_TYPE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_1 | FileCheck %s -check-prefix=TOP_LEVEL_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OBJ_DOT_1 | FileCheck %s -check-prefix=OBJ_DOT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FREE_FUNC_1 | FileCheck %s -check-prefix=FREE_FUNC_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FREE_FUNC_2 | FileCheck %s -check-prefix=FREE_FUNC_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CURRIED_FREE_FUNC_1 | FileCheck %s -check-prefix=CURRIED_FREE_FUNC_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CURRIED_FREE_FUNC_2 | FileCheck %s -check-prefix=CURRIED_FREE_FUNC_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_1 | FileCheck %s -check-prefix=INIT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METHOD_1 | FileCheck %s -check-prefix=METHOD_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METHOD_2 | FileCheck %s -check-prefix=METHOD_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_1 | FileCheck %s -check-prefix=SUBSCRIPT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_FREE_FUNC_1 | FileCheck %s -check-prefix=GENERIC_FREE_FUNC_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INTERESTING_TYPE_1 | FileCheck %s -check-prefix=INTERESTING_TYPE_1
 
 func freeFunc1(#x: Int...) { }
 func freeFunc2(#x: Int, #y: Int...) { }

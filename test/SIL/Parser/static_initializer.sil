@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -verify | FileCheck %s
+// RUN: %target-sil-opt %s -verify | FileCheck %s
 
 // Generated from
 // var x : Int = 2

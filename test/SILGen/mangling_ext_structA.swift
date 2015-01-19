@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift -emit-module -o %t %S/Inputs/def_structA.swift
-// RUN: %swift -emit-silgen -module-name ext_structA -I=%t %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_structA.swift
+// RUN: %target-swift-frontend -emit-silgen -module-name ext_structA -I %t %s | FileCheck %s
 
 import def_structA
 

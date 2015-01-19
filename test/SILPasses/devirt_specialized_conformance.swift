@@ -1,4 +1,4 @@
-// RUN: %swift -O %s -emit-sil -sil-verify-all | FileCheck %s
+// RUN: %target-swift-frontend -O %s -emit-sil -sil-verify-all | FileCheck %s
 
 // Make sure that we completely inline/devirtualize/substitute all the way down
 // to unknown1.

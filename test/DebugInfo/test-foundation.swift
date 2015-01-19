@@ -1,7 +1,7 @@
-// RUN: %target-build-swift -emit-ir -g %s -o %t.ll
-// RUN: cat %t.ll | FileCheck %s --check-prefix SANITY
-// RUN: cat %t.ll | FileCheck %s --check-prefix IMPORT-CHECK
-// RUN: cat %t.ll | FileCheck %s --check-prefix LOC-CHECK
+// RUN: %target-swift-frontend -emit-ir -g %s -o %t.ll
+// RUN: FileCheck %s --check-prefix SANITY < %t.ll
+// RUN: FileCheck %s --check-prefix IMPORT-CHECK < %t.ll
+// RUN: FileCheck %s --check-prefix LOC-CHECK < %t.ll
 // RUN: llc %t.ll -filetype=obj -o %t.o
 // RUN: llvm-dwarfdump %t.o | FileCheck %s --check-prefix DWARF-CHECK
 // RUN: dwarfdump --verify %t.o
@@ -65,7 +65,7 @@ var MyObj: MyObject
 MyObj = NsObj as! MyObject
 MyObj.blah()
 
-func err() {
+public func err() {
   // DWARF-CHECK: DW_AT_name{{.*}}NSError
   // DWARF-CHECK: DW_AT_linkage_name{{.*}}_TtCSo7NSError
   let error = NSError(domain: "myDomain", code: 4, 
@@ -73,7 +73,7 @@ func err() {
 }
 
 // LOC-CHECK: define {{.*}}4date
-func date() {
+public func date() {
   // LOC-CHECK: call {{.*}} @_TFSSCfMSSFT21_builtinStringLiteralBp8byteSizeBw7isASCIIBi1__SS{{.*}}, !dbg ![[L1:.*]]
   let d1 = NSDateFormatter()
   // LOC-CHECK: br{{.*}}, !dbg ![[L2:.*]]

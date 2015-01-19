@@ -1,8 +1,8 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift -emit-module -sil-serialize-all -o %t %S/Inputs/def_transparent.swift
+// RUN: %target-swift-frontend -emit-module -sil-serialize-all -o %t %S/Inputs/def_transparent.swift
 // RUN: llvm-bcanalyzer %t/def_transparent.swiftmodule | FileCheck %s
-// RUN: %swift -emit-silgen -sil-link-all -I=%t %s | FileCheck %s -check-prefix=SIL
+// RUN: %target-swift-frontend -emit-silgen -sil-link-all -I %t %s | FileCheck %s -check-prefix=SIL
 
 // CHECK-NOT: UnknownCode
 

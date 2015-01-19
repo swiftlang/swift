@@ -1,4 +1,4 @@
-// RUN: %swift %clang-importer-sdk -parse -target x86_64-apple-macosx10.9 -I %S/Inputs/custom-modules -enable-objc-implicit-properties %s -verify
+// RUN: %target-swift-frontend %clang-importer-sdk -parse -I %S/Inputs/custom-modules -enable-objc-implicit-properties %s -verify
 
 import ObjectiveC
 import ObjCImplicitProperties

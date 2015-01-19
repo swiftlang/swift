@@ -1,5 +1,5 @@
-// RUN: %swift-ide-test -syntax-coloring -source-filename %s | FileCheck %s
-// RUN: %swift-ide-test -syntax-coloring -typecheck -source-filename %s | FileCheck %s
+// RUN: %target-swift-ide-test -syntax-coloring -source-filename %s | FileCheck %s
+// RUN: %target-swift-ide-test -syntax-coloring -typecheck -source-filename %s | FileCheck %s
 
 // CHECK: <kw>struct</kw> S {
 struct S {

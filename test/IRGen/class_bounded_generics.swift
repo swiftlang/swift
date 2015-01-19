@@ -1,4 +1,6 @@
-// RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | FileCheck %s
+
+// REQUIRES: CPU=x86_64
 
 protocol ClassBound : class {
   func classBoundMethod()

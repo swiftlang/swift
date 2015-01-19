@@ -1,4 +1,4 @@
-// RUN: %swift -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 // CHECK-LABEL: sil @main
 // CHECK: bb0({{%.*}} : $Int32, {{%.*}} : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>):

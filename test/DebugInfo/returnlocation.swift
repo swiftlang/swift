@@ -1,4 +1,4 @@
-// RUN: %target-build-swift -g -emit-ir %s -o %t.ll
+// RUN: %target-swift-frontend -g -emit-ir %s -o %t.ll
 
 import Foundation
 
@@ -6,9 +6,9 @@ import Foundation
 // of simple/complex/empty return expressions,
 // cleanups/no cleanups, single / multiple return locations.
 
-// RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_NONE
-// CHECK_NONE: define hidden void {{.*}}none
-func none(inout a: Int) {
+// RUN: FileCheck %s --check-prefix=CHECK_NONE < %t.ll
+// CHECK_NONE: define void {{.*}}none
+public func none(inout a: Int) {
   // CHECK_NONE: call void @llvm.dbg{{.*}}, !dbg
   // CHECK_NONE: !dbg ![[NONE_INIT:.*]]
   a -= 2;
@@ -17,9 +17,9 @@ func none(inout a: Int) {
   // CHECK_NONE: ![[NONE_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
-// RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_EMPTY
-// CHECK_EMPTY: define hidden {{.*}}empty
-func empty(inout a: Int) {
+// RUN: FileCheck %s --check-prefix=CHECK_EMPTY < %t.ll
+// CHECK_EMPTY: define {{.*}}empty
+public func empty(inout a: Int) {
   if a > 24 {
       // CHECK-DAG_EMPTY: br {{.*}}, !dbg ![[EMPTY_RET1:.*]]
       // CHECK-DAG_EMPTY_RET1: ![[EMPTY_RET1]] = !MDLocation(line: [[@LINE+1]], column: 6,
@@ -34,9 +34,9 @@ func empty(inout a: Int) {
   // CHECK-DAG_EMPTY: ![[EMPTY_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
-// RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_EMPTY_NONE
+// RUN: FileCheck %s --check-prefix=CHECK_EMPTY_NONE < %t.ll
 // CHECK_EMPTY_NONE: define {{.*}}empty_none
-func empty_none(inout a: Int) {
+public func empty_none(inout a: Int) {
   if a > 24 {
       return;
   }
@@ -46,9 +46,9 @@ func empty_none(inout a: Int) {
   // CHECK_EMPTY_NONE: ![[EMPTY_NONE_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
-// RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_SIMPLE_RET
+// RUN: FileCheck %s --check-prefix=CHECK_SIMPLE_RET < %t.ll
 // CHECK_SIMPLE_RET: define {{.*}}simple
-func simple(a: Int) -> Int {
+public func simple(a: Int) -> Int {
   if a > 24 {
       return 0;
   }
@@ -57,9 +57,9 @@ func simple(a: Int) -> Int {
   // CHECK_SIMPLE_RET: ![[SIMPLE_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
-// RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_COMPLEX_RET
+// RUN: FileCheck %s --check-prefix=CHECK_COMPLEX_RET < %t.ll
 // CHECK_COMPLEX_RET: define {{.*}}complex
-func complex(a: Int) -> Int {
+public func complex(a: Int) -> Int {
   if a > 24 {
       return a*a
   }
@@ -68,9 +68,9 @@ func complex(a: Int) -> Int {
   // CHECK_COMPLEX_RET: ![[COMPLEX_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
-// RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_COMPLEX_SIMPLE
+// RUN: FileCheck %s --check-prefix=CHECK_COMPLEX_SIMPLE < %t.ll
 // CHECK_COMPLEX_SIMPLE: define {{.*}}complex_simple
-func complex_simple(a: Int) -> Int {
+public func complex_simple(a: Int) -> Int {
   if a > 24 {
       return a*a
   }
@@ -79,9 +79,9 @@ func complex_simple(a: Int) -> Int {
   // CHECK_COMPLEX_SIMPLE: ![[COMPLEX_SIMPLE_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
-// RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_SIMPLE_COMPLEX
+// RUN: FileCheck %s --check-prefix=CHECK_SIMPLE_COMPLEX < %t.ll
 // CHECK_SIMPLE_COMPLEX: define {{.*}}simple_complex
-func simple_complex(a: Int) -> Int {
+public func simple_complex(a: Int) -> Int {
   if a > 24 {
       return a*a
   }
@@ -94,17 +94,17 @@ func simple_complex(a: Int) -> Int {
 // ---------------------------------------------------------------------
 
 
-// RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_CLEANUP_NONE
+// RUN: FileCheck %s --check-prefix=CHECK_CLEANUP_NONE < %t.ll
 // CHECK_CLEANUP_NONE: define {{.*}}cleanup_none
-func cleanup_none(inout a: NSString) {
+public func cleanup_none(inout a: NSString) {
   a = "empty"
   // CHECK_CLEANUP_NONE: ret void, !dbg ![[CLEANUP_NONE_RET:.*]]
   // CHECK_CLEANUP_NONE: ![[CLEANUP_NONE_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
-// RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_CLEANUP_EMPTY
+// RUN: FileCheck %s --check-prefix=CHECK_CLEANUP_EMPTY < %t.ll
 // CHECK_CLEANUP_EMPTY: define {{.*}}cleanup_empty
-func cleanup_empty(inout a: NSString) {
+public func cleanup_empty(inout a: NSString) {
   if a.length > 24 {
       return;
     }
@@ -115,9 +115,9 @@ func cleanup_empty(inout a: NSString) {
   // CHECK_CLEANUP_EMPTY: ![[CLEANUP_EMPTY_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
-// RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_CLEANUP_EMPTY_NONE
+// RUN: FileCheck %s --check-prefix=CHECK_CLEANUP_EMPTY_NONE < %t.ll
 // CHECK_CLEANUP_EMPTY_NONE: define {{.*}}cleanup_empty_none
-func cleanup_empty_none(inout a: NSString) {
+public func cleanup_empty_none(inout a: NSString) {
   if a.length > 24 {
       return;
     }
@@ -127,9 +127,9 @@ func cleanup_empty_none(inout a: NSString) {
   // CHECK_CLEANUP_EMPTY_NONE: ![[CLEANUP_EMPTY_NONE_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
-// RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_CLEANUP_SIMPLE_RET
+// RUN: FileCheck %s --check-prefix=CHECK_CLEANUP_SIMPLE_RET < %t.ll
 // CHECK_CLEANUP_SIMPLE_RET: define {{.*}}cleanup_simple
-func cleanup_simple(a: NSString) -> Int {
+public func cleanup_simple(a: NSString) -> Int {
   if a.length > 24 {
       return 0
   }
@@ -139,9 +139,9 @@ func cleanup_simple(a: NSString) -> Int {
   // CHECK_CLEANUP_SIMPLE_RET: ![[CLEANUP_SIMPLE_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
-// RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_CLEANUP_COMPLEX
+// RUN: FileCheck %s --check-prefix=CHECK_CLEANUP_COMPLEX < %t.ll
 // CHECK_CLEANUP_COMPLEX: define {{.*}}cleanup_complex
-func cleanup_complex(a: NSString) -> Int {
+public func cleanup_complex(a: NSString) -> Int {
   if a.length > 24 {
       return a.length*a.length
   }
@@ -151,9 +151,9 @@ func cleanup_complex(a: NSString) -> Int {
   // CHECK_CLEANUP_COMPLEX: ![[CLEANUP_COMPLEX_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
-// RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_CLEANUP_COMPLEX_SIMPLE
+// RUN: FileCheck %s --check-prefix=CHECK_CLEANUP_COMPLEX_SIMPLE < %t.ll
 // CHECK_CLEANUP_COMPLEX_SIMPLE: define {{.*}}cleanup_complex_simple
-func cleanup_complex_simple(a: NSString) -> Int {
+public func cleanup_complex_simple(a: NSString) -> Int {
   if a.length > 24 {
       return a.length*a.length
   }
@@ -163,9 +163,9 @@ func cleanup_complex_simple(a: NSString) -> Int {
   // CHECK_CLEANUP_COMPLEX_SIMPLE: ![[CLEANUP_COMPLEX_SIMPLE_RET]] = !MDLocation(line: [[@LINE+1]], column: 1,
 }
 
-// RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_CLEANUP_SIMPLE_COMPLEX
+// RUN: FileCheck %s --check-prefix=CHECK_CLEANUP_SIMPLE_COMPLEX < %t.ll
 // CHECK_CLEANUP_SIMPLE_COMPLEX: define {{.*}}cleanup_simple_complex
-func cleanup_simple_complex(a: NSString) -> Int {
+public func cleanup_simple_complex(a: NSString) -> Int {
   if a.length > 24 {
       return a.length*a.length
   }

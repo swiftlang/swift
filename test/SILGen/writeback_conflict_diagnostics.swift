@@ -1,4 +1,4 @@
-// RUN: %swift %s -o /dev/null -emit-silgen -verify
+// RUN: %target-swift-frontend %s -o /dev/null -emit-silgen -verify
 
 
 struct MutatorStruct {

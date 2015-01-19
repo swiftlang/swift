@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -mandatory-inlining -verify
+// RUN: %target-sil-opt %s -mandatory-inlining -verify
 
 import Builtin
 import Swift

@@ -1,4 +1,4 @@
-// RUN: %swift-ide-test -annotate -source-filename %s | FileCheck %s
+// RUN: %target-swift-ide-test -annotate -source-filename %s | FileCheck %s
 
 // CHECK: import struct <iMod>Swift</iMod>.<iStruct@>Int</iStruct>
 import struct Swift.Int

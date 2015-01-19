@@ -1,4 +1,4 @@
-// RUN: %swift -emit-silgen -parse-as-library %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -parse-as-library %s | FileCheck %s
 
 
 func dup<T>(let x: T) -> (T, T) { return (x,x) }

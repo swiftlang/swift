@@ -1,4 +1,4 @@
-// RUN: %swift %s -parse -parse-stdlib -verify
+// RUN: %target-parse-verify-swift -parse-stdlib
 
 import Swift
 

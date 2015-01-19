@@ -1,6 +1,6 @@
-// RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 %s | FileCheck --check-prefix=X86_64 %s 
-// RUN: %swift -emit-ir -target arm64-apple-ios8.0 %s | FileCheck --check-prefix=ARM64 %s 
-// RUN: %swift -emit-ir -target armv7-apple-ios8.0 %s | FileCheck --check-prefix=ARMV7 %s 
+// RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 %s | FileCheck --check-prefix=X86_64 %s
+// RUN: %swift -emit-ir -target arm64-apple-ios8.0 %s | FileCheck --check-prefix=ARM64 %s
+// RUN: %swift -emit-ir -target armv7-apple-ios8.0 %s | FileCheck --check-prefix=ARMV7 %s
 
 sil_stage canonical
 

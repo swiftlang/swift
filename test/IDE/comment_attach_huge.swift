@@ -846,7 +846,7 @@ END
 */
 func decl_func_1() {}
 
-// RUN: %swift-ide-test -print-comments -source-filename %s | FileCheck %s
+// RUN: %target-swift-ide-test -print-comments -source-filename %s | FileCheck %s
 
 // CHECK: Func/decl_func_1 RawComment=[/**\nBEGIN\n{{[^]]*}}\nEND\n*/]
 

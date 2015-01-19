@@ -1,7 +1,9 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-irgen-test-overlays
-// RUN: %swift -emit-module -o %t %S/Inputs/objc_protocols_Bas.swift
-// RUN: %swift -sdk %S/Inputs -I %t -primary-file %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/objc_protocols_Bas.swift
+// RUN: %target-swift-frontend -sdk %S/Inputs -I %t -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | FileCheck %s
+
+// REQUIRES: CPU=x86_64
 
 import gizmo
 import objc_protocols_Bas

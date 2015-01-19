@@ -1,4 +1,6 @@
-// RUN: %swift %clang-importer-sdk -target x86_64-apple-macosx10.9 -emit-ir -o - -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend %clang-importer-sdk -emit-ir -o - -primary-file %s | FileCheck %s
+
+// REQUIRES: OS=macosx
 
 import ctypes
 

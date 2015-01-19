@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 // Common pitfall: trying to subscript a string with integers.
 func testIntSubscripting(s: String, i: Int) {

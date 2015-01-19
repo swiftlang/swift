@@ -1,4 +1,4 @@
-// RUN: %swift -emit-sil  %s -parse-as-library -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil %s -parse-as-library -o /dev/null -verify
 
 var gg: Bool = false
 var rg: Int = 0

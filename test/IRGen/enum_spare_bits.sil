@@ -1,6 +1,9 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-irgen-test-overlays
-// RUN: %swift -sdk %S/Inputs -I %t %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -I %t %s -emit-ir | FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %s
+
+// REQUIRES: CPU=i386_or_x86_64
+// REQUIRES: objc_interop
 
 import Swift
 import Foundation
@@ -12,13 +15,15 @@ enum SwiftClass {
   case A(C), B(D)
 }
 // can use spare bits—both payloads are Swift-defined classes
-// CHECK: %O15enum_spare_bits10SwiftClass = type <{ [8 x i8] }>
+// CHECK-32: %O15enum_spare_bits10SwiftClass = type <{ [4 x i8] }>
+// CHECK-64: %O15enum_spare_bits10SwiftClass = type <{ [8 x i8] }>
 
 enum ObjCClass {
   case A(NSObject), B(C)
 }
 // can't use spare bits—NSObject is an ObjC-defined class
-// CHECK: %O15enum_spare_bits9ObjCClass = type <{ [8 x i8], [1 x i8] }>
+// CHECK-32: %O15enum_spare_bits9ObjCClass = type <{ [4 x i8] }>
+// CHECK-64: %O15enum_spare_bits9ObjCClass = type <{ [8 x i8], [1 x i8] }>
 
 @objc @unsafe_no_objc_tagged_pointer
 protocol NoTaggedPointers {}
@@ -27,19 +32,22 @@ enum Existential {
   case A(AnyObject), B(C)
 }
 // can't use spare bits—existential may be bound to tagged pointer type
-// CHECK: %O15enum_spare_bits11Existential = type <{ [8 x i8], [1 x i8] }>
+// CHECK-32: %O15enum_spare_bits11Existential = type <{ [4 x i8] }>
+// CHECK-64: %O15enum_spare_bits11Existential = type <{ [8 x i8], [1 x i8] }>
 
 enum ExistentialNoTaggedPointers {
   case A(NoTaggedPointers), B(C)
 }
 // can use spare bits—@unsafe_no_objc_tagged_pointer says it's ok
-// CHECK: %O15enum_spare_bits27ExistentialNoTaggedPointers = type <{ [8 x i8] }>
+// CHECK-32: %O15enum_spare_bits27ExistentialNoTaggedPointers = type <{ [4 x i8] }>
+// CHECK-64: %O15enum_spare_bits27ExistentialNoTaggedPointers = type <{ [8 x i8] }>
 
 enum Archetype<T: AnyObject> {
   case A(T), B(C)
 }
 // can't use spare bits—archetype may be bound to tagged pointer type
-// CHECK: [[ARCHETYPE:%O15enum_spare_bits9Archetype.*]] = type <{ [8 x i8], [1 x i8] }>
+// CHECK-32: [[ARCHETYPE:%O15enum_spare_bits9Archetype.*]] = type <{ [4 x i8], [1 x i8] }>
+// CHECK-64: [[ARCHETYPE:%O15enum_spare_bits9Archetype.*]] = type <{ [8 x i8], [1 x i8] }>
 
 sil_global @swiftClass: $SwiftClass
 sil_global @objcClass: $ObjCClass

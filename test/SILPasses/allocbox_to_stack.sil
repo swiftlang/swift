@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -allocbox-to-stack | FileCheck %s
+// RUN: %target-sil-opt %s -allocbox-to-stack | FileCheck %s
 
 import Builtin
 import Swift

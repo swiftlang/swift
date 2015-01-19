@@ -1,4 +1,4 @@
-// RUN: %swift -emit-sil -verify %s
+// RUN: %target-swift-frontend -emit-sil -verify %s
 
 struct SelfRecursiveStruct { // expected-error{{recursive value type}}
   let a: SelfRecursiveStruct

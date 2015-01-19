@@ -1,6 +1,7 @@
-// RUN: %swift -O -disable-func-sig-opts -emit-sil %s |  FileCheck %s
+// RUN: %target-swift-frontend -O -disable-func-sig-opts -emit-sil %s |  FileCheck %s
 
 // Make sure we are not looping forever.
+
 extension Array {
   mutating
   func new_method(predicate: (T, T) -> Bool, left : Int, right : Int) {

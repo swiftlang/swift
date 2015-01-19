@@ -1,4 +1,4 @@
-// RUN: %swift %s -emit-sil -verify
+// RUN: %target-swift-frontend -emit-sil -verify %s
 
 struct A {
   var i : Int

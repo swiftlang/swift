@@ -1,4 +1,7 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir | FileCheck %s
+
+// REQUIRES: CPU=i386_or_x86_64
+// REQUIRES: objc_interop
 
 func foo<T: AnyObject>(x: T) -> T { return x }
 

@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 func f1() -> Int { }
 func f2(Int = 5) -> Int { }

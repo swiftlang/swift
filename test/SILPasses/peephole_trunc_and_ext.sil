@@ -1,4 +1,5 @@
-// RUN: %swift %s -emit-sil -O -o - -verify | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-sil -O -o - -verify | FileCheck %s
+
 sil_stage canonical
 
 import Builtin

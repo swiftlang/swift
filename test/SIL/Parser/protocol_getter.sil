@@ -1,4 +1,4 @@
-// RUN: %swift %s -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-silgen | FileCheck %s
 
 // Verify that SILParser correctly handles witness_method on a getter.
 import Swift

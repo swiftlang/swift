@@ -5,6 +5,7 @@
 
 // Make sure that SILFunctionType with GenericSignature can match up with
 // SILFunctionType deserialized from module.
+
 sil_stage raw
 
 import def_generic

@@ -1,4 +1,5 @@
-// RUN: %swift -primary-file %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
+
 class Foo
 {
   func DefinesClosure (a_string : String) -> () -> String

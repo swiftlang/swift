@@ -1,4 +1,4 @@
-// RUN: %sil-opt -strip-debug-info %s | FileCheck %s
+// RUN: %target-sil-opt -strip-debug-info %s | FileCheck %s
 
 sil_stage canonical
 

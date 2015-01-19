@@ -1,4 +1,6 @@
-// RUN: %swift -emit-silgen -target x86_64-apple-macosx10.9 -enable-experimental-availability-checking %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-experimental-availability-checking %s | FileCheck %s
+
+// REQUIRES: OS=macosx
 
 // CHECK: [[MAJOR:%.*]] = integer_literal $Builtin.Word, 10
 // CHECK: [[MINOR:%.*]] = integer_literal $Builtin.Word, 9

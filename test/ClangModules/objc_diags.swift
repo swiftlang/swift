@@ -1,14 +1,7 @@
-// RUN: not %swift %clang-importer-sdk -parse -target x86_64-apple-macosx10.9 %s -debug-constraints 2> %t.out
-// RUN: FileCheck %s < %t.out
+// RUN: %target-swift-frontend %clang-importer-sdk -parse %s -verify
 
 import ObjectiveC
 
 func instanceMethod(b: B) {
-  // CHECK: found solution
-  // CHECK: found solution
-  // CHECK: found solution
-  // CHECK: found solution
-  // CHECK: found solution
-  // FIXME: improve this diagnostic
-  b.method(1, 2.5)
+  b.method(1, 2.5) // expected-error {{cannot invoke 'method' with an argument list of type '(Int, Double)'}}
 }

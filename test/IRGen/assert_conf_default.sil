@@ -1,6 +1,6 @@
-// RUN: %swift -assert-config DisableReplacement -emit-ir %s   | FileCheck %s --check-prefix=DISABLED
-// RUN: %swift -assert-config Release -emit-ir %s   | FileCheck %s --check-prefix=RELEASE
-// RUN: %swift -assert-config Debug -emit-ir %s   | FileCheck %s --check-prefix=DEBUG
+// RUN: %target-swift-frontend -assert-config DisableReplacement -emit-ir %s   | FileCheck %s --check-prefix=DISABLED
+// RUN: %target-swift-frontend -assert-config Release -emit-ir %s   | FileCheck %s --check-prefix=RELEASE
+// RUN: %target-swift-frontend -assert-config Debug -emit-ir %s   | FileCheck %s --check-prefix=DEBUG
 
 import Builtin
 

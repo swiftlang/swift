@@ -1,4 +1,5 @@
-// RUN: %swift -emit-sil -O -emit-object %s
+// RUN: %target-swift-frontend -emit-sil -O -emit-object %s
+
 // We used to crash on this when trying to devirtualize a call to:
 //
 // %168 = witness_method $Array<String>, #SequenceType."~>"!1 : $@cc(witness_method) @thin <τ_0_0, τ_1_0 where τ_0_0 : SequenceType, τ_0_0.Generator : GeneratorType> (@out Optional<τ_1_0>, @in τ_0_0, _PreprocessingPass, @owned @callee_owned (@out τ_1_0, @in τ_0_0) -> (), @thick τ_0_0.Type) -> ()

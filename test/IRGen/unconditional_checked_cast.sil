@@ -1,4 +1,6 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
+
+// REQUIRES: CPU=x86_64
 
 // Make sure that we are able to lower unconditional_checked_cast
 // addresses for the super_to_archetype case and the downcast case.

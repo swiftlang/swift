@@ -1,4 +1,6 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
+
+// REQUIRES: CPU=x86_64
 
 import Swift
 
@@ -17,7 +19,7 @@ struct SomeWeak {
   weak var y: C?
 }
 
-// CHECK: @_TWVV21array_value_witnesses3POD = 
+// CHECK: @_TWVV21array_value_witnesses3POD =
 // CHECK-NOT: @_TwXxV21array_value_witnesses3POD
 // CHECK:   @__swift_noop_void_return
 // CHECK-NOT: @_TwCcV21array_value_witnesses3POD
@@ -27,7 +29,7 @@ struct SomeWeak {
 // CHECK-NOT: @_TwtTV21array_value_witnesses3POD
 // CHECK:   @__swift_memmove_array8_8
 
-// CHECK: @_TWVV21array_value_witnesses14BitwiseTakable = 
+// CHECK: @_TWVV21array_value_witnesses14BitwiseTakable =
 // CHECK:   @_TwXxV21array_value_witnesses14BitwiseTakable
 // CHECK:   @_TwCcV21array_value_witnesses14BitwiseTakable
 // CHECK-NOT: @_TwTtV21array_value_witnesses14BitwiseTakable

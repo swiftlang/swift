@@ -1,8 +1,9 @@
-// REQUIRES: OS=macosx
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -c -g -o %t.o
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -c -g -o %t.o
 // RUN: dwarfdump --verify --apple-types %t.o | FileCheck --check-prefix=CHECK-ACCEL %s
 // RUN: dwarfdump --debug-info %t.o | FileCheck --check-prefix=CHECK-DWARF %s
+
+// REQUIRES: OS=macosx
 
 // Verify that the unmangles basenames end up in the accelerator table.
 // CHECK-ACCEL-DAG:	 str[0]{{.*}}"Int"

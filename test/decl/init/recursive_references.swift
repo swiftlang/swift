@@ -1,4 +1,4 @@
-// RUN: %swift %s -parse -verify
+// RUN: %target-parse-verify-swift
 
 class Foo {
   func bar(bar) {} // expected-error{{use of undeclared type 'bar'}}

@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -module-name themodule -enable-source-import -I=%S/../decl -sdk "" -verify -show-diagnostics-after-fatal
+// RUN: %target-swift-frontend -parse %s -module-name themodule -enable-source-import -I %S/../decl -sdk "" -verify -show-diagnostics-after-fatal
 
 import Swift
 import nonexistentimport  // expected-error {{no such module 'nonexistentimport'}}

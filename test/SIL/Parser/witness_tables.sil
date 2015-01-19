@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -module-name=witness_tables -verify | %sil-opt -verify -module-name=witness_tables | FileCheck %s
+// RUN: %target-sil-opt %s -module-name=witness_tables -verify | %target-sil-opt -verify -module-name=witness_tables | FileCheck %s
 
 protocol AssocReqt {
   func requiredMethod()

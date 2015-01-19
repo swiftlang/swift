@@ -21,7 +21,7 @@ func useTemp() {
 }
 
 // objc_retainAutoreleasedReturnValue will fail to reclaim the first
-// object autoreleased from each shared object on x86-64, so prime it.
+// object autoreleased from each shared object on x86_64, so prime it.
 autoreleasepool { useTemp() }
 autoreleasepool {
   println("autorelease test begin")

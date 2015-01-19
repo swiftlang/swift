@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -capture-promotion -verify | FileCheck %s
+// RUN: %target-sil-opt %s -capture-promotion -verify | FileCheck %s
 
 // Check to make sure that the process of promoting closure captures results in
 // a correctly cloned and modified closure function body. This test

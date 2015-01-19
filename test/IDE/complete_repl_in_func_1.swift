@@ -1,4 +1,4 @@
-// RUN: %swift-ide-test -repl-code-completion -source-filename %s | FileCheck %s
+// RUN: %target-swift-ide-test -repl-code-completion -source-filename %s | FileCheck %s
 
 // Make sure we partially type check the function body even if function body is
 // missing the right brace.

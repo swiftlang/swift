@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift %clang-importer-sdk -emit-module -o %t %S/Inputs/def_objc_xref.swift
-// RUN: %swift %clang-importer-sdk -parse -I=%t %s -verify
+// RUN: %target-swift-frontend %clang-importer-sdk -emit-module -o %t %S/Inputs/def_objc_xref.swift
+// RUN: %target-swift-frontend %clang-importer-sdk -parse -I %t %s -verify
 
 import def_objc_xref
 

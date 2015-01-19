@@ -1,11 +1,12 @@
-// RUN: %target-build-swift %s -g -emit-ir -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -g -emit-ir -o - | FileCheck %s
+
 class X {
   init (i : Int) { x = i }
   var x : Int
 }
 
 // CHECK: define {{.*}}ifelseexpr
-func ifelseexpr() -> Int {
+public func ifelseexpr() -> Int {
   var x = X(i:0); 
   if true {
     // CHECK:  @swift_release
@@ -17,3 +18,4 @@ func ifelseexpr() -> Int {
   // CHECK:  ret{{.*}}, !dbg ![[RET]]
   return x.x; // CHECK: ![[RET]] = !MDLocation(line: [[@LINE]],
 }
+

@@ -1,4 +1,5 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
+
 struct X { }
 
 // Simple examples

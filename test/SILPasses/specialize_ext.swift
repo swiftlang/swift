@@ -1,4 +1,4 @@
-// RUN: %swift -disable-func-sig-opts -sil-inline-threshold 0 -O -emit-sil -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -disable-func-sig-opts -sil-inline-threshold 0 -O -emit-sil -primary-file %s | FileCheck %s
 
 struct XXX<T> {
   init(t : T) {m_t = t}

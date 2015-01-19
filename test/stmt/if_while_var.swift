@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify %s
+// RUN: %target-parse-verify-swift
 
 func foo() -> Int? { return .None }
 func nonOptional() -> Int { return 0 }

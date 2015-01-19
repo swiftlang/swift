@@ -1,8 +1,8 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift -emit-module -o %t %S/Inputs/def_struct.swift
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_struct.swift
 // RUN: llvm-bcanalyzer %t/def_struct.swiftmodule | FileCheck %s
-// RUN: %swift -emit-silgen -I=%t %s -o /dev/null
+// RUN: %target-swift-frontend -emit-silgen -I %t %s -o /dev/null
 
 // CHECK-NOT: UnknownCode
 

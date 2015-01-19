@@ -1,4 +1,5 @@
-// RUN: %swift %s -emit-sil -emit-verbose-sil -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-sil -emit-verbose-sil -g -o - | FileCheck %s
+
 class NSURL {}
 
 class NSPathControlItem {

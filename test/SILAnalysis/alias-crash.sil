@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -global-load-store-opts | FileCheck %s
+// RUN: %target-sil-opt %s -global-load-store-opts | FileCheck %s
 
 sil_stage canonical
 

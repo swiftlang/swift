@@ -1,4 +1,5 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
+
 protocol P {
   func f() -> Self // expected-note 2{{protocol requires function 'f()' with type '() -> Self'}}
 }

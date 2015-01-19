@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 protocol P1 { typealias Assoc }
 protocol P2 : P1 { typealias Assoc }

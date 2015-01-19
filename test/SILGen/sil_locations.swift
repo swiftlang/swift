@@ -1,4 +1,4 @@
-// RUN: %swift -emit-silgen -emit-verbose-sil %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | FileCheck %s
 
 // FIXME: Not sure if this an ideal source info for the branch - 
 // it points to if, not the last instruction in the block.

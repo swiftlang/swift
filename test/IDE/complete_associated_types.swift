@@ -1,23 +1,23 @@
 // RUN: sed -n -e '1,/NO_ERRORS_UP_TO_HERE$/ p' %s > %t_no_errors.swift
-// RUN: %swift -verify -parse %t_no_errors.swift
+// RUN: %target-swift-frontend -parse -verify %t_no_errors.swift
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_AS_TYPE > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_AS_TYPE > %t.types.txt
 // RUN: FileCheck %s -check-prefix=STRUCT_TYPE_COUNT < %t.types.txt
 // RUN: FileCheck %s -check-prefix=STRUCT_TYPES < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_AS_EXPR > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_AS_EXPR > %t.types.txt
 // RUN: FileCheck %s -check-prefix=STRUCT_TYPES < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_INSTANCE > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_INSTANCE > %t.types.txt
 // RUN: FileCheck %s -check-prefix=STRUCT_INSTANCE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSOCIATED_TYPES_UNQUAL_1 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSOCIATED_TYPES_UNQUAL_1 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=ASSOCIATED_TYPES_UNQUAL < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSOCIATED_TYPES_UNQUAL_2 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSOCIATED_TYPES_UNQUAL_2 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=ASSOCIATED_TYPES_UNQUAL < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=BROKEN_CONFORMANCE_1 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BROKEN_CONFORMANCE_1 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=BROKEN_CONFORMANCE_1 < %t.types.txt
 
 // FIXME: extensions that introduce conformances?

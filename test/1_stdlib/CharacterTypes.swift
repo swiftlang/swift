@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify -enable-character-literals
+// RUN: %target-parse-verify-swift -enable-character-literals
 
 func testTypeInference() {
   func isUnicodeScalar(inout _: UnicodeScalar) {}

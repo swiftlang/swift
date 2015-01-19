@@ -1,4 +1,4 @@
-// RUN: %swift -parse -parse-as-library %s -verify
+// RUN: %target-parse-verify-swift -parse-as-library
 
 lazy func lazy_func() {} // expected-error {{'lazy' may only be used on 'var' declarations}}
 

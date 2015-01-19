@@ -1,4 +1,4 @@
-// RUN: %swift -emit-module %s -target x86_64-apple-macosx10.9 -module-name Swift -sil-serialize-all -module-link-name swiftCore -parse-as-library -parse-sil -parse-stdlib -o - | %sil-opt -verify -module-name=Swift
+// RUN: %target-swift-frontend -emit-module %s -module-name Swift -sil-serialize-all -module-link-name swiftCore -parse-as-library -parse-sil -parse-stdlib -o - | %target-sil-opt -verify -module-name=Swift
 
 struct A {
   var f : () -> ()

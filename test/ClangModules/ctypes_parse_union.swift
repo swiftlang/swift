@@ -1,4 +1,4 @@
-// RUN: %swift %clang-importer-sdk -enable-union-import -parse -verify -target x86_64-apple-macosx10.9 %s
+// RUN: %target-swift-frontend %clang-importer-sdk -enable-union-import -parse -verify %s
 
 import ctypes
 

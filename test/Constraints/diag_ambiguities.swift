@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 func f0(i: Int, d: Double) {} // expected-note{{found this candidate}}
 func f0(d: Double, i: Int) {} // expected-note{{found this candidate}}

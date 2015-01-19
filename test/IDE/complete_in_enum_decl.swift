@@ -1,9 +1,9 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_CASE_1 | FileCheck %s -check-prefix=NO_RESULTS
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_CASE_2 | FileCheck %s -check-prefix=NO_RESULTS
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_CASE_3 | FileCheck %s -check-prefix=NO_RESULTS
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_CASE_4 | FileCheck %s -check-prefix=NO_RESULTS
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_CASE_5 | FileCheck %s -check-prefix=NO_RESULTS
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_CASE_6 | FileCheck %s -check-prefix=NO_RESULTS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_CASE_1 | FileCheck %s -check-prefix=NO_RESULTS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_CASE_2 | FileCheck %s -check-prefix=NO_RESULTS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_CASE_3 | FileCheck %s -check-prefix=NO_RESULTS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_CASE_4 | FileCheck %s -check-prefix=NO_RESULTS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_CASE_5 | FileCheck %s -check-prefix=NO_RESULTS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_CASE_6 | FileCheck %s -check-prefix=NO_RESULTS
 
 // NO_RESULTS: found code completion token
 // NO_RESULTS-NOT: Begin completions

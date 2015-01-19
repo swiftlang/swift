@@ -1,13 +1,11 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t/comments.framework/Modules/comments.swiftmodule/
 
-// RUN: %swift -module-name comments -emit-module -emit-module-path %t/comments.framework/Modules/comments.swiftmodule/x86_64.swiftmodule -emit-module-doc-path %t/comments.framework/Modules/comments.swiftmodule/x86_64.swiftdoc %s
-// RUN: %swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -F %t | FileCheck %s
+// RUN: %target-swift-frontend -module-name comments -emit-module -emit-module-path %t/comments.framework/Modules/comments.swiftmodule/%target-swiftmodule-name -emit-module-doc-path %t/comments.framework/Modules/comments.swiftmodule/%target-swiftdoc-name %s
+// RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -F %t | FileCheck %s
 
 // RUN: cp -r %t/comments.framework/Modules/comments.swiftmodule %t/comments.swiftmodule
-// RUN: %swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -I %t | FileCheck %s
-
-// REQUIRES: OS=macosx
+// RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -I %t | FileCheck %s
 
 /// first_decl_class_1 Aaa.
 class first_decl_class_1 {

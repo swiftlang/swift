@@ -1,8 +1,8 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %swift -emit-module-path %t/basic.swiftmodule %S/basic.swift
+// RUN: %target-swift-frontend -emit-module-path %t/basic.swiftmodule %S/basic.swift
 
-// RUN: %swift -emit-ir -module-name Foo %s -I %t -g -o - | FileCheck %s
-// RUN: %swift -c -module-name Foo %s -I %t -g -o - | llvm-dwarfdump - | FileCheck --check-prefix=DWARF %s
+// RUN: %target-swift-frontend -emit-ir -module-name Foo %s -I %t -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -c -module-name Foo %s -I %t -g -o - | llvm-dwarfdump - | FileCheck --check-prefix=DWARF %s
 
 // CHECK-DAG: ![[FOOMODULE:[0-9]+]] = {{.*}}[ DW_TAG_module ] [Foo]
 // CHECK-DAG:  !"0x3a\001\00", ![[THISFILE:[0-9]+]], ![[FOOMODULE]]} ; [ DW_TAG_imported_module ]

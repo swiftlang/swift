@@ -1,4 +1,6 @@
-// RUN: %swift -import-cf-types -sdk %S/Inputs -target x86_64-apple-macosx10.9 %s -emit-silgen -o - | FileCheck %s
+// RUN: %target-swift-frontend -import-cf-types -sdk %S/Inputs %s -emit-silgen -o - | FileCheck %s
+
+// REQUIRES: objc_interop
 
 import CoreCooling
 

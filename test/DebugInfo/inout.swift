@@ -1,4 +1,5 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+
 // LValues are direct values, too. They are reference types, though.
 
 func Close(fn: () -> Int) { fn() }
@@ -13,7 +14,7 @@ typealias MyFloat = Float
 
 // Closure with promoted capture.
 // CHECK: define {{.*}}@_TTSf2d_i___TFF5inout13modifyFooHeapFTRSiSf_T_U_FT_Si
-// CHECK: call void @llvm.dbg.declare(metadata i64* %{{.*}}, metadata ![[A1:[0-9]+]], metadata ![[EMPTY_EXPR:[0-9]+]])
+// CHECK: call void @llvm.dbg.declare(metadata {{(i32|i64)}}* %{{.*}}, metadata ![[A1:[0-9]+]], metadata ![[EMPTY_EXPR:[0-9]+]])
 
 // Inout reference type.
 // CHECK: define {{.*}}@_TF5inout9modifyFooFTRSiSf_T_

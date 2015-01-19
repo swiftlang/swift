@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify -parse
+// RUN: %target-parse-verify-swift
 
 // FIXME: When we can IRGen recursively specified enums, remove the '-parse' flag from this test
 enum E {

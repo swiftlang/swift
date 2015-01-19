@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify %s
+// RUN: %target-parse-verify-swift
 
 func myMap<T1, T2>(array: [T1], fn: (T1) -> T2) -> [T2] {}
 

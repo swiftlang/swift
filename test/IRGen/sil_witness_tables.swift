@@ -1,6 +1,8 @@
 // RUN: rm -rf %t && mkdir %t
-// RUN: %swift -emit-module -o %t %S/sil_witness_tables_external_conformance.swift
-// RUN: %swift -I %t -primary-file %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o %t %S/sil_witness_tables_external_conformance.swift
+// RUN: %target-swift-frontend -I %t -primary-file %s -emit-ir | FileCheck %s
+
+// REQUIRES: CPU=x86_64
 
 import sil_witness_tables_external_conformance
 

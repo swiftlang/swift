@@ -1,4 +1,4 @@
-// RUN: %swift -sdk %S/Inputs -primary-file %s %S/objc_attr_NSManaged.swift -I %S/Inputs -enable-source-import -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -primary-file %s %S/objc_attr_NSManaged.swift -I %S/Inputs -enable-source-import -emit-silgen | FileCheck %s
 
 import Foundation
 

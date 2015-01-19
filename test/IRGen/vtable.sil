@@ -1,4 +1,7 @@
-// RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+
+// REQUIRES: CPU=x86_64
+
 sil_stage canonical
 
 import Builtin
@@ -21,7 +24,7 @@ sil @_TFC6vtable1CD : $@cc(method) @thin (@owned C) -> ()
 // CHECK: i64 ptrtoint (%objc_class* @_TMmC6vtable1C to i64), 
 // CHECK: %objc_class* @"OBJC_CLASS_$_SwiftObject", 
 // CHECK: %swift.opaque* @_objc_empty_cache, 
-// CHECK: %swift.opaque* @_objc_empty_vtable, 
+// CHECK: %swift.opaque* {{(@_objc_empty_vtable|null)}},
 // CHECK: i64 add (i64 ptrtoint ({ i32, i32, i32, i32, i8*, i8*, i8*, i8*, i8*, i8*, i8* }* @_DATA__TtC6vtable1C to i64), i64 1),
 // CHECK: i32 3, i32 0, i32 16, i16 7, i16 0,
 // CHECK: i32 104, i32 16,

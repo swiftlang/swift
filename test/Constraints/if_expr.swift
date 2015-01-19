@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 struct MyLogicValue : BooleanType {
   var boolValue: Bool {

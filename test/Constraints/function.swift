@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify %s
+// RUN: %target-parse-verify-swift
 
 func f0(x: Float) -> Float {}
 func f1(x: Float) -> Float {}

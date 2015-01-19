@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 let bad_property_1: Int {    // expected-error {{'let' declarations cannot be computed properties}}
   get {

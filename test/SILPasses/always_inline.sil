@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -inline -dce -sil-inline-threshold=1 -verify | FileCheck %s
+// RUN: %target-sil-opt %s -inline -dce -sil-inline-threshold=1 -verify | FileCheck %s
 
 sil_stage canonical
 

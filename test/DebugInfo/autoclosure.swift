@@ -1,4 +1,5 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+
 // CHECK: define linkonce_odr hidden void @_TFF11autoclosure7call_meFSiT_u_KT_PSs11BooleanType_
 // CHECK: call void @llvm.dbg.declare{{.*}}, !dbg
 // CHECK: , !dbg ![[DBG:.*]]

@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module %s -emit-ir -g -o - | FileCheck %s
 
 // CHECK-DAG: \0030"{{.*}}, null, ![[TY0:.*]]} ; [ DW_TAG_structure_type ] [{{.*}}ObjCClass{{.*}}] [line [[@LINE+1]]
 @objc class ObjCClass {

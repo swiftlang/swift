@@ -1,4 +1,4 @@
-// RUN: %swift -sdk %S/../Inputs/objc-generics-sdk -I %S/../Inputs/objc-generics-sdk/swift-modules -enable-source-import -parse -parse-as-library -verify -target x86_64-apple-macosx10.9 %s
+// RUN: %target-swift-frontend -sdk %S/../Inputs/objc-generics-sdk -I %S/../Inputs/objc-generics-sdk/swift-modules -enable-source-import -parse -parse-as-library -verify %s
 
 // REQUIRES: objc_generics
 

@@ -1,4 +1,5 @@
-// RUN: %swift %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+
 class C {
   let n : Int
   required init (number i :Int) {

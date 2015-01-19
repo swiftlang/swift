@@ -1,113 +1,113 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_DOT_1 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_DOT_2 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_DOT_3 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_DOT_4 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_DOT_5 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_NO_DOT_1 | FileCheck %s -check-prefix=FOO_OBJECT_NO_DOT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_NO_DOT_2 | FileCheck %s -check-prefix=FOO_OBJECT_NO_DOT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_STRUCT_DOT_1 | FileCheck %s -check-prefix=FOO_STRUCT_DOT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_STRUCT_NO_DOT_1 | FileCheck %s -check-prefix=FOO_STRUCT_NO_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_DOT_1 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_DOT_2 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_DOT_3 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_DOT_4 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_DOT_5 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_NO_DOT_1 | FileCheck %s -check-prefix=FOO_OBJECT_NO_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_NO_DOT_2 | FileCheck %s -check-prefix=FOO_OBJECT_NO_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_STRUCT_DOT_1 | FileCheck %s -check-prefix=FOO_STRUCT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_STRUCT_NO_DOT_1 | FileCheck %s -check-prefix=FOO_STRUCT_NO_DOT
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CF1 | FileCheck %s -check-prefix=CF1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CF2 | FileCheck %s -check-prefix=CF2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CF3 | FileCheck %s -check-prefix=CF3
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CF4 | FileCheck %s -check-prefix=CF4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CF1 | FileCheck %s -check-prefix=CF1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CF2 | FileCheck %s -check-prefix=CF2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CF3 | FileCheck %s -check-prefix=CF3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CF4 | FileCheck %s -check-prefix=CF4
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_FUNC_0 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_FUNC_0
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_FUNC_1 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_FUNC_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_FUNC_2 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_FUNC_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_FUNC_0 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_FUNC_0
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_FUNC_1 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_FUNC_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_FUNC_2 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_FUNC_2
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_VARARG_FUNC_0 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_VARARG_FUNC_0
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_VARARG_FUNC_1 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_VARARG_FUNC_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_VARARG_FUNC_2 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_VARARG_FUNC_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_VARARG_FUNC_0 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_VARARG_FUNC_0
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_VARARG_FUNC_1 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_VARARG_FUNC_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_VARARG_FUNC_2 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_VARARG_FUNC_2
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_OVERLOADED_FUNC_1 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_OVERLOADED_FUNC_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_OVERLOADED_FUNC_2 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_OVERLOADED_FUNC_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_OVERLOADED_FUNC_1 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_OVERLOADED_FUNC_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_OVERLOADED_FUNC_2 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_OVERLOADED_FUNC_2
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_CURRIED_FUNC_1 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_CURRIED_FUNC_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_CURRIED_FUNC_2 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_CURRIED_FUNC_2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_CURRIED_FUNC_3 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_CURRIED_FUNC_3
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_CURRIED_FUNC_4 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_CURRIED_FUNC_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_CURRIED_FUNC_1 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_CURRIED_FUNC_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_CURRIED_FUNC_2 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_CURRIED_FUNC_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_CURRIED_FUNC_3 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_CURRIED_FUNC_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_CURRIED_FUNC_4 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_CURRIED_FUNC_4
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_SWITCH_CASE_1 | FileCheck %s -check-prefix=IN_SWITCH_CASE
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_SWITCH_CASE_2 | FileCheck %s -check-prefix=IN_SWITCH_CASE
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_SWITCH_CASE_3 | FileCheck %s -check-prefix=IN_SWITCH_CASE
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_SWITCH_CASE_4 | FileCheck %s -check-prefix=IN_SWITCH_CASE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_SWITCH_CASE_1 | FileCheck %s -check-prefix=IN_SWITCH_CASE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_SWITCH_CASE_2 | FileCheck %s -check-prefix=IN_SWITCH_CASE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_SWITCH_CASE_3 | FileCheck %s -check-prefix=IN_SWITCH_CASE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_SWITCH_CASE_4 | FileCheck %s -check-prefix=IN_SWITCH_CASE
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=VF1 | FileCheck %s -check-prefix=VF1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=VF2 | FileCheck %s -check-prefix=VF2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=BASE_MEMBERS | FileCheck %s -check-prefix=BASE_MEMBERS
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=BASE_MEMBERS_STATIC | FileCheck %s -check-prefix=BASE_MEMBERS_STATIC
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VF1 | FileCheck %s -check-prefix=VF1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VF2 | FileCheck %s -check-prefix=VF2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BASE_MEMBERS | FileCheck %s -check-prefix=BASE_MEMBERS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BASE_MEMBERS_STATIC | FileCheck %s -check-prefix=BASE_MEMBERS_STATIC
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTO_MEMBERS_NO_DOT_1 | FileCheck %s -check-prefix=PROTO_MEMBERS_NO_DOT_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTO_MEMBERS_NO_DOT_2 | FileCheck %s -check-prefix=PROTO_MEMBERS_NO_DOT_2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTO_MEMBERS_NO_DOT_3 | FileCheck %s -check-prefix=PROTO_MEMBERS_NO_DOT_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTO_MEMBERS_NO_DOT_1 | FileCheck %s -check-prefix=PROTO_MEMBERS_NO_DOT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTO_MEMBERS_NO_DOT_2 | FileCheck %s -check-prefix=PROTO_MEMBERS_NO_DOT_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTO_MEMBERS_NO_DOT_3 | FileCheck %s -check-prefix=PROTO_MEMBERS_NO_DOT_3
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTO_MEMBERS_1 | FileCheck %s -check-prefix=PROTO_MEMBERS_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTO_MEMBERS_2 | FileCheck %s -check-prefix=PROTO_MEMBERS_2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTO_MEMBERS_3 | FileCheck %s -check-prefix=PROTO_MEMBERS_3
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTO_MEMBERS_4 | FileCheck %s -check-prefix=PROTO_MEMBERS_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTO_MEMBERS_1 | FileCheck %s -check-prefix=PROTO_MEMBERS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTO_MEMBERS_2 | FileCheck %s -check-prefix=PROTO_MEMBERS_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTO_MEMBERS_3 | FileCheck %s -check-prefix=PROTO_MEMBERS_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTO_MEMBERS_4 | FileCheck %s -check-prefix=PROTO_MEMBERS_4
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_0 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_0
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_1 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_2 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_3 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_3
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_4 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_4
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_5 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_5
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_6 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_6
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_7 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_7
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_0 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_0
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_1 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_2 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_3 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_4 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_5 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_6 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_6
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_7 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_7
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_VARARG_FUNCTION_CALL_1 | FileCheck %s -check-prefix=INSIDE_VARARG_FUNCTION_CALL_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_VARARG_FUNCTION_CALL_2 | FileCheck %s -check-prefix=INSIDE_VARARG_FUNCTION_CALL_2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_VARARG_FUNCTION_CALL_3 | FileCheck %s -check-prefix=INSIDE_VARARG_FUNCTION_CALL_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_VARARG_FUNCTION_CALL_1 | FileCheck %s -check-prefix=INSIDE_VARARG_FUNCTION_CALL_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_VARARG_FUNCTION_CALL_2 | FileCheck %s -check-prefix=INSIDE_VARARG_FUNCTION_CALL_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_VARARG_FUNCTION_CALL_3 | FileCheck %s -check-prefix=INSIDE_VARARG_FUNCTION_CALL_3
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_OVERLOADED_FUNCTION_CALL_1 | FileCheck %s -check-prefix=INSIDE_OVERLOADED_FUNCTION_CALL_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_OVERLOADED_FUNCTION_CALL_1 | FileCheck %s -check-prefix=INSIDE_OVERLOADED_FUNCTION_CALL_1
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_CURRIED_FUNCTION_CALL_1 | FileCheck %s -check-prefix=INSIDE_CURRIED_FUNCTION_CALL_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_CURRIED_FUNCTION_CALL_1 | FileCheck %s -check-prefix=INSIDE_CURRIED_FUNCTION_CALL_1
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_FUNC_PARAM_1 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_FUNC_PARAM_2 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_FUNC_PARAM_3 | FileCheck %s -check-prefix=RESOLVE_FUNC_PARAM_3
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_FUNC_PARAM_4 | FileCheck %s -check-prefix=RESOLVE_FUNC_PARAM_4
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_FUNC_PARAM_5 | FileCheck %s -check-prefix=RESOLVE_FUNC_PARAM_5
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_FUNC_PARAM_6 | FileCheck %s -check-prefix=RESOLVE_FUNC_PARAM_6
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_FUNC_PARAM_1 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_FUNC_PARAM_2 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_FUNC_PARAM_3 | FileCheck %s -check-prefix=RESOLVE_FUNC_PARAM_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_FUNC_PARAM_4 | FileCheck %s -check-prefix=RESOLVE_FUNC_PARAM_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_FUNC_PARAM_5 | FileCheck %s -check-prefix=RESOLVE_FUNC_PARAM_5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_FUNC_PARAM_6 | FileCheck %s -check-prefix=RESOLVE_FUNC_PARAM_6
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_CONSTRUCTOR_PARAM_1 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_CONSTRUCTOR_PARAM_2 | FileCheck %s -check-prefix=RESOLVE_CONSTRUCTOR_PARAM_2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_CONSTRUCTOR_PARAM_3 | FileCheck %s -check-prefix=RESOLVE_CONSTRUCTOR_PARAM_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_CONSTRUCTOR_PARAM_1 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_CONSTRUCTOR_PARAM_2 | FileCheck %s -check-prefix=RESOLVE_CONSTRUCTOR_PARAM_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_CONSTRUCTOR_PARAM_3 | FileCheck %s -check-prefix=RESOLVE_CONSTRUCTOR_PARAM_3
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_PAREN_PATTERN_1 | FileCheck %s -check-prefix=FUNC_PAREN_PATTERN_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_PAREN_PATTERN_2 | FileCheck %s -check-prefix=FUNC_PAREN_PATTERN_2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_PAREN_PATTERN_3 | FileCheck %s -check-prefix=FUNC_PAREN_PATTERN_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_PAREN_PATTERN_1 | FileCheck %s -check-prefix=FUNC_PAREN_PATTERN_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_PAREN_PATTERN_2 | FileCheck %s -check-prefix=FUNC_PAREN_PATTERN_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_PAREN_PATTERN_3 | FileCheck %s -check-prefix=FUNC_PAREN_PATTERN_3
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CHAINED_CALLS_1 | FileCheck %s -check-prefix=CHAINED_CALLS_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CHAINED_CALLS_2 | FileCheck %s -check-prefix=CHAINED_CALLS_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CHAINED_CALLS_1 | FileCheck %s -check-prefix=CHAINED_CALLS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CHAINED_CALLS_2 | FileCheck %s -check-prefix=CHAINED_CALLS_2
 
 // Disabled because we aren't handling failures well.
-// FIXME: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CHAINED_CALLS_3 | FileCheck %s -check-prefix=CHAINED_CALLS_3
+// FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CHAINED_CALLS_3 | FileCheck %s -check-prefix=CHAINED_CALLS_3
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_1 | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_2 | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_3 | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_3
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_4 | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_4
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_5 | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_5
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_ERROR_1 | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_ERROR_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_1 | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_2 | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_3 | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_4 | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_5 | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_ERROR_1 | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_ERROR_1
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_1_STATIC | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_1_STATIC
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_2_STATIC | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_2_STATIC
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_3_STATIC | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_3_STATIC
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_4_STATIC | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_4_STATIC
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_5_STATIC | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_5_STATIC
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_1_STATIC | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_1_STATIC
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_2_STATIC | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_2_STATIC
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_3_STATIC | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_3_STATIC
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_4_STATIC | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_4_STATIC
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_GENERIC_PARAMS_5_STATIC | FileCheck %s -check-prefix=RESOLVE_GENERIC_PARAMS_5_STATIC
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_UNSOLVED_VARIABLES_1 | FileCheck %s -check-prefix=TC_UNSOLVED_VARIABLES_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_UNSOLVED_VARIABLES_2 | FileCheck %s -check-prefix=TC_UNSOLVED_VARIABLES_2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_UNSOLVED_VARIABLES_3 | FileCheck %s -check-prefix=TC_UNSOLVED_VARIABLES_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_UNSOLVED_VARIABLES_1 | FileCheck %s -check-prefix=TC_UNSOLVED_VARIABLES_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_UNSOLVED_VARIABLES_2 | FileCheck %s -check-prefix=TC_UNSOLVED_VARIABLES_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_UNSOLVED_VARIABLES_3 | FileCheck %s -check-prefix=TC_UNSOLVED_VARIABLES_3
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_MODULES_1 | FileCheck %s -check-prefix=RESOLVE_MODULES_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_MODULES_1 | FileCheck %s -check-prefix=RESOLVE_MODULES_1
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INTERPOLATED_STRING_1 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INTERPOLATED_STRING_1 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
 
 // Test code completion of expressions that produce a value.
 

@@ -1,4 +1,4 @@
-// RUN: %swift %clang-importer-sdk %s -parse -verify
+// RUN: %target-swift-frontend %clang-importer-sdk %s -parse -verify
 
 import Foundation
 

@@ -1,4 +1,4 @@
-// RUN: %swift-ide-test -print-ast-typechecked -source-filename=%s -print-implicit-attrs | FileCheck %s
+// RUN: %target-swift-ide-test -print-ast-typechecked -source-filename=%s -print-implicit-attrs | FileCheck %s
 
 @objc class Super {}
 

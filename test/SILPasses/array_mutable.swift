@@ -1,4 +1,4 @@
-// RUN: %swift -O -emit-sil -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil -primary-file %s | FileCheck %s
 //
 // Test Array "make_mutable" hoisting.  It's hard for FileCheck to
 // recognize the hoisting because we don't know which block is the

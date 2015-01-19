@@ -1,4 +1,4 @@
-// RUN: %swift -emit-silgen -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
 
 import Foundation
 class MyFunkyDictionary: NSDictionary {

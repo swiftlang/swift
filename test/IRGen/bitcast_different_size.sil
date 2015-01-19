@@ -1,4 +1,6 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -emit-ir %s -verify | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -verify | FileCheck %s
+
+// REQUIRES: CPU=i386_or_x86_64
 
 sil_stage canonical
 

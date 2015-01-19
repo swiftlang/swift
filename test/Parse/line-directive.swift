@@ -1,4 +1,5 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
+
 let x = 0 // We need this because of the #line-ends-with-a-newline requirement.
 
 #line

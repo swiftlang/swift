@@ -11,7 +11,7 @@ func f() {
   println("jump directly to def")
 }
 
-// RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s -S -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -S -g -o - | FileCheck %s
 // CHECK: .file	[[MAIN:.*]] "{{.*}}line-directive.swift"
 // CHECK: .loc	[[MAIN]] 1
 // CHECK: .file	[[ABC:.*]] "{{.*}}abc.swift"

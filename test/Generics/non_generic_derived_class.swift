@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify %s
+// RUN: %target-parse-verify-swift
 
 class Base<T> {
   class func f(arg: T) -> Int {

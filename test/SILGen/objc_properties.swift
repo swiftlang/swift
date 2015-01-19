@@ -1,4 +1,6 @@
-// RUN: %swift %s -emit-silgen -emit-verbose-sil -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-silgen -emit-verbose-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import | FileCheck %s
+
+// REQUIRES: objc_interop
 
 import Foundation
 

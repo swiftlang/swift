@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -O -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend %s -O -emit-ir | FileCheck %s
 
 public var x = 0
 

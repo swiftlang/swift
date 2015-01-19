@@ -1,4 +1,4 @@
-// RUN: %swift -emit-silgen -parse-stdlib %s
+// RUN: %target-swift-frontend -emit-silgen -parse-stdlib %s
 
 protocol P {
   typealias Assoc

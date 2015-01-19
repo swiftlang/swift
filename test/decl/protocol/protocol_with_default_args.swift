@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify %s
+// RUN: %target-parse-verify-swift
 
 protocol P {
   func foo(truth: Bool = false) // expected-error{{default argument not permitted in a protocol method}}

@@ -1,4 +1,4 @@
-// RUN: %swift %s -emit-silgen -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-silgen -o - | FileCheck %s
 
 func standalone_generic<T>(x: T, y: T) -> T { return x }
 

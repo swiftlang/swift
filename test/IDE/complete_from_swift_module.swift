@@ -1,33 +1,33 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 //
-// RUN: %swift -emit-module -o %t %S/Inputs/foo_swift_module.swift
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/foo_swift_module.swift
 //
 // Note: this test checks both module import case and file import case.
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_1 > %t.compl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_1 > %t.compl.txt
 // RUN: FileCheck %s -check-prefix=MODULE_QUALIFIED_1 < %t.compl.txt
 //
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %S/Inputs -enable-source-import -code-completion-token=MODULE_QUALIFIED_1 > %t.compl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %S/Inputs -enable-source-import -code-completion-token=MODULE_QUALIFIED_1 > %t.compl.txt
 // RUN: FileCheck %s -check-prefix=MODULE_QUALIFIED_1 < %t.compl.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_2 > %t.compl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_2 > %t.compl.txt
 // RUN: FileCheck %s -check-prefix=MODULE_QUALIFIED_2 < %t.compl.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_3 > %t.compl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_3 > %t.compl.txt
 // RUN: FileCheck %s -check-prefix=MODULE_QUALIFIED_3 < %t.compl.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_4 > %t.compl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_4 > %t.compl.txt
 // RUN: FileCheck %s -check-prefix=MODULE_QUALIFIED_4 < %t.compl.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_5 | FileCheck %s -check-prefix=ERROR_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_5 | FileCheck %s -check-prefix=ERROR_COMMON
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=TOP_LEVEL_1 > %t.compl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=TOP_LEVEL_1 > %t.compl.txt
 // RUN: FileCheck %s -check-prefix=TOP_LEVEL_1 < %t.compl.txt
 // rdar://15305873 Code completion: implement proper shadowing of declarations represented by cached results
 // FIXME: FileCheck %s -check-prefix=TOP_LEVEL_1_NEGATIVE < %t.compl.txt
 //
-// RUN: %swift-ide-test -code-completion -source-filename %s -I %S/Inputs -enable-source-import -code-completion-token=TOP_LEVEL_1 > %t.compl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %S/Inputs -enable-source-import -code-completion-token=TOP_LEVEL_1 > %t.compl.txt
 // RUN: FileCheck %s -check-prefix=TOP_LEVEL_1 < %t.compl.txt
 // rdar://15305873 Code completion: implement proper shadowing of declarations represented by cached results
 // FIXME: FileCheck %s -check-prefix=TOP_LEVEL_1_NEGATIVE < %t.compl.txt

@@ -1,4 +1,5 @@
-// RUN: %sil-opt %s -aa=typed-access-tb-aa -aa-dump -o /dev/null | FileCheck %s
+// RUN: %target-sil-opt %s -aa=typed-access-tb-aa -aa-dump -o /dev/null | FileCheck %s
+
 // REQUIRES: asserts
 
 import Builtin

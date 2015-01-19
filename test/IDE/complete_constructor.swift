@@ -1,19 +1,19 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_CONSTRUCTORS_1 | FileCheck %s -check-prefix=IMPLICIT_CONSTRUCTORS_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_CONSTRUCTORS_1P | FileCheck %s -check-prefix=IMPLICIT_CONSTRUCTORS_1P
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_CONSTRUCTORS_2 | FileCheck %s -check-prefix=IMPLICIT_CONSTRUCTORS_2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_CONSTRUCTORS_2P | FileCheck %s -check-prefix=IMPLICIT_CONSTRUCTORS_2P
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_CONSTRUCTORS_1 | FileCheck %s -check-prefix=IMPLICIT_CONSTRUCTORS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_CONSTRUCTORS_1P | FileCheck %s -check-prefix=IMPLICIT_CONSTRUCTORS_1P
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_CONSTRUCTORS_2 | FileCheck %s -check-prefix=IMPLICIT_CONSTRUCTORS_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_CONSTRUCTORS_2P | FileCheck %s -check-prefix=IMPLICIT_CONSTRUCTORS_2P
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_1 | FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_1P | FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_1P
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_1 | FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_1P | FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_1P
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_2 | FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_2P | FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_2P
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_2 | FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_2P | FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_2P
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_3P | FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_3P
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_3P | FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_3P
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_SELECTOR_1 | FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_SELECTOR_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_SELECTOR_1 | FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_SELECTOR_1
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_BASE_DERIVED_1 | FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_BASE_DERIVED_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_BASE_DERIVED_1 | FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_BASE_DERIVED_1
 
 func freeFunc() {}
 

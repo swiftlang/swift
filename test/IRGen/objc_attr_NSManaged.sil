@@ -1,6 +1,8 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-irgen-test-overlays
-// RUN: %swift -sdk %S/Inputs -I %t %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -I %t %s -emit-ir | FileCheck %s
+
+// REQUIRES: CPU=x86_64
 
 // CHECK: [[SGIZMO:%C19objc_attr_NSManaged10SwiftGizmo]] = type
 
@@ -20,7 +22,7 @@ import gizmo
 // CHECK: @_PROPERTIES__TtC19objc_attr_NSManaged10SwiftGizmo = private constant { {{.*}}i32, i32, [1 x { i8*, i8* }] } { i32 16, i32 1, [1 x { i8*, i8* }] [{ i8*, i8* } { i8* getelementptr inbounds ([2 x i8]* [[X]], i64 0, i64 0),
 
 // The getter/setter should not show up in the Swift metadata.
-// CHECK: @_TMdC19objc_attr_NSManaged10SwiftGizmo = global { {{.*}} } { void (%C19objc_attr_NSManaged10SwiftGizmo*)* @_TFC19objc_attr_NSManaged10SwiftGizmoD, i8** @_TWVBO, i64 ptrtoint (%objc_class* @"OBJC_METACLASS_$__TtC19objc_attr_NSManaged10SwiftGizmo" to i64), %objc_class* @"OBJC_CLASS_$_Gizmo", %swift.opaque* @_objc_empty_cache, %swift.opaque* @_objc_empty_vtable, i64 add (i64 ptrtoint ({ i32, i32, i32, i32, i8*, i8*, { i32, i32, [2 x { i8*, i8*, i8* }] }*, i8*, i8*, i8*, { i32, i32, [1 x { i8*, i8* }] }* }* @_DATA__TtC19objc_attr_NSManaged10SwiftGizmo to i64), i64 1), i32 1, i32 0, i32 16, i16 7, i16 0, i32 104, i32 16, { i64, i8*, i32, i32, i8*, %swift.type** (%swift.type*)*, %swift.type_pattern*, i32, i32, i32 }* @_TMnC19objc_attr_NSManaged10SwiftGizmo, i64 (i64, %C19objc_attr_NSManaged10SwiftGizmo*)* @_TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT7bellsOnSi_GSQS0__, %C19objc_attr_NSManaged10SwiftGizmo* (%C19objc_attr_NSManaged10SwiftGizmo*)* @_TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT_S0_ }
+// CHECK: @_TMdC19objc_attr_NSManaged10SwiftGizmo = global { {{.*}} } { void (%C19objc_attr_NSManaged10SwiftGizmo*)* @_TFC19objc_attr_NSManaged10SwiftGizmoD, i8** @_TWVBO, i64 ptrtoint (%objc_class* @"OBJC_METACLASS_$__TtC19objc_attr_NSManaged10SwiftGizmo" to i64), %objc_class* @"OBJC_CLASS_$_Gizmo", %swift.opaque* @_objc_empty_cache, %swift.opaque* {{(@_objc_empty_vtable|null)}}, i64 add (i64 ptrtoint ({ i32, i32, i32, i32, i8*, i8*, { i32, i32, [2 x { i8*, i8*, i8* }] }*, i8*, i8*, i8*, { i32, i32, [1 x { i8*, i8* }] }* }* @_DATA__TtC19objc_attr_NSManaged10SwiftGizmo to i64), i64 1), i32 1, i32 0, i32 16, i16 7, i16 0, i32 104, i32 16, { i64, i8*, i32, i32, i8*, %swift.type** (%swift.type*)*, %swift.type_pattern*, i32, i32, i32 }* @_TMnC19objc_attr_NSManaged10SwiftGizmo, i64 (i64, %C19objc_attr_NSManaged10SwiftGizmo*)* @_TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT7bellsOnSi_GSQS0__, %C19objc_attr_NSManaged10SwiftGizmo* (%C19objc_attr_NSManaged10SwiftGizmo*)* @_TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT_S0_ }
 
 @objc class SwiftGizmo : Gizmo {
   @objc @NSManaged var x: X

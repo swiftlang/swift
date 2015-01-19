@@ -1,4 +1,4 @@
-// RUN: %swift %clang-importer-sdk -parse %s -verify
+// RUN: %target-swift-frontend %clang-importer-sdk -parse %s -verify
 
 import AppKit
 import NotificationCenter

@@ -1,5 +1,4 @@
-// RUN: %swift -O  -module-name devirt_default_case -disable-func-sig-opts -emit-sil %s | FileCheck %s
-
+// RUN: %target-swift-frontend -O -module-name devirt_default_case -disable-func-sig-opts -emit-sil %s | FileCheck %s
 
 @asmname("action")
 func action(n:Int)->()

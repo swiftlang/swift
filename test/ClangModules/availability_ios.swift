@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -verify %s
+// RUN: %target-parse-verify-swift
 // REQUIRES: OS=ios
 
 import Foundation

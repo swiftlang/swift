@@ -5,6 +5,8 @@
 // RUN: %t.shebang.swift | FileCheck -check-prefix=NONE %s
 // RUN: %t.shebang.swift a b c | FileCheck -check-prefix=THREE-ARGS %s
 
+// REQUIRES: swift_interpreter
+
 println("Begin")
 for arg in Process.arguments {
   println(arg)

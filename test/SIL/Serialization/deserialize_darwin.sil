@@ -1,6 +1,7 @@
 // Make sure that we can deserialize darwin.
 // RUN: %target-sil-opt -verify %platform-module-dir/Darwin.swiftmodule > /dev/null
 // RUN: llvm-bcanalyzer %platform-module-dir/Darwin.swiftmodule | FileCheck %s
+
 // REQUIRES: sdk
 
 // CHECK-NOT: Unknown

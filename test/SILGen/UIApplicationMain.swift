@@ -1,5 +1,7 @@
-// RUN: %swift -emit-silgen -parse-as-library -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
-// RUN: %swift -emit-ir -parse-as-library -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s -check-prefix=IR
+// RUN: %target-swift-frontend -emit-silgen -parse-as-library -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -parse-as-library -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s -check-prefix=IR
+
+// REQUIRES: OS=ios
 
 import Foundation
 import UIKit

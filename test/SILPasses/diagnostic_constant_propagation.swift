@@ -1,4 +1,9 @@
-// RUN: %swift -emit-sil -primary-file %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
+
+// REQUIRES: PTRSIZE=64
+
+// FIXME: <rdar://problem/19508336> Extend test/SILPasses/diagnostic_constant_propagation.swift to 32-bit platforms
+
 // These are tests for diagnostics produced by constant propagation pass.
 
 func testArithmeticOverflow() {

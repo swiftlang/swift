@@ -1,4 +1,4 @@
-// RUN: %swift %s -parse -parse-as-library -verify
+// RUN: %target-parse-verify-swift -parse-as-library
 
 struct S {
   func foo() {

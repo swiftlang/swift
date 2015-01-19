@@ -1,4 +1,6 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
+
+// REQUIRES: CPU=x86_64
 
 import Swift
 
@@ -19,7 +21,7 @@ import Swift
 // CHECK:   i64 0,
 // CHECK:   %objc_class* @"OBJC_CLASS_$_SwiftObject",
 // CHECK:   %swift.opaque* @_objc_empty_cache,
-// CHECK:   %swift.opaque* @_objc_empty_vtable,
+// CHECK:   %swift.opaque* {{(@_objc_empty_vtable|null)}},
 // CHECK:   i64 1,
 // CHECK:   i32 3,
 // CHECK:   i32 0,
@@ -43,7 +45,7 @@ import Swift
 // CHECK:   i64 0,
 // CHECK:   %objc_class* @"OBJC_CLASS_$_SwiftObject",
 // CHECK:   %swift.opaque* @_objc_empty_cache,
-// CHECK:   %swift.opaque* @_objc_empty_vtable,
+// CHECK:   %swift.opaque* {{(@_objc_empty_vtable|null)}},
 // CHECK:   i64 1,
 // CHECK:   i32 3,
 // CHECK:   i32 0,
@@ -60,7 +62,7 @@ import Swift
 // CHECK:   i64 0,
 // CHECK:   %swift.type* null,
 // CHECK:   %swift.opaque* @_objc_empty_cache,
-// CHECK:   %swift.opaque* @_objc_empty_vtable,
+// CHECK:   %swift.opaque* {{(@_objc_empty_vtable|null)}},
 // CHECK:   i64 1,
 // CHECK:   void (%swift.opaque*, [[A]]*)* @_TFC13generic_types1A3run
 // CHECK: }
@@ -70,7 +72,7 @@ import Swift
 // CHECK:   i64 0,
 // CHECK:   %swift.type* null,
 // CHECK:   %swift.opaque* @_objc_empty_cache,
-// CHECK:   %swift.opaque* @_objc_empty_vtable,
+// CHECK:   %swift.opaque* {{(@_objc_empty_vtable|null)}},
 // CHECK:   i64 1,
 // CHECK:   void (i64, [[D]]*)* @_TFC13generic_types1D3run
 // CHECK: }

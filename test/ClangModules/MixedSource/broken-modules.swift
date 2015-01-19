@@ -1,13 +1,13 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: not %swift -parse %s -I %S/Inputs/broken-modules/ -enable-source-import -show-diagnostics-after-fatal 2> %t/err.txt
+// RUN: not %target-swift-frontend -parse %s -I %S/Inputs/broken-modules/ -enable-source-import -show-diagnostics-after-fatal 2> %t/err.txt
 // RUN: FileCheck -check-prefix CHECK -check-prefix CLANG-CHECK %s < %t/err.txt
 
-// RUN: not %swift -parse %s -import-objc-header %S/Inputs/broken-modules/BrokenClangModule.h -enable-source-import 2> %t/err.bridging-header.txt 
+// RUN: not %target-swift-frontend -parse %s -import-objc-header %S/Inputs/broken-modules/BrokenClangModule.h -enable-source-import 2> %t/err.bridging-header.txt 
 // RUN: FileCheck -check-prefix CHECK-BRIDGING-HEADER -check-prefix CLANG-CHECK %s < %t/err.bridging-header.txt
 
-// RUN: not %swift -parse %s -import-objc-header %t/fake.h 2>&1 | FileCheck -check-prefix=MISSING-HEADER %s
+// RUN: not %target-swift-frontend -parse %s -import-objc-header %t/fake.h 2>&1 | FileCheck -check-prefix=MISSING-HEADER %s
 
-// RUN: not %swift -parse %s -import-objc-header %S/../../Inputs/empty.swift 2>&1 | FileCheck -check-prefix=EMPTY-HEADER %s
+// RUN: not %target-swift-frontend -parse %s -import-objc-header %S/../../Inputs/empty.swift 2>&1 | FileCheck -check-prefix=EMPTY-HEADER %s
 
 // MISSING-HEADER: error: bridging header '{{.*}}/fake.h' does not exist
 // MISSING-HEADER-NOT: error

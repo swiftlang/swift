@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -parse-as-library -verify
+// RUN: %target-parse-verify-swift -parse-as-library
 
 //===--- Recovery for extra braces at top level.
 //===--- Keep this test the first one in the file.

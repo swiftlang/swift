@@ -1,5 +1,5 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_DOT_1 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=BAR_OBJECT_DOT_1 | FileCheck %s -check-prefix=BAR_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_DOT_1 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BAR_OBJECT_DOT_1 | FileCheck %s -check-prefix=BAR_OBJECT_DOT
 
 protocol FooBaseProtocol {
   var instanceProperty: Int { get }

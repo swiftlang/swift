@@ -1,4 +1,4 @@
-// RUN: %swift %s -emit-sil | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-sil | FileCheck %s
 
 // This is an integration check for the inout-deshadow pass, verifying that it
 // deshadows the inout variables in certain cases.  These test should not be

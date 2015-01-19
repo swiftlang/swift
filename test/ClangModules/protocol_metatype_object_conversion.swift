@@ -1,4 +1,4 @@
-// RUN: %swift %clang-importer-sdk -parse -verify -target x86_64-apple-macosx10.9 %s
+// RUN: %target-swift-frontend %clang-importer-sdk -parse -verify %s -disable-objc-attr-requires-foundation-module
 
 import ObjectiveC
 

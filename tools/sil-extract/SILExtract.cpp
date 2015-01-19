@@ -68,6 +68,9 @@ SDKPath("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
                               "importer."),
         llvm::cl::init(""));
 
+static llvm::cl::opt<std::string>
+Triple("target", llvm::cl::desc("target triple"));
+
 // This function isn't referenced outside its translation unit, but it
 // can't use the "static" keyword because its address is used for
 // getMainExecutable (since some platforms don't support taking the
@@ -139,6 +142,8 @@ int main(int argc, char **argv) {
   }
   if (!SDKPath.empty())
     Invocation.setSDKPath(SDKPath);
+  if (!Triple.empty())
+    Invocation.setTargetTriple(Triple);
   if (!ResourceDir.empty())
     Invocation.setRuntimeResourcePath(ResourceDir);
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;

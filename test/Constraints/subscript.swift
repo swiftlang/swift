@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 // Simple subscript of arrays:
 func simpleSubscript(array: [Float], x: Int) -> Float {

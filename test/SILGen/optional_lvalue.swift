@@ -1,4 +1,4 @@
-// RUN: %swift -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 // CHECK-LABEL: sil hidden @_TF15optional_lvalue22assign_optional_lvalueFTRGSqSi_Si_T_
 // CHECK:         [[SHADOW:%.*]] = alloc_box $Optional<Int>

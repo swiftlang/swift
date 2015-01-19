@@ -1,4 +1,4 @@
-// RUN: %swift -O %s -disable-func-sig-opts -emit-sil | FileCheck %s
+// RUN: %target-swift-frontend -O %s -disable-func-sig-opts -emit-sil | FileCheck %s
 
 // rdar://16761933
 // Make sure we can handle recursive function within a class.

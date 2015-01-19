@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -sdk %S/Inputs -O -emit-sil -I %S/Inputs -enable-source-import -primary-file %s -enable-union-import | FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -O -emit-sil -I %S/Inputs -enable-source-import -primary-file %s -enable-union-import | FileCheck %s
 
 import gizmo
 

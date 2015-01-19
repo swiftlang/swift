@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify %s
+// RUN: %target-parse-verify-swift
 
 // Infer bound generic types in closures
 func dict_int_string_indexer(getElement: (Dictionary<Int, String>) -> String) -> String {

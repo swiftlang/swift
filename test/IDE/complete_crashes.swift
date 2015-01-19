@@ -1,6 +1,6 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=BAD_MEMBERS_1 | FileCheck %s -check-prefix=BAD_MEMBERS_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=BAD_MEMBERS_2 | FileCheck %s -check-prefix=BAD_MEMBERS_2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_CALLED_IN_PLACE_1 | FileCheck %s -check-prefix=WITH_GLOBAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BAD_MEMBERS_1 | FileCheck %s -check-prefix=BAD_MEMBERS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BAD_MEMBERS_2 | FileCheck %s -check-prefix=BAD_MEMBERS_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_CALLED_IN_PLACE_1 | FileCheck %s -check-prefix=WITH_GLOBAL
 
 class BadMembers1 {
   var prop: Int {
@@ -36,7 +36,7 @@ func badMembers2(a: BadMembers2) {
 
 func globalFunc() {}
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=LET_COMPUTED | FileCheck %s -check-prefix=WITH_GLOBAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LET_COMPUTED | FileCheck %s -check-prefix=WITH_GLOBAL
 class C {
   let x : Int { #^LET_COMPUTED^# }
 }

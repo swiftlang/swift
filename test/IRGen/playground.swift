@@ -1,5 +1,8 @@
 // RUN: rm -rf %t
-// RUN: %swift -use-jit -playground -parse-stdlib -target x86_64-apple-macosx10.9 %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -use-jit -playground -parse-stdlib %s -emit-ir -disable-objc-attr-requires-foundation-module | FileCheck %s
+
+// REQUIRES: OS=macosx
+// REQUIRES: CPU=x86_64
 
 import Swift
 

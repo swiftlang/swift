@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 @IBOutlet // expected-error {{only instance properties can be declared 'IBOutlet'}}
 var iboutlet_global: Int

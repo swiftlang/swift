@@ -92,7 +92,7 @@ func is_doc18() {}
  */
 func is_doc19() {}
 
-// RUN: %swift-ide-test -print-comments -source-filename %s > %t.txt
+// RUN: %target-swift-ide-test -print-comments -source-filename %s > %t.txt
 // RUN: FileCheck %s -check-prefix=WRONG < %t.txt
 // RUN: FileCheck %s < %t.txt
 

@@ -1,5 +1,6 @@
-// RUN: %sil-opt %s -sil-combine -verify | FileCheck %s
-// RUN: %sil-opt %s -diagnostic-constant-propagation -verify | FileCheck %s
+// RUN: %target-sil-opt %s -sil-combine -verify | FileCheck %s
+// RUN: %target-sil-opt %s -diagnostic-constant-propagation -verify | FileCheck %s
+
 sil_stage canonical
 
 import Builtin

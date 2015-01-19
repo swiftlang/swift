@@ -1,5 +1,5 @@
-// RUN: %sil-opt -loop-rotate -dce -simplify-cfg -abcopts -enable-abcopts=1 %s | FileCheck %s
-// RUN: %sil-opt -loop-rotate -dce -simplify-cfg -abcopts -dce -enable-abcopts -enable-abc-hoisting %s | FileCheck %s --check-prefix=HOIST
+// RUN: %target-sil-opt -loop-rotate -dce -simplify-cfg -abcopts -enable-abcopts=1 %s | FileCheck %s
+// RUN: %target-sil-opt -loop-rotate -dce -simplify-cfg -abcopts -dce -enable-abcopts -enable-abc-hoisting %s | FileCheck %s --check-prefix=HOIST
 
 sil_stage canonical
 

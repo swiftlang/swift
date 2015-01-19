@@ -1,7 +1,9 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -emit-ir -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -primary-file %s | FileCheck %s
 
 // Make sure that optimization passes don't choke on storage types for generic tuples
-// RUN: %swift -target x86_64-apple-macosx10.9 -emit-ir -O %s
+// RUN: %target-swift-frontend -emit-ir -O %s
+
+// REQUIRES: CPU=x86_64
 
 // CHECK: [[TYPE:%swift.type]] = type {
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque

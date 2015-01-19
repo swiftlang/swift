@@ -1,4 +1,5 @@
-// RUN: %swift %s -O -emit-sil | not FileCheck %s
+// RUN: %target-swift-frontend %s -O -emit-sil | not FileCheck %s
+
 // FIXME: Existential devirtualization needs to be updated to work with
 // open_existential instructions. rdar://problem/18506660
 

@@ -1,4 +1,11 @@
-// RUN: %swift -emit-ir -parse-stdlib -target x86_64-apple-macosx10.9 -primary-file %s | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
+// RUN: %swift -target i386-apple-ios7.0 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s
+// RUN: %swift -target x86_64-apple-ios7.0 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
+// RUN: %swift -target armv7-apple-ios7.0 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s
+// RUN: %swift -target arm64-apple-ios7.0 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
+// RUN: %swift -target x86_64-unknown-linux-gnu -disable-objc-interop -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
+
+// REQUIRES: X86
 
 // CHECK: define hidden %swift.type* [[GENERIC_TYPEOF:@_TF17generic_metatypes13genericTypeof.*]](%swift.opaque* noalias, %swift.type* [[TYPE:%.*]])
 func genericTypeof<T>(x: T) -> T.Type {
@@ -40,15 +47,20 @@ func protocolTypeof(x: Bas) -> Bas.Type {
   // CHECK: [[METADATA:%.*]] = load %swift.type** [[METADATA_ADDR]]
   // CHECK: [[BUFFER:%.*]] = getelementptr inbounds %P17generic_metatypes3Bas_* [[X]], i32 0, i32 0
   // CHECK: [[METADATA_I8:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
-  // CHECK: [[VW_ADDR:%.*]] = getelementptr inbounds i8*** [[METADATA_I8]], i64 -1
+  // CHECK-32: [[VW_ADDR:%.*]] = getelementptr inbounds i8*** [[METADATA_I8]], i32 -1
+  // CHECK-64: [[VW_ADDR:%.*]] = getelementptr inbounds i8*** [[METADATA_I8]], i64 -1
   // CHECK: [[VW:%.*]] = load i8*** [[VW_ADDR]]
   // CHECK: [[PROJECT_ADDR:%.*]] = getelementptr inbounds i8** [[VW]], i32 2
-  // CHECK: [[PROJECT_PTR:%.*]] = load i8** [[PROJECT_ADDR]], align 8
-  // CHECK: [[PROJECT:%.*]] = bitcast i8* [[PROJECT_PTR]] to %swift.opaque* ([24 x i8]*, %swift.type*)*
-  // CHECK: [[PROJECTION:%.*]] = call %swift.opaque* [[PROJECT]]([24 x i8]* [[BUFFER]], %swift.type* [[METADATA]])
+  // CHECK-32: [[PROJECT_PTR:%.*]] = load i8** [[PROJECT_ADDR]], align 4
+  // CHECK-64: [[PROJECT_PTR:%.*]] = load i8** [[PROJECT_ADDR]], align 8
+  // CHECK-32: [[PROJECT:%.*]] = bitcast i8* [[PROJECT_PTR]] to %swift.opaque* ([12 x i8]*, %swift.type*)*
+  // CHECK-64: [[PROJECT:%.*]] = bitcast i8* [[PROJECT_PTR]] to %swift.opaque* ([24 x i8]*, %swift.type*)*
+  // CHECK-32: [[PROJECTION:%.*]] = call %swift.opaque* [[PROJECT]]([12 x i8]* [[BUFFER]], %swift.type* [[METADATA]])
+  // CHECK-64: [[PROJECTION:%.*]] = call %swift.opaque* [[PROJECT]]([24 x i8]* [[BUFFER]], %swift.type* [[METADATA]])
   // CHECK: [[METATYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* [[PROJECTION]], %swift.type* [[METADATA]])
   // CHECK: [[T0:%.*]] = getelementptr inbounds %P17generic_metatypes3Bas_* [[X]], i32 0, i32 2
-  // CHECK: [[WTABLE:%.*]] = load i8*** [[T0]], align 8
+  // CHECK-32: [[WTABLE:%.*]] = load i8*** [[T0]], align 4
+  // CHECK-64: [[WTABLE:%.*]] = load i8*** [[T0]], align 8
   // CHECK: [[T0:%.*]] = insertvalue { %swift.type*, i8** } undef, %swift.type* [[METATYPE]], 0
   // CHECK: [[T1:%.*]] = insertvalue { %swift.type*, i8** } [[T0]], i8** [[WTABLE]], 1
   // CHECK: ret { %swift.type*, i8** } [[T1]]

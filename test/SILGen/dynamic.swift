@@ -1,5 +1,7 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import -primary-file %s %S/Inputs/dynamic_other.swift -emit-silgen | FileCheck %s
-// RUN: %swift -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import -primary-file %s %S/Inputs/dynamic_other.swift -emit-sil -verify
+// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import -primary-file %s %S/Inputs/dynamic_other.swift -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import -primary-file %s %S/Inputs/dynamic_other.swift -emit-sil -verify
+
+// REQUIRES: objc_interop
 
 import Foundation
 import gizmo

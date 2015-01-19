@@ -1,5 +1,4 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -verify
+// RUN: %target-swift-frontend %s -emit-ir -verify -disable-objc-attr-requires-foundation-module
 
 @objc class ObjCBox<T> {
   var x: T // expected-error{{unimplemented}}

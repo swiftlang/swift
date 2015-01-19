@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify -D FOO -D BAZ -target x86_64-apple-macosx10.9
+// RUN: %target-parse-verify-swift -D FOO -D BAZ
 
 #if FOO == BAZ // expected-error{{expected '&&' or '||' expression}}
 var x = 0

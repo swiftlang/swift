@@ -1,4 +1,4 @@
-// RUN: %swift %clang-importer-sdk -parse %s -verify
+// RUN: %target-swift-frontend %clang-importer-sdk -parse %s -verify
 
 // Note: this is in a separate file because -verify doesn't complain
 // about diagnostics from other files.

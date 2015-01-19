@@ -1,4 +1,6 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
+
+// REQUIRES: CPU=x86_64
 
 // FIXME: Not a SIL test because we can't parse dynamic Self in SIL.
 // <rdar://problem/16931299>

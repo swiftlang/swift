@@ -1,5 +1,9 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift %clang-importer-sdk -target x86_64-apple-macosx10.9 %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -disable-objc-attr-requires-foundation-module | FileCheck %s
+
+// FIXME: This test could use %clang-importer-sdk, but the compiler crashes.
+
+// REQUIRES: OS=ios
+// REQUIRES: objc_interop
 
 import UIKit
 

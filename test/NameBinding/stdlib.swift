@@ -1,4 +1,4 @@
-// RUN: %swift -parse-stdlib -module-name=Swift %s -parse -verify 
+// RUN: %target-parse-verify-swift -parse-stdlib -module-name Swift
 
 // <rdar://problem/15593704>
 struct X {

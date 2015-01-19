@@ -1,4 +1,4 @@
-// RUN: not %swift -parse %s -F %S/Inputs/frameworks -Xcc -D -Xcc FOO 2> %t.err.txt
+// RUN: not %target-swift-frontend -parse %s -F %S/Inputs/frameworks -Xcc -D -Xcc FOO 2> %t.err.txt
 // RUN: FileCheck -input-file=%t.err.txt %s
 
 import Module
@@ -7,7 +7,7 @@ import Module
 // CHECK: Sub2.h:2:9: error: could not build module 'Another'
 // CHECK: diags_from_module.swift:[[@LINE-4]]:8: error: could not build Objective-C module 'Module'
 
-// RUN: %swift -parse %s -F %S/Inputs/frameworks 2> %tw.err.txt
+// RUN: %target-swift-frontend -parse %s -F %S/Inputs/frameworks 2> %tw.err.txt
 // RUN: FileCheck -input-file=%tw.err.txt %s -check-prefix=CHECK-WARN
 
 // CHECK-WARN: Sub2.h:7:2: warning: here is some warning about something

@@ -1,68 +1,68 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_1 > %t.enum.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_1 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS < %t.enum.txt
 // RUN: FileCheck %s -check-prefix=FOO_ENUM_TYPE_CONTEXT < %t.enum.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_2 > %t.enum.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_2 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS < %t.enum.txt
 // RUN: FileCheck %s -check-prefix=FOO_ENUM_TYPE_CONTEXT < %t.enum.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_3 > %t.enum.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_3 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS < %t.enum.txt
 // RUN: FileCheck %s -check-prefix=BAR_ENUM_TYPE_CONTEXT < %t.enum.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_4 > %t.enum.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_4 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS < %t.enum.txt
 // RUN: FileCheck %s -check-prefix=BAZ_ENUM_TYPE_CONTEXT < %t.enum.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_5 > %t.enum.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_5 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS < %t.enum.txt
 // RUN: FileCheck %s -check-prefix=QUX_ENUM_TYPE_CONTEXT < %t.enum.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_WITH_DOT_1 > %t.enum.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_WITH_DOT_1 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=FOO_ENUM_DOT_ELEMENTS < %t.enum.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_WITH_QUAL_1 > %t.enum.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_WITH_QUAL_1 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=FOO_ENUM_DOT < %t.enum.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_EXPR_ERROR_1 > %t.enum.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_EXPR_ERROR_1 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=FOO_ENUM_DOT < %t.enum.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_IN_PATTERN_1 > %t.enum.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_IN_PATTERN_1 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS < %t.enum.txt
 // RUN: FileCheck %s -check-prefix=ENUM_SW_IN_PATTERN_1 < %t.enum.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_IN_PATTERN_2 > %t.enum.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_IN_PATTERN_2 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=ERROR_COMMON < %t.enum.txt
 // RUN: FileCheck %s -check-prefix=ENUM_SW_IN_PATTERN_2 < %t.enum.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_NO_DOT_1 > %t.enum.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_NO_DOT_1 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=FOO_ENUM_NO_DOT < %t.enum.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_NO_DOT_2 > %t.enum.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_NO_DOT_2 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=BAR_ENUM_NO_DOT < %t.enum.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_NO_DOT_3 > %t.enum.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_NO_DOT_3 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=BAZ_INT_ENUM_NO_DOT < %t.enum.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_NO_DOT_4 > %t.enum.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_NO_DOT_4 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=BAZ_T_ENUM_NO_DOT < %t.enum.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_NO_DOT_5 > %t.enum.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_NO_DOT_5 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=QUX_ENUM_NO_DOT < %t.enum.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_DOT_1 > %t.enum.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_DOT_1 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=FOO_ENUM_DOT < %t.enum.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_DOT_2 > %t.enum.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_DOT_2 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=BAR_ENUM_DOT < %t.enum.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_DOT_3 > %t.enum.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_DOT_3 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=BAZ_INT_ENUM_DOT < %t.enum.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_DOT_4 > %t.enum.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_DOT_4 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=BAZ_T_ENUM_DOT < %t.enum.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_DOT_5 > %t.enum.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_DOT_5 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=QUX_ENUM_DOT < %t.enum.txt
 
 // ERROR_COMMON: found code completion token

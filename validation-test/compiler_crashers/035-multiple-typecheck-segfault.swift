@@ -1,4 +1,4 @@
-// RUN: %swift %s -parse -verify
+// RUN: %target-parse-verify-swift
 // rdar://17242486
 protocol a {
   typealias d // expected-note{{protocol requires nested type 'd'}}

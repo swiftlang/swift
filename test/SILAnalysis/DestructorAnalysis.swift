@@ -1,4 +1,4 @@
-// RUN: %swift -O -emit-sil %s -Xllvm -debug-only=destructor-analysis 2>&1 | FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil %s -Xllvm -debug-only=destructor-analysis 2>&1 | FileCheck %s
 
 // This test depends on asserts because we look at debug output.
 // REQUIRES: asserts

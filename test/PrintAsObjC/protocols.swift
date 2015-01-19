@@ -2,8 +2,8 @@
 
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift %clang-importer-sdk -emit-module -o %t %s
-// RUN: %swift %clang-importer-sdk -parse-as-library %t/protocols.swiftmodule -parse -emit-objc-header-path %t/protocols.h -import-objc-header %S/../Inputs/empty.h
+// RUN: %target-swift-frontend %clang-importer-sdk -emit-module -o %t %s
+// RUN: %target-swift-frontend %clang-importer-sdk -parse-as-library %t/protocols.swiftmodule -parse -emit-objc-header-path %t/protocols.h -import-objc-header %S/../Inputs/empty.h
 // RUN: FileCheck %s < %t/protocols.h
 // RUN: FileCheck --check-prefix=NEGATIVE %s < %t/protocols.h
 // RUN: %check-in-clang %t/protocols.h

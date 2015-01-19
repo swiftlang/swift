@@ -1,7 +1,7 @@
+// RUN: %target-swift-frontend -emit-sil -verify %s
+
 // High-level tests that DI accepts and rejects failure from failable
 // initializers properly.
-
-// RUN: %swift -emit-sil -verify %s
 
 // For value types, we can handle failure at any point, using DI's established
 // analysis for partial struct and tuple values.

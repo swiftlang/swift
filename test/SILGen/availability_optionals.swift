@@ -1,4 +1,6 @@
-// RUN: %swift -emit-silgen -target x86_64-apple-macosx10.9 -enable-experimental-availability-checking -enable-experimental-unavailable-as-optional %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-experimental-availability-checking -enable-experimental-unavailable-as-optional %s | FileCheck %s
+
+// REQUIRES: OS=macosx
 
 @availability(OSX, introduced=10.9)
 var globalAvailableOn10_9: Int = 9

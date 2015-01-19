@@ -1,4 +1,5 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -verify -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -verify -g -o - | FileCheck %s
+
 class C<A> {
 // CHECK-DAG: ![[A:[0-9]+]] = {{.*}}; [ DW_TAG_structure_type ] [_TtQq_C11archetypes21C]
 // CHECK-DAG: ![[B:[0-9]+]] = {{.*}}; [ DW_TAG_structure_type ] [_TtQq_FC11archetypes21C3foo{{.*}}]

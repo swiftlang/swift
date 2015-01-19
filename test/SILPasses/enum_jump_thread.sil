@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -simplify-cfg -cse | FileCheck %s
+// RUN: %target-sil-opt %s -simplify-cfg -cse | FileCheck %s
 
 // Test if jump-threading is done to combine two enum instructions
 // into a single block.

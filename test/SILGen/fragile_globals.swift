@@ -1,8 +1,8 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift -emit-module -parse-as-library -sil-serialize-all -o %t %S/Inputs/ModuleA.swift
-// RUN: %swift -emit-module -parse-as-library -sil-serialize-all -o %t %S/Inputs/ModuleB.swift
-// RUN: %swift -parse-as-library -I%t %s -O -emit-sil | FileCheck %s
+// RUN: %target-swift-frontend -emit-module -parse-as-library -sil-serialize-all -o %t %S/Inputs/ModuleA.swift
+// RUN: %target-swift-frontend -emit-module -parse-as-library -sil-serialize-all -o %t %S/Inputs/ModuleB.swift
+// RUN: %target-swift-frontend -parse-as-library -I%t %s -O -emit-sil | FileCheck %s
 
 import ModuleA
 import ModuleB

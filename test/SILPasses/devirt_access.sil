@@ -1,4 +1,5 @@
-// RUN: %sil-opt %s -inline -devirtualize -verify | FileCheck %s
+// RUN: %target-sil-opt %s -inline -devirtualize -verify | FileCheck %s
+
 sil_stage canonical
 
 import Builtin

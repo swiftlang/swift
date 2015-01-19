@@ -1,116 +1,116 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_1 | FileCheck %s -check-prefix=COND_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_2 | FileCheck %s -check-prefix=COND_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_3 | FileCheck %s -check-prefix=COND_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_4 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_1 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_2 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_3 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_4 | FileCheck %s -check-prefix=COND_COMMON
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_1 | FileCheck %s -check-prefix=COND_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_2 | FileCheck %s -check-prefix=COND_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_3 | FileCheck %s -check-prefix=COND_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_4 | FileCheck %s -check-prefix=COND_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_5 | FileCheck %s -check-prefix=COND_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_6 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_1 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_2 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_3 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_4 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_5 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_6 | FileCheck %s -check-prefix=COND_COMMON
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_WHILE_1 | FileCheck %s -check-prefix=COND_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_WHILE_2 | FileCheck %s -check-prefix=COND_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_WHILE_3 | FileCheck %s -check-prefix=COND_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_WHILE_4 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_WHILE_1 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_WHILE_2 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_WHILE_3 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_WHILE_4 | FileCheck %s -check-prefix=COND_COMMON
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_DO_WHILE_1 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_DO_WHILE_1 | FileCheck %s -check-prefix=COND_COMMON
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INIT_1 | FileCheck %s -check-prefix=COND_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INIT_2 | FileCheck %s -check-prefix=COND_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INIT_3 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INIT_1 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INIT_2 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INIT_3 | FileCheck %s -check-prefix=COND_COMMON
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_COND_1 | FileCheck %s -check-prefix=COND_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_COND_2 | FileCheck %s -check-prefix=COND_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_COND_3 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_COND_1 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_COND_2 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_COND_3 | FileCheck %s -check-prefix=COND_COMMON
 
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_COND_I_1 > %t.cond.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_COND_I_1 > %t.cond.txt
 // RUN: FileCheck %s -check-prefix=COND_COMMON < %t.cond.txt
 // RUN: FileCheck %s -check-prefix=WITH_I_INT_EXPR_SPECIFIC < %t.cond.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_COND_I_2 > %t.cond.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_COND_I_2 > %t.cond.txt
 // RUN: FileCheck %s -check-prefix=COND_COMMON < %t.cond.txt
 // RUN: FileCheck %s -check-prefix=WITH_I_ERROR_EXPR_SPECIFIC < %t.cond.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_COND_I_E_1 > %t.cond.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_COND_I_E_1 > %t.cond.txt
 // RUN: FileCheck %s -check-prefix=COND_COMMON < %t.cond.txt
 // RUN: FileCheck %s -check-prefix=WITH_I_E_EXPR_SPECIFIC < %t.cond.txt
 
 
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_1 | FileCheck %s -check-prefix=COND_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_2 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_1 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_2 | FileCheck %s -check-prefix=COND_COMMON
 
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_I_1 > %t.incr.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_I_1 > %t.incr.txt
 // RUN: FileCheck %s -check-prefix=COND_COMMON < %t.incr.txt
 // RUN: FileCheck %s -check-prefix=WITH_I_INT_EXPR_SPECIFIC < %t.incr.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_I_2 > %t.incr.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_I_2 > %t.incr.txt
 // RUN: FileCheck %s -check-prefix=COND_COMMON < %t.incr.txt
 // RUN: FileCheck %s -check-prefix=WITH_I_INT_EXPR_SPECIFIC < %t.incr.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_I_3 > %t.incr.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_I_3 > %t.incr.txt
 // RUN: FileCheck %s -check-prefix=COND_COMMON < %t.incr.txt
 // RUN: FileCheck %s -check-prefix=WITH_I_INT_EXPR_SPECIFIC < %t.incr.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_I_4 > %t.incr.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_I_4 > %t.incr.txt
 // RUN: FileCheck %s -check-prefix=COND_COMMON < %t.incr.txt
 // RUN: FileCheck %s -check-prefix=WITH_I_ERROR_EXPR_SPECIFIC < %t.incr.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_I_E_1 > %t.incr.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_I_E_1 > %t.incr.txt
 // RUN: FileCheck %s -check-prefix=COND_COMMON < %t.incr.txt
 // RUN: FileCheck %s -check-prefix=WITH_I_E_EXPR_SPECIFIC < %t.incr.txt
 
 
 // FIXME: should have 'i' in these results.
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_BODY_I_1 > %t.body.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_BODY_I_1 > %t.body.txt
 // RUN: FileCheck %s -check-prefix=COND_COMMON < %t.body.txt
 // FIXME: FileCheck %s -check-prefix=WITH_I_INT_EXPR_SPECIFIC < %t.body.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_BODY_I_2 > %t.body.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_BODY_I_2 > %t.body.txt
 // RUN: FileCheck %s -check-prefix=COND_COMMON < %t.body.txt
 // RUN: FileCheck %s -check-prefix=WITH_I_INT_EXPR_SPECIFIC < %t.body.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_BODY_I_3 > %t.body.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_BODY_I_3 > %t.body.txt
 // RUN: FileCheck %s -check-prefix=COND_COMMON < %t.body.txt
 // RUN: FileCheck %s -check-prefix=WITH_I_ERROR_EXPR_SPECIFIC < %t.body.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_BODY_I_4 > %t.body.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_BODY_I_4 > %t.body.txt
 // RUN: FileCheck %s -check-prefix=COND_COMMON < %t.body.txt
 // RUN: FileCheck %s -check-prefix=WITH_I_INT_LOCAL < %t.body.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_BODY_I_5 > %t.body.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_BODY_I_5 > %t.body.txt
 // RUN: FileCheck %s -check-prefix=COND_COMMON < %t.body.txt
 // RUN: FileCheck %s -check-prefix=WITH_I_INT_LOCAL < %t.body.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_BODY_I_6 > %t.body.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_BODY_I_6 > %t.body.txt
 // RUN: FileCheck %s -check-prefix=COND_COMMON < %t.body.txt
 // RUN: FileCheck %s -check-prefix=WITH_I_INT_LOCAL < %t.body.txt
 
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_EACH_EXPR_1 | FileCheck %s -check-prefix=COND_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_EACH_EXPR_2 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_EACH_EXPR_1 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_EACH_EXPR_2 | FileCheck %s -check-prefix=COND_COMMON
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_EXPR_1 | FileCheck %s -check-prefix=COND_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_EXPR_2 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_EXPR_1 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_EXPR_2 | FileCheck %s -check-prefix=COND_COMMON
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_CASE_WHERE_EXPR_1 | FileCheck %s -check-prefix=COND_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_CASE_WHERE_EXPR_2 | FileCheck %s -check-prefix=COND_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_CASE_WHERE_EXPR_3 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_CASE_WHERE_EXPR_1 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_CASE_WHERE_EXPR_2 | FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_CASE_WHERE_EXPR_3 | FileCheck %s -check-prefix=COND_COMMON
 
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_CASE_WHERE_EXPR_I_1 > %t.where.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_CASE_WHERE_EXPR_I_1 > %t.where.txt
 // RUN: FileCheck %s -check-prefix=COND_COMMON < %t.where.txt
 // RUN: FileCheck %s -check-prefix=WITH_I_INT_LOCAL < %t.where.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_CASE_WHERE_EXPR_I_2 > %t.where.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_CASE_WHERE_EXPR_I_2 > %t.where.txt
 // RUN: FileCheck %s -check-prefix=COND_COMMON < %t.where.txt
 // RUN: FileCheck %s -check-prefix=WITH_I_INT_LOCAL < %t.where.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_CASE_WHERE_EXPR_I_J_1 > %t.where.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_CASE_WHERE_EXPR_I_J_1 > %t.where.txt
 // RUN: FileCheck %s -check-prefix=COND_COMMON < %t.where.txt
 // RUN: FileCheck %s -check-prefix=WITH_I_INT_LOCAL < %t.where.txt
 // RUN: FileCheck %s -check-prefix=WITH_J_INT < %t.where.txt

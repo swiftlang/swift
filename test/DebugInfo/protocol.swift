@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
 protocol PointUtils {
   func distanceFromOrigin() -> Float
@@ -21,10 +21,10 @@ class Point : PointUtils {
 
 }
 
-// CHECK-DAG: define hidden i64 @_TF8protocol4mainFT_Si() {
-func main() -> Int {
+// CHECK-DAG: define hidden i64 @_TF8protocol4mainFT_VSs5Int64() {
+func main() -> Int64 {
     var pt = Point(_x: 2.5, _y: 4.25)
-// CHECK: [[LOC2D:%[a-zA-Z0-9]+]] = alloca %P8protocol10PointUtils_, align 8
+// CHECK: [[LOC2D:%[a-zA-Z0-9]+]] = alloca %P8protocol10PointUtils_, align {{(4|8)}}
 // CHECK: call void @llvm.dbg.declare(metadata {{.*}} [[LOC2D]], metadata ![[LOC:.*]], metadata !{{[0-9]+}})
     var loc2d : protocol<PointUtils> = pt
     var distance = loc2d.distanceFromOrigin()

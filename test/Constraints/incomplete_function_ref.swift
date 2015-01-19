@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify %s
+// RUN: %target-parse-verify-swift
 
 Array.map // expected-error{{argument for generic parameter 'T' could not be inferred}}
 

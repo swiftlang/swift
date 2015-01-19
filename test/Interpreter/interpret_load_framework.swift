@@ -3,6 +3,8 @@
 // RUN: %clang -dynamiclib %S/Inputs/VerySmallObjCFramework.m -fmodules -F %t -o %t/VerySmallObjCFramework.framework/VerySmallObjCFramework
 // RUN: %swift_driver -F %t %s | FileCheck %s
 
+// REQUIRES: swift_interpreter
+
 import VerySmallObjCFramework
 
 // CHECK: 42

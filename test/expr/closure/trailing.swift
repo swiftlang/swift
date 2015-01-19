@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 func takeFunc(f: (Int) -> Int) -> Int {}
 func takeValueAndFunc(value: Int, f: (Int) -> Int) {}

@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 // An @objc protocol can have 'unavailable'
 // methods.  They are treated as if they

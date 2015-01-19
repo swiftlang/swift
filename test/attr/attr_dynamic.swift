@@ -1,5 +1,5 @@
-// RUN: %swift -parse -verify %s
-// RUN: %swift-ide-test -print-ast-typechecked -source-filename=%s -print-implicit-attrs
+// RUN: %target-parse-verify-swift
+// RUN: %target-swift-ide-test -print-ast-typechecked -source-filename=%s -print-implicit-attrs
 
 struct NotObjCAble {
   var c: Foo

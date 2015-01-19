@@ -1,5 +1,6 @@
-// RUN: %sil-opt %s -simplify-cfg | FileCheck %s
-// RUN: %sil-opt %s -codemotion -simplify-cfg | FileCheck %s --check-prefix=CHECK_WITH_CODEMOTION
+// RUN: %target-sil-opt %s -simplify-cfg | FileCheck %s
+// RUN: %target-sil-opt %s -codemotion -simplify-cfg | FileCheck %s --check-prefix=CHECK_WITH_CODEMOTION
+
 sil_stage raw
 
 import Builtin

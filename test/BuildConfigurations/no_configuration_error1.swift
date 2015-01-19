@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 // With a space next to the '#if'
 #if // expected-error {{expected a build configuration expression to follow the #if clause}}

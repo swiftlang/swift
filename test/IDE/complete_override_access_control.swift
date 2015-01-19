@@ -1,21 +1,21 @@
 // RUN: sed -n -e '1,/NO_ERRORS_UP_TO_HERE$/ p' %s > %t_no_errors.swift
-// RUN: %swift -verify -parse %t_no_errors.swift
+// RUN: %target-swift-frontend -parse -verify -disable-objc-attr-requires-foundation-module %t_no_errors.swift
 //
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_ABC -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_PRIVATE_ABC
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_INTERNAL_ABC -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_INTERNAL_ABC
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PUBLIC_ABC -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_PUBLIC_ABC
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_ABC -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_PRIVATE_ABC
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_INTERNAL_ABC -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_INTERNAL_ABC
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PUBLIC_ABC -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_PUBLIC_ABC
 //
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_DE -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_PRIVATE_DE
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_INTERNAL_DE -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_INTERNAL_DE
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PUBLIC_DE -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_PUBLIC_DE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_DE -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_PRIVATE_DE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_INTERNAL_DE -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_INTERNAL_DE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PUBLIC_DE -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_PUBLIC_DE
 //
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_ED -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_PRIVATE_ED
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_INTERNAL_ED -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_INTERNAL_ED
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PUBLIC_ED -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_PUBLIC_ED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_ED -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_PRIVATE_ED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_INTERNAL_ED -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_INTERNAL_ED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PUBLIC_ED -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_PUBLIC_ED
 //
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_EF -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_PRIVATE_EF
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_INTERNAL_EF -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_INTERNAL_EF
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PUBLIC_EF -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_PUBLIC_EF
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_EF -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_PRIVATE_EF
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_INTERNAL_EF -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_INTERNAL_EF
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PUBLIC_EF -code-completion-keywords=false | FileCheck %s -check-prefix=TEST_PUBLIC_EF
 
 @objc
 private class TagPA {}

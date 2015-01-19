@@ -1,4 +1,4 @@
-// RUN: %swift %clang-importer-sdk -I %S/Inputs/custom-modules -target x86_64-apple-macosx10.9 -emit-silgen -o - %s | FileCheck %s
+// RUN: %target-swift-frontend %clang-importer-sdk -I %S/Inputs/custom-modules -emit-silgen -o - %s | FileCheck %s
 
 import ObjectiveC
 import Foundation

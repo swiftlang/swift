@@ -2,21 +2,21 @@
 //
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift -module-name comments -emit-module -emit-module-path %t/comments.swiftmodule -emit-module-doc -emit-module-doc-path %t/comments.swiftdoc %s
+// RUN: %target-swift-frontend -module-name comments -emit-module -emit-module-path %t/comments.swiftmodule -emit-module-doc -emit-module-doc-path %t/comments.swiftdoc %s
 // RUN: llvm-bcanalyzer %t/comments.swiftmodule | FileCheck %s -check-prefix=BCANALYZER
 // RUN: llvm-bcanalyzer %t/comments.swiftdoc | FileCheck %s -check-prefix=BCANALYZER
-// RUN: %swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -I %t | FileCheck %s -check-prefix=FIRST
+// RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -I %t | FileCheck %s -check-prefix=FIRST
 
 // Test the case when we have a multiple files in a module.
 //
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift -module-name comments -emit-module -emit-module-path %t/first.swiftmodule -emit-module-doc -emit-module-doc-path %t/first.swiftdoc -primary-file %s %S/Inputs/def_comments.swift
-// RUN: %swift -module-name comments -emit-module -emit-module-path %t/second.swiftmodule -emit-module-doc -emit-module-doc-path %t/second.swiftdoc %s -primary-file %S/Inputs/def_comments.swift
-// RUN: %swift -module-name comments -emit-module -emit-module-path %t/comments.swiftmodule -emit-module-doc -emit-module-doc-path %t/comments.swiftdoc %t/first.swiftmodule %t/second.swiftmodule
+// RUN: %target-swift-frontend -module-name comments -emit-module -emit-module-path %t/first.swiftmodule -emit-module-doc -emit-module-doc-path %t/first.swiftdoc -primary-file %s %S/Inputs/def_comments.swift
+// RUN: %target-swift-frontend -module-name comments -emit-module -emit-module-path %t/second.swiftmodule -emit-module-doc -emit-module-doc-path %t/second.swiftdoc %s -primary-file %S/Inputs/def_comments.swift
+// RUN: %target-swift-frontend -module-name comments -emit-module -emit-module-path %t/comments.swiftmodule -emit-module-doc -emit-module-doc-path %t/comments.swiftdoc %t/first.swiftmodule %t/second.swiftmodule
 // RUN: llvm-bcanalyzer %t/comments.swiftmodule | FileCheck %s -check-prefix=BCANALYZER
 // RUN: llvm-bcanalyzer %t/comments.swiftdoc | FileCheck %s -check-prefix=BCANALYZER
-// RUN: %swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -I %t > %t.printed.txt
+// RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -I %t > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=FIRST < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=SECOND < %t.printed.txt
 

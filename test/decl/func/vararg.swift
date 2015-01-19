@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 var t1a: (Int...) = (1) // expected-error{{cannot create a variadic tuple}}
 var t2d: (Double = 0.0) = 1 // expected-error {{default argument not permitted in a tuple type}}

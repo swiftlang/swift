@@ -1,4 +1,6 @@
-// RUN: %swift %clang-importer-sdk -parse -verify -target x86_64-apple-macosx10.9 %s
+// RUN: %target-swift-frontend %clang-importer-sdk -parse -verify %s
+
+// REQUIRES: OS=macosx
 
 // The accessibility APIs are handled differently. A class might conform to both 
 // NSAccessibility (containing accessibility properties) and individual 

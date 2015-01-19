@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 // Function arguments are not API by default, so this is okay.
 func f1(a: Int, b: Int) { }

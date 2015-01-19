@@ -1,4 +1,4 @@
-// RUN: %swift %s -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-silgen | FileCheck %s
 
 // rdar://16238241
 // Make sure we can parse where clause with conformance & same-type requirements.

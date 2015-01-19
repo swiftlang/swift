@@ -1,5 +1,5 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -sdk %S/../SILGen/Inputs -I %S/../SILGen/Inputs -enable-source-import -primary-file %s -emit-sil -emit-verbose-sil | FileCheck %s -check-prefix=CHECK-DEBUG
-// RUN: %swift -target x86_64-apple-macosx10.9 -sdk %S/../SILGen/Inputs -I %S/../SILGen/Inputs -enable-source-import -primary-file %s -emit-sil -emit-verbose-sil -O | FileCheck %s -check-prefix=CHECK-RELEASE
+// RUN: %target-swift-frontend -sdk %S/../SILGen/Inputs -I %S/../SILGen/Inputs -enable-source-import -primary-file %s -emit-sil -emit-verbose-sil | FileCheck %s -check-prefix=CHECK-DEBUG
+// RUN: %target-swift-frontend -sdk %S/../SILGen/Inputs -I %S/../SILGen/Inputs -enable-source-import -primary-file %s -emit-sil -emit-verbose-sil -O | FileCheck %s -check-prefix=CHECK-RELEASE
 
 import gizmo
 

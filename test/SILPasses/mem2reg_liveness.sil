@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -mem2reg -verify | FileCheck %s
+// RUN: %target-sil-opt %s -mem2reg -verify | FileCheck %s
 
 import Builtin
 import Swift

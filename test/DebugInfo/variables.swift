@@ -1,14 +1,14 @@
-// RUN: %target-build-swift %s -g -emit-ir -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -g -emit-ir -o - | FileCheck %s
 
 // Ensure that the debug info we're emitting passes the back end verifier.
-// RUN: %target-build-swift %s -g -S -o - | FileCheck %s --check-prefix ASM
+// RUN: %target-swift-frontend %s -g -S -o - | FileCheck %s --check-prefix ASM
 // ASM: DWARF
 //
 
 // Test variables-interpreter.swift runs this code with `swift -g -i`.
 // Test variables-repl.swift runs this code with `swift -g < variables.swift`.
 
-// CHECK-DAG: ![[TLC:.*]] ={{.*}}; [ DW_TAG_module ] [main]
+// CHECK-DAG: ![[TLC:.*]] ={{.*}}; [ DW_TAG_module ] [variables]
 
 // Global variables.
 var glob_i8:   Int8 = 8;

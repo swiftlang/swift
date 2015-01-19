@@ -1,10 +1,11 @@
-// RUN: %swift -primary-file %s -emit-ir -g -o - | FileCheck %s
-struct stuffStruct {
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
+
+public struct stuffStruct {
     var a: Int = 6
     var b: String = "Nothing"
 }
 
-func f() {
+public func f() {
     var thing: stuffStruct = stuffStruct()
 }
 
@@ -12,9 +13,9 @@ func f() {
 // is constructed in an alloca. The debug info for the alloca should not
 // describe a reference type as we would normally do with inout arguments.
 //
-// CHECK: define hidden void  @_TFV4self11stuffStructCfMS0_FT_S0_(%V4self11stuffStruct* noalias sret) {
+// CHECK: define {{.*}} @_TFV4self11stuffStructCfMS0_FT_S0_(
 // CHECK-NEXT: entry:
-// CHECK-NEXT: %[[ALLOCA:.*]] = alloca %V4self11stuffStruct, align 8
+// CHECK-NEXT: %[[ALLOCA:.*]] = alloca %V4self11stuffStruct, align {{(4|8)}}
 // CHECK: call void @llvm.dbg.declare(metadata %V4self11stuffStruct* %[[ALLOCA]], metadata ![[SELF:.*]], metadata !{{[0-9]+}}), !dbg
 // CHECK: ![[STUFFSTRUCT:[^,]+]]} ; [ DW_TAG_structure_type ] [stuffStruct]
 // CHECK: ![[SELF]] = {{.*}}![[STUFFSTRUCT]]} ; [ DW_TAG_auto_variable ] [self]

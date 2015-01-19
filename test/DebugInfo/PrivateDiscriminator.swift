@@ -1,9 +1,9 @@
 // Private discriminators should only be emitted for multi-file projects.
 
-// RUN: %swift -emit-ir %s -g -o - | FileCheck --check-prefix=SINGLE %s
+// RUN: %target-swift-frontend -emit-ir %s -g -o - | FileCheck --check-prefix=SINGLE %s
 // SINGLE-NOT: -private-discriminator{{.*}}; [ DW_TAG_compile_unit ]
 
-// RUN: %swift %S/../Inputs/empty.swift -primary-file %s -emit-ir -g | FileCheck %s
+// RUN: %target-swift-frontend %S/../Inputs/empty.swift -primary-file %s -emit-ir -g | FileCheck %s
 // CHECK: -private-discriminator [[DISCRIMINATOR:_[A-Z0-9]+]]{{.*}}; [ DW_TAG_compile_unit ]
 
 private class A {

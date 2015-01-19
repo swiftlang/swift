@@ -1,5 +1,5 @@
-// RUN: %sil-opt -function-signature-opts %s | FileCheck %s
-// RUN: %sil-opt -function-signature-opts %s | FileCheck -check-prefix=CHECK-NEGATIVE %s
+// RUN: %target-sil-opt -function-signature-opts %s | FileCheck %s
+// RUN: %target-sil-opt -function-signature-opts %s | FileCheck -check-prefix=CHECK-NEGATIVE %s
 
 import Builtin
 

@@ -1,4 +1,5 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -S -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -S -g -o - | FileCheck %s
+
 func app() {
 // Make sure we don't jump back to before the prologue.
 // CHECK: .loc	[[FILEID:[0-9]]] [[@LINE+2]]

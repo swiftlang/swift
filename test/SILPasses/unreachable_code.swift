@@ -1,4 +1,4 @@
-// RUN: %swift -emit-sil %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify
 
 func ifFalse() -> Int {
   if false { // expected-note {{always evaluates to false}}

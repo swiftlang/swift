@@ -1,6 +1,8 @@
+// RUN: %target-swift-frontend -Ounchecked %s -emit-ir | FileCheck %s
+
+// REQUIRES: CPU=x86_64
+
 // We were missing target transform info and not vectorizing the loop below.
-// RUN: %swift -target x86_64-apple-macosx10.9  -Ounchecked %s  -emit-ir | FileCheck %s
-// REQUIRES: X86
 
 // CHECK: xor <2 x i64>
 

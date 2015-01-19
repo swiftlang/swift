@@ -1,7 +1,8 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+
 class Foo {
+  // CHECK: _TFC11Destructors3FooD{{.*}} ; [ DW_TAG_subprogram ] [line [[@LINE-1]]] [def] [deinit]
   var x : Int
-  // CHECK: _TFC11Destructors3FooD{{.*}} ; [ DW_TAG_subprogram ] [line 2] [def] [deinit]
   init(x: Int) { self.x = x }
   func bar() -> (() -> ()) { return { println(self.x) } }
 }

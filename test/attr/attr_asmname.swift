@@ -1,4 +1,4 @@
-// RUN: %swift %s -parse -verify
+// RUN: %target-parse-verify-swift
 
 @asmname("foo") // expected-note {{attribute already specified here}}
 @asmname("bar") // expected-error {{duplicate attribute}}

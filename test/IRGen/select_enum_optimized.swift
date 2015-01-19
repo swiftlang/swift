@@ -1,4 +1,4 @@
-// RUN: %swift -primary-file %s -O -disable-llvm-optzns -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -O -disable-llvm-optzns -emit-ir | FileCheck %s
 
 enum NoPayload {
   case E0

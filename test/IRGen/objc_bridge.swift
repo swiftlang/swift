@@ -1,6 +1,8 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-irgen-test-overlays
-// RUN: %swift -emit-ir -sdk %S/Inputs -I %t -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -sdk %S/Inputs -I %t -primary-file %s | FileCheck %s
+
+// REQUIRES: CPU=x86_64
 
 import Foundation
 

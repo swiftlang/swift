@@ -203,7 +203,7 @@ protocol decl_protocol_1 {
 extension decl_extension_1 {
 }
 
-// RUN: %swift-ide-test -print-comments -source-filename %s > %t.txt
+// RUN: %target-swift-ide-test -print-comments -source-filename %s > %t.txt
 // RUN: FileCheck %s -check-prefix=WRONG < %t.txt
 // RUN: FileCheck %s < %t.txt
 

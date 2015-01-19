@@ -1,5 +1,4 @@
-// RUN: %swift -parse %s -verify
-
+// RUN: %target-parse-verify-swift
 
 @unknown func f0() {} // expected-error{{unknown attribute 'unknown'}}
 

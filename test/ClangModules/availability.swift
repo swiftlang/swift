@@ -1,4 +1,4 @@
-// RUN: %swift %clang-importer-sdk -parse -verify -I %S/Inputs/custom-modules -target x86_64-apple-macosx10.9 %s
+// RUN: %target-swift-frontend %clang-importer-sdk -parse -verify -I %S/Inputs/custom-modules %s
 
 import Dispatch
 import Foundation
@@ -34,10 +34,6 @@ func test_class_avail(x:NSObject, obj: AnyObject) {
   x.`class`() // expected-error {{'class()' is unavailable: use 'dynamicType' instead}}
   NSObject.`class`() // expected-error {{'class()' is unavailable: use 'self' instead}}
   obj.`class`!() // expected-error {{'class()' is unavailable: use 'dynamicType' instead}}
-}
-
-func test_unavailable_because_deprecated() {
-  println(NSRealMemoryAvailable()) // expected-error {{'NSRealMemoryAvailable()' is unavailable: APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift}}
 }
 
 func test_unavailable_app_extension() {

@@ -1,4 +1,5 @@
-// RUN: %swift %s -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-silgen | FileCheck %s
+
 struct X { }
 
 class A {

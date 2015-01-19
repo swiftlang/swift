@@ -1,6 +1,9 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-irgen-test-overlays
-// RUN: %swift -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %t -primary-file %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -I %t -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | FileCheck %s
+
+// REQUIRES: CPU=x86_64
+// REQUIRES: objc_interop
 
 // CHECK: [[HOOZIT:%C17objc_class_export6Hoozit]] = type <{ [[REF:%swift.refcounted]] }>
 // CHECK: [[REF]] = type
@@ -16,7 +19,7 @@
 // CHECK:   %objc_class* @"OBJC_METACLASS_$_SwiftObject",
 // CHECK:   %objc_class* @"OBJC_METACLASS_$_SwiftObject",
 // CHECK:   %swift.opaque* @_objc_empty_cache,
-// CHECK:   %swift.opaque* @_objc_empty_vtable,
+// CHECK:   %swift.opaque* {{(@_objc_empty_vtable|null)}},
 // CHECK:   i64 ptrtoint ({{.*}}* @_METACLASS_DATA__TtC17objc_class_export3Foo to i64)
 // CHECK: }
 // CHECK: [[FOO_NAME:@.*]] = private unnamed_addr constant [28 x i8] c"_TtC17objc_class_export3Foo\00"
@@ -52,7 +55,7 @@
 // CHECK:   i64 ptrtoint (%objc_class* @"OBJC_METACLASS_$__TtC17objc_class_export3Foo" to i64),
 // CHECK:   %objc_class* @"OBJC_CLASS_$_SwiftObject",
 // CHECK:   %swift.opaque* @_objc_empty_cache,
-// CHECK:   %swift.opaque* @_objc_empty_vtable,
+// CHECK:   %swift.opaque* {{(@_objc_empty_vtable|null)}},
 // CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC17objc_class_export3Foo to i64), i64 1),
 // CHECK:   [[FOO]]* (%swift.type*)* @_TFC17objc_class_export3Foo6createfMS0_FT_S0_,
 // CHECK:   void (double, double, double, double, [[FOO]]*)* @_TFC17objc_class_export3Foo10drawInRectfS0_FT5dirtyVSC6NSRect_T_

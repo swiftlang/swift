@@ -1,4 +1,4 @@
-// RUN: %swift -primary-file %s -emit-sil -emit-verbose-sil | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-sil -emit-verbose-sil | FileCheck %s
 
 func searchForMe(x: Float) -> Float {
   return x

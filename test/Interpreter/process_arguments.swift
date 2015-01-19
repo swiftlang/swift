@@ -3,6 +3,8 @@
 // RUN: %swift -interpret %s -Onone -g -- | FileCheck %s -check-prefix=CHECK-NONE
 // RUN: %swift -interpret %s -Onone -g -- a b c | FileCheck %s -check-prefix=CHECK-THREE
 
+// REQUIRES: swift_interpreter
+
 println("Begin")
 for arg in Process.arguments { println(arg) }
 println("End")

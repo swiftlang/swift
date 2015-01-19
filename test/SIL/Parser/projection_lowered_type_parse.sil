@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -verify
+// RUN: %target-sil-opt %s -verify
 
 import Builtin
 

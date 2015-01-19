@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir %t
-// RUN: %swift -emit-module -o %t %S/Inputs/has_ambiguities.swift
-// RUN: not %swift -parse %s -I %t 2>&1 | FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/has_ambiguities.swift
+// RUN: not %target-swift-frontend -parse %s -I %t 2>&1 | FileCheck %s
 
 import has_ambiguities
 

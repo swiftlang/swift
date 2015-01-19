@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify -parse-as-library
+// RUN: %target-parse-verify-swift -parse-as-library
 
 #if FAIL
 class C {}

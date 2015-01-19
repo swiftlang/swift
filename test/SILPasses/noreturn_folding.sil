@@ -1,4 +1,4 @@
-// RUN: %sil-opt -noreturn-folding < %s | FileCheck %s
+// RUN: %target-sil-opt -noreturn-folding < %s | FileCheck %s
 
 import Builtin
 

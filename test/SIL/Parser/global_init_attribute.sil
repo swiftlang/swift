@@ -1,4 +1,4 @@
-// RUN: %swift %s -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-silgen | FileCheck %s
 
 sil_stage canonical
 

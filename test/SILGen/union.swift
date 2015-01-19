@@ -1,4 +1,4 @@
-// RUN: %swift -emit-silgen -parse-as-library %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -parse-as-library %s | FileCheck %s
 
 enum Boolish {
   case falsy

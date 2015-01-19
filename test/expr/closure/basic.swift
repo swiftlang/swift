@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 func takeIntToInt(f: (Int) -> Int) { }
 func takeIntIntToInt(f: (Int, Int) -> Int) { }

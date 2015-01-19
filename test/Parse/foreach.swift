@@ -1,4 +1,4 @@
-// RUN: %swift %s -parse -verify
+// RUN: %target-parse-verify-swift
 
 struct IntRange<Int> : SequenceType, GeneratorType {
   typealias Element = (Int, Int)

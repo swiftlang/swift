@@ -1,4 +1,4 @@
-// RUN: %swift %s -emit-sil -verify
+// RUN: %target-swift-frontend %s -emit-sil -verify
 
 sil_stage canonical
 sil_stage raw // expected-error {{sil_stage declared multiple times}}

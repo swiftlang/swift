@@ -1,9 +1,8 @@
-
-// RUN: %swift -emit-sil -O %s %S/Inputs/whole_module_optimization_helper.swift -o %t.sil -module-name main
+// RUN: %target-swift-frontend -emit-sil -O %s %S/Inputs/whole_module_optimization_helper.swift -o %t.sil -module-name main
 // RUN: FileCheck %s < %t.sil
 // RUN: FileCheck %s -check-prefix=NEGATIVE < %t.sil
 
-// RUN: %swift -emit-sil -O -primary-file %s %S/Inputs/whole_module_optimization_helper.swift -o %t.unopt.sil -module-name main
+// RUN: %target-swift-frontend -emit-sil -O -primary-file %s %S/Inputs/whole_module_optimization_helper.swift -o %t.unopt.sil -module-name main
 // RUN: FileCheck %s -check-prefix=CHECK-SINGLE-FILE < %t.unopt.sil
 
 private func privateFn() -> Int {

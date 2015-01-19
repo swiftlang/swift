@@ -1,53 +1,53 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_1 | FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_2 | FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_2
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_3 | FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_3
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_4 | FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_4
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_5 | FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_5
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_6 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_1 | FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_2 | FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_3 | FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_4 | FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_5 | FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_6 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_KW_1 | FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_KW_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1 | FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_KW_1 | FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_KW_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1 | FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_INIT_1 > %t.toplevel.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_INIT_1 > %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_INIT_1 < %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_INIT_1_NEGATIVE < %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_INIT_2 | FileCheck %s -check-prefix=TOP_LEVEL_VAR_INIT_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_INIT_2 | FileCheck %s -check-prefix=TOP_LEVEL_VAR_INIT_2
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_1 > %t.toplevel.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_1 > %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=PLAIN_TOP_LEVEL_NO_DUPLICATES < %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.txt
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_2 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_2 | FileCheck %s -check-prefix=NEGATIVE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_2 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_2 | FileCheck %s -check-prefix=NEGATIVE
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_1 > %t.toplevel.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_1 > %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_1 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_2 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_3 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_4 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_1 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_2 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_3 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_4 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_5 > %t.toplevel.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_5 > %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=TOP_LEVEL_STMT_5 < %t.toplevel.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_6 > %t.toplevel.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_6 > %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=TOP_LEVEL_STMT_6 < %t.toplevel.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_7 > %t.toplevel.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_7 > %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=TOP_LEVEL_STMT_7 < %t.toplevel.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_8 > %t.toplevel.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_8 > %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=TOP_LEVEL_STMT_8 < %t.toplevel.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_9 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_9 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
 
 // Test code completion in top-level code.
 //

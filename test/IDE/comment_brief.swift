@@ -1,4 +1,4 @@
-// RUN: %swift-ide-test -print-comments -source-filename %s | FileCheck %s
+// RUN: %target-swift-ide-test -print-comments -source-filename %s | FileCheck %s
 
 ///
 func briefLine1() {}

@@ -1,4 +1,6 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -gnone -emit-ir -enable-dynamic-value-type-layout | FileCheck %s
+// RUN: %target-swift-frontend %s -gnone -emit-ir -enable-dynamic-value-type-layout | FileCheck %s
+
+// REQUIRES: CPU=x86_64
 
 // We have to claim this is raw SIL because there are critical edges from non
 // cond_br instructions.

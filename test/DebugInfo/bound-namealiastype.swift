@@ -1,4 +1,4 @@
-// RUN: %target-build-swift -emit-ir -g %s -o - | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -g %s -o - | FileCheck %s
 
 import Dispatch
 // CHECK-DAG: ![[QUEUE_T:[0-9]+]] = {{.*}} [_TtGSQaSC21dispatch_queue_attr_t_]

@@ -1,4 +1,5 @@
-// RUN: %sil-opt %s -verify | FileCheck %s
+// RUN: %target-sil-opt %s -verify | FileCheck %s
+
 import Swift
 
 public protocol mmOutputStreamType {

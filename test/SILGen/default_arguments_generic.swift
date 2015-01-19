@@ -1,4 +1,5 @@
-// RUN: %swift -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+
 func foo<T: IntegerLiteralConvertible>(x: T = 0) { }
 
 struct Zim<T: IntegerLiteralConvertible> {

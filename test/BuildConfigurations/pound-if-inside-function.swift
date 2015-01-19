@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify -parse
+// RUN: %target-parse-verify-swift
 
 // Check that if config statement has range properly nested in its parent
 // EOF.

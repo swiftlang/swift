@@ -1,4 +1,6 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -emit-verbose-sil | FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -emit-verbose-sil | FileCheck %s
+
+// REQUIRES: objc_interop
 
 import gizmo
 
@@ -10,8 +12,8 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   retain [[THIS]]
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozit7typicalfS0_FTSi1yCSo5Gizmo_S1_ : $@cc(method) @thin (Int, @owned Gizmo, @owned Hoozit) -> @owned Gizmo
-  // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[X]], [[Y]], [[THIS]]) {{.*}} line:6:8:auto_gen
-  // CHECK-NEXT:   autorelease_return [[RES]] : $Gizmo // {{.*}} line:6:8:auto_gen
+  // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[X]], [[Y]], [[THIS]]) {{.*}} line:[[@LINE-7]]:8:auto_gen
+  // CHECK-NEXT:   autorelease_return [[RES]] : $Gizmo // {{.*}} line:[[@LINE-8]]:8:auto_gen
   // CHECK-NEXT: }
 
   // NS_CONSUMES_SELF by inheritance

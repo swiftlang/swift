@@ -1,4 +1,6 @@
-// RUN: %swift %clang-importer-sdk -target x86_64-apple-macosx10.9 %s -emit-ir -o - | FileCheck %s
+// RUN: %target-swift-frontend %clang-importer-sdk %s -emit-ir -o - | FileCheck %s
+
+// REQUIRES: OS=macosx
 
 import cvars
 

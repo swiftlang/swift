@@ -1,4 +1,4 @@
-// RUN: %swift -O %s -emit-sil | FileCheck %s
+// RUN: %target-swift-frontend -O %s -emit-sil | FileCheck %s
 
 // rdar://16761933
 // Make sure we can handle recursive function within a class that

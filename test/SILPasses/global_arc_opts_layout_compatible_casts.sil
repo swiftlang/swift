@@ -1,4 +1,4 @@
-// RUN: %sil-opt -global-arc-opts %s | FileCheck %s
+// RUN: %target-sil-opt -global-arc-opts %s | FileCheck %s
 
 // This file is separate from the normal ARC optimizer tests to make
 // it easy to remove when layout compatible types are removed.

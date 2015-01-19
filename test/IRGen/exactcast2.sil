@@ -1,4 +1,5 @@
 // RUN: %target-build-swift %s -emit-ir -o - 
+
 // Make sure we are not crashing here.
 
 sil_stage canonical

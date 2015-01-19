@@ -1,4 +1,6 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
+
+// REQUIRES: CPU=i386_or_x86_64
 
 sil_stage canonical
 
@@ -99,7 +101,7 @@ entry(%a : $AnyObject):
 }
 
 // CHECK-LABEL: define { %swift.type*, i8**, i8** } @u_cast_to_existential_metatype_mixed(%swift.type*)
-// CHECK:         [[CAST:%.*]] = call %swift.type* @swift_dynamicCastTypeToObjCProtocolUnconditional(%swift.type* %0, i64 1, i8** {{%.*}})
+// CHECK:         [[CAST:%.*]] = call %swift.type* @swift_dynamicCastTypeToObjCProtocolUnconditional(%swift.type* %0, {{(i32|i64)}} 1, i8** {{%.*}})
 // CHECK:         call { i8**, i8** } @dynamic_cast_existential_2_unconditional(%swift.type* %0, %swift.protocol* @_TMp5casts2CP, %swift.protocol* @_TMp5casts3CP2)
 // CHECK:         insertvalue {{.*}} [[CAST]]
 sil @u_cast_to_existential_metatype_mixed : $@thin (@owned @thick Any.Type) -> @owned @thick protocol<CP, OP, CP2>.Type {
@@ -181,7 +183,7 @@ nay:
 }
 
 // CHECK-LABEL: define { %swift.type*, i8**, i8** } @c_cast_to_existential_metatype_mixed(%swift.type*)
-// CHECK:         [[OBJC_CAST:%.*]] = call %swift.type* @swift_dynamicCastTypeToObjCProtocolConditional(%swift.type* %0, i64 1, i8** {{%.*}})
+// CHECK:         [[OBJC_CAST:%.*]] = call %swift.type* @swift_dynamicCastTypeToObjCProtocolConditional(%swift.type* %0, {{(i32|i64)}} 1, i8** {{%.*}})
 // CHECK:         [[IS_NULL:%.*]] = icmp eq %swift.type* [[OBJC_CAST]], null
 // CHECK:         br i1 [[IS_NULL]], label %cont, label %success
 // CHECK:       success:

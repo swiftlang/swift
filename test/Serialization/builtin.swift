@@ -1,8 +1,8 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift -emit-module -parse-stdlib -o %t %S/Inputs/alias_builtin.swift
+// RUN: %target-swift-frontend -emit-module -parse-stdlib -o %t %S/Inputs/alias_builtin.swift
 // RUN: llvm-bcanalyzer %t/alias_builtin.swiftmodule | FileCheck %s
-// RUN: %swift -I=%t -parse %s -verify
+// RUN: %target-swift-frontend -I %t -parse %s -verify
 
 // CHECK-NOT: UnknownCode
 

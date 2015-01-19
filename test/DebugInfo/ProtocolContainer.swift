@@ -1,4 +1,5 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+
 protocol AProtocol {
 	func print()
 }
@@ -10,7 +11,7 @@ class AClass : AProtocol {
 }
 // CHECK: define hidden void @_TF17ProtocolContainer3foo
 // CHECK-NEXT: entry:
-// CHECK-NEXT: %[[X:.*]] = alloca %P17ProtocolContainer9AProtocol_, align 8
+// CHECK-NEXT: %[[X:.*]] = alloca %P17ProtocolContainer9AProtocol_, align {{(4|8)}}
 // CHECK:      call void @llvm.dbg.declare(metadata %P17ProtocolContainer9AProtocol_* %[[X]], metadata ![[XMD:.*]], metadata !{{[0-9]+}})
 // CHECK-NOT: variable ] [x]
 // CHECK: ![[XMD]] = {{.*}}[ DW_TAG_arg_variable ] [x] [line [[@LINE+2]]]

@@ -1,4 +1,5 @@
-// RUN: %swift %s -emit-sil -verify
+// RUN: %target-swift-frontend %s -emit-sil -verify
+
 import Builtin
 
 // test_static_report

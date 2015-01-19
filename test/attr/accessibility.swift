@@ -1,4 +1,4 @@
-// RUN: %swift %s -parse -verify
+// RUN: %target-parse-verify-swift
 
 // CHECK PARSING
 private // expected-note {{modifier already specified here}}

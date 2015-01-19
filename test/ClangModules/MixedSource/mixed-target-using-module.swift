@@ -1,6 +1,6 @@
-// RUN: %swift %clang-importer-sdk -target x86_64-apple-macosx10.9 -F %S/Inputs/mixed-target/ -module-name Mixed -import-underlying-module -parse %s -verify
-// RUN: %swift %clang-importer-sdk -target x86_64-apple-macosx10.9 -F %S/Inputs/mixed-target/ -module-name Mixed -import-underlying-module -emit-ir %S/../../Inputs/empty.swift - | FileCheck -check-prefix=CHECK-AUTOLINK %s
-// RUN: not %swift %clang-importer-sdk -target x86_64-apple-macosx10.9 -F %S/Inputs/mixed-target/ -module-name WrongName -import-underlying-module -parse %s 2>&1 | FileCheck -check-prefix=CHECK-WRONG-NAME %s
+// RUN: %target-swift-frontend %clang-importer-sdk -F %S/Inputs/mixed-target/ -module-name Mixed -import-underlying-module -parse %s -verify
+// RUN: %target-swift-frontend %clang-importer-sdk -F %S/Inputs/mixed-target/ -module-name Mixed -import-underlying-module -emit-ir %S/../../Inputs/empty.swift - | FileCheck -check-prefix=CHECK-AUTOLINK %s
+// RUN: not %target-swift-frontend %clang-importer-sdk -F %S/Inputs/mixed-target/ -module-name WrongName -import-underlying-module -parse %s 2>&1 | FileCheck -check-prefix=CHECK-WRONG-NAME %s
 
 // CHECK-AUTOLINK: !{{[0-9]+}} = !{i32 {{[0-9]+}}, !"Linker Options", ![[LINK_LIST:[0-9]+]]}
 // CHECK-AUTOLINK: ![[LINK_LIST]] = !{

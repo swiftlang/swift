@@ -1,5 +1,9 @@
-// RUN: %swift %clang-importer-sdk -parse -verify -target x86_64-apple-macosx10.9 %s
-// RUN: %swift-ide-test %clang-importer-sdk -print-ast-typechecked -source-filename %s -target x86_64-apple-macosx10.9 -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true | FileCheck %s
+// RUN: %target-swift-frontend %clang-importer-sdk -parse -verify %s
+// RUN: %target-swift-ide-test %clang-importer-sdk -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true | FileCheck %s
+
+#if os(iOS)
+import Foundation
+#endif
 
 import CoreGraphics
 

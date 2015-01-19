@@ -2,8 +2,8 @@
 
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift %clang-importer-sdk -I %S/Inputs/custom-modules/ -emit-module -o %t %s
-// RUN: %swift %clang-importer-sdk -I %S/Inputs/custom-modules/ -parse-as-library %t/imports.swiftmodule -parse -emit-objc-header-path %t/imports.h -import-objc-header %S/../Inputs/empty.h
+// RUN: %target-swift-frontend %clang-importer-sdk -I %S/Inputs/custom-modules/ -emit-module -o %t %s
+// RUN: %target-swift-frontend %clang-importer-sdk -I %S/Inputs/custom-modules/ -parse-as-library %t/imports.swiftmodule -parse -emit-objc-header-path %t/imports.h -import-objc-header %S/../Inputs/empty.h
 // RUN: FileCheck %s < %t/imports.h
 // RUN: FileCheck -check-prefix=NEGATIVE %s < %t/imports.h
 // RUN: %check-in-clang %t/imports.h -I %S/Inputs/custom-modules/

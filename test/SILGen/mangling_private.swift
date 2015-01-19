@@ -1,14 +1,14 @@
 // RUN: rm -rf %t && mkdir %t
-// RUN: %swift -emit-module -o %t %S/Inputs/mangling_private_helper.swift
-// RUN: %swift -emit-silgen %S/Inputs/mangling_private_helper.swift | FileCheck %s -check-prefix=CHECK-BASE
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/mangling_private_helper.swift
+// RUN: %target-swift-frontend -emit-silgen %S/Inputs/mangling_private_helper.swift | FileCheck %s -check-prefix=CHECK-BASE
 
-// RUN: %swift %s -I %t -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend %s -I %t -emit-silgen | FileCheck %s
 
 // RUN: cp %s %t
-// RUN: %swift %t/mangling_private.swift -I %t -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend %t/mangling_private.swift -I %t -emit-silgen | FileCheck %s
 
 // RUN: cp %s %t/other_name.swift
-// RUN: %swift %t/other_name.swift -I %t -emit-silgen -module-name mangling_private | FileCheck %s -check-prefix=OTHER-NAME
+// RUN: %target-swift-frontend %t/other_name.swift -I %t -emit-silgen -module-name mangling_private | FileCheck %s -check-prefix=OTHER-NAME
 
 import mangling_private_helper
 

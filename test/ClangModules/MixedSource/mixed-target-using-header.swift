@@ -1,4 +1,4 @@
-// RUN: %swift %clang-importer-sdk -target x86_64-apple-macosx10.9 -I %S/../Inputs/custom-modules -import-objc-header %S/Inputs/mixed-target/header.h -parse %s -verify
+// RUN: %target-swift-frontend %clang-importer-sdk -I %S/../Inputs/custom-modules -import-objc-header %S/Inputs/mixed-target/header.h -parse %s -verify
 
 func test(foo : FooProto) {
   let _: CInt = foo.bar

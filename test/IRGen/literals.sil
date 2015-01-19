@@ -1,4 +1,6 @@
-// RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+
+// REQUIRES: CPU=x86_64
 
 // CHECK: [[U8_0:@.*]] = private unnamed_addr constant [8 x i8] c"help\09me\00"
 // CHECK: [[U8_1:@.*]] = private unnamed_addr constant [5 x i8] c"\00x\C6\AB\00"

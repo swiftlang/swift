@@ -1,8 +1,8 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %swift -emit-module -Onone -o %t %S/Inputs/devirt_access_other_module.swift
+// RUN: %target-swift-frontend -emit-module -Onone -o %t %S/Inputs/devirt_access_other_module.swift
 
-// RUN: %swift -O -primary-file %s %S/Inputs/devirt_access_helper.swift -I %t -emit-sil -enable-private-discriminators -sil-inline-threshold 1000 -sil-verify-all | FileCheck -check-prefix=WHOLE-MODULE %s
-// RUN: %swift -O -primary-file %s %S/Inputs/devirt_access_helper.swift -I %t -emit-sil -enable-private-discriminators -sil-inline-threshold 1000 -sil-verify-all | FileCheck -check-prefix=PRIMARY-FILE %s
+// RUN: %target-swift-frontend -O -primary-file %s %S/Inputs/devirt_access_helper.swift -I %t -emit-sil -enable-private-discriminators -sil-inline-threshold 1000 -sil-verify-all | FileCheck -check-prefix=WHOLE-MODULE %s
+// RUN: %target-swift-frontend -O -primary-file %s %S/Inputs/devirt_access_helper.swift -I %t -emit-sil -enable-private-discriminators -sil-inline-threshold 1000 -sil-verify-all | FileCheck -check-prefix=PRIMARY-FILE %s
 
 import devirt_access_other_module
 

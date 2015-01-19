@@ -1,4 +1,4 @@
-// RUN: %swift -parse -parse-stdlib -verify %s
+// RUN: %target-parse-verify-swift -parse-stdlib
 
 // This disables importing the stdlib intentionally.
 

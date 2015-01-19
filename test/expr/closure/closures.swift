@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 var func6 : (fn : (Int,Int) -> Int) -> ()
 var func6a : ((Int, Int) -> Int) -> ()

@@ -1,4 +1,4 @@
-// RUN: %swift -enable-experimental-patterns -I %S/Inputs -enable-source-import -parse -verify %s
+// RUN: %target-parse-verify-swift -enable-experimental-patterns -I %S/Inputs -enable-source-import
 
 import imported_enums
 

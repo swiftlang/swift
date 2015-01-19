@@ -1,8 +1,8 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=WEAK_VARS_1 | FileCheck %s -check-prefix=WEAK_VARS_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=WEAK_NO_DOT_1 | FileCheck %s -check-prefix=WEAK_NO_DOT_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=WEAK_DOT_1 | FileCheck %s -check-prefix=WEAK_DOT_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=UNOWNED_NO_DOT_1 | FileCheck %s -check-prefix=UNOWNED_NO_DOT_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=UNOWNED_DOT_1 | FileCheck %s -check-prefix=UNOWNED_DOT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WEAK_VARS_1 | FileCheck %s -check-prefix=WEAK_VARS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WEAK_NO_DOT_1 | FileCheck %s -check-prefix=WEAK_NO_DOT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WEAK_DOT_1 | FileCheck %s -check-prefix=WEAK_DOT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNOWNED_NO_DOT_1 | FileCheck %s -check-prefix=UNOWNED_NO_DOT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNOWNED_DOT_1 | FileCheck %s -check-prefix=UNOWNED_DOT_1
 
 class CompleteWeak {
   func instanceFunc() {}

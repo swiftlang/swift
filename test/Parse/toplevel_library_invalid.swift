@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify -parse-as-library %s
+// RUN: %target-parse-verify-swift -parse-as-library
 
 println("a"); // expected-error {{expressions are not allowed at the top level}}
 println("a"); // expected-error {{expressions are not allowed at the top level}}

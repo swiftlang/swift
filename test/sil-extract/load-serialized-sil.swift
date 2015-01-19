@@ -1,4 +1,4 @@
-// RUN: %swift -primary-file %s -module-name Swift -g -sil-serialize-all -module-link-name swiftCore -O -parse-as-library -parse-stdlib -emit-module -emit-module-path - -o /dev/null | %sil-extract -module-name="Swift" -func="_TFVSs1X4testfS_FT_T_" | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -module-name Swift -g -sil-serialize-all -module-link-name swiftCore -O -parse-as-library -parse-stdlib -emit-module -emit-module-path - -o /dev/null | %target-sil-extract -module-name="Swift" -func="_TFVSs1X4testfS_FT_T_" | FileCheck %s
 
 // CHECK: import Builtin
 // CHECK: import Swift

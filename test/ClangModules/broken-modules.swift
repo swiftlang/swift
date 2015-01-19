@@ -1,5 +1,5 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: not %swift -parse %s -I %S/Inputs/custom-modules/ -show-diagnostics-after-fatal 2> %t/err.txt
+// RUN: not %target-swift-frontend -parse %s -I %S/Inputs/custom-modules/ -show-diagnostics-after-fatal 2> %t/err.txt
 // RUN: FileCheck %s < %t/err.txt
 
 import MissingHeader

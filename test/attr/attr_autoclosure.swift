@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 // Simple case.
 @autoclosure var fn : () -> Int = 4

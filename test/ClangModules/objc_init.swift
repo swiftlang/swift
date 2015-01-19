@@ -1,4 +1,7 @@
-// RUN: %swift %clang-importer-sdk -emit-sil -I %S/Inputs/custom-modules -target x86_64-apple-macosx10.9 %s -verify
+// RUN: %target-swift-frontend %clang-importer-sdk -emit-sil -I %S/Inputs/custom-modules %s -verify
+
+// REQUIRES: OS=macosx
+// FIXME: <rdar://problem/19452886> test/ClangModules/objc_init.swift should not require REQUIRES: OS=macosx
 
 import AppKit
 import objc_ext

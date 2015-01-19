@@ -1,0 +1,83 @@
+// RUN: %target-swift-frontend -module-name generic_classes %s -emit-ir | FileCheck %s -check-prefix=CHECK-%target-os
+
+// REQUIRES: CPU=x86_64
+
+// rdar://15806697 - use null pointers for &_objc_empty_vtable in the simulator
+//
+// Objective-C class objects contain two pointers which are
+// canonically supposed to be initialized to a pair of symbols
+// vended by the Objective-C runtime: &objc_empty_cache and
+// &objc_empty_vtable.  The runtime defines the first with a
+// normal global variable.  The second is currently defined as
+// an absolute symbol 0, i.e. the runtime says that the address
+// of that symbol is a null pointer, meaning that references to
+// it should resolve to a null pointer, i.e. that field in ObjC
+// classes should be initialized to zero.
+//
+// If you go far back enough in time, you can find a version of
+// dyld that does not actually support absolute symbols; but
+// much more importantly, the iOS simulator does not actually
+// use dyld, and instead uses its own gross collection of hacks,
+// which do not happen to include support for absolute symbols.
+// So this pointer is getting initialized in a totally bogus way
+// when running on the iOS simulator.
+//
+// This field is actually used by the runtime, and it's for
+// something completely unrelated to v-tables: it's used as a
+// mask for the method cache hashtable.  So using a totally
+// bogus value here really screws up the runtime.
+//
+// The reason this doesn't break everything in the world is that
+// the ObjC runtime has a hack in it for running on the
+// simulator: it goes through every class in the class list and
+// initializes this field to zero.  However, Swift generic
+// classes do not actually appear in the class list, and so they
+// do not benefit from this hack.
+//
+// The crash in this bug occurs when the initialization of a
+// generic class specialization calls +class in order to force
+// the ObjC runtime to recognize the new class.  (This is
+// important if ObjC messages will be sent to the object; in
+// this case, no messages will be sent to the object, but the
+// generic-class runtime doesn't know that.)  Because the
+// "vtable" field is misinitialized, this message send explodes.
+
+import Swift
+
+class RootNonGeneric {
+  var x : UInt8
+  var y : Int
+  var z : UInt8
+
+  init()
+}
+sil @_TFC15generic_classes14RootNonGenericD : $@cc(method) @thin (RootNonGeneric) -> ()
+
+// CHECK-macosx: @_TMdC15generic_classes14RootNonGeneric = global { {{.*}} } {
+// CHECK-macosx:   void (%C15generic_classes14RootNonGeneric*)* @_TFC15generic_classes14RootNonGenericD,
+// CHECK-macosx:   i8** @_TWVBo,
+// CHECK-macosx:   i64 ptrtoint (%objc_class* @_TMmC15generic_classes14RootNonGeneric to i64),
+// CHECK-macosx:   %objc_class* @"OBJC_CLASS_$_SwiftObject",
+// CHECK-macosx:   %swift.opaque* @_objc_empty_cache,
+// CHECK-macosx:   %swift.opaque* @_objc_empty_vtable,
+// CHECK-macosx:   @_DATA__TtC15generic_classes14RootNonGeneric
+// CHECK-macosx:   i32 33,
+// CHECK-macosx:   i16 7,
+// CHECK-macosx:   i16 0,
+// CHECK-macosx:   {{.*}}* @_TMnC15generic_classes14RootNonGeneric,
+// CHECK-macosx: }
+
+// CHECK-ios: @_TMdC15generic_classes14RootNonGeneric = global { {{.*}} } {
+// CHECK-ios:   void (%C15generic_classes14RootNonGeneric*)* @_TFC15generic_classes14RootNonGenericD,
+// CHECK-ios:   i8** @_TWVBo,
+// CHECK-ios:   i64 ptrtoint (%objc_class* @_TMmC15generic_classes14RootNonGeneric to i64),
+// CHECK-ios:   %objc_class* @"OBJC_CLASS_$_SwiftObject",
+// CHECK-ios:   %swift.opaque* @_objc_empty_cache,
+// CHECK-ios:   %swift.opaque* null,
+// CHECK-ios:   @_DATA__TtC15generic_classes14RootNonGeneric
+// CHECK-ios:   i32 33,
+// CHECK-ios:   i16 7,
+// CHECK-ios:   i16 0,
+// CHECK-ios:   {{.*}}* @_TMnC15generic_classes14RootNonGeneric,
+// CHECK-ios: }
+

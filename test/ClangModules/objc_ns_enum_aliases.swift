@@ -1,4 +1,4 @@
-// RUN: %swift %clang-importer-sdk -parse -target x86_64-apple-macosx10.9 %s -verify
+// RUN: %target-swift-frontend %clang-importer-sdk -parse %s -verify
 
 import Foundation
 

@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -sdk %S/Inputs -emit-silgen -I %S/Inputs -enable-source-import %s | FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module | FileCheck %s
 
 import gizmo
 

@@ -1,4 +1,4 @@
-// RUN: %swift -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 func takeFn<T>(f : T -> T?) {}
 func liftOptional(x : Int) -> Int? { return x }

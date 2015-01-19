@@ -1,4 +1,4 @@
-// RUN: %swift -dump-ast %s 2>&1 | FileCheck %s
+// RUN: %target-swift-frontend -dump-ast %s 2>&1 | FileCheck %s
 
 // CHECK: (func_decl "r13756261(_:_:)"
 func r13756261(x: Bool, y: Int) -> Int {

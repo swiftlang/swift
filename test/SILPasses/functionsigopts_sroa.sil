@@ -1,4 +1,4 @@
-// RUN: %sil-opt -function-signature-opts -verify %s | FileCheck %s
+// RUN: %target-sil-opt -function-signature-opts -verify %s | FileCheck %s
 
 import Builtin
 

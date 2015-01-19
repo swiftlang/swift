@@ -1,35 +1,35 @@
 // rdar://13723332 Crash on -emit-sil with no input files
-// RUN: not %swift -emit-sil 2>&1 | FileCheck -check-prefix=NO_FILES %s
-// RUN: not %swift -emit-sil -parse-as-library 2>&1 | FileCheck -check-prefix=NO_FILES %s
+// RUN: not %target-swift-frontend -emit-sil 2>&1 | FileCheck -check-prefix=NO_FILES %s
+// RUN: not %target-swift-frontend -emit-sil -parse-as-library 2>&1 | FileCheck -check-prefix=NO_FILES %s
 // NO_FILES: this mode requires at least one input file
 
-// RUN: not %swift -parse-sil -emit-sil 2>&1 | FileCheck -check-prefix=SIL_FILES %s
-// RUN: not %swift -parse-sil -emit-sil %s %s 2>&1 | FileCheck -check-prefix=SIL_FILES %s
+// RUN: not %target-swift-frontend -parse-sil -emit-sil 2>&1 | FileCheck -check-prefix=SIL_FILES %s
+// RUN: not %target-swift-frontend -parse-sil -emit-sil %s %s 2>&1 | FileCheck -check-prefix=SIL_FILES %s
 // SIL_FILES: this mode requires a single input file
 
-// RUN: not %swift -emit-silgen -parse-as-library %S/Inputs/invalid-module-name.swift 2>&1 | FileCheck -check-prefix=INVALID_MODULE_NAME %s
+// RUN: not %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid-module-name.swift 2>&1 | FileCheck -check-prefix=INVALID_MODULE_NAME %s
 // INVALID_MODULE_NAME: error: module name "invalid-module-name" is not a valid identifier; use -module-name flag to specify an alternate name
 
-// RUN: not %swift -emit-silgen -parse-as-library %S/Inputs/invalid.module.name.swift 2>&1 | FileCheck -check-prefix=INVALID_MODULE_NAME2 %s
+// RUN: not %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid.module.name.swift 2>&1 | FileCheck -check-prefix=INVALID_MODULE_NAME2 %s
 // INVALID_MODULE_NAME2: error: module name "invalid.module.name" is not a valid identifier; use -module-name flag to specify an alternate name
 
-// RUN: not %swift -emit-silgen -parse-as-library %S/Inputs/invalid-module-name.swift -module-name still-invalid 2>&1 | FileCheck -check-prefix=STILL_INVALID %s
+// RUN: not %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid-module-name.swift -module-name still-invalid 2>&1 | FileCheck -check-prefix=STILL_INVALID %s
 // STILL_INVALID: error: module name "still-invalid" is not a valid identifier{{$}}
 
-// RUN: not %swiftc_driver -emit-silgen -parse-as-library %s -module-name "Swift" 2>&1 | FileCheck -check-prefix=STDLIB_MODULE %s
-// RUN: %swiftc_driver -emit-silgen -parse-as-library %s -module-name "Swift" -parse-stdlib -###
+// RUN: not %target-swiftc_driver -emit-silgen -parse-as-library %s -module-name "Swift" 2>&1 | FileCheck -check-prefix=STDLIB_MODULE %s
+// RUN: %target-swiftc_driver -emit-silgen -parse-as-library %s -module-name "Swift" -parse-stdlib -###
 // STDLIB_MODULE: error: module name "Swift" is reserved for the standard library{{$}}
 
-// RUN: not %swift -parse -emit-module %s 2>&1 | FileCheck -check-prefix=PARSE_NO_MODULE %s
+// RUN: not %target-swift-frontend -parse -emit-module %s 2>&1 | FileCheck -check-prefix=PARSE_NO_MODULE %s
 // PARSE_NO_MODULE: error: this mode does not support emitting modules{{$}}
 
-// RUN: not %swift -dump-ast -emit-dependencies %s 2>&1 | FileCheck -check-prefix=DUMP_NO_DEPS %s
+// RUN: not %target-swift-frontend -dump-ast -emit-dependencies %s 2>&1 | FileCheck -check-prefix=DUMP_NO_DEPS %s
 // DUMP_NO_DEPS: error: this mode does not support emitting dependency files{{$}}
 
 // Should not fail with non-zero exit code.
-// RUN: %swift -emit-silgen %S/Inputs/invalid-module-name.swift > /dev/null
-// RUN: %swift -emit-silgen -parse-as-library %S/Inputs/invalid-module-name.swift -module-name foo > /dev/null
-// RUN: %swift -parse -parse-as-library %S/Inputs/invalid-module-name.swift -module-name foo
+// RUN: %target-swift-frontend -emit-silgen %S/Inputs/invalid-module-name.swift > /dev/null
+// RUN: %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid-module-name.swift -module-name foo > /dev/null
+// RUN: %target-swift-frontend -parse -parse-as-library %S/Inputs/invalid-module-name.swift -module-name foo
 
 // RUN: not %swiftc_driver -crazy-option-that-does-not-exist %s 2>&1 | FileCheck -check-prefix=INVALID_OPTION %s
 // RUN: not %swift_driver -crazy-option-that-does-not-exist 2>&1 | FileCheck -check-prefix=INVALID_OPTION %s

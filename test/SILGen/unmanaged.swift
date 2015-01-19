@@ -1,4 +1,4 @@
-// RUN: %swift -emit-sil %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-sil %s | FileCheck %s
 
 class C {}
 

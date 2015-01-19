@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
 // radar://16375832
 sil_stage raw
 

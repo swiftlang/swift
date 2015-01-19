@@ -1,4 +1,4 @@
-// RUN: %swift -gnone -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -gnone -emit-ir %s | FileCheck %s
 
 import Builtin
 
@@ -11,32 +11,32 @@ enum SinglePayloadSingleEmpty {
 sil @select_enum_SinglePayloadSingleEmpty : $@thin (@in SinglePayloadSingleEmpty) -> () {
 bb0(%0 : $*SinglePayloadSingleEmpty):
   %1 = load %0 : $*SinglePayloadSingleEmpty
-  // CHECK: [[PAYLOAD1:%[0-9]+]] = load i64*
+  // CHECK: [[PAYLOAD1:%[0-9]+]] = load [[WORD_TY:(i32|i64)]]*
   // CHECK: [[TAG1:%[0-9]+]] = load i1*
 
   %2 = integer_literal $Builtin.Int32, 2
   %3 = integer_literal $Builtin.Int32, 3
 
-  // CHECK:      [[V1:%[0-9]+]] = icmp eq i64 [[PAYLOAD1]], 0
+  // CHECK:      [[V1:%[0-9]+]] = icmp eq [[WORD_TY]] [[PAYLOAD1]], 0
   // CHECK-NEXT: [[V2:%[0-9]+]] = and i1 [[TAG1]], [[V1]]
   // CHECK-NEXT:   select i1 [[V2]], i32 2, i32 3
   %4 = select_enum %1 : $SinglePayloadSingleEmpty, case #SinglePayloadSingleEmpty.EmptyCase!enumelt: %2, case #SinglePayloadSingleEmpty.DataCase!enumelt.1: %3 : $Builtin.Int32
 
-  // CHECK:      [[V1:%[0-9]+]] = icmp eq i64 [[PAYLOAD1]], 0
+  // CHECK:      [[V1:%[0-9]+]] = icmp eq [[WORD_TY]] [[PAYLOAD1]], 0
   // CHECK-NEXT: [[V2:%[0-9]+]] = and i1 [[TAG1]], [[V1]]
   // CHECK-NEXT: [[V3:%[0-9]+]] = xor i1 [[V2]], true
   // CHECK-NEXT:   select i1 [[V3]], i32 3, i32 2
   %5 = select_enum %1 : $SinglePayloadSingleEmpty, case #SinglePayloadSingleEmpty.DataCase!enumelt.1: %3, case #SinglePayloadSingleEmpty.EmptyCase!enumelt: %2 : $Builtin.Int32
 
-  // CHECK: [[PAYLOAD0:%[0-9]+]] = load i64*
+  // CHECK: [[PAYLOAD0:%[0-9]+]] = load [[WORD_TY]]*
   // CHECK: [[TAG0:%[0-9]+]] = load i1*
 
-  // CHECK:      [[V1:%[0-9]+]] = icmp eq i64 [[PAYLOAD0]], 0
+  // CHECK:      [[V1:%[0-9]+]] = icmp eq [[WORD_TY]] [[PAYLOAD0]], 0
   // CHECK-NEXT: [[V2:%[0-9]+]] = and i1 [[TAG0]], [[V1]]
   // CHECK-NEXT:   select i1 [[V2]], i32 2, i32 3
   %6 = select_enum_addr %0 : $*SinglePayloadSingleEmpty, case #SinglePayloadSingleEmpty.EmptyCase!enumelt: %2, case #SinglePayloadSingleEmpty.DataCase!enumelt.1: %3 : $Builtin.Int32
 
-  // CHECK:      [[V1:%[0-9]+]] = icmp eq i64 [[PAYLOAD1]], 0
+  // CHECK:      [[V1:%[0-9]+]] = icmp eq [[WORD_TY]] [[PAYLOAD1]], 0
   // CHECK-NEXT: [[V2:%[0-9]+]] = and i1 [[TAG1]], [[V1]]
   // CHECK-NEXT:   select i1 [[V2]], i32 2, i32 3
   %7 = select_enum %1 : $SinglePayloadSingleEmpty, case #SinglePayloadSingleEmpty.EmptyCase!enumelt: %2, default %3 : $Builtin.Int32

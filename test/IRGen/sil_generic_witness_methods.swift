@@ -1,4 +1,6 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | FileCheck %s
+
+// REQUIRES: CPU=x86_64
 
 // FIXME: These should be SIL tests, but we can't parse generic types in SIL
 // yet.

@@ -1,4 +1,4 @@
-// RUN: %sil-opt -global-arc-opts -verify %s | FileCheck %s
+// RUN: %target-sil-opt -global-arc-opts -verify %s | FileCheck %s
 
 sil_stage canonical
 

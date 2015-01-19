@@ -1,4 +1,6 @@
-// RUN: %swift -emit-silgen -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-os-%target-cpu
+
+// REQUIRES: objc_interop
 
 import Foundation
 
@@ -82,22 +84,56 @@ func setFoo(var f: Foo, var s: String) {
 func getZim(f: Foo) -> Bool {
   return f.zim()
 }
-// CHECK-LABEL: sil hidden @_TF13objc_bridging6getZim
-// CHECK:   [[OBJC_BOOL:%.*]] = apply {{.*}} : $@cc(objc_method) @thin (Foo) -> ObjCBool
-// CHECK:   [[CONVERT:%.*]] = function_ref @swift_ObjCBoolToBool : $@thin (ObjCBool) -> Bool
-// CHECK:   [[SWIFT_BOOL:%.*]] = apply [[CONVERT]]([[OBJC_BOOL]]) : $@thin (ObjCBool) -> Bool
-// CHECK:   return [[SWIFT_BOOL]] : $Bool
-// CHECK: }
+// CHECK-i386-LABEL: sil hidden @_TF13objc_bridging6getZim
+// CHECK-i386:   [[OBJC_BOOL:%.*]] = apply {{.*}} : $@cc(objc_method) @thin (Foo) -> ObjCBool
+// CHECK-i386:   [[CONVERT:%.*]] = function_ref @swift_ObjCBoolToBool : $@thin (ObjCBool) -> Bool
+// CHECK-i386:   [[SWIFT_BOOL:%.*]] = apply [[CONVERT]]([[OBJC_BOOL]]) : $@thin (ObjCBool) -> Bool
+// CHECK-i386:   return [[SWIFT_BOOL]] : $Bool
+// CHECK-i386: }
+
+// CHECK-macsox-x86_64-LABEL: sil hidden @_TF13objc_bridging6getZim
+// CHECK-macsox-x86_64:   [[OBJC_BOOL:%.*]] = apply {{.*}} : $@cc(objc_method) @thin (Foo) -> ObjCBool
+// CHECK-macsox-x86_64:   [[CONVERT:%.*]] = function_ref @swift_ObjCBoolToBool : $@thin (ObjCBool) -> Bool
+// CHECK-macsox-x86_64:   [[SWIFT_BOOL:%.*]] = apply [[CONVERT]]([[OBJC_BOOL]]) : $@thin (ObjCBool) -> Bool
+// CHECK-macsox-x86_64:   return [[SWIFT_BOOL]] : $Bool
+// CHECK-macsox-x86_64: }
+
+// CHECK-ios-x86_64-LABEL: sil hidden @_TF13objc_bridging6getZim
+// CHECK-ios-x86_64:   [[SWIFT_BOOL:%.*]] = apply {{.*}} : $@cc(objc_method) @thin (Foo) -> Bool
+// CHECK-ios-x86_64:   return [[SWIFT_BOOL]] : $Bool
+// CHECK-ios-x86_64: }
+
+// CHECK-arm64-LABEL: sil hidden @_TF13objc_bridging6getZim
+// CHECK-arm64:   [[SWIFT_BOOL:%.*]] = apply {{.*}} : $@cc(objc_method) @thin (Foo) -> Bool
+// CHECK-arm64:   return [[SWIFT_BOOL]] : $Bool
+// CHECK-arm64: }
 
 // @interface Foo -(void) setZim: (BOOL)b; @end
 func setZim(f: Foo, b: Bool) {
   f.setZim(b)
 }
-// CHECK-LABEL: sil hidden @_TF13objc_bridging6setZim
-// CHECK:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@thin (Bool) -> ObjCBool
-// CHECK:   [[OBJC_BOOL:%.*]] = apply [[CONVERT]]({{%.*}}) : $@thin (Bool) -> ObjCBool
-// CHECK:   apply {{%.*}}([[OBJC_BOOL]], {{%.*}}) : $@cc(objc_method) @thin (ObjCBool, Foo) -> ()
-// CHECK: }
+// CHECK-i386-LABEL: sil hidden @_TF13objc_bridging6setZim
+// CHECK-i386:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@thin (Bool) -> ObjCBool
+// CHECK-i386:   [[OBJC_BOOL:%.*]] = apply [[CONVERT]]({{%.*}}) : $@thin (Bool) -> ObjCBool
+// CHECK-i386:   apply {{%.*}}([[OBJC_BOOL]], {{%.*}}) : $@cc(objc_method) @thin (ObjCBool, Foo) -> ()
+// CHECK-i386: }
+
+// CHECK-macsox-x86_64-LABEL: sil hidden @_TF13objc_bridging6setZim
+// CHECK-macsox-x86_64:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@thin (Bool) -> ObjCBool
+// CHECK-macsox-x86_64:   [[OBJC_BOOL:%.*]] = apply [[CONVERT]]({{%.*}}) : $@thin (Bool) -> ObjCBool
+// CHECK-macsox-x86_64:   apply {{%.*}}([[OBJC_BOOL]], {{%.*}}) : $@cc(objc_method) @thin (ObjCBool, Foo) -> ()
+// CHECK-macsox-x86_64: }
+
+// CHECK-ios-x86_64-LABEL: sil hidden @_TF13objc_bridging6setZim
+// CHECK-ios-x86_64: bb0([[FOO_OBJ:%[0-9]+]] : $Foo, [[SWIFT_BOOL:%[0-9]+]] : $Bool):
+// CHECK-ios-x86_64:   apply {{%.*}}([[SWIFT_BOOL]], [[FOO_OBJ]]) : $@cc(objc_method) @thin (Bool, Foo) -> ()
+// CHECK-ios-x86_64: }
+
+// CHECK-arm64-LABEL: sil hidden @_TF13objc_bridging6setZim
+// CHECK-arm64: bb0([[FOO_OBJ:%[0-9]+]] : $Foo, [[SWIFT_BOOL:%[0-9]+]] : $Bool):
+// CHECK-arm64:   apply {{%.*}}([[SWIFT_BOOL]], [[FOO_OBJ]]) : $@cc(objc_method) @thin (Bool, Foo) -> ()
+// CHECK-arm64: }
+
 // @interface Foo -(_Bool) zang; @end
 func getZang(f: Foo) -> Bool {
   return f.zang()
@@ -362,12 +398,37 @@ func forceNSArrayMembers() -> (NSArray, NSArray) {
 // CHECK:         [[RESULT:%.*]] = apply [[METHOD]]
 // CHECK:         return [[RESULT]]
 
-// Check that type lowering preserves the bool/BOOL distinction when bridging imported C functions.
-// CHECK-LABEL: sil hidden @_TF13objc_bridging5boolsFSbTSbSb_
-// CHECK:         function_ref @useBOOL : $@cc(cdecl) @thin (ObjCBool) -> ()
-// CHECK:         function_ref @useBool : $@cc(cdecl) @thin (Bool) -> ()
-// CHECK:         function_ref @getBOOL : $@cc(cdecl) @thin () -> ObjCBool
-// CHECK:         function_ref @getBool : $@cc(cdecl) @thin () -> Bool
+// Check that type lowering preserves the bool/BOOL distinction when bridging
+// imported C functions.
+
+// CHECK-i386-LABEL: sil hidden @_TF13objc_bridging5boolsFSbTSbSb_
+// CHECK-i386:         function_ref @useBOOL : $@cc(cdecl) @thin (ObjCBool) -> ()
+// CHECK-i386:         function_ref @useBool : $@cc(cdecl) @thin (Bool) -> ()
+// CHECK-i386:         function_ref @getBOOL : $@cc(cdecl) @thin () -> ObjCBool
+// CHECK-i386:         function_ref @getBool : $@cc(cdecl) @thin () -> Bool
+
+// CHECK-macsox-x86_64-LABEL: sil hidden @_TF13objc_bridging5boolsFSbTSbSb_
+// CHECK-macsox-x86_64:         function_ref @useBOOL : $@cc(cdecl) @thin (ObjCBool) -> ()
+// CHECK-macsox-x86_64:         function_ref @useBool : $@cc(cdecl) @thin (Bool) -> ()
+// CHECK-macsox-x86_64:         function_ref @getBOOL : $@cc(cdecl) @thin () -> ObjCBool
+// CHECK-macsox-x86_64:         function_ref @getBool : $@cc(cdecl) @thin () -> Bool
+
+// FIXME: no distinction on x86_64 and arm64, since SILGen looks at the
+// underlying Clang decl of the bridged decl to decide whether it needs
+// bridging.
+//
+// CHECK-ios-x86_64-LABEL: sil hidden @_TF13objc_bridging5boolsFSbTSbSb_
+// CHECK-ios-x86_64:         function_ref @useBOOL : $@cc(cdecl) @thin (Bool) -> ()
+// CHECK-ios-x86_64:         function_ref @useBool : $@cc(cdecl) @thin (Bool) -> ()
+// CHECK-ios-x86_64:         function_ref @getBOOL : $@cc(cdecl) @thin () -> Bool
+// CHECK-ios-x86_64:         function_ref @getBool : $@cc(cdecl) @thin () -> Bool
+
+// CHECK-arm64-LABEL: sil hidden @_TF13objc_bridging5boolsFSbTSbSb_
+// CHECK-arm64:         function_ref @useBOOL : $@cc(cdecl) @thin (Bool) -> ()
+// CHECK-arm64:         function_ref @useBool : $@cc(cdecl) @thin (Bool) -> ()
+// CHECK-arm64:         function_ref @getBOOL : $@cc(cdecl) @thin () -> Bool
+// CHECK-arm64:         function_ref @getBool : $@cc(cdecl) @thin () -> Bool
+
 func bools(x: Bool) -> (Bool, Bool) {
   useBOOL(x)
   useBool(x)

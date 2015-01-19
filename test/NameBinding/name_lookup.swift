@@ -1,4 +1,4 @@
-// RUN: %swift -verify -parse %s
+// RUN: %target-parse-verify-swift
 
 class ThisBase1 {
   init() { }

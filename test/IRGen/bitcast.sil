@@ -1,4 +1,6 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
+
+// REQUIRES: CPU=i386_or_x86_64
 
 sil_stage canonical
 
@@ -6,30 +8,49 @@ import Swift
 
 class C {}
 
-// CHECK-LABEL: define i64 @bitcast_trivial(%C7bitcast1C*) {
-// CHECK:         [[BUF:%.*]] = alloca %C7bitcast1C*, align 8
-// CHECK:         store %C7bitcast1C* %0, %C7bitcast1C** [[BUF]]
-// CHECK:         [[OUT_BUF:%.*]] = bitcast %C7bitcast1C** [[BUF]] to %Si*
-// CHECK:         [[VALUE_BUF:%.*]] = getelementptr inbounds %Si* [[OUT_BUF]], i32 0, i32 0
-// CHECK:         [[VALUE:%.*]] = load i64* [[VALUE_BUF]], align 8
-// CHECK:         ret i64 [[VALUE]]
-// CHECK:       }
+// CHECK-i386-LABEL: define i32 @bitcast_trivial(%C7bitcast1C*) {
+// CHECK-i386:         [[BUF:%.*]] = alloca %C7bitcast1C*, align 4
+// CHECK-i386:         store %C7bitcast1C* %0, %C7bitcast1C** [[BUF]]
+// CHECK-i386:         [[OUT_BUF:%.*]] = bitcast %C7bitcast1C** [[BUF]] to %Si*
+// CHECK-i386:         [[VALUE_BUF:%.*]] = getelementptr inbounds %Si* [[OUT_BUF]], i32 0, i32 0
+// CHECK-i386:         [[VALUE:%.*]] = load i32* [[VALUE_BUF]], align 4
+// CHECK-i386:         ret i32 [[VALUE]]
+// CHECK-i386:       }
+
+// CHECK-x86_64-LABEL: define i64 @bitcast_trivial(%C7bitcast1C*) {
+// CHECK-x86_64:         [[BUF:%.*]] = alloca %C7bitcast1C*, align 8
+// CHECK-x86_64:         store %C7bitcast1C* %0, %C7bitcast1C** [[BUF]]
+// CHECK-x86_64:         [[OUT_BUF:%.*]] = bitcast %C7bitcast1C** [[BUF]] to %Si*
+// CHECK-x86_64:         [[VALUE_BUF:%.*]] = getelementptr inbounds %Si* [[OUT_BUF]], i32 0, i32 0
+// CHECK-x86_64:         [[VALUE:%.*]] = load i64* [[VALUE_BUF]], align 8
+// CHECK-x86_64:         ret i64 [[VALUE]]
+// CHECK-x86_64:       }
 sil @bitcast_trivial: $@thin (C) -> Int {
 entry(%c : $C):
   %i = unchecked_trivial_bit_cast %c : $C to $Int
   return %i : $Int
 }
 
-// CHECK-LABEL: define i64 @bitcast_ref(%C7bitcast1C*) {
-// CHECK:         [[BUF:%.*]] = alloca %C7bitcast1C*, align 8
-// CHECK:         store %C7bitcast1C* %0, %C7bitcast1C** [[BUF]]
-// CHECK:         [[OUT_BUF:%.*]] = bitcast %C7bitcast1C** [[BUF]] to %Sq*
-// CHECK:         [[VALUE_BUF:%.*]] = bitcast %Sq* [[OUT_BUF]] to i64*
-// CHECK:         [[VALUE:%.*]] = load i64* [[VALUE_BUF]], align 8
-// CHECK:         ret i64 [[VALUE]]
-// CHECK:       }
+// CHECK-i386-LABEL: define i32 @bitcast_ref(%C7bitcast1C*) {
+// CHECK-i386:         [[BUF:%.*]] = alloca %C7bitcast1C*, align 4
+// CHECK-i386:         store %C7bitcast1C* %0, %C7bitcast1C** [[BUF]]
+// CHECK-i386:         [[OUT_BUF:%.*]] = bitcast %C7bitcast1C** [[BUF]] to %Sq*
+// CHECK-i386:         [[VALUE_BUF:%.*]] = bitcast %Sq* [[OUT_BUF]] to i32*
+// CHECK-i386:         [[VALUE:%.*]] = load i32* [[VALUE_BUF]], align 4
+// CHECK-i386:         ret i32 [[VALUE]]
+// CHECK-i386:       }
+
+// CHECK-x86_64-LABEL: define i64 @bitcast_ref(%C7bitcast1C*) {
+// CHECK-x86_64:         [[BUF:%.*]] = alloca %C7bitcast1C*, align 8
+// CHECK-x86_64:         store %C7bitcast1C* %0, %C7bitcast1C** [[BUF]]
+// CHECK-x86_64:         [[OUT_BUF:%.*]] = bitcast %C7bitcast1C** [[BUF]] to %Sq*
+// CHECK-x86_64:         [[VALUE_BUF:%.*]] = bitcast %Sq* [[OUT_BUF]] to i64*
+// CHECK-x86_64:         [[VALUE:%.*]] = load i64* [[VALUE_BUF]], align 8
+// CHECK-x86_64:         ret i64 [[VALUE]]
+// CHECK-x86_64:       }
 sil @bitcast_ref: $@thin (C) -> Optional<C> {
 entry(%c : $C):
   %o = unchecked_ref_bit_cast %c : $C to $Optional<C>
   return %o : $Optional<C>
 }
+

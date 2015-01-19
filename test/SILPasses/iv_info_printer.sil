@@ -1,5 +1,7 @@
-// RUN: %sil-opt %s -iv-info-printer 2>&1 | FileCheck %s
+// RUN: %target-sil-opt %s -iv-info-printer 2>&1 | FileCheck %s
+
 // REQUIRES: asserts
+
 sil_stage canonical
 
 import Builtin

@@ -1,9 +1,9 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift -emit-object -emit-module -o %t %S/Inputs/def_class.swift
+// RUN: %target-swift-frontend -emit-object -emit-module -o %t %S/Inputs/def_class.swift -disable-objc-attr-requires-foundation-module
 // RUN: llvm-bcanalyzer %t/def_class.swiftmodule | FileCheck %s
-// RUN: %swift -emit-sil -sil-debug-serialization -I=%t %s | FileCheck %s -check-prefix=SIL
-// RUN: echo "import def_class; struct A : ClassProto {}" | not %swift -parse -I=%t - 2>&1 | FileCheck %s -check-prefix=CHECK-STRUCT
+// RUN: %target-swift-frontend -emit-sil -sil-debug-serialization -I %t %s | FileCheck %s -check-prefix=SIL
+// RUN: echo "import def_class; struct A : ClassProto {}" | not %target-swift-frontend -parse -I %t - 2>&1 | FileCheck %s -check-prefix=CHECK-STRUCT
 
 // CHECK-NOT: UnknownCode
 // CHECK-STRUCT: non-class type 'A' cannot conform to class protocol 'ClassProto'

@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %sil-opt %s -inline -debug-only=sil-inliner -sil-inline-test-threshold=1 2>%t/log | FileCheck %s
-// RUN: FileCheck -check-prefix=LOG %s <%t/log
+// RUN: %target-sil-opt %s -inline -debug-only=sil-inliner -sil-inline-test-threshold=1 2>%t/log | FileCheck %s
+// RUN: FileCheck -check-prefix=LOG %s < %t/log
 // REQUIRES: asserts
 
 // This test checks the inline heuristics based on the debug log output of

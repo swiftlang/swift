@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify -parse
+// RUN: %target-parse-verify-swift
 
 func fuzz() { for var H
 // expected-note@-1 {{to match this opening '{'}}

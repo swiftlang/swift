@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -specialize -module-name inherit -verify | FileCheck %s
+// RUN: %target-sil-opt %s -specialize -module-name inherit -verify | FileCheck %s
 
 import Builtin
 import Swift

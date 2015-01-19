@@ -1,4 +1,4 @@
-// RUN: %swift -emit-sil %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify
 
 @transparent func waldo(x: Double) -> Double {
   return fred(x); // expected-error {{inlining 'transparent' functions forms circular loop}} expected-note 1 {{while inlining here}}

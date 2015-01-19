@@ -1,5 +1,7 @@
-// RUN: %sil-opt %s -mem2reg -verify
+// RUN: %target-sil-opt %s -mem2reg -verify
+
 // Make sure we are not crashing on blocks that are not dominated by the entry block.
+
 sil_stage canonical
 
 import Builtin

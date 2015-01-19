@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %S/../../utils/gyb %s -o %t/mapped-integers.swift
-// RUN: %swift %clang-importer-sdk -parse -verify -target x86_64-apple-macosx10.9 %t/mapped-integers.swift
+// RUN: %target-swift-frontend %clang-importer-sdk -parse -verify %t/mapped-integers.swift
 
 import ctypes
 

@@ -1,4 +1,5 @@
-// RUN: %sil-opt -closure-specialize %s | FileCheck %s
+// RUN: %target-sil-opt -closure-specialize %s | FileCheck %s
+
 // rdar://18156518
 
 import Builtin

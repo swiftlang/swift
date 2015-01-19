@@ -1,4 +1,4 @@
-// RUN: %swift -emit-silgen -primary-file %s %S/Inputs/multi_file_helper.swift | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -primary-file %s %S/Inputs/multi_file_helper.swift | FileCheck %s
 
 // CHECK-LABEL: sil hidden @_TF10multi_file12rdar16016713
 func rdar16016713(r: Range) {

@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %swift -emit-module -o %t %S/Inputs/accessibility_vtables_helper.swift
-// RUN: %swift -emit-silgen -primary-file %s %S/Inputs/accessibility_vtables_other.swift -I %t -module-name accessibility_vtables -enable-private-discriminators | FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/accessibility_vtables_helper.swift
+// RUN: %target-swift-frontend -emit-silgen -primary-file %s %S/Inputs/accessibility_vtables_other.swift -I %t -module-name accessibility_vtables -enable-private-discriminators | FileCheck %s
 
 import accessibility_vtables_helper
 

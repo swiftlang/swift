@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
 
 // CHECK-DAG: [ DW_TAG_arg_variable ] [arg] [line [[@LINE+1]]]
 func a(arg : Int)

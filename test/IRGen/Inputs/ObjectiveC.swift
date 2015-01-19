@@ -2,12 +2,30 @@
 @exported import ObjectiveC
 
 public struct ObjCBool : Printable {
-  private var value : UInt8
+#if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
+  // On OS X and 32-bit iOS, Objective-C's BOOL type is a "signed char".
+  private var value: Int8
+
+  public init(_ value: Bool) {
+    self.value = value ? 1 : 0
+  }
 
   /// \brief Allow use in a Boolean context.
   public var boolValue: Bool {
     return value != 0
   }
+#else
+  // Everywhere else it is C/C++'s "Bool"
+  private var value: Bool
+
+  public init(_ value: Bool) {
+    self.value = value
+  }
+
+  public var boolValue: Bool {
+    return value
+  }
+#endif
 
   public var description: String {
     // Dispatch to Bool.
@@ -21,11 +39,10 @@ public struct Selector {
 
 // Functions used to implicitly bridge ObjCBool types to Swift's Bool type.
 
-internal func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
-  return ObjCBool(value: x ? 1 : 0)
+public func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
+  return ObjCBool(x)
 }
-internal func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
+public func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
   return x.boolValue
 }
-
 

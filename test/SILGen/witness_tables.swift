@@ -1,5 +1,6 @@
-// RUN: %swift -emit-silgen -parse-stdlib -I %S/Inputs -enable-source-import %s | FileCheck -check-prefix=TABLE %s
-// RUN: %swift -emit-silgen -parse-stdlib -I %S/Inputs -enable-source-import %s | FileCheck -check-prefix=SYMBOL %s
+// RUN: %target-swift-frontend -emit-silgen -parse-stdlib -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module > %t.sil
+// RUN: FileCheck -check-prefix=TABLE %s < %t.sil
+// RUN: FileCheck -check-prefix=SYMBOL %s < %t.sil
 
 import witness_tables_b
 

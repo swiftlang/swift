@@ -1,5 +1,5 @@
-// RUN: %swift %s -verify -parse
-// RUN: %swift-ide-test -print-ast-typechecked -source-filename %s -target x86_64-apple-macosx10.9 -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true | FileCheck %s
+// RUN: %target-parse-verify-swift
+// RUN: %target-swift-ide-test -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true | FileCheck %s
 
 class PlainClass {}
 struct PlainStruct {}

@@ -1,4 +1,4 @@
-// RUN: %swift -O -primary-file %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -O -primary-file %s -emit-ir | FileCheck %s
 
 // Check if the hashValue and == for an enum (without payload) are generated and
 // check if that functions are compiled in an optimal way.

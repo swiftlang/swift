@@ -1,7 +1,7 @@
 // RUN: rm -f %t.*
-// RUN: %swift -emit-sil %s -o %t.sil
+// RUN: %target-swift-frontend -emit-sil %s -o %t.sil
 // RUN: FileCheck --input-file=%t.sil %s
-// RUN: %swift -emit-silgen %t.sil -module-name=printer_include_decl | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %t.sil -module-name=printer_include_decl | FileCheck %s
 
 var x: Int
 // CHECK: var x: Int

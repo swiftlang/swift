@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-parse-verify-swift
 
 // Single extraneous keyword argument (tuple-to-scalar)
 func f1(a: Int) { }

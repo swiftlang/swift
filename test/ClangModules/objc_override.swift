@@ -1,4 +1,4 @@
-// RUN: %swift %clang-importer-sdk -emit-sil -I %S/Inputs/custom-modules -target x86_64-apple-macosx10.9 %s -verify
+// RUN: %target-swift-frontend %clang-importer-sdk -emit-sil -I %S/Inputs/custom-modules %s -verify
 
 import Foundation
 

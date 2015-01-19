@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -sdk %S/Inputs %s -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs %s -emit-silgen | FileCheck %s
 
 import gizmo
 

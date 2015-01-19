@@ -1,7 +1,7 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_A | FileCheck %s -check-prefix=TEST_A
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_B | FileCheck %s -check-prefix=TEST_B
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_C | FileCheck %s -check-prefix=TEST_C
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_D | FileCheck %s -check-prefix=TEST_D
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_A | FileCheck %s -check-prefix=TEST_A
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_B | FileCheck %s -check-prefix=TEST_B
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_C | FileCheck %s -check-prefix=TEST_C
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_D | FileCheck %s -check-prefix=TEST_D
 
 class A {
   init(int i: Int) {}

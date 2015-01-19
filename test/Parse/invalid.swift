@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify %s
+// RUN: %target-parse-verify-swift
 
 func foo(a: Int) {
   foo(<#a#>) // expected-error 2 {{expected ',' separator}} \

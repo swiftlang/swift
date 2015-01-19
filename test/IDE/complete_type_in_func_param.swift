@@ -1,178 +1,178 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_1 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_1 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_2 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_2 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_3 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_3 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_4 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_4 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// FIXME: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_5 > %t.types.txt
+// FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_5 > %t.types.txt
 // FIXME: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // FIXME: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_6 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_6 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_7 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_7 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_8 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_8 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_9 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_9 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_CONSTRUCTOR_PARAM_1 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_CONSTRUCTOR_PARAM_1 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_CONSTRUCTOR_PARAM_2 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_CONSTRUCTOR_PARAM_2 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_CONSTRUCTOR_PARAM_3 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_CONSTRUCTOR_PARAM_3 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_CONSTRUCTOR_PARAM_4 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_CONSTRUCTOR_PARAM_4 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_CONSTRUCTOR_PARAM_5 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_CONSTRUCTOR_PARAM_5 > %t.types.txt
 // FIXME: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // FIXME: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_CONSTRUCTOR_PARAM_6 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_CONSTRUCTOR_PARAM_6 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_CONSTRUCTOR_PARAM_7 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_CONSTRUCTOR_PARAM_7 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_CONSTRUCTOR_PARAM_8 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_CONSTRUCTOR_PARAM_8 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_CONSTRUCTOR_PARAM_9 > %t.types.txt
-// RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
-
-
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_CURRIED_1 > %t.types.txt
-// RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
-
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_CURRIED_2 > %t.types.txt
-// RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
-
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_CURRIED_3 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_CONSTRUCTOR_PARAM_9 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_1 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_CURRIED_1 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_2 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_CURRIED_2 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_3 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_CURRIED_3 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_4 > %t.types.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_1 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_5 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_2 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_6 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_3 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_7 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_4 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_8 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_5 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_9 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_6 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_10 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_7 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_11 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_8 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_12 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_9 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_13 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_10 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_PARAM_FORWARD_1 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_11 > %t.types.txt
+// RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
+// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_12 > %t.types.txt
+// RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
+// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_RESULT_13 > %t.types.txt
+// RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
+// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_PARAM_FORWARD_1 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=TYPE_IN_PARAM_FORWARD < %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_PARAM_FORWARD_2 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_PARAM_FORWARD_2 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=TYPE_IN_PARAM_FORWARD < %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_PARAM_FORWARD_3 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_PARAM_FORWARD_3 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=TYPE_IN_PARAM_FORWARD < %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_PARAM_FORWARD_4 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_PARAM_FORWARD_4 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=TYPE_IN_PARAM_FORWARD < %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_PARAM_FORWARD_5 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_PARAM_FORWARD_5 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=TYPE_IN_PARAM_FORWARD < %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_PARAM_FORWARD_6 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_PARAM_FORWARD_6 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=TYPE_IN_PARAM_FORWARD < %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_PARAM_FORWARD_7 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_PARAM_FORWARD_7 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=TYPE_IN_PARAM_FORWARD < %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_PARAM_FORWARD_8 > %t.types.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_PARAM_FORWARD_8 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=TYPE_IN_PARAM_FORWARD < %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt

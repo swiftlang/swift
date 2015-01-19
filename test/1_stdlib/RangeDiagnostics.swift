@@ -9,7 +9,7 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %swift -verify -parse %s
+// RUN: %target-parse-verify-swift
 
 func assertCollection<C: CollectionType>(_: C) {}
 assertCollection(0..<10)

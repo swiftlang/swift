@@ -1,4 +1,4 @@
-// RUN: %swift -parse-as-library -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -emit-silgen %s | FileCheck %s
 
 // CHECK: sil private @globalinit_[[T:.*]]_func0 : $@thin () -> () {
 // CHECK:   [[XADDR:%.*]] = global_addr @_Tv12lazy_globals1xSi : $*Int

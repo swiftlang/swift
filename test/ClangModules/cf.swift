@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify -import-cf-types -I %S/Inputs/custom-modules -target x86_64-apple-macosx10.9 %s
+// RUN: %target-swift-frontend -parse -verify -import-cf-types -I %S/Inputs/custom-modules %s
 
 import CoreCooling
 

@@ -1,4 +1,4 @@
-// RUN: %swift %s -parse -verify
+// RUN: %target-parse-verify-swift
 
 protocol Eq {
   func ==(lhs: Self, rhs: Self) -> Bool

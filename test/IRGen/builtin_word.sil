@@ -1,6 +1,7 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -gnone -emit-ir -o - | FileCheck %s -check-prefix=INTEL
-// REQUIRES: ARM
 // RUN: %swift -target armv7-apple-ios7 %s -gnone -emit-ir -o - | FileCheck %s -check-prefix=ARM32
+
+// REQUIRES: ARM
 
 sil_stage canonical
 import Builtin

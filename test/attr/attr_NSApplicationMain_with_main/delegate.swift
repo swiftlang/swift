@@ -1,7 +1,7 @@
 // This file is a part of the multi-file test driven by 'main.swift'.
 
 // NB: No "-verify"--this file should parse successfully on its own.
-// RUN: %swift %clang-importer-sdk -parse -parse-as-library %s
+// RUN: %target-swift-frontend %clang-importer-sdk -parse -parse-as-library %s
 
 import AppKit
 
