@@ -152,6 +152,16 @@ namespace {
             if (isLValueBase)
               outputTy = LValueType::get(outputTy);
           }
+        } else if (auto dictTy =
+                      dyn_cast<DictionaryType>(baseTy.getPointer())) {
+          auto valueTy = dictTy->getValueType();
+          
+          if (!dictTy->getAs<TypeVariableType>()) {
+            outputTy = OptionalType::get(valueTy);
+            
+            if (isLValueBase)
+              outputTy = LValueType::get(outputTy);
+          }
         }
       }
       
