@@ -29,7 +29,8 @@ func testArithmeticOverflow() {
   xu8_3 += 40 // expected-error {{arithmetic operation '240 + 40' (on type 'UInt8') results in an overflow}}
   var cadd : UInt8 = 240 + 5 + 15 // expected-error {{arithmetic operation '245 + 15' (on type 'UInt8') results in an overflow}}
   
-  let ranges = Int8(126) + (1+1) // expected-error {{arithmetic operation '126 + 2' (on type 'Int8') results in an overflow}}  
+  // TODO: We should remove the second init for Int8 - see rdar://problem/19224768
+  let ranges = Int8(126) + Int8(1+1) // expected-error {{arithmetic operation '126 + 2' (on type 'Int8') results in an overflow}}  
 //  DISABLED FOR NOW
 //  asserts in the shift operators confuse constant propagation
 //  var csh1: Int8 = (1 << 7) - 1 // expected - error {{arithmetic operation '-128 - 1' (on type 'Int8') results in an overflow}}

@@ -3335,9 +3335,6 @@ retry:
   if (desugar2->getKind() == TypeKind::Function) {
     auto func2 = cast<FunctionType>(desugar2);
 
-    assert(func1->getResult()->is<TypeVariableType>() &&
-           "the output of funct1 is a free variable by construction");
-
     // If this application is part of an operator, then we allow an implicit
     // lvalue to be compatible with inout arguments.  This is used by
     // assignment operators.

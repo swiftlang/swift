@@ -1141,6 +1141,56 @@ namespace {
 
       favorCallOverloads(expr, isFavoredDecl);
     }
+    
+    /// Determine whether or not a given NominalTypeDecl has a failable
+    /// initializer member.
+    bool hasFailableInits(NominalTypeDecl *NTD,
+                          ConstraintSystem *CS) {
+      
+      // TODO: Note that we search manually, rather than invoking lookupMember
+      // on the ConstraintSystem object. Because this is a hot path, this keeps
+      // the overhead of the check low, and is twice as fast.
+      if (!NTD->getSearchedForFailableInits()) {
+        
+        for (auto member : NTD->getMembers()) {
+          if (auto CD = dyn_cast<ConstructorDecl>(member)) {
+            if (CD->getFailability()) {
+              NTD->setHasFailableInits();
+              break;
+            }
+          }
+        }
+        
+        if (!NTD->getHasFailableInits()) {
+          for (auto extension : NTD->getExtensions()) {
+            for (auto member : extension->getMembers()) {
+              if (auto CD = dyn_cast<ConstructorDecl>(member)) {
+                if (CD->getFailability()) {
+                  NTD->setHasFailableInits();
+                  break;
+                }
+              }
+            }
+          }
+        
+          if (!NTD->getHasFailableInits()) {
+            for (auto parentTyLoc : NTD->getInherited()) {
+              if (auto nominalType =
+                  parentTyLoc.getType()->getAs<NominalType>()) {
+                if (hasFailableInits(nominalType->getDecl(), CS)) {
+                  NTD->setHasFailableInits();
+                  break;
+                }
+              }
+            }
+          }
+        }
+        
+        NTD->setSearchedForFailableInits();
+      }
+      
+      return NTD->getHasFailableInits();
+    }
 
     /// Favor binary operator constraints where we have exact matches
     /// for the operands and contextual type.
@@ -1224,13 +1274,42 @@ namespace {
     }
 
     Type visitApplyExpr(ApplyExpr *expr) {
+      Type outputTy;
+      
+      auto fnExpr = expr->getFn();
+      
+      if (isa<DeclRefExpr>(fnExpr)) {
+        if (auto fnType = fnExpr->getType()->getAs<AnyFunctionType>()) {
+          outputTy = fnType->getResult();
+        }
+      } else if (auto TE = dyn_cast<TypeExpr>(fnExpr)) {
+        outputTy = TE->getType()->getAs<MetatypeType>()->getInstanceType();
+        
+        if (auto enumType = outputTy->getAs<EnumType>()) {
+          auto enumDecl = enumType->getDecl();
+          
+          if (enumDecl->hasRawType()) {
+            outputTy = getOptionalType(fnExpr->getLoc(), outputTy);
+          }
+        } else if (auto nominalType = outputTy->getAs<NominalType>()) {
+          auto NTD = nominalType->getDecl();
+          if (!(isa<ClassDecl>(NTD) || isa<StructDecl>(NTD)) ||
+              hasFailableInits(NTD, &CS)) {
+            outputTy = Type();
+          }
+        } else {
+          outputTy = Type();
+        }
+      }
+      
       // The function subexpression has some rvalue type T1 -> T2 for fresh
       // variables T1 and T2.
-      auto outputTy
-        = CS.createTypeVariable(
-            CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction),
-            /*options=*/0);
-
+      if (outputTy.isNull())
+        outputTy = CS.createTypeVariable(
+                     CS.getConstraintLocator(expr,
+                                             ConstraintLocator::ApplyFunction),
+                                             /*options=*/0);
+      
       auto funcTy = FunctionType::get(expr->getArg()->getType(), outputTy);
       
       if (isa<PrefixUnaryExpr>(expr) || isa<PostfixUnaryExpr>(expr)) {

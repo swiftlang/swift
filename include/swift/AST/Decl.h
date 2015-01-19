@@ -2619,12 +2619,16 @@ class NominalTypeDecl : public TypeDecl, public DeclContext,
   ExtensionDecl *LastExtension = nullptr;
 
   /// \brief The generation at which we last loaded extensions.
-  unsigned ExtensionGeneration: 31;
+  unsigned ExtensionGeneration: 29;
                           
   /// \brief Whether or not the generic signature of the type declaration is
   /// currently being validated.
   unsigned ValidatingGenericSignature: 1;
-                    
+  
+  /// \brief Whether or not this declaration has a failable initializer member,
+  /// and whether or not we've actually searched for one.
+  unsigned HasFailableInits : 1;
+  unsigned SearchedForFailableInits : 1;
 
   /// \brief A lookup table containing all of the members of this type and
   /// its extensions.
@@ -2669,6 +2673,8 @@ protected:
     NominalTypeDeclBits.AddedImplicitInitializers = false;
     ExtensionGeneration = 0;
     ValidatingGenericSignature = false;
+    SearchedForFailableInits = false;
+    HasFailableInits = false;
   }
 
   friend class ProtocolType;
@@ -2714,6 +2720,17 @@ public:
   /// Note that we have attempted to
   void setAddedImplicitInitializers() {
     NominalTypeDeclBits.AddedImplicitInitializers = true;
+  }
+              
+  bool getHasFailableInits() { return HasFailableInits; }
+  void setHasFailableInits(bool failable = true) {
+    HasFailableInits = failable;
+  }
+  void setSearchedForFailableInits(bool searched = true) {
+    SearchedForFailableInits = searched;
+  }
+  bool getSearchedForFailableInits() {
+    return SearchedForFailableInits;
   }
 
   GenericParamList *getGenericParams() const { return GenericParams; }
