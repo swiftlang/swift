@@ -11,7 +11,7 @@ func func6c(f: (Int, Int) -> Int, _ n: Int = 0) {}
 @autoclosure var closure1 : () -> Int = 4  // Function producing 4 whenever it is called.
 var closure2 : (Int,Int) -> Int = { 4 } // FIXME: expected-error{{tuple types '(Int, Int)' and '()' have a different number of elements (2 vs. 0)}}
 var closure3a : ()->()->(Int,Int) = {{ (4, 2) }} // multi-level closing.
-var closure3b : (Int,Int)->(Int)->(Int,Int) = {{ (4, 2) }} // FIXME: expected-error{{different number of elements}}
+var closure3b : (Int,Int)->(Int)->(Int,Int) = {{ (4, 2) }} // FIXME: expected-error{{'Int' is not a subtype of '()'}}
 var closure4 : (Int,Int) -> Int = { $0 + $1 }
 var closure5 : (Double) -> Int =
    { // expected-error{{could not find an overload for '+' that accepts the supplied arguments}}

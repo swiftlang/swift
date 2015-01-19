@@ -115,14 +115,51 @@ namespace {
         = CS.getConstraintLocator(expr, ConstraintLocator::SubscriptIndex);
       auto resultLocator
         = CS.getConstraintLocator(expr, ConstraintLocator::SubscriptResult);
+      
+      Type outputTy;
 
       // The base type must have a subscript declaration with type
       // I -> inout? O, where I and O are fresh type variables. The index
       // expression must be convertible to I and the subscript expression
       // itself has type inout? O, where O may or may not be an lvalue.
       auto inputTv = CS.createTypeVariable(indexLocator, /*options=*/0);
-      auto outputTv = CS.createTypeVariable(resultLocator,
-                                            TVO_CanBindToLValue);
+      
+      // For an integer subscript expression on an array slice type, instead of
+      // introducing a new type variable we can easily obtain the element type.
+      if (auto subscriptExpr = dyn_cast<SubscriptExpr>(expr)) {
+        
+        auto isLValueBase = false;
+        auto baseTy = subscriptExpr->getBase()->getType();
+        
+        if (baseTy->getAs<LValueType>()) {
+          isLValueBase = true;
+          baseTy = baseTy->getLValueOrInOutObjectType();
+        }
+        
+        if (auto arraySliceTy = dyn_cast<ArraySliceType>(baseTy.getPointer())) {
+          baseTy = arraySliceTy->getDesugaredType();
+          
+          auto indexExpr = subscriptExpr->getIndex();
+          
+          if (auto parenExpr = dyn_cast<ParenExpr>(indexExpr)) {
+            indexExpr = parenExpr->getSubExpr();
+          }
+          
+          if(isa<IntegerLiteralExpr>(indexExpr)) {
+            
+            auto outputTy = baseTy->getAs<BoundGenericType>()->
+                              getGenericArgs()[0];
+            
+            if (isLValueBase)
+              outputTy = LValueType::get(outputTy);
+          }
+        }
+      }
+      
+      if (outputTy.isNull()) {
+        outputTy = CS.createTypeVariable(resultLocator,
+                                              TVO_CanBindToLValue);
+      }
 
       auto subscriptMemberLocator
         = CS.getConstraintLocator(expr, ConstraintLocator::SubscriptMember);
@@ -130,7 +167,7 @@ namespace {
       // Add the member constraint for a subscript declaration.
       // FIXME: lame name!
       auto baseTy = base->getType();
-      auto fnTy = FunctionType::get(inputTv, outputTv);
+      auto fnTy = FunctionType::get(inputTv, outputTy);
       CS.addValueMemberConstraint(baseTy, Context.Id_subscript,
                                   fnTy, subscriptMemberLocator);
 
@@ -138,7 +175,7 @@ namespace {
       // to the input type of the subscript operator.
       CS.addConstraint(ConstraintKind::ArgumentTupleConversion,
                        index->getType(), inputTv, indexLocator);
-      return outputTv;
+      return outputTy;
     }
 
   public:
@@ -844,6 +881,18 @@ namespace {
     }
 
     Type visitClosureExpr(ClosureExpr *expr) {
+      
+      // If a contextual function type exists, we can use that to obtain the
+      // expected return type, rather than allocating a fresh type variable.
+      auto contextualType = CS.getContextualType(expr);
+      Type crt;
+      
+      if (contextualType) {
+        if (auto cft = (*contextualType)->getAs<AnyFunctionType>()) {
+          crt = cft->getResult();
+        }
+      }
+      
       // Closure expressions always have function type. In cases where a
       // parameter or return type is omitted, a fresh type variable is used to
       // stand in for that parameter or return type, allowing it to be inferred
@@ -851,7 +900,9 @@ namespace {
       Type funcTy;
       if (expr->hasExplicitResultType()) {
         funcTy = expr->getExplicitResultTypeLoc().getType();
-      } else {
+      } else if (!crt.isNull()) {
+        funcTy = crt;
+      } else{
         // If no return type was specified, create a fresh type
         // variable for it.
         funcTy = CS.createTypeVariable(
