@@ -4322,6 +4322,12 @@ class FuncDecl : public AbstractFunctionDecl {
   ///
   /// \sa getBodyResultType()
   Type BodyResultType;
+  
+  /// If this declaration is part of an overload set, determine if we've
+  /// searched for a common overload amongst all overloads, or if we've found
+  /// one.
+  unsigned HaveSearchedForCommonOverloadReturnType : 1;
+  unsigned HaveFoundCommonOverloadReturnType : 1;
 
   /// \brief If this FuncDecl is an accessor for a property, this indicates
   /// which property and what kind of accessor.
@@ -4344,6 +4350,9 @@ class FuncDecl : public AbstractFunctionDecl {
     setType(Ty);
     FuncDeclBits.Mutating = false;
     FuncDeclBits.HasDynamicSelf = false;
+        
+    HaveSearchedForCommonOverloadReturnType = false;
+    HaveFoundCommonOverloadReturnType = false;
   }
 
   static FuncDecl *createImpl(ASTContext &Context, SourceLoc StaticLoc,
@@ -4390,6 +4399,19 @@ public:
   }
   void setMutating(bool Mutating = true) {
     FuncDeclBits.Mutating = Mutating;
+  }
+  
+  bool getHaveSearchedForCommonOverloadReturnType() {
+    return HaveSearchedForCommonOverloadReturnType;
+  }
+  void setHaveSearchedForCommonOverloadReturnType(bool b = true) {
+    HaveSearchedForCommonOverloadReturnType = b;
+  }
+  bool getHaveFoundCommonOverloadReturnType() {
+    return HaveFoundCommonOverloadReturnType;
+  }
+  void setHaveFoundCommonOverloadReturnType(bool b = true) {
+    HaveFoundCommonOverloadReturnType = b;
   }
 
   /// \returns true if this is non-mutating due to applying a 'mutating'

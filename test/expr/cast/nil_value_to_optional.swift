@@ -2,8 +2,8 @@
 
 var t = true
 var f = false
-println(t != nil) // expected-error{{binary operator '!=' cannot be applied operands of type 'Bool' and 'nil'}}
-println(f != nil) // expected-error{{binary operator '!=' cannot be applied operands of type 'Bool' and 'nil'}}
+println(t != nil) // expected-error{{cannot find an overload for 'println' that accepts an argument list of type '(Bool)'}}
+println(f != nil) // expected-error{{cannot find an overload for 'println' that accepts an argument list of type '(Bool)'}}
 
 class C : Equatable {}
 

@@ -1300,6 +1300,75 @@ namespace {
         } else {
           outputTy = Type();
         }
+      } else if (auto OSR = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
+        
+        auto ODR = dyn_cast<OverloadedDeclRefExpr>(fnExpr);
+        
+        // We only delay equality constraints - this is a boolean.
+        if (ODR && ODR->isPotentiallyDelayedGlobalOperator()) {
+          
+          
+          outputTy = CS.getTypeChecker().lookupBoolType(CS.DC);
+        } else if (auto FD = dyn_cast<FuncDecl>(OSR->getDecls()[0])) {
+
+          // If we've already agreed upon an overloaded return type, use it.
+          if (FD->getHaveSearchedForCommonOverloadReturnType()) {
+            
+            if (FD->getHaveFoundCommonOverloadReturnType()) {
+              outputTy = FD->getType()->getAs<AnyFunctionType>()->getResult();
+            }
+            
+          } else {
+          
+            // Determine if the overloads all share a common return type.
+            Type commonType;
+            Type resultType;
+            
+            for (auto OD : OSR->getDecls()) {
+              
+              if (auto OFD = dyn_cast<FuncDecl>(OD)) {
+                auto OFT = OFD->getType()->getAs<AnyFunctionType>();
+                
+                if (!OFT) {
+                  commonType = Type();
+                  break;
+                }
+                
+                resultType = OFT->getResult();
+                
+                if (commonType.isNull()) {
+                  commonType = resultType;
+                } else if (!commonType->isEqual(resultType)) {
+                  commonType = Type();
+                  break;
+                }
+              } else {
+                // TODO: unreachable?
+                commonType = Type();
+                break;
+              }
+            }
+            
+            // TODO: For now, disallow tyvar, archetype and function types.
+            if (!(commonType.isNull() ||
+                  commonType->getAs<TypeVariableType>() ||
+                  commonType->getAs<ArchetypeType>() ||
+                  commonType->getAs<AnyFunctionType>())) {
+              outputTy = commonType;
+            }
+            
+            // Set the search bits appropriately.
+            for (auto OD : OSR->getDecls()) {
+              if (auto OFD = dyn_cast<FuncDecl>(OD)) {
+                OFD->setHaveSearchedForCommonOverloadReturnType();
+                
+                if (!outputTy.isNull())
+                  OFD->setHaveFoundCommonOverloadReturnType();
+              }
+            }
+            
+          }
+        }
       }
       
       // The function subexpression has some rvalue type T1 -> T2 for fresh
