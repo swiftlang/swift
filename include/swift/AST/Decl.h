@@ -3040,6 +3040,12 @@ public:
   }
 };
 
+/// The kind of artificial main to generate for a class.
+enum class ArtificialMainKind : uint8_t {
+  NSApplicationMain,
+  UIApplicationMain,
+};
+
 /// ClassDecl - This is the declaration of a class, for example:
 ///
 ///    class Complex { var R : Double, I : Double }
@@ -3146,6 +3152,13 @@ public:
   /// Retrieve the name to use for this class when interoperating with
   /// the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
+
+  /// Returns the appropriate kind of entry point to generate for this class,
+  /// based on its attributes.
+  ///
+  /// It is an error to call this on a class that does not have a
+  /// *ApplicationMain attribute.
+  ArtificialMainKind getArtificialMainKind() const;
 
   using NominalTypeDecl::lookupDirect;
 

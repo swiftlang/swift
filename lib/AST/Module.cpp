@@ -1226,64 +1226,94 @@ bool Module::isBuiltinModule() const {
   return this == Ctx.TheBuiltinModule;
 }
 
-bool Module::registerMainClass(ClassDecl *mainClass, SourceLoc diagLoc) {
+bool SourceFile::registerMainClass(ClassDecl *mainClass, SourceLoc diagLoc) {
+  if (mainClass == MainClass)
+    return false;
+
+  ArtificialMainKind kind = mainClass->getArtificialMainKind();
+  if (getParentModule()->registerEntryPointFile(this, diagLoc, kind))
+    return true;
+
+  MainClass = mainClass;
+  MainClassDiagLoc = diagLoc;
+  return false;
+}
+
+bool Module::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
+                                    Optional<ArtificialMainKind> kind) {
+  if (!MainInfo.hasMain()) {
+    MainInfo.setMainFile(file);
+    return false;
+  }
+
+  if (diagLoc.isInvalid())
+    return true;
+
+  assert(kind.hasValue() && "multiple entry points without attributes");
+
   // %select indices for UI/NSApplication-related diagnostics.
   enum : unsigned {
     UIApplicationMainClass = 0,
     NSApplicationMainClass = 1,
-  };
-  
-  unsigned mainClassDiagKind;
-  if (mainClass->getAttrs().hasAttribute<UIApplicationMainAttr>())
+  } mainClassDiagKind;
+
+  switch (kind.getValue()) {
+  case ArtificialMainKind::UIApplicationMain:
     mainClassDiagKind = UIApplicationMainClass;
-  else if (mainClass->getAttrs().hasAttribute<NSApplicationMainAttr>())
+    break;
+  case ArtificialMainKind::NSApplicationMain:
     mainClassDiagKind = NSApplicationMainClass;
-  else
-    llvm_unreachable("main class has no @ApplicationMain attribute?!");
-  
-  if (mainClass == MainClass)
-    return false;
-  
-  if (MainClass) {
-    // If we already have a main class, and we haven't diagnosed it, do so now.
-    if (!DiagnosedMultipleMainClasses) {
-      getASTContext().Diags.diagnose(MainClassDiagLoc,
-                                     diag::attr_ApplicationMain_multiple,
-                                     mainClassDiagKind);
-      DiagnosedMultipleMainClasses = true;
-    }
-    getASTContext().Diags.diagnose(diagLoc,
-                                   diag::attr_ApplicationMain_multiple,
-                                   mainClassDiagKind);
-    return true;
+    break;
   }
-  
-  // Complain if there is also a script file in this module.
-  if (!DiagnosedMainClassWithScript) {
-    DiagnosedMainClassWithScript = true;
-    for (auto file : getFiles()) {
-      auto sf = dyn_cast<SourceFile>(file);
-      if (!sf)
-        continue;
-      if (sf->isScriptMode()) {
-        getASTContext().Diags.diagnose(diagLoc,
-                                     diag::attr_ApplicationMain_with_script,
-                                     mainClassDiagKind);
-        // Note the source file we're reading top-level code from.
-        if (auto bufID = sf->getBufferID()) {
-          auto fileLoc = getASTContext().SourceMgr.getLocForBufferStart(*bufID);
-          getASTContext().Diags.diagnose(fileLoc,
-                                     diag::attr_ApplicationMain_script_here,
-                                     mainClassDiagKind);
-        }
-        break;
+
+  FileUnit *existingFile = MainInfo.getMainFile();
+  const ClassDecl *existingClass = nullptr;
+  SourceLoc existingDiagLoc;
+
+  if (auto *sourceFile = dyn_cast<SourceFile>(existingFile)) {
+    if ((existingClass = sourceFile->getMainClass())) {
+      existingDiagLoc = sourceFile->getMainClassDiagLoc();
+    } else {
+      if (auto bufID = sourceFile->getBufferID())
+        existingDiagLoc = Ctx.SourceMgr.getLocForBufferStart(*bufID);
+    }
+
+  } else {
+    // FIXME: Handle the non-source-file case.
+  }
+
+  if (existingClass) {
+    if (MainInfo.markDiagnosedMultipleMainClasses()) {
+      // If we already have a main class, and we haven't diagnosed it,
+      // do so now.
+      if (existingDiagLoc.isValid()) {
+        Ctx.Diags.diagnose(existingDiagLoc, diag::attr_ApplicationMain_multiple,
+                           mainClassDiagKind);
+      } else {
+        Ctx.Diags.diagnose(existingClass, diag::attr_ApplicationMain_multiple,
+                           mainClassDiagKind);
+      }
+    }
+
+    // Always diagnose the new class.
+    Ctx.Diags.diagnose(diagLoc, diag::attr_ApplicationMain_multiple,
+                       mainClassDiagKind);
+
+  } else {
+    // We don't have an existing class, but we /do/ have a file in script mode.
+    // Diagnose that.
+    if (MainInfo.markDiagnosedMainClassWithScript()) {
+        Ctx.Diags.diagnose(diagLoc, diag::attr_ApplicationMain_with_script,
+                           mainClassDiagKind);
+
+      if (existingDiagLoc.isValid()) {
+        Ctx.Diags.diagnose(existingDiagLoc,
+                           diag::attr_ApplicationMain_script_here);
       }
     }
   }
-  
-  MainClass = mainClass;
-  MainClassDiagLoc = diagLoc;
-  return false;
+
+  return true;
 }
 
 bool Module::isSystemModule() const {
@@ -1475,7 +1505,13 @@ SourceFile::SourceFile(Module &M, SourceFileKind K,
     BufferID(bufferID ? *bufferID : -1), Kind(K) {
   M.Ctx.addDestructorCleanup(*this);
   performAutoImport(*this, ModImpKind);
-      
+
+  if (isScriptMode()) {
+    bool problem = M.registerEntryPointFile(this, SourceLoc(), None);
+    assert(!problem && "multiple main files?");
+    (void)problem;
+  }
+
   // The root type refinement context reflects the fact that all parts of
   // the source file are guaranteed to be executing on at least the minimum
   // platform version.
@@ -1513,24 +1549,6 @@ StringRef SourceFile::getFilename() const  {
     return "";
   SourceManager &SM = getASTContext().SourceMgr;
   return SM.getIdentifierForBuffer(BufferID);
-}
-
-bool SourceFile::hasMainClass() const {
-  auto mainClass = getParentModule()->getMainClass();
-  if (!mainClass) return false;
-  return mainClass->getParentSourceFile() == this;
-}
-
-ArtificialMainKind SourceFile::getArtificialMainKind() const {
-  if (hasMainClass()) {
-    auto &attrs = getParentModule()->getMainClass()->getAttrs();
-    if (attrs.hasAttribute<UIApplicationMainAttr>())
-      return ArtificialMainKind::UIApplicationMain;
-    if (attrs.hasAttribute<NSApplicationMainAttr>())
-      return ArtificialMainKind::NSApplicationMain;
-    llvm_unreachable("main class has no @ApplicationMain attr?!");
-  }
-  return ArtificialMainKind::None;
 }
 
 Identifier

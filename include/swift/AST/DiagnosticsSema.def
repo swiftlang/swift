@@ -1143,7 +1143,7 @@ ERROR(attr_ApplicationMain_with_script,sema_tcd,none,
       (unsigned))
 NOTE(attr_ApplicationMain_script_here,sema_tcd,none,
      "top-level code defined in this source file",
-     (unsigned))
+     ())
 
 #undef SELECT_APPLICATION_MAIN
 #undef SELECT_APPLICATION_DELEGATE

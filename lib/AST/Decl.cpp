@@ -1952,6 +1952,14 @@ StringRef ClassDecl::getObjCRuntimeName(
   return mangleObjCRuntimeName(this, buffer);
 }
 
+ArtificialMainKind ClassDecl::getArtificialMainKind() const {
+  if (getAttrs().hasAttribute<UIApplicationMainAttr>())
+    return ArtificialMainKind::UIApplicationMain;
+  if (getAttrs().hasAttribute<NSApplicationMainAttr>())
+    return ArtificialMainKind::NSApplicationMain;
+  llvm_unreachable("class has no @ApplicationMain attr?!");
+}
+
 FuncDecl *ClassDecl::findOverridingDecl(const FuncDecl *Method) const {
   auto Members = getMembers();
   for (auto M : Members) {

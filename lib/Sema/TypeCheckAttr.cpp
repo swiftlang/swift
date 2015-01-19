@@ -935,7 +935,8 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   
   // Register the class as the main class in the module. If there are multiples
   // they will be diagnosed.
-  if (CD->getModuleContext()->registerMainClass(CD, attr->getLocation()))
+  auto *SF = cast<SourceFile>(CD->getModuleScopeContext());
+  if (SF->registerMainClass(CD, attr->getLocation()))
     attr->setInvalid();
   
   // Check that we have the needed symbols in the frameworks.

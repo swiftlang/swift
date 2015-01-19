@@ -963,13 +963,7 @@ public:
 
     // If the source file contains an artificial main, emit the implicit
     // toplevel code.
-    switch (auto artificialMain = sf->getArtificialMainKind()) {
-    case ArtificialMainKind::None:
-      break;
-
-    case ArtificialMainKind::UIApplicationMain:
-    case ArtificialMainKind::NSApplicationMain:
-      ClassDecl *mainClass = sf->getParentModule()->getMainClass();
+    if (auto mainClass = sf->getMainClass()) {
       assert(!sgm.M.lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)
              && "already emitted toplevel before main class?!");
 
@@ -981,8 +975,7 @@ public:
 
       SILGenFunction gen(sgm, *toplevel);
       emitTopLevelProlog(gen, mainClass);
-      gen.emitArtificialTopLevel(artificialMain, mainClass);
-      break;
+      gen.emitArtificialTopLevel(mainClass);
     }
   }
 };

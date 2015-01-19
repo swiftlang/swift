@@ -21,6 +21,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/OptionSet.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -37,6 +38,7 @@ namespace clang {
 }
 
 namespace swift {
+  enum class ArtificialMainKind : uint8_t;
   class ASTContext;
   class ASTWalker;
   class BraceStmt;
@@ -221,12 +223,49 @@ private:
   DebuggerClient *DebugClient = nullptr;
 
   SmallVector<FileUnit *, 2> Files;
-  
-  /// The class in this module marked @NS/UIApplicationMain.
-  ClassDecl *MainClass = nullptr;
-  
-  /// The source location of the main class.
-  SourceLoc MainClassDiagLoc;
+
+  /// Tracks the file that will generate the module's entry point, either
+  /// because it contains a class marked with \@UIApplicationMain
+  /// or \@NSApplicationMain, or because it is a script file.
+  class MainInfoTy {
+    enum class Flags {
+      DiagnosedMultipleMainClasses = 1 << 0,
+      DiagnosedMainClassWithScript = 1 << 1
+    };
+    llvm::PointerIntPair<FileUnit *, 2, OptionSet<Flags>> storage;
+  public:
+    MainInfoTy() = default;
+
+    FileUnit *getMainFile() const {
+      return storage.getPointer();
+    }
+    void setMainFile(FileUnit *file) {
+      assert(!storage.getPointer());
+      storage.setPointer(file);
+    }
+
+    bool hasMain() const {
+      return storage.getPointer();
+    }
+
+    bool markDiagnosedMultipleMainClasses() {
+      bool res = storage.getInt().contains(Flags::DiagnosedMultipleMainClasses);
+      storage.setInt(storage.getInt() | Flags::DiagnosedMultipleMainClasses);
+      return !res;
+    }
+
+    bool markDiagnosedMainClassWithScript() {
+      bool res = storage.getInt().contains(Flags::DiagnosedMainClassWithScript);
+      storage.setInt(storage.getInt() | Flags::DiagnosedMainClassWithScript);
+      return !res;
+    }
+  };
+
+  /// Information about the file responsible for the module's entry point,
+  /// if any.
+  ///
+  /// \see MainInfoTy
+  MainInfoTy MainInfo;
 
   /// The magic __dso_handle variable.
   VarDecl *DSOHandle = nullptr;
@@ -460,23 +499,16 @@ public:
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(ASTWalker &Walker);
 
-  static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::Module;
-  }
-  
-  /// Get the "main" class for the module, which has been decorated with one of
-  /// the @\{UI,NS}ApplicationMain attributes. Returns null if there is no
-  /// main class.
-  ClassDecl *getMainClass() const {
-    return MainClass;
-  }
-  
-  /// Register a "main" class for the module, complaining if there is more than
-  /// one. Can only be called during type-checking.
-  bool registerMainClass(ClassDecl *mainClass, SourceLoc diagLoc);
+  /// Register the file responsible for generating this module's entry point.
+  bool registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
+                              Optional<ArtificialMainKind> kind);
 
   /// Returns the associated clang module if one exists.
   const clang::Module *findUnderlyingClangModule();
+
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::Module;
+  }
 
 private:
   // Make placement new and vanilla new/delete illegal for Modules.
@@ -701,13 +733,6 @@ public:
   }
 };
   
-/// The kind of artificial main a source file carries.
-enum class ArtificialMainKind {
-  None,
-  NSApplicationMain,
-  UIApplicationMain,
-};
-  
 /// A file containing Swift source code.
 ///
 /// This is a .swift or .sil file (or a virtual file, such as the contents of
@@ -740,17 +765,23 @@ private:
   /// same module.
   mutable Identifier PrivateDiscriminator;
 
-  /// \brief The ID for the memory buffer containing this file's source.
-  ///
-  /// May be -1, to indicate no association with a buffer.
-  int BufferID;
-
   /// The root TypeRefinementContext for this SourceFile.
   TypeRefinementContext *TRC = nullptr;
 
   /// If non-null, used to track name lookups that happen within this file.
   ReferencedNameTracker *ReferencedNames = nullptr;
-  
+
+  /// The class in this file marked \@NS/UIApplicationMain.
+  ClassDecl *MainClass = nullptr;
+
+  /// The source location of the main class.
+  SourceLoc MainClassDiagLoc;
+
+  /// \brief The ID for the memory buffer containing this file's source.
+  ///
+  /// May be -1, to indicate no association with a buffer.
+  int BufferID;
+
   friend ASTContext;
   ~SourceFile();
 public:
@@ -903,20 +934,31 @@ public:
   }
   
   /// True if this source file contains the main class for the module.
-  bool hasMainClass() const;
-  
-  /// True if this source file includes an artificial main entry point.
-  ArtificialMainKind getArtificialMainKind() const;
-  
+  bool hasMainClass() const {
+    return MainClass;
+  }
+  ClassDecl *getMainClass() const {
+    return MainClass;
+  }
+  SourceLoc getMainClassDiagLoc() const {
+    assert(hasMainClass());
+    return MainClassDiagLoc;
+  }
+
+  /// Register a "main" class for the module, complaining if there is more than
+  /// one.
+  ///
+  /// Should only be called during type-checking.
+  bool registerMainClass(ClassDecl *mainClass, SourceLoc diagLoc);
+
   /// True if this source file has an application entry point.
   ///
   /// This is true if the source file either is in script mode or contains
   /// a designated main class.
   bool hasEntryPoint() const {
-    return isScriptMode()
-      || getArtificialMainKind() != ArtificialMainKind::None;
+    return isScriptMode() || hasMainClass();
   }
-  
+
   /// Get the root refinement context for the file.
   TypeRefinementContext *getTypeRefinementContext();
 

@@ -360,8 +360,7 @@ public:
 
   /// Generates code for an artificial top-level function that starts an
   /// application based on a main class.
-  void emitArtificialTopLevel(ArtificialMainKind kind,
-                              ClassDecl *mainClass);
+  void emitArtificialTopLevel(ClassDecl *mainClass);
   
   /// Generates code for a class deallocating destructor. This
   /// calls the destroying destructor and then deallocates 'self'.

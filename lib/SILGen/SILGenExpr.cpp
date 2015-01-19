@@ -3041,13 +3041,12 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   emitEpilog(ace);
 }
 
-void SILGenFunction::emitArtificialTopLevel(ArtificialMainKind kind,
-                                            ClassDecl *mainClass) {
+void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
   // Load argc and argv from the entry point arguments.
   SILValue argc = F.begin()->getBBArg(0);
   SILValue argv = F.begin()->getBBArg(1);
   
-  switch (kind) {
+  switch (mainClass->getArtificialMainKind()) {
   case ArtificialMainKind::UIApplicationMain: {
     // Emit a UIKit main.
     // return UIApplicationMain(C_ARGC, C_ARGV, nil, ClassName);
@@ -3193,9 +3192,6 @@ void SILGenFunction::emitArtificialTopLevel(ArtificialMainKind kind,
     B.createReturn(mainClass, r);
     return;
   }
-  
-  case ArtificialMainKind::None:
-    llvm_unreachable("no artificial main?!");
   }
 }
 
