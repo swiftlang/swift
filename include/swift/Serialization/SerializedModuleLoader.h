@@ -204,6 +204,10 @@ public:
 
   virtual StringRef getFilename() const override;
 
+  ClassDecl *getMainClass() const override;
+
+  bool hasEntryPoint() const override;
+
   virtual const clang::Module *getUnderlyingClangModule() override;
 
   static bool classof(const FileUnit *file) {

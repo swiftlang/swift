@@ -42,6 +42,8 @@ class ProtocolConformance;
 
 /// A serialized module, along with the tools to access it.
 class ModuleFile : public LazyMemberLoader {
+  friend class SerializedASTFile;
+
   /// A reference back to the AST representation of the file.
   FileUnit *FileContext = nullptr;
 
@@ -276,6 +278,13 @@ private:
   std::unique_ptr<SerializedDeclCommentTable> DeclCommentTable;
 
   struct {
+    /// The decl ID of the main class in this module file, if it has one.
+    unsigned EntryPointDeclID : 31;
+
+    /// Whether or not this module file comes from a context that had a main
+    /// entry point.
+    unsigned HasEntryPoint : 1;
+
     /// Whether this module file comes from a framework.
     unsigned IsFramework : 1;
 
@@ -288,13 +297,21 @@ private:
 
     /// Whether this module file can be used, and what's wrong if not.
     unsigned Status : 4;
+
+    // Explicitly pad out to the next word boundary.
     unsigned : 0;
   } Bits = {};
-  static_assert(sizeof(Bits) <= 4, "The bit set should be small");
+  static_assert(sizeof(Bits) <= 8, "The bit set should be small");
 
   void setStatus(ModuleStatus status) {
     Bits.Status = static_cast<unsigned>(status);
     assert(status == getStatus() && "not enough bits for status");
+  }
+
+  void setEntryPointClassID(serialization::DeclID DID) {
+    Bits.HasEntryPoint = true;
+    Bits.EntryPointDeclID = DID;
+    assert(Bits.EntryPointDeclID == DID && "not enough bits for DeclID");
   }
 
   /// Creates a new AST node to represent a deserialized decl.

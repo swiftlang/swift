@@ -1267,19 +1267,16 @@ bool Module::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
   }
 
   FileUnit *existingFile = MainInfo.getMainFile();
-  const ClassDecl *existingClass = nullptr;
+  const ClassDecl *existingClass = existingFile->getMainClass();
   SourceLoc existingDiagLoc;
 
   if (auto *sourceFile = dyn_cast<SourceFile>(existingFile)) {
-    if ((existingClass = sourceFile->getMainClass())) {
+    if (existingClass) {
       existingDiagLoc = sourceFile->getMainClassDiagLoc();
     } else {
       if (auto bufID = sourceFile->getBufferID())
         existingDiagLoc = Ctx.SourceMgr.getLocForBufferStart(*bufID);
     }
-
-  } else {
-    // FIXME: Handle the non-source-file case.
   }
 
   if (existingClass) {
@@ -1303,8 +1300,8 @@ bool Module::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
     // We don't have an existing class, but we /do/ have a file in script mode.
     // Diagnose that.
     if (MainInfo.markDiagnosedMainClassWithScript()) {
-        Ctx.Diags.diagnose(diagLoc, diag::attr_ApplicationMain_with_script,
-                           mainClassDiagKind);
+      Ctx.Diags.diagnose(diagLoc, diag::attr_ApplicationMain_with_script,
+                         mainClassDiagKind);
 
       if (existingDiagLoc.isValid()) {
         Ctx.Diags.diagnose(existingDiagLoc,

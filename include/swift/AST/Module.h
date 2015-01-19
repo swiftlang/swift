@@ -655,6 +655,18 @@ public:
 
   /// @}
 
+  /// True if this file contains the main class for the module.
+  bool hasMainClass() const {
+    return getMainClass();
+  }
+  virtual ClassDecl *getMainClass() const {
+    assert(hasEntryPoint());
+    return nullptr;
+  }
+  virtual bool hasEntryPoint() const {
+    return false;
+  }
+
   /// Returns the associated clang module if one exists.
   virtual const clang::Module *getUnderlyingClangModule() { return nullptr; }
 
@@ -933,11 +945,7 @@ public:
     llvm_unreachable("bad SourceFileKind");
   }
   
-  /// True if this source file contains the main class for the module.
-  bool hasMainClass() const {
-    return MainClass;
-  }
-  ClassDecl *getMainClass() const {
+  ClassDecl *getMainClass() const override {
     return MainClass;
   }
   SourceLoc getMainClassDiagLoc() const {
@@ -955,7 +963,7 @@ public:
   ///
   /// This is true if the source file either is in script mode or contains
   /// a designated main class.
-  bool hasEntryPoint() const {
+  bool hasEntryPoint() const override {
     return isScriptMode() || hasMainClass();
   }
 

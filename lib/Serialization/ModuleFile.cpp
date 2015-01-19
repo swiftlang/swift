@@ -355,6 +355,7 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
 
     case llvm::BitstreamEntry::Record:
       scratch.clear();
+      blobData = {};
       unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
 
       switch (kind) {
@@ -387,6 +388,10 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         break;
       case index_block::OBJC_METHODS:
         ObjCMethods = readObjCMethodTable(scratch, blobData);
+        break;
+      case index_block::ENTRY_POINT:
+        assert(blobData.empty());
+        setEntryPointClassID(scratch.front());
         break;
       default:
         // Unknown index kind, which this version of the compiler won't use.
@@ -940,6 +945,12 @@ ModuleStatus ModuleFile::associateWithFileContext(FileUnit *file,
   if (Bits.HasUnderlyingModule)
     (void)getModule(FileContext->getParentModule()->Name);
 
+  if (Bits.HasEntryPoint) {
+    FileContext->getParentModule()->registerEntryPointFile(FileContext,
+                                                           SourceLoc(),
+                                                           None);
+  }
+
   return getStatus();
 }
 
@@ -1339,4 +1350,13 @@ void ModuleFile::verify() const {
     if (next.isComplete())
       swift::verify(next);
 #endif
+}
+
+bool SerializedASTFile::hasEntryPoint() const {
+  return File.Bits.HasEntryPoint;
+}
+
+ClassDecl *SerializedASTFile::getMainClass() const {
+  assert(hasEntryPoint());
+  return cast_or_null<ClassDecl>(File.getDecl(File.Bits.EntryPointDeclID));
 }

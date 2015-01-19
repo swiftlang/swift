@@ -1248,6 +1248,8 @@ namespace index_block {
     /// Objective-C selectors to the methods/initializers/properties/etc. that
     /// produce Objective-C methods.
     OBJC_METHODS,
+
+    ENTRY_POINT,
   };
 
   using OffsetsLayout = BCGenericRecordLayout<
@@ -1265,6 +1267,11 @@ namespace index_block {
     OBJC_METHODS,  // record ID
     BCVBR<16>,     // table offset within the blob (see below)
     BCBlob         // map from Objective-C selectors to methods with that selector
+  >;
+
+  using EntryPointLayout = BCRecordLayout<
+    ENTRY_POINT,
+    DeclIDField  // the ID of the main class; 0 if there was a main source file
   >;
 }
 

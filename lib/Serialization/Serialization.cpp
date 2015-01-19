@@ -338,6 +338,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, CLASS_MEMBERS);
   BLOCK_RECORD(index_block, OPERATOR_METHODS);
   BLOCK_RECORD(index_block, OBJC_METHODS);
+  BLOCK_RECORD(index_block, ENTRY_POINT);
 
   BLOCK(SIL_BLOCK);
   BLOCK_RECORD(sil_block, SIL_FUNCTION);
@@ -3078,8 +3079,13 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
   DeclTable topLevelDecls, extensionDecls, operatorDecls, operatorMethodDecls;
   ObjCMethodTable objcMethods;
 
+  Optional<DeclID> entryPointClassID;
+
   ArrayRef<const FileUnit *> files = SF ? SF : M->getFiles();
   for (auto nextFile : files) {
+    if (nextFile->hasEntryPoint())
+      entryPointClassID = addDeclRef(nextFile->getMainClass());
+
     // FIXME: Switch to a visitor interface?
     SmallVector<Decl *, 32> fileDecls;
     nextFile->getTopLevelDecls(fileDecls);
@@ -3140,6 +3146,11 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
 
     index_block::ObjCMethodTableLayout ObjCMethodTable(Out);
     writeObjCMethodTable(ObjCMethodTable, objcMethods);
+
+    if (entryPointClassID.hasValue()) {
+      index_block::EntryPointLayout EntryPoint(Out);
+      EntryPoint.emit(ScratchRecord, entryPointClassID.getValue());
+    }
   }
 }
 
