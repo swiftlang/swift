@@ -49,7 +49,7 @@ public struct ObjCBool : BooleanType, BooleanLiteralConvertible {
 #if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
     return value != 0
 #else
-    return value == true
+    return value
 #endif
   }
 
