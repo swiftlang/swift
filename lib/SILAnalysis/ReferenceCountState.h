@@ -217,7 +217,7 @@ struct RefCountState {
 
     // If we can prove that Other can not use the pointer we are tracking,
     // return...
-    if (!canDecrementRefCount(PotentialDecrement, getValue(), AA))
+    if (!mayDecrementRefCount(PotentialDecrement, getValue(), AA))
       return false;
 
     // Otherwise, allow the CRTP substruct to update itself given we have a
@@ -241,7 +241,7 @@ struct RefCountState {
     if (!asImpl()->valueCanBeUsedGivenLatticeState())
       return false;
 
-    if (!canUseValue(PotentialUser, getValue(), AA))
+    if (!mayUseValue(PotentialUser, getValue(), AA))
       return false;
 
     return asImpl()->handleUser(PotentialUser);

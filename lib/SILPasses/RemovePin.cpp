@@ -142,7 +142,7 @@ public:
     SmallVector<SILInstruction *, 16> RemovePin;
     for (auto *P : AvailablePins) {
       if (!isSafeArraySemanticFunction(I) &&
-          canDecrementRefCount(I, P, AA))
+          mayDecrementRefCount(I, P, AA))
           RemovePin.push_back(P);
     }
 

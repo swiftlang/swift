@@ -124,8 +124,8 @@ static bool canDecrementRefCountsByValueKind(SILInstruction *User) {
   }
 }
 
-bool swift::canDecrementRefCount(SILInstruction *User,
-                                      SILValue Ptr, AliasAnalysis *AA) {
+bool swift::mayDecrementRefCount(SILInstruction *User,
+                                 SILValue Ptr, AliasAnalysis *AA) {
   // If we have an instruction that does not have *pure* side effects, it can
   // not affect ref counts.
   //
@@ -155,7 +155,7 @@ bool swift::canDecrementRefCount(SILInstruction *User,
   return true;
 }
 
-bool swift::canCheckRefCount(SILInstruction *User) {
+bool swift::mayCheckRefCount(SILInstruction *User) {
   if (auto *AI = dyn_cast<ApplyInst>(User))
     if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
         return FRI->getReferencedFunction()->getName().startswith(
@@ -298,8 +298,8 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
 
 
 
-bool swift::canUseValue(SILInstruction *User, SILValue Ptr,
-                             AliasAnalysis *AA) {
+bool swift::mayUseValue(SILInstruction *User, SILValue Ptr,
+                        AliasAnalysis *AA) {
   // If Inst is an instruction that we know can never use values with reference
   // semantics, return true.
   if (canNeverUseValues(User))
@@ -356,7 +356,7 @@ valueHasARCUsesInInstructionRange(SILValue Op,
   // Otherwise, until Start != End.
   while (Start != End) {
     // Check if Start can use Op in an ARC relevant way. If so, return true.
-    if (canUseValue(&*Start, Op, AA))
+    if (mayUseValue(&*Start, Op, AA))
       return Start;
 
     // Otherwise, increment our iterator.
@@ -389,7 +389,7 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
     // Check if Start can decrement or check Op's ref count. If so, return
     // Start. Ref count checks do not have side effects, but are barriers for
     // retains.
-    if (canDecrementRefCount(&*Start, Op, AA) || canCheckRefCount(&*Start))
+    if (mayDecrementRefCount(&*Start, Op, AA) || mayCheckRefCount(&*Start))
       return Start;
     // Otherwise, increment our iterator.
     ++Start;
