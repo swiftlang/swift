@@ -1426,11 +1426,15 @@ bb0:
   return %1 : $@callee_owned () -> ()
 }
 
-// CHECK-LABEL: sil @dead_global_init_call : $@thin () -> () {
+/// Global initializers might have side-effects. We cannot delete such unused
+/// calls.
+// CHECK-LABEL: sil @not_dead_global_init_call : $@thin () -> () {
 // CHECK-NEXT: bb0:
+// CHECK: [[FUN:%.*]] = function_ref
+// CHECK-NEXT: apply [[FUN]]()
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @dead_global_init_call : $@thin () -> () {
+sil @not_dead_global_init_call : $@thin () -> () {
 bb0:
   %0 = function_ref @global_init_fun : $@thin () -> Builtin.RawPointer
   %1 = apply %0() : $@thin () -> Builtin.RawPointer

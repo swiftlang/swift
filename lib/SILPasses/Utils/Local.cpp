@@ -88,15 +88,6 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
   if (!I->use_empty() || isa<TermInst>(I))
     return false;
 
-  // We know that some calls do not have side effects.
-  if (const ApplyInst *AI = dyn_cast<ApplyInst>(I)) {
-    if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
-      // If we call an apply inst to a global initializer, but the value is not
-      // used it is safe to remove it.
-      if (FRI->getReferencedFunction()->isGlobalInit())
-        return true;
-  }
-
   if (auto *BI = dyn_cast<BuiltinInst>(I)) {
     return isSideEffectFree(BI);
   }
