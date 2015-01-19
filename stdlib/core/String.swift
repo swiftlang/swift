@@ -938,21 +938,31 @@ extension String {
 
 // Index conversions
 extension String.Index {
+  /// Construct the position in `characters` that corresponds exactly to
+  /// `unicodeScalarIndex`. If no such position exists, the result is `nil`.
+  ///
+  /// Requires: `unicodeScalarIndex` is an element of
+  /// `indices(characters.unicodeScalars)`.
   public init?(
-    _ sourceIndex: String.UnicodeScalarIndex,
+    _ unicodeScalarIndex: String.UnicodeScalarIndex,
     within characters: String
   ) {
-    if !sourceIndex._isOnGraphemeClusterBoundary {
+    if !unicodeScalarIndex._isOnGraphemeClusterBoundary {
       return nil
     }
-    self.init(_base: sourceIndex)
+    self.init(_base: unicodeScalarIndex)
   }
 
+  /// Construct the position in `characters` that corresponds exactly to
+  /// `utf16Index`. If no such position exists, the result is `nil`.
+  ///
+  /// Requires: `utf16Index` is an element of
+  /// `indices(characters.utf16)`.
   public init?(
-    _ sourceIndex: String.UTF16Index,
+    _ utf16Index: String.UTF16Index,
     within characters: String
   ) {
-    if let me = sourceIndex.samePositionIn(
+    if let me = utf16Index.samePositionIn(
       characters.unicodeScalars
     )?.samePositionIn(characters) {
       self = me
@@ -962,11 +972,16 @@ extension String.Index {
     }
   }
   
+  /// Construct the position in `characters` that corresponds exactly to
+  /// `utf8Index`. If no such position exists, the result is `nil`.
+  ///
+  /// Requires: `utf8Index` is an element of
+  /// `indices(characters.utf8)`.
   public init?(
-    _ sourceIndex: String.UTF8Index,
+    _ utf8Index: String.UTF8Index,
     within characters: String
   ) {
-    if let me = sourceIndex.samePositionIn(
+    if let me = utf8Index.samePositionIn(
       characters.unicodeScalars
     )?.samePositionIn(characters) {
       self = me
@@ -975,20 +990,34 @@ extension String.Index {
       return nil
     }
   }
-  
+
+  /// Return the position in `utf8` that corresponds exactly
+  /// to `self`.
+  ///
+  /// Requires: `self` is an element of `indices(String(utf8))`.
   public func samePositionIn(
-    otherView: String.UTF8View
+    utf8: String.UTF8View
   ) -> String.UTF8View.Index {
-    return String.UTF8View.Index(self, within: otherView)
+    return String.UTF8View.Index(self, within: utf8)
   }
+  
+  /// Return the position in `utf16` that corresponds exactly
+  /// to `self`.
+  ///
+  /// Requires: `self` is an element of `indices(String(utf16))`.
   public func samePositionIn(
-    otherView: String.UTF16View
+    utf16: String.UTF16View
   ) -> String.UTF16View.Index {
-    return String.UTF16View.Index(self, within: otherView)
+    return String.UTF16View.Index(self, within: utf16)
   }
+  
+  /// Return the position in `unicodeScalars` that corresponds exactly
+  /// to `self`.
+  ///
+  /// Requires: `self` is an element of `indices(String(unicodeScalars))`.
   public func samePositionIn(
-    otherView: String.UnicodeScalarView
+    unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarView.Index {
-    return String.UnicodeScalarView.Index(self, within: otherView)
+    return String.UnicodeScalarView.Index(self, within: unicodeScalars)
   }
 }

@@ -309,58 +309,86 @@ func == (lhs: String.UTF8View.Index, rhs: String.UTF8View.Index) -> Bool {
   while true
 }
 
-extension String.UTF8Index {
+// Index conversions
+extension String.UTF8View.Index {
   internal init(_ core: _StringCore, _utf16Offset: Int) {
       let (_, buffer) = core._encodeSomeUTF8(_utf16Offset)
       self.init(core, _utf16Offset, buffer)
   }
   
-  public init?(_ sourceIndex: String.UTF16Index, within utf8: String.UTF8View) {
-    let sourceView = String.UTF16View(utf8._core)
+  /// Construct the position in `utf8` that corresponds exactly to
+  /// `utf16Index`. If no such position exists, the result is `nil`.
+  ///
+  /// Requires: `utf8Index` is an element of
+  /// `indices(String(utf16).utf8)`.
+  public init?(_ utf16Index: String.UTF16Index, within utf8: String.UTF8View) {
+    let utf16 = String.UTF16View(utf8._core)
     
-    if sourceIndex != sourceView.startIndex
-    && sourceIndex != sourceView.endIndex {
+    if utf16Index != utf16.startIndex
+    && utf16Index != utf16.endIndex {
       _precondition(
-        sourceIndex >= sourceView.startIndex
-        && sourceIndex <= sourceView.endIndex,
+        utf16Index >= utf16.startIndex
+        && utf16Index <= utf16.endIndex,
         "Invalid String.UTF16Index for this UTF-8 view")
       
       // Detect positions that have no corresponding index.  Note that
       // we have to check before and after, because an unpaired
       // surrogate will be decoded as a single replacement character,
       // thus making the corresponding position valid in UTF8.
-      if UTF16.isTrailSurrogate(sourceView[sourceIndex])
-        && UTF16.isLeadSurrogate(sourceView[sourceIndex.predecessor()]) {
+      if UTF16.isTrailSurrogate(utf16[utf16Index])
+        && UTF16.isLeadSurrogate(utf16[utf16Index.predecessor()]) {
         return nil
       }
     }
-    self.init(utf8._core, _utf16Offset: sourceIndex._offset)
+    self.init(utf8._core, _utf16Offset: utf16Index._offset)
   }
   
+  /// Construct the position in `utf8` that corresponds exactly to
+  /// `unicodeScalarIndex`.
+  ///
+  /// Requires: `unicodeScalarIndex` is an element of
+  /// `indices(String(utf8).unicodeScalars)`.
   public init(
-    _ sourceIndex: String.UnicodeScalarIndex, within utf8: String.UTF8View) {
-    self.init(utf8._core, _utf16Offset: sourceIndex._position)
+    _ unicodeScalarIndex: String.UnicodeScalarIndex,
+    within utf8: String.UTF8View
+  ) {
+    self.init(utf8._core, _utf16Offset: unicodeScalarIndex._position)
   }
   
-  public init(_ sourceIndex: String.Index, within utf8: String.UTF8View) {
-    self.init(utf8._core, _utf16Offset: sourceIndex._base._position)
+  /// Construct the position in `utf8` that corresponds exactly to
+  /// `characterIndex`.
+  ///
+  /// Requires: `characterIndex` is an element of
+  /// `indices(String(utf8))`.
+  public init(_ characterIndex: String.Index, within utf8: String.UTF8View) {
+    self.init(utf8._core, _utf16Offset: characterIndex._base._position)
   }
-}
 
-// Index conversions
-extension String.UTF8View.Index {
+  /// Return the position in `utf16` that corresponds exactly
+  /// to `self`, or if no such position exists, `nil`.
+  ///
+  /// Requires: `self` is an element of `indices(String(utf16).utf8)`.
   public func samePositionIn(
-    otherView: String.UTF16View
+    utf16: String.UTF16View
   ) -> String.UTF16View.Index? {
-    return String.UTF16View.Index(self, within: otherView)
+    return String.UTF16View.Index(self, within: utf16)
   }
   
+  /// Return the position in `unicodeScalars` that corresponds exactly
+  /// to `self`, or if no such position exists, `nil`.
+  ///
+  /// Requires: `self` is an element of
+  /// `indices(String(unicodeScalars).utf8)`.
   public func samePositionIn(
-    otherView: String.UnicodeScalarView
+    unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarIndex? {
-    return String.UnicodeScalarIndex(self, within: otherView)
+    return String.UnicodeScalarIndex(self, within: unicodeScalars)
   }
   
+  /// Return the position in `characters` that corresponds exactly
+  /// to `self`, or if no such position exists, `nil`.
+  ///
+  /// Requires: `self` is an element of `indices(characters.utf8)`.
   public func samePositionIn(
     characters: String
   ) -> String.Index? {
