@@ -5,7 +5,7 @@ var s = ["two", "three", "five", "seven", "eleven", "thirteen"]
 
 var i = 0
 var prefix = ""
-for p in Zip2(n, s) {
+for p in zip(n, s) {
     print("\(prefix)\(p.0) => \(p.1)")
     ++i
     prefix = ", "
@@ -15,7 +15,7 @@ println(" (\(i) items)")
 
 i = 0
 prefix = ""
-for p in Zip2(s, n) {
+for p in zip(s, n) {
     print("\(prefix)\(p.0) => \(p.1)")
     ++i
     prefix = ", "
