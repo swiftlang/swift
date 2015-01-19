@@ -1282,22 +1282,47 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       InitType = cs.generateConstraints(pattern, Locator);
       if (!InitType)
         return true;
-
-      // Determine the generator type of the sequence.
-      // FIXME: Should look up the type witness.
-      auto generatorType = cs.createTypeVariable(Locator, /*options=*/0);
-      cs.addConstraint(Constraint::create(cs, ConstraintKind::TypeMember,
-                                          expr->getType(), generatorType,
-                                          tc.Context.Id_Generator,
-                                          Locator));
-
-      // Determine the element type of the generator.
-      // FIXME: Should look up the type witness.
-      auto elementType = cs.createTypeVariable(Locator, /*options=*/0);
-      cs.addConstraint(Constraint::create(cs, ConstraintKind::TypeMember,
-                                          generatorType, elementType,
-                                          tc.Context.Id_Element,
-                                          Locator));
+      
+      // Manually search for the generator witness. If no generator/element pair
+      // exists, solve for them.
+      Type generatorType;
+      Type elementType;
+      
+      auto member = cs.TC.lookupMemberType(expr->getType()->getRValueType(),
+                                           tc.Context.Id_Generator,
+                                           cs.DC,
+                                           isa<AbstractFunctionDecl>(cs.DC));
+      
+      if (member) {
+        generatorType = member.front().second;
+        
+        member = cs.TC.lookupMemberType(generatorType,
+                                        tc.Context.Id_Element,
+                                        cs.DC,
+                                        isa<AbstractFunctionDecl>(cs.DC));
+        
+        if (member)
+          elementType = member.front().second;
+      }
+      
+      if (elementType.isNull()) {
+      
+        // Determine the generator type of the sequence.
+        generatorType = cs.createTypeVariable(Locator, /*options=*/0);
+        cs.addConstraint(Constraint::create(cs, ConstraintKind::TypeMember,
+                                            expr->getType(), generatorType,
+                                            tc.Context.Id_Generator,
+                                            Locator));
+  
+        // Determine the element type of the generator.
+        // FIXME: Should look up the type witness.
+        elementType = cs.createTypeVariable(Locator, /*options=*/0);
+        cs.addConstraint(Constraint::create(cs, ConstraintKind::TypeMember,
+                                            generatorType, elementType,
+                                            tc.Context.Id_Element,
+                                            Locator));
+      }
+      
 
       // Add a conversion constraint between the element type of the sequence
       // and the type of the element pattern.
