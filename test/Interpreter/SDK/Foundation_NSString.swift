@@ -72,16 +72,18 @@ func testComparisons() {
   if s1 != s1 { println("s1 != s1") }
 
   // Test String [==,!=] NSString.
-  if s1 == ns2 { println("s1 == ns2") }
-  if s1 != ns2 { println("s1 != ns2") }
-  if s1 == ns1 { println("s1 == ns1") }
-  if s1 != ns1 { println("s1 != ns1") }
+  // This test does not compile, as comparing these 2 types is ambiguous.
+  // if s1 == ns2 { println("s1 == ns2") }
+  // if s1 != ns2 { println("s1 != ns2") }
+  // if s1 == ns1 { println("s1 == ns1") }
+  // if s1 != ns1 { println("s1 != ns1") }
 
   // Test NSString [==,!=] String.
-  if ns1 == s2 { println("ns1 == s2") }
-  if ns1 != s2 { println("ns1 != s2") }
-  if ns1 == s1 { println("ns1 == s1") }
-  if ns1 != s1 { println("ns1 != s1") }
+  // This test does not compile, as comparing these 2 types is ambiguous.
+  // if ns1 == s2 { println("ns1 == s2") }
+  // if ns1 != s2 { println("ns1 != s2") }
+  // if ns1 == s1 { println("ns1 == s1") }
+  // if ns1 != s1 { println("ns1 != s1") }
 
   // Test NString [==,!=] NString.
   if ns1 == ns2 { println("ns1 == ns2") }
@@ -90,10 +92,11 @@ func testComparisons() {
   if ns1 != ns1 { println("ns1 != ns1") }
 
   // Test NSMutableString [==,!=] String.
-  if nms1 == s2 { println("nms1 == s2") }
-  if nms1 != s2 { println("nms1 != s2") }
-  if nms1 == s1 { println("nms1 == s1") }
-  if nms1 != s1 { println("nms1 != s1") }
+  // This test does not compile, as comparing these 2 types is ambiguous.
+  // if nms1 == s2 { println("nms1 == s2") }
+  // if nms1 != s2 { println("nms1 != s2") }
+  // if nms1 == s1 { println("nms1 == s1") }
+  // if nms1 != s1 { println("nms1 != s1") }
 
   // Test NSMutableString [==,!=] NSMutableString.
   if nms1 == nms2 { println("nms1 == nms2") }
@@ -116,14 +119,8 @@ func testComparisons() {
 
 // CHECK: s1 != s2
 // CHECK: s1 == s1
-// CHECK: s1 != ns2
-// CHECK: s1 == ns1
-// CHECK: ns1 != s2
-// CHECK: ns1 == s1
 // CHECK: ns1 != ns2
 // CHECK: ns1 == ns1
-// CHECK: nms1 != s2
-// CHECK: nms1 == s1
 // CHECK: nms1 != nms2
 // CHECK: nms1 == nms1
 // CHECK: ns1 != nms2

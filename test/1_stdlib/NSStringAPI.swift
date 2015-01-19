@@ -1698,26 +1698,6 @@ func checkStringComparison(
   checkHashable(
     expectedEqualUnicodeScalars, lhsNSString, rhsNSString,
     stackTrace.withCurrentLoc())
-
-  // Test mixed comparisons.
-
-  // String / NSString
-  expectEqual(expected.isEQ(), lhs == rhsNSString, stackTrace: stackTrace)
-  expectEqual(expected.isNE(), lhs != rhsNSString, stackTrace: stackTrace)
-
-  expectEqual(expected.isLT(), lhs < rhsNSString, stackTrace: stackTrace)
-  expectEqual(expected.isLE(), lhs <= rhsNSString, stackTrace: stackTrace)
-  expectEqual(expected.isGE(), lhs >= rhsNSString, stackTrace: stackTrace)
-  expectEqual(expected.isGT(), lhs > rhsNSString, stackTrace: stackTrace)
-
-  // NSString / String
-  expectEqual(expected.isEQ(), lhsNSString == rhs, stackTrace: stackTrace)
-  expectEqual(expected.isNE(), lhsNSString != rhs, stackTrace: stackTrace)
-
-  expectEqual(expected.isLT(), lhsNSString < rhs, stackTrace: stackTrace)
-  expectEqual(expected.isLE(), lhsNSString <= rhs, stackTrace: stackTrace)
-  expectEqual(expected.isGE(), lhsNSString >= rhs, stackTrace: stackTrace)
-  expectEqual(expected.isGT(), lhsNSString > rhs, stackTrace: stackTrace)
 }
 
 NSStringAPIs.test("String.{Equatable,Hashable,Comparable}") {
