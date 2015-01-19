@@ -23,7 +23,6 @@
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
-using namespace swift::arc;
 
 //===----------------------------------------------------------------------===//
 //                             Decrement Analysis
@@ -125,7 +124,7 @@ static bool canDecrementRefCountsByValueKind(SILInstruction *User) {
   }
 }
 
-bool swift::arc::canDecrementRefCount(SILInstruction *User,
+bool swift::canDecrementRefCount(SILInstruction *User,
                                       SILValue Ptr, AliasAnalysis *AA) {
   // If we have an instruction that does not have *pure* side effects, it can
   // not affect ref counts.
@@ -156,7 +155,7 @@ bool swift::arc::canDecrementRefCount(SILInstruction *User,
   return true;
 }
 
-bool swift::arc::canCheckRefCount(SILInstruction *User) {
+bool swift::canCheckRefCount(SILInstruction *User) {
   if (auto *AI = dyn_cast<ApplyInst>(User))
     if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
         return FRI->getReferencedFunction()->getName().startswith(
@@ -204,7 +203,7 @@ static bool canApplyOfBuiltinUseNonTrivialValues(BuiltinInst *BInst) {
 }
 
 /// Returns true if Inst is a function that we know never uses ref count values.
-bool swift::arc::canNeverUseValues(SILInstruction *Inst) {
+bool swift::canNeverUseValues(SILInstruction *Inst) {
   switch (Inst->getKind()) {
   // These instructions do not use other values.
   case ValueKind::FunctionRefInst:
@@ -299,7 +298,7 @@ bool swift::arc::canNeverUseValues(SILInstruction *Inst) {
 
 
 
-bool swift::arc::canUseValue(SILInstruction *User, SILValue Ptr,
+bool swift::canUseValue(SILInstruction *User, SILValue Ptr,
                              AliasAnalysis *AA) {
   // If Inst is an instruction that we know can never use values with reference
   // semantics, return true.
@@ -342,7 +341,7 @@ bool swift::arc::canUseValue(SILInstruction *User, SILValue Ptr,
 /// first such instruction. Otherwise return None. We assume that
 /// Start and End are both in the same basic block.
 Optional<SILBasicBlock::iterator>
-swift::arc::
+swift::
 valueHasARCUsesInInstructionRange(SILValue Op,
                                   SILBasicBlock::iterator Start,
                                   SILBasicBlock::iterator End,
@@ -373,7 +372,7 @@ valueHasARCUsesInInstructionRange(SILValue Op,
 /// if no such instruction exists. We assume that Start and End are both in the
 /// same basic block.
 Optional<SILBasicBlock::iterator>
-swift::arc::
+swift::
 valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
                                               SILBasicBlock::iterator Start,
                                               SILBasicBlock::iterator End,
@@ -427,7 +426,7 @@ static bool ignoreableBuiltinInstInUnreachableBlock(BuiltinInst *BI) {
 }
 
 /// Match a call to a trap BB with no ARC relevant side effects.
-bool swift::arc::isARCInertTrapBB(SILBasicBlock *BB) {
+bool swift::isARCInertTrapBB(SILBasicBlock *BB) {
   auto II = BB->begin(), IE = BB->end();
   while (II != IE) {
     if (isa<UnreachableInst>(&*II))
@@ -484,7 +483,7 @@ ConsumedArgToEpilogueReleaseMatcher(RCIdentityAnalysis *RCIA,
     if (!isa<ReleaseValueInst>(*II) && !isa<StrongReleaseInst>(*II)) {
       // And the object can not use values in a manner that will keep the object
       // alive, continue. We may be able to find additional releases.
-      if (arc::canNeverUseValues(&*II))
+      if (canNeverUseValues(&*II))
         continue;
 
       // Otherwise, we need to stop computing since we do not want to reduce the

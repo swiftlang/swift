@@ -25,7 +25,6 @@ namespace swift {
 } // end namespace swift
 
 namespace swift {
-namespace arc {
 
 //===----------------------------------------------------------------------===//
 //                                  Utility
@@ -584,7 +583,6 @@ struct TopDownRefCountState : public RefCountState<TopDownRefCountState> {
   bool merge(const TopDownRefCountState &Other);
 };
 
-} // end arc namespace
 } // end swift namespace
 
 #endif

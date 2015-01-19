@@ -26,7 +26,6 @@
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
-using namespace swift::arc;
 
 //===----------------------------------------------------------------------===//
 //                                 Utilities
@@ -493,7 +492,7 @@ static bool processBBTopDown(
 }
 
 void
-swift::arc::ARCSequenceDataflowEvaluator::mergePredecessors(ARCBBState &BBState,
+swift::ARCSequenceDataflowEvaluator::mergePredecessors(ARCBBState &BBState,
                                                             SILBasicBlock *BB) {
   bool HasAtLeastOnePred = false;
   llvm::SmallVector<SILBasicBlock *, 4> BBThatNeedInsertPts;
@@ -536,7 +535,7 @@ swift::arc::ARCSequenceDataflowEvaluator::mergePredecessors(ARCBBState &BBState,
   }
 }
 
-bool swift::arc::ARCSequenceDataflowEvaluator::processTopDown() {
+bool swift::ARCSequenceDataflowEvaluator::processTopDown() {
   bool NestingDetected = false;
 
   DEBUG(llvm::dbgs() << "<<<< Processing Top Down! >>>>\n");
@@ -571,7 +570,7 @@ bool swift::arc::ARCSequenceDataflowEvaluator::processTopDown() {
 /// NestingDetected will be set to indicate that the block needs to be
 /// reanalyzed if code motion occurs.
 bool
-swift::arc::ARCSequenceDataflowEvaluator::
+swift::ARCSequenceDataflowEvaluator::
 processBBBottomUp(ARCBBState &BBState, bool FreezeOwnedArgEpilogueReleases) {
   DEBUG(llvm::dbgs() << ">>>> Bottom Up!\n");
   SILBasicBlock &BB = BBState.getBB();
@@ -690,7 +689,7 @@ processBBBottomUp(ARCBBState &BBState, bool FreezeOwnedArgEpilogueReleases) {
 }
 
 void
-swift::arc::ARCSequenceDataflowEvaluator::mergeSuccessors(ARCBBState &BBState,
+swift::ARCSequenceDataflowEvaluator::mergeSuccessors(ARCBBState &BBState,
                                                           SILBasicBlock *BB) {
   // Grab the backedge set for our BB.
   auto &BackEdgeSet = BackedgeMap[BB];
@@ -736,7 +735,7 @@ swift::arc::ARCSequenceDataflowEvaluator::mergeSuccessors(ARCBBState &BBState,
   }
 }
 
-bool swift::arc::ARCSequenceDataflowEvaluator::
+bool swift::ARCSequenceDataflowEvaluator::
 processBottomUp(bool FreezeOwnedArgEpilogueReleases) {
   bool NestingDetected = false;
 
@@ -765,7 +764,7 @@ processBottomUp(bool FreezeOwnedArgEpilogueReleases) {
 //                 Top Level ARC Sequence Dataflow Evaluator
 //===----------------------------------------------------------------------===//
 
-void swift::arc::ARCSequenceDataflowEvaluator::init() {
+void swift::ARCSequenceDataflowEvaluator::init() {
   // Initialize the post order data structure.
 #ifndef NDEBUG
   unsigned Count = 0;
@@ -797,12 +796,12 @@ void swift::arc::ARCSequenceDataflowEvaluator::init() {
   TopDownBBStates.sort();
 }
 
-bool swift::arc::ARCSequenceDataflowEvaluator::run(bool FreezeOwnedReleases) {
+bool swift::ARCSequenceDataflowEvaluator::run(bool FreezeOwnedReleases) {
   bool NestingDetected = processBottomUp(FreezeOwnedReleases);
   NestingDetected |= processTopDown();
   return NestingDetected;
 }
 
-void swift::arc::ARCBBState::initializeTrapStatus() {
+void swift::ARCBBState::initializeTrapStatus() {
   IsTrapBB = isARCInertTrapBB(BB);
 }

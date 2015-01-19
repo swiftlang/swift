@@ -31,7 +31,6 @@ class SILFunction;
 } // end namespace swift
 
 namespace swift {
-namespace arc {
 
 /// \returns True if the user \p User decrement the ref count of pointer \p Ptr.
 bool canDecrementRefCount(SILInstruction *User, SILValue Ptr,
@@ -173,7 +172,6 @@ public:
   Range<iterator> getRange() { return swift::make_range(begin(), end()); }
 };
 
-} // end namespace arc
 } // end namespace swift
 
 #endif

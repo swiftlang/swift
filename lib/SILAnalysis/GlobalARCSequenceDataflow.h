@@ -24,7 +24,6 @@ class AliasAnalysis;
 } // end swift namespace
 
 namespace swift {
-namespace arc {
 
 /// \brief Per-BasicBlock state.
 class ARCBBState {
@@ -262,5 +261,4 @@ private:
   void computePostDominatingConsumedArgMap();
 };
 
-} // end arc namespace
 } // end swift namespace

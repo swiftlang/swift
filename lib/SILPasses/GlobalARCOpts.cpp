@@ -30,7 +30,6 @@
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
-using namespace swift::arc;
 
 STATISTIC(NumRefCountOpsMoved, "Total number of increments moved");
 STATISTIC(NumRefCountOpsRemoved, "Total number of increments removed");

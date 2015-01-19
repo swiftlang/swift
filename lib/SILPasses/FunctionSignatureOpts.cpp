@@ -34,7 +34,6 @@
 #include <type_traits>
 
 using namespace swift;
-using namespace swift::arc;
 
 STATISTIC(NumFunctionSignaturesOptimized, "Total func sig optimized");
 STATISTIC(NumDeadArgsEliminated, "Total dead args eliminated");

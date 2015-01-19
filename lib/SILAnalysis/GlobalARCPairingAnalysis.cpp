@@ -32,7 +32,6 @@
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
-using namespace swift::arc;
 
 namespace {
 
@@ -353,7 +352,6 @@ bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
 //===----------------------------------------------------------------------===//
 
 namespace swift {
-namespace arc {
 
 struct ARCMatchingSetComputationContext {
   BlotMapVector<SILInstruction *, TopDownRefCountState> DecToIncStateMap;
@@ -369,11 +367,10 @@ struct ARCMatchingSetComputationContext {
       RCIA(RCIA) {}
 };
 
-} // end namespace arc
 } // end namespace swift
 
 ARCMatchingSetComputationContext *
-swift::arc::
+swift::
 createARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA,
                                        PostOrderAnalysis *POTA,
                                        RCIdentityAnalysis *RCIA) {
@@ -391,7 +388,7 @@ createARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA,
 }
 
 void
-swift::arc::
+swift::
 destroyARCMatchingSetComputationContext(ARCMatchingSetComputationContext *Ctx) {
   delete Ctx;
 }
@@ -400,7 +397,7 @@ destroyARCMatchingSetComputationContext(ARCMatchingSetComputationContext *Ctx) {
 //                           Top Level Entry Point
 //===----------------------------------------------------------------------===//
 
-bool swift::arc::
+bool swift::
 computeARCMatchingSet(ARCMatchingSetComputationContext *Ctx,
                       bool FreezePostDomReleases,
                       std::function<void (ARCMatchingSet&)> Fun) {

@@ -38,7 +38,6 @@ STATISTIC(NumRefCountOpsSimplified, "number of enum ref count ops simplified.");
 STATISTIC(NumHoisted, "Number of instructions hoisted");
 
 using namespace swift;
-using namespace swift::arc;
 
 //===----------------------------------------------------------------------===//
 //                                  Utility
