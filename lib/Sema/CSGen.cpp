@@ -1192,6 +1192,62 @@ namespace {
 
       favorCallOverloads(expr, isFavoredDecl);
     }
+
+    size_t getOperandCount(Type t) {
+      size_t nOperands = 0;
+      
+      if (auto parenTy = dyn_cast<ParenType>(t.getPointer())) {
+        if (parenTy->getDesugaredType())
+          nOperands = 1;
+      } else if (auto tupleTy = t->getAs<TupleType>()) {
+        nOperands = tupleTy->getElementTypes().size();
+      }
+      
+      return nOperands;
+    }
+    
+    void favorMatchingOverloadExprs(ApplyExpr *expr) {
+      // Find the argument type.
+      auto argTy = expr->getArg()->getType();
+      size_t nArgs = getOperandCount(argTy);
+      auto fnExpr = expr->getFn();
+      
+      // Check to ensure that we have an OverloadedDeclRef, and that we're not
+      // favoring multiple overload constraints. (Otherwise, in this case
+      // favoring is useless.
+      if (auto ODR = dyn_cast<OverloadedDeclRefExpr>(fnExpr)) {
+        bool haveMultipleApplicableOverloads = false;
+        
+        for (auto VD : ODR->getDecls()) {
+          if (auto fnTy = VD->getType()->getAs<AnyFunctionType>()) {
+            size_t nParams = getOperandCount(fnTy->getInput());
+           
+            if (nArgs == nParams) {
+              if (haveMultipleApplicableOverloads) {
+                return;
+              } else {
+                haveMultipleApplicableOverloads = true;
+              }
+            }
+          }
+        }
+      } else {
+        return;
+      }
+      
+      // Determine whether the given declaration is favored.
+      auto isFavoredDecl = [&](ValueDecl *value) -> bool {
+        auto valueTy = value->getType();
+        
+        auto fnTy = valueTy->getAs<AnyFunctionType>();
+        if (!fnTy)
+          return false;
+        
+        return nArgs == getOperandCount(fnTy->getInput());
+      };
+      
+      favorCallOverloads(expr, isFavoredDecl);
+    }
     
     /// Determine whether or not a given NominalTypeDecl has a failable
     /// initializer member.
@@ -1417,7 +1473,6 @@ namespace {
                   OFD->setHaveFoundCommonOverloadReturnType();
               }
             }
-            
           }
         }
       }
@@ -1436,6 +1491,8 @@ namespace {
         favorMatchingUnaryOperators(expr);
       } else if (isa<BinaryExpr>(expr)) {
         favorMatchingBinaryOperators(expr);
+      } else {
+        favorMatchingOverloadExprs(expr);
       }
 
       CS.addConstraint(ConstraintKind::ApplicableFunction, funcTy,
