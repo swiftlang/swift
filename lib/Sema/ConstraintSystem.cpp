@@ -1215,16 +1215,40 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
 void ConstraintSystem::addOverloadSet(Type boundType,
                                       ArrayRef<OverloadChoice> choices,
-                                      ConstraintLocator *locator) {
+                                      ConstraintLocator *locator,
+                                      OverloadChoice *favoredChoice) {
   assert(!choices.empty() && "Empty overload set");
 
   SmallVector<Constraint *, 4> overloads;
+  
+  // As we do for other favored constraints, if a favored overload has been
+  // specified, let it be the first term in the disjunction.
+  if (favoredChoice) {
+    auto bindOverloadConstraint =
+        Constraint::createBindOverload(*this,
+                                       boundType,
+                                       *favoredChoice,
+                                       locator);
+    
+    bindOverloadConstraint->setFavored();
+    
+    overloads.push_back(bindOverloadConstraint);
+  }
+  
   for (auto choice : choices) {
+    if (favoredChoice && (favoredChoice == &choice))
+      continue;
+    
     overloads.push_back(Constraint::createBindOverload(*this, boundType, choice,
                                                        locator));
   }
-  addConstraint(Constraint::createDisjunction(*this, overloads,
-                                              locator));
+  
+  auto disjunction = Constraint::createDisjunction(*this, overloads, locator);
+  
+  if (favoredChoice)
+    disjunction->setFavored();
+  
+  addConstraint(disjunction);
 }
 
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,

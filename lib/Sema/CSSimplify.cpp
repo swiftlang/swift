@@ -2758,6 +2758,15 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
       return SolutionKind::Error;
     }
+    
+    TypeBase *favoredType = nullptr;
+    if (auto anchor = constraint.getLocator()->getAnchor()) {
+      if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
+        favoredType = this->getFavoredType(applyExpr->getArg());
+      }
+    }
+    
+    OverloadChoice favoredChoice;
 
     // Introduce a new overload set.
     retry_ctors_after_fail:
@@ -2788,6 +2797,34 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       SourceLoc anchorLoc = constraint.getLocator()->getAnchor()->getLoc();
       auto unavailReason = TC.checkDeclarationAvailability(constructor,
                                                            anchorLoc, DC);
+      
+      // If the invocation's argument expression has a favored constraint,
+      // use that information to determine whether a specific overload for
+      // the initializer should be favored.
+      if (favoredType && !favoredChoice.getDecl()) {
+        // Only try and favor monomorphic initializers.
+        if (auto fnTypeWithSelf =
+            constructor->getType()->getAs<FunctionType>()) {
+          
+          if (auto fnType =
+                  fnTypeWithSelf->getResult()->getAs<FunctionType>()) {
+          
+            auto argType = fnType->getInput();
+            
+            if (auto parenType =
+                dyn_cast<ParenType>(argType.getPointer())) {
+              argType = parenType->getUnderlyingType();
+            }
+            
+            if (argType->isEqual(favoredType)) {
+              favoredChoice = OverloadChoice(baseTy, constructor,
+                                           /*isSpecialized=*/false, *this,
+                                           unavailReason);
+            }
+          }
+        }
+      }
+      
       choices.push_back(OverloadChoice(baseTy, constructor,
                                        /*isSpecialized=*/false, *this,
                                        unavailReason));
@@ -2810,7 +2847,10 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       return SolutionKind::Error;
     }
     
-    addOverloadSet(memberTy, choices, constraint.getLocator());
+    addOverloadSet(memberTy,
+                   choices,
+                   constraint.getLocator(),
+                   favoredChoice.getDecl() ? &favoredChoice :  nullptr);
     return SolutionKind::Solved;
   }
 

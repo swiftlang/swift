@@ -979,9 +979,13 @@ namespace {
 
     /// Determine whether the given parameter and argument type should be
     /// "favored" because they match exactly.
-    bool isFavoredParamAndArg(Type paramTy, Type argTy) {
+    bool isFavoredParamAndArg(Type paramTy, Type argTy, Type otherArgTy) {
       if (argTy->getAs<LValueType>())
         argTy = argTy->getLValueOrInOutObjectType();
+      
+      if (!otherArgTy.isNull() &&
+          otherArgTy->getAs<LValueType>())
+        otherArgTy = otherArgTy->getLValueOrInOutObjectType();
       
       // Do the types match exactly?
       if (paramTy->isEqual(argTy))
@@ -993,9 +997,22 @@ namespace {
       // Is the argument a type variable...
       if (auto argTypeVar = argTy->getAs<TypeVariableType>()) {
         if (auto proto = argTypeVar->getImpl().literalConformanceProto) {
-          if (auto defaultTy = CS.TC.getDefaultType(proto, CS.DC)) {
-            if (paramTy->isEqual(defaultTy))
+          // If it's a struct type associated with the literal conformance,
+          // test against it directly. This helps to avoid 'widening' the
+          // favored type to the default type for the literal.
+          if (!otherArgTy.isNull() &&
+              otherArgTy->getAs<StructType>()) {
+            
+            if (CS.TC.conformsToProtocol(otherArgTy,
+                                         proto,
+                                         CS.DC,
+                                         true)) {
+              return otherArgTy->isEqual(paramTy);
+            }
+          } else if (auto defaultTy = CS.TC.getDefaultType(proto, CS.DC)) {
+            if (paramTy->isEqual(defaultTy)) {
               return true;
+            }
           }
         }
       }
@@ -1275,7 +1292,7 @@ namespace {
         auto resultTy = fnTy->getResult();
         auto contextualTy = CS.getContextualType(expr);
         
-        return isFavoredParamAndArg(paramTy, argTy) &&
+        return isFavoredParamAndArg(paramTy, argTy, Type()) &&
                (!contextualTy || (*contextualTy)->isEqual(resultTy));
       };
 
@@ -1307,22 +1324,43 @@ namespace {
             }
           }
         }
-      } else {
-        return;
+        
+        // Determine whether the given declaration is favored.
+        auto isFavoredDecl = [&](ValueDecl *value) -> bool {
+          auto valueTy = value->getType();
+          
+          auto fnTy = valueTy->getAs<AnyFunctionType>();
+          if (!fnTy)
+            return false;
+          
+          return nArgs == getOperandCount(fnTy->getInput());
+        };
+        
+        favorCallOverloads(expr, isFavoredDecl);
+        
       }
       
-      // Determine whether the given declaration is favored.
-      auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-        auto valueTy = value->getType();
+      if (auto favoredTy = CS.getFavoredType(expr->getArg())) {
+        // Determine whether the given declaration is favored.
+        auto isFavoredDecl = [&](ValueDecl *value) -> bool {
+          auto valueTy = value->getType();
+          
+          auto fnTy = valueTy->getAs<AnyFunctionType>();
+          if (!fnTy)
+            return false;
+          
+          // Figure out the parameter type.
+          if (value->getDeclContext()->isTypeContext()) {
+            fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
+          }
+          
+          Type paramTy = fnTy->getInput();
+          
+          return favoredTy->isEqual(paramTy);
+        };
         
-        auto fnTy = valueTy->getAs<AnyFunctionType>();
-        if (!fnTy)
-          return false;
-        
-        return nArgs == getOperandCount(fnTy->getInput());
-      };
-      
-      favorCallOverloads(expr, isFavoredDecl);
+        favorCallOverloads(expr, isFavoredDecl);
+      }
     }
 
     /// Favor binary operator constraints where we have exact matches
@@ -1379,8 +1417,8 @@ namespace {
         auto resultTy = fnTy->getResult();
         auto contextualTy = CS.getContextualType(expr);
         
-        return (isFavoredParamAndArg(firstParamTy, firstArgTy) ||
-            isFavoredParamAndArg(secondParamTy, secondArgTy)) &&
+        return (isFavoredParamAndArg(firstParamTy, firstArgTy, secondArgTy) ||
+            isFavoredParamAndArg(secondParamTy, secondArgTy, firstArgTy)) &&
             firstParamTy->isEqual(secondParamTy) &&
             (!contextualTy || (*contextualTy)->isEqual(resultTy));
       };

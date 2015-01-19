@@ -1968,7 +1968,8 @@ public:
   /// \brief Add a new overload set to the list of unresolved overload
   /// sets.
   void addOverloadSet(Type boundType, ArrayRef<OverloadChoice> choices,
-                      ConstraintLocator *locator);
+                      ConstraintLocator *locator,
+                      OverloadChoice *favored = nullptr);
 
   /// If the given type is ImplicitlyUnwrappedOptional<T>, and we're in a context
   /// that should transparently look through ImplicitlyUnwrappedOptional types,
