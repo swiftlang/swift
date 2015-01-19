@@ -30,7 +30,7 @@ class Foo {
   // x86_64-macosx: define hidden double @_TFC8abitypes3Foo14getXFromNSRect{{.*}}(double, double, double, double, %C8abitypes3Foo*) {
   // x86_64-macosx: define hidden double @_TToFC8abitypes3Foo14getXFromNSRect{{.*}}(i8*, i8*, %VSC6CGRect* byval align 8) unnamed_addr {
   // armv7-ios: define hidden double @_TFC8abitypes3Foo14getXFromNSRect{{.*}}(float, float, float, float, %C8abitypes3Foo*) {
-  // armv7-ios: define internal double @_TToFC8abitypes3Foo14getXFromNSRect{{.*}}(i8*, i8*, [4 x i32]) unnamed_addr { 
+  // armv7-ios: define hidden double @_TToFC8abitypes3Foo14getXFromNSRect{{.*}}(i8*, i8*, [4 x i32]) unnamed_addr { 
   dynamic func getXFromNSRect(r: NSRect) -> Double {
     return Double(r.origin.x)
   }
@@ -38,7 +38,7 @@ class Foo {
   // x86_64-macosx: define hidden float @_TFC8abitypes3Foo12getXFromRect{{.*}}(float, float, float, float, %C8abitypes3Foo*) {
   // x86_64-macosx: define hidden float @_TToFC8abitypes3Foo12getXFromRect{{.*}}(i8*, i8*, <2 x float>, <2 x float>) unnamed_addr {
   // armv7-ios: define hidden float @_TFC8abitypes3Foo12getXFromRect{{.*}}(float, float, float, float, %C8abitypes3Foo*) {
-  // armv7-ios: define internal float @_TToFC8abitypes3Foo12getXFromRect{{.*}}(i8*, i8*, [4 x i32]) unnamed_addr {
+  // armv7-ios: define hidden float @_TToFC8abitypes3Foo12getXFromRect{{.*}}(i8*, i8*, [4 x i32]) unnamed_addr {
   dynamic func getXFromRect(r: MyRect) -> Float {
     return r.x
   }
@@ -238,7 +238,7 @@ class Foo {
   // armv7-ios: [[TOBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBool{{.*}}(i8 [[NEG]])
   // armv7-ios: ret i1 [[TOBOOL]]
   //
-  // armv7-ios: define internal signext i8 @_TToFC8abitypes3Foo7negate2{{.*}}(i8*, i8*, i8 signext)
+  // armv7-ios: define hidden signext i8 @_TToFC8abitypes3Foo7negate2{{.*}}(i8*, i8*, i8 signext)
   // armv7-ios: [[TOBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBool
   // armv7-ios: [[NEG:%[0-9]+]] = call i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1 [[TOBOOL]]
   // armv7-ios: [[TOOBJCBOOL:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[NEG]])

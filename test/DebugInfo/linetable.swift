@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 // RUN: %target-swift-frontend %s -S -g -o - | FileCheck %s --check-prefix ASM-CHECK
+
+// REQUIRES: CPU=i386_or_x86_64
+
 import Swift
 
 class MyClass
@@ -56,7 +59,7 @@ func main(x: Int) -> Void
 // ASM-CHECK:_TTSf2d_i_n___TFF9linetable4mainFSiT_U_FT_T_:
 // ASM-CHECK-NOT: retq
 // The end-of-prologue should have a valid location.
-// ASM-CHECK: .loc	[[FILEID]] 34 {{[0-9]+}} prologue_end
+// ASM-CHECK: .loc	[[FILEID]] 37 {{[0-9]+}} prologue_end
 
 
 main(30)
