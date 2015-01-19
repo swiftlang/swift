@@ -139,3 +139,23 @@ var i1 = 1
 var ia = i1 + i1 + i1 + i1 + i1 + i1 + i1 + i1 + i1 + i1
 println(ia)
 // CHECK: 10
+
+println( "test" + "ing" + " " + "this" + " " + "code" )
+// CHECK: testing this code
+
+let at1 : Float = 0
+let at2 : Float = 0
+let rat : Float = 0
+var rr : Float = 0
+var ii : Float = 0
+println((rr-at1)*(rr-at1) + (ii-at2)*(ii-at2))
+// CHECK: 0.0
+
+let y = 1
+let kWorldTileDivisor = 32
+let kWorldSize = 4096
+let kWorldTileSize = kWorldSize / kWorldTileDivisor
+let kWorldCenter = kWorldSize / 2
+
+println((kWorldSize - (y * kWorldTileSize)) - kWorldCenter  - kWorldTileSize / 2)
+// CHECK: 1856
