@@ -226,6 +226,7 @@ namespace {
     class EntityContext {
       Remangler &R;
       unsigned SavedAbsoluteDepth;
+      bool AsContext = false;
     public:
       EntityContext(Remangler &R)
         : R(R), SavedAbsoluteDepth(R.AbsoluteArchetypeDepth) {
@@ -235,6 +236,24 @@ namespace {
         assert(R.AbsoluteArchetypeDepth >= SavedAbsoluteDepth);
         R.AbsoluteArchetypeDepth = SavedAbsoluteDepth;
       }
+
+      bool isAsContext() const {
+        return AsContext;
+      }
+
+      class ManglingContextRAII {
+        EntityContext &Ctx;
+        bool SavedValue;
+      public:
+        ManglingContextRAII(EntityContext &ctx)
+          : Ctx(ctx), SavedValue(ctx.AsContext) {
+          ctx.AsContext = true;
+        }
+
+        ~ManglingContextRAII() {
+          Ctx.AsContext = SavedValue;
+        }
+      };
     };
 
     void mangle(Node *node) {
@@ -280,6 +299,9 @@ namespace {
                                    StringRef entityKind,
                                    EntityContext &ctx);
     void mangleNominalType(Node *node, char basicKind, EntityContext &ctx);
+
+    void mangleProtocolWithoutPrefix(Node *node);
+    void mangleProtocolListWithoutPrefix(Node *node);
 
     void mangleEntityContext(Node *node, EntityContext &ctx);
     void mangleEntityType(Node *node, EntityContext &ctx);
@@ -428,8 +450,8 @@ void Remangler::mangleGenericSpecialization(Node *node) {
 }
 void Remangler::mangleGenericSpecializationParam(Node *node) {
   // Should be a type followed by a series of protocol conformances.
-  // (Is that series really not terminated?)
   mangleChildNodes(node);
+  Out << '_';
 }
 
 void Remangler::mangleFunctionSignatureSpecialization(Node *node) {
@@ -477,7 +499,7 @@ void Remangler::mangleFunctionSignatureSpecializationParam(Node *node) {
     Out << "cpi" << node->getChild(1)->getText() << '_';
     return;
   case FunctionSigSpecializationParamKind::ConstantPropFloat:
-    Out << "cpf" << node->getChild(1)->getText() << '_';
+    Out << "cpfl" << node->getChild(1)->getText() << '_';
     return;
   case FunctionSigSpecializationParamKind::ConstantPropString: {
     Out << "cpse";
@@ -529,7 +551,10 @@ void Remangler::mangleFunctionSignatureSpecializationParamKind(Node *node) {
 
 void Remangler::mangleProtocolConformance(Node *node) {
   // type, protocol name, context
-  mangleChildNodes(node);
+  assert(node->getNumChildren() == 3);
+  mangleChildNode(node, 0);
+  mangleProtocolWithoutPrefix(node->begin()[1].get());
+  mangleChildNode(node, 2);
 }
 
 void Remangler::mangleObjCAttribute(Node *node) {
@@ -709,9 +734,7 @@ void Remangler::mangleDeallocator(Node *node, EntityContext &ctx) {
 }
 
 void Remangler::mangleDestructor(Node *node, EntityContext &ctx) {
-  auto entityKind =
-    (node->getChild(0)->getKind() == Node::Kind::Class ? "d" : "D");
-  mangleSimpleEntity(node, 'F', entityKind, ctx);
+  mangleSimpleEntity(node, 'F', "d", ctx);
 }
 
 void Remangler::mangleAllocator(Node *node, EntityContext &ctx) {
@@ -719,9 +742,7 @@ void Remangler::mangleAllocator(Node *node, EntityContext &ctx) {
 }
 
 void Remangler::mangleConstructor(Node *node, EntityContext &ctx) {
-  auto entityKind =
-    (node->getChild(0)->getKind() == Node::Kind::Class ? "c" : "C");
-  mangleTypedEntity(node, 'F', entityKind, ctx);
+  mangleTypedEntity(node, 'F', "c", ctx);
 }
 
 void Remangler::mangleIVarInitializer(Node *node, EntityContext &ctx) {
@@ -811,7 +832,7 @@ void Remangler::mangleNamedEntity(Node *node, char basicKind,
                                   StringRef entityKind,
                                   EntityContext &ctx) {
   assert(node->getNumChildren() == 2);
-  Out << basicKind;
+  if (basicKind != '\0') Out << basicKind;
   mangleEntityContext(node->begin()[0].get(), ctx);
   Out << entityKind;
   mangleChildNode(node, 1); // decl name / index
@@ -839,6 +860,9 @@ void Remangler::mangleNamedAndTypedEntity(Node *node, char basicKind,
 }
 
 void Remangler::mangleEntityContext(Node *node, EntityContext &ctx) {
+  // Remember that we're mangling a context.
+  EntityContext::ManglingContextRAII raii(ctx);
+
   switch (node->getKind()) {
 #define NODE(ID)                                \
   case Node::Kind::ID:
@@ -892,7 +916,7 @@ void Remangler::manglePrivateDeclName(Node *node) {
 }
 
 void Remangler::mangleTypeMangling(Node *node) {
-  Out << "_Tt";
+  Out << 't';
   mangleSingleChildNode(node); // type
 }
 
@@ -926,12 +950,12 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
   } else if (text == "Builtin.Word") {
     Out << 'w';
   } else if (stripPrefix(text, "Builtin.Int")) {
-    Out << text << '_';
+    Out << 'i' << text << '_';
   } else if (stripPrefix(text, "Builtin.Float")) {
-    Out << text << '_';
+    Out << 'f' << text << '_';
   } else if (stripPrefix(text, "Builtin.Vec")) {
     auto split = text.split('x');
-    Out << split.first << 'B';
+    Out << 'v' << split.first << 'B';
     if (split.second == "RawPointer") {
       Out << 'p';
     } else if (stripPrefix(split.second, "Float")) {
@@ -1121,7 +1145,18 @@ void Remangler::mangleMetatypeRepresentation(Node *node) {
 void Remangler::mangleProtocolList(Node *node) {
   // In its usual use as a type, this gets a prefix 'P'.
   Out << 'P';
-  mangleSingleChildNode(node); // type list
+  mangleProtocolListWithoutPrefix(node);
+}
+
+void Remangler::mangleProtocolListWithoutPrefix(Node *node) {
+  assert(node->getKind() == Node::Kind::ProtocolList);
+  assert(node->getNumChildren() == 1);
+  auto typeList = node->begin()[0].get();
+  assert(typeList->getKind() == Node::Kind::TypeList);
+  for (auto &child : *typeList) {
+    mangleProtocolWithoutPrefix(child.get());
+  }
+  Out << '_';
 }
 
 void Remangler::mangleUnowned(Node *node) {
@@ -1223,21 +1258,22 @@ void Remangler::mangleGenerics(Node *node, EntityContext &ctx) {
   unsigned index = 0;
   for (; i != e && i->get()->getKind() == Node::Kind::Archetype; ++i) {
     auto child = i->get();
-    Archetypes[child->getText()] = ArchetypeInfo{index, absoluteDepth};
+    Archetypes[child->getText()] = ArchetypeInfo{index++, absoluteDepth};
     mangle(child); // archetype
   }
   if (i != e) {
     Out << 'U';
     mangleNodes(i, e); // associated types
+    Out << '_';
+  } else {
+    Out << '_';
   }
 }
 
 void Remangler::mangleArchetype(Node *node) {
   if (node->hasChildren()) {
-    // Make sure we don't print the 'P' on the child protocol list.
-    auto protocolList = node->begin()->get();
-    assert(protocolList->getKind() == Node::Kind::ProtocolList);
-    mangleSingleChildNode(protocolList); // type list
+    assert(node->getNumChildren() == 1);
+    mangleProtocolListWithoutPrefix(node->begin()->get());
   } else {
     Out << '_';
   }
@@ -1245,10 +1281,8 @@ void Remangler::mangleArchetype(Node *node) {
 
 void Remangler::mangleAssociatedType(Node *node) {
   if (node->hasChildren()) {
-    // Make sure we don't print the 'P' on the child protocol list.
-    auto protocolList = node->begin()->get();
-    assert(protocolList->getKind() == Node::Kind::ProtocolList);
-    mangleSingleChildNode(protocolList); // type list
+    assert(node->getNumChildren() == 1);
+    mangleProtocolListWithoutPrefix(node->begin()->get());
   } else {
     Out << '_';
   }
@@ -1257,8 +1291,9 @@ void Remangler::mangleAssociatedType(Node *node) {
 void Remangler::mangleSelfTypeRef(Node *node) {
   SubstitutionEntry entry;
   if (trySubstitution(node, entry)) return;
-  Out << 'Q';
-  mangleSingleChildNode(node); // protocol
+  Out << "QP";
+  assert(node->getNumChildren() == 1);
+  mangleProtocolWithoutPrefix(node->begin()[0].get());
   addSubstitution(entry);
 }
 
@@ -1299,7 +1334,9 @@ void Remangler::mangleExtension(Node *node, EntityContext &ctx) {
 void Remangler::mangleModule(Node *node, EntityContext &ctx) {
   SubstitutionEntry entry;
   if (trySubstitution(node, entry)) return;
-  Out << 'M';
+
+  // Module types get an M prefix, but module contexts don't.
+  if (!ctx.isAsContext()) Out << 'M';
   mangleIdentifier(node->getText(), OperatorKind::NotOperator);
   addSubstitution(entry);
 }
@@ -1335,6 +1372,17 @@ void Remangler::mangleDependentGenericParamType(Node *node) {
 
 void Remangler::mangleProtocol(Node *node, EntityContext &ctx) {
   mangleNominalType(node, 'P', ctx);
+}
+
+void Remangler::mangleProtocolWithoutPrefix(Node *node) {
+  if (node->getKind() == Node::Kind::Type) {
+    assert(node->getNumChildren() == 1);
+    node = node->begin()[0].get();
+  }
+
+  assert(node->getKind() == Node::Kind::Protocol);
+  EntityContext ctx(*this);
+  mangleNominalType(node, '\0', ctx);
 }
 
 void Remangler::mangleStructure(Node *node, EntityContext &ctx) {

@@ -37,8 +37,8 @@ TreeOnly("tree-only",
            llvm::cl::desc("Tree-only mode (do not show the demangled string)"));
 
 static llvm::cl::opt<bool>
-RemangleMode("remangle",
-           llvm::cl::desc("Remangle mode (show the remangled string)"));
+RemangleMode("test-remangle",
+           llvm::cl::desc("Remangle test mode (show the remangled string)"));
 
 static llvm::cl::opt<bool>
 DisableSugar("no-sugar",
@@ -50,8 +50,11 @@ InputNames(llvm::cl::Positional, llvm::cl::desc("[mangled name...]"),
 
 static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
                      const swift::Demangle::DemangleOptions &options) {
-  if (name.startswith("__"))
+  bool hadLeadingUnderscore = false;
+  if (name.startswith("__")) {
+    hadLeadingUnderscore = true;
     name = name.substr(1);
+  }
   swift::Demangle::NodePointer pointer =
       swift::demangle_wrappers::demangleSymbolAsNode(name);
   if (ExpandMode || TreeOnly) {
@@ -59,9 +62,16 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
     swift::demangle_wrappers::NodeDumper(pointer).print(llvm::outs());
   }
   if (RemangleMode) {
-    llvm::outs() << "Remangling for " << name << " ---> ";
-    llvm::outs() << swift::Demangle::mangleNode(pointer);
-    llvm::outs() << '\n';
+    if (hadLeadingUnderscore) llvm::outs() << '_';
+    // Just reprint the original mangled name if it didn't demangle.
+    // This makes it easier to share the same database between the
+    // mangling and demangling tests.
+    if (!pointer) {
+      llvm::outs() << name;
+    } else {
+      llvm::outs() << swift::Demangle::mangleNode(pointer);
+    }
+    return;
   }
   if (!TreeOnly) {
     std::string string = swift::Demangle::nodeToString(pointer, options);

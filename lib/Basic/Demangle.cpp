@@ -650,15 +650,12 @@ private:
     while (!Mangled.nextIf('_')) {
       // Otherwise, we have another parameter. Demangle the type.
       NodePointer param = NodeFactory::create(Node::Kind::GenericSpecializationParam);
-      NodePointer type = demangleType();
-      if (!type)
-        return nullptr;
-      param->addChild(type);
+      DEMANGLE_CHILD_OR_RETURN(param, Type);
 
       // Then parse any conformances until we find an underscore. Pop off the
       // underscore since it serves as the end of our mangling list.
-      while (NodePointer conformance = demangleProtocolConformance()) {
-        param->addChild(conformance);
+      while (!Mangled.nextIf('_')) {
+        DEMANGLE_CHILD_OR_RETURN(param, ProtocolConformance);
       }
 
       // Add the parameter to our specialization list.
@@ -685,8 +682,7 @@ private:
       if (!name || !Mangled.nextIf('_'))
         return false;
       parent->addChild(FUNCSIGSPEC_CREATE_PARAM_KIND(ConstantPropFunction));
-      std::string demangledName = demangleSymbolAsString(name->getText());
-      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(demangledName));
+      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(name->getText()));
       return true;
     }
 
@@ -695,8 +691,7 @@ private:
       if (!name || !Mangled.nextIf('_'))
         return false;
       parent->addChild(FUNCSIGSPEC_CREATE_PARAM_KIND(ConstantPropGlobal));
-      std::string demangledName = demangleSymbolAsString(name->getText());
-      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(demangledName));
+      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(name->getText()));
       return true;
     }
 
@@ -759,8 +754,7 @@ private:
     }
 
     parent->addChild(FUNCSIGSPEC_CREATE_PARAM_KIND(ClosureProp));
-    std::string demangledName = demangleSymbolAsString(name->getText());
-    parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(demangledName));
+    parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(name->getText()));
 
     // Then demangle types until we fail.
     NodePointer type;
@@ -1199,10 +1193,7 @@ private:
     bool hasType = true;
     NodePointer name;
     if (Mangled.nextIf('D')) {
-      if (context->getKind() == Node::Kind::Class)
-        entityKind = Node::Kind::Deallocator;
-      else
-        entityKind = Node::Kind::Destructor;
+      entityKind = Node::Kind::Deallocator;
       hasType = false;
     } else if (Mangled.nextIf('d')) {
       entityKind = Node::Kind::Destructor;
@@ -1214,10 +1205,7 @@ private:
       entityKind = Node::Kind::IVarDestroyer;
       hasType = false;
     } else if (Mangled.nextIf('C')) {
-      if (context->getKind() == Node::Kind::Class)
-        entityKind = Node::Kind::Allocator;
-      else
-        entityKind = Node::Kind::Constructor;
+      entityKind = Node::Kind::Allocator;
     } else if (Mangled.nextIf('c')) {
       entityKind = Node::Kind::Constructor;
     } else if (Mangled.nextIf('a')) {
@@ -2491,7 +2479,20 @@ unsigned NodePrinter::printFunctionSigSpecializationParam(NodePointer pointer,
     print(pointer->getChild(Idx++));
     return Idx;
   case FunctionSigSpecializationParamKind::ConstantPropFunction:
-  case FunctionSigSpecializationParamKind::ConstantPropGlobal:
+  case FunctionSigSpecializationParamKind::ConstantPropGlobal: {
+    Printer << "[";
+    print(pointer->getChild(Idx++));
+    Printer << " : ";
+    const auto &text = pointer->getChild(Idx++)->getText();
+    std::string demangledName = demangleSymbolAsString(text);
+    if (demangledName.empty()) {
+      Printer << text;
+    } else {
+      Printer << demangledName;
+    }
+    Printer << "]";
+    return Idx;
+  }
   case FunctionSigSpecializationParamKind::ConstantPropInteger:
   case FunctionSigSpecializationParamKind::ConstantPropFloat:
     Printer << "[";
@@ -2540,6 +2541,10 @@ unsigned NodePrinter::printFunctionSigSpecializationParam(NodePointer pointer,
       "Invalid OptionSet");
   print(pointer->getChild(Idx++));
   return Idx;
+}
+
+static bool isClassType(NodePointer pointer) {
+  return pointer->getKind() == Node::Kind::Class;
 }
 
 void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) {
@@ -2787,7 +2792,12 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   }
   case Node::Kind::FunctionSignatureSpecializationParamPayload: {
-    Printer << pointer->getText();
+    std::string demangledName = demangleSymbolAsString(pointer->getText());
+    if (demangledName.empty()) {
+      Printer << pointer->getText();
+    } else {
+      Printer << demangledName;
+    }
     return;
   }
   case Node::Kind::FunctionSignatureSpecializationParamKind: {
@@ -3122,7 +3132,9 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     printEntity(true, true, ".didset");
     return;
   case Node::Kind::Allocator:
-    printEntity(false, true, "__allocating_init");
+    printEntity(false, true,
+                isClassType(pointer->getChild(0))
+                  ? "__allocating_init" : "init");
     return;
   case Node::Kind::Constructor:
     printEntity(false, true, "init");
@@ -3131,7 +3143,9 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     printEntity(false, false, "deinit");
     return;
   case Node::Kind::Deallocator:
-    printEntity(false, false, "__deallocating_deinit");
+    printEntity(false, false,
+                isClassType(pointer->getChild(0))
+                  ? "__deallocating_deinit" : "deinit");
     return;
   case Node::Kind::IVarInitializer:
     printEntity(false, false, "__ivar_initializer");
