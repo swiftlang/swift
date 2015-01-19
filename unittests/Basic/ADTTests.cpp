@@ -45,3 +45,44 @@ TEST(OptionSet, contains) {
   EXPECT_TRUE(abcSet.contains(bcSet));
   EXPECT_TRUE(abcSet.contains(cSet));
 }
+
+
+TEST(OptionSet, intptr_t) {
+  enum class Small : int8_t {
+    A = 1 << 0
+  };
+
+  OptionSet<Small> small = Small::A;
+  EXPECT_EQ(static_cast<intptr_t>(Small::A), static_cast<intptr_t>(small));
+
+
+  enum class UPtr : uintptr_t {
+    A = std::numeric_limits<uintptr_t>::max()
+  };
+
+  OptionSet<UPtr> uptr = UPtr::A;
+  EXPECT_EQ(static_cast<intptr_t>(UPtr::A), static_cast<intptr_t>(uptr));
+
+
+  enum class Ptr : intptr_t {
+    A = std::numeric_limits<intptr_t>::min()
+  };
+
+  OptionSet<Ptr> ptr = Ptr::A;
+  EXPECT_EQ(static_cast<intptr_t>(Ptr::A), static_cast<intptr_t>(ptr));
+
+
+  enum class LongLong : unsigned long long {
+    A = 1
+  };
+  bool isConvertible =
+      std::is_constructible<intptr_t, OptionSet<LongLong>>::value;
+
+  if (sizeof(intptr_t) < sizeof(long long)) {
+    EXPECT_FALSE(isConvertible);
+  } else {
+    EXPECT_TRUE(isConvertible);
+  }
+}
+
+

@@ -20,6 +20,7 @@
 #include "llvm/ADT/None.h"
 
 #include <type_traits>
+#include <cstdint>
 
 namespace swift {
 
@@ -65,6 +66,17 @@ public:
 
   /// Explicitly convert an option set to its underlying storage.
   explicit operator StorageType() const { return Storage; }
+
+  /// Explicitly convert an option set to intptr_t, for use in
+  /// llvm::PointerIntPair.
+  ///
+  /// This member is not present if the underlying type is bigger than
+  /// a pointer.
+  template <typename T = std::intptr_t>
+  explicit operator typename std::enable_if<sizeof(StorageType) <= sizeof(T),
+      std::intptr_t>::type () const {
+    return static_cast<intptr_t>(Storage);
+  }
 
   /// Retrieve the "raw" representation of this option set.
   StorageType toRaw() const { return Storage; }
