@@ -36,23 +36,40 @@ struct DemangleOptions {
 class Node;
 typedef std::shared_ptr<Node> NodePointer;
 
-enum class FunctionSigSpecializationParamInfoKind : unsigned {
+enum class FunctionSigSpecializationParamKind : unsigned {
   // Option Flags use bits 0-5. This give us 6 bits implying 64 entries to
   // work with.
-  Dead=0,
-  ConstantPropFunction=1,
-  ConstantPropGlobal=2,
-  ConstantPropInteger=3,
-  ConstantPropFloat=4,
-  ConstantPropString=5,
-  ClosureProp=6,
-  InOutToValue=7,
+  Dead = 0,
+  ConstantPropFunction = 1,
+  ConstantPropGlobal = 2,
+  ConstantPropInteger = 3,
+  ConstantPropFloat = 4,
+  ConstantPropString = 5,
+  ClosureProp = 6,
+  InOutToValue = 7,
 
   // Option Set Flags use bits 6-31. This gives us 26 bits to use for option
   // flags.
-  OwnedToGuaranteed=1 << 6,
-  SROA=1 << 7,
+  OwnedToGuaranteed = 1 << 6,
+  SROA = 1 << 7,
 };
+
+/// The pass that caused the specialization to occur. We use this to make sure
+/// that two passes that generate similar changes do not yield the same
+/// mangling. This currently can not happen, so this is just a safety measure
+/// that creates separate name spaces.
+enum class SpecializationPass : uint8_t {
+  AllocBoxToStack,
+  ClosureSpecializer,
+  CapturePromotion,
+  CapturePropagation,
+  FunctionSignatureOpts,
+  GenericSpecializer,
+};
+
+static inline char encodeSpecializationPass(SpecializationPass Pass) {
+  return char(uint8_t(Pass)) + 48;
+}
 
 enum class ValueWitnessKind {
   AllocateBuffer,

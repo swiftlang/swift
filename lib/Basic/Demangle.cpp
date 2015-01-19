@@ -252,6 +252,15 @@ public:
     advanceOffset(Text.size());
     return result;
   }
+
+  bool readUntil(char c, std::string &result) {
+    llvm::Optional<char> c2;
+    while (!isEmpty() && (c2 = peek()).getValue() != c) {
+      result.push_back(c2.getValue());
+      advanceOffset(1);
+    }
+    return c2.hasValue() && c2.getValue() == c;
+  }
 };
 
 static StringRef toString(Directness d) {
@@ -637,9 +646,7 @@ private:
     return demangleEntity();
   }
 
-  NodePointer demangleGenericSpecialization() {
-    auto specialization = NodeFactory::create(Node::Kind::GenericSpecialization);
-
+  NodePointer demangleGenericSpecialization(NodePointer specialization) {
     while (!Mangled.nextIf('_')) {
       // Otherwise, we have another parameter. Demangle the type.
       NodePointer param = NodeFactory::create(Node::Kind::GenericSpecializationParam);
@@ -662,75 +669,114 @@ private:
   }
 
 /// TODO: This is an atrocity. Come up with a shorter name.
-#define FUNCSIGSPEC_CREATE_INFO_KIND(kind)                              \
-  NodeFactory::create(                                                  \
-    Node::Kind::FunctionSignatureSpecializationParamInfo,               \
-    unsigned(FunctionSigSpecializationParamInfoKind::kind))
+#define FUNCSIGSPEC_CREATE_PARAM_KIND(kind)                                    \
+  NodeFactory::create(Node::Kind::FunctionSignatureSpecializationParamKind,    \
+                      unsigned(FunctionSigSpecializationParamKind::kind))
+#define FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(payload)                              \
+  NodeFactory::create(Node::Kind::FunctionSignatureSpecializationParamPayload, \
+                      payload)
 
-  NodePointer demangleFuncSigSpecializationConstantProp() {
+  bool demangleFuncSigSpecializationConstantProp(NodePointer parent) {
     // Then figure out what was actually constant propagated. First check if
     // we have a function.
     if (Mangled.nextIf("fr")) {
       // Demangle the identifier
-      if (!demangleIdentifier() || !Mangled.nextIf('_')) {
-        return nullptr;
-      }
-      return FUNCSIGSPEC_CREATE_INFO_KIND(ConstantPropFunction);
-    } else if (Mangled.nextIf('g')) {
-      if (!demangleIdentifier() || !Mangled.nextIf('_')) {
-        return nullptr;
-      }
-      return FUNCSIGSPEC_CREATE_INFO_KIND(ConstantPropGlobal);
-    } else if (Mangled.nextIf('i')) {
-      // Skip over the integer, we don't care about it.
-      while (Mangled.nextIfNot('_'))
-        continue;
-      if (!Mangled.nextIf('_'))
-        return nullptr;
-      return FUNCSIGSPEC_CREATE_INFO_KIND(ConstantPropInteger);
-    } else if (Mangled.nextIf("fl")) {
-      // Skip over the float, we don't care about it.
-      while (Mangled.nextIfNot('_'))
-        continue;
-      if (!Mangled.nextIf('_'))
-        return nullptr;
-      return FUNCSIGSPEC_CREATE_INFO_KIND(ConstantPropFloat);
-    } else if (Mangled.nextIf("s")) {
-      // Skip: 'e' encoding 'v' hash. encoding is a 0 or 1 and hash is a 32
-      // bit hex MD5 sum of the contents.
-      Mangled.advanceOffset(3);      
-      if (!demangleIdentifier())
-        return nullptr;
-      if (!Mangled.nextIf('_'))
-        return nullptr;
-      return FUNCSIGSPEC_CREATE_INFO_KIND(ConstantPropString);
+      NodePointer name = demangleIdentifier();
+      if (!name || !Mangled.nextIf('_'))
+        return false;
+      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_KIND(ConstantPropFunction));
+      std::string demangledName = demangleSymbolAsString(name->getText());
+      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(demangledName));
+      return true;
+    }
+
+    if (Mangled.nextIf('g')) {
+      NodePointer name = demangleIdentifier();
+      if (!name || !Mangled.nextIf('_'))
+        return false;
+      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_KIND(ConstantPropGlobal));
+      std::string demangledName = demangleSymbolAsString(name->getText());
+      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(demangledName));
+      return true;
+    }
+
+    if (Mangled.nextIf('i')) {
+      std::string Str;
+      if (!Mangled.readUntil('_', Str) || !Mangled.nextIf('_'))
+        return false;
+      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_KIND(ConstantPropInteger));
+      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(Str));
+      return true;
+    }
+
+    if (Mangled.nextIf("fl")) {
+      std::string Str;
+      if (!Mangled.readUntil('_', Str) || !Mangled.nextIf('_'))
+        return false;
+      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_KIND(ConstantPropFloat));
+      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(Str));
+      return true;
+    }
+
+    if (Mangled.nextIf("s")) {
+      // Skip: 'e' encoding 'v' str. encoding is a 0 or 1 and str is a string of
+      // length less than or equal to 32. We do not specialize strings with a
+      // length greater than 32.
+      if (!Mangled.nextIf('e'))
+        return false;
+      char encoding = Mangled.peek();
+      if (encoding != '0' && encoding != '1')
+        return false;
+      std::string encodingStr;
+      if (encoding == '0')
+        encodingStr += "u8";
+      else
+        encodingStr += "u16";
+      Mangled.advanceOffset(1);
+
+      if (!Mangled.nextIf('v'))
+        return false;
+      NodePointer str = demangleIdentifier();
+      if (!str || !Mangled.nextIf('_'))
+        return false;
+
+      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_KIND(ConstantPropString));
+      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(encodingStr));
+      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(str->getText()));
+      return true;
     }
 
     unreachable("Unknown constant prop specialization");
   }
 
-  NodePointer demangleFuncSigSpecializationClosureProp() {
+  bool demangleFuncSigSpecializationClosureProp(NodePointer parent) {
     // We don't actually demangle the function or types for now. But we do want
     // to signal that we specialized a closure.
 
-    // If we don't, we must have a global. Skip it.
-    if (!demangleIdentifier()) {
-      return nullptr;
+    NodePointer name = demangleIdentifier();
+    if (!name) {
+      return false;
     }
 
+    parent->addChild(FUNCSIGSPEC_CREATE_PARAM_KIND(ClosureProp));
+    std::string demangledName = demangleSymbolAsString(name->getText());
+    parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(demangledName));
+
     // Then demangle types until we fail.
-    while (Mangled.peek() != '_' && demangleType()) {}
+    NodePointer type;
+    while (Mangled.peek() != '_' && (type = demangleType())) {
+      parent->addChild(type);
+    }
 
     // Eat last '_'
     if (!Mangled.nextIf('_'))
-      return nullptr;
+      return false;
 
-    return FUNCSIGSPEC_CREATE_INFO_KIND(ClosureProp);
+    return true;
   }
 
-  NodePointer demangleFunctionSignatureSpecialization() {
-    auto specialization = NodeFactory::create(Node::Kind::FunctionSignatureSpecialization);
-
+  NodePointer
+  demangleFunctionSignatureSpecialization(NodePointer specialization) {
     unsigned paramCount = 0;
 
     // Until we hit the last '_' in our specialization info...
@@ -744,22 +790,18 @@ private:
       if (Mangled.nextIf("n_")) {
         // Leave the parameter empty.
       } else if (Mangled.nextIf("d_")) {
-        auto result = FUNCSIGSPEC_CREATE_INFO_KIND(Dead);
+        auto result = FUNCSIGSPEC_CREATE_PARAM_KIND(Dead);
         if (!result)
           return nullptr;
         param->addChild(result);
       } else if (Mangled.nextIf("cp")) {
-        auto result = demangleFuncSigSpecializationConstantProp();
-        if (!result)
+        if (!demangleFuncSigSpecializationConstantProp(param))
           return nullptr;
-        param->addChild(result);
       } else if (Mangled.nextIf("cl")) {
-        auto result = demangleFuncSigSpecializationClosureProp();
-        if (!result)
+        if (!demangleFuncSigSpecializationClosureProp(param))
           return nullptr;
-        param->addChild(result);
       } else if (Mangled.nextIf("i_")) {
-        auto result = FUNCSIGSPEC_CREATE_INFO_KIND(InOutToValue);
+        auto result = FUNCSIGSPEC_CREATE_PARAM_KIND(InOutToValue);
         if (!result)
           return nullptr;
         param->addChild(result);
@@ -768,11 +810,11 @@ private:
         unsigned Value = 0;
         if (Mangled.nextIf('g')) {
           Value |=
-            unsigned(FunctionSigSpecializationParamInfoKind::OwnedToGuaranteed);
+              unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed);
         }
 
         if (Mangled.nextIf('s')) {
-          Value |= unsigned(FunctionSigSpecializationParamInfoKind::SROA);
+          Value |= unsigned(FunctionSigSpecializationParamKind::SROA);
         }
 
         if (!Mangled.nextIf("_"))
@@ -781,8 +823,8 @@ private:
         if (!Value)
           return nullptr;
 
-        auto result = NodeFactory::create(Node::Kind::FunctionSignatureSpecializationParamInfo,
-                                          Value);
+        auto result = NodeFactory::create(
+            Node::Kind::FunctionSignatureSpecializationParamKind, Value);
         if (!result)
           return nullptr;
         param->addChild(result);
@@ -794,22 +836,29 @@ private:
 
     return specialization;
   }
-#undef FUNCSIGSPEC_CREATE_INFO_KIND
+
+#undef FUNCSIGSPEC_CREATE_PARAM_KIND
+#undef FUNCSIGSPEC_CREATE_PARAM_PAYLOAD
 
   NodePointer demangleSpecializedAttribute() {
     if (Mangled.nextIf("g")) {
-      // Eat the pass id. We don't care about it.
-      Mangled.next();
-
+      auto spec = NodeFactory::create(Node::Kind::GenericSpecialization);
+      // Create a node for the pass id.
+      spec->addChild(NodeFactory::create(Node::Kind::SpecializationPassID,
+                                         unsigned(Mangled.next() - 48)));
       // And then mangle the generic specialization.
-      return demangleGenericSpecialization();
+      return demangleGenericSpecialization(spec);
     }
     if (Mangled.nextIf("f")) {
-      // Eat the pass id. We don't care about it.
-      Mangled.next();
+      auto spec =
+          NodeFactory::create(Node::Kind::FunctionSignatureSpecialization);
+
+      // Add the pass id.
+      spec->addChild(NodeFactory::create(Node::Kind::SpecializationPassID,
+                                         unsigned(Mangled.next() - 48)));
 
       // Then perform the function signature specialization.
-      return demangleFunctionSignatureSpecialization();
+      return demangleFunctionSignatureSpecialization(spec);
     }
 
     // We don't know how to handle this specialization.
@@ -2194,7 +2243,8 @@ private:
     case Node::Kind::Function:
     case Node::Kind::FunctionSignatureSpecialization:
     case Node::Kind::FunctionSignatureSpecializationParam:
-    case Node::Kind::FunctionSignatureSpecializationParamInfo:
+    case Node::Kind::FunctionSignatureSpecializationParamKind:
+    case Node::Kind::FunctionSignatureSpecializationParamPayload:
     case Node::Kind::FunctionType:
     case Node::Kind::Generics:
     case Node::Kind::GenericSpecialization:
@@ -2244,6 +2294,7 @@ private:
     case Node::Kind::ReabstractionThunk:
     case Node::Kind::ReabstractionThunkHelper:
     case Node::Kind::Setter:
+    case Node::Kind::SpecializationPassID:
     case Node::Kind::Subscript:
     case Node::Kind::Suffix:
     case Node::Kind::ThinFunctionType:
@@ -2415,6 +2466,9 @@ private:
   }
 
   void print(NodePointer pointer, bool asContext = false, bool suppressType = false);
+
+  unsigned printFunctionSigSpecializationParam(NodePointer pointer,
+                                               unsigned Idx);
 };
 } // end anonymous namespace
 
@@ -2423,6 +2477,69 @@ static bool isExistentialType(NodePointer node) {
   node = node->getChild(0);
   return (node->getKind() == Node::Kind::ExistentialMetatype ||
           node->getKind() == Node::Kind::ProtocolList);
+}
+
+/// Print the relevant parameters and return the new index.
+unsigned NodePrinter::printFunctionSigSpecializationParam(NodePointer pointer,
+                                                          unsigned Idx) {
+  NodePointer firstChild = pointer->getChild(Idx);
+  unsigned V = firstChild->getIndex();
+  auto K = FunctionSigSpecializationParamKind(V);
+  switch (K) {
+  case FunctionSigSpecializationParamKind::Dead:
+  case FunctionSigSpecializationParamKind::InOutToValue:
+    print(pointer->getChild(Idx++));
+    return Idx;
+  case FunctionSigSpecializationParamKind::ConstantPropFunction:
+  case FunctionSigSpecializationParamKind::ConstantPropGlobal:
+  case FunctionSigSpecializationParamKind::ConstantPropInteger:
+  case FunctionSigSpecializationParamKind::ConstantPropFloat:
+    Printer << "[";
+    print(pointer->getChild(Idx++));
+    Printer << " : ";
+    print(pointer->getChild(Idx++));
+    Printer << "]";
+    return Idx;
+  case FunctionSigSpecializationParamKind::ConstantPropString:
+    Printer << "[";
+    print(pointer->getChild(Idx++));
+    Printer << " : ";
+    print(pointer->getChild(Idx++));
+    Printer << "'";
+    print(pointer->getChild(Idx++));
+    Printer << "'";
+    Printer << "]";
+    return Idx;
+  case FunctionSigSpecializationParamKind::ClosureProp:
+    Printer << "[";
+    print(pointer->getChild(Idx++));
+    Printer << " : ";
+    print(pointer->getChild(Idx++));
+    Printer << ", Argument Types : [";
+    for (unsigned e = pointer->getNumChildren(); Idx < e;) {
+      NodePointer child = pointer->getChild(Idx);
+      // Until we no longer have a type node, keep demangling.
+      if (child->getKind() != Node::Kind::Type)
+        break;
+      print(child);
+      ++Idx;
+
+      // If we are not done, print the ", ".
+      if (Idx < e && pointer->getChild(Idx)->hasText())
+        Printer << ", ";
+    }
+    Printer << "]";
+    return Idx;
+  default:
+    break;
+  }
+
+  assert(
+      ((V & unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed)) ||
+       (V & unsigned(FunctionSigSpecializationParamKind::SROA))) &&
+      "Invalid OptionSet");
+  print(pointer->getChild(Idx++));
+  return Idx;
 }
 
 void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) {
@@ -2631,7 +2748,9 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       Printer << "generic specialization <";
     }
     bool hasPrevious = false;
-    for (unsigned i = 0, e = pointer->getNumChildren(); i < e; ++i) {
+    // We skip the 0 index since the SpecializationPassID does not contain any
+    // information that is useful to our users.
+    for (unsigned i = 1, e = pointer->getNumChildren(); i < e; ++i) {
       // Ignore empty specializations.
       if (!pointer->getChild(i)->hasChildren())
         continue;
@@ -2657,23 +2776,30 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     uint64_t argNum = pointer->getIndex();
 
     Printer << "Arg[" << argNum << "] = ";
-    print(pointer->getChild(0));
-    for (unsigned i = 1, e = pointer->getNumChildren(); i < e; ++i) {
+
+    unsigned Idx = printFunctionSigSpecializationParam(pointer, 0);
+
+    for (unsigned e = pointer->getNumChildren(); Idx < e;) {
       Printer << " and ";
-      print(pointer->getChild(i));
+      Idx = printFunctionSigSpecializationParam(pointer, Idx);
     }
+
     return;
   }
-  case Node::Kind::FunctionSignatureSpecializationParamInfo: {
+  case Node::Kind::FunctionSignatureSpecializationParamPayload: {
+    Printer << pointer->getText();
+    return;
+  }
+  case Node::Kind::FunctionSignatureSpecializationParamKind: {
     uint64_t raw = pointer->getIndex();
 
     bool convertedToGuaranteed =
-      raw & uint64_t(FunctionSigSpecializationParamInfoKind::OwnedToGuaranteed);
+        raw & uint64_t(FunctionSigSpecializationParamKind::OwnedToGuaranteed);
     if (convertedToGuaranteed) {
       Printer << "Owned To Guaranteed";
     }
 
-    if (raw & uint64_t(FunctionSigSpecializationParamInfoKind::SROA)) {
+    if (raw & uint64_t(FunctionSigSpecializationParamKind::SROA)) {
       if (convertedToGuaranteed)
         Printer << " and ";
       Printer << "Exploded";
@@ -2683,29 +2809,40 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     if (convertedToGuaranteed)
       return;
 
-    switch (FunctionSigSpecializationParamInfoKind(raw)) {
-    case FunctionSigSpecializationParamInfoKind::Dead:
+    switch (FunctionSigSpecializationParamKind(raw)) {
+    case FunctionSigSpecializationParamKind::Dead:
       Printer << "Dead";
       break;
-    case FunctionSigSpecializationParamInfoKind::InOutToValue:
+    case FunctionSigSpecializationParamKind::InOutToValue:
       Printer << "Value Promoted from InOut";
       break;
-    case FunctionSigSpecializationParamInfoKind::ConstantPropFunction:
-    case FunctionSigSpecializationParamInfoKind::ConstantPropGlobal:
-    case FunctionSigSpecializationParamInfoKind::ConstantPropInteger:
-    case FunctionSigSpecializationParamInfoKind::ConstantPropFloat:
-    case FunctionSigSpecializationParamInfoKind::ConstantPropString:
-      Printer << "Constant Propagated";
+    case FunctionSigSpecializationParamKind::ConstantPropFunction:
+      Printer << "Constant Propagated Function";
       break;
-    case FunctionSigSpecializationParamInfoKind::ClosureProp:
+    case FunctionSigSpecializationParamKind::ConstantPropGlobal:
+      Printer << "Constant Propagated Global";
+      break;
+    case FunctionSigSpecializationParamKind::ConstantPropInteger:
+      Printer << "Constant Propagated Integer";
+      break;
+    case FunctionSigSpecializationParamKind::ConstantPropFloat:
+      Printer << "Constant Propagated Float";
+      break;
+    case FunctionSigSpecializationParamKind::ConstantPropString:
+      Printer << "Constant Propagated String";
+      break;
+    case FunctionSigSpecializationParamKind::ClosureProp:
       Printer << "Closure Propagated";
       break;
-    case FunctionSigSpecializationParamInfoKind::OwnedToGuaranteed:
-    case FunctionSigSpecializationParamInfoKind::SROA:
+    case FunctionSigSpecializationParamKind::OwnedToGuaranteed:
+    case FunctionSigSpecializationParamKind::SROA:
       unreachable("option sets should have been handled earlier");
     }
     return;
   }
+  case Node::Kind::SpecializationPassID:
+    Printer << pointer->getIndex();
+    return;
   case Node::Kind::BuiltinTypeName:
     Printer << pointer->getText();
     return;

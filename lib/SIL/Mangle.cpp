@@ -162,9 +162,7 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
     llvm::SmallString<33> Str;
     Str += "u";
     Str += V;
-
-    auto Encoding = ArgumentModifierIntBase(SLI->getEncoding());
-    os << "se" << unsigned(Encoding) << "v";
+    os << "se" << unsigned(SLI->getEncoding()) << "v";
     M.mangleIdentifier(Str);
     break;
   }

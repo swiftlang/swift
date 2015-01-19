@@ -14,6 +14,7 @@
 #define SWIFT_SIL_MANGLE_H
 
 #include "llvm/ADT/DenseMap.h"
+#include "swift/Basic/Demangle.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Mangle.h"
@@ -32,23 +33,8 @@ enum class SpecializationKind : uint8_t {
   FunctionSignature,
 };
 
-/// The pass that caused the specialization to occur. We use this to make sure
-/// that two passes that generate similar mangling changes do not have
-/// overriding types.
-///
-/// TODO: Can this actually happen?
-enum class SpecializationPass : uint8_t {
-  AllocBoxToStack,
-  ClosureSpecializer,
-  CapturePromotion,
-  CapturePropagation,
-  FunctionSignatureOpts,
-  GenericSpecializer,
-};
-
-static inline char encodeSpecializationPass(SpecializationPass Pass) {
-  return char(uint8_t(Pass)) + 48;
-}
+/// Inject SpecializationPass into the Mangle namespace.
+using SpecializationPass = Demangle::SpecializationPass;
 
 class SpecializationManglerBase {
 protected:
@@ -72,7 +58,7 @@ public:
 protected:
   SpecializationManglerBase(SpecializationKind K, SpecializationPass P,
                             Mangler &M, SILFunction *F)
-    : Kind(K), Pass(P), M(M), Function(F) {}
+      : Kind(K), Pass(P), M(M), Function(F) {}
 
   llvm::raw_ostream &getBuffer() { return M.Buffer; }
   SILFunction *getFunction() const { return Function; }
@@ -128,7 +114,7 @@ public:
 protected:
   SpecializationMangler(SpecializationKind K, SpecializationPass P, Mangler &M,
                         SILFunction *F)
-    : SpecializationManglerBase(K, P, M, F) {}
+      : SpecializationManglerBase(K, P, M, F) {}
 };
 
 class GenericSpecializationMangler :

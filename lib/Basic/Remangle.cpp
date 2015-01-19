@@ -443,63 +443,88 @@ void Remangler::mangleFunctionSignatureSpecialization(Node *node) {
   Out << "__T";
 }
 
+void Remangler::mangleSpecializationPassID(Node *node) {
+  Out << node->getIndex();
+}
+
 void Remangler::mangleFunctionSignatureSpecializationParam(Node *node) {
   if (!node->hasChildren()) {
     Out << "n_";
     return;
   }
-  mangleSingleChildNode(node);
-}
 
-void Remangler::mangleFunctionSignatureSpecializationParamInfo(Node *node) {
-  assert(node->hasIndex());
-  auto kind = FunctionSigSpecializationParamInfoKind(node->getIndex());
+  // The first child is always a kind that specifies the type of param that we
+  // have.
+  NodePointer firstChild = node->getChild(0);
+  unsigned kindValue = firstChild->getIndex();
+  auto kind = FunctionSigSpecializationParamKind(kindValue);
+
   switch (kind) {
-  case FunctionSigSpecializationParamInfoKind::Dead:
+  case FunctionSigSpecializationParamKind::Dead:
     Out << "d_";
     return;
-  case FunctionSigSpecializationParamInfoKind::ConstantPropFunction:
+  case FunctionSigSpecializationParamKind::ConstantPropFunction:
     Out << "cpfr";
-    // FIXME: some identifier?
+    mangleIdentifier(node->getChild(1).get());
     Out << '_';
     return;
-  case FunctionSigSpecializationParamInfoKind::ConstantPropGlobal:
-    Out << "cp";
-    // FIXME: some identifier?
+  case FunctionSigSpecializationParamKind::ConstantPropGlobal:
+    Out << "cpg";
+    mangleIdentifier(node->getChild(1).get());
     Out << '_';
     return;
-  case FunctionSigSpecializationParamInfoKind::ConstantPropInteger:
-    Out << "cp";
-    // FIXME: the integer value
-    Out << '_';
-    return;    
-  case FunctionSigSpecializationParamInfoKind::ConstantPropFloat:
-    Out << "cp";
-    // FIXME: the floating-point value
+  case FunctionSigSpecializationParamKind::ConstantPropInteger:
+    Out << "cpi" << node->getChild(1)->getText() << '_';
+    return;
+  case FunctionSigSpecializationParamKind::ConstantPropFloat:
+    Out << "cpf" << node->getChild(1)->getText() << '_';
+    return;
+  case FunctionSigSpecializationParamKind::ConstantPropString: {
+    Out << "cpse";
+    StringRef encodingStr = node->getChild(1)->getText();
+    if (encodingStr == "u8")
+      Out << '0';
+    else if (encodingStr == "u16")
+      Out << '1';
+    else
+      unreachable("Unknown encoding");
+    Out << 'v';
+    mangleIdentifier(node->getChild(2).get());
     Out << '_';
     return;
-  case FunctionSigSpecializationParamInfoKind::ConstantPropString:
-    Out << "cp";
-    // FIXME: the string hash
-    Out << '_';
-    return;
-  case FunctionSigSpecializationParamInfoKind::ClosureProp:
+  }
+  case FunctionSigSpecializationParamKind::ClosureProp:
     Out << "cl";
-    // FIXME
+    mangleIdentifier(node->getChild(1).get());
+    for (unsigned i = 2, e = node->getNumChildren(); i != e; ++i) {
+      mangleType(node->getChild(i).get());
+    }
     Out << '_';
     return;
-  case FunctionSigSpecializationParamInfoKind::InOutToValue:
+  case FunctionSigSpecializationParamKind::InOutToValue:
     Out << "i_";
     return;
   default:
-    unsigned value = unsigned(kind);
-    if (value &
-        unsigned(FunctionSigSpecializationParamInfoKind::OwnedToGuaranteed))
+    if (kindValue &
+        unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed))
       Out << 'g';
-    if (value & unsigned(FunctionSigSpecializationParamInfoKind::SROA))
+    if (kindValue & unsigned(FunctionSigSpecializationParamKind::SROA))
       Out << 's';
     Out << '_';
+    return;
   }
+}
+
+void Remangler::mangleFunctionSignatureSpecializationParamPayload(Node *node) {
+  // This should never be called since mangling parameter payloads require
+  // knowing what the parameter kind is.
+  unreachable("This should never be called");
+}
+
+void Remangler::mangleFunctionSignatureSpecializationParamKind(Node *node) {
+  // This should never be called since mangling parameter kinds have influence
+  // on the payloads.
+  unreachable("This should never be called");
 }
 
 void Remangler::mangleProtocolConformance(Node *node) {

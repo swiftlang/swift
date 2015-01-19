@@ -741,14 +741,15 @@ Globals
   global ::= 'Tr' reabstract-signature   // reabstraction thunk
 
   global ::= 'TS' specializationinfo '_' mangled-name
-  specializationinfo ::= 'g' (type protocol-conformance* '_')+                // Generic specialization info.
-  specializationinfo ::= 'f' (funcspecializationarginfo '_')+                 // Function signature specialization kind
-  funcsigspecializationarginfo ::= 'cl' closurename type*                     // Closure specialized with closed over types in argument order.
-  funcsigspecializationarginfo ::= 'n'                                        // Unmodified argument
-  funcsigspecializationarginfo ::= 'cp' funcsigspecializationconstantpropinfo // Constant propagated argument
-  funcsigspecializationarginfo ::= 'd'                                        // Dead argument
-  funcsigspecializationarginfo ::= 'g' 's'?                                   // Owned => Guaranteed and Exploded if 's' present.
-  funcsigspecializationarginfo ::= 's'                                        // Exploded
+  specializationinfo ::= 'g' passid (type protocol-conformance* '_')+            // Generic specialization info.
+  specializationinfo ::= 'f' passid (funcspecializationarginfo '_')+             // Function signature specialization kind
+  passid ::= integer                                                             // The id of the pass that generated this specialization.
+  funcsigspecializationarginfo ::= 'cl' closurename type*                        // Closure specialized with closed over types in argument order.
+  funcsigspecializationarginfo ::= 'n'                                           // Unmodified argument
+  funcsigspecializationarginfo ::= 'cp' funcsigspecializationconstantproppayload // Constant propagated argument
+  funcsigspecializationarginfo ::= 'd'                                           // Dead argument
+  funcsigspecializationarginfo ::= 'g' 's'?                                      // Owned => Guaranteed and Exploded if 's' present.
+  funcsigspecializationarginfo ::= 's'                                           // Exploded
   funcsigspecializationconstantpropinfo ::= 'fr' mangled-name
   funcsigspecializationconstantpropinfo ::= 'g' mangled-name
   funcsigspecializationconstantpropinfo ::= 'i' 64-bit-integer
