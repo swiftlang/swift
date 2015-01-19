@@ -51,13 +51,28 @@ static llvm::ConstantInt *getMetadataKind(IRGenModule &IGM,
 HeapLayout::HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
                        ArrayRef<SILType> fieldTypes,
                        ArrayRef<const TypeInfo *> fieldTypeInfos,
-                       llvm::StructType *typeToFill)
+                       llvm::StructType *typeToFill,
+                       NecessaryBindings &&bindings)
   : StructLayout(IGM, LayoutKind::HeapObject, strategy,
                  fieldTypeInfos, typeToFill),
-    ElementTypes(fieldTypes.begin(), fieldTypes.end())
+    ElementTypes(fieldTypes.begin(), fieldTypes.end()),
+    Bindings(std::move(bindings))
 {
+#ifndef NDEBUG
   assert(fieldTypeInfos.size() == fieldTypes.size()
          && "type infos don't match types");
+  if (!Bindings.empty()) {
+    assert(fieldTypeInfos.size() >= 1 && "no field for bindings");
+    auto fixedBindingsField = dyn_cast<FixedTypeInfo>(fieldTypeInfos[0]);
+    assert(fixedBindingsField
+           && "bindings field is not fixed size");
+    assert(fixedBindingsField->getFixedSize()
+               == Bindings.getBufferSize(IGM)
+           && fixedBindingsField->getFixedAlignment()
+               == IGM.getPointerAlignment()
+           && "bindings field doesn't fit bindings");
+  }
+#endif
 }
 
 void irgen::emitDeallocateHeapObject(IRGenFunction &IGF,

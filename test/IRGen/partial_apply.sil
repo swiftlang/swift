@@ -203,6 +203,22 @@ entry(%x : $Int):
   return %p : $@callee_owned Int -> Int
 }
 
+sil public_external @generic_captured_and_open_param : $@thin <T> (@out T, @in T, @inout T) -> ()
+
+// CHECK-LABEL: define {{.*}} @partial_apply_open_generic_capture({{.*}} %swift.type* %T) {
+// CHECK:         store %swift.type* %T
+// CHECK:         insertvalue {{.*}} [[PARTIAL_APPLY_STUB:@_TPA_[A-Za-z0-9_]+]]
+
+// CHECK:       define {{.*}} [[PARTIAL_APPLY_STUB]]
+// CHECK:         [[T:%.*]] = load %swift.type**
+// CHECK:         tail call void @generic_captured_and_open_param({{.*}} %swift.type* [[T]])
+sil @partial_apply_open_generic_capture : $@thin <T> (@inout T) -> @callee_owned (@out T, @in T) -> () {
+entry(%a : $*T):
+  %f = function_ref @generic_captured_and_open_param : $@thin <U> (@out U, @in U, @inout U) -> ()
+  %p = partial_apply %f<T>(%a) : $@thin <U> (@out U, @in U, @inout U) -> ()
+  return %p : $@callee_owned (@out T, @in T) -> ()
+}
+
 sil public_external @guaranteed_captured_class_param : $@thin (Int, @guaranteed SwiftClass) -> Int
 
 // CHECK-LABEL: define { i8*, %swift.refcounted* } @partial_apply_guaranteed_class_param(%C13partial_apply10SwiftClass*)

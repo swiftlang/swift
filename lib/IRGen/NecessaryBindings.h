@@ -22,6 +22,7 @@
 #define SWIFT_IRGEN_NECESSARYBINDINGS_H
 
 #include "llvm/ADT/SetVector.h"
+#include "swift/AST/Types.h"
 
 namespace swift {
   class ArchetypeType;
@@ -33,12 +34,25 @@ namespace irgen {
   class Size;
 
 /// NecessaryBindings - The set of metadata that must be saved in
-/// order to perform value operations on the target type.
+/// order to perform some set of operations on a type.
 class NecessaryBindings {
   llvm::SetVector<ArchetypeType*> Types;
 
 public:
-  NecessaryBindings(IRGenModule &IGM, CanType type);
+  NecessaryBindings() = default;
+  
+  /// Collect the necessary bindings to invoke a function with the given
+  /// signature.
+  static NecessaryBindings forFunctionInvocations(IRGenModule &IGM,
+                                                  CanSILFunctionType origType,
+                                                  CanSILFunctionType substType,
+                                                  ArrayRef<Substitution> subs);
+  
+  /// Collect the necessary bindings to perform value operations on a type.
+  static NecessaryBindings forValueOperations(IRGenModule &IGM, CanType type);
+
+  /// Add bindings required by the given archetype.
+  void addArchetype(CanArchetypeType archetype);
 
   /// Is the work to do trivial?
   bool empty() const { return Types.empty(); }
