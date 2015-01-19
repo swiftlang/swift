@@ -15,7 +15,7 @@ func badMembers1(a: BadMembers1) {
 }
 // BAD_MEMBERS_1: Begin completions, 2 items
 // BAD_MEMBERS_1-NEXT: Decl[InstanceVar]/CurrNominal: .prop[#Int#]{{$}}
-// BAD_MEMBERS_1-NEXT: Decl[Subscript]/CurrNominal:   [{#i: Int#}][#Double#]{{$}}
+// BAD_MEMBERS_1-NEXT: Decl[Subscript]/CurrNominal:   [{#Int#}][#Double#]{{$}}
 // BAD_MEMBERS_1-NEXT: End completions
 
 protocol BadMembers2 {
@@ -31,7 +31,7 @@ func badMembers2(a: BadMembers2) {
 }
 // BAD_MEMBERS_2: Begin completions, 2 items
 // BAD_MEMBERS_2-NEXT: Decl[InstanceVar]/CurrNominal: .prop[#Int#]{{$}}
-// BAD_MEMBERS_2-NEXT: Decl[Subscript]/CurrNominal:   [{#i: Int#}][#Double#]{{$}}
+// BAD_MEMBERS_2-NEXT: Decl[Subscript]/CurrNominal:   [{#Int#}][#Double#]{{$}}
 // BAD_MEMBERS_2-NEXT: End completions
 
 func globalFunc() {}

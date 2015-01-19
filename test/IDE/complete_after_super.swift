@@ -177,7 +177,7 @@ extension SuperBaseA {
 // COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .baseProp[#Int#]{{$}}
 // COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseFunc0()[#Void#]{{$}}
 // COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseFunc1({#(a): Int#})[#Void#]{{$}}
-// COMMON_BASE_A_NO_DOT-DAG: Decl[Subscript]/CurrNominal:      [{#i: Int#}][#Double#]{{$}}
+// COMMON_BASE_A_NO_DOT-DAG: Decl[Subscript]/CurrNominal:      [{#Int#}][#Double#]{{$}}
 // COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .baseExtProp[#Int#]{{$}}
 // COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseExtFunc0()[#Void#]{{$}}
 // COMMON_BASE_A_NO_DOT: End completions
@@ -249,7 +249,7 @@ class SuperDerivedA : SuperBaseA {
 // COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .baseProp[#Int#]{{$}}
 // COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseFunc0()[#Void#]{{$}}
 // COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseFunc1({#(a): Int#})[#Void#]{{$}}
-// COMMON_BASE_B_NO_DOT-DAG: Decl[Subscript]/CurrNominal:      [{#i: Int#}][#Double#]{{$}}
+// COMMON_BASE_B_NO_DOT-DAG: Decl[Subscript]/CurrNominal:      [{#Int#}][#Double#]{{$}}
 // COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .baseExtProp[#Int#]{{$}}
 // COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseExtFunc0()[#Void#]{{$}}
 // COMMON_BASE_B_NO_DOT: End completions

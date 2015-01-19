@@ -67,3 +67,46 @@ struct Subscripts2 {
 }
 
 
+func f4(a: Int)(_ b: Int) { }
+func f5(a: Int)(b: Int) { }
+
+func testFunctions(i: Int, x: X) {
+  f4(i)(i)
+  f4(i)(b: i) // expected-error{{extraneous argument label 'b:' in call}}
+  f5(i)(i) // expected-error{{missing argument label 'b:' in call}}
+  f5(i)(b: i)
+}
+
+struct Y {
+  func m0(a: Int)(_ b: Int) { }
+  func m1(a: Int)(b: Int) { }
+
+  func m2(a: Int)(_ b: Int, _ c: Int) { }
+  func m3(a: Int)(b: Int, c2 c: Int) { }
+
+  subscript (x: Int) -> Int {
+    get { return x }
+  }
+
+  subscript (#y: String) -> String {
+    get { return y }
+  }
+}
+
+func testMethods(i: Int, x: Y) {
+  x.m0(i)(i)
+  x.m0(i)(b: i) // expected-error{{extraneous argument label 'b:' in call}}
+  x.m1(i)(i) // expected-error{{missing argument label 'b:' in call}}
+  x.m1(i)(b: i) 
+  x.m2(i)(i, c: i) // expected-error{{extraneous argument label 'c:' in call}}
+  x.m2(i)(i, i)
+  x.m3(i)(b: i, i) // expected-error{{missing argument label 'c2:' in call}}
+  x.m3(i)(b: i, c2: i)
+}
+
+func testSubscripts(i: Int, s: String, x: Y) {
+  var i2 = x[i]
+  var i3 = x[x: i] // expected-error{{extraneous argument label 'x:' in subscript}}
+  var s2 = x[y: s]
+  var s3 = x[s]  // expected-error{{missing argument label 'y:' in subscript}}
+}

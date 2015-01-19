@@ -325,7 +325,7 @@ struct NestedOuter1 {
 // NESTED_NOMINAL_DECL_A_5-NEXT: Decl[InstanceMethod]/CurrNominal: .aTestInstaceFunc()[#Void#]{{$}}
 // NESTED_NOMINAL_DECL_A_5-NEXT: Decl[InstanceVar]/CurrNominal:    .aInstanceVar[#Int#]{{$}}
 // NESTED_NOMINAL_DECL_A_5-NEXT: Decl[InstanceMethod]/CurrNominal: .aInstanceFunc()[#Void#]{{$}}
-// NESTED_NOMINAL_DECL_A_5-NEXT: Decl[Subscript]/CurrNominal:      [{#i: Int#}][#Double#]{{$}}
+// NESTED_NOMINAL_DECL_A_5-NEXT: Decl[Subscript]/CurrNominal:      [{#Int#}][#Double#]{{$}}
 // NESTED_NOMINAL_DECL_A_5-NEXT: End completions
   }
 
@@ -434,7 +434,7 @@ struct NestedOuter1 {
 // NESTED_NOMINAL_DECL_B_5-DAG: Decl[InstanceMethod]/CurrNominal: .bTestInstaceFunc()[#Void#]{{$}}
 // NESTED_NOMINAL_DECL_B_5-DAG: Decl[InstanceVar]/CurrNominal:    .bInstanceVar[#Int#]{{$}}
 // NESTED_NOMINAL_DECL_B_5-DAG: Decl[InstanceMethod]/CurrNominal: .bInstanceFunc()[#Void#]{{$}}
-// NESTED_NOMINAL_DECL_B_5-DAG: Decl[Subscript]/CurrNominal:      [{#i: Int#}][#Double#]{{$}}
+// NESTED_NOMINAL_DECL_B_5-DAG: Decl[Subscript]/CurrNominal:      [{#Int#}][#Double#]{{$}}
 // NESTED_NOMINAL_DECL_B_5: End completions
   }
 
@@ -525,7 +525,7 @@ func testOuterC() {
 // NESTED_NOMINAL_DECL_C_5-NEXT: Decl[InstanceMethod]/CurrNominal: .cTestInstaceFunc()[#Void#]{{$}}
 // NESTED_NOMINAL_DECL_C_5-NEXT: Decl[InstanceVar]/CurrNominal:    .cInstanceVar[#Int#]{{$}}
 // NESTED_NOMINAL_DECL_C_5-NEXT: Decl[InstanceMethod]/CurrNominal: .cInstanceFunc()[#Void#]{{$}}
-// NESTED_NOMINAL_DECL_C_5-NEXT: Decl[Subscript]/CurrNominal:      [{#i: Int#}][#Double#]{{$}}
+// NESTED_NOMINAL_DECL_C_5-NEXT: Decl[Subscript]/CurrNominal:      [{#Int#}][#Double#]{{$}}
 // NESTED_NOMINAL_DECL_C_5-NEXT: End completions
 }
 

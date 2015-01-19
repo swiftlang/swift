@@ -99,7 +99,7 @@ static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
     os << "<expr>";
     return;
   case PatternKind::Named:
-    os << "var " << cast<NamedPattern>(p)->getBoundName();
+    os << "var " << cast<NamedPattern>(p)->getBodyName();
     return;
   case PatternKind::Tuple: {
     unsigned numFields = cast<TuplePattern>(p)->getNumFields();

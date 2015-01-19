@@ -4,7 +4,7 @@ func double(x: Int) -> Int {
   return x+x
 }
 
-func curriedSubtract(x: Int)(y: Int) -> Int {
+func curriedSubtract(x: Int)(_ y: Int) -> Int {
   return x-y
 }
 
@@ -18,7 +18,7 @@ println(double(2))
 println(double(4))
 
 // CHECK: 12
-println(curriedSubtract(16)(y: 4))
+println(curriedSubtract(16)(4))
 
 // CHECK: 20
 println(twice(double, 5))

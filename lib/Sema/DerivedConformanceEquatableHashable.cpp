@@ -199,7 +199,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, EnumDecl *enumDecl) {
   auto getParamPattern = [&](StringRef s) -> std::pair<VarDecl*, Pattern*> {
     VarDecl *aDecl = new (C) ParamDecl(/*isLet*/ true,
                                        SourceLoc(),
-                                       C.getIdentifier(s),
+                                       Identifier(),
                                        SourceLoc(),
                                        C.getIdentifier(s),
                                        enumTy,

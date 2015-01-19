@@ -1271,7 +1271,10 @@ public:
       return;
     }
 
-    Builder.addCallParameter(P->getBoundName(), P->getType(),/*IsVarArg*/false);
+    Type PType = P->getType();
+    if (auto Parens = dyn_cast<ParenType>(PType.getPointer()))
+      PType = Parens->getUnderlyingType();
+    Builder.addCallParameter(P->getBoundName(), PType, /*IsVarArg*/false);
   }
 
   void addPatternFromTypeImpl(CodeCompletionResultBuilder &Builder, Type T,
@@ -1372,10 +1375,11 @@ public:
         if (BodyTuple) {
           // If we have a local name for the parameter, pass in that as well.
           auto ParamPat = BodyTuple->getFields()[i].getPattern();
-          Builder.addCallParameter(Name, ParamPat->getBoundName(), ParamType,
+          Builder.addCallParameter(Name, ParamPat->getBodyName(), ParamType,
                                    TupleElt.isVararg());
-        } else
+        } else {
           Builder.addCallParameter(Name, ParamType, TupleElt.isVararg());
+        }
         NeedComma = true;
       }
     } else {
@@ -1387,7 +1391,7 @@ public:
       }
       if (BodyTuple) {
         auto ParamPat = BodyTuple->getFields().front().getPattern();
-        Builder.addCallParameter(Identifier(), ParamPat->getBoundName(), T,
+        Builder.addCallParameter(Identifier(), ParamPat->getBodyName(), T,
                                  /*IsVarArg*/false);
       } else
         Builder.addCallParameter(Identifier(), T, /*IsVarArg*/false);

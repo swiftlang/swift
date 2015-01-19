@@ -370,7 +370,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
 
   VarDecl *rawDecl = new (C) ParamDecl(/*IsVal*/true,
                                        SourceLoc(),
-                                       Identifier(),
+                                       C.Id_rawValue,
                                        SourceLoc(),
                                        C.Id_rawValue,
                                        rawType,

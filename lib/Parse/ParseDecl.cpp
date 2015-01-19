@@ -2428,7 +2428,7 @@ static TypedPattern *createSetterAccessorArgument(SourceLoc nameLoc,
   }
 
   VarDecl *value = new (P.Context) ParamDecl(/*IsLet*/true,
-                                             nameLoc, name,
+                                             SourceLoc(), Identifier(),
                                              nameLoc, name,
                                              Type(), P.CurDeclContext);
   if (isNameImplicit)

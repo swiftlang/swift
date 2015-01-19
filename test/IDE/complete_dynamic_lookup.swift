@@ -114,16 +114,16 @@ protocol Bar { func bar() }
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule:    .topLevelObjcClass_Property1[#Int?#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .topLevelObjcProtocol_InstanceFunc1!()[#Void#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule:    .topLevelObjcProtocol_Property1[#Int?#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#i: Bar_ImportedObjcClass#}][#Int?#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#i: Foo_TopLevelObjcProtocol#}][#Int?#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#i: Int16#}][#Int?#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#i: Int32#}][#Int?#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#i: Int64#}][#Int?#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#i: Int8#}][#Int?#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#i: TopLevelObjcClass#}][#Int?#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#i: TopLevelObjcProtocol#}][#Int?#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#idx: Int32#}][#AnyObject!?#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#key: AnyObject!#}][#AnyObject!?#]{{$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#Bar_ImportedObjcClass#}][#Int?#]{{$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#Foo_TopLevelObjcProtocol#}][#Int?#]{{$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#Int16#}][#Int?#]{{$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#Int32#}][#Int?#]{{$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#Int64#}][#Int?#]{{$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#Int8#}][#Int?#]{{$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#TopLevelObjcClass#}][#Int?#]{{$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#TopLevelObjcProtocol#}][#Int?#]{{$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#Int32#}][#AnyObject!?#]{{$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#AnyObject!#}][#AnyObject!?#]{{$}}
 // DL_INSTANCE_NO_DOT: End completions
 
 // DL_INSTANCE_DOT: Begin completions
@@ -232,7 +232,7 @@ protocol Bar { func bar() }
 // TLOC_MEMBERS_NO_DOT: Begin completions
 // TLOC_MEMBERS_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .returnsObjcClass({#(i): Int#})[#TopLevelObjcClass#]{{$}}
 // TLOC_MEMBERS_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .topLevelObjcClass_InstanceFunc1()[#Void#]{{$}}
-// TLOC_MEMBERS_NO_DOT-NEXT: Decl[Subscript]/CurrNominal:      [{#i: Int8#}][#Int#]{{$}}
+// TLOC_MEMBERS_NO_DOT-NEXT: Decl[Subscript]/CurrNominal:      [{#Int8#}][#Int#]{{$}}
 // TLOC_MEMBERS_NO_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    .topLevelObjcClass_Property1[#Int#]{{$}}
 // TLOC_MEMBERS_NO_DOT-NEXT: End completions
 

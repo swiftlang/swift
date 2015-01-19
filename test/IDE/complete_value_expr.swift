@@ -324,8 +324,8 @@ var fooObject: FooStruct
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .overloadedInstanceFunc2({#(x): Int#})[#Int#]{{$}}
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .overloadedInstanceFunc2({#(x): Double#})[#Int#]{{$}}
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .builderFunc1({#(a): Int#})[#FooStruct#]{{$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[Subscript]/CurrNominal:      [{#i: Int#}][#Double#]{{$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[Subscript]/CurrNominal:      [{#i: Int#}, {#j: Int#}][#Double#]{{$}}
+// FOO_OBJECT_NO_DOT-NEXT: Decl[Subscript]/CurrNominal:      [{#Int#}][#Double#]{{$}}
+// FOO_OBJECT_NO_DOT-NEXT: Decl[Subscript]/CurrNominal:      [{#Int#}, {#Int#}][#Double#]{{$}}
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedVoidFunc1()[#() -> Void#]{{$}}
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedVoidFunc2()[#(a: Int) -> Void#]{{$}}
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedVoidFunc3({#(a): Int#})[#() -> Void#]{{$}}
@@ -874,7 +874,7 @@ func testLookInProtoNoDot1() {
 // PROTO_MEMBERS_NO_DOT_1-NEXT: Decl[InstanceVar]/CurrNominal:    .fooInstanceVar2[#Int#]{{$}}
 // PROTO_MEMBERS_NO_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal: .fooInstanceFunc0()[#Double#]{{$}}
 // PROTO_MEMBERS_NO_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal: .fooInstanceFunc1({#(a): Int#})[#Double#]{{$}}
-// PROTO_MEMBERS_NO_DOT_1-NEXT: Decl[Subscript]/CurrNominal:      [{#i: Int#}][#Double#]{{$}}
+// PROTO_MEMBERS_NO_DOT_1-NEXT: Decl[Subscript]/CurrNominal:      [{#Int#}][#Double#]{{$}}
 // PROTO_MEMBERS_NO_DOT_1-NEXT: End completions
 }
 
@@ -888,7 +888,7 @@ func testLookInProtoNoDot2() {
 // PROTO_MEMBERS_NO_DOT_2-NEXT: Decl[InstanceVar]/CurrNominal:    .fooInstanceVar2[#Int#]{{$}}
 // PROTO_MEMBERS_NO_DOT_2-NEXT: Decl[InstanceMethod]/CurrNominal: .fooInstanceFunc0()[#Double#]{{$}}
 // PROTO_MEMBERS_NO_DOT_2-NEXT: Decl[InstanceMethod]/CurrNominal: .fooInstanceFunc1({#(a): Int#})[#Double#]{{$}}
-// PROTO_MEMBERS_NO_DOT_2-NEXT: Decl[Subscript]/CurrNominal:      [{#i: Int#}][#Double#]{{$}}
+// PROTO_MEMBERS_NO_DOT_2-NEXT: Decl[Subscript]/CurrNominal:      [{#Int#}][#Double#]{{$}}
 // PROTO_MEMBERS_NO_DOT_2-NEXT: End completions
 }
 
@@ -903,7 +903,7 @@ func testLookInProtoNoDot3() {
 // PROTO_MEMBERS_NO_DOT_3-NEXT: Decl[InstanceVar]/Super:          .fooInstanceVar2[#Int#]{{$}}
 // PROTO_MEMBERS_NO_DOT_3-NEXT: Decl[InstanceMethod]/Super:       .fooInstanceFunc0()[#Double#]{{$}}
 // PROTO_MEMBERS_NO_DOT_3-NEXT: Decl[InstanceMethod]/Super:       .fooInstanceFunc1({#(a): Int#})[#Double#]{{$}}
-// PROTO_MEMBERS_NO_DOT_3-NEXT: Decl[Subscript]/Super:            [{#i: Int#}][#Double#]{{$}}
+// PROTO_MEMBERS_NO_DOT_3-NEXT: Decl[Subscript]/Super:            [{#Int#}][#Double#]{{$}}
 // PROTO_MEMBERS_NO_DOT_3-NEXT: Decl[InstanceMethod]/CurrNominal: .fooExInstanceFunc0()[#Double#]{{$}}
 // PROTO_MEMBERS_NO_DOT_3-NEXT: End completions
 }
@@ -1068,7 +1068,7 @@ func testFuncParenPattern1(fpp: FuncParenPattern) {
   fpp#^FUNC_PAREN_PATTERN_1^#
 // FUNC_PAREN_PATTERN_1: Begin completions
 // FUNC_PAREN_PATTERN_1-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#Int#})[#Void#]{{$}}
-// FUNC_PAREN_PATTERN_1-NEXT: Decl[Subscript]/CurrNominal: [{#(Int)#}][#Int#]{{$}}
+// FUNC_PAREN_PATTERN_1-NEXT: Decl[Subscript]/CurrNominal: [{#Int#}][#Int#]{{$}}
 // FUNC_PAREN_PATTERN_1-NEXT: End completions
 }
 

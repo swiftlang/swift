@@ -319,8 +319,7 @@ private:
   /// \returns true if anything was printed.
   bool printASTNodes(const ArrayRef<ASTNode> &Elements, bool NeedIndent = true);
 
-  void printOneParameter(Identifier ArgName,
-                         const Pattern *BodyPattern,
+  void printOneParameter(const Pattern *BodyPattern,
                          bool ArgNameIsAPIByDefault,
                          bool StripOuterSliceType,
                          bool Curried);
@@ -420,7 +419,7 @@ void PrintAST::printPattern(const Pattern *pattern) {
     auto named = cast<NamedPattern>(pattern);
     recordDeclLoc(named->getDecl(),
       [&]{
-        Printer.printName(named->getBoundName());
+        Printer.printName(named->getBodyName());
       });
     break;
   }
@@ -1194,47 +1193,41 @@ void PrintAST::visitParamDecl(ParamDecl *decl) {
   return visitVarDecl(decl);
 }
 
-void PrintAST::printOneParameter(Identifier ArgName,
-                                 const Pattern *BodyPattern,
+void PrintAST::printOneParameter(const Pattern *BodyPattern,
                                  bool ArgNameIsAPIByDefault,
                                  bool StripOuterSliceType,
                                  bool Curried) {
   auto printArgName = [&]() {
     // Print argument name.
-    auto BodyName = BodyPattern->getBoundName();
-    if (Curried) {
-      // For curried parameters, just print the body name if there is one.
-      Printer.printName(BodyName);
-      Printer << ": ";
-    } else {
-      auto printArg = [&]{
-        if (!ArgName.empty() && !ArgNameIsAPIByDefault)
-          Printer << "#";
-        Printer.printName(ArgName);
-      };
+    auto ArgName = BodyPattern->getBoundName();
+    auto BodyName = BodyPattern->getBodyName();
+    auto printArg = [&]{
+      if (!ArgName.empty() && !ArgNameIsAPIByDefault)
+        Printer << "#";
+      Printer.printName(ArgName);
+    };
 
-      switch (Options.ArgAndParamPrinting) {
-      case PrintOptions::ArgAndParamPrintingMode::ArgumentOnly:
+    switch (Options.ArgAndParamPrinting) {
+    case PrintOptions::ArgAndParamPrintingMode::ArgumentOnly:
+      printArg();
+      break;
+    case PrintOptions::ArgAndParamPrintingMode::BothIfDifferent:
+      if (ArgName == BodyName) {
         printArg();
         break;
-      case PrintOptions::ArgAndParamPrintingMode::BothIfDifferent:
-        if (ArgName == BodyName) {
-          printArg();
-          break;
-        }
-        if (ArgName.empty() && !ArgNameIsAPIByDefault) {
-          Printer.printName(BodyName);
-          break;
-        }
-        SWIFT_FALLTHROUGH;
-      case PrintOptions::ArgAndParamPrintingMode::BothAlways:
-        Printer.printName(ArgName);
-        Printer << " ";
+      }
+      if (ArgName.empty() && !ArgNameIsAPIByDefault) {
         Printer.printName(BodyName);
         break;
       }
-      Printer << ": ";
+      SWIFT_FALLTHROUGH;
+    case PrintOptions::ArgAndParamPrintingMode::BothAlways:
+      Printer.printName(ArgName);
+      Printer << " ";
+      Printer.printName(BodyName);
+      break;
     }
+    Printer << ": ";
   };
 
   if (auto *VP = dyn_cast<VarPattern>(BodyPattern))
@@ -1280,12 +1273,6 @@ void PrintAST::printOneParameter(Identifier ArgName,
 }
 
 void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
-  ArrayRef<Identifier> ArgNames;
-  DeclName Name = AFD->getFullName();
-  if (Name) {
-    ArgNames = Name.getArgumentNames();
-  }
-
   ArrayRef<Pattern *> BodyPatterns = AFD->getBodyParamPatterns();
 
   // Skip over the implicit 'self'.
@@ -1295,7 +1282,6 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
 
   for (unsigned CurrPattern = 0, NumPatterns = BodyPatterns.size();
        CurrPattern != NumPatterns; ++CurrPattern) {
-    bool UseArgName = Name && (CurrPattern == 0);
     if (auto *BodyTuple = dyn_cast<TuplePattern>(BodyPatterns[CurrPattern])) {
       Printer << "(";
       for (unsigned i = 0, e = BodyTuple->getFields().size(); i != e; ++i) {
@@ -1305,12 +1291,12 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
         // Determine whether the argument name is API by default.
         bool ArgNameIsAPIByDefault = (CurrPattern == 0 &&
                                       AFD->argumentNameIsAPIByDefault(i)) ||
+          CurrPattern > 0 ||
           (BodyTuple->getFields()[i].getDefaultArgKind() != 
              DefaultArgumentKind::None &&
            Options.PrintDefaultParameterPlaceholder);
 
-        printOneParameter(UseArgName ? ArgNames[i] : Identifier(),
-                          BodyTuple->getFields()[i].getPattern(),
+        printOneParameter(BodyTuple->getFields()[i].getPattern(),
                           ArgNameIsAPIByDefault,
                           /*StripOuterSliceType=*/i == e - 1 &&
                             BodyTuple->hasVararg(),
@@ -1329,8 +1315,7 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
                                   AFD->argumentNameIsAPIByDefault(0));
     auto *BodyParen = cast<ParenPattern>(BodyPatterns[CurrPattern]);
     Printer << "(";
-    printOneParameter(UseArgName? ArgNames[0] : Identifier(), 
-                      BodyParen->getSubPattern(),
+    printOneParameter(BodyParen->getSubPattern(),
                       ArgNameIsAPIByDefault,
                       /*StripOuterSliceType=*/false,
                       /*Curried=*/CurrPattern > 0);
@@ -1402,7 +1387,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
             if (!TP->isImplicit() && !TP->getFields().empty()) {
               auto *P = TP->getFields().begin()->getPattern()->
                             getSemanticsProvidingPattern();
-              Identifier Name = P->getBoundName();
+              Identifier Name = P->getBodyName();
               if (!Name.empty() && !P->isImplicit()) {
                 Printer << "(";
                 Printer.printName(Name);

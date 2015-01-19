@@ -210,7 +210,7 @@ private:
     if (isa<AnyPattern>(param))
       os << "_";
     else
-      os << cast<NamedPattern>(param)->getBoundName();
+      os << cast<NamedPattern>(param)->getBodyName();
 
     return restOfSelector;
   }

@@ -2488,6 +2488,8 @@ struct ASTNodeBase {};
           return;
       } else if (Pattern *P = Parent.getAsPattern()) {
         Enclosing = P->getSourceRange();
+        if (P->isImplicit())
+          return;
       } else if (Expr *E = Parent.getAsExpr()) {
         // FIXME: This hack is required because the inclusion check below
         // doesn't compares the *start* of the ranges, not the end of the

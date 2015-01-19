@@ -41,8 +41,18 @@ static void addMemberToContextIfNeeded(Decl *D, DeclContext *DC,
 }
 
 static VarDecl *getParamDeclAtIndex(FuncDecl *fn, unsigned index) {
-  auto params = cast<TuplePattern>(fn->getBodyParamPatterns().back());
-  auto firstParamPattern = params->getFields()[index].getPattern();
+  TuplePatternElt singleParam;
+  Pattern *paramPattern = fn->getBodyParamPatterns().back();
+  ArrayRef<TuplePatternElt> params;
+  if (auto paramTuple = dyn_cast<TuplePattern>(paramPattern)) {
+    params = paramTuple->getFields();
+  } else {
+    singleParam = TuplePatternElt(
+                                  cast<ParenPattern>(paramPattern)->getSubPattern());
+    params = singleParam;
+  }
+
+  auto firstParamPattern = params[index].getPattern();
   return firstParamPattern->getSingleVar();    
 }
 
@@ -447,9 +457,16 @@ static Expr *buildSubscriptIndexReference(ASTContext &ctx, FuncDecl *accessor) {
   // Pull out the body parameters, which we should have cloned
   // previously to be forwardable.  Drop the initial buffer/value
   // parameter in accessors that have one.
-  auto paramTuple = cast<TuplePattern>(accessor->getBodyParamPatterns().back());
-  auto params = paramTuple->getFields();
-
+  TuplePatternElt singleParam;
+  Pattern *paramPattern = accessor->getBodyParamPatterns().back();
+  ArrayRef<TuplePatternElt> params;
+  if (auto paramTuple = dyn_cast<TuplePattern>(paramPattern)) {
+    params = paramTuple->getFields();
+  } else {
+    singleParam = TuplePatternElt(
+                    cast<ParenPattern>(paramPattern)->getSubPattern());
+    params = singleParam;
+  }
   auto accessorKind = accessor->getAccessorKind();
 
   // Ignore the value/buffer parameter.

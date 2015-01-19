@@ -170,7 +170,7 @@ struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
     ResultString += ")";
   }
   void visitNamedPattern(NamedPattern *P) {
-    ResultString += P->getBoundName().str();
+    ResultString += P->getBodyName().str();
   }
   void visitAnyPattern(AnyPattern *P) {
     ResultString += "_";

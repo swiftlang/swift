@@ -543,6 +543,24 @@ Identifier Pattern::getBoundName() const {
   return Identifier();
 }
 
+Identifier Pattern::getBodyName() const {
+  if (auto *NP = dyn_cast<NamedPattern>(getSemanticsProvidingPattern()))
+    return NP->getBodyName();
+  return Identifier();
+}
+
+Identifier NamedPattern::getBoundName() const {
+  if (auto param = dyn_cast<ParamDecl>(Var))
+    return param->getArgumentName();
+
+  return Var->getName();
+}
+
+Identifier NamedPattern::getBodyName() const {
+  return Var->getName();
+}
+
+
 /// Allocate a new pattern that matches a tuple.
 TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
                                    ArrayRef<TuplePatternElt> elts, SourceLoc rp,
@@ -570,6 +588,7 @@ Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
   if (elements.size() == 1 &&
       elements[0].getInit() == nullptr &&
       elements[0].getPattern()->getBoundName().empty() &&
+      elements[0].getPattern()->getBodyName().empty() &&
       !hasVararg) {
     auto &first = const_cast<TuplePatternElt&>(elements.front());
     return new (C) ParenPattern(lp, first.getPattern(), rp);

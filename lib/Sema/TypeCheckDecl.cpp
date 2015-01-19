@@ -2557,8 +2557,6 @@ public:
 
       // Relabel the indices according to the subscript name.
       auto indicesType = SD->getIndices()->getType();
-      indicesType = indicesType->getRelabeledType(
-                      TC.Context, SD->getFullName().getArgumentNames());
       SD->setType(FunctionType::get(indicesType, SD->getElementType()));
 
       // If we're in a generic context, set the interface type.
@@ -3570,14 +3568,6 @@ public:
         params = outerGenericParams;
       }
       
-      // If we have a compound name, relabel the argument type for the primary
-      // argument list.
-      if (e - i - 1 == hasSelf) {
-        if (auto name = FD->getEffectiveFullName()) {
-          argTy = argTy->getRelabeledType(TC.Context, name.getArgumentNames());
-        }
-      }
-
       // Validate and consume the function type attributes.
       auto Info = validateAndApplyFunctionTypeAttributes(FD);
       if (params) {
@@ -5580,7 +5570,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
               !PBD->getInit()->getType()) {
             diagnose(PBD->getPattern()->getLoc(),
                      diag::identifier_init_failure,
-                     PBD->getPattern()->getBoundName());
+                     PBD->getPattern()->getBodyName());
           }
           
           return;

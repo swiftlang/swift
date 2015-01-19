@@ -121,6 +121,10 @@ public:
   /// identifier if the pattern does not bind a name directly.
   Identifier getBoundName() const;
 
+  /// Returns the name directly bound by this pattern within the body of
+  /// a function, or the null identifier if the pattern does not bind a name directly.
+  Identifier getBodyName() const;
+
   /// If this pattern binds a single variable without any
   /// destructuring or conditionalizing, return that variable.
   VarDecl *getSingleVar() const;
@@ -358,7 +362,8 @@ public:
   }
 
   VarDecl *getDecl() const { return Var; }
-  Identifier getBoundName() const { return Var->getName(); }
+  Identifier getBoundName() const;
+  Identifier getBodyName() const;
   StringRef getNameStr() const { return Var->getNameStr(); }
 
   SourceLoc getLoc() const { return Var->getLoc(); }

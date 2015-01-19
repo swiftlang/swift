@@ -412,7 +412,7 @@ mapParsedParameters(Parser &parser,
     case Parser::ParameterContextKind::Closure:
     case Parser::ParameterContextKind::Subscript:
     case Parser::ParameterContextKind::Operator:
-      isKeywordArgumentByDefault = false;
+      isKeywordArgumentByDefault = !isFirstParameterClause;
       break;
 
     case Parser::ParameterContextKind::Initializer:
@@ -420,7 +420,7 @@ mapParsedParameters(Parser &parser,
       break;
 
     case Parser::ParameterContextKind::Method:
-      isKeywordArgumentByDefault = !isFirstParameter;
+      isKeywordArgumentByDefault = !isFirstParameterClause || !isFirstParameter;
       break;
     }
 

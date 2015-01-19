@@ -2894,7 +2894,8 @@ VarDecl *AbstractFunctionDecl::getImplicitSelfDecl() const {
 
   // The decl should be named 'self' and be implicit.
   auto NP = dyn_cast<NamedPattern>(P);
-  if (NP && NP->isImplicit() && NP->getBoundName() == getASTContext().Id_self)
+  if (NP && NP->isImplicit() &&
+      NP->getDecl()->getName() == getASTContext().Id_self)
     return NP->getDecl();
   return nullptr;
 }
