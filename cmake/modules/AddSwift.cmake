@@ -333,16 +333,11 @@ function(_compile_swift_files dependency_target_out_var_name)
     list(APPEND swift_flags "-Xfrontend" "-emit-sorted-sil")
   endif()
 
-  # FIXME: Remove -disable-llvm-slp-vectorizer
-  #        (rdar://problem/19433841) once the underlying LLVM issue is
-  #        resolved (rdar://problem/19430955).
-
   # FIXME: Cleaner way to do this?
   if(SWIFTFILE_IS_STDLIB_CORE)
     list(APPEND swift_flags
         "-nostdimport" "-parse-stdlib" "-module-name" "Swift"
-        "-Xfrontend" "-sil-serialize-all" "-Xfrontend"
-        "-disable-llvm-slp-vectorizer")
+        "-Xfrontend" "-sil-serialize-all")
   endif()
 
   if(SWIFTFILE_IS_SDK_OVERLAY)
