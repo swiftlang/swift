@@ -72,7 +72,7 @@ public:
   /// Determine whether this option set contains all of the options in the
   /// given set.
   bool contains(OptionSet set) const {
-    return static_cast<bool>(*this & set);
+    return !static_cast<bool>(set - *this);
   }
 
   /// Produce the union of two option sets.

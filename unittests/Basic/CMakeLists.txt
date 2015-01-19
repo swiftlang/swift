@@ -6,6 +6,7 @@ handle_gyb_sources(
     ${SWIFT_HOST_VARIANT_ARCH})
 
 add_swift_unittest(SwiftBasicTests
+  ADTTests.cpp
   ClusteredBitVectorTest.cpp
   Demangle.cpp
   SourceManager.cpp
