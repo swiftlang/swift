@@ -70,3 +70,18 @@ if let castX = c as! C4? {} // expected-error {{cannot downcast from 'AnyObject'
 // Only suggest replacing 'as' with 'as!' if it would fix the error.
 C3() as C4 // expected-error {{'C3' is not convertible to 'C4'; did you mean to use 'as!' to force downcast?}}
 C3() as C5 // expected-error {{'C3' is not convertible to 'C5'}}
+
+// <rdar://problem/19495142> Various incorrect diagnostics for explicit type conversions
+1 as Double as Float // expected-error{{'Double' is not convertible to 'Float'}}
+1 as Int as String // expected-error{{'Int' is not convertible to 'String'}}
+Double(1) as Double as String // expected-error{{'Double' is not convertible to 'String'}}
+["awd"] as [Int] // expected-error{{'[String]' is not convertible to '[Int]'}}
+([1, 2, 1.0], 1) as ([String], Int) // expected-error{{'([Double], Int)' is not convertible to '([String], Int)'}}
+// FIXME: below diagnostic should say [[Int]], not [Array<Int>]
+[[1]] as [[String]] // expected-error{{'[Array<Int>]' is not convertible to '[[String]]'}}
+(1, 1.0) as (Int, Int) // expected-error{{'(Int, Double)' is not convertible to '(Int, Int)'}}
+(1.0, 1, "asd") as (String, Int, Float) // expected-error{{'(Double, Int, String)' is not convertible to '(String, Int, Float)'}}
+(1, 1.0, "a", [1, 23]) as (Int, Double, String, [String]) // expected-error{{'(Int, Double, String, [Int])' is not convertible to '(Int, Double, String, [String])'}}
+
+[1] as! [String] // expected-error{{'[Int]' is not convertible to '[String]'}}
+[(1, (1, 1))] as! [(Int, (String, Int))] // expected-error{{'[(Int, (Int, Int))]' is not convertible to '[(Int, (String, Int))]'}}

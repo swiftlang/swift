@@ -86,8 +86,7 @@ func arrayToNSArray() {
   nsa = [BridgedClass]() as NSArray
   nsa = [OtherClass]() as NSArray
   nsa = [BridgedStruct]() as NSArray
-  // FIXME: the below diagnostic makes no sense
-  nsa = [NotBridgedStruct]() as NSArray // expected-error{{cannot assign to immutable value of type 'NSArray'}} expected-error{{'NSArray' is not convertible to '()'}}
+  nsa = [NotBridgedStruct]() as NSArray // expected-error{{cannot assign to immutable value of type 'NSArray'}} expected-error{{'[(NotBridgedStruct)]' is not convertible to 'NSArray'}}
 }
 
 // NSArray -> Array
@@ -123,13 +122,12 @@ func dictionaryToNSDictionary() {
   nsd = [NSObject : BridgedStruct]()
   nsd = [NSObject : BridgedStruct]() as NSDictionary
   nsd = [NSObject : NotBridgedStruct]() // expected-error{{cannot assign a value of type '[NSObject : NotBridgedStruct]' to a value of type 'NSDictionary'}}
-  // FIXME: the below diagnostic makes no sense
-  nsd = [NSObject : NotBridgedStruct]() as NSDictionary // expected-error{{cannot assign to immutable value of type 'NSDictionary'}} expected-error{{'NSDictionary' is not convertible to '()'}}
+  nsd = [NSObject : NotBridgedStruct]() as NSDictionary // expected-error{{cannot assign to immutable value of type 'NSDictionary'}} expected-error{{'[NSObject : NotBridgedStruct]' is not convertible to 'NSDictionary'}}
 
   nsd = [NSObject : BridgedClass?]() // expected-error{{cannot assign a value of type '[NSObject : BridgedClass?]' to a value of type 'NSDictionary'}}
-  nsd = [NSObject : BridgedClass?]() as NSDictionary // expected-error{{cannot assign to immutable value of type 'NSDictionary'}} expected-error{{'NSDictionary' is not convertible to '()'}}
+  nsd = [NSObject : BridgedClass?]() as NSDictionary // expected-error{{cannot assign to immutable value of type 'NSDictionary'}} expected-error{{'[NSObject : BridgedClass?]' is not convertible to 'NSDictionary'}}
   nsd = [NSObject : BridgedStruct?]()  // expected-error{{cannot assign a value of type '[NSObject : BridgedStruct?]' to a value of type 'NSDictionary'}}
-  nsd = [NSObject : BridgedStruct?]() as NSDictionary // expected-error{{cannot assign to immutable value of type 'NSDictionary'}} expected-error{{'NSDictionary' is not convertible to '()'}}
+  nsd = [NSObject : BridgedStruct?]() as NSDictionary // expected-error{{cannot assign to immutable value of type 'NSDictionary'}} expected-error{{'[NSObject : BridgedStruct?]' is not convertible to 'NSDictionary'}}
 
   nsd = [BridgedClass : AnyObject]()
   nsd = [BridgedClass : AnyObject]() as NSDictionary
@@ -138,7 +136,7 @@ func dictionaryToNSDictionary() {
   nsd = [BridgedStruct : AnyObject]()
   nsd = [BridgedStruct : AnyObject]() as NSDictionary
   nsd = [NotBridgedStruct : AnyObject]()  // expected-error{{cannot assign a value of type '[NotBridgedStruct : AnyObject]' to a value of type 'NSDictionary'}}
-  nsd = [NotBridgedStruct : AnyObject]() as NSDictionary  // expected-error{{cannot assign to immutable value of type 'NSDictionary'}} expected-error{{'NSDictionary' is not convertible to '()'}}
+  nsd = [NotBridgedStruct : AnyObject]() as NSDictionary  // expected-error{{cannot assign to immutable value of type 'NSDictionary'}} expected-error{{'[NotBridgedStruct : AnyObject]' is not convertible to 'NSDictionary'}}
 
   // <rdar://problem/17134986>
   var bcOpt: BridgedClass?

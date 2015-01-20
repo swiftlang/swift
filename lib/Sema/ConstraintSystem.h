@@ -1188,6 +1188,9 @@ private:
   /// Diagnose a failed coerce expression, considering the possibility that it
   /// should be a forced downcast instead.
   bool diagnoseFailureForCoerceExpr();
+
+  /// Diagnose a failed forced downcast expr.
+  bool diagnoseFailureForForcedCheckedCastExpr();
 };
 
 /// An intrusive, doubly-linked list of constraints.

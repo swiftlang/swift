@@ -1368,6 +1368,7 @@ expr(expr), CS(cs) {
     // first one of those as well.
     if ((!conversionConstraint || constraint->isFavored()) &&
         (constraint->getKind() == ConstraintKind::Conversion ||
+         constraint->getKind() == ConstraintKind::ExplicitConversion ||
          constraint->getKind() == ConstraintKind::ArgumentTupleConversion)) {
           conversionConstraint = constraint;
         }
@@ -2027,12 +2028,20 @@ bool FailureDiagnosis::diagnoseFailureForCoerceExpr() {
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
   CoerceExpr *coerceExpr = dyn_cast<CoerceExpr>(expr);
 
+  Expr *subExpr = coerceExpr->getSubExpr();
+  Type subType = getTypeOfIndependentSubExpression(subExpr);
+  if (isErrorTypeKind(subType)) {
+    return true;
+  }
+
   std::pair<Type, Type> conversionTypes(nullptr, nullptr);
-  if (conversionConstraint) {
+  if (conversionConstraint &&
+      conversionConstraint->getKind() == ConstraintKind::ExplicitConversion &&
+      conversionConstraint->getLocator()->getAnchor() == expr) {
     conversionTypes = getBoundTypesFromConstraint(CS, coerceExpr,
                                                        conversionConstraint);
   } else {
-    conversionTypes.first = coerceExpr->getSubExpr()->getType();
+    conversionTypes.first = subType->getLValueOrInOutObjectType();
     conversionTypes.second = coerceExpr->getType();
   }
 
@@ -2062,6 +2071,39 @@ bool FailureDiagnosis::diagnoseFailureForCoerceExpr() {
                     Failure::TypesNotConvertible - Failure::TypesNotEqual,
                     conversionTypes.first, conversionTypes.second)
       .highlight(coerceExpr->getSourceRange());
+    return true;
+  }
+
+  return diagnoseGeneralFailure();
+}
+
+bool FailureDiagnosis::diagnoseFailureForForcedCheckedCastExpr() {
+  assert(expr->getKind() == ExprKind::ForcedCheckedCast);
+  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
+  ForcedCheckedCastExpr *castExpr = dyn_cast<ForcedCheckedCastExpr>(expr);
+
+  Expr *subExpr = castExpr->getSubExpr();
+  Type subType = getTypeOfIndependentSubExpression(subExpr);
+  if (isErrorTypeKind(subType)) {
+    return true;
+  }
+
+  std::pair<Type, Type> conversionTypes(nullptr, nullptr);
+  if (conversionConstraint &&
+      conversionConstraint->getKind() == ConstraintKind::CheckedCast &&
+      conversionConstraint->getLocator()->getAnchor() == expr) {
+    conversionTypes = getBoundTypesFromConstraint(CS, castExpr,
+                                                       conversionConstraint);
+  } else {
+    conversionTypes.first = subType->getLValueOrInOutObjectType();
+    conversionTypes.second = castExpr->getType();
+  }
+
+  if (conversionTypes.first && conversionTypes.second) {
+    CS->TC.diagnose(castExpr->getLoc(), diag::invalid_relation,
+                    Failure::TypesNotConvertible - Failure::TypesNotEqual,
+                    conversionTypes.first, conversionTypes.second)
+      .highlight(castExpr->getSourceRange());
     return true;
   }
 
