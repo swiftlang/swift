@@ -73,6 +73,8 @@ ERROR(error_no_input_files,driver,none,
 ERROR(error_unknown_file_type,driver,none,
       "unexpected input file: %0", (StringRef))
 
+ERROR(error_unknown_target,driver,none,
+      "unknown target '%0'", (StringRef))
 ERROR(error_invalid_arch,driver,none,
       "invalid target architecture '%0'", (StringRef))
 

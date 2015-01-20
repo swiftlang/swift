@@ -285,7 +285,7 @@ public:
   void printHelp(bool ShowHidden) const;
 
 private:
-  const ToolChain &getToolChain(const llvm::opt::ArgList &Args,
+  const ToolChain *getToolChain(const llvm::opt::ArgList &Args,
                                 StringRef DarwinArchName = "") const;
 
   /// Parse the driver kind.

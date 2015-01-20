@@ -122,7 +122,7 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
 
   // Check minimum supported OS versions.
   if (const Arg *A = Args.getLastArg(options::OPT_target)) {
-    llvm::Triple triple(A->getValue());
+    llvm::Triple triple(llvm::Triple::normalize(A->getValue()));
     if (triple.isMacOSX()) {
       if (triple.isMacOSXVersionLT(10, 9))
         diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
@@ -187,29 +187,34 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     translateInputArgs(*ArgList));
 
   if (const Arg *A = ArgList->getLastArg(options::OPT_target))
-    DefaultTargetTriple = A->getValue();
-
-  const ToolChain &TC = getToolChain(*ArgList);
+    DefaultTargetTriple = llvm::Triple::normalize(A->getValue());
 
   validateArgs(Diags, *TranslatedArgList);
 
   if (Diags.hadAnyError())
     return nullptr;
+  
+  const ToolChain *TC = getToolChain(*ArgList);
+  if (!TC) {
+    Diags.diagnose(SourceLoc(), diag::error_unknown_target,
+                   ArgList->getLastArg(options::OPT_target)->getValue());
+    return nullptr;
+  }
 
-  if (!handleImmediateArgs(*TranslatedArgList, TC)) {
+  if (!handleImmediateArgs(*TranslatedArgList, *TC)) {
     return nullptr;
   }
 
   // Construct the list of inputs.
   InputList Inputs;
-  buildInputs(TC, *TranslatedArgList, Inputs);
+  buildInputs(*TC, *TranslatedArgList, Inputs);
 
   if (Diags.hadAnyError())
     return nullptr;
 
   // Determine the OutputInfo for the driver.
   OutputInfo OI;
-  buildOutputInfo(TC, *TranslatedArgList, Inputs, OI);
+  buildOutputInfo(*TC, *TranslatedArgList, Inputs, OI);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -239,7 +244,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
 
   // Construct the graph of Actions.
   ActionList Actions;
-  buildActions(TC, *TranslatedArgList, Inputs, OI, OFM.get(), ArgsHash,
+  buildActions(*TC, *TranslatedArgList, Inputs, OI, OFM.get(), ArgsHash,
                Actions);
 
   if (Diags.hadAnyError())
@@ -270,7 +275,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
       llvm_unreachable("Unknown OutputLevel argument!");
   }
 
-  std::unique_ptr<Compilation> C(new Compilation(*this, TC, Diags, Level,
+  std::unique_ptr<Compilation> C(new Compilation(*this, *TC, Diags, Level,
                                                  std::move(ArgList),
                                                  std::move(TranslatedArgList),
                                                  ArgsHash,
@@ -1764,7 +1769,7 @@ static llvm::Triple computeTargetTriple(DiagnosticEngine &diags,
                                         StringRef DarwinArchName) {
   // FIXME: need to check -target for overrides
 
-  llvm::Triple target(llvm::Triple::normalize(DefaultTargetTriple));
+  llvm::Triple target(DefaultTargetTriple);
 
   // Handle Darwin-specific options available here.
   if (target.isOSDarwin()) {
@@ -1778,7 +1783,7 @@ static llvm::Triple computeTargetTriple(DiagnosticEngine &diags,
   return target;
 }
 
-const ToolChain &Driver::getToolChain(const ArgList &Args,
+const ToolChain *Driver::getToolChain(const ArgList &Args,
                                       StringRef DarwinArchName) const {
   llvm::Triple Target = computeTargetTriple(Diags, DefaultTargetTriple, Args,
                                             DarwinArchName);
@@ -1795,8 +1800,8 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
       TC = new toolchains::Linux(*this, Target);
       break;
     default:
-      llvm_unreachable("No tool chain available for Triple");
+      TC = nullptr;
     }
   }
-  return *TC;
+  return TC;
 }

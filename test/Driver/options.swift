@@ -105,3 +105,6 @@
 
 // RUN: %swift_driver -g -### %s 2>&1 | FileCheck -check-prefix=OPTIONS_BEFORE_FILE %s
 // OPTIONS_BEFORE_FILE: -g
+
+// RUN: not %swift_driver -target abc -### %s 2>&1 | FileCheck -check-prefix=BAD_TARGET %s
+// BAD_TARGET: error: unknown target 'abc'
