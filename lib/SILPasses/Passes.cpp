@@ -276,7 +276,8 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   PM.resetAndRemoveTransformations("LateLoopOpt");
   AddLowLevelLoopOptPasses(PM);
-  PM.add(createLateDeadFunctionElimination());
+  PM.add(createExternalFunctionDefinitionsElimination());
+  PM.add(createDeadFunctionElimination());
   PM.runOneIteration();
 
   // Call the CFG viewer.
