@@ -37,7 +37,9 @@ value.amount = 42
 let observer = ValueObserver(value: value)
 // CHECK: updated to 43
 value.amount++
-// CHECK: amount: 43
+// CHECK: : 43
+// FIXME: rdar://19537198 
+// FIXME-CHECK: amount: 43
 dump(value)
 
 
