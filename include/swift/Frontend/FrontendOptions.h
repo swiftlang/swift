@@ -134,6 +134,10 @@ public:
   /// Indicates that the input(s) should be parsed as the Swift stdlib.
   bool ParseStdlib = false;
 
+  /// If set, emitted module files will always contain options for the
+  /// debugger to use.
+  bool AlwaysSerializeDebuggingOptions = false;
+
   /// If set, dumps wall time taken to check each function body to llvm::errs().
   bool DebugTimeFunctionBodies = false;
 

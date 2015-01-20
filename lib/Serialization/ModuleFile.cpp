@@ -690,6 +690,12 @@ ModuleFile::ModuleFile(
           Bits.HasUnderlyingModule = hasUnderlyingModule;
           break;
         }
+        case input_block::SEARCH_PATH: {
+          bool isFramework;
+          input_block::SearchPathLayout::readRecord(scratch, isFramework);
+          SearchPaths.push_back({blobData, isFramework});
+          break;
+        }
         default:
           // Unknown input kind, possibly for use by a future version of the
           // module format.
@@ -876,13 +882,22 @@ ModuleStatus ModuleFile::associateWithFileContext(FileUnit *file,
     return error(ModuleStatus::TargetTooNew);
   }
 
+  auto clangImporter = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+
+  for (const auto &searchPathPair : SearchPaths) {
+    if (searchPathPair.second) {
+      ctx.SearchPathOpts.FrameworkSearchPaths.push_back(searchPathPair.first);
+    } else {
+      ctx.SearchPathOpts.ImportSearchPaths.push_back(searchPathPair.first);
+    }
+    clangImporter->addSearchPath(searchPathPair.first, searchPathPair.second);
+  }
+
   bool missingDependency = false;
   for (auto &dependency : Dependencies) {
     assert(!dependency.isLoaded() && "already loaded?");
 
     if (dependency.isHeader()) {
-      auto clangImporter =
-        static_cast<ClangImporter *>(ctx.getClangModuleLoader());
       // The path may be empty if the file being loaded is a partial AST,
       // and the current compiler invocation is a merge-modules step.
       if (!dependency.RawPath.empty()) {

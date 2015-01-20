@@ -37,6 +37,7 @@ namespace swift {
     bool AutolinkForceLoad = false;
     bool HasUnderlyingModule = false;
     bool SerializeAllSIL = false;
+    bool SerializeOptionsForDebugging = false;
   };
 
 } // end namespace swift

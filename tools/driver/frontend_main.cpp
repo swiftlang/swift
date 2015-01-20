@@ -480,6 +480,13 @@ static bool performCompile(CompilerInstance &Instance,
       if (!IRGenOpts.ForceLoadSymbolName.empty())
         serializationOpts.AutolinkForceLoad = true;
       serializationOpts.HasUnderlyingModule = opts.ImportUnderlyingModule;
+
+      // Options contain information about the developer's computer,
+      // so only serialize them if the module isn't going to be shipped to
+      // the public.
+      serializationOpts.SerializeOptionsForDebugging =
+          !moduleIsPublic || opts.AlwaysSerializeDebuggingOptions;
+
       serialize(DC, serializationOpts, SM.get());
     }
 

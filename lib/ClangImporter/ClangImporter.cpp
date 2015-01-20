@@ -495,6 +495,25 @@ ClangImporter::create(ASTContext &ctx,
   return importer;
 }
 
+bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework) {
+  clang::FileManager &fileMgr = Impl.Instance->getFileManager();
+  const clang::DirectoryEntry *entry = fileMgr.getDirectory(newSearchPath);
+  if (!entry)
+    return true;
+
+  auto &headerSearchInfo = Impl.getClangPreprocessor().getHeaderSearchInfo();
+  headerSearchInfo.AddSearchPath({entry, clang::SrcMgr::C_User, isFramework},
+                                 /*isAngled=*/true);
+
+  // In addition to changing the current preprocessor directly, we still need
+  // to change the options structure for future module-building.
+  Impl.Instance->getHeaderSearchOpts().AddPath(newSearchPath,
+                                               clang::frontend::Angled,
+                                               isFramework,
+                                               /*ignoreSysroot=*/true);
+  return false;
+}
+
 void ClangImporter::Implementation::importHeader(
     Module *adapter, StringRef headerName, SourceLoc diagLoc,
     std::unique_ptr<llvm::MemoryBuffer> sourceBuffer) {

@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 167; // Last change: include target
+const uint16_t VERSION_MINOR = 168; // Last change: search paths
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -392,7 +392,8 @@ namespace input_block {
     LINK_LIBRARY,
     IMPORTED_HEADER,
     IMPORTED_HEADER_CONTENTS,
-    MODULE_FLAGS
+    MODULE_FLAGS,
+    SEARCH_PATH
   };
 
   using SourceFileLayout = BCRecordLayout<
@@ -432,6 +433,12 @@ namespace input_block {
   using ModuleFlagsLayout = BCRecordLayout<
     MODULE_FLAGS,
     BCFixed<1> // has underlying module?
+  >;
+
+  using SearchPathLayout = BCRecordLayout<
+    SEARCH_PATH,
+    BCFixed<1>, // framework?
+    BCBlob      // path
   >;
 }
 

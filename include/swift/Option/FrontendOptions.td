@@ -77,6 +77,9 @@ def disable_objc_attr_requires_foundation_module :
 def print_clang_stats : Flag<["-"], "print-clang-stats">,
   HelpText<"Print Clang importer statistics">;
 
+def serialize_debugging_options : Flag<["-"], "serialize-debugging-options">,
+  HelpText<"Always serialize options for debugging (default: only for apps)">;
+
 } // end let Flags = [FrontendOption, NoDriverOption]
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;

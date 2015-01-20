@@ -320,6 +320,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(input_block, IMPORTED_HEADER);
   BLOCK_RECORD(input_block, IMPORTED_HEADER_CONTENTS);
   BLOCK_RECORD(input_block, MODULE_FLAGS);
+  BLOCK_RECORD(input_block, SEARCH_PATH);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
 #define RECORD(X) BLOCK_RECORD(decls_block, X);
@@ -507,6 +508,15 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   input_block::ImportedHeaderLayout ImportedHeader(Out);
   input_block::ImportedHeaderContentsLayout ImportedHeaderContents(Out);
   input_block::ModuleFlagsLayout ModuleFlags(Out);
+  input_block::SearchPathLayout SearchPath(Out);
+
+  if (options.SerializeOptionsForDebugging) {
+    const SearchPathOptions &searchPathOpts = M->Ctx.SearchPathOpts;
+    for (auto &path : searchPathOpts.ImportSearchPaths)
+      SearchPath.emit(ScratchRecord, /*framework=*/false, path);
+    for (auto &path : searchPathOpts.FrameworkSearchPaths)
+      SearchPath.emit(ScratchRecord, /*framework=*/true, path);
+  }
 
   for (auto filename : options.InputFilenames) {
     llvm::SmallString<128> path(filename);
