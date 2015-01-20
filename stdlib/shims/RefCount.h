@@ -165,13 +165,17 @@ class StrongRefCount {
   // is set.  During deallocation the reference count is undefined.
   bool isUniquelyReferencedOrPinned() const {
     auto value = __atomic_load_n(&refCount, __ATOMIC_RELAXED);
-    // Rotating right by one sets the sign bit to the pinned bit.
-    // The dealloc flag is the least significant bit followed by the reference
-    // count. A reference count of two or higher means that our value is bigger
-    // than 3 if the pinned bit is not set. If the pinned bit is set the value
-    // is negative.
-    auto rotateRightByOne = ((value >> 1) | (value << (sizeof(value) * 8 - 1)));
-    return ((int32_t)rotateRightByOne) < 4;
+    // Rotating right by one sets the sign bit to the pinned bit. After
+    // rotation, the dealloc flag is the least significant bit followed by the
+    // reference count. A reference count of two or higher means that our value
+    // is bigger than 3 if the pinned bit is not set. If the pinned bit is set
+    // the value is negative.
+    // Note: Because we are using the sign bit for testing pinnedness it
+    // is important to do a signed comparison below.
+    static_assert(RC_PINNED_FLAG == 1,
+                  "The pinned flag must be the lowest bit");
+    auto rotateRightByOne = ((value >> 1) | (value << 31));
+    return (int32_t)rotateRightByOne < (int32_t)RC_ONE;
   }
 
   // Return true if the object is inside deallocation.
