@@ -93,8 +93,7 @@ public:
                          Explosion &targetExplosion) const = 0;
 
   /// Shift values from the source explosion to the target explosion
-  /// as if by copy-initialization.  This operation may also shift
-  /// explosion levels.
+  /// as if by copy-initialization.
   virtual void copy(IRGenFunction &IGF, Explosion &sourceExplosion,
                     Explosion &targetExplosion) const = 0;
   
