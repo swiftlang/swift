@@ -436,3 +436,11 @@ protocol ShouldntCrash {
   var propertyWithoutType { get } // expected-error {{type annotation missing in pattern}} expected-error {{computed property must have an explicit type}}
 }
 
+// rdar://problem/18168866
+protocol FirstProtocol {
+    weak var delegate : SecondProtocol? { get } // expected-error{{'weak' cannot be applied to non-class type 'SecondProtocol'}}
+}
+
+protocol SecondProtocol {
+    func aMethod(object : FirstProtocol)
+}
