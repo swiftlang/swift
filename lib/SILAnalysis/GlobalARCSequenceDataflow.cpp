@@ -146,8 +146,8 @@ void ARCBBState::mergeSuccBottomUp(ARCBBState &SuccBBState) {
   for (std::pair<SILValue, BottomUpRefCountState> &Pair : getBottomupStates()) {
     SILValue RefCountedValue = Pair.first;
 
-    // If our SILValue was blotted, skip it. This will be ignored in the rest of
-    // the optimizer.
+    // If our SILValue was blotted, skip it. This will be ignored for the rest
+    // of the ARC optimization.
     if (!RefCountedValue)
       continue;
 
@@ -165,17 +165,13 @@ void ARCBBState::mergeSuccBottomUp(ARCBBState &SuccBBState) {
     SILValue OtherRefCountedValue = Other->first;
 
     // If the other ref count value was blotted, blot our value and continue.
-    // This has the effect of an intersection.
+    // This has the effect of an intersection since we already checked earlier
+    // that RefCountedValue was not blotted.
     if (!OtherRefCountedValue) {
       PtrToBottomUpState.blot(RefCountedValue);
       continue;
     }
 
-    // Ok, so now we know that the ref counted value we are tracking was not
-    // blotted on either side. Now we need to make sure that none of the ref
-    // count modifiers that we are tracking are reachable from any other to
-    // prevent our set from dynamically representing more than one reference
-    // count.
     BottomUpRefCountState &RefCountState = Pair.second;
     BottomUpRefCountState &OtherRefCountState = Other->second;
 
@@ -188,7 +184,7 @@ void ARCBBState::mergeSuccBottomUp(ARCBBState &SuccBBState) {
 
 /// Initialize this BB with the state of the successor basic block. This is
 /// called on a basic block's state and then any other successors states are
-/// merged in. This is currently a stub.
+/// merged in.
 void ARCBBState::initSuccBottomUp(ARCBBState &SuccBBState) {
   PtrToBottomUpState = SuccBBState.PtrToBottomUpState;
 }
@@ -205,9 +201,9 @@ void ARCBBState::mergePredTopDown(ARCBBState &PredBBState) {
       continue;
 
     // Then attempt to lookup the corresponding (SILValue, TopDownState) from
-    // SuccBB. If we fail to do so, blot this SILValue and continue.
+    // PredBB. If we fail to do so, blot this SILValue and continue.
     //
-    // Since we are already initialized by initSuccTopDown(), this has the
+    // Since we are already initialized by initPredTopDown(), this has the
     // effect of an intersection.
     auto Other = PredBBState.PtrToTopDownState.find(RefCountedValue);
     if (Other == PredBBState.PtrToTopDownState.end()) {
@@ -225,13 +221,15 @@ void ARCBBState::mergePredTopDown(ARCBBState &PredBBState) {
     }
 
     // Ok, so now we know that the ref counted value we are tracking was not
-    // blotted on either side. Now we need to make sure that none of the ref
-    // count modifiers that we are tracking are reachable from any other to
-    // prevent our set from dynamically representing more than one reference
-    // count.
+    // blotted on either side. Grab the states.
     TopDownRefCountState &RefCountState = Pair.second;
     TopDownRefCountState &OtherRefCountState = Other->second;
 
+    // We create states for specific arguments when processing top down. If we
+    // have one ref count state that has seen a ref count and a different one
+    // that was initialized with an argument but has not seen a ref count value,
+    // we don't want to merge them. Instead we blot since this is a form of
+    // partial merging that we do not support.
     if (RefCountState.Argument.isNull() != OtherRefCountState.Argument.isNull()) {
       DEBUG(llvm::dbgs() << "Can not merge arg and non-arg path!\n");
       PtrToTopDownState.blot(RefCountedValue);
@@ -242,14 +240,14 @@ void ARCBBState::mergePredTopDown(ARCBBState &PredBBState) {
     // of instructions which together semantically act as one ref count
     // increment. Merge the two states together.
     RefCountState.merge(OtherRefCountState);
-    DEBUG(llvm::dbgs() << "                Partial: " << (RefCountState.isPartial()?"yes":"no")
-          << "\n");
+    DEBUG(llvm::dbgs() << "                Partial: "
+                       << (RefCountState.isPartial()?"yes":"no") << "\n");
   }
 }
 
 /// Initialize the state for this BB with the state of its predecessor
 /// BB. Used to create an initial state before we merge in other
-/// predecessors. This is currently a stub.
+/// predecessors.
 void ARCBBState::initPredTopDown(ARCBBState &PredBBState) {
   PtrToTopDownState = PredBBState.PtrToTopDownState;
 }
@@ -278,9 +276,11 @@ bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
   KnownSafe &= Other.KnownSafe;
 
   // If we're doing a merge on a path that's previously seen a partial merge,
-  // conservatively drop the sequence, to avoid doing partial RR
-  // elimination. If the branch predicates for the two merge differ, mixing
-  // them is unsafe since they are not control dependent.
+  // conservatively drop the sequence, to avoid doing partial RR elimination. If
+  // the branch predicates for the two merge differ, mixing them is unsafe since
+  // they are not control dependent.
+  //
+  // TODO: Add support for determining control dependence.
   if (LatState == TopDownRefCountState::LatticeState::None) {
     clear();
     DEBUG(llvm::dbgs() << "            Found LatticeState::None. "
@@ -330,9 +330,11 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
   KnownSafe &= Other.KnownSafe;
 
   // If we're doing a merge on a path that's previously seen a partial merge,
-  // conservatively drop the sequence, to avoid doing partial RR
-  // elimination. If the branch predicates for the two merge differ, mixing
-  // them is unsafe since they are not control dependent.
+  // conservatively drop the sequence, to avoid doing partial RR elimination. If
+  // the branch predicates for the two merge differ, mixing them is unsafe since
+  // they are not control dependent.
+  //
+  // TODO: Add support for working around control dependence issues.
   if (LatState == BottomUpRefCountState::LatticeState::None) {
     DEBUG(llvm::dbgs() << "            Found LatticeState::None. "
                           "Clearing State!\n");
@@ -374,9 +376,13 @@ static bool processBBTopDown(
   bool NestingDetected = false;
 
   // If the current BB is the entry BB, initialize a state corresponding to each
-  // of its owned parameters.
+  // of its owned parameters. This enables us to know that if we see a retain
+  // before any decrements that the retain is known safe.
   //
-  // TODO: Handle gauranteed parameters.
+  // We do not handle guaranteed parameters here since those are handled in the
+  // code in GlobalARCPairingAnalysis. This is because even if we don't do
+  // anything, we will still pair the retain, releases and then the guaranteed
+  // parameter will ensure it is known safe to remove them.
   if (&BB == &*BB.getParent()->begin()) {
     auto Args = BB.getBBArgs();
     auto SignatureParams =
@@ -400,6 +406,8 @@ static bool processBBTopDown(
 
     DEBUG(llvm::dbgs() << "VISITING:\n    " << I);
 
+    // If we see an autorelease pool call, be conservative and clear all state
+    // that we are currently tracking in the BB.
     if (isAutoreleasePoolCall(I)) {
       BBState.clear();
       continue;
@@ -430,20 +438,21 @@ static bool processBBTopDown(
 
       DEBUG(llvm::dbgs() << "    REF COUNT DECREMENT!\n");
 
-      // If the state is already initialized to contain a reference count
-      // increment of the same type (i.e. retain_value, release_value or
-      // strong_retain, strong_release), then remove the state from the map
-      // and add the retain/release pair to the delete list and continue.
+      // If we are tracking an increment on the ref count root associated with
+      // the decrement and the decrement matches, pair this decrement with a
+      // copy of the increment state and then clear the original increment state
+      // so that we are ready to process further values.
       if (RefCountState.isRefCountInstMatchedToTrackedInstruction(&I)) {
         // Copy the current value of ref count state into the result map.
         DecToIncStateMap[&I] = RefCountState;
         DEBUG(llvm::dbgs() << "    MATCHING INCREMENT:\n"
                            << RefCountState.getValue());
 
-        // Clear the ref count state in case we see more operations on this
-        // ref counted value. This is for safety reasons.
+        // Clear the ref count state in preparation for more pairs.
         RefCountState.clear();
-      } else {
+      }
+#if NDEBUG
+      else {
         if (RefCountState.isTrackingRefCountInst()) {
           DEBUG(llvm::dbgs() << "    FAILED MATCH INCREMENT:\n"
                              << RefCountState.getValue());
@@ -451,6 +460,7 @@ static bool processBBTopDown(
           DEBUG(llvm::dbgs() << "    FAILED MATCH. NO INCREMENT.\n");
         }
       }
+#endif
 
       // Otherwise we continue processing the reference count decrement to
       // see if the decrement can affect any other pointers that we are
@@ -459,7 +469,9 @@ static bool processBBTopDown(
 
     // For all other [(SILValue, TopDownState)] we are tracking...
     for (auto &OtherState : BBState.getTopDownStates()) {
-      // If the state we are visiting is for the pointer we just visited, bail.
+      // If we visited an increment or decrement successfully (and thus Op is
+      // set), if this is the state for this operand, skip it. We already
+      // processed it.
       if (Op && OtherState.first == Op)
         continue;
 
@@ -472,7 +484,7 @@ static bool processBBTopDown(
         continue;
 
       // Check if the instruction we are visiting could potentially decrement
-      // the reference counted value we are tracking... in a manner that could
+      // the reference counted value we are tracking in a manner that could
       // cause us to change states. If we do change states continue...
       if (OtherState.second.handlePotentialDecrement(&I, AA)) {
         DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
@@ -569,6 +581,15 @@ bool swift::ARCSequenceDataflowEvaluator::processTopDown() {
 ///
 /// NestingDetected will be set to indicate that the block needs to be
 /// reanalyzed if code motion occurs.
+///
+/// An epilogue release is a release that post dominates all other uses of a
+/// pointer in a function that implies that the pointer is alive up to that
+/// point. We "freeze" (i.e. do not attempt to remove or move) such releases if
+/// FreezeOwnedArgEpilogueReleases is set. This is useful since in certain cases
+/// due to dataflow issues, we can not properly propagate the last use
+/// information. Instead we run an extra iteration of the ARC optimizer with
+/// this enabled in a side table so the information gets propgated everywhere in
+/// the CFG.
 bool
 swift::ARCSequenceDataflowEvaluator::
 processBBBottomUp(ARCBBState &BBState, bool FreezeOwnedArgEpilogueReleases) {
@@ -584,6 +605,7 @@ processBBBottomUp(ARCBBState &BBState, bool FreezeOwnedArgEpilogueReleases) {
 
     DEBUG(llvm::dbgs() << "VISITING:\n    " << I);
 
+    // If we see an autorelease pool, be conservative and clear *everything*.
     if (isAutoreleasePoolCall(I)) {
       BBState.clear();
       continue;
@@ -596,6 +618,7 @@ processBBBottomUp(ARCBBState &BBState, bool FreezeOwnedArgEpilogueReleases) {
       continue;
 
     SILValue Op;
+
     // If I is a ref count decrement instruction...
     if (isRefCountDecrement(I)) {
       // map its operand to a newly initialized or reinitialized ref count
@@ -604,7 +627,8 @@ processBBBottomUp(ARCBBState &BBState, bool FreezeOwnedArgEpilogueReleases) {
       BottomUpRefCountState &State = BBState.getBottomUpRefCountState(Op);
       NestingDetected |= State.initWithInst(&I);
 
-      // If we know that this decrement is on the same SILValue.
+      // If we are running with 'frozen' owned arg releases, check if we have a
+      // frozen use in the side table. If so, this release must be known safe.
       if (FreezeOwnedArgEpilogueReleases) {
         State.KnownSafe |= ConsumedArgToReleaseMap.argumentHasRelease(Op);
       }
@@ -625,20 +649,22 @@ processBBBottomUp(ARCBBState &BBState, bool FreezeOwnedArgEpilogueReleases) {
 
       DEBUG(llvm::dbgs() << "    REF COUNT INCREMENT!\n");
 
-      // If the state is already initialized to contain a reference count
-      // increment of the same type (i.e. retain_value, release_value or
-      // strong_retain, strong_release), then remove the state from the map
-      // and add the retain/release pair to the delete list and continue.
+      // If we find a state initialized with a matching increment, pair this
+      // decrement with a copy of the ref count state and then clear the ref
+      // count state in preparation for any future pairs we may see on the same
+      // pointer.
       if (RefCountState.isRefCountInstMatchedToTrackedInstruction(&I)) {
         // Copy the current value of ref count state into the result map.
         IncToDecStateMap[&I] = RefCountState;
         DEBUG(llvm::dbgs() << "    MATCHING DECREMENT:"
                            << RefCountState.getValue());
 
-        // Clear the ref count state in case we see more operations on this
-        // ref counted value. This is for safety reasons.
+        // Clear the ref count state so it can be used for future pairs we may
+        // see.
         RefCountState.clear();
-      } else {
+      }
+#ifndef NDEBUG
+      else {
         if (RefCountState.isTrackingRefCountInst()) {
           DEBUG(llvm::dbgs()
                 << "    FAILED MATCH DECREMENT:" << RefCountState.getValue());
@@ -647,6 +673,7 @@ processBBBottomUp(ARCBBState &BBState, bool FreezeOwnedArgEpilogueReleases) {
                                 "decrement.\n");
         }
       }
+#endif
 
       // Otherwise we continue processing the reference count decrement to
       // see if the increment can act as a use for other values.
