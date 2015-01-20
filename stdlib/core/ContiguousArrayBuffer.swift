@@ -381,12 +381,6 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     return __bufferPointer.holdsUniqueReference()
   }
 
-  /// Returns true iff this buffer is mutable. NOTE: a true result
-  /// does not mean the buffer is uniquely-referenced.
-  public func isMutable() -> Bool {
-    return true
-  }
-
 #if _runtime(_ObjC)
   /// Convert to an NSArray.
   /// Precondition: T is bridged to Objective-C
