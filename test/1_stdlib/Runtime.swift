@@ -1256,6 +1256,9 @@ Reflection.test("Unmanaged/nil") {
   expectEqual(expected, output)
 }
 
+#if os(iOS) && arch(arm64)
+// FIXME: rdar://19537198
+#else
 Reflection.test("Unmanaged/not-nil") {
   var output = ""
   var optionalURL: Unmanaged<CFURL>? =
@@ -1271,6 +1274,7 @@ Reflection.test("Unmanaged/not-nil") {
 
   optionalURL!.release()
 }
+#endif
 
 Reflection.test("TupleMirror/NoLeak") {
   if true {
