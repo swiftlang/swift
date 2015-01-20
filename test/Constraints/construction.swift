@@ -124,3 +124,7 @@ s1 = S1(i: 5)
 
 var s2 = getMetatype(3.14)(i: 5)
 s2 = S2(i: 5)
+
+// rdar://problem/19254404
+let i32 = Int32(123123123)
+Int(i32 - 2 + 1)
