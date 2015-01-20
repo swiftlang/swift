@@ -927,6 +927,7 @@ func _createUniqueMutableBuffer<_Buffer: _ArrayBufferType>(
   return _forceCreateUniqueMutableBuffer(&source, newCount, requiredCapacity)
 }
 
+@inline(never)
 func _forceCreateUniqueMutableBuffer<_Buffer: _ArrayBufferType>(
   inout source: _Buffer, newCount: Int, requiredCapacity: Int
 ) -> _ContiguousArrayBuffer<_Buffer.Element> {
