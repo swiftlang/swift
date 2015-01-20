@@ -170,7 +170,7 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: - (struct FooStruct1)tagStruct;
 // CHECK-NEXT: - (enum Tribool)tagEnum;
 // CHECK-NEXT: - (FooStructTypedef2)anonStructTypedef;
-// CHECK-NEXT: - (CFTypeRef)cf:(CFTreeRef)x str:(CFStringRef)str str2:(CFMutableStringRef)str2;
+// CHECK-NEXT: - (CFTypeRef)cf:(CFTreeRef)x str:(CFStringRef)str str2:(CFMutableStringRef)str2 obj:(CFAliasForTypeRef)obj;
 // CHECK-NEXT: - (void)appKitInImplementation;
 // CHECK-NEXT: - (NSURL * __nullable)returnsURL;
 // CHECK-NEXT: init
@@ -191,7 +191,7 @@ typealias AliasForNSRect = NSRect
   func tagEnum() -> Tribool { return True }
   func anonStructTypedef() -> FooStructTypedef2 { return FooStructTypedef2(x: 0, y: 0) }
 
-  func cf(x: CFTree, str: CFString, str2: CFMutableString) -> CFTypeRef? { return nil }
+  func cf(x: CFTree, str: CFString, str2: CFMutableString, obj: CFAliasForType) -> CFTypeRef? { return nil }
 
   func appKitInImplementation() {
     let _ : NSResponder? = nil

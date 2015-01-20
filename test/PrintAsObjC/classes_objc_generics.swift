@@ -168,7 +168,7 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: - (NSArray * __nullable)maybeArray;
 // CHECK-NEXT: - (enum NSRuncingMode)someEnum;
 // CHECK-NEXT: - (NSZone *)zone;
-// CHECK-NEXT: - (CFTypeRef)cf:(CFTreeRef)x str:(CFStringRef)str str2:(CFMutableStringRef)str2;
+// CHECK-NEXT: - (CFTypeRef)cf:(CFTreeRef)x str:(CFStringRef)str str2:(CFMutableStringRef)str2 obj:(CFAliasForTypeRef)obj;
 // CHECK-NEXT: - (void)appKitInImplementation;
 // CHECK-NEXT: - (NSURL * __nullable)returnsURL;
 // CHECK-NEXT: init
@@ -185,7 +185,7 @@ typealias AliasForNSRect = NSRect
 
   func zone() -> NSZone { return nil }
 
-  func cf(x: CFTree, str: CFString, str2: CFMutableString) -> CFTypeRef? { return nil }
+  func cf(x: CFTree, str: CFString, str2: CFMutableString, obj: CFAliasForType) -> CFTypeRef? { return nil }
 
   func appKitInImplementation() {
     let _ : NSResponder? = nil

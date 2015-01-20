@@ -14,6 +14,8 @@ typedef struct __attribute__((objc_bridge(NSString))) __CFString const *CFString
 typedef struct __CFTree *CFTreeRef;
 typedef const struct __attribute__((objc_bridge(CFURL))) __CFURL * CFURLRef;
 
+typedef CFTypeRef CFAliasForTypeRef;
+
 
 typedef signed long CFIndex;
 extern CFIndex CFIndex_test;

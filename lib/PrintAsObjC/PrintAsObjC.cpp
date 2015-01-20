@@ -563,7 +563,12 @@ private:
                              optionalKind))
       return;
 
-    if (alias->hasClangNode() || alias->isObjC()) {
+    if (alias->hasClangNode()) {
+      os << cast<clang::NamedDecl>(alias->getClangDecl())->getName();
+      return;
+    }
+
+    if (alias->isObjC()) {
       os << alias->getName();
       return;
     }
@@ -1068,10 +1073,11 @@ public:
     state.second = true;
   }
 
-  void forwardDeclare(const ClassDecl *CD) {
+  bool forwardDeclare(const ClassDecl *CD) {
     if (!CD->isObjC() || CD->isForeign())
-      return;
+      return false;
     forwardDeclare(CD, [&]{ os << "@class " << CD->getName() << ";\n"; });
+    return true;
   }
 
   void forwardDeclare(const ProtocolDecl *PD) {
@@ -1114,9 +1120,13 @@ public:
       ReferencedTypeFinder::walk(VD->getType(),
                                  [this](ReferencedTypeFinder &finder,
                                         const TypeDecl *TD) {
-        if (auto CD = dyn_cast<ClassDecl>(TD))
-          forwardDeclare(CD);
-        else if (auto PD = dyn_cast<ProtocolDecl>(TD))
+        if (auto CD = dyn_cast<ClassDecl>(TD)) {
+          if (!forwardDeclare(CD)) {
+            bool didAddImport = addImport(CD);
+            assert(didAddImport && "local class is not forward-declarable");
+            (void)didAddImport;
+          }
+        } else if (auto PD = dyn_cast<ProtocolDecl>(TD))
           forwardDeclare(PD);
         else if (auto ED = dyn_cast<EnumDecl>(TD))
           forwardDeclare(ED);
