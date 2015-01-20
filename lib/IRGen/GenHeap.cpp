@@ -21,6 +21,7 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Intrinsics.h"
 
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ABI/MetadataValues.h"
 
@@ -75,6 +76,80 @@ HeapLayout::HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
 #endif
 }
 
+HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
+                                         const HeapLayout &layout) {
+  if (!layout.isFixedLayout()) {
+    // Calculate all the non-fixed layouts.
+    // TODO: We could be lazier about this.
+    llvm::Value *offset = nullptr;
+    llvm::Value *totalAlign = llvm::ConstantInt::get(IGF.IGM.SizeTy,
+                                         layout.getAlignment().getMaskValue());
+    for (unsigned i : indices(layout.getElements())) {
+      auto &elt = layout.getElements()[i];
+      auto eltTy = layout.getElementTypes()[i];
+      switch (elt.getKind()) {
+      case ElementLayout::Kind::InitialNonFixedSize:
+        // Factor the non-fixed-size field's alignment into the total alignment.
+        totalAlign = IGF.Builder.CreateOr(totalAlign,
+                                    elt.getType().getAlignmentMask(IGF, eltTy));
+        SWIFT_FALLTHROUGH;
+      case ElementLayout::Kind::Empty:
+      case ElementLayout::Kind::Fixed:
+        // Don't need to dynamically calculate this offset.
+        Offsets.push_back(nullptr);
+        break;
+      
+      case ElementLayout::Kind::NonFixed:
+        // Start calculating non-fixed offsets from the end of the first fixed
+        // field.
+        assert(i > 0 && "shouldn't begin with a non-fixed field");
+        auto &prevElt = layout.getElements()[i-1];
+        auto prevType = layout.getElementTypes()[i-1];
+        // Start calculating offsets from the last fixed-offset field.
+        if (!offset) {
+          Size lastFixedOffset = layout.getElements()[i-1].getByteOffset();
+          if (auto *fixedType = dyn_cast<FixedTypeInfo>(&prevElt.getType())) {
+            // If the last fixed-offset field is also fixed-size, we can
+            // statically compute the end of the fixed-offset fields.
+            auto fixedEnd = lastFixedOffset + fixedType->getFixedSize();
+            offset
+              = llvm::ConstantInt::get(IGF.IGM.SizeTy, fixedEnd.getValue());
+          } else {
+            // Otherwise, we need to add the dynamic size to the fixed start
+            // offset.
+            offset
+              = llvm::ConstantInt::get(IGF.IGM.SizeTy,
+                                       lastFixedOffset.getValue());
+            offset = IGF.Builder.CreateAdd(offset,
+                                     prevElt.getType().getSize(IGF, prevType));
+          }
+        }
+        
+        // Round up to alignment to get the offset.
+        auto alignMask = elt.getType().getAlignmentMask(IGF, eltTy);
+        auto notAlignMask = IGF.Builder.CreateNot(alignMask);
+        offset = IGF.Builder.CreateAdd(offset, alignMask);
+        offset = IGF.Builder.CreateAnd(offset, notAlignMask);
+        
+        Offsets.push_back(offset);
+        
+        // Advance by the field's size to start the next field.
+        offset = IGF.Builder.CreateAdd(offset,
+                                     prevElt.getType().getSize(IGF, prevType));
+        totalAlign = IGF.Builder.CreateOr(totalAlign,
+                                    elt.getType().getAlignmentMask(IGF, eltTy));
+
+        break;
+      }
+    }
+    TotalSize = offset;
+    TotalAlignMask = totalAlign;
+  } else {
+    TotalSize = layout.emitSize(IGF.IGM);
+    TotalAlignMask = layout.emitAlignMask(IGF.IGM);
+  }
+}
+
 void irgen::emitDeallocateHeapObject(IRGenFunction &IGF,
                                      llvm::Value *object,
                                      llvm::Value *size,
@@ -110,9 +185,18 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
 
   Address structAddr = layout.emitCastTo(IGF, fn->arg_begin());
 
-  // FIXME: provide non-fixed offsets
-  NonFixedOffsets offsets = None;
+  // Bind necessary bindings, if we have them.
+  if (layout.hasBindings()) {
+    // The type metadata bindings should be at a fixed offset, so we can pass
+    // None for NonFixedOffsets. If we didn't, we'd have a chicken-egg problem.
+    auto bindingsAddr = layout.getElements()[0].project(IGF, structAddr, None);
+    layout.getBindings().restore(IGF, bindingsAddr);
+  }
 
+  // Figure out the non-fixed offsets.
+  HeapNonFixedOffsets offsets(IGF, layout);
+
+  // Destroy the fields.
   for (unsigned i : indices(layout.getElements())) {
     auto &field = layout.getElements()[i];
     auto fieldTy = layout.getElementTypes()[i];
@@ -123,8 +207,8 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
                             fieldTy);
   }
 
-  emitDeallocateHeapObject(IGF, fn->arg_begin(), layout.emitSize(IGM),
-                           layout.emitAlignMask(IGM));
+  emitDeallocateHeapObject(IGF, fn->arg_begin(), offsets.getSize(),
+                           offsets.getAlignMask());
   IGF.Builder.CreateRetVoid();
 
   return fn;
@@ -183,10 +267,17 @@ llvm::Constant *HeapLayout::getPrivateMetadata(IRGenModule &IGM) const {
 }
 
 llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
-                                               const llvm::Twine &name) {
+                                               const llvm::Twine &name,
+                                           const HeapNonFixedOffsets *offsets) {
   llvm::Value *metadata = layout.getPrivateMetadata(IGM);
-  llvm::Value *size = layout.emitSize(IGM);
-  llvm::Value *alignMask = layout.emitAlignMask(IGM);
+  llvm::Value *size, *alignMask;
+  if (offsets) {
+    size = offsets->getSize();
+    alignMask = offsets->getAlignMask();
+  } else {
+    size = layout.emitSize(IGM);
+    alignMask = layout.emitAlignMask(IGM);
+  }
 
   return emitAllocObjectCall(metadata, size, alignMask, name);
 }

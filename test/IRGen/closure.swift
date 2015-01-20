@@ -22,7 +22,7 @@ protocol Ordinable {
 }
 
 func b<T : Ordinable>(var #seq: T) -> (Int) -> Int {
-  return {i in i + seq.ord() }
+  return { i in i + seq.ord() }
 }
 
 // -- Closure entry point

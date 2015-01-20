@@ -2612,7 +2612,6 @@ static void emitApplyArgument(IRGenFunction &IGF,
                         in, out);
 }
 
-
 /// Emit the forwarding stub function for a partial application.
 static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                    llvm::Function *staticFnPtr,
@@ -2677,9 +2676,6 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   };
   SmallVector<AddressToDeallocate, 4> addressesToDeallocate;
 
-  // FIXME: support
-  NonFixedOffsets offsets = None;
-  
   bool dependsOnContextLifetime = false;
   bool consumesContext;
   
@@ -2709,7 +2705,6 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     rawData = origParams.takeLast();
     Address data = layout.emitCastTo(subIGF, rawData);
 
-    // Perform the loads.
     unsigned origParamI = outType->getParameters().size();
     assert(layout.getElements().size() == conventions.size()
            && "conventions don't match context layout");
@@ -2719,11 +2714,17 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // Restore type metadata bindings, if we have them.
     if (layout.hasBindings()) {
       auto bindingLayout = layout.getElements()[i];
-      auto bindingsAddr = bindingLayout.project(subIGF, data, offsets);
+      // The bindings should be fixed-layout inside the object, so we can
+      // pass None here. If they weren't, we'd have a chicken-egg problem.
+      auto bindingsAddr = bindingLayout.project(subIGF, data, /*offsets*/ None);
       layout.getBindings().restore(subIGF, bindingsAddr);
       ++i;
     }
 
+    // Calculate non-fixed field offsets.
+    HeapNonFixedOffsets offsets(subIGF, layout);
+
+    // Perform the loads.
     for (unsigned size = layout.getElements().size(); i < size; ++i) {
       auto &fieldLayout = layout.getElements()[i];
       auto &fieldTy = layout.getElementTypes()[i];
@@ -2754,7 +2755,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         dependsOnContextLifetime = true;
         break;
       case ParameterConvention::Indirect_Inout:
-        // Load the address of the inout parameter.
+        // Load the add ress of the inout parameter.
         cast<LoadableTypeInfo>(fieldTI).loadAsCopy(subIGF, fieldAddr, param);
         break;
       case ParameterConvention::Direct_Guaranteed:
@@ -2987,11 +2988,11 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     data = IGF.IGM.RefCountedNull;
   } else {
     // Allocate a new object.
-    data = IGF.emitUnmanagedAlloc(layout, "closure");
+    HeapNonFixedOffsets offsets(IGF, layout);
+
+    data = IGF.emitUnmanagedAlloc(layout, "closure", &offsets);
     Address dataAddr = layout.emitCastTo(IGF, data);
 
-    // FIXME: preserve non-fixed offsets
-    NonFixedOffsets offsets = None;
     
     unsigned i = 0;
     

@@ -68,6 +68,31 @@ public:
   llvm::Constant *getPrivateMetadata(IRGenModule &IGM) const;
 };
 
+class HeapNonFixedOffsets : public NonFixedOffsetsImpl {
+  SmallVector<llvm::Value *, 1> Offsets;
+  llvm::Value *TotalSize;
+  llvm::Value *TotalAlignMask;
+public:
+  HeapNonFixedOffsets(IRGenFunction &IGF, const HeapLayout &layout);
+  
+  llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) override {
+    auto result = Offsets[index];
+    assert(result != nullptr
+           && "fixed-layout field doesn't need NonFixedOffsets");
+    return result;
+  }
+  
+  // The total size of the heap object.
+  llvm::Value *getSize() const {
+    return TotalSize;
+  }
+  
+  // The total alignment of the heap object.
+  llvm::Value *getAlignMask() const {
+    return TotalAlignMask;
+  }
+};
+
 /// Emit a heap object deallocation.
 void emitDeallocateHeapObject(IRGenFunction &IGF,
                               llvm::Value *object,
