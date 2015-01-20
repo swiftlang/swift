@@ -2,6 +2,10 @@
 
 // REQUIRES: CPU=x86_64
 
+// Broken due to lack of NonFixedOffsets and NecessaryBindings on HeapLayouts
+//   -JoeG
+// XFAIL: *
+
 infix operator ~> { precedence 255 }
 
 func ~> <Target, Args, Result> (
@@ -27,7 +31,7 @@ func split<Seq: Runcible>(seq: Seq)(isSeparator: Seq.Element -> Bool) { }
 var seq = Spoon()
 var x = seq ~> split
 
-// CHECK-LABEL: define internal { i8*, %swift.refcounted* } @_TPA__TF21partial_apply_generic5split{{.*}}(%V21partial_apply_generic5Spoon* noalias)
+// CHECK-LABEL: define internal { i8*, %swift.refcounted* } @_TPA__TF21partial_apply_generic5split{{.*}}(%V21partial_apply_generic5Spoon* noalias, %swift.refcounted*)
 // CHECK:         [[REABSTRACT:%.*]] = bitcast %V21partial_apply_generic5Spoon* %0 to %swift.opaque*
 // CHECK:         tail call { i8*, %swift.refcounted* } @_TF21partial_apply_generic5split{{.*}}(%swift.opaque* noalias [[REABSTRACT]],
 

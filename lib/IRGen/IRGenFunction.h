@@ -56,7 +56,6 @@ namespace irgen {
   class Explosion;
   class FunctionRef;
   class HeapLayout;
-  class HeapNonFixedOffsets;
   class IRGenModule;
   class LinkEntity;
   class Scope;
@@ -183,8 +182,7 @@ private:
 //--- Reference-counting methods -----------------------------------------------
 public:
   llvm::Value *emitUnmanagedAlloc(const HeapLayout &layout,
-                                  const llvm::Twine &name,
-                                  const HeapNonFixedOffsets *offsets = 0);
+                                  const llvm::Twine &name);
   void emitLoadAndRetain(Address addr, Explosion &explosion);
   void emitAssignRetained(llvm::Value *value, Address addr);
   void emitInitializeRetained(llvm::Value *value, Address addr);

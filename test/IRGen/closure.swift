@@ -22,7 +22,7 @@ protocol Ordinable {
 }
 
 func b<T : Ordinable>(var #seq: T) -> (Int) -> Int {
-  return { i in i + seq.ord() }
+  return {i in i + seq.ord() }
 }
 
 // -- Closure entry point
@@ -30,21 +30,19 @@ func b<T : Ordinable>(var #seq: T) -> (Int) -> Int {
 // -- partial_apply stub
 // CHECK: define internal i64 @_TPA_[[CLOSURE]](i64, %swift.refcounted*) {
 // CHECK: entry:
-// CHECK:   [[CONTEXT:%.*]] = bitcast %swift.refcounted* %1 to <{ %swift.refcounted, i128, %swift.refcounted*, %swift.opaque* }>*
-// CHECK:   [[BINDINGSADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, i128, %swift.refcounted*, %swift.opaque* }>* [[CONTEXT]], i32 0, i32 1
-// CHECK:   [[TYPEADDR:%.*]] = bitcast i128* [[BINDINGSADDR]]
-// CHECK:   [[TYPE:%.*]] = load %swift.type** [[TYPEADDR]], align 8
-// CHECK:   [[WITNESSADDR_0:%.*]] = getelementptr inbounds %swift.type** [[TYPEADDR]], i32 1
-// CHECK:   [[WITNESSADDR:%.*]] = bitcast %swift.type** [[WITNESSADDR_0]]
-// CHECK:   [[WITNESS:%.*]] = load i8*** [[WITNESSADDR]], align 8
-// CHECK:   [[BOXADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, i128, %swift.refcounted*, %swift.opaque* }>* [[CONTEXT]], i32 0, i32 2
+// CHECK:   [[CONTEXT:%.*]] = bitcast %swift.refcounted* %1 to <{ %swift.refcounted, %swift.refcounted*, %swift.opaque*, %swift.type*, i8** }>*
+// CHECK:   [[BOXADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, %swift.refcounted*, %swift.opaque*, %swift.type*, i8** }>* [[CONTEXT]], i32 0, i32 1
 // CHECK:   [[BOX:%.*]] = load %swift.refcounted** [[BOXADDR]], align 8
 // CHECK:   call void @swift_retain_noresult(%swift.refcounted* [[BOX]])
-// CHECK:   [[ADDRADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, i128, %swift.refcounted*, %swift.opaque* }>* [[CONTEXT]], i32 0, i32 3
+// CHECK:   [[ADDRADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, %swift.refcounted*, %swift.opaque*, %swift.type*, i8** }>* [[CONTEXT]], i32 0, i32 2
 // CHECK:   [[ADDR:%.*]] = load %swift.opaque** [[ADDRADDR]], align 8
+// CHECK:   [[TYPEADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, %swift.refcounted*, %swift.opaque*, %swift.type*, i8** }>* [[CONTEXT]], i32 0, i32 3
+// CHECK:   [[TYPE:%.*]] = load %swift.type** [[TYPEADDR]], align 8
+// CHECK:   [[WITNESSADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, %swift.refcounted*, %swift.opaque*, %swift.type*, i8** }>* [[CONTEXT]], i32 0, i32 4
+// CHECK:   [[WITNESS:%.*]] = load i8*** [[WITNESSADDR]], align 8
 // CHECK:   call void @swift_release(%swift.refcounted* %1)
 // CHECK:   [[RES:%.*]] = tail call i64 @[[CLOSURE]](i64 %0, %swift.refcounted* [[BOX]], %swift.opaque* noalias [[ADDR]], %swift.type* [[TYPE]], i8** [[WITNESS]])
-// CHECK:   ret i64 [[RES]]
+// CHECK:   ret i64 %11
 // CHECK: }
 
 // -- <rdar://problem/14443343> Boxing of tuples with generic elements

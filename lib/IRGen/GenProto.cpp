@@ -4378,17 +4378,22 @@ static void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF,
 namespace {
   /// A CRTP class for finding the archetypes we need to bind in order
   /// to perform value operations on the given type.
-  struct FindArchetypesForValueOperations
-    : CanTypeVisitor<FindArchetypesForValueOperations>
-  {
-    NecessaryBindings &Bindings;
+  struct FindArchetypesToBind : CanTypeVisitor<FindArchetypesToBind> {
+    llvm::SetVector<ArchetypeType*> &Types;
   public:
-    FindArchetypesForValueOperations(NecessaryBindings &bindings)
-      : Bindings(bindings) {}
+    FindArchetypesToBind(llvm::SetVector<ArchetypeType*> &types)
+      : Types(types) {}
 
     // We're collecting archetypes.
     void visitArchetypeType(CanArchetypeType type) {
-      Bindings.addArchetype(type);
+      if (Types.insert(type)) {
+        // Collect the associated archetypes.
+        for (auto nested : type->getNestedTypes()) {
+          if (auto assocArchetype = nested.second.dyn_cast<ArchetypeType*>()) {
+            visitArchetypeType(CanArchetypeType(assocArchetype));
+          }
+        }
+      }
     }
 
     // We need to walk into tuples.
@@ -4444,29 +4449,9 @@ namespace {
   };
 }
 
-NecessaryBindings
-NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
-                                          CanSILFunctionType origType,
-                                          CanSILFunctionType substType,
-                                          ArrayRef<Substitution> subs) {
-  NecessaryBindings bindings;
-  // Collect bindings required by the polymorphic parameters to the function.
-  for (auto &sub : subs) {
-    sub.getReplacement().findIf([&](Type t) -> bool {
-      if (auto archetype = dyn_cast<ArchetypeType>(t->getCanonicalType())) {
-        bindings.addArchetype(archetype);
-      }
-      return false;
-    });
-  }
-  return bindings;
-}
-
-NecessaryBindings
-NecessaryBindings::forValueOperations(IRGenModule &IGM, CanType type) {
-  NecessaryBindings bindings;
-  FindArchetypesForValueOperations(bindings).visit(type);
-  return bindings;
+/// Initialize this set of necessary bindings.
+NecessaryBindings::NecessaryBindings(IRGenModule &IGM, CanType type) {
+  FindArchetypesToBind(Types).visit(type);
 }
 
 Size NecessaryBindings::getBufferSize(IRGenModule &IGM) const {
@@ -4561,14 +4546,6 @@ void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
       IGF.Builder.CreateStore(witness, witnessSlot);
     }
   }
-}
-
-void NecessaryBindings::addArchetype(CanArchetypeType type) {
-  if (Types.insert(type))
-    // Collect the associated archetypes.
-    for (auto nested : type->getNestedTypes())
-      if (auto assocArchetype = nested.second.dyn_cast<ArchetypeType*>())
-        addArchetype(CanArchetypeType(assocArchetype));
 }
 
 /// Emit a single protocol witness table reference.
