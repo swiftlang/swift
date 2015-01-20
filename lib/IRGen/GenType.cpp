@@ -617,13 +617,103 @@ namespace {
 
   /// A TypeInfo implementation for types represented as a single
   /// scalar type.
-  class PrimitiveTypeInfo :
+  class PrimitiveTypeInfo final :
     public PODSingleScalarTypeInfo<PrimitiveTypeInfo, LoadableTypeInfo> {
   public:
     PrimitiveTypeInfo(llvm::Type *storage, Size size,
                       SpareBitVector &&spareBits,
                       Alignment align)
       : PODSingleScalarTypeInfo(storage, size, std::move(spareBits), align) {}
+  };
+  
+  /// A TypeInfo implementation for types represented as a compound
+  /// scalar type.
+  class OpaqueStorageTypeInfo final :
+    public ScalarTypeInfo<OpaqueStorageTypeInfo, LoadableTypeInfo>
+  {
+    llvm::IntegerType *ScalarType;
+  public:
+    OpaqueStorageTypeInfo(llvm::ArrayType *storage,
+                          llvm::IntegerType *scalarType,
+                          Size size,
+                          SpareBitVector &&spareBits,
+                          Alignment align)
+      : ScalarTypeInfo(storage, size, std::move(spareBits), align, IsPOD),
+        ScalarType(scalarType)
+    {}
+    
+    llvm::ArrayType *getStorageType() const {
+      return cast<llvm::ArrayType>(ScalarTypeInfo::getStorageType());
+    }
+    
+    unsigned getExplosionSize() const override {
+      return 1;
+    }
+    
+    void loadAsCopy(IRGenFunction &IGF, Address addr,
+                    Explosion &explosion) const override {
+      loadAsTake(IGF, addr, explosion);
+    }
+    
+    void loadAsTake(IRGenFunction &IGF, Address addr,
+                    Explosion &explosion) const override {
+      addr = IGF.Builder.CreateBitCast(addr, ScalarType->getPointerTo());
+      explosion.add(IGF.Builder.CreateLoad(addr));
+    }
+    
+    void assign(IRGenFunction &IGF, Explosion &explosion,
+                Address addr) const override {
+      initialize(IGF, explosion, addr);
+    }
+    
+    void initialize(IRGenFunction &IGF, Explosion &explosion,
+                    Address addr) const override {
+      addr = IGF.Builder.CreateBitCast(addr, ScalarType->getPointerTo());
+      IGF.Builder.CreateStore(explosion.claimNext(), addr);
+    }
+    
+    void reexplode(IRGenFunction &IGF, Explosion &sourceExplosion,
+                   Explosion &targetExplosion) const override {
+      targetExplosion.add(sourceExplosion.claimNext());
+    }
+    
+    void copy(IRGenFunction &IGF, Explosion &sourceExplosion,
+              Explosion &targetExplosion) const override {
+      reexplode(IGF, sourceExplosion, targetExplosion);
+    }
+    
+    void consume(IRGenFunction &IGF, Explosion &explosion) const override {
+      explosion.claimNext();
+    }
+    
+    void fixLifetime(IRGenFunction &IGF, Explosion &explosion) const override {
+      explosion.claimNext();
+    }
+    
+    void destroy(IRGenFunction &IGF, Address address, SILType T) const override{
+      /* nop */
+    }
+    
+    void getSchema(ExplosionSchema &schema) const override {
+      schema.add(ExplosionSchema::Element::forScalar(ScalarType));
+    }
+    
+    llvm::Value *packEnumPayload(IRGenFunction &IGF,
+                                 Explosion &source,
+                                 unsigned bitWidth,
+                                 unsigned offset) const override {
+      PackEnumPayload pack(IGF, bitWidth);
+      pack.addAtOffset(source.claimNext(), offset);
+      return pack.get();
+    }
+    
+    void unpackEnumPayload(IRGenFunction &IGF,
+                           llvm::Value *payload,
+                           Explosion &target,
+                           unsigned offset) const override {
+      UnpackEnumPayload unpack(IGF, payload);
+      target.add(unpack.claimAtOffset(ScalarType, offset));
+    }
   };
 
   /// A TypeInfo implementation for address-only types which can never
@@ -1139,13 +1229,15 @@ TypeConverter::getOpaqueStorageTypeInfo(Size size, Alignment align) {
   if (existing != OpaqueStorageTypes.end())
     return *existing->second;
 
-  llvm::IntegerType *intType =
-    llvm::IntegerType::get(IGM.LLVMContext, size.getValue() * 8);
-
+  // Use an [N x i8] array for storage, but load and store as a single iNNN
+  // scalar.
+  auto storageType = llvm::ArrayType::get(IGM.Int8Ty, size.getValue());
+  auto intType = llvm::IntegerType::get(IGM.LLVMContext, size.getValueInBits());
   // There are no spare bits in an opaque storage type.
-  auto type = new PrimitiveTypeInfo(intType, size,
+  auto type = new OpaqueStorageTypeInfo(storageType, intType, size,
                     SpareBitVector::getConstant(size.getValueInBits(), false),
                     align);
+  
   type->NextConverted = FirstType;
   FirstType = type;
 

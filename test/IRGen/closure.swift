@@ -30,17 +30,17 @@ func b<T : Ordinable>(var #seq: T) -> (Int) -> Int {
 // -- partial_apply stub
 // CHECK: define internal i64 @_TPA_[[CLOSURE]](i64, %swift.refcounted*) {
 // CHECK: entry:
-// CHECK:   [[CONTEXT:%.*]] = bitcast %swift.refcounted* %1 to <{ %swift.refcounted, i128, %swift.refcounted*, %swift.opaque* }>*
-// CHECK:   [[BINDINGSADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, i128, %swift.refcounted*, %swift.opaque* }>* [[CONTEXT]], i32 0, i32 1
-// CHECK:   [[TYPEADDR:%.*]] = bitcast i128* [[BINDINGSADDR]]
+// CHECK:   [[CONTEXT:%.*]] = bitcast %swift.refcounted* %1 to <{ %swift.refcounted, [16 x i8], %swift.refcounted*, %swift.opaque* }>*
+// CHECK:   [[BINDINGSADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [16 x i8], %swift.refcounted*, %swift.opaque* }>* [[CONTEXT]], i32 0, i32 1
+// CHECK:   [[TYPEADDR:%.*]] = bitcast [16 x i8]* [[BINDINGSADDR]]
 // CHECK:   [[TYPE:%.*]] = load %swift.type** [[TYPEADDR]], align 8
 // CHECK:   [[WITNESSADDR_0:%.*]] = getelementptr inbounds %swift.type** [[TYPEADDR]], i32 1
 // CHECK:   [[WITNESSADDR:%.*]] = bitcast %swift.type** [[WITNESSADDR_0]]
 // CHECK:   [[WITNESS:%.*]] = load i8*** [[WITNESSADDR]], align 8
-// CHECK:   [[BOXADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, i128, %swift.refcounted*, %swift.opaque* }>* [[CONTEXT]], i32 0, i32 2
+// CHECK:   [[BOXADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [16 x i8], %swift.refcounted*, %swift.opaque* }>* [[CONTEXT]], i32 0, i32 2
 // CHECK:   [[BOX:%.*]] = load %swift.refcounted** [[BOXADDR]], align 8
 // CHECK:   call void @swift_retain_noresult(%swift.refcounted* [[BOX]])
-// CHECK:   [[ADDRADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, i128, %swift.refcounted*, %swift.opaque* }>* [[CONTEXT]], i32 0, i32 3
+// CHECK:   [[ADDRADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [16 x i8], %swift.refcounted*, %swift.opaque* }>* [[CONTEXT]], i32 0, i32 3
 // CHECK:   [[ADDR:%.*]] = load %swift.opaque** [[ADDRADDR]], align 8
 // CHECK:   call void @swift_release(%swift.refcounted* %1)
 // CHECK:   [[RES:%.*]] = tail call i64 @[[CLOSURE]](i64 %0, %swift.refcounted* [[BOX]], %swift.opaque* noalias [[ADDR]], %swift.type* [[TYPE]], i8** [[WITNESS]])
