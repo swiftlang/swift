@@ -235,9 +235,9 @@ NOTE(note_remapped_type,sema_nb,none,
   "did you mean to use '%0'?", (StringRef))
 ERROR(identifier_init_failure,sema_nb,none,
   "could not infer type for %0", (Identifier))
+NOTE(note_module_as_type,sema_nb,none,
+     "cannot use module %0 as a type", (Identifier))
 
-ERROR(use_module_as_type,sema_nb,none,
-      "use of module %0 as a type", (Identifier))
 ERROR(use_non_type_value,sema_nb,none,
       "%0 is not a type", (Identifier))
 NOTE(use_non_type_value_prev,sema_nb,none,

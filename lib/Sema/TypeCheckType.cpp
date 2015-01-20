@@ -872,9 +872,12 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
     result = resolveIdentTypeComponent(*this, DC, Components, options, 
                                        diagnoseErrors, resolver);
   if (auto mod = result.dyn_cast<Module*>()) {
-    if (diagnoseErrors)
+    if (diagnoseErrors) {
       diagnose(Components.back()->getIdLoc(),
-               diag::use_module_as_type, mod->Name);
+               diag::use_undeclared_type, mod->Name);
+      diagnose(Components.back()->getIdLoc(),
+               diag::note_module_as_type, mod->Name);
+    }
     Type ty = ErrorType::get(Context);
     Components.back()->setValue(ty);
     return ty;

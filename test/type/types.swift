@@ -25,7 +25,7 @@ e0[] // expected-error {{cannot subscript a value of type '[Int]' with an index 
 var f0 : [Float]
 var f1 : [(Int,Int)]
 
-var g : Swift // expected-error {{use of module 'Swift' as a type}}
+var g : Swift // expected-error {{use of undeclared type 'Swift'}} expected-note {{cannot use module 'Swift' as a type}}
 
 var h0 : Int?
 h0 == nil // no-warning
