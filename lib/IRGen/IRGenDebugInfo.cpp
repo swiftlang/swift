@@ -770,11 +770,10 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
 
   // RAUW the entry point function forward declaration with the real thing.
   if (LinkageName == SWIFT_ENTRY_POINT_FUNCTION) {
-    assert(isa<llvm::MDNodeFwdDecl>(EntryPointFn) &&
+    assert(EntryPointFn->isTemporary() &&
            "more than one entry point function");
-    auto tmp = cast<llvm::MDNodeFwdDecl>(EntryPointFn);
-    tmp->replaceAllUsesWith(SP);
-    llvm::MDNode::deleteTemporary(tmp);
+    EntryPointFn->replaceAllUsesWith(SP);
+    llvm::MDNode::deleteTemporary(EntryPointFn);
     EntryPointFn = SP;
   }
 
@@ -1282,7 +1281,7 @@ llvm::DICompositeType IRGenDebugInfo::createStructType(
       Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, DerivedFrom,
       Members, RuntimeLang, llvm::DIType(), UniqueID);
 
-  cast<llvm::MDNodeFwdDecl>(FwdDecl.get())->replaceAllUsesWith(DITy);
+  FwdDecl->replaceAllUsesWith(DITy);
   llvm::MDNode::deleteTemporary(FwdDecl);
   return DITy;
 }
@@ -1349,7 +1348,7 @@ IRGenDebugInfo::createEnumType(DebugTypeInfo DbgTy, EnumDecl *Decl,
       getEnumElements(DbgTy, Decl, Scope, File, Flags),
       llvm::dwarf::DW_LANG_Swift);
 
-  cast<llvm::MDNodeFwdDecl>(FwdDecl.get())->replaceAllUsesWith(DITy);
+  FwdDecl->replaceAllUsesWith(DITy);
   llvm::MDNode::deleteTemporary(FwdDecl);
   return DITy;
 }
@@ -1666,7 +1665,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
         llvm::dwarf::DW_LANG_Swift, llvm::DIType(),
         StringRef() /*don't unique*/);
 
-    cast<llvm::MDNodeFwdDecl>(FwdDecl.get())->replaceAllUsesWith(DITy);
+    FwdDecl->replaceAllUsesWith(DITy);
     llvm::MDNode::deleteTemporary(FwdDecl);
     return DITy;
   }
