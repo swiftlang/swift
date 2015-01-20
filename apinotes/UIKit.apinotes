@@ -3005,6 +3005,9 @@ Classes:
     Nullability:
     - O
     NullabilityOfRet: U
+	- Selector: 'printInfo'
+		MethodKind: Class
+    FactoryAsInit: C
   Properties:
   - Name: printerID
     Nullability: O
