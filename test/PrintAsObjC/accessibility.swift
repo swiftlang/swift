@@ -41,7 +41,7 @@ import AppKit
 import UIKit
 
 @UIApplicationMain
-@objc class AppDelegate : UIApplicationDelegate {}
+@objc class AppDelegate : NSObject, UIApplicationDelegate {}
 
 #else
 // Uh oh, this test depends on having an app delegate.
