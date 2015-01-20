@@ -1599,8 +1599,8 @@ ERROR(bool_intrinsics_not_found,sema_tct,none,
 ERROR(unchecked_not_optional_type,sema_tct,none,
       "type following '@unchecked' must be an optional type", ())
 ERROR(self_in_nominal,sema_tct,none,
-      "'Self' is only available in a protocol or as the result of a class "
-      "method; did you mean %0?", (Identifier))
+      "'Self' is only available in a protocol or as the result of a "
+      "method in a class; did you mean %0?", (Identifier))
 ERROR(non_generic_class_with_generic_superclass,sema_tct,none,
       "classes derived from generic classes must also be generic", ())
 ERROR(class_super_access,sema_tcd,none,

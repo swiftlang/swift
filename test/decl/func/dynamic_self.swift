@@ -12,21 +12,21 @@ func inFunction() {
 struct S0 {
   func f() -> Self { } // expected-error{{struct method cannot return 'Self'; did you mean to use the struct type 'S0'?}}{{15-19=S0}}
 
-  func g(ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a class method; did you mean 'S0'?}}{{14-18=S0}}
+  func g(ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'S0'?}}{{14-18=S0}}
 }
 
 enum E0 {
   func f() -> Self { } // expected-error{{enum method cannot return 'Self'; did you mean to use the enum type 'E0'?}}{{15-19=E0}}
 
-  func g(ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a class method; did you mean 'E0'?}}{{14-18=E0}}
+  func g(ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'E0'?}}{{14-18=E0}}
 }
 
 class C0 {
   func f() -> Self { } // okay
 
-  func g(ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a class method; did you mean 'C0'?}}{{14-18=C0}}
+  func g(ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C0'?}}{{14-18=C0}}
 
-  func h(ds: Self) -> Self { } // expected-error{{'Self' is only available in a protocol or as the result of a class method; did you mean 'C0'?}}{{14-18=C0}}
+  func h(ds: Self) -> Self { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C0'?}}{{14-18=C0}}
 }
 
 protocol P0 {
@@ -48,7 +48,7 @@ class C1 {
     if !b { return self.dynamicType(int: 5) }
 
     // Can't utter Self within the body of a method.
-    var s2: Self = self // expected-error{{'Self' is only available in a protocol or as the result of a class method; did you mean 'C1'?}}
+    var s2: Self = self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}}
 
     // Okay to return 'self', because it has the appropriate type.
     return self // okay
@@ -60,7 +60,7 @@ class C1 {
     var x: Int = self // expected-error{{'Self.Type' is not convertible to 'Int'}}
 
     // Can't utter Self within the body of a method.
-    var c1 = C1(int: 5) as Self // expected-error{{'Self' is only available in a protocol or as the result of a class method; did you mean 'C1'?}}
+    var c1 = C1(int: 5) as Self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}}
 
     if b { return self(int: 5) }
 
