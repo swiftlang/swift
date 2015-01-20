@@ -15,6 +15,16 @@ println(plus5(5)) // CHECK-NEXT: 10
 
 println(insult("😰")) // CHECK-NEXT: I'm with stupid ☞ 😰
 
+// rdar://problem/18988428
+
+func clamp<T: Comparable>(minValue: T, maxValue: T)(n: T) -> T {
+    return max(minValue, min(n, maxValue))
+}
+
+let clampFoo2 = clamp(10.0, 30.0)
+
+println(clampFoo2(n: 3.0)) // CHECK-NEXT: 10.0
+
 // rdar://problem/19195470
 
 func pair<T,U> (a: T) -> U -> (T,U) {
