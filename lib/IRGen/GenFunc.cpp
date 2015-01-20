@@ -2612,7 +2612,6 @@ static void emitApplyArgument(IRGenFunction &IGF,
                         in, out);
 }
 
-
 /// Emit the forwarding stub function for a partial application.
 static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                    llvm::Function *staticFnPtr,
@@ -2677,9 +2676,6 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   };
   SmallVector<AddressToDeallocate, 4> addressesToDeallocate;
 
-  // FIXME: support
-  NonFixedOffsets offsets = None;
-  
   bool dependsOnContextLifetime = false;
   bool consumesContext;
   
@@ -2709,12 +2705,27 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     rawData = origParams.takeLast();
     Address data = layout.emitCastTo(subIGF, rawData);
 
-    // Perform the loads.
     unsigned origParamI = outType->getParameters().size();
     assert(layout.getElements().size() == conventions.size()
            && "conventions don't match context layout");
+    
+    unsigned i = 0;
+    
+    // Restore type metadata bindings, if we have them.
+    if (layout.hasBindings()) {
+      auto bindingLayout = layout.getElements()[i];
+      // The bindings should be fixed-layout inside the object, so we can
+      // pass None here. If they weren't, we'd have a chicken-egg problem.
+      auto bindingsAddr = bindingLayout.project(subIGF, data, /*offsets*/ None);
+      layout.getBindings().restore(subIGF, bindingsAddr);
+      ++i;
+    }
 
-    for (unsigned i : indices(layout.getElements())) {
+    // Calculate non-fixed field offsets.
+    HeapNonFixedOffsets offsets(subIGF, layout);
+
+    // Perform the loads.
+    for (unsigned size = layout.getElements().size(); i < size; ++i) {
       auto &fieldLayout = layout.getElements()[i];
       auto &fieldTy = layout.getElementTypes()[i];
       auto fieldConvention = conventions[i];
@@ -2744,7 +2755,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         dependsOnContextLifetime = true;
         break;
       case ParameterConvention::Indirect_Inout:
-        // Load the address of the inout parameter.
+        // Load the add ress of the inout parameter.
         cast<LoadableTypeInfo>(fieldTI).loadAsCopy(subIGF, fieldAddr, param);
         break;
       case ParameterConvention::Direct_Guaranteed:
@@ -2796,6 +2807,12 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     fnPtr = subIGF.Builder.CreateBitCast(fnPtr, fnTy);
   }
   
+  // Emit the polymorphic arguments.
+  assert(subs.empty() != hasPolymorphicParameters(origType)
+         && "should have substitutions iff original function is generic");
+  if (hasPolymorphicParameters(origType))
+    emitPolymorphicArguments(subIGF, origType, substType, subs, params);
+  
   llvm::CallInst *call = subIGF.Builder.CreateCall(fnPtr, params.claimAll());
   
   // FIXME: Default Swift attributes for indirect calls?
@@ -2844,10 +2861,24 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     hasSingleSwiftRefcountedContext = Maybe;
   Optional<ParameterConvention> singleRefcountedConvention;
   
-  // Collect the type infos for the context types.
   SmallVector<const TypeInfo *, 4> argTypeInfos;
   SmallVector<SILType, 4> argValTypes;
   SmallVector<ParameterConvention, 4> argConventions;
+
+  // Reserve space for polymorphic bindings.
+  auto bindings = NecessaryBindings::forFunctionInvocations(IGF.IGM,
+                                                     origType, substType, subs);
+  if (!bindings.empty()) {
+    hasSingleSwiftRefcountedContext = No;
+    auto bindingsSize = bindings.getBufferSize(IGF.IGM);
+    auto &bindingsTI = IGF.IGM.getOpaqueStorageTypeInfo(bindingsSize,
+                                                 IGF.IGM.getPointerAlignment());
+    argValTypes.push_back(SILType());
+    argTypeInfos.push_back(&bindingsTI);
+    argConventions.push_back(ParameterConvention::Direct_Unowned);
+  }
+
+  // Collect the type infos for the context parameters.
   for (auto param : params) {
     SILType argType = param.getSILType();
     
@@ -2891,7 +2922,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       continue;
     
     // Adding nonempty values when we already have a single refcounted pointer
-    // ruins it.
+    // means we don't have a single value anymore.
     if (hasSingleSwiftRefcountedContext == Yes) {
       hasSingleSwiftRefcountedContext = No;
       continue;
@@ -2918,35 +2949,6 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       hasSingleSwiftRefcountedContext = Yes;
       singleRefcountedConvention = origType->getCalleeConvention();
     }
-  }
-  
-  // Collect the polymorphic arguments.
-  if (hasPolymorphicParameters(origType)) {
-    assert(!subs.empty() && "no substitutions for polymorphic argument?!");
-    Explosion polymorphicArgs;
-    emitPolymorphicArguments(IGF, origType, substType, subs, polymorphicArgs);
-
-    const TypeInfo &metatypeTI = IGF.IGM.getTypeMetadataPtrTypeInfo(),
-                   &witnessTI = IGF.IGM.getWitnessTablePtrTypeInfo();
-    for (llvm::Value *arg : polymorphicArgs.getAll()) {
-      // No type we can push here, but that should be OK, because none
-      // of the TypeInfo operations on type metadata or witness tables
-      // depend on context.
-      if (arg->getType() == IGF.IGM.TypeMetadataPtrTy) {
-        argValTypes.push_back(SILType());
-        argConventions.push_back(ParameterConvention::Direct_Unowned);
-        argTypeInfos.push_back(&metatypeTI);
-      } else if (arg->getType() == IGF.IGM.WitnessTablePtrTy) {
-        argValTypes.push_back(SILType());
-        argConventions.push_back(ParameterConvention::Direct_Unowned);
-        argTypeInfos.push_back(&witnessTI);
-      } else
-        llvm_unreachable("unexpected polymorphic argument");
-    }
-    
-    args.add(polymorphicArgs.claimAll());
-  } else {
-    assert(subs.empty() && "substitutions for non-polymorphic function?!");
   }
   
   // If we have a single refcounted pointer context (and no polymorphic args
@@ -2978,20 +2980,32 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   assert(argValTypes.size() == argTypeInfos.size()
          && argTypeInfos.size() == argConventions.size()
          && "argument info lists out of sync");
-  HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, argValTypes, argTypeInfos);
+  HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, argValTypes, argTypeInfos,
+                    /*typeToFill*/ nullptr,
+                    std::move(bindings));
   llvm::Value *data;
   if (layout.isKnownEmpty()) {
     data = IGF.IGM.RefCountedNull;
   } else {
     // Allocate a new object.
-    data = IGF.emitUnmanagedAlloc(layout, "closure");
+    HeapNonFixedOffsets offsets(IGF, layout);
+
+    data = IGF.emitUnmanagedAlloc(layout, "closure", &offsets);
     Address dataAddr = layout.emitCastTo(IGF, data);
 
-    // FIXME: preserve non-fixed offsets
-    NonFixedOffsets offsets = None;
     
-    // Perform the store.
-    for (unsigned i : indices(layout.getElements())) {
+    unsigned i = 0;
+    
+    // Store necessary bindings, if we have them.
+    if (layout.hasBindings()) {
+      auto &bindingsLayout = layout.getElements()[i];
+      Address bindingsAddr = bindingsLayout.project(IGF, dataAddr, offsets);
+      layout.getBindings().save(IGF, bindingsAddr);
+      ++i;
+    }
+    
+    // Store the context arguments.
+    for (unsigned end = layout.getElements().size(); i < end; ++i) {
       auto &fieldLayout = layout.getElements()[i];
       auto &fieldTy = layout.getElementTypes()[i];
       Address fieldAddr = fieldLayout.project(IGF, dataAddr, offsets);

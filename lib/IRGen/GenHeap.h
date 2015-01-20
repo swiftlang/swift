@@ -34,12 +34,26 @@ namespace irgen {
 /// heap-allocation.
 class HeapLayout : public StructLayout {
   SmallVector<SILType, 8> ElementTypes;
+  NecessaryBindings Bindings;
   
 public:
   HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
              ArrayRef<SILType> elementTypes,
              ArrayRef<const TypeInfo *> elementTypeInfos,
-             llvm::StructType *typeToFill = 0);
+             llvm::StructType *typeToFill = 0,
+             NecessaryBindings &&bindings = {});
+  
+  /// True if the heap object carries type bindings.
+  ///
+  /// If true, the first element of the heap layout will be the type metadata
+  /// buffer.
+  bool hasBindings() const {
+    return !Bindings.empty();
+  }
+  
+  const NecessaryBindings &getBindings() const {
+    return Bindings;
+  }
 
   /// Get the types of the elements.
   ArrayRef<SILType> getElementTypes() const {
@@ -52,6 +66,31 @@ public:
   /// As a convenience, build a metadata object with internal linkage
   /// consisting solely of the standard heap metadata.
   llvm::Constant *getPrivateMetadata(IRGenModule &IGM) const;
+};
+
+class HeapNonFixedOffsets : public NonFixedOffsetsImpl {
+  SmallVector<llvm::Value *, 1> Offsets;
+  llvm::Value *TotalSize;
+  llvm::Value *TotalAlignMask;
+public:
+  HeapNonFixedOffsets(IRGenFunction &IGF, const HeapLayout &layout);
+  
+  llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) override {
+    auto result = Offsets[index];
+    assert(result != nullptr
+           && "fixed-layout field doesn't need NonFixedOffsets");
+    return result;
+  }
+  
+  // The total size of the heap object.
+  llvm::Value *getSize() const {
+    return TotalSize;
+  }
+  
+  // The total alignment of the heap object.
+  llvm::Value *getAlignMask() const {
+    return TotalAlignMask;
+  }
 };
 
 /// Emit a heap object deallocation.

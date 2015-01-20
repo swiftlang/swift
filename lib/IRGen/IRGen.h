@@ -172,6 +172,7 @@ public:
   explicit Alignment(int_type Value) : Value(Value) {}
 
   int_type getValue() const { return Value; }
+  int_type getMaskValue() const { return Value - 1; }
 
   bool isOne() const { return Value == 1; }
   bool isZero() const { return Value == 0; }
