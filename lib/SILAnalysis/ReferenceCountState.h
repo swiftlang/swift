@@ -264,7 +264,7 @@ struct RefCountState {
 //                         Bottom Up Ref Count State
 //===----------------------------------------------------------------------===//
 
-struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
+struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
   using SuperTy = RefCountState<BottomUpRefCountState>;
 
   /// Sequence of states that a value with reference semantics can go through
@@ -423,7 +423,7 @@ struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
 //                          Top Down Ref Count State
 //===----------------------------------------------------------------------===//
 
-struct TopDownRefCountState : public RefCountState<TopDownRefCountState> {
+struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
   using SuperTy = RefCountState<TopDownRefCountState>;
 
   /// Sequence of states that a value with reference semantics can go through
