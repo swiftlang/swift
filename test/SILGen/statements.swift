@@ -1,5 +1,9 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-silgen %s | FileCheck %s
 
+class MyClass { 
+  func foo() { }
+}
+
 func bar(x: Int) {}
 func foo(x: Int, y: Bool) {}
 
@@ -131,6 +135,7 @@ func do_loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
 // CHECK-LABEL: sil hidden  @_TF10statements21do_loop_with_continue 
 
 
+// CHECK-LABEL: sil hidden  @{{.*}}for_loops
 func for_loops(var x: Int, c: Bool) {
   for i in 1..<100 {
     println(i)
@@ -146,10 +151,18 @@ func for_loops(var x: Int, c: Bool) {
   
   for var i = 0; i < 100; i {
   }
-  
+
+  // rdar://problem/19316670
+  // CHECK: [[NEXT:%[0-9]+]] = function_ref @_TFVSs17IndexingGenerator4nextUSs15_CollectionType_USs16ForwardIndexType_Ss18_SignedIntegerType_Ss33_BuiltinIntegerLiteralConvertible____fRGS_Q__FT_GSqQQ_8_Element_
+  // CHECK-NEXT: apply [[NEXT]]<[MyClass]
+  // CHECK: class_method [[OBJ:%[0-9]+]] : $MyClass, #MyClass.foo!1
+  var objects = [MyClass(), MyClass() ]
+  for obj in objects {
+    obj.foo()
+  }
+
   return 
 }
-// CHECK-LABEL: sil hidden  @{{.*}}for_loops
 
 func void_return() {
   var b:Bool

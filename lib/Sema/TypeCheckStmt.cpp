@@ -535,12 +535,20 @@ public:
                        DC, generatorProto, genConformance,
                        TC.Context.Id_next, {}, diag::generator_protocol_broken);
     if (!genNext) return nullptr;
-    // Check that next() produces an Optional<Element> value.
+    // Check that next() produces an Optional<T> value.
     if (genNext->getType()->getCanonicalType()->getAnyNominal()
           != TC.Context.getOptionalDecl()) {
       TC.diagnose(S->getForLoc(), diag::generator_protocol_broken);
       return nullptr;
     }
+
+    // Convert that Optional<T> value to Optional<Element>.
+    auto optPatternType = OptionalType::get(S->getPattern()->getType());
+    if (!optPatternType->isEqual(genNext->getType()) &&
+        TC.convertToType(genNext, optPatternType, DC)) {
+      return nullptr;
+    }
+
     S->setGeneratorNext(genNext);
     
     // Type-check the body of the loop.
