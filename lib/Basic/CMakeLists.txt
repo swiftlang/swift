@@ -68,9 +68,8 @@ if(NOT "${SWIFT_VENDOR}" STREQUAL "")
       " -DSWIFT_VENDOR=\"\\\"${SWIFT_VENDOR}\\\"\"")
 endif()
 
-option(SWIFT_REPOSITORY_STRING
-    "The string that identifies the SCM commit(s) for this build"
-    "")
+set(SWIFT_REPOSITORY_STRING "" CACHE STRING
+    "The string that identifies the SCM commit(s) for this build")
 
 if(NOT "${CLANG_REPOSITORY_STRING}" STREQUAL "")
   set(SWIFT_REPOSITORY_STRING
