@@ -538,7 +538,13 @@ namespace {
       return true;
     }
 
-    bool  visitRefToBridgeObjectInst(RefToBridgeObjectInst *X) {
+    bool visitRefToBridgeObjectInst(RefToBridgeObjectInst *X) {
+      return true;
+    }
+    bool visitThinFunctionToPointerInst(ThinFunctionToPointerInst *X) {
+      return true;
+    }
+    bool visitPointerToThinFunctionInst(PointerToThinFunctionInst *X) {
       return true;
     }
   private:
