@@ -99,12 +99,12 @@ func testMixedSignArithmetic() {
     // disabled by the ambiguity trick.
     //===------------------------------------------------------------------===//
 
-    Stride(1) - ${T}(0) // expected-error {{binary operator '-' cannot be applied operands of type 'Stride' and}} expected-note {{Overloads for '-' exist with these partially matching parameter lists:}}
+    Stride(1) - ${T}(0) // expected-error {{binary operator '-' cannot be applied to operands of type 'Stride' and}} expected-note {{Overloads for '-' exist with these partially matching parameter lists:}}
 
     // These tests are expected to start failing when we get improved diagnostics.
     var y: Stride = 0
-    y += ${T}(1)        // expected-error {{binary operator '+=' cannot be applied operands of type 'Stride' and}} expected-note {{Overloads for '+=' exist with these partially matching parameter lists:}}
-    y -= ${T}(1)        // expected-error {{binary operator '-=' cannot be applied operands of type 'Stride' and}} expected-note {{Overloads for '-=' exist with these partially matching parameter lists:}}
+    y += ${T}(1)        // expected-error {{binary operator '+=' cannot be applied to operands of type 'Stride' and}} expected-note {{Overloads for '+=' exist with these partially matching parameter lists:}}
+    y -= ${T}(1)        // expected-error {{binary operator '-=' cannot be applied to operands of type 'Stride' and}} expected-note {{Overloads for '-=' exist with these partially matching parameter lists:}}
   }
 % end
 }
