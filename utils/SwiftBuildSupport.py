@@ -19,6 +19,9 @@ import subprocess
 import sys
 
 
+HOME = os.environ.get("HOME", "/")
+
+
 def _get_default_source_root():
     result = ""
 
