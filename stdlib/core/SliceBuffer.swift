@@ -148,6 +148,11 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     return _hasNativeBuffer && isUniquelyReferenced()
   }
 
+  public
+  mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
+    return _hasNativeBuffer && isUniquelyReferencedOrPinned()
+  }
+
   /// If this buffer is backed by a `_ContiguousArrayBuffer`
   /// containing the same number of elements as `self`, return it.
   /// Otherwise, return `nil`.
@@ -223,6 +228,10 @@ struct _SliceBuffer<T> : _ArrayBufferType {
 
   mutating func isUniquelyReferenced() -> Bool {
     return isUniquelyReferencedNonObjC(&owner)
+  }
+
+  mutating func isUniquelyReferencedOrPinned() -> Bool {
+    return isUniquelyReferencedOrPinnedNonObjC(&owner)
   }
 
   /// Access the element at `position`.

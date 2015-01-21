@@ -270,6 +270,10 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     return isUniquelyReferenced()
   }
 
+  public mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
+    return isUniquelyReferencedOrPinned()
+  }
+
   /// If this buffer is backed by a `_ContiguousArrayBuffer`
   /// containing the same number of elements as `self`, return it.
   /// Otherwise, return `nil`.
@@ -379,6 +383,13 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   /// some immutable Cocoa container.
   public mutating func isUniquelyReferenced() -> Bool {
     return __bufferPointer.holdsUniqueReference()
+  }
+
+  /// Return true iff this buffer's storage is either
+  /// uniquely-referenced or pinned.  NOTE: this does not mean
+  /// the buffer is mutable; see the comment on isUniquelyReferenced.
+  public mutating func isUniquelyReferencedOrPinned() -> Bool {
+    return __bufferPointer.holdsUniqueOrPinnedReference()
   }
 
 #if _runtime(_ObjC)

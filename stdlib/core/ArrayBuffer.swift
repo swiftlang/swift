@@ -74,6 +74,15 @@ extension _ArrayBuffer {
     return _storage.isUniquelyReferencedNative()
   }
 
+  /// Return true iff this buffer's storage is either
+  /// uniquely-referenced or pinned.
+  mutating func isUniquelyReferencedOrPinned() -> Bool {
+    if !_isClassOrObjCExistential(T.self) {
+      return _storage.isUniquelyReferencedOrPinned_native_noSpareBits()
+    }
+    return _storage.isUniquelyReferencedOrPinnedNative()
+  }
+
   /// Convert to an NSArray.
   /// Precondition: _isBridgedToObjectiveC(Element.self)
   /// O(1) if the element type is bridged verbatim, O(N) otherwise
@@ -107,6 +116,11 @@ extension _ArrayBuffer {
     return isUniquelyReferenced()
   }
   
+  public
+  mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
+    return isUniquelyReferencedOrPinned()
+  }
+
   /// If this buffer is backed by a `_ContiguousArrayBuffer`
   /// containing the same number of elements as `self`, return it.
   /// Otherwise, return `nil`.

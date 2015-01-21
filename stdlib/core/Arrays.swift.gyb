@@ -192,16 +192,24 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
       _checkSubscript(index)
       return _getElement(index)
     }
-%else:
-    unsafeAddress {
+%elif Self == 'Slice':
+    addressWithOwner {
       _checkSubscript(index)
-      return UnsafePointer(_buffer.baseAddress + index)
+      return (UnsafePointer(_buffer.baseAddress + index),
+              Builtin.castToUnknownObject(_buffer.owner))
+    }
+%else:
+    addressWithNativeOwner {
+      _checkSubscript(index)
+      return (UnsafePointer(_buffer.baseAddress + index),
+              Builtin.castToNativeObject(_buffer.owner))
     }
 %end
-    unsafeMutableAddress {
-      _makeMutableAndUnique()
+    mutableAddressWithPinnedNativeOwner {
+      _makeMutableAndUniqueOrPinned()
       _checkSubscript(index)
-      return _getElementAddress(index)
+      return (_getElementAddress(index),
+              Builtin.tryPin(Builtin.castToNativeObject(_buffer.owner)))
     }
   }
 
@@ -257,6 +265,13 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
   @semantics("array.make_mutable")
   mutating func _makeMutableAndUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
+      _copyBuffer(&_buffer)
+    }
+  }
+
+  @semantics("array.make_mutable_shared")
+  mutating func _makeMutableAndUniqueOrPinned() {
+    if _slowPath(!_buffer.isMutableAndUniquelyReferencedOrPinned()) {
       _copyBuffer(&_buffer)
     }
   }

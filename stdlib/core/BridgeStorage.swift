@@ -73,6 +73,14 @@ struct _BridgeStorage<
     )
   }
 
+  @inline(__always)
+  public // @testable
+  mutating func isUniquelyReferencedOrPinnedNative() -> Bool {
+    return _swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject(
+      _bitPattern(rawValue)
+    )
+  }
+
   public // @testable
   var isNative: Bool {
     @inline(__always) get {
@@ -111,6 +119,15 @@ struct _BridgeStorage<
     _sanityCheck(_nonPointerBits(rawValue) == 0)
     let p: UnsafePointer<HeapObject> = Builtin.reinterpretCast(rawValue)
     return _swift_isUniquelyReferenced_nonNull_native(p)
+  }
+
+  @inline(__always)
+  public // @testable
+  mutating func isUniquelyReferencedOrPinned_native_noSpareBits() -> Bool {
+    _sanityCheck(isNative)
+    _sanityCheck(_nonPointerBits(rawValue) == 0)
+    let p: UnsafePointer<HeapObject> = Builtin.reinterpretCast(rawValue)
+    return _swift_isUniquelyReferencedOrPinned_nonNull_native(p)
   }
 
   public // @testable

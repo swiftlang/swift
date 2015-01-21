@@ -110,6 +110,10 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
     return isUniquelyReferenced()
   }
 
+  public mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
+    return isUniquelyReferencedOrPinned()
+  }
+
   /// If this buffer is backed by a `_UnitTestArrayBuffer`
   /// containing the same number of elements as `self`, return it.
   /// Otherwise, return `nil`.
@@ -225,6 +229,9 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
   /// some immutable Cocoa container.
   public mutating func isUniquelyReferenced() -> Bool {
     return _base.isUniquelyReferenced()
+  }
+  public mutating func isUniquelyReferencedOrPinned() -> Bool {
+    return _base.isUniquelyReferencedOrPinned()
   }
 
 #if _runtime(_ObjC)

@@ -219,6 +219,13 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
     Builtin.fixLifetime(_storage)
     return result
   }
+
+  mutating func isUniquelyReferencedOrPinned() -> Bool {
+    let o: UnsafePointer<HeapObject> = Builtin.reinterpretCast(_storage)
+    let result = _swift_isUniquelyReferencedOrPinned_native(o)
+    Builtin.fixLifetime(_storage)
+    return result
+  }
 }
 
 // HeapBuffers are equal when they reference the same buffer

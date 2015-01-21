@@ -265,6 +265,17 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     _fixLifetime(_nativeBuffer)
     return result
   }
+
+  /// Returns true iff either `self` holds the only strong reference
+  /// to its buffer or the pinned has been 'pinned'.
+  ///
+  /// See `isUniquelyReferenced` for details.
+  public mutating func holdsUniqueOrPinnedReference() -> Bool {
+    let o = UnsafePointer<HeapObject>(Builtin.bridgeToRawPointer(_nativeBuffer))
+    let result = _swift_isUniquelyReferencedOrPinned_nonNull_native(o)
+    _fixLifetime(_nativeBuffer)
+    return result
+  }
   
   //===--- internal/private API -------------------------------------------===//
   
@@ -413,6 +424,15 @@ public func isUniquelyReferencedNonObjC<T: AnyObject>(inout object: T) -> Bool {
   // extra reference will be held during the check below
   let o = UnsafePointer<Void>(Builtin.bridgeToRawPointer(object))
   let result = _swift_isUniquelyReferencedNonObjC_nonNull(o)
+  Builtin.fixLifetime(object)
+  return result
+}
+
+internal func isUniquelyReferencedOrPinnedNonObjC<T: AnyObject>(inout object: T) -> Bool {
+  // Note: the pointer must be extracted in a separate step or an
+  // extra reference will be held during the check below
+  let o = UnsafePointer<Void>(Builtin.bridgeToRawPointer(object))
+  let result = _swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(o)
   Builtin.fixLifetime(object)
   return result
 }
