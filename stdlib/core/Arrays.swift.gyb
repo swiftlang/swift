@@ -269,7 +269,7 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
     }
   }
 
-  @semantics("array.make_mutable_shared")
+  @semantics("array.make_mutable")
   mutating func _makeMutableAndUniqueOrPinned() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferencedOrPinned()) {
       _copyBuffer(&_buffer)
