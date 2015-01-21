@@ -14,13 +14,14 @@ import os
 import re
 import shutil
 import argparse
+from pipes import quote as shell_quote
 
 HOME = os.environ['HOME']
 SWIFT_SOURCE_ROOT = os.environ.get('SWIFT_SOURCE_ROOT', os.path.join(HOME, 'src', 's'))
-SWIFT_BUILD_ROOT = os.environ.get('SWIFT_BUILD_ROOT', os.path.join(HOME, 'build', 'swift'))
+SWIFT_BUILD_ROOT = os.environ.get('SWIFT_BUILD_ROOT', os.path.join(SWIFT_SOURCE_ROOT, 'build'))
 VERBOSE = False
 
-variantDir = os.path.join(SWIFT_BUILD_ROOT, 'Ninja-ReleaseAssert')
+variantDir = os.path.join(SWIFT_BUILD_ROOT, 'Ninja-Release')
 buildDir = os.path.join(variantDir, 'swift-macosx-x86_64')
 binDir = os.path.join(buildDir, 'bin')
 benchDir = os.path.join(variantDir, 'bench')
@@ -28,7 +29,14 @@ sourceDir = os.path.join(SWIFT_SOURCE_ROOT, 'swift')
 
 import os
 
+def print_call(*args, **kw):
+    if isinstance(args[0], (str, unicode)):
+        args = [args]
+        
+    print '$ ' + ' '.join(shell_quote(x) for x in args[0]) + '   # %r, %r' % (args[1:], kw)
+    
 def check_call(*args, **kw):
+    print_call(*args, **kw)
     try:
         return subprocess.check_call(*args, **kw)
     except:
@@ -37,6 +45,7 @@ def check_call(*args, **kw):
         raise
     
 def check_output(*args, **kw):
+    print_call(*args, **kw)
     try:
         return subprocess.check_output(*args, **kw)
     except:
@@ -58,7 +67,7 @@ def getWorkTreeSha():
     check_call(['git', 'stash', 'drop', '-q'], cwd=sourceDir)
     return sha
     
-def buildBenchmarks(cacheDir):
+def buildBenchmarks(cacheDir, build_script_args):
     print('Building executables...')
     
     configVars = {'SWIFT_INCLUDE_BENCHMARKS':'TRUE', 'SWIFT_INCLUDE_PERF_TESTSUITE':'TRUE', 'SWIFT_STDLIB_BUILD_TYPE':'RelWithDebInfo', 'SWIFT_STDLIB_ASSERTIONS':'FALSE'}
@@ -73,8 +82,8 @@ def buildBenchmarks(cacheDir):
 
     check_call(
         [ os.path.join(sourceDir, 'utils', 'build-script'),
-          '-R', '--no-swift-stdlib-assertions'
-      ])
+          '-R', '--no-assertions']
+        + build_script_args)
 
     # Doing this requires copying or linking all the libraries to the
     # same executable-relative location.  Probably not worth it.
@@ -86,7 +95,7 @@ def buildBenchmarks(cacheDir):
     #    shutil.copy(os.path.join(binDir, exe), os.path.join(cacheDir, exe))
     print('done.')
 
-def collectBenchmarks(exeNames, treeish = None, repeat = 3):
+def collectBenchmarks(exeNames, treeish = None, repeat = 3, build_script_args = []):
     treeSha = getWorkTreeSha() if treeish is None else getTreeSha(treeish)
     cacheDir = os.path.join(benchDir, treeSha)
     print('Collecting benchmarks for %s in %s ' % (treeish if treeish else 'working tree', cacheDir))
@@ -114,12 +123,12 @@ def collectBenchmarks(exeNames, treeish = None, repeat = 3):
 
                     try:
                         check_call(['git', 'checkout', treeish], cwd=sourceDir)
-                        buildBenchmarks(cacheDir)
+                        buildBenchmarks(cacheDir, build_script_args)
                     finally:
                         subprocess.call(['git', 'checkout', saveHead], cwd=sourceDir)
                         subprocess.call(['git', 'stash', 'pop'], cwd=sourceDir)
                 else:
-                    buildBenchmarks(cacheDir)
+                    buildBenchmarks(cacheDir, build_script_args)
                     
                 rebuilt = True
         else:
@@ -275,6 +284,8 @@ if __name__ == '__main__':
                         action='append', help='Optimization levels to test')
     parser.add_argument(dest='baseline', nargs='?', metavar='tree-ish', default='origin/master',
                         help='the baseline Git commit to compare with.')
+    parser.add_argument(dest='build_script_args', nargs=argparse.REMAINDER, metavar='build-script-args', default=[]
+                        help='additional arguments to build script, e.g. -- --distcc --build-args=-j30')
     args = parser.parse_args()
 
     optimization = args.optimization or ['3']
@@ -285,8 +296,8 @@ if __name__ == '__main__':
     # TODO: This name sucks.
     checkAndUpdatePerfTestSuite(sourceDir)
 
-    workCacheDir = collectBenchmarks(exeNames, None, args.repeat)    
-    baselineCacheDir = collectBenchmarks(exeNames, args.baseline, args.repeat)
+    workCacheDir = collectBenchmarks(exeNames, tree_ish=None, repeat=args.repeat, build_script_args=args.build_script_args)    
+    baselineCacheDir = collectBenchmarks(exeNames, tree_ish=args.baseline, repeat=args.repeat, build_script_args=args.build_script_args)
     
     if baselineCacheDir == workCacheDir:
         print('No changes between work tree and %s; nothing to compare.' % args.baseline)
