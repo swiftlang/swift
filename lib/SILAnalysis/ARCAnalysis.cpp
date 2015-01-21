@@ -399,6 +399,39 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
   return None;
 }
 
+bool
+swift::
+mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
+  // Only applies can require a guaranteed lifetime. If we don't have one, bail.
+  auto *AI = dyn_cast<ApplyInst>(User);
+  if (!AI)
+    return false;
+
+  // Ok, we have an apply. If the apply has no arguments, we don't need to worry
+  // about any guaranteed parameters.
+  if (!AI->getNumOperands())
+    return false;
+
+  // Ok, we have an apply with arguments. Look at the function type and iterate
+  // through the function parameters. If any of the parameters are guaranteed,
+  // attempt to prove that the passed in parameter can not alias Ptr. If we
+  // fail, return true.
+  CanSILFunctionType FType = AI->getSubstCalleeType();
+  auto Params = FType->getParameters();
+  for (unsigned i : indices(Params)) {    
+    if (!Params[i].isGuaranteed())
+      continue;
+    SILValue Op = AI->getArgument(i);
+    for (int i = 0, e = Ptr->getNumTypes(); i < e; i++)
+      if (!AA->isNoAlias(Op, SILValue(Ptr.getDef(), i)))
+        return true;
+  }
+
+  // Ok, we were able to prove that all arguments to the apply that were
+  // guaranteed do not alias Ptr. Return false.
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 //           Utilities for recognizing trap BBs that are ARC inert
 //===----------------------------------------------------------------------===//

@@ -198,6 +198,33 @@ struct RefCountState {
   /// potential control dependency issues.
   bool isPartial() const { return Partial; }
 
+  /// Check if PotentialGuaranteedUser can use the reference count associated
+  /// with the value we are tracking. If so advance the state's sequence
+  /// appropriately and return true. Otherwise return false.
+  bool handlePotentialGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
+                                     AliasAnalysis *AA) {
+    // If we are not tracking a ref count, just return false.
+    if (!isTrackingRefCount())
+      return false;
+
+    // If at the current lattice state, we don't care if the value we are
+    // tracking can be decremented or used, just return false.
+    //
+    // This causes us to only perform alias queries when we are at a lattice
+    // state where the alias queries will actually be used.
+    if (!asImpl()->valueCanBeGuaranteedUsedGivenLatticeState())
+      return false;
+
+    // If we can prove that Other can not use the pointer we are tracking,
+    // return...
+    if (!mayGuaranteedUseValue(PotentialGuaranteedUser, getValue(), AA))
+      return false;
+
+    // Otherwise, allow the CRTP substruct to update itself given we have a
+    // potential decrement.
+    return asImpl()->handleGuaranteedUser(PotentialGuaranteedUser);
+  }
+
   /// Check if PotentialDecrement can decrement the reference count associated
   /// with the value we are tracking. If so advance the state's sequence
   /// appropriately and return true. Otherwise return false.
@@ -397,6 +424,46 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
     }
   }
 
+  /// Returns true if given the current lattice state, do we care if the value
+  /// we are tracking is used.
+  bool valueCanBeGuaranteedUsedGivenLatticeState() const {
+    switch (LatState) {
+    case LatticeState::None:
+    case LatticeState::MightBeDecremented:
+      return false;
+    case LatticeState::Decremented:
+    case LatticeState::MightBeUsed:
+      return true;
+    }
+  }
+
+  /// Given the current lattice state, if we have seen a use, advance the
+  /// lattice state. Return true if we do so and false otherwise.
+  bool handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser) {
+    assert(valueCanBeGuaranteedUsedGivenLatticeState() &&
+           "Must be able to be used at this point of the lattice.");
+    // Advance the sequence...
+    switch (LatState) {
+      // If were decremented, insert the insertion point.
+      case LatticeState::Decremented: {
+        assert(InsertPts.empty() && "If we are decremented, we should have no "
+               "insertion points.");
+        auto Iter = SILBasicBlock::iterator(PotentialGuaranteedUser);
+        InsertPts.insert(std::next(Iter));
+        LatState = LatticeState::MightBeDecremented;
+        return true;
+      }
+      case LatticeState::MightBeUsed:
+        // If we have a might be used, we already created an insertion point
+        // earlier. Just move to MightBeDecremented.
+        LatState = LatticeState::MightBeDecremented;
+        return true;
+      case LatticeState::MightBeDecremented:
+      case LatticeState::None:
+        return false;
+    }
+  }
+
   /// We have a matching ref count inst. Return true if we advance the sequence
   /// and false otherwise.
   bool handleRefCountInstMatch(SILInstruction *RefCountInst) {
@@ -560,6 +627,46 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
         return false;
     }
   }
+
+  /// Returns true if given the current lattice state, do we care if the value
+  /// we are tracking is used.
+  bool valueCanBeGuaranteedUsedGivenLatticeState() const {
+    switch (LatState) {
+    case LatticeState::None:
+    case LatticeState::MightBeUsed:
+      return false;
+    case LatticeState::Incremented:
+    case LatticeState::MightBeDecremented:
+      return true;
+    }
+  }
+
+  /// Given the current lattice state, if we have seen a use, advance the
+  /// lattice state. Return true if we do so and false otherwise.
+  bool handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser) {
+    assert(valueCanBeGuaranteedUsedGivenLatticeState() &&
+           "Must be able to be used at this point of the lattice.");
+    // Advance the sequence...
+    switch (LatState) {
+      // If were decremented, insert the insertion point.
+      case LatticeState::Incremented: {
+        assert(InsertPts.empty() && "If we are decremented, we should have no "
+               "insertion points.");
+        LatState = LatticeState::MightBeUsed;
+        InsertPts.insert(PotentialGuaranteedUser);
+        return true;
+      }
+      case LatticeState::MightBeDecremented:
+        // If we have a might be used, we already created an insertion point
+        // earlier. Just move to MightBeDecremented.
+        LatState = LatticeState::MightBeUsed;
+        return true;
+      case LatticeState::MightBeUsed:
+      case LatticeState::None:
+        return false;
+    }
+  }
+
 
   /// We have a matching ref count inst. Return true if we advance the sequence
   /// and false otherwise.

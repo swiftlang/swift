@@ -51,6 +51,8 @@ enum Either<LTy, RTy> {
   case Right(RTy)
 }
 
+sil @guaranteed_use : $@thin (@guaranteed Builtin.NativeObject) -> ()
+
 /////////////////
 // Basic Tests //
 /////////////////
@@ -1513,3 +1515,59 @@ bb2:
   %2 = tuple()
   return %2 : $()
 }
+
+// CHECK-LABEL: sil @guaranteed_is_a_mayuse_maydecrement : $@thin (@owned Builtin.NativeObject) -> () {
+// CHECK: retain
+// CHECK: release
+sil @guaranteed_is_a_mayuse_maydecrement : $@thin (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @guaranteed_use : $@thin (@guaranteed Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1(%0) : $@thin (@guaranteed Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @guaranteed_is_a_mayuse_maydecrement_can_remove_if_known_safe : $@thin (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: strong_retain
+// CHECK: strong_retain
+// CHECK-NEXT: apply
+// CHECK: strong_release
+// CHECK-NOT: strong_release
+sil @guaranteed_is_a_mayuse_maydecrement_can_remove_if_known_safe : $@thin (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @guaranteed_use : $@thin (@guaranteed Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1(%0) : $@thin (@guaranteed Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @guaranteed_check_if_we_already_have_insertion_pt_we_use_that_one : $@thin (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK: function_ref @guaranteed_use
+// CHECK: strong_retain
+// CHECK: strong_release
+// CHECK: apply
+// CHECK: function_ref @guaranteed_use
+// CHECK: strong_retain
+// CHECK: strong_release
+// CHECK: function_ref @guaranteed_use : $@thin (@guaranteed Builtin.NativeObject) -> ()
+sil @guaranteed_check_if_we_already_have_insertion_pt_we_use_that_one : $@thin (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  %2 = function_ref @guaranteed_use : $@thin (@guaranteed Builtin.NativeObject) -> ()
+  strong_release %1 : $Builtin.NativeObject
+  %3 = function_ref @guaranteed_use : $@thin (@guaranteed Builtin.NativeObject) -> ()
+  apply %2(%0) : $@thin (@guaranteed Builtin.NativeObject) -> ()
+  %4 = function_ref @guaranteed_use : $@thin (@guaranteed Builtin.NativeObject) -> ()
+  strong_retain %1 : $Builtin.NativeObject
+  %5 = function_ref @guaranteed_use : $@thin (@guaranteed Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+

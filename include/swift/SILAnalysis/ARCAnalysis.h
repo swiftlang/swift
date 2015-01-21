@@ -50,6 +50,13 @@ bool mayUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA);
 /// about a specific value while this is about general values.
 bool canNeverUseValues(SILInstruction *User);
 
+/// \returns true if the user \p User may use \p Ptr in a manner that requires
+/// Ptr's life to be guaranteed to exist at this point.
+///
+/// TODO: Better name.
+bool mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr,
+                           AliasAnalysis *AA);
+
 /// If \p Op has arc uses in the instruction range [Start, End), return the
 /// first such instruction. Otherwise return None. We assume that
 /// Start and End are both in the same basic block.

@@ -2332,6 +2332,12 @@ public:
     return isConsumedParameter(getConvention());
   }
 
+  /// Returns true if this parameter is guaranteed, either indirectly or
+  /// directly.
+  bool isGuaranteed() const {
+    return isGuaranteedParameter(getConvention());
+  }
+
   SILType getSILType() const; // in SILType.h
 
   /// Transform this SILParameterInfo by applying the user-provided

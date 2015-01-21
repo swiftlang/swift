@@ -481,6 +481,11 @@ public:
     return getArgumentOperands()[i].set(V);
   }
 
+  /// Returns true if this apply has a self argument.
+  bool hasSelfArgument() const {
+    return getSubstCalleeType()->hasSelfArgument();
+  }
+
   /// The collection of following routines wrap the representation difference in
   /// between the self substitution being first, but the self parameter of a
   /// function being last.
