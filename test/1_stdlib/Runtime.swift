@@ -1256,9 +1256,6 @@ Reflection.test("Unmanaged/nil") {
   expectEqual(expected, output)
 }
 
-#if os(iOS) && arch(arm64)
-// FIXME: rdar://19537198
-#else
 Reflection.test("Unmanaged/not-nil") {
   var output = ""
   var optionalURL: Unmanaged<CFURL>? =
@@ -1274,7 +1271,6 @@ Reflection.test("Unmanaged/not-nil") {
 
   optionalURL!.release()
 }
-#endif
 
 Reflection.test("TupleMirror/NoLeak") {
   if true {
@@ -1318,6 +1314,37 @@ Reflection.test("TupleMirror/NoLeak") {
     expectEqual(0, swiftObjectCanaryCount)
   }
 }
+
+// A struct type and class type whose NominalTypeDescriptor.FieldNames 
+// data is exactly eight bytes long. FieldNames data of exactly 
+// 4 or 8 or 16 bytes was once miscompiled on arm64.
+struct EightByteFieldNamesStruct {
+  let abcdef = 42
+}
+class EightByteFieldNamesClass {
+  let abcdef = 42
+}
+
+Reflection.test("FieldNamesBug") {
+  if true {
+    let expected =
+      "▿ a.EightByteFieldNamesStruct\n" +
+      "  - abcdef: 42\n"
+    var output = ""
+    dump(EightByteFieldNamesStruct(), &output)
+    expectEqual(expected, output)
+  }
+
+  if true {
+    let expected =
+      "▿ a.EightByteFieldNamesClass #0\n" +
+      "  - abcdef: 42\n"
+    var output = ""
+    dump(EightByteFieldNamesClass(), &output)
+    expectEqual(expected, output)
+  }
+}
+
 
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 
