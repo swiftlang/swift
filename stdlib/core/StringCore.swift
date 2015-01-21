@@ -50,19 +50,21 @@ public struct _StringCore {
 #if INTERNAL_CHECKS_ENABLED
     _sanityCheck(count >= 0)
     
-    if _baseAddress == .null() {
+    if _baseAddress == nil {
 #if _runtime(_ObjC)
-      _sanityCheck(cocoaBuffer != nil,
+      _sanityCheck(hasCocoaBuffer,
         "Only opaque cocoa strings may have a null base pointer")
 #endif
       _sanityCheck(elementWidth == 2,
         "Opaque cocoa strings should have an elementWidth of 2")
     }
     else if _baseAddress == _emptyStringBase {
+      _sanityCheck(!hasCocoaBuffer)
       _sanityCheck(count == 0, "Empty string storage with non-zero length")
       _sanityCheck(_owner == nil, "String pointing at empty storage has owner")
     }
     else if let buffer = nativeBuffer {
+      _sanityCheck(!hasCocoaBuffer)
       _sanityCheck(elementWidth == buffer.elementWidth,
         "_StringCore elementWidth doesn't match its buffer's")
       _sanityCheck(UnsafeMutablePointer(_baseAddress) >= buffer.start)
