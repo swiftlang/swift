@@ -1141,6 +1141,14 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
     if (auto *IER = dyn_cast<InitExistentialRefInst>(OER->getOperand()))
       return new (RRPI->getModule()) RefToRawPointerInst(
           RRPI->getLoc(), IER->getOperand(), RRPI->getType());
+
+  // (ref_to_raw_pointer (unchecked_ref_bit_cast x))
+  //    -> (unchecked_trivial_bit_cast x)
+  if (auto *URBCI = dyn_cast<UncheckedRefBitCastInst>(RRPI->getOperand())) {
+    return new (RRPI->getModule()) UncheckedTrivialBitCastInst(
+        RRPI->getLoc(), URBCI->getOperand(), RRPI->getType());
+  }
+
   return nullptr;
 }
 

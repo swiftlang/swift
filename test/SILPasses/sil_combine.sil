@@ -1870,3 +1870,18 @@ bb0(%0: $Builtin.NativeObject):
   %6 = tuple ()
   return %6 : $()
 }
+
+// CHECK-LABEL:     sil @collapse_to_unchecked_trivial_bit_cast
+// CHECK:           bb0([[Ref:%.*]]: $Optional<MyClass>):
+// CHECK:             unchecked_trivial_bit_cast [[Ref]]
+// CHECK-NOT:         unchecked_ref_bit_cast
+// CHECK-NOT:         ref_to_raw_pointer
+// CHECK:             return
+
+// (ref_to_raw_pointer (unchecked_ref_bit_cast x)) -> (unchecked_trivial_bit_cast x)
+sil @collapse_to_unchecked_trivial_bit_cast : $@thin (Optional<MyClass>) -> (Builtin.RawPointer) {
+bb0(%0 : $Optional<MyClass>):
+  %1 = unchecked_ref_bit_cast %0 : $Optional<MyClass> to $Builtin.NativeObject
+  %2 = ref_to_raw_pointer %1 : $Builtin.NativeObject to $Builtin.RawPointer
+  return %2 : $Builtin.RawPointer
+}
