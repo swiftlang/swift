@@ -16,6 +16,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILPasses/Utils/ConstantFolding.h"
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -70,39 +71,8 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
   // Calculate the result.
   APInt LHSInt = Op1->getValue();
   APInt RHSInt = Op2->getValue();
-  APInt Res;
   bool Overflow;
-  bool Signed = false;
-  StringRef Operator = "+";
-
-  switch (ID) {
-  default: llvm_unreachable("Invalid case");
-  case llvm::Intrinsic::sadd_with_overflow:
-    Res = LHSInt.sadd_ov(RHSInt, Overflow);
-    Signed = true;
-    break;
-  case llvm::Intrinsic::uadd_with_overflow:
-    Res = LHSInt.uadd_ov(RHSInt, Overflow);
-    break;
-  case llvm::Intrinsic::ssub_with_overflow:
-    Res = LHSInt.ssub_ov(RHSInt, Overflow);
-    Operator = "-";
-    Signed = true;
-    break;
-  case llvm::Intrinsic::usub_with_overflow:
-    Res = LHSInt.usub_ov(RHSInt, Overflow);
-    Operator = "-";
-    break;
-  case llvm::Intrinsic::smul_with_overflow:
-    Res = LHSInt.smul_ov(RHSInt, Overflow);
-    Operator = "*";
-    Signed = true;
-    break;
-  case llvm::Intrinsic::umul_with_overflow:
-    Res = LHSInt.umul_ov(RHSInt, Overflow);
-    Operator = "*";
-    break;
-  }
+  APInt Res = constantFoldBinaryWithOverflow(LHSInt, RHSInt, Overflow, ID);
 
   // If we can statically determine that the operation overflows,
   // warn about it if warnings are not disabled by ResultsInError being null.
@@ -128,6 +98,32 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
         LHSRange = Args->getElement(0)->getSourceRange();
         RHSRange = Args->getElement(1)->getSourceRange();
       }
+    }
+
+    bool Signed = false;
+    StringRef Operator = "+";
+    
+    switch (ID) {
+      default: llvm_unreachable("Invalid case");
+      case llvm::Intrinsic::sadd_with_overflow:
+        Signed = true;
+        break;
+      case llvm::Intrinsic::uadd_with_overflow:
+        break;
+      case llvm::Intrinsic::ssub_with_overflow:
+        Operator = "-";
+        Signed = true;
+        break;
+      case llvm::Intrinsic::usub_with_overflow:
+        Operator = "-";
+        break;
+      case llvm::Intrinsic::smul_with_overflow:
+        Operator = "*";
+        Signed = true;
+        break;
+      case llvm::Intrinsic::umul_with_overflow:
+        Operator = "*";
+        break;
     }
 
     if (!OpType.isNull()) {
@@ -201,22 +197,7 @@ static SILInstruction *constantFoldCompare(BuiltinInst *BI,
   IntegerLiteralInst *LHS = dyn_cast<IntegerLiteralInst>(Args[0]);
   IntegerLiteralInst *RHS = dyn_cast<IntegerLiteralInst>(Args[1]);
   if (LHS && RHS) {
-    APInt V1 = LHS->getValue();
-    APInt V2 = RHS->getValue();
-    APInt Res;
-    switch (ID) {
-    default: llvm_unreachable("Invalid integer compare kind");
-    case BuiltinValueKind::ICMP_EQ:  Res = V1 == V2; break;
-    case BuiltinValueKind::ICMP_NE:  Res = V1 != V2; break;
-    case BuiltinValueKind::ICMP_SLT: Res = V1.slt(V2); break;
-    case BuiltinValueKind::ICMP_SGT: Res = V1.sgt(V2); break;
-    case BuiltinValueKind::ICMP_SLE: Res = V1.sle(V2); break;
-    case BuiltinValueKind::ICMP_SGE: Res = V1.sge(V2); break;
-    case BuiltinValueKind::ICMP_ULT: Res = V1.ult(V2); break;
-    case BuiltinValueKind::ICMP_UGT: Res = V1.ugt(V2); break;
-    case BuiltinValueKind::ICMP_ULE: Res = V1.ule(V2); break;
-    case BuiltinValueKind::ICMP_UGE: Res = V1.uge(V2); break;
-    }
+    APInt Res = constantFoldComparison(LHS->getValue(), RHS->getValue(), ID);
     SILBuilderWithScope<1> B(BI);
     return B.createIntegerLiteral(BI->getLoc(), BI->getType(), Res);
   }
@@ -228,10 +209,8 @@ static SILInstruction *
 constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
                              Optional<bool> &ResultsInError) {
   assert(ID == BuiltinValueKind::SDiv ||
-         ID == BuiltinValueKind::ExactSDiv ||
          ID == BuiltinValueKind::SRem ||
          ID == BuiltinValueKind::UDiv ||
-         ID == BuiltinValueKind::ExactUDiv ||
          ID == BuiltinValueKind::URem);
 
   OperandValueArrayRef Args = BI->getArguments();
@@ -262,26 +241,9 @@ constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
     return nullptr;
   APInt NumVal = Num->getValue();
 
-  APInt ResVal;
-  bool Overflowed = false;
-  switch (ID) {
-    // We do not cover all the cases below - only the ones that are easily
-    // computable for APInt.
-  default : return nullptr;
-  case BuiltinValueKind::SDiv:
-    ResVal = NumVal.sdiv_ov(DenomVal, Overflowed);
-    break;
-  case BuiltinValueKind::SRem:
-    ResVal = NumVal.srem(DenomVal);
-    break;
-  case BuiltinValueKind::UDiv:
-    ResVal = NumVal.udiv(DenomVal);
-    break;
-  case BuiltinValueKind::URem:
-    ResVal = NumVal.urem(DenomVal);
-    break;
-  }
-
+  bool Overflowed;
+  APInt ResVal = constantFoldDiv(NumVal, DenomVal, Overflowed, ID);
+  
   // If we overflowed...
   if (Overflowed) {
     // And we are not asked to produce diagnostics, just return nullptr...
@@ -316,12 +278,15 @@ static SILInstruction *constantFoldBinary(BuiltinInst *BI,
   default:
     llvm_unreachable("Not all BUILTIN_BINARY_OPERATIONs are covered!");
 
+  // Not supported yet (not easily computable for APInt).
+  case BuiltinValueKind::ExactSDiv:
+  case BuiltinValueKind::ExactUDiv:
+    return nullptr;
+
   // Fold constant division operations and report div by zero.
   case BuiltinValueKind::SDiv:
-  case BuiltinValueKind::ExactSDiv:
   case BuiltinValueKind::SRem:
   case BuiltinValueKind::UDiv:
-  case BuiltinValueKind::ExactUDiv:
   case BuiltinValueKind::URem: {
     return constantFoldAndCheckDivision(BI, ID, ResultsInError);
   }
@@ -345,28 +310,7 @@ static SILInstruction *constantFoldBinary(BuiltinInst *BI,
       return nullptr;
     APInt LHSI = LHS->getValue();
     APInt RHSI = RHS->getValue();
-    APInt ResI;
-    switch (ID) {
-    default: llvm_unreachable("Not all cases are covered!");
-    case BuiltinValueKind::And:
-      ResI = LHSI.And(RHSI);
-      break;
-    case BuiltinValueKind::AShr:
-      ResI = LHSI.ashr(RHSI);
-      break;
-    case BuiltinValueKind::LShr:
-      ResI = LHSI.lshr(RHSI);
-      break;
-    case BuiltinValueKind::Or:
-      ResI = LHSI.Or(RHSI);
-      break;
-    case BuiltinValueKind::Shl:
-      ResI = LHSI.shl(RHSI);
-      break;
-    case BuiltinValueKind::Xor:
-      ResI = LHSI.Xor(RHSI);
-      break;
-    }
+    APInt ResI = constantFoldBitOperation(LHS->getValue(), RHS->getValue(), ID);
     // Add the literal instruction to represent the result.
     SILBuilderWithScope<1> B(BI);
     return B.createIntegerLiteral(BI->getLoc(), BI->getType(), ResI);
@@ -636,32 +580,7 @@ case BuiltinValueKind::id:
     if (!V)
       return nullptr;
 
-    // Get the cast result.
-    Type SrcTy = Builtin.Types[0];
-    Type DestTy = Builtin.Types.size() == 2 ? Builtin.Types[1] : Type();
-    uint32_t SrcBitWidth =
-      SrcTy->castTo<BuiltinIntegerType>()->getGreatestWidth();
-    uint32_t DestBitWidth =
-      DestTy->castTo<BuiltinIntegerType>()->getGreatestWidth();
-
-    APInt CastResV;
-    if (SrcBitWidth == DestBitWidth) {
-      CastResV = V->getValue();
-    } else switch (Builtin.ID) {
-      default : llvm_unreachable("Invalid case.");
-      case BuiltinValueKind::Trunc:
-      case BuiltinValueKind::TruncOrBitCast:
-        CastResV = V->getValue().trunc(DestBitWidth);
-        break;
-      case BuiltinValueKind::ZExt:
-      case BuiltinValueKind::ZExtOrBitCast:
-        CastResV = V->getValue().zext(DestBitWidth);
-        break;
-      case BuiltinValueKind::SExt:
-      case BuiltinValueKind::SExtOrBitCast:
-        CastResV = V->getValue().sext(DestBitWidth);
-        break;
-    }
+    APInt CastResV = constantFoldCast(V->getValue(), Builtin);
 
     // Add the literal instruction to represent the result of the cast.
     SILBuilderWithScope<1> B(BI);
