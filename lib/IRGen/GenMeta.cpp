@@ -1918,6 +1918,17 @@ namespace {
       }
       // The final null terminator is provided by getAddrOfGlobalString.
       
+      // FIXME: rdar://19537198
+      // If the FieldNames string (including the final terminator) 
+      // is exactly 4 or 8 or 16 bytes long then on arm64 it gets emitted 
+      // into section __TEXT,__literal4/8/16 and miscompiled somehow.
+      // Workaround: add an extra byte to avoid those sizes.
+      if (fieldNames.size() == 3 || 
+          fieldNames.size() == 7 || 
+          fieldNames.size() == 15) {
+        fieldNames.push_back('\0');
+      }
+      
       addConstantInt32(numFields);
       addConstantInt32InWords(FieldVectorOffset);
       addWord(IGM.getAddrOfGlobalString(fieldNames));
@@ -2007,6 +2018,17 @@ namespace {
         ++numFields;
       }
       // The final null terminator is provided by getAddrOfGlobalString.
+      
+      // FIXME: rdar://19537198
+      // If the FieldNames string (including the final terminator) 
+      // is exactly 4 or 8 or 16 bytes long then on arm64 it gets emitted 
+      // into section __TEXT,__literal4/8/16 and miscompiled somehow.
+      // Workaround: add an extra byte to avoid those sizes.
+      if (fieldNames.size() == 3 || 
+          fieldNames.size() == 7 || 
+          fieldNames.size() == 15) {
+        fieldNames.push_back('\0');
+      }
       
       addConstantInt32(numFields);
       addConstantInt32InWords(FieldVectorOffset);
