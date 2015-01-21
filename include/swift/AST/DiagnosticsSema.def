@@ -83,7 +83,8 @@ ERROR(cannot_convert_existential_to_metatype,sema,none,
       "accessing members of protocol type value %0 is unimplemented", (Type))
 
 ERROR(cannot_apply_binop_to_args,sema,none,
-      "binary operator '%0' cannot be applied operands of type '%1' and '%2'",
+      "binary operator '%0' cannot be applied to operands of type "
+      "'%1' and '%2'",
       (StringRef, StringRef, StringRef))
 
 ERROR(cannot_apply_binop_to_same_args,sema,none,
