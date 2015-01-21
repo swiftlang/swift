@@ -1483,7 +1483,7 @@ namespace {
         if (auto enumType = outputTy->getAs<EnumType>()) {
           auto enumDecl = enumType->getDecl();
           
-          if (enumDecl->hasRawType()) {
+          if (enumDecl->hasRawType() || hasFailableInits(enumDecl, &CS)) {
             outputTy = getOptionalType(fnExpr->getLoc(), outputTy);
           }
         } else if (auto nominalType = outputTy->getAs<NominalType>()) {
