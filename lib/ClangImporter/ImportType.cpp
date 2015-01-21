@@ -1038,6 +1038,26 @@ static llvm::SmallBitVector getNonNullArgs(
   return result;
 }
 
+/// Apply the @noescape attribute
+static Type applyNoEscape(Type type) {
+  // Recurse into optional types.
+  OptionalTypeKind optKind;
+  if (Type objectType = type->getAnyOptionalObjectType(optKind)) {
+    return OptionalType::get(optKind, applyNoEscape(objectType));
+  }
+
+  // Apply @noescape to @objc_block function types.
+  if (auto funcType = type->getAs<FunctionType>()) {
+    if (funcType->getExtInfo().getRepresentation()
+          == AnyFunctionType::Representation::Block) {
+      return FunctionType::get(funcType->getInput(), funcType->getResult(),
+                               funcType->getExtInfo().withNoEscape());
+    }
+  }
+
+  return type;
+}
+
 Type ClangImporter::Implementation::importFunctionType(
        const clang::FunctionDecl *clangDecl,
        clang::QualType resultType,
@@ -1116,6 +1136,16 @@ Type ClangImporter::Implementation::importFunctionType(
     if (!swiftParamTy)
       return Type();
 
+    // Map __attribute__((noescape)) to @noescape.
+    bool addNoEscapeAttr = false;
+    if (param->hasAttr<clang::NoEscapeAttr>()) {
+      Type newParamTy = applyNoEscape(swiftParamTy);
+      if (newParamTy.getPointer() != swiftParamTy.getPointer()) {
+        swiftParamTy = newParamTy;
+        addNoEscapeAttr = true;
+      }
+    }
+
     // Figure out the name for this parameter.
     Identifier bodyName = importName(param->getDeclName());
 
@@ -1133,6 +1163,12 @@ Type ClangImporter::Implementation::importFunctionType(
                                      importSourceLoc(param->getLocation()),
                                      bodyName, swiftParamTy, 
                                      ImportedHeaderUnit);
+
+    if (addNoEscapeAttr) {
+      bodyVar->getAttrs().add(
+        new (SwiftContext) NoEscapeAttr(/*IsImplicit=*/false));
+    }
+
     bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
     bodyPattern->setType(swiftParamTy);
     bodyPattern
@@ -1270,6 +1306,16 @@ Type ClangImporter::Implementation::importMethodType(
     if (!swiftParamTy)
       return Type();
 
+    // Map __attribute__((noescape)) to @noescape.
+    bool addNoEscapeAttr = false;
+    if (param->hasAttr<clang::NoEscapeAttr>()) {
+      Type newParamTy = applyNoEscape(swiftParamTy);
+      if (newParamTy.getPointer() != swiftParamTy.getPointer()) {
+        swiftParamTy = newParamTy;
+        addNoEscapeAttr = true;
+      }
+    }
+
     // Figure out the name for this parameter.
     Identifier bodyName = importName(param->getDeclName());
 
@@ -1289,6 +1335,12 @@ Type ClangImporter::Implementation::importMethodType(
                                      importSourceLoc(param->getLocation()),
                                      bodyName, swiftParamTy, 
                                      ImportedHeaderUnit);
+
+    if (addNoEscapeAttr) {
+      bodyVar->getAttrs().add(
+        new (SwiftContext) NoEscapeAttr(/*IsImplicit=*/false));
+    }
+
     bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
     bodyPattern->setType(swiftParamTy);
     bodyPattern
