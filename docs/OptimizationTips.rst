@@ -75,8 +75,8 @@ in addition to the overhead of performing the indirect call itself. In
 performance critical code, one often will want to restrict this dynamic
 behavior.
 
-Advice: Use 'final' when you know the declaration does not need to be overridden
---------------------------------------------------------------------------------
+Advice: Use 'final' when one knows the declaration does not need to be overridden
+---------------------------------------------------------------------------------
 
 The ``final`` keyword is a restriction on a declaration of a class, a method, or
 a property such that the declaration cannot be overridden. This implies that the
@@ -113,7 +113,7 @@ Advice: Use 'private' when declaration does not need to be accessed outside of f
 Applying the ``private`` keyword to a declaration restricts the visibility of
 the declaration to the file in which it is declared. This allows the compiler to
 be able to ascertain all other potentially overridding declarations. Thus the
-absense of any such declarations enables the compiler to infer the ``final``
+absence of any such declarations enables the compiler to infer the ``final``
 keyword automatically and remove indirect calls for methods and field accesses
 accordingly. For instance in the following, ``e.doSomething()`` and
 ``f.myPrivateVar``, will be able to be accessed directly assuming ``E``, ``F``
@@ -146,73 +146,96 @@ An important feature provided by the Swift standard library are the generic
 containers Array and Dictionary. This section will explain how to use these
 types in a performant manner.
 
-Advice: Use value type for small POD types in containers
---------------------------------------------------------
+Advice: Use value type in containers
+------------------------------------
 
 In Swift, types can be divided into two different categories: value types
-(structs) and reference types (classes). While there are many distinctions in
-between the two semantic wise from a container stand point the main interesting
-item is that value types can not be Objective-C classes. Inside the Swift
-standard library containers, there is much special code to handle bridging from
-Objective-C. By using a value type, one can avoid all such bridging code.
+(structs, enums, tuples) and reference types (classes). While there are many
+distinctions in between the two semantic wise from a container stand point the
+main interesting item is that value types can not be Objective-C classes. Inside
+the Swift standard library containers, there is much special code to handle
+bridging from Objective-C. By using a value type, one can avoid all such
+bridging code.
 
 Additionally, In contrast to reference types, value types only need reference
-counting if they contain recursively a reference type themselves. This avoids
-additional retain, release traffic inside Array.
-
-If you can choose between a class and a struct use a struct if the copy of the
-whole struct is expected to be a cheap operation.
+counting if they contain, recursively, a reference type. By using value types
+without reference types, one can avoid additional retain, release traffic inside
+containers.
 
 ::
 
   // Don't use a class here.
   struct PhonebookEntry {
-    final var name : String
-    final var number : [Int]
+    var name : String
+    var number : [Int]
   }
 
   var a : [PhonebookEntry]
 
-Advice: Use inout to prevent unnecessary COW copies
----------------------------------------------------
+Keep in mind that there is a trade off in between using large value types and
+reference types. In certain cases, the overhead of copying, moving around large
+value types will outweigh the cost of removing the bridging and retain, release
+overhead.
 
-Arrays and Dictionaries in Swift are value types that use COW (copy-on-write)
-[#]_ to perform copies instead of explicitly copies. In many cases this allows
-the compiler to elide unnecessary copies by retaining the container instead of
-performing a deep copy.  In other cases, unexpected copies can occur. One common
-case that can cause unexpected copies is if one passes an array as a parameter
-to a function. This causes the reference count of the array to be incremented
-causing a copy if one mutates the array. For instance in the following, the call
-to append will cause an unnecessary copy of ``a``, while the call to
-inplace_append will not cause any copies:
+Advice: Use inplace mutation instead of object-reassignment
+-----------------------------------------------------------
+
+All standard library containers in Swift are value types that use COW
+(copy-on-write) [#]_ to perform copies instead of explicitly copies. In many
+cases this allows the compiler to elide unnecessary copies by retaining the
+container instead of performing a deep copy. This is done by only copying the
+underlying container if the reference count of the container is greater than 1
+and the container is mutated. For instance in the following, no copying will
+occur when ``d`` is assigned to ``c``, but when ``d`` undergoes structural
+mutation by appending ``2``, ``d`` will be copied and then ``2`` will be
+appended to ``d``:
 
 ::
 
-  func append(a: [Int], value: Int) -> [Int] {
-    a.append(value)
+  var c: [Int] = [ ... ]
+  var d = c        // No copy will occur here.
+  d.append(2)      // A copy *does* occur here.
+
+Sometimes COW can introduce additional unexpected copies if the user is not
+careful. An example of this is attempting to perform mutation via
+object-reassignment in functions. In Swift, all parameters are passed in at +1,
+i.e. the parameters are retained before a callsite, and then are released at the
+end of the callee. This means that if one writes a function like the following:
+
+::
+
+  func append_one(a: [Int]) -> [Int] {
+    a.append(1)
     return a
   }
 
-  func inplace_append(inout a: [Int], value: Int) {
-    a.append(value)
+  var a = [1, 2, 3]
+  a = append_one(a)
+
+``a`` may be copied [#]_ despite the version of ``a`` without one appended to it
+has no uses after ``append_one`` due to the assignment. This can be avoided
+through the usage of ``inout`` parameters:
+
+::
+
+  func append_one_in_place(inout a: [Int]) {
+    a.append(1)
   }
 
-  var a = [ ... ]
-  a = append(a, 0)
-  inplace_append(a, 1)
+  var a = [1, 2, 3]
+  append_one_in_place(&a)
 
 Unchecked operations
 ====================
 
-One source of bugs that Swift eliminates are integer overflows. This is done by
-performing checks for overflow when performing normal arithmetic. This is not
-appropriate in high performance code where one knows that no memory safety
-issues can result.
+Swift eliminates integer overflow bugs by checking for overflow when performing
+normal arithmetic. These checks are not appropriate in high performance code
+where one knows that no memory safety issues can result.
 
-Advice: Use unchecked integer operations when its is known to be safe
----------------------------------------------------------------------
+Advice: Use unchecked integer when not compromising memory safety
+-----------------------------------------------------------------
 
-In performance critical code you can elide overflow checks if you know it is
+In performance-critical code you can elide overflow checks if you know it is
 safe.
 
 ::
@@ -242,8 +265,7 @@ passed any type through the usage of boxes and vtables. Thus in the following,
   MySwiftFunc<Int> X    // Will instantiate generic code that works with Int...
   MySwiftFunc<Double> Y // ... as well as Double.
 
-This contrasts to other languages like C++ where generic templates are
-instantiated for every use, i.e.,
+This with C++ where generic templates are instantiated for every use, i.e.,
 
 ::
 
@@ -294,12 +316,15 @@ Footnotes
 =========
 
 .. [#] A virtual method table or 'vtable' is a type specific table referenced by
-     instances that contains the addresses of the type's methods.  Dynamic dispatch
-     proceeds by first looking up the table from the object and then looking up the
-     method in the table.
+       instances that contains the addresses of the type's methods. Dynamic
+       dispatch proceeds by first looking up the table from the object and then
+       looking up the method in the table.
 
 .. [#] This is due to the compiler not knowing the exact function being called.
 
 .. [#] i.e. a direct load of a class's field or a direct call to a function.
 
 .. [#] Explain what COW is here.
+
+.. [#] In certain cases the optimizer is able to via inlining and ARC
+       optimization remove the retain, release causing no copy to occur.
