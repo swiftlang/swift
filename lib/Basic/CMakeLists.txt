@@ -37,8 +37,13 @@ add_swift_library(swiftBasic
   LINK_LIBRARIES ${UUID_LIBRARIES}
   COMPONENT_DEPENDS support)
 
-set(SWIFT_VERSION "1.1")
+set(SWIFT_VERSION "99.99" CACHE STRING
+    "The user-visible version of the Swift compiler")
+set(SWIFT_VENDOR "" CACHE STRING
+    "The vendor name of the Swift compiler")
+
 message(STATUS "Swift version: ${SWIFT_VERSION}")
+message(STATUS "Swift vendor: ${SWIFT_VENDOR}")
 
 string(REGEX REPLACE "([0-9]+)\\.[0-9]+(\\.[0-9]+)?" "\\1" SWIFT_VERSION_MAJOR
   ${SWIFT_VERSION})
@@ -48,20 +53,7 @@ string(REGEX REPLACE "[0-9]+\\.([0-9]+)(\\.[0-9]+)?" "\\1" SWIFT_VERSION_MINOR
 set_property(SOURCE Version.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
   " -DSWIFT_VERSION=${SWIFT_VERSION} -DSWIFT_VERSION_MAJOR=${SWIFT_VERSION_MAJOR} -DSWIFT_VERSION_MINOR=${SWIFT_VERSION_MINOR}")
 
-# Default swift submit version quad for local builds
-set(SWIFT_VERSION_QUAD "600.0.20.0")
-
-if (LLVM_SUBMIT_VERSION)
-  set(SWIFT_VERSION_QUAD "${LLVM_SUBMIT_VERSION}.${LLVM_SUBMIT_SUBVERSION}")
-endif()
-
-set_property(SOURCE Version.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
-  " -DSWIFT_SUBMIT_VERSION_QUAD_STRING=\"${SWIFT_VERSION_QUAD}\"")
-
-set_property(SOURCE Version.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
-  " -DSWIFT_SUBMIT_VERSION_STRING=\"swift-${SWIFT_VERSION_QUAD}\"")
-
-if (${SWIFT_VERSION} MATCHES "[0-9]+\\.[0-9]+\\.[0-9]+")
+if ("${SWIFT_VERSION}" MATCHES "[0-9]+\\.[0-9]+\\.[0-9]+")
   string(REGEX REPLACE "[0-9]+\\.[0-9]+\\.([0-9]+)" "\\1" SWIFT_VERSION_PATCHLEVEL
     ${SWIFT_VERSION})
   set_property(SOURCE Version.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
@@ -69,5 +61,26 @@ if (${SWIFT_VERSION} MATCHES "[0-9]+\\.[0-9]+\\.[0-9]+")
 else()
   set_property(SOURCE Version.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
     " -DSWIFT_HAS_VERSION_PATCHLEVEL=0")
+endif()
+
+if(NOT "${SWIFT_VENDOR}" STREQUAL "")
+  set_property(SOURCE Version.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
+      " -DSWIFT_VENDOR=\"\\\"${SWIFT_VENDOR}\\\"\"")
+endif()
+
+option(SWIFT_REPOSITORY_STRING
+    "The string that identifies the SCM commit(s) for this build"
+    "")
+
+if(NOT "${CLANG_REPOSITORY_STRING}" STREQUAL "")
+  set(SWIFT_REPOSITORY_STRING
+      "${SWIFT_REPOSITORY_STRING} ${CLANG_REPOSITORY_STRING}")
+endif()
+
+message(STATUS "Swift repository string: ${SWIFT_REPOSITORY_STRING}")
+
+if(NOT "${SWIFT_REPOSITORY_STRING}" STREQUAL "")
+  set_property(SOURCE Version.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
+      " -DSWIFT_REPOSITORY_STRING=\"\\\"${SWIFT_REPOSITORY_STRING}\\\"\"")
 endif()
 

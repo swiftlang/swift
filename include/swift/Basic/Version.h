@@ -24,15 +24,12 @@
 namespace swift {
 namespace version {
 
-/// \brief Retrieves the numeric {major, minor} Swift version.
+/// Retrieves the numeric {major, minor} Swift version.
 std::pair<unsigned, unsigned> getSwiftNumericVersion();
 
-/// \brief Retrieves a string representing the complete Swift version, which
-/// includes the Swift version number, the repository version, and the vendor
-/// tag.
+/// Retrieves a string representing the complete Swift version, which includes
+/// the Swift version number, the repository version, and the vendor tag.
 std::string getSwiftFullVersion();
-  
-std::string getSwiftSubmitVersionQuad();
 
 } // end namespace version
 } // end namespace swift

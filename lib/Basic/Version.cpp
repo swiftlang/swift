@@ -1,4 +1,4 @@
-//===- Version.cpp - Swift Version Number -----------------------*- C++ -*-===//
+//===--- Version.cpp - Swift Version Number -------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -23,20 +23,20 @@
 #define TOSTR(X) TOSTR2(X)
 
 #ifdef SWIFT_VERSION_PATCHLEVEL
-/// \brief Helper macro for SWIFT_VERSION_STRING.
-#define SWIFT_MAKE_VERSION_STRING(X,Y,Z) TOSTR2(X.Y.Z)
+/// Helper macro for SWIFT_VERSION_STRING.
+#define SWIFT_MAKE_VERSION_STRING(X, Y, Z) TOSTR(X) "." TOSTR(Y) "." TOSTR(Z)
 
-/// \brief A string that describes the Swift version number, e.g., "1.0".
-#define SWIFT_VERSION_STRING \
-SWIFT_MAKE_VERSION_STRING(SWIFT_VERSION_MAJOR,SWIFT_VERSION_MINOR, \
-SWIFT_VERSION_PATCHLEVEL)
+/// A string that describes the Swift version number, e.g., "1.0".
+#define SWIFT_VERSION_STRING                                                   \
+  SWIFT_MAKE_VERSION_STRING(SWIFT_VERSION_MAJOR, SWIFT_VERSION_MINOR,          \
+                            SWIFT_VERSION_PATCHLEVEL)
 #else
-/// \brief Helper macro for SWIFT_VERSION_STRING.
-#define SWIFT_MAKE_VERSION_STRING(X,Y) TOSTR2(X.Y)
+/// Helper macro for SWIFT_VERSION_STRING.
+#define SWIFT_MAKE_VERSION_STRING(X, Y) TOSTR(X) "." TOSTR(Y)
 
-/// \brief A string that describes the Swift version number, e.g., "1.0".
-#define SWIFT_VERSION_STRING \
-SWIFT_MAKE_VERSION_STRING(SWIFT_VERSION_MAJOR,SWIFT_VERSION_MINOR)
+/// A string that describes the Swift version number, e.g., "1.0".
+#define SWIFT_VERSION_STRING                                                   \
+  SWIFT_MAKE_VERSION_STRING(SWIFT_VERSION_MAJOR, SWIFT_VERSION_MINOR)
 #endif
 
 namespace swift {
@@ -50,22 +50,15 @@ std::string getSwiftFullVersion() {
   std::string buf;
   llvm::raw_string_ostream OS(buf);
 #ifdef SWIFT_VENDOR
-  OS << SWIFT_VENDOR;
+  OS << SWIFT_VENDOR " ";
 #endif
   OS << "Swift version " SWIFT_VERSION_STRING;
-#ifdef SWIFT_SUBMIT_VERSION_STRING
-  OS << " (" TOSTR(SWIFT_SUBMIT_VERSION_STRING) ")";
+#ifdef SWIFT_REPOSITORY_STRING
+  OS << " (" SWIFT_REPOSITORY_STRING ")";
 #endif
   return OS.str();
 }
-  
-std::string getSwiftSubmitVersionQuad() {
-#ifdef SWIFT_SUBMIT_VERSION_QUAD_STRING
-  return TOSTR(SWIFT_SUBMIT_VERSION_QUAD_STRING);
-#else
-  return "0.0.0.0";
-#endif
-}
-  
+
 } // end namespace version
 } // end namespace swift
+
