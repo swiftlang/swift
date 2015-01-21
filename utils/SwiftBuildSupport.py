@@ -19,14 +19,13 @@ import subprocess
 import sys
 
 
-HOME = os.environ.get("HOME", "/")
-
-
 def _get_default_source_root():
-    # Default to ~/src/s for historical reasons.
-    result = os.path.join(HOME, "src", "s")
+    result = ""
 
-    # Are we in a Swift checkout? $SWIFT_SOURCE_ROOT/swift/utils/
+    # Are we in a Swift checkout? Start from this file and check its parent
+    # directories.
+    #
+    # $SWIFT_SOURCE_ROOT/swift/utils/SwiftBuildSupport.py
     (swift_path, parent_dirname) = os.path.split(os.path.dirname(__file__))
     if parent_dirname != "utils":
         return result
@@ -34,9 +33,12 @@ def _get_default_source_root():
         return result
     result = os.path.dirname(swift_path)
 
-    # Are we in an LLVM checkout? $SWIFT_SOURCE_ROOT/llvm/tools/swift/utils/
-    (llvm_path, root_dirname) = os.path.split(result)
-    if root_dirname != "tools":
+    # Are we in an LLVM checkout? Start from the Swift checkout and check /its/
+    # parent directories.
+    #
+    # $SWIFT_SOURCE_ROOT/llvm/tools/swift/utils/SwiftBuildSupport.py
+    (llvm_path, parent_dirname) = os.path.split(result)
+    if parent_dirname != "tools":
         return result
     if not os.path.exists(os.path.join(llvm_path, 'CMakeLists.txt')):
         return result
@@ -48,7 +50,6 @@ def _get_default_source_root():
 # are found.
 SWIFT_SOURCE_ROOT = os.environ.get(
     "SWIFT_SOURCE_ROOT", _get_default_source_root())
-
 
 # Set SWIFT_BUILD_ROOT to a directory that will contain a subdirectory
 # for each build configuration
@@ -64,7 +65,6 @@ def bad_usage(message):
     print_with_argv0(message)
     print("Run '" + pipes.quote(sys.argv[0]) + " --help' for more information.")
     sys.exit(1)
-
 
 def quote_shell_command(args):
     return " ".join([ pipes.quote(a) for a in args ])
