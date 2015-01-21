@@ -98,16 +98,24 @@ Substitution Substitution::subst(Module *module,
   // conformances.
   if (auto replacementArch = Replacement->getAs<ArchetypeType>()) {
     if (!substReplacement->hasDependentProtocolConformances()) {
-      conformancesChanged = true;
       // Find the conformances mapped to the archetype.
-      auto foundConformances = conformanceMap.find(replacementArch);
-      assert(foundConformances != conformanceMap.end()
+      auto found = conformanceMap.find(replacementArch);
+      assert(found != conformanceMap.end()
              && "no conformances for replaced archetype?!");
+
+      auto &foundConformances = found->second;
+
+      // If the substituted replacement archetype has no conformances,
+      // then there are no conformances to substitute.
+      if (foundConformances.empty())
+        return Substitution{Archetype, substReplacement, Conformance};
+
+      conformancesChanged = true;
 
       // Get the conformances for the type that apply to the original
       // substituted archetype.
       for (auto proto : Archetype->getConformsTo()) {
-        for (auto c : foundConformances->second) {
+        for (auto c : foundConformances) {
           if (c->getProtocol() == proto) {
             substConformance.push_back(c);
             goto found_conformance;
