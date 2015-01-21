@@ -78,5 +78,120 @@ ${SelfName}TestSuite.test("Hashable") {
 
 % end
 
+enum Check {
+  case LeftOverlap
+  case RightOverlap
+  case Disjoint
+}
+
+class Missile {
+  static var missilesLaunched = 0
+  let number: Int
+  init(_ number: Int) { self.number = number }
+  deinit { Missile.missilesLaunched++ }
+}
+
+func checkPointerCorrectness(check: Check,
+  f: UnsafeMutablePointer<Missile> ->
+    (UnsafeMutablePointer<Missile>, count: Int) -> (),
+  _ withMissiles: Bool = false) {
+  let ptr = UnsafeMutablePointer<Missile>.alloc(4)
+  switch check {
+  case .RightOverlap:
+    ptr.initialize(Missile(1))
+    (ptr + 1).initialize(Missile(2))
+    if withMissiles {
+      (ptr + 2).initialize(Missile(3))
+    }
+    f(ptr + 1)(ptr, count: 2)
+    expectEqual(1, ptr[1].number)
+    expectEqual(2, ptr[2].number)
+  case .LeftOverlap:
+    if withMissiles {
+      ptr.initialize(Missile(1))
+    }
+    (ptr + 1).initialize(Missile(2))
+    (ptr + 2).initialize(Missile(3))
+    f(ptr)(ptr + 1, count: 2)
+    expectEqual(2, ptr[0].number)
+    expectEqual(3, ptr[1].number)
+  case .Disjoint:
+    if withMissiles {
+      ptr.initialize(Missile(0))
+      (ptr + 1).initialize(Missile(1))
+    }
+    (ptr + 2).initialize(Missile(2))
+    (ptr + 3).initialize(Missile(3))
+    f(ptr)(ptr + 2, count: 2)
+    expectEqual(2, ptr[0].number)
+    expectEqual(3, ptr[1].number)
+    // backwards
+    let ptr2 = UnsafeMutablePointer<Missile>.alloc(4)
+    ptr2.initialize(Missile(0))
+    (ptr2 + 1).initialize(Missile(1))
+    if withMissiles {
+      (ptr2 + 2).initialize(Missile(2))
+      (ptr2 + 3).initialize(Missile(3))
+    }
+    f(ptr2 + 2)(ptr2, count: 2)
+    expectEqual(0, ptr2[2].number)
+    expectEqual(1, ptr2[3].number)
+  }
+}
+
+let checkPtr: ((UnsafeMutablePointer<Missile> ->
+  (UnsafeMutablePointer<Missile>, count: Int) -> ()), Bool) -> Check -> ()
+  = { (f, m) in return { checkPointerCorrectness($0, f, m) } }
+
+UnsafeMutablePointerTestSuite.test("moveInitializeBackwardFrom") {
+  let check = checkPtr(UnsafeMutablePointer.moveInitializeBackwardFrom, false)
+  check(Check.RightOverlap)
+  check(Check.Disjoint)
+  expectCrashLater()
+  check(Check.LeftOverlap)
+}
+
+UnsafeMutablePointerTestSuite.test("moveAssignFrom") {
+  let check = checkPtr(UnsafeMutablePointer.moveAssignFrom, true)
+  check(Check.Disjoint)
+  expectCrashLater()
+  check(Check.LeftOverlap)
+  expectCrashLater()
+  check(Check.RightOverlap)
+}
+
+UnsafeMutablePointerTestSuite.test("assignFrom") {
+  let check = checkPtr(UnsafeMutablePointer.assignFrom, true)
+  check(Check.LeftOverlap)
+  check(Check.Disjoint)
+  expectCrashLater()
+  check(Check.RightOverlap)
+}
+
+UnsafeMutablePointerTestSuite.test("assignBackwardFrom") {
+  let check = checkPtr(UnsafeMutablePointer.assignBackwardFrom, true)
+  check(Check.RightOverlap)
+  check(Check.Disjoint)
+  expectCrashLater()
+  check(Check.LeftOverlap)
+}
+
+UnsafeMutablePointerTestSuite.test("moveInitializeFrom") {
+  let check = checkPtr(UnsafeMutablePointer.moveInitializeFrom, false)
+  check(Check.LeftOverlap)
+  check(Check.Disjoint)
+  expectCrashLater()
+  check(Check.RightOverlap)
+}
+
+UnsafeMutablePointerTestSuite.test("initializeFrom") {
+  let check = checkPtr(UnsafeMutablePointer.initializeFrom, false)
+  check(Check.LeftOverlap)
+  check(Check.Disjoint)
+  expectCrashLater()
+  check(Check.RightOverlap)
+}
+
+
 runAllTests()
 

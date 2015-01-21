@@ -184,7 +184,7 @@ public struct ${Self}<T>
     _debugPrecondition(
       count >= 0, "${Self}.moveInitializeBackwardFrom with negative count")
     _debugPrecondition(
-      source <= self || source > self + count,
+      source < self || source >= self + count,
       "${Self}.moveInitializeBackwardFrom non-preceding overlapping range; use moveInitializeFrom instead")
     var src = source + count
     var dst = self + count
@@ -199,8 +199,8 @@ public struct ${Self}<T>
     _debugPrecondition(
       count >= 0, "moveAssignFrom with negative count")
     _debugPrecondition(
-      source > self || source < self - count,
-      "moveAssignFrom non-following overlapping range")
+      self + count <= source || source + count <= self,
+      "moveAssignFrom overlapping range")
     for i in 0..<count {
       self[i] = (source + i).move()
     }
@@ -210,10 +210,10 @@ public struct ${Self}<T>
   /// memory, proceeding from the first element to the last.
   public func assignFrom(source: ${Self}, count: Int) {
     _debugPrecondition(
-      count >= 0, "moveAssignFrom with negative count")
+      count >= 0, "assignFrom with negative count")
     _debugPrecondition(
-      source > self || source < self - count,
-      "moveAssignFrom non-following overlapping range; use assignBackwardFrom")
+      self < source || self >= source + count,
+      "assignFrom non-following overlapping range; use assignBackwardFrom")
     for i in 0..<count {
       self[i] = source[i]
     }
@@ -229,7 +229,7 @@ public struct ${Self}<T>
     _debugPrecondition(
       count >= 0, "${Self}.assignBackwardFrom with negative count")
     _debugPrecondition(
-      source <= self || source > self + count,
+      source < self || source >= self + count,
       "${Self}.assignBackwardFrom non-preceding overlapping range; use assignFrom instead")
     for var i = count; --i >= 0; {
       self[i] = source[i]
@@ -242,7 +242,7 @@ public struct ${Self}<T>
     _debugPrecondition(
       count >= 0, "${Self}.moveInitializeFrom with negative count")
     _debugPrecondition(
-      source >= self || source < self - count,
+      self < source || self >= source + count,
       "${Self}.moveInitializeFrom non-following overlapping range; use moveInitializeBackwardFrom")
     for i in 0..<count {
       (self + i).initialize((source + i).move())
@@ -256,7 +256,7 @@ public struct ${Self}<T>
     _debugPrecondition(
       count >= 0, "${Self}.initializeFrom with negative count")
     _debugPrecondition(
-      source >= self || source < self - count,
+      self < source || self >= source + count,
       "${Self}.initializeFrom non-following overlapping range")
     for i in 0..<count {
       (self + i).initialize(source[i])
