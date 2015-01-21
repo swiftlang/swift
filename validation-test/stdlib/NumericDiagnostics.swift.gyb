@@ -25,10 +25,14 @@ func testIteratedOperations() {
         or T2 in numeric_type_names_Macintosh_only() else "" }
       % for op in operatorsToTest:
         % count += 1
+        % theDiagnostic = "// expected-error{{of type}}" if (T1 != T2) else \
+        %   "// expected-note{{add an explicit type annotation}}  expected-warning{{inferred to have type}}"\
+        %   if (op in all_integer_assignment_operator_names() + all_integer_or_real_assignment_operator_names())\
+        %   else "" #FIXME Temporary workaround for rdar://15928178 gyb miscompiles nested if elif
     if true { // ${count}
       var x1_${T1}: ${T1} = 0
       var x2_${T2}: ${T2} = 0
-      x1_${T1} ${op} x2_${T2}  ${ "// expected-error{{ }}" if T1 != T2 else "" }
+      var result = x1_${T1} ${op} x2_${T2}  ${theDiagnostic} 
     }
       %end # op
       ${ "\n#endif //arch(i386) || arch(x86_64)\n\n" if T1 in numeric_type_names_Macintosh_only() 
