@@ -70,7 +70,20 @@ TEST(OptionSet, intptr_t) {
 
   OptionSet<Ptr> ptr = Ptr::A;
   EXPECT_EQ(static_cast<intptr_t>(Ptr::A), static_cast<intptr_t>(ptr));
+}
 
+TEST(OptionSet, intptr_t_isConstructible) {
+  // First check that std::is_constructible counts explicit conversion
+  // operators.
+  class AlwaysConvertible {
+  public:
+    explicit operator intptr_t () const { return 0; }
+  };
+
+  if (!std::is_constructible<intptr_t, AlwaysConvertible>::value) {
+    // std::is_constructible doesn't test what we want it to. Just exit early.
+    return;
+  }
 
   enum class LongLong : unsigned long long {
     A = 1
