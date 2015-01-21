@@ -434,6 +434,98 @@ Optional<bool> swift::computeSignBit(SILValue V) {
       // Alignof always returns non-negative results.
       case BuiltinValueKind::Alignof:
         return false;
+      // Both operands to AND must have the top bit set for V to.
+      case BuiltinValueKind::And: {
+        // Compute the sign bit of the LHS and RHS.
+        auto Left = computeSignBit(BI->getArguments()[0]);
+        auto Right = computeSignBit(BI->getArguments()[1]);
+
+        // We don't know either's sign bit so we can't
+        // say anything about the result.
+        if (!Left && !Right) {
+          return None;
+        }
+
+        // Now we know that we were able to determine the sign bit
+        // for at least one of Left/Right. Canonicalize the determined
+        // sign bit on the left.
+        if (Right) {
+          std::swap(Left, Right);
+        }
+
+        // We know we must have at least one result and it must be on
+        // the Left. If Right is still not None, then get both values
+        // and AND them together.
+        if (Right) {
+          return Left.getValue() && Right.getValue();
+        }
+
+        // Now we know that Right is None and Left has a value. If
+        // Left's value is true, then we return None as the final
+        // sign bit depends on the unknown Right value.
+        if (Left.getValue()) {
+          return None;
+        }
+
+        // Otherwise, Left must be false and false AND'd with anything
+        // else yields false.
+        return false;
+      }
+      // At least one operand to OR must have the top bit set.
+      case BuiltinValueKind::Or: {
+        // Compute the sign bit of the LHS and RHS.
+        auto Left = computeSignBit(BI->getArguments()[0]);
+        auto Right = computeSignBit(BI->getArguments()[1]);
+
+        // We don't know either's sign bit so we can't
+        // say anything about the result.
+        if (!Left && !Right) {
+          return None;
+        }
+
+        // Now we know that we were able to determine the sign bit
+        // for at least one of Left/Right. Canonicalize the determined
+        // sign bit on the left.
+        if (Right) {
+          std::swap(Left, Right);
+        }
+
+        // We know we must have at least one result and it must be on
+        // the Left. If Right is still not None, then get both values
+        // and OR them together.
+        if (Right) {
+          return Left.getValue() || Right.getValue();
+        }
+
+        // Now we know that Right is None and Left has a value. If
+        // Left's value is false, then we return None as the final
+        // sign bit depends on the unknown Right value.
+        if (!Left.getValue()) {
+          return None;
+        }
+
+        // Otherwise, Left must be true and true OR'd with anything
+        // else yields true.
+        return true;
+      }
+      // Only one of the operands to XOR must have the top bit set.
+      case BuiltinValueKind::Xor: {
+        // Compute the sign bit of the LHS and RHS.
+        auto Left = computeSignBit(BI->getArguments()[0]);
+        auto Right = computeSignBit(BI->getArguments()[1]);
+
+        // If either Left or Right is unknown then we can't say
+        // anything about the sign of the final result since
+        // XOR does not short-circuit.
+        if (!Left || !Right) {
+          return None;
+        }
+
+        // Now we know that both Left and Right must have a value.
+        // For the sign of the final result to be set, only one
+        // of Left or Right should be true.
+        return Left.getValue() != Right.getValue();
+      }
       case BuiltinValueKind::LShr: {
         // If count is provably >= 1, then top bit is not set.
         auto *ILShiftCount = dyn_cast<IntegerLiteralInst>(BI->getArguments()[1]);

@@ -458,7 +458,7 @@ static SILValue simplifyBuiltin(BuiltinInst *BI) {
                    m_CheckedConversion(
                      m_ExtOrBitCast(m_SILValue(Result))), 0))) {
       // If the top bit of Result is known to be 0, then
-      // it is safe to replace the whole patterb by original bits of x
+      // it is safe to replace the whole pattern by original bits of x
       if (Result.getType() == BI->getType()) {
         if (auto signBit = computeSignBit(Result))
           if (!signBit.getValue())
