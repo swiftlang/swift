@@ -198,19 +198,21 @@ func _cocoaStringLengthImpl(source: _CocoaStringType) -> Int {
 }
 
 func _cocoaStringSliceImpl(
-  target: _StringCore, subRange: Range<Int>) -> _StringCore {
+  target: _StringCore, subRange: Range<Int>
+) -> _StringCore {
+  _sanityCheck(target.hasCocoaBuffer)
   
-  let buffer = _NSOpaqueString(
-    owner: String(target) as NSString,
-    subRange:
-      NSRange(location: subRange.startIndex, length: count(subRange)))
+  let cfSelf = unsafeBitCast(target.cocoaBuffer!, CFString.self)
   
-  return _StringCore(
-    baseAddress: nil,
-    count: count(subRange),
-    elementShift: 1,
-    hasCocoaBuffer: true,
-    owner: buffer)
+  _sanityCheck(
+    CFStringGetCharactersPtr(cfSelf) == nil,
+    "Known contiguously-stored strings should already be converted to Swift")
+
+  let cfResult = CFStringCreateWithSubstring(
+    kCFAllocatorDefault, cfSelf,
+    CFRange(location: subRange.startIndex, length: count(subRange)))
+
+  return String(cfResult)._core
 }
 
 func _cocoaStringSubscriptImpl(
@@ -221,80 +223,6 @@ func _cocoaStringSubscriptImpl(
 
   return CFStringGetCharacterAtIndex(cfSelf, position)
 }
-
-//
-// NSString slice subclasses created when converting String to
-// NSString.  We take care to avoid creating long wrapper chains
-// when converting back and forth.
-//
-
-// A substring of an arbitrary immutable NSString.  The underlying
-// NSString is assumed to not provide contiguous UTF-16 storage.
-final class _NSOpaqueString : NSString {
-  override var length: Int { 
-    return subRange.length
-  }
-
-  override func characterAtIndex(index: Int) -> unichar {
-    return owner.characterAtIndex(index + subRange.location)
-  }
-
-  override func getCharacters(buffer: UnsafeMutablePointer<unichar>,
-                              range aRange: NSRange) {
-
-    owner.getCharacters(
-      buffer, 
-      range: NSRange(location: aRange.location + subRange.location, 
-                     length: aRange.length))
-  }
-  
-  //
-  // Implement sub-slicing without adding layers of wrapping
-  // 
-  override func substringFromIndex(start: Int) -> String {
-    return _NSOpaqueString(
-             owner: owner, 
-             subRange: NSRange(location: subRange.location + start, 
-                               length: subRange.length - start)) as String
-  }
-
-  override func substringToIndex(end: Int) -> String {
-    return _NSOpaqueString(
-             owner: owner, 
-             subRange: NSRange(location: subRange.location, length: end)) as String
-  }
-
-  override func substringWithRange(aRange: NSRange) -> String {
-    return _NSOpaqueString(
-             owner: owner, 
-             subRange: NSRange(location: aRange.location + subRange.location, 
-                               length: aRange.length)) as String
-  }
-
-  override init() {
-    _sanityCheckFailure("init() not implemented for _NSOpaqueString")
-  }
-
-  init(owner: NSString, subRange: NSRange) {
-    self.owner = owner
-    self.subRange = subRange
-    super.init()
-  }
-
-  required init(coder aDecoder: NSCoder) {
-    _sanityCheckFailure("init(coder:) not implemented for _NSOpaqueString")
-  }
-
-  //
-  // Implement copy; since this string is immutable we can just return ourselves
-  override func copy() -> AnyObject {
-    return self
-  }
-  
-  var owner: NSString
-  var subRange: NSRange
-}
-
 
 //
 // Conversion from NSString to Swift's native representation

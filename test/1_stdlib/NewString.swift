@@ -146,18 +146,14 @@ func ascii() {
   let i3 = advance(newNSASCII.startIndex, 3)
   let i6 = advance(newNSASCII.startIndex, 6)
   
-  // Slicing the String does not allocate
-  // XCHECK-NEXT: String(Opaque(buffer: @[[asciiaddress]][3...6]))
+  // Slicing the String
   println("  \(repr(newNSASCII[i3..<i6]))")
 
-  // Representing a slice as an NSString requires a new object
-  // XCHECK-NOT: NSString@[[asciiaddress]] = "bar"
-  // XCHECK-NEXT: _NSOpaqueString@[[nsOpaqueSliceAddress:[x0-9a-f]+]] = "bar"
+  // Representing a slice as an NSString
   var nsSliceASCII = newNSASCII[i3..<i6] as NSString
   println("  \(repr(nsSliceASCII))")
 
-  // When round-tripped back to Swift, the _NSOpaqueString object is the new owner
-  // XCHECK-NEXT: String(Opaque(buffer: @[[nsOpaqueSliceAddress]][0...3]))
+  // Round-tripped back to Swift
   println("  \(repr(nsSliceASCII as String))")
 }
 ascii()
