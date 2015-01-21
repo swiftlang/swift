@@ -1544,12 +1544,12 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
     auto &InstList0 = EnumInst0->getParent()->getInstList();
     InstList0.insert(InstList0.end(),
                      BranchInst::create(SEI->getLoc(), SwitchDestBB0,
-                                        *SEI->getParent()->getParent()));
+                                        *SEI->getFunction()));
 
     auto &InstList1 = SEI->getParent()->getInstList();
     InstList1.insert(InstList1.end(),
                      BranchInst::create(SEI->getLoc(), SwitchDestBB1,
-                                        *SEI->getParent()->getParent()));
+                                        *SEI->getFunction()));
     ClonedSEI->eraseFromParent();
     SEI->eraseFromParent();
   }

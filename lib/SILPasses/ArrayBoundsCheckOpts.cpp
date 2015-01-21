@@ -205,11 +205,8 @@ static bool isIdentifiedUnderlyingArrayObject(SILValue V) {
     return true;
 
   // Function arguments are safe.
-  if (auto Arg = dyn_cast<SILArgument>(V.getDef())) {
-    auto Fn = Arg->getParent()->getParent();
-    if (Arg->getParent() == Fn->begin())
-      return true;
-  }
+  if (auto Arg = dyn_cast<SILArgument>(V.getDef()))
+    return Arg->isFunctionArg();
 
   return false;
 }

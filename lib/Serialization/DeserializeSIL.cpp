@@ -1643,7 +1643,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     setLocalValue(ResultVal, ++LastValueID);
 
   for (auto I : InsertedInsn)
-    I->setDebugScope(I->getParent()->getParent()->getDebugScope());
+    I->setDebugScope(I->getFunction()->getDebugScope());
 
   return false;
 }

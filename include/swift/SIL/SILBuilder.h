@@ -35,7 +35,7 @@ public:
 
   explicit SILBuilder(SILInstruction *I,
                       SmallVectorImpl<SILInstruction*> *InsertedInstrs = 0)
-    : F(*I->getParent()->getParent()), InsertedInstrs(InsertedInstrs) {
+    : F(*I->getFunction()), InsertedInstrs(InsertedInstrs) {
     setInsertionPoint(I);
   }
 

@@ -130,7 +130,7 @@ void SILGlobalOpt::collectOnceCall(BuiltinInst *BI) {
 
   // We currently disable optimizing the intializer if a globalinit_func
   // is called by "once" from multiple locations.
-  if (!BI->getParent()->getParent()->isGlobalInit())
+  if (!BI->getFunction()->isGlobalInit())
     // If a globalinit_func is called by "once" from a function that is not
     // an addressor, we set count to 2 to disable optimizing the initializer.
     InitializerCount[Callee] = 2;

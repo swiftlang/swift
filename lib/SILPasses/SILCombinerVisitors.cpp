@@ -140,7 +140,7 @@ SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *SEAI) {
   EnumVal->setDebugScope(SEAI->getDebugScope());
   auto *I = SelectEnumInst::create(SEAI->getLoc(), EnumVal, SEAI->getType(),
                                    Default, Cases,
-                                   *SEAI->getParent()->getParent());
+                                   *SEAI->getFunction());
   I->setDebugScope(SEAI->getDebugScope());
   return I;
 }
@@ -1636,7 +1636,7 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
     }
 
     return SwitchEnumInst::create(SEI->getLoc(), SEI->getEnumOperand(), Default,
-                                  Cases, *SEI->getParent()->getParent());
+                                  Cases, *SEI->getFunction());
   }
 
   return nullptr;
