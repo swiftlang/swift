@@ -277,12 +277,10 @@ const TypeInfo &IRGenModule::getObjCClassPtrTypeInfo() {
 }
 
 const LoadableTypeInfo &TypeConverter::getObjCClassPtrTypeInfo() {
+  // ObjC class pointers look like unmanaged (untagged) object references.
   if (ObjCClassPtrTI) return *ObjCClassPtrTI;
-  // ObjC class objects are guaranteed to be pointer-aligned.
-  ObjCClassPtrTI = createPrimitiveForAlignedPointer(IGM.ObjCClassPtrTy,
-                                                    IGM.getPointerSize(),
-                                                    IGM.getPointerAlignment(),
-                                                    IGM.getPointerAlignment());
+  ObjCClassPtrTI =
+    createUnmanagedStorageType(IGM.ObjCClassPtrTy);
   ObjCClassPtrTI->NextConverted = FirstType;
   FirstType = ObjCClassPtrTI;
   return *ObjCClassPtrTI;

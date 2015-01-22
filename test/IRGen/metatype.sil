@@ -56,20 +56,6 @@ bb0(%0 : $@objc_metatype Gizmo.Type):
   return %1 : $@thick Gizmo.Type
 }
 
-// CHECK-LABEL: define void @optional_objc_metatype(i64)
-sil @optional_objc_metatype : $@thin (Optional<@objc_metatype Gizmo.Type>) -> () {
-bb0(%0 : $Optional<@objc_metatype Gizmo.Type>):
-  %1 = tuple ()
-  return %1 : $()
-}
-
-// CHECK-LABEL: define void @optional_swift_metatype(i64)
-sil @optional_swift_metatype : $@thin (Optional<@thick Gizmo.Type>) -> () {
-bb0(%0 : $Optional<@thick Gizmo.Type>):
-  %1 = tuple ()
-  return %1 : $()
-}
-
 protocol CP: class {}
 
 // CHECK-LABEL: define %objc_class* @archetype_objc_metatype(%swift.type* %T, i8** %T.CP)

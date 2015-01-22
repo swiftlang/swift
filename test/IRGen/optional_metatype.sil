@@ -1,0 +1,56 @@
+// RUN: rm -rf %t && mkdir %t
+// RUN: %build-irgen-test-overlays
+// RUN: %target-swift-frontend -sdk %S/Inputs -I %t -emit-ir %s | FileCheck %s --check-prefix=%target-cpu
+
+import Builtin
+import Swift
+import gizmo
+
+// x86_64-LABEL: define void @optional_objc_metatype(i64)
+// x86_64:         switch {{.*}} [
+// x86_64:           i64 0, label
+// i386-LABEL:   define void @optional_objc_metatype(i32)
+// i386:           switch {{.*}} [
+// i386:             i32 0, label
+// arm64-LABEL:  define void @optional_objc_metatype(i64)
+// arm64:          switch {{.*}} [
+// arm64:            i64 0, label
+// armv7-LABEL:  define void @optional_objc_metatype(i32)
+// armv7:          switch {{.*}} [
+// armv7:            i32 0, label
+
+sil @optional_objc_metatype : $@thin (Optional<@objc_metatype Gizmo.Type>) -> () {
+bb0(%0 : $Optional<@objc_metatype Gizmo.Type>):
+  switch_enum %0 : $Optional<@objc_metatype Gizmo.Type>, case #Optional.Some!enumelt.1: some, case #Optional.None!enumelt: none
+some(%m : $@objc_metatype Gizmo.Type):
+  br cont
+none:
+  br cont
+cont:
+  return undef : $()
+}
+
+// x86_64-LABEL: define void @optional_swift_metatype(i64)
+// x86_64:         switch {{.*}} [
+// x86_64:           i64 0, label
+// i386-LABEL:   define void @optional_swift_metatype(i32)
+// i386:           switch {{.*}} [
+// i386:             i32 0, label
+// arm64-LABEL:  define void @optional_swift_metatype(i64)
+// arm64:          switch {{.*}} [
+// arm64:            i64 0, label
+// armv7-LABEL:  define void @optional_swift_metatype(i32)
+// armv7:          switch {{.*}} [
+// armv7:            i32 0, label
+
+sil @optional_swift_metatype : $@thin (Optional<@thick Gizmo.Type>) -> () {
+bb0(%0 : $Optional<@thick Gizmo.Type>):
+  switch_enum %0 : $Optional<@thick Gizmo.Type>, case #Optional.Some!enumelt.1: some, case #Optional.None!enumelt: none
+some(%m : $@thick Gizmo.Type):
+  br cont
+none:
+  br cont
+cont:
+  return undef : $()
+}
+
