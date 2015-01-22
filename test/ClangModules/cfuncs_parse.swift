@@ -11,7 +11,7 @@ func test_cfunc2(i: Int) {
   var f = cfunc2(i, 17)
   var f2 : Float = f
   // FIXME: Should report this error: {{cannot convert the expression's type '$T3' to type 'CLong'}}
-  cfunc2(b:17, a:i) // expected-error{{cannot invoke 'cfunc2' with an argument list of type '(Int, Int)'}} expected-note {{expected an argument list of type '(Int, Int32)'}}
+  cfunc2(b:17, a:i) // expected-error{{cannot invoke 'cfunc2' with an argument list of type '(b: Int, a: Int)'}} expected-note {{expected an argument list of type '(Int, Int32)'}}
 }
 
 func test_cfunc3_a() {

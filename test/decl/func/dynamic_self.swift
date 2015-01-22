@@ -42,7 +42,8 @@ class C1 {
 
   // Instance methods have a self of type Self.
   func f(b: Bool) -> Self {
-    if b { return C1(int: 5) } // expected-error{{cannot invoke initializer for type 'C1' with an argument list of type '(Int)'}}
+    // FIXME: below diagnostic should complain about C1 -> Self conversion
+    if b { return C1(int: 5) } // expected-error{{cannot invoke initializer for type 'C1' with an argument list of type '(int: Int)'}} expected-note{{expected an argument list of type '(int: Int)'}}
 
     // One can use .dynamicType to attempt to construct an object of type Self.
     if !b { return self.dynamicType(int: 5) }

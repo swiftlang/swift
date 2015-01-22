@@ -499,8 +499,7 @@ func conversionTest(inout a: Double, inout b: Int) {
   var pi_f4 = float(pi_f)
 
   var e = Empty(f)
-  // FIXME: Need note pointing back to the initializer.
-  var e2 = Empty(d) // expected-error{{cannot invoke initializer for type 'Empty' with an argument list of type '(Double)'}}
+  var e2 = Empty(d) // expected-error{{cannot invoke initializer for type 'Empty' with an argument list of type '(Double)'}} expected-note{{expected an argument list of type '(Float)'}}
   var e3 = Empty(Float(d))
 }
 
@@ -510,7 +509,7 @@ struct Rule {
 }
 
 var ruleVar: Rule
-ruleVar = Rule("a") // expected-error{{cannot assign to immutable value of type 'Rule'}} expected-error {{cannot invoke initializer for type 'Rule' with an argument list of type '(String)'}}
+ruleVar = Rule("a") // expected-error{{cannot assign to immutable value of type 'Rule'}} expected-error {{cannot invoke initializer for type 'Rule' with an argument list of type '(String)'}} expected-note{{expected an argument list of type '(target: String, dependencies: String)'}}
 
 
 class C {
@@ -518,7 +517,7 @@ class C {
   init(other: C?) { x = other }
 }
 
-var c = C(3) // expected-error {{cannot invoke initializer for type 'C' with an argument list of type '(Int)'}}
+var c = C(3) // expected-error {{cannot invoke initializer for type 'C' with an argument list of type '(Int)'}} expected-note{{expected an argument list of type '(other: C?)'}}
 
 //===----------------------------------------------------------------------===//
 // Unary Operators

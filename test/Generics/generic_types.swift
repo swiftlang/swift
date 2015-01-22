@@ -199,7 +199,7 @@ func useNested(ii: Int, hni: HasNested<Int>,
   // Generic constructor of a generic struct
   HNI(1, 2.71828)
   // FIXME: Should report this error: {{cannot convert the expression's type 'HNI' to type 'Int'}}
-  HNI(1.5, 2.71828) // expected-error{{cannot invoke initializer for type 'HNI' with an argument list of type '(Double, Double)'}}
+  HNI(1.5, 2.71828) // expected-error{{cannot invoke initializer for type 'HNI' with an argument list of type '(Double, Double)'}} expected-note{{expected an argument list of type '(T, U)'}}
 
   // Generic function in a nested generic struct
   var ids = xis.g(1, u: "Hello", v: 3.14159)

@@ -65,7 +65,7 @@ func test_static_method_value_coerce(a: A) {
 func test_mixed_overload(a: A, x: X, y: Y) {
   var x1 = a.mixed(x: x)
   x1 = x
-  var y1 = a.mixed(y: y) // expected-error{{cannot invoke 'mixed' with an argument list of type '(Y)'}}
+  var y1 = a.mixed(y: y) // expected-error{{cannot invoke 'mixed' with an argument list of type '(y: Y)'}}
 
   
   A.mixed(x) // expected-error{{cannot invoke 'mixed' with an argument list of type '(X)'}}

@@ -167,7 +167,7 @@ func staticEqCheck<T : StaticEq, U : StaticEq>(t: T, u: U) {
 
   if T.isEqual(t, y: t) { return }
   if U.isEqual(u, y: u) { return }
-  T.isEqual(t, y: u) // expected-error{{cannot invoke 'isEqual' with an argument list of type '(T, U)'}}
+  T.isEqual(t, y: u) // expected-error{{cannot invoke 'isEqual' with an argument list of type '(T, y: U)'}}
 }
 
 //===----------------------------------------------------------------------===//

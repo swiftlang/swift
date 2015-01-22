@@ -108,7 +108,7 @@ func checkInitWithCoder(coder: NSCoder) {
   NSTableViewController(coder: coder)
   MyViewController(coder: coder)
   MyTableViewController(coder: coder)
-  MyOtherTableViewController(coder: coder) // expected-error{{cannot invoke initializer for type 'MyOtherTableViewController' with an argument list of type '(NSCoder)'}}
+  MyOtherTableViewController(coder: coder) // expected-error{{cannot invoke initializer for type 'MyOtherTableViewController' with an argument list of type '(coder: NSCoder)'}} expected-note{{expected an argument list of type '(int: Int)'}}
   MyThirdTableViewController(coder: coder)
 }
 

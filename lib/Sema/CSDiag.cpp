@@ -1289,17 +1289,29 @@ Expr* unwrapParenExpr(Expr *e) {
   return e;
 }
 
-/// Given a vector of types, obtain a stringified comma-separated list of their
-/// associated "user friendly" type names.
-std::string getTypeListString(SmallVectorImpl<Type> &types) {
+/// Given a vector of names and types, obtain a stringified comma-separated
+/// list of the names (if present) and their associated "user friendly" type
+/// names.
+std::string getTypeListString(SmallVectorImpl<Identifier> &names,
+                              SmallVectorImpl<Type> &types) {
   
   std::string typeList = "";
   
   if (types.size()) {
+    if (!names[0].empty()) {
+      typeList += names[0].get();
+      typeList += ": ";
+    }
     typeList += getUserFriendlyTypeName(types[0]);
     
-    for (size_t i = 1; i < types.size(); i++)
-      typeList += ", " + getUserFriendlyTypeName(types[i]);
+    for (size_t i = 1; i < types.size(); i++) {
+      typeList += ", ";
+      if (!names[i].empty()) {
+        typeList += names[i].get();
+        typeList += ": ";
+      }
+      typeList += getUserFriendlyTypeName(types[i]);
+    }
   }
   
   return typeList;
@@ -1578,14 +1590,18 @@ void FailureDiagnosis::suggestPotentialOverloads(
   std::map<std::string, bool> dupes;
 
   for (auto paramList : paramLists) {
+    SmallVector<Identifier, 16> paramNames;
     SmallVector<Type, 16> paramTypes;
     
     // Assemble the parameter type list.
     if (auto parenType = dyn_cast<ParenType>(paramList.getPointer())) {
+      paramNames.push_back(Identifier());
       paramTypes.push_back(parenType->getUnderlyingType());
     } else if (auto tupleType = paramList->getAs<TupleType>()) {
-      paramTypes.append(tupleType->getElementTypes().begin(),
-                        tupleType->getElementTypes().end());
+      for (auto field : tupleType->getFields()) {
+        paramNames.push_back(field.getName());
+        paramTypes.push_back(field.getType());
+      }
     }
     
     if (paramTypes.size() != argTypes.size())
@@ -1596,7 +1612,7 @@ void FailureDiagnosis::suggestPotentialOverloads(
       auto at = argTypes[i];
     
       if (pt->isEqual(at)) {
-        auto typeListString = getTypeListString(paramTypes);
+        auto typeListString = getTypeListString(paramNames, paramTypes);
         if (!dupes[typeListString]) {
           dupes[typeListString] = true;
           if (suggestionText.length())
@@ -1795,7 +1811,8 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
   bool isInitializer = false;
   bool isOverloadedFn = false;
   
-  llvm::SmallVector<Type,16> paramLists;
+  llvm::SmallVector<Type, 16> paramLists;
+  llvm::SmallVector<Identifier, 16> argNames;
   llvm::SmallVector<Type, 16> argTypes;
   
   // Obtain the function's name, and collect any parameter lists for diffing
@@ -1824,6 +1841,19 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
     // It's always a metatype type, so use the instance type name.
     auto instanceType = TE->getType()->getAs<MetatypeType>()->getInstanceType();
     overloadName = instanceType->getString();
+
+    auto ctors = CS->TC.lookupConstructors(instanceType, CS->DC, false); // TODO: figure out right value for isKnownPrivate
+    for (auto ctor : ctors) {
+      if (auto fnType = ctor->getType()->getAs<AnyFunctionType>()) {
+        // skip type argument
+        if (auto fnType2 = fnType->getResult()->getAs<AnyFunctionType>()) {
+          paramLists.push_back(fnType2->getInput());
+        }
+      }
+    }
+    if (paramLists.size() > 1) {
+      isOverloadedFn = true;
+    }
   } else if (auto UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
     overloadName = UDE->getName().str().str();
   } else {
@@ -1841,14 +1871,18 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
     if (isErrorTypeKind(subType))
       foundIntermediateError = true;
     
+    argNames.push_back(Identifier());
     argTypes.push_back(subType);
   } else if (auto tupleExpr = dyn_cast<TupleExpr>(argExpr)) {
-    for (auto elExpr : tupleExpr->getElements()) {
+    for (unsigned i = 0; i < tupleExpr->getNumElements(); i++) {
+      Identifier elName = tupleExpr->getElementName(i);
+      Expr *elExpr = tupleExpr->getElement(i);
       auto elType = getTypeOfIndependentSubExpression(elExpr);
       
       if (isErrorTypeKind(elType))
         foundIntermediateError = true;
       
+      argNames.push_back(elName);
       argTypes.push_back(elType);
     }
   }
@@ -1858,7 +1892,7 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
   
   if (argTypes.size()) {
     
-    std::string argString = "(" + getTypeListString(argTypes) + ")";
+    std::string argString = "(" + getTypeListString(argNames, argTypes) + ")";
     
     if (!isOverloadedFn) {
       if (isClosureInvocation) {
@@ -1904,17 +1938,21 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
   if (paramLists.size()) {
     if(!isOverloadedFn) {
       std::string paramString = "";
+      SmallVector<Identifier, 16> paramNames;
       SmallVector<Type, 16> paramTypes;
       
       if (auto parenType = dyn_cast<ParenType>(paramLists[0].getPointer())) {
+        paramNames.push_back(Identifier());
         paramTypes.push_back(parenType->getUnderlyingType());
       } else if (auto tupleType = paramLists[0]->getAs<TupleType>()) {
-        paramTypes.append(tupleType->getElementTypes().begin(),
-                          tupleType->getElementTypes().end());
+        for (auto field : tupleType->getFields()) {
+          paramNames.push_back(field.getName());
+          paramTypes.push_back(field.getType());
+        }
       }
       
       if (paramTypes.size()) {
-        paramString = "(" + getTypeListString(paramTypes) + ")";
+        paramString = "(" + getTypeListString(paramNames, paramTypes) + ")";
         
         CS->TC.diagnose(argExpr->getLoc(),
                         diag::expected_certain_args,

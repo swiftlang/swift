@@ -128,7 +128,7 @@ variadics1(x: 1, y: 2, 1, 2, 3)
 
 // Using various (out-of-order)
 // FIXME: Poor diagnostic.
-variadics1(1, 2, 3, 4, 5, x: 6, y: 7) // expected-error{{cannot invoke 'variadics1' with an argument list of type '(Int, Int, Int, Int, Int, Int, Int)'}} expected-note{{expected an argument list of type '(Int, Int, [Int])'}}
+variadics1(1, 2, 3, 4, 5, x: 6, y: 7) // expected-error{{cannot invoke 'variadics1' with an argument list of type '(Int, Int, Int, Int, Int, x: Int, y: Int)'}} expected-note{{expected an argument list of type '(x: Int, y: Int, [Int])'}}
 
 func variadics2(#x: Int, y: Int = 2, #z: Int...) { }
 
