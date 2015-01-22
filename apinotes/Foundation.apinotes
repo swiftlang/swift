@@ -10227,7 +10227,7 @@ Classes:
   - Selector: 'initWithIdentity:certificates:persistence:'
     MethodKind: Instance
     Nullability:
-    - U
+    - N
     - N
     - S
     NullabilityOfRet: N
