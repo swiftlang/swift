@@ -165,13 +165,19 @@ public func join<
     result.reserveCapacity(n)
   }
 
-  var needSeparator = false
-  for x in elements {
-    if needSeparator {
-      result.extend(separator)
+  if separatorSize != 0 {
+    var needSeparator = false
+    for x in elements {
+      if needSeparator {
+        result.extend(separator)
+      }
+      result.extend(x)
+      needSeparator = true
     }
-    result.extend(x)
-    needSeparator = true
+  } else {
+    for x in elements {
+      result.extend(x)
+    }
   }
 
   return result
