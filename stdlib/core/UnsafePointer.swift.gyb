@@ -174,38 +174,6 @@ public struct ${Self}<T>
     return Builtin.take(_rawValue)
   }
 
-  /// Move count values beginning at source into uninitialized memory,
-  /// transforming the source values into raw memory, proceeding from
-  /// the last value to the first.  Use this for copying ranges into
-  /// later memory that may overlap with the source range.
-  ///
-  /// Requires: either `source` precedes `self` or follows `self + count`.
-  public func moveInitializeBackwardFrom(source: ${Self}, count: Int) {
-    _debugPrecondition(
-      count >= 0, "${Self}.moveInitializeBackwardFrom with negative count")
-    _debugPrecondition(
-      source < self || source >= self + count,
-      "${Self}.moveInitializeBackwardFrom non-preceding overlapping range; use moveInitializeFrom instead")
-    var src = source + count
-    var dst = self + count
-    while dst != self {
-      (--dst).initialize((--src).move())
-    }
-  }
-
-  /// Assign from count values beginning at source into initialized
-  /// memory, transforming the source values into raw memory.
-  public func moveAssignFrom(source: ${Self}, count: Int) {
-    _debugPrecondition(
-      count >= 0, "moveAssignFrom with negative count")
-    _debugPrecondition(
-      self + count <= source || source + count <= self,
-      "moveAssignFrom overlapping range")
-    for i in 0..<count {
-      self[i] = (source + i).move()
-    }
-  }
-
   /// Assign from `count` values beginning at source into initialized
   /// memory, proceeding from the first element to the last.
   public func assignFrom(source: ${Self}, count: Int) {
@@ -244,23 +212,49 @@ public struct ${Self}<T>
     _debugPrecondition(
       self < source || self >= source + count,
       "${Self}.moveInitializeFrom non-following overlapping range; use moveInitializeBackwardFrom")
-    for i in 0..<count {
-      (self + i).initialize((source + i).move())
-    }
+    Builtin.takeArrayFrontToBack(T.self, self._rawValue, source._rawValue,
+      count.value)
+    // for i in 0..<count {
+    //   (self + i).initialize((source + i).move())
+    // }
+  }
+
+  /// Move `count` values beginning at `source` into uninitialized memory,
+  /// transforming the source values into raw memory, proceeding from
+  /// the last value to the first.  Use this for copying ranges into
+  /// later memory that may overlap with the source range.
+  ///
+  /// Requires: either `source` precedes `self` or follows `self + count`.
+  public func moveInitializeBackwardFrom(source: ${Self}, count: Int) {
+    _debugPrecondition(
+      count >= 0, "${Self}.moveInitializeBackwardFrom with negative count")
+    _debugPrecondition(
+      source < self || source >= self + count,
+      "${Self}.moveInitializeBackwardFrom non-preceding overlapping range; use moveInitializeFrom instead")
+    Builtin.takeArrayBackToFront(T.self, self._rawValue, source._rawValue,
+      count.value)
+    // var src = source + count
+    // var dst = self + count
+    // while dst != self {
+    //   (--dst).initialize((--src).move())
+    // }
   }
 
   /// Copy count values beginning at source into raw memory.
   ///
   /// Precondition: the memory is not initialized.
+  ///
+  /// Requires: `self` and `source` may not overlap.
   public func initializeFrom(source: ${Self}, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.initializeFrom with negative count")
     _debugPrecondition(
-      self < source || self >= source + count,
+      self + count <= source || source + count <= self,
       "${Self}.initializeFrom non-following overlapping range")
-    for i in 0..<count {
-      (self + i).initialize(source[i])
-    }
+    Builtin.copyArray(T.self, self._rawValue, source._rawValue, count.value)
+    // for i in 0..<count {
+    //   (self + i).initialize(source[i])
+    // }
   }
 
   /// Copy the elements of `C` into raw memory.
@@ -278,6 +272,21 @@ public struct ${Self}<T>
       // C.Generator.Element in all cases, but doing so crashes the
       // type-checker.
       p++.initialize(unsafeBitCast(x, T.self))
+    }
+  }
+
+  /// Assign from `count` values beginning at `source` into initialized
+  /// memory, transforming the source values into raw memory.
+  ///
+  /// Requires: the `self` and `source` ranges may not overlap.
+  public func moveAssignFrom(source: ${Self}, count: Int) {
+    _debugPrecondition(
+      count >= 0, "moveAssignFrom with negative count")
+    _debugPrecondition(
+      self + count <= source || source + count <= self,
+      "moveAssignFrom overlapping range")
+    for i in 0..<count {
+      self[i] = (source + i).move()
     }
   }
 

@@ -156,6 +156,10 @@ UnsafeMutablePointerTestSuite.test("moveAssignFrom") {
   check(Check.Disjoint)
   expectCrashLater()
   check(Check.LeftOverlap)
+}
+
+UnsafeMutablePointerTestSuite.test("moveAssignFrom.Right") {
+  let check = checkPtr(UnsafeMutablePointer.moveAssignFrom, true)
   expectCrashLater()
   check(Check.RightOverlap)
 }
@@ -186,12 +190,16 @@ UnsafeMutablePointerTestSuite.test("moveInitializeFrom") {
 
 UnsafeMutablePointerTestSuite.test("initializeFrom") {
   let check = checkPtr(UnsafeMutablePointer.initializeFrom, false)
-  check(Check.LeftOverlap)
   check(Check.Disjoint)
+  expectCrashLater()
+  check(Check.LeftOverlap)
+}
+
+UnsafeMutablePointerTestSuite.test("initializeFrom.Right") {
+  let check = checkPtr(UnsafeMutablePointer.initializeFrom, false)
   expectCrashLater()
   check(Check.RightOverlap)
 }
-
 
 runAllTests()
 
