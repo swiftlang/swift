@@ -184,14 +184,15 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
     return _getCount()
   }
 
-  /// Access the `index`\ th element. Reading is O(1).  Writing is
-  /// ${O1}.
 #if _runtime(_ObjC)
   // FIXME: Code is duplicated here between the Objective-C and non-Objective-C
   // runtimes because config blocks can't appear inside a subscript function
   // without causing parse errors. When this is fixed, they should be merged
   // as described in the comment below.
   // rdar://problem/19553956
+
+  /// Access the `index`\ th element. Reading is O(1).  Writing is
+  /// ${O1}.
   public subscript(index: Int) -> Element {
 %if Self == 'Array':
     get {
@@ -221,6 +222,8 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
     }
   }
 #else
+  /// Access the `index`\ th element. Reading is O(1).  Writing is
+  /// ${O1}.
   public subscript(index: Int) -> Element {
     addressWithNativeOwner {
       _checkSubscript(index)
