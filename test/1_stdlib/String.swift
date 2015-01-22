@@ -1001,5 +1001,30 @@ StringTests.test("unicodeViews") {
     advance(ga.utf8.startIndex, 6)]))
 }
 
+// Validate that index conversion does something useful for Cocoa
+// programmers.
+StringTests.test("indexConversion") {
+  var err: NSError? = nil
+
+  let re = NSRegularExpression(
+    pattern: "([^ ]+)er", options: NSRegularExpressionOptions(), error: &err)!
+
+  let s = "go further into the larder to barter."
+
+  var matches: [String] = []
+  
+  re.enumerateMatchesInString(
+    s, options: NSMatchingOptions(), range: NSRange(0..<count(s.utf16))
+  ) {
+    result, flags, stop
+  in
+    let r = result.rangeAtIndex(1)
+    let start = String.UTF16Index(r.location)
+    let end = String.UTF16Index(r.location + r.length)
+    matches.append(String(s.utf16[start..<end]))
+  }
+
+  expectEqual(["furth", "lard", "bart"], matches)
+}
 runAllTests()
 
