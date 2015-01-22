@@ -41,3 +41,15 @@ func extensionReferences(x: Foo) {
   let _ = x.cox
 
 }
+
+func extensionMethodCurrying(x: Foo) {
+  let _ = x.zang
+  let _ = x.kay
+}
+
+// CHECK-LABEL: sil shared @_TFC10extensions3Foo4zangFS0_FT_T_
+// CHECK:         function_ref @_TFC10extensions3Foo4zangfS0_FT_T_
+// CHECK:       sil shared @_TFC10extensions3Foo3kayFS0_FT_T_
+// CHECK:         function_ref @_TTDFC10extensions3Foo3kayfS0_FT_T_
+// CHECK:       sil shared [transparent] @_TTDFC10extensions3Foo3kayfS0_FT_T_
+// CHECK:         class_method [volatile] %0 : $Foo, #Foo.kay!1.foreign

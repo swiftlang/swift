@@ -17,6 +17,9 @@ extension Sub {
     // CHECK: = function_ref @_TFC15objc_extensions3SubW4propGSQSS_
     // CHECK: }
   }
+
+  func foo() {
+  }
 }
 
 // CHECK-LABEL: sil hidden @_TF15objc_extensions20testOverridePropertyFCS_3SubT_
@@ -26,3 +29,11 @@ func testOverrideProperty(obj: Sub) {
 } // CHECK: }
 
 testOverrideProperty(Sub())
+
+// CHECK-LABEL: sil shared @_TFC15objc_extensions3Sub3fooFS0_FT_T_
+// CHECK:         function_ref @_TTDFC15objc_extensions3Sub3foofS0_FT_T_
+// CHECK:       sil shared [transparent] @_TTDFC15objc_extensions3Sub3foofS0_FT_T_
+// CHECK:         class_method [volatile] %0 : $Sub, #Sub.foo!1.foreign
+func testCurry(x: Sub) {
+  let _ = x.foo
+}

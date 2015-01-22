@@ -4417,6 +4417,12 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
         == MethodDispatch::Class) {
     SILValue thisArg = curriedArgs.back();
     
+    // Use the dynamic thunk if dynamic.
+    if (next.getDecl()->isDynamic()) {
+      auto dynamicThunk = gen.SGM.getDynamicThunk(next, constantInfo);
+      return gen.B.createFunctionRef(loc, dynamicThunk);
+    }
+    
     return gen.B.createClassMethod(loc, thisArg, next,
                                    constantInfo.getSILType());
   }
