@@ -575,12 +575,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   Opts.Playground |= Args.hasArg(OPT_playground);
 
-  if (auto A = Args.getLastArg(OPT_enable_objc_interop,
-                               OPT_disable_objc_interop)) {
-    Opts.EnableObjCInterop
-      = A->getOption().matches(OPT_enable_objc_interop);
-  }
-
   if (auto A = Args.getLastArg(OPT_enable_objc_attr_requires_foundation_module,
                                OPT_disable_objc_attr_requires_foundation_module)) {
     Opts.EnableObjCAttrRequiresFoundation
@@ -624,12 +618,20 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Opts.SplitPrepositions)
     Opts.addBuildConfigOption("OBJC_SELECTOR_SPLITTING");
 
+  llvm::Triple Target = Opts.Target;
+  if (const Arg *A = Args.getLastArg(OPT_target))
+    Target = llvm::Triple(A->getValue());
+
+  Opts.EnableObjCInterop = Target.isOSDarwin();
+  if (auto A = Args.getLastArg(OPT_enable_objc_interop,
+                               OPT_disable_objc_interop)) {
+    Opts.EnableObjCInterop
+      = A->getOption().matches(OPT_enable_objc_interop);
+  }
+
   // Must be processed after any other language options that could affect
   // target configuration options.
-  if (const Arg *A = Args.getLastArg(OPT_target))
-    Opts.setTarget(llvm::Triple(A->getValue()));
-  else
-    Opts.setTarget(Opts.Target);
+  Opts.setTarget(Target);
 
   return false;
 }
