@@ -16,6 +16,7 @@
 
 #define DEBUG_TYPE "debug-info"
 #include "IRGenDebugInfo.h"
+#include "GenOpaque.h"
 #include "GenType.h"
 #include "Linking.h"
 #include "swift/AST/Expr.h"
@@ -1639,7 +1640,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     else if (DbgTy.size)
       SizeInBits = DbgTy.size.getValue() * SizeOfByte;
     else
-      SizeInBits = 3 * IGM.DataLayout.getPointerSizeInBits();
+      SizeInBits = getFixedBufferSize(IGM).getValue();
 
     auto FwdDecl = DBuilder.createReplaceableForwardDecl(
       llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, L.Line,
