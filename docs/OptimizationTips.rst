@@ -303,6 +303,60 @@ declaration is in the same file as the invocation of the generic. *NOTE* The
 standard library is a special case. Definitions in the standard library are
 visible in all modules and available for specialization.
 
+
+Unsafe code
+===========
+
+Swift classes are always reference counted. The swift compiler inserts code
+that increments the reference count every time the object is accessed.
+For example, consider the problem of scanning a linked list that's
+implemented using classes. Scanning the list is done by moving a
+reference from one node to the next: ``elem = elem.next``. Every time we move
+the reference swift will increment the reference count of the ``next`` object
+and decrement the reference count of the previous object. These reference
+count operations are expensive and unavoidable when using Swift classes.
+
+::
+
+  final class Node {
+   var next: Node?
+   var data: Int
+   ...
+  }
+
+
+Swift provided a way for working with C pointers and raw memory. These
+unsafe constructs are fast and powerful, but are also error prone. It is
+possible to implement the linked list object using unsafe constructs and
+scan the list using unsafe pointers.
+
+::
+
+  struct Node {
+    var next : UnsafeMutablePointer<Node> = nil
+    var data : Int = 0
+  ...
+  }
+
+
+
+Advice: Use unsafe pointers to avoid reference counting overhead
+----------------------------------------------------------------
+
+In performance-critical code you can use choose to use unsafe pointers
+and manage the memory yourself.
+
+::
+
+    // Allocate
+    var x = UnsafeMutablePointer<Node>.alloc(sizeof(Node))
+
+    // Mutate
+    x.memory.next = y
+
+    // Free
+    x.destroy()
+
 Footnotes
 =========
 
