@@ -67,7 +67,7 @@ func patterns(gir: GoodRange<Int>, gtr: GoodTupleGeneratorType) {
   for (i, f) in gtr {
     sum = sum + i
     sumf = sumf + f
-    sum = sum + f  // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and 'Float'}} expected-note{{Overloads for '+' exist with these partially matching parameter lists:}}
+    sum = sum + f  // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and 'Float'}} expected-note{{overloads for '+' exist with these partially matching parameter lists:}}
   }
 
   for (i, _) : (Int, Float) in gtr { sum = sum + i }

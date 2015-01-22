@@ -12,7 +12,7 @@ func == (lhs: C, rhs: C) -> Bool {
 }
 
 func test(c: C) {
-  if c == nil {} // expected-error{{binary operator '==' cannot be applied to operands of type 'C' and 'nil'}} expected-note{{Overloads for '==' exist with these partially matching parameter lists: (C, C)}}
+  if c == nil {} // expected-error {{binary operator '==' cannot be applied to operands of type 'C' and 'nil'}} expected-note {{overloads for '==' exist with these partially matching parameter lists: (C, C)}}
 }
 
 class D {}

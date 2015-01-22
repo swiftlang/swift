@@ -45,8 +45,8 @@ func basictest() {
   x8 = x8 + 1
   x8 + 1
   0 + x8
-  1.0 + x8 // expected-error{{binary operator '+' cannot be applied to operands of type 'Double' and 'Int8'}} expected-note{{Overloads for '+' exist with these partially matching parameter lists:}}
-  var x9 : Int16 = x8 + 1 // expected-error{{binary operator '+' cannot be applied to operands of type 'Int8' and 'Int'}} expected-note{{Overloads for '+' exist with these partially matching parameter lists:}}
+  1.0 + x8 // expected-error{{binary operator '+' cannot be applied to operands of type 'Double' and 'Int8'}} expected-note {{overloads for '+' exist with these partially matching parameter lists:}}
+  var x9 : Int16 = x8 + 1 // expected-error{{binary operator '+' cannot be applied to operands of type 'Int8' and 'Int'}} expected-note {{overloads for '+' exist with these partially matching parameter lists:}}
 
   // Various tuple types.
   var tuple1 : ()
@@ -245,7 +245,7 @@ func test_floating_point() {
 
 func test_nonassoc(x: Int, y: Int) -> Bool {
   // FIXME: the second error and note here should arguably disappear
-  return x == y == x // expected-error {{non-associative operator is adjacent to operator of same precedence}}  expected-error {{binary operator '==' cannot be applied to operands of type 'Bool' and 'Int'}} expected-note{{Overloads for '==' exist with these partially matching parameter lists:}}
+  return x == y == x // expected-error {{non-associative operator is adjacent to operator of same precedence}}  expected-error {{binary operator '==' cannot be applied to operands of type 'Bool' and 'Int'}} expected-note {{overloads for '==' exist with these partially matching parameter lists:}}
 }
 
 // More realistic examples.

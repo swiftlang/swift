@@ -91,7 +91,7 @@ z.non_settable_x += x // expected-error{{}}
 z[0] = 0.0 // expected-error{{}}
 f2(&z[0]) // expected-error{{}}
 f1(&z[0]) // expected-error{{}}
-z[0] += 0.0 // expected-error{{}} expected-note{{Overloads for '+=' exist with these partially matching parameter lists:}}
+z[0] += 0.0 // expected-error{{}} expected-note{{overloads for '+=' exist with these partially matching parameter lists:}}
 ++z[0] // expected-error{{}}
 
 // settable property of an rvalue value type is non-settable:
@@ -112,7 +112,7 @@ fref().property += 0.0
 z.non_settable_x.property = 1.0 // expected-error{{}}
 f2(&z.non_settable_x.property) // expected-error{{}}
 f1(&z.non_settable_x.property) // expected-error{{}}
-z.non_settable_x.property += 1.0 // expected-error{{}} expected-note{{Overloads for '+=' exist with these partially matching parameter lists:}}
+z.non_settable_x.property += 1.0 // expected-error{{}} expected-note{{overloads for '+=' exist with these partially matching parameter lists:}}
 ++z.non_settable_x.property // expected-error{{}}
 
 // settable property of a non-settable reference type IS SETTABLE:

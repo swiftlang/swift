@@ -17,4 +17,4 @@ let ff: CGFloat = floorf(20.0) // expected-error{{cannot invoke 'floorf' with an
 
 let total = 15.0
 let count = 7
-let median = total / count // expected-error {{binary operator '/' cannot be applied to operands of type 'Double' and 'Int'}} expected-note{{Overloads for '/' exist with these partially matching parameter lists: (Int, Int), (Double, Double)}}
+let median = total / count // expected-error {{binary operator '/' cannot be applied to operands of type 'Double' and 'Int'}} expected-note {{overloads for '/' exist with these partially matching parameter lists: (Int, Int), (Double, Double)}}

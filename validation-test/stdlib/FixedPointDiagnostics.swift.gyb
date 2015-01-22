@@ -34,44 +34,44 @@ func test_truncatingBitPatternAPIIsStableAcrossPlatforms() {
   UInt16(truncatingBitPattern: UInt(0))
   UInt32(truncatingBitPattern: UInt(0))
   UInt64(truncatingBitPattern: UInt(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
-  UInt(truncatingBitPattern: UInt(0))   // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{Overloads for 'UInt' exist with these partially matching parameter lists: }}
+  UInt(truncatingBitPattern: UInt(0))   // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{overloads for 'UInt' exist with these partially matching parameter lists: }}
 
   Int8(truncatingBitPattern: UInt(0))
   Int16(truncatingBitPattern: UInt(0))
   Int32(truncatingBitPattern: UInt(0))
   Int64(truncatingBitPattern: UInt(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
-  Int(truncatingBitPattern: UInt(0))   // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{Overloads for 'Int' exist with these partially matching parameter lists: }}
+  Int(truncatingBitPattern: UInt(0))   // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{overloads for 'Int' exist with these partially matching parameter lists: }}
 
   UInt8(truncatingBitPattern: Int(0))
   UInt16(truncatingBitPattern: Int(0))
   UInt32(truncatingBitPattern: Int(0))
   UInt64(truncatingBitPattern: Int(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
-  UInt(truncatingBitPattern: Int(0))   // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{Overloads for 'UInt' exist with these partially matching parameter lists: }}
+  UInt(truncatingBitPattern: Int(0))   // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{overloads for 'UInt' exist with these partially matching parameter lists: }}
 
   Int8(truncatingBitPattern: Int(0))
   Int16(truncatingBitPattern: Int(0))
   Int32(truncatingBitPattern: Int(0))
   Int64(truncatingBitPattern: Int(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
-  Int(truncatingBitPattern: Int(0))   // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{Overloads for 'Int' exist with these partially matching parameter lists: }}
+  Int(truncatingBitPattern: Int(0))   // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{overloads for 'Int' exist with these partially matching parameter lists: }}
 
-  UInt(truncatingBitPattern: UInt8(0))  // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{Overloads for 'UInt' exist with these partially matching parameter lists: }}
-  UInt(truncatingBitPattern: UInt16(0)) // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{Overloads for 'UInt' exist with these partially matching parameter lists: }}
-  UInt(truncatingBitPattern: UInt32(0)) // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{Overloads for 'UInt' exist with these partially matching parameter lists: }}
+  UInt(truncatingBitPattern: UInt8(0))  // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{overloads for 'UInt' exist with these partially matching parameter lists: }}
+  UInt(truncatingBitPattern: UInt16(0)) // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{overloads for 'UInt' exist with these partially matching parameter lists: }}
+  UInt(truncatingBitPattern: UInt32(0)) // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{overloads for 'UInt' exist with these partially matching parameter lists: }}
   UInt(truncatingBitPattern: UInt64(0))
 
-  Int(truncatingBitPattern: UInt8(0))  // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{Overloads for 'Int' exist with these partially matching parameter lists: }}
-  Int(truncatingBitPattern: UInt16(0)) // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{Overloads for 'Int' exist with these partially matching parameter lists: }}
-  Int(truncatingBitPattern: UInt32(0)) // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{Overloads for 'Int' exist with these partially matching parameter lists: }}
+  Int(truncatingBitPattern: UInt8(0))  // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{overloads for 'Int' exist with these partially matching parameter lists: }}
+  Int(truncatingBitPattern: UInt16(0)) // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{overloads for 'Int' exist with these partially matching parameter lists: }}
+  Int(truncatingBitPattern: UInt32(0)) // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{overloads for 'Int' exist with these partially matching parameter lists: }}
   Int(truncatingBitPattern: UInt64(0))
 
-  UInt(truncatingBitPattern: Int8(0))  // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{Overloads for 'UInt' exist with these partially matching parameter lists: }}
-  UInt(truncatingBitPattern: Int16(0)) // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{Overloads for 'UInt' exist with these partially matching parameter lists: }}
-  UInt(truncatingBitPattern: Int32(0)) // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{Overloads for 'UInt' exist with these partially matching parameter lists: }}
+  UInt(truncatingBitPattern: Int8(0))  // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{overloads for 'UInt' exist with these partially matching parameter lists: }}
+  UInt(truncatingBitPattern: Int16(0)) // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{overloads for 'UInt' exist with these partially matching parameter lists: }}
+  UInt(truncatingBitPattern: Int32(0)) // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{overloads for 'UInt' exist with these partially matching parameter lists: }}
   UInt(truncatingBitPattern: Int64(0))
 
-  Int(truncatingBitPattern: Int8(0))  // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{Overloads for 'Int' exist with these partially matching parameter lists: }}
-  Int(truncatingBitPattern: Int16(0)) // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{Overloads for 'Int' exist with these partially matching parameter lists: }}
-  Int(truncatingBitPattern: Int32(0)) // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{Overloads for 'Int' exist with these partially matching parameter lists: }}
+  Int(truncatingBitPattern: Int8(0))  // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{overloads for 'Int' exist with these partially matching parameter lists: }}
+  Int(truncatingBitPattern: Int16(0)) // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{overloads for 'Int' exist with these partially matching parameter lists: }}
+  Int(truncatingBitPattern: Int32(0)) // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{overloads for 'Int' exist with these partially matching parameter lists: }}
   Int(truncatingBitPattern: Int64(0))
 }
 
@@ -99,12 +99,12 @@ func testMixedSignArithmetic() {
     // disabled by the ambiguity trick.
     //===------------------------------------------------------------------===//
 
-    Stride(1) - ${T}(0) // expected-error {{binary operator '-' cannot be applied to operands of type 'Stride' and}} expected-note {{Overloads for '-' exist with these partially matching parameter lists:}}
+    Stride(1) - ${T}(0) // expected-error {{binary operator '-' cannot be applied to operands of type 'Stride' and}} expected-note {{overloads for '-' exist with these partially matching parameter lists:}}
 
     // These tests are expected to start failing when we get improved diagnostics.
     var y: Stride = 0
-    y += ${T}(1)        // expected-error {{binary operator '+=' cannot be applied to operands of type 'Stride' and}} expected-note {{Overloads for '+=' exist with these partially matching parameter lists:}}
-    y -= ${T}(1)        // expected-error {{binary operator '-=' cannot be applied to operands of type 'Stride' and}} expected-note {{Overloads for '-=' exist with these partially matching parameter lists:}}
+    y += ${T}(1)        // expected-error {{binary operator '+=' cannot be applied to operands of type 'Stride' and}} expected-note {{overloads for '+=' exist with these partially matching parameter lists:}}
+    y -= ${T}(1)        // expected-error {{binary operator '-=' cannot be applied to operands of type 'Stride' and}} expected-note {{overloads for '-=' exist with these partially matching parameter lists:}}
   }
 % end
 }

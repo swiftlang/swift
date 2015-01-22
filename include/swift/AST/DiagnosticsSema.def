@@ -149,7 +149,7 @@ ERROR(invalid_trailing_closure_target,sema,none,
       "unexpected trailing closure", ())
 
 NOTE(suggest_partial_overloads,sema,none,
-      "Overloads for '%0' exist with these partially matching parameter "
+      "overloads for '%0' exist with these partially matching parameter "
       "lists: %1", (StringRef, StringRef))
 
 ERROR(unsupported_objc_metatype_conversion,sema,none,
@@ -1043,7 +1043,7 @@ ERROR(broken_int_integer_literal_convertible_conformance,sema_tcd,none,
 ERROR(broken_equatable_eq_operator,sema_tcd,none,
       "Equatable protocol is broken: no infix operator declaration for '=='", ())
 ERROR(no_equal_overload_for_int,sema_tcd,none,
-      "No overload of '==' for Int", ())
+      "no overload of '==' for Int", ())
 
 // Dynamic Self
 ERROR(dynamic_self_non_method,sema_tcd,none,
