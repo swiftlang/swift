@@ -1622,13 +1622,11 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // This is an inout type. Naturally we would be emitting them as
     // DW_TAG_reference_type types, but LLDB can deal better with pointer-sized
     // struct that has the appropriate mangled name.
-    auto *Decl = DbgTy.getDecl();
-    Location L = getLoc(SM, Decl);
     auto ObjectTy = BaseTy->castTo<InOutType>()->getObjectType();
     auto DT = getOrCreateDesugaredType(ObjectTy, DbgTy);
-    llvm::Twine Name = Decl ? "inout " + Decl->getNameStr() : MangledName;
-    return createPointerSizedStruct(Scope, Name.str(), DT, File, L.Line, Flags,
-                                    MangledName);
+    return createPointerSizedStruct(Scope, MangledName, DT, File, 0, Flags,
+                                    BaseTy->isUnspecializedGeneric()
+                                    ? StringRef() : MangledName);
   }
 
   case TypeKind::Archetype: {

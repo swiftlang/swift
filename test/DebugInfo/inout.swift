@@ -23,6 +23,7 @@ typealias MyFloat = Float
 // CHECK-DAG: ![[EMPTY_EXPR]] = !{!"0x102"} ; [ DW_TAG_expression ]
 // CHECK-DAG: ![[REFINT:.*]] = {{.*}}[ DW_TAG_structure_type ] [_TtRSi]
 // CHECK-DAG: ![[A1]] = {{.*}}!"_TtSi"} ; [ DW_TAG_arg_variable ] [a]
+// CHECK-DAG: "_TtRSi"{{.*}}[ DW_TAG_structure_type ] [_TtRSi] [line 0,
 func modifyFooHeap(inout a: Int,
 // CHECK-DAG: ![[A:[0-9]+]] = {{.*}}!"_TtRSi"} ; [ DW_TAG_arg_variable ] [a] [line [[@LINE-1]]]
 // CHECK-DAG: ![[B]] = {{.*}}![[MYFLOAT:.*]]} ; [ DW_TAG_arg_variable ] [b] [line [[@LINE+2]]]
