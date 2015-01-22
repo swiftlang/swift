@@ -3973,22 +3973,33 @@ namespace {
       auto swiftClass = swiftTy->getClassOrBoundGenericClass();
       bool isRoot = swiftClass && !swiftClass->getSuperclass();
 
+      const clang::ObjCInterfaceDecl *interfaceDecl = nullptr;
+      const ClangModuleUnit *declModule;
+      const ClangModuleUnit *interfaceModule;
+
       for (auto proto : protocols) {
         auto clangProto =
           cast_or_null<clang::ObjCProtocolDecl>(proto->getClangDecl());
         if (!clangProto)
           continue;
 
+        if (!interfaceDecl) {
+          declModule = Impl.getClangModuleForDecl(decl);
+          if ((interfaceDecl = dyn_cast<clang::ObjCInterfaceDecl>(decl))) {
+            interfaceModule = declModule;
+          } else {
+            auto category = cast<clang::ObjCCategoryDecl>(decl);
+            interfaceDecl = category->getClassInterface();
+            interfaceModule = Impl.getClangModuleForDecl(interfaceDecl);
+          }
+        }
+
         // Don't import a protocol's members if the superclass already adopts
         // the protocol, or (for categories) if the class itself adopts it
         // in its main @interface.
-        auto interfaceDecl = dyn_cast<clang::ObjCInterfaceDecl>(decl);
-        if (!interfaceDecl) {
-          auto category = cast<clang::ObjCCategoryDecl>(decl);
-          interfaceDecl = category->getClassInterface();
+        if (decl != interfaceDecl)
           if (classImplementsProtocol(interfaceDecl, clangProto, false))
             continue;
-        }
         if (auto superInterface = interfaceDecl->getSuperClass())
           if (classImplementsProtocol(superInterface, clangProto, true))
             continue;
@@ -4005,7 +4016,23 @@ namespace {
             // FIXME: We should still mirror the setter as a method if it's
             // not already there.
             clang::Selector sel = objcProp->getGetterName();
-            if (decl->getMethod(sel, /*instance=*/true))
+            if (interfaceDecl->getInstanceMethod(sel))
+              continue;
+
+            bool inNearbyCategory =
+                std::any_of(interfaceDecl->visible_categories_begin(),
+                            interfaceDecl->visible_categories_end(),
+                            [=](const clang::ObjCCategoryDecl *category)->bool {
+              if (category != decl) {
+                auto *categoryModule = Impl.getClangModuleForDecl(category);
+                if (categoryModule != declModule &&
+                    categoryModule != interfaceModule) {
+                  return false;
+                }
+              }
+              return category->getInstanceMethod(sel);
+            });
+            if (inNearbyCategory)
               continue;
 
             if (auto imported = Impl.importMirroredDecl(objcProp, dc)) {
