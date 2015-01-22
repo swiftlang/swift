@@ -1771,21 +1771,13 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::Substituted: {
-    auto *SubstitutedTy = cast<SubstitutedType>(BaseTy);
-    auto OrigTy = SubstitutedTy->getReplacementType();
-    Location L = getLoc(SM, DbgTy.getDecl());
-    auto File = getOrCreateFile(L.Filename);
-    return DBuilder.createTypedef(getOrCreateDesugaredType(OrigTy, DbgTy),
-                                  MangledName, File, L.Line, File);
+    auto OrigTy = cast<SubstitutedType>(BaseTy)->getReplacementType();
+    return getOrCreateDesugaredType(OrigTy, DbgTy);
   }
 
   case TypeKind::Paren: {
-    auto *ParenTy = cast<ParenType>(BaseTy);
-    auto Ty = ParenTy->getUnderlyingType();
-    Location L = getLoc(SM, DbgTy.getDecl());
-    auto File = getOrCreateFile(L.Filename);
-    return DBuilder.createTypedef(getOrCreateDesugaredType(Ty, DbgTy),
-                                  MangledName, File, L.Line, File);
+    auto Ty = cast<ParenType>(BaseTy)->getUnderlyingType();
+    return getOrCreateDesugaredType(Ty, DbgTy);
   }
 
   // SyntaxSugarType derivations.
