@@ -368,7 +368,7 @@ private class Private : A1 {}
 }
 
 // CHECK-LABEL: @interface PropertiesOverridden
-// CHECK-NEXT: @property (nonatomic, copy, getter=bees, setter=setBees:) NSArray * bees;
+// CHECK-NEXT: @property (nonatomic, copy, getter=bees, setter=setBees:) NSArray * __null_unspecified bees;
 // CHECK-NEXT: - (SWIFT_NULLABILITY(null_unspecified) instancetype)init
 // CHECK-NEXT: @end
 @objc class PropertiesOverridden : Hive {
