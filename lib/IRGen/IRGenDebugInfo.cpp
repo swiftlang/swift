@@ -1048,9 +1048,6 @@ void IRGenDebugInfo::emitVariableDeclaration(
   llvm::DIFile Unit = getFile(Scope);
   // FIXME: this should be the scope of the type's declaration.
   llvm::DIType DITy = getOrCreateType(DbgTy);
-
-  // If there is no debug info for this type then do not emit debug info
-  // for this variable.
   assert(DITy && "could not determine debug type of variable");
 
   unsigned Line = Loc.Line;
