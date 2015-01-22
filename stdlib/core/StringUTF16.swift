@@ -18,14 +18,14 @@ extension String {
       // random access
       public // SPI(Foundation)
       init(_offset: Int) { self._offset = _offset }
-      internal init(_ offset: Int) { _offset = offset }
+      
       public let _offset: Int
     }
     
     /// The position of the first code unit if the `String` is
     /// non-empty; identical to `endIndex` otherwise.
     public var startIndex: Index {
-      return Index(0)
+      return Index(_offset: 0)
     }
     
     /// The "past the end" position.
@@ -34,7 +34,7 @@ extension String {
     /// reachable from `startIndex` by zero or more applications of
     /// `successor()`.
     public var endIndex: Index {
-      return Index(_length)
+      return Index(_offset: _length)
     }
 
     func _toInternalIndex(i: Int) -> Int {
@@ -180,10 +180,10 @@ extension String.UTF16View.Index : BidirectionalIndexType {
   public typealias Distance = Int
 
   public func successor() -> String.UTF16View.Index {
-    return String.UTF16View.Index(_offset.successor())
+    return String.UTF16View.Index(_offset: _offset.successor())
   }
   public func predecessor() -> String.UTF16View.Index {
-    return String.UTF16View.Index(_offset.predecessor())
+    return String.UTF16View.Index(_offset: _offset.predecessor())
   }
 }
 
@@ -256,7 +256,7 @@ extension String.UTF16View.Index {
     if !utf8Index._isOnUnicodeScalarBoundary {
       return nil
     }
-    self.init(utf8Index._coreIndex)
+    _offset = utf8Index._coreIndex
   }
   
   /// Construct the position in `utf16` that corresponds exactly to
@@ -267,7 +267,7 @@ extension String.UTF16View.Index {
   public init(
     _ unicodeScalarIndex: String.UnicodeScalarIndex,
     within utf16: String.UTF16View) {
-    self.init(unicodeScalarIndex._position)
+    _offset = unicodeScalarIndex._position
   }
   
   /// Construct the position in `utf16` that corresponds exactly to
@@ -276,7 +276,7 @@ extension String.UTF16View.Index {
   /// Requires: `characterIndex` is an element of
   /// `indices(String(utf16))`.
   public init(_ characterIndex: String.Index, within utf16: String.UTF16View) {
-    self.init(characterIndex._utf16Index)
+    _offset = characterIndex._utf16Index
   }
 
   /// Return the position in `utf8` that corresponds exactly
