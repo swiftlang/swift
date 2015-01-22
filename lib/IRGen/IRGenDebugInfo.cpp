@@ -1603,14 +1603,12 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   case TypeKind::Tuple: {
     auto *TupleTy = BaseTy->castTo<TupleType>();
-    Location L = getLoc(SM, DbgTy.getDecl());
-    auto File = getOrCreateFile(L.Filename);
     // Tuples are also represented as structs.
     unsigned RealSize;
-    auto Elements = getTupleElements(TupleTy, Scope, File, Flags,
+    auto Elements = getTupleElements(TupleTy, Scope, MainFile, Flags,
                                      DbgTy.getDeclContext(), RealSize);
     return DBuilder.createStructType(
-        Scope, MangledName, File, L.Line, RealSize, AlignInBits, Flags,
+        Scope, MangledName, File, 0, RealSize, AlignInBits, Flags,
         llvm::DIType(), // DerivedFrom
         Elements, llvm::dwarf::DW_LANG_Swift, llvm::DIType(), MangledName);
   }
