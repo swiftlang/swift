@@ -2013,31 +2013,6 @@ bb0(%0 : $Builtin.Word):
   return %8 : $Builtin.Word
 }
 
-struct GenContainer<T> {
-}
-
-sil public_external [fragile] @materializeForSetClosure : $@thin <T> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer<T>, @thick GenContainer<T>.Type) -> () {
-bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*GenContainer<T>, %3 : $@thick GenContainer<T>.Type):
-  unreachable
-}
-
-// CHECK-LABEL: sil @combine_cast_of_materializeForSet_function
-// CHECK: bb0
-// CHECK: [[FUN:%.*]] = function_ref @materializeForSetClosure
-// CHECK: apply [[FUN]]<Int>(
-// CHECK: return
-
-sil @combine_cast_of_materializeForSet_function : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer<Int>) -> () {
-bbO(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2: $*GenContainer<Int>):
-  %3 = metatype $@thick GenContainer<Int>.Type
-  %4 = function_ref @materializeForSetClosure : $@thin <τ_0_0> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer<τ_0_0>, @thick GenContainer<τ_0_0>.Type) -> ()
-  %5 = thin_function_to_pointer %4 : $@thin <τ_0_0> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer<τ_0_0>, @thick GenContainer<τ_0_0>.Type) -> () to $Builtin.RawPointer
-  %6 = pointer_to_thin_function %5 : $Builtin.RawPointer to $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer<Int>, @thick GenContainer<Int>.Type) -> ()
-  %7 = apply %6(%0, %1, %2, %3) : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer<Int>, @thick GenContainer<Int>.Type) -> ()
-  %8 = tuple ()
-  return %8 : $()
-}
-
 // CHECK-LABEL:   sil @thin_function_to_pointer_identity
 // CHECK:         bb0([[Ref:%.*]]: $Builtin.RawPointer):
 // CHECK-NOT:       pointer_to_thin_function
