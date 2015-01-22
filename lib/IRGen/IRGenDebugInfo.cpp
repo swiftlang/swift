@@ -1272,12 +1272,10 @@ llvm::DICompositeType IRGenDebugInfo::createStructType(
 
   auto TH = llvm::TrackingMDNodeRef(FwdDecl);
   DITypeCache[DbgTy.getType()] = TH;
-  DIRefMap[llvm::MDString::get(IGM.getLLVMContext(), UniqueID)] = TH;
   auto Members = getStructMembers(Decl, BaseTy, Scope, File, Flags, SizeInBits);
   auto DITy = DBuilder.createStructType(
       Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, DerivedFrom,
       Members, RuntimeLang, llvm::DIType(), UniqueID);
-
   FwdDecl->replaceAllUsesWith(DITy);
   llvm::MDNode::deleteTemporary(FwdDecl);
   return DITy;
@@ -1338,7 +1336,6 @@ IRGenDebugInfo::createEnumType(DebugTypeInfo DbgTy, EnumDecl *Decl,
 
   auto TH = llvm::TrackingMDNodeRef(FwdDecl);
   DITypeCache[DbgTy.getType()] = TH;
-  DIRefMap[llvm::MDString::get(IGM.getLLVMContext(), MangledName)] = TH;
 
   auto DITy = DBuilder.createUnionType(
       Scope, MangledName, File, Line, SizeInBits, AlignInBits, Flags,
@@ -1881,12 +1878,7 @@ llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
     Context = Context->getParent();
   llvm::DIScope Scope = getOrCreateContext(Context);
   llvm::DIType DITy = createType(DbgTy, MangledName, Scope, getFile(Scope));
-  DITy.Verify();
-
-  // Archetypes may have different storage types so we can't cache
-  // them based on their Swift type.
-  if (DbgTy.getType()->getKind() == TypeKind::Archetype)
-    return DITy;
+  assert(DITy.Verify() && "type did not verify");
 
   // Incrementally build the DIRefMap.
   if (DITy.isCompositeType()) {
@@ -1897,11 +1889,22 @@ llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
       if (CachedTy.Verify())
         assert(CachedTy == DITy && "conflicting types for one UID");
     }
-    if (auto *UID = llvm::DICompositeType(DITy).getIdentifier())
+#endif
+    // If this type supports a UID, enter it to the cache.
+    if (auto *UID = llvm::DICompositeType(DITy).getIdentifier()) {
       assert(UID->getString() == MangledName &&
              "Unique identifier is different from mangled name ");
-#endif
-    DIRefMap[UID] = llvm::TrackingMDNodeRef(DITy);
+      DIRefMap[UID] = llvm::TrackingMDNodeRef(DITy);
+    }
+  }
+
+  // After the specializer did its work, archetypes may have different
+  // storage types so we can't cache them based on their Swift type.
+  if (DbgTy.getType()->isUnspecializedGeneric()) {
+    // In order to create recursive data structures we temporarily
+    // still insert them into the cache, so remove them.
+    DITypeCache.erase(DbgTy.getType());
+    return DITy;
   }
 
   // Store it in the cache.
