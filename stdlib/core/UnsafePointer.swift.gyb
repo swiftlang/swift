@@ -214,6 +214,7 @@ public struct ${Self}<T>
       "${Self}.moveInitializeFrom non-following overlapping range; use moveInitializeBackwardFrom")
     Builtin.takeArrayFrontToBack(T.self, self._rawValue, source._rawValue,
       count.value)
+    // This builtin is equivalent to:
     // for i in 0..<count {
     //   (self + i).initialize((source + i).move())
     // }
@@ -233,6 +234,7 @@ public struct ${Self}<T>
       "${Self}.moveInitializeBackwardFrom non-preceding overlapping range; use moveInitializeFrom instead")
     Builtin.takeArrayBackToFront(T.self, self._rawValue, source._rawValue,
       count.value)
+    // This builtin is equivalent to:
     // var src = source + count
     // var dst = self + count
     // while dst != self {
@@ -252,6 +254,7 @@ public struct ${Self}<T>
       self + count <= source || source + count <= self,
       "${Self}.initializeFrom non-following overlapping range")
     Builtin.copyArray(T.self, self._rawValue, source._rawValue, count.value)
+    // This builtin is equivalent to:
     // for i in 0..<count {
     //   (self + i).initialize(source[i])
     // }
