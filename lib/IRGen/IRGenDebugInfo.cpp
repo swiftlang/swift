@@ -1632,9 +1632,14 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                            ? llvm::DIType()
                            : getOrCreateDesugaredType(Superclass, DbgTy);
     // Essentially a %swift.opaque pointer.
-    unsigned SizeInBits = DbgTy.StorageType->isSized()
-      ? IGM.DataLayout.getTypeSizeInBits(DbgTy.StorageType)
-      : IGM.DataLayout.getPointerSizeInBits();
+    unsigned SizeInBits;
+    // Prefere the actual storage size over the DbgTy, over a safe default.
+    if (DbgTy.StorageType->isSized())
+      SizeInBits = IGM.DataLayout.getTypeSizeInBits(DbgTy.StorageType);
+    else if (DbgTy.size)
+      SizeInBits = DbgTy.size.getValue() * SizeOfByte;
+    else
+      SizeInBits = 3 * IGM.DataLayout.getPointerSizeInBits();
 
     auto FwdDecl = DBuilder.createReplaceableForwardDecl(
       llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, L.Line,
