@@ -146,21 +146,19 @@ An important feature provided by the Swift standard library are the generic
 containers Array and Dictionary. This section will explain how to use these
 types in a performant manner.
 
-Advice: Use value type in containers
-------------------------------------
+Advice: Use value types in Array
+--------------------------------
 
 In Swift, types can be divided into two different categories: value types
-(structs, enums, tuples) and reference types (classes). While there are many
-distinctions in between the two semantic wise from a container stand point the
-main interesting item is that value types can not be Objective-C classes. Inside
-the Swift standard library containers, there is much special code to handle
-bridging from Objective-C. By using a value type, one can avoid all such
-bridging code.
+(structs, enums, tuples) and reference types (classes). A key distinction is
+that value types can not be included inside an NSArray. Thus when using value
+types, the optimizer can remove most of the overhead in Array that is necessary
+to handle ContiguousArray and NSArray.
 
 Additionally, In contrast to reference types, value types only need reference
 counting if they contain, recursively, a reference type. By using value types
 without reference types, one can avoid additional retain, release traffic inside
-containers.
+Array.
 
 ::
 
@@ -172,23 +170,22 @@ containers.
 
   var a : [PhonebookEntry]
 
-Keep in mind that there is a trade off in between using large value types and
-reference types. In certain cases, the overhead of copying, moving around large
-value types will outweigh the cost of removing the bridging and retain, release
-overhead.
+Keep in mind that there is a trade-off between using large value types and using
+reference types. In certain cases, the overhead of copying and moving around
+large value types will outweigh the cost of removing the bridging and
+retain/release overhead.
 
 Advice: Use inplace mutation instead of object-reassignment
 -----------------------------------------------------------
 
 All standard library containers in Swift are value types that use COW
-(copy-on-write) [#]_ to perform copies instead of explicitly copies. In many
-cases this allows the compiler to elide unnecessary copies by retaining the
-container instead of performing a deep copy. This is done by only copying the
-underlying container if the reference count of the container is greater than 1
-and the container is mutated. For instance in the following, no copying will
-occur when ``d`` is assigned to ``c``, but when ``d`` undergoes structural
-mutation by appending ``2``, ``d`` will be copied and then ``2`` will be
-appended to ``d``:
+(copy-on-write) [#]_ to perform copies instead of explicit copies. In many cases
+this allows the compiler to elide unnecessary copies by retaining the container
+instead of performing a deep copy. This is done by only copying the underlying
+container if the reference count of the container is greater than 1 and the
+container is mutated. For instance in the following, no copying will occur when
+``d`` is assigned to ``c``, but when ``d`` undergoes structural mutation by
+appending ``2``, ``d`` will be copied and then ``2`` will be appended to ``d``:
 
 ::
 
@@ -253,32 +250,24 @@ Generics
 ========
 
 Swift provides a very powerful abstraction mechanism through the use of generic
-types. By default, the Swift compiler will generate generic code that can be
-passed any type through the usage of boxes and vtables. Thus in the following,
-``MySwiftFunc`` only emits one generic function for use in both
-``MySwiftFunc<Int>`` and ``MySwiftFunc<Double>``.
+types. The Swift compiler emits one block of concrete code that can perform
+``MySwiftFunc<T>`` for any ``T``. The generated code takes a table of function
+pointers and a box containing ``T`` as additional parameters. Any differences in
+behavior between ``MySwiftFunc<Int>`` and ``MySwiftFunc<String>`` are accounted
+for by passing a different table of function pointers and the size abstraction
+provided by the box. An example of generics:
 
 ::
 
   class MySwiftFunc<T> { ... }
 
-  MySwiftFunc<Int> X    // Will instantiate generic code that works with Int...
-  MySwiftFunc<Double> Y // ... as well as Double.
+  MySwiftFunc<Int> X    // Will emit code that works with Int...
+  MySwiftFunc<String> Y // ... as well as String.
 
-This with C++ where generic templates are instantiated for every use, i.e.,
-
-::
-
-  template <typename T>
-  class MyCPPFunc<T> { ... };
-
-  MyCPPFunc<int> X;     // Will instantiate MyCPPFunc<int>.
-  MyCPPFunc<double> Y;  // Will instantiate MyCPPFunc<double>.
-
-When optimizations are enabled, the optimizer looks at each invocation of such
-code and attempts to ascertain the concrete (i.e. non-generic type) use in the
-invocation. If the generic function's definition is visible to the optimizer and
-the concrete type is known, the Swift compiler will emit a version of the
+When optimizations are enabled, the Swift compiler looks at each invocation of
+such code and attempts to ascertain the concrete (i.e. non-generic type) used in
+the invocation. If the generic function's definition is visible to the optimizer
+and the concrete type is known, the Swift compiler will emit a version of the
 generic function specialized to the specific type. This process, called
 *specialization*, enables the removal of the overhead associated with
 generics. Some more examples of generics:
@@ -310,7 +299,9 @@ Advice: Put generic declarations in the same file where they are used
 
 The optimizer can only perform specializations if the definition of the generic
 declaration is visible in the current Module. This can only occur if the
-declaration is in the same file as the invocation of the generic.
+declaration is in the same file as the invocation of the generic. *NOTE* The
+standard library is a special case. Definitions in the standard library are
+visible in all modules and available for specialization.
 
 Footnotes
 =========
