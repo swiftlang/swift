@@ -632,11 +632,6 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: S
-  - Selector: 'isEqualToNode:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    NullabilityOfRet: S
   - Selector: node
     MethodKind: Class
     NullabilityOfRet: N
@@ -730,6 +725,11 @@ Classes:
     Nullability: N
   - Name: node
     Nullability: O
+- Name: SKPhysicsJointPin
+  Methods:
+  - Selector: 'jointWithBodyA:bodyB:anchor:'
+    MethodKind: Class
+    FactoryAsInit: I
 - Name: SKPhysicsWorld
   Methods:
   - Selector: 'addJoint:'

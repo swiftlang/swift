@@ -2407,7 +2407,7 @@ Classes:
     Nullability:
     - N
     - S
-    - O
+    - N
     NullabilityOfRet: O
   - Selector: 'dateFromString:'
     MethodKind: Instance
@@ -10536,7 +10536,7 @@ Classes:
   - Name: mainDocumentURL
     Nullability: O
   - Name: URL
-    Nullability: N
+    Nullability: O
 - Name: NSURLResponse
   Methods:
   - Selector: 'initWithURL:MIMEType:expectedContentLength:textEncodingName:'

@@ -1,0 +1,275 @@
+---
+Name: HomeKit
+Classes:
+- Name: HMAccessory
+  Properties:
+  - Name: delegate
+    Nullability: O
+- Name: HMAccessoryBrowser
+  Properties:
+  - Name: delegate
+    Nullability: O
+- Name: HMHome
+  Properties:
+  - Name: delegate
+    Nullability: O
+- Name: HMHomeManager
+  Properties:
+  - Name: delegate
+    Nullability: O
+Protocols:
+- Name: HMAccessoryBrowserDelegate
+  Methods:
+  - Selector: 'accessoryBrowser:didFindNewAccessory:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'accessoryBrowser:didRemoveNewAccessory:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+- Name: HMAccessoryDelegate
+  Methods:
+  - Selector: 'accessory:didUpdateAssociatedServiceTypeForService:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'accessory:didUpdateNameForService:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'accessory:service:didUpdateValueForCharacteristic:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    - U
+    NullabilityOfRet: S
+  - Selector: 'accessoryDidUpdateName:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'accessoryDidUpdateReachability:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'accessoryDidUpdateServices:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+- Name: HMHomeDelegate
+  Methods:
+  - Selector: 'home:didAddAccessory:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didAddActionSet:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didAddRoom:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didAddRoom:toZone:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didAddService:toServiceGroup:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didAddServiceGroup:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didAddTrigger:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didAddUser:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didAddZone:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didEncounterError:forAccessory:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didRemoveAccessory:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didRemoveActionSet:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didRemoveRoom:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didRemoveRoom:fromZone:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didRemoveService:fromServiceGroup:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didRemoveServiceGroup:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didRemoveTrigger:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didRemoveUser:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didRemoveZone:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didUnblockAccessory:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didUpdateActionsForActionSet:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didUpdateNameForActionSet:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didUpdateNameForRoom:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didUpdateNameForServiceGroup:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didUpdateNameForTrigger:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didUpdateNameForZone:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didUpdateRoom:forAccessory:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    - U
+    NullabilityOfRet: S
+  - Selector: 'home:didUpdateTrigger:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'homeDidUpdateName:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+- Name: HMHomeManagerDelegate
+  Methods:
+  - Selector: 'homeManager:didAddHome:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'homeManager:didRemoveHome:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'homeManagerDidUpdateHomes:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'homeManagerDidUpdatePrimaryHome:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S

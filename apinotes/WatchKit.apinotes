@@ -102,6 +102,9 @@ Classes:
     - O
     - N
     NullabilityOfRet: S
+  - Selector: init
+    MethodKind: Instance
+    NullabilityOfRet: N
   - Selector: 'initWithContext:'
     MethodKind: Instance
     Nullability:
@@ -127,6 +130,12 @@ Classes:
     NullabilityOfRet: S
   - Selector: 'pushControllerWithName:context:'
     MethodKind: Instance
+    Nullability:
+    - N
+    - O
+    NullabilityOfRet: S
+  - Selector: 'reloadRootControllersWithNames:contexts:'
+    MethodKind: Class
     Nullability:
     - N
     - O

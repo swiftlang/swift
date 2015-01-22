@@ -3000,14 +3000,14 @@ Classes:
   - Selector: dictionaryRepresentation
     MethodKind: Instance
     NullabilityOfRet: O
+  - Selector: printInfo
+    MethodKind: Class
+    FactoryAsInit: C
   - Selector: 'printInfoWithDictionary:'
     MethodKind: Class
     Nullability:
     - O
     NullabilityOfRet: U
-  - Selector: 'printInfo'
-    MethodKind: Class
-    FactoryAsInit: C
   Properties:
   - Name: printerID
     Nullability: O
@@ -4478,7 +4478,7 @@ Classes:
   - Name: maskView
     Nullability: O
   - Name: motionEffects
-    Nullability: O
+    Nullability: N
   - Name: restorationIdentifier
     Nullability: O
   - Name: subviews
@@ -5138,6 +5138,13 @@ Protocols:
     Nullability:
     - N
     - N
+    NullabilityOfRet: S
+  - Selector: 'application:handleWatchKitExtensionRequest:reply:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - O
+    - U
     NullabilityOfRet: S
   - Selector: 'application:openURL:sourceApplication:annotation:'
     MethodKind: Instance

@@ -1200,7 +1200,7 @@ public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>
 extension NSPredicate {
   // + (NSPredicate *)predicateWithFormat:(NSString *)predicateFormat, ...;
   public
-  convenience init?(format predicateFormat: String, _ args: CVarArgType...) {
+  convenience init(format predicateFormat: String, _ args: CVarArgType...) {
     let va_args = getVaList(args)
     self.init(format: predicateFormat, arguments: va_args)
   }

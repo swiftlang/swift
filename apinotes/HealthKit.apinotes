@@ -1,0 +1,27 @@
+---
+Name: HealthKit
+Classes:
+- Name: HKHealthStore
+  Methods:
+  - Selector: 'biologicalSexWithError:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: O
+  - Selector: 'bloodTypeWithError:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: O
+  - Selector: 'dateOfBirthWithError:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: O
+- Name: HKQuantity
+  Methods:
+  - Selector: 'compare:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S

@@ -192,9 +192,9 @@ Classes:
   - Name: renamingIdentifier
     Nullability: N
   - Name: subentities
-    Nullability: N
+    Nullability: O
   - Name: subentitiesByName
-    Nullability: N
+    Nullability: O
   - Name: superentity
     Nullability: O
   - Name: userInfo
