@@ -2037,3 +2037,41 @@ bbO(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2: $*GenContain
   %8 = tuple ()
   return %8 : $()
 }
+
+// CHECK-LABEL:   sil @thin_function_to_pointer_identity
+// CHECK:         bb0([[Ref:%.*]]: $Builtin.RawPointer):
+// CHECK-NOT:       pointer_to_thin_function
+// CHECK-NOT:       thin_function_to_pointer
+// CHECK:           return [[Ref]]
+
+sil @thin_function_to_pointer_identity : $@thin (Builtin.RawPointer) -> (Builtin.RawPointer) {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = pointer_to_thin_function %0 : $Builtin.RawPointer to $@thin () -> ()
+  %2 = thin_function_to_pointer %1 : $@thin () -> () to $Builtin.RawPointer
+  return %2 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL:   sil @pointer_to_thin_function_identity
+// CHECK:         bb0([[Ref:%.*]]: $@thin () -> ()):
+// CHECK-NOT:       thin_function_to_pointer
+// CHECK-NOT:       pointer_to_thin_function
+// CHECK:           return [[Ref]]
+
+sil @pointer_to_thin_function_identity : $@thin (@thin () -> ()) -> (@thin () -> ()) {
+bb0(%0 : $@thin () -> ()):
+  %1 = thin_function_to_pointer %0 : $@thin () -> () to $Builtin.RawPointer
+  %2 = pointer_to_thin_function %1 : $Builtin.RawPointer to $@thin () -> ()
+  return %2 : $@thin () -> ()
+}
+
+// CHECK-LABEL:   sil @pointer_to_thin_function_different_type
+// CHECK:           thin_function_to_pointer
+// CHECK-NEXT:      pointer_to_thin_function
+// CHECK-NEXT:      return
+
+sil @pointer_to_thin_function_different_type : $@thin (@thin (Builtin.Int8) -> ()) -> (@thin () -> ()) {
+bb0(%0 : $@thin (Builtin.Int8) -> ()):
+  %1 = thin_function_to_pointer %0 : $@thin (Builtin.Int8) -> () to $Builtin.RawPointer
+  %2 = pointer_to_thin_function %1 : $Builtin.RawPointer to $@thin () -> ()
+  return %2 : $@thin () -> ()
+}

@@ -54,6 +54,8 @@ namespace {
     SILValue visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *URBCI);
     SILValue
     visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
+    SILValue visitThinFunctionToPointerInst(ThinFunctionToPointerInst *TFTPI);
+    SILValue visitPointerToThinFunctionInst(PointerToThinFunctionInst *PTTFI);
 
     SILValue simplifyOverflowBuiltin(BuiltinInst *BI);
   };
@@ -416,6 +418,23 @@ visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
   return SILValue();
 }
 
+SILValue InstSimplifier::visitThinFunctionToPointerInst(ThinFunctionToPointerInst *TFTPI) {
+  // (thin_function_to_pointer (pointer_to_thin_function x)) -> x
+  if (auto *PTTFI = dyn_cast<PointerToThinFunctionInst>(TFTPI->getOperand()))
+    if (PTTFI->getOperand().getType() == TFTPI->getType())
+      return PTTFI->getOperand();
+
+  return SILValue();
+}
+
+SILValue InstSimplifier::visitPointerToThinFunctionInst(PointerToThinFunctionInst *PTTFI) {
+  // (pointer_to_thin_function (thin_function_to_pointer x)) -> x
+  if (auto *TFTPI = dyn_cast<ThinFunctionToPointerInst>(PTTFI->getOperand()))
+    if (TFTPI->getOperand().getType() == PTTFI->getType())
+      return TFTPI->getOperand();
+
+  return SILValue();
+}
 
 static SILValue simplifyBuiltin(BuiltinInst *BI) {
   const IntrinsicInfo &Intrinsic = BI->getIntrinsicInfo();
