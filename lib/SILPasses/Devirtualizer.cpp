@@ -166,7 +166,7 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
     CalleeGenericParamsNum = GenCalleeType->getGenericSignature()
                                           ->getGenericParams().size();
   // Class F belongs to.
-  CanType FSelfClass = F->getLoweredFunctionType()->getSelfParameter().getType();
+  CanType FSelfClass = GenCalleeType->getSelfParameter().getType();
   SILType ClassInstanceType = ClassInstance.getType();
 
   // *NOTE*:
