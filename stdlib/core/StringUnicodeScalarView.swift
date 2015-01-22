@@ -222,19 +222,18 @@ extension String {
     var _core: _StringCore
   }
 
+  /// Construct the `String` corresponding to the given sequence of
+  /// Unicode scalars.
+  public init(_ unicodeScalars: UnicodeScalarView) {
+    self.init(unicodeScalars._core)
+  }
+
   /// The index type for subscripting a `String`\ 's `.unicodeScalars`
   /// view.
   public typealias UnicodeScalarIndex = UnicodeScalarView.Index
 }
 
 extension String {
-  /// Construct an instance given a collection of `Unicode scalar
-  /// values
-  /// <http://www.unicode.org/glossary/#unicode_scalar_value>`_.
-  public init(_ view: UnicodeScalarView) {
-    self = String(view._core)
-  }
-
   /// The value of `self` as a collection of `Unicode scalar values
   /// <http://www.unicode.org/glossary/#unicode_scalar_value>`_.
   public var unicodeScalars : UnicodeScalarView {

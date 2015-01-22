@@ -272,6 +272,12 @@ extension String {
     return result
   }
 
+  /// Construct the `String` corresponding to the given sequence of
+  /// UTF8 code units.
+  public init(_ utf8: UTF8View) {
+    self.init(utf8._core)
+  }
+
   /// The index type for subscripting a `String`\ 's `.utf8` view.
   public typealias UTF8Index = UTF8View.Index
 }

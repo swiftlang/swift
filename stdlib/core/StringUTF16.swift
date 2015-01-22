@@ -164,6 +164,12 @@ extension String {
     return UTF16View(_core)
   }
 
+  /// Construct the `String` corresponding to the given sequence of
+  /// UTF16 code units.
+  public init(_ utf16: UTF16View) {
+    self.init(utf16._core[utf16._offset..<utf16._offset+utf16._length])
+  }
+  
   /// The index type for subscripting a `String`\ 's `utf16` view.
   public typealias UTF16Index = UTF16View.Index
 }

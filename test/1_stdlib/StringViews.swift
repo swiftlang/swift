@@ -694,4 +694,44 @@ tests.test("UTF8 indexes") {
   }
 }
 
+tests.test("UTF16->String") {
+  let s = summer + winter + winter + summer
+  let v = s.utf16
+  for i in indices(s) {
+    for j in i..<s.endIndex {
+      expectEqual(
+        s[i..<j],
+        String(v[i.samePositionIn(v)..<j.samePositionIn(v)])
+      )
+    }
+  }
+}
+
+tests.test("UTF8->String") {
+  let s = summer + winter + winter + summer
+  let v = s.utf16
+  for i in indices(s) {
+    for j in i..<s.endIndex {
+      expectEqual(
+        s[i..<j],
+        String(v[i.samePositionIn(v)..<j.samePositionIn(v)])
+      )
+    }
+  }
+}
+
+tests.test("UnicodeScalars->String") {
+  let s = summer + winter + winter + summer
+  let v = s.unicodeScalars
+  for i in indices(s) {
+    for j in i..<s.endIndex {
+      expectEqual(
+        s[i..<j],
+        String(v[i.samePositionIn(v)..<j.samePositionIn(v)])
+      )
+    }
+  }
+}
+
+
 runAllTests()
