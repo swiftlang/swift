@@ -712,7 +712,8 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
            "Dest type must be a class type");
 
   It = Builder.createCheckedCastBranch(AI->getLoc(), /*exact*/ true,
-                                       ClassInstance, RealSubClassTy, Iden, Virt);
+                                       ClassInstance, RealSubClassTy, Iden,
+                                       Virt);
 
   SILBuilder VirtBuilder(Virt);
   SILBuilder IdenBuilder(Iden);
