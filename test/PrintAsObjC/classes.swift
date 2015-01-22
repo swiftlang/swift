@@ -95,8 +95,8 @@ class NotObjC {}
 // CHECK-NEXT: + (SWIFT_METATYPE(Methods) __nonnull)getSelf;
 // CHECK-NEXT: - (Methods * __nullable)maybeGetSelf;
 // CHECK-NEXT: + (SWIFT_METATYPE(Methods) __nullable)maybeGetSelf;
-// CHECK-NEXT: - (Methods *)uncheckedGetSelf;
-// CHECK-NEXT: + (SWIFT_METATYPE(Methods))uncheckedGetSelf;
+// CHECK-NEXT: - (Methods * __null_unspecified)uncheckedGetSelf;
+// CHECK-NEXT: + (SWIFT_METATYPE(Methods) __null_unspecified)uncheckedGetSelf;
 // CHECK-NEXT: - (void)testParens:(NSInteger)a;
 // CHECK-NEXT: - (void)testIgnoredParam:(NSInteger)_;
 // CHECK-NEXT: - (void)testIgnoredParams:(NSInteger)_ again:(NSInteger)_;
@@ -315,12 +315,12 @@ private class Private : A1 {}
 // CHECK-NEXT: @property (nonatomic, weak) id <MyProtocol> __nullable weakProto;
 // CHECK-NEXT: @property (nonatomic) CFTypeRef weakCF;
 // CHECK-NEXT: @property (nonatomic) CFStringRef weakCFString;
-// CHECK-NEXT: @property (nonatomic, weak) IBOutlet id outlet;
-// CHECK-NEXT: @property (nonatomic) IBOutlet Properties * typedOutlet;
+// CHECK-NEXT: @property (nonatomic, weak) IBOutlet id  __null_unspecified outlet;
+// CHECK-NEXT: @property (nonatomic) IBOutlet Properties * __null_unspecified typedOutlet;
 // CHECK-NEXT: @property (nonatomic, copy) NSString * __nonnull string;
 // CHECK-NEXT: @property (nonatomic, copy) NSArray * __nonnull array;
 // CHECK-NEXT: @property (nonatomic, copy) NSDictionary * __nonnull dictionary;
-// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray * outletCollection;
+// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray * __null_unspecified outletCollection;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray * __nullable outletCollectionOptional;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * __nullable outletCollectionAnyObject;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * __nullable outletCollectionProto;
@@ -369,7 +369,7 @@ private class Private : A1 {}
 
 // CHECK-LABEL: @interface PropertiesOverridden
 // CHECK-NEXT: @property (nonatomic, copy, getter=bees, setter=setBees:) NSArray * bees;
-// CHECK-NEXT: - (instancetype)init
+// CHECK-NEXT: - (SWIFT_NULLABILITY(null_unspecified) instancetype)init
 // CHECK-NEXT: @end
 @objc class PropertiesOverridden : Hive {
   override var bees : [AnyObject]! {

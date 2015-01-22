@@ -442,9 +442,6 @@ private:
   void printNullability(OptionalTypeKind kind,
                         NullabilityPrintKind printKind
                           = NullabilityPrintKind::After) {
-    if (kind == OTK_ImplicitlyUnwrappedOptional)
-      return;
-
     if (printKind == NullabilityPrintKind::After)
       os << ' ';
 
@@ -464,7 +461,10 @@ private:
       break;
 
     case OTK_ImplicitlyUnwrappedOptional:
-      llvm_unreachable("Handled above");
+      if (printKind == NullabilityPrintKind::ContextSensitive)
+        os << "SWIFT_NULLABILITY(null_unspecified)";
+      else
+        os << "__null_unspecified";
       break;
     }
 
@@ -613,7 +613,7 @@ private:
 #ifndef SWIFT_DISABLE_OBJC_GENERICS
       if (!BGT->getGenericArgs()[0]->isAnyObject()) {
         os << "NS_ARRAY(";
-        visitPart(BGT->getGenericArgs()[0], OTK_ImplicitlyUnwrappedOptional);
+        visitPart(BGT->getGenericArgs()[0], OTK_None);
         os << ")";
       } else {
         os << "NSArray *";
@@ -631,9 +631,9 @@ private:
       if (!isNSObject(BGT->getGenericArgs()[0]) ||
           !BGT->getGenericArgs()[1]->isAnyObject()) {
         os << "NS_DICTIONARY(";
-        visitPart(BGT->getGenericArgs()[0], OTK_ImplicitlyUnwrappedOptional);
+        visitPart(BGT->getGenericArgs()[0], OTK_None);
         os << ", ";
-        visitPart(BGT->getGenericArgs()[1], OTK_ImplicitlyUnwrappedOptional);
+        visitPart(BGT->getGenericArgs()[1], OTK_None);
         os << ")";
       } else {
         os << "NSDictionary *";
@@ -650,7 +650,7 @@ private:
 #ifndef SWIFT_DISABLE_OBJC_GENERICS
       if (!isNSObject(BGT->getGenericArgs()[0])) {
         os << "NS_SET(";
-        visitPart(BGT->getGenericArgs()[0], OTK_ImplicitlyUnwrappedOptional);
+        visitPart(BGT->getGenericArgs()[0], OTK_None);
         os << ")";
       } else {
         os << "NSSet *";

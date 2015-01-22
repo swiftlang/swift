@@ -19,10 +19,10 @@ import ObjectiveC
 // CHECK-NEXT: - (void (^ __nullable)(NSObject * __nonnull))returnsBlockWithInput;
 // CHECK-NEXT: - (void (^ __nullable)(NSObject * __nonnull))returnsBlockWithParenthesizedInput;
 // CHECK-NEXT: - (void (^ __nullable)(NSObject * __nonnull, NSObject * __nonnull))returnsBlockWithTwoInputs;
-// CHECK-NEXT: - (NSInteger (*)(NSInteger))functionPointers:(NSInteger (*)(NSInteger))input;
-// CHECK-NEXT: - (void)functionPointerTakesAndReturnsFunctionPointer:(NSInteger (* (*)(NSInteger (*)(NSInteger)))(NSInteger))input;
+// CHECK-NEXT: - (NSInteger (* __null_unspecified)(NSInteger))functionPointers:(NSInteger (* __null_unspecified)(NSInteger))input;
+// CHECK-NEXT: - (void)functionPointerTakesAndReturnsFunctionPointer:(NSInteger (* __null_unspecified (* __null_unspecified)(NSInteger (* __null_unspecified)(NSInteger)))(NSInteger))input;
 // CHECK-NEXT: @property (nonatomic, copy) NSInteger (^ __nullable savedBlock)(NSInteger);
-// CHECK-NEXT: @property (nonatomic) NSInteger (* savedFunctionPointer)(NSInteger);
+// CHECK-NEXT: @property (nonatomic) NSInteger (* __null_unspecified savedFunctionPointer)(NSInteger);
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Callbacks {
