@@ -11,6 +11,12 @@ func testIntSubscripting(s: String, i: Int) {
   let c5 = s[17...20] // expected-error{{subscript' is unavailable: cannot subscript String with a range of Int}}
 }
 
+func testNonAmbiguousStringComparisons() {
+  let names = ["Chris", "Alex", "Ewa", "Barry", "Daniella"]
+  var reversed1 = sorted(names, { s1, s2 in s1 > s2 })
+  var reversed2 = sorted(names, { s1, s2 in s1 as String > s2 })
+}
+
 func testAmbiguousStringComparisons(s: String) {
   let nsString = s as NSString
   let a1 = s == nsString // expected-error{{'==' is unavailable: Comparing Swift.String and NSString is ambiguous}}
