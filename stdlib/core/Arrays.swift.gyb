@@ -186,12 +186,20 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
 
   /// Access the `index`\ th element. Reading is O(1).  Writing is
   /// ${O1}.
+#if _runtime(_ObjC)
+  // FIXME: Code is duplicated here between the Objective-C and non-Objective-C
+  // runtimes because config blocks can't appear inside a subscript function
+  // without causing parse errors. When this is fixed, they should be merged
+  // as described in the comment below.
+  // rdar://problem/19553956
   public subscript(index: Int) -> Element {
 %if Self == 'Array':
     get {
       _checkSubscript(index)
       return _getElement(index)
     }
+    // on non-Objective-C, this should just be NativeOwner for all other
+    // cases, including Slice.
 %elif Self == 'Slice':
     addressWithOwner {
       _checkSubscript(index)
@@ -212,6 +220,21 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
               Builtin.tryPin(Builtin.castToNativeObject(_buffer.owner)))
     }
   }
+#else
+  public subscript(index: Int) -> Element {
+    addressWithNativeOwner {
+      _checkSubscript(index)
+      return (UnsafePointer(_buffer.baseAddress + index),
+              Builtin.castToNativeObject(_buffer.owner))
+    }
+    mutableAddressWithPinnedNativeOwner {
+      _makeMutableAndUniqueOrPinned()
+      _checkSubscript(index)
+      return (_getElementAddress(index),
+              Builtin.tryPin(Builtin.castToNativeObject(_buffer.owner)))
+    }
+  }
+#endif
 
   /// Return a *generator* over the elements.
   ///
