@@ -166,3 +166,11 @@ let r: [Double] = [0.0, 1.0]
 let size : Double = (q[0]-p[0])*(r[1]-p[1]) - (q[1]-p[1])*(r[0]-p[0])
 println(size)
 // CHECK: 0.0
+
+let cc = 1 + 1 + 1.0 + 1 + 1 + 1.0
+println(cc)
+// CHECK: 6.0
+
+let dd = 1 + 1 + Double(1) + 1 + Double(1)
+println(dd)
+// CHECK: 5.0

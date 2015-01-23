@@ -128,3 +128,8 @@ s2 = S2(i: 5)
 // rdar://problem/19254404
 let i32 = Int32(123123123)
 Int(i32 - 2 + 1)
+
+// rdar://problem/19459079
+let xx: UInt64 = 100
+let yy = ((xx + 10) - 5) / 5
+let zy = (xx + (10 - 5)) / 5
