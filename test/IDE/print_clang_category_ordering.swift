@@ -1,6 +1,8 @@
 // RUN: %target-swift-ide-test -print-module -source-filename %s -I %S/Inputs/category-ordering/ -module-to-print=ProtocolThenProperty | FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-PROTO-FIRST
 // RUN: %target-swift-ide-test -print-module -source-filename %s -I %S/Inputs/category-ordering/ -module-to-print=PropertyThenProtocol | FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-PROP-FIRST
 
+// REQUIRES: objc_interop
+
 // CHECK-LABEL: class Base {
 // CHECK: }
 
