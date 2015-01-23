@@ -75,8 +75,8 @@ in addition to the overhead of performing the indirect call itself. In
 performance critical code, one often will want to restrict this dynamic
 behavior.
 
-Advice: Use 'final' when one knows the declaration does not need to be overridden
----------------------------------------------------------------------------------
+Advice: Use 'final' when you know the declaration does not need to be overridden
+--------------------------------------------------------------------------------
 
 The ``final`` keyword is a restriction on a declaration of a class, a method, or
 a property such that the declaration cannot be overridden. This implies that the
@@ -153,7 +153,7 @@ In Swift, types can be divided into two different categories: value types
 (structs, enums, tuples) and reference types (classes). A key distinction is
 that value types can not be included inside an NSArray. Thus when using value
 types, the optimizer can remove most of the overhead in Array that is necessary
-to handle ContiguousArray and NSArray.
+to handle the possibility of the array being backed an NSArray.
 
 Additionally, In contrast to reference types, value types only need reference
 counting if they contain, recursively, a reference type. By using value types
@@ -229,8 +229,8 @@ Swift eliminates integer overflow bugs by checking for overflow when performing
 normal arithmetic. These checks are not appropriate in high performance code
 where one knows that no memory safety issues can result.
 
-Advice: Use unchecked integer when not compromising memory safety
------------------------------------------------------------------
+Advice: Use unchecked integer arithmetic when you can prove that overflow can not occur
+---------------------------------------------------------------------------------------
 
 In performance-critical code you can elide overflow checks if you know it is
 safe.
