@@ -58,12 +58,10 @@ typedef struct {
   const char *Filename;
 } Location;
 
-typedef struct {
-  Location LocForLinetable, Loc;
-} FullLocation;
+typedef struct { Location LocForLinetable, Loc; } FullLocation;
 
 typedef llvm::DenseMap<const llvm::MDString *, llvm::TrackingMDNodeRef>
-        TrackingDIRefMap;
+    TrackingDIRefMap;
 
 enum IndirectionKind : bool { DirectValue = false, IndirectValue = true };
 enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
@@ -199,12 +197,10 @@ public:
                                   ArtificialKind = RealValue);
 
   /// Emit a dbg.declare or dbg.value intrinsic, depending on Storage.
-  void emitDbgIntrinsic(llvm::BasicBlock *BB,
-                        llvm::Value* Storage,
+  void emitDbgIntrinsic(llvm::BasicBlock *BB, llvm::Value *Storage,
                         llvm::DIVariable Var, llvm::DIExpression Expr,
                         unsigned Line, unsigned Col, llvm::DIDescriptor Scope,
                         SILDebugScope *DS);
-
 
   /// Create debug metadata for a global variable.
   void emitGlobalVariableDeclaration(llvm::GlobalValue *Storage, StringRef Name,
@@ -238,7 +234,7 @@ private:
   llvm::DIType getOrCreateType(DebugTypeInfo DbgTy);
   llvm::DIDescriptor getOrCreateScope(SILDebugScope *DS);
   llvm::DIScope getOrCreateContext(DeclContext *DC);
-  llvm::MDNode* createInlinedAt(SILDebugScope *Scope);
+  llvm::MDNode *createInlinedAt(SILDebugScope *Scope);
 
   StringRef getCurrentDirname();
   llvm::DIFile getOrCreateFile(const char *Filename);
@@ -248,7 +244,7 @@ private:
   StringRef getMangledName(TypeAliasDecl *Decl);
   StringRef getMangledName(DebugTypeInfo DTI);
   llvm::DITypeArray createParameterTypes(CanSILFunctionType FnTy,
-                                     DeclContext *DeclCtx);
+                                         DeclContext *DeclCtx);
   llvm::DITypeArray createParameterTypes(SILType SILTy, DeclContext *DeclCtx);
   void createParameterType(llvm::SmallVectorImpl<llvm::Metadata *> &Parameters,
                            SILType CanTy, DeclContext *DeclCtx);
