@@ -1,6 +1,6 @@
 COPYRIGHT AND PERMISSION NOTICE
 
-Copyright © 1991-2014 Unicode, Inc. All rights reserved.
+Copyright © 1991-2015 Unicode, Inc. All rights reserved.
 Distributed under the Terms of Use in
 http://www.unicode.org/copyright.html.
 
@@ -12,9 +12,9 @@ without restriction, including without limitation the rights to use,
 copy, modify, merge, publish, distribute, and/or sell copies of
 the Data Files or Software, and to permit persons to whom the Data Files
 or Software are furnished to do so, provided that
-(a) this copyright and permission notice appear with all copies 
+(a) this copyright and permission notice appear with all copies
 of the Data Files or Software,
-(b) this copyright and permission notice appear in associated 
+(b) this copyright and permission notice appear in associated
 documentation, and
 (c) there is clear notice in each modified Data File or in the Software
 as well as in the documentation associated with the Data File(s) or

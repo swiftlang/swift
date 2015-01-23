@@ -32,7 +32,7 @@ SuppLookup1BytesPerEntry = 1
 SuppLookup2BytesPerEntry = 1
 SuppDataBytesPerEntry = 1
 
-TrieSize = 15889
+TrieSize = 18449
 
 BMPLookupBytesOffset = 0
 BMPDataBytesOffset = 256

@@ -227,5 +227,18 @@ UnicodeTrie.test("GraphemeClusterSegmentation/Extra") {
       SourceLocStack().withCurrentLoc())
 }
 
+UnicodeTrie.test("GraphemeClusterSegmentation/Unicode_7_0_0") {
+  // Verify that we are using Unicode 7.0.0+ data tables.
+
+  // In Unicode 6.3.0, this sequence was segmented into two grapheme clusters.
+  //
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+1122C KHOJKI VOWEL SIGN AA
+  checkGraphemeClusterSegmentation(
+      [ 0, 2 ],
+      scalars: [ 0x0041, 0x1122c ],
+      SourceLocStack().withCurrentLoc())
+}
+
 runAllTests()
 

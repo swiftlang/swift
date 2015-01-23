@@ -35,7 +35,10 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name arch)
   set(de_gybbed_sources)
   set(gyb_sources)
   set(gyb_tool "${SWIFT_SOURCE_DIR}/utils/gyb")
-  set(gyb_extra_sources "${SWIFT_SOURCE_DIR}/utils/GYBUnicodeDataUtils.py")
+  set(gyb_extra_sources
+      "${SWIFT_SOURCE_DIR}/utils/GYBUnicodeDataUtils.py"
+      "${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakProperty.txt"
+      "${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakTest.txt")
   foreach (src ${${sources_var_name}})
     string(REGEX REPLACE "[.]gyb$" "" src_sans_gyb "${src}")
     if(src STREQUAL src_sans_gyb)
