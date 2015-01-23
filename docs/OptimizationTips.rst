@@ -175,6 +175,17 @@ reference types. In certain cases, the overhead of copying and moving around
 large value types will outweigh the cost of removing the bridging and
 retain/release overhead.
 
+Advice: Use ContiguousArray with reference types when NSArray bridging is unnecessary
+-------------------------------------------------------------------------------------
+
+If you need an array of reference types and the array does not need to be
+bridged to NSArray, use ContiguousArray instead of Array:
+
+::
+
+  class C { ... }
+  var a: ContiguousArray<C> = [C(...), C(...), ..., C(...)]
+
 Advice: Use inplace mutation instead of object-reassignment
 -----------------------------------------------------------
 
