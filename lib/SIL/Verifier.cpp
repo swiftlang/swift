@@ -90,7 +90,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   const SILFunction &F;
   Lowering::TypeConverter &TC;
   const SILInstruction *CurInstruction = nullptr;
-  DominanceInfo *Dominance;
+  DominanceInfo *Dominance = nullptr;
 
   SILVerifier(const SILVerifier&) = delete;
   void operator=(const SILVerifier&) = delete;
@@ -158,8 +158,7 @@ public:
   }
   
   /// Require two function types to be ABI-compatible.
-  void requireABICompatibleFunctionTypes(SILModule &M,
-                                         CanSILFunctionType type1,
+  void requireABICompatibleFunctionTypes(CanSILFunctionType type1,
                                          CanSILFunctionType type2,
                                          const Twine &what) {
     
@@ -183,7 +182,20 @@ public:
     
     _require(type1->getRepresentation() == type2->getRepresentation(), what,
              complain("Different function representations"));
-    
+
+    // TODO: We should compare generic signatures. Class and witness methods
+    // allow variance in "self"-fulfilled parameters; other functions must
+    // match exactly.
+    auto signature1 = type1->getGenericSignature();
+    auto signature2 = type2->getGenericSignature();
+
+    auto getAnyOptionalObjectTypeInContext = [&](GenericSignature *sig,
+                                                 SILType type) {
+      Lowering::GenericContextScope context(F.getModule().Types, sig);
+      OptionalTypeKind _;
+      return type.getAnyOptionalObjectType(F.getModule(), _);
+    };
+
     // TODO: More sophisticated param and return ABI compatibility rules could
     // diverge.
     std::function<bool (SILType, SILType)>
@@ -220,23 +232,37 @@ public:
       for (unsigned i : indices(aElements)) {
         auto aa = SILType::getPrimitiveObjectType(aElements[i]),
              bb = SILType::getPrimitiveObjectType(bElements[i]);
+        // Equivalent types are always ABI-compatible.
+        if (aa == bb)
+          continue;
+        
         // Bridgeable object types are interchangeable.
         if (aa.isBridgeableObjectType() && bb.isBridgeableObjectType())
           continue;
         
         // Optional and IUO are interchangeable if their elements are.
-        OptionalTypeKind scratch;
-        if (auto aObject = aa.getAnyOptionalObjectType(M, scratch))
-          if (auto bObject = bb.getAnyOptionalObjectType(M, scratch)) {
-            if (!areABICompatibleParamsOrReturns(aObject, bObject))
-              return false;
-            else
+        if (auto aObject = getAnyOptionalObjectTypeInContext(signature1, aa))
+          if (auto bObject = getAnyOptionalObjectTypeInContext(signature2, bb))
+            if (areABICompatibleParamsOrReturns(aObject, bObject))
               continue;
+        
+        // Function types are interchangeable if they're also ABI-compatible.
+        if (auto aFunc = aa.getAs<SILFunctionType>())
+          if (auto bFunc = bb.getAs<SILFunctionType>()) {
+            // FIXME
+            requireABICompatibleFunctionTypes(aFunc, bFunc, what);
+            return true;
           }
         
+        // Metatypes are interchangeable with metatypes with the same
+        // representation.
+        if (auto aMeta = aa.getAs<MetatypeType>())
+          if (auto bMeta = bb.getAs<MetatypeType>())
+            if (aMeta->getRepresentation() == bMeta->getRepresentation())
+              continue;
+        
         // Other types must match exactly.
-        if (aa != bb)
-          return false;
+        return false;
       }
       return true;
     };
@@ -290,6 +316,9 @@ public:
 
   SILVerifier(const SILFunction &F)
       : M(F.getModule().getSwiftModule()), F(F), TC(F.getModule().Types) {
+    if (F.isExternalDeclaration())
+      return;
+      
     // Check to make sure that all blocks are well formed.  If not, the
     // SILVerifier object will explode trying to compute dominance info.
     for (auto &BB : F) {
@@ -1957,7 +1986,7 @@ public:
                                    "convert_function result");
 
     // convert_function is required to be an ABI-compatible conversion.
-    requireABICompatibleFunctionTypes(F.getModule(), opTI, resTI,
+    requireABICompatibleFunctionTypes(opTI, resTI,
                                  "convert_function cannot change function ABI");
   }
 
@@ -2649,6 +2678,7 @@ void SILVTable::verify(const SILModule &M) const {
   for (auto &entry : getEntries()) {
     // All vtable entries must be decls in a class context.
     assert(entry.first.hasDecl() && "vtable entry is not a decl");
+    auto baseInfo = M.Types.getConstantInfo(entry.first);
     ValueDecl *decl = entry.first.getDecl();
     auto theClass = dyn_cast_or_null<ClassDecl>(decl->getDeclContext());
     assert(theClass && "vtable entry must refer to a class member");
@@ -2666,14 +2696,24 @@ void SILVTable::verify(const SILModule &M) const {
     assert(c && "vtable entry must refer to a member of the vtable's class");
 
     // All function vtable entries must be at their natural uncurry level.
-    // FIXME: We should change this to uncurry level 1.
     assert(!entry.first.isCurried && "vtable entry must not be curried");
 
     // Foreign entry points shouldn't appear in vtables.
     assert(!entry.first.isForeign && "vtable entry must not be foreign");
-
-    // TODO: Verify that property entries are dynamically dispatched under our
-    // finalized property dynamic dispatch rules.
+    
+    // The vtable entry must be ABI-compatible with the overridden vtable slot.
+    SmallString<32> baseName;
+    {
+      llvm::raw_svector_ostream os(baseName);
+      entry.first.print(os);
+      os.flush();
+    }
+    
+    SILVerifier(*entry.second)
+      .requireABICompatibleFunctionTypes(
+                    baseInfo.getSILType().castTo<SILFunctionType>(),
+                    entry.second->getLoweredFunctionType(),
+                    "vtable entry for " + baseName + " must be ABI-compatible");
   }
 #endif
 }
