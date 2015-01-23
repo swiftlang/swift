@@ -1179,16 +1179,6 @@ function(add_swift_library name)
           list(APPEND swiftlib_link_libraries "${lib}${VARIANT_SUFFIX}")
         endforeach()
 
-        set(swiftlib_private_link_libraries_targets)
-        foreach(lib ${SWIFTLIB_PRIVATE_LINK_LIBRARIES})
-          if(TARGET "${lib}${VARIANT_SUFFIX}")
-            list(APPEND swiftlib_private_link_libraries_targets
-                "${lib}${VARIANT_SUFFIX}")
-          else()
-            list(APPEND swiftlib_private_link_libraries_targets "${lib}")
-          endif()
-        endforeach()
-
         set(swiftlib_module_depends_flattened ${SWIFTLIB_SWIFT_MODULE_DEPENDS})
         if("${sdk}" STREQUAL "OSX")
           list(APPEND swiftlib_module_depends_flattened
@@ -1202,6 +1192,17 @@ function(add_swift_library name)
         foreach(mod ${swiftlib_module_depends_flattened})
           list(APPEND swiftlib_module_dependency_targets
               "swift${mod}${VARIANT_SUFFIX}")
+        endforeach()
+
+        set(swiftlib_private_link_libraries_targets
+            ${swiftlib_module_dependency_targets})
+        foreach(lib ${SWIFTLIB_PRIVATE_LINK_LIBRARIES})
+          if(TARGET "${lib}${VARIANT_SUFFIX}")
+            list(APPEND swiftlib_private_link_libraries_targets
+                "${lib}${VARIANT_SUFFIX}")
+          else()
+            list(APPEND swiftlib_private_link_libraries_targets "${lib}")
+          endif()
         endforeach()
 
         # Add this library variant.
