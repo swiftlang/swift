@@ -2,6 +2,8 @@
 // RUN: %build-irgen-test-overlays
 // RUN: %target-swift-frontend -sdk %S/Inputs -I %t -emit-ir %s | FileCheck %s --check-prefix=%target-cpu
 
+// REQUIRES: objc_interop
+
 import Builtin
 import Swift
 import gizmo
