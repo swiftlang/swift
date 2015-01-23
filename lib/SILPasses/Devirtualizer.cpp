@@ -38,8 +38,8 @@
 using namespace swift;
 
 STATISTIC(NumInlineCaches, "Number of monomorphic inline caches inserted");
-STATISTIC(NumDevirtualized, "Number of calls devirtualzied");
-STATISTIC(NumAMI, "Number of witness_method devirtualzied");
+STATISTIC(NumDevirtualized, "Number of calls devirtualized");
+STATISTIC(NumAMI, "Number of witness_method devirtualized");
 
 // The number of subclasses to allow when placing polymorphic inline caches.
 static const int MaxNumPolymorphicInlineCaches = 6;
