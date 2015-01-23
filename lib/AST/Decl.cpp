@@ -2998,7 +2998,14 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
   auto Pats = getBodyParamPatterns();
   if (Pats.empty())
     return getNameLoc();
-  return SourceRange(getNameLoc(), Pats.back()->getEndLoc());
+
+  for (int I = Pats.size() - 1; I >= 0; I--) {
+    auto endLoc = Pats[I]->getEndLoc();
+    if (endLoc.isValid()) {
+      return SourceRange(getNameLoc(), endLoc);
+    }
+  }
+  return getNameLoc();
 }
 
 ObjCSelector AbstractFunctionDecl::getObjCSelector() const {
