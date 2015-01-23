@@ -48,7 +48,7 @@ set(SWIFT_VERSION "1.1" CACHE STRING
     "User-visible version of the Swift compiler")
 
 set(_SWIFT_KNOWN_INSTALL_COMPONENTS
-    "compiler;clang-builtin-headers;arclite-symlink;stdlib;stdlib-experimental;editor-integration;lang-docs;tools;testsuite-tools;dev")
+    "compiler;clang-builtin-headers;clang-resource-dir-symlink;arclite-symlink;stdlib;stdlib-experimental;editor-integration;lang-docs;tools;testsuite-tools;dev")
 
 set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
     "A semicolon-separated list of components to install ${_SWIFT_KNOWN_INSTALL_COMPONENTS}")
@@ -57,11 +57,17 @@ set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
 # packaging.  The following components are defined:
 #
 # * compiler -- the Swift compiler and (on supported platforms) the REPL.
+# * clang-builtin-headers -- install a copy of Clang builtin headers under
+#   'lib/swift/clang'.  This is useful when Swift compiler is installed in
+#   isolation.
+# * clang-resource-dir-symlink -- install a symlink to the Clang resource
+#   directory (which contains builtin headers) under 'lib/swift/clang'.  This is
+#   useful when Clang and Swift are installed side-by-side.
 # * stdlib -- the Swift standard library and SDK overlays.
 # * stdlib-experimental -- the Swift standard library module for experimental
 #   APIs.
 # * editor-integration -- scripts for Swift integration in IDEs other than
-# Xcode;
+#   Xcode;
 # * tools -- tools (other than the compiler) useful for developers writing
 #   Swift code.
 # * testsuite-tools -- extra tools required to run the Swift testsuite.

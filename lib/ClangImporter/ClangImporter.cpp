@@ -339,15 +339,19 @@ ClangImporter::create(ASTContext &ctx,
   }
 
   const std::string &overrideResourceDir = importerOpts.OverrideResourceDir;
-
   if (overrideResourceDir.empty()) {
     llvm::SmallString<128> resourceDir(searchPathOpts.RuntimeResourcePath);
-  
-    // Adjust the path torefer to our copy of the Clang headers under
-    // lib/swift/clang.
-  
+
+    // Adjust the path to refer to our copy of the Clang resource directory
+    // under 'lib/swift/clang', which is either a real resource directory or a
+    // symlink to one inside of a full Clang installation.
+    //
+    // The rationale for looking under the Swift resource directory and not
+    // assuming that the Clang resource directory is located next to it is that
+    // Swift, when installed separately, should not need to install files in
+    // directories that are not "owned" by it.
     llvm::sys::path::append(resourceDir, "clang", CLANG_VERSION_STRING);
-  
+
     // Set the Clang resource directory to the path we computed.
     invocationArgStrs.push_back("-resource-dir");
     invocationArgStrs.push_back(resourceDir.str());
