@@ -403,7 +403,7 @@ static SILValue upcastArgument(SILValue Arg, SILType SuperTy, ApplyInst *AI) {
 
 /// Devirtualize the application of a witness_method. Replace this application
 /// by invocation of a witness thunk which was found by findFuncInWitnessTable.
-bool devirtulizeWitness(ApplyInst *AI,
+bool devirtualizeWitness(ApplyInst *AI,
                         SILFunction *F,
                         ArrayRef<Substitution> Subs) {
   // We know the witness thunk and the corresponding set of substitutions
@@ -507,7 +507,7 @@ static bool optimizeWitnessMethod(ApplyInst *AI, WitnessMethodInst *WMI) {
   }
   assert(WT && "WitnessTable should never be null if F is not.");
 
-  return devirtulizeWitness(AI, F, Subs);
+  return devirtualizeWitness(AI, F, Subs);
 }
 
 //===----------------------------------------------------------------------===//
