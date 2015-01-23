@@ -149,4 +149,8 @@ void DebugTypeInfo::dump() const {
     getDecl()->dump(llvm::errs());
   else
     getType()->dump();
+  if (StorageType) {
+    llvm::errs() << "StorageType=";
+    StorageType->dump();
+  }
 }
