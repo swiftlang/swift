@@ -3328,7 +3328,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
 
     // If we syntactically match the second decl-var production, with a
     // var-get-set clause, parse the var-get-set clause.
-    if (Tok.is(tok::l_brace)) {
+    if (Tok.is(tok::l_brace) && !Flags.contains(PD_InLoop)) {
       if (auto *boundVar =
             parseDeclVarGetSet(pattern.get(), Flags, StaticLoc, Attributes,
                                Decls)) {

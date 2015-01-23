@@ -1116,8 +1116,9 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
   if (Tok.is(tok::kw_var) || Tok.is(tok::kw_let) || Tok.is(tok::at_sign)) {
     DeclAttributes Attributes;
     parseDeclAttributeList(Attributes);
-    ParserStatus VarDeclStatus = parseDeclVar(
-        None, Attributes, FirstDecls, SourceLoc(), StaticSpellingKind::None);
+    ParserStatus VarDeclStatus = parseDeclVar(PD_InLoop, Attributes, FirstDecls,
+                                              SourceLoc(),
+                                              StaticSpellingKind::None);
     if (VarDeclStatus.isError())
       return VarDeclStatus; // FIXME: better recovery
   } else if (Tok.isNot(tok::semi)) {
