@@ -1633,14 +1633,12 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                            ? llvm::DIType()
                            : getOrCreateDesugaredType(Superclass, DbgTy);
     // Essentially a %swift.opaque pointer.
-    unsigned SizeInBits;
+    unsigned SizeInBits = 0;
     // Prefere the actual storage size over the DbgTy, over a safe default.
     if (DbgTy.StorageType->isSized())
       SizeInBits = IGM.DataLayout.getTypeSizeInBits(DbgTy.StorageType);
     else if (DbgTy.size)
       SizeInBits = DbgTy.size.getValue() * SizeOfByte;
-    else
-      SizeInBits = getFixedBufferSize(IGM).getValue();
 
     auto FwdDecl = DBuilder.createReplaceableForwardDecl(
       llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, L.Line,
@@ -1904,15 +1902,13 @@ llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
 
   // After the specializer did its work, archetypes may have different
   // storage types so we can't cache them based on their Swift type.
-  if (DbgTy.getType()->isUnspecializedGeneric()) {
+  if (DbgTy.getType()->hasArchetype())
     // In order to create recursive data structures we temporarily
     // still insert them into the cache, so remove them.
     DITypeCache.erase(DbgTy.getType());
-    return DITy;
-  }
-
-  // Store it in the cache.
-  DITypeCache[DbgTy.getType()] = llvm::TrackingMDNodeRef(DITy);
+  else
+    // Store it in the cache.
+    DITypeCache.insert({DbgTy.getType(), llvm::TrackingMDNodeRef(DITy)});
 
   return DITy;
 }
