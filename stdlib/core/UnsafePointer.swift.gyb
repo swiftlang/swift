@@ -288,9 +288,13 @@ public struct ${Self}<T>
     _debugPrecondition(
       self + count <= source || source + count <= self,
       "moveAssignFrom overlapping range")
-    for i in 0..<count {
-      self[i] = (source + i).move()
-    }
+    Builtin.destroyArray(T.self, self._rawValue, count.value)
+    Builtin.takeArrayFrontToBack(T.self, self._rawValue, source._rawValue,
+      count.value)
+    // These builtins are equivalent to:
+    // for i in 0..<count {
+    //   self[i] = (source + i).move()
+    // }
   }
 
   /// Destroy the object the pointer points to.
