@@ -12,8 +12,77 @@ UTF16APIs.test("width") {
 }
 
 UTF16APIs.test("leadSurrogate,trailSurrogate") {
-  expectEqual(0xD834, UTF16.leadSurrogate("𝄞"))
-  expectEqual(0xDD1E, UTF16.trailSurrogate("𝄞"))
+  if true {
+    let us: UnicodeScalar = "𝄞"
+    expectEqual(0xD834, UTF16.leadSurrogate(us))
+    expectEqual(0xDD1E, UTF16.trailSurrogate(us))
+  }
+  if true {
+    let us: UnicodeScalar = "\u{10000}"
+    expectEqual(0xD800, UTF16.leadSurrogate(us))
+    expectEqual(0xDC00, UTF16.trailSurrogate(us))
+  }
+  if true {
+    let us: UnicodeScalar = "\u{20000}"
+    expectEqual(0xD840, UTF16.leadSurrogate(us))
+    expectEqual(0xDC00, UTF16.trailSurrogate(us))
+  }
+  if true {
+    let us: UnicodeScalar = "\u{80000}"
+    expectEqual(0xD9C0, UTF16.leadSurrogate(us))
+    expectEqual(0xDC00, UTF16.trailSurrogate(us))
+  }
+  if true {
+    let us: UnicodeScalar = "\u{F0000}"
+    expectEqual(0xDB80, UTF16.leadSurrogate(us))
+    expectEqual(0xDC00, UTF16.trailSurrogate(us))
+  }
+  if true {
+    let us: UnicodeScalar = "\u{100000}"
+    expectEqual(0xDBC0, UTF16.leadSurrogate(us))
+    expectEqual(0xDC00, UTF16.trailSurrogate(us))
+  }
+  if true {
+    let us: UnicodeScalar = "\u{10FFFF}"
+    expectEqual(0xDBFF, UTF16.leadSurrogate(us))
+    expectEqual(0xDFFF, UTF16.trailSurrogate(us))
+  }
+}
+
+UTF16APIs.test("leadSurrogate/trap/U+0000") {
+  let us: UnicodeScalar = "\u{00}"
+  expectCrashLater()
+  UTF16.leadSurrogate(us)
+}
+
+UTF16APIs.test("leadSurrogate/trap/U+005A") {
+  let us: UnicodeScalar = "\u{5A}"
+  expectCrashLater()
+  UTF16.leadSurrogate(us)
+}
+
+UTF16APIs.test("leadSurrogate/trap/U+FFFF") {
+  let us: UnicodeScalar = "\u{FFFF}"
+  expectCrashLater()
+  UTF16.leadSurrogate(us)
+}
+
+UTF16APIs.test("trailSurrogate/trap/U+0000") {
+  let us: UnicodeScalar = "\u{00}"
+  expectCrashLater()
+  UTF16.trailSurrogate(us)
+}
+
+UTF16APIs.test("trailSurrogate/trap/U+005A") {
+  let us: UnicodeScalar = "\u{5A}"
+  expectCrashLater()
+  UTF16.trailSurrogate(us)
+}
+
+UTF16APIs.test("trailSurrogate/trap/U+FFFF") {
+  let us: UnicodeScalar = "\u{FFFF}"
+  expectCrashLater()
+  UTF16.trailSurrogate(us)
 }
 
 class EOFCountingGenerator<T> : GeneratorType {
