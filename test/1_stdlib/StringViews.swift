@@ -697,25 +697,35 @@ tests.test("UTF8 indexes") {
 tests.test("UTF16->String") {
   let s = summer + winter + winter + summer
   let v = s.utf16
-  for i in indices(s) {
-    for j in i..<s.endIndex {
-      expectEqual(
-        s[i..<j],
-        String(v[i.samePositionIn(v)..<j.samePositionIn(v)])
-      )
+  for i in indices(v) {
+    for j in i..<v.endIndex {      
+      if let si = i.samePositionIn(s) {
+        if let sj = j.samePositionIn(s) {
+          expectEqual(i, i1)
+          expectEqual(j, j1)
+          expectEqual(s[si..<sj], String(v[i..<j]))
+          continue
+        }
+      }
+      expectEmpty(String(v[i..<j]))
     }
   }
 }
 
 tests.test("UTF8->String") {
   let s = summer + winter + winter + summer
-  let v = s.utf16
-  for i in indices(s) {
-    for j in i..<s.endIndex {
-      expectEqual(
-        s[i..<j],
-        String(v[i.samePositionIn(v)..<j.samePositionIn(v)])
-      )
+  let v = s.utf8
+  for i in indices(v) {
+    for j in i..<v.endIndex {      
+      if let si = i.samePositionIn(s) {
+        if let sj = j.samePositionIn(s) {
+          expectEqual(i, i1)
+          expectEqual(j, j1)
+          expectEqual(s[si..<sj], String(v[i..<j]))
+          continue
+        }
+      }
+      expectEmpty(String(v[i..<j]))
     }
   }
 }

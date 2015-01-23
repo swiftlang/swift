@@ -273,11 +273,20 @@ extension String {
   }
 
   /// Construct the `String` corresponding to the given sequence of
-  /// UTF8 code units.
-  public init(_ utf8: UTF8View) {
-    self.init(utf8._core)
+  /// UTF-8 code units.  If `utf8` contains unpaired surrogates, the
+  /// result is `nil`.
+  public init?(_ utf8: UTF8View) {
+    let wholeString = String(utf8._core)
+    
+    if let start = utf8.startIndex.samePositionIn(wholeString) {
+      if let end = utf8.endIndex.samePositionIn(wholeString) {
+        self = wholeString[start..<end]
+        return
+      }
+    }
+    return nil
   }
-
+  
   /// The index type for subscripting a `String`\ 's `.utf8` view.
   public typealias UTF8Index = UTF8View.Index
 }
@@ -327,7 +336,7 @@ extension String.UTF8View.Index {
   /// `utf16Index`. If no such position exists, the result is `nil`.
   ///
   /// Requires: `utf8Index` is an element of
-  /// `indices(String(utf16).utf8)`.
+  /// `indices(String(utf16)!.utf8)`.
   public init?(_ utf16Index: String.UTF16Index, within utf8: String.UTF8View) {
     let utf16 = String.UTF16View(utf8._core)
     
@@ -354,7 +363,7 @@ extension String.UTF8View.Index {
   /// `unicodeScalarIndex`.
   ///
   /// Requires: `unicodeScalarIndex` is an element of
-  /// `indices(String(utf8).unicodeScalars)`.
+  /// `indices(String(utf8)!.unicodeScalars)`.
   public init(
     _ unicodeScalarIndex: String.UnicodeScalarIndex,
     within utf8: String.UTF8View
@@ -366,7 +375,7 @@ extension String.UTF8View.Index {
   /// `characterIndex`.
   ///
   /// Requires: `characterIndex` is an element of
-  /// `indices(String(utf8))`.
+  /// `indices(String(utf8)!)`.
   public init(_ characterIndex: String.Index, within utf8: String.UTF8View) {
     self.init(utf8._core, _utf16Offset: characterIndex._base._position)
   }
@@ -374,7 +383,7 @@ extension String.UTF8View.Index {
   /// Return the position in `utf16` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
-  /// Requires: `self` is an element of `indices(String(utf16).utf8)`.
+  /// Requires: `self` is an element of `indices(String(utf16)!.utf8)`.
   public func samePositionIn(
     utf16: String.UTF16View
   ) -> String.UTF16View.Index? {

@@ -165,9 +165,18 @@ extension String {
   }
 
   /// Construct the `String` corresponding to the given sequence of
-  /// UTF16 code units.
-  public init(_ utf16: UTF16View) {
-    self.init(utf16._core[utf16._offset..<utf16._offset+utf16._length])
+  /// UTF-16 code units.  If `utf16` contains unpaired surrogates, the
+  /// result is `nil`.
+  public init?(_ utf16: UTF16View) {
+    let wholeString = String(utf16._core)
+    
+    if let start = utf16.startIndex.samePositionIn(wholeString) {
+      if let end = utf16.endIndex.samePositionIn(wholeString) {
+        self = wholeString[start..<end]
+        return
+      }
+    }
+    return nil
   }
   
   /// The index type for subscripting a `String`\ 's `utf16` view.
@@ -242,7 +251,7 @@ extension String.UTF16View.Index {
   /// `utf8Index`. If no such position exists, the result is `nil`.
   ///
   /// Requires: `utf8Index` is an element of
-  /// `indices(String(utf16).utf8)`.
+  /// `indices(String(utf16)!.utf8)`.
   public init?(
     _ utf8Index: String.UTF8Index, within utf16: String.UTF16View
   ) {
@@ -263,7 +272,7 @@ extension String.UTF16View.Index {
   /// `unicodeScalarIndex`.
   ///
   /// Requires: `unicodeScalarIndex` is an element of
-  /// `indices(String(utf16).unicodeScalars)`.
+  /// `indices(String(utf16)!.unicodeScalars)`.
   public init(
     _ unicodeScalarIndex: String.UnicodeScalarIndex,
     within utf16: String.UTF16View) {
@@ -274,7 +283,7 @@ extension String.UTF16View.Index {
   /// `characterIndex`.
   ///
   /// Requires: `characterIndex` is an element of
-  /// `indices(String(utf16))`.
+  /// `indices(String(utf16)!)`.
   public init(_ characterIndex: String.Index, within utf16: String.UTF16View) {
     _offset = characterIndex._utf16Index
   }
@@ -283,7 +292,7 @@ extension String.UTF16View.Index {
   /// to `self`, or if no such position exists, `nil`.
   ///
   /// Requires: `self` is an element of
-  /// `indices(String(utf8).utf16)`.
+  /// `indices(String(utf8)!.utf16)`.
   public func samePositionIn(
     utf8: String.UTF8View
   ) -> String.UTF8View.Index? {

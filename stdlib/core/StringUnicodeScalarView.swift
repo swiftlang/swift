@@ -415,7 +415,7 @@ extension String.UnicodeScalarIndex {
   /// Return the position in `utf8` that corresponds exactly
   /// to `self`.
   ///
-  /// Requires: `self` is an element of `indices(String(utf8))`.
+  /// Requires: `self` is an element of `indices(String(utf8)!)`.
   public func samePositionIn(utf8: String.UTF8View) -> String.UTF8View.Index {
     return String.UTF8View.Index(self, within: utf8)
   }
@@ -423,7 +423,7 @@ extension String.UnicodeScalarIndex {
   /// Return the position in `utf16` that corresponds exactly
   /// to `self`.
   ///
-  /// Requires: `self` is an element of `indices(String(utf16))`.
+  /// Requires: `self` is an element of `indices(String(utf16)!)`.
   public func samePositionIn(
     utf16: String.UTF16View
   ) -> String.UTF16View.Index {
