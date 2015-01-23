@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -emit-ir -g %s -o %t.ll
 // RUN: FileCheck %s --check-prefix SANITY < %t.ll
+// RUN: FileCheck %s --check-prefix CHECK-HIDDEN < %t.ll
 // RUN: FileCheck %s --check-prefix IMPORT-CHECK < %t.ll
 // RUN: FileCheck %s --check-prefix LOC-CHECK < %t.ll
 // RUN: llc %t.ll -filetype=obj -o %t.o
@@ -23,6 +24,8 @@
 // SANITY: {{^ *ret }}
 // SANITY: DW_TAG_compile_unit
 
+// CHECK-HIDDEN: @[[HIDDEN_GV:_TWVVSC.*]] = linkonce_odr hidden
+// CHECK-HIDDEN-NOT: [[HIDDEN_GV]]{{.*}}[ DW_TAG_variable ]{{.*}}[line 0]
 
 import ObjectiveC
 import Foundation

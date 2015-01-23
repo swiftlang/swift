@@ -1166,7 +1166,8 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
     return;
 
   llvm::DIType Ty = getOrCreateType(DbgTy);
-  if (Ty.isArtificial() || Ty == InternalType)
+  if (Ty.isArtificial() || Ty == InternalType ||
+      Var->getVisibility() == llvm::GlobalValue::HiddenVisibility)
     // FIXME: Really these should be marked as artificial, but LLVM
     // currently has no support for flags to be put on global
     // variables. In the mean time, elide these variables, they
