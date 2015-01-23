@@ -189,7 +189,7 @@ public:
   SILTypeList *getSILTypeList(ArrayRef<SILType> Types) const;
 
   /// \brief This converts Swift types to SILTypes.
-  Lowering::TypeConverter Types;
+  mutable Lowering::TypeConverter Types;
 
   /// Look up the TypeLowering for a SILType.
   const Lowering::TypeLowering &getTypeLowering(SILType t) {

@@ -90,7 +90,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   const SILFunction &F;
   Lowering::TypeConverter &TC;
   const SILInstruction *CurInstruction = nullptr;
-  DominanceInfo *Dominance;
+  DominanceInfo *Dominance = nullptr;
 
   SILVerifier(const SILVerifier&) = delete;
   void operator=(const SILVerifier&) = delete;
@@ -156,6 +156,157 @@ public:
       llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n';
     });
   }
+  
+  /// Require two function types to be ABI-compatible.
+  void requireABICompatibleFunctionTypes(CanSILFunctionType type1,
+                                         CanSILFunctionType type2,
+                                         const Twine &what) {
+    
+    auto complain = [=](const char *msg) -> std::function<void()> {
+      return [=]{
+        llvm::dbgs() << "  " << msg << '\n'
+                     << "  " << type1 << "\n  " << type2 << '\n';
+      };
+    };
+    auto complainBy = [=](std::function<void()> msg) -> std::function<void()> {
+      return [=]{
+        msg();
+        llvm::dbgs() << '\n';
+        llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n';
+      };
+    };
+    
+    // The calling convention and function representation can't be changed.
+    _require(type1->getAbstractCC() == type2->getAbstractCC(), what,
+             complain("Different calling conventions"));
+    
+    _require(type1->getRepresentation() == type2->getRepresentation(), what,
+             complain("Different function representations"));
+
+    // TODO: We should compare generic signatures. Class and witness methods
+    // allow variance in "self"-fulfilled parameters; other functions must
+    // match exactly.
+    auto signature1 = type1->getGenericSignature();
+    auto signature2 = type2->getGenericSignature();
+
+    auto getAnyOptionalObjectTypeInContext = [&](GenericSignature *sig,
+                                                 SILType type) {
+      Lowering::GenericContextScope context(F.getModule().Types, sig);
+      OptionalTypeKind _;
+      return type.getAnyOptionalObjectType(F.getModule(), _);
+    };
+
+    // TODO: More sophisticated param and return ABI compatibility rules could
+    // diverge.
+    std::function<bool (SILType, SILType)>
+    areABICompatibleParamsOrReturns = [&](SILType a, SILType b) -> bool {
+      // Address parameters are all ABI-compatible, though the referenced
+      // values may not be. Assume whoever's doing this knows what they're
+      // doing.
+      if (a.isAddress() && b.isAddress())
+        return true;
+      // Addresses aren't compatible with values.
+      // TODO: An exception for pointerish types?
+      else if (a.isAddress() || b.isAddress())
+        return false;
+      
+      // Tuples are ABI compatible if their elements are.
+      // TODO: Should destructure recursively.
+      SmallVector<CanType, 1> aElements, bElements;
+      if (auto tup = a.getAs<TupleType>()) {
+        auto types = tup.getElementTypes();
+        aElements.append(types.begin(), types.end());
+      } else {
+        aElements.push_back(a.getSwiftRValueType());
+      }
+      if (auto tup = b.getAs<TupleType>()) {
+        auto types = tup.getElementTypes();
+        bElements.append(types.begin(), types.end());
+      } else {
+        bElements.push_back(b.getSwiftRValueType());
+      }
+      
+      if (aElements.size() != bElements.size())
+        return false;
+
+      for (unsigned i : indices(aElements)) {
+        auto aa = SILType::getPrimitiveObjectType(aElements[i]),
+             bb = SILType::getPrimitiveObjectType(bElements[i]);
+        // Equivalent types are always ABI-compatible.
+        if (aa == bb)
+          continue;
+        
+        // Bridgeable object types are interchangeable.
+        if (aa.isBridgeableObjectType() && bb.isBridgeableObjectType())
+          continue;
+        
+        // Optional and IUO are interchangeable if their elements are.
+        auto aObject = getAnyOptionalObjectTypeInContext(signature1, aa);
+        auto bObject = getAnyOptionalObjectTypeInContext(signature2, bb);
+        if (aObject && bObject
+            && areABICompatibleParamsOrReturns(aObject, bObject))
+          continue;
+        // Optional objects are ABI-interchangeable with non-optionals;
+        // None is represented by a null pointer.
+        if (aObject && aObject.isBridgeableObjectType()
+            && bb.isBridgeableObjectType())
+          continue;
+        if (bObject && bObject.isBridgeableObjectType()
+            && aa.isBridgeableObjectType())
+          continue;
+        
+        // Function types are interchangeable if they're also ABI-compatible.
+        if (auto aFunc = aa.getAs<SILFunctionType>())
+          if (auto bFunc = bb.getAs<SILFunctionType>()) {
+            // FIXME
+            requireABICompatibleFunctionTypes(aFunc, bFunc, what);
+            return true;
+          }
+        
+        // Metatypes are interchangeable with metatypes with the same
+        // representation.
+        if (auto aMeta = aa.getAs<MetatypeType>())
+          if (auto bMeta = bb.getAs<MetatypeType>())
+            if (aMeta->getRepresentation() == bMeta->getRepresentation())
+              continue;
+        
+        // Other types must match exactly.
+        return false;
+      }
+      return true;
+    };
+    
+    // Check the return value.
+    
+    auto result1 = type1->getResult();
+    auto result2 = type2->getResult();
+    _require(result1.getConvention() == result2.getConvention(), what,
+             complain("Different return value conventions"));
+    _require(areABICompatibleParamsOrReturns(result1.getSILType(),
+                                             result2.getSILType()), what,
+             complain("ABI-incompatible return values"));
+
+    // Check the parameters.
+    // TODO: Could allow known-empty types to be inserted or removed, but SIL
+    // doesn't know what empty types are yet.
+    
+    _require(type1->getParameters().size() == type2->getParameters().size(),
+             what, complain("different number of parameters"));
+    for (unsigned i : indices(type1->getParameters())) {
+      auto param1 = type1->getParameters()[i];
+      auto param2 = type2->getParameters()[i];
+      
+      _require(param1.getConvention() == param2.getConvention(), what,
+               complainBy([=] {
+                 llvm::dbgs() << "Different conventions for parameter " << i;
+               }));
+      _require(areABICompatibleParamsOrReturns(param1.getSILType(),
+                                               param2.getSILType()), what,
+               complainBy([=] {
+                 llvm::dbgs() << "ABI-incompatible types for parameter " << i;
+               }));
+    }
+  }
 
   void requireSameFunctionComponents(CanSILFunctionType type1,
                                      CanSILFunctionType type2,
@@ -174,6 +325,9 @@ public:
 
   SILVerifier(const SILFunction &F)
       : M(F.getModule().getSwiftModule()), F(F), TC(F.getModule().Types) {
+    if (F.isExternalDeclaration())
+      return;
+      
     // Check to make sure that all blocks are well formed.  If not, the
     // SILVerifier object will explode trying to compute dominance info.
     for (auto &BB : F) {
@@ -1840,12 +1994,9 @@ public:
     auto resTI = requireObjectType(SILFunctionType, ICI,
                                    "convert_function result");
 
-    // convert_function is required to be a no-op conversion.
-
-    require(opTI->getAbstractCC() == resTI->getAbstractCC(),
-            "convert_function cannot change function cc");
-    require(opTI->getRepresentation() == resTI->getRepresentation(),
-            "convert_function cannot change function representation");
+    // convert_function is required to be an ABI-compatible conversion.
+    requireABICompatibleFunctionTypes(opTI, resTI,
+                                 "convert_function cannot change function ABI");
   }
 
   void checkThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
@@ -2292,7 +2443,8 @@ public:
                                     ObjCExistentialMetatypeToObjectInst *OMOI) {
     require(OMOI->getOperand().getType().isObject(),
             "objc_metatype_to_object must take a value");
-    auto fromMetaTy = OMOI->getOperand().getType().getAs<ExistentialMetatypeType>();
+    auto fromMetaTy = OMOI->getOperand().getType()
+      .getAs<ExistentialMetatypeType>();
     require(fromMetaTy, "objc_metatype_to_object must take an @objc existential metatype value");
     require(fromMetaTy->getRepresentation() == MetatypeRepresentation::ObjC,
             "objc_metatype_to_object must take an @objc existential metatype value");
@@ -2535,6 +2687,7 @@ void SILVTable::verify(const SILModule &M) const {
   for (auto &entry : getEntries()) {
     // All vtable entries must be decls in a class context.
     assert(entry.first.hasDecl() && "vtable entry is not a decl");
+    auto baseInfo = M.Types.getConstantInfo(entry.first);
     ValueDecl *decl = entry.first.getDecl();
     auto theClass = dyn_cast_or_null<ClassDecl>(decl->getDeclContext());
     assert(theClass && "vtable entry must refer to a class member");
@@ -2552,14 +2705,24 @@ void SILVTable::verify(const SILModule &M) const {
     assert(c && "vtable entry must refer to a member of the vtable's class");
 
     // All function vtable entries must be at their natural uncurry level.
-    // FIXME: We should change this to uncurry level 1.
     assert(!entry.first.isCurried && "vtable entry must not be curried");
 
     // Foreign entry points shouldn't appear in vtables.
     assert(!entry.first.isForeign && "vtable entry must not be foreign");
-
-    // TODO: Verify that property entries are dynamically dispatched under our
-    // finalized property dynamic dispatch rules.
+    
+    // The vtable entry must be ABI-compatible with the overridden vtable slot.
+    SmallString<32> baseName;
+    {
+      llvm::raw_svector_ostream os(baseName);
+      entry.first.print(os);
+      os.flush();
+    }
+    
+    SILVerifier(*entry.second)
+      .requireABICompatibleFunctionTypes(
+                    baseInfo.getSILType().castTo<SILFunctionType>(),
+                    entry.second->getLoweredFunctionType(),
+                    "vtable entry for " + baseName + " must be ABI-compatible");
   }
 #endif
 }

@@ -1216,6 +1216,12 @@ bb0(%0 : $*Beth):
   return undef : $()
 }
 
+sil @convert_function : $@thin (@thin (AnyObject) -> Optional<AnyObject>) -> (@thin (Optional<AnyObject>) -> AnyObject) {
+entry(%0 : $@thin (AnyObject) -> Optional<AnyObject>):
+  %1 = convert_function %0 : $@thin (AnyObject) -> Optional<AnyObject> to $@thin (Optional<AnyObject>) -> AnyObject
+  return %1 : $@thin (Optional<AnyObject>) -> AnyObject
+}
+
 sil @meta_metatype : $@thin () -> @thick Beth.Type.Type {
 entry:
   %m = metatype $@thick Beth.Type.Type
