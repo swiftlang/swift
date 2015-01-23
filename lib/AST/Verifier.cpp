@@ -2531,11 +2531,6 @@ struct ASTNodeBase {};
 
       if (!D->hasType())
         return;
-      if (D->isInvalid() && !D->getType()->is<ErrorType>()) {
-        Out << "Invalid decl has non-error type!\n";
-        D->dump(Out);
-        abort();
-      }
       if (D->getType()->is<ErrorType>() && !D->isInvalid()) {
         Out << "Valid decl has error type!\n";
         D->dump(Out);
