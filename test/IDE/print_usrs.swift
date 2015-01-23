@@ -139,6 +139,14 @@ class Observers {
     // CHECK: [[@LINE+1]]:5 s:FC14swift_ide_test9ObserversW2p1Si{{$}}
     didSet { doit() }
   }
+
+  // CHECK: [[@LINE+1]]:7 s:vC14swift_ide_test9Observers2p2Si{{$}}
+  var p2 = 42 {
+    // CHECK: [[@LINE+1]]:5 s:FC14swift_ide_test9Observersw2p2Si{{$}}
+    willSet(newValue) { doit() }
+    // CHECK: [[@LINE+1]]:5 s:FC14swift_ide_test9ObserversW2p2Si{{$}}
+    didSet { doit() }
+  }
 }
 
 // CHECK: [[@LINE+2]]:7 s:C14swift_ide_test10ObjCClass1{{$}}

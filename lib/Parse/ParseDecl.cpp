@@ -2921,7 +2921,7 @@ void Parser::parseAccessorBodyDelayed(AbstractFunctionDecl *AFD) {
 
 /// \brief Parse the brace-enclosed getter and setter for a variable.
 VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
-                                    SourceLoc StaticLoc,
+                                    SourceLoc StaticLoc, bool hasInitializer,
                                     const DeclAttributes &Attributes,
                                     SmallVectorImpl<Decl *> &Decls) {
   bool Invalid = false;
@@ -2945,16 +2945,10 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     setLocalDiscriminator(PrimaryVar);
   }
 
-  // The grammar syntactically requires a type annotation. Complain if
-  // our pattern does not have one.
   TypeLoc TyLoc;
   if (TypedPattern *TP = dyn_cast<TypedPattern>(pattern)) {
     TyLoc = TP->getTypeLoc();
-  } else {
-    if (PrimaryVar) {
-      diagnose(pattern->getLoc(), diag::computed_property_missing_type);
-      Invalid = true;
-    }
+  } else if (!PrimaryVar) {
     TyLoc = TypeLoc::withoutLoc(ErrorType::get(Context));
   }
 
@@ -2966,7 +2960,15 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   // If we have an invalid case, bail out now.
   if (!PrimaryVar)
     return nullptr;
-  
+
+  if (!TyLoc.hasLocation()) {
+    if (accessors.Get || accessors.Set || accessors.Addressor ||
+        accessors.MutableAddressor) {
+      diagnose(pattern->getLoc(), diag::computed_property_missing_type);
+      Invalid = true;
+    }
+  }
+
   // Reject accessors on 'let's after parsing them (for better recovery).
   if (PrimaryVar->isLet() && !Attributes.hasAttribute<SILStoredAttr>()) {
     if (accessors.WillSet || accessors.DidSet)
@@ -3329,10 +3331,9 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     // If we syntactically match the second decl-var production, with a
     // var-get-set clause, parse the var-get-set clause.
     if (Tok.is(tok::l_brace) && !Flags.contains(PD_InLoop)) {
-      if (auto *boundVar =
-            parseDeclVarGetSet(pattern.get(), Flags, StaticLoc, Attributes,
-                               Decls)) {
-
+      if (auto *boundVar = parseDeclVarGetSet(pattern.get(), Flags, StaticLoc,
+                                              PBD->hasInit(), Attributes,
+                                              Decls)) {
         if (PBD->getInit() && !boundVar->hasStorage()) {
           diagnose(pattern.get()->getLoc(), diag::getset_init)
             .highlight(PBD->getInit()->getSourceRange());

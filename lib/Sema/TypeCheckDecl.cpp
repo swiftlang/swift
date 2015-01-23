@@ -2493,7 +2493,8 @@ public:
           TC.diagnose(var->getLoc(), diag::observingprop_requires_initializer);
           PBD->setInvalid();
           var->setInvalid();
-          var->overwriteType(ErrorType::get(TC.Context));
+          if (!var->hasType())
+            var->setType(ErrorType::get(TC.Context));
           return;
         }
 
@@ -2504,7 +2505,8 @@ public:
                       var->getCorrectStaticSpelling());
           PBD->setInvalid();
           var->setInvalid();
-          var->overwriteType(ErrorType::get(TC.Context));
+          if (!var->hasType())
+            var->setType(ErrorType::get(TC.Context));
           return;
         }
 
@@ -2515,7 +2517,8 @@ public:
                       diag::global_requires_initializer, var->isLet());
           PBD->setInvalid();
           var->setInvalid();
-          var->overwriteType(ErrorType::get(TC.Context));
+          if (!var->hasType())
+            var->setType(ErrorType::get(TC.Context));
           return;
         }
       });
@@ -3483,6 +3486,25 @@ public:
       return;
 
     TC.checkForForbiddenPrefix(FD);
+
+    // Observing accessors (and their generated regular accessors) may have
+    // the type of the var inferred.
+    if (AbstractStorageDecl *ASD = FD->getAccessorStorageDecl()) {
+      if (ASD->hasObservers()) {
+        TC.validateDecl(ASD);
+        Type valueTy = ASD->getType()->getReferenceStorageReferent();
+        if (FD->isObservingAccessor() || (FD->isSetter() && FD->isImplicit())) {
+          unsigned firstParamIdx = FD->getParent()->isTypeContext();
+          auto *firstParamPattern = FD->getBodyParamPatterns()[firstParamIdx];
+          auto *tuplePattern = cast<TuplePattern>(firstParamPattern);
+          auto *paramPattern = tuplePattern->getFields().front().getPattern();
+          auto *paramTypePattern = cast<TypedPattern>(paramPattern);
+          paramTypePattern->getTypeLoc().setType(valueTy, true);
+        } else if (FD->isGetter() && FD->isImplicit()) {
+          FD->getBodyResultTypeLoc().setType(valueTy, true);
+        }
+      }
+    }
 
     bool badType = false;
     if (!FD->getBodyResultTypeLoc().isNull()) {
@@ -5551,13 +5573,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::Param: {
     auto VD = cast<VarDecl>(D);
     if (!VD->hasType()) {
-      // Make sure the getter and setter have valid types, since they will be
-      // used by SILGen for any accesses to this variable.
-      if (auto getter = VD->getGetter())
-        validateDecl(getter);
-      if (auto setter = VD->getSetter())
-        validateDecl(setter);
-
       if (PatternBindingDecl *PBD = VD->getParentPattern()) {
         validatePatternBindingDecl(*this, PBD);
         if (PBD->isInvalid() || !PBD->getPattern()->hasType()) {
@@ -5597,6 +5612,13 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
                isa<TopLevelCodeDecl>(D->getDeclContext()));
         D->setType(ErrorType::get(Context));
       }
+
+      // Make sure the getter and setter have valid types, since they will be
+      // used by SILGen for any accesses to this variable.
+      if (auto getter = VD->getGetter())
+        validateDecl(getter);
+      if (auto setter = VD->getSetter())
+        validateDecl(setter);
     }
 
     // Synthesize accessors as necessary.

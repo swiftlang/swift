@@ -742,7 +742,7 @@ public:
                        SourceLoc staticLoc, ParsedAccessors &accessors);
   void parseAccessorBodyDelayed(AbstractFunctionDecl *AFD);
   VarDecl *parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
-                              SourceLoc StaticLoc,
+                              SourceLoc StaticLoc, bool hasInitializer,
                               const DeclAttributes &Attributes,
                               SmallVectorImpl<Decl *> &Decls);
   

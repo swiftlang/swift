@@ -720,6 +720,27 @@ struct WillSetDidSetProperties {
     func f() {}
     return ()
   }
+
+  var inferred1 = 42 {
+    willSet {
+      print("almost")
+    }
+    didSet {
+      print("here")
+    }
+  }
+
+  var inferred2 = 40 {
+    willSet {
+      print("look: \(b) and \(newValue)")
+    }
+  }
+
+  var inferred3 = 50 {
+    willSet(newC) {
+      print("look: \(c) and \(newC)")
+    }
+  }
 }
 
 // Disambiguated as accessor.

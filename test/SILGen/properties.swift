@@ -743,6 +743,18 @@ struct ObservingPropertiesWithOwnershipTypes {
   }
 }
 
+struct ObservingPropertiesWithOwnershipTypesInferred {
+  unowned var alwaysPresent = Ref(i: 0) {
+    didSet {
+    }
+  }
+
+  weak var maybePresent = nil as Ref? {
+    willSet {
+    }
+  }
+}
+
 // <rdar://problem/16554876> property accessor synthesization of weak variables doesn't work
 protocol WeakPropertyProtocol {
  weak var maybePresent : Ref? { get set }
