@@ -29,5 +29,23 @@ FoundationPrinting.test("SelectorPrinting") {
   expectPrinted("abc:def:", Selector("abc:def:"))
 }
 
+// Pure Swift classes with and without a custom description
+class PureSwiftDescription {
+  @objc var description: String = "awesome"
+}
+class PureSwiftNoDescription {
+  var x = 318
+}
+
+FoundationPrinting.test("NSArrayDescription") {
+  var array = NSArray(objects:PureSwiftDescription(), PureSwiftNoDescription())
+  var expected = 
+    "(\n" +
+    "    awesome,\n" +
+    "    \"main.PureSwiftNoDescription\"\n" +
+    ")"
+  expectPrinted(expected, array)
+}
+
 runAllTests()
 

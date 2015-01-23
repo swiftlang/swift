@@ -372,6 +372,18 @@ static NSString *_getDescription(SwiftObject *obj) {
   });
   return result;
 }
+
+// Foundation collections expect these to be implemented.
+- (BOOL)isNSArray__      { return NO; }
+- (BOOL)isNSDictionary__ { return NO; }
+- (BOOL)isNSSet__        { return NO; }
+- (BOOL)isNSOrderedSet__ { return NO; }
+- (BOOL)isNSNumber__     { return NO; }
+- (BOOL)isNSData__       { return NO; }
+- (BOOL)isNSDate__       { return NO; }
+- (BOOL)isNSString__     { return NO; }
+- (BOOL)isNSValue__      { return NO; }
+
 @end
 
 /*****************************************************************************/
