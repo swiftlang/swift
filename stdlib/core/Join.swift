@@ -166,13 +166,13 @@ public func join<
   }
 
   if separatorSize != 0 {
-    var needSeparator = false
-    for x in elements {
-      if needSeparator {
+    var gen = elements.generate()
+    if let first = gen.next() {
+      result.extend(first)
+      while let next = gen.next() {
         result.extend(separator)
+        result.extend(next)
       }
-      result.extend(x)
-      needSeparator = true
     }
   } else {
     for x in elements {
