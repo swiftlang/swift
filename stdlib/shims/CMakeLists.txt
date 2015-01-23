@@ -69,6 +69,9 @@ add_custom_command_target(unused_var
     COMMAND
       "${CMAKE_COMMAND}" "-E" "make_directory" "${SWIFTLIB_DIR}/install-tmp/install-tmp"
     COMMAND
+      "${CMAKE_COMMAND}" "-E" "remove"
+      "${SWIFTLIB_DIR}/install-tmp/install-tmp/clang"
+    COMMAND
       "${CMAKE_COMMAND}" "-E" "create_symlink"
       "../clang"
       "${SWIFTLIB_DIR}/install-tmp/install-tmp/clang"
