@@ -2760,9 +2760,16 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     }
     
     TypeBase *favoredType = nullptr;
+    
     if (auto anchor = constraint.getLocator()->getAnchor()) {
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
-        favoredType = this->getFavoredType(applyExpr->getArg());
+        auto argExpr = applyExpr->getArg();
+        favoredType = this->getFavoredType(argExpr);
+        
+        if (!favoredType) {
+          this->optimizeConstraints(argExpr);
+          favoredType = this->getFavoredType(argExpr);
+        }        
       }
     }
     
@@ -2851,6 +2858,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
                    choices,
                    constraint.getLocator(),
                    favoredChoice.getDecl() ? &favoredChoice :  nullptr);
+    
     return SolutionKind::Solved;
   }
 

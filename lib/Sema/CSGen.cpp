@@ -60,6 +60,711 @@ static bool isDelayedOperatorDecl(ValueDecl *vd) {
 }
 
 namespace {
+  
+  /// Internal struct for tracking information about types within a series
+  /// of "linked" expressions. (Such as a chain of binary operator invocations.)
+  struct LinkedTypeInfo {
+    uint haveIntLiteral : 1;
+    uint haveFloatLiteral : 1;
+    uint haveStringLiteral : 1;
+    
+    llvm::SmallSet<TypeBase*, 16> collectedTypes;
+    
+    LinkedTypeInfo() {
+      haveIntLiteral = false;
+      haveFloatLiteral = false;
+    }
+  };
+
+  /// Walks an expression sub-tree, and collects information about expressions
+  /// whose types are mutually dependent upon one another.
+  class LinkedExprCollector : public ASTWalker {
+    
+    llvm::SmallVectorImpl<Expr*> &LinkedExprs;
+
+  public:
+    
+    LinkedExprCollector(llvm::SmallVectorImpl<Expr*> &linkedExprs) :
+        LinkedExprs(linkedExprs) {}
+    
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      
+      // Store top-level binary exprs for further analysis.
+      if (dyn_cast<BinaryExpr>(expr)) {
+        LinkedExprs.push_back(expr);
+        return {false, expr};
+      }
+      
+      return { true, expr };
+    }
+    
+    Expr *walkToExprPost(Expr *expr) override {
+      return expr;
+    }
+    
+    /// \brief Ignore statements.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return { false, stmt };
+    }
+    
+    /// \brief Ignore declarations.
+    bool walkToDeclPre(Decl *decl) override { return false; }
+  };
+  
+  /// Given a collection of "linked" expressions, analyzes them for
+  /// commonalities regarding their types. This will help us compute a
+  /// "best common type" from the expression types.
+  class LinkedExprAnalyzer : public ASTWalker {
+    
+    LinkedTypeInfo &LTI;
+    ConstraintSystem &CS;
+    
+  public:
+    
+    LinkedExprAnalyzer(LinkedTypeInfo &lti, ConstraintSystem &cs) :
+        LTI(lti), CS(cs) {}
+    
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      
+      if (dyn_cast<IntegerLiteralExpr>(expr)) {
+        LTI.haveIntLiteral = true;
+        return {false, expr};
+      }
+      
+      if (dyn_cast<FloatLiteralExpr>(expr)) {
+        LTI.haveFloatLiteral = true;
+        return {false, expr};
+      }
+      
+      if (dyn_cast<StringLiteralExpr>(expr)) {
+        LTI.haveStringLiteral = true;
+        return {false, expr};
+      }
+      
+      if (auto favoredType = CS.getFavoredType(expr)) {
+        LTI.collectedTypes.insert(favoredType);
+        return {false, expr};
+      }
+      
+      return { true, expr };
+    }
+    
+    Expr *walkToExprPost(Expr *expr) override {
+      return expr;
+    }
+    
+    /// \brief Ignore statements.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return { false, stmt };
+    }
+    
+    /// \brief Ignore declarations.
+    bool walkToDeclPre(Decl *decl) override { return false; }
+  };
+  
+  /// For a given expression, given information that is global to the
+  /// expression, attempt to derive a favored type for it.
+  bool computeFavoredTypeForExpr(Expr *expr, ConstraintSystem &CS) {
+    LinkedTypeInfo lti;
+    
+    expr->walk(LinkedExprAnalyzer(lti, CS));
+    
+    if (!lti.collectedTypes.empty()) {
+      // TODO: Compute the BCT.
+      CS.setFavoredType(expr, *lti.collectedTypes.begin());
+      return true;
+    }
+    
+    if (lti.haveFloatLiteral) {
+      if (auto floatProto =
+            CS.TC.Context.getProtocol(
+                                  KnownProtocolKind::FloatLiteralConvertible)) {
+        if (auto defaultType = CS.TC.getDefaultType(floatProto, CS.DC)) {
+          CS.setFavoredType(expr, defaultType.getPointer());
+          return true;
+        }
+      }
+    }
+    
+    if (lti.haveIntLiteral) {
+      if (auto intProto =
+            CS.TC.Context.getProtocol(
+                                KnownProtocolKind::IntegerLiteralConvertible)) {
+        if (auto defaultType = CS.TC.getDefaultType(intProto, CS.DC)) {
+          CS.setFavoredType(expr, defaultType.getPointer());
+          return true;
+        }
+      }
+    }
+    
+    if (lti.haveStringLiteral) {
+      if (auto stringProto =
+          CS.TC.Context.getProtocol(
+                                KnownProtocolKind::StringLiteralConvertible)) {
+        if (auto defaultType = CS.TC.getDefaultType(stringProto, CS.DC)) {
+          CS.setFavoredType(expr, defaultType.getPointer());
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  }
+  
+  /// Determine whether the given parameter and argument type should be
+  /// "favored" because they match exactly.
+  bool isFavoredParamAndArg(ConstraintSystem &CS,
+                            Type paramTy,
+                            Type argTy,
+                            Type otherArgTy) {
+    if (argTy->getAs<LValueType>())
+      argTy = argTy->getLValueOrInOutObjectType();
+    
+    if (!otherArgTy.isNull() &&
+        otherArgTy->getAs<LValueType>())
+      otherArgTy = otherArgTy->getLValueOrInOutObjectType();
+    
+    // Do the types match exactly?
+    if (paramTy->isEqual(argTy))
+      return true;
+    
+    // If the argument is a type variable created for a literal that has a
+    // default type, this is a favored param/arg pair if the parameter is of
+    // that default type.
+    // Is the argument a type variable...
+    if (auto argTypeVar = argTy->getAs<TypeVariableType>()) {
+      if (auto proto = argTypeVar->getImpl().literalConformanceProto) {
+        // If it's a struct type associated with the literal conformance,
+        // test against it directly. This helps to avoid 'widening' the
+        // favored type to the default type for the literal.
+        if (!otherArgTy.isNull() &&
+            otherArgTy->getAs<StructType>()) {
+          
+          if (CS.TC.conformsToProtocol(otherArgTy,
+                                       proto,
+                                       CS.DC,
+                                       true)) {
+            return otherArgTy->isEqual(paramTy);
+          }
+        } else if (auto defaultTy = CS.TC.getDefaultType(proto, CS.DC)) {
+          if (paramTy->isEqual(defaultTy)) {
+            return true;
+          }
+        }
+      }
+    }
+    
+    return false;
+  }
+  
+  /// Extracts == from a type's Equatable conformance.
+  ///
+  /// This only applies to types whose Equatable conformance can be derived.
+  /// Performing the conformance check forces the function to be synthesized.
+  void addNewEqualsOperatorOverloads(ConstraintSystem &CS,
+                                     SmallVectorImpl<Constraint *> &newConstraints,
+                                     Type paramTy,
+                                     Type tyvarType,
+                                     ConstraintLocator *csLoc) {
+    ProtocolDecl *equatableProto =
+    CS.TC.Context.getProtocol(KnownProtocolKind::Equatable);
+    if (!equatableProto)
+      return;
+    
+    paramTy = paramTy->getLValueOrInOutObjectType();
+    paramTy = paramTy->getReferenceStorageReferent();
+    
+    auto nominal = paramTy->getAnyNominal();
+    if (!nominal)
+      return;
+    if (!nominal->derivesProtocolConformance(equatableProto))
+      return;
+    
+    ProtocolConformance *conformance = nullptr;
+    if (!CS.TC.conformsToProtocol(paramTy, equatableProto,
+                                  CS.DC, true, &conformance))
+      return;
+    if (!conformance)
+      return;
+    
+    auto requirement =
+    equatableProto->lookupDirect(CS.TC.Context.Id_EqualsOperator);
+    assert(requirement.size() == 1 && "broken Equatable protocol");
+    ConcreteDeclRef witness =
+    conformance->getWitness(requirement.front(), &CS.TC);
+    if (!witness)
+      return;
+    
+    // FIXME: If we ever have derived == for generic types, we may need to
+    // revisit this.
+    if (witness.getDecl()->getType()->hasArchetype())
+      return;
+    
+    OverloadChoice choice{
+      Type(), witness.getDecl(), /*specialized=*/false, CS
+    };
+    auto overload =
+    Constraint::createBindOverload(CS, tyvarType, choice, csLoc);
+    newConstraints.push_back(overload);
+  }
+  
+  /// Favor certain overloads in a call based on some basic analysis
+  /// of the overload set and call arguments.
+  ///
+  /// \param expr The application.
+  /// \param isFavored Determine wheth the given overload is favored.
+  /// \param createReplacements If provided, a function that creates a set of
+  /// replacement fallback constraints.
+  void favorCallOverloads(ApplyExpr *expr,
+                          ConstraintSystem &CS,
+                          std::function<bool(ValueDecl *)> isFavored,
+                          std::function<void(TypeVariableType *tyvarType,
+                                             ArrayRef<Constraint *>,
+                                             SmallVectorImpl<Constraint *>&)>
+                          createReplacements = nullptr) {
+    // Find the type variable associated with the function, if any.
+    auto fnType = expr->getFn()->getType();
+    auto tyvarType = fnType->getAs<TypeVariableType>();
+    if (!tyvarType)
+      return;
+    
+    // This type variable is only currently associated with the function
+    // being applied, and the only constraint attached to it should
+    // be the disjunction constraint for the overload group.
+    auto &CG = CS.getConstraintGraph();
+    SmallVector<Constraint *, 4> constraints;
+    CG.gatherConstraints(tyvarType, constraints);
+    if (constraints.empty())
+      return;
+    
+    // Look for the disjunction that binds the overload set.
+    for (auto constraint : constraints) {
+      if (constraint->getKind() != ConstraintKind::Disjunction)
+        continue;
+      
+      auto oldConstraints = constraint->getNestedConstraints();
+      auto csLoc = CS.getConstraintLocator(expr->getFn());
+      
+      // Only replace the disjunctive overload constraint.
+      if (oldConstraints[0]->getKind() != ConstraintKind::BindOverload) {
+        continue;
+      }
+      
+      SmallVector<Constraint *, 4> favoredConstraints;
+      
+      TypeBase *favoredTy = nullptr;
+      
+      // Copy over the existing bindings, dividing the constraints up
+      // into "favored" and non-favored lists.
+      for (auto oldConstraint : oldConstraints) {
+        auto overloadChoice = oldConstraint->getOverloadChoice();
+        if (isFavored(overloadChoice.getDecl())) {
+          favoredConstraints.push_back(oldConstraint);
+          
+          favoredTy = overloadChoice.getDecl()->
+          getType()->getAs<AnyFunctionType>()->
+          getResult().getPointer();
+        }
+      }
+      
+      if (favoredConstraints.size() == 1) {
+        CS.setFavoredType(expr, favoredTy);
+      }
+      
+      // If there might be replacement constraints, get them now.
+      SmallVector<Constraint *, 4> replacementConstraints;
+      if (createReplacements)
+        createReplacements(tyvarType, oldConstraints, replacementConstraints);
+      
+      // If we did not find any favored constraints, just introduce
+      // the replacement constraints (if they differ).
+      if (favoredConstraints.empty()) {
+        if (replacementConstraints.size() > oldConstraints.size()) {
+          // Remove the old constraint.
+          CS.removeInactiveConstraint(constraint);
+          
+          CS.addConstraint(
+                           Constraint::createDisjunction(CS,
+                                                         replacementConstraints,
+                                                         csLoc));
+        }
+        break;
+      }
+      
+      // Remove the original constraint from the inactive constraint
+      // list and add the new one.
+      CS.removeInactiveConstraint(constraint);
+      
+      // Create the disjunction of favored constraints.
+      auto favoredConstraintsDisjunction =
+      Constraint::createDisjunction(CS,
+                                    favoredConstraints,
+                                    csLoc);
+      
+      // If we didn't actually build a disjunction, clone
+      // the underlying constraint so we can mark it as
+      // favored.
+      if (favoredConstraints.size() == 1) {
+        favoredConstraintsDisjunction
+        = favoredConstraintsDisjunction->clone(CS);
+      }
+      
+      favoredConstraintsDisjunction->setFavored();
+      
+      // Find the disjunction of fallback constraints. If any
+      // constraints were added here, create a new disjunction.
+      Constraint *fallbackConstraintsDisjunction = constraint;
+      if (replacementConstraints.size() > oldConstraints.size()) {
+        fallbackConstraintsDisjunction =
+        Constraint::createDisjunction(CS,
+                                      replacementConstraints,
+                                      csLoc);
+      }
+      
+      // Form the (favored, fallback) disjunction.
+      auto aggregateConstraints = {
+        favoredConstraintsDisjunction,
+        fallbackConstraintsDisjunction
+      };
+      
+      CS.addConstraint(
+                       Constraint::createDisjunction(CS,
+                                                     aggregateConstraints,
+                                                     csLoc));
+      break;
+    }
+    
+  }
+  
+  /// Determine whether or not a given NominalTypeDecl has a failable
+  /// initializer member.
+  bool hasFailableInits(NominalTypeDecl *NTD,
+                        ConstraintSystem *CS) {
+    
+    // TODO: Note that we search manually, rather than invoking lookupMember
+    // on the ConstraintSystem object. Because this is a hot path, this keeps
+    // the overhead of the check low, and is twice as fast.
+    if (!NTD->getSearchedForFailableInits()) {
+      
+      for (auto member : NTD->getMembers()) {
+        if (auto CD = dyn_cast<ConstructorDecl>(member)) {
+          if (CD->getFailability()) {
+            NTD->setHasFailableInits();
+            break;
+          }
+        }
+      }
+      
+      if (!NTD->getHasFailableInits()) {
+        for (auto extension : NTD->getExtensions()) {
+          for (auto member : extension->getMembers()) {
+            if (auto CD = dyn_cast<ConstructorDecl>(member)) {
+              if (CD->getFailability()) {
+                NTD->setHasFailableInits();
+                break;
+              }
+            }
+          }
+        }
+        
+        if (!NTD->getHasFailableInits()) {
+          for (auto parentTyLoc : NTD->getInherited()) {
+            if (auto nominalType =
+                parentTyLoc.getType()->getAs<NominalType>()) {
+              if (hasFailableInits(nominalType->getDecl(), CS)) {
+                NTD->setHasFailableInits();
+                break;
+              }
+            }
+          }
+        }
+      }
+      
+      NTD->setSearchedForFailableInits();
+    }
+    
+    return NTD->getHasFailableInits();
+  }
+  
+  Type getInnerParenType(const Type &t) {
+    if (auto parenType = dyn_cast<ParenType>(t.getPointer())) {
+      return getInnerParenType(parenType->getUnderlyingType());
+    }
+    
+    return t;
+  }
+  
+  size_t getOperandCount(Type t) {
+    size_t nOperands = 0;
+    
+    if (auto parenTy = dyn_cast<ParenType>(t.getPointer())) {
+      if (parenTy->getDesugaredType())
+        nOperands = 1;
+    } else if (auto tupleTy = t->getAs<TupleType>()) {
+      nOperands = tupleTy->getElementTypes().size();
+    }
+    
+    return nOperands;
+  }
+  
+  /// Favor unary operator constraints where we have exact matches
+  /// for the operand and contextual type.
+  void favorMatchingUnaryOperators(ApplyExpr *expr,
+                                   ConstraintSystem &CS) {
+    // Find the argument type.
+    auto argTy = getInnerParenType(expr->getArg()->getType());
+    
+    // Determine whether the given declaration is favored.
+    auto isFavoredDecl = [&](ValueDecl *value) -> bool {
+      auto valueTy = value->getType();
+      
+      auto fnTy = valueTy->getAs<AnyFunctionType>();
+      if (!fnTy)
+        return false;
+      
+      // Figure out the parameter type.
+      if (value->getDeclContext()->isTypeContext()) {
+        fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
+      }
+      
+      Type paramTy = fnTy->getInput();
+      auto resultTy = fnTy->getResult();
+      auto contextualTy = CS.getContextualType(expr);
+      
+      return isFavoredParamAndArg(CS, paramTy, argTy, Type()) &&
+      (!contextualTy || (*contextualTy)->isEqual(resultTy));
+    };
+    
+    favorCallOverloads(expr, CS, isFavoredDecl);
+  }
+  
+  void favorMatchingOverloadExprs(ApplyExpr *expr,
+                                  ConstraintSystem &CS) {
+    // Find the argument type.
+    auto argTy = expr->getArg()->getType();
+    size_t nArgs = getOperandCount(argTy);
+    auto fnExpr = expr->getFn();
+    
+    // Check to ensure that we have an OverloadedDeclRef, and that we're not
+    // favoring multiple overload constraints. (Otherwise, in this case
+    // favoring is useless.
+    if (auto ODR = dyn_cast<OverloadedDeclRefExpr>(fnExpr)) {
+      bool haveMultipleApplicableOverloads = false;
+      
+      for (auto VD : ODR->getDecls()) {
+        if (auto fnTy = VD->getType()->getAs<AnyFunctionType>()) {
+          size_t nParams = getOperandCount(fnTy->getInput());
+          
+          if (nArgs == nParams) {
+            if (haveMultipleApplicableOverloads) {
+              return;
+            } else {
+              haveMultipleApplicableOverloads = true;
+            }
+          }
+        }
+      }
+      
+      // Determine whether the given declaration is favored.
+      auto isFavoredDecl = [&](ValueDecl *value) -> bool {
+        auto valueTy = value->getType();
+        
+        auto fnTy = valueTy->getAs<AnyFunctionType>();
+        if (!fnTy)
+          return false;
+        
+        return nArgs == getOperandCount(fnTy->getInput());
+      };
+      
+      favorCallOverloads(expr, CS, isFavoredDecl);
+      
+    }
+    
+    if (auto favoredTy = CS.getFavoredType(expr->getArg())) {
+      // Determine whether the given declaration is favored.
+      auto isFavoredDecl = [&](ValueDecl *value) -> bool {
+        auto valueTy = value->getType();
+        
+        auto fnTy = valueTy->getAs<AnyFunctionType>();
+        if (!fnTy)
+          return false;
+        
+        // Figure out the parameter type.
+        if (value->getDeclContext()->isTypeContext()) {
+          fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
+        }
+        
+        Type paramTy = fnTy->getInput();
+        
+        return favoredTy->isEqual(paramTy);
+      };
+      
+      favorCallOverloads(expr, CS, isFavoredDecl);
+    }
+  }
+  
+  /// Favor binary operator constraints where we have exact matches
+  /// for the operands and contextual type.
+  void favorMatchingBinaryOperators(ApplyExpr *expr,
+                                    ConstraintSystem &CS) {
+    // If we're generating constraints for a binary operator application,
+    // there are two special situations to consider:
+    //  1. If the type checker has any newly created functions with the
+    //     operator's name. If it does, the overloads were created after the
+    //     associated overloaded id expression was created, and we'll need to
+    //     add a new disjunction constraint for the new set of overloads.
+    //  2. If any component argument expressions (nested or otherwise) are
+    //     literals, we can favor operator overloads whose argument types are
+    //     identical to the literal type, or whose return types are identical
+    //     to any contextual type associated with the application expression.
+    
+    // Find the argument types.
+    auto argTy = expr->getArg()->getType();
+    auto argTupleTy = argTy->castTo<TupleType>();
+    auto argTupleExpr = dyn_cast<TupleExpr>(expr->getArg());
+    Type firstArgTy = getInnerParenType(argTupleTy->getFields()[0].getType());
+    Type secondArgTy =
+    getInnerParenType(argTupleTy->getFields()[1].getType());
+    
+    auto firstFavoredTy = CS.getFavoredType(argTupleExpr->getElements()[0]);
+    auto secondFavoredTy = CS.getFavoredType(argTupleExpr->getElements()[1]);
+    
+    auto favoredExprTy = CS.getFavoredType(expr);
+    
+    // If the parent has been favored on the way down, propagate that
+    // information to its children.
+    if (!firstFavoredTy) {
+      CS.setFavoredType(argTupleExpr->getElements()[0], favoredExprTy);
+      firstFavoredTy = favoredExprTy;
+    }
+    
+    if (!secondFavoredTy) {
+      CS.setFavoredType(argTupleExpr->getElements()[1], favoredExprTy);
+      secondFavoredTy = favoredExprTy;
+    }
+    
+    if (firstFavoredTy && firstArgTy->getAs<TypeVariableType>()) {
+      firstArgTy = firstFavoredTy;
+    }
+    
+    if (secondFavoredTy && secondArgTy->getAs<TypeVariableType>()) {
+      secondArgTy = secondFavoredTy;
+    }
+    
+    // Determine whether the given declaration is favored.
+    auto isFavoredDecl = [&](ValueDecl *value) -> bool {
+      auto valueTy = value->getType();
+      
+      auto fnTy = valueTy->getAs<AnyFunctionType>();
+      if (!fnTy)
+        return false;
+      
+      // Figure out the parameter type.
+      if (value->getDeclContext()->isTypeContext()) {
+        fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
+      }
+      
+      Type paramTy = fnTy->getInput();
+      auto paramTupleTy = paramTy->castTo<TupleType>();
+      auto firstParamTy = paramTupleTy->getFields()[0].getType();
+      auto secondParamTy = paramTupleTy->getFields()[1].getType();
+      
+      auto resultTy = fnTy->getResult();
+      auto contextualTy = CS.getContextualType(expr);
+      
+      return
+        (isFavoredParamAndArg(CS, firstParamTy, firstArgTy, secondArgTy) ||
+         isFavoredParamAndArg(CS, secondParamTy, secondArgTy, firstArgTy)) &&
+        firstParamTy->isEqual(secondParamTy) &&
+        (!contextualTy || (*contextualTy)->isEqual(resultTy));
+    };
+    
+    auto createReplacements
+    = [&](TypeVariableType *tyvarType,
+          ArrayRef<Constraint *> oldConstraints,
+          SmallVectorImpl<Constraint *>& replacementConstraints) {
+      auto declRef = dyn_cast<OverloadedDeclRefExpr>(expr->getFn());
+      if (!declRef)
+        return;
+      
+      if (!declRef->isPotentiallyDelayedGlobalOperator())
+        return;
+      
+      Identifier eqOperator = CS.TC.Context.Id_EqualsOperator;
+      if (declRef->getDecls()[0]->getName() != eqOperator)
+        return;
+      
+      if (declRef->isSpecialized())
+        return;
+      
+      replacementConstraints.append(oldConstraints.begin(),
+                                    oldConstraints.end());
+      
+      auto csLoc = CS.getConstraintLocator(expr->getFn());
+      addNewEqualsOperatorOverloads(CS, replacementConstraints, firstArgTy,
+                                    tyvarType, csLoc);
+      if (!firstArgTy->isEqual(secondArgTy)) {
+        addNewEqualsOperatorOverloads(CS, replacementConstraints,
+                                      secondArgTy,
+                                      tyvarType, csLoc);
+      }
+    };
+    
+    favorCallOverloads(expr, CS, isFavoredDecl, createReplacements);
+  }
+  
+  class ConstraintOptimizer : public ASTWalker {
+    
+    ConstraintSystem &CS;
+    
+  public:
+    
+    ConstraintOptimizer(ConstraintSystem &cs) :
+      CS(cs) {}
+    
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      
+      if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
+        if (isa<PrefixUnaryExpr>(applyExpr) ||
+            isa<PostfixUnaryExpr>(applyExpr)) {
+          favorMatchingUnaryOperators(applyExpr, CS);
+        } else if (isa<BinaryExpr>(applyExpr)) {
+          favorMatchingBinaryOperators(applyExpr, CS);
+        } else {
+          favorMatchingOverloadExprs(applyExpr, CS);
+        }
+      }
+      
+      // If the paren expr has a favored type, and the subExpr doesn't,
+      // propagate downwards. Otherwise, propagate upwards.
+      if (auto parenExpr = dyn_cast<ParenExpr>(expr)) {
+        if (!CS.getFavoredType(parenExpr->getSubExpr())) {
+          CS.setFavoredType(parenExpr->getSubExpr(),
+                            CS.getFavoredType(parenExpr));
+        } else if (!CS.getFavoredType(parenExpr)) {
+          CS.setFavoredType(parenExpr,
+                            CS.getFavoredType(parenExpr->getSubExpr()));
+        }
+      }
+      
+      return { true, expr };
+    }
+    
+    Expr *walkToExprPost(Expr *expr) override {
+      return expr;
+    }
+    
+    /// \brief Ignore statements.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return { false, stmt };
+    }
+    
+    /// \brief Ignore declarations.
+    bool walkToDeclPre(Decl *decl) override { return false; }
+  };
+}
+
+namespace {
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
     ConstraintSystem &CS;
 
@@ -324,6 +1029,11 @@ namespace {
                                         E->isSpecialized(),
                                         CS,
                                         reason));
+      
+      if (E->getDecl()->getType() &&
+          !E->getDecl()->getType()->getAs<TypeVariableType>()) {
+        CS.setFavoredType(E, E->getDecl()->getType().getPointer());
+      }
 
       return tv;
     }
@@ -988,486 +1698,6 @@ namespace {
       return expr->getType();
     }
 
-    /// Determine whether the given parameter and argument type should be
-    /// "favored" because they match exactly.
-    bool isFavoredParamAndArg(Type paramTy, Type argTy, Type otherArgTy) {
-      if (argTy->getAs<LValueType>())
-        argTy = argTy->getLValueOrInOutObjectType();
-      
-      if (!otherArgTy.isNull() &&
-          otherArgTy->getAs<LValueType>())
-        otherArgTy = otherArgTy->getLValueOrInOutObjectType();
-      
-      // Do the types match exactly?
-      if (paramTy->isEqual(argTy))
-        return true;
-
-      // If the argument is a type variable created for a literal that has a
-      // default type, this is a favored param/arg pair if the parameter is of
-      // that default type.
-      // Is the argument a type variable...
-      if (auto argTypeVar = argTy->getAs<TypeVariableType>()) {
-        if (auto proto = argTypeVar->getImpl().literalConformanceProto) {
-          // If it's a struct type associated with the literal conformance,
-          // test against it directly. This helps to avoid 'widening' the
-          // favored type to the default type for the literal.
-          if (!otherArgTy.isNull() &&
-              otherArgTy->getAs<StructType>()) {
-            
-            if (CS.TC.conformsToProtocol(otherArgTy,
-                                         proto,
-                                         CS.DC,
-                                         true)) {
-              return otherArgTy->isEqual(paramTy);
-            }
-          } else if (auto defaultTy = CS.TC.getDefaultType(proto, CS.DC)) {
-            if (paramTy->isEqual(defaultTy)) {
-              return true;
-            }
-          }
-        }
-      }
-
-      return false;
-    }
-
-    /// Extracts == from a type's Equatable conformance.
-    ///
-    /// This only applies to types whose Equatable conformance can be derived.
-    /// Performing the conformance check forces the function to be synthesized.
-    void addNewEqualsOperatorOverloads(
-        SmallVectorImpl<Constraint *> &newConstraints,
-        Type paramTy,
-        Type tyvarType,
-        ConstraintLocator *csLoc) {
-      ProtocolDecl *equatableProto =
-        CS.TC.Context.getProtocol(KnownProtocolKind::Equatable);
-      if (!equatableProto)
-        return;
-
-      paramTy = paramTy->getLValueOrInOutObjectType();
-      paramTy = paramTy->getReferenceStorageReferent();
-
-      auto nominal = paramTy->getAnyNominal();
-      if (!nominal)
-        return;
-      if (!nominal->derivesProtocolConformance(equatableProto))
-        return;
-
-      ProtocolConformance *conformance = nullptr;
-      if (!CS.TC.conformsToProtocol(paramTy, equatableProto,
-                                    CS.DC, true, &conformance))
-        return;
-      if (!conformance)
-        return;
-
-      auto requirement =
-        equatableProto->lookupDirect(CS.TC.Context.Id_EqualsOperator);
-      assert(requirement.size() == 1 && "broken Equatable protocol");
-      ConcreteDeclRef witness =
-        conformance->getWitness(requirement.front(), &CS.TC);
-      if (!witness)
-        return;
-
-      // FIXME: If we ever have derived == for generic types, we may need to
-      // revisit this.
-      if (witness.getDecl()->getType()->hasArchetype())
-        return;
-
-      OverloadChoice choice{
-        Type(), witness.getDecl(), /*specialized=*/false, CS
-      };
-      auto overload =
-        Constraint::createBindOverload(CS, tyvarType, choice, csLoc);
-      newConstraints.push_back(overload);
-    }
-
-    /// Favor certain overloads in a call based on some basic analysis
-    /// of the overload set and call arguments.
-    ///
-    /// \param expr The application.
-    /// \param isFavored Determine wheth the given overload is favored.
-    /// \param createReplacements If provided, a function that creates a set of
-    /// replacement fallback constraints.
-    void favorCallOverloads(ApplyExpr *expr,
-                            std::function<bool(ValueDecl *)> isFavored,
-                            std::function<void(TypeVariableType *tyvarType,
-                                               ArrayRef<Constraint *>,
-                                               SmallVectorImpl<Constraint *>&)>
-                              createReplacements = nullptr) {
-      // Find the type variable associated with the function, if any.
-      auto fnType = expr->getFn()->getType();
-      auto tyvarType = fnType->getAs<TypeVariableType>();
-      if (!tyvarType)
-        return;
-      
-      // This type variable is only currently associated with the function
-      // being applied, and the only constraint attached to it should
-      // be the disjunction constraint for the overload group.
-      auto &CG = CS.getConstraintGraph();
-      SmallVector<Constraint *, 4> constraints;
-      CG.gatherConstraints(tyvarType, constraints);
-      if (constraints.empty())
-        return;
-
-      // Look for the disjunction that binds the overload set.
-      for (auto constraint : constraints) {
-        if (constraint->getKind() != ConstraintKind::Disjunction)
-          continue;
-        
-        auto oldConstraints = constraint->getNestedConstraints();
-        auto csLoc = CS.getConstraintLocator(expr->getFn());
-        
-        // Only replace the disjunctive overload constraint.
-        if (oldConstraints[0]->getKind() != ConstraintKind::BindOverload) {
-          continue;
-        }
-
-        SmallVector<Constraint *, 4> favoredConstraints;
-        
-        TypeBase *favoredTy = nullptr;
-
-        // Copy over the existing bindings, dividing the constraints up
-        // into "favored" and non-favored lists.
-        for (auto oldConstraint : oldConstraints) {
-          auto overloadChoice = oldConstraint->getOverloadChoice();
-          if (isFavored(overloadChoice.getDecl())) {
-            favoredConstraints.push_back(oldConstraint);
-            
-            favoredTy = overloadChoice.getDecl()->
-                          getType()->getAs<AnyFunctionType>()->
-                            getResult().getPointer();
-          }
-        }
-        
-        if (favoredConstraints.size() == 1) {
-          CS.setFavoredType(expr, favoredTy);
-        }
-
-        // If there might be replacement constraints, get them now.
-        SmallVector<Constraint *, 4> replacementConstraints;
-        if (createReplacements)
-          createReplacements(tyvarType, oldConstraints, replacementConstraints);
-
-        // If we did not find any favored constraints, just introduce
-        // the replacement constraints (if they differ).
-        if (favoredConstraints.empty()) {
-          if (replacementConstraints.size() > oldConstraints.size()) {
-            // Remove the old constraint.
-            CS.removeInactiveConstraint(constraint);
-
-            CS.addConstraint(
-              Constraint::createDisjunction(CS,
-                                            replacementConstraints,
-                                            csLoc));
-          }
-          break;
-        }
-
-        // Remove the original constraint from the inactive constraint
-        // list and add the new one.
-        CS.removeInactiveConstraint(constraint);
-        
-        // Create the disjunction of favored constraints.
-        auto favoredConstraintsDisjunction =
-          Constraint::createDisjunction(CS,
-                                        favoredConstraints,
-                                        csLoc);
-
-        // If we didn't actually build a disjunction, clone
-        // the underlying constraint so we can mark it as
-        // favored.
-        if (favoredConstraints.size() == 1) {
-          favoredConstraintsDisjunction
-            = favoredConstraintsDisjunction->clone(CS);
-        }
-
-        favoredConstraintsDisjunction->setFavored();
-        
-        // Find the disjunction of fallback constraints. If any
-        // constraints were added here, create a new disjunction.
-        Constraint *fallbackConstraintsDisjunction = constraint;
-        if (replacementConstraints.size() > oldConstraints.size()) {
-          fallbackConstraintsDisjunction =
-            Constraint::createDisjunction(CS,
-                                          replacementConstraints,
-                                          csLoc);
-        }
-
-        // Form the (favored, fallback) disjunction.
-        auto aggregateConstraints = {
-          favoredConstraintsDisjunction,
-          fallbackConstraintsDisjunction
-        };
-
-        CS.addConstraint(
-          Constraint::createDisjunction(CS,
-                                        aggregateConstraints,
-                                        csLoc));
-        break;
-      }
-
-    }
-    
-    /// Determine whether or not a given NominalTypeDecl has a failable
-    /// initializer member.
-    bool hasFailableInits(NominalTypeDecl *NTD,
-                          ConstraintSystem *CS) {
-      
-      // TODO: Note that we search manually, rather than invoking lookupMember
-      // on the ConstraintSystem object. Because this is a hot path, this keeps
-      // the overhead of the check low, and is twice as fast.
-      if (!NTD->getSearchedForFailableInits()) {
-        
-        for (auto member : NTD->getMembers()) {
-          if (auto CD = dyn_cast<ConstructorDecl>(member)) {
-            if (CD->getFailability()) {
-              NTD->setHasFailableInits();
-              break;
-            }
-          }
-        }
-        
-        if (!NTD->getHasFailableInits()) {
-          for (auto extension : NTD->getExtensions()) {
-            for (auto member : extension->getMembers()) {
-              if (auto CD = dyn_cast<ConstructorDecl>(member)) {
-                if (CD->getFailability()) {
-                  NTD->setHasFailableInits();
-                  break;
-                }
-              }
-            }
-          }
-          
-          if (!NTD->getHasFailableInits()) {
-            for (auto parentTyLoc : NTD->getInherited()) {
-              if (auto nominalType =
-                  parentTyLoc.getType()->getAs<NominalType>()) {
-                if (hasFailableInits(nominalType->getDecl(), CS)) {
-                  NTD->setHasFailableInits();
-                  break;
-                }
-              }
-            }
-          }
-        }
-        
-        NTD->setSearchedForFailableInits();
-      }
-      
-      return NTD->getHasFailableInits();
-    }
-    
-    Type getInnerParenType(const Type &t) {
-      if (auto parenType = dyn_cast<ParenType>(t.getPointer())) {
-        return getInnerParenType(parenType->getUnderlyingType());
-      }
-      
-      return t;
-    }
-
-    size_t getOperandCount(Type t) {
-      size_t nOperands = 0;
-      
-      if (auto parenTy = dyn_cast<ParenType>(t.getPointer())) {
-        if (parenTy->getDesugaredType())
-          nOperands = 1;
-      } else if (auto tupleTy = t->getAs<TupleType>()) {
-        nOperands = tupleTy->getElementTypes().size();
-      }
-      
-      return nOperands;
-    }
-    
-    /// Favor unary operator constraints where we have exact matches
-    /// for the operand and contextual type.
-    void favorMatchingUnaryOperators(ApplyExpr *expr) {
-      // Find the argument type.
-      auto argTy = getInnerParenType(expr->getArg()->getType());
-
-      // Determine whether the given declaration is favored.
-      auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-        auto valueTy = value->getType();
-          
-        auto fnTy = valueTy->getAs<AnyFunctionType>();
-        if (!fnTy)
-          return false;
-
-        // Figure out the parameter type.
-        if (value->getDeclContext()->isTypeContext()) {
-          fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
-        }
-        
-        Type paramTy = fnTy->getInput();        
-        auto resultTy = fnTy->getResult();
-        auto contextualTy = CS.getContextualType(expr);
-        
-        return isFavoredParamAndArg(paramTy, argTy, Type()) &&
-               (!contextualTy || (*contextualTy)->isEqual(resultTy));
-      };
-
-      favorCallOverloads(expr, isFavoredDecl);
-    }
-    
-    void favorMatchingOverloadExprs(ApplyExpr *expr) {
-      // Find the argument type.
-      auto argTy = expr->getArg()->getType();
-      size_t nArgs = getOperandCount(argTy);
-      auto fnExpr = expr->getFn();
-      
-      // Check to ensure that we have an OverloadedDeclRef, and that we're not
-      // favoring multiple overload constraints. (Otherwise, in this case
-      // favoring is useless.
-      if (auto ODR = dyn_cast<OverloadedDeclRefExpr>(fnExpr)) {
-        bool haveMultipleApplicableOverloads = false;
-        
-        for (auto VD : ODR->getDecls()) {
-          if (auto fnTy = VD->getType()->getAs<AnyFunctionType>()) {
-            size_t nParams = getOperandCount(fnTy->getInput());
-           
-            if (nArgs == nParams) {
-              if (haveMultipleApplicableOverloads) {
-                return;
-              } else {
-                haveMultipleApplicableOverloads = true;
-              }
-            }
-          }
-        }
-        
-        // Determine whether the given declaration is favored.
-        auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-          auto valueTy = value->getType();
-          
-          auto fnTy = valueTy->getAs<AnyFunctionType>();
-          if (!fnTy)
-            return false;
-          
-          return nArgs == getOperandCount(fnTy->getInput());
-        };
-        
-        favorCallOverloads(expr, isFavoredDecl);
-        
-      }
-      
-      if (auto favoredTy = CS.getFavoredType(expr->getArg())) {
-        // Determine whether the given declaration is favored.
-        auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-          auto valueTy = value->getType();
-          
-          auto fnTy = valueTy->getAs<AnyFunctionType>();
-          if (!fnTy)
-            return false;
-          
-          // Figure out the parameter type.
-          if (value->getDeclContext()->isTypeContext()) {
-            fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
-          }
-          
-          Type paramTy = fnTy->getInput();
-          
-          return favoredTy->isEqual(paramTy);
-        };
-        
-        favorCallOverloads(expr, isFavoredDecl);
-      }
-    }
-
-    /// Favor binary operator constraints where we have exact matches
-    /// for the operands and contextual type.
-    void favorMatchingBinaryOperators(ApplyExpr *expr) {
-      // If we're generating constraints for a binary operator application,
-      // there are two special situations to consider:
-      //  1. If the type checker has any newly created functions with the
-      //     operator's name. If it does, the overloads were created after the
-      //     associated overloaded id expression was created, and we'll need to
-      //     add a new disjunction constraint for the new set of overloads.
-      //  2. If any component argument expressions (nested or otherwise) are
-      //     literals, we can favor operator overloads whose argument types are
-      //     identical to the literal type, or whose return types are identical
-      //     to any contextual type associated with the application expression.
-
-      // Find the argument types.
-      auto argTy = expr->getArg()->getType();
-      auto argTupleTy = argTy->castTo<TupleType>();
-      auto argTupleExpr = dyn_cast<TupleExpr>(expr->getArg());
-      Type firstArgTy = getInnerParenType(argTupleTy->getFields()[0].getType());
-      Type secondArgTy =
-              getInnerParenType(argTupleTy->getFields()[1].getType());
-      
-      auto firstFavoredTy = CS.getFavoredType(argTupleExpr->getElements()[0]);
-      auto secondFavoredTy = CS.getFavoredType(argTupleExpr->getElements()[1]);
-      
-      if (firstFavoredTy && firstArgTy->getAs<TypeVariableType>()) {
-        firstArgTy = firstFavoredTy;
-      }
-      
-      if (secondFavoredTy && secondArgTy->getAs<TypeVariableType>()) {
-        secondArgTy = secondFavoredTy;
-      }
-
-      // Determine whether the given declaration is favored.
-      auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-        auto valueTy = value->getType();
-          
-        auto fnTy = valueTy->getAs<AnyFunctionType>();
-        if (!fnTy)
-          return false;
-
-        // Figure out the parameter type.
-        if (value->getDeclContext()->isTypeContext()) {
-          fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
-        }
-        
-        Type paramTy = fnTy->getInput();
-        auto paramTupleTy = paramTy->castTo<TupleType>();
-        auto firstParamTy = paramTupleTy->getFields()[0].getType();
-        auto secondParamTy = paramTupleTy->getFields()[1].getType();
-        
-        auto resultTy = fnTy->getResult();
-        auto contextualTy = CS.getContextualType(expr);
-        
-        return (isFavoredParamAndArg(firstParamTy, firstArgTy, secondArgTy) ||
-            isFavoredParamAndArg(secondParamTy, secondArgTy, firstArgTy)) &&
-            firstParamTy->isEqual(secondParamTy) &&
-            (!contextualTy || (*contextualTy)->isEqual(resultTy));
-      };
-
-      auto createReplacements
-        = [&](TypeVariableType *tyvarType,
-              ArrayRef<Constraint *> oldConstraints,
-              SmallVectorImpl<Constraint *>& replacementConstraints) {
-        auto declRef = dyn_cast<OverloadedDeclRefExpr>(expr->getFn());
-        if (!declRef)
-          return;
-
-        if (!declRef->isPotentiallyDelayedGlobalOperator())
-          return;
-
-        Identifier eqOperator = CS.TC.Context.Id_EqualsOperator;
-        if (declRef->getDecls()[0]->getName() != eqOperator)
-          return;
-
-        if (declRef->isSpecialized())
-          return;
-
-        replacementConstraints.append(oldConstraints.begin(),
-                                      oldConstraints.end());
-
-        auto csLoc = CS.getConstraintLocator(expr->getFn());
-        addNewEqualsOperatorOverloads(replacementConstraints, firstArgTy,
-                                      tyvarType, csLoc);
-        if (!firstArgTy->isEqual(secondArgTy)) {
-          addNewEqualsOperatorOverloads(replacementConstraints,
-                                        secondArgTy,
-                                        tyvarType, csLoc);
-        }
-      };
-
-      favorCallOverloads(expr, isFavoredDecl, createReplacements);
-    }
-
     Type visitApplyExpr(ApplyExpr *expr) {
       Type outputTy;
       
@@ -1579,14 +1809,6 @@ namespace {
       }
       
       auto funcTy = FunctionType::get(expr->getArg()->getType(), outputTy);
-      
-      if (isa<PrefixUnaryExpr>(expr) || isa<PostfixUnaryExpr>(expr)) {
-        favorMatchingUnaryOperators(expr);
-      } else if (isa<BinaryExpr>(expr)) {
-        favorMatchingBinaryOperators(expr);
-      } else {
-        favorMatchingOverloadExprs(expr);
-      }
 
       CS.addConstraint(ConstraintKind::ApplicableFunction, funcTy,
         expr->getFn()->getType(),
@@ -2058,7 +2280,13 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   // Walk the expression, generating constraints.
   ConstraintGenerator cg(*this);
   ConstraintWalker cw(cg);
-  return expr->walk(cw);
+  
+  Expr* result = expr->walk(cw);
+  
+  if (result)
+    this->optimizeConstraints(result);
+  
+  return result;
 }
 
 Expr *ConstraintSystem::generateConstraintsShallow(Expr *expr) {
@@ -2070,6 +2298,9 @@ Expr *ConstraintSystem::generateConstraintsShallow(Expr *expr) {
   auto type = cg.visit(expr);
   if (!type)
     return nullptr;
+  
+  this->optimizeConstraints(expr);
+  
   expr->setType(type);
   return expr;
 }
@@ -2078,4 +2309,22 @@ Type ConstraintSystem::generateConstraints(Pattern *pattern,
                                            ConstraintLocatorBuilder locator) {
   ConstraintGenerator cg(*this);
   return cg.getTypeForPattern(pattern, /*forFunctionParam*/ false, locator);
+}
+
+void ConstraintSystem::optimizeConstraints(Expr *e) {
+  
+  SmallVector<Expr *, 16> linkedExprs;
+  
+  // Collect any linked expressions.
+  LinkedExprCollector collector(linkedExprs);
+  e->walk(collector);
+  
+  // Favor types, as appropriate.
+  for (auto linkedExpr : linkedExprs) {
+    computeFavoredTypeForExpr(linkedExpr, *this);
+  }
+  
+  // Optimize the constraints.
+  ConstraintOptimizer optimizer(*this);
+  e->walk(optimizer);
 }

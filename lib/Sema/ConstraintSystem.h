@@ -2352,6 +2352,11 @@ public:
     expressionExceededThreshold = tc;
   }
   
+  /// \brief Reorder the disjunctive clauses for a given expression to
+  /// increase the likelyhood that a favored constraint will be be successfully
+  /// resolved before any others.
+  void optimizeConstraints(Expr *e);
+  
   /// \brief Determine if the expression being solved has exceeded the solver's
   /// memory threshold.
   bool getExpressionTooComplex() {
