@@ -346,7 +346,7 @@ BoolTestSuite.test("!") {
   }
 }
 
-BoolTestSuite.test("!") {
+BoolTestSuite.test("==,!=") {
   let v: Bool = false
   if true {
     var r = (v == v)
@@ -354,10 +354,6 @@ BoolTestSuite.test("!") {
   }
   if true {
     var r = (v != v)
-    expectType(Bool.self, &r)
-  }
-  if true {
-    var r = !v
     expectType(Bool.self, &r)
   }
 }
