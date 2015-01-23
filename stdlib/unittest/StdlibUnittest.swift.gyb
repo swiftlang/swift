@@ -225,6 +225,7 @@ public func expectGE(
 public func expectType<T>(_: T.Type, inout x: T) {}
 
 public func isSequenceType<X : SequenceType>(x: X) -> X { return x }
+public func expectIsBooleanType<X : BooleanType>(inout x: X) -> X { return x }
 
 public struct AssertionResult : Printable, BooleanType {
   init(isPass: Bool) {

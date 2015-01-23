@@ -267,5 +267,100 @@ _UnimplementedError()
 
 #endif
 
+var BoolTestSuite = TestSuite("Bool")
+
+BoolTestSuite.test("literals") {
+  if true {
+    var v = false
+    expectType(Bool.self, &v)
+  }
+  if true {
+    var v = true
+    expectType(Bool.self, &v)
+  }
+}
+
+BoolTestSuite.test("init()") {
+  let v = Bool()
+  expectFalse(v)
+}
+
+struct Booleanish : BooleanType {
+  let boolValue: Bool
+}
+
+BoolTestSuite.test("init<T : BooleanType>(_:)") {
+  if true {
+    let v = Bool(Booleanish(boolValue: false))
+    expectFalse(v)
+  }
+  if true {
+    let v = Bool(Booleanish(boolValue: true))
+    expectTrue(v)
+  }
+}
+
+BoolTestSuite.test("BooleanType") {
+  if true {
+    var v: Bool = false
+    expectIsBooleanType(&v)
+    expectFalse(v.boolValue)
+  }
+  if true {
+    var v: Bool = true
+    expectTrue(v.boolValue)
+  }
+}
+
+BoolTestSuite.test("Printable") {
+  if true {
+    let v: Bool = false
+    expectEqual("false", toString(v))
+  }
+  if true {
+    let v: Bool = true
+    expectEqual("true", toString(v))
+  }
+}
+
+BoolTestSuite.test("Equatable,Hashable") {
+  checkHashable(true, false, false)
+  checkHashable(false, false, true)
+  checkHashable(true, true, true)
+
+  expectNotEqual(false.hashValue, true.hashValue)
+}
+
+BoolTestSuite.test("!") {
+  if true {
+    let v: Bool = false
+    var r = !v
+    expectType(Bool.self, &r)
+    expectTrue(r)
+  }
+  if true {
+    let v: Bool = true
+    var r = !v
+    expectType(Bool.self, &r)
+    expectFalse(r)
+  }
+}
+
+BoolTestSuite.test("!") {
+  let v: Bool = false
+  if true {
+    var r = (v == v)
+    expectType(Bool.self, &r)
+  }
+  if true {
+    var r = (v != v)
+    expectType(Bool.self, &r)
+  }
+  if true {
+    var r = !v
+    expectType(Bool.self, &r)
+  }
+}
+
 runAllTests()
 

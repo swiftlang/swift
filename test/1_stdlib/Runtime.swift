@@ -991,7 +991,7 @@ Reflection.test("CustomMirror") {
     // Check the ObjectIdentifier created is stable
     expectTrue(
       (ObjectIdentifier(a) < ObjectIdentifier(b))
-      ^ (ObjectIdentifier(a) > ObjectIdentifier(b)))
+      != (ObjectIdentifier(a) > ObjectIdentifier(b)))
     expectFalse(
       ObjectIdentifier(a) >= ObjectIdentifier(b)
       && ObjectIdentifier(a) <= ObjectIdentifier(b))

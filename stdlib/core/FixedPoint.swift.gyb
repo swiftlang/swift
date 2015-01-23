@@ -534,7 +534,7 @@ public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 public func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   Builtin.condfail((rhs == 0).value)
 % if signed:
-  Builtin.condfail(((lhs == ${Self}.min) & (rhs == -1)).value)
+  Builtin.condfail(((lhs == ${Self}.min) && (rhs == -1)).value)
 % end
   // FIXME: currently doesn't detect overflow -- blocked by:
   // <rdar://15735295> Need [su]{div,rem}_with_overflow IR

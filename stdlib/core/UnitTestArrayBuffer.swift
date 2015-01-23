@@ -185,7 +185,7 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
     /// the return from this function, as this implementation generates
     /// no shortcircuiting blocks.
     _precondition(_base.hasStorage, "Cannot index empty buffer")
-    return (index >= 0) & (index < _base.value.count)
+    return (index >= 0) && (index < _base.value.count)
   }
 
   /// How many elements the buffer can store without reallocation

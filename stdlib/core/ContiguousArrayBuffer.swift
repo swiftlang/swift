@@ -339,7 +339,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     /// Note that this is better than folding hasStorage in to
     /// the return from this function, as this implementation generates
     /// no shortcircuiting blocks.
-    return (index >= 0) & (index < __bufferPointer.value.count)
+    return (index >= 0) && (index < __bufferPointer.value.count)
   }
 
   /// How many elements the buffer can store without reallocation

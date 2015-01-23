@@ -64,27 +64,6 @@ extension Bool : Printable {
 public // COMPILER_INTRINSIC
 func _getBool(v: Builtin.Int1) -> Bool { return Bool(v) }
 
-//===----------------------------------------------------------------------===//
-// Standard Operators
-//===----------------------------------------------------------------------===//
-
-// Unary bitwise complement.
-@transparent
-public prefix func ~(a: Bool) -> Bool {
-  return a ^ true
-}
-
-// Unary logical complement.
-@transparent
-public prefix func !(a: Bool) -> Bool {
-  return ~a
-}
-
-@transparent
-public func ==(lhs: Bool, rhs: Bool) -> Bool {
-  return Bool(Builtin.cmp_eq_Int1(lhs.value, rhs.value))
-}
-
 @transparent
 extension Bool : Equatable, Hashable {
   /// The hash value.
@@ -99,36 +78,64 @@ extension Bool : Equatable, Hashable {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// Operators
+//===----------------------------------------------------------------------===//
+
+// Unary logical complement.
+@transparent
+public prefix func !(a: Bool) -> Bool {
+  return Bool(Builtin.xor_Int1(a.value, true.value))
+}
+
+@transparent
+public func ==(lhs: Bool, rhs: Bool) -> Bool {
+  return Bool(Builtin.cmp_eq_Int1(lhs.value, rhs.value))
+}
+
+//===----------------------------------------------------------------------===//
+// Unavailable Operators
+//===----------------------------------------------------------------------===//
+
+// Unary bitwise complement.
+@availability(*, unavailable, message="use the '!' operator instead")
+public prefix func ~(a: Bool) -> Bool {
+  _preconditionFailure("unavailable function can not be called")
+}
+
 // Bitwise 'and'.
-@transparent public func & (lhs: Bool, rhs: Bool) -> Bool {
-  return Bool(Builtin.and_Int1(lhs.value, rhs.value))
+@availability(*, unavailable, message="use the '&&' operator instead")
+public func & (lhs: Bool, rhs: Bool) -> Bool {
+  _preconditionFailure("unavailable function can not be called")
 }
 
 // Bitwise 'xor'.
-@transparent public func ^ (lhs: Bool, rhs: Bool) -> Bool {
-  return Bool(Builtin.xor_Int1(lhs.value, rhs.value))
+@availability(*, unavailable, message="use the '!=' operator instead")
+public func ^ (lhs: Bool, rhs: Bool) -> Bool {
+  _preconditionFailure("unavailable function can not be called")
 }
 
 // Bitwise 'or'.
-@transparent public func | (lhs: Bool, rhs: Bool) -> Bool {
-  return Bool(Builtin.or_Int1(lhs.value, rhs.value))
+@availability(*, unavailable, message="use the '||' operator instead")
+public func | (lhs: Bool, rhs: Bool) -> Bool {
+  _preconditionFailure("unavailable function can not be called")
 }
 
 // Compound assignment (with bitwise and)
-@transparent
+@availability(*, unavailable, message="use the '&&' operator instead")
 public func &= (inout lhs: Bool, rhs: Bool) {
-  lhs = lhs & rhs
+  _preconditionFailure("unavailable function can not be called")
 }
 
 // Compound assignment (with bitwise or)
-@transparent
+@availability(*, unavailable, message="use the '||' operator instead")
 public func |= (inout lhs: Bool, rhs: Bool) {
-  lhs = lhs | rhs
+  _preconditionFailure("unavailable function can not be called")
 }
 
 // Compound assignment (with bitwise xor)
-@transparent
+@availability(*, unavailable, message="use the '!=' operator instead")
 public func ^= (inout lhs: Bool, rhs: Bool) {
-  lhs = lhs ^ rhs
+  _preconditionFailure("unavailable function can not be called")
 }
 

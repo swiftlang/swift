@@ -25,14 +25,14 @@ import SwiftShims
 /// ≤ index ≤ count`
 @transparent
 internal func _isValidArrayIndex(index: Int, count: Int) -> Bool {
-  return (index >= 0) & (index <= count)
+  return (index >= 0) && (index <= count)
 }
 
 /// Return true iff the given `index` is valid for subscripting, i.e.
 /// `0 ≤ index < count`
 @transparent
 internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
-  return (index >= 0) & (index < count)
+  return (index >= 0) && (index < count)
 }
 
 /// An `NSArray` with Swift-native reference counting and contiguous
