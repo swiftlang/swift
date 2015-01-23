@@ -301,6 +301,11 @@ public:
   bool isDependentType() const {
     return getSwiftRValueType()->isDependentType();
   }
+  
+  /// True if the type is bridgeable to an ObjC object pointer type.
+  bool isBridgeableObjectType() const {
+    return getSwiftRValueType()->isBridgeableObjectType();
+  }
 
   /// True if the type involves any archetypes.
   bool hasArchetype() const {
@@ -367,7 +372,7 @@ public:
   ///
   /// Only call this with function types!
   SILType substGenericArgs(SILModule &M,
-                                    ArrayRef<Substitution> Subs) const;
+                           ArrayRef<Substitution> Subs) const;
 
   SILType subst(SILModule &silModule, Module *astModule,
                 TypeSubstitutionMap &subs) const;

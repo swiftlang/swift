@@ -156,6 +156,122 @@ public:
       llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n';
     });
   }
+  
+  /// Require two function types to be ABI-compatible.
+  void requireABICompatibleFunctionTypes(SILModule &M,
+                                         CanSILFunctionType type1,
+                                         CanSILFunctionType type2,
+                                         const Twine &what) {
+    
+    auto complain = [=](const char *msg) -> std::function<void()> {
+      return [=]{
+        llvm::dbgs() << "  " << msg << '\n'
+                     << "  " << type1 << "\n  " << type2 << '\n';
+      };
+    };
+    auto complainBy = [=](std::function<void()> msg) -> std::function<void()> {
+      return [=]{
+        msg();
+        llvm::dbgs() << '\n';
+        llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n';
+      };
+    };
+    
+    // The calling convention and function representation can't be changed.
+    _require(type1->getAbstractCC() == type2->getAbstractCC(), what,
+             complain("Different calling conventions"));
+    
+    _require(type1->getRepresentation() == type2->getRepresentation(), what,
+             complain("Different function representations"));
+    
+    // TODO: More sophisticated param and return ABI compatibility rules could
+    // diverge.
+    std::function<bool (SILType, SILType)>
+    areABICompatibleParamsOrReturns = [&](SILType a, SILType b) -> bool {
+      // Address parameters are all ABI-compatible, though the referenced
+      // values may not be. Assume whoever's doing this knows what they're
+      // doing.
+      if (a.isAddress() && b.isAddress())
+        return true;
+      // Addresses aren't compatible with values.
+      // TODO: An exception for pointerish types?
+      else if (a.isAddress() || b.isAddress())
+        return false;
+      
+      // Tuples are ABI compatible if their elements are.
+      // TODO: Should destructure recursively.
+      SmallVector<CanType, 1> aElements, bElements;
+      if (auto tup = a.getAs<TupleType>()) {
+        auto types = tup.getElementTypes();
+        aElements.append(types.begin(), types.end());
+      } else {
+        aElements.push_back(a.getSwiftRValueType());
+      }
+      if (auto tup = b.getAs<TupleType>()) {
+        auto types = tup.getElementTypes();
+        bElements.append(types.begin(), types.end());
+      } else {
+        bElements.push_back(b.getSwiftRValueType());
+      }
+      
+      if (aElements.size() != bElements.size())
+        return false;
+
+      for (unsigned i : indices(aElements)) {
+        auto aa = SILType::getPrimitiveObjectType(aElements[i]),
+             bb = SILType::getPrimitiveObjectType(bElements[i]);
+        // Bridgeable object types are interchangeable.
+        if (aa.isBridgeableObjectType() && bb.isBridgeableObjectType())
+          continue;
+        
+        // Optional and IUO are interchangeable if their elements are.
+        OptionalTypeKind scratch;
+        if (auto aObject = aa.getAnyOptionalObjectType(M, scratch))
+          if (auto bObject = bb.getAnyOptionalObjectType(M, scratch)) {
+            if (!areABICompatibleParamsOrReturns(aObject, bObject))
+              return false;
+            else
+              continue;
+          }
+        
+        // Other types must match exactly.
+        if (aa != bb)
+          return false;
+      }
+      return true;
+    };
+    
+    // Check the return value.
+    
+    auto result1 = type1->getResult();
+    auto result2 = type2->getResult();
+    _require(result1.getConvention() == result2.getConvention(), what,
+             complain("Different return value conventions"));
+    _require(areABICompatibleParamsOrReturns(result1.getSILType(),
+                                             result2.getSILType()), what,
+             complain("ABI-incompatible return values"));
+
+    // Check the parameters.
+    // TODO: Could allow known-empty types to be inserted or removed, but SIL
+    // doesn't know what empty types are yet.
+    
+    _require(type1->getParameters().size() == type2->getParameters().size(),
+             what, complain("different number of parameters"));
+    for (unsigned i : indices(type1->getParameters())) {
+      auto param1 = type1->getParameters()[i];
+      auto param2 = type2->getParameters()[i];
+      
+      _require(param1.getConvention() == param2.getConvention(), what,
+               complainBy([=] {
+                 llvm::dbgs() << "Different conventions for parameter " << i;
+               }));
+      _require(areABICompatibleParamsOrReturns(param1.getSILType(),
+                                               param2.getSILType()), what,
+               complainBy([=] {
+                 llvm::dbgs() << "ABI-incompatible types for parameter " << i;
+               }));
+    }
+  }
 
   void requireSameFunctionComponents(CanSILFunctionType type1,
                                      CanSILFunctionType type2,
@@ -1840,12 +1956,9 @@ public:
     auto resTI = requireObjectType(SILFunctionType, ICI,
                                    "convert_function result");
 
-    // convert_function is required to be a no-op conversion.
-
-    require(opTI->getAbstractCC() == resTI->getAbstractCC(),
-            "convert_function cannot change function cc");
-    require(opTI->getRepresentation() == resTI->getRepresentation(),
-            "convert_function cannot change function representation");
+    // convert_function is required to be an ABI-compatible conversion.
+    requireABICompatibleFunctionTypes(F.getModule(), opTI, resTI,
+                                 "convert_function cannot change function ABI");
   }
 
   void checkThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
@@ -2292,7 +2405,8 @@ public:
                                     ObjCExistentialMetatypeToObjectInst *OMOI) {
     require(OMOI->getOperand().getType().isObject(),
             "objc_metatype_to_object must take a value");
-    auto fromMetaTy = OMOI->getOperand().getType().getAs<ExistentialMetatypeType>();
+    auto fromMetaTy = OMOI->getOperand().getType()
+      .getAs<ExistentialMetatypeType>();
     require(fromMetaTy, "objc_metatype_to_object must take an @objc existential metatype value");
     require(fromMetaTy->getRepresentation() == MetatypeRepresentation::ObjC,
             "objc_metatype_to_object must take an @objc existential metatype value");
