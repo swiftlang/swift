@@ -11,9 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/Concurrent.h"
 #include "gtest/gtest.h"
-#include <vector>
+#include <iterator>
 #include <functional>
+#include <vector>
 #include <pthread.h>
 
 #if !defined(_POSIX_BARRIERS) || _POSIX_BARRIERS < 0
@@ -188,6 +190,30 @@ GenericMetadataTest<3> MetadataTest1 = {
     nullptr
   }
 };
+
+TEST(Concurrent, ConcurrentList) {
+  const int numElem = 100;
+  const int elemVal = 1;
+
+  ConcurrentList<int> List;
+  auto results = RaceTest<int*>(
+    [&]() -> int* {
+        for (int i = 0; i < numElem; i++)
+          List.push_front(elemVal);
+        return nullptr;
+    }
+  );
+
+  size_t ListLen = 0;
+  // Check that all of the values are initialized properly.
+  for (auto A : List) {
+    EXPECT_EQ(elemVal, A);
+    ListLen++;
+  }
+
+  // Check that the length of the list is correct.
+  EXPECT_EQ(ListLen, results.size() * numElem);
+}
 
 TEST(MetadataTest, getGenericMetadata) {
   auto metadataTemplate = (GenericMetadata*) &MetadataTest1;
