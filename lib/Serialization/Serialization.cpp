@@ -2337,9 +2337,8 @@ void Serializer::writeType(Type ty) {
     SmallVector<bool, 4> areArchetypes;
     for (auto next : archetypeTy->getNestedTypes()) {
       nestedTypeNames.push_back(addIdentifierRef(next.first));
-      nestedTypes.push_back(
-                    addTypeRef(ArchetypeType::getNestedTypeValue(next.second)));
-      areArchetypes.push_back(next.second.is<ArchetypeType*>());
+      nestedTypes.push_back(addTypeRef(next.second.getValue()));
+      areArchetypes.push_back(!next.second.isConcreteType());
     }
 
     abbrCode = DeclTypeAbbrCodes[ArchetypeNestedTypeNamesLayout::Code];

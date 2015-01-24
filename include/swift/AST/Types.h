@@ -3018,13 +3018,44 @@ public:
   
   /// A nested type. Either a dependent associated archetype, or a concrete
   /// type (which may be a bound archetype from an outer context).
-  typedef llvm::PointerUnion<ArchetypeType*, Type> NestedType;
-  
-  static Type getNestedTypeValue(NestedType t) {
-    if (auto ty = t.dyn_cast<Type>())
-      return ty;
-    return t.get<ArchetypeType*>();
-  }
+  class NestedType {
+    llvm::PointerIntPair<TypeBase *, 1> TypeAndIsConcrete;
+    NestedType(Type type, bool isConcrete)
+      : TypeAndIsConcrete(type.getPointer(), isConcrete) {}
+  public:
+    NestedType() { assert(!*this && "empty nested type isn't false"); }
+    static NestedType forArchetype(ArchetypeType *archetype) {
+      return { archetype, false };
+    }
+    static NestedType forConcreteType(Type concrete) {
+      return { concrete, true };
+    }
+    operator bool() const { return TypeAndIsConcrete.getOpaqueValue() != 0; }
+    bool isConcreteType() const { return TypeAndIsConcrete.getInt(); }
+    Type getValue() const { return TypeAndIsConcrete.getPointer(); }
+
+    /// Check whether this nested type is a concrete type.
+    Type getAsConcreteType() const {
+      return (isConcreteType() ? getValue() : Type());
+    }
+
+    /// Assert that this nested type is a concrete type.
+    Type castToConcreteType() const {
+      assert(isConcreteType());
+      return getValue();
+    }
+
+    /// Check whether this nested type is an archetype.
+    ArchetypeType *getAsArchetype() const {
+      return (isConcreteType() ? nullptr : castToArchetype());
+    }
+
+    /// Assert that this nested type is an archetype.
+    ArchetypeType *castToArchetype() const {
+      assert(!isConcreteType());
+      return cast_or_null<ArchetypeType>(TypeAndIsConcrete.getPointer());
+    }
+  };
   
 private:
   ArrayRef<ProtocolDecl *> ConformsTo;
@@ -3148,7 +3179,7 @@ public:
   NestedType getNestedType(Identifier Name) const;
   
   Type getNestedTypeValue(Identifier Name) const {
-    return getNestedTypeValue(getNestedType(Name));
+    return getNestedType(Name).getValue();
   }
   
   /// \brief Check if the archetype contains a nested type with the given name.

@@ -940,7 +940,7 @@ bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
 
     // Add any nested archetypes to the archetype stack.
     for (auto Nested : archetype->getNestedTypes()) {
-      auto NestedArch = Nested.second.dyn_cast<ArchetypeType*>();
+      auto NestedArch = Nested.second.getAsArchetype();
       if (!NestedArch)
         continue;
       if (knownArchetypes.insert(NestedArch).second)

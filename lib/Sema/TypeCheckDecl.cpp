@@ -5541,7 +5541,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         TypeLoc underlyingTy;
         ArchetypeType *archetype = selfArchetype;
         archetype = selfArchetype->getNestedType(assocType->getName())
-          .dyn_cast<ArchetypeType*>();
+          .getAsArchetype();
         if (!archetype)
           return;
         assocType->setArchetype(archetype);

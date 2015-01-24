@@ -3804,7 +3804,7 @@ namespace {
 
       auto *potential = ParamArchetypes.resolveArchetype(depType);
       if (!potential)
-        return nullptr;
+        return ArchetypeType::NestedType();
 
       return potential->getType(ParamArchetypes);
     }
@@ -4066,7 +4066,7 @@ namespace {
       auto representative = getRepresentativeArchetype(arg);
       if (!representative)
         return;
-      auto arch = representative.dyn_cast<ArchetypeType*>();
+      auto arch = representative.getAsArchetype();
       if (!arch)
         return;
 
@@ -4088,7 +4088,7 @@ namespace {
 
       // First of all, the archetype or concrete type fulfills its own
       // requirements.
-      if (auto arch = representative.dyn_cast<ArchetypeType*>())
+      if (auto arch = representative.getAsArchetype())
         considerDependentType(arg, arch, 0, 0);
 
       // FIXME: We can't pass associated types of Self through the witness
@@ -4118,7 +4118,7 @@ namespace {
         if (rootParamTy == arg) {
           auto depRep = getRepresentativeArchetype(depTy);
           assert(depRep && "no representative for dependent type?!");
-          if (auto depArch = depRep.dyn_cast<ArchetypeType*>())
+          if (auto depArch = depRep.getAsArchetype())
             considerDependentType(depTy, depArch, ~0u, ~0u);
         }
       }
@@ -4567,7 +4567,7 @@ void NecessaryBindings::addArchetype(CanArchetypeType type) {
   if (Types.insert(type))
     // Collect the associated archetypes.
     for (auto nested : type->getNestedTypes())
-      if (auto assocArchetype = nested.second.dyn_cast<ArchetypeType*>())
+      if (auto assocArchetype = nested.second.getAsArchetype())
         addArchetype(CanArchetypeType(assocArchetype));
 }
 
@@ -4734,7 +4734,7 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
     // parameter, it doesn't need an independent metadata parameter.
     auto type = getRepresentativeArchetype(depTy);
     assert(type && "no potential archetype for dependent type?!");
-    auto arch = type.dyn_cast<ArchetypeType*>();
+    auto arch = type.getAsArchetype();
     if (!arch)
       continue;
 
@@ -4830,7 +4830,7 @@ namespace {
         // constrained to concrete types.
         auto representative = getRepresentativeArchetype(depTy);
         assert(representative && "no representative archetype for param?!");
-        auto arch = representative.dyn_cast<ArchetypeType*>();
+        auto arch = representative.getAsArchetype();
         if (!arch)
           continue;
 

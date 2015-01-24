@@ -1070,8 +1070,7 @@ static void profileArchetypeConstraints(Type ty,
   
   // Recursively profile nested archetypes.
   for (auto nested : arch->getNestedTypes()) {
-    profileArchetypeConstraints(ArchetypeType::getNestedTypeValue(nested.second),
-                                ID, seen, depth + 1);
+    profileArchetypeConstraints(nested.second.getValue(), ID, seen, depth + 1);
   }
 }
 

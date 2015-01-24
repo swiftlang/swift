@@ -444,7 +444,7 @@ struct ASTNodeBase {};
 
           // Make sure that none of the nested types are dependent.
           for (const auto &nested : archetype->getNestedTypes()) {
-            if (auto nestedType = nested.second.dyn_cast<Type>()) {
+            if (auto nestedType = nested.second.getAsConcreteType()) {
               if (nestedType->isDependentType()) {
                 Out << "Nested type " << nested.first.str()
                     << " of archetype " << archetype->getString()

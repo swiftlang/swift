@@ -1733,7 +1733,7 @@ ArchetypeType::NestedType ArchetypeType::getNestedType(Identifier Name) const {
                               OrderArchetypeByName());
   if ((Pos == NestedTypes.end() || Pos->first != Name) && this->isRecursive) {
     if (Name == this->getName()) {
-      NestedType rec = (ArchetypeType*)this;
+      NestedType rec = NestedType::forArchetype((ArchetypeType*)this);
     
       return rec;
     } else {

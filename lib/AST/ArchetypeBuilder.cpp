@@ -35,6 +35,8 @@
 using namespace swift;
 using llvm::DenseMap;
 
+using NestedType = ArchetypeType::NestedType;
+
 void RequirementSource::dump(SourceManager *srcMgr) const {
   dump(llvm::errs(), srcMgr);
 }
@@ -416,8 +418,7 @@ static Type substConcreteTypesForDependentTypes(ArchetypeBuilder &builder,
 
       if (auto typeParam = type->getAs<GenericTypeParamType>()) {
         auto potentialArchetype = builder.resolveArchetype(typeParam);
-        return ArchetypeType::getNestedTypeValue(
-                 potentialArchetype->getType(builder));
+        return potentialArchetype->getType(builder).getValue();
       }
 
       return type;
@@ -434,9 +435,10 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
   if (ArchetypeOrConcreteType) {
     // If the concrete type is dependent, substitute dependent types
     // for archetypes.
-    if (auto concreteType = ArchetypeOrConcreteType.dyn_cast<Type>()) {
+    if (auto concreteType = ArchetypeOrConcreteType.getAsConcreteType()) {
       if (concreteType->isDependentType()) {
-        return substConcreteTypesForDependentTypes(builder, concreteType);
+        return NestedType::forConcreteType(
+                 substConcreteTypesForDependentTypes(builder, concreteType));
       }
     }
 
@@ -453,15 +455,14 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     auto parentTy = parent->getType(builder);
     if (!parentTy)
       return {};
-    ParentArchetype = parentTy.dyn_cast<ArchetypeType*>();
+    ParentArchetype = parentTy.getAsArchetype();
     if (!ParentArchetype) {
       // We might have an outer archetype as a concrete type here; if so, just
       // return that.
-      ParentArchetype
-        = ArchetypeType::getNestedTypeValue(parentTy)->getAs<ArchetypeType>();
+      ParentArchetype = parentTy.getValue()->getAs<ArchetypeType>();
       if (ParentArchetype) {
-        ArchetypeOrConcreteType
-          = ParentArchetype->getNestedTypeValue(getName());
+        ArchetypeOrConcreteType = NestedType::forConcreteType(
+                             ParentArchetype->getNestedTypeValue(getName()));
         return ArchetypeOrConcreteType;
       }
 
@@ -473,8 +474,8 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
 
   // If we ended up building our parent archetype, then we'll have
   // already filled in our own archetype.
-  if (auto arch = ArchetypeOrConcreteType.get<ArchetypeType*>())
-    return arch;
+  if (auto arch = ArchetypeOrConcreteType.getAsArchetype())
+    return NestedType::forArchetype(arch);
 
   SmallVector<ProtocolDecl *, 4> Protos;
   for (const auto &conforms : ConformsTo) {
@@ -486,21 +487,20 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
                             assocTypeOrProto, getName(), Protos,
                             Superclass, isRecursive());
 
-  ArchetypeOrConcreteType = arch;
+  ArchetypeOrConcreteType = NestedType::forArchetype(arch);
   
   // Collect the set of nested types of this archetype, and put them into
   // the archetype itself.
-  SmallVector<std::pair<Identifier, ArchetypeType::NestedType>, 4>
+  SmallVector<std::pair<Identifier, NestedType>, 4>
     FlatNestedTypes;
   for (auto Nested : NestedTypes) {
     FlatNestedTypes.push_back({ Nested.first,
                                 Nested.second.front()->getType(builder) });
-    assert(!FlatNestedTypes.back().second.isNull() &&
-           "Couldn't create nested type'");
+    assert(FlatNestedTypes.back().second && "Couldn't create nested type'");
   }
   arch->setNestedTypes(mod.getASTContext(), FlatNestedTypes);
   
-  return arch;
+  return NestedType::forArchetype(arch);
 }
 
 Type ArchetypeBuilder::PotentialArchetype::getDependentType(
@@ -826,8 +826,8 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   }
   
   // Merge any concrete constraints.
-  Type concrete1 = T1->ArchetypeOrConcreteType.dyn_cast<Type>();
-  Type concrete2 = T2->ArchetypeOrConcreteType.dyn_cast<Type>();
+  Type concrete1 = T1->ArchetypeOrConcreteType.getAsConcreteType();
+  Type concrete2 = T2->ArchetypeOrConcreteType.getAsConcreteType();
   
   if (concrete1 && concrete2) {
     if (!concrete1->isEqual(concrete2)) {
@@ -837,14 +837,14 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
       
     }
   } else if (concrete1) {
-    assert(!T2->ArchetypeOrConcreteType.dyn_cast<ArchetypeType*>()
+    assert(!T2->ArchetypeOrConcreteType
            && "already formed archetype for concrete-constrained parameter");
-    T2->ArchetypeOrConcreteType = concrete1;
+    T2->ArchetypeOrConcreteType = NestedType::forConcreteType(concrete1);
     T2->SameTypeSource = T1->SameTypeSource;
   } else if (concrete2) {
-    assert(!T1->ArchetypeOrConcreteType.dyn_cast<ArchetypeType*>()
+    assert(!T1->ArchetypeOrConcreteType
            && "already formed archetype for concrete-constrained parameter");
-    T1->ArchetypeOrConcreteType = concrete2;
+    T1->ArchetypeOrConcreteType = NestedType::forConcreteType(concrete2);
     T1->SameTypeSource = T2->SameTypeSource;
   }
   
@@ -888,12 +888,12 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   auto OrigT = T;
   T = T->getRepresentative();
   
-  assert(!T->ArchetypeOrConcreteType.dyn_cast<ArchetypeType*>()
+  assert(!T->ArchetypeOrConcreteType.getAsArchetype()
          && "already formed archetype for concrete-constrained parameter");
   
   // If we've already been bound to a type, we're either done, or we have a
   // problem.
-  if (auto oldConcrete = T->ArchetypeOrConcreteType.dyn_cast<Type>()) {
+  if (auto oldConcrete = T->ArchetypeOrConcreteType.getAsConcreteType()) {
     if (!oldConcrete->isEqual(Concrete)) {
       Diags.diagnose(Source.getLoc(), diag::requires_same_type_conflict,
                      T->getName(), oldConcrete, Concrete);
@@ -927,7 +927,7 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   }
   
   // Record the requirement.
-  T->ArchetypeOrConcreteType = Concrete;
+  T->ArchetypeOrConcreteType = NestedType::forConcreteType(Concrete);
   T->SameTypeSource = Source;
 
   Impl->SameTypeRequirements.push_back({OrigT, Concrete});
@@ -1282,7 +1282,7 @@ ArchetypeBuilder::getArchetype(GenericTypeParamDecl *GenericParam) {
   if (known == Impl->PotentialArchetypes.end())
     return nullptr;
 
-  return known->second->getType(*this).dyn_cast<ArchetypeType *>();
+  return known->second->getType(*this).getAsArchetype();
 }
 
 ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
@@ -1298,7 +1298,7 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
 
       PotentialArchetype *PA = Entry.second;
       if (PA->isPrimary()) {
-        auto Archetype = PA->getType(*this).get<ArchetypeType *>();
+        auto Archetype = PA->getType(*this).castToArchetype();
         assert(Archetype->isPrimary() && "isPrimary mismatch");
         if (KnownArchetypes.insert(Archetype).second)
           Impl->AllArchetypes.push_back(Archetype);
@@ -1313,7 +1313,7 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
 
       PotentialArchetype *PA = Entry.second;
       if (!PA->isConcreteType()) {
-        auto Archetype = PA->getType(*this).get<ArchetypeType *>();
+        auto Archetype = PA->getType(*this).castToArchetype();
         GenericParamList::addNestedArchetypes(Archetype, KnownArchetypes,
                                               Impl->AllArchetypes);
       }
@@ -1403,7 +1403,7 @@ void ArchetypeBuilder::enumerateRequirements(F f) {
 
     // If we have a concrete type, produce a same-type requirement.
     if (archetype->isConcreteType()) {
-      Type concreteType = archetype->getType(*this).get<Type>();
+      Type concreteType = archetype->getType(*this).castToConcreteType();
       f(RequirementKind::SameType, archetype, concreteType,
         archetype->getSameTypeSource());
       return;
@@ -1438,7 +1438,7 @@ void ArchetypeBuilder::enumerateRequirements(F f) {
     for (auto proto : protocols) {
       assert(protocolSources.count(proto) == 1 && "Missing conformance?");
       f(RequirementKind::Conformance, archetype, 
-        proto->getDeclaredInterfaceType(), 
+        proto->getDeclaredInterfaceType(),
         protocolSources.find(proto)->second);
     }
   };
@@ -1606,7 +1606,7 @@ bool ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
           auto key = GenericTypeParamKey::forDecl(gpDecl);
           assert(Impl->PotentialArchetypes.count(key) && "Missing parameter?");
           auto *pa = Impl->PotentialArchetypes[key];
-          pa->ArchetypeOrConcreteType = Type(archetype);
+          pa->ArchetypeOrConcreteType = NestedType::forConcreteType(archetype);
           pa->SameTypeSource = RequirementSource(RequirementSource::OuterScope,
                                                  SourceLoc());
         }

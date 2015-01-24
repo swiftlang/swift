@@ -535,7 +535,7 @@ public:
     if (Representative != this)
       return Representative->isPrimary();
 
-    return ArchetypeOrConcreteType.is<Type>();
+    return ArchetypeOrConcreteType.isConcreteType();
   }
 
   /// Determine whether this potential archetype will map to a primary

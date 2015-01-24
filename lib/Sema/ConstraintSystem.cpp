@@ -454,8 +454,7 @@ namespace {
                                 
         if (implArchetype->hasNestedType(member->getName())) {
           nestedType = implArchetype->getNestedType(member->getName());
-          archetype = ArchetypeType::getNestedTypeValue(nestedType)
-                        ->getAs<ArchetypeType>();
+          archetype = nestedType.getValue()->getAs<ArchetypeType>();
         } else if (implArchetype->isSelfDerived()) {
           archetype = implArchetype;
         }

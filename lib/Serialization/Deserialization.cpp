@@ -3238,10 +3238,10 @@ Type ModuleFile::getType(TypeID TID) {
       nestedTypes;
     for_each3(rawNameIDs, areArchetypes, rawTypeIDs,
               [&](IdentifierID nameID, bool isArchetype, TypeID nestedID) {
-      ArchetypeType::NestedType nestedTy = getType(nestedID);
-      if (isArchetype) {
-        nestedTy = nestedTy.get<Type>()->castTo<ArchetypeType>();
-      }
+      Type type = getType(nestedID);
+      auto nestedTy = (isArchetype
+          ? ArchetypeType::NestedType::forArchetype(type->castTo<ArchetypeType>())
+          : ArchetypeType::NestedType::forConcreteType(type));
       nestedTypes.push_back(std::make_pair(getIdentifier(nameID), nestedTy));
     });
     archetype->setNestedTypes(ctx, nestedTypes);
