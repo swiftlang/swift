@@ -343,7 +343,9 @@ func calls(var i:Int, var j:Int, var k:Int) {
   // CHECK: [[PADDR:%[0-9]+]] = alloc_box $SomeProtocol
   var p : SomeProtocol = ConformsToSomeProtocol()
 
-  // CHECK: [[PVALUE:%[0-9]+]] = open_existential [[PADDR]]#1 : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
+  // CHECK: [[TEMP:%.*]] = alloc_stack $SomeProtocol
+  // CHECK: copy_addr [[PADDR]]#1 to [initialization] [[TEMP]]#1
+  // CHECK: [[PVALUE:%[0-9]+]] = open_existential [[TEMP]]#1 : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
   // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method!1
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: apply [[PMETHOD]]<[[OPENED]]>([[I]], [[PVALUE]])

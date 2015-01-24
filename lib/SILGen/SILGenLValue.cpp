@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
+#include "ArgumentSource.h"
 #include "LValue.h"
 #include "RValue.h"
 #include "Scope.h"
@@ -135,7 +136,7 @@ static LValueTypeData getUnsubstitutedTypeData(SILGenFunction &gen,
   return {
     AbstractionPattern(formalRValueType),
     formalRValueType,
-    gen.getLoweredType(formalRValueType),
+    gen.getLoweredType(formalRValueType).getObjectType(),
   };
 }
 
@@ -147,7 +148,7 @@ static LValueTypeData getMemberTypeData(SILGenFunction &gen,
   return {
     origFormalType,
     substFormalType,
-    gen.getLoweredType(origFormalType, substFormalType)
+    gen.getLoweredType(origFormalType, substFormalType).getObjectType()
   };
 }
 
@@ -353,7 +354,7 @@ static LValueTypeData getValueTypeData(SILValue value, SILModule &M) {
   return {
     AbstractionPattern(value.getType().getSwiftRValueType()),
     value.getType().getSwiftRValueType(),
-    value.getType()
+    value.getType().getObjectType()
   };
 }
 
@@ -477,6 +478,35 @@ namespace {
 
     void print(raw_ostream &OS) const override {
       OS << "ForceOptionalObjectComponent()\n";
+    }
+  };
+
+  /// A physical path component which projects out an opened archetype
+  /// from an existential.
+  class OpenOpaqueExistentialComponent : public PhysicalPathComponent {
+    static LValueTypeData getOpenedArchetypeTypeData(CanArchetypeType type) {
+      return {
+        AbstractionPattern(type), type, SILType::getPrimitiveObjectType(type)
+      };
+    }
+  public:
+    OpenOpaqueExistentialComponent(CanArchetypeType openedArchetype)
+      : PhysicalPathComponent(getOpenedArchetypeTypeData(openedArchetype),
+                              OpenedExistentialKind) {}
+    
+    ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
+                        AccessKind accessKind) && override {
+      assert(base.getType().isExistentialType() &&
+             "base for open existential component must be an existential");
+      auto addr = gen.B.createOpenExistential(loc, base.getLValueAddress(),
+                                           getTypeOfRValue().getAddressType());
+      gen.setArchetypeOpeningSite(cast<ArchetypeType>(getSubstFormalType()),
+                                  addr);
+      return ManagedValue::forLValue(addr);
+    }
+
+    void print(raw_ostream &OS) const override {
+      OS << "OpenOpaqueExistentialComponent(" << getSubstFormalType() << ")\n";
     }
   };
 
@@ -606,7 +636,7 @@ namespace {
     RValue subscripts;
 
     struct AccessorArgs {
-      RValueSource base;
+      ArgumentSource base;
       RValue subscripts;
     };
 
@@ -751,7 +781,7 @@ namespace {
 
       // Allocate a temporary.
       SILValue buffer =
-        gen.emitTemporaryAllocation(loc, getTypeOfRValue().getObjectType());
+        gen.emitTemporaryAllocation(loc, getTypeOfRValue());
 
       // If the base is a +1 r-value, just borrow it for materializeForSet.
       // prepareAccessorArgs will copy it if necessary.
@@ -1159,25 +1189,45 @@ namespace {
 } // end anonymous namespace.
 
 namespace {
-  /// Remap an lvalue referencing a generic type to an lvalue of its substituted
-  /// type in a concrete context.
-  class OrigToSubstComponent : public LogicalPathComponent {
-    AbstractionPattern origType;
-    CanType substType;
+  /// An abstract class for components which translate values in some way.
+  class TranslationComponent : public LogicalPathComponent {
+  public:
+    TranslationComponent(const LValueTypeData &typeData, KindTy kind)
+      : LogicalPathComponent(typeData, kind) {}
+
+    void diagnoseWritebackConflict(LogicalPathComponent *RHS,
+                                   SILLocation loc1, SILLocation loc2,
+                                   SILGenFunction &gen) override {
+      // no useful writeback diagnostics at this point
+    }
+
+    AccessKind getBaseAccessKind(SILGenFunction &gen,
+                                 AccessKind kind) const override {
+      // Always use the same access kind for the base.
+      return kind;
+    }
+  };
+
+  /// Remap an lvalue referencing a generic type to an lvalue of its
+  /// substituted type in a concrete context.
+  class OrigToSubstComponent : public TranslationComponent {
+    AbstractionPattern OrigType;
     
   public:
-    OrigToSubstComponent(SILGenFunction &gen,
-                         AbstractionPattern origType, CanType substType)
-      : LogicalPathComponent(getUnsubstitutedTypeData(gen, substType),
+    OrigToSubstComponent(AbstractionPattern origType,
+                         CanType substFormalType,
+                         SILType loweredSubstType)
+      : TranslationComponent({ AbstractionPattern(substFormalType),
+                               substFormalType, loweredSubstType },
                              OrigToSubstKind),
-        origType(origType), substType(substType)
+        OrigType(origType)
     {}
     
     void set(SILGenFunction &gen, SILLocation loc,
              RValue &&value, ManagedValue base) && override {
       // Map the value to the original abstraction level.
       ManagedValue mv = std::move(value).getAsSingleValue(gen, loc);
-      mv = gen.emitSubstToOrigValue(loc, mv, origType, substType);
+      mv = gen.emitSubstToOrigValue(loc, mv, OrigType, getSubstFormalType());
       // Store to the base.
       mv.assignInto(gen, loc, base.getValue());
     }
@@ -1191,51 +1241,86 @@ namespace {
                                           IsNotTake);
       // Map the base value to its substituted representation.
       return gen.emitOrigToSubstValue(loc, baseVal,
-                                      origType, substType, c);
+                                      OrigType, getSubstFormalType(), c);
     }
     
     std::unique_ptr<LogicalPathComponent>
     clone(SILGenFunction &gen, SILLocation loc) const override {
       LogicalPathComponent *clone
-        = new OrigToSubstComponent(gen, origType, substType);
+        = new OrigToSubstComponent(OrigType, getSubstFormalType(),
+                                   getTypeOfRValue());
       return std::unique_ptr<LogicalPathComponent>(clone);
     }
 
-    /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
-    /// the same dynamic PathComponent type as the receiver) to see if they are
-    /// identical.  If so, there is a conflicting writeback happening, so emit a
-    /// diagnostic.
-    void diagnoseWritebackConflict(LogicalPathComponent *RHS,
-                                   SILLocation loc1, SILLocation loc2,
-                                   SILGenFunction &gen) override {
-      //      auto &rhs = (GetterSetterComponent&)*RHS;
-
+    void print(raw_ostream &OS) const override {
+      OS << "OrigToSubstComponent("
+         << OrigType.getAsType() << ", "
+         << getSubstFormalType() << ", "
+         << getTypeOfRValue() << ")\n";
     }
+  };
 
-    AccessKind getBaseAccessKind(SILGenFunction &gen,
-                                 AccessKind kind) const override {
-      return kind;
+  /// Remap an lvalue referencing a concrete type to an lvalue of a
+  /// generically-reabstracted type.
+  class SubstToOrigComponent : public TranslationComponent {
+  public:
+    SubstToOrigComponent(AbstractionPattern origType,
+                         CanType substFormalType,
+                         SILType loweredSubstType)
+      : TranslationComponent({ origType, substFormalType, loweredSubstType },
+                             SubstToOrigKind)
+    {}
+    
+    void set(SILGenFunction &gen, SILLocation loc,
+             RValue &&value, ManagedValue base) && override {
+      // Map the value to the substituted abstraction level.
+      ManagedValue mv = std::move(value).getAsSingleValue(gen, loc);
+      mv = gen.emitOrigToSubstValue(loc, mv, getOrigFormalType(),
+                                    getSubstFormalType());
+      // Store to the base.
+      mv.assignInto(gen, loc, base.getValue());
+    }
+    
+    ManagedValue get(SILGenFunction &gen, SILLocation loc,
+                     ManagedValue base, SGFContext c) && override {
+      // Load the original value.
+      ManagedValue baseVal = gen.emitLoad(loc, base.getValue(),
+                                          gen.getTypeLowering(base.getType()),
+                                          SGFContext(),
+                                          IsNotTake);
+      // Map the base value to the original representation.
+      return gen.emitSubstToOrigValue(loc, baseVal,
+                                      getOrigFormalType(),
+                                      getSubstFormalType(), c);
+    }
+    
+    std::unique_ptr<LogicalPathComponent>
+    clone(SILGenFunction &gen, SILLocation loc) const override {
+      LogicalPathComponent *clone
+        = new SubstToOrigComponent(getOrigFormalType(), getSubstFormalType(),
+                                   getTypeOfRValue());
+      return std::unique_ptr<LogicalPathComponent>(clone);
     }
 
     void print(raw_ostream &OS) const override {
-      OS << "OrigToSubstComponent(...)\n";
+      OS << "SubstToOrigComponent("
+         << getOrigFormalType().getAsType() << ", "
+         << getSubstFormalType() << ", "
+         << getTypeOfRValue() << ")\n";
     }
   };
-} // end anonymous namespace.
 
-namespace {
   /// Remap a weak value to Optional<T>*, or unowned pointer to T*.
-  class OwnershipComponent : public LogicalPathComponent {
+  class OwnershipComponent : public TranslationComponent {
   public:
     OwnershipComponent(LValueTypeData typeData)
-      : LogicalPathComponent(typeData, OwnershipKind) {
+      : TranslationComponent(typeData, OwnershipKind) {
     }
-
 
     ManagedValue get(SILGenFunction &gen, SILLocation loc,
                      ManagedValue base, SGFContext c) && override {
       assert(base && "ownership component must not be root of lvalue path");
-      auto &TL = gen.getTypeLowering(getTypeData().TypeOfRValue);
+      auto &TL = gen.getTypeLowering(getTypeOfRValue());
 
       // Load the original value.
       ManagedValue result = gen.emitLoad(loc, base.getValue(), TL,
@@ -1259,37 +1344,84 @@ namespace {
       return std::unique_ptr<LogicalPathComponent>(clone);
     }
 
-    /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
-    /// the same dynamic PathComponent type as the receiver) to see if they are
-    /// identical.  If so, there is a conflicting writeback happening, so emit a
-    /// diagnostic.
-    void diagnoseWritebackConflict(LogicalPathComponent *RHS,
-                                   SILLocation loc1, SILLocation loc2,
-                                   SILGenFunction &gen) override {
-      //      auto &rhs = (GetterSetterComponent&)*RHS;
-
-    }
-
-    AccessKind getBaseAccessKind(SILGenFunction &gen,
-                                 AccessKind kind) const override {
-      return kind;
-    }
-
     void print(raw_ostream &OS) const override {
       OS << "OwnershipComponent(...)\n";
     }
   };
 } // end anonymous namespace.
 
+LValue LValue::forAddress(ManagedValue address,
+                          AbstractionPattern origFormalType,
+                          CanType substFormalType) {
+  assert(address.isLValue());
+  LValueTypeData typeData = {
+    origFormalType, substFormalType, address.getType().getObjectType()
+  };
+
+  LValue lv;
+  lv.add<ValueComponent>(address, typeData);
+  return lv;
+}
+
+void LValue::addOrigToSubstComponent(SILType loweredSubstType) {
+  loweredSubstType = loweredSubstType.getObjectType();
+  assert(getTypeOfRValue() != loweredSubstType &&
+         "reabstraction component is unnecessary!");
+
+  // Peephole away complementary reabstractons.
+  assert(!Path.empty() && "adding translation component to empty l-value");
+  if (Path.back()->getKind() == PathComponent::SubstToOrigKind) {
+    // But only if the lowered type matches exactly.
+    if (Path[Path.size()-2]->getTypeOfRValue() == loweredSubstType) {
+      Path.pop_back();
+      return;
+    }
+    // TODO: combine reabstractions; this doesn't matter all that much
+    // for most things, but it can be dramatically better for function
+    // reabstraction.
+  }
+  add<OrigToSubstComponent>(getOrigFormalType(), getSubstFormalType(),
+                            loweredSubstType);
+}
+
+void LValue::addSubstToOrigComponent(AbstractionPattern origType,
+                                     SILType loweredSubstType) {
+  loweredSubstType = loweredSubstType.getObjectType();
+  assert(getTypeOfRValue() != loweredSubstType &&
+         "reabstraction component is unnecessary!");
+
+  // Peephole away complementary reabstractons.
+  assert(!Path.empty() && "adding translation component to empty l-value");
+  if (Path.back()->getKind() == PathComponent::OrigToSubstKind) {
+    // But only if the lowered type matches exactly.
+    if (Path[Path.size()-2]->getTypeOfRValue() == loweredSubstType) {
+      Path.pop_back();
+      return;
+    }
+    // TODO: combine reabstractions; this doesn't matter all that much
+    // for most things, but it can be dramatically better for function
+    // reabstraction.
+  }
+
+  add<SubstToOrigComponent>(origType, getSubstFormalType(), loweredSubstType);
+}
+
+void LValue::addOpenOpaqueExistentialComponent(CanArchetypeType archetype) {
+  assert(archetype->getOpenedExistentialType());
+  assert(archetype->getOpenedExistentialType()->isEqual(getSubstFormalType()));
+  add<OpenOpaqueExistentialComponent>(archetype);
+}
+
 LValue SILGenFunction::emitLValue(Expr *e, AccessKind accessKind) {
   LValue r = SILGenLValue(*this).visit(e, accessKind);
   // If the final component is physical with an abstraction change, introduce a
   // reabstraction component.
-  if (r.isLastComponentPhysical()
-      && getTypeLowering(r.getSubstFormalType()).getLoweredType()
-            != r.getTypeOfRValue()) {
-    r.add<OrigToSubstComponent>(*this, r.getOrigFormalType(),
-                                r.getSubstFormalType());
+  if (r.isLastComponentPhysical()) {
+    auto substFormalType = r.getSubstFormalType();
+    auto loweredSubstType = getLoweredType(substFormalType);
+    if (r.getTypeOfRValue() != loweredSubstType.getObjectType()) {
+      r.addOrigToSubstComponent(loweredSubstType);
+    }
   }
   return r;
 }
@@ -1305,7 +1437,7 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind) {
     // Calls through opaque protocols can be done with +0 rvalues.  This allows
     // us to avoid materializing copies of existentials.
     if (gen.SGM.Types.isIndirectPlusZeroSelfParameter(e->getType()))
-      Ctx = SGFContext::AllowPlusZero;
+      Ctx = SGFContext::AllowGuaranteedPlusZero;
     else if (auto *DRE = dyn_cast<DeclRefExpr>(e)) {
       // Any reference to "self" can be done at +0 so long as it is a direct
       // access, since we know it is guaranteed.
@@ -1316,13 +1448,13 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind) {
       if (isa<ParamDecl>(DRE->getDecl()) &&
           DRE->getDecl()->getName().str() == "self" &&
           DRE->getDecl()->isImplicit()) {
-        Ctx = SGFContext::AllowPlusZero;
+        Ctx = SGFContext::AllowGuaranteedPlusZero;
       } else if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
         // All let values are guaranteed to be held alive across their lifetime,
         // and won't change once initialized.  Any loaded value is good for the
         // duration of this expression evaluation.
         if (VD->isLet())
-          Ctx = SGFContext::AllowPlusZero;
+          Ctx = SGFContext::AllowGuaranteedPlusZero;
       }
     }
     
@@ -1441,8 +1573,7 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e, AccessKind accessKind) {
 
 LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e,
                                                    AccessKind accessKind) {
-  // If it is convenient to avoid loading the base, don't bother loading it.
-  gen.emitRValue(e->getLHS(), SGFContext::AllowPlusZero);
+  gen.emitIgnoredExpr(e->getLHS());
   return visitRec(e->getRHS(), accessKind);
 }
 
@@ -1533,11 +1664,11 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
     lv.add<AddressorComponent>(var, e->isSuper(), /*direct*/ true,
                                e->getMember().getSubstitutions(),
                                typeData, varStorageType);
-  } else if (!e->getBase()->getType()->is<LValueType>() &&
-             !e->getBase()->getType()->is<InOutType>()) {
-    assert(e->getBase()->getType()->hasReferenceSemantics());
+  } else if (e->getBase()->getType()->mayHaveSuperclass()) {
     lv.add<RefElementComponent>(var, varStorageType, typeData);
   } else {
+    assert(e->getBase()->getType()->getLValueOrInOutObjectType()
+                                  ->getStructOrBoundGenericStruct());
     lv.add<StructElementComponent>(var, varStorageType, typeData);
   }
   
@@ -1672,8 +1803,10 @@ LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, ManagedValue base,
     ->getTypeOfMember(F.getModule().getSwiftModule(),
                       ivar, nullptr)
     ->getCanonicalType();
-  LValueTypeData typeData = { origFormalType, substFormalType,
-                              getLoweredType(origFormalType, substFormalType) };
+  LValueTypeData typeData = {
+    origFormalType, substFormalType,
+    getLoweredType(origFormalType, substFormalType).getObjectType()
+  };
 
   // Find the substituted storage type.
   SILType varStorageType =
@@ -1699,9 +1832,13 @@ LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, ManagedValue base,
 ///
 /// \param rvalueTL - the type lowering for the type-of-rvalue
 ///   of the address
+/// \param isGuaranteedValid - true if the value in this address
+///   is guaranteed to be valid for the duration of the current
+///   evaluation (see SGFContext::AllowGuaranteedPlusZero)
 ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
                                       const TypeLowering &rvalueTL,
-                                      SGFContext C, IsTake_t isTake) {
+                                      SGFContext C, IsTake_t isTake,
+                                      bool isGuaranteedValid) {
   // Get the lowering for the address type.  We can avoid a re-lookup
   // in the very common case of this being equivalent to the r-value
   // type.
@@ -1709,11 +1846,16 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
     (addr.getType() == rvalueTL.getLoweredType().getAddressType()
        ? rvalueTL : getTypeLowering(addr.getType()));
 
+  // Never do a +0 load together with a take.
+  bool isPlusZeroOk = (isTake == IsNotTake &&
+                       (isGuaranteedValid ? C.isGuaranteedPlusZeroOk()
+                                          : C.isImmediatePlusZeroOk()));
+
   if (rvalueTL.isAddressOnly()) {
     // If the client is cool with a +0 rvalue, the decl has an address-only
     // type, and there are no conversions, then we can return this as a +0
     // address RValue.
-    if (C.isPlusZeroOk() && rvalueTL.getLoweredType()==addrTL.getLoweredType())
+    if (isPlusZeroOk && rvalueTL.getLoweredType() == addrTL.getLoweredType())
       return ManagedValue::forUnmanaged(addr);
         
     // Copy the address-only value.
@@ -1726,8 +1868,7 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
   // Ok, this is something loadable.  If this is a non-take access at plus zero,
   // we can perform a +0 load of the address instead of materializing a +1
   // value.
-  if (C.isPlusZeroOk() && isTake == IsNotTake &&
-      addrTL.getLoweredType() == rvalueTL.getLoweredType()) {
+  if (isPlusZeroOk && addrTL.getLoweredType() == rvalueTL.getLoweredType()) {
     return ManagedValue::forUnmanaged(B.createLoad(loc, addr));
   }
 
@@ -1775,7 +1916,7 @@ static CanType getOptionalValueType(SILType optType,
 }
 
 void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
-                                                 RValueSource &&value,
+                                                 ArgumentSource &&value,
                                                  SILValue dest,
                                                  const TypeLowering &optTL) {
   SILType optType = optTL.getLoweredType();

@@ -154,6 +154,7 @@ func for_loops(var x: Int, c: Bool) {
 
   // rdar://problem/19316670
   // CHECK: [[NEXT:%[0-9]+]] = function_ref @_TFVSs17IndexingGenerator4nextUSs15_CollectionType_USs16ForwardIndexType_Ss18_SignedIntegerType_Ss33_BuiltinIntegerLiteralConvertible____fRGS_Q__FT_GSqQQ_8_Element_
+  // CHECK-NEXT: alloc_stack $Optional<MyClass>
   // CHECK-NEXT: apply [[NEXT]]<[MyClass]
   // CHECK: class_method [[OBJ:%[0-9]+]] : $MyClass, #MyClass.foo!1
   var objects = [MyClass(), MyClass() ]

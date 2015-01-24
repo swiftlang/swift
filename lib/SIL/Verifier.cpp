@@ -1180,10 +1180,10 @@ public:
             "result of tuple_extract must be object");
 
     require(EI->getFieldNo() < operandTy->getNumElements(),
-            "invalid field index for element_addr instruction");
+            "invalid field index for tuple_extract instruction");
     require(EI->getType().getSwiftRValueType()
             == operandTy.getElementType(EI->getFieldNo()),
-            "type of tuple_element_addr does not match type of element");
+            "type of tuple_extract does not match type of element");
   }
 
   void checkStructExtractInst(StructExtractInst *EI) {

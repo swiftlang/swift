@@ -1,4 +1,5 @@
 add_swift_library(swiftSILGen
+  ArgumentSource.cpp
   Cleanup.cpp
   Condition.cpp
   ManagedValue.cpp

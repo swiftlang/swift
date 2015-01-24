@@ -10,11 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "ArgumentSource.h"
 #include "LValue.h"
 #include "RValue.h"
 #include "Scope.h"
 #include "Initialization.h"
 #include "SpecializedEmitter.h"
+#include "Varargs.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Module.h"
@@ -328,6 +330,19 @@ private:
     return selfType;
   }
 
+  CanType getWitnessMethodSelfType() const {
+    CanType type = SubstFormalType.getInput();
+    if (auto tuple = dyn_cast<TupleType>(type)) {
+      assert(tuple->getNumElements() == 1);
+      type = tuple.getElementType(0);
+    }
+    if (auto lv = dyn_cast<InOutType>(type)) {
+      type = lv.getObjectType();
+    }
+    assert(getArchetypeForSelf(type));
+    return type;
+  }
+
   CanSILFunctionType getSubstFunctionType(SILGenModule &SGM,
                                           CanSILFunctionType origFnType,
                                           CanAnyFunctionType origLoweredType,
@@ -349,18 +364,10 @@ private:
                                        substLoweredInterfaceType);
   }
 
-  /// Return the value being passed as 'self' for this protocol callee.
-  CanType getProtocolSelfType(SILGenModule &SGM) const {
-    if (kind == Kind::WitnessMethod) {
-      return method.selfValue.getType().getSwiftRValueType();
-    } else {
-      llvm_unreachable("bad callee kind for protocol method");
-    }
-  }
-
   /// Add the 'self' clause back to the substituted formal type of
   /// this protocol method.
-  void addProtocolSelfToFormalType(SILGenModule &SGM, SILDeclRef name) {
+  void addProtocolSelfToFormalType(SILGenModule &SGM, SILDeclRef name,
+                                   CanType protocolSelfType) {
     // The result types of the expressions yielding protocol values
     // (reflected in SubstFormalType) reflect an implicit level of
     // function application, including some extra polymorphic
@@ -372,9 +379,8 @@ private:
     // Add the 'self' parameter back.  We want it to look like a
     // substitution of the appropriate clause from the original type.
     auto polyFormalType = cast<PolymorphicFunctionType>(OrigFormalOldType);
-    auto selfType = getProtocolSelfType(SGM);
     auto substSelfType =
-      buildSubstSelfType(polyFormalType.getInput(), selfType, ctx);
+      buildSubstSelfType(polyFormalType.getInput(), protocolSelfType, ctx);
 
     // Existential witnesses are always "thick" with the polymorphic info,
     // unless @objc.
@@ -386,70 +392,6 @@ private:
 
     SubstFormalType = CanFunctionType::get(substSelfType, SubstFormalType,
                                            extInfo);
-  }
-
-  SILType getProtocolClosureType(SILGenModule &SGM,
-                                 SILDeclRef constant,
-                                 SILConstantInfo &constantInfo,
-                                 CanArchetypeType &archetype) const {
-    auto &C = SGM.getASTContext();
-    
-    CanType selfType = getProtocolSelfType(SGM);
-
-    // Find the archetype.
-    archetype = getArchetypeForSelf(selfType);
-
-    // addProtocolSelfToFormalType initializes SubstFormalType->isThin()
-    // appropriately for the archetype kind.
-    FunctionType::Representation rep = SubstFormalType->getRepresentation();
-
-    // We may need to make the OrigLoweredType thick so that
-    // computing the substFnType below preserves this information.
-    if (rep != FunctionType::Representation::Thin) {
-      constantInfo.LoweredType =
-        adjustFunctionType(constantInfo.LoweredType, rep);
-      constantInfo.LoweredInterfaceType =
-        adjustFunctionType(constantInfo.LoweredInterfaceType, rep);
-    }
-
-    // The expected result of witness_method is a partial application
-    // of the archetype method to the expected archetype.
-    CanAnyFunctionType partialSubstFormalType =
-      cast<FunctionType>(
-        cast<PolymorphicFunctionType>(OrigFormalOldType)
-          ->substGenericArgs(SGM.SwiftModule, archetype)
-            ->getCanonicalType());
-    
-    // If the requirement is generic, sever its connection to the substituted
-    // outer parameter list.
-    if (auto polyMethod = dyn_cast<PolymorphicFunctionType>(
-                                          partialSubstFormalType.getResult())) {
-      auto origParams = &polyMethod->getGenericParams();
-      
-      auto emptyOuterParams = GenericParamList::getEmpty(C);
-      auto params = origParams->cloneWithOuterParameters(C, emptyOuterParams);
-      
-      polyMethod = CanPolymorphicFunctionType::get(polyMethod.getInput(),
-                                                   polyMethod.getResult(),
-                                                   params,
-                                                   polyMethod->getExtInfo());
-      partialSubstFormalType
-        = CanFunctionType::get(partialSubstFormalType.getInput(), polyMethod);
-    }
-
-    // Same thing for the interface type.
-
-    auto partialSubstInterfaceType =
-      cast<AnyFunctionType>(
-        cast<GenericFunctionType>(OrigFormalInterfaceType)
-          ->partialSubstGenericArgs(SGM.SwiftModule, archetype)
-            ->getCanonicalType());
-    
-    auto partialSubstUncurriedType =
-      SGM.Types.getConstantFunctionType(constant, partialSubstFormalType,
-                                        partialSubstInterfaceType,
-                                        rep);
-    return SILType::getPrimitiveObjectType(partialSubstUncurriedType);
   }
 
   /// Add the 'self' type to the substituted function type of this
@@ -506,13 +448,15 @@ public:
     return Callee(Kind::SuperMethod, gen, selfValue, name,
                   substFormalType, l);
   }
-  static Callee forArchetype(SILGenFunction &gen, SILValue value,
+  static Callee forArchetype(SILGenFunction &gen,
+                             SILValue optOpeningInstruction,
+                             CanType protocolSelfType,
                              SILDeclRef name,
                              CanAnyFunctionType substFormalType,
                              SILLocation l) {
-    Callee callee(Kind::WitnessMethod, gen, value, name,
+    Callee callee(Kind::WitnessMethod, gen, optOpeningInstruction, name,
                   substFormalType, l);
-    callee.addProtocolSelfToFormalType(gen.SGM, name);
+    callee.addProtocolSelfToFormalType(gen.SGM, name, protocolSelfType);
     return callee;
   }
   static Callee forDynamic(SILGenFunction &gen, SILValue proto,
@@ -651,7 +595,7 @@ public:
       }
 
       // Look up the witness for the archetype.
-      auto selfType = getProtocolSelfType(gen.SGM);
+      auto selfType = getWitnessMethodSelfType();
       auto archetype = getArchetypeForSelf(selfType);
       // Get the openend existential value if the archetype is an opened
       // existential type.
@@ -728,6 +672,160 @@ public:
     llvm_unreachable("bad callee kind");
   }
 };
+
+/// Given that we've applied some sort of trivial transform to the
+/// value of the given ManagedValue, enter a cleanup for the result if
+/// the original had a cleanup.
+static ManagedValue maybeEnterCleanupForTransformed(SILGenFunction &gen,
+                                                    ManagedValue orig,
+                                                    SILValue result) {
+  if (orig.hasCleanup()) {
+    orig.forwardCleanup(gen);
+    return gen.emitManagedRValueWithCleanup(result);
+  } else {
+    return ManagedValue::forUnmanaged(result);
+  }
+}
+
+static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
+                                     SILDeclRef constant,
+                                     ArgumentSource &selfValue,
+                                     CanAnyFunctionType substAccessorType,
+                                     ArrayRef<Substitution> &substitutions) {
+  auto fd = cast<AbstractFunctionDecl>(constant.getDecl());
+  auto protocol = cast<ProtocolDecl>(fd->getDeclContext());
+  
+  // Method calls through ObjC protocols require ObjC dispatch.
+  constant = constant.asForeign(protocol->isObjC());
+
+  CanType selfTy = selfValue.getSubstRValueType();
+
+  SILParameterInfo _selfParam;
+  auto getSelfParameter = [&]() -> SILParameterInfo {
+    if (_selfParam != SILParameterInfo()) return _selfParam;
+    auto constantFnType = gen.SGM.Types.getConstantFunctionType(constant);
+    return (_selfParam = constantFnType->getSelfParameter());
+  };
+  auto getSGFContextForSelf = [&]() -> SGFContext {
+    return (getSelfParameter().isConsumed()
+              ? SGFContext() : SGFContext::AllowGuaranteedPlusZero);
+  };
+
+  auto setSelfValueToAddress = [&](SILLocation loc, ManagedValue address) {
+    assert(address.getType().isAddress());
+    assert(address.getType().is<ArchetypeType>());
+    auto formalTy = address.getType().getSwiftRValueType();
+
+    if (getSelfParameter().isIndirectInOut()) {
+      // Be sure not to consume the cleanup for an inout argument.
+      auto selfLV = ManagedValue::forLValue(address.getValue());
+      selfValue = ArgumentSource(loc,
+                    LValue::forAddress(selfLV, AbstractionPattern(formalTy),
+                                       formalTy));
+    } else {
+      selfValue = ArgumentSource(loc, RValue(address, formalTy));
+    }
+  };
+
+  // If we're calling a member of a non-class-constrained protocol,
+  // but our archetype/protocol refines it to be class-bound, then
+  // we have to materialize the value in order to pass it indirectly.
+  auto materializeSelfIfNecessary = [&] {
+    // Only an instance method of a non-class protocol is ever passed
+    // indirectly.
+    if (!fd->isInstanceMember() ||
+        protocol->requiresClass() ||
+        selfValue.hasLValueType() ||
+        !cast<ArchetypeType>(selfValue.getSubstRValueType())->requiresClass())
+      return;
+
+    auto selfParameter = getSelfParameter();
+    assert(selfParameter.isIndirect());
+
+    SILLocation selfLoc = selfValue.getLocation();
+
+    // Evaluate the reference into memory.
+    ManagedValue address = [&]() -> ManagedValue {
+      // Do so at +0 if we can.
+      auto ref = std::move(selfValue)
+                   .getAsSingleValue(gen, getSGFContextForSelf());
+
+      // If we're already in memory for some reason, great.
+      if (ref.getType().isAddress())
+        return ref;
+
+      // Store the reference into a temporary.
+      auto temp =
+        gen.emitTemporaryAllocation(selfLoc, ref.getValue().getType());
+      gen.B.createStore(selfLoc, ref.getValue(), temp);
+
+      // If we had a cleanup, create a cleanup at the new address.
+      return maybeEnterCleanupForTransformed(gen, ref, temp);
+    }();
+
+    setSelfValueToAddress(selfLoc, address);
+  };
+
+  // If this is an archetype case, construct an archetype call.
+  if (!selfTy.isAnyExistentialType()) {
+    // Link back to something to create a data dependency if we have
+    // an opened type.
+    SILValue openingSite;
+    auto archetype =
+      cast<ArchetypeType>(CanType(selfTy->getRValueInstanceType()));
+    if (archetype->getOpenedExistentialType()) {
+      openingSite = gen.getArchetypeOpeningSite(archetype);
+    }
+
+    materializeSelfIfNecessary();
+
+    return Callee::forArchetype(gen, openingSite, selfTy,
+                                constant, substAccessorType, loc);
+  }
+    
+  // If this is an existential (not archetype) use, open the container
+  // type immediately.
+  ManagedValue existentialVal =
+    std::move(selfValue).getAsSingleValue(gen, getSGFContextForSelf());
+
+  CanArchetypeType openedTy = ArchetypeType::getOpened(selfTy);
+  auto selfLoc = selfValue.getLocation();
+
+  // Open the existential and project out the value, then update the
+  // self value to use the projection.
+  SILValue openingSite;
+  if (existentialVal.getType().isClassExistentialType()) {
+    // Attach the existential cleanup to the projection so that it gets
+    // consumed (or not) when the call is applied to it (or isn't).
+    openingSite =
+      gen.B.createOpenExistentialRef(loc, existentialVal.getValue(),
+                                SILType::getPrimitiveObjectType(openedTy));
+    gen.setArchetypeOpeningSite(openedTy, openingSite);
+
+    ManagedValue openedVal =
+      maybeEnterCleanupForTransformed(gen, existentialVal, openingSite);
+    selfValue =
+      ArgumentSource(selfLoc, RValue(openedVal, openedTy));
+
+    materializeSelfIfNecessary();
+
+  } else {
+    assert(existentialVal.getType().isAddress() && "should be address-only");
+    openingSite = gen.B.createOpenExistential(selfLoc,
+                                              existentialVal.getValue(),
+                               SILType::getPrimitiveAddressType(openedTy));
+    gen.setArchetypeOpeningSite(openedTy, openingSite);
+
+    ManagedValue openedVal =
+      maybeEnterCleanupForTransformed(gen, existentialVal, openingSite);
+    setSelfValueToAddress(selfLoc, openedVal);
+  }
+
+  remapSelfSubstitutions(gen, substitutions, openedTy);
+    
+  return Callee::forArchetype(gen, openingSite, openedTy,
+                              constant, substAccessorType, loc);
+}
   
 /// An ASTVisitor for building SIL function calls.
 /// Nested ApplyExprs applied to an underlying curried function or method
@@ -739,7 +837,7 @@ class SILGenApply : public Lowering::ExprVisitor<SILGenApply>
 public:
   SILGenFunction &gen;
   Optional<Callee> callee;
-  RValue selfParam;
+  ArgumentSource SelfParam;
   Expr *SelfApplyExpr = nullptr;
   std::vector<ApplyExpr*> callSites;
   Expr *sideEffect = nullptr;
@@ -750,7 +848,7 @@ public:
   {}
   
   void setCallee(Callee &&c) {
-    assert((selfParam ? callDepth == 1 : callDepth == 0)
+    assert((SelfParam ? callDepth == 1 : callDepth == 0)
            && "setting callee at non-zero call depth?!");
     assert(!callee && "already set callee!");
     callee.emplace(std::move(c));
@@ -761,9 +859,9 @@ public:
     sideEffect = sideEffectExpr;
   }
   
-  void setSelfParam(RValue &&theSelfParam, Expr *theSelfApplyExpr) {
-    assert(!selfParam && "already set this!");
-    selfParam = std::move(theSelfParam);
+  void setSelfParam(ArgumentSource &&theSelfParam, Expr *theSelfApplyExpr) {
+    assert(!SelfParam && "already set this!");
+    SelfParam = std::move(theSelfParam);
     SelfApplyExpr = theSelfApplyExpr;
     ++callDepth;
   }
@@ -973,13 +1071,16 @@ public:
                         selfValue);
         }
 
-        setSelfParam(std::move(self), thisCallSite);
+        auto selfValue = self.peekScalarValue();
+
+        setSelfParam(ArgumentSource(thisCallSite->getArg(), std::move(self)),
+                     thisCallSite);
         SILDeclRef constant(afd, kind.getValue(),
                             SILDeclRef::ConstructAtBestResilienceExpansion,
                             SILDeclRef::ConstructAtNaturalUncurryLevel,
                             gen.SGM.requiresObjCDispatch(afd));
         
-        setCallee(Callee::forClassMethod(gen, selfParam.peekScalarValue(),
+        setCallee(Callee::forClassMethod(gen, selfValue,
                                          constant, getSubstFnType(), e));
         
         // setSelfParam bumps the callDepth, but we aren't really past the
@@ -1087,18 +1188,10 @@ public:
     // rvalue, but the witness is actually expecting a pointer to the +0 value
     // in memory.  We access this with the open_existential instruction, or
     // just pass in the address since archetypes are address-only.
-    //
-    // FIXME: This is hideous. We should be letting emitRawApply figure this
-    // out.
-    SGFContext allowPlusZero = SGFContext::AllowPlusZero;
+
+    ArgumentSource selfValue = e->getBase();
+
     auto *proto = cast<ProtocolDecl>(fd->getDeclContext());
-    if (proto->requiresClass())
-      allowPlusZero = SGFContext();
-    
-    auto baseVal = gen.emitRValueAsSingleValue(e->getBase(), allowPlusZero);
-
-    auto baseTy = e->getBase()->getType()->getLValueOrInOutObjectType();
-
     ArrayRef<Substitution> subs = e->getMember().getSubstitutions();
     
     // Figure out the kind of declaration reference we're working with.
@@ -1109,72 +1202,20 @@ public:
         // initializer. We need to allocate the object ourselves.
         kind = SILDeclRef::Kind::Initializer;
 
-        baseVal = allocateObjCObject(baseVal, e->getBase());
+        auto metatype = std::move(selfValue).getAsSingleValue(gen);
+        auto allocated = allocateObjCObject(metatype, e->getBase());
+        auto allocatedType = allocated.getType().getSwiftRValueType();
+        selfValue = ArgumentSource(e->getBase(),
+                                   RValue(allocated, allocatedType));
+                                     
       } else {
         // For non-Objective-C initializers, we have an allocating
         // initializer to call.
         kind = SILDeclRef::Kind::Allocator;
       }
     }
+    SILDeclRef constant = SILDeclRef(fd, kind);
 
-    // Open existential types to get at the value and witnesses inside.
-    //
-    // FIXME: The AST could do this for us better.
-    if (baseTy->isExistentialType()) {
-      // TODO: Existential type methods ideally wouldn't be a special case.
-      if (!fd->isInstanceMember()) {
-        assert(baseVal.getType().is<ExistentialMetatypeType>() &&
-               "non-existential-metatype for existential static method?!");
-        // FIXME: It is impossible to invoke a class method on a protocol
-        // directly, it must be done through an archetype.
-        setSelfParam(RValue(gen, e, baseVal.getType().getSwiftRValueType(),
-                            baseVal), e);
-        goto did_set_self_param;
-      }
-      
-      CanType baseOpenedTy = ArchetypeType::getOpened(baseTy)
-        ->getCanonicalType();
-      SILType loweredOpenedTy = gen.getLoweredType(baseOpenedTy);
-      
-      // Attach the existential cleanup to the projection so that it gets
-      // consumed (or not) when the call is applied to it (or isn't).
-      if (baseVal.getType().isClassExistentialType()) {
-        SILValue val = gen.B.createOpenExistentialRef(e,
-                                          baseVal.getValue(), loweredOpenedTy);
-        baseVal = ManagedValue(val, baseVal.getCleanup());
-      } else {
-        assert(loweredOpenedTy.isAddress() && "Self should be address-only");
-        SILValue val = gen.B.createOpenExistential(e, baseVal.getValue(),
-                                                   loweredOpenedTy);
-        baseVal = ManagedValue::forUnmanaged(val);
-      }
-      
-      // Remap substitutions from the protocol type to the opened archetype.
-      remapSelfSubstitutions(gen, subs, baseOpenedTy);
-      baseTy = baseOpenedTy;
-    }
-    
-    // If we're calling a non-class-constrained protocol member through a
-    // refinement of the protocol that is class-constrained, then we have to
-    // materialize the value in order to pass it indirectly.
-    if (fd->isInstanceMember()
-        && !proto->requiresClass()
-        && !baseVal.getType().isAddress()) {
-      auto temp = gen.emitTemporaryAllocation(e, baseVal.getType());
-      gen.B.createStore(e, baseVal.getValue(), temp);
-      baseVal = ManagedValue(temp, baseVal.getCleanup());
-    }
-
-    setSelfParam(RValue(gen, e->getBase(), baseVal.getType().getSwiftType(),
-                        baseVal), e);
-    
-  did_set_self_param:
-    // Method calls through ObjC protocols require ObjC dispatch.
-    bool isObjC = proto->isObjC();
-    
-    assert(!baseTy->getRValueInstanceType()->isExistentialType()
-           && "did not open existential type?!");
-    
     // Gross. We won't have any call sites if this is a curried generic method
     // application, because it doesn't look like a call site in the AST, but a
     // member ref.
@@ -1183,16 +1224,18 @@ public:
       substFnType = getSubstFnType();
     else
       substFnType = cast<FunctionType>(e->getType()->getCanonicalType());
-    
-    setCallee(Callee::forArchetype(gen, selfParam.peekScalarValue(),
-                                   SILDeclRef(fd, kind).asForeign(isObjC),
-                                   substFnType, e));
+
+    // Prepare the callee.  This can modify both selfValue and subs.
+    Callee theCallee = prepareArchetypeCallee(gen, e, constant, selfValue,
+                                              substFnType, subs);
+
+    setSelfParam(std::move(selfValue), e);
+    setCallee(std::move(theCallee));
 
     // If there are substitutions, add them now.
     if (!subs.empty()) {
       callee->setSubstitutions(gen, e, subs, callDepth);
     }
-    
   }
 
   void visitFunctionConversionExpr(FunctionConversionExpr *e) {
@@ -1242,7 +1285,8 @@ public:
       llvm_unreachable("invalid super callee");
 
     CanType superFormalType = arg->getType()->getCanonicalType();
-    setSelfParam(RValue(gen, apply, superFormalType, super), apply);
+    setSelfParam(ArgumentSource(arg, RValue(gen, apply, superFormalType, super)),
+                 apply);
     
     SILValue superMethod;
     if (constant.isForeign) {
@@ -1292,7 +1336,8 @@ public:
     }
 
     CanType selfFormalType = arg->getType()->getCanonicalType();
-    setSelfParam(RValue(gen, expr, selfFormalType, self), expr);
+    setSelfParam(ArgumentSource(arg, RValue(gen, expr, selfFormalType, self)),
+                 expr);
 
     // Determine the callee. For structs and enums, this is the allocating
     // constructor (because there is no initializing constructor). For classes,
@@ -1408,8 +1453,8 @@ public:
     if (fd->isInstanceMember()) {
       assert(fd->isInstanceMember() && "Non-instance dynamic member reference");
 
-      Type openedType = ArchetypeType::getOpened(
-                                    existential.getType().getSwiftRValueType());
+      CanArchetypeType openedType = ArchetypeType::getOpened(
+                                   existential.getType().getSwiftRValueType());
       SILType loweredOpenedType = gen.getLoweredLoadableType(openedType);
       
       // Attach the existential cleanup to the projection so that it gets
@@ -1417,18 +1462,21 @@ public:
       val = gen.B.createOpenExistentialRef(dynamicMemberRef,
                       existential.getValue(),
                       loweredOpenedType);
+      gen.setArchetypeOpeningSite(openedType, val);
       ManagedValue proj(val, existential.getCleanup());
-      setSelfParam(RValue(gen, dynamicMemberRef,
-                          proj.getType().getSwiftRValueType(), proj),
+      setSelfParam(ArgumentSource(dynamicMemberRef->getBase(),
+                                  RValue(gen, dynamicMemberRef,
+                                    proj.getType().getSwiftRValueType(), proj)),
                    dynamicMemberRef);
     } else {
       assert(existential.getType().is<ExistentialMetatypeType>() &&
              "non-dynamic-lookup-metatype for static method?!");
       val = existential.getValue();
       ManagedValue proj(val, existential.getCleanup());
-      setSelfParam(RValue(gen, dynamicMemberRef,
-                          existential.getType().getSwiftRValueType(),
-                          existential),
+      setSelfParam(ArgumentSource(dynamicMemberRef->getBase(),
+                                  RValue(gen, dynamicMemberRef,
+                                    existential.getType().getSwiftRValueType(),
+                                         existential)),
                    dynamicMemberRef);
     }
 
@@ -1504,8 +1552,10 @@ static bool isNative(AbstractCC cc) {
 /// Given two SIL types which are representations of the same type,
 /// check whether they have an abstraction difference.
 static bool hasAbstractionDifference(AbstractCC cc,
-                                     CanType type1, CanType type2) {
-  assert(!isNative(cc) || areOnlyAbstractionDifferent(type1, type2));
+                                     SILType type1, SILType type2) {
+  CanType ct1 = type1.getSwiftRValueType();
+  CanType ct2 = type2.getSwiftRValueType();
+  assert(!isNative(cc) || areOnlyAbstractionDifferent(ct1, ct2));
 
   // Assuming that we've applied the same substitutions to both types,
   // abstraction equality should equal type equality.
@@ -1594,9 +1644,8 @@ ManagedValue SILGenFunction::emitApply(
   // the actual result type we got back.  Note that this will also
   // include bridging differences.
   bool hasAbsDiffs =
-    hasAbstractionDifference(cc,
-                             loweredFormalResultType.getSwiftRValueType(),
-                             actualResultType.getSwiftRValueType());
+    hasAbstractionDifference(cc, loweredFormalResultType,
+                             actualResultType);
 
   // Prepare a result address if necessary.
   SILValue resultAddr;
@@ -1770,33 +1819,25 @@ ManagedValue SILGenFunction::emitMonomorphicApply(SILLocation loc,
 }
 
 /// Count the number of SILParameterInfos that are needed in order to
-/// pass the given argument.  This wouldn't be necessary if we uncurried
-/// left-to-right.
+/// pass the given argument.
 static unsigned getFlattenedValueCount(AbstractionPattern origType,
                                        CanType substType) {
-  if (auto origTuple = dyn_cast<TupleType>(origType.getAsType())) {
-    auto substTuple = cast<TupleType>(substType);
-    unsigned count = 0;
-    assert(origTuple->getNumElements() == substTuple->getNumElements());
-    for (auto i : indices(origTuple.getElementTypes())) {
-      count += getFlattenedValueCount(origType.getTupleElementType(i),
-                                      substTuple.getElementType(i));
-    }
-    return count;
-  }
+  // The count is always 1 unless the substituted type is a tuple.
+  auto substTuple = dyn_cast<TupleType>(substType);
+  if (!substTuple) return 1;
 
-  // Most general form of an unmaterializable type.
-  if (auto substTuple = dyn_cast<TupleType>(substType)) {
-    assert(origType.isOpaque());
-    if (!substTuple->isMaterializable()) {
-      unsigned count = 0;
-      for (auto substElt : substTuple.getElementTypes()) {
-        count += getFlattenedValueCount(origType, substElt);
-      }
-      return count;
-    }
+  // If the original type is opaque and the substituted type is
+  // materializable, the count is 1 anyway.
+  if (origType.isOpaque() && substTuple->isMaterializable())
+    return 1;
+
+  // Otherwise, add up the elements.
+  unsigned count = 0;
+  for (auto i : indices(substTuple.getElementTypes())) {
+    count += getFlattenedValueCount(origType.getTupleElementType(i),
+                                    substTuple.getElementType(i));
   }
-  return 1;
+  return count;
 }
 
 static AbstractionPattern claimNextParamClause(AbstractionPattern &type) {
@@ -1811,22 +1852,181 @@ static CanType claimNextParamClause(CanAnyFunctionType &type) {
   return result;
 }
 
+using InOutArgument = std::pair<LValue, SILLocation>;
+
+/// Begin all the formal accesses for a set of inout arguments.
+static void beginInOutFormalAccesses(SILGenFunction &gen,
+                                     MutableArrayRef<InOutArgument> inoutArgs,
+                         MutableArrayRef<SmallVector<ManagedValue, 4>> args) {
+  assert(!inoutArgs.empty());
+
+  SmallVector<std::pair<SILValue, SILLocation>, 4> emittedInoutArgs;
+  auto inoutNext = inoutArgs.begin();
+
+  // The assumption we make is that 'args' and 'inoutArgs' were built
+  // up in parallel, with empty spots being dropped into 'args'
+  // wherever there's an inout argument to insert.
+  //
+  // Note that this also begins the formal accesses in evaluation order.
+  for (auto &siteArgs : args) {
+    for (ManagedValue &siteArg : siteArgs) {
+      if (siteArg) continue;
+
+      LValue &inoutArg = inoutNext->first;
+      SILLocation loc = inoutNext->second;
+      ManagedValue address = gen.emitAddressOfLValue(loc, std::move(inoutArg),
+                                                     AccessKind::ReadWrite);
+      siteArg = address;
+      emittedInoutArgs.push_back({address.getValue(), loc});
+
+      if (++inoutNext == inoutArgs.end())
+        goto done;
+    }
+  }
+
+  llvm_unreachable("ran out of null arguments before we ran out of inouts");
+
+ done:
+
+  // Check to see if we have multiple inout arguments which obviously
+  // alias.  Note that we could do this in a later SILDiagnostics pass
+  // as well: this would be stronger (more equivalences exposed) but
+  // would have worse source location information.
+  for (auto i = emittedInoutArgs.begin(), e = emittedInoutArgs.end();
+         i != e; ++i) {
+    for (auto j = emittedInoutArgs.begin(); j != i; ++j) {
+      // TODO: This uses exact SILValue equivalence to detect aliases,
+      // we could do something stronger here to catch other obvious cases.
+      if (i->first != j->first) continue;
+
+      gen.SGM.diagnose(i->second, diag::inout_argument_alias)
+        .highlight(i->second.getSourceRange());
+      gen.SGM.diagnose(j->second, diag::previous_inout_alias)
+        .highlight(j->second.getSourceRange());
+    }
+  }
+}
+
+/// Given a scalar value, materialize it into memory with the
+/// exact same level of cleanup it had before.
+static ManagedValue emitMaterializeIntoTemporary(SILGenFunction &gen,
+                                                 SILLocation loc,
+                                                 ManagedValue object) {
+  auto temporary = gen.emitTemporaryAllocation(loc, object.getType());
+  bool hadCleanup = object.hasCleanup();
+  gen.B.createStore(loc, object.forward(gen), temporary);
+
+  // The temporary memory is +0 if the value was.
+  if (hadCleanup) {
+    return ManagedValue(temporary, gen.enterDestroyCleanup(temporary));
+  } else {
+    return ManagedValue::forUnmanaged(temporary);
+  }
+}
+
 namespace {
+  /// A destination for an argument other than just "onto to the end
+  /// of the arguments lists".
+  ///
+  /// This allows us to re-use the argument expression emitter for
+  /// some weird cases, like a shuffled tuple where some of the
+  /// arguments are going into a varargs array.
+  struct ArgSpecialDest {
+    VarargsInfo *SharedInfo;
+    unsigned Index;
+    CleanupHandle Cleanup;
+
+    ArgSpecialDest() : SharedInfo(nullptr) {}
+    explicit ArgSpecialDest(VarargsInfo &info, unsigned index)
+      : SharedInfo(&info), Index(index) {}
+
+    // Reference semantics: need to preserve the cleanup handle.
+    ArgSpecialDest(const ArgSpecialDest &) = delete;
+    ArgSpecialDest &operator=(const ArgSpecialDest &) = delete;
+    ArgSpecialDest(ArgSpecialDest &&other)
+      : SharedInfo(other.SharedInfo), Index(other.Index),
+        Cleanup(other.Cleanup) {
+      other.SharedInfo = nullptr;
+    }
+    ArgSpecialDest &operator=(ArgSpecialDest &&other) {
+      assert(!isValid() && "overwriting valid special destination!");
+      SharedInfo = other.SharedInfo;
+      Index = other.Index;
+      Cleanup = other.Cleanup;
+      other.SharedInfo = nullptr;
+      return *this;
+    }
+
+    ~ArgSpecialDest() {
+      assert(!isValid() && "failed to deactivate special dest");
+    }
+
+    /// Is this a valid special destination?
+    ///
+    /// Most of the time, most arguments don't have special
+    /// destinations, and making an array of Optional<Special special
+    /// destinations has t
+    bool isValid() const { return SharedInfo != nullptr; }
+
+    /// Fill this special destination with a value.
+    void fill(SILGenFunction &gen, ArgumentSource &&arg,
+              AbstractionPattern _unused_origType,
+              SILType loweredSubstParamType) {
+      assert(isValid() && "filling an invalid destination");
+
+      SILLocation loc = arg.getLocation();
+      auto destAddr = SharedInfo->getBaseAddress();
+      if (Index != 0) {
+        SILValue index = gen.B.createIntegerLiteral(loc,
+                    SILType::getBuiltinWordType(gen.getASTContext()), Index);
+        destAddr = gen.B.createIndexAddr(loc, destAddr, index);
+      }
+
+      assert(destAddr.getType() == loweredSubstParamType.getAddressType());
+      
+      auto &destTL = SharedInfo->getBaseTypeLowering();
+      Cleanup = gen.enterDormantTemporaryCleanup(destAddr, destTL);
+
+      TemporaryInitialization init(destAddr, Cleanup);
+      std::move(arg).forwardInto(gen, SharedInfo->getBaseAbstractionPattern(),
+                                 &init, destTL);
+    }
+
+    /// Deactive this special destination.  Must always be called
+    /// before destruction.
+    void deactivate(SILGenFunction &gen) {
+      assert(isValid() && "deactivating an invalid destination");
+      if (Cleanup.isValid())
+        gen.Cleanups.forwardCleanup(Cleanup);
+      SharedInfo = nullptr;
+    }
+  };
+
+  using ArgSpecialDestArray = MutableArrayRef<ArgSpecialDest>;
+
   class ArgEmitter {
     SILGenFunction &SGF;
     AbstractCC CC;
     ArrayRef<SILParameterInfo> ParamInfos;
     SmallVectorImpl<ManagedValue> &Args;
 
-    /// This keeps track of any inout arguments that are emitted.
-    SmallVector<std::pair<SILValue, SILLocation>, 2> InOutArguments;
+    /// Track any inout arguments that are emitted.  Each corresponds
+    /// in order to a "hole" (a null value) in Args.
+    SmallVectorImpl<InOutArgument> &InOutArguments;
+
+    Optional<ArgSpecialDestArray> SpecialDests;
   public:
     ArgEmitter(SILGenFunction &SGF, AbstractCC cc,
                ArrayRef<SILParameterInfo> paramInfos,
-               SmallVectorImpl<ManagedValue> &args)
-      : SGF(SGF), CC(cc), ParamInfos(paramInfos), Args(args) {}
+               SmallVectorImpl<ManagedValue> &args,
+               SmallVectorImpl<InOutArgument> &inoutArgs,
+               Optional<ArgSpecialDestArray> specialDests = None)
+      : SGF(SGF), CC(cc), ParamInfos(paramInfos),
+        Args(args), InOutArguments(inoutArgs), SpecialDests(specialDests) {
+      assert(!specialDests || specialDests->size() == paramInfos.size());
+    }
 
-    void emit(RValueSource &&arg, AbstractionPattern origParamType) {
+    void emit(ArgumentSource &&arg, AbstractionPattern origParamType) {
       // If it was a tuple in the original type, the parameters will
       // have been exploded.
       if (isa<TupleType>(origParamType.getAsType())) {
@@ -1854,16 +2054,23 @@ namespace {
 
       // The substituted parameter type.  Might be different from the
       // substituted argument type by abstraction and/or bridging.
-      auto param = claimNextParameter();
+      SILParameterInfo param = claimNextParameter();
+      ArgSpecialDest *specialDest = claimNextSpecialDest();
 
-      auto loweredSubstArgType =
-        SGF.getLoweredType(substArgType).getSwiftRValueType();
+      // Make sure we use the same value category for these so that we
+      // can hereafter just use simple equality checks to test for
+      // abstraction.
+      SILType loweredSubstArgType = SGF.getLoweredType(substArgType);
+      SILType loweredSubstParamType =
+        SILType::getPrimitiveType(param.getType(),
+                                  loweredSubstArgType.getCategory());
 
       // If the caller takes the argument indirectly, the argument has an
       // inout type.
       if (param.isIndirectInOut()) {
+        assert(!specialDest);
         assert(isa<InOutType>(substArgType));
-        emitInOut(std::move(arg), loweredSubstArgType, param.getType(),
+        emitInOut(std::move(arg), loweredSubstArgType, loweredSubstParamType,
                   origParamType, substArgType);
         return;
       }
@@ -1874,15 +2081,22 @@ namespace {
       // ownership, like Itanium C++.)
       if (param.isIndirect()) {
         assert(!param.isIndirectResult());
-        auto value = std::move(arg).materialize(SGF, origParamType,
-                                                param.getSILType());
-        Args.push_back(value);
+        if (specialDest) {
+          emitIndirectInto(std::move(arg), origParamType,
+                           loweredSubstParamType, *specialDest);
+          Args.push_back(ManagedValue::forInContext());
+        } else {
+          auto value = emitIndirect(std::move(arg), loweredSubstArgType,
+                                    origParamType, param);
+          Args.push_back(value);
+        }
         return;
       }
 
       // Okay, if the original parameter is passed directly, then we
       // just need to handle abstraction differences and bridging.
-      emitDirect(std::move(arg), origParamType, param);
+      assert(!specialDest);
+      emitDirect(std::move(arg), loweredSubstArgType, origParamType, param);
     }
 
   private:
@@ -1893,6 +2107,16 @@ namespace {
       return param;
     }
 
+    /// Claim the next destination, returning a null pointer if there
+    /// is no special destination.
+    ArgSpecialDest *claimNextSpecialDest() {
+      if (!SpecialDests) return nullptr;
+      assert(!SpecialDests->empty());
+      auto dest = &SpecialDests->front();
+      SpecialDests = SpecialDests->slice(1);
+      return (dest->isValid() ? dest : nullptr);
+    }
+
     bool isUnmaterializableTupleType(CanType type) {
       if (auto tuple = dyn_cast<TupleType>(type))
         if (!tuple->isMaterializable())
@@ -1901,11 +2125,13 @@ namespace {
     }
 
     /// Emit an argument as an expanded tuple.
-    void emitExpanded(RValueSource &&arg, AbstractionPattern origParamType) {
+    void emitExpanded(ArgumentSource &&arg, AbstractionPattern origParamType) {
       CanTupleType substArgType = cast<TupleType>(arg.getSubstType());
 
       // The original type isn't necessarily a tuple.
       assert(origParamType.matchesTuple(substArgType));
+
+      assert(!arg.isLValue() && "argument is l-value but parameter is tuple?");
 
       // If we're working with an r-value, just expand it out and emit
       // all the elements individually.
@@ -1934,80 +2160,115 @@ namespace {
         return;
       }
 
-      // TODO: tuple shuffles, etc.
+      if (auto shuffle = dyn_cast<TupleShuffleExpr>(e)) {
+        emitShuffle(shuffle, origParamType);
+        return;
+      }
 
       // Fall back to the r-value case.
       emitExpanded({ e, SGF.emitRValue(e) }, origParamType);
     }
 
-    void emitInOut(RValueSource &&arg,
-                   CanType loweredSubstArgType, CanType loweredSubstParamType,
+    void emitShuffle(TupleShuffleExpr *shuffle, AbstractionPattern origType);
+
+    ManagedValue emitIndirect(ArgumentSource &&arg,
+                              SILType loweredSubstArgType,
+                              AbstractionPattern origParamType,
+                              SILParameterInfo param) {
+      auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
+
+      // If no abstraction is required, try to honor the emission contexts.
+      if (loweredSubstArgType.getSwiftRValueType() == param.getType()) {
+        auto loc = arg.getLocation();
+        ManagedValue result =
+          std::move(arg).getAsSingleValue(SGF, contexts.ForEmission);
+
+        // If it's already in memory, great.
+        if (result.getType().isAddress()) {
+          return result;
+
+        // Otherwise, put it there.
+        } else {
+          return emitMaterializeIntoTemporary(SGF, loc, result);
+        }
+      }
+
+      // Otherwise, simultaneously emit and reabstract.
+      return std::move(arg).materialize(SGF, origParamType, param.getSILType());
+    }
+
+    void emitIndirectInto(ArgumentSource &&arg,
+                          AbstractionPattern origType,
+                          SILType loweredSubstParamType,
+                          ArgSpecialDest &dest) {
+      dest.fill(SGF, std::move(arg), origType, loweredSubstParamType);
+    }
+
+    void emitInOut(ArgumentSource &&arg,
+                   SILType loweredSubstArgType, SILType loweredSubstParamType,
                    AbstractionPattern origType, CanType substType) {
       SILLocation loc = arg.getLocation();
-      ManagedValue address;
-      if (arg.isRValue()) {
-        // If the argument is already lowered to an RValue, it must be the
-        // receiver of a self argument, which will be the first inout.
-        address = std::move(arg).asKnownRValue().getScalarValue();
-      } else {
-        auto *e = cast<InOutExpr>(std::move(arg).asKnownExpr()->
-                                     getSemanticsProvidingExpr());
 
-        LValue lv = SGF.emitLValue(e->getSubExpr(), AccessKind::ReadWrite);
-        address = SGF.emitAddressOfLValue(e->getSubExpr(), std::move(lv),
-                                          AccessKind::ReadWrite);
-      }
+      LValue lv = [&]{
+        // If the argument is already lowered to an LValue, it must be the
+        // receiver of a self argument, which will be the first inout.
+        if (arg.isLValue()) {
+          return std::move(arg).asKnownLValue();
+
+        // This is logically wrong, but propagating l-values within
+        // RValues is hard to avoid in custom argument-emission code
+        // without making ArgumentSource capable of holding mixed
+        // RValue/LValue tuples.  (materializeForSet has to do this,
+        // for one.)  The onus is on the caller to ensure that formal
+        // access semantics are honored.
+        } else if (arg.isRValue()) {
+          auto address = std::move(arg).asKnownRValue()
+            .getAsSingleValue(SGF, arg.getKnownRValueLocation());
+          assert(address.isLValue());
+          auto substObjectType = cast<InOutType>(substType).getObjectType();
+          return LValue::forAddress(address,
+                                    AbstractionPattern(substObjectType),
+                                    substObjectType);
+        } else {
+          auto *e = cast<InOutExpr>(std::move(arg).asKnownExpr()->
+                                    getSemanticsProvidingExpr());
+          return SGF.emitLValue(e->getSubExpr(), AccessKind::ReadWrite);
+        }
+      }();
 
       if (hasAbstractionDifference(CC, loweredSubstParamType,
                                    loweredSubstArgType)) {
-        // This could actually just be type-bridging.  In any case,
-        // it can be dealt with with writeback.
-        llvm::errs() << "Unimplemented: abstraction difference in l-value\n";
-        llvm::errs() << "\n  "; loweredSubstParamType.dump();
-        llvm::errs() << "\n  "; loweredSubstArgType.dump();
-        abort();
+        lv.addSubstToOrigComponent(origType, loweredSubstParamType);
       }
 
-      // We know that the rvalue has a single ManagedValue.  Check to see if we
-      // have an obvious alias with a previously emitted argument.  Note that we
-      // could do this in a later SILDiagnostics pass as well: this would be
-      // stronger (more equivalences exposed) but would have worse source
-      // location information.
-      
-      // TODO: This uses exact SILValue equivalence to detect aliases, we could
-      // do something stronger here to catch other obvious cases.
-      for (auto prev : InOutArguments) {
-        if (prev.first == address.getValue()) {
-          SGF.SGM.diagnose(loc, diag::inout_argument_alias)
-            .highlight(loc.getSourceRange());
-          SGF.SGM.diagnose(prev.second, diag::previous_inout_alias)
-            .highlight(prev.second.getSourceRange());
-        }
-      }
-      
-      InOutArguments.push_back({address.getValue(), loc});
-      Args.push_back(address);
+      // Leave an empty space in the ManagedValue sequence and
+      // remember that we had an inout argument.
+      InOutArguments.push_back({std::move(lv), loc});
+      Args.push_back(ManagedValue());
       return;
     }
 
-    void emitDirect(RValueSource &&arg, AbstractionPattern origParamType,
+    void emitDirect(ArgumentSource &&arg, SILType loweredSubstArgType,
+                    AbstractionPattern origParamType,
                     SILParameterInfo param) {
+      auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
       if (arg.isRValue()) {
         emitDirect(arg.getKnownRValueLocation(), std::move(arg).asKnownRValue(),
-                   origParamType, param);
+                   origParamType, param, contexts.ForReabstraction);
       } else {
         Expr *e = std::move(arg).asKnownExpr();
-        emitDirect(e, SGF.emitRValue(e), origParamType, param);
+        emitDirect(e, SGF.emitRValue(e, contexts.ForEmission),
+                   origParamType, param, contexts.ForReabstraction);
       }
     }
 
     void emitDirect(SILLocation loc, RValue &&arg,
                     AbstractionPattern origParamType,
-                    SILParameterInfo param) {
+                    SILParameterInfo param, SGFContext ctxt) {
       auto value = std::move(arg).getScalarValue();
       if (isNative(CC)) {
         value = SGF.emitSubstToOrigValue(loc, value, origParamType,
-                                         arg.getType());
+                                         arg.getType(), ctxt);
       } else {
         value = SGF.emitNativeToBridgedValue(loc, value, CC,
                                              origParamType.getAsType(),
@@ -2015,8 +2276,307 @@ namespace {
       }
       Args.push_back(value);
     }
+
+    struct EmissionContexts {
+      /// The context for emitting the r-value.
+      SGFContext ForEmission;
+      /// The context for reabstracting the r-value.
+      SGFContext ForReabstraction;
+    };
+    static EmissionContexts getRValueEmissionContexts(SILType loweredArgType,
+                                                      SILParameterInfo param) {
+      // If the parameter is consumed, we have to emit at +1.
+      if (param.isConsumed()) {
+        return { SGFContext(), SGFContext() };
+      }
+
+      // Otherwise, we can emit the final value at +0 (but only with a
+      // guarantee that the value will survive).
+      // 
+      // TODO: we can pass at +0 (immediate) to an unowned parameter
+      // if we know that there will be no arbitrary side-effects
+      // between now and the call.
+      SGFContext finalContext = SGFContext::AllowGuaranteedPlusZero;
+
+      // If the r-value doesn't require reabstraction, the final context
+      // is the emission context.
+      if (loweredArgType.getSwiftRValueType() == param.getType()) {
+        return { finalContext, SGFContext() };
+      }
+
+      // Otherwise, the final context is the reabstraction context.
+      return { SGFContext(), finalContext };
+    }
+  };
+}
+
+void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
+                             AbstractionPattern origParamType) {
+  // We could support dest addrs here, but it can't actually happen
+  // with the current limitations on default arguments in tuples.
+  assert(!SpecialDests && "shuffle nested within varargs expansion?");
+
+  auto inner = E->getSubExpr();
+  auto innerTuple = cast<TupleType>(inner->getType()->getCanonicalType());
+  auto outerTuple = cast<TupleType>(E->getType()->getCanonicalType());
+
+  struct ElementExtent {
+    /// The parameters which go into this tuple element.
+    /// This is set in the first pass.
+    ArrayRef<SILParameterInfo> Params;
+    /// The destination index, if any.
+    /// This is set in the first pass.
+    unsigned DestIndex : 30;
+    unsigned HasDestIndex : 1;
+#ifndef NDEBUG
+    unsigned Used : 1;
+#endif
+    /// The arguments which feed this tuple element.
+    /// This is set in the second pass.
+    ArrayRef<ManagedValue> Args;
+    /// The inout arguments which feed this tuple element.
+    /// This is set in the second pass.
+    MutableArrayRef<InOutArgument> InOutArgs;
+
+    ElementExtent() : HasDestIndex(false)
+#ifndef NDEBUG
+                    , Used(false)
+#endif
+    {}
   };
 
+  // The original parameter type.
+  AbstractionPattern innerOrigParamType = AbstractionPattern::getInvalid();
+  // Flattened inner parameter sequence.
+  SmallVector<SILParameterInfo, 8> innerParams;
+  // Extents of the inner elements.
+  SmallVector<ElementExtent, 8> innerExtents(innerTuple->getNumElements());
+
+  Optional<VarargsInfo> varargsInfo;
+  SILParameterInfo variadicParamInfo; // innerExtents will point at this
+  Optional<SmallVector<ArgSpecialDest, 8>> innerSpecialDests;
+
+  // First, construct an abstraction pattern and parameter sequence
+  // which we can use to emit the inner tuple.
+  {
+    SmallVector<TupleTypeElt, 8> origInnerElts(innerTuple->getFields().begin(),
+                                               innerTuple->getFields().end());
+
+    unsigned nextParamIndex = 0;
+    for (unsigned outerIndex : indices(outerTuple.getElementTypes())) {
+      CanType substEltType = outerTuple.getElementType(outerIndex);
+      AbstractionPattern origEltType =
+        origParamType.getTupleElementType(outerIndex);
+      unsigned numParams = getFlattenedValueCount(origEltType, substEltType);
+
+      // Grab the parameter infos corresponding to this tuple element
+      // (but don't drop them from ParamInfos yet).
+      auto eltParams = ParamInfos.slice(nextParamIndex, numParams);
+      nextParamIndex += numParams;
+
+      int innerIndex = E->getElementMapping()[outerIndex];
+      if (innerIndex >= 0) {
+#ifndef NDEBUG
+        assert(!innerExtents[innerIndex].Used && "using element twice");
+        innerExtents[innerIndex].Used = true;
+#endif
+        innerExtents[innerIndex].Params = eltParams;
+        origInnerElts[innerIndex] =
+          origInnerElts[innerIndex].getWithType(origEltType.getAsType());
+      } else if (innerIndex == TupleShuffleExpr::FirstVariadic) {
+        assert(outerIndex + 1 == outerTuple->getNumElements());
+
+        auto &varargsField = outerTuple->getFields()[outerIndex];
+        assert(varargsField.isVararg());
+        assert(!varargsInfo.hasValue() && "already had varargs entry?");
+
+        CanType varargsEltType = CanType(varargsField.getVarargBaseTy());
+        unsigned numVarargs = E->getElementMapping().size() - (outerIndex + 1);
+        assert(E->getVarargsArrayType()->isEqual(substEltType));
+        CanType varargsArrayType = substEltType;
+
+        // Create the array value.
+        varargsInfo.emplace(emitBeginVarargs(SGF, E, varargsEltType,
+                                             varargsArrayType, numVarargs));
+
+        // If we have any varargs, we'll need to actually initialize
+        // the array buffer.
+        if (numVarargs) {
+          // For this, we'll need special destinations.
+          assert(!innerSpecialDests);
+          innerSpecialDests.emplace();
+
+          // Prepare the variadic "arguments" as single +1 indirect
+          // parameters with the array's desired abstraction pattern.
+          // The vararg element type should be materializable, and the
+          // abstraction pattern should be opaque, so ArgEmitter's
+          // lowering should always generate exactly one "argument"
+          // per element even if the substituted element type is a tuple.
+          variadicParamInfo =
+            SILParameterInfo(varargsInfo->getBaseTypeLowering()
+                               .getLoweredType().getSwiftRValueType(),
+                             ParameterConvention::Indirect_In);
+
+          for (unsigned i = 0; i != numVarargs; ++i) {
+            // Find out where the next varargs element is coming from.
+            int innerIndex = E->getElementMapping()[outerIndex + 1 + i];
+            assert(innerIndex >= 0 && "special source for varargs element??");
+#ifndef NDEBUG
+            assert(!innerExtents[innerIndex].Used && "using element twice");
+            innerExtents[innerIndex].Used = true;
+#endif
+
+            // Set the destination index.
+            innerExtents[innerIndex].HasDestIndex = true;
+            innerExtents[innerIndex].DestIndex = i;
+
+            // Use the singleton param info we prepared before.
+            innerExtents[innerIndex].Params = variadicParamInfo;
+
+            // Propagate the element abstraction pattern.
+            origInnerElts[innerIndex] =
+              origInnerElts[innerIndex].getWithType(
+                varargsInfo->getBaseAbstractionPattern().getAsType());
+          }
+        }
+      }
+    }
+
+    // The inner abstraction pattern is opaque if we started with an
+    // opaque pattern; otherwise, it's a tuple of the de-shuffled
+    // tuple elements.  
+    innerOrigParamType = origParamType;
+    if (!origParamType.isOpaque()) {
+      auto origInnerTuple = TupleType::get(origInnerElts, SGF.getASTContext());
+      innerOrigParamType = AbstractionPattern(CanType(origInnerTuple));
+    }
+
+    // Flatten the parameters from innerExtents into innerParams, and
+    // fill out varargsAddrs if necessary.
+    for (auto &extent : innerExtents) {
+      assert(extent.Used && "didn't use all the inner tuple elements!");
+      innerParams.append(extent.Params.begin(), extent.Params.end());
+
+      // Fill in the special destinations array.
+      if (innerSpecialDests) {
+        // Use the saved index if applicable.
+        if (extent.HasDestIndex) {
+          assert(extent.Params.size() == 1);
+          innerSpecialDests->push_back(
+                               ArgSpecialDest(*varargsInfo, extent.DestIndex));
+
+        // Otherwise, fill in with the appropriate number of invalid
+        // special dests.
+        } else {
+          // ArgSpecialDest isn't copyable, so we can't just use append.
+          for (auto &p : extent.Params) {
+            (void) p;
+            innerSpecialDests->push_back(ArgSpecialDest());
+          }
+        }
+      }
+    }
+  }
+
+  // Emit the inner expression.
+  SmallVector<ManagedValue, 8> innerArgs;
+  SmallVector<InOutArgument, 2> innerInOutArgs;
+  ArgEmitter(SGF, CC, innerParams, innerArgs, innerInOutArgs,
+             (innerSpecialDests ? ArgSpecialDestArray(*innerSpecialDests)
+                                : Optional<ArgSpecialDestArray>()))
+    .emit(ArgumentSource(E->getSubExpr()), innerOrigParamType);
+
+  // Make a second pass to split the inner arguments correctly.
+  {  
+    ArrayRef<ManagedValue> nextArgs = innerArgs;
+    MutableArrayRef<InOutArgument> nextInOutArgs = innerInOutArgs;
+    for (auto &extent : innerExtents) {
+      auto length = extent.Params.size();
+
+      // Claim the next N inner args for this inner argument.
+      extent.Args = nextArgs.slice(0, length);
+      nextArgs = nextArgs.slice(length);
+
+      // Claim the correct number of inout arguments as well.
+      unsigned numInOut = 0;
+      for (auto arg : extent.Args) {
+        assert(!arg.isInContext() || extent.HasDestIndex);
+        if (!arg) numInOut++;
+      }
+      extent.InOutArgs = nextInOutArgs.slice(0, numInOut);
+      nextInOutArgs = nextInOutArgs.slice(numInOut);
+    }
+
+    assert(nextArgs.empty() && "didn't claim all args");
+    assert(nextInOutArgs.empty() && "didn't claim all inout args");
+  }
+
+  // Make a final pass to emit default arguments and move things into
+  // the outer arguments lists.
+  unsigned nextCallerDefaultArg = 0;
+  for (unsigned outerIndex = 0, e = outerTuple->getNumElements();
+         outerIndex != e; ++outerIndex) {
+    // If this comes from an inner element, move the appropriate
+    // inner element values over.
+    int innerIndex = E->getElementMapping()[outerIndex];
+    if (innerIndex >= 0) {
+      auto &extent = innerExtents[innerIndex];
+
+      // Drop N parameters off of ParamInfos.
+      ParamInfos = ParamInfos.slice(extent.Args.size());
+
+      // Move the appropriate inner arguments over as outer arguments.
+      Args.append(extent.Args.begin(), extent.Args.end());
+      for (auto &inoutArg : extent.InOutArgs)
+        InOutArguments.push_back(std::move(inoutArg));
+
+    // If this is default initialization, call the default argument
+    // generator.
+    } else if (innerIndex == TupleShuffleExpr::DefaultInitialize) {
+      // Otherwise, emit the default initializer, then map that as a
+      // default argument.
+      CanType eltType = outerTuple.getElementType(outerIndex);
+      ManagedValue value =
+        SGF.emitApplyOfDefaultArgGenerator(E, E->getDefaultArgsOwner(),
+                                           outerIndex, eltType);
+      emit(ArgumentSource(E, RValue(SGF, E, eltType, value)),
+           origParamType.getTupleElementType(outerIndex));
+
+     // If this is caller default initialization, generate the
+     // appropriate value.
+    } else if (innerIndex == TupleShuffleExpr::CallerDefaultInitialize) {
+      auto arg = E->getCallerDefaultArgs()[nextCallerDefaultArg++];
+      emit(ArgumentSource(arg), origParamType.getTupleElementType(outerIndex));
+      
+    // If we're supposed to create a varargs array with the rest, do so.
+    } else if (innerIndex == TupleShuffleExpr::FirstVariadic) {
+      auto &varargsField = outerTuple->getFields()[outerIndex];
+      assert(varargsField.isVararg() &&
+             "Cannot initialize nonvariadic element");
+      assert(varargsInfo.hasValue());
+
+      // We've successfully built the varargs array; deactivate all
+      // the special destinations.
+      if (innerSpecialDests) {
+        for (auto &dest : *innerSpecialDests) {
+          if (dest.isValid())
+            dest.deactivate(SGF);
+        }
+      }
+
+      CanType eltType = outerTuple.getElementType(outerIndex);
+      ManagedValue varargs = emitEndVarargs(SGF, E, std::move(*varargsInfo));
+      emit(ArgumentSource(E, RValue(SGF, E, eltType, varargs)),
+           origParamType.getTupleElementType(outerIndex));
+
+    // That's the last special case defined so far.
+    } else {
+      llvm_unreachable("unexpected special case in tuple shuffle!");
+    }
+  }
+}
+
+namespace {
   /// A structure for conveniently claiming sets of uncurried parameters.
   struct ParamLowering {
     ArrayRef<SILParameterInfo> Params;
@@ -2046,7 +2606,7 @@ namespace {
     CanType SubstResultType;
 
   private:
-    RValueSource ArgValue;
+    ArgumentSource ArgValue;
     
   public:
     CallSite(ApplyExpr *apply)
@@ -2059,7 +2619,7 @@ namespace {
         ArgValue(expr) {
     }
   
-    CallSite(SILLocation loc, RValueSource &&value, Type resultType)
+    CallSite(SILLocation loc, ArgumentSource &&value, Type resultType)
       : Loc(loc), SubstResultType(resultType->getCanonicalType()),
         ArgValue(std::move(value)) {
     }
@@ -2076,14 +2636,15 @@ namespace {
     }
     
     void emit(SILGenFunction &gen, AbstractionPattern origParamType,
-              ParamLowering &lowering, SmallVectorImpl<ManagedValue> &args) && {
+              ParamLowering &lowering, SmallVectorImpl<ManagedValue> &args,
+              SmallVectorImpl<InOutArgument> &inoutArgs) && {
       auto params = lowering.claimParams(origParamType, getSubstArgType());
 
-      ArgEmitter emitter(gen, lowering.CC, params, args);
+      ArgEmitter emitter(gen, lowering.CC, params, args, inoutArgs);
       emitter.emit(std::move(ArgValue), origParamType);
     }
 
-    RValueSource &&forward() && {
+    ArgumentSource &&forward() && {
       return std::move(ArgValue);
     }
   };
@@ -2201,6 +2762,7 @@ namespace {
         // Emit the arguments.
         Optional<SILLocation> uncurriedLoc;
         SmallVector<SmallVector<ManagedValue, 4>, 2> args;
+        SmallVector<InOutArgument, 2> inoutArgs;
         CanFunctionType formalApplyType;
         args.reserve(uncurriedSites.size());
         {
@@ -2215,11 +2777,16 @@ namespace {
             uncurriedLoc = site.Loc;
             args.push_back({});
             std::move(site).emit(gen, origParamType, paramLowering,
-                                 args.back());
+                                 args.back(), inoutArgs);
           }
         }
         assert(uncurriedLoc);
         assert(formalApplyType);
+
+        // Begin the formal accesses to any inout arguments we have.
+        if (!inoutArgs.empty()) {
+          beginInOutFormalAccesses(gen, inoutArgs, args);
+        }
 
         // Uncurry the arguments in calling convention order.
         SmallVector<ManagedValue, 4> uncurriedArgs;
@@ -2273,13 +2840,18 @@ namespace {
         ParamLowering paramLowering(substFnType);
 
         SmallVector<ManagedValue, 4> siteArgs;
+        SmallVector<InOutArgument, 2> inoutArgs;
 
         // The result function has already been reabstracted to the substituted
         // type, so use the substituted formal type as the abstraction pattern
         // for argument passing now.
         AbstractionPattern origParamType(claimNextParamClause(formalType));
         std::move(extraSites[i]).emit(gen, origParamType, paramLowering,
-                                      siteArgs);
+                                      siteArgs, inoutArgs);
+        if (!inoutArgs.empty()) {
+          beginInOutFormalAccesses(gen, inoutArgs, siteArgs);
+        }
+
         SGFContext context = i == size - 1 ? C : SGFContext();
         SILLocation loc = extraSites[i].Loc;
         result = gen.emitApply(loc, result, {}, siteArgs,
@@ -2330,10 +2902,8 @@ static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
   CallEmission emission(gen, apply.getCallee(), std::move(writebacks));
   
   // Apply 'self' if provided.
-  if (apply.selfParam)
-    emission.addCallSite(RegularLocation(e),
-                         RValueSource(apply.SelfApplyExpr,
-                                      std::move(apply.selfParam)),
+  if (apply.SelfParam)
+    emission.addCallSite(RegularLocation(e), std::move(apply.SelfParam),
                          apply.SelfApplyExpr->getType());
 
   // Apply arguments from call sites, innermost to outermost.
@@ -2415,7 +2985,7 @@ SILGenFunction::emitUninitializedArrayAllocation(Type ArrayTy,
 static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
                                          SILLocation loc,
                                          SILDeclRef constant,
-                                         RValueSource &selfValue,
+                                         ArgumentSource &selfValue,
                                          bool isSuper,
                                          bool isDirectUse,
                                          CanAnyFunctionType substAccessorType,
@@ -2423,58 +2993,15 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
 
   // If this is a method in a protocol, generate it as a protocol call.
-  if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+  if (isa<ProtocolDecl>(decl->getDeclContext())) {
     assert(!isDirectUse && "direct use of protocol accessor?");
-    
-    // Method calls through ObjC protocols require ObjC dispatch.
-    constant = constant.asForeign(protoDecl->isObjC());
+    assert(!isSuper && "super call to protocol method?");
 
     // The protocol self is implicitly decurried.
-    substAccessorType = CanAnyFunctionType(substAccessorType->getResult()
-                                           ->castTo<AnyFunctionType>());
+    substAccessorType = cast<AnyFunctionType>(substAccessorType.getResult());
 
-    // If this is an archetype case, construct an archetype call.
-    auto selfTy = selfValue.getSubstType()->getInOutObjectType();
-    if (!selfTy->isAnyExistentialType()) {
-      SILValue baseVal =
-        selfValue.forceAndPeekRValue(gen).peekScalarValue();
-    
-      return Callee::forArchetype(gen, baseVal, constant,
-                                  substAccessorType, loc);
-    }
-    
-    // If this is a protocol (not archetype) use, open the contained type.
-    ManagedValue baseVal =
-      std::move(selfValue).getAsSingleValue(gen, SGFContext::AllowPlusZero);
-    
-    Type openedTy = ArchetypeType::getOpened(selfTy);
-    SILType loweredOpenedTy = gen.getLoweredType(openedTy);
-    auto selfLoc = selfValue.getLocation();
-
-    ManagedValue projVal;
-    if (baseVal.getType().isClassExistentialType()) {
-      // Attach the existential cleanup to the projection so that it gets
-      // consumed (or not) when the call is applied to it (or isn't).
-      SILValue val = gen.B.createOpenExistentialRef(loc,
-                                                    baseVal.getValue(),
-                                                    loweredOpenedTy);
-      projVal = ManagedValue(val, baseVal.getCleanup());
-    } else {
-      assert(loweredOpenedTy.isAddress() && "Self should be address-only");
-      SILValue val = gen.B.createOpenExistential(selfLoc,
-                                                 baseVal.getValue(),
-                                                 loweredOpenedTy);
-      projVal = ManagedValue::forUnmanaged(val);
-    }
-
-    // Update the self value to use the projection.
-    selfValue = RValueSource(selfLoc, RValue(gen, selfLoc,
-                                             loweredOpenedTy.getSwiftType(),
-                                             projVal));
-    remapSelfSubstitutions(gen, substitutions, openedTy);
-    
-    return Callee::forArchetype(gen, projVal.getValue(), constant,
-                                substAccessorType, loc);
+    return prepareArchetypeCallee(gen, loc, constant, selfValue,
+                                  substAccessorType, substitutions);
   }
 
   bool isClassDispatch = false;
@@ -2516,7 +3043,7 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
                                    SILLocation loc,
                                    SILDeclRef constant,
                                    ArrayRef<Substitution> substitutions,
-                                   RValueSource &selfValue,
+                                   ArgumentSource &selfValue,
                                    bool isSuper,
                                    bool isDirectUse)
 {
@@ -2555,9 +3082,9 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   return callee;
 }
 
-RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
-                                                    ManagedValue base,
-                                                    SILDeclRef accessor) {
+ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
+                                                      ManagedValue base,
+                                                      SILDeclRef accessor) {
   auto accessorType = SGM.Types.getConstantFunctionType(accessor);
   SILParameterInfo selfParam = accessorType->getParameters().back();
 
@@ -2599,9 +3126,25 @@ RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
 
       base = emitLoad(loc, base.forward(*this), getTypeLowering(baseType),
                       SGFContext(), shouldTake);
+
+    // Handle inout bases specially here.
+    } else if (selfParam.isIndirectInOut()) {
+      // It sometimes happens that we get r-value bases here,
+      // e.g. when calling a mutating setter on a materialized
+      // temporary.  Just don't claim the value.
+      if (!base.isLValue()) {
+        base = ManagedValue::forLValue(base.getValue());
+      }
+
+      // FIXME: this assumes that there's never meaningful
+      // reabstraction of self arguments.
+      CanType selfFormalType = baseType.getSwiftRValueType();
+      return ArgumentSource(loc,
+                 LValue::forAddress(base, AbstractionPattern(selfFormalType),
+                                    selfFormalType));
     }
 
-  // If the base is currently a value, we may have to drop it in
+  // If the base is currently scalar, we may have to drop it in
   // memory or copy it.
   } else {
     assert(!base.isLValue());
@@ -2614,22 +3157,37 @@ RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
     // If the parameter is indirect, we need to drop the value into
     // temporary memory.
     if (selfParam.isIndirect()) {
-      auto temporary = emitTemporaryAllocation(loc, baseType);
-      bool hadCleanup = base.hasCleanup();
-      B.createStore(loc, base.forward(*this), temporary);
+      // It's usually a really bad idea to materialize when we're
+      // about to pass a value to an inout argument, because it's a
+      // really easy way to silently drop modifications (e.g. from a
+      // mutating getter in a writeback pair).  Our caller should
+      // always take responsibility for that decision (by doing the
+      // materialization itself).
+      //
+      // However, when the base is a reference type and the target is
+      // a non-class protocol, this is innocuous.
+      assert((!selfParam.isIndirectInOut() ||
+              (baseType.getSwiftRValueType()->isAnyClassReferenceType() &&
+               isa<ProtocolDecl>(accessor.getDecl()->getDeclContext()) &&
+               !cast<ProtocolDecl>(accessor.getDecl()->getDeclContext())
+                 ->requiresClass())) &&
+             "passing unmaterialized r-value as inout argument");
 
-      // The temporary memory is +0 if the value was.  (But note that
-      // we'll make it +1 if the parameter is consumed.)
-      if (hadCleanup) {
-        base = ManagedValue(temporary, enterDestroyCleanup(temporary));
-      } else {
-        base = ManagedValue::forUnmanaged(temporary);
+      base = emitMaterializeIntoTemporary(*this, loc, base);
+
+      if (selfParam.isIndirectInOut()) {
+        // Drop the cleanup if we have one.
+        auto baseLV = ManagedValue::forLValue(base.getValue());
+        auto baseType = base.getType().getSwiftRValueType();
+        return ArgumentSource(loc, LValue::forAddress(baseLV,
+                                               AbstractionPattern(baseType),
+                                                      baseType));
       }
     }
   }
 
-  return RValueSource(loc, RValue(*this, loc,
-                                  base.getType().getSwiftType(), base));
+  return ArgumentSource(loc, RValue(*this, loc,
+                               base.getType().getSwiftRValueType(), base));
 }
 
 SILDeclRef SILGenFunction::getGetterDeclRef(AbstractStorageDecl *storage,
@@ -2643,7 +3201,8 @@ SILDeclRef SILGenFunction::getGetterDeclRef(AbstractStorageDecl *storage,
 /// Emit a call to a getter.
 ManagedValue SILGenFunction::
 emitGetAccessor(SILLocation loc, SILDeclRef get,
-                ArrayRef<Substitution> substitutions, RValueSource &&selfValue,
+                ArrayRef<Substitution> substitutions,
+                ArgumentSource &&selfValue,
                 bool isSuper, bool isDirectUse,
                 RValue &&subscripts, SGFContext c) {
   Callee getter = emitSpecializedAccessorFunctionRef(*this, loc, get,
@@ -2661,7 +3220,7 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
   if (!subscripts)
     subscripts = emitEmptyTupleRValue(loc);
 
-  emission.addCallSite(loc, RValueSource(loc, std::move(subscripts)),
+  emission.addCallSite(loc, ArgumentSource(loc, std::move(subscripts)),
                        accessType.getResult());
 
   // T
@@ -2678,7 +3237,7 @@ SILDeclRef SILGenFunction::getSetterDeclRef(AbstractStorageDecl *storage,
 
 void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
                                      ArrayRef<Substitution> substitutions,
-                                     RValueSource &&selfValue,
+                                     ArgumentSource &&selfValue,
                                      bool isSuper, bool isDirectUse,
                                      RValue &&subscripts, RValue &&setValue) {
   Callee setter = emitSpecializedAccessorFunctionRef(*this, loc, set,
@@ -2704,7 +3263,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
   } else {
     setValue.rewriteType(accessType.getInput());
   }
-  emission.addCallSite(loc, RValueSource(loc, std::move(setValue)),
+  emission.addCallSite(loc, ArgumentSource(loc, std::move(setValue)),
                        accessType.getResult());
   // ()
   emission.apply();
@@ -2723,7 +3282,7 @@ SILGenFunction::getMaterializeForSetDeclRef(AbstractStorageDecl *storage,
 std::pair<SILValue, SILValue> SILGenFunction::
 emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                               ArrayRef<Substitution> substitutions,
-                              RValueSource &&selfValue,
+                              ArgumentSource &&selfValue,
                               bool isSuper, bool isDirectUse,
                               RValue &&subscripts, SILValue buffer,
                               SILValue callbackStorage) {
@@ -2742,6 +3301,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
   }
 
   // (buffer, callbackStorage)  or (buffer, callbackStorage, indices) ->
+  // Note that this "RValue" stores a mixed LValue/RValue tuple.
   RValue args = [&] {
     SmallVector<ManagedValue, 4> elts;
 
@@ -2757,7 +3317,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
     }
     return RValue(elts, accessType.getInput());
   }();
-  emission.addCallSite(loc, RValueSource(loc, std::move(args)),
+  emission.addCallSite(loc, ArgumentSource(loc, std::move(args)),
                        accessType.getResult());
   // (buffer, optionalCallback)
   SILValue pointerAndOptionalCallback = emission.apply().getUnmanagedValue();
@@ -2791,7 +3351,8 @@ SILDeclRef SILGenFunction::getAddressorDeclRef(AbstractStorageDecl *storage,
 std::pair<ManagedValue, ManagedValue> SILGenFunction::
 emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                       ArrayRef<Substitution> substitutions,
-                      RValueSource &&selfValue, bool isSuper, bool isDirectUse,
+                      ArgumentSource &&selfValue,
+                      bool isSuper, bool isDirectUse,
                       RValue &&subscripts, SILType addressType) {
 
   Callee callee =
@@ -2810,7 +3371,7 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
   if (!subscripts)
     subscripts = emitEmptyTupleRValue(loc);
 
-  emission.addCallSite(loc, RValueSource(loc, std::move(subscripts)),
+  emission.addCallSite(loc, ArgumentSource(loc, std::move(subscripts)),
                        accessType.getResult());
 
   // Unsafe{Mutable}Pointer<T> or
@@ -2879,7 +3440,8 @@ ManagedValue SILGenFunction::emitApplyConversionFunction(SILLocation loc,
   operand.rewriteType(funcExpr->getType()->castTo<FunctionType>()->getInput()
                         ->getCanonicalType());
   // Add the operand as the final callsite.
-  emission.addCallSite(loc, RValueSource(loc, std::move(operand)), resultType);
+  emission.addCallSite(loc, ArgumentSource(loc, std::move(operand)),
+                       resultType);
   return emission.apply();
 }
 
@@ -2944,16 +3506,18 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     // Attach the existential cleanup to the projection so that it gets
     // consumed (or not) when the call is applied to it (or isn't).
     ManagedValue proj;
-    Type openedType = ArchetypeType::getOpened(operand.getType()
+    CanArchetypeType openedType = ArchetypeType::getOpened(operand.getType()
                                                          .getSwiftRValueType());
     SILType loweredOpenedType = getLoweredType(openedType);
     
     if (operand.getType().isClassExistentialType()) {
       SILValue val = B.createOpenExistentialRef(e, operand, loweredOpenedType);
+      setArchetypeOpeningSite(openedType, val);
       proj = ManagedValue(val, existential.getCleanup());
     } else {
       assert(loweredOpenedType.isAddress() && "Self should be address-only");
       SILValue val = B.createOpenExistential(e, operand, loweredOpenedType);
+      setArchetypeOpeningSite(openedType, val);
       proj = ManagedValue::forUnmanaged(val);
     }
     
@@ -3054,12 +3618,13 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   // Emit the base operand.
   ManagedValue existential = emitRValueAsSingleValue(e->getBase());
 
-  Type openedType = ArchetypeType::getOpened(
+  auto openedType = ArchetypeType::getOpened(
                                    existential.getType().getSwiftRValueType());
   SILType loweredOpenedType = getLoweredLoadableType(openedType);
   
   SILValue base = existential.getValue();
   base = B.createOpenExistentialRef(e, base, loweredOpenedType);
+  setArchetypeOpeningSite(openedType, base);
 
   // Emit the index.
   RValue index = emitRValue(e->getIndex());

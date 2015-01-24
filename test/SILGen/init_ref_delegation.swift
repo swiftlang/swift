@@ -63,10 +63,10 @@ struct S2 {
 
     // CHECK:   [[S2_DELEG_INIT:%[0-9]+]] = function_ref @_TFV19init_ref_delegation2S2CfMS0_U__FT1tQ__S0_ : $@thin <τ_0_0> (@in τ_0_0, @thin S2.Type) -> S2
 
-    // CHECK:   [[X_BOX:%[0-9]+]] = alloc_stack $X
     // CHECK:   [[X_INIT:%[0-9]+]] = function_ref @_TFV19init_ref_delegation1XCfMS0_FT_S0_ : $@thin (@thin X.Type) -> X
     // CHECK:   [[X_META:%[0-9]+]] = metatype $@thin X.Type
     // CHECK:   [[X:%[0-9]+]] = apply [[X_INIT]]([[X_META]]) : $@thin (@thin X.Type) -> X
+    // CHECK:   [[X_BOX:%[0-9]+]] = alloc_stack $X
     // CHECK:   store [[X]] to [[X_BOX]]#1 : $*X
     // CHECK:   [[SELF_BOX1:%[0-9]+]] = apply [[S2_DELEG_INIT]]<X>([[X_BOX]]#1, [[S2_META]]) : $@thin <τ_0_0> (@in τ_0_0, @thin S2.Type) -> S2
     // CHECK:   assign [[SELF_BOX1]] to [[SELF]] : $*S2

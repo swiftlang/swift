@@ -14,8 +14,9 @@ func foo<B : Runcible>(x: B) {
 
 // CHECK-LABEL: sil hidden @_TF15generic_witness3bar{{.*}} : $@thin (@in Runcible) -> ()
 func bar(var x: Runcible) {
-  // CHECK: [[BOX:%.*]] = alloc_box $Runcible 
-  // CHECK: [[EXIST:%.*]] = open_existential [[BOX]]#1 : $*Runcible to $*[[OPENED:@opened(.*) Runcible]]
+  // CHECK: [[BOX:%.*]] = alloc_box $Runcible
+  // CHECK: [[TEMP:%.*]] = alloc_stack $Runcible
+  // CHECK: [[EXIST:%.*]] = open_existential [[TEMP]]#1 : $*Runcible to $*[[OPENED:@opened(.*) Runcible]]
   // CHECK: [[METHOD:%.*]] = witness_method $[[OPENED]], #Runcible.runce!1
   // CHECK: apply [[METHOD]]<[[OPENED]], Int>
   x.runce(5)

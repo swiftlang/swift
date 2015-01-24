@@ -22,6 +22,7 @@
 namespace swift {
 namespace Lowering {
 
+class ArgumentSource;
 class Condition;
 class ConsumableManagedValue;
 class Initialization;
@@ -29,7 +30,6 @@ class LogicalPathComponent;
 class LValue;
 class ManagedValue;
 class RValue;
-class RValueSource;
 class TemporaryInitialization;
 
 /// Represents a temporary allocation.
@@ -67,21 +67,51 @@ enum class MethodDispatch {
 /// +1.  The client is then responsible for checking the ManagedValue to see if
 /// it got back a ManagedValue at +0 or +1.
 class SGFContext {
-  llvm::PointerIntPair<Initialization *, 1, bool> state;
+  enum DesiredTransfer {
+    PlusOne,
+    ImmediatePlusZero,
+    GuaranteedPlusZero,
+  };
+  llvm::PointerIntPair<Initialization *, 2, DesiredTransfer> state;
 public:
   SGFContext() = default;
   
-  enum AllowPlusZero_t {
-    AllowPlusZero
+  enum AllowImmediatePlusZero_t {
+    /// The client is okay with getting a +0 value and plans to use it
+    /// immediately.
+    ///
+    /// For example, in this context, it would be okay to return +0
+    /// even for a load from a mutable variable, because the only way
+    /// the value could be invalidated before it's used is a race
+    /// condition.
+    AllowImmediatePlusZero
+  };
+
+  enum AllowGuaranteedPlusZero_t {
+    /// The client is okay with getting a +0 value as long as it's
+    /// guaranteed to last at least as long as the current evaluation.
+    /// (For expression evaluation, this generally means at least
+    /// until the end of the current statement.)
+    ///
+    /// For example, in this context, it would be okay to return +0
+    /// for a reference to a local 'let' because that will last until
+    /// the 'let' goes out of scope.  However, it would not be okay to
+    /// return +0 for a load from a mutable 'var', because that could
+    /// be mutated before the end of the statement.
+    AllowGuaranteedPlusZero
   };
   
   /// Creates an emitInto context that will store the result of the visited expr
   /// into the given Initialization.
-  explicit SGFContext(Initialization *emitInto) : state(emitInto, false) {
+  explicit SGFContext(Initialization *emitInto) : state(emitInto, PlusOne) {
   }
   
   /*implicit*/
-  SGFContext(AllowPlusZero_t) : state(nullptr, true) {
+  SGFContext(AllowImmediatePlusZero_t) : state(nullptr, ImmediatePlusZero) {
+  }
+
+  /*implicit*/
+  SGFContext(AllowGuaranteedPlusZero_t) : state(nullptr, GuaranteedPlusZero) {
   }
   
   /// Returns a pointer to the Initialization that the current expression should
@@ -91,10 +121,38 @@ public:
     return state.getPointer();
   }
   
-  /// Return true if a ManagedValue producer is encouraged to return its value
-  /// at +0 instead of +1.
-  bool isPlusZeroOk() const {
-    return state.getInt();
+  /// Return true if a ManagedValue producer is allowed to return at
+  /// +0, given that it cannot guarantee that the value will be valid
+  /// until the end of the current evaluation.
+  bool isImmediatePlusZeroOk() const {
+    return state.getInt() == ImmediatePlusZero;
+  }
+
+  /// Return true if a ManagedValue producer is allowed to return at
+  /// +0 if it can guarantee that the value will be valid until the
+  /// end of the current evaluation.
+  bool isGuaranteedPlusZeroOk() const {
+    // Either ImmediatePlusZero or GuaranteedPlusZero is fine.
+    return state.getInt() >= ImmediatePlusZero;
+  }
+
+  /// Get a context for a sub-expression given that arbitrary side
+  /// effects may follow the subevaluation.
+  SGFContext withFollowingSideEffects() const {
+    SGFContext copy = *this;
+    if (copy.state.getInt() == ImmediatePlusZero) {
+      copy.state.setInt(GuaranteedPlusZero);
+    }
+    return copy;
+  }
+
+  /// Get a context for a sub-expression where we plan to project out
+  /// a value.  The Initialization is not okay to propagate down, but
+  /// the +0/+1-ness is.
+  SGFContext withFollowingProjection() const {
+    SGFContext copy;
+    copy.state.setInt(copy.state.getInt());
+    return copy;
   }
 };
 
@@ -223,6 +281,21 @@ public:
   /// emitted. The map is queried to produce the lvalue for a DeclRefExpr to
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
+
+  /// OpenedArchetypes - Mappings of opened archetypes back to the
+  /// instruction which opened them.
+  llvm::DenseMap<CanType, SILValue> ArchetypeOpenings;
+
+  SILValue getArchetypeOpeningSite(CanArchetypeType archetype) const {
+    auto it = ArchetypeOpenings.find(archetype);
+    assert(it != ArchetypeOpenings.end() &&
+           "opened archetype was not registered with SILGenFunction");
+    return it->second;
+  }
+
+  void setArchetypeOpeningSite(CanArchetypeType archetype, SILValue site) {
+    ArchetypeOpenings.insert({archetype, site});
+  }
     
   /// When rebinding 'self' during an initializer delegation, we have to be
   /// careful to preserve the object at 1 retain count during the delegation
@@ -711,14 +784,14 @@ public:
   
   Materialize emitMaterialize(SILLocation loc, ManagedValue v);
   
-  RValueSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
-                                      SILDeclRef accessor);
+  ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
+                                        SILDeclRef accessor);
 
   SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl,
                               bool isDirectAccessorUse);  
   ManagedValue emitGetAccessor(SILLocation loc, SILDeclRef getter,
                                ArrayRef<Substitution> substitutions,
-                               RValueSource &&optionalSelfValue,
+                               ArgumentSource &&optionalSelfValue,
                                bool isSuper, bool isDirectAccessorUse,
                                RValue &&optionalSubscripts, SGFContext C);
 
@@ -726,7 +799,7 @@ public:
                               bool isDirectAccessorUse);  
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
                        ArrayRef<Substitution> substitutions,
-                       RValueSource &&optionalSelfValue,
+                       ArgumentSource &&optionalSelfValue,
                        bool isSuper, bool isDirectAccessorUse,
                        RValue &&optionalSubscripts, RValue &&value);
 
@@ -735,7 +808,7 @@ public:
   std::pair<SILValue, SILValue>
   emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                                 ArrayRef<Substitution> substitutions,
-                                RValueSource &&optionalSelfValue,
+                                ArgumentSource &&optionalSelfValue,
                                 bool isSuper, bool isDirectAccessorUse,
                                 RValue &&optionalSubscripts,
                                 SILValue buffer, SILValue callbackStorage);
@@ -746,7 +819,7 @@ public:
   std::pair<ManagedValue,ManagedValue>
   emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                         ArrayRef<Substitution> substitutions,
-                        RValueSource &&optionalSelfValue,
+                        ArgumentSource &&optionalSelfValue,
                         bool isSuper, bool isDirectAccessorUse,
                         RValue &&optionalSubscripts,
                         SILType addressType);
@@ -789,7 +862,8 @@ public:
   
   ManagedValue emitLoad(SILLocation loc, SILValue addr,
                         const TypeLowering &rvalueTL,
-                        SGFContext C, IsTake_t isTake);
+                        SGFContext C, IsTake_t isTake,
+                        bool isGuaranteedValid = false);
   
   void emitAssignToLValue(SILLocation loc, RValue &&src,
                           LValue &&dest);
@@ -889,6 +963,12 @@ public:
                          Optional<AbstractCC> overrideCC,
                          SGFContext evalContext);
 
+  ManagedValue emitApplyOfDefaultArgGenerator(SILLocation loc,
+                                              ConcreteDeclRef defaultArgsOwner,
+                                              unsigned destIndex,
+                                              CanType resultType,
+                                              SGFContext C = SGFContext());
+
   /// A convenience method for emitApply that just handles monomorphic
   /// applications.
   ManagedValue emitMonomorphicApply(SILLocation loc,
@@ -954,7 +1034,7 @@ public:
   /// \param dest  The uninitialized memory in which to store the result value.
   /// \param optTL Type lowering information for the optional to create.
   void emitInjectOptionalValueInto(SILLocation loc,
-                                   RValueSource &&value,
+                                   ArgumentSource &&value,
                                    SILValue dest,
                                    const TypeLowering &optTL);
 

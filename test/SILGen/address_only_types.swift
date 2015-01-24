@@ -163,8 +163,8 @@ func address_only_call_1_in_2() {
   // CHECK: bb0:
   some_address_only_function_2(some_address_only_function_1())
   // CHECK: [[FUNC2:%[0-9]+]] = function_ref @_TF18address_only_types28some_address_only_function_2
-  // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
   // CHECK: [[FUNC1:%[0-9]+]] = function_ref @_TF18address_only_types28some_address_only_function_1
+  // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
   // CHECK: apply [[FUNC1]]([[TEMP]]#1)
   // CHECK: apply [[FUNC2]]([[TEMP]]#1)
   // CHECK: dealloc_stack [[TEMP]]#0
@@ -181,7 +181,7 @@ func address_only_materialize() -> Int {
   // CHECK: [[TEMP_PROJ:%[0-9]+]] = open_existential [[TEMP]]#1 : $*Unloadable to $*[[OPENED:@opened(.*) Unloadable]]
   // CHECK: [[FOO_METHOD:%[0-9]+]] = witness_method $[[OPENED]], #Unloadable.foo!1
   // CHECK: [[RET:%[0-9]+]] = apply [[FOO_METHOD]]<[[OPENED]]>([[TEMP_PROJ]])
-  // CHECK: destroy_addr [[TEMP]]#1
+  // CHECK: destroy_addr [[TEMP_PROJ]]
   // CHECK: dealloc_stack [[TEMP]]#0
   // CHECK: return [[RET]]
 }

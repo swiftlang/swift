@@ -25,8 +25,8 @@ class Foo: Fooable {
 }
 
 // CHECK-LABEL: sil hidden @_TF15witnesses_class3genUS_7Fooable__FQ_T_
-// CHECK:         strong_retain [[SELF:%.*]] : $
 // CHECK:         [[METHOD:%.*]] = witness_method $T
+// CHECK:         strong_retain [[SELF:%.*]] : $
 // CHECK:         apply [[METHOD]]<T>([[SELF]])
 // CHECK:         return
 func gen<T: Fooable>(foo: T) {

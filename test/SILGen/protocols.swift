@@ -108,7 +108,8 @@ func use_property_rvalue_get() -> Int {
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_property_rvalue_get
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @_Tv9protocols11propertyGetPS_18PropertyWithGetter_ : $*PropertyWithGetter
-// CHECK: [[PROJ:%[0-9]+]] = open_existential [[GLOB]] : $*PropertyWithGetter to $*[[OPENED:@opened(.*) PropertyWithGetter]]
+// CHECK: [[COPY:%.*]] = alloc_stack $PropertyWithGetter
+// CHECK: [[PROJ:%[0-9]+]] = open_existential [[COPY]]#1 : $*PropertyWithGetter to $*[[OPENED:@opened(.*) PropertyWithGetter]]
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #PropertyWithGetter.a!getter.1
 // CHECK-NEXT: apply [[METH]]<[[OPENED]]>([[PROJ]])
 
@@ -177,8 +178,8 @@ protocol Initializable {
 
 // CHECK-LABEL: sil hidden @_TF9protocols27use_initializable_archetype
 func use_initializable_archetype<T: Initializable>(t: T, i: Int) {
-  // CHECK:   [[T_META:%[0-9]+]] = metatype $@thick T.Type
   // CHECK:   [[T_INIT:%[0-9]+]] = witness_method $T, #Initializable.init!allocator.1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
+  // CHECK:   [[T_META:%[0-9]+]] = metatype $@thick T.Type
   // CHECK:   [[T_RESULT:%[0-9]+]] = alloc_stack $T
   // CHECK:   [[T_RESULT_ADDR:%[0-9]+]] = apply [[T_INIT]]<T>([[T_RESULT]]#1, %1, [[T_META]]) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
   // CHECK:   destroy_addr [[T_RESULT]]#1 : $*T

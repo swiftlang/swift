@@ -261,16 +261,13 @@ func tuple_element(x: (Int, Float)) {
 func containers() -> ([Int], Dictionary<String, Int>) {
   return ([1, 2, 3], ["Ankeny": 1, "Burnside": 2, "Couch": 3])
   // CHECK-LABEL: sil hidden @_TF13sil_locations10containers
-  // CHECK: string_literal utf8 "Ankeny"                             {{.*}} line:[[@LINE-2]]:23
+  // CHECK: apply {{%.*}}<(String, Int)>({{%.*}})            {{.*}} line:[[@LINE-2]]:22
+  
+  // CHECK: string_literal utf8 "Ankeny"                             {{.*}} line:[[@LINE-4]]:23
 
-  // CHECK: integer_literal $Builtin.Int2048, 1                      {{.*}} line:[[@LINE-4]]:33
-  // CHECK: integer_literal $Builtin.Int2048, 2                      {{.*}} line:[[@LINE-5]]:48
+  // CHECK: integer_literal $Builtin.Int2048, 1                      {{.*}} line:[[@LINE-6]]:33
+  // CHECK: integer_literal $Builtin.Int2048, 2                      {{.*}} line:[[@LINE-7]]:48
 
-  // FIXME: Can we give a better location for the tuples?
-  // CHECK: tuple ({{%.*}} : $String, {{%.*}} : $Int)                      {{.*}} line:[[@LINE-8]]:22
-  // CHECK: tuple ({{%.*}} : $String, {{%.*}} : $Int)                      {{.*}} line:[[@LINE-9]]:22
-  // CHECK: tuple ({{%.*}} : $String, {{%.*}} : $Int)                      {{.*}} line:[[@LINE-10]]:22
-  // CHECK: apply {{%.*}}<(String, Int)>({{%.*}})            {{.*}} line:[[@LINE-11]]:22
   
   
 }

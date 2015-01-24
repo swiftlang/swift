@@ -115,12 +115,14 @@ struct B : Subscriptable {
 
 // CHECK: sil hidden @_TF10addressors6test_BFRVS_1BT_ : $@thin (@inout B) -> () {
 // CHECK: bb0([[B:%.*]] : $*B):
+// CHECK:   [[T0:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK:   [[INDEX:%.*]] = struct $Int ([[T0]] : $Builtin.Word)
+// CHECK:   [[RHS:%.*]] = integer_literal $Builtin.Word, 7
 // CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Bau9subscriptFSiSi
-// CHECK:   [[PTR:%.*]] = apply [[T0]]({{.*}}, [[B]])
+// CHECK:   [[PTR:%.*]] = apply [[T0]]([[INDEX]], [[B]])
 // CHECK:   [[T0:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int>,
 // CHECK:   [[ADDR:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int
-// CHECK:   integer_literal $Builtin.Word, 7
-// CHECK:   load
+// CHECK:   load [[ADDR]]
 // CHECK:   [[T1:%.*]] = builtin "or_Word"
 // CHECK:   [[T2:%.*]] = struct $Int ([[T1]] : $Builtin.Word)
 // CHECK:   store [[T2]] to [[ADDR]] : $*Int

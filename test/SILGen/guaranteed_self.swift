@@ -30,8 +30,7 @@ struct S: Fooable {
   // TODO: Way too many redundant r/r pairs here. Should use +0 rvalues.
   // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1S3foofS0_FSiT_ : $@cc(method) @thin (Int, @guaranteed S) -> () {
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $S):
-  // CHECK:         retain_value [[SELF]]
-  // CHECK:         release_value [[SELF]]
+  // CHECK-NOT:     retain_value [[SELF]]
   // CHECK-NOT:     release_value [[SELF]]
   func foo(x: Int) {
     self.foo(x)
@@ -49,8 +48,7 @@ struct S: Fooable {
   }
   // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1S3basfS0_FT_T_ : $@cc(method) @thin (@guaranteed S) -> ()
   // CHECK:       bb0([[SELF:%.*]] : $S):
-  // CHECK:         retain_value [[SELF]]
-  // CHECK:         release_value [[SELF]]
+  // CHECK-NOT:     retain_value [[SELF]]
   // CHECK-NOT:     release_value [[SELF]]
   func bas() {
     self.bas()
@@ -209,11 +207,8 @@ struct AO<T>: Fooable {
   init() {}
   // CHECK-LABEL: sil hidden @_TFV15guaranteed_self2AO3fooU__fGS0_Q__FSiT_ : $@cc(method) @thin <T> (Int, @in_guaranteed AO<T>) -> ()
   // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*AO<T>):
-  // TODO: We could avoid the copy/destroy here.
-  // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY:%.*]]#1
-  // CHECK:         apply {{.*}} [[SELF_COPY]]
-  // CHECK:         destroy_addr [[SELF_COPY]]
-  // CHECK:         dealloc_stack [[SELF_COPY]]
+  // CHECK-NOT:     copy_addr
+  // CHECK:         apply {{.*}} [[SELF_ADDR]]
   // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
   // CHECK:       }
   func foo(x: Int) {

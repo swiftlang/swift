@@ -33,15 +33,36 @@ class LogicalPathComponent;
 
 /// Information about the type of an l-value.
 struct LValueTypeData {
+  /// The abstraction pattern of the l-value.
+  ///
+  /// The type-of-rvalue should always be the substituted formal type
+  /// lowered under this abstraction pattern.
   AbstractionPattern OrigFormalType = AbstractionPattern::getInvalid();
+
+  /// The substituted formal object type of the l-value.
+  ///
+  /// Tn the most common case, this is the type of an l-value
+  /// expression as recorded in the AST, only with the
+  /// LValueType/InOutType stripped off.
   CanType SubstFormalType;
+
+  /// The lowered type of value that should be stored in the l-value.
+  /// Always an object type.
+  ///
+  /// On physical path components, projection yields an address of
+  /// this type.  On logical path components, materialize yields an
+  /// address of this type, set expects a value of this type, and
+  /// get yields a vlaue of this type.
   SILType TypeOfRValue;
 
   LValueTypeData() = default;
   LValueTypeData(AbstractionPattern origFormalType, CanType substFormalType,
                  SILType typeOfRValue)
     : OrigFormalType(origFormalType), SubstFormalType(substFormalType),
-      TypeOfRValue(typeOfRValue) {}
+      TypeOfRValue(typeOfRValue) {
+    assert(typeOfRValue.isObject());
+    assert(substFormalType->isMaterializable());
+  }
 };
 
 /// An l-value path component represents a chunk of the access path to
@@ -73,12 +94,14 @@ public:
     TupleElementKind,           // tuple_element_addr
     StructElementKind,          // struct_element_addr
     OptionalObjectKind,         // optional projection
+    OpenedExistentialKind,      // opened opaque existential
     AddressorKind,              // var/subscript addressor
     ValueKind,                  // random base pointer as an lvalue
 
     // Logical LValue kinds
     GetterSetterKind,           // property or subscript getter/setter
     OrigToSubstKind,            // generic type substitution
+    SubstToOrigKind,            // generic type substitution
     OwnershipKind,              // weak pointer remapping
     AutoreleasingWritebackKind, // autorelease pointer on set
     WritebackPseudoKind,        // a fake component to customize writeback
@@ -126,7 +149,7 @@ public:
                                        AccessKind accessKind) const = 0;
   
   /// Returns the logical type-as-rvalue of the value addressed by the
-  /// component.
+  /// component.  This is always an object type, never an address.
   SILType getTypeOfRValue() const { return TypeData.TypeOfRValue; }
   AbstractionPattern getOrigFormalType() const {
     return TypeData.OrigFormalType;
@@ -252,6 +275,13 @@ public:
   LValue(const LValue &other) = delete;
   LValue(LValue &&other) = default;
 
+  LValue &operator=(const LValue &) = delete;
+  LValue &operator=(LValue &&) = default;
+
+  static LValue forAddress(ManagedValue address,
+                           AbstractionPattern origFormalType,
+                           CanType substFormalType);
+
   bool isValid() const { return !Path.empty(); }
 
   /// Is this lvalue purely physical?
@@ -274,6 +304,24 @@ public:
   void add(As &&... args) {
     Path.emplace_back(new T(std::forward<As>(args)...));
   }
+
+  /// Add a subst-to-orig reabstraction component.  That is, given
+  /// that this l-value trafficks in values following the substituted
+  /// abstraction pattern, make an l-value trafficking in values
+  /// following the original abstraction pattern.
+  void addSubstToOrigComponent(AbstractionPattern origType,
+                               SILType loweredResultType);
+
+  /// Add an orig-to-subst reabstraction component.  That is, given
+  /// that this l-value trafficks in values following the original
+  /// abstraction pattern, make an l-value trafficking in values
+  /// following the substituted abstraction pattern.
+  void addOrigToSubstComponent(SILType loweredResultType);
+
+  /// Add an "open existential" component.  That is, given that this
+  /// l-value currently refers to an opaque existential, make it refer
+  /// to the given opened archetype.
+  void addOpenOpaqueExistentialComponent(CanArchetypeType archetype);
 
   typedef std::vector<std::unique_ptr<PathComponent>>::iterator iterator;
   typedef std::vector<std::unique_ptr<PathComponent>>::const_iterator

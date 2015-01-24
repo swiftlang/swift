@@ -315,10 +315,11 @@ static ManagedValue emitCastToReferenceType(SILGenFunction &gen,
 
   // If the argument is existential, open it.
   if (substitutions[0].getReplacement()->isClassExistentialType()) {
-    Type openedTy
+    auto openedTy
       = ArchetypeType::getOpened(substitutions[0].getReplacement());
     SILType loweredOpenedTy = gen.getLoweredLoadableType(openedTy);
     arg = gen.B.createOpenExistentialRef(loc, arg, loweredOpenedTy);
+    gen.setArchetypeOpeningSite(openedTy, arg);
   }
 
   SILValue result = gen.B.createUncheckedRefCast(loc, arg, objPointerType);
@@ -582,10 +583,11 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &gen,
   
   // If the argument is existential, open it.
   if (subs[0].getReplacement()->isClassExistentialType()) {
-    Type openedTy
+    auto openedTy
       = ArchetypeType::getOpened(subs[0].getReplacement());
     SILType loweredOpenedTy = gen.getLoweredLoadableType(openedTy);
     ref = gen.B.createOpenExistentialRef(loc, ref, loweredOpenedTy);
+    gen.setArchetypeOpeningSite(openedTy, ref);
   }
   
   SILValue result = gen.B.createRefToBridgeObject(loc, ref, bits);

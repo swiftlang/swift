@@ -164,10 +164,8 @@ func applyBlock(f: @objc_block Gizmo -> Gizmo, x: Gizmo) -> Gizmo {
   // CHECK:     bb0([[BLOCK:%.*]] : $@cc(cdecl) @objc_block (Gizmo) -> @autoreleased Gizmo, [[ARG:%.*]] : $Gizmo):
   // CHECK:       [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   // CHECK:       strong_retain [[BLOCK_COPY]]
-  // CHECK:       strong_retain [[ARG]]
   // CHECK:       [[RESULT:%.*]] = apply [[BLOCK_COPY]]([[ARG]])
   // CHECK:       strong_retain_autoreleased [[RESULT]]
-  // CHECK:       strong_release [[ARG]]
   // CHECK:       strong_release [[BLOCK_COPY]]
   // CHECK:       strong_release [[ARG]]
   // CHECK:       strong_release [[BLOCK_COPY]]
