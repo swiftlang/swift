@@ -25,6 +25,7 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/Support/Allocator.h"
 
 namespace swift {
 
@@ -475,6 +476,8 @@ public:
     return getParent(Tree);
   }
 
+  llvm::Optional<Projection> getProjection() const { return Proj; }
+
 private:
   void addNonProjectionUser(Operand *Op) {
     IsLive = true;
@@ -508,13 +511,14 @@ class ProjectionTree {
 
   SILModule &Mod;
 
-  llvm::SmallVector<ProjectionTreeNode, 32> ProjectionTreeNodes;
-
+  llvm::BumpPtrAllocator &Allocator;
+  llvm::SmallVector<ProjectionTreeNode *, 32> ProjectionTreeNodes;
   llvm::SmallVector<unsigned, 16> LeafIndices;
 
 public:
   /// Construct a projection tree from BaseTy.
-  ProjectionTree(SILModule &Mod, SILType BaseTy);
+  ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &Allocator,
+                 SILType BaseTy);
 
   /// Compute liveness and use information in this projection tree using Base.
   void computeUsesAndLiveness(SILValue Base);
@@ -534,11 +538,11 @@ public:
   }
 
   ProjectionTreeNode *getNode(unsigned i) {
-    return &ProjectionTreeNodes[i];
+    return ProjectionTreeNodes[i];
   }
 
   const ProjectionTreeNode *getNode(unsigned i) const {
-    return &ProjectionTreeNodes[i];
+    return ProjectionTreeNodes[i];
   }
 
   bool canExplodeValue() const {
@@ -565,37 +569,41 @@ private:
   void createRoot(SILType BaseTy) {
     assert(ProjectionTreeNodes.empty() &&
            "Should only create root when ProjectionTreeNodes is empty");
-    ProjectionTreeNodes.push_back(ProjectionTreeNode(BaseTy));
+    auto *Node = new (Allocator) ProjectionTreeNode(BaseTy);
+    ProjectionTreeNodes.push_back(Node);
   }  
 
   ProjectionTreeNode *createChild(ProjectionTreeNode *Parent,
                                   SILType BaseTy,
                                   const Projection &P) {
     unsigned Index = ProjectionTreeNodes.size();
-    ProjectionTreeNodes.push_back(ProjectionTreeNode(Parent, Index, BaseTy, P));
-    return &ProjectionTreeNodes[Index];
+    auto *Node = new (Allocator) ProjectionTreeNode(Parent, Index, BaseTy, P);
+    ProjectionTreeNodes.push_back(Node);
+    return ProjectionTreeNodes[Index];
   }
 
   ProjectionTreeNode *
   createChildForStruct(ProjectionTreeNode *Parent, SILType Ty, ValueDecl *VD,
                        unsigned Index) {
-    return createChild(Parent, Ty, Projection(ProjectionKind::Struct, Ty, VD,
-                                              Index));
+    Projection P = Projection(ProjectionKind::Struct, Ty, VD, Index);
+    ProjectionTreeNode *N = createChild(Parent, Ty, P);
+    return N;
   }
 
   ProjectionTreeNode *
   createChildForClass(ProjectionTreeNode *Parent, SILType Ty, ValueDecl *VD,
                       unsigned Index) {
-    return createChild(Parent, Ty, Projection(ProjectionKind::Class, Ty, VD,
-                                              Index));
+    Projection P = Projection(ProjectionKind::Class, Ty, VD, Index);
+    ProjectionTreeNode *N = createChild(Parent, Ty, P);
+    return N;
   }
 
   ProjectionTreeNode *
   createChildForTuple(ProjectionTreeNode *Parent, SILType Ty, unsigned Index) {
-    return createChild(Parent, Ty, Projection(ProjectionKind::Tuple, Ty,
-                                              nullptr, Index));
+    Projection P = Projection(ProjectionKind::Tuple, Ty, nullptr, Index);
+    ProjectionTreeNode *N = createChild(Parent, Ty, P);
+    return N;
   }
-
 };
 
 } // end swift namespace

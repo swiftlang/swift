@@ -578,12 +578,18 @@ createChildrenForStruct(ProjectionTree &Tree,
                         llvm::SmallVectorImpl<ProjectionTreeNode *> &Worklist,
                         StructDecl *SD) {
   SILModule &Mod = Tree.getModule();
-  unsigned Index = 0;
+  unsigned ChildIndex = 0;
   SILType Ty = getType();
   for (VarDecl *VD : SD->getStoredProperties()) {
+    assert(Tree.getNode(Index) == this && "Node is not mapped to itself?");
     SILType NodeTy = Ty.getFieldType(VD, Mod);
-    auto *Node = Tree.createChildForStruct(this, NodeTy, VD, Index++);
+    auto *Node = Tree.createChildForStruct(this, NodeTy, VD, ChildIndex++);
+    DEBUG(llvm::dbgs() << "        Creating child for: " << NodeTy << "\n");
+    DEBUG(llvm::dbgs() << "            Projection: " << Node->getProjection().getValue().getGeneralizedIndex() << "\n");
     ChildProjections.push_back(Node->getIndex());
+    assert(getChildForProjection(Tree, Node->getProjection().getValue()) == Node &&
+           "Child not matched to its projection in parent!");
+    assert(Node->getParent(Tree) == this && "Parent of Child is not Parent?!");
     Worklist.push_back(Node);
   }
 }
@@ -595,9 +601,15 @@ createChildrenForTuple(ProjectionTree &Tree,
                        TupleType *TT) {
   SILType Ty = getType();
   for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
+    assert(Tree.getNode(Index) == this && "Node is not mapped to itself?");
     SILType NodeTy = Ty.getTupleElementType(i);
     auto *Node = Tree.createChildForTuple(this, NodeTy, i);
+    DEBUG(llvm::dbgs() << "        Creating child for: " << NodeTy << "\n");
+    DEBUG(llvm::dbgs() << "            Projection: " << Node->getProjection().getValue().getGeneralizedIndex() << "\n");
     ChildProjections.push_back(Node->getIndex());
+    assert(getChildForProjection(Tree, Node->getProjection().getValue()) == Node &&
+           "Child not matched to its projection in parent!");
+    assert(Node->getParent(Tree) == this && "Parent of Child is not Parent?!");
     Worklist.push_back(Node);
   }
 }
@@ -606,25 +618,35 @@ void
 ProjectionTreeNode::
 createChildren(ProjectionTree &Tree,
                llvm::SmallVectorImpl<ProjectionTreeNode *> &Worklist) {
-  if (Initialized)
+  DEBUG(llvm::dbgs() << "    Creating children for: " << getType() << "\n");
+  if (Initialized) {
+    DEBUG(llvm::dbgs() << "        Already initialized! bailing!\n");
     return;
+  }
 
   Initialized = true;
 
   SILType Ty = getType();
 
-  if (Ty.aggregateHasUnreferenceableStorage())
+  if (Ty.aggregateHasUnreferenceableStorage()) {
+    DEBUG(llvm::dbgs() << "        Has unreferenced storage bailing!\n");
     return;
+  }
 
   if (auto *SD = Ty.getStructOrBoundGenericStruct()) {
+    DEBUG(llvm::dbgs() << "        Found a struct!\n");
     createChildrenForStruct(Tree, Worklist, SD);
     return;
   }
 
   auto TT = Ty.getAs<TupleType>();
-  if (!TT)
+  if (!TT) {
+    DEBUG(llvm::dbgs() << "        Did not find a tuple or struct, "
+          "bailing!\n");
     return;
+  }
 
+  DEBUG(llvm::dbgs() << "        Found a tuple.");
   createChildrenForTuple(Tree, Worklist, TT);
 }
 
@@ -650,7 +672,8 @@ createAggregate(SILBuilder &B, SILLocation Loc, ArrayRef<SILValue> Args) const {
 //                               ProjectionTree
 //===----------------------------------------------------------------------===//
 
-ProjectionTree::ProjectionTree(SILModule &Mod, SILType BaseTy) : Mod(Mod) {
+ProjectionTree::ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &BPA,
+                               SILType BaseTy) : Mod(Mod), Allocator(BPA) {
   DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy);
 
   // Create the root node of the tree with our base type.
@@ -688,7 +711,12 @@ ProjectionTree::computeUsesAndLiveness(SILValue Base) {
   while (!UseWorklist.empty()) {
     DEBUG(llvm::dbgs() << "Current Worklist:\n");
     DEBUG(for (auto &T : UseWorklist) {
-        llvm::dbgs() << "    Type: " << T.second->getType() << "; Value: " << T.first;
+        llvm::dbgs() << "    Type: " << T.second->getType() << "; Value: ";
+        if (T.first) {
+          llvm::dbgs() << T.first;
+        } else {
+          llvm::dbgs() << "<null>\n";
+        }
     });
 
     SILValue Value;

@@ -30,6 +30,7 @@
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Allocator.h"
 #include "llvm/Support/Debug.h"
 #include <type_traits>
 
@@ -74,7 +75,7 @@ struct ArgumentDescriptor {
   /// The projection tree of this arguments.
   ProjectionTree ProjTree;
 
-  ArgumentDescriptor() = default;
+  ArgumentDescriptor() = delete;
 
   /// Initialize this argument descriptor with all information from A that we
   /// use in our optimization.
@@ -83,10 +84,10 @@ struct ArgumentDescriptor {
   /// to the original argument. The reason why we do this is to make sure we
   /// have access to the original argument's state if we modify the argument
   /// when optimizing.
-  ArgumentDescriptor(SILArgument *A)
+  ArgumentDescriptor(llvm::BumpPtrAllocator &BPA, SILArgument *A)
     : Arg(A), Index(A->getIndex()), ParameterInfo(A->getParameterInfo()),
       Decl(A->getDecl()), IsDead(A->use_empty()), CalleeRelease(),
-      ProjTree(A->getModule(), A->getType()) {
+      ProjTree(A->getModule(), BPA, A->getType()) {
     ProjTree.computeUsesAndLiveness(A);
   }
 
@@ -311,6 +312,8 @@ inline T1 getFirstPairElt(const std::pair<T1, T2> &P) { return P.first; }
 /// A class that contains all analysis information we gather about our
 /// function. Also provides utility methods for creating the new empty function.
 class FunctionAnalyzer {
+  llvm::BumpPtrAllocator &Allocator;
+
   RCIdentityAnalysis *RCIA;
 
   /// The function that we are analyzing.
@@ -328,8 +331,10 @@ public:
   FunctionAnalyzer(const FunctionAnalyzer &) = delete;
   FunctionAnalyzer(FunctionAnalyzer &&) = delete;
 
-  FunctionAnalyzer(RCIdentityAnalysis *RCIA, SILFunction *F)
-    : RCIA(RCIA), F(F), ShouldOptimize(false), ArgDescList() {}
+  FunctionAnalyzer(llvm::BumpPtrAllocator &Allocator,
+                   RCIdentityAnalysis *RCIA, SILFunction *F)
+    : Allocator(Allocator), RCIA(RCIA), F(F), ShouldOptimize(false),
+      ArgDescList() {}
 
   /// Analyze the given function.
   bool analyze();
@@ -369,7 +374,7 @@ FunctionAnalyzer::analyze() {
   // argument.
   ConsumedArgToEpilogueReleaseMatcher ArgToEpilogueReleaseMap(RCIA, F);
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
-    ArgumentDescriptor A{Args[i]};
+    ArgumentDescriptor A(Allocator, Args[i]);
 
     if (A.IsDead) {
       ShouldOptimize = true;
@@ -618,7 +623,8 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
 /// function returns true if we were successful in creating the new function and
 /// returns false otherwise.
 static bool
-optimizeFunctionSignature(RCIdentityAnalysis *RCIA,
+optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
+                          RCIdentityAnalysis *RCIA,
                           SILFunction *F,
                           CallGraphNode::CallerCallSiteList CallSites,
                           bool CallerSetIsComplete,
@@ -631,7 +637,7 @@ optimizeFunctionSignature(RCIdentityAnalysis *RCIA,
   llvm::SmallVector<ArgumentDescriptor, 8> Arguments;
 
   // Analyze function arguments. If there is no work to be done, exit early.
-  FunctionAnalyzer Analyzer(RCIA, F);
+  FunctionAnalyzer Analyzer(BPA, RCIA, F);
   if (!Analyzer.analyze()) {
     DEBUG(llvm::dbgs() << "    Has no optimizable arguments... "
                           "bailing...\n");
@@ -744,6 +750,7 @@ public:
     SILModule *M = getModule();
     auto *CGA = getAnalysis<CallGraphAnalysis>();
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
+    llvm::BumpPtrAllocator Allocator;
 
     DEBUG(llvm::dbgs() << "**** Optimizing Function Signatures ****\n\n");
 
@@ -791,7 +798,7 @@ public:
       bool CallerSetIsComplete = FNode->isCallerSetComplete();
 
       // Otherwise, try to optimize the function signature of F.
-      Changed |= optimizeFunctionSignature(RCIA, &F, CallSites,
+      Changed |= optimizeFunctionSignature(Allocator, RCIA, &F, CallSites,
                                            CallerSetIsComplete,
                                            DeadFunctions);
     }

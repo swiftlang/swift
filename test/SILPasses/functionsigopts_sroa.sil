@@ -98,6 +98,26 @@ sil @fakestring_user : $@thin (FakeString) -> ()
 
 sil @tuple_user : $@thin ((Builtin.Int32, Builtin.Int16, S1)) ->  ()
 
+struct EightFieldStruct {
+  var a1 : Builtin.Int32
+  var a2 : Builtin.Int32
+  var a3 : Builtin.Int32
+  var a4 : Builtin.Int32
+  var a5 : Builtin.Int32
+  var a6 : Builtin.Int32
+  var a7 : Builtin.Int32
+  var a8 : Builtin.Int32
+}
+
+struct ThirtySixFieldStruct {
+  var b1 : EightFieldStruct
+  var b2 : EightFieldStruct
+  var b3 : EightFieldStruct
+  var b4 : EightFieldStruct
+  var b5 : EightFieldStruct
+}
+
+
 ///////////
 // Tests //
 ///////////
@@ -615,6 +635,28 @@ bb0(%0 : $*S1):
 	%2 = apply %1(%0) : $@thin (@in S1) -> ()
 	%9999 = tuple()
 	return %9999 : $()
+}
+
+// This test makes sure we can handle functions with more than 32 fields
+// (including each subtype's field in that count). This fixes a bug where we
+// were not handling the possibility of an std::vector resize invalidated
+// references. This cause the this pointer to become invalidated and other
+// schinanigans. So just make sure we don't crash
+// CHECK-LABEL: sil [fragile] @more_than_32_type_sized_caller : $@thin (ThirtySixFieldStruct) -> () {
+sil [fragile] @more_than_32_type_sized_caller : $@thin (ThirtySixFieldStruct) -> () {
+bb0(%0 : $ThirtySixFieldStruct):
+  %1 = function_ref @more_than_32_type_sized_callee : $@thin (ThirtySixFieldStruct) -> Builtin.Int32
+  %2 = apply %1(%0) : $@thin (ThirtySixFieldStruct) -> Builtin.Int32
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [fragile] @more_than_32_type_sized_callee : $@thin (ThirtySixFieldStruct) -> Builtin.Int32 {
+sil [fragile] @more_than_32_type_sized_callee : $@thin (ThirtySixFieldStruct) -> Builtin.Int32 {
+bb0(%0 : $ThirtySixFieldStruct):
+  %1 = struct_extract %0 : $ThirtySixFieldStruct, #ThirtySixFieldStruct.b1
+  %2 = struct_extract %1 : $EightFieldStruct, #EightFieldStruct.a1
+  return %2 : $Builtin.Int32
 }
 
 // Check Statements for generated code.
