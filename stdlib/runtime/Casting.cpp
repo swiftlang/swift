@@ -14,10 +14,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Concurrent.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Enum.h"
 #include "swift/Runtime/HeapObject.h"
