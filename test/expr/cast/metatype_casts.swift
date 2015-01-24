@@ -36,7 +36,7 @@ let c: C.Type = D.self
 use(c as! D.Type)
 use(c as! X.Type) // expected-warning{{always fails}}
 use(c is AnyObject.Type) // expected-warning{{always true}}
-use(c as! AnyObject.Protocol) // expected-error{{always succeeds}}
+use(c as! AnyObject.Protocol) // expected-warning{{always succeeds}}
 use(c as! CP.Type)
 use(c as! CP.Protocol) // expected-warning{{always fails}}
 use(c as! Int.Type) // expected-warning{{always fails}}

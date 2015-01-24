@@ -3203,6 +3203,9 @@ public:
   {
   }
 
+  /// Retrieve the location of the '!' that follows 'as'.
+  SourceLoc getExclaimLoc() const { return ExclaimLoc; }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ForcedCheckedCast;
   }

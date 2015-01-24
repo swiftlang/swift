@@ -2891,7 +2891,9 @@ namespace {
           return nullptr;
 
         tc.diagnose(expr->getLoc(), diag::forced_downcast_coercion,
-                    sub->getType(), toType);
+                    sub->getType(), toType)
+          .fixItReplace(SourceRange(expr->getLoc(), expr->getExclaimLoc()),
+                        "as");
 
         // Convert the subexpression.
         bool failed = tc.convertToType(sub, toType, cs.DC);

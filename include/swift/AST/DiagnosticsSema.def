@@ -309,18 +309,18 @@ ERROR(does_not_have_non_mutating_member,sema_tcc,none,
 WARNING(isa_is_always_true,sema_tcc,none,
         "'is' test is always true",
         (Type, Type))
-ERROR(conditional_downcast_coercion,sema_tcc,none,
-      "conditional downcast from %0 to %1 always succeeds",
+WARNING(conditional_downcast_coercion,sema_tcc,none,
+      "conditional cast from %0 to %1 always succeeds",
       (Type, Type))
-ERROR(forced_downcast_coercion,sema_tcc,none,
-      "forced downcast from %0 to %1 always succeeds",
+WARNING(forced_downcast_coercion,sema_tcc,none,
+      "forced cast from %0 to %1 always succeeds; did you mean to use 'as'?",
       (Type, Type))
 ERROR(downcast_same_type,sema_tcc,none,
       "downcast from %0 to %1 only unwraps optionals; did you mean to use "
       "'%2'?",
       (Type, Type, StringRef))
 WARNING(downcast_to_unrelated,sema_tcc,none,
-        "downcast from %0 to unrelated type %1 always fails", (Type, Type))
+        "cast from %0 to unrelated type %1 always fails", (Type, Type))
 ERROR(downcast_from_existential_to_unrelated,sema_tcc,none,
       "cannot cast from protocol type %0 to non-conforming type %1",
       (Type, Type))

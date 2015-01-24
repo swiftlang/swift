@@ -57,7 +57,7 @@ if let p = cc as? P {
 
 // Test that 'as?' coercion fails.
 let strImplicitOpt: String! = nil
-strImplicitOpt as? String // expected-error{{conditional downcast from 'String!' to 'String' always succeeds}}
+strImplicitOpt as? String // expected-warning{{conditional cast from 'String!' to 'String' always succeeds}}
 
 class C3 {}
 class C4 : C3 {}
@@ -85,3 +85,6 @@ Double(1) as Double as String // expected-error{{'Double' is not convertible to 
 
 [1] as! [String] // expected-error{{'[Int]' is not convertible to '[String]'}}
 [(1, (1, 1))] as! [(Int, (String, Int))] // expected-error{{'[(Int, (Int, Int))]' is not convertible to '[(Int, (String, Int))]'}}
+
+// <rdar://problem/19495253> Incorrect diagnostic for explicitly casting to the same type
+"hello" as! String // expected-warning{{forced cast from 'String' to 'String' always succeeds; did you mean to use 'as'?}}

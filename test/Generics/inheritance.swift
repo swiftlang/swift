@@ -29,7 +29,7 @@ func f0<T : A>(obji: T, ai: A, bi: B) {
   obj = b // expected-error{{cannot assign a value of type 'B' to a value of type 'T'}}
 
   // Downcast that is actually a coercion
-  a = (obj as? A)! // expected-error{{conditional downcast from 'T' to 'A' always succeeds}}
+  a = (obj as? A)! // expected-warning{{conditional cast from 'T' to 'A' always succeeds}}
   a = obj as A
 
   // Downcasts
