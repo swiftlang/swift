@@ -76,15 +76,12 @@ SetTraps.test("RemoveInvalidIndex3") {
 }
 
 SetTraps.test("RemoveInvalidIndex4") {
-  // <rdar://problem/19331717> Optimizer breaks Set<T> and Dictionary<K, V>
-  /*
   var s: Set<Int> = [ 10 ]
   let index = s.indexOf(10)!
   s.removeAtIndex(index)
   expectFalse(s.contains(10))
   expectCrashLater()
   s.removeAtIndex(index)
-  */
 }
 
 SetTraps.test("RemoveFirstFromEmpty") {

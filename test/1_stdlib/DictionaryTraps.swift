@@ -96,15 +96,12 @@ DictionaryTraps.test("RemoveInvalidIndex3") {
 }
 
 DictionaryTraps.test("RemoveInvalidIndex4") {
-  // <rdar://problem/19331717> Optimizer breaks Set<T> and Dictionary<K, V>
-  /*
   var d = [ 10: 1010 ]
   let index = d.indexForKey(10)!
   d.removeAtIndex(index)
   expectEmpty(d[10])
   expectCrashLater()
   d.removeAtIndex(index)
-  */
 }
 
 class TestObjCKeyTy : NSObject {
