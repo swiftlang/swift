@@ -15,7 +15,7 @@
 #include <atomic>
 #include <stdint.h>
 
-/// This is a node in an concurrent linked list.
+/// This is a node in a concurrent linked list.
 template <class ElemTy> struct ConcurrentListNode {
   ConcurrentListNode(ElemTy Elem) : Payload(Elem), Next(nullptr) {}
   ConcurrentListNode(const ConcurrentListNode &) = delete;
