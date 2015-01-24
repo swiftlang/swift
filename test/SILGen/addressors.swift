@@ -122,7 +122,8 @@ struct B : Subscriptable {
 // CHECK:   [[PTR:%.*]] = apply [[T0]]([[INDEX]], [[B]])
 // CHECK:   [[T0:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int>,
 // CHECK:   [[ADDR:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int
-// CHECK:   load [[ADDR]]
+// Accept either of struct_extract+load or load+struct_element_addr.
+// CHECK:   load
 // CHECK:   [[T1:%.*]] = builtin "or_Word"
 // CHECK:   [[T2:%.*]] = struct $Int ([[T1]] : $Builtin.Word)
 // CHECK:   store [[T2]] to [[ADDR]] : $*Int
