@@ -569,6 +569,10 @@ void Remangler::mangleDynamicAttribute(Node *node) {
   Out << "TD";
 }
 
+void Remangler::mangleVTableAttribute(Node *node) {
+  Out << "TV";
+}
+
 void Remangler::mangleGenericTypeMetadataPattern(Node *node) {
   Out << "MP";
   mangleChildNodes(node); // directness, type

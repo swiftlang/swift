@@ -381,6 +381,8 @@ public:
       topLevel->addChild(NodeFactory::create(Node::Kind::NonObjCAttribute));
     } else if (Mangled.nextIf("TD")) {
       topLevel->addChild(NodeFactory::create(Node::Kind::DynamicAttribute));
+    } else if (Mangled.nextIf("TV")) {
+      topLevel->addChild(NodeFactory::create(Node::Kind::VTableAttribute));
     }
 
     DEMANGLE_CHILD_OR_RETURN(topLevel, Global);
@@ -2299,6 +2301,7 @@ private:
     case Node::Kind::ValueWitness:
     case Node::Kind::ValueWitnessTable:
     case Node::Kind::Variable:
+    case Node::Kind::VTableAttribute:
     case Node::Kind::Weak:
     case Node::Kind::WillSet:
     case Node::Kind::WitnessTableOffset:
@@ -2744,6 +2747,9 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::DynamicAttribute:
     Printer << "dynamic ";
+    return;
+  case Node::Kind::VTableAttribute:
+    Printer << "override ";
     return;
   case Node::Kind::FunctionSignatureSpecialization:
   case Node::Kind::GenericSpecialization: {

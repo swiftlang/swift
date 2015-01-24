@@ -756,6 +756,7 @@ Globals
   funcsigspecializationconstantpropinfo ::= 'fl' float-as-64-bit-integer
   funcsigspecializationconstantpropinfo ::= 'se' stringencoding 'v' md5hash
 
+  global ::= 'TV' global                 // vtable override thunk
   global ::= 'TW' protocol-conformance entity
                                          // protocol witness thunk
   entity ::= nominal-type                // named type declaration

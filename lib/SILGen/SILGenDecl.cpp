@@ -1219,13 +1219,17 @@ public:
   // Add an entry to the vtable.
   void addEntry(SILDeclRef member) {
     /// Get the function to reference from the vtable.
-    auto getVtableEntryFn = [&]() -> SILFunction* {
+    auto getVtableEntryFn = [&](SILDeclRef entry) -> SILFunction* {
       // If the member is dynamic, reference its dynamic dispatch thunk so that
       // it will be redispatched, funneling the method call through the runtime
       // hook point.
+      // TODO: Dynamic thunks could conceivably require reabstraction too.
       if (member.getDecl()->getAttrs().hasAttribute<DynamicAttr>())
         return SGM.getDynamicThunk(member, SGM.Types.getConstantInfo(member));
-      return SGM.getFunction(member, NotForDefinition);
+      
+      // The derived method may require thunking to match up to the ABI of the
+      // base method.
+      return SGM.emitVTableMethod(member, entry);
     };
 
     // Try to find an overridden entry.
@@ -1264,7 +1268,7 @@ public:
           // Replace the overridden member.
           if (entry.first == ref) {
             // The entry is keyed by the least derived method.
-            entry = {ref, getVtableEntryFn()};
+            entry = {ref, getVtableEntryFn(ref)};
             return;
           }
         } while ((ref = ref.getOverridden()));
@@ -1284,7 +1288,7 @@ public:
       return;
 
     // Otherwise, introduce a new vtable entry.
-    vtableEntries.emplace_back(member, getVtableEntryFn());
+    vtableEntries.emplace_back(member, getVtableEntryFn(member));
   }
 
   // Default for members that don't require vtable entries.

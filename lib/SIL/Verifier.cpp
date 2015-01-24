@@ -970,7 +970,7 @@ public:
     SILType caseTy =
       UI->getOperand().getType().getEnumElementType(UI->getElement(),
                                                     F.getModule());
-    require(caseTy == UI->getType(),
+    requireSameType(caseTy, UI->getType(),
             "InitEnumDataAddrInst result does not match type of enum case");
   }
 

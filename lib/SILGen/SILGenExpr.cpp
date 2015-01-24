@@ -339,6 +339,161 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   return F;
 }
 
+static constexpr unsigned OTKPair(OptionalTypeKind a, OptionalTypeKind b) {
+  return unsigned(a) << 8 | unsigned(b);
+}
+
+SILFunction *
+SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
+  // As a fast path, if there is no override, definitely no thunk is necessary.
+  if (!M.getOptions().EnableVTableThunks ||
+      derived == base)
+    return getFunction(derived, NotForDefinition);
+  
+  auto origDerivedTy = getConstantType(derived).castTo<SILFunctionType>();
+  auto baseTy = getConstantType(base).castTo<SILFunctionType>();
+
+  bool needsThunk = false;
+  
+  // Introduce optionality into the derived signature to match the base.
+  // TODO: Handle other forms of reabstraction.
+  SmallVector<SILParameterInfo, 4> vtableParams;
+  SILResultInfo vtableResult;
+  SmallVector<VTableParamThunk, 4> paramActions;
+  VTableResultThunk resultAction;
+
+  // The derived result may be less optional than the base.
+  {
+    SILType vtableResultTy;
+    OptionalTypeKind baseOTK, derivedOTK;
+    auto baseObj = baseTy->getSemanticResultSILType().getSwiftRValueType()
+      ->getAnyOptionalObjectType(baseOTK);
+    origDerivedTy->getSemanticResultSILType().getSwiftRValueType()
+      ->getAnyOptionalObjectType(derivedOTK);
+    
+    switch (OTKPair(baseOTK, derivedOTK)) {
+    case OTKPair(OTK_ImplicitlyUnwrappedOptional, OTK_None):
+    case OTKPair(OTK_Optional, OTK_None):
+      // Optionalize the return value.
+      // This only requires a thunk if the underlying type isn't an object
+      // reference.
+      vtableResultTy = baseTy->getSemanticResultSILType();
+      resultAction = VTableResultThunk::MakeOptional;
+      needsThunk |= !baseObj->isBridgeableObjectType();
+      break;
+      
+    case OTKPair(OTK_None, OTK_None):
+    case OTKPair(OTK_Optional, OTK_Optional):
+    case OTKPair(OTK_Optional, OTK_ImplicitlyUnwrappedOptional):
+    case OTKPair(OTK_ImplicitlyUnwrappedOptional, OTK_Optional):
+    case OTKPair(OTK_ImplicitlyUnwrappedOptional,
+                 OTK_ImplicitlyUnwrappedOptional):
+      // The return value doesn't need to change.
+      vtableResultTy = origDerivedTy->getSemanticResultSILType();
+      resultAction = VTableResultThunk::None;
+      break;
+      
+    default:
+      llvm_unreachable("derived return can't be more optional than base");
+    }
+    
+    assert(origDerivedTy->hasIndirectResult() == baseTy->hasIndirectResult()
+           && "return type reabstraction for override not implemented");
+    if (origDerivedTy->hasIndirectResult()) {
+      vtableParams.push_back(
+                           SILParameterInfo(vtableResultTy.getSwiftRValueType(),
+                                            ParameterConvention::Indirect_Out));
+      vtableResult = SILResultInfo(TupleType::getEmpty(getASTContext()),
+                                   ResultConvention::Unowned);
+    } else {
+      vtableResult = SILResultInfo(vtableResultTy.getSwiftRValueType(),
+                                   origDerivedTy->getResult().getConvention());
+    }
+  }
+
+  // The parameters may be either more optional than the base, or if the base
+  // is IUO, may force off optionality.
+  auto baseParams = baseTy->getParametersWithoutIndirectResult();
+  auto derivedParams = origDerivedTy->getParametersWithoutIndirectResult();
+  assert(baseParams.size() == derivedParams.size()
+         && "explosion reabstraction for override not implemented");
+  for (unsigned i : indices(baseParams)) {
+    OptionalTypeKind baseOTK, derivedOTK;
+    baseParams[i].getSILType().getSwiftRValueType()
+      ->getAnyOptionalObjectType(baseOTK);
+    auto derivedObj = derivedParams[i].getSILType().getSwiftRValueType()
+      ->getAnyOptionalObjectType(derivedOTK);
+    
+    VTableParamThunk paramAction;
+    
+    switch (OTKPair(baseOTK, derivedOTK)) {
+    case OTKPair(OTK_None, OTK_Optional):
+    case OTKPair(OTK_None, OTK_ImplicitlyUnwrappedOptional):
+      // De-optionalize the parameter.
+      // This only requires a thunk if the underlying type isn't an object
+      // reference.
+      vtableParams.push_back(baseParams[i]);
+      paramAction = VTableParamThunk::MakeOptional;
+      needsThunk |= !derivedObj->isBridgeableObjectType();
+      break;
+      
+    case OTKPair(OTK_ImplicitlyUnwrappedOptional, OTK_None):
+      // Optionalize the parameter. We'll force it in the thunk.
+      vtableParams.push_back(baseParams[i]);
+      paramAction = VTableParamThunk::ForceIUO;
+      needsThunk = true;
+      break;
+      
+    case OTKPair(OTK_None, OTK_None):
+    case OTKPair(OTK_Optional, OTK_Optional):
+    case OTKPair(OTK_Optional, OTK_ImplicitlyUnwrappedOptional):
+    case OTKPair(OTK_ImplicitlyUnwrappedOptional, OTK_Optional):
+    case OTKPair(OTK_ImplicitlyUnwrappedOptional,
+                 OTK_ImplicitlyUnwrappedOptional):
+      // The parameter doesn't need to change.
+      vtableParams.push_back(derivedParams[i]);
+      paramAction = VTableParamThunk::None;
+      break;
+      
+    default:
+      llvm_unreachable("derived param can't be less optional than base");
+    }
+    
+    paramActions.push_back(paramAction);
+  }
+  
+  // If no thunk action was necessary, just emit the method as is.
+  if (!needsThunk)
+    return getFunction(derived, NotForDefinition);
+  
+  // Mangle the constant with a _TTV header.
+  // TODO: If we allocated a new vtable slot for the derived method, then
+  // further derived methods would potentially need multiple thunks, and we
+  // would need to mangle the base method into the symbol as well.
+  llvm::SmallString<32> name;
+  derived.mangle(name, "_TTV");
+  
+  assert(!M.lookUpFunction(name)
+         && "vtable thunk already exists");
+  
+  auto vtableDerivedTy = SILFunctionType::get(
+                                          origDerivedTy->getGenericSignature(),
+                                          origDerivedTy->getExtInfo(),
+                                          origDerivedTy->getCalleeConvention(),
+                                          vtableParams, vtableResult,
+                                          getASTContext());
+  SILLocation loc(derived.getDecl());
+  auto thunk = SILFunction::create(M, SILLinkage::Private, name, vtableDerivedTy,
+                         cast<FuncDecl>(derived.getDecl())->getGenericParams(),
+                         loc, IsBare, IsNotTransparent, IsNotFragile);
+  thunk->setDebugScope(new (M) SILDebugScope(loc, *thunk));
+  
+  SILGenFunction(*this, *thunk)
+    .emitVTableThunk(derived, base, paramActions, resultAction);
+  
+  return thunk;
+}
+
 SILValue SILGenFunction::emitDynamicMethodRef(SILLocation loc,
                                               SILDeclRef constant,
                                               SILConstantInfo constantInfo) {
@@ -4610,6 +4765,142 @@ void SILGenFunction::emitForeignThunk(SILDeclRef thunk) {
   }
   // FIXME: use correct convention for native-to-foreign return
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(fd), result);
+}
+
+void
+SILGenFunction::emitVTableThunk(SILDeclRef derived, SILDeclRef base,
+                                ArrayRef<VTableParamThunk> paramThunks,
+                                VTableResultThunk resultThunk) {
+  auto fd = cast<AbstractFunctionDecl>(derived.getDecl());
+
+  SILLocation loc(fd);
+  loc.markAutoGenerated();
+  CleanupLocation cleanupLoc(fd);
+  cleanupLoc.markAutoGenerated();
+  Scope scope(Cleanups, cleanupLoc);
+
+  // Collect the parameters.
+  SmallVector<ManagedValue, 8> thunkArgs;
+  SILValue indirectReturn;
+  for (auto param : F.getLoweredFunctionType()->getParameters()) {
+    auto paramTy = F.mapTypeIntoContext(param.getSILType());
+    auto arg = new (F.getModule()) SILArgument(F.begin(), paramTy);
+    if (param.getConvention() == ParameterConvention::Indirect_Out)
+      indirectReturn = arg;
+    else
+      thunkArgs.push_back(emitManagedRValueWithCleanup(arg));
+  }
+
+  auto origFn = SGM.getFunction(derived, NotForDefinition);
+  auto origTy = origFn->getLoweredFunctionType();
+
+  // Process the arguments.
+  SmallVector<SILValue, 8> origArgs;
+  
+  // Handle the indirect return, if we have one.
+  if (indirectReturn.isValid()) {
+    switch (resultThunk) {
+    case VTableResultThunk::None:
+      // Emit into the indirect return directly.
+      origArgs.push_back(indirectReturn);
+      break;
+
+    case VTableResultThunk::MakeOptional:
+      // Emit into the payload of the optional indirect return.
+      OptionalTypeKind OTK;
+      indirectReturn.getType().getSwiftRValueType()
+        ->getAnyOptionalObjectType(OTK);
+      auto payloadTy = F.mapTypeIntoContext(origTy->getSemanticResultSILType());
+      auto returnPayload = B.createInitEnumDataAddr(loc, indirectReturn,
+                                      getASTContext().getOptionalSomeDecl(OTK),
+                                      payloadTy);
+      origArgs.push_back(returnPayload);
+      break;
+    }
+  }
+  
+  auto origParams = origTy->getParametersWithoutIndirectResult();
+  for (unsigned i : indices(paramThunks)) {
+    switch (paramThunks[i]) {
+    // Forward this argument as-is.
+    case VTableParamThunk::None:
+      origArgs.push_back(thunkArgs[i].forward(*this));
+      break;
+
+    // Wrap this argument up in an optional.
+    case VTableParamThunk::MakeOptional: {
+      OptionalTypeKind OTK;
+      origParams[i].getType()->getAnyOptionalObjectType(OTK);
+      auto someDecl = getASTContext().getOptionalSomeDecl(OTK);
+      auto optTy = F.mapTypeIntoContext(origParams[i].getSILType());
+      if (thunkArgs[i].getType().isAddress()) {
+        auto buf = emitTemporaryAllocation(loc, optTy);
+        auto payload = B.createInitEnumDataAddr(loc, buf, someDecl,
+                                                thunkArgs[i].getType());
+        B.createCopyAddr(loc, thunkArgs[i].forward(*this), payload,
+                         IsTake, IsInitialization);
+        B.createInjectEnumAddr(loc, buf, someDecl);
+        origArgs.push_back(buf);
+      } else {
+        auto some = B.createEnum(loc, thunkArgs[i].forward(*this),
+                                 someDecl, optTy);
+        origArgs.push_back(some);
+      }
+      break;
+    }
+    
+    // Force-unwrap this optional argument.
+    case VTableParamThunk::ForceIUO: {
+      auto &tl = getTypeLowering(thunkArgs[i].getType());
+      auto payload =
+        emitCheckedGetOptionalValueFrom(loc, thunkArgs[i], tl, SGFContext());
+      origArgs.push_back(payload.forward(*this));
+      break;
+    }
+    }
+  }
+
+  // Call the underlying function.
+  auto origFnRef = B.createFunctionRef(loc, origFn);
+  auto subs = getForwardingSubstitutions();
+  auto substTy = origTy->substGenericArgs(SGM.M, SGM.M.getSwiftModule(), subs);
+  SILValue result = B.createApply(loc, origFnRef,
+                              SILType::getPrimitiveObjectType(substTy),
+                              origTy->getResult().getSILType(), subs, origArgs);
+
+  // Process the result.
+  switch (resultThunk) {
+  case VTableResultThunk::None:
+    break;
+  case VTableResultThunk::MakeOptional:
+    // Wrap the result in an optional.
+    OptionalTypeKind OTK;
+    if (indirectReturn) {
+      indirectReturn.getType().getSwiftRValueType()
+        ->getAnyOptionalObjectType(OTK);
+
+      // We emitted the payload in-place above. We just need to inject
+      // the tag.
+      B.createInjectEnumAddr(loc, indirectReturn,
+                             getASTContext().getOptionalSomeDecl(OTK));
+    } else {
+      // Wrap up the immediate value in an optional.
+      auto thunkResultTy
+        = F.getLoweredFunctionType()->getResult().getSILType();
+      
+      thunkResultTy.getSwiftRValueType()
+        ->getAnyOptionalObjectType(OTK);
+      
+      result = B.createEnum(loc, result,
+                            getASTContext().getOptionalSomeDecl(OTK),
+                            thunkResultTy);
+    }
+    break;
+  }
+  
+  scope.pop();
+  
+  B.createReturn(loc, result);
 }
 
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {

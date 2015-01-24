@@ -86,11 +86,14 @@ public:
   /// Should we print out instruction counts if -print-stats is passed in?
   bool PrintInstCounts = false;
 
-  /// Should we optimize function signatures. Disabled by default.
+  /// Should we optimize function signatures?
   bool EnableFuncSigOpts = true;
 
-  /// Should we emit self as a guaranteed parameter. Disabled by default.
+  /// Should we emit self as a guaranteed parameter?
   bool EnableGuaranteedSelf = false;
+
+  /// Should we emit thunks for ABI-mismatched vtable entries?
+  bool EnableVTableThunks = false;
 
   /// Should we use a pass pipeline passed in via a json file? Null by default.
   StringRef ExternalPassPipelineFilename;

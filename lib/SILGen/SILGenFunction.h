@@ -101,6 +101,18 @@ public:
 class SwitchContext;
 struct LValueWriteback;
 
+/// A thunk action that a vtable thunk needs to perform on its result.
+enum class VTableResultThunk {
+  None, ///< No result change.
+  MakeOptional, ///< Wrap the result in an optional.
+};
+/// A thunk action that a vtable thunk needs to perform on a parameter.
+enum class VTableParamThunk {
+  None, ///< No result change.
+  MakeOptional, ///< Wrap the param in an optional.
+  ForceIUO, ///< Force-unwrap the IUO param.
+};
+
 /// SILGenFunction - an ASTVisitor for producing SIL from function bodies.
 class LLVM_LIBRARY_VISIBILITY SILGenFunction
   : public ASTVisitor<SILGenFunction>
@@ -447,6 +459,11 @@ public:
   ManagedValue emitBlockToFunc(SILLocation loc,
                                ManagedValue block,
                                CanSILFunctionType funcTy);
+  
+  /// Thunk between a derived and base class.
+  void emitVTableThunk(SILDeclRef derived, SILDeclRef base,
+                       ArrayRef<VTableParamThunk> paramThunks,
+                       VTableResultThunk resultThunk);
   
   //===--------------------------------------------------------------------===//
   // Control flow

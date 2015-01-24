@@ -1857,6 +1857,13 @@ ManagedValue SILGenFunction::emitCheckedGetOptionalValueFrom(SILLocation loc,
   FuncDecl *fn = getASTContext().getGetOptionalValueDecl(nullptr, optionalKind);
   Substitution sub = getSimpleSubstitution(fn, valueType);
 
+  // The intrinsic takes its parameter indirectly.
+  if (src.getType().isObject()) {
+    auto buf = emitTemporaryAllocation(loc, src.getType());
+    B.createStore(loc, src.forward(*this), buf);
+    src = emitManagedBufferWithCleanup(buf);
+  }
+
   return emitApplyOfLibraryIntrinsic(loc, fn, sub, src, C);
 }
 
