@@ -215,7 +215,8 @@ TEST(Concurrent, ConcurrentList) {
   EXPECT_EQ(ListLen, results.size() * numElem);
 }
 
-
+// Notice that the memory that we allocate in this test leaks
+// because our allocator never frees memory.
 TEST(Concurrent, ConcurrentMemoryBank) {
   const int numElem = 16;
   const int magicValue = 123;
@@ -257,6 +258,43 @@ TEST(Concurrent, ConcurrentMemoryBank) {
 
   // Delete the bank.
   delete Bank;
+}
+
+
+// Notice that the memory that we allocate in this test leaks
+// because our allocator never frees memory.
+TEST(Concurrent, ConcurrentMemoryAllocator) {
+  const int magicValue = 123;
+
+  // Create an allocator with only two elements per bank to stress the
+  // allocator itself.
+  ConcurrentMemoryAllocator<int, 2> Allocator;
+
+  // Allocate some memory from multiple threads.
+  auto results = RaceTest<int*>(
+    [&]() -> int* {
+      // Allocate memory.
+      int *ptr = Allocator.Allocate();
+      EXPECT_NE(ptr, nullptr);
+      // And initialize it.
+      *ptr = magicValue;
+      return ptr;
+    }
+  );
+
+  // Check that we can access all of the memory that we've allocated.
+  for (auto A : results) {
+      EXPECT_NE(A, nullptr);
+      // Check that are are getting the value that we placed earlier.
+      EXPECT_EQ(magicValue, *A);
+  }
+
+
+  // Allocate some more memory.
+  for (int i = 0; i < 256; i++) {
+      EXPECT_NE(Allocator.Allocate(), nullptr);
+  }
+
 }
 
 TEST(MetadataTest, getGenericMetadata) {

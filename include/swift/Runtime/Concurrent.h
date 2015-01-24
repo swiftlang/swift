@@ -250,4 +250,33 @@ public:
   }
 };
 
+
+/// This is a concurrent bump pointer memory allocator. It only allocates memory
+/// and never frees it.
+template <class ElemTy, int BankSize = 256>
+class ConcurrentMemoryAllocator {
+  typedef ConcurrentMemoryBank<ElemTy, BankSize> BankTy;
+  /// A list of banks to allocate from.
+  ConcurrentList<BankTy*> Banks;
+
+public:
+  /// Allocate memory and return a pointer to the newly
+  /// allocated buffer.
+  ElemTy *Allocate() {
+    start:
+    // Try to allocate memory in one of the banks:
+    for (auto Bank : Banks) {
+      // If we were able to allocate memory in one of the existing banks then
+      // simply return the newly allocated pointer.
+      if (ElemTy *P = Bank->Allocate())
+        return P;
+    }
+
+    // We were not able to allocate memory in one of the existing banks.
+    // Allocate a new bank and try again.
+    Banks.push_front(new BankTy());
+    goto start;
+  }
+};
+
 #endif // SWIFT_RUNTIME_CONCURRENTUTILS_H
