@@ -334,7 +334,13 @@ SourceRange TupleExpr::getSourceRange() const {
   
   SourceLoc Start = LParenLoc.isValid()? LParenLoc
                                        : getElement(0)->getStartLoc();
-  SourceLoc End = getElement(getElements().size()-1)->getEndLoc();
+  SourceLoc End = getElements().back()->getEndLoc();
+
+  // Add an escape hatch for implicitly created tuples, usually for arguments
+  // in compiler-generated function calls.
+  if ((Start.isInvalid() || End.isInvalid()) && isImplicit())
+    return SourceRange();
+
   return SourceRange(Start, End);
 }
 
