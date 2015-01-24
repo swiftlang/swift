@@ -209,4 +209,45 @@ private:
   }
 };
 
+/// A concurrent bump pointer allocator bank.
+template <class ElemTy, int NumElements = 256> class ConcurrentMemoryBank {
+  /// The storage.
+  ElemTy Storage[NumElements];
+
+  /// Points to the first free memory location.
+  std::atomic<size_t> NextFree;
+
+public:
+  ConcurrentMemoryBank() : Storage(), NextFree(0) {}
+
+  /// Return true if there is free space in this bank.
+  bool hasFreeSpace() {
+    return NextFree.load(std::memory_order_acquire) < NumElements;
+  }
+
+  /// Try to allocate memory in the current bank. Return a pointer to the newly
+  /// allocated memory or null in case of failure.
+  ElemTy *Allocate() {
+    size_t CurrNextFree = NextFree.load(std::memory_order_acquire);
+    size_t Next = CurrNextFree + 1;
+
+    if (CurrNextFree >= NumElements)
+      return nullptr;
+
+    // Try to replace the current First with the new node.
+    while (!std::atomic_compare_exchange_weak_explicit(&NextFree, &CurrNextFree, Next,
+                                               std::memory_order_release,
+                                               std::memory_order_relaxed)) {
+      CurrNextFree = NextFree.load(std::memory_order_acquire);
+      Next = CurrNextFree + 1;
+
+      // if we fail we can try again as long as there is space in the buffer.
+      if (CurrNextFree >= NumElements)
+        return nullptr;
+    }
+
+    return &Storage[CurrNextFree];
+  }
+};
+
 #endif // SWIFT_RUNTIME_CONCURRENTUTILS_H

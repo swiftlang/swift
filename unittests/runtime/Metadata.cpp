@@ -215,6 +215,50 @@ TEST(Concurrent, ConcurrentList) {
   EXPECT_EQ(ListLen, results.size() * numElem);
 }
 
+
+TEST(Concurrent, ConcurrentMemoryBank) {
+  const int numElem = 16;
+  const int magicValue = 123;
+
+  // Allocate a new concurrent memory bank.
+  typedef ConcurrentMemoryBank<int, numElem> BankTy;
+  auto Bank = new BankTy();
+
+  // The bank should start empty.
+  EXPECT_EQ(Bank->hasFreeSpace(), true);
+
+  // Allocate some memory from multiple threads.
+  auto results = RaceTest<int*>(
+    [&]() -> int* {
+      // Allocate memory.
+      int *ptr = Bank->Allocate();
+      // And initialize it.
+      if (ptr) *ptr = magicValue;
+      return ptr;
+    }
+  );
+
+  // After so many allocation requests the bank should be full.
+  EXPECT_EQ(Bank->hasFreeSpace(), false);
+
+  // Count the number of successfully allocated memory blocks
+  // and read/write into that memory to make sure it is valid.
+  int NonNulls = 0;
+  for (auto A : results) {
+    if (A != nullptr) {
+      NonNulls++;
+      // Check that are are getting the value that we placed earlier.
+      EXPECT_EQ(magicValue, *A);
+    }
+  }
+
+  // Check that we were able to allocate all of the slots in the bank.
+  EXPECT_EQ(numElem, NonNulls);
+
+  // Delete the bank.
+  delete Bank;
+}
+
 TEST(MetadataTest, getGenericMetadata) {
   auto metadataTemplate = (GenericMetadata*) &MetadataTest1;
 
