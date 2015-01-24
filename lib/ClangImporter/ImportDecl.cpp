@@ -4384,7 +4384,8 @@ namespace {
       // Create the archetype for the implicit 'Self'.
       auto selfId = Impl.SwiftContext.Id_Self;
       auto selfDecl = result->getSelf();
-      auto selfArchetype = ArchetypeType::getNew(Impl.SwiftContext, nullptr,
+      ArchetypeType *selfArchetype =
+                           ArchetypeType::getNew(Impl.SwiftContext, nullptr,
                                                  result, selfId,
                                                  Type(result->getDeclaredType()),
                                                  Type(), false);

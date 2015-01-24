@@ -2724,7 +2724,7 @@ DependentMemberType *DependentMemberType::get(Type base,
   return known;
 }
 
-ArchetypeType *ArchetypeType::getOpened(Type existential,
+CanArchetypeType ArchetypeType::getOpened(Type existential,
                                         Optional<UUID> knownID) {
   auto &ctx = existential->getASTContext();
   auto &openedExistentialArchetypes = ctx.Impl.OpenedExistentialArchetypes;
@@ -2737,7 +2737,7 @@ ArchetypeType *ArchetypeType::getOpened(Type existential,
       auto result = found->second;
       assert(result->getOpenedExistentialType()->isEqual(existential) &&
              "Retrieved the wrong opened existential type?");
-      return result;
+      return CanArchetypeType(result);
     }
   } else {
     // Create a new ID.
@@ -2758,7 +2758,7 @@ ArchetypeType *ArchetypeType::getOpened(Type existential,
                                        existential->getSuperclass(nullptr));
   result->setOpenedExistentialID(*knownID);
   openedExistentialArchetypes[*knownID] = result;
-  return result;
+  return CanArchetypeType(result);
 }
 
 void *ExprHandle::operator new(size_t Bytes, ASTContext &C,

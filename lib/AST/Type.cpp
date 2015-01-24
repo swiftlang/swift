@@ -1660,12 +1660,13 @@ int TupleType::getFieldForScalarInit() const {
   return FieldWithoutDefault == -1 ? 0 : FieldWithoutDefault;
 }
 
-ArchetypeType *ArchetypeType::getNew(const ASTContext &Ctx,
-                                     ArchetypeType *Parent,
-                                     AssocTypeOrProtocolType AssocTypeOrProto,
-                                     Identifier Name, ArrayRef<Type> ConformsTo,
-                                     Type Superclass,
-                                     bool isRecursive) {
+CanArchetypeType ArchetypeType::getNew(const ASTContext &Ctx,
+                                       ArchetypeType *Parent,
+                                       AssocTypeOrProtocolType AssocTypeOrProto,
+                                       Identifier Name,
+                                       ArrayRef<Type> ConformsTo,
+                                       Type Superclass,
+                                       bool isRecursive) {
   // Gather the set of protocol declarations to which this archetype conforms.
   SmallVector<ProtocolDecl *, 4> ConformsToProtos;
   for (auto P : ConformsTo) {
@@ -1674,12 +1675,13 @@ ArchetypeType *ArchetypeType::getNew(const ASTContext &Ctx,
   ProtocolType::canonicalizeProtocols(ConformsToProtos);
 
   auto arena = AllocationArena::Permanent;
-  return new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocTypeOrProto, Name,
-                                        Ctx.AllocateCopy(ConformsToProtos),
-                                        Superclass, isRecursive);
+  return CanArchetypeType(
+           new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocTypeOrProto, Name,
+                                          Ctx.AllocateCopy(ConformsToProtos),
+                                          Superclass, isRecursive));
 }
 
-ArchetypeType *
+CanArchetypeType
 ArchetypeType::getNew(const ASTContext &Ctx, ArchetypeType *Parent,
                       AssocTypeOrProtocolType AssocTypeOrProto,
                       Identifier Name,
@@ -1689,9 +1691,10 @@ ArchetypeType::getNew(const ASTContext &Ctx, ArchetypeType *Parent,
   ProtocolType::canonicalizeProtocols(ConformsTo);
 
   auto arena = AllocationArena::Permanent;
-  return new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocTypeOrProto, Name,
-                                        Ctx.AllocateCopy(ConformsTo),
-                                        Superclass, isRecursive);
+  return CanArchetypeType(
+           new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocTypeOrProto, Name,
+                                          Ctx.AllocateCopy(ConformsTo),
+                                          Superclass, isRecursive));
 }
 
 bool ArchetypeType::requiresClass() const {

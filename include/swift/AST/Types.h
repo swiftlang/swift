@@ -3078,7 +3078,8 @@ public:
   /// getNew - Create a new archetype with the given name.
   ///
   /// The ConformsTo array will be copied into the ASTContext by this routine.
-  static ArchetypeType *getNew(const ASTContext &Ctx, ArchetypeType *Parent,
+  static CanTypeWrapper<ArchetypeType>
+                        getNew(const ASTContext &Ctx, ArchetypeType *Parent,
                                AssocTypeOrProtocolType AssocTypeOrProto,
                                Identifier Name, ArrayRef<Type> ConformsTo,
                                Type Superclass,
@@ -3088,7 +3089,8 @@ public:
   ///
   /// The ConformsTo array will be minimized then copied into the ASTContext
   /// by this routine.
-  static ArchetypeType *getNew(const ASTContext &Ctx, ArchetypeType *Parent,
+  static CanTypeWrapper<ArchetypeType>
+                        getNew(const ASTContext &Ctx, ArchetypeType *Parent,
                                AssocTypeOrProtocolType AssocTypeOrProto,
                                Identifier Name,
                                SmallVectorImpl<ProtocolDecl *> &ConformsTo,
@@ -3102,7 +3104,8 @@ public:
   ///
   /// \param knownID When non-empty, the known ID of the archetype. When empty,
   /// a fresh archetype with a unique ID will be opened.
-  static ArchetypeType *getOpened(Type existential, 
+  static CanTypeWrapper<ArchetypeType>
+                        getOpened(Type existential, 
                                   Optional<UUID> knownID = None);
 
   /// \brief Retrieve the name of this archetype.
