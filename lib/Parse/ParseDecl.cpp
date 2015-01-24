@@ -974,7 +974,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // If the attribute follows the new representation, switch
   // over to the alternate parsing path.
   DeclAttrKind DK = DeclAttribute::getAttrKindFromString(Tok.getText());
-  if (DK != DAK_Count)
+  if (DK != DAK_Count && !DeclAttribute::shouldBeRejectedByParser(DK))
     return parseNewDeclAttribute(Attributes, AtLoc, DK);
 
   if (TypeAttributes::getAttrKindFromString(Tok.getText()) != TAK_Count)

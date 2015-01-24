@@ -380,6 +380,9 @@ public:
     /// True if this attribute is only valid when parsing a .sil file.
     SILOnly = 1 << 4,
 
+    /// The attribute should be reported by parser as unknown.
+    RejectByParser = 1 << 5,
+
     // There is one entry for each DeclKind here, and some higher level buckets
     // down below.  These are used in Attr.def to control which kinds of
     // declarations an attribute can be attached to.
@@ -478,6 +481,10 @@ public:
   }
   static bool isLongAttribute(DeclAttrKind DK) {
     return getOptions(DK) & LongAttribute;
+  }
+
+  static bool shouldBeRejectedByParser(DeclAttrKind DK) {
+    return getOptions(DK) & RejectByParser;
   }
 
   bool isDeclModifier() const {

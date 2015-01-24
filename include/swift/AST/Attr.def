@@ -180,11 +180,11 @@ DECL_ATTR_ALIAS(public, Accessibility)
 
 
 DECL_ATTR(__accessibility, SetterAccessibility,
-          OnVar | OnSubscript | DeclModifier | NotSerialized,
+          OnVar | OnSubscript | DeclModifier | NotSerialized | RejectByParser,
           /* Not serialized */ 47)
 
-DECL_ATTR(__raw_doc_comment, RawDocComment, OnAnyDecl | NotSerialized,
-          /* Not serialized */48)
+DECL_ATTR(__raw_doc_comment, RawDocComment, OnAnyDecl |
+          NotSerialized | RejectByParser, /* Not serialized */48)
 
 // Also handles unowned and unowned(weak).
 DECL_ATTR(weak,    Ownership, OnVar | OnParam | DeclModifier | NotSerialized,
@@ -194,7 +194,7 @@ DECL_ATTR(effects, Effects, OnFunc | OnConstructor | OnDestructor, 50)
 
 DECL_ATTR_ALIAS(unowned, Ownership)
 
-DECL_ATTR(__objc_bridged, ObjCBridged, OnClass | NotSerialized,
+DECL_ATTR(__objc_bridged, ObjCBridged, OnClass | NotSerialized | RejectByParser,
           /* Not serialized */51)
 
 SIMPLE_DECL_ATTR(NSApplicationMain, NSApplicationMain,
