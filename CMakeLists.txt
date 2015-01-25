@@ -81,6 +81,15 @@ set(SWIFT_PRIMARY_VARIANT_SDK "" CACHE STRING
 set(SWIFT_PRIMARY_VARIANT_ARCH "" CACHE STRING
     "Primary arch for target binaries")
 
+set(SWIFT_NATIVE_LLVM_TOOLS_PATH "" CACHE STRING
+    "Path to the directory that contains LLVM tools that are executable on the build machine")
+
+set(SWIFT_NATIVE_CLANG_TOOLS_PATH "" CACHE STRING
+    "Path to the directory that contains Clang tools that are executable on the build machine")
+
+set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "" CACHE STRING
+    "Path to the directory that contains Swift tools that are executable on the build machine")
+
 #
 # User-configurable Darwin-specific options.
 #
@@ -177,6 +186,12 @@ endif()
 # lipo is used to create universal binaries.
 find_program(LIPO "lipo")
 
+if("${SWIFT_NATIVE_LLVM_TOOLS_PATH}" STREQUAL "")
+  set(SWIFT_CROSS_COMPILING FALSE)
+else()
+  set(SWIFT_CROSS_COMPILING TRUE)
+endif()
+
 # Reset CMAKE_SYSTEM_PROCESSOR if not cross-compiling.
 # CMake refuses to use `uname -m` on OS X
 # http://public.kitware.com/Bug/view.php?id=10326
@@ -190,12 +205,23 @@ endif()
 # Support building Swift as a standalone project, using LLVM as an
 # external library.
 if(SWIFT_BUILT_STANDALONE)
-  # Rely on llvm-config.
-  set(CONFIG_OUTPUT)
-  find_program(LLVM_CONFIG "llvm-config")
-  if(LLVM_CONFIG)
+  if(SWIFT_CROSS_COMPILING)
+    # Can't run llvm-config from the cross-compiled LLVM.
+    set(LLVM_TOOLS_BINARY_DIR "" CACHE PATH "Path to llvm/bin")
+    set(LLVM_LIBRARY_DIR "" CACHE PATH "Path to llvm/lib")
+    set(LLVM_MAIN_INCLUDE_DIR "" CACHE PATH "Path to llvm/include")
+    set(LLVM_BINARY_DIR "" CACHE PATH "Path to LLVM build tree")
+    set(LLVM_MAIN_SRC_DIR "" CACHE PATH "Path to LLVM source tree")
+  else()
+    # Rely on llvm-config.
+    set(CONFIG_OUTPUT)
+    find_program(LLVM_CONFIG "llvm-config")
+    if(NOT LLVM_CONFIG)
+      message(FATAL_ERROR "llvm-config not found -- ${LLVM_CONFIG}")
+    endif()
+
     message(STATUS "Found LLVM_CONFIG as ${LLVM_CONFIG}")
-    set(CONFIG_COMMAND ${LLVM_CONFIG}
+    set(CONFIG_COMMAND "${LLVM_CONFIG}"
       "--assertion-mode"
       "--bindir"
       "--libdir"
@@ -216,31 +242,32 @@ if(SWIFT_BUILT_STANDALONE)
       message(STATUS "${CONFIG_COMMAND_STR}")
       message(FATAL_ERROR "llvm-config failed with status ${HAD_ERROR}")
     endif()
-  else()
-    message(FATAL_ERROR "llvm-config not found -- ${LLVM_CONFIG}")
+
+    list(GET CONFIG_OUTPUT 0 ENABLE_ASSERTIONS)
+    list(GET CONFIG_OUTPUT 1 TOOLS_BINARY_DIR)
+    list(GET CONFIG_OUTPUT 2 LIBRARY_DIR)
+    list(GET CONFIG_OUTPUT 3 INCLUDE_DIR)
+    list(GET CONFIG_OUTPUT 4 LLVM_OBJ_ROOT)
+    list(GET CONFIG_OUTPUT 5 MAIN_SRC_DIR)
+  
+    if(NOT MSVC_IDE)
+      set(LLVM_ENABLE_ASSERTIONS ${ENABLE_ASSERTIONS}
+        CACHE BOOL "Enable assertions")
+      # Assertions should follow llvm-config's.
+      mark_as_advanced(LLVM_ENABLE_ASSERTIONS)
+    endif()
+  
+    set(LLVM_TOOLS_BINARY_DIR "${TOOLS_BINARY_DIR}" CACHE PATH "Path to llvm/bin")
+    set(LLVM_LIBRARY_DIR "${LIBRARY_DIR}" CACHE PATH "Path to llvm/lib")
+    set(LLVM_MAIN_INCLUDE_DIR "${INCLUDE_DIR}" CACHE PATH "Path to llvm/include")
+    set(LLVM_BINARY_DIR "${LLVM_OBJ_ROOT}" CACHE PATH "Path to LLVM build tree")
+    set(LLVM_MAIN_SRC_DIR "${MAIN_SRC_DIR}" CACHE PATH "Path to LLVM source tree")
+
+    set(SWIFT_NATIVE_LLVM_TOOLS_PATH "${TOOLS_BINARY_DIR}")
+    set(SWIFT_NATIVE_CLANG_TOOLS_PATH "${TOOLS_BINARY_DIR}")
   endif()
 
-  list(GET CONFIG_OUTPUT 0 ENABLE_ASSERTIONS)
-  list(GET CONFIG_OUTPUT 1 TOOLS_BINARY_DIR)
-  list(GET CONFIG_OUTPUT 2 LIBRARY_DIR)
-  list(GET CONFIG_OUTPUT 3 INCLUDE_DIR)
-  list(GET CONFIG_OUTPUT 4 LLVM_OBJ_ROOT)
-  list(GET CONFIG_OUTPUT 5 MAIN_SRC_DIR)
-
-  if(NOT MSVC_IDE)
-    set(LLVM_ENABLE_ASSERTIONS ${ENABLE_ASSERTIONS}
-      CACHE BOOL "Enable assertions")
-    # Assertions should follow llvm-config's.
-    mark_as_advanced(LLVM_ENABLE_ASSERTIONS)
-  endif()
-
-  set(LLVM_TOOLS_BINARY_DIR ${TOOLS_BINARY_DIR} CACHE PATH "Path to llvm/bin")
-  set(LLVM_LIBRARY_DIR ${LIBRARY_DIR} CACHE PATH "Path to llvm/lib")
-  set(LLVM_MAIN_INCLUDE_DIR ${INCLUDE_DIR} CACHE PATH "Path to llvm/include")
-  set(LLVM_BINARY_DIR ${LLVM_OBJ_ROOT} CACHE PATH "Path to LLVM build tree")
-  set(LLVM_MAIN_SRC_DIR ${MAIN_SRC_DIR} CACHE PATH "Path to LLVM source tree")
-
-  find_program(LLVM_TABLEGEN_EXE "llvm-tblgen" ${LLVM_TOOLS_BINARY_DIR}
+  find_program(LLVM_TABLEGEN_EXE "llvm-tblgen" "${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
     NO_DEFAULT_PATH)
 
   set(LLVM_CMAKE_PATH "${LLVM_BINARY_DIR}/share/llvm/cmake")
@@ -289,9 +316,9 @@ if(SWIFT_BUILT_STANDALONE)
 
   list(APPEND CMAKE_MODULE_PATH "${SWIFT_PATH_TO_LLVM_BUILD}/share/llvm/cmake")
 
-  get_filename_component(PATH_TO_LLVM_BUILD ${SWIFT_PATH_TO_LLVM_BUILD}
+  get_filename_component(PATH_TO_LLVM_BUILD "${SWIFT_PATH_TO_LLVM_BUILD}"
     ABSOLUTE)
-  get_filename_component(PATH_TO_CLANG_BUILD ${SWIFT_PATH_TO_CLANG_BUILD}
+  get_filename_component(PATH_TO_CLANG_BUILD "${SWIFT_PATH_TO_CLANG_BUILD}"
     ABSOLUTE)
 
   # MSVC has a gazillion warnings with this.
@@ -382,6 +409,9 @@ set(SWIFT_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 set(SWIFT_RUNTIME_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin")
 set(SWIFT_LIBRARY_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib")
 set(SWIFT_INCLUDE_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/include")
+if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
+  set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+endif()
 
 # We'll need this once we have generated headers
 include_directories(BEFORE
@@ -520,8 +550,10 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   set(SWIFT_HOST_VARIANT "macosx" CACHE STRING
       "Deployment OS for Swift host tools (the compiler) [macosx, iphoneos].")
 
-  set(SWIFT_HOST_VARIANT_SDK "OSX")
-  set(SWIFT_HOST_VARIANT_ARCH "x86_64")
+  set(SWIFT_HOST_VARIANT_SDK "OSX" CACHE STRING
+      "Deployment sdk for Swift host tools (the compiler).")
+  set(SWIFT_HOST_VARIANT_ARCH "x86_64" CACHE STRING
+      "Deployment arch for Swift host tools (the compiler).")
 
   # FIXME: guess target variant based on the host.
   # if(SWIFT_HOST_VARIANT MATCHES "^macosx")

@@ -33,7 +33,9 @@ endif()
 # Platforms that have a REPL need extra libraries to be linked into the 'swift'
 # binary.
 include(SwiftDarwin)
-if(SWIFT_HOST_VARIANT STREQUAL "macosx")
+if("${SWIFT_HOST_VARIANT}" STREQUAL "macosx"
+   OR "${SWIFT_HOST_VARIANT}" STREQUAL "iphoneos"
+   OR "${SWIFT_HOST_VARIANT}" STREQUAL "iphonesimulator")
   # Link in CoreFoundation on Darwin.
   find_library(CORE_FOUNDATION NAMES CoreFoundation)
   target_link_libraries(swift ${CORE_FOUNDATION})

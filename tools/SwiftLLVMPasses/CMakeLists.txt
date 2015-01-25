@@ -3,7 +3,7 @@ if(NOT SWIFT_INSTALL_TESTSUITE_TOOLS)
   set(LLVM_INSTALL_TOOLCHAIN_ONLY TRUE)
 endif()
 
-add_llvm_loadable_module(SwiftLLVMPasses
+add_swift_llvm_loadable_module(SwiftLLVMPasses
   SwiftLLVMPasses.cpp
   LINK_LIBS swiftLLVMPasses
 )

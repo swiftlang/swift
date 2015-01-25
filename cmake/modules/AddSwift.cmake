@@ -406,8 +406,8 @@ function(_compile_swift_files dependency_target_out_var_name)
     set(apinote_file "${module_dir}/${apinote_module}.apinotesc")
     set(apinote_input_file
         "${SWIFT_API_NOTES_PATH}/${apinote_module}.apinotes")
+    set(CLANG_APINOTES "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang")
 
-    set(CLANG_APINOTES "${LLVM_TOOLS_BINARY_DIR}/clang")
     list(APPEND command_create_apinotes
         COMMAND
           "${CLANG_APINOTES}" "-cc1apinotes" "-yaml-to-binary"
@@ -423,7 +423,7 @@ function(_compile_swift_files dependency_target_out_var_name)
   endforeach()
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
-  set(swift_compiler_tool "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc")
+  set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
 
   add_custom_command_target(
       dependency_target
@@ -1621,3 +1621,34 @@ function(add_swift_executable name)
       ${SWIFTEXE_DISABLE_ASLR_FLAG})
 endfunction()
 
+function(add_swift_llvm_loadable_module name)
+  add_llvm_loadable_module(${name} ${ARGN})
+  set(sdk "${SWIFT_HOST_VARIANT_SDK}")
+  set(arch "${SWIFT_HOST_VARIANT_ARCH}")
+
+  # Determine compiler flags.
+  set(c_compile_flags)
+  _add_variant_c_compile_flags(
+      "${sdk}"
+      "${arch}"
+      "${CMAKE_BUILD_TYPE}"
+      "${LLVM_ENABLE_ASSERTIONS}"
+      c_compile_flags)
+  
+  set(link_flags)
+  _add_variant_link_flags(
+      "${sdk}"
+      "${arch}"
+      "${CMAKE_BUILD_TYPE}"
+      "${LLVM_ENABLE_ASSERTIONS}"
+      link_flags)
+
+  # Convert variables to space-separated strings.
+  string(REPLACE ";" " " c_compile_flags "${c_compile_flags}")
+  string(REPLACE ";" " " link_flags "${link_flags}")
+
+  set_property(TARGET ${name} APPEND_STRING PROPERTY
+      COMPILE_FLAGS " ${c_compile_flags}")
+  set_property(TARGET ${name} APPEND_STRING PROPERTY
+      LINK_FLAGS " ${link_flags}")
+endfunction()
