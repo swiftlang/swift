@@ -265,9 +265,9 @@ public:
   llvm::SmallDenseMap<const VarDecl *, unsigned, 8> ArgNo;
   llvm::SmallBitVector DidEmitDebugInfoForArg;
   
-  // Destination basic blocks for condfail traps.
-  llvm::SmallVector<llvm::BasicBlock *, 8> FailBBs;
-
+  // Shared destination basic block for condfail traps.
+  llvm::BasicBlock *FailBB = nullptr;
+  
   SILFunction *CurSILFn;
   Address IndirectReturn;
   
@@ -500,15 +500,29 @@ public:
                                      Ty, DS, Name, DirectValue);
   }
 
+  /// Emit the shared trap block for condfail instructions, or reuse one we
+  /// already emitted.
+  llvm::BasicBlock *getFailBB() {
+    if (FailBB)
+      return FailBB;
+    
+    FailBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
+    return FailBB;
+  }
   
   void emitFailBB() {
-    if (!FailBBs.empty()) {
-      // Move the trap basic blocks to the end of the function.
-      for (auto *FailBB : FailBBs) {
-        auto &BlockList = CurFn->getBasicBlockList();
-        BlockList.splice(BlockList.end(), BlockList, FailBB);
-      }
-    }
+    assert(FailBB && "no failure BB");
+    // Any line number we would put on a unified trap block would be
+    // misleading. Let's be blunt about this and use an artificial location.
+    if (IGM.DebugInfo)
+      IGM.DebugInfo->setArtificialTrapLocation(Builder,
+                                               CurSILFn->getDebugScope());
+    CurFn->getBasicBlockList().push_back(FailBB);
+    Builder.SetInsertPoint(FailBB);
+    llvm::Function *trapIntrinsic = llvm::Intrinsic::getDeclaration(&IGM.Module,
+                                                    llvm::Intrinsic::ID::trap);
+    Builder.CreateCall(trapIntrinsic);
+    Builder.CreateUnreachable();
   }
   
   //===--------------------------------------------------------------------===//
@@ -737,7 +751,7 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
 IRGenSILFunction::~IRGenSILFunction() {
   assert(Builder.hasPostTerminatorIP() && "did not terminate BB?!");
   // Emit the fail BB if we have one.
-  if (!FailBBs.empty())
+  if (FailBB)
     emitFailBB();
   DEBUG(CurFn->print(llvm::dbgs()));
 }
@@ -3121,17 +3135,8 @@ static void emitValueBitCast(IRGenSILFunction &IGF,
     // with mismatching fixed sizes.
     // Usually llvm can eliminate this code again because the user's safety
     // check should be constant foldable on llvm level.
-    llvm::BasicBlock *failBB =
-        llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+    llvm::BasicBlock *failBB = IGF.getFailBB();
     IGF.Builder.CreateBr(failBB);
-    IGF.FailBBs.push_back(failBB);
-
-    IGF.Builder.emitBlock(failBB);
-    llvm::Function *trapIntrinsic = llvm::Intrinsic::getDeclaration(
-        &IGF.IGM.Module, llvm::Intrinsic::ID::trap);
-    IGF.Builder.CreateCall(trapIntrinsic);
-    IGF.Builder.CreateUnreachable();
-
     llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
     IGF.Builder.emitBlock(contBB);
     in.claimAll();
@@ -3840,19 +3845,11 @@ void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
 void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
   Explosion e = getLoweredExplosion(i->getOperand());
   llvm::Value *cond = e.claimNext();
-
-  // Emit individual fail blocks so that we can map the failure back to a source
-  // line.
-  llvm::BasicBlock *failBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
+  llvm::BasicBlock *failBB = getFailBB();
   llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
+  
   Builder.CreateCondBr(cond, failBB, contBB);
-  Builder.emitBlock(failBB);
-  llvm::Function *trapIntrinsic =
-      llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::ID::trap);
-  Builder.CreateCall(trapIntrinsic);
-  Builder.CreateUnreachable();
   Builder.emitBlock(contBB);
-  FailBBs.push_back(failBB);
 }
 
 void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
