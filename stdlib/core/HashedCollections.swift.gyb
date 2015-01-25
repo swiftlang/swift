@@ -460,14 +460,8 @@ public struct Set<T : Hashable> :
           _variantStorage = .Cocoa(owner)
       }
     } else {
-      // FIXME: <rdar://problem/18803556> Can't use for-in syntax on a
-      // SequenceType passed through a generic initializer or method
-      // Workaround: use the generator's sequence.
-      var generator = sequence.generate()
-      var item: T? = generator.next()
-      while item != nil {
-        insert(item!)
-        item = generator.next()
+      for item in sequence {
+        insert(item)
       }
     }
   }
@@ -539,14 +533,8 @@ public struct Set<T : Hashable> :
   public mutating func unionInPlace<
     S: SequenceType where S.Generator.Element == T
   >(sequence: S) {
-    // FIXME: <rdar://problem/18803556> Can't use for-in syntax on a
-    // SequenceType passed through a generic initializer or method
-    // Workaround: use the generator's sequence.
-    var generator = sequence.generate()
-    var item: T? = generator.next()
-    while item != nil {
-      insert(item!)
-      item = generator.next()
+    for item in sequence {
+      insert(item)
     }
   }
 
@@ -564,14 +552,8 @@ public struct Set<T : Hashable> :
   public mutating func subtractInPlace<
     S: SequenceType where S.Generator.Element == T
   >(sequence: S) {
-    // FIXME: <rdar://problem/18803556> Can't use for-in syntax on a
-    // SequenceType passed through a generic initializer or method
-    // Workaround: use the generator's sequence.
-    var generator = sequence.generate()
-    var item: T? = generator.next()
-    while item != nil {
-      remove(item!)
-      item = generator.next()
+    for item in sequence {
+      remove(item)
     }
   }
 
