@@ -52,7 +52,7 @@ public struct StaticString
   ///
   /// - bit 1: set to 1 if `_startPtrOrData` is a pointer and string data is
   ///   ASCII.
-  var _flags: Builtin.Word
+  var _flags: Builtin.Int8
 
   /// A pointer to the beginning of UTF-8 code units
   ///
@@ -93,7 +93,7 @@ public struct StaticString
   /// `true` iff `self` stores a pointer to ASCII or UTF-8 code units
   @transparent
   public var hasPointerRepresentation: Bool {
-    return (UWord(_flags) & 0x1) == 0
+    return (UInt8(_flags) & 0x1) == 0
   }
 
   /// `true` if `self` stores a pointer to ASCII code units.
@@ -102,7 +102,7 @@ public struct StaticString
   /// `isASCII` is unspecified.
   @transparent
   public var isASCII: Bool {
-    return (UWord(_flags) & 0x2) != 0
+    return (UInt8(_flags) & 0x2) != 0
   }
 
   /// Invoke `body` with a buffer containing the UTF-8 code units of
@@ -149,7 +149,7 @@ public struct StaticString
   ) {
     self._startPtrOrData = start
     self._byteSize = byteSize
-    self._flags = Bool(isASCII) ? 0x2.value : 0x0.value
+    self._flags = Bool(isASCII) ? (0x2 as UInt8).value : (0x0 as UInt8).value
   }
 
   @transparent
@@ -158,8 +158,10 @@ public struct StaticString
   ) {
     self._startPtrOrData =
       unsafeBitCast(UWord(UInt32(unicodeScalar)), COpaquePointer.self)._rawValue
-    self._byteSize = 0.value
-    self._flags = UnicodeScalar(unicodeScalar).isASCII() ? 0x3.value : 0x1.value
+    self._byteSize = 0._builtinWordValue
+    self._flags = UnicodeScalar(unicodeScalar).isASCII()
+      ? (0x3 as UInt8).value
+      : (0x1 as UInt8).value
   }
 
   @effects(readonly)

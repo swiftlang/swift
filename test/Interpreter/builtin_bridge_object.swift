@@ -40,7 +40,7 @@ func nonPointerBits(x: Builtin.BridgeObject) -> UInt {
 // Try without any bits set.
 if true {
   let x = C()
-  let bo = Builtin.castToBridgeObject(x, 0.value)
+  let bo = Builtin.castToBridgeObject(x, 0._builtinWordValue)
   let bo2 = bo
   let x1: C = Builtin.castReferenceFromBridgeObject(bo)
   let x2: C = Builtin.castReferenceFromBridgeObject(bo2)
@@ -52,7 +52,7 @@ if true {
   println(nonPointerBits(bo) == 0)
   // CHECK-NEXT: true
   
-  var bo3 = Builtin.castToBridgeObject(C(), 0.value)
+  var bo3 = Builtin.castToBridgeObject(C(), 0._builtinWordValue)
   println(
     _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
       bitPattern(bo3)))
@@ -71,7 +71,7 @@ if true {
 // Try with all spare bits set.
 if true {
   let x = C()
-  let bo = Builtin.castToBridgeObject(x, NATIVE_SPARE_BITS.value)
+  let bo = Builtin.castToBridgeObject(x, NATIVE_SPARE_BITS._builtinWordValue)
 
   let bo2 = bo
   let x1: C = Builtin.castReferenceFromBridgeObject(bo)
@@ -84,7 +84,7 @@ if true {
   println(nonPointerBits(bo) == NATIVE_SPARE_BITS)
   // CHECK-NEXT: true
   
-  var bo3 = Builtin.castToBridgeObject(C(), NATIVE_SPARE_BITS.value)
+  var bo3 = Builtin.castToBridgeObject(C(), NATIVE_SPARE_BITS._builtinWordValue)
   println(
     _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
       bitPattern(bo3)))
@@ -107,7 +107,7 @@ import Foundation
 func nonNativeBridgeObject(o: AnyObject) -> Builtin.BridgeObject {
   let tagged = ((Builtin.reinterpretCast(o) as UInt) & OBJC_TAGGED_POINTER_BITS) != 0
   return Builtin.castToBridgeObject(
-    o, tagged ? 0.value : NATIVE_SPARE_BITS.value)
+    o, tagged ? 0._builtinWordValue : NATIVE_SPARE_BITS._builtinWordValue)
 }
 
 // Try with a (probably) tagged pointer. No bits may be masked into a
@@ -187,7 +187,7 @@ if true {
   // CHECK-NEXT: None
   hitOptionalGenerically(bo)
 
-  bo = Builtin.castToBridgeObject(C(), 0.value)
+  bo = Builtin.castToBridgeObject(C(), 0._builtinWordValue)
   // CHECK-NEXT: Some
   hitOptionalSpecifically(bo)
   // CHECK-NEXT: Some

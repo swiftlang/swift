@@ -44,7 +44,7 @@ public struct ${Self}<T>
   /// Construct a null pointer.
   @transparent
   public init() {
-    self._rawValue = Builtin.inttoptr_Word(0.value)
+    self._rawValue = _nilRawPointer
   }
 
   /// Construct ${a_Self} from a builtin raw pointer.
@@ -66,7 +66,7 @@ public struct ${Self}<T>
   /// This is a fundamentally unsafe conversion.
   @transparent
   public init(bitPattern: Word) {
-    self._rawValue = Builtin.inttoptr_Word(bitPattern.value)
+    self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
   /// Construct ${a_Self} from a given address in memory.
@@ -74,7 +74,7 @@ public struct ${Self}<T>
   /// This is a fundamentally unsafe conversion.
   @transparent
   public init(bitPattern: UWord) {
-    self._rawValue = Builtin.inttoptr_Word(bitPattern.value)
+    self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
   /// Convert from an UnsafeMutablePointer of a different type.
@@ -112,7 +112,8 @@ public struct ${Self}<T>
   public static func alloc(num: Int) -> ${Self} {
     // Don't bother with overflow checking.
     var size = strideof(T.self) * num
-    return ${Self}(Builtin.allocRaw(size.value, Builtin.alignof(T.self)))
+    return ${Self}(
+      Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(T.self)))
   }
 
   /// Deallocate `num` objects.
@@ -127,7 +128,8 @@ public struct ${Self}<T>
   public func dealloc(num: Int) {
     // Overflow checking is actually not required here.
     var size = strideof(T.self) * num
-    Builtin.deallocRaw(_rawValue, size.value, Builtin.alignof(T.self))
+    Builtin.deallocRaw(
+      _rawValue, size._builtinWordValue, Builtin.alignof(T.self))
   }
 %  end
 
@@ -212,8 +214,8 @@ public struct ${Self}<T>
     _debugPrecondition(
       self < source || self >= source + count,
       "${Self}.moveInitializeFrom non-following overlapping range; use moveInitializeBackwardFrom")
-    Builtin.takeArrayFrontToBack(T.self, self._rawValue, source._rawValue,
-      count.value)
+    Builtin.takeArrayFrontToBack(
+      T.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // for i in 0..<count {
     //   (self + i).initialize((source + i).move())
@@ -232,8 +234,8 @@ public struct ${Self}<T>
     _debugPrecondition(
       source < self || source >= self + count,
       "${Self}.moveInitializeBackwardFrom non-preceding overlapping range; use moveInitializeFrom instead")
-    Builtin.takeArrayBackToFront(T.self, self._rawValue, source._rawValue,
-      count.value)
+    Builtin.takeArrayBackToFront(
+      T.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // var src = source + count
     // var dst = self + count
@@ -253,7 +255,8 @@ public struct ${Self}<T>
     _debugPrecondition(
       self + count <= source || source + count <= self,
       "${Self}.initializeFrom non-following overlapping range")
-    Builtin.copyArray(T.self, self._rawValue, source._rawValue, count.value)
+    Builtin.copyArray(
+      T.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // for i in 0..<count {
     //   (self + i).initialize(source[i])
@@ -288,9 +291,9 @@ public struct ${Self}<T>
     _debugPrecondition(
       self + count <= source || source + count <= self,
       "moveAssignFrom overlapping range")
-    Builtin.destroyArray(T.self, self._rawValue, count.value)
-    Builtin.takeArrayFrontToBack(T.self, self._rawValue, source._rawValue,
-      count.value)
+    Builtin.destroyArray(T.self, self._rawValue, count._builtinWordValue)
+    Builtin.takeArrayFrontToBack(
+      T.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // These builtins are equivalent to:
     // for i in 0..<count {
     //   self[i] = (source + i).move()
@@ -314,7 +317,7 @@ public struct ${Self}<T>
   /// be initialized before being used again.
   public func destroy(count: Int) {
     _debugPrecondition(count >= 0, "${Self}.destroy with negative count")
-    Builtin.destroyArray(T.self, _rawValue, count.value)
+    Builtin.destroyArray(T.self, _rawValue, count._builtinWordValue)
   }
 %  end
 
@@ -467,8 +470,8 @@ public func < <T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
 
 @transparent
 public func + <T>(lhs: ${Self}<T>, rhs: Int) -> ${Self}<T> {
-  return ${Self}(
-    Builtin.gep_Word(lhs._rawValue, (rhs &* strideof(T.self)).value))
+  return ${Self}(Builtin.gep_Word(
+    lhs._rawValue, (rhs &* strideof(T.self))._builtinWordValue))
 }
 
 @transparent

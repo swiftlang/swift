@@ -203,6 +203,12 @@ public struct ${Self}
     value = _v
   }
 
+% if self_ty.is_word:
+  public var _builtinWordValue: Builtin.Word {
+    return value
+  }
+% end
+
   /// Create an instance initialized to `value`.
   @transparent public
   init(_ value: ${Self}) { self = value }

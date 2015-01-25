@@ -1482,11 +1482,12 @@ bb4:
 
 bb5:
   %39 = function_ref @_TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_ : $@thin @noreturn (StaticString, StaticString, StaticString) -> () // user: %43
-  %40 = string_literal utf8 "fatal error"         // user: %42
-  %41 = integer_literal $Builtin.Word, 11         // user: %42
-  %42 = struct $StaticString (%40 : $Builtin.RawPointer, %41 : $Builtin.Word, %41 : $Builtin.Word) // user: %43
-  %43 = apply %39(%42, %42, %42) : $@thin @noreturn (StaticString, StaticString, StaticString) -> ()
-  unreachable                                     // id: %44
+  %40 = string_literal utf8 "fatal error"
+  %41 = integer_literal $Builtin.Word, 11
+  %42 = integer_literal $Builtin.Int8, 11
+  %43 = struct $StaticString (%40 : $Builtin.RawPointer, %41 : $Builtin.Word, %42 : $Builtin.Int8)
+  %44 = apply %39(%43, %43, %43) : $@thin @noreturn (StaticString, StaticString, StaticString) -> ()
+  unreachable
 }
 
 // CHECK-LABEL: sil @propagate_postdominating_owned_release_info : $@thin (@owned Builtin.NativeObject) -> () {

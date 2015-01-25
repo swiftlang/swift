@@ -95,7 +95,7 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   /// This is a fundamentally unsafe conversion.
   @transparent
   public init(bitPattern: Word) {
-    _rawValue = Builtin.inttoptr_Word(bitPattern.value)
+    _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
   /// Construct a `COpaquePointer` from a given address in memory.
@@ -103,7 +103,7 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   /// This is a fundamentally unsafe conversion.
   @transparent
   public init(bitPattern: UWord) {
-    _rawValue = Builtin.inttoptr_Word(bitPattern.value)
+    _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
   /// Convert a typed `UnsafePointer` to an opaque C pointer.

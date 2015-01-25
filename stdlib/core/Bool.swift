@@ -18,7 +18,10 @@ public struct Bool {
 
   /// Default-initialize Boolean value to `false`.
   @transparent
-  public init() { value = Builtin.trunc_Word_Int1(0.value) }
+  public init() {
+    let zero: Int8 = 0
+    value = Builtin.trunc_Int8_Int1(zero.value)
+  }
 
   @transparent
   init(_ v : Builtin.Int1) { value = v }

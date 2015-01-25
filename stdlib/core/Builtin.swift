@@ -18,7 +18,8 @@ import SwiftShims
 /// An initialized raw pointer to use as a NULL value.
 @transparent
 internal var _nilRawPointer: Builtin.RawPointer {
-  return Builtin.inttoptr_Word(0.value)
+  let zero: Int8 = 0
+  return Builtin.inttoptr_Int8(zero.value)
 }
 
 /// Returns the contiguous memory footprint of `T`.
@@ -381,6 +382,6 @@ internal func _makeBridgeObject(
     "Can't store non-spare bits into Builtin.BridgeObject")
   
   return Builtin.castToBridgeObject(
-    object, bits.value
+    object, bits._builtinWordValue
   )
 }
