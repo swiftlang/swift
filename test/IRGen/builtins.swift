@@ -352,12 +352,16 @@ func testCondFail(b: Bool, c: Bool) {
   // CHECK: br i1 %0, label %[[FAIL:.*]], label %[[CONT:.*]]
   Builtin.condfail(b)
   // CHECK: <label>:[[CONT]]
-  // CHECK: br i1 %1, label %[[FAIL]], label %[[CONT:.*]]
+  // CHECK: br i1 %1, label %[[FAIL2:.*]], label %[[CONT:.*]]
   Builtin.condfail(c)
   // CHECK: <label>:[[CONT]]
   // CHECK: ret void
 
   // CHECK: <label>:[[FAIL]]
+  // CHECK: call void @llvm.trap()
+  // CHECK: unreachable
+
+  // CHECK: <label>:[[FAIL2]]
   // CHECK: call void @llvm.trap()
   // CHECK: unreachable
 }
