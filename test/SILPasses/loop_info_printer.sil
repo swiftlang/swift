@@ -12,34 +12,34 @@ sil_stage canonical
 
 sil @simple_loop_with_enum : $@thin () -> () {
 bb0:
-  %0 = integer_literal $Builtin.Word, 0
-  %1 = integer_literal $Builtin.Word, 1000
-  br bb1(%0 : $Builtin.Word)
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = integer_literal $Builtin.Int32, 1000
+  br bb1(%0 : $Builtin.Int32)
 
-bb1(%3 : $Builtin.Word):
-  %4 = struct $Int (%3 : $Builtin.Word)
-  %6 = builtin "cmp_eq_Word"(%3 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+bb1(%3 : $Builtin.Int32):
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  %6 = builtin "cmp_eq_Int32"(%3 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   cond_br %6, bb2, bb3
 
 bb2:
-  %8 = enum $Optional<Int>, #Optional.None!enumelt
-  br bb4(%3 : $Builtin.Word, %8 : $Optional<Int>)
+  %8 = enum $Optional<Int32>, #Optional.None!enumelt
+  br bb4(%3 : $Builtin.Int32, %8 : $Optional<Int32>)
 
 bb3:
-  %10 = integer_literal $Builtin.Word, 1
+  %10 = integer_literal $Builtin.Int32, 1
   %12 = integer_literal $Builtin.Int1, -1
-  %13 = builtin "sadd_with_overflow_Word"(%3 : $Builtin.Word, %10 : $Builtin.Word, %12 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %14 = tuple_extract %13 : $(Builtin.Word, Builtin.Int1), 0
-  %15 = tuple_extract %13 : $(Builtin.Word, Builtin.Int1), 1
+  %13 = builtin "sadd_with_overflow_Int32"(%3 : $Builtin.Int32, %10 : $Builtin.Int32, %12 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %14 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 0
+  %15 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %15 : $Builtin.Int1
-  %17 = enum $Optional<Int>, #Optional.Some!enumelt.1, %4 : $Int
-  br bb4(%14 : $Builtin.Word, %17 : $Optional<Int>)
+  %17 = enum $Optional<Int32>, #Optional.Some!enumelt.1, %4 : $Int32
+  br bb4(%14 : $Builtin.Int32, %17 : $Optional<Int32>)
 
-bb4(%19 : $Builtin.Word, %20 : $Optional<Int>):
-  switch_enum %20 : $Optional<Int>, case #Optional.Some!enumelt.1: bb5, case #Optional.None!enumelt: bb6
+bb4(%19 : $Builtin.Int32, %20 : $Optional<Int32>):
+  switch_enum %20 : $Optional<Int32>, case #Optional.Some!enumelt.1: bb5, case #Optional.None!enumelt: bb6
 
 bb5:
-  br bb1(%19 : $Builtin.Word)
+  br bb1(%19 : $Builtin.Int32)
 
 bb6:
   %23 = tuple ()
@@ -51,24 +51,24 @@ bb6:
 
 sil @simple_loop : $@thin () -> () {
 bb0:
-  %0 = integer_literal $Builtin.Word, 0
-  %1 = integer_literal $Builtin.Word, 1000
-  br bb1(%0 : $Builtin.Word)
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = integer_literal $Builtin.Int32, 1000
+  br bb1(%0 : $Builtin.Int32)
 
-bb1(%3 : $Builtin.Word):
-  %4 = struct $Int (%3 : $Builtin.Word)
-  %6 = builtin "cmp_eq_Word"(%3 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+bb1(%3 : $Builtin.Int32):
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  %6 = builtin "cmp_eq_Int32"(%3 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   cond_br %6, bb3, bb2
 
 bb2:
-  %8 = integer_literal $Builtin.Word, 1
+  %8 = integer_literal $Builtin.Int32, 1
   %10 = integer_literal $Builtin.Int1, -1
-  %11 = builtin "sadd_with_overflow_Word"(%3 : $Builtin.Word, %8 : $Builtin.Word, %10 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %12 = tuple_extract %11 : $(Builtin.Word, Builtin.Int1), 0
-  %13 = tuple_extract %11 : $(Builtin.Word, Builtin.Int1), 1
+  %11 = builtin "sadd_with_overflow_Int32"(%3 : $Builtin.Int32, %8 : $Builtin.Int32, %10 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %12 = tuple_extract %11 : $(Builtin.Int32, Builtin.Int1), 0
+  %13 = tuple_extract %11 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %13 : $Builtin.Int1
-  %15 = enum $Optional<Int>, #Optional.Some!enumelt.1, %4 : $Int
-  br bb1(%12 : $Builtin.Word)
+  %15 = enum $Optional<Int32>, #Optional.Some!enumelt.1, %4 : $Int32
+  br bb1(%12 : $Builtin.Int32)
 
 bb3:
   %17 = tuple ()
@@ -81,41 +81,41 @@ bb3:
 
 sil @nested_loop : $@thin () -> () {
 bb0:
-  %0 = integer_literal $Builtin.Word, 0
-  %1 = integer_literal $Builtin.Word, 1000
-  br bb1(%0 : $Builtin.Word)
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = integer_literal $Builtin.Int32, 1000
+  br bb1(%0 : $Builtin.Int32)
 
-bb1(%3 : $Builtin.Word):
-  %5 = builtin "cmp_eq_Word"(%3 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+bb1(%3 : $Builtin.Int32):
+  %5 = builtin "cmp_eq_Int32"(%3 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   cond_br %5, bb3, bb2
 
 bb2:
-  %7 = integer_literal $Builtin.Word, 1
+  %7 = integer_literal $Builtin.Int32, 1
   %9 = integer_literal $Builtin.Int1, -1
-  %10 = builtin "sadd_with_overflow_Word"(%3 : $Builtin.Word, %7 : $Builtin.Word, %9 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %11 = tuple_extract %10 : $(Builtin.Word, Builtin.Int1), 0
-  %12 = tuple_extract %10 : $(Builtin.Word, Builtin.Int1), 1
+  %10 = builtin "sadd_with_overflow_Int32"(%3 : $Builtin.Int32, %7 : $Builtin.Int32, %9 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %11 = tuple_extract %10 : $(Builtin.Int32, Builtin.Int1), 0
+  %12 = tuple_extract %10 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %12 : $Builtin.Int1
-  %14 = integer_literal $Builtin.Word, 2000
-  br bb4(%0 : $Builtin.Word)
+  %14 = integer_literal $Builtin.Int32, 2000
+  br bb4(%0 : $Builtin.Int32)
 
 bb3:
   %16 = tuple ()
   return %16 : $()
 
-bb4(%18 : $Builtin.Word):
-  %19 = builtin "cmp_eq_Word"(%18 : $Builtin.Word, %14 : $Builtin.Word) : $Builtin.Int1
+bb4(%18 : $Builtin.Int32):
+  %19 = builtin "cmp_eq_Int32"(%18 : $Builtin.Int32, %14 : $Builtin.Int32) : $Builtin.Int1
   cond_br %19, bb6, bb5
 
 bb5:
-  %21 = integer_literal $Builtin.Word, 1
+  %21 = integer_literal $Builtin.Int32, 1
   %23 = integer_literal $Builtin.Int1, -1
-  %24 = builtin "sadd_with_overflow_Word"(%18 : $Builtin.Word, %21 : $Builtin.Word, %23 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %25 = tuple_extract %24 : $(Builtin.Word, Builtin.Int1), 0
-  %26 = tuple_extract %24 : $(Builtin.Word, Builtin.Int1), 1
+  %24 = builtin "sadd_with_overflow_Int32"(%18 : $Builtin.Int32, %21 : $Builtin.Int32, %23 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %25 = tuple_extract %24 : $(Builtin.Int32, Builtin.Int1), 0
+  %26 = tuple_extract %24 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %26 : $Builtin.Int1
-  br bb4(%25 : $Builtin.Word)
+  br bb4(%25 : $Builtin.Int32)
 
 bb6:
-  br bb1(%11 : $Builtin.Word)
+  br bb1(%11 : $Builtin.Int32)
 }

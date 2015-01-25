@@ -15,16 +15,16 @@ import Swift
 import SwiftShims
 
 struct Cont {
-	var cl: (Int) -> Int
+	var cl: (Int32) -> Int32
 }
 
 struct Cont2 {
-	var tp: (Int, (Int) -> Int)
+	var tp: (Int32, (Int32) -> Int32)
 }
 
 enum E {
 	case A
-	case B((Int) -> Int)
+	case B((Int32) -> Int32)
 }
 
 
@@ -37,25 +37,25 @@ enum E {
 // LOG: Eligible callee: takeDirectClosure
 // LOG: Boost: apply const function
 
-sil @testDirectClosure : $@thin () -> Int {
+sil @testDirectClosure : $@thin () -> Int32 {
 bb0:
-  %0 = function_ref @takeDirectClosure : $@thin (@owned @callee_owned (Int) -> Int) -> Int
-  %1 = function_ref @closure : $@thin (Int) -> Int
-  %2 = thin_to_thick_function %1 : $@thin (Int) -> Int to $@callee_owned (Int) -> Int
-  %3 = apply %0(%2) : $@thin (@owned @callee_owned (Int) -> Int) -> Int
-  return %3 : $Int
+  %0 = function_ref @takeDirectClosure : $@thin (@owned @callee_owned (Int32) -> Int32) -> Int32
+  %1 = function_ref @closure : $@thin (Int32) -> Int32
+  %2 = thin_to_thick_function %1 : $@thin (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
+  %3 = apply %0(%2) : $@thin (@owned @callee_owned (Int32) -> Int32) -> Int32
+  return %3 : $Int32
 }
 
-sil @takeDirectClosure : $@thin (@owned @callee_owned (Int) -> Int) -> Int {
-bb0(%0 : $@callee_owned (Int) -> Int):
+sil @takeDirectClosure : $@thin (@owned @callee_owned (Int32) -> Int32) -> Int32 {
+bb0(%0 : $@callee_owned (Int32) -> Int32):
   // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
 
-  %1 = integer_literal $Builtin.Word, 27
-  %2 = struct $Int (%1 : $Builtin.Word)
-  %3 = apply %0(%2) : $@callee_owned (Int) -> Int
-  return %3 : $Int
+  %1 = integer_literal $Builtin.Int32, 27
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  %3 = apply %0(%2) : $@callee_owned (Int32) -> Int32
+  return %3 : $Int32
 }
 
 
@@ -68,27 +68,27 @@ bb0(%0 : $@callee_owned (Int) -> Int):
 // LOG: Eligible callee: takeStructClosure
 // LOG: Boost: apply const function
 
-sil @testStructClosure : $@thin () -> Int {
+sil @testStructClosure : $@thin () -> Int32 {
 bb0:
-  %0 = function_ref @takeStructClosure : $@thin (@owned Cont) -> Int
-  %1 = function_ref @closure : $@thin (Int) -> Int
-  %2 = thin_to_thick_function %1 : $@thin (Int) -> Int to $@callee_owned (Int) -> Int
-  %3 = struct $Cont (%2 : $@callee_owned (Int) -> Int)
-  %4 = apply %0(%3) : $@thin (@owned Cont) -> Int
-  return %4 : $Int
+  %0 = function_ref @takeStructClosure : $@thin (@owned Cont) -> Int32
+  %1 = function_ref @closure : $@thin (Int32) -> Int32
+  %2 = thin_to_thick_function %1 : $@thin (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
+  %3 = struct $Cont (%2 : $@callee_owned (Int32) -> Int32)
+  %4 = apply %0(%3) : $@thin (@owned Cont) -> Int32
+  return %4 : $Int32
 }
 
-sil @takeStructClosure : $@thin (@owned Cont) -> Int {
+sil @takeStructClosure : $@thin (@owned Cont) -> Int32 {
 bb0(%0 : $Cont):
   // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
 
   %1 = struct_extract %0 : $Cont, #Cont.cl
-  %2 = integer_literal $Builtin.Word, 27
-  %3 = struct $Int (%2 : $Builtin.Word)
-  %4 = apply %1(%3) : $@callee_owned (Int) -> Int
-  return %4 : $Int
+  %2 = integer_literal $Builtin.Int32, 27
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  %4 = apply %1(%3) : $@callee_owned (Int32) -> Int32
+  return %4 : $Int32
 }
 
 
@@ -101,35 +101,35 @@ bb0(%0 : $Cont):
 // LOG: Eligible callee: takeStructAddrClosure
 // LOG: Boost: apply const function
 
-sil @testStructAddrClosure : $@thin () -> Int {
+sil @testStructAddrClosure : $@thin () -> Int32 {
 bb0:
   %0 = alloc_stack $Cont
-  %1 = function_ref @closure : $@thin (Int) -> Int
-  %2 = thin_to_thick_function %1 : $@thin (Int) -> Int to $@callee_owned (Int) -> Int
-  %3 = struct $Cont (%2 : $@callee_owned (Int) -> Int)
+  %1 = function_ref @closure : $@thin (Int32) -> Int32
+  %2 = thin_to_thick_function %1 : $@thin (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
+  %3 = struct $Cont (%2 : $@callee_owned (Int32) -> Int32)
   store %3 to %0#1 : $*Cont
-  %5 = function_ref @takeStructAddrClosure : $@thin (@inout Cont) -> Int
-  %6 = apply %5(%0#1) : $@thin (@inout Cont) -> Int
+  %5 = function_ref @takeStructAddrClosure : $@thin (@inout Cont) -> Int32
+  %6 = apply %5(%0#1) : $@thin (@inout Cont) -> Int32
   %7 = struct_element_addr %0#1 : $*Cont, #Cont.cl
-  %8 = load %7 : $*@callee_owned (Int) -> Int
-  strong_release %8 : $@callee_owned (Int) -> Int
+  %8 = load %7 : $*@callee_owned (Int32) -> Int32
+  strong_release %8 : $@callee_owned (Int32) -> Int32
   dealloc_stack %0#0 : $*@local_storage Cont
-  return %6 : $Int
+  return %6 : $Int32
 }
 
-sil @takeStructAddrClosure : $@thin (@inout Cont) -> Int {
+sil @takeStructAddrClosure : $@thin (@inout Cont) -> Int32 {
 bb0(%0 : $*Cont):
   // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
 
   %1 = struct_element_addr %0 : $*Cont, #Cont.cl
-  %2 = load %1 : $*@callee_owned (Int) -> Int
-  %3 = integer_literal $Builtin.Word, 27
-  %4 = struct $Int (%3 : $Builtin.Word)
-  strong_retain %2 : $@callee_owned (Int) -> Int
-  %6 = apply %2(%4) : $@callee_owned (Int) -> Int
-  return %6 : $Int
+  %2 = load %1 : $*@callee_owned (Int32) -> Int32
+  %3 = integer_literal $Builtin.Int32, 27
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  strong_retain %2 : $@callee_owned (Int32) -> Int32
+  %6 = apply %2(%4) : $@callee_owned (Int32) -> Int32
+  return %6 : $Int32
 }
 
 
@@ -142,32 +142,32 @@ bb0(%0 : $*Cont):
 // LOG: Eligible callee: takeTupleClosure
 // LOG: Boost: apply const function
 
-sil @testTupleClosure : $@thin () -> Int {
+sil @testTupleClosure : $@thin () -> Int32 {
 bb0:
-  %0 = function_ref @takeTupleClosure : $@thin (@owned Cont2) -> Int
-  %1 = integer_literal $Builtin.Word, 27
-  %2 = struct $Int (%1 : $Builtin.Word)
-  %3 = function_ref @closure : $@thin (Int) -> Int
-  %4 = thin_to_thick_function %3 : $@thin (Int) -> Int to $@callee_owned (Int) -> Int
-  %5 = tuple (%2 : $Int, %4 : $@callee_owned (Int) -> Int)
-  %6 = struct $Cont2 (%5 : $(Int, @callee_owned (Int) -> Int))
-  %7 = apply %0(%6) : $@thin (@owned Cont2) -> Int
-  return %7 : $Int
+  %0 = function_ref @takeTupleClosure : $@thin (@owned Cont2) -> Int32
+  %1 = integer_literal $Builtin.Int32, 27
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  %3 = function_ref @closure : $@thin (Int32) -> Int32
+  %4 = thin_to_thick_function %3 : $@thin (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
+  %5 = tuple (%2 : $Int32, %4 : $@callee_owned (Int32) -> Int32)
+  %6 = struct $Cont2 (%5 : $(Int32, @callee_owned (Int32) -> Int32))
+  %7 = apply %0(%6) : $@thin (@owned Cont2) -> Int32
+  return %7 : $Int32
 }
 
 
-sil @takeTupleClosure : $@thin (@owned Cont2) -> Int {
+sil @takeTupleClosure : $@thin (@owned Cont2) -> Int32 {
 bb0(%0 : $Cont2):
   // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
 
   %1 = struct_extract %0 : $Cont2, #Cont2.tp
-  %2 = tuple_extract %1 : $(Int, @callee_owned (Int) -> Int), 1
-  %3 = integer_literal $Builtin.Word, 27
-  %4 = struct $Int (%3 : $Builtin.Word)
-  %5 = apply %2(%4) : $@callee_owned (Int) -> Int
-  return %5 : $Int
+  %2 = tuple_extract %1 : $(Int32, @callee_owned (Int32) -> Int32), 1
+  %3 = integer_literal $Builtin.Int32, 27
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  %5 = apply %2(%4) : $@callee_owned (Int32) -> Int32
+  return %5 : $Int32
 }
 
 // CHECK-LABEL: sil @testEnumClosure
@@ -179,42 +179,42 @@ bb0(%0 : $Cont2):
 // LOG: Eligible callee: takeEnumClosure
 // LOG: Boost: apply const function
 
-sil @testEnumClosure : $@thin () -> Int {
+sil @testEnumClosure : $@thin () -> Int32 {
 bb0:
-  %0 = function_ref @takeEnumClosure : $@thin (@owned E) -> Int
-  %1 = function_ref @closure : $@thin (Int) -> Int
-  %2 = thin_to_thick_function %1 : $@thin (Int) -> Int to $@callee_owned (Int) -> Int
-  %3 = enum $E, #E.B!enumelt.1, %2 : $@callee_owned (Int) -> Int
-  %4 = apply %0(%3) : $@thin (@owned E) -> Int
-  return %4 : $Int
+  %0 = function_ref @takeEnumClosure : $@thin (@owned E) -> Int32
+  %1 = function_ref @closure : $@thin (Int32) -> Int32
+  %2 = thin_to_thick_function %1 : $@thin (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
+  %3 = enum $E, #E.B!enumelt.1, %2 : $@callee_owned (Int32) -> Int32
+  %4 = apply %0(%3) : $@thin (@owned E) -> Int32
+  return %4 : $Int32
 }
 
 
-sil @takeEnumClosure : $@thin (@owned E) -> Int {
+sil @takeEnumClosure : $@thin (@owned E) -> Int32 {
 bb0(%0 : $E):
   // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
 
   %1 = unchecked_enum_data %0 : $E, #E.B!enumelt.1
-  %2 = integer_literal $Builtin.Word, 27
-  %3 = struct $Int (%2 : $Builtin.Word)
-  %4 = apply %1(%3) : $@callee_owned (Int) -> Int
-  return %4 : $Int
+  %2 = integer_literal $Builtin.Int32, 27
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  %4 = apply %1(%3) : $@callee_owned (Int32) -> Int32
+  return %4 : $Int32
 }
 
 // The closure which is used by all tests above.
 
-sil shared @closure : $@thin (Int) -> Int {
-bb0(%0 : $Int):
-  %1 = integer_literal $Builtin.Word, 1
-  %2 = struct_extract %0 : $Int, #Int.value
+sil shared @closure : $@thin (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %1 = integer_literal $Builtin.Int32, 1
+  %2 = struct_extract %0 : $Int32, #Int32.value
   %3 = integer_literal $Builtin.Int1, -1
-  %4 = builtin "sadd_with_overflow_Word"(%2 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %5 = tuple_extract %4 : $(Builtin.Word, Builtin.Int1), 0
-  %6 = tuple_extract %4 : $(Builtin.Word, Builtin.Int1), 1
+  %4 = builtin "sadd_with_overflow_Int32"(%2 : $Builtin.Int32, %1 : $Builtin.Int32, %3 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %5 = tuple_extract %4 : $(Builtin.Int32, Builtin.Int1), 0
+  %6 = tuple_extract %4 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %6 : $Builtin.Int1
-  %8 = struct $Int (%5 : $Builtin.Word)
-  return %8 : $Int
+  %8 = struct $Int32 (%5 : $Builtin.Int32)
+  return %8 : $Int32
 }
 

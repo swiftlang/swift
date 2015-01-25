@@ -2,23 +2,23 @@
   return x
 }
 
-@transparent public func testBuiltin() -> Int {
-  var y: Int = 300;
+@transparent public func testBuiltin() -> Int32 {
+  var y: Int32 = 300;
   var z = "foo"
   return y
 }
 
-@transparent public func standalone_function(#x: Int, #y: Int) -> Int {
+@transparent public func standalone_function(#x: Int32, #y: Int32) -> Int32 {
   return x
 }
-@transparent public func curried_function(#x: Int)(y: Int) -> Int {
+@transparent public func curried_function(#x: Int32)(y: Int32) -> Int32 {
   return standalone_function(x: x, y: y)
 }
-@transparent public func calls(#i: Int, #j: Int) {
+@transparent public func calls(#i: Int32, #j: Int32) {
   var f1 = curried_function(x: i)
   f1(y: j);
 }
-public func foo() -> Int { return 0 }
+public func foo() -> Int32 { return 0 }
 public func runced() -> Bool { return true }
 
 public func a() {}
@@ -39,9 +39,9 @@ public func e() {}
 
 public enum MaybePair {
   case Neither
-  case Left(Int)
+  case Left(Int32)
   case Right(String)
-  case Both(Int, String)
+  case Both(Int32, String)
 }
 public func do_switch(#u: MaybePair) {
   switch u {
@@ -58,17 +58,17 @@ public func do_switch(#u: MaybePair) {
 }
 
 public struct Wrapper {
-  public var value: Int
+  public var value: Int32
   
-  @transparent public init(Val: Int) {
+  @transparent public init(Val: Int32) {
     value = Val
   }
   
-  @transparent public func getValue() -> Int {
+  @transparent public func getValue() -> Int32 {
     return value
   }
   
-  public var valueAgain: Int {
+  public var valueAgain: Int32 {
     @transparent
     get {
       return value
@@ -77,7 +77,7 @@ public struct Wrapper {
 }
 
 @transparent public extension Wrapper {
-  func getValueAgain() -> Int {
+  func getValueAgain() -> Int32 {
     return self.value
   }
 }

@@ -1061,15 +1061,15 @@ entry(%x : $Class1, %w : $Builtin.Word):
 }
 
 class Foo {
-  subscript (x: Int, y: Int) -> Int { get set }
+  subscript (x: Int, y: Int) -> Int32 { get set }
   var x: Int
   var y: Int
   init()
 }
 
-// CHECK-LABEL: sil [fragile] @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, @owned Foo) -> Int
-// CHECK_DECL-LABEL: sil [fragile] @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, @owned Foo) -> Int{{$}}
-sil [fragile] @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, @owned Foo) -> Int {
+// CHECK-LABEL: sil [fragile] @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, @owned Foo) -> Int32
+// CHECK_DECL-LABEL: sil [fragile] @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, @owned Foo) -> Int32{{$}}
+sil [fragile] @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, @owned Foo) -> Int32 {
 bb0(%0 : $Int, %1 : $Int, %2 : $Foo):
   %3 = tuple ()
   %4 = alloc_stack $Int  // var x               // users: %17, %6
@@ -1079,21 +1079,21 @@ bb0(%0 : $Int, %1 : $Int, %2 : $Foo):
   %8 = alloc_stack $Foo  // var self              // users: %15, %14, %9
   store %2 to %8#1 : $*Foo
   %10 = metatype $@thin Int.Type
-  %12 = integer_literal $Builtin.Word, 0         // user: %13
-  %13 = struct $Int (%12 : $Builtin.Word)      // user: %18
+  %12 = integer_literal $Builtin.Int32, 0         // user: %13
+  %13 = struct $Int32 (%12 : $Builtin.Int32)      // user: %18
   destroy_addr %8#1 : $*Foo
   dealloc_stack %8#0 : $*@local_storage Foo
   dealloc_stack %5#0 : $*@local_storage Int
   dealloc_stack %4#0 : $*@local_storage Int
-  return %13 : $Int
+  return %13 : $Int32
 }
 
-// CHECK-LABEL: sil [fragile] @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, Int, @owned Foo) -> ()
-// CHECK_DECL-LABEL: sil [fragile] @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, Int, @owned Foo) -> (){{$}}
-sil [fragile] @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, Int, @owned Foo) -> () {
-bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $Foo):
-  %4 = alloc_stack $Int  // var value           // users: %16, %5
-  store %0 to %4#1 : $*Int
+// CHECK-LABEL: sil [fragile] @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int32, Int, Int, @owned Foo) -> ()
+// CHECK_DECL-LABEL: sil [fragile] @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int32, Int, Int, @owned Foo) -> (){{$}}
+sil [fragile] @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int32, Int, Int, @owned Foo) -> () {
+bb0(%0 : $Int32, %1 : $Int, %2 : $Int, %3 : $Foo):
+  %4 = alloc_stack $Int32  // var value         // users: %16, %5
+  store %0 to %4#1 : $*Int32
   %6 = alloc_stack $Int  // var x               // users: %15, %8
   %7 = alloc_stack $Int  // var y               // users: %14, %9
   store %1 to %6#1 : $*Int
@@ -1104,7 +1104,7 @@ bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $Foo):
   dealloc_stack %10#0 : $*@local_storage Foo
   dealloc_stack %7#0 : $*@local_storage Int
   dealloc_stack %6#0 : $*@local_storage Int
-  dealloc_stack %4#0 : $*@local_storage Int
+  dealloc_stack %4#0 : $*@local_storage Int32
   %17 = tuple ()                                  // user: %18
   return %17 : $()
 }

@@ -7,33 +7,33 @@ sil_stage canonical
 import Builtin
 import Swift
 
-sil @_TF4main3fooFT1xSi1ySi_Si : $@thin (Int, Int) -> Int {
-bb0(%0 : $Int, %1 : $Int):
-  debug_value %0 : $Int  // let x                 // id: %2
-  debug_value %1 : $Int  // let y                 // id: %3
-  %4 = alloc_stack $Int  // var g                 // users: %14, %18, %20, %21
-  %6 = struct_extract %1 : $Int, #Int.value       // user: %8
-  %7 = struct_extract %0 : $Int, #Int.value       // user: %8
-  %8 = builtin "cmp_sgt_Word"(%6 : $Builtin.Word, %7 : $Builtin.Word) : $Builtin.Int1 // user: %9
+sil @_TF4main3fooFT1xSi1ySi_Si : $@thin (Int32, Int32) -> Int32 {
+bb0(%0 : $Int32, %1 : $Int32):
+  debug_value %0 : $Int32  // let x               // id: %2
+  debug_value %1 : $Int32  // let y               // id: %3
+  %4 = alloc_stack $Int32  // var g               // users: %14, %18, %20, %21
+  %6 = struct_extract %1 : $Int32, #Int32.value   // user: %8
+  %7 = struct_extract %0 : $Int32, #Int32.value   // user: %8
+  %8 = builtin "cmp_sgt_Word"(%6 : $Builtin.Int32, %7 : $Builtin.Int32) : $Builtin.Int1 // user: %9
   %9 = struct $Bool (%8 : $Builtin.Int1)          // user: %10
   %10 = struct_extract %9 : $Bool, #Bool.value    // user: %11
   br bb2                                          // id: %11
 
 bb1:                                              // Preds: bb0
-  %12 = integer_literal $Builtin.Word, 5          // user: %13
-  %13 = struct $Int (%12 : $Builtin.Word)         // user: %14
-  store %13 to %4#1 : $*Int                       // id: %14
+  %12 = integer_literal $Builtin.Int32, 5         // user: %13
+  %13 = struct $Int32 (%12 : $Builtin.Int32)      // user: %14
+  store %13 to %4#1 : $*Int32                     // id: %14
   br bb3                                          // id: %15
 
 bb2:                                              // Preds: bb0
-  %16 = integer_literal $Builtin.Word, 4          // user: %17
-  %17 = struct $Int (%16 : $Builtin.Word)         // user: %18
-  store %17 to %4#1 : $*Int                       // id: %18
+  %16 = integer_literal $Builtin.Int32, 4         // user: %17
+  %17 = struct $Int32 (%16 : $Builtin.Int32)      // user: %18
+  store %17 to %4#1 : $*Int32                     // id: %18
   br bb3                                          // id: %19
 
 bb3:                                              // Preds: bb1 bb2
-  %20 = load %4#1 : $*Int                         // user: %22
-  dealloc_stack %4#0 : $*@local_storage Int       // id: %21
-  return %20 : $Int                               // id: %22
+  %20 = load %4#1 : $*Int32                       // user: %22
+  dealloc_stack %4#0 : $*@local_storage Int32     // id: %21
+  return %20 : $Int32                             // id: %22
 }
 

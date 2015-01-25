@@ -9,7 +9,7 @@ sil @f_in : $@thin <T> (@in T) -> ()
 sil @f_out : $@thin <T> (@out T) -> ()
 
 protocol P  {
-  init(_ i : Int)
+  init(_ i : Int32)
 };
 
 // CHECK-LABEL: nrvo
@@ -23,18 +23,18 @@ bb0(%0 : $*T, %1 : $Bool):
 
 bb1:                                              // Preds: bb0
   %5 = metatype $@thick T.Type                    // user: %9
-  %6 = witness_method $T, #P.init!allocator.1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, Int, @thick τ_0_0.Type) -> () // user: %9
-  %7 = integer_literal $Builtin.Word, 10          // user: %8
-  %8 = struct $Int (%7 : $Builtin.Word)           // user: %9
-  %9 = apply %6<T>(%2#1, %8, %5) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
+  %6 = witness_method $T, #P.init!allocator.1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, Int32, @thick τ_0_0.Type) -> () // user: %9
+  %7 = integer_literal $Builtin.Int32, 10          // user: %8
+  %8 = struct $Int32 (%7 : $Builtin.Int32)           // user: %9
+  %9 = apply %6<T>(%2#1, %8, %5) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, Int32, @thick τ_0_0.Type) -> ()
   br bb3                                          // id: %10
 
 bb2:                                              // Preds: bb0
   %11 = metatype $@thick T.Type                   // user: %15
-  %12 = witness_method $T, #P.init!allocator.1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, Int, @thick τ_0_0.Type) -> () // user: %15
-  %13 = integer_literal $Builtin.Word, 1          // user: %14
-  %14 = struct $Int (%13 : $Builtin.Word)         // user: %15
-  %15 = apply %12<T>(%2#1, %14, %11) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
+  %12 = witness_method $T, #P.init!allocator.1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, Int32, @thick τ_0_0.Type) -> () // user: %15
+  %13 = integer_literal $Builtin.Int32, 1          // user: %14
+  %14 = struct $Int32 (%13 : $Builtin.Int32)         // user: %15
+  %15 = apply %12<T>(%2#1, %14, %11) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, Int32, @thick τ_0_0.Type) -> ()
   br bb3                                          // id: %16
 
 bb3:                                              // Preds: bb1 bb2

@@ -13,8 +13,8 @@ sil_global private @globalinit_token120 : $Builtin.Word
 sil @globalinit_func11 :  $@thin () -> ()
 
 //CHECK: sil @a_method_to_simplify
-sil @a_method_to_simplify : $@thin (Builtin.RawPointer, @owned Builtin.NativeObject, Builtin.Word) -> Builtin.RawPointer {
-bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.NativeObject, %2 : $Builtin.Word):
+sil @a_method_to_simplify : $@thin (Builtin.RawPointer, @owned Builtin.NativeObject, Builtin.Int32) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.NativeObject, %2 : $Builtin.Int32):
   %4 = struct $UnsafeMutablePointer<UInt8> (%0 : $Builtin.RawPointer) // user: %37
   strong_retain %1 : $Builtin.NativeObject       // id: %5
   strong_retain %1 : $Builtin.NativeObject       // id: %6
@@ -25,37 +25,37 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.NativeObject, %2 : $Builtin.Word):
   %12 = function_ref @globalinit_func11 : $@thin () -> () // users: %26, %13
   %13 = thin_to_thick_function %12 : $@thin () -> () to $@callee_owned () -> () // user: %14
   %14 = builtin "once"(%11 : $Builtin.RawPointer, %13 : $@callee_owned () -> ()) : $()
-  %15 = alloc_stack $Int                          // users: %38, %40, %41
-  %16 = struct_element_addr %15#1 : $*Int, #Int.value // users: %28, %17
-  %17 = load %16 : $*Builtin.Word                 // user: %20
-  %18 = integer_literal $Builtin.Word, -1         // user: %20
-  %20 = builtin "xor_Word"(%17 : $Builtin.Word, %18 : $Builtin.Word) : $Builtin.Word // user: %22
-  %22 = builtin "and_Word"(%2 : $Builtin.Word, %20 : $Builtin.Word) : $Builtin.Word // users: %30, %23
+  %15 = alloc_stack $Int32                        // users: %38, %40, %41
+  %16 = struct_element_addr %15#1 : $*Int32, #Int32.value // users: %28, %17
+  %17 = load %16 : $*Builtin.Int32                // user: %20
+  %18 = integer_literal $Builtin.Int32, -1         // user: %20
+  %20 = builtin "xor_Int32"(%17 : $Builtin.Int32, %18 : $Builtin.Int32) : $Builtin.Int32 // user: %22
+  %22 = builtin "and_Int32"(%2 : $Builtin.Int32, %20 : $Builtin.Int32) : $Builtin.Int32 // users: %30, %23
 //CHECK-NOT: cond_br
-  cond_br %8, bb1, bb2(%22 : $Builtin.Word)       // id: %23
+  cond_br %8, bb1, bb2(%22 : $Builtin.Int32)       // id: %23
 
 bb1:                                              // Preds: bb0
   %24 = global_addr @globalinit_token11 : $*Builtin.Word // user: %25
   %25 = address_to_pointer %24 : $*Builtin.Word to $Builtin.RawPointer // user: %27
   %26 = thin_to_thick_function %12 : $@thin () -> () to $@callee_owned () -> () // user: %27
   %27 = builtin "once"(%25 : $Builtin.RawPointer, %26 : $@callee_owned () -> ()) : $()
-  %28 = load %16 : $*Builtin.Word                 // user: %30
-// CHECK: [[VAR_21:%[0-9]+]] = builtin "and_Word"
-  %30 = builtin "or_Word"(%22 : $Builtin.Word, %28 : $Builtin.Word) : $Builtin.Word // user: %31
-  br bb2(%30 : $Builtin.Word)                     // id: %31
+  %28 = load %16 : $*Builtin.Int32                // user: %30
+// CHECK: [[VAR_21:%[0-9]+]] = builtin "and_Int32"
+  %30 = builtin "or_Int32"(%22 : $Builtin.Int32, %28 : $Builtin.Int32) : $Builtin.Int32 // user: %31
+  br bb2(%30 : $Builtin.Int32)                    // id: %31
 
-bb2(%32 : $Builtin.Word):                         // Preds: bb0 bb1
+bb2(%32 : $Builtin.Int32):                        // Preds: bb0 bb1
 //CHECK-NEXT: tuple ()
   %33 = tuple ()                                  // user: %34
   br bb3(%33 : $())                               // id: %34
 
 bb3(%35 : $()):                                   // Preds: bb2
-// CHECK-NEXT: struct $Int ([[VAR_21]] : $Builtin.Word)
-  %36 = struct $Int (%32 : $Builtin.Word)         // user: %37
-  strong_retain %1 : $Builtin.NativeObject       // id: %38
-  strong_release %1 : $Builtin.NativeObject      // id: %39
-  strong_release %1 : $Builtin.NativeObject      // id: %40
-  dealloc_stack %15#0 : $*@local_storage Int      // id: %41
+// CHECK-NEXT: struct $Int32 ([[VAR_21]] : $Builtin.Int32)
+  %36 = struct $Int32 (%32 : $Builtin.Int32)      // user: %37
+  strong_retain %1 : $Builtin.NativeObject        // id: %38
+  strong_release %1 : $Builtin.NativeObject       // id: %39
+  strong_release %1 : $Builtin.NativeObject       // id: %40
+  dealloc_stack %15#0 : $*@local_storage Int32    // id: %41
 // CHECK: return
   return %0 : $Builtin.RawPointer
 }
@@ -66,17 +66,17 @@ bb3(%35 : $()):                                   // Preds: bb2
 //CHECK: bb2:
 //CHECK-NEXT: tuple ()
 //CHECK-NEXT: return
-sil @remove_dead_args: $@thin (Int) -> () {
-bb0(%0 : $Int):
-  %1 = integer_literal $Builtin.Word, 37
-  %3 = struct_extract %0 : $Int, #Int.value
-  %4 = builtin "cmp_ne_Word"(%3 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+sil @remove_dead_args: $@thin (Int32) -> () {
+bb0(%0 : $Int32):
+  %1 = integer_literal $Builtin.Int32, 37
+  %3 = struct_extract %0 : $Int32, #Int32.value
+  %4 = builtin "cmp_ne_Int32"(%3 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   %5 = struct $Bool (%4 : $Builtin.Int1)
   cond_br %4, bb1, bb3
 
 bb1:
-  %7 = integer_literal $Builtin.Word, 42
-  %8 = builtin "cmp_ne_Word"(%3 : $Builtin.Word, %7 : $Builtin.Word) : $Builtin.Int1
+  %7 = integer_literal $Builtin.Int32, 42
+  %8 = builtin "cmp_ne_Int32"(%3 : $Builtin.Int32, %7 : $Builtin.Int32) : $Builtin.Int1
   %9 = struct $Bool (%8 : $Builtin.Int1)
   br bb2(%9 : $Bool)
 
@@ -97,179 +97,179 @@ class A {}
 //CHECK: bb1([[VAR:%[0-9]+]] : $A)
 //CHECK-NOT: [[VAR]]
 //CHECK: return
-sil @no_remove_mandatory_dead_args : $@thin (@owned AnyObject) -> Int {
+sil @no_remove_mandatory_dead_args : $@thin (@owned AnyObject) -> Int32 {
 bb0(%0 : $AnyObject):
   checked_cast_br %0 : $AnyObject to $A, bb1, bb2 // id: %3
 
 bb1(%1 : $A):
-  %2 = integer_literal $Builtin.Word, 1
-  br bb3(%2 : $Builtin.Word)
+  %2 = integer_literal $Builtin.Int32, 1
+  br bb3(%2 : $Builtin.Int32)
 
 bb2:
-  %3 = integer_literal $Builtin.Word, 0
-  br bb3(%3 : $Builtin.Word)
+  %3 = integer_literal $Builtin.Int32, 0
+  br bb3(%3 : $Builtin.Int32)
 
-bb3(%4 : $Builtin.Word):
-  %5 = struct $Int (%4 : $Builtin.Word)
+bb3(%4 : $Builtin.Int32):
+  %5 = struct $Int32 (%4 : $Builtin.Int32)
   strong_release %0 : $AnyObject
-  return %5 : $Int
+  return %5 : $Int32
 }
 
 enum X {
   case A
-  case B((Int, Int))
-  case C(Int)
+  case B((Int32, Int32))
+  case C(Int32)
 }
 
 // CHECK-LABEL: simplify_switch_include_args
-sil @simplify_switch_include_args : $@thin (Int, Int) -> Int {
-bb0(%0 : $Int, %1 : $Int):
-// CHECK: return %0 : $Int
-  %2 = tuple (%0 : $Int, %1 : $Int)               // user: %3
-  %3 = enum $X, #X.B!enumelt.1, %2 : $(Int, Int)  // user: %4
+sil @simplify_switch_include_args : $@thin (Int32, Int32) -> Int32 {
+bb0(%0 : $Int32, %1 : $Int32):
+// CHECK: return %0 : $Int32
+  %2 = tuple (%0 : $Int32, %1 : $Int32)               // user: %3
+  %3 = enum $X, #X.B!enumelt.1, %2 : $(Int32, Int32)  // user: %4
   switch_enum %3 : $X, case #X.A!enumelt: bb1, case #X.B!enumelt.1: bb3, case #X.C!enumelt.1: bb5 // id: %4
 
 bb1:                                              // Preds: bb0
   br bb2                                          // id: %5
 
 bb2:                                              // Preds: bb1
-  %6 = integer_literal $Builtin.Word, 0           // user: %7
-  %7 = struct $Int (%6 : $Builtin.Word)           // user: %8
-  br bb7(%7 : $Int)                               // id: %8
+  %6 = integer_literal $Builtin.Int32, 0          // user: %7
+  %7 = struct $Int32 (%6 : $Builtin.Int32)        // user: %8
+  br bb7(%7 : $Int32)                             // id: %8
 
-bb3(%9 : $(Int, Int)):                            // Preds: bb0
-  %10 = tuple_extract %9 : $(Int, Int), 0         // user: %12
+bb3(%9 : $(Int32, Int32)):                        // Preds: bb0
+  %10 = tuple_extract %9 : $(Int32, Int32), 0     // user: %12
   br bb4                                          // id: %11
 
 bb4:                                              // Preds: bb3
-  br bb7(%10 : $Int)                              // id: %12
+  br bb7(%10 : $Int32)                            // id: %12
 
-bb5(%13 : $Int):                                  // Preds: bb0
+bb5(%13 : $Int32):                                // Preds: bb0
   br bb6                                          // id: %14
 
 bb6:                                              // Preds: bb5
-  br bb7(%13 : $Int)                              // id: %15
+  br bb7(%13 : $Int32)                            // id: %15
 
-bb7(%16 : $Int):                                  // Preds: bb2 bb4 bb6
-  return %16 : $Int                               // id: %17
+bb7(%16 : $Int32):                                // Preds: bb2 bb4 bb6
+  return %16 : $Int32                             // id: %17
 }
 
 // CHECK-LABEL: simplify_switch_dont_include_args
-sil @simplify_switch_dont_include_args : $@thin (Int, Int) -> Int {
-bb0(%0 : $Int, %1 : $Int):
-  %2 = tuple (%0 : $Int, %1 : $Int)               // user: %3
-  %3 = enum $X, #X.B!enumelt.1, %2 : $(Int, Int)  // user: %4
+sil @simplify_switch_dont_include_args : $@thin (Int32, Int32) -> Int32 {
+bb0(%0 : $Int32, %1 : $Int32):
+  %2 = tuple (%0 : $Int32, %1 : $Int32)               // user: %3
+  %3 = enum $X, #X.B!enumelt.1, %2 : $(Int32, Int32)  // user: %4
   switch_enum %3 : $X, case #X.A!enumelt: bb1, case #X.B!enumelt.1: bb3, case #X.C!enumelt.1: bb5 // id: %4
 
 bb1:                                              // Preds: bb0
   br bb2                                          // id: %5
 
 bb2:                                              // Preds: bb1
-  %6 = integer_literal $Builtin.Word, 0           // user: %7
-  %7 = struct $Int (%6 : $Builtin.Word)           // user: %8
+  %6 = integer_literal $Builtin.Int32, 0          // user: %7
+  %7 = struct $Int32 (%6 : $Builtin.Int32)        // user: %8
   br bb5
 
-bb3(%9 : $(Int, Int)):                            // Preds: bb0
-  %10 = tuple_extract %9 : $(Int, Int), 0         // user: %12
+bb3(%9 : $(Int32, Int32)):                        // Preds: bb0
+  %10 = tuple_extract %9 : $(Int32, Int32), 0     // user: %12
   br bb4                                          // id: %11
 
 bb4:                                              // Preds: bb3
   br bb5                                          // id: %12
 
 bb5:                                              // Preds: bb0
-  return %0 : $Int                                // id: %17
+  return %0 : $Int32                              // id: %17
 }
 
 // CHECK-LABEL: simplify_switch_dont_include_args_nested
-sil @simplify_switch_dont_include_args_nested : $@thin (Int, Int, X) -> Int {
+sil @simplify_switch_dont_include_args_nested : $@thin (Int32, Int32, X) -> Int32 {
 // CHECK: bb0
 // CHECK: switch_enum %2
-bb0(%0 : $Int, %1 : $Int, %2 : $X):
+bb0(%0 : $Int32, %1 : $Int32, %2 : $X):
   switch_enum %2 : $X, case #X.A!enumelt: bb3, case #X.B!enumelt.1: bb1, case #X.C!enumelt.1: bb5
 
 // CHECK: bb1
 // CHECK-NOT: switch_enum
-bb1(%12: $(Int, Int)):
+bb1(%12: $(Int32, Int32)):
   switch_enum %2 : $X, case #X.A!enumelt: bb6, case #X.B!enumelt.1: bb7, case #X.C!enumelt.1: bb8
 
 bb2:
-  %6 = integer_literal $Builtin.Word, 0
-  %7 = struct $Int (%6 : $Builtin.Word)
-  br bb5(%7 : $Int)
+  %6 = integer_literal $Builtin.Int32, 0
+  %7 = struct $Int32 (%6 : $Builtin.Int32)
+  br bb5(%7 : $Int32)
 
 bb3:
-  %9 = integer_literal $Builtin.Word, 1
-  %10 = struct $Int (%9 : $Builtin.Word)
-  br bb4(%10 : $Int)
+  %9 = integer_literal $Builtin.Int32, 1
+  %10 = struct $Int32 (%9 : $Builtin.Int32)
+  br bb4(%10 : $Int32)
 
-bb4(%16 : $Int):
-  br bb5(%16 : $Int)
+bb4(%16 : $Int32):
+  br bb5(%16 : $Int32)
 
-bb5(%19 : $Int):
-  return %19 : $Int
+bb5(%19 : $Int32):
+  return %19 : $Int32
 
 bb6:
-  %14 = integer_literal $Builtin.Word, 2
-  %15 = struct $Int (%14 : $Builtin.Word)
-  br bb5(%15 : $Int)
+  %14 = integer_literal $Builtin.Int32, 2
+  %15 = struct $Int32 (%14 : $Builtin.Int32)
+  br bb5(%15 : $Int32)
 
 bb7:
-  %17 = integer_literal $Builtin.Word, 3
-  %18 = struct $Int (%17 : $Builtin.Word)
-  br bb5(%18 : $Int)
+  %17 = integer_literal $Builtin.Int32, 3
+  %18 = struct $Int32 (%17 : $Builtin.Int32)
+  br bb5(%18 : $Int32)
 
-bb8(%20 : $Int):
-  br bb5(%20 : $Int)
+bb8(%20 : $Int32):
+  br bb5(%20 : $Int32)
 }
 
 // CHECK-LABEL: simplify_switch_wrong_args
-sil @simplify_switch_wrong_args : $@thin (Int, Int, X, Builtin.Int1) -> Int {
+sil @simplify_switch_wrong_args : $@thin (Int32, Int32, X, Builtin.Int1) -> Int32 {
 // CHECK: bb0
 // CHECK: switch_enum %2
-bb0(%0 : $Int, %1 : $Int, %2 : $X, %24 : $Builtin.Int1):
+bb0(%0 : $Int32, %1 : $Int32, %2 : $X, %24 : $Builtin.Int1):
   switch_enum %2 : $X, case #X.A!enumelt: bb3, case #X.B!enumelt.1: bb9, case #X.C!enumelt.1: bb5
 
-bb9(%21 : $(Int, Int)):
-  %22 = tuple_extract %21 : $(Int, Int), 1
-  cond_br %24, bb1(%22 : $Int), bb5(%22 : $Int)
+bb9(%21 : $(Int32, Int32)):
+  %22 = tuple_extract %21 : $(Int32, Int32), 1
+  cond_br %24, bb1(%22 : $Int32), bb5(%22 : $Int32)
 
 // CHECK: bb1
 // CHECK-NOT: switch_enum
-bb1(%12: $Int):
+bb1(%12: $Int32):
   switch_enum %2 : $X, case #X.A!enumelt: bb6, case #X.B!enumelt.1: bb7, case #X.C!enumelt.1: bb8
 
 bb2:
-  %6 = integer_literal $Builtin.Word, 0
-  %7 = struct $Int (%6 : $Builtin.Word)
-  br bb5(%7 : $Int)
+  %6 = integer_literal $Builtin.Int32, 0
+  %7 = struct $Int32 (%6 : $Builtin.Int32)
+  br bb5(%7 : $Int32)
 
 bb3:
-  %9 = integer_literal $Builtin.Word, 1
-  %10 = struct $Int (%9 : $Builtin.Word)
-  br bb4(%10 : $Int)
+  %9 = integer_literal $Builtin.Int32, 1
+  %10 = struct $Int32 (%9 : $Builtin.Int32)
+  br bb4(%10 : $Int32)
 
-bb4(%16 : $Int):
-  br bb5(%16 : $Int)
+bb4(%16 : $Int32):
+  br bb5(%16 : $Int32)
 
-bb5(%19 : $Int):
-  return %19 : $Int
+bb5(%19 : $Int32):
+  return %19 : $Int32
 
 bb6:
-  %14 = integer_literal $Builtin.Word, 2
-  %15 = struct $Int (%14 : $Builtin.Word)
-  br bb5(%15 : $Int)
+  %14 = integer_literal $Builtin.Int32, 2
+  %15 = struct $Int32 (%14 : $Builtin.Int32)
+  br bb5(%15 : $Int32)
 
-bb7(%23 : $(Int, Int)):
-  %17 = tuple_extract %21 : $(Int, Int), 0
-  br bb5(%17 : $Int)
+bb7(%23 : $(Int32, Int32)):
+  %17 = tuple_extract %21 : $(Int32, Int32), 0
+  br bb5(%17 : $Int32)
 
-bb8(%20 : $Int):
-  br bb5(%20 : $Int)
+bb8(%20 : $Int32):
+  br bb5(%20 : $Int32)
 }
 
 enum EA {
   case cA
-  case cB(Int)
+  case cB(Int32)
   case cC(Float)
 }
 
@@ -288,7 +288,7 @@ bb1:
 bb2:
   br bb7
 
-bb3(%6 : $Int):
+bb3(%6 : $Int32):
   br bb4
 
 bb4:
@@ -306,11 +306,11 @@ bb7:
 }
 
 // CHECK-LABEL: fold_unreachable_terminators2
-sil @fold_unreachable_terminators2 : $@thin (EA) -> Int {
+sil @fold_unreachable_terminators2 : $@thin (EA) -> Int32 {
 // CHECK: bb0
 bb0(%0 : $EA):
 // CHECK-NEXT:  [[VAL:%[a-zA-Z0-9]+]] = unchecked_enum_data %0 : $EA, #EA.cB!enumelt.1 // user: %2
-// CHECK-NEXT: return [[VAL]] : $Int
+// CHECK-NEXT: return [[VAL]] : $Int32
   switch_enum %0 : $EA, case #EA.cA!enumelt: bb1, case #EA.cB!enumelt.1: bb3, case #EA.cC!enumelt.1: bb5
 
 bb1:
@@ -319,11 +319,11 @@ bb1:
 bb2:
   unreachable
 
-bb3(%6 : $Int):
+bb3(%6 : $Int32):
   br bb4
 
 bb4:
-  return %6 : $Int
+  return %6 : $Int32
 
 bb5(%10 : $Float):
   br bb6
@@ -391,25 +391,25 @@ bb4(%3 : $Builtin.Int1):
 }
 
 // CHECK-LABEL: sil @same_destination_unused_arg
-sil @same_destination_unused_arg : $@thin (Optional<Int>) -> Optional<Int> {
-bb0(%0 : $Optional<Int>):
+sil @same_destination_unused_arg : $@thin (Optional<Int32>) -> Optional<Int32> {
+bb0(%0 : $Optional<Int32>):
   %t = integer_literal $Builtin.Int1, 1
   %f = integer_literal $Builtin.Int1, 0
 // CHECK: select_enum
 // CHECK-NEXT: return
-  %1 = select_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: %t, default %f : $Builtin.Int1
-  cond_br %1, bb1(%0 : $Optional<Int>), bb2(%0 : $Optional<Int>)
+  %1 = select_enum %0 : $Optional<Int32>, case #Optional.Some!enumelt.1: %t, default %f : $Builtin.Int1
+  cond_br %1, bb1(%0 : $Optional<Int32>), bb2(%0 : $Optional<Int32>)
 
-bb1(%2 : $Optional<Int>):
-  br bb2(%2 : $Optional<Int>)
+bb1(%2 : $Optional<Int32>):
+  br bb2(%2 : $Optional<Int32>)
 
-bb2(%3 : $Optional<Int>):
-  return %0 : $Optional<Int>
+bb2(%3 : $Optional<Int32>):
+  return %0 : $Optional<Int32>
 }
 
 public enum Numbers {
   case First, Second, Third, Fourth, Fifth
-  //var hashValue: Int { get }
+  //var hashValue: Int32 { get }
 }
     
 
@@ -423,7 +423,7 @@ public enum Numbers {
 // CHECK_WITH_CODEMOTION-NOT: switch_enum
 // CHECK_WITH_CODEMOTION: select_enum
 // CHECK_WITH_CODEMOTION: return
-sil @FormSelectEnumFromTwoSelectSwitches : $@thin (Numbers) -> Int {
+sil @FormSelectEnumFromTwoSelectSwitches : $@thin (Numbers) -> Int32 {
 bb0(%0 : $Numbers):
   debug_value %0 : $Numbers  // let e             // id: %1
   switch_enum %0 : $Numbers, case #Numbers.First!enumelt: bb1, case #Numbers.Second!enumelt: bb3, case #Numbers.Third!enumelt: bb4, default bb6 // id: %2
@@ -432,9 +432,9 @@ bb1:                                              // Preds: bb0
   br bb2                                          // id: %3
 
 bb2:                                              // Preds: bb1
-  %4 = integer_literal $Builtin.Word, 42          // user: %5
-  %5 = struct $Int (%4 : $Builtin.Word)           // user: %6
-  br bb20(%5 : $Int)                              // id: %6
+  %4 = integer_literal $Builtin.Int32, 42         // user: %5
+  %5 = struct $Int32 (%4 : $Builtin.Int32)        // user: %6
+  br bb20(%5 : $Int32)                            // id: %6
 
 bb3:                                              // Preds: bb0
   br bb5                                          // id: %7
@@ -443,9 +443,9 @@ bb4:                                              // Preds: bb0
   br bb5                                          // id: %8
 
 bb5:                                              // Preds: bb3 bb4
-  %9 = integer_literal $Builtin.Word, 24          // user: %10
-  %10 = struct $Int (%9 : $Builtin.Word)          // user: %11
-  br bb20(%10 : $Int)                             // id: %11
+  %9 = integer_literal $Builtin.Int32, 24         // user: %10
+  %10 = struct $Int32 (%9 : $Builtin.Int32)       // user: %11
+  br bb20(%10 : $Int32)                           // id: %11
 
 bb6:                                              // Preds: bb0
   br bb7                                          // id: %12
@@ -463,9 +463,9 @@ bb10:                                             // Preds: bb9
   br bb11                                         // id: %16
 
 bb11:                                             // Preds: bb10
-  %17 = integer_literal $Builtin.Word, 42         // user: %18
-  %18 = struct $Int (%17 : $Builtin.Word)         // user: %19
-  br bb20(%18 : $Int)                             // id: %19
+  %17 = integer_literal $Builtin.Int32, 42        // user: %18
+  %18 = struct $Int32 (%17 : $Builtin.Int32)      // user: %19
+  br bb20(%18 : $Int32)                           // id: %19
 
 bb12:                                             // Preds: bb9
   br bb14                                         // id: %20
@@ -474,17 +474,17 @@ bb13:                                             // Preds: bb9
   br bb14                                         // id: %21
 
 bb14:                                             // Preds: bb12 bb13
-  %22 = integer_literal $Builtin.Word, 24         // user: %23
-  %23 = struct $Int (%22 : $Builtin.Word)         // user: %24
-  br bb20(%23 : $Int)                             // id: %24
+  %22 = integer_literal $Builtin.Int32, 24        // user: %23
+  %23 = struct $Int32 (%22 : $Builtin.Int32)      // user: %24
+  br bb20(%23 : $Int32)                           // id: %24
 
 bb15:                                             // Preds: bb9
   br bb16                                         // id: %25
 
 bb16:                                             // Preds: bb15
-  %26 = integer_literal $Builtin.Word, 100        // user: %27
-  %27 = struct $Int (%26 : $Builtin.Word)         // user: %28
-  br bb20(%27 : $Int)                             // id: %28
+  %26 = integer_literal $Builtin.Int32, 100       // user: %27
+  %27 = struct $Int32 (%26 : $Builtin.Int32)      // user: %28
+  br bb20(%27 : $Int32)                           // id: %28
 
 bb17:                                             // Preds: bb9
   br bb18                                         // id: %29
@@ -493,19 +493,19 @@ bb18:                                             // Preds: bb17
   br bb19                                         // id: %30
 
 bb19:                                             // Preds: bb18
-  %31 = integer_literal $Builtin.Word, 100        // user: %32
-  %32 = struct $Int (%31 : $Builtin.Word)         // user: %33
-  br bb20(%32 : $Int)                             // id: %33
+  %31 = integer_literal $Builtin.Int32, 100       // user: %32
+  %32 = struct $Int32 (%31 : $Builtin.Int32)      // user: %33
+  br bb20(%32 : $Int32)                           // id: %33
 
-bb20(%34 : $Int):                                 // Preds: bb2 bb5 bb11 bb14 bb16 bb19
-  return %34 : $Int                               // id: %35
+bb20(%34 : $Int32):                                 // Preds: bb2 bb5 bb11 bb14 bb16 bb19
+  return %34 : $Int32                               // id: %35
 }
 
 // CHECK_WITH_CODEMOTION-LABEL: sil @FormSelectEnumIntResult
 // CHECK_WITH_CODEMOTION-NOT: switch_enum
 // CHECK_WITH_CODEMOTION: select_enum
 // CHECK_WITH_CODEMOTION: return
-sil @FormSelectEnumIntResult : $@thin (Numbers) -> Int {
+sil @FormSelectEnumIntResult : $@thin (Numbers) -> Int32 {
 bb0(%0 : $Numbers):
   debug_value %0 : $Numbers  // let e             // id: %1
   switch_enum %0 : $Numbers, case #Numbers.First!enumelt: bb1, case #Numbers.Second!enumelt: bb3, case #Numbers.Third!enumelt: bb4, case #Numbers.Fourth!enumelt: bb6, default bb8 // id: %2
@@ -514,9 +514,9 @@ bb1:                                              // Preds: bb0
   br bb2                                          // id: %3
 
 bb2:                                              // Preds: bb1
-  %4 = integer_literal $Builtin.Word, 42          // user: %5
-  %5 = struct $Int (%4 : $Builtin.Word)           // user: %6
-  br bb11(%5 : $Int)                              // id: %6
+  %4 = integer_literal $Builtin.Int32, 42         // user: %5
+  %5 = struct $Int32 (%4 : $Builtin.Int32)        // user: %6
+  br bb11(%5 : $Int32)                            // id: %6
 
 bb3:                                              // Preds: bb0
   br bb5                                          // id: %7
@@ -525,17 +525,17 @@ bb4:                                              // Preds: bb0
   br bb5                                          // id: %8
 
 bb5:                                              // Preds: bb3 bb4
-  %9 = integer_literal $Builtin.Word, 24          // user: %10
-  %10 = struct $Int (%9 : $Builtin.Word)          // user: %11
-  br bb11(%10 : $Int)                             // id: %11
+  %9 = integer_literal $Builtin.Int32, 24         // user: %10
+  %10 = struct $Int32 (%9 : $Builtin.Int32)       // user: %11
+  br bb11(%10 : $Int32)                           // id: %11
 
 bb6:                                              // Preds: bb0
   br bb7                                          // id: %12
 
 bb7:                                              // Preds: bb6
-  %13 = integer_literal $Builtin.Word, 100        // user: %14
-  %14 = struct $Int (%13 : $Builtin.Word)         // user: %15
-  br bb11(%14 : $Int)                             // id: %15
+  %13 = integer_literal $Builtin.Int32, 100       // user: %14
+  %14 = struct $Int32 (%13 : $Builtin.Int32)      // user: %15
+  br bb11(%14 : $Int32)                           // id: %15
 
 bb8:                                              // Preds: bb0
   br bb9                                          // id: %16
@@ -544,12 +544,12 @@ bb9:                                              // Preds: bb8
   br bb10                                         // id: %17
 
 bb10:                                             // Preds: bb9
-  %18 = integer_literal $Builtin.Word, 100        // user: %19
-  %19 = struct $Int (%18 : $Builtin.Word)         // user: %20
-  br bb11(%19 : $Int)                             // id: %20
+  %18 = integer_literal $Builtin.Int32, 100       // user: %19
+  %19 = struct $Int32 (%18 : $Builtin.Int32)      // user: %20
+  br bb11(%19 : $Int32)                           // id: %20
 
-bb11(%21 : $Int):                                 // Preds: bb2 bb5 bb7 bb10
-  return %21 : $Int                               // id: %22
+bb11(%21 : $Int32):                               // Preds: bb2 bb5 bb7 bb10
+  return %21 : $Int32                             // id: %22
 }
 
 // CHECK_WITH_CODEMOTION-LABEL: sil @FormSelectEnumBoolResult

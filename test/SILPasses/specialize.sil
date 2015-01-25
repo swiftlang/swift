@@ -7,10 +7,10 @@ import Swift
 
 // CHECK-LABEL: sil @_TF10specialize4exp1FT_T_ : $@thin () -> () {
 // CHECK-NOT: apply
-// CHECK: [[CTOR:%[0-9]+]] = function_ref @_TTSg5Si___TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__
+// CHECK: [[CTOR:%[0-9]+]] = function_ref @_TTSg5VSs5Int32___TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__
 // CHECK: apply [[CTOR]]
 // CHECK: [[ACCEPTS_INT:%[0-9]+]] = function_ref @_TF10specialize10acceptsIntFSiT_
-// CHECK: [[FOO:%[0-9]+]] = function_ref @_TTSg5Si___TFV10specialize3XXX3fooU__fRGS0_Q__FT1tQ__Si
+// CHECK: [[FOO:%[0-9]+]] = function_ref @_TTSg5VSs5Int32___TFV10specialize3XXX3fooU__fRGS0_Q__FT1tQ__Si
 // CHECK: apply [[FOO]]
 // CHECK: apply [[ACCEPTS_INT]]
 // CHECK: return
@@ -18,7 +18,7 @@ import Swift
 
 struct XXX<T> {
   init(t: T)
-  mutating func foo(#t: T) -> Int
+  mutating func foo(#t: T) -> Int32
   var m_t: T
 }
 
@@ -46,8 +46,8 @@ bb0(%0 : $*XXX<T>, %1 : $*T, %2 : $@thin XXX<T>.Type):
   return %12 : $()                                // id: %14
 }
 
-// specialize.XXX.foo <A>(@inout specialize.XXX<A>)(t : A) -> Swift.Int
-sil @_TFV10specialize3XXX3fooU__fRGS0_Q__FT1tQ__Si : $@cc(method) @thin <T> (@in T, @inout XXX<T>) -> Int {
+// specialize.XXX.foo <A>(@inout specialize.XXX<A>)(t : A) -> Swift.Int32
+sil @_TFV10specialize3XXX3fooU__fRGS0_Q__FT1tQ__Si : $@cc(method) @thin <T> (@in T, @inout XXX<T>) -> Int32 {
 bb0(%0 : $*T, %1 : $*XXX<T>):
   debug_value_addr %0 : $*T  // let t             // id: %2
   %3 = alloc_stack $T                             // users: %4, %6, %7
@@ -55,25 +55,25 @@ bb0(%0 : $*T, %1 : $*XXX<T>):
   %5 = struct_element_addr %1 : $*XXX<T>, #XXX.m_t // user: %6
   copy_addr [take] %3#1 to %5 : $*T               // id: %6
   dealloc_stack %3#0 : $*@local_storage T         // id: %7
-  %8 = integer_literal $Builtin.Word, 4           // user: %9
-  %9 = struct $Int (%8 : $Builtin.Word)           // user: %11
+  %8 = integer_literal $Builtin.Int32, 4          // user: %9
+  %9 = struct $Int32 (%8 : $Builtin.Int32)        // user: %11
   destroy_addr %0 : $*T                           // id: %10
-  return %9 : $Int                                // id: %11
+  return %9 : $Int32                              // id: %11
 }
 
-// Swift.Int._convertFromBuiltinIntegerLiteral (Swift.Int.Type)(Builtin.Int2048) -> Swift.Int
-sil public_external [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int {
-bb0(%0 : $Builtin.Int2048, %1 : $@thin Int.Type):
-  %3 = builtin "s_to_s_checked_trunc_Int2048_Word"(%0 : $Builtin.Int2048) : $(Builtin.Word, Builtin.Int1)
-  %4 = tuple_extract %3 : $(Builtin.Word, Builtin.Int1), 0 // user: %5
-  %5 = struct $Int (%4 : $Builtin.Word)           // user: %6
-  return %5 : $Int                                // id: %6
+// Swift.Int32._convertFromBuiltinIntegerLiteral (Swift.Int32.Type)(Builtin.Int2048) -> Swift.Int32
+sil public_external [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int32.Type) -> Int32 {
+bb0(%0 : $Builtin.Int2048, %1 : $@thin Int32.Type):
+  %3 = builtin "s_to_s_checked_trunc_Int2048_Int32"(%0 : $Builtin.Int2048) : $(Builtin.Int32, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int32, Builtin.Int1), 0 // user: %5
+  %5 = struct $Int32 (%4 : $Builtin.Int32)           // user: %6
+  return %5 : $Int32                                // id: %6
 }
 
-// specialize.acceptsInt (Swift.Int) -> ()
-sil @_TF10specialize10acceptsIntFSiT_ : $@thin (Int) -> () {
-bb0(%0 : $Int):
-  debug_value %0 : $Int  // let x                 // id: %1
+// specialize.acceptsInt (Swift.Int32) -> ()
+sil @_TF10specialize10acceptsIntFSiT_ : $@thin (Int32) -> () {
+bb0(%0 : $Int32):
+  debug_value %0 : $Int32  // let x                 // id: %1
   %2 = tuple ()                                   // user: %3
   return %2 : $()                                 // id: %3
 }
@@ -81,30 +81,30 @@ bb0(%0 : $Int):
 // specialize.exp1 () -> ()
 sil @_TF10specialize4exp1FT_T_ : $@thin () -> () {
 bb0:
-  %0 = alloc_stack $XXX<Int>  // var II           // users: %7, %15, %19
+  %0 = alloc_stack $XXX<Int32>  // var II           // users: %7, %15, %19
   // function_ref specialize.XXX.init <A>(specialize.XXX<A>.Type)(t : A) -> specialize.XXX<A>
   %1 = function_ref @_TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__ : $@thin <τ_0_0> (@out XXX<τ_0_0>, @in τ_0_0, @thin XXX<τ_0_0>.Type) -> () // user: %7
-  %2 = metatype $@thin XXX<Int>.Type              // user: %7
-  %3 = alloc_stack $Int                           // users: %6, %7, %8
-  %4 = integer_literal $Builtin.Word, 5           // user: %5
-  %5 = struct $Int (%4 : $Builtin.Word)           // user: %6
-  store %5 to %3#1 : $*Int                        // id: %6
-  %7 = apply %1<Int>(%0#1, %3#1, %2) : $@thin <τ_0_0> (@out XXX<τ_0_0>, @in τ_0_0, @thin XXX<τ_0_0>.Type) -> ()
-  dealloc_stack %3#0 : $*@local_storage Int       // id: %8
-  // function_ref specialize.acceptsInt (Swift.Int) -> ()
-  %9 = function_ref @_TF10specialize10acceptsIntFSiT_ : $@thin (Int) -> () // user: %16
-  // function_ref specialize.XXX.foo <A>(@inout specialize.XXX<A>)(t : A) -> Swift.Int
-  %10 = function_ref @_TFV10specialize3XXX3fooU__fRGS0_Q__FT1tQ__Si : $@cc(method) @thin <τ_0_0> (@in τ_0_0, @inout XXX<τ_0_0>) -> Int // user: %15
-  %11 = alloc_stack $Int                          // users: %14, %15, %17
-  %12 = integer_literal $Builtin.Word, 4          // user: %13
-  %13 = struct $Int (%12 : $Builtin.Word)         // user: %14
-  store %13 to %11#1 : $*Int                      // id: %14
-  %15 = apply %10<Int>(%11#1, %0#1) : $@cc(method) @thin <τ_0_0> (@in τ_0_0, @inout XXX<τ_0_0>) -> Int // user: %16
-  %16 = apply %9(%15) : $@thin (Int) -> ()
-  dealloc_stack %11#0 : $*@local_storage Int      // id: %17
-  %18 = tuple ()                                  // user: %20
-  dealloc_stack %0#0 : $*@local_storage XXX<Int>  // id: %19
-  return %18 : $()                                // id: %20
+  %2 = metatype $@thin XXX<Int32>.Type              // user: %7
+  %3 = alloc_stack $Int32                           // users: %6, %7, %8
+  %4 = integer_literal $Builtin.Int32, 5            // user: %5
+  %5 = struct $Int32 (%4 : $Builtin.Int32)          // user: %6
+  store %5 to %3#1 : $*Int32                        // id: %6
+  %7 = apply %1<Int32>(%0#1, %3#1, %2) : $@thin <τ_0_0> (@out XXX<τ_0_0>, @in τ_0_0, @thin XXX<τ_0_0>.Type) -> ()
+  dealloc_stack %3#0 : $*@local_storage Int32       // id: %8
+  // function_ref specialize.acceptsInt (Swift.Int32) -> ()
+  %9 = function_ref @_TF10specialize10acceptsIntFSiT_ : $@thin (Int32) -> () // user: %16
+  // function_ref specialize.XXX.foo <A>(@inout specialize.XXX<A>)(t : A) -> Swift.Int32
+  %10 = function_ref @_TFV10specialize3XXX3fooU__fRGS0_Q__FT1tQ__Si : $@cc(method) @thin <τ_0_0> (@in τ_0_0, @inout XXX<τ_0_0>) -> Int32 // user: %15
+  %11 = alloc_stack $Int32                          // users: %14, %15, %17
+  %12 = integer_literal $Builtin.Int32, 4           // user: %13
+  %13 = struct $Int32 (%12 : $Builtin.Int32)        // user: %14
+  store %13 to %11#1 : $*Int32                      // id: %14
+  %15 = apply %10<Int32>(%11#1, %0#1) : $@cc(method) @thin <τ_0_0> (@in τ_0_0, @inout XXX<τ_0_0>) -> Int32 // user: %16
+  %16 = apply %9(%15) : $@thin (Int32) -> ()
+  dealloc_stack %11#0 : $*@local_storage Int32      // id: %17
+  %18 = tuple ()                                    // user: %20
+  dealloc_stack %0#0 : $*@local_storage XXX<Int32>  // id: %19
+  return %18 : $()                                  // id: %20
 }
 
 // specialize.exp2 () -> ()
@@ -120,27 +120,27 @@ bb0:
   store %5 to %3#1 : $*UInt8                      // id: %6
   %7 = apply %1<UInt8>(%0#1, %3#1, %2) : $@thin <τ_0_0> (@out XXX<τ_0_0>, @in τ_0_0, @thin XXX<τ_0_0>.Type) -> ()
   dealloc_stack %3#0 : $*@local_storage UInt8     // id: %8
-  // function_ref specialize.acceptsInt (Swift.Int) -> ()
-  %9 = function_ref @_TF10specialize10acceptsIntFSiT_ : $@thin (Int) -> () // user: %16
-  // function_ref specialize.XXX.foo <A>(@inout specialize.XXX<A>)(t : A) -> Swift.Int
-  %10 = function_ref @_TFV10specialize3XXX3fooU__fRGS0_Q__FT1tQ__Si : $@cc(method) @thin <τ_0_0> (@in τ_0_0, @inout XXX<τ_0_0>) -> Int // user: %15
+  // function_ref specialize.acceptsInt (Swift.Int32) -> ()
+  %9 = function_ref @_TF10specialize10acceptsIntFSiT_ : $@thin (Int32) -> () // user: %16
+  // function_ref specialize.XXX.foo <A>(@inout specialize.XXX<A>)(t : A) -> Swift.Int32
+  %10 = function_ref @_TFV10specialize3XXX3fooU__fRGS0_Q__FT1tQ__Si : $@cc(method) @thin <τ_0_0> (@in τ_0_0, @inout XXX<τ_0_0>) -> Int32 // user: %15
   %11 = alloc_stack $UInt8                        // users: %14, %15, %17
   %12 = integer_literal $Builtin.Int8, 4          // user: %13
   %13 = struct $UInt8 (%12 : $Builtin.Int8)       // user: %14
   store %13 to %11#1 : $*UInt8                    // id: %14
-  %15 = apply %10<UInt8>(%11#1, %0#1) : $@cc(method) @thin <τ_0_0> (@in τ_0_0, @inout XXX<τ_0_0>) -> Int // user: %16
-  %16 = apply %9(%15) : $@thin (Int) -> ()
+  %15 = apply %10<UInt8>(%11#1, %0#1) : $@cc(method) @thin <τ_0_0> (@in τ_0_0, @inout XXX<τ_0_0>) -> Int32 // user: %16
+  %16 = apply %9(%15) : $@thin (Int32) -> ()
   dealloc_stack %11#0 : $*@local_storage UInt8    // id: %17
   %18 = tuple ()                                  // user: %20
   dealloc_stack %0#0 : $*@local_storage XXX<UInt8> // id: %19
   return %18 : $()                                // id: %20
 }
 
-// Swift.UInt8.init (Swift.UInt8.Type)(Swift.Int) -> Swift.UInt8
-sil public_external [transparent] @_TFVSs5UInt8CfMS_FSiS_ : $@thin (Int, @thin UInt8.Type) -> UInt8 {
-bb0(%0 : $Int, %1 : $@thin UInt8.Type):
-  %3 = struct_extract %0 : $Int, #Int.value       // user: %4
-  %4 = builtin "zextOrBitCast_Word_Int64"(%3 : $Builtin.Word) : $Builtin.Int64 // user: %6
+// Swift.UInt8.init (Swift.UInt8.Type)(Swift.Int32) -> Swift.UInt8
+sil public_external [transparent] @_TFVSs5UInt8CfMS_FSiS_ : $@thin (Int32, @thin UInt8.Type) -> UInt8 {
+bb0(%0 : $Int32, %1 : $@thin UInt8.Type):
+  %3 = struct_extract %0 : $Int32, #Int32.value       // user: %4
+  %4 = builtin "zextOrBitCast_Int32_Int64"(%3 : $Builtin.Int32) : $Builtin.Int64 // user: %6
   %6 = builtin "s_to_u_checked_trunc_Int64_Int8"(%4 : $Builtin.Int64) : $(Builtin.Int8, Builtin.Int1) // users: %7, %8
   %7 = tuple_extract %6 : $(Builtin.Int8, Builtin.Int1), 0 // user: %10
   %8 = tuple_extract %6 : $(Builtin.Int8, Builtin.Int1), 1 // user: %9

@@ -6,16 +6,16 @@ import Swift
 // CHECK: sil_global private @globalinit_token0 : $Builtin.Word
 sil_global private @globalinit_token0 : $Builtin.Word
 
-// CHECK: sil_global @_Tv2ch1xSi : $Int, @globalinit_func0 : $@thin () -> ()
-sil_global @_Tv2ch1xSi : $Int
+// CHECK: sil_global @_Tv2ch1xSi : $Int32, @globalinit_func0 : $@thin () -> ()
+sil_global @_Tv2ch1xSi : $Int32
 
 // CHECK-LABEL: sil private @globalinit_func0 : $@thin () -> () {
 sil private @globalinit_func0 : $@thin () -> () {
 bb0:
-  %0 = global_addr @_Tv2ch1xSi : $*Int
-  %1 = integer_literal $Builtin.Word, 2
-  %2 = struct $Int (%1 : $Builtin.Word)
-  store %2 to %0 : $*Int
+  %0 = global_addr @_Tv2ch1xSi : $*Int32
+  %1 = integer_literal $Builtin.Int32, 2
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  store %2 to %0 : $*Int32
   %4 = tuple ()
   return %4 : $()
 }
@@ -26,7 +26,7 @@ bb0:
 // CHECK-NEXT: address_to_pointer
 // CHECK: function_ref @globalinit_func0 : $@thin () -> ()
 // CHECK-NEXT: thin_to_thick_function
-// CHECK-NEXT: global_addr @_Tv2ch1xSi : $*Int
+// CHECK-NEXT: global_addr @_Tv2ch1xSi : $*Int32
 // CHECK-NEXT: address_to_pointer
 // CHECK-NEXT: return
 sil [global_init] @_TF2cha1xSi : $@thin () -> Builtin.RawPointer {
@@ -36,17 +36,17 @@ bb0:
   %3 = function_ref @globalinit_func0 : $@thin () -> ()
   %4 = thin_to_thick_function %3 : $@thin () -> () to $@callee_owned () -> ()
   %5 = builtin "once"(%2 : $Builtin.RawPointer, %4 : $@callee_owned () -> ()) : $()
-  %6 = global_addr @_Tv2ch1xSi : $*Int
-  %7 = address_to_pointer %6 : $*Int to $Builtin.RawPointer
+  %6 = global_addr @_Tv2ch1xSi : $*Int32
+  %7 = address_to_pointer %6 : $*Int32 to $Builtin.RawPointer
   return %7 : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: sil @_TF2ch1fFT_Si : $@thin () -> Int {
-sil @_TF2ch1fFT_Si : $@thin () -> Int {
+// CHECK-LABEL: sil @_TF2ch1fFT_Si : $@thin () -> Int32 {
+sil @_TF2ch1fFT_Si : $@thin () -> Int32 {
 bb0:
   %0 = function_ref @_TF2cha1xSi : $@thin () -> Builtin.RawPointer
   %1 = apply %0() : $@thin () -> Builtin.RawPointer
-  %2 = pointer_to_address %1 : $Builtin.RawPointer to $*Int
-  %3 = load %2 : $*Int
-  return %3 : $Int
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to $*Int32
+  %3 = load %2 : $*Int32
+  return %3 : $Int32
 }

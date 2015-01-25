@@ -13,17 +13,25 @@ bb0:
   return %0 : $()                                 // id: %1
 }
 
+struct BuiltinWord {
+  var value: Builtin.Word
+}
+
+struct BuiltinUWord {
+  var value: Builtin.Word
+}
+
 // peephole: Word(Int64(x >> 1)) -> (x >> 1)
-// CHECK-LABEL: sil @_TF4test29test_trunc_u_to_s_zext_lshr_1FSuSi : $@thin (UInt) -> Int
+// CHECK-LABEL: sil @_TF4test29test_trunc_u_to_s_zext_lshr_1FSuSi : $@thin (BuiltinUWord) -> BuiltinWord
 // CHECK: builtin "lshr_Word"
 // CHECK-NOT: builtin "zextOrBitCast_Word_Int64"
 // CHECK-NOT: builtin "u_to_s_checked_conversion_Int64"
 // CHECK-NOT: builtin "truncOrBitCast_Int64_Word"
 // CHECK: return
-// test.test_trunc_u_to_s_zext_lshr_1 (Swift.UInt) -> Swift.Int
-sil @_TF4test29test_trunc_u_to_s_zext_lshr_1FSuSi : $@thin (UInt) -> Int {
-bb0(%0 : $UInt):
-  debug_value %0 : $UInt  // let x                // id: %1
+// test.test_trunc_u_to_s_zext_lshr_1 (BuiltinUWord) -> Swift.BuiltinWord
+sil @_TF4test29test_trunc_u_to_s_zext_lshr_1FSuSi : $@thin (BuiltinUWord) -> BuiltinWord {
+bb0(%0 : $BuiltinUWord):
+  debug_value %0 : $BuiltinUWord  // let x        // id: %1
   %2 = integer_literal $Builtin.Word, 1           // user: %7
   br bb1                                          // id: %3
 
@@ -31,13 +39,13 @@ bb1:                                              // Preds: bb0
   br bb2                                          // id: %4
 
 bb2:                                              // Preds: bb1
-  %6 = struct_extract %0 : $UInt, #UInt.value     // user: %7
+  %6 = struct_extract %0 : $BuiltinUWord, #BuiltinUWord.value     // user: %7
   %7 = builtin "lshr_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word // user: %8
-  %8 = struct $UInt (%7 : $Builtin.Word)          // user: %11
+  %8 = struct $BuiltinUWord (%7 : $Builtin.Word)  // user: %11
   br bb3                                          // id: %9
 
 bb3:                                              // Preds: bb2
-  %11 = struct_extract %8 : $UInt, #UInt.value    // user: %12
+  %11 = struct_extract %8 : $BuiltinUWord, #BuiltinUWord.value    // user: %12
   %12 = builtin "zextOrBitCast_Word_Int64"(%11 : $Builtin.Word) : $Builtin.Int64 // user: %14
   %14 = builtin "u_to_s_checked_conversion_Int64"(%12 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1) // users: %15, %16
   %15 = tuple_extract %14 : $(Builtin.Int64, Builtin.Int1), 0 // user: %18
@@ -46,23 +54,23 @@ bb3:                                              // Preds: bb2
   %18 = struct $Int64 (%15 : $Builtin.Int64)      // user: %19
   %19 = struct_extract %18 : $Int64, #Int64.value // user: %21
   %21 = builtin "truncOrBitCast_Int64_Word"(%19 : $Builtin.Int64) : $Builtin.Word // user: %22
-  %22 = struct $Int (%21 : $Builtin.Word)         // users: %23, %24
-  debug_value %22 : $Int  // let v1               // id: %23
-  return %22 : $Int                               // id: %24
+  %22 = struct $BuiltinWord (%21 : $Builtin.Word) // users: %23, %24
+  debug_value %22 : $BuiltinWord  // let v1       // id: %23
+  return %22 : $BuiltinWord                       // id: %24
 }
 
 
 // peephole: Word(Int64(x >> 10)) -> (x >> 1)
-// CHECK-LABEL: sil @_TF4test30test_trunc_u_to_s_zext_lshr_10FSuSi : $@thin (UInt) -> Int
+// CHECK-LABEL: sil @_TF4test30test_trunc_u_to_s_zext_lshr_10FSuSi : $@thin (BuiltinUWord) -> BuiltinWord
 // CHECK: builtin "lshr_Word"
 // CHECK-NOT: builtin "zextOrBitCast_Word_Int64"
 // CHECK-NOT: builtin "u_to_s_checked_conversion_Int64"
 // CHECK-NOT: builtin "truncOrBitCast_Int64_Word"
 // CHECK: return
-// test.test_trunc_u_to_s_zext_lshr_10 (Swift.UInt) -> Swift.Int
-sil @_TF4test30test_trunc_u_to_s_zext_lshr_10FSuSi : $@thin (UInt) -> Int {
-bb0(%0 : $UInt):
-  debug_value %0 : $UInt  // let x                // id: %1
+// test.test_trunc_u_to_s_zext_lshr_10 (Swift.BuiltinUWord) -> Swift.BuiltinWord
+sil @_TF4test30test_trunc_u_to_s_zext_lshr_10FSuSi : $@thin (BuiltinUWord) -> BuiltinWord {
+bb0(%0 : $BuiltinUWord):
+  debug_value %0 : $BuiltinUWord  // let x                // id: %1
   %2 = integer_literal $Builtin.Word, 10          // user: %7
   br bb1                                          // id: %3
 
@@ -70,13 +78,13 @@ bb1:                                              // Preds: bb0
   br bb2                                          // id: %4
 
 bb2:                                              // Preds: bb1
-  %6 = struct_extract %0 : $UInt, #UInt.value     // user: %7
+  %6 = struct_extract %0 : $BuiltinUWord, #BuiltinUWord.value     // user: %7
   %7 = builtin "lshr_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word // user: %8
-  %8 = struct $UInt (%7 : $Builtin.Word)          // user: %11
+  %8 = struct $BuiltinUWord (%7 : $Builtin.Word)          // user: %11
   br bb3                                          // id: %9
 
 bb3:                                              // Preds: bb2
-  %11 = struct_extract %8 : $UInt, #UInt.value    // user: %12
+  %11 = struct_extract %8 : $BuiltinUWord, #BuiltinUWord.value    // user: %12
   %12 = builtin "zextOrBitCast_Word_Int64"(%11 : $Builtin.Word) : $Builtin.Int64 // user: %14
   %14 = builtin "u_to_s_checked_conversion_Int64"(%12 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1) // users: %15, %16
   %15 = tuple_extract %14 : $(Builtin.Int64, Builtin.Int1), 0 // user: %18
@@ -85,59 +93,58 @@ bb3:                                              // Preds: bb2
   %18 = struct $Int64 (%15 : $Builtin.Int64)      // user: %19
   %19 = struct_extract %18 : $Int64, #Int64.value // user: %21
   %21 = builtin "truncOrBitCast_Int64_Word"(%19 : $Builtin.Int64) : $Builtin.Word // user: %22
-  %22 = struct $Int (%21 : $Builtin.Word)         // users: %23, %24
-  debug_value %22 : $Int  // let v1               // id: %23
-  return %22 : $Int                               // id: %24
+  %22 = struct $BuiltinWord (%21 : $Builtin.Word)         // users: %23, %24
+  debug_value %22 : $BuiltinWord  // let v1               // id: %23
+  return %22 : $BuiltinWord                               // id: %24
 }
 
 // no peephole: Word(Int64(x >> c)), where c is a variable
 // This should not trigger the optimization as it is not known if c > 0
-// CHECK-LABEL: sil @_TF4test31test_trunc_u_to_s_zext_lshr_varFTSuSu_Si : $@thin (UInt, UInt) -> Int
+// CHECK-LABEL: sil @_TF4test31test_trunc_u_to_s_zext_lshr_varFTSuSu_Si : $@thin (BuiltinUWord, BuiltinUWord) -> BuiltinWord
 // CHECK: builtin "u_to_s_checked_conversion_Int64"
 // CHECK: builtin "truncOrBitCast_Int64_Word"
 // CHECK: return
-// test.test_trunc_u_to_s_zext_lshr_var (Swift.UInt, Swift.UInt) -> Swift.Int
-sil @_TF4test31test_trunc_u_to_s_zext_lshr_varFTSuSu_Si : $@thin (UInt, UInt) -> Int {
-bb0(%0 : $UInt, %1 : $UInt):
-  debug_value %0 : $UInt  // let x                // id: %2
-  debug_value %1 : $UInt  // let c                // id: %3
-  %4 = string_literal utf8 "shift amount is larger than type size in bits" // user: %7
-  %5 = integer_literal $Builtin.Word, 45          // user: %7
-  %6 = integer_literal $Builtin.Word, 2           // users: %7, %10, %31
-  %7 = struct $StaticString (%4 : $Builtin.RawPointer, %5 : $Builtin.Word, %6 : $Builtin.Word) // user: %32
-  %8 = string_literal utf8 "/Users/roman/build/swift/Ninja-RelWithDebInfo/swift/stdlib/core/8/FixedPoint.swift" // user: %10
-  %9 = integer_literal $Builtin.Word, 82          // user: %10
-  %10 = struct $StaticString (%8 : $Builtin.RawPointer, %9 : $Builtin.Word, %6 : $Builtin.Word) // user: %32
-  %11 = integer_literal $Builtin.Word, 5712       // user: %12
-  %12 = struct $UInt (%11 : $Builtin.Word)        // user: %32
+// test.test_trunc_u_to_s_zext_lshr_var (Swift.BuiltinUWord, Swift.BuiltinUWord) -> Swift.BuiltinWord
+sil @_TF4test31test_trunc_u_to_s_zext_lshr_varFTSuSu_Si : $@thin (BuiltinUWord, BuiltinUWord) -> BuiltinWord {
+bb0(%0 : $BuiltinUWord, %1 : $BuiltinUWord):
+  debug_value %0 : $BuiltinUWord  // let x                // id: %2
+  debug_value %1 : $BuiltinUWord  // let c                // id: %3
+  %4 = tuple ()
+  %5 = tuple ()
+  %6 = tuple ()
+  %7 = tuple ()
+  %8 = tuple ()
+  %9 = tuple ()
+  %10 = tuple ()
+  %11 = tuple ()
+  %12 = tuple ()
   br bb1                                          // id: %13
 
 bb1:                                              // Preds: bb0
   %14 = integer_literal $Builtin.Word, 64         // user: %17
-  %16 = struct_extract %1 : $UInt, #UInt.value    // user: %17
+  %16 = struct_extract %1 : $BuiltinUWord, #BuiltinUWord.value    // user: %17
   %17 = builtin "cmp_ult_Word"(%16 : $Builtin.Word, %14 : $Builtin.Word) : $Builtin.Int1 // user: %20
   %18 = integer_literal $Builtin.Int1, -1         // user: %20
   %20 = builtin "int_expect_Int1"(%17 : $Builtin.Int1, %18 : $Builtin.Int1) : $Builtin.Int1 // user: %21
   cond_br %20, bb2, bb3                           // id: %21
 
 bb2:                                              // Preds: bb1
-  %23 = struct_extract %0 : $UInt, #UInt.value    // user: %25
-  %24 = struct_extract %1 : $UInt, #UInt.value    // user: %25
+  %23 = struct_extract %0 : $BuiltinUWord, #BuiltinUWord.value    // user: %25
+  %24 = struct_extract %1 : $BuiltinUWord, #BuiltinUWord.value    // user: %25
   %25 = builtin "lshr_Word"(%23 : $Builtin.Word, %24 : $Builtin.Word) : $Builtin.Word // user: %26
-  %26 = struct $UInt (%25 : $Builtin.Word)        // user: %35
+  %26 = struct $BuiltinUWord (%25 : $Builtin.Word)        // user: %35
   br bb4                                          // id: %27
 
 bb3:                                              // Preds: bb1
-  // function_ref Swift._fatalErrorMessage (Swift.StaticString, Swift.StaticString, Swift.StaticString, Swift.UInt) -> ()
-  %28 = function_ref @_TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_ : $@thin @noreturn (StaticString, StaticString, StaticString, UInt) -> () // user: %32
-  %29 = string_literal utf8 "fatal error"         // user: %31
-  %30 = integer_literal $Builtin.Word, 11         // user: %31
-  %31 = struct $StaticString (%29 : $Builtin.RawPointer, %30 : $Builtin.Word, %6 : $Builtin.Word) // user: %32
-  %32 = apply %28(%31, %7, %10, %12) : $@thin @noreturn (StaticString, StaticString, StaticString, UInt) -> ()
+  %28 = function_ref @fatalError : $@thin @noreturn () -> () // user: %32
+  %29 = tuple ()
+  %30 = tuple ()
+  %31 = tuple ()
+  %32 = apply %28() : $@thin @noreturn () -> ()
   unreachable                                     // id: %33
 
 bb4:                                              // Preds: bb2
-  %35 = struct_extract %26 : $UInt, #UInt.value   // user: %36
+  %35 = struct_extract %26 : $BuiltinUWord, #BuiltinUWord.value   // user: %36
   %36 = builtin "zextOrBitCast_Word_Int64"(%35 : $Builtin.Word) : $Builtin.Int64 // user: %38
   %38 = builtin "u_to_s_checked_conversion_Int64"(%36 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1) // users: %39, %40
   %39 = tuple_extract %38 : $(Builtin.Int64, Builtin.Int1), 0 // user: %42
@@ -146,9 +153,9 @@ bb4:                                              // Preds: bb2
   %42 = struct $Int64 (%39 : $Builtin.Int64)      // user: %43
   %43 = struct_extract %42 : $Int64, #Int64.value // user: %45
   %45 = builtin "truncOrBitCast_Int64_Word"(%43 : $Builtin.Int64) : $Builtin.Word // user: %46
-  %46 = struct $Int (%45 : $Builtin.Word)         // users: %47, %48
-  debug_value %46 : $Int  // let v1               // id: %47
-  return %46 : $Int                               // id: %48
+  %46 = struct $BuiltinWord (%45 : $Builtin.Word)         // users: %47, %48
+  debug_value %46 : $BuiltinWord  // let v1               // id: %47
+  return %46 : $BuiltinWord                               // id: %48
 }
 
 // peephole: UInt16(Int32(x >> 1)) -> (x >> 1)
@@ -226,57 +233,57 @@ bb3:                                              // Preds: bb2
   return %20 : $Int16                             // id: %22
 }
 
-// No peephole for UInt(UInt64(x)), because it is not known if top bit of x is set
-// CHECK-LABEL: sil @_TF4test26test_trunc_s_to_u_zext_varFSiSu : $@thin (Int) -> UInt
+// No peephole for UWord(UInt64(x)), because it is not known if top bit of x is set
+// CHECK-LABEL: sil @_TF4test26test_trunc_s_to_u_zext_varFSiSu : $@thin (BuiltinWord) -> BuiltinUWord
 // This should not trigger the optimization as it is not known if top bit of x is set
 // CHECK: builtin "zextOrBitCast_Word_Int64"
 // CHECK: builtin "s_to_u_checked_conversion_Int64"
 // CHECK: builtin "truncOrBitCast_Int64_Word"
 // CHECK: return
-// test.test_trunc_s_to_u_zext_var (Swift.Int) -> Swift.UInt
-sil @_TF4test26test_trunc_s_to_u_zext_varFSiSu : $@thin (Int) -> UInt {
-bb0(%0 : $Int):
-  debug_value %0 : $Int  // let x                 // id: %1
-  %3 = struct_extract %0 : $Int, #Int.value       // user: %4
+// test.test_trunc_s_to_u_zext_var (Swift.BuiltinWord) -> Swift.BuiltinUWord
+sil @_TF4test26test_trunc_s_to_u_zext_varFSiSu : $@thin (BuiltinWord) -> BuiltinUWord {
+bb0(%0 : $BuiltinWord):
+  debug_value %0 : $BuiltinWord  // let x                   // id: %1
+  %3 = struct_extract %0 : $BuiltinWord, #BuiltinWord.value // user: %4
   %4 = builtin "zextOrBitCast_Word_Int64"(%3 : $Builtin.Word) : $Builtin.Int64 // user: %6
   %6 = builtin "s_to_u_checked_conversion_Int64"(%4 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1) // users: %7, %8
   %7 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 0 // user: %10
   %8 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 1 // user: %9
-  cond_fail %8 : $Builtin.Int1                    // id: %9
-  %10 = struct $UInt64 (%7 : $Builtin.Int64)      // user: %11
-  %11 = struct_extract %10 : $UInt64, #UInt64.value // user: %13
+  cond_fail %8 : $Builtin.Int1                              // id: %9
+  %10 = struct $UInt64 (%7 : $Builtin.Int64)                // user: %11
+  %11 = struct_extract %10 : $UInt64, #UInt64.value         // user: %13
   %13 = builtin "truncOrBitCast_Int64_Word"(%11 : $Builtin.Int64) : $Builtin.Word // user: %14
-  %14 = struct $UInt (%13 : $Builtin.Word)        // user: %15
-  return %14 : $UInt                              // id: %15
+  %14 = struct $BuiltinUWord (%13 : $Builtin.Word)          // user: %15
+  return %14 : $BuiltinUWord                                // id: %15
 }
 
 
 // sizeof is known to return strictly positive values
-// peephole: UInt(UInt64(sizeof(Int))) -> sizeof(Int)
-// CHECK-LABEL: sil @_TF4test29test_trunc_s_to_u_zext_sizeofFT_Su : $@thin () -> UInt
+// peephole: UWord(UInt64(sizeof(Int))) -> sizeof(Int)
+// CHECK-LABEL: sil @_TF4test29test_trunc_s_to_u_zext_sizeofFT_Su : $@thin () -> BuiltinUWord
 // CHECK: builtin "sizeof"
 // CHECK-NOT: builtin "zextOrBitCast_Word_Int64"
 // CHECK-NOT: builtin "s_to_u_checked_conversion_Int64"
 // CHECK-NOT: builtin "truncOrBitCast_Int64_Word"
 // CHECK: return
-// test.test_trunc_s_to_u_zext_sizeof () -> Swift.UInt
-sil @_TF4test29test_trunc_s_to_u_zext_sizeofFT_Su : $@thin () -> UInt {
+// test.test_trunc_s_to_u_zext_sizeof () -> Swift.BuiltinUWord
+sil @_TF4test29test_trunc_s_to_u_zext_sizeofFT_Su : $@thin () -> BuiltinUWord {
 bb0:
-  %0 = metatype $@thin Int.Type
-  %2 = metatype $@thick Int.Type                  // user: %3
-  %3 = builtin "sizeof"<(Int)>(%2 : $@thick (Int).Type) : $Builtin.Word // user: %4
-  %4 = struct $Int (%3 : $Builtin.Word)           // user: %6
-  %6 = struct_extract %4 : $Int, #Int.value       // user: %7
+  %0 = metatype $@thin BuiltinWord.Type
+  %2 = metatype $@thick BuiltinWord.Type                      // user: %3
+  %3 = builtin "sizeof"<(BuiltinWord)>(%2 : $@thick (BuiltinWord).Type) : $Builtin.Word // user: %4
+  %4 = struct $BuiltinWord (%3 : $Builtin.Word)              // user: %6
+  %6 = struct_extract %4 : $BuiltinWord, #BuiltinWord.value  // user: %7
   %7 = builtin "zextOrBitCast_Word_Int64"(%6 : $Builtin.Word) : $Builtin.Int64 // user: %9
   %9 = builtin "s_to_u_checked_conversion_Int64"(%7 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1) // users: %10, %11
   %10 = tuple_extract %9 : $(Builtin.Int64, Builtin.Int1), 0 // user: %13
   %11 = tuple_extract %9 : $(Builtin.Int64, Builtin.Int1), 1 // user: %12
-  cond_fail %11 : $Builtin.Int1                   // id: %12
-  %13 = struct $UInt64 (%10 : $Builtin.Int64)     // user: %14
-  %14 = struct_extract %13 : $UInt64, #UInt64.value // user: %16
+  cond_fail %11 : $Builtin.Int1                              // id: %12
+  %13 = struct $UInt64 (%10 : $Builtin.Int64)                // user: %14
+  %14 = struct_extract %13 : $UInt64, #UInt64.value          // user: %16
   %16 = builtin "truncOrBitCast_Int64_Word"(%14 : $Builtin.Int64) : $Builtin.Word // user: %17
-  %17 = struct $UInt (%16 : $Builtin.Word)        // user: %18
-  return %17 : $UInt                              // id: %18
+  %17 = struct $BuiltinUWord (%16 : $Builtin.Word)           // user: %18
+  return %17 : $BuiltinUWord                                 // id: %18
 }
 
 
@@ -294,9 +301,9 @@ bb0:
   %0 = metatype $@thin Int.Type
   %2 = metatype $@thick Int.Type                  // user: %3
   %3 = builtin "sizeof"<(Int)>(%2 : $@thick (Int).Type) : $Builtin.Word // user: %4
-  %4 = struct $Int (%3 : $Builtin.Word)           // user: %6
-  %6 = struct_extract %4 : $Int, #Int.value       // user: %7
-  %7 = builtin "zextOrBitCast_Word_Int64"(%6 : $Builtin.Word) : $Builtin.Int64 // user: %9
+  %4 = tuple ()
+  %6 = tuple ()
+  %7 = builtin "zextOrBitCast_Word_Int64"(%3 : $Builtin.Word) : $Builtin.Int64 // user: %9
   %9 = builtin "s_to_u_checked_trunc_Int64_Int32"(%7 : $Builtin.Int64) : $(Builtin.Int32, Builtin.Int1) // users: %10, %11
   %10 = tuple_extract %9 : $(Builtin.Int32, Builtin.Int1), 0 // user: %13
   %11 = tuple_extract %9 : $(Builtin.Int32, Builtin.Int1), 1 // user: %12
@@ -452,5 +459,4 @@ bb0(%0 : $UInt32):
   return %13 : $Int8                             // id: %14
 }
 
-// Swift._fatalErrorMessage (Swift.StaticString, Swift.StaticString, Swift.StaticString, Swift.UInt) -> ()
-sil [noinline] @_TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_ : $@thin @noreturn (StaticString, StaticString, StaticString, UInt) -> ()
+sil [noinline] @fatalError : $@thin @noreturn () -> ()

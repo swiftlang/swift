@@ -1,8 +1,8 @@
 // RUN: %target-sil-opt %s -verify | FileCheck %s
 
 // Generated from
-// var x : Int = 2
-// public func f() -> Int { return x }
+// var x : Int32 = 2
+// public func f() -> Int32 { return x }
 // with swiftc -O -parse-as-library -emit-sil
 
 import Builtin
@@ -11,16 +11,16 @@ import Swift
 // CHECK: sil_global private @globalinit_token0 : $Builtin.Word
 sil_global private @globalinit_token0 : $Builtin.Word
 
-// CHECK: sil_global @_Tv2ch1xSi : $Int, @globalinit_func0 : $@thin () -> ()
-sil_global @_Tv2ch1xSi : $Int, @globalinit_func0 : $@thin () -> ()
+// CHECK: sil_global @_Tv2ch1xSi : $Int32, @globalinit_func0 : $@thin () -> ()
+sil_global @_Tv2ch1xSi : $Int32, @globalinit_func0 : $@thin () -> ()
 
 // CHECK-LABEL: sil private @globalinit_func0 : $@thin () -> () {
 sil private @globalinit_func0 : $@thin () -> () {
 bb0:
-  %0 = global_addr @_Tv2ch1xSi : $*Int
-  %1 = integer_literal $Builtin.Word, 2
-  %2 = struct $Int (%1 : $Builtin.Word)
-  store %2 to %0 : $*Int
+  %0 = global_addr @_Tv2ch1xSi : $*Int32
+  %1 = integer_literal $Builtin.Int32, 2
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  store %2 to %0 : $*Int32
   %4 = tuple ()
   return %4 : $()
 }
@@ -28,15 +28,15 @@ bb0:
 // CHECK-LABEL: sil [global_init] @_TF2cha1xSi : $@thin () -> Builtin.RawPointer {
 sil [global_init] @_TF2cha1xSi : $@thin () -> Builtin.RawPointer {
 bb0:
-  %0 = global_addr @_Tv2ch1xSi : $*Int
-  %1 = address_to_pointer %0 : $*Int to $Builtin.RawPointer
+  %0 = global_addr @_Tv2ch1xSi : $*Int32
+  %1 = address_to_pointer %0 : $*Int32 to $Builtin.RawPointer
   return %1 : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: sil @_TF2ch1fFT_Si : $@thin () -> Int {
-sil @_TF2ch1fFT_Si : $@thin () -> Int {
+// CHECK-LABEL: sil @_TF2ch1fFT_Si : $@thin () -> Int32 {
+sil @_TF2ch1fFT_Si : $@thin () -> Int32 {
 bb0:
-  %0 = global_addr @_Tv2ch1xSi : $*Int
-  %1 = load %0 : $*Int
-  return %1 : $Int
+  %0 = global_addr @_Tv2ch1xSi : $*Int32
+  %1 = load %0 : $*Int32
+  return %1 : $Int32
 }

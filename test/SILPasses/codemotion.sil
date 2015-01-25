@@ -657,7 +657,7 @@ bb3:
 }
 
 sil @arc_user : $@thin () -> ()
-sil @_swift_isUniquelyReferenced_native : $@thin (Int) -> Bool
+sil @_swift_isUniquelyReferenced_native : $@thin (Int32) -> Bool
 
 // The retains here aren't able to be moved to a successor BB.  But we still want to move them as far
 // as possible down the current BB.  The first retain should be moved to above the release_value.
@@ -681,8 +681,8 @@ sil @_swift_isUniquelyReferenced_native : $@thin (Int) -> Bool
 // CHECK-NEXT: apply
 // CHECK-NEXT: function_ref _swift_isUniquelyReferenced_native
 // CHECK-NEXT: function_ref @_swift_isUniquelyReferenced_native
-// CHECK-NEXT: integer_literal $Builtin.Word, 1
-// CHECK-NEXT: struct $Int
+// CHECK-NEXT: integer_literal $Builtin.Int32, 1
+// CHECK-NEXT: struct $Int32 (
 // CHECK-NEXT: retain_value %3
 // CHECK-NEXT: apply
 // CHECK-NEXT: retain_value %3
@@ -700,10 +700,10 @@ bb0(%0 : $FakeOptional<Builtin.Int32>, %1 : $FakeOptional<Builtin.Int32>, %2 : $
   apply %1000 () : $@thin () -> ()
   retain_value %3 : $FakeOptional<Builtin.Int32>
   // function_ref _swift_isUniquelyReferenced_native
-  %500 = function_ref @_swift_isUniquelyReferenced_native : $@thin (Int) -> Bool
-  %501 = integer_literal $Builtin.Word, 1
-  %502 = struct $Int (%501 : $Builtin.Word)
-  %503 = apply %500(%502) : $@thin (Int) -> Bool
+  %500 = function_ref @_swift_isUniquelyReferenced_native : $@thin (Int32) -> Bool
+  %501 = integer_literal $Builtin.Int32, 1
+  %502 = struct $Int32 (%501 : $Builtin.Int32)
+  %503 = apply %500(%502) : $@thin (Int32) -> Bool
   retain_value %3 : $FakeOptional<Builtin.Int32>
   switch_enum %0 : $FakeOptional<Builtin.Int32>, case #FakeOptional.Some!enumelt.1: bb1, default bb2
 

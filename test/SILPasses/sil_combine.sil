@@ -944,24 +944,24 @@ bb0:
 // CHECK-LABEL: @_TF6expect3fooFSiSi
 // CHECK: bb0
 // CHECK-NEXT: cond_br %0, bb2, bb1
-sil @_TF6expect3fooFSiSi : $@thin (Builtin.Int1) -> Int {
+sil @_TF6expect3fooFSiSi : $@thin (Builtin.Int1) -> Int32 {
 bb0(%0 : $Builtin.Int1):
   %5 = integer_literal $Builtin.Int1, -1
   %9 = builtin "xor_Int1"(%0 : $Builtin.Int1, %5 : $Builtin.Int1) : $Builtin.Int1
-  cond_br %9, bb1, bb2                            // id: %10
+  cond_br %9, bb1, bb2                              // id: %10
 
-bb1:                                              // Preds: bb0
-  %1 = integer_literal $Builtin.Word, 0
-  %2 = struct $Int (%1 : $Builtin.Word)          // user: %12
-  br bb3(%2 : $Int)                              // id: %12
+bb1:                                                // Preds: bb0
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = struct $Int32 (%1 : $Builtin.Int32)          // user: %12
+  br bb3(%2 : $Int32)                               // id: %12
 
-bb2:                                              // Preds: bb0
-  %3 = integer_literal $Builtin.Word, 1
-  %4 = struct $Int (%3 : $Builtin.Word)          // user: %12
-  br bb3(%4 : $Int)                              // id: %15
+bb2:                                                // Preds: bb0
+  %3 = integer_literal $Builtin.Int32, 1
+  %4 = struct $Int32 (%3 : $Builtin.Int32)          // user: %12
+  br bb3(%4 : $Int32)                               // id: %15
 
-bb3(%16 : $Int):                                  // Preds: bb1 bb2
-  return %16 : $Int                               // id: %17
+bb3(%16 : $Int32):                                  // Preds: bb1 bb2
+  return %16 : $Int32                               // id: %17
 }
 
 // CHECK-LABEL: sil @enum_promotion_of_concrete_types
@@ -1654,13 +1654,13 @@ sil @nonnil : $@thin () -> Builtin.Int1 {
 bb0:
 // CHECK: bb0
 // CHECK-NOT: select_enum
-  %1 = integer_literal $Builtin.Word, 8
-  %2 = struct $Int (%1 : $Builtin.Word)
-  %3 = enum $Optional<Int>, #Optional.Some!enumelt.1, %2 : $Int
+  %1 = integer_literal $Builtin.Int32, 8
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  %3 = enum $Optional<Int32>, #Optional.Some!enumelt.1, %2 : $Int32
   %t = integer_literal $Builtin.Int1, -1
   %f = integer_literal $Builtin.Int1, 0
 // CHECK: [[ONE:%[^ ]+]] = integer_literal $Builtin.Int1, -1
-  %5 = select_enum %3 : $Optional<Int>, case #Optional.Some!enumelt.1: %t, case #Optional.None!enumelt: %f : $Builtin.Int1
+  %5 = select_enum %3 : $Optional<Int32>, case #Optional.Some!enumelt.1: %t, case #Optional.None!enumelt: %f : $Builtin.Int1
 // CHECK: return [[ONE]]
   return %5 : $Builtin.Int1
 }

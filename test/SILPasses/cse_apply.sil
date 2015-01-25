@@ -16,34 +16,34 @@ import Swift
 //CHECK-NOT: builtin
 //CHECK-NOT: cond_fail
 //CHECK: return
-sil @simply_arith : $@thin (Int, Int) -> Int {
-bb0(%0 : $Int, %1 : $Int):
-  debug_value %0 : $Int  // let x                 // id: %2
-  debug_value %1 : $Int  // let y                 // id: %3
-  %5 = struct_extract %0 : $Int, #Int.value       // user: %8
-  %6 = struct_extract %1 : $Int, #Int.value       // user: %8
+sil @simply_arith : $@thin (Int32, Int32) -> Int32 {
+bb0(%0 : $Int32, %1 : $Int32):
+  debug_value %0 : $Int32  // let x                 // id: %2
+  debug_value %1 : $Int32  // let y                 // id: %3
+  %5 = struct_extract %0 : $Int32, #Int32.value       // user: %8
+  %6 = struct_extract %1 : $Int32, #Int32.value       // user: %8
   %7 = integer_literal $Builtin.Int1, -1          // user: %8
-  %8 = builtin "sadd_with_overflow_Word"(%5 : $Builtin.Word, %6 : $Builtin.Word, %7 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1) // users: %9, %10
-  %9 = tuple_extract %8 : $(Builtin.Word, Builtin.Int1), 0 // user: %12
-  %10 = tuple_extract %8 : $(Builtin.Word, Builtin.Int1), 1 // user: %11
+  %8 = builtin "sadd_with_overflow_Int32"(%5 : $Builtin.Int32, %6 : $Builtin.Int32, %7 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %9, %10
+  %9 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 0 // user: %12
+  %10 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 1 // user: %11
   cond_fail %10 : $Builtin.Int1                   // id: %11
-  %12 = struct $Int (%9 : $Builtin.Word)          // user: %23
-  %14 = struct_extract %0 : $Int, #Int.value      // user: %17
-  %15 = struct_extract %1 : $Int, #Int.value      // user: %17
+  %12 = struct $Int32 (%9 : $Builtin.Int32)          // user: %23
+  %14 = struct_extract %0 : $Int32, #Int32.value      // user: %17
+  %15 = struct_extract %1 : $Int32, #Int32.value      // user: %17
   %16 = integer_literal $Builtin.Int1, -1         // user: %17
-  %17 = builtin "sadd_with_overflow_Word"(%14 : $Builtin.Word, %15 : $Builtin.Word, %16 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1) // users: %18, %19
-  %18 = tuple_extract %17 : $(Builtin.Word, Builtin.Int1), 0 // user: %21
-  %19 = tuple_extract %17 : $(Builtin.Word, Builtin.Int1), 1 // user: %20
+  %17 = builtin "sadd_with_overflow_Int32"(%14 : $Builtin.Int32, %15 : $Builtin.Int32, %16 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %18, %19
+  %18 = tuple_extract %17 : $(Builtin.Int32, Builtin.Int1), 0 // user: %21
+  %19 = tuple_extract %17 : $(Builtin.Int32, Builtin.Int1), 1 // user: %20
   cond_fail %19 : $Builtin.Int1                   // id: %20
-  %21 = struct $Int (%18 : $Builtin.Word)         // user: %24
-  %23 = struct_extract %12 : $Int, #Int.value     // user: %26
-  %24 = struct_extract %21 : $Int, #Int.value     // user: %26
+  %21 = struct $Int32 (%18 : $Builtin.Int32)         // user: %24
+  %23 = struct_extract %12 : $Int32, #Int32.value     // user: %26
+  %24 = struct_extract %21 : $Int32, #Int32.value     // user: %26
   %25 = integer_literal $Builtin.Int1, -1         // user: %26
-  %26 = builtin "sadd_with_overflow_Word"(%23 : $Builtin.Word, %24 : $Builtin.Word, %25 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1) // users: %27, %28
-  %27 = tuple_extract %26 : $(Builtin.Word, Builtin.Int1), 0 // user: %30
-  %28 = tuple_extract %26 : $(Builtin.Word, Builtin.Int1), 1 // user: %29
+  %26 = builtin "sadd_with_overflow_Int32"(%23 : $Builtin.Int32, %24 : $Builtin.Int32, %25 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %27, %28
+  %27 = tuple_extract %26 : $(Builtin.Int32, Builtin.Int1), 0 // user: %30
+  %28 = tuple_extract %26 : $(Builtin.Int32, Builtin.Int1), 1 // user: %29
   cond_fail %28 : $Builtin.Int1                   // id: %29
-  %30 = struct $Int (%27 : $Builtin.Word)         // user: %31
-  return %30 : $Int                               // id: %31
+  %30 = struct $Int32 (%27 : $Builtin.Int32)         // user: %31
+  return %30 : $Int32                               // id: %31
 }
 

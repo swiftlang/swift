@@ -8,129 +8,129 @@ import Builtin
 import Swift
 
 // CHECK-LABEL: sil @tst_ssub 
-// CHECK: %1 = integer_literal $Builtin.Word, 0
-// CHECK: %2 = struct $Int (%1 : $Builtin.Word)
+// CHECK: %1 = integer_literal $Builtin.Int32, 0
+// CHECK: %2 = struct $Int32 (%1 : $Builtin.Int32)
 // CHECK: return %2
-sil @tst_ssub : $@thin (Int) -> Int {
-bb0(%0 : $Int):
-  %1 = struct_extract %0 : $Int, #Int.value
+sil @tst_ssub : $@thin (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = integer_literal $Builtin.Int1, -1
-  %3 = builtin "ssub_with_overflow_Word"(%1 : $Builtin.Word, %1 : $Builtin.Word, %2 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %4 = tuple_extract %3 : $(Builtin.Word, Builtin.Int1), 0
-  %5 = tuple_extract %3 : $(Builtin.Word, Builtin.Int1), 1
+  %3 = builtin "ssub_with_overflow_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32, %2 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int32, Builtin.Int1), 0
+  %5 = tuple_extract %3 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %5 : $Builtin.Int1
-  %7 = struct $Int (%4 : $Builtin.Word)
-  return %7 : $Int
+  %7 = struct $Int32 (%4 : $Builtin.Int32)
+  return %7 : $Int32
 }
 
 // CHECK-LABEL: sil @tst_usub 
-// CHECK: %1 = integer_literal $Builtin.Word, 0
-// CHECK: %2 = struct $UInt (%1 : $Builtin.Word)
+// CHECK: %1 = integer_literal $Builtin.Int32, 0
+// CHECK: %2 = struct $UInt32 (%1 : $Builtin.Int32)
 // CHECK: return %2
-sil @tst_usub : $@thin (UInt) -> UInt {
-bb0(%0 : $UInt):
-  %1 = struct_extract %0 : $UInt, #UInt.value
+sil @tst_usub : $@thin (UInt32) -> UInt32 {
+bb0(%0 : $UInt32):
+  %1 = struct_extract %0 : $UInt32, #UInt32.value
   %2 = integer_literal $Builtin.Int1, -1
-  %3 = builtin "usub_with_overflow_Word"(%1 : $Builtin.Word, %1 : $Builtin.Word, %2 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %4 = tuple_extract %3 : $(Builtin.Word, Builtin.Int1), 0
-  %5 = tuple_extract %3 : $(Builtin.Word, Builtin.Int1), 1
+  %3 = builtin "usub_with_overflow_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32, %2 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int32, Builtin.Int1), 0
+  %5 = tuple_extract %3 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %5 : $Builtin.Int1
-  %7 = struct $UInt (%4 : $Builtin.Word)
-  return %7 : $UInt
+  %7 = struct $UInt32 (%4 : $Builtin.Int32)
+  return %7 : $UInt32
 }
 
 // CHECK-LABEL: sil @tst_sdiv 
-// CHECK: %1 = integer_literal $Builtin.Word, 1
-// CHECK: %2 = struct $Int (%1 : $Builtin.Word)
+// CHECK: %1 = integer_literal $Builtin.Int32, 1
+// CHECK: %2 = struct $Int32 (%1 : $Builtin.Int32)
 // CHECK: return %2
-sil @tst_sdiv : $@thin (Int) -> Int {
-bb0(%0 : $Int):
-  %1 = integer_literal $Builtin.Word, 0
-  %2 = struct_extract %0 : $Int, #Int.value
-  %3 = builtin "sdiv_Word"(%2 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
-  %4 = struct $Int (%3 : $Builtin.Word)
-  return %4 : $Int
+sil @tst_sdiv : $@thin (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = struct_extract %0 : $Int32, #Int32.value
+  %3 = builtin "sdiv_Int32"(%2 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  return %4 : $Int32
 }
 
 // CHECK-LABEL: sil @tst_udiv 
-// CHECK: %1 = integer_literal $Builtin.Word, 1
-// CHECK: %2 = struct $UInt (%1 : $Builtin.Word)
+// CHECK: %1 = integer_literal $Builtin.Int32, 1
+// CHECK: %2 = struct $UInt32 (%1 : $Builtin.Int32)
 // CHECK: return %2
-sil @tst_udiv : $@thin (UInt) -> UInt {
-bb0(%0 : $UInt):
-  %1 = integer_literal $Builtin.Word, 0
-  %2 = struct_extract %0 : $UInt, #UInt.value
-  %3 = builtin "udiv_Word"(%2 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
-  %4 = struct $UInt (%3 : $Builtin.Word)
-  return %4 : $UInt
+sil @tst_udiv : $@thin (UInt32) -> UInt32 {
+bb0(%0 : $UInt32):
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = struct_extract %0 : $UInt32, #UInt32.value
+  %3 = builtin "udiv_Int32"(%2 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32
+  %4 = struct $UInt32 (%3 : $Builtin.Int32)
+  return %4 : $UInt32
 }
 
 // CHECK-LABEL: sil @tst_srem 
-// CHECK: %1 = integer_literal $Builtin.Word, 0
-// CHECK: %2 = struct $Int (%1 : $Builtin.Word)
+// CHECK: %1 = integer_literal $Builtin.Int32, 0
+// CHECK: %2 = struct $Int32 (%1 : $Builtin.Int32)
 // CHECK: return %2
-sil @tst_srem : $@thin (Int) -> Int {
-bb0(%0 : $Int):
-  %1 = integer_literal $Builtin.Word, 0
-  %2 = struct_extract %0 : $Int, #Int.value
-  %3 = builtin "srem_Word"(%2 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
-  %4 = struct $Int (%3 : $Builtin.Word)
-  return %4 : $Int
+sil @tst_srem : $@thin (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = struct_extract %0 : $Int32, #Int32.value
+  %3 = builtin "srem_Int32"(%2 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  return %4 : $Int32
 }
 
 // CHECK-LABEL: sil @tst_urem 
-// CHECK: %1 = integer_literal $Builtin.Word, 0
-// CHECK: %2 = struct $UInt (%1 : $Builtin.Word)
+// CHECK: %1 = integer_literal $Builtin.Int32, 0
+// CHECK: %2 = struct $UInt32 (%1 : $Builtin.Int32)
 // CHECK: return %2
-sil @tst_urem : $@thin (UInt) -> UInt {
-bb0(%0 : $UInt):
-  %1 = integer_literal $Builtin.Word, 0
-  %2 = struct_extract %0 : $UInt, #UInt.value
-  %3 = builtin "urem_Word"(%2 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
-  %4 = struct $UInt (%3 : $Builtin.Word)
-  return %4 : $UInt
+sil @tst_urem : $@thin (UInt32) -> UInt32 {
+bb0(%0 : $UInt32):
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = struct_extract %0 : $UInt32, #UInt32.value
+  %3 = builtin "urem_Int32"(%2 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32
+  %4 = struct $UInt32 (%3 : $Builtin.Int32)
+  return %4 : $UInt32
 }
 
 // CHECK-LABEL: sil @tst_and 
 // CHECK: return %0
-sil @tst_and : $@thin (Int) -> Int {
-bb0(%0 : $Int):
-  %1 = struct_extract %0 : $Int, #Int.value
-  %2 = builtin "and_Word"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
-  %3 = struct $Int (%2 : $Builtin.Word)
-  return %3 : $Int
+sil @tst_and : $@thin (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %1 = struct_extract %0 : $Int32, #Int32.value
+  %2 = builtin "and_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  return %3 : $Int32
 }
 
 // CHECK-LABEL: sil @tst_or 
 // CHECK: return %0
-sil @tst_or : $@thin (Int) -> Int {
-bb0(%0 : $Int):
-  %1 = struct_extract %0 : $Int, #Int.value
-  %2 = builtin "or_Word"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
-  %3 = struct $Int (%2 : $Builtin.Word)
-  return %3 : $Int
+sil @tst_or : $@thin (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %1 = struct_extract %0 : $Int32, #Int32.value
+  %2 = builtin "or_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  return %3 : $Int32
 }
 
 // CHECK-LABEL: sil @tst_xor 
-// CHECK: %1 = integer_literal $Builtin.Word, 0
-// CHECK: %2 = struct $Int (%1 : $Builtin.Word)
+// CHECK: %1 = integer_literal $Builtin.Int32, 0
+// CHECK: %2 = struct $Int32 (%1 : $Builtin.Int32)
 // CHECK: return %2
-sil @tst_xor : $@thin (Int) -> Int {
-bb0(%0 : $Int):
-  %1 = struct_extract %0 : $Int, #Int.value
-  %2 = builtin "xor_Word"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
-  %3 = struct $Int (%2 : $Builtin.Word)
-  return %3 : $Int
+sil @tst_xor : $@thin (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %1 = struct_extract %0 : $Int32, #Int32.value
+  %2 = builtin "xor_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  return %3 : $Int32
 }
 
 // CHECK-LABEL: sil @tst_icmp_eq 
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_icmp_eq : $@thin (Int) -> Bool {
-bb0(%0 : $Int):
-  %1 = struct_extract %0 : $Int, #Int.value
-  %2 = builtin "cmp_eq_Word"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+sil @tst_icmp_eq : $@thin (Int32) -> Bool {
+bb0(%0 : $Int32):
+  %1 = struct_extract %0 : $Int32, #Int32.value
+  %2 = builtin "cmp_eq_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   %3 = struct $Bool (%2 : $Builtin.Int1)
   return %3 : $Bool
 }
@@ -139,10 +139,10 @@ bb0(%0 : $Int):
 // CHECK: %1 = integer_literal $Builtin.Int1, 0
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_icmp_ne : $@thin (Int) -> Bool {
-bb0(%0 : $Int):
-  %1 = struct_extract %0 : $Int, #Int.value
-  %2 = builtin "cmp_ne_Word"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+sil @tst_icmp_ne : $@thin (Int32) -> Bool {
+bb0(%0 : $Int32):
+  %1 = struct_extract %0 : $Int32, #Int32.value
+  %2 = builtin "cmp_ne_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   %3 = struct $Bool (%2 : $Builtin.Int1)
   return %3 : $Bool
 }
@@ -151,10 +151,10 @@ bb0(%0 : $Int):
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_icmp_sle : $@thin (Int) -> Bool {
-bb0(%0 : $Int):
-  %1 = struct_extract %0 : $Int, #Int.value
-  %2 = builtin "cmp_sle_Word"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+sil @tst_icmp_sle : $@thin (Int32) -> Bool {
+bb0(%0 : $Int32):
+  %1 = struct_extract %0 : $Int32, #Int32.value
+  %2 = builtin "cmp_sle_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   %3 = struct $Bool (%2 : $Builtin.Int1)
   return %3 : $Bool
 }
@@ -163,10 +163,10 @@ bb0(%0 : $Int):
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_icmp_sge : $@thin (Int) -> Bool {
-bb0(%0 : $Int):
-  %1 = struct_extract %0 : $Int, #Int.value
-  %2 = builtin "cmp_sge_Word"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+sil @tst_icmp_sge : $@thin (Int32) -> Bool {
+bb0(%0 : $Int32):
+  %1 = struct_extract %0 : $Int32, #Int32.value
+  %2 = builtin "cmp_sge_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   %3 = struct $Bool (%2 : $Builtin.Int1)
   return %3 : $Bool
 }
@@ -175,10 +175,10 @@ bb0(%0 : $Int):
 // CHECK: %1 = integer_literal $Builtin.Int1, 0
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_icmp_slt : $@thin (Int) -> Bool {
-bb0(%0 : $Int):
-  %1 = struct_extract %0 : $Int, #Int.value
-  %2 = builtin "cmp_slt_Word"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+sil @tst_icmp_slt : $@thin (Int32) -> Bool {
+bb0(%0 : $Int32):
+  %1 = struct_extract %0 : $Int32, #Int32.value
+  %2 = builtin "cmp_slt_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   %3 = struct $Bool (%2 : $Builtin.Int1)
   return %3 : $Bool
 }
@@ -187,10 +187,10 @@ bb0(%0 : $Int):
 // CHECK: %1 = integer_literal $Builtin.Int1, 0
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_icmp_sgt : $@thin (Int) -> Bool {
-bb0(%0 : $Int):
-  %1 = struct_extract %0 : $Int, #Int.value
-  %2 = builtin "cmp_sgt_Word"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+sil @tst_icmp_sgt : $@thin (Int32) -> Bool {
+bb0(%0 : $Int32):
+  %1 = struct_extract %0 : $Int32, #Int32.value
+  %2 = builtin "cmp_sgt_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   %3 = struct $Bool (%2 : $Builtin.Int1)
   return %3 : $Bool
 }
@@ -199,10 +199,10 @@ bb0(%0 : $Int):
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_icmp_ule : $@thin (UInt) -> Bool {
-bb0(%0 : $UInt):
-  %1 = struct_extract %0 : $UInt, #UInt.value
-  %2 = builtin "cmp_ule_Word"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+sil @tst_icmp_ule : $@thin (UInt32) -> Bool {
+bb0(%0 : $UInt32):
+  %1 = struct_extract %0 : $UInt32, #UInt32.value
+  %2 = builtin "cmp_ule_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   %3 = struct $Bool (%2 : $Builtin.Int1)
   return %3 : $Bool
 }
@@ -211,10 +211,10 @@ bb0(%0 : $UInt):
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_icmp_uge : $@thin (UInt) -> Bool {
-bb0(%0 : $UInt):
-  %1 = struct_extract %0 : $UInt, #UInt.value
-  %2 = builtin "cmp_uge_Word"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+sil @tst_icmp_uge : $@thin (UInt32) -> Bool {
+bb0(%0 : $UInt32):
+  %1 = struct_extract %0 : $UInt32, #UInt32.value
+  %2 = builtin "cmp_uge_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   %3 = struct $Bool (%2 : $Builtin.Int1)
   return %3 : $Bool
 }
@@ -223,10 +223,10 @@ bb0(%0 : $UInt):
 // CHECK: %1 = integer_literal $Builtin.Int1, 0
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_icmp_ult : $@thin (UInt) -> Bool {
-bb0(%0 : $UInt):
-  %1 = struct_extract %0 : $UInt, #UInt.value
-  %2 = builtin "cmp_ult_Word"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+sil @tst_icmp_ult : $@thin (UInt32) -> Bool {
+bb0(%0 : $UInt32):
+  %1 = struct_extract %0 : $UInt32, #UInt32.value
+  %2 = builtin "cmp_ult_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   %3 = struct $Bool (%2 : $Builtin.Int1)
   return %3 : $Bool
 }
@@ -235,10 +235,10 @@ bb0(%0 : $UInt):
 // CHECK: %1 = integer_literal $Builtin.Int1, 0
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_icmp_ugt : $@thin (UInt) -> Bool {
-bb0(%0 : $UInt):
-  %1 = struct_extract %0 : $UInt, #UInt.value
-  %2 = builtin "cmp_ugt_Word"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+sil @tst_icmp_ugt : $@thin (UInt32) -> Bool {
+bb0(%0 : $UInt32):
+  %1 = struct_extract %0 : $UInt32, #UInt32.value
+  %2 = builtin "cmp_ugt_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   %3 = struct $Bool (%2 : $Builtin.Int1)
   return %3 : $Bool
 }

@@ -13,35 +13,35 @@ class MD5 {
 sil @test_unique_check_arc : $@cc(method) @thin (@owned MD5) -> () {
 // CHECK: bb0
 bb0(%0 : $MD5):
-  %1 = integer_literal $Builtin.Word, 0
-  %2 = integer_literal $Builtin.Word, 16
-  %3 = struct $Int (%1 : $Builtin.Word)
-  br bb1(%1 : $Builtin.Word)
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = integer_literal $Builtin.Int32, 16
+  %3 = struct $Int32 (%1 : $Builtin.Int32)
+  br bb1(%1 : $Builtin.Int32)
 
 // CHECK: bb1
-bb1(%5 : $Builtin.Word):
-  %7 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+bb1(%5 : $Builtin.Int32):
+  %7 = builtin "cmp_eq_Int32"(%5 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int1
   cond_br %7, bb3, bb2
 
 // CHECK: bb2
 bb2:
-  %9 = integer_literal $Builtin.Word, 1
+  %9 = integer_literal $Builtin.Int32, 1
   %11 = integer_literal $Builtin.Int1, -1
-  %12 = builtin "sadd_with_overflow_Word"(%5 : $Builtin.Word, %9 : $Builtin.Word, %11 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %13 = tuple_extract %12 : $(Builtin.Word, Builtin.Int1), 0
+  %12 = builtin "sadd_with_overflow_Int32"(%5 : $Builtin.Int32, %9 : $Builtin.Int32, %11 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %13 = tuple_extract %12 : $(Builtin.Int32, Builtin.Int1), 0
   // CHECK-NOT: strong_retain
   // CHECK-NOT: strong_release
   strong_retain %0 : $MD5
   // function_ref _swift_isUniquelyReferenced_native
-  %172 = function_ref @_swift_isUniquelyReferenced_native : $@thin (Int) -> Bool
+  %172 = function_ref @_swift_isUniquelyReferenced_native : $@thin (Int32) -> Bool
   %314 = ref_element_addr %0 : $MD5, #MD5.w
   %318 = load %314 : $*Array<UInt32>
   %319 = alloc_stack $Array<UInt32>
   store %318 to %319#1 : $*Array<UInt32>
-  %321 = unchecked_addr_cast %319#1 : $*Array<UInt32> to $*Int
-  %322 = load %321 : $*Int
+  %321 = unchecked_addr_cast %319#1 : $*Array<UInt32> to $*Int32
+  %322 = load %321 : $*Int32
   dealloc_stack %319#0 : $*@local_storage Array<UInt32>
-  %179 = apply %172(%322) : $@thin (Int) -> Bool
+  %179 = apply %172(%322) : $@thin (Int32) -> Bool
   %180 = struct_extract %179 : $Bool, #Bool.value
   cond_br %180, bb4, bb5 
 
@@ -60,7 +60,7 @@ bb4:
 // CHECK-NOT: strong_release
 bb5:
   strong_release %0 : $MD5
-  br bb1(%13 : $Builtin.Word)
+  br bb1(%13 : $Builtin.Int32)
 
 }
-sil @_swift_isUniquelyReferenced_native : $@thin (Int) -> Bool
+sil @_swift_isUniquelyReferenced_native : $@thin (Int32) -> Bool

@@ -5,40 +5,40 @@ sil_stage canonical
 import Builtin
 import Swift
 
-sil [semantics "no_inline_plz"] @callee_func : $@thin () -> Int {
+sil [semantics "no_inline_plz"] @callee_func : $@thin () -> Int32 {
 bb0:
-  %0 = integer_literal $Builtin.Word, 3           // user: %1
-  %1 = struct $Int (%0 : $Builtin.Word)           // user: %2
-  return %1 : $Int                                // id: %2
+  %0 = integer_literal $Builtin.Int32, 3           // user: %1
+  %1 = struct $Int32 (%0 : $Builtin.Int32)         // user: %2
+  return %1 : $Int32                               // id: %2
 }
 
 //CHECK-LABLE: caller_func
 //CHECK: function_ref
 //CHECK: apply
 //CHECK-NEXT: ret
-sil @caller_func : $@thin () -> Int {
+sil @caller_func : $@thin () -> Int32 {
 bb0:
-  %0 = function_ref @callee_func : $@thin () -> Int // user: %1
-  %1 = apply %0() : $@thin () -> Int              // user: %2
-  return %1 : $Int                                // id: %2
+  %0 = function_ref @callee_func : $@thin () -> Int32 // user: %1
+  %1 = apply %0() : $@thin () -> Int32                // user: %2
+  return %1 : $Int32                                  // id: %2
 }
 
 // A function annocated with the @effects(readonly) attribute.
-sil [readonly] @callee_func2 : $@thin () -> Int {
+sil [readonly] @callee_func2 : $@thin () -> Int32 {
 bb0:
-  %0 = integer_literal $Builtin.Word, 3           // user: %1
-  %1 = struct $Int (%0 : $Builtin.Word)           // user: %2
-  return %1 : $Int                                // id: %2
+  %0 = integer_literal $Builtin.Int32, 3           // user: %1
+  %1 = struct $Int32 (%0 : $Builtin.Int32)         // user: %2
+  return %1 : $Int32                               // id: %2
 }
 
 //CHECK-LABLE: caller_func1
 //CHECK: function_ref
 //CHECK: apply
 //CHECK-NEXT: ret
-sil @caller_func1 : $@thin () -> Int {
+sil @caller_func1 : $@thin () -> Int32 {
 bb0:
-  %0 = function_ref @callee_func2 : $@thin () -> Int // user: %1
-  %1 = apply %0() : $@thin () -> Int              // user: %2
-  return %1 : $Int                                // id: %2
+  %0 = function_ref @callee_func2 : $@thin () -> Int32 // user: %1
+  %1 = apply %0() : $@thin () -> Int32                 // user: %2
+  return %1 : $Int32                                   // id: %2
 }
 

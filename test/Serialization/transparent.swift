@@ -15,13 +15,13 @@ import def_transparent
 // SIL: store [[RESULT]] to [[RAW]] : $*Bool
 var raw = testTransparent(x: false)
 
-// SIL: [[TMP:%.+]] = global_addr @_Tv11transparent3tmpSi : $*Int
-// SIL: [[FUNC2:%.+]] = function_ref @_TF15def_transparent11testBuiltinFT_Si : $@thin () -> Int
-// SIL: [[RESULT2:%.+]] = apply [transparent] [[FUNC2]]() : $@thin () -> Int
-// SIL: store [[RESULT2]] to [[TMP]] : $*Int
+// SIL: [[TMP:%.+]] = global_addr @_Tv11transparent3tmpVSs5Int32 : $*Int32
+// SIL: [[FUNC2:%.+]] = function_ref @_TF15def_transparent11testBuiltinFT_VSs5Int32 : $@thin () -> Int32
+// SIL: [[RESULT2:%.+]] = apply [transparent] [[FUNC2]]() : $@thin () -> Int32
+// SIL: store [[RESULT2]] to [[TMP]] : $*Int32
 var tmp = testBuiltin()
 
-func test_partial(i: Int, j: Int) {
+func test_partial(i: Int32, j: Int32) {
   calls(i: i, j: j)
 }
 
@@ -29,11 +29,11 @@ func test_partial(i: Int, j: Int) {
 // SIL: bb0(%0 : $Bool):
 // SIL: return %0 : $Bool
 
-// SIL-LABEL: sil public_external [transparent] [fragile] @_TF15def_transparent11testBuiltinFT_Si : $@thin () -> Int {
+// SIL-LABEL: sil public_external [transparent] [fragile] @_TF15def_transparent11testBuiltinFT_VSs5Int32 : $@thin () -> Int32 {
 // SIL: bb0:
-// SIL: integer_literal $Builtin.Word, 300
+// SIL: integer_literal $Builtin.Int32, 300
 // SIL: string_literal utf8 "foo"
-// SIL: return %{{.*}} : $Int
+// SIL: return %{{.*}} : $Int32
 
 // SIL-LABEL: sil public_external [transparent] [fragile] @_TF15def_transparent7test_brFT_T_ : $@thin () -> () {
 // SIL: bb{{.*}}:
@@ -49,17 +49,17 @@ func wrap_br() {
 // SIL: retain_value %0 : $MaybePair
 // SIL: switch_enum %0 : $MaybePair, case #MaybePair.Neither!enumelt: bb[[CASE1:[0-9]+]], case #MaybePair.Left!enumelt.1: bb[[CASE2:[0-9]+]], case #MaybePair.Right!enumelt.1: bb[[CASE3:[0-9]+]], case #MaybePair.Both!enumelt.1: bb[[CASE4:[0-9]+]]
 // SIL: bb[[CASE1]]:
-// SIL: bb[[CASE2]](%{{.*}} : $Int):
+// SIL: bb[[CASE2]](%{{.*}} : $Int32):
 // SIL: bb[[CASE3]](%{{.*}} : $String):
-// SIL: bb[[CASE4]](%{{.*}} : $(Int, String)):
+// SIL: bb[[CASE4]](%{{.*}} : $(Int32, String)):
 func test_switch(u: MaybePair) {
   do_switch(u: u)
 }
 
-// SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7WrapperCfMS0_FT3ValSi_S0_ : $@thin (Int, @thin Wrapper.Type) -> Wrapper {
-// SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7Wrapper8getValuefS0_FT_Si : $@cc(method) @thin (Wrapper) -> Int {
-// SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7Wrapperg10valueAgainSi : $@cc(method) @thin (Wrapper) -> Int {
-// SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7Wrapper13getValueAgainfS0_FT_Si : $@cc(method) @thin (Wrapper) -> Int {
+// SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7WrapperCfMS0_FT3ValVSs5Int32_S0_ : $@thin (Int32, @thin Wrapper.Type) -> Wrapper {
+// SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7Wrapper8getValuefS0_FT_VSs5Int32 : $@cc(method) @thin (Wrapper) -> Int32 {
+// SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7Wrapperg10valueAgainVSs5Int32 : $@cc(method) @thin (Wrapper) -> Int32 {
+// SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7Wrapper13getValueAgainfS0_FT_VSs5Int32 : $@cc(method) @thin (Wrapper) -> Int32 {
 func test_wrapper() {
   var w = Wrapper(Val: 42)
   
@@ -76,6 +76,6 @@ func test_open_existentials(p: P, cp: CP) {
   open_existentials(p: p, cp: cp)
 }
 
-// SIL-LABEL: sil shared_external [transparent] [fragile] @_TF15def_transparent16curried_functionFT1xSi_FT1ySi_Si : $@thin (Int) -> @owned @callee_owned (Int) -> Int {
-// SIL: function_ref @_TF15def_transparent16curried_functionfT1xSi_FT1ySi_Si : $@thin (Int, Int) -> Int
-// SIL: partial_apply %1(%0) : $@thin (Int, Int) -> Int
+// SIL-LABEL: sil shared_external [transparent] [fragile] @_TF15def_transparent16curried_functionFT1xVSs5Int32_FT1yS0__S0_ : $@thin (Int32) -> @owned @callee_owned (Int32) -> Int32 {
+// SIL: function_ref @_TF15def_transparent16curried_functionfT1xVSs5Int32_FT1yS0__S0_ : $@thin (Int32, Int32) -> Int32
+// SIL: partial_apply %1(%0) : $@thin (Int32, Int32) -> Int32

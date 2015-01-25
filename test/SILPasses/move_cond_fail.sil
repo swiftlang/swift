@@ -4,25 +4,25 @@ import Builtin
 import Swift
 
 sil_global @startTime : $Double
-sil_global @sum1 : $Int
+sil_global @sum1 : $Int32
 
 // CHECK-LABEl: @sink_cond_fail
 sil @sink_cond_fail : $@thin () -> () {
 // CHECK: bb0
 bb0:
   %0 = global_addr @startTime : $*Double
-  %1 = global_addr @sum1 : $*Int
-  %2 = integer_literal $Builtin.Word, 0
-  %3 = struct $Int (%2 : $Builtin.Word)
-  store %3 to %1 : $*Int
+  %1 = global_addr @sum1 : $*Int32
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  store %3 to %1 : $*Int32
   %5 = function_ref @callee : $@cc(cdecl) @thin () -> Double
   %6 = apply %5() : $@cc(cdecl) @thin () -> Double
   store %6 to %0 : $*Double
-  %8 = integer_literal $Builtin.Word, 1000000000
-  // CHECK: integer_literal $Builtin.Word, 1
+  %8 = integer_literal $Builtin.Int32, 1000000000
+  // CHECK: integer_literal $Builtin.Int32, 1
   // CHECK: integer_literal $Builtin.Int1, -1
-  // CHECK: struct_element_addr {{.*}} : $*Int, #Int.value
-  br bb2(%2 : $Builtin.Word)
+  // CHECK: struct_element_addr {{.*}} : $*Int32, #Int32.value
+  br bb2(%2 : $Builtin.Int32)
 
 // CHECK: bb1:
 bb1:
@@ -30,34 +30,34 @@ bb1:
   return %11 : $()
 
 // CHECK: bb2(
-bb2(%13 : $Builtin.Word):
-  %14 = integer_literal $Builtin.Word, 1
+bb2(%13 : $Builtin.Int32):
+  %14 = integer_literal $Builtin.Int32, 1
   %16 = integer_literal $Builtin.Int1, -1
   // CHECK-NEXT: builtin
-  %17 = builtin "sadd_with_overflow_Word"(%13 : $Builtin.Word, %14 : $Builtin.Word, %16 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %17 = builtin "sadd_with_overflow_Word"(%13 : $Builtin.Int32, %14 : $Builtin.Int32, %16 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   // CHECK-NEXT: tuple_extract
-  %18 = tuple_extract %17 : $(Builtin.Word, Builtin.Int1), 0
+  %18 = tuple_extract %17 : $(Builtin.Int32, Builtin.Int1), 0
   // CHECK-NEXT: tuple_extract
-  %19 = tuple_extract %17 : $(Builtin.Word, Builtin.Int1), 1
+  %19 = tuple_extract %17 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %19 : $Builtin.Int1
-  %21 = struct_element_addr %1 : $*Int, #Int.value
+  %21 = struct_element_addr %1 : $*Int32, #Int32.value
   // CHECK-NEXT: load
-  %22 = load %21 : $*Builtin.Word
+  %22 = load %21 : $*Builtin.Int32
   // CHECK-NEXT: builtin
-  %23 = builtin "sadd_with_overflow_Word"(%22 : $Builtin.Word, %14 : $Builtin.Word, %16 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %23 = builtin "sadd_with_overflow_Word"(%22 : $Builtin.Int32, %14 : $Builtin.Int32, %16 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   // CHECK-NEXT: tuple_extract
-  %24 = tuple_extract %23 : $(Builtin.Word, Builtin.Int1), 0
+  %24 = tuple_extract %23 : $(Builtin.Int32, Builtin.Int1), 0
   // CHECK-NEXT: tuple_extract
-  %25 = tuple_extract %23 : $(Builtin.Word, Builtin.Int1), 1
+  %25 = tuple_extract %23 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %25 : $Builtin.Int1
   // CHECK-NEXT: struct
-  %27 = struct $Int (%24 : $Builtin.Word)
+  %27 = struct $Int32 (%24 : $Builtin.Int32)
   // CHECK-NEXT: store
-  store %27 to %1 : $*Int
+  store %27 to %1 : $*Int32
   // CHECK-NEXT: cond_fail
   // CHECK-NEXT: cond_fail
-  %29 = builtin "cmp_eq_Word"(%18 : $Builtin.Word, %8 : $Builtin.Word) : $Builtin.Int1
-  cond_br %29, bb1, bb2(%18 : $Builtin.Word)
+  %29 = builtin "cmp_eq_Word"(%18 : $Builtin.Int32, %8 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %29, bb1, bb2(%18 : $Builtin.Int32)
 }
 
 sil @callee : $@cc(cdecl) @thin () -> Double

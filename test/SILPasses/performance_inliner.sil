@@ -518,26 +518,26 @@ bb0(%0 : $Builtin.NativeObject):
 //////////
 
 // Make sure SILCloner does not get into an infinite loop here.
-sil @_TFSsoi1xFT3lhsVSs5UWord3rhsS__S_ : $@thin (UWord, UWord) -> UWord {
-bb0(%0 : $UWord, %1 : $UWord):
-  %3 = struct_extract %0 : $UWord, #UWord.value   // user: %5
-  %4 = struct_extract %1 : $UWord, #UWord.value   // user: %5
-  %5 = builtin "xor_Word"(%3 : $Builtin.Word, %4 : $Builtin.Word) : $Builtin.Word // user: %6
-  %6 = struct $UWord (%5 : $Builtin.Word)         // user: %7
-  return %6 : $UWord                              // id: %7
+sil @_TFSsoi1xFT3lhsVSs5UWord3rhsS__S_ : $@thin (UInt32, UInt32) -> UInt32 {
+bb0(%0 : $UInt32, %1 : $UInt32):
+  %3 = struct_extract %0 : $UInt32, #UInt32.value   // user: %5
+  %4 = struct_extract %1 : $UInt32, #UInt32.value   // user: %5
+  %5 = builtin "xor_Int32"(%3 : $Builtin.Int32, %4 : $Builtin.Int32) : $Builtin.Int32 // user: %6
+  %6 = struct $UInt32 (%5 : $Builtin.Int32)         // user: %7
+  return %6 : $UInt32                               // id: %7
 }
 
-sil @_TFSsop1tFT1aVSs5UWord_S_ : $@thin (UWord) -> UWord {
-bb0(%0 : $UWord):
-  // function_ref Swift.^ [infix] (lhs : Swift.UWord, rhs : Swift.UWord) -> Swift.UWord
-  %1 = function_ref @_TFSsoi1xFT3lhsVSs5UWord3rhsS__S_ : $@thin (UWord, UWord) -> UWord // user: %6
-  // function_ref Swift.~ [prefix] (a : Swift.UWord) -> Swift.UWord
-  %2 = function_ref @_TFSsop1tFT1aVSs5UWord_S_ : $@thin (UWord) -> UWord // user: %5
-  %3 = integer_literal $Builtin.Word, 0           // user: %4
-  %4 = struct $UWord (%3 : $Builtin.Word)         // user: %5
-  %5 = apply %2(%4) : $@thin (UWord) -> UWord     // user: %6
-  %6 = apply %1(%0, %5) : $@thin (UWord, UWord) -> UWord // user: %7
-  return %6 : $UWord                              // id: %7
+sil @_TFSsop1tFT1aVSs5UWord_S_ : $@thin (UInt32) -> UInt32 {
+bb0(%0 : $UInt32):
+  // function_ref Swift.^ [infix] (lhs : Swift.UInt32, rhs : Swift.UInt32) -> Swift.UInt32
+  %1 = function_ref @_TFSsoi1xFT3lhsVSs5UWord3rhsS__S_ : $@thin (UInt32, UInt32) -> UInt32 // user: %6
+  // function_ref Swift.~ [prefix] (a : Swift.UInt32) -> Swift.UInt32
+  %2 = function_ref @_TFSsop1tFT1aVSs5UWord_S_ : $@thin (UInt32) -> UInt32 // user: %5
+  %3 = integer_literal $Builtin.Int32, 0            // user: %4
+  %4 = struct $UInt32 (%3 : $Builtin.Int32)         // user: %5
+  %5 = apply %2(%4) : $@thin (UInt32) -> UInt32     // user: %6
+  %6 = apply %1(%0, %5) : $@thin (UInt32, UInt32) -> UInt32 // user: %7
+  return %6 : $UInt32                               // id: %7
 }
 
 // Transparent function may inline private functions.
@@ -898,12 +898,12 @@ bb0(%0 : $*Bool):
 // CHECK: function_ref @coldcall
 // CHECK: apply
 // CHECK-LABEL: bb2:
-sil @coldcall_caller : $@thin (Int) -> () {
-bb0(%0 : $Int):
+sil @coldcall_caller : $@thin (Int32) -> () {
+bb0(%0 : $Int32):
   %1 = alloc_stack $Bool                          // users: %7, %9, %11
-  %2 = integer_literal $Builtin.Word, 0           // user: %5
-  %4 = struct_extract %0 : $Int, #Int.value       // user: %5
-  %5 = builtin "cmp_eq_Word"(%4 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1 // user: %6
+  %2 = integer_literal $Builtin.Int32, 0          // user: %5
+  %4 = struct_extract %0 : $Int32, #Int32.value   // user: %5
+  %5 = builtin "cmp_eq_Word"(%4 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int1 // user: %6
   %6 = struct $Bool (%5 : $Builtin.Int1)          // user: %7
   store %6 to %1#1 : $*Bool                       // id: %7
   %8 = function_ref @_TTSgSbSbSs11BooleanType___TFSs9_slowPathUSs11BooleanType__FQ_Sb : $@thin (@in Bool) -> Bool // user: %9

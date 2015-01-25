@@ -7,17 +7,17 @@ import Swift
 
 /*
 class Foo {
-  var m_val : Int
-  init(x : Int) { m_val = x }
-  func get() -> Int {return m_val}
+  var m_val : Int32
+  init(x : Int32) { m_val = x }
+  func get() -> Int32 {return m_val}
 }
-func test_me(x : Int) -> Foo { return Foo(x) }
+func test_me(x : Int32) -> Foo { return Foo(x) }
 func main() { print(test_me(3).get()) } */
 
 class Foo {
-  var m_val: Int
-  init(x: Int)
-  func get() -> Int
+  var m_val: Int32
+  init(x: Int32)
+  func get() -> Int32
 }
 
 //CHECK: _TF4main4mainFT_T_
@@ -26,28 +26,28 @@ class Foo {
 sil @_TF4main4mainFT_T_ : $@thin () -> () {
 bb0:
   // function_ref swift
-  %0 = function_ref @_TSs5printFT3valSi_T_ : $@thin (Int) -> () // user: %8
-  %1 = integer_literal $Builtin.Word, 3          // user: %2
-  %2 = struct $Int (%1 : $Builtin.Word)        // user: %5
+  %0 = function_ref @_TSs5printFT3valSi_T_ : $@thin (Int32) -> () // user: %8
+  %1 = integer_literal $Builtin.Int32, 3          // user: %2
+  %2 = struct $Int32 (%1 : $Builtin.Int32)        // user: %5
   %3 = alloc_ref $Foo                             // users: %6, %7, %4
-  %4 = ref_element_addr %3 : $Foo, #Foo.m_val         // user: %5
-  store %2 to %4 : $*Int                        // id: %5
-  %6 = class_method %3 : $Foo, #Foo.get!1 : Foo -> () -> Int , $@cc(method) @thin (@owned Foo) -> Int // user: %7
-  %7 = apply %6(%3) : $@cc(method) @thin (@owned Foo) -> Int // user: %8
-  %8 = apply %0(%7) : $@thin (Int) -> ()
+  %4 = ref_element_addr %3 : $Foo, #Foo.m_val     // user: %5
+  store %2 to %4 : $*Int32                        // id: %5
+  %6 = class_method %3 : $Foo, #Foo.get!1 : Foo -> () -> Int32 , $@cc(method) @thin (@owned Foo) -> Int32 // user: %7
+  %7 = apply %6(%3) : $@cc(method) @thin (@owned Foo) -> Int32 // user: %8
+  %8 = apply %0(%7) : $@thin (Int32) -> ()
   %9 = tuple ()                                   // user: %10
   return %9 : $()                                 // id: %10
 }
 
-sil @_TSs5printFT3valSi_T_ : $@thin (Int) -> ()
+sil @_TSs5printFT3valSi_T_ : $@thin (Int32) -> ()
 
-// main.Foo.get (main.Foo)() -> Swift.Int
-sil @_TFC4main3Foo3getfS0_FT_Si : $@cc(method) @thin (@owned Foo) -> Int {
+// main.Foo.get (main.Foo)() -> Swift.Int32
+sil @_TFC4main3Foo3getfS0_FT_Si : $@cc(method) @thin (@owned Foo) -> Int32 {
 bb0(%0 : $Foo):
-  %1 = ref_element_addr %0 : $Foo, #Foo.m_val         // user: %2
-  %2 = load %1 : $*Int                          // user: %4
+  %1 = ref_element_addr %0 : $Foo, #Foo.m_val     // user: %2
+  %2 = load %1 : $*Int32                          // user: %4
   strong_release %0 : $Foo                        // id: %3
-  return %2 : $Int                              // id: %4
+  return %2 : $Int32                              // id: %4
 }
 
 sil_vtable Foo {

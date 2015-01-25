@@ -6,48 +6,48 @@ import Builtin
 import Swift
 
 // CHECK-LABEL: sil @dead1
-sil @dead1 : $@thin (Int, Int) -> Int {
+sil @dead1 : $@thin (Int32, Int32) -> Int32 {
 // CHECK: bb0
-bb0(%0 : $Int, %1 : $Int):
-  %3 = struct_extract %0 : $Int, #Int.value
-  %4 = struct_extract %1 : $Int, #Int.value
+bb0(%0 : $Int32, %1 : $Int32):
+  %3 = struct_extract %0 : $Int32, #Int32.value
+  %4 = struct_extract %1 : $Int32, #Int32.value
   %5 = integer_literal $Builtin.Int1, -1
-  %6 = builtin "sadd_with_overflow_Word"(%3 : $Builtin.Word, %4 : $Builtin.Word, %5 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %7 = tuple_extract %6 : $(Builtin.Word, Builtin.Int1), 0
-  %8 = struct $Int (%7 : $Builtin.Word)
+  %6 = builtin "sadd_with_overflow_Int32"(%3 : $Builtin.Int32, %4 : $Builtin.Int32, %5 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %7 = tuple_extract %6 : $(Builtin.Int32, Builtin.Int1), 0
+  %8 = struct $Int32 (%7 : $Builtin.Int32)
 // CHECK-NEXT: return %0
-  return %0 : $Int
+  return %0 : $Int32
 }
 
 // CHECK-LABEL: sil @dead2
 sil @dead2 : $@thin () -> () {
 // CHECK: bb0
 bb0:
-// CHECK-NOT: integer_literal $Builtin.Word, 2
-  %0 = integer_literal $Builtin.Word, 2
-// CHECK-NOT: integer_literal $Builtin.Word, 0
-  %1 = integer_literal $Builtin.Word, 0
+// CHECK-NOT: integer_literal $Builtin.Int32, 2
+  %0 = integer_literal $Builtin.Int32, 2
+// CHECK-NOT: integer_literal $Builtin.Int32, 0
+  %1 = integer_literal $Builtin.Int32, 0
 // CHECK-NEXT: br bb1
-  br bb1(%0 : $Builtin.Word, %1 : $Builtin.Word)
+  br bb1(%0 : $Builtin.Int32, %1 : $Builtin.Int32)
 
 // CHECK: bb1
-bb1(%3 : $Builtin.Word, %4 : $Builtin.Word):
+bb1(%3 : $Builtin.Int32, %4 : $Builtin.Int32):
 // CHECK-NEXT: br bb3
-  %5 = integer_literal $Builtin.Word, 100
-  %7 = builtin "cmp_slt_Word"(%4 : $Builtin.Word, %5 : $Builtin.Word) : $Builtin.Int1
+  %5 = integer_literal $Builtin.Int32, 100
+  %7 = builtin "cmp_slt_Int32"(%4 : $Builtin.Int32, %5 : $Builtin.Int32) : $Builtin.Int1
   cond_br %7, bb2, bb3
 
 // CHECK: bb2
 bb2:
 // CHECK-NEXT: br bb1
-  %9 = integer_literal $Builtin.Word, 3
+  %9 = integer_literal $Builtin.Int32, 3
   %11 = integer_literal $Builtin.Int1, -1
-  %12 = builtin "sadd_with_overflow_Word"(%3 : $Builtin.Word, %9 : $Builtin.Word, %11 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %13 = tuple_extract %12 : $(Builtin.Word, Builtin.Int1), 0
-  %14 = integer_literal $Builtin.Word, 1
-  %15 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Word, %14 : $Builtin.Word, %11 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %16 = tuple_extract %15 : $(Builtin.Word, Builtin.Int1), 0
-  br bb1(%13 : $Builtin.Word, %16 : $Builtin.Word)
+  %12 = builtin "sadd_with_overflow_Int32"(%3 : $Builtin.Int32, %9 : $Builtin.Int32, %11 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %13 = tuple_extract %12 : $(Builtin.Int32, Builtin.Int1), 0
+  %14 = integer_literal $Builtin.Int32, 1
+  %15 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %14 : $Builtin.Int32, %11 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %16 = tuple_extract %15 : $(Builtin.Int32, Builtin.Int1), 0
+  br bb1(%13 : $Builtin.Int32, %16 : $Builtin.Int32)
 
 // CHECK: bb3
 bb3:
@@ -63,118 +63,118 @@ bb3:
 sil @dead3 : $@thin () -> () {
 // CHECK: bb0
 bb0:
-// CHECK: integer_literal $Builtin.Word, 0
-  %0 = integer_literal $Builtin.Word, 0
+// CHECK: integer_literal $Builtin.Int32, 0
+  %0 = integer_literal $Builtin.Int32, 0
   br bb0
 }
 
 // CHECK-LABEL: sil hidden @test_dce_bbargs
 sil hidden @test_dce_bbargs : $@thin () -> () {
 bb0:
-  %0 = integer_literal $Builtin.Word, 0
-  %1 = struct $Int (%0 : $Builtin.Word)
-  %2 = integer_literal $Builtin.Word, 0
-  %3 = struct $Int (%2 : $Builtin.Word)
-  %4 = integer_literal $Builtin.Word, 0
-  %5 = struct $Int (%4 : $Builtin.Word)
-  %6 = integer_literal $Builtin.Word, 0
-  %7 = struct $Int (%6 : $Builtin.Word)
-  %8 = integer_literal $Builtin.Word, 0
-  %9 = struct $Int (%8 : $Builtin.Word)
-  %10 = integer_literal $Builtin.Word, 0
-  %11 = struct $Int (%10 : $Builtin.Word)
-  br bb1(%1 : $Int, %3 : $Int, %11 : $Int, %7 : $Int, %9 : $Int)
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  %4 = integer_literal $Builtin.Int32, 0
+  %5 = struct $Int32 (%4 : $Builtin.Int32)
+  %6 = integer_literal $Builtin.Int32, 0
+  %7 = struct $Int32 (%6 : $Builtin.Int32)
+  %8 = integer_literal $Builtin.Int32, 0
+  %9 = struct $Int32 (%8 : $Builtin.Int32)
+  %10 = integer_literal $Builtin.Int32, 0
+  %11 = struct $Int32 (%10 : $Builtin.Int32)
+  br bb1(%1 : $Int32, %3 : $Int32, %11 : $Int32, %7 : $Int32, %9 : $Int32)
 
-bb1(%13 : $Int, %14 : $Int, %15 : $Int, %16 : $Int, %17 : $Int):
-  %18 = integer_literal $Builtin.Word, 11
-  %20 = struct_extract %15 : $Int, #Int.value
-  %21 = builtin "cmp_slt_Word"(%20 : $Builtin.Word, %18 : $Builtin.Word) : $Builtin.Int1
+bb1(%13 : $Int32, %14 : $Int32, %15 : $Int32, %16 : $Int32, %17 : $Int32):
+  %18 = integer_literal $Builtin.Int32, 11
+  %20 = struct_extract %15 : $Int32, #Int32.value
+  %21 = builtin "cmp_slt_Int32"(%20 : $Builtin.Int32, %18 : $Builtin.Int32) : $Builtin.Int1
   %22 = struct $Bool (%21 : $Builtin.Int1)
   %23 = struct_extract %22 : $Bool, #Bool.value
   cond_br %23, bb2, bb10
 
 // CHECK: bb2:
 bb2:
-  %25 = integer_literal $Builtin.Word, 0
-  %26 = struct $Int (%25 : $Builtin.Word)
-// br bb3(undef : $Int, undef : $Int,
-  br bb3(%13 : $Int, %14 : $Int, %26 : $Int, %17 : $Int)
+  %25 = integer_literal $Builtin.Int32, 0
+  %26 = struct $Int32 (%25 : $Builtin.Int32)
+// br bb3(undef : $Int32, undef : $Int32,
+  br bb3(%13 : $Int32, %14 : $Int32, %26 : $Int32, %17 : $Int32)
 
-bb3(%28 : $Int, %29 : $Int, %30 : $Int, %31 : $Int):
-  %32 = integer_literal $Builtin.Word, 22
-  %34 = struct_extract %30 : $Int, #Int.value
-  %35 = builtin "cmp_slt_Word"(%34 : $Builtin.Word, %32 : $Builtin.Word) : $Builtin.Int1
+bb3(%28 : $Int32, %29 : $Int32, %30 : $Int32, %31 : $Int32):
+  %32 = integer_literal $Builtin.Int32, 22
+  %34 = struct_extract %30 : $Int32, #Int32.value
+  %35 = builtin "cmp_slt_Int32"(%34 : $Builtin.Int32, %32 : $Builtin.Int32) : $Builtin.Int1
   %36 = struct $Bool (%35 : $Builtin.Int1)
   %37 = struct_extract %36 : $Bool, #Bool.value
   cond_br %37, bb4, bb9
 
 // CHECK: bb4:
 bb4:
-  %39 = integer_literal $Builtin.Word, 0
-  %41 = struct_extract %28 : $Int, #Int.value
-  %42 = builtin "cmp_eq_Word"(%39 : $Builtin.Word, %41 : $Builtin.Word) : $Builtin.Int1
+  %39 = integer_literal $Builtin.Int32, 0
+  %41 = struct_extract %28 : $Int32, #Int32.value
+  %42 = builtin "cmp_eq_Int32"(%39 : $Builtin.Int32, %41 : $Builtin.Int32) : $Builtin.Int1
   %43 = struct $Bool (%42 : $Builtin.Int1)
   %44 = struct_extract %43 : $Bool, #Bool.value
 // CHECK-NOT: cond_br
 // CHECK: br bb8
-  cond_br %44, bb5, bb6(%28 : $Int)
+  cond_br %44, bb5, bb6(%28 : $Int32)
 
 bb5:
-  %46 = integer_literal $Builtin.Word, 0
-  %47 = struct $Int (%46 : $Builtin.Word)
-  br bb6(%47 : $Int)
+  %46 = integer_literal $Builtin.Int32, 0
+  %47 = struct $Int32 (%46 : $Builtin.Int32)
+  br bb6(%47 : $Int32)
 
 // CHECK: bb6
-bb6(%49 : $Int):
-  %50 = integer_literal $Builtin.Word, 10
-  %52 = struct_extract %29 : $Int, #Int.value
-  %53 = builtin "cmp_eq_Word"(%50 : $Builtin.Word, %52 : $Builtin.Word) : $Builtin.Int1
+bb6(%49 : $Int32):
+  %50 = integer_literal $Builtin.Int32, 10
+  %52 = struct_extract %29 : $Int32, #Int32.value
+  %53 = builtin "cmp_eq_Int32"(%50 : $Builtin.Int32, %52 : $Builtin.Int32) : $Builtin.Int1
   %54 = struct $Bool (%53 : $Builtin.Int1)
   %55 = struct_extract %54 : $Bool, #Bool.value
 // CHECK-NOT: cond_br
 // CHECK: br bb8
-  cond_br %55, bb7, bb8(%29 : $Int)
+  cond_br %55, bb7, bb8(%29 : $Int32)
 
 // CHECK: bb7:
 bb7:
-  %57 = integer_literal $Builtin.Word, 0
-  %58 = struct $Int (%57 : $Builtin.Word)
+  %57 = integer_literal $Builtin.Int32, 0
+  %58 = struct $Int32 (%57 : $Builtin.Int32)
 // CHECK: br bb8
-  br bb8(%58 : $Int)
+  br bb8(%58 : $Int32)
 
 // CHECK: bb8
-bb8(%60 : $Int):
-  %61 = struct_extract %31 : $Int, #Int.value
-  %62 = integer_literal $Builtin.Word, 1
+bb8(%60 : $Int32):
+  %61 = struct_extract %31 : $Int32, #Int32.value
+  %62 = integer_literal $Builtin.Int32, 1
   %64 = integer_literal $Builtin.Int1, -1
-  %65 = builtin "sadd_with_overflow_Word"(%61 : $Builtin.Word, %62 : $Builtin.Word, %64 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %66 = tuple_extract %65 : $(Builtin.Word, Builtin.Int1), 0
-  %67 = tuple_extract %65 : $(Builtin.Word, Builtin.Int1), 1
+  %65 = builtin "sadd_with_overflow_Int32"(%61 : $Builtin.Int32, %62 : $Builtin.Int32, %64 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %66 = tuple_extract %65 : $(Builtin.Int32, Builtin.Int1), 0
+  %67 = tuple_extract %65 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %67 : $Builtin.Int1
-  %69 = struct $Int (%66 : $Builtin.Word)
-  %70 = struct_extract %30 : $Int, #Int.value
-  %71 = integer_literal $Builtin.Word, 1
+  %69 = struct $Int32 (%66 : $Builtin.Int32)
+  %70 = struct_extract %30 : $Int32, #Int32.value
+  %71 = integer_literal $Builtin.Int32, 1
   %73 = integer_literal $Builtin.Int1, -1
-  %74 = builtin "sadd_with_overflow_Word"(%70 : $Builtin.Word, %71 : $Builtin.Word, %73 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %75 = tuple_extract %74 : $(Builtin.Word, Builtin.Int1), 0
-  %76 = tuple_extract %74 : $(Builtin.Word, Builtin.Int1), 1
+  %74 = builtin "sadd_with_overflow_Int32"(%70 : $Builtin.Int32, %71 : $Builtin.Int32, %73 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %75 = tuple_extract %74 : $(Builtin.Int32, Builtin.Int1), 0
+  %76 = tuple_extract %74 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %76 : $Builtin.Int1
-  %78 = struct $Int (%75 : $Builtin.Word)
-// CHECK: br bb3(undef : $Int, undef : $Int,
-  br bb3(%49 : $Int, %60 : $Int, %78 : $Int, %69 : $Int)
+  %78 = struct $Int32 (%75 : $Builtin.Int32)
+// CHECK: br bb3(undef : $Int32, undef : $Int32,
+  br bb3(%49 : $Int32, %60 : $Int32, %78 : $Int32, %69 : $Int32)
 
 // CHECK: bb9:
 bb9:
-  %80 = struct_extract %15 : $Int, #Int.value
-  %81 = integer_literal $Builtin.Word, 1
+  %80 = struct_extract %15 : $Int32, #Int32.value
+  %81 = integer_literal $Builtin.Int32, 1
   %83 = integer_literal $Builtin.Int1, -1
-  %84 = builtin "sadd_with_overflow_Word"(%80 : $Builtin.Word, %81 : $Builtin.Word, %83 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %85 = tuple_extract %84 : $(Builtin.Word, Builtin.Int1), 0
-  %86 = tuple_extract %84 : $(Builtin.Word, Builtin.Int1), 1
+  %84 = builtin "sadd_with_overflow_Int32"(%80 : $Builtin.Int32, %81 : $Builtin.Int32, %83 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %85 = tuple_extract %84 : $(Builtin.Int32, Builtin.Int1), 0
+  %86 = tuple_extract %84 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %86 : $Builtin.Int1
-  %88 = struct $Int (%85 : $Builtin.Word)
-// CHECK: br bb1(undef : $Int, undef : $Int,
-  br bb1(%28 : $Int, %29 : $Int, %88 : $Int, %30 : $Int, %31 : $Int)
+  %88 = struct $Int32 (%85 : $Builtin.Int32)
+// CHECK: br bb1(undef : $Int32, undef : $Int32,
+  br bb1(%28 : $Int32, %29 : $Int32, %88 : $Int32, %30 : $Int32, %31 : $Int32)
 
 // CHECK: bb10:
 bb10:

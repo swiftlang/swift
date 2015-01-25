@@ -1022,46 +1022,46 @@ entry(%0 : $GenericStruct<Int>):
 }
 
 class Foo {
-  subscript (x: Int, y: Int) -> Int { get set }
-  var x: Int
-  var y: Int
+  subscript (x: Int32, y: Int32) -> Int32 { get set }
+  var x: Int32
+  var y: Int32
   init()
 }
 
-sil @_TC3tmp3Foo9subscriptFT1xSi1ySi_Sig : $@cc(method) @thin (Int, Int, Foo) -> Int {
-bb0(%0 : $Int, %1 : $Int, %2 : $Foo):
+sil @_TFC3tmp3Foog9subscriptFTVSs5Int32S1__S1_ : $@cc(method) @thin (Int32, Int32, Foo) -> Int32 {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $Foo):
   %3 = tuple ()
-  %4 = alloc_stack $Int  // var x               // users: %17, %6
-  %5 = alloc_stack $Int  // var y               // users: %16, %7
-  store %0 to %4#1 : $*Int
-  store %1 to %5#1 : $*Int
+  %4 = alloc_stack $Int32  // var x               // users: %17, %6
+  %5 = alloc_stack $Int32  // var y               // users: %16, %7
+  store %0 to %4#1 : $*Int32
+  store %1 to %5#1 : $*Int32
   %8 = alloc_stack $Foo  // var self              // users: %15, %14, %9
   store %2 to %8#1 : $*Foo
-  %10 = metatype $@thin Int.Type
-  %12 = integer_literal $Builtin.Word, 0         // user: %13
-  %13 = struct $Int (%12 : $Builtin.Word)      // user: %18
+  %10 = metatype $@thin Int32.Type
+  %12 = integer_literal $Builtin.Int32, 0         // user: %13
+  %13 = struct $Int32 (%12 : $Builtin.Int32)      // user: %18
   destroy_addr %8#1 : $*Foo
   dealloc_stack %8#0 : $*@local_storage Foo
-  dealloc_stack %5#0 : $*@local_storage Int
-  dealloc_stack %4#0 : $*@local_storage Int
-  return %13 : $Int
+  dealloc_stack %5#0 : $*@local_storage Int32
+  dealloc_stack %4#0 : $*@local_storage Int32
+  return %13 : $Int32
 }
 
-sil @_TC3tmp3Foo9subscriptFT1xSi1ySi_Sis : $@cc(method) @thin (Int, Int, Int, Foo) -> () {
-bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $Foo):
-  %4 = alloc_stack $Int  // var value           // users: %16, %5
-  store %0 to %4#1 : $*Int
-  %6 = alloc_stack $Int  // var x               // users: %15, %8
-  %7 = alloc_stack $Int  // var y               // users: %14, %9
-  store %1 to %6#1 : $*Int
-  store %2 to %7#1 : $*Int
+sil @_TFC3tmp3Foos9subscriptFTVSs5Int32S1__S1_ : $@cc(method) @thin (Int32, Int32, Int32, Foo) -> () {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $Int32, %3 : $Foo):
+  %4 = alloc_stack $Int32  // var value           // users: %16, %5
+  store %0 to %4#1 : $*Int32
+  %6 = alloc_stack $Int32  // var x               // users: %15, %8
+  %7 = alloc_stack $Int32  // var y               // users: %14, %9
+  store %1 to %6#1 : $*Int32
+  store %2 to %7#1 : $*Int32
   %10 = alloc_stack $Foo  // var self             // users: %13, %12, %11
   store %3 to %10#1 : $*Foo
   destroy_addr %10#1 : $*Foo
   dealloc_stack %10#0 : $*@local_storage Foo
-  dealloc_stack %7#0 : $*@local_storage Int
-  dealloc_stack %6#0 : $*@local_storage Int
-  dealloc_stack %4#0 : $*@local_storage Int
+  dealloc_stack %7#0 : $*@local_storage Int32
+  dealloc_stack %6#0 : $*@local_storage Int32
+  dealloc_stack %4#0 : $*@local_storage Int32
   %17 = tuple ()                                  // user: %18
   return %17 : $()
 }
@@ -1257,11 +1257,11 @@ bb0(%a : $(@noescape @callee_owned () -> Int)):
 
 
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK: #Foo.subscript!getter.1: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
-// CHECK: #Foo.subscript!setter.1: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis
+// CHECK: #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVSs5Int32S1__S1_
+// CHECK: #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVSs5Int32S1__S1_
 // CHECK: } 
 sil_vtable Foo {
-  #Foo.subscript!getter.1: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
-  #Foo.subscript!setter.1: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis
+  #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVSs5Int32S1__S1_
+  #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVSs5Int32S1__S1_
 }
 

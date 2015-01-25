@@ -150,22 +150,22 @@ var int_global : Int
 
 
 // CHECK-LABEL: sil @promote_alloc_stack
-sil @promote_alloc_stack : $@thin (Int) -> Builtin.Word {
-bb0(%0 : $Int):
-  %5 = integer_literal $Builtin.Word, 1
+sil @promote_alloc_stack : $@thin (Int32) -> Builtin.Int32 {
+bb0(%0 : $Int32):
+  %5 = integer_literal $Builtin.Int32, 1
   // CHECK: [[IL:%[0-9]+]] = integer_literal
 
-  %18 = struct $Int (%5 : $Builtin.Word)
-  %22 = alloc_stack $Int
+  %18 = struct $Int32 (%5 : $Builtin.Int32)
+  %22 = alloc_stack $Int32
 
   // CHECK-NOT: alloc_stack
 
-  store %18 to %22#1 : $*Int
-  %24 = struct_element_addr %22#1 : $*Int, #Int.value
-  %25 = load %24 : $*Builtin.Word
-  dealloc_stack %22#0 : $*@local_storage Int
+  store %18 to %22#1 : $*Int32
+  %24 = struct_element_addr %22#1 : $*Int32, #Int32.value
+  %25 = load %24 : $*Builtin.Int32
+  dealloc_stack %22#0 : $*@local_storage Int32
   // CHECK-NEXT: return [[IL]]
-  return %25 : $Builtin.Word
+  return %25 : $Builtin.Int32
 }
 
 // CHECK-LABEL: sil @copy_addr_to_load

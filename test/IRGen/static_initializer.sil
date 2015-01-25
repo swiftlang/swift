@@ -3,74 +3,74 @@
 // REQUIRES: CPU=x86_64
 
 // Generated from
-// var x : Int = 2
-// public func f() -> Int { return x }
+// var x : Int32 = 2
+// public func f() -> Int32 { return x }
 // with swiftc -O -parse-as-library -emit-sil
 
 import Builtin
 import Swift
 
 struct S {
-  var m : Int
+  var m : Int32
 }
 
 public struct S2 {
-  public var i, j : Int
+  public var i, j : Int32
   var s : S
 }
 
-// CHECK: %Si = type <{ i64 }>
-// CHECK: %V18static_initializer2S2 = type <{ %Si, %Si, %V18static_initializer1S }>
-// CHECK: %V18static_initializer1S = type <{ %Si }>
+// CHECK: %VSs5Int32 = type <{ i32 }>
+// CHECK: %V18static_initializer2S2 = type <{ %VSs5Int32, %VSs5Int32, %V18static_initializer1S }>
+// CHECK: %V18static_initializer1S = type <{ %VSs5Int32 }>
 
-sil_global @_Tv2ch1xSi : $Int, @globalinit_func0 : $@thin () -> ()
-// CHECK: @_Tv2ch1xSi = global %Si <{ i64 2 }>, align 8
+sil_global @_Tv2ch1xSi : $Int32, @globalinit_func0 : $@thin () -> ()
+// CHECK: @_Tv2ch1xSi = global %VSs5Int32 <{ i32 2 }>, align 4
 
 sil_global @_Tv6nested1xVS_2S2 : $S2, @globalinit_func1 : $@thin () -> ()
-// CHECK: @_Tv6nested1xVS_2S2 = global %V18static_initializer2S2 <{ %Si <{ i64 2 }>, %Si <{ i64 3 }>, %V18static_initializer1S <{ %Si <{ i64 4 }> }> }>, align 8
+// CHECK: @_Tv6nested1xVS_2S2 = global %V18static_initializer2S2 <{ %VSs5Int32 <{ i32 2 }>, %VSs5Int32 <{ i32 3 }>, %V18static_initializer1S <{ %VSs5Int32 <{ i32 4 }> }> }>, align 4
 
 sil private @globalinit_func0 : $@thin () -> () {
 bb0:
-  %0 = global_addr @_Tv2ch1xSi : $*Int
-  %1 = integer_literal $Builtin.Word, 2
-  %2 = struct $Int (%1 : $Builtin.Word)
-  store %2 to %0 : $*Int
+  %0 = global_addr @_Tv2ch1xSi : $*Int32
+  %1 = integer_literal $Builtin.Int32, 2
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  store %2 to %0 : $*Int32
   %4 = tuple ()
   return %4 : $()
 }
 
 // CHECK-LABEL: define i8* @_TF2cha1xSi() {
 // CHECK-NEXT: entry:
-// CHECK-NEXT: ret i8* bitcast (%Si* @_Tv2ch1xSi to i8*)
+// CHECK-NEXT: ret i8* bitcast (%VSs5Int32* @_Tv2ch1xSi to i8*)
 sil [global_init] @_TF2cha1xSi : $@thin () -> Builtin.RawPointer {
 bb0:
-  %0 = global_addr @_Tv2ch1xSi : $*Int
-  %1 = address_to_pointer %0 : $*Int to $Builtin.RawPointer
+  %0 = global_addr @_Tv2ch1xSi : $*Int32
+  %1 = address_to_pointer %0 : $*Int32 to $Builtin.RawPointer
   return %1 : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: define i64 @_TF2ch1fFT_Si() {
+// CHECK-LABEL: define i32 @_TF2ch1fFT_Si() {
 // CHECK-NEXT: entry:
-// CHECK-NEXT: load i64* getelementptr inbounds (%Si* @_Tv2ch1xSi, i32 0, i32 0)
+// CHECK-NEXT: load i32* getelementptr inbounds (%VSs5Int32* @_Tv2ch1xSi, i32 0, i32 0)
 // CHECK-NEXT: ret
-sil @_TF2ch1fFT_Si : $@thin () -> Int {
+sil @_TF2ch1fFT_Si : $@thin () -> Int32 {
 bb0:
-  %0 = global_addr @_Tv2ch1xSi : $*Int
-  %1 = load %0 : $*Int
-  return %1 : $Int
+  %0 = global_addr @_Tv2ch1xSi : $*Int32
+  %1 = load %0 : $*Int32
+  return %1 : $Int32
 }
 
 sil private @globalinit_func1 : $@thin () -> () {
 bb0:
   %0 = global_addr @_Tv6nested1xVS_2S2 : $*S2
-  %1 = integer_literal $Builtin.Word, 2
-  %2 = struct $Int (%1 : $Builtin.Word)
-  %3 = integer_literal $Builtin.Word, 3
-  %4 = struct $Int (%3 : $Builtin.Word)
-  %5 = integer_literal $Builtin.Word, 4
-  %6 = struct $Int (%5 : $Builtin.Word)
-  %7 = struct $S (%6 : $Int)
-  %8 = struct $S2 (%2 : $Int, %4 : $Int, %7 : $S)
+  %1 = integer_literal $Builtin.Int32, 2
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  %3 = integer_literal $Builtin.Int32, 3
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  %5 = integer_literal $Builtin.Int32, 4
+  %6 = struct $Int32 (%5 : $Builtin.Int32)
+  %7 = struct $S (%6 : $Int32)
+  %8 = struct $S2 (%2 : $Int32, %4 : $Int32, %7 : $S)
   store %8 to %0 : $*S2
   %10 = tuple ()
   return %10 : $()
@@ -86,11 +86,11 @@ bb0:
   return %1 : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: define { i64, i64, i64 } @_TF6nested1fFT_VS_2S2() {
+// CHECK-LABEL: define { i32, i32, i32 } @_TF6nested1fFT_VS_2S2() {
 // CHECK-NEXT: entry:
-// CHECK-NEXT: load i64* getelementptr inbounds (%V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 0, i32 0)
-// CHECK-NEXT: load i64* getelementptr inbounds (%V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 1, i32 0)
-// CHECK-NEXT: load i64* getelementptr inbounds (%V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 2, i32 0, i32 0)
+// CHECK-NEXT: load i32* getelementptr inbounds (%V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 0, i32 0)
+// CHECK-NEXT: load i32* getelementptr inbounds (%V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 1, i32 0)
+// CHECK-NEXT: load i32* getelementptr inbounds (%V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 2, i32 0, i32 0)
 sil @_TF6nested1fFT_VS_2S2 : $@thin () -> S2 {
 bb0:
   %0 = global_addr @_Tv6nested1xVS_2S2 : $*S2

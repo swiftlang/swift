@@ -17,40 +17,40 @@ class Bar {
 }
 
 public class FooClass {
-  @sil_stored var value: Int { get set }
-  @inline(never) func foo(x: Int) -> Int
-  init(value: Int)
+  @sil_stored var value: Int32 { get set }
+  @inline(never) func foo(x: Int32) -> Int32
+  init(value: Int32)
    deinit
 }
 
-// devirt_jump_thread.FooClass.value.getter : Swift.Int
-sil [transparent] [fragile] @_TFC18devirt_jump_thread8FooClassg5valueSi : $@cc(method) @thin (@owned FooClass) -> Int {
+// devirt_jump_thread.FooClass.value.getter : Swift.Int32
+sil [transparent] [fragile] @_TFC18devirt_jump_thread8FooClassg5valueSi : $@cc(method) @thin (@owned FooClass) -> Int32 {
 bb0(%0 : $FooClass):
   %1 = ref_element_addr %0 : $FooClass, #FooClass.value // user: %2
-  %2 = load %1 : $*Int                            // user: %4
+  %2 = load %1 : $*Int32                            // user: %4
   strong_release %0 : $FooClass                   // id: %3
-  return %2 : $Int                                // id: %4
+  return %2 : $Int32                                // id: %4
 }
 
-// devirt_jump_thread.FooClass.value.setter : Swift.Int
-sil [transparent] [fragile] @_TFC18devirt_jump_thread8FooClasss5valueSi : $@cc(method) @thin (Int, @owned FooClass) -> () {
-bb0(%0 : $Int, %1 : $FooClass):
+// devirt_jump_thread.FooClass.value.setter : Swift.Int32
+sil [transparent] [fragile] @_TFC18devirt_jump_thread8FooClasss5valueSi : $@cc(method) @thin (Int32, @owned FooClass) -> () {
+bb0(%0 : $Int32, %1 : $FooClass):
   %2 = ref_element_addr %1 : $FooClass, #FooClass.value // user: %3
-  store %0 to %2 : $*Int                          // id: %3
+  store %0 to %2 : $*Int32                          // id: %3
   strong_release %1 : $FooClass                   // id: %4
   %5 = tuple ()                                   // user: %6
   return %5 : $()                                 // id: %6
 }
 
-// devirt_jump_thread.FooClass.foo (devirt_jump_thread.FooClass)(Swift.Int) -> Swift.Int
-sil [noinline] @_TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@cc(method) @thin (Int, @owned FooClass) -> Int {
-bb0(%0 : $Int, %1 : $FooClass):
+// devirt_jump_thread.FooClass.foo (devirt_jump_thread.FooClass)(Swift.Int32) -> Swift.Int32
+sil [noinline] @_TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@cc(method) @thin (Int32, @owned FooClass) -> Int32 {
+bb0(%0 : $Int32, %1 : $FooClass):
   // function_ref @!objc  with unmangled suffix "no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi"
-  %2 = function_ref @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@cc(method) @thin (Int, @guaranteed FooClass) -> Int // user: %3
-  %3 = apply %2(%0, %1) : $@cc(method) @thin (Int, @guaranteed FooClass) -> Int // user: %6
+  %2 = function_ref @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 // user: %3
+  %3 = apply %2(%0, %1) : $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 // user: %6
   fix_lifetime %1 : $FooClass                     // id: %4
   strong_release %1 : $FooClass                   // id: %5
-  return %3 : $Int                                // id: %6
+  return %3 : $Int32                                // id: %6
 }
 
 // Check that checked_cast_br instructions resulting from devirtualization 
@@ -76,104 +76,104 @@ bb0(%0 : $Int, %1 : $FooClass):
 // CHECK-NOT: function_ref
 // CHECK: br bb1
 // CHECK: }
-// devirt_jump_thread.jumpthread_checked_cast_br (devirt_jump_thread.FooClass) -> Swift.Int
-sil @_TF18devirt_jump_thread26jumpthread_checked_cast_brFCS_8FooClassSi : $@thin (@owned FooClass) -> Int {
+// devirt_jump_thread.jumpthread_checked_cast_br (devirt_jump_thread.FooClass) -> Swift.Int32
+sil @_TF18devirt_jump_thread26jumpthread_checked_cast_brFCS_8FooClassSi : $@thin (@owned FooClass) -> Int32 {
 bb0(%0 : $FooClass):
-  %1 = integer_literal $Builtin.Word, 2           // user: %2
-  %2 = struct $Int (%1 : $Builtin.Word)           // users: %37, %43, %48, %54
+  %1 = integer_literal $Builtin.Int32, 2           // user: %2
+  %2 = struct $Int32 (%1 : $Builtin.Int32)           // users: %37, %43, %48, %54
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb5, bb6 // id: %3
 
-bb1(%4 : $Int):                                   // Preds: bb5 bb6
+bb1(%4 : $Int32):                                   // Preds: bb5 bb6
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb7, bb8 // id: %5
 
-bb2(%6 : $Int):                                   // Preds: bb7 bb8
-  %7 = struct_extract %4 : $Int, #Int.value       // user: %10
-  %8 = struct_extract %6 : $Int, #Int.value       // user: %10
+bb2(%6 : $Int32):                                   // Preds: bb7 bb8
+  %7 = struct_extract %4 : $Int32, #Int32.value       // user: %10
+  %8 = struct_extract %6 : $Int32, #Int32.value       // user: %10
   %9 = integer_literal $Builtin.Int1, -1          // users: %10, %19, %28
-  %10 = builtin "sadd_with_overflow_Word"(%7 : $Builtin.Word, %8 : $Builtin.Word, %9 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1) // users: %11, %12
-  %11 = tuple_extract %10 : $(Builtin.Word, Builtin.Int1), 0 // user: %19
-  %12 = tuple_extract %10 : $(Builtin.Word, Builtin.Int1), 1 // user: %13
+  %10 = builtin "sadd_with_overflow_Int32"(%7 : $Builtin.Int32, %8 : $Builtin.Int32, %9 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %11, %12
+  %11 = tuple_extract %10 : $(Builtin.Int32, Builtin.Int1), 0 // user: %19
+  %12 = tuple_extract %10 : $(Builtin.Int32, Builtin.Int1), 1 // user: %13
   cond_fail %12 : $Builtin.Int1                   // id: %13
-  %14 = integer_literal $Builtin.Word, 3          // user: %15
-  %15 = struct $Int (%14 : $Builtin.Word)         // users: %59, %65
+  %14 = integer_literal $Builtin.Int32, 3          // user: %15
+  %15 = struct $Int32 (%14 : $Builtin.Int32)         // users: %59, %65
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb9, bb10 // id: %16
 
-bb3(%17 : $Int):                                  // Preds: bb9 bb10
-  %18 = struct_extract %17 : $Int, #Int.value     // user: %19
-  %19 = builtin "sadd_with_overflow_Word"(%11 : $Builtin.Word, %18 : $Builtin.Word, %9 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1) // users: %20, %21
-  %20 = tuple_extract %19 : $(Builtin.Word, Builtin.Int1), 0 // user: %28
-  %21 = tuple_extract %19 : $(Builtin.Word, Builtin.Int1), 1 // user: %22
+bb3(%17 : $Int32):                                  // Preds: bb9 bb10
+  %18 = struct_extract %17 : $Int32, #Int32.value     // user: %19
+  %19 = builtin "sadd_with_overflow_Int32"(%11 : $Builtin.Int32, %18 : $Builtin.Int32, %9 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %20, %21
+  %20 = tuple_extract %19 : $(Builtin.Int32, Builtin.Int1), 0 // user: %28
+  %21 = tuple_extract %19 : $(Builtin.Int32, Builtin.Int1), 1 // user: %22
   cond_fail %21 : $Builtin.Int1                   // id: %22
-  %23 = integer_literal $Builtin.Word, 4          // user: %24
-  %24 = struct $Int (%23 : $Builtin.Word)         // users: %69, %74
+  %23 = integer_literal $Builtin.Int32, 4          // user: %24
+  %24 = struct $Int32 (%23 : $Builtin.Int32)         // users: %69, %74
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb11, bb12 // id: %25
 
-bb4(%26 : $Int):                                  // Preds: bb11 bb12
-  %27 = struct_extract %26 : $Int, #Int.value     // user: %28
-  %28 = builtin "sadd_with_overflow_Word"(%20 : $Builtin.Word, %27 : $Builtin.Word, %9 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1) // users: %29, %30
-  %29 = tuple_extract %28 : $(Builtin.Word, Builtin.Int1), 0 // user: %32
-  %30 = tuple_extract %28 : $(Builtin.Word, Builtin.Int1), 1 // user: %31
+bb4(%26 : $Int32):                                  // Preds: bb11 bb12
+  %27 = struct_extract %26 : $Int32, #Int32.value     // user: %28
+  %28 = builtin "sadd_with_overflow_Int32"(%20 : $Builtin.Int32, %27 : $Builtin.Int32, %9 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %29, %30
+  %29 = tuple_extract %28 : $(Builtin.Int32, Builtin.Int1), 0 // user: %32
+  %30 = tuple_extract %28 : $(Builtin.Int32, Builtin.Int1), 1 // user: %31
   cond_fail %30 : $Builtin.Int1                   // id: %31
-  %32 = struct $Int (%29 : $Builtin.Word)         // user: %33
-  return %32 : $Int                               // id: %33
+  %32 = struct $Int32 (%29 : $Builtin.Int32)         // user: %33
+  return %32 : $Int32                               // id: %33
 
 bb5(%34 : $FooClass):                             // Preds: bb0
   // function_ref @!objc  with unmangled suffix "no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi"
-  %35 = function_ref @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@cc(method) @thin (Int, @guaranteed FooClass) -> Int // user: %37
+  %35 = function_ref @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 // user: %37
   strong_retain %0 : $FooClass                    // id: %36
-  %37 = apply %35(%2, %34) : $@cc(method) @thin (Int, @guaranteed FooClass) -> Int // user: %40
+  %37 = apply %35(%2, %34) : $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 // user: %40
   fix_lifetime %34 : $FooClass                    // id: %38
   strong_release %0 : $FooClass                   // id: %39
-  br bb1(%37 : $Int)                              // id: %40
+  br bb1(%37 : $Int32)                              // id: %40
 
 bb6:                                              // Preds: bb0
-  %41 = class_method %0 : $FooClass, #FooClass.foo!1 : FooClass -> (Int) -> Int , $@cc(method) @thin (Int, @owned FooClass) -> Int // user: %43
+  %41 = class_method %0 : $FooClass, #FooClass.foo!1 : FooClass -> (Int32) -> Int32 , $@cc(method) @thin (Int32, @owned FooClass) -> Int32 // user: %43
   strong_retain %0 : $FooClass                    // id: %42
-  %43 = apply %41(%2, %0) : $@cc(method) @thin (Int, @owned FooClass) -> Int // user: %44
-  br bb1(%43 : $Int)                              // id: %44
+  %43 = apply %41(%2, %0) : $@cc(method) @thin (Int32, @owned FooClass) -> Int32 // user: %44
+  br bb1(%43 : $Int32)                              // id: %44
 
 bb7(%45 : $FooClass):                             // Preds: bb1
   // function_ref @!objc  with unmangled suffix "no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi"
-  %46 = function_ref @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@cc(method) @thin (Int, @guaranteed FooClass) -> Int // user: %48
+  %46 = function_ref @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 // user: %48
   strong_retain %0 : $FooClass                    // id: %47
-  %48 = apply %46(%2, %45) : $@cc(method) @thin (Int, @guaranteed FooClass) -> Int // user: %51
+  %48 = apply %46(%2, %45) : $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 // user: %51
   fix_lifetime %45 : $FooClass                    // id: %49
   strong_release %0 : $FooClass                   // id: %50
-  br bb2(%48 : $Int)                              // id: %51
+  br bb2(%48 : $Int32)                              // id: %51
 
 bb8:                                              // Preds: bb1
-  %52 = class_method %0 : $FooClass, #FooClass.foo!1 : FooClass -> (Int) -> Int , $@cc(method) @thin (Int, @owned FooClass) -> Int // user: %54
+  %52 = class_method %0 : $FooClass, #FooClass.foo!1 : FooClass -> (Int32) -> Int32 , $@cc(method) @thin (Int32, @owned FooClass) -> Int32 // user: %54
   strong_retain %0 : $FooClass                    // id: %53
-  %54 = apply %52(%2, %0) : $@cc(method) @thin (Int, @owned FooClass) -> Int // user: %55
-  br bb2(%54 : $Int)                              // id: %55
+  %54 = apply %52(%2, %0) : $@cc(method) @thin (Int32, @owned FooClass) -> Int32 // user: %55
+  br bb2(%54 : $Int32)                              // id: %55
 
 bb9(%56 : $FooClass):                             // Preds: bb2
   // function_ref @!objc  with unmangled suffix "no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi"
-  %57 = function_ref @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@cc(method) @thin (Int, @guaranteed FooClass) -> Int // user: %59
+  %57 = function_ref @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 // user: %59
   strong_retain %0 : $FooClass                    // id: %58
-  %59 = apply %57(%15, %56) : $@cc(method) @thin (Int, @guaranteed FooClass) -> Int // user: %62
+  %59 = apply %57(%15, %56) : $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 // user: %62
   fix_lifetime %56 : $FooClass                    // id: %60
   strong_release %0 : $FooClass                   // id: %61
-  br bb3(%59 : $Int)                              // id: %62
+  br bb3(%59 : $Int32)                              // id: %62
 
 bb10:                                             // Preds: bb2
-  %63 = class_method %0 : $FooClass, #FooClass.foo!1 : FooClass -> (Int) -> Int , $@cc(method) @thin (Int, @owned FooClass) -> Int // user: %65
+  %63 = class_method %0 : $FooClass, #FooClass.foo!1 : FooClass -> (Int32) -> Int32 , $@cc(method) @thin (Int32, @owned FooClass) -> Int32 // user: %65
   strong_retain %0 : $FooClass                    // id: %64
-  %65 = apply %63(%15, %0) : $@cc(method) @thin (Int, @owned FooClass) -> Int // user: %66
-  br bb3(%65 : $Int)                              // id: %66
+  %65 = apply %63(%15, %0) : $@cc(method) @thin (Int32, @owned FooClass) -> Int32 // user: %66
+  br bb3(%65 : $Int32)                              // id: %66
 
 bb11(%67 : $FooClass):                            // Preds: bb3
   // function_ref @!objc  with unmangled suffix "no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi"
-  %68 = function_ref @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@cc(method) @thin (Int, @guaranteed FooClass) -> Int // user: %69
-  %69 = apply %68(%24, %67) : $@cc(method) @thin (Int, @guaranteed FooClass) -> Int // user: %72
+  %68 = function_ref @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 // user: %69
+  %69 = apply %68(%24, %67) : $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 // user: %72
   fix_lifetime %67 : $FooClass                    // id: %70
   strong_release %67 : $FooClass                  // id: %71
-  br bb4(%69 : $Int)                              // id: %72
+  br bb4(%69 : $Int32)                              // id: %72
 
 bb12:                                             // Preds: bb3
-  %73 = class_method %0 : $FooClass, #FooClass.foo!1 : FooClass -> (Int) -> Int , $@cc(method) @thin (Int, @owned FooClass) -> Int // user: %74
-  %74 = apply %73(%24, %0) : $@cc(method) @thin (Int, @owned FooClass) -> Int // user: %75
-  br bb4(%74 : $Int)                              // id: %75
+  %73 = class_method %0 : $FooClass, #FooClass.foo!1 : FooClass -> (Int32) -> Int32 , $@cc(method) @thin (Int32, @owned FooClass) -> Int32 // user: %74
+  %74 = apply %73(%24, %0) : $@cc(method) @thin (Int32, @owned FooClass) -> Int32 // user: %75
+  br bb4(%74 : $Int32)                              // id: %75
 }
 
 // Check that checked_cast_br gets jump threaded
@@ -188,46 +188,46 @@ bb12:                                             // Preds: bb3
 // CHECK: class_method
 // CHECK: br bb1
 // CHECK }
-// devirt_jump_thread.double (devirt_jump_thread.FooClass) -> Swift.Int
-sil @_TF18devirt_jump_thread6doubleFCS_8FooClassSi : $@thin (@owned FooClass) -> Int {
+// devirt_jump_thread.double (devirt_jump_thread.FooClass) -> Swift.Int32
+sil @_TF18devirt_jump_thread6doubleFCS_8FooClassSi : $@thin (@owned FooClass) -> Int32 {
 bb0(%0 : $FooClass):
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb3, bb4 // id: %1
 
-bb1(%2 : $Int):                                   // Preds: bb3 bb4
+bb1(%2 : $Int32):                                   // Preds: bb3 bb4
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb5, bb6 // id: %3
 
-bb2(%4 : $Int):                                   // Preds: bb5 bb6
-  %5 = struct_extract %2 : $Int, #Int.value       // user: %8
-  %6 = struct_extract %4 : $Int, #Int.value       // user: %8
+bb2(%4 : $Int32):                                   // Preds: bb5 bb6
+  %5 = struct_extract %2 : $Int32, #Int32.value       // user: %8
+  %6 = struct_extract %4 : $Int32, #Int32.value       // user: %8
   %7 = integer_literal $Builtin.Int1, -1          // user: %8
-  %8 = builtin "sadd_with_overflow_Word"(%5 : $Builtin.Word, %6 : $Builtin.Word, %7 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1) // users: %9, %10
-  %9 = tuple_extract %8 : $(Builtin.Word, Builtin.Int1), 0 // user: %12
-  %10 = tuple_extract %8 : $(Builtin.Word, Builtin.Int1), 1 // user: %11
+  %8 = builtin "sadd_with_overflow_Int32"(%5 : $Builtin.Int32, %6 : $Builtin.Int32, %7 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %9, %10
+  %9 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 0 // user: %12
+  %10 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 1 // user: %11
   cond_fail %10 : $Builtin.Int1                   // id: %11
-  %12 = struct $Int (%9 : $Builtin.Word)          // user: %13
-  return %12 : $Int                               // id: %13
+  %12 = struct $Int32 (%9 : $Builtin.Int32)          // user: %13
+  return %12 : $Int32                               // id: %13
 
 bb3(%14 : $FooClass):                             // Preds: bb0
   %15 = ref_element_addr %14 : $FooClass, #FooClass.value // user: %16
-  %16 = load %15 : $*Int                          // user: %17
-  br bb1(%16 : $Int)                              // id: %17
+  %16 = load %15 : $*Int32                          // user: %17
+  br bb1(%16 : $Int32)                              // id: %17
 
 bb4:                                              // Preds: bb0
-  %18 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int , $@cc(method) @thin (@owned FooClass) -> Int // user: %20
+  %18 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int32 , $@cc(method) @thin (@owned FooClass) -> Int32 // user: %20
   strong_retain %0 : $FooClass                    // id: %19
-  %20 = apply %18(%0) : $@cc(method) @thin (@owned FooClass) -> Int // user: %21
-  br bb1(%20 : $Int)                              // id: %21
+  %20 = apply %18(%0) : $@cc(method) @thin (@owned FooClass) -> Int32 // user: %21
+  br bb1(%20 : $Int32)                              // id: %21
 
 bb5(%22 : $FooClass):                             // Preds: bb1
   %23 = ref_element_addr %22 : $FooClass, #FooClass.value // user: %24
-  %24 = load %23 : $*Int                          // user: %26
+  %24 = load %23 : $*Int32                          // user: %26
   strong_release %22 : $FooClass                  // id: %25
-  br bb2(%24 : $Int)                              // id: %26
+  br bb2(%24 : $Int32)                              // id: %26
 
 bb6:                                              // Preds: bb1
-  %27 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int , $@cc(method) @thin (@owned FooClass) -> Int // user: %28
-  %28 = apply %27(%0) : $@cc(method) @thin (@owned FooClass) -> Int // user: %29
-  br bb2(%28 : $Int)                              // id: %29
+  %27 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int32 , $@cc(method) @thin (@owned FooClass) -> Int32 // user: %28
+  %28 = apply %27(%0) : $@cc(method) @thin (@owned FooClass) -> Int32 // user: %29
+  br bb2(%28 : $Int32)                              // id: %29
 }
 
 
@@ -238,51 +238,51 @@ bb6:                                              // Preds: bb1
 // CHECK-LABEL: sil @_TF18devirt_jump_thread6dont_jump_thread_alloc_stackFCS_8FooClassSi
 // CHECK: bb0(%{{.*}} : $FooClass):
 // CHECK: checked_cast_br
-// CHECK: bb1(%{{.*}} : $Int):
+// CHECK: bb1(%{{.*}} : $Int32):
 // CHECK: checked_cast_br
-// CHECK: bb2(%{{.*}} : $Int):
+// CHECK: bb2(%{{.*}} : $Int32):
 // CHECK }
-sil @_TF18devirt_jump_thread6dont_jump_thread_alloc_stackFCS_8FooClassSi : $@thin (@owned FooClass) -> Int {
+sil @_TF18devirt_jump_thread6dont_jump_thread_alloc_stackFCS_8FooClassSi : $@thin (@owned FooClass) -> Int32 {
 bb0(%0 : $FooClass):
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb3, bb4 // id: %1
 
-bb1(%2 : $Int):                                   // Preds: bb3 bb4
-  %60 = alloc_stack $Int
+bb1(%2 : $Int32):                                   // Preds: bb3 bb4
+  %60 = alloc_stack $Int32
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb5, bb6 // id: %3
 
-bb2(%4 : $Int):                                   // Preds: bb5 bb6
-  %5 = struct_extract %2 : $Int, #Int.value       // user: %8
-  %6 = struct_extract %4 : $Int, #Int.value       // user: %8
+bb2(%4 : $Int32):                                   // Preds: bb5 bb6
+  %5 = struct_extract %2 : $Int32, #Int32.value       // user: %8
+  %6 = struct_extract %4 : $Int32, #Int32.value       // user: %8
   %7 = integer_literal $Builtin.Int1, -1          // user: %8
-  %8 = builtin "sadd_with_overflow_Word"(%5 : $Builtin.Word, %6 : $Builtin.Word, %7 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1) // users: %9, %10
-  %9 = tuple_extract %8 : $(Builtin.Word, Builtin.Int1), 0 // user: %12
-  %10 = tuple_extract %8 : $(Builtin.Word, Builtin.Int1), 1 // user: %11
+  %8 = builtin "sadd_with_overflow_Int32"(%5 : $Builtin.Int32, %6 : $Builtin.Int32, %7 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %9, %10
+  %9 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 0 // user: %12
+  %10 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 1 // user: %11
   cond_fail %10 : $Builtin.Int1                   // id: %11
-  dealloc_stack %60#0 : $*@local_storage Int
-  %12 = struct $Int (%9 : $Builtin.Word)          // user: %13
-  return %12 : $Int                               // id: %13
+  dealloc_stack %60#0 : $*@local_storage Int32
+  %12 = struct $Int32 (%9 : $Builtin.Int32)          // user: %13
+  return %12 : $Int32                               // id: %13
 
 bb3(%14 : $FooClass):                             // Preds: bb0
   %15 = ref_element_addr %14 : $FooClass, #FooClass.value // user: %16
-  %16 = load %15 : $*Int                          // user: %17
-  br bb1(%16 : $Int)                              // id: %17
+  %16 = load %15 : $*Int32                          // user: %17
+  br bb1(%16 : $Int32)                              // id: %17
 
 bb4:                                              // Preds: bb0
-  %18 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int , $@cc(method) @thin (@owned FooClass) -> Int // user: %20
+  %18 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int32 , $@cc(method) @thin (@owned FooClass) -> Int32 // user: %20
   strong_retain %0 : $FooClass                    // id: %19
-  %20 = apply %18(%0) : $@cc(method) @thin (@owned FooClass) -> Int // user: %21
-  br bb1(%20 : $Int)                              // id: %21
+  %20 = apply %18(%0) : $@cc(method) @thin (@owned FooClass) -> Int32 // user: %21
+  br bb1(%20 : $Int32)                              // id: %21
 
 bb5(%22 : $FooClass):                             // Preds: bb1
   %23 = ref_element_addr %22 : $FooClass, #FooClass.value // user: %24
-  %24 = load %23 : $*Int                          // user: %26
+  %24 = load %23 : $*Int32                          // user: %26
   strong_release %22 : $FooClass                  // id: %25
-  br bb2(%24 : $Int)                              // id: %26
+  br bb2(%24 : $Int32)                              // id: %26
 
 bb6:                                              // Preds: bb1
-  %27 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int , $@cc(method) @thin (@owned FooClass) -> Int // user: %28
-  %28 = apply %27(%0) : $@cc(method) @thin (@owned FooClass) -> Int // user: %29
-  br bb2(%28 : $Int)                              // id: %29
+  %27 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int32 , $@cc(method) @thin (@owned FooClass) -> Int32 // user: %28
+  %28 = apply %27(%0) : $@cc(method) @thin (@owned FooClass) -> Int32 // user: %29
+  br bb2(%28 : $Int32)                              // id: %29
 }
 
 
@@ -294,72 +294,72 @@ bb6:                                              // Preds: bb1
 // CHECK-LABEL: sil @_TF18devirt_jump_thread6dont_jump_thread_objc_methodFCS_8FooClassSi
 // CHECK: bb0(%{{.*}} : $FooClass):
 // CHECK: checked_cast_br
-// CHECK: bb1(%{{.*}} : $Int):
+// CHECK: bb1(%{{.*}} : $Int32):
 // CHECK: checked_cast_br
-// CHECK: bb2(%{{.*}} : $Int):
+// CHECK: bb2(%{{.*}} : $Int32):
 // CHECK }
-sil @_TF18devirt_jump_thread6dont_jump_thread_objc_methodFCS_8FooClassSi : $@thin (@owned FooClass) -> Int {
+sil @_TF18devirt_jump_thread6dont_jump_thread_objc_methodFCS_8FooClassSi : $@thin (@owned FooClass) -> Int32 {
 bb0(%0 : $FooClass):
   %100 = alloc_ref $Bar
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb3, bb4 // id: %1
 
-bb1(%2 : $Int):                                   // Preds: bb3 bb4
+bb1(%2 : $Int32):                                   // Preds: bb3 bb4
   %101 = class_method [volatile] %100 : $Bar, #Bar.foo!1.foreign : Bar -> () -> () , $@cc(objc_method) @thin (Bar) -> ()
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb5, bb6 // id: %3
 
-bb2(%4 : $Int):                                   // Preds: bb5 bb6
-  %5 = struct_extract %2 : $Int, #Int.value       // user: %8
-  %6 = struct_extract %4 : $Int, #Int.value       // user: %8
+bb2(%4 : $Int32):                                   // Preds: bb5 bb6
+  %5 = struct_extract %2 : $Int32, #Int32.value       // user: %8
+  %6 = struct_extract %4 : $Int32, #Int32.value       // user: %8
   %7 = integer_literal $Builtin.Int1, -1          // user: %8
-  %8 = builtin "sadd_with_overflow_Word"(%5 : $Builtin.Word, %6 : $Builtin.Word, %7 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1) // users: %9, %10
-  %9 = tuple_extract %8 : $(Builtin.Word, Builtin.Int1), 0 // user: %12
-  %10 = tuple_extract %8 : $(Builtin.Word, Builtin.Int1), 1 // user: %11
+  %8 = builtin "sadd_with_overflow_Int32"(%5 : $Builtin.Int32, %6 : $Builtin.Int32, %7 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %9, %10
+  %9 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 0 // user: %12
+  %10 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 1 // user: %11
   cond_fail %10 : $Builtin.Int1                   // id: %11
-  %12 = struct $Int (%9 : $Builtin.Word)          // user: %13
-  return %12 : $Int                               // id: %13
+  %12 = struct $Int32 (%9 : $Builtin.Int32)          // user: %13
+  return %12 : $Int32                               // id: %13
 
 bb3(%14 : $FooClass):                             // Preds: bb0
   %15 = ref_element_addr %14 : $FooClass, #FooClass.value // user: %16
-  %16 = load %15 : $*Int                          // user: %17
-  br bb1(%16 : $Int)                              // id: %17
+  %16 = load %15 : $*Int32                          // user: %17
+  br bb1(%16 : $Int32)                              // id: %17
 
 bb4:                                              // Preds: bb0
-  %18 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int , $@cc(method) @thin (@owned FooClass) -> Int // user: %20
+  %18 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int32 , $@cc(method) @thin (@owned FooClass) -> Int32 // user: %20
   strong_retain %0 : $FooClass                    // id: %19
-  %20 = apply %18(%0) : $@cc(method) @thin (@owned FooClass) -> Int // user: %21
-  br bb1(%20 : $Int)                              // id: %21
+  %20 = apply %18(%0) : $@cc(method) @thin (@owned FooClass) -> Int32 // user: %21
+  br bb1(%20 : $Int32)                              // id: %21
 
 bb5(%22 : $FooClass):                             // Preds: bb1
   %23 = ref_element_addr %22 : $FooClass, #FooClass.value // user: %24
-  %24 = load %23 : $*Int                          // user: %26
+  %24 = load %23 : $*Int32                          // user: %26
   strong_release %22 : $FooClass                  // id: %25
-  br bb2(%24 : $Int)                              // id: %26
+  br bb2(%24 : $Int32)                              // id: %26
 
 bb6:                                              // Preds: bb1
-  %27 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int , $@cc(method) @thin (@owned FooClass) -> Int // user: %28
-  %28 = apply %27(%0) : $@cc(method) @thin (@owned FooClass) -> Int // user: %29
-  br bb2(%28 : $Int)                              // id: %29
+  %27 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int32 , $@cc(method) @thin (@owned FooClass) -> Int32 // user: %28
+  %28 = apply %27(%0) : $@cc(method) @thin (@owned FooClass) -> Int32 // user: %29
+  br bb2(%28 : $Int32)                              // id: %29
 }
 
 // @!objc  with unmangled suffix "no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi"
-sil [noinline] @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@cc(method) @thin (Int, @guaranteed FooClass) -> Int {
-bb0(%0 : $Int, %1 : $FooClass):
-  %2 = integer_literal $Builtin.Word, 11          // user: %5
-  %3 = struct_extract %0 : $Int, #Int.value       // user: %5
+sil [noinline] @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 {
+bb0(%0 : $Int32, %1 : $FooClass):
+  %2 = integer_literal $Builtin.Int32, 11          // user: %5
+  %3 = struct_extract %0 : $Int32, #Int32.value       // user: %5
   %4 = integer_literal $Builtin.Int1, -1          // user: %5
-  %5 = builtin "sadd_with_overflow_Word"(%3 : $Builtin.Word, %2 : $Builtin.Word, %4 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1) // users: %6, %7
-  %6 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 0 // user: %9
-  %7 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 1 // user: %8
+  %5 = builtin "sadd_with_overflow_Int32"(%3 : $Builtin.Int32, %2 : $Builtin.Int32, %4 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %6, %7
+  %6 = tuple_extract %5 : $(Builtin.Int32, Builtin.Int1), 0 // user: %9
+  %7 = tuple_extract %5 : $(Builtin.Int32, Builtin.Int1), 1 // user: %8
   cond_fail %7 : $Builtin.Int1                    // id: %8
-  %9 = struct $Int (%6 : $Builtin.Word)           // user: %10
-  return %9 : $Int                                // id: %10
+  %9 = struct $Int32 (%6 : $Builtin.Int32)           // user: %10
+  return %9 : $Int32                                // id: %10
 }
 
 
 sil_vtable FooClass {
-  #FooClass.foo!1: _TFC18devirt_jump_thread8FooClass3foofS0_FSiSi	// devirt_jump_thread.FooClass.foo (devirt_jump_thread.FooClass)(Swift.Int) -> Swift.Int
-  #FooClass.value!getter.1: _TFC18devirt_jump_thread8FooClassg5valueSi	// devirt_jump_thread.FooClass.value.getter : Swift.Int
-  #FooClass.value!setter.1: _TFC18devirt_jump_thread8FooClasss5valueSi	// devirt_jump_thread.FooClass.value.setter : Swift.Int
+  #FooClass.foo!1: _TFC18devirt_jump_thread8FooClass3foofS0_FSiSi	// devirt_jump_thread.FooClass.foo (devirt_jump_thread.FooClass)(Swift.Int32) -> Swift.Int32
+  #FooClass.value!getter.1: _TFC18devirt_jump_thread8FooClassg5valueSi	// devirt_jump_thread.FooClass.value.getter : Swift.Int32
+  #FooClass.value!setter.1: _TFC18devirt_jump_thread8FooClasss5valueSi	// devirt_jump_thread.FooClass.value.setter : Swift.Int32
 }
 
 

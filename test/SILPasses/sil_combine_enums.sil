@@ -97,14 +97,14 @@ enum E {
 // CHECK: select_enum {{.*}} case #E.E2!enumelt:
 // CHECK: return
 
-sil @canonicalize_select_enum : $@thin (E) -> Int {
+sil @canonicalize_select_enum : $@thin (E) -> Int32 {
 bb0(%0 : $E):
-  %1 = integer_literal $Builtin.Word, 0
-  %2 = integer_literal $Builtin.Word, 1
-  %3 = integer_literal $Builtin.Word, 2
-  %4 = select_enum %0 : $E, case #E.E0!enumelt: %1, case #E.E1!enumelt: %2, default %3 : $Builtin.Word
-  %5 = struct $Int (%4 : $Builtin.Word)
-  return %5 : $Int
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = integer_literal $Builtin.Int32, 2
+  %4 = select_enum %0 : $E, case #E.E0!enumelt: %1, case #E.E1!enumelt: %2, default %3 : $Builtin.Int32
+  %5 = struct $Int32 (%4 : $Builtin.Int32)
+  return %5 : $Int32
 }
 
 enum G<T> {
@@ -117,37 +117,37 @@ enum G<T> {
 // CHECK: select_enum_addr {{.*}} case #G.E2!enumelt:
 // CHECK: return
 
-sil @canonicalize_select_enum_addr : $@thin <T> (@in G<T>) -> Int {
+sil @canonicalize_select_enum_addr : $@thin <T> (@in G<T>) -> Int32 {
 bb0(%0 : $*G<T>):
-  %2 = integer_literal $Builtin.Word, 0
-  %3 = integer_literal $Builtin.Word, 1
-  %4 = integer_literal $Builtin.Word, 2
-  %5 = select_enum_addr %0 : $*G<T>, case #G.E0!enumelt: %2, case #G.E1!enumelt: %3, default %4 : $Builtin.Word
-  %6 = struct $Int (%5 : $Builtin.Word)
-  return %6 : $Int
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = integer_literal $Builtin.Int32, 1
+  %4 = integer_literal $Builtin.Int32, 2
+  %5 = select_enum_addr %0 : $*G<T>, case #G.E0!enumelt: %2, case #G.E1!enumelt: %3, default %4 : $Builtin.Int32
+  %6 = struct $Int32 (%5 : $Builtin.Int32)
+  return %6 : $Int32
 }
 
 // CHECK-LABEL: sil @canonicalize_init_enum_data_addr
 // CHECK-NOT: init_enum_data_addr
 // CHECK-NOT: inject_enum_addr
-// CHECK: enum $Optional<Int>, #Optional.Some!enumelt.1
+// CHECK: enum $Optional<Int32>, #Optional.Some!enumelt.1
 // CHECK-NOT: inject_enum_addr
 // CHECK: return
-sil @canonicalize_init_enum_data_addr : $@thin (@inout Int, Builtin.Word) -> Int {
-bb0(%0 : $*Int, %1 : $Builtin.Word):
-  %s1 = alloc_stack $Optional<Int>
-  %e1 = init_enum_data_addr %s1#1 : $*Optional<Int>, #Optional.Some!enumelt.1
-  %v = load %0 : $*Int
-  store %v to %e1 : $*Int
-  %i1 = integer_literal $Builtin.Word, 1
+sil @canonicalize_init_enum_data_addr : $@thin (@inout Int32, Builtin.Int32) -> Int32 {
+bb0(%0 : $*Int32, %1 : $Builtin.Int32):
+  %s1 = alloc_stack $Optional<Int32>
+  %e1 = init_enum_data_addr %s1#1 : $*Optional<Int32>, #Optional.Some!enumelt.1
+  %v = load %0 : $*Int32
+  store %v to %e1 : $*Int32
+  %i1 = integer_literal $Builtin.Int32, 1
   %i0 = integer_literal $Builtin.Int1, 0
-  %a = builtin "sadd_with_overflow_Word"(%1 : $Builtin.Word, %i1 : $Builtin.Word, %i0 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %w = tuple_extract %a : $(Builtin.Word, Builtin.Int1), 0
-  %i = struct $Int (%w : $Builtin.Word)
-  store %i to %0 : $*Int
-  inject_enum_addr %s1#1 : $*Optional<Int>, #Optional.Some!enumelt.1
-  dealloc_stack %s1#0 : $*@local_storage Optional<Int>
-  return %i : $Int
+  %a = builtin "sadd_with_overflow_Int32"(%1 : $Builtin.Int32, %i1 : $Builtin.Int32, %i0 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %w = tuple_extract %a : $(Builtin.Int32, Builtin.Int1), 0
+  %i = struct $Int32 (%w : $Builtin.Int32)
+  store %i to %0 : $*Int32
+  inject_enum_addr %s1#1 : $*Optional<Int32>, #Optional.Some!enumelt.1
+  dealloc_stack %s1#0 : $*@local_storage Optional<Int32>
+  return %i : $Int32
 }
 
 // Check the cond_br(select_enum) -> switch_enum conversion.

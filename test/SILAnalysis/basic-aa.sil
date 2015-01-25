@@ -427,9 +427,9 @@ sil @globals_dont_alias : $@thin () -> () {
 }
 
 class HalfOpenRange {
-  final var current: Int
-  final let end: Int
-  init(start: Int, end: Int)
+  final var current: Int32
+  final let end: Int32
+  init(start: Int32, end: Int32)
 }
 // CHECK-LABEL: @different_fields
 // CHECK: PAIR #51.
@@ -437,23 +437,23 @@ class HalfOpenRange {
 // CHECK-NEXT: (0):   %7 = ref_element_addr %4 : $HalfOpenRange, #HalfOpenRange.end
 // CHECK-NEXT: NoAlias
 // CHECK: PAIR #64.
-// CHECK-NEXT: (0):   %9 = struct_element_addr %5 : $*Int, #Int.value
-// CHECK-NEXT: (0):   %10 = struct_element_addr %7 : $*Int, #Int.value
+// CHECK-NEXT: (0):   %9 = struct_element_addr %5 : $*Int32, #Int32.value
+// CHECK-NEXT: (0):   %10 = struct_element_addr %7 : $*Int32, #Int32.value
 // CHECK-NEXT: NoAlias
 sil @different_fields : $@thin () -> () {
-  %0 = integer_literal $Builtin.Word, 0
-  %1 = struct $Int (%0 : $Builtin.Word)
-  %2 = integer_literal $Builtin.Word, 10
-  %3 = struct $Int (%2 : $Builtin.Word)
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  %2 = integer_literal $Builtin.Int32, 10
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
   %4 = alloc_ref $HalfOpenRange
   %5 = ref_element_addr %4 : $HalfOpenRange, #HalfOpenRange.current
-  store %1 to %5 : $*Int
+  store %1 to %5 : $*Int32
   %7 = ref_element_addr %4 : $HalfOpenRange, #HalfOpenRange.end
-  store %3 to %7 : $*Int 
-  %9 = struct_element_addr %5 : $*Int, #Int.value 
-  %10 = struct_element_addr %7 : $*Int, #Int.value
-  %11 = load %9 : $*Builtin.Word
-  %12 = load %10 : $*Builtin.Word
+  store %3 to %7 : $*Int32 
+  %9 = struct_element_addr %5 : $*Int32, #Int32.value 
+  %10 = struct_element_addr %7 : $*Int32, #Int32.value
+  %11 = load %9 : $*Builtin.Int32
+  %12 = load %10 : $*Builtin.Int32
   %13 = tuple() 
   return %13 : $() 
 }

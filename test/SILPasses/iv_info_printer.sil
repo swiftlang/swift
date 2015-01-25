@@ -8,110 +8,110 @@ import Builtin
 import Swift
 
 // CHECK: Induction variables for function: for_loop
-// CHECK: IV Header:   [[ARG:%.*]] = argument of bb1 : $Builtin.Word
-// CHECK: IV:   [[ADD:%.*]] = builtin {{.*}}([[ARG]] : $Builtin.Word, {{%.*}} : $Builtin.Word, {{.*}} : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-// CHECK: with header:   [[ARG]] = argument of bb1 : $Builtin.Word
-// CHECK: IV:   {{.*}} = tuple_extract [[ADD]] : $(Builtin.Word, Builtin.Int1), 0
-// CHECK: with header:   [[ARG]] = argument of bb1 : $Builtin.Word
+// CHECK: IV Header:   [[ARG:%.*]] = argument of bb1 : $Builtin.Int32
+// CHECK: IV:   [[ADD:%.*]] = builtin {{.*}}([[ARG]] : $Builtin.Int32, {{%.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+// CHECK: with header:   [[ARG]] = argument of bb1 : $Builtin.Int32
+// CHECK: IV:   {{.*}} = tuple_extract [[ADD]] : $(Builtin.Int32, Builtin.Int1), 0
+// CHECK: with header:   [[ARG]] = argument of bb1 : $Builtin.Int32
 
-sil @for_loop : $@thin (Int) -> Int {
-bb0(%0 : $Int):
-  %1 = integer_literal $Builtin.Word, 0
-  br bb1(%1 : $Builtin.Word, %1 : $Builtin.Word)
+sil @for_loop : $@thin (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %1 = integer_literal $Builtin.Int32, 0
+  br bb1(%1 : $Builtin.Int32, %1 : $Builtin.Int32)
 
-bb1(%3 : $Builtin.Word, %4 : $Builtin.Word):
-  %6 = struct_extract %0 : $Int, #Int.value
-  %7 = builtin "cmp_slt_Word"(%4 : $Builtin.Word, %6 : $Builtin.Word) : $Builtin.Int1
+bb1(%3 : $Builtin.Int32, %4 : $Builtin.Int32):
+  %6 = struct_extract %0 : $Int32, #Int32.value
+  %7 = builtin "cmp_slt_Int32"(%4 : $Builtin.Int32, %6 : $Builtin.Int32) : $Builtin.Int1
   cond_br %7, bb2, bb3
 
 bb2:
   %10 = integer_literal $Builtin.Int1, -1
-  %11 = builtin "sadd_with_overflow_Word"(%3 : $Builtin.Word, %4 : $Builtin.Word, %10 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %12 = tuple_extract %11 : $(Builtin.Word, Builtin.Int1), 0
-  %13 = tuple_extract %11 : $(Builtin.Word, Builtin.Int1), 1
+  %11 = builtin "sadd_with_overflow_Int32"(%3 : $Builtin.Int32, %4 : $Builtin.Int32, %10 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %12 = tuple_extract %11 : $(Builtin.Int32, Builtin.Int1), 0
+  %13 = tuple_extract %11 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %13 : $Builtin.Int1
-  %15 = integer_literal $Builtin.Word, 1
-  %16 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Word, %15 : $Builtin.Word, %10 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %17 = tuple_extract %16 : $(Builtin.Word, Builtin.Int1), 0
-  %18 = tuple_extract %16 : $(Builtin.Word, Builtin.Int1), 1
+  %15 = integer_literal $Builtin.Int32, 1
+  %16 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %15 : $Builtin.Int32, %10 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %17 = tuple_extract %16 : $(Builtin.Int32, Builtin.Int1), 0
+  %18 = tuple_extract %16 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %18 : $Builtin.Int1
-  br bb1(%12 : $Builtin.Word, %17 : $Builtin.Word)
+  br bb1(%12 : $Builtin.Int32, %17 : $Builtin.Int32)
 
 bb3:
-  %21 = struct $Int (%3 : $Builtin.Word)
-  return %21 : $Int
+  %21 = struct $Int32 (%3 : $Builtin.Int32)
+  return %21 : $Int32
 }
 
 
 // CHECK: Induction variables for function: for_in_loop
-// CHECK: IV Header:   [[ARG:%.*]] = argument of bb1 : $Builtin.Word
-// CHECK: IV:   [[ADD:%.*]] = builtin {{.*}}([[ARG]] : $Builtin.Word, {{%.*}} : $Builtin.Word, {{.*}} : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-// CHECK: with header:   [[ARG]] = argument of bb1 : $Builtin.Word
-// CHECK: IV:   {{.*}} = tuple_extract [[ADD]] : $(Builtin.Word, Builtin.Int1), 0
-// CHECK: with header:   [[ARG]] = argument of bb1 : $Builtin.Word
+// CHECK: IV Header:   [[ARG:%.*]] = argument of bb1 : $Builtin.Int32
+// CHECK: IV:   [[ADD:%.*]] = builtin {{.*}}([[ARG]] : $Builtin.Int32, {{%.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+// CHECK: with header:   [[ARG]] = argument of bb1 : $Builtin.Int32
+// CHECK: IV:   {{.*}} = tuple_extract [[ADD]] : $(Builtin.Int32, Builtin.Int1), 0
+// CHECK: with header:   [[ARG]] = argument of bb1 : $Builtin.Int32
 
-sil @for_in_loop : $@thin (Int) -> Int {
-bb0(%0 : $Int):
-  %1 = integer_literal $Builtin.Word, 0
-  %2 = struct_extract %0 : $Int, #Int.value
-  br bb1(%1 : $Builtin.Word, %1 : $Builtin.Word)
+sil @for_in_loop : $@thin (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = struct_extract %0 : $Int32, #Int32.value
+  br bb1(%1 : $Builtin.Int32, %1 : $Builtin.Int32)
 
-bb1(%4 : $Builtin.Word, %5 : $Builtin.Word):
-  %7 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32):
+  %7 = builtin "cmp_eq_Int32"(%5 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int1
   cond_br %7, bb2, bb3
 
 bb2:
-  %9 = struct $Int (%4 : $Builtin.Word)
-  return %9 : $Int
+  %9 = struct $Int32 (%4 : $Builtin.Int32)
+  return %9 : $Int32
 
 bb3:
-  %11 = integer_literal $Builtin.Word, 1
+  %11 = integer_literal $Builtin.Int32, 1
   %13 = integer_literal $Builtin.Int1, -1
-  %14 = builtin "sadd_with_overflow_Word"(%5 : $Builtin.Word, %11 : $Builtin.Word, %13 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %15 = tuple_extract %14 : $(Builtin.Word, Builtin.Int1), 0
-  %16 = tuple_extract %14 : $(Builtin.Word, Builtin.Int1), 1
+  %14 = builtin "sadd_with_overflow_Int32"(%5 : $Builtin.Int32, %11 : $Builtin.Int32, %13 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %15 = tuple_extract %14 : $(Builtin.Int32, Builtin.Int1), 0
+  %16 = tuple_extract %14 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %16 : $Builtin.Int1
-  %18 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Word, %5 : $Builtin.Word, %13 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %19 = tuple_extract %18 : $(Builtin.Word, Builtin.Int1), 0
-  %20 = tuple_extract %18 : $(Builtin.Word, Builtin.Int1), 1
+  %18 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %13 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %19 = tuple_extract %18 : $(Builtin.Int32, Builtin.Int1), 0
+  %20 = tuple_extract %18 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %20 : $Builtin.Int1
-  br bb1(%19 : $Builtin.Word, %15 : $Builtin.Word)
+  br bb1(%19 : $Builtin.Int32, %15 : $Builtin.Int32)
 }
 
 // CHECK: Induction variables for function: copy_iv
-// CHECK: IV Header:   [[ARG:%.*]] = argument of bb1 : $Builtin.Word
-// CHECK: IV:   [[ADD:%.*]] = builtin {{.*}}([[ARG]] : $Builtin.Word, {{%.*}} : $Builtin.Word, {{.*}} : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-// CHECK: with header:   [[ARG]] = argument of bb1 : $Builtin.Word
-// CHECK: IV:   {{.*}} = tuple_extract [[ADD]] : $(Builtin.Word, Builtin.Int1), 0
-// CHECK: with header:   [[ARG]] = argument of bb1 : $Builtin.Word
+// CHECK: IV Header:   [[ARG:%.*]] = argument of bb1 : $Builtin.Int32
+// CHECK: IV:   [[ADD:%.*]] = builtin {{.*}}([[ARG]] : $Builtin.Int32, {{%.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+// CHECK: with header:   [[ARG]] = argument of bb1 : $Builtin.Int32
+// CHECK: IV:   {{.*}} = tuple_extract [[ADD]] : $(Builtin.Int32, Builtin.Int1), 0
+// CHECK: with header:   [[ARG]] = argument of bb1 : $Builtin.Int32
 
-sil @copy_iv : $@thin (Int, Int) -> () {
-bb0(%0 : $Int, %1 : $Int):
-  %2 = struct_extract %0 : $Int, #Int.value
-  %3 = integer_literal $Builtin.Word, 2
-  br bb1(%3 : $Builtin.Word, %2 : $Builtin.Word)
+sil @copy_iv : $@thin (Int32, Int32) -> () {
+bb0(%0 : $Int32, %1 : $Int32):
+  %2 = struct_extract %0 : $Int32, #Int32.value
+  %3 = integer_literal $Builtin.Int32, 2
+  br bb1(%3 : $Builtin.Int32, %2 : $Builtin.Int32)
 
-bb1(%5 : $Builtin.Word, %6 : $Builtin.Word):
-  %8 = struct_extract %1 : $Int, #Int.value
-  %9 = builtin "cmp_ne_Word"(%6 : $Builtin.Word, %8 : $Builtin.Word) : $Builtin.Int1
+bb1(%5 : $Builtin.Int32, %6 : $Builtin.Int32):
+  %8 = struct_extract %1 : $Int32, #Int32.value
+  %9 = builtin "cmp_ne_Int32"(%6 : $Builtin.Int32, %8 : $Builtin.Int32) : $Builtin.Int1
   cond_br %9, bb2, bb4
 
 bb2:
-  %11 = integer_literal $Builtin.Word, 1
+  %11 = integer_literal $Builtin.Int32, 1
   %13 = integer_literal $Builtin.Int1, -1
-  %14 = builtin "sadd_with_overflow_Word"(%6 : $Builtin.Word, %11 : $Builtin.Word, %13 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %15 = tuple_extract %14 : $(Builtin.Word, Builtin.Int1), 0
-  %16 = tuple_extract %14 : $(Builtin.Word, Builtin.Int1), 1
+  %14 = builtin "sadd_with_overflow_Int32"(%6 : $Builtin.Int32, %11 : $Builtin.Int32, %13 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %15 = tuple_extract %14 : $(Builtin.Int32, Builtin.Int1), 0
+  %16 = tuple_extract %14 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %16 : $Builtin.Int1
-  %19 = builtin "smul_with_overflow_Word"(%15 : $Builtin.Word, %3 : $Builtin.Word, %13 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %20 = tuple_extract %19 : $(Builtin.Word, Builtin.Int1), 0
-  %21 = tuple_extract %19 : $(Builtin.Word, Builtin.Int1), 1
+  %19 = builtin "smul_with_overflow_Int32"(%15 : $Builtin.Int32, %3 : $Builtin.Int32, %13 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %20 = tuple_extract %19 : $(Builtin.Int32, Builtin.Int1), 0
+  %21 = tuple_extract %19 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %21 : $Builtin.Int1
-  %24 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %20 : $Builtin.Word) : $Builtin.Int1
+  %24 = builtin "cmp_eq_Int32"(%5 : $Builtin.Int32, %20 : $Builtin.Int32) : $Builtin.Int1
   cond_br %24, bb4, bb3
 
 bb3:
-  br bb1(%20 : $Builtin.Word, %15 : $Builtin.Word)
+  br bb1(%20 : $Builtin.Int32, %15 : $Builtin.Int32)
 
 bb4:
   %27 = tuple ()

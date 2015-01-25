@@ -16,7 +16,7 @@ public struct ECurve {
 public struct ECPoint {
     public let curve: ECurve
 
-    public var coordinate: Int
+    public var coordinate: Int32
     
     init(curve: ECurve)
 }
@@ -33,10 +33,10 @@ bb0:
 // ECurve.ECurve.point (ECurve.ECurve)() -> Swift.Optional<ECurve.ECPoint>
 sil @_TFV6ECurve6ECurve5pointfS0_FT_GSqVS_7ECPoint_ : $@cc(method) @thin (ECurve) -> Optional<ECPoint> {
 bb0(%0 : $ECurve):
-  %1 = integer_literal $Builtin.Word, 9           // user: %2
-  %2 = struct $Int (%1 : $Builtin.Word)           // user: %4
+  %1 = integer_literal $Builtin.Int32, 9          // user: %2
+  %2 = struct $Int32 (%1 : $Builtin.Int32)        // user: %4
   %3 = struct $ECurve ()                          // user: %4
-  %4 = struct $ECPoint (%3 : $ECurve, %2 : $Int)  // user: %5
+  %4 = struct $ECPoint (%3 : $ECurve, %2 : $Int32) // user: %5
   %5 = enum $Optional<ECPoint>, #Optional.Some!enumelt.1, %4 : $ECPoint // user: %6
   return %5 : $Optional<ECPoint>                  // id: %6
 }
