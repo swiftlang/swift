@@ -438,7 +438,11 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
                                               UDRE->isImplicit());
   }
   
-  llvm_unreachable("Can't represent lookup result");
+  // FIXME: If we reach this point, the program we're being handed is likely
+  // very broken, but it's still conceivable that this may happen due to
+  // invalid shadowed declarations.
+  // llvm_unreachable("Can't represent lookup result");
+  return new (TC.Context) ErrorExpr(Loc);
 }
 
 namespace {

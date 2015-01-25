@@ -642,12 +642,18 @@ public:
   Stmt *visitSwitchStmt(SwitchStmt *S) {
     // Type-check the subject expression.
     Expr *subjectExpr = S->getSubjectExpr();
+    bool hadTypeError = false;
+
     if (TC.typeCheckExpression(subjectExpr, DC, Type(), Type(),
-                               /*discardedExpr=*/false))
-      return nullptr;
+                               /*discardedExpr=*/false)) {
+      hadTypeError = true;
+    }
+    
     subjectExpr = TC.coerceToMaterializable(subjectExpr);
+    
     if (!subjectExpr)
       return nullptr;
+    
     S->setSubjectExpr(subjectExpr);
     Type subjectType = subjectExpr->getType();
 
@@ -655,7 +661,6 @@ public:
     AddSwitchNest switchNest(*this);
     AddLabeledStmt labelNest(*this, S);
 
-    bool hadTypeError = false;
     for (unsigned i = 0, e = S->getCases().size(); i < e; ++i) {
       auto *caseBlock = S->getCases()[i];
       // Fallthrough transfers control to the next case block. In the
