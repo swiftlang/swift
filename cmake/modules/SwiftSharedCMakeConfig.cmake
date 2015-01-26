@@ -238,9 +238,11 @@ macro(swift_common_unified_build_config product)
   set(PATH_TO_LLVM_SOURCE "${CMAKE_SOURCE_DIR}")
   set(PATH_TO_LLVM_BUILD "${CMAKE_BINARY_DIR}")
   set(${product}_PATH_TO_CLANG_BUILD "${CMAKE_BINARY_DIR}")
-  set(PATH_TO_CLANG_BUILD "${SWIFT_PATH_TO_CLANG_BUILD}")
+  set(PATH_TO_CLANG_BUILD "${CMAKE_BINARY_DIR}")
   set(CLANG_MAIN_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/tools/clang/include")
   set(CLANG_BUILD_INCLUDE_DIR "${CMAKE_BINARY_DIR}/tools/clang/include")
+  set(${product}_NATIVE_LLVM_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
+  set(${product}_NATIVE_CLANG_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
 
   include_directories(
       "${CLANG_BUILD_INCLUDE_DIR}"
