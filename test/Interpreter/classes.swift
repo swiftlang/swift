@@ -1,5 +1,4 @@
-// RUN: %target-build-swift %s -Xfrontend -enable-vtable-thunks -o %t/a.out
-// RUN: %target-run %t/a.out | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
 class Interval {
   var lo, hi : Int

@@ -92,9 +92,6 @@ public:
   /// Should we emit self as a guaranteed parameter?
   bool EnableGuaranteedSelf = false;
 
-  /// Should we emit thunks for ABI-mismatched vtable entries?
-  bool EnableVTableThunks = false;
-
   /// Should we use a pass pipeline passed in via a json file? Null by default.
   StringRef ExternalPassPipelineFilename;
 };

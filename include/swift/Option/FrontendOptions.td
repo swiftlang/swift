@@ -250,9 +250,6 @@ def interpret : Flag<["-"], "interpret">, HelpText<"Immediate mode">, ModeOpt;
 def enable_guaranteed_self : Flag<["-"], "enable-guaranteed-self">,
   HelpText<"Enable the passing of self as a guaranteed parameter">;
 
-def enable_vtable_thunks : Flag<["-"], "enable-vtable-thunks">,
-  HelpText<"Enable code generation of thunks for vtable overrides">;
-
 def external_pass_pipeline_filename : Separate<["-"], "external-pass-pipeline-filename">,
     HelpText<"Use the pass pipeline defined by <pass_pipeline_file>">,
     MetaVarName<"<pass_pipeline_file>">;

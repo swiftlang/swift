@@ -826,7 +826,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.PrintInstCounts |= Args.hasArg(OPT_print_inst_counts);
   Opts.EnableFuncSigOpts &= !Args.hasArg(OPT_disable_func_sig_opts);
   Opts.EnableGuaranteedSelf |= Args.hasArg(OPT_enable_guaranteed_self);
-  Opts.EnableVTableThunks |= Args.hasArg(OPT_enable_vtable_thunks);
   if (const Arg *A = Args.getLastArg(OPT_external_pass_pipeline_filename))
     Opts.ExternalPassPipelineFilename = A->getValue();
 

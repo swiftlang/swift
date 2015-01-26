@@ -348,8 +348,7 @@ static constexpr unsigned OTKPair(OptionalTypeKind a, OptionalTypeKind b) {
 SILFunction *
 SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   // As a fast path, if there is no override, definitely no thunk is necessary.
-  if (!M.getOptions().EnableVTableThunks ||
-      derived == base)
+  if (derived == base)
     return getFunction(derived, NotForDefinition);
   
   // Generate the thunk name.
