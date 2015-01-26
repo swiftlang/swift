@@ -1325,6 +1325,28 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   return %11 : $Int32
 }
 
+// CHECK-LABEL: sil @indexrawpointer_to_indexaddr_with_casts : $@thin (Builtin.RawPointer, Builtin.Int64) -> Int32
+// CHECK:      pointer_to_address
+// CHECK-NEXT: builtin "truncOrBitCast_Int64_Word"
+// CHECK-NEXT: index_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: return
+
+sil @indexrawpointer_to_indexaddr_with_casts : $@thin (Builtin.RawPointer, Builtin.Int64) -> Int32 {
+bb0(%0 : $Builtin.RawPointer, %1: $Builtin.Int64):
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = metatype $@thick Int32.Type
+  %4 = builtin "strideof_nonzero"<Int32>(%3 : $@thick Int32.Type) : $Builtin.Word
+  %5 = builtin "zextOrBitCast_Word_Int64"(%4 : $Builtin.Word) : $Builtin.Int64
+  %6 = builtin "smul_with_overflow_Int64"(%1 : $Builtin.Int64, %5 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %7 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 0
+  %8 = builtin "truncOrBitCast_Int64_Word"(%7 : $Builtin.Int64) : $Builtin.Word
+  %9 = index_raw_pointer %0 : $Builtin.RawPointer, %8 : $Builtin.Word
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int32
+  %11 =  load %10 : $*Int32
+  return %11 : $Int32
+}
+
 sil @eliminate_dead_thin_to_thick_function_fun : $@thin () -> ()
 
 // CHECK-LABEL: sil @eliminate_dead_thin_to_thick_function : $@thin () -> () {

@@ -1403,6 +1403,68 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
                                                          PTAI->getType());
   }
 
+  // Turn this also into a index_addr. We generate this pattern after switching
+  // the Word type to an explicit Int32 or Int64 in the stdlib.
+  //
+  // %101 = builtin "strideof_nonzero"<Int>(%84 : $@thick Int.Type) :
+  //         $Builtin.Word
+  // %102 = builtin "zextOrBitCast_Word_Int64"(%101 : $Builtin.Word) :
+  //         $Builtin.Int64
+  // %111 = builtin "smul_with_overflow_Int64"(%108 : $Builtin.Int64,
+  //                               %102 : $Builtin.Int64, %20 : $Builtin.Int1) :
+  //         $(Builtin.Int64, Builtin.Int1)
+  // %112 = tuple_extract %111 : $(Builtin.Int64, Builtin.Int1), 0
+  // %113 = builtin "truncOrBitCast_Int64_Word"(%112 : $Builtin.Int64) :
+  //         $Builtin.Word
+  // %114 = index_raw_pointer %100 : $Builtin.RawPointer, %113 : $Builtin.Word
+  // %115 = pointer_to_address %114 : $Builtin.RawPointer to $*Int
+  SILValue Distance;
+  SILValue TruncOrBitCast;
+  MetatypeInst *Metatype;
+  IndexRawPointerInst *IndexRawPtr;
+  BuiltinInst *StrideMul;
+  if (match(
+          PTAI->getOperand(),
+          m_IndexRawPointerInst(IndexRawPtr))) {
+    SILValue Ptr = IndexRawPtr->getOperand(0);
+    SILValue TruncOrBitCast = IndexRawPtr->getOperand(1);
+    if (match(TruncOrBitCast,
+              m_ApplyInst(BuiltinValueKind::TruncOrBitCast,
+                          m_TupleExtractInst(m_BuiltinInst(StrideMul), 0)))) {
+      if (match(StrideMul,
+                m_ApplyInst(
+                    BuiltinValueKind::SMulOver, m_SILValue(Distance),
+                    m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
+                                m_ApplyInst(BuiltinValueKind::StrideofNonZero,
+                                            m_MetatypeInst(Metatype))))) ||
+          match(StrideMul,
+                m_ApplyInst(
+                    BuiltinValueKind::SMulOver,
+                    m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
+                                m_ApplyInst(BuiltinValueKind::StrideofNonZero,
+                                            m_MetatypeInst(Metatype))),
+                    m_SILValue(Distance)))) {
+        SILType InstanceType =
+            Metatype->getType().getMetatypeInstanceType(PTAI->getModule());
+        auto *Trunc = cast<BuiltinInst>(TruncOrBitCast);
+
+        // Make sure that the type of the metatype matches the type that we are
+        // casting to so we stride by the correct amount.
+        if (InstanceType.getAddressType() != PTAI->getType()) {
+          return nullptr;
+        }
+
+        auto *NewPTAI = Builder->createPointerToAddress(PTAI->getLoc(), Ptr,
+                                                        PTAI->getType());
+        auto DistanceAsWord = Builder->createBuiltin(
+            PTAI->getLoc(), Trunc->getName(), Trunc->getType(), {}, Distance);
+
+        NewPTAI->setDebugScope(PTAI->getDebugScope());
+        return new (PTAI->getModule())
+            IndexAddrInst(PTAI->getLoc(), NewPTAI, DistanceAsWord);
+      }
+    }
+  }
   // Turn:
   //
   //   %stride = Builtin.strideof(T) * %distance
@@ -1415,7 +1477,6 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   //   %result = index_addr %addr, %distance
   //
   BuiltinInst *Bytes;
-  MetatypeInst *Metatype;
   if (match(PTAI->getOperand(),
             m_IndexRawPointerInst(m_ValueBase(),
                                   m_TupleExtractInst(m_BuiltinInst(Bytes),
