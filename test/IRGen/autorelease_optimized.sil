@@ -9,6 +9,9 @@
 import Builtin
 
 class C {}
+
+sil_vtable C {}
+
 sil @_TFC21autorelease_optimized1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.NativeObject {
 bb0(%0 : $C):
   %1 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject // user: %2

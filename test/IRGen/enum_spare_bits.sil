@@ -9,7 +9,9 @@ import Swift
 import Foundation
 
 class C {}
+sil_vtable C {}
 class D: NSObject {}
+sil_vtable D {}
 
 enum SwiftClass {
   case A(C), B(D)

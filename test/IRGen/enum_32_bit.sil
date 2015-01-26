@@ -12,6 +12,7 @@ sil_stage canonical
 import Builtin
 
 class C {}
+sil_vtable C {}
 
 sil @_TFC11enum_32_bit1CD : $@thin (@owned C) -> ()
 

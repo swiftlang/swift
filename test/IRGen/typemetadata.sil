@@ -9,6 +9,7 @@ import Builtin
 struct S {}
 
 class C {}
+sil_vtable C {}
 
 sil @_TFC12typemetadata1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.NativeObject
 

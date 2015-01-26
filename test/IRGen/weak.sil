@@ -15,6 +15,7 @@ sil_stage canonical
 import Swift
 
 class C {}
+sil_vtable C {}
 sil @_TFC4weak1CD : $@cc(method) @thin (C) -> ()
 
 protocol P : class {

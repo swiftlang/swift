@@ -5,6 +5,7 @@
 import Swift
 
 class C {}
+sil_vtable C {}
 
 struct JustWeak {
   weak var x: C?

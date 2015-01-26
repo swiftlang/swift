@@ -12,6 +12,7 @@ class X {
   @objc var value : Int { get }
   @objc subscript (i : Int) -> Int { get }
 }
+sil_vtable X {}
 
 sil @_TFC14dynamic_lookup1XD : $@cc(method) @thin (X) -> ()
 

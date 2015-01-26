@@ -9,12 +9,14 @@ import Swift
 
 class A<T> {
 }
+sil_vtable A {}
 
 protocol P {
   func operate()
 }
 
 class B<T, U:P> {}
+sil_vtable B {}
 
 // CHECK-LABEL: define hidden void @thick_metatype(%swift.type*)
 sil hidden @thick_metatype : $@thin <T> (@thick A<T>.Type) -> () {

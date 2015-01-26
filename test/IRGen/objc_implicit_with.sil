@@ -19,6 +19,7 @@ class SwiftGizmo : Gizmo {
   func color(#red: Float, green: Float, blue: Float)
   func otherColorFor(#red: Float, green: Float, blue: Float)
 }
+sil_vtable SwiftGizmo {}
 
 sil @_TToFC18objc_implicit_with10SwiftGizmocfMS0_FT3redSf5greenSf4blueSf_S0_ : $@cc(objc_method) @thin (Float, Float, Float, @owned SwiftGizmo) -> @owned SwiftGizmo {
 bb0(%0 : $Float, %1 : $Float, %2 : $Float, %3 : $SwiftGizmo):

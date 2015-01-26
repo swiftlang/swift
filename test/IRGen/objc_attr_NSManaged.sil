@@ -14,20 +14,22 @@ import gizmo
 
 @objc class X {
 }
+sil_vtable X {}
 
 // The getter/setter should not show up in the Objective-C metadata.
 // CHECK: _INSTANCE_METHODS__TtC19objc_attr_NSManaged10SwiftGizmo = private constant { {{.*}}i32, i32, [2 x { i8*, i8*, i8* }] } { i32 24, i32 2, {{.*}} @"\01L_selector_data(initWithBellsOn:)", {{.*}} @"\01L_selector_data(init)", 
 
-// The property "x' should show up in the Objective-C metadata.
+// The property 'x' should show up in the Objective-C metadata.
 // CHECK: @_PROPERTIES__TtC19objc_attr_NSManaged10SwiftGizmo = private constant { {{.*}}i32, i32, [1 x { i8*, i8* }] } { i32 16, i32 1, [1 x { i8*, i8* }] [{ i8*, i8* } { i8* getelementptr inbounds ([2 x i8]* [[X]], i64 0, i64 0),
 
 // The getter/setter should not show up in the Swift metadata.
-// CHECK: @_TMdC19objc_attr_NSManaged10SwiftGizmo = global { {{.*}} } { void (%C19objc_attr_NSManaged10SwiftGizmo*)* @_TFC19objc_attr_NSManaged10SwiftGizmoD, i8** @_TWVBO, i64 ptrtoint (%objc_class* @"OBJC_METACLASS_$__TtC19objc_attr_NSManaged10SwiftGizmo" to i64), %objc_class* @"OBJC_CLASS_$_Gizmo", %swift.opaque* @_objc_empty_cache, %swift.opaque* {{(@_objc_empty_vtable|null)}}, i64 add (i64 ptrtoint ({ i32, i32, i32, i32, i8*, i8*, { i32, i32, [2 x { i8*, i8*, i8* }] }*, i8*, i8*, i8*, { i32, i32, [1 x { i8*, i8* }] }* }* @_DATA__TtC19objc_attr_NSManaged10SwiftGizmo to i64), i64 1), i32 1, i32 0, i32 16, i16 7, i16 0, i32 104, i32 16, { i64, i8*, i32, i32, i8*, %swift.type** (%swift.type*)*, %swift.type_pattern*, i32, i32, i32 }* @_TMnC19objc_attr_NSManaged10SwiftGizmo, i64 (i64, %C19objc_attr_NSManaged10SwiftGizmo*)* @_TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT7bellsOnSi_GSQS0__, %C19objc_attr_NSManaged10SwiftGizmo* (%C19objc_attr_NSManaged10SwiftGizmo*)* @_TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT_S0_ }
+/* FIXME: sil_vtable parser picks the wrong 'init' overload. Both vtable entries
+   ought to be nonnull here. rdar://problem/19572342 */
+// CHECK: @_TMdC19objc_attr_NSManaged10SwiftGizmo = global { {{.*}} } { void (%C19objc_attr_NSManaged10SwiftGizmo*)* @_TFC19objc_attr_NSManaged10SwiftGizmoD, i8** @_TWVBO, i64 ptrtoint (%objc_class* @"OBJC_METACLASS_$__TtC19objc_attr_NSManaged10SwiftGizmo" to i64), %objc_class* @"OBJC_CLASS_$_Gizmo", %swift.opaque* @_objc_empty_cache, %swift.opaque* {{(@_objc_empty_vtable|null)}}, i64 add (i64 ptrtoint ({ i32, i32, i32, i32, i8*, i8*, { i32, i32, [2 x { i8*, i8*, i8* }] }*, i8*, i8*, i8*, { i32, i32, [1 x { i8*, i8* }] }* }* @_DATA__TtC19objc_attr_NSManaged10SwiftGizmo to i64), i64 1), i32 1, i32 0, i32 16, i16 7, i16 0, i32 104, i32 16, { i64, i8*, i32, i32, i8*, %swift.type** (%swift.type*)*, %swift.type_pattern*, i32, i32, i32 }* @_TMnC19objc_attr_NSManaged10SwiftGizmo, %C19objc_attr_NSManaged10SwiftGizmo* (i64, %C19objc_attr_NSManaged10SwiftGizmo*)* @_TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT7bellsOnSi_S0_, i8* bitcast (void ()* @swift_reportMissingMethod to i8*) }
 
 @objc class SwiftGizmo : Gizmo {
   @objc @NSManaged var x: X
 }
-
 sil @_TToFC19objc_attr_NSManaged1XcfMS0_FT_S0_ : $@cc(objc_method) @thin (@owned X) -> @owned X {
 bb0(%0 : $X):
   return %0 : $X
@@ -57,9 +59,8 @@ sil @_TFC19objc_attr_NSManaged10SwiftGizmoD : $@cc(method) @thin (@owned SwiftGi
 
 sil @_TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT7bellsOnSi_GSQS0__ : $@cc(method) @thin (Int, @owned SwiftGizmo) -> Int
 
-/* FIXME: sil_vtable parser picks the wrong 'init' overload. rdar://problem/19572342
+/* FIXME: sil_vtable parser picks the wrong 'init' overload. rdar://problem/19572342 */
 sil_vtable SwiftGizmo {
-  #SwiftGizmo.init!initializer.1: _TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT_S0_     // objc_attr_NSManaged.SwiftGizmo.init (objc_attr_NSManaged.SwiftGizmo.Type)() -> objc_attr_NSManaged.SwiftGizmo
-  #SwiftGizmo.init!initializer.1: _TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT7bellsOnSi_S0_      // objc_attr_NSManaged.SwiftGizmo.init (objc_attr_NSManaged.SwiftGizmo.Type)(withBellsOn : Swift.Int) -> objc_attr_NSManaged.SwiftGizmo
+  // #SwiftGizmo.init!initializer.1: _TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT_S0_
+  #SwiftGizmo.init!initializer.1: _TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT7bellsOnSi_S0_
 }
- */

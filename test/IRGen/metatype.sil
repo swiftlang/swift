@@ -12,6 +12,7 @@ import gizmo
 
 class X {
 }
+sil_vtable X {}
 
 sil @_TFC8metatype1Xd : $@cc(method) @thin (@owned X) -> @owned Builtin.NativeObject
 

@@ -8,7 +8,9 @@
 // CHECK-NEXT: ret void
 
 class C {}
+sil_vtable C {}
 class D : C {}
+sil_vtable D {}
 
 sil @upcast_test : $@thin (@inout D) -> () {
 bb0(%0 : $*D):

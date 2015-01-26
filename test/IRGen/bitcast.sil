@@ -7,6 +7,7 @@ sil_stage canonical
 import Swift
 
 class C {}
+sil_vtable C {}
 
 // CHECK-i386-LABEL: define i32 @bitcast_trivial(%C7bitcast1C*) {
 // CHECK-i386:         [[BUF:%.*]] = alloca %C7bitcast1C*, align 4

@@ -6,6 +6,7 @@
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque
 
 class C {}
+sil_vtable C {}
 
 sil @_TFC13ios_simulator1CD : $@cc(method) @thin (@owned C) -> () {
 bb0(%0 : $C):
@@ -17,6 +18,7 @@ bb0(%0 : $C):
 // CHECK: _TMdC13ios_simulator1C = {{.*}}, [[OPAQUE]]* @_objc_empty_cache, [[OPAQUE]]* null,
 
 class G<T> {}
+sil_vtable G {}
 
 sil @_TFC13ios_simulator1GD : $@cc(method) @thin <T> (@owned G<T>) -> () {
 bb0(%0 : $G<T>):

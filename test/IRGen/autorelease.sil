@@ -11,6 +11,7 @@ import Swift
 // i386:   [[OBJC:%objc_object]] = type
 
 class C {}
+sil_vtable C {}
 sil @_TFC11autorelease1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.NativeObject {
 bb0(%0 : $C):
   %1 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject // user: %2

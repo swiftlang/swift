@@ -9,6 +9,7 @@
 // CHECK: [[A:%V7unowned1A]] = type <{ [[C]]* }>
 
 class C {}
+sil_vtable C {}
 protocol P : class {
   func explode()
 }

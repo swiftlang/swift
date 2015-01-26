@@ -7,6 +7,7 @@ sil_stage canonical
 import Swift
 
 class Foo {}
+sil_vtable Foo {}
 
 sil @_TFC10objc_block3FooD : $Foo -> ()
 

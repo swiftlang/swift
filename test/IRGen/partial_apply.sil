@@ -15,6 +15,7 @@ import gizmo
   
   func initFamily() -> ObjCClass { return self }
 }
+sil_vtable ObjCClass {}
 sil @_TFC13partial_apply9ObjCClassD : $@cc(method) @thin (ObjCClass) -> ()
 
 sil @_TFC13partial_apply9ObjCClasscfMS_FT_S_ : $@cc(method) @thin (ObjCClass) -> ObjCClass {
@@ -156,6 +157,7 @@ done(%f : $@callee_owned Int -> ()):
 }
 
 class SwiftClass {}
+sil_vtable SwiftClass {}
 sil @_TFC13partial_apply10SwiftClassD : $@cc(method) @thin (SwiftClass) -> ()
 
 sil @partially_applyable_to_class : $@thin (@owned SwiftClass) -> ()

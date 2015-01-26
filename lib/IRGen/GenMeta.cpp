@@ -2362,14 +2362,11 @@ namespace {
          : public ConstantBuilder<ClassMetadataLayout<Impl>> {
     using super = ConstantBuilder<ClassMetadataLayout<Impl>>;
 
-    /// A mapping from functions to their final overriders.
-    llvm::DenseMap<AbstractFunctionDecl*,AbstractFunctionDecl*> FinalOverriders;
-
     Optional<MetadataSize> ClassObjectExtents;
 
   protected:
-    using super::IGM;
-    using super::Target;
+    IRGenModule &IGM = super::IGM;
+    ClassDecl * const& Target = super::Target;
     using super::addWord;
     using super::addConstantWord;
     using super::addInt16;
@@ -2379,46 +2376,19 @@ namespace {
     using super::addStruct;
     using super::getNextOffset;
     const StructLayout &Layout;
+    SILVTable *VTable;
 
     ClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
                              const StructLayout &layout)
       : super(IGM, theClass), Layout(layout) {
-
-      computeFinalOverriders();
-    }
-
-    /// Compute a map of all the final overriders for the class.
-    void computeFinalOverriders() {
-      // Walk up the whole class hierarchy.
-      ClassDecl *cls = Target;
-      do {
-        // Make sure that each function has its final overrider set.
-        for (auto member : cls->getMembers()) {
-          auto fn = dyn_cast<AbstractFunctionDecl>(member);
-          if (!fn) continue;
-
-          // Check whether we already have an entry for this function.
-          auto &finalOverrider = FinalOverriders[fn];
-
-          // If not, the function is its own final overrider.
-          if (!finalOverrider) finalOverrider = fn;
-
-          // If the function directly overrides something, update the
-          // overridden function's entry.
-          if (auto overridden = fn->getOverriddenDecl())
-            FinalOverriders.insert(std::make_pair(overridden, finalOverrider));
-
-        }
-
-        
-      } while (cls->hasSuperclass() &&
-               (cls = cls->getSuperclass()->getClassOrBoundGenericClass()));
+      VTable = IGM.SILMod->lookUpVTable(Target);
     }
 
     void computeClassObjectExtents() {
       if (ClassObjectExtents.hasValue()) return;
       ClassObjectExtents = getSizeOfMetadata(IGM, Target);
     }
+
 
   public:
     /// The 'metadata flags' field in a class is actually a pointer to
@@ -2602,8 +2572,7 @@ namespace {
 
     void addFieldOffset(VarDecl *var) {
       // Use a fixed offset if we have one.
-      if (auto offset = tryEmitClassConstantFragileFieldOffset(IGM, Target,
-                                                               var))
+      if (auto offset = tryEmitClassConstantFragileFieldOffset(IGM,Target,var))
         addWord(offset);
       // Otherwise, leave a placeholder for the runtime to populate at runtime.
       else
@@ -2622,17 +2591,9 @@ namespace {
         global->setInitializer(offsetV);
       }
 
-      // Find the final overrider, which we should already have computed.
-      auto it = FinalOverriders.find(cast<AbstractFunctionDecl>(fn.getDecl()));
-      assert(it != FinalOverriders.end());
-      AbstractFunctionDecl *finalOverrider = it->second;
-
-      fn = SILDeclRef(finalOverrider, fn.kind, fn.getResilienceExpansion(),
-                      fn.uncurryLevel);
-
-      // Add the appropriate method to the module.
-      SILFunction *func = IGM.SILMod->lookUpFunction(fn);
-      if (func) {
+      // Find the vtable entry.
+      assert(VTable && "no vtable?!");
+      if (SILFunction *func = VTable->getImplementation(*IGM.SILMod, fn)) {
         addWord(IGM.getAddrOfSILFunction(func, NotForDefinition));
       } else {
         // The method is removed by dead method elimination.

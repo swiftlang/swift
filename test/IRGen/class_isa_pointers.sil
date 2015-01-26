@@ -15,6 +15,7 @@ import gizmo
 class Purebred {
   func method() {}
 }
+sil_vtable Purebred {}
 
 // CHECK-LABEL: define void @purebred_method(%C18class_isa_pointers8Purebred*) {
 // CHECK:         [[ISA_PTR:%.*]] = bitcast %C18class_isa_pointers8Purebred* %0 to %swift.type**
@@ -35,6 +36,7 @@ entry(%0 : $Purebred):
 class Mongrel: Gizmo {
   func method() {}
 }
+sil_vtable Mongrel {}
 
 // CHECK-LABEL: define void @mongrel_method(%C18class_isa_pointers7Mongrel*) {
 // CHECK:         [[T0:%.*]] = bitcast {{.*}} %0 to i64*

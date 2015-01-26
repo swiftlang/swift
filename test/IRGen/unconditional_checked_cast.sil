@@ -6,7 +6,9 @@
 // addresses for the super_to_archetype case and the downcast case.
 
 class C {}
+sil_vtable C {}
 class D : C {}
+sil_vtable D {}
 
 // CHECK-LABEL: define void @downcast_test(%C26unconditional_checked_cast1D** noalias sret, %C26unconditional_checked_cast1C** noalias) {
 // CHECK: entry:

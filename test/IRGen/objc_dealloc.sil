@@ -14,6 +14,7 @@ import Swift
 import gizmo
 
 class X { }
+sil_vtable X {}
 sil @_TFC12objc_dealloc1XD : $@cc(method) @thin (X) -> ()
 
 func onDestruct() { }
@@ -23,6 +24,7 @@ class SwiftGizmo : Gizmo {
   override init()
   deinit
 }
+sil_vtable SwiftGizmo {}
 sil @_TFC12objc_dealloc10SwiftGizmoD : $@cc(method) @thin (SwiftGizmo) -> ()
 
 sil @_TF12objc_dealloc10onDestructFT_T_ : $@thin () -> () {

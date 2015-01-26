@@ -129,6 +129,12 @@ sil @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_ : $@cc(method) @thin
 
 sil @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_ : $@cc(method) @thin <T> (@owned RootGeneric<T>) -> ()
 
+sil_vtable RootGeneric {
+  #RootGeneric.foo!1: _TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_
+  #RootGeneric.bar!1: _TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_
+  #RootGeneric.bas!1: _TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_
+}
+
 class RootGenericFixedLayout<T> {
   var x : UInt8
   var y : [T]
@@ -136,6 +142,7 @@ class RootGenericFixedLayout<T> {
 
   init()
 }
+sil_vtable RootGenericFixedLayout {}
 sil @_TFC15generic_classes22RootGenericFixedLayoutD : $@cc(method) @thin <T> (RootGenericFixedLayout<T>) -> ()
 
 class RootNonGeneric {
@@ -145,6 +152,7 @@ class RootNonGeneric {
 
   init()
 }
+sil_vtable RootNonGeneric {}
 sil @_TFC15generic_classes14RootNonGenericD : $@cc(method) @thin (RootNonGeneric) -> ()
 
 class GenericInheritsGeneric<A, B> : RootGeneric<A> {
@@ -164,11 +172,21 @@ sil @_TFC15generic_classes22GenericInheritsGeneric3dooU___fGS0_Q_Q0__FT_T_ : $@c
 
 sil @_TFC15generic_classes22GenericInheritsGeneric3dahU___fGS0_Q_Q0__FT_T_ : $@cc(method) @thin <A, B> (@owned GenericInheritsGeneric<A, B>) -> ()
 
+sil_vtable GenericInheritsGeneric {
+  #RootGeneric.foo!1: _TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_
+  #RootGeneric.bar!1: _TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_
+  #RootGeneric.bas!1: _TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_
+  #GenericInheritsGeneric.zippity!1: _TFC15generic_classes22GenericInheritsGeneric7zippityU___fGS0_Q_Q0__FT_T_
+  #GenericInheritsGeneric.doo!1: _TFC15generic_classes22GenericInheritsGeneric3dooU___fGS0_Q_Q0__FT_T_
+  #GenericInheritsGeneric.dah!1: _TFC15generic_classes22GenericInheritsGeneric3dahU___fGS0_Q_Q0__FT_T_
+}
+
 class GenericInheritsNonGeneric<C> : RootNonGeneric {
   var w : UInt8
 
   override init()
 }
+sil_vtable GenericInheritsNonGeneric {}
 sil @_TFC15generic_classes25GenericInheritsNonGenericD : $@cc(method) @thin <T> (GenericInheritsNonGeneric<T>) -> ()
 
 // rdar://18067671
@@ -182,6 +200,7 @@ class RecursiveGenericInheritsGeneric<A, B> : RootGeneric<A> {
 
   override init()
 }
+sil_vtable RecursiveGenericInheritsGeneric {}
 sil @_TFC15generic_classes31RecursiveGenericInheritsGenericD : $@cc(method) @thin <T,U> (RecursiveGenericInheritsGeneric<T,U>) -> ()
 
 

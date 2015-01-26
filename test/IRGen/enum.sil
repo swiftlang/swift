@@ -1035,6 +1035,7 @@ end:
 }
 
 class C {}
+sil_vtable C {}
 
 sil @_TFC4enum1CD : $@cc(method) @thin (C) -> ()
 
@@ -2026,6 +2027,7 @@ entry:
 }
 
 class D {}
+sil_vtable D {}
 
 sil @_TFC4enum1DD : $@cc(method) @thin (D) -> ()
 

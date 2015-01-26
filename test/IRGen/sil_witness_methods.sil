@@ -6,6 +6,7 @@ sil_stage canonical
 
 struct Foo {}
 class Bar<T, U, V> {}
+sil_vtable Bar {}
 sil @_TFC19sil_witness_methods3BarD : $@cc(method) @thin <T,U,V> (Bar<T,U,V>) -> ()
 
 struct X {}

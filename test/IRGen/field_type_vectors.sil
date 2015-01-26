@@ -37,12 +37,13 @@ struct Bas<T, U> {
 // CHECK-LABEL: @_TMPdC18field_type_vectors3Zim = global
 // -- There should be 14 words between the address point and the field type
 //    vector slot, with type %swift.type**
-// CHECK:         i64, %objc_class*, %swift.opaque*, %swift.opaque*, i64, i32, i32, i32, i16, i16, i32, i32, { {{[^}]*}} }*, %swift.type*, %swift.type*, %C18field_type_vectors3Zim* (%C18field_type_vectors3Zim*)*, i64, i64, i64, %swift.type**
+// CHECK:         i64, %objc_class*, %swift.opaque*, %swift.opaque*, i64, i32, i32, i32, i16, i16, i32, i32, { {{[^}]*}} }*, %swift.type*, %swift.type*, i8*, i64, i64, i64, %swift.type**
 class Zim<T, U> {
   var foo: Foo? = nil
   var bar: Bar<T>? = nil
   var bas: Bas<T, U>? = nil
 }
+sil_vtable Zim {}
 
 sil @_TFC18field_type_vectors3ZimcU___fMGS0_Q_Q0__FT_GS0_Q_Q0__ : $@cc(method) @thin <T, U> (@owned Zim<T, U>) -> @owned Zim<T, U>
 
@@ -51,10 +52,11 @@ sil @_TFC18field_type_vectors3ZimcU___fMGS0_Q_Q0__FT_GS0_Q_Q0__ : $@cc(method) @
 // CHECK-LABEL: @_TMPdC18field_type_vectors4Zang = global
 // -- There should be 16 words between the address point and the field type
 //    vector slot, with type %swift.type**
-// CHECK:         i64, %swift.type*, %swift.opaque*, %swift.opaque*, i64, i32, i32, i32, i16, i16, i32, i32, { {{[^}]*}} }*, %swift.type*, %swift.type*, %C18field_type_vectors4Zang* (%C18field_type_vectors4Zang*)*, i64, i64, i64, %swift.type*, i64, %swift.type**
+// CHECK:         i64, %swift.type*, %swift.opaque*, %swift.opaque*, i64, i32, i32, i32, i16, i16, i32, i32, { {{[^}]*}} }*, %swift.type*, %swift.type*, i8*, i64, i64, i64, %swift.type*, i64, %swift.type**
 class Zang<V>: Zim<V, V> {
   var zung: Int = 0
 }
+sil_vtable Zang {}
 
 sil @_TFC18field_type_vectors4ZangcU__fMGS0_Q__FT_GS0_Q__ : $@cc(method) @thin <V> (@owned Zang<V>) -> @owned Zang<V>
 
@@ -68,6 +70,7 @@ class StorageQualified {
     b = x
   }
 }
+sil_vtable StorageQualified {}
 
 // CHECK: define private %swift.type** [[FOO_TYPES_ACCESSOR]](%swift.type*)
 // CHECK:   [[EXISTING:%.*]] = load %swift.type*** [[FOO_TYPE_VECTOR_SLOT]]

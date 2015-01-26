@@ -51,6 +51,7 @@ class RootNonGeneric {
 
   init()
 }
+sil_vtable RootNonGeneric {}
 sil @_TFC15generic_classes14RootNonGenericD : $@cc(method) @thin (RootNonGeneric) -> ()
 
 // CHECK-macosx: @_TMdC15generic_classes14RootNonGeneric = global { {{.*}} } {

@@ -13,6 +13,7 @@
 // CHECK:  call void bitcast (void (%swift.refcounted*)* @swift_fixLifetime to void (%C11fixlifetime1C**)*)(%C11fixlifetime1C**
 
 class C {}
+sil_vtable C {}
 protocol P : class {}
 typealias F = () -> ()
 struct Agg {

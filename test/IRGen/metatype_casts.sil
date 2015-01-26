@@ -40,6 +40,7 @@ end:
 }
 
 class SomeClass {}
+sil_vtable SomeClass {}
 
 // CHECK-LABEL: define %objc_object* @metatype_object_conversion(%objc_class*) {
 // CHECK:         %1 = bitcast %objc_class* %0 to %objc_object*
