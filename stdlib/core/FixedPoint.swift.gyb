@@ -193,7 +193,7 @@ public struct ${Self}
   /// Create an instance initialized to zero.
   @transparent public
   init() {
-    var maxWidthZero: IntMax = 0
+    let maxWidthZero: IntMax = 0
     value = Builtin.truncOrBitCast_Int${int_max_bits}_${BuiltinName}(
        maxWidthZero.value)
   }
@@ -382,7 +382,7 @@ extension ${Self} {
   /// overflow.
   @transparent public
   static func ${Method}WithOverflow(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, overflow: Bool) {
-    var tmp = Builtin.${sign}${op}_with_overflow_${BuiltinName}(lhs.value, rhs.value, false.value)
+    let tmp = Builtin.${sign}${op}_with_overflow_${BuiltinName}(lhs.value, rhs.value, false.value)
     return (${Self}(tmp.0), Bool(tmp.1))
   }
 % end
@@ -403,7 +403,7 @@ extension ${Self} {
 % end
     // FIXME: currently doesn't detect overflow -- blocked by:
     // <rdar://15735295> Need [su]{div,rem}_with_overflow IR
-    var tmp = Builtin.${sign}${op}_${BuiltinName}(lhs.value, rhs.value)
+    let tmp = Builtin.${sign}${op}_${BuiltinName}(lhs.value, rhs.value)
     return (${Self}(tmp), false)
   }
 %end
@@ -443,31 +443,31 @@ extension ${Self} {
   public init(_ v: ${Src}) {
 %
 %       if srcBuiltinName == 'Word':
-    var srcNotWord = Builtin.${CastFromWord}(v.value)
+    let srcNotWord = Builtin.${CastFromWord}(v.value)
 %       else:
-    var srcNotWord = v.value
+    let srcNotWord = v.value
 %       end
 %
 %       if srcBits == bits and srcSign == sign:
-    var dstNotWord = srcNotWord
+    let dstNotWord = srcNotWord
 %
 %       elif srcBits == bits:
-    var tmp = Builtin.${srcSign}_to_${sign}_checked_conversion_Int${srcBits}(srcNotWord)
+    let tmp = Builtin.${srcSign}_to_${sign}_checked_conversion_Int${srcBits}(srcNotWord)
     Builtin.condfail(tmp.1)
-    var dstNotWord = tmp.0
+    let dstNotWord = tmp.0
 %
 %       elif srcBits > bits:
-    var tmp = Builtin.${srcSign}_to_${sign}_checked_trunc_Int${srcBits}_Int${bits}(srcNotWord)
+    let tmp = Builtin.${srcSign}_to_${sign}_checked_trunc_Int${srcBits}_Int${bits}(srcNotWord)
     Builtin.condfail(tmp.1)
-    var dstNotWord = tmp.0
+    let dstNotWord = tmp.0
 %
 %       elif srcSigned and not signed:
-    var tmp = Builtin.s_to_u_checked_conversion_Int${srcBits}(srcNotWord)
+    let tmp = Builtin.s_to_u_checked_conversion_Int${srcBits}(srcNotWord)
     Builtin.condfail(tmp.1)
-    var dstNotWord = Builtin.${srcExt}_Int${srcBits}_Int${bits}(tmp.0)
+    let dstNotWord = Builtin.${srcExt}_Int${srcBits}_Int${bits}(tmp.0)
 %
 %       else:
-    var dstNotWord = Builtin.${srcExt}_Int${srcBits}_Int${bits}(srcNotWord)
+    let dstNotWord = Builtin.${srcExt}_Int${srcBits}_Int${bits}(srcNotWord)
 %       end
 %
 %       if BuiltinName == 'Word':
@@ -544,7 +544,7 @@ public func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 % end
   // FIXME: currently doesn't detect overflow -- blocked by:
   // <rdar://15735295> Need [su]{div,rem}_with_overflow IR
-  var tmp = Builtin.${sign}${inst}_${BuiltinName}(lhs.value, rhs.value)
+  let tmp = Builtin.${sign}${inst}_${BuiltinName}(lhs.value, rhs.value)
   return ${Self}(tmp)
 }
 %end
