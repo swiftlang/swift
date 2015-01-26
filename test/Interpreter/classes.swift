@@ -1,4 +1,5 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-build-swift %s -Xfrontend -enable-vtable-thunks -o %t/a.out
+// RUN: %target-run %t/a.out | FileCheck %s
 
 class Interval {
   var lo, hi : Int
@@ -65,3 +66,32 @@ class RDar16563763_B : RDar16563763_A {}
 println("self is Type = \(RDar16563763_A.self is RDar16563763_B.Type)")
 // CHECK: self is Type = false
 
+//
+// rdar://problem/19321484
+//
+
+class Base {
+  func makePossibleString() -> String? {
+    return "Base"
+  }
+}
+
+/* inherits from Base with method that returns a String instead of an Optional
+ * String */
+class CompilerCrasher : Base {
+  override func makePossibleString() -> String {
+    return "CompilerCrasher"
+  }
+}
+
+func testCrash(c: Base) -> String? {
+  let s = c.makePossibleString()
+  return s
+}
+
+public func driver() {
+  var c = CompilerCrasher()
+  var r = testCrash(c)
+  println(r)
+}
+driver() // CHECK: Optional("CompilerCrasher")
