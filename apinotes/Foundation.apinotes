@@ -13021,7 +13021,7 @@ Functions:
 - Name: NSZoneName
   Availability: none
   Nullability:
-  - N
+  - O
   NullabilityOfRet: N
 - Name: NSZoneRealloc
   Availability: none
