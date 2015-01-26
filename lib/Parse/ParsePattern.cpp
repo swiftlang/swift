@@ -540,6 +540,9 @@ mapParsedParameters(Parser &parser,
         parser.diagnose(param.EllipsisLoc, diag::parameter_ellipsis_not_at_end)
           .fixItRemove(param.EllipsisLoc);
         param.EllipsisLoc = SourceLoc();
+      } else if (!isa<TypedPattern>(pattern)) {
+        parser.diagnose(param.EllipsisLoc, diag::untyped_pattern_ellipsis)
+          .highlight(pattern->getSourceRange());
       } else {
         ellipsisLoc = param.EllipsisLoc;
       }
