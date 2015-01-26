@@ -107,10 +107,10 @@ struct _NSViewMirror : MirrorType {
               _v.cacheDisplayInRect(bounds, toBitmapImageRep: b)
               result = .Some(.View(b))
           }
+          
+          _NSViewMirror._views.removeObject(_v)
         default: ()
       }
-      
-      _NSViewMirror._views.removeObject(_v)
       
       return result
       
