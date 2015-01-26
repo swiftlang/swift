@@ -352,6 +352,19 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
       derived == base)
     return getFunction(derived, NotForDefinition);
   
+  // Generate the thunk name.
+  // TODO: If we allocated a new vtable slot for the derived method, then
+  // further derived methods would potentially need multiple thunks, and we
+  // would need to mangle the base method into the symbol as well.
+  llvm::SmallString<32> name;
+  derived.mangle(name, "_TTV");
+  
+  // If we already emitted this thunk, reuse it.
+  // TODO: Allocating new vtable slots for derived methods with different ABIs
+  // would invalidate the assumption that the same thunk is correct, as above.
+  if (auto existingThunk = M.lookUpFunction(name))
+    return existingThunk;
+  
   auto origDerivedTy = getConstantType(derived).castTo<SILFunctionType>();
   auto baseTy = getConstantType(base).castTo<SILFunctionType>();
 
@@ -467,16 +480,6 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   // If no thunk action was necessary, just emit the method as is.
   if (!needsThunk)
     return getFunction(derived, NotForDefinition);
-  
-  // Mangle the constant with a _TTV header.
-  // TODO: If we allocated a new vtable slot for the derived method, then
-  // further derived methods would potentially need multiple thunks, and we
-  // would need to mangle the base method into the symbol as well.
-  llvm::SmallString<32> name;
-  derived.mangle(name, "_TTV");
-  
-  assert(!M.lookUpFunction(name)
-         && "vtable thunk already exists");
   
   auto vtableDerivedTy = SILFunctionType::get(
                                           origDerivedTy->getGenericSignature(),

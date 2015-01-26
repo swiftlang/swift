@@ -84,6 +84,14 @@ class CompilerCrasher : Base {
   }
 }
 
+class SonOfCompilerCrasher: CompilerCrasher {}
+
+class ReturnOfCompilerCrasher: CompilerCrasher {
+  override func makePossibleString() -> String {
+    return "ReturnOfCompilerCrasher"
+  }
+}
+
 func testCrash(c: Base) -> String? {
   let s = c.makePossibleString()
   return s
@@ -91,7 +99,16 @@ func testCrash(c: Base) -> String? {
 
 public func driver() {
   var c = CompilerCrasher()
+  var d = SonOfCompilerCrasher()
+  var e = ReturnOfCompilerCrasher()
   var r = testCrash(c)
   println(r)
+  r = testCrash(d)
+  println(r)
+  r = testCrash(e)
+  println(r)
 }
-driver() // CHECK: Optional("CompilerCrasher")
+driver()
+// CHECK: Optional("CompilerCrasher")
+// CHECK-NEXT: Optional("CompilerCrasher")
+// CHECK-NEXT: Optional("ReturnOfCompilerCrasher")

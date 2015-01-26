@@ -57,6 +57,33 @@ class D: B {
   override func i4(x: Int, y: Int) -> Int {}
 }
 
+// Inherits the thunked impls from D
+class E: D { }
+
+// Overrides w/ its own thunked impls
+class F: D {
+  override func f(x: B?, y: B) -> B {}
+  override func f2(x: B, y: B) -> B {}
+  override func f3(x: B?, y: B) -> B {}
+  override func f4(x: B, y: B) -> B {}
+
+  override func g(x: AddrOnly?, y: AddrOnly) -> AddrOnly {}
+  override func g2(x: AddrOnly, y: AddrOnly) -> AddrOnly {}
+  override func g3(x: AddrOnly?, y: AddrOnly) -> AddrOnly {}
+  override func g4(x: AddrOnly, y: AddrOnly) -> AddrOnly {}
+
+  override func h<U>(x: U?, y: U) -> U {}
+  override func h2<U>(x: U, y: U) -> U {}
+  override func h3<U>(x: U?, y: U) -> U {}
+  override func h4<U>(x: U, y: U) -> U {}
+
+  override func i(x: Int?, y: Int) -> Int {}
+  override func i2(x: Int, y: Int) -> Int {}
+  override func i3(x: Int?, y: Int) -> Int {}
+  override func i4(x: Int, y: Int) -> Int {}
+
+}
+
 // CHECK-LABEL: sil private @_TTVFC13vtable_thunks1D3iuofS0_FTGSqCS_1B_1yS1_1zS1__S1_
 // CHECK:         [[WRAP_X:%.*]] = enum $Optional<B>
 // CHECK:         [[FORCE_UNWRAP_FN:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
@@ -75,20 +102,59 @@ class D: B {
 // CHECK:         inject_enum_addr [[WRAP_RES_ADDR]]
 
 // CHECK-LABEL: sil_vtable D {
-// CHECK:         #B.iuo!1: _TTVF
-// CHECK:         #B.f!1: _TF
-// CHECK:         #B.f2!1: _TF
-// CHECK:         #B.f3!1: _TF
-// CHECK:         #B.f4!1: _TF
-// CHECK:         #B.g!1: _TTVF
-// CHECK:         #B.g2!1: _TTVF
-// CHECK:         #B.g3!1: _TTVF
-// CHECK:         #B.g4!1: _TF
-// CHECK:         #B.h!1: _TTVF
-// CHECK:         #B.h2!1: _TTVF
-// CHECK:         #B.h3!1: _TTVF
-// CHECK:         #B.h4!1: _TF
-// CHECK:         #B.i!1: _TTVF
-// CHECK:         #B.i2!1: _TTVF
-// CHECK:         #B.i3!1: _TTVF
-// CHECK:         #B.i4!1: _TF
+// CHECK:         #B.iuo!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.f!1: _TF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.f2!1: _TF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.f3!1: _TF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.f4!1: _TF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.g!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.g2!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.g3!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.g4!1: _TF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.h!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.h2!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.h3!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.h4!1: _TF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.i!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.i2!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.i3!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.i4!1: _TF{{[A-Z0-9a-z_]*}}1D
+
+// CHECK-LABEL: sil_vtable E {
+// CHECK:         #B.iuo!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.f!1: _TF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.f2!1: _TF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.f3!1: _TF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.f4!1: _TF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.g!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.g2!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.g3!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.g4!1: _TF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.h!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.h2!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.h3!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.h4!1: _TF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.i!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.i2!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.i3!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.i4!1: _TF{{[A-Z0-9a-z_]*}}1D
+
+// CHECK-LABEL: sil_vtable F {
+// CHECK:         #B.iuo!1: _TTVF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.f!1: _TF{{[A-Z0-9a-z_]*}}1F
+// CHECK:         #B.f2!1: _TF{{[A-Z0-9a-z_]*}}1F
+// CHECK:         #B.f3!1: _TF{{[A-Z0-9a-z_]*}}1F
+// CHECK:         #B.f4!1: _TF{{[A-Z0-9a-z_]*}}1F
+// CHECK:         #B.g!1: _TTVF{{[A-Z0-9a-z_]*}}1F
+// CHECK:         #B.g2!1: _TTVF{{[A-Z0-9a-z_]*}}1F
+// CHECK:         #B.g3!1: _TTVF{{[A-Z0-9a-z_]*}}1F
+// CHECK:         #B.g4!1: _TF{{[A-Z0-9a-z_]*}}1F
+// CHECK:         #B.h!1: _TTVF{{[A-Z0-9a-z_]*}}1F
+// CHECK:         #B.h2!1: _TTVF{{[A-Z0-9a-z_]*}}1F
+// CHECK:         #B.h3!1: _TTVF{{[A-Z0-9a-z_]*}}1F
+// CHECK:         #B.h4!1: _TF{{[A-Z0-9a-z_]*}}1F
+// CHECK:         #B.i!1: _TTVF{{[A-Z0-9a-z_]*}}1F
+// CHECK:         #B.i2!1: _TTVF{{[A-Z0-9a-z_]*}}1F
+// CHECK:         #B.i3!1: _TTVF{{[A-Z0-9a-z_]*}}1F
+// CHECK:         #B.i4!1: _TF{{[A-Z0-9a-z_]*}}1F
+
