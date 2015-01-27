@@ -22,14 +22,12 @@
 
 @availability(*, unavailable,
   message="Comparing Swift.String and NSString is ambiguous")
-@transparent
 public func ${op} (lhs: String, rhs: NSString) -> Bool {
   fatalError("impossible")
 }
 
 @availability(*, unavailable,
   message="Comparing Swift.String and NSString is ambiguous")
-@transparent
 public func ${op} (lhs: NSString, rhs: String) -> Bool {
   fatalError("impossible")
 }
