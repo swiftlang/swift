@@ -158,7 +158,10 @@ public func join<
 
   // FIXME: include separator
   let reservation = elements~>_preprocessingPass {
-    reduce($0, 0, { $0 + separatorSize + count($1) }) - separatorSize
+    { (s: S) -> C.Index.Distance in
+      var r: C.Index.Distance = reduce(s, 0, { $0 + separatorSize + count($1) })
+      return r - separatorSize
+    }($0)
   }
 
   if let n = reservation {
