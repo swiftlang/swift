@@ -92,3 +92,29 @@ func checkOverloadResolution() {
 }
 checkOverloadResolution()
 
+class Base  {
+    var v = 0
+    required init() {}
+    func map() {
+        v = 1
+    }
+}
+
+class D1 : Base {
+    required  init() {}
+    override func map() {
+        v = 2
+    }
+}
+
+func parse<T:Base>()->T {
+    var inst = T()
+    inst.map()
+    return inst
+}
+
+var m : D1 = parse()
+
+println(m.v)
+// CHECK: 2
+
