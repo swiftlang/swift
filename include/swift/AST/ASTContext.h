@@ -181,7 +181,7 @@ public:
   /// The standard library module.
   mutable Module *TheStdlibModule = nullptr;
 
-  /// The name of the standard library module "swift".
+  /// The name of the standard library module "Swift".
   Identifier StdlibModuleName;
 
   /// The name of the module "ObjectiveC".
