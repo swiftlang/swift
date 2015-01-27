@@ -480,6 +480,7 @@ struct ASTNodeBase {};
       case DeclContextKind::TopLevelCodeDecl:
       case DeclContextKind::Initializer:
       case DeclContextKind::AbstractClosureExpr:
+      case DeclContextKind::SerializedLocal:
         return nullptr;
 
       case DeclContextKind::AbstractFunctionDecl:

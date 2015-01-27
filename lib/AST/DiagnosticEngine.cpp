@@ -443,6 +443,7 @@ void DiagnosticEngine::flushActiveDiagnostic() {
               ppDecl = cast<NominalTypeDecl>(dc);
               break;
 
+            case DeclContextKind::SerializedLocal:
             case DeclContextKind::Initializer:
             case DeclContextKind::AbstractClosureExpr:
             case DeclContextKind::AbstractFunctionDecl:

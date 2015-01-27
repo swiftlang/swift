@@ -1812,6 +1812,22 @@ public:
   using DeclContext::operator new;
 };
 
+/// SerializedTopLevelCodeDeclContext - This represents what was originally a
+/// TopLevelCodeDecl during serialization. It is preserved only to maintain the
+/// correct AST structure and remangling after deserialization.
+class SerializedTopLevelCodeDeclContext : public SerializedLocalDeclContext {
+public:
+  SerializedTopLevelCodeDeclContext(DeclContext *Parent)
+    : SerializedLocalDeclContext(LocalDeclContextKind::TopLevelCodeDecl,
+                                 Parent) {}
+  static bool classof(const DeclContext *DC) {
+    if (auto LDC = dyn_cast<SerializedLocalDeclContext>(DC))
+      return LDC->getLocalDeclContextKind() ==
+        LocalDeclContextKind::TopLevelCodeDecl;
+    return false;
+  }
+};
+
 /// This represents one part of a #if block.  If the condition field is
 /// non-null, then this represents a #if or a #elseif, otherwise it represents
 /// an #else block.

@@ -531,20 +531,22 @@ ModuleFile::maybeReadConformance(Type conformingType,
 
   lastRecordOffset.reset();
 
-  DeclID protoID, ownerID;
+  DeclID protoID;
+  DeclContextID contextID;
   unsigned valueCount, typeCount, inheritedCount, defaultedCount;
   bool isIncomplete;
   ArrayRef<uint64_t> rawIDs;
 
-  NormalProtocolConformanceLayout::readRecord(scratch, protoID, ownerID,
-                                              valueCount, typeCount,
-                                              inheritedCount, defaultedCount,
-                                              isIncomplete, rawIDs);
+  NormalProtocolConformanceLayout::readRecord(scratch, protoID,
+                                              contextID, valueCount,
+                                              typeCount, inheritedCount,
+                                              defaultedCount, isIncomplete,
+                                              rawIDs);
 
   auto proto = cast<ProtocolDecl>(getDecl(protoID));
   ASTContext &ctx = getContext();
   auto conformance = ctx.getConformance(conformingType, proto, SourceLoc(),
-                                        getDeclContext(ownerID),
+                                        getDeclContext(contextID),
                                         ProtocolConformanceState::Incomplete);
 
   InheritedConformanceMap inheritedConformances;
@@ -962,11 +964,11 @@ bool ModuleFile::readMembers(SmallVectorImpl<Decl *> &Members) {
   SmallVector<uint64_t, 16> memberIDBuffer;
 
   unsigned kind = DeclTypeCursor.readRecord(entry.ID, memberIDBuffer);
-  assert(kind == DECL_CONTEXT);
+  assert(kind == MEMBERS);
   (void)kind;
 
   ArrayRef<uint64_t> rawMemberIDs;
-  decls_block::DeclContextLayout::readRecord(memberIDBuffer, rawMemberIDs);
+  decls_block::MembersLayout::readRecord(memberIDBuffer, rawMemberIDs);
 
   if (rawMemberIDs.empty())
     return false;
@@ -1331,20 +1333,138 @@ Identifier ModuleFile::getIdentifier(IdentifierID IID) {
   return getContext().getIdentifier(rawStrPtr.slice(0, terminatorOffset));
 }
 
-DeclContext *ModuleFile::getDeclContext(DeclID DID) {
-  if (DID == 0)
+DeclContext *ModuleFile::getLocalDeclContext(DeclContextID DCID) {
+  assert(DCID != 0 && "invalid local DeclContext ID 0");
+  auto &declContextOrOffset = LocalDeclContexts[DCID-1];
+
+  if (declContextOrOffset.isComplete())
+    return declContextOrOffset;
+
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  DeclTypeCursor.JumpToBit(declContextOrOffset);
+  auto entry = DeclTypeCursor.advance();
+
+  if (entry.Kind != llvm::BitstreamEntry::Record) {
+    error();
+    return nullptr;
+  }
+
+  ASTContext &ctx = getContext();
+  SmallVector<uint64_t, 64> scratch;
+  StringRef blobData;
+
+  unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
+                                                &blobData);
+  switch(recordID) {
+  case decls_block::ABSTRACT_CLOSURE_EXPR_CONTEXT: {
+    TypeID closureTypeID;
+    unsigned discriminator = 0;
+    bool implicit = false;
+    DeclContextID parentID;
+
+    decls_block::AbstractClosureExprLayout::readRecord(scratch,
+                                                       closureTypeID,
+                                                       implicit,
+                                                       discriminator,
+                                                       parentID);
+    DeclContext *parent = getDeclContext(parentID);
+    auto type = getType(closureTypeID);
+
+    declContextOrOffset = new (ctx)
+      SerializedAbstractClosureExpr(type, implicit, discriminator, parent);
+    break;
+  }
+
+  case decls_block::TOP_LEVEL_CODE_DECL_CONTEXT: {
+    DeclContextID parentID;
+    decls_block::TopLevelCodeDeclContextLayout::readRecord(scratch,
+                                                           parentID);
+    DeclContext *parent = getDeclContext(parentID);
+
+    declContextOrOffset = new (ctx) SerializedTopLevelCodeDeclContext(parent);
+    break;
+  }
+
+  case decls_block::PATTERN_BINDING_INITIALIZER_CONTEXT: {
+    DeclID bindingID;
+    decls_block::PatternBindingInitializerLayout::readRecord(scratch,
+                                                             bindingID);
+    auto decl = getDecl(bindingID);
+    PatternBindingDecl *binding = cast<PatternBindingDecl>(decl);
+
+    declContextOrOffset = new (ctx)
+      SerializedPatternBindingInitializer(binding);
+    break;
+  }
+
+  case decls_block::DEFAULT_ARGUMENT_INITIALIZER_CONTEXT: {
+    DeclContextID parentID;
+    unsigned index = 0;
+    decls_block::DefaultArgumentInitializerLayout::readRecord(scratch,
+                                                              parentID,
+                                                              index);
+    DeclContext *parent = getDeclContext(parentID);
+
+    declContextOrOffset = new (ctx)
+      SerializedDefaultArgumentInitializer(index, parent);
+    break;
+  }
+
+  default:
+    llvm_unreachable("Unknown record ID found when reading local DeclContext.");
+  }
+  return declContextOrOffset;
+}
+
+DeclContext *ModuleFile::getDeclContext(DeclContextID DCID) {
+  if (DCID == 0)
     return FileContext;
 
-  Decl *D = getDecl(DID);
+  assert(DCID <= DeclContexts.size() && "invalid DeclContext ID");
+  auto &declContextOrOffset = DeclContexts[DCID-1];
 
-  if (auto ND = dyn_cast<NominalTypeDecl>(D))
-    return ND;
-  if (auto ED = dyn_cast<ExtensionDecl>(D))
-    return ED;
-  if (auto AFD = dyn_cast<AbstractFunctionDecl>(D))
-    return AFD;
+  if (declContextOrOffset.isComplete())
+    return declContextOrOffset;
 
-  llvm_unreachable("unknown DeclContext kind");
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  DeclTypeCursor.JumpToBit(declContextOrOffset);
+  auto entry = DeclTypeCursor.advance();
+
+  if (entry.Kind != llvm::BitstreamEntry::Record) {
+    error();
+    return nullptr;
+  }
+
+  SmallVector<uint64_t, 64> scratch;
+  StringRef blobData;
+
+  unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+
+  if (recordID != decls_block::DECL_CONTEXT)
+    llvm_unreachable("Expected a DECL_CONTEXT record");
+
+  DeclContextID declOrDeclContextId;
+  bool isDecl;
+
+  decls_block::DeclContextLayout::readRecord(scratch, declOrDeclContextId,
+                                             isDecl);
+
+  if (!isDecl)
+    return getLocalDeclContext(declOrDeclContextId);
+
+  auto D = getDecl(declOrDeclContextId);
+
+  if (auto ND = dyn_cast<NominalTypeDecl>(D)) {
+    declContextOrOffset = ND;
+  } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+    declContextOrOffset = ED;
+  } else if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+    declContextOrOffset = AFD;
+  } else {
+    llvm_unreachable("Unknown Decl : DeclContext kind");
+  }
+  
+  return declContextOrOffset;
 }
 
 Module *ModuleFile::getModule(ModuleID MID) {
@@ -1615,24 +1735,42 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   };
   unsigned recordID;
 
-  class DiscriminatorRAII {
+  class PrivateDiscriminatorRAII {
     ModuleFile &moduleFile;
     Serialized<Decl *> &declOrOffset;
 
   public:
     Identifier discriminator;
 
-    DiscriminatorRAII(ModuleFile &moduleFile,
+    PrivateDiscriminatorRAII(ModuleFile &moduleFile,
                       Serialized<Decl *> &declOrOffset)
       : moduleFile(moduleFile), declOrOffset(declOrOffset) {}
 
-    ~DiscriminatorRAII() {
+    ~PrivateDiscriminatorRAII() {
       if (!discriminator.empty() && declOrOffset.isComplete())
         if (auto value = dyn_cast_or_null<ValueDecl>(declOrOffset.get()))
           moduleFile.PrivateDiscriminatorsByValue[value] = discriminator;
     }
   };
-  DiscriminatorRAII discriminatorRAII{*this, declOrOffset};
+
+  class LocalDiscriminatorRAII {
+    Serialized<Decl *> &declOrOffset;
+
+  public:
+    unsigned discriminator;
+
+    LocalDiscriminatorRAII(Serialized<Decl *> &declOrOffset)
+      : declOrOffset(declOrOffset), discriminator(0) {}
+
+    ~LocalDiscriminatorRAII() {
+      if (discriminator != 0 && declOrOffset.isComplete())
+        if (auto value = dyn_cast<ValueDecl>(declOrOffset.get()))
+          value->setLocalDiscriminator(discriminator);
+    }
+  };
+
+  PrivateDiscriminatorRAII privateDiscriminatorRAII{*this, declOrOffset};
+  LocalDiscriminatorRAII localDiscriminatorRAII(declOrOffset);
 
   while (true) {
     if (entry.Kind != llvm::BitstreamEntry::Record) {
@@ -1767,11 +1905,16 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
       AddAttribute(Attr);
 
-    } else if (recordID == decls_block::DISCRIMINATOR) {
+    } else if (recordID == decls_block::PRIVATE_DISCRIMINATOR) {
       IdentifierID discriminatorID;
-      decls_block::DiscriminatorLayout::readRecord(scratch, discriminatorID);
-      discriminatorRAII.discriminator = getIdentifier(discriminatorID);
+      decls_block::PrivateDiscriminatorLayout::readRecord(scratch,
+                                                          discriminatorID);
+      privateDiscriminatorRAII.discriminator = getIdentifier(discriminatorID);
 
+    } else if (recordID == decls_block::LOCAL_DISCRIMINATOR) {
+      unsigned discriminator;
+      decls_block::LocalDiscriminatorLayout::readRecord(scratch, discriminator);
+      localDiscriminatorRAII.discriminator = discriminator;
     } else {
       break;
     }
@@ -1789,7 +1932,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   switch (recordID) {
   case decls_block::TYPE_ALIAS_DECL: {
     IdentifierID nameID;
-    DeclID contextID;
+    DeclContextID contextID;
     TypeID underlyingTypeID, interfaceTypeID;
     bool isImplicit;
     uint8_t rawAccessLevel;
@@ -1827,7 +1970,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   case decls_block::GENERIC_TYPE_PARAM_DECL: {
     IdentifierID nameID;
-    DeclID contextID;
+    DeclContextID contextID;
     bool isImplicit;
     unsigned depth;
     unsigned index;
@@ -1874,7 +2017,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   case decls_block::ASSOCIATED_TYPE_DECL: {
     IdentifierID nameID;
-    DeclID contextID;
+    DeclContextID contextID;
     TypeID superclassID;
     TypeID archetypeID;
     TypeID defaultDefinitionID;
@@ -1917,7 +2060,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   case decls_block::STRUCT_DECL: {
     IdentifierID nameID;
-    DeclID contextID;
+    DeclContextID contextID;
     bool isImplicit;
     uint8_t rawAccessLevel;
     ArrayRef<uint64_t> rawProtocolIDs;
@@ -1973,7 +2116,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     theStruct->setProtocols(protocols);
 
     theStruct->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
-    skipRecord(DeclTypeCursor, decls_block::DECL_CONTEXT);
+    skipRecord(DeclTypeCursor, decls_block::MEMBERS);
     theStruct->setConformanceLoader(this, DeclTypeCursor.GetCurrentBitNo());
 
     theStruct->setCheckedInheritanceClause();
@@ -1981,7 +2124,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   }
 
   case decls_block::CONSTRUCTOR_DECL: {
-    DeclID parentID;
+    DeclContextID contextID;
     uint8_t rawFailability;
     bool isImplicit, isObjC;
     uint8_t storedInitKind, rawAccessLevel;
@@ -1990,13 +2133,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclID overriddenID;
     ArrayRef<uint64_t> argNameIDs;
 
-    decls_block::ConstructorLayout::readRecord(scratch, parentID,
+    decls_block::ConstructorLayout::readRecord(scratch, contextID,
                                                rawFailability, isImplicit, 
                                                isObjC, storedInitKind,
                                                signatureID, interfaceID,
                                                overriddenID, rawAccessLevel,
                                                argNameIDs);
-    auto parent = getDeclContext(parentID);
+    auto parent = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -2080,18 +2223,18 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   case decls_block::VAR_DECL: {
     IdentifierID nameID;
-    DeclID contextID;
+    DeclContextID contextID;
     bool isImplicit, isObjC, isStatic, isLet, hasNonPatternBindingInit;
     uint8_t storageKind, rawAccessLevel, rawSetterAccessLevel;
     TypeID typeID, interfaceTypeID;
     DeclID getterID, setterID, materializeForSetID, willSetID, didSetID;
     DeclID addressorID, mutableAddressorID, overriddenID;
 
-    decls_block::VarLayout::readRecord(scratch, nameID, contextID, isImplicit,
-                                       isObjC, isStatic, isLet,
-                                       hasNonPatternBindingInit, storageKind, typeID,
-                                       interfaceTypeID, getterID, setterID,
-                                       materializeForSetID,
+    decls_block::VarLayout::readRecord(scratch, nameID, contextID,
+                                       isImplicit, isObjC, isStatic, isLet,
+                                       hasNonPatternBindingInit, storageKind,
+                                       typeID, interfaceTypeID, getterID,
+                                       setterID, materializeForSetID,
                                        addressorID, mutableAddressorID,
                                        willSetID, didSetID, overriddenID,
                                        rawAccessLevel, rawSetterAccessLevel);
@@ -2147,7 +2290,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   case decls_block::PARAM_DECL: {
     IdentifierID argNameID, paramNameID;
-    DeclID contextID;
+    DeclContextID contextID;
     bool isLet;
     TypeID typeID, interfaceTypeID;
 
@@ -2176,7 +2319,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   }
 
   case decls_block::FUNC_DECL: {
-    DeclID contextID;
+    DeclContextID contextID;
     bool isImplicit;
     bool isStatic;
     uint8_t rawStaticSpelling, rawAccessLevel, rawAddressorKind;
@@ -2303,7 +2446,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   }
 
   case decls_block::PATTERN_BINDING_DECL: {
-    DeclID contextID;
+    DeclContextID contextID;
     bool isImplicit;
     bool isStatic;
     uint8_t RawStaticSpelling;
@@ -2337,7 +2480,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   case decls_block::PROTOCOL_DECL: {
     IdentifierID nameID;
-    DeclID contextID;
+    DeclContextID contextID;
     bool isImplicit, isClassBounded, isObjC;
     uint8_t rawAccessLevel;
     ArrayRef<uint64_t> protocolIDs;
@@ -2399,11 +2542,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   case decls_block::PREFIX_OPERATOR_DECL: {
     IdentifierID nameID;
-    DeclID contextID;
+    DeclContextID contextID;
 
-    decls_block::PrefixOperatorLayout::readRecord(scratch, nameID, contextID);
-    declOrOffset = createDecl<PrefixOperatorDecl>(getDeclContext(contextID),
-                                                  SourceLoc(),
+    decls_block::PrefixOperatorLayout::readRecord(scratch, nameID,
+                                                  contextID);
+    auto DC = getDeclContext(contextID);
+    declOrOffset = createDecl<PrefixOperatorDecl>(DC, SourceLoc(),
                                                   getIdentifier(nameID),
                                                   SourceLoc(), SourceLoc(),
                                                   SourceLoc());
@@ -2412,11 +2556,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   case decls_block::POSTFIX_OPERATOR_DECL: {
     IdentifierID nameID;
-    DeclID contextID;
+    DeclContextID contextID;
 
-    decls_block::PostfixOperatorLayout::readRecord(scratch, nameID, contextID);
-    declOrOffset = createDecl<PostfixOperatorDecl>(getDeclContext(contextID),
-                                                   SourceLoc(),
+    decls_block::PostfixOperatorLayout::readRecord(scratch, nameID,
+                                                   contextID);
+
+    auto DC = getDeclContext(contextID);
+    declOrOffset = createDecl<PostfixOperatorDecl>(DC, SourceLoc(),
                                                    getIdentifier(nameID),
                                                    SourceLoc(), SourceLoc(),
                                                    SourceLoc());
@@ -2425,7 +2571,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   case decls_block::INFIX_OPERATOR_DECL: {
     IdentifierID nameID;
-    DeclID contextID;
+    DeclContextID contextID;
     uint8_t rawAssociativity;
     unsigned precedence;
     bool isAssignment;
@@ -2433,7 +2579,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     bool isPrecedenceImplicit;
     bool isAssignmentImplicit;
 
-    decls_block::InfixOperatorLayout::readRecord(scratch, nameID, contextID,
+    decls_block::InfixOperatorLayout::readRecord(scratch, nameID,
+                                                 contextID,
                                                  rawAssociativity, precedence,
                                                  isAssignment,
                                                  isAssocImplicit,
@@ -2449,8 +2596,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     InfixData infixData(precedence, associativity.getValue(),
                         isAssignment);
 
-    declOrOffset = createDecl<InfixOperatorDecl>(getDeclContext(contextID),
-                                                 SourceLoc(),
+    auto DC = getDeclContext(contextID);
+
+    declOrOffset = createDecl<InfixOperatorDecl>(DC, SourceLoc(),
                                                  getIdentifier(nameID),
                                                  SourceLoc(), SourceLoc(),
                                                  isAssocImplicit,
@@ -2465,7 +2613,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   case decls_block::CLASS_DECL: {
     IdentifierID nameID;
-    DeclID contextID;
+    DeclContextID contextID;
     bool isImplicit, isObjC, requiresStoredPropertyInits, foreign;
     TypeID superclassID;
     uint8_t rawAccessLevel;
@@ -2529,7 +2677,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     theClass->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     theClass->setHasDestructor();
-    skipRecord(DeclTypeCursor, decls_block::DECL_CONTEXT);
+    skipRecord(DeclTypeCursor, decls_block::MEMBERS);
     theClass->setConformanceLoader(this, DeclTypeCursor.GetCurrentBitNo());
 
     theClass->setCheckedInheritanceClause();
@@ -2539,7 +2687,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   case decls_block::ENUM_DECL: {
     IdentifierID nameID;
-    DeclID contextID;
+    DeclContextID contextID;
     bool isImplicit;
     TypeID rawTypeID;
     uint8_t rawAccessLevel;
@@ -2597,7 +2745,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     theEnum->setProtocols(protocols);
 
     theEnum->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
-    skipRecord(DeclTypeCursor, decls_block::DECL_CONTEXT);
+    skipRecord(DeclTypeCursor, decls_block::MEMBERS);
     theEnum->setConformanceLoader(this, DeclTypeCursor.GetCurrentBitNo());
 
     theEnum->setCheckedInheritanceClause();
@@ -2606,15 +2754,16 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   case decls_block::ENUM_ELEMENT_DECL: {
     IdentifierID nameID;
-    DeclID contextID;
+    DeclContextID contextID;
     TypeID argTypeID, ctorTypeID, interfaceTypeID;
     bool isImplicit; bool isNegative;
     unsigned rawValueKindID;
 
-    decls_block::EnumElementLayout::readRecord(scratch, nameID, contextID,
-                                                argTypeID, ctorTypeID,
-                                                interfaceTypeID, isImplicit,
-                                                rawValueKindID, isNegative);
+    decls_block::EnumElementLayout::readRecord(scratch, nameID,
+                                               contextID, argTypeID,
+                                               ctorTypeID, interfaceTypeID,
+                                               isImplicit, rawValueKindID,
+                                               isNegative);
 
     DeclContext *DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2658,7 +2807,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   }
 
   case decls_block::SUBSCRIPT_DECL: {
-    DeclID contextID;
+    DeclContextID contextID;
     bool isImplicit, isObjC;
     TypeID declTypeID, elemTypeID, interfaceTypeID;
     DeclID getterID, setterID, materializeForSetID;
@@ -2668,8 +2817,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     uint8_t rawStorageKind;
     ArrayRef<uint64_t> argNameIDs;
 
-    decls_block::SubscriptLayout::readRecord(scratch, contextID, isImplicit,
-                                             isObjC, rawStorageKind,
+    decls_block::SubscriptLayout::readRecord(scratch, contextID,
+                                             isImplicit, isObjC, rawStorageKind,
                                              declTypeID, elemTypeID,
                                              interfaceTypeID,
                                              getterID, setterID,
@@ -2734,7 +2883,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   case decls_block::EXTENSION_DECL: {
     TypeID baseID;
-    DeclID contextID;
+    DeclContextID contextID;
     bool isImplicit;
     ArrayRef<uint64_t> rawProtocolIDs;
 
@@ -2769,7 +2918,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     extension->setProtocols(protocols);
 
     extension->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
-    skipRecord(DeclTypeCursor, decls_block::DECL_CONTEXT);
+    skipRecord(DeclTypeCursor, decls_block::MEMBERS);
     extension->setConformanceLoader(this, DeclTypeCursor.GetCurrentBitNo());
 
     nominal->addExtension(extension);
@@ -2783,14 +2932,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   }
 
   case decls_block::DESTRUCTOR_DECL: {
-    DeclID parentID;
+    DeclContextID contextID;
     bool isImplicit, isObjC;
     TypeID signatureID, interfaceID;
 
-    decls_block::DestructorLayout::readRecord(scratch, parentID, isImplicit,
-                                              isObjC, signatureID, interfaceID);
+    decls_block::DestructorLayout::readRecord(scratch, contextID,
+                                              isImplicit, isObjC, signatureID,
+                                              interfaceID);
 
-    DeclContext *DC = getDeclContext(parentID);
+    DeclContext *DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 

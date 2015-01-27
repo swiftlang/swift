@@ -114,6 +114,9 @@ public:
   void mangleGlobalGetterEntity(ValueDecl *decl);
   void mangleDefaultArgumentEntity(const DeclContext *ctx, unsigned index);
   void mangleInitializerEntity(const VarDecl *var);
+  void mangleClosureEntity(const SerializedAbstractClosureExpr *closure,
+                           ResilienceExpansion explosion,
+                           unsigned uncurryingLevel);
   void mangleClosureEntity(const AbstractClosureExpr *closure,
                            ResilienceExpansion explosion,
                            unsigned uncurryingLevel);
@@ -158,6 +161,11 @@ private:
   void mangleProtocolList(ArrayRef<Type> protocols);
   void mangleIdentifier(Identifier ident,
                         OperatorFixity fixity = OperatorFixity::NotOperator);
+
+  void mangleClosureComponents(Type Ty, unsigned discriminator, bool isImplicit,
+                               const DeclContext *parentContext,
+                               const DeclContext *localContext);
+
   void manglePolymorphicType(const GenericParamList *genericParams, Type T,
                              ResilienceExpansion expansion,
                              unsigned uncurryLevel,

@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 168; // Last change: search paths
+const uint16_t VERSION_MINOR = 169; // Last change: local type serialization
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -63,6 +63,10 @@ using TypeIDField = DeclIDField;
 // IdentifierID must be the same as DeclID because it is stored in the same way.
 using IdentifierID = DeclID;
 using IdentifierIDField = DeclIDField;
+
+// DeclContextID must be the same as DeclID because it is stored in the same way.
+using DeclContextID = DeclID;
+using DeclContextIDField = DeclIDField;
 
 // ModuleID must be the same as IdentifierID because it is stored the same way.
 using ModuleID = IdentifierID;
@@ -670,7 +674,7 @@ namespace decls_block {
   using TypeAliasLayout = BCRecordLayout<
     TYPE_ALIAS_DECL,
     IdentifierIDField, // name
-    DeclIDField, // context decl
+    DeclContextIDField,// context decl
     TypeIDField, // underlying type
     TypeIDField, // interface type
     BCFixed<1>,  // implicit flag
@@ -680,7 +684,7 @@ namespace decls_block {
   using GenericTypeParamDeclLayout = BCRecordLayout<
     GENERIC_TYPE_PARAM_DECL,
     IdentifierIDField, // name
-    DeclIDField, // context decl
+    DeclContextIDField,// context decl
     BCFixed<1>,  // implicit flag
     BCVBR<4>,    // depth
     BCVBR<4>,    // index
@@ -692,7 +696,7 @@ namespace decls_block {
   using AssociatedTypeDeclLayout = BCRecordLayout<
     ASSOCIATED_TYPE_DECL,
     IdentifierIDField, // name
-    DeclIDField,       // context decl
+    DeclContextIDField,// context decl
     TypeIDField,       // underlying type
     TypeIDField,       // archetype type
     TypeIDField,       // default definition
@@ -703,30 +707,30 @@ namespace decls_block {
   using StructLayout = BCRecordLayout<
     STRUCT_DECL,
     IdentifierIDField,      // name
-    DeclIDField,            // context decl
+    DeclContextIDField,     // context decl
     BCFixed<1>,             // implicit flag
     AccessibilityKindField, // accessibility
     BCArray<DeclIDField>    // protocols
-    // Trailed by the generic parameters (if any), the decl context record, and
+    // Trailed by the generic parameters (if any), the members record, and
     // finally conformance info (if any).
   >;
 
   using EnumLayout = BCRecordLayout<
     ENUM_DECL,
     IdentifierIDField,      // name
-    DeclIDField,            // context decl
+    DeclContextIDField,     // context decl
     BCFixed<1>,             // implicit flag
     TypeIDField,            // raw type
     AccessibilityKindField, // accessibility
     BCArray<DeclIDField>    // protocols
-    // Trailed by the generic parameters (if any), the decl context record, and
+    // Trailed by the generic parameters (if any), the members record, and
     // finally conformance info (if any).
   >;
 
   using ClassLayout = BCRecordLayout<
     CLASS_DECL,
     IdentifierIDField, // name
-    DeclIDField,       // context decl
+    DeclContextIDField,// context decl
     BCFixed<1>,        // implicit?
     BCFixed<1>,        // explicitly objc?
     BCFixed<1>,        // requires stored property initial values
@@ -734,25 +738,25 @@ namespace decls_block {
     TypeIDField,       // superclass
     AccessibilityKindField, // accessibility
     BCArray<DeclIDField>    // protocols
-    // Trailed by the generic parameters (if any), the decl context record, and
+    // Trailed by the generic parameters (if any), the members record, and
     // finally conformance info (if any).
   >;
 
   using ProtocolLayout = BCRecordLayout<
     PROTOCOL_DECL,
     IdentifierIDField,      // name
-    DeclIDField,            // context decl
+    DeclContextIDField,     // context decl
     BCFixed<1>,             // implicit flag
     BCFixed<1>,             // class-bounded?
     BCFixed<1>,             // objc?
     AccessibilityKindField, // accessibility
     BCArray<DeclIDField>    // protocols
-    // Trailed by the generic parameters (if any) and the decl context record
+    // Trailed by the generic parameters (if any) and the members record
   >;
 
   using ConstructorLayout = BCRecordLayout<
     CONSTRUCTOR_DECL,
-    DeclIDField, // context decl
+    DeclContextIDField, // context decl
     OptionalTypeKindField,  // failability
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
@@ -769,7 +773,7 @@ namespace decls_block {
   using VarLayout = BCRecordLayout<
     VAR_DECL,
     IdentifierIDField, // name
-    DeclIDField,  // context decl
+    DeclContextIDField,  // context decl
     BCFixed<1>,   // implicit?
     BCFixed<1>,   // explicitly objc?
     BCFixed<1>,   // static?
@@ -794,7 +798,7 @@ namespace decls_block {
     PARAM_DECL,
     IdentifierIDField, // argument name
     IdentifierIDField, // parameter name
-    DeclIDField,  // context decl
+    DeclContextIDField,  // context decl
     BCFixed<1>,   // isLet?
     TypeIDField,  // type
     TypeIDField  // interface type
@@ -802,7 +806,7 @@ namespace decls_block {
 
   using FuncLayout = BCRecordLayout<
     FUNC_DECL,
-    DeclIDField,  // context decl
+    DeclContextIDField,  // context decl
     BCFixed<1>,   // implicit?
     BCFixed<1>,   // is 'static' or 'class'?
     StaticSpellingKindField, // spelling of 'static' or 'class'
@@ -827,7 +831,7 @@ namespace decls_block {
 
   using PatternBindingLayout = BCRecordLayout<
     PATTERN_BINDING_DECL,
-    DeclIDField, // context decl
+    DeclContextIDField, // context decl
     BCFixed<1>,  // implicit flag
     BCFixed<1>,  // static?
     StaticSpellingKindField // spelling of 'static' or 'class'
@@ -838,7 +842,7 @@ namespace decls_block {
   using UnaryOperatorLayout = BCRecordLayout<
     Code, // ID field
     IdentifierIDField, // name
-    DeclIDField // context decl
+    DeclContextIDField // context decl
   >;
 
   using PrefixOperatorLayout = UnaryOperatorLayout<PREFIX_OPERATOR_DECL>;
@@ -847,7 +851,7 @@ namespace decls_block {
   using InfixOperatorLayout = BCRecordLayout<
     INFIX_OPERATOR_DECL,
     IdentifierIDField, // name
-    DeclIDField, // context decl
+    DeclContextIDField,// context decl
     AssociativityField,
     BCFixed<8>,  // precedence
     BCFixed<1>,  // assignment
@@ -859,7 +863,7 @@ namespace decls_block {
   using EnumElementLayout = BCRecordLayout<
     ENUM_ELEMENT_DECL,
     IdentifierIDField, // name
-    DeclIDField, // context decl
+    DeclContextIDField,// context decl
     TypeIDField, // argument type
     TypeIDField, // constructor type
     TypeIDField, // interface type
@@ -871,7 +875,7 @@ namespace decls_block {
 
   using SubscriptLayout = BCRecordLayout<
     SUBSCRIPT_DECL,
-    DeclIDField, // context decl
+    DeclContextIDField, // context decl
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
     StorageKindField,   // StorageKind
@@ -895,15 +899,15 @@ namespace decls_block {
   using ExtensionLayout = BCRecordLayout<
     EXTENSION_DECL,
     TypeIDField, // base type
-    DeclIDField, // context decl
+    DeclContextIDField, // context decl
     BCFixed<1>,  // implicit flag
     BCArray<DeclIDField> // protocols
-    // Trailed by the decl context record and then conformance info (if any).
+    // Trailed by the members record and then conformance info (if any).
   >;
 
   using DestructorLayout = BCRecordLayout<
     DESTRUCTOR_DECL,
-    DeclIDField, // context decl
+    DeclContextIDField, // context decl
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
     TypeIDField, // type (signature)
@@ -1008,11 +1012,16 @@ namespace decls_block {
     BCFixed<1>                 // dummy
   >;
 
-  /// Specifies the discriminator string for a private declaration. This
+  /// Specifies the private discriminator string for a private declaration. This
   /// identifies the declaration's original source file in some opaque way.
-  using DiscriminatorLayout = BCRecordLayout<
-    DISCRIMINATOR,
+  using PrivateDiscriminatorLayout = BCRecordLayout<
+    PRIVATE_DISCRIMINATOR,
     IdentifierIDField  // discriminator string, as an identifier
+  >;
+
+  using LocalDiscriminatorLayout = BCRecordLayout<
+    LOCAL_DISCRIMINATOR,
+    BCVBR<2> // context-scoped discriminator counter
   >;
 
   /// A placeholder for lack of conformance information. Conformances are
@@ -1025,7 +1034,7 @@ namespace decls_block {
   using NormalProtocolConformanceLayout = BCRecordLayout<
     NORMAL_PROTOCOL_CONFORMANCE,
     DeclIDField, // the protocol
-    DeclIDField, // the decl that provided this conformance
+    DeclContextIDField, // the decl that provided this conformance
     BCVBR<5>, // value mapping count
     BCVBR<5>, // type mapping count
     BCVBR<5>, // inherited conformances count
@@ -1064,8 +1073,8 @@ namespace decls_block {
                   // conformance is in the following record
   >;
 
-  using DeclContextLayout = BCRecordLayout<
-    DECL_CONTEXT,
+  using MembersLayout = BCRecordLayout<
+    MEMBERS,
     BCArray<DeclIDField>
   >;
 
@@ -1117,15 +1126,49 @@ namespace decls_block {
   >;
 
   using SemanticsDeclAttrLayout = BCRecordLayout<
-  Semantics_DECL_ATTR,
-  BCFixed<1>, // implicit flag
-  BCBlob      // semantics value
+    Semantics_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCBlob      // semantics value
   >;
 
-    using EffectsDeclAttrLayout = BCRecordLayout<
+  using EffectsDeclAttrLayout = BCRecordLayout<
     Effects_DECL_ATTR,
     BCFixed<2>  // modref value
-    >;
+  >;
+
+  using DeclContextLayout = BCRecordLayout<
+    DECL_CONTEXT,
+    // If this DeclContext is a local context, this is an
+    // index into the local decl context table.
+    // If this DeclContext is a Decl (and not a DeclContext
+    // *at all*, this is an index into the decl table.
+    DeclContextIDField,
+    BCFixed<1> // is a decl
+  >;
+
+  using AbstractClosureExprLayout = BCRecordLayout<
+    ABSTRACT_CLOSURE_EXPR_CONTEXT,
+    TypeIDField, // type
+    BCFixed<1>, // implicit
+    BCVBR<4>, // discriminator
+    DeclContextIDField // parent context decl
+  >;
+
+  using TopLevelCodeDeclContextLayout = BCRecordLayout<
+    TOP_LEVEL_CODE_DECL_CONTEXT,
+    DeclContextIDField // parent context decl
+  >;
+
+  using PatternBindingInitializerLayout = BCRecordLayout<
+    PATTERN_BINDING_INITIALIZER_CONTEXT,
+    DeclIDField // parent pattern binding decl
+  >;
+
+  using DefaultArgumentInitializerLayout = BCRecordLayout<
+    DEFAULT_ARGUMENT_INITIALIZER_CONTEXT,
+    DeclContextIDField, // parent context decl
+    BCVBR<3> // parameter index
+  >;
 
   // Stub layouts, unused.
   using OwnershipDeclAttrLayout = BCRecordLayout<Ownership_DECL_ATTR>;
@@ -1257,10 +1300,13 @@ namespace index_block {
     OBJC_METHODS,
 
     ENTRY_POINT,
+    LOCAL_DECL_CONTEXT_OFFSETS,
+    DECL_CONTEXT_OFFSETS,
+    LOCAL_TYPE_DECLS,
   };
 
   using OffsetsLayout = BCGenericRecordLayout<
-    BCFixed<3>,  // record ID
+    BCFixed<4>,  // record ID
     BCArray<BitOffsetField>
   >;
 

@@ -59,6 +59,7 @@ Type DeclContext::getDeclaredTypeOfContext() const {
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::Initializer:
+  case DeclContextKind::SerializedLocal:
     return Type();
 
   case DeclContextKind::ExtensionDecl: {
@@ -87,6 +88,7 @@ Type DeclContext::getDeclaredTypeInContext() const {
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::Initializer:
+  case DeclContextKind::SerializedLocal:
     return Type();
 
   case DeclContextKind::ExtensionDecl:
@@ -106,6 +108,7 @@ Type DeclContext::getDeclaredInterfaceType() const {
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::Initializer:
+  case DeclContextKind::SerializedLocal:
     return Type();
 
   case DeclContextKind::ExtensionDecl:
@@ -127,6 +130,7 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
   case DeclContextKind::TopLevelCodeDecl:
     return nullptr;
 
+  case DeclContextKind::SerializedLocal:
   case DeclContextKind::Initializer:
   case DeclContextKind::AbstractClosureExpr:
     // Closures and initializers can't themselves be generic, but they
@@ -170,6 +174,7 @@ GenericSignature *DeclContext::getGenericSignatureOfContext() const {
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::Initializer:
+  case DeclContextKind::SerializedLocal:
     return nullptr;
 
   case DeclContextKind::AbstractFunctionDecl: {
@@ -218,6 +223,7 @@ AbstractFunctionDecl *DeclContext::getInnermostMethodContext() {
     switch (result->getContextKind()) {
     case DeclContextKind::AbstractClosureExpr:
     case DeclContextKind::Initializer:
+    case DeclContextKind::SerializedLocal:
       // Look through closures, initial values.
       result = result->getParent();
       continue;
@@ -252,6 +258,7 @@ DeclContext *DeclContext::getInnermostTypeContext() {
     case DeclContextKind::Initializer:
     case DeclContextKind::TopLevelCodeDecl:
     case DeclContextKind::AbstractFunctionDecl:
+    case DeclContextKind::SerializedLocal:
       Result = Result->getParent();
       continue;
 
@@ -304,6 +311,7 @@ bool DeclContext::isGenericContext() const {
 
     case DeclContextKind::Initializer:
     case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::SerializedLocal:
       // Check parent context.
       continue;
 
@@ -353,6 +361,9 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
   switch (getContextKind()) {
   case DeclContextKind::AbstractClosureExpr:
     break;
+
+  case DeclContextKind::SerializedLocal:
+    llvm_unreachable("should not perform lookups in deserialized contexts");
 
   case DeclContextKind::Initializer:
     // Default arguments still require a type.
@@ -416,6 +427,8 @@ bool DeclContext::walkContext(ASTWalker &Walker) {
     return cast<TopLevelCodeDecl>(this)->walk(Walker);
   case DeclContextKind::AbstractFunctionDecl:
     return cast<AbstractFunctionDecl>(this)->walk(Walker);
+  case DeclContextKind::SerializedLocal:
+    llvm_unreachable("walk is unimplemented for deserialized contexts");
   case DeclContextKind::Initializer:
     // Is there any point in trying to walk the expression?
     return false;
@@ -443,6 +456,7 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
   switch (getContextKind()) {
   case DeclContextKind::Module:           Kind = "Module"; break;
   case DeclContextKind::FileUnit:         Kind = "FileUnit"; break;
+  case DeclContextKind::SerializedLocal:  Kind = "Serialized Local"; break;
   case DeclContextKind::AbstractClosureExpr:
     Kind = "AbstractClosureExpr";
     break;
@@ -521,6 +535,31 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
       break;
     }
     }
+    break;
+
+  case DeclContextKind::SerializedLocal: {
+    auto local = cast<SerializedLocalDeclContext>(this);
+    switch (local->getLocalDeclContextKind()) {
+    case LocalDeclContextKind::AbstractClosure: {
+      auto serializedClosure = cast<SerializedAbstractClosureExpr>(local);
+      OS << " closure : " << serializedClosure->getType();
+      break;
+    }
+    case LocalDeclContextKind::DefaultArgumentInitializer: {
+      auto init = cast<SerializedDefaultArgumentInitializer>(local);
+      OS << "DefaultArgument index=" << init->getIndex();
+      break;
+    }
+    case LocalDeclContextKind::PatternBindingInitializer: {
+      auto init = cast<SerializedPatternBindingInitializer>(local);
+      OS << " PatternBinding 0x" << (void*) init->getBinding();
+      break;
+    }
+    case LocalDeclContextKind::TopLevelCodeDecl:
+      OS << " TopLevelCode";
+      break;
+    }
+  }
   }
 
   OS << "\n";
@@ -627,4 +666,3 @@ void IterableDeclContext::loadAllMembers() const {
 
   --NumUnloadedLazyIterableDeclContexts;
 }
-

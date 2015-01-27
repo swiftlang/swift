@@ -92,6 +92,31 @@ public:
   }
 };
 
+/// SerializedPatternBindingInitializer - This represents what was originally a
+/// PatternBindingInitializer during serialization. It is preserved as a special
+/// class only to maintain the correct AST structure and remangling after
+/// deserialization.
+class SerializedPatternBindingInitializer : public SerializedLocalDeclContext {
+  PatternBindingDecl *Binding;
+
+public:
+  SerializedPatternBindingInitializer(PatternBindingDecl *Binding)
+    : SerializedLocalDeclContext(LocalDeclContextKind::PatternBindingInitializer,
+                                 Binding->getDeclContext()),
+      Binding(Binding) {}
+
+  PatternBindingDecl *getBinding() const {
+    return Binding;
+  }
+
+  static bool classof(const DeclContext *DC) {
+    if (auto LDC = dyn_cast<SerializedLocalDeclContext>(DC))
+      return LDC->getLocalDeclContextKind() ==
+      LocalDeclContextKind::PatternBindingInitializer;
+    return false;
+  }
+};
+
 /// A default argument expression.  The parent context is the function
 /// (possibly a closure) for which this is a default argument.
 class DefaultArgumentInitializer : public Initializer {
@@ -124,6 +149,29 @@ public:
   }
   static bool classof(const Initializer *I) {
     return I->getInitializerKind() == InitializerKind::DefaultArgument;
+  }
+};
+
+/// SerializedDefaultArgumentInitializer - This represents what was originally a
+/// DefaultArgumentInitializer during serialization. It is preserved only to
+/// maintain the correct AST structure and remangling after deserialization.
+class SerializedDefaultArgumentInitializer : public SerializedLocalDeclContext {
+  const unsigned Index;
+public:
+  SerializedDefaultArgumentInitializer(unsigned Index, DeclContext *Parent)
+    : SerializedLocalDeclContext(LocalDeclContextKind::DefaultArgumentInitializer,
+                                 Parent),
+      Index(Index) {}
+
+  unsigned getIndex() const {
+    return Index;
+  }
+
+  static bool classof(const DeclContext *DC) {
+    if (auto LDC = dyn_cast<SerializedLocalDeclContext>(DC))
+      return LDC->getLocalDeclContextKind() ==
+        LocalDeclContextKind::DefaultArgumentInitializer;
+    return false;
   }
 };
   

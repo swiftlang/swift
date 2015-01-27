@@ -43,6 +43,7 @@ namespace swift {
   class ASTWalker;
   class BraceStmt;
   class Decl;
+  class TypeDecl;
   enum class DeclKind : uint8_t;
   class ExtensionDecl;
   class DebuggerClient;
@@ -321,6 +322,11 @@ public:
   void lookupValue(AccessPathTy AccessPath, DeclName Name, NLKind LookupKind,
                    SmallVectorImpl<ValueDecl*> &Result) const;
 
+  /// Look up a local type declaration by its mangled name.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  TypeDecl *lookupLocalType(StringRef MangledName) const;
+
   /// Find ValueDecls in the module and pass them to the given consumer object.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
@@ -407,6 +413,12 @@ public:
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const;
+
+  /// Finds all local type decls of this module.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  void getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const;
 
   /// Finds all top-level decls that should be displayed to a client of this
   /// module.
@@ -562,6 +574,13 @@ public:
                            NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const = 0;
 
+  /// Look up a local type declaration by its mangled name.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  virtual TypeDecl *lookupLocalType(StringRef MangledName) const {
+    return nullptr;
+  }
+
   /// Find ValueDecls in the module and pass them to the given consumer object.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
@@ -606,6 +625,13 @@ public:
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {}
+
+
+  /// Finds all local type decls in this file.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  virtual void getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &results) const {}
 
   /// Adds all top-level decls to the given vector.
   ///
@@ -807,6 +833,9 @@ public:
   /// The list of top-level declarations in the source file.
   std::vector<Decl*> Decls;
 
+  /// The list of local type declarations in the source file.
+  TinyPtrVector<TypeDecl*> LocalTypeDecls;
+
   /// The first location where an @objc attribute appeared.
   Optional<SourceLoc> FirstObjCAttrLoc;
 
@@ -871,6 +900,9 @@ public:
                     SmallVectorImpl<ValueDecl*> &results) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
+
+  virtual void
+  getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &results) const override;
 
   virtual void
   getImportedModules(SmallVectorImpl<Module::ImportedModule> &imports,

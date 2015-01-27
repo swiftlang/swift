@@ -2669,6 +2669,42 @@ public:
   using Expr::dump;
 };
 
+/// SerializedAbstractClosureExpr - This represents what was originally an
+/// AbstractClosureExpr during serialization. It is preserved only to maintain
+/// the correct AST structure and remangling after deserialization.
+class SerializedAbstractClosureExpr : public SerializedLocalDeclContext {
+  const Type Ty;
+  llvm::PointerIntPair<Type, 1> TypeAndImplicit;
+  const unsigned Discriminator;
+
+public:
+  SerializedAbstractClosureExpr(Type Ty, bool Implicit, unsigned Discriminator,
+                                DeclContext *Parent)
+    : SerializedLocalDeclContext(LocalDeclContextKind::AbstractClosure,
+                                 Parent),
+      TypeAndImplicit(llvm::PointerIntPair<Type, 1>(Ty, Implicit)),
+      Discriminator(Discriminator) {}
+
+  Type getType() const {
+    return TypeAndImplicit.getPointer();
+  }
+
+  unsigned getDiscriminator() const {
+    return Discriminator;
+  }
+
+  bool isImplicit() const {
+    return TypeAndImplicit.getInt();
+  }
+
+  static bool classof(const DeclContext *DC) {
+    if (auto LDC = dyn_cast<SerializedLocalDeclContext>(DC))
+      return LDC->getLocalDeclContextKind() ==
+        LocalDeclContextKind::AbstractClosure;
+    return false;
+  }
+};
+
 /// \brief An explicit unnamed function expression, which can optionally have
 /// named arguments.
 ///

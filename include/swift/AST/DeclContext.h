@@ -50,19 +50,34 @@ namespace swift {
   class ValueDecl;
   class Initializer;
   class ClassDecl;
+  class SerializedAbstractClosureExpr;
+  class SerializedPatternBindingInitializer;
+  class SerializedDefaultArgumentInitializer;
+  class SerializedTopLevelCodeDecl;
 
 enum class DeclContextKind : uint8_t {
   AbstractClosureExpr,
   Initializer,
   TopLevelCodeDecl,
   AbstractFunctionDecl,
-  Last_LocalDeclContextKind = AbstractFunctionDecl,
+  SerializedLocal,
+  Last_LocalDeclContextKind = SerializedLocal,
 
   Module,
   FileUnit,
   NominalTypeDecl,
   ExtensionDecl,
   Last_DeclContextKind = ExtensionDecl
+};
+
+/// Kinds of DeclContexts after deserialization.
+///
+/// \see SerializedLocalDeclContext.
+enum class LocalDeclContextKind : uint8_t {
+  AbstractClosure,
+  PatternBindingInitializer,
+  DefaultArgumentInitializer,
+  TopLevelCodeDecl
 };
 
 /// A DeclContext is an AST object which acts as a semantic container
@@ -279,6 +294,28 @@ public:
   // Only allow allocation of DeclContext using the allocator in ASTContext.
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = alignof(DeclContext));
+};
+
+/// SerializedLocalDeclContext - the base class for DeclContexts that were
+/// serialized to preserve AST structure and accurate mangling after
+/// deserialization.
+class SerializedLocalDeclContext : public DeclContext {
+private:
+  const LocalDeclContextKind LocalKind;
+
+public:
+  SerializedLocalDeclContext(LocalDeclContextKind LocalKind,
+                             DeclContext *Parent)
+    : DeclContext(DeclContextKind::SerializedLocal, Parent),
+      LocalKind(LocalKind) {}
+
+  LocalDeclContextKind getLocalDeclContextKind() const {
+    return LocalKind;
+  }
+
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::SerializedLocal;
+  }
 };
 
 /// An iterator that walks through a list of declarations stored

@@ -1900,6 +1900,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
     case DeclContextKind::Initializer:
     case DeclContextKind::TopLevelCodeDecl:
+    case DeclContextKind::SerializedLocal:
       llvm_unreachable("bad decl context");
 
     case DeclContextKind::AbstractFunctionDecl:

@@ -21,6 +21,7 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Demangle.h"
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Basic/LangOptions.h"
@@ -74,6 +75,7 @@ enum class ActionType {
   PrintModuleComments,
   PrintModuleImports,
   PrintUSRs,
+  PrintLocalTypes,
   ParseReST,
   TestCreateCompilerInvocation,
   GenerateModuleAPIDescription,
@@ -153,6 +155,8 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "print-module-imports", "Recursively print all imports visible from a particular module"),
            clEnumValN(ActionType::PrintUSRs,
                       "print-usrs", "Print USRs for all decls"),
+           clEnumValN(ActionType::PrintLocalTypes,
+                      "print-local-types", "Print local types and remanglings in a module"),
            clEnumValN(ActionType::ParseReST,
                       "parse-rest", "Parse a ReST file"),
            clEnumValN(ActionType::TestCreateCompilerInvocation,
@@ -1240,6 +1244,106 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
   return EXIT_SUCCESS;
 }
 
+static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
+                             const std::vector<std::string> ModulesToPrint) {
+  using NodeKind = Demangle::Node::Kind;
+
+  CompilerInvocation Invocation(InitInvok);
+  CompilerInstance CI;
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+  if (CI.setup(Invocation))
+    return 1;
+
+  auto &Context = CI.getASTContext();
+
+  auto *Stdlib = getModuleByFullName(Context, Context.StdlibModuleName);
+  if (!Stdlib)
+    return 1;
+
+  int ExitCode = 0;
+
+  PrintOptions Options = PrintOptions::printEverything();
+
+  for (StringRef ModuleName : ModulesToPrint) {
+    auto *M = getModuleByFullName(Context, ModuleName);
+    if (!M) {
+      llvm::errs() << "Couldn't find module " << ModuleName << "\n";
+      ExitCode = 1;
+      continue;
+    }
+
+    SmallVector<TypeDecl *, 10> LocalTypeDecls;
+    SmallVector<std::string, 10> MangledNames;
+
+    // Sneak into the module and get all of the local type decls
+    M->getLocalTypeDecls(LocalTypeDecls);
+
+    // Simulate already having mangled names
+    for (auto LTD : LocalTypeDecls) {
+      SmallString<64> MangledName;
+      llvm::raw_svector_ostream Buffer(MangledName);
+      Mangle::Mangler Mangler(Buffer, /*DWARFMangling*/ true);
+      Mangler.mangleTypeForDebugger(LTD->getDeclaredType(), LTD->getDeclContext());
+      MangledNames.push_back(Buffer.str());
+    }
+
+    // Simulate the demangling / parsing process
+    for (auto MangledName : MangledNames) {
+
+      // Global
+      auto node = demangle_wrappers::demangleSymbolAsNode(MangledName);
+
+      // TypeMangling
+      node = node->getFirstChild();
+
+      // Type
+      node = node->getFirstChild();
+      auto typeNode = node;
+
+      // Nominal Type
+      node = node->getFirstChild();
+
+      switch (node->getKind()) {
+        case NodeKind::Structure:
+        case NodeKind::Class:
+        case NodeKind::Enum:
+          break;
+
+        default:
+          llvm::errs() << "Expected a nominal type node in " <<
+            MangledName << "\n";
+          return EXIT_FAILURE;
+      }
+
+      while (node->getKind() != NodeKind::LocalDeclName)
+        node = node->getChild(1); // local decl name
+
+      // Now simulate the remangling process directly on the
+      // LocalDeclName node.
+      auto localDeclNameNode = node;
+
+      auto remangled = Demangle::mangleNode(typeNode);
+
+      auto LTD = M->lookupLocalType(remangled);
+
+      if (!LTD) {
+        llvm::errs() << "Couldn't find local type " << remangled << "\n";
+        return EXIT_FAILURE;
+      }
+
+      llvm::outs() << remangled << "\n";
+
+      auto Options = PrintOptions::printEverything();
+      Options.PrintAccessibility = false;
+      LTD->print(llvm::outs(), Options);
+      llvm::outs() << "\n";
+    }
+  }
+
+  return ExitCode;
+}
+
 namespace {
 class AnnotatingPrinter : public StreamPrinter {
 public:
@@ -2024,6 +2128,9 @@ int main(int argc, char *argv[]) {
                           options::DebugClientDiscriminator);
     break;
   }
+  case ActionType::PrintLocalTypes:
+    ExitCode = doPrintLocalTypes(InitInvok, options::ModuleToPrint);
+    break;
 
   case ActionType::PrintModule: {
     ide::ModuleTraversalOptions TraversalOptions;

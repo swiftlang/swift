@@ -1069,6 +1069,7 @@ static SourceLoc bestLocationInDeclContextHierarchy(DeclContext *DC) {
       Loc = cast<ExtensionDecl>(Ancestor)->getLoc();
       break;
 
+    case DeclContextKind::SerializedLocal:
     case DeclContextKind::Initializer:
     case DeclContextKind::Module:
     case DeclContextKind::FileUnit:

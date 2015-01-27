@@ -262,6 +262,44 @@ public:
   }
 };
 
+/// Used to deserialize entries in the on-disk decl hash table.
+class ModuleFile::LocalDeclTableInfo {
+public:
+  using internal_key_type = StringRef;
+  using external_key_type = internal_key_type;
+  using data_type = std::pair<DeclID, unsigned>; // ID, local discriminator
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
+
+  internal_key_type GetInternalKey(external_key_type ID) {
+    return ID;
+  }
+
+  hash_value_type ComputeHash(internal_key_type key) {
+    return llvm::HashString(key);
+  }
+
+  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+    return lhs == rhs;
+  }
+
+  static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
+    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
+    return { keyLength, sizeof(DeclID) + sizeof(unsigned) };
+  }
+
+  static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    return StringRef(reinterpret_cast<const char *>(data), length);
+  }
+
+  static data_type ReadData(internal_key_type key, const uint8_t *data,
+                            unsigned length) {
+    auto declID = endian::readNext<DeclID, little, unaligned>(data);
+    auto discriminator = endian::readNext<unsigned, little, unaligned>(data);
+    return { declID, discriminator };
+  }
+};
+
 std::unique_ptr<ModuleFile::SerializedDeclTable>
 ModuleFile::readDeclTable(ArrayRef<uint64_t> fields, StringRef blobData) {
   uint32_t tableOffset;
@@ -271,6 +309,17 @@ ModuleFile::readDeclTable(ArrayRef<uint64_t> fields, StringRef blobData) {
   using OwnedTable = std::unique_ptr<SerializedDeclTable>;
   return OwnedTable(SerializedDeclTable::Create(base + tableOffset,
                                                 base + sizeof(uint32_t), base));
+}
+
+std::unique_ptr<ModuleFile::SerializedLocalDeclTable>
+ModuleFile::readLocalDeclTable(ArrayRef<uint64_t> fields, StringRef blobData) {
+  uint32_t tableOffset;
+  index_block::DeclListLayout::readRecord(fields, tableOffset);
+  auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+
+  using OwnedTable = std::unique_ptr<SerializedLocalDeclTable>;
+  return OwnedTable(SerializedLocalDeclTable::Create(base + tableOffset,
+    base + sizeof(uint32_t), base));
 }
 
 /// Used to deserialize entries in the on-disk Objective-C method table.
@@ -363,6 +412,10 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         Decls.assign(scratch.begin(), scratch.end());
         break;
+      case index_block::DECL_CONTEXT_OFFSETS:
+        assert(blobData.empty());
+        DeclContexts.assign(scratch.begin(), scratch.end());
+        break;
       case index_block::TYPE_OFFSETS:
         assert(blobData.empty());
         Types.assign(scratch.begin(), scratch.end());
@@ -392,6 +445,13 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
       case index_block::ENTRY_POINT:
         assert(blobData.empty());
         setEntryPointClassID(scratch.front());
+        break;
+      case index_block::LOCAL_TYPE_DECLS:
+        LocalTypeDecls = readLocalDeclTable(scratch, blobData);
+        break;
+      case index_block::LOCAL_DECL_CONTEXT_OFFSETS:
+        assert(blobData.empty());
+        LocalDeclContexts.assign(scratch.begin(), scratch.end());
         break;
       default:
         // Unknown index kind, which this version of the compiler won't use.
@@ -1009,6 +1069,19 @@ void ModuleFile::lookupValue(DeclName name,
   }
 }
 
+TypeDecl *ModuleFile::lookupLocalType(StringRef MangledName) {
+  PrettyModuleFileDeserialization stackEntry(*this);
+
+  if (!LocalTypeDecls)
+    return nullptr;
+
+  auto iter = LocalTypeDecls->find(MangledName);
+  if (iter == LocalTypeDecls->end())
+    return nullptr;
+
+  return cast<TypeDecl>(getDecl((*iter).first));
+}
+
 OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {
   PrettyModuleFileDeserialization stackEntry(*this);
 
@@ -1299,6 +1372,20 @@ void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
       for (auto item : entry)
         results.push_back(getDecl(item.second));
     }
+  }
+}
+
+void
+ModuleFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl *> &results) {
+  PrettyModuleFileDeserialization stackEntry(*this);
+  if (!LocalTypeDecls)
+    return;
+
+  for (auto entry : LocalTypeDecls->data()) {
+    auto DeclID = entry.first;
+    auto TD = cast<TypeDecl>(getDecl(DeclID));
+    TD->setLocalDiscriminator(entry.second);
+    results.push_back(TD);
   }
 }
 

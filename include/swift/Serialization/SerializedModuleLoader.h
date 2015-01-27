@@ -173,6 +173,8 @@ public:
                            DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &results) const override;
 
+  virtual TypeDecl *lookupLocalType(StringRef MangledName) const override;
+
   virtual OperatorDecl *lookupOperator(Identifier name,
                                        DeclKind fixity) const override;
 
@@ -190,6 +192,9 @@ public:
   Optional<BriefAndRawComment> getCommentForDecl(const Decl *D) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
+
+  virtual void
+  getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &results) const override;
 
   virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results) const override;
 

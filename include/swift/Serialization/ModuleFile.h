@@ -234,6 +234,12 @@ private:
   /// Decls referenced by this module.
   std::vector<Serialized<Decl*>> Decls;
 
+  /// DeclContexts referenced by this module.
+  std::vector<Serialized<DeclContext*>> DeclContexts;
+
+  /// Local DeclContexts referenced by this module.
+  std::vector<Serialized<DeclContext*>> LocalDeclContexts;
+
   /// Types referenced by this module.
   std::vector<Serialized<Type>> Types;
 
@@ -257,11 +263,16 @@ private:
   using SerializedDeclTable =
       llvm::OnDiskIterableChainedHashTable<DeclTableInfo>;
 
+  class LocalDeclTableInfo;
+  using SerializedLocalDeclTable =
+      llvm::OnDiskIterableChainedHashTable<LocalDeclTableInfo>;
+
   std::unique_ptr<SerializedDeclTable> TopLevelDecls;
   std::unique_ptr<SerializedDeclTable> OperatorDecls;
   std::unique_ptr<SerializedDeclTable> ExtensionDecls;
   std::unique_ptr<SerializedDeclTable> ClassMembersByName;
   std::unique_ptr<SerializedDeclTable> OperatorMethodDecls;
+  std::unique_ptr<SerializedLocalDeclTable> LocalTypeDecls;
 
   class ObjCMethodTableInfo;
   using SerializedObjCMethodTable =
@@ -356,6 +367,11 @@ private:
   std::unique_ptr<SerializedDeclTable>
   readDeclTable(ArrayRef<uint64_t> fields, StringRef blobData);
 
+  /// Read an on-disk local decl hash table stored in
+  /// index_block::DeclListLayout format.
+  std::unique_ptr<SerializedLocalDeclTable>
+  readLocalDeclTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
   /// Read an on-disk Objective-C method table stored in
   /// index_block::ObjCMethodTableLayout format.
   std::unique_ptr<ModuleFile::SerializedObjCMethodTable>
@@ -394,7 +410,7 @@ private:
   ///
   /// Note: this destroys the cursor's position in the stream. Furthermore,
   /// because it reads from the cursor, it is not possible to reset the cursor
-  /// after reading. Nothing should ever follow a DECL_CONTEXT record.
+  /// after reading. Nothing should ever follow a MEMBERS record.
   bool readMembers(SmallVectorImpl<Decl *> &Members);
 
   /// Resolves a cross-reference, starting from the given module.
@@ -472,6 +488,9 @@ public:
   /// Searches the module's top-level decls for the given identifier.
   void lookupValue(DeclName name, SmallVectorImpl<ValueDecl*> &results);
 
+  /// Searches the module's local type decls for the given mangled name.
+  TypeDecl *lookupLocalType(StringRef MangledName);
+
   /// Searches the module's operators for one with the given name and fixity.
   ///
   /// If none is found, returns null.
@@ -530,6 +549,9 @@ public:
 
   /// Adds all top-level decls to the given vector.
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results);
+
+  /// Adds all local type decls to the given vector.
+  void getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results);
 
   /// Adds all top-level decls to the given vector.
   ///
@@ -601,7 +623,10 @@ public:
                 Optional<DeclContext *> ForcedContext = None);
 
   /// Returns the decl context with the given ID, deserializing it if needed.
-  DeclContext *getDeclContext(serialization::DeclID DID);
+  DeclContext *getDeclContext(serialization::DeclContextID DID);
+
+  /// Returns the local decl context with the given ID, deserializing it if needed.
+  DeclContext *getLocalDeclContext(serialization::DeclContextID DID);
 
   /// Returns the appropriate module for the given ID.
   Module *getModule(serialization::ModuleID MID);

@@ -191,6 +191,8 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
         case DeclContextKind::AbstractClosureExpr:
         case DeclContextKind::AbstractFunctionDecl:
           continue;
+        case DeclContextKind::SerializedLocal:
+          llvm_unreachable("should not be typechecking deserialized things");
         }
 
         break;

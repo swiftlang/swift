@@ -158,6 +158,10 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     Buffer << "<anonymous function>";
     return;
 
+  case DeclContextKind::SerializedLocal:
+    Buffer << "<serialized local context>";
+    return;
+
   case DeclContextKind::NominalTypeDecl: {
     const NominalTypeDecl *Nominal = cast<NominalTypeDecl>(Context);
     printFullContext(Nominal->getDeclContext(), Buffer);

@@ -819,6 +819,10 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
     os << "(file)";
     break;
 
+  case DeclContextKind::SerializedLocal:
+    os << "local context";
+    break;
+
   case DeclContextKind::AbstractClosureExpr: {
     auto *ACE = cast<AbstractClosureExpr>(dc);
     if (isa<ClosureExpr>(ACE))

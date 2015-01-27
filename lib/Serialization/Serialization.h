@@ -87,10 +87,16 @@ public:
 
 private:
   /// A map from Types and Decls to their serialized IDs.
-  llvm::DenseMap<DeclTypeUnion, DeclIDAndForce> DeclIDs;
+  llvm::DenseMap<DeclTypeUnion, DeclIDAndForce> DeclAndTypeIDs;
 
   /// A map from Identifiers to their serialized IDs.
   llvm::DenseMap<Identifier, IdentifierID> IdentifierIDs;
+
+  /// A map from DeclContexts to their serialized IDs.
+  llvm::DenseMap<const DeclContext*, DeclContextID> DeclContextIDs;
+
+  /// A map from local DeclContexts to their serialized IDs.
+  llvm::DenseMap<const DeclContext*, DeclContextID> LocalDeclContextIDs;
 
   /// A map from generic parameter lists to the decls they come from.
   llvm::DenseMap<const GenericParamList *, const Decl *> GenericContexts;
@@ -123,6 +129,12 @@ private:
   /// decl-or-type might trigger the serialization of another one.
   std::queue<DeclTypeUnion> DeclsAndTypesToWrite;
 
+  /// DeclContexts that need to be serialized.
+  std::queue<const DeclContext*> DeclContextsToWrite;
+
+  /// Local DeclContexts that need to be serialized.
+  std::queue<const DeclContext*> LocalDeclContextsToWrite;
+
   /// All identifiers that need to be serialized.
   std::vector<Identifier> IdentifiersToWrite;
 
@@ -138,6 +150,13 @@ private:
   /// The offset of each Type in the bitstream, indexed by TypeID.
   std::vector<BitOffset> TypeOffsets;
 
+  /// The offset of each DeclContext in the bitstream, indexed by DeclContextID
+  std::vector<BitOffset> DeclContextOffsets;
+
+  /// The offset of each localDeclContext in the bitstream,
+  /// indexed by DeclContextID
+  std::vector<BitOffset> LocalDeclContextOffsets;
+
   /// The offset of each Identifier in the identifier data block, indexed by
   /// IdentifierID.
   std::vector<CharOffset> IdentifierOffsets;
@@ -147,6 +166,12 @@ private:
 
   /// The last assigned DeclID for decls from this module.
   DeclID LastDeclID = 0;
+
+  /// The last assigned DeclContextID for decl contexts from this module.
+  DeclContextID LastDeclContextID = 0;
+
+  /// The last assigned DeclContextID for local decl contexts from this module.
+  DeclContextID LastLocalDeclContextID = 0;
 
   /// The last assigned DeclID for types from this module.
   TypeID LastTypeID = 0;
@@ -168,6 +193,10 @@ private:
       return index_block::TYPE_OFFSETS;
     if (&values == &IdentifierOffsets)
       return index_block::IDENTIFIER_OFFSETS;
+    if (&values == &DeclContextOffsets)
+      return index_block::DECL_CONTEXT_OFFSETS;
+    if (&values == &LocalDeclContextOffsets)
+      return index_block::LOCAL_DECL_CONTEXT_OFFSETS;
     llvm_unreachable("unknown offset kind");
   }
 
@@ -214,20 +243,28 @@ private:
   /// Writes a reference to a decl in another module.
   void writeCrossReference(const Decl *D);
 
-
   /// Writes out a declaration attribute.
   void writeDeclAttribute(const DeclAttribute *DA);
 
   /// Writes the given decl.
-  ///
-  /// Returns false if the decl cannot be serialized without losing
-  /// information.
   void writeDecl(const Decl *D);
 
+  /// Writes the given decl context.
+  void writeDeclContext(const DeclContext *DC);
+
+  /// Write a DeclContext as a local DeclContext at the current offset.
+  void writeLocalDeclContext(const DeclContext *DC);
+
+  /// Write the components of a PatternBindingInitializer as a local context.
+  void writePatternBindingInitializer(PatternBindingDecl *binding);
+
+  /// Write the components of a DefaultArgumentInitializer as a local context.
+  void writeDefaultArgumentInitializer(const DeclContext *parentContext, unsigned index);
+
+  /// Write the components of an AbstractClosureExpr as a local context.
+  void writeAbstractClosureExpr(const DeclContext *parentContext, Type Ty, bool isImplicit, unsigned discriminator);
+
   /// Writes the given type.
-  ///
-  /// Returns false if the type cannot be serialized without losing
-  /// information.
   void writeType(Type ty);
 
   /// Registers the abbreviation for the given decl or type layout.
@@ -295,6 +332,16 @@ public:
   ///
   /// \returns The ID for the given Decl in this module.
   DeclID addDeclRef(const Decl *D, bool forceSerialization = false);
+
+  /// Records the use of the given DeclContext.
+  ///
+  /// The DeclContext will be scheduled for serialization if necessary.
+  DeclContextID addDeclContextRef(const DeclContext *DC);
+
+  /// Records the use of the given local DeclContext.
+  ///
+  /// The DeclContext will be scheduled for serialization if necessary.
+  DeclContextID addLocalDeclContextRef(const DeclContext *DC);
 
   /// Records the use of the given module.
   ///

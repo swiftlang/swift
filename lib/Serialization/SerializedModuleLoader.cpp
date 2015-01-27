@@ -434,6 +434,10 @@ void SerializedASTFile::lookupValue(Module::AccessPathTy accessPath,
   File.lookupValue(name, results);
 }
 
+TypeDecl *SerializedASTFile::lookupLocalType(llvm::StringRef MangledName) const{
+  return File.lookupLocalType(MangledName);
+}
+
 OperatorDecl *SerializedASTFile::lookupOperator(Identifier name,
                                                 DeclKind fixity) const {
   return File.lookupOperator(name, fixity);
@@ -462,8 +466,14 @@ SerializedASTFile::getCommentForDecl(const Decl *D) const {
   return File.getCommentForDecl(D);
 }
 
-void SerializedASTFile::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const{
+void
+SerializedASTFile::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
   File.getTopLevelDecls(results);
+}
+
+void
+SerializedASTFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &results) const{
+  File.getLocalTypeDecls(results);
 }
 
 void SerializedASTFile::getDisplayDecls(SmallVectorImpl<Decl*> &results) const {

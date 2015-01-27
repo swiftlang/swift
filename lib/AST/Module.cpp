@@ -432,6 +432,15 @@ void Module::lookupValue(AccessPathTy AccessPath, DeclName Name,
   FORWARD(lookupValue, (AccessPath, Name, LookupKind, Result));
 }
 
+TypeDecl * Module::lookupLocalType(StringRef MangledName) const {
+  for (auto file : getFiles()) {
+    auto TD = file->lookupLocalType(MangledName);
+    if (TD)
+      return TD;
+  }
+  return nullptr;
+}
+
 void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
                           DeclContext *container, DeclName name,
                           Identifier privateDiscriminator) const {
@@ -439,6 +448,7 @@ void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   bool alreadyInPrivateContext = false;
 
   switch (container->getContextKind()) {
+  case DeclContextKind::SerializedLocal:
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::Initializer:
   case DeclContextKind::TopLevelCodeDecl:
@@ -590,12 +600,20 @@ void SourceFile::lookupClassMember(Module::AccessPathTy accessPath,
   getCache().lookupClassMember(accessPath, name, results, *this);
 }
 
+void Module::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
+  FORWARD(getLocalTypeDecls, (Results));
+}
+
 void Module::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   FORWARD(getTopLevelDecls, (Results));
 }
 
 void SourceFile::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   Results.append(Decls.begin(), Decls.end());
+}
+
+void SourceFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
+  Results.append(LocalTypeDecls.begin(), LocalTypeDecls.end());
 }
 
 void Module::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {

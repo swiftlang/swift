@@ -16,6 +16,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/LinkLibrary.h"
+#include "swift/AST/Mangle.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Dwarf.h"
@@ -89,6 +90,46 @@ namespace {
     }
   };
 
+  class LocalDeclTableInfo {
+  public:
+    using key_type = std::string;
+    using key_type_ref = StringRef;
+    using data_type = std::pair<DeclID, unsigned>; // ID, local discriminator
+    using data_type_ref = const data_type &;
+    using hash_value_type = uint32_t;
+    using offset_type = unsigned;
+
+    hash_value_type ComputeHash(key_type_ref key) {
+      assert(!key.empty());
+      return llvm::HashString(key);
+    }
+
+    std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
+                                                    key_type_ref key,
+                                                    data_type_ref data) {
+      uint32_t keyLength = key.size();
+      uint32_t dataLength = sizeof(DeclID) + sizeof(unsigned);
+      endian::Writer<little> writer(out);
+      writer.write<uint16_t>(keyLength);
+      return { keyLength, dataLength };
+    }
+
+    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+      out << key;
+    }
+
+    void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                  unsigned len) {
+      static_assert(sizeof(DeclID) <= 4, "DeclID too large");
+      endian::Writer<little> writer(out);
+      writer.write<DeclID>(data.first);
+      writer.write<unsigned>(data.second);
+    }
+  };
+
+  using LocalTypeHashTableGenerator =
+    llvm::OnDiskChainedHashTableGenerator<LocalDeclTableInfo>;
+
 } // end anonymous namespace
 
 namespace llvm {
@@ -115,6 +156,10 @@ static ASTContext &getContext(ModuleOrSourceFile DC) {
   return getModule(DC)->Ctx;
 }
 
+static bool shouldSerializeAsLocalContext(const DeclContext *DC) {
+  return DC->isLocalContext() && !isa<AbstractFunctionDecl>(DC);
+}
+
 static const Decl *getDeclForContext(const DeclContext *DC) {
   switch (DC->getContextKind()) {
   case DeclContextKind::Module:
@@ -122,6 +167,8 @@ static const Decl *getDeclForContext(const DeclContext *DC) {
     return nullptr;
   case DeclContextKind::FileUnit:
     return getDeclForContext(DC->getParent());
+  case DeclContextKind::SerializedLocal:
+    llvm_unreachable("Serialized local contexts should only come from deserialization");
   case DeclContextKind::Initializer:
   case DeclContextKind::AbstractClosureExpr:
     // FIXME: What about default functions?
@@ -197,11 +244,48 @@ static Accessors getAccessors(const AbstractStorageDecl *storage) {
   llvm_unreachable("bad storage kind");
 }
 
+DeclID Serializer::addLocalDeclContextRef(const DeclContext *DC) {
+  assert(DC->isLocalContext() && "Expected a local DeclContext");
+  auto &id = LocalDeclContextIDs[DC];
+  if (id != 0)
+    return id;
+
+  id = { ++LastLocalDeclContextID };
+  LocalDeclContextsToWrite.push(DC);
+  return id;
+}
+
+DeclContextID Serializer::addDeclContextRef(const DeclContext *DC) {
+  switch (DC->getContextKind()) {
+  case DeclContextKind::Module:
+  case DeclContextKind::FileUnit: // Skip up to the module
+    return 0;
+  default:
+    break;
+  }
+
+  // If this decl context is a plain old serializable decl, queue it up for
+  // normal serialization.
+  if (shouldSerializeAsLocalContext(DC))
+    addLocalDeclContextRef(DC);
+  else
+    addDeclRef(getDeclForContext(DC));
+
+  auto &id = DeclContextIDs[DC];
+  if (id)
+    return id;
+
+  id = { ++LastDeclContextID };
+  DeclContextsToWrite.push(DC);
+
+  return id;
+}
+
 DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization) {
   if (!D)
     return 0;
 
-  DeclIDAndForce &id = DeclIDs[D];
+  DeclIDAndForce &id = DeclAndTypeIDs[D];
   if (id.first != 0) {
     if (forceSerialization && !id.second)
       id.second = true;
@@ -230,7 +314,7 @@ TypeID Serializer::addTypeRef(Type ty) {
   if (!ty)
     return 0;
 
-  auto &id = DeclIDs[ty];
+  auto &id = DeclAndTypeIDs[ty];
   if (id.first != 0)
     return id.first;
 
@@ -340,6 +424,9 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, OPERATOR_METHODS);
   BLOCK_RECORD(index_block, OBJC_METHODS);
   BLOCK_RECORD(index_block, ENTRY_POINT);
+  BLOCK_RECORD(index_block, LOCAL_DECL_CONTEXT_OFFSETS);
+  BLOCK_RECORD(index_block, DECL_CONTEXT_OFFSETS);
+  BLOCK_RECORD(index_block, LOCAL_TYPE_DECLS);
 
   BLOCK(SIL_BLOCK);
   BLOCK_RECORD(sil_block, SIL_FUNCTION);
@@ -923,7 +1010,7 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     unsigned numInheritedConformances = conf->getInheritedConformances().size();
     unsigned abbrCode
       = abbrCodes[NormalProtocolConformanceLayout::Code];
-    auto ownerID = addDeclRef(getDeclForContext(conf->getDeclContext()));
+    auto ownerID = addDeclContextRef(conf->getDeclContext());
     NormalProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                                 addDeclRef(protocol), ownerID,
                                                 numValueWitnesses,
@@ -963,8 +1050,7 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
   case ProtocolConformanceKind::Specialized: {
     auto conf = cast<SpecializedProtocolConformance>(conformance);
     auto substitutions = conf->getGenericSubstitutions();
-    unsigned abbrCode
-      = abbrCodes[SpecializedProtocolConformanceLayout::Code];
+    unsigned abbrCode = abbrCodes[SpecializedProtocolConformanceLayout::Code];
     DeclID typeID;
     ModuleID moduleID;
 
@@ -1111,7 +1197,7 @@ static bool shouldSerializeMember(Decl *D) {
 void Serializer::writeMembers(DeclRange members, bool isClass) {
   using namespace decls_block;
 
-  unsigned abbrCode = DeclTypeAbbrCodes[DeclContextLayout::Code];
+  unsigned abbrCode = DeclTypeAbbrCodes[MembersLayout::Code];
   SmallVector<DeclID, 16> memberIDs;
   for (auto member : members) {
     if (!shouldSerializeMember(member))
@@ -1129,7 +1215,7 @@ void Serializer::writeMembers(DeclRange members, bool isClass) {
       }
     }
   }
-  DeclContextLayout::emitRecord(Out, ScratchRecord, abbrCode, memberIDs);
+  MembersLayout::emitRecord(Out, ScratchRecord, abbrCode, memberIDs);
 }
 
 static serialization::AccessorKind getStableAccessorKind(swift::AccessorKind K){
@@ -1175,6 +1261,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::Initializer:
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::SerializedLocal:
     llvm_unreachable("cannot cross-reference this context");
 
   case DeclContextKind::FileUnit:
@@ -1528,11 +1615,155 @@ bool Serializer::isDeclXRef(const Decl *D) const {
     assert(isa<GenericTypeParamDecl>(D) && "unexpected decl kind");
     return false;
   }
-  return !isForced(D, DeclIDs);
+  return !isForced(D, DeclAndTypeIDs);
+}
+
+void Serializer::writeDeclContext(const DeclContext *DC) {
+  using namespace decls_block;
+  auto isDecl = false;
+  auto id = DeclContextIDs[DC];
+  assert(id != 0 && "decl context not referenced properly");
+  (void)id;
+
+  assert((id - 1) == DeclContextOffsets.size());
+  DeclContextOffsets.push_back(Out.GetCurrentBitNo());
+
+  auto abbrCode = DeclTypeAbbrCodes[DeclContextLayout::Code];
+  DeclContextID declOrDeclContextID = 0;
+
+  switch (DC->getContextKind()) {
+  case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::NominalTypeDecl:
+  case DeclContextKind::ExtensionDecl:
+    declOrDeclContextID = addDeclRef(getDeclForContext(DC));
+    isDecl = true;
+    break;
+
+  case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::Initializer:
+  case DeclContextKind::SerializedLocal:
+    declOrDeclContextID = addLocalDeclContextRef(DC);
+    break;
+  case DeclContextKind::Module:
+    llvm_unreachable("References to the module are serialized implicitly");
+  case DeclContextKind::FileUnit:
+    llvm_unreachable("Can't serialize a FileUnit");
+  }
+
+  DeclContextLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                declOrDeclContextID, isDecl);
+}
+
+void Serializer::writePatternBindingInitializer(PatternBindingDecl *binding) {
+  using namespace decls_block;
+  auto abbrCode = DeclTypeAbbrCodes[PatternBindingInitializerLayout::Code];
+  PatternBindingInitializerLayout::emitRecord(Out, ScratchRecord,
+                                              abbrCode, addDeclRef(binding));
+}
+
+void
+Serializer::writeDefaultArgumentInitializer(const DeclContext *parentContext,
+                                            unsigned index) {
+  using namespace decls_block;
+  auto abbrCode = DeclTypeAbbrCodes[DefaultArgumentInitializerLayout::Code];
+  DefaultArgumentInitializerLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                               addDeclContextRef(parentContext),
+                                               index);
+}
+
+void Serializer::writeAbstractClosureExpr(const DeclContext *parentContext,
+                                          Type Ty, bool isImplicit,
+                                          unsigned discriminator) {
+  using namespace decls_block;
+  auto abbrCode = DeclTypeAbbrCodes[AbstractClosureExprLayout::Code];
+  AbstractClosureExprLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                        addTypeRef(Ty), isImplicit,
+                                        discriminator,
+                                        addDeclContextRef(parentContext));
+}
+
+void Serializer::writeLocalDeclContext(const DeclContext *DC) {
+  using namespace decls_block;
+
+  assert(shouldSerializeAsLocalContext(DC) &&
+         "Can't serialize as local context");
+
+  auto id = LocalDeclContextIDs[DC];
+  assert(id != 0 && "decl context not referenced properly");
+  (void)id;
+
+  assert((id - 1)== LocalDeclContextOffsets.size());
+  LocalDeclContextOffsets.push_back(Out.GetCurrentBitNo());
+
+  switch (DC->getContextKind()) {
+  case DeclContextKind::AbstractClosureExpr: {
+    auto ACE = cast<AbstractClosureExpr>(DC);
+    writeAbstractClosureExpr(ACE->getParent(), ACE->getType(),
+                             ACE->isImplicit(), ACE->getDiscriminator());
+    break;
+  }
+
+  case DeclContextKind::Initializer: {
+    if (auto PBI = dyn_cast<PatternBindingInitializer>(DC)) {
+      writePatternBindingInitializer(PBI->getBinding());
+    } else if (auto DAI = dyn_cast<DefaultArgumentInitializer>(DC)) {
+      writeDefaultArgumentInitializer(DAI->getParent(), DAI->getIndex());
+    }
+    break;
+  }
+
+  case DeclContextKind::TopLevelCodeDecl: {
+    auto abbrCode = DeclTypeAbbrCodes[TopLevelCodeDeclContextLayout::Code];
+    TopLevelCodeDeclContextLayout::emitRecord(Out, ScratchRecord, abbrCode,
+      addDeclContextRef(DC->getParent()));
+    break;
+  }
+
+  // If we are merging already serialized modules with local decl contexts,
+  // we handle them here in a similar fashion.
+  case DeclContextKind::SerializedLocal: {
+    auto local = cast<SerializedLocalDeclContext>(DC);
+    switch (local->getLocalDeclContextKind()) {
+    case LocalDeclContextKind::AbstractClosure: {
+      auto SACE = cast<SerializedAbstractClosureExpr>(local);
+      writeAbstractClosureExpr(SACE->getParent(), SACE->getType(),
+                               SACE->isImplicit(), SACE->getDiscriminator());
+      return;
+    }
+    case LocalDeclContextKind::DefaultArgumentInitializer: {
+      auto DAI = cast<SerializedDefaultArgumentInitializer>(local);
+      writeDefaultArgumentInitializer(DAI->getParent(), DAI->getIndex());
+      return;
+    }
+    case LocalDeclContextKind::PatternBindingInitializer: {
+      auto PBI = cast<SerializedPatternBindingInitializer>(local);
+      writePatternBindingInitializer(PBI->getBinding());
+      return;
+    }
+    case LocalDeclContextKind::TopLevelCodeDecl: {
+      auto abbrCode = DeclTypeAbbrCodes[TopLevelCodeDeclContextLayout::Code];
+      TopLevelCodeDeclContextLayout::emitRecord(Out, ScratchRecord,
+        abbrCode, addDeclContextRef(DC->getParent()));
+      return;
+    }
+    }
+  }
+
+  default:
+    llvm_unreachable("Trying to write a DeclContext that isn't local");
+  }
 }
 
 void Serializer::writeDecl(const Decl *D) {
   using namespace decls_block;
+
+  auto id = DeclAndTypeIDs[D].first;
+  assert(id != 0 && "decl or type not referenced properly");
+  (void)id;
+
+  assert((id - 1) == DeclOffsets.size());
+  DeclOffsets.push_back(Out.GetCurrentBitNo());
 
   assert(!D->isInvalid() && "cannot create a module with an invalid decl");
   if (isDeclXRef(D)) {
@@ -1561,11 +1792,21 @@ void Serializer::writeDecl(const Decl *D) {
         if (auto *enclosingFile = dyn_cast<FileUnit>(topLevelContext)) {
           Identifier discriminator =
             enclosingFile->getDiscriminatorForPrivateValue(value);
-          unsigned abbrCode = DeclTypeAbbrCodes[DiscriminatorLayout::Code];
-          DiscriminatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
+          unsigned abbrCode =
+            DeclTypeAbbrCodes[PrivateDiscriminatorLayout::Code];
+          PrivateDiscriminatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                           addIdentifierRef(discriminator));
         }
       }
+    }
+  }
+
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    if (VD->getDeclContext()->isLocalContext()) {
+      auto discriminator = VD->getLocalDiscriminator();
+      auto abbrCode = DeclTypeAbbrCodes[LocalDiscriminatorLayout::Code];
+      LocalDiscriminatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                           discriminator);
     }
   }
 
@@ -1580,7 +1821,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto extension = cast<ExtensionDecl>(D);
     verifyAttrSerializable(extension);
 
-    const Decl *DC = getDeclForContext(extension->getDeclContext());
+    auto contextID = addDeclContextRef(extension->getDeclContext());
     Type baseTy = extension->getExtendedType();
 
     // Make sure the base type has registered itself as a provider of generic
@@ -1594,7 +1835,7 @@ void Serializer::writeDecl(const Decl *D) {
     unsigned abbrCode = DeclTypeAbbrCodes[ExtensionLayout::Code];
     ExtensionLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addTypeRef(baseTy),
-                                addDeclRef(DC),
+                                contextID,
                                 extension->isImplicit(),
                                 protocols);
 
@@ -1618,11 +1859,11 @@ void Serializer::writeDecl(const Decl *D) {
     auto binding = cast<PatternBindingDecl>(D);
     verifyAttrSerializable(binding);
 
-    const Decl *DC = getDeclForContext(binding->getDeclContext());
+    auto contextID = addDeclContextRef(binding->getDeclContext());
 
     unsigned abbrCode = DeclTypeAbbrCodes[PatternBindingLayout::Code];
     PatternBindingLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, addDeclRef(DC), binding->isImplicit(),
+        Out, ScratchRecord, abbrCode, contextID, binding->isImplicit(),
         binding->isStatic(),
         uint8_t(getStableStaticSpelling(binding->getStaticSpelling())));
 
@@ -1640,13 +1881,13 @@ void Serializer::writeDecl(const Decl *D) {
     auto op = cast<InfixOperatorDecl>(D);
     verifyAttrSerializable(op);
 
-    const Decl *DC = getDeclForContext(op->getDeclContext());
+    auto contextID = addDeclContextRef(op->getDeclContext());
     auto associativity = getRawStableAssociativity(op->getAssociativity());
 
     unsigned abbrCode = DeclTypeAbbrCodes[InfixOperatorLayout::Code];
     InfixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                     addIdentifierRef(op->getName()),
-                                    addDeclRef(DC),
+                                    contextID,
                                     associativity,
                                     op->getPrecedence(),
                                     op->isAssignment(),
@@ -1660,12 +1901,12 @@ void Serializer::writeDecl(const Decl *D) {
     auto op = cast<PrefixOperatorDecl>(D);
     verifyAttrSerializable(op);
 
-    const Decl *DC = getDeclForContext(op->getDeclContext());
+    auto contextID = addDeclContextRef(op->getDeclContext());
 
     unsigned abbrCode = DeclTypeAbbrCodes[PrefixOperatorLayout::Code];
     PrefixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                      addIdentifierRef(op->getName()),
-                                     addDeclRef(DC));
+                                     contextID);
     break;
   }
 
@@ -1673,12 +1914,12 @@ void Serializer::writeDecl(const Decl *D) {
     auto op = cast<PostfixOperatorDecl>(D);
     verifyAttrSerializable(op);
 
-    const Decl *DC = getDeclForContext(op->getDeclContext());
+    auto contextID = addDeclContextRef(op->getDeclContext());
 
     unsigned abbrCode = DeclTypeAbbrCodes[PostfixOperatorLayout::Code];
     PostfixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                       addIdentifierRef(op->getName()),
-                                      addDeclRef(DC));
+                                      contextID);
     break;
   }
 
@@ -1689,7 +1930,7 @@ void Serializer::writeDecl(const Decl *D) {
            "concrete typealiases cannot have protocols");
     verifyAttrSerializable(typeAlias);
 
-    const Decl *DC = getDeclForContext(typeAlias->getDeclContext());
+    auto contextID = addDeclContextRef(typeAlias->getDeclContext());
 
     Type underlying;
     if (typeAlias->hasUnderlyingType())
@@ -1701,7 +1942,7 @@ void Serializer::writeDecl(const Decl *D) {
     unsigned abbrCode = DeclTypeAbbrCodes[TypeAliasLayout::Code];
     TypeAliasLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addIdentifierRef(typeAlias->getName()),
-                                addDeclRef(DC),
+                                contextID,
                                 addTypeRef(underlying),
                                 addTypeRef(typeAlias->getInterfaceType()),
                                 typeAlias->isImplicit(),
@@ -1713,7 +1954,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto genericParam = cast<GenericTypeParamDecl>(D);
     verifyAttrSerializable(genericParam);
 
-    const Decl *DC = getDeclForContext(genericParam->getDeclContext());
+    auto contextID = addDeclContextRef(genericParam->getDeclContext());
 
     SmallVector<DeclID, 4> protocols;
     for (auto proto : genericParam->getProtocols())
@@ -1722,7 +1963,7 @@ void Serializer::writeDecl(const Decl *D) {
     unsigned abbrCode = DeclTypeAbbrCodes[GenericTypeParamDeclLayout::Code];
     GenericTypeParamDeclLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addIdentifierRef(genericParam->getName()),
-                                addDeclRef(DC),
+                                contextID,
                                 genericParam->isImplicit(),
                                 genericParam->getDepth(),
                                 genericParam->getIndex(),
@@ -1736,7 +1977,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto assocType = cast<AssociatedTypeDecl>(D);
     verifyAttrSerializable(assocType);
 
-    const Decl *DC = getDeclForContext(assocType->getDeclContext());
+    auto contextID = addDeclContextRef(assocType->getDeclContext());
 
     SmallVector<DeclID, 4> protocols;
     for (auto proto : assocType->getProtocols())
@@ -1746,7 +1987,7 @@ void Serializer::writeDecl(const Decl *D) {
     AssociatedTypeDeclLayout::emitRecord(
       Out, ScratchRecord, abbrCode,
       addIdentifierRef(assocType->getName()),
-      addDeclRef(DC),
+      contextID,
       addTypeRef(assocType->getSuperclass()),
       addTypeRef(assocType->getArchetype()),
       addTypeRef(assocType->getDefaultDefinitionType()),
@@ -1759,7 +2000,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto theStruct = cast<StructDecl>(D);
     verifyAttrSerializable(theStruct);
 
-    const Decl *DC = getDeclForContext(theStruct->getDeclContext());
+    auto contextID = addDeclContextRef(theStruct->getDeclContext());
 
     SmallVector<DeclID, 8> protocols;
     for (auto proto : theStruct->getProtocols())
@@ -1771,7 +2012,7 @@ void Serializer::writeDecl(const Decl *D) {
     unsigned abbrCode = DeclTypeAbbrCodes[StructLayout::Code];
     StructLayout::emitRecord(Out, ScratchRecord, abbrCode,
                              addIdentifierRef(theStruct->getName()),
-                             addDeclRef(DC),
+                             contextID,
                              theStruct->isImplicit(),
                              rawAccessLevel,
                              protocols);
@@ -1789,7 +2030,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto theEnum = cast<EnumDecl>(D);
     verifyAttrSerializable(theEnum);
 
-    const Decl *DC = getDeclForContext(theEnum->getDeclContext());
+    auto contextID = addDeclContextRef(theEnum->getDeclContext());
 
     SmallVector<DeclID, 8> protocols;
     for (auto proto : theEnum->getProtocols())
@@ -1801,7 +2042,7 @@ void Serializer::writeDecl(const Decl *D) {
     unsigned abbrCode = DeclTypeAbbrCodes[EnumLayout::Code];
     EnumLayout::emitRecord(Out, ScratchRecord, abbrCode,
                             addIdentifierRef(theEnum->getName()),
-                            addDeclRef(DC),
+                            contextID,
                             theEnum->isImplicit(),
                             addTypeRef(theEnum->getRawType()),
                             rawAccessLevel,
@@ -1819,7 +2060,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto theClass = cast<ClassDecl>(D);
     verifyAttrSerializable(theClass);
 
-    const Decl *DC = getDeclForContext(theClass->getDeclContext());
+    auto contextID = addDeclContextRef(theClass->getDeclContext());
 
     SmallVector<DeclID, 8> protocols;
     for (auto proto : theClass->getProtocols())
@@ -1831,7 +2072,7 @@ void Serializer::writeDecl(const Decl *D) {
     unsigned abbrCode = DeclTypeAbbrCodes[ClassLayout::Code];
     ClassLayout::emitRecord(Out, ScratchRecord, abbrCode,
                             addIdentifierRef(theClass->getName()),
-                            addDeclRef(DC),
+                            contextID,
                             theClass->isImplicit(),
                             theClass->isObjC(),
                             theClass->requiresStoredPropertyInits(),
@@ -1853,7 +2094,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto proto = cast<ProtocolDecl>(D);
     verifyAttrSerializable(proto);
 
-    const Decl *DC = getDeclForContext(proto->getDeclContext());
+    auto contextID = addDeclContextRef(proto->getDeclContext());
 
     SmallVector<DeclID, 8> protocols;
     for (auto proto : proto->getProtocols())
@@ -1865,7 +2106,7 @@ void Serializer::writeDecl(const Decl *D) {
     unsigned abbrCode = DeclTypeAbbrCodes[ProtocolLayout::Code];
     ProtocolLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                addIdentifierRef(proto->getName()),
-                               addDeclRef(DC),
+                               contextID,
                                proto->isImplicit(),
                                const_cast<ProtocolDecl *>(proto)
                                  ->requiresClass(),
@@ -1883,7 +2124,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto var = cast<VarDecl>(D);
     verifyAttrSerializable(var);
 
-    const Decl *DC = getDeclForContext(var->getDeclContext());
+    auto contextID = addDeclContextRef(var->getDeclContext());
     Type type = var->hasType() ? var->getType() : nullptr;
 
     Accessors accessors = getAccessors(var);
@@ -1897,7 +2138,7 @@ void Serializer::writeDecl(const Decl *D) {
     unsigned abbrCode = DeclTypeAbbrCodes[VarLayout::Code];
     VarLayout::emitRecord(Out, ScratchRecord, abbrCode,
                           addIdentifierRef(var->getName()),
-                          addDeclRef(DC),
+                          contextID,
                           var->isImplicit(),
                           var->isObjC(),
                           var->isStatic(),
@@ -1922,14 +2163,14 @@ void Serializer::writeDecl(const Decl *D) {
     auto param = cast<ParamDecl>(D);
     verifyAttrSerializable(param);
 
-    const Decl *DC = getDeclForContext(param->getDeclContext());
+    auto contextID = addDeclContextRef(param->getDeclContext());
     Type type = param->hasType() ? param->getType() : nullptr;
 
     unsigned abbrCode = DeclTypeAbbrCodes[ParamLayout::Code];
     ParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
                             addIdentifierRef(param->getArgumentName()),
                             addIdentifierRef(param->getName()),
-                            addDeclRef(DC),
+                            contextID,
                             param->isLet(),
                             addTypeRef(type),
                             addTypeRef(param->getInterfaceType()));
@@ -1940,7 +2181,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto fn = cast<FuncDecl>(D);
     verifyAttrSerializable(fn);
 
-    const Decl *DC = getDeclForContext(fn->getDeclContext());
+    auto contextID = addDeclContextRef(fn->getDeclContext());
 
     unsigned abbrCode = DeclTypeAbbrCodes[FuncLayout::Code];
     SmallVector<IdentifierID, 4> nameComponents;
@@ -1954,7 +2195,7 @@ void Serializer::writeDecl(const Decl *D) {
       getRawStableAddressorKind(fn->getAddressorKind());
 
     FuncLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                           addDeclRef(DC),
+                           contextID,
                            fn->isImplicit(),
                            fn->isStatic(),
                            uint8_t(getStableStaticSpelling(fn->getStaticSpelling())),
@@ -1983,7 +2224,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::EnumElement: {
     auto elem = cast<EnumElementDecl>(D);
-    const Decl *DC = getDeclForContext(elem->getDeclContext());
+    auto contextID = addDeclContextRef(elem->getDeclContext());
 
     // We only serialize the raw values of @objc enums, because they're part
     // of the ABI. That isn't the case for Swift enums.
@@ -2001,7 +2242,7 @@ void Serializer::writeDecl(const Decl *D) {
     unsigned abbrCode = DeclTypeAbbrCodes[EnumElementLayout::Code];
     EnumElementLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                   addIdentifierRef(elem->getName()),
-                                  addDeclRef(DC),
+                                  contextID,
                                   addTypeRef(elem->getArgumentType()),
                                   addTypeRef(elem->getType()),
                                   addTypeRef(elem->getInterfaceType()),
@@ -2016,7 +2257,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto subscript = cast<SubscriptDecl>(D);
     verifyAttrSerializable(subscript);
 
-    const Decl *DC = getDeclForContext(subscript->getDeclContext());
+    auto contextID = addDeclContextRef(subscript->getDeclContext());
 
     SmallVector<IdentifierID, 4> nameComponents;
     for (auto argName : subscript->getFullName().getArgumentNames())
@@ -2032,7 +2273,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[SubscriptLayout::Code];
     SubscriptLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                addDeclRef(DC),
+                                contextID,
                                 subscript->isImplicit(),
                                 subscript->isObjC(),
                                 (unsigned) accessors.Kind,
@@ -2060,7 +2301,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto ctor = cast<ConstructorDecl>(D);
     verifyAttrSerializable(ctor);
 
-    const Decl *DC = getDeclForContext(ctor->getDeclContext());
+    auto contextID = addDeclContextRef(ctor->getDeclContext());
 
     SmallVector<IdentifierID, 4> nameComponents;
     for (auto argName : ctor->getFullName().getArgumentNames())
@@ -2071,7 +2312,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[ConstructorLayout::Code];
     ConstructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                  addDeclRef(DC),
+                                  contextID,
                                   getRawStableOptionalTypeKind(
                                     ctor->getFailability()),
                                   ctor->isImplicit(),
@@ -2095,11 +2336,11 @@ void Serializer::writeDecl(const Decl *D) {
     auto dtor = cast<DestructorDecl>(D);
     verifyAttrSerializable(dtor);
 
-    const Decl *DC = getDeclForContext(dtor->getDeclContext());
+    auto contextID = addDeclContextRef(dtor->getDeclContext());
 
     unsigned abbrCode = DeclTypeAbbrCodes[DestructorLayout::Code];
     DestructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 addDeclRef(DC),
+                                 contextID,
                                  dtor->isImplicit(),
                                  dtor->isObjC(),
                                  addTypeRef(dtor->getType()),
@@ -2191,6 +2432,14 @@ static TypeAliasDecl *findTypeAliasForBuiltin(ASTContext &Ctx,
 
 void Serializer::writeType(Type ty) {
   using namespace decls_block;
+
+  auto id = DeclAndTypeIDs[ty].first;
+  assert(id != 0 && "type not referenced properly");
+  (void)id;
+
+  assert((id - 1) == TypeOffsets.size());
+
+  TypeOffsets.push_back(Out.GetCurrentBitNo());
 
   switch (ty.getPointer()->getKind()) {
   case TypeKind::Error:
@@ -2677,114 +2926,120 @@ void Serializer::writeType(Type ty) {
 
 void Serializer::writeAllDeclsAndTypes() {
   BCBlockRAII restoreBlock(Out, DECLS_AND_TYPES_BLOCK_ID, 8);
+  using namespace decls_block;
+  registerDeclTypeAbbr<NameAliasTypeLayout>();
+  registerDeclTypeAbbr<GenericTypeParamDeclLayout>();
+  registerDeclTypeAbbr<AssociatedTypeDeclLayout>();
+  registerDeclTypeAbbr<NominalTypeLayout>();
+  registerDeclTypeAbbr<ParenTypeLayout>();
+  registerDeclTypeAbbr<TupleTypeLayout>();
+  registerDeclTypeAbbr<TupleTypeEltLayout>();
+  registerDeclTypeAbbr<FunctionTypeLayout>();
+  registerDeclTypeAbbr<MetatypeTypeLayout>();
+  registerDeclTypeAbbr<ExistentialMetatypeTypeLayout>();
+  registerDeclTypeAbbr<LValueTypeLayout>();
+  registerDeclTypeAbbr<InOutTypeLayout>();
+  registerDeclTypeAbbr<ArchetypeTypeLayout>();
+  registerDeclTypeAbbr<ArchetypeNestedTypeNamesLayout>();
+  registerDeclTypeAbbr<ArchetypeNestedTypesAreArchetypesLayout>();
+  registerDeclTypeAbbr<ArchetypeNestedTypesLayout>();
+  registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
+  registerDeclTypeAbbr<SubstitutedTypeLayout>();
+  registerDeclTypeAbbr<BoundGenericTypeLayout>();
+  registerDeclTypeAbbr<BoundGenericSubstitutionLayout>();
+  registerDeclTypeAbbr<PolymorphicFunctionTypeLayout>();
+  registerDeclTypeAbbr<GenericFunctionTypeLayout>();
+  registerDeclTypeAbbr<SILBlockStorageTypeLayout>();
+  registerDeclTypeAbbr<SILFunctionTypeLayout>();
+  registerDeclTypeAbbr<ArraySliceTypeLayout>();
+  registerDeclTypeAbbr<DictionaryTypeLayout>();
+  registerDeclTypeAbbr<ReferenceStorageTypeLayout>();
+  registerDeclTypeAbbr<UnboundGenericTypeLayout>();
+  registerDeclTypeAbbr<OptionalTypeLayout>();
+  registerDeclTypeAbbr<ImplicitlyUnwrappedOptionalTypeLayout>();
+  registerDeclTypeAbbr<DynamicSelfTypeLayout>();
+  registerDeclTypeAbbr<OpenedExistentialTypeLayout>();
 
-  {
-    using namespace decls_block;
-    registerDeclTypeAbbr<NameAliasTypeLayout>();
-    registerDeclTypeAbbr<GenericTypeParamDeclLayout>();
-    registerDeclTypeAbbr<AssociatedTypeDeclLayout>();
-    registerDeclTypeAbbr<NominalTypeLayout>();
-    registerDeclTypeAbbr<ParenTypeLayout>();
-    registerDeclTypeAbbr<TupleTypeLayout>();
-    registerDeclTypeAbbr<TupleTypeEltLayout>();
-    registerDeclTypeAbbr<FunctionTypeLayout>();
-    registerDeclTypeAbbr<MetatypeTypeLayout>();
-    registerDeclTypeAbbr<ExistentialMetatypeTypeLayout>();
-    registerDeclTypeAbbr<LValueTypeLayout>();
-    registerDeclTypeAbbr<InOutTypeLayout>();
-    registerDeclTypeAbbr<ArchetypeTypeLayout>();
-    registerDeclTypeAbbr<ArchetypeNestedTypeNamesLayout>();
-    registerDeclTypeAbbr<ArchetypeNestedTypesAreArchetypesLayout>();
-    registerDeclTypeAbbr<ArchetypeNestedTypesLayout>();
-    registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
-    registerDeclTypeAbbr<SubstitutedTypeLayout>();
-    registerDeclTypeAbbr<BoundGenericTypeLayout>();
-    registerDeclTypeAbbr<BoundGenericSubstitutionLayout>();
-    registerDeclTypeAbbr<PolymorphicFunctionTypeLayout>();
-    registerDeclTypeAbbr<GenericFunctionTypeLayout>();
-    registerDeclTypeAbbr<SILBlockStorageTypeLayout>();
-    registerDeclTypeAbbr<SILFunctionTypeLayout>();
-    registerDeclTypeAbbr<ArraySliceTypeLayout>();
-    registerDeclTypeAbbr<DictionaryTypeLayout>();
-    registerDeclTypeAbbr<ReferenceStorageTypeLayout>();
-    registerDeclTypeAbbr<UnboundGenericTypeLayout>();
-    registerDeclTypeAbbr<OptionalTypeLayout>();
-    registerDeclTypeAbbr<ImplicitlyUnwrappedOptionalTypeLayout>();
-    registerDeclTypeAbbr<DynamicSelfTypeLayout>();
-    registerDeclTypeAbbr<OpenedExistentialTypeLayout>();
+  registerDeclTypeAbbr<TypeAliasLayout>();
+  registerDeclTypeAbbr<GenericTypeParamTypeLayout>();
+  registerDeclTypeAbbr<AssociatedTypeTypeLayout>();
+  registerDeclTypeAbbr<DependentMemberTypeLayout>();
+  registerDeclTypeAbbr<StructLayout>();
+  registerDeclTypeAbbr<ConstructorLayout>();
+  registerDeclTypeAbbr<VarLayout>();
+  registerDeclTypeAbbr<ParamLayout>();
+  registerDeclTypeAbbr<FuncLayout>();
+  registerDeclTypeAbbr<PatternBindingLayout>();
+  registerDeclTypeAbbr<ProtocolLayout>();
+  registerDeclTypeAbbr<PrefixOperatorLayout>();
+  registerDeclTypeAbbr<PostfixOperatorLayout>();
+  registerDeclTypeAbbr<InfixOperatorLayout>();
+  registerDeclTypeAbbr<ClassLayout>();
+  registerDeclTypeAbbr<EnumLayout>();
+  registerDeclTypeAbbr<EnumElementLayout>();
+  registerDeclTypeAbbr<SubscriptLayout>();
+  registerDeclTypeAbbr<ExtensionLayout>();
+  registerDeclTypeAbbr<DestructorLayout>();
 
-    registerDeclTypeAbbr<TypeAliasLayout>();
-    registerDeclTypeAbbr<GenericTypeParamTypeLayout>();
-    registerDeclTypeAbbr<AssociatedTypeTypeLayout>();
-    registerDeclTypeAbbr<DependentMemberTypeLayout>();
-    registerDeclTypeAbbr<StructLayout>();
-    registerDeclTypeAbbr<ConstructorLayout>();
-    registerDeclTypeAbbr<VarLayout>();
-    registerDeclTypeAbbr<ParamLayout>();
-    registerDeclTypeAbbr<FuncLayout>();
-    registerDeclTypeAbbr<PatternBindingLayout>();
-    registerDeclTypeAbbr<ProtocolLayout>();
-    registerDeclTypeAbbr<PrefixOperatorLayout>();
-    registerDeclTypeAbbr<PostfixOperatorLayout>();
-    registerDeclTypeAbbr<InfixOperatorLayout>();
-    registerDeclTypeAbbr<ClassLayout>();
-    registerDeclTypeAbbr<EnumLayout>();
-    registerDeclTypeAbbr<EnumElementLayout>();
-    registerDeclTypeAbbr<SubscriptLayout>();
-    registerDeclTypeAbbr<ExtensionLayout>();
-    registerDeclTypeAbbr<DestructorLayout>();
+  registerDeclTypeAbbr<ParenPatternLayout>();
+  registerDeclTypeAbbr<TuplePatternLayout>();
+  registerDeclTypeAbbr<TuplePatternEltLayout>();
+  registerDeclTypeAbbr<NamedPatternLayout>();
+  registerDeclTypeAbbr<VarPatternLayout>();
+  registerDeclTypeAbbr<AnyPatternLayout>();
+  registerDeclTypeAbbr<TypedPatternLayout>();
+  registerDeclTypeAbbr<GenericParamListLayout>();
+  registerDeclTypeAbbr<GenericParamLayout>();
+  registerDeclTypeAbbr<GenericRequirementLayout>();
+  registerDeclTypeAbbr<LastGenericRequirementLayout>();
 
-    registerDeclTypeAbbr<ParenPatternLayout>();
-    registerDeclTypeAbbr<TuplePatternLayout>();
-    registerDeclTypeAbbr<TuplePatternEltLayout>();
-    registerDeclTypeAbbr<NamedPatternLayout>();
-    registerDeclTypeAbbr<VarPatternLayout>();
-    registerDeclTypeAbbr<AnyPatternLayout>();
-    registerDeclTypeAbbr<TypedPatternLayout>();
+  registerDeclTypeAbbr<DeclContextLayout>();
+  registerDeclTypeAbbr<AbstractClosureExprLayout>();
+  registerDeclTypeAbbr<PatternBindingInitializerLayout>();
+  registerDeclTypeAbbr<DefaultArgumentInitializerLayout>();
+  registerDeclTypeAbbr<TopLevelCodeDeclContextLayout>();
 
-    registerDeclTypeAbbr<GenericParamListLayout>();
-    registerDeclTypeAbbr<GenericParamLayout>();
-    registerDeclTypeAbbr<GenericRequirementLayout>();
-    registerDeclTypeAbbr<LastGenericRequirementLayout>();
+  registerDeclTypeAbbr<XRefTypePathPieceLayout>();
+  registerDeclTypeAbbr<XRefValuePathPieceLayout>();
+  registerDeclTypeAbbr<XRefExtensionPathPieceLayout>();
+  registerDeclTypeAbbr<XRefOperatorOrAccessorPathPieceLayout>();
+  registerDeclTypeAbbr<XRefGenericParamPathPieceLayout>();
+  registerDeclTypeAbbr<XRefInitializerPathPieceLayout>();
 
-    registerDeclTypeAbbr<XRefTypePathPieceLayout>();
-    registerDeclTypeAbbr<XRefValuePathPieceLayout>();
-    registerDeclTypeAbbr<XRefExtensionPathPieceLayout>();
-    registerDeclTypeAbbr<XRefOperatorOrAccessorPathPieceLayout>();
-    registerDeclTypeAbbr<XRefGenericParamPathPieceLayout>();
-    registerDeclTypeAbbr<XRefInitializerPathPieceLayout>();
+  registerDeclTypeAbbr<NoConformanceLayout>();
+  registerDeclTypeAbbr<NormalProtocolConformanceLayout>();
+  registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();
+  registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
 
-    registerDeclTypeAbbr<NoConformanceLayout>();
-    registerDeclTypeAbbr<NormalProtocolConformanceLayout>();
-    registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();
-    registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
-
-    registerDeclTypeAbbr<DiscriminatorLayout>();
-    registerDeclTypeAbbr<DeclContextLayout>();
-    registerDeclTypeAbbr<XRefLayout>();
+  registerDeclTypeAbbr<LocalDiscriminatorLayout>();
+  registerDeclTypeAbbr<PrivateDiscriminatorLayout>();
+  registerDeclTypeAbbr<MembersLayout>();
+  registerDeclTypeAbbr<XRefLayout>();
 
 #define DECL_ATTR(X, NAME, ...) \
-    registerDeclTypeAbbr<NAME##DeclAttrLayout>();
+  registerDeclTypeAbbr<NAME##DeclAttrLayout>();
 #include "swift/AST/Attr.def"
-  }
 
   while (!DeclsAndTypesToWrite.empty()) {
-    DeclTypeUnion next = DeclsAndTypesToWrite.front();
+    auto next = DeclsAndTypesToWrite.front();
     DeclsAndTypesToWrite.pop();
-
-    auto id = DeclIDs[next].first;
-    assert(id != 0 && "decl or type not referenced properly");
-    (void)id;
-
-    auto &offsets = next.isDecl() ? DeclOffsets : TypeOffsets;
-    assert((id - 1) == offsets.size());
-
-    offsets.push_back(Out.GetCurrentBitNo());
 
     if (next.isDecl())
       writeDecl(next.getDecl());
     else
       writeType(next.getType());
+
+    while (!DeclContextsToWrite.empty()) {
+      auto next = DeclContextsToWrite.front();
+      DeclContextsToWrite.pop();
+      writeDeclContext(next);
+
+      while (!LocalDeclContextsToWrite.empty()) {
+        auto next = LocalDeclContextsToWrite.front();
+        LocalDeclContextsToWrite.pop();
+        writeLocalDeclContext(next);
+      }
+    }
   }
 }
 
@@ -2827,6 +3082,22 @@ static void writeDeclTable(const index_block::DeclListLayout &DeclList,
     for (auto &entry : table)
       generator.insert(entry.first, entry.second);
 
+    llvm::raw_svector_ostream blobStream(hashTableBlob);
+    // Make sure that no bucket is at offset 0
+    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    tableOffset = generator.Emit(blobStream);
+  }
+
+  DeclList.emit(scratch, kind, tableOffset, hashTableBlob);
+}
+
+static void writeLocalDeclTable(const index_block::DeclListLayout &DeclList,
+                                index_block::RecordKind kind,
+                                LocalTypeHashTableGenerator &generator) {
+  SmallVector<uint64_t, 8> scratch;
+  llvm::SmallString<4096> hashTableBlob;
+  uint32_t tableOffset;
+  {
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
     endian::Writer<little>(blobStream).write<uint32_t>(0);
@@ -3087,6 +3358,8 @@ static void addOperatorsAndTopLevel(Serializer &S, Range members,
 void Serializer::writeAST(ModuleOrSourceFile DC) {
   DeclTable topLevelDecls, extensionDecls, operatorDecls, operatorMethodDecls;
   ObjCMethodTable objcMethods;
+  LocalTypeHashTableGenerator localTypeGenerator;
+  bool hasLocalTypes = false;
 
   Optional<DeclID> entryPointClassID;
 
@@ -3133,6 +3406,24 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
           .push_back({ getStableFixity(OD->getKind()), addDeclRef(D) });
       }
     }
+
+    SmallVector<TypeDecl *, 16> localTypeDecls;
+    nextFile->getLocalTypeDecls(localTypeDecls);
+
+    for (auto TD : localTypeDecls) {
+      hasLocalTypes = true;
+
+      SmallString<32> MangledName;
+      llvm::raw_svector_ostream Stream(MangledName);
+      Mangle::Mangler DebugMangler(Stream, false);
+      DebugMangler.mangleType(TD->getDeclaredType(),
+                              ResilienceExpansion::Minimal, 0);
+      Stream.flush();
+      assert(!MangledName.empty() && "Mangled type came back empty!");
+      localTypeGenerator.insert(MangledName, {
+        addDeclRef(TD), TD->getLocalDiscriminator()
+      });
+    }
   }
 
   writeAllDeclsAndTypes();
@@ -3145,6 +3436,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     writeOffsets(Offsets, DeclOffsets);
     writeOffsets(Offsets, TypeOffsets);
     writeOffsets(Offsets, IdentifierOffsets);
+    writeOffsets(Offsets, DeclContextOffsets);
+    writeOffsets(Offsets, LocalDeclContextOffsets);
 
     index_block::DeclListLayout DeclList(Out);
     writeDeclTable(DeclList, index_block::TOP_LEVEL_DECLS, topLevelDecls);
@@ -3152,6 +3445,9 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     writeDeclTable(DeclList, index_block::EXTENSIONS, extensionDecls);
     writeDeclTable(DeclList, index_block::CLASS_MEMBERS, ClassMembersByName);
     writeDeclTable(DeclList, index_block::OPERATOR_METHODS, operatorMethodDecls);
+    if (hasLocalTypes)
+      writeLocalDeclTable(DeclList, index_block::LOCAL_TYPE_DECLS,
+                          localTypeGenerator);
 
     index_block::ObjCMethodTableLayout ObjCMethodTable(Out);
     writeObjCMethodTable(ObjCMethodTable, objcMethods);

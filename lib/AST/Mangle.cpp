@@ -199,6 +199,29 @@ void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {
     mangleContext(ctx->getParent(), shouldBind);
     return;
 
+  case DeclContextKind::SerializedLocal: {
+    auto local = cast<SerializedLocalDeclContext>(ctx);
+    switch (local->getLocalDeclContextKind()) {
+    case LocalDeclContextKind::AbstractClosure:
+      mangleClosureEntity(cast<SerializedAbstractClosureExpr>(local),
+                          ResilienceExpansion::Minimal, /*uncurry*/ 0);
+      return;
+    case LocalDeclContextKind::DefaultArgumentInitializer: {
+      auto argInit = cast<SerializedDefaultArgumentInitializer>(local);
+      mangleDefaultArgumentEntity(ctx->getParent(), argInit->getIndex());
+      return;
+    }
+    case LocalDeclContextKind::PatternBindingInitializer: {
+      auto patternInit = cast<SerializedPatternBindingInitializer>(local);
+      auto var = findFirstVariable(patternInit->getBinding());
+      mangleInitializerEntity(var);
+      return;
+    }
+    case LocalDeclContextKind::TopLevelCodeDecl:
+      return mangleContext(local->getParent(), shouldBind);
+    }
+  }
+
   case DeclContextKind::NominalTypeDecl:
     mangleNominalType(cast<NominalTypeDecl>(ctx), ResilienceExpansion::Minimal,
                       shouldBind);
@@ -1269,26 +1292,42 @@ void Mangler::mangleFunctionType(AnyFunctionType *fn,
              (uncurryLevel > 0 ? uncurryLevel - 1 : 0));
 }
 
-void Mangler::mangleClosureEntity(const AbstractClosureExpr *closure,
-                                  ResilienceExpansion explosion,
-                                  unsigned uncurryLevel) {
+void Mangler::mangleClosureComponents(Type Ty, unsigned discriminator,
+                                      bool isImplicit,
+                                      const DeclContext *parentContext,
+                                      const DeclContext *localContext) {
   // entity-name ::= 'U' index type         // explicit anonymous closure
   // entity-name ::= 'u' index type         // implicit anonymous closure
 
-  auto discriminator = closure->getDiscriminator();
   assert(discriminator != AbstractClosureExpr::InvalidDiscriminator
-         && "closure not marked correctly with discriminator?");
+         && "closure must be marked correctly with discriminator");
 
   Buffer << 'F';
-  mangleContext(closure->getParent(), BindGenerics::All);
-  Buffer << (isa<ClosureExpr>(closure) ? 'U' : 'u') << Index(discriminator);
+  mangleContext(parentContext, BindGenerics::All);
+  Buffer << (isImplicit ? 'u' : 'U') << Index(discriminator);
 
-  Type Ty = closure->getType();
   if (!Ty)
-    Ty = ErrorType::get(closure->getASTContext());
+    Ty = ErrorType::get(localContext->getASTContext());
 
-  if (!DeclCtx) DeclCtx = closure->getLocalContext();
-  mangleType(Ty->getCanonicalType(), ResilienceExpansion::Minimal, /*uncurry*/ 0);
+  if (!DeclCtx) DeclCtx = localContext;
+  mangleType(Ty->getCanonicalType(), ResilienceExpansion::Minimal,
+             /*uncurry*/ 0);
+}
+
+void Mangler::mangleClosureEntity(const SerializedAbstractClosureExpr *closure,
+                                  ResilienceExpansion explosion,
+                                  unsigned uncurryingLevel) {
+  mangleClosureComponents(closure->getType(), closure->getDiscriminator(),
+                          closure->isImplicit(), closure->getParent(),
+                          closure->getLocalContext());
+}
+
+void Mangler::mangleClosureEntity(const AbstractClosureExpr *closure,
+                                  ResilienceExpansion explosion,
+                                  unsigned uncurryLevel) {
+  mangleClosureComponents(closure->getType(), closure->getDiscriminator(),
+                          isa<AutoClosureExpr>(closure), closure->getParent(),
+                          closure->getLocalContext());
 }
 
 void Mangler::mangleConstructorEntity(const ConstructorDecl *ctor,

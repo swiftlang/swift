@@ -1480,6 +1480,7 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
   if (!D->hasAccessibility()) {
     DeclContext *DC = D->getDeclContext();
     switch (DC->getContextKind()) {
+    case DeclContextKind::SerializedLocal:
     case DeclContextKind::AbstractClosureExpr:
     case DeclContextKind::Initializer:
     case DeclContextKind::TopLevelCodeDecl:
@@ -5418,6 +5419,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     // FIXME: Avoid full check in these cases?
     DeclContext *DC = typeParam->getDeclContext();
     switch (DC->getContextKind()) {
+    case DeclContextKind::SerializedLocal:
     case DeclContextKind::Module:
     case DeclContextKind::FileUnit:
     case DeclContextKind::TopLevelCodeDecl:
