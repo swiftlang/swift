@@ -86,10 +86,8 @@ extension String {
   public struct UTF8View : CollectionType, Reflectable, Printable,
     DebugPrintable {
     internal let _core: _StringCore
-    // FIXME: rdar://problem/19534462 - These are optional as a work around to a
-    // compiler segfault.
-    internal let _startIndex: Index!
-    internal let _endIndex: Index!
+    internal let _startIndex: Index
+    internal let _endIndex: Index
 
     init(_ _core: _StringCore) {
       self._core = _core
