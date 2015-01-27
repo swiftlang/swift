@@ -23,3 +23,16 @@ protocol Q : A { } // expected-error{{non-class type 'Q' cannot inherit from cla
 
 // Extension inheriting a class
 extension C : A { } // expected-error{{extension of type 'C' cannot inherit from class 'A'}}
+
+
+class GenericBase<T> {}
+
+class GenericSub<T> : GenericBase<T> {} // okay
+	
+class InheritGenericParam<T> : T {} // expected-error {{inheritance from non-protocol, non-class type 'T'}}
+class InheritBody : T { // expected-error {{use of undeclared type 'T'}}
+	typealias T = A
+}
+class InheritBodyBad : fn { // expected-error {{use of undeclared type 'fn'}}
+	func fn() {}
+}

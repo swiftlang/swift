@@ -209,24 +209,28 @@ enum TypeResolutionFlags {
   
   /// Whether this type is being used in an inheritance clause.
   TR_InheritanceClause = 0x400,
-  
+
+  /// Whether this type is being used in the inheritance clause of a nominal
+  /// type.
+  TR_NominalInheritanceClause = 0x800,
+
   /// Whether this type is the referent of a global type alias.
-  TR_GlobalTypeAlias = 0x800,
+  TR_GlobalTypeAlias = 0x1000,
 
   /// Whether this type is the value carried in an enum case.
-  TR_EnumCase = 0x1000,
+  TR_EnumCase = 0x2000,
 
   /// Whether this type is being used in an expression or local declaration.
   ///
   /// This affects what sort of dependencies are recorded when resolving the
   /// type.
-  TR_InExpression = 0x2000,
+  TR_InExpression = 0x4000,
   
   /// Whether this type resolution is guaranteed not to affect downstream files.
-  TR_KnownNonCascadingDependency = 0x4000,
+  TR_KnownNonCascadingDependency = 0x8000,
 
   /// Whether we should allow references to unavailable types.
-  TR_AllowUnavailable = 0x8000,
+  TR_AllowUnavailable = 0x10000,
 };
 
 /// Option set describing how type resolution should work.
@@ -475,11 +479,13 @@ public:
 
   /// \brief Apply generic arguments to the given type.
   ///
-  /// \param type         The unbound generic type to which to apply arguments.
-  /// \param loc          The source location for diagnostic reporting.
-  /// \param dc           The context where the arguments are applied.
-  /// \param genericArgs  The list of generic arguments to apply to the type.
-  /// \param resolver     The generic type resolver.
+  /// \param type The unbound generic type to which to apply arguments.
+  /// \param loc The source location for diagnostic reporting.
+  /// \param dc The context where the arguments are applied.
+  /// \param genericArgs The list of generic arguments to apply to the type.
+  /// \param isNominalInheritanceClause True if these generic arguments appear
+  /// in the inheritance clause of a nominal type.
+  /// \param resolver The generic type resolver.
   ///
   /// \returns A BoundGenericType bound to the given arguments, or null on
   /// error.
@@ -487,6 +493,7 @@ public:
                              SourceLoc loc,
                              DeclContext *dc,
                              MutableArrayRef<TypeLoc> genericArgs,
+                             bool isNominalInheritanceClause,
                              GenericTypeResolver *resolver);
 
   /// \brief Replace the type \c T of a protocol member \c Member given the

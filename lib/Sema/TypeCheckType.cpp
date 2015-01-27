@@ -273,6 +273,7 @@ Type TypeChecker::applyGenericArguments(Type type,
                                         SourceLoc loc,
                                         DeclContext *dc,
                                         MutableArrayRef<TypeLoc> genericArgs,
+                                        bool isNominalInheritanceClause,
                                         GenericTypeResolver *resolver) {
   // Make sure we always have a resolver to use.
   PartialGenericTypeToArchetypeResolver defaultResolver(*this);
@@ -304,11 +305,15 @@ Type TypeChecker::applyGenericArguments(Type type,
     return nullptr;
   }
 
+  TypeResolutionOptions options;
+  if (isNominalInheritanceClause)
+    options |= TR_NominalInheritanceClause;
+
   // Validate the generic arguments and capture just the types.
   SmallVector<Type, 4> genericArgTypes;
   for (auto &genericArg : genericArgs) {
     // Validate the generic argument.
-    if (validateType(genericArg, dc, None, resolver))
+    if (validateType(genericArg, dc, options, resolver))
       return nullptr;
 
     genericArgTypes.push_back(genericArg.getType());
@@ -341,11 +346,13 @@ Type TypeChecker::applyGenericArguments(Type type,
 static Type applyGenericTypeReprArgs(TypeChecker &TC, Type type, SourceLoc loc,
                                      DeclContext *dc,
                                      ArrayRef<TypeRepr *> genericArgs,
+                                     bool isNominalInheritanceClause,
                                      GenericTypeResolver *resolver) {
   SmallVector<TypeLoc, 8> args;
   for (auto tyR : genericArgs)
     args.push_back(tyR);
-  Type ty = TC.applyGenericArguments(type, loc, dc, args, resolver);
+  Type ty = TC.applyGenericArguments(type, loc, dc, args,
+                                     isNominalInheritanceClause, resolver);
   if (!ty)
     return ErrorType::get(TC.Context);
   return ty;
@@ -365,6 +372,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
                             DeclContext *dc,
                             ArrayRef<TypeRepr *> genericArgs,
                             bool allowUnboundGenerics,
+                            bool isNominalInheritanceClause,
                             GenericTypeResolver *resolver) {
   TC.validateDecl(typeDecl);
 
@@ -399,7 +407,8 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
 
   if (!genericArgs.empty()) {
     // Apply the generic arguments to the type.
-    type = applyGenericTypeReprArgs(TC, type, loc, dc, genericArgs, resolver);
+    type = applyGenericTypeReprArgs(TC, type, loc, dc, genericArgs,
+                                    isNominalInheritanceClause, resolver);
   }
 
   assert(type);
@@ -426,12 +435,15 @@ static NominalTypeDecl *getEnclosingNominalContext(DeclContext *dc) {
 /// \param dc The context in which name lookup occurred.
 /// \param components The components that refer to the type, where the last
 /// component refers to the type that could not be found.
+/// \param isNominalInheritanceClause True if this type is in a nominal's
+/// inheritance clause.
 ///
 /// \returns true if we could not fix the type reference, false if
 /// typo correction (or some other mechanism) was able to fix the
 /// reference.
 static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
                                 ArrayRef<ComponentIdentTypeRepr *> components,
+                                bool isNominalInheritanceClause,
                                 GenericTypeResolver *resolver) {
   auto comp = components.back();
 
@@ -446,7 +458,8 @@ static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
       // Retrieve the nominal type and resolve it within this context.
       assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
       auto type = resolveTypeDecl(tc, nominal, comp->getIdLoc(), dc, { },
-                                  /*allowUnboundGenerics=*/false, resolver);
+                                  /*allowUnboundGenerics=*/false,
+                                  isNominalInheritanceClause, resolver);
       if (type->is<ErrorType>())
         return true;
 
@@ -515,6 +528,113 @@ static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
   return true;
 }
 
+static void
+resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
+                                  ComponentIdentTypeRepr *comp,
+                                  TypeResolutionOptions options,
+                                  bool diagnoseErrors,
+                                  GenericTypeResolver *resolver) {
+  // Resolve the first component, which is the only one that requires
+  // unqualified name lookup.
+  DeclContext *lookupDC = DC;
+  if (options.contains(TR_NominalInheritanceClause))
+    lookupDC = DC->getParent();
+  UnqualifiedLookup Globals(comp->getIdentifier(), lookupDC, &TC,
+                            options.contains(TR_KnownNonCascadingDependency),
+                            comp->getIdLoc(), /*TypeLookup*/true);
+
+  // Process the names we found.
+  llvm::PointerUnion<Type, Module *> current;
+  bool isAmbiguous = false;
+  for (const auto &result : Globals.Results) {
+    // If we found a module, record it.
+    if (result.Kind == UnqualifiedLookupResult::ModuleName) {
+      // If we already found a name of some sort, it's ambiguous.
+      if (!current.isNull()) {
+        isAmbiguous = true;
+        break;
+      }
+
+      // Save this result.
+      current = result.getNamedModule();
+      comp->setValue(result.getNamedModule());
+      continue;
+    }
+
+    // Ignore non-type declarations.
+    auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl());
+    if (!typeDecl)
+      continue;
+    
+    // If necessary, add delayed members to the declaration.
+    if (auto nomDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
+      TC.forceExternalDeclMembers(nomDecl);
+    }
+
+    ArrayRef<TypeRepr *> genericArgs;
+    if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
+      genericArgs = genComp->getGenericArgs();
+    Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(),
+                                DC, genericArgs,
+                                options.contains(TR_AllowUnboundGenerics),
+                                options.contains(TR_NominalInheritanceClause),
+                                resolver);
+    if (type->is<ErrorType>()) {
+      comp->setValue(type);
+      return;
+    }
+
+    // If this is the first result we found, record it.
+    if (current.isNull()) {
+      current = type;
+      comp->setValue(type);
+      continue;
+    }
+
+    // Otherwise, check for an ambiguity.
+    if (current.is<Module *>() || !current.get<Type>()->isEqual(type)) {
+      isAmbiguous = true;
+      break;
+    }
+
+    // We have a found multiple type aliases that refer to the same thing.
+    // Ignore the duplicate.
+  }
+
+  // Complain about any ambiguities we detected.
+  // FIXME: We could recover by looking at later components.
+  if (isAmbiguous) {
+    if (diagnoseErrors) {
+      TC.diagnose(comp->getIdLoc(), diag::ambiguous_type_base,
+                  comp->getIdentifier())
+        .highlight(comp->getIdLoc());
+      for (auto Result : Globals.Results) {
+        if (Globals.Results[0].hasValueDecl())
+          TC.diagnose(Result.getValueDecl(), diag::found_candidate);
+        else
+          TC.diagnose(comp->getIdLoc(), diag::found_candidate);
+      }
+    }
+    Type ty = ErrorType::get(TC.Context);
+    comp->setValue(ty);
+    return;
+  }
+
+  // If we found nothing, complain and give ourselves a chance to recover.
+  if (current.isNull()) {
+    // If we're not allowed to complain or we couldn't fix the
+    // source, bail out.
+    if (!diagnoseErrors ||
+        diagnoseUnknownType(TC, DC, comp,
+                            options.contains(TR_NominalInheritanceClause),
+                            resolver)) {
+      Type ty = ErrorType::get(TC.Context);
+      comp->setValue(ty);
+      return;
+    }
+  }
+}
+
 static llvm::PointerUnion<Type, Module *>
 resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                           ArrayRef<ComponentIdentTypeRepr *> components,
@@ -525,99 +645,41 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   if (!comp->isBound()) {
     auto parentComps = components.slice(0, components.size()-1);
     if (parentComps.empty()) {
-      // Resolve the first component, which is the only one that requires
-      // unqualified name lookup.
-      UnqualifiedLookup Globals(comp->getIdentifier(), DC, &TC,
-                                options.contains(TR_KnownNonCascadingDependency),
-                                comp->getIdLoc(), /*TypeLookup*/true);
+      TypeResolutionOptions lookupOptions = options;
 
-      // Process the names we found.
-      llvm::PointerUnion<Type, Module *> current;
-      bool isAmbiguous = false;
-      for (const auto &result : Globals.Results) {
-        // If we found a module, record it.
-        if (result.Kind == UnqualifiedLookupResult::ModuleName) {
-          // If we already found a name of some sort, it's ambiguous.
-          if (!current.isNull()) {
-            isAmbiguous = true;
-            break;
-          }
+      // For inheritance clause lookups, don't actually look into the type.
+      // Just look at the generic parameters, and then move up to the enclosing
+      // context.
+      if (options.contains(TR_NominalInheritanceClause)) {
+        auto *nominal = cast<NominalTypeDecl>(DC);
 
-          // Save this result.
-          current = result.getNamedModule();
-          comp->setValue(result.getNamedModule());
-          continue;
-        }
+        if (!isa<GenericIdentTypeRepr>(comp)) {
+          if (auto *genericParams = nominal->getGenericParams()) {
+            auto matchingParam =
+                std::find_if(genericParams->begin(), genericParams->end(),
+                             [comp](const GenericTypeParamDecl *param) {
+              return param->getFullName().matchesRef(comp->getIdentifier());
+            });
 
-        // Ignore non-type declarations.
-        auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl());
-        if (!typeDecl)
-          continue;
-        
-        // If necessary, add delayed members to the declaration.
-        if (auto nomDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
-          TC.forceExternalDeclMembers(nomDecl);
-        }
-
-        ArrayRef<TypeRepr *> genericArgs;
-        if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
-          genericArgs = genComp->getGenericArgs();
-        Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(),
-                                    DC, genericArgs,
-                                    options.contains(TR_AllowUnboundGenerics),
-                                    resolver);
-        if (type->is<ErrorType>()) {
-          comp->setValue(type);
-          return type;
-        }
-
-        // If this is the first result we found, record it.
-        if (current.isNull()) {
-          current = type;
-          comp->setValue(type);
-          continue;
-        }
-
-        // Otherwise, check for an ambiguity.
-        if (current.is<Module *>() || !current.get<Type>()->isEqual(type)) {
-          isAmbiguous = true;
-          break;
-        }
-
-        // We have a found multiple type aliases that refer to the same thing.
-        // Ignore the duplicate.
-      }
-
-      // Complain about any ambiguities we detected.
-      // FIXME: We could recover by looking at later components.
-      if (isAmbiguous) {
-        if (diagnoseErrors) {
-          TC.diagnose(comp->getIdLoc(), diag::ambiguous_type_base,
-                      comp->getIdentifier())
-            .highlight(SourceRange(comp->getIdLoc(),
-                                   components.back()->getIdLoc()));
-          for (auto Result : Globals.Results) {
-            if (Globals.Results[0].hasValueDecl())
-              TC.diagnose(Result.getValueDecl(), diag::found_candidate);
-            else
-              TC.diagnose(comp->getIdLoc(), diag::found_candidate);
+            if (matchingParam != genericParams->end()) {
+              bool unboundGenerics = options.contains(TR_AllowUnboundGenerics);
+              Type type = resolveTypeDecl(TC, *matchingParam, comp->getIdLoc(),
+                                          DC, None, unboundGenerics, true,
+                                          resolver);
+              comp->setValue(type);
+              if (type->is<ErrorType>())
+                return type;
+            }
           }
         }
-        Type ty = ErrorType::get(TC.Context);
-        comp->setValue(ty);
-        return ty;
+
+        if (!DC->isCascadingContextForLookup(/*excludeFunctions*/true))
+          lookupOptions |= TR_KnownNonCascadingDependency;
       }
 
-      // If we found nothing, complain and give ourselves a chance to recover.
-      if (current.isNull()) {
-        // If we're not allowed to complain or we couldn't fix the
-        // source, bail out.
-        if (!diagnoseErrors || 
-            diagnoseUnknownType(TC, DC, components, resolver)) {
-          Type ty = ErrorType::get(TC.Context);
-          comp->setValue(ty);
-          return ty;
-        }
+      if (!comp->isBound()) {
+        resolveTopLevelIdentTypeComponent(TC, DC, comp, lookupOptions,
+                                          diagnoseErrors, resolver);
       }
     } else {
       llvm::PointerUnion<Type, Module *>
@@ -683,12 +745,13 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         }
 
         // If we didn't find anything, complain.
+        bool isNominal = options.contains(TR_NominalInheritanceClause);
         bool recovered = false;
         if (!memberTypes) {
           // If we're not allowed to complain or we couldn't fix the
           // source, bail out.
           if (!diagnoseErrors || 
-              diagnoseUnknownType(TC, DC, components, resolver)) {
+              diagnoseUnknownType(TC, DC, components, isNominal, resolver)) {
             Type ty = ErrorType::get(TC.Context);
             comp->setValue(ty);
             return ty;
@@ -713,7 +776,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
           memberType = applyGenericTypeReprArgs(TC, memberType,
                                                 genComp->getIdLoc(),
                                                 DC, genComp->getGenericArgs(),
-                                                resolver);
+                                                isNominal, resolver);
 
         comp->setValue(memberType);
         return memberType;
@@ -745,10 +808,11 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       }
 
       // If we didn't find a type, complain.
+      bool isNominal = options.contains(TR_NominalInheritanceClause);
       bool recovered = false;
       if (!foundModuleTypes) {
         if (!diagnoseErrors || 
-            diagnoseUnknownType(TC, DC, components, resolver)) {
+            diagnoseUnknownType(TC, DC, components, isNominal, resolver)) {
           Type ty = ErrorType::get(TC.Context);
           comp->setValue(ty);
           return ty;
@@ -764,7 +828,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
         foundType = applyGenericTypeReprArgs(TC, foundType, genComp->getIdLoc(),
                                              DC, genComp->getGenericArgs(),
-                                             resolver);
+                                             isNominal, resolver);
       }
 
       comp->setValue(foundType);
@@ -796,6 +860,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), DC,
                               genericArgs, 
                               options.contains(TR_AllowUnboundGenerics),
+                              options.contains(TR_NominalInheritanceClause),
                               resolver);
   comp->setValue(type);
   return type;
@@ -1550,8 +1615,10 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
     TypeLoc args[2] = { TypeLoc(repr->getKey()), TypeLoc(repr->getValue()) };
 
     if (!TC.applyGenericArguments(unboundTy, repr->getStartLoc(), DC, args,
-                                  Resolver))
+                                  options.contains(TR_NominalInheritanceClause),
+                                  Resolver)) {
       return ErrorType::get(TC.Context);
+    }
 
     return dictTy;
   }

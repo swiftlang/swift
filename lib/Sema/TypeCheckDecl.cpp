@@ -237,11 +237,14 @@ static void validateAttributes(TypeChecker &TC, Decl *VD);
 /// to which this type declaration conforms.
 void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
                                          GenericTypeResolver *resolver) {
+  TypeResolutionOptions options = TR_InheritanceClause;
   if (!DC) {
-    if (auto nominal = dyn_cast<NominalTypeDecl>(decl))
+    if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
       DC = nominal;
-    else
+      options |= TR_NominalInheritanceClause;
+    } else {
       DC = decl->getDeclContext();
+    }
   }
 
   // Establish a default generic type resolver.
@@ -282,7 +285,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
     auto &inherited = inheritedClause[i];
 
     // Validate the type.
-    if (validateType(inherited, DC, TR_InheritanceClause, resolver)) {
+    if (validateType(inherited, DC, options, resolver)) {
       inherited.setInvalidType(Context);
       continue;
     }

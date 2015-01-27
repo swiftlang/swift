@@ -276,7 +276,6 @@ extension PrivateTy6 : PrivateProto3 {}
 // CHECK-DAG: - "V4main10IntWrapper"
 // CHECK-DAG: - "PSs10Comparable"
 // CHECK-DAG: - "C4main18ClassFromOtherFile"
-// CHECK-DAG: - "C4main8Subclass"
 // CHECK-DAG: !private "Si"
 // CHECK-DAG: - "PSs23FloatLiteralConvertible"
 // CHECK-DAG: !private "PSs31UnicodeScalarLiteralConvertible"
