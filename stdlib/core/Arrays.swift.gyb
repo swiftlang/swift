@@ -397,8 +397,7 @@ extension ${Self} : _ArrayType {
     var p: UnsafeMutablePointer<T>
     (self, p) = ${Self}._allocateUninitialized(count)
     for _ in 0..<count {
-      p.initialize(repeatedValue)
-      ++p
+      p++.initialize(repeatedValue)
     }
   }
 
