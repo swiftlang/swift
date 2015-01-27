@@ -119,3 +119,4 @@
 // CHECK-NULLABILITY:   func stringMethod() -> String{{$}}
 // CHECK-NULLABILITY:   func optArrayMethod() -> [AnyObject]?
 // CHECK-NULLABILITY: }
+// CHECK-NULLABILITY: func compare_classes(sc1: SomeClass, sc2: SomeClass, sc3: SomeClass!)

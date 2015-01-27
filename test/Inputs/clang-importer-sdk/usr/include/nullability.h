@@ -24,4 +24,8 @@ extern __nullable id global_id;
 -(nonnull instancetype)returnMe;
 @end
 
+#define NON_NULL_MACRO(...) __attribute__ ((nonnull(__VA_ARGS__)))
+
+void compare_classes(SomeClass *sc1, SomeClass *sc2, SomeClass *sc3) NON_NULL_MACRO(1,2);
+
 #endif
