@@ -19,3 +19,10 @@ x
 #line
 x
 x x // expected-error{{consecutive statements}}
+
+// rdar://19582475
+public struct S {
+// expected-error@+2{{consecutive declarations on a line must be separated by ';'}}
+// expected-error@+1{{expected declaration}}
+/ ###line 25 "line-directive.swift"
+}

@@ -1593,8 +1593,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       break;
     }
     case tok::pound_line:
-      DeclResult = parseLineDirective();
-      Status = DeclResult;
+      Status = parseLineDirective();
       break;
 
     case tok::kw_func:
