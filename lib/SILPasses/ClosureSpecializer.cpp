@@ -32,10 +32,12 @@ STATISTIC(NumClosureSpecialized,
           "Number of functions with closures specialized");
 
 //===----------------------------------------------------------------------===//
-//                            Closure Spec Cloner
+//                       Closure Spec Cloner Interface
 //===----------------------------------------------------------------------===//
 
 namespace {
+
+class CallSiteDescriptor;
 
 /// \brief A SILCloner subclass which clones a function that takes a closure
 /// argument. We update the parameter list to remove the parameter for the
@@ -49,32 +51,157 @@ public:
   friend class SILVisitor<ClosureSpecCloner>;
   friend class SILCloner<ClosureSpecCloner>;
 
-  ClosureSpecCloner(SILFunction *PAIUser, PartialApplyInst *PAI,
-                     unsigned ClosureIndex, StringRef ClonedName)
-    : SuperTy(*initCloned(PAIUser, PAI, ClosureIndex, ClonedName)),
-      PAIUser(PAIUser), ClosureIndex(ClosureIndex), PAI(PAI) {
-  }
+  ClosureSpecCloner(const CallSiteDescriptor &CallSiteDesc,
+                    StringRef ClonedName)
+      : SuperTy(*initCloned(CallSiteDesc, ClonedName)),
+        CallSiteDesc(CallSiteDesc) {}
 
   void populateCloned();
 
   SILFunction *getCloned() { return &getBuilder().getFunction(); }
-  static SILFunction *cloneFunction(SILFunction *F, PartialApplyInst *PAI,
-                                    unsigned ClosureIndex, StringRef NewName) {
-    ClosureSpecCloner C(F, PAI, ClosureIndex, NewName);
+  static SILFunction *cloneFunction(const CallSiteDescriptor &CallSiteDesc,
+                                    StringRef NewName) {
+    ClosureSpecCloner C(CallSiteDesc, NewName);
     C.populateCloned();
     ++NumClosureSpecialized;
     return C.getCloned();
   };
 
 private:
-  static SILFunction *initCloned(SILFunction *PAIUser, PartialApplyInst *PAI,
-                                 unsigned ClosureIndex, StringRef ClonedName);
-  SILFunction *PAIUser;
-  unsigned ClosureIndex;
-  PartialApplyInst *PAI;
+  static SILFunction *initCloned(const CallSiteDescriptor &CallSiteDesc,
+                                 StringRef ClonedName);
+  const CallSiteDescriptor &CallSiteDesc;
 };
 
 } // end anonymous namespace
+
+//===----------------------------------------------------------------------===//
+//                            Arg Spec Descriptor
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class CallSiteDescriptor {
+  SILInstruction *Closure;
+  ApplyInst *AI;
+  unsigned ClosureIndex;
+
+public:
+  CallSiteDescriptor(SILInstruction *ClosureInst, ApplyInst *AI,
+                     unsigned ClosureIndex)
+      : Closure(ClosureInst), AI(AI), ClosureIndex(ClosureIndex) {}
+
+  SILFunction *getApplyCallee() const {
+    return cast<FunctionRefInst>(AI->getCallee())->getReferencedFunction();
+  }
+
+  SILFunction *getClosureCallee() const {
+    auto *PAI = cast<PartialApplyInst>(Closure);
+    return cast<FunctionRefInst>(PAI->getCallee())->getReferencedFunction();
+  }
+
+  unsigned getClosureIndex() const { return ClosureIndex; }
+
+  SILInstruction *
+  createNewClosure(SILBuilder &B, SILValue V,
+                   llvm::SmallVectorImpl<SILValue> &Args) const {
+    return B.createPartialApply(Closure->getLoc(), V, V.getType(), {}, Args,
+                                Closure->getType(0));
+  }
+
+  ApplyInst *getApplyInst() const { return AI; }
+
+  void specializeClosure() const;
+
+  void createName(llvm::SmallString<64> &NewName) const;
+
+  OperandValueArrayRef getArguments() const {
+    if (auto *PAI = dyn_cast<PartialApplyInst>(Closure))
+      return PAI->getArguments();
+    return OperandValueArrayRef(ArrayRef<Operand>());
+  }
+
+  SILInstruction *getClosure() const { return Closure; }
+
+  unsigned getNumArguments() const {
+    auto *PAI = cast<PartialApplyInst>(Closure);
+    return PAI->getNumArguments();
+  }
+
+  SILLocation getLoc() const { return Closure->getLoc(); }
+
+  SILModule &getModule() const { return AI->getModule(); }
+};
+
+} // end anonymous namespace
+
+/// Update the callsite to pass in the correct arguments.
+static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
+                             SILFunction *NewF) {
+  ApplyInst *AI = CSDesc.getApplyInst();
+  SILBuilderWithScope<2> Builder(AI);
+  FunctionRefInst *FRI = Builder.createFunctionRef(AI->getLoc(), NewF);
+
+  // Create the args for the new apply by removing the closure argument and
+  // appending the captured argument.
+  llvm::SmallVector<SILValue, 8> NewArgs;
+  unsigned Index = 0;
+  for (auto Arg : AI->getArguments()) {
+    if (Index != CSDesc.getClosureIndex())
+      NewArgs.push_back(Arg);
+    Index++;
+  }
+  for (auto Arg : CSDesc.getArguments())
+    NewArgs.push_back(Arg);
+
+  SILType LoweredType = NewF->getLoweredType();
+  SILType ResultType = LoweredType.castTo<SILFunctionType>()->getSILResult();
+  ApplyInst *NewAI = Builder.createApply(AI->getLoc(), FRI, LoweredType,
+                                         ResultType, ArrayRef<Substitution>(),
+                                         NewArgs, NewF->isTransparent());
+
+  // Replace all uses of the old apply with the new apply.
+  AI->replaceAllUsesWith(NewAI);
+  // Erase the old apply.
+  AI->eraseFromParent();
+
+  SILInstruction *Closure = CSDesc.getClosure();
+  if (Closure->use_empty())
+    Closure->eraseFromParent();
+}
+
+void CallSiteDescriptor::createName(llvm::SmallString<64> &NewName) const {
+  llvm::raw_svector_ostream buffer(NewName);
+  Mangle::Mangler M(buffer);
+  auto P = Mangle::SpecializationPass::ClosureSpecializer;
+  Mangle::FunctionSignatureSpecializationMangler FSSM(P, M, getApplyCallee());
+  auto *PAI = cast<PartialApplyInst>(Closure);
+  FSSM.setArgumentClosureProp(getClosureIndex(), PAI);
+  FSSM.mangle();
+}
+
+void CallSiteDescriptor::specializeClosure() const {
+  llvm::SmallString<64> NewFName;
+  createName(NewFName);
+  DEBUG(llvm::dbgs() << "    Perform optimizations with new name " << NewFName
+                     << '\n');
+
+  // Then see if we already have a specialized version of this function in our
+  // module.
+  SILFunction *NewF = getModule().lookUpFunction(NewFName);
+
+  // If not, create a specialized version of ApplyCallee calling the closure
+  // directly.
+  if (!NewF)
+    NewF = ClosureSpecCloner::cloneFunction(*this, NewFName);
+
+  // Rewrite the call
+  rewriteApplyInst(*this, NewF);
+}
+
+//===----------------------------------------------------------------------===//
+//                     Closure Spec Cloner Implementation
+//===----------------------------------------------------------------------===//
 
 /// In this function we create the actual cloned function and its proper cloned
 /// type. But we do not create any body. This implies that the creation of the
@@ -85,19 +212,20 @@ private:
 /// \arg ClosureIndex The index of the partial apply in PAUser's function
 ///                   signature.
 /// \arg ClonedName The name of the cloned function that we will create.
-SILFunction *ClosureSpecCloner::initCloned(SILFunction *PAIUser,
-                                           PartialApplyInst *PAI,
-                                           unsigned ClosureIndex,
-                                           StringRef ClonedName) {
+SILFunction *
+ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
+                              StringRef ClonedName) {
+  SILFunction *ClosureUser = CallSiteDesc.getApplyCallee();
+
   // This is the list of new interface parameters of the cloned function.
   llvm::SmallVector<SILParameterInfo, 4> NewParameterInfoList;
 
   // First add to NewParameterInfoList all of the SILParameterInfo in the
   // original function except for the closure.
-  CanSILFunctionType PAIUserFunTy = PAIUser->getLoweredFunctionType();
+  CanSILFunctionType ClosureUserFunTy = ClosureUser->getLoweredFunctionType();
   unsigned Index = 0;
-  for (auto &param : PAIUserFunTy->getParameters()) {
-    if (Index != ClosureIndex)
+  for (auto &param : ClosureUserFunTy->getParameters()) {
+    if (Index != CallSiteDesc.getClosureIndex())
       NewParameterInfoList.push_back(param);
     ++Index;
   }
@@ -105,33 +233,30 @@ SILFunction *ClosureSpecCloner::initCloned(SILFunction *PAIUser,
   // Then add any arguments that are captured in the closure to the function's
   // argument type. Since they are captured, we need to pass them directly into
   // the new specialized function.
-  auto *ClosedOverFunFRI = cast<FunctionRefInst>(PAI->getCallee());
-  auto ClosedOverFunTy = ClosedOverFunFRI->getFunctionType();
+  SILFunction *ClosedOverFun = CallSiteDesc.getClosureCallee();
+  CanSILFunctionType ClosedOverFunTy = ClosedOverFun->getLoweredFunctionType();
 
   // Captured parameters are always appended to the function signature. So grab the
   unsigned NumTotalParams = ClosedOverFunTy->getParameters().size();
-  unsigned NumNotCaptured = NumTotalParams - PAI->getNumArguments();
+  unsigned NumNotCaptured = NumTotalParams - CallSiteDesc.getNumArguments();
   for (auto &PInfo : ClosedOverFunTy->getParameters().slice(NumNotCaptured))
     NewParameterInfoList.push_back(PInfo);
 
-  SILModule &M = PAIUser->getModule();
-  auto ClonedTy =
-    SILFunctionType::get(PAIUserFunTy->getGenericSignature(),
-                         PAIUserFunTy->getExtInfo(),
-                         PAIUserFunTy->getCalleeConvention(),
-                         NewParameterInfoList,
-                         PAIUserFunTy->getResult(),
-                         M.getASTContext());
+  SILModule &M = ClosureUser->getModule();
+  auto ClonedTy = SILFunctionType::get(
+      ClosureUserFunTy->getGenericSignature(), ClosureUserFunTy->getExtInfo(),
+      ClosureUserFunTy->getCalleeConvention(), NewParameterInfoList,
+      ClosureUserFunTy->getResult(), M.getASTContext());
 
   // We make this function bare so we don't have to worry about decls in the
   // SILArgument.
   auto Fn = SILFunction::create(
-      M, PAIUser->getLinkage(), ClonedName, ClonedTy,
-      PAIUser->getContextGenericParams(), PAIUser->getLocation(), IsBare,
-      PAIUser->isTransparent(), PAIUser->isFragile(),
-      PAIUser->getClassVisibility(), PAIUser->getInlineStrategy(),
-      PAIUser->getEffectsKind(), PAIUser, PAIUser->getDebugScope());
-  Fn->setSemanticsAttr(PAIUser->getSemanticsAttr());
+      M, ClosureUser->getLinkage(), ClonedName, ClonedTy,
+      ClosureUser->getContextGenericParams(), ClosureUser->getLocation(),
+      IsBare, ClosureUser->isTransparent(), ClosureUser->isFragile(),
+      ClosureUser->getClassVisibility(), ClosureUser->getInlineStrategy(),
+      ClosureUser->getEffectsKind(), ClosureUser, ClosureUser->getDebugScope());
+  Fn->setSemanticsAttr(ClosureUser->getSemanticsAttr());
   return Fn;
 }
 
@@ -141,15 +266,17 @@ void ClosureSpecCloner::populateCloned() {
   SILFunction *Cloned = getCloned();
   SILModule &M = Cloned->getModule();
 
+  SILFunction *ClosureUser = CallSiteDesc.getApplyCallee();
+
   // Create arguments for the entry block.
-  SILBasicBlock *PAIUserEntryBB = PAIUser->begin();
+  SILBasicBlock *ClosureUserEntryBB = ClosureUser->begin();
   SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
 
   // Remove the closure argument.
   SILArgument *ClosureArg = nullptr;
-  for (size_t i = 0, e = PAIUserEntryBB->bbarg_size(); i != e; ++i) {
-    SILArgument *Arg = PAIUserEntryBB->getBBArg(i);
-    if (i == ClosureIndex) {
+  for (size_t i = 0, e = ClosureUserEntryBB->bbarg_size(); i != e; ++i) {
+    SILArgument *Arg = ClosureUserEntryBB->getBBArg(i);
+    if (i == CallSiteDesc.getClosureIndex()) {
       ClosureArg = Arg;
       continue;
     }
@@ -168,12 +295,10 @@ void ClosureSpecCloner::populateCloned() {
   // definition is nothing in the partial apply user function that references
   // such arguments. After this pass is done the only thing that will reference
   // the arguments is the partial apply that we will create.
-
-  auto *ClosedOverFunFRI = cast<FunctionRefInst>(PAI->getCallee());
-  auto *ClosedOverFun = ClosedOverFunFRI->getReferencedFunction();
-  auto ClosedOverFunTy = ClosedOverFunFRI->getFunctionType();
+  SILFunction *ClosedOverFun = CallSiteDesc.getClosureCallee();
+  CanSILFunctionType ClosedOverFunTy = ClosedOverFun->getLoweredFunctionType();
   unsigned NumTotalParams = ClosedOverFunTy->getParameters().size();
-  unsigned NumNotCaptured = NumTotalParams - PAI->getNumArguments();
+  unsigned NumNotCaptured = NumTotalParams - CallSiteDesc.getNumArguments();
   llvm::SmallVector<SILValue, 4> NewPAIArgs;
   for (auto &PInfo : ClosedOverFunTy->getParameters().slice(NumNotCaptured)) {
     SILValue MappedValue =
@@ -184,73 +309,22 @@ void ClosureSpecCloner::populateCloned() {
   getBuilder().setInsertionPoint(ClonedEntryBB);
   // Clone FRI and PAI, and replace usage of the removed closure argument
   // with result of cloned PAI.
-  SILValue FnVal = getBuilder().createFunctionRef(ClosedOverFunFRI->getLoc(),
-                                                  ClosedOverFun);
-  auto *NewPAI = getBuilder().createPartialApply(PAI->getLoc(), FnVal,
-                                                 FnVal.getType(), {},
-                                                 NewPAIArgs, PAI->getType());
-  ValueMap.insert(std::make_pair(ClosureArg, SILValue(NewPAI, 0)));
+  SILValue FnVal =
+      getBuilder().createFunctionRef(CallSiteDesc.getLoc(), ClosedOverFun);
+  auto *NewClosure =
+      CallSiteDesc.createNewClosure(getBuilder(), FnVal, NewPAIArgs);
+  ValueMap.insert(std::make_pair(ClosureArg, SILValue(NewClosure)));
 
-  BBMap.insert(std::make_pair(PAIUserEntryBB, ClonedEntryBB));
+  BBMap.insert(std::make_pair(ClosureUserEntryBB, ClonedEntryBB));
   // Recursively visit original BBs in depth-first preorder, starting with the
   // entry block, cloning all instructions other than terminators.
-  visitSILBasicBlock(PAIUserEntryBB);
+  visitSILBasicBlock(ClosureUserEntryBB);
 
   // Now iterate over the BBs and fix up the terminators.
   for (auto BI = BBMap.begin(), BE = BBMap.end(); BI != BE; ++BI) {
     getBuilder().setInsertionPoint(BI->second);
     visit(BI->first->getTerminator());
   }
-}
-
-//===----------------------------------------------------------------------===//
-//                            Arg Spec Descriptor
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-struct ArgDescriptor {
-  PartialApplyInst *PAI;
-  ApplyInst *AI;
-  unsigned ClosureIndex;
-  ArgDescriptor(PartialApplyInst *PAI, ApplyInst *AI,
-                    unsigned ClosureIndex) :
-    PAI(PAI), AI(AI), ClosureIndex(ClosureIndex) {
-  }
-};
-
-} // end anonymous namespace
-
-/// Update the callsite to pass in the correct arguments.
-static void rewriteApplyInst(ArgDescriptor &AD, SILFunction *NewF) {
-  SILBuilderWithScope<2> Builder(AD.AI);
-  FunctionRefInst *FRI = Builder.createFunctionRef(AD.AI->getLoc(), NewF);
-
-  // Create the args for the new apply by removing the closure argument and
-  // appending the captured argument.
-  llvm::SmallVector<SILValue, 8> NewArgs;
-  unsigned Index = 0;
-  for (auto Arg : AD.AI->getArguments()) {
-    if (Index != AD.ClosureIndex)
-      NewArgs.push_back(Arg);
-    Index++;
-  }
-  for (auto Arg : AD.PAI->getArguments())
-    NewArgs.push_back(Arg);
-
-  SILType LoweredType = NewF->getLoweredType();
-  SILType ResultType = LoweredType.castTo<SILFunctionType>()->getSILResult();
-  ApplyInst *NewAI = Builder.createApply(AD.AI->getLoc(), FRI, LoweredType,
-                                         ResultType, ArrayRef<Substitution>(),
-                                         NewArgs, NewF->isTransparent());
-
-  // Replace all uses of the old apply with the new apply.
-  AD.AI->replaceAllUsesWith(NewAI);
-  // Erase the old apply.
-  AD.AI->eraseFromParent();
-
-  if (AD.PAI->use_empty())
-    AD.PAI->eraseFromParent();
 }
 
 //===----------------------------------------------------------------------===//
@@ -267,29 +341,16 @@ struct ClosureSpecializer {
   }
 
   void gatherCallSites(SILFunction *Caller,
-                       llvm::SmallVectorImpl<ArgDescriptor> &CallSites,
+                       llvm::SmallVectorImpl<CallSiteDescriptor> &CallSites,
                        llvm::SmallPtrSet<ApplyInst *, 4> &MultipleClosureAI);
   bool specialize(SILFunction *Caller);
 };
 
 } // end anonymous namespace
 
-static void createName(SILFunction *Callee, SILArgument *Arg,
-                       PartialApplyInst *PAI,
-                       llvm::SmallString<64> &Name) {
-  llvm::raw_svector_ostream buffer(Name);
-  Mangle::Mangler M(buffer);
-  auto P = Mangle::SpecializationPass::ClosureSpecializer;
-  Mangle::FunctionSignatureSpecializationMangler FSSM(P, M, Callee);
-  FSSM.setArgumentClosureProp(Arg->getIndex(), PAI);
-  FSSM.mangle();
-}
-
-void
-ClosureSpecializer::
-gatherCallSites(SILFunction *Caller,
-                llvm::SmallVectorImpl<ArgDescriptor> &CallSites,
-                llvm::SmallPtrSet<ApplyInst *, 4> &MultipleClosureAI) {
+void ClosureSpecializer::gatherCallSites(
+    SILFunction *Caller, llvm::SmallVectorImpl<CallSiteDescriptor> &CallSites,
+    llvm::SmallPtrSet<ApplyInst *, 4> &MultipleClosureAI) {
 
   // A set of apply inst that we have associated with a closure. We use this to
   // make sure that we do not handle call sites with multiple closure arguments.
@@ -360,9 +421,9 @@ gatherCallSites(SILFunction *Caller,
       if (!PAIIndex.hasValue())
         continue;
 
-      // Now we know that AD is profitable to specialize. Add it to our call
+      // Now we know that CSDesc is profitable to specialize. Add it to our call
       // site list.
-      CallSites.push_back(ArgDescriptor(PAI, AI, PAIIndex.getValue()));
+      CallSites.push_back(CallSiteDescriptor(PAI, AI, PAIIndex.getValue()));
     }
   }
 }
@@ -373,32 +434,18 @@ bool ClosureSpecializer::specialize(SILFunction *Caller) {
 
   // Collect all of the PartialApplyInsts that are used as arguments to
   // ApplyInsts. Check the profitability of specializing the closure argument.
-  llvm::SmallVector<ArgDescriptor, 8> CallSites;
+  llvm::SmallVector<CallSiteDescriptor, 8> CallSites;
   llvm::SmallPtrSet<ApplyInst *, 4> MultipleClosureAI;
   gatherCallSites(Caller, CallSites, MultipleClosureAI);
 
   bool Changed = false;
-  for (auto &AD : CallSites) {
+  for (auto &CSDesc : CallSites) {
     // Do not specialize apply insts that take in multiple closures. This pass
     // does not know how to do this yet.
-    if (MultipleClosureAI.count(AD.AI))
+    if (MultipleClosureAI.count(CSDesc.getApplyInst()))
       continue;
 
-    auto *CalleeFRI = cast<FunctionRefInst>(AD.AI->getCallee());
-    auto *Callee = CalleeFRI->getReferencedFunction();
-
-    llvm::SmallString<64> NewFName;
-    createName(Callee, Callee->getArgument(AD.ClosureIndex), AD.PAI,
-               NewFName);
-    DEBUG(llvm::dbgs() << "    Perform optimizations with new name "
-                       << NewFName << '\n');
-
-    SILFunction *NewF = Callee->getModule().lookUpFunction(NewFName);
-    if (!NewF)
-      NewF = ClosureSpecCloner::cloneFunction(Callee, AD.PAI, AD.ClosureIndex,
-                                              NewFName);
-
-    rewriteApplyInst(AD, NewF);
+    CSDesc.specializeClosure();
     Changed = true;
   }
 
