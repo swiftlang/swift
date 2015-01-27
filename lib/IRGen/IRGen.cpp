@@ -133,8 +133,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
     return nullptr;
   }
 
-  const llvm::DataLayout *DataLayout =
-    TargetMachine->getSubtargetImpl()->getDataLayout();
+  const llvm::DataLayout *DataLayout = TargetMachine->getDataLayout();
   assert(DataLayout && "target machine didn't set DataLayout?");
 
   // Create the IR emitter.
