@@ -266,19 +266,9 @@ public struct ${Self}<T>
   /// Copy the elements of `C` into raw memory.
   ///
   /// Precondition: the memory is not initialized.
-  public func initializeFrom<
-    C: CollectionType where C.Generator.Element == T
-  >(
-    source: C
-  ) {
-    var p = self
-    for x in source {
-      // FIXME: <rdar://problem/16951692> We should be able to use a
-      // C.Generator.Element == T constraint here, because C._Element ==
-      // C.Generator.Element in all cases, but doing so crashes the
-      // type-checker.
-      p++.initialize(unsafeBitCast(x, T.self))
-    }
+  public func initializeFrom<C: CollectionType where C.Generator.Element == T>(
+    source: C) {
+    source~>_initializeTo(self)
   }
 
   /// Assign from `count` values beginning at `source` into initialized

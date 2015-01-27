@@ -110,6 +110,9 @@ public protocol SequenceType : _Sequence_Type {
   func ~>(
     _:Self, _: (_CopyToNativeArrayBuffer, ())
   ) -> _ContiguousArrayBuffer<Self.Generator.Element>
+
+  /// Copy a Sequence into an array.
+  func ~> (source:Self, ptr:(_InitializeTo, UnsafeMutablePointer<Self.Generator.Element>))
 }
 
 public struct _CopyToNativeArrayBuffer {}
@@ -139,6 +142,19 @@ public func ~> <T: _SequenceType>(s: T,_:(_UnderestimateCount, ())) -> Int {
 /// actually Collections, this will return count(x)
 public func underestimateCount<T: SequenceType>(x: T) -> Int {
   return x~>_underestimateCount()
+}
+
+public struct _InitializeTo {}
+internal func _initializeTo<Args>(a: Args) -> (_InitializeTo, Args) {
+  return (_InitializeTo(), a)
+}
+
+public func ~> <T: _Sequence_Type>(
+  source: T, ptr: (_InitializeTo, UnsafeMutablePointer<T.Generator.Element>)) {
+  var p = UnsafeMutablePointer<T.Generator.Element>(ptr.1)
+  for x in GeneratorSequence(source.generate()) {
+    p++.initialize(x)
+  }
 }
 
 // Operation tags for preprocessingPass.  See Index.swift for an

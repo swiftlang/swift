@@ -102,6 +102,23 @@ public func ~> <T: _CollectionType>(x:T,_:(_UnderestimateCount,())) -> Int {
   return numericCast(x~>_count())
 }
 
+// A fast implementation for when you are backed by a contiguous array.
+public func ~> <T : protocol<_Sequence_Type, _ArrayType>>(
+  source: T, ptr: (_InitializeTo, UnsafeMutablePointer<T.Generator.Element>)) {
+  let s = source._baseAddressIfContiguous
+  if s != nil {
+    let p = UnsafeMutablePointer<T.Element>(ptr.1)
+    p.initializeFrom(s, count: source.count)
+    _fixLifetime(source._owner)
+  } else {
+    var p = UnsafeMutablePointer<T.Generator.Element>(ptr.1)
+    var g = source.generate()
+    while let x = g.next() {
+      p++.initialize(x)
+    }
+  }
+}
+
 // Default implementation of `preprocessingPass` for *collections*.  Do not
 // use this operator directly; call `_preprocessingPass(s)` instead
 public func ~> <T: _CollectionType, R>(
