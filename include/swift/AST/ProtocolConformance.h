@@ -135,6 +135,12 @@ public:
   const Substitution &getTypeWitness(AssociatedTypeDecl *assocType,
                                     LazyResolver *resolver) const;
 
+  static Type
+  getTypeWitnessByName(Type type,
+                       ProtocolConformance *conformance,
+                       Identifier name,
+                       LazyResolver *resolver);
+
   /// Apply the given function object to each type witness within this
   /// protocol conformance.
   ///
@@ -329,7 +335,7 @@ public:
   /// requirement.
   const Substitution &getTypeWitness(AssociatedTypeDecl *assocType, 
                                      LazyResolver *resolver) const;
-
+                                    
   /// Determine whether the protocol conformance has a type witness for the
   /// given associated type.
   bool hasTypeWitness(AssociatedTypeDecl *assocType) const {

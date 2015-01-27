@@ -2910,3 +2910,49 @@ DeclName::DeclName(ASTContext &C, Identifier baseName,
   SimpleOrCompound = compoundName;
   C.Impl.CompoundNames.InsertNode(compoundName, insert);
 }
+
+Optional<Type>
+ASTContext::getBridgedToObjC(const DeclContext *dc, bool inExpression,
+                             Type type, LazyResolver *resolver) const {
+  if (type->isBridgeableObjectType())
+    return type;
+  // Retrieve the _BridgedToObjectiveC protocol.
+  auto bridgedProto = getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
+  if (!bridgedProto)
+    return None;
+  
+  // Check whether the type conforms to _BridgedToObjectiveC.
+  auto conformance
+    = dc->getParentModule()->lookupConformance(type, bridgedProto, resolver);
+  
+  switch (conformance.getInt()) {
+  case ConformanceKind::Conforms:
+    // The type conforms, and we know the conformance, so we can look up the
+    // bridged type below.
+    break;
+  case ConformanceKind::UncheckedConforms:
+    // The type conforms, but we don't have a conformance yet. Return
+    // Optional(nullptr) to signal this.
+    return Type();
+  case ConformanceKind::DoesNotConform:
+    return None;
+  }
+  
+  // If the type is generic, check whether its generic arguments are also
+  // bridged to Objective-C.
+  if (auto bgt = type->getAs<BoundGenericType>()) {
+    for (auto arg : bgt->getGenericArgs()) {
+      if (arg->hasTypeVariable())
+        continue;
+
+      if (!getBridgedToObjC(dc, inExpression, arg, resolver))
+        return None;
+    }
+  }
+  
+  // Find the type we bridge to.
+  return ProtocolConformance::getTypeWitnessByName(type,
+                                               conformance.getPointer(),
+                                               getIdentifier("_ObjectiveCType"),
+                                               resolver);
+}

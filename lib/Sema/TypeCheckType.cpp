@@ -2351,36 +2351,9 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
 
 Type TypeChecker::getBridgedToObjC(const DeclContext *dc, bool inExpression,
                                    Type type) {
-  if (type->isBridgeableObjectType())
-    return type;
-
-  // Retrieve the _BridgedToObjectiveC protocol.
-  auto bridgedProto
-    = Context.getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
-  if (!bridgedProto)
-    return nullptr;
-
-  // Check whether the type conforms to _BridgedToObjectiveC.
-  ProtocolConformance *conformance = nullptr;
-  if (!conformsToProtocol(type, bridgedProto, const_cast<DeclContext *>(dc),
-                          inExpression, &conformance))
-    return nullptr;
-
-  // If the type is generic, check whether its generic arguments are also
-  // bridged to Objective-C.
-  if (auto bgt = type->getAs<BoundGenericType>()) {
-    for (auto arg : bgt->getGenericArgs()) {
-      if (arg->hasTypeVariable())
-        continue;
-
-      if (getBridgedToObjC(dc, inExpression, arg).isNull())
-        return nullptr;
-    }
-  }
-
-  return getWitnessType(type, bridgedProto, conformance,
-                        Context.getIdentifier("_ObjectiveCType"),
-                        diag::broken_bridged_to_objc_protocol);
+  if (auto bridged = Context.getBridgedToObjC(dc, inExpression, type, this))
+    return *bridged;
+  return nullptr;
 }
 
 bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {

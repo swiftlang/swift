@@ -957,40 +957,10 @@ Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
                                  ProtocolConformance *conformance,
                                  Identifier name,
                                  Diag<> brokenProtocolDiag) {
-  // For an archetype, retrieve the nested type with the appropriate name.
-  // There are no conformance tables.
-  if (auto archetype = type->getAs<ArchetypeType>()) {
-    auto nestedType = archetype->getNestedTypeValue(name);
-    
-    if (auto GTPT = nestedType->getAs<GenericTypeParamType>()) {
-      auto gpDecl = GTPT->getDecl();
-      
-      if (auto archetype = gpDecl->getArchetype()) {
-        return archetype;
-      }
-    }
-    
-    return nestedType;
-  }
-
-  // Find the named requirement.
-  AssociatedTypeDecl *requirement = nullptr;
-  for (auto member : protocol->getMembers()) {
-    auto td = dyn_cast<AssociatedTypeDecl>(member);
-    if (!td || !td->hasName())
-      continue;
-
-    if (td->getName() == name) {
-      requirement = td;
-      break;
-    }
-  }
-
-  if (!requirement) {
+  Type ty = ProtocolConformance::getTypeWitnessByName(type, conformance,
+                                                      name, this);
+  if (!ty)
     diagnose(protocol->getLoc(), brokenProtocolDiag);
-    return nullptr;
-  }
 
-  assert(conformance && "Missing conformance information");
-  return conformance->getTypeWitness(requirement, this).getReplacement();
+  return ty;
 }

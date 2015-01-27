@@ -449,6 +449,12 @@ public:
 
   /// Retrieve a specific, known protocol.
   ProtocolDecl *getProtocol(KnownProtocolKind kind) const;
+  
+  /// Get the Objective-C type that a Swift type bridges to, if any.
+  Optional<Type> getBridgedToObjC(const DeclContext *dc,
+                                  bool inExpression,
+                                  Type type,
+                                  LazyResolver *resolver) const;
 
   /// \brief Notify all of the mutation listeners that the given declaration
   /// was just added.
