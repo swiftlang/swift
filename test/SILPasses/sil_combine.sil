@@ -1639,7 +1639,7 @@ bb0(%0 : $Int):
 //CHECK-LABEL: @remove_pointer_compare_to_zero_NE
 //CHECK-NOT: apply
 //CHECK: cond_fail
-//CHECK: return
+//CHECK: unreachable
 sil @remove_pointer_compare_to_zero_NE : $@thin (Int) -> () {
 bb0(%0 : $Int):
   %1 = string_literal utf16 "ss"
@@ -2096,4 +2096,33 @@ bb0(%0 : $@thin (Builtin.Int8) -> ()):
   %1 = thin_function_to_pointer %0 : $@thin (Builtin.Int8) -> () to $Builtin.RawPointer
   %2 = pointer_to_thin_function %1 : $Builtin.RawPointer to $@thin () -> ()
   return %2 : $@thin () -> ()
+}
+
+// CHECK-LABEL:   sil @remove_dead_code_after_cond_fail
+// CHECK:           [[Ref:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:      cond_fail [[Ref]]
+// CHECK-NEXT:      unreachable
+
+sil @remove_dead_code_after_cond_fail : $@thin () -> (Int) {
+bb0:
+  %0 = integer_literal $Builtin.Word, -2
+  %1 = integer_literal $Builtin.Int1, -1
+  cond_fail %1 : $Builtin.Int1
+  %3 = struct $Int (%0 : $Builtin.Word)
+  return %3 : $Int
+}
+
+// CHECK-LABEL:   sil @dont_remove_code_after_cond_fail
+// CHECK:         bb0([[Cond:%.*]] : $Builtin.Int1):
+// CHECK-NEXT:      [[Ref:%.*]] = integer_literal $Builtin.Word, -2
+// CHECK-NEXT:      cond_fail [[Cond]]
+// CHECK-NEXT:      [[Ret:%.*]] = struct $Int ([[Ref]] : $Builtin.Word)
+// CHECK-NEXT:      return [[Ret]]
+
+sil @dont_remove_code_after_cond_fail : $@thin (Builtin.Int1) -> (Int) {
+bb0(%0 : $Builtin.Int1):
+  %1 = integer_literal $Builtin.Word, -2
+  cond_fail %0 : $Builtin.Int1
+  %3 = struct $Int (%1 : $Builtin.Word)
+  return %3 : $Int
 }

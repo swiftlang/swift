@@ -1174,10 +1174,42 @@ SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
   if (RemoveCondFails)
     return eraseInstFromFunction(*CFI);
 
-  // Erase. (cond_fail 0)
-  if (auto *I = dyn_cast<IntegerLiteralInst>(CFI->getOperand()))
-    if (!I->getValue().getBoolValue())
+  if (auto *I = dyn_cast<IntegerLiteralInst>(CFI->getOperand())) {
+    // Remove unreachable code after (cond_fail 1)
+    if (I->getValue().getBoolValue()) {
+
+      // Nothing more to do here
+      if (isa<UnreachableInst>(CFI->getParent()->getInstList().getNext(CFI)))
+        return nullptr;
+
+      // Add an `unreachable` after the `cond_fail`
+      auto Unreachable =
+        new (CFI->getModule()) UnreachableInst(ArtificialUnreachableLocation());
+      CFI->getParent()->getInstList().insertAfter(CFI, Unreachable);
+
+      // Collect together all the instructions after this point
+      SmallVector<SILInstruction *, 32> ToRemove;
+      for (auto Inst = CFI->getParent()->rbegin(); &*Inst != Unreachable; ++Inst) {
+        ToRemove.push_back(&*Inst);
+      }
+
+      // Now erase them
+      for (auto Inst : ToRemove) {
+        // But first, we replace all uses of this instruction with `undef`
+        SmallVector<Operand *, 16> Uses(Inst->use_begin(), Inst->use_end());
+        for (auto Use : Uses)
+          Use->set(SILUndef::get(Use->get().getType(), Inst->getModule()));
+
+        eraseInstFromFunction(*Inst);
+      }
+
+      return nullptr;
+
+    } else {
+      // Erase. (cond_fail 0)
       return eraseInstFromFunction(*CFI);
+    }
+  }
 
   return nullptr;
 }
