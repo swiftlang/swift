@@ -1190,6 +1190,7 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
                && "solution did not find optional type for "
                   "conditional binding?!");
       }
+      patternType = patternType->getWithoutDefaultArgs(tc.Context);
 
       TypeResolutionOptions options;
       options |= TR_OverrideType;

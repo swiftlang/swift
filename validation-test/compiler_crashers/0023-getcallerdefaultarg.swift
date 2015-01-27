@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: %target-swift-frontend %s -parse -verify
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
@@ -8,4 +8,4 @@
 func a(b: Int = 0) {
 }
 let c = a
-c()
+c() // expected-error {{missing argument for parameter 'b' in call}}
