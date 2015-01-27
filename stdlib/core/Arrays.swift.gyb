@@ -790,17 +790,9 @@ func _arrayNonSliceInPlaceReplace<
     // so as not to self-clobber.
     newTailStart.moveInitializeBackwardFrom(oldTailStart, count: tailCount)
 
-    // FIXME(performance): Use moveAssignFrom
-    // Assign over the original subRange
-    var i = newValues.startIndex
-    for j in subRange {
-      elements[j] = newValues[i++]
-    }
-    // Initialize the hole left by sliding the tail forward
-    for j in oldTailIndex..<newTailIndex {
-      (elements + j).initialize(newValues[i++])
-    }
-    _expectEnd(i, newValues)
+    (elements + subRange.startIndex).destroy(
+      subRange.endIndex - subRange.startIndex)
+    (elements + subRange.startIndex).initializeFrom(newValues)
   }
   else { // We're not growing the buffer
     // Assign all the new elements into the start of the subRange
