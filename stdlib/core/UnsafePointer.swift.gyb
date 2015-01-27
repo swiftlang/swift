@@ -267,7 +267,7 @@ public struct ${Self}<T>
   ///
   /// Precondition: the memory is not initialized.
   public func initializeFrom<
-    C: CollectionType where C._Element == T
+    C: CollectionType where C.Generator.Element == T
   >(
     source: C
   ) {

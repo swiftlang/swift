@@ -460,7 +460,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
 
 /// Append the elements of rhs to lhs
 public func += <
-  T, C: CollectionType where C._Element == T
+  T, C: CollectionType where C.Generator.Element == T
 > (inout lhs: _ContiguousArrayBuffer<T>, rhs: C) {
   let oldCount = lhs.count
   let newCount = oldCount + numericCast(count(rhs))

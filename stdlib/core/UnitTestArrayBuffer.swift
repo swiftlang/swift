@@ -310,7 +310,7 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
 
 /// Append the elements of rhs to lhs
 public func += <
-  T, C: CollectionType where C._Element == T
+  T, C: CollectionType where C.Generator.Element == T
 > (
   inout lhs: _UnitTestArrayBuffer<T>, rhs: C
 ) {
