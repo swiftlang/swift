@@ -3769,19 +3769,44 @@ Expr *ExprRewriter::coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type ob
 
 Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
                                         ConstraintLocatorBuilder locator) {
-  // If the types match exactly, there's nothing to do.
-  // FIXME: This is propping up string literals, but it feels wrong.
-  if (arg->getType()->isEqual(paramType))
-    return arg;
 
+  bool allParamsMatch = arg->getType()->isEqual(paramType);
+  
   // Determine the parameter bindings.
-  MatchCallArgumentListener listener;
   TupleTypeElt paramScalar;
   ArrayRef<TupleTypeElt> paramTuple = decomposeArgParamType(paramType,
                                                             paramScalar);
   TupleTypeElt argScalar;
   ArrayRef<TupleTypeElt> argTupleElts = decomposeArgParamType(arg->getType(),
                                                               argScalar);
+
+  // Quickly test if any further fix-ups for the argument types are necessary.
+  // FIXME: This hack is only necessary to work around some problems we have
+  // for inferring the type of an unresolved member reference expression in
+  // an optional context. We should seek a more holistic fix for this.
+  if (allParamsMatch &&
+      (paramTuple.size() == argTupleElts.size())) {
+    if (auto argTuple = dyn_cast<TupleExpr>(arg)) {
+      auto argElts = argTuple->getElements();
+    
+      for (size_t i = 0; i < paramTuple.size(); i++) {
+        if (auto dotExpr = dyn_cast<DotSyntaxCallExpr>(argElts[i])) {
+          auto paramTy = paramTuple[i].getType()->getLValueOrInOutObjectType();
+          auto argTy = dotExpr->getType()->getLValueOrInOutObjectType();
+          if (!paramTy->isEqual(argTy)) {
+            allParamsMatch = false;
+            break;
+          }
+        }
+      }
+    }
+  }
+  
+  if (allParamsMatch)
+    return arg;
+  
+  MatchCallArgumentListener listener;
+  
   SmallVector<ParamBinding, 4> parameterBindings;
   bool failed = constraints::matchCallArguments(argTupleElts, paramTuple,
                                                 hasTrailingClosure(locator),
