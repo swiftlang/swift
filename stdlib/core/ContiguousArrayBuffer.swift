@@ -546,5 +546,6 @@ func _copyCollectionToNativeArrayBuffer<
   )
 
   source~>_initializeTo(result.baseAddress)
+  // FIXME: add back _expectEnd (?)
   return result
 }

@@ -793,6 +793,7 @@ func _arrayNonSliceInPlaceReplace<
     (elements + subRange.startIndex).destroy(
       subRange.endIndex - subRange.startIndex)
     (elements + subRange.startIndex).initializeFrom(newValues)
+    // FIXME: add back _expectEnd(i, newValues) (?)
   }
   else { // We're not growing the buffer
     // Assign all the new elements into the start of the subRange
