@@ -9,7 +9,7 @@ func testSomeClass(sc: SomeClass, osc: SomeClass?) {
   var ao2: AnyObject = sc.methodB(nil)
   if sc.methodA(osc) == nil { } // expected-error{{binary operator '==' cannot be applied to operands of type 'AnyObject' and 'nil'}}
 
-  var ao3: AnyObject = sc.property // expected-error{{value of optional type 'nonnull_id?' not unwrapped; did you mean to use '!' or '?'?}}
+  var ao3: AnyObject = sc.property // expected-error{{value of optional type 'AnyObject?' not unwrapped; did you mean to use '!' or '?'?}}
   var ao3_ok: AnyObject? = sc.property // okay
 
   var ao4: AnyObject = sc.methodD()

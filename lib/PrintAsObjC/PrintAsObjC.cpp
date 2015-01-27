@@ -47,7 +47,8 @@ static bool isNSObject(Type type) {
 
 namespace {
 class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
-                    private TypeVisitor<ObjCPrinter, void, OptionalTypeKind> {
+                    private TypeVisitor<ObjCPrinter, void, 
+                                        Optional<OptionalTypeKind>> {
   friend ASTVisitor;
   friend TypeVisitor;
 
@@ -428,7 +429,7 @@ private:
   /// Visit part of a type, such as the base of a pointer type.
   ///
   /// If a full type is being printed, use print() instead.
-  void visitPart(Type ty, OptionalTypeKind optionalKind) {
+  void visitPart(Type ty, Optional<OptionalTypeKind> optionalKind) {
     TypeVisitor::visit(ty, optionalKind);
   }
 
@@ -439,13 +440,16 @@ private:
     ContextSensitive,
   };
 
-  void printNullability(OptionalTypeKind kind,
+  void printNullability(Optional<OptionalTypeKind> kind,
                         NullabilityPrintKind printKind
                           = NullabilityPrintKind::After) {
+    if (!kind)
+      return;
+
     if (printKind == NullabilityPrintKind::After)
       os << ' ';
 
-    switch (kind) {
+    switch (*kind) {
     case OTK_None:
       if (printKind == NullabilityPrintKind::ContextSensitive)
         os << "SWIFT_NULLABILITY(nonnull)";
@@ -479,7 +483,7 @@ private:
   /// This handles typealiases and structs provided by the standard library
   /// for interfacing with C and Objective-C.
   bool printIfKnownTypeName(Identifier moduleName, Identifier name,
-                            OptionalTypeKind optionalKind) {
+                            Optional<OptionalTypeKind> optionalKind) {
     if (specialNames.empty()) {
 #define MAP(SWIFT_NAME, CLANG_REPR, NEEDS_NULLABILITY)                       \
       specialNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = \
@@ -549,7 +553,7 @@ private:
     return true;
   }
 
-  void visitType(TypeBase *Ty, OptionalTypeKind optionalKind) {
+  void visitType(TypeBase *Ty, Optional<OptionalTypeKind> optionalKind) {
     assert(Ty->getDesugaredType() == Ty && "unhandled sugared type");
     os << "/* ";
     Ty->print(os);
@@ -557,7 +561,7 @@ private:
   }
 
   void visitNameAliasType(NameAliasType *aliasTy,
-                          OptionalTypeKind optionalKind) {
+                          Optional<OptionalTypeKind> optionalKind) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
     if (printIfKnownTypeName(alias->getModuleContext()->Name, alias->getName(),
                              optionalKind))
@@ -591,7 +595,8 @@ private:
     os << clangDecl->getKindName() << " ";
   }
 
-  void visitStructType(StructType *ST, OptionalTypeKind optionalKind) {
+  void visitStructType(StructType *ST, 
+                       Optional<OptionalTypeKind> optionalKind) {
     const StructDecl *SD = ST->getStructOrBoundGenericStruct();
     if (printIfKnownTypeName(SD->getModuleContext()->Name, SD->getName(),
                              optionalKind))
@@ -604,7 +609,7 @@ private:
   /// If \p BGT represents a generic struct used to import Clang types, print
   /// it out.
   bool printIfKnownGenericStruct(const BoundGenericStructType *BGT,
-                                 OptionalTypeKind optionalKind) {
+                                 Optional<OptionalTypeKind> optionalKind) {
     StructDecl *SD = BGT->getDecl();
     if (!SD->getModuleContext()->isStdlibModule())
       return false;
@@ -613,7 +618,7 @@ private:
 #ifndef SWIFT_DISABLE_OBJC_GENERICS
       if (!BGT->getGenericArgs()[0]->isAnyObject()) {
         os << "NS_ARRAY(";
-        visitPart(BGT->getGenericArgs()[0], OTK_None);
+        visitPart(BGT->getGenericArgs()[0], None);
         os << ")";
       } else {
         os << "NSArray *";
@@ -631,9 +636,9 @@ private:
       if (!isNSObject(BGT->getGenericArgs()[0]) ||
           !BGT->getGenericArgs()[1]->isAnyObject()) {
         os << "NS_DICTIONARY(";
-        visitPart(BGT->getGenericArgs()[0], OTK_None);
+        visitPart(BGT->getGenericArgs()[0], None);
         os << ", ";
-        visitPart(BGT->getGenericArgs()[1], OTK_None);
+        visitPart(BGT->getGenericArgs()[1], None);
         os << ")";
       } else {
         os << "NSDictionary *";
@@ -650,7 +655,7 @@ private:
 #ifndef SWIFT_DISABLE_OBJC_GENERICS
       if (!isNSObject(BGT->getGenericArgs()[0])) {
         os << "NS_SET(";
-        visitPart(BGT->getGenericArgs()[0], OTK_None);
+        visitPart(BGT->getGenericArgs()[0], None);
         os << ")";
       } else {
         os << "NSSet *";
@@ -692,21 +697,22 @@ private:
   }
 
   void visitBoundGenericStructType(BoundGenericStructType *BGT,
-                                   OptionalTypeKind optionalKind) {
+                                   Optional<OptionalTypeKind> optionalKind) {
     if (printIfKnownGenericStruct(BGT, optionalKind))
       return;
     visitBoundGenericType(BGT, optionalKind);
   }
 
   void visitBoundGenericType(BoundGenericType *BGT,
-                             OptionalTypeKind optionalKind) {
-    if (auto underlying = BGT->getAnyOptionalObjectType(optionalKind)) {
-      visitPart(underlying, optionalKind);
+                             Optional<OptionalTypeKind> optionalKind) {
+    OptionalTypeKind innerOptionalKind;
+    if (auto underlying = BGT->getAnyOptionalObjectType(innerOptionalKind)) {
+      visitPart(underlying, innerOptionalKind);
     } else
       visitType(BGT, optionalKind);
   }
 
-  void visitEnumType(EnumType *ET, OptionalTypeKind optionalKind) {
+  void visitEnumType(EnumType *ET, Optional<OptionalTypeKind> optionalKind) {
     const EnumDecl *ED = ET->getDecl();
     maybePrintTagKeyword(ED);
     
@@ -714,7 +720,7 @@ private:
     os << "enum " << ED->getName();
   }
 
-  void visitClassType(ClassType *CT, OptionalTypeKind optionalKind) {
+  void visitClassType(ClassType *CT, Optional<OptionalTypeKind> optionalKind) {
     const ClassDecl *CD = CT->getClassOrBoundGenericClass();
     assert(CD->isObjC());
     auto clangDecl = dyn_cast_or_null<clang::NamedDecl>(CD->getClangDecl());
@@ -732,7 +738,8 @@ private:
     }
   }
 
-  void visitProtocolType(ProtocolType *PT, OptionalTypeKind optionalKind, 
+  void visitProtocolType(ProtocolType *PT, 
+                         Optional<OptionalTypeKind> optionalKind, 
                          bool isMetatype = false) {
     os << (isMetatype ? "Class" : "id");
 
@@ -750,7 +757,7 @@ private:
   }
 
   void visitProtocolCompositionType(ProtocolCompositionType *PCT, 
-                                    OptionalTypeKind optionalKind,
+                                    Optional<OptionalTypeKind> optionalKind,
                                     bool isMetatype = false) {
     CanType canonicalComposition = PCT->getCanonicalType();
     if (auto singleProto = dyn_cast<ProtocolType>(canonicalComposition))
@@ -770,7 +777,7 @@ private:
   }
 
   void visitExistentialMetatypeType(ExistentialMetatypeType *MT, 
-                                    OptionalTypeKind optionalKind) {
+                                    Optional<OptionalTypeKind> optionalKind) {
     Type instanceTy = MT->getInstanceType();
     if (auto protoTy = instanceTy->getAs<ProtocolType>()) {
       visitProtocolType(protoTy, optionalKind, /*isMetatype=*/true);
@@ -781,7 +788,8 @@ private:
     }
   }
 
-  void visitMetatypeType(MetatypeType *MT, OptionalTypeKind optionalKind) {
+  void visitMetatypeType(MetatypeType *MT, 
+                         Optional<OptionalTypeKind> optionalKind) {
     Type instanceTy = MT->getInstanceType();
     if (auto classTy = instanceTy->getAs<ClassType>()) {
       const ClassDecl *CD = classTy->getDecl();
@@ -796,14 +804,15 @@ private:
   }
                       
   void printFunctionType(FunctionType *FT, char pointerSigil,
-                         OptionalTypeKind optionalKind) {
+                         Optional<OptionalTypeKind> optionalKind) {
     visitPart(FT->getResult(), OTK_None);
     os << " (" << pointerSigil;
     printNullability(optionalKind);
     openFunctionTypes.push_back(FT);
   }
 
-  void visitFunctionType(FunctionType *FT, OptionalTypeKind optionalKind) {
+  void visitFunctionType(FunctionType *FT, 
+                         Optional<OptionalTypeKind> optionalKind) {
     switch (FT->getRepresentation()) {
     case AnyFunctionType::Representation::Thin:
       llvm_unreachable("can't handle thin functions yet");
@@ -837,36 +846,38 @@ private:
     os << ")";
   }
 
-  void visitTupleType(TupleType *TT, OptionalTypeKind optionalKind) {
+  void visitTupleType(TupleType *TT, Optional<OptionalTypeKind> optionalKind) {
     assert(TT->getNumElements() == 0);
     os << "void";
   }
 
-  void visitParenType(ParenType *PT, OptionalTypeKind optionalKind) {
+  void visitParenType(ParenType *PT, Optional<OptionalTypeKind> optionalKind) {
     visitPart(PT->getSinglyDesugaredType(), optionalKind);
   }
 
-  void visitSubstitutedType(SubstitutedType *ST, OptionalTypeKind optionalKind) {
+  void visitSubstitutedType(SubstitutedType *ST, 
+                            Optional<OptionalTypeKind> optionalKind) {
     visitPart(ST->getSinglyDesugaredType(), optionalKind);
   }
 
   void visitSyntaxSugarType(SyntaxSugarType *SST, 
-                            OptionalTypeKind optionalKind) {
+                            Optional<OptionalTypeKind> optionalKind) {
     visitPart(SST->getSinglyDesugaredType(), optionalKind);
   }
 
-  void visitDictionaryType(DictionaryType *DT, OptionalTypeKind optionalKind) {
+  void visitDictionaryType(DictionaryType *DT, 
+                           Optional<OptionalTypeKind> optionalKind) {
     visitPart(DT->getSinglyDesugaredType(), optionalKind);
   }
 
   void visitDynamicSelfType(DynamicSelfType *DST, 
-                            OptionalTypeKind optionalKind) {
+                            Optional<OptionalTypeKind> optionalKind) {
     printNullability(optionalKind, NullabilityPrintKind::ContextSensitive);
     os << "instancetype";
   }
 
   void visitReferenceStorageType(ReferenceStorageType *RST, 
-                                 OptionalTypeKind optionalKind) {
+                                 Optional<OptionalTypeKind> optionalKind) {
     visitPart(RST->getReferentType(), optionalKind);
   }
 
@@ -876,7 +887,8 @@ private:
   /// finishFunctionType()). If only a part of a type is being printed, use
   /// visitPart().
 public:
-  void print(Type ty, OptionalTypeKind optionalKind, StringRef name = "") {
+  void print(Type ty, Optional<OptionalTypeKind> optionalKind, 
+             StringRef name = "") {
     decltype(openFunctionTypes) savedFunctionTypes;
     savedFunctionTypes.swap(openFunctionTypes);
 
