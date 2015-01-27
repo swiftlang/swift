@@ -121,6 +121,12 @@ func for_loop() {
   for ((j,k) = (0,10); j != k; --k) {}
   for var i = 0, j = 0; i * j < 10; i++, j++ {}
   for j = 0, k = 52; j < k; ++j, --k { }
+  // rdar://19540536
+  // expected-error@+4{{expected var declaration in a 'for' statement}}
+  // expected-error@+3{{type of expression is ambiguous without more context}}
+  // expected-error@+2{{expected an attribute name}}
+  // expected-error@+1{{braced block of statements is an unused closure}}
+  for @ {}
 }
 
 break // expected-error {{'break' is only allowed inside a loop}}

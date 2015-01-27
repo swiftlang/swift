@@ -1116,6 +1116,13 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
   if (Tok.is(tok::kw_var) || Tok.is(tok::kw_let) || Tok.is(tok::at_sign)) {
     DeclAttributes Attributes;
     parseDeclAttributeList(Attributes);
+
+    // After parsing optional attributes above we should be at 'var' or 'let'
+    if (!Tok.is(tok::kw_var) && !Tok.is(tok::kw_let)) {
+      diagnose(Tok.getLoc(), diag::expected_var_decl_for_stmt);
+      return makeParserError();
+    }
+
     ParserStatus VarDeclStatus = parseDeclVar(PD_InLoop, Attributes, FirstDecls,
                                               SourceLoc(),
                                               StaticSpellingKind::None);

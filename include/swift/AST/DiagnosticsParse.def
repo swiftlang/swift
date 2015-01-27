@@ -740,6 +740,8 @@ ERROR(expected_rparen_for_stmt,stmt_parsing,none,
       "expected ')' in 'for' statement", ())
 ERROR(expected_lbrace_after_for,stmt_parsing,none,
       "expected '{' in 'for' statement", ())
+ERROR(expected_var_decl_for_stmt,stmt_parsing,PointsToFirstBadToken,
+      "expected var declaration in a 'for' statement", ())
 
 // For-each Stmt
 ERROR(expected_foreach_in,stmt_parsing,none,
