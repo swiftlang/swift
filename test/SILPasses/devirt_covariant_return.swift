@@ -102,3 +102,42 @@ func driver() -> () {
 }
 
 driver()
+
+
+final class Payload {
+  let value: Int
+  init(_ n:Int) {
+    value = n
+  }
+
+  func getValue() -> Int {
+    return value
+  }
+}
+
+class C {
+   func doSomething() -> Payload? {
+      return Payload(1)
+   }
+}
+
+
+final class C1:C {
+   // Override base method, but return a non-optional result
+   override func doSomething() -> Payload {
+      return Payload(2)
+   }
+}
+
+// Check that the Optional return value from doSomething
+// gets properly unwrapped into a Payload object and then further
+// devirtualized.
+// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return7driver1FCS_2C1Si 
+// CHECK: integer_literal $Builtin.Word, 2
+// CHECK: struct $Int (%{{.*}} : $Builtin.Word)
+// CHECK-NOT: class_method
+// CHECK-NOT: function_ref
+// CHECK: return
+func driver1(var c:C1) -> Int {
+  return c.doSomething().getValue()
+}

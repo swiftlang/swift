@@ -353,12 +353,32 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
   // If our return type differs from AI's return type, then we know that we have
   // a covariant return type. Cast it before we RAUW. This can not happen 
   if (ReturnType != AI->getType()) {
-    assert((ReturnType.isAddress() || ReturnType.isHeapObjectReferenceType()) &&
+
+    // Check if the return type is an optional of the apply_inst type
+    // or the other way around
+    bool UnwrapOptionalResult = false;
+    OptionalTypeKind OTK;
+
+    auto OptionalReturnType = ReturnType.getSwiftRValueType()
+                                        .getAnyOptionalObjectType();
+    if (OptionalReturnType == AI->getType().getSwiftRValueType()) {
+      ReturnType.getSwiftRValueType().getAnyOptionalObjectType(OTK);
+      UnwrapOptionalResult = true;
+    }
+
+    assert((ReturnType.isAddress() ||
+            ReturnType.isHeapObjectReferenceType() ||
+            UnwrapOptionalResult) &&
            "Only addresses and refs can have their types changed due to "
            "covariant return types or contravariant argument types.");
 
     SILValue CastedAI = NewAI;
-    if (ReturnType.isAddress()) {
+    if (UnwrapOptionalResult) {
+      // The devirtualized method returns an optional result.
+      // We need to extract the actual result from the optional.
+      auto *SomeDecl = B.getASTContext().getOptionalSomeDecl(OTK);
+      CastedAI = B.createUncheckedEnumData(AI->getLoc(), NewAI, SomeDecl);
+    } else if (ReturnType.isAddress()) {
       CastedAI = B.createUncheckedAddrCast(AI->getLoc(), NewAI, AI->getType());
     } else {
       CastedAI = B.createUncheckedRefCast(AI->getLoc(), NewAI, AI->getType());
