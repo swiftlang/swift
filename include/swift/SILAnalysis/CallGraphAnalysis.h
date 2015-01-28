@@ -263,6 +263,8 @@ public:
 private:
   void addCallGraphNode(SILFunction *F, unsigned Ordinal);
   void addEdges(SILFunction *F);
+  bool tryGetCalleeSet(SILValue Callee, CallGraphEdge::CalleeSetType &CalleeSet,
+                       bool &Complete);
   void addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode);
   void computeBottomUpSCCOrder();
   void computeBottomUpFunctionOrder();

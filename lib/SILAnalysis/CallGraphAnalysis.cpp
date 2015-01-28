@@ -25,7 +25,7 @@ using namespace swift;
 STATISTIC(NumCallGraphNodes, "# of call graph nodes created");
 STATISTIC(NumCallSitesWithEdges, "# of call sites with edges");
 STATISTIC(NumCallSitesWithoutEdges,
-          "# of non-builtin call sites without call graph edges");
+          "# of call sites without call graph edges");
 STATISTIC(NumCallSitesOfBuiltins, "# of call sites calling builtins");
 
 CallGraph::CallGraph(SILModule *M, bool completeModule) {
@@ -59,88 +59,70 @@ void CallGraph::addCallGraphNode(SILFunction *F, unsigned NodeOrdinal) {
     CallGraphRoots.push_back(Node);
 }
 
-void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
-  auto Callee = AI->getCallee();
-  CallGraphEdge::CalleeSetType CalleeSet;
+bool CallGraph::tryGetCalleeSet(SILValue Callee,
+                                CallGraphEdge::CalleeSetType &CalleeSet,
+                                bool &Complete) {
 
   switch (Callee->getKind()) {
   case ValueKind::FunctionRefInst: {
     auto *CalleeFn = cast<FunctionRefInst>(Callee)->getReferencedFunction();
-    // TODO: Compute this from the call graph itself after stripping
-    //       unreachable nodes from graph.
-    ++NumCallSitesWithEdges;
     auto *CalleeNode = getCallGraphNode(CalleeFn);
     assert(CalleeNode &&
            "Expected to have a call graph node for all functions!");
 
+    assert(CalleeSet.empty() && "Expected empty callee set!");
     CalleeSet.insert(CalleeNode);
-
-    auto *CallSite = new CallGraphEdge(AI, CalleeSet, /* Complete = */ true);
-    CallerNode->addCallSite(CallSite);
-    CalleeNode->addCaller(CallSite);
-    break;
+    Complete = true;
+    return true;
   }
 
-  case ValueKind::DynamicMethodInst: {
+  case ValueKind::DynamicMethodInst:
     // TODO: Decide how to handle these in graph construction and
     //       analysis passes. We might just leave them out of the
     //       graph.
-    ++NumCallSitesWithoutEdges;
-    break;
-  }
+    return false;
 
   case ValueKind::ThinToThickFunctionInst: {
     auto ThinCallee = cast<ThinToThickFunctionInst>(Callee)->getOperand();
     // TODO: We want to see through these to the underlying function.
     assert(cast<FunctionRefInst>(ThinCallee) && "Expected function reference!");
     (void)ThinCallee;
-    ++NumCallSitesWithoutEdges;
-    break;
+    return false;
   }
 
-  case ValueKind::SILArgument: {
+  case ValueKind::SILArgument:
     // First-pass call-graph construction will not do anything with
     // these, but a second pass can potentially statically determine
     // the called function in some cases.
-    ++NumCallSitesWithoutEdges;
-    break;
-  }
+    return false;
 
-  case ValueKind::ApplyInst: {
+  case ValueKind::ApplyInst:
     // TODO: Probably not worth iterating invocation- then
     //       reverse-invocation order to catch this.
-    ++NumCallSitesWithoutEdges;
-    break;
-  }
+    return false;
 
-  case ValueKind::TupleExtractInst: {
+  case ValueKind::TupleExtractInst:
     // TODO: It would be good to tunnel through extracts so that we
     //       can build a more accurate call graph prior to any
     //       optimizations.
-    ++NumCallSitesWithoutEdges;
-    break;
-  }
+    return false;
 
-  case ValueKind::StructExtractInst: {
+  case ValueKind::StructExtractInst:
     // TODO: It would be good to tunnel through extracts so that we
     //       can build a more accurate call graph prior to any
     //       optimizations.
-    ++NumCallSitesWithoutEdges;
-    break;
-  }
+    return false;
 
-  case ValueKind::BuiltinInst: {
+  case ValueKind::BuiltinInst:
     ++NumCallSitesOfBuiltins;
-    break;
-  }
+    return false;
 
   case ValueKind::PartialApplyInst:
   case ValueKind::ClassMethodInst:
   case ValueKind::WitnessMethodInst:
   case ValueKind::SuperMethodInst:
     // TODO: Each of these requires specific handling.
-    ++NumCallSitesWithoutEdges;
-    break;
+    return false;
 
   default:
     assert(!isa<MethodInst>(Callee)
@@ -148,9 +130,27 @@ void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
 
     // There are cases where we will be very hard pressed to determine
     // what we are calling.
-    ++NumCallSitesWithoutEdges;
-    break;
+    return false;
   }
+}
+
+void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
+  CallGraphEdge::CalleeSetType CalleeSet;
+  bool Complete = false;
+
+  if (tryGetCalleeSet(AI->getCallee(), CalleeSet, Complete)) {
+    auto *CallSite = new CallGraphEdge(AI, CalleeSet, Complete);
+    CallerNode->addCallSite(CallSite);
+    for (auto *CalleeNode : CalleeSet)
+      CalleeNode->addCaller(CallSite);
+
+    // TODO: Compute this from the call graph itself after stripping
+    //       unreachable nodes from graph.
+    ++NumCallSitesWithEdges;
+    return;
+  }
+
+  ++NumCallSitesWithoutEdges;
 }
 
 void CallGraph::addEdges(SILFunction *F) {
