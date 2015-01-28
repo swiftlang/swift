@@ -26,7 +26,7 @@ namespace swift {
 class SILOptions {
 public:
   /// Controls the aggressiveness of the performance inliner.
-  unsigned InlineThreshold = 150;
+  int InlineThreshold = -1;
 
   /// Controls the aggressiveness of devirtualization. 0=disabled.
   unsigned DevirtThreshold = 0;

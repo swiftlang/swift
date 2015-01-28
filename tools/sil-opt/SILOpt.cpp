@@ -243,9 +243,9 @@ static llvm::cl::opt<unsigned>
 AssertConfId("assert-conf-id", llvm::cl::Hidden,
              llvm::cl::init(0));
 
-static llvm::cl::opt<unsigned>
+static llvm::cl::opt<int>
 SILInlineThreshold("sil-inline-threshold", llvm::cl::Hidden,
-                   llvm::cl::init(50));
+                   llvm::cl::init(-1));
 
 static llvm::cl::opt<unsigned>
 SILDevirtThreshold("sil-devirt-threshold", llvm::cl::Hidden,

@@ -18,10 +18,12 @@
 #include "swift/SILAnalysis/ColdBlockInfo.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
+#include "swift/SILAnalysis/LoopAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Utils/SILInliner.h"
+#include "swift/SILPasses/Utils/ConstantFolding.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
@@ -38,6 +40,46 @@ namespace {
   // 1.
   llvm::cl::opt<int> TestThreshold("sil-inline-test-threshold",
                                         llvm::cl::init(-1), llvm::cl::Hidden);
+
+  llvm::cl::opt<int> TestOpt("sil-inline-test",
+                                   llvm::cl::init(0), llvm::cl::Hidden);
+  
+  // The following constants define the cost model for inlining.
+  
+  // The base value for every call: it represents the benefit of removing the
+  // call overhead.
+  // This value can be overridden with the -sil-inline-threshold option.
+  const unsigned RemovedCallBenefit = 80;
+  
+  // The benefit if the condition of a terminator instruction gets constant due
+  // to inlining.
+  const unsigned ConstTerminatorBenefit = 2;
+
+  // Benefit if the operand of an apply gets constant, e.g. if a closure is
+  // passed to an apply instruction in the callee.
+  const unsigned ConstCalleeBenefit = 150;
+  
+  // Additional benefit for each loop level.
+  const unsigned LoopBenefitFactor = 40;
+
+  // Represents a value in integer constant evaluation.
+  struct IntConst {
+    IntConst() : isValid(false), isFromCaller(false) { }
+    
+    IntConst(const APInt &value, bool isFromCaller) :
+    value(value), isValid(true), isFromCaller(isFromCaller) { }
+    
+    // The actual value.
+    APInt value;
+    
+    // True if the value is valid, i.e. could be evaluated to a constant.
+    bool isValid;
+    
+    // True if the value is only valid, because a constant is passed to the
+    // callee. False if constant propagation could do the same job inside the
+    // callee without inlining it.
+    bool isFromCaller;
+  };
   
   // Tracks constants in the caller and callee to get an estimation of what
   // values get constant if the callee is inlined.
@@ -59,6 +101,9 @@ namespace {
     // This is only an estimation, because e.g. it does not consider potential
     // aliasing.
     llvm::DenseMap<SILValue, SILInstruction *> memoryContent;
+    
+    // Cache for evaluated constants.
+    llvm::SmallDenseMap<BuiltinInst *, IntConst> constCache;
 
     // The caller/callee function which is tracked.
     SILFunction *F;
@@ -104,16 +149,22 @@ namespace {
       return nullptr;
     }
     
-    // Gets the estimated constant of a value.
-    SILInstruction *getConst(SILValue val, ProjectionPath &projStack);
+    // Gets the estimated definition of a value.
+    SILInstruction *getDef(SILValue val, ProjectionPath &projStack);
 
+    // Gets the estimated integer constant result of a builtin.
+    IntConst getBuiltinConst(BuiltinInst *BI, int depth);
+    
   public:
     
     // Constructor for the caller function.
-    ConstantTracker(SILFunction *function) : F(function), callerTracker(nullptr), AI(nullptr) { }
+    ConstantTracker(SILFunction *function) :
+      F(function), callerTracker(nullptr), AI(nullptr)
+    { }
     
     // Constructor for the callee function.
-    ConstantTracker(SILFunction *function, ConstantTracker *caller, ApplyInst *callerApply) :
+    ConstantTracker(SILFunction *function, ConstantTracker *caller,
+                    ApplyInst *callerApply) :
        F(function), callerTracker(caller), AI(callerApply)
     { }
     
@@ -126,11 +177,22 @@ namespace {
     // Must be called for each instruction visited in dominance order.
     void trackInst(SILInstruction *inst);
     
-    // Gets the estimated constant of a value.
-    SILInstruction *getConst(SILValue val) {
+    // Gets the estimated definition of a value.
+    SILInstruction *getDef(SILValue val) {
       ProjectionPath projStack;
-      return getConst(val, projStack);
+      return getDef(val, projStack);
     }
+    
+    // Gets the estimated definition of a value if it is in the caller.
+    SILInstruction *getDefInCaller(SILValue val) {
+      SILInstruction *def = getDef(val);
+      if (def && def->getFunction() != F)
+        return def;
+      return nullptr;
+    }
+    
+    // Gets the estimated integer constant of a value.
+    IntConst getIntConst(SILValue val, int depth = 0);
   };
 
   // Controls the decision to inline functions with @semantics, @effect and
@@ -143,26 +205,29 @@ namespace {
 
   class SILPerformanceInliner {
     /// The inline threashold.
-    const unsigned InlineCostThreshold;
+    const int InlineCostThreshold;
     /// Specifies which functions not to inline, based on @semantics and
     /// global_init attributes.
     InlineSelection WhatToInline;
 
     SILFunction *getEligibleFunction(ApplyInst *AI);
     
-    bool isProfitableToInline(ApplyInst *AI, DominanceAnalysis *DA,
+    bool isProfitableToInline(ApplyInst *AI, unsigned loopDepthOfAI,
+                              DominanceAnalysis *DA,
+                              SILLoopAnalysis *LA,
                               ConstantTracker &constTracker);
     
     void visitColdBlocks(SmallVectorImpl<ApplyInst *> &CallSitesToInline,
                                SILBasicBlock *root, DominanceInfo *DT);
 
   public:
-    SILPerformanceInliner(unsigned threshold,
+    SILPerformanceInliner(int threshold,
                           InlineSelection WhatToInline)
       : InlineCostThreshold(threshold),
     WhatToInline(WhatToInline) {}
 
-    bool inlineCallsIntoFunction(SILFunction *F, DominanceAnalysis *DA);
+    bool inlineCallsIntoFunction(SILFunction *F, DominanceAnalysis *DA,
+                                 SILLoopAnalysis *LA);
   };
 }
 
@@ -260,26 +325,12 @@ static SILValue getMember(SILInstruction *inst, ProjectionPath &projStack) {
   return SILValue();
 }
 
-SILInstruction *ConstantTracker::getConst(SILValue val,
+SILInstruction *ConstantTracker::getDef(SILValue val,
                                           ProjectionPath &projStack) {
   
   // Track the value up the dominator tree.
   for (;;) {
     if (SILInstruction *inst = dyn_cast<SILInstruction>(val)) {
-      switch (inst->getKind()) {
-      // partial_apply is not a constant but for the heuristic "as good"
-      // as a constant.
-      case ValueKind::PartialApplyInst:
-      case ValueKind::FunctionRefInst:
-      case ValueKind::IntegerLiteralInst:
-      case ValueKind::FloatLiteralInst:
-        return inst;
-      case ValueKind::ThinToThickFunctionInst:
-        val = inst->getOperand(0);
-        continue;
-      default:
-        break;
-      }
       if (auto proj = Projection::valueProjectionForInstruction(inst)) {
         // Extract a member from a struct/tuple/enum.
         projStack.push_back(proj.getValue());
@@ -294,7 +345,11 @@ SILInstruction *ConstantTracker::getConst(SILValue val,
         // A value loaded from memory.
         val = loadedVal;
         continue;
+      } else if (isa<ThinToThickFunctionInst>(inst)) {
+        val = inst->getOperand(0);
+        continue;
       }
+      return inst;
     } else if (SILValue param = getParam(val)) {
       // Continue in the caller.
       val = param;
@@ -304,6 +359,119 @@ SILInstruction *ConstantTracker::getConst(SILValue val,
   }
 }
 
+IntConst ConstantTracker::getBuiltinConst(BuiltinInst *BI, int depth) {
+  const BuiltinInfo &Builtin = BI->getBuiltinInfo();
+  OperandValueArrayRef Args = BI->getArguments();
+  switch (Builtin.ID) {
+    default: break;
+      
+      // Fold comparison predicates.
+#define BUILTIN(id, name, Attrs)
+#define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
+case BuiltinValueKind::id:
+#include "swift/AST/Builtins.def"
+    {
+      IntConst lhs = getIntConst(Args[0], depth);
+      IntConst rhs = getIntConst(Args[1], depth);
+      if (lhs.isValid && rhs.isValid) {
+        return IntConst(constantFoldComparison(lhs.value, rhs.value,
+                                              Builtin.ID),
+                        lhs.isFromCaller || rhs.isFromCaller);
+      }
+      break;
+    }
+      
+      
+    case BuiltinValueKind::SAddOver:
+    case BuiltinValueKind::UAddOver:
+    case BuiltinValueKind::SSubOver:
+    case BuiltinValueKind::USubOver:
+    case BuiltinValueKind::SMulOver:
+    case BuiltinValueKind::UMulOver: {
+      IntConst lhs = getIntConst(Args[0], depth);
+      IntConst rhs = getIntConst(Args[1], depth);
+      if (lhs.isValid && rhs.isValid) {
+        bool IgnoredOverflow;
+        return IntConst(constantFoldBinaryWithOverflow(lhs.value, rhs.value,
+                        IgnoredOverflow,
+                        getLLVMIntrinsicIDForBuiltinWithOverflow(Builtin.ID)),
+                          lhs.isFromCaller || rhs.isFromCaller);
+      }
+      break;
+    }
+      
+    case BuiltinValueKind::SDiv:
+    case BuiltinValueKind::SRem:
+    case BuiltinValueKind::UDiv:
+    case BuiltinValueKind::URem: {
+      IntConst lhs = getIntConst(Args[0], depth);
+      IntConst rhs = getIntConst(Args[1], depth);
+      if (lhs.isValid && rhs.isValid && rhs.value != 0) {
+        bool IgnoredOverflow;
+        return IntConst(constantFoldDiv(lhs.value, rhs.value,
+                                        IgnoredOverflow, Builtin.ID),
+                        lhs.isFromCaller || rhs.isFromCaller);
+      }
+      break;
+    }
+      
+    case BuiltinValueKind::And:
+    case BuiltinValueKind::AShr:
+    case BuiltinValueKind::LShr:
+    case BuiltinValueKind::Or:
+    case BuiltinValueKind::Shl:
+    case BuiltinValueKind::Xor: {
+      IntConst lhs = getIntConst(Args[0], depth);
+      IntConst rhs = getIntConst(Args[1], depth);
+      if (lhs.isValid && rhs.isValid) {
+        return IntConst(constantFoldBitOperation(lhs.value, rhs.value,
+                                                 Builtin.ID),
+                        lhs.isFromCaller || rhs.isFromCaller);
+      }
+      break;
+    }
+      
+    case BuiltinValueKind::Trunc:
+    case BuiltinValueKind::ZExt:
+    case BuiltinValueKind::SExt:
+    case BuiltinValueKind::TruncOrBitCast:
+    case BuiltinValueKind::ZExtOrBitCast:
+    case BuiltinValueKind::SExtOrBitCast: {
+      IntConst val = getIntConst(Args[0], depth);
+      if (val.isValid) {
+        return IntConst(constantFoldCast(val.value, Builtin), val.isFromCaller);
+      }
+      break;
+    }
+  }
+  return IntConst();
+}
+
+// Tries to evaluate the integer constant of a value. The \p depth is used
+// to limit the complexity.
+IntConst ConstantTracker::getIntConst(SILValue val, int depth) {
+  
+  // Don't spend too much time with constant evaluation.
+  if (depth >= 10)
+    return IntConst();
+  
+  SILInstruction *I = getDef(val);
+  if (!I)
+    return IntConst();
+  
+  if (auto *IL = dyn_cast<IntegerLiteralInst>(I)) {
+    return IntConst(IL->getValue(), IL->getFunction() != F);
+  }
+  if (auto *BI = dyn_cast<BuiltinInst>(I)) {
+    if (constCache.count(BI) != 0)
+      return constCache[BI];
+    
+    IntConst builtinConst = getBuiltinConst(BI, depth + 1);
+    constCache[BI] = builtinConst;
+    return builtinConst;
+  }
+  return IntConst();
+}
 
 //===----------------------------------------------------------------------===//
 //                           Performance Inliner
@@ -397,9 +565,69 @@ static unsigned testCost(SILInstruction *I) {
   }
 }
 
+// Returns the taken block of a terminator instruction if the condition turns
+// out to be constant.
+static SILBasicBlock *getTakenBlock(TermInst *term,
+                                    ConstantTracker &constTracker) {
+  if (CondBranchInst *CBI = dyn_cast<CondBranchInst>(term)) {
+    IntConst condConst = constTracker.getIntConst(CBI->getCondition());
+    if (condConst.isFromCaller) {
+      return condConst.value != 0 ? CBI->getTrueBB() : CBI->getFalseBB();
+    }
+    return nullptr;
+  }
+  if (SwitchValueInst *SVI = dyn_cast<SwitchValueInst>(term)) {
+    IntConst switchConst = constTracker.getIntConst(SVI->getOperand());
+    if (switchConst.isFromCaller) {
+      for (unsigned Idx = 0; Idx < SVI->getNumCases(); ++Idx) {
+        auto switchCase = SVI->getCase(Idx);
+        if (auto *IL = dyn_cast<IntegerLiteralInst>(switchCase.first)) {
+          if (switchConst.value == IL->getValue())
+            return switchCase.second;
+        } else {
+          return nullptr;
+        }
+      }
+      if (SVI->hasDefault())
+          return SVI->getDefaultBB();
+    }
+    return nullptr;
+  }
+  if (SwitchEnumInst *SEI = dyn_cast<SwitchEnumInst>(term)) {
+    if (SILInstruction *def = constTracker.getDefInCaller(SEI->getOperand())) {
+      if (EnumInst *EI = dyn_cast<EnumInst>(def)) {
+        for (unsigned Idx = 0; Idx < SEI->getNumCases(); ++Idx) {
+          auto enumCase = SEI->getCase(Idx);
+          if (enumCase.first == EI->getElement())
+            return enumCase.second;
+        }
+        if (SEI->hasDefault())
+          return SEI->getDefaultBB();
+      }
+    }
+    return nullptr;
+  }
+  if (CheckedCastBranchInst *CCB = dyn_cast<CheckedCastBranchInst>(term)) {
+    if (SILInstruction *def = constTracker.getDefInCaller(CCB->getOperand())) {
+      if (UpcastInst *UCI = dyn_cast<UpcastInst>(def)) {
+        SILType castType = UCI->getOperand()->getType(0);
+        if (CCB->getCastType().isSuperclassOf(castType)) {
+          return CCB->getSuccessBB();
+        }
+        if (!castType.isSuperclassOf(CCB->getCastType())) {
+          return CCB->getFailureBB();
+        }
+      }
+    }
+  }
+  return nullptr;
+}
+
 /// Return true if inlining this call site is profitable.
 bool SILPerformanceInliner::isProfitableToInline(ApplyInst *AI,
+                                              unsigned loopDepthOfAI,
                                               DominanceAnalysis *DA,
+                                              SILLoopAnalysis *LA,
                                               ConstantTracker &callerTracker) {
   /// Always inline transparent calls. This should have been done during
   /// MandatoryInlining, but generics are not currenly handled.
@@ -412,20 +640,22 @@ bool SILPerformanceInliner::isProfitableToInline(ApplyInst *AI,
     return true;
   
   ConstantTracker constTracker(Callee, &callerTracker, AI);
-  SILFunction *Caller = AI->getFunction();
   
   DominanceInfo *DT = DA->getDomInfo(Callee);
-  if (!DT->isValid(Callee))
-    DT->recalculate(*Callee);
+  SILLoopInfo *LI = LA->getLoopInfo(Callee);
+  
   DominanceOrder domOrder(&Callee->front(), DT, Callee->size());
   
   // Calculate the inlining cost of the callee.
   unsigned CalleeCost = 0;
-  unsigned BoostFactor = 1;
+  unsigned Benefit = InlineCostThreshold > 0 ? InlineCostThreshold :
+                                               RemovedCallBenefit;
+  Benefit += loopDepthOfAI * LoopBenefitFactor;
   int testThreshold = TestThreshold;
 
   while (SILBasicBlock *block = domOrder.getNext()) {
     constTracker.beginBlock();
+    unsigned loopDepth = LI->getLoopDepth(block);
     for (SILInstruction &I : *block) {
       constTracker.trackInst(&I);
       
@@ -445,33 +675,47 @@ bool SILPerformanceInliner::isProfitableToInline(ApplyInst *AI,
         
         // Check if the callee is passed as an argument. If so, increase the
         // threshold, because inlining will (probably) eliminate the closure.
-        SILInstruction *constVal = constTracker.getConst(AI->getCallee());
-        if (constVal && constVal->getFunction() == Caller) {
+        SILInstruction *def = constTracker.getDefInCaller(AI->getCallee());
+        if (def && (isa<FunctionRefInst>(def) || isa<PartialApplyInst>(def))) {
+
           DEBUG(llvm::dbgs() << "        Boost: apply const function at" << *AI);
-          BoostFactor = 2;
+          Benefit += ConstCalleeBenefit + loopDepth * LoopBenefitFactor;
+          testThreshold *= 2;
         }
       }
     }
-    domOrder.pushChildren(block);
+    // Don't count costs in blocks which are dead after inlining.
+    SILBasicBlock *takenBlock = getTakenBlock(block->getTerminator(),
+                                              constTracker);
+    if (takenBlock) {
+      Benefit += ConstTerminatorBenefit + TestOpt;
+      DEBUG(llvm::dbgs() << "      Take bb" << takenBlock->getDebugID() <<
+            " of" << *block->getTerminator());
+      domOrder.pushChildrenIf(block, [=] (SILBasicBlock *child) {
+        return child->getSinglePredecessor() != block || child == takenBlock;
+      });
+    } else {
+      domOrder.pushChildren(block);
+    }
   }
 
-  unsigned Threshold = (testThreshold >= 0 ? (unsigned)testThreshold :
-                        InlineCostThreshold);
-  Threshold *= BoostFactor;
+  unsigned Threshold = (testThreshold >= 0 ? testThreshold : Benefit);
+  
   if (CalleeCost > Threshold) {
-    DEBUG(llvm::dbgs() << "        FAIL: Function too big to inline, "
-          "callee cost: " << CalleeCost << ", threshold: " << Threshold << "\n");
+    DEBUG(llvm::dbgs() << "        NO: Function too big to inline, "
+          "cost: " << CalleeCost << ", threshold: " << Threshold << "\n");
     return false;
   }
-  DEBUG(llvm::dbgs() << "        Ready to inline, callee cost: " << CalleeCost
-        << ", threshold: " << Threshold << "\n");
+  DEBUG(llvm::dbgs() << "        YES: ready to inline, "
+        "cost: " << CalleeCost << ", threshold: " << Threshold << "\n");
   return true;
 }
 
 /// \brief Attempt to inline all calls smaller than our threshold.
 /// returns True if a function was inlined.
 bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
-                                                    DominanceAnalysis *DA) {
+                                                    DominanceAnalysis *DA,
+                                                    SILLoopAnalysis *LA) {
   bool Changed = false;
   DEBUG(llvm::dbgs() << "Visiting Function: " << Caller->getName() << "\n");
 
@@ -481,8 +725,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
   // We don't change anything yet, which let's the dominance info kept alive.
 
   DominanceInfo *DT = DA->getDomInfo(Caller);
-  if (!DT->isValid(Caller))
-    DT->recalculate(*Caller);
+  SILLoopInfo *LI = LA->getLoopInfo(Caller);
 
   ConstantTracker constTracker(Caller);
   DominanceOrder domOrder(&Caller->front(), DT, Caller->size());
@@ -491,6 +734,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
   // We do this in dominance order for the constTracker.
   while (SILBasicBlock *block = domOrder.getNext()) {
     constTracker.beginBlock();
+    unsigned loopDepth = LI->getLoopDepth(block);
     for (SILInstruction &I : *block) {
       constTracker.trackInst(&I);
       
@@ -500,7 +744,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
 
         auto *Callee = getEligibleFunction(AI);
         if (Callee) {
-          if (isProfitableToInline(AI, DA, constTracker))
+          if (isProfitableToInline(AI, loopDepth, DA, LA, constTracker))
             CallSitesToInline.push_back(AI);
         }
       }
@@ -549,7 +793,8 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
                        SILInliner::InlineKind::PerformanceInline,
                        ContextSubs, AI->getSubstitutions());
     Inliner.inlineFunction(AI, Args);
-    DT->reset();
+    DA->invalidate(Caller, SILAnalysis::InvalidationKind::CFG);
+    LA->invalidate(Caller, SILAnalysis::InvalidationKind::CFG);
     NumFunctionsInlined++;
     Changed = true;
   }
@@ -600,6 +845,7 @@ public:
   void run() {
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
     DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
+    SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
 
     if (getOptions().InlineThreshold == 0) {
       DEBUG(llvm::dbgs() << "*** The Performance Inliner is disabled ***\n");
@@ -617,7 +863,7 @@ public:
           !getModule()->linkFunction(F, SILModule::LinkingMode::LinkAll))
         continue;
 
-      Changed |= inliner.inlineCallsIntoFunction(F, DA);
+      Changed |= inliner.inlineCallsIntoFunction(F, DA, LA);
     }
 
     // Invalidate the call graph.
