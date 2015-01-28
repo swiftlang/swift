@@ -1,4 +1,5 @@
 // RUN: not --crash %target-swift-frontend %s -parse
+// XFAIL: no_asserts
 // XFAIL: asan
 
 // Distributed under the terms of the MIT license
