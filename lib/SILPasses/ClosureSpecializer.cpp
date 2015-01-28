@@ -255,12 +255,6 @@ bool CallSiteDescriptor::isSupportedClosure(const SILInstruction *Closure) {
   if (!FRI || FRI->getFunctionType()->hasIndirectResult())
     return false;
 
-  // If our closure has more than one use... bail...
-  //
-  // TODO: Handle multiple apply insts.
-  if (!Closure->hasOneUse())
-    return false;
-
   // Otherwise, we do support specializing this closure.
   return true;
 }
@@ -430,48 +424,51 @@ void ClosureSpecializer::gatherCallSites(
       if (!CallSiteDescriptor::isSupportedClosure(&II))
         continue;
 
-      // Grab the use of our partial apply. If that use is not an apply inst or
-      // an apply inst with substitutions, there is nothing interesting for us
-      // to do, so continue...
-      auto *AI = dyn_cast<ApplyInst>(II.use_begin().getUser());
-      if (!AI || AI->hasSubstitutions())
-        continue;
-
-      // Check if we have already associated this apply inst with a closure to
-      // be specialized. We do not handle applies that take in multiple
-      // closures at this time.
-      if (!VisitedAI.insert(AI).second) {
-        MultipleClosureAI.insert(AI);
-        continue;
-      }
-
-      // If AI does not have a function_ref defintion as its callee, we can not
-      // do anything here... so continue...
-      auto *CalleeFRI = dyn_cast<FunctionRefInst>(AI->getCallee());
-      if (!CalleeFRI ||
-          CalleeFRI->getReferencedFunction()->isExternalDeclaration())
-        continue;
-
-      // Ok, we know that we can perform the optimization but not whether or not
-      // the optimization is profitable. Find the index of the argument
-      // corresponding to our partial apply.
-      Optional<unsigned> ClosureIndex;
-      for (unsigned i = 0, e = AI->getNumArguments(); i != e; ++i) {
-        if (AI->getArgument(i) != SILValue(&II))
+      // Go through all uses of our closure.
+      for (auto *Use : II.getUses()) {
+        // If this use use is not an apply inst or an apply inst with
+        // substitutions, there is nothing interesting for us to do, so
+        // continue...
+        auto *AI = dyn_cast<ApplyInst>(Use->getUser());
+        if (!AI || AI->hasSubstitutions())
           continue;
-        ClosureIndex = i;
-        DEBUG(llvm::dbgs() << "    Found callsite with closure argument at "
-              << i << ": " << *AI);
-        break;
+
+        // Check if we have already associated this apply inst with a closure to
+        // be specialized. We do not handle applies that take in multiple
+        // closures at this time.
+        if (!VisitedAI.insert(AI).second) {
+          MultipleClosureAI.insert(AI);
+          continue;
+        }
+
+        // If AI does not have a function_ref defintion as its callee, we can not
+        // do anything here... so continue...
+        auto *CalleeFRI = dyn_cast<FunctionRefInst>(AI->getCallee());
+        if (!CalleeFRI ||
+            CalleeFRI->getReferencedFunction()->isExternalDeclaration())
+          continue;
+
+        // Ok, we know that we can perform the optimization but not whether or not
+        // the optimization is profitable. Find the index of the argument
+        // corresponding to our partial apply.
+        Optional<unsigned> ClosureIndex;
+        for (unsigned i = 0, e = AI->getNumArguments(); i != e; ++i) {
+          if (AI->getArgument(i) != SILValue(&II))
+            continue;
+          ClosureIndex = i;
+          DEBUG(llvm::dbgs() << "    Found callsite with closure argument at "
+                << i << ": " << *AI);
+          break;
+        }
+
+        // If we did not find an index, there is nothing further to do, continue.
+        if (!ClosureIndex.hasValue())
+          continue;
+
+        // Now we know that CSDesc is profitable to specialize. Add it to our call
+        // site list.
+        CallSites.push_back(CallSiteDescriptor(&II, AI, ClosureIndex.getValue()));
       }
-
-      // If we did not find an index, there is nothing further to do, continue.
-      if (!ClosureIndex.hasValue())
-        continue;
-
-      // Now we know that CSDesc is profitable to specialize. Add it to our call
-      // site list.
-      CallSites.push_back(CallSiteDescriptor(&II, AI, ClosureIndex.getValue()));
     }
   }
 }

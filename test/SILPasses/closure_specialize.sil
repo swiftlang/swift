@@ -14,76 +14,36 @@ import Swift
 // CHECK: thin_to_thick_function [[FUN]] : $@thin (Int, Int) -> () to $@callee_owned (Int, Int) -> ()
 
 // CHECK-LABEL: sil [noinline] @_TF7specgen12take_closureFFTSiSi_T_T_ : $@thin (@owned @callee_owned (Int, Int) -> ()) -> () {
-// specgen.take_closure ((Swift.Int, Swift.Int) -> ()) -> ()
 sil [noinline] @_TF7specgen12take_closureFFTSiSi_T_T_ : $@thin (@owned @callee_owned (Int, Int) -> ()) -> () {
 bb0(%0 : $@callee_owned (Int, Int) -> ()):
-  %2 = alloc_box $RangeGenerator<Int>  // var $v$generator // users: %19, %26, %40
-  // function_ref Swift.Range.generate <A : Swift.ForwardIndexType>(Swift.Range<A>)() -> Swift.RangeGenerator<A>
-  %3 = function_ref @external_bad : $@cc(method) @thin <τ_0_0 where τ_0_0 : ForwardIndexType, τ_0_0.Distance : _SignedIntegerType, τ_0_0.Distance.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@out RangeGenerator<τ_0_0>, @in Range<τ_0_0>) -> () // user: %19
-  %4 = alloc_stack $Range<Int>                    // users: %18, %19, %22
-  // function_ref Swift.... infix <A : protocol<Swift.Comparable, Swift.ForwardIndexType>>(A, A) -> Swift.Range<A>
-  %5 = function_ref @external_bad2 : $@thin <τ_0_0 where τ_0_0 : Comparable, τ_0_0 : ForwardIndexType, τ_0_0.Distance : _SignedIntegerType, τ_0_0.Distance.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@out Range<τ_0_0>, @in τ_0_0, @in τ_0_0) -> () // user: %18
-  %6 = alloc_stack $Int                           // users: %11, %18, %21
-  // function_ref Swift.Int._convertFromBuiltinIntegerLiteral (Swift.Int.Type)(Builtin.Int2048) -> Swift.Int
-  %7 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %10
-  %8 = metatype $@thin Int.Type                   // user: %10
-  %9 = integer_literal $Builtin.Int2048, 0        // user: %10
-  %10 = apply [transparent] %7(%9, %8) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %11
-  store %10 to %6#1 : $*Int                       // id: %11
-  %12 = alloc_stack $Int                          // users: %17, %18, %20
-  // function_ref Swift.Int._convertFromBuiltinIntegerLiteral (Swift.Int.Type)(Builtin.Int2048) -> Swift.Int
-  %13 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %16
-  %14 = metatype $@thin Int.Type                  // user: %16
-  %15 = integer_literal $Builtin.Int2048, 999     // user: %16
-  %16 = apply [transparent] %13(%15, %14) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %17
-  store %16 to %12#1 : $*Int                      // id: %17
-  %18 = apply [transparent] %5<Int, Int, Int, Int>(%4#1, %6#1, %12#1) : $@thin <τ_0_0 where τ_0_0 : Comparable, τ_0_0 : ForwardIndexType, τ_0_0.Distance : _SignedIntegerType, τ_0_0.Distance.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@out Range<τ_0_0>, @in τ_0_0, @in τ_0_0) -> ()
-  %19 = apply %3<Int, Int, Int, Int>(%2#1, %4#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : ForwardIndexType, τ_0_0.Distance : _SignedIntegerType, τ_0_0.Distance.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@out RangeGenerator<τ_0_0>, @in Range<τ_0_0>) -> ()
-  dealloc_stack %12#0 : $*@local_storage Int      // id: %20
-  dealloc_stack %6#0 : $*@local_storage Int       // id: %21
-  dealloc_stack %4#0 : $*@local_storage Range<Int> // id: %22
-  %23 = alloc_stack $Optional<Int>                // users: %26, %28, %32, %39
-  br bb1                                          // id: %24
-
-bb1:                                              // Preds: bb0 bb2
-  // function_ref Swift.RangeGenerator.next <A : Swift.ForwardIndexType>(inout Swift.RangeGenerator<A>)() -> Swift.Optional<A>
-  %25 = function_ref @external_bad3 : $@cc(method) @thin <τ_0_0 where τ_0_0 : ForwardIndexType, τ_0_0.Distance : _SignedIntegerType, τ_0_0.Distance.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@out Optional<τ_0_0>, @inout RangeGenerator<τ_0_0>) -> () // user: %26
-  %26 = apply %25<Int, Int, Int, Int>(%23#1, %2#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : ForwardIndexType, τ_0_0.Distance : _SignedIntegerType, τ_0_0.Distance.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@out Optional<τ_0_0>, @inout RangeGenerator<τ_0_0>) -> ()
-  // function_ref Swift._doesOptionalHaveValue <A>(inout Swift.Optional<A>) -> Builtin.Int1
-  %27 = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_ : $@thin <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1 // user: %28
-  %28 = apply [transparent] %27<Int>(%23#1) : $@thin <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1 // user: %29
-  cond_br %28, bb2, bb3                           // id: %29
-
-bb2:                                              // Preds: bb1
-  // function_ref Swift._getOptionalValue <A>(Swift.Optional<A>) -> A
-  %30 = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_ : $@thin <τ_0_0> (@out τ_0_0, @in Optional<τ_0_0>) -> () // user: %32
-  %31 = alloc_stack $Int                          // users: %32, %33, %37
-  %32 = apply [transparent] %30<Int>(%31#1, %23#1) : $@thin <τ_0_0> (@out τ_0_0, @in Optional<τ_0_0>) -> ()
-  %33 = load %31#1 : $*Int                        // users: %34, %36, %36
-  strong_retain %0 : $@callee_owned (Int, Int) -> () // id: %35
-  %36 = apply %0(%33, %33) : $@callee_owned (Int, Int) -> ()
-  dealloc_stack %31#0 : $*@local_storage Int      // id: %37
-  br bb1                                          // id: %38
-
-bb3:                                              // Preds: bb1
-  dealloc_stack %23#0 : $*@local_storage Optional<Int> // id: %39
-  strong_release %2#0 : $Builtin.NativeObject     // id: %40
-  strong_release %0 : $@callee_owned (Int, Int) -> () // id: %41
-  %42 = tuple ()                                  // user: %43
-  return %42 : $()                                // id: %43
+  %1 = alloc_stack $Int
+  %2 = load %1#1 : $*Int
+  %3 = apply %0(%2, %2) : $@callee_owned (Int, Int) -> ()
+  dealloc_stack %1#0 : $*@local_storage Int
+  %9999 = tuple()
+  return %9999 : $()
 }
 
-sil @external_bad : $@cc(method) @thin <τ_0_0 where τ_0_0 : ForwardIndexType, τ_0_0.Distance : _SignedIntegerType, τ_0_0.Distance.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@out RangeGenerator<τ_0_0>, @in Range<τ_0_0>) -> ()
+// CHECK-LABEL: sil [noinline] @_TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen13take_closure2FFTSiSi_T_T_ : $@thin (Int) -> () {
+// CHECK-NEXT: bb0(%0 : $Int)
+// CHECK: function_ref @_TFF7specgen6callerFSiT_U_FTSiSi_T_
+// CHECK: partial_apply
 
-sil [transparent] @external_bad2 : $@thin <τ_0_0 where τ_0_0 : Comparable, τ_0_0 : ForwardIndexType, τ_0_0.Distance : _SignedIntegerType, τ_0_0.Distance.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@out Range<τ_0_0>, @in τ_0_0, @in τ_0_0) -> ()
+// CHECK-LABEL: sil [noinline] @_TTSf1cl27_TF7specgen6calleeFTSiSi_T____TF7specgen13take_closure2FFTSiSi_T_T_ : $@thin () -> () {
+// CHECK-NEXT: bb0:
+// CHECK: [[FUN:%.*]] = function_ref @_TF7specgen6calleeFTSiSi_T_ : $@thin (Int, Int) -> ()
+// CHECK: thin_to_thick_function [[FUN]] : $@thin (Int, Int) -> () to $@callee_owned (Int, Int) -> ()
 
-sil [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
-
-sil @external_bad3 : $@cc(method) @thin <τ_0_0 where τ_0_0 : ForwardIndexType, τ_0_0.Distance : _SignedIntegerType, τ_0_0.Distance.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@out Optional<τ_0_0>, @inout RangeGenerator<τ_0_0>) -> ()
-
-sil [transparent] @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_ : $@thin <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
-
-sil [transparent] @_TFSs17_getOptionalValueU__FGSqQ__Q_ : $@thin <τ_0_0> (@out τ_0_0, @in Optional<τ_0_0>) -> ()
+// CHECK-LABEL: sil [noinline] @_TF7specgen13take_closure2FFTSiSi_T_T_ : $@thin (@owned @callee_owned (Int, Int) -> ()) -> () {
+sil [noinline] @_TF7specgen13take_closure2FFTSiSi_T_T_ : $@thin (@owned @callee_owned (Int, Int) -> ()) -> () {
+bb0(%0 : $@callee_owned (Int, Int) -> ()):
+  %1 = alloc_stack $Int
+  %2 = load %1#1 : $*Int
+  %3 = apply %0(%2, %2) : $@callee_owned (Int, Int) -> ()
+  dealloc_stack %1#0 : $*@local_storage Int
+  %9999 = tuple()
+  return %9999 : $()
+}
 
 // CHECK-LABEL: sil [noinline] @_TF7specgen6calleeFTSiSiSi_T_ : $@thin (Int, Int, Int) -> () {
 // specgen.callee (Swift.Int, Swift.Int, Swift.Int) -> ()
@@ -96,8 +56,8 @@ bb0(%0 : $Int, %1 : $Int, %2 : $Int):
 // CHECK-LABEL: sil @_TF7specgen6callerFSiT_ : $@thin (Int) -> () {
 // CHECK: [[ID1:%[0-9]+]] = function_ref @_TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ : $@thin (Int) -> ()
 // CHECK-NEXT: apply [[ID1]](%0) : $@thin (Int) -> ()
-
-// specgen.caller (Swift.Int) -> ()
+// CHECK: [[ID2:%[0-9]+]] = function_ref @_TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen13take_closure2FFTSiSi_T_T_ : $@thin (Int) -> ()
+// CHECK-NEXT: apply [[ID2]](%0) : $@thin (Int) -> ()
 sil @_TF7specgen6callerFSiT_ : $@thin (Int) -> () {
 bb0(%0 : $Int):
   // function_ref specgen.take_closure ((Swift.Int, Swift.Int) -> ()) -> ()
@@ -105,14 +65,14 @@ bb0(%0 : $Int):
   // function_ref specgen.(caller (Swift.Int) -> ()).(closure #1)
   %3 = function_ref @_TFF7specgen6callerFSiT_U_FTSiSi_T_ : $@thin (Int, Int, Int) -> () // user: %4
   %4 = partial_apply %3(%0) : $@thin (Int, Int, Int) -> () // user: %5
-  %7 = tuple()
   %5 = apply %2(%4) : $@thin (@owned @callee_owned (Int, Int) -> ()) -> ()
-  %6 = tuple ()                                   // user: %7
-  return %6 : $()                                 // id: %7
+  %6 = function_ref @_TF7specgen13take_closure2FFTSiSi_T_T_ : $@thin (@owned @callee_owned (Int, Int) -> ()) -> () // user: %5
+  %7 = apply %6(%4) : $@thin (@owned @callee_owned (Int, Int) -> ()) -> ()
+  %9999 = tuple()
+  return %9999 : $()
 }
 
 // CHECK-LABEL: sil shared @_TFF7specgen6callerFSiT_U_FTSiSi_T_ : $@thin (Int, Int, Int) -> () {
-// specgen.(caller (Swift.Int) -> ()).(closure #1)
 sil shared @_TFF7specgen6callerFSiT_U_FTSiSi_T_ : $@thin (Int, Int, Int) -> () {
 bb0(%0 : $Int, %1 : $Int, %2 : $Int):
   %5 = alloc_box $Int  // var p                   // users: %6, %10, %14
@@ -145,6 +105,8 @@ bb0(%0 : $Int, %1 : $Int):
 // CHECK-LABEL: sil @_TF7specgen11tttficallerFSiT_ : $@thin (Int) -> () {
 // CHECK: [[ID1:%[0-9]+]] = function_ref @_TTSf1cl27_TF7specgen6calleeFTSiSi_T____TF7specgen12take_closureFFTSiSi_T_T_ : $@thin () -> ()
 // CHECK-NEXT: apply [[ID1]]() : $@thin () -> ()
+// CHECK: [[ID2:%[0-9]+]] = function_ref @_TTSf1cl27_TF7specgen6calleeFTSiSi_T____TF7specgen13take_closure2FFTSiSi_T_T_ : $@thin () -> ()
+// CHECK-NEXT: apply [[ID2]]() : $@thin () -> ()
 sil @_TF7specgen11tttficallerFSiT_ : $@thin (Int) -> () {
 bb0(%0 : $Int):
   // function_ref specgen.take_closure ((Swift.Int, Swift.Int) -> ()) -> ()
@@ -152,8 +114,9 @@ bb0(%0 : $Int):
   // function_ref specgen.(caller (Swift.Int) -> ()).(closure #1)
   %3 = function_ref @_TF7specgen6calleeFTSiSi_T_ : $@thin (Int, Int) -> () // user: %4
   %4 = thin_to_thick_function %3 : $@thin (Int, Int) -> () to $@callee_owned (Int, Int) -> () // user: %5
-  %7 = tuple()
   %5 = apply %2(%4) : $@thin (@owned @callee_owned (Int, Int) -> ()) -> ()
-  %6 = tuple ()                                   // user: %7
-  return %6 : $()                                 // id: %7
+  %6 = function_ref @_TF7specgen13take_closure2FFTSiSi_T_T_ : $@thin (@owned @callee_owned (Int, Int) -> ()) -> ()
+  %7 = apply %6(%4) : $@thin (@owned @callee_owned (Int, Int) -> ()) -> ()
+  %9999 = tuple ()                                   // user: %7
+  return %9999 : $()                                 // id: %7
 }
