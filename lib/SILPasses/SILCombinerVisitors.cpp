@@ -802,9 +802,121 @@ static SILInstruction *optimizeBuiltinWithSameOperands(BuiltinInst *I,
   return nullptr;
 }
 
+/// Match an index pointer that is fed by a sizeof(T)*Distance offset.
+static IndexRawPointerInst *matchSizeOfMultiplication(SILValue I,
+                                               MetatypeInst *RequiredType,
+                                               SILValue &Ptr,
+                                               SILValue &Distance) {
+  IndexRawPointerInst *Res = dyn_cast<IndexRawPointerInst>(I);
+  if (!Res)
+    return nullptr;
+
+  SILValue Dist;
+  MetatypeInst *StrideType;
+  if (match(Res->getOperand(1),
+            m_TupleExtractInst(
+                m_ApplyInst(BuiltinValueKind::SMulOver, m_SILValue(Dist),
+                            m_ApplyInst(BuiltinValueKind::StrideofNonZero,
+                                        m_MetatypeInst(StrideType))),
+                0)) ||
+      match(Res->getOperand(1),
+            m_TupleExtractInst(
+                m_ApplyInst(BuiltinValueKind::SMulOver,
+                            m_ApplyInst(BuiltinValueKind::StrideofNonZero,
+                                        m_MetatypeInst(StrideType)),
+                            m_SILValue(Dist)),
+                0))) {
+    if (StrideType != RequiredType)
+      return nullptr;
+    Distance = Dist;
+    Ptr = Res->getOperand(0);
+    return Res;
+  }
+  return nullptr;
+}
+
+/// Given an index_raw_pointer Ptr, size_of(Metatype) * Distance create an
+/// address_to_pointer (index_addr ptr, Distance : $*Metatype) : $RawPointer
+/// instruction.
+static SILInstruction *createIndexAddrFrom(IndexRawPointerInst *I,
+                                    MetatypeInst *Metatype, SILValue Ptr,
+                                    SILValue Distance,
+                                    SILType RawPointerTy,
+                                    SILBuilder *Builder) {
+  SILType InstanceType =
+    Metatype->getType().getMetatypeInstanceType(I->getModule());
+
+  auto *NewPTAI = Builder->createPointerToAddress(
+    I->getLoc(), Ptr, InstanceType.getAddressType());
+  NewPTAI->setDebugScope(I->getDebugScope());
+
+  auto *NewIAI = Builder->createIndexAddr(I->getLoc(), NewPTAI, Distance);
+  NewIAI->setDebugScope(I->getDebugScope());
+
+  auto *NewATPI =
+    Builder->createAddressToPointer(I->getLoc(), NewIAI, RawPointerTy);
+  NewATPI->setDebugScope(I->getDebugScope());
+  return NewATPI;
+}
+
+/// Optimize an array operation that has (index_raw_pointer b, sizeof(T) * Dist)
+/// operands into one that use index_addr as operands.
+SILInstruction *optimizeBuiltinArrayOperation(BuiltinInst *I,
+                                              SILBuilder *Builder) {
+  if (I->getNumOperands() < 3)
+    return nullptr;
+
+  // Take something like this:
+  //   %stride = Builtin.strideof(T) * %distance
+  //   %ptr' = index_raw_pointer %ptr, %stride
+  //     = builtin "takeArrayFrontToBack"<Int>(%metatype, %ptr', ...
+
+  // And convert it to this:
+  //   %addr = pointer_to_address %ptr, $T
+  //   %result = index_addr %addr, %distance
+  //   %ptr' = address_to_pointer result : $RawPointer
+  //     = builtin "takeArrayFrontToBack"<Int>(%metatype, %ptr', ...
+
+  auto *Metatype = dyn_cast<MetatypeInst>(I->getOperand(0));
+  if (!Metatype)
+    return nullptr;
+
+  SILValue Ptr;
+  SILValue Distance;
+  SILValue NewOp1 = I->getOperand(1), NewOp2 = I->getOperand(2);
+
+  // Try to replace the first pointer operand.
+  auto *IdxRawPtr1 =
+      matchSizeOfMultiplication(I->getOperand(1), Metatype, Ptr, Distance);
+  if (IdxRawPtr1)
+    NewOp1 = createIndexAddrFrom(IdxRawPtr1, Metatype, Ptr, Distance,
+                                 NewOp1.getType(), Builder);
+
+  // Try to replace the second pointer operand.
+  auto *IdxRawPtr2 =
+      matchSizeOfMultiplication(I->getOperand(2), Metatype, Ptr, Distance);
+  if (IdxRawPtr2)
+    NewOp2 = createIndexAddrFrom(IdxRawPtr2, Metatype, Ptr, Distance,
+                                 NewOp2.getType(), Builder);
+
+  if (NewOp1 != I->getOperand(1) || NewOp2 != I->getOperand(2)) {
+    SmallVector<SILValue, 5> NewOpds;
+    for (auto OldOpd : I->getArguments())
+      NewOpds.push_back(OldOpd);
+    NewOpds[1] = NewOp1;
+    NewOpds[2] = NewOp2;
+    return BuiltinInst::create(I->getLoc(), I->getName(), I->getType(),
+                               I->getSubstitutions(), NewOpds,
+                               *I->getFunction());
+  }
+  return nullptr;
+}
+
 SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
   if (I->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass)
     return optimizeBuiltinCanBeObjCClass(I);
+  if (I->getBuiltinInfo().ID == BuiltinValueKind::TakeArrayFrontToBack)
+    return optimizeBuiltinArrayOperation(I, Builder);
 
   if (I->getNumOperands() >= 2 && I->getOperand(0) == I->getOperand(1)) {
     // It's a builtin which has the same value in its first and second operand.
