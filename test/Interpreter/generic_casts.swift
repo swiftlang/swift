@@ -150,6 +150,7 @@ println(u is Int.Type) // CHECK: false
 // CHECK-LABEL: AnyObject casts:
 println("AnyObject casts:")
 println(allToAll(C(), AnyObject.self)) // CHECK-NEXT: true
+println(allToAll(C().dynamicType, AnyObject.self)) // CHECK-NEXT: true
 // Bridging
 println(allToAll(0, AnyObject.self)) // CHECK-NEXT: true
 

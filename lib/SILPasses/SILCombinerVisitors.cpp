@@ -2120,8 +2120,8 @@ visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
   // to a protocol type at compile-time.
   if (!CCABI->getTargetType().isAnyExistentialType())
     return nullptr;
-  auto SILSourceTy = SILType::getPrimitiveObjectType(CCABI->getSourceType());
-  auto SILTargetTy = SILType::getPrimitiveObjectType(CCABI->getTargetType());
+  auto SILSourceTy = CCABI->getSrc().getType().getObjectType();
+  auto SILTargetTy = CCABI->getDest().getType().getObjectType();
   // Check if we can statically figure out the outcome of this cast.
   auto *SourceNominalTy = CCABI->getSourceType().getAnyNominal();
   if (SILSourceTy.isExistentialType() || !SourceNominalTy)

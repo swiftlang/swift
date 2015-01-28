@@ -3288,15 +3288,18 @@ void emitValueCheckedCast(IRGenSILFunction &IGF,
   CanType sourceType = operand.getType().getSwiftRValueType();
   CanType targetType = loweredTargetType.getSwiftRValueType();
 
-  if (isa<AnyMetatypeType>(sourceType)) {
-    llvm::Value *metatypeVal;
+  if (auto sourceMetaType = dyn_cast<AnyMetatypeType>(sourceType)) {
+    llvm::Value *metatypeVal = nullptr;
     auto fromEx = IGF.getLoweredExplosion(operand);
-    metatypeVal = fromEx.claimNext();
+    if (sourceMetaType->getRepresentation() != MetatypeRepresentation::Thin)
+      metatypeVal = fromEx.claimNext();
     // If the metatype is existential, there may be witness tables in the
     // value, which we don't need.
     // TODO: In existential-to-existential casts, we should carry over common
     // witness tables from the source to the destination.
     fromEx.claimAll();
+    
+    SmallVector<ProtocolDecl*, 1> protocols;
     
     if (auto existential = dyn_cast<ExistentialMetatypeType>(targetType))
       emitScalarExistentialDowncast(IGF, metatypeVal,
@@ -3304,9 +3307,16 @@ void emitValueCheckedCast(IRGenSILFunction &IGF,
                                     mode,
                                     existential->getRepresentation(),
                                     ex);
-    else
-      emitMetatypeDowncast(IGF, metatypeVal, cast<MetatypeType>(targetType),
-                           mode, ex);
+    else if (auto destMetaType = dyn_cast<MetatypeType>(targetType))
+      emitMetatypeDowncast(IGF, metatypeVal, destMetaType, mode, ex);
+    else if (targetType->isExistentialType(protocols)) {
+      assert(IGF.IGM.ObjCInterop
+             && protocols.size() == 1
+             && *protocols[0]->getKnownProtocolKind()
+                   == KnownProtocolKind::AnyObject
+             && "metatypes can only be cast to AnyObject, with ObjC interop");
+      emitMetatypeToObjectDowncast(IGF, metatypeVal, sourceMetaType, mode, ex);
+    }
     return;
   }
 

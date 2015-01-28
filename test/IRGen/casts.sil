@@ -7,6 +7,8 @@ sil_stage canonical
 import Builtin
 import Swift
 
+struct NotClass {}
+
 class A {}
 class B: A {}
 
@@ -213,3 +215,37 @@ nay:
   unreachable
 }
 
+// CHECK-LABEL: define void @checked_metatype_to_object_casts
+sil @checked_metatype_to_object_casts : $@thin <T> (@thick Any.Type) -> () {
+entry(%e : $@thick Any.Type):
+  %a = metatype $@thin NotClass.Type
+  // CHECK: br i1 false
+  checked_cast_br %a : $@thin NotClass.Type to $AnyObject, a_yea, a_nay
+a_yea(%1 : $AnyObject):
+  %b = metatype $@thick A.Type
+  // CHECK: bitcast %swift.type* {{%.*}} to %objc_object*
+  checked_cast_br %b : $@thick A.Type to $AnyObject, b_yea, b_nay
+b_yea(%2 : $AnyObject):
+  %c = metatype $@objc_metatype A.Type
+  // CHECK: bitcast %objc_class* {{%.*}} to %objc_object*
+  checked_cast_br %c : $@objc_metatype A.Type to $AnyObject, c_yea, c_nay
+c_yea(%3 : $AnyObject):
+  %d = metatype $@thick T.Type
+  // CHECK: call %objc_object* @swift_dynamicCastMetatypeToObjectConditional(%swift.type* %T)
+  checked_cast_br %d : $@thick T.Type to $AnyObject, d_yea, d_nay
+d_yea(%4 : $AnyObject):
+  // CHECK: call %objc_object* @swift_dynamicCastMetatypeToObjectConditional(%swift.type* %0)
+  checked_cast_br %e : $@thick Any.Type to $AnyObject, e_yea, e_nay
+e_yea(%5 : $AnyObject):
+  return undef : $()
+a_nay:
+  unreachable
+b_nay:
+  unreachable
+c_nay:
+  unreachable
+d_nay:
+  unreachable
+e_nay:
+  unreachable
+}

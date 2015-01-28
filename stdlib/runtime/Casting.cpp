@@ -469,12 +469,12 @@ static bool _conformsToProtocol(const OpaqueValue *value,
       return sourceExistential->isClassBounded();
     }
       
-    case MetadataKind::ExistentialMetatype: // FIXME
+    case MetadataKind::ExistentialMetatype:
+    case MetadataKind::Metatype:
     case MetadataKind::Function:
     case MetadataKind::ThinFunction:
     case MetadataKind::Block: // FIXME
     case MetadataKind::HeapLocalVariable:
-    case MetadataKind::Metatype:
     case MetadataKind::Enum:
     case MetadataKind::Opaque:
     case MetadataKind::PolyFunction:
@@ -691,6 +691,73 @@ static void deallocateDynamicValue(OpaqueValue *value, const Metadata *type) {
   _failCorruptType(type);
 }
 
+#if SWIFT_OBJC_INTEROP
+extern "C" id
+swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype) {
+  switch (metatype->getKind()) {
+  case MetadataKind::Class:
+    // Swift classes are objects in and of themselves.
+    return (id)metatype;
+
+  case MetadataKind::ObjCClassWrapper: {
+    // Unwrap ObjC class objects.
+    auto wrapper = static_cast<const ObjCClassWrapperMetadata*>(metatype);
+    return (id)wrapper->getClassObject();
+  }
+  
+  // Other kinds of metadata don't cast to AnyObject.
+  case MetadataKind::Struct:
+  case MetadataKind::Enum:
+  case MetadataKind::Opaque:
+  case MetadataKind::Tuple:
+  case MetadataKind::Function:
+  case MetadataKind::PolyFunction:
+  case MetadataKind::Existential:
+  case MetadataKind::Metatype:
+  case MetadataKind::ExistentialMetatype:
+  case MetadataKind::ForeignClass:
+  case MetadataKind::Block:
+  case MetadataKind::ThinFunction:
+  case MetadataKind::HeapLocalVariable:
+    return nullptr;
+  }
+}
+
+extern "C" id
+swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype) {
+  switch (metatype->getKind()) {
+  case MetadataKind::Class:
+    // Swift classes are objects in and of themselves.
+    return (id)metatype;
+
+  case MetadataKind::ObjCClassWrapper: {
+    // Unwrap ObjC class objects.
+    auto wrapper = static_cast<const ObjCClassWrapperMetadata*>(metatype);
+    return (id)wrapper->getClassObject();
+  }
+  
+  // Other kinds of metadata don't cast to AnyObject.
+  case MetadataKind::Struct:
+  case MetadataKind::Enum:
+  case MetadataKind::Opaque:
+  case MetadataKind::Tuple:
+  case MetadataKind::Function:
+  case MetadataKind::PolyFunction:
+  case MetadataKind::Existential:
+  case MetadataKind::Metatype:
+  case MetadataKind::ExistentialMetatype:
+  case MetadataKind::ForeignClass:
+  case MetadataKind::Block:
+  case MetadataKind::ThinFunction:
+  case MetadataKind::HeapLocalVariable: {
+    std::string sourceName = nameForMetadata(metatype);
+    swift_dynamicCastFailure(metatype, sourceName.c_str(),
+                             nullptr, "AnyObject",
+                         "only class metatypes can be converted to AnyObject");
+  }
+  }
+}
+#endif
 
 /// Perform a dynamic cast to an existential type.
 static bool _dynamicCastToExistential(OpaqueValue *dest,
@@ -698,6 +765,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
                                       const Metadata *srcType,
                                       const ExistentialTypeMetadata *targetType,
                                       DynamicCastFlags flags) {
+  id tmp;
   // Find the actual type of the source.
   OpaqueValue *srcDynamicValue;
   const Metadata *srcDynamicType;
@@ -712,12 +780,29 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     // If the source type is a value type, it cannot possibly conform
     // to a class-bounded protocol. 
     switch (srcDynamicType->getKind()) {
+    case MetadataKind::ExistentialMetatype:
+    case MetadataKind::Metatype: {
+#if SWIFT_OBJC_INTEROP
+      // Class metadata can be used as an object when ObjC interop is available.
+      auto metatypePtr = reinterpret_cast<const Metadata **>(src);
+      auto metatype = *metatypePtr;
+      tmp = swift_dynamicCastMetatypeToObjectConditional(metatype);
+      // If the cast succeeded, use the result value as the class instance
+      // below.
+      if (tmp) {
+        srcDynamicValue = reinterpret_cast<OpaqueValue*>(&tmp);
+        srcDynamicType = reinterpret_cast<const Metadata*>(tmp);
+        break;
+      }
+#endif
+      // Otherwise, metatypes aren't class objects.
+      return _fail(src, srcType, targetType, flags);
+    }
+    
     case MetadataKind::Class:
     case MetadataKind::ObjCClassWrapper:
     case MetadataKind::ForeignClass:
     case MetadataKind::Existential:
-    case MetadataKind::ExistentialMetatype:
-    case MetadataKind::Metatype:
       // Handle these cases below.
       break;
 

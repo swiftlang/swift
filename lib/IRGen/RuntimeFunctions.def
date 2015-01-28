@@ -671,6 +671,20 @@ FUNCTION(DynamicCastObjCProtocolConditional,
          ARGS(ObjCPtrTy, SizeTy, Int8PtrPtrTy),
          ATTRS(NoUnwind))
 
+// id swift_dynamicCastMetatypeToObjectUnconditional(type *type);
+FUNCTION(DynamicCastMetatypeToObjectUnconditional,
+         swift_dynamicCastMetatypeToObjectUnconditional, RuntimeCC,
+         RETURNS(ObjCPtrTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// id swift_dynamicCastMetatypeToObjectConditional(type *type);
+FUNCTION(DynamicCastMetatypeToObjectConditional,
+         swift_dynamicCastMetatypeToObjectConditional, RuntimeCC,
+         RETURNS(ObjCPtrTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
 // witness_table* swift_conformsToProtocol(type*, protocol*);
 FUNCTION(ConformsToProtocol,
          swift_conformsToProtocol, RuntimeCC,

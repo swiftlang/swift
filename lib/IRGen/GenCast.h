@@ -81,6 +81,13 @@ namespace irgen {
                                   Optional<MetatypeRepresentation> metatypeKind,
                                   Explosion &ex);
 
+  /// Emit a checked cast from a metatype to AnyObject.
+  void emitMetatypeToObjectDowncast(IRGenFunction &IGF,
+                                    llvm::Value *metatypeValue,
+                                    CanAnyMetatypeType type,
+                                    CheckedCastMode mode,
+                                    Explosion &ex);
+
   /// Emit a Protocol* value referencing an ObjC protocol.
   llvm::Value *emitReferenceToObjCProtocol(IRGenFunction &IGF,
                                            ProtocolDecl *proto);

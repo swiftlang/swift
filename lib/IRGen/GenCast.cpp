@@ -346,6 +346,69 @@ static llvm::Function *emitExistentialScalarCastFn(IRGenModule &IGM,
   return fn;
 }
 
+void irgen::emitMetatypeToObjectDowncast(IRGenFunction &IGF,
+                                         llvm::Value *metatypeValue,
+                                         CanAnyMetatypeType type,
+                                         CheckedCastMode mode,
+                                         Explosion &ex) {
+  // If ObjC interop is enabled, casting a metatype to AnyObject succeeds
+  // if the metatype is for a class.
+  auto triviallyFail = [&] {
+    ex.add(llvm::ConstantPointerNull::get(IGF.IGM.ObjCPtrTy));
+  };
+  
+  if (!IGF.IGM.ObjCInterop)
+    return triviallyFail();
+  
+  switch (type->getRepresentation()) {
+  case MetatypeRepresentation::ObjC:
+    // Metatypes that can be represented as ObjC trivially cast to AnyObject.
+    ex.add(IGF.Builder.CreateBitCast(metatypeValue, IGF.IGM.ObjCPtrTy));
+    return;
+
+  case MetatypeRepresentation::Thin:
+    // Metatypes that can be thin would never be classes.
+    // TODO: Final class metatypes could in principle be thin.
+    assert(!type.getInstanceType()->mayHaveSuperclass()
+           && "classes should not have thin metatypes (yet)");
+    return triviallyFail();
+    
+  case MetatypeRepresentation::Thick: {
+    auto instanceTy = type.getInstanceType();
+    // Is the type obviously a class?
+    if (instanceTy->mayHaveSuperclass()) {
+      // Get the ObjC metadata for the class.
+      auto heapMetadata = emitClassHeapMetadataRefForMetatype(IGF,metatypeValue,
+                                                              instanceTy);
+      ex.add(IGF.Builder.CreateBitCast(heapMetadata, IGF.IGM.ObjCPtrTy));
+      return;
+    }
+    
+    // Is the type obviously not a class?
+    if (!isa<ArchetypeType>(instanceTy)
+        && !isa<ExistentialMetatypeType>(type))
+      return triviallyFail();
+
+    // Ask the runtime whether this is class metadata.
+    llvm::Constant *castFn;
+    switch (mode) {
+    case CheckedCastMode::Conditional:
+      castFn = IGF.IGM.getDynamicCastMetatypeToObjectConditionalFn();
+      break;
+    case CheckedCastMode::Unconditional:
+      castFn = IGF.IGM.getDynamicCastMetatypeToObjectUnconditionalFn();
+      break;
+    }
+    
+    auto call = IGF.Builder.CreateCall(castFn, metatypeValue);
+    ex.add(call);
+    return;
+  }
+  }
+
+}
+
+
 /// Emit a checked cast to an Objective-C protocol or protocol composition.
 void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
                                   llvm::Value *value,
@@ -360,25 +423,25 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   // Get references to the ObjC Protocol* values for the objc protocols.
   SmallVector<llvm::Value*, 4> objcProtos;
   bool requiresWitnessTableLookup = false;
-
+  bool requiresClassCheck = false;
+  
   for (auto proto : allProtos) {
     if (requiresProtocolWitnessTable(proto))
       requiresWitnessTableLookup = true;
     if (!proto->isObjC())
       continue;
-    // Casting an object to AnyObject trivially succeeds.
-    // Casting a metatype to AnyObject succeeds if the metatype is
     if (proto->getKnownProtocolKind()
-        && *proto->getKnownProtocolKind() == KnownProtocolKind::AnyObject
-        && !metatypeKind)
+        && *proto->getKnownProtocolKind() == KnownProtocolKind::AnyObject) {
+      // Casting an object to AnyObject trivially succeeds.
       continue;
-      
+    }
+    
     objcProtos.push_back(emitReferenceToObjCProtocol(IGF, proto));
   }
   
   // If we don't have any protocols we really need to check, then trivially
   // succeed.
-  if (objcProtos.empty() && !requiresWitnessTableLookup) {
+  if (objcProtos.empty() && !requiresWitnessTableLookup && !requiresClassCheck){
     value = IGF.Builder.CreateBitCast(value, IGF.IGM.ObjCPtrTy);
     ex.add(value);
     return;
