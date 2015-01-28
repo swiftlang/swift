@@ -61,21 +61,15 @@ private:
 public:
   /// Create a call graph edge for a call site where we will fill in
   /// the set of potentially called functions later.
-  CallGraphEdge(ApplyInst *CallSite) : CallSite(CallSite),
-                                       CalleeSet(new CalleeSetType, 0) {
+  CallGraphEdge(ApplyInst *CallSite, CalleeSetType &KnownCallees, bool Complete)
+    : CallSite(CallSite),
+      // FIXME: Do not allocate memory for the singleton callee case.
+      CalleeSet(new CalleeSetType, Complete) {
+
     // TODO: We will probably have many call sites that can share a
     //       callee set so we should optimize allocation and
     //       deallocation of these accordingly.
-  }
-
-  /// Create a call graph edge for a call site that is known to have
-  /// only a single callee.
-  CallGraphEdge(ApplyInst *CallSite, CallGraphNode *Node)
-    : CallSite(CallSite),
-      // FIXME: Do not allocate memory for the singleton callee case.
-      CalleeSet(new CalleeSetType, 0) {
-    addCallee(Node);
-    markCalleeSetComplete();
+    CalleeSet.getPointer()->insert(KnownCallees.begin(), KnownCallees.end());
   }
 
   ~CallGraphEdge() {
@@ -108,12 +102,6 @@ public:
   /// Return whether the call set is known to be complete.
   bool isCalleeSetComplete() const {
     return CalleeSet.getInt();
-  }
-
-private:
-  /// Mark the call set as being complete.
-  void markCalleeSetComplete() {
-    CalleeSet.setInt(1);
   }
 };
 

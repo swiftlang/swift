@@ -61,6 +61,7 @@ void CallGraph::addCallGraphNode(SILFunction *F, unsigned NodeOrdinal) {
 
 void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
   auto Callee = AI->getCallee();
+  CallGraphEdge::CalleeSetType CalleeSet;
 
   switch (Callee->getKind()) {
   case ValueKind::FunctionRefInst: {
@@ -72,7 +73,9 @@ void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
     assert(CalleeNode &&
            "Expected to have a call graph node for all functions!");
 
-    auto *CallSite = new CallGraphEdge(AI, CalleeNode);
+    CalleeSet.insert(CalleeNode);
+
+    auto *CallSite = new CallGraphEdge(AI, CalleeSet, /* Complete = */ true);
     CallerNode->addCallSite(CallSite);
     CalleeNode->addCaller(CallSite);
     break;
