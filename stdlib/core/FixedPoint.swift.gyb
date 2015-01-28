@@ -33,10 +33,6 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 # Number of bits in integer literals.
 builtinIntLiteralBits = 2048
 
-# FIXME: checked and unchecked conversions of Word types
-CastFromWord = 'zextOrBitCast_Word_Int64' if word_bits==64 else 'truncOrBitCast_Word_Int32'
-CastToWord = 'truncOrBitCast_Int64_Word' if word_bits==64 else 'zextOrBitCast_Int32_Word'
-
 def maskBits(n):
     """Return an n-bit mask in hex"""
     return hexify((1 << n) - 1)
@@ -204,8 +200,24 @@ public struct ${Self}
   }
 
 % if self_ty.is_word:
-  public var _builtinWordValue: Builtin.Word {
-    return value
+  @transparent
+  public // @testable
+  init(_ v: Builtin.Word) {
+% if BuiltinName == 'Int32':
+    value = Builtin.truncOrBitCast_Word_Int32(v)
+% elif BuiltinName == 'Int64':
+    value = Builtin.zextOrBitCast_Word_Int64(v)
+% end
+  }
+
+  @transparent
+  public // @testable
+  var _builtinWordValue: Builtin.Word {
+% if BuiltinName == 'Int32':
+    return Builtin.zextOrBitCast_Int32_Word(value)
+% elif BuiltinName == 'Int64':
+    return Builtin.truncOrBitCast_Int64_Word(value)
+% end
   }
 % end
 
@@ -294,13 +306,14 @@ extension ${Self} : Hashable {
   /// different invocations of the same program.  Do not persist the
   /// hash value across program runs.
   public var hashValue: Int {
-% if bits < word_bits:
-    return Int(Builtin.sextOrBitCast_${BuiltinName}_Word(self.value))
-% elif self_ty.is_word:
-    return Int(self.value)
-% elif bits == word_bits:
-    return Int(Builtin.${CastToWord}(self.value))
+% if bits <= word_bits and signed:
+    // Sign extend the value.
+    return Int(self)
+% elif bits <= word_bits and not signed:
+    // Sign extend the value.
+    return Int(${OtherSelf}(bitPattern: self))
 % elif bits == word_bits * 2:
+    // We have twice as many bits as we need to return.
     return
       Int(truncatingBitPattern: self) ^
       Int(truncatingBitPattern: self >> 32)
@@ -437,16 +450,11 @@ extension ${Self} {
 %    srcBits = src_ty.bits
 %    srcSigned = src_ty.is_signed
 %    Src = src_ty.stdlib_name
-%    srcBuiltinName = src_ty.builtin_name
 %    (srcSign, srcExt) = ('s', 'sext') if srcSigned else ('u', 'zext')
 %    if Self != Src:
   public init(_ v: ${Src}) {
 %
-%       if srcBuiltinName == 'Word':
-    let srcNotWord = Builtin.${CastFromWord}(v.value)
-%       else:
     let srcNotWord = v.value
-%       end
 %
 %       if srcBits == bits and srcSign == sign:
     let dstNotWord = srcNotWord
@@ -470,11 +478,7 @@ extension ${Self} {
     let dstNotWord = Builtin.${srcExt}_Int${srcBits}_Int${bits}(srcNotWord)
 %       end
 %
-%       if BuiltinName == 'Word':
-    value = Builtin.${CastToWord}(dstNotWord)
-%       else:
     value = dstNotWord
-%       end
   }
 %    end
 
@@ -486,11 +490,7 @@ extension ${Self} {
   @transparent
   public init(truncatingBitPattern: ${Src}) {
 %
-%       if srcBuiltinName == 'Word':
-    let srcNotWord = Builtin.${CastFromWord}(truncatingBitPattern.value)
-%       else:
     let srcNotWord = truncatingBitPattern.value
-%       end
 %
 %       if self_ty.bits == src_ty.bits:
     let dstNotWord = srcNotWord
@@ -498,11 +498,7 @@ extension ${Self} {
     let dstNotWord = Builtin.trunc_Int${srcBits}_Int${bits}(srcNotWord)
 %       end
 %
-%       if BuiltinName == 'Word':
-    value = Builtin.${CastToWord}(dstNotWord)
-%       else:
     value = dstNotWord
-%       end
   }
 
 %    end
@@ -633,6 +629,17 @@ public postfix func -- (inout x: ${Self}) -> ${Self} {
   x = x - 1
   return ret
 }
+
+% if signed:
+// TODO: Consider removing the underscore.
+/// Returns the argument and specifies that the value is not negative.
+/// It has only an effect if the argument is a load or call.
+@transparent
+public func _assumeNonNegative(x: ${Self}) -> ${Self} {
+  _sanityCheck(x >= 0)
+  return ${Self}(Builtin.assumeNonNegative_${BuiltinName}(x.value))
+}
+% end
 
 % end  # for bits in allInts
 

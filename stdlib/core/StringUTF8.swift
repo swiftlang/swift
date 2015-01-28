@@ -128,9 +128,9 @@ extension String {
         // Map the high nibble of the current code unit into the
         // amount by which to increment the utf16 index.  Only when
         // the high nibble is 1111 do we have a surrogate pair.
-        let u16Increments = 
+        let u16Increments = Int(bitPattern:
         // 1111 1110 1101 1100 1011 1010 1001 1000 0111 0110 0101 0100 0011 0010 0001 0000
-           0b10___01___01___01___00___00___00___00___01___01___01___01___01___01___01___01
+           0b10___01___01___01___00___00___00___00___01___01___01___01___01___01___01___01)
         let increment = (u16Increments >> numericCast(hiNibble << 1)) & 0x3
         let nextCoreIndex = _coreIndex &+ increment        
         let nextBuffer = Index._nextBuffer(_buffer)

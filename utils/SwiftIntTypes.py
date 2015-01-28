@@ -33,7 +33,7 @@ class SwiftIntegerType(object):
             'Int' + \
             ('' if is_word else str(bits))
 
-        self.builtin_name = ('Word' if is_word else 'Int' + str(bits))
+        self.builtin_name = 'Int' + str(bits)
 
     def get_opposite_signedness(self):
         return SwiftIntegerType(self.is_word, self.bits, not self.is_signed)

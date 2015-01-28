@@ -23,6 +23,9 @@ allFloatBits = [32, 64, 80]
 # Bit counts for all int types
 allIntBits = [8, 16, 32, 64, 'Int']
 
+# Number of bits in the Builtin.Word type
+word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
+
 # Number of bits in integer literals.
 builtinIntLiteralBits = 2048
 
@@ -35,7 +38,7 @@ def baseIntName(name):
     return 'Int' if name == 'Int' else 'Int' + str(name)
 
 def builtinIntName(name):
-    return 'Word' if name == 'Int' else 'Int' + str(name)
+    return 'Int' + str(word_bits) if name == 'Int' else 'Int' + str(name)
 
 def intName(name, signed):
     return ('' if signed else 'U') + baseIntName(name)

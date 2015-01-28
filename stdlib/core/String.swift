@@ -405,9 +405,9 @@ extension String : Hashable {
     // Mix random bits into NSString's hash so that clients don't rely on
     // Swift.String.hashValue and NSString.hash being the same.
 #if arch(i386) || arch(arm)
-    let hashOffset = 0x88ddcc21
+    let hashOffset = Int(bitPattern: 0x88dd_cc21)
 #else
-    let hashOffset = 0x429b126688ddcc21
+    let hashOffset = Int(bitPattern: 0x429b_1266_88dd_cc21)
 #endif
 #if _runtime(_ObjC)
     // FIXME(performance): constructing a temporary NSString is extremely

@@ -209,16 +209,6 @@ public func _getUnsafePointerToStoredProperties(x: AnyObject)
     storedPropertyOffset
 }
 
-/// Returns the argument and specifies that the value is not negative.
-/// It has only an effect if the argument is a load or call.
-// TODO: Define this function also for other signed integer types.
-// TODO: Consider removing the underscore.
-@transparent
-public func _assumeNonNegative(x: Int) -> Int {
-  _sanityCheck(x >= 0)
-  return Int(Builtin.assumeNonNegative_Word(x.value))
-}
-
 //===----------------------------------------------------------------------===//
 // Branch hints
 //===----------------------------------------------------------------------===//

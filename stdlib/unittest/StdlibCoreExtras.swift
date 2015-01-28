@@ -222,7 +222,7 @@ public struct _stdlib_ShardedAtomicCounter {
       var result = 0
       for var i = 0; i != Int._sizeInBits; ++i {
         result = (result << 1) | (_state & 1)
-        _state = (_state >> 1) ^ (-(_state & 1) & 0xD0000001)
+        _state = (_state >> 1) ^ (-(_state & 1) & Int(bitPattern: 0xD0000001))
       }
       return result
     }
