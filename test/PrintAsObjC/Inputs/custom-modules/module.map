@@ -18,3 +18,7 @@ module Base {
     }
   }
 }
+
+module OverrideBase [system] {
+  header "override.h"
+}

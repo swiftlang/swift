@@ -201,11 +201,18 @@ private:
   }
 
   StringRef printSingleMethodParam(StringRef selectorString,
-                                   const Pattern *param) {
+                                   const Pattern *param,
+                                   const clang::ParmVarDecl *clangParam,
+                                   bool isNSUIntegerSubscript) {
     StringRef firstPiece, restOfSelector;
     std::tie(firstPiece, restOfSelector) = selectorString.split(':');
     os << firstPiece << ":(";
-    this->print(param->getType(), OTK_None);
+    if ((isNSUIntegerSubscript && restOfSelector.empty()) ||
+        (clangParam && isNSUInteger(clangParam->getType()))) {
+      os << "NSUInteger";
+    } else {
+      this->print(param->getType(), OTK_None);
+    }
     os << ")";
 
     if (isa<AnyPattern>(param))
@@ -216,12 +223,46 @@ private:
     return restOfSelector;
   }
 
-  void printAbstractFunction(AbstractFunctionDecl *AFD, bool isClassMethod) {
+  template <typename T>
+  static const T *findClangBase(const T *member) {
+    while (member) {
+      if (member->getClangDecl())
+        return member;
+      member = member->getOverriddenDecl();
+    }
+    return nullptr;
+  }
+
+  /// Returns true if \p clangTy is the typedef for NSUInteger.
+  bool isNSUInteger(clang::QualType clangTy) {
+    const auto *typedefTy = dyn_cast<clang::TypedefType>(clangTy);
+    if (!typedefTy)
+      return false;
+
+    const clang::IdentifierInfo *nameII = typedefTy->getDecl()->getIdentifier();
+    if (!nameII)
+      return false;
+    if (nameII->getName() != "NSUInteger")
+      return false;
+
+    return true;
+  }
+
+  void printAbstractFunction(AbstractFunctionDecl *AFD, bool isClassMethod,
+                             bool isNSUIntegerSubscript = false) {
     printDocumentationComment(AFD);
     if (isClassMethod)
       os << "+ (";
     else
       os << "- (";
+
+    const clang::ObjCMethodDecl *clangMethod = nullptr;
+    if (!isNSUIntegerSubscript) {
+      if (const AbstractFunctionDecl *clangBase = findClangBase(AFD)) {
+        clangMethod =
+            dyn_cast_or_null<clang::ObjCMethodDecl>(clangBase->getClangDecl());
+      }
+    }
 
     Type rawMethodTy = AFD->getType()->castTo<AnyFunctionType>()->getResult();
     auto methodTy = rawMethodTy->castTo<FunctionType>();
@@ -245,6 +286,8 @@ private:
     } else if (methodTy->getResult()->isVoid() &&
                AFD->getAttrs().hasAttribute<IBActionAttr>()) {
       os << "IBAction";
+    } else if (clangMethod && isNSUInteger(clangMethod->getReturnType())) {
+      os << "NSUInteger";
     } else {
       print(methodTy->getResult(), OTK_None);
     }
@@ -260,7 +303,10 @@ private:
     if (isa<ParenPattern>(bodyPatterns.back())) {
       // One argument.
       auto bodyPattern = bodyPatterns.back()->getSemanticsProvidingPattern();
-      selectorString = printSingleMethodParam(selectorString, bodyPattern);
+      auto clangParam = clangMethod ? clangMethod->parameters()[0] : nullptr;
+      selectorString = printSingleMethodParam(selectorString, bodyPattern,
+                                              clangParam,
+                                              isNSUIntegerSubscript);
 
     } else {
       const TuplePattern *bodyParams = cast<TuplePattern>(bodyPatterns.back());
@@ -270,13 +316,20 @@ private:
         selectorString = "";
       } else {
         // Two or more arguments, or one argument with name and type.
-        interleave(bodyParams->getFields(),
-                   [this, &selectorString] (const TuplePatternElt &param) {
-                     auto pattern = param.getPattern();
-                     pattern = pattern->getSemanticsProvidingPattern();
-                     selectorString = printSingleMethodParam(selectorString,
-                                                             pattern);
-                   },
+        auto clangParams = clangMethod ? clangMethod->parameters() : None;
+        auto printNextParam = [&] (const TuplePatternElt &param) {
+          auto pattern = param.getPattern();
+          pattern = pattern->getSemanticsProvidingPattern();
+          const clang::ParmVarDecl *clangParam = nullptr;
+          if (!clangParams.empty()) {
+            clangParam = clangParams.front();
+            clangParams = clangParams.slice(1);
+          }
+          selectorString = printSingleMethodParam(selectorString, pattern,
+                                                  clangParam,
+                                                  isNSUIntegerSubscript);
+        };
+        interleave(bodyParams->getFields(), printNextParam,
                    [this] { os << " "; });
       }
     }
@@ -392,16 +445,8 @@ private:
     // consistent when an Objective-C property is overridden.
     // FIXME: Will we ever need to do this for properties that /don't/ come
     // from Objective-C?
-    bool overridesObjC = false;
-    for (VarDecl *baseDecl = VD->getOverriddenDecl(); baseDecl;
-         baseDecl = baseDecl->getOverriddenDecl()) {
-      if (baseDecl->hasClangNode()) {
-        overridesObjC = true;
-        break;
-      }
-    }
-
-    if (overridesObjC) {
+    const VarDecl *base = findClangBase(VD);
+    if (base) {
       llvm::SmallString<64> buffer;
       os << ", getter=" << VD->getObjCGetterSelector().getString(buffer);
       if (VD->isSettable(nullptr)) {
@@ -415,15 +460,35 @@ private:
       if (!maybePrintIBOutletCollection(ty))
         os << "IBOutlet ";
     }
-    print(ty, OTK_None, VD->getName().str());
+
+    clang::QualType clangTy;
+    if (base)
+      if (auto prop = dyn_cast<clang::ObjCPropertyDecl>(base->getClangDecl()))
+        clangTy = prop->getType();
+
+    if (!clangTy.isNull() && isNSUInteger(clangTy)) {
+      os << "NSUInteger " << VD->getName().str();
+    } else {
+      print(ty, OTK_None, VD->getName().str());
+    }
+
     os << ";\n";
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
     assert(SD->isInstanceMember() && "static subscripts not supported");
-    printAbstractFunction(SD->getGetter(), false);
+
+    bool isNSUIntegerSubscript = false;
+    if (auto clangBase = findClangBase(SD)) {
+      const auto *clangGetter =
+          cast<clang::ObjCMethodDecl>(clangBase->getClangDecl());
+      const auto *indexParam = clangGetter->parameters().front();
+      isNSUIntegerSubscript = isNSUInteger(indexParam->getType());
+    }
+
+    printAbstractFunction(SD->getGetter(), false, isNSUIntegerSubscript);
     if (auto setter = SD->getSetter())
-      printAbstractFunction(setter, false);
+      printAbstractFunction(setter, false, isNSUIntegerSubscript);
   }
 
   /// Visit part of a type, such as the base of a pointer type.

@@ -3544,7 +3544,7 @@ namespace {
           getterThunk->getBodyParamPatterns()[1]->clone(context);
       DeclName name(context, context.Id_subscript, { Identifier() });
       auto subscript
-        = Impl.createDeclWithClangNode<SubscriptDecl>(objcMethod,
+        = Impl.createDeclWithClangNode<SubscriptDecl>(getter->getClangNode(),
                                       name, decl->getLoc(), bodyPatterns,
                                       decl->getLoc(),
                                       TypeLoc::withoutLoc(elementTy), dc);
