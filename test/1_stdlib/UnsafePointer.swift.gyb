@@ -63,7 +63,7 @@ ${SelfName}TestSuite.test("Hashable") {
   let ptrs = [
     ${SelfType}(bitPattern: 0x0),
     ${SelfType}(bitPattern: 0x12345678),
-    ${SelfType}(bitPattern: 0x87654321),
+    ${SelfType}(bitPattern: 0x87654321 as UInt),
   ]
   for i in indices(ptrs) {
     for j in indices(ptrs) {

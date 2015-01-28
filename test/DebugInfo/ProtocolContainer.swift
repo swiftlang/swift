@@ -1,13 +1,13 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
 protocol AProtocol {
-	func print()
+  func print()
 }
 
 class AClass : AProtocol {
-	var x : Int
-	init() { x = 0xDEADBEEF }
-	func print() { println("x = \(x)")}
+   var x: UInt32
+   init() { x = 0xDEADBEEF }
+   func print() { println("x = \(x)")}
 }
 // CHECK: define hidden void @_TF17ProtocolContainer3foo
 // CHECK-NEXT: entry:

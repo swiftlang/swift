@@ -182,7 +182,7 @@ test_StdlibTypesPrinted()
 // CHECK: test_StdlibTypesPrinted done
 
 func test_IntegerPrinting() {
-  if (Int.max > 0x1_0000_0000) {
+  if (UInt64(Int.max) > 0x1_0000_0000 as UInt64) {
     printedIs(Int.min, "-9223372036854775808")
     printedIs(Int.max, "9223372036854775807")
   } else {
@@ -193,7 +193,7 @@ func test_IntegerPrinting() {
   printedIs(Int(42), "42")
   printedIs(Int(-42), "-42")
 
-  if (UInt.max > 0x1_0000_0000) {
+  if (UInt64(UInt.max) > 0x1_0000_0000 as UInt64) {
     printedIs(UInt.max, "18446744073709551615")
   } else {
     printedIs(UInt.max, "4294967295")
@@ -449,7 +449,7 @@ test_CTypesPrinting()
 
 func test_PointerPrinting() {
   let nullUP = UnsafeMutablePointer<Float>()
-  let fourByteUP = UnsafeMutablePointer<Float>(bitPattern: 0xabcd1234)
+  let fourByteUP = UnsafeMutablePointer<Float>(bitPattern: 0xabcd1234 as UInt)
 
 #if !(arch(i386) || arch(arm))
   let eightByteAddr: UWord = 0xabcddcba12344321
