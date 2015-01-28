@@ -4144,7 +4144,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     SourceLoc LBraceLoc;
     SourceLoc RBraceLoc;
     if (parseToken(tok::l_brace, LBraceLoc, diag::expected_lbrace_protocol)) {
-      LBraceLoc = Tok.getLoc();
+      LBraceLoc = PreviousLoc;
       RBraceLoc = LBraceLoc;
       Status.setIsParseError();
     } else {
