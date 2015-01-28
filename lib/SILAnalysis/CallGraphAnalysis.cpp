@@ -219,7 +219,7 @@ public:
 
     for (auto *CallSite : Node->getCallSites()) {
       llvm::SmallVector<CallGraphNode *, 4> OrderedNodes;
-      orderCallees(CallSite->getCalleeSet(), OrderedNodes);
+      orderCallees(CallSite->getKnownCalleeSet(), OrderedNodes);
 
       for (auto *CalleeNode : OrderedNodes) {
         if (DFSNum.find(CalleeNode) == DFSNum.end()) {
