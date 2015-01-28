@@ -46,9 +46,6 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
     ditto_cmd = ["ditto"]
     if verbose:
         ditto_cmd.append("-V")
-    mkdir_cmd = ["mkdir", "-p"]
-    if verbose:
-        mkdir_cmd.append("-v")
     cpfile_cmd = ["cp", "-f", "-p"]
     if verbose:
         cpfile_cmd.append("-v")
@@ -79,8 +76,7 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
             else:
                 print "-- Creating subdir %s" % destPath
                 if not os.path.isdir(destPath):
-                    check_call(mkdir_cmd + [destPath],
-                               print_command=verbose, verbose=verbose)
+                    os.makedirs(destPath)
         elif all([os.path.isfile(item) for item in file_paths]):
             # It's a regular file in all found instances, see if they're identical.
             if all([filecmp.cmp(item, file_paths[0]) for item in file_paths]):
