@@ -53,10 +53,6 @@ mayBridgeToObjectiveC(Module *M, CanType T) {
 /// Try to classify the dynamic-cast relationship between two types.
 DynamicCastFeasibility
 swift::classifyDynamicCast(Module *M, CanType source, CanType target) {
-  source->dump();
-  target->dump();
-  #warning "butt"
-  auto butt = [&]() -> DynamicCastFeasibility {
   if (source == target) return DynamicCastFeasibility::WillSucceed;
 
   auto sourceObject = source.getAnyOptionalObjectType();
@@ -130,10 +126,6 @@ swift::classifyDynamicCast(Module *M, CanType source, CanType target) {
   }
 
   return DynamicCastFeasibility::WillFail;
-  };
-  auto result = butt();
-  llvm::errs() << (int)result << '\n';
-  return result;
 }
 
 static unsigned getOptionalDepth(CanType type) {
