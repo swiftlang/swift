@@ -105,12 +105,12 @@ driver()
 
 
 final class Payload {
-  let value: Int
-  init(_ n:Int) {
+  let value: Int32
+  init(_ n:Int32) {
     value = n
   }
 
-  func getValue() -> Int {
+  func getValue() -> Int32 {
     return value
   }
 }
@@ -132,12 +132,12 @@ final class C1:C {
 // Check that the Optional return value from doSomething
 // gets properly unwrapped into a Payload object and then further
 // devirtualized.
-// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return7driver1FCS_2C1Si 
-// CHECK: integer_literal $Builtin.Word, 2
-// CHECK: struct $Int (%{{.*}} : $Builtin.Word)
+// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return7driver1FCS_2C1VSs5Int32
+// CHECK: integer_literal $Builtin.Int32, 2
+// CHECK: struct $Int32 (%{{.*}} : $Builtin.Int32)
 // CHECK-NOT: class_method
 // CHECK-NOT: function_ref
 // CHECK: return
-func driver1(var c:C1) -> Int {
+func driver1(var c:C1) -> Int32 {
   return c.doSomething().getValue()
 }
