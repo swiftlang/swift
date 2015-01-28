@@ -582,7 +582,8 @@ TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
 Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
                                     ArrayRef<TuplePatternElt> elements,
                                     SourceLoc rp,
-                                    bool hasVararg, SourceLoc ellipsis) {
+                                    bool hasVararg, SourceLoc ellipsis,
+                                    Optional<bool> implicit) {
   assert(lp.isValid() == rp.isValid());
 
   if (elements.size() == 1 &&
@@ -591,10 +592,10 @@ Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
       elements[0].getPattern()->getBodyName().empty() &&
       !hasVararg) {
     auto &first = const_cast<TuplePatternElt&>(elements.front());
-    return new (C) ParenPattern(lp, first.getPattern(), rp);
+    return new (C) ParenPattern(lp, first.getPattern(), rp, implicit);
   }
 
-  return create(C, lp, elements, rp, hasVararg, ellipsis);
+  return create(C, lp, elements, rp, hasVararg, ellipsis, implicit);
 }
 
 SourceRange TuplePattern::getSourceRange() const {

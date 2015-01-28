@@ -721,8 +721,9 @@ Parser::parseConstructorArguments(DeclName &FullName, Pattern *&BodyPattern,
     }
 
     // Create an empty tuple to recover.
-    BodyPattern = TuplePattern::createSimple(Context, Tok.getLoc(), {},
-                                             Tok.getLoc());
+    BodyPattern = TuplePattern::createSimple(Context, PreviousLoc, {},
+                                             PreviousLoc, false,
+                                             SourceLoc(), true);
     FullName = DeclName(Context, Context.Id_init, { });
     return makeParserError();
   }

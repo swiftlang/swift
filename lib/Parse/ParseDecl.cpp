@@ -4021,7 +4021,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
   SmallVector<Decl*, 8> MemberDecls;
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class)) {
-    LBLoc = Tok.getLoc();
+    LBLoc = PreviousLoc;
     RBLoc = LBLoc;
     Status.setIsParseError();
   } else {

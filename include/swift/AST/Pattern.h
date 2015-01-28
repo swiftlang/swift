@@ -320,7 +320,8 @@ public:
   static Pattern *createSimple(ASTContext &C, SourceLoc lp,
                                ArrayRef<TuplePatternElt> elements, SourceLoc rp,
                                bool hasVararg = false,
-                               SourceLoc ellipsis = SourceLoc());
+                               SourceLoc ellipsis = SourceLoc(),
+                               Optional<bool> implicit = None);
 
   unsigned getNumFields() const {
     return TuplePatternBits.NumFields;
