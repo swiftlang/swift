@@ -2131,23 +2131,28 @@ bb0(%0 : $Builtin.Int1):
 // CHECK:  [[MT:%.*]] = metatype $@thick Int32.Type
 // CHECK:  [[ONE:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK:  [[PTA1:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to $*Int32
-// CHECK:  [[IAD1:%.*]] = index_addr [[PTA1]] : $*Int32, %0 : $Builtin.Word
+// CHECK:  [[CAST1:%.*]] = builtin "truncOrBitCast_Int64_Word"(%0 : $Builtin.Int64)
+// CHECK:  [[IAD1:%.*]] = index_addr [[PTA1]] : $*Int32, [[CAST1]] : $Builtin.Word
 // CHECK:  [[ATP1:%.*]] = address_to_pointer [[IAD1]] : $*Int32 to $Builtin.RawPointer
 // CHECK:  [[PTA2:%.*]] = pointer_to_address %2 : $Builtin.RawPointer to $*Int32
-// CHECK:  [[IAD2:%.*]] = index_addr [[PTA2]] : $*Int32, %0 : $Builtin.Word
+// CHECK:  [[CAST2:%.*]] = builtin "truncOrBitCast_Int64_Word"(%0 : $Builtin.Int64)
+// CHECK:  [[IAD2:%.*]] = index_addr [[PTA2]] : $*Int32, [[CAST2]] : $Builtin.Word
 // CHECK:  [[ATP2:%.*]] = address_to_pointer [[IAD2]] : $*Int32 to $Builtin.RawPointer
 // CHECK:  builtin "takeArrayFrontToBack"<Int32>([[MT]] : $@thick Int32.Type, [[ATP1]] : $Builtin.RawPointer, [[ATP2]] : $Builtin.RawPointer, [[ONE]] : $Builtin.Word) : $()
 // CHECK: return
-sil @builtin_array_opt_index_raw_pointer_to_index_addr : $@thin (Builtin.Word, Builtin.RawPointer, Builtin.RawPointer) -> () {
-bb0(%0 : $Builtin.Word, %1 : $Builtin.RawPointer, %2 : $Builtin.RawPointer):
+
+sil @builtin_array_opt_index_raw_pointer_to_index_addr : $@thin (Builtin.Int64, Builtin.RawPointer, Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.RawPointer, %2 : $Builtin.RawPointer):
   %4 = metatype $@thick Int32.Type
   %5 = integer_literal $Builtin.Word, 1
   %6 = integer_literal $Builtin.Int1, 0
   %7 = builtin "strideof_nonzero"<Int32>(%4 : $@thick Int32.Type) : $Builtin.Word
-  %8 = builtin "smul_with_overflow_Word"(%0 : $Builtin.Word, %7 : $Builtin.Word, %6 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
-  %9 = tuple_extract %8 : $(Builtin.Word, Builtin.Int1), 0
-  %10 = index_raw_pointer %1 : $Builtin.RawPointer, %9 : $Builtin.Word
-  %11 = index_raw_pointer %2 : $Builtin.RawPointer, %9 : $Builtin.Word
+  %14 = builtin "zextOrBitCast_Word_Int64"(%7 : $Builtin.Word) : $Builtin.Int64
+  %8 = builtin "smul_with_overflow_Word"(%14 : $Builtin.Int64, %0 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 0
+  %15 = builtin "truncOrBitCast_Int64_Word"(%9 : $Builtin.Int64) : $Builtin.Word
+  %10 = index_raw_pointer %1 : $Builtin.RawPointer, %15 : $Builtin.Word
+  %11 = index_raw_pointer %2 : $Builtin.RawPointer, %15 : $Builtin.Word
   %12 = builtin "takeArrayFrontToBack"<Int32>(%4 : $@thick Int32.Type, %10 : $Builtin.RawPointer, %11 : $Builtin.RawPointer, %5 : $Builtin.Word) : $()
   %13 = tuple ()
   return %13 : $()

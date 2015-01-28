@@ -803,31 +803,42 @@ static SILInstruction *optimizeBuiltinWithSameOperands(BuiltinInst *I,
 }
 
 /// Match an index pointer that is fed by a sizeof(T)*Distance offset.
-static IndexRawPointerInst *matchSizeOfMultiplication(SILValue I,
-                                               MetatypeInst *RequiredType,
-                                               SILValue &Ptr,
-                                               SILValue &Distance) {
+static IndexRawPointerInst *
+matchSizeOfMultiplication(SILValue I, MetatypeInst *RequiredType,
+                          BuiltinInst *&TruncOrBitCast, SILValue &Ptr,
+                          SILValue &Distance) {
   IndexRawPointerInst *Res = dyn_cast<IndexRawPointerInst>(I);
   if (!Res)
     return nullptr;
 
   SILValue Dist;
   MetatypeInst *StrideType;
-  if (match(Res->getOperand(1),
-            m_TupleExtractInst(
-                m_ApplyInst(BuiltinValueKind::SMulOver, m_SILValue(Dist),
-                            m_ApplyInst(BuiltinValueKind::StrideofNonZero,
-                                        m_MetatypeInst(StrideType))),
-                0)) ||
-      match(Res->getOperand(1),
-            m_TupleExtractInst(
-                m_ApplyInst(BuiltinValueKind::SMulOver,
-                            m_ApplyInst(BuiltinValueKind::StrideofNonZero,
-                                        m_MetatypeInst(StrideType)),
-                            m_SILValue(Dist)),
-                0))) {
+  if (match(
+          Res->getOperand(1),
+          m_ApplyInst(
+              BuiltinValueKind::TruncOrBitCast,
+              m_TupleExtractInst(
+                  m_ApplyInst(
+                      BuiltinValueKind::SMulOver, m_SILValue(Dist),
+                      m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
+                                  m_ApplyInst(BuiltinValueKind::StrideofNonZero,
+                                              m_MetatypeInst(StrideType)))),
+                  0))) ||
+      match(
+          Res->getOperand(1),
+          m_ApplyInst(
+              BuiltinValueKind::TruncOrBitCast,
+              m_TupleExtractInst(
+                  m_ApplyInst(
+                      BuiltinValueKind::SMulOver,
+                      m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
+                                  m_ApplyInst(BuiltinValueKind::StrideofNonZero,
+                                              m_MetatypeInst(StrideType))),
+                      m_SILValue(Dist)),
+                  0)))) {
     if (StrideType != RequiredType)
       return nullptr;
+    TruncOrBitCast = cast<BuiltinInst>(Res->getOperand(1));
     Distance = Dist;
     Ptr = Res->getOperand(0);
     return Res;
@@ -839,10 +850,11 @@ static IndexRawPointerInst *matchSizeOfMultiplication(SILValue I,
 /// address_to_pointer (index_addr ptr, Distance : $*Metatype) : $RawPointer
 /// instruction.
 static SILInstruction *createIndexAddrFrom(IndexRawPointerInst *I,
-                                    MetatypeInst *Metatype, SILValue Ptr,
-                                    SILValue Distance,
-                                    SILType RawPointerTy,
-                                    SILBuilder *Builder) {
+                                           MetatypeInst *Metatype,
+                                           BuiltinInst *TruncOrBitCast,
+                                           SILValue Ptr, SILValue Distance,
+                                           SILType RawPointerTy,
+                                           SILBuilder *Builder) {
   SILType InstanceType =
     Metatype->getType().getMetatypeInstanceType(I->getModule());
 
@@ -850,7 +862,12 @@ static SILInstruction *createIndexAddrFrom(IndexRawPointerInst *I,
     I->getLoc(), Ptr, InstanceType.getAddressType());
   NewPTAI->setDebugScope(I->getDebugScope());
 
-  auto *NewIAI = Builder->createIndexAddr(I->getLoc(), NewPTAI, Distance);
+  auto *DistanceAsWord =
+      Builder->createBuiltin(I->getLoc(), TruncOrBitCast->getName(),
+                             TruncOrBitCast->getType(), {}, Distance);
+  DistanceAsWord->setDebugScope(I->getDebugScope());
+
+  auto *NewIAI = Builder->createIndexAddr(I->getLoc(), NewPTAI, DistanceAsWord);
   NewIAI->setDebugScope(I->getDebugScope());
 
   auto *NewATPI =
@@ -883,21 +900,22 @@ SILInstruction *optimizeBuiltinArrayOperation(BuiltinInst *I,
 
   SILValue Ptr;
   SILValue Distance;
+  BuiltinInst *TruncOrBitCast;
   SILValue NewOp1 = I->getOperand(1), NewOp2 = I->getOperand(2);
 
   // Try to replace the first pointer operand.
-  auto *IdxRawPtr1 =
-      matchSizeOfMultiplication(I->getOperand(1), Metatype, Ptr, Distance);
+  auto *IdxRawPtr1 = matchSizeOfMultiplication(I->getOperand(1), Metatype,
+                                               TruncOrBitCast, Ptr, Distance);
   if (IdxRawPtr1)
-    NewOp1 = createIndexAddrFrom(IdxRawPtr1, Metatype, Ptr, Distance,
-                                 NewOp1.getType(), Builder);
+    NewOp1 = createIndexAddrFrom(IdxRawPtr1, Metatype, TruncOrBitCast, Ptr,
+                                 Distance, NewOp1.getType(), Builder);
 
   // Try to replace the second pointer operand.
-  auto *IdxRawPtr2 =
-      matchSizeOfMultiplication(I->getOperand(2), Metatype, Ptr, Distance);
+  auto *IdxRawPtr2 = matchSizeOfMultiplication(I->getOperand(2), Metatype,
+                                               TruncOrBitCast, Ptr, Distance);
   if (IdxRawPtr2)
-    NewOp2 = createIndexAddrFrom(IdxRawPtr2, Metatype, Ptr, Distance,
-                                 NewOp2.getType(), Builder);
+    NewOp2 = createIndexAddrFrom(IdxRawPtr2, Metatype, TruncOrBitCast, Ptr,
+                                 Distance, NewOp2.getType(), Builder);
 
   if (NewOp1 != I->getOperand(1) || NewOp2 != I->getOperand(2)) {
     SmallVector<SILValue, 5> NewOpds;
@@ -915,7 +933,9 @@ SILInstruction *optimizeBuiltinArrayOperation(BuiltinInst *I,
 SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
   if (I->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass)
     return optimizeBuiltinCanBeObjCClass(I);
-  if (I->getBuiltinInfo().ID == BuiltinValueKind::TakeArrayFrontToBack)
+  if (I->getBuiltinInfo().ID == BuiltinValueKind::TakeArrayFrontToBack ||
+      I->getBuiltinInfo().ID == BuiltinValueKind::TakeArrayBackToFront ||
+      I->getBuiltinInfo().ID == BuiltinValueKind::CopyArray)
     return optimizeBuiltinArrayOperation(I, Builder);
 
   if (I->getNumOperands() >= 2 && I->getOperand(0) == I->getOperand(1)) {
