@@ -32,9 +32,31 @@ static unsigned getAnyMetatypeDepth(CanType type) {
   return depth;
 }
 
+static bool
+mayBridgeToObjectiveC(Module *M, CanType T) {
+  // If the target type is either an unknown dynamic type, or statically
+  // known to bridge, the cast may succeed.
+  // TODO: We could be more precise with the bridged-to type.
+  if (T->hasArchetype())
+    return true;
+  
+  if (T->isAnyExistentialType())
+    return true;
+  
+  if (M->getASTContext().getBridgedToObjC(M, /*inExpression*/ false,
+                                          T, nullptr))
+    return true;
+
+  return false;
+}
+
 /// Try to classify the dynamic-cast relationship between two types.
 DynamicCastFeasibility
 swift::classifyDynamicCast(Module *M, CanType source, CanType target) {
+  source->dump();
+  target->dump();
+  #warning "butt"
+  auto butt = [&]() -> DynamicCastFeasibility {
   if (source == target) return DynamicCastFeasibility::WillSucceed;
 
   auto sourceObject = source.getAnyOptionalObjectType();
@@ -72,6 +94,8 @@ swift::classifyDynamicCast(Module *M, CanType source, CanType target) {
     // obviously succeed/fail.
     // TODO: prove that some conversions from class existential metatype
     // to a concrete non-class metatype will obviously fail.
+    // TODO: class metatype to/from AnyObject
+    // TODO: protocol concrete metatype to/from ObjCProtocol
     if (isa<ExistentialMetatypeType>(sourceMetatype) ||
         isa<ExistentialMetatypeType>(targetMetatype))
       return (getAnyMetatypeDepth(source) == getAnyMetatypeDepth(target)
@@ -94,8 +118,22 @@ swift::classifyDynamicCast(Module *M, CanType source, CanType target) {
 
   // FIXME: tuple conversions?
 
-  // FIXME: bridged types, e.g. NSString <-> String (but not for metatypes).
+  // Check if there might be a bridging conversion.
+  if (source->isBridgeableObjectType()
+      && mayBridgeToObjectiveC(M, target)) {
+    return DynamicCastFeasibility::MaySucceed;
+  }
+  
+  if (target->isBridgeableObjectType()
+      && mayBridgeToObjectiveC(M, source)) {
+    return DynamicCastFeasibility::MaySucceed;
+  }
+
   return DynamicCastFeasibility::WillFail;
+  };
+  auto result = butt();
+  llvm::errs() << (int)result << '\n';
+  return result;
 }
 
 static unsigned getOptionalDepth(CanType type) {

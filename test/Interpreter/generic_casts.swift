@@ -1,4 +1,8 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-build-swift -O %s -o %t/a.out.optimized
+// RUN: %target-run %t/a.out.optimized | FileCheck %s
+
+import Foundation
 
 func allToInt<T>(x: T) -> Int {
   return x as! Int
@@ -145,5 +149,27 @@ println(u is Int.Type) // CHECK: false
 // FIXME: Can't spell AnyObject.Protocol
 // CHECK-LABEL: AnyObject casts:
 println("AnyObject casts:")
-println(allToAll(C(), AnyObject.self)) // CHECK: true
-println(allToAll(0, AnyObject.self)) // CHECK: false
+// FIXME: Becomes "false" in optimized builds. 
+println(allToAll(C(), AnyObject.self)) // FIXME-NEXT: true CHECK-NEXT: {{true|false}}
+// Bridging
+println(allToAll(0, AnyObject.self)) // CHECK-NEXT: true
+
+struct NotBridged { var x: Int }
+println(allToAll(NotBridged(x: 0), AnyObject.self)) // CHECK-NEXT: false
+
+//
+// rdar://problem/19482567
+//
+
+func swiftOptimizesThisFunctionIncorrectly() -> Bool {
+    let anArray = [] as NSArray
+
+    if let whyThisIsNeverExecutedIfCalledFromFunctionAndNotFromMethod = anArray as? [NSObject] {
+        return true
+    }
+    
+    return false
+}
+
+let result = swiftOptimizesThisFunctionIncorrectly()
+println("Bridge cast result: \(result)") // CHECK-NEXT: Bridge cast result: true

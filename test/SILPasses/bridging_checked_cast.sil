@@ -1,0 +1,67 @@
+// RUN: %target-sil-opt -inline %s | FileCheck %s
+// REQUIRES: objc_interop
+
+import Swift
+
+@objc class NSCloud {}
+
+struct Butt: _ObjectiveCBridgeable {
+  typealias _ObjectiveCType = NSCloud
+  static func _isBridgedToObjectiveC() -> Bool
+  static func _getObjectiveCType() -> Any.Type
+  func _bridgeToObjectiveC() -> NSCloud
+  static func _forceBridgeFromObjectiveC(source: NSCloud,
+                                         inout result: Butt?)
+  static func _conditionallyBridgeFromObjectiveC(source: NSCloud,
+                                         inout result: Butt?) -> Bool
+}
+
+sil @checked_cast_object_to_value : $@thin () -> () {
+entry:
+  %b = alloc_stack $NSCloud
+  %c = alloc_stack $Butt
+
+  checked_cast_addr_br take_always NSCloud in %b#1 : $*NSCloud to Butt in %c#1 : $*Butt, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %c#0 : $*@local_storage Butt
+  dealloc_stack %b#0 : $*@local_storage NSCloud
+  return undef : $()
+}
+
+sil @checked_cast_value_to_object : $@thin () -> () {
+entry:
+  %b = alloc_stack $NSCloud
+  %c = alloc_stack $Butt
+
+  checked_cast_addr_br take_always Butt in %c#1 : $*Butt to NSCloud in %b#1 : $*NSCloud, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %c#0 : $*@local_storage Butt
+  dealloc_stack %b#0 : $*@local_storage NSCloud
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @inline_into_here
+// CHECK:         checked_cast_addr_br take_always NSCloud in {{%.*}} : $*NSCloud to Butt in {{%.*}} : $*Butt
+// CHECK:         checked_cast_addr_br take_always Butt in {{%.*}} : $*Butt to NSCloud in {{%.*}} : $*NSCloud
+sil @inline_into_here : $@thin () -> () {
+entry:
+  %f = function_ref @checked_cast_object_to_value : $@thin () -> ()
+  %y = apply %f() : $@thin () -> ()
+  %g = function_ref @checked_cast_value_to_object : $@thin () -> ()
+  %z = apply %g() : $@thin () -> ()
+  return %z : $()
+}
