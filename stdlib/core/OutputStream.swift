@@ -223,7 +223,7 @@ public func toDebugString<T>(x: T) -> String {
 ///
 /// * If `T` conforms to `DebugPrintable`, write `x.debugDescription`
 /// * Otherwise, if `T` conforms to `Printable`, write `x.description`
-/// * Otherwise, if `T` conforms to `Stramable`, write `x`
+/// * Otherwise, if `T` conforms to `Streamable`, write `x`
 /// * Otherwise, fall back to a default textual representation.
 ///
 /// See also: `debugPrintln(x, &target)`
@@ -254,7 +254,7 @@ public func debugPrint<T, TargetStream : OutputStreamType>(
 ///
 /// * If `T` conforms to `DebugPrintable`, write `x.debugDescription`
 /// * Otherwise, if `T` conforms to `Printable`, write `x.description`
-/// * Otherwise, if `T` conforms to `Stramable`, write `x`
+/// * Otherwise, if `T` conforms to `Streamable`, write `x`
 /// * Otherwise, fall back to a default textual representation.
 ///
 /// See also: `debugPrint(x, &target)`
@@ -271,7 +271,7 @@ public func debugPrintln<T, TargetStream : OutputStreamType>(
 ///
 /// * If `T` conforms to `DebugPrintable`, write `x.debugDescription`
 /// * Otherwise, if `T` conforms to `Printable`, write `x.description`
-/// * Otherwise, if `T` conforms to `Stramable`, write `x`
+/// * Otherwise, if `T` conforms to `Streamable`, write `x`
 /// * Otherwise, fall back to a default textual representation.
 ///
 /// See also: `debugPrintln(x)`
@@ -286,7 +286,7 @@ public func debugPrint<T>(x: T) {
 ///
 /// * If `T` conforms to `DebugPrintable`, write `x.debugDescription`
 /// * Otherwise, if `T` conforms to `Printable`, write `x.description`
-/// * Otherwise, if `T` conforms to `Stramable`, write `x`
+/// * Otherwise, if `T` conforms to `Streamable`, write `x`
 /// * Otherwise, fall back to a default textual representation.
 ///
 /// See also: `debugPrint(x)`
