@@ -250,13 +250,15 @@ constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
     if (!ResultsInError.hasValue())
       return nullptr;
 
+    bool IsRem = ID == BuiltinValueKind::SRem || ID == BuiltinValueKind::URem;
+
     // Otherwise emit the diagnostic, set ResultsInError to be true, and return
     // nullptr.
     diagnose(M.getASTContext(),
              BI->getLoc().getSourceLoc(),
              diag::division_overflow,
              NumVal.toString(/*Radix*/ 10, /*Signed*/true),
-             "/",
+             IsRem ? "%" : "/",
              DenomVal.toString(/*Radix*/ 10, /*Signed*/true));
     ResultsInError = Optional<bool>(true);
     return nullptr;

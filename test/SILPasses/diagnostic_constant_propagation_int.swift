@@ -87,8 +87,7 @@ func testArithmeticOverflow_Int_32bit() {
     // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: division by zero{{$}}
 
     var t5: Int = -0x8000_0000 % -1
-    // FIXME: Missing diagnostic:
-    // <rdar://problem/19622097> Overflow in "-2147483648 % -1" is not detected
+    // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: division '-2147483648 % -1' results in an overflow{{$}}
   }
 
   if true {
@@ -345,9 +344,8 @@ func testArithmeticOverflow_Int_64bit() {
     var t4: Int = -0x7fff_ffff_ffff_ffff % 0
     // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: division by zero{{$}}
 
-    var t5: Int = -0x8000_0000 % -1
-    // FIXME: Missing diagnostic:
-    // <rdar://problem/19622097> Overflow in "-2147483648 % -1" is not detected
+    var t5: Int = -0x8000_0000_0000_0000 % -1
+    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: division '-9223372036854775808 % -1' results in an overflow{{$}}
   }
 
   if true {

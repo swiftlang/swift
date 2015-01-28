@@ -78,7 +78,8 @@ APInt swift::constantFoldDiv(APInt lhs, APInt rhs, bool &Overflow,
     case BuiltinValueKind::SDiv:
       return lhs.sdiv_ov(rhs, Overflow);
     case BuiltinValueKind::SRem:
-      Overflow = false;
+      // Check for overflow
+      lhs.sdiv_ov(rhs, Overflow);
       return lhs.srem(rhs);
     case BuiltinValueKind::UDiv:
       Overflow = false;
