@@ -107,8 +107,8 @@ public:
 
 /// A helper method for use with ArrayRefView. Just returns the CallSite
 /// ApplyInst of E.
-inline ApplyInst *getEdgeApplyInst(CallGraphEdge * const &E) {
-  return const_cast<ApplyInst *>(E->getCallSite());
+inline const ApplyInst *getEdgeApplyInst(CallGraphEdge * const &E) {
+  return E->getCallSite();
 }
 
 class CallGraphNode {
@@ -160,7 +160,7 @@ public:
 
   // An adaptor that is used to show all of the apply insts which call the
   // SILFunction of this node.
-  using CallerCallSiteList = ArrayRefView<CallGraphEdge *, ApplyInst *,
+  using CallerCallSiteList = ArrayRefView<CallGraphEdge *, const ApplyInst *,
                                           getEdgeApplyInst>;
 
   /// Return the set of apply insts that can call into this function.

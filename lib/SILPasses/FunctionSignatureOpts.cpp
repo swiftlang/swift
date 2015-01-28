@@ -496,7 +496,9 @@ llvm::SmallString<64> FunctionAnalyzer::getOptimizedName() {
 static void
 rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
                                   CallGraphNode::CallerCallSiteList CallSites) {
-  for (ApplyInst *AI : CallSites) {
+  for (const ApplyInst *CAI : CallSites) {
+    auto *AI = const_cast<ApplyInst *>(CAI);
+
     SILBuilderWithScope<16> Builder(AI);
 
     FunctionRefInst *FRI = Builder.createFunctionRef(AI->getLoc(), NewF);
