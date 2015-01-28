@@ -4,6 +4,7 @@ import argparse
 import os.path
 import filecmp
 import os
+import shutil
 
 from SwiftBuildSupport import *
 
@@ -40,15 +41,6 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
     corresponding subdirectory in dest_root_dir. If the subdirectory path matches
     copy_verbatim_subpaths, the whole subdirectory is recursively copied verbatim.
     """
-    ln_cmd = ["ln", "-f", "-s"]
-    if verbose:
-        ln_cmd.append("-v")
-    ditto_cmd = ["ditto"]
-    if verbose:
-        ditto_cmd.append("-V")
-    cpfile_cmd = ["cp", "-f", "-p"]
-    if verbose:
-        cpfile_cmd.append("-v")
     lipo_cmd = [lipo_executable,"-create"]
 
     for file in file_list:
@@ -64,15 +56,15 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
         if all([os.path.islink(item) for item in file_paths]):
             #It's a symlink in all found instances, copy the link.
             print "-- Creating symlink %s" % destPath
-            check_call(ln_cmd + [os.readlink(file_paths[0]), destPath],
-                       print_command=verbose, verbose=verbose)
+            os.symlink(os.readlink(file_paths[0]), destPath)
         elif all([os.path.isdir(item) for item in file_paths]):
             # It's a subdir in all found instances.
             # See if we should copy verbatim or create the destination subdir.
             if file in copy_verbatim_subpaths:
                 print "-- Copying subdir verbatim %s" % destPath
-                check_call(ditto_cmd + [file_paths[0], destPath],
-                    print_command=verbose, verbose=verbose)
+                if os.path.isdir(destPath):
+                    shutil.rmtree(destPath)
+                shutil.copytree(file_paths[0], destPath, symlinks=True)
             else:
                 print "-- Creating subdir %s" % destPath
                 if not os.path.isdir(destPath):
@@ -82,8 +74,7 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
             if all([filecmp.cmp(item, file_paths[0]) for item in file_paths]):
                 # All instances are identical, just copy the unique file.
                 print "-- Copying file %s" % destPath
-                check_call(cpfile_cmd + [file_paths[0], destPath],
-                           print_command=verbose, verbose=verbose)
+                shutil.copy2(file_paths[0], destPath)
             elif all([os.access(item, os.X_OK) for item in file_paths]):
                 # Multiple instances are different and executable, try lipo.
                 if verbose:
