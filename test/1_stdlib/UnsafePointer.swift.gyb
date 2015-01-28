@@ -18,11 +18,6 @@ ${SelfName}TestSuite.test("convertFromNil") {
   expectEqual(0, unsafeBitCast(ptr, Word.self))
 }
 
-${SelfName}TestSuite.test("null()") {
-  let ptr = ${SelfType}.null()
-  expectEqual(0, unsafeBitCast(ptr, Word.self))
-}
-
 ${SelfName}TestSuite.test("initNoArgs") {
   let ptr = ${SelfType}()
   expectEqual(0, unsafeBitCast(ptr, Word.self))

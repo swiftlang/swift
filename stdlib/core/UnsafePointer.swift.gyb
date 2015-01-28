@@ -100,9 +100,9 @@ public struct ${Self}<T>
   }
 
   /// Return a `nil` instance.
-  @transparent
+  @availability(*, unavailable, message="use 'nil' literal instead")
   public static func null() -> ${Self} {
-    return ${Self}()
+    _preconditionFailure("unavailable function can not be called")
   }
 
 %  if mutable:
