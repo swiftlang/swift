@@ -13,7 +13,7 @@
 struct _StringBufferIVars {
   init(_ elementWidth: Int) {
     _sanityCheck(elementWidth == 1 || elementWidth == 2)
-    usedEnd = .null()
+    usedEnd = nil
     capacityAndElementShift = elementWidth - 1
   }
 

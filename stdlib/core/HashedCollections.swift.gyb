@@ -2412,8 +2412,8 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     let unmanagedKeys = _UnmanagedAnyObjectArray(keys)
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
 
-    if keys == UnsafeMutablePointer.null() {
-      if objects == UnsafeMutablePointer.null() {
+    if keys == nil {
+      if objects == nil {
         // do nothing, both are null
       } else {
         // keys null, objects nonnull
@@ -2426,7 +2426,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
         }
       }
     } else {
-      if objects == UnsafeMutablePointer.null() {
+      if objects == nil {
         // keys nonnull, objects null
         while position < count {
           if let elem = bridgedNativeStorage[position] {

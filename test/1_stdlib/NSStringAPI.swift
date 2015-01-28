@@ -1816,7 +1816,7 @@ NSStringAPIs.test("CompareStringsWithUnpairedSurrogates")
 var CStringTests = TestSuite("CStringTests")
 
 func getNullCString() -> UnsafeMutablePointer<CChar> {
-  return .null()
+  return nil
 }
 
 func getASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {

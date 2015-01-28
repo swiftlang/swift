@@ -96,7 +96,7 @@ public struct ${Self}<T>
   /// Create an instance initialized with `nil`.
   @transparent public
   init(nilLiteral: ()) {
-    self = .null()
+    self = ${Self}()
   }
 
   /// Return a `nil` instance.
@@ -313,7 +313,7 @@ public struct ${Self}<T>
 
   @transparent public
   var _isNull : Bool {
-    return self == ${Self}.null()
+    return self == nil
   }
 
   /// Access the `i`\ th element of the raw array starting at `self`.

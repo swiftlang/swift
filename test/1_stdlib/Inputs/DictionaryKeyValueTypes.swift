@@ -634,7 +634,7 @@ func slurpFastEnumerationFromSwift<
       &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
-    expectNotEqual(.null(), state.mutationsPtr)
+    expectNotEqual(nil, state.mutationsPtr)
     if returnedCount == 0 {
       break
     }
@@ -653,7 +653,7 @@ func slurpFastEnumerationFromSwift<
       &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
-    expectNotEqual(.null(), state.mutationsPtr)
+    expectNotEqual(nil, state.mutationsPtr)
     expectEqual(0, returnedCount)
   }
 }
@@ -677,7 +677,7 @@ func slurpFastEnumerationFromSwift<
       &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
-    expectNotEqual(.null(), state.mutationsPtr)
+    expectNotEqual(nil, state.mutationsPtr)
     if returnedCount == 0 {
       break
     }
@@ -1009,7 +1009,7 @@ func slurpFastEnumerationFromSwift<
       &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
-    expectNotEqual(.null(), state.mutationsPtr)
+    expectNotEqual(nil, state.mutationsPtr)
     if returnedCount == 0 {
       break
     }
@@ -1028,7 +1028,7 @@ func slurpFastEnumerationFromSwift<
       &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
-    expectNotEqual(.null(), state.mutationsPtr)
+    expectNotEqual(nil, state.mutationsPtr)
     expectEqual(0, returnedCount)
   }
 }

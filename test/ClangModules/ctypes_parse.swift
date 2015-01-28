@@ -74,7 +74,7 @@ func testArrays() {
 // FIXME: Import pointers to opaque types as unique types.
 
 func testPointers() {
-  var hWnd: HWND = HWND.null()
+  var hWnd: HWND = nil
   var cfstr: CFString? = nil
   var cfty: CFTypeRef? = cfstr
 }
