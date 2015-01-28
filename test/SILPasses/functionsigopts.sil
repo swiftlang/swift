@@ -107,9 +107,10 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   return %5 : $()
 }
 
-// This test case verifies how dumb our implementation is currently.
+// This test case verifies we can specialize functions called through thin_to_thick_function.
 // CHECK-LABEL: sil [fragile] @dead_arg_obfuscated_callsite : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
-// CHECK-NOT: function_ref @_TTSf4d_n__dead_arg_with_callsites : $@thin (Builtin.NativeObject) -> ()
+// CHECK: [[OPT_FUN:%[0-9]+]] = function_ref @_TTSf4d_n__dead_arg_with_callsites : $@thin (Builtin.NativeObject) -> ()
+// CHECK-NEXT: apply [[OPT_FUN]](
 sil [fragile] @dead_arg_obfuscated_callsite : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   %2 = function_ref @dead_arg_with_callsites : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> ()
