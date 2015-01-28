@@ -1174,42 +1174,36 @@ SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
   if (RemoveCondFails)
     return eraseInstFromFunction(*CFI);
 
-  if (auto *I = dyn_cast<IntegerLiteralInst>(CFI->getOperand())) {
-    // Remove unreachable code after (cond_fail 1)
-    if (I->getValue().getBoolValue()) {
+  auto *I = dyn_cast<IntegerLiteralInst>(CFI->getOperand());
+  if (!I)
+    return nullptr;
 
-      // Nothing more to do here
-      if (isa<UnreachableInst>(CFI->getParent()->getInstList().getNext(CFI)))
-        return nullptr;
+  // Erase. (cond_fail 0)
+  if (!I->getValue().getBoolValue())
+    return eraseInstFromFunction(*CFI);
 
-      // Add an `unreachable` after the `cond_fail`
-      auto Unreachable =
-        new (CFI->getModule()) UnreachableInst(ArtificialUnreachableLocation());
-      CFI->getParent()->getInstList().insertAfter(CFI, Unreachable);
+  // Remove any code that follows a (cond_fail 1) and set the block's
+  // terminator to unreachable.
 
-      // Collect together all the instructions after this point
-      SmallVector<SILInstruction *, 32> ToRemove;
-      for (auto Inst = CFI->getParent()->rbegin(); &*Inst != Unreachable; ++Inst) {
-        ToRemove.push_back(&*Inst);
-      }
+  // Nothing more to do here
+  if (isa<UnreachableInst>(std::next(SILBasicBlock::iterator(CFI))))
+    return nullptr;
 
-      // Now erase them
-      for (auto Inst : ToRemove) {
-        // But first, we replace all uses of this instruction with `undef`
-        SmallVector<Operand *, 16> Uses(Inst->use_begin(), Inst->use_end());
-        for (auto Use : Uses)
-          Use->set(SILUndef::get(Use->get().getType(), Inst->getModule()));
+  // Collect together all the instructions after this point
+  llvm::SmallVector<SILInstruction *, 32> ToRemove;
+  for (auto Inst = CFI->getParent()->rbegin(); &*Inst != CFI; ++Inst)
+    ToRemove.push_back(&*Inst);
 
-        eraseInstFromFunction(*Inst);
-      }
-
-      return nullptr;
-
-    } else {
-      // Erase. (cond_fail 0)
-      return eraseInstFromFunction(*CFI);
-    }
+  for (auto *Inst : ToRemove) {
+    // Replace any non-dead results with SILUndef values
+    Inst->replaceAllUsesWithUndef();
+    // and remove the instruction itself
+    eraseInstFromFunction(*Inst);
   }
+
+  // Add an `unreachable` to be the new terminator for this block
+  Builder->setInsertionPoint(CFI->getParent());
+  Builder->createUnreachable(ArtificialUnreachableLocation());
 
   return nullptr;
 }
