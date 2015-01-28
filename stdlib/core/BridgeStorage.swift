@@ -12,11 +12,10 @@
 //
 //  Types that are bridged to Objective-C need to manage an object
 //  that may be either some native class or the @objc Cocoa
-//  equivalent.  Ideally we would have a Builtin type that could
-//  discriminate between these two possibilities and store a few extra
-//  bits when the stored type is native.  _BridgeStorage is an
-//  abstraction layer that will allow us to seamlessly integrate that
-//  type, when it becomes available.
+//  equivalent.  _BridgeStorage discriminates between these two
+//  possibilities and stores a few extra bits when the stored type is
+//  native.  It is assumed that the @objc class instance may in fact
+//  be a tagged pointer, and thus no extra bits may be available.
 //
 //===----------------------------------------------------------------------===//
 import SwiftShims
@@ -35,6 +34,8 @@ struct _BridgeStorage<
   public // @testable
   init(native: Native, bits: Int) {
     _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
+    
+    // More bits are available on some platforms, but it's not portable
     _sanityCheck(0..<3 ~= bits,
         "BridgeStorage can't store bits outside the range 0..<3")
 
