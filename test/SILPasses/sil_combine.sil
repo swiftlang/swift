@@ -2103,28 +2103,28 @@ bb0(%0 : $@thin (Builtin.Int8) -> ()):
 // CHECK-NEXT:      cond_fail [[Ref]]
 // CHECK-NEXT:      unreachable
 
-sil @remove_dead_code_after_cond_fail : $@thin () -> (Int) {
+sil @remove_dead_code_after_cond_fail : $@thin () -> (Int32) {
 bb0:
-  %0 = integer_literal $Builtin.Word, -2
+  %0 = integer_literal $Builtin.Int32, -2
   %1 = integer_literal $Builtin.Int1, -1
   cond_fail %1 : $Builtin.Int1
-  %3 = struct $Int (%0 : $Builtin.Word)
-  return %3 : $Int
+  %3 = struct $Int32 (%0 : $Builtin.Int32)
+  return %3 : $Int32
 }
 
 // CHECK-LABEL:   sil @dont_remove_code_after_cond_fail
 // CHECK:         bb0([[Cond:%.*]] : $Builtin.Int1):
-// CHECK-NEXT:      [[Ref:%.*]] = integer_literal $Builtin.Word, -2
+// CHECK-NEXT:      [[Ref:%.*]] = integer_literal $Builtin.Int32, -2
 // CHECK-NEXT:      cond_fail [[Cond]]
-// CHECK-NEXT:      [[Ret:%.*]] = struct $Int ([[Ref]] : $Builtin.Word)
+// CHECK-NEXT:      [[Ret:%.*]] = struct $Int32 ([[Ref]] : $Builtin.Int32)
 // CHECK-NEXT:      return [[Ret]]
 
-sil @dont_remove_code_after_cond_fail : $@thin (Builtin.Int1) -> (Int) {
+sil @dont_remove_code_after_cond_fail : $@thin (Builtin.Int1) -> (Int32) {
 bb0(%0 : $Builtin.Int1):
-  %1 = integer_literal $Builtin.Word, -2
+  %1 = integer_literal $Builtin.Int32, -2
   cond_fail %0 : $Builtin.Int1
-  %3 = struct $Int (%1 : $Builtin.Word)
-  return %3 : $Int
+  %3 = struct $Int32 (%1 : $Builtin.Int32)
+  return %3 : $Int32
 }
 
 // CHECK-LABEL: sil @builtin_array_opt_index_raw_pointer_to_index_addr
