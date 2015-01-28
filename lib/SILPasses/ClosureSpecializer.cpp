@@ -76,7 +76,7 @@ private:
 } // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
-//                            Arg Spec Descriptor
+//                            Call Site Descriptor
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -91,13 +91,18 @@ public:
                      unsigned ClosureIndex)
       : Closure(ClosureInst), AI(AI), ClosureIndex(ClosureIndex) {}
 
+  static bool isSupportedClosure(const SILInstruction *Closure);
+
   SILFunction *getApplyCallee() const {
     return cast<FunctionRefInst>(AI->getCallee())->getReferencedFunction();
   }
 
   SILFunction *getClosureCallee() const {
-    auto *PAI = cast<PartialApplyInst>(Closure);
-    return cast<FunctionRefInst>(PAI->getCallee())->getReferencedFunction();
+    if (auto *PAI = dyn_cast<PartialApplyInst>(Closure))
+      return cast<FunctionRefInst>(PAI->getCallee())->getReferencedFunction();
+
+    auto *TTTFI = cast<ThinToThickFunctionInst>(Closure);
+    return cast<FunctionRefInst>(TTTFI->getCallee())->getReferencedFunction();
   }
 
   unsigned getClosureIndex() const { return ClosureIndex; }
@@ -105,8 +110,14 @@ public:
   SILInstruction *
   createNewClosure(SILBuilder &B, SILValue V,
                    llvm::SmallVectorImpl<SILValue> &Args) const {
-    return B.createPartialApply(Closure->getLoc(), V, V.getType(), {}, Args,
-                                Closure->getType(0));
+    if (isa<PartialApplyInst>(Closure))
+      return B.createPartialApply(Closure->getLoc(), V, V.getType(), {}, Args,
+                                  Closure->getType(0));
+
+    assert(isa<ThinToThickFunctionInst>(Closure) &&
+           "We only support partial_apply and thin_to_thick_function");
+    return B.createThinToThickFunction(Closure->getLoc(), V,
+                                       Closure->getType(0));
   }
 
   ApplyInst *getApplyInst() const { return AI; }
@@ -118,14 +129,23 @@ public:
   OperandValueArrayRef getArguments() const {
     if (auto *PAI = dyn_cast<PartialApplyInst>(Closure))
       return PAI->getArguments();
+
+    // Thin to thick function has no non-callee arguments.
+    assert(isa<ThinToThickFunctionInst>(Closure) &&
+           "We only support partial_apply and thin_to_thick_function");
     return OperandValueArrayRef(ArrayRef<Operand>());
   }
 
   SILInstruction *getClosure() const { return Closure; }
 
   unsigned getNumArguments() const {
-    auto *PAI = cast<PartialApplyInst>(Closure);
-    return PAI->getNumArguments();
+    if (auto *PAI = dyn_cast<PartialApplyInst>(Closure))
+      return PAI->getNumArguments();
+
+    // Thin to thick function has no non-callee arguments.
+    assert(isa<ThinToThickFunctionInst>(Closure) &&
+           "We only support partial_apply and thin_to_thick_function");
+    return 0;
   }
 
   SILLocation getLoc() const { return Closure->getLoc(); }
@@ -175,8 +195,14 @@ void CallSiteDescriptor::createName(llvm::SmallString<64> &NewName) const {
   Mangle::Mangler M(buffer);
   auto P = Mangle::SpecializationPass::ClosureSpecializer;
   Mangle::FunctionSignatureSpecializationMangler FSSM(P, M, getApplyCallee());
-  auto *PAI = cast<PartialApplyInst>(Closure);
-  FSSM.setArgumentClosureProp(getClosureIndex(), PAI);
+  if (auto *PAI = dyn_cast<PartialApplyInst>(Closure)) {
+    FSSM.setArgumentClosureProp(getClosureIndex(), PAI);
+    FSSM.mangle();
+    return;
+  }
+
+  auto *TTTFI = cast<ThinToThickFunctionInst>(Closure);
+  FSSM.setArgumentClosureProp(getClosureIndex(), TTTFI);
   FSSM.mangle();
 }
 
@@ -197,6 +223,46 @@ void CallSiteDescriptor::specializeClosure() const {
 
   // Rewrite the call
   rewriteApplyInst(*this, NewF);
+}
+
+bool CallSiteDescriptor::isSupportedClosure(const SILInstruction *Closure) {
+  if (!isa<PartialApplyInst>(Closure) && !isa<ThinToThickFunctionInst>(Closure))
+    return false;
+
+  // We only support simple closures where a partial_apply or
+  // thin_to_thick_function is passed a function_ref. This will be stored here
+  // so the checking of the Callee can use the same code in both cases.
+  SILValue Callee;
+
+  // If Closure is a partial apply...
+  if (auto *PAI = dyn_cast<PartialApplyInst>(Closure)) {
+    // And it has substitutions, return false.
+    if (PAI->hasSubstitutions())
+      return false;
+    // Ok, it is a closure we support, set Callee.
+    Callee = PAI->getCallee();
+  } else {
+    // Otherwise closure must be a thin_to_thick_function.
+    Callee = cast<ThinToThickFunctionInst>(Closure)->getCallee();
+  }
+
+  // Make sure that it is a simple partial apply (i.e. its callee is a
+  // function_ref). We also do not handle indirect results currently in the
+  // closure so make sure that does not happen at this point.
+  //
+  // TODO: We can probably handle other partial applies here.
+  auto *FRI = dyn_cast<FunctionRefInst>(Callee);
+  if (!FRI || FRI->getFunctionType()->hasIndirectResult())
+    return false;
+
+  // If our closure has more than one use... bail...
+  //
+  // TODO: Handle multiple apply insts.
+  if (!Closure->hasOneUse())
+    return false;
+
+  // Otherwise, we do support specializing this closure.
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -360,32 +426,14 @@ void ClosureSpecializer::gatherCallSites(
   for (auto &BB : *Caller) {
     // For each instruction II in BB...
     for (auto &II : BB) {
-      // If II is not a partial apply or is a partial apply with substitutions,
-      // we are not interested in it... Skip it.
-      auto *PAI = dyn_cast<PartialApplyInst>(&II);
-      if (!PAI || PAI->hasSubstitutions())
-        continue;
-
-      // If II is a partial apply, make sure that it is a simple partial apply
-      // (i.e. its callee is a function_ref). We also do not handle indirect
-      // results currently in the closure so make sure that does not happen at
-      // this point.
-      //
-      // TODO: We can probably handle other partial applies here.
-      auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
-      if (!FRI || FRI->getFunctionType()->hasIndirectResult())
-        continue;
-
-      // If our partial apply has more than one use, bail.
-      //
-      // TODO: Handle multiple apply insts.
-      if (!PAI->hasOneUse())
+      // If II is not a closure that we support specializing, skip it...
+      if (!CallSiteDescriptor::isSupportedClosure(&II))
         continue;
 
       // Grab the use of our partial apply. If that use is not an apply inst or
       // an apply inst with substitutions, there is nothing interesting for us
       // to do, so continue...
-      auto *AI = dyn_cast<ApplyInst>(PAI->use_begin().getUser());
+      auto *AI = dyn_cast<ApplyInst>(II.use_begin().getUser());
       if (!AI || AI->hasSubstitutions())
         continue;
 
@@ -407,23 +455,23 @@ void ClosureSpecializer::gatherCallSites(
       // Ok, we know that we can perform the optimization but not whether or not
       // the optimization is profitable. Find the index of the argument
       // corresponding to our partial apply.
-      Optional<unsigned> PAIIndex;
+      Optional<unsigned> ClosureIndex;
       for (unsigned i = 0, e = AI->getNumArguments(); i != e; ++i) {
-        if (AI->getArgument(i) != SILValue(PAI))
+        if (AI->getArgument(i) != SILValue(&II))
           continue;
-        PAIIndex = i;
+        ClosureIndex = i;
         DEBUG(llvm::dbgs() << "    Found callsite with closure argument at "
               << i << ": " << *AI);
         break;
       }
 
       // If we did not find an index, there is nothing further to do, continue.
-      if (!PAIIndex.hasValue())
+      if (!ClosureIndex.hasValue())
         continue;
 
       // Now we know that CSDesc is profitable to specialize. Add it to our call
       // site list.
-      CallSites.push_back(CallSiteDescriptor(PAI, AI, PAIIndex.getValue()));
+      CallSites.push_back(CallSiteDescriptor(&II, AI, ClosureIndex.getValue()));
     }
   }
 }

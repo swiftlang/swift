@@ -103,11 +103,19 @@ public:
   void replaceAllUsesWith(ValueBase *RHS);
 
   bool use_empty() const { return FirstUse == nullptr; }
-  inline ValueBaseUseIterator use_begin();
-  inline ValueBaseUseIterator use_end();
-  inline Range<ValueBaseUseIterator> getUses();
 
-  inline bool hasOneUse();
+  using use_iterator = ValueBaseUseIterator;
+  using const_use_iterator = const ValueBaseUseIterator;
+
+  inline use_iterator use_begin();
+  inline use_iterator use_end();
+  inline Range<use_iterator> getUses();
+
+  inline const_use_iterator use_begin() const;
+  inline const_use_iterator use_end() const;
+  inline Range<const_use_iterator> getUses() const;
+
+  inline bool hasOneUse() const;
 
   /// Pretty-print the value.
   void dump() const;
@@ -196,12 +204,18 @@ public:
     RHS.ValueAndResultNumber.getOpaqueValue();
   }
 
-  inline bool use_empty() const;
-  inline ValueUseIterator use_begin();
-  inline ValueUseIterator use_end();
-  inline Range<ValueUseIterator> getUses();
+  using use_iterator = ValueUseIterator;
+  using const_use_iterator = const ValueUseIterator;
 
-  inline bool hasOneUse();
+  inline bool use_empty() const;
+  inline use_iterator use_begin();
+  inline use_iterator use_end();
+  inline Range<use_iterator> getUses();
+  inline bool hasOneUse() const;
+
+  inline const_use_iterator use_begin() const;
+  inline const_use_iterator use_end() const;
+  inline Range<const_use_iterator> getUses() const;
 
   // Return the underlying SILValue after stripping off all casts from the
   // current SILValue.
@@ -449,21 +463,29 @@ public:
     return !(lhs == rhs);
   }
 };
-inline ValueBaseUseIterator ValueBase::use_begin() {
-  return ValueBaseUseIterator(FirstUse);
+inline ValueBase::use_iterator ValueBase::use_begin() {
+  return ValueBase::use_iterator(FirstUse);
 }
-inline ValueBaseUseIterator ValueBase::use_end() {
-  return ValueBaseUseIterator(nullptr);
+inline ValueBase::use_iterator ValueBase::use_end() {
+  return ValueBase::use_iterator(nullptr);
 }
-inline Range<ValueBaseUseIterator> ValueBase::getUses() {
+inline Range<ValueBase::use_iterator> ValueBase::getUses() {
   return { use_begin(), use_end() };
 }
-inline bool ValueBase::hasOneUse() {
+inline bool ValueBase::hasOneUse() const {
   auto I = use_begin(), E = use_end();
   if (I == E) return false;
   return ++I == E;
 }
-
+inline ValueBase::const_use_iterator ValueBase::use_begin() const {
+  return ValueBase::const_use_iterator(FirstUse);
+}
+inline ValueBase::const_use_iterator ValueBase::use_end() const {
+  return ValueBase::const_use_iterator(nullptr);
+}
+inline Range<ValueBase::const_use_iterator> ValueBase::getUses() const {
+  return {use_begin(), use_end()};
+}
 
 /// An iterator over all uses of a specific result of a ValueBase.
 class ValueUseIterator  : public std::iterator<std::forward_iterator_tag,
@@ -515,25 +537,31 @@ public:
     return !(lhs == rhs);
   }
 };
-inline ValueUseIterator SILValue::use_begin() {
-  return ValueUseIterator((*this)->FirstUse, getResultNumber());
+inline SILValue::use_iterator SILValue::use_begin() {
+  return SILValue::use_iterator((*this)->FirstUse, getResultNumber());
 }
-inline ValueUseIterator SILValue::use_end() {
-  return ValueUseIterator(nullptr, 0);
+inline SILValue::use_iterator SILValue::use_end() {
+  return SILValue::use_iterator(nullptr, 0);
 }
-inline Range<ValueUseIterator> SILValue::getUses() {
+inline Range<SILValue::use_iterator> SILValue::getUses() {
   return { use_begin(), use_end() };
 }
-inline bool SILValue::use_empty() const {
-  SILValue *mthis = const_cast<SILValue*>(this);
-  return mthis->use_begin() == mthis->use_end();
-}
-inline bool SILValue::hasOneUse() {
+inline bool SILValue::use_empty() const { return use_begin() == use_end(); }
+inline bool SILValue::hasOneUse() const {
   auto I = use_begin(), E = use_end();
   if (I == E) return false;
   return ++I == E;
 }
 
+inline SILValue::const_use_iterator SILValue::use_begin() const {
+  return SILValue::const_use_iterator((*this)->FirstUse, getResultNumber());
+}
+inline SILValue::const_use_iterator SILValue::use_end() const {
+  return SILValue::const_use_iterator(nullptr, 0);
+}
+inline Range<SILValue::const_use_iterator> SILValue::getUses() const {
+  return {use_begin(), use_end()};
+}
 
 /// A constant-size list of the operands of an instruction.
 template <unsigned N> class FixedOperandList {

@@ -1456,6 +1456,13 @@ class ThinToThickFunctionInst
 public:
   ThinToThickFunctionInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
+
+  /// Return the callee of the thin_to_thick_function.
+  ///
+  /// This is not technically necessary, but from a symmetry perspective it
+  /// makes sense to follow the lead of partial_apply which also creates
+  /// closures.
+  SILValue getCallee() const { return getOperand(); }
 };
 
 /// Given a thick metatype value, produces an Objective-C metatype

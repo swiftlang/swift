@@ -95,6 +95,14 @@ setArgumentClosureProp(unsigned ArgNo, PartialApplyInst *PAI) {
 
 void
 FunctionSignatureSpecializationMangler::
+setArgumentClosureProp(unsigned ArgNo, ThinToThickFunctionInst *TTTFI) {
+  auto &Info = Args[ArgNo];
+  Info.first = ArgumentModifierIntBase(ArgumentModifier::ClosureProp);
+  Info.second = TTTFI;
+}
+
+void
+FunctionSignatureSpecializationMangler::
 setArgumentConstantProp(unsigned ArgNo, LiteralInst *LI) {
   auto &Info = Args[ArgNo];
   Info.first = ArgumentModifierIntBase(ArgumentModifier::ConstantProp);
@@ -192,16 +200,36 @@ mangleClosureProp(PartialApplyInst *PAI) {
   }
 }
 
-void
-FunctionSignatureSpecializationMangler::
-mangleArgument(ArgumentModifierIntBase ArgMod, NullablePtr<SILInstruction> Inst) {
+void FunctionSignatureSpecializationMangler::mangleClosureProp(
+    ThinToThickFunctionInst *TTTFI) {
+  Mangler &M = getMangler();
+  llvm::raw_ostream &os = getBuffer();
+
+  os << "cl";
+
+  // Add in the partial applies function name if we can find one. Assert
+  // otherwise. The reason why this is ok to do is currently we only perform
+  // closure specialization if we know the function_ref in question. When this
+  // restriction is removed, the assert here will fire.
+  auto *FRI = cast<FunctionRefInst>(TTTFI->getCallee());
+  M.mangleIdentifier(FRI->getReferencedFunction()->getName());
+}
+
+void FunctionSignatureSpecializationMangler::mangleArgument(
+    ArgumentModifierIntBase ArgMod, NullablePtr<SILInstruction> Inst) {
   if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::ConstantProp)) {
     mangleConstantProp(cast<LiteralInst>(Inst.get()));
     return;
   }
 
   if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::ClosureProp)) {
-    mangleClosureProp(cast<PartialApplyInst>(Inst.get()));
+    if (auto *PAI = dyn_cast<PartialApplyInst>(Inst.get())) {
+      mangleClosureProp(PAI);
+      return;
+    }
+
+    auto *TTTFI = cast<ThinToThickFunctionInst>(Inst.get());
+    mangleClosureProp(TTTFI);
     return;
   }
 

@@ -167,6 +167,7 @@ public:
                                          Mangler &M, SILFunction *F);
   void setArgumentConstantProp(unsigned ArgNo, LiteralInst *LI);
   void setArgumentClosureProp(unsigned ArgNo, PartialApplyInst *PAI);
+  void setArgumentClosureProp(unsigned ArgNo, ThinToThickFunctionInst *TTTFI);
   void setArgumentDead(unsigned ArgNo);
   void setArgumentOwnedToGuaranteed(unsigned ArgNo);
   void setArgumentSROA(unsigned ArgNo);
@@ -176,6 +177,7 @@ private:
   void mangleSpecialization();
   void mangleConstantProp(LiteralInst *LI);
   void mangleClosureProp(PartialApplyInst *PAI);
+  void mangleClosureProp(ThinToThickFunctionInst *TTTFI);
   void mangleArgument(ArgumentModifierIntBase ArgMod,
                       NullablePtr<SILInstruction> Inst);
 };
