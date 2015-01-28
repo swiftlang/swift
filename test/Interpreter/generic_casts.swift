@@ -149,8 +149,7 @@ println(u is Int.Type) // CHECK: false
 // FIXME: Can't spell AnyObject.Protocol
 // CHECK-LABEL: AnyObject casts:
 println("AnyObject casts:")
-// FIXME: Becomes "false" in optimized builds. 
-println(allToAll(C(), AnyObject.self)) // FIXME-NEXT: true CHECK-NEXT: {{true|false}}
+println(allToAll(C(), AnyObject.self)) // CHECK-NEXT: true
 // Bridging
 println(allToAll(0, AnyObject.self)) // CHECK-NEXT: true
 

@@ -201,6 +201,8 @@ nay:
 }
 
 // CHECK-LABEL: define %objc_object* @checked_upcast(%C5casts1A*) {
+// -- Don't need to check conformance of an object to AnyObject.
+// CHECK-NOT:     call %objc_object* @swift_dynamicCastObjCProtocolConditional
 // CHECK:         phi %objc_object*
 sil @checked_upcast : $@thin (@owned A) -> @owned AnyObject {
 entry(%a : $A):
@@ -210,3 +212,4 @@ yea(%o : $AnyObject):
 nay:
   unreachable
 }
+

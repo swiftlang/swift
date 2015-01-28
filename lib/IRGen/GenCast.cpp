@@ -366,7 +366,22 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
       requiresWitnessTableLookup = true;
     if (!proto->isObjC())
       continue;
+    // Casting an object to AnyObject trivially succeeds.
+    // Casting a metatype to AnyObject succeeds if the metatype is
+    if (proto->getKnownProtocolKind()
+        && *proto->getKnownProtocolKind() == KnownProtocolKind::AnyObject
+        && !metatypeKind)
+      continue;
+      
     objcProtos.push_back(emitReferenceToObjCProtocol(IGF, proto));
+  }
+  
+  // If we don't have any protocols we really need to check, then trivially
+  // succeed.
+  if (objcProtos.empty() && !requiresWitnessTableLookup) {
+    value = IGF.Builder.CreateBitCast(value, IGF.IGM.ObjCPtrTy);
+    ex.add(value);
+    return;
   }
   
   // Check the ObjC protocol conformances if there were any.
