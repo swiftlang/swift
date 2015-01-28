@@ -290,7 +290,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       if (Kind == BraceItemListKind::TopLevelCode) {
         auto *TLCD = new (Context) TopLevelCodeDecl(CurDeclContext);
         auto Brace = BraceStmt::create(Context, StartLoc,
-                                       {Result}, Tok.getLoc());
+                                       {Result}, PreviousLoc);
         TLCD->setBody(Brace);
         Entries.push_back(TLCD);
       } else {

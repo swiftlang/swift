@@ -2395,7 +2395,12 @@ struct ASTNodeBase {};
         // Body elements
         auto StoredLoc = Location;
         for (auto &Element : Clause.Elements) {
-          if (!Ctx.SourceMgr.isBeforeInBuffer(StoredLoc, Element.getStartLoc())) {
+          auto StartLocation = Element.getStartLoc();
+          if (StartLocation.isInvalid()) {
+            continue;
+          }
+          
+          if (!Ctx.SourceMgr.isBeforeInBuffer(StoredLoc, StartLocation)) {
             Out << "invalid IfConfigStmt clause element start location\n";
             S->print(Out);
             abort();
