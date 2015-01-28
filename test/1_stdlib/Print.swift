@@ -819,6 +819,14 @@ func test_ArbitraryStructPrinting() {
 test_ArbitraryStructPrinting()
 // CHECK: test_ArbitraryStructPrinting done
 
+func test_MetatypePrinting() {
+  printedIs(Int.self, "Swift.Int")
+
+  println("test_MetatypePrinting done")
+}
+test_MetatypePrinting()
+// CHECK: test_MetatypePrinting done
+
 func test_StringInterpolation() {
   assertEquals("1", "\(1)")
   assertEquals("2", "\(1 + 1)")
