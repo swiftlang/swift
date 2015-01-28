@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
-#include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
@@ -65,9 +64,6 @@ bool CallGraph::tryGetCalleeSet(SILValue Callee,
                                 bool &Complete) {
 
   switch (Callee->getKind()) {
-  case ValueKind::ThinToThickFunctionInst:
-    Callee = cast<ThinToThickFunctionInst>(Callee)->getOperand();
-    SWIFT_FALLTHROUGH;
   case ValueKind::FunctionRefInst: {
     auto *CalleeFn = cast<FunctionRefInst>(Callee)->getReferencedFunction();
     auto *CalleeNode = getCallGraphNode(CalleeFn);
@@ -85,6 +81,14 @@ bool CallGraph::tryGetCalleeSet(SILValue Callee,
     //       analysis passes. We might just leave them out of the
     //       graph.
     return false;
+
+  case ValueKind::ThinToThickFunctionInst: {
+    auto ThinCallee = cast<ThinToThickFunctionInst>(Callee)->getOperand();
+    // TODO: We want to see through these to the underlying function.
+    assert(cast<FunctionRefInst>(ThinCallee) && "Expected function reference!");
+    (void)ThinCallee;
+    return false;
+  }
 
   case ValueKind::SILArgument:
     // First-pass call-graph construction will not do anything with
