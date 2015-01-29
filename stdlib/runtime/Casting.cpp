@@ -765,7 +765,6 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
                                       const Metadata *srcType,
                                       const ExistentialTypeMetadata *targetType,
                                       DynamicCastFlags flags) {
-  id tmp;
   // Find the actual type of the source.
   OpaqueValue *srcDynamicValue;
   const Metadata *srcDynamicType;
@@ -786,10 +785,9 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
       // Class metadata can be used as an object when ObjC interop is available.
       auto metatypePtr = reinterpret_cast<const Metadata **>(src);
       auto metatype = *metatypePtr;
-      tmp = swift_dynamicCastMetatypeToObjectConditional(metatype);
       // If the cast succeeded, use the result value as the class instance
       // below.
-      if (tmp) {
+      if (id tmp = swift_dynamicCastMetatypeToObjectConditional(metatype)) {
         srcDynamicValue = reinterpret_cast<OpaqueValue*>(&tmp);
         srcDynamicType = reinterpret_cast<const Metadata*>(tmp);
         break;
