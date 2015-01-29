@@ -340,6 +340,10 @@ bb0(%0 : $X):
 // CHECK: integer_literal {{.*}} 0
 // CHECK: [[FALSE:%.*]] = integer_literal {{.*}} 0
 // CHECK: [[VAL:%[a-zA-Z0-9]+]] = select_enum %0 : $X, case #X.A!enumelt: [[TRUE]], default [[FALSE]]
+// CHECK-NOT: switch_enum
+// CHECK-NOT: bb2
+// CHECK: [[RETVAL:%[a-zA-Z0-9]+]] = struct $Bool ([[VAL]] : $Builtin.Int1)
+// CHECK-NEXT: return [[RETVAL]] : $Bool
   %2 = integer_literal $Builtin.Int1, 0
   switch_enum %0 : $X, case #X.A!enumelt: bb1, case #X.B!enumelt.1: bb2, case #X.C!enumelt.1: bb3
 
@@ -354,11 +358,47 @@ bb3:                                              // Preds: bb0
   br bb4(%2 : $Builtin.Int1)
 
 bb4(%20 : $Builtin.Int1):                         // Preds: bb1 bb2 bb3
-// CHECK: bb4
-// CHECK: [[RETVAL:%[a-zA-Z0-9]+]] = struct $Bool ([[VAL]] : $Builtin.Int1)
-// CHECK-NEXT: return [[RETVAL]] : $Bool
   %11 = struct $Bool (%20 : $Builtin.Int1)
   return %11 : $Bool
+}
+
+
+sil @external_f :  $@thin () -> ()
+
+// Check that switch_enum to select_enum conversion does not
+// take place in a peresence of side-effects.
+// CHECK-LABEL: simplify_switch_to_select_enum_with_side_effects
+sil @simplify_switch_to_select_enum_with_side_effects : $@thin (X) -> Int32 {
+bb0(%0 : $X):
+// CHECK: bb0
+// CHECK-NOT: select_enum
+// CHECK: switch_enum
+  switch_enum %0 : $X, case #X.A!enumelt: bb1, case #X.B!enumelt.1: bb2, case #X.C!enumelt.1: bb3
+
+// CHECK: bb1:
+bb1:                                              // Preds: bb0
+  %10 = integer_literal $Builtin.Int32, 1
+  br bb4(%10 : $Builtin.Int32)
+
+bb2:                                              // Preds: bb0
+  // This BB contains a side-effect. Therefore switch_enum cannot be eliminated.
+  %11 = function_ref @external_f :  $@thin () -> ()
+  %12 = apply %11() : $@thin () -> ()
+  %13 = integer_literal $Builtin.Int32, 2
+  br bb4(%13 : $Builtin.Int32)
+
+// CHECK: bb3:
+// CHECK: br bb4
+bb3:                                              // Preds: bb0
+  %14 = integer_literal $Builtin.Int32, 3
+  br bb4(%14 : $Builtin.Int32)
+
+bb4(%20 : $Builtin.Int32):                         // Preds: bb1 bb2 bb3
+// CHECK: bb4([[VAL:%[a-zA-Z0-9]+]]{{.*}}):
+// CHECK: [[RETVAL:%[a-zA-Z0-9]+]] = struct $Int32 ([[VAL]] : $Builtin.Int32)
+// CHECK-NEXT: return [[RETVAL]] : $Int32
+  %21 = struct $Int32 (%20 : $Builtin.Int32)
+  return %21 : $Int32
 }
 
 enum E {
@@ -433,8 +473,7 @@ bb1:                                              // Preds: bb0
 
 bb2:                                              // Preds: bb1
   %4 = integer_literal $Builtin.Int32, 42         // user: %5
-  %5 = struct $Int32 (%4 : $Builtin.Int32)        // user: %6
-  br bb20(%5 : $Int32)                            // id: %6
+  br bb20(%4 : $Builtin.Int32)                    // id: %6
 
 bb3:                                              // Preds: bb0
   br bb5                                          // id: %7
@@ -444,8 +483,7 @@ bb4:                                              // Preds: bb0
 
 bb5:                                              // Preds: bb3 bb4
   %9 = integer_literal $Builtin.Int32, 24         // user: %10
-  %10 = struct $Int32 (%9 : $Builtin.Int32)       // user: %11
-  br bb20(%10 : $Int32)                           // id: %11
+  br bb20(%9 : $Builtin.Int32)                    // id: %11
 
 bb6:                                              // Preds: bb0
   br bb7                                          // id: %12
@@ -464,8 +502,7 @@ bb10:                                             // Preds: bb9
 
 bb11:                                             // Preds: bb10
   %17 = integer_literal $Builtin.Int32, 42        // user: %18
-  %18 = struct $Int32 (%17 : $Builtin.Int32)      // user: %19
-  br bb20(%18 : $Int32)                           // id: %19
+  br bb20(%17 : $Builtin.Int32)                   // id: %19
 
 bb12:                                             // Preds: bb9
   br bb14                                         // id: %20
@@ -475,16 +512,14 @@ bb13:                                             // Preds: bb9
 
 bb14:                                             // Preds: bb12 bb13
   %22 = integer_literal $Builtin.Int32, 24        // user: %23
-  %23 = struct $Int32 (%22 : $Builtin.Int32)      // user: %24
-  br bb20(%23 : $Int32)                           // id: %24
+  br bb20(%22 : $Builtin.Int32)                   // id: %24
 
 bb15:                                             // Preds: bb9
   br bb16                                         // id: %25
 
 bb16:                                             // Preds: bb15
   %26 = integer_literal $Builtin.Int32, 100       // user: %27
-  %27 = struct $Int32 (%26 : $Builtin.Int32)      // user: %28
-  br bb20(%27 : $Int32)                           // id: %28
+  br bb20(%26 : $Builtin.Int32)                   // id: %28
 
 bb17:                                             // Preds: bb9
   br bb18                                         // id: %29
@@ -494,11 +529,11 @@ bb18:                                             // Preds: bb17
 
 bb19:                                             // Preds: bb18
   %31 = integer_literal $Builtin.Int32, 100       // user: %32
-  %32 = struct $Int32 (%31 : $Builtin.Int32)      // user: %33
-  br bb20(%32 : $Int32)                           // id: %33
+  br bb20(%31 : $Builtin.Int32)                   // id: %33
 
-bb20(%34 : $Int32):                                 // Preds: bb2 bb5 bb11 bb14 bb16 bb19
-  return %34 : $Int32                               // id: %35
+bb20(%34 : $Builtin.Int32):                       // Preds: bb2 bb5 bb11 bb14 bb16 bb19
+  %35 = struct $Int32 (%34 : $Builtin.Int32)        // user: %36
+  return %35 : $Int32                               // id: %36
 }
 
 // CHECK_WITH_CODEMOTION-LABEL: sil @FormSelectEnumIntResult
@@ -515,8 +550,7 @@ bb1:                                              // Preds: bb0
 
 bb2:                                              // Preds: bb1
   %4 = integer_literal $Builtin.Int32, 42         // user: %5
-  %5 = struct $Int32 (%4 : $Builtin.Int32)        // user: %6
-  br bb11(%5 : $Int32)                            // id: %6
+  br bb11(%4 : $Builtin.Int32)                    // id: %6
 
 bb3:                                              // Preds: bb0
   br bb5                                          // id: %7
@@ -526,16 +560,14 @@ bb4:                                              // Preds: bb0
 
 bb5:                                              // Preds: bb3 bb4
   %9 = integer_literal $Builtin.Int32, 24         // user: %10
-  %10 = struct $Int32 (%9 : $Builtin.Int32)       // user: %11
-  br bb11(%10 : $Int32)                           // id: %11
+  br bb11(%9 : $Builtin.Int32)                    // id: %11
 
 bb6:                                              // Preds: bb0
   br bb7                                          // id: %12
 
 bb7:                                              // Preds: bb6
   %13 = integer_literal $Builtin.Int32, 100       // user: %14
-  %14 = struct $Int32 (%13 : $Builtin.Int32)      // user: %15
-  br bb11(%14 : $Int32)                           // id: %15
+  br bb11(%13 : $Builtin.Int32)                   // id: %15
 
 bb8:                                              // Preds: bb0
   br bb9                                          // id: %16
@@ -545,11 +577,11 @@ bb9:                                              // Preds: bb8
 
 bb10:                                             // Preds: bb9
   %18 = integer_literal $Builtin.Int32, 100       // user: %19
-  %19 = struct $Int32 (%18 : $Builtin.Int32)      // user: %20
-  br bb11(%19 : $Int32)                           // id: %20
+  br bb11(%18 : $Builtin.Int32)                   // id: %20
 
-bb11(%21 : $Int32):                               // Preds: bb2 bb5 bb7 bb10
-  return %21 : $Int32                             // id: %22
+bb11(%21 : $Builtin.Int32):                       // Preds: bb2 bb5 bb7 bb10
+  %22 = struct $Int32 (%21: $Builtin.Int32)
+  return %22 : $Int32                             // id: %22
 }
 
 // CHECK_WITH_CODEMOTION-LABEL: sil @FormSelectEnumBoolResult
@@ -566,8 +598,7 @@ bb1:                                              // Preds: bb0
 
 bb2:                                              // Preds: bb1
   %4 = integer_literal $Builtin.Int1, -1          // user: %5
-  %5 = struct $Bool (%4 : $Builtin.Int1)          // user: %6
-  br bb9(%5 : $Bool)                              // id: %6
+  br bb9(%4 : $Builtin.Int1)                      // id: %6
 
 bb3:                                              // Preds: bb0
   br bb5                                          // id: %7
@@ -577,8 +608,7 @@ bb4:                                              // Preds: bb0
 
 bb5:                                              // Preds: bb3 bb4
   %9 = integer_literal $Builtin.Int1, 0           // user: %10
-  %10 = struct $Bool (%9 : $Builtin.Int1)         // user: %11
-  br bb9(%10 : $Bool)                             // id: %11
+  br bb9(%9 : $Builtin.Int1)                      // id: %11
 
 bb6:                                              // Preds: bb0
   br bb7                                          // id: %12
@@ -588,11 +618,11 @@ bb7:                                              // Preds: bb6
 
 bb8:                                              // Preds: bb7
   %14 = integer_literal $Builtin.Int1, -1         // user: %15
-  %15 = struct $Bool (%14 : $Builtin.Int1)        // user: %16
-  br bb9(%15 : $Bool)                             // id: %16
+  br bb9(%14 : $Builtin.Int1)                     // id: %16
 
-bb9(%17 : $Bool):                                 // Preds: bb2 bb5 bb8
-  return %17 : $Bool                              // id: %18
+bb9(%17 : $Builtin.Int1):                         // Preds: bb2 bb5 bb8
+  %18 = struct $Bool (%17 : $Builtin.Int1)
+  return %18 : $Bool                              // id: %19
 }
 
 // CHECK_WITH_CODEMOTION-LABEL: sil @DontFormSelectEnumBoolResult
@@ -602,7 +632,7 @@ bb9(%17 : $Bool):                                 // Preds: bb2 bb5 bb8
 sil @DontFormSelectEnumBoolResult : $@thin (Numbers, Bool) -> Bool {
 bb0(%0 : $Numbers, %1 : $Bool):
   debug_value %0 : $Numbers  // let e             // id: %2
-  debug_value %1 : $Bool  // let b                // id: %3
+  %2 = struct_extract %1 : $Bool, #Bool.value
   switch_enum %0 : $Numbers, case #Numbers.First!enumelt: bb1, case #Numbers.Second!enumelt: bb3, case #Numbers.Third!enumelt: bb4, default bb6 // id: %4
 
 bb1:                                              // Preds: bb0
@@ -610,8 +640,7 @@ bb1:                                              // Preds: bb0
 
 bb2:                                              // Preds: bb1
   %6 = integer_literal $Builtin.Int1, -1          // user: %7
-  %7 = struct $Bool (%6 : $Builtin.Int1)          // user: %8
-  br bb10(%7 : $Bool)                             // id: %8
+  br bb10(%6 : $Builtin.Int1)                     // id: %8
 
 bb3:                                              // Preds: bb0
   br bb5                                          // id: %9
@@ -621,8 +650,7 @@ bb4:                                              // Preds: bb0
 
 bb5:                                              // Preds: bb3 bb4
   %11 = integer_literal $Builtin.Int1, 0          // user: %12
-  %12 = struct $Bool (%11 : $Builtin.Int1)        // user: %13
-  br bb10(%12 : $Bool)                            // id: %13
+  br bb10(%11 : $Builtin.Int1)                    // id: %13
 
 bb6:                                              // Preds: bb0
   br bb7                                          // id: %14
@@ -634,9 +662,10 @@ bb8:                                              // Preds: bb7
   br bb9                                          // id: %16
 
 bb9:                                              // Preds: bb8
-  br bb10(%1 : $Bool)                             // id: %17
+  br bb10(%2 : $Builtin.Int1)                     // id: %17
 
-bb10(%18 : $Bool):                                // Preds: bb2 bb5 bb9
-  return %18 : $Bool                              // id: %19
+bb10(%18 : $Builtin.Int1):                        // Preds: bb2 bb5 bb9
+  %19 = struct $Bool (%18 : $Builtin.Int1)
+  return %19 : $Bool                              // id: %19
 }
 

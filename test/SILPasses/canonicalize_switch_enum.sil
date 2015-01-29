@@ -16,6 +16,8 @@ enum GenE<T> {
 	case C(T)
 }
 
+sil @external_f : $@thin () -> ()
+
 // CHECK-LABEL: sil @test_switch_enum
 sil @test_switch_enum : $@thin (E) -> Int32 {
 bb0(%0 : $E):
@@ -27,8 +29,10 @@ bb1:
   br bb4(%2 : $Builtin.Int32)
 
 bb2:
-  %4 = integer_literal $Builtin.Int32, 20
-  br bb4(%4 : $Builtin.Int32)
+  %21 = function_ref @external_f : $@thin () -> ()
+  %22 = apply %21() : $@thin () -> ()
+  %23 = integer_literal $Builtin.Int32, 20
+  br bb4(%23 : $Builtin.Int32)
 
 bb3:
   %6 = integer_literal $Builtin.Int32, 30
@@ -79,6 +83,8 @@ bb1:
   br bb3(%3 : $Builtin.Int32)
 
 bb2:
+  %21 = function_ref @external_f : $@thin () -> ()
+  %22 = apply %21() : $@thin () -> ()
   %5 = integer_literal $Builtin.Int32, 30
   br bb3(%5 : $Builtin.Int32)
 

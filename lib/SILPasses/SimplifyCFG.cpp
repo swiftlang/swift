@@ -2321,6 +2321,36 @@ getSwitchEnumPred(SILBasicBlock *BB, SwitchEnumInst *SEI, SILBasicBlock *PostBB,
   if (!isDiamondForm(BB, (SEI) ? SEI->getParent() : nullptr, PostBB, DT, PDT))
     return nullptr;
 
+  // Check that this block only produces the value, but does not
+  // have any side effects.
+  bool BBHasIntegerLiteral = false;
+  auto First = BB->begin();
+  auto *BI = dyn_cast<BranchInst>(BB->getTerminator());
+  if (!BI)
+    return nullptr;
+  if (BI != First) {
+    // There may be only one instruction before the branch.
+    if (BI != next(First))
+      return nullptr;
+
+    // There are some instructions besides the branch.
+    // It should be only an integer literal instruction.
+    // Handle only integer values for now.
+    auto *ILI = dyn_cast<IntegerLiteralInst>(First);
+    if (!ILI)
+      return nullptr;
+
+    // Check that this literal is used by the terminator.
+    for (auto U : ILI->getUses())
+      if (U->getUser() != BI)
+        return nullptr;
+
+    // The branch can pass arguments only to the PostBB.
+    if (BI->getDestBB() != PostBB)
+      return nullptr;
+    BBHasIntegerLiteral = true;
+  }
+
   // Each BB on the path should have only a single branch instruction.
   // The only exception is a BB which has a BB ending with switch_enum
   // as its single predecessor. Such a block may have an integer_literal
@@ -2336,19 +2366,6 @@ getSwitchEnumPred(SILBasicBlock *BB, SwitchEnumInst *SEI, SILBasicBlock *PostBB,
       PredSEI = dyn_cast<SwitchEnumInst>(PredBB->getTerminator());
       if (!PredSEI)
         return nullptr;
-
-      // Check that this block only produces the value, but does not
-      // have any side effects.
-      auto First = BB->begin();
-      if (BB->getTerminator() != First) {
-        // There are some instructions besides the branch.
-        // It should be only an integer literal instruction.
-        // Handle only integer values for now.
-        if (!dyn_cast<IntegerLiteralInst>(First))
-          return nullptr;
-        if (BB->getTerminator() != ++First)
-          return nullptr;
-      }
       // Remember that this BB is immediately reachable from a switch_enum.
       Blocks.insert(BB);
     }
@@ -2394,6 +2411,11 @@ bool simplifySwitchEnumToSelectEnum(SILBasicBlock *BB, unsigned ArgNum,
                                     PostDominanceInfo *PDT) {
 
   if (!DT || !PDT)
+    return false;
+
+  // Don't know which values should be passed if there is more
+  // than one basic block argument.
+  if (BB->bbarg_size() > 1)
     return false;
 
   // Mapping from case values to the results corresponding to this case value.
@@ -2551,20 +2573,31 @@ bool simplifySwitchEnumToSelectEnum(SILBasicBlock *BB, unsigned ArgNum,
                                        IntArg->getType(),
                                        DefaultSILValue, CaseToValue);
   if (!HasNonSwitchEnumPreds) {
-    IntArg->replaceAllUsesWith(SelectInst);
-  } else {
-    // Don't know which values should be passed if there is more
-    // than one basic block argument.
-    if (BB->bbarg_size() > 1)
-      return false;
-    // Do not replace the bbarg
-    SmallVector<SILValue, 4> Args;
-    Args.push_back(SelectInst);
-    B.setInsertionPoint(SelectInst->getNextNode());
-    B.createBranch(SEI->getLoc(), BB, Args);
-    // Remove switch_enum instruction
-    SEI->getParent()->getTerminator()->eraseFromParent();
+    // Check that all uses of IntArg are dominated by SelectInst
+    bool SelectDominatesAllArgUses = true;
+
+    for(auto U : IntArg->getUses()) {
+      if (!DT->dominates(SelectInst->getParent(), U->getUser()->getParent())) {
+        SelectDominatesAllArgUses = false;
+        break;
+      }
+    }
+
+    // If all uses of IntArg are dominated by SelectInst, it is safe
+    // to replace IntArg by the result of SelectInst because
+    // it is the only incoming value for the IntArg.
+    if (SelectDominatesAllArgUses) {
+      IntArg->replaceAllUsesWith(SelectInst);
+    }
   }
+
+  // Do not replace the bbarg
+  SmallVector<SILValue, 4> Args;
+  Args.push_back(SelectInst);
+  B.setInsertionPoint(SelectInst->getNextNode());
+  B.createBranch(SEI->getLoc(), BB, Args);
+  // Remove switch_enum instruction
+  SEI->getParent()->getTerminator()->eraseFromParent();
 
   return true;
 }
