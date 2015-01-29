@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -debug-values-propagate-liveness -O %s -disable-llvm-optzns -emit-ir -g -o - | FileCheck %s
-// CHECK: define hidden i1 {{.*}}4main4sort
+// CHECK: define {{.*}}i1 {{.*}}4main4sort
 // CHECK: call void @llvm.dbg.value({{.*}}, metadata ![[A:.*]], metadata ![[P1:.*]])
 // CHECK: call void @llvm.dbg.value({{.*}}, metadata ![[A]], metadata ![[P2:.*]])
 // CHECK: call void @llvm.dbg.value({{.*}}, metadata ![[A]], metadata ![[P3:.*]])
