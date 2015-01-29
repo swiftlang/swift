@@ -543,6 +543,19 @@ case let (jeb):
 // expected-error@+1{{extraneous '}' at top level}}
 }
 
+// rdar://19605164
+// expected-note@+4{{to match this opening '('}}
+// expected-note@+3{{to match this opening '['}}
+// expected-error@+2{{use of undeclared type 'S'}}
+struct Foo19605164 {
+func a(s: S[{{g) -> Int {}
+// expected-error@+5{{expected parameter type following ':'}}
+// expected-error@+4{{expected ']' in array type}}
+// expected-error@+3{{expected ')' in parameter}}
+// expected-error@+2{{expected ',' separator}}
+// expected-error@+1{{expected ',' separator}}
+}}}
+
 
 // rdar://19605567
 // expected-note@+4{{to match this opening '{'}}
@@ -551,4 +564,4 @@ case let (jeb):
 // expected-error@+1{{expected an identifier to name generic parameter}}
 func F() { init<( }
 
-// expected-error{{at end of brace statement}}
+// expected-error@+1{{at end of brace statement}}

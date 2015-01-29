@@ -606,7 +606,7 @@ ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
   NestedType = makeParserErrorResult(Base);
   ATR = new (Context) ArrayTypeRepr(NestedType.get(), nullptr,
                                     SourceRange(lsquareLoc,
-                                                getEndOfPreviousLoc()),
+                                                PreviousLoc),
                                     /*OldSyntax=*/true);
   return makeParserErrorResult(ATR);
 }
