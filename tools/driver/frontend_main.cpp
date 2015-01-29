@@ -370,9 +370,6 @@ static bool performCompile(CompilerInstance &Instance,
     return false;
   }
 
-  if (Context.hadError())
-    return true;
-
   // If we were asked to print Clang stats, do so.
   if (opts.PrintClangStats && Context.getClangModuleLoader())
     Context.getClangModuleLoader()->printStatistics();
@@ -384,6 +381,9 @@ static bool performCompile(CompilerInstance &Instance,
   if (shouldTrackReferences)
     emitReferenceDependencies(Context.Diags, Instance.getPrimarySourceFile(),
                               *Instance.getDependencyTracker(), opts);
+
+  if (Context.hadError())
+    return true;
 
   // FIXME: This is still a lousy approximation of whether the module file will
   // be externally consumed.

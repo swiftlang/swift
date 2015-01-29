@@ -59,6 +59,10 @@
 // CHECK-IMPORT-YAML-NOT: {{^-}}
 // CHECK-IMPORT-YAML-NOT: {{:$}}
 
+// RUN: not %target-swift-frontend %clang-importer-sdk -DERROR -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-dependencies-path - -parse %s | FileCheck -check-prefix=CHECK-IMPORT %s
+// RUN: not %target-swift-frontend %clang-importer-sdk -DERROR -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-reference-dependencies-path - -parse -primary-file %s | FileCheck -check-prefix=CHECK-IMPORT-YAML %s
+
+
 import Foundation
 import UserClangModule
 
@@ -68,3 +72,7 @@ _ = A()
 _ = USER_VERSION
 _ = EXTRA_VERSION
 _ = MONEY
+
+#if ERROR
+_ = someRandomUndefinedName
+#endif
