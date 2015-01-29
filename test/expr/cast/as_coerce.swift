@@ -88,3 +88,7 @@ Double(1) as Double as String // expected-error{{'Double' is not convertible to 
 
 // <rdar://problem/19495253> Incorrect diagnostic for explicitly casting to the same type
 "hello" as! String // expected-warning{{forced cast from 'String' to 'String' always succeeds; did you mean to use 'as'?}}
+
+// <rdar://problem/19499340> QoI: Nimble as -> as! changes not covered by Fix-Its
+func f(x : String) {}
+f("what" as Any as String) // expected-error{{'Any' is not convertible to 'String'; did you mean to use 'as!' to force downcast?}}
