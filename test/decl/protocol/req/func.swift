@@ -129,8 +129,8 @@ prefix func ~~(_: X4z) -> X1a {} // expected-note{{candidate has non-matching ty
 
 // Objective-C protocol
 @objc protocol P5 {
-  func f2(x: Int, withInt a: Int) // expected-note{{multiple matching functions named 'f2(_:withInt:)' with type '(Int, withInt: Int) -> ()'}}
-  func f2(x: Int, withOtherInt a: Int) // expected-note{{multiple matching functions named 'f2(_:withOtherInt:)' with type '(Int, withOtherInt: Int) -> ()'}}
+  func f2(x: Int, withInt a: Int) // expected-note{{protocol requires function 'f2(_:withInt:)' with type '(Int, withInt: Int) -> ()'}}
+  func f2(x: Int, withOtherInt a: Int) // expected-note{{protocol requires function 'f2(_:withOtherInt:)' with type '(Int, withOtherInt: Int) -> ()'}}
 }
 
 // Exact match.
@@ -152,8 +152,10 @@ class X5c : P5 {
 
 // Names need to match up for an Objective-C protocol as well.
 class X5d : P5 { // expected-error{{type 'X5d' does not conform to protocol 'P5'}}
-  @objc func f2(#y: Int, withInt a: Int) {} // expected-note 2{{candidate matches (with renaming)}}
-  @objc func f2(#y: Int, withOtherValue a: Int) {} // expected-note 2{{candidate matches (with renaming)}}
+  @objc func f2(#y: Int, withInt a: Int) {} // expected-note {{Objective-C method 'f2WithY:withInt:' provided by method 'f2(y:withInt:)' does not match the requirement's selector ('f2:withInt:')}}
+  // expected-note@-1{{Objective-C method 'f2WithY:withInt:' provided by method 'f2(y:withInt:)' does not match the requirement's selector ('f2:withOtherInt:')}}
+  @objc func f2(#y: Int, withOtherValue a: Int) {} // expected-note{{Objective-C method 'f2WithY:withOtherValue:' provided by method 'f2(y:withOtherValue:)' does not match the requirement's selector ('f2:withInt:')}}
+  // expected-note@-1{{Objective-C method 'f2WithY:withOtherValue:' provided by method 'f2(y:withOtherValue:)' does not match the requirement's selector ('f2:withOtherInt:')}}
 }
 
 // Distinguish names within tuple arguments.

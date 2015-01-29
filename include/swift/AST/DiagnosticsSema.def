@@ -1815,6 +1815,11 @@ ERROR(objc_class_method_load,sema_objc,none,
       OBJC_DIAG_SELECT " defines Objective-C class method 'load', which is "
       "not permitted by Swift", (unsigned, DeclName))
 
+NOTE(objc_witness_selector_mismatch,sema_objc,none,
+      "Objective-C method %2 provided by " OBJC_DIAG_SELECT
+      " does not match the requirement's selector (%3)",
+      (unsigned, DeclName, ObjCSelector, ObjCSelector))
+
 #undef OBJC_DIAG_SELECT
 
 

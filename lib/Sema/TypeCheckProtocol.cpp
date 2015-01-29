@@ -227,6 +227,10 @@ namespace {
 
     /// The witness is not @noreturn, but the requirement is.
     NoReturnConflict,
+
+    /// The witness has a different Objective-C selector than the
+    /// requirement.
+    ObjCSelectorConflict,
   };
 
   /// \brief Describes a match between a requirement and a witness.
@@ -264,6 +268,7 @@ namespace {
       case MatchKind::PostfixNonPostfixConflict:
       case MatchKind::MutatingConflict:
       case MatchKind::NoReturnConflict:
+      case MatchKind::ObjCSelectorConflict:
         return false;
       }
     }
@@ -284,6 +289,7 @@ namespace {
       case MatchKind::PostfixNonPostfixConflict:
       case MatchKind::MutatingConflict:
       case MatchKind::NoReturnConflict:
+      case MatchKind::ObjCSelectorConflict:
         return false;
       }
     }
@@ -510,6 +516,48 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
   return !requirement->isMutating() && witnessMutating;
 }
 
+/// Check that the Objective-C method(s) provided by the witness have
+/// the same selectors as those required by the requirement.
+static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
+                                     ValueDecl *witness,
+                                     bool complain) {
+  // Simple case: for methods, check that the selectors match.
+  if (auto reqFunc = dyn_cast<AbstractFunctionDecl>(req)) {
+    auto witnessFunc = cast<AbstractFunctionDecl>(witness);
+    if (reqFunc->getObjCSelector() == witnessFunc->getObjCSelector())
+      return false;
+
+    if (complain) {
+      auto diagInfo = getObjCMethodDiagInfo(witnessFunc);
+      tc.diagnose(witness, diag::objc_witness_selector_mismatch,
+                  diagInfo.first, diagInfo.second,
+                  witnessFunc->getObjCSelector(), reqFunc->getObjCSelector());
+    }
+
+    return true;
+  }
+
+  // Otherwise, we have an abstract storage declaration.
+  auto reqStorage = cast<AbstractStorageDecl>(req);
+  auto witnessStorage = cast<AbstractStorageDecl>(witness);
+
+  // Check the getter.
+  if (auto reqGetter = reqStorage->getGetter()) {
+    if (checkObjCWitnessSelector(tc, reqGetter, witnessStorage->getGetter(),
+                                 complain))
+      return true;
+  }
+
+  // Check the setter.
+  if (auto reqSetter = reqStorage->getSetter()) {
+    if (checkObjCWitnessSelector(tc, reqSetter, witnessStorage->getSetter(),
+                                 complain))
+      return true;
+  }
+
+  return false;
+}
+
 /// \brief Match the given witness to the given requirement.
 ///
 /// \returns the result of performing the match.
@@ -619,6 +667,13 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     decomposeFunctionType = true;
     ignoreReturnType = true;
   }
+
+  // If the requirement and witness are both @objc, check that the
+  // selectors coincide.
+  // FIXME: The witness might get marked as @objc later.
+  if (req->isObjC() && witness->isObjC() &&
+      checkObjCWitnessSelector(tc, req, witness, /*complain=*/false))
+    return RequirementMatch(witness, MatchKind::ObjCSelectorConflict);
 
   // Set up the match, determining the requirement and witness types
   // in the process.
@@ -993,6 +1048,9 @@ diagnoseMatch(TypeChecker &tc, Module *module,
   case MatchKind::NoReturnConflict:
     // FIXME: Could emit a Fix-It here.
     tc.diagnose(match.Witness, diag::protocol_witness_noreturn_conflict);
+    break;
+  case MatchKind::ObjCSelectorConflict:
+    (void)checkObjCWitnessSelector(tc, req, match.Witness, /*complain=*/true);
     break;
   }
 }
