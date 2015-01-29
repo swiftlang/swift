@@ -480,6 +480,19 @@ static bool usesNativeSwiftReferenceCounting_allocated(const void *object) {
   return usesNativeSwiftReferenceCounting(_swift_getClassOfAllocated(object));
 }
 
+static bool usesNativeSwiftReferenceCounting_unowned(const void *object) {
+  // If an unknown object is unowned-referenced, it may in fact be implemented
+  // using an ObjC weak reference, which will eagerly deallocate the object
+  // when strongly released. We have to check first whether the object is in
+  // the side table before dereferencing the pointer.
+  if (UnownedRefs.count(object))
+    return false;
+  // For a natively unowned reference, even after all strong references have
+  // been released, there's enough of a husk left behind to determine its
+  // species.
+  return usesNativeSwiftReferenceCounting_allocated(object);
+}
+
 void *swift::swift_unknownRetain(void *object) {
   if (isObjCTaggedPointerOrNull(object)) return object;
   if (usesNativeSwiftReferenceCounting_allocated(object))
@@ -549,20 +562,20 @@ void swift::swift_bridgeObjectRelease(void *object) {
 #if SWIFT_OBJC_INTEROP
 void swift::swift_unknownRetainUnowned(void *object) {
   if (isObjCTaggedPointerOrNull(object)) return;
-  if (usesNativeSwiftReferenceCounting_allocated(object))
+  if (usesNativeSwiftReferenceCounting_unowned(object))
     return swift_retainUnowned((HeapObject*) object);
   objc_rootRetainUnowned((id) object);
 }
 
 void swift::swift_unknownWeakRetain(void *object) {
   if (isObjCTaggedPointerOrNull(object)) return;
-  if (usesNativeSwiftReferenceCounting_allocated(object))
+  if (usesNativeSwiftReferenceCounting_unowned(object))
     return swift_weakRetain((HeapObject*) object);
   objc_rootWeakRetain((id) object);
 }
 void swift::swift_unknownWeakRelease(void *object) {
   if (isObjCTaggedPointerOrNull(object)) return;
-  if (usesNativeSwiftReferenceCounting_allocated(object))
+  if (usesNativeSwiftReferenceCounting_unowned(object))
     return swift_weakRelease((HeapObject*) object);
   objc_rootWeakRelease((id) object);
 }
