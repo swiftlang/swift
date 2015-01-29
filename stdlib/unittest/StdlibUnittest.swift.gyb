@@ -90,6 +90,20 @@ public func expectEqual<T : Equatable>(
     file: file, line: line)
 }
 
+public func expectEqual<T: Equatable, U: Equatable>(
+  expected: (T, U), actual: (T, U),
+  stackTrace: SourceLocStack? = nil,
+  _ collectMoreInfo: (()->String)? = nil,
+  file: String = __FILE__, line: UWord = __LINE__
+) {
+  expectEqual(expected.0, actual.0, {$0 == $1},
+    stackTrace: stackTrace, collectMoreInfo,
+    file: file, line: line)
+  expectEqual(expected.1, actual.1, {$0 == $1},
+    stackTrace: stackTrace, collectMoreInfo,
+    file: file, line: line)
+}
+
 public func expectEqual<T>(
     expected: T, actual: T, equal: (T,T)->Bool,
     stackTrace: SourceLocStack? = nil,
