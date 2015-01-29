@@ -129,8 +129,8 @@ prefix func ~~(_: X4z) -> X1a {} // expected-note{{candidate has non-matching ty
 
 // Objective-C protocol
 @objc protocol P5 {
-  func f2(x: Int, withInt a: Int) // expected-note{{requirement 'f2(_:withInt:)' declared here}}
-  func f2(x: Int, withOtherInt a: Int) // expected-note{{protocol requires function 'f2(_:withOtherInt:)' with type '(Int, withOtherInt: Int) -> ()'}}
+  func f2(x: Int, withInt a: Int) // expected-note{{multiple matching functions named 'f2(_:withInt:)' with type '(Int, withInt: Int) -> ()'}}
+  func f2(x: Int, withOtherInt a: Int) // expected-note{{multiple matching functions named 'f2(_:withOtherInt:)' with type '(Int, withOtherInt: Int) -> ()'}}
 }
 
 // Exact match.
@@ -150,11 +150,10 @@ class X5c : P5 {
   @objc func f2(y: Int, withOtherInt b: Int) {}
 }
 
-// Cannot change name of the selector.
+// Names need to match up for an Objective-C protocol as well.
 class X5d : P5 { // expected-error{{type 'X5d' does not conform to protocol 'P5'}}
-  @objc func f2(#y: Int, withInt a: Int) {} // expected-note{{candidate has non-matching type '(y: Int, withInt: Int) -> ()'}} 
-  // expected-error @-1{{method 'f2(y:withInt:)' has different argument names from those required by protocol 'P5' ('f2(_:withInt:)')}}
-  @objc func f2(#y: Int, withOtherValue a: Int) {} // expected-note{{candidate has non-matching type '(y: Int, withOtherValue: Int) -> ()'}}
+  @objc func f2(#y: Int, withInt a: Int) {} // expected-note 2{{candidate matches (with renaming)}}
+  @objc func f2(#y: Int, withOtherValue a: Int) {} // expected-note 2{{candidate matches (with renaming)}}
 }
 
 // Distinguish names within tuple arguments.

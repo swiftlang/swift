@@ -524,8 +524,6 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
              const std::function<RequirementMatch(bool)> &finalize) {
   assert(!req->isInvalid() && "Cannot have an invalid requirement here");
 
-  auto protocol = conformance->getProtocol();
-
   /// Make sure the witness is of the same kind as the requirement.
   if (req->getKind() != witness->getKind())
     return RequirementMatch(witness, MatchKind::KindConflict);
@@ -674,15 +672,6 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
       if (reqParams[i].getName() != witnessParams[i].getName()) {
         // A parameter has been renamed.
         anyRenaming = true;
-
-        // For an Objective-C requirement, all but the first parameter name is
-        // significant.
-        // FIXME: Specialize the match failure kind.
-        // FIXME: Constructors care about the first name.
-        // FIXME: This should be dead code.
-        if (protocol->isObjC() && i > 0)
-          return RequirementMatch(witness, MatchKind::TypeConflict,
-                                  witnessType);
       }
 
       // Gross hack: strip a level of unchecked-optionality off both
@@ -2321,7 +2310,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   if (Proto->isObjC())
     if (auto clas = canT->getClassOrBoundGenericClass())
       if (clas->isForeign()) {
-        TC.diagnose(ComplainLoc, diag::foreign_class_cannot_conform_to_objc_protocol,
+        TC.diagnose(ComplainLoc,
+                    diag::foreign_class_cannot_conform_to_objc_protocol,
                     T, Proto->getDeclaredType());
         conformance->setState(ProtocolConformanceState::Invalid);
         return conformance;
