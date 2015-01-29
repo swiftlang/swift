@@ -90,13 +90,18 @@ namespace {
 
       // Explicit closures start their own sequence.
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
+        // In the repl, the parent top-level context may have been re-written.
         if (CE->getParent() != ParentDC) {
+          if ((CE->getParent()->getContextKind() !=
+                    ParentDC->getContextKind()) ||
+              ParentDC->getContextKind() != DeclContextKind::TopLevelCodeDecl) {
           // If a closure is nested within an auto closure, we'll need to update
           // its parent to the auto closure parent.
           assert(ParentDC->getContextKind() ==
                  DeclContextKind::AbstractClosureExpr &&
                  "Incorrect parent decl context for closure");
           CE->setParent(ParentDC);
+          }
         }
 
         // If the closure has a single expression body, we need to

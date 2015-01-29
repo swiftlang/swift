@@ -144,6 +144,8 @@ ERROR(cannot_invoke_closure,sema,none,
 
 ERROR(cannot_infer_closure_type,sema,none,
       "unable to infer closure type in the current context", ())
+NOTE(mult_stmt_closures_require_explicit_result,sema,none,
+      "multi-statement closures require an explicit return type", ())
 
 ERROR(invalid_trailing_closure_target,sema,none,
       "unexpected trailing closure", ())

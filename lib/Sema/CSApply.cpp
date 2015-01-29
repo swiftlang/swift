@@ -935,6 +935,19 @@ namespace {
     }
 
   public:
+    
+    
+    /// \brief Coerce a closure expression with a non-void return type to a
+    /// contextual function type with a void return type.
+    ///
+    /// This operation cannot fail.
+    ///
+    /// \param expr The closure expression to coerce.
+    ///
+    /// \returns The coerced closure expression.
+    ///
+    ClosureExpr *coerceClosureExprToVoid(Expr *expr);
+    
     /// \brief Coerce the given expression to the given type.
     ///
     /// This operation cannot fail.
@@ -4061,6 +4074,57 @@ static bool applyTypeToClosureExpr(Expr *expr, Type toType) {
   return false;
 }
 
+ClosureExpr *ExprRewriter::coerceClosureExprToVoid(Expr *expr) {
+  
+  auto &tc = cs.getTypeChecker();
+  // Re-write the single-expression closure to return '()'
+  auto closureExpr = cast<ClosureExpr>(expr);
+  assert(closureExpr->hasSingleExpressionBody());
+  
+  auto member = closureExpr->getBody()->getElements()[0];
+  
+  // A single-expression body contains a single return statement.
+  auto returnStmt = dyn_cast<ReturnStmt>(member.get<Stmt *>());
+  auto singleExpr = returnStmt->getResult();
+  auto voidExpr = TupleExpr::createEmpty(tc.Context,
+                                         singleExpr->getStartLoc(),
+                                         singleExpr->getEndLoc(),
+                                         /*implicit*/true);
+  returnStmt->setResult(voidExpr);
+  
+  SmallVector<ASTNode, 2> elements;
+  elements.push_back(singleExpr);
+  elements.push_back(returnStmt);
+  
+  auto braceStmt = BraceStmt::create(cs.getASTContext(),
+                                     closureExpr->getStartLoc(),
+                                     elements,
+                                     closureExpr->getEndLoc(),
+                                     /*implicit*/true);
+
+  auto newClosure = new (cs.getASTContext())
+                      ClosureExpr(closureExpr->getParams(),
+                                  SourceLoc(),
+                                  SourceLoc(),
+                                  TypeLoc(),
+                                  closureExpr->getDiscriminator(),
+                                  cs.DC);
+  
+  newClosure->setImplicit();
+  newClosure->setBody(braceStmt, false);
+  
+  auto fnType = closureExpr->getType()->getAs<FunctionType>();
+  Type inputType = fnType->getInput();
+  Type resultType = voidExpr->getType();
+  auto newClosureType = FunctionType::get(inputType,
+                                          resultType,
+                                          fnType->getExtInfo());
+  
+  newClosure->setType(newClosureType);
+  
+  return newClosure;
+}
+
 
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  ConstraintLocatorBuilder locator) {
@@ -5335,16 +5399,23 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
           // Enter the context of the closure when type-checking the body.
           llvm::SaveAndRestore<DeclContext *> savedDC(Rewriter.dc, closure);
           Expr *body = closure->getSingleExpressionBody()->walk(*this);
-          if (body)
-            body = Rewriter.coerceToType(body,
-                                         fnType->getResult(),
-                                         cs.getConstraintLocator(
-                                           closure,
-                                           ConstraintLocator::ClosureResult));
-          if (!body)
-            return { false, nullptr } ;
+          if (body) {
+            
+            if (fnType->getResult()->isVoid() && !body->getType()->isVoid()) {
+              closure = Rewriter.coerceClosureExprToVoid(closure);
+            } else {
+            
+              body = Rewriter.coerceToType(body,
+                                           fnType->getResult(),
+                                           cs.getConstraintLocator(
+                                             closure,
+                                             ConstraintLocator::ClosureResult));
+              if (!body)
+                return { false, nullptr } ;
 
-          closure->setSingleExpressionBody(body);
+              closure->setSingleExpressionBody(body);
+            }
+          }
         } else {
           // For other closures, type-check the body.
           tc.typeCheckClosureBody(closure);

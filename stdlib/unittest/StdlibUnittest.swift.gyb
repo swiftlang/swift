@@ -416,8 +416,10 @@ struct _FDInputStream {
     }
     let readResult: ssize_t = _buffer.withUnsafeMutableBufferPointer {
       (_buffer) in
-      return Darwin.read(
-        self.fd, _buffer.baseAddress + self._bufferUsed, size_t(bufferFree))
+      let fd = self.fd
+      let addr = _buffer.baseAddress + self._bufferUsed
+      let size = size_t(bufferFree)
+      return Darwin.read(fd, addr, size)
     }
     if readResult == 0 {
       isEOF = true

@@ -70,11 +70,14 @@ func _stdlib_select(
       (writefds) in
       errorfds._data.withUnsafeMutableBufferPointer {
         (errorfds) in
+        let readAddr = readfds.baseAddress
+        let writeAddr = writefds.baseAddress
+        let errorAddr = errorfds.baseAddress
         return select(
           _stdlib_FD_SETSIZE,
-          UnsafeMutablePointer(readfds.baseAddress),
-          UnsafeMutablePointer(writefds.baseAddress),
-          UnsafeMutablePointer(errorfds.baseAddress),
+          UnsafeMutablePointer(readAddr),
+          UnsafeMutablePointer(writeAddr),
+          UnsafeMutablePointer(errorAddr),
           timeout)
       }
     }

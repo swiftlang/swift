@@ -11,7 +11,7 @@ func func6c(f: (Int, Int) -> Int, _ n: Int = 0) {}
 @autoclosure var closure1 : () -> Int = 4  // Function producing 4 whenever it is called.
 var closure2 : (Int,Int) -> Int = { 4 } // FIXME: expected-error{{tuple types '(Int, Int)' and '()' have a different number of elements (2 vs. 0)}}
 var closure3a : ()->()->(Int,Int) = {{ (4, 2) }} // multi-level closing.
-var closure3b : (Int,Int)->(Int)->(Int,Int) = {{ (4, 2) }} // FIXME: expected-error{{'Int' is not a subtype of '()'}}
+var closure3b : (Int,Int)->(Int)->(Int,Int) = {{ (4, 2) }} // expected-error{{tuple types '(Int, Int)' and '()' have a different number of elements (2 vs. 0)}}
 var closure4 : (Int,Int) -> Int = { $0 + $1 }
 var closure5 : (Double) -> Int =
    { // expected-error{{could not find an overload for '+' that accepts the supplied arguments}}
@@ -231,4 +231,25 @@ func rdar19179412() -> Int -> Int {
     }
   }
 }
+
+// Test coercion of single-expression closure return types to void.
+func takesVoidFunc(f: ()->()) {}
+var i: Int = 1
+
+takesVoidFunc({i})
+var f1: ()->() = {i}
+var x = {return $0}(1)
+
+func returnsInt() -> Int { return 0 }
+takesVoidFunc(returnsInt) // expected-error {{cannot invoke 'takesVoidFunc' with an argument list of type '(() -> Int)'}} expected-note{{expected an argument list of type '(() -> ())'}}
+takesVoidFunc({()->Int in 0}) // expected-error {{cannot invoke 'takesVoidFunc' with an argument list of type '(() -> Int)'}} expected-note{{expected an argument list of type '(() -> ())'}}
+
+// These used to crash the compiler, but were fixed to support the implemenation of rdar://problem/17228969
+Void(0) // expected-error{{cannot invoke initializer for type 'Void' with an argument list of type '(Int)'}}
+var _ = {0}
+
+let samples = { // expected-error{{unable to infer closure type in the current context}} expected-note{{multi-statement closures require an explicit return type}}
+          if (i > 10) { return true }
+          else { return false }
+        }()
 

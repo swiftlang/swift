@@ -1845,12 +1845,15 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
     auto instanceType = TE->getType()->getAs<MetatypeType>()->getInstanceType();
     overloadName = instanceType->getString();
 
-    auto ctors = CS->TC.lookupConstructors(instanceType, CS->DC, false); // TODO: figure out right value for isKnownPrivate
-    for (auto ctor : ctors) {
-      if (auto fnType = ctor->getType()->getAs<AnyFunctionType>()) {
-        // skip type argument
-        if (auto fnType2 = fnType->getResult()->getAs<AnyFunctionType>()) {
-          paramLists.push_back(fnType2->getInput());
+    // TODO: figure out right value for isKnownPrivate
+    if (!instanceType->getAs<TupleType>()) {
+      auto ctors = CS->TC.lookupConstructors(instanceType, CS->DC, false);
+      for (auto ctor : ctors) {
+        if (auto fnType = ctor->getType()->getAs<AnyFunctionType>()) {
+          // skip type argument
+          if (auto fnType2 = fnType->getResult()->getAs<AnyFunctionType>()) {
+            paramLists.push_back(fnType2->getInput());
+          }
         }
       }
     }
@@ -1928,6 +1931,19 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
     
     if (isClosureInvocation) {
       CS->TC.diagnose(fnExpr->getLoc(), diag::cannot_infer_closure_type);
+      
+      if (!isInvalidTrailingClosureTarget) {
+        auto closureExpr = dyn_cast<ClosureExpr>(unwrapParenExpr(fnExpr));
+        
+        if (!closureExpr->hasSingleExpressionBody() &&
+            !closureExpr->hasExplicitResultType() &&
+            closureExpr->getBody()->getElements().size()) {
+          CS->TC.diagnose(fnExpr->getLoc(),
+                          diag::mult_stmt_closures_require_explicit_result);
+        }
+        
+      }
+      
     } else {
       CS->TC.diagnose(fnExpr->getLoc(),
                       isInitializer ?

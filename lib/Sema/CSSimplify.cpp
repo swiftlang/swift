@@ -1961,6 +1961,22 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                           ConversionRestrictionKind::ForceUnchecked);
     }
   }
+  
+  // If the types disagree, but we're comparing a non-void, single-expression
+  // closure result type to a void function result type, allow the conversion.
+  {
+    if (concrete && kind >= TypeMatchKind::Subtype && type2->isVoid()) {
+      SmallVector<LocatorPathElt, 2> parts;
+      locator.getLocatorParts(parts);
+      
+      while (!parts.empty()) {
+        if (parts.back().getKind() == ConstraintLocator::ClosureResult) {
+          return SolutionKind::Solved;
+        }
+        parts.pop_back();
+      }
+    }
+  }
 
 commit_to_conversions:
   // When we hit this point, we're committed to the set of potential

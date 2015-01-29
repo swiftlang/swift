@@ -1737,11 +1737,30 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // may be incomplete and the type mismatch in return statement will just
   // confuse the type checker.
   bool hasSingleExpressionBody = false;
-  if (!Status.hasCodeCompletion() &&
-      bodyElements.size() == 1 && bodyElements[0].is<Expr *>()) {
-    hasSingleExpressionBody = true;
-    bodyElements[0] = new (Context) ReturnStmt(SourceLoc(),
-                                               bodyElements[0].get<Expr*>());
+  if (!Status.hasCodeCompletion() && bodyElements.size() == 1) {
+    // If the closure's only body element is a single return statement,
+    // use that instead of creating a new wrapping return expression.
+    if (bodyElements[0].is<Stmt *>()) {
+      if (auto returnStmt =
+                  dyn_cast<ReturnStmt>(bodyElements[0].get<Stmt*>())) {
+        
+        if (!returnStmt->hasResult()) {
+          returnStmt->setResult(TupleExpr::createEmpty(Context,
+                                                       SourceLoc(),
+                                                       SourceLoc(),
+                                                       /*implicit*/true));
+        }
+        
+        hasSingleExpressionBody = true;
+      }
+    }
+    
+    // Otherwise, create the wrapping return.
+    if (bodyElements[0].is<Expr *>()) {
+      hasSingleExpressionBody = true;
+      bodyElements[0] = new (Context) ReturnStmt(SourceLoc(),
+                                                 bodyElements[0].get<Expr*>());
+    }
   }
 
   // Set the body of the closure.
