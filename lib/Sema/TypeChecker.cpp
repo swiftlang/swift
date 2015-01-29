@@ -547,6 +547,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // Diagnose conflicts and unintended overrides between
     // Objective-C methods.
     Ctx.diagnoseObjCMethodConflicts(SF);
+    Ctx.diagnoseObjCUnsatisfiedOptReqConflicts(SF);
     Ctx.diagnoseUnintendedObjCMethodOverrides(SF);
   }
 
@@ -580,6 +581,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   auto &Ctx = SF.getASTContext();
   Ctx.diagnoseObjCMethodConflicts(SF);
+  Ctx.diagnoseObjCUnsatisfiedOptReqConflicts(SF);
   Ctx.diagnoseUnintendedObjCMethodOverrides(SF);
 }
 

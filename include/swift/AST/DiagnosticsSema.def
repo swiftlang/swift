@@ -785,6 +785,9 @@ NOTE(protocol_witness_nonconform_type,sema_tcd,none,
 
 NOTE(protocol_requirement_here,sema_tcd,none,
      "requirement %0 declared here", (DeclName))
+NOTE(protocol_conformance_here,sema_tcd,none,
+     "class %0 declares conformance to protocol %1 here",
+     (DeclName, DeclName))
 
 // Protocols and existentials
 NOTE(protocol_existential_assoc_type,sema_tcd,none,
@@ -1797,6 +1800,8 @@ ERROR(missing_bridging_function,sema_objc,Fatal,
 
 #define OBJC_DIAG_SELECT "%select{initializer %1|implicit initializer %1|deinitializer|implicit deinitializer|method %1|getter for %1|subscript getter|setter for %1|subscript setter}0"
 
+#define OBJC_DIAG_SELECT_2 "%select{initializer %3|implicit initializer %3|deinitializer|implicit deinitializer|method %3|getter for %3|subscript getter|setter for %3|subscript setter}2"
+
 ERROR(objc_redecl,sema_objc,none,
       OBJC_DIAG_SELECT " redeclares Objective-C method %2",
       (unsigned, DeclName, ObjCSelector))
@@ -1820,6 +1825,13 @@ NOTE(objc_witness_selector_mismatch,sema_objc,none,
       " does not match the requirement's selector (%3)",
       (unsigned, DeclName, ObjCSelector, ObjCSelector))
 
+ERROR(objc_optional_requirement_conflict,sema_objc,none,
+      "Objective-C method %4 provided by " OBJC_DIAG_SELECT
+      " conflicts with optional requirement " OBJC_DIAG_SELECT_2
+      " in protocol %5",
+      (unsigned, DeclName, unsigned, DeclName, ObjCSelector, DeclName))
+
+#undef OBJC_DIAG_SELECT_2
 #undef OBJC_DIAG_SELECT
 
 

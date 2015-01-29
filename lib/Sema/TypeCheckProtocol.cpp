@@ -1159,6 +1159,20 @@ void ConformanceChecker::recordOptionalWitness(ValueDecl *requirement) {
 
   // Record that there is no witness.
   Conformance->setWitness(requirement, ConcreteDeclRef());
+
+  // If the requirement is @objc, note that we have an unsatisfied
+  // optional @objc requirement.
+  if (requirement->isObjC()) {
+    if (auto funcReq = dyn_cast<AbstractFunctionDecl>(requirement))
+      TC.Context.recordObjCUnsatisfiedOptReq(DC, funcReq);
+    else {
+      auto storageReq = cast<AbstractStorageDecl>(requirement);
+      if (auto getter = storageReq->getGetter())
+        TC.Context.recordObjCUnsatisfiedOptReq(DC, getter);
+      if (auto setter = storageReq->getSetter())
+        TC.Context.recordObjCUnsatisfiedOptReq(DC, setter);
+    }
+  }
 }
 
 void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,

@@ -52,6 +52,10 @@ llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
 
 namespace {
   typedef std::tuple<ClassDecl *, ObjCSelector, bool> ObjCMethodConflict;
+
+  /// An unsatisfied, optional @objc requirement in a protocol conformance.
+  typedef std::pair<DeclContext *, AbstractFunctionDecl *>
+    ObjCUnsatisfiedOptReq;
 }
 
 struct ASTContext::Implementation {
@@ -244,6 +248,10 @@ struct ASTContext::Implementation {
 
   /// List of Objective-C member conflicts we have found during type checking.
   std::vector<ObjCMethodConflict> ObjCMethodConflicts;
+
+  /// List of optional @objc protocol requirements that have gone
+  /// unsatisfied, which might conflict with other Objective-C methods.
+  std::vector<ObjCUnsatisfiedOptReq> ObjCUnsatisfiedOptReqs;
 
   /// List of Objective-C methods created by the type checker (and not
   /// by the Clang importer or deserialized), which is used for
@@ -1822,6 +1830,94 @@ bool ASTContext::diagnoseObjCMethodConflicts(SourceFile &sf) {
                                  Impl.ObjCMethodConflicts.end());
 
   return anyConflicts;
+}
+
+void ASTContext::recordObjCUnsatisfiedOptReq(DeclContext *dc,
+                                             AbstractFunctionDecl *req) {
+  Impl.ObjCUnsatisfiedOptReqs.push_back(ObjCUnsatisfiedOptReq(dc, req));
+}
+
+/// Retrieve the source location associated with this declaration
+/// context.
+static SourceLoc getDeclContextLoc(DeclContext *dc) {
+  if (auto ext = dyn_cast<ExtensionDecl>(dc))
+    return ext->getLoc();
+
+  return cast<NominalTypeDecl>(dc)->getLoc();
+}
+
+bool ASTContext::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
+  // If there are no unsatisfied, optional @objc requirements, we're done.
+  if (Impl.ObjCUnsatisfiedOptReqs.empty())
+    return false;
+
+  // Partition the set of unsatisfied requirements to put the
+  // conflicts that involve this source file at the end.
+  auto firstLocalReq
+    = std::partition(Impl.ObjCUnsatisfiedOptReqs.begin(),
+                     Impl.ObjCUnsatisfiedOptReqs.end(),
+                     [&](const ObjCUnsatisfiedOptReq &unsatisfied) -> bool {
+                       return &sf != unsatisfied.first->getParentSourceFile();
+                     });
+
+  // If there were no local unsatisfied requirements, we're done.
+  unsigned numLocalReqs
+    = Impl.ObjCUnsatisfiedOptReqs.end() - firstLocalReq;
+  if (numLocalReqs == 0)
+    return false;
+
+  // Sort the set of local unsatisfied requirements, so we get a
+  // deterministic order for diagnostics.
+  MutableArrayRef<ObjCUnsatisfiedOptReq> localReqs(&*firstLocalReq,
+                                                   numLocalReqs);
+  std::sort(localReqs.begin(), localReqs.end(),
+            [&](const ObjCUnsatisfiedOptReq &lhs,
+                const ObjCUnsatisfiedOptReq &rhs) -> bool {
+              return SourceMgr.isBeforeInBuffer(getDeclContextLoc(lhs.first),
+                                                getDeclContextLoc(rhs.first));
+            });
+
+  // Check each of the unsatisfied optional requirements.
+  bool anyDiagnosed = false;
+  for (const auto &unsatisfied : localReqs) {
+    // Check whether there is a conflict here.
+    ClassDecl *classDecl = unsatisfied.first->isClassOrClassExtensionContext();
+    auto req = unsatisfied.second;
+    auto selector = req->getObjCSelector();
+    bool isInstanceMethod = req->isInstanceMember();
+    // FIXME: Also look in superclasses?
+    auto conflicts = classDecl->lookupDirect(selector, isInstanceMethod);
+    if (conflicts.empty())
+      continue;
+
+    // Diagnose the conflict.
+    auto reqDiagInfo = getObjCMethodDiagInfo(unsatisfied.second);
+    auto conflictDiagInfo = getObjCMethodDiagInfo(conflicts[0]);
+    auto protocolName
+      = cast<ProtocolDecl>(req->getDeclContext())->getFullName();
+    Diags.diagnose(conflicts[0],
+                   diag::objc_optional_requirement_conflict,
+                   conflictDiagInfo.first,
+                   conflictDiagInfo.second,
+                   reqDiagInfo.first,
+                   reqDiagInfo.second,
+                   selector,
+                   protocolName);
+    Diags.diagnose(getDeclContextLoc(unsatisfied.first),
+                   diag::protocol_conformance_here,
+                   classDecl->getFullName(),
+                   protocolName);
+    Diags.diagnose(req, diag::protocol_requirement_here,
+                   reqDiagInfo.second);
+
+    anyDiagnosed = true;
+  }
+
+  // Erase the local unsatisfied requirements from the list.
+  Impl.ObjCUnsatisfiedOptReqs.erase(firstLocalReq,
+                                    Impl.ObjCUnsatisfiedOptReqs.end());
+
+  return anyDiagnosed;
 }
 
 //===----------------------------------------------------------------------===//

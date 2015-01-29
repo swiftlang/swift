@@ -697,6 +697,17 @@ public:
   /// \returns true if there were any conflicts diagnosed.
   bool diagnoseObjCMethodConflicts(SourceFile &sf);
 
+  /// Note that an optional @objc requirement has gone unsatisfied by
+  /// a conformance to its protocol.
+  ///
+  /// \param dc The declaration context in which the conformance occurs.
+  /// \param req The optional requirement.
+  void recordObjCUnsatisfiedOptReq(DeclContext *dc, AbstractFunctionDecl *req);
+
+  /// Diagnose any unsatisfied @objc optional requirements of
+  /// protocols that conflict with methods.
+  bool diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf);
+
 private:
   friend class Decl;
   Optional<RawComment> getRawComment(const Decl *D);
