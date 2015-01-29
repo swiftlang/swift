@@ -92,3 +92,7 @@ Double(1) as Double as String // expected-error{{'Double' is not convertible to 
 // <rdar://problem/19499340> QoI: Nimble as -> as! changes not covered by Fix-Its
 func f(x : String) {}
 f("what" as Any as String) // expected-error{{'Any' is not convertible to 'String'; did you mean to use 'as!' to force downcast?}}
+
+// <rdar://problem/19563805> Fuzzing Swift: performTypeChecking(...) crashes in ConformanceChecker::recordTypeWitness(...): Assertion failed: "Conformance should already have been verified"
+let s : AnyObject = C3()
+s as C3 // expected-error{{'AnyObject' is not convertible to 'C3'; did you mean to use 'as!' to force downcast?}}

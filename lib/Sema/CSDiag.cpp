@@ -2101,16 +2101,6 @@ static CoerceExprDiagnosis diagnoseCoerceExpr(
     bool suppressDiagnostics() const override { return true; }
   } listener;
 
-  // Does the 'as' expression typecheck already?
-  Expr *expr = coerceExpr;
-  CS->TC.eraseTypeData(expr);
-  bool coerceTypeCheckFailed =
-    CS->TC.typeCheckExpression(expr, CS->DC, Type(), Type(), false,
-                               FreeTypeVariableBinding::Disallow, &listener);
-  if (!coerceTypeCheckFailed) {
-    return CoerceExprDiagnosis::Success;
-  }
-
   // See if changing the 'as' expression to 'as!' fixes things.
   Expr *forceExpr = new (CS->getASTContext()) ForcedCheckedCastExpr(
     coerceExpr->getSubExpr(), coerceExpr->getLoc(), SourceLoc(),
