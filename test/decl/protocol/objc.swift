@@ -5,10 +5,10 @@
 @objc class ObjCClass { }
 
 @objc protocol P1 {
-  func method1() // expected-note{{protocol requires function 'method1()' with type '() -> ()'}}
+  func method1() // expected-note 2{{protocol requires function 'method1()' with type '() -> ()'}}
 
-  var property1: ObjCClass { get } // expected-note{{protocol requires property 'property1' with type 'ObjCClass'}}
-  var property2: ObjCClass { get set } // expected-note{{protocol requires property 'property2' with type 'ObjCClass'}}
+  var property1: ObjCClass { get } // expected-note 2{{protocol requires property 'property1' with type 'ObjCClass'}}
+  var property2: ObjCClass { get set } // expected-note 2{{protocol requires property 'property2' with type 'ObjCClass'}}
 }
 
 @objc class C1 : P1 { // expected-error{{type 'C1' does not conform to protocol 'P1'}}
@@ -24,6 +24,12 @@
     get { return ObjCClass() }
     @objc(setProperty2Please:) set { } // expected-note{{Objective-C method 'setProperty2Please:' provided by setter for 'property2' does not match the requirement's selector ('setProperty2:')}}
   }
+}
+
+class C1b : P1 { // expected-error{{type 'C1b' does not conform to protocol 'P1'}}
+  func method1() { } // expected-note{{candidate is not '@objc', but protocol requires it}}{{3-3=@objc }}
+  var property1: ObjCClass = ObjCClass() // expected-note{{candidate is not '@objc', but protocol requires it}}{{3-3=@objc }}
+  var property2: ObjCClass = ObjCClass() // expected-note{{candidate is not '@objc', but protocol requires it}}{{3-3=@objc }}
 }
 
 // Complain about optional requirements that aren't satisfied

@@ -266,8 +266,8 @@ func <~>(x: ConformingClassToClassProtocol,
 // SYMBOL:  sil hidden @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_FS1_oi3ltgUS1__U_S_9AssocReqt__fMQPS1{{.*}} : $@cc(witness_method) @thin (@owned ConformingClassToClassProtocol, @owned ConformingClassToClassProtocol, @thick ConformingClassToClassProtocol.Type) -> ()
 
 class ConformingClassToObjCProtocol : ObjCProtocol {
-  func method(#x: ObjCClass) {}
-  class func staticMethod(#y: ObjCClass) {}
+  @objc func method(#x: ObjCClass) {}
+  @objc class func staticMethod(#y: ObjCClass) {}
 }
 // TABLE-NOT:  sil_witness_table hidden ConformingClassToObjCProtocol
 
@@ -488,8 +488,8 @@ protocol InheritedFromObjC : ObjCProtocol {
 }
 
 class ConformsInheritedFromObjC : InheritedFromObjC {
-  func method(#x: ObjCClass) {}
-  class func staticMethod(#y: ObjCClass) {}
+  @objc func method(#x: ObjCClass) {}
+  @objc class func staticMethod(#y: ObjCClass) {}
   func inheritedMethod() {}
 }
 // TABLE-LABEL: sil_witness_table hidden ConformsInheritedFromObjC: InheritedFromObjC module witness_tables {

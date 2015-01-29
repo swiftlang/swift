@@ -12,15 +12,15 @@ import Foundation
 }
 
 class C: Fungible {
-  func runce() {}
-  func funge() {}
+  @objc func runce() {}
+  @objc func funge() {}
 }
 
 class D {}
 
 extension D: Fungible {
-  func runce() {}
-  func funge() {}
+  @objc func runce() {}
+  @objc func funge() {}
 }
 
 extension NSString: Fungible {

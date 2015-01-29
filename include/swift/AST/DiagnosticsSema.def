@@ -777,6 +777,8 @@ NOTE(protocol_witness_settable_conflict,sema_tcd,none,
      "candidate is not settable, but protocol requires it", ())
 NOTE(protocol_witness_noreturn_conflict,sema_tcd,none,
      "candidate is not 'noreturn', but protocol requires it", ())
+NOTE(protocol_witness_not_objc,sema_tcd,none,
+     "candidate is not '@objc', but protocol requires it", ())
 
 NOTE(protocol_witness_type,sema_tcd,none,
      "possibly intended match", ())

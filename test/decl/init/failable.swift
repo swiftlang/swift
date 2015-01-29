@@ -205,7 +205,7 @@ class C1b : P1 {
 }
 
 class C1b_objc : P1_objc {
-  required init!(string: String) { } // expected-error{{non-failable initializer requirement 'init(string:)' in Objective-C protocol cannot be satisfied by a failable initializer ('init!')}}
+  @objc required init!(string: String) { } // expected-error{{non-failable initializer requirement 'init(string:)' in Objective-C protocol cannot be satisfied by a failable initializer ('init!')}}
 }
 
 class C2a : P2 {

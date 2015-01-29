@@ -231,6 +231,9 @@ namespace {
     /// The witness has a different Objective-C selector than the
     /// requirement.
     ObjCSelectorConflict,
+
+    /// The witness is not @objc but the requirement is.
+    NotObjC,
   };
 
   /// \brief Describes a match between a requirement and a witness.
@@ -269,6 +272,7 @@ namespace {
       case MatchKind::MutatingConflict:
       case MatchKind::NoReturnConflict:
       case MatchKind::ObjCSelectorConflict:
+      case MatchKind::NotObjC:
         return false;
       }
     }
@@ -290,6 +294,7 @@ namespace {
       case MatchKind::MutatingConflict:
       case MatchKind::NoReturnConflict:
       case MatchKind::ObjCSelectorConflict:
+      case MatchKind::NotObjC:
         return false;
       }
     }
@@ -668,12 +673,17 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     ignoreReturnType = true;
   }
 
-  // If the requirement and witness are both @objc, check that the
-  // selectors coincide.
-  // FIXME: The witness might get marked as @objc later.
-  if (req->isObjC() && witness->isObjC() &&
-      checkObjCWitnessSelector(tc, req, witness, /*complain=*/false))
-    return RequirementMatch(witness, MatchKind::ObjCSelectorConflict);
+  // Objective-C checking for @objc requirements.
+  if (req->isObjC()) {
+    // The witness must also be @objc.
+    if (!witness->isObjC())
+      return RequirementMatch(witness, MatchKind::NotObjC);
+
+    
+    // The selectors must coincide.
+    if (checkObjCWitnessSelector(tc, req, witness, /*complain=*/false))
+      return RequirementMatch(witness, MatchKind::ObjCSelectorConflict);
+  }
 
   // Set up the match, determining the requirement and witness types
   // in the process.
@@ -1052,6 +1062,16 @@ diagnoseMatch(TypeChecker &tc, Module *module,
   case MatchKind::ObjCSelectorConflict:
     (void)checkObjCWitnessSelector(tc, req, match.Witness, /*complain=*/true);
     break;
+  case MatchKind::NotObjC: {
+    SourceLoc witnessStartLoc = match.Witness->getStartLoc();
+    if (auto varWitness = dyn_cast<VarDecl>(match.Witness)) {
+      if (auto patternBinding = varWitness->getParentPattern())
+        witnessStartLoc = patternBinding->getStartLoc();
+    }
+    tc.diagnose(match.Witness, diag::protocol_witness_not_objc)
+      .fixItInsert(witnessStartLoc, "@objc ");
+    break;
+  }
   }
 }
 

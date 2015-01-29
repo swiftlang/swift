@@ -231,8 +231,8 @@ func classAnyObject(obj: NSObject) {
 
 // Protocol conformances
 class Wobbler : NSWobbling {
-  func wobble() { }
-  func returnMyself() -> Self { return self }
+  @objc func wobble() { }
+  @objc func returnMyself() -> Self { return self }
 }
 
 func optionalMemberAccess(w: NSWobbling) {
@@ -291,18 +291,18 @@ func testRepeatedProtocolAdoption(w: NSWindow) {
 }
 
 class ProtocolAdopter1 : FooProto {
-  var bar: CInt // no-warning
+  @objc var bar: CInt // no-warning
 
   init() { bar = 5 }
 }
 class ProtocolAdopter2 : FooProto {
-  var bar: CInt {
+  @objc var bar: CInt {
     get { return 42 }
     set { /* do nothing! */ }
   }
 }
 class ProtocolAdopterBad1 : FooProto { // expected-error{{type 'ProtocolAdopterBad1' does not conform to protocol 'FooProto'}}
-  var bar: Int = 0 // expected-note{{candidate has non-matching type 'Int'}}
+  @objc var bar: Int = 0 // expected-note{{candidate has non-matching type 'Int'}}
 }
 class ProtocolAdopterBad2 : FooProto { // expected-error{{type 'ProtocolAdopterBad2' does not conform to protocol 'FooProto'}}
   let bar: CInt = 0 // expected-note{{candidate is not settable, but protocol requires it}}

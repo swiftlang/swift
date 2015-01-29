@@ -74,14 +74,14 @@ func objc_protocol_composition(x: protocol<NSRuncing, NSFunging>) {
 
 class Foo : NSRuncing, NSFunging, Ansible {
   // -- NSRuncing
-  func runce() -> NSObject { return NSObject() }
-  func copyRuncing() -> NSObject { return NSObject() }
+  @objc func runce() -> NSObject { return NSObject() }
+  @objc func copyRuncing() -> NSObject { return NSObject() }
 
   // -- NSFunging
-  func funge() {}
+  @objc func funge() {}
 
   // -- Both NSRuncing and NSFunging
-  func foo() {}
+  @objc func foo() {}
 
   // -- Ansible
   func anse() {}
@@ -96,9 +96,9 @@ class Foo : NSRuncing, NSFunging, Ansible {
 class Bar { }
 
 extension Bar : NSRuncing {
-  func runce() -> NSObject { return NSObject() }
-  func copyRuncing() -> NSObject { return NSObject() }
-  func foo() {}
+  @objc func runce() -> NSObject { return NSObject() }
+  @objc func copyRuncing() -> NSObject { return NSObject() }
+  @objc func foo() {}
 }
 
 // CHECK-LABEL: sil hidden  @_TToFC14objc_protocols3Bar5runcefS0_FT_CSo8NSObject
@@ -108,8 +108,8 @@ extension Bar : NSRuncing {
 // class Bas from objc_protocols_Bas module
 extension Bas : NSRuncing {
   // runce() implementation from the original definition of Bas
-  func copyRuncing() -> NSObject { return NSObject() }
-  func foo() {}
+  @objc func copyRuncing() -> NSObject { return NSObject() }
+  @objc func foo() {}
 }
 
 // CHECK-LABEL: sil hidden  @_TToFE14objc_protocolsC18objc_protocols_Bas3Bas11copyRuncingfS1_FT_CSo8NSObject
@@ -120,8 +120,8 @@ extension Bas : NSRuncing {
 protocol Fungible : NSFunging { }
 
 class Zim : Fungible {
-  func funge() {}
-  func foo() {}
+  @objc func funge() {}
+  @objc func foo() {}
 }
 
 // CHECK-LABEL: sil hidden  @_TToFC14objc_protocols3Zim5fungefS0_FT_T_
@@ -130,7 +130,7 @@ class Zim : Fungible {
 // class Zang from objc_protocols_Bas module
 extension Zang : Fungible {
   // funge() implementation from the original definition of Zim
-  func foo() {}
+  @objc func foo() {}
 }
 
 // CHECK-LABEL: sil hidden  @_TToFE14objc_protocolsC18objc_protocols_Bas4Zang3foofS1_FT_T_
@@ -143,14 +143,14 @@ extension Zang : Fungible {
 }
 
 class StoredPropertyCount {
-  let count = 0
+  @objc let count = 0
 }
 
 extension StoredPropertyCount: NSCounting {}
 // CHECK-LABEL: sil hidden [transparent] @_TToFC14objc_protocols19StoredPropertyCountg5countSi
 
 class ComputedPropertyCount {
-  var count: Int { return 0 }
+  @objc var count: Int { return 0 }
 }
 
 extension ComputedPropertyCount: NSCounting {}
@@ -195,7 +195,7 @@ func testInitializableExistential(im: Initializable.Type, i: Int) -> Initializab
 }
 
 class InitializableConformer: Initializable {
-  required init(int: Int) {}
+  @objc required init(int: Int) {}
 }
 // CHECK-LABEL: sil hidden @_TToFC14objc_protocols22InitializableConformercfMS0_FT3intSi_S0_
 
@@ -204,7 +204,7 @@ final class InitializableConformerByExtension {
 }
 
 extension InitializableConformerByExtension: Initializable {
-  convenience init(int: Int) {
+  @objc convenience init(int: Int) {
     self.init()
   }
 }

@@ -4,7 +4,7 @@ import Foundation
 
 class NotCopyable {}
 class CopyableClass : NSCopying {
-  func copyWithZone(zone: NSZone) -> AnyObject { return self }
+  @objc func copyWithZone(zone: NSZone) -> AnyObject { return self }
 }
 
 @NSCopying  // expected-error {{'NSCopying' may only be used on 'var' declarations}}}}

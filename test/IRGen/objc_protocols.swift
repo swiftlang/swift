@@ -19,9 +19,9 @@ protocol Ansible {
 }
 
 class Foo : NSRuncing, NSFunging, Ansible {
-  func runce() {}
-  func funge() {}
-  func foo() {}
+  @objc func runce() {}
+  @objc func funge() {}
+  @objc func foo() {}
   func anse() {}
 }
 // CHECK: @_INSTANCE_METHODS__TtC14objc_protocols3Foo = private constant { i32, i32, [3 x { i8*, i8*, i8* }] } {
@@ -41,9 +41,9 @@ class Bar {
 // CHECK-NOT: @_INSTANCE_METHODS_Bar
 
 extension Bar : NSRuncing, NSFunging {
-  func runce() {}
-  func funge() {}
-  func foo() {}
+  @objc func runce() {}
+  @objc func funge() {}
+  @objc func foo() {}
 
   func notObjC() {}
 }
@@ -61,7 +61,7 @@ extension Bar : NSRuncing, NSFunging {
 // class Bas from objc_protocols_Bas module
 extension Bas : NSRuncing {
   // -- The runce() implementation comes from the original definition.
-  public
+  @objc public
   func foo() {}
 }
 
@@ -78,9 +78,9 @@ protocol Frungible : NSRuncing, NSFunging {
 }
 
 class Zim : Frungible {
-  func runce() {}
-  func funge() {}
-  func foo() {}
+  @objc func runce() {}
+  @objc func funge() {}
+  @objc func foo() {}
 
   func frunge() {}
 }
@@ -96,10 +96,10 @@ class Zim : Frungible {
 
 // class Zang from objc_protocols_Bas module
 extension Zang : Frungible {
-  public
+  @objc public
   func runce() {}
   // funge() implementation from original definition of Zang
-  public
+  @objc public
   func foo() {}
 
   func frunge() {}

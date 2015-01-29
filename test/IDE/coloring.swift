@@ -218,8 +218,8 @@ class Observers {
 
 // CHECK: <kw>func</kw> test3(o: <type>AnyObject</type>) {
 func test3(o: AnyObject) {
-  // CHECK: <kw>let</kw> x = o <kw>as</kw> <type>MyCls</type>
-  let x = o as MyCls
+  // CHECK: <kw>let</kw> x = o <kw>as</kw>! <type>MyCls</type>
+  let x = o as! MyCls
 }
 
 // CHECK: <kw>func</kw> test4(<kw>inout</kw> a: <type>Int</type>) {}

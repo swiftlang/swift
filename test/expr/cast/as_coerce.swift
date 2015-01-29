@@ -6,7 +6,7 @@
 }
 
 class A : P1 { 
-  func foo() { }
+  @objc func foo() { }
 }
 @objc class B : A { 
   func bar() { }

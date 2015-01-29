@@ -9,7 +9,7 @@
 }
 
 class Foo : Proto {
-  func good() {}
+  @objc func good() {}
 }
 
 // Reject protocols with 'unavailable' requirements

@@ -1,10 +1,11 @@
 // Used by the objc_protocols test to test extensions that add conformances
 // using existing methods on a class.
+import Foundation
 
 public class Bas {
-  public func runce() {}
+  @objc public func runce() {}
 }
 
 public class Zang {
-  public func funge() {}
+  @objc public func funge() {}
 }

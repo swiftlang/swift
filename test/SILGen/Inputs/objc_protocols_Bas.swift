@@ -4,9 +4,9 @@
 import gizmo
 
 public class Bas {
-  public func runce() -> NSObject { return NSObject() }
+  @objc public func runce() -> NSObject { return NSObject() }
 }
 
 public class Zang {
-  public func funge() {}
+  @objc public func funge() {}
 }

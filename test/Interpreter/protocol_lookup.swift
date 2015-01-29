@@ -118,7 +118,7 @@ extension C: Runcible {
 }
 
 extension D: Fungible {
-  func funge() { println("D") }
+  @objc func funge() { println("D") }
 }
 
 let c1: AnyObject = C()

@@ -227,8 +227,8 @@ class Observers {
 class C9 {}
 // CHECK: func <Func>test6</Func>(<Param>o</Param>: <iProtocol@>AnyObject</iProtocol>) {
 func test6(o: AnyObject) {
-  // CHECK: let <Var>x</Var> = <Param@[[@LINE-1]]:12>o</Param> as <Class@[[@LINE-3]]:7>C9</Class>
-  let x = o as C9
+  // CHECK: let <Var>x</Var> = <Param@[[@LINE-1]]:12>o</Param> as! <Class@[[@LINE-3]]:7>C9</Class>
+  let x = o as! C9
 }
 
 // CHECK: enum <Enum>myCoolEnum</Enum> {

@@ -14,9 +14,9 @@
 }
 
 public class ProtoConformer : ForwardClassUser {
-  public func consumeForwardClass(arg: ForwardClass) {}
+  @objc public func consumeForwardClass(arg: ForwardClass) {}
 
-  public var forward = ForwardClass()
+  @objc public var forward = ForwardClass()
   public init() {}
 }
 

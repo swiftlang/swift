@@ -3028,35 +3028,6 @@ public:
     TC.checkDeclAttributes(SD);
   }
 
-  void checkObjCConformance(ProtocolDecl *protocol,
-                            ProtocolConformance *conformance) {
-    // FIXME: Put the invalid-conformance check below?
-    if (!conformance || conformance->isInvalid())
-      return;
-    if (protocol->isObjC()) {
-      conformance->forEachValueWitness(&TC,
-                                       [&](ValueDecl *req,
-                                           ConcreteDeclRef witness) {
-        if (req->isObjC() && witness)
-          markAsObjC(TC, witness.getDecl(), true);
-      });
-    }
-
-    for (auto &inherited : conformance->getInheritedConformances())
-      checkObjCConformance(inherited.first, inherited.second);
-  }
-
-  /// Mark class members needed to conform to ObjC protocols as requiring ObjC
-  /// interop.
-  void checkObjCConformances(ArrayRef<ProtocolDecl*> protocols,
-                             ArrayRef<ProtocolConformance*> conformances) {
-    assert(protocols.size() == conformances.size() &&
-           "protocol conformance mismatch");
-
-    for (unsigned i = 0, size = protocols.size(); i < size; ++i)
-      checkObjCConformance(protocols[i], conformances[i]);
-  }
-
   /// Check whether the given propertes can be @NSManaged in this class.
   static bool propertiesCanBeNSManaged(ClassDecl *classDecl,
                                        ArrayRef<VarDecl *> vars) {
@@ -3388,7 +3359,6 @@ public:
     }
     if (!(IsFirstPass || CD->isInvalid())) {
       checkExplicitConformance(CD, CD->getDeclaredTypeInContext());
-      checkObjCConformances(CD->getProtocols(), CD->getConformances());
     }
 
     TC.checkDeclAttributes(CD);
@@ -5086,7 +5056,6 @@ public:
     if (!IsFirstPass) {
       computeDefaultAccessibility(TC, ED);
       checkExplicitConformance(ED, ED->getExtendedType());
-      checkObjCConformances(ED->getProtocols(), ED->getConformances());
     }
     TC.checkDeclAttributes(ED);
  }

@@ -27,9 +27,9 @@ func testCFunction() {
 }
 
 class ProtoConformer : ForwardClassUser {
-  func consumeForwardClass(arg: ForwardClass) {}
+  @objc func consumeForwardClass(arg: ForwardClass) {}
 
-  var forward = ForwardClass()
+  @objc var forward = ForwardClass()
 }
 
 func testProtocolWrapper(conformer: ForwardClassUser) {
