@@ -302,5 +302,5 @@ TEST(WeakTest, objc_weak_release_after_strong_release) {
   ASSERT_EQ(1U, DestroyedObjCCount);
   
   swift_unknownWeakRelease(o);
-  // strong 1, unowned 0
+  // strong 0, unowned 0
 }
