@@ -5,7 +5,9 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     Metadata.cpp
     Enum.cpp
     Refcounting.cpp
+    weak.mm
     )
+  target_link_libraries(SwiftRuntimeTests swiftStdlibUnittest${SWIFT_PRIMARY_VARIANT_SUFFIX})
 
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     find_library(FOUNDATION_LIBRARY Foundation)

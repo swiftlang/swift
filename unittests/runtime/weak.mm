@@ -34,11 +34,9 @@ static HeapObject *make_objc_object() {
   return (HeapObject*) [ObjCClass new];
 }
 
-// Make a Native Swift object by calling a constructor.
-extern "C" HeapObject *_TFCSs6ObjectCfMS_FT_S_(void *unused);
-static HeapObject *make_swift_object() {
-  return _TFCSs6ObjectCfMS_FT_S_(0);
-}
+// Make a Native Swift object by calling a Swift function.
+// make_swift_object is defined in TestHelpers.swift as part of StdlibUnittest.
+extern "C" HeapObject *make_swift_object();
 
 static void unknown_release(void *value) {
   objc_release((id) value);

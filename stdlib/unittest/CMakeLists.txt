@@ -14,6 +14,7 @@ add_swift_library(swiftStdlibUnittest SHARED IS_STDLIB
   Statistics.swift
   StdlibCoreExtras.swift
   SwiftBlockToCFunctionThunks.cpp
+  TestHelpers.swift
   LifetimeTracked.swift
 
   # Can not serialize StdlibUnittest because of:
