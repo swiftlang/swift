@@ -603,7 +603,7 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
     }
     
     if (B.hasValidInsertionPoint()) {
-      // Accosiate the loop body's closing brace with this branch.
+      // Associate the loop body's closing brace with this branch.
       RegularLocation L(S->getBody());
       L.pointToEnd();
       B.createBranch(L, LoopBB);
@@ -688,8 +688,9 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
       Scope InnerForScope(Cleanups, CleanupLocation(S->getBody()));
       InitializationPtr initLoopVars
         = emitPatternBindingInitialization(S->getPattern());
+      auto managedNext = emitManagedBufferWithCleanup(nextBuf);
       ManagedValue val = emitUncheckedGetOptionalValueFrom(S,
-                               ManagedValue::forUnmanaged(nextBuf),
+                               managedNext,
                                optTL,
                                SGFContext(initLoopVars.get()));
       if (!val.isInContext())
