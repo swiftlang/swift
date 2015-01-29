@@ -2260,6 +2260,17 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D, bool isObjC) {
           = D->getDeclContext()->isClassOrClassExtensionContext()) {
       if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
         classDecl->recordObjCMethod(method);
+
+        // Swift does not permit class methods named "load".
+        if (!method->isInstanceMember()) {
+          auto selector = method->getObjCSelector();
+          if (selector.getNumArgs() == 0 &&
+              selector.getSelectorPieces()[0] == TC.Context.Id_load) {
+            auto diagInfo = getObjCMethodDiagInfo(method);
+            TC.diagnose(method, diag::objc_class_method_load,
+                        diagInfo.first, diagInfo.second);
+          }
+        }
       }
     }
 

@@ -711,6 +711,12 @@ private:
   void setSubstitutions(BoundGenericType *Bound,
                         ArrayRef<Substitution> Subs) const;
 };
+
+/// Retrieve information about the given Objective-C method for
+/// diagnostic purposes, to be used with OBJC_DIAG_SELECT in
+/// DiagnosticsSema.def.
+std::pair<unsigned, DeclName> getObjCMethodDiagInfo(
+                                AbstractFunctionDecl *method);
   
 } // end namespace swift
 

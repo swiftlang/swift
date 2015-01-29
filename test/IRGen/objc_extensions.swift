@@ -44,7 +44,7 @@ extension Gizmo: NewProtocol {
   }
 
   // Overrides a class method of NSObject
-  public override class func load() {
+  public override class func initialize() {
   }
 
   // Shadows an original instance method of Gizmo

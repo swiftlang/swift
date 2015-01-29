@@ -1793,23 +1793,28 @@ ERROR(missing_bridging_function,sema_objc,Fatal,
       "missing '%select{_forceBridgeFromObjectiveC|"
       "_conditionallyBridgeFromObjectiveC}0'", (bool))
 
-#define OBJC_REDECL_SELECT "%select{initializer %1|implicit initializer %1|deinitializer|implicit deinitializer|method %1|getter for %1|subscript getter|setter for %1|subscript setter}0"
+#define OBJC_DIAG_SELECT "%select{initializer %1|implicit initializer %1|deinitializer|implicit deinitializer|method %1|getter for %1|subscript getter|setter for %1|subscript setter}0"
 
 ERROR(objc_redecl,sema_objc,none,
-      OBJC_REDECL_SELECT " redeclares Objective-C method %2",
+      OBJC_DIAG_SELECT " redeclares Objective-C method %2",
       (unsigned, DeclName, ObjCSelector))
 NOTE(objc_redecl_prev,sema_nb,none,
-     "Objective-C method %2 previously declared by " OBJC_REDECL_SELECT " here",
+     "Objective-C method %2 previously declared by " OBJC_DIAG_SELECT " here",
      (unsigned, DeclName, ObjCSelector))
 
 ERROR(objc_override_other,sema_objc,none,
-      OBJC_REDECL_SELECT " overrides Objective-C method %2 from superclass %3",
+      OBJC_DIAG_SELECT " overrides Objective-C method %2 from superclass %3",
       (unsigned, DeclName, ObjCSelector, Type))
 NOTE(objc_override_other_here,sema_objc,none,
-     "Objective-C method %2 defined by " OBJC_REDECL_SELECT " here",
+     "Objective-C method %2 defined by " OBJC_DIAG_SELECT " here",
       (unsigned, DeclName, ObjCSelector))
 
-#undef OBJC_REDECL_SELECT
+ERROR(objc_class_method_load,sema_objc,none,
+      OBJC_DIAG_SELECT " defines Objective-C class method 'load', which is "
+      "not permitted by Swift", (unsigned, DeclName))
+
+#undef OBJC_DIAG_SELECT
+
 
 //------------------------------------------------------------------------------
 // dynamic

@@ -1726,3 +1726,24 @@ typealias BadBlock = @objc_block NotObjCEnum -> () // expected-error{{@objc_bloc
   // CHECK: @objc private func baz
   @objc private func baz() {}
 }
+
+//===--- Ban @objc +load methods
+class Load1 {
+  // Okay: not @objc
+  class func load() { }
+}
+
+@objc class Load2 {
+  class func load() { } // expected-error{{method 'load()' defines Objective-C class method 'load', which is not permitted by Swift}}
+}
+
+@objc class Load3 {
+  class var load: Load3 {
+    get { return Load3() } // expected-error{{getter for 'load' defines Objective-C class method 'load', which is not permitted by Swift}}
+    set { }
+  }
+}
+
+
+
+

@@ -1468,8 +1468,8 @@ namespace {
 }
 
 /// Compute the information used to describe an Objective-C redeclaration.
-static std::pair<unsigned, DeclName> getObjCRedeclInfo(
-                                       AbstractFunctionDecl *member) {
+std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
+                                AbstractFunctionDecl *member) {
   if (isa<ConstructorDecl>(member))
     return { 0 + member->isImplicit(), member->getFullName() };
 
@@ -1612,17 +1612,17 @@ bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
     }
 
     // Diagnose the override.
-    auto methodRedeclInfo = getObjCRedeclInfo(method);
-    auto overriddenRedeclInfo = getObjCRedeclInfo(overriddenMethod);
+    auto methodDiagInfo = getObjCMethodDiagInfo(method);
+    auto overriddenDiagInfo = getObjCMethodDiagInfo(overriddenMethod);
     Diags.diagnose(method->getLoc(), diag::objc_override_other,
-                   methodRedeclInfo.first,
-                   methodRedeclInfo.second,
+                   methodDiagInfo.first,
+                   methodDiagInfo.second,
                    selector,
                    overriddenMethod->getDeclContext()
                      ->getDeclaredInterfaceType());
     Diags.diagnose(overriddenMethod->getLoc(), diag::objc_override_other_here,
-                   overriddenRedeclInfo.first,
-                   overriddenRedeclInfo.second,
+                   overriddenDiagInfo.first,
+                   overriddenDiagInfo.second,
                    selector);
 
     diagnosedAny = true;
@@ -1803,16 +1803,16 @@ bool ASTContext::diagnoseObjCMethodConflicts(SourceFile &sf) {
     auto originalMethod = methods.front();
     auto conflictingMethods = methods.slice(1);
 
-    auto origRedeclInfo = getObjCRedeclInfo(originalMethod);
+    auto origDiagInfo = getObjCMethodDiagInfo(originalMethod);
     for (auto conflictingDecl : conflictingMethods) {
-      auto redeclInfo = getObjCRedeclInfo(conflictingDecl);
+      auto diagInfo = getObjCMethodDiagInfo(conflictingDecl);
       Diags.diagnose(conflictingDecl->getLoc(), diag::objc_redecl,
-                     redeclInfo.first,
-                     redeclInfo.second,
+                     diagInfo.first,
+                     diagInfo.second,
                      selector);
       Diags.diagnose(originalMethod->getLoc(), diag::objc_redecl_prev,
-                     origRedeclInfo.first,
-                     origRedeclInfo.second,
+                     origDiagInfo.first,
+                     origDiagInfo.second,
                      selector);
     }
   }
