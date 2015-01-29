@@ -605,10 +605,10 @@ ERROR(pattern_binds_no_variables,sema_tcd,none,
 // Generic types
 ERROR(unsupported_generic_nested_in_type,sema_tcd,none,
       "generic type %0 nested in type %1 is not allowed",
-      (Identifier, Identifier))
+      (Identifier, Type))
 ERROR(unsupported_type_nested_in_generic_type,sema_tcd,none,
       "type %0 nested in generic type %1 is not allowed",
-      (Identifier, Identifier))
+      (Identifier, Type))
 ERROR(unsupported_generic_extension,sema_tcd,none,
       "extension of generic type %0 from a different module cannot provide "
       "public declarations", (Type))

@@ -2788,12 +2788,12 @@ public:
         if (NTD->getGenericParams())
           TC.diagnose(NTD->getLoc(), diag::unsupported_generic_nested_in_type,
                 NTD->getName(),
-                cast<NominalTypeDecl>(DC)->getName());
+                DC->getDeclaredTypeOfContext());
         else
           TC.diagnose(NTD->getLoc(),
                       diag::unsupported_type_nested_in_generic_type,
                       NTD->getName(),
-                      cast<NominalTypeDecl>(DC)->getName());
+                      DC->getDeclaredTypeOfContext());
         return true;
       } else if (DC->isLocalContext()) {
         // A local generic context is a generic function.

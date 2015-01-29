@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Without assertions, this test fails nondeterministically.
 // REQUIRES: asserts

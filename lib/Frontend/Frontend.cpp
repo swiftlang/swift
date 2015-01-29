@@ -355,10 +355,12 @@ void CompilerInstance::performSema() {
       setPrimarySourceFile(NextInput);
 
     bool Done;
-    parseIntoSourceFile(*NextInput, BufferID, &Done, nullptr,
-                        &PersistentState, DelayedCB.get());
-    assert(Done && "Parser returned early?");
-    (void) Done;
+    do {
+      // Parser may stop at some erroneous constructions like #else, #endif
+      // or '}' in some cases, continue parsing until we are done
+      parseIntoSourceFile(*NextInput, BufferID, &Done, nullptr,
+                          &PersistentState, DelayedCB.get());
+    } while (!Done);
 
     performNameBinding(*NextInput);
   }
