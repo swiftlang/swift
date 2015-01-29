@@ -312,7 +312,22 @@ static SILInstruction *constantFoldBinary(BuiltinInst *BI,
       return nullptr;
     APInt LHSI = LHS->getValue();
     APInt RHSI = RHS->getValue();
-    APInt ResI = constantFoldBitOperation(LHS->getValue(), RHS->getValue(), ID);
+
+    bool IsShift = ID == BuiltinValueKind::AShr ||
+                   ID == BuiltinValueKind::LShr ||
+                   ID == BuiltinValueKind::Shl;
+
+    // Reject shifting all significant bits
+    if (IsShift && RHSI.getZExtValue() >= LHSI.getBitWidth()) {
+      diagnose(BI->getModule().getASTContext(),
+               RHS->getLoc().getSourceLoc(),
+               diag::shifting_all_significant_bits);
+
+      ResultsInError = Optional<bool>(true);
+      return nullptr;
+    }
+
+    APInt ResI = constantFoldBitOperation(LHSI, RHSI, ID);
     // Add the literal instruction to represent the result.
     SILBuilderWithScope<1> B(BI);
     return B.createIntegerLiteral(BI->getLoc(), BI->getType(), ResI);

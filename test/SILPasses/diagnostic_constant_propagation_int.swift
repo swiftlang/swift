@@ -109,11 +109,11 @@ func testArithmeticOverflow_Int_32bit() {
     var t7: Int = (-1) >> 0
     var t8: Int = (-1) >> 1
 
-    var t9: Int = 0x7fff_ffff >> 31
+    var t9: Int = 0x7fff_ffff >> 31 // OK
     var t10: Int = 0x7fff_ffff >> 32
+    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
     var t11: Int = 0x7fff_ffff >> 33
-    // FIXME: Missing diagnostic:
-    // <rdar://problem/19622546> Shifting all significant bits is not rejected at compile-time
+    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
   }
 
   if true {
@@ -135,11 +135,11 @@ func testArithmeticOverflow_Int_32bit() {
     var t7: Int = (-1) << 0
     var t8: Int = (-1) << 1
 
-    var t9: Int = 0x7fff_ffff << 31
+    var t9: Int = 0x7fff_ffff << 31 // OK
     var t10: Int = 0x7fff_ffff << 32
+    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
     var t11: Int = 0x7fff_ffff << 33
-    // FIXME: Missing diagnostic:
-    // <rdar://problem/19622546> Shifting all significant bits is not rejected at compile-time
+    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
   }
 }
 
@@ -239,11 +239,11 @@ func testArithmeticOverflow_UInt_32bit() {
     var t5: UInt = (-1) >> 0
     var t6: UInt = (-1) >> 1
 
-    var t7: UInt = 0x7fff_ffff >> 31
+    var t7: UInt = 0x7fff_ffff >> 31 // OK
     var t8: UInt = 0x7fff_ffff >> 32
+    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
     var t9: UInt = 0x7fff_ffff >> 33
-    // FIXME: Missing diagnostic:
-    // <rdar://problem/19622546> Shifting all significant bits is not rejected at compile-time
+    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
   }
 
   if true {
@@ -257,11 +257,11 @@ func testArithmeticOverflow_UInt_32bit() {
     var t5: UInt = (-1) << 0
     var t6: UInt = (-1) << 1
 
-    var t7: UInt = 0x7fff_ffff << 31
+    var t7: UInt = 0x7fff_ffff << 31 // OK
     var t8: UInt = 0x7fff_ffff << 32
+    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
     var t9: UInt = 0x7fff_ffff << 33
-    // FIXME: Missing diagnostic:
-    // <rdar://problem/19622546> Shifting all significant bits is not rejected at compile-time
+    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
   }
 }
 
@@ -367,11 +367,11 @@ func testArithmeticOverflow_Int_64bit() {
     var t7: Int = (-1) >> 0
     var t8: Int = (-1) >> 1
 
-    var t9: Int = 0x7fff_ffff_ffff_ffff >> 31
-    var t10: Int = 0x7fff_ffff_ffff_ffff >> 32
-    var t11: Int = 0x7fff_ffff_ffff_ffff >> 33
-    // FIXME: Missing diagnostic:
-    // <rdar://problem/19622546> Shifting all significant bits is not rejected at compile-time
+    var t9: Int = 0x7fff_ffff_ffff_ffff >> 63
+    var t10: Int = 0x7fff_ffff_ffff_ffff >> 64
+    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
+    var t11: Int = 0x7fff_ffff_ffff_ffff >> 65
+    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
   }
 
   if true {
@@ -393,11 +393,11 @@ func testArithmeticOverflow_Int_64bit() {
     var t7: Int = (-1) << 0
     var t8: Int = (-1) << 1
 
-    var t9: Int = 0x7fff_ffff_ffff_ffff << 31
-    var t10: Int = 0x7fff_ffff_ffff_ffff << 32
-    var t11: Int = 0x7fff_ffff_ffff_ffff << 33
-    // FIXME: Missing diagnostic:
-    // <rdar://problem/19622546> Shifting all significant bits is not rejected at compile-time
+    var t9: Int = 0x7fff_ffff_ffff_ffff << 63
+    var t10: Int = 0x7fff_ffff_ffff_ffff << 64
+    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
+    var t11: Int = 0x7fff_ffff_ffff_ffff << 65
+    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
   }
 }
 
@@ -497,11 +497,11 @@ func testArithmeticOverflow_UInt_64bit() {
     var t5: UInt = (-1) >> 0
     var t6: UInt = (-1) >> 1
 
-    var t7: UInt = 0x7fff_ffff_ffff_ffff >> 31
-    var t8: UInt = 0x7fff_ffff_ffff_ffff >> 32
-    var t9: UInt = 0x7fff_ffff_ffff_ffff >> 33
-    // FIXME: Missing diagnostic:
-    // <rdar://problem/19622546> Shifting all significant bits is not rejected at compile-time
+    var t7: UInt = 0x7fff_ffff_ffff_ffff >> 63 // OK
+    var t8: UInt = 0x7fff_ffff_ffff_ffff >> 64
+    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
+    var t9: UInt = 0x7fff_ffff_ffff_ffff >> 65
+    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
   }
 
   if true {
@@ -515,11 +515,11 @@ func testArithmeticOverflow_UInt_64bit() {
     var t5: UInt = (-1) << 0
     var t6: UInt = (-1) << 1
 
-    var t7: UInt = 0x7fff_ffff_ffff_ffff << 31
-    var t8: UInt = 0x7fff_ffff_ffff_ffff << 32
-    var t9: UInt = 0x7fff_ffff_ffff_ffff << 33
-    // FIXME: Missing diagnostic:
-    // <rdar://problem/19622546> Shifting all significant bits is not rejected at compile-time
+    var t7: UInt = 0x7fff_ffff_ffff_ffff << 63 // OK
+    var t8: UInt = 0x7fff_ffff_ffff_ffff << 64
+    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
+    var t9: UInt = 0x7fff_ffff_ffff_ffff << 65
+    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
   }
 }
 
