@@ -143,6 +143,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
     // always have to run the job, but it doesn't affect any other jobs. If
     // there should be one but it's not present or can't be loaded, we have to
     // run all the jobs.
+    // FIXME: We can probably do better here!
     Job::Condition Condition = Job::Condition::Always;
     StringRef DependenciesFile =
       Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
@@ -369,8 +370,10 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
       if (!State.ScheduledCommands.count(Cmd))
         continue;
 
-
-      State.UnfinishedCommands.insert({Cmd, DepGraph.isMarked(Cmd)});
+      bool isCascading = true;
+      if (getIncrementalBuildEnabled())
+        isCascading = DepGraph.isMarked(Cmd);
+      State.UnfinishedCommands.insert({Cmd, isCascading});
     }
   }
 
