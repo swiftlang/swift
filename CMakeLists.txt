@@ -44,7 +44,7 @@ option(SWIFT_INCLUDE_DOCS
     "Create targets for building docs."
     TRUE)
 
-set(SWIFT_VERSION "1.1" CACHE STRING
+set(SWIFT_VERSION "1.2" CACHE STRING
     "User-visible version of the Swift compiler")
 
 set(_SWIFT_KNOWN_INSTALL_COMPONENTS
