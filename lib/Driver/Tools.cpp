@@ -213,7 +213,9 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     FrontendModeOption = "-repl";
     break;
   case OutputInfo::Mode::UpdateCode:
-    FrontendModeOption = "-parse";
+    // Make sure that adding '-update-code' will permit accepting all arguments
+    // '-c' accepts.
+    FrontendModeOption = "-c";
     break;
   }
 
