@@ -225,7 +225,7 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.subscript(_: Int)")
     // Test setter.
     let audioBuffer = AudioBuffer(
       mNumberChannels: 5, mDataByteSize: 256,
-      mData: UnsafeMutablePointer<Void>(bitPattern: 0x8765_4321))
+      mData: UnsafeMutablePointer<Void>(bitPattern: 0x8765_4321 as UInt))
 
     ablPtrWrapper.count = 2
     ablPtrWrapper[1] = audioBuffer
