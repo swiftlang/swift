@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -emit-module %S/Inputs/local_types_helper.swift -o %t
 // RUN: %target-swift-frontend -emit-ir -parse-as-library %s -I %t | FileCheck %s
 
-//import local_types_helper
+import local_types_helper
 
 // CHECK-DAG: @_TMdVF18local_types_helper4testFT_T_L_1S = external hidden global %swift.full_type
 
@@ -14,7 +14,7 @@ public func singleFunc() {
 }
 
 public let singleClosure: () -> () = {
-  // CHECK-DAG: VF11local_typesU_FT_T_L_19SingleClosureStruct
+  // CHECK-DAG: @_TWVVFIv11local_types13singleClosureFT_T_iU_FT_T_L_19SingleClosureStruct = hidden constant
   struct SingleClosureStruct {
     let i: Int
   }
@@ -43,7 +43,7 @@ public func singleDefaultArgument(i: Int = {
 
 
 // CHECK-LABEL: define void @_TF11local_types8callTestFT_T_() {
-//public func callTest() {
-//  // CHECK: call %swift.type* @_TMaMVF18local_types_helper4testFT_T_L_1S()
-//  test()
-//} // CHECK: {{^[}]$}}
+public func callTest() {
+  // CHECK: call %swift.type* @_TMaMVF18local_types_helper4testFT_T_L_1S()
+  test()
+} // CHECK: {{^[}]$}}
