@@ -353,14 +353,6 @@ public func _setTestSuiteFailedCallback(callback: () -> ()) {
   _testSuiteFailedCallback = callback
 }
 
-var _runTestsInProcess: Bool {
-  return contains(Process.arguments, "--stdlib-unittest-in-process")
-}
-
-var _isChildProcess: Bool {
-  return contains(Process.arguments, "--stdlib-unittest-run-child")
-}
-
 func _stdlib_getline() -> String? {
   var result = _UnitTestArray<UInt8>()
   while true {
@@ -432,9 +424,10 @@ struct _FDInputStream {
   }
 }
 
-func _printDebuggingAdvice() {
+func _printDebuggingAdvice(fullTestName: String) {
   println("To debug, run:")
-  println("$ \(Process.arguments[0]) --stdlib-unittest-in-process")
+  println("$ \(Process.arguments[0]) " +
+    "--stdlib-unittest-in-process --stdlib-unittest-filter \"\(fullTestName)\"")
 }
 
 var _allTestSuites: _UnitTestArray<TestSuite> = []
@@ -468,6 +461,14 @@ struct _ParentProcess {
   var _childStdinFD: CInt = -1
   var _childStdoutFD: CInt = -1
   var _childStderrFD: CInt = -1
+
+  internal var _runTestsInProcess: Bool
+  internal var _filter: String?
+
+  init(runTestsInProcess: Bool, filter: String?) {
+    self._runTestsInProcess = runTestsInProcess
+    self._filter = filter
+  }
 
   mutating func _spawnChild() {
     (_pid, _childStdinFD, _childStdoutFD, _childStderrFD) =
@@ -605,12 +606,21 @@ struct _ParentProcess {
   }
 
   mutating func run() {
+    if let filter = _filter {
+      println("StdlibUnittest: using filter: \(filter)")
+    }
     for testSuite in _allTestSuites {
       var uxpassedTests = _UnitTestArray<String>()
       var failedTests = _UnitTestArray<String>()
       var skippedTests = _UnitTestArray<String>()
       for t in testSuite._tests {
         let fullTestName = "\(testSuite.name).\(t.name)"
+        if let filter = _filter {
+          if findSubstring(fullTestName, filter) == nil {
+            continue
+          }
+        }
+
         let activeSkips = t.getActiveSkipPredicates()
         if !activeSkips.isEmpty {
           skippedTests += [ t.name ]
@@ -702,7 +712,12 @@ struct _ParentProcess {
         println("UXPASS: \(uxpassedTests)")
         println("FAIL: \(failedTests)")
         println("SKIP: \(skippedTests)")
-        _printDebuggingAdvice()
+        if !uxpassedTests.isEmpty {
+          _printDebuggingAdvice(uxpassedTests[0])
+        }
+        if !failedTests.isEmpty {
+          _printDebuggingAdvice(failedTests[0])
+        }
         _testSuiteFailedCallback()
       } else {
         println("\(testSuite.name): All tests passed")
@@ -715,10 +730,45 @@ public func runAllTests() {
   autoreleasepool {
     _stdlib_initializeReturnAutoreleased()
   }
+
+  let _isChildProcess: Bool =
+    contains(Process.arguments, "--stdlib-unittest-run-child")
+
   if _isChildProcess {
     _childProcess()
   } else {
-    var parent = _ParentProcess()
+    var runTestsInProcess: Bool = false
+    var filter: String? = nil
+    for var i = 0; i < Process.arguments.count; {
+      let arg = Process.arguments[i]
+      if arg == "--stdlib-unittest-in-process" {
+        runTestsInProcess = true
+        ++i
+        continue
+      }
+      if arg == "--stdlib-unittest-filter" {
+        filter = Process.arguments[i + 1]
+        i += 2
+        continue
+      }
+      if arg == "--help" {
+        println(
+"optional arguments:\n" +
+"--stdlib-unittest-in-process\n" +
+"                        run tests in-process without intercepting crashes.\n" +
+"                        Useful for running under a debugger.\n" +
+"--stdlib-unittest-filter FILTER-STRING\n" +
+"                        only run tests whose names contain FILTER-STRING as\n" +
+"                        a substring.")
+        return
+      }
+
+      // FIXME: skipping unrecognized parameters.
+      ++i
+    }
+
+    var parent = _ParentProcess(
+      runTestsInProcess: runTestsInProcess, filter: filter)
     parent.run()
   }
 }
