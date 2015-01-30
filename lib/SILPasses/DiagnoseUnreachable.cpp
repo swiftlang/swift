@@ -527,7 +527,12 @@ static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
                                      SILModule &M,
                                      const SILBasicBlockSet &Reachable,
                                      UnreachableUserCodeReportingState *State,
-                                     const SILBasicBlock *TopLevelB = nullptr) {
+                                     const SILBasicBlock *TopLevelB,
+                                 llvm::DenseSet<const SILBasicBlock*> &Visited){
+  if (Visited.count(&B))
+    return false;
+  Visited.insert(&B);
+  
   assert(State);
   for (auto I = B.begin(), E = B.end(); I != E; ++I) {
     SILLocation Loc = I->getLoc();
@@ -605,7 +610,7 @@ static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
     // If all of the predecessors of this sucessor are unreachable, check if
     // it contains user code.
     if (!HasReachablePred && diagnoseUnreachableBlock(*SB, M, Reachable,
-                                                      State, TopLevelB))
+                                                    State, TopLevelB, Visited))
       return true;
   }
   
@@ -641,8 +646,10 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
     for (auto BI = State->PossiblyUnreachableBlocks.begin(),
               BE = State->PossiblyUnreachableBlocks.end(); BI != BE; ++BI) {
       const SILBasicBlock *BB = *BI;
-      if (!Reachable.count(BB))
-        diagnoseUnreachableBlock(**BI, M, Reachable, State, BB);
+      if (!Reachable.count(BB)) {
+        llvm::DenseSet<const SILBasicBlock *> visited;
+        diagnoseUnreachableBlock(**BI, M, Reachable, State, BB, visited);
+      }
     }
   }
 
