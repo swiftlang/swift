@@ -35,7 +35,7 @@ public:
 };
 } // end anonymous namespace
 
-void IRGenModule::emitLocalDecls(clang::Decl *decl) {
+void IRGenModule::emitClangDecl(clang::Decl *decl) {
   auto valueDecl = dyn_cast<clang::ValueDecl>(decl);
   if (!valueDecl || valueDecl->isExternallyVisible()) {
     ClangCodeGen->HandleTopLevelDecl(clang::DeclGroupRef(decl));

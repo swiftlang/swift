@@ -3202,19 +3202,3 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
                                                blockFields);
   IGF.Builder.CreateStore(blockHeader, headerAddr);
 }
-
-void IRGenModule::emitLocalDecls(BraceStmt *body) {
-}
-
-void IRGenModule::emitLocalDecls(FuncDecl *fd) {
-  if (auto *clangDecl = fd->getClangDecl())
-    emitLocalDecls(const_cast<clang::Decl *>(clangDecl));
-}
-
-void IRGenModule::emitLocalDecls(ConstructorDecl *cd) {
-  // Currenly does nothing.
-}
-
-void IRGenModule::emitLocalDecls(DestructorDecl *dd) {
-  // Currently does nothing.
-}

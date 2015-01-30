@@ -748,67 +748,7 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
 
   // Emit the class metadata.
   emitClassMetadata(*this, D, layout);
-  
-  // FIXME: This is mostly copy-paste from emitExtension;
-  // figure out how to refactor! 
-  for (Decl *member : D->getMembers()) {
-    switch (member->getKind()) {
-    case DeclKind::Import:
-    case DeclKind::TopLevelCode:
-    case DeclKind::Protocol:
-    case DeclKind::EnumElement:
-    case DeclKind::Extension:
-    case DeclKind::InfixOperator:
-    case DeclKind::PrefixOperator:
-    case DeclKind::PostfixOperator:
-    case DeclKind::EnumCase:
-    case DeclKind::Param:
-      llvm_unreachable("decl not allowed in class!");
-        
-    // We can have meaningful initializers for variables, but
-    // we can't handle them yet.  For the moment, just ignore them.
-    case DeclKind::PatternBinding:
-      continue;
-
-    case DeclKind::Subscript:
-      // Getter/setter will be handled separately.
-      continue;
-        
-    case DeclKind::IfConfig:
-      // Any active IfConfig block members are handled separately.
-      continue;
-
-    case DeclKind::TypeAlias:
-    case DeclKind::AssociatedType:
-    case DeclKind::GenericTypeParam:
-      continue;
-    case DeclKind::Enum:
-      emitEnumDecl(cast<EnumDecl>(member));
-      continue;
-    case DeclKind::Struct:
-      emitStructDecl(cast<StructDecl>(member));
-      continue;
-    case DeclKind::Class:
-      emitClassDecl(cast<ClassDecl>(member));
-      continue;
-    case DeclKind::Var:
-      if (!cast<VarDecl>(member)->hasStorage())
-        // Getter/setter will be handled separately.
-        continue;
-      // FIXME: Will need an implementation here for resilience
-      continue;
-    case DeclKind::Func:
-      emitLocalDecls(cast<FuncDecl>(member));
-      continue;
-    case DeclKind::Constructor:
-      emitLocalDecls(cast<ConstructorDecl>(member));
-      continue;
-    case DeclKind::Destructor:
-      emitLocalDecls(cast<DestructorDecl>(member));
-      continue;
-    }
-    llvm_unreachable("bad extension member kind");
-  }
+  emitNestedTypeDecls(D->getMembers());
 }
 
 namespace {

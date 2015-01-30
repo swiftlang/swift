@@ -747,70 +747,10 @@ llvm::Constant *irgen::emitPhysicalStructMemberFixedOffset(IRGenModule &IGM,
   FOR_STRUCT_IMPL(IGM, baseType, getConstantFieldOffset, field);
 }
 
-/// emitStructDecl - Emit all the declarations associated with this struct type.
 void IRGenModule::emitStructDecl(StructDecl *st) {
   emitStructMetadata(*this, st);
-
-  // FIXME: This is mostly copy-paste from emitExtension;
-  // figure out how to refactor! 
-  for (Decl *member : st->getMembers()) {
-    switch (member->getKind()) {
-    case DeclKind::Import:
-    case DeclKind::TopLevelCode:
-    case DeclKind::Protocol:
-    case DeclKind::Extension:
-    case DeclKind::Destructor:
-    case DeclKind::EnumCase:
-    case DeclKind::EnumElement:
-    case DeclKind::InfixOperator:
-    case DeclKind::PrefixOperator:
-    case DeclKind::PostfixOperator:
-    case DeclKind::Param:
-      llvm_unreachable("decl not allowed in struct!");
-
-    // We can have meaningful initializers for variables, but
-    // we can't handle them yet.  For the moment, just ignore them.
-    case DeclKind::PatternBinding:
-      continue;
-
-    // Active members of the IfConfig block are handled separately.
-    case DeclKind::IfConfig:
-      continue;
-
-    case DeclKind::Subscript:
-      // Getter/setter will be handled separately.
-      continue;
-    case DeclKind::TypeAlias:
-    case DeclKind::AssociatedType:
-    case DeclKind::GenericTypeParam:
-      continue;
-    case DeclKind::Enum:
-      emitEnumDecl(cast<EnumDecl>(member));
-      continue;
-    case DeclKind::Struct:
-      emitStructDecl(cast<StructDecl>(member));
-      continue;
-    case DeclKind::Class:
-      emitClassDecl(cast<ClassDecl>(member));
-      continue;
-    case DeclKind::Var:
-      if (!cast<VarDecl>(member)->hasStorage())
-        // Getter/setter will be handled separately.
-        continue;
-      // FIXME: Will need an implementation here for resilience
-      continue;
-    case DeclKind::Func:
-      emitLocalDecls(cast<FuncDecl>(member));
-      continue;
-    case DeclKind::Constructor:
-      emitLocalDecls(cast<ConstructorDecl>(member));
-      continue;
-    }
-    llvm_unreachable("bad extension member kind");
-  }
+  emitNestedTypeDecls(st->getMembers());
 }
-#include "llvm/Support/raw_ostream.h"
-
 
 
 const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,

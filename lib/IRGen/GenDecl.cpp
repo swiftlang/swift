@@ -1136,8 +1136,8 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
     return;
 
   case DeclKind::Func:
-    // Emit local definitions from the function body.
-    return emitLocalDecls(cast<FuncDecl>(D));
+    // Handled in SIL.
+    return;
 
   case DeclKind::TopLevelCode:
     // All the top-level code will be lowered separately.
@@ -1175,10 +1175,14 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
     llvm_unreachable("Not a valid external definition for IRgen");
 
   case DeclKind::Func:
-    return emitLocalDecls(cast<FuncDecl>(D));
+    if (auto *clangDecl = D->getClangDecl())
+      emitClangDecl(const_cast<clang::Decl *>(clangDecl));
+    break;
+
   case DeclKind::Constructor:
-    return emitLocalDecls(cast<ConstructorDecl>(D));
-    
+    // Do nothing.
+    break;
+
   // No need to eagerly emit Swift metadata for external types.
   case DeclKind::Struct:
   case DeclKind::Enum:
@@ -1769,42 +1773,42 @@ static bool protocolExtensionRequiresCategory(ProtocolDecl *protocol,
   return false;
 }
 
-/// Emit a type extension.
-void IRGenModule::emitExtension(ExtensionDecl *ext) {
-  ClassDecl *origClass = ext->getExtendedType()->getClassOrBoundGenericClass();
-
-  for (Decl *member : ext->getMembers()) {
+void IRGenModule::emitNestedTypeDecls(DeclRange members) {
+  for (Decl *member : members) {
     switch (member->getKind()) {
     case DeclKind::Import:
-    case DeclKind::EnumCase:
-    case DeclKind::EnumElement:
     case DeclKind::TopLevelCode:
     case DeclKind::Protocol:
     case DeclKind::Extension:
-    case DeclKind::Destructor:
     case DeclKind::InfixOperator:
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
     case DeclKind::Param:
-      llvm_unreachable("decl not allowed in extension!");
+      llvm_unreachable("decl not allowed in type context");
 
-    // PatternBindingDecls don't really make sense here, but we
-    // produce one as a side-effect of parsing a var property.
-    // Just ignore it.
-    case DeclKind::PatternBinding:
-      continue;
-    
-    // Active members of the IfConfig block are handled separately.
     case DeclKind::IfConfig:
       continue;
 
+    case DeclKind::PatternBinding:
+    case DeclKind::Var:
     case DeclKind::Subscript:
-      // Getter/setter will be handled separately.
+    case DeclKind::Func:
+    case DeclKind::Constructor:
+    case DeclKind::Destructor:
+    case DeclKind::EnumCase:
+    case DeclKind::EnumElement:
+      // Skip non-type members.
       continue;
-    case DeclKind::TypeAlias:
-    case DeclKind::GenericTypeParam:
+
     case DeclKind::AssociatedType:
+    case DeclKind::GenericTypeParam:
+      // Do nothing.
       continue;
+
+    case DeclKind::TypeAlias:
+      // Do nothing.
+      continue;
+
     case DeclKind::Enum:
       emitEnumDecl(cast<EnumDecl>(member));
       continue;
@@ -1814,30 +1818,20 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     case DeclKind::Class:
       emitClassDecl(cast<ClassDecl>(member));
       continue;
-    case DeclKind::Var: {
-      auto var = cast<VarDecl>(member);
-      if (!var->hasStorage())
-        // Getter/setter will be handled separately.
-        continue;
-      if (var->isStatic() && !origClass)
-        continue;
-      llvm_unreachable("decl not allowed in extension!");
     }
-    case DeclKind::Func:
-      emitLocalDecls(cast<FuncDecl>(member));
-      continue;
-    case DeclKind::Constructor:
-      emitLocalDecls(cast<ConstructorDecl>(member));
-      continue;
-    }
-    llvm_unreachable("bad extension member kind");
   }
-  
+}
+
+void IRGenModule::emitExtension(ExtensionDecl *ext) {
+  emitNestedTypeDecls(ext->getMembers());
+
   // Generate a category if the extension either introduces a
   // conformance to an ObjC protocol or introduces a method
   // that requires an Objective-C entry point.
+  ClassDecl *origClass = ext->getExtendedType()->getClassOrBoundGenericClass();
   if (!origClass)
     return;
+
   bool needsCategory = false;
   if (!needsCategory) {
     for (unsigned i = 0, size = ext->getProtocols().size(); i < size; ++i)

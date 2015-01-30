@@ -4404,69 +4404,9 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
   return ti;
 }
 
-/// emitEnumDecl - Emit all the declarations associated with this enum type.
 void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
   emitEnumMetadata(*this, theEnum);
-
-  // FIXME: This is mostly copy-paste from emitExtension;
-  // figure out how to refactor!
-  for (Decl *member : theEnum->getMembers()) {
-    switch (member->getKind()) {
-    case DeclKind::Import:
-    case DeclKind::TopLevelCode:
-    case DeclKind::Protocol:
-    case DeclKind::Extension:
-    case DeclKind::Destructor:
-    case DeclKind::InfixOperator:
-    case DeclKind::PrefixOperator:
-    case DeclKind::PostfixOperator:
-    case DeclKind::Param:
-      llvm_unreachable("decl not allowed in enum!");
-
-    // We can't have meaningful initializers for variables; these just show
-    // up as part of parsing properties.
-    case DeclKind::PatternBinding:
-      continue;
-
-    // Active members of the IfConfig block are handled separately.
-    case DeclKind::IfConfig:
-       continue;
-
-    case DeclKind::Subscript:
-      // Getter/setter will be handled separately.
-      continue;
-    case DeclKind::TypeAlias:
-    case DeclKind::AssociatedType:
-    case DeclKind::GenericTypeParam:
-      continue;
-    case DeclKind::Enum:
-      emitEnumDecl(cast<EnumDecl>(member));
-      continue;
-    case DeclKind::Struct:
-      emitStructDecl(cast<StructDecl>(member));
-      continue;
-    case DeclKind::Class:
-      emitClassDecl(cast<ClassDecl>(member));
-      continue;
-    case DeclKind::Var:
-      if (!cast<VarDecl>(member)->hasStorage())
-        // Getter/setter will be handled separately.
-        continue;
-      continue;
-    case DeclKind::Func:
-      emitLocalDecls(cast<FuncDecl>(member));
-      continue;
-    case DeclKind::Constructor:
-      emitLocalDecls(cast<ConstructorDecl>(member));
-      continue;
-
-    case DeclKind::EnumCase:
-    case DeclKind::EnumElement:
-      // Lowered in SIL.
-      continue;
-    }
-    llvm_unreachable("bad extension member kind");
-  }
+  emitNestedTypeDecls(theEnum->getMembers());
 }
 
 // FIXME: PackEnumPayload and UnpackEnumPayload need to be endian-aware.

@@ -429,13 +429,8 @@ public:
   void emitSILWitnessTable(SILWitnessTable *wt);
   void emitSILStaticInitializer();
   
-  /// Generate local decls in the given function body. This skips VarDecls and
-  /// other locals that are consumed by SIL.
-  void emitLocalDecls(BraceStmt *body);
-  void emitLocalDecls(FuncDecl *fd);
-  void emitLocalDecls(ConstructorDecl *cd);
-  void emitLocalDecls(DestructorDecl *dd);
-  void emitLocalDecls(clang::Decl *decl);
+  void emitNestedTypeDecls(DeclRange members);
+  void emitClangDecl(clang::Decl *decl);
 
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       ExtraData extraData,
