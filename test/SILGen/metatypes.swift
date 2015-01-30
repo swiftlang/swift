@@ -2,8 +2,6 @@
 
 import Swift
 
-// FIXME: typeof should be available through the standard library.
-
 protocol SomeProtocol {
   func method()
   func static_method()
