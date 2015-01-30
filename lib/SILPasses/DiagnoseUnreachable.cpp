@@ -528,7 +528,7 @@ static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
                                      const SILBasicBlockSet &Reachable,
                                      UnreachableUserCodeReportingState *State,
                                      const SILBasicBlock *TopLevelB,
-                                 llvm::DenseSet<const SILBasicBlock*> &Visited){
+                         llvm::SmallPtrSetImpl<const SILBasicBlock*> &Visited){
   if (Visited.count(&B))
     return false;
   Visited.insert(&B);
@@ -647,7 +647,7 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
               BE = State->PossiblyUnreachableBlocks.end(); BI != BE; ++BI) {
       const SILBasicBlock *BB = *BI;
       if (!Reachable.count(BB)) {
-        llvm::DenseSet<const SILBasicBlock *> visited;
+        llvm::SmallPtrSet<const SILBasicBlock *, 1> visited;
         diagnoseUnreachableBlock(**BI, M, Reachable, State, BB, visited);
       }
     }
