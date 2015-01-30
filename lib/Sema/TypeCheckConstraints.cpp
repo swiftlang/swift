@@ -910,6 +910,7 @@ bool TypeChecker::typeCheckExpression(
   if (convertType) {
     cs.addConstraint(ConstraintKind::Conversion, expr->getType(), convertType,
                      cs.getConstraintLocator(expr));
+    cs.setConversionType(expr, convertType.getPointer());
   }
 
   // Notify the listener that we've built the constraint system.
@@ -1455,7 +1456,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   /// Expression type checking listener for conditions.
   class ConditionListener : public ExprTypeCheckListener {
-    Expr *OrigExpr;
+    Expr *OrigExpr = nullptr;
 
   public:
     // Add the appropriate LogicValue constraint.
@@ -1482,8 +1483,20 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
         return true;
       }
 
+      auto logicValueType = logicValueProto->getDeclaredType();
+      
+      // Relate this expr to the the logic value type in the cache, but don't
+      // create a new conformance. This will help us produce a better
+      // diagnostic, if need be.
+      auto innerExpr = expr;
+      while (auto parenExpr = dyn_cast<ParenExpr>(innerExpr))
+        innerExpr = parenExpr->getSubExpr();
+      
+      if (dyn_cast<LiteralExpr>(innerExpr))
+        cs.setConversionType(expr, logicValueType);
+      
       cs.addConstraint(ConstraintKind::ConformsTo, expr->getType(),
-                       logicValueProto->getDeclaredType(),
+                       logicValueType,
                        cs.getConstraintLocator(OrigExpr));
       return false;
     }
@@ -1495,6 +1508,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
       return solution.convertToLogicValue(expr,
                                           cs.getConstraintLocator(OrigExpr));
     }
+    
   };
 
   ConditionListener listener;

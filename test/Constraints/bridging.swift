@@ -165,7 +165,7 @@ let d2: Double = 3.14159
 inferDouble2 = d2
 
 // rdar://problem/18269449
-var i1: Int = 1.5 * 3.5 // expected-error{{binary operator '*' cannot be applied to two Double operands}} expected-note{{overloads for '*' exist with these partially matching parameter lists:}}
+var i1: Int = 1.5 * 3.5 // expected-error{{'Double' is not convertible to 'Int'}}
 
 // rdar://problem/18330319
 func rdar18330319(s: String, d: [String : AnyObject]) {

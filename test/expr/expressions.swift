@@ -46,7 +46,7 @@ func basictest() {
   x8 + 1
   0 + x8
   1.0 + x8 // expected-error{{binary operator '+' cannot be applied to operands of type 'Double' and 'Int8'}} expected-note {{overloads for '+' exist with these partially matching parameter lists:}}
-  var x9 : Int16 = x8 + 1 // expected-error{{binary operator '+' cannot be applied to operands of type 'Int8' and 'Int'}} expected-note {{overloads for '+' exist with these partially matching parameter lists:}}
+  var x9 : Int16 = x8 + 1 // expected-error{{'Int8' is not convertible to 'Int16'}}
 
   // Various tuple types.
   var tuple1 : ()
@@ -589,13 +589,13 @@ _ // expected-error{{'_' can only appear in a pattern or on the left side of an 
 func arrayLiterals() { 
   var a = [1,2,3]
   var b : [Int] = []
-  var c = []  // expected-error {{type of expression is ambiguous without more context}}
+  var c = []  // expected-error {{type of expression is ambiguous without more context}} expected-error{{'_' is not convertible to 'ArrayLiteralConvertible'}}
 }
 
 func dictionaryLiterals() {
   var a = [1 : "foo",2 : "bar",3 : "baz"]
   var b : Dictionary<Int, String> = [:]
-  var c = [:]  // expected-error {{type of expression is ambiguous without more context}}
+  var c = [:]  // expected-error {{type of expression is ambiguous without more context}} expected-error{{'_' is not convertible to 'DictionaryLiteralConvertible'}}
 }
 
 func invalidDictionaryLiteral() {

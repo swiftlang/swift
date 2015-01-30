@@ -80,7 +80,7 @@ postfix func ^ (x: Man) -> () -> God {
   return { return God() }
 }
 
-var _ : God = Man()^() // expected-error{{binary operator '^' cannot be applied to operands of type 'Man' and '()'}}
+var _ : God = Man()^() // expected-error{{'Man' is not convertible to 'God'}}
 
 func &(x : Man, y : Man) -> Man { return x } // forgive amp_prefix token
 

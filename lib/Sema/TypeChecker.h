@@ -328,6 +328,9 @@ private:
 
   /// A set of types that can be mapped to C integer types.
   llvm::DenseSet<CanType> CIntegerTypes;
+  
+  /// The set of expressions currently being analyzed for failures.
+  llvm::DenseSet<Expr *> DiagnosedExprs;
 
   /// A set of types that are representable in Objective-C, but require
   /// non-trivial bridging.
@@ -1249,6 +1252,14 @@ public:
   bool hasEnabledForbiddenTypecheckPrefix() const {
     return !Context.LangOpts.DebugForbidTypecheckPrefix.empty();
   }
+
+  void addExprForDiagnosis(Expr *E) {
+    DiagnosedExprs.insert(E);
+  }
+  bool exprIsBeingDiagnosed(Expr *E) {
+    return DiagnosedExprs.count(E) != 0;
+  }
+
 };
 
 /// \brief RAII object that cleans up the given expression if not explicitly

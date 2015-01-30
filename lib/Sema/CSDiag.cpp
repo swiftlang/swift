@@ -1505,40 +1505,60 @@ bool GeneralFailureDiagnosis::diagnoseGeneralConversionFailure() {
                       diag::could_not_convert_argument,
                       types.first).
       highlight(anchor->getSourceRange());
-    } else {
       
-      // If it's a type variable failing a conformance, avoid printing the type
-      // variable and just print the conformance.
-      if ((constraint->getKind() == ConstraintKind::ConformsTo) &&
-          types.first->getAs<TypeVariableType>()) {
-        CS->TC.diagnose(anchor->getLoc(),
-                        diag::single_expression_conformance_failure,
-                        types.first)
-        .highlight(anchor->getSourceRange());
-      } else {
-        // If the second type is a type variable, the expression itself is
-        // ambiguous.
-        if (types.first->getAs<UnboundGenericType>() ||
-            types.second->getAs<TypeVariableType>()) {
-          if (isa<ClosureExpr>(expr)) {
-            CS->TC.diagnose(expr->getLoc(),
-                            diag::cannot_infer_closure_type);
-          } else {
-            CS->TC.diagnose(expr->getLoc(),
-                            diag::type_of_expression_is_ambiguous);
-          }
-        } else {
-          auto failureKind =
-          Failure::TypesNotConvertible - Failure::TypesNotEqual;
-          
-          CS->TC.diagnose(anchor->getLoc(),
-                          diag::invalid_relation,
-                          failureKind,
-                          types.first, types.second)
-          .highlight(anchor->getSourceRange());
-        }
-      }
+      return true;
     }
+      
+    // If it's a type variable failing a conformance, avoid printing the type
+    // variable and just print the conformance.
+    if ((constraint->getKind() == ConstraintKind::ConformsTo) &&
+        types.first->getAs<TypeVariableType>()) {
+      CS->TC.diagnose(anchor->getLoc(),
+                      diag::single_expression_conformance_failure,
+                      types.first)
+      .highlight(anchor->getSourceRange());
+      
+      return true;
+    }
+    
+    auto fromType = getTypeOfIndependentSubExpression(expr);
+    
+    if (fromType->getAs<ErrorType>())
+      fromType = types.first.getPointer();
+    
+    auto toType = CS->getConversionType(expr);
+    
+    if (!toType && CS->getContextualType(expr))
+      toType = CS->getContextualType(expr)->getPointer();
+    
+    if (!toType)
+      toType = types.second.getPointer();
+    
+    // If the second type is a type variable, the expression itself is
+    // ambiguous.
+    if (fromType->getAs<UnboundGenericType>() ||
+        toType->getAs<TypeVariableType>()) {
+      if (isa<ClosureExpr>(expr)) {
+        CS->TC.diagnose(expr->getLoc(),
+                        diag::cannot_infer_closure_type);
+        
+        return true;
+      } else {
+        CS->TC.diagnose(expr->getLoc(),
+                        diag::type_of_expression_is_ambiguous);
+      }
+      
+      return true;
+    }
+    
+    auto failureKind =
+    Failure::TypesNotConvertible - Failure::TypesNotEqual;
+    
+    CS->TC.diagnose(anchor->getLoc(),
+                    diag::invalid_relation,
+                    failureKind,
+                    fromType, toType)
+    .highlight(anchor->getSourceRange());
     
     return true;
   }
@@ -1553,10 +1573,17 @@ bool GeneralFailureDiagnosis::diagnoseGeneralFailure() {
          diagnoseGeneralConversionFailure();
 }
 
-Type FailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
+Type GeneralFailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
+  
+  // Track if this sub-expression is currently being diagnosed.
+  if (CS->TC.exprIsBeingDiagnosed(subExpr))
+    return subExpr->getType();
+  
+  CS->TC.addExprForDiagnosis(subExpr);
   
   if (!isa<ClosureExpr>(subExpr) &&
-      typeIsNotSpecialized(subExpr->getType())) {
+      (dyn_cast<ArrayExpr>(subExpr) ||
+      typeIsNotSpecialized(subExpr->getType()))) {
     
     // Store off the sub-expression, in case a new one is provided via the
     // type check operation.
@@ -1575,6 +1602,39 @@ Type FailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
   assert(subExpr->getType());
   
   return subExpr->getType();
+}
+
+bool GeneralFailureDiagnosis::diagnoseContextualConversionError(Expr *expr) {
+  
+  TypeBase *contextualType = CS->getConversionType(expr);
+  
+  if (!contextualType) {
+    if (!CS->getContextualType(expr)) {
+      return false;
+    }
+    contextualType = CS->getContextualType(expr)->getPointer();
+  }
+  
+  auto subExprTy = getTypeOfIndependentSubExpression(expr);
+  
+  if (subExprTy->isEqual(contextualType))
+    return false;
+  
+  // We've already caught the error.
+  if (subExprTy->getAs<ErrorType>())
+    return true;
+  
+  if (subExprTy->getAs<TypeVariableType>())
+    return false;
+  
+  CS->TC.diagnose(expr->getLoc(),
+                  diag::invalid_relation,
+                  Failure::FailureKind::TypesNotConvertible -
+                      Failure::FailureKind::TypesNotEqual,
+                  subExprTy, contextualType)
+  .highlight(expr->getSourceRange());
+  
+  return true;
 }
 
 /// FIXME: Right now, a "matching" overload is one with a parameter whose type
@@ -1638,6 +1698,9 @@ void FailureDiagnosis::suggestPotentialOverloads(
 
 bool FailureDiagnosis::diagnoseFailureForBinaryExpr() {
   assert(expr->getKind() == ExprKind::Binary);
+  
+  if (diagnoseContextualConversionError(expr))
+    return true;
   
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
   
@@ -1708,6 +1771,9 @@ bool FailureDiagnosis::diagnoseFailureForUnaryExpr() {
   assert(expr->getKind() == ExprKind::PostfixUnary ||
          expr->getKind() == ExprKind::PrefixUnary);
   
+  if (diagnoseContextualConversionError(expr))
+    return true;
+  
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
   
   auto applyExpr = cast<ApplyExpr>(expr);
@@ -1758,6 +1824,9 @@ bool FailureDiagnosis::diagnoseFailureForSubscriptExpr() {
   assert(expr->getKind() == ExprKind::Subscript ||
          expr->getKind() == ExprKind::PrefixUnary);
   
+  if (diagnoseContextualConversionError(expr))
+    return true;
+  
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
   
   auto subscriptExpr = cast<SubscriptExpr>(expr);
@@ -1794,6 +1863,9 @@ bool FailureDiagnosis::diagnoseFailureForSubscriptExpr() {
 
 bool FailureDiagnosis::diagnoseFailureForCallExpr() {
   assert(expr->getKind() == ExprKind::Call);
+  
+  if (diagnoseContextualConversionError(expr))
+    return true;
   
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
   

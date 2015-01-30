@@ -1116,7 +1116,16 @@ public:
   /// kind of expression that could not be type checked.
   bool diagnoseGeneralFailure();
   
+  /// If the type check failure on the expression is a top-level one, obtain a
+  /// type or any sub expressions by potentially re-typechecking in a
+  /// context-free manner.
+  Type getTypeOfIndependentSubExpression(Expr *subExpr);
+  
 protected:
+  
+  /// Attempt to produce a diagnostic for a mismatch between an expression's
+  /// type and its assumed contextual type.
+  bool diagnoseContextualConversionError(Expr *subExpr);
   
   /// Produce a diagnostic for a general member-lookup failure (irrespective of
   /// the exact expression kind).
@@ -1155,10 +1164,6 @@ public:
   bool diagnoseFailure();
   
 private:
-  /// If the type check failure on the expression is a top-level one, obtain a
-  /// type or any sub expressions by potentially re-typechecking in a
-  /// context-free manner.
-  Type getTypeOfIndependentSubExpression(Expr *subExpr);
   
   /// Given a set of parameter lists from an overload group, and a list of
   /// arguments, emit a diagnostic indicating any partially matching overloads.
@@ -1279,6 +1284,8 @@ private:
   SmallVector<TypeVariableType *, 16> TypeVariables;
   llvm::DenseMap<Expr *, Type *> ContextualTypes;
   llvm::DenseMap<Expr *, TypeBase *> FavoredTypes;
+  llvm::DenseMap<Expr *, TypeBase *> ConversionTypes;
+
 
   /// \brief The set of constraint restrictions used to reach the
   /// current constraint system.
@@ -1525,12 +1532,18 @@ public:
   TypeBase* getFavoredType(Expr *E) {
     return this->FavoredTypes[E];
   }
-  
+  TypeBase* getConversionType(Expr *E) {
+    return this->ConversionTypes[E];
+  }
+
   void setContextualType(Expr *E, Type *T) {
     this->ContextualTypes[E] = T;
   }
   void setFavoredType(Expr *E, TypeBase *T) {
     this->FavoredTypes[E] = T;
+  }
+  void setConversionType(Expr *E, TypeBase *T) {
+    this->ConversionTypes[E] = T;
   }
 
   /// \brief Retrieve the constraint locator for the given anchor and

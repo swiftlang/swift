@@ -75,7 +75,7 @@ func fail2<
   where
   T.Foo == U.Foo, T.Foo == X, U.Foo == Y // expected-error{{generic parameter 'Foo' cannot be equal to both 'X' and 'Y'}}
 >(t: T, u: U) -> (X, Y) {
-  return (t.foo, u.foo) // expected-error{{'(_, _)' is not convertible to 'Y'}}
+  return (t.foo, u.foo) // expected-error{{'(X, X)' is not convertible to '(X, Y)'}}
 }
 
 func test4<T: Barrable where T.Bar == Y>(t: T) -> Y {
@@ -108,7 +108,7 @@ func fail4<
   T.Bar == Y,
   T.Bar.Foo == Z // expected-error{{generic parameter 'Foo' cannot be equal to both 'X' and 'Z'}}
 >(t: T) -> (Y, Z) {
-  return (t.bar, t.bar.foo) // expected-error{{'(_, _)' is not convertible to 'Z'}}
+  return (t.bar, t.bar.foo) // expected-error{{'(Y, X)' is not convertible to '(Y, Z)'}}
 }
 
 // TODO: repeat diagnostic
@@ -118,7 +118,7 @@ func fail5<
   T.Bar.Foo == Z,
   T.Bar == Y // expected-error{{generic parameter 'Foo' cannot be equal to both 'Z' and 'X'}} expected-error{{generic parameter 'Foo' cannot be equal to both 'Z' and 'X'}}
 >(t: T) -> (Y, Z) {
-  return (t.bar, t.bar.foo) // expected-error{{'(_, _)' is not convertible to 'Z'}}
+  return (t.bar, t.bar.foo) // expected-error{{(Y, X)' is not convertible to '(Y, Z)'}}
 }
 
 func test8<T: Fooable where T.Foo == X, T.Foo == Y>(t: T) {} // expected-error{{generic parameter 'Foo' cannot be equal to both 'X' and 'Y'}}

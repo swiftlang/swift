@@ -79,13 +79,13 @@ func passFunction(f: (Int) -> Float, x: Int, y: Float) {
    acceptFunction(f, y, y) // expected-error{{cannot invoke 'acceptFunction' with an argument list of type '((Int) -> Float, Float, Float)'}} expected-note{{expected an argument list of type '((T) -> U, T, U)'}}
 }
 
-func returnTuple<T, U>(_: T) -> (T, U) { } // expected-note{{in call to function 'returnTuple'}}
+func returnTuple<T, U>(_: T) -> (T, U) { } // expected-note{{in call to function 'returnTuple'}} expected-note{{}}
 
 func testReturnTuple(x: Int, y: Float) {
   returnTuple(x) // expected-error{{argument for generic parameter 'U' could not be inferred}}
   var rt1 : (Int, Float) = returnTuple(x)
   var rt2 : (Float, Float) = returnTuple(y)
-  var rt3 : (Int, Float) = returnTuple(y) // expected-error{{cannot invoke 'returnTuple' with an argument list of type '(Float)'}} expected-note{{expected an argument list of type '(T)'}}
+  var rt3 : (Int, Float) = returnTuple(y) // expected-error{{argument for generic parameter 'U' could not be inferred}} 
 }
 
 
