@@ -650,3 +650,12 @@ public func y1(x: CGFloat) -> CGFloat {
 public func yn(n: Int, x: CGFloat) -> CGFloat {
   return CGFloat(yn(n, Double(x.native)))
 }
+
+@transparent
+extension CGFloat : _CVarArgPassedAsDouble {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs
+  public func encode() -> [Word] {
+    return native.encode()
+  }
+}

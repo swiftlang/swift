@@ -39,6 +39,11 @@ public protocol CVarArgType {
   func encode() -> [Word]
 }
 
+/// Floating point types need to be passed differently on x86_64
+/// systems.  CoreGraphics uses this to make CGFloat work properly.
+public // SPI(CoreGraphics)
+protocol _CVarArgPassedAsDouble : CVarArgType {}
+
 #if arch(x86_64)
 let _x86_64CountGPRegisters = 6
 let _x86_64CountSSERegisters = 8
@@ -185,7 +190,7 @@ extension COpaquePointer : CVarArgType {
   }
 }
 
-extension Float : CVarArgType {
+extension Float : _CVarArgPassedAsDouble {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
   public func encode() -> [Word] {
@@ -193,7 +198,7 @@ extension Float : CVarArgType {
   }
 }
 
-extension Double : CVarArgType {
+extension Double : _CVarArgPassedAsDouble {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
   public func encode() -> [Word] {
@@ -242,9 +247,9 @@ final public class VaListBuilder {
 
   func append(arg: CVarArgType) {
     var encoded = arg.encode()
-    
-    if ((arg.dynamicType is Float.Type) || (arg.dynamicType is Double.Type))
-       && sseRegistersUsed < _x86_64CountSSERegisters {
+
+    if arg is _CVarArgPassedAsDouble
+      && sseRegistersUsed < _x86_64CountSSERegisters {
       var startIndex = _x86_64CountGPRegisters
            + (sseRegistersUsed * _x86_64SSERegisterWords)
       for w in encoded {
