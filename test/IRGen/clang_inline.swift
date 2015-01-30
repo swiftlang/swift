@@ -8,6 +8,7 @@
 // RUN: FileCheck -check-prefix=NEGATIVE %s < %t.ll
 
 // REQUIRES: CPU=i386_or_x86_64
+// XFAIL: linux
 
 #if IMPORT_EMPTY
 import Empty

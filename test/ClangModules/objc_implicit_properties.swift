@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -parse -I %S/Inputs/custom-modules -enable-objc-implicit-properties %s -verify
 
+// REQUIRES: objc_interop
+
 import ObjectiveC
 import ObjCImplicitProperties
 

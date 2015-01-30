@@ -1,5 +1,8 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
+// FIXME: rdar://problem/19648117 Needs splitting objc parts out
+// XFAIL: linux
+
 import Foundation
 
 let opaqueNil: COpaquePointer = nil

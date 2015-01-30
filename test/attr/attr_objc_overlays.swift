@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -parse %s %clang-importer-sdk -verify
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 struct NativeStruct {}

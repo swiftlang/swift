@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift foo | FileCheck %s
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 class SuperString : NSString {

@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift
 
+// REQUIRES: objc_interop
+
 class C {}
 struct S {}
 

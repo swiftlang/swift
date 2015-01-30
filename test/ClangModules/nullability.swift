@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -parse %s -verify
 
+// XFAIL: linux
+
 import nullability;
 
 func testSomeClass(sc: SomeClass, osc: SomeClass?) {

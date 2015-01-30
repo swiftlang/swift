@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend -emit-sil -sdk %S/../SILGen/Inputs %s -I %S/../SILGen/Inputs -enable-source-import -parse-stdlib -o /dev/null -verify
 
+// FIXME: rdar://problem/19648117 Needs splitting objc parts out
+// XFAIL: linux
+
 import Swift
 import gizmo
 

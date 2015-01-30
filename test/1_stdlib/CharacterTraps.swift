@@ -9,6 +9,8 @@
 // CHECK: OK
 // CHECK: CRASHED: SIG{{ILL|TRAP|ABRT}}
 
+// XFAIL: linux
+
 import Darwin
 
 // Interpret the command line arguments.

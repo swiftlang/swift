@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt %s -specialize -verify | FileCheck %s
 
+// REQUIRES: objc_interop
+
 // This test checks that we properly distinguish in between the specialized
 // functions for the @thick, @thin, and @objc_metatype metatypes.
 //

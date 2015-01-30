@@ -3,6 +3,9 @@
 // RUN: %S/timeout.sh 360 %target-run %t/a.out %S/Inputs/shuffle.jpg | FileCheck %s
 // FIXME: timeout wrapper is necessary because the ASan test runs for hours
 
+// FIXME: rdar://problem/19648117 Needs splitting objc parts out
+// XFAIL: linux
+
 import Foundation
 import SpriteKit
 

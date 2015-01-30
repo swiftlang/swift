@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift
 
+// XFAIL: linux
+
 // Dictionary types.
 class Base {
   func f0(d: [String: Int]) { }

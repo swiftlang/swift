@@ -1,5 +1,6 @@
 // RUN: %target-build-swift -emit-ir %s
-// REQUIRES: sdk
+
+// REQUIRES: objc_interop
 
 import Dispatch
 

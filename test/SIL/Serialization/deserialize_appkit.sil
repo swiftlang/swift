@@ -2,7 +2,7 @@
 // RUN: %target-sil-opt -verify %platform-module-dir/AppKit.swiftmodule > /dev/null
 // RUN: llvm-bcanalyzer %platform-module-dir/AppKit.swiftmodule | FileCheck %s
 
-// REQUIRES: sdk
+// REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
 // CHECK-NOT: Unknown

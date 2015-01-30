@@ -7,6 +7,8 @@
 // RUN: rm -rf %t/mixed-target/
 // RUN: %target-swift-frontend %clang-importer-sdk -I %t -I %S/../Inputs/custom-modules -parse %s -verify
 
+// XFAIL: linux
+
 import MixedWithHeader
 
 func testReexportedClangModules(foo : FooProto) {

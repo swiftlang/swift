@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -parse %clang-importer-sdk %s -verify
 
+// REQUIRES: objc_interop
+
 import ObjectiveC
 
 // Attribute requires that all stored properties have in-class

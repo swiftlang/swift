@@ -13,6 +13,7 @@
 // RUN: %target-build-swift -emit-executable %s -gline-tables-only -o %t/ASTSection -emit-module
 // RUN: %lldb-moduleimport-test %t/ASTSection | FileCheck %s --allow-empty --check-prefix=LINETABLE-CHECK
 
+// UNSUPPORTED: OS=linux-gnu
 
 // REQUIRES: ld-add_ast_path
 

@@ -1,5 +1,7 @@
 // RUN: %target-run-stdlib-swift | FileCheck %s
 
+// XFAIL: linux
+
 import Foundation
 import Swift
 // ==== Tests =====

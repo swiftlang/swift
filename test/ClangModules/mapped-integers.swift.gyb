@@ -2,6 +2,8 @@
 // RUN: %S/../../utils/gyb %s -o %t/mapped-integers.swift
 // RUN: %target-swift-frontend %clang-importer-sdk -parse -verify %t/mapped-integers.swift
 
+// XFAIL: linux
+
 import ctypes
 
 func testUnsignedIntegers() {

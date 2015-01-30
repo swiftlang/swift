@@ -12,6 +12,8 @@
 //
 // RUN: %target-run %t/Set
 
+// XFAIL: linux
+
 import StdlibUnittest
 import Foundation
 

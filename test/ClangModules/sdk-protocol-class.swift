@@ -5,7 +5,7 @@
 // RUN: %target-swift-frontend -parse %S/Inputs/sdk-protocol-class/os2.swift
 // RUN: %target-swift-frontend -parse %S/Inputs/sdk-protocol-class/os3.swift
 
-// REQUIRES: sdk
+// REQUIRES: objc_interop
 
 import ObjectiveC
 

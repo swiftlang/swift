@@ -8,6 +8,8 @@
 // RUN: FileCheck --check-prefix=NEGATIVE %s < %t/extensions.h
 // RUN: %check-in-clang %t/extensions.h
 
+// REQUIRES: objc_interop
+
 import Foundation
 import AppKit
 

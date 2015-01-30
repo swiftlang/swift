@@ -7,6 +7,8 @@
 // RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foundation.NSArray -function-definitions=false > %t/Foundation.NSArray-failable-inits.printed.txt
 // RUN: FileCheck -input-file %t/Foundation.NSArray-failable-inits.printed.txt -check-prefix=CHECK1-FAILABLE-INITS %s
 
+// REQUIRES: objc_interop
+
 // CHECK1: class NSMutableArray : NSArray
 // CHECK1:   func setArray(otherArray: [AnyObject])
 

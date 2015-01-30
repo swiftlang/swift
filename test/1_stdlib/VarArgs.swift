@@ -1,6 +1,7 @@
 // RUN: %swift -interpret -parse-stdlib -sdk %sdk -target %target-triple %s | FileCheck %s
+
 // REQUIRES: swift_interpreter
-// REQUIRES: sdk
+// XFAIL: linux
 
 // FIXME: iOS fails: target-run-stdlib-swift gets 'unknown identifier VarArgs'
 

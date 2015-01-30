@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -I %S/Inputs/custom-modules -emit-silgen -o - %s | FileCheck %s
 
+// REQUIRES: objc_interop
+
 import ObjectiveC
 import Foundation
 import objc_ext

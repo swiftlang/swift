@@ -1,4 +1,7 @@
 // RUN: %target-run-stdlib-swift | FileCheck %s
+
+// XFAIL: linux
+
 import Swift
 
 // Regression test for <rdar://problem/16119895>.

@@ -4,6 +4,7 @@
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
+// REQUIRES: objc_interop
 
 import Foundation
 

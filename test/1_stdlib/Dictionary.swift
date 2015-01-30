@@ -12,6 +12,8 @@
 //
 // RUN: %target-run %t/Dictionary
 
+// XFAIL: linux
+
 import Darwin
 import StdlibUnittest
 import Foundation

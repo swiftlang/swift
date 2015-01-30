@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -parse %s -verify
 
+// REQUIRES: objc_interop
+
 // Note: this is in a separate file because -verify doesn't complain
 // about diagnostics from other files.
 import Foundation

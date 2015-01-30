@@ -3,6 +3,8 @@
 // RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-run %t/a.out
 
+// REQUIRES: objc_interop
+
 //
 // Tests for the NSString APIs as exposed by String
 //

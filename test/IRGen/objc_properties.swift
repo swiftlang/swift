@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -disable-objc-attr-requires-foundation-module | FileCheck %s
 
 // REQUIRES: CPU=x86_64
+// REQUIRES: objc_interop
 
 @objc class SomeObject {
   var readonly : SomeObject {

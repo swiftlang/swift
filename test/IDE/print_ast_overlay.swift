@@ -9,6 +9,8 @@
 // RUN: %target-swift-ide-test -print-module -source-filename %s -I %t -F %S/Inputs/mock-sdk -module-to-print=Foo.FooSub > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_WITHOUT_OVERLAY -strict-whitespace < %t.printed.txt
 
+// XFAIL: linux
+
 // RUN: %target-swift-ide-test -print-module -source-filename %s -I %t -F %S/Inputs/mock-sdk -module-to-print=Foo -accessibility-filter-public -annotate-print > %t.annotated.txt
 // RUN: FileCheck %s -check-prefix=PASS_ANNOTATED -strict-whitespace < %t.annotated.txt
 

@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -g -emit-ir %s -o %t.ll
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 // This file contains linetable testcases for all permutations

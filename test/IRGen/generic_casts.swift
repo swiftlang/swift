@@ -3,7 +3,9 @@
 // RUN: %target-swift-frontend -sdk %S/Inputs -I %t -primary-file %s -emit-ir | FileCheck %s
 
 // REQUIRES: CPU=x86_64
-// REQUIRES: objc_interop
+
+// FIXME: rdar://problem/19648117 Needs splitting objc parts out
+// XFAIL: linux
 
 import Foundation
 import gizmo

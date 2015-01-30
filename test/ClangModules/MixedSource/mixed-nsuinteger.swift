@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -I %S/Inputs/user-module -parse %s -verify
 
+// REQUIRES: objc_interop
+
 // Type checker should not report any errors in the code below.
 
 import Foundation

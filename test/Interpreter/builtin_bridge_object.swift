@@ -2,6 +2,9 @@
 // RUN: %target-build-swift -parse-stdlib %s -o %t/a.out
 // RUN: %target-run %t/a.out | FileCheck %s
 
+// FIXME: rdar://problem/19648117 Needs splitting objc parts out
+// XFAIL: linux
+
 import Swift
 import SwiftShims
 

@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -parse -verify %s -disable-objc-attr-requires-foundation-module
 
+// REQUIRES: objc_interop
+
 import ObjectiveC
 
 @objc protocol ObjCProto {}

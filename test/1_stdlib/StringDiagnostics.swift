@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift
 
+// XFAIL: linux
+
 import Foundation
 
 // Common pitfall: trying to subscript a string with integers.

@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -sdk %S/Inputs %s -emit-silgen | FileCheck %s
 
+// REQUIRES: objc_interop
+
 import gizmo
 
 

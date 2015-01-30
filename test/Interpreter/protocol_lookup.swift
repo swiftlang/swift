@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
+// XFAIL: linux
+
 // Note: JIT mode is checked in Interpreter/protocol_lookup_jit.swift.
 
 protocol Fooable {

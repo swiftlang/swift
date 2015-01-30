@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -enable-union-import -parse -verify %s
 
+// XFAIL: linux
+
 import ctypes
 
 func useUnion(vec: GLKVector4) -> GLKVector4 {

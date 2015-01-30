@@ -8,6 +8,8 @@
 // RUN: rm %t/mixed-target/header.h
 // RUN: not %target-swift-frontend %clang-importer-sdk -I %t -I %S/../Inputs/custom-modules -parse %s 2>&1 | FileCheck %s -check-prefix=USE-SERIALIZED-HEADER
 
+// XFAIL: linux
+
 // USE-SERIALIZED-HEADER: redefinition of 'Point2D'
 // USE-SERIALIZED-HEADER: previous definition is here
 

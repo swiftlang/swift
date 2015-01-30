@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend %clang-importer-sdk %s -emit-ir | FileCheck %s
 
 // REQUIRES: CPU=x86_64
+// REQUIRES: objc_interop
 
 // CHECK: [[SWIFT_TYPE:%swift.type]] = type { i64 }
 sil_stage canonical

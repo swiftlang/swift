@@ -9,6 +9,8 @@
 // RUN: %target-build-swift %t/main.swift %t/double_type.swift -o %t/double.out
 // RUN: %target-run %t/double.out | FileCheck %s
 
+// XFAIL: linux
+
 import Darwin
 
 //===---

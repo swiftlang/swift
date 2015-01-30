@@ -4,6 +4,8 @@
 // RUN: %target-build-swift -g -o %t/sdk-link %s
 // RUN: %target-run %t/sdk-link | FileCheck %s
 
+// XFAIL: linux
+
 // REQUIRES: ld-add_ast_path
 
 import Foundation

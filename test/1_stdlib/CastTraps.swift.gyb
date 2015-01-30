@@ -7,6 +7,8 @@
 // FIXME: Casting.cpp has dozens of places to fail a cast. This test does not 
 // attempt to enumerate them all.
 
+// XFAIL: linux
+
 import StdlibUnittest
 import Foundation
 

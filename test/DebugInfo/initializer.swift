@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -import-objc-header %S/Inputs/serialized-objc-header.h -emit-ir -g -o - | FileCheck %s
 
+// REQUIRES: objc_interop
+
 protocol Named {
     var name : String { get }
 }

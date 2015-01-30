@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -parse -verify %s
 
+// XFAIL: linux
+
 @exported import macros
 
 func circle_area(radius: CDouble) -> CDouble {

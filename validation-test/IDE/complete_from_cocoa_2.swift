@@ -1,7 +1,7 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -sdk %sdk -code-completion-token=T1 | FileCheck %s -check-prefix=T1
 // RUN: %swift-ide-test -code-completion -source-filename %s -sdk %sdk -code-completion-token=T2 | FileCheck %s -check-prefix=T2
 
-// REQUIRES: sdk
+// REQUIRES: objc_interop
 
 // FIXME: iOS has no Cocoa.framework
 // REQUIRES: OS=macosx

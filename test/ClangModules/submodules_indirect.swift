@@ -5,6 +5,8 @@
 // RUN: echo 'import submodules; println("\(x), \(y)")' | %target-swift-frontend %clang-importer-sdk -parse - -I %t -I %S/Inputs/custom-modules/
 // RUN: echo 'import submodules; println("\(x), \(y)")' | not %target-swift-frontend -parse - -I %t -I %S/Inputs/custom-modules/ 2>&1 | FileCheck -check-prefix=MISSING %s
 
+// XFAIL: linux
+
 import ctypes_bits_exported
 // MISSING: could not build Objective-C module 'ctypes_bits_exported'
 

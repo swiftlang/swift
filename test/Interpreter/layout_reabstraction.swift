@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
+// XFAIL: linux
+
 struct S {}
 struct Q {}
 

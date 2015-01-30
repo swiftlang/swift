@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift
 
+// REQUIRES: objc_interop
+
 #if os(OSX)
 import AppKit
 #endif

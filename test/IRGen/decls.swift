@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
+// XFAIL: linux
 
 // Multiple local decls.
 func test1() {

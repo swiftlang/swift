@@ -8,6 +8,8 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -emit-module -o %t/Mixed.framework/Modules/Mixed.swiftmodule/%target-swiftmodule-name %S/Inputs/mixed-framework/Mixed.swift -import-underlying-module -F %t -module-name Mixed -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend %clang-importer-sdk -F %t -parse %s -verify
 
+// XFAIL: linux
+
 import Mixed
 
 let instance = SwiftClass(x: 42)

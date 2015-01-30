@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -parse %s -verify
 // RUN: %target-swift-frontend %clang-importer-sdk %s -dump-ast -verify 2>&1 | FileCheck %s
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 func testDowncastObjectToArray(obj: AnyObject, objImplicit: AnyObject!) {

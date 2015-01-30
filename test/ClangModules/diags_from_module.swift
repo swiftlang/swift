@@ -1,6 +1,8 @@
 // RUN: not %target-swift-frontend -parse %s -F %S/Inputs/frameworks -Xcc -D -Xcc FOO 2> %t.err.txt
 // RUN: FileCheck -input-file=%t.err.txt %s
 
+// XFAIL: linux
+
 import Module
 
 // CHECK: Another.h:2:4: error: Module should have been built without -DFOO

@@ -5,6 +5,8 @@
 // RUN: cp %S/Inputs/resolve-cross-language/Base-module.map %t/module.map
 // RUN: %target-swift-frontend %clang-importer-sdk -parse -I %t -F %S/Inputs/resolve-cross-language %s -verify
 
+// REQUIRES: objc_interop
+
 import Base
 import BaseUser
 

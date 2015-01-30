@@ -4,6 +4,8 @@
 // RUN: %S/../../utils/line-directive %t.swift -- %target-build-swift -Xfrontend -disable-access-control %t.swift -o %t.out
 // RUN: %S/../../utils/line-directive %t.swift -- %target-run %t.out
 
+// XFAIL: linux
+
 import StdlibUnittest
 
 var Algorithm = TestSuite("Algorithm")

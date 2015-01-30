@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift | FileCheck %s
-// REQUIRES: sdk
+
+// REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
 import Foundation

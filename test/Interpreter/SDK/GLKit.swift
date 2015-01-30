@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+
 // FIXME: Clang miscompiles GLKit functions on i386. rdar://problem/19184403
 // XFAIL: CPU=i386
+
+// REQUIRES: objc_interop
 
 import GLKit
 

@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-silgen %s | FileCheck %s
 
+// REQUIRES: objc_interop
+
 class X {
   @objc func f() { }
   @objc class func staticF() { }

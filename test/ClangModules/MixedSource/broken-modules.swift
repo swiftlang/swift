@@ -9,6 +9,8 @@
 
 // RUN: not %target-swift-frontend -parse %s -import-objc-header %S/../../Inputs/empty.swift 2>&1 | FileCheck -check-prefix=EMPTY-HEADER %s
 
+// REQUIRES: objc_interop
+
 // MISSING-HEADER: error: bridging header '{{.*}}/fake.h' does not exist
 // MISSING-HEADER-NOT: error
 

@@ -20,6 +20,8 @@
 // RUN: %target-swift-frontend -emit-ir -parse-stdlib -module-name someModule -module-link-name module %S/../Inputs/empty.swift -autolink-force-load | FileCheck --check-prefix=FORCE-LOAD %s
 // RUN: %target-swift-frontend -emit-ir -parse-stdlib -module-name someModule -module-link-name 0module %S/../Inputs/empty.swift -autolink-force-load | FileCheck --check-prefix=FORCE-LOAD-HEX %s
 
+// UNSUPPORTED: OS=linux-gnu
+
 import someModule
 
 // CHECK: !{{[0-9]+}} = !{i32 6, !"Linker Options", ![[LINK_LIST:[0-9]+]]}

@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/objc_protocols_Bas.swift
 // RUN: %target-swift-frontend -sdk %S/Inputs -I %t -primary-file %s -emit-ir | FileCheck %s
 
+// XFAIL: linux
 
 import gizmo
 

@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // rdar://16726530
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 // Test overlain variadic methods.

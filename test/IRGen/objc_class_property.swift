@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -disable-objc-attr-requires-foundation-module | FileCheck %s
 
 // REQUIRES: CPU=x86_64
+// REQUIRES: objc_interop
 
 // Class properties get reflected to ObjC as class methods. ObjC does not have
 // class properties, so no ObjC property is reflected.

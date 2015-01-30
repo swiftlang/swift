@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift %clang-importer-sdk
 
+// REQUIRES: objc_interop
+
 import Darwin
 
 let _: Fract? = nil // expected-error{{use of undeclared type 'Fract'}}

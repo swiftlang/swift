@@ -4,6 +4,8 @@
 // RUN: FileCheck %s < %t.swiftdeps
 // RUN: FileCheck -check-prefix=NEGATIVE %s < %t.swiftdeps
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 // CHECK-LABEL: class-members:

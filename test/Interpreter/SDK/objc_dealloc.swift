@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 // Check that ObjC associated objects are cleaned up when attached to native

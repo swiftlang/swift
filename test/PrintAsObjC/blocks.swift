@@ -7,6 +7,8 @@
 // RUN: FileCheck %s < %t/blocks.h
 // RUN: %check-in-clang %t/blocks.h
 
+// REQUIRES: objc_interop
+
 import ObjectiveC
 
 // CHECK-LABEL: @interface Callbacks

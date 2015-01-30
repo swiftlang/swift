@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -sdk %S/Inputs -primary-file %s %S/objc_attr_NSManaged.swift -I %S/Inputs -enable-source-import -emit-silgen | FileCheck %s
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 // CHECK-LABEL: sil hidden @_TF25objc_attr_NSManaged_multi9testMultiFCS_10SwiftGizmoPSs9AnyObject_ : $@thin (@owned SwiftGizmo) -> @owned AnyObject {

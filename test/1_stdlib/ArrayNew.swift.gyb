@@ -11,6 +11,8 @@
 // RUN: %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Array -Xfrontend -disable-access-control
 // RUN: %S/../../utils/line-directive %t/main.swift -- %target-run %t/Array
 
+// XFAIL: linux
+
 import Darwin
 import StdlibUnittest
 import Foundation

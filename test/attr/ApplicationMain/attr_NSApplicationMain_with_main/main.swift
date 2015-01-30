@@ -5,4 +5,6 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -emit-module-path %t.swiftmodule -primary-file %s %S/delegate.swift
 // RUN: %target-swift-frontend %clang-importer-sdk -parse-as-library -parse %t.swiftmodule -primary-file %S/delegate.swift -verify
 
+// REQUIRES: objc_interop
+
 hi()

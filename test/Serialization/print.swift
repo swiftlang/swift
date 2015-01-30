@@ -3,6 +3,8 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -emit-module -o %t %s
 // RUN: %target-swift-ide-test -print-module -module-to-print=print -I %t -source-filename=%s %clang-importer-sdk | FileCheck %s
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 // CHECK-LABEL: class PropertyOwnership {

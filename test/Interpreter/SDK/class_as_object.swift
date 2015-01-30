@@ -2,6 +2,8 @@
 // RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-run %t/a.out | FileCheck %s
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 let classes = NSMutableArray()

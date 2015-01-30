@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -parse -I %S/Inputs/custom-modules %s -verify
 
+// REQUIRES: objc_interop
+
 // Test the use of Objective-C categories on the value types that
 // bridge to Objective-C class types.
 import Foundation

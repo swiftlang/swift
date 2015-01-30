@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -emit-sil -I %S/Inputs/custom-modules -split-objc-selectors %s -verify
 
+// REQUIRES: objc_interop
+
 import AppKit
 import objc_ext
 import TestProtocols

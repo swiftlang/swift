@@ -10,7 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
+//
 // XFAIL: interpret
+// REQUIRES: objc_interop
 
 import StdlibUnittest
 import Foundation

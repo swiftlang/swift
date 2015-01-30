@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend -sdk %S/Inputs -I %t %s -emit-ir | FileCheck %s
 
 // REQUIRES: CPU=x86_64
+// REQUIRES: objc_interop
 
 // CHECK: [[SGIZMO:%C19objc_attr_NSManaged10SwiftGizmo]] = type
 

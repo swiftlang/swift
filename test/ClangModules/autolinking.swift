@@ -8,6 +8,8 @@
 // RUN: FileCheck %s < %t/with-adapter.ll
 // RUN: FileCheck --check-prefix=CHECK-WITH-SWIFT %s < %t/with-adapter.ll
 
+// UNSUPPORTED: OS=linux-gnu
+
 import LinkMusket
 import LinkFramework
 import ClangModuleUser

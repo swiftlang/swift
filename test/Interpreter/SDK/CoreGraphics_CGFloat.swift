@@ -1,4 +1,6 @@
 // RUN: %target-run-simple-swift
+
+// REQUIRES: objc_interop
 // XFAIL: interpret
 
 import CoreGraphics

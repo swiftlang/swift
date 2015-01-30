@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 var hello : NSString = "Hello, world!"

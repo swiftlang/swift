@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift
 
+// REQUIRES: objc_interop
+
 @objc class Redecl1 { // expected-note{{Objective-C method 'dealloc' previously declared by implicit deinitializer here}}
   @objc init() { } // expected-note{{Objective-C method 'init' previously declared by initializer 'init()' here}}
 

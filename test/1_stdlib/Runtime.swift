@@ -1,6 +1,8 @@
 // RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control -module-name a %s -o %t.out
 // RUN: %target-run %t.out
 
+// XFAIL: linux
+
 import Swift
 import StdlibUnittest
 import Foundation

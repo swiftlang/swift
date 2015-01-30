@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -parse -verify -import-cf-types -I %S/Inputs/custom-modules %s
 
+// REQUIRES: objc_interop
+
 import CoreCooling
 
 func assertUnmanaged<T: AnyObject>(t: Unmanaged<T>) {}

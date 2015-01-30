@@ -2,6 +2,9 @@
 
 // REQUIRES: CPU=x86_64
 
+// FIXME: rdar://problem/19648117 Needs splitting objc parts out
+// XFAIL: linux
+
 import Builtin
 
 // Enums consisting of a retainable pointer and a single empty case use nullable

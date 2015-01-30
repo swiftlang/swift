@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -parse -verify %s
 
+// XFAIL: linux
+
 import Foundation
 
 // Swift and Foundation types should work.

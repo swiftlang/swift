@@ -3,6 +3,7 @@
 
 // REQUIRES: OS=macosx
 // REQUIRES: CPU=x86_64
+// REQUIRES: objc_interop
 
 import Swift
 

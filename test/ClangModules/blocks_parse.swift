@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -parse -verify %s
 
+// REQUIRES: objc_interop
+
 import blocks
 import Foundation
 

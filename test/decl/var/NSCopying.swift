@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %clang-importer-sdk %s -parse -verify
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 class NotCopyable {}

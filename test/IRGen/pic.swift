@@ -3,6 +3,8 @@
 
 // RUN: %target-swift-frontend %s -module-name main -S -o - | FileCheck -check-prefix=%target-cpu %s
 
+// XFAIL: linux
+
 var global: Int = 0
 
 public func use_global() -> Int {

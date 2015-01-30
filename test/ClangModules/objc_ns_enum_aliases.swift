@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -parse %s -verify
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 var alias1 = NSAliasesEnum.BySameValue // expected-error{{}}

@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -I %S/../Inputs/custom-modules -import-objc-header %S/Inputs/mixed-target/header.h -parse %s -verify
 
+// REQUIRES: objc_interop
+
 func test(foo : FooProto) {
   let _: CInt = foo.bar
   let _: CInt = ExternIntX.x

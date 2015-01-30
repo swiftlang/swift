@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift
 
+// XFAIL: linux
+
 import StdlibUnittest
 
 var tests = TestSuite("FixedPoint")

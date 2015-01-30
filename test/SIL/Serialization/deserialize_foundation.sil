@@ -2,6 +2,6 @@
 // RUN: %target-sil-opt -verify %platform-module-dir/Foundation.swiftmodule > /dev/null
 // RUN: llvm-bcanalyzer %platform-module-dir/Foundation.swiftmodule | FileCheck %s
 
-// REQUIRES: sdk
+// REQUIRES: objc_interop
 
 // CHECK-NOT: Unknown

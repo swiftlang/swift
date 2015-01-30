@@ -15,6 +15,8 @@
 // RUN: FileCheck -check-prefix=CHECK -check-prefix=CHECK-INTERNAL %s < %t/accessibility-main.h
 // RUN: %check-in-clang %t/accessibility-main.h
 
+// REQUIRES: objc_interop
+
 // CHECK-LABEL: @interface A_Public{{$}}
 // CHECK-INTERNAL-NEXT: init
 // CHECK-NEXT: @end

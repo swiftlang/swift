@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
 
 // REQUIRES: CPU=x86_64
+// XFAIL: linux
 
 import Swift
 

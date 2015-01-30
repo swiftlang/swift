@@ -2,6 +2,8 @@
 // RUN: %build-irgen-test-overlays
 // RUN: %target-swift-frontend -sdk %S/Inputs -I %t %s -emit-ir | FileCheck %s
 
+// REQUIRES: objc_interop
+
 // CHECK-NOT: @_TWvi{{.*}}
 // CHECK: _TWvdvC12rdar153043293Bar3fooGVS_3FooSi_
 // CHECK-NOT: @_TWvi{{.*}}

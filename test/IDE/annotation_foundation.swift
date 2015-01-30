@@ -1,5 +1,7 @@
 // RUN: %target-swift-ide-test -annotate -source-filename %s | FileCheck %s
 
+// REQUIRES: objc_interop
+
 // CHECK: import <iMod>Foundation</iMod>
 import Foundation
 

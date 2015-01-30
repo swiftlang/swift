@@ -5,6 +5,8 @@
 // RUN: %check-in-clang %t/override.h -I %S/Inputs/custom-modules -Wno-super-class-method-mismatch -Wno-overriding-method-mismatch
 // RUN: not %check-in-clang %t/override.h -Wno-super-class-method-mismatch -I %S/Inputs/custom-modules 2>&1 | FileCheck -check-prefix=CLANG %s
 
+// REQUIRES: objc_interop
+
 import OverrideBase
 // No errors from Clang until we get to the FixMe class.
 // CLANG-NOT: error

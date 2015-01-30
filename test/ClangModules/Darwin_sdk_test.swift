@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -parse %s -verify
 
+// REQUIRES: objc_interop
+
 import Darwin
 import ObjectiveC
 

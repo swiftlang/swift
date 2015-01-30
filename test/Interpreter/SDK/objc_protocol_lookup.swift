@@ -1,6 +1,8 @@
 // Check JIT mode
 // RUN: %swift -sdk %sdk -interpret %s | FileCheck %s
+
 // REQUIRES: swift_interpreter
+// REQUIRES: objc_interop
 
 import Foundation
 

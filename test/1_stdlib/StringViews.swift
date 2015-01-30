@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
 
+// XFAIL: linux
+
 // FIXME: move to validation suite.
 // REQUIRES: long_tests
 

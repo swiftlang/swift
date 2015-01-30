@@ -2,6 +2,9 @@
 // RUN: %target-build-swift -O %s -o %t/a.out.optimized
 // RUN: %target-run %t/a.out.optimized | FileCheck %s
 
+// FIXME: rdar://problem/19648117 Needs splitting objc parts out
+// XFAIL: linux
+
 import Foundation
 
 func allToInt<T>(x: T) -> Int {

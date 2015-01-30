@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -parse -verify -application-extension %s
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 func test_unavailable_app_extension() {

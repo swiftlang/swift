@@ -3,6 +3,8 @@
 // NB: No "-verify"--this file should parse successfully on its own.
 // RUN: %target-swift-frontend %clang-importer-sdk -parse -parse-as-library %s
 
+// REQUIRES: objc_interop
+
 import UIKit
 
 @UIApplicationMain // expected-error{{'UIApplicationMain' attribute cannot be used in a module that contains top-level code}}

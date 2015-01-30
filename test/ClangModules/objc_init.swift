@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -emit-sil -I %S/Inputs/custom-modules %s -verify
 
+// REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 // FIXME: <rdar://problem/19452886> test/ClangModules/objc_init.swift should not require REQUIRES: OS=macosx
 

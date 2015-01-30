@@ -1,5 +1,8 @@
 // RUN: %target-parse-verify-swift %clang-importer-sdk
 
+// FIXME: rdar://problem/19648117 Needs splitting objc parts out
+// XFAIL: linux
+
 import ctypes
 import CoreGraphics
 import Foundation

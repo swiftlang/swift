@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -emit-ir -parse-as-library -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s -check-prefix=IR
 
 // REQUIRES: OS=ios
+// REQUIRES: objc_interop
 
 import Foundation
 import UIKit

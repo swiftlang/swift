@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module %s -emit-ir -g -o - | FileCheck %s
 
+// REQUIRES: objc_interop
+
 // CHECK-DAG: \0030"{{.*}}, null, ![[TY0:.*]]} ; [ DW_TAG_structure_type ] [{{.*}}ObjCClass{{.*}}] [line [[@LINE+1]]
 @objc class ObjCClass {
       @IBAction func click(_: AnyObject?) -> () {}

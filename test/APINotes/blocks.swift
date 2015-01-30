@@ -1,5 +1,7 @@
 // RUN: %target-build-swift -Xfrontend %clang-importer-sdk %s -emit-ir
 
+// REQUIRES: objc_interop
+
 import UIKit
 
 class MyView: UIView {

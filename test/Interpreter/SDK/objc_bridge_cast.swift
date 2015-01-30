@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
+// REQUIRES: objc_interop
+
 // Test dynamic casts that bridge value types through the runtime.
 
 import Foundation

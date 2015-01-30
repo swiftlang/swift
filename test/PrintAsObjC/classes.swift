@@ -11,6 +11,8 @@
 // RUN: not %check-in-clang -fno-modules %t/classes.h
 // RUN: %check-in-clang -fno-modules %t/classes.h -include Foundation.h -include ctypes.h -include CoreFoundation.h
 
+// REQUIRES: objc_interop
+
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Properties;
 // CHECK-NOT: Swift;

@@ -7,6 +7,8 @@
 // RUN: cp -r %t/comments.framework/Modules/comments.swiftmodule %t/comments.swiftmodule
 // RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -I %t | FileCheck %s
 
+// XFAIL: linux
+
 /// first_decl_class_1 Aaa.
 class first_decl_class_1 {
 

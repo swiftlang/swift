@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt %s -sil-combine -verify | FileCheck %s
 
+// XFAIL: linux
+
 sil_stage canonical
 
 import Builtin

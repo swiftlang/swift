@@ -8,6 +8,8 @@ import Foundation
 // RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_1 < %t.members.txt
 // RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members.txt
 
+// REQUIRES: objc_interop
+
 // NO_STDLIB_PRIVATE: Begin completions
 // NO_STDLIB_PRIVATE-NOT: _convertStringToNSString
 // NO_STDLIB_PRIVATE: End completions

@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift foo | FileCheck %s
 
+// REQUIRES: objc_interop
+
 // The Objective-C runtime does not implement the autorelease
 // optimization on i386, even in the iOS simulator.
 // XFAIL: CPU=i386

@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift
 
+// XFAIL: linux
+
 class V {}
 class U : V {}
 class T : U {}

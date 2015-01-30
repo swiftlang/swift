@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
+// REQUIRES: objc_interop
+
 import CoreGraphics
 
 func print(r: CGPoint, prefix: String) {

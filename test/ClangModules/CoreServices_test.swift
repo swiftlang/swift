@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift %clang-importer-sdk
 
+// REQUIRES: objc_interop
+
 import CoreServices
 
 func test(url: CFURL, ident: CSIdentity) {

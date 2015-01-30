@@ -17,7 +17,9 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-stdlib-swift %s | FileCheck %s
+//
 // XFAIL: interpret
+// REQUIRES: objc_interop
 
 import Swift
 import SwiftShims

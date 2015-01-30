@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
+// REQUIRES: objc_interop
+
 // Test interop of pure Swift objects as ObjC objects accessed through AnyObject.
 
 import Foundation

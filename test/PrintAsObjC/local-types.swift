@@ -7,6 +7,8 @@
 // RUN: FileCheck %s < %t/local.h
 // RUN: %check-in-clang %t/local.h
 
+// REQUIRES: objc_interop
+
 import ObjectiveC
 
 // CHECK-LABEL: @interface AFullyDefinedClass

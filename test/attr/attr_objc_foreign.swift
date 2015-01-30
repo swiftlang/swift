@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -parse -verify %s
 // RUN: %target-swift-ide-test %clang-importer-sdk -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true | FileCheck %s
 
+// REQUIRES: objc_interop
+
 #if os(iOS)
 import Foundation
 #endif

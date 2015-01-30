@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -parse -verify %clang-importer-sdk -I %S/Inputs/custom-modules %s
 
+// REQUIRES: objc_interop
+
 // Do not import Foundation! This tests indirect visibility.
 import Redeclaration
 import AppKit

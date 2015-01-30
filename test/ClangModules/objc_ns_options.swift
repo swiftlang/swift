@@ -2,6 +2,8 @@
 // -- Check that we can successfully round-trip.
 // RUN: %target-swift-frontend %clang-importer-sdk -emit-ir %s >/dev/null
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 var withMince: NSRuncingOptions = .EnableMince

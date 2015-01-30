@@ -1,5 +1,6 @@
 // RUN: %swift -sdk %sdk -target %target-triple -repl < %s | FileCheck %s
-// REQUIRES: sdk
+
+// REQUIRES: objc_interop
 // REQUIRES: swift_repl
 
 import Cocoa

@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
+// XFAIL: linux
+
 // Type:
 // Swift.Dictionary<Swift.Int64, Swift.String>
 // CHECK: ![[DT:[^,]+]]} ; [ DW_TAG_structure_type ] [Dictionary]

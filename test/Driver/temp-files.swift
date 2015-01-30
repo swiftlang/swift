@@ -5,6 +5,8 @@
 // RUN: ls %t/main
 // RUN: ls %t/tmp | FileCheck -check-prefix=EMPTY %s
 
+// XFAIL: linux
+
 // EMPTY-NOT: .{{(o|swiftmodule|swiftdoc)}}
 
 // RUN: rm -rf %t && mkdir -p %t/tmp/ && touch %t/tmp/dummy

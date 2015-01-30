@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift
 
+// REQUIRES: objc_interop
+
 // Test casting through a class type to a bridged value type.
 
 class NSObject { }

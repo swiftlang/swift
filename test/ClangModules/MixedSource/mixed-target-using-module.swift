@@ -2,6 +2,8 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -F %S/Inputs/mixed-target/ -module-name Mixed -import-underlying-module -emit-ir %S/../../Inputs/empty.swift - | FileCheck -check-prefix=CHECK-AUTOLINK %s
 // RUN: not %target-swift-frontend %clang-importer-sdk -F %S/Inputs/mixed-target/ -module-name WrongName -import-underlying-module -parse %s 2>&1 | FileCheck -check-prefix=CHECK-WRONG-NAME %s
 
+// REQUIRES: objc_interop
+
 // CHECK-AUTOLINK: !{{[0-9]+}} = !{i32 {{[0-9]+}}, !"Linker Options", ![[LINK_LIST:[0-9]+]]}
 // CHECK-AUTOLINK: ![[LINK_LIST]] = !{
 // CHECK-AUTOLINK-NOT: metadata !"-framework", metadata !"Mixed"

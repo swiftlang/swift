@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+
 // XFAIL: interpret
+// REQUIRES: objc_interop
 
 // CHECK: testing...
 println("testing...")

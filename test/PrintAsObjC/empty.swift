@@ -6,6 +6,8 @@
 // RUN: %check-in-clang -fno-modules %t/empty.h
 // RUN: not %check-in-clang -I %S/Inputs/clang-headers %t/empty.h 2>&1 | FileCheck %s --check-prefix=CUSTOM-OBJC-PROLOGUE
 
+// REQUIRES: objc_interop
+
 // CHECK-NOT: @import Swift;
 
 // CHECK-LABEL: #include <objc/NSObject.h>

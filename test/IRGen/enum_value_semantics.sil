@@ -2,6 +2,9 @@
 
 // REQUIRES: CPU=x86_64
 
+// FIXME: rdar://problem/19648117 Needs splitting objc parts out
+// XFAIL: linux
+
 import Builtin
 
 // CHECK: @_TWVO20enum_value_semantics20SinglePayloadTrivial = constant [20 x i8*] [

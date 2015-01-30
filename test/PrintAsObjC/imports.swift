@@ -8,6 +8,8 @@
 // RUN: FileCheck -check-prefix=NEGATIVE %s < %t/imports.h
 // RUN: %check-in-clang %t/imports.h -I %S/Inputs/custom-modules/
 
+// REQUIRES: objc_interop
+
 // CHECK-DAG: @import ctypes.bits;
 // CHECK-DAG: @import Foundation;
 // CHECK-DAG: @import Base;

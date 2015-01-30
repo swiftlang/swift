@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -gnone -sdk %S/Inputs %s -emit-ir | FileCheck %s
 
 // REQUIRES: CPU=x86_64
+// REQUIRES: objc_interop
 
 sil_stage canonical
 

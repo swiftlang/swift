@@ -8,6 +8,8 @@
 // RUN: echo 'import submodules; println("\(x), \(y)")' | %target-swift-frontend %clang-importer-sdk -parse - -I %t
 // RUN: echo 'import submodules; println("\(x), \(y)")' | not %target-swift-frontend -parse - -I %t 2>&1 | FileCheck -check-prefix=MISSING %s
 
+// XFAIL: linux
+
 #if IMPORT_TOP_LEVEL
 import ctypes
 #endif

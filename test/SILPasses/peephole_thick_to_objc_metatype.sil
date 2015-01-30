@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt %s -sil-combine -verify | FileCheck %s
 
+// REQUIRES: objc_interop
+
 sil_stage canonical
 
 import Builtin

@@ -1,4 +1,6 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+
+// REQUIRES: objc_interop
 import Foundation
 
 func foo(f: String -> String) {

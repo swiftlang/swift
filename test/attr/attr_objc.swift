@@ -1,6 +1,8 @@
 // RUN: %target-parse-verify-swift
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true | FileCheck %s
 
+// REQUIRES: objc_interop
+
 class PlainClass {}
 struct PlainStruct {}
 enum PlainEnum {}

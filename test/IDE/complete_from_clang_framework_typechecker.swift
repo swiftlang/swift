@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift -F %S/Inputs/mock-sdk
 
+// XFAIL: linux
+
 import Foo
 // Don't import 'FooHelper'.
 

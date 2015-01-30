@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen | FileCheck %s
 
+// REQUIRES: objc_interop
+
 // This file is also used by objc_attr_NSManaged_multi.swift.
 
 import Foundation

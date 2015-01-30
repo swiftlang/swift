@@ -8,6 +8,8 @@
 // RUN: FileCheck --check-prefix=NEGATIVE %s < %t/protocols.h
 // RUN: %check-in-clang %t/protocols.h
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 // CHECK-LABEL: @protocol A{{$}}

@@ -8,3 +8,4 @@
 // RUN: diff %t/comments.h-cleaned %S/Inputs/comments-expected-output.h
 // RUN: %check-in-clang -Wno-documentation %t/comments.h
 
+// REQUIRES: objc_interop

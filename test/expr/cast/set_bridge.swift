@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift
 
+// REQUIRES: objc_interop
+
 class Root : Hashable { 
   var hashValue: Int {
     return 0

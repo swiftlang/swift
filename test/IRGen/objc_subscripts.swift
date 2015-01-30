@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | FileCheck %s
 
 // REQUIRES: CPU=x86_64
+// REQUIRES: objc_interop
 
 // CHECK: @_INSTANCE_METHODS__TtC15objc_subscripts10SomeObject = 
 // CHECK:   private constant { i32, i32, [5 x { i8*, i8*, i8* }] } 

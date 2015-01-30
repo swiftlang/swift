@@ -19,6 +19,8 @@
 // RUN: %S/../../utils/line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out
 // RUN: %S/../../utils/line-directive %t/out.swift -- %target-run %t/a.out
 
+// REQUIRES: objc_interop
+
 import Swift
 
 //===--- Code destined for stdlib -----------------------------------------===//

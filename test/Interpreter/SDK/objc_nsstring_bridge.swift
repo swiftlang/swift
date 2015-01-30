@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 // Add a method to String to make sure a value is really a String and not

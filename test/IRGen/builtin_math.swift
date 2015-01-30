@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
 
+// XFAIL: linux
+
 import Darwin
 
 // Make sure we use an intrinsic for functions such as exp.

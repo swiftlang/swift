@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -verify -parse %s
 
+// REQUIRES: objc_interop
+
 import Dispatch
 
 func getAnyValue<T>(opt: T?) -> T { return opt! }

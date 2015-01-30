@@ -1,5 +1,7 @@
 // RUN: %swift -parse -target x86_64-apple-macosx10.10 %s -verify
 
+// XFAIL: linux
+
 // REQUIRES: OS=macosx
 
 @availability(OSX, introduced=10.5, deprecated=10.8, obsoleted=10.9,

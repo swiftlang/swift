@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 // Dynamic subscripting of NSArray, dynamic method dispatch

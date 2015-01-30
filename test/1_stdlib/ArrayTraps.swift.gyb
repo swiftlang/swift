@@ -9,6 +9,8 @@
 // CHECK: OK
 // CHECK: CRASHED: SIG{{ILL|TRAP}}
 
+// XFAIL: linux
+
 // This file is gybbe'd twice, once to generate the test file, and
 // once to run the tests.  The second time, the output is thrown away,
 // but the list of tests is used to invoke the test executable

@@ -7,6 +7,8 @@
 // FileCheck -check-prefix=CHECK-BASIC < %t.d
 // FileCheck -check-prefix=CHECK-BASIC-YAML < %t.swiftdeps
 
+// XFAIL: linux
+
 // CHECK-BASIC-LABEL: - :
 // CHECK-BASIC: Inputs/empty.swift
 // CHECK-BASIC: Swift.swiftmodule

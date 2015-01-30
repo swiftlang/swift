@@ -8,6 +8,7 @@
 // RUN: %target-swift-frontend -target x86_64-apple-macosx10.10 -sdk %S/Inputs -I %t -primary-file %s -emit-ir | FileCheck -check-prefix=CHECK-10_10 %s
 
 // REQUIRES: OS=macosx
+// REQUIRES: objc_interop
 
 // FIXME: This test in written in Swift because the SIL parser fails
 // when referencing weak_variable.

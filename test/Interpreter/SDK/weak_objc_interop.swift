@@ -8,6 +8,8 @@
 // RUN: %target-build-swift %t/main.swift -I %S/Inputs/ObjCWeak/ -Xlinker %t/ObjCWeak.o -o %t/weak_objc_interop -Xfrontend -disable-access-control
 // RUN: %target-run %t/weak_objc_interop 2>&1 | FileCheck %s
 
+// REQUIRES: objc_interop
+
 import Foundation
 import ObjCWeak
 

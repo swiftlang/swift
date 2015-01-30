@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-silgen | FileCheck %s
 
+// XFAIL: linux
+
 sil_stage raw // CHECK: sil_stage raw
 
 import Builtin

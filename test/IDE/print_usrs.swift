@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -parse -verify %clang-importer-sdk -disable-objc-attr-requires-foundation-module %s
 // RUN: %target-swift-ide-test -print-usrs -source-filename %s %clang-importer-sdk | FileCheck %s -strict-whitespace
 
+// XFAIL: linux
+
 import macros
 
 // CHECK: [[@LINE+1]]:8 s:V14swift_ide_test1S{{$}}

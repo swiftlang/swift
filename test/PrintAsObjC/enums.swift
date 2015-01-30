@@ -6,6 +6,8 @@
 // RUN: %check-in-clang %t/enums.h
 // RUN: %check-in-clang -fno-modules %t/enums.h -include Foundation.h -include ctypes.h -include CoreFoundation.h
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 // CHECK-LABEL: enum FooComments : NSInteger;

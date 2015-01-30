@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -parse -verify
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 func useUnavailable() {

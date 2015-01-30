@@ -11,6 +11,8 @@
 // RUN: %target-run %t/a.out StringUTF16ViewSubscriptDecrementedStartIndex 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out StringUTF16ViewSubscriptEndIndex 2>&1 | FileCheck %s -check-prefix=CHECK
 
+// XFAIL: linux
+
 // CHECK: OK
 // CHECK: CRASHED: SIG{{ILL|TRAP|ABRT}}
 

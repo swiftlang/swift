@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -module-name generic_classes %s -emit-ir | FileCheck %s -check-prefix=CHECK-%target-os
 
 // REQUIRES: CPU=x86_64
+// UNSUPPORTED: OS=linux-gnu
 
 // rdar://15806697 - use null pointers for &_objc_empty_vtable in the simulator
 //

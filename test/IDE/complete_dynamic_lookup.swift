@@ -61,6 +61,8 @@
 // RUN: FileCheck %s -check-prefix=DL_CLASS_DOT < %t.dl.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
+// REQUIRES: objc_interop
+
 import foo_swift_module
 import class bar_swift_module.Bar_ImportedObjcClass
 import baz_clang_module

@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
+// XFAIL: linux
+
 func foo() -> String? { return "" }
 func bar() -> String? { return "" }
 

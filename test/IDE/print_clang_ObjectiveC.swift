@@ -8,6 +8,8 @@
 // RUN: FileCheck -input-file %t/ObjectiveC.NSObject.forward-decls.txt -check-prefix=CHECK -check-prefix=CHECK-WITH-FORWARD-DECLS %s
 // RUN: FileCheck -input-file %t/ObjectiveC.NSObject.forward-decls.txt -check-prefix=NEGATIVE %s
 
+// REQUIRES: objc_interop
+
 // NEGATIVE-WITHOUT-FORWARD-DECLS-NOT: var description
 // NEGATIVE-NOT: NSCoder
 

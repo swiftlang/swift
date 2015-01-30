@@ -1,6 +1,8 @@
 // RUN: %swiftc_driver -driver-print-jobs -g -sdk %S/../Inputs/clang-importer-sdk %s 2>&1 | FileCheck %s
 // RUN: env SDKROOT=%S/../Inputs/clang-importer-sdk %swiftc_driver_plain -g -driver-print-jobs %s 2>&1 | FileCheck %s
 
+// XFAIL: linux
+
 // CHECK-NOT: warning: no such SDK:
 // CHECK: bin/swift
 // CHECK: Driver/sdk.swift
