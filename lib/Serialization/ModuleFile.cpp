@@ -704,10 +704,6 @@ ModuleFile::ModuleFile(
         StringRef blobData;
         unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
         switch (kind) {
-        case input_block::SOURCE_FILE:
-          assert(scratch.empty());
-          SourcePaths.push_back(blobData);
-          break;
         case input_block::IMPORTED_MODULE: {
           bool exported, scoped;
           input_block::ImportedModuleLayout::readRecord(scratch,

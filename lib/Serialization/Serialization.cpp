@@ -398,7 +398,6 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(control_block, TARGET);
 
   BLOCK(INPUT_BLOCK);
-  BLOCK_RECORD(input_block, SOURCE_FILE);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
   BLOCK_RECORD(input_block, LINK_LIBRARY);
   BLOCK_RECORD(input_block, IMPORTED_HEADER);
@@ -589,7 +588,6 @@ static void flattenImportPath(const Module::ImportedModule &import,
 
 void Serializer::writeInputBlock(const SerializationOptions &options) {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 4);
-  input_block::SourceFileLayout SourceFile(Out);
   input_block::ImportedModuleLayout ImportedModule(Out);
   input_block::LinkLibraryLayout LinkLibrary(Out);
   input_block::ImportedHeaderLayout ImportedHeader(Out);
@@ -603,17 +601,6 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
       SearchPath.emit(ScratchRecord, /*framework=*/false, path);
     for (auto &path : searchPathOpts.FrameworkSearchPaths)
       SearchPath.emit(ScratchRecord, /*framework=*/true, path);
-  }
-
-  for (auto filename : options.InputFilenames) {
-    llvm::SmallString<128> path(filename);
-
-    std::error_code err;
-    err = llvm::sys::fs::make_absolute(path);
-    if (err)
-      continue;
-
-    SourceFile.emit(ScratchRecord, path);
   }
 
   // FIXME: Having to deal with private imports as a superset of public imports

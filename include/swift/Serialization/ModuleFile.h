@@ -75,9 +75,6 @@ class ModuleFile : public LazyMemberLoader {
   /// The data blob containing all of the module's identifiers.
   StringRef IdentifierData;
 
-  /// Paths to the source files used to build this module.
-  SmallVector<StringRef, 4> SourcePaths;
-
 public:
   /// Represents another module that has been imported as a dependency.
   class Dependency {
@@ -469,12 +466,6 @@ public:
   /// Checks whether this module can be used.
   ModuleStatus getStatus() const {
     return static_cast<ModuleStatus>(Bits.Status);
-  }
-
-  /// Returns paths to the source files that were used to build this module.
-  ArrayRef<StringRef> getInputSourcePaths() const {
-    assert(getStatus() == ModuleStatus::Valid);
-    return SourcePaths;
   }
 
   /// Returns the list of modules this module depends on.

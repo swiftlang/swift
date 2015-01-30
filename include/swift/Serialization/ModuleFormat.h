@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 169; // Last change: local type serialization
+const uint16_t VERSION_MINOR = 170; // Last change: dropped SOURCE_FILE record.
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -391,19 +391,13 @@ namespace input_block {
   // These IDs must \em not be renumbered or reordered without incrementing
   // VERSION_MAJOR.
   enum {
-    SOURCE_FILE = 1,
-    IMPORTED_MODULE,
+    IMPORTED_MODULE = 1,
     LINK_LIBRARY,
     IMPORTED_HEADER,
     IMPORTED_HEADER_CONTENTS,
     MODULE_FLAGS,
     SEARCH_PATH
   };
-
-  using SourceFileLayout = BCRecordLayout<
-    SOURCE_FILE, // ID
-    BCBlob // path
-  >;
 
   using ImportedModuleLayout = BCRecordLayout<
     IMPORTED_MODULE,
