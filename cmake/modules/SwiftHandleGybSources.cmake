@@ -18,18 +18,25 @@ include(SwiftSetIfArchBitness)
 #   sources should depend on ${dependency_out_var_name} targets.
 #
 # arch
-#   The architecture that the files will be compiled for.
+#   The architecture that the files will be compiled for.  If this is
+#   false, the files are architecture-independent and will be emitted
+#   into ${CMAKE_CURRENT_BINARY_DIR} instead of an architecture-specific
+#   destination; this is useful for generated include files.
 function(handle_gyb_sources dependency_out_var_name sources_var_name arch)
-  set_if_arch_bitness(ptr_size
+  set(extra_gyb_flags "")
+  if (arch)
+    set_if_arch_bitness(ptr_size
       ARCH "${arch}"
       CASE_32_BIT "4"
       CASE_64_BIT "8")
+    set(extra_gyb_flags "-DCMAKE_SIZEOF_VOID_P=${ptr_size}")
+  endif()
 
   set(gyb_flags
       "--test" # Run gyb's self-tests whenever we use it.  They're cheap
                # enough and it keeps us honest.
       ${SWIFT_GYB_FLAGS}
-      "-DCMAKE_SIZEOF_VOID_P=${ptr_size}")
+      ${extra_gyb_flags})
 
   set(dependency_targets)
   set(de_gybbed_sources)
@@ -45,7 +52,11 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name arch)
     if(src STREQUAL src_sans_gyb)
       list(APPEND de_gybbed_sources "${src}")
     else()
-      set(dir "${CMAKE_CURRENT_BINARY_DIR}/${ptr_size}")
+      if (arch)
+        set(dir "${CMAKE_CURRENT_BINARY_DIR}/${ptr_size}")
+      else()
+        set(dir "${CMAKE_CURRENT_BINARY_DIR}")
+      endif()
       set(output_file_name "${dir}/${src_sans_gyb}")
       list(APPEND de_gybbed_sources "${output_file_name}")
       string(MD5 output_file_name_hash "${output_file_name}")

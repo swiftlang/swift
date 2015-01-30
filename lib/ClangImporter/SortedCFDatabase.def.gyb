@@ -1,0 +1,53 @@
+%# -*- mode: Python -*-
+%# Ignore the following admonition; it applies to the resulting .def file only
+//// Automatically Generated From SortedCFDatabase.def.gyb.
+//// Do Not Edit Directly!
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+
+import re
+
+prologueLines = ""
+epilogueLines = ""
+
+# A dictionary mapping type names to their corresponding lines
+# in the database.
+lineForName = {}
+
+# Load the data file.
+with open(CFDatabaseFile, 'rb') as f:
+  for line in f:
+    # Pass through preprocessor directives literally.
+    # Assume that they all fall into either a strict prologue or epilogue.
+    if re.match('^#', line):
+      if len(lineForName) == 0:
+        prologueLines += line
+      else:
+        epilogueLines += line
+      continue
+
+    # Otherwise, check for lines like FOO(BAR)
+    m = re.match('^\w+\((\w+)\)', line)   
+    if m:
+      lineForName[m.group(1)] = line
+}%
+
+${prologueLines}
+
+%# Use a quasi-lexicographic order: length first, then string data.
+%for name in sorted(lineForName.keys(), key=lambda x: (len(x), x)):
+${lineForName[name]}
+%end
+
+${epilogueLines}

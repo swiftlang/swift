@@ -257,7 +257,7 @@ struct _InternalStruct {
 - (void)performSelectorWithMagic:(SEL)cmd;
 @end
 
-typedef struct __FooCFType *FooCFTypeRef;
+typedef struct __attribute__((objc_bridge(id))) __FooCFType *FooCFTypeRef;
 void FooCFTypeRelease(FooCFTypeRef);
 
 

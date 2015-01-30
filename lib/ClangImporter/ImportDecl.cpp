@@ -41,6 +41,8 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Path.h"
 
+#include <algorithm>
+
 #define DEBUG_TYPE "Clang module importer"
 
 STATISTIC(NumTotalImportedEntities, "# of imported clang entities");
@@ -886,16 +888,51 @@ namespace {
   };
 }
 
+/// The maximum length of any particular string in the whitelist.
+const size_t MaxCFWhitelistStringLength = 38;
+namespace {
+  struct CFWhitelistEntry {
+    unsigned char Length;
+    char Data[MaxCFWhitelistStringLength + 1];
+
+    operator StringRef() const { return StringRef(Data, Length); }
+  };
+
+  // Quasi-lexicographic order: string length first, then string data.
+  // Since we don't care about the actual length, we can use this, which
+  // lets us ignore the string data a larger proportion of the time.
+  struct CFWhitelistComparator {
+    bool operator()(StringRef lhs, StringRef rhs) const {
+      return (lhs.size() < rhs.size() ||
+              (lhs.size() == rhs.size() && lhs < rhs));
+    }
+  };
+}
+
+template <size_t Len>
+static constexpr size_t string_lengthof(const char (&data)[Len]) {
+  return Len - 1;
+}
+
+/// The CF whitelist.  We use 'constexpr' to verify that this is
+/// emitted as a constant.  Note that this is expected to be sorted in
+/// quasi-lexicographic order.
+static constexpr const CFWhitelistEntry CFWhitelist[] = {
+#define CF_TYPE(NAME) { string_lengthof(#NAME), #NAME },
+#define NON_CF_TYPE(NAME)
+#include "SortedCFDatabase.def"
+};
+const size_t NumCFWhitelistEntries = sizeof(CFWhitelist) / sizeof(*CFWhitelist);
+
+/// Maintain a set of whitelisted CF types.
+static bool isWhitelistedCFTypeName(StringRef name) {
+  return std::binary_search(CFWhitelist, CFWhitelist + NumCFWhitelistEntries,
+                            name, CFWhitelistComparator());
+}
+
 /// Classify a potential CF typedef.
 CFPointeeInfo
 CFPointeeInfo::classifyTypedef(const clang::TypedefNameDecl *typedefDecl) {
-  bool isKnownNonCFType = llvm::StringSwitch<bool>(typedefDecl->getName())
-#define NON_CF(NAME) .Case(#NAME, true)
-#include "CFExclusions.def"
-    .Default(false);
-  if (isKnownNonCFType)
-    return forInvalid();
-
   clang::QualType type = typedefDecl->getUnderlyingType();
 
   if (auto subTypedef = type->getAs<clang::TypedefType>()) {
@@ -913,11 +950,18 @@ CFPointeeInfo::classifyTypedef(const clang::TypedefNameDecl *typedefDecl) {
     quals.removeConst();
     if (quals.empty()) {
       if (auto record = pointee->getAs<clang::RecordType>()) {
-        if (!record->getDecl()->getDefinition()) {
+        auto recordDecl = record->getDecl();
+        if (recordDecl->hasAttr<clang::ObjCBridgeAttr>() ||
+            recordDecl->hasAttr<clang::ObjCBridgeMutableAttr>() ||
+            recordDecl->hasAttr<clang::ObjCBridgeRelatedAttr>() ||
+            isWhitelistedCFTypeName(typedefDecl->getName())) {
           return forRecord(isConst, record->getDecl());
         }
       } else if (isConst && pointee->isVoidType()) {
-        return forConstVoid();
+        if (typedefDecl->hasAttr<clang::ObjCBridgeAttr>() ||
+            isWhitelistedCFTypeName(typedefDecl->getName())) {
+          return forConstVoid();
+        }
       }
     }
   }
@@ -926,9 +970,6 @@ CFPointeeInfo::classifyTypedef(const clang::TypedefNameDecl *typedefDecl) {
 }
 
 static bool isCFTypeDecl(const clang::TypedefNameDecl *Decl) {
-  if (!Decl->getName().endswith(SWIFT_CFTYPE_SUFFIX))
-    return false;
-
   if (auto pointee = CFPointeeInfo::classifyTypedef(Decl))
     return pointee.isValid();
   return false;

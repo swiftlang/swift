@@ -1,4 +1,4 @@
-typedef const struct __CCPowerSupply *CCPowerSupplyRef;
+typedef const struct __attribute__((objc_bridge(id))) __CCPowerSupply *CCPowerSupplyRef;
 
 /// The standard power supply.
 extern const CCPowerSupplyRef kCCPowerStandard;
@@ -7,7 +7,7 @@ extern const CCPowerSupplyRef kCCPowerStandard;
 __attribute__((cf_returns_not_retained))
 CCPowerSupplyRef CCPowerSupplyGetDefault();
 
-typedef const struct __CCRefrigerator *CCRefrigeratorRef;
+typedef const struct __attribute__((objc_bridge(id))) __CCRefrigerator *CCRefrigeratorRef;
 
 // Unaudited function: unmanaged result despite name
 CCRefrigeratorRef CCRefrigeratorCreate(CCPowerSupplyRef power);

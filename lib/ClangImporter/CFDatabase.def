@@ -1,0 +1,581 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef CF_TYPE
+#  error "Must define CF_TYPE(NAME) before including this file."
+#endif
+
+#ifndef NON_CF_TYPE
+#  error "Must define NON_CF_TYPE(NAME) before including this file."
+#endif
+
+// Accelerate/vImage
+CF_TYPE(vImageCVImageFormatRef)
+CF_TYPE(vImageConstCVImageFormatRef)
+CF_TYPE(vImageConverterRef)
+
+// AddressBook
+CF_TYPE(ABAddressBookRef)
+CF_TYPE(ABGroupRef)
+CF_TYPE(ABMultiValueRef)
+CF_TYPE(ABMutableMultiValueRef)
+CF_TYPE(ABPersonRef)
+CF_TYPE(ABPickerRef)
+CF_TYPE(ABRecordRef)
+CF_TYPE(ABSearchElementRef)
+
+// ApplicationServices/ATS
+NON_CF_TYPE(ATSFontContainerRef)
+NON_CF_TYPE(ATSFontFamilyRef)
+NON_CF_TYPE(ATSFontNotificationInfoRef)
+NON_CF_TYPE(ATSFontNotificationRef)
+NON_CF_TYPE(ATSFontRef)
+NON_CF_TYPE(ATSGlyphRef)
+NON_CF_TYPE(ATSULineRef)
+
+// ApplicationServices/ColorSync
+CF_TYPE(ColorSyncCMMRef)
+CF_TYPE(ColorSyncMutableProfileRef)
+CF_TYPE(ColorSyncProfileRef)
+CF_TYPE(ColorSyncTransformRef)
+
+// ApplicationServices/HIServices
+CF_TYPE(AXObserverRef)
+CF_TYPE(AXUIElementRef)
+CF_TYPE(AXValueRef)
+CF_TYPE(HIMutableShapeRef)
+CF_TYPE(HIShapeRef)
+NON_CF_TYPE(IconCacheRef)
+NON_CF_TYPE(IconSuiteRef)
+CF_TYPE(PasteboardRef)
+CF_TYPE(TranslationRef)
+
+// ApplicationServices/LangAnalysis
+NON_CF_TYPE(DCMDictionaryRef)
+NON_CF_TYPE(DCMDictionaryStreamRef)
+NON_CF_TYPE(DCMObjectRef)
+NON_CF_TYPE(LAContextRef)
+NON_CF_TYPE(LAEnvironmentRef)
+
+// ApplicationServices/QD
+NON_CF_TYPE(ATSUStyleSettingRef)
+NON_CF_TYPE(WindowRef)
+
+// AudioToolbox
+NON_CF_TYPE(AUEventListenerRef)
+NON_CF_TYPE(AUMIDIControllerRef)
+NON_CF_TYPE(AUParameterListenerRef) // CFExclusions.def
+NON_CF_TYPE(AudioConverterRef) // CFExclusions.def
+NON_CF_TYPE(AudioQueueBufferRef)
+NON_CF_TYPE(AudioQueueProcessingTapRef) // CFExclusions.def
+NON_CF_TYPE(AudioQueueRef) // CFExclusions.def
+NON_CF_TYPE(AudioQueueTimelineRef) // CFExclusions.def
+NON_CF_TYPE(CAClockRef) // CFExclusions.def
+NON_CF_TYPE(ExtAudioFileRef) // CFExclusions.def
+
+// CFNetwork
+CF_TYPE(CFHTTPAuthenticationRef)
+CF_TYPE(CFHTTPMessageRef)
+CF_TYPE(CFHostRef)
+CF_TYPE(CFNetDiagnosticRef)
+CF_TYPE(CFNetServiceBrowserRef)
+CF_TYPE(CFNetServiceMonitorRef)
+CF_TYPE(CFNetServiceRef)
+
+// Carbon/CarbonSound
+NON_CF_TYPE(ModRef)
+
+// Carbon/CommonPanels
+CF_TYPE(FCFontDescriptorRef)
+
+// Carbon/HIToolbox
+CF_TYPE(ControlRef)
+NON_CF_TYPE(DataBrowserItemDataRef)
+NON_CF_TYPE(DialogRef)
+NON_CF_TYPE(DragItemRef)
+NON_CF_TYPE(DragRef)
+NON_CF_TYPE(EventHandlerCallRef)
+NON_CF_TYPE(EventHandlerRef)
+NON_CF_TYPE(EventHotKeyRef)
+NON_CF_TYPE(EventLoopRef)
+CF_TYPE(EventLoopTimerRef)
+NON_CF_TYPE(EventQueueRef)
+NON_CF_TYPE(EventRef)
+NON_CF_TYPE(EventTargetRef)
+CF_TYPE(HIArchiveRef)
+CF_TYPE(HIObjectClassRef)
+CF_TYPE(HIObjectRef)
+CF_TYPE(HIToolbarItemRef)
+CF_TYPE(HIToolbarRef)
+CF_TYPE(HIViewRef)
+NON_CF_TYPE(HIViewTrackingAreaRef)
+NON_CF_TYPE(HIWindowRef)
+NON_CF_TYPE(IBNibRef)
+NON_CF_TYPE(KeyboardLayoutRef)
+NON_CF_TYPE(ListRef)
+CF_TYPE(MenuRef)
+CF_TYPE(MouseTrackingRef)
+NON_CF_TYPE(ScrapRef)
+CF_TYPE(TISInputSourceRef)
+NON_CF_TYPE(ToolboxObjectClassRef)
+NON_CF_TYPE(WindowGroupRef)
+
+// Carbon/Ink
+CF_TYPE(InkStrokeRef)
+CF_TYPE(InkTextRef)
+
+// Carbon/NavigationServices
+CF_TYPE(NavDialogRef)
+
+// CommonCrypto
+NON_CF_TYPE(CCCryptorRef) // CFExclusions.def
+
+// CoreAudio
+NON_CF_TYPE(AudioHardwarePlugInRef) // CFExclusions.def
+NON_CF_TYPE(AudioServerPlugInDriverRef)
+NON_CF_TYPE(AudioServerPlugInHostRef)
+
+// CoreFoundation
+CF_TYPE(CFAllocatorRef)
+CF_TYPE(CFArrayRef)
+CF_TYPE(CFAttributedStringRef)
+CF_TYPE(CFBagRef)
+CF_TYPE(CFBinaryHeapRef)
+CF_TYPE(CFBitVectorRef)
+CF_TYPE(CFBooleanRef)
+CF_TYPE(CFBundleRef)
+CF_TYPE(CFCalendarRef)
+CF_TYPE(CFCharacterSetRef)
+CF_TYPE(CFDataRef)
+CF_TYPE(CFDateFormatterRef)
+CF_TYPE(CFDateRef)
+CF_TYPE(CFDictionaryRef)
+CF_TYPE(CFErrorRef)
+CF_TYPE(CFFileDescriptorRef)
+CF_TYPE(CFFileSecurityRef)
+CF_TYPE(CFLocaleRef)
+CF_TYPE(CFMachPortRef)
+CF_TYPE(CFMessagePortRef)
+CF_TYPE(CFMutableArrayRef)
+CF_TYPE(CFMutableAttributedStringRef)
+CF_TYPE(CFMutableBagRef)
+CF_TYPE(CFMutableBitVectorRef)
+CF_TYPE(CFMutableCharacterSetRef)
+CF_TYPE(CFMutableDataRef)
+CF_TYPE(CFMutableDictionaryRef)
+CF_TYPE(CFMutableSetRef)
+CF_TYPE(CFMutableStringRef)
+CF_TYPE(CFNotificationCenterRef)
+CF_TYPE(CFNullRef)
+CF_TYPE(CFNumberFormatterRef)
+CF_TYPE(CFNumberRef)
+CF_TYPE(CFPlugInInstanceRef)
+CF_TYPE(CFPlugInRef)
+CF_TYPE(CFPropertyListRef)
+CF_TYPE(CFReadStreamRef)
+CF_TYPE(CFRunLoopObserverRef)
+CF_TYPE(CFRunLoopRef)
+CF_TYPE(CFRunLoopSourceRef)
+CF_TYPE(CFRunLoopTimerRef)
+CF_TYPE(CFSetRef)
+CF_TYPE(CFSocketRef)
+CF_TYPE(CFStringRef)
+CF_TYPE(CFStringTokenizerRef)
+CF_TYPE(CFTimeZoneRef)
+CF_TYPE(CFTreeRef)
+CF_TYPE(CFTypeRef)
+CF_TYPE(CFURLEnumeratorRef)
+CF_TYPE(CFURLRef)
+CF_TYPE(CFUUIDRef)
+CF_TYPE(CFUserNotificationRef)
+CF_TYPE(CFWriteStreamRef)
+CF_TYPE(CFXMLNodeRef)
+CF_TYPE(CFXMLParserRef)
+CF_TYPE(CFXMLTreeRef)
+
+// CoreGraphics
+CF_TYPE(CGColorRef)
+CF_TYPE(CGColorSpaceRef)
+CF_TYPE(CGContextRef)
+CF_TYPE(CGDataConsumerRef)
+CF_TYPE(CGDataProviderRef)
+NON_CF_TYPE(CGDisplayConfigRef)
+CF_TYPE(CGDisplayModeRef)
+CF_TYPE(CGDisplayStreamRef)
+CF_TYPE(CGDisplayStreamUpdateRef)
+CF_TYPE(CGEventRef)
+CF_TYPE(CGEventSourceRef)
+CF_TYPE(CGFontRef)
+CF_TYPE(CGFunctionRef)
+CF_TYPE(CGGradientRef)
+CF_TYPE(CGImageRef)
+CF_TYPE(CGLayerRef)
+CF_TYPE(CGMutablePathRef)
+NON_CF_TYPE(CGPDFArrayRef) // CFExclusions.def
+NON_CF_TYPE(CGPDFContentStreamRef)
+NON_CF_TYPE(CGPDFDictionaryRef) // CFExclusions.def
+CF_TYPE(CGPDFDocumentRef)
+NON_CF_TYPE(CGPDFObjectRef) // CFExclusions.def
+NON_CF_TYPE(CGPDFOperatorTableRef)
+CF_TYPE(CGPDFPageRef)
+NON_CF_TYPE(CGPDFScannerRef)
+NON_CF_TYPE(CGPDFStreamRef) // CFExclusions.def
+NON_CF_TYPE(CGPDFStringRef) // CFExclusions.def
+CF_TYPE(CGPSConverterRef)
+CF_TYPE(CGPathRef)
+CF_TYPE(CGPatternRef)
+CF_TYPE(CGShadingRef)
+
+// CoreMIDI
+NON_CF_TYPE(MIDIClientRef) // CFExclusions.def
+NON_CF_TYPE(MIDIDeviceListRef) // CFExclusions.def
+NON_CF_TYPE(MIDIDeviceRef) // CFExclusions.def
+NON_CF_TYPE(MIDIDriverRef)
+NON_CF_TYPE(MIDIEndpointRef) // CFExclusions.def
+NON_CF_TYPE(MIDIEntityRef) // CFExclusions.def
+NON_CF_TYPE(MIDIObjectRef) // CFExclusions.def
+NON_CF_TYPE(MIDIPortRef) // CFExclusions.def
+NON_CF_TYPE(MIDISetupRef) // CFExclusions.def
+NON_CF_TYPE(MIDIThruConnectionRef) // CFExclusions.def
+
+// CoreMedia
+CF_TYPE(CMAttachmentBearerRef)
+CF_TYPE(CMAudioFormatDescriptionRef)
+CF_TYPE(CMBlockBufferRef)
+CF_TYPE(CMBufferQueueRef)
+CF_TYPE(CMBufferRef)
+CF_TYPE(CMClockOrTimebaseRef)
+CF_TYPE(CMClockRef)
+CF_TYPE(CMClosedCaptionFormatDescriptionRef)
+CF_TYPE(CMFormatDescriptionRef)
+CF_TYPE(CMMemoryPoolRef)
+CF_TYPE(CMMetadataFormatDescriptionRef)
+CF_TYPE(CMMuxedFormatDescriptionRef)
+CF_TYPE(CMSampleBufferRef)
+CF_TYPE(CMSimpleQueueRef)
+CF_TYPE(CMTextFormatDescriptionRef)
+CF_TYPE(CMTimeCodeFormatDescriptionRef)
+CF_TYPE(CMTimebaseRef)
+CF_TYPE(CMVideoFormatDescriptionRef)
+
+// CoreMediaIO
+NON_CF_TYPE(CMIOHardwarePlugInRef)
+
+// CoreServices/AE
+NON_CF_TYPE(AERemoteProcessResolverRef)
+NON_CF_TYPE(AEStreamRef)
+
+// CoreServices/CarbonCore
+NON_CF_TYPE(CollatorRef)
+NON_CF_TYPE(FNSubscriptionRef)
+CF_TYPE(FSFileOperationRef)
+CF_TYPE(FSFileSecurityRef)
+NON_CF_TYPE(FSRef)
+NON_CF_TYPE(LocaleRef)
+NON_CF_TYPE(TECObjectRef)
+NON_CF_TYPE(TECSnifferObjectRef)
+NON_CF_TYPE(TextBreakLocatorRef)
+NON_CF_TYPE(ThreadTaskRef)
+NON_CF_TYPE(UCTypeSelectRef)
+
+// CoreServices/DictionaryServices
+CF_TYPE(DCSDictionaryRef)
+
+// CoreServices/FSEvents
+NON_CF_TYPE(ConstFSEventStreamRef) // CFExclusions.def
+NON_CF_TYPE(FSEventStreamRef) // CFExclusions.def
+
+// CoreServices/LaunchServices
+NON_CF_TYPE(IconRef)
+CF_TYPE(LSSharedFileListItemRef)
+CF_TYPE(LSSharedFileListRef)
+
+// CoreServices/Metadata
+CF_TYPE(MDItemRef)
+CF_TYPE(MDLabelRef)
+CF_TYPE(MDQueryRef)
+
+// CoreServices/OSServices
+CF_TYPE(CSIdentityAuthorityRef)
+CF_TYPE(CSIdentityQueryRef)
+CF_TYPE(CSIdentityRef)
+CF_TYPE(KCItemRef)
+CF_TYPE(KCRef)
+CF_TYPE(KCSearchRef)
+CF_TYPE(WSMethodInvocationRef)
+CF_TYPE(WSProtocolHandlerRef)
+
+// CoreServices/SearchKit
+CF_TYPE(SKDocumentRef)
+CF_TYPE(SKIndexDocumentIteratorRef)
+CF_TYPE(SKIndexRef)
+CF_TYPE(SKSearchGroupRef)
+CF_TYPE(SKSearchRef)
+CF_TYPE(SKSearchResultsRef)
+CF_TYPE(SKSummaryRef)
+
+// CoreText
+CF_TYPE(CTFontCollectionRef)
+CF_TYPE(CTFontDescriptorRef)
+CF_TYPE(CTFontRef)
+CF_TYPE(CTFrameRef)
+CF_TYPE(CTFramesetterRef)
+CF_TYPE(CTGlyphInfoRef)
+CF_TYPE(CTLineRef)
+CF_TYPE(CTMutableFontCollectionRef)
+CF_TYPE(CTParagraphStyleRef)
+CF_TYPE(CTRubyAnnotationRef)
+CF_TYPE(CTRunDelegateRef)
+CF_TYPE(CTRunRef)
+CF_TYPE(CTTextTabRef)
+CF_TYPE(CTTypesetterRef)
+
+// CoreVideo
+CF_TYPE(CVBufferRef)
+CF_TYPE(CVDisplayLinkRef)
+CF_TYPE(CVImageBufferRef)
+CF_TYPE(CVMetalTextureCacheRef)
+CF_TYPE(CVMetalTextureRef)
+CF_TYPE(CVOpenGLBufferPoolRef)
+CF_TYPE(CVOpenGLBufferRef)
+CF_TYPE(CVOpenGLESTextureCacheRef)
+CF_TYPE(CVOpenGLESTextureRef)
+CF_TYPE(CVOpenGLTextureCacheRef)
+CF_TYPE(CVOpenGLTextureRef)
+CF_TYPE(CVPixelBufferPoolRef)
+CF_TYPE(CVPixelBufferRef)
+
+// DVDPlayback
+NON_CF_TYPE(DVDEventCallBackRef)
+
+// DiscRecording
+CF_TYPE(DRAudioTrackRef)
+CF_TYPE(DRBurnRef)
+CF_TYPE(DRCDTextBlockRef)
+CF_TYPE(DRDeviceRef)
+CF_TYPE(DREraseRef)
+CF_TYPE(DRFSObjectRef)
+CF_TYPE(DRFileRef)
+CF_TYPE(DRFilesystemTrackRef)
+CF_TYPE(DRFolderRef)
+CF_TYPE(DRNotificationCenterRef)
+CF_TYPE(DRTrackRef)
+CF_TYPE(DRTypeRef)
+
+// DiscRecordingUI
+CF_TYPE(DRBurnSessionRef)
+CF_TYPE(DREraseSessionRef)
+
+// DiskArbitration
+CF_TYPE(DAApprovalSessionRef)
+CF_TYPE(DADiskRef)
+CF_TYPE(DADissenterRef)
+CF_TYPE(DASessionRef)
+
+// FWAUserLib
+NON_CF_TYPE(FWAAudioPlugRef)
+NON_CF_TYPE(FWAAudioStreamRef)
+NON_CF_TYPE(FWADeviceRef)
+NON_CF_TYPE(FWAEngineRef)
+NON_CF_TYPE(FWAIsochStreamRef)
+NON_CF_TYPE(FWAMIDIDeviceNubRef)
+NON_CF_TYPE(FWAMIDIPlugRef)
+NON_CF_TYPE(FWAMIDIStreamRef)
+NON_CF_TYPE(FWARef)
+
+// GLKit
+CF_TYPE(GLKMatrixStackRef)
+
+// IOBluetooth
+CF_TYPE(IOBluetoothDeviceRef)
+CF_TYPE(IOBluetoothL2CAPChannelRef)
+CF_TYPE(IOBluetoothObjectRef)
+CF_TYPE(IOBluetoothRFCOMMChannelRef)
+CF_TYPE(IOBluetoothSDPDataElementRef)
+CF_TYPE(IOBluetoothSDPServiceRecordRef)
+CF_TYPE(IOBluetoothSDPUUIDRef)
+CF_TYPE(IOBluetoothUserNotificationRef)
+NON_CF_TYPE(OBEXSessionRef)
+NON_CF_TYPE(PrivOBEXSessionDataRef)
+
+// IOBluetoothUI
+CF_TYPE(IOBluetoothDeviceSelectorControllerRef)
+CF_TYPE(IOBluetoothPairingControllerRef)
+CF_TYPE(IOBluetoothServiceBrowserControllerRef)
+
+// IOKit
+NON_CF_TYPE(IOBlitMemoryRef)
+NON_CF_TYPE(IOFWAsyncStreamListenerInterfaceRef)
+NON_CF_TYPE(IOFireWireLibAsyncStreamCommandRef)
+NON_CF_TYPE(IOFireWireLibPHYCommandRef)
+NON_CF_TYPE(IOFireWireLibPHYPacketListenerRef)
+NON_CF_TYPE(IOFireWireLibVectorCommandRef)
+CF_TYPE(IOHIDDeviceRef)
+CF_TYPE(IOHIDElementRef)
+CF_TYPE(IOHIDManagerRef)
+CF_TYPE(IOHIDQueueRef)
+CF_TYPE(IOHIDTransactionRef)
+CF_TYPE(IOHIDValueRef)
+NON_CF_TYPE(IOI2CConnectRef)
+NON_CF_TYPE(IONotificationPortRef)
+NON_CF_TYPE(IOStreamRef)
+NON_CF_TYPE(IOVideoDeviceRef)
+
+// IOSurface
+CF_TYPE(IOSurfaceRef)
+
+// ImageIO
+CF_TYPE(CGImageDestinationRef)
+CF_TYPE(CGImageMetadataRef)
+CF_TYPE(CGImageMetadataTagRef)
+CF_TYPE(CGImageSourceRef)
+CF_TYPE(CGMutableImageMetadataRef)
+
+// JavaScriptCore
+NON_CF_TYPE(JSClassRef)
+NON_CF_TYPE(JSContextGroupRef)
+NON_CF_TYPE(JSContextRef)
+NON_CF_TYPE(JSGlobalContextRef)
+NON_CF_TYPE(JSObjectRef)
+NON_CF_TYPE(JSPropertyNameAccumulatorRef)
+NON_CF_TYPE(JSPropertyNameArrayRef)
+NON_CF_TYPE(JSStringRef)
+NON_CF_TYPE(JSValueRef)
+
+// JavaVM/JavaRuntimeSupport
+CF_TYPE(JRSUIControlRef)
+CF_TYPE(JRSUIRendererRef)
+
+// Kernel
+NON_CF_TYPE(HIDPreparsedDataRef)
+NON_CF_TYPE(IOFBCursorRef)
+NON_CF_TYPE(IONotificationRef)
+NON_CF_TYPE(UNDReplyRef)
+NON_CF_TYPE(UNDServerRef)
+
+// LatentSemanticMapping
+CF_TYPE(LSMMapRef)
+CF_TYPE(LSMResultRef)
+CF_TYPE(LSMTextRef)
+
+// MediaToolbox
+CF_TYPE(MTAudioProcessingTapRef)
+
+// OpenDirectory/CFOpenDirectory
+CF_TYPE(ODContextRef)
+CF_TYPE(ODNodeRef)
+CF_TYPE(ODQueryRef)
+CF_TYPE(ODRecordRef)
+CF_TYPE(ODSessionRef)
+
+// QuickLook
+CF_TYPE(QLPreviewRequestRef)
+CF_TYPE(QLThumbnailRef)
+CF_TYPE(QLThumbnailRequestRef)
+
+// QuickTime
+NON_CF_TYPE(HandleDataRef)
+NON_CF_TYPE(ICMCompressionFrameOptionsRef)
+NON_CF_TYPE(ICMCompressionSessionOptionsRef)
+NON_CF_TYPE(ICMCompressionSessionRef)
+NON_CF_TYPE(ICMCompressorSessionRef)
+NON_CF_TYPE(ICMCompressorSourceFrameRef)
+NON_CF_TYPE(ICMDecompressionFrameOptionsRef)
+NON_CF_TYPE(ICMDecompressionSessionOptionsRef)
+NON_CF_TYPE(ICMDecompressionSessionRef)
+NON_CF_TYPE(ICMEncodedFrameRef)
+NON_CF_TYPE(ICMMultiPassStorageRef)
+NON_CF_TYPE(ICMMutableEncodedFrameRef)
+NON_CF_TYPE(MovieAudioExtractionRef)
+NON_CF_TYPE(PointerDataRef)
+NON_CF_TYPE(QTAudioContextInsertRegistryInfoRef)
+NON_CF_TYPE(QTAudioContextRef)
+NON_CF_TYPE(QTAudioTrackInsertRegistryInfoRef)
+CF_TYPE(QTComponentPropertyListenersRef)
+NON_CF_TYPE(QTMetaDataRef)
+NON_CF_TYPE(QTMutableSampleTableRef)
+NON_CF_TYPE(QTSampleTableRef)
+NON_CF_TYPE(QTVisualContextRef)
+NON_CF_TYPE(RTPMPSampleRef)
+NON_CF_TYPE(RTPPacketGroupRef)
+NON_CF_TYPE(RTPPacketRef)
+NON_CF_TYPE(RTPPacketRepeatedDataRef)
+
+// Security
+NON_CF_TYPE(AuthorizationEngineRef) // CFExclusions.def
+NON_CF_TYPE(AuthorizationMechanismRef)
+NON_CF_TYPE(AuthorizationPluginRef)
+NON_CF_TYPE(AuthorizationRef) // CFExclusions.def
+CF_TYPE(CMSDecoderRef)
+CF_TYPE(CMSEncoderRef)
+NON_CF_TYPE(SSLConnectionRef)
+CF_TYPE(SSLContextRef)
+CF_TYPE(SecACLRef)
+CF_TYPE(SecAccessControlRef)
+CF_TYPE(SecAccessRef)
+NON_CF_TYPE(SecAsn1CoderRef)
+CF_TYPE(SecCertificateRef)
+CF_TYPE(SecCodeRef)
+CF_TYPE(SecGroupTransformRef)
+NON_CF_TYPE(SecGuestRef)
+CF_TYPE(SecIdentityRef)
+CF_TYPE(SecIdentitySearchRef)
+CF_TYPE(SecKeyRef)
+CF_TYPE(SecKeychainItemRef)
+CF_TYPE(SecKeychainRef)
+CF_TYPE(SecKeychainSearchRef)
+CF_TYPE(SecPasswordRef)
+CF_TYPE(SecPolicyRef)
+CF_TYPE(SecPolicySearchRef)
+NON_CF_TYPE(SecRandomRef)
+CF_TYPE(SecRequirementRef)
+CF_TYPE(SecStaticCodeRef)
+CF_TYPE(SecTaskRef)
+CF_TYPE(SecTransformAttributeRef)
+NON_CF_TYPE(SecTransformImplementationRef)
+CF_TYPE(SecTransformRef)
+CF_TYPE(SecTransformStringOrAttributeRef)
+CF_TYPE(SecTrustRef)
+CF_TYPE(SecTrustedApplicationRef)
+NON_CF_TYPE(SecureDownloadRef) // CFExclusions.def
+
+// SystemConfiguration
+CF_TYPE(SCBondInterfaceRef)
+CF_TYPE(SCBondStatusRef)
+CF_TYPE(SCDynamicStoreRef)
+CF_TYPE(SCNetworkConnectionRef)
+CF_TYPE(SCNetworkInterfaceRef)
+CF_TYPE(SCNetworkProtocolRef)
+CF_TYPE(SCNetworkReachabilityRef)
+CF_TYPE(SCNetworkServiceRef)
+CF_TYPE(SCNetworkSetRef)
+CF_TYPE(SCPreferencesRef)
+CF_TYPE(SCVLANInterfaceRef)
+
+// VideoToolbox
+CF_TYPE(VTCompressionSessionRef)
+CF_TYPE(VTDecompressionSessionRef)
+CF_TYPE(VTFrameSiloRef)
+CF_TYPE(VTMultiPassStorageRef)
+CF_TYPE(VTPixelTransferSessionRef)
+CF_TYPE(VTSessionRef)
+
+// WebKit
+NON_CF_TYPE(JRIGlobalRef)
+
+// dns_sd
+NON_CF_TYPE(DNSRecordRef)
+NON_CF_TYPE(DNSServiceRef)
+NON_CF_TYPE(TXTRecordRef)
+
+#undef NON_CF_TYPE
+#undef CF_TYPE
