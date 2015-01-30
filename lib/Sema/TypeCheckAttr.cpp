@@ -51,7 +51,6 @@ public:
   IGNORED_ATTR(Availability)
   IGNORED_ATTR(ClassProtocol)
   IGNORED_ATTR(Final)
-  IGNORED_ATTR(IBDesignable)
   IGNORED_ATTR(NSApplicationMain)
   IGNORED_ATTR(NSCopying)
   IGNORED_ATTR(NoReturn)
@@ -93,6 +92,7 @@ public:
 
   void visitIBActionAttr(IBActionAttr *attr);
   void visitLazyAttr(LazyAttr *attr);
+  void visitIBDesignableAttr(IBDesignableAttr *attr);
   void visitIBInspectableAttr(IBInspectableAttr *attr);
   void visitIBOutletAttr(IBOutletAttr *attr);
   void visitLLDBDebuggerFunctionAttr(LLDBDebuggerFunctionAttr *attr);
@@ -108,8 +108,9 @@ public:
 void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     CanType ExtendedTy = DeclContext::getExtendedType(ED);
+    const NominalTypeDecl *ExtendedNominal = ExtendedTy->getAnyNominal();
     // Only Struct and Enum extensions can be transparent.
-    if (!isa<StructType>(ExtendedTy) && !isa<EnumType>(ExtendedTy))
+    if (!isa<StructDecl>(ExtendedNominal) && !isa<EnumDecl>(ExtendedNominal))
       return diagnoseAndRemoveAttr(attr,diag::transparent_on_invalid_extension);
     return;
   }
@@ -177,6 +178,14 @@ void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
       FD->isStatic() || FD->isAccessor())
     return diagnoseAndRemoveAttr(attr, diag::invalid_ibaction_decl);
 
+}
+
+void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
+  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    CanType extendedTy = DeclContext::getExtendedType(ED);
+    if (!isa<ClassDecl>(extendedTy->getAnyNominal()))
+      return diagnoseAndRemoveAttr(attr, diag::invalid_ibdesignable_extension);
+  }
 }
 
 void AttributeEarlyChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {

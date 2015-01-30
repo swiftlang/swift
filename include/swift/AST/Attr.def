@@ -108,7 +108,7 @@ SIMPLE_DECL_ATTR(IBAction, IBAction,
                  OnFunc, 11)
 
 SIMPLE_DECL_ATTR(IBDesignable, IBDesignable,
-                 OnClass, 12)
+                 OnClass | OnExtension, 12)
 
 SIMPLE_DECL_ATTR(IBInspectable, IBInspectable,
                  OnVar, 13)

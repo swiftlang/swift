@@ -466,6 +466,9 @@ NOTE(note_make_optional,sema_tcd,none,
 NOTE(note_make_implicitly_unwrapped_optional,sema_tcd,none,
       "add '!' to form the implicitly unwrapped optional type %0", (Type))
 
+ERROR(invalid_ibdesignable_extension,sema_tcd,none,
+      "'IBDesignable' attribute can only be applied to classes and extensions "
+      "of classes", ())
 ERROR(invalid_ibinspectable,sema_tcd,none,
       "only instance properties can be declared 'IBInspectable'", ())
 ERROR(invalid_ibaction_decl,sema_tcd,none,

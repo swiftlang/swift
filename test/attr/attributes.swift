@@ -16,14 +16,21 @@ func f5(inout x: binary) {}
 
 @IBDesignable
 class IBDesignableClassTy {
-  @IBDesignable func foo() {} // expected-error {{'IBDesignable' may only be used on 'class' declarations}}
+  @IBDesignable func foo() {} // expected-error {{'IBDesignable' attribute cannot be applied to this declaration}}
 }
 
-@IBDesignable // expected-error {{'IBDesignable' may only be used on 'class' declarations}}
+@IBDesignable // expected-error {{'IBDesignable' attribute cannot be applied to this declaration}}
 struct IBDesignableStructTy {}
 
-@IBDesignable // expected-error {{'IBDesignable' may only be used on 'class' declarations}}
+@IBDesignable // expected-error {{'IBDesignable' attribute cannot be applied to this declaration}}
 protocol IBDesignableProtTy {}
+
+@IBDesignable // expected-error {{'IBDesignable' attribute can only be applied to classes and extensions of classes}}
+extension IBDesignableStructTy {}
+
+class IBDesignableClassExtensionTy {}
+@IBDesignable // okay
+extension IBDesignableClassExtensionTy {}
 
 class Inspect {
   @IBInspectable var value : Int = 0
