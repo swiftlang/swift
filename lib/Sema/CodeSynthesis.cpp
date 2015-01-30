@@ -942,6 +942,7 @@ synthesizeSetterForMutableAddressedStorage(AbstractStorageDecl *storage,
 /// protocol property requirement.  Ensure that it has the full
 /// complement of accessors.
 void TypeChecker::synthesizeWitnessAccessorsForStorage(
+                                             AbstractStorageDecl *requirement,
                                              AbstractStorageDecl *storage) {
   // If the decl is stored, convert it to StoredWithTrivialAccessors
   // by synthesizing the full set of accessors.
@@ -949,10 +950,10 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
     addTrivialAccessorsToStorage(storage, *this);
     return;
   }
-
-  // Otherwise, if it's settable, ensure that there's a
+  
+  // Otherwise, if the requirement is settable, ensure that there's a
   // materializeForSet function.
-  if (storage->getSetter() && !storage->getMaterializeForSetFunc()) {
+  if (requirement->getSetter() && !storage->getMaterializeForSetFunc()) {
     FuncDecl *materializeForSet = addMaterializeForSet(storage, *this);
     synthesizeMaterializeForSet(materializeForSet, storage, *this);
     typeCheckDecl(materializeForSet, true);

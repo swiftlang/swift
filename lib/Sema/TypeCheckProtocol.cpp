@@ -1153,7 +1153,9 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
 
   // Synthesize accessors for the protocol witness table to use.
   if (auto storage = dyn_cast<AbstractStorageDecl>(witness.getDecl()))
-    TC.synthesizeWitnessAccessorsForStorage(storage);
+    TC.synthesizeWitnessAccessorsForStorage(
+                                        cast<AbstractStorageDecl>(requirement),
+                                        storage);
 
   // Note that the witness conforms to the requirement.
   if (requirement != match.Witness)

@@ -688,10 +688,11 @@ public:
   /// enum with a raw type.
   void addImplicitEnumConformances(EnumDecl *ED);
 
-  /// The specified AbstractStorageDecl was just found to satisfy a
-  /// protocol property requirement.  Ensure that it has the full
+  /// The specified AbstractStorageDecl \c storage was just found to satisfy
+  /// the protocol property \c requirement.  Ensure that it has the full
   /// complement of accessors.
-  void synthesizeWitnessAccessorsForStorage(AbstractStorageDecl *storage);
+  void synthesizeWitnessAccessorsForStorage(AbstractStorageDecl *requirement,
+                                            AbstractStorageDecl *storage);
 
   /// Provide storage and accessor implementations for the given property,
   /// which must be lazy.
