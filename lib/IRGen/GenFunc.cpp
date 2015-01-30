@@ -3203,88 +3203,18 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   IGF.Builder.CreateStore(blockHeader, headerAddr);
 }
 
-namespace {
-
-struct EmitLocalDecls : public ASTWalker {
-  IRGenModule &IGM;
-  
-  EmitLocalDecls(IRGenModule &IGM) : IGM(IGM) {}
-  
-  bool walkToDeclPre(Decl *D) override {
-    switch (D->getKind()) {
-    case DeclKind::Import:
-    case DeclKind::Subscript:
-    case DeclKind::TopLevelCode:
-    case DeclKind::Protocol:
-    case DeclKind::Extension:
-    case DeclKind::EnumCase:
-    case DeclKind::EnumElement:
-    case DeclKind::Constructor:
-    case DeclKind::Destructor:
-    case DeclKind::InfixOperator:
-    case DeclKind::PrefixOperator:
-    case DeclKind::PostfixOperator:
-    case DeclKind::IfConfig:
-      llvm_unreachable("declaration cannot appear in local scope");
-      
-    case DeclKind::TypeAlias:
-    case DeclKind::AssociatedType:
-    case DeclKind::GenericTypeParam:
-      // no IR generation support required.
-    case DeclKind::PatternBinding:
-    case DeclKind::Var:
-    case DeclKind::Param:
-      // These get lowered by SIL.
-      return false;
-      
-    case DeclKind::Func:
-      // The body gets lowered by SIL, but we need to check for local decls.
-      IGM.emitLocalDecls(cast<FuncDecl>(D));
-      return false;
-      
-    case DeclKind::Enum:
-      IGM.emitEnumDecl(cast<EnumDecl>(D));
-      return false;
-      
-    case DeclKind::Struct:
-      IGM.emitStructDecl(cast<StructDecl>(D));
-      return false;
-      
-    case DeclKind::Class:
-      IGM.emitClassDecl(cast<ClassDecl>(D));
-      return false;
-    }
-  }
-  
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-    if (auto *CE = dyn_cast<ClosureExpr>(E)) {
-      IGM.emitLocalDecls(CE->getBody());
-      return { false, E };
-    }
-    return { true, E };
-  }
-};
-
-} // end anonymous namespace
-
 void IRGenModule::emitLocalDecls(BraceStmt *body) {
-  EmitLocalDecls walker(*this);
-  body->walk(walker);
 }
 
 void IRGenModule::emitLocalDecls(FuncDecl *fd) {
-  if (fd->getBody())
-    emitLocalDecls(fd->getBody());
-  else if (auto *clangDecl = fd->getClangDecl())
+  if (auto *clangDecl = fd->getClangDecl())
     emitLocalDecls(const_cast<clang::Decl *>(clangDecl));
 }
 
 void IRGenModule::emitLocalDecls(ConstructorDecl *cd) {
-  if (cd->getBody())
-    emitLocalDecls(cd->getBody());
+  // Currenly does nothing.
 }
 
 void IRGenModule::emitLocalDecls(DestructorDecl *dd) {
-  if (dd->getBody())
-    emitLocalDecls(dd->getBody());
+  // Currently does nothing.
 }

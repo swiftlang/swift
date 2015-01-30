@@ -17,3 +17,10 @@ private struct PrivateStruct { var x: Int }
 // CHECK: @_TWVV14access_controlP33_8F630B0A1EEF3ED34B761E3ED76C95A813PrivateStruct = hidden constant
 // CHECK: @_TMnV14access_controlP33_8F630B0A1EEF3ED34B761E3ED76C95A813PrivateStruct = hidden constant
 // CHECK: @_TMdV14access_controlP33_8F630B0A1EEF3ED34B761E3ED76C95A813PrivateStruct = hidden constant
+
+func local() {
+  struct LocalStruct { var x: Int }
+  // CHECK: @_TWVVF14access_control5localFT_T_L_11LocalStruct = hidden constant
+  // CHECK: @_TMnVF14access_control5localFT_T_L_11LocalStruct = hidden constant
+  // CHECK: @_TMdVF14access_control5localFT_T_L_11LocalStruct = hidden constant
+}

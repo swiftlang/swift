@@ -63,17 +63,17 @@ getGenericClauseLinkage(ArrayRef<GenericTypeParamDecl *> params) {
 }
 
 FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
-  DeclContext *DC = D->getDeclContext();
-  while (!DC->isModuleScopeContext()) {
-    if (DC->isLocalContext())
-      return FormalLinkage::Private;
-    DC = DC->getParent();
-  }
+  const DeclContext *fileContext = D->getDeclContext()->getModuleScopeContext();
 
   // Clang declarations are public and can't be assured of having a
   // unique defining location.
-  if (isa<ClangModuleUnit>(DC))
+  if (isa<ClangModuleUnit>(fileContext))
     return FormalLinkage::PublicNonUnique;
+
+  if (!D->hasAccessibility()) {
+    assert(D->getDeclContext()->isLocalContext());
+    return FormalLinkage::Private;
+  }
 
   switch (D->getAccessibility()) {
   case Accessibility::Public:

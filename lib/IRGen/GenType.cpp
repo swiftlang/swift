@@ -1661,13 +1661,8 @@ TypeConverter::getMetatypeTypeInfo(MetatypeRepresentation representation) {
 /// createNominalType - Create a new nominal type.
 llvm::StructType *IRGenModule::createNominalType(TypeDecl *decl) {
   llvm::SmallString<32> typeName;
-  if (decl->getDeclContext()->isLocalContext()) {
-    typeName = decl->getName().str();
-    typeName.append(".local");
-  } else {
-    auto type = decl->getDeclaredType()->getCanonicalType();
-    LinkEntity::forTypeMangling(type).mangle(typeName);
-  }
+  auto type = decl->getDeclaredType()->getCanonicalType();
+  LinkEntity::forTypeMangling(type).mangle(typeName);
   return llvm::StructType::create(getLLVMContext(), typeName.str());
 }
 

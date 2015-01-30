@@ -402,6 +402,8 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   // Emit types and other global decls.
   for (unsigned i = StartElem, e = SF.Decls.size(); i != e; ++i)
     emitGlobalDecl(SF.Decls[i]);
+  for (auto *localDecl : SF.LocalTypeDecls)
+    emitGlobalDecl(localDecl);
 
   SF.forAllVisibleModules([&](swift::Module::ImportedModule import) {
     swift::Module *next = import.second;
@@ -1314,6 +1316,7 @@ static llvm::Constant *getAddrOfLLVMVariable(IRGenModule &IGM,
     // If we're looking to define something, we may need to replace a
     // forward declaration.
     if (definitionType) {
+      assert(existing->isDeclaration() && "already defined");
       assert(entry->getType() == pointerToDefaultType);
       updateLinkageForDefinition(IGM, existing, entity);
 
