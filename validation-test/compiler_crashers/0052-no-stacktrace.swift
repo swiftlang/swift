@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend %s -emit-ir
+// RUN: not %target-swift-frontend %s
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)

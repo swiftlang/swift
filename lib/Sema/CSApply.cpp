@@ -5152,9 +5152,11 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
         auto type = solution.simplifyType(TC, affected->getType())
                       ->getRValueType();
         if (auto tupleTy = type->getAs<TupleType>()) {
-          if (auto tuple = dyn_cast<TupleExpr>(affected))
-            affected = tuple->getElement(0);
-          type = tupleTy->getFields()[0].getType()->getRValueType();
+          if (tupleTy->getElementTypes().size()) {
+            if (auto tuple = dyn_cast<TupleExpr>(affected))
+              affected = tuple->getElement(0);
+            type = tupleTy->getFields()[0].getType()->getRValueType();
+          }
         }
 
         if (auto optTy = type->getAnyOptionalObjectType())
