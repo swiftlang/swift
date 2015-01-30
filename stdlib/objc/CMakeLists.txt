@@ -1,6 +1,7 @@
 # All libraries in this directory tree are overlays.
 add_subdirectory(AppKit)
 add_subdirectory(AssetsLibrary)
+add_subdirectory(CoreAudio)
 add_subdirectory(CoreGraphics)
 add_subdirectory(CoreImage)
 add_subdirectory(Darwin)
