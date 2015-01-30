@@ -2002,11 +2002,13 @@ namespace {
         }
       }
 
-      // We diagnose unavailability here, but do not convert to an optional,
-      // even when EnableExperimentalUnavailableAsOptional is turned on.
+      // If EnableExperimentalUnavailableAsOptional is turned on, we diagnose
+      // unavailability here rather than treating the initializer as optional.
       // We may want to do eventually treat unavailable OtherConstructorRefs,
       // as optional, but perhaps only inside failable initializers.
-      diagnoseIfOverloadChoiceUnavailable(choice, expr->getConstructorLoc());
+      if (cs.TC.getLangOpts().EnableExperimentalUnavailableAsOptional) {
+        diagnoseIfOverloadChoiceUnavailable(choice, expr->getConstructorLoc());
+      }
       
       // Build a partial application of the initializer.
       Expr *ctorRef = buildOtherConstructorRef(
@@ -4695,9 +4697,8 @@ ExprRewriter::convertUnavailableToOptional(Expr *expr, ValueDecl *decl,
   assert(cs.TC.getLangOpts().EnableExperimentalAvailabilityChecking);
 
   if (!cs.TC.getLangOpts().EnableExperimentalUnavailableAsOptional) {
-    // If feature is not enabled, do not perform a conversion and instead
-    // diagnose immediately.
-    cs.TC.diagnosePotentialUnavailability(decl, declRefLoc, reason);
+    // If the unavailable as optional feature is not enabled, we do not perform
+    // a conversion; instead we will diagnose in swift::performExprDiagnostics().
     return expr;
   }
 
@@ -4900,7 +4901,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // We diagnose unavailability here, but do not yet convert to an optional,
   // even when EnableExperimentalTreatOptionalAsUnavailable is turned on.
-  diagnoseIfOverloadChoiceUnavailable(choice, fn->getEndLoc());
+  if (cs.TC.getLangOpts().EnableExperimentalUnavailableAsOptional) {
+    diagnoseIfOverloadChoiceUnavailable(choice, fn->getEndLoc());
+  }
   
   // Consider the constructor decl reference expr 'implicit', but the
   // constructor call expr itself has the apply's 'implicitness'.

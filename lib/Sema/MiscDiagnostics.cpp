@@ -482,9 +482,9 @@ static void diagAvailability(TypeChecker &TC, const ValueDecl *D,
   if (!D)
     return;
 
+  SourceLoc Loc = R.Start;
   if (auto Attr = AvailabilityAttr::isUnavailable(D)) {
     auto Name = D->getFullName();
-    SourceLoc Loc = R.Start;
 
     if (!Attr->Rename.empty()) {
       TC.diagnose(Loc, diag::availability_decl_unavailable_rename, Name,
@@ -520,6 +520,21 @@ static void diagAvailability(TypeChecker &TC, const ValueDecl *D,
       }
 
     }
+    return;
+  }
+  
+  // We only diagnose potentially unavailability here if availability checking
+  // is turned on, but we are not treating unavailable symbols as having
+  // optional type.
+  if (!TC.getLangOpts().EnableExperimentalAvailabilityChecking ||
+      TC.getLangOpts().EnableExperimentalUnavailableAsOptional) {
+    return;
+  }
+
+  // Diagnose for potential unavailability
+  auto maybeUnavail = TC.checkDeclarationAvailability(D, Loc, DC);
+  if (maybeUnavail.hasValue()) {
+    TC.diagnosePotentialUnavailability(D, Loc, maybeUnavail.getValue());
   }
 }
 

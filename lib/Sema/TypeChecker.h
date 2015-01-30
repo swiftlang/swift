@@ -1196,7 +1196,7 @@ public:
 
   /// \brief Returns the version range on which a declaration is available
   ///  We assume a declaration without an annotation is always available.
-  static VersionRange availableRange(Decl *D, ASTContext &C);
+  static VersionRange availableRange(const Decl *D, ASTContext &C);
 
   /// Walk the AST to build the hierarchy of TypeRefinementContexts
   ///
@@ -1212,27 +1212,28 @@ public:
   /// If the declaration is not available, return false and write the
   /// declaration's available version range to the out parameter
   /// OutAvailableRange.
-  bool isDeclAvailable(Decl *D, SourceLoc referenceLoc,
-                       DeclContext *referenceDC,
-                        VersionRange &OutAvailableRange);
+  bool isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
+                       const DeclContext *referenceDC,
+                       VersionRange &OutAvailableRange);
 
   /// Checks whether a declaration should be considered unavailable when
   /// referred to at the given location and, if so, returns the reason why the
   /// declaration is unavailable. Returns None is the declaration is
   /// definitely available.
   Optional<UnavailabilityReason>
-  checkDeclarationAvailability(Decl *D, SourceLoc referenceLoc,
-                               DeclContext *referenceDC);
+  checkDeclarationAvailability(const Decl *D, SourceLoc referenceLoc,
+                               const DeclContext *referenceDC);
 
   // Emits a diagnostic, if necessary, for a reference to a declaration
   // that is potentially unavailable at the given source location.
-  void diagnosePotentialUnavailability(ValueDecl *D, SourceLoc referenceLoc,
+  void diagnosePotentialUnavailability(const ValueDecl *D,
+                                       SourceLoc referenceLoc,
                                        const UnavailabilityReason &Reason);
 
   // Emits a diagnostic, if necessary, for a reference to a declaration
   // that is potentially unavailable at the given source location, using
   // Name as the diagnostic name.
-  void diagnosePotentialUnavailability(Decl *D, DeclName Name,
+  void diagnosePotentialUnavailability(const Decl *D, DeclName Name,
                                        SourceLoc referenceLoc,
                                        const UnavailabilityReason &Reason);
   /// @}

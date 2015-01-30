@@ -684,11 +684,11 @@ void TypeChecker::diagnoseAmbiguousMemberType(Type baseTy,
   }
 }
 
-VersionRange TypeChecker::availableRange(Decl *D, ASTContext &Ctx) {
+VersionRange TypeChecker::availableRange(const Decl *D, ASTContext &Ctx) {
   VersionRange Avail = VersionRange::all();
 
   for (auto Attr : D->getAttrs()) {
-    AvailabilityAttr *AvailAttr = dyn_cast<AvailabilityAttr>(Attr);
+    auto *AvailAttr = dyn_cast<AvailabilityAttr>(Attr);
     if (AvailAttr == NULL || !AvailAttr->Introduced.hasValue() ||
         !AvailAttr->isActivePlatform(Ctx)) {
       continue;
@@ -1046,8 +1046,8 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF,
 /// declaration context with a valid source location. Returns the location
 /// of the innermost context with a valid location if one is found, and an
 /// invalid location otherwise.
-static SourceLoc bestLocationInDeclContextHierarchy(DeclContext *DC) {
-  DeclContext *Ancestor = DC;
+static SourceLoc bestLocationInDeclContextHierarchy(const DeclContext *DC) {
+  const DeclContext *Ancestor = DC;
   while (Ancestor) {
     SourceLoc Loc;
     switch (Ancestor->getContextKind()) {
@@ -1087,8 +1087,8 @@ static SourceLoc bestLocationInDeclContextHierarchy(DeclContext *DC) {
   return SourceLoc();
 }
 
-bool TypeChecker::isDeclAvailable(Decl *D, SourceLoc referenceLoc,
-                                  DeclContext *referenceDC,
+bool TypeChecker::isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
+                                  const DeclContext *referenceDC,
                                   VersionRange &OutAvailableRange) {
   SourceFile *SF = referenceDC->getParentSourceFile();
   assert(SF);
@@ -1138,8 +1138,8 @@ bool TypeChecker::isDeclAvailable(Decl *D, SourceLoc referenceLoc,
 }
 
 Optional<UnavailabilityReason>
-TypeChecker::checkDeclarationAvailability(Decl *D, SourceLoc referenceLoc,
-                                          DeclContext *referenceDC) {
+TypeChecker::checkDeclarationAvailability(const Decl *D, SourceLoc referenceLoc,
+                                          const DeclContext *referenceDC) {
   if (!Context.LangOpts.EnableExperimentalAvailabilityChecking) {
     return None;
   }
@@ -1160,12 +1160,13 @@ TypeChecker::checkDeclarationAvailability(Decl *D, SourceLoc referenceLoc,
 }
 
 void TypeChecker::diagnosePotentialUnavailability(
-    ValueDecl *D, SourceLoc referenceLoc, const UnavailabilityReason &Reason) {
+    const ValueDecl *D, SourceLoc referenceLoc,
+    const UnavailabilityReason &Reason) {
   diagnosePotentialUnavailability(D, D->getFullName(), referenceLoc, Reason);
 }
 
 void TypeChecker::diagnosePotentialUnavailability(
-    Decl *D, DeclName Name, SourceLoc referenceLoc,
+    const Decl *D, DeclName Name, SourceLoc referenceLoc,
     const UnavailabilityReason &Reason) {
 
   // We only emit diagnostics for API unavailability, not for explicitly
