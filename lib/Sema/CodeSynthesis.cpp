@@ -953,7 +953,11 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
   
   // Otherwise, if the requirement is settable, ensure that there's a
   // materializeForSet function.
-  if (requirement->getSetter() && !storage->getMaterializeForSetFunc()) {
+  //
+  // @objc protocols don't need a materializeForSet since ObjC doesn't have
+  // that concept.
+  if (!requirement->isObjC() &&
+      requirement->getSetter() && !storage->getMaterializeForSetFunc()) {
     FuncDecl *materializeForSet = addMaterializeForSet(storage, *this);
     synthesizeMaterializeForSet(materializeForSet, storage, *this);
     typeCheckDecl(materializeForSet, true);

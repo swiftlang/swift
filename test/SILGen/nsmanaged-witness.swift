@@ -6,7 +6,11 @@ import Foundation
   var name : String { get }
 }
 
-class SomeObject : NSObject, ObjCReadOnly {
+@objc protocol ObjCReadWrite {
+  var name : String { get set }
+}
+
+class SomeObject : NSObject, ObjCReadOnly, ObjCReadWrite {
   @NSManaged var name : String
 }
 
