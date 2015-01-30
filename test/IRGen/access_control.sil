@@ -1,0 +1,19 @@
+// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+
+import Builtin
+import Swift
+
+public struct PublicStruct { var x: Int }
+// CHECK: @_TWVV14access_control12PublicStruct = constant
+// CHECK: @_TMnV14access_control12PublicStruct = constant
+// CHECK: @_TMdV14access_control12PublicStruct = constant
+
+internal struct InternalStruct { var x: Int }
+// CHECK: @_TWVV14access_control14InternalStruct = constant
+// CHECK: @_TMnV14access_control14InternalStruct = constant
+// CHECK: @_TMdV14access_control14InternalStruct = constant
+
+private struct PrivateStruct { var x: Int }
+// CHECK: @_TWVV14access_controlP33_8F630B0A1EEF3ED34B761E3ED76C95A813PrivateStruct = hidden constant
+// CHECK: @_TMnV14access_controlP33_8F630B0A1EEF3ED34B761E3ED76C95A813PrivateStruct = hidden constant
+// CHECK: @_TMdV14access_controlP33_8F630B0A1EEF3ED34B761E3ED76C95A813PrivateStruct = hidden constant

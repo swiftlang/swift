@@ -419,6 +419,7 @@ VarDecl *Module::getDSOHandle() {
   DSOHandle->setImplicit(true);
   DSOHandle->getAttrs().add(
     new (Ctx) AsmnameAttr("__dso_handle", /*Implicit=*/true));
+  DSOHandle->setAccessibility(Accessibility::Internal);
   return DSOHandle;
 }
 

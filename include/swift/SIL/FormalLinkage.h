@@ -16,8 +16,8 @@
 namespace swift {
 
 class CanType;
-class Decl;
 class ProtocolConformance;
+class ValueDecl;
 enum class SILLinkage : unsigned char;
 enum ForDefinition_t : bool;
 
@@ -88,7 +88,7 @@ inline FormalLinkage &operator^=(FormalLinkage &lhs, FormalLinkage rhs) {
 }
 
 FormalLinkage getTypeLinkage(CanType type);
-FormalLinkage getDeclLinkage(Decl *decl);
+FormalLinkage getDeclLinkage(const ValueDecl *decl);
 SILLinkage getSILLinkage(FormalLinkage linkage,
                          ForDefinition_t forDefinition);
 

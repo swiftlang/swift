@@ -1887,6 +1887,7 @@ ClassDecl *IRGenModule::getSwiftRootClass() {
   SwiftRootClass->getAttrs().add(ObjCAttr::createNullary(Context, name,
                                                          /*implicit=*/true));
   SwiftRootClass->setImplicit();
+  SwiftRootClass->setAccessibility(Accessibility::Public);
   return SwiftRootClass;
 }
 

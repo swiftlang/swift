@@ -62,7 +62,7 @@ getGenericClauseLinkage(ArrayRef<GenericTypeParamDecl *> params) {
   return result;
 }
 
-FormalLinkage swift::getDeclLinkage(Decl *D) {
+FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
   DeclContext *DC = D->getDeclContext();
   while (!DC->isModuleScopeContext()) {
     if (DC->isLocalContext())
@@ -75,8 +75,19 @@ FormalLinkage swift::getDeclLinkage(Decl *D) {
   if (isa<ClangModuleUnit>(DC))
     return FormalLinkage::PublicNonUnique;
 
-  // TODO: access control
-  return FormalLinkage::PublicUnique;
+  switch (D->getAccessibility()) {
+  case Accessibility::Public:
+    return FormalLinkage::PublicUnique;
+  case Accessibility::Internal:
+    // FIXME: This ought to be "hidden" as well, but that causes problems when
+    // inlining code from the standard library, which may reference internal
+    // declarations.
+    return FormalLinkage::PublicUnique;
+  case Accessibility::Private:
+    // Why "hidden" instead of "private"? Because the debugger may need to
+    // access these symbols.
+    return FormalLinkage::HiddenUnique;
+  }
 }
 
 FormalLinkage swift::getTypeLinkage(CanType type) {
