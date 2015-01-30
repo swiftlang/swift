@@ -384,6 +384,9 @@ static llvm::cl::opt<std::string>
 CommentsXMLSchema("comments-xml-schema",
                   llvm::cl::desc("Filename of the RelaxNG schema for documentation comments"));
 
+static llvm::cl::list<std::string>
+ClangXCC("Xcc", llvm::cl::desc("option to pass to clang"));
+
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -2054,6 +2057,9 @@ int main(int argc, char *argv[]) {
     options::ObjCForwardDeclarations;
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
+  }
+  for (auto &Arg : options::ClangXCC) {
+    InitInvok.getClangImporterOptions().ExtraArgs.push_back(Arg);
   }
   InitInvok.getLangOptions().DebugForbidTypecheckPrefix =
     options::DebugForbidTypecheckPrefix;
