@@ -53,7 +53,9 @@ template <class ElemTy> struct ConcurrentList {
   ConcurrentList &operator=(const ConcurrentList &) = delete;
 
   /// A list iterator.
-  struct ConcurrentListIterator {
+  struct ConcurrentListIterator :
+      public std::iterator<std::forward_iterator_tag, ElemTy> {
+
     /// Points to the current link.
     ConcurrentListNode<ElemTy> *Ptr;
     /// C'tor.

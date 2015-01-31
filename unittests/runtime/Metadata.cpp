@@ -204,11 +204,10 @@ TEST(Concurrent, ConcurrentList) {
     }
   );
 
-  size_t ListLen = 0;
+  size_t ListLen = std::distance(List.begin(), List.end());
   // Check that all of the values are initialized properly.
   for (auto A : List) {
     EXPECT_EQ(elemVal, A);
-    ListLen++;
   }
 
   // Check that the length of the list is correct.
