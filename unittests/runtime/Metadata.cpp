@@ -110,11 +110,11 @@ void *RaceThunk(void *vargs) {
 
 /// RaceTest(code) runs code in many threads simultaneously, 
 /// and returns a vector of all returned results.
-template <typename T>
+template <typename T, int NumThreads = 64>
 std::vector<T> 
 RaceTest(std::function<T()> code)
 {
-  const unsigned threadCount = 64;
+  const unsigned threadCount = NumThreads;
 
   pthread_barrier_t go;
   pthread_barrier_init(&go, nullptr, threadCount);
