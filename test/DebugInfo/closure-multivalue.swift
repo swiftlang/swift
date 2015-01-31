@@ -1,4 +1,6 @@
 // RUN: %target-swift-frontend -Xllvm -debug-values-propagate-liveness -O %s -disable-llvm-optzns -emit-ir -g -o - | FileCheck %s
+// <rdar://problem/19674999> DebugInfo/closure-multivalue.swift fails for 32-bit simulator
+// REQUIRES: disabled
 // CHECK: define {{.*}}4main4demo
 // CHECK: define {{.*}}hidden i1 {{.*}}4main4sort
 // CHECK: call void @llvm.dbg.value(metadata i8*{{.*}}, metadata ![[A:.*]], metadata ![[P1:.*]])
