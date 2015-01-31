@@ -77,40 +77,26 @@ ProtocolConformance::getTypeWitnessByName(Type type,
                                           ProtocolConformance *conformance,
                                           Identifier name,
                                           LazyResolver *resolver) {
-    // For an archetype, retrieve the nested type with the appropriate name.
-  // There are no conformance tables.
+  // For an archetype, retrieve the nested type with the appropriate
+  // name. There are no conformance tables.
   if (auto archetype = type->getAs<ArchetypeType>()) {
-    auto nestedType = archetype->getNestedTypeValue(name);
-    
-    if (auto GTPT = nestedType->getAs<GenericTypeParamType>()) {
-      auto gpDecl = GTPT->getDecl();
-      
-      if (auto archetype = gpDecl->getArchetype()) {
-        return archetype;
-      }
-    }
-    
-    return nestedType;
+    return archetype->getNestedTypeValue(name);
   }
 
   // Find the named requirement.
-  AssociatedTypeDecl *requirement = nullptr;
-  for (auto member : conformance->getProtocol()->getMembers()) {
-    auto td = dyn_cast<AssociatedTypeDecl>(member);
-    if (!td || !td->hasName())
-      continue;
-
-    if (td->getName() == name) {
-      requirement = td;
+  AssociatedTypeDecl *assocType = nullptr;
+  auto members = conformance->getProtocol()->lookupDirect(name);
+  for (auto member : members) {
+    assocType = dyn_cast<AssociatedTypeDecl>(member);
+    if (assocType)
       break;
-    }
   }
 
-  if (!requirement)
+  if (!assocType)
     return nullptr;
   
   assert(conformance && "Missing conformance information");
-  return conformance->getTypeWitness(requirement, resolver).getReplacement();
+  return conformance->getTypeWitness(assocType, resolver).getReplacement();
 }
 
 ConcreteDeclRef ProtocolConformance::getWitness(ValueDecl *requirement,
