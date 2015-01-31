@@ -16,4 +16,4 @@ class SomeObject : NSObject, ObjCReadOnly, ObjCReadWrite {
 
 // We should not emit references to native Swift accessors for @NSManaged
 // properties.
-// CHECK-NOT: _TFC4main10SomeObject{{.}}4nameSS
+// CHECK-NOT: hidden_external {{.*}}main{{.*}}SomeObject{{.*}}name
