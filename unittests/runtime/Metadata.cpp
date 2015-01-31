@@ -229,7 +229,7 @@ TEST(Concurrent, ConcurrentMemoryBank) {
   auto results = RaceTest<int*>(
     [&]() -> int* {
       // Allocate memory.
-      int *ptr = Bank->Allocate();
+      int *ptr = Bank->allocate();
       // And initialize it.
       if (ptr) *ptr = magicValue;
       return ptr;
@@ -269,7 +269,7 @@ TEST(Concurrent, ConcurrentMemoryAllocator) {
   auto results = RaceTest<int*>(
     [&]() -> int* {
       // Allocate memory.
-      int *ptr = Allocator.Allocate();
+      int *ptr = Allocator.allocate();
       EXPECT_NE(ptr, nullptr);
       // And initialize it.
       *ptr = magicValue;
@@ -286,7 +286,7 @@ TEST(Concurrent, ConcurrentMemoryAllocator) {
 
   // Allocate some more memory.
   for (int i = 0; i < 256; i++) {
-      EXPECT_NE(Allocator.Allocate(), nullptr);
+      EXPECT_NE(Allocator.allocate(), nullptr);
   }
 }
 

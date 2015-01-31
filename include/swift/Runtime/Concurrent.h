@@ -278,13 +278,13 @@ public:
 
   /// Allocate memory and return a pointer to the newly
   /// allocated buffer.
-  ElemTy *Allocate() {
+  ElemTy *allocate() {
     start:
     // Try to allocate memory in one of the banks:
     for (auto *Bank : Banks) {
       // If we were able to allocate memory in one of the existing banks then
       // simply return the newly allocated pointer.
-      if (ElemTy *P = Bank->Allocate())
+      if (ElemTy *P = Bank->allocate())
         return P;
     }
 
