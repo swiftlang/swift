@@ -21,6 +21,8 @@
 // CHECK-NOT: extension [
 // CHECK-NOT: extension {{.*}}?
 // CHECK-NOT: extension {{.*}}!
+// CHECK-NOT: addressWithOwner
+// CHECK-NOT: mutableAddressWithOwner
 
 // CHECK-SUGAR: extension Array :
 // CHECK-SUGAR: extension ImplicitlyUnwrappedOptional :
@@ -29,4 +31,3 @@
 // CHECK-MUTATING-ATTR: mutating func
 
 // NO-FIXMES-NOT: FIXME
-

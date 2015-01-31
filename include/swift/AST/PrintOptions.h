@@ -34,6 +34,13 @@ struct PrintOptions {
   /// \brief Whether to print '{ get set }' on readwrite computed properties.
   bool PrintGetSetOnRWProperties = true;
 
+  /// \brief Whether to print the accessors of a property abstractly,
+  /// i.e. always as get and set rather than the specific accessors
+  /// actually used to implement the property.
+  ///
+  /// Printing function definitions takes priority over this setting.
+  bool AbstractAccessors = true;
+
   /// \brief Whether to print type definitions.
   bool TypeDefinitions = false;
 
@@ -165,6 +172,7 @@ struct PrintOptions {
     PrintOptions result;
     result.PrintLongAttrsOnSeparateLines = true;
     result.PrintStorageRepresentationAttrs = true;
+    result.AbstractAccessors = false;
     result.PrintForSIL = true;
     result.PrintInSILBody = true;
     return result;
@@ -177,6 +185,7 @@ struct PrintOptions {
     PrintOptions result = printVerbose();
     result.ExcludeAttrList.clear();
     result.PrintStorageRepresentationAttrs = true;
+    result.AbstractAccessors = false;
     result.PrintAccessibility = true;
     result.SkipEmptyExtensionDecls = false;
     return result;

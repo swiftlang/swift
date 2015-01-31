@@ -592,66 +592,180 @@ bool PrintAST::shouldPrint(const Decl *D) {
   return true;
 }
 
+static bool isAccessorAssumedNonMutating(FuncDecl *accessor) {
+  switch (accessor->getAccessorKind()) {
+  case AccessorKind::IsGetter:
+  case AccessorKind::IsAddressor:
+    return true;
+
+  case AccessorKind::IsSetter:
+  case AccessorKind::IsWillSet:
+  case AccessorKind::IsDidSet:
+  case AccessorKind::IsMaterializeForSet:
+  case AccessorKind::IsMutableAddressor:
+    return false;
+
+  case AccessorKind::NotAccessor:
+    llvm_unreachable("not an addressor!");
+  }
+  llvm_unreachable("bad addressor kind");
+}
+
+static StringRef getAddressorLabel(FuncDecl *addressor) {
+  switch (addressor->getAddressorKind()) {
+  case AddressorKind::NotAddressor:
+    llvm_unreachable("addressor claims not to be an addressor");
+  case AddressorKind::Unsafe:
+    return "unsafeAddress";
+  case AddressorKind::Owning:
+    return "addressWithOwner";
+  case AddressorKind::NativeOwning:
+    return "addressWithNativeOwner";
+  case AddressorKind::NativePinning:
+    return "addressWithPinnedNativeOwner";
+  }
+  llvm_unreachable("bad addressor kind");
+}
+
+static StringRef getMutableAddressorLabel(FuncDecl *addressor) {
+  switch (addressor->getAddressorKind()) {
+  case AddressorKind::NotAddressor:
+    llvm_unreachable("addressor claims not to be an addressor");
+  case AddressorKind::Unsafe:
+    return "unsafeMutableAddress";
+  case AddressorKind::Owning:
+    return "mutableAddressWithOwner";
+  case AddressorKind::NativeOwning:
+    return "mutableAddressWithNativeOwner";
+  case AddressorKind::NativePinning:
+    return "mutableAddressWithPinnedNativeOwner";
+  }
+  llvm_unreachable("bad addressor kind");
+}
+
+/// Is the getter-like accessor for this storage explicitly mutating?
+static bool hasMutatingGetter(AbstractStorageDecl *storage) {
+  switch (storage->getStorageKind()) {
+  case AbstractStorageDecl::Stored:
+    return false;
+
+  case AbstractStorageDecl::StoredWithTrivialAccessors:
+  case AbstractStorageDecl::StoredWithObservers:
+  case AbstractStorageDecl::InheritedWithObservers:
+  case AbstractStorageDecl::ComputedWithMutableAddress:
+  case AbstractStorageDecl::Computed:
+    assert(storage->getGetter());
+    return storage->getGetter()->isMutating();
+
+  case AbstractStorageDecl::Addressed:
+  case AbstractStorageDecl::AddressedWithTrivialAccessors:
+  case AbstractStorageDecl::AddressedWithObservers:
+    assert(storage->getAddressor());
+    return storage->getAddressor()->isMutating();
+  }
+  llvm_unreachable("bad storage kind");
+}
+
+/// Is the setter-like accessor for this storage explicitly nonmutating?
+static bool hasExplicitNonMutatingSetter(AbstractStorageDecl *storage) {
+  assert(storage->isSettable(nullptr));
+  switch (storage->getStorageKind()) {
+  case AbstractStorageDecl::Stored:
+    return false;
+
+  case AbstractStorageDecl::StoredWithTrivialAccessors:
+  case AbstractStorageDecl::StoredWithObservers:
+  case AbstractStorageDecl::InheritedWithObservers:
+  case AbstractStorageDecl::Computed:
+    assert(storage->getSetter());
+    return storage->getSetter()->isExplicitNonMutating();
+
+  case AbstractStorageDecl::Addressed:
+  case AbstractStorageDecl::AddressedWithTrivialAccessors:
+  case AbstractStorageDecl::AddressedWithObservers:
+  case AbstractStorageDecl::ComputedWithMutableAddress:
+    assert(storage->getMutableAddressor());
+    return storage->getMutableAddressor()->isExplicitNonMutating();
+  }
+  llvm_unreachable("bad storage kind");
+}
+
 void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
-  // If we are printing StoredWithTrivialAccessors in sil, print get|set
-  // to differentiate from stored property. FIXME: Parser can't handle
-  // "let {get}", so do not print it.
-  // FIXME: addressors?
-  if (ASD->getStorageKind() == AbstractStorageDecl::Stored ||
-      (Options.PrintForSIL &&
-       ASD->getStorageKind() == AbstractStorageDecl::StoredWithTrivialAccessors
-       && isa<VarDecl>(ASD) && cast<VarDecl>(ASD)->isLet() &&
-       !ASD->getSetter()) ||
-      (!Options.PrintForSIL &&
-       ASD->getStorageKind()
-       == AbstractStorageDecl::StoredWithTrivialAccessors)) {
-    // This is a 'let' vardecl.  We could print the initializer if we could
-    // print expressions.
+  auto storageKind = ASD->getStorageKind();
+
+  // Never print anything for stored properties.
+  if (storageKind == AbstractStorageDecl::Stored)
     return;
+
+  // Treat StoredWithTrivialAccessors the same as Stored unless
+  // we're printing for SIL, in which case we want to distinguish it
+  // from a pure stored property.
+  if (storageKind == AbstractStorageDecl::StoredWithTrivialAccessors) {
+    if (!Options.PrintForSIL) return;
+
+    // Don't print an accessor for a let; the parser can't handle it.
+    if (isa<VarDecl>(ASD) && cast<VarDecl>(ASD)->isLet())
+      return;
   }
 
-  bool PrintGetSetOnRWProperties = Options.PrintGetSetOnRWProperties;
-  if (auto Getter = ASD->getGetter())
-    if (Getter->isMutating())
-      PrintGetSetOnRWProperties = true;
-  if (auto Setter = ASD->getSetter())
-    if (Setter->isExplicitNonMutating())
-      PrintGetSetOnRWProperties = true;
+  // We sometimes want to print the accessors abstractly
+  // instead of listing out how they're actually implemented.
+  bool inProtocol = isa<ProtocolDecl>(ASD->getDeclContext());
+  if (inProtocol ||
+      (Options.AbstractAccessors && !Options.FunctionDefinitions)) {
+    bool mutatingGetter = hasMutatingGetter(ASD);
 
-  if (PrintGetSetOnRWProperties && !Options.FunctionDefinitions &&
-      (ASD->getGetter() || ASD->getSetter())) {
-    Printer << " {";
-    if (auto Getter = ASD->getGetter()) {
-      if (Getter->isMutating())
-        Printer << " mutating";
-      Printer << " get";
+    bool settable = ASD->isSettable(nullptr);
+    bool nonmutatingSetter =
+      (settable ? hasExplicitNonMutatingSetter(ASD) : false);
+
+    // We're about to print something like this:
+    //   { mutating? get (nonmutating? set)? }
+    // But don't print "{ get set }" if we don't have to.
+    if (!inProtocol && !Options.PrintGetSetOnRWProperties &&
+        settable && !mutatingGetter && !nonmutatingSetter) {
+      return;
     }
-    if (auto Setter = ASD->getSetter()) {
-      if (Setter->isExplicitNonMutating())
-        Printer << " nonmutating";
+
+    Printer << " {";
+    if (mutatingGetter) Printer << " mutating";
+    Printer << " get";
+    if (settable) {
+      if (nonmutatingSetter) Printer << " nonmutating";
       Printer << " set";
     }
     Printer << " }";
     return;
   }
 
-  bool InProtocol = isa<ProtocolDecl>(ASD->getDeclContext());
-  if (!InProtocol && !Options.FunctionDefinitions &&
-      !PrintGetSetOnRWProperties &&
-      ASD->getGetter() && ASD->getSetter())
-    return;
+  // Honor !Options.PrintGetSetOnRWProperties in the only remaining
+  // case where we could end up printing { get set }.
+  if (storageKind == AbstractStorageDecl::StoredWithTrivialAccessors ||
+      storageKind == AbstractStorageDecl::Computed) {
+    if (!Options.PrintGetSetOnRWProperties &&
+        !Options.FunctionDefinitions &&
+        ASD->getSetter() &&
+        !ASD->getGetter()->isMutating() &&
+        !ASD->getSetter()->isExplicitNonMutating()) {
+      return;
+    }
+  }
 
-  bool PrintAccessorBody = Options.FunctionDefinitions && !InProtocol;
+  // Otherwise, print all the concrete defining accessors.
+
+  bool PrintAccessorBody = Options.FunctionDefinitions;
 
   auto PrintAccessor = [&](FuncDecl *Accessor, StringRef Label) {
     if (!Accessor)
       return;
     if (!PrintAccessorBody) {
-      if (Accessor->isGetter()) {
+      if (isAccessorAssumedNonMutating(Accessor)) {
         if (Accessor->isMutating())
           Printer << " mutating";
-      } else if (Accessor->isExplicitNonMutating()) {
-        Printer << " nonmutating";
+      } else {
+        if (Accessor->isExplicitNonMutating()) {
+          Printer << " nonmutating";
+        }
       }
       Printer << " " << Label;
     } else {
@@ -664,40 +778,16 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
 
   auto PrintAddressor = [&](FuncDecl *accessor) {
     if (!accessor) return;
-    switch (accessor->getAddressorKind()) {
-    case AddressorKind::NotAddressor:
-      llvm_unreachable("addressor claims not to be an addressor");
-    case AddressorKind::Unsafe:
-      return PrintAccessor(accessor, "unsafeAddress");
-    case AddressorKind::Owning:
-      return PrintAccessor(accessor, "addressWithOwner");
-    case AddressorKind::NativeOwning:
-      return PrintAccessor(accessor, "addressWithNativeOwner");
-    case AddressorKind::NativePinning:
-      return PrintAccessor(accessor, "addressWithPinnedNativeOwner");
-    }
-    llvm_unreachable("bad addressor kind");
+    PrintAccessor(accessor, getAddressorLabel(accessor));
   };
 
   auto PrintMutableAddressor = [&](FuncDecl *accessor) {
     if (!accessor) return;
-    switch (accessor->getAddressorKind()) {
-    case AddressorKind::NotAddressor:
-      llvm_unreachable("addressor claims not to be an addressor");
-    case AddressorKind::Unsafe:
-      return PrintAccessor(accessor, "unsafeMutableAddress");
-    case AddressorKind::Owning:
-      return PrintAccessor(accessor, "mutableAddressWithOwner");
-    case AddressorKind::NativeOwning:
-      return PrintAccessor(accessor, "mutableAddressWithNativeOwner");
-    case AddressorKind::NativePinning:
-      return PrintAccessor(accessor, "mutableAddressWithPinnedNativeOwner");
-    }
-    llvm_unreachable("bad addressor kind");
+    PrintAccessor(accessor, getMutableAddressorLabel(accessor));
   };
 
   Printer << " {";
-  switch (ASD->getStorageKind()) {
+  switch (storageKind) {
   case AbstractStorageDecl::Stored:
     llvm_unreachable("filtered out above!");
     
@@ -1356,7 +1446,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         [&]{
           if (decl->isMutating())
             Printer << "mutating ";
-          Printer << (kind == AccessorKind::IsGetter ? "get" : "address");
+          Printer << (kind == AccessorKind::IsGetter
+                        ? "get" : getAddressorLabel(decl));
         });
       Printer << " {";
       break;
@@ -1369,7 +1460,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
             Printer << "nonmutating ";
           Printer << (kind == AccessorKind::IsDidSet ? "didSet" :
                       kind == AccessorKind::IsMaterializeForSet
-                        ? "materializeForSet" : "mutableAddress");
+                        ? "materializeForSet"
+                        : getMutableAddressorLabel(decl));
         });
       Printer << " {";
       break;

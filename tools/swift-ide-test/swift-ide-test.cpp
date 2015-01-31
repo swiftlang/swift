@@ -282,6 +282,12 @@ FunctionDefinitions("function-definitions",
                     llvm::cl::init(true));
 
 static llvm::cl::opt<bool>
+AbstractAccessors("abstract-accessors",
+                  llvm::cl::desc("Hide the concrete accessors used to "
+                                 "implement a property or subscript"),
+                  llvm::cl::init(true));
+
+static llvm::cl::opt<bool>
 PreferTypeRepr("prefer-type-repr",
                llvm::cl::desc("When printing types, prefer printing TypeReprs"),
                llvm::cl::init(true));
@@ -1097,6 +1103,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
                       StringRef SourceFilename,
                       bool RunTypeChecker,
                       bool FunctionDefinitions,
+                      bool AbstractAccessors,
                       bool PreferTypeRepr,
                       bool ExplodePatternBindingDecls,
                       bool PrintImplicitAttrs,
@@ -1131,6 +1138,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
     CI.performSema();
 
   PrintOptions Options = PrintOptions::printEverything();
+  Options.AbstractAccessors = AbstractAccessors;
   Options.FunctionDefinitions = FunctionDefinitions;
   Options.PreferTypeRepr = PreferTypeRepr;
   Options.ExplodePatternBindingDecls = ExplodePatternBindingDecls;
@@ -1384,6 +1392,7 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
                           bool FullyQualifiedTypesIfAmbiguous,
                           bool SynthesizeSugarOnTypes,
                           bool AnnotatePrint,
+                          bool AbstractAccessors,
                           bool PrintImplicitAttrs,
                           bool PrintAccessibility,
                           bool PrintUnavailableDecls,
@@ -1411,6 +1420,7 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
   PrintOptions Options = PrintOptions::printEverything();
   Options.FullyQualifiedTypesIfAmbiguous = FullyQualifiedTypesIfAmbiguous;
   Options.SynthesizeSugarOnTypes = SynthesizeSugarOnTypes;
+  Options.AbstractAccessors = AbstractAccessors;
   Options.PrintImplicitAttrs = PrintImplicitAttrs;
   Options.PrintAccessibility = PrintAccessibility;
   Options.AccessibilityFilter = AccessibilityFilter;
@@ -2124,6 +2134,7 @@ int main(int argc, char *argv[]) {
                           options::SourceFilename,
                           RunTypeChecker,
                           /*FunctionDefinitions=*/options::FunctionDefinitions,
+                          options::AbstractAccessors,
                           /*PreferTypeRepr=*/options::PreferTypeRepr,
                           options::ExplodePatternBindingDecls,
                           options::PrintImplicitAttrs,
@@ -2152,6 +2163,7 @@ int main(int argc, char *argv[]) {
         options::FullyQualifiedTypesIfAmbiguous,
         options::SynthesizeSugarOnTypes,
         options::AnnotatePrint,
+        options::AbstractAccessors,
         options::PrintImplicitAttrs,
         options::PrintAccessibility,
         !options::SkipUnavailable,
