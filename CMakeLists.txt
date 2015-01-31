@@ -276,6 +276,19 @@ swift_common_cxx_warnings()
 # Configure SDKs.
 #
 
+function(is_sdk_requested name result_var_name)
+  if("${SWIFT_SDKS}" STREQUAL "")
+    set("${result_var_name}" "TRUE" PARENT_SCOPE)
+  else()
+    list(FIND SWIFT_SDKS "${name}" sdk_index)
+    if(${sdk_index} EQUAL -1)
+      set("${result_var_name}" "FALSE" PARENT_SCOPE)
+    else()
+      set("${result_var_name}" "TRUE" PARENT_SCOPE)
+    endif()
+  endif()
+endfunction()
+
 # FIXME: separate the notions of SDKs used for compiler tools and target
 # binaries.
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
@@ -288,8 +301,8 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
 
-  option(SWIFT_BUILD_OSX "Build for OS X targets" TRUE)
-  if(SWIFT_BUILD_OSX)
+  is_sdk_requested(OSX swift_build_osx)
+  if(swift_build_osx)
     configure_sdk_darwin(OSX "OS X" "10.9" macosx macosx macosx "x86_64" TRUE)
     configure_target_variant(OSX-DA "OS X Debug+Asserts"   OSX DA "Debug+Asserts")
     configure_target_variant(OSX-RA "OS X Release+Asserts" OSX RA "Release+Asserts")
@@ -300,23 +313,21 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     # FIXME: Can not cross-compile stdlib using Xcode.  Xcode insists on
     # passing -mmacosx-version-min to the compiler, and we want to pass
     # -mios-version-min.  Clang sees both options and complains.
-    set(swift_crosscompile_stdlib_default FALSE)
+    set(swift_can_crosscompile_stdlib FALSE)
   else()
-    set(swift_crosscompile_stdlib_default TRUE)
+    set(swift_can_crosscompile_stdlib TRUE)
   endif()
 
-  option(SWIFT_BUILD_IOS "Build for iOS targets"
-      "${swift_crosscompile_stdlib_default}")
-  if(SWIFT_BUILD_IOS)
+  is_sdk_requested(IOS swift_build_ios)
+  if(swift_build_ios AND ${swift_can_crosscompile_stdlib})
     configure_sdk_darwin(IOS "iOS" "7.0" iphoneos ios ios "armv7;arm64" TRUE)
     configure_target_variant(IOS-DA "iOS Debug+Asserts"   IOS DA "Debug+Asserts")
     configure_target_variant(IOS-RA "iOS Release+Asserts" IOS RA "Release+Asserts")
     configure_target_variant(IOS-R  "iOS Release"         IOS R "Release")
   endif()
 
-  option(SWIFT_BUILD_IOS_SIMULATOR "Build for iOS Simulator targets"
-      "${swift_crosscompile_stdlib_default}")
-  if(SWIFT_BUILD_IOS_SIMULATOR)
+  is_sdk_requested(IOS_SIMULATOR swift_build_ios_simulator)
+  if(swift_build_ios_simulator AND ${swift_can_crosscompile_stdlib})
     configure_sdk_darwin(IOS_SIMULATOR "iOS Simulator" "7.0" iphonesimulator
         ios-simulator ios "i386;x86_64" FALSE)
     configure_target_variant(
