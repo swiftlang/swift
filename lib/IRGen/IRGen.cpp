@@ -26,6 +26,7 @@
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/Bitcode/ReaderWriter.h"
+#include "llvm/CodeGen/BasicTTIImpl.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/LLVMContext.h"
@@ -297,7 +298,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   // Configure the function passes.
   FunctionPassManager FunctionPasses(Module);
   FunctionPasses.add(new llvm::DataLayoutPass());
-  TargetMachine->addAnalysisPasses(FunctionPasses);
+  FunctionPasses.add(
+      createTargetTransformInfoWrapperPass(TargetMachine->getTTI()));
   if (Opts.Verify)
     FunctionPasses.add(createVerifierPass());
   PMBuilder.populateFunctionPassManager(FunctionPasses);
@@ -317,7 +319,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   // Configure the module passes.
   PassManager ModulePasses;
   ModulePasses.add(new llvm::DataLayoutPass());
-  TargetMachine->addAnalysisPasses(ModulePasses);
+  ModulePasses.add(
+      createTargetTransformInfoWrapperPass(TargetMachine->getTTI()));
   PMBuilder.populateModulePassManager(ModulePasses);
 
   // The PMBuilder only knows about LLVM AA passes.  We should explicitly add
@@ -350,7 +353,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                   ? llvm::TargetMachine::CGFT_AssemblyFile
                   : llvm::TargetMachine::CGFT_ObjectFile);
 
-    TargetMachine->addAnalysisPasses(EmitPasses);
+    EmitPasses.add(
+        createTargetTransformInfoWrapperPass(TargetMachine->getTTI()));
 
     // Make sure we do ARC contraction under optimization.  We don't
     // rely on any other LLVM ARC transformations, but we do need ARC
