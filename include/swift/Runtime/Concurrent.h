@@ -240,7 +240,7 @@ public:
 
   /// Try to allocate memory in the current bank. Return a pointer to the newly
   /// allocated memory or null in case of failure.
-  ElemTy *Allocate() {
+  ElemTy *allocate() {
     size_t CurrNextFree = NextFree.load(std::memory_order_acquire);
     size_t Next = CurrNextFree + 1;
 
