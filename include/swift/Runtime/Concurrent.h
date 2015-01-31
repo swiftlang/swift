@@ -40,6 +40,14 @@ template <class ElemTy> struct ConcurrentListNode {
 template <class ElemTy> struct ConcurrentList {
   ConcurrentList() : First(nullptr) {}
   ~ConcurrentList() {
+    clear();
+  }
+
+  /// Remove all of the links in the chain.
+  /// Notice that this operation is non-concurrent because
+  /// we have no way of ensuring that no one is currently
+  /// traversing the list.
+  void clear() {
     // Iterate over the list and delete all the nodes.
     auto Ptr = First.load(std::memory_order_acquire);
     while (Ptr) {
