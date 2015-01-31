@@ -43,13 +43,16 @@ template <class ElemTy> struct ConcurrentList {
     clear();
   }
 
-  /// Remove all of the links in the chain.
+  /// Remove all of the links in the chain. This method leaves
+  /// the list at a usable state and new links can be added.
   /// Notice that this operation is non-concurrent because
   /// we have no way of ensuring that no one is currently
   /// traversing the list.
   void clear() {
     // Iterate over the list and delete all the nodes.
     auto Ptr = First.load(std::memory_order_acquire);
+    First.store(nullptr, std:: memory_order_release);
+
     while (Ptr) {
       auto N = Ptr->Next;
       delete Ptr;
@@ -268,14 +271,17 @@ class ConcurrentMemoryAllocator {
   typedef ConcurrentMemoryBank<ElemTy, BankSize> BankTy;
   /// A list of banks to allocate from.
   ConcurrentList<BankTy*> Banks;
-
 public:
+  ~ConcurrentMemoryAllocator() {
+    reset();
+  }
+
   /// Allocate memory and return a pointer to the newly
   /// allocated buffer.
   ElemTy *Allocate() {
     start:
     // Try to allocate memory in one of the banks:
-    for (auto Bank : Banks) {
+    for (auto *Bank : Banks) {
       // If we were able to allocate memory in one of the existing banks then
       // simply return the newly allocated pointer.
       if (ElemTy *P = Bank->Allocate())
@@ -286,6 +292,19 @@ public:
     // Allocate a new bank and try again.
     Banks.push_front(new BankTy());
     goto start;
+  }
+
+  /// Free all of the memory that was allocated.
+  /// This method leaves the allocator at a usable state and new memory can be
+  /// allocated.
+  /// Notice that this operation is non-concurrent because
+  /// we have no way of ensuring that no one kept pointers to the
+  /// allocated data.
+  void reset() {
+    for (auto *Bank : Banks) {
+      delete Bank;
+    }
+    Banks.clear();
   }
 };
 

@@ -214,8 +214,6 @@ TEST(Concurrent, ConcurrentList) {
   EXPECT_EQ(ListLen, results.size() * numElem);
 }
 
-// Notice that the memory that we allocate in this test leaks
-// because our allocator never frees memory.
 TEST(Concurrent, ConcurrentMemoryBank) {
   const int numElem = 16;
   const int magicValue = 123;
@@ -260,8 +258,6 @@ TEST(Concurrent, ConcurrentMemoryBank) {
 }
 
 
-// Notice that the memory that we allocate in this test leaks
-// because our allocator never frees memory.
 TEST(Concurrent, ConcurrentMemoryAllocator) {
   const int magicValue = 123;
 
@@ -288,12 +284,10 @@ TEST(Concurrent, ConcurrentMemoryAllocator) {
       EXPECT_EQ(magicValue, *A);
   }
 
-
   // Allocate some more memory.
   for (int i = 0; i < 256; i++) {
       EXPECT_NE(Allocator.Allocate(), nullptr);
   }
-
 }
 
 TEST(MetadataTest, getGenericMetadata) {
