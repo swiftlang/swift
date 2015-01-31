@@ -1764,7 +1764,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
       
       if (isBridgeableTargetType && TC.getBridgedToObjC(DC, true, type1) &&
-          !HandlingFavoredConstraint) {
+          (kind == TypeMatchKind::ExplicitConversion ||
+           !HandlingFavoredConstraint)) {
         conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeToObjC);
       }
     }
@@ -1776,8 +1777,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       if (type1->mayHaveSuperclass() && type2->isPotentiallyBridgedValueType() &&
           type2->getAnyNominal() 
             != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
-          allowsBridgingFromObjC(TC, DC, type2) &&
-          !HandlingFavoredConstraint) {
+          allowsBridgingFromObjC(TC, DC, type2)) {
         conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeFromObjC);
       }
     }

@@ -685,16 +685,6 @@ static bool diagnoseFailure(ConstraintSystem &cs,
   case Failure::TypesNotConstructible:
   case Failure::FunctionTypesMismatch: {
     
-    // For conversion failures in 'as' and 'as!' expressions, diagnose that
-    // expression directly.
-    if ((isa<CoerceExpr>(cloc->getAnchor()) ||
-         isa<ForcedCheckedCastExpr>(cloc->getAnchor())) &&
-        failure.getKind() == Failure::TypesNotConvertible) {
-      if (cs.diagnoseFailureForExpr(cloc->getAnchor())) {
-        return true;
-      }
-    }
-
     // We can do a better job of diagnosing application argument conversion
     // failures elsewhere.
     if (isa<ApplyExpr>(expr) ||
@@ -2152,42 +2142,6 @@ bool FailureDiagnosis::diagnoseFailureForInOutExpr() {
   return diagnoseGeneralFailure();
 }
 
-enum class CoerceExprDiagnosis {
-  // The 'as' expression fails to type-check, even after being changed to 'as!'.
-  Failure,
-
-  // The 'as' expression type-checks if changed to 'as!'.
-  ChangeToForcedCheckedCast,
-
-  // The 'as' expression type-checks as-is.
-  Success
-};
-
-// Type-check the coerceExpr independently of any other expression; if it
-// fails, see if changing it to an 'as!' expression helps any. Return the
-// result of the type checking.
-static CoerceExprDiagnosis diagnoseCoerceExpr(
-    CoerceExpr *coerceExpr, ConstraintSystem *CS) {
-  class NoDiagnosticsListener : public ExprTypeCheckListener {
-  public:
-    bool suppressDiagnostics() const override { return true; }
-  } listener;
-
-  // See if changing the 'as' expression to 'as!' fixes things.
-  Expr *forceExpr = new (CS->getASTContext()) ForcedCheckedCastExpr(
-    coerceExpr->getSubExpr(), coerceExpr->getLoc(), SourceLoc(),
-    coerceExpr->getCastTypeLoc());
-  CS->TC.eraseTypeData(forceExpr);
-  bool forceTypeCheckFailed =
-    CS->TC.typeCheckExpression(forceExpr, CS->DC, Type(), Type(), false,
-                               FreeTypeVariableBinding::Disallow, &listener);
-  if (!forceTypeCheckFailed) {
-    return CoerceExprDiagnosis::ChangeToForcedCheckedCast;
-  }
-
-  return CoerceExprDiagnosis::Failure;
-}
-
 bool FailureDiagnosis::diagnoseFailureForCoerceExpr() {
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
   CoerceExpr *coerceExpr = cast<CoerceExpr>(expr);
@@ -2210,22 +2164,11 @@ bool FailureDiagnosis::diagnoseFailureForCoerceExpr() {
   }
 
   if (conversionTypes.first && conversionTypes.second) {
-    switch (diagnoseCoerceExpr(coerceExpr, CS)) {
-    case CoerceExprDiagnosis::Failure:
-      CS->TC.diagnose(coerceExpr->getLoc(), diag::invalid_relation,
-                      Failure::TypesNotConvertible - Failure::TypesNotEqual,
-                      conversionTypes.first, conversionTypes.second)
-        .highlight(coerceExpr->getSourceRange());
-      return true;
-    case CoerceExprDiagnosis::ChangeToForcedCheckedCast:
-      CS->TC.diagnose(coerceExpr->getLoc(), diag::missing_forced_downcast,
-                      conversionTypes.first, conversionTypes.second)
-        .highlight(coerceExpr->getSourceRange())
-        .fixItReplace(coerceExpr->getLoc(), "as!");
-      return true;
-    case CoerceExprDiagnosis::Success:
-      break;
-    }
+    CS->TC.diagnose(coerceExpr->getLoc(), diag::invalid_relation,
+                    Failure::TypesNotConvertible - Failure::TypesNotEqual,
+                    conversionTypes.first, conversionTypes.second)
+      .highlight(coerceExpr->getSourceRange());
+    return true;
   }
 
   return diagnoseGeneralFailure();

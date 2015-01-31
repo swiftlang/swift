@@ -1922,9 +1922,23 @@ namespace {
       auto locator = CS.getConstraintLocator(expr,
                                      ConstraintLocator::CheckedCastOperand);
 
-      // The source type can be explicitly converted to the destination type.
-      CS.addConstraint(ConstraintKind::ExplicitConversion, fromType, toType,
-                       locator);
+      if (CS.shouldAttemptFixes()) {
+        Constraint *coerceConstraint =
+          Constraint::create(CS, ConstraintKind::ExplicitConversion,
+                             fromType, toType, DeclName(), locator);
+        Constraint *downcastConstraint =
+          Constraint::create(CS, ConstraintKind::CheckedCast, fromType, toType,
+                             DeclName(), locator);
+        coerceConstraint->setFavored();
+        auto constraints = { coerceConstraint, downcastConstraint };
+        CS.addConstraint(Constraint::createDisjunction(CS, constraints,
+                                                       locator,
+                                                       RememberChoice));
+      } else {
+        // The source type can be explicitly converted to the destination type.
+        CS.addConstraint(ConstraintKind::ExplicitConversion, fromType, toType,
+                         locator);
+      }
 
       return toType;
     }

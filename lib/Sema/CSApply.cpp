@@ -2857,9 +2857,72 @@ namespace {
       auto toType = simplifyType(expr->getCastTypeLoc().getType());
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
+      // Determine whether we performed a coercion or downcast.
+      auto locator =
+        cs.getConstraintLocator(expr, ConstraintLocator::CheckedCastOperand);
+      bool shouldChangeToForcedCheckedCast = false;
+      if (cs.shouldAttemptFixes()) {
+        unsigned choice = solution.getDisjunctionChoice(locator);
+        assert(choice <= 1 && "coercion choices not synced with disjunction");
+        shouldChangeToForcedCheckedCast = (choice == 1);
+      }
+
       auto &tc = cs.getTypeChecker();
       auto sub = tc.coerceToRValue(expr->getSubExpr());
 
+      if (shouldChangeToForcedCheckedCast) {
+        auto fromType = sub->getType();
+        auto castKind = tc.typeCheckCheckedCast(
+                          fromType, toType, cs.DC,
+                          expr->getLoc(),
+                          sub->getSourceRange(),
+                          expr->getCastTypeLoc().getSourceRange(),
+                          [&](Type commonTy) -> bool {
+                            return tc.convertToType(sub, commonTy,
+                                                   cs.DC);
+                          },
+                          /*suppressDiagnostics=*/ true);
+        switch (castKind) {
+        // Invalid cast.
+        case CheckedCastKind::Unresolved:
+          tc.diagnose(expr->getLoc(), diag::invalid_relation,
+                      Failure::TypesNotConvertible - Failure::TypesNotEqual,
+                      fromType, toType)
+            .highlight(expr->getSourceRange());
+          return nullptr;
+        case CheckedCastKind::Coercion:
+          llvm_unreachable("Coercions handled above");
+
+        // Valid casts.
+        case CheckedCastKind::ArrayDowncast:
+        case CheckedCastKind::DictionaryDowncast:
+        case CheckedCastKind::DictionaryDowncastBridged:
+        case CheckedCastKind::SetDowncast:
+        case CheckedCastKind::SetDowncastBridged:
+        case CheckedCastKind::ValueCast:
+        case CheckedCastKind::BridgeFromObjectiveC:
+            break;
+        }
+
+        // Emit 'as' -> 'as!' diagnostic and transmute to checked cast.
+        tc.diagnose(expr->getLoc(), diag::missing_forced_downcast,
+                    fromType, toType)
+          .highlight(expr->getSourceRange())
+          .fixItReplace(expr->getLoc(), "as!");
+        auto *cast =
+          new (tc.Context) ForcedCheckedCastExpr(sub, expr->getLoc(),
+                                                 SourceLoc(),
+                                                 expr->getCastTypeLoc());
+        cast->setType(toType);
+        cast->setCastKind(castKind);
+        if (expr->isImplicit()) {
+          cast->setImplicit();
+        }
+        
+        return handleOptionalBindings(cast, simplifyType(expr->getType()),
+                                      /*conditionalCast=*/false);
+      }
+      
       // The subexpression is always an rvalue.
       if (!sub)
         return nullptr;

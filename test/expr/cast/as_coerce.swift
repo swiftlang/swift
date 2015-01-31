@@ -92,6 +92,7 @@ Double(1) as Double as String // expected-error{{'Double' is not convertible to 
 // <rdar://problem/19499340> QoI: Nimble as -> as! changes not covered by Fix-Its
 func f(x : String) {}
 f("what" as Any as String) // expected-error{{'Any' is not convertible to 'String'; did you mean to use 'as!' to force downcast?}}
+f(1 as String) // expected-error{{'Int' is not convertible to 'String'}}
 
 // <rdar://problem/19650402> Swift compiler segfaults while running the annotation tests
 let s : AnyObject = C3()
