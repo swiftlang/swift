@@ -1240,6 +1240,12 @@ public:
   void diagnosePotentialUnavailability(const Decl *D, DeclName Name,
                                        SourceLoc referenceLoc,
                                        const UnavailabilityReason &Reason);
+
+  /// Emits a diagnostic for a reference to a storage accessor that is
+  /// potentially unavailable.
+  void diagnosePotentialAccessorUnavailability(
+      FuncDecl *Accessor, SourceLoc referenceLoc,
+      const UnavailabilityReason &Reason, bool ForInout);
   /// @}
 
   /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl

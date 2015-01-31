@@ -273,6 +273,56 @@ class ClassWithUnavailableProperties {
       availableOn10_10Stored = newVal
     }
   }
+  
+  var propWithSetterOnlyAvailableOn10_10 : Int {
+    get {
+      funcAvailableOn10_10() // expected-error {{'funcAvailableOn10_10()' is only available on OS X version 10.10 or greater}}
+      return 0
+    }
+    @availability(OSX, introduced=10.10)
+    set(newVal) {
+    funcAvailableOn10_10()
+    }
+  }
+  
+  var propWithGetterOnlyAvailableOn10_10 : Int {
+    @availability(OSX, introduced=10.10)
+    get {
+      funcAvailableOn10_10()
+      return 0
+    }
+    set(newVal) {
+      funcAvailableOn10_10() // expected-error {{'funcAvailableOn10_10()' is only available on OS X version 10.10 or greater}}
+    }
+  }
+  
+  var propWithGetterAndSetterOnlyAvailableOn10_10 : Int {
+    @availability(OSX, introduced=10.10)
+    get {
+      return 0
+    }
+    @availability(OSX, introduced=10.10)
+    set(newVal) {
+    }
+  }
+  
+  var propWithSetterOnlyAvailableOn10_10ForNestedMemberRef : ClassWithUnavailableProperties {
+    get {
+      return ClassWithUnavailableProperties()
+    }
+    @availability(OSX, introduced=10.10)
+    set(newVal) {
+    }
+  }
+  
+  var propWithGetterOnlyAvailableOn10_10ForNestedMemberRef : ClassWithUnavailableProperties {
+    @availability(OSX, introduced=10.10)
+    get {
+      return ClassWithUnavailableProperties()
+    }
+    set(newVal) {
+    }
+  }
 }
 
 func accessUnavailableProperties(o: ClassWithUnavailableProperties) {
@@ -289,6 +339,57 @@ func accessUnavailableProperties(o: ClassWithUnavailableProperties) {
   
   o.availableOn10_9Computed = 9
   o.availableOn10_10Computed = 10 // expected-error {{'availableOn10_10Computed' is only available on OS X version 10.10 or greater}}
+  
+  // Getter allowed on 10.9 but setter is not
+  let _: Int = o.propWithSetterOnlyAvailableOn10_10
+  o.propWithSetterOnlyAvailableOn10_10 = 5 // expected-error {{setter for 'propWithSetterOnlyAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+  
+  if #os(OSX >= 10.10) {
+    // Setter is allowed on 10.10 and greater
+    o.propWithSetterOnlyAvailableOn10_10 = 5
+  }
+  
+  // Setter allowed on 10.9 but getter is not
+  o.propWithGetterOnlyAvailableOn10_10 = 5
+  let _: Int = o.propWithGetterOnlyAvailableOn10_10 // expected-error {{getter for 'propWithGetterOnlyAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+  
+  if #os(OSX >= 10.10) {
+    // Getter is allowed on 10.10 and greater
+    let _: Int = o.propWithGetterOnlyAvailableOn10_10
+  }
+  
+  // Tests for nested member refs
+  
+  // Both getters are potentially unavailable.
+  let _: Int = o.propWithGetterOnlyAvailableOn10_10ForNestedMemberRef.propWithGetterOnlyAvailableOn10_10 // expected-error {{getter for 'propWithGetterOnlyAvailableOn10_10ForNestedMemberRef' is only available on OS X version 10.10 or greater}} expected-error {{getter for 'propWithGetterOnlyAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+
+  // Nested getter is potentially unavailable, outer getter is available
+  let _: Int = o.propWithGetterOnlyAvailableOn10_10ForNestedMemberRef.propWithSetterOnlyAvailableOn10_10 // expected-error {{getter for 'propWithGetterOnlyAvailableOn10_10ForNestedMemberRef' is only available on OS X version 10.10 or greater}}
+
+  // Nested getter is available, outer getter is potentially unavailable
+  let _:Int = o.propWithSetterOnlyAvailableOn10_10ForNestedMemberRef.propWithGetterOnlyAvailableOn10_10 // expected-error {{getter for 'propWithGetterOnlyAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+
+  // Both getters are always available.
+  let _: Int = o.propWithSetterOnlyAvailableOn10_10ForNestedMemberRef.propWithSetterOnlyAvailableOn10_10
+  
+  
+  // Nesting in source of assignment
+  var v: Int
+  
+  v = o.propWithGetterOnlyAvailableOn10_10 // expected-error {{getter for 'propWithGetterOnlyAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+  v = (o.propWithGetterOnlyAvailableOn10_10) // expected-error {{getter for 'propWithGetterOnlyAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+  
+  // Inout requires access to both getter and setter
+  
+  func takesInout(inout i : Int) { }
+  
+  takesInout(&o.propWithGetterOnlyAvailableOn10_10) // expected-error {{cannot pass as inout because getter for 'propWithGetterOnlyAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+  takesInout(&o.propWithSetterOnlyAvailableOn10_10) // expected-error {{cannot pass as inout because setter for 'propWithSetterOnlyAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+  
+  takesInout(&o.propWithGetterAndSetterOnlyAvailableOn10_10) // expected-error {{cannot pass as inout because getter for 'propWithGetterAndSetterOnlyAvailableOn10_10' is only available on OS X version 10.10 or greater}} expected-error {{cannot pass as inout because setter for 'propWithGetterAndSetterOnlyAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+
+  takesInout(&o.availableOn10_9Computed)
+  takesInout(&o.propWithGetterOnlyAvailableOn10_10ForNestedMemberRef.availableOn10_9Computed) // expected-error {{getter for 'propWithGetterOnlyAvailableOn10_10ForNestedMemberRef' is only available on OS X version 10.10 or greater}}
 }
 
 // Classes

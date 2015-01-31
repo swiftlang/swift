@@ -1181,6 +1181,23 @@ void TypeChecker::diagnosePotentialUnavailability(
            Reason.getRequiredOSVersionRange().getLowerEndpoint());
 }
 
+void TypeChecker::diagnosePotentialAccessorUnavailability(
+    FuncDecl *Accessor, SourceLoc ReferenceLoc,
+    const UnavailabilityReason &Reason, bool ForInout) {
+  assert(Accessor->isGetterOrSetter());
+
+  AbstractStorageDecl *ASD = Accessor->getAccessorStorageDecl();
+  DeclName Name = ASD->getFullName();
+
+  auto &diag = ForInout ? diag::availability_inout_accessor_only_version_greater
+                        : diag::availability_accessor_only_version_greater;
+
+  diagnose(ReferenceLoc, diag,
+           static_cast<unsigned>(Accessor->getAccessorKind()), Name,
+           prettyPlatformString(targetPlatform(Context.LangOpts)),
+           Reason.getRequiredOSVersionRange().getLowerEndpoint());
+}
+
 // checkForForbiddenPrefix is for testing purposes.
 
 void TypeChecker::checkForForbiddenPrefix(const Decl *D) {

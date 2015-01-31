@@ -476,11 +476,12 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
 // Diagnose availability.
 //===--------------------------------------------------------------------===//
 
-/// Diagnose uses of unavailable declarations.
-static void diagAvailability(TypeChecker &TC, const ValueDecl *D,
+/// Diagnose uses of unavailable declarations. Returns true if a diagnostic
+/// was emitted.
+static bool diagAvailability(TypeChecker &TC, const ValueDecl *D,
                              SourceRange R, const DeclContext *DC) {
   if (!D)
-    return;
+    return false;
 
   SourceLoc Loc = R.Start;
   if (auto Attr = AvailabilityAttr::isUnavailable(D)) {
@@ -520,7 +521,7 @@ static void diagAvailability(TypeChecker &TC, const ValueDecl *D,
       }
 
     }
-    return;
+    return true;
   }
   
   // We only diagnose potentially unavailability here if availability checking
@@ -528,30 +529,55 @@ static void diagAvailability(TypeChecker &TC, const ValueDecl *D,
   // optional type.
   if (!TC.getLangOpts().EnableExperimentalAvailabilityChecking ||
       TC.getLangOpts().EnableExperimentalUnavailableAsOptional) {
-    return;
+    return false;
   }
 
   // Diagnose for potential unavailability
   auto maybeUnavail = TC.checkDeclarationAvailability(D, Loc, DC);
   if (maybeUnavail.hasValue()) {
     TC.diagnosePotentialUnavailability(D, Loc, maybeUnavail.getValue());
+    return true;
   }
+  return false;
 }
 
 
 namespace {
 class AvailabilityWalker : public ASTWalker {
+  /// Describes how the next member reference will be treated as we traverse
+  /// the AST.
+  enum class MemberAccessContext : unsigned {
+    /// The member reference is in a context where an access will call
+    /// the getter.
+    Getter,
+
+    /// The member reference is in a context where an access will call
+    /// the setter.
+    Setter,
+
+    /// The member reference is in a context where it will be turned into
+    /// an inout argument. (Once this happens, we have to conservatively assume
+    /// that both the getter and setter could be called.)
+    InOut
+  };
+
   TypeChecker &TC;
   const DeclContext *DC;
-public:
-  AvailabilityWalker(TypeChecker &TC, const DeclContext *DC)
-    : TC(TC), DC(DC) {}
+  const MemberAccessContext AccessContext;
 
-  virtual Expr *walkToExprPost(Expr *E) override {
+public:
+  AvailabilityWalker(
+      TypeChecker &TC, const DeclContext *DC,
+      MemberAccessContext AccessContext = MemberAccessContext::Getter)
+      : TC(TC), DC(DC), AccessContext(AccessContext) {}
+
+  virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (auto DR = dyn_cast<DeclRefExpr>(E))
       diagAvailability(TC, DR->getDecl(), DR->getSourceRange(), DC);
-    if (auto MR = dyn_cast<MemberRefExpr>(E))
-      diagAvailability(TC, MR->getMember().getDecl(), MR->getNameLoc(), DC);
+    if (auto MR = dyn_cast<MemberRefExpr>(E)) {
+      walkMemberRef(MR);
+      return std::make_pair(false, E);
+    }
     if (auto OCDR = dyn_cast<OtherConstructorDeclRefExpr>(E))
       diagAvailability(TC, OCDR->getDecl(), OCDR->getConstructorLoc(), DC);
     if (auto DMR = dyn_cast<DynamicMemberRefExpr>(E))
@@ -562,7 +588,118 @@ public:
       if (S->hasDecl())
         diagAvailability(TC, S->getDecl().getDecl(), S->getSourceRange(), DC);
     }
-    return E;
+    if (auto A = dyn_cast<AssignExpr>(E)) {
+      walkAssignExpr(A);
+      return std::make_pair(false, E);
+    }
+    if (auto IO = dyn_cast<InOutExpr>(E)) {
+      walkInOutExpr(IO);
+      return std::make_pair(false, E);
+    }
+    
+    return std::make_pair(true, E);
+  }
+
+private:
+  /// Walk an assignment expression, checking for availability.
+  void walkAssignExpr(AssignExpr *E) const {
+    // We take over recursive walking of assignment expressions in order to
+    // walk the destination and source expressions in different member
+    // access contexts.
+    Expr *Dest = E->getDest();
+    if (!Dest) {
+      return;
+    }
+
+    // Check the Dest expression in a setter context.
+    // We have an implicit assumption here that the first MemberRefExpr
+    // encountered walking (pre-order) is the Dest is the destination of the
+    // write. For the moment this is fine -- but future syntax might violate
+    // this assumption.
+    walkInContext(Dest, MemberAccessContext::Setter);
+
+    // Check RHS in getter context
+    Expr *Source = E->getSrc();
+    if (!Source) {
+      return;
+    }
+    walkInContext(Source, MemberAccessContext::Getter);
+  }
+  
+  /// Walk a member reference expression, checking for availability.
+  void walkMemberRef(MemberRefExpr *E) {
+    // Walk the base in a getter context.
+    walkInContext(E->getBase(), MemberAccessContext::Getter);
+
+    ValueDecl *D = E->getMember().getDecl();
+    // Diagnose for the the member declaration itself.
+    if (diagAvailability(TC, D, E->getNameLoc(), DC)) {
+      return;
+    }
+
+    if (!TC.getLangOpts().EnableExperimentalAvailabilityChecking ||
+        TC.getLangOpts().EnableExperimentalUnavailableAsOptional) {
+      return;
+    }
+
+    if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
+      // Diagnose for appropriate accessors, given the access context.
+      diagStorageAccess(ASD, E->getLoc());
+    }
+  }
+  
+  /// Walk an inout expression, checking for availability.
+  void walkInOutExpr(InOutExpr *E) {
+    walkInContext(E->getSubExpr(), MemberAccessContext::InOut);
+  }
+
+  /// Walk the given expression in the member access context.
+  void walkInContext(Expr *E, MemberAccessContext AccessContext) const {
+    E->walk(AvailabilityWalker(TC, DC, AccessContext));
+  }
+
+  /// Emit diagnostics, if necessary, for accesses to storage where
+  /// the accessor for the AccessContext is not available.
+  void diagStorageAccess(AbstractStorageDecl *D, SourceLoc ReferenceLoc) const {
+    if (!D->hasAccessorFunctions()) {
+      return;
+    }
+    
+    // Check availability of accessor functions
+    switch (AccessContext) {
+    case MemberAccessContext::Getter:
+      diagAccessorAvailability(D->getGetter(), ReferenceLoc,
+                               /*ForInout=*/false);
+      break;
+
+    case MemberAccessContext::Setter:
+      diagAccessorAvailability(D->getSetter(), ReferenceLoc,
+                               /*ForInout=*/false);
+      break;
+
+    case MemberAccessContext::InOut:
+      diagAccessorAvailability(D->getGetter(), ReferenceLoc,
+                               /*ForInout=*/true);
+
+      diagAccessorAvailability(D->getSetter(), ReferenceLoc,
+                               /*ForInout=*/true);
+      break;
+    }
+  }
+
+  /// Emit a diagnostic, if necessary for a potentially unavailable accessor.
+  /// Returns true if a diagnostic was emitted.
+  void diagAccessorAvailability(FuncDecl *D, SourceLoc ReferenceLoc,
+                                bool ForInout) const {
+    if (!D) {
+      return;
+    }
+    auto MaybeUnavail = TC.checkDeclarationAvailability(D, ReferenceLoc, DC);
+    if (MaybeUnavail.hasValue()) {
+      TC.diagnosePotentialAccessorUnavailability(D, ReferenceLoc,
+                                                 MaybeUnavail.getValue(),
+                                                 ForInout);
+    }
   }
 };
 }

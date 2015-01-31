@@ -1874,6 +1874,16 @@ ERROR(availability_decl_only_version_greater, sema_avail, none,
       "%0 is only available on %1 version %2 or greater",
       (DeclName, StringRef, clang::VersionTuple))
 
+ERROR(availability_accessor_only_version_greater, sema_avail, none,
+      "%select{getter|setter}0 for %1 is only available on %2 version %3"
+      " or greater",
+      (/*AccessorKind*/unsigned, DeclName, StringRef, clang::VersionTuple))
+
+ERROR(availability_inout_accessor_only_version_greater, sema_avail, none,
+      "cannot pass as inout because %select{getter|setter}0 for %1 is only "
+      "available on %2 version %3 or greater",
+      (/*AccessorKind*/unsigned, DeclName, StringRef, clang::VersionTuple))
+
 ERROR(availability_query_repeated_platform, sema_avail, none,
       "conditions for '%0' already specified for this query", (StringRef))
 
