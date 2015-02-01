@@ -277,14 +277,18 @@ swift_common_cxx_warnings()
 #
 
 function(is_sdk_requested name result_var_name)
-  if("${SWIFT_SDKS}" STREQUAL "")
+  if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${name}")
     set("${result_var_name}" "TRUE" PARENT_SCOPE)
   else()
-    list(FIND SWIFT_SDKS "${name}" sdk_index)
-    if(${sdk_index} EQUAL -1)
-      set("${result_var_name}" "FALSE" PARENT_SCOPE)
-    else()
+    if("${SWIFT_SDKS}" STREQUAL "")
       set("${result_var_name}" "TRUE" PARENT_SCOPE)
+    else()
+      list(FIND SWIFT_SDKS "${name}" sdk_index)
+      if(${sdk_index} EQUAL -1)
+        set("${result_var_name}" "FALSE" PARENT_SCOPE)
+      else()
+        set("${result_var_name}" "TRUE" PARENT_SCOPE)
+      endif()
     endif()
   endif()
 endfunction()
@@ -300,6 +304,15 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
   set(SWIFT_PRIMARY_VARIANT_SDK_default "LINUX")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  # Set defaults.
+
+  set(SWIFT_HOST_VARIANT "macosx" CACHE STRING
+      "Deployment OS for Swift host tools (the compiler) [macosx, iphoneos].")
+
+  set(SWIFT_HOST_VARIANT_SDK "OSX" CACHE STRING
+      "Deployment sdk for Swift host tools (the compiler).")
+  set(SWIFT_HOST_VARIANT_ARCH "x86_64" CACHE STRING
+      "Deployment arch for Swift host tools (the compiler).")
 
   is_sdk_requested(OSX swift_build_osx)
   if(swift_build_osx)
@@ -337,16 +350,6 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     configure_target_variant(
         IOS_SIMULATOR-R  "iOS Release"         IOS_SIMULATOR R "Release")
   endif()
-
-  # Set defaults.
-
-  set(SWIFT_HOST_VARIANT "macosx" CACHE STRING
-      "Deployment OS for Swift host tools (the compiler) [macosx, iphoneos].")
-
-  set(SWIFT_HOST_VARIANT_SDK "OSX" CACHE STRING
-      "Deployment sdk for Swift host tools (the compiler).")
-  set(SWIFT_HOST_VARIANT_ARCH "x86_64" CACHE STRING
-      "Deployment arch for Swift host tools (the compiler).")
 
   # FIXME: guess target variant based on the host.
   # if(SWIFT_HOST_VARIANT MATCHES "^macosx")
@@ -397,7 +400,7 @@ endif()
 set(SWIFT_PRIMARY_VARIANT_SUFFIX
     "-${SWIFT_SDK_${SWIFT_PRIMARY_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_PRIMARY_VARIANT_ARCH}")
 
-message(STATUS "Building host Swift tools for ${SWIFT_PRIMARY_VARIANT_SDK} ${SWIFT_PRIMARY_VARIANT_ARCH}")
+message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Assertions: ${LLVM_ENABLE_ASSERTIONS}")
 message(STATUS "")
