@@ -33,8 +33,6 @@
 - (_Bool) zang;
 - (void) setZang: (_Bool)b;
 
-@property int intProperty;
-
 @end
 
 NSString *bar(void);

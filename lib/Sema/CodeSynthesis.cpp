@@ -1111,18 +1111,10 @@ static void synthesizeComputedMaterializeForSet(FuncDecl *materializeForSet,
   ASTContext &ctx = TC.Context;
 
   SmallVector<ASTNode, 4> body;
-  
-  AccessSemantics semantics;
-  // If the storage is dynamic, we must dynamically redispatch through the
-  // accessor. Otherwise, we can do a direct peer access.
-  if (storage->isDynamic())
-    semantics = AccessSemantics::Ordinary;
-  else
-    semantics = AccessSemantics::DirectToAccessor;
 
   // Builtin.initialize(self.property, buffer)
   Expr *curValue = buildStorageReference(materializeForSet, storage,
-                                         semantics,
+                                         AccessSemantics::DirectToAccessor,
                                          SelfAccessKind::Peer, TC);
   Expr *bufferRef = new (ctx) DeclRefExpr(bufferDecl, SourceLoc(), IsImplicit);
   body.push_back(buildCallToBuiltin(ctx, "initialize",
@@ -1152,7 +1144,7 @@ static void synthesizeComputedMaterializeForSet(FuncDecl *materializeForSet,
       Expr *storageRef =
         buildStorageReference(
                CallbackStorageReferenceContext{selfDecl, callbackStorageDecl},
-                              storage, semantics,
+                              storage, AccessSemantics::DirectToAccessor,
                               SelfAccessKind::Peer, TC);
       body.push_back(new (ctx) AssignExpr(storageRef, SourceLoc(),
                                           value, IsImplicit));
@@ -1370,12 +1362,11 @@ void swift::synthesizeMaterializeForSet(FuncDecl *materializeForSet,
     llvm_unreachable("no accessors");
 
   // We can use direct access to stored variables, but not if they're
-  // weak, unowned, or dynamic.
+  // weak or unowned.
   case AbstractStorageDecl::StoredWithTrivialAccessors: {
     // Only variables can be Stored, and only variables can be weak/unowned.
     auto var = cast<VarDecl>(storage);
-    if (var->getType()->is<ReferenceStorageType>()
-        || var->isDynamic()) {
+    if (var->getType()->is<ReferenceStorageType>()) {
       synthesizeComputedMaterializeForSet(materializeForSet, storage,
                                           bufferDecl, TC);
       return;
