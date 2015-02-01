@@ -1,6 +1,9 @@
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/main.swift
 // RUN: %S/../../utils/line-directive %t/main.swift -- %target-swift-frontend -parse -verify %t/main.swift
 
+// <rdar://problem/19677545> Type checker diagnostics differ between platforms for "var a: UInt8 = -(1)"
+// XFAIL: CPU=arm64
+
 func testUnaryMinusInUnsigned() {
   var a: UInt8 = -(1) // expected-error {{unary operator '-' cannot be applied to an operand of type '(Int)'}}
   var b: UInt16 = -(1) // expected-error {{unary operator '-' cannot be applied to an operand of type '(Int)'}}
