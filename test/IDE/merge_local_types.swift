@@ -3,9 +3,9 @@
 // RUN: rm -rf %t && mkdir %t
 
 // Create separate modules and merge them together
-// RUN: %swiftc_driver -v -emit-module -module-name LocalTypesMerged -o %t/LocalTypesMerged.swiftmodule %s %S/local_types.swift
+// RUN: %target-swiftc_driver -v -emit-module -module-name LocalTypesMerged -o %t/LocalTypesMerged.swiftmodule %s %S/local_types.swift
 
-// RUN: %swift-ide-test -print-local-types -I %t -module-to-print LocalTypesMerged -source-filename %s | FileCheck %s
+// RUN: %target-swift-ide-test -print-local-types -I %t -module-to-print LocalTypesMerged -source-filename %s | FileCheck %s
 
 public func toMerge() {
   // CHECK-DAG: VF16LocalTypesMerged7toMergeFT_T_L_16SingleFuncStruct
