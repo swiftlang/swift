@@ -47,8 +47,9 @@ class A {
     other.prop = x
   }
 
-  // CHECK-LABEL: sil hidden @_TFC15objc_properties1Ad : $@cc(method) @thin (@owned A) -> @owned Builtin.NativeObject
-  // CHECK-NOT: class_method {{.*}} #A.prop
+  // CHECK-LABEL: sil hidden @_TFC15objc_properties1Ad : $@cc(method) @thin (@owned A) -> @owned Builtin.NativeObject {
+  // CHECK-NOT:     class_method {{.*}} #A.prop
+  // CHECK:       }
   deinit {
     prop = 7
     method(prop)
