@@ -10,6 +10,10 @@ func testNSArrayBridging(hive: Hive) {
 
 func testNSDictionaryBridging(hive: Hive) {
   let beesByName: [String : Bee] = hive.beesByName // expected-error{{value of optional type '[String : Bee]?' not unwrapped;}}
+
+  var dict1 = hive.anythingToBees
+  var dict2: [NSObject : Bee] = dict1
+  dict1 = dict2
 }
 
 func testNSSetBridging(hive: Hive) {

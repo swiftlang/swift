@@ -474,6 +474,13 @@ namespace {
     }
 
     ImportResult VisitTypedefType(const clang::TypedefType *type) {
+#ifndef SWIFT_DISABLE_OBJC_GENERICS
+      // If the underlying declaration is an Objective-C type parameter,
+      // import the underlying sugar instead.
+      if (isa<clang::ObjCTypeParamDecl>(type->getDecl()))
+        return Visit(type->desugar());
+#endif
+
       // Import the underlying declaration.
       auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(type->getDecl()));
 
@@ -889,13 +896,19 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   }
 
   // When NSDictionary* is the type of a function parameter or a function
-  // result type, map it to [NSObject : AnyObject].
+  // result type, map it to [K : V].
   if (hint == ImportHint::NSDictionary && canBridgeTypes(importKind) &&
       impl.tryLoadFoundationModule()) {
     Type keyType = hint.TypeArgs[0];
     Type objectType = hint.TypeArgs[1];
-    if (keyType.isNull()) {
+
+    // If no key type was provided, or the key doesn't match the 'NSObject'
+    // bound required by the Swift Dictionary key, substitute in 'NSObject'.
+    if (keyType.isNull() || !impl.matchesNSObjectBound(keyType)) {
       keyType = impl.getNSObjectType();
+    }
+
+    if (objectType.isNull()) {
       objectType = impl.getNamedSwiftType(impl.getStdlibModule(), "AnyObject");
     }
 
@@ -903,12 +916,16 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   }
 
   // When NSSet* is the type of a function parameter or a function
-  // result type, map it to Set<NSObject>.
+  // result type, map it to Set<T>.
   if (hint == ImportHint::NSSet && canBridgeTypes(importKind) &&
       impl.tryLoadFoundationModule()) {
     Type elementType = hint.TypeArgs[0];
-    if (elementType.isNull())
+
+    // If no element type was provided, or the element type doesn't match the
+    // 'NSObject' bound required by the Swift Set, substitute in 'NSObject'.
+    if (elementType.isNull() || !impl.matchesNSObjectBound(elementType))
       elementType = impl.getNSObjectType();
+
     importedType = impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
                                                         "Set",
                                                         elementType);
@@ -1502,6 +1519,23 @@ Type ClangImporter::Implementation::getNSObjectType() {
   }
 
   return Type();
+}
+
+bool ClangImporter::Implementation::matchesNSObjectBound(Type type) {
+  Type NSObjectType = getNSObjectType();
+  if (!NSObjectType)
+    return false;
+
+  // Class type or existential that inherits from NSObject.
+  if (NSObjectType->isSuperclassOf(type, typeResolver))
+    return true;
+
+  // Struct or enum type must have been bridged.
+  if (type->getStructOrBoundGenericStruct() ||
+      type->getEnumOrBoundGenericEnum())
+    return true;
+
+  return false;
 }
 
 Type ClangImporter::Implementation::getNSCopyingType() {

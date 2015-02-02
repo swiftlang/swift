@@ -106,6 +106,7 @@ typedef double NSTimeInterval;
 @property (nonnull) NSArray<Bee *> *bees;
 @property (nullable) NSDictionary<NSString *, Bee *> *beesByName;
 @property NSSet<Bee *> *allBees;
+@property NSDictionary<id <NSCopying>, Bee *> *anythingToBees;
 
 + (instancetype)hiveWithQueen:(Bee *)queen;
 
