@@ -1160,7 +1160,8 @@ public func checkHashable<T : Hashable>(
   // If objects are not equal, then the hash value can be different or it can
   // collide.
   if expectedEqual {
-    expectEqual(lhs.hashValue, rhs.hashValue)
+    expectEqual(lhs.hashValue, rhs.hashValue,
+      stackTrace: stackTrace, collectMoreInfo)
   }
 }
 
