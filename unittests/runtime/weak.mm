@@ -29,9 +29,6 @@ static unsigned DestroyedObjCCount = 0;
 - (void) dealloc {
   DestroyedObjCCount++;
   [super dealloc];
-  // Clobber the object's "isa" pointer to simulate the object's memory getting
-  // reclaimed.
-  object_setClass(self, nullptr);
 }
 @end
 static HeapObject *make_objc_object() {
