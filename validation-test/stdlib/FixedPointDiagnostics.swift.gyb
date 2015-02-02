@@ -3,6 +3,7 @@
 
 // <rdar://problem/19677545> Type checker diagnostics differ between platforms for "var a: UInt8 = -(1)"
 // XFAIL: CPU=arm64
+// XFAIL: CPU=armv7
 
 func testUnaryMinusInUnsigned() {
   var a: UInt8 = -(1) // expected-error {{unary operator '-' cannot be applied to an operand of type '(Int)'}}
