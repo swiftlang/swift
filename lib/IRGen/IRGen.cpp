@@ -298,8 +298,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   // Configure the function passes.
   FunctionPassManager FunctionPasses(Module);
   FunctionPasses.add(new llvm::DataLayoutPass());
-  FunctionPasses.add(
-      createTargetTransformInfoWrapperPass(TargetMachine->getTTI()));
+  FunctionPasses.add(createTargetTransformInfoWrapperPass(
+      TargetMachine->getTargetIRAnalysis()));
   if (Opts.Verify)
     FunctionPasses.add(createVerifierPass());
   PMBuilder.populateFunctionPassManager(FunctionPasses);
@@ -319,8 +319,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   // Configure the module passes.
   PassManager ModulePasses;
   ModulePasses.add(new llvm::DataLayoutPass());
-  ModulePasses.add(
-      createTargetTransformInfoWrapperPass(TargetMachine->getTTI()));
+  ModulePasses.add(createTargetTransformInfoWrapperPass(
+      TargetMachine->getTargetIRAnalysis()));
   PMBuilder.populateModulePassManager(ModulePasses);
 
   // The PMBuilder only knows about LLVM AA passes.  We should explicitly add
@@ -353,8 +353,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                   ? llvm::TargetMachine::CGFT_AssemblyFile
                   : llvm::TargetMachine::CGFT_ObjectFile);
 
-    EmitPasses.add(
-        createTargetTransformInfoWrapperPass(TargetMachine->getTTI()));
+    EmitPasses.add(createTargetTransformInfoWrapperPass(
+        TargetMachine->getTargetIRAnalysis()));
 
     // Make sure we do ARC contraction under optimization.  We don't
     // rely on any other LLVM ARC transformations, but we do need ARC
