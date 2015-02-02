@@ -535,6 +535,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       !Opts.PrimaryInput && !Opts.ModuleOutputPath.empty();
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_import_module))
+    Opts.ImplicitImportModuleName = A->getValue();
+
   for (const Arg *A : make_range(Args.filtered_begin(OPT_Xllvm),
                                  Args.filtered_end())) {
     Opts.LLVMArgs.push_back(A->getValue());

@@ -72,6 +72,9 @@ public:
   /// by the frontend.
   std::string OutputFilename;
 
+  /// An arbitrary module to import and make implicitly visible.
+  std::string ImplicitImportModuleName;
+
   /// An Objective-C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
 

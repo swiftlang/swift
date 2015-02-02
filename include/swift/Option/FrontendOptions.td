@@ -184,6 +184,9 @@ def enable_union_import :
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 
+def import_module : Separate<["-"], "import-module">,
+  HelpText<"Implicitly import the specified module">;
+
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;
 

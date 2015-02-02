@@ -222,6 +222,7 @@ Module *CompilerInstance::getMainModule() {
 }
 
 void CompilerInstance::performSema() {
+  const FrontendOptions &options = Invocation.getFrontendOptions();
   const SourceFileKind Kind = Invocation.getInputKind();
   Module *MainModule = getMainModule();
   Context->LoadedModules[MainModule->Name] = MainModule;
@@ -254,7 +255,7 @@ void CompilerInstance::performSema() {
     static_cast<ClangImporter *>(Context->getClangModuleLoader());
 
   Module *underlying = nullptr;
-  if (Invocation.getFrontendOptions().ImportUnderlyingModule) {
+  if (options.ImportUnderlyingModule) {
     underlying = clangImporter->loadModule(SourceLoc(),
                                            std::make_pair(MainModule->Name,
                                                           SourceLoc()));
@@ -265,16 +266,26 @@ void CompilerInstance::performSema() {
   }
 
   Module *importedHeaderModule = nullptr;
-  StringRef implicitHeaderPath =
-    Invocation.getFrontendOptions().ImplicitObjCHeaderPath;
+  StringRef implicitHeaderPath = options.ImplicitObjCHeaderPath;
   if (!implicitHeaderPath.empty()) {
     clangImporter->importBridgingHeader(implicitHeaderPath, MainModule);
     importedHeaderModule = clangImporter->getImportedHeaderModule();
     assert(importedHeaderModule);
   }
 
+  Module *importModule = nullptr;
+  if (!options.ImplicitImportModuleName.empty()) {
+    if (Lexer::isIdentifier(options.ImplicitImportModuleName)) {
+      auto moduleID = Context->getIdentifier(options.ImplicitImportModuleName);
+      importModule = Context->getModule(std::make_pair(moduleID, SourceLoc()));
+    } else {
+      Diagnostics.diagnose(SourceLoc(), diag::error_bad_module_name,
+                           options.ImplicitImportModuleName, false);
+    }
+  }
+
   auto addAdditionalInitialImports = [&](SourceFile *SF) {
-    if (!underlying && !importedHeaderModule)
+    if (!underlying && !importedHeaderModule && !importModule)
       return;
 
     auto initialImports = SF->getImports(/*allowUnparsed=*/true);
@@ -289,6 +300,10 @@ void CompilerInstance::performSema() {
     if (importedHeaderModule)
       initialImportsBuf.push_back({ { /*accessPath=*/{}, importedHeaderModule },
                                     /*exported=*/true });
+    if (importModule)
+      initialImportsBuf.push_back({ { /*accessPath=*/{}, importModule },
+                                    /*exported=*/false });
+
     SF->setImports(Context->AllocateCopy(initialImportsBuf));
   };
 
