@@ -257,7 +257,9 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
                        FinishedCmd->getCreator().getNameForDiagnostics(),
                        ReturnCode);
 
-      return TaskFinishedResponse::StopExecution;
+      return ContinueBuildingAfterErrors ? 
+          TaskFinishedResponse::ContinueExecution :
+          TaskFinishedResponse::StopExecution;
     }
 
     // When a task finishes, we need to reevaluate the other commands in our

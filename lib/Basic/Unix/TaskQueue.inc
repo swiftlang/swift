@@ -331,12 +331,12 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
           if (WIFEXITED(Status)) {
             int Result = WEXITSTATUS(Status);
 
-            if (Finished &&
-                Finished(T.getPid(), Result, T.getOutput(), T.getContext()) ==
-                TaskFinishedResponse::StopExecution) {
+            if (Finished) {
               // If we have a TaskFinishedCallback, only set SubtaskFailed to
               // true if the callback returns StopExecution.
-              SubtaskFailed = true;
+              SubtaskFailed = Finished(T.getPid(), Result, T.getOutput(),
+                                       T.getContext()) ==
+                  TaskFinishedResponse::StopExecution;
             } else if (Result != 0) {
               // Since we don't have a TaskFinishedCallback, treat a subtask
               // which returned a nonzero exit code as having failed.

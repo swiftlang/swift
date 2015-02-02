@@ -99,6 +99,10 @@ class Compilation {
   /// implemented separately, as the dummy TaskQueue may provide faked output.
   bool SkipTaskExecution;
 
+  /// Indicates whether this Compilation should continue execution of subtasks
+  /// even if they returned an error status.
+  bool ContinueBuildingAfterErrors = false;
+
   /// Indicates whether tasks should only be executed if their output is out
   /// of date.
   bool EnableIncrementalBuild;
@@ -137,6 +141,13 @@ public:
   }
   void disableIncrementalBuild() {
     EnableIncrementalBuild = false;
+  }
+  
+  bool getContinueBuildingAfterErrors() const {
+    return ContinueBuildingAfterErrors;
+  }
+  void setContinueBuildingAfterErrors(bool Value = true) {
+    ContinueBuildingAfterErrors = Value;
   }
 
   void setCompilationRecordPath(StringRef path) {

@@ -285,6 +285,11 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
 
   buildJobs(Actions, OI, OFM.get(), *C);
 
+  // For updating code we need to go through all the files and pick up changes,
+  // even if they have compiler errors.
+  if (OI.CompilerMode == OutputInfo::Mode::UpdateCode)
+    C->setContinueBuildingAfterErrors();
+
   if (OFM)
     if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput())
       C->setCompilationRecordPath(masterOutputMap->lookup(types::TY_SwiftDeps));
