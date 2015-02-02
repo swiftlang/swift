@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen | FileCheck %s
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 @objc protocol ObjCReadOnly {
