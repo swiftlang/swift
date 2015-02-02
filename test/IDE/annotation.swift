@@ -239,6 +239,13 @@ enum myCoolEnum {
   case
 }
 
+// rdar://19614869, do not crash
+class E {
+  lazy var u: T {
+    return 1
+  }
+}
+
 class C10 {
   init(int: Int, andThis: Float) {}
   func meth(x: Int, withFloat: Float) {}
