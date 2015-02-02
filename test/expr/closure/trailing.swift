@@ -4,7 +4,7 @@ func takeFunc(f: (Int) -> Int) -> Int {}
 func takeValueAndFunc(value: Int, f: (Int) -> Int) {}
 func takeTwoFuncs(f: (Int) -> Int, g: (Int) -> Int) {}
 func takeFuncWithDefault(f : ((Int) -> Int)? = nil) {}
-func takeTwoFuncsWithDefaults(f1 : ((Int) -> Int)? = nil, f2 : (() -> ())? = nil) {}
+func takeTwoFuncsWithDefaults(f1 : (Int -> Int)? = nil, f2 : (String -> String)? = nil) {}
 
 struct X {
   func takeFunc(f: (Int) -> Int) {}
@@ -68,7 +68,7 @@ var c3 = C().map // expected-note{{parsing trailing closure for this call}}
 // <rdar://problem/16835718> Ban multiple trailing closures
 func multiTrailingClosure(a : () -> (), b : () -> ()) {
   multiTrailingClosure({}) {} // ok
-  multiTrailingClosure {} {}   // expected-error {{missing argument for parameter #2 in call}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-error {{braced block of statements is an unused closure}} expected-error{{type of expression is ambiguous without more context}}
+  multiTrailingClosure {} {}   // expected-error {{missing argument for parameter #1 in call}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-error {{braced block of statements is an unused closure}} expected-error{{type of expression is ambiguous without more context}}
   
   
 }
@@ -81,8 +81,23 @@ func labeledArgumentAndTrailingClosure() {
   takeFuncWithDefault({ $0 + 1 }) // expected-error {{missing argument label 'f:' in call}}
   takeFuncWithDefault(f: { $0 + 1 })
 
-  // Trailing closure binds to first function-type parameter.
-  takeTwoFuncsWithDefaults { $0 + 1 }
-  takeTwoFuncsWithDefaults {} // expected-error {{function produces expected type '((Int) -> Int)?'; did you mean to call it with '()'?}}
-  takeTwoFuncsWithDefaults(f2: {})
+  // Trailing closure binds to last parameter, always.
+ takeTwoFuncsWithDefaults { "Hello, " + $0 }
+  takeTwoFuncsWithDefaults { $0 + 1 } // expected-error {{cannot invoke 'takeTwoFuncsWithDefaults' with an argument list of type '((_) -> _)'}} 
+  // expected-note@-1{{expected an argument list of type '(f1: (Int -> Int)?, f2: (String -> String)?)'}}
+  takeTwoFuncsWithDefaults(f1: {$0 + 1 })
+}
+
+// rdar://problem/17965209
+func rdar17965209(x: Int = 0, handler: (y: Int) -> ()) {}
+func rdar17965209_test() {
+  rdar17965209() {
+    (y) -> () in
+    print(1)
+  }
+
+  rdar17965209(x: 5) {
+    (y) -> () in
+    print(1)
+  }
 }

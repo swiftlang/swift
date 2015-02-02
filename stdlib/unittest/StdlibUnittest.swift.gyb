@@ -82,33 +82,33 @@ var _seenExpectCrash = false
 public func expectEqual<T : Equatable>(
     expected: T, actual: T,
     stackTrace: SourceLocStack? = nil,
-    _ collectMoreInfo: (()->String)? = nil,
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UWord = __LINE__,
+    collectMoreInfo: (()->String)? = nil
 ) {
   expectEqual(expected, actual, {$0 == $1},
-    stackTrace: stackTrace, collectMoreInfo,
-    file: file, line: line)
+    stackTrace: stackTrace, file: file, line: line,
+    collectMoreInfo: collectMoreInfo)
 }
 
 public func expectEqual<T: Equatable, U: Equatable>(
   expected: (T, U), actual: (T, U),
   stackTrace: SourceLocStack? = nil,
-  _ collectMoreInfo: (()->String)? = nil,
-  file: String = __FILE__, line: UWord = __LINE__
+  file: String = __FILE__, line: UWord = __LINE__,
+  collectMoreInfo: (()->String)? = nil
 ) {
   expectEqual(expected.0, actual.0, {$0 == $1},
-    stackTrace: stackTrace, collectMoreInfo,
-    file: file, line: line)
+    stackTrace: stackTrace, file: file, line: line,
+    collectMoreInfo: collectMoreInfo)
   expectEqual(expected.1, actual.1, {$0 == $1},
-    stackTrace: stackTrace, collectMoreInfo,
-    file: file, line: line)
+    stackTrace: stackTrace, file: file, line: line,
+    collectMoreInfo: collectMoreInfo)
 }
 
 public func expectEqual<T>(
     expected: T, actual: T, equal: (T,T)->Bool,
     stackTrace: SourceLocStack? = nil,
-    _ collectMoreInfo: (()->String)? = nil,
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UWord = __LINE__,
+    collectMoreInfo: (()->String)? = nil
 ) {
   if !equal(expected, actual) {
     _anyExpectFailed = true
@@ -163,32 +163,32 @@ public func expectOptionalEqual<T : Equatable>(
 public func expectEqual${Generic}(
     expected: ${EquatableType}, actual: ${EquatableType},
     stackTrace: SourceLocStack? = nil,
-    _ collectMoreInfo: (()->String)? = nil,
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UWord = __LINE__,
+    collectMoreInfo: (()->String)? = nil
 ) {
   expectEqual(
     expected, actual,
     // FIXME: Simpler closures don't work here due to
     // <rdar://problem/17716712> and <rdar://problem/17717618>
     { (x: ${EquatableType}, y: ${EquatableType})->Bool in  x == y },
-    stackTrace: stackTrace, collectMoreInfo, 
-    file: file, line: line)
+    stackTrace: stackTrace, file: file, line: line,
+    collectMoreInfo: collectMoreInfo)
 }
 
 
 public func expectEqualSequence${Generic}(
     expected: ${EquatableType}, actual: ${EquatableType},
     stackTrace: SourceLocStack? = nil,
-    _ collectMoreInfo: (()->String)? = nil,
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UWord = __LINE__,
+    collectMoreInfo: (()->String)? = nil
 ) {
   expectEqual(
     expected, actual,
     // FIXME: Simpler closures don't work here due to
     // <rdar://problem/17716712> and <rdar://problem/17717618>
     { (x: ${EquatableType}, y: ${EquatableType})->Bool in  x == y },
-    stackTrace: stackTrace, collectMoreInfo, 
-    file: file, line: line)
+    stackTrace: stackTrace, file: file, line: line, 
+    collectMoreInfo: collectMoreInfo)
 }
 
 
@@ -274,8 +274,8 @@ public func assertionFailure() -> AssertionResult {
 public func expectTrue(
     actual: ${BoolType},
     stackTrace: SourceLocStack? = nil,
-    _ collectMoreInfo: (()->String)? = nil,
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UWord = __LINE__,
+    collectMoreInfo: (()->String)? = nil
 ) {
   if !actual {
     _anyExpectFailed = true
@@ -291,8 +291,8 @@ public func expectTrue(
 public func expectFalse(
     actual: ${BoolType},
     stackTrace: SourceLocStack? = nil,
-    _ collectMoreInfo: (()->String)? = nil,
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UWord = __LINE__,
+    collectMoreInfo: (()->String)? = nil
 ) {
   if actual {
     _anyExpectFailed = true
@@ -1127,19 +1127,21 @@ public enum TestRunPredicate : Printable {
 
 public func checkEquatable<T : Equatable>(
   expectedEqual: Bool, lhs: T, rhs: T, stackTrace: SourceLocStack,
-  _ collectMoreInfo: (()->String)? = nil
+  collectMoreInfo: (()->String)? = nil
 ) {
   // Test operator '==' that is found through witness tables.
   expectEqual(
-    expectedEqual, lhs == rhs, stackTrace: stackTrace, collectMoreInfo)
+    expectedEqual, lhs == rhs, stackTrace: stackTrace, 
+    collectMoreInfo: collectMoreInfo)
   expectEqual(
-    !expectedEqual, lhs != rhs, stackTrace: stackTrace, collectMoreInfo)
+    !expectedEqual, lhs != rhs, stackTrace: stackTrace, 
+    collectMoreInfo: collectMoreInfo)
 }
 
 public func checkEquatable<T : Equatable>(
   expectedEqual: Bool, lhs: T, rhs: T,
-  _ collectMoreInfo: (()->String)? = nil,
-  file: String = __FILE__, line: UWord = __LINE__
+  file: String = __FILE__, line: UWord = __LINE__,
+  collectMoreInfo: (()->String)? = nil
 ) {
   checkEquatable(
     expectedEqual, lhs, rhs, SourceLocStack().with(SourceLoc(file, line)))
@@ -1147,13 +1149,15 @@ public func checkEquatable<T : Equatable>(
 
 public func checkHashable<T : Hashable>(
   expectedEqual: Bool, lhs: T, rhs: T, stackTrace: SourceLocStack,
-  _ collectMoreInfo: (()->String)? = nil
+  collectMoreInfo: (()->String)? = nil
 ) {
   // Test operator '==' that is found through witness tables.
   expectEqual(
-    expectedEqual, lhs == rhs, stackTrace: stackTrace, collectMoreInfo)
+    expectedEqual, lhs == rhs, stackTrace: stackTrace,
+    collectMoreInfo: collectMoreInfo)
   expectEqual(
-    !expectedEqual, lhs != rhs, stackTrace: stackTrace, collectMoreInfo)
+    !expectedEqual, lhs != rhs, stackTrace: stackTrace,
+    collectMoreInfo: collectMoreInfo)
 
   // Test 'hashValue'.
   //
@@ -1161,18 +1165,18 @@ public func checkHashable<T : Hashable>(
   // collide.
   if expectedEqual {
     expectEqual(lhs.hashValue, rhs.hashValue,
-      stackTrace: stackTrace, collectMoreInfo)
+      stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
   }
 }
 
 public func checkHashable<T : Hashable>(
   expectedEqual: Bool, lhs: T, rhs: T,
-  _ collectMoreInfo: (()->String)? = nil,
-  file: String = __FILE__, line: UWord = __LINE__
+  file: String = __FILE__, line: UWord = __LINE__,
+  collectMoreInfo: (()->String)? = nil
 ) {
   checkHashable(
     expectedEqual, lhs, rhs, SourceLocStack(SourceLoc(file, line)),
-    collectMoreInfo)
+    collectMoreInfo: collectMoreInfo)
 }
 
 public enum ExpectedComparisonResult {
@@ -1432,12 +1436,12 @@ public func expectEqualSequence<
 >(
     expected: Expected, actual: Actual,
     stackTrace: SourceLocStack? = nil,
-    _ collectMoreInfo: (()->String)? = nil,
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UWord = __LINE__,
+    collectMoreInfo: (()->String)? = nil
 ) {
   expectEqualSequence(
     expected, actual, { $0 == $1 }, stackTrace: stackTrace,
-    collectMoreInfo: collectMoreInfo, file: file, line: line)
+    file: file, line: line, collectMoreInfo: collectMoreInfo)
 }
 
 public func expectEqualSequence<
@@ -1448,8 +1452,8 @@ public func expectEqualSequence<
     expected: Expected, actual: Actual,
     sameValue: (Expected.Generator.Element, Expected.Generator.Element)->Bool,
     stackTrace: SourceLocStack? = nil,
-    collectMoreInfo: (()->String)? = nil,
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UWord = __LINE__,
+    collectMoreInfo: (()->String)? = nil
 ) {
   if !equal(expected, actual, sameValue) {
     _anyExpectFailed = true
@@ -1471,8 +1475,8 @@ public func expectEqualsUnordered<
     compare: (Expected.Generator.Element, Expected.Generator.Element)
       -> ExpectedComparisonResult,
     stackTrace: SourceLocStack? = nil,
-    collectMoreInfo: (()->String)? = nil,
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UWord = __LINE__,
+    collectMoreInfo: (()->String)? = nil
 ) {
   let x: [Expected.Generator.Element] = sorted(
     Array(expected), compose(compare, { $0.isLT() }))
@@ -1480,7 +1484,7 @@ public func expectEqualsUnordered<
     Array(actual), compose(compare, { $0.isLT() }))
   expectEqualSequence(
     x, y, compose(compare, { $0.isEQ() }), stackTrace: stackTrace,
-    collectMoreInfo: collectMoreInfo, file: file, line:  line)
+    file: file, line: line, collectMoreInfo: collectMoreInfo)
 }
 
 public func expectEqualFunctionsForDomain<ArgumentType, Result : Equatable>(
@@ -1517,8 +1521,8 @@ public func expectEqualMethodsForDomain<
 public func expectEqualUnicodeScalars(
   expected: _UnitTestArray<UInt32>, actual: String,
   stackTrace: SourceLocStack? = nil,
-  collectMoreInfo: (()->String)? = nil,
-  file: String = __FILE__, line: UWord = __LINE__
+  file: String = __FILE__, line: UWord = __LINE__,
+  collectMoreInfo: (()->String)? = nil
 ) {
   let actualUnicodeScalars = _UnitTestArray(lazy(actual.unicodeScalars).map { $0.value })
   if !equal(expected, actualUnicodeScalars) {

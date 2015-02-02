@@ -88,31 +88,6 @@ static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
   return dist;
 }
 
-/// Function that determines whether the parameter at the given
-/// index could be bound to a trailing closure.
-static bool paramCanBeTrailingClosure(ArrayRef<TupleTypeElt> paramTuple,
-                                      unsigned paramIdx) {
-  for (unsigned i = paramIdx, n = paramTuple.size(); i != n; ++i) {
-    const auto &param = paramTuple[i];
-    auto type = param.isVararg() ? param.getVarargBaseTy() : param.getType();
-    type = type->getRValueInstanceType();
-
-    // Look through optionals.
-    if (auto optValue = type->getAnyOptionalObjectType()) {
-      type = optValue;
-    }
-
-    auto funcTy = type->getAs<FunctionType>();
-    if (!funcTy)
-      return false;
-
-    if (funcTy->isAutoClosure())
-      return false;
-  }
-
-  return true;
-};
-
 ArrayRef<TupleTypeElt> constraints::decomposeArgParamType(Type type,
                                                           TupleTypeElt &scalar){
   switch (type->getKind()) {
@@ -250,16 +225,6 @@ bool constraints::matchCallArguments(
       return claim(name, i);
     }
 
-    // If the current parameter can claim a trailing closure, allow it even if
-    // the parameter has a name.
-    bool nextArgIsTrailingClosure = hasTrailingClosure &&
-                                    nextArgIdx + 1 == numArgs &&
-                                    argTuple[nextArgIdx].getName().empty();
-    if (nextArgIsTrailingClosure &&
-        paramCanBeTrailingClosure(paramTuple, paramIdx)) {
-      return claim(Identifier(), nextArgIdx, /*ignoreNameClash=*/true);
-    }
-
     // If we're not supposed to attempt any fixes, we're done.
     if (!allowFixes)
       return None;
@@ -329,9 +294,17 @@ bool constraints::matchCallArguments(
     haveUnfulfilledParams = true;
   };
 
+  // If we have a trailing closure, it maps to the last parameter.
+  if (hasTrailingClosure && numParams > 0) {
+    claimedArgs[numArgs-1] = true;
+    ++numClaimedArgs;
+    parameterBindings[numParams-1].push_back(numArgs-1);
+  }
+
   // Mark through the parameters, binding them to their arguments.
   for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
-    bindNextParameter(false);
+    if (parameterBindings[paramIdx].empty())
+      bindNextParameter(false);
   }
 
   // If we have any unclaimed arguments, complain about those.
