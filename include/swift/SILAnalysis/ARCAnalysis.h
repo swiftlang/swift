@@ -32,7 +32,7 @@ class SILFunction;
 
 namespace swift {
 
-/// \returns True if the user \p User decrement the ref count of pointer \p Ptr.
+/// \returns True if the user \p User decrements the ref count of \p Ptr.
 bool mayDecrementRefCount(SILInstruction *User, SILValue Ptr,
                           AliasAnalysis *AA);
 
