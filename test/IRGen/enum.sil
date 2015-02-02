@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -gnone -emit-ir -enable-dynamic-value-type-layout | FileCheck %s
+// RUN: %target-swift-frontend %s -gnone -emit-ir -enable-dynamic-value-type-layout | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: CPU=x86_64
 
@@ -2283,6 +2283,27 @@ sil @dynamic_singleton_instance_arg_2 : $(DynamicSingleton<NoPayloads>) -> () {
 entry(%0 : $DynamicSingleton<NoPayloads>):
   %v = tuple ()
   return %v : $()
+}
+
+// Check that payloads get properly masked in nested single-payload enums.
+// rdar://problem/18841262
+// CHECK-64-LABEL: define i1 @optional_optional_class_protocol(i128)
+// CHECK-64:         %1 = trunc i128 %0 to i64
+// CHECK-64:         %2 = zext i64 %1 to i128
+// CHECK-64:         %3 = icmp eq i128 %2, 2
+// CHECK-32-LABEL: define i1 @optional_optional_class_protocol(i64)
+// CHECK-32:         %1 = trunc i64 %0 to i32
+// CHECK-32:         %2 = zext i32 %1 to i64
+// CHECK-32:         %3 = icmp eq i64 %2, 2
+enum Optionable<T> {
+  case Some(T), None
+}
+sil @optional_optional_class_protocol : $@thin Optionable<Optionable<PC>> -> Builtin.Int1 {
+entry(%o : $Optionable<Optionable<PC>>):
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
+  %r = select_enum %o : $Optionable<Optionable<PC>>, case #Optionable.Some!enumelt.1: %t, case #Optionable.None!enumelt: %f : $Builtin.Int1
+  return %r : $Builtin.Int1
 }
 
 sil @force_global_variables_to_materialize : $() -> () {

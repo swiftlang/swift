@@ -231,6 +231,11 @@ namespace {
       llvm_unreachable("unimplemented enums shouldn't delegate type info");
     }
     unsigned getExplosionSize() const override {
+      return 0;
+    }
+    llvm::Value *
+    maskFixedExtraInhabitant(IRGenFunction &IGF,
+                             llvm::Value *payload) const override {
       llvm_unreachable("unimplemented enums shouldn't delegate type info");
     }
     void loadAsCopy(IRGenFunction &IGF, Address addr,
@@ -626,6 +631,14 @@ namespace {
       return getFixedSingleton()
         ->getFixedExtraInhabitantValue(IGM, bits, index);
     }
+    
+    llvm::Value *
+    maskFixedExtraInhabitant(IRGenFunction &IGF,
+                             llvm::Value *payload) const override {
+      assert(TIK >= Fixed);
+      assert(getSingleton() && "empty singletons have no extra inhabitants");
+      return getFixedSingleton()->maskFixedExtraInhabitant(IGF, payload);
+    }
 
     ClusteredBitVector getTagBitsForPayloads(IRGenModule &IGM) const override {
       // No tag bits, there's only one payload.
@@ -831,6 +844,12 @@ namespace {
       return ClusteredBitVector::getConstant(
                        cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits(),
                        true);
+    }
+    
+    llvm::Value *
+    maskFixedExtraInhabitant(IRGenFunction &IGF,
+                             llvm::Value *payload) const override {
+      return payload;
     }
   };
 
@@ -1417,7 +1436,7 @@ namespace {
         if (ElementsWithNoPayload.size() == 1 &&
             ElementsWithRecursivePayload.empty()) {
           auto *InvertedResult = emitValueCaseTest(IGF, value,
-                                                   ElementsWithNoPayload[0].decl);
+                                                 ElementsWithNoPayload[0].decl);
           return IGF.Builder.CreateNot(InvertedResult);
         }
         
@@ -2491,6 +2510,12 @@ namespace {
       auto payload = projectPayloadData(IGF, dest);
       getPayloadTypeInfo().storeExtraInhabitant(IGF, index, payload,
                                                    getPayloadType(IGF.IGM, T));
+    }
+    
+    llvm::Value *
+    maskFixedExtraInhabitant(IRGenFunction &IGF,
+                             llvm::Value *payload) const override {
+      return getFixedPayloadTypeInfo().maskFixedExtraInhabitant(IGF, payload);
     }
 
     ClusteredBitVector
@@ -3632,7 +3657,13 @@ namespace {
                               SILType T) const override {
       llvm_unreachable("extra inhabitants for multi-payload enums not implemented");
     }
-
+    
+    llvm::Value *
+    maskFixedExtraInhabitant(IRGenFunction &IGF,
+                             llvm::Value *payload) const override {      
+      llvm_unreachable("extra inhabitants for multi-payload enums not implemented");
+    }
+    
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
       return 0;
     }
@@ -3940,6 +3971,12 @@ namespace {
                                                     unsigned index)
     const override {
       return Strategy.getFixedExtraInhabitantValue(IGM, bits, index);
+    }
+    
+    llvm::Value *maskFixedExtraInhabitant(IRGenFunction &IGF,
+                                          llvm::Value *payload)
+    const override {
+      return Strategy.maskFixedExtraInhabitant(IGF, payload);
     }
   };
 

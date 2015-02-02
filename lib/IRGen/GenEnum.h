@@ -424,6 +424,10 @@ public:
                                unsigned bits,
                                unsigned index) const = 0;
   
+  virtual llvm::Value *
+  maskFixedExtraInhabitant(IRGenFunction &IGF,
+                           llvm::Value *payload) const = 0;
+  
   /// \group Delegated LoadableTypeInfo operations
   
   virtual unsigned getExplosionSize() const = 0;
