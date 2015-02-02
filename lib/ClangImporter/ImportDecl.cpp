@@ -969,6 +969,14 @@ CFPointeeInfo::classifyTypedef(const clang::TypedefNameDecl *typedefDecl) {
   return forInvalid();
 }
 
+/// Return the name to import a CF typedef as.
+static StringRef getImportedCFTypeName(StringRef name) {
+  // If the name ends in the CF typedef suffix ("Ref"), drop that.
+  if (name.endswith(SWIFT_CFTYPE_SUFFIX))
+    return name.drop_back(strlen(SWIFT_CFTYPE_SUFFIX));
+  return name;
+}
+
 static bool isCFTypeDecl(const clang::TypedefNameDecl *Decl) {
   if (auto pointee = CFPointeeInfo::classifyTypedef(Decl))
     return pointee.isValid();
@@ -1097,9 +1105,8 @@ namespace {
 
     Type importCFClassType(const clang::TypedefNameDecl *decl,
                            CFPointeeInfo info) {
-      // Name the class 'CFString', not 'CFStringRef'.
-      StringRef nameWithoutRef =
-        decl->getName().drop_back(strlen(SWIFT_CFTYPE_SUFFIX));
+      // If the name ends in 'Ref', drop that from the imported class name.
+      StringRef nameWithoutRef = getImportedCFTypeName(decl->getName());
       Identifier className = Impl.SwiftContext.getIdentifier(nameWithoutRef);
 
       auto dc = Impl.importDeclContextOf(decl);
@@ -1174,8 +1181,10 @@ namespace {
         if (IsError)
           return nullptr;
 
-        // Import 'typedef struct __Blah *BlahRef;' as a CF type.
-        if (!SwiftType && Decl->getName().endswith(SWIFT_CFTYPE_SUFFIX)) {
+        // Import 'typedef struct __Blah *BlahRef;' and
+        // 'typedef const void *FooRef;' as CF types if they have the
+        // right attributes or match our name whitelist.
+        if (!SwiftType) {
           if (auto pointee = CFPointeeInfo::classifyTypedef(Decl)) {
             // If the pointee is a record, consider creating a class type.
             if (pointee.isRecord()) {
@@ -1201,8 +1210,7 @@ namespace {
               if (!DC)
                 return nullptr;
 
-              StringRef nameWithoutRef =
-                Name.str().drop_back(strlen(SWIFT_CFTYPE_SUFFIX));
+              StringRef nameWithoutRef = getImportedCFTypeName(Name.str());
               Identifier idWithoutRef =
                 Impl.SwiftContext.getIdentifier(nameWithoutRef);
               auto aliasWithoutRef =
@@ -1216,9 +1224,9 @@ namespace {
               SwiftType = aliasWithoutRef->getDeclaredType();
               NameMapping = MappedTypeNameKind::DefineOnly;
 
-            // If the pointee is 'const void', and the typedef is named
+            // If the pointee is 'const void', 
             // 'CFTypeRef', bring it in specifically as AnyObject.
-            } else if (pointee.isConstVoid() && Decl->getName() == "CFTypeRef") {
+            } else if (pointee.isConstVoid()) {
               auto proto = Impl.SwiftContext.getProtocol(
                                                KnownProtocolKind::AnyObject);
               if (!proto)
