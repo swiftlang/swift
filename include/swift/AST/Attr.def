@@ -78,7 +78,7 @@ DECL_ATTR(asmname, Asmname,
 DECL_ATTR(availability, Availability,
           OnFunc | OnStruct | OnEnum | OnClass | OnProtocol | OnVar |
           OnConstructor | OnDestructor | OnTypeAlias | OnSubscript |
-          AllowMultipleAttributes | LongAttribute, 1)
+          OnEnumElement | AllowMultipleAttributes | LongAttribute, 1)
 
 SIMPLE_DECL_ATTR(final, Final,
                  OnClass | OnFunc | OnVar | OnSubscript|DeclModifier, 2)

@@ -392,6 +392,70 @@ func accessUnavailableProperties(o: ClassWithUnavailableProperties) {
   takesInout(&o.propWithGetterOnlyAvailableOn10_10ForNestedMemberRef.availableOn10_9Computed) // expected-error {{getter for 'propWithGetterOnlyAvailableOn10_10ForNestedMemberRef' is only available on OS X version 10.10 or greater}}
 }
 
+// Enums
+
+@availability(OSX, introduced=10.10)
+enum EnumIntroducedOn10_10 {
+ case Element
+}
+
+@availability(OSX, introduced=10.11)
+enum EnumIntroducedOn10_11 {
+ case Element
+}
+
+@availability(OSX, introduced=10.10)
+enum CompassPoint {
+  case North
+  case South
+  case East
+
+  @availability(OSX, introduced=10.11)
+  case West
+
+  case WithAvailableByEnumPayload(p : EnumIntroducedOn10_10)
+
+  @availability(OSX, introduced=10.11)
+  case WithAvailableByEnumElementPayload(p : EnumIntroducedOn10_11)
+
+  case WithUnavailablePayload(p : EnumIntroducedOn10_11) // expected-error {{'EnumIntroducedOn10_11' is only available on OS X version 10.11 or greater}}
+}
+
+@availability(OSX, introduced=10.11)
+func functionTakingEnumIntroducedOn10_11(e: EnumIntroducedOn10_11) { }
+
+func useEnums() {
+  let _: CompassPoint = .North // expected-error {{'CompassPoint' is only available on OS X version 10.10 or greater}}
+
+  if #os(OSX >= 10.10) {
+    let _: CompassPoint = .North
+
+    let _: CompassPoint = .West // expected-error {{'West' is only available on OS X version 10.11 or greater}}
+  }
+
+  if #os(OSX >= 10.11) {
+    let _: CompassPoint = .West
+  }
+
+  // Pattern matching on an enum element does not require it to be definitely available
+  if #os(OSX >= 10.10) {
+    let point: CompassPoint = .North
+    switch (point) {
+      case .North, .South, .East:
+        println("NSE")
+      case .West: // We do not expect an error here
+        print("W")
+
+      case .WithAvailableByEnumElementPayload(let p):
+        println("WithAvailableByEnumElementPayload")
+
+        // For the moment, we do not incorporate enum element availability into 
+        // TRC construction. Perhaps we should?
+        functionTakingEnumIntroducedOn10_11(p)  // expected-error {{'functionTakingEnumIntroducedOn10_11' is only available on OS X version 10.11 or greater}}
+    }
+  }
+}
+
 // Classes
 
 @availability(OSX, introduced=10.9)
