@@ -58,10 +58,10 @@ func autocloseFile(@autoclosure x: () -> String = __FILE__,
                    @autoclosure y: () -> Int = __LINE__) { }
 // CHECK-LABEL: sil hidden @_TF17default_arguments17testAutocloseFileFT_T_
 func testAutocloseFile() {
-  // CHECK-LABEL: sil shared @_TFF17default_arguments17testAutocloseFileFT_T_u_KT_SS : $@noescape @thin () -> @owned String
+  // CHECK-LABEL: sil shared @_TFF17default_arguments17testAutocloseFileFT_T_u_KT_SS : $@thin () -> @owned String
   // CHECK: string_literal utf16{{.*}}default_arguments.swift
 
-  // CHECK-LABEL: sil shared @_TFF17default_arguments17testAutocloseFileFT_T_u0_KT_Si : $@noescape @thin () -> Int
+  // CHECK-LABEL: sil shared @_TFF17default_arguments17testAutocloseFileFT_T_u0_KT_Si : $@thin () -> Int
   // CHECK: integer_literal $Builtin.Int2048, [[@LINE+1]]
   autocloseFile()
 }

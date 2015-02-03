@@ -2502,7 +2502,6 @@ private:
   /// TODO: Permit an arbitrary number of results.
   SILResultInfo InterfaceResult;
 
-  /// TODO: Retire in favor of InterfaceParameters.
   MutableArrayRef<SILParameterInfo> getMutableParameters() {
     auto ptr = reinterpret_cast<SILParameterInfo*>(this + 1);
     return MutableArrayRef<SILParameterInfo>(ptr, NumParameters);

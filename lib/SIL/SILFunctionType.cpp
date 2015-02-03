@@ -513,8 +513,11 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   if (extInfo.hasContext())
     calleeConvention = conventions.getCallee();
 
-  // Always strip the auto-closure bit.
-  extInfo = extInfo.withIsAutoClosure(false);
+  // Always strip the auto-closure and no-escape bit.
+  // TODO: The noescape bit could be of interesting to SIL optimizations.
+  //   We should bring it back when we have those optimizations.
+  extInfo = extInfo.withIsAutoClosure(false)
+                   .withNoEscape(false);
 
   return SILFunctionType::get(genericSig,
                               extInfo, calleeConvention,
