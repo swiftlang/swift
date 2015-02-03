@@ -18,6 +18,15 @@ func f2(_: Float) {}
 
 func g(_: (protocol<Barable, Fooable>) -> ()) {}
 
+protocol Classable : AnyObject {}
+class SomeArbitraryClass {}
+
+func fc0(_: Classable) {}
+func fc1(_: protocol<Fooable, Classable>) {}
+func fc2(_: AnyObject) {}
+func fc3(_: SomeArbitraryClass) {}
+func gc(_: (protocol<Classable, Fooable>) -> ()) {}
+
 var i : Int
 var f : Float
 var b : Barable
@@ -37,10 +46,41 @@ f1(b) // expected-error{{cannot invoke 'f1' with an argument list of type '(Bara
 //===--------------------------------------------------------------------===//
 // Subtyping
 //===--------------------------------------------------------------------===//
-g(f0)
-g(f1)
+g(f0) // expected-error{{cannot invoke 'g' with an argument list of type '((Barable) -> ())'}} expected-note{{expected an argument list of type '((protocol<Barable, Fooable>) -> ())'}}
+g(f1) // okay (exact match)
 
 g(f2) // expected-error{{cannot invoke 'g' with an argument list of type '((Float) -> ())'}} expected-note{{expected an argument list of type '((protocol<Barable, Fooable>) -> ())'}}
+
+gc(fc0) // okay
+gc(fc1) // okay
+gc(fc2) // okay
+gc(fc3) // expected-error{{cannot invoke 'gc' with an argument list of type '((SomeArbitraryClass) -> ())'}} expected-note{{expected an argument list of type '((protocol<Classable, Fooable>) -> ())'}}
+
+// rdar://problem/19600325
+func getAnyObject() -> AnyObject? {
+  return SomeArbitraryClass()
+}
+
+func castToClass(object: Any) -> SomeArbitraryClass? {
+  return object as? SomeArbitraryClass
+}
+
+getAnyObject().map(castToClass) // expected-error{{cannot invoke 'map' with an argument list of type '((Any) -> SomeArbitraryClass?)'}}
+
+
+let _ = { (_: Any) -> Void in
+  return
+} as ((Int) -> Void) // expected-error {{'Any -> Void' is not convertible to '(Int) -> Void'}}
+
+let _: (Int) -> Void = {  // expected-error {{'Int' is not a subtype of 'Any'}}
+	(_: Any) -> Void in
+	return
+}
+
+let _: () -> Any = {  // expected-error {{'Int' is not a subtype of 'Any'}}
+	() -> Int in
+	return 0
+}
 
 //===--------------------------------------------------------------------===//
 // Dynamic self

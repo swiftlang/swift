@@ -645,6 +645,10 @@ enum class TypeMatchKind : char {
   /// \brief Require the first type to be a subtype of the second type
   /// (or be an exact match or trivial subtype).
   Subtype,
+  /// \brief Require the first type to be a subtype of the second type
+  /// such that the first type's metatype can be converted to the second type's
+  /// metatype.
+  MetatypeSubtype,
   /// \brief Requires the first type to be convertible to the second type,
   /// which includes exact matches and both forms of subtyping.
   Conversion,
@@ -652,6 +656,7 @@ enum class TypeMatchKind : char {
   /// type, which includes all forms of conversion included in Conversion, in
   /// addition to bridging conversions.
   ExplicitConversion,
+
   /// \brief Requires the first type to be the element of an argument tuple
   /// that is convertible to the second type, which represents the corresponding
   /// element of the parameter tuple.

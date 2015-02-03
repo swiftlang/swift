@@ -585,6 +585,7 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
   case TypeMatchKind::BindToPointerType:
   case TypeMatchKind::SameType:
   case TypeMatchKind::Subtype:
+  case TypeMatchKind::MetatypeSubtype:
     llvm_unreachable("Not an call argument constraint");
   }
   
@@ -782,6 +783,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case TypeMatchKind::BindToPointerType:
   case TypeMatchKind::SameType:
   case TypeMatchKind::Subtype:
+  case TypeMatchKind::MetatypeSubtype:
     llvm_unreachable("Not a conversion");
   }
 
@@ -974,6 +976,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     break;
 
   case TypeMatchKind::Subtype:
+  case TypeMatchKind::MetatypeSubtype:
   case TypeMatchKind::Conversion:
   case TypeMatchKind::ExplicitConversion:
   case TypeMatchKind::ArgumentConversion:
@@ -1023,6 +1026,7 @@ static Failure::FailureKind getRelationalFailureKind(TypeMatchKind kind) {
     return Failure::TypesNotEqual;
 
   case TypeMatchKind::Subtype:
+  case TypeMatchKind::MetatypeSubtype:
     return Failure::TypesNotSubtypes;
 
   case TypeMatchKind::Conversion:
@@ -1159,6 +1163,7 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
     return ConstraintKind::Equal;
 
   case TypeMatchKind::Subtype:
+  case TypeMatchKind::MetatypeSubtype:
     return ConstraintKind::Subtype;
 
   case TypeMatchKind::Conversion:
@@ -1364,6 +1369,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
 
     case TypeMatchKind::Subtype:
+    case TypeMatchKind::MetatypeSubtype:
     case TypeMatchKind::Conversion:
     case TypeMatchKind::ExplicitConversion:
     case TypeMatchKind::ArgumentConversion:
@@ -1516,7 +1522,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           kind != TypeMatchKind::SameType &&
           (meta1->getInstanceType()->mayHaveSuperclass() ||
            meta2->getInstanceType()->getClassOrBoundGenericClass()))
-        subKind = std::min(kind, TypeMatchKind::Subtype);
+        subKind = std::min(kind, TypeMatchKind::MetatypeSubtype);
       
       return matchTypes(meta1->getInstanceType(), meta2->getInstanceType(),
                         subKind, subFlags,
@@ -1859,12 +1865,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
   // For a subtyping relation involving a conversion to an existential
   // metatype, match the child types.
-  if (concrete && kind >= TypeMatchKind::Subtype) {
+  if (concrete && kind >= TypeMatchKind::Conversion) {
     if (auto meta1 = type1->getAs<MetatypeType>()) {
       if (auto meta2 = type2->getAs<ExistentialMetatypeType>()) {
         return matchTypes(meta1->getInstanceType(),
                           meta2->getInstanceType(),
-                          TypeMatchKind::Subtype, subFlags,
+                          TypeMatchKind::MetatypeSubtype, subFlags,
                           locator.withPathElement(
                                   ConstraintLocator::InstanceType));
       }
@@ -1877,7 +1883,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // protocols in the second type.
   if (concrete && kind >= TypeMatchKind::Subtype &&
       type2->isExistentialType()) {
-    conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
+
+    if (kind >= TypeMatchKind::MetatypeSubtype ||
+        (type1->isAnyClassReferenceType() && type2->isClassExistentialType())) {
+      conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
+    }
   }
 
   // A value of type T can be converted to type U? if T is convertible to U.

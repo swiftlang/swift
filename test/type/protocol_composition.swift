@@ -110,7 +110,9 @@ func testConversion() {
 
   // Subtyping
   var f1 : () -> protocol<FooProtocol, SuperREPLPrintable> = return_superPrintable
-  var f2 : () -> protocol<FooProtocol, REPLPrintable> = return_superPrintable
+
+  // FIXME: closures make ABI conversions explicit. rdar://problem/19517003
+  var f2 : () -> protocol<FooProtocol, REPLPrintable> = { return_superPrintable($0) }
 }
 
 // Test the parser's splitting of >= into > and =.

@@ -395,6 +395,8 @@ ERROR(generic_parameter_binds_to_non_objc_existential,sema_tcc,none,
 ERROR(noescape_functiontype_mismatch,sema_tcc,none,
       "invalid use of non-escaping function in escaping context %0",
       (Type))
+ERROR(invalid_function_conversion,sema_tcc,none,
+      "%1 does not have the same representation as %0", (Type, Type))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations
