@@ -50,12 +50,15 @@ bb4:                                              // Preds: bb3 bb2
   br bb5                                          // id: %21
 
 //CHECK: bb5([[PHI:%[0-9]+]] : $Int64):
+//CHECK-NOT: alloc_stack
 bb5:                                              // Preds: bb4 bb1
   %22 = alloc_stack $Int64  // var i              // users: %31, %25, %40, %43, %23
   store %5 to %22#1 : $*Int64                     // id: %23
   br bb6                                          // id: %24
 
+//CHECK: bb6([[PHI2:%[0-9]+]] : $Int64):
 bb6:                                              // Preds: bb7 bb5
+  //CHECK: struct_extract [[PHI2]]
   %25 = struct_element_addr %22#1 : $*Int64, #Int64.value // user: %26
   %26 = load %25 : $*Builtin.Int64                // user: %29
   %27 = integer_literal $Builtin.Int64, 10        // user: %29
@@ -63,6 +66,7 @@ bb6:                                              // Preds: bb7 bb5
   cond_br %29, bb7, bb8                           // id: %30
 
 bb7:                                              // Preds: bb6
+  //CHECK: struct_extract [[PHI2]]
   %31 = struct_element_addr %22#1 : $*Int64, #Int64.value // user: %32
   %32 = load %31 : $*Builtin.Int64                // user: %35
   %33 = integer_literal $Builtin.Int64, 1         // user: %35

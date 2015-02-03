@@ -28,6 +28,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/CFG.h"
 #include "swift/SILPasses/Utils/Local.h"
@@ -154,13 +155,6 @@ class MemoryToRegisters {
   /// The builder used to create new instructions during register promotion.
   SILBuilder B;
 
-  /// \brief Check if the AllocStackInst \p ASI is captured by any of its users.
-  bool isCaptured(AllocStackInst *ASI);
-
-  /// \brief Check if the AllocStackInst \p ASI is only used within a single
-  /// basic block.
-  bool isSingleBlockUsage(AllocStackInst *ASI);
-
   /// \brief Check if the AllocStackInst \p ASI is only written into.
   bool isWriteOnlyAllocation(AllocStackInst *ASI, bool Promoted = false);
 
@@ -181,14 +175,44 @@ public:
 
 } // end anonymous namespace.
 
+/// Returns true if \p I is an address of a LoadInst, skipping struct and
+/// tuple address projections. Sets \p singleBlock to null if the load (or
+/// it's address is not in \p singleBlock.
+static bool isAddressForLoad(SILInstruction *I, SILBasicBlock *&singleBlock) {
+  
+  if (isa<LoadInst>(I))
+    return true;
+
+  if (!isa<StructElementAddrInst>(I) && !isa<TupleElementAddrInst>(I))
+    return false;
+  
+  // Recursively search for other (non-)loads in the instruction's uses.
+  for (auto UI : I->getUses()) {
+    SILInstruction *II = UI->getUser();
+    if (II->getParent() != singleBlock)
+      singleBlock = nullptr;
+    
+    if (!isAddressForLoad(II, singleBlock))
+        return false;
+  }
+  return true;
+}
+
 /// Returns true if this AllocStacks is captured.
-bool MemoryToRegisters::isCaptured(AllocStackInst *ASI) {
+/// Sets \p inSingleBlock to true if all uses of \p ASI are in a single block.
+static bool isCaptured(AllocStackInst *ASI, bool &inSingleBlock) {
+  
+  SILBasicBlock *singleBlock = ASI->getParent();
+  
   // For all users of the AllocStack instruction.
   for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI) {
     SILInstruction *II = UI->getUser();
 
+    if (II->getParent() != singleBlock)
+      singleBlock = nullptr;
+    
     // Loads are okay.
-    if (isa<LoadInst>(II))
+    if (isAddressForLoad(II, singleBlock))
       continue;
 
     // We can store into an AllocStack (but not the pointer).
@@ -207,6 +231,7 @@ bool MemoryToRegisters::isCaptured(AllocStackInst *ASI) {
   }
 
   // None of the users capture the AllocStack.
+  inSingleBlock = (singleBlock != nullptr);
   return false;
 }
 
@@ -239,19 +264,6 @@ bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI,
   return true;
 }
 
-/// Returns true if this AllocStack is only used within a single basic block.
-bool MemoryToRegisters::isSingleBlockUsage(AllocStackInst *ASI) {
-  assert(!isCaptured(ASI) && "This AllocStack must not be captured");
-  SILBasicBlock *BB = ASI->getParent();
-
-  // All of the users of the AllocStack must be in the same block.
-  for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI)
-    if (UI->getUser()->getParent() != BB)
-      return false;
-
-  return true;
-}
-
 /// Promote a DebugValueAddr to a DebugValue of the given value.
 static void
 promoteDebugValueAddr(DebugValueAddrInst *DVAI, SILValue Value, SILBuilder &B) {
@@ -259,6 +271,65 @@ promoteDebugValueAddr(DebugValueAddrInst *DVAI, SILValue Value, SILBuilder &B) {
   B.setInsertionPoint(DVAI);
   B.createDebugValue(DVAI->getLoc(), Value);
   DVAI->eraseFromParent();
+}
+
+/// Returns true if \p I is a load which loads from \p ASI.
+static bool isLoadFromStack(SILInstruction *I, AllocStackInst *ASI) {
+  if (!isa<LoadInst>(I))
+    return false;
+  
+  // Skip struct and tuple address projections.
+  ValueBase *op = I->getOperand(0).getDef();
+  while (op != ASI) {
+    if (!isa<StructElementAddrInst>(op) && !isa<TupleElementAddrInst>(op))
+      return false;
+    
+    op = cast<SILInstruction>(op)->getOperand(0).getDef();
+  }
+  return true;
+}
+
+/// Collects all load instructions which (transitively) use \p I as address.
+static void collectLoads(SILInstruction *I, SmallVectorImpl<LoadInst *> &Loads) {
+  if (LoadInst *load = dyn_cast<LoadInst>(I)) {
+    Loads.push_back(load);
+    return;
+  }
+  if (!isa<StructElementAddrInst>(I) && !isa<TupleElementAddrInst>(I))
+    return;
+  
+  // Recursively search for other loads in the instruction's uses.
+  for (auto UI : I->getUses()) {
+    collectLoads(UI->getUser(), Loads);
+  }
+}
+
+
+static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
+  ProjectionPath projections;
+  SILValue op = LI->getOperand();
+  while (op.getDef() != ASI) {
+    assert(isa<StructElementAddrInst>(op) || isa<TupleElementAddrInst>(op));
+    SILInstruction *Inst = cast<SILInstruction>(op);
+    auto projection = Projection::addressProjectionForInstruction(Inst);
+    projections.push_back(projection.getValue());
+    op = Inst->getOperand(0);
+  }
+  SILBuilder builder(LI);
+  for (auto iter = projections.rbegin(); iter != projections.rend(); ++iter) {
+    const Projection &projection = *iter;
+    val = projection.createValueProjection(builder, LI->getLoc(), val).get();
+  }
+  op = LI->getOperand();
+  SILValue(LI, 0).replaceAllUsesWith(val);
+  LI->eraseFromParent();
+  while (op.getDef() != ASI && op.use_empty()) {
+    assert(isa<StructElementAddrInst>(op) || isa<TupleElementAddrInst>(op));
+    SILInstruction *Inst = cast<SILInstruction>(op);
+    SILValue next = Inst->getOperand(0);
+    Inst->eraseFromParent();
+    op = next;
+  }
 }
 
 StoreInst *
@@ -274,23 +345,19 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
   for (auto BBI = BB->begin(), E = BB->end(); BBI != E;) {
     SILInstruction *Inst = BBI++;
 
-    if (LoadInst *LI = dyn_cast<LoadInst>(Inst)) {
-      // Make sure we are loading from this ASI.
-      if (LI->getOperand().getDef() != ASI)
-        continue;
-
+    if (isLoadFromStack(Inst, ASI)) {
       if (RunningVal.isValid()) {
         // If we are loading from the AllocStackInst and we already know the
         // content of the Alloca then use it.
-        DEBUG(llvm::dbgs() << "*** Promoting load: " << *LI);
-        SILValue(Inst, 0).replaceAllUsesWith(RunningVal);
-        Inst->eraseFromParent();
+        DEBUG(llvm::dbgs() << "*** Promoting load: " << *Inst);
+        
+        replaceLoad(cast<LoadInst>(Inst), RunningVal, ASI);
         NumInstRemoved++;
-      } else {
+      } else if (Inst->getOperand(0).getDef() == ASI) {
         // If we don't know the content of the AllocStack then the loaded
         // value *is* the new value;
-        DEBUG(llvm::dbgs() << "*** First load: " << *LI);
-        RunningVal = LI;
+        DEBUG(llvm::dbgs() << "*** First load: " << *Inst);
+        RunningVal = Inst;
       }
       continue;
     }
@@ -353,18 +420,15 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
 
     // Remove instructions that we are loading from. Replace the loaded value
     // with our running value.
-    if (LoadInst *LI = dyn_cast<LoadInst>(Inst)) {
-      if (LI->getOperand().getDef() == ASI) {
-        if (!RunningVal.isValid()) {
-          assert(ASI->getElementType().isVoid() &&
-                 "Expected initialization of non-void type!");
-          RunningVal = SILUndef::get(ASI->getElementType(), ASI->getModule());
-        }
-        SILValue(Inst, 0).replaceAllUsesWith(RunningVal);
-        Inst->eraseFromParent();
-        NumInstRemoved++;
-        continue;
+    if (isLoadFromStack(Inst, ASI)) {
+      if (!RunningVal.isValid()) {
+        assert(ASI->getElementType().isVoid() &&
+               "Expected initialization of non-void type!");
+        RunningVal = SILUndef::get(ASI->getElementType(), ASI->getModule());
       }
+      replaceLoad(cast<LoadInst>(Inst), RunningVal, ASI);
+      NumInstRemoved++;
+      continue;
     }
 
     // Remove stores and record the value that we are saving as the running
@@ -485,47 +549,48 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSet &PhiBlocks,
 
 void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
   // First update uses of the value.
+  SmallVector<LoadInst *, 4> collectedLoads;
   for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E;) {
     auto *Inst = UI->getUser();
-
     UI++;
 
-    if (!isa<LoadInst>(Inst) && !isa<DebugValueAddrInst>(Inst))
-      continue;
-
-    SILBasicBlock *BB = Inst->getParent();
-
-    // If this block has no predecessors then nothing dominates it and
-    // the instruction is unreachable. If the instruction we're
-    // examining is a value, replace it with undef. Either way, delete
-    // the instruction and move on.
-    if (BB->pred_empty() || !DT->getNode(BB)) {
-      if (Inst->hasValue()) {
-        auto *Undef = SILUndef::get(ASI->getElementType(), ASI->getModule());
-        Inst->replaceAllUsesWith(Undef);
+    collectedLoads.clear();
+    collectLoads(Inst, collectedLoads);
+    for (LoadInst *LI : collectedLoads) {
+      SILValue Def;
+      // If this block has no predecessors then nothing dominates it and
+      // the instruction is unreachable. If the instruction we're
+      // examining is a value, replace it with undef. Either way, delete
+      // the instruction and move on.
+      SILBasicBlock *BB = LI->getParent();
+      if (BB->pred_empty() || !DT->getNode(BB)) {
+        Def = SILUndef::get(ASI->getElementType(), ASI->getModule());
+      } else {
+        Def = getLiveInValue(PhiBlocks, BB);
       }
-      Inst->eraseFromParent();
-      NumInstRemoved++;
-      continue;
-    }
-
-    SILValue Def = getLiveInValue(PhiBlocks, BB);
-
-    // If this is an instruction that produces a value, we'll replace
-    // the uses with our live-in value.
-    if (Inst->hasValue()) {
-      DEBUG(llvm::dbgs() << "*** Replacing " << *Inst << " with Def " << *Def);
-
+      
+      DEBUG(llvm::dbgs() << "*** Replacing " << *LI << " with Def " << *Def);
+        
       // Replace the load with the definition that we found.
-      SILValue(Inst, 0).replaceAllUsesWith(Def);
-      Inst->eraseFromParent();
+      replaceLoad(LI, Def, ASI);
       NumInstRemoved++;
-      continue;
     }
-
-    // Otherwise we expect a DebugValueAddr, which we will replace
-    // with a DebugValue.
-    promoteDebugValueAddr(cast<DebugValueAddrInst>(Inst), Def, B);
+    if (isa<DebugValueAddrInst>(Inst)) {
+      // If this block has no predecessors then nothing dominates it and
+      // the instruction is unreachable. If the instruction we're
+      // examining is a value, replace it with undef. Either way, delete
+      // the instruction and move on.
+      SILBasicBlock *BB = Inst->getParent();
+      if (BB->pred_empty() || !DT->getNode(BB)) {
+        Inst->eraseFromParent();
+      } else {
+        // Otherwise we expect a DebugValueAddr, which we will replace
+        // with a DebugValue.
+        SILValue Def = getLiveInValue(PhiBlocks, BB);
+        promoteDebugValueAddr(cast<DebugValueAddrInst>(Inst), Def, B);
+      }
+      NumInstRemoved++;
+    }
   }
 
   // Now that all of the uses are fixed we can fix the branches that point
@@ -715,7 +780,8 @@ bool MemoryToRegisters::run() {
       NumAllocStackFound++;
 
       // Don't handle captured AllocStacks.
-      if (isCaptured(ASI)) {
+      bool inSingleBlock = false;
+      if (isCaptured(ASI, inSingleBlock)) {
         NumAllocStackCaptured++;
         ++I;
         continue;
@@ -723,7 +789,7 @@ bool MemoryToRegisters::run() {
 
       // For AllocStacks that are only used within a single basic blocks, use
       // the linear sweep to remove the AllocStack.
-      if (isSingleBlockUsage(ASI)) {
+      if (inSingleBlock) {
         removeSingleBlockAllocation(ASI);
 
         DEBUG(llvm::dbgs() << "*** Deleting single block AllocStackInst: "

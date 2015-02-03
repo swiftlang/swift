@@ -167,3 +167,72 @@ bb0(%0 : $Int):
   dealloc_stack %1#0 : $*@local_storage Int
   return %2 : $Int
 }
+
+// CHECK-LABEL: sil @mem2reg_struct_addr
+// CHECK-NOT: alloc_stack
+// CHECK: struct_extract
+// CHECK: return
+sil @mem2reg_struct_addr : $@thin (Int64) -> Builtin.Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64
+  store %0 to %1#1 : $*Int64
+  %2 = struct_element_addr %1#1 : $*Int64, #Int64.value
+  %3 = load %2 : $*Builtin.Int64
+  dealloc_stack %1#0 : $*@local_storage Int64
+  return %3 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @mem2reg_tuple_addr
+// CHECK-NOT: alloc_stack
+// CHECK: tuple_extract {{.*}}, 0
+// CHECK: return
+sil @mem2reg_tuple_addr : $@thin (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $(Int64, Int64)
+  %2 = tuple (%0 : $Int64, %0 : $Int64)
+  store %2 to %1#1 : $*(Int64, Int64)
+  %4 = tuple_element_addr %1#1 : $*(Int64, Int64), 0
+  %5 = load %4 : $*Int64
+  dealloc_stack %1#0 : $*@local_storage (Int64, Int64)
+  return %5 : $Int64
+}
+
+// CHECK-LABEL: sil @struct_extract_if_then_else
+// CHECK-NOT: alloc_stack
+sil @struct_extract_if_then_else : $@thin (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64
+  store %0 to %1#1 : $*Int64
+  %3 = integer_literal $Builtin.Int64, 2
+  %4 = struct_extract %0 : $Int64, #Int64.value
+  %5 = builtin "cmp_sgt_Int64"(%4 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  %6 = struct_element_addr %1#1 : $*Int64, #Int64.value
+  cond_br %5, bb1, bb2
+
+// CHECK: bb1:
+// CHECK: struct_extract %0
+bb1:
+  %8 = load %6 : $*Builtin.Int64
+  %9 = integer_literal $Builtin.Int64, 1
+  %10 = integer_literal $Builtin.Int1, 0
+  %11 = builtin "sadd_with_overflow_Int64"(%8 : $Builtin.Int64, %9 : $Builtin.Int64, %10 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %12 = tuple_extract %11 : $(Builtin.Int64, Builtin.Int1), 0
+  br bb3(%12 : $Builtin.Int64)
+
+// CHECK: bb2:
+// CHECK: struct_extract %0
+bb2:
+  %14 = load %6 : $*Builtin.Int64
+  %15 = integer_literal $Builtin.Int64, 2
+  %16 = integer_literal $Builtin.Int1, 0
+  %17 = builtin "sadd_with_overflow_Int64"(%14 : $Builtin.Int64, %15 : $Builtin.Int64, %16 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %18 = tuple_extract %17 : $(Builtin.Int64, Builtin.Int1), 0
+  br bb3(%18 : $Builtin.Int64)
+
+// CHECK-NOT: dealloc_stack
+bb3(%20 : $Builtin.Int64):
+  dealloc_stack %1#0 : $*@local_storage Int64
+  %22 = struct $Int64 (%20 : $Builtin.Int64)
+  return %22 : $Int64
+}
+
