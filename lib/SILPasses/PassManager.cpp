@@ -30,6 +30,10 @@ llvm::cl::opt<std::string>
                     llvm::cl::desc("Only print out the sil for this function"));
 
 llvm::cl::opt<std::string>
+    SILPrintOnlyFuns("sil-print-only-functions", llvm::cl::init(""),
+                    llvm::cl::desc("Only print out the sil for the functions whose name contains this substring"));
+
+llvm::cl::opt<std::string>
     SILPrintBefore("sil-print-before", llvm::cl::init(""), llvm::cl::desc(
       "Print out the sil before passes which contain this string"));
 
@@ -45,6 +49,10 @@ static bool doPrintBefore(SILTransform *T, SILFunction *F) {
   if (!SILPrintOnlyFun.empty() && F && F->getName() != SILPrintOnlyFun)
     return false;
 
+  if (!SILPrintOnlyFuns.empty() && F &&
+      F->getName().find(SILPrintOnlyFuns, 0) != StringRef::npos)
+    return true;
+
   if (!SILPrintBefore.empty() &&
       T->getName().find(SILPrintBefore) != StringRef::npos)
     return true;
@@ -59,7 +67,11 @@ static bool doPrintBefore(SILTransform *T, SILFunction *F) {
 static bool doPrintAfter(SILTransform *T, SILFunction *F, bool Default) {
   if (!SILPrintOnlyFun.empty() && F && F->getName() != SILPrintOnlyFun)
     return false;
-  
+
+  if (!SILPrintOnlyFuns.empty() && F &&
+      F->getName().find(SILPrintOnlyFuns, 0) != StringRef::npos)
+    return true;
+
   if (!SILPrintAfter.empty() &&
       T->getName().find(SILPrintAfter) != StringRef::npos)
     return true;
@@ -72,12 +84,16 @@ static bool doPrintAfter(SILTransform *T, SILFunction *F, bool Default) {
 }
 
 static void printModule(SILModule *Mod) {
-  if (SILPrintOnlyFun.empty()) {
+  if (SILPrintOnlyFun.empty() && SILPrintOnlyFuns.empty()) {
     Mod->dump();
     return;
   }
   for (auto &F : *Mod) {
-    if (F.getName().str() == SILPrintOnlyFun)
+    if (!SILPrintOnlyFun.empty() && F.getName().str() == SILPrintOnlyFun)
+      F.dump();
+
+    if (!SILPrintOnlyFuns.empty() &&
+        F.getName().find(SILPrintOnlyFuns, 0) != StringRef::npos)
       F.dump();
   }
 }
@@ -234,17 +250,22 @@ void SILPassManager::runOneIteration() {
 void SILPassManager::run() {
   const SILOptions &Options = getOptions();
   if (Options.PrintAll) {
-    if (SILPrintOnlyFun.empty()) {
+    if (SILPrintOnlyFun.empty() && SILPrintOnlyFuns.empty()) {
       llvm::dbgs() << "*** SIL module before transformation ("
                    << NumOptimizationIterations << ") ***\n";
       Mod->dump();
     } else {
       for (auto &F : *Mod) {
-        if (F.getName().str() == SILPrintOnlyFun) {
+        if (!SILPrintOnlyFun.empty() && F.getName().str() == SILPrintOnlyFun) {
           llvm::dbgs() << "*** SIL function before transformation ("
                        << NumOptimizationIterations << ") ***\n";
           F.dump();
         }
+        if (!SILPrintOnlyFuns.empty() &&
+            F.getName().find(SILPrintOnlyFuns, 0) != StringRef::npos)
+          llvm::dbgs() << "*** SIL function before transformation ("
+                       << NumOptimizationIterations << ") ***\n";
+          F.dump();
       }
     }
   }
