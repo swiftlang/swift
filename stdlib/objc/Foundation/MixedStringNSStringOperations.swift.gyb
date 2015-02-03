@@ -10,26 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-//
-// Mixed-type comparisons between String and NSString.
-// Since the compiler will implicitly bridge String to NSString, these more
-// refined overloads exist to disable invalid bridging from happening.
-// For example, swiftString < nsString will bridge swiftString to NSString
-// and perform incorrect unicode comparison.
-//
-
-% for op in [ '==', '!=', '<', '<=', '>=', '>' ]:
-
-@availability(*, unavailable,
-  message="Comparing Swift.String and NSString is ambiguous")
-public func ${op} (lhs: String, rhs: NSString) -> Bool {
-  fatalError("impossible")
+// comparisons in non-generic code.
+@transparent
+public func == (lhs: NSString, rhs: NSString) -> Bool {
+  return lhs as NSObject == rhs as NSObject
 }
 
-@availability(*, unavailable,
-  message="Comparing Swift.String and NSString is ambiguous")
-public func ${op} (lhs: NSString, rhs: String) -> Bool {
-  fatalError("impossible")
+// This overload is required to disambiguate homogeneous NSString/NSString
+// comparisons in non-generic code.
+@transparent
+public func != (lhs: NSString, rhs: NSString) -> Bool {
+  return !(lhs == rhs)
 }
-
-% end
