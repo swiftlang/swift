@@ -326,15 +326,7 @@ ClangImporter::create(ASTContext &ctx,
   const std::string &moduleCachePath = importerOpts.ModuleCachePath;
 
   // Set the module cache path.
-  if (moduleCachePath.empty()) {
-    llvm::SmallString<128> DefaultModuleCache;
-    llvm::sys::path::system_temp_directory(/*erasedOnReboot=*/false,
-                                           DefaultModuleCache);
-    llvm::sys::path::append(DefaultModuleCache, "org.llvm.clang");
-    llvm::sys::path::append(DefaultModuleCache, "ModuleCache");
-    invocationArgStrs.push_back("-fmodules-cache-path=");
-    invocationArgStrs.back().append(DefaultModuleCache.str());
-  } else {
+  if (!moduleCachePath.empty()) {
     invocationArgStrs.push_back("-fmodules-cache-path=");
     invocationArgStrs.back().append(moduleCachePath);
   }
