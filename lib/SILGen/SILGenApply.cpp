@@ -741,6 +741,7 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
 
     auto selfParameter = getSelfParameter();
     assert(selfParameter.isIndirect());
+    (void)selfParameter;
 
     SILLocation selfLoc = selfValue.getLocation();
 
@@ -1556,6 +1557,8 @@ static bool hasAbstractionDifference(AbstractCC cc,
   CanType ct1 = type1.getSwiftRValueType();
   CanType ct2 = type2.getSwiftRValueType();
   assert(!isNative(cc) || areOnlyAbstractionDifferent(ct1, ct2));
+  (void)ct1;
+  (void)ct2;
 
   // Assuming that we've applied the same substitutions to both types,
   // abstraction equality should equal type equality.
@@ -2554,6 +2557,7 @@ void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
       assert(varargsField.isVararg() &&
              "Cannot initialize nonvariadic element");
       assert(varargsInfo.hasValue());
+      (void) varargsField;
 
       // We've successfully built the varargs array; deactivate all
       // the special destinations.
