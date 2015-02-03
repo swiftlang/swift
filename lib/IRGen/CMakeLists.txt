@@ -27,6 +27,7 @@ add_swift_library(swiftIRGen
   Linking.cpp
   SwiftTargetInfo.cpp
   StructLayout.cpp
+  TypeLayoutVerifier.cpp
   UnimplementedTypeInfo.cpp
   LINK_LIBRARIES
     swiftAST

@@ -172,7 +172,7 @@ private:
 
   ArchetypeType *getExemplarArchetype(ArchetypeType *t);
   CanType getExemplarType(CanType t);
-
+  
   class Types_t {
     llvm::DenseMap<TypeBase*, TypeCacheEntry> IndependentCache;
     llvm::DenseMap<TypeBase*, TypeCacheEntry> DependentCache;
@@ -218,6 +218,10 @@ public:
     TC.popGenericContext(sig);
   }
 };
+
+/// Generate code to verify that static type assumptions agree with the runtime.
+void emitTypeLayoutVerifier(IRGenFunction &IGF,
+                            ArrayRef<CanType> formalTypes);
   
 } // end namespace irgen
 } // end namespace swift

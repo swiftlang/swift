@@ -2126,6 +2126,39 @@ fail:
   return false;
 }
 
+#ifndef NDEBUG
+extern "C"
+void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
+                                            const void *runtimeValue,
+                                            const void *staticValue,
+                                            size_t size,
+                                            const char *description) {
+  auto presentValue = [&](const void *value) {
+    if (size < sizeof(long long)) {
+      long long intValue = 0;
+      memcpy(&intValue, value, size);
+      fprintf(stderr, "%lld (%#llx)\n                  ", intValue, intValue);
+    }
+    auto bytes = reinterpret_cast<const uint8_t *>(value);
+    for (unsigned i = 0; i < size; ++i) {
+      fprintf(stderr, "%02x ", bytes[i]);
+    }
+    fprintf(stderr, "\n");
+  };
+  
+  if (memcmp(runtimeValue, staticValue, size) != 0) {
+    auto typeName = nameForMetadata(type);
+    fprintf(stderr, "*** Type verification of %s %s failed ***\n",
+            typeName.c_str(), description);
+    
+    fprintf(stderr, "  runtime value:  ");
+    presentValue(runtimeValue);
+    fprintf(stderr, "  compiler value: ");
+    presentValue(staticValue);
+  }
+}
+#endif
+
 namespace llvm { namespace hashing { namespace detail {
   // An extern variable expected by LLVM's hashing templates. We don't link any
   // LLVM libs into the runtime, so define this here.

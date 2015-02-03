@@ -100,6 +100,9 @@ public:
   
   /// Special codegen for playgrounds.
   unsigned Playground : 1;
+  
+  /// Emit code to verify that static and runtime type layout are consistent.
+  unsigned VerifyTypeLayout : 1;
 
   IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
                    Optimize(false), DebugInfoKind(IRGenDebugInfoKind::None),
@@ -107,7 +110,7 @@ public:
                    DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
                    DisableLLVMSLPVectorizer(false),
                    DisableFPElim(true), HasUnderlyingModule(false),
-                   Playground(false) {}
+                   Playground(false), VerifyTypeLayout(false) {}
 };
 
 } // end namespace swift

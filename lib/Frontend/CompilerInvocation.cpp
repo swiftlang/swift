@@ -932,6 +932,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_use_jit))
     Opts.UseJIT = true;
   
+  if (Args.hasArg(OPT_verify_type_layout))
+    Opts.VerifyTypeLayout = true;
+  
   return false;
 }
 

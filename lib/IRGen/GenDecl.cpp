@@ -43,6 +43,7 @@
 #include "GenClass.h"
 #include "GenObjC.h"
 #include "GenMeta.h"
+#include "GenType.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -785,6 +786,38 @@ void IRGenModule::emitVTableStubs() {
     llvm::GlobalAlias::create(llvm::GlobalValue::ExternalLinkage, F.getName(),
                               stub);
   }
+}
+
+void IRGenModule::emitTypeVerifier() {
+  // Find the entry point.
+  SILFunction *EntryPoint = SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
+
+  if (!EntryPoint)
+    return;
+  
+  llvm::Function *EntryFunction = Module.getFunction(EntryPoint->getName());
+  if (!EntryFunction)
+    return;
+  
+  // Create a new function to contain our logic.
+  auto fnTy = llvm::FunctionType::get(VoidTy, /*varArg*/ false);
+  auto VerifierFunction = llvm::Function::Create(fnTy,
+                                             llvm::GlobalValue::PrivateLinkage,
+                                             "type_verifier",
+                                             getModule());
+  
+  // Insert a call into the entry function.
+  {
+    llvm::BasicBlock *EntryBB = &EntryFunction->getEntryBlock();
+    llvm::BasicBlock::iterator IP = EntryBB->getFirstInsertionPt();
+    IRBuilder Builder(getLLVMContext());
+    Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
+    Builder.CreateCall(VerifierFunction);
+  }
+  
+  IRGenFunction VerifierIGF(*this, VerifierFunction);
+  emitTypeLayoutVerifier(VerifierIGF, TypesToVerify);
+  VerifierIGF.Builder.CreateRetVoid();
 }
 
 /// Get SIL-linkage for something that's not required to be visible

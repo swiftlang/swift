@@ -286,6 +286,7 @@ public:
   
 private:
   TypeConverter &Types;
+  std::vector<CanType> TypesToVerify;
   friend class TypeConverter;
 
   const clang::ASTContext *ClangASTContext;
@@ -493,6 +494,7 @@ public:
   void emitRuntimeRegistration();
   void emitLazyDefinitions();
   void emitVTableStubs();
+  void emitTypeVerifier();
 private:
   void emitGlobalDecl(Decl *D);
   void emitExternalDefinition(Decl *D);

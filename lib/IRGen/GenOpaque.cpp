@@ -583,6 +583,16 @@ llvm::Value *irgen::emitLoadOfIsPOD(IRGenFunction &IGF, llvm::Value *wtable) {
                                   wtable->getName() + ".isPOD");
 }
 
+/// Load the 'isBitwiseTakable' valueWitness from the given table as an i1.
+llvm::Value *irgen::emitLoadOfIsBitwiseTakable(IRGenFunction &IGF,
+                                               llvm::Value *wtable) {
+  auto flags = emitLoadOfValueWitness(IGF, wtable, ValueWitness::Flags);
+  auto mask = IGF.IGM.getSize(Size(ValueWitnessFlags::IsNonBitwiseTakable));
+  auto masked = IGF.Builder.CreateAnd(flags, mask);
+  return IGF.Builder.CreateICmpEQ(masked, IGF.IGM.getSize(Size(0)),
+                                  wtable->getName() + ".isBitwiseTakable");
+}
+
 /// Load the 'isInline' valueWitness from the given table as an i1.
 llvm::Value *irgen::emitLoadOfIsInline(IRGenFunction &IGF,
                                        llvm::Value *wtable) {
@@ -593,7 +603,26 @@ llvm::Value *irgen::emitLoadOfIsInline(IRGenFunction &IGF,
                                   wtable->getName() + ".isInline");
 }
 
+/// Load the 'hasExtraInhabitants' valueWitness from the given table as an i1.
+llvm::Value *irgen::emitLoadOfHasExtraInhabitants(IRGenFunction &IGF,
+                                                  llvm::Value *wtable) {
+  auto flags = emitLoadOfValueWitness(IGF, wtable, ValueWitness::Flags);
+  auto mask = IGF.IGM.getSize(Size(ValueWitnessFlags::Enum_HasExtraInhabitants));
+  auto masked = IGF.Builder.CreateAnd(flags, mask);
+  return IGF.Builder.CreateICmpNE(masked, IGF.IGM.getSize(Size(0)),
+                                  wtable->getName() + ".hasExtraInhabitants");
+}
+
 /// Load the 'stride' value witness from the given table as a size_t.
 llvm::Value *irgen::emitLoadOfStride(IRGenFunction &IGF, llvm::Value *wtable) {
   return emitLoadOfValueWitness(IGF, wtable, ValueWitness::Stride);
+}
+
+llvm::Value *irgen::emitLoadOfExtraInhabitantCount(IRGenFunction &IGF,
+                                                   llvm::Value *wtable) {
+  auto xiFlags = emitLoadOfValueWitness(IGF, wtable,
+                                        ValueWitness::ExtraInhabitantFlags);
+  auto mask = IGF.IGM.getSize(
+                          Size(ExtraInhabitantFlags::NumExtraInhabitantsMask));
+  return IGF.Builder.CreateAnd(xiFlags, mask);
 }

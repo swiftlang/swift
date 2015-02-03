@@ -16,6 +16,7 @@
 
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILModule.h"
@@ -1180,6 +1181,16 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   if (!convertedTI->NextConverted) {
     convertedTI->NextConverted = FirstType;
     FirstType = convertedTI;
+  }
+  
+  // Verify fixed-layout, non-dependent, nominal types.
+  // TODO: A better mechanism to control what types get verified.
+  if (IGM.Opts.VerifyTypeLayout
+      && isa<FixedTypeInfo>(convertedTI)
+      && canonicalTy->getAnyNominal()
+      && !canonicalTy->isDependentType()
+      && !canonicalTy->hasArchetype()) {
+    IGM.TypesToVerify.push_back(canonicalTy);
   }
 
   return convertedTI;

@@ -157,8 +157,22 @@ namespace irgen {
   /// Emit a load of the 'isPOD' value witness.
   llvm::Value *emitLoadOfIsPOD(IRGenFunction &IGF, llvm::Value *vwtable);
 
+  /// Emit a load of the 'isBitwiseTakable' value witness.
+  llvm::Value *emitLoadOfIsBitwiseTakable(IRGenFunction &IGF,
+                                          llvm::Value *vwtable);
+
   /// Emit a load of the 'isInline' value witness.
   llvm::Value *emitLoadOfIsInline(IRGenFunction &IGF, llvm::Value *vwtable);
+
+  /// Emit a load of the 'hasExtraInhabitants' value witness.
+  llvm::Value *emitLoadOfHasExtraInhabitants(IRGenFunction &IGF,
+                                             llvm::Value *vwtable);
+  
+  /// Emit a load of the 'extraInhabitantCount' value witness.
+  /// The type must be dynamically known to have extra inhabitant witnesses.
+  llvm::Value *emitLoadOfExtraInhabitantCount(IRGenFunction &IGF,
+                                              llvm::Value *vwtable);
+
 } // end namespace irgen
 } // end namespace swift
 

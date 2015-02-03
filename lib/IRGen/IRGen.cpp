@@ -177,6 +177,10 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   // Emit symbols for eliminated dead methods.
   IGM.emitVTableStubs();
 
+  // Verify type layout if we were asked to.
+  if (Opts.VerifyTypeLayout)
+    IGM.emitTypeVerifier();
+
   // Register our info with the runtime if needed.
   if (Opts.UseJIT)
     IGM.emitRuntimeRegistration();
