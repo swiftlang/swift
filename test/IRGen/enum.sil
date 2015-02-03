@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -gnone -emit-ir -enable-dynamic-value-type-layout | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: CPU=i386_or_x86_64
 
 // We have to claim this is raw SIL because there are critical edges from non
 // cond_br instructions.
@@ -79,7 +79,8 @@ import Builtin
 
 // CHECK: %O4enum18MultiPayloadNested = type <{ [9 x i8] }>
 
-// CHECK: %O4enum27MultiPayloadNestedSpareBits = type <{ [8 x i8] }>
+// 32-bit object references don't have enough spare bits.
+// CHECK-64: %O4enum27MultiPayloadNestedSpareBits = type <{ [8 x i8] }>
 
 // -- Dynamic enums. The type layout is opaque; we dynamically bitcast to
 //    the element type.
@@ -94,10 +95,10 @@ import Builtin
 // CHECK: [[DYNAMICSINGLETON_NAME:@.*]] = private unnamed_addr constant [25 x i8] c"O4enum16DynamicSingleton\00"
 // CHECK: @_TMnO4enum16DynamicSingleton = constant { {{.*}} i32 } {
 // --       2 = enum
-// CHECK:   i64 2,
-// CHECK:   i8* getelementptr inbounds ([25 x i8]* [[DYNAMICSINGLETON_NAME]], i64 0, i64 0),
+// CHECK:   [[WORD:i64|i32]] 2,
+// CHECK:   i8* getelementptr inbounds ([25 x i8]* [[DYNAMICSINGLETON_NAME]]
 // --       FIXME
-// CHECK:   i32 0, i32 0, i64 0,
+// CHECK:   i32 0, i32 0, [[WORD]] 0,
 // --       generic parameter vector offset
 // CHECK:   i32 3,
 // --       generic parameter vector length; witness table counts
@@ -116,17 +117,17 @@ import Builtin
 // CHECK: @_TWVO4enum10NoPayloads = constant [23 x i8*] [
 // -- ...
 // -- size
-// CHECK:   i8* inttoptr (i64 1 to i8*),
+// CHECK:   i8* inttoptr ([[WORD]] 1 to i8*),
 // -- flags                 0x4_0000 - alignment 1, has extra inhabitants
-// CHECK:   i8* inttoptr (i64 262144 to i8*),
+// CHECK:   i8* inttoptr ([[WORD]] 262144 to i8*),
 // -- stride
-// CHECK:   i8* inttoptr (i64 1 to i8*),
+// CHECK:   i8* inttoptr ([[WORD]] 1 to i8*),
 // -- storeExtraInhabitant
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO4enum10NoPayloads to i8*),
 // -- getExtraInhabitantIndex
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO4enum10NoPayloads to i8*),
 // -- num extra inhabitants (256 - 3 valid states)
-// CHECK:   i8* inttoptr (i64 253 to i8*)
+// CHECK:   i8* inttoptr ([[WORD]] 253 to i8*)
 // CHECK: ] 
 
 // -- Single-payload enums take unused extra inhabitants from their payload
@@ -134,17 +135,17 @@ import Builtin
 // CHECK: @_TWVO4enum19SinglePayloadNested = constant [23 x i8*] [
 // -- ...
 // -- size
-// CHECK:   i8* inttoptr (i64 1 to i8*),
+// CHECK:   i8* inttoptr ([[WORD]] 1 to i8*),
 // -- flags                 0x4_0000 - alignment 1, has extra inhabitants
-// CHECK:   i8* inttoptr (i64 262144 to i8*),
+// CHECK:   i8* inttoptr ([[WORD]] 262144 to i8*),
 // -- stride
-// CHECK:   i8* inttoptr (i64 1 to i8*),
+// CHECK:   i8* inttoptr ([[WORD]] 1 to i8*),
 // -- storeExtraInhabitant
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO4enum19SinglePayloadNested to i8*),
 // -- getExtraInhabitantIndex
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO4enum19SinglePayloadNested to i8*),
 // -- num extra inhabitants (253 from payload - 3 empty cases)
-// CHECK:   i8* inttoptr (i64 250 to i8*)
+// CHECK:   i8* inttoptr ([[WORD]] 250 to i8*)
 // CHECK: ] 
 
 
@@ -155,9 +156,8 @@ import Builtin
 // CHECK:   i8* null
 
 // CHECK: @_TWVO4enum18MultiPayloadNested = constant [20 x i8*] [
-// CHECK:   i8* inttoptr (i64 9 to i8*),
-// CHECK:   i8* inttoptr (i64 7 to i8*),
-// CHECK:   i8* inttoptr (i64 16 to i8*)
+// CHECK:   i8* inttoptr ([[WORD]] 9 to i8*),
+// CHECK:   i8* inttoptr ([[WORD]] 16 to i8*)
 // CHECK: ]
 
 enum Empty {}
@@ -1046,15 +1046,26 @@ enum SinglePayloadClass {
   case w
 }
 
-// CHECK: define void @single_payload_class_switch(i64) {
-// CHECK: entry:
-// CHECK:   switch i64 %0, label {{%.*}} [
-// CHECK:     i64 0, label {{%.*}}
-// CHECK:     i64 2, label {{%.*}}
-// CHECK:     i64 4, label {{%.*}}
-// CHECK:   ]
-// CHECK: ; <label>
-// CHECK:   inttoptr i64 %0 to %C4enum1C*
+// CHECK-64: define void @single_payload_class_switch(i64) {
+// CHECK-64: entry:
+// CHECK-64:   switch i64 %0, label {{%.*}} [
+// CHECK-64:     i64 0, label {{%.*}}
+// CHECK-64:     i64 2, label {{%.*}}
+// CHECK-64:     i64 4, label {{%.*}}
+// CHECK-64:   ]
+// CHECK-64: ; <label>
+// CHECK-64:   inttoptr [[WORD]] %0 to %C4enum1C*
+
+// CHECK-32: define void @single_payload_class_switch(i32) {
+// CHECK-32: entry:
+// CHECK-32:   switch i32 %0, label {{%.*}} [
+// CHECK-32:     i32 0, label {{%.*}}
+// CHECK-32:     i32 1, label {{%.*}}
+// CHECK-32:     i32 2, label {{%.*}}
+// CHECK-32:   ]
+// CHECK-32: ; <label>
+// CHECK-32:   inttoptr [[WORD]] %0 to %C4enum1C*
+
 sil @single_payload_class_switch : $(SinglePayloadClass) -> () {
 entry(%c : $SinglePayloadClass):
   switch_enum %c : $SinglePayloadClass, case #SinglePayloadClass.x!enumelt.1: x_dest, case #SinglePayloadClass.y!enumelt: y_dest, case #SinglePayloadClass.z!enumelt: z_dest, case #SinglePayloadClass.w!enumelt: w_dest
@@ -1085,22 +1096,35 @@ enum SinglePayloadObjCProtocol {
   case y, z, w
 }
 
-// CHECK: define void @single_payload_class_protocol_switch(i128) {
-// CHECK:   %1 = trunc i128 %0 to i64
-// CHECK:   %2 = zext i64 %1 to i128
-// CHECK:   switch i128 %2, label {{%.*}} [
-// CHECK:     i128 0, label {{%.*}}
-// --           0x2_0000_0000_0000_0000
-// CHECK:     i128 2, label {{%.*}}
-// --           0x4_0000_0000_0000_0000
-// CHECK:     i128 4, label {{%.*}}
-// CHECK:   ]
+// CHECK-64: define void @single_payload_class_protocol_switch(i128) {
+// CHECK-64:   %1 = trunc i128 %0 to i64
+// CHECK-64:   %2 = zext i64 %1 to i128
+// CHECK-64:   switch i128 %2, label {{%.*}} [
+// CHECK-64:     i128 0, label {{%.*}}
+// CHECK-64:     i128 2, label {{%.*}}
+// CHECK-64:     i128 4, label {{%.*}}
+// CHECK-64:   ]
 
-// CHECK:   [[OBJECT_INT:%.*]] = trunc i128 %0 to i64
-// CHECK:   inttoptr i64 [[OBJECT_INT]] to %objc_object*
-// CHECK:   [[WITNESS_SHR:%.*]] = lshr i128 %0, 64
-// CHECK:   [[WITNESS_INT:%.*]] = trunc i128 [[WITNESS_SHR]] to i64
-// CHECK:   inttoptr i64 [[WITNESS_INT]] to i8**
+// CHECK-64:   [[OBJECT_INT:%.*]] = trunc i128 %0 to i64
+// CHECK-64:   inttoptr i64 [[OBJECT_INT]] to %objc_object*
+// CHECK-64:   [[WITNESS_SHR:%.*]] = lshr i128 %0, 64
+// CHECK-64:   [[WITNESS_INT:%.*]] = trunc i128 [[WITNESS_SHR]] to i64
+// CHECK-64:   inttoptr i64 [[WITNESS_INT]] to i8**
+
+// CHECK-32: define void @single_payload_class_protocol_switch(i64) {
+// CHECK-32:   %1 = trunc i64 %0 to i32
+// CHECK-32:   %2 = zext i32 %1 to i64
+// CHECK-32:   switch i64 %2, label {{%.*}} [
+// CHECK-32:     i64 0, label {{%.*}}
+// CHECK-32:     i64 1, label {{%.*}}
+// CHECK-32:     i64 2, label {{%.*}}
+// CHECK-32:   ]
+
+// CHECK-32:   [[OBJECT_INT:%.*]] = trunc i64 %0 to i32
+// CHECK-32:   inttoptr i32 [[OBJECT_INT]] to %objc_object*
+// CHECK-32:   [[WITNESS_SHR:%.*]] = lshr i64 %0, 32
+// CHECK-32:   [[WITNESS_INT:%.*]] = trunc i64 [[WITNESS_SHR]] to i32
+// CHECK-32:   inttoptr i32 [[WITNESS_INT]] to i8**
 
 sil @single_payload_class_protocol_switch : $(SinglePayloadClassProtocol) -> () {
 entry(%c : $SinglePayloadClassProtocol):
@@ -1119,14 +1143,21 @@ end:
   return undef : $()
 }
 
-// CHECK: define void @single_payload_objc_protocol_switch(i64) {
-// CHECK:   switch i64 %0, label {{%.*}}
-// CHECK:     i64 0, label {{%.*}}
-// CHECK:     i64 2, label {{%.*}}
-// CHECK:     i64 4, label {{%.*}}
-// CHECK:   ]
+// CHECK-64: define void @single_payload_objc_protocol_switch(i64) {
+// CHECK-64:   switch i64 %0, label {{%.*}}
+// CHECK-64:     i64 0, label {{%.*}}
+// CHECK-64:     i64 2, label {{%.*}}
+// CHECK-64:     i64 4, label {{%.*}}
+// CHECK-64:   ]
+// CHECK-64:   inttoptr i64 %0 to %objc_object*
 
-// CHECK:   inttoptr i64 %0 to %objc_object*
+// CHECK-32: define void @single_payload_objc_protocol_switch(i32) {
+// CHECK-32:   switch i32 %0, label {{%.*}}
+// CHECK-32:     i32 0, label {{%.*}}
+// CHECK-32:     i32 1, label {{%.*}}
+// CHECK-32:     i32 2, label {{%.*}}
+// CHECK-32:   ]
+// CHECK-32:   inttoptr i32 %0 to %objc_object*
 
 sil @single_payload_objc_protocol_switch : $(SinglePayloadObjCProtocol) -> () {
 entry(%c : $SinglePayloadObjCProtocol):
@@ -2038,26 +2069,43 @@ enum MultiPayloadClasses {
   case w
 }
 
-// CHECK-LABEL: define void @multi_payload_classes_switch(i64) {
-// CHECK:   %1 = lshr i64 %0, 62
-// CHECK:   %2 = trunc i64 %1 to i2
-// CHECK:   switch i2 %2, label {{%.*}} [
-// CHECK:     i2 0, label {{%.*}}
-// CHECK:     i2 1, label {{%.*}}
-// CHECK:     i2 -2, label {{%.*}}
-// CHECK:   ]
-// CHECK:   switch i64 %0, label {{%.*}} [
+// CHECK-64-LABEL: define void @multi_payload_classes_switch(i64) {
+// CHECK-64:   %1 = lshr i64 %0, 62
+// CHECK-64:   %2 = trunc i64 %1 to i2
+// CHECK-64:   switch i2 %2, label {{%.*}} [
+// CHECK-64:     i2 0, label {{%.*}}
+// CHECK-64:     i2 1, label {{%.*}}
+// CHECK-64:     i2 -2, label {{%.*}}
+// CHECK-64:   ]
+// CHECK-64:   switch i64 %0, label {{%.*}} [
 // --             0x8000000000000000
-// CHECK:     i64 -9223372036854775808, label {{%.*}}
+// CHECK-64:     i64 -9223372036854775808, label {{%.*}}
 // --             0x8000000000000008
-// CHECK:     i64 -9223372036854775800, label {{%.*}}
-// CHECK:   ]
+// CHECK-64:     i64 -9223372036854775800, label {{%.*}}
+// CHECK-64:   ]
 // -- Extract x(C)
-// CHECK:   inttoptr i64 %0 to %C4enum1C*
+// CHECK-64:   inttoptr i64 %0 to %C4enum1C*
 // -- Extract y(D)
 // --                                     0x3fffffffffffffff
-// CHECK:   [[MASKED:%.*]] = and i64 %0, 4611686018427387903
-// CHECK:   inttoptr i64 [[MASKED]] to %C4enum1D*
+// CHECK-64:   [[MASKED:%.*]] = and i64 %0, 4611686018427387903
+// CHECK-64:   inttoptr i64 [[MASKED]] to %C4enum1D*
+
+// CHECK-32-LABEL: define void @multi_payload_classes_switch(i32) {
+// CHECK-32:   %1 = trunc i32 %0 to i2
+// CHECK-32:   switch i2 %1, label {{%.*}} [
+// CHECK-32:     i2 0, label {{%.*}}
+// CHECK-32:     i2 1, label {{%.*}}
+// CHECK-32:     i2 -2, label {{%.*}}
+// CHECK-32:   ]
+// CHECK-32:   switch i32 %0, label {{%.*}} [
+// CHECK-32:     i32 2, label {{%.*}}
+// CHECK-32:     i32 6, label {{%.*}}
+// CHECK-32:   ]
+// -- Extract x(C)
+// CHECK-32:   inttoptr i32 %0 to %C4enum1C*
+// -- Extract y(D)
+// CHECK-32:   [[MASKED:%.*]] = and i32 %0, -4
+// CHECK-32:   inttoptr i32 [[MASKED]] to %C4enum1D*
 
 sil @multi_payload_classes_switch : $(MultiPayloadClasses) -> () {
 entry(%c : $MultiPayloadClasses):
@@ -2093,32 +2141,59 @@ enum MultiPayloadSpareBitAggregates {
   case z(S)
 }
 
-// CHECK-LABEL: define void @multi_payload_spare_bit_aggregate_switch(i128) {
-// CHECK:   [[T0:%.*]] = lshr i128 %0, 62
-// CHECK:   [[TAG:%.*]] = trunc i128 [[T0]] to i2
-// CHECK:   switch i2 [[TAG]], label {{%.*}} [
-// CHECK:     i2 0, label %[[X_DEST:[0-9]+]]
-// CHECK:     i2 1, label %[[Y_DEST:[0-9]+]]
-// CHECK:     i2 -2, label %[[Z_DEST:[0-9]+]]
-// CHECK:   ]
-// CHECK: ; <label>:[[X_DEST]]
-// CHECK:   [[X_0:%.*]] = trunc i128 %0 to i32
-// CHECK:   [[T1:%.*]] = lshr i128 %0, 64
-// CHECK:   [[X_1:%.*]] = trunc i128 [[T1]] to i64
-// CHECK: ; <label>:[[Y_DEST]]
+// CHECK-64-LABEL: define void @multi_payload_spare_bit_aggregate_switch(i128) {
+// CHECK-64:   [[T0:%.*]] = lshr i128 %0, 62
+// CHECK-64:   [[TAG:%.*]] = trunc i128 [[T0]] to i2
+// CHECK-64:   switch i2 [[TAG]], label {{%.*}} [
+// CHECK-64:     i2 0, label %[[X_DEST:[0-9]+]]
+// CHECK-64:     i2 1, label %[[Y_DEST:[0-9]+]]
+// CHECK-64:     i2 -2, label %[[Z_DEST:[0-9]+]]
+// CHECK-64:   ]
+// CHECK-64: ; <label>:[[X_DEST]]
+// CHECK-64:   [[X_0:%.*]] = trunc i128 %0 to i32
+// CHECK-64:   [[T1:%.*]] = lshr i128 %0, 64
+// CHECK-64:   [[X_1:%.*]] = trunc i128 [[T1]] to i64
+// CHECK-64: ; <label>:[[Y_DEST]]
 // --                                        0x3fffffffffffffff
-// CHECK:   [[Y_MASKED:%.*]] = and i128 %0, -13835058055282163713
-// CHECK:   [[T2:%.*]] = trunc i128 [[Y_MASKED]] to i64
-// CHECK:   [[Y_0:%.*]] = inttoptr i64 [[T2]] to %C4enum1C*
-// CHECK:   [[T3:%.*]] = lshr i128 [[Y_MASKED]], 64
-// CHECK:   [[T4:%.*]] = trunc i128 [[T3]] to i64
-// CHECK:   [[Y_1:%.*]] = inttoptr i64 [[T4]] to %C4enum1C*
-// CHECK: ; <label>:[[Z_DEST]]
+// CHECK-64:   [[Y_MASKED:%.*]] = and i128 %0, -13835058055282163713
+// CHECK-64:   [[T2:%.*]] = trunc i128 [[Y_MASKED]] to i64
+// CHECK-64:   [[Y_0:%.*]] = inttoptr i64 [[T2]] to %C4enum1C*
+// CHECK-64:   [[T3:%.*]] = lshr i128 [[Y_MASKED]], 64
+// CHECK-64:   [[T4:%.*]] = trunc i128 [[T3]] to i64
+// CHECK-64:   [[Y_1:%.*]] = inttoptr i64 [[T4]] to %C4enum1C*
+// CHECK-64: ; <label>:[[Z_DEST]]
 // --                                        0x3fffffffffffffff
-// CHECK:   [[Z_MASKED:%.*]] = and i128 %0, -13835058055282163713
-// CHECK:   [[Z_A:%.*]] = trunc i128 [[Z_MASKED]] to i21
-// CHECK:   [[T5:%.*]] = lshr i128 [[Z_MASKED]], 64
-// CHECK:   [[Z_B:%.*]] = trunc i128 [[T5]] to i64
+// CHECK-64:   [[Z_MASKED:%.*]] = and i128 %0, -13835058055282163713
+// CHECK-64:   [[Z_A:%.*]] = trunc i128 [[Z_MASKED]] to i21
+// CHECK-64:   [[T5:%.*]] = lshr i128 [[Z_MASKED]], 64
+// CHECK-64:   [[Z_B:%.*]] = trunc i128 [[T5]] to i64
+
+// CHECK-32-LABEL: define void @multi_payload_spare_bit_aggregate_switch(i128) {
+// CHECK-32:   [[T0:%.*]] = lshr i128 %0, 32
+// CHECK-32:   [[TAG:%.*]] = trunc i128 [[T0]] to i2
+// CHECK-32:   switch i2 [[TAG]], label {{%.*}} [
+// CHECK-32:     i2 0, label %[[X_DEST:[0-9]+]]
+// CHECK-32:     i2 1, label %[[Y_DEST:[0-9]+]]
+// CHECK-32:     i2 -2, label %[[Z_DEST:[0-9]+]]
+// CHECK-32:   ]
+// CHECK-32: ; <label>:[[X_DEST]]
+// CHECK-32:   [[X_0:%.*]] = trunc i128 %0 to i32
+// CHECK-32:   [[T1:%.*]] = lshr i128 %0, 64
+// CHECK-32:   [[X_1:%.*]] = trunc i128 [[T1]] to i64
+// CHECK-32: ; <label>:[[Y_DEST]]
+// --                                        0xffff_fffc_ffff_ffff
+// CHECK-32:   [[Y_MASKED:%.*]] = and i128 %0, -12884901889
+// CHECK-32:   [[T2:%.*]] = trunc i128 [[Y_MASKED]] to i32
+// CHECK-32:   [[Y_0:%.*]] = inttoptr i32 [[T2]] to %C4enum1C*
+// CHECK-32:   [[T3:%.*]] = lshr i128 [[Y_MASKED]], 32
+// CHECK-32:   [[T4:%.*]] = trunc i128 [[T3]] to i32
+// CHECK-32:   [[Y_1:%.*]] = inttoptr i32 [[T4]] to %C4enum1C*
+// CHECK-32: ; <label>:[[Z_DEST]]
+// --                                        0xffff_fffc_ffff_ffff
+// CHECK-32:   [[Z_MASKED:%.*]] = and i128 %0, -12884901889
+// CHECK-32:   [[Z_A:%.*]] = trunc i128 [[Z_MASKED]] to i21
+// CHECK-32:   [[T5:%.*]] = lshr i128 [[Z_MASKED]], 64
+// CHECK-32:   [[Z_B:%.*]] = trunc i128 [[T5]] to i64
 
 sil @multi_payload_spare_bit_aggregate_switch : $(MultiPayloadSpareBitAggregates) -> () {
 entry(%c : $MultiPayloadSpareBitAggregates):
@@ -2183,16 +2258,16 @@ enum MultiPayloadNestedSpareBits {
   case B(MultiPayloadInnerSpareBits)
 }
 
-// CHECK-LABEL: define void @multi_payload_nested_spare_bits_switch(%O4enum27MultiPayloadNestedSpareBits* noalias) {
-// CHECK: entry:
-// CHECK:   %1 = bitcast %O4enum27MultiPayloadNestedSpareBits* %0 to i64*
-// CHECK:   %2 = load i64* %1, align 8
-// CHECK:   %3 = lshr i64 %2, 61
-// CHECK:   %4 = trunc i64 %3 to i1
-// CHECK:   switch i1 %4, label {{%.*}} [
-// CHECK:     i1 false, label {{%.*}}
-// CHECK:     i1 true, label {{%.*}}
-// CHECK:   ]
+// CHECK-64-LABEL: define void @multi_payload_nested_spare_bits_switch(%O4enum27MultiPayloadNestedSpareBits* noalias) {
+// CHECK-64: entry:
+// CHECK-64:   %1 = bitcast %O4enum27MultiPayloadNestedSpareBits* %0 to i64*
+// CHECK-64:   %2 = load i64* %1
+// CHECK-64:   %3 = lshr i64 %2, 61
+// CHECK-64:   %4 = trunc i64 %3 to i1
+// CHECK-64:   switch i1 %4, label {{%.*}} [
+// CHECK-64:     i1 false, label {{%.*}}
+// CHECK-64:     i1 true, label {{%.*}}
+// CHECK-64:   ]
 sil @multi_payload_nested_spare_bits_switch : $(@in MultiPayloadNestedSpareBits) -> () {
 entry(%c : $*MultiPayloadNestedSpareBits):
   switch_enum_addr %c : $*MultiPayloadNestedSpareBits, case #MultiPayloadNestedSpareBits.A!enumelt.1: a_dest, case #MultiPayloadNestedSpareBits.B!enumelt.1: b_dest
@@ -2294,7 +2369,7 @@ entry(%0 : $DynamicSingleton<NoPayloads>):
 // CHECK-32-LABEL: define i1 @optional_optional_class_protocol(i64)
 // CHECK-32:         %1 = trunc i64 %0 to i32
 // CHECK-32:         %2 = zext i32 %1 to i64
-// CHECK-32:         %3 = icmp eq i64 %2, 2
+// CHECK-32:         %3 = icmp eq i64 %2, 1
 enum Optionable<T> {
   case Some(T), None
 }
@@ -2334,31 +2409,31 @@ entry:
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8** [[METADATA_ARRAY]], i32 -1
 // CHECK:   store i8* [[T0]], i8** [[T1]]
 // CHECK:   [[T_VWTS:%.*]] = bitcast %swift.type* [[T]] to i8***
-// CHECK:   [[T_VWT_ADDR:%.*]] = getelementptr inbounds i8*** [[T_VWTS]], i64 -1
-// CHECK:   [[T_VWT:%.*]] = load i8*** [[T_VWT_ADDR]], align 8
+// CHECK:   [[T_VWT_ADDR:%.*]] = getelementptr inbounds i8*** [[T_VWTS]], [[WORD]] -1
+// CHECK:   [[T_VWT:%.*]] = load i8*** [[T_VWT_ADDR]]
 // CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds i8** [[VWT]], i32 17
 // CHECK:   [[T_SIZE_ADDR:%.*]] = getelementptr inbounds i8** [[T_VWT]], i32 17
-// CHECK:   [[T_SIZE:%.*]] = load i8** [[T_SIZE_ADDR]], align 8
-// CHECK:   store i8* [[T_SIZE]], i8** [[SIZE_ADDR]], align 8
+// CHECK:   [[T_SIZE:%.*]] = load i8** [[T_SIZE_ADDR]]
+// CHECK:   store i8* [[T_SIZE]], i8** [[SIZE_ADDR]]
 // CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8** [[VWT]], i32 18
 // CHECK:   [[T_FLAGS_ADDR:%.*]] = getelementptr inbounds i8** [[T_VWT]], i32 18
-// CHECK:   [[T_FLAGS:%.*]] = load i8** [[T_FLAGS_ADDR]], align 8
-// CHECK:   store i8* [[T_FLAGS]], i8** [[FLAGS_ADDR]], align 8
+// CHECK:   [[T_FLAGS:%.*]] = load i8** [[T_FLAGS_ADDR]]
+// CHECK:   store i8* [[T_FLAGS]], i8** [[FLAGS_ADDR]]
 // CHECK:   [[STRIDE_ADDR:%.*]] = getelementptr inbounds i8** [[VWT]], i32 19
 // CHECK:   [[T_STRIDE_ADDR:%.*]] = getelementptr inbounds i8** [[T_VWT]], i32 19
-// CHECK:   [[T_STRIDE:%.*]] = load i8** [[T_STRIDE_ADDR]], align 8
-// CHECK:   store i8* [[T_STRIDE]], i8** [[STRIDE_ADDR]], align 8
+// CHECK:   [[T_STRIDE:%.*]] = load i8** [[T_STRIDE_ADDR]]
+// CHECK:   store i8* [[T_STRIDE]], i8** [[STRIDE_ADDR]]
 // -- Test the 'has extra inhabitants' bit and carry over the extra inhabitants
 //    flag if set.
-// CHECK:   [[T_FLAGS_VAL:%.*]] = ptrtoint i8* [[T_FLAGS]] to i64
-// CHECK:   [[XI_FLAG:%.*]] = and i64 [[T_FLAGS_VAL]], 262144
-// CHECK:   [[XI_BIT:%.*]] = icmp ne i64 [[XI_FLAG]], 0
+// CHECK:   [[T_FLAGS_VAL:%.*]] = ptrtoint i8* [[T_FLAGS]] to [[WORD]]
+// CHECK:   [[XI_FLAG:%.*]] = and [[WORD]] [[T_FLAGS_VAL]], 262144
+// CHECK:   [[XI_BIT:%.*]] = icmp ne [[WORD]] [[XI_FLAG]], 0
 // CHECK:   br i1 [[XI_BIT]], label %[[HAS_XI:[0-9]+]], label %[[HAS_NO_XI:[0-9]+]]
 // CHECK: ; <label>:[[HAS_XI]]
 // CHECK:   [[XI_FLAGS_ADDR:%.*]] = getelementptr inbounds i8** [[VWT]], i32 22
 // CHECK:   [[T_XI_FLAGS_ADDR:%.*]] = getelementptr inbounds i8** [[T_VWT]], i32 22
-// CHECK:   [[T_XI_FLAGS:%.*]] = load i8** [[T_XI_FLAGS_ADDR]], align 8
-// CHECK:   store i8* [[T_XI_FLAGS]], i8** [[XI_FLAGS_ADDR]], align 8
+// CHECK:   [[T_XI_FLAGS:%.*]] = load i8** [[T_XI_FLAGS_ADDR]]
+// CHECK:   store i8* [[T_XI_FLAGS]], i8** [[XI_FLAGS_ADDR]]
 // CHECK:   br label %[[HAS_NO_XI]]
 // CHECK: ; <label>:[[HAS_NO_XI]]
 // CHECK:   ret %swift.type* [[METADATA]]
