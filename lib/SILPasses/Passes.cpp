@@ -143,6 +143,7 @@ void AddHighLevelLoopOptPasses(SILPassManager &PM) {
 }
 
 void AddLowLevelLoopOptPasses(SILPassManager &PM) {
+  PM.add(createMem2Reg());
   PM.add(createLICM());
   PM.add(createDCE());
   PM.add(createCSE());
