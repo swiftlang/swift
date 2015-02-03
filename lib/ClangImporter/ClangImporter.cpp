@@ -226,6 +226,7 @@ ClangImporter::create(ASTContext &ctx,
     "-fretain-comments-from-system-headers",
     "-fmodules-validate-system-headers",
     "-Werror=non-modular-include-in-framework-module",
+    "-Xclang", "-fmodule-feature", "-Xclang", "swift",
   };
 
   // Set C language options.

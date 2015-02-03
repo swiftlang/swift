@@ -105,3 +105,8 @@ module UsesSubmodule {
   header "UsesSubmodule.h"
   export *
 }
+
+module Requires {
+  module Swift { requires swift }
+  module NotSwift { requires !swift }
+}
