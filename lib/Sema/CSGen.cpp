@@ -1726,15 +1726,7 @@ namespace {
           outputTy = Type();
         }
       } else if (auto OSR = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
-        
-        auto ODR = dyn_cast<OverloadedDeclRefExpr>(fnExpr);
-        
-        // We only delay equality constraints - this is a boolean.
-        if (ODR && ODR->isPotentiallyDelayedGlobalOperator()) {
-          
-          
-          outputTy = CS.getTypeChecker().lookupBoolType(CS.DC);
-        } else if (auto FD = dyn_cast<FuncDecl>(OSR->getDecls()[0])) {
+        if (auto FD = dyn_cast<FuncDecl>(OSR->getDecls()[0])) {
 
           // If we've already agreed upon an overloaded return type, use it.
           if (FD->getHaveSearchedForCommonOverloadReturnType()) {

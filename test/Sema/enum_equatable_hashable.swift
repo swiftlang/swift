@@ -53,7 +53,7 @@ func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String {
   return ""
 }
 if InvalidCustomHashable.A == .B { }
-var s: String = InvalidCustomHashable.A == .B // expected-error {{'Bool' is not convertible to 'String'}}
+var s: String = InvalidCustomHashable.A == .B
 s = InvalidCustomHashable.A.hashValue
 var i: Int = InvalidCustomHashable.A.hashValue // expected-error{{'String' is not convertible to 'Int'}}
 
