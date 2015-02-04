@@ -132,6 +132,7 @@ void AddHighLevelLoopOptPasses(SILPassManager &PM) {
   PM.add(createCSE());
   PM.add(createSILCombine());
   PM.add(createSimplifyCFG());
+  PM.add(createLICM());
   PM.add(createRemovePins());
   PM.add(createABCOpt());
   // Cleanup.
