@@ -376,6 +376,35 @@ typedef NS_OPTIONS(NSUInteger, NSABitmapFormat5) {
   NSAB32d,
 };
 
+/// Aaa.  NSUnavailableOptions.  Bbb.
+typedef NS_OPTIONS(NSUInteger, NSUnavailableOptions) {
+  NSUnavailableOptionsFirst   = (1 << 0),
+  NSUnavailableOptionsSecond  = (1 << 1),
+  NSUnavailableOptionsThird   = (1 << 2),
+}  __attribute__((availability(macosx, introduced=10.10)));
+
+/// Aaa.  NSOptionsWithUnavailableElement.  Bbb.
+typedef NS_OPTIONS(NSUInteger, NSOptionsWithUnavailableElement) {
+  NSOptionsWithUnavailableElementFirst    = (1 << 0),
+  NSOptionsWithUnavailableElementSecond   = (1 << 1),
+  NSOptionsWithUnavailableElementThird __attribute__((availability(macosx, introduced=10.10))) = (1 << 2),
+};
+
+/// Aaa.  NSUnavailableEnum.  Bbb.
+typedef NS_ENUM(NSUInteger, NSUnavailableEnum) {
+  NSUnavailableEnumFirst,
+  NSUnavailableEnumSecond,
+  NSUnavailableEnumThird,
+}  __attribute__((availability(macosx, introduced=10.10)));
+
+/// Aaa.  NSEnumWithUnavailableElement.  Bbb.
+typedef NS_ENUM(NSUInteger, NSEnumWithUnavailableElement) {
+  NSEnumWithUnavailableElementFirst,
+  NSEnumWithUnavailableElementSecond,
+  NSEnumWithUnavailableElementThird __attribute__((availability(macosx, introduced=10.10))),
+};
+
+
 
 @protocol NSWobbling
 -(void)wobble;

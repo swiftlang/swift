@@ -1560,6 +1560,9 @@ namespace {
       auto argTy = MetatypeType::get(theEnum->getDeclaredType());
       element->overwriteType(FunctionType::get(argTy,
                                                theEnum->getDeclaredType()));
+
+      Impl.importAttributes(decl, element);
+
       return element;
     }
     
@@ -1572,12 +1575,13 @@ namespace {
         return nullptr;
       
       // Create the constant.
-      return Impl.createConstant(name, theStruct,
-                                 theStruct->getDeclaredTypeInContext(),
-                                 clang::APValue(decl->getInitVal()),
-                                 ConstantConvertKind::Construction,
-                                 /*isStatic*/ true,
-                                 decl);
+      Decl *CD = Impl.createConstant(name, theStruct,
+                                     theStruct->getDeclaredTypeInContext(),
+                                     clang::APValue(decl->getInitVal()),
+                                     ConstantConvertKind::Construction,
+                                     /*isStatic*/ true, decl);
+      Impl.importAttributes(decl, CD);
+      return CD;
     }
 
     Decl *VisitEnumDecl(const clang::EnumDecl *decl) {

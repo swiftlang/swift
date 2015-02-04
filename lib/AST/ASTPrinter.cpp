@@ -1551,7 +1551,7 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
 }
 
 void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {
-  // FIXME: Attributes?
+  printAttributes(decl);
   Printer << "case ";
 
   interleave(decl->getElements().begin(), decl->getElements().end(),
@@ -1567,6 +1567,7 @@ void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
 
   // In cases where there is no parent EnumCaseDecl (such as imported or
   // deserialized elements), print the element independently.
+  printAttributes(decl);
   Printer << "case ";
   printEnumElement(decl);
 }

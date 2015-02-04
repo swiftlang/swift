@@ -36,3 +36,14 @@ class ClassExtendingUnvailableClass : NSAvailableOn10_10 { // expected-error {{'
 
 class ClassAdoptingUnavailableProtocol : NSProtocolAvailableOn10_10 { // expected-error {{'NSProtocolAvailableOn10_10' is only available on OS X version 10.10 or greater}}
 }
+
+
+// Enums from Objective-C
+
+let _: NSUnavailableOptions = .First // expected-error {{'NSUnavailableOptions' is only available on OS X version 10.10 or greater}}
+
+let _: NSOptionsWithUnavailableElement = .Third // expected-error {{'Third' is only available on OS X version 10.10 or greater}}
+
+let _: NSUnavailableEnum = .First // expected-error {{'NSUnavailableEnum' is only available on OS X version 10.10 or greater}}
+
+let _: NSEnumWithUnavailableElement = .Third // expected-error {{'Third' is only available on OS X version 10.10 or greater}}
