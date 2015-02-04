@@ -34,6 +34,8 @@ public func || <T: BooleanType>(
     return lhs.boolValue ? true : rhs().boolValue
 }
 
+// <rdar://problem/19707366> QoI: @autoclosure declaration change fixit
+let migrate4 : @autoclosure() -> ()   // expected-error {{'autoclosure' attribute is now an attribute of the parameter declaration, not its type}} {{1-1=@autoclosure }} {{16-28=}}
 
 
 struct SomeStruct {

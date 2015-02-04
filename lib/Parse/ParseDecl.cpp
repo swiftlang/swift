@@ -1020,10 +1020,41 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   if (attr == TAK_Count) {
     if (justChecking) return true;
 
-    if (DeclAttribute::getAttrKindFromString(Tok.getText()) != DAK_Count)
-      diagnose(Tok, diag::decl_attribute_applied_to_type);
-    else
+    auto declAttrID = DeclAttribute::getAttrKindFromString(Tok.getText());
+    if (declAttrID == DAK_Count) {
+      // Not a decl or type attribute.
       diagnose(Tok, diag::unknown_attribute, Tok.getText());
+    } else {
+      // Otherwise this is a valid decl attribute so they should have put it on
+      // the decl instead of the type.
+
+      // Special case handling of @autoclosure attribute on the type, which
+      // was supported in Swift 1.0 and 1.1, but removed in Swift 1.2.
+      auto diagID = diag::decl_attribute_applied_to_type;
+      if (declAttrID == DAK_AutoClosure)
+        diagID = diag::autoclosure_is_decl_attribute;
+      
+      // If this is the first attribute, and if we are on a simple decl, emit a
+      // fixit to move the attribute.  Otherwise, we don't have the location of
+      // the @ sign, or we don't have confidence that the fixit will be right.
+      if (!Attributes.empty() || StructureMarkers.empty() ||
+          StructureMarkers.back().Kind != StructureMarkerKind::Declaration ||
+          StructureMarkers.back().Loc.isInvalid() ||
+          peekToken().is(tok::equal)) {
+        diagnose(Tok, diagID);
+      } else {
+        // Otherwise, this is the first type attribute and we know where the
+        // declaration is.  Emit the same diagnostic, but include a fixit to
+        // move the attribute.  Unfortunately, we don't have enough info to add
+        // the attribute to DeclAttributes.
+        diagnose(Tok, diagID)
+          .fixItRemove(SourceRange(Attributes.AtLoc, Tok.getLoc()))
+          .fixItInsert(StructureMarkers.back().Loc,
+                       "@" + Tok.getText().str()+" ");
+      }
+    }
+    
+    
 
     // Recover by eating @foo when foo is not known.
     consumeToken();
