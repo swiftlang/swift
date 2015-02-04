@@ -19,6 +19,7 @@
 #include "swift/SILAnalysis/ColdBlockInfo.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/LoopAnalysis.h"
+#include "swift/SILAnalysis/RCIdentityAnalysis.h"
 #include "swift/SILAnalysis/ValueTracking.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
@@ -221,9 +222,26 @@ protected:
 } // namespace
 
 /// \return true if the given instruction releases the given value.
-static bool isRelease(SILInstruction *Inst, SILValue Value) {
-  if (isa<ReleaseValueInst>(Inst) && Inst->getOperand(0) == Value)
-    return true;
+static bool isRelease(SILInstruction *Inst, SILValue Value,
+                      RCIdentityAnalysis *RCIA,
+                      SmallPtrSetImpl<Operand *> &MatchedReleases) {
+  if (auto *R = dyn_cast<ReleaseValueInst>(Inst))
+    if (!MatchedReleases.count(&R->getOperandRef()))
+      if (RCIA->getRCIdentityRoot(Inst->getOperand(0)) ==
+          RCIA->getRCIdentityRoot(Value)) {
+        DEBUG(llvm::dbgs() << "     matching with release " << *Inst);
+        MatchedReleases.insert(&R->getOperandRef());
+        return true;
+      }
+
+  if (auto *R = dyn_cast<StrongReleaseInst>(Inst))
+    if (!MatchedReleases.count(&R->getOperandRef()))
+      if (RCIA->getRCIdentityRoot(Inst->getOperand(0)) ==
+          RCIA->getRCIdentityRoot(Value)) {
+        DEBUG(llvm::dbgs() << "     matching with release " << *Inst);
+        MatchedReleases.insert(&R->getOperandRef());
+        return true;
+      }
 
   if (ApplyInst *AI = dyn_cast<ApplyInst>(Inst)) {
     if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI->getCallee())) {
@@ -232,11 +250,17 @@ static bool isRelease(SILInstruction *Inst, SILValue Value) {
       auto Args = AI->getArguments();
       for (unsigned ArgIdx = 0, ArgEnd = Params.size(); ArgIdx != ArgEnd;
            ++ArgIdx) {
-        if (Args[ArgIdx] != Value)
+        if (MatchedReleases.count(&AI->getArgumentRef(ArgIdx)))
+          continue;
+        if (RCIA->getRCIdentityRoot(Args[ArgIdx]) !=
+            RCIA->getRCIdentityRoot(Value))
           continue;
         ParameterConvention P = Params[ArgIdx].getConvention();
-        if (P == ParameterConvention::Direct_Owned)
+        if (P == ParameterConvention::Direct_Owned) {
+          DEBUG(llvm::dbgs() << "     matching with release " << *Inst);
+          MatchedReleases.insert(&AI->getArgumentRef(ArgIdx));
           return true;
+        }
       }
     }
   }
@@ -273,6 +297,7 @@ class COWArrayOpt {
   typedef StructUseCollector::UserList UserList;
   typedef StructUseCollector::UserOperList UserOperList;
 
+  RCIdentityAnalysis *RCIA;
   SILFunction *Function;
   SILLoop *Loop;
   SILBasicBlock *Preheader;
@@ -281,6 +306,10 @@ class COWArrayOpt {
 
   // Keep track of cold blocks.
   ColdBlockInfo ColdBlocks;
+
+  // Cache of the analysis whether a loop is safe wrt. make_unique hoisting by
+  // looking at the operations (no uniquely identified objects).
+  std::pair<bool, bool> CachedSafeLoop;
 
   // Set of all blocks that may reach the loop, not including loop blocks.
   llvm::SmallPtrSet<SILBasicBlock*,32> ReachingBlocks;
@@ -300,11 +329,13 @@ class COWArrayOpt {
   // abort earlier.
   SmallPtrSet<SILInstruction*, 8> ArrayUserSet;
 
+  // When matching retains to releases we must not count the same release twice.
+  SmallPtrSet<Operand*, 8> MatchedReleases;
 public:
-  COWArrayOpt(SILLoop *L, DominanceAnalysis *DA)
-    : Function(L->getHeader()->getParent()), Loop(L),
+  COWArrayOpt(RCIdentityAnalysis *RCIA, SILLoop *L, DominanceAnalysis *DA)
+    : RCIA(RCIA), Function(L->getHeader()->getParent()), Loop(L),
       Preheader(L->getLoopPreheader()), DomTree(DA->getDomInfo(Function)),
-      ColdBlocks(DA)
+      ColdBlocks(DA), CachedSafeLoop(false, false)
     {}
 
   bool run();
@@ -313,12 +344,14 @@ protected:
   bool checkUniqueArrayContainer(SILValue ArrayContainer);
   SmallPtrSetImpl<SILBasicBlock*> &getReachingBlocks();
   bool isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
-                                    SILValue ArrayVal);
+                                    SILValue ArrayVal,
+                                    bool IsUniquelyIdentifiedArray = true);
   bool checkSafeArrayAddressUses(UserList &AddressUsers);
   bool checkSafeArrayValueUses(UserList &ArrayValueUsers);
   bool checkSafeArrayElementUse(SILInstruction *UseInst, SILValue ArrayVal);
   bool checkSafeElementValueUses(UserOperList &ElementValueUsers);
   bool hoistMakeMutable(ArraySemanticsCall MakeMutable, SILValue ArrayAddr);
+  bool hasLoopOnlyDestructorSafeArrayOperations();
 };
 } // namespace
 
@@ -375,14 +408,31 @@ SmallPtrSetImpl<SILBasicBlock*> &COWArrayOpt::getReachingBlocks() {
   return ReachingBlocks;
 }
 
+
+// \return true if the instruction is a call to a non-mutating array semantic
+// function.
+static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
+  ArraySemanticsCall Call(Inst);
+  if (!Call)
+    return false;
+
+  if (Call.getKind() < ArrayCallKind::kMakeMutable)
+    return true;
+
+  return false;
+}
+
 /// \return true if the given retain instruction is followed by a release on the
 /// same object prior to any potential mutating operation.
 bool COWArrayOpt::isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
-                                               SILValue ArrayVal) {
+                                               SILValue ArrayVal,
+                                               bool IsUniquelyIdentifiedArray) {
   // If a retain is found outside the loop ignore it. Otherwise, it must
   // have a matching @owned call.
   if (!Loop->contains(RetainInst))
     return true;
+
+  DEBUG(llvm::dbgs() << "     Looking at retain " << *RetainInst);
 
   // Walk forward looking for a release of ArrayLoad or element of
   // ArrayUserSet. Note that ArrayUserSet does not included uses of elements
@@ -391,11 +441,40 @@ bool COWArrayOpt::isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
   // (element uses may only be retained/released).
   for (auto II = std::next(SILBasicBlock::iterator(RetainInst)),
          IE = RetainInst->getParent()->end(); II != IE; ++II) {
-    if (isRelease(II, ArrayVal))
+    if (isRelease(II, ArrayVal, RCIA, MatchedReleases))
       return true;
 
-    if (ArrayUserSet.count(II)) // May be an array mutation.
+    if (isa<RetainValueInst>(II) || isa<StrongRetainInst>(II))
+      continue;
+
+    // Non mutating array calls are safe.
+    if (isNonMutatingArraySemanticCall(II))
+      continue;
+
+    if (IsUniquelyIdentifiedArray) {
+      // It is okay for an identified loop to have releases in between a retain
+      // and a release. We can end up here if we have two retains in a row and
+      // then a release. The second retain cannot be matched with the release
+      // but must be matched by a follow up instruction.
+      //   retain %ptr
+      //   retain %ptr
+      //   release %ptr
+      //   array_operation(..., @owned %ptr)
+      //
+      // This is not the case for an potentially aliased array because a release
+      // can cause a destrutor to run. The destructor in turn can cause arbitrary
+      // side effects.
+      if (isa<ReleaseValueInst>(II) || isa<StrongReleaseInst>(II))
+        continue;
+
+      if (ArrayUserSet.count(II)) // May be an array mutation.
+        break;
+    } else if (II->mayHaveSideEffects()) {
+      if (auto *BI = dyn_cast<BuiltinInst>(II))
+        if(isSideEffectFree(BI))
+          continue;
       break;
+    }
   }
   DEBUG(llvm::dbgs() << "    Skipping Array: retained in loop!\n    "
         << *RetainInst);
@@ -573,6 +652,108 @@ bool COWArrayOpt::checkSafeElementValueUses(UserOperList &ElementValueUsers) {
   }
   return true;
 }
+static bool isArrayEltStore(StoreInst *SI) {
+  SILValue Dest = SI->getDest();
+  if (auto *MD = dyn_cast<MarkDependenceInst>(Dest))
+    Dest = MD->getOperand(0);
+
+  if (auto *PtrToAddr =
+          dyn_cast<PointerToAddressInst>(Dest.stripAddressProjections()))
+    if (auto *SEI = dyn_cast<StructExtractInst>(PtrToAddr->getOperand())) {
+      ArraySemanticsCall Call(SEI->getOperand().getDef());
+      if (Call && Call.getKind() == ArrayCallKind::kGetElementAddress)
+        return true;
+    }
+  return false;
+}
+
+/// Check if a loop has only 'safe' array operations such that we can hoist the
+/// uniqueness check even without having an 'identified' object.
+///
+/// 'Safe' array operations are:
+///   * all array semantic functions
+///   * stores to array elements
+///   * any instruction that does not have side effects.
+///   * any retain must be matched by a release before we hit a make_unique.
+///
+/// Note, that a release in this modus (we don't have a uniquely identified
+/// object) is not safe because the destructor of what we are releasing might
+/// be unsafe (creating a reference).
+///
+bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
+  if (CachedSafeLoop.first)
+    return CachedSafeLoop.second;
+
+  assert(CachedSafeLoop.second == false &&
+         "We only move to a true state below");
+
+  // We will compute the state of this loop now.
+  CachedSafeLoop.first = true;
+
+  DEBUG(llvm::dbgs() << "    checking whether loop only has safe array operations ...\n");
+  CanType SameTy;
+  for (auto *BB : Loop->getBlocks()) {
+    for (auto &It : *BB) {
+      auto *Inst = &It;
+
+      // Semantic calls are safe.
+      ArraySemanticsCall Sem(Inst);
+      if (Sem) {
+        // All array types must be the same. This is a stronger guarantueed than
+        // we actually need. The requirement is that we can't create another
+        // reference to the array by performing an array operation: for example,
+        // storing or appending one array into an two-dimensional array.
+        // Checking
+        // that all types are the same make guarantees that this can not happen.
+        if (SameTy.isNull()) {
+          SameTy =
+              Sem.getSelf().getType().getSwiftRValueType()->getCanonicalType();
+        } else if (Sem.getSelf()
+                       .getType()
+                       .getSwiftRValueType()
+                       ->getCanonicalType() != SameTy) {
+          DEBUG(llvm::dbgs() << "    (NO) mismatching array types\n");
+          return false;
+        }
+        // Safe array semantics operation.
+        continue;
+      }
+
+      // Stores to array elements.
+      if (auto *SI = dyn_cast<StoreInst>(Inst)) {
+        if (isArrayEltStore(SI))
+          continue;
+        DEBUG(llvm::dbgs() << "     (NO) unknown store " << *SI);
+        return false;
+      }
+
+      // Instructions without side effects are safe.
+      if (!Inst->mayHaveSideEffects())
+        continue;
+      if (auto *BI = dyn_cast<BuiltinInst>(Inst))
+        if(isSideEffectFree(BI))
+          continue;
+      if (isa<CondFailInst>(Inst))
+        continue;
+      if (isa<AllocationInst>(Inst) || isa<DeallocStackInst>(Inst))
+        continue;
+
+      if (auto *RVI = dyn_cast<RetainValueInst>(Inst))
+        if (isRetainReleasedBeforeMutate(Inst, RVI->getOperand(), false))
+          continue;
+      if (auto SRI = dyn_cast<StrongRetainInst>(Inst))
+        if (isRetainReleasedBeforeMutate(Inst, SRI->getOperand(), false))
+          continue;
+
+      DEBUG(llvm::dbgs() << "     (NO) unknown operation " << *Inst);
+      return false;
+    }
+  }
+
+  DEBUG(llvm::dbgs() << "     (YES)\n");
+  CachedSafeLoop.second = true;
+  return true;
+}
 
 /// Check if this call to "make_mutable" is hoistable, and move it, or delete it
 /// if it's already hoisted.
@@ -588,8 +769,20 @@ bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable, SILValue Arra
   SILValue ArrayContainer = getAccessPath(ArrayAddr, AccessPath);
 
   // Check that the array is a member of an inout argument or return value.
-  if (!checkUniqueArrayContainer(ArrayContainer))
+  if (!checkUniqueArrayContainer(ArrayContainer)) {
+    // Check whether we can hoist make_mutable based on the operations that are
+    // in the loop.
+    if (hasLoopOnlyDestructorSafeArrayOperations()) {
+      assert(MakeMutable.canHoist(Preheader->getTerminator(), DomTree) &&
+             "Should be able to hoist make_mutable");
+
+      // Hoist this call to make_mutable.
+      DEBUG(llvm::dbgs() << "    Hoisting make_mutable: " << *MakeMutable);
+      MakeMutable.hoist(Preheader->getTerminator(), DomTree);
+      return true;
+    }
     return false;
+  }
 
   // Check that the Array is not retained with this loop and it's address does
   // not escape within this function.
@@ -655,13 +848,16 @@ class COWArrayOptPass : public SILFunctionTransform
   void run() override {
     DEBUG(llvm::dbgs() << "COW Array Opts in Func " << getFunction()->getName()
           << "\n");
+
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
+    RCIdentityAnalysis *RCIA = PM->getAnalysis<RCIdentityAnalysis>();
     SILLoopInfo *LI = LA->getLoopInfo(getFunction());
     if (LI->empty()) {
       DEBUG(llvm::dbgs() << "  Skipping Function: No loops.\n");
       return;
     }
+
     // Create a flat list of loops in loop-tree postorder (bottom-up).
     llvm::SmallVector<SILLoop *, 16> Loops;
     std::function<void (SILLoop*)> pushChildren = [&](SILLoop *L) {
@@ -674,7 +870,7 @@ class COWArrayOptPass : public SILFunctionTransform
 
     bool HasChanged = false;
     for (auto *L : Loops)
-      HasChanged |= COWArrayOpt(L, DA).run();
+      HasChanged |= COWArrayOpt(RCIA, L, DA).run();
 
     if (HasChanged)
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);

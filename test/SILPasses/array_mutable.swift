@@ -35,3 +35,57 @@ func arrelt(inout s: S) {
     s.a[i] = 0
   }
 }
+
+class ArrayInClass {
+  final var A : [Int]
+  final var B : [Int]
+  final var C : [[Int]]
+
+  init() {
+    A = []
+    B = []
+    C = [[]]
+  }
+
+  // CHECK-LABEL: sil hidden @_TFC13array_mutable12ArrayInClass12hoistInClassfS0_FT_T_
+  // CHECK: %[[FR:[0-9]+]] = function_ref @_swift_isUniquelyReferenced
+  // CHECK-NOT: {{^bb}}
+  // CHECK: apply %[[FR]]
+  // CHECK: {{^bb}}
+  // CHECK-NOT: _swift_isUniquelyReferenced
+  // CHECK: {{^[}]}}
+
+  func hoistInClass() {
+    for i in 0..<A.count {
+      A[i] = 0
+    }
+  }
+  // CHECK-LABEL: sil hidden @_TFC13array_mutable12ArrayInClass16hoistInClass2ArrfS0_FT_T_
+  // CHECK: %[[FR:[0-9]+]] = function_ref @_swift_isUniquelyReferenced
+  // CHECK-NOT: {{^bb}}
+  // CHECK: apply %[[FR]]
+  // CHECK: {{^bb}}
+  // CHECK: apply %[[FR]]
+  // CHECK: {{^bb}}
+  // CHECK-NOT: _swift_isUniquelyReferenced
+  // CHECK: {{^[}]}}
+  func hoistInClass2Arr() {
+    for i in 0..<A.count {
+      A[i] = 0
+      B[i] = 2
+    }
+  }
+
+  // CHECK-LABEL: sil hidden @_TFC13array_mutable12ArrayInClass22dontHoistInClassAppendfS0_FT_T_
+  // CHECK: %[[FR:[0-9]+]] = function_ref @_swift_isUniquelyReferenced
+  // CHECK-NOT: apply %[[FR]]
+  // CHECK: {{^bb}}
+  // CHECK: apply %[[FR]]
+  // CHECK: {{^[}]}}
+  func dontHoistInClassAppend() {
+    for i in 0..<A.count {
+      A[i] = 0
+      C.append(A)
+    }
+  }
+}
