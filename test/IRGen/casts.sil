@@ -250,3 +250,35 @@ d_nay:
 e_nay:
   unreachable
 }
+
+@objc class OA {}
+sil_vtable OA {}
+sil hidden @_TToFC5casts2OAcfMS0_FT_S0_ : $@thin (OA) -> OA {
+entry(%x : $OA):
+  return %x : $OA
+}
+
+@objc class OB {}
+sil_vtable OB {}
+sil hidden_external @_TToFC5casts2OBcfMS0_FT_S0_ : $@thin (OB) -> OB {
+entry(%x : $OB):
+  return %x : $OB
+}
+
+// CHECK-LABEL: define %C5casts1B* @checked_object_to_object_casts(%C5casts1A*)
+// CHECK:         @swift_dynamicCastClassUnconditional
+sil @checked_object_to_object_casts : $@thin (A) -> B {
+entry(%a : $A):
+  %b = unconditional_checked_cast %a : $A to $B
+  return %b : $B
+}
+
+// CHECK-LABEL: define %C5casts2OB* @checked_objc_object_to_object_casts(%C5casts2OA*)
+// CHECK:         @swift_dynamicCastClassUnconditional
+sil @checked_objc_object_to_object_casts : $@thin (OA) -> OB {
+entry(%a : $OA):
+  %b = unconditional_checked_cast %a : $OA to $OB
+  return %b : $OB
+}
+
+

@@ -3320,15 +3320,6 @@ void emitValueCheckedCast(IRGenSILFunction &IGF,
     return;
   }
 
-  if (sourceType->isSuperclassOf(targetType, nullptr)) {
-    Explosion from = IGF.getLoweredExplosion(operand);
-    llvm::Value *fromValue = from.claimNext();
-    llvm::Value *cast;
-    cast = emitClassDowncast(IGF, fromValue, loweredTargetType, mode);
-    ex.add(cast);
-    return;
-  }
-
   if ((isa<ArchetypeType>(sourceType) && !targetType.isExistentialType()) ||
       (isa<ArchetypeType>(targetType) && !sourceType.isExistentialType())) {
     Explosion archetype = IGF.getLoweredExplosion(operand);
@@ -3371,7 +3362,11 @@ void emitValueCheckedCast(IRGenSILFunction &IGF,
     return;
   }
 
-  llvm_unreachable("unexpected cast?");
+  Explosion from = IGF.getLoweredExplosion(operand);
+  llvm::Value *fromValue = from.claimNext();
+  llvm::Value *cast
+    = emitClassDowncast(IGF, fromValue, loweredTargetType, mode);
+  ex.add(cast);
 }
 
 void IRGenSILFunction::visitUnconditionalCheckedCastInst(
