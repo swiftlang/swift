@@ -3485,7 +3485,7 @@ DictionaryTestSuite.test("getObjects:andKeys:") {
     start: UnsafeMutablePointer<NSString>.alloc(2), count: 2)
   var kp = AutoreleasingUnsafeMutablePointer<AnyObject?>(keys.baseAddress)
   var vp = AutoreleasingUnsafeMutablePointer<AnyObject?>(values.baseAddress)
-  var null = AutoreleasingUnsafeMutablePointer<AnyObject?>.null()
+  var null: AutoreleasingUnsafeMutablePointer<AnyObject?> = nil
 
   d.getObjects(null, andKeys: null) // don't segfault
 
