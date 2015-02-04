@@ -369,7 +369,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (E->getArg()) {
       Expr *E2 = doIt(E->getArg());
       if (E2 == nullptr) return nullptr;
-      E->setArg(E2);
+      
+      // Protect against setting a non-tuple argument expression for a binop,
+      // which may occur as a result of error recovery.
+      // E.g., "println(Array<Int)"
+      if (!dyn_cast<BinaryExpr>(E) || dyn_cast<TupleExpr>(E2))
+        E->setArg(E2);
     }
 
     return E;
