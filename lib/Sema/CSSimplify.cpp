@@ -2970,6 +2970,23 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       addConstraint(ConstraintKind::Bind, memberTy, toRawType, locator);
 
       return SolutionKind::Solved;
+    } else if (shouldAttemptFixes() && 
+               baseObjTy->getOptionalObjectType()) {
+      // If the base type was an optional, look through it.
+
+      // Note the fix.
+      increaseScore(SK_Fix);
+      if (worseThanBestSolution())
+        return SolutionKind::Error;
+
+      Fixes.push_back({FixKind::ForceOptional, constraint.getLocator()});
+
+      // Look through one level of optional.
+      addValueMemberConstraint(baseObjTy->getOptionalObjectType(),
+                               constraint.getMember(),
+                               constraint.getSecondType(),
+                               constraint.getLocator());
+      return SolutionKind::Solved;
     }
   }
 

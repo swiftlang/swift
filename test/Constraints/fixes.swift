@@ -95,7 +95,9 @@ class T {
 }
 
 // Used an optional in a conditional expression
-class C {}
+class C {
+  var a: Int = 1
+}
 var co: C? = nil
 var ciuo: C! = nil 
 
@@ -107,3 +109,6 @@ ciuo ? true : false // expected-error{{optional type '@lvalue C!' cannot be used
 !ciuo ? false : true // expected-error{{optional type '@lvalue C!' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{6-6= != nil)}}
 !co // expected-error{{optional type '@lvalue C?' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{4-4= != nil)}}
 !ciuo // expected-error{{optional type '@lvalue C!' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{6-6= != nil)}}
+
+// Forgotten ! or ?
+var someInt = co.a // expected-error{{value of optional type 'C?' not unwrapped; did you mean to use '!' or '?'?}}
