@@ -32,7 +32,7 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
                                      ComponentIdentTypeRepr *ref) {
   return Builder.resolveArchetype(baseTy)->getRepresentative()
            ->getNestedType(ref->getIdentifier(), Builder, ref)
-           ->getDependentType(Builder);
+           ->getDependentType(Builder, true);
 }
 
 Type DependentGenericTypeResolver::resolveSelfAssociatedType(
@@ -41,7 +41,7 @@ Type DependentGenericTypeResolver::resolveSelfAssociatedType(
        AssociatedTypeDecl *assocType) {
   return Builder.resolveArchetype(selfTy)->getRepresentative()
            ->getNestedType(assocType->getName(), Builder, nullptr)
-           ->getDependentType(Builder);
+           ->getDependentType(Builder, true);
 }
 
 Type DependentGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
@@ -181,7 +181,7 @@ Type CompleteGenericTypeResolver::resolveSelfAssociatedType(Type selfTy,
        AssociatedTypeDecl *assocType) {
   return Builder.resolveArchetype(selfTy)->getRepresentative()
            ->getNestedType(assocType->getName(), Builder, nullptr)
-           ->getDependentType(Builder);
+           ->getDependentType(Builder, false);
 }
 
 Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
@@ -520,12 +520,16 @@ static void collectRequirements(ArchetypeBuilder &builder,
 
   // Add all of the same-type requirements.
   for (auto req : builder.getSameTypeRequirements()) {
-    auto firstType = req.first->getDependentType(builder);
+    auto firstType = req.first->getDependentType(builder, false);
     Type secondType;
     if (auto concrete = req.second.dyn_cast<Type>())
       secondType = concrete;
     else if (auto secondPA = req.second.dyn_cast<PotentialArchetype*>())
-      secondType = secondPA->getDependentType(builder);
+      secondType = secondPA->getDependentType(builder, false);
+
+    if (firstType->is<ErrorType>() || secondType->is<ErrorType>())
+      continue;
+
     requirements.push_back(Requirement(RequirementKind::SameType,
                                        firstType, secondType));
   }

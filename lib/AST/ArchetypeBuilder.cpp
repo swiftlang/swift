@@ -504,13 +504,20 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
 }
 
 Type ArchetypeBuilder::PotentialArchetype::getDependentType(
-       ArchetypeBuilder &builder) {
+       ArchetypeBuilder &builder,
+       bool allowUnresolved) {
   if (auto parent = getParent()) {
-    Type parentType = parent->getDependentType(builder);
+    Type parentType = parent->getDependentType(builder, allowUnresolved);
+    if (parentType->is<ErrorType>())
+      return parentType;
 
     // If we've resolved to an associated type, use it.
     if (auto assocType = getResolvedAssociatedType())
       return DependentMemberType::get(parentType, assocType, builder.Context);
+
+    // If we don't allow unresolved dependent member types, fail.
+    if (!allowUnresolved)
+      return ErrorType::get(builder.Context);
 
     return DependentMemberType::get(parentType, getName(), builder.Context);
   }
@@ -1250,7 +1257,8 @@ bool ArchetypeBuilder::finalize(SourceLoc loc) {
       // Typo correction succeeded; emit Fix-Its and update the
       // component ids.
       auto diag = Diags.diagnose(diagLoc, diag::invalid_member_type_suggest,
-                                 pa->getParent()->getDependentType(*this),
+                                 pa->getParent()->getDependentType(*this,
+                                                                   true),
                                  pa->getName(),
                                  correction);
 

@@ -149,3 +149,7 @@ func test8a<
   return (t.bar, u.bar, t.bar.foo, u.bar.foo)
 }
 
+// rdar://problem/19137463
+func rdar19137463<T where T.a == T>(t: T) {} // expected-error{{'a' is not a member type of 'T'}}
+rdar19137463(1)
+

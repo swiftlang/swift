@@ -527,7 +527,7 @@ public:
 
   /// Retrieve the dependent type that describes this potential
   /// archetype.
-  Type getDependentType(ArchetypeBuilder &builder);
+  Type getDependentType(ArchetypeBuilder &builder, bool allowUnresolved);
 
   /// True if the potential archetype has been bound by a concrete type
   /// constraint.
