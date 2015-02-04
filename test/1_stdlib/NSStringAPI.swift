@@ -1803,6 +1803,39 @@ NSStringAPIs.test("Failures{hasPrefix,hasSuffix}")
   }
 }
 
+NSStringAPIs.test("SameTypeComparisons") {
+  // U+0323 COMBINING DOT BELOW
+  // U+0307 COMBINING DOT ABOVE
+  // U+1E63 LATIN SMALL LETTER S WITH DOT BELOW
+  let xs = "\u{1e69}"
+  expectTrue(xs == "s\u{323}\u{307}")
+  expectFalse(xs != "s\u{323}\u{307}")
+  expectTrue("s\u{323}\u{307}" == xs)
+  expectFalse("s\u{323}\u{307}" != xs)
+  expectTrue("\u{1e69}" == "s\u{323}\u{307}")
+  expectFalse("\u{1e69}" != "s\u{323}\u{307}")
+  expectTrue(xs == xs)
+  expectFalse(xs != xs)
+}
+
+NSStringAPIs.test("MixedTypeComparisons") {
+  // U+0323 COMBINING DOT BELOW
+  // U+0307 COMBINING DOT ABOVE
+  // U+1E63 LATIN SMALL LETTER S WITH DOT BELOW
+  // NSString does not decompose characters, so the two strings will be (==) in
+  // swift but not in Foundation.
+  let xs = "\u{1e69}"
+  let ys: NSString = "s\u{323}\u{307}"
+  expectFalse(ys == "\u{1e69}")
+  expectTrue(ys != "\u{1e69}")
+  expectFalse("\u{1e69}" == ys)
+  expectTrue("\u{1e69}" != ys)
+  expectFalse(xs == ys)
+  expectTrue(xs != ys)
+  expectTrue(ys == ys)
+  expectFalse(ys != ys)
+}
+
 NSStringAPIs.test("CompareStringsWithUnpairedSurrogates")
   .xfail(
     .Custom({ true },

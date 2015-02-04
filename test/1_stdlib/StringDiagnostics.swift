@@ -19,23 +19,19 @@ func testNonAmbiguousStringComparisons() {
   var reversed2 = sorted(names, { s1, s2 in s1 as String > s2 })
 }
 
-func testSomeConversionsWork() {
-  let xs = "abc"
-  xs == "def"
-  xs != "def"
-  "def" == xs
-  "def" != xs
-  "abc" == "def"
-  "abc" != "def"
-  xs == xs
-  xs != xs
-  let ys: NSString = "abc"
-  ys == "def"
-  ys != "def"
-  "def" == ys
-  "def" != ys
-  xs == ys
-  xs != ys
-  ys == ys
-  ys != ys
+func testAmbiguousStringComparisons(s: String) {
+  let nsString = s as NSString
+  let a1 = s == nsString
+  let a2 = s != nsString
+  let a3 = s < nsString // expected-error {{binary operator '<' cannot be applied to operands of type 'String' and 'NSString'}} expected-note {{overloads for '<' exist with these partially matching parameter lists: (String, String)}}
+  let a4 = s <= nsString // expected-error {{binary operator '<=' cannot be applied to operands of type 'String' and 'NSString'}}
+  let a5 = s >= nsString // expected-error {{binary operator '>=' cannot be applied to operands of type 'String' and 'NSString'}}
+  let a6 = s > nsString // expected-error {{binary operator '>' cannot be applied to operands of type 'String' and 'NSString'}}
+  // now the other way
+  let a7 = nsString == s
+  let a8 = nsString != s
+  let a9 = nsString < s // expected-error {{binary operator '<' cannot be applied to operands of type 'NSString' and 'String'}} expected-note {{overloads for '<' exist with these partially matching parameter lists: (String, String)}} 
+  let a10 = nsString <= s // expected-error {{binary operator '<=' cannot be applied to operands of type 'NSString' and 'String'}}
+  let a11 = nsString >= s // expected-error {{binary operator '>=' cannot be applied to operands of type 'NSString' and 'String'}}
+  let a12 = nsString > s // expected-error {{binary operator '>' cannot be applied to operands of type 'NSString' and 'String'}}
 }
