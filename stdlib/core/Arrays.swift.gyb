@@ -725,7 +725,12 @@ struct _InitializeMemoryFromCollection<
   C: CollectionType
 > : _PointerFunctionType {
   func call(rawMemory: UnsafeMutablePointer<C.Generator.Element>, count: Int) {
-    rawMemory.initializeFrom(newValues)
+    var p = rawMemory
+    var q = newValues.startIndex
+    for _ in 0..<count {
+      p++.initialize(newValues[q++])
+    }
+    _expectEnd(q, newValues)
   }
 
   init(_ newValues: C) {
@@ -790,16 +795,21 @@ func _arrayNonSliceInPlaceReplace<
     // so as not to self-clobber.
     newTailStart.moveInitializeBackwardFrom(oldTailStart, count: tailCount)
 
-    (elements + subRange.startIndex).destroy(
-      subRange.endIndex - subRange.startIndex)
-    (elements + subRange.startIndex).initializeFrom(newValues)
-    // FIXME: add back _expectEnd(i, newValues) (?)
+    // Assign over the original subRange
+    var i = newValues.startIndex
+    for j in subRange {
+      elements[j] = newValues[i++]
+    }
+    // Initialize the hole left by sliding the tail forward
+    for j in oldTailIndex..<newTailIndex {
+      (elements + j).initialize(newValues[i++])
+    }
+    _expectEnd(i, newValues)
   }
   else { // We're not growing the buffer
     // Assign all the new elements into the start of the subRange
     var i = subRange.startIndex
     var j = newValues.startIndex
-    // FIXME(performance): Use moveAssignFrom
     for _ in 0..<insertCount {
       elements[i++] = newValues[j++]
     }
@@ -921,7 +931,10 @@ where C.Generator.Element == T
     max(newCount, _growArrayCapacity(capacity))
     : newCount)
   
-  (lhs._buffer.baseAddress + oldCount).initializeFrom(rhs)
+  var p = lhs._buffer.baseAddress + oldCount
+  for x in rhs {
+    (p++).initialize(x)
+  }
   lhs._buffer.count = newCount
 }
 % end
@@ -1118,8 +1131,6 @@ func _arrayAppendSequence<
 
   // This will force uniqueness
   _arrayAppend(&buffer, nextItem!)
-  
-  // FIXME(performance): This should use initializeFrom, not initialize
   var count = buffer.count
   nextItem = stream.next()
   while nextItem != nil {
