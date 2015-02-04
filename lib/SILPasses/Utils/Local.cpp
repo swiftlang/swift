@@ -73,11 +73,7 @@ DebugValuesPropagateLiveness("debug-values-propagate-liveness",
                              llvm::cl::init(false));
 
 bool swift::debugValuesPropagateLiveness() {
-#ifndef NDEBUG
   return DebugValuesPropagateLiveness;
-#else
-  return false;
-#endif
 }
 
 /// \brief Perform a fast local check to see if the instruction is dead.
