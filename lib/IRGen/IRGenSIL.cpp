@@ -1077,7 +1077,8 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
       continue;
     }
     case clang::CodeGen::ABIArgInfo::Expand: {
-      loadableArgTI.reexplode(IGF, params, argExplosion);
+      emitClangExpandedParameter(IGF, params, argExplosion, argTys[i],
+                                 arg->getType(), loadableArgTI);
       IGF.setLoweredExplosion(arg, argExplosion);
       continue;
     }
