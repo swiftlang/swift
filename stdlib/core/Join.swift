@@ -55,7 +55,7 @@ public protocol _ExtensibleCollectionType : CollectionType {
   ///
   ///   reserveCapacity(count(self) + underestimateCount(newElements))
   ///   for x in newElements {
-  ///     newElements.append(x)
+  ///     self.append(x)
   ///   }
   mutating func extend<
       S : SequenceType
