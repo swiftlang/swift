@@ -33,17 +33,20 @@ llvm::cl::opt<std::string>
     SILPrintOnlyFuns("sil-print-only-functions", llvm::cl::init(""),
                     llvm::cl::desc("Only print out the sil for the functions whose name contains this substring"));
 
-llvm::cl::opt<std::string>
-    SILPrintBefore("sil-print-before", llvm::cl::init(""), llvm::cl::desc(
-      "Print out the sil before passes which contain this string"));
+llvm::cl::list<std::string>
+    SILPrintBefore("sil-print-before",
+                   llvm::cl::desc("Print out the sil before passes which "
+                                  "contain a string from this list."));
 
-llvm::cl::opt<std::string>
-    SILPrintAfter("sil-print-after", llvm::cl::init(""), llvm::cl::desc(
-      "Print out the sil after passes which contain this string"));
+llvm::cl::list<std::string>
+    SILPrintAfter("sil-print-after",
+                  llvm::cl::desc("Print out the sil after passes which contain "
+                                 "a string from this list."));
 
-llvm::cl::opt<std::string>
-    SILPrintAround("sil-print-around", llvm::cl::init(""), llvm::cl::desc(
-      "Print out the sil before and after passes which contain this string"));
+llvm::cl::list<std::string>
+    SILPrintAround("sil-print-around",
+                   llvm::cl::desc("Print out the sil before and after passes "
+                                  "which contain a string from this list"));
 
 static bool doPrintBefore(SILTransform *T, SILFunction *F) {
   if (!SILPrintOnlyFun.empty() && F && F->getName() != SILPrintOnlyFun)
@@ -53,12 +56,16 @@ static bool doPrintBefore(SILTransform *T, SILFunction *F) {
       F->getName().find(SILPrintOnlyFuns, 0) != StringRef::npos)
     return true;
 
-  if (!SILPrintBefore.empty() &&
-      T->getName().find(SILPrintBefore) != StringRef::npos)
+  auto MatchFun = [&](const std::string &Str) -> bool {
+    return T->getName().find(Str) != StringRef::npos;
+  };
+
+  if (SILPrintBefore.end() !=
+      std::find_if(SILPrintBefore.begin(), SILPrintBefore.end(), MatchFun))
     return true;
 
-  if (!SILPrintAround.empty() &&
-      T->getName().find(SILPrintAround) != StringRef::npos)
+  if (SILPrintAround.end() !=
+      std::find_if(SILPrintAround.begin(), SILPrintAround.end(), MatchFun))
     return true;
 
   return false;
@@ -72,12 +79,16 @@ static bool doPrintAfter(SILTransform *T, SILFunction *F, bool Default) {
       F->getName().find(SILPrintOnlyFuns, 0) != StringRef::npos)
     return true;
 
-  if (!SILPrintAfter.empty() &&
-      T->getName().find(SILPrintAfter) != StringRef::npos)
+  auto MatchFun = [&](const std::string &Str) -> bool {
+    return T->getName().find(Str) != StringRef::npos;
+  };
+
+  if (SILPrintAfter.end() !=
+      std::find_if(SILPrintAfter.begin(), SILPrintAfter.end(), MatchFun))
     return true;
 
-  if (!SILPrintAround.empty() &&
-      T->getName().find(SILPrintAround) != StringRef::npos)
+  if (SILPrintAround.end() !=
+      std::find_if(SILPrintAround.begin(), SILPrintAround.end(), MatchFun))
     return true;
 
   return Default;
