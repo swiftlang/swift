@@ -2499,7 +2499,10 @@ llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
   assert(DL.getTypeSizeInBits(fromTy) >= DL.getTypeSizeInBits(toTy)
          && "Coerced type should not be smaller!");
 
-  auto address = createAlloca(fromTy, Alignment(0),
+  auto alignment = std::max(DL.getABITypeAlignment(fromTy),
+                            DL.getABITypeAlignment(toTy));
+
+  auto address = createAlloca(fromTy, Alignment(alignment),
                               value->getName() + ".coerced");
   Builder.CreateStore(value, address.getAddress());
   auto *coerced = Builder.CreateBitCast(address.getAddress(),

@@ -100,3 +100,18 @@ bb0:
   %r = tuple ()
   return %r : $()
 }
+
+sil public_external @createSIMDStruct : $@thin @cc(cdecl) () -> SIMDStruct
+sil public_external @consumeSIMDStruct : $@thin @cc(cdecl) SIMDStruct -> ()
+
+// CHECK-LABEL: define void @testSIMDStruct()
+// CHECK:         alloca <2 x double>, align 16
+// CHECK:         alloca i128, align 16
+sil @testSIMDStruct : $() -> () {
+bb0:
+  %f = function_ref @createSIMDStruct : $@thin @cc(cdecl) () -> SIMDStruct
+  %x = apply %f() : $@thin @cc(cdecl) () -> SIMDStruct
+  %g = function_ref @consumeSIMDStruct : $@thin @cc(cdecl) SIMDStruct -> ()
+  %z = apply %g(%x) : $@thin @cc(cdecl) SIMDStruct -> ()
+  return undef : $()
+}

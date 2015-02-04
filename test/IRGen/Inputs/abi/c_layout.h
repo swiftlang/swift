@@ -51,3 +51,11 @@ typedef struct {
   unsigned : 0;
   unsigned char b;
 } BitfieldSeparatorAnon;
+
+typedef float vector_float3 __attribute__((__ext_vector_type__(3)));
+
+struct SIMDStruct {
+  vector_float3 v;
+};
+
+void takesSIMDStruct(struct SIMDStruct);
