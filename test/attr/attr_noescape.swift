@@ -59,3 +59,9 @@ func testAutoclosure(@autoclosure a : () -> Int) { // expected-note{{parameter '
   doesEscape { a() }  // expected-error {{closure use of @noescape parameter 'a' may allow it to escape}}
 }
 
+
+// <rdar://problem/19470858> QoI: @autoclosure implies @noescape, so you shouldn't be allowed to specify both
+func redundant(@noescape  // expected-error {{'noescape' attribute is implied by @autoclosure and should not be redundantly specified}}
+               @autoclosure fn : () -> Int) {
+}
+

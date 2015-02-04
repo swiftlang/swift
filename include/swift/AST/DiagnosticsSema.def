@@ -1123,6 +1123,9 @@ ERROR(autoclosure_function_input_nonunit,attribute_parsing,none,
 ERROR(noescape_function_type,attribute_parsing,none,
       "'noescape' attribute may only be applied to parameters of function type",
       ())
+ERROR(noescape_implied_by_autoclosure,attribute_parsing,none,
+      "'noescape' attribute is implied by @autoclosure and should not be "
+      "redundantly specified", ())
 
 
 // NSManaged attribute
