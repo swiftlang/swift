@@ -20,11 +20,6 @@
 
 #include "CallingConvention.h"
 
-namespace clang {
-  template <class> class CanQual;
-  class Type;
-}
-
 namespace swift {
   class ApplyInst;
   class FuncDecl;
@@ -37,9 +32,7 @@ namespace irgen {
   class Alignment;
   class Explosion;
   class IRGenFunction;
-  class LoadableTypeInfo;
   class TypeInfo;
-
   /// Return the natural level at which to uncurry this function.  This
   /// is the number of additional parameter clauses that are uncurried
   /// in the function body.
@@ -102,12 +95,6 @@ namespace irgen {
   bool canCoerceToSchema(IRGenModule &IGM,
                          ArrayRef<llvm::Type*> types,
                          const ExplosionSchema &schema);
-
-  void emitClangExpandedParameter(IRGenFunction &IGF,
-                                  Explosion &in, Explosion &out,
-                                  clang::CanQual<clang::Type> clangType,
-                                  SILType swiftType,
-                                  const LoadableTypeInfo &swiftTI);
   
 } // end namespace irgen
 } // end namespace swift
