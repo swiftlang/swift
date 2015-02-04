@@ -573,7 +573,7 @@ extension ${Self} : _ArrayType {
   /// `self`, in turn, i.e. return
   /// `combine(combine(...combine(combine(initial, self[0]),
   /// self[1]),...self[count-2]), self[count-1])`.
-  public func reduce<U>(initial: U, combine: (U, T)->U) -> U {
+  public func reduce<U>(initial: U, @noescape combine: (U, T) -> U) -> U {
     return Swift.reduce(self, initial, combine)
   }
 
@@ -581,7 +581,7 @@ extension ${Self} : _ArrayType {
   /// `isOrderedBefore` induces a `strict weak ordering
   /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
   /// over the elements.
-  public mutating func sort(isOrderedBefore: (T, T)->Bool) {
+  public mutating func sort(isOrderedBefore: (T, T) -> Bool) {
     return withUnsafeMutableBufferPointer {
       me in Swift.sort(&me, isOrderedBefore)
       return
@@ -593,7 +593,7 @@ extension ${Self} : _ArrayType {
   /// `strict weak ordering
   /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
   /// over the elements.
-  public func sorted(isOrderedBefore: (T, T)->Bool) -> ${Self} {
+  public func sorted(isOrderedBefore: (T, T) -> Bool) -> ${Self} {
     var result = self
     result.sort(isOrderedBefore)
     return result
@@ -601,7 +601,7 @@ extension ${Self} : _ArrayType {
 
   /// Return ${a_Self} containing the results of calling
   /// `transform(x)` on each element `x` of `self`
-  public func map<U>(transform: (T)->U) -> ${Self}<U> {
+  public func map<U>(transform: T -> U) -> ${Self}<U> {
     return ${Self}<U>(lazy(self).map(transform))
   }
 
@@ -612,7 +612,7 @@ extension ${Self} : _ArrayType {
 
   /// Return ${a_Self} containing the elements `x` of `self` for which
   /// `includeElement(x)` is `true`
-  public func filter(includeElement: (T)->Bool) -> ${Self} {
+  public func filter(includeElement: T -> Bool) -> ${Self} {
     return ${Self}(lazy(self).filter(includeElement))
   }
 }
@@ -697,7 +697,7 @@ extension ${Self} {
   /// same algorithm on `body`\ 's argument lets you trade safety for
   /// speed.
   public mutating func withUnsafeMutableBufferPointer<R>(
-    body: (inout UnsafeMutableBufferPointer<T>)->R
+    @noescape body: inout UnsafeMutableBufferPointer<T> -> R
   ) -> R {
     // Ensure unique storage
     _arrayReserve(&_buffer, 0)

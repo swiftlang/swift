@@ -243,7 +243,7 @@ internal class _ContiguousArrayStorageBase
   /// `UnsafeBufferPointer` to the elements and return the result.
   /// Otherwise, return `nil`.
   internal func _withVerbatimBridgedUnsafeBuffer<R>(
-    body: (UnsafeBufferPointer<AnyObject>)->R
+    @noescape body: (UnsafeBufferPointer<AnyObject>)->R
   ) -> R? {
     _sanityCheckFailure(
       "Concrete subclasses must implement _withVerbatimBridgedUnsafeBuffer")

@@ -29,7 +29,7 @@ internal final class _EmptyArrayStorage
 
 #if _runtime(_ObjC)
   override func _withVerbatimBridgedUnsafeBuffer<R>(
-    body: (UnsafeBufferPointer<AnyObject>)->R
+    @noescape body: UnsafeBufferPointer<AnyObject> -> R
   ) -> R? {
     return body(UnsafeBufferPointer(start: nil, count: 0))
   }
@@ -74,7 +74,7 @@ class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
   /// `UnsafeBufferPointer` to the elements and return the result.
   /// Otherwise, return `nil`.
   final override func _withVerbatimBridgedUnsafeBuffer<R>(
-    body: (UnsafeBufferPointer<AnyObject>)->R
+    @noescape body: UnsafeBufferPointer<AnyObject> -> R
   ) -> R? {
     var result: R? = nil
     self._withVerbatimBridgedUnsafeBufferImpl {
@@ -86,7 +86,7 @@ class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
   /// If `T` is bridged verbatim, invoke `body` on an
   /// `UnsafeBufferPointer` to the elements.
   internal func _withVerbatimBridgedUnsafeBufferImpl(
-    body: (UnsafeBufferPointer<AnyObject>)->Void
+    @noescape body: UnsafeBufferPointer<AnyObject> -> Void
   ) {
     _sanityCheckFailure(
       "Must override _withVerbatimBridgedUnsafeBufferImpl in derived classes")
@@ -107,7 +107,7 @@ final class _ContiguousArrayStorage<T> : _ContiguousArrayStorage1 {
   /// If `T` is bridged verbatim, invoke `body` on an
   /// `UnsafeBufferPointer` to the elements.
   internal final override func _withVerbatimBridgedUnsafeBufferImpl(
-    body: (UnsafeBufferPointer<AnyObject>)->Void
+    @noescape body: UnsafeBufferPointer<AnyObject> -> Void
   ) {
     if _isBridgedVerbatimToObjectiveC(T.self) {
       let count = __manager.value.count

@@ -170,7 +170,7 @@ public struct FilterCollectionView<Base: CollectionType> : CollectionType {
 /// Return an `Array` containing the elements of `source`,
 /// in order, that satisfy the predicate `includeElement`.
 public func filter<S:SequenceType>(
-  source: S, includeElement: (S.Generator.Element)->Bool
+  source: S, includeElement: S.Generator.Element -> Bool
 ) -> [S.Generator.Element] {
   return lazy(source).filter(includeElement).array
 }

@@ -130,7 +130,7 @@ extension ${Self} {
   /// calling `transform` function on a base element.
   public
   func map<U>(
-    transform: (S.Generator.Element)->U
+    transform: S.Generator.Element -> U
   ) -> ${Self}<${View}<S, U>> {
     return ${Self}<${View}<S, U>>(
       ${View}(_base: self._base, _transform: transform)
