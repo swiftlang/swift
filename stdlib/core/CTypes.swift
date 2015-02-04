@@ -128,7 +128,7 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   /// Determine whether the given pointer is null.
   @transparent
   var _isNull : Bool {
-    return self == COpaquePointer.null()
+    return self == nil
   }
   
   /// The hash value.

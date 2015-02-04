@@ -206,7 +206,7 @@ public struct _StringCore {
 
   public var hasContiguousStorage: Bool {
 #if _runtime(_ObjC)
-    return _fastPath(_baseAddress != .null())
+    return _fastPath(_baseAddress != nil)
 #else
     return true
 #endif
@@ -305,7 +305,7 @@ public struct _StringCore {
       position <= count,
       "subscript: index points past String end")
 
-    if _fastPath(_baseAddress != .null()) {
+    if _fastPath(_baseAddress != nil) {
       return _nthContiguous(position)
     }
 #if _runtime(_ObjC)
@@ -322,7 +322,7 @@ public struct _StringCore {
     where Encoding.CodeUnit == Output.Element
   >(encoding: Encoding.Type, inout output: Output)
   {
-    if _fastPath(_baseAddress != .null()) {
+    if _fastPath(_baseAddress != nil) {
       if _fastPath(elementWidth == 1) {
         var out = output
         for x in UnsafeBufferPointer(
@@ -390,10 +390,10 @@ public struct _StringCore {
       }
       else if newSize > buffer.capacity {
         // Growth failed because of insufficient storage; double the size
-        return (max(_growArrayCapacity(buffer.capacity), newSize), .null())
+        return (max(_growArrayCapacity(buffer.capacity), newSize), nil)
       }
     }
-    return (newSize, .null())
+    return (newSize, nil)
   }
 
   /// Ensure that this String references a _StringBuffer having
