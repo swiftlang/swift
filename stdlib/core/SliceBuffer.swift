@@ -293,7 +293,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   /// underlying contiguous storage.
   public
   func withUnsafeBufferPointer<R>(
-    body: (UnsafeBufferPointer<Element>)->R
+    @noescape body: UnsafeBufferPointer<Element> -> R
   ) -> R {
     let ret = body(UnsafeBufferPointer(start: self.baseAddress, count: count))
     _fixLifetime(self)
@@ -304,7 +304,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   /// over the underlying contiguous storage.  
   public
   mutating func withUnsafeMutableBufferPointer<R>(
-    body: (UnsafeMutableBufferPointer<T>)->R
+    @noescape body: UnsafeMutableBufferPointer<T> -> R
   ) -> R {
     let ret = body(
       UnsafeMutableBufferPointer(start: baseAddress, count: count))

@@ -684,7 +684,7 @@ extension ${Self} {
   /// same algorithm on `body`\ 's argument lets you trade safety for
   /// speed.
   public func withUnsafeBufferPointer<R>(
-    body: (UnsafeBufferPointer<T>) -> R
+    @noescape body: UnsafeBufferPointer<T> -> R
   ) -> R {
     return _buffer.withUnsafeBufferPointer(body)
   }
