@@ -42,14 +42,19 @@ func testAlwaysInline() -> CInt {
 }
 
 // CHECK: define hidden i32 @_TF12clang_inline20testInlineRedeclaredFT_VSs5Int32() {
-// CHECK: define internal i32 @wrappedZeroRedeclared() #0 {
+// CHECK: define internal i32 @zeroRedeclared() #{{[0-9]+}} {
 func testInlineRedeclared() -> CInt {
+  return zeroRedeclared()
+}
+
+// CHECK: define hidden i32 @_TF12clang_inline27testInlineRedeclaredWrappedFT_VSs5Int32() {
+// CHECK: define internal i32 @wrappedZeroRedeclared() #{{[0-9]+}} {
+func testInlineRedeclaredWrapped() -> CInt {
   return wrappedZeroRedeclared()
 }
 
 // CHECK: define internal i32 @innerZero() [[INNER_ZERO_ATTR:#[0-9]+]] {
 // CHECK: declare i32 @getInt() [[GET_INT_ATTR:#[0-9]+]]
-// CHECK: define internal i32 @zeroRedeclared() #{{[0-9]+}} {
 
 // CHECK: attributes [[SSP]] = { ssp }
 // CHECK: attributes [[INNER_ZERO_ATTR]] = { inlinehint nounwind ssp 

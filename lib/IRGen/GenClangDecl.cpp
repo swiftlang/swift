@@ -42,7 +42,7 @@ void IRGenModule::emitClangDecl(clang::Decl *decl) {
     return;
   }
 
-  if (!GlobalClangDecls.insert(decl).second)
+  if (!GlobalClangDecls.insert(decl->getCanonicalDecl()).second)
     return;
   SmallVector<const clang::Decl *, 8> stack;
   stack.push_back(decl);
