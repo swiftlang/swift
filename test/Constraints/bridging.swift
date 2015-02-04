@@ -180,3 +180,13 @@ func rdar19551164b(s: NSString, a: NSArray) {
   rdar19551164a(s, a) // expected-error{{'NSString' is not convertible to 'String'; did you mean to use 'as!' to force downcast?}}{{18-18= as! String}}
   // expected-error@-1{{'NSArray' is not convertible to '[String]'; did you mean to use 'as!' to force downcast?}}{{21-21= as! [String]}}
 }
+
+// rdar://problem/19695671
+func takesSet<T: Hashable>(p: Set<T>) {}
+func takesDictionary<K: Hashable, V>(p: Dictionary<K, V>) {}
+func takesArray<T>(t: Array<T>) {}
+func rdar19695671() {
+  takesSet(NSSet() as! Set) // expected-error{{'NSSet' is not convertible to 'Set<T>'}}
+  takesDictionary(NSDictionary() as! Dictionary) // expected-error{{'NSDictionary' is not convertible to 'Dictionary<Key, Value>'}}
+  takesArray(NSArray() as! Array) // expected-error{{'NSArray' is not convertible to 'Array<T>'}}
+}

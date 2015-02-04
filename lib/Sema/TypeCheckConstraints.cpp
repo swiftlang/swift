@@ -1018,7 +1018,20 @@ public:
   std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
     expr->setType(nullptr);
     
+    if (auto cast = dyn_cast<ExplicitCastExpr>(expr)) {
+      if (cast->getCastTypeLoc().getTypeRepr())
+        cast->getCastTypeLoc().setType(nullptr);
+    } else if (auto typeExpr = dyn_cast<TypeExpr>(expr)) {
+      if (typeExpr->getTypeLoc().getTypeRepr())
+        typeExpr->getTypeLoc().setType(nullptr);
+    }
+
     return { true, expr };
+  }
+
+  std::pair<bool, Pattern*> walkToPatternPre(Pattern *pattern) override {
+    pattern->setType(nullptr);
+    return { true, pattern };
   }
 };
 
