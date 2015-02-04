@@ -118,11 +118,10 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
     self._rawValue = source._rawValue
   }
 
-  // FIXME: should this API be internalized or retired?
   /// Returns `nil`
-  @transparent
+  @availability(*, unavailable, message="use 'nil' literal instead")
   public static func null() -> COpaquePointer {
-    return COpaquePointer()
+    _preconditionFailure("unavailable function can not be called")
   }
 
   /// Determine whether the given pointer is null.
@@ -184,10 +183,10 @@ public struct CFunctionPointer<T> : Equatable, Hashable, NilLiteralConvertible {
     self.value = value
   }
 
-  // FIXME: should this API be internalized or retired?
   /// Returns `nil`
+  @availability(*, unavailable, message="use 'nil' literal instead")
   public static func null() -> CFunctionPointer {
-    return CFunctionPointer()
+    _preconditionFailure("unavailable function can not be called")
   }
 
   /// The hash value.

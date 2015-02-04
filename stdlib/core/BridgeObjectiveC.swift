@@ -317,11 +317,10 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
     _rawValue = _nilRawPointer
   }
 
-  // FIXME: should this API be retired or internalized?
   /// Returns `nil`
-  @transparent public
-  static func null() -> AutoreleasingUnsafeMutablePointer {
-    return AutoreleasingUnsafeMutablePointer(_nilRawPointer)
+  @availability(*, unavailable, message="use 'nil' literal instead")
+  public static func null() -> AutoreleasingUnsafeMutablePointer {
+    _preconditionFailure("unavailable function can not be called")
   }
 
   /// Initialize to a null pointer.
