@@ -470,6 +470,10 @@ public:
     return Operands.getDynamicValuesAsArray();
   }
 
+  Operand &getArgumentRef(unsigned i) {
+    return Operands.getDynamicAsArray()[i];
+  }
+
   /// The number of arguments passed to the ApplyInst.
   unsigned getNumArguments() const { return getArguments().size(); }
 
