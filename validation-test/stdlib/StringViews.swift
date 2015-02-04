@@ -700,8 +700,6 @@ tests.test("UTF16->String") {
     for j in i..<v.endIndex {      
       if let si = i.samePositionIn(s) {
         if let sj = j.samePositionIn(s) {
-          dump(i)
-          dump(si)
           expectEqual(s[si..<sj], String(v[i..<j])!)
           continue
         }
