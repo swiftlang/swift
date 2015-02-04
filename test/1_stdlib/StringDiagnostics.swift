@@ -23,15 +23,15 @@ func testAmbiguousStringComparisons(s: String) {
   let nsString = s as NSString
   let a1 = s == nsString
   let a2 = s != nsString
-  let a3 = s < nsString // expected-error {{binary operator '<' cannot be applied to operands of type 'String' and 'NSString'}} expected-note {{overloads for '<' exist with these partially matching parameter lists: (String, String)}}
-  let a4 = s <= nsString // expected-error {{binary operator '<=' cannot be applied to operands of type 'String' and 'NSString'}}
-  let a5 = s >= nsString // expected-error {{binary operator '>=' cannot be applied to operands of type 'String' and 'NSString'}}
-  let a6 = s > nsString // expected-error {{binary operator '>' cannot be applied to operands of type 'String' and 'NSString'}}
+  let a3 = s < nsString
+  let a4 = s <= nsString
+  let a5 = s >= nsString
+  let a6 = s > nsString
   // now the other way
   let a7 = nsString == s
   let a8 = nsString != s
-  let a9 = nsString < s // expected-error {{binary operator '<' cannot be applied to operands of type 'NSString' and 'String'}} expected-note {{overloads for '<' exist with these partially matching parameter lists: (String, String)}} 
-  let a10 = nsString <= s // expected-error {{binary operator '<=' cannot be applied to operands of type 'NSString' and 'String'}}
-  let a11 = nsString >= s // expected-error {{binary operator '>=' cannot be applied to operands of type 'NSString' and 'String'}}
-  let a12 = nsString > s // expected-error {{binary operator '>' cannot be applied to operands of type 'NSString' and 'String'}}
+  let a9 = nsString < s
+  let a10 = nsString <= s
+  let a11 = nsString >= s
+  let a12 = nsString > s
 }
