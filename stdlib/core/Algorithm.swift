@@ -116,7 +116,7 @@ public func max<T : Comparable>(x: T, y: T, z: T, rest: T...) -> T {
 /// the result for each pair of consecutive 
 public func split<S: Sliceable, R:BooleanType>(
   elements: S, 
-  isSeparator: (S.Generator.Element)->R, 
+  @noescape isSeparator: S.Generator.Element -> R, 
   maxSplit: Int = Int.max,
   allowEmptySlices: Bool = false
   ) -> [S.SubSlice] {
@@ -188,7 +188,8 @@ public func startsWith<
   where
     S0.Generator.Element == S1.Generator.Element
 >(s: S0, prefix: S1,
-  isEquivalent: (S1.Generator.Element, S1.Generator.Element) -> Bool) -> Bool
+  @noescape isEquivalent: (S1.Generator.Element, S1.Generator.Element) -> Bool)
+  -> Bool
 {
   var prefixGenerator = prefix.generate()
 
@@ -325,7 +326,8 @@ public func equal<
   where
     S1.Generator.Element == S2.Generator.Element
 >(a1: S1, a2: S2,
-  isEquivalent: (S1.Generator.Element, S1.Generator.Element) -> Bool) -> Bool
+  @noescape isEquivalent: (S1.Generator.Element, S1.Generator.Element) -> Bool)
+  -> Bool
 {
   var g1 = a1.generate()
   var g2 = a2.generate()
@@ -385,7 +387,8 @@ public func lexicographicalCompare<
     S1.Generator.Element == S2.Generator.Element
 >(
   a1: S1, a2: S2,
-  isOrderedBefore less: (S1.Generator.Element,S1.Generator.Element)->Bool
+  @noescape isOrderedBefore less: (S1.Generator.Element, S1.Generator.Element) 
+  -> Bool
 ) -> Bool {
   var g1 = a1.generate()
   var g2 = a2.generate()
@@ -414,7 +417,7 @@ public func lexicographicalCompare<
 /// Return `true` iff an element in `seq` satisfies `predicate`.
 public func contains<
   S : SequenceType, L : BooleanType
->(seq: S, predicate: (S.Generator.Element)->L) -> Bool {
+>(seq: S, @noescape predicate: S.Generator.Element -> L) -> Bool {
   for a in seq {
     if predicate(a) {
       return true
@@ -434,7 +437,7 @@ public func contains<
 /// accumulated value initialized to `initial` and each element of
 /// `sequence`, in turn.
 public func reduce<S : SequenceType, U>(
-  sequence: S, initial: U, combine: (U, S.Generator.Element)->U
+  sequence: S, initial: U, @noescape combine: (U, S.Generator.Element) -> U
 ) -> U {
   var result = initial
   for element in sequence {
