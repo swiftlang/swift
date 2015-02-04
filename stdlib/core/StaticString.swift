@@ -109,7 +109,8 @@ public struct StaticString
   /// `self`.
   ///
   /// This method works regardless of what `self` stores.
-  public func withUTF8Buffer<R>(body: (UnsafeBufferPointer<UInt8>) -> R) -> R {
+  public func withUTF8Buffer<R>(
+    @noescape body: (UnsafeBufferPointer<UInt8>) -> R) -> R {
     if hasPointerRepresentation {
       return body(UnsafeBufferPointer(start: utf8Start, count: Int(byteSize)))
     } else {
