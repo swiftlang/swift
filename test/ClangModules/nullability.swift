@@ -1,8 +1,9 @@
-// RUN: %target-swift-frontend %clang-importer-sdk -parse %s -verify
+// RUN: %target-swift-frontend %clang-importer-sdk -parse -I %S/Inputs/custom-modules %s -verify
 
-// XFAIL: linux
+// REQUIRES: objc_interop
 
 import nullability;
+import CoreCooling
 
 func testSomeClass(sc: SomeClass, osc: SomeClass?) {
   var ao1: AnyObject = sc.methodA(osc)
@@ -40,4 +41,17 @@ func testSomeClass(sc: SomeClass, osc: SomeClass?) {
   var sc4 = sc.returnMe()
   var sc4a: SomeClass = sc4
   if sc4 == nil { } // expected-error{{binary operator '==' cannot be applied to operands of type 'SomeClass' and 'nil'}}
+}
+
+// Nullability with CF types.
+func testCF(fridge: CCRefrigerator) {
+  CCRefrigeratorOpenDoSomething(fridge) // okay
+  CCRefrigeratorOpenDoSomething(nil) // expected-error{{cannot invoke 'CCRefrigeratorOpenDoSomething' with an argument list of type '(nil)'}}
+  // expected-note@-1{{expected an argument list of type '(CCRefrigerator)'}}
+
+  CCRefrigeratorOpenMaybeDoSomething(fridge) // okay
+  CCRefrigeratorOpenMaybeDoSomething(nil) // okay
+
+  CCRefrigeratorOpenMaybeDoSomething(5) // expected-error{{cannot invoke}}
+  // expected-note@-1{{argument list of type '(CCRefrigerator?)'}}
 }

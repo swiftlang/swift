@@ -37,3 +37,7 @@ typedef CCRefrigeratorRef CCFridgeRef;
 typedef const void *CCOpaqueTypeRef __attribute__((objc_bridge(id)));
 CCOpaqueTypeRef CCRetain(CCOpaqueTypeRef typeRef);
 void CCRelease(CCOpaqueTypeRef typeRef);
+
+// Nullability
+void CCRefrigeratorOpenDoSomething(__nonnull CCRefrigeratorRef fridge);
+void CCRefrigeratorOpenMaybeDoSomething(__nullable CCRefrigeratorRef fridge);
