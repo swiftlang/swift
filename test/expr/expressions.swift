@@ -498,7 +498,7 @@ struct Rule {
 }
 
 var ruleVar: Rule
-ruleVar = Rule("a") // expected-error{{cannot assign to immutable value of type 'Rule'}} expected-error {{cannot invoke initializer for type 'Rule' with an argument list of type '(String)'}} expected-note{{expected an argument list of type '(target: String, dependencies: String)'}}
+ruleVar = Rule("a") // expected-error {{cannot invoke initializer for type 'Rule' with an argument list of type '(String)'}} expected-note{{expected an argument list of type '(target: String, dependencies: String)'}}
 
 
 class C {

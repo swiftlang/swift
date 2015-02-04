@@ -1100,24 +1100,28 @@ static std::pair<Type, Type> getBoundTypesFromConstraint(ConstraintSystem *CS,
   
   if (auto typeVariableType =
       dyn_cast<TypeVariableType>(type2.getPointer())) {
-    SmallVector<Type, 4> bindings;
-    CS->getComputedBindings(typeVariableType, bindings);
-    auto binding = bindings.size() ? bindings.front() : Type();
     
-    if (!binding.isNull()) {
-      if (binding.getPointer() != type1.getPointer())
-        type2 = binding;
-    } else {
-      auto impl = typeVariableType->getImpl();
-      if (auto archetypeType = impl.getArchetype()) {
-        type2 = archetypeType;
+    if (typeVariableType->getImpl().
+          getRepresentative(nullptr) == typeVariableType) {
+      SmallVector<Type, 4> bindings;
+      CS->getComputedBindings(typeVariableType, bindings);
+      auto binding = bindings.size() ? bindings.front() : Type();
+      
+      if (!binding.isNull()) {
+        if (binding.getPointer() != type1.getPointer())
+          type2 = binding;
       } else {
-        auto implAnchor = impl.getLocator()->getAnchor();
-        auto anchorType = implAnchor->getType();
-        
-        // Don't re-substitute an opened type variable for itself.
-        if (anchorType.getPointer() != type1.getPointer())
-          type2 = anchorType;
+        auto impl = typeVariableType->getImpl();
+        if (auto archetypeType = impl.getArchetype()) {
+          type2 = archetypeType;
+        } else {
+          auto implAnchor = impl.getLocator()->getAnchor();
+          auto anchorType = implAnchor->getType();
+          
+          // Don't re-substitute an opened type variable for itself.
+          if (anchorType.getPointer() != type1.getPointer())
+            type2 = anchorType;
+        }
       }
     }
   }
@@ -1572,8 +1576,9 @@ Type GeneralFailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
   CS->TC.addExprForDiagnosis(subExpr);
   
   if (!isa<ClosureExpr>(subExpr) &&
-      (dyn_cast<ArrayExpr>(subExpr) ||
-      typeIsNotSpecialized(subExpr->getType()))) {
+      (dyn_cast<CallExpr>(subExpr) ||
+       dyn_cast<ArrayExpr>(subExpr) ||
+       typeIsNotSpecialized(subExpr->getType()))) {
     
     // Store off the sub-expression, in case a new one is provided via the
     // type check operation.
@@ -1754,6 +1759,8 @@ bool FailureDiagnosis::diagnoseFailureForBinaryExpr() {
                               paramLists,
                               argTypes);
   
+  expr->setType(ErrorType::get(CS->getASTContext()));
+  
   return true;
 }
   
@@ -1798,6 +1805,8 @@ bool FailureDiagnosis::diagnoseFailureForUnaryExpr() {
                   diag::cannot_apply_unop_to_arg,
                   overloadName,
                   argTyName);
+  
+  expr->setType(ErrorType::get(CS->getASTContext()));
   
   return true;
 }
@@ -2047,6 +2056,8 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
     }
   }
   
+  expr->setType(ErrorType::get(CS->getASTContext()));
+  
   return true;
 }
 
@@ -2209,21 +2220,6 @@ bool FailureDiagnosis::diagnoseFailureForForcedCheckedCastExpr() {
 
 bool FailureDiagnosis::diagnoseFailure() {
   assert(CS && expr);
-  
-  if (activeConformanceConstraint) {
-    std::pair<Type, Type> types =
-    getBoundTypesFromConstraint(CS,
-                                expr,
-                                activeConformanceConstraint);
-    
-    CS->TC.diagnose(expr->getLoc(),
-                         diag::does_not_conform_to_constraint,
-                         types.first,
-                         types.second)
-    .highlight(expr->getSourceRange());
-    
-    return true;
-  }
   
   // If a bridging conversion slips through, treat it as ambiguous.
   if (bridgeToObjCConstraint) {

@@ -33,3 +33,11 @@ var dd: Double = f1 - f2 // expected-error{{'Float' is not convertible to 'Doubl
 func f() -> Bool {
   return 1 + 1 // expected-error{{'Int' is not convertible to 'Bool'}}
 }
+
+// Test that nested diagnostics are properly surfaced.
+func takesInt(i: Int) {}
+func noParams() -> Int { return 0 }
+func takesAndReturnsInt(i: Int) -> Int { return 0 }
+
+takesInt(noParams(1)) // expected-error{{cannot invoke 'noParams' with an argument list of type '(Int)'}}
+takesInt(takesAndReturnsInt("")) // expected-error{{cannot invoke 'takesAndReturnsInt' with an argument list of type '(String)'}} expected-note{{expected an argument list of type '(Int)'}}
