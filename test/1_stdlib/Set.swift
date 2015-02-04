@@ -1,16 +1,13 @@
-// REQUIRES: long_tests
-// FIXME: move to validation suite.
-
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 //
 // FIXME: -fobjc-abi-version=2 is a band-aid fix for for rdar://16946936
 //
-// RUN: cp %s %t/main.swift
+// RUN: %S/../../utils/gyb %s -o %t/main.swift
 // RUN: xcrun -sdk %target-sdk-name clang++ -fobjc-arc -fobjc-abi-version=2 -arch %target-cpu %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
-// RUN: %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Set -Xfrontend -disable-access-control
+// RUN: %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Set -Xfrontend -disable-access-control
 //
-// RUN: %target-run %t/Set
+// RUN: %S/../../utils/line-directive %t/main.swift -- %target-run %t/Set
 
 // XFAIL: linux
 
@@ -129,7 +126,7 @@ func getAsNSSet(_ members: [Int] = [1010, 2020, 3030]) -> NSSet {
   for member in members {
     nsArray.addObject(TestObjCKeyTy(member))
   }
-  return NSMutableSet(array: nsArray)
+  return NSMutableSet(array: nsArray as [AnyObject])
 }
 
 /// Get an NSMutableSet of TestObjCKeyTy values
@@ -138,7 +135,7 @@ func getAsNSMutableSet(_ members: [Int] = [1010, 2020, 3030]) -> NSMutableSet {
   for member in members {
     nsArray.addObject(TestObjCKeyTy(member))
   }
-  return NSMutableSet(array: nsArray)
+  return NSMutableSet(array: nsArray as [AnyObject])
 }
 
 /// Get a Set<NSObject> (Set<TestObjCKeyTy>) backed by Cocoa storage
@@ -236,7 +233,7 @@ func getRoundtripBridgedNSSet() -> NSSet {
   items.addObject(TestObjCKeyTy(2020))
   items.addObject(TestObjCKeyTy(3030))
 
-  var nss = NSSet(array: items)
+  var nss = NSSet(array: items as [AnyObject])
 
   var s: Set<NSObject> = _convertNSSetToSet(nss)
 
@@ -1161,7 +1158,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Insert") {
     expectTrue(isNativeSet(s))
 
     expectFalse(s.contains(TestBridgedKeyTy(2040)))
-    s.insert(TestObjCKeyTy(2040))
+    s.insert(TestObjCKeyTy(2040) as TestBridgedKeyTy)
 
     var identity2 = unsafeBitCast(s, Word.self)
     expectNotEqual(identity1, identity2)
@@ -1660,9 +1657,9 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     expectEqual(identity1, unsafeBitCast(s1, Word.self))
     expectNotEqual(identity2, identity1)
     expectEqual(3, s1.count)
-    expectTrue(s1.contains(TestObjCKeyTy(1010)))
+    expectTrue(s1.contains(TestObjCKeyTy(1010) as TestBridgedKeyTy))
     expectEqual(0, s2.count)
-    expectFalse(s2.contains(TestObjCKeyTy(1010)))
+    expectFalse(s2.contains(TestObjCKeyTy(1010) as TestBridgedKeyTy))
   }
 }
 
@@ -1828,7 +1825,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
   expectEqual(identity1, unsafeBitCast(s1, Word.self))
   expectEqual(identity2, unsafeBitCast(s2, Word.self))
 
-  s2.insert(TestObjCKeyTy(4040))
+  s2.insert(TestObjCKeyTy(4040) as TestBridgedKeyTy)
   expectTrue(isNativeSet(s2))
   expectEqual(identity2, unsafeBitCast(s2, Word.self))
 
@@ -2134,9 +2131,9 @@ SetTestSuite.test("NSSetToSetConversion") {
     nsArray.addObject(TestObjCKeyTy(i))
   }
 
-  let nss = NSSet(array: nsArray)
+  let nss = NSSet(array: nsArray as [AnyObject])
 
-  let s: Set = nss
+  let s = nss as Set
 
   var members = [Int]()
   for member: AnyObject in s {
@@ -2671,10 +2668,10 @@ SetTestSuite.test("Equatable.Native.Native") {
   let s1 = getCOWFastSet()
   let s2 = getCOWFastSet([1010, 2020, 3030, 4040, 5050, 6060])
 
-  checkEquatable(true, s1, s1, nil)
-  checkEquatable(false, s1, Set<Int>(), nil)
-  checkEquatable(true, Set<Int>(), Set<Int>(), nil)
-  checkEquatable(false, s1, s2, nil)
+  checkEquatable(true, s1, s1)
+  checkEquatable(false, s1, Set<Int>())
+  checkEquatable(true, Set<Int>(), Set<Int>())
+  checkEquatable(false, s1, s2)
 }
 
 SetTestSuite.test("Equatable.Native.BridgedVerbatim") {
@@ -2703,10 +2700,10 @@ SetTestSuite.test("Equatable.BridgedNonverbatim.BridgedNonverbatim") {
   let bnvs2 = getBridgedNonverbatimSet([1010, 2020, 3030, 4040, 5050, 6060])
   let bnvsEmpty = getBridgedNonverbatimSet([])
 
-  checkEquatable(true, bnvs1, bnvs1, nil)
-  checkEquatable(false, bnvs1, bnvs2, nil)
-  checkEquatable(false, bnvs1, bnvsEmpty, nil)
-  checkEquatable(false, bnvs2, bnvsEmpty, nil)
+  checkEquatable(true, bnvs1, bnvs1)
+  checkEquatable(false, bnvs1, bnvs2)
+  checkEquatable(false, bnvs1, bnvsEmpty)
+  checkEquatable(false, bnvs2, bnvsEmpty)
 }
 
 SetTestSuite.test("isDisjointWith.Set.Set") {

@@ -13,9 +13,6 @@
 
 // XFAIL: linux
 
-// FIXME: move to validation suite.
-// REQUIRES: long_tests
-
 import Swift
 import StdlibUnittest
 
@@ -703,9 +700,9 @@ tests.test("UTF16->String") {
     for j in i..<v.endIndex {      
       if let si = i.samePositionIn(s) {
         if let sj = j.samePositionIn(s) {
-          expectEqual(i, i1)
-          expectEqual(j, j1)
-          expectEqual(s[si..<sj], String(v[i..<j]))
+          dump(i)
+          dump(si)
+          expectEqual(s[si..<sj], String(v[i..<j])!)
           continue
         }
       }
@@ -721,9 +718,7 @@ tests.test("UTF8->String") {
     for j in i..<v.endIndex {      
       if let si = i.samePositionIn(s) {
         if let sj = j.samePositionIn(s) {
-          expectEqual(i, i1)
-          expectEqual(j, j1)
-          expectEqual(s[si..<sj], String(v[i..<j]))
+          expectEqual(s[si..<sj], String(v[i..<j])!)
           continue
         }
       }

@@ -9,9 +9,6 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// REQUIRES: long_tests
-// FIXME: move to validation suite.
-
 // RUN: %target-run-stdlib-swift
 
 // XFAIL: linux

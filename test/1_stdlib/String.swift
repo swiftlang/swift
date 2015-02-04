@@ -2,9 +2,6 @@
 
 // XFAIL: interpret
 // XFAIL: linux
-// REQUIRES: long_tests
-// FIXME: move to validation suite.
-
 
 import StdlibUnittest
 import Foundation
@@ -1023,7 +1020,7 @@ StringTests.test("indexConversion") {
     let r = result.rangeAtIndex(1)
     let start = String.UTF16Index(r.location)
     let end = String.UTF16Index(r.location + r.length)
-    matches.append(String(s.utf16[start..<end]))
+    matches.append(String(s.utf16[start..<end])!)
   }
 
   expectEqual(["furth", "lard", "bart"], matches)

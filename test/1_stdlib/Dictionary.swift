@@ -1,16 +1,13 @@
-// FIXME: move to validation suite.
-// REQUIRES: long_tests
-
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 //
 // FIXME: -fobjc-abi-version=2 is a band-aid fix for for rdar://16946936
 //
-// RUN: cp %s %t/main.swift
+// RUN: %S/../../utils/gyb %s -o %t/main.swift
 // RUN: xcrun -sdk %target-sdk-name clang++ -fobjc-arc -fobjc-abi-version=2 -arch %target-cpu %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
-// RUN: %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -Xfrontend -disable-access-control
+// RUN: %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -Xfrontend -disable-access-control
 //
-// RUN: %target-run %t/Dictionary
+// RUN: %S/../../utils/line-directive %t/main.swift -- %target-run %t/Dictionary
 
 // XFAIL: linux
 
@@ -1060,7 +1057,7 @@ func getAsNSDictionary(d: Dictionary<Int, Int>) -> NSDictionary {
   }
   // Return an `NSMutableDictionary` to make sure that it has a unique
   // pointer identity.
-  return NSMutableDictionary(objects: values, forKeys: keys)
+  return NSMutableDictionary(objects: values as [AnyObject], forKeys: keys as [AnyObject])
 }
 
 func getAsEquatableNSDictionary(d: Dictionary<Int, Int>) -> NSDictionary {
@@ -1072,7 +1069,7 @@ func getAsEquatableNSDictionary(d: Dictionary<Int, Int>) -> NSDictionary {
   }
   // Return an `NSMutableDictionary` to make sure that it has a unique
   // pointer identity.
-  return NSMutableDictionary(objects: values, forKeys: keys)
+  return NSMutableDictionary(objects: values as [AnyObject], forKeys: keys as [AnyObject])
 }
 
 func getAsNSMutableDictionary(d: Dictionary<Int, Int>) -> NSMutableDictionary {
@@ -1082,7 +1079,7 @@ func getAsNSMutableDictionary(d: Dictionary<Int, Int>) -> NSMutableDictionary {
     keys.addObject(TestObjCKeyTy(k))
     values.addObject(TestObjCValueTy(v))
   }
-  return NSMutableDictionary(objects: values, forKeys: keys)
+  return NSMutableDictionary(objects: values as [AnyObject], forKeys: keys as [AnyObject])
 }
 
 func getBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
@@ -1135,7 +1132,7 @@ func getHugeBridgedVerbatimDictionaryHelper() -> NSDictionary {
     values.addObject(TestObjCValueTy(1000 + i))
   }
 
-  return NSDictionary(objects: values, forKeys: keys)
+  return NSDictionary(objects: values as [AnyObject], forKeys: keys as [AnyObject])
 }
 
 func getHugeBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
@@ -2644,7 +2641,7 @@ func getRoundtripBridgedNSDictionary() -> NSDictionary {
   values.addObject(TestObjCValueTy(1020))
   values.addObject(TestObjCValueTy(1030))
 
-  var nsd = NSDictionary(objects: values, forKeys: keys)
+  var nsd = NSDictionary(objects: values as [AnyObject], forKeys: keys as [AnyObject])
 
   var d: Dictionary<NSObject, AnyObject> = _convertNSDictionaryToDictionary(nsd)
 
@@ -2684,9 +2681,9 @@ DictionaryTestSuite.test("NSDictionaryToDictionaryCoversion") {
   values.addObject(TestObjCValueTy(1020))
   values.addObject(TestObjCValueTy(1030))
 
-  let nsd = NSDictionary(objects: values, forKeys: keys)
+  let nsd = NSDictionary(objects: values as [AnyObject], forKeys: keys as [AnyObject])
 
-  let d: Dictionary = nsd
+  let d: Dictionary = nsd as Dictionary
 
   var pairs = Array<(Int, Int)>()
   for (key, value: AnyObject) in d {
