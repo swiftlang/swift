@@ -1,9 +1,18 @@
 ---
 Name: WatchKit
 Classes:
+- Name: WKAccessibilityImageRegion
+  Properties:
+  - Name: label
+    Nullability: N
 - Name: WKInterfaceButton
   Methods:
   - Selector: 'setAttributedTitle:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
+  - Selector: 'setBackgroundColor:'
     MethodKind: Instance
     Nullability:
     - O
@@ -23,11 +32,6 @@ Classes:
     Nullability:
     - O
     NullabilityOfRet: S
-  - Selector: 'setColor:'
-    MethodKind: Instance
-    Nullability:
-    - O
-    NullabilityOfRet: S
   - Selector: 'setTitle:'
     MethodKind: Instance
     Nullability:
@@ -35,16 +39,6 @@ Classes:
     NullabilityOfRet: S
 - Name: WKInterfaceController
   Methods:
-  - Selector: 'awakeWithContext:'
-    MethodKind: Instance
-    Nullability:
-    - O
-  - Selector: 'actionForUserActivity:context:'
-    MethodKind: Instance
-    Nullability:
-    - O
-    - O
-    NullabilityOfRet: O
   - Selector: 'addMenuItemWithImage:title:action:'
     MethodKind: Instance
     Nullability:
@@ -65,6 +59,11 @@ Classes:
     - S
     - N
     - S
+    NullabilityOfRet: S
+  - Selector: 'awakeWithContext:'
+    MethodKind: Instance
+    Nullability:
+    - O
     NullabilityOfRet: S
   - Selector: 'contextForSegueWithIdentifier:'
     MethodKind: Instance
@@ -102,14 +101,20 @@ Classes:
     - O
     - N
     NullabilityOfRet: S
-  - Selector: init
-    MethodKind: Instance
-    NullabilityOfRet: N
-  - Selector: 'initWithContext:'
+  - Selector: 'handleUserActivity:'
     MethodKind: Instance
     Nullability:
     - O
+    NullabilityOfRet: S
+  - Selector: init
+    MethodKind: Instance
     NullabilityOfRet: N
+  - Selector: 'openParentApplication:reply:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - O
+    NullabilityOfRet: S
   - Selector: 'presentControllerWithName:context:'
     MethodKind: Instance
     Nullability:
@@ -122,10 +127,11 @@ Classes:
     - N
     - O
     NullabilityOfRet: S
-  - Selector: 'presentTextInputControllerWithSuggestions:completion:'
+  - Selector: 'presentTextInputControllerWithSuggestions:allowedInputMode:completion:'
     MethodKind: Instance
     Nullability:
-    - N
+    - O
+    - S
     - N
     NullabilityOfRet: S
   - Selector: 'pushControllerWithName:context:'
@@ -151,10 +157,11 @@ Classes:
     - N
     - S
     NullabilityOfRet: S
-  - Selector: 'updateUserActivity:userInfo:'
+  - Selector: 'updateUserActivity:userInfo:webpageURL:'
     MethodKind: Instance
     Nullability:
     - N
+    - O
     - O
     NullabilityOfRet: S
 - Name: WKInterfaceDate
@@ -197,7 +204,7 @@ Classes:
     - N
     NullabilityOfRet: S
   Properties:
-  - Name: currentLocale
+  - Name: cachedImages
     Nullability: N
   - Name: preferredContentSizeCategory
     Nullability: N
@@ -240,6 +247,11 @@ Classes:
     Nullability:
     - O
     NullabilityOfRet: S
+  - Selector: 'setTintColor:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
 - Name: WKInterfaceLabel
   Methods:
   - Selector: 'setAttributedText:'
@@ -259,17 +271,19 @@ Classes:
     NullabilityOfRet: S
 - Name: WKInterfaceMap
   Methods:
-  - Selector: 'addAnnotation:withImage:'
+  - Selector: 'addAnnotation:withImage:centerOffset:'
     MethodKind: Instance
     Nullability:
     - S
     - O
+    - S
     NullabilityOfRet: S
-  - Selector: 'addAnnotation:withImageNamed:'
+  - Selector: 'addAnnotation:withImageNamed:centerOffset:'
     MethodKind: Instance
     Nullability:
     - S
     - O
+    - S
     NullabilityOfRet: S
 - Name: WKInterfaceObject
   Methods:
@@ -277,6 +291,11 @@ Classes:
     MethodKind: Instance
     Nullability:
     - O
+    NullabilityOfRet: S
+  - Selector: 'setAccessibilityImageRegions:'
+    MethodKind: Instance
+    Nullability:
+    - N
     NullabilityOfRet: S
   - Selector: 'setAccessibilityLabel:'
     MethodKind: Instance
@@ -301,6 +320,23 @@ Classes:
 - Name: WKInterfaceSlider
   Methods:
   - Selector: 'setColor:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
+- Name: WKInterfaceSwitch
+  Methods:
+  - Selector: 'setAttributedTitle:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
+  - Selector: 'setColor:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
+  - Selector: 'setTitle:'
     MethodKind: Instance
     Nullability:
     - O
