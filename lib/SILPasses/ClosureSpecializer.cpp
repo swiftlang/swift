@@ -18,7 +18,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
-#include "swift/SILAnalysis/LoopAnalysis.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/SILInliner.h"
 #include "llvm/ADT/Statistic.h"
@@ -394,11 +393,7 @@ void ClosureSpecCloner::populateCloned() {
 namespace {
 
 struct ClosureSpecializer {
-  SILLoopAnalysis *LA;
-
-  ClosureSpecializer(SILLoopAnalysis *LA)
-    : LA(LA) {
-  }
+  ClosureSpecializer() = default;
 
   void gatherCallSites(SILFunction *Caller,
                        llvm::SmallVectorImpl<CallSiteDescriptor> &CallSites,
@@ -508,7 +503,6 @@ public:
 
   virtual void run() {
     auto *CGA = getAnalysis<CallGraphAnalysis>();
-    auto *LA = getAnalysis<SILLoopAnalysis>();
 
     bool Changed = false;
     // Specialize going bottom-up in the call graph.
@@ -519,7 +513,7 @@ public:
           !getModule()->linkFunction(F, SILModule::LinkingMode::LinkAll))
         continue;
 
-      Changed |= ClosureSpecializer(LA).specialize(F);
+      Changed |= ClosureSpecializer().specialize(F);
     }
 
     // Invalidate the call graph.
