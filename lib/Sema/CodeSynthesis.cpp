@@ -328,6 +328,14 @@ static Type getSelfTypeForMaterializeForSetCallback(ASTContext &ctx,
   }
 }
 
+// True if the storage is dynamic or imported from Objective-C. In these cases,
+// we need to emit a static materializeForSet thunk that dynamically dispatches
+// to 'get' and 'set', rather than the normal dynamically dispatched
+// materializeForSet that peer dispatches to 'get' and 'set'.
+static bool needsDynamicMaterializeForSet(AbstractStorageDecl *storage) {
+  return storage->isDynamic() || storage->hasClangNode();
+}
+
 static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
                                                   VarDecl *&bufferParamDecl,
                                                   TypeChecker &TC) {
@@ -394,8 +402,21 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   materializeForSet->setMutating(setter->isMutating());
   materializeForSet->setStatic(setter->isStatic());
 
+  // materializeForSet is final if the storage is.
   if (storage->isFinal())
     makeFinal(ctx, materializeForSet);
+  
+  // If the storage is dynamic or ObjC-native, we can't add a dynamically-
+  // dispatched method entry for materializeForSet, so force it to be
+  // statically dispatched. ("final" would be inappropriate because the
+  // property can still be overridden.)
+  if (needsDynamicMaterializeForSet(storage))
+    materializeForSet->setForcedStaticDispatch(true);
+  
+  // If the property came from ObjC, we need to register this as an external
+  // definition to be compiled.
+  if (storage->hasClangNode())
+    TC.Context.addedExternalDecl(materializeForSet);
   
   return materializeForSet;
 }
@@ -1115,7 +1136,7 @@ static void synthesizeComputedMaterializeForSet(FuncDecl *materializeForSet,
   AccessSemantics semantics;
   // If the storage is dynamic, we must dynamically redispatch through the
   // accessor. Otherwise, we can do a direct peer access.
-  if (storage->isDynamic())
+  if (needsDynamicMaterializeForSet(storage))
     semantics = AccessSemantics::Ordinary;
   else
     semantics = AccessSemantics::DirectToAccessor;
@@ -1375,7 +1396,7 @@ void swift::synthesizeMaterializeForSet(FuncDecl *materializeForSet,
     // Only variables can be Stored, and only variables can be weak/unowned.
     auto var = cast<VarDecl>(storage);
     if (var->getType()->is<ReferenceStorageType>()
-        || var->isDynamic()) {
+        || needsDynamicMaterializeForSet(var)) {
       synthesizeComputedMaterializeForSet(materializeForSet, storage,
                                           bufferDecl, TC);
       return;

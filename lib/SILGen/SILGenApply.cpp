@@ -34,6 +34,9 @@ SILGenFunction::getMethodDispatch(AbstractFunctionDecl *method) {
   // Final methods can be statically referenced.
   if (method->isFinal())
     return MethodDispatch::Static;
+  // Some methods are forced to be statically dispatched.
+  if (method->hasForcedStaticDispatch())
+    return MethodDispatch::Static;
   
   // If this declaration is in a class but not marked final, then it is
   // always dynamically dispatched.

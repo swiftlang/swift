@@ -1475,6 +1475,9 @@ static SILValue getWitnessFunctionRef(SILGenFunction &gen,
   bool isExtension = false;
 
   isFinal |= witness.getDecl()->isFinal();
+  if (auto fnDecl = dyn_cast<AbstractFunctionDecl>(witness.getDecl()))
+    isFinal |= fnDecl->hasForcedStaticDispatch();
+    
   if (DeclContext *dc = witness.getDecl()->getDeclContext())
     isExtension = isa<ExtensionDecl>(dc);
 

@@ -397,8 +397,11 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// Whether this function has a dynamic Self return type.
     unsigned HasDynamicSelf : 1;
+    
+    /// Whether we are statically dispatched even if overridable
+    unsigned ForcedStaticDispatch : 1;
   };
-  enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 5 };
+  enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 6 };
   static_assert(NumFuncDeclBits <= 32, "fits in an unsigned");
 
   class ConstructorDeclBitfields {
@@ -4331,6 +4334,9 @@ public:
     return DC->getContextKind() == DeclContextKind::AbstractFunctionDecl;
   }
   
+  /// True if the declaration is forced to be statically dispatched.
+  bool hasForcedStaticDispatch() const;
+  
   using DeclContext::operator new;
   using Decl::getASTContext;
 };
@@ -4379,6 +4385,7 @@ class FuncDecl : public AbstractFunctionDecl {
     setType(Ty);
     FuncDeclBits.Mutating = false;
     FuncDeclBits.HasDynamicSelf = false;
+    FuncDeclBits.ForcedStaticDispatch = false;
         
     HaveSearchedForCommonOverloadReturnType = false;
     HaveFoundCommonOverloadReturnType = false;
@@ -4612,6 +4619,14 @@ public:
   void setOperatorDecl(OperatorDecl *o) {
     assert(isOperator() && "can't set an OperatorDecl for a non-operator");
     OperatorAndAddressorKind.setPointer(o);
+  }
+  
+  /// Returns true if the function is forced to be statically dispatched.
+  bool hasForcedStaticDispatch() const {
+    return FuncDeclBits.ForcedStaticDispatch;
+  }
+  void setForcedStaticDispatch(bool flag) {
+    FuncDeclBits.ForcedStaticDispatch = flag;
   }
 
   /// Returns true if a function declaration overrides a given
@@ -5283,6 +5298,12 @@ inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getBodyParamBuffer() {
 inline DeclIterator &DeclIterator::operator++() {
   Current = Current->NextDecl;
   return *this;
+}
+
+inline bool AbstractFunctionDecl::hasForcedStaticDispatch() const {
+  if (auto func = dyn_cast<FuncDecl>(this))
+    return func->hasForcedStaticDispatch();
+  return false;
 }
 
 } // end namespace swift
