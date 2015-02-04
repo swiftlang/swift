@@ -770,6 +770,23 @@ NOTE(protocol_witness_kind_conflict,sema_tcd,none,
      "a subscript}0", (RequirementKind))
 NOTE(protocol_witness_type_conflict,sema_tcd,none,
      "candidate has non-matching type %0%1", (Type, StringRef))
+
+NOTE(protocol_witness_optionality_conflict,sema_tcd,none,
+     "candidate %select{type has|result type has|parameter type has|"
+     "parameter types have|result and parameter types have}0 incorrect "
+     "optionality%1",
+     (unsigned, StringRef))
+ERROR(err_protocol_witness_optionality,sema_tcd,none,
+      "%select{type|result|parameter|parameters|"
+      "result and parameters}0 of %1 %select{has|has|has|have|have|}0"
+      " different optionality than required by protocol %2",
+      (unsigned, DeclName, DeclName))
+WARNING(warn_protocol_witness_optionality,sema_tcd,none,
+      "%select{type|result|parameter|parameters|"
+      "result and parameters}0 of %1 %select{has|has|has|have|have|}0"
+      " different optionality than expected by protocol %2",
+      (unsigned, DeclName, DeclName))
+
 NOTE(protocol_witness_static_conflict,sema_tcd,none,
      "candidate operates on %select{a type|an instance}0, not "
      "%select{an instance|a type}0 as required", (bool))

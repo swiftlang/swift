@@ -197,6 +197,9 @@ namespace {
     /// \brief The witness matched the requirement exactly.
     ExactMatch,
 
+    /// \brief There is a difference in optionality.
+    OptionalityConflict,
+
     /// \brief The witness matched the requirement with some renaming.
     RenamedMatch,
 
@@ -236,16 +239,134 @@ namespace {
     NotObjC,
   };
 
+  /// Describes the kind of optional adjustment performed when
+  /// comparing two types.
+  enum class OptionalAdjustmentKind {
+    // No adjustment required.
+    None,
+
+    /// The witness can produce a 'nil' that won't be handled by
+    /// callers of the requirement. This is a type-safety problem.
+    ProducesUnhandledNil,
+
+    /// Callers of the requirement can provide 'nil', but the witness
+    /// does not handle it. This is a type-safety problem.
+    ConsumesUnhandledNil,
+
+    /// The witness handles 'nil', but won't ever be given a 'nil'.
+    /// This is not a type-safety problem.
+    WillNeverConsumeNil,
+      
+    /// Callers of the requirement can expect to receive 'nil', but
+    /// the witness will never produce one. This is not a type-safety
+    /// problem.
+    WillNeverProduceNil,
+
+    /// The witness has an IUO that can be removed, because the
+    /// protocol doesn't need it. This is not a type-safety problem.
+    RemoveIUO,
+
+    /// The witness has an IUO that should be translated into a true
+    /// optional. This is not a type-safety problem.
+    IUOToOptional,
+  };
+
+  /// Describes an optional adjustment made to a witness.
+  class OptionalAdjustment {
+    /// The kind of adjustment.
+    unsigned Kind : 16;
+
+    /// Whether this is a parameter adjustment (with an index) vs. a
+    /// result or value type adjustment (no index needed).
+    unsigned IsParameterAdjustment : 1;
+
+    /// The adjustment index, for parameter adjustments.
+    unsigned ParameterAdjustmentIndex : 15;
+
+  public:
+    /// Create a non-parameter optional adjustment.
+    explicit OptionalAdjustment(OptionalAdjustmentKind kind) 
+      : Kind(static_cast<unsigned>(kind)), IsParameterAdjustment(false),
+        ParameterAdjustmentIndex(0) { }
+
+    /// Create an optional adjustment to a parameter.
+    OptionalAdjustment(OptionalAdjustmentKind kind,
+                       unsigned parameterIndex)
+      : Kind(static_cast<unsigned>(kind)), IsParameterAdjustment(true),
+        ParameterAdjustmentIndex(parameterIndex) { }
+
+    /// Determine the kind of optional adjustment.
+    OptionalAdjustmentKind getKind() const { 
+      return static_cast<OptionalAdjustmentKind>(Kind);
+    }
+
+    /// Determine whether this is a parameter adjustment.
+    bool isParameterAdjustment() const {
+      return IsParameterAdjustment;
+    }
+
+    /// Return the index of a parameter adjustment.
+    unsigned getParameterIndex() const {
+      assert(isParameterAdjustment() && "Not a parameter adjustment");
+      return ParameterAdjustmentIndex;
+    }
+
+    /// Determines whether the optional adjustment is an error.
+    bool isError() const {
+      switch (getKind()) {
+      case OptionalAdjustmentKind::None:
+        return false;
+
+      case OptionalAdjustmentKind::ProducesUnhandledNil:
+      case OptionalAdjustmentKind::ConsumesUnhandledNil:
+        return true;
+
+      case OptionalAdjustmentKind::WillNeverConsumeNil:
+      case OptionalAdjustmentKind::WillNeverProduceNil:
+      case OptionalAdjustmentKind::RemoveIUO:
+      case OptionalAdjustmentKind::IUOToOptional:
+        // Warnings at most.
+        return false;
+      }
+    }
+
+    /// Retrieve the source location at which the optional is
+    /// specified or would be inserted.
+    SourceLoc getOptionalityLoc(ValueDecl *witness) const;
+
+    /// Retrieve the optionality location for the given type
+    /// representation.
+    SourceLoc getOptionalityLoc(TypeRepr *tyR) const;
+  };
+
+  /// Whether any of the given optional adjustments is an error (vs. a
+  /// warning).
+  bool hasAnyError(ArrayRef<OptionalAdjustment> adjustments) {
+    for (const auto &adjustment : adjustments)
+      if (adjustment.isError())
+        return true;
+
+    return false;
+  }
+
   /// \brief Describes a match between a requirement and a witness.
   struct RequirementMatch {
+    RequirementMatch(ValueDecl *witness, MatchKind kind)
+      : Witness(witness), Kind(kind), WitnessType() {
+      assert(!hasWitnessType() && "Should have witness type");
+    }
+
     RequirementMatch(ValueDecl *witness, MatchKind kind,
-                     Type witnessType = Type())
-      : Witness(witness), Kind(kind), WitnessType(witnessType)
+                     Type witnessType,
+                     ArrayRef<OptionalAdjustment> optionalAdjustments = {})
+      : Witness(witness), Kind(kind), WitnessType(witnessType),
+        OptionalAdjustments(optionalAdjustments.begin(),
+                            optionalAdjustments.end())
     {
       assert(hasWitnessType() == !witnessType.isNull() &&
              "Should (or should not) have witness type");
     }
-    
+
     /// \brief The witness that matches the (implied) requirement.
     ValueDecl *Witness;
     
@@ -255,10 +376,14 @@ namespace {
     /// \brief The type of the witness when it is referenced.
     Type WitnessType;
 
+    /// The set of optional adjustments performed on the witness.
+    SmallVector<OptionalAdjustment, 2> OptionalAdjustments;
+
     /// \brief Determine whether this match is viable.
     bool isViable() const {
       switch(Kind) {
       case MatchKind::ExactMatch:
+      case MatchKind::OptionalityConflict:
       case MatchKind::RenamedMatch:
         return true;
 
@@ -283,6 +408,7 @@ namespace {
       case MatchKind::ExactMatch:
       case MatchKind::RenamedMatch:
       case MatchKind::TypeConflict:
+      case MatchKind::OptionalityConflict:
         return true;
 
       case MatchKind::WitnessInvalid:
@@ -305,7 +431,161 @@ namespace {
     
     /// \brief Associated type substitutions needed to match the witness.
     SmallVector<Substitution, 2> WitnessSubstitutions;
+
+    /// Classify the provided optionality issues for use in diagnostics.
+    /// FIXME: Enumify this
+    unsigned classifyOptionalityIssues(ValueDecl *requirement) const {
+      unsigned numParameterAdjustments = 0;
+      bool hasNonParameterAdjustment = false;
+      for (const auto &adjustment : OptionalAdjustments) {
+        if (adjustment.isParameterAdjustment())
+          ++numParameterAdjustments;
+        else
+          hasNonParameterAdjustment = true;
+      }
+
+      if (hasNonParameterAdjustment) {
+        // Both return and parameter adjustments.
+        if (numParameterAdjustments > 0)
+          return 4;
+
+        // The type of a variable.
+        if (isa<VarDecl>(requirement))
+          return 0;
+
+        // The result type of something.
+        return 1;
+      }
+
+      // Only parameter adjustments.
+      assert(numParameterAdjustments > 0 && "No adjustments?");
+      return numParameterAdjustments == 1 ? 2 : 3;
+    }
+
+    /// Add Fix-Its that correct the optionality in the witness.
+    void addOptionalityFixIts(const ASTContext &ctx,
+                              ValueDecl *witness, 
+                              InFlightDiagnostic &diag) const;
   };
+}
+
+SourceLoc OptionalAdjustment::getOptionalityLoc(ValueDecl *witness) const {
+  // For non-parameter adjustments, use the result type or whole type,
+  // as appropriate.
+  if (!isParameterAdjustment()) {
+    // For a function, use the result type.
+    if (auto func = dyn_cast<FuncDecl>(witness)) {
+      return getOptionalityLoc(
+               func->getBodyResultTypeLoc().getTypeRepr());
+    }
+
+    // For a subscript, use the element type.
+    if (auto subscript = dyn_cast<SubscriptDecl>(witness)) {
+      return getOptionalityLoc(
+               subscript->getElementTypeLoc().getTypeRepr());
+    }
+
+    // Otherwise, we have a variable.
+    // FIXME: Dig into the pattern.
+    return SourceLoc();
+  }
+
+  // For parameter adjustments, dig out the pattern.
+  Pattern *pattern = nullptr;
+  if (auto func = dyn_cast<AbstractFunctionDecl>(witness)) {
+    auto bodyPatterns = func->getBodyParamPatterns();
+    if (func->getDeclContext()->isTypeContext())
+      bodyPatterns = bodyPatterns.slice(1);
+    pattern = bodyPatterns[0];
+  } else if (auto subscript = dyn_cast<SubscriptDecl>(witness)) {
+    pattern = subscript->getIndices();
+  } else {
+    return SourceLoc();
+  }
+
+  // Handle parentheses.
+  if (auto paren = dyn_cast<ParenPattern>(pattern)) {
+    assert(getParameterIndex() == 0 && "just the one parameter");
+    if (auto typed = dyn_cast<TypedPattern>(paren->getSubPattern())) {
+      return getOptionalityLoc(typed->getTypeLoc().getTypeRepr());
+    }
+    return SourceLoc();
+  }
+
+  // Handle tuples.
+  auto tuple = dyn_cast<TuplePattern>(pattern);
+  if (!tuple)
+    return SourceLoc();
+
+  const auto &tupleElt = tuple->getFields()[getParameterIndex()];
+  if (auto typed = dyn_cast<TypedPattern>(tupleElt.getPattern())) {
+    return getOptionalityLoc(typed->getTypeLoc().getTypeRepr());
+  }
+  return SourceLoc();
+}
+
+SourceLoc OptionalAdjustment::getOptionalityLoc(TypeRepr *tyR) const {
+  if (!tyR)
+    return SourceLoc();
+
+  switch (getKind()) {
+  case OptionalAdjustmentKind::None:
+    llvm_unreachable("not an adjustment");
+
+  case OptionalAdjustmentKind::ConsumesUnhandledNil:
+  case OptionalAdjustmentKind::WillNeverProduceNil:
+    // The location of the '?' to be inserted is after the type.
+    return tyR->getEndLoc();
+
+  case OptionalAdjustmentKind::ProducesUnhandledNil:
+  case OptionalAdjustmentKind::WillNeverConsumeNil:
+  case OptionalAdjustmentKind::RemoveIUO:
+  case OptionalAdjustmentKind::IUOToOptional:
+    // Find the location of optionality, below.
+    break;
+  }
+
+  if (auto optRepr = dyn_cast<OptionalTypeRepr>(tyR))
+    return optRepr->getQuestionLoc();
+
+  if (auto iuoRepr = dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(tyR))
+    return iuoRepr->getExclamationLoc();
+
+  return SourceLoc();
+}
+
+void RequirementMatch::addOptionalityFixIts(
+      const ASTContext &ctx,
+       ValueDecl *witness, 
+       InFlightDiagnostic &diag) const {
+  for (const auto &adjustment : OptionalAdjustments) {
+    SourceLoc adjustmentLoc = adjustment.getOptionalityLoc(witness);
+    if (adjustmentLoc.isInvalid())
+      continue;
+
+    switch (adjustment.getKind()) {
+    case OptionalAdjustmentKind::None:
+      llvm_unreachable("not an optional adjustment");
+
+    case OptionalAdjustmentKind::ProducesUnhandledNil:
+    case OptionalAdjustmentKind::WillNeverConsumeNil:
+    case OptionalAdjustmentKind::RemoveIUO:
+      diag.fixItRemove(adjustmentLoc);
+      break;
+
+    case OptionalAdjustmentKind::WillNeverProduceNil:
+    case OptionalAdjustmentKind::ConsumesUnhandledNil:
+      diag.fixItInsert(Lexer::getLocForEndOfToken(ctx.SourceMgr,
+                                                  adjustmentLoc),
+                       "?");
+      break;
+
+    case OptionalAdjustmentKind::IUOToOptional:
+      diag.fixItReplace(adjustmentLoc, "?");
+      break;
+    }
+  }
+
 }
 
 ///\ brief Decompose the given type into a set of tuple elements.
@@ -417,24 +697,95 @@ namespace {
     }
   };
 
+  /// The kind of variance (none, covariance, contravariance) to apply
+  /// when comparing types from a witness to types in the requirement
+  /// we're matching it against.
+  enum class VarianceKind {
+    None,
+    Covariant,
+    Contravariant
+   };
 } // end anonymous namespace
 
-static std::pair<Type,Type> getTypesToCompare(ValueDecl *reqt, Type reqtType,
-                                              Type witnessType) {
-  // Only do this hack when the protocol is @objc.
+static std::tuple<Type,Type, OptionalAdjustmentKind> 
+getTypesToCompare(ValueDecl *reqt, 
+                  Type reqtType,
+                  Type witnessType,
+                  VarianceKind variance) {  
+  // For @objc protocols, deal with differences in the optionality.
+  // FIXME: It probably makes sense to extend this to non-@objc
+  // protocols as well, but this requires more testing.
+  OptionalAdjustmentKind optAdjustment = OptionalAdjustmentKind::None;
   if (reqt->isObjC()) {
-    // If the requirement type is an ImplicitlyUnwrappedOptional type, pretend it isn't.
-    if (auto reqtValueType = reqtType->getImplicitlyUnwrappedOptionalObjectType()) {
+    OptionalTypeKind reqtOptKind;
+    if (Type reqtValueType
+          = reqtType->getAnyOptionalObjectType(reqtOptKind))
       reqtType = reqtValueType;
+    OptionalTypeKind witnessOptKind;
+    if (Type witnessValueType 
+          = witnessType->getAnyOptionalObjectType(witnessOptKind))
+      witnessType = witnessValueType;
 
-      // But be sure to allow the witness type to be explicitly optional.
-      if (auto witnessValueType = witnessType->getAnyOptionalObjectType()) {
-        witnessType = witnessValueType;
+    switch (reqtOptKind) {
+    case OTK_None:
+      switch (witnessOptKind) {
+      case OTK_None:
+        // Exact match is always okay.
+        break;
+
+      case OTK_Optional:
+        switch (variance) {
+        case VarianceKind::None:
+        case VarianceKind::Covariant:
+          optAdjustment = OptionalAdjustmentKind::ProducesUnhandledNil;
+          break;
+
+        case VarianceKind::Contravariant:
+          optAdjustment = OptionalAdjustmentKind::WillNeverConsumeNil;
+          break;
+        }
+        break;
+
+      case OTK_ImplicitlyUnwrappedOptional:
+        optAdjustment = OptionalAdjustmentKind::RemoveIUO;
+        break;
       }
+      break;
+
+    case OTK_Optional:
+      switch (witnessOptKind) {
+      case OTK_None:
+        switch (variance) {
+        case VarianceKind::None:
+        case VarianceKind::Contravariant:
+          optAdjustment = OptionalAdjustmentKind::ConsumesUnhandledNil;
+          break;
+
+        case VarianceKind::Covariant:
+          optAdjustment = OptionalAdjustmentKind::WillNeverProduceNil;
+          break;
+        }
+        break;
+
+      case OTK_Optional:
+        // Exact match is always okay.
+        break;
+
+      case OTK_ImplicitlyUnwrappedOptional:
+        optAdjustment = OptionalAdjustmentKind::IUOToOptional;
+        break;
+      }
+      break;
+
+    case OTK_ImplicitlyUnwrappedOptional:
+      // When the requirement is an IUO, all is permitted, because we
+      // assume that the user knows more about the signature than we
+      // have information in the protocol.
+      break;
     }
   }
 
-  return {reqtType, witnessType};
+  return std::make_tuple(reqtType, witnessType, optAdjustment);
 }
 
 // Given that we're looking at a stored property, should we use the
@@ -574,7 +925,9 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
                &setup,
              const std::function<Optional<RequirementMatch>(Type, Type)> 
                &matchTypes,
-             const std::function<RequirementMatch(bool)> &finalize) {
+             const std::function<
+                     RequirementMatch(bool, ArrayRef<OptionalAdjustment>)
+                   > &finalize) {
   assert(!req->isInvalid() && "Cannot have an invalid requirement here");
 
   /// Make sure the witness is of the same kind as the requirement.
@@ -696,6 +1049,7 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     }
   }
 
+  SmallVector<OptionalAdjustment, 2> optionalAdjustments;
   bool anyRenaming = false;
   if (decomposeFunctionType) {
     // Decompose function types into parameters and result type.
@@ -710,8 +1064,18 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     // Result types must match.
     // FIXME: Could allow (trivial?) subtyping here.
     if (!ignoreReturnType) {
-      auto typePair = getTypesToCompare(req, reqResultType, witnessResultType);
-      if (auto result = matchTypes(typePair.first, typePair.second)) {
+      auto types = getTypesToCompare(req, reqResultType, 
+                                     witnessResultType,
+                                     VarianceKind::Covariant);
+
+      // Record optional adjustment, if any.
+      if (std::get<2>(types) != OptionalAdjustmentKind::None) {
+        optionalAdjustments.push_back(
+          OptionalAdjustment(std::get<2>(types)));
+      }
+
+      if (auto result = matchTypes(std::get<0>(types), 
+                                   std::get<1>(types))) {
         return *result;
       }
     }
@@ -724,7 +1088,8 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
 
     // If the number of parameters doesn't match, we're done.
     if (reqParams.size() != witnessParams.size())
-      return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
+      return RequirementMatch(witness, MatchKind::TypeConflict, 
+                              witnessType);
 
     // Match each of the parameters.
     for (unsigned i = 0, n = reqParams.size(); i != n; ++i) {
@@ -741,11 +1106,19 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
 
       // Gross hack: strip a level of unchecked-optionality off both
       // sides when matching against a protocol imported from Objective-C.
-      auto typePair = getTypesToCompare(req, reqParams[i].getType(),
-                                        witnessParams[i].getType());
+      auto types = getTypesToCompare(req, reqParams[i].getType(),
+                                     witnessParams[i].getType(),
+                                     VarianceKind::Contravariant);
+
+      // Record any optional adjustment that occurred.
+      if (std::get<2>(types) != OptionalAdjustmentKind::None) {
+        optionalAdjustments.push_back(
+          OptionalAdjustment(std::get<2>(types), i));
+      }
 
       // Check whether the parameter types match.
-      if (auto result = matchTypes(typePair.first, typePair.second)) {
+      if (auto result = matchTypes(std::get<0>(types), 
+                                   std::get<1>(types))) {
         return *result;
       }
 
@@ -753,14 +1126,22 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     }
   } else {
     // Simple case: add the constraint.
-    auto typePair = getTypesToCompare(req, reqType, witnessType);
-    if (auto result = matchTypes(typePair.first, typePair.second)) {
+    auto types = getTypesToCompare(req, reqType, witnessType,
+                                   VarianceKind::None);
+
+    // Record optional adjustment, if any.
+    if (std::get<2>(types) != OptionalAdjustmentKind::None) {
+      optionalAdjustments.push_back(
+        OptionalAdjustment(std::get<2>(types)));
+    }
+
+    if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
       return *result;
     }
   }
 
   // Now finalize the match.
-  return finalize(anyRenaming);
+  return finalize(anyRenaming, optionalAdjustments);
 }
 
 static RequirementMatch
@@ -831,7 +1212,9 @@ matchWitness(ConformanceChecker &cc, TypeChecker &tc,
   };
 
   // Finalize the match.
-  auto finalize = [&](bool anyRenaming) -> RequirementMatch {
+  auto finalize = [&](bool anyRenaming, 
+                      ArrayRef<OptionalAdjustment> optionalAdjustments) 
+                        -> RequirementMatch {
     // Try to solve the system.
     SmallVector<constraints::Solution, 1> solutions;
     if (cs->solve(solutions, FreeTypeVariableBinding::Allow)) {
@@ -839,12 +1222,15 @@ matchWitness(ConformanceChecker &cc, TypeChecker &tc,
                               witnessType);
     }
     auto &solution = solutions.front();
-    
+
     // Success. Form the match result.
     RequirementMatch result(witness,
-                            anyRenaming? MatchKind::RenamedMatch
-                                       : MatchKind::ExactMatch,
-                            witnessType);
+                            hasAnyError(optionalAdjustments)
+                              ? MatchKind::OptionalityConflict
+                              : anyRenaming ? MatchKind::RenamedMatch
+                                            : MatchKind::ExactMatch,
+                            witnessType,
+                            optionalAdjustments);
 
     // For any associated types for which we deduced replacement types,
     // record them now.
@@ -1027,6 +1413,15 @@ diagnoseMatch(TypeChecker &tc, Module *module,
                 getTypeForDisplay(tc, module, match.Witness),
                 withAssocTypes);
     break;
+
+  case MatchKind::OptionalityConflict: {
+    auto diag = tc.diagnose(match.Witness, 
+                            diag::protocol_witness_optionality_conflict,
+                            match.classifyOptionalityIssues(req),
+                            withAssocTypes);
+    match.addOptionalityFixIts(tc.Context, match.Witness, diag);
+    break;
+  }
 
   case MatchKind::StaticNonStaticConflict:
     // FIXME: Could emit a Fix-It here.
@@ -1511,6 +1906,24 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           TC.fixAbstractFunctionNames(diag,
                                       cast<AbstractFunctionDecl>(best.Witness),
                                       requirement->getFullName());
+        }
+
+        TC.diagnose(requirement, diag::protocol_requirement_here,
+                    requirement->getFullName());
+      }
+
+      // If the optionality didn't line up, complain.
+      if (!best.OptionalAdjustments.empty()) {
+        {
+          auto diag = TC.diagnose(
+                        best.Witness,
+                        hasAnyError(best.OptionalAdjustments)
+                          ? diag::err_protocol_witness_optionality
+                          : diag::warn_protocol_witness_optionality,
+                        best.classifyOptionalityIssues(requirement),
+                        best.Witness->getFullName(),
+                        Proto->getFullName());
+          best.addOptionalityFixIts(TC.Context, best.Witness, diag);
         }
 
         TC.diagnose(requirement, diag::protocol_requirement_here,
