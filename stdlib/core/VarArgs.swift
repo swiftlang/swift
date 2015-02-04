@@ -190,6 +190,38 @@ extension COpaquePointer : CVarArgType {
   }
 }
 
+extension CFunctionPointer : CVarArgType {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs
+  public func encode() -> [Word] {
+    return _encodeBitsAsWords(self)
+  }
+}
+
+extension UnsafePointer : CVarArgType {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs
+  public func encode() -> [Word] {
+    return _encodeBitsAsWords(self)
+  }
+}
+
+extension UnsafeMutablePointer : CVarArgType {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs
+  public func encode() -> [Word] {
+    return _encodeBitsAsWords(self)
+  }
+}
+
+extension AutoreleasingUnsafeMutablePointer : CVarArgType {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs
+  public func encode() -> [Word] {
+    return _encodeBitsAsWords(self)
+  }
+}
+
 extension Float : _CVarArgPassedAsDouble {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
