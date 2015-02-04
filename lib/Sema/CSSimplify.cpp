@@ -1241,6 +1241,19 @@ static Type representsNonTrivialGenericParameter(TypeVariableType *typeVar) {
   return nullptr;
 }
 
+/// Check whether the given value type is one of a few specific
+/// bridged types.
+static bool isArrayDictionarySetOrString(const ASTContext &ctx, Type type) {
+  if (auto structDecl = type->getStructOrBoundGenericStruct()) {
+    return (structDecl == ctx.getStringDecl() ||
+            structDecl == ctx.getArrayDecl() ||
+            structDecl == ctx.getDictionaryDecl() ||
+            structDecl == ctx.getSetDecl());
+  }
+
+  return false;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                              unsigned flags,
@@ -1994,6 +2007,12 @@ commit_to_conversions:
     // FIXME: Also allow types bridged through Objective-C classes.
     if (objectType1->isAnyObject() &&
         type2->getClassOrBoundGenericClass()) {
+      conversionsOrFixes.push_back(Fix::getForcedDowncast(*this, type2));
+    }
+
+    // If we could perform a bridging cast, try it.
+    if (isArrayDictionarySetOrString(TC.Context, type2) &&
+        TC.getDynamicBridgedThroughObjCClass(DC, true, objectType1, type2)) {
       conversionsOrFixes.push_back(Fix::getForcedDowncast(*this, type2));
     }
 

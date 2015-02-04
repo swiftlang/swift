@@ -173,3 +173,10 @@ var i1: Int = 1.5 * 3.5 // expected-error{{'Double' is not convertible to 'Int'}
 func rdar18330319(s: String, d: [String : AnyObject]) {
   let t = d[s] as! String?
 }
+
+// rdar://problm/rdar19551164
+func rdar19551164a(s: String, a: [String]) {}
+func rdar19551164b(s: NSString, a: NSArray) {
+  rdar19551164a(s, a) // expected-error{{'NSString' is not convertible to 'String'; did you mean to use 'as!' to force downcast?}}{{18-18= as! String}}
+  // expected-error@-1{{'NSArray' is not convertible to '[String]'; did you mean to use 'as!' to force downcast?}}{{21-21= as! [String]}}
+}
