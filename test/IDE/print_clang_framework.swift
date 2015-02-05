@@ -22,6 +22,10 @@
 // RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foo -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=true -annotate-print > %t/Foo.annotated.txt
 // RUN: diff -u %t/Foo.annotated.txt %S/Inputs/mock-sdk/Foo.annotated.txt
 
+// RUN: %target-swift-frontend -emit-module -o %t -I %t %clang-importer-sdk %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
+// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foundation -sdk %S/../Inputs/clang-importer-sdk -I %t -function-definitions=false -prefer-type-repr=true > %t.printed.txt
+// RUN: FileCheck %s -check-prefix=FOUNDATION -strict-whitespace < %t.printed.txt
+
 // This test is in general platform-independent, but it happens to check
 // printing of @availability attributes for OS X, and those are not printed on
 // iOS.
@@ -30,3 +34,20 @@
 //
 // REQUIRES: OS=macosx
 
+// FOUNDATION-LABEL: {{^}}/// Aaa.  NSUnavailableOptions.  Bbb.
+// FOUNDATION-NEXT: {{^}}@availability(OSX, introduced=10.10){{$}}
+// FOUNDATION-NEXT: {{^}}struct NSUnavailableOptions : RawOptionSetType {{{$}}
+
+// FOUNDATION-LABEL: {{^}}/// Aaa.  NSOptionsWithUnavailableElement.  Bbb.
+// FOUNDATION-NEXT: {{^}}struct NSOptionsWithUnavailableElement : RawOptionSetType {{{$}}
+// FOUNDATION: {{^}}  @availability(OSX, introduced=10.10){{$}}
+// FOUNDATION-NEXT: {{^}}  static var Third: NSOptionsWithUnavailableElement { get }{{$}}
+
+// FOUNDATION-LABEL: {{^}}/// Aaa.  NSUnavailableEnum.  Bbb.
+// FOUNDATION-NEXT: {{^}}@availability(OSX, introduced=10.10){{$}}
+// FOUNDATION-NEXT: {{^}}enum NSUnavailableEnum : UInt {{{$}}
+
+// FOUNDATION-LABEL: {{^}}/// Aaa.  NSEnumWithUnavailableElement.  Bbb.
+// FOUNDATION-NEXT: {{^}}enum NSEnumWithUnavailableElement : UInt {{{$}}
+// FOUNDATION: {{^}}  @availability(OSX, introduced=10.10){{$}}
+// FOUNDATION-NEXT: {{^}}  case Third{{$}}

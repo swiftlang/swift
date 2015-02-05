@@ -100,24 +100,6 @@
 // FOUNDATION-NEXT: {{^}}  init(nilLiteral _: ()){{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
-// FOUNDATION-LABEL: {{^}}/// Aaa.  NSUnavailableOptions.  Bbb.
-// FOUNDATION-NEXT: {{^}}@availability(OSX, introduced=10.10){{$}}
-// FOUNDATION-NEXT: {{^}}struct NSUnavailableOptions : RawOptionSetType {{{$}}
-
-// FOUNDATION-LABEL: {{^}}/// Aaa.  NSOptionsWithUnavailableElement.  Bbb.
-// FOUNDATION-NEXT: {{^}}struct NSOptionsWithUnavailableElement : RawOptionSetType {{{$}}
-// FOUNDATION: {{^}}  @availability(OSX, introduced=10.10){{$}}
-// FOUNDATION-NEXT: {{^}}  static var Third: NSOptionsWithUnavailableElement { get }{{$}}
-
-// FOUNDATION-LABEL: {{^}}/// Aaa.  NSUnavailableEnum.  Bbb.
-// FOUNDATION-NEXT: {{^}}@availability(OSX, introduced=10.10){{$}}
-// FOUNDATION-NEXT: {{^}}enum NSUnavailableEnum : UInt {{{$}}
-
-// FOUNDATION-LABEL: {{^}}/// Aaa.  NSEnumWithUnavailableElement.  Bbb.
-// FOUNDATION-NEXT: {{^}}enum NSEnumWithUnavailableElement : UInt {{{$}}
-// FOUNDATION: {{^}}  @availability(OSX, introduced=10.10){{$}}
-// FOUNDATION-NEXT: {{^}}  case Third{{$}}
-
 // FOUNDATION-LABEL: {{^}}/// Unavailable Global Functions{{$}}
 // FOUNDATION-NEXT: @availability(*, unavailable)
 // FOUNDATION-NEXT: NSSetZoneName(zone: NSZone, name: String)
