@@ -544,9 +544,18 @@ makeDowncastFilterRange(Range range) {
   return DowncastFilterRange<Subclass, Range>(range);
 }
 
-template <typename Vector> void sortUnique(Vector &V) {
-  std::sort(V.begin(), V.end());
-  V.erase(std::unique(V.begin(), V.end()), V.end());
+/// Sorts and then uniques a container with random access iterators and an erase
+/// method that removes a range specified by random access iterators.
+template <typename Container>
+void sortUnique(
+    Container &C,
+    typename std::enable_if<
+        std::is_same<typename std::iterator_traits<
+                         typename Container::iterator>::iterator_category,
+                     std::random_access_iterator_tag>::value,
+        void>::type * = nullptr) {
+  std::sort(C.begin(), C.end());
+  C.erase(std::unique(C.begin(), C.end()), C.end());
 }
 
 } // end namespace swift
