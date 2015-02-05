@@ -190,10 +190,10 @@ public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
 /// performed to ensure that `x` actually has dynamic type `T`.
 ///
 /// .. Danger:: trades safety for performance.  Use `unsafeDowncast`
-/// only when `x as T` has proven to be a performance problem and you
-/// are confident that, always, `x is T`.  It is better than an
-/// `unsafeBitCast` because it's more restrictive, and because
-/// checking is still performed in debug builds.
+///   only when `x as T` has proven to be a performance problem and you
+///   are confident that, always, `x is T`.  It is better than an
+///   `unsafeBitCast` because it's more restrictive, and because
+///   checking is still performed in debug builds.
 @transparent
 public func unsafeDowncast<T: AnyObject>(x: AnyObject) -> T {
   _debugPrecondition(x is T, "invalid unsafeDowncast")
