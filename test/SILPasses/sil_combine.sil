@@ -148,9 +148,7 @@ bb0(%0 : $B):
   %8 = strong_release %1#0 : $Builtin.NativeObject
   %9 = function_ref @exit : $@thin @noreturn () -> () // ret.exit : () -> ()
   %10 = apply %9() : $@thin @noreturn () -> ()
-  %6 = unchecked_ref_cast %5 : $Builtin.NativeObject to $B
-  %11 = tuple()
-  %12 = return %11 : $()
+  unreachable
 }
 
 // CHECK-LABEL: sil @removeTriviallyDeadCrossBasicBlocks
@@ -167,9 +165,7 @@ bb1:
 bb2:
   %9 = function_ref @exit : $@thin @noreturn () -> () // ret.exit : () -> ()
   %10 = apply %9() : $@thin @noreturn () -> ()
-  %21 = unchecked_ref_cast %5 : $Builtin.NativeObject to $B
-  %32 = tuple ()
-  %33 = return %32 : $()
+  unreachable
 }
 
 // CHECK-LABEL: sil @dead_use_of_alloc_stack

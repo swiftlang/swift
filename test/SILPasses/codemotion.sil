@@ -1462,3 +1462,18 @@ bb0(%0 : $Builtin.NativeObject):
   %9999 = tuple()
   return %9999 : $()
 }
+
+sil @no_return_func : $@thin @noreturn () -> ()
+
+// Make sure that we do not move retains over noreturn functions.
+// CHECK-LABEL: sil @no_return_stops_codemotion : $@thin (Builtin.NativeObject) -> () {
+// CHECK: apply
+// CHECK-NEXT: unreachable
+sil @no_return_stops_codemotion : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = alloc_ref $C
+  strong_retain %1 : $C
+  %9999 = function_ref @no_return_func : $@thin @noreturn () -> ()
+  apply %9999() : $@thin @noreturn () -> ()
+  unreachable
+}

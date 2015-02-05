@@ -74,6 +74,11 @@ static bool canApplyDecrementRefCount(ApplyInst *AI, SILValue Ptr,
     if (FTy->getExtInfo().hasContext())
       return true;
 
+  // Treat applications of @noreturn functions as decrementing ref counts. This
+  // causes the apply to become a sink barrier for ref count increments.
+  if (AI->getCallee().getType().getAs<SILFunctionType>()->isNoReturn())
+    return true;
+
   // swift_keepAlive can not retain values. Remove this when we get rid of that.
   if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
     if (isKnownToNotDecrementRefCount(FRI))
