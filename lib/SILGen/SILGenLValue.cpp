@@ -1027,6 +1027,34 @@ namespace {
       // If the decls match, then this could conflict.
       if (decl != rhs.decl || IsSuper != rhs.IsSuper) return;
 
+      // If the decl is monomorphically a stored property, allow aliases.
+      // It could be overridden by a computed property in a subclass, but
+      // that's not likely enough to be worth the strictness here.
+      if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
+        switch (storage->getStorageKind()) {
+        case AbstractStorageDecl::Stored:
+        case AbstractStorageDecl::StoredWithTrivialAccessors:
+        case AbstractStorageDecl::Addressed:
+        case AbstractStorageDecl::AddressedWithTrivialAccessors:
+          return;
+        // TODO: Stored properties with didSet accessors that don't look at the
+        // oldValue could also be addressed.
+        case AbstractStorageDecl::StoredWithObservers:
+        case AbstractStorageDecl::AddressedWithObservers:
+          break;
+          
+        case AbstractStorageDecl::InheritedWithObservers:
+        case AbstractStorageDecl::Computed:
+        case AbstractStorageDecl::ComputedWithMutableAddress:
+          break;
+        }
+      }
+      
+      // If the property is a generic requirement, allow aliases, because
+      // it may be conformed to using a stored property.
+      if (isa<ProtocolDecl>(decl->getDeclContext()))
+        return;
+
       // If this is a simple property access, then we must have a conflict.
       if (!subscripts) {
         assert(isa<VarDecl>(decl));
