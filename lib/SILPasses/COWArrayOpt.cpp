@@ -699,6 +699,11 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
       // Semantic calls are safe.
       ArraySemanticsCall Sem(Inst);
       if (Sem) {
+        auto Kind = Sem.getKind();
+        // Safe because they create new arrays.
+        if (Kind == ArrayCallKind::kArrayInit ||
+            Kind == ArrayCallKind::kArrayUninitialized)
+          continue;
         // All array types must be the same. This is a stronger guarantueed than
         // we actually need. The requirement is that we can't create another
         // reference to the array by performing an array operation: for example,

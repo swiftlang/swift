@@ -16,7 +16,6 @@ c.append(Foo())
 d.append([Foo()])
 
 // CHECK-DAG: mayStoreToMemoryOnDestruction is false: Array<Int>
-// CHECK-DAG: mayStoreToMemoryOnDestruction is false: Builtin.Word
 // CHECK-DAG: mayStoreToMemoryOnDestruction is false: Array<Array<Int>>
 // CHECK-DAG: mayStoreToMemoryOnDestruction is true: Array<Foo>
 // CHECK-DAG: mayStoreToMemoryOnDestruction is true: Array<Array<Foo>>

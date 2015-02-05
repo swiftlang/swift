@@ -118,6 +118,8 @@ namespace swift {
     kGetElementAddress,
     kMakeMutable,
     kMutateUnknown,
+    // The following two semantic function kinds return the result @owned
+    // instead of operating on self passed as parameter.
     kArrayInit,
     kArrayUninitialized
   };
@@ -143,6 +145,11 @@ namespace swift {
 
     /// Determine which kind of array semantics call this is.
     ArrayCallKind getKind();
+
+    /// Does this semantic call has a self argument.
+    ///
+    /// For example, kArrayInit and kArrayUninitialized don't.
+    bool hasSelf();
 
     /// Get the self argument.
     SILValue getSelf();

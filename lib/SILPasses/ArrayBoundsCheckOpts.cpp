@@ -169,14 +169,16 @@ mayChangeArraySize(SILInstruction *I, ArrayCallKind &Kind, SILValue &Array,
   ArraySemanticsCall ArrayCall(I);
   Kind = ArrayCall.getKind();
   if (Kind != ArrayCallKind::kNone) {
-    Array = ArrayCall.getSelf();
     if (Kind < ArrayCallKind::kMutateUnknown) {
       // These methods are not mutating and pass the array owned. Therefore we
       // will potentially see a load of the array struct if there are mutating
       // functions in the loop on the same array.
-      Array = getArrayStructPointer(Kind, Array);
+      Array = getArrayStructPointer(Kind, ArrayCall.getSelf());
       return ArrayBoundsEffect::kNone;
-    }
+    } else if (Kind >= ArrayCallKind::kArrayInit)
+      return ArrayBoundsEffect::kMayChangeAny;
+
+    Array = ArrayCall.getSelf();
     return ArrayBoundsEffect::kMayChangeArg;
   }
 
@@ -284,13 +286,16 @@ private:
     ArrayCallKind K;
     auto BoundsEffect =
         mayChangeArraySize(Inst, K, Array, ReleaseSafeArrayReferences, RCIA);
-    assert(Array || K == ArrayCallKind::kNone);
 
     if (BoundsEffect == ArrayBoundsEffect::kMayChangeAny) {
       DEBUG(llvm::dbgs() << " no safe because kMayChangeAny " << *Inst);
       SafeArrays.clear();
       return false;
     }
+
+    assert(Array ||
+           K == ArrayCallKind::kNone &&
+               "Need to have an array for array semantic functions");
 
     // We need to make sure that the array container is not aliased in ways
     // that we don't understand.
@@ -1124,7 +1129,7 @@ public:
     for (auto &BB : *F)
       for (auto &Inst : BB) {
         ArraySemanticsCall Call(&Inst);
-        if (Call) {
+        if (Call && Call.hasSelf()) {
           DEBUG(llvm::dbgs() << "Gathering " << *(ApplyInst*)Call);
           auto rcRoot = RCIA->getRCIdentityRoot(Call.getSelf());
           // Check the type of the array. We need to have an array element type
