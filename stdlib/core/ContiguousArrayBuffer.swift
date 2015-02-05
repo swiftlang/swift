@@ -357,13 +357,10 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     _sanityCheck(subRange.endIndex >= subRange.startIndex)
     _sanityCheck(subRange.endIndex <= count)
 
-    var dst = target
-    var src = baseAddress + subRange.startIndex
-    for i in subRange {
-      dst++.initialize(src++.memory)
-    }
+    let c = subRange.endIndex - subRange.startIndex
+    target.initializeFrom(baseAddress + subRange.startIndex, count: c)
     _fixLifetime(owner)
-    return dst
+    return target + c
   }
 
   /// Return a _SliceBuffer containing the given subRange of values
@@ -481,11 +478,6 @@ public func += <
   }
 }
 
-/// Append rhs to lhs
-public func += <T> (inout lhs: _ContiguousArrayBuffer<T>, rhs: T) {
-  lhs += CollectionOfOne(rhs)
-}
-
 extension _ContiguousArrayBuffer : CollectionType {
   /// The position of the first element in a non-empty collection.
   ///
@@ -523,7 +515,7 @@ public func ~> <
   // Using GeneratorSequence here essentially promotes the sequence to
   // a SequenceType from _Sequence_Type so we can iterate the elements
   for x in GeneratorSequence(source.generate()) {
-    result += x
+    result += CollectionOfOne(x)
   }
   return result
 }

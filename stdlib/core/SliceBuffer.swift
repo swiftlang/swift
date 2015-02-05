@@ -173,10 +173,9 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     _sanityCheck(subRange.startIndex >= 0)
     _sanityCheck(subRange.endIndex >= subRange.startIndex)
     _sanityCheck(subRange.endIndex <= count)
-    for i in subRange {
-      target++.initialize(start[i])
-    }
-    return target
+    let c = subRange.endIndex - subRange.startIndex
+    target.initializeFrom(start + subRange.startIndex, count: c)
+    return target + c
   }
 
   public

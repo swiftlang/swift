@@ -203,13 +203,10 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
     _sanityCheck(subRange.endIndex >= subRange.startIndex)
     _sanityCheck(subRange.endIndex <= count)
 
-    var dst = target
-    var src = baseAddress + subRange.startIndex
-    for i in subRange {
-      dst++.initialize(src++.memory)
-    }
+    let c = subRange.endIndex - subRange.startIndex
+    target.initializeFrom(baseAddress + subRange.startIndex, count: c)
     _fixLifetime(owner)
-    return dst
+    return target + c
   }
 
   /// Return a _SliceBuffer containing the given subRange of values
