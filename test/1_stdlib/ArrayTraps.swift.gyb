@@ -1,159 +1,128 @@
-// -*- swift -*-
-// These tests should crash.
-// RUN: rm -rf %t ; mkdir -p %t
-// RUN: %S/../../utils/gyb -DRUN_TESTS= %s -o %t/ArrayTraps.swift
-// RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/CatchCrashes.cpp -c -o %t/CatchCrashes.o
-// RUN: %S/../../utils/line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -Xlinker %t/CatchCrashes.o -o %t/a.out
-// RUN: %S/../../utils/gyb -DRUN_TESTS="%target-run %t/a.out" -DSOURCE=%s %s > /dev/null
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+// RUN: %S/../../utils/gyb %s -o %t/ArrayTraps.swift
+// RUN: %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Debug
+// RUN: %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Release -O
 //
-// CHECK: OK
-// CHECK: CRASHED: SIG{{ILL|TRAP}}
+// RUN: %target-run %t/a.out_Debug
+// RUN: %target-run %t/a.out_Release
 
 // XFAIL: linux
 
-// This file is gybbe'd twice, once to generate the test file, and
-// once to run the tests.  The second time, the output is thrown away,
-// but the list of tests is used to invoke the test executable
-// repeatedly with different arguments.
-import Foundation
-
-// Interpret the command line arguments.
-var arg = Process.arguments[1]
+import StdlibUnittest
 
 %{
-  # A list of arguments that should be passed to successive
-  # invocations of the executable, to run all the different tests.
-  tests = [] 
+# We test for bounds-checking traps for both reading and writing
+# both single elements and slices of all three different array
+# types.
+array_types = ('Array', 'ContiguousArray', 'Slice', '_UnitTestArray')
 
-  # We test for bounds-checking traps for both reading and writing
-  # both single elements and slices of all three different array
-  # types.
-  arrayTypes = ('Array', 'ContiguousArray', 'Slice', '_UnitTestArray')
-
-  def test(x = None):
-    global Array
-    global io
-    tests.append(
-      '%s%s.%s' % (
-         Array, '.' + io if io else '', len(tests) if x is None else x))
-    return 'if arg == "%s"' % tests[-1]
-
-  def boundsTrap(index, exprToWrite):
-    global io
-    return 'println("OK")\n' + (
-      'let x = a[%s]' % index 
-       if io == 'read' else
-      'a[%s] = %s' % (index, exprToWrite))
+def bounds_trap(index, expr_to_write):
+  global io
+  return 'expectCrashLater()\n' + (
+    'let x = a[%s]' % index
+     if io == 'read' else
+    'a[%s] = %s' % (index, expr_to_write))
 }%
 
-% for Array in arrayTypes:
+% for ArrayTy in array_types:
+
+var ${ArrayTy}Traps = TestSuite("${ArrayTy}Traps")
+
 %   for io in ['read', 'write']:
-${test('Bounds1')} {
-  var a = ${Array}<Int>()
-  ${boundsTrap(0,1)}
+
+${ArrayTy}Traps.test("bounds1/${io}") {
+  var a: ${ArrayTy}<Int> = []
+  ${bounds_trap(index='0', expr_to_write='1')}
 }
 
-${test('Bounds2')} {
-  var a = ${Array}<Int>()
-  ${boundsTrap(100,1)}
+${ArrayTy}Traps.test("bounds2/${io}") {
+  var a: ${ArrayTy}<Int> = []
+  ${bounds_trap(index='100', expr_to_write='1')}
 }
 
-${test('Bounds3')} {
-  var a = ${Array}([ 10, 20, 30 ])
-  ${boundsTrap(3,1)}
+${ArrayTy}Traps.test("bounds3/${io}") {
+  var a: ${ArrayTy} = [ 10, 20, 30 ]
+  ${bounds_trap(index='3', expr_to_write='1')}
 }
 
-${test('PopFromEmpty')} {
-  var a: ${Array}<Int> = []
-  println("OK")
-  a.removeLast()
+${ArrayTy}Traps.test("sliceBounds0/${io}") {
+  var a: ${ArrayTy}<Int> = []
+  ${bounds_trap(index='-1..<1', expr_to_write='Slice()')}
 }
 
-${test('SliceBounds0')} {
-  var a = ${Array}<Int>()
-  ${boundsTrap('-1..<1','Slice()')}
+${ArrayTy}Traps.test("sliceBounds1/${io}") {
+  var a: ${ArrayTy} = [ 1 ]
+  ${bounds_trap(index='-1..<1', expr_to_write='Slice()')}
 }
 
-${test('SliceBounds1')} {
-  var a = ${Array}([1])
-  ${boundsTrap('-1..<1','Slice()')}
+${ArrayTy}Traps.test("sliceBounds2/${io}") {
+  var a: ${ArrayTy} = [ 1 ]
+  ${bounds_trap(index='0..<2', expr_to_write='Slice()')}
 }
 
-${test('SliceBounds2')} {
-  var a = ${Array}([1])
-  ${boundsTrap('0..<2','Slice()')}
-}
-
-${test('SliceBounds2')} {
-  var a = ${Array}([1])
-  ${boundsTrap('1..<2','Slice()')}
+${ArrayTy}Traps.test("sliceBounds3/${io}") {
+  var a: ${ArrayTy} = [ 1 ]
+  ${bounds_trap(index='1..<2', expr_to_write='Slice()')}
 }
 
 %   end
-%   io = ''
+
+${ArrayTy}Traps.test("PopFromEmpty") {
+  var a: ${ArrayTy}<Int> = []
+  expectCrashLater()
+  a.removeLast()
+}
 
 %   for index in -1, 2:
-${test('Insert%s' % index)} {
-  var a: ${Array}<Int> = [42]
-  println("OK")
+${ArrayTy}Traps.test("${'insert(_:atIndex:)/%s' % index}") {
+  var a: ${ArrayTy}<Int> = [42]
+  expectCrashLater()
   a.insert(3, atIndex: ${index})
 }
 %   end
 
 %   for index in -1, 1, 2:
-${test('Remove%s' % index)} {
-  var a: ${Array}<Int> = [42]
-  println("OK")
+${ArrayTy}Traps.test("${'removeAtIndex(_:)/%s' % index}") {
+  var a: ${ArrayTy}<Int> = [42]
+  expectCrashLater()
   a.removeAtIndex(${index})
 }
 %   end
 % end
-% Array = 'Array'
 
 class Base { }
 class Derived : Base { }
 
-${test('Downcast1')} {
-  let ba: [Base] = [Derived(), Base()]
+ArrayTraps.test("downcast1") {
+  let ba: [Base] = [ Derived(), Base() ]
   let da = ba as! [Derived]
   let d0 = da[0]
-  println("OK")
-  let d1 = da[1]
+  expectCrashLater()
+  da[1]
 }
 
-${test('Downcast2')} {
-  let a: [AnyObject] = ["String", 1]
+import Foundation
+
+ArrayTraps.test("downcast2") {
+  let a: [AnyObject] = [ "String", 1 ]
   let sa = a as! [NSString]
   let s0 = sa[0]
-  println("OK")
-  let s1 = sa[1]
+  expectCrashLater()
+  sa[1]
 }
 
-${test('UnsafeLength')} {
-  var a = [42, 77, 88]
-  
-  if a.withUnsafeBufferPointer({ $0[0] }) == 42 {
-    println("OK")
-  }
-  
+ArrayTraps.test("unsafeLength") {
+  var a = [ 42, 77, 88 ]
+
+  expectEqual(42, a.withUnsafeBufferPointer({ $0[0] }))
+
+  expectCrashLater()
+
   a.withUnsafeBufferPointer {
     UnsafeBufferPointer(start: $0.baseAddress, count: -1)
   }
 }
-println("BUSTED: should have crashed already")
-exit(1)
 
-%{
-  if RUN_TESTS:
-    from subprocess import call
-    import sys
-    exitCode = 0
-    for t in tests:
-      if call(
-        '%s %s 2>&1 | FileCheck %s' % (RUN_TESTS, t, SOURCE), 
-        shell=True
-      ) != 0:
-        exitCode = 1
-        sys.stderr.write('%s failed\n' % t)
-    exit(exitCode)
-}%
+runAllTests()
+
