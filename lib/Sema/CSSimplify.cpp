@@ -910,42 +910,6 @@ static bool isFunctionTypeAcceptingNoArguments(Type type) {
   return true;
 }
 
-/// \brief Map a type-matching kind to a constraint kind.
-static ConstraintKind getConstraintKind(TypeMatchKind kind) {
-  switch (kind) {
-  case TypeMatchKind::BindType:
-  case TypeMatchKind::BindToPointerType:
-    return ConstraintKind::Bind;
-
-  case TypeMatchKind::SameType:
-    return ConstraintKind::Equal;
-
-  case TypeMatchKind::Subtype:
-  case TypeMatchKind::MetatypeSubtype:
-    return ConstraintKind::Subtype;
-
-  case TypeMatchKind::Conversion:
-    return ConstraintKind::Conversion;
-
-  case TypeMatchKind::ExplicitConversion:
-    return ConstraintKind::ExplicitConversion;
-      
-  case TypeMatchKind::ArgumentConversion:
-    return ConstraintKind::ArgumentConversion;
-
-  case TypeMatchKind::ArgumentTupleConversion:
-    return ConstraintKind::ArgumentTupleConversion;
-
-  case TypeMatchKind::OperatorArgumentTupleConversion:
-    return ConstraintKind::OperatorArgumentTupleConversion;
-
-  case TypeMatchKind::OperatorArgumentConversion:
-    return ConstraintKind::OperatorArgumentConversion;
-  }
-
-  llvm_unreachable("unhandled type matching kind");
-}
-
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      TypeMatchKind kind, unsigned flags,
@@ -1003,56 +967,54 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   }
 
   // Determine how we match up the input/result types.
-  TypeMatchKind subKind = std::min(kind, TypeMatchKind::Subtype);
+  TypeMatchKind subKind;
+  switch (kind) {
+  case TypeMatchKind::BindType:
+  case TypeMatchKind::BindToPointerType:
+  case TypeMatchKind::SameType:
+    subKind = kind;
+    break;
 
-  // Input types can be contravariant (or equal).
-  auto *inputLoc = getConstraintLocator(locator.withPathElement(
-      ConstraintLocator::FunctionArgument));
-  auto *inputTypeMatch = Constraint::create(*this, getConstraintKind(subKind),
-                                            func2->getInput(),
-                                            func1->getInput(),
-                                            {}, inputLoc);
-
-  auto *resultLoc = getConstraintLocator(locator.withPathElement(
-      ConstraintLocator::FunctionResult));
-  auto *resultTypeMatch = Constraint::create(*this, getConstraintKind(subKind),
-                                             func1->getResult(),
-                                             func2->getResult(),
-                                             {}, resultLoc);
-
-  if (!shouldAttemptFixes() || kind < TypeMatchKind::Conversion) {
-    addConstraint(inputTypeMatch);
-    addConstraint(resultTypeMatch);
-    return SolutionKind::Solved;
+  case TypeMatchKind::Subtype:
+  case TypeMatchKind::MetatypeSubtype:
+  case TypeMatchKind::Conversion:
+  case TypeMatchKind::ExplicitConversion:
+  case TypeMatchKind::ArgumentConversion:
+  case TypeMatchKind::ArgumentTupleConversion:
+  case TypeMatchKind::OperatorArgumentTupleConversion:
+  case TypeMatchKind::OperatorArgumentConversion:
+    subKind = TypeMatchKind::Subtype;
+    break;
   }
 
-  // If we're trying to fix the constraint system, consider allowing a
-  // function conversion that changes the ABI.
-  auto *matchLoc = getConstraintLocator(locator);
-  auto *subtypeMatch =
-      Constraint::createConjunction(*this, {inputTypeMatch, resultTypeMatch},
-                                    matchLoc);
-  subtypeMatch->setFavored();
+  unsigned subFlags = flags | TMF_GenerateConstraints;
 
-  TypeMatchKind fixKind = std::min(kind, TypeMatchKind::Conversion);
-  auto *inputConversion =
-      Constraint::createFixed(*this, getConstraintKind(fixKind),
-                              Fix::getFunctionConversion(*this, func2),
-                              func2->getInput(), func1->getInput(), inputLoc);
+  // Input types can be contravariant (or equal).
+  SolutionKind result = matchTypes(func2->getInput(), func1->getInput(),
+                                   subKind, subFlags,
+                                   locator.withPathElement(
+                                     ConstraintLocator::FunctionArgument));
+  if (result == SolutionKind::Error)
+    return SolutionKind::Error;
 
-  auto *resultConversion = Constraint::create(*this, getConstraintKind(fixKind),
-                                              func1->getResult(),
-                                              func2->getResult(),
-                                              {}, resultLoc);
-  auto *subtypeConversion =
-      Constraint::createConjunction(*this, {inputConversion, resultConversion},
-                                    matchLoc);
+  // Result type can be covariant (or equal).
+  switch (matchTypes(func1->getResult(), func2->getResult(), subKind,
+                     subFlags,
+                     locator.withPathElement(
+                       ConstraintLocator::FunctionResult))) {
+  case SolutionKind::Error:
+    return SolutionKind::Error;
 
-  auto *disjunction =
-      Constraint::createDisjunction(*this, {subtypeMatch, subtypeConversion},
-                                    matchLoc);
-  addConstraint(disjunction);
-  return SolutionKind::Solved;
+  case SolutionKind::Solved:
+    result = SolutionKind::Solved;
+    break;
+
+  case SolutionKind::Unsolved:
+    result = SolutionKind::Unsolved;
+    break;
+  }
+
+  return result;
 }
 
 /// \brief Map a failed type-matching kind to a failure kind, generically.
@@ -1188,6 +1150,42 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   }
 
   return SolutionKind::Solved;
+}
+
+/// \brief Map a type-matching kind to a constraint kind.
+static ConstraintKind getConstraintKind(TypeMatchKind kind) {
+  switch (kind) {
+  case TypeMatchKind::BindType:
+  case TypeMatchKind::BindToPointerType:
+    return ConstraintKind::Bind;
+
+  case TypeMatchKind::SameType:
+    return ConstraintKind::Equal;
+
+  case TypeMatchKind::Subtype:
+  case TypeMatchKind::MetatypeSubtype:
+    return ConstraintKind::Subtype;
+
+  case TypeMatchKind::Conversion:
+    return ConstraintKind::Conversion;
+
+  case TypeMatchKind::ExplicitConversion:
+    return ConstraintKind::ExplicitConversion;
+      
+  case TypeMatchKind::ArgumentConversion:
+    return ConstraintKind::ArgumentConversion;
+
+  case TypeMatchKind::ArgumentTupleConversion:
+    return ConstraintKind::ArgumentTupleConversion;
+
+  case TypeMatchKind::OperatorArgumentTupleConversion:
+    return ConstraintKind::OperatorArgumentTupleConversion;
+
+  case TypeMatchKind::OperatorArgumentConversion:
+    return ConstraintKind::OperatorArgumentConversion;
+  }
+
+  llvm_unreachable("unhandled type matching kind");
 }
 
 static bool isStringCompatiblePointerBaseType(TypeChecker &TC,
@@ -4288,10 +4286,6 @@ ConstraintSystem::simplifyFixConstraint(Fix fix,
   case FixKind::FromRawToInit:
   case FixKind::ToRawToRawValue:
     llvm_unreachable("handled elsewhere");
-
-  case FixKind::FunctionConversion:
-    // We already have a different matchKind.
-    return matchTypes(type1, type2, matchKind, subFlags, locator);
   }
 }
 

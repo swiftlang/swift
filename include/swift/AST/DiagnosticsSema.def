@@ -396,10 +396,7 @@ ERROR(noescape_functiontype_mismatch,sema_tcc,none,
       "invalid use of non-escaping function in escaping context %0",
       (Type))
 ERROR(invalid_function_conversion,sema_tcc,none,
-      "function signature %0 is not compatible with expected type %1",
-      (Type, Type))
-NOTE(invalid_function_conversion_closure,sema_tcc,none,
-     "use a closure to safely wrap calls to the function", ())
+      "%1 does not have the same representation as %0", (Type, Type))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations

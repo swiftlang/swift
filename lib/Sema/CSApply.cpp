@@ -5195,20 +5195,6 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
         }
       }
 
-      // Fixing an invalid function conversion comes from a mismatch on the
-      // input or result type, which we strip.
-      if (fix.first.getKind() == FixKind::FunctionConversion) {
-        auto path = locator->getPath();
-        if (path.empty())
-          continue;
-        if (path.back().getKind() != ConstraintLocator::FunctionArgument &&
-            path.back().getKind() != ConstraintLocator::FunctionResult)
-          continue;
-        path = path.drop_back();
-        auto newFlags = ConstraintLocator::getSummaryFlagsForPath(path);
-        locator = getConstraintLocator(locator->getAnchor(), path, newFlags);
-      }
-
       // Resolve the locator to a specific expression.
       SourceRange range1, range2;
       ConstraintLocator *resolved
@@ -5429,42 +5415,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
       diagnosed = true;
       break;
     }
-
-      case FixKind::FunctionConversion: {
-        Type fromType =
-          solution.simplifyType(TC, affected->getType())->getRValueObjectType();
-        Type toType = solution.simplifyType(TC,
-                                            fix.first.getTypeArgument(*this));
-        TC.diagnose(affected->getLoc(), diag::invalid_function_conversion,
-                    fromType, toType);
-        diagnosed = true;
-
-        auto hasAnyLabeledParams = [](const AnyFunctionType *fnTy) -> bool {
-          auto *params = fnTy->getInput()->getAs<TupleType>();
-          if (!params)
-            return false;
-          return std::any_of(params->getFields().begin(),
-                             params->getFields().end(),
-                             [](TupleTypeElt field) {
-            return field.hasName();
-          });
-        };
-
-        if (!isa<ClosureExpr>(affected) && !isa<CaptureListExpr>(affected) &&
-            !hasAnyLabeledParams(toType->castTo<AnyFunctionType>())) {
-          bool needsParens = !affected->canAppendCallParentheses();
-
-          SourceLoc endLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
-                                                        affected->getEndLoc());
-          TC.diagnose(affected->getLoc(),
-                      diag::invalid_function_conversion_closure)
-            .fixItInsert(affected->getStartLoc(), needsParens ? "{ (" : "{ ")
-            .fixItInsert(endLoc, needsParens ? ")($0) }" : "($0) }");
-        }
-
-        break;
-      }
-      }
+    }
 
       // FIXME: It would be really nice to emit a follow-up note showing where
       // we got the other type information from, e.g., the parameter we're
