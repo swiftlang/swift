@@ -49,6 +49,15 @@ Optional<bool> computeSignBit(SILValue Value);
 /// Returns true of an overflow can happen. Otherwise returns false.
 bool canOverflow(BuiltinInst *BI);
 
+/// Return true if I is a thin_to_thick_function or partial_apply that is local
+/// to the given function, does not escape, and has only ref count
+/// users. Returns false otherwise. The relevant ref count users are returned in
+/// RC on success.
+///
+/// TODO: Refactor SILCombine dead closure removal to use this code.
+bool isLocalDeadClosure(SILInstruction *I,
+                        llvm::SmallVectorImpl<SILInstruction *> &RC);
+
 } // end namespace swift
 
 #endif // SWIFT_SILANALYSIS_VALUETRACKING_H
