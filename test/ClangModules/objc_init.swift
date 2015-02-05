@@ -9,6 +9,13 @@ import objc_ext
 import TestProtocols
 import ObjCParseExtras
 
+// rdar://problem/18500201
+extension NSSet {
+  convenience init<T>(array: Array<T>) {
+    self.init()
+  }
+}
+
 // Subclassing and designated initializers
 func testNSInterestingDesignated() {
   NSInterestingDesignated()

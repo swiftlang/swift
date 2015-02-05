@@ -3015,14 +3015,15 @@ namespace {
       Type allocType = FunctionType::get(selfMetaVar->getType(), type);
       Type initType = FunctionType::get(selfTy, type);
 
-      // Look for other constructors that occur in this context with
+      // Look for other imported constructors that occur in this context with
       // the same name.
       Type allocParamType = allocType->castTo<AnyFunctionType>()->getResult()
                               ->castTo<AnyFunctionType>()->getInput();
       for (auto other : nominalOwner->lookupDirect(name)) {
         auto ctor = dyn_cast<ConstructorDecl>(other);
         if (!ctor || ctor->isInvalid() ||
-            ctor->getAttrs().isUnavailable(Impl.SwiftContext))
+            ctor->getAttrs().isUnavailable(Impl.SwiftContext) ||
+            !ctor->getClangDecl())
           continue;
 
         // Resolve the type of the constructor.

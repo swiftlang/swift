@@ -97,6 +97,7 @@ __attribute__((availability(macosx,introduced=10.10)))
 - (instancetype)init;
 - (NSUInteger)count;
 - (id)anyObject;
+- (instancetype)initWithArray:(NSArray *)array;
 @end
 
 @interface NSMutableSet : NSSet

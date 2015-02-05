@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: %target-swift-frontend %s -parse
 // XFAIL: no_asserts
 
 // Distributed under the terms of the MIT license
