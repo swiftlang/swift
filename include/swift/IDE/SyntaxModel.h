@@ -32,6 +32,8 @@ enum class SyntaxNodeKind : uint8_t {
   Integer,
   Floating,
   String,
+  /// Marks the parens for a string interpolation.
+  StringInterpolationAnchor,
   Character,
   CommentLine,
   CommentBlock,

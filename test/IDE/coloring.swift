@@ -173,7 +173,7 @@ func genFn<T : Prot where T.Blarg : Prot2>(_: T) -> Int {}
 func f(x: Int) -> Int {
   // CHECK: <comment-line>// string interpolation is the best</comment-line>
   // string interpolation is the best
-  // CHECK: <str>"This is string </str>\(genFn({(a:<type>Int</type> -> <type>Int</type>) <kw>in</kw> a}))<str> interpolation"</str>
+  // CHECK: <str>"This is string </str>\<anchor>(</anchor>genFn({(a:<type>Int</type> -> <type>Int</type>) <kw>in</kw> a})<anchor>)</anchor><str> interpolation"</str>
   "This is string \(genFn({(a:Int -> Int) in a})) interpolation"
 }
 
@@ -194,7 +194,7 @@ func test() {
 typealias MyInt = Int
 
 func test2(x: Int) {
-  // CHECK: <str>"</str>\(x)<str>"</str>
+  // CHECK: <str>"</str>\<anchor>(</anchor>x<anchor>)</anchor><str>"</str>
   "\(x)"
 }
 

@@ -56,7 +56,8 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
                                            /*TokenizeInterpolatedString=*/true);
   std::vector<SyntaxNode> Nodes;
   SourceLoc AttrLoc;
-  for (auto &Tok : Tokens) {
+  for (unsigned I = 0, E = Tokens.size(); I != E; ++I) {
+    auto &Tok = Tokens[I];
     SyntaxNodeKind Kind;
     SourceLoc Loc;
     Optional<unsigned> Length;
@@ -100,6 +101,35 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         // attribute name.
         AttrLoc = Tok.getLoc();
         continue;
+
+      case tok::l_paren: {
+        // Check if this is a string interpolation paren.
+        if (I == 0)
+          continue;
+        auto &PrevTok = Tokens[I-1];
+        if (PrevTok.getKind() != tok::string_literal)
+          continue;
+        StringRef StrText = PrevTok.getText();
+        if (StrText.size() > 1 && StrText.back() == '\"')
+          continue;
+        Kind = SyntaxNodeKind::StringInterpolationAnchor;
+        break;
+      }
+
+      case tok::r_paren: {
+        // Check if this is a string interpolation paren.
+        if (I+1 == E)
+          continue;
+        auto &NextTok = Tokens[I+1];
+        if (NextTok.getKind() != tok::string_literal)
+          continue;
+        StringRef StrText = NextTok.getText();
+        if (StrText.size() > 1 && StrText.front() == '\"')
+          continue;
+        Kind = SyntaxNodeKind::StringInterpolationAnchor;
+        break;
+      }
+
       default:
         continue;
       }

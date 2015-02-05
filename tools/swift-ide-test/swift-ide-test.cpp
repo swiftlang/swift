@@ -610,6 +610,7 @@ public:
     case SyntaxNodeKind::Integer: Id = "int"; break;
     case SyntaxNodeKind::Floating: Id = "float"; break;
     case SyntaxNodeKind::String: Id = "str"; break;
+    case SyntaxNodeKind::StringInterpolationAnchor: Id = "anchor"; break;
     case SyntaxNodeKind::Character: Id = "char"; break;
     case SyntaxNodeKind::CommentLine: Id = "comment-line"; break;
     case SyntaxNodeKind::CommentBlock: Id = "comment-block"; break;
@@ -635,6 +636,7 @@ public:
     case SyntaxNodeKind::Integer: Col = llvm::raw_ostream::BLUE; break;
     case SyntaxNodeKind::Floating: Col = llvm::raw_ostream::BLUE; break;
     case SyntaxNodeKind::String: Col = llvm::raw_ostream::RED; break;
+    case SyntaxNodeKind::StringInterpolationAnchor: Col = llvm::raw_ostream::CYAN; break;
     case SyntaxNodeKind::Character: Col = llvm::raw_ostream::BLUE; break;
     case SyntaxNodeKind::CommentLine: Col = llvm::raw_ostream::GREEN; break;
     case SyntaxNodeKind::CommentBlock: Col = llvm::raw_ostream::GREEN; break;
