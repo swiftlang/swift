@@ -238,8 +238,16 @@ bool CallSiteDescriptor::isSupportedClosure(const SILInstruction *Closure) {
     // And it has substitutions, return false.
     if (PAI->hasSubstitutions())
       return false;
+
+    // If any arguments are not objects, return false. This is a temporary
+    // limitation.
+    for (SILValue Arg : PAI->getArguments())
+      if (!Arg.getType().isObject())
+        return false;
+
     // Ok, it is a closure we support, set Callee.
     Callee = PAI->getCallee();
+
   } else {
     // Otherwise closure must be a thin_to_thick_function.
     Callee = cast<ThinToThickFunctionInst>(Closure)->getCallee();

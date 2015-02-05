@@ -120,3 +120,33 @@ bb0(%0 : $Int):
   %9999 = tuple ()                                   // user: %7
   return %9999 : $()                                 // id: %7
 }
+
+// We don't handle closures that close over address types (*NOTE* this includes
+// address and non-address only types). This is a temporary limitation.
+// CHECK-LABEL: sil @address_closure : $@thin (@in Int) -> () {
+sil @address_closure : $@thin (@in Int) -> () {
+bb0(%0 : $*Int):
+  %6 = tuple()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil @address_closure_user : $@thin (@owned @callee_owned () -> ()) -> () {
+sil @address_closure_user : $@thin (@owned @callee_owned () -> ()) -> () {
+bb0(%0 : $@callee_owned () -> ()):
+  %1 = apply %0() : $@callee_owned () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @address_caller : $@thin (@in Int) -> () {
+// CHECK-NOT: _TTSf1cl15address_closureSi__address_closure_user
+sil @address_caller : $@thin (@in Int) -> () {
+bb0(%0 : $*Int):
+  %1 = function_ref @address_closure : $@thin (@in Int) -> ()
+  %2 = partial_apply %1(%0) : $@thin (@in Int) -> ()
+  %3 = function_ref @address_closure_user : $@thin (@owned @callee_owned () -> ()) -> ()
+  %4 = apply %3(%2) : $@thin (@owned @callee_owned () -> ()) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
