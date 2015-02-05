@@ -59,8 +59,10 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILModule.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclGroup.h"
+#include "clang/AST/RecordLayout.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -849,6 +851,341 @@ llvm::Type *SignatureExpansion::expandResult() {
   }
 }
 
+static const clang::FieldDecl *
+getLargestUnionField(const clang::RecordDecl *record,
+                     const clang::ASTContext &ctx) {
+  const clang::FieldDecl *largestField = nullptr;
+  clang::CharUnits unionSize = clang::CharUnits::Zero();
+
+  for (auto field : record->fields()) {
+    assert(!field->isBitField());
+    clang::CharUnits fieldSize = ctx.getTypeSizeInChars(field->getType());
+    if (unionSize < fieldSize) {
+      unionSize = fieldSize;
+      largestField = field;
+    }
+  }
+  assert(largestField && "empty union?");
+  return largestField;
+}
+
+namespace {
+  /// A CRTP class for working with Clang's ABIArgInfo::Expand
+  /// argument type expansions.
+  template <class Impl, class... Args> struct ClangExpand {
+    IRGenModule &IGM;
+    const clang::ASTContext &Ctx;
+    ClangExpand(IRGenModule &IGM) : IGM(IGM), Ctx(IGM.getClangASTContext()) {}
+
+    Impl &asImpl() { return *static_cast<Impl*>(this); }
+
+    void visit(clang::CanQualType type, Args... args) {
+      switch (type->getTypeClass()) {
+#define TYPE(Class, Base)
+#define NON_CANONICAL_TYPE(Class, Base) \
+      case clang::Type::Class:
+#define DEPENDENT_TYPE(Class, Base) \
+      case clang::Type::Class:
+#define NON_CANONICAL_UNLESS_DEPENDENT_TYPE(Class, Base) \
+      case clang::Type::Class:
+#include "clang/AST/TypeNodes.def"
+        llvm_unreachable("canonical or dependent type in ABI lowering");
+
+      // These shouldn't occur in expandable struct types.
+      case clang::Type::IncompleteArray:
+      case clang::Type::VariableArray:
+        llvm_unreachable("variable-sized or incomplete array in ABI lowering");
+
+      // We should only ever get ObjC pointers, not underlying objects.
+      case clang::Type::ObjCInterface:
+      case clang::Type::ObjCObject:
+        llvm_unreachable("ObjC object type in ABI lowering");
+
+      // We should only ever get function pointers.
+      case clang::Type::FunctionProto:
+      case clang::Type::FunctionNoProto:
+        llvm_unreachable("non-pointer function type in ABI lowering");
+
+      // We currently never import C++ code, and we should be able to
+      // kill Expand before we do.
+      case clang::Type::LValueReference:
+      case clang::Type::RValueReference:
+      case clang::Type::MemberPointer:
+      case clang::Type::Auto:
+        llvm_unreachable("C++ type in ABI lowering?");
+
+      case clang::Type::ConstantArray: {
+        auto array = Ctx.getAsConstantArrayType(type);
+        auto elt = Ctx.getCanonicalType(array->getElementType());
+        auto &&context = asImpl().beginArrayElements(elt);
+        uint64_t n = array->getSize().getZExtValue();
+        for (uint64_t i = 0; i != n; ++i) {
+          asImpl().visitArrayElement(elt, i, context, args...);
+        }
+        return;
+      }
+
+      case clang::Type::Record: {
+        auto record = cast<clang::RecordType>(type)->getDecl();
+        if (record->isUnion()) {
+          auto largest = getLargestUnionField(record, Ctx);
+          asImpl().visitUnionField(record, largest, args...);
+        } else {
+          auto &&context = asImpl().beginStructFields(record);
+          for (auto field : record->fields()) {
+            asImpl().visitStructField(record, field, context, args...);
+          }
+        }
+        return;
+      }
+
+      case clang::Type::Complex: {
+        auto elt = type.castAs<clang::ComplexType>().getElementType();
+        asImpl().visitComplexElement(elt, 0, args...);
+        asImpl().visitComplexElement(elt, 1, args...);
+        return;
+      }
+
+      // Just handle this types as opaque integers.
+      case clang::Type::Enum:
+      case clang::Type::Atomic:
+        asImpl().visitScalar(convertTypeAsInteger(type), args...);
+        return;
+
+      case clang::Type::Builtin:
+        asImpl().visitScalar(
+                      convertBuiltinType(type.castAs<clang::BuiltinType>()),
+                             args...);
+        return;
+
+      case clang::Type::Vector:
+      case clang::Type::ExtVector:
+        asImpl().visitScalar(
+                      convertVectorType(type.castAs<clang::VectorType>()),
+                             args...);
+        return;
+
+      case clang::Type::Pointer:
+      case clang::Type::BlockPointer:
+      case clang::Type::ObjCObjectPointer:
+        asImpl().visitScalar(IGM.Int8PtrTy, args...);
+        return;
+      }
+      llvm_unreachable("bad type kind");
+    }
+    
+    Size getSizeOfType(clang::QualType type) {
+      auto clangSize = Ctx.getTypeSizeInChars(type);
+      return Size(clangSize.getQuantity());
+    }
+
+  private:
+    llvm::Type *convertVectorType(clang::CanQual<clang::VectorType> type) {
+      auto eltTy =
+        convertBuiltinType(type->getElementType().castAs<clang::BuiltinType>());
+      return llvm::VectorType::get(eltTy, type->getNumElements());
+    }
+
+    llvm::Type *convertBuiltinType(clang::CanQual<clang::BuiltinType> type) {
+      switch (type.getTypePtr()->getKind()) {
+#define BUILTIN_TYPE(Id, SingletonId)
+#define PLACEHOLDER_TYPE(Id, SingletonId) \
+      case clang::BuiltinType::Id:
+#include "clang/AST/BuiltinTypes.def"
+      case clang::BuiltinType::Dependent:
+        llvm_unreachable("placeholder type in ABI lowering");
+
+      // We should never see these unadorned.
+      case clang::BuiltinType::ObjCId:
+      case clang::BuiltinType::ObjCClass:
+      case clang::BuiltinType::ObjCSel:
+        llvm_unreachable("bare Objective-C object type in ABI lowering");
+
+      // This should never be the type of an argument or field.
+      case clang::BuiltinType::Void:
+        llvm_unreachable("bare void type in ABI lowering");
+
+      // We should never see the OpenCL builtin types at all.
+      case clang::BuiltinType::OCLImage1d:
+      case clang::BuiltinType::OCLImage1dArray:
+      case clang::BuiltinType::OCLImage1dBuffer:
+      case clang::BuiltinType::OCLImage2d:
+      case clang::BuiltinType::OCLImage2dArray:
+      case clang::BuiltinType::OCLImage3d:
+      case clang::BuiltinType::OCLSampler:
+      case clang::BuiltinType::OCLEvent:
+        llvm_unreachable("OpenCL type in ABI lowering");
+
+      // Handle all the integer types as opaque values.
+#define BUILTIN_TYPE(Id, SingletonId)
+#define SIGNED_TYPE(Id, SingletonId) \
+      case clang::BuiltinType::Id:
+#define UNSIGNED_TYPE(Id, SingletonId) \
+      case clang::BuiltinType::Id:
+#include "clang/AST/BuiltinTypes.def"
+        return convertTypeAsInteger(type);
+
+      // Lower all the floating-point values by their semantics.
+      case clang::BuiltinType::Half:
+        return convertFloatingType(Ctx.getTargetInfo().getHalfFormat());
+      case clang::BuiltinType::Float:
+        return convertFloatingType(Ctx.getTargetInfo().getFloatFormat());
+      case clang::BuiltinType::Double:
+        return convertFloatingType(Ctx.getTargetInfo().getDoubleFormat());
+      case clang::BuiltinType::LongDouble:
+        return convertFloatingType(Ctx.getTargetInfo().getLongDoubleFormat());
+
+      // nullptr_t -> void*
+      case clang::BuiltinType::NullPtr:
+        return IGM.Int8PtrTy;
+      }
+      llvm_unreachable("bad builtin type");
+    }
+
+    llvm::Type *convertFloatingType(const llvm::fltSemantics &format) {
+      if (&format == &llvm::APFloat::IEEEhalf)
+        return llvm::Type::getHalfTy(IGM.getLLVMContext());
+      if (&format == &llvm::APFloat::IEEEsingle)
+        return llvm::Type::getFloatTy(IGM.getLLVMContext());
+      if (&format == &llvm::APFloat::IEEEdouble)
+        return llvm::Type::getDoubleTy(IGM.getLLVMContext());
+      if (&format == &llvm::APFloat::IEEEquad)
+        return llvm::Type::getFP128Ty(IGM.getLLVMContext());
+      if (&format == &llvm::APFloat::PPCDoubleDouble)
+        return llvm::Type::getPPC_FP128Ty(IGM.getLLVMContext());
+      if (&format == &llvm::APFloat::x87DoubleExtended)
+        return llvm::Type::getX86_FP80Ty(IGM.getLLVMContext());
+      llvm_unreachable("bad float format");
+    }
+
+    llvm::Type *convertTypeAsInteger(clang::QualType type) {
+      auto size = getSizeOfType(type);
+      return llvm::IntegerType::get(IGM.getLLVMContext(),
+                                    size.getValueInBits());
+    }
+  };
+
+  /// A CRTP specialization of ClangExpand which projects down to
+  /// various aggregate elements of an address.
+  ///
+  /// Subclasses should only have to define visitScalar.
+  template <class Impl>
+  class ClangExpandProjection : public ClangExpand<Impl, Address> {
+    using super = ClangExpand<Impl, Address>;
+    using super::asImpl;
+    using super::IGM;
+    using super::Ctx;
+    using super::getSizeOfType;
+
+  protected:
+    IRGenFunction &IGF;
+    ClangExpandProjection(IRGenFunction &IGF)
+      : super(IGF.IGM), IGF(IGF) {}
+
+  public:
+    void visit(clang::CanQualType type, Address addr) {
+      assert(addr.getType() == IGM.Int8PtrTy);
+      super::visit(type, addr);
+    }
+    
+    Size beginArrayElements(clang::CanQualType element) {
+      return getSizeOfType(element);
+    }
+    void visitArrayElement(clang::CanQualType element, unsigned i,
+                           Size elementSize, Address arrayAddr) {
+      asImpl().visit(element, createGEPAtOffset(arrayAddr, elementSize * i));
+    }
+
+    void visitComplexElement(clang::CanQualType element, unsigned i,
+                             Address complexAddr) {
+      Address addr = complexAddr;
+      if (i) { addr = createGEPAtOffset(complexAddr, getSizeOfType(element)); }
+      asImpl().visit(element, addr);
+    }
+
+    void visitUnionField(const clang::RecordDecl *record,
+                         const clang::FieldDecl *field,
+                         Address structAddr) {
+      asImpl().visit(Ctx.getCanonicalType(field->getType()), structAddr);
+    }
+
+    const clang::ASTRecordLayout &
+    beginStructFields(const clang::RecordDecl *record) {
+      return Ctx.getASTRecordLayout(record);
+    }
+    void visitStructField(const clang::RecordDecl *record,
+                          const clang::FieldDecl *field,
+                          const clang::ASTRecordLayout &layout,
+                          Address structAddr) {
+      auto fieldIndex = field->getFieldIndex();
+      auto fieldOffset = Size(layout.getFieldOffset(fieldIndex) / 8);
+      asImpl().visit(Ctx.getCanonicalType(field->getType()),
+                     createGEPAtOffset(structAddr, fieldOffset));
+    }
+
+  private:
+    Address createGEPAtOffset(Address addr, Size offset) {
+      if (offset.isZero()) {
+        return addr;
+      } else {
+        return IGF.Builder.CreateConstByteArrayGEP(addr, offset);
+      }
+    }
+  };
+
+  /// A class for collecting the types of a Clang ABIArgInfo::Expand
+  /// argument expansion.
+  struct ClangExpandTypeCollector : ClangExpand<ClangExpandTypeCollector> {
+    SmallVectorImpl<llvm::Type*> &Types;
+    ClangExpandTypeCollector(IRGenModule &IGM,
+                             SmallVectorImpl<llvm::Type*> &types)
+      : ClangExpand(IGM), Types(types) {}
+
+    bool beginArrayElements(clang::CanQualType element) { return true; }
+    void visitArrayElement(clang::CanQualType element, unsigned i, bool _) {
+      visit(element);
+    }
+
+    void visitComplexElement(clang::CanQualType element, unsigned i) {
+      visit(element);
+    }
+
+    void visitUnionField(const clang::RecordDecl *record,
+                         const clang::FieldDecl *field) {
+      visit(Ctx.getCanonicalType(field->getType()));
+    }
+
+    bool beginStructFields(const clang::RecordDecl *record) { return true; }
+    void visitStructField(const clang::RecordDecl *record,
+                          const clang::FieldDecl *field,
+                          bool _) {
+      visit(Ctx.getCanonicalType(field->getType()));
+    }
+
+    void visitScalar(llvm::Type *type) {
+      Types.push_back(type);
+    }
+  };
+}
+
+static bool doesClangExpansionMatchSchema(IRGenModule &IGM,
+                                          clang::CanQualType type,
+                                          const ExplosionSchema &schema) {
+  assert(!schema.containsAggregate());
+  SmallVector<llvm::Type *, 4> expansion;
+  ClangExpandTypeCollector(IGM, expansion).visit(type);
+
+  if (expansion.size() != schema.size())
+    return false;
+
+  for (size_t i = 0, e = schema.size(); i != e; ++i) {
+    if (schema[i].getScalarType() != expansion[i])
+      return false;
+  }
+
+  return true;
+}
+
 /// Expand the result and parameter types to the appropriate LLVM IR
 /// types for C and Objective-C signatures.
 llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
@@ -950,13 +1287,9 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
       addPointerParameter(paramTI.getStorageType());
       break;
     }
-    case clang::CodeGen::ABIArgInfo::Expand: {
-      assert(i >= paramOffset && "Unexpected index for expanded argument");
-      auto &param = params[i - paramOffset];
-      auto schema = IGM.getSchema(param.getSILType());
-      schema.addToArgTypes(IGM, ParamIRTypes);
+    case clang::CodeGen::ABIArgInfo::Expand:
+      ClangExpandTypeCollector(IGM, ParamIRTypes).visit(paramTys[i]);
       break;
-    }
     case clang::CodeGen::ABIArgInfo::Ignore:
       break;
     case clang::CodeGen::ABIArgInfo::InAlloca:
@@ -2249,6 +2582,84 @@ static void emitDirectExternalArgument(IRGenFunction &IGF,
   argTI.deallocateStack(IGF, temporary, argType);
 }
 
+namespace {
+  /// Load a clang argument expansion from a buffer.
+  struct ClangExpandLoadEmitter :
+    ClangExpandProjection<ClangExpandLoadEmitter> {
+
+    Explosion &Out;
+    ClangExpandLoadEmitter(IRGenFunction &IGF, Explosion &out)
+      : ClangExpandProjection(IGF), Out(out) {}
+
+    void visitScalar(llvm::Type *scalarTy, Address addr) {
+      addr = IGF.Builder.CreateBitCast(addr, scalarTy->getPointerTo());
+      auto value = IGF.Builder.CreateLoad(addr);
+      Out.add(value);
+    }
+  };
+
+  /// Store a clang argument expansion into a buffer.
+  struct ClangExpandStoreEmitter :
+    ClangExpandProjection<ClangExpandStoreEmitter> {
+
+    Explosion &In;
+    ClangExpandStoreEmitter(IRGenFunction &IGF, Explosion &in)
+      : ClangExpandProjection(IGF), In(in) {}
+
+    void visitScalar(llvm::Type *scalarTy, Address addr) {
+      auto value = In.claimNext();
+
+      addr = IGF.Builder.CreateBitCast(addr, scalarTy->getPointerTo());
+      IGF.Builder.CreateStore(value, addr);
+    }
+  };
+}
+
+/// Given a Swift value explosion in 'in', produce a Clang expansion
+/// (according to ABIArgInfo::Expand) in 'out'.
+static void emitClangExpandedArgument(IRGenFunction &IGF,
+                                      Explosion &in, Explosion &out,
+                                      clang::CanQualType clangType,
+                                      SILType swiftType,
+                                      const LoadableTypeInfo &swiftTI) {
+  // If Clang's expansion schema matches Swift's, great.
+  auto swiftSchema = swiftTI.getSchema();
+  if (doesClangExpansionMatchSchema(IGF.IGM, clangType, swiftSchema)) {
+    return in.transferInto(out, swiftSchema.size());
+  }
+
+  // Otherwise, materialize to a temporary.
+  Address temp = swiftTI.allocateStack(IGF, swiftType,
+                                       "clang-expand-arg.temp").getAddress();
+  swiftTI.initialize(IGF, in, temp);
+
+  Address castTemp = IGF.Builder.CreateBitCast(temp, IGF.IGM.Int8PtrTy);
+  ClangExpandLoadEmitter(IGF, out).visit(clangType, castTemp);
+}
+
+/// Given a Clang-expanded (according to ABIArgInfo::Expand) parameter
+/// in 'in', produce a Swift value explosion in 'out'.
+void irgen::emitClangExpandedParameter(IRGenFunction &IGF,
+                                       Explosion &in, Explosion &out,
+                                       clang::CanQualType clangType,
+                                       SILType swiftType,
+                                       const LoadableTypeInfo &swiftTI) {
+  // If Clang's expansion schema matches Swift's, great.
+  auto swiftSchema = swiftTI.getSchema();
+  if (doesClangExpansionMatchSchema(IGF.IGM, clangType, swiftSchema)) {
+    return in.transferInto(out, swiftSchema.size());
+  }
+
+  // Otherwise, materialize to a temporary.
+  Address temp = swiftTI.allocateStack(IGF, swiftType,
+                                       "clang-expand-param.temp").getAddress();
+  Address castTemp = IGF.Builder.CreateBitCast(temp, IGF.IGM.Int8PtrTy);
+  ClangExpandStoreEmitter(IGF, in).visit(clangType, castTemp);
+
+  // Then load out.
+  swiftTI.loadAsTake(IGF, temp, out);
+}
+
 static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
                                  Explosion &in, Explosion &out,
                      SmallVectorImpl<std::pair<unsigned, Alignment>> &newByvals,
@@ -2333,11 +2744,10 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
       out.add(addr.getAddress());
       break;
     }
-    case clang::CodeGen::ABIArgInfo::Expand: {
-      auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType));
-      ti.reexplode(IGF, in, out);
+    case clang::CodeGen::ABIArgInfo::Expand:
+      emitClangExpandedArgument(IGF, in, out, paramTys[i], paramType,
+                         cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType)));
       break;
-    }
     case clang::CodeGen::ABIArgInfo::Ignore:
       break;
     case clang::CodeGen::ABIArgInfo::InAlloca:
