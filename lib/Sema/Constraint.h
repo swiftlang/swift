@@ -256,6 +256,9 @@ enum class FixKind : uint8_t {
 
   /// Replace a call of 'toRaw' with a reference to 'rawValue'.
   ToRawToRawValue,
+
+  /// Wrap a function value in a closure to adjust the ABI.
+  FunctionConversion
 };
 
 /// Desribes a fix that can be applied to a constraint before visiting it.
@@ -283,6 +286,9 @@ public:
 
   /// Produce a new fix that performs a forced downcast to the given type.
   static Fix getForcedDowncast(ConstraintSystem &cs, Type toType);
+
+  /// Produce a new fix that performs a function conversion.
+  static Fix getFunctionConversion(ConstraintSystem &cs, FunctionType *toType);
 
   /// Retrieve the kind of fix.
   FixKind getKind() const { return Kind; }

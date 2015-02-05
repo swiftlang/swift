@@ -168,6 +168,143 @@ bool Expr::isSuperExpr() const {
   } while (true);
 }
 
+bool Expr::canAppendCallParentheses() const {
+  switch (getKind()) {
+  case ExprKind::Error:
+    return false;
+
+  case ExprKind::NilLiteral:
+  case ExprKind::IntegerLiteral:
+  case ExprKind::FloatLiteral:
+  case ExprKind::BooleanLiteral:
+  case ExprKind::CharacterLiteral:
+  case ExprKind::StringLiteral:
+  case ExprKind::InterpolatedStringLiteral:
+  case ExprKind::MagicIdentifierLiteral:
+    return true;
+
+  case ExprKind::DiscardAssignment:
+    // Legal but pointless.
+    return true;
+
+  case ExprKind::DeclRef:
+    return !cast<DeclRefExpr>(this)->getDecl()->getName().isOperator();
+
+  case ExprKind::SuperRef:
+  case ExprKind::Type:
+  case ExprKind::OtherConstructorDeclRef:
+  case ExprKind::UnresolvedConstructor:
+  case ExprKind::DotSyntaxBaseIgnored:
+    return true;
+
+  case ExprKind::OverloadedDeclRef: {
+    auto *overloadedExpr = cast<OverloadedDeclRefExpr>(this);
+    if (overloadedExpr->getDecls().empty())
+      return false;
+    return !overloadedExpr->getDecls().front()->getName().isOperator();
+  }
+
+  case ExprKind::OverloadedMemberRef:
+    return true;
+
+  case ExprKind::UnresolvedDeclRef:
+    return cast<UnresolvedDeclRefExpr>(this)->getName().isOperator();
+
+  case ExprKind::MemberRef:
+  case ExprKind::DynamicMemberRef:
+  case ExprKind::DynamicSubscript:
+  case ExprKind::UnresolvedSpecialize:
+  case ExprKind::UnresolvedMember:
+  case ExprKind::UnresolvedDot:
+  case ExprKind::UnresolvedSelector:
+    return true;
+
+  case ExprKind::Sequence:
+    return false;
+
+  case ExprKind::Paren:
+  case ExprKind::DotSelf:
+  case ExprKind::Tuple:
+  case ExprKind::Array:
+  case ExprKind::Dictionary:
+  case ExprKind::Subscript:
+  case ExprKind::TupleElement:
+    return true;
+
+  case ExprKind::CaptureList:
+  case ExprKind::Closure:
+  case ExprKind::AutoClosure:
+    return false;
+
+  case ExprKind::Module:
+  case ExprKind::DynamicType:
+    return true;
+
+  case ExprKind::InOut:
+    return false;
+
+  case ExprKind::RebindSelfInConstructor:
+  case ExprKind::OpaqueValue:
+  case ExprKind::BindOptional:
+  case ExprKind::OptionalEvaluation:
+    return false;
+
+  case ExprKind::ForceValue:
+    return true;
+
+  case ExprKind::OpenExistential:
+    return false;
+
+  case ExprKind::Call:
+  case ExprKind::PostfixUnary:
+  case ExprKind::DotSyntaxCall:
+  case ExprKind::ConstructorRefCall:
+    return true;
+
+  case ExprKind::PrefixUnary:
+  case ExprKind::Binary:
+    return false;
+
+  case ExprKind::Load:
+  case ExprKind::TupleShuffle:
+  case ExprKind::FunctionConversion:
+  case ExprKind::CovariantFunctionConversion:
+  case ExprKind::CovariantReturnConversion:
+  case ExprKind::MetatypeConversion:
+  case ExprKind::CollectionUpcastConversion:
+  case ExprKind::Erasure:
+  case ExprKind::MetatypeErasure:
+  case ExprKind::DerivedToBase:
+  case ExprKind::ArchetypeToSuper:
+  case ExprKind::ScalarToTuple:
+  case ExprKind::InjectIntoOptional:
+  case ExprKind::UnavailableToOptional:
+  case ExprKind::ClassMetatypeToObject:
+  case ExprKind::ExistentialMetatypeToObject:
+  case ExprKind::ProtocolMetatypeToObject:
+  case ExprKind::InOutToPointer:
+  case ExprKind::ArrayToPointer:
+  case ExprKind::StringToPointer:
+  case ExprKind::PointerToPointer:
+  case ExprKind::LValueToPointer:
+  case ExprKind::ForeignObjectConversion:
+    return false;
+
+  case ExprKind::ForcedCheckedCast:
+  case ExprKind::ConditionalCheckedCast:
+  case ExprKind::Isa:
+  case ExprKind::Coerce:
+    return false;
+
+  case ExprKind::If:
+  case ExprKind::Assign:
+  case ExprKind::DefaultValue:
+  case ExprKind::UnresolvedPattern:
+  case ExprKind::AvailabilityQuery:
+    return false;
+  }
+}
+
 llvm::DenseMap<Expr *, Expr *> Expr::getParentMap() {
   class RecordingTraversal : public ASTWalker {
   public:
