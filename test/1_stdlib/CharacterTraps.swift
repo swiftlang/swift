@@ -1,33 +1,28 @@
-// These tests should crash.
+// RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/CatchCrashes.cpp -c -o %t/CatchCrashes.o
-// RUN: %target-build-swift %s -Xlinker %t/CatchCrashes.o -o %t/a.out
+// RUN: %target-build-swift %s -o %t/a.out_Debug
+// RUN: %target-build-swift %s -o %t/a.out_Release -O
 //
-// RUN: %target-run %t/a.out CharacterFromEmptyString 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out CharacterFromMoreThanOneGraphemeCluster 2>&1 | FileCheck %s -check-prefix=CHECK
-
-// CHECK: OK
-// CHECK: CRASHED: SIG{{ILL|TRAP|ABRT}}
+// RUN: %target-run %t/a.out_Debug
+// RUN: %target-run %t/a.out_Release
 
 // XFAIL: linux
 
-import Darwin
+import StdlibUnittest
 
-// Interpret the command line arguments.
-var arg = Process.arguments[1]
+var CharacterTraps = TestSuite("CharacterTraps")
 
-if arg == "CharacterFromEmptyString" {
+CharacterTraps.test("CharacterFromEmptyString") {
   var s = ""
-  println("OK")
+  expectCrashLater()
   Character(s)
 }
 
-if arg == "CharacterFromMoreThanOneGraphemeCluster" {
+CharacterTraps.test("CharacterFromMoreThanOneGraphemeCluster") {
   var s = "ab"
-  println("OK")
+  expectCrashLater()
   Character(s)
 }
 
-println("BUSTED: should have crashed already")
-exit(1)
+runAllTests()
 

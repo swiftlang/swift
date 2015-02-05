@@ -9,55 +9,45 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// These tests should crash
+// RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/CatchCrashes.cpp -c -o %t/CatchCrashes.o
-// RUN: %target-build-swift %s -Xlinker %t/CatchCrashes.o -o %t/a.out_Debug
-// RUN: %target-build-swift %s -Xlinker %t/CatchCrashes.o -o %t/a.out_Release -O
+// RUN: %target-build-swift %s -o %t/a.out_Debug
+// RUN: %target-build-swift %s -o %t/a.out_Release -O
 //
-// RUN: %target-run %t/a.out_Debug HalfOpen 2>&1 | FileCheck %s
-// RUN: %target-run %t/a.out_Debug Closed 2>&1 | FileCheck %s
-// RUN: %target-run %t/a.out_Debug OutOfRange 2>&1 | FileCheck %s
-// RUN: %target-run %t/a.out_Release HalfOpen 2>&1 | FileCheck %s
-// RUN: %target-run %t/a.out_Release Closed 2>&1 | FileCheck %s
-// RUN: %target-run %t/a.out_Release OutOfRange 2>&1 | FileCheck %s
+// RUN: %target-run %t/a.out_Debug
+// RUN: %target-run %t/a.out_Release
 
 // XFAIL: linux
 
-// CHECK: OK
-// CHECK: CRASHED: SIG{{ILL|TRAP}}
+import StdlibUnittest
 
-// Interpret the command line arguments.
-var arg = Process.arguments[1]
+var RangeTraps = TestSuite("RangeTraps")
 
-if arg == "HalfOpen" {
-  println("OK")
+RangeTraps.test("HalfOpen") {
+  expectCrashLater()
   1..<0
 }
 
-if arg == "Closed" {
-  println("OK")
+RangeTraps.test("Closed") {
+  expectCrashLater()
   1...0
 }
 
-if arg == "OutOfRange" {
-  
+RangeTraps.test("OutOfRange") {
   0..<Int.max // This is a Range
 
   // This works for Intervals, but...
-  if ClosedInterval(0...Int.max).contains(Int.max) {
-    println("OK")
-  }
+  expectTrue(ClosedInterval(0...Int.max).contains(Int.max))
+
   // ...no support yet for Ranges containing the maximum representable value
+  expectCrashLater()
 #if arch(i386)  ||  arch(arm)
   // FIXME <rdar://17670791> Range<Int> bounds checking not enforced in optimized 32-bit
-  1...0  // crash some other way to pacify FileCheck
+  1...0  // crash some other way
 #else
   0...Int.max
 #endif
 }
 
-println("BUSTED: should have crashed already")
+runAllTests()
 
-import Darwin
-exit(1)
