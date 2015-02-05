@@ -18,25 +18,22 @@ import StdlibUnittest
 
 var IntervalTestSuite = TestSuite("Interval")
 
-func expectType<T>(T.Type, x: T) {
-}
-
 IntervalTestSuite.test("Ambiguity") {
   // Ensure type deduction still works as expected; these will fail to
   // compile if it's broken
-  let pieToPie = -3.1415927..<3.1415927
-  expectType(HalfOpenInterval<Double>.self, pieToPie)
-  
-  let pieThruPie = -3.1415927...3.1415927
-  expectType(ClosedInterval<Double>.self, pieThruPie)
-  
-  let zeroToOne = 0..<1
-  expectType(Range<Int>.self, zeroToOne)
-  
-  let zeroThruOne = 0...1
+  var pieToPie = -3.1415927..<3.1415927
+  expectType(HalfOpenInterval<Double>.self, &pieToPie)
+
+  var pieThruPie = -3.1415927...3.1415927
+  expectType(ClosedInterval<Double>.self, &pieThruPie)
+
+  var zeroToOne = 0..<1
+  expectType(Range<Int>.self, &zeroToOne)
+
+  var zeroThruOne = 0...1
   // If/when we get a separate ClosedRange representation, this test
   // will have to change.
-  expectType(Range<Int>.self, zeroThruOne)
+  expectType(Range<Int>.self, &zeroThruOne)
 }
 
 IntervalTestSuite.test("PatternMatching") {
