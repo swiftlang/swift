@@ -65,3 +65,23 @@ func redundant(@noescape  // expected-error {{'noescape' attribute is implied by
                @autoclosure fn : () -> Int) {
 }
 
+
+protocol P1 {
+  typealias Element
+}
+protocol P2 : P1 {
+  typealias Element
+}
+
+func overloadedEach<O: P1, T>(source: O, transform: O.Element -> ()) {}
+
+func overloadedEach<P: P2, T>(source: P, transform: P.Element -> ()) {}
+
+struct S : P2 {
+  typealias Element = Int
+  func each(@noescape transform: Int -> ()) {
+    overloadedEach(self, transform) // expected-error {{invalid use of non-escaping function in escaping context 'O.Element -> ()'}}
+      // expected-error@-1 {{invalid use of non-escaping function in escaping context 'P.Element -> ()'}}
+      // expected-error@-2 {{cannot find an overload for 'overloadedEach' that accepts an argument list of type '(S, @noescape Int -> ())'}}
+  }
+}

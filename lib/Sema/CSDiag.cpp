@@ -1862,7 +1862,23 @@ bool FailureDiagnosis::diagnoseFailureForSubscriptExpr() {
 
 bool FailureDiagnosis::diagnoseFailureForCallExpr() {
   assert(expr->getKind() == ExprKind::Call);
-  
+
+  // If there are multiple available overloads to a call expression that
+  // didn't have one of the expected attributes below, we may have recorded
+  // multiple failures. These shouldn't fall through to the contextual
+  // conversion diagnostics because the actual types may be correct
+  // (minus the attribute).
+  SmallPtrSet<Type, 3> noEscapeSecondTypes;
+  for (auto failure : CS->failures) {
+    if (failure.getLocator()->getAnchor() != expr)
+      continue;
+
+    if (failure.getKind() == Failure::FunctionNoEscapeMismatch) {
+        if (noEscapeSecondTypes.insert(failure.getSecondType()).second)
+          ::diagnoseFailure(*CS, failure, expr, false);
+    }
+  }
+
   if (diagnoseContextualConversionError(expr))
     return true;
   
@@ -1878,7 +1894,7 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
   }
   
   std::string overloadName = "";
-  
+
   bool isClosureInvocation = false;
   bool isInvalidTrailingClosureTarget = false;
   bool foundIntermediateError = false;
@@ -2376,23 +2392,6 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable,
     
     if (diagnoseFailure(*this, failure, expr, false))
       return true;
-  } else if(failures.size() > 1) {
-    // If there are multiple available overloads to a call expression that
-    // didn't one of the expected attributes below, we may have recorded multiple
-    // failures. These shouldn't fall through to the contextual conversion
-    // diagnostics because the actual types may be correct (minus the attribute).
-    auto &failure = unavoidableFailures.empty()? *failures.begin()
-                                               : **unavoidableFailures.begin();
-    switch (failure.getKind()) {
-    case Failure::FunctionNoEscapeMismatch:
-    case Failure::FunctionAutoclosureMismatch:
-    case Failure::FunctionNoReturnMismatch:
-      if (diagnoseFailure(*this, failure, expr, false))
-        return true;
-      break;
-    default:
-      break;
-    }
   }
   
   if (getExpressionTooComplex()) {

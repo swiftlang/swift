@@ -57,4 +57,23 @@ class DerivedClass {
   var property : () -> Int { get {} set {} }
 }
 
+protocol P1 {
+  typealias Element
+}
+protocol P2 : P1 {
+  typealias Element
+}
 
+func overloadedEach<O: P1>(source: O, closure: () -> ()) {
+}
+
+func overloadedEach<P: P2>(source: P, closure: () -> ()) {
+}
+
+struct S : P2 {
+  typealias Element = Int
+  func each(@autoclosure closure: () -> ()) {
+    overloadedEach(self, closure) // expected-error {{invalid use of non-escaping function in escaping context '() -> ()'}}
+      // expected-error@-1 {{cannot find an overload for 'overloadedEach' that accepts an argument list of type '(S, @autoclosure () -> ())'}}
+  }
+}
