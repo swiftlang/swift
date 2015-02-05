@@ -109,6 +109,14 @@ static void _buildNominalTypeName(const NominalTypeDescriptor *ntd,
   }
 }
 
+static const char *_getProtocolName(const ProtocolDescriptor *protocol) {
+  const char *name = protocol->Name;
+  // Protocol names are emitted with the _Tt prefix so that ObjC can
+  // recognize them as mangled Swift names.
+  assert(name[0] == '_' && name[1] == 'T' && name[2] == 't');
+  return name + 3;
+}
+
 static void _buildExistentialTypeName(const ProtocolDescriptorList *protocols,
                                       std::string &result) {
   // If there's only one protocol, the existential type name is the protocol
@@ -116,8 +124,8 @@ static void _buildExistentialTypeName(const ProtocolDescriptorList *protocols,
   auto descriptors = protocols->getProtocols();
   
   if (protocols->NumProtocols == 1) {
-    result += Demangle::demangleTypeAsString(descriptors[0]->Name,
-                                               strlen(descriptors[0]->Name));
+    auto name = _getProtocolName(descriptors[0]);
+    result += Demangle::demangleTypeAsString(name, strlen(name));
     return;
   }
   
@@ -125,8 +133,8 @@ static void _buildExistentialTypeName(const ProtocolDescriptorList *protocols,
   for (unsigned i = 0, e = protocols->NumProtocols; i < e; ++i) {
     if (i > 0)
       result += ", ";
-    result += Demangle::demangleTypeAsString(descriptors[i]->Name,
-                                             strlen(descriptors[i]->Name));
+    auto name = _getProtocolName(descriptors[i]);
+    result += Demangle::demangleTypeAsString(name, strlen(name));
   }
   result += ">";
 }

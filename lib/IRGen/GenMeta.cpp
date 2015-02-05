@@ -4335,8 +4335,17 @@ namespace {
     }
     
     void addName() {
-      Fields.push_back(getMangledTypeName(IGM,
-                             Protocol->getDeclaredType()->getCanonicalType()));
+      // Include the _Tt prefix. Since Swift protocol descriptors are laid
+      // out to look like ObjC Protocol* objects, the name has to clearly be
+      // a Swift mangled name.
+      SmallString<32> mangling;
+      mangling += "_Tt";
+      
+      auto name = LinkEntity::forTypeMangling(
+        Protocol->getDeclaredType()->getCanonicalType());
+      name.mangle(mangling);
+      auto global = IGM.getAddrOfGlobalString(mangling);
+      Fields.push_back(global);
     }
     
     void addInherited() {

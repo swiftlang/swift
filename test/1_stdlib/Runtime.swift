@@ -1064,6 +1064,25 @@ Reflection.test("MetatypeMirror") {
 
     expectEqual(reflect(concreteClassMetatype).objectIdentifier!,
                 reflect(objcProtocolMetatype).objectIdentifier!)
+
+    let nativeProtocolConcreteMetatype = SomeNativeProto.self
+    let expectedNativeProtocolConcrete = "- a.SomeNativeProto #0\n"
+    output = ""
+    dump(nativeProtocolConcreteMetatype, &output)
+    expectEqual(expectedNativeProtocolConcrete, output)
+
+    let objcProtocolConcreteMetatype = SomeObjCProto.self
+    let expectedObjCProtocolConcrete = "- a.SomeObjCProto #0\n"
+    output = ""
+    dump(objcProtocolConcreteMetatype, &output)
+    expectEqual(expectedObjCProtocolConcrete, output)
+
+    typealias Composition = protocol<SomeNativeProto, SomeObjCProto>
+    let compositionConcreteMetatype = Composition.self
+    let expectedComposition = "- protocol<a.SomeNativeProto, a.SomeObjCProto> #0\n"
+    output = ""
+    dump(compositionConcreteMetatype, &output)
+    expectEqual(expectedComposition, output)
   }
 }
 
