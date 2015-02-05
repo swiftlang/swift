@@ -379,6 +379,33 @@ namespace {
     void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
       IGF.emitFixLifetime(value);
     }
+    
+    // Unowned types have the same spare bits as strong heap object refs.
+    
+    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+      return true;
+    }
+
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+      return getHeapObjectExtraInhabitantCount(IGM);
+    }
+
+    llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                                  unsigned bits,
+                                                  unsigned index) const override {
+      return getHeapObjectFixedExtraInhabitantValue(IGM, bits, index, 0);
+    }
+
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
+                                         SILType T)
+    const override {
+      return getHeapObjectExtraInhabitantIndex(IGF, src);
+    }
+
+    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                              Address dest, SILType T) const override {
+      return storeHeapObjectExtraInhabitant(IGF, index, dest);
+    }
   };
 
   /// A type implementation for a [weak] reference to an object
@@ -507,6 +534,33 @@ namespace {
 
     void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
       IGF.emitFixLifetime(value);
+    }
+    
+    // Unowned types have the same spare bits as strong unknown object refs.
+    
+    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+      return true;
+    }
+
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+      return getHeapObjectExtraInhabitantCount(IGM);
+    }
+
+    llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                                  unsigned bits,
+                                                  unsigned index) const override {
+      return getHeapObjectFixedExtraInhabitantValue(IGM, bits, index, 0);
+    }
+
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
+                                         SILType T)
+    const override {
+      return getHeapObjectExtraInhabitantIndex(IGF, src);
+    }
+
+    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                              Address dest, SILType T) const override {
+      return storeHeapObjectExtraInhabitant(IGF, index, dest);
     }
   };
 

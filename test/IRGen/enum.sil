@@ -1039,6 +1039,13 @@ sil_vtable C {}
 
 sil @_TFC4enum1CD : $@cc(method) @thin (C) -> ()
 
+@objc class OC {}
+sil_vtable OC {}
+sil hidden @_TToFC4enum2OCcfMS0_FT_S0_ : $@thin (OC) -> OC {
+entry(%x : $OC):
+  return %x : $OC
+}
+
 enum SinglePayloadClass {
   case x(C)
   case y
@@ -2379,6 +2386,33 @@ entry(%o : $Optionable<Optionable<PC>>):
   %f = integer_literal $Builtin.Int1, 0
   %r = select_enum %o : $Optionable<Optionable<PC>>, case #Optionable.Some!enumelt.1: %t, case #Optionable.None!enumelt: %f : $Builtin.Int1
   return %r : $Builtin.Int1
+}
+
+struct ContainsUnowned {
+  unowned let x: C
+}
+struct ContainsUnownedObjC {
+  unowned let x: C
+}
+// CHECK-LABEL: define {{.*}} @optional_unowned() {
+// CHECK-64:      ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 2 }
+// CHECK-32:      ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
+sil @optional_unowned : $@thin () -> (Optionable<ContainsUnowned>, Optionable<Optionable<ContainsUnowned>>) {
+entry:
+  %a = enum $Optionable<ContainsUnowned>, #Optionable.None!enumelt
+  %b = enum $Optionable<Optionable<ContainsUnowned>>, #Optionable.None!enumelt
+  %t = tuple (%a : $Optionable<ContainsUnowned>, %b : $Optionable<Optionable<ContainsUnowned>>)
+  return %t : $(Optionable<ContainsUnowned>, Optionable<Optionable<ContainsUnowned>>)
+}
+// CHECK-LABEL: define {{.*}} @optional_unowned_objc() {
+// CHECK-64:      ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 2 }
+// CHECK-32:      ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
+sil @optional_unowned_objc : $@thin () -> (Optionable<ContainsUnownedObjC>, Optionable<Optionable<ContainsUnownedObjC>>) {
+entry:
+  %a = enum $Optionable<ContainsUnownedObjC>, #Optionable.None!enumelt
+  %b = enum $Optionable<Optionable<ContainsUnownedObjC>>, #Optionable.None!enumelt
+  %t = tuple (%a : $Optionable<ContainsUnownedObjC>, %b : $Optionable<Optionable<ContainsUnownedObjC>>)
+  return %t : $(Optionable<ContainsUnownedObjC>, Optionable<Optionable<ContainsUnownedObjC>>)
 }
 
 sil @force_global_variables_to_materialize : $() -> () {
