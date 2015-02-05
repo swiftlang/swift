@@ -358,7 +358,8 @@ public:
                                          CanSILFunctionType type,
                                          IsBare_t isBareSILFunction,
                                          IsTransparent_t isTransparent,
-                                         IsFragile_t isFragile);
+                                         IsFragile_t isFragile,
+                                         IsThunk_t isThunk);
 
   /// \brief Return the declaration of a function, or create it if it doesn't
   /// exist..
@@ -369,6 +370,7 @@ public:
                                    IsBare_t isBareSILFunction,
                                    IsTransparent_t isTransparent,
                                    IsFragile_t isFragile,
+                                   IsThunk_t isThunk = IsNotThunk,
                                    SILFunction::ClassVisibility_t CV =
                                            SILFunction::NotRelevant);
 

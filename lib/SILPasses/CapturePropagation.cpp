@@ -233,7 +233,8 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   SILFunction *NewF = SILFunction::create(
       *getModule(), SILLinkage::Shared, Name, NewFTy,
       /*contextGenericParams*/ nullptr, OrigF->getLocation(), OrigF->isBare(),
-      OrigF->isTransparent(), OrigF->isFragile(), OrigF->getClassVisibility(),
+      OrigF->isTransparent(), OrigF->isFragile(), OrigF->isThunk(),
+      OrigF->getClassVisibility(),
       OrigF->getInlineStrategy(), OrigF->getEffectsKind(),
       /*InsertBefore*/ OrigF, OrigF->getDebugScope(), OrigF->getDeclContext());
   DEBUG(llvm::dbgs() << "  Specialize callee as ";

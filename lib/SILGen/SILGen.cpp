@@ -295,7 +295,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   return SILFunction::create(M, SILLinkage::Public,
                              SWIFT_ENTRY_POINT_FUNCTION, topLevelType, nullptr,
                              Loc, IsBare, IsNotTransparent, IsNotFragile,
-                             SILFunction::NotRelevant);
+                             IsNotThunk, SILFunction::NotRelevant);
 }
 
 SILType SILGenModule::getConstantType(SILDeclRef constant) {
@@ -385,7 +385,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
 
   auto *F = SILFunction::create(M, linkage, constant.mangle(buffer),
                                 constantType, nullptr,
-                                None, IsNotBare, IsTrans, IsFrag,
+                                None, IsNotBare, IsTrans, IsFrag, IsNotThunk,
                                 getClassVisibility(constant),
                                 inlineStrategy, EK);
 

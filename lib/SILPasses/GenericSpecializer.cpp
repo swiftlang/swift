@@ -97,9 +97,9 @@ SILFunction *SpecializingCloner::initCloned(SILFunction *Orig,
   SILFunction *NewF = SILFunction::create(
       M, getSpecializedLinkage(Orig->getLinkage()), NewName, FTy, nullptr,
       Orig->getLocation(), Orig->isBare(), Orig->isTransparent(),
-      Orig->isFragile(), Orig->getClassVisibility(), Orig->getInlineStrategy(),
-      Orig->getEffectsKind(), Orig, Orig->getDebugScope(),
-      Orig->getDeclContext());
+      Orig->isFragile(), Orig->isThunk(), Orig->getClassVisibility(),
+      Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
+      Orig->getDebugScope(), Orig->getDeclContext());
   NewF->setSemanticsAttr(Orig->getSemanticsAttr());
 
   NumSpecialized++;

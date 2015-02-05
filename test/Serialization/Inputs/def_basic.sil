@@ -809,6 +809,13 @@ bb0:
   %3 = return %2 : $()
 }
 
+// CHECK-LABEL: sil public_external [fragile] [thunk] @test_thunk : $@thin () -> () {
+sil [fragile] [thunk] @test_thunk : $@thin () -> () {
+bb0:
+  %0 = tuple ()
+  %1 = return %0 : $()
+}
+
 // CHECK-LABEL: [noinline] @noinline_callee
 sil [fragile] [noinline] @noinline_callee : $@thin () -> Int {
 bb0:
@@ -1239,6 +1246,7 @@ bb0:
 
   %107 = function_ref @test_assign : $@thin (Int, @inout Int) -> ()
   %109 = function_ref @test_transparent : $@thin () -> ()
+  %110 = function_ref @test_thunk : $@thin () -> ()
   %130 = function_ref @noinline_callee : $@thin () -> Int
   %132 = function_ref @always_inline_callee : $@thin () -> Int
   %131 = function_ref @test_semantics : $@thin () -> ()

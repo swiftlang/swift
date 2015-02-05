@@ -34,6 +34,7 @@ class SILModule;
 enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
 enum Inline_t { InlineDefault, NoInline, AlwaysInline };
+enum IsThunk_t { IsNotThunk, IsThunk };
 
 /// SILFunction - A function body that has been lowered to SIL. This consists of
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
@@ -100,6 +101,12 @@ private:
   /// functions in the stdlib.
   unsigned Fragile : 1;
 
+  /// Specifies if this function is a thunk.
+  ///
+  /// The inliner uses this information to avoid inlining (non-trivial)
+  /// functions into the thunk.
+  unsigned Thunk : 1;
+
   /// The visiblity of the parent class, if this is a method which is contained
   /// in the vtable of that class.
   unsigned ClassVisibility : 2;
@@ -142,6 +149,7 @@ private:
               IsBare_t isBareSILFunction,
               IsTransparent_t isTrans,
               IsFragile_t isFragile,
+              IsThunk_t isThunk,
               ClassVisibility_t classVisibility,
               Inline_t inlineStrategy, EffectsKind E,
               SILFunction *insertBefore,
@@ -156,6 +164,7 @@ public:
                              IsBare_t isBareSILFunction,
                              IsTransparent_t isTrans,
                              IsFragile_t isFragile,
+                             IsThunk_t isThunk = IsNotThunk,
                              ClassVisibility_t classVisibility = NotRelevant,
                              Inline_t inlineStrategy = InlineDefault,
                              EffectsKind EK = EffectsKind::Unspecified,
@@ -349,7 +358,10 @@ public:
   /// Get this function's fragile attribute.
   IsFragile_t isFragile() const { return IsFragile_t(Fragile); }
   void setFragile(IsFragile_t isFrag) { Fragile = isFrag; }
-  
+
+  IsThunk_t isThunk() const { return IsThunk_t(Thunk); }
+  void setThunk(IsThunk_t isThunk) { Thunk = isThunk; }
+
   /// Get the class visibility (relevant for class methods).
   ClassVisibility_t getClassVisibility() const {
     return ClassVisibility_t(ClassVisibility);

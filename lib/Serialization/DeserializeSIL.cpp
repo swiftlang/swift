@@ -295,7 +295,7 @@ static SILFunction *createBogusSILFunction(SILModule &M,
   return SILFunction::create(M, SILLinkage::Private, name,
                              type.castTo<SILFunctionType>(),
                              nullptr, SILFileLocation(loc), IsNotBare,
-                             IsNotTransparent, IsNotFragile,
+                             IsNotTransparent, IsNotFragile, IsNotThunk,
                              SILFunction::NotRelevant);
 }
 
@@ -381,12 +381,12 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   (void)kind;
 
   TypeID funcTyID;
-  unsigned rawLinkage, isTransparent, isFragile, isGlobal, inlineStrategy,
-      effect;
+  unsigned rawLinkage, isTransparent, isFragile, isThunk, isGlobal,
+           inlineStrategy, effect;
   IdentifierID SemanticsID;
   // TODO: read fragile
   SILFunctionLayout::readRecord(scratch, rawLinkage,
-                                isTransparent, isFragile, isGlobal,
+                                isTransparent, isFragile, isThunk, isGlobal,
                                 inlineStrategy, effect, funcTyID,
                                 SemanticsID);
 
@@ -439,7 +439,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
                              nullptr, loc,
                              IsNotBare, IsTransparent_t(isTransparent == 1),
                              IsFragile_t(isFragile == 1),
-                             SILFunction::NotRelevant,
+                             IsThunk_t(isThunk == 1), SILFunction::NotRelevant,
                              (Inline_t)inlineStrategy);
     fn->setGlobalInit(isGlobal == 1);
     fn->setEffectsKind((EffectsKind)effect);

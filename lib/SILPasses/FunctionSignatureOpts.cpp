@@ -441,7 +441,8 @@ createEmptyFunctionWithOptimizedSig(llvm::SmallString<64> &NewFName) {
   auto *NewDebugScope = new (M) SILDebugScope(*F->getDebugScope());
   SILFunction *NewF = SILFunction::create(
       M, F->getLinkage(), NewFName, NewFTy, nullptr, F->getLocation(),
-      F->isBare(), F->isTransparent(), F->isFragile(), F->getClassVisibility(),
+      F->isBare(), F->isTransparent(), F->isFragile(), F->isThunk(),
+      F->getClassVisibility(),
       F->getInlineStrategy(), F->getEffectsKind(), 0, NewDebugScope,
       F->getDeclContext());
   NewF->setSemanticsAttr(F->getSemanticsAttr());
@@ -614,6 +615,8 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
                            ArgDesc.Decl);
   }
   createThunkBody(ThunkBody, NewF, Analyzer);
+  
+  F->setThunk(IsThunk);
 
   return NewF;
 }

@@ -248,6 +248,7 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
                                             IsBare_t isBareSILFunction,
                                             IsTransparent_t isTransparent,
                                             IsFragile_t isFragile,
+                                            IsThunk_t isThunk,
                                             SILFunction::ClassVisibility_t CV) {
   if (auto fn = lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == type);
@@ -257,7 +258,7 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
 
   auto fn = SILFunction::create(*this, linkage, name, type, nullptr,
                                 loc, isBareSILFunction, isTransparent,
-                                isFragile, CV);
+                                isFragile, isThunk, CV);
   fn->setDebugScope(new (*this) SILDebugScope(loc, *fn));
   return fn;
 }
@@ -267,10 +268,11 @@ SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
                                                   CanSILFunctionType type,
                                                   IsBare_t isBareSILFunction,
                                                   IsTransparent_t isTransparent,
-                                                  IsFragile_t isFragile) {
+                                                  IsFragile_t isFragile,
+                                                  IsThunk_t isThunk) {
   return getOrCreateFunction(loc, name, SILLinkage::Shared,
                              type, isBareSILFunction, isTransparent, isFragile,
-                             SILFunction::NotRelevant);
+                             isThunk, SILFunction::NotRelevant);
 }
 
 ArrayRef<SILType> ValueBase::getTypes() const {

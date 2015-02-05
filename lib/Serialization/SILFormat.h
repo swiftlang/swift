@@ -226,6 +226,7 @@ namespace sil_block {
     SILLinkageField,
     BCFixed<1>,        // transparent
     BCFixed<1>,        // fragile
+    BCFixed<1>,        // thunk
     BCFixed<1>,        // global_init
     BCFixed<2>,        // inlineStrategy
     BCFixed<2>,        // side effect info.

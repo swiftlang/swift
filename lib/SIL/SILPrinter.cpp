@@ -1423,6 +1423,9 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
   if (isFragile())
     OS << "[fragile] ";
   
+  if (isThunk())
+    OS << "[thunk] ";
+  
   if (isGlobalInit())
     OS << "[global_init] ";
   

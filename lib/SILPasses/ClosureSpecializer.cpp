@@ -313,6 +313,7 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
       M, ClosureUser->getLinkage(), ClonedName, ClonedTy,
       ClosureUser->getContextGenericParams(), ClosureUser->getLocation(),
       IsBare, ClosureUser->isTransparent(), ClosureUser->isFragile(),
+      ClosureUser->isThunk(),
       ClosureUser->getClassVisibility(), ClosureUser->getInlineStrategy(),
       ClosureUser->getEffectsKind(), ClosureUser, ClosureUser->getDebugScope());
   Fn->setSemanticsAttr(ClosureUser->getSemanticsAttr());

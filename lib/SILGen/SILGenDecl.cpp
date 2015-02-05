@@ -2631,7 +2631,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                 SILLocation(witness.getDecl()),
                 IsNotBare,
                 IsNotTransparent,
-                makeModuleFragile ? IsFragile : IsNotFragile);
+                makeModuleFragile ? IsFragile : IsNotFragile,
+                IsThunk);
 
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(witness.getDecl()), *f));
@@ -2682,5 +2683,5 @@ SILGenModule::getOrCreateReabstractionThunk(SILLocation loc,
   return M.getOrCreateSharedFunction(loc, buffer.str(),
                                      thunkType,
                                      IsBare, IsTransparent,
-                                     Fragile);
+                                     Fragile, IsNotThunk);
 }

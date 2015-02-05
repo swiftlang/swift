@@ -31,7 +31,7 @@ bb3:
   return %4 : $()
 }
 
-// CHECK-LABEL: sil [fragile] @dead_arg_with_callsites : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [fragile] [thunk] @dead_arg_with_callsites : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
 // CHECK: bb0
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref @_TTSf4d_n__dead_arg_with_callsites : $@thin (Builtin.NativeObject) -> ()
@@ -124,7 +124,7 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
 // @owned => @guaranteed
 
 // We should optimize this call.
-// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_simple_singlebb_callee : $@thin (@owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [fragile] [thunk] @owned_to_guaranteed_simple_singlebb_callee : $@thin (@owned Builtin.NativeObject) -> () {
 // CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSf4g__owned_to_guaranteed_simple_singlebb_callee : $@thin (@guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[FUNC_REF]]
 // CHECK: fix_lifetime
@@ -174,7 +174,7 @@ bb0(%0 : $Builtin.NativeObject):
 // We should be able to optimize this callee since the release is in the exit
 // BB. Additionally this test makes sure that we delete dead parameters before
 // invalidating the owned argument -> release map.
-// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@thin (Builtin.Int1, @owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [fragile] [thunk] @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@thin (Builtin.Int1, @owned Builtin.NativeObject) -> () {
 // CHECK: fix_lifetime %1 : $Builtin.NativeObject
 // CHECK: release_value %1 : $Builtin.NativeObject
 sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@thin (Builtin.Int1, @owned Builtin.NativeObject) -> () {
@@ -206,7 +206,7 @@ bb2:
   return %1 : $()
 }
 
-// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_simple_singlebb_multiple_arg_callee : $@thin (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> () {
+// CHECK-LABEL: sil [fragile] [thunk] @owned_to_guaranteed_simple_singlebb_multiple_arg_callee : $@thin (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> () {
 sil [fragile] @owned_to_guaranteed_simple_singlebb_multiple_arg_callee : $@thin (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.NativeObject, %2 : $Builtin.Int1):
   cond_br %0, bb1, bb2
@@ -223,7 +223,7 @@ bb3:
   return %3 : $()
 }
 
-// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@thin (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [fragile] [thunk] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@thin (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 // CHECK: bb0([[INPUT_PTR1:%.*]] : $Builtin.NativeObject, [[INPUT_PTR2:%.*]] : $Builtin.NativeObject):
 // CHECK: release_value [[INPUT_PTR1]] : $Builtin.NativeObject
 // CHECK: release_value [[INPUT_PTR2]] : $Builtin.NativeObject
@@ -241,7 +241,7 @@ bb2:
   return %2 : $()
 }
 
-// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@thin (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [fragile] [thunk] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@thin (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 // CHECK: bb0([[INPUT_PTR1:%.*]] : $Builtin.NativeObject, [[INPUT_PTR2:%.*]] : $Builtin.NativeObject):
 // CHECK: release_value [[INPUT_PTR1]] : $Builtin.NativeObject
 // CHECK: release_value [[INPUT_PTR2]] : $Builtin.NativeObject

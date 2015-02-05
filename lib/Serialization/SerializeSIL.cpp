@@ -253,8 +253,9 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   SILFunctionLayout::emitRecord(
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
       (unsigned)F.isTransparent(), (unsigned)F.isFragile(),
-      (unsigned)F.isGlobalInit(), (unsigned)F.getInlineStrategy(),
-      (unsigned)F.getEffectsKind(), FnID, SemanticsID);
+      (unsigned)F.isThunk(), (unsigned)F.isGlobalInit(),
+      (unsigned)F.getInlineStrategy(), (unsigned)F.getEffectsKind(),
+      FnID, SemanticsID);
 
   if (DeclOnly || isAvailableExternally(Linkage) || F.isExternalDeclaration())
     return;

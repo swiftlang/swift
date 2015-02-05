@@ -680,7 +680,8 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
 }
 
 static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
-                                 bool *isGlobalInit, Inline_t *inlineStrategy,
+                                 bool *isThunk, bool *isGlobalInit,
+                                 Inline_t *inlineStrategy,
                                  std::string *Semantics, EffectsKind *MRK,
                                  Parser &P) {
   while (P.consumeIf(tok::l_square)) {
@@ -691,6 +692,8 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
       *isTransparent = true;
     else if (isFragile && P.Tok.getText() == "fragile")
       *isFragile = true;
+    else if (isThunk && P.Tok.getText() == "thunk")
+      *isThunk = true;
     else if (isGlobalInit && P.Tok.getText() == "global_init")
       *isGlobalInit = true;
     else if (inlineStrategy && P.Tok.getText() == "noinline")
@@ -3386,12 +3389,13 @@ bool Parser::parseDeclSIL() {
   Scope S(this, ScopeKind::TopLevel);
   bool isTransparent = false;
   bool isFragile = false;
+  bool isThunk = false;
   bool isGlobalInit = false;
   Inline_t inlineStrategy = InlineDefault;
   std::string Semantics;
   EffectsKind MRK = EffectsKind::Unspecified;
   if (parseSILLinkage(FnLinkage, *this) ||
-      parseDeclSILOptional(&isTransparent, &isFragile, &isGlobalInit,
+      parseDeclSILOptional(&isTransparent, &isFragile, &isThunk, &isGlobalInit,
                            &inlineStrategy, &Semantics, &MRK, *this) ||
       parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
@@ -3415,6 +3419,7 @@ bool Parser::parseDeclSIL() {
     FunctionState.F->setBare(IsBare);
     FunctionState.F->setTransparent(IsTransparent_t(isTransparent));
     FunctionState.F->setFragile(IsFragile_t(isFragile));
+    FunctionState.F->setThunk(IsThunk_t(isThunk));
     FunctionState.F->setGlobalInit(isGlobalInit);
     FunctionState.F->setInlineStrategy(inlineStrategy);
     FunctionState.F->setEffectsKind(MRK);
@@ -3509,7 +3514,7 @@ bool Parser::parseSILGlobal() {
   Lexer::SILBodyRAII Tmp(*L);
   Scope S(this, ScopeKind::TopLevel);
   if (parseSILLinkage(GlobalLinkage, *this) ||
-      parseDeclSILOptional(nullptr, &isFragile, nullptr,
+      parseDeclSILOptional(nullptr, &isFragile, nullptr, nullptr,
                            nullptr, nullptr, nullptr, *this) ||
       parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       parseIdentifier(GlobalName, NameLoc, diag::expected_sil_value_name) ||
@@ -3912,7 +3917,7 @@ bool Parser::parseSILWitnessTable() {
   parseSILLinkage(Linkage, *this);
   
   bool isFragile = false;
-  if (parseDeclSILOptional(nullptr, &isFragile, nullptr,
+  if (parseDeclSILOptional(nullptr, &isFragile, nullptr, nullptr,
                            nullptr, nullptr, nullptr, *this))
     return true;
 

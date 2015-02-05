@@ -937,6 +937,13 @@ bb0:
   %3 = return %2 : $()
 }
 
+// CHECK-LABEL: sil [thunk] @test_thunk : $@thin () -> () {
+sil [thunk] @test_thunk : $@thin () -> () {
+bb0:
+  %0 = tuple ()
+  %1 = return %0 : $()
+}
+
 // CHECK-LABEL: sil @takes_unnamed_closure : $@thin (@callee_owned () -> Int) -> () -> () -> Int
 sil @takes_unnamed_closure : $@thin (@callee_owned () -> Int) -> () -> () -> Int
 
