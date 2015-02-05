@@ -24,6 +24,7 @@
 #include <functional>
 #include <iterator>
 #include <type_traits>
+#include <algorithm>
 
 namespace swift {
 
@@ -541,6 +542,11 @@ template<typename Subclass, typename Range>
 DowncastFilterRange<Subclass, Range>
 makeDowncastFilterRange(Range range) {
   return DowncastFilterRange<Subclass, Range>(range);
+}
+
+template <typename Vector> void sortUnique(Vector &V) {
+  std::sort(V.begin(), V.end());
+  V.erase(std::unique(V.begin(), V.end()), V.end());
 }
 
 } // end namespace swift
