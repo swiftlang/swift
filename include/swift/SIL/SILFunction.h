@@ -484,6 +484,8 @@ public:
     return begin()->getBBArg(i);
   }
 
+  ArrayRef<SILArgument *> getArguments() const { return begin()->getBBArgs(); }
+
   //===--------------------------------------------------------------------===//
   // Miscellaneous
   //===--------------------------------------------------------------------===//
