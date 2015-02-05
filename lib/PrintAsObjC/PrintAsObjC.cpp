@@ -1401,6 +1401,9 @@ public:
            "# if !defined(__nullable)\n"
            "#  define __nullable\n"
            "# endif\n"
+           "# if !defined(__null_unspecified)\n"
+           "#  define __null_unspecified\n"
+           "# endif\n"
            "#  define SWIFT_NULLABILITY(X)\n"
            "#endif\n";
   }

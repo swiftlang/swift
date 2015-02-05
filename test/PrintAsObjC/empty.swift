@@ -20,6 +20,7 @@
 // CHECK: # define SWIFT_PROTOCOL
 // CHECK: # define SWIFT_EXTENSION(M)
 // CHECK: # define OBJC_DESIGNATED_INITIALIZER
+// CHECK: # define __null_unspecified
 
 // CHECK-LABEL: #if defined(__has_feature) && __has_feature(modules)
 // CHECK-NEXT: #endif
