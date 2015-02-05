@@ -61,6 +61,10 @@ namespace {
   
   // Additional benefit for each loop level.
   const unsigned LoopBenefitFactor = 40;
+  
+  // Approximately up to this cost level a function can be inlined without
+  // increasing the code size.
+  const unsigned TrivialFunctionThreshold = 20;
 
   // Represents a value in integer constant evaluation.
   struct IntConst {
@@ -699,8 +703,16 @@ bool SILPerformanceInliner::isProfitableToInline(ApplyInst *AI,
     }
   }
 
-  unsigned Threshold = (testThreshold >= 0 ? testThreshold : Benefit);
-  
+  unsigned Threshold = Benefit; // The default.
+  if (testThreshold >= 0) {
+    // We are in testing mode.
+    Threshold = testThreshold;
+  } else if (AI->getFunction()->isThunk()) {
+    // Only inline trivial functions into thunks (which will not increase the
+    // code size).
+    Threshold = TrivialFunctionThreshold;
+  }
+
   if (CalleeCost > Threshold) {
     DEBUG(llvm::dbgs() << "        NO: Function too big to inline, "
           "cost: " << CalleeCost << ", threshold: " << Threshold << "\n");

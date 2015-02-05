@@ -1669,7 +1669,11 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
   
   Callee callee = Callee::forKnownFunction(origCalleeType, substCalleeType,
                                            substitutions, calleeFn, calleeData);
-  return CallEmission(IGF, callee);
+  CallEmission callEmission(IGF, callee);
+  if (AI->getFunction()->isThunk())
+    callEmission.addAttribute(llvm::AttributeSet::FunctionIndex, llvm::Attribute::NoInline);
+  
+  return callEmission;
 }
 
 static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
