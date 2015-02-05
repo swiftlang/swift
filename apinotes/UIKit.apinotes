@@ -4478,7 +4478,7 @@ Classes:
   - Name: maskView
     Nullability: O
   - Name: motionEffects
-    Nullability: N
+    Nullability: O
   - Name: restorationIdentifier
     Nullability: O
   - Name: subviews
