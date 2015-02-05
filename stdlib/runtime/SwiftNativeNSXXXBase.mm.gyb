@@ -182,28 +182,6 @@ swift_stdlib_NSStringUppercaseString(NSString *NS_RELEASES_ARGUMENT str) {
   return Result;
 }
 
-extern "C" NSString *
-swift_stdlib_CFStringCreateCopy(NSString *NS_RELEASES_ARGUMENT str) {
-  NSString *Result =
-      (__bridge NSString *)CFStringCreateCopy(nil, (__bridge CFStringRef)str);
-  swift_unknownRelease(str);
-  return Result;
-}
-
-extern "C" size_t swift_stdlib_CFStringGetLength(NSString *NS_RELEASES_ARGUMENT
-                                                     str) {
-  size_t Result = CFStringGetLength((__bridge CFStringRef)str);
-  swift_unknownRelease(str);
-  return Result;
-}
-
-extern "C" const uint16_t *
-swift_stdlib_CFStringGetCharactersPtr(NSString *NS_RELEASES_ARGUMENT str) {
-  const uint16_t *Result = CFStringGetCharactersPtr((__bridge CFStringRef)str);
-  swift_unknownRelease(str);
-  return Result;
-}
-
 extern "C" void swift_stdlib_CFSetGetValues(NSSet *NS_RELEASES_ARGUMENT set,
                                             const void **values) {
   CFSetGetValues((__bridge CFSetRef)set, values);

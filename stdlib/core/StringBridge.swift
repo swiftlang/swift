@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
+
 #if _runtime(_ObjC)
 // Swift's String bridges NSString via this protocol and these
 // variables, allowing the core stdlib to remain decoupled from
@@ -20,16 +22,24 @@
 /// Foundation.
 @objc public protocol _CocoaStringType {}
 
-@asmname("swift_stdlib_CFStringCreateCopy")
-func _stdlib_CFStringCreateCopy(source: _CocoaStringType) -> _CocoaStringType
+@inline(__always)
+internal func _stdlib_CFStringCreateCopy(
+  source: _CocoaStringType
+) -> _CocoaStringType {
+  return unsafeBitCast(CFStringCreateCopy(nil, source), _CocoaStringType.self)
+}
 
-@asmname("swift_stdlib_CFStringGetLength")
-func _stdlib_CFStringGetLength(source: _CocoaStringType)
-  -> Int
+@inline(__always)
+internal func _stdlib_CFStringGetLength(source: _CocoaStringType) -> Int {
+  return CFStringGetLength(source)
+}
 
-@asmname("swift_stdlib_CFStringGetCharactersPtr")
-func _stdlib_CFStringGetCharactersPtr(source: _CocoaStringType)
-  -> UnsafeMutablePointer<UTF16.CodeUnit>
+@inline(__always)
+internal func _stdlib_CFStringGetCharactersPtr(
+  source: _CocoaStringType
+) -> UnsafeMutablePointer<UTF16.CodeUnit> {
+  return UnsafeMutablePointer(CFStringGetCharactersPtr(source))
+}
 
 /// Bridges a `source` to `Swift.String`, assuming that `source` has non-ASCII
 /// characters (does not apply ASCII optimizations).

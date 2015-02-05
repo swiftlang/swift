@@ -1,4 +1,5 @@
 set(sources
+  CoreFoundationShims.h
   DarwinShims.h
   FoundationShims.h
   GlobalObjects.h

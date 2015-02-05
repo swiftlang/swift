@@ -1,4 +1,5 @@
 module SwiftShims {
+  header "CoreFoundationShims.h"
   header "DarwinShims.h"
   header "FoundationShims.h"
   header "GlobalObjects.h"
