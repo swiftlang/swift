@@ -74,7 +74,7 @@ extension _StringCore {
     let storage = _CollectionOf<Int, UInt16>(
       startIndex: 0, endIndex: self.count) {
       (i: Int) -> UInt16 in
-      return _cocoaStringSubscript(target: self, position: i)
+      return _cocoaStringSubscript(self, i)
     }
     return _transcodeSomeUTF16AsUTF8(storage, i)
   }

@@ -137,137 +137,13 @@ extension NSString : StringLiteralConvertible {
 //===----------------------------------------------------------------------===//
 extension NSString : _CocoaStringType {}
 
-/// Sets variables in Swift's core stdlib that allow it to
-/// bridge Cocoa strings properly.  Currently invoked by a HACK in
-/// Misc.mm; a better mechanism may be needed.
-@asmname("__swift_initializeCocoaStringBridge") 
-public // COMPILER_INTRINSIC
-func __swift_initializeCocoaStringBridge() -> COpaquePointer {
-  _cocoaStringToContiguous = _cocoaStringToContiguousImpl
-  _cocoaStringReadAll = _cocoaStringReadAllImpl
-  _cocoaStringLength = _cocoaStringLengthImpl
-  _cocoaStringSlice = _cocoaStringSliceImpl
-  _cocoaStringSubscript = _cocoaStringSubscriptImpl
-  return COpaquePointer()
-}
-
-// When used as a _CocoaStringType, an NSString should be either
-// immutable or uniquely-referenced, and not have a buffer of
-// contiguous UTF-16.  Ideally these distinctions would be captured in
-// the type system, so one would have to explicitly convert NSString
-// to a type that conforms.  Unfortunately, we don't have a way to do
-// that without an allocation (to wrap NSString in another class
-// instance) or growing these protocol instances from one word to four
-// (by way of allowing structs to conform).  Fortunately, correctness
-// doesn't depend on these preconditions but efficiency might,
-// because producing a _StringBuffer from an
-// NSString-as-_CocoaStringType is assumed to require allocation and
-// buffer copying.
-//
-func _cocoaStringReadAllImpl(
-  source: _CocoaStringType, destination: UnsafeMutablePointer<UTF16.CodeUnit>) {
-  let cfSelf = unsafeBitCast(source, CFString.self)
-  CFStringGetCharacters(
-  cfSelf, CFRange(location: 0, length: CFStringGetLength(cfSelf)), destination)
-}
-  
-func _cocoaStringToContiguousImpl(
-  source: _CocoaStringType, range: Range<Int>, minimumCapacity: Int
-) -> _StringBuffer {
-  let cfSelf = unsafeBitCast(source, CFString.self)
-  _sanityCheck(CFStringGetCharactersPtr(cfSelf) == nil,
-    "Known contiguously-stored strings should already be converted to Swift")
-
-  var startIndex = range.startIndex
-  var count = range.endIndex - startIndex
-
-  var buffer = _StringBuffer(capacity: max(count, minimumCapacity), 
-                             initialSize: count, elementWidth: 2)
-
-  CFStringGetCharacters(
-    cfSelf, CFRange(location: startIndex, length: count), 
-    UnsafeMutablePointer<UniChar>(buffer.start))
-  
-  return buffer
-}
-
-func _cocoaStringLengthImpl(source: _CocoaStringType) -> Int {
-  // FIXME: Not ultra-fast, but reliable... but we're counting on an
-  // early demise for this function anyhow
-  return (source as! NSString).length
-}
-
-func _cocoaStringSliceImpl(
-  target: _StringCore, subRange: Range<Int>
-) -> _StringCore {
-  _sanityCheck(target.hasCocoaBuffer)
-  
-  let cfSelf = unsafeBitCast(target.cocoaBuffer!, CFString.self)
-  
-  _sanityCheck(
-    CFStringGetCharactersPtr(cfSelf) == nil,
-    "Known contiguously-stored strings should already be converted to Swift")
-
-  let cfResult = CFStringCreateWithSubstring(
-    kCFAllocatorDefault, cfSelf,
-    CFRange(location: subRange.startIndex, length: count(subRange)))
-
-  return String(cfResult)._core
-}
-
-func _cocoaStringSubscriptImpl(
-  target: _StringCore, position: Int) -> UTF16.CodeUnit {
-  let cfSelf = unsafeBitCast(target.cocoaBuffer!, CFString.self)
-  _sanityCheck(CFStringGetCharactersPtr(cfSelf)._isNull,
-    "Known contiguously-stored strings should already be converted to Swift")
-
-  return CFStringGetCharacterAtIndex(cfSelf, position)
-}
-
 //
 // Conversion from NSString to Swift's native representation
 //
 
 extension String {
   public init(_ cocoaString: NSString) {
-    if let wrapped = (cocoaString as AnyObject) as? _NSContiguousString {
-      self._core = wrapped._core
-      return
-    }
-
-    // Treat it as a CF object because presumably that's what these
-    // things tend to be, and CF has a fast path that avoids
-    // objc_msgSend
-    let cfValue = unsafeBitCast(cocoaString, CFString.self)
-
-    // "copy" it into a value to be sure nobody will modify behind
-    // our backs.  In practice, when value is already immutable, this
-    // just does a retain.
-    let cfImmutableValue: CFString = CFStringCreateCopy(nil, cfValue)
-
-    let length = CFStringGetLength(cfImmutableValue)
-
-    // Look first for null-terminated ASCII
-    // Note: the code in clownfish appears to guarantee
-    // nul-termination, but I'm waiting for an answer from Chris Kane
-    // about whether we can count on it for all time or not.
-    let nulTerminatedASCII = CFStringGetCStringPtr(
-      cfImmutableValue, kCFStringEncodingASCII)
-
-    // start will hold the base pointer of contiguous storage, if it
-    // is found.
-    var start = UnsafeMutablePointer<RawByte>(nulTerminatedASCII)
-    let isUTF16 = nulTerminatedASCII._isNull
-    if (isUTF16) {
-      start = UnsafeMutablePointer(CFStringGetCharactersPtr(cfImmutableValue))
-    }
-
-    self._core = _StringCore(
-      baseAddress: COpaquePointer(start),
-      count: length,
-      elementShift: isUTF16 ? 1 : 0,
-      hasCocoaBuffer: true,
-      owner: unsafeBitCast(cfImmutableValue, Optional<AnyObject>.self))
+    self = String(_cocoaString: cocoaString)
   }
 }
 

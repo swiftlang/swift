@@ -122,6 +122,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
       "-all_load" "-Xlinker" "-reexport-lobjc")
   list(APPEND swift_core_private_link_libraries swiftRuntime)
   list(APPEND swift_core_framework_depends Foundation)
+  list(APPEND swift_core_framework_depends CoreFoundation)
 else()
   # With the GNU linker the equivalent of -all_load is to tell the linker
   # --whole-archive before the archive and --no-whole-archive after (without

@@ -279,7 +279,7 @@ public struct _StringCore {
         owner: _owner)
     }
 #if _runtime(_ObjC)
-    return _cocoaStringSlice(target: self, subRange: subRange)
+    return _cocoaStringSlice(self, subRange)
 #else
     _sanityCheckFailure("subscript: non-native string without objc runtime")
 #endif
@@ -309,7 +309,7 @@ public struct _StringCore {
       return _nthContiguous(position)
     }
 #if _runtime(_ObjC)
-    return _cocoaStringSubscript(target: self, position: position)
+    return _cocoaStringSubscript(self, position)
 #else
     _sanityCheckFailure("subscript: non-native string without objc runtime")
 #endif
@@ -347,8 +347,7 @@ public struct _StringCore {
     else if (hasCocoaBuffer) {
 #if _runtime(_ObjC)
       _StringCore(
-        _cocoaStringToContiguous(source: cocoaBuffer!, range: 0..<count,
-                                 minimumCapacity: 0)
+        _cocoaStringToContiguous(cocoaBuffer!, 0..<count, minimumCapacity: 0)
       ).encode(encoding, output: &output)
 #else
       _sanityCheckFailure("encode: non-native string without objc runtime")
@@ -453,8 +452,7 @@ public struct _StringCore {
       // FIXME: can we get Cocoa to tell us quickly that an opaque
       // string is ASCII?  Do we care much about that edge case?
       _sanityCheck(newStorage.elementShift == 1)
-      _cocoaStringReadAll(source: cocoaBuffer!, 
-                          destination: UnsafeMutablePointer(newStorage.start))
+      _cocoaStringReadAll(cocoaBuffer!, UnsafeMutablePointer(newStorage.start))
 #else
       _sanityCheckFailure("_copyInPlace: non-native string without objc runtime")
 #endif
@@ -527,8 +525,7 @@ public struct _StringCore {
     else {
 #if _runtime(_ObjC)
       _sanityCheck(elementWidth == 2)
-      _cocoaStringReadAll(source: rhs.cocoaBuffer!, 
-                          destination: UnsafeMutablePointer(destination))
+      _cocoaStringReadAll(rhs.cocoaBuffer!, UnsafeMutablePointer(destination))
 #else
       _sanityCheckFailure("subscript: non-native string without objc runtime")
 #endif
