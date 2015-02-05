@@ -1457,6 +1457,8 @@ bb0(%0 : $Builtin.NativeObject):
 
 sil @_TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_ : $@thin @noreturn (StaticString, StaticString, StaticString) -> () // user: %43
 
+sil @random_prefix_TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_ : $@thin @noreturn (StaticString, StaticString, StaticString) -> () // user: %43
+
 // CHECK-LABEL: sil @ignore_fatalErrorMsgBB : $@thin (Builtin.NativeObject) -> () {
 // CHECK-NOT: strong_retain
 // CHECK-NOT: strong_release
@@ -1473,7 +1475,7 @@ bb2:
   cond_br undef, bb3, bb4
 
 bb3:
-  br bb4
+  cond_br undef, bb4, bb6
 
 bb4:
   strong_release %0 : $Builtin.NativeObject
@@ -1487,6 +1489,15 @@ bb5:
   %42 = integer_literal $Builtin.Int8, 11
   %43 = struct $StaticString (%40 : $Builtin.RawPointer, %41 : $Builtin.Word, %42 : $Builtin.Int8)
   %44 = apply %39(%43, %43, %43) : $@thin @noreturn (StaticString, StaticString, StaticString) -> ()
+  unreachable
+
+bb6:
+  %45 = function_ref @random_prefix_TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_ : $@thin @noreturn (StaticString, StaticString, StaticString) -> () // user: %43
+  %46 = string_literal utf8 "fatal error"
+  %47 = integer_literal $Builtin.Word, 11
+  %48 = integer_literal $Builtin.Int8, 11
+  %49 = struct $StaticString (%46 : $Builtin.RawPointer, %47 : $Builtin.Word, %48 : $Builtin.Int8)
+  %50 = apply %45(%49, %49, %49) : $@thin @noreturn (StaticString, StaticString, StaticString) -> ()
   unreachable
 }
 
