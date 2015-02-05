@@ -39,6 +39,37 @@ __attribute__((availability(macosx,introduced=10.10)))
 
 @end
 
+__attribute__((availability(macosx,introduced=10.9)))
+@interface NSAvailableOn10_9 : NSObject
+
+@property NSInteger propertyOn10_9;
+
+// Properties with unavailable accessors declared before property.
+- (void)setPropertyOn10_10WithSetterOn10_11Before:(NSInteger)prop __attribute__((availability(macosx,introduced=10.11)));
+@property NSInteger propertyOn10_10WithSetterOn10_11Before __attribute__((availability(macosx,introduced=10.10)));
+
+- (NSInteger)propertyOn10_10WithGetterOn10_11Before __attribute__((availability(macosx,introduced=10.11)));
+@property NSInteger propertyOn10_10WithGetterOn10_11Before __attribute__((availability(macosx,introduced=10.10)));
+
+// Properties with unavailable accessors declared after property.
+@property NSInteger propertyOn10_10WithSetterOn10_11After __attribute__((availability(macosx,introduced=10.10)));
+- (void)setPropertyOn10_10WithSetterOn10_11After:(NSInteger)prop __attribute__((availability(macosx,introduced=10.11)));
+
+@property NSInteger propertyOn10_10WithGetterOn10_11After __attribute__((availability(macosx,introduced=10.10)));
+- (NSInteger)propertyOn10_10WithGetterOn10_11After __attribute__((availability(macosx,introduced=10.11)));
+
+// Property with redeclared with a setter in a category
+@property(readonly) NSInteger readOnlyRedeclaredWithSetterInCategory __attribute__((availability(macosx,introduced=10.10)));
+
+- (void)methodAvailableOn10_11 __attribute__((availability(macosx,introduced=10.11)));
+@end
+
+@interface NSAvailableOn10_9 (NSWithPropertyReclarationInACategory)
+
+@property(readwrite) NSInteger readOnlyRedeclaredWithSetterInCategory __attribute__((availability(macosx,introduced=10.10)));
+- (void)setReadOnlyRedeclaredWithSetterInCategory:(NSInteger)prop __attribute__((availability(macosx,introduced=10.11)));
+@end
+
 @class NSString, NSArray, NSDictionary, NSSet, NSEnumerator;
 
 /// Aaa.  NSArray.  Bbb.

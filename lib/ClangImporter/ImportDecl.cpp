@@ -3684,6 +3684,20 @@ namespace {
       return subscript;
     }
 
+    /// Import the the accessor and its attributes.
+    FuncDecl *importAccessor(clang::ObjCMethodDecl *clangAccessor,
+                             DeclContext *dc) {
+      auto *accessor =
+          cast_or_null<FuncDecl>(VisitObjCMethodDecl(clangAccessor, dc));
+      if (!accessor) {
+        return nullptr;
+      }
+
+      Impl.importAttributes(clangAccessor, accessor);
+
+      return accessor;
+    }
+
   public:
 
     /// Recursively add the given protocol and its inherited protocols to the
@@ -4690,7 +4704,8 @@ namespace {
       if (original->isSettable(nullptr))
         return;
 
-      auto setter = cast_or_null<FuncDecl>(VisitObjCMethodDecl(clangSetter));
+      FuncDecl *setter = importAccessor(clangSetter,
+                                        original->getDeclContext());
       if (!setter)
         return;
 
@@ -4743,7 +4758,7 @@ namespace {
       // Import the getter.
       FuncDecl *getter = nullptr;
       if (auto clangGetter = decl->getGetterMethodDecl()) {
-        getter = cast_or_null<FuncDecl>(VisitObjCMethodDecl(clangGetter, dc));
+        getter = importAccessor(clangGetter, dc);
         if (!getter)
           return nullptr;
       }
@@ -4751,7 +4766,7 @@ namespace {
       // Import the setter, if there is one.
       FuncDecl *setter = nullptr;
       if (auto clangSetter = decl->getSetterMethodDecl()) {
-        setter = cast_or_null<FuncDecl>(VisitObjCMethodDecl(clangSetter, dc));
+        setter = importAccessor(clangSetter, dc);
         if (!setter)
           return nullptr;
       }
