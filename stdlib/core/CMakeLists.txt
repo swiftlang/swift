@@ -61,6 +61,7 @@ set(SWIFTLIB_ESSENTIAL
   Map.swift.gyb
   Mirrors.swift.gyb
   Misc.swift
+  ObjCMirrors.swift
   Optional.swift
   OutputStream.swift
   Pointer.swift

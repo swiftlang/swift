@@ -69,7 +69,10 @@ bool _swift_isUniquelyReferencedOrPinned_nonNull_native(
 bool _swift_usesNativeSwiftReferenceCounting_nonNull(const void *);
 bool _swift_usesNativeSwiftReferenceCounting_class(const void *);
 
- __swift_size_t _swift_class_getInstancePositiveExtentSize(const void *);
+__swift_size_t _swift_class_getInstancePositiveExtentSize(const void *);
+
+/// Return an NSString to be used as the Mirror summary of the object
+void* _swift_objCMirrorSummary(const void * nsObject);
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift

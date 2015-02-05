@@ -813,7 +813,7 @@ static const Metadata *getObjCMirrorMetadata() {
   static const Metadata *metadata = nullptr;
   if (!metadata)
     metadata = reinterpret_cast<const FullMetadata<Metadata>*>(
-      dlsym(RTLD_DEFAULT, "_TMdV10Foundation11_ObjCMirror"));
+      dlsym(RTLD_DEFAULT, "_TMdVSs11_ObjCMirror"));
   assert(metadata);
   return metadata;
 }
@@ -821,7 +821,7 @@ static const MirrorWitnessTable *getObjCMirrorWitness() {
   static const MirrorWitnessTable *witness = nullptr;
   if (!witness)
     witness = reinterpret_cast<const MirrorWitnessTable*>(
-      dlsym(RTLD_DEFAULT, "_TWPV10Foundation11_ObjCMirrorSs10MirrorTypeS_"));
+      dlsym(RTLD_DEFAULT, "_TWPVSs11_ObjCMirrorSs10MirrorTypeSs"));
   assert(witness);
   return witness;
 }
@@ -829,7 +829,7 @@ static const Metadata *getObjCSuperMirrorMetadata() {
   static const Metadata *metadata = nullptr;
   if (!metadata)
     metadata = reinterpret_cast<const FullMetadata<Metadata>*>(
-      dlsym(RTLD_DEFAULT, "_TMdV10Foundation16_ObjCSuperMirror"));
+      dlsym(RTLD_DEFAULT, "_TMdVSs16_ObjCSuperMirror"));
   assert(metadata);
   return metadata;
 }
@@ -837,7 +837,7 @@ static const MirrorWitnessTable *getObjCSuperMirrorWitness() {
   static const MirrorWitnessTable *witness = nullptr;
   if (!witness)
     witness = reinterpret_cast<const MirrorWitnessTable*>(
-      dlsym(RTLD_DEFAULT, "_TWPV10Foundation16_ObjCSuperMirrorSs10MirrorTypeS_"));
+      dlsym(RTLD_DEFAULT, "_TWPVSs16_ObjCSuperMirrorSs10MirrorTypeSs"));
   assert(witness);
   
   return witness;
