@@ -40,7 +40,13 @@
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSOptionsWithUnavailableElement.  Bbb.
 // FOUNDATION-NEXT: {{^}}struct NSOptionsWithUnavailableElement : RawOptionSetType {{{$}}
-// FOUNDATION: {{^}}  @availability(OSX, introduced=10.10){{$}}
+// FOUNDATION-NEXT: {{^}}  init(){{$}}
+// FOUNDATION-NEXT: {{^}}  init(_ rawValue: UInt){{$}}
+// FOUNDATION-NEXT: {{^}}  init(rawValue: UInt){{$}}
+// FOUNDATION-NEXT: {{^}}  let rawValue: UInt{{$}}
+// FOUNDATION-NEXT: {{^}}  static var First: NSOptionsWithUnavailableElement { get }{{$}}
+// FOUNDATION-NEXT: {{^}}  static var Second: NSOptionsWithUnavailableElement { get }{{$}}
+// FOUNDATION-NEXT: {{^}}  @availability(OSX, introduced=10.10){{$}}
 // FOUNDATION-NEXT: {{^}}  static var Third: NSOptionsWithUnavailableElement { get }{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSUnavailableEnum.  Bbb.
@@ -49,5 +55,9 @@
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSEnumWithUnavailableElement.  Bbb.
 // FOUNDATION-NEXT: {{^}}enum NSEnumWithUnavailableElement : UInt {{{$}}
-// FOUNDATION: {{^}}  @availability(OSX, introduced=10.10){{$}}
+// FOUNDATION-NEXT: {{^}}  init?(rawValue: UInt){{$}}
+// FOUNDATION-NEXT: {{^}}  var rawValue: UInt { get }{{$}}
+// FOUNDATION-NEXT: {{^}}  case First{{$}}
+// FOUNDATION-NEXT: {{^}}  case Second{{$}}
+// FOUNDATION-NEXT: {{^}}  @availability(OSX, introduced=10.10){{$}}
 // FOUNDATION-NEXT: {{^}}  case Third{{$}}
