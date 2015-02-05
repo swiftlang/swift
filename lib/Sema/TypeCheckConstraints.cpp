@@ -1024,6 +1024,11 @@ public:
     } else if (auto typeExpr = dyn_cast<TypeExpr>(expr)) {
       if (typeExpr->getTypeLoc().getTypeRepr())
         typeExpr->getTypeLoc().setType(nullptr);
+    } else if (auto unresolvedSpec = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
+      for (auto &arg : unresolvedSpec->getUnresolvedParams()) {
+        if (arg.getTypeRepr())
+          arg.setType(nullptr);
+      }
     }
 
     return { true, expr };
