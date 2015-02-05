@@ -2431,6 +2431,7 @@ void CallEmission::emitToExplosion(Explosion &out) {
 
 CallEmission::CallEmission(CallEmission &&other)
   : IGF(other.IGF),
+    Attrs(other.Attrs),
     Args(std::move(other.Args)),
     CurCallee(std::move(other.CurCallee)),
     LastArgWritten(other.LastArgWritten),
@@ -2809,6 +2810,10 @@ void CallEmission::addArg(Explosion &arg) {
   for (auto value : arg.claimAll()) {
     *argIterator++ = value;
   }
+}
+
+void CallEmission::addAttribute(unsigned Index, llvm::Attribute::AttrKind Attr) {
+  Attrs = Attrs.addAttribute(IGF.IGM.LLVMContext, Index, Attr);
 }
 
 /// Initialize an Explosion with the parameters of the current

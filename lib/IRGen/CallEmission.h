@@ -76,6 +76,8 @@ public:
 
   /// Add a new set of arguments to the function from an explosion.
   void addArg(Explosion &arg);
+  
+  void addAttribute(unsigned Index, llvm::Attribute::AttrKind Attr);
 
   void emitToMemory(Address addr, const TypeInfo &substResultTI);
   void emitToExplosion(Explosion &out);
