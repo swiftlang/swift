@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-build-swift %s -parse-stdlib -Xfrontend -disable-access-control -o %t/Builtins
+//   note: building with -Onone to test debug-mode-only safety checks
+// RUN: %target-build-swift %s -parse-stdlib -Xfrontend -disable-access-control -Onone -o %t/Builtins
 // RUN: %target-run %t/Builtins
 
 // XFAIL: interpret
@@ -61,6 +62,14 @@ func genint() -> Int {
 tests.test("_assumeNonNegative") {
   let r = _assumeNonNegative(genint())
   expectEqual(r, 27)
+}
+
+tests.test("unsafeUnwrap") {
+  let empty: Int? = nil
+  let nonEmpty: Int? = 3
+  expectEqual(3, unsafeUnwrap(nonEmpty))
+  expectCrashLater()
+  unsafeUnwrap(empty)
 }
 
 runAllTests()

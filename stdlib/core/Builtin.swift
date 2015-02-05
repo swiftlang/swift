@@ -200,6 +200,36 @@ public func unsafeDowncast<T: AnyObject>(x: AnyObject) -> T {
   return Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(x))
 }
 
+/// Returns: `nonEmpty!`
+///
+/// Requires: `nonEmpty != nil`.  In particular, in -O builds, no test
+/// is performed to ensure that `nonEmpty` actually is non-nil.
+///
+/// .. Danger:: trades safety for performance.  Use `unsafeUnwrap`
+///   only when `nonEmpty!` has proven to be a performance problem and
+///   you are confident that, always, `nonEmpty != nil`.  It is better
+///   than an `unsafeBitCast` because it's more restrictive, and
+///   because checking is still performed in debug builds.
+@inline(__always)
+public func unsafeUnwrap<T>(nonEmpty: T?) -> T {
+  if let x = nonEmpty {
+    return x
+  }
+  _debugPreconditionFailure("unsafeUnwrap of nil optional")
+}
+
+/// Returns: `unsafeUnwrap(nonEmpty)`
+///
+/// This version is for internal stdlib use; it avoids any checking
+/// overhead for users, even in Debug builds.
+@inline(__always)
+internal func _unsafeUnwrap<T>(nonEmpty: T?) -> T {
+  if let x = nonEmpty {
+    return x
+  }
+  _sanityCheckFailure("_unsafeUnwrap of nil optional")
+}
+
 @inline(__always)
 public func _getUnsafePointerToStoredProperties(x: AnyObject)
   -> UnsafeMutablePointer<UInt8> {
