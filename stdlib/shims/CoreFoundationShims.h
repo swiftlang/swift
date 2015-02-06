@@ -20,6 +20,7 @@
 
 #include "SwiftStdint.h"
 
+#ifdef __OBJC2__
 #if __LLP64__
 typedef unsigned long long _swift_shims_CFTypeID;
 typedef unsigned long long _swift_shims_CFOptionFlags;
@@ -84,5 +85,6 @@ _swift_shims_Boolean CFStringFindWithOptions(
   _swift_shims_CFRange rangeToSearch,
   _swift_shims_CFStringCompareFlags searchOptions,
   _swift_shims_CFRange * __nullable result);
+#endif
 
 #endif
