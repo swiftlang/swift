@@ -503,18 +503,21 @@ public:
   ///
   /// FIXME: Could this be standardized? It has and will lead to bugs. IMHO.
   SILValue getSelfArgument() const {
+    assert(hasSelfArgument() && "Must have a self argument");
     assert(getNumArguments() && "Should only be called when Callee has "
            "arguments.");
     return getArgument(getNumArguments()-1);
   }
 
   void setSelfArgument(SILValue V) {
+    assert(hasSelfArgument() && "Must have a self argument");
     assert(getNumArguments() && "Should only be called when Callee has "
                                 "arguments.");
     getArgumentOperands()[getNumArguments() - 1].set(V);
   }
 
   OperandValueArrayRef getArgumentsWithoutSelf() const {
+    assert(hasSelfArgument() && "Must have a self argument");
     assert(getNumArguments() && "Should only be called when Callee has "
            "at least a self parameter.");
     assert(hasSubstitutions() && "Should only be called when Callee has "
