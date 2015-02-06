@@ -9,36 +9,35 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// These tests should crash
+// RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/CatchCrashes.cpp -c -o %t/CatchCrashes.o
-// RUN: %target-build-swift %s -Xlinker %t/CatchCrashes.o -o %t/a.out_Debug
-// RUN: %target-build-swift %s -Xlinker %t/CatchCrashes.o -o %t/a.out_Release -O
+// RUN: %target-build-swift %s -o %t/a.out_Debug
+// RUN: %target-build-swift %s -o %t/a.out_Release -O
 //
-// RUN: %target-run %t/a.out_Debug HalfOpen 2>&1 | FileCheck %s
-// RUN: %target-run %t/a.out_Debug Closed 2>&1 | FileCheck %s
-// RUN: %target-run %t/a.out_Release HalfOpen 2>&1 | FileCheck %s
-// RUN: %target-run %t/a.out_Release Closed 2>&1 | FileCheck %s
+// RUN: %target-run %t/a.out_Debug
+// RUN: %target-run %t/a.out_Release
 
 // XFAIL: linux
 
-// CHECK: OK
-// CHECK: CRASHED: SIG{{ILL|TRAP}}
+import StdlibUnittest
 
-// Interpret the command line arguments.
-var arg = Process.arguments[1]
+var IntervalTraps = TestSuite("IntervalTraps")
 
-if arg == "HalfOpen" {
-  println("OK")
+IntervalTraps.test("HalfOpen") {
+  var interval = 1.0..<1.0
+  expectType(HalfOpenInterval<Double>.self, &interval)
+
+  expectCrashLater()
   1.0..<0.0
 }
 
-if arg == "Closed" {
-  println("OK")
+IntervalTraps.test("Closed") {
+  var interval = 1.0...1.0
+  expectType(ClosedInterval<Double>.self, &interval)
+
+  expectCrashLater()
   1.0...0.0
 }
 
-println("BUSTED: should have crashed already")
+runAllTests()
 
-import Darwin
-exit(1)
