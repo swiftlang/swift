@@ -1940,8 +1940,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         // Do not attempt a value-to-optional conversion when resolving the
         // applicable overloads for an operator application with nil operands.
         if (!(subFlags & TMF_ApplyingOperatorWithNil)) {
-          conversionsOrFixes.push_back(
-              ConversionRestrictionKind::ValueToOptional);
+          if (kind >= TypeMatchKind::Conversion ||
+              type1->isAnyClassReferenceType()) {
+            conversionsOrFixes.push_back(
+                ConversionRestrictionKind::ValueToOptional);
+          }
         }
       }
     }
@@ -3667,13 +3670,8 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   //   T $< U ===> T $< U?
   case ConversionRestrictionKind::ValueToOptional: {
     addContextualScore();
-    
-    // Do not penalize the conversion if it's really optional-to-optional.
-    if (!(type1->getAnyOptionalObjectType() &&
-          type2->getAnyOptionalObjectType())) {
-      increaseScore(SK_ValueToOptional);
-    }
-    
+    increaseScore(SK_ValueToOptional);
+
     assert(matchKind >= TypeMatchKind::Subtype);
     auto generic2 = type2->castTo<BoundGenericType>();
     assert(generic2->getDecl()->classifyAsOptionalType());

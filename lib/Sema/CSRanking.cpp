@@ -568,6 +568,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   auto foundRefinement1 = false;
   auto foundRefinement2 = false;
 
+  bool isStdlibOptionalMPlusOperator1 = false;
+  bool isStdlibOptionalMPlusOperator2 = false;
+
   // Compare overload sets.
   for (auto &overload : diff.overloads) {
     auto choice1 = overload.choices[idx1];
@@ -576,7 +579,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // If the systems made the same choice, there's nothing interesting here.
     if (sameOverloadChoice(choice1, choice2))
       continue;
-    
+
     auto decl1 = choice1.getDecl();
     auto dc1 = decl1->getDeclContext();
     auto decl2 = choice2.getDecl();
@@ -718,6 +721,37 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         }
       }
 
+      // FIXME: Lousy hack for ?? to prefer the catamorphism (flattening)
+      // over the mplus (non-flattening) overload if all else is equal.
+      if (decl1->getName().str() == "??") {
+        assert(decl2->getName().str() == "??");
+
+        auto check = [](const ValueDecl *VD) -> bool {
+          if (!VD->getModuleContext()->isStdlibModule())
+            return false;
+          auto fnTy = VD->getType()->castTo<AnyFunctionType>();
+          if (!fnTy->getResult()->getAnyOptionalObjectType())
+            return false;
+
+          // Check that the standard library hasn't added another overload of
+          // the ?? operator.
+          auto inputTupleTy = fnTy->getInput()->castTo<TupleType>();
+          auto inputTypes = inputTupleTy->getElementTypes();
+          assert(inputTypes.size() == 2);
+          assert(inputTypes[0]->getAnyOptionalObjectType());
+          auto autoclosure = inputTypes[1]->castTo<AnyFunctionType>();
+          assert(autoclosure->isAutoClosure());
+          auto secondParamTy = autoclosure->getResult();
+          assert(secondParamTy->getAnyOptionalObjectType());
+          (void)secondParamTy;
+
+          return true;
+        };
+
+        isStdlibOptionalMPlusOperator1 = check(decl1);
+        isStdlibOptionalMPlusOperator2 = check(decl2);
+      }
+
       break;
     }
   }
@@ -857,6 +891,14 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     if (foundRefinement2) {
       ++score2;
     }
+  }
+
+  // FIXME: All other things being equal, prefer the catamorphism (flattening)
+  // overload of ?? over the mplus (non-flattening) overload.
+  if (score1 == score2) {
+    // This is correct: we want to /disprefer/ the mplus.
+    score2 += isStdlibOptionalMPlusOperator1;
+    score1 += isStdlibOptionalMPlusOperator2;
   }
 
   // FIXME: There are type variables and overloads not common to both solutions
