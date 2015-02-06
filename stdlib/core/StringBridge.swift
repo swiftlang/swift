@@ -22,31 +22,36 @@ import SwiftShims
 /// Foundation.
 @objc public protocol _CocoaStringType {}
 
-@semantics("stdlib_binary_only") // user code should not see the CF dependency
-internal func _stdlib_CFStringCreateCopy(
+public // @testable
+func _stdlib_binary_CFStringCreateCopy(
   source: _CocoaStringType
 ) -> _CocoaStringType {
   return unsafeBitCast(CFStringCreateCopy(nil, source), _CocoaStringType.self)
 }
 
-@semantics("stdlib_binary_only") // user code should not see the CF dependency
-internal func _stdlib_CFStringGetLength(source: _CocoaStringType) -> Int {
+public // @testable
+func _stdlib_binary_CFStringGetLength(
+  source: _CocoaStringType
+) -> Int {
   return CFStringGetLength(source)
 }
 
-@semantics("stdlib_binary_only") // user code should not see the CF dependency
-internal func _stdlib_CFStringGetCharactersPtr(
+public // @testable
+func _stdlib_binary_CFStringGetCharactersPtr(
   source: _CocoaStringType
 ) -> UnsafeMutablePointer<UTF16.CodeUnit> {
   return UnsafeMutablePointer(CFStringGetCharactersPtr(source))
 }
 
-/// Bridges a `source` to `Swift.String`, assuming that `source` has non-ASCII
+/// Bridges `source` to `Swift.String`, assuming that `source` has non-ASCII
 /// characters (does not apply ASCII optimizations).
-func _cocoaStringToSwiftString_NonASCII(source: _CocoaStringType) -> String {
-  let cfImmutableValue = _stdlib_CFStringCreateCopy(source)
-  let length = _stdlib_CFStringGetLength(cfImmutableValue)
-  let start = _stdlib_CFStringGetCharactersPtr(cfImmutableValue)
+@inline(never) @semantics("stdlib_binary_only") // Hide the CF dependency
+func _cocoaStringToSwiftString_NonASCII(
+  source: _CocoaStringType
+) -> String {
+  let cfImmutableValue = _stdlib_binary_CFStringCreateCopy(source)
+  let length = _stdlib_binary_CFStringGetLength(cfImmutableValue)
+  let start = _stdlib_binary_CFStringGetCharactersPtr(cfImmutableValue)
 
   return String(_StringCore(
     baseAddress: COpaquePointer(start),
@@ -61,7 +66,7 @@ func _cocoaStringToSwiftString_NonASCII(source: _CocoaStringType) -> String {
 
 /// Produces a `_StringBuffer` from a given subrange of a source
 /// `_CocoaStringType`, having the given minimum capacity.
-@semantics("stdlib_binary_only") // user code should not see the CF dependency
+@inline(never) @semantics("stdlib_binary_only") // Hide the CF dependency
 internal func _cocoaStringToContiguous(
   source: _CocoaStringType, range: Range<Int>, #minimumCapacity: Int
 ) -> _StringBuffer {
@@ -83,7 +88,7 @@ internal func _cocoaStringToContiguous(
 
 /// Reads the entire contents of a _CocoaStringType into contiguous
 /// storage of sufficient capacity.
-@semantics("stdlib_binary_only") // user code should not see the CF dependency
+@inline(never) @semantics("stdlib_binary_only") // Hide the CF dependency
 internal func _cocoaStringReadAll(
   source: _CocoaStringType, destination: UnsafeMutablePointer<UTF16.CodeUnit>
 ) {
@@ -92,14 +97,7 @@ internal func _cocoaStringReadAll(
       location: 0, length: CFStringGetLength(source)), destination)
 }
 
-@semantics("stdlib_binary_only") // user code should not see the CF dependency
-internal func _cocoaStringLength(
-  source: _CocoaStringType
-) -> Int {
-  return CFStringGetLength(source)
-}
-
-@semantics("stdlib_binary_only") // user code should not see the CF dependency
+@inline(never) @semantics("stdlib_binary_only") // Hide the CF dependency
 internal func _cocoaStringSlice(
   target: _StringCore, subRange: Range<Int>
 ) -> _StringCore {
@@ -118,7 +116,7 @@ internal func _cocoaStringSlice(
   return String(_cocoaString: cfResult)._core
 }
 
-@semantics("stdlib_binary_only") // user code should not see the CF dependency
+@inline(never) @semantics("stdlib_binary_only") // Hide the CF dependency
 internal func _cocoaStringSubscript(
   target: _StringCore, position: Int
 ) -> UTF16.CodeUnit {
@@ -139,7 +137,7 @@ internal var kCFStringEncodingASCII : _swift_shims_CFStringEncoding {
 }
 
 extension String {
-  @semantics("stdlib_binary_only") // user code should not see the CF dependency
+  @inline(never) @semantics("stdlib_binary_only") // Hide the CF dependency
   public // SPI(Foundation)
   init(_cocoaString: AnyObject) {
     if let wrapped = _cocoaString as? _NSContiguousString {
@@ -281,14 +279,19 @@ public final class _NSContiguousString : _SwiftNativeNSString {
 extension String {
   /// Same as `_bridgeToObjectiveC()`, but located inside the core standard
   /// library.
-  public func _bridgeToObjectiveCImpl() -> AnyObject {
+  public func _stdlib_binary_bridgeToObjectiveCImpl() -> AnyObject {
     if let ns = _core.cocoaBuffer {
-      if _cocoaStringLength(ns) == _core.count {
+      if CFStringGetLength(ns) == _core.count {
         return ns
       }
     }
     _sanityCheck(_core.hasContiguousStorage)
     return _NSContiguousString(_core)
+  }
+
+  @inline(never) @semantics("stdlib_binary_only") // Hide the CF dependency
+  public func _bridgeToObjectiveCImpl() -> AnyObject {
+    return _stdlib_binary_bridgeToObjectiveCImpl()
   }
 }
 #endif

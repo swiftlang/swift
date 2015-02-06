@@ -782,7 +782,7 @@ RuntimeFoundationWrappers.test("_stdlib_CFStringCreateCopy/NoLeak") {
   if true {
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
-    _stdlib_CFStringCreateCopy(a)
+    _stdlib_binary_CFStringCreateCopy(a)
   }
   expectEqual(0, nsStringCanaryCount)
 }
@@ -792,7 +792,7 @@ RuntimeFoundationWrappers.test("_stdlib_CFStringGetLength/NoLeak") {
   if true {
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
-    _stdlib_CFStringGetLength(a)
+    _stdlib_binary_CFStringGetLength(a)
   }
   expectEqual(0, nsStringCanaryCount)
 }
@@ -802,7 +802,7 @@ RuntimeFoundationWrappers.test("_stdlib_CFStringGetCharactersPtr/NoLeak") {
   if true {
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
-    _stdlib_CFStringGetCharactersPtr(a)
+    _stdlib_binary_CFStringGetCharactersPtr(a)
   }
   expectEqual(0, nsStringCanaryCount)
 }

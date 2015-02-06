@@ -318,11 +318,13 @@ extension String : Comparable {
 }
 
 extension String {
+  @inline(never) @semantics("stdlib_binary_only") // Hide the CF dependency
   public // @testable
   func _lessThanUTF16(rhs: String) -> Bool {
 #if _runtime(_ObjC)
     return _stdlib_compareNSStringDeterministicUnicodeCollation(
-      self._bridgeToObjectiveCImpl(), rhs._bridgeToObjectiveCImpl()) < 0
+      self._stdlib_binary_bridgeToObjectiveCImpl(),
+      rhs._stdlib_binary_bridgeToObjectiveCImpl()) < 0
 #else
     // FIXME: Actually implement. For now, all strings are unequal
     // rdar://problem/18878343
@@ -412,8 +414,9 @@ extension String : Hashable {
 #if _runtime(_ObjC)
     // FIXME(performance): constructing a temporary NSString is extremely
     // wasteful and inefficient.
-    let cocoaString =
-      unsafeBitCast(self._bridgeToObjectiveCImpl(), _NSStringCoreType.self)
+    let cocoaString = unsafeBitCast(
+      self._bridgeToObjectiveCImpl(), _NSStringCoreType.self)
+
     // If we have an ASCII string, we do not need to normalize.
     if self._core.isASCII {
       return hashOffset ^ _stdlib_NSStringASCIIHashValue(cocoaString)
