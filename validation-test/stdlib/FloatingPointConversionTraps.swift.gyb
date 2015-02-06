@@ -1,11 +1,11 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %S/../../utils/gyb %s -o %t/FloatingPointConversionTraps.swift
-// RUN: %target-build-swift %t/FloatingPointConversionTraps.swift -Xfrontend -disable-access-control -o %t/a.out_Debug
-// RUN: %target-build-swift %t/FloatingPointConversionTraps.swift -Xfrontend -disable-access-control -o %t/a.out_Release -O
+// RUN: %S/../../utils/line-directive %t/FloatingPointConversionTraps.swift -- %target-build-swift %t/FloatingPointConversionTraps.swift -Xfrontend -disable-access-control -o %t/a.out_Debug
+// RUN: %S/../../utils/line-directive %t/FloatingPointConversionTraps.swift -- %target-build-swift %t/FloatingPointConversionTraps.swift -Xfrontend -disable-access-control -o %t/a.out_Release -O
 //
-// RUN: %target-run %t/a.out_Debug
-// RUN: %target-run %t/a.out_Release
+// RUN: %S/../../utils/line-directive %t/FloatingPointConversionTraps.swift -- %target-run %t/a.out_Debug
+// RUN: %S/../../utils/line-directive %t/FloatingPointConversionTraps.swift -- %target-run %t/a.out_Release
 
 import StdlibUnittest
 

@@ -1,11 +1,11 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %S/../../utils/gyb %s -o %t/ArrayTraps.swift
-// RUN: %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Debug
-// RUN: %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Release -O
+// RUN: %S/../../utils/line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Debug
+// RUN: %S/../../utils/line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Release -O
 //
-// RUN: %target-run %t/a.out_Debug
-// RUN: %target-run %t/a.out_Release
+// RUN: %S/../../utils/line-directive %t/ArrayTraps.swift -- %target-run %t/a.out_Debug
+// RUN: %S/../../utils/line-directive %t/ArrayTraps.swift -- %target-run %t/a.out_Release
 
 // XFAIL: linux
 

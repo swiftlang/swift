@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/FixedPoint.swift
 // RUN: %S/../../utils/line-directive %t/FixedPoint.swift -- %target-build-swift %t/FixedPoint.swift -o %t/a.out
-// RUN: %target-run %t/a.out
+// RUN: %S/../../utils/line-directive %t/FixedPoint.swift -- %target-run %t/a.out
 
 import StdlibUnittest
 
