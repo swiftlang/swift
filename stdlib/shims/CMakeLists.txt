@@ -15,7 +15,7 @@ set(output_dir "${SWIFTLIB_DIR}/shims")
 
 set(commands
     COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${output_dir}")
-set(outputs "${output_dir}")
+set(outputs)
 foreach(input ${sources})
   list(APPEND commands
       COMMAND
@@ -24,6 +24,8 @@ foreach(input ${sources})
         "${output_dir}/${input}")
   list(APPEND outputs "${output_dir}/${input}")
 endforeach()
+# Put the output dir itself last so that it isn't considered the primary output.
+list(APPEND outputs "${output_dir}")
 
 add_custom_command_target(unused_var
     ${commands}
