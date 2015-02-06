@@ -15,6 +15,7 @@
 //  part of SwiftShims.
 //
 //===----------------------------------------------------------------------===//
+
 #ifndef SWIFT_STDLIB_SHIMS_COREFOUNDATIONSHIMS_H
 #define SWIFT_STDLIB_SHIMS_COREFOUNDATIONSHIMS_H
 
@@ -39,7 +40,7 @@ typedef struct {
 } _swift_shims_CFRange;
 
 typedef id _swift_shims_CFStringRef;
-typedef const struct _swift_shims_CFAllocator * _swift_shims_CFAllocatorRef;
+typedef const struct _swift_shims_CFAllocator *_swift_shims_CFAllocatorRef;
 typedef __swift_uint32_t _swift_shims_CFStringEncoding;
 typedef _swift_shims_CFOptionFlags _swift_shims_CFStringCompareFlags;
 typedef _swift_shims_CFIndex _swift_shims_CFComparisonResult;
@@ -49,42 +50,44 @@ typedef unsigned char _swift_shims_Boolean;
 typedef __swift_uint16_t _swift_shims_UniChar;
 
 // Buffer is nullable in case the string is zero-length.
-void CFStringGetCharacters(
-  _swift_shims_CFStringRef __nonnull theString, _swift_shims_CFRange range, 
-  _swift_shims_UniChar * __nullable buffer);
+void CFStringGetCharacters(_swift_shims_CFStringRef __nonnull theString,
+                           _swift_shims_CFRange range,
+                           _swift_shims_UniChar *__nullable buffer);
 
-const _swift_shims_UniChar * __nullable CFStringGetCharactersPtr(
-  _swift_shims_CFStringRef __nonnull theString);
+const _swift_shims_UniChar *__nullable CFStringGetCharactersPtr(
+    _swift_shims_CFStringRef __nonnull theString);
 
-_swift_shims_CFIndex CFStringGetLength(
-  _swift_shims_CFStringRef __nonnull theString);
+_swift_shims_CFIndex
+    CFStringGetLength(_swift_shims_CFStringRef __nonnull theString);
 
 _swift_shims_CFStringRef __nonnull CFStringCreateWithSubstring(
-  _swift_shims_CFAllocatorRef __nullable alloc,
-  _swift_shims_CFStringRef __nonnull str, 
-  _swift_shims_CFRange range);
+    _swift_shims_CFAllocatorRef __nullable alloc,
+    _swift_shims_CFStringRef __nonnull str, _swift_shims_CFRange range);
 
-_swift_shims_UniChar CFStringGetCharacterAtIndex(
-  _swift_shims_CFStringRef __nonnull theString, _swift_shims_CFIndex idx);
+_swift_shims_UniChar
+CFStringGetCharacterAtIndex(_swift_shims_CFStringRef __nonnull theString,
+                            _swift_shims_CFIndex idx);
 
 _swift_shims_CFStringRef __nonnull CFStringCreateCopy(
-  _swift_shims_CFAllocatorRef __nullable alloc,
-  _swift_shims_CFStringRef __nonnull theString);
+    _swift_shims_CFAllocatorRef __nullable alloc,
+    _swift_shims_CFStringRef __nonnull theString);
 
-const char * __nullable CFStringGetCStringPtr(
-  _swift_shims_CFStringRef __nonnull theString,
-  _swift_shims_CFStringEncoding encoding);
+const char *__nullable CFStringGetCStringPtr(
+    _swift_shims_CFStringRef __nonnull theString,
+    _swift_shims_CFStringEncoding encoding);
 
-_swift_shims_CFComparisonResult CFStringCompare(
-  _swift_shims_CFStringRef __nonnull theString1, _swift_shims_CFStringRef __nonnull theString2,
-   _swift_shims_CFStringCompareFlags compareOptions);
+_swift_shims_CFComparisonResult
+CFStringCompare(_swift_shims_CFStringRef __nonnull theString1,
+                _swift_shims_CFStringRef __nonnull theString2,
+                _swift_shims_CFStringCompareFlags compareOptions);
 
-_swift_shims_Boolean CFStringFindWithOptions(
-  _swift_shims_CFStringRef __nonnull theString, 
-  _swift_shims_CFStringRef __nonnull stringToFind,
-  _swift_shims_CFRange rangeToSearch,
-  _swift_shims_CFStringCompareFlags searchOptions,
-  _swift_shims_CFRange * __nullable result);
-#endif
+_swift_shims_Boolean
+CFStringFindWithOptions(_swift_shims_CFStringRef __nonnull theString,
+                        _swift_shims_CFStringRef __nonnull stringToFind,
+                        _swift_shims_CFRange rangeToSearch,
+                        _swift_shims_CFStringCompareFlags searchOptions,
+                        _swift_shims_CFRange *__nullable result);
+#endif // __OBJC2__
 
-#endif
+#endif // SWIFT_STDLIB_SHIMS_COREFOUNDATIONSHIMS_H
+
