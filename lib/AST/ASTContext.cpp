@@ -2389,8 +2389,23 @@ static RecursiveTypeProperties getFunctionRecursiveProperties(Type Input,
   return properties;
 }
 
-/// FunctionType::get - Return a uniqued function type with the specified
-/// input and result.
+AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
+  if (isa<FunctionType>(this))
+    return FunctionType::get(getInput(), getResult(), info);
+  if (auto *polyFnTy = dyn_cast<PolymorphicFunctionType>(this))
+    return PolymorphicFunctionType::get(getInput(), getResult(),
+                                        &polyFnTy->getGenericParams(), info);
+  if (auto *genFnTy = dyn_cast<GenericFunctionType>(this))
+    return GenericFunctionType::get(genFnTy->getGenericSignature(),
+                                    getInput(), getResult(), info);
+
+  static_assert(3 - 1 ==
+                  static_cast<int>(TypeKind::Last_AnyFunctionType) -
+                    static_cast<int>(TypeKind::First_AnyFunctionType),
+                "unhandled function type");
+  llvm_unreachable("unhandled function type");
+}
+
 FunctionType *FunctionType::get(Type Input, Type Result,
                                 const ExtInfo &Info) {
   auto properties = getFunctionRecursiveProperties(Input, Result);

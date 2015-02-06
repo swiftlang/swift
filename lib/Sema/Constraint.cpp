@@ -409,13 +409,21 @@ Fix Fix::getForcedDowncast(ConstraintSystem &cs, Type toType) {
   return Fix(FixKind::ForceDowncast, index);
 }
 
+Fix Fix::getFunctionConversion(ConstraintSystem &cs,
+                               FunctionType *toType) {
+  unsigned index = cs.FixedTypes.size();
+  cs.FixedTypes.push_back(toType);
+  return Fix(FixKind::FunctionConversion, index);
+}
+
 ArrayRef<Identifier> Fix::getRelabelTupleNames(ConstraintSystem &cs) const {
   assert(isRelabelTuple());
   return cs.RelabelTupleNames[Data];
 }
 
 Type Fix::getTypeArgument(ConstraintSystem &cs) const {
-  assert(getKind() == FixKind::ForceDowncast);
+  assert(getKind() == FixKind::ForceDowncast ||
+         getKind() == FixKind::FunctionConversion);
   return cs.FixedTypes[Data];
 }
 
@@ -445,6 +453,8 @@ StringRef Fix::getName(FixKind kind) {
     return "fix: fromRaw(x) to init(rawValue:x)";
   case FixKind::ToRawToRawValue:
     return "fix: toRaw() to rawValue";
+  case FixKind::FunctionConversion:
+    return "fix: function conversion";
   }
 }
 

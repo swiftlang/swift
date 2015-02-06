@@ -48,7 +48,7 @@ func test4() {
   func foo() -> Int { return 0 }
   func takes_optfn(f : () -> Int?) -> Int? { return f() }
 
-  takes_optfn(foo) // expected-error {{cannot invoke 'takes_optfn' with an argument list of type '(() -> Int)'}} expected-note {{expected an argument list of type '(() -> Int?)'}}
+  takes_optfn(foo) // expected-error {{function signature '() -> Int' is not compatible with expected type '() -> Int?'}} expected-note {{use a closure to safely wrap calls to the function}}
 
   func takes_objoptfn(f : () -> AnyObject?) -> AnyObject? { return f() }
   func objFoo() -> AnyObject { return A() }

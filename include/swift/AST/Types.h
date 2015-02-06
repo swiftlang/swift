@@ -2026,6 +2026,9 @@ public:
     return getExtInfo().isNoEscape();
   }
 
+  /// Returns a new function type exactly like this one but with the ExtInfo
+  /// replaced.
+  AnyFunctionType *withExtInfo(ExtInfo info) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

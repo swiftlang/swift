@@ -190,3 +190,9 @@ func rdar19695671() {
   takesDictionary(NSDictionary() as! Dictionary) // expected-error{{'NSDictionary' is not convertible to 'Dictionary<Key, Value>'}}
   takesArray(NSArray() as! Array) // expected-error{{'NSArray' is not convertible to 'Array<T>'}}
 }
+
+
+// This failed at one point while fixing rdar://problem/19600325.
+func getArrayOfAnyObject(_: AnyObject) -> [AnyObject] { return [] }
+func testCallback(f: (AnyObject) -> AnyObject?) {}
+testCallback { return getArrayOfAnyObject($0) }
