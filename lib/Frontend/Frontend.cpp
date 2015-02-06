@@ -26,6 +26,8 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "clang/Lex/HeaderSearch.h"
+#include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/CommandLine.h"
@@ -221,6 +223,22 @@ Module *CompilerInstance::getMainModule() {
   return MainModule;
 }
 
+namespace {
+class CloseClangModuleFiles {
+  clang::Preprocessor &PP;
+public:
+  CloseClangModuleFiles(clang::Preprocessor &PP) : PP(PP) {}
+  ~CloseClangModuleFiles() {
+    clang::ModuleMap &ModMap = PP.getHeaderSearchInfo().getModuleMap();
+    for (auto I = ModMap.module_begin(), E = ModMap.module_end(); I != E; ++I) {
+      clang::Module *M = I->second;
+      if (!M->isSubModule() && M->getASTFile())
+        M->getASTFile()->closeFile();
+    }
+  }
+};
+} // end anonymous namespace
+
 void CompilerInstance::performSema() {
   const FrontendOptions &options = Invocation.getFrontendOptions();
   const SourceFileKind Kind = Invocation.getInputKind();
@@ -253,6 +271,11 @@ void CompilerInstance::performSema() {
 
   auto clangImporter =
     static_cast<ClangImporter *>(Context->getClangModuleLoader());
+
+  // When we exit, we won't build any more clang modules, so close the .pcm
+  // files to prevent fd leaks in clients that cache the AST.
+  // FIXME: Remove this once rdar://problem/19720334 is complete.
+  CloseClangModuleFiles ccmf(clangImporter->getClangPreprocessor());
 
   Module *underlying = nullptr;
   if (options.ImportUnderlyingModule) {
