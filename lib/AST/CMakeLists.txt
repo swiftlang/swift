@@ -59,7 +59,8 @@ add_swift_library(swiftAST
     clangBasic
 
   COMPONENT_DEPENDS
-    profiledata object mc mcparser bitreader option core support)
+    profiledata instrumentation object mc mcparser bitreader option core
+    support)
 
 if(NOT SWIFT_BUILT_STANDALONE)
   add_dependencies(swiftAST intrinsics_gen)
