@@ -5,23 +5,23 @@
 // 2. the witness thunk
 // Both should not inline the testit function and should set the noinline-attribute for llvm.
 
-// CHECK-LABEL: define hidden i64 @_TFV{{.*}}testit
-// CHECK: call i64 @_TTS{{.*}}testit{{.*}} #[[ATTR:[0-9]+]]
+// CHECK-LABEL: define hidden i32 @_TFV{{.*}}testit
+// CHECK: call i32 @_TTS{{.*}}testit{{.*}} #[[ATTR:[0-9]+]]
 // CHECK: ret
 
-// CHECK-LABEL: define hidden i64 @_TTW{{.*}}testit
-// CHECK: call i64 @_TTS{{.*}}testit{{.*}} #[[ATTR]]
+// CHECK-LABEL: define hidden i32 @_TTW{{.*}}testit
+// CHECK: call i32 @_TTS{{.*}}testit{{.*}} #[[ATTR]]
 // CHECK: ret
 
 // CHECK: attributes #[[ATTR]] = { noinline }
 
 protocol Proto {
-  func testit(x: Int) -> Int
+  func testit(x: Int32) -> Int32
 }
 
 
 struct TestStruct : Proto {
-  func testit(x: Int) -> Int {
+  func testit(x: Int32) -> Int32 {
     return x + 1
   }
 }
