@@ -52,7 +52,8 @@ let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegister
 #endif
 
 /// Invoke `f` with a C `va_list` argument derived from `args`.
-public func withVaList<R>(args: [CVarArgType], f: (CVaListPointer)->R) -> R {
+public func withVaList<R>(args: [CVarArgType],
+  @noescape f: CVaListPointer -> R) -> R {
   var builder = VaListBuilder()
   for a in args {
     builder.append(a)
@@ -61,7 +62,8 @@ public func withVaList<R>(args: [CVarArgType], f: (CVaListPointer)->R) -> R {
 }
 
 /// Invoke `f` with a C `va_list` argument derived from `builder`.
-public func withVaList<R>(builder: VaListBuilder, f: (CVaListPointer)->R) -> R {
+public func withVaList<R>(builder: VaListBuilder,
+  @noescape f: CVaListPointer -> R) -> R {
   let result = f(builder.va_list())
   _fixLifetime(builder)
   return result

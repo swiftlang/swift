@@ -13,7 +13,7 @@
 /// Evaluate `f()` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
 public func withExtendedLifetime<T, Result>(
-  x: T, f: ()->Result
+  x: T, @noescape f: () -> Result
 ) -> Result {
   let result = f()
   _fixLifetime(x)
@@ -23,7 +23,7 @@ public func withExtendedLifetime<T, Result>(
 /// Evaluate `f(x)` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
 public func withExtendedLifetime<T, Result>(
-  x: T, f: (T)->Result
+  x: T, @noescape f: T -> Result
 ) -> Result {
   let result = f(x)
   _fixLifetime(x)
@@ -36,7 +36,7 @@ extension String {
   /// a nul-terminated array of char, ensuring that the array's
   /// lifetime extends through the execution of `f`.
   public func withCString<Result>(
-    f: (UnsafePointer<Int8>)->Result
+    @noescape f: UnsafePointer<Int8> -> Result
   ) -> Result {
     return self.nulTerminatedUTF8.withUnsafeBufferPointer {
       f(UnsafePointer($0.baseAddress))
@@ -56,7 +56,7 @@ public func _fixLifetime<T>(var x: T) {
 /// parameters (and default-constructible "out" parameters) by pointer
 public func withUnsafeMutablePointer<T, Result>(
   inout arg: T,
-  body: (UnsafeMutablePointer<T>)->Result
+  @noescape body: UnsafeMutablePointer<T> -> Result
 ) -> Result
 {
   return body(UnsafeMutablePointer<T>(Builtin.addressof(&arg)))
@@ -66,7 +66,7 @@ public func withUnsafeMutablePointer<T, Result>(
 public func withUnsafeMutablePointers<A0, A1, Result>(
   inout arg0: A0,
   inout arg1: A1,
-  body: (UnsafeMutablePointer<A0>, UnsafeMutablePointer<A1>)->Result
+  @noescape body: (UnsafeMutablePointer<A0>, UnsafeMutablePointer<A1>) -> Result
 ) -> Result {
   return withUnsafeMutablePointer(&arg0) {
     arg0 in withUnsafeMutablePointer(&arg1) {
@@ -81,11 +81,11 @@ public func withUnsafeMutablePointers<A0, A1, A2, Result>(
   inout arg0: A0,
   inout arg1: A1,
   inout arg2: A2,
-  body: (
+  @noescape body: (
     UnsafeMutablePointer<A0>,
     UnsafeMutablePointer<A1>,
     UnsafeMutablePointer<A2>
-  )->Result
+  ) -> Result
 ) -> Result {
   return withUnsafeMutablePointer(&arg0) {
     arg0 in withUnsafeMutablePointer(&arg1) {
@@ -101,7 +101,7 @@ public func withUnsafeMutablePointers<A0, A1, A2, Result>(
 /// parameters (and default-constructible "out" parameters) by pointer
 public func withUnsafePointer<T, Result>(
   inout arg: T,
-  body: (UnsafePointer<T>)->Result
+  @noescape body: UnsafePointer<T> -> Result
 ) -> Result
 {
   return body(UnsafePointer<T>(Builtin.addressof(&arg)))
@@ -111,7 +111,7 @@ public func withUnsafePointer<T, Result>(
 public func withUnsafePointers<A0, A1, Result>(
   inout arg0: A0,
   inout arg1: A1,
-  body: (UnsafePointer<A0>, UnsafePointer<A1>)->Result
+  @noescape body: (UnsafePointer<A0>, UnsafePointer<A1>) -> Result
 ) -> Result {
   return withUnsafePointer(&arg0) {
     arg0 in withUnsafePointer(&arg1) {
@@ -126,11 +126,11 @@ public func withUnsafePointers<A0, A1, A2, Result>(
   inout arg0: A0,
   inout arg1: A1,
   inout arg2: A2,
-  body: (
+  @noescape body: (
     UnsafePointer<A0>,
     UnsafePointer<A1>,
     UnsafePointer<A2>
-  )->Result
+  ) -> Result
 ) -> Result {
   return withUnsafePointer(&arg0) {
     arg0 in withUnsafePointer(&arg1) {

@@ -351,7 +351,7 @@ public struct ${Self}<T>
   /// of a T which is written into buffer before this method returns
   @transparent public
   func _withBridgeObject<U: AnyObject, R>(
-    inout buffer: U?, @noescape body: (AutoreleasingUnsafeMutablePointer<U?>)->R
+    inout buffer: U?, @noescape body: AutoreleasingUnsafeMutablePointer<U?> -> R
   ) -> R {
     return self != nil ? body(&buffer) : body(nil)
   }
@@ -362,7 +362,7 @@ public struct ${Self}<T>
   /// of buffer
   @transparent public
   func _withBridgeValue<U, R>(
-    inout buffer: U, @noescape body: (UnsafeMutablePointer<U>)->R
+    inout buffer: U, @noescape body: UnsafeMutablePointer<U> -> R
   ) -> R {
     return self != nil ? body(&buffer) : body(nil)
   }

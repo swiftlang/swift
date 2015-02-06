@@ -195,7 +195,7 @@ func __pushAutoreleasePool() -> COpaquePointer
 @asmname("objc_autoreleasePoolPop") 
 func __popAutoreleasePool(pool: COpaquePointer)
 
-public func autoreleasepool(code: () -> ()) {
+public func autoreleasepool(@noescape code: () -> ()) {
   var pool = __pushAutoreleasePool()
   code()
   __popAutoreleasePool(pool)
