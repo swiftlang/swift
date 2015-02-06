@@ -322,6 +322,10 @@ class FunctionAnalyzer {
   /// Did we ascertain that we can optimize this function?
   bool ShouldOptimize;
 
+  /// Did we change the self argument. If so we need to change the calling
+  /// convention 'method' to 'freestanding'.
+  bool HaveModifiedSelfArgument;
+
   /// A list of structures which present a "view" of precompiled information on
   /// an argument that we will use during our optimization.
   llvm::SmallVector<ArgumentDescriptor, 8> ArgDescList;
@@ -331,10 +335,10 @@ public:
   FunctionAnalyzer(const FunctionAnalyzer &) = delete;
   FunctionAnalyzer(FunctionAnalyzer &&) = delete;
 
-  FunctionAnalyzer(llvm::BumpPtrAllocator &Allocator,
-                   RCIdentityAnalysis *RCIA, SILFunction *F)
-    : Allocator(Allocator), RCIA(RCIA), F(F), ShouldOptimize(false),
-      ArgDescList() {}
+  FunctionAnalyzer(llvm::BumpPtrAllocator &Allocator, RCIdentityAnalysis *RCIA,
+                   SILFunction *F)
+      : Allocator(Allocator), RCIA(RCIA), F(F), ShouldOptimize(false),
+        HaveModifiedSelfArgument(false), ArgDescList() {}
 
   /// Analyze the given function.
   bool analyze();
@@ -375,9 +379,10 @@ FunctionAnalyzer::analyze() {
   ConsumedArgToEpilogueReleaseMatcher ArgToEpilogueReleaseMap(RCIA, F);
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
     ArgumentDescriptor A(Allocator, Args[i]);
+    bool HaveOptimizedArg = false;
 
     if (A.IsDead) {
-      ShouldOptimize = true;
+      HaveOptimizedArg = true;
       ++NumDeadArgsEliminated;
     }
 
@@ -386,14 +391,22 @@ FunctionAnalyzer::analyze() {
     if (A.hasConvention(ParameterConvention::Direct_Owned)) {
       if (auto *Release = ArgToEpilogueReleaseMap.releaseForArgument(A.Arg)) {
         A.CalleeRelease = Release;
-        ShouldOptimize = true;
+        HaveOptimizedArg = true;
         ++NumOwnedConvertedToGuaranteed;
       }
     }
 
     if (A.canExplodeValue()) {
-      ShouldOptimize = true;
+      HaveOptimizedArg = true;
       ++NumSROAArguments;
+    }
+
+    if (HaveOptimizedArg) {
+      ShouldOptimize = true;
+      // Store that we have modified the self argument. We need to change the
+      // calling convention later.
+      if (Args[i]->isSelf())
+        HaveModifiedSelfArgument = true;
     }
 
     // Add the argument to our list.
@@ -422,9 +435,14 @@ FunctionAnalyzer::createOptimizedSILFunctionType() {
   }
 
   SILResultInfo InterfaceResult = FTy->getResult();
+  auto ExtInfo = FTy->getExtInfo();
+
+  // Change the calling convention to freestanding if we have modified self.
+  if (HaveModifiedSelfArgument)
+    ExtInfo = ExtInfo.withCallingConv(AbstractCC::Freestanding);
 
   return SILFunctionType::get(FTy->getGenericSignature(),
-                              FTy->getExtInfo(),
+                              ExtInfo,
                               FTy->getCalleeConvention(),
                               InterfaceParams, InterfaceResult, Ctx);
 }
