@@ -466,6 +466,7 @@ public:
     return std::find_if(begin(), end(),
       [](const SILBasicBlock &BB) -> bool {
         const TermInst *TI = BB.getTerminator();
+        // TODO: We autorelease_return should also be handled here.
         return isa<ReturnInst>(TI);
     });
   }
