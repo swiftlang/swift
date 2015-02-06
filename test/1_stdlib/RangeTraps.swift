@@ -24,11 +24,17 @@ import StdlibUnittest
 var RangeTraps = TestSuite("RangeTraps")
 
 RangeTraps.test("HalfOpen") {
+  var range = 1..<1
+  expectType(Range<Int>.self, &range)
+
   expectCrashLater()
   1..<0
 }
 
 RangeTraps.test("Closed") {
+  var range = 1...1
+  expectType(Range<Int>.self, &range)
+
   expectCrashLater()
   1...0
 }
