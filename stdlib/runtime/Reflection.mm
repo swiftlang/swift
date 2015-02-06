@@ -785,64 +785,57 @@ OptionalQuickLookObject swift_ClassMirror_quickLookObject(HeapObject *owner,
 #endif
   
 // -- MagicMirror implementation.
-  
+
+// TODO: There are other non-Apple platforms that underscore asm symbols.
+#if __APPLE__
+# define UNDERSCORE "_"
+#else
+# define UNDERSCORE
+#endif
+
 // Addresses of the type metadata and Mirror witness tables for the primitive
 // mirrors.
-extern "C" const FullMetadata<Metadata> _TMdVSs13_OpaqueMirror;
-extern "C" const MirrorWitnessTable _TWPVSs13_OpaqueMirrorSs10MirrorTypeSs;
+extern "C" const FullMetadata<Metadata> OpaqueMirrorMetadata
+  __asm__(UNDERSCORE "_TMdVSs13_OpaqueMirror");
+extern "C" const MirrorWitnessTable OpaqueMirrorWitnessTable
+  __asm__(UNDERSCORE "_TWPVSs13_OpaqueMirrorSs10MirrorTypeSs");
+extern "C" const FullMetadata<Metadata> TupleMirrorMetadata
+  __asm__(UNDERSCORE "_TMdVSs12_TupleMirror");
+extern "C" const MirrorWitnessTable TupleMirrorWitnessTable
+  __asm__(UNDERSCORE "_TWPVSs12_TupleMirrorSs10MirrorTypeSs");
 
-extern "C" const FullMetadata<Metadata> _TMdVSs12_TupleMirror;
-extern "C" const MirrorWitnessTable _TWPVSs12_TupleMirrorSs10MirrorTypeSs;
+extern "C" const FullMetadata<Metadata> StructMirrorMetadata
+  __asm__(UNDERSCORE "_TMdVSs13_StructMirror");
+extern "C" const MirrorWitnessTable StructMirrorWitnessTable
+  __asm__(UNDERSCORE "_TWPVSs13_StructMirrorSs10MirrorTypeSs");
 
-extern "C" const FullMetadata<Metadata> _TMdVSs13_StructMirror;
-extern "C" const MirrorWitnessTable _TWPVSs13_StructMirrorSs10MirrorTypeSs;
+extern "C" const FullMetadata<Metadata> ClassMirrorMetadata
+  __asm__(UNDERSCORE "_TMdVSs12_ClassMirror");
+extern "C" const MirrorWitnessTable ClassMirrorWitnessTable
+  __asm__(UNDERSCORE "_TWPVSs12_ClassMirrorSs10MirrorTypeSs");
 
-extern "C" const FullMetadata<Metadata> _TMdVSs12_ClassMirror;
-extern "C" const MirrorWitnessTable _TWPVSs12_ClassMirrorSs10MirrorTypeSs;
+extern "C" const FullMetadata<Metadata> ClassSuperMirrorMetadata
+  __asm__(UNDERSCORE "_TMdVSs17_ClassSuperMirror");
+extern "C" const MirrorWitnessTable ClassSuperMirrorWitnessTable
+  __asm__(UNDERSCORE "_TWPVSs17_ClassSuperMirrorSs10MirrorTypeSs");
 
-extern "C" const FullMetadata<Metadata> _TMdVSs17_ClassSuperMirror;
-extern "C" const MirrorWitnessTable _TWPVSs17_ClassSuperMirrorSs10MirrorTypeSs;
-
-extern "C" const FullMetadata<Metadata> _TMdVSs15_MetatypeMirror;
-extern "C" const MirrorWitnessTable _TWPVSs15_MetatypeMirrorSs10MirrorTypeSs;
+extern "C" const FullMetadata<Metadata> MetatypeMirrorMetadata
+  __asm__(UNDERSCORE "_TMdVSs15_MetatypeMirror");
+extern "C" const MirrorWitnessTable MetatypeMirrorWitnessTable
+  __asm__(UNDERSCORE "_TWPVSs15_MetatypeMirrorSs10MirrorTypeSs");
   
 #if SWIFT_OBJC_INTEROP
-// These type metadata objects are kept in swiftFoundation because they rely
-// on string bridging being installed.
-static const Metadata *getObjCMirrorMetadata() {
-  static const Metadata *metadata = nullptr;
-  if (!metadata)
-    metadata = reinterpret_cast<const FullMetadata<Metadata>*>(
-      dlsym(RTLD_DEFAULT, "_TMdVSs11_ObjCMirror"));
-  assert(metadata);
-  return metadata;
-}
-static const MirrorWitnessTable *getObjCMirrorWitness() {
-  static const MirrorWitnessTable *witness = nullptr;
-  if (!witness)
-    witness = reinterpret_cast<const MirrorWitnessTable*>(
-      dlsym(RTLD_DEFAULT, "_TWPVSs11_ObjCMirrorSs10MirrorTypeSs"));
-  assert(witness);
-  return witness;
-}
-static const Metadata *getObjCSuperMirrorMetadata() {
-  static const Metadata *metadata = nullptr;
-  if (!metadata)
-    metadata = reinterpret_cast<const FullMetadata<Metadata>*>(
-      dlsym(RTLD_DEFAULT, "_TMdVSs16_ObjCSuperMirror"));
-  assert(metadata);
-  return metadata;
-}
-static const MirrorWitnessTable *getObjCSuperMirrorWitness() {
-  static const MirrorWitnessTable *witness = nullptr;
-  if (!witness)
-    witness = reinterpret_cast<const MirrorWitnessTable*>(
-      dlsym(RTLD_DEFAULT, "_TWPVSs16_ObjCSuperMirrorSs10MirrorTypeSs"));
-  assert(witness);
-  
-  return witness;
-}
+extern "C" const FullMetadata<Metadata> ObjCMirrorMetadata
+  __asm__(UNDERSCORE "_TMdVSs11_ObjCMirror");
+extern "C" const MirrorWitnessTable ObjCMirrorWitnessTable
+  __asm__(UNDERSCORE "_TWPVSs11_ObjCMirrorSs10MirrorTypeSs");
+extern "C" const FullMetadata<Metadata> ObjCSuperMirrorMetadata
+  __asm__(UNDERSCORE "_TMdVSs16_ObjCSuperMirror");
+extern "C" const MirrorWitnessTable ObjCSuperMirrorWitnessTable
+  __asm__(UNDERSCORE "_TWPVSs16_ObjCSuperMirrorSs10MirrorTypeSs");
 #endif
+
+#undef UNDERSCORE
 
 /// \param owner passed at +1, consumed.
 /// \param value passed unowned.
@@ -860,8 +853,8 @@ static Mirror getMirrorForSuperclass(const ClassMetadata *sup,
   Mirror resultBuf;
   MagicMirror *result = ::new (&resultBuf) MagicMirror;
   
-  result->Self = &_TMdVSs17_ClassSuperMirror;
-  result->MirrorWitness = &_TWPVSs17_ClassSuperMirrorSs10MirrorTypeSs;
+  result->Self = &ClassSuperMirrorMetadata;
+  result->MirrorWitness = &ClassSuperMirrorWitnessTable;
   result->Data.Owner = owner;
   result->Data.Type = sup;
   result->Data.Value = value;
@@ -879,8 +872,8 @@ static Mirror ObjC_getMirrorForSuperclass(Class sup,
   Mirror resultBuf;
   MagicMirror *result = ::new (&resultBuf) MagicMirror;
   
-  result->Self = getObjCSuperMirrorMetadata();
-  result->MirrorWitness = getObjCSuperMirrorWitness();
+  result->Self = &ObjCSuperMirrorMetadata;
+  result->MirrorWitness = &ObjCSuperMirrorWitnessTable;
   result->Data.Owner = owner;
   result->Data.Type = reinterpret_cast<ClassMetadata*>(sup);
   result->Data.Value = value;
@@ -906,12 +899,12 @@ getImplementationForClass(const OpaqueValue *Value) {
 #if SWIFT_OBJC_INTEROP
   // If this is a pure ObjC class, reflect it using ObjC's runtime facilities.
   if (!isa->isTypeMetadata())
-    return {isa, getObjCMirrorMetadata(), getObjCMirrorWitness()};
+    return {isa, &ObjCMirrorMetadata, &ObjCMirrorWitnessTable};
 #endif
 
   // Otherwise, use the native Swift facilities.
   return std::make_tuple(
-      isa, &_TMdVSs12_ClassMirror, &_TWPVSs12_ClassMirrorSs10MirrorTypeSs);
+      isa, &ClassMirrorMetadata, &ClassMirrorWitnessTable);
 }
   
 /// Get the magic mirror witnesses appropriate to a particular type.
@@ -920,11 +913,11 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   switch (T->getKind()) {
   case MetadataKind::Tuple:
     return std::make_tuple(
-        T, &_TMdVSs12_TupleMirror, &_TWPVSs12_TupleMirrorSs10MirrorTypeSs);
+        T, &TupleMirrorMetadata, &TupleMirrorWitnessTable);
       
   case MetadataKind::Struct:
     return std::make_tuple(
-        T, &_TMdVSs13_StructMirror, &_TWPVSs13_StructMirrorSs10MirrorTypeSs);
+        T, &StructMirrorMetadata, &StructMirrorWitnessTable);
       
   case MetadataKind::ObjCClassWrapper:
   case MetadataKind::ForeignClass:
@@ -953,8 +946,8 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   
   case MetadataKind::Metatype:
   case MetadataKind::ExistentialMetatype: {
-    return std::make_tuple(T, &_TMdVSs15_MetatypeMirror,
-                           &_TWPVSs15_MetatypeMirrorSs10MirrorTypeSs);
+    return std::make_tuple(T, &MetatypeMirrorMetadata,
+                           &MetatypeMirrorWitnessTable);
   }
       
   /// TODO: Implement specialized mirror witnesses for all kinds.
@@ -964,7 +957,7 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   case MetadataKind::Block:
   case MetadataKind::Existential:
     return std::make_tuple(
-        T, &_TMdVSs13_OpaqueMirror, &_TWPVSs13_OpaqueMirrorSs10MirrorTypeSs);
+        T, &OpaqueMirrorMetadata, &OpaqueMirrorWitnessTable);
       
   // Types can't have these kinds.
   case MetadataKind::PolyFunction:
