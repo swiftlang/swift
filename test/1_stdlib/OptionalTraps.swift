@@ -1,40 +1,40 @@
-// These tests should crash.
+// RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/CatchCrashes.cpp -c -o %t/CatchCrashes.o
-// RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/ReturnNil/ReturnNil.m -c -o %t/ReturnNil.o -g
-// RUN: %target-build-swift %s -I %S/Inputs/ReturnNil/ -Xlinker %t/CatchCrashes.o -Xlinker %t/ReturnNil.o -o %t/OptionalTraps_Debug
-// RUN: %target-build-swift %s -I %S/Inputs/ReturnNil/ -Xlinker %t/CatchCrashes.o -Xlinker %t/ReturnNil.o -o %t/OptionalTraps_Release -O
-// RUN: %target-build-swift %s -I %S/Inputs/ReturnNil/ -Xlinker %t/CatchCrashes.o -Xlinker %t/ReturnNil.o -o %t/OptionalTraps_Fast -Ounchecked
+// RUN: %target-build-swift %s -o %t/Assert_Debug -Onone
+// RUN: %target-build-swift %s -Xfrontend -disable-access-control -o %t/Assert_Release -O
+// RUN: %target-build-swift %s -Xfrontend -disable-access-control -o %t/Assert_Unchecked -Ounchecked
 //
-// RUN: %target-run %t/OptionalTraps_Debug UnwrapNone1 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/OptionalTraps_Release UnwrapNone1 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/OptionalTraps_Fast UnwrapNoneFast1 2>&1 | FileCheck %s -check-prefix=CHECK_UNWRAP_NONE_1_FAST
+// RUN: %target-run %t/Assert_Debug
+// RUN: %target-run %t/Assert_Release
+// RUN: %target-run %t/Assert_Unchecked
 
-// XFAIL: linux
+import StdlibUnittest
 
-// CHECK: OK
-// CHECK: CRASHED: SIG{{ILL|TRAP}}
-
-import Foundation
-import ReturnNil
-
-// Interpret the command line arguments.
-var arg = Process.arguments[1]
-
-if arg == "UnwrapNone1" {
-  var a: AnyObject? = returnNil()
-  println("OK")
-  var w = unsafeBitCast(a!, Word.self)
+func returnNil() -> AnyObject? {
+  return _opaqueIdentity(nil as AnyObject?)
 }
 
-if arg == "UnwrapNoneFast1" {
-  var a: AnyObject? = returnNil()
-  var w = unsafeBitCast(a!, Word.self)
-  println("Unwrapping .None: \(w)")
-  exit(0)
-}
-// CHECK_UNWRAP_NONE_1_FAST: Unwrapping .None: 0{{$}}
+var OptionalTraps = TestSuite("OptionalTraps")
 
-println("BUSTED: should have crashed already")
-exit(1)
+OptionalTraps.test("UnwrapNone")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
+  var a: AnyObject? = returnNil()
+  expectCrashLater()
+  let unwrapped: AnyObject = a!
+  _blackHole(unwrapped)
+}
+
+OptionalTraps.test("UnwrapNone/Ounchecked")
+  .xfail(.Custom(
+    { !_isFastAssertConfiguration() },
+    reason: "unwrapping nil should trap unless we are in -Ounchecked mode"))
+  .code {
+  var a: AnyObject? = returnNil()
+  expectEqual(0, unsafeBitCast(a!, Word.self))
+}
+
+runAllTests()
 
