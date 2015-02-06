@@ -1,4 +1,4 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -sdk %sdk  -code-completion-token=T1 | FileCheck %s -check-prefix=T1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=T1 | FileCheck %s -check-prefix=T1
 
 // REQUIRES: objc_interop
 
