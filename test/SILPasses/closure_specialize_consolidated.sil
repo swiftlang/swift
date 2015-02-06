@@ -1,0 +1,285 @@
+// RUN: %target-sil-opt -closure-specialize %s | FileCheck %s -check-prefix=REMOVECLOSURES
+// RUN: %target-sil-opt -closure-specialize-eliminate-dead-closures=0 -closure-specialize %s | FileCheck %s
+
+import Builtin
+import Swift
+
+///////////////////
+// Utility Types //
+///////////////////
+
+protocol P {
+  func foo(f: Int32->Int32, _ j: Int32) -> Int32
+}
+
+// = Test Summary =
+// We test the following things here:
+//
+// 1. Address Argument
+// 2. ThinToThick, Partial Apply:
+//   a. with and without removal of closure.
+//   b. @owned and @guaranteed.
+// 3. Bad NonFailureExitBB.
+// 4. No Call in Apply Callee.
+// 5. Non simple closure (i.e. non function_ref closure).
+// 6. Handle interface return types correctly.
+
+////////////////////////////
+// Address Argument Tests //
+////////////////////////////
+//
+// Make sure that we do not specialize if we have address arguments. We do not
+// handle them correctly so there is a special check to not perform any action.
+//
+
+// We don't handle closures that close over address types (*NOTE* this includes
+// address and non-address only types). This is a temporary limitation.
+// CHECK-LABEL: sil @address_closure : $@thin (@in Int) -> () {
+sil @address_closure : $@thin (@in Int) -> () {
+bb0(%0 : $*Int):
+  %6 = tuple()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil @address_closure_user : $@thin (@owned @callee_owned () -> ()) -> () {
+sil @address_closure_user : $@thin (@owned @callee_owned () -> ()) -> () {
+bb0(%0 : $@callee_owned () -> ()):
+  %1 = apply %0() : $@callee_owned () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @address_caller : $@thin (@in Int) -> () {
+// CHECK-NOT: _TTSf1cl15address_closureSi__address_closure_user
+sil @address_caller : $@thin (@in Int) -> () {
+bb0(%0 : $*Int):
+  %1 = function_ref @address_closure : $@thin (@in Int) -> ()
+  %2 = partial_apply %1(%0) : $@thin (@in Int) -> ()
+  %3 = function_ref @address_closure_user : $@thin (@owned @callee_owned () -> ()) -> ()
+  %4 = apply %3(%2) : $@thin (@owned @callee_owned () -> ()) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+/////////////////////////////////////
+// Thin To Thick and Partial Apply //
+/////////////////////////////////////
+//
+// Make sure that we handle these correctly with and without removal of the
+// closure and @owned and @guaranteed.
+//
+
+// CHECK-LABEL: sil @large_closure_callee : $@thin (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+sil @large_closure_callee : $@thin (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.Int32, %2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject, %4 : $Builtin.NativeObject, %5 : $Builtin.Int32, %6 : $Builtin.NativeObject, %7 : $Builtin.NativeObject):
+  %9999 = tuple ()
+
+  release_value %2 : $Builtin.NativeObject
+  release_value %6 : $Builtin.NativeObject
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @small_closure_callee : $@thin (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+sil @small_closure_callee : $@thin (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.Int32, %2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject):
+  %9999 = tuple ()
+  release_value %2 : $Builtin.NativeObject
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @_TTSf1cl20large_closure_calleeBoBi32_BoBo_n_n_n_n__owned_apply_callee : $@thin (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, @owned Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK: [[FUN:%.*]] = function_ref @large_closure_callee : $@thin (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+// CHECK: [[CLOSURE:%.*]] = partial_apply [[FUN]](
+// CHECK: apply [[CLOSURE]](
+// CHECK: release_value [[CLOSURE]]
+
+// CHECK-LABEL: sil @_TTSf1cl20small_closure_callee_n_n_n_n__owned_apply_callee : $@thin (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK: [[FUN:%.*]] = function_ref @small_closure_callee
+// CHECK: [[CLOSURE:%.*]] = thin_to_thick_function [[FUN]] : $@thin (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () to $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+// CHECK: apply [[CLOSURE]](
+// CHECK: release_value [[CLOSURE]]
+
+// CHECK-LABEL: sil @owned_apply_callee : $@thin (@owned @callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> (), Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+sil @owned_apply_callee : $@thin (@owned @callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> (), Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> (), %1 : $Builtin.NativeObject, %2 : $Builtin.Int32, %3 : $Builtin.NativeObject, %4 : $Builtin.NativeObject):
+  retain_value %3 : $Builtin.NativeObject
+  apply %0(%1, %2, %3, %4) : $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+  release_value %3 : $Builtin.NativeObject
+  release_value %0 : $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @_TTSf1cl20large_closure_calleeBoBi32_BoBo_n_n_n_n__guaranteed_apply_callee : $@thin (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, @owned Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK: bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.Int32, %2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject, %4 : $Builtin.NativeObject, %5 : $Builtin.Int32, %6 : $Builtin.NativeObject, %7 : $Builtin.NativeObject):
+// CHECK: [[FUN:%.*]] = function_ref @large_closure_callee : $@thin (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+// CHECK: [[CLOSURE:%.*]] = partial_apply [[FUN]](
+// CHECK: apply [[CLOSURE]](
+// CHECK: release_value [[CLOSURE]]
+
+// CHECK-LABEL: sil @_TTSf1cl20small_closure_callee_n_n_n_n__guaranteed_apply_callee : $@thin (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+// CHECK: bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.Int32, %2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject):
+// CHECK: [[FUN:%.*]] = function_ref @small_closure_callee
+// CHECK: [[CLOSURE:%.*]] = thin_to_thick_function [[FUN]] :
+// CHECK: apply [[CLOSURE]](
+// CHECK-NOT: release_value [[CLOSURE]]
+
+// CHECK-LABEL: sil @guaranteed_apply_callee : $@thin (@guaranteed @callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> (), Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+sil @guaranteed_apply_callee : $@thin (@guaranteed @callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> (), Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> (), %1 : $Builtin.NativeObject, %2 : $Builtin.Int32, %3 : $Builtin.NativeObject, %4 : $Builtin.NativeObject):
+  retain_value %3 : $Builtin.NativeObject
+  apply %0(%1, %2, %3, %4) : $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+  release_value %3 : $Builtin.NativeObject
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @thin_thick_and_partial_apply_test : $@thin (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $Builtin.NativeObject, [[ARG1:%.*]] : $Builtin.Int32, [[ARG2:%.*]] : $Builtin.NativeObject, [[ARG3:%.*]] : $Builtin.NativeObject):
+// CHECK: [[OLD_CLOSURE_CALLEE1:%.*]] = function_ref @large_closure_callee
+// CHECK: [[OLD_CLOSURE_CALLEE2:%.*]] = function_ref @small_closure_callee
+// CHECK: retain_value [[ARG0]] : $Builtin.NativeObject
+// CHECK-NEXT: retain_value [[ARG2]] : $Builtin.NativeObject
+// CHECK-NEXT: retain_value [[ARG3]] : $Builtin.NativeObject
+// CHECK: [[SPECFUN0:%.*]] = function_ref @_TTSf1cl20large_closure_calleeBoBi32_BoBo_n_n_n_n__guaranteed_apply_callee
+// CHECK: retain_value [[ARG0]] : $Builtin.NativeObject
+// CHECK-NEXT: retain_value [[ARG2]] : $Builtin.NativeObject
+// CHECK-NEXT: retain_value [[ARG3]] : $Builtin.NativeObject
+// CHECK: [[SPECFUN1:%.*]] = function_ref @_TTSf1cl20large_closure_calleeBoBi32_BoBo_n_n_n_n__owned_apply_callee
+// CHECK: retain_value [[ARG0]] : $Builtin.NativeObject
+// CHECK-NEXT: retain_value [[ARG2]] : $Builtin.NativeObject
+// CHECK-NEXT: retain_value [[ARG3]] : $Builtin.NativeObject
+// CHECK: [[DEAD_CLOSURE_1:%.*]] = partial_apply [[OLD_CLOSURE_CALLEE1]]
+// CHECK: [[SPECFUN2:%.*]] = function_ref @_TTSf1cl20small_closure_callee_n_n_n_n__guaranteed_apply_callee
+// CHECK: [[SPECFUN3:%.*]] = function_ref @_TTSf1cl20small_closure_callee_n_n_n_n__owned_apply_callee
+// CHECK: [[DEAD_CLOSURE_2:%.*]] = thin_to_thick_function [[OLD_CLOSURE_CALLEE2]]
+// CHECK: retain_value [[DEAD_CLOSURE_1]]
+// CHECK-NOT: retain_value [[DEAD_CLOSURE_2]]
+// CHECK-NOT: apply [[DEAD_CLOSURE_1]]
+// CHECK-NOT: apply [[DEAD_CLOSURE_2]]
+// CHECK: apply [[SPECFUN1]](
+// CHECK-NEXT: release_value [[DEAD_CLOSURE_1]]
+// CHECK-NOT: release_value [[DEAD_CLOSURE_2]]
+// CHECK: apply [[SPECFUN3]](
+// CHECK-NOT: release_value [[DEAD_CLOSURE_1]]
+// CHECK-NOT: release_value [[DEAD_CLOSURE_2]]
+// CHECK: apply [[SPECFUN0]](
+// CHECK-NOT: release_value [[DEAD_CLOSURE_1]]
+// CHECK-NOT: release_value [[DEAD_CLOSURE_2]]
+// CHECK: apply [[SPECFUN2]](
+// CHECK-NEXT: release_value [[DEAD_CLOSURE_1]]
+// CHECK-NOT: release_value [[DEAD_CLOSURE_2]]
+
+// REMOVECLOSURES-LABEL: sil @thin_thick_and_partial_apply_test : $@thin (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+// REMOVECLOSURES: bb0([[ARG0:%.*]] : $Builtin.NativeObject, [[ARG1:%.*]] : $Builtin.Int32, [[ARG2:%.*]] : $Builtin.NativeObject, [[ARG3:%.*]] : $Builtin.NativeObject):
+// REMOVECLOSURES: [[OLD_CLOSURE_CALLEE1:%.*]] = function_ref @large_closure_callee
+// REMOVECLOSURES: [[OLD_CLOSURE_CALLEE2:%.*]] = function_ref @small_closure_callee
+// REMOVECLOSURES: retain_value [[ARG0]] : $Builtin.NativeObject
+// REMOVECLOSURES-NEXT: retain_value [[ARG2]] : $Builtin.NativeObject
+// REMOVECLOSURES-NEXT: retain_value [[ARG3]] : $Builtin.NativeObject
+// REMOVECLOSURES: [[SPECFUN0:%.*]] = function_ref @_TTSf1cl20large_closure_calleeBoBi32_BoBo_n_n_n_n__guaranteed_apply_callee
+// REMOVECLOSURES: retain_value [[ARG0]] : $Builtin.NativeObject
+// REMOVECLOSURES-NEXT: retain_value [[ARG2]] : $Builtin.NativeObject
+// REMOVECLOSURES-NEXT: retain_value [[ARG3]] : $Builtin.NativeObject
+// REMOVECLOSURES: [[SPECFUN1:%.*]] = function_ref @_TTSf1cl20large_closure_calleeBoBi32_BoBo_n_n_n_n__owned_apply_callee
+// REMOVECLOSURES: retain_value [[ARG0]] : $Builtin.NativeObject
+// REMOVECLOSURES-NEXT: retain_value [[ARG2]] : $Builtin.NativeObject
+// REMOVECLOSURES-NEXT: retain_value [[ARG3]] : $Builtin.NativeObject
+// REMOVECLOSURES-NOT: partial_apply [[OLD_CLOSURE_CALLEE1]]
+// REMOVECLOSURES: [[SPECFUN2:%.*]] = function_ref @_TTSf1cl20small_closure_callee_n_n_n_n__guaranteed_apply_callee
+// REMOVECLOSURES: [[SPECFUN3:%.*]] = function_ref @_TTSf1cl20small_closure_callee_n_n_n_n__owned_apply_callee
+// REMOVECLOSURES-NOT: thin_to_thick_function [[OLD_CLOSURE_CALLEE2]]
+// REMOVECLOSURES: apply [[SPECFUN1]](
+// REMOVECLOSURES-NEXT: apply [[SPECFUN3]](
+// REMOVECLOSURES-NEXT: apply [[SPECFUN0]](
+// REMOVECLOSURES-NEXT: apply [[SPECFUN2]](
+// REMOVECLOSURES-NEXT: release_value [[ARG0]] : $Builtin.NativeObject
+// REMOVECLOSURES-NEXT: release_value [[ARG2]] : $Builtin.NativeObject
+// REMOVECLOSURES-NEXT: release_value [[ARG3]] : $Builtin.NativeObject
+
+sil @thin_thick_and_partial_apply_test : $@thin (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.Int32, %2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject):
+  %4 = function_ref @owned_apply_callee : $@thin (@owned @callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> (), Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+  %5 = function_ref @guaranteed_apply_callee : $@thin (@guaranteed @callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> (), Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+  %6 = function_ref @large_closure_callee : $@thin (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+  %7 = function_ref @small_closure_callee : $@thin (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+
+  retain_value %0 : $Builtin.NativeObject
+  retain_value %2 : $Builtin.NativeObject
+  retain_value %3 : $Builtin.NativeObject
+  %8 = partial_apply %6(%0, %1, %2, %3) : $@thin (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+  %9 = thin_to_thick_function %7 : $@thin (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () to $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+
+  retain_value %8 : $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+  apply %4(%8, %0, %1, %2, %3) : $@thin (@owned @callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> (), Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+  apply %4(%9, %0, %1, %2, %3) : $@thin (@owned @callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> (), Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+  apply %5(%8, %0, %1, %2, %3) : $@thin (@guaranteed @callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> (), Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+  apply %5(%9, %0, %1, %2, %3) : $@thin (@guaranteed @callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> (), Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+
+  release_value %8 : $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+//////////////////////////////
+// Non Function Ref Closure //
+//////////////////////////////
+//
+// Make sure we do not try to specialize a closure if we are not closing over a
+// direct function ref.
+
+// CHECK-LABEL: @_TF4test3barFTPS_1P_Si_Si : $@thin (@in P, Int32) -> Int32 {
+// CHECK: partial_apply
+// CHECK: apply
+sil [noinline] @_TF4test3barFTPS_1P_Si_Si : $@thin (@in P, Int32) -> Int32 {
+bb0(%0 : $*P, %1 : $Int32):
+  %2 = open_existential %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P
+  %3 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.foo!1, %2 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@thin @cc(witness_method) @callee_owned <T: P> (@owned @callee_owned (Int32) -> Int32, Int32, @inout T) -> Int32
+  %4 = integer_literal $Builtin.Int32, 2
+  %5 = struct $Int32 (%4 : $Builtin.Int32)
+  // function_ref test.baz (Swift.Int32)(m : Swift.Int32) -> Swift.Int32
+  %6 = function_ref @_TF4test3bazfSiFT1mSi_Si : $@thin (Int32, Int32) -> Int32
+  %7 = partial_apply %6(%5) : $@thin (Int32, Int32) -> Int32
+  %8 = apply %3<@opened("01234567-89ab-cdef-0123-000000000000") P>(%7, %1, %2) : $@thin @cc(witness_method) @callee_owned <T: P> (@owned @callee_owned (Int32) -> Int32, Int32, @inout T) -> Int32
+  destroy_addr %0 : $*P
+  return %8 : $Int32
+}
+
+sil @_TF4test3bazfSiFT1mSi_Si : $@thin (Int32, Int32) -> Int32
+
+//////////////////////////////////////////////////////////////////////////////////
+// Make sure that we properly set a specialized closure's indirect return type. //
+//////////////////////////////////////////////////////////////////////////////////
+//
+// SIL verification should catch the incorrect type.
+// rdar:://19321284
+
+// CHECK-LABEL: sil hidden [fragile] @callee : $@thin (Builtin.Int32) -> () {
+sil hidden [fragile] @callee : $@thin (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  unreachable
+}
+
+sil hidden [fragile] @thunk : $@thin (@out (), @owned @callee_owned ()->()) -> () {
+bb0(%0 : $*(), %1 : $@callee_owned () -> ()):
+  apply %1() : $@callee_owned () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: @test_closure_propagation : $@thin () -> () {
+// REMOVECLOSURES-LABEL: @test_closure_propagation : $@thin () -> () {
+// REMOVECLOSURES-NOT: partial_apply
+sil hidden [fragile] @test_closure_propagation : $@thin () -> () {
+bb0:
+  %f1 = function_ref @callee : $@thin (Builtin.Int32) -> ()
+  %i1 = integer_literal $Builtin.Int32, 24
+  %p1 = partial_apply %f1(%i1) : $@thin (Builtin.Int32) -> ()
+  %f2 = function_ref @thunk : $@thin (@out (), @owned @callee_owned () -> ()) -> ()
+  %s1 = alloc_stack $()
+  %a1 = apply [transparent] %f2(%s1#1, %p1) : $@thin (@out (), @owned @callee_owned () -> ()) -> ()
+  dealloc_stack %s1#0 : $*@local_storage ()
+  unreachable
+}

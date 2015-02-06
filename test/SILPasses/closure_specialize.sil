@@ -26,8 +26,8 @@ bb0(%0 : $@callee_owned (Int, Int) -> ()):
 
 // CHECK-LABEL: sil [noinline] @_TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen13take_closure2FFTSiSi_T_T_ : $@thin (Int) -> () {
 // CHECK-NEXT: bb0(%0 : $Int)
-// CHECK: function_ref @_TFF7specgen6callerFSiT_U_FTSiSi_T_
-// CHECK: partial_apply
+// CHECK: [[FUN:%.*]] = function_ref @_TFF7specgen6callerFSiT_U_FTSiSi_T_
+// CHECK: partial_apply [[FUN]](
 
 // CHECK-LABEL: sil [noinline] @_TTSf1cl27_TF7specgen6calleeFTSiSi_T____TF7specgen13take_closure2FFTSiSi_T_T_ : $@thin () -> () {
 // CHECK-NEXT: bb0:
@@ -54,10 +54,10 @@ bb0(%0 : $Int, %1 : $Int, %2 : $Int):
 }
 
 // CHECK-LABEL: sil @_TF7specgen6callerFSiT_ : $@thin (Int) -> () {
-// CHECK: [[ID1:%[0-9]+]] = function_ref @_TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ : $@thin (Int) -> ()
-// CHECK-NEXT: apply [[ID1]](%0) : $@thin (Int) -> ()
-// CHECK: [[ID2:%[0-9]+]] = function_ref @_TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen13take_closure2FFTSiSi_T_T_ : $@thin (Int) -> ()
-// CHECK-NEXT: apply [[ID2]](%0) : $@thin (Int) -> ()
+// CHECK: [[ID1:%[0-9]+]] = function_ref @_TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen13take_closure2FFTSiSi_T_T_ : $@thin (Int) -> ()
+// CHECK: [[ID2:%[0-9]+]] = function_ref @_TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ : $@thin (Int) -> ()
+// CHECK: apply [[ID2]](%0) : $@thin (Int) -> ()
+// CHECK: apply [[ID1]](%0) : $@thin (Int) -> ()
 sil @_TF7specgen6callerFSiT_ : $@thin (Int) -> () {
 bb0(%0 : $Int):
   // function_ref specgen.take_closure ((Swift.Int, Swift.Int) -> ()) -> ()
@@ -65,9 +65,12 @@ bb0(%0 : $Int):
   // function_ref specgen.(caller (Swift.Int) -> ()).(closure #1)
   %3 = function_ref @_TFF7specgen6callerFSiT_U_FTSiSi_T_ : $@thin (Int, Int, Int) -> () // user: %4
   %4 = partial_apply %3(%0) : $@thin (Int, Int, Int) -> () // user: %5
+  strong_retain %4 : $@callee_owned (Int, Int) -> ()
   %5 = apply %2(%4) : $@thin (@owned @callee_owned (Int, Int) -> ()) -> ()
   %6 = function_ref @_TF7specgen13take_closure2FFTSiSi_T_T_ : $@thin (@owned @callee_owned (Int, Int) -> ()) -> () // user: %5
+  strong_retain %4 : $@callee_owned (Int, Int) -> ()
   %7 = apply %6(%4) : $@thin (@owned @callee_owned (Int, Int) -> ()) -> ()
+  strong_release %4 : $@callee_owned (Int, Int) -> ()
   %9999 = tuple()
   return %9999 : $()
 }
@@ -103,10 +106,10 @@ bb0(%0 : $Int, %1 : $Int):
 }
 
 // CHECK-LABEL: sil @_TF7specgen11tttficallerFSiT_ : $@thin (Int) -> () {
-// CHECK: [[ID1:%[0-9]+]] = function_ref @_TTSf1cl27_TF7specgen6calleeFTSiSi_T____TF7specgen12take_closureFFTSiSi_T_T_ : $@thin () -> ()
-// CHECK-NEXT: apply [[ID1]]() : $@thin () -> ()
-// CHECK: [[ID2:%[0-9]+]] = function_ref @_TTSf1cl27_TF7specgen6calleeFTSiSi_T____TF7specgen13take_closure2FFTSiSi_T_T_ : $@thin () -> ()
-// CHECK-NEXT: apply [[ID2]]() : $@thin () -> ()
+// CHECK: [[ID1:%[0-9]+]] = function_ref @_TTSf1cl27_TF7specgen6calleeFTSiSi_T____TF7specgen13take_closure2FFTSiSi_T_T_ : $@thin () -> ()
+// CHECK: [[ID2:%[0-9]+]] = function_ref @_TTSf1cl27_TF7specgen6calleeFTSiSi_T____TF7specgen12take_closureFFTSiSi_T_T_ : $@thin () -> ()
+// CHECK: apply [[ID2]]() : $@thin () -> ()
+// CHECK: apply [[ID1]]() : $@thin () -> ()
 sil @_TF7specgen11tttficallerFSiT_ : $@thin (Int) -> () {
 bb0(%0 : $Int):
   // function_ref specgen.take_closure ((Swift.Int, Swift.Int) -> ()) -> ()
