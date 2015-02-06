@@ -555,3 +555,120 @@ ConsumedArgToEpilogueReleaseMatcher(RCIdentityAnalysis *RCIA,
       return;
   }
 }
+
+//===----------------------------------------------------------------------===//
+//                    Code for Determining Final Releases
+//===----------------------------------------------------------------------===//
+
+// Propagate liveness backwards from an initial set of blocks in our
+// LiveIn set.
+static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock *> &LiveIn,
+                              SILBasicBlock *DefBB) {
+  // First populate a worklist of predecessors.
+  llvm::SmallVector<SILBasicBlock *, 64> Worklist;
+  for (auto *BB : LiveIn)
+    for (auto Pred : BB->getPreds())
+      Worklist.push_back(Pred);
+
+  // Now propagate liveness backwards until we hit the alloc_box.
+  while (!Worklist.empty()) {
+    auto *BB = Worklist.pop_back_val();
+
+    // If it's already in the set, then we've already queued and/or
+    // processed the predecessors.
+    if (BB == DefBB || !LiveIn.insert(BB).second)
+      continue;
+
+    for (auto Pred : BB->getPreds())
+      Worklist.push_back(Pred);
+  }
+}
+
+// Is any successor of BB in the LiveIn set?
+static bool successorHasLiveIn(SILBasicBlock *BB,
+                               llvm::SmallPtrSetImpl<SILBasicBlock *> &LiveIn) {
+  for (auto &Succ : BB->getSuccs())
+    if (LiveIn.count(Succ))
+      return true;
+
+  return false;
+}
+
+// Walk backwards in BB looking for strong_release or dealloc_box of
+// the given value, and add it to Releases.
+static bool addLastRelease(SILValue V, SILBasicBlock *BB,
+                           ReleaseTracker &Tracker) {
+  for (auto I = BB->rbegin(); I != BB->rend(); ++I) {
+    if (isa<StrongReleaseInst>(*I) || isa<DeallocBoxInst>(*I) ||
+        isa<ReleaseValueInst>(*I)) {
+      if (I->getOperand(0) != V)
+        continue;
+
+      Tracker.trackLastRelease(&*I);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/// TODO: Refactor this code so the decision on whether or not to accept an
+/// instruction.
+bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
+  llvm::SmallPtrSet<SILBasicBlock *, 16> LiveIn;
+  llvm::SmallPtrSet<SILBasicBlock *, 16> UseBlocks;
+
+  // First attempt to get the BB where this value resides.
+  auto *DefBB = V->getParentBB();
+  if (!DefBB)
+    return false;
+
+  bool seenRelease = false;
+  SILInstruction *OneRelease = nullptr;
+
+  // We'll treat this like a liveness problem where the value is the def. Each
+  // block that has a use of the value has the value live-in unless it is the
+  // block with the value.
+  for (auto *UI : V.getUses()) {
+    auto *User = UI->getUser();
+    auto *BB = User->getParent();
+
+    if (!Tracker.isUserAcceptable(User))
+      return false;
+    Tracker.trackUser(User);
+
+    if (BB != DefBB)
+      LiveIn.insert(BB);
+
+    // Also keep track of the blocks with uses.
+    UseBlocks.insert(BB);
+
+    // Try to speed up the trivial case of single release/dealloc.
+    if (isa<StrongReleaseInst>(User) || isa<DeallocBoxInst>(User)) {
+      if (!seenRelease)
+        OneRelease = User;
+      else
+        OneRelease = nullptr;
+
+      seenRelease = true;
+    }
+  }
+
+  // Only a single release/dealloc? We're done!
+  if (OneRelease) {
+    Tracker.trackLastRelease(OneRelease);
+    return true;
+  }
+
+  propagateLiveness(LiveIn, DefBB);
+
+  // Now examine each block we saw a use in. If it has no successors
+  // that are in LiveIn, then the last use in the block is the final
+  // release/dealloc.
+  for (auto *BB : UseBlocks)
+    if (!successorHasLiveIn(BB, LiveIn))
+      if (!addLastRelease(V, BB, Tracker))
+        return false;
+
+  return true;
+}

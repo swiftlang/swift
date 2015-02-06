@@ -179,6 +179,38 @@ public:
   Range<iterator> getRange() { return swift::make_range(begin(), end()); }
 };
 
+class ReleaseTracker {
+  llvm::SmallPtrSet<SILInstruction *, 4> TrackedUsers;
+  llvm::SmallPtrSet<SILInstruction *, 4> FinalReleases;
+  std::function<bool(SILInstruction *)> AcceptableUserQuery;
+
+public:
+  ReleaseTracker(std::function<bool(SILInstruction *)> AcceptableUserQuery)
+      : TrackedUsers(), FinalReleases(),
+        AcceptableUserQuery(AcceptableUserQuery) {}
+
+  void trackLastRelease(SILInstruction *Inst) { FinalReleases.insert(Inst); }
+
+  bool isUserAcceptable(SILInstruction *User) const {
+    return AcceptableUserQuery(User);
+  }
+
+  void trackUser(SILInstruction *User) { TrackedUsers.insert(User); }
+
+  using range = Range<llvm::SmallPtrSetImpl<SILInstruction *>::iterator>;
+
+  range getTrackedUsers() { return {TrackedUsers.begin(), TrackedUsers.end()}; }
+
+  range getFinalReleases() {
+    return {FinalReleases.begin(), FinalReleases.end()};
+  }
+};
+
+/// Return true if we can find a set of post-dominating final releases. Returns
+/// false otherwise. The FinalRelease set is placed in the out parameter
+/// FinalRelease.
+bool getFinalReleasesForValue(SILValue Value, ReleaseTracker &Tracker);
+
 } // end namespace swift
 
 #endif
