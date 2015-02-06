@@ -382,7 +382,7 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() {
 bool swift::ArraySemanticsCall::hasSelf() {
   assert(SemanticsCall && "Must have a semantics call");
   // Array.init and Array.uninitialized return 'self' @owned.
-  return getKind() < ArrayCallKind::kArrayInit;
+  return SemanticsCall->getOrigCalleeType()->hasSelfArgument();
 }
 
 SILValue swift::ArraySemanticsCall::getSelf() {
