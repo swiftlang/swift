@@ -784,7 +784,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
       // short-cut the classification scheme above.
       if (StoreInst *SI = dyn_cast<StoreInst>(User)) {
         // If this is a store *to* the object, we can zap it.
-        if (UI.getOperandNo() == StoreInst::getPointerOperandIndex()) {
+        if (UI.getUse().getOperandNo() == StoreInst::getPointerOperandIndex()) {
           InvolvedInstructions.insert(SI);
           continue;
         }
@@ -793,7 +793,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
       }
       if (MemIntrinsic *MI = dyn_cast<MemIntrinsic>(User)) {
         // If this is a memset/memcpy/memmove *to* the object, we can zap it.
-        if (UI.getOperandNo() == 0) {
+        if (UI.getUse().getOperandNo() == 0) {
           InvolvedInstructions.insert(MI);
           continue;
         }
