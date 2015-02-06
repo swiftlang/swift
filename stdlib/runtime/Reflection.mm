@@ -689,8 +689,8 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
 
 extern "C"
 OptionalQuickLookObject swift_ClassMirror_quickLookObject(HeapObject *owner,
-                                                          const OpaqueValue *value,
-                                                          const Metadata *type) {
+                                                       const OpaqueValue *value,
+                                                       const Metadata *type) {
   OptionalQuickLookObject result;
   memset(&result, 0, sizeof(result));
   
