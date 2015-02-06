@@ -25,7 +25,7 @@ public enum Optional<T> : Reflectable, NilLiteralConvertible {
   public init(_ some: T) { self = .Some(some) }
 
   /// If `self == nil`, returns `nil`.  Otherwise, returns `f(self!)`.
-  public func map<U>(f: (T)->U) -> U? {
+  public func map<U>(@noescape f: (T)->U) -> U? {
     switch self {
     case .Some(var y):
       return .Some(f(y))
@@ -69,7 +69,7 @@ extension Optional : DebugPrintable {
 //   (x as T).map { ... }
 //
 /// Haskell's fmap for Optionals.
-public func map<T, U>(x: T?, f: (T)->U) -> U? {
+public func map<T, U>(x: T?, @noescape f: (T)->U) -> U? {
   switch x {
     case .Some(var y):
     return .Some(f(y))
