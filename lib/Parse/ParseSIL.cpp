@@ -3234,7 +3234,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   case ValueKind::ApplyInst : {
     if (ArgTys.size() != ArgNames.size()) {
       P.diagnose(TypeLoc, diag::expected_sil_type_kind,
-                 "have the right argument types");
+                 "to have the same number of arg names as arg types");
       return true;
     }
     
