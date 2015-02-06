@@ -116,7 +116,7 @@ public func max<T : Comparable>(x: T, y: T, z: T, rest: T...) -> T {
 /// the result for each pair of consecutive 
 public func split<S: Sliceable, R:BooleanType>(
   elements: S, 
-  @noescape isSeparator: S.Generator.Element -> R, 
+  @noescape isSeparator: (S.Generator.Element) -> R,
   maxSplit: Int = Int.max,
   allowEmptySlices: Bool = false
   ) -> [S.SubSlice] {
@@ -387,7 +387,7 @@ public func lexicographicalCompare<
     S1.Generator.Element == S2.Generator.Element
 >(
   a1: S1, a2: S2,
-  @noescape isOrderedBefore less: (S1.Generator.Element, S1.Generator.Element) 
+  @noescape isOrderedBefore less: (S1.Generator.Element, S1.Generator.Element)
   -> Bool
 ) -> Bool {
   var g1 = a1.generate()
@@ -417,7 +417,7 @@ public func lexicographicalCompare<
 /// Return `true` iff an element in `seq` satisfies `predicate`.
 public func contains<
   S : SequenceType, L : BooleanType
->(seq: S, @noescape predicate: S.Generator.Element -> L) -> Bool {
+>(seq: S, @noescape predicate: (S.Generator.Element) -> L) -> Bool {
   for a in seq {
     if predicate(a) {
       return true

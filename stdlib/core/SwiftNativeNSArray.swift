@@ -42,7 +42,7 @@ class _SwiftNativeNSArrayWithContiguousStorage
 
   // Operate on our contiguous storage
   internal func withUnsafeBufferOfObjects<R>(
-    body: (UnsafeBufferPointer<AnyObject>)->R
+    body: (UnsafeBufferPointer<AnyObject>) -> R
   ) -> R {
     _sanityCheckFailure(
       "Must override withUnsafeBufferOfObjects in derived classes")
@@ -163,7 +163,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
   }
 
   internal override func withUnsafeBufferOfObjects<R>(
-    body: (UnsafeBufferPointer<AnyObject>)->R
+    body: (UnsafeBufferPointer<AnyObject>) -> R
   ) -> R {
     do {
       var buffer: UnsafeBufferPointer<AnyObject>

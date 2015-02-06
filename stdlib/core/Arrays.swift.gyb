@@ -601,7 +601,7 @@ extension ${Self} : _ArrayType {
 
   /// Return ${a_Self} containing the results of calling
   /// `transform(x)` on each element `x` of `self`
-  public func map<U>(transform: T -> U) -> ${Self}<U> {
+  public func map<U>(transform: (T) -> U) -> ${Self}<U> {
     return ${Self}<U>(lazy(self).map(transform))
   }
 
@@ -612,7 +612,7 @@ extension ${Self} : _ArrayType {
 
   /// Return ${a_Self} containing the elements `x` of `self` for which
   /// `includeElement(x)` is `true`
-  public func filter(includeElement: T -> Bool) -> ${Self} {
+  public func filter(includeElement: (T) -> Bool) -> ${Self} {
     return ${Self}(lazy(self).filter(includeElement))
   }
 }
@@ -684,7 +684,7 @@ extension ${Self} {
   /// same algorithm on `body`\ 's argument lets you trade safety for
   /// speed.
   public func withUnsafeBufferPointer<R>(
-    @noescape body: UnsafeBufferPointer<T> -> R
+    @noescape body: (UnsafeBufferPointer<T>) -> R
   ) -> R {
     return _buffer.withUnsafeBufferPointer(body)
   }
@@ -697,7 +697,7 @@ extension ${Self} {
   /// same algorithm on `body`\ 's argument lets you trade safety for
   /// speed.
   public mutating func withUnsafeMutableBufferPointer<R>(
-    @noescape body: inout UnsafeMutableBufferPointer<T> -> R
+    @noescape body: (inout UnsafeMutableBufferPointer<T>) -> R
   ) -> R {
     // Ensure unique storage
     _arrayReserve(&_buffer, 0)

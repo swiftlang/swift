@@ -312,7 +312,7 @@ extension _ArrayBuffer {
   /// created on-demand.
   public
   func withUnsafeBufferPointer<R>(
-    @noescape body: UnsafeBufferPointer<Element> -> R
+    @noescape body: (UnsafeBufferPointer<Element>) -> R
   ) -> R {
     if _fastPath(_isNative) {
       let ret = body(UnsafeBufferPointer(start: self.baseAddress, count: count))
@@ -327,7 +327,7 @@ extension _ArrayBuffer {
   /// contiguous storage exists or the buffer is empty
   public
   mutating func withUnsafeMutableBufferPointer<R>(
-    @noescape body: UnsafeMutableBufferPointer<T> -> R
+    @noescape body: (UnsafeMutableBufferPointer<T>) -> R
   ) -> R {
     _sanityCheck(
       baseAddress != nil || count == 0,

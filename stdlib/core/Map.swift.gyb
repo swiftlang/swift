@@ -62,7 +62,7 @@ public struct MapSequenceView<Base: SequenceType, T> : SequenceType {
 /// Return an `Array` containing the results of mapping `transform`
 /// over `source`.
 public func map<S:SequenceType, T>(
-  source: S, transform: (S.Generator.Element)->T
+  source: S, transform: (S.Generator.Element) -> T
 ) -> [T] {
   return lazy(source).map(transform).array
 }
@@ -112,7 +112,7 @@ public struct MapCollectionView<Base: CollectionType, T> : CollectionType {
 /// Return an `Array` containing the results of mapping `transform`
 /// over `source`.
 public func map<C:CollectionType, T>(
-  source: C, transform: (C.Generator.Element)->T
+  source: C, transform: (C.Generator.Element) -> T
 ) -> [T] {
   return lazy(source).map(transform).array
 }
@@ -130,7 +130,7 @@ extension ${Self} {
   /// calling `transform` function on a base element.
   public
   func map<U>(
-    transform: S.Generator.Element -> U
+    transform: (S.Generator.Element) -> U
   ) -> ${Self}<${View}<S, U>> {
     return ${Self}<${View}<S, U>>(
       ${View}(_base: self._base, _transform: transform)
