@@ -322,6 +322,34 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   return %9999 : $()
 }
 
+// We should remove the array semantic from specialized calls.
+
+// CHECK-LABEL: sil [fragile] [thunk] [semantics "array.foobar"] @array_semantic : $@thin (@owned Builtin.NativeObject) -> () {
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSf4g__array_semantic : $@thin (@guaranteed Builtin.NativeObject) -> ()
+// CHECK: apply [[FUNC_REF]]
+// CHECK: fix_lifetime
+// CHECK: release_value
+sil [fragile] [semantics "array.foobar"] @array_semantic : $@thin (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  release_value %0 : $Builtin.NativeObject
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil [fragile] @array_semantic_caller : $@thin (Builtin.NativeObject) -> () {
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSf4g__array_semantic : $@thin (@guaranteed Builtin.NativeObject) -> ()
+// CHECK: apply [[FUNC_REF]]
+// CHECK: fix_lifetime
+// CHECK: release_value
+sil [fragile] @array_semantic_caller : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @array_semantic : $@thin (@owned Builtin.NativeObject) -> ()
+  apply %1(%0) : $@thin (@owned Builtin.NativeObject) -> ()
+  %2 = tuple()
+  return %2 : $()
+}
+
+
 // Check that we specialized this function by removing the dead argument and
 // copied everything appropriately.
 
@@ -352,3 +380,11 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
 // CHECK: bb2:
 // CHECK-NEXT:  tuple
 // CHECK-NEXT:  return
+
+
+// Check that we have remove the array semantic attribute from the specialized function.
+
+// CHECK-LABEL: sil [fragile] @_TTSf4g__array_semantic : $@thin (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: bb0(%0 : $Builtin.NativeObject)
+// CHECK-NEXT:  %1 = tuple ()
+// CHECK-NEXT:  return %1
