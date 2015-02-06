@@ -237,6 +237,16 @@ namespace swift {
     /// Returns a new instruction if optimization was possible.
     SILInstruction *optimize();
   };
+
+  /// If Closure is a partial_apply or thin_to_thick_function with only local
+  /// ref count users and a set of post-dominating releases:
+  ///
+  /// 1. Remove all ref count operations and the closure.
+  /// 2. Add each one of the last release locations insert releases for the
+  ///    captured args if we have a partial_apply.
+  ///
+  /// In the future this should be extended to be less conservative with users.
+  bool tryDeleteDeadClosure(SILInstruction *Closure);
 } // end namespace swift
 
 #endif

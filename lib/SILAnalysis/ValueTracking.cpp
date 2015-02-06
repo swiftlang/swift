@@ -655,39 +655,3 @@ bool swift::canOverflow(BuiltinInst *BI) {
   // Conservatively assume that an overflow can happen
   return true;
 }
-
-static bool isSupportedRefCountUser(SILInstruction *User) {
-  switch (User->getKind()) {
-  case ValueKind::StrongRetainInst:
-  case ValueKind::StrongReleaseInst:
-  case ValueKind::RetainValueInst:
-  case ValueKind::ReleaseValueInst:
-    return true;
-  default:
-    return false;
-  }
-}
-
-bool swift::isLocalDeadClosure(SILInstruction *I,
-                               SmallVectorImpl<SILInstruction *> &RC) {
-  if (!isa<PartialApplyInst>(I) && !isa<ThinToThickFunctionInst>(I))
-    return false;
-
-  // Go through all of PAI's users and see if they are all ref count
-  // instructions.
-  //
-  // TODO: Add a context to valueMayBeCaptured and use the context to decide
-  // this.
-  for (auto *Op : I->getUses()) {
-    SILInstruction *User = Op->getUser();
-
-    if (!isSupportedRefCountUser(User))
-      return false;
-
-    RC.push_back(User);
-  }
-
-  sortUnique(RC);
-
-  return true;
-}

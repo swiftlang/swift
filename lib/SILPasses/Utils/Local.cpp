@@ -11,6 +11,7 @@
 //===---------------------------------------------------------------------===//
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILAnalysis/Analysis.h"
+#include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -894,3 +895,65 @@ SILInstruction *StringConcatenationOptimizer::optimize() {
                            *FRIConvertFromBuiltin->getReferencedFunction());
 }
 
+//===----------------------------------------------------------------------===//
+//                              Closure Deletion
+//===----------------------------------------------------------------------===//
+
+static bool isARCOperationRemovableIfObjectIsDead(const SILInstruction *I) {
+  switch (I->getKind()) {
+  case ValueKind::StrongRetainInst:
+  case ValueKind::StrongReleaseInst:
+  case ValueKind::RetainValueInst:
+  case ValueKind::ReleaseValueInst:
+    return true;
+  default:
+    return false;
+  }
+}
+
+/// TODO: Generalize this to general objects. We are using the fact that
+/// closures
+bool swift::tryDeleteDeadClosure(SILInstruction *Closure) {
+  // We currently only handle locally distinct values.
+  if (!isa<PartialApplyInst>(Closure) && !isa<ThinToThickFunctionInst>(Closure))
+    return false;
+
+  // We only accept a user if it is an ARC object that can be removed if the
+  // object is dead. This should be expanded in the future. This also ensures
+  // that we are locally distinct since we only allow for specific ARC users.
+  ReleaseTracker Tracker([](const SILInstruction *I) -> bool {
+    return isARCOperationRemovableIfObjectIsDead(I);
+  });
+
+  // Find the ARC Users and the final retain, release.
+  if (!getFinalReleasesForValue(SILValue(Closure), Tracker))
+    return false;
+
+  // If we have a partial_apply, release each captured argument at each one of
+  // the final release locations of the partial apply.
+  SILBuilder Builder(Closure);
+  SILModule &M = Closure->getModule();
+  if (auto *PAI = dyn_cast<PartialApplyInst>(Closure)) {
+    for (auto *FinalRelease : Tracker.getFinalReleases()) {
+      Builder.setInsertionPoint(FinalRelease);
+      for (SILValue Arg : PAI->getArguments()) {
+        if (Arg.getType().isTrivial(M))
+          continue;
+        Builder.createReleaseValue(FinalRelease->getLoc(), Arg);
+      }
+    }
+  }
+
+  // Then delete all user instructions.
+  for (auto *User : Tracker.getTrackedUsers()) {
+    assert(User->getNumTypes() == 0 && "We expect only ARC operations without "
+                                       "results. This is true b/c of "
+                                       "isARCOperationRemovableIfObjectIsDead");
+    User->eraseFromParent();
+  }
+
+  // Finally delete the closure.
+  Closure->eraseFromParent();
+
+  return true;
+}
