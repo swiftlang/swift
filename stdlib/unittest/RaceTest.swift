@@ -37,7 +37,14 @@
 //===----------------------------------------------------------------------===//
 
 import Darwin
-import Foundation
+
+#if _runtime(_ObjC)
+import ObjectiveC
+#else
+func autoreleasepool(@noescape code: () -> ()) {
+  // Do nothing.
+}
+#endif
 
 /// Race tests that need a fresh set of data for every trial should implement
 /// this protocol.
