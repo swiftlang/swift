@@ -723,6 +723,12 @@ namespace {
       if (auto *DRE = dyn_cast<DeclRefExpr>(E))
         return walkToDeclRefExpr(DRE);
 
+      if (auto *superE = dyn_cast<SuperRefExpr>(E)) {
+        if (CurDC->isChildContextOf(superE->getSelf()->getDeclContext()))
+          addCapture(superE->getSelf(), superE->getLoc());
+        return { false, superE };
+      }
+
       // Don't recurse into child closures. They should already have a capture
       // list computed; we just propagate it, filtering out stuff that they
       // capture from us.

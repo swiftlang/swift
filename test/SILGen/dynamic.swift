@@ -415,6 +415,25 @@ func dynamicExtensionMethods(obj: ObjCOtherFile) {
   _ = obj.dynamicType.dynExtensionClassProp
 }
 
+public class Base {
+  dynamic var x: Bool { return false }
+}
+
+public class Sub : Base {
+  // CHECK-LABEL: sil hidden @_TFC7dynamic3Subg1xSb : $@cc(method) @thin (@owned Sub) -> Bool {
+  // CHECK: [[AUTOCLOSURE:%.*]] = function_ref @_TFFC7dynamic3Subg1xSbu_KT_Sb : $@thin (@owned Sub) -> Bool
+  // CHECK: = partial_apply [[AUTOCLOSURE]](%0)
+  // CHECK: return {{%.*}} : $Bool
+  // CHECK: }
+
+  // CHECK-LABEL: sil shared @_TFFC7dynamic3Subg1xSbu_KT_Sb : $@thin (@owned Sub) -> Bool {
+  // CHECK: [[SUPER:%.*]] = super_method [volatile] %0 : $Sub, #Base.x!getter.1.foreign : Base -> () -> Bool , $@cc(objc_method) @thin (Base) -> ObjCBool
+  // CHECK: = apply [[SUPER]]({{%.*}})
+  // CHECK: return {{%.*}} : $Bool
+  // CHECK: }
+  override var x: Bool { return false || super.x }
+}
+
 
 // Vtable contains entries for native and @objc methods, but not dynamic ones
 // CHECK-LABEL: sil_vtable Foo {

@@ -29,3 +29,21 @@ func test_auto_closure_without_capture() -> Bool {
   // CHECK: return [[RET]]
   return call_auto_closure(false_)
 }
+
+public class Base {
+  var x: Bool { return false_ }
+}
+
+public class Sub : Base {
+  // CHECK-LABEL: sil hidden @_TFC13auto_closures3Subg1xVS_4Bool : $@cc(method) @thin (@owned Sub) -> Bool {
+  // CHECK: [[AUTOCLOSURE:%.*]] = function_ref @_TFFC13auto_closures3Subg1xVS_4Boolu_KT_S1_ : $@thin (@owned Sub) -> Bool
+  // CHECK: = partial_apply [[AUTOCLOSURE]](%0)
+  // CHECK: return {{%.*}} : $Bool
+  // CHECK: }
+
+  // CHECK-LABEL: sil shared @_TFFC13auto_closures3Subg1xVS_4Boolu_KT_S1_ : $@thin (@owned Sub) -> Bool {
+  // CHECK: [[SUPER:%.*]] = function_ref @_TFC13auto_closures4Baseg1xVS_4Bool
+  // CHECK: [[RET:%.*]] = apply [[SUPER]]({{%.*}})
+  // CHECK: return [[RET]]
+  override var x: Bool { return call_auto_closure(super.x) }
+}
