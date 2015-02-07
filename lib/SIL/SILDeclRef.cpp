@@ -420,3 +420,35 @@ StringRef SILDeclRef::mangle(SmallVectorImpl<char> &buffer,
   mangleConstant(*this, stream, prefix);
   return stream.str();
 }
+
+SILDeclRef SILDeclRef::getOverriddenVTableEntry() const {
+  if (auto overridden = getOverridden()) {
+    // If we overrode a foreign decl, a dynamic method, this is an
+    // accessor for a property that overrides an ObjC decl, or if it is an
+    // @NSManaged property, then it won't be in the vtable.
+    if (overridden.getDecl()->hasClangNode())
+      return SILDeclRef();
+    if (overridden.getDecl()->getAttrs().hasAttribute<DynamicAttr>())
+      return SILDeclRef();
+    if (auto *ovFD = dyn_cast<FuncDecl>(overridden.getDecl()))
+      if (auto *asd = ovFD->getAccessorStorageDecl()) {
+        if (asd->hasClangNode())
+          return SILDeclRef();
+      }
+
+    // If we overrode a decl from an extension, it won't be in a vtable
+    // either. This can occur for extensions to ObjC classes.
+    if (isa<ExtensionDecl>(overridden.getDecl()->getDeclContext()))
+      return SILDeclRef();
+
+    // If we overrode a non-required initializer, there won't be a vtable
+    // slot for the allocator.
+    if (overridden.kind == SILDeclRef::Kind::Allocator &&
+        !cast<ConstructorDecl>(overridden.getDecl())->isRequired()) {
+      return SILDeclRef();
+    }
+
+    return overridden;
+  }
+  return SILDeclRef();
+}

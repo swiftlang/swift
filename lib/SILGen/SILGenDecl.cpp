@@ -1235,32 +1235,7 @@ public:
     // Try to find an overridden entry.
     // NB: Mutates vtableEntries in-place
     // FIXME: O(n^2)
-    if (auto overridden = member.getOverridden()) {
-      // If we overrode a foreign decl, a dynamic method, this is an
-      // accessor for a property that overrides an ObjC decl, or if it is an
-      // @NSManaged property, then it won't be in the vtable.
-      if (overridden.getDecl()->hasClangNode())
-        goto not_overridden;
-      if (overridden.getDecl()->getAttrs().hasAttribute<DynamicAttr>())
-        goto not_overridden;
-      if (auto *ovFD = dyn_cast<FuncDecl>(overridden.getDecl()))
-        if (auto *asd = ovFD->getAccessorStorageDecl()) {
-          if (asd->hasClangNode())
-            goto not_overridden;
-        }
-
-      // If we overrode a decl from an extension, it won't be in a vtable
-      // either. This can occur for extensions to ObjC classes.
-      if (isa<ExtensionDecl>(overridden.getDecl()->getDeclContext()))
-        goto not_overridden;
-
-      // If we overrode a non-required initializer, there won't be a vtable
-      // slot for the allocator.
-      if (overridden.kind == SILDeclRef::Kind::Allocator &&
-          !cast<ConstructorDecl>(overridden.getDecl())->isRequired()) {
-        goto not_overridden;
-      }
-
+    if (auto overridden = member.getOverriddenVTableEntry()) {
       for (SILVTable::Pair &entry : vtableEntries) {
         SILDeclRef ref = overridden;
 
@@ -1276,7 +1251,6 @@ public:
       llvm_unreachable("no overridden vtable entry?!");
     }
 
-  not_overridden:
     // If this is a final member and isn't overriding something, we don't need
     // to add it to the vtable.
     if (member.getDecl()->isFinal())

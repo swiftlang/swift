@@ -312,8 +312,15 @@ struct SILDeclRef {
     auto overridden = getDecl()->getOverriddenDecl();
     if (!overridden)
       return SILDeclRef();
+    
     return SILDeclRef(overridden, kind, getResilienceExpansion(), uncurryLevel);
   }
+  
+  /// Return a SILDeclRef to the declaration whose vtable entry this declaration
+  /// overrides. This may be different from "getOverridden" because some
+  /// declarations do not always have vtable entries.
+  SILDeclRef getOverriddenVTableEntry() const;
+  
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILDeclRef C) {
