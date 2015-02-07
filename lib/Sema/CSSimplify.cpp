@@ -4185,12 +4185,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   llvm_unreachable("bad conversion restriction");
 }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyFixConstraint(Fix fix,
-                                        Type type1, Type type2,
-                                        TypeMatchKind matchKind,
-                                        unsigned flags,
-                                        ConstraintLocatorBuilder locator) {
+bool ConstraintSystem::recordFix(Fix fix, ConstraintLocatorBuilder locator) {
   auto &ctx = getASTContext();
   if (ctx.LangOpts.DebugConstraintSolver) {
     auto &log = ctx.TypeCheckerDebug->getStream();
@@ -4210,7 +4205,19 @@ ConstraintSystem::simplifyFixConstraint(Fix fix,
     // the best solution we've seen already, stop now.
     increaseScore(SK_Fix);
     if (worseThanBestSolution())
-      return SolutionKind::Error;
+      return true;
+  }
+  return false;
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyFixConstraint(Fix fix,
+                                        Type type1, Type type2,
+                                        TypeMatchKind matchKind,
+                                        unsigned flags,
+                                        ConstraintLocatorBuilder locator) {
+  if (recordFix(fix, locator)) {
+    return SolutionKind::Error;
   }
 
   // Try with the fix.
@@ -4284,6 +4291,7 @@ ConstraintSystem::simplifyFixConstraint(Fix fix,
 
   case FixKind::FromRawToInit:
   case FixKind::ToRawToRawValue:
+  case FixKind::CoerceToCheckedCast:
     llvm_unreachable("handled elsewhere");
 
   case FixKind::FunctionConversion:
@@ -4368,10 +4376,22 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
              TMF_None,
              constraint.getKind() == ConstraintKind::SelfObjectOfProtocol);
 
-  case ConstraintKind::CheckedCast:
-    return simplifyCheckedCastConstraint(constraint.getFirstType(),
-                                         constraint.getSecondType(),
-                                         constraint.getLocator());
+  case ConstraintKind::CheckedCast: {
+    auto result = simplifyCheckedCastConstraint(constraint.getFirstType(),
+                                                constraint.getSecondType(),
+                                                constraint.getLocator());
+    // NOTE: simplifyCheckedCastConstraint() may return Unsolved, e.g. if the
+    // subexpression's type is unresolved. Don't record the fix until we
+    // successfully simplify the constraint.
+    if (result == SolutionKind::Solved) {
+      if (auto fix = constraint.getFix()) {
+        if (recordFix(*fix, constraint.getLocator())) {
+          return SolutionKind::Error;
+        }
+      }
+    }
+    return result;
+  }
 
   case ConstraintKind::OptionalObject:
     return simplifyOptionalObjectConstraint(constraint);

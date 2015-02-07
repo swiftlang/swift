@@ -357,6 +357,16 @@ void constraints::simplifyLocator(Expr *&anchor,
       }
       break;
 
+    case ConstraintLocator::CheckedCastOperand:
+      if (auto castExpr = dyn_cast<ExplicitCastExpr>(anchor)) {
+        targetAnchor = nullptr;
+        targetPath.clear();
+        anchor = castExpr->getSubExpr();
+        path = path.slice(1);
+        continue;
+      }
+      break;
+
     default:
       // FIXME: Lots of other cases to handle.
       break;

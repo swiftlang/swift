@@ -1672,6 +1672,10 @@ public:
     return !solverState || solverState->recordFailures;
   }
 
+  /// \brief Log and record the application of the fix. Return true iff any
+  /// subsequent solution would be worse than the best known solution.
+  bool recordFix(Fix fix, ConstraintLocatorBuilder locator);
+
   /// \brief Record a failure at the given location with the given kind,
   /// along with any additional arguments to be passed to the failure
   /// constructor.

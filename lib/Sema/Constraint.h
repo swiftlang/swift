@@ -258,7 +258,10 @@ enum class FixKind : uint8_t {
   ToRawToRawValue,
 
   /// Wrap a function value in a closure to adjust the ABI.
-  FunctionConversion
+  FunctionConversion,
+
+  /// Replace a coercion ('as') with a forced checked cast ('as!').
+  CoerceToCheckedCast,
 };
 
 /// Desribes a fix that can be applied to a constraint before visiting it.

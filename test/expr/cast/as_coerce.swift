@@ -71,6 +71,10 @@ if let castX = c as! C4? {} // expected-error {{cannot downcast from 'AnyObject'
 C3() as C4 // expected-error {{'C3' is not convertible to 'C4'; did you mean to use 'as!' to force downcast?}}
 C3() as C5 // expected-error {{'C3' is not convertible to 'C5'}}
 
+// Diagnostic shouldn't include @lvalue in type of c3.
+var c3 = C3()
+c3 as C4 // expected-error {{'C3' is not convertible to 'C4'; did you mean to use 'as!' to force downcast?}}
+
 // <rdar://problem/19495142> Various incorrect diagnostics for explicit type conversions
 1 as Double as Float // expected-error{{'Double' is not convertible to 'Float'}}
 1 as Int as String // expected-error{{'Int' is not convertible to 'String'}}

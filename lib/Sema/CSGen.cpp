@@ -1919,8 +1919,9 @@ namespace {
           Constraint::create(CS, ConstraintKind::ExplicitConversion,
                              fromType, toType, DeclName(), locator);
         Constraint *downcastConstraint =
-          Constraint::create(CS, ConstraintKind::CheckedCast, fromType, toType,
-                             DeclName(), locator);
+          Constraint::createFixed(CS, ConstraintKind::CheckedCast,
+                                  FixKind::CoerceToCheckedCast, fromType,
+                                  toType, locator);
         coerceConstraint->setFavored();
         auto constraints = { coerceConstraint, downcastConstraint };
         CS.addConstraint(Constraint::createDisjunction(CS, constraints,

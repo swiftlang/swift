@@ -455,6 +455,8 @@ StringRef Fix::getName(FixKind kind) {
     return "fix: toRaw() to rawValue";
   case FixKind::FunctionConversion:
     return "fix: function conversion";
+  case FixKind::CoerceToCheckedCast:
+    return "fix: as to as!";
   }
 }
 
