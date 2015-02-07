@@ -5289,92 +5289,92 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
         break;
       }
 
-    case FixKind::FromRawToInit: {
-      // Chase the parent map to find the reference to 'fromRaw' and
-      // the call to it. We'll need these for the Fix-It.
-      UnresolvedDotExpr *fromRawRef = nullptr;
-      CallExpr *fromRawCall = nullptr;
-      auto parentMap = expr->getParentMap();
-      Expr *current = affected;
-      do {
-        if (!fromRawRef) {
-          // We haven't found the reference to fromRaw yet, look for it now.
-          fromRawRef = dyn_cast<UnresolvedDotExpr>(current);
-          if (fromRawRef && fromRawRef->getName() != TC.Context.Id_fromRaw)
-            fromRawRef = nullptr;
+      case FixKind::FromRawToInit: {
+        // Chase the parent map to find the reference to 'fromRaw' and
+        // the call to it. We'll need these for the Fix-It.
+        UnresolvedDotExpr *fromRawRef = nullptr;
+        CallExpr *fromRawCall = nullptr;
+        auto parentMap = expr->getParentMap();
+        Expr *current = affected;
+        do {
+          if (!fromRawRef) {
+            // We haven't found the reference to fromRaw yet, look for it now.
+            fromRawRef = dyn_cast<UnresolvedDotExpr>(current);
+            if (fromRawRef && fromRawRef->getName() != TC.Context.Id_fromRaw)
+              fromRawRef = nullptr;
 
+            current = parentMap[current];
+            continue;
+          } 
+          
+          // We previously found the reference to fromRaw, so we're
+          // looking for the call.
+          fromRawCall = dyn_cast<CallExpr>(current);
+          if (fromRawCall)
+            break;
+          
           current = parentMap[current];
-          continue;
-        } 
-        
-        // We previously found the reference to fromRaw, so we're
-        // looking for the call.
-        fromRawCall = dyn_cast<CallExpr>(current);
-        if (fromRawCall)
-          break;
-        
-        current = parentMap[current];
-        continue;          
-      } while (current);
+          continue;          
+        } while (current);
 
-      if (fromRawCall) {
-        auto argStartLoc = fromRawCall->getArg()->getStartLoc();
-        argStartLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
-                                                 argStartLoc);
+        if (fromRawCall) {
+          auto argStartLoc = fromRawCall->getArg()->getStartLoc();
+          argStartLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                                   argStartLoc);
 
-        TC.diagnose(fromRawRef->getNameLoc(), 
-                    diag::migrate_from_raw_to_init)
-          .fixItReplace(SourceRange(fromRawRef->getDotLoc(),
-                                    fromRawCall->getArg()->getStartLoc()),
-                        "(rawValue: ");
-      } else {
-        // Diagnostic without Fix-It; we couldn't find what we needed.
-        TC.diagnose(affected->getLoc(), diag::migrate_from_raw_to_init);
+          TC.diagnose(fromRawRef->getNameLoc(), 
+                      diag::migrate_from_raw_to_init)
+            .fixItReplace(SourceRange(fromRawRef->getDotLoc(),
+                                      fromRawCall->getArg()->getStartLoc()),
+                          "(rawValue: ");
+        } else {
+          // Diagnostic without Fix-It; we couldn't find what we needed.
+          TC.diagnose(affected->getLoc(), diag::migrate_from_raw_to_init);
+        }
+        diagnosed = true;
+        break;
       }
-      diagnosed = true;
-      break;
-    }
 
-    case FixKind::ToRawToRawValue: {
-      // Chase the parent map to find the reference to 'toRaw' and
-      // the call to it. We'll need these for the Fix-It.
-      UnresolvedDotExpr *toRawRef = nullptr;
-      CallExpr *toRawCall = nullptr;
-      auto parentMap = expr->getParentMap();
-      Expr *current = affected;
-      do {
-        if (!toRawRef) {
-          // We haven't found the reference to toRaw yet, look for it now.
-          toRawRef = dyn_cast<UnresolvedDotExpr>(current);
-          if (toRawRef && toRawRef->getName() != TC.Context.Id_toRaw)
-            toRawRef = nullptr;
+      case FixKind::ToRawToRawValue: {
+        // Chase the parent map to find the reference to 'toRaw' and
+        // the call to it. We'll need these for the Fix-It.
+        UnresolvedDotExpr *toRawRef = nullptr;
+        CallExpr *toRawCall = nullptr;
+        auto parentMap = expr->getParentMap();
+        Expr *current = affected;
+        do {
+          if (!toRawRef) {
+            // We haven't found the reference to toRaw yet, look for it now.
+            toRawRef = dyn_cast<UnresolvedDotExpr>(current);
+            if (toRawRef && toRawRef->getName() != TC.Context.Id_toRaw)
+              toRawRef = nullptr;
 
+            current = parentMap[current];
+            continue;
+          } 
+          
+          // We previously found the reference to toRaw, so we're
+          // looking for the call.
+          toRawCall = dyn_cast<CallExpr>(current);
+          if (toRawCall)
+            break;
+          
           current = parentMap[current];
-          continue;
-        } 
-        
-        // We previously found the reference to toRaw, so we're
-        // looking for the call.
-        toRawCall = dyn_cast<CallExpr>(current);
-        if (toRawCall)
-          break;
-        
-        current = parentMap[current];
-        continue;          
-      } while (current);
+          continue;          
+        } while (current);
 
-      if (toRawCall) {
-        TC.diagnose(toRawRef->getNameLoc(),
-                    diag::migrate_to_raw_to_raw_value)
-          .fixItReplace(SourceRange(toRawRef->getNameLoc(),
-                                    toRawCall->getArg()->getEndLoc()),
-                        "rawValue");
-      } else {
-        TC.diagnose(affected->getLoc(), diag::migrate_to_raw_to_raw_value);
+        if (toRawCall) {
+          TC.diagnose(toRawRef->getNameLoc(),
+                      diag::migrate_to_raw_to_raw_value)
+            .fixItReplace(SourceRange(toRawRef->getNameLoc(),
+                                      toRawCall->getArg()->getEndLoc()),
+                          "rawValue");
+        } else {
+          TC.diagnose(affected->getLoc(), diag::migrate_to_raw_to_raw_value);
+        }
+        diagnosed = true;
+        break;
       }
-      diagnosed = true;
-      break;
-    }
 
       case FixKind::FunctionConversion: {
         Type fromType =
