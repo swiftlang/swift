@@ -53,8 +53,8 @@ static bool doPrintBefore(SILTransform *T, SILFunction *F) {
     return false;
 
   if (!SILPrintOnlyFuns.empty() && F &&
-      F->getName().find(SILPrintOnlyFuns, 0) != StringRef::npos)
-    return true;
+      F->getName().find(SILPrintOnlyFuns, 0) == StringRef::npos)
+    return false;
 
   auto MatchFun = [&](const std::string &Str) -> bool {
     return T->getName().find(Str) != StringRef::npos;
@@ -76,8 +76,8 @@ static bool doPrintAfter(SILTransform *T, SILFunction *F, bool Default) {
     return false;
 
   if (!SILPrintOnlyFuns.empty() && F &&
-      F->getName().find(SILPrintOnlyFuns, 0) != StringRef::npos)
-    return true;
+      F->getName().find(SILPrintOnlyFuns, 0) == StringRef::npos)
+    return false;
 
   auto MatchFun = [&](const std::string &Str) -> bool {
     return T->getName().find(Str) != StringRef::npos;
