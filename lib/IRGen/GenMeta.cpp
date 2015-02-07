@@ -3166,34 +3166,6 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   }
 }
 
-/// Does the given method require an override entry in the class v-table?
-bool irgen::doesMethodRequireOverrideEntry(IRGenModule &IGM,
-                                           AbstractFunctionDecl *fn,
-                                           ResilienceExpansion explosionLevel,
-                                           unsigned uncurryLevel) {
-  // Check each of the overridden declarations in turn.
-  AbstractFunctionDecl *overridden = fn->getOverriddenDecl();
-  do {
-    assert(overridden);
-    
-    // ObjC methods never get vtable entries, so overrides always need a new
-    // entry.
-    if (!hasKnownVTableEntry(IGM, overridden))
-      continue;
-
-    // TODO: eventually we'll need to handle stuff like abstraction
-    // differences due to overrides of methods of polymorphic classes, e.g.
-    //   class A<T> { func foo() -> T { ... } }
-    //   class B : A<Int> { func foo() -> Int { ... } }
-    // But that really ought to be handled by SIL-gen.
-    return false;
-
-  } while ((overridden = overridden->getOverriddenDecl()));
-
-  // Otherwise, we need a new entry.
-  return true;
-}
-
 /// Emit a load from the given metadata at a constant index.
 static llvm::Value *emitLoadFromMetadataAtIndex(IRGenFunction &IGF,
                                                 llvm::Value *metadata,
@@ -3737,20 +3709,15 @@ AbstractCallee irgen::getAbstractVirtualCallee(IRGenFunction &IGF,
 }
 
 /// Find the function which will actually appear in the virtual table.
-static AbstractFunctionDecl *findOverriddenFunction(
-                                        IRGenModule &IGM,
-                                        AbstractFunctionDecl *method,
-                                        ResilienceExpansion explosionLevel,
-                                        unsigned uncurryLevel) {
+static SILDeclRef findOverriddenFunction(IRGenModule &IGM,
+                                         SILDeclRef method) {
   // 'method' is the most final method in the hierarchy which we
   // haven't yet found a compatible override for.  'cur' is the method
   // we're currently looking at.  Compatibility is transitive,
   // so we can forget our original method and just keep going up.
 
-  AbstractFunctionDecl *cur = method;
-  while ((cur = cur->getOverriddenDecl())) {
-    if (!hasKnownVTableEntry(IGM, cur))
-      break;
+  SILDeclRef cur = method;
+  while ((cur = cur.getOverriddenVTableEntry())) {
     method = cur;
   }
   return method;
@@ -3762,14 +3729,12 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                            SILType baseType,
                                            SILDeclRef method,
                                            CanSILFunctionType methodType) {
-  // FIXME: Support property accessors.
   AbstractFunctionDecl *methodDecl
     = cast<AbstractFunctionDecl>(method.getDecl());
 
   // Find the function that's actually got an entry in the metadata.
-  AbstractFunctionDecl *overridden =
-    findOverriddenFunction(IGF.IGM, methodDecl,
-                           method.getResilienceExpansion(), method.uncurryLevel);
+  SILDeclRef overridden =
+    findOverriddenFunction(IGF.IGM, method);
 
   // Find the metadata.
   llvm::Value *metadata;
@@ -3788,10 +3753,8 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   auto fnTy = IGF.IGM.getFunctionType(methodType,
                                       ExtraData::None, attrs)->getPointerTo();
 
-  SILDeclRef fnRef(overridden, method.kind, method.getResilienceExpansion(),
-                   method.uncurryLevel);
-  auto declaringClass = cast<ClassDecl>(overridden->getDeclContext());
-  auto index = FindClassMethodIndex(IGF.IGM, declaringClass, fnRef)
+  auto declaringClass = cast<ClassDecl>(overridden.getDecl()->getDeclContext());
+  auto index = FindClassMethodIndex(IGF.IGM, declaringClass, overridden)
                  .getTargetIndex();
 
   return emitLoadFromMetadataAtIndex(IGF, metadata, index, fnTy);

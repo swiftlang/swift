@@ -166,3 +166,24 @@ entry(%c : $C?):
   autorelease_value %c : $C?
   return %c : $C?
 }
+
+// rdar://problem/19514920
+
+class NonRequiredBase {}
+class RequiredBase: NonRequiredBase {
+  required override init()
+}
+
+sil public_external @init_NonRequiredBase : $@thin @cc(method) (@owned NonRequiredBase) -> @owned NonRequiredBase
+sil public_external @alloc_RequiredBase : $@thin (@thick RequiredBase.Type) -> @owned RequiredBase
+sil public_external @init_RequiredBase : $@thin @cc(method) (@owned RequiredBase) -> @owned RequiredBase
+
+sil_vtable NonRequiredBase {
+  #NonRequiredBase.init!initializer.1: init_NonRequiredBase
+}
+
+sil_vtable RequiredBase {
+  #NonRequiredBase.init!initializer.1: init_RequiredBase
+  #RequiredBase.init!allocator.1: alloc_RequiredBase
+}
+
