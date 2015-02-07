@@ -15,6 +15,8 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
 
+// REQUIRES: objc_interop
+
 // Unfortunately, StdlibUnittest brings in Foundation somehow, so we
 // can't use it here.
 
