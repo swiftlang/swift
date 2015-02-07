@@ -186,14 +186,13 @@ static bool loadSwiftRuntime(StringRef runtimeLibPath) {
 }
 
 static bool tryLoadLibrary(LinkLibrary linkLib,
-                           SearchPathOptions searchPathOpts,
-                           DiagnosticEngine &diags) {
+                           SearchPathOptions searchPathOpts) {
   llvm::SmallString<128> path = linkLib.getName();
   bool success;
 
   // If we have an absolute or relative path, just try to load it now.
   if (llvm::sys::path::has_parent_path(path.str())) {
-    success = dlopen(path.c_str(), 0);
+    success = dlopen(path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
   } else {
     switch (linkLib.getKind()) {
     case LibraryKind::Library: {
@@ -211,13 +210,14 @@ static bool tryLoadLibrary(LinkLibrary linkLib,
       for (auto &libDir : searchPathOpts.LibrarySearchPaths) {
         path = libDir;
         llvm::sys::path::append(path, stem.str());
-        success = dlopen(path.c_str(), 0);
+        success = dlopen(path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
         if (success)
           break;
       }
 
       // Let dlopen determine the best search paths.
-      success = dlopen(stem.c_str(), 0);
+      if (!success)
+        success = dlopen(stem.c_str(), RTLD_LAZY | RTLD_GLOBAL);
 
       // If that fails, try our runtime library path.
       if (!success)
@@ -236,25 +236,53 @@ static bool tryLoadLibrary(LinkLibrary linkLib,
       for (auto &frameworkDir : searchPathOpts.FrameworkSearchPaths) {
         path = frameworkDir;
         llvm::sys::path::append(path, frameworkPart.str());
-        success = dlopen(path.c_str(), 0);
+        success = dlopen(path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
         if (success)
           break;
       }
 
       // If that fails, let dlopen search for system frameworks.
       if (!success)
-        success = dlopen(frameworkPart.c_str(), 0);
+        success = dlopen(frameworkPart.c_str(), RTLD_LAZY | RTLD_GLOBAL);
       break;
     }
     }
   }
-
-  if (!success) {
-    diags.diagnose(SourceLoc(), diag::error_immediate_mode_missing_library,
-                   (unsigned)linkLib.getKind(),
-                   llvm::sys::path::stem(path));
-  }
   return success;
+}
+
+static bool tryLoadLibraries(ArrayRef<LinkLibrary> LinkLibraries,
+                             SearchPathOptions SearchPathOpts,
+                             DiagnosticEngine &Diags) {
+  SmallVector<bool, 4> LoadedLibraries;
+  LoadedLibraries.append(LinkLibraries.size(), false);
+
+  // Libraries are not sorted in the topological order of dependencies, and we
+  // don't know the dependencies in advance.  Try to load all libraries until
+  // we stop making progress.
+  bool HadProgress;
+  do {
+    HadProgress = false;
+    for (unsigned i = 0; i != LinkLibraries.size(); ++i) {
+      if (!LoadedLibraries[i] &&
+          tryLoadLibrary(LinkLibraries[i], SearchPathOpts)) {
+        LoadedLibraries[i] = true;
+        HadProgress = true;
+      }
+    }
+  } while (HadProgress);
+
+  bool Success = true;
+  for (unsigned i = 0; i != LinkLibraries.size(); ++i) {
+    if (!LoadedLibraries[i]) {
+      Success = false;
+      auto Lib = LinkLibraries[i];
+      Diags.diagnose(SourceLoc(), diag::error_immediate_mode_missing_library,
+                     (unsigned)Lib.getKind(),
+                     llvm::sys::path::stem(Lib.getName()));
+    }
+  }
+  return Success;
 }
 
 static void linkerDiagnosticHandler(const llvm::DiagnosticInfo &DI,
@@ -303,16 +331,13 @@ static bool IRGenImportedModules(CompilerInstance &CI,
                                  const SILOptions &SILOpts,
                                  bool IsREPL = true) {
   swift::Module *M = CI.getMainModule();
-  bool hadError = false;
 
   // Perform autolinking.
+  SmallVector<LinkLibrary, 4> AllLinkLibraries(IRGenOpts.LinkLibraries);
   auto addLinkLibrary = [&](LinkLibrary linkLib) {
-    if (!tryLoadLibrary(linkLib, CI.getASTContext().SearchPathOpts,
-                        CI.getDiags()))
-      hadError = true;
+    AllLinkLibraries.push_back(linkLib);
   };
-  std::for_each(IRGenOpts.LinkLibraries.begin(), IRGenOpts.LinkLibraries.end(),
-                addLinkLibrary);
+
   M->forAllVisibleModules({}, /*includePrivateTopLevel=*/true,
                           [&](Module::ImportedModule import) {
     import.second->collectLinkLibraries(addLinkLibrary);
@@ -327,6 +352,9 @@ static bool IRGenImportedModules(CompilerInstance &CI,
     next->collectLinkLibraries(addLinkLibrary);
     prev = next;
   }
+
+  bool hadError = !tryLoadLibraries(
+      AllLinkLibraries, CI.getASTContext().SearchPathOpts, CI.getDiags());
 
   ImportedModules.insert(M);
   if (!CI.hasSourceImport())
@@ -1202,10 +1230,7 @@ public:
                              diag::error_immediate_mode_missing_stdlib);
       return;
     }
-    std::for_each(CI.getLinkLibraries().begin(), CI.getLinkLibraries().end(),
-                  [&](LinkLibrary linkLib) {
-      tryLoadLibrary(linkLib, Ctx.SearchPathOpts, CI.getDiags());
-    });
+    tryLoadLibraries(CI.getLinkLibraries(), Ctx.SearchPathOpts, CI.getDiags());
 
     llvm::EngineBuilder builder(
         std::move(std::unique_ptr<llvm::Module>(Module)));
