@@ -111,9 +111,9 @@ func testArithmeticOverflow_Int_32bit() {
 
     var t9: Int = 0x7fff_ffff >> 31 // OK
     var t10: Int = 0x7fff_ffff >> 32
-    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
+    // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
     var t11: Int = 0x7fff_ffff >> 33
-    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
+    // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
   }
 
   if true {
@@ -137,9 +137,9 @@ func testArithmeticOverflow_Int_32bit() {
 
     var t9: Int = 0x7fff_ffff << 31 // OK
     var t10: Int = 0x7fff_ffff << 32
-    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
+    // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
     var t11: Int = 0x7fff_ffff << 33
-    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
+    // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
   }
 }
 
@@ -241,9 +241,9 @@ func testArithmeticOverflow_UInt_32bit() {
 
     var t7: UInt = 0x7fff_ffff >> 31 // OK
     var t8: UInt = 0x7fff_ffff >> 32
-    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
+    // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
     var t9: UInt = 0x7fff_ffff >> 33
-    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
+    // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
   }
 
   if true {
@@ -259,9 +259,9 @@ func testArithmeticOverflow_UInt_32bit() {
 
     var t7: UInt = 0x7fff_ffff << 31 // OK
     var t8: UInt = 0x7fff_ffff << 32
-    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
+    // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
     var t9: UInt = 0x7fff_ffff << 33
-    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
+    // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
   }
 }
 
@@ -369,9 +369,9 @@ func testArithmeticOverflow_Int_64bit() {
 
     var t9: Int = 0x7fff_ffff_ffff_ffff >> 63
     var t10: Int = 0x7fff_ffff_ffff_ffff >> 64
-    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
+    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
     var t11: Int = 0x7fff_ffff_ffff_ffff >> 65
-    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
+    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
   }
 
   if true {
@@ -395,9 +395,9 @@ func testArithmeticOverflow_Int_64bit() {
 
     var t9: Int = 0x7fff_ffff_ffff_ffff << 63
     var t10: Int = 0x7fff_ffff_ffff_ffff << 64
-    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
+    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
     var t11: Int = 0x7fff_ffff_ffff_ffff << 65
-    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
+    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
   }
 }
 
@@ -499,9 +499,9 @@ func testArithmeticOverflow_UInt_64bit() {
 
     var t7: UInt = 0x7fff_ffff_ffff_ffff >> 63 // OK
     var t8: UInt = 0x7fff_ffff_ffff_ffff >> 64
-    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
+    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
     var t9: UInt = 0x7fff_ffff_ffff_ffff >> 65
-    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
+    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
   }
 
   if true {
@@ -517,9 +517,9 @@ func testArithmeticOverflow_UInt_64bit() {
 
     var t7: UInt = 0x7fff_ffff_ffff_ffff << 63 // OK
     var t8: UInt = 0x7fff_ffff_ffff_ffff << 64
-    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
+    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
     var t9: UInt = 0x7fff_ffff_ffff_ffff << 65
-    // CHECK-32=DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is larger than or equal to type size in bits{{$}}
+    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
   }
 }
 
