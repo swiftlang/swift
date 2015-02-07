@@ -8,7 +8,7 @@ import Accelerate
 extension vU1024: IntegerLiteralConvertible, Printable, Equatable {
   public init(var integerLiteral: Int) {
     self.init()
-    memcpy(&self, &integerLiteral, UInt(sizeof(Int.self)))
+    memcpy(&self, &integerLiteral, sizeof(Int.self))
   }
 
   init(_ int: Int) {
@@ -34,7 +34,7 @@ extension Int {
   init(var _ u1024: vU1024) {
     // NB: Doesn't overflow check
     self.init()
-    memcpy(&self, &u1024, UInt(sizeof(Int.self)))
+    memcpy(&self, &u1024, sizeof(Int.self))
   }
 }
 
@@ -52,7 +52,7 @@ func quorem(var x: vU1024, var y: vU1024) -> (vU1024, vU1024) {
 }
 
 public func ==(var x: vU1024, var y: vU1024) -> Bool {
-  return memcmp(&x, &y, UInt(sizeof(vU1024.self))) == 0
+  return memcmp(&x, &y, sizeof(vU1024.self)) == 0
 }
 
 func factorial(x: Int) -> vU1024 {

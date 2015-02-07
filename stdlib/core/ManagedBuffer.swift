@@ -349,7 +349,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// The actual number of bytes allocated for this object.
   internal var _allocatedByteCount: Int {
-    return Int(bitPattern: swift_malloc_size(_address))
+    return swift_malloc_size(_address)
   }
   
   /// The address of this instance in a convenient pointer-to-bytes form

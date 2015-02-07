@@ -81,7 +81,7 @@ extension AudioBufferList {
   /// The memory should be freed with `free()`.
   public static func allocate(#maximumBuffers: Int)
     -> UnsafeMutableAudioBufferListPointer {
-    let byteSize = UInt(sizeInBytes(maximumBuffers: maximumBuffers))
+    let byteSize = sizeInBytes(maximumBuffers: maximumBuffers)
     let ablMemory = calloc(byteSize, 1)
     _precondition(ablMemory != nil,
       "failed to allocate memory for an AudioBufferList")

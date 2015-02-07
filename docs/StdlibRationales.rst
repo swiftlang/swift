@@ -27,6 +27,9 @@ Radars: rdar://problem/19705854
 ``size_t`` is unsigned, but it is imported as ``Int``
 -----------------------------------------------------
 
+Converging APIs to use ``Int`` as the default integer type allows users to
+write fewer explicit type conversions.
+
 Importing ``size_t`` as a signed ``Int`` type would not be a problem for 64-bit
 platforms.  The only concern is about 32-bit platforms, and only about
 operating on array-like data structures that span more than half of the address

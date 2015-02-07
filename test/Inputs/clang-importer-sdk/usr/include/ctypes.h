@@ -137,6 +137,7 @@ STDLIB_TEST(__UINTPTR_TYPE__, uintptr_t);
 // Types from stddef.h.
 STDLIB_TYPEDEF(__PTRDIFF_TYPE__, ptrdiff_t);
 STDLIB_TYPEDEF(__SIZE_TYPE__, size_t);
+STDLIB_TYPEDEF(__SIZE_TYPE__, rsize_t);
 
 // Types from sys/types.h (POSIX).
 STDLIB_TYPEDEF(long, ssize_t);

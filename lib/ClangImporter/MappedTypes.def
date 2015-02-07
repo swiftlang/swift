@@ -102,12 +102,13 @@ MAP_STDLIB_TYPE("__swift_uintptr_t", UnsignedWord, 0, "UInt", All, false,
 
 // stddef.h types.
 MAP_STDLIB_TYPE("ptrdiff_t", SignedWord,   0, "Int",  All, false, DefineOnly)
-MAP_STDLIB_TYPE("size_t",    UnsignedWord, 0, "UInt", All, false, DefineOnly)
+MAP_STDLIB_TYPE("size_t",    UnsignedWord, 0, "Int",  All, false, DefineOnly)
+MAP_STDLIB_TYPE("rsize_t",   UnsignedWord, 0, "Int",  All, false, DefineOnly)
 
 // SwiftStddef.h defines its own copy of stddef.h types.
 MAP_STDLIB_TYPE("__swift_ptrdiff_t", SignedWord, 0, "Int", All, false,
                 DefineOnly)
-MAP_STDLIB_TYPE("__swift_size_t", UnsignedWord, 0, "UInt", All, false,
+MAP_STDLIB_TYPE("__swift_size_t", UnsignedWord, 0, "Int", All, false,
                 DefineOnly)
 
 // POSIX sys/types.h.

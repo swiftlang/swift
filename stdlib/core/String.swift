@@ -300,7 +300,7 @@ public func ==(lhs: String, rhs: String) -> Bool {
     return memcmp(
       UnsafeMutablePointer(lhs._core.startASCII),
       UnsafeMutablePointer(rhs._core.startASCII),
-      UInt(rhs._core.count)) == 0
+      rhs._core.count) == 0
   }
 #if _runtime(_ObjC)
   // Note: this operation should be consistent with equality comparison of
@@ -346,7 +346,7 @@ extension String {
     let compare = memcmp(
       UnsafeMutablePointer(self._core.startASCII),
       UnsafeMutablePointer(rhs._core.startASCII),
-      min(UInt(self._core.count), UInt(rhs._core.count)))
+      min(self._core.count, rhs._core.count))
     if compare == 0 {
       return self._core.count < rhs._core.count
     } else {

@@ -165,10 +165,12 @@ func testImportStdintTypes() {
 
 func testImportStddefTypes() {
   var t1_unqual: Int = ptrdiff_t_test
-  var t2_unqual: UInt = size_t_test
+  var t2_unqual: Int = size_t_test
+  var t3_unqual: Int = rsize_t_test
 
   var t1_qual: ctypes.ptrdiff_t = t1_unqual
   var t2_qual: ctypes.size_t = t2_unqual
+  var t3_qual: ctypes.rsize_t = t3_unqual
 }
 
 func testImportSysTypesTypes() {
