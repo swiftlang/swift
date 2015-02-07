@@ -4,5 +4,5 @@ add_swift_library(swiftSILPassesUtils
   SILInliner.cpp
   SILSSAUpdater.cpp
   ConstantFolding.cpp
-  LINK_LIBRARIES swiftSIL)
+  LINK_LIBRARIES swiftSIL swiftSILAnalysis)
 
