@@ -338,3 +338,159 @@ struct StructWithMutatingMethod {
 // Check that the closure body only takes the pointer.
 // CHECK-LABEL: sil shared @_TFFV8closures24StructWithMutatingMethod14mutatingMethodFRS0_FT_T_U_FT_Si : $@thin (@inout StructWithMutatingMethod) -> Int {
 // CHECK-NEXT:  bb0(%0 : $*StructWithMutatingMethod):
+
+class SuperBase {
+  func boom() {}
+}
+class SuperSub : SuperBase {
+  override func boom() {}
+  
+  // CHECK-LABEL: sil hidden @_TFC8closures8SuperSub1afS0_FT_T_
+  // CHECK: [[INNER:%.*]] = function_ref @_TFFC8closures8SuperSub1aFS0_FT_T_L_2a1fT_T_
+  // CHECK: = partial_apply [[INNER]](%0)
+  // CHECK: return
+  func a() {
+    // CHECK-LABEL: sil shared @_TFFC8closures8SuperSub1aFS0_FT_T_L_2a1fT_T_
+    // CHECK: [[CLASS_METHOD:%.*]] = class_method %0 : $SuperSub, #SuperSub.boom!1
+    // CHECK: = apply [[CLASS_METHOD]](%0)
+    // CHECK: [[SUPER:%.*]] = upcast %0 : $SuperSub to $SuperBase
+    // CHECK: [[SUPER_METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boomfS0_FT_T_
+    // CHECK: = apply [[SUPER_METHOD]]([[SUPER]])
+    // CHECK: return
+    func a1() {
+      boom() // FIXME: should require "self."
+      super.boom()
+    }
+    a1()
+  }
+  
+  // CHECK-LABEL: sil hidden @_TFC8closures8SuperSub1bfS0_FT_T_
+  // CHECK: [[INNER:%.*]] = function_ref @_TFFC8closures8SuperSub1bFS0_FT_T_L_2b1fT_T_
+  // CHECK: = partial_apply [[INNER]](%0)
+  // CHECK: return
+  func b() {
+    // CHECK-LABEL: sil shared @_TFFC8closures8SuperSub1bFS0_FT_T_L_2b1fT_T_
+    // CHECK: [[INNER:%.*]] = function_ref @_TFFFC8closures8SuperSub1bFS0_FT_T_L_2b1FT_T_L_2b2fT_T_
+    // CHECK: = partial_apply [[INNER]](%0)
+    // CHECK: return
+    func b1() {
+      // CHECK-LABEL: sil shared @_TFFFC8closures8SuperSub1bFS0_FT_T_L_2b1FT_T_L_2b2fT_T_
+      // CHECK: [[CLASS_METHOD:%.*]] = class_method %0 : $SuperSub, #SuperSub.boom!1
+      // CHECK: = apply [[CLASS_METHOD]](%0)
+      // CHECK: [[SUPER:%.*]] = upcast %0 : $SuperSub to $SuperBase
+      // CHECK: [[METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boomfS0_FT_T_
+      // CHECK: = apply [[METHOD]]([[SUPER]])
+      // CHECK: return
+      func b2() {
+        boom() // FIXME: should require "self."
+        super.boom()
+      }
+      b2()
+    }
+    b1()
+  }
+  
+  // CHECK-LABEL: sil hidden @_TFC8closures8SuperSub1cfS0_FT_T_
+  // CHECK: [[INNER:%.*]] = function_ref @_TFFC8closures8SuperSub1cFS0_FT_T_U_FT_T_
+  // CHECK: = partial_apply [[INNER]](%0)
+  // CHECK: return
+  func c() {
+    // CHECK-LABEL: sil shared @_TFFC8closures8SuperSub1cFS0_FT_T_U_FT_T_
+    // CHECK: [[CLASS_METHOD:%.*]] = class_method %0 : $SuperSub, #SuperSub.boom!1
+    // CHECK: = apply [[CLASS_METHOD]](%0)
+    // CHECK: [[SUPER:%.*]] = upcast %0 : $SuperSub to $SuperBase
+    // CHECK: [[METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boomfS0_FT_T_
+    // CHECK: = apply [[METHOD]]([[SUPER]])
+    // CHECK: return
+    let c1 = { () -> Void in
+      self.boom()
+      super.boom()
+    }
+    c1()
+  }
+  
+  // CHECK-LABEL: sil hidden @_TFC8closures8SuperSub1dfS0_FT_T_
+  // CHECK: [[INNER:%.*]] = function_ref @_TFFC8closures8SuperSub1dFS0_FT_T_U_FT_T_
+  // CHECK: = partial_apply [[INNER]](%0)
+  // CHECK: return
+  func d() {
+    // CHECK-LABEL: sil shared @_TFFC8closures8SuperSub1dFS0_FT_T_U_FT_T_
+    // CHECK: [[INNER:%.*]] = function_ref @_TFFFC8closures8SuperSub1dFS0_FT_T_U_FT_T_L_2d2fT_T_
+    // CHECK: = partial_apply [[INNER]](%0)
+    // CHECK: return
+    let d1 = { () -> Void in
+      // CHECK-LABEL: sil shared @_TFFFC8closures8SuperSub1dFS0_FT_T_U_FT_T_L_2d2fT_T_
+      // CHECK: [[SUPER:%.*]] = upcast %0 : $SuperSub to $SuperBase
+      // CHECK: [[METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boomfS0_FT_T_
+      // CHECK: = apply [[METHOD]]([[SUPER]])
+      // CHECK: return
+      func d2() {
+        super.boom()
+      }
+      d2()
+    }
+    d1()
+  }
+  
+  // CHECK-LABEL: sil hidden @_TFC8closures8SuperSub1efS0_FT_T_
+  // CHECK: [[INNER:%.*]] = function_ref @_TFFC8closures8SuperSub1eFS0_FT_T_L_2e1fT_T_
+  // CHECK: = partial_apply [[INNER]](%0)
+  // CHECK: return
+  func e() {
+    // CHECK-LABEL: sil shared @_TFFC8closures8SuperSub1eFS0_FT_T_L_2e1fT_T_
+    // CHECK: [[INNER:%.*]] = function_ref @_TFFFC8closures8SuperSub1eFS0_FT_T_L_2e1FT_T_U_FT_T_
+    // CHECK: = partial_apply [[INNER]](%0)
+    // CHECK: return
+    func e1() {
+      // CHECK-LABEL: sil shared @_TFFFC8closures8SuperSub1eFS0_FT_T_L_2e1FT_T_U_FT_T_
+      // CHECK: [[SUPER:%.*]] = upcast %0 : $SuperSub to $SuperBase
+      // CHECK: [[METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boomfS0_FT_T_
+      // CHECK: = apply [[METHOD]]([[SUPER]])
+      // CHECK: return
+      let e2 = {
+        super.boom()
+      }
+      e2()
+    }
+    e1()
+  }
+  
+  // CHECK-LABEL: sil hidden @_TFC8closures8SuperSub1ffS0_FT_T_
+  // CHECK: [[INNER:%.*]] = function_ref @_TFFC8closures8SuperSub1fFS0_FT_T_U_FT_T_
+  // CHECK: = partial_apply [[INNER]](%0)
+  // CHECK: return
+  func f() {
+    // CHECK-LABEL: sil shared @_TFFC8closures8SuperSub1fFS0_FT_T_U_FT_T_
+    // CHECK: [[INNER:%.*]] = function_ref @_TFFFC8closures8SuperSub1fFS0_FT_T_U_FT_T_u_KT_T_
+    // CHECK: = partial_apply [[INNER]](%0)
+    // CHECK: return
+    let f1 = {
+      // CHECK-LABEL: sil shared @_TFFFC8closures8SuperSub1fFS0_FT_T_U_FT_T_u_KT_T_
+      // CHECK: [[SUPER:%.*]] = upcast %0 : $SuperSub to $SuperBase
+      // CHECK: [[METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boomfS0_FT_T_
+      // CHECK: = apply [[METHOD]]([[SUPER]])
+      // CHECK: return
+      nil ?? super.boom()
+    }
+  }
+  
+  // CHECK-LABEL: sil hidden @_TFC8closures8SuperSub1gfS0_FT_T_
+  // CHECK: [[INNER:%.*]] = function_ref @_TFFC8closures8SuperSub1gFS0_FT_T_L_2g1fT_T_
+  // CHECK: = partial_apply [[INNER]](%0)
+  // CHECK: return
+  func g() {
+    // CHECK-LABEL: sil shared @_TFFC8closures8SuperSub1gFS0_FT_T_L_2g1fT_T_
+    // CHECK: [[INNER:%.*]] = function_ref @_TFFFC8closures8SuperSub1gFS0_FT_T_L_2g1FT_T_u_KT_T_
+    // CHECK: = partial_apply [[INNER]](%0)
+    // CHECK: return
+    func g1() {
+      // CHECK-LABEL: sil shared @_TFFFC8closures8SuperSub1gFS0_FT_T_L_2g1FT_T_u_KT_T_
+      // CHECK: [[SUPER:%.*]] = upcast %0 : $SuperSub to $SuperBase
+      // CHECK: [[METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boomfS0_FT_T_
+      // CHECK: = apply [[METHOD]]([[SUPER]])
+      // CHECK: return
+      nil ?? super.boom()
+    }
+    g1()
+  }
+}

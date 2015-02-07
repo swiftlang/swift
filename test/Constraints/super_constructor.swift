@@ -2,7 +2,7 @@
 
 struct S {
   init() {
-    super.init() // expected-error{{'super' members cannot be referenced in a non-class type}}
+    super.init() // expected-error{{'super' cannot be used outside of class members}}
   }
 }
 

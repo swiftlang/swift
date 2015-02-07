@@ -87,6 +87,22 @@
 // RUN: FileCheck %s -check-prefix=NO_SUPER_DECLS < %t.super.txt
 // RUN: FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_1 > %t.super.txt
+// RUN: FileCheck %s -check-prefix=COMMON_BASE_A_DOT < %t.super.txt
+// RUN: FileCheck %s -check-prefix=CLOSURE_1 < %t.super.txt
+// RUN: FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_2 > %t.super.txt
+// RUN: FileCheck %s -check-prefix=COMMON_BASE_A_DOT < %t.super.txt
+// RUN: FileCheck %s -check-prefix=CLOSURE_2 < %t.super.txt
+// RUN: FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_CAPTURE_1 > %t.super.txt
+// RUN: FileCheck %s -check-prefix=CLOSURE_CAPTURE_1 < %t.super.txt
+// RUN: FileCheck %s -check-prefix=NO_SUPER_DECLS < %t.super.txt
+// RUN: FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
+
 // NO_CONSTRUCTORS-NOT: init(
 
 // NO_SUPER_DECLS-NOT: Decl/Super
@@ -441,6 +457,32 @@ class SemanticContextDerived1 : SemanticContextBase1 {
   }
 }
 
+class Closures : SuperBaseA {
+  func foo() {
+    func inner() {
+      super.#^CLOSURE_1^#
+      // CLOSURE_1: Begin completions, 6 items
+      // CLOSURE_1: End completions
+    }
+  }
+
+  func bar() {
+    let inner = { () -> Void in
+      // CLOSURE_2: Begin completions, 6 items
+      // CLOSURE_2: End completions
+      super.#^CLOSURE_2^#
+    }
+  }
+
+  func baz() {
+    let inner = { [weak self] in
+      super.#^CLOSURE_CAPTURE_1^#
+      // CLOSURE_CAPTURE_1-NOT: Begin completions
+    }
+  }
+}
+
+
 //===--- Code completion for 'super' keyword itself.
 
 class SuperKWBase {
@@ -456,4 +498,3 @@ class SuperKWDerived : SuperKWBase {
     #^DERIVED_SUPER_KW^#
   }
 }
-

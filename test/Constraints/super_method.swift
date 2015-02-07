@@ -2,7 +2,7 @@
 
 struct S {
   func foo() {
-    super.foo() // expected-error{{'super' members cannot be referenced in a non-class type}}
+    super.foo() // expected-error{{'super' cannot be used outside of class members}}
   }
 }
 
@@ -57,5 +57,5 @@ func use_d(d: D) -> Int {
 }
 
 func not_method() {
-  super.foo() // expected-error{{'super' members cannot be referenced in a non-class type}}
+  super.foo() // expected-error{{'super' cannot be used outside of class members}}
 }

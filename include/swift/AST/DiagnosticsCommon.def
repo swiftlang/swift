@@ -61,7 +61,7 @@ NOTE(while_parsing_as_less_operator,common,none,
 // FIXME: This is used both as a parse error (a literal "super" outside a
 // method) and a type-checker error ("super" in a method of a non-class type).
 ERROR(super_not_in_class_method,common,none,
-      "'super' members cannot be referenced in a non-class type", ())
+      "'super' cannot be used outside of class members", ())
 
 ERROR(class_func_not_in_class,common,none,
       "class methods are only allowed within classes; "

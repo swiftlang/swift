@@ -444,12 +444,24 @@ UnresolvedDeclRefExpr *Parser::parseExprOperator() {
 static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
                                                    DeclContext *DC,
                                                    SourceLoc Loc) {
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
-    if (auto *SelfDecl = AFD->getImplicitSelfDecl())
-      return SelfDecl;
+  auto *methodContext = DC->getInnermostMethodContext();
+  if (!methodContext) {
+    P.diagnose(Loc, diag::super_not_in_class_method);
+    return nullptr;
   }
-  P.diagnose(Loc, diag::super_not_in_class_method);
-  return nullptr;
+
+  // Do an actual lookup for 'self' in case it shows up in a capture list.
+  auto *methodSelf = methodContext->getImplicitSelfDecl();
+  auto *lookupSelf = P.lookupInScope(P.Context.Id_self);
+  if (lookupSelf && lookupSelf != methodSelf) {
+    // FIXME: This is the wrong diagnostic for if someone manually declares a
+    // variable named 'self' using backticks.
+    P.diagnose(Loc, diag::super_in_closure_with_capture);
+    P.diagnose(lookupSelf->getLoc(), diag::super_in_closure_with_capture_here);
+    return nullptr;
+  }
+
+  return methodSelf;
 }
 
 /// parseExprSuper

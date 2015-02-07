@@ -1527,8 +1527,7 @@ public:
         getSemanticContext(CD, Reason));
     Builder.setAssociatedDecl(CD);
      if (IsSuperRefExpr) {
-      assert(isa<ConstructorDecl>(
-                 dyn_cast<AbstractFunctionDecl>(CurrDeclContext)) &&
+      assert(isa<ConstructorDecl>(CurrDeclContext) &&
              "can call super.init only inside a constructor");
       addLeadingDot(Builder);
       Builder.addTextChunk("init");
@@ -1689,9 +1688,8 @@ public:
           addConstructorCall(CD, Reason);
         }
         if (IsSuperRefExpr) {
-          if (auto *AFD = dyn_cast<AbstractFunctionDecl>(CurrDeclContext))
-            if (!isa<ConstructorDecl>(AFD))
-              return;
+          if (!isa<ConstructorDecl>(CurrDeclContext))
+            return;
           addConstructorCall(CD, Reason);
         }
         return;

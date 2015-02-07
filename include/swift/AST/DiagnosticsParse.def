@@ -859,6 +859,11 @@ ERROR(expected_identifier_after_super_dot_expr,expr_parsing,
       "expected identifier or 'init' after super '.' expression", ())
 ERROR(expected_dot_or_subscript_after_super,expr_parsing,PointsToFirstBadToken,
       "expected '.' or '[' after 'super'", ())
+ERROR(super_in_closure_with_capture,expr_parsing,none,
+      "using 'super' in a closure where 'self' is explicitly captured is "
+      "not yet supported", ())
+NOTE(super_in_closure_with_capture_here,expr_parsing,none,
+     "'self' explicitly captured here", ())
 ERROR(super_initializer_not_in_initializer,expr_parsing,none,
       "'super.init' cannot be called outside of an initializer", ())
 ERROR(super_initializer_must_be_called,expr_parsing,none,
