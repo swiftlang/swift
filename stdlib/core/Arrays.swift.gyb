@@ -602,6 +602,9 @@ extension ${Self} : _ArrayType {
   /// Return ${a_Self} containing the results of calling
   /// `transform(x)` on each element `x` of `self`
   public func map<U>(transform: (T) -> U) -> ${Self}<U> {
+    // 'transform' should be @noescape, but there's a compiler bug:
+    // <rdar://problem/19763792> Calling Swift.map from Array.map causes
+    // Assertion failed: UnresolvedDot in wrong phase
     return ${Self}<U>(lazy(self).map(transform))
   }
 
@@ -613,6 +616,9 @@ extension ${Self} : _ArrayType {
   /// Return ${a_Self} containing the elements `x` of `self` for which
   /// `includeElement(x)` is `true`
   public func filter(includeElement: (T) -> Bool) -> ${Self} {
+    // 'includeElement' should be @noescape, but there's a compiler bug:
+    // <rdar://problem/19763792> Calling Swift.map from Array.map causes
+    // Assertion failed: UnresolvedDot in wrong phase
     return ${Self}(lazy(self).filter(includeElement))
   }
 }
