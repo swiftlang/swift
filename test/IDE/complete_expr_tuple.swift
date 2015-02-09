@@ -28,8 +28,8 @@ func testTupleNoDot1() {
   t#^TUPLE_NO_DOT_1^#
 }
 // TUPLE_NO_DOT_1: Begin completions, 2 items
-// TUPLE_NO_DOT_1-NEXT: Pattern/CurrNominal: .0[#Int#]{{$}}
-// TUPLE_NO_DOT_1-NEXT: Pattern/CurrNominal: .1[#Double#]{{$}}
+// TUPLE_NO_DOT_1-NEXT: Pattern/CurrNominal: .0[#Int#]{{; name=.+$}}
+// TUPLE_NO_DOT_1-NEXT: Pattern/CurrNominal: .1[#Double#]{{; name=.+$}}
 // TUPLE_NO_DOT_1-NEXT: End completions
 
 func testTupleNoDot2() {
@@ -37,8 +37,8 @@ func testTupleNoDot2() {
   t#^TUPLE_NO_DOT_2^#
 }
 // TUPLE_NO_DOT_2: Begin completions, 2 items
-// TUPLE_NO_DOT_2-NEXT: Pattern/CurrNominal: .foo[#Int#]{{$}}
-// TUPLE_NO_DOT_2-NEXT: Pattern/CurrNominal: .bar[#Double#]{{$}}
+// TUPLE_NO_DOT_2-NEXT: Pattern/CurrNominal: .foo[#Int#]{{; name=.+$}}
+// TUPLE_NO_DOT_2-NEXT: Pattern/CurrNominal: .bar[#Double#]{{; name=.+$}}
 // TUPLE_NO_DOT_2-NEXT: End completions
 
 func testTupleNoDot3() {
@@ -46,8 +46,8 @@ func testTupleNoDot3() {
   t#^TUPLE_NO_DOT_3^#
 }
 // TUPLE_NO_DOT_3: Begin completions, 2 items
-// TUPLE_NO_DOT_3-NEXT: Pattern/CurrNominal: .foo[#Int#]{{$}}
-// TUPLE_NO_DOT_3-NEXT: Pattern/CurrNominal: .1[#Double#]{{$}}
+// TUPLE_NO_DOT_3-NEXT: Pattern/CurrNominal: .foo[#Int#]{{; name=.+$}}
+// TUPLE_NO_DOT_3-NEXT: Pattern/CurrNominal: .1[#Double#]{{; name=.+$}}
 // TUPLE_NO_DOT_3-NEXT: End completions
 
 func testTupleDot1() {
@@ -55,8 +55,8 @@ func testTupleDot1() {
   t.#^TUPLE_DOT_1^#
 }
 // TUPLE_DOT_1: Begin completions, 2 items
-// TUPLE_DOT_1-NEXT: Pattern/CurrNominal: 0[#Int#]{{$}}
-// TUPLE_DOT_1-NEXT: Pattern/CurrNominal: 1[#Double#]{{$}}
+// TUPLE_DOT_1-NEXT: Pattern/CurrNominal: 0[#Int#]{{; name=.+$}}
+// TUPLE_DOT_1-NEXT: Pattern/CurrNominal: 1[#Double#]{{; name=.+$}}
 // TUPLE_DOT_1-NEXT: End completions
 
 func testTupleDot2() {
@@ -64,8 +64,8 @@ func testTupleDot2() {
   t.#^TUPLE_DOT_2^#
 }
 // TUPLE_DOT_2: Begin completions, 2 items
-// TUPLE_DOT_2-NEXT: Pattern/CurrNominal: foo[#Int#]{{$}}
-// TUPLE_DOT_2-NEXT: Pattern/CurrNominal: bar[#Double#]{{$}}
+// TUPLE_DOT_2-NEXT: Pattern/CurrNominal: foo[#Int#]{{; name=.+$}}
+// TUPLE_DOT_2-NEXT: Pattern/CurrNominal: bar[#Double#]{{; name=.+$}}
 // TUPLE_DOT_2-NEXT: End completions
 
 func testTupleDot3() {
@@ -73,8 +73,8 @@ func testTupleDot3() {
   t.#^TUPLE_DOT_3^#
 }
 // TUPLE_DOT_3: Begin completions, 2 items
-// TUPLE_DOT_3-NEXT: Pattern/CurrNominal: foo[#Int#]{{$}}
-// TUPLE_DOT_3-NEXT: Pattern/CurrNominal: 1[#Double#]{{$}}
+// TUPLE_DOT_3-NEXT: Pattern/CurrNominal: foo[#Int#]{{; name=.+$}}
+// TUPLE_DOT_3-NEXT: Pattern/CurrNominal: 1[#Double#]{{; name=.+$}}
 // TUPLE_DOT_3-NEXT: End completions
 
 struct FooStruct {
@@ -87,7 +87,6 @@ func testTupleNested1() {
   t.foo.#^TUPLE_NESTED_1^#
 }
 // TUPLE_NESTED_1: Begin completions, 2 items
-// TUPLE_NESTED_1-NEXT: Decl[InstanceVar]/CurrNominal: fooInstanceVar[#Int#]{{$}}
-// TUPLE_NESTED_1-NEXT: Decl[InstanceVar]/CurrNominal: barInstanceVar[#Double#]{{$}}
+// TUPLE_NESTED_1-NEXT: Decl[InstanceVar]/CurrNominal: fooInstanceVar[#Int#]{{; name=.+$}}
+// TUPLE_NESTED_1-NEXT: Decl[InstanceVar]/CurrNominal: barInstanceVar[#Double#]{{; name=.+$}}
 // TUPLE_NESTED_1-NEXT: End completions
-

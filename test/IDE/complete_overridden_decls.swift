@@ -54,37 +54,36 @@ func test1(b: TestABase) {
   b.#^OVER_BASE_1^#
 }
 // OVER_BASE_1: Begin completions
-// OVER_BASE_1-NEXT: Decl[InstanceVar]/CurrNominal:    baseInstanceVar[#FooBase#]{{$}}
-// OVER_BASE_1-NEXT: Decl[InstanceVar]/CurrNominal:    baseOverInstanceVar[#FooBase#]{{$}}
-// OVER_BASE_1-NEXT: Decl[InstanceMethod]/CurrNominal: baseOverFunc()[#Void#]{{$}}
-// OVER_BASE_1-NEXT: Decl[InstanceMethod]/CurrNominal: baseOverContravariant({#(a): FooMoreDerived#})[#Void#]{{$}}
-// OVER_BASE_1-NEXT: Decl[InstanceMethod]/CurrNominal: baseOverCovariant()[#FooBase#]{{$}}
+// OVER_BASE_1-NEXT: Decl[InstanceVar]/CurrNominal:    baseInstanceVar[#FooBase#]{{; name=.+$}}
+// OVER_BASE_1-NEXT: Decl[InstanceVar]/CurrNominal:    baseOverInstanceVar[#FooBase#]{{; name=.+$}}
+// OVER_BASE_1-NEXT: Decl[InstanceMethod]/CurrNominal: baseOverFunc()[#Void#]{{; name=.+$}}
+// OVER_BASE_1-NEXT: Decl[InstanceMethod]/CurrNominal: baseOverContravariant({#(a): FooMoreDerived#})[#Void#]{{; name=.+$}}
+// OVER_BASE_1-NEXT: Decl[InstanceMethod]/CurrNominal: baseOverCovariant()[#FooBase#]{{; name=.+$}}
 // OVER_BASE_1-NEXT: End completions
 
 func test2(d: TestADerived) {
   d.#^OVER_DERIVED_1^#
 }
 // OVER_DERIVED_1: Begin completions
-// OVER_DERIVED_1-NEXT: Decl[InstanceVar]/CurrNominal:    derivedInstanceVar[#FooBase#]{{$}}
-// OVER_DERIVED_1-NEXT: Decl[InstanceVar]/CurrNominal:    baseOverInstanceVar[#FooDerived#]{{$}}
-// OVER_DERIVED_1-NEXT: Decl[InstanceVar]/CurrNominal:    derivedOverInstanceVar[#FooBase#]{{$}}
-// OVER_DERIVED_1-NEXT: Decl[InstanceMethod]/CurrNominal: baseOverFunc()[#Void#]{{$}}
-// OVER_DERIVED_1-NEXT: Decl[InstanceMethod]/CurrNominal: baseOverContravariant({#(a): FooDerived#})[#Void#]{{$}}
-// OVER_DERIVED_1-NEXT: Decl[InstanceMethod]/CurrNominal: baseOverCovariant()[#FooDerived#]{{$}}
-// OVER_DERIVED_1-NEXT: Decl[InstanceVar]/Super:          baseInstanceVar[#FooBase#]{{$}}
+// OVER_DERIVED_1-NEXT: Decl[InstanceVar]/CurrNominal:    derivedInstanceVar[#FooBase#]{{; name=.+$}}
+// OVER_DERIVED_1-NEXT: Decl[InstanceVar]/CurrNominal:    baseOverInstanceVar[#FooDerived#]{{; name=.+$}}
+// OVER_DERIVED_1-NEXT: Decl[InstanceVar]/CurrNominal:    derivedOverInstanceVar[#FooBase#]{{; name=.+$}}
+// OVER_DERIVED_1-NEXT: Decl[InstanceMethod]/CurrNominal: baseOverFunc()[#Void#]{{; name=.+$}}
+// OVER_DERIVED_1-NEXT: Decl[InstanceMethod]/CurrNominal: baseOverContravariant({#(a): FooDerived#})[#Void#]{{; name=.+$}}
+// OVER_DERIVED_1-NEXT: Decl[InstanceMethod]/CurrNominal: baseOverCovariant()[#FooDerived#]{{; name=.+$}}
+// OVER_DERIVED_1-NEXT: Decl[InstanceVar]/Super:          baseInstanceVar[#FooBase#]{{; name=.+$}}
 // OVER_DERIVED_1-NEXT: End completions
 
 func test3(md: TestAMoreDerived) {
   md.#^OVER_MORE_DERIVED_1^#
 }
 // OVER_MORE_DERIVED_1: Begin completions
-// OVER_MORE_DERIVED_1-NEXT: Decl[InstanceVar]/CurrNominal:    moreDerivedInstanceVar[#FooBase#]{{$}}
-// OVER_MORE_DERIVED_1-NEXT: Decl[InstanceVar]/CurrNominal:    baseOverInstanceVar[#FooMoreDerived#]{{$}}
-// OVER_MORE_DERIVED_1-NEXT: Decl[InstanceVar]/CurrNominal:    derivedOverInstanceVar[#FooDerived#]{{$}}
-// OVER_MORE_DERIVED_1-NEXT: Decl[InstanceMethod]/CurrNominal: baseOverFunc()[#Void#]{{$}}
-// OVER_MORE_DERIVED_1-NEXT: Decl[InstanceMethod]/CurrNominal: baseOverContravariant({#(a): FooBase#})[#Void#]{{$}}
-// OVER_MORE_DERIVED_1-NEXT: Decl[InstanceMethod]/CurrNominal: baseOverCovariant()[#FooMoreDerived#]{{$}}
-// OVER_MORE_DERIVED_1-NEXT: Decl[InstanceVar]/Super:          derivedInstanceVar[#FooBase#]{{$}}
-// OVER_MORE_DERIVED_1-NEXT: Decl[InstanceVar]/Super:          baseInstanceVar[#FooBase#]{{$}}
+// OVER_MORE_DERIVED_1-NEXT: Decl[InstanceVar]/CurrNominal:    moreDerivedInstanceVar[#FooBase#]{{; name=.+$}}
+// OVER_MORE_DERIVED_1-NEXT: Decl[InstanceVar]/CurrNominal:    baseOverInstanceVar[#FooMoreDerived#]{{; name=.+$}}
+// OVER_MORE_DERIVED_1-NEXT: Decl[InstanceVar]/CurrNominal:    derivedOverInstanceVar[#FooDerived#]{{; name=.+$}}
+// OVER_MORE_DERIVED_1-NEXT: Decl[InstanceMethod]/CurrNominal: baseOverFunc()[#Void#]{{; name=.+$}}
+// OVER_MORE_DERIVED_1-NEXT: Decl[InstanceMethod]/CurrNominal: baseOverContravariant({#(a): FooBase#})[#Void#]{{; name=.+$}}
+// OVER_MORE_DERIVED_1-NEXT: Decl[InstanceMethod]/CurrNominal: baseOverCovariant()[#FooMoreDerived#]{{; name=.+$}}
+// OVER_MORE_DERIVED_1-NEXT: Decl[InstanceVar]/Super:          derivedInstanceVar[#FooBase#]{{; name=.+$}}
+// OVER_MORE_DERIVED_1-NEXT: Decl[InstanceVar]/Super:          baseInstanceVar[#FooBase#]{{; name=.+$}}
 // OVER_MORE_DERIVED_1-NEXT: End completions
-

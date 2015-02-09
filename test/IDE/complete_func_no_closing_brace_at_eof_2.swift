@@ -6,11 +6,10 @@
 // Don't add any tests at the end of the file!
 //
 // A: Begin completions
-// A-DAG: Decl[InstanceMethod]/CurrNominal: a()[#Void#]{{$}}
+// A-DAG: Decl[InstanceMethod]/CurrNominal: a()[#Void#]{{; name=.+$}}
 // A: End completions
 struct FooStruct {
   func a() {}
 }
 func f(foo: FooStruct) {
   foo.#^A^#
-

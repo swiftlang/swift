@@ -12,9 +12,8 @@ import Cocoa
 func testUnqualified() {
   #^T1^#
 // T1: Begin completions
-// T1-DAG: Decl[FreeFunction]/OtherModule: CFArrayCreate({#(allocator): CFAllocator!#}, {#(values): UnsafeMutablePointer<UnsafePointer<Void>>#}, {#(numValues): CFIndex#}, {#(callBacks): UnsafePointer<CFArrayCallBacks>#})[#CFArray!#]{{$}}
-// T1-DAG: Decl[FreeFunction]/OtherModule: CFArrayGetCount({#(theArray): CFArray!#})[#CFIndex#]{{$}}
-// T1-DAG: Decl[Class]/OtherModule:        NSObject[#NSObject#]{{$}}
+// T1-DAG: Decl[FreeFunction]/OtherModule: CFArrayCreate({#(allocator): CFAllocator!#}, {#(values): UnsafeMutablePointer<UnsafePointer<Void>>#}, {#(numValues): CFIndex#}, {#(callBacks): UnsafePointer<CFArrayCallBacks>#})[#CFArray!#]{{; name=.+$}}
+// T1-DAG: Decl[FreeFunction]/OtherModule: CFArrayGetCount({#(theArray): CFArray!#})[#CFIndex#]{{; name=.+$}}
+// T1-DAG: Decl[Class]/OtherModule:        NSObject[#NSObject#]{{; name=.+$}}
 // T1: End completions
 }
-

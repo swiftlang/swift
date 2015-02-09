@@ -49,12 +49,12 @@ struct FooStruct {
 }
 
 // FOO_OBJECT_DOT: Begin completions
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc0()[#Void#]{{$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc0()[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: End completions
 
 // WITH_GLOBAL_DECLS: Begin completions
-// WITH_GLOBAL_DECLS: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{$}}
+// WITH_GLOBAL_DECLS: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{; name=.+$}}
 // WITH_GLOBAL_DECLS: End completions
 
 //===--- Check that we can resolve closure parameters.
@@ -133,7 +133,7 @@ struct NestedStructWithClosureMember1 {
 
 // WITH_GLOBAL_DECLS_AND_LOCAL1: Begin completions
 // WITH_GLOBAL_DECLS_AND_LOCAL1: Decl[LocalVar]/Local: x[#Int#]
-// WITH_GLOBAL_DECLS_AND_LOCAL1: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{$}}
+// WITH_GLOBAL_DECLS_AND_LOCAL1: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{; name=.+$}}
 // WITH_GLOBAL_DECLS_AND_LOCAL1: End completions
 
 struct StructWithClosureMemberAndLocal {
@@ -226,4 +226,3 @@ acceptsListAndTrailingClosureTVoid(
   item.instanceFunc0()
   item.#^IN_TRAILING_CLOSURE_15^#
 }
-

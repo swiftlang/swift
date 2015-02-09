@@ -12,9 +12,9 @@ class A {
 }
 
 // TEST_A: Begin completions
-// TEST_A-NEXT: Decl[Constructor]/CurrNominal:      ({#int: Int#})[#A#]{{$}}
-// TEST_A-NEXT: Decl[Constructor]/CurrNominal:      ({#double: Double#})[#A#]{{$}}
-// TEST_A-NEXT: Decl[Constructor]/CurrNominal:      ({#float: Float#})[#A#]{{$}}
+// TEST_A-NEXT: Decl[Constructor]/CurrNominal:      ({#int: Int#})[#A#]{{; name=.+$}}
+// TEST_A-NEXT: Decl[Constructor]/CurrNominal:      ({#double: Double#})[#A#]{{; name=.+$}}
+// TEST_A-NEXT: Decl[Constructor]/CurrNominal:      ({#float: Float#})[#A#]{{; name=.+$}}
 // TEST_A-NEXT: End completions
 
 class B : A {
@@ -24,9 +24,9 @@ class B : A {
 }
 
 // TEST_B: Begin completions
-// TEST_B-NEXT: Decl[Constructor]/CurrNominal:      ({#int: Int#})[#B#]{{$}}
-// TEST_B-NEXT: Decl[Constructor]/CurrNominal:      ({#double: Double#})[#B#]{{$}}
-// TEST_B-NEXT: Decl[Constructor]/Super:            ({#float: Float#})[#A#]{{$}}
+// TEST_B-NEXT: Decl[Constructor]/CurrNominal:      ({#int: Int#})[#B#]{{; name=.+$}}
+// TEST_B-NEXT: Decl[Constructor]/CurrNominal:      ({#double: Double#})[#B#]{{; name=.+$}}
+// TEST_B-NEXT: Decl[Constructor]/Super:            ({#float: Float#})[#A#]{{; name=.+$}}
 // TEST_B-NEXT: End completions
 
 class C : B {
@@ -40,8 +40,8 @@ class C : B {
 }
 
 // TEST_C: Begin completions
-// TEST_C-NEXT: Decl[Constructor]/CurrNominal:      ({#int: Int#})[#C#]{{$}}
-// TEST_C-NEXT: Decl[Constructor]/CurrNominal:      ({#c: C#})[#C#]{{$}}
+// TEST_C-NEXT: Decl[Constructor]/CurrNominal:      ({#int: Int#})[#C#]{{; name=.+$}}
+// TEST_C-NEXT: Decl[Constructor]/CurrNominal:      ({#c: C#})[#C#]{{; name=.+$}}
 // TEST_C-NEXT: End completions
 
 class D : C {
@@ -56,9 +56,9 @@ class D : C {
 }
 
 // TEST_D: Begin completions
-// TEST_D-NEXT: Decl[Constructor]/CurrNominal:      ({#d: D#})[#D#]{{$}}
-// TEST_D-NEXT: Decl[Constructor]/CurrNominal:      ({#int: Int#})[#D#]{{$}}
-// TEST_D-NEXT: Decl[Constructor]/Super:            ({#c: C#})[#C#]{{$}}
+// TEST_D-NEXT: Decl[Constructor]/CurrNominal:      ({#d: D#})[#D#]{{; name=.+$}}
+// TEST_D-NEXT: Decl[Constructor]/CurrNominal:      ({#int: Int#})[#D#]{{; name=.+$}}
+// TEST_D-NEXT: Decl[Constructor]/Super:            ({#c: C#})[#C#]{{; name=.+$}}
 // TEST_D-NEXT: End completions
 
 func testA() {
@@ -76,4 +76,3 @@ func testC() {
 func testD() {
   D#^TEST_D^#
 }
-

@@ -13,8 +13,8 @@ class CompleteWeak {
     #^WEAK_VARS_1^#
   }
 // WEAK_VARS_1: Begin completions
-// WEAK_VARS_1-DAG: Decl[LocalVar]/Local: weakSelf[#CompleteWeak?#]{{$}}
-// WEAK_VARS_1-DAG: Decl[LocalVar]/Local: unownedSelf[#CompleteWeak#]{{$}}
+// WEAK_VARS_1-DAG: Decl[LocalVar]/Local: weakSelf[#CompleteWeak?#]{{; name=.+$}}
+// WEAK_VARS_1-DAG: Decl[LocalVar]/Local: unownedSelf[#CompleteWeak#]{{; name=.+$}}
 // WEAK_VARS_1: End completions
 
   func weakNoDot() {
@@ -22,7 +22,7 @@ class CompleteWeak {
     weakSelf#^WEAK_NO_DOT_1^#
   }
 // WEAK_NO_DOT_1: Begin completions
-// WEAK_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: ?.instanceFunc()[#Void#]{{$}}
+// WEAK_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: ?.instanceFunc()[#Void#]{{; name=.+$}}
 // WEAK_NO_DOT_1: End completions
 
   func weakDot() {
@@ -30,7 +30,7 @@ class CompleteWeak {
     weakSelf.#^WEAK_DOT_1^#
   }
 // WEAK_DOT_1: Begin completions
-// WEAK_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal/Erase[1]: ?.instanceFunc()[#Void#]{{$}}
+// WEAK_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal/Erase[1]: ?.instanceFunc()[#Void#]{{; name=.+$}}
 // WEAK_DOT_1: End completions
 
   func unownedNoDot() {
@@ -38,7 +38,7 @@ class CompleteWeak {
     unownedSelf#^UNOWNED_NO_DOT_1^#
   }
 // UNOWNED_NO_DOT_1: Begin completions
-// UNOWNED_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc()[#Void#]{{$}}
+// UNOWNED_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc()[#Void#]{{; name=.+$}}
 // UNOWNED_NO_DOT_1: End completions
 
   func unownedDot() {
@@ -46,8 +46,7 @@ class CompleteWeak {
     unownedSelf.#^UNOWNED_DOT_1^#
   }
 // UNOWNED_DOT_1: Begin completions
-// UNOWNED_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc()[#Void#]{{$}}
+// UNOWNED_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc()[#Void#]{{; name=.+$}}
 // UNOWNED_DOT_1: End completions
 
 }
-

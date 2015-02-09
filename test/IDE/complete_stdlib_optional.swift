@@ -77,41 +77,41 @@ class ObjcClass {
 }
 
 // OPT_NO_DOT_FOOSTRUCT: Begin completions
-// OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal:    ?.instanceVar[#Int#]{{$}}
-// OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal: ?.instanceFunc()[#Void#]{{$}}
+// OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal:    ?.instanceVar[#Int#]{{; name=.+$}}
+// OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal: ?.instanceFunc()[#Void#]{{; name=.+$}}
 // OPT_NO_DOT_FOOSTRUCT: End completions
 
 // OPT_DOT_FOOSTRUCT: Begin completions
-// OPT_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal/Erase[1]:    ?.instanceVar[#Int#]{{$}}
-// OPT_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal/Erase[1]: ?.instanceFunc()[#Void#]{{$}}
+// OPT_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal/Erase[1]:    ?.instanceVar[#Int#]{{; name=.+$}}
+// OPT_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal/Erase[1]: ?.instanceFunc()[#Void#]{{; name=.+$}}
 // OPT_DOT_FOOSTRUCT: End completions
 
 // OPT_DOT_FOOSTRUCT_SPACES: Begin completions
-// OPT_DOT_FOOSTRUCT_SPACES-DAG: Decl[InstanceVar]/CurrNominal/Erase[3]:    ?.instanceVar[#Int#]{{$}}
-// OPT_DOT_FOOSTRUCT_SPACES-DAG: Decl[InstanceMethod]/CurrNominal/Erase[3]: ?.instanceFunc()[#Void#]{{$}}
+// OPT_DOT_FOOSTRUCT_SPACES-DAG: Decl[InstanceVar]/CurrNominal/Erase[3]:    ?.instanceVar[#Int#]{{; name=.+$}}
+// OPT_DOT_FOOSTRUCT_SPACES-DAG: Decl[InstanceMethod]/CurrNominal/Erase[3]: ?.instanceFunc()[#Void#]{{; name=.+$}}
 // OPT_DOT_FOOSTRUCT_SPACES: End completions
 
 // UN_OPT_NO_DOT_FOOSTRUCT: Begin completions
-// UN_OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal:    .instanceVar[#Int#]{{$}}
-// UN_OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc()[#Void#]{{$}}
+// UN_OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal:    .instanceVar[#Int#]{{; name=.+$}}
+// UN_OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc()[#Void#]{{; name=.+$}}
 // UN_OPT_NO_DOT_FOOSTRUCT: End completions
 
 // UN_OPT_DOT_FOOSTRUCT: Begin completions
-// UN_OPT_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{$}}
-// UN_OPT_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc()[#Void#]{{$}}
+// UN_OPT_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
+// UN_OPT_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc()[#Void#]{{; name=.+$}}
 // UN_OPT_DOT_FOOSTRUCT: End completions
 
 // UN_OPT_NO_DOT_INT: Begin completions
-// UN_OPT_NO_DOT_INT-DAG: Decl[InstanceMethod]/CurrNominal: .successor()[#Int#]{{$}}
+// UN_OPT_NO_DOT_INT-DAG: Decl[InstanceMethod]/CurrNominal: .successor()[#Int#]{{; name=.+$}}
 // UN_OPT_NO_DOT_INT: End completions
 
 // UN_OPT_DOT_INT: Begin completions
-// UN_OPT_DOT_INT-DAG: Decl[InstanceMethod]/CurrNominal: successor()[#Int#]{{$}}
+// UN_OPT_DOT_INT-DAG: Decl[InstanceMethod]/CurrNominal: successor()[#Int#]{{; name=.+$}}
 // UN_OPT_DOT_INT: End completions
 
 // OPT_NO_DOT_OBJCCLASS: Begin completions
-// OPT_NO_DOT_OBJCCLASS-DAG: Decl[InstanceVar]/CurrNominal:    ?.instanceVar[#Int#]{{$}}
-// OPT_NO_DOT_OBJCCLASS-DAG: Decl[InstanceMethod]/CurrNominal: ?.instanceFunc()[#ObjcClass#]{{$}}
+// OPT_NO_DOT_OBJCCLASS-DAG: Decl[InstanceVar]/CurrNominal:    ?.instanceVar[#Int#]{{; name=.+$}}
+// OPT_NO_DOT_OBJCCLASS-DAG: Decl[InstanceMethod]/CurrNominal: ?.instanceFunc()[#ObjcClass#]{{; name=.+$}}
 // OPT_NO_DOT_OBJCCLASS: End completions
 
 // OBJCCLASS_MEMBERS_NO_DOT: Begin completions
@@ -195,4 +195,3 @@ func testAnyObject7(a: AnyObject) {
 func testAnyObject8(a: AnyObject) {
   (a as? ObjcClass)#^OPT_CAST_AS_RESULT_1^#
 }
-

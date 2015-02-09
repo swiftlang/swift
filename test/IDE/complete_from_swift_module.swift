@@ -51,7 +51,7 @@ func testCompleteModuleQualified2() {
   foo_swift_module.FooSwiftStruct.#^MODULE_QUALIFIED_2^#
 }
 // MODULE_QUALIFIED_2: Begin completions
-// MODULE_QUALIFIED_2-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc({#self: FooSwiftStruct#})[#() -> Void#]{{$}}
+// MODULE_QUALIFIED_2-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc({#self: FooSwiftStruct#})[#() -> Void#]{{; name=.+$}}
 // MODULE_QUALIFIED_2-NEXT: End completions
 
 func testCompleteModuleQualified3() {
@@ -59,7 +59,7 @@ func testCompleteModuleQualified3() {
 }
 // MODULE_QUALIFIED_3: Begin completions
 // MODULE_QUALIFIED_3-NEXT: Decl[Constructor]/CurrNominal:    ({#t: T#})[#BarGenericSwiftStruct1<T>#]
-// MODULE_QUALIFIED_3-NEXT: Decl[InstanceMethod]/CurrNominal: .bar1InstanceFunc({#self: BarGenericSwiftStruct1<T>#})[#() -> Void#]{{$}}
+// MODULE_QUALIFIED_3-NEXT: Decl[InstanceMethod]/CurrNominal: .bar1InstanceFunc({#self: BarGenericSwiftStruct1<T>#})[#() -> Void#]{{; name=.+$}}
 // MODULE_QUALIFIED_3-NEXT: End completions
 
 func testCompleteModuleQualified4() {
@@ -76,7 +76,7 @@ func testCompleteModuleQualified5() {
 
 #^TOP_LEVEL_1^#
 // TOP_LEVEL_1: Begin completions
-// TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:  testCompleteModuleQualified1()[#Void#]{{$}}
-// TOP_LEVEL_1-DAG: Decl[FreeFunction]/OtherModule: visibleImport()[#Void#]{{$}}
-// TOP_LEVEL_1-DAG: Decl[GlobalVar]/CurrModule:     hiddenImport[#Int#]{{$}}
+// TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:  testCompleteModuleQualified1()[#Void#]{{; name=.+$}}
+// TOP_LEVEL_1-DAG: Decl[FreeFunction]/OtherModule: visibleImport()[#Void#]{{; name=.+$}}
+// TOP_LEVEL_1-DAG: Decl[GlobalVar]/CurrModule:     hiddenImport[#Int#]{{; name=.+$}}
 // TOP_LEVEL_1: End completions

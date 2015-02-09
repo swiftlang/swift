@@ -15,21 +15,20 @@ func testReturnVoid1() {
 // compiler error if the type of that expression changes to non-void.
 
 // RETURN_VOID_1: Begin completions
-// RETURN_VOID_1-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{$}}
+// RETURN_VOID_1-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{; name=.+$}}
 // RETURN_VOID_1: End completions
 }
 
 func testReturnInt1() {
   return #^RETURN_INT_1^#
 // RETURN_INT_1: Begin completions
-// RETURN_INT_1-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{$}}
+// RETURN_INT_1-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{; name=.+$}}
 // RETURN_INT_1: End completions
 }
 
 func testReturnInt2(fooObject: FooStruct) {
   return fooObject.#^RETURN_INT_2^#
 // RETURN_INT_2: Begin completions
-// RETURN_INT_2-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{$}}
+// RETURN_INT_2-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}
 // RETURN_INT_2-NEXT: End completions
 }
-

@@ -30,11 +30,11 @@ func testTopLevel() {
   #^TOP_LEVEL_1^#
 }
 // TOP_LEVEL_1: Begin completions
-// TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:      freeFunc1({#x: Int...#})[#Void#]{{$}}
-// TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:      freeFunc2({#x: Int#}, {#y: Int...#})[#Void#]{{$}}
-// TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:      freeFunc3({#w: Int...#})[#(x: Int...) -> Void#]{{$}}
-// TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:      genericFreeFunc1({#t: T...#})[#Void#]{{$}}
-// TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:      interestingType1({#x: (Int, (Int, String))...#})[#Void#]{{$}}
+// TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:      freeFunc1({#x: Int...#})[#Void#]{{; name=.+$}}
+// TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:      freeFunc2({#x: Int#}, {#y: Int...#})[#Void#]{{; name=.+$}}
+// TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:      freeFunc3({#w: Int...#})[#(x: Int...) -> Void#]{{; name=.+$}}
+// TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:      genericFreeFunc1({#t: T...#})[#Void#]{{; name=.+$}}
+// TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:      interestingType1({#x: (Int, (Int, String))...#})[#Void#]{{; name=.+$}}
 // TOP_LEVEL_1: End completions
 
 var obj = C()
@@ -42,9 +42,9 @@ func testObjDot1() {
   obj.#^OBJ_DOT_1^#
 }
 // OBJ_DOT_1: Begin completions
-// OBJ_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   method1({#x: Int...#})[#Void#]{{$}}
-// OBJ_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   method2({#x: Int#}, {#y: Int...#})[#Void#]{{$}}
-// OBJ_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   method3({#w: Int...#})[#(x: Int...) -> Void#]{{$}}
+// OBJ_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   method1({#x: Int...#})[#Void#]{{; name=.+$}}
+// OBJ_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   method2({#x: Int#}, {#y: Int...#})[#Void#]{{; name=.+$}}
+// OBJ_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   method3({#w: Int...#})[#(x: Int...) -> Void#]{{; name=.+$}}
 // OBJ_DOT_1: End completions
 
 func testFreeFunc() {
@@ -52,10 +52,10 @@ func testFreeFunc() {
   freeFunc2(#^FREE_FUNC_2^#
 }
 // FREE_FUNC_1: Begin completions, 1 items
-// FREE_FUNC_1: Pattern/ExprSpecific:               ['(']{#x: Int...#})[#Void#]{{$}}
+// FREE_FUNC_1: Pattern/ExprSpecific:               ['(']{#x: Int...#})[#Void#]{{; name=.+$}}
 // FREE_FUNC_1: End completions
 // FREE_FUNC_2: Begin completions, 1 items
-// FREE_FUNC_2: Pattern/ExprSpecific:               ['(']{#x: Int#}, {#y: Int...#})[#Void#]{{$}}
+// FREE_FUNC_2: Pattern/ExprSpecific:               ['(']{#x: Int#}, {#y: Int...#})[#Void#]{{; name=.+$}}
 // FREE_FUNC_2: End completions
 
 func testCurriedFreeFunc() {
@@ -63,17 +63,17 @@ func testCurriedFreeFunc() {
   freeFunc3(w: 3, 4)(#^CURRIED_FREE_FUNC_2^#
 }
 // CURRIED_FREE_FUNC_1: Begin completions, 1 items
-// CURRIED_FREE_FUNC_1: Pattern/ExprSpecific:               ['(']{#w: Int...#})[#(x: Int...) -> ()#]{{$}}
+// CURRIED_FREE_FUNC_1: Pattern/ExprSpecific:               ['(']{#w: Int...#})[#(x: Int...) -> ()#]{{; name=.+$}}
 // CURRIED_FREE_FUNC_1: End completions
 // CURRIED_FREE_FUNC_2: Begin completions, 1 items
-// CURRIED_FREE_FUNC_2: Pattern/ExprSpecific:               ['(']{#x: Int...#})[#Void#]{{$}}
+// CURRIED_FREE_FUNC_2: Pattern/ExprSpecific:               ['(']{#x: Int...#})[#Void#]{{; name=.+$}}
 // CURRIED_FREE_FUNC_2: End completions
 
 func testInit() {
   let c =C(#^INIT_1^#
 }
 // INIT_1: Begin completions, 1 items
-// INIT_1: Decl[Constructor]/CurrNominal:      ['(']{#x: Int...#})[#C#]{{$}}
+// INIT_1: Decl[Constructor]/CurrNominal:      ['(']{#x: Int...#})[#C#]{{; name=.+$}}
 // INIT_1: End completions
 
 func testMethod() {
@@ -81,24 +81,24 @@ func testMethod() {
   obj.method2(#^METHOD_2^#
 }
 // METHOD_1: Begin completions, 1 items
-// METHOD_1: Pattern/ExprSpecific:               ['(']{#x: Int...#})[#Void#]{{$}}
+// METHOD_1: Pattern/ExprSpecific:               ['(']{#x: Int...#})[#Void#]{{; name=.+$}}
 // METHOD_1: End completions
 // METHOD_2: Begin completions, 1 items
-// METHOD_2: Pattern/ExprSpecific:               ['(']{#x: Int#}, {#y: Int...#})[#Void#]{{$}}
+// METHOD_2: Pattern/ExprSpecific:               ['(']{#x: Int#}, {#y: Int...#})[#Void#]{{; name=.+$}}
 // METHOD_2: End completions
 
 func testSubscript() {
   obj#^SUBSCRIPT_1^#
 }
 // SUBSCRIPT_1: Begin completions
-// SUBSCRIPT_1: Decl[Subscript]/CurrNominal:        [{#Int...#}][#Int#]{{$}}
+// SUBSCRIPT_1: Decl[Subscript]/CurrNominal:        [{#Int...#}][#Int#]{{; name=.+$}}
 // SUBSCRIPT_1: End completions
 
 func testGenericFreeFunc() {
   genericFreeFunc1(#^GENERIC_FREE_FUNC_1^#
 }
 // GENERIC_FREE_FUNC_1: Begin completions, 1 items
-// GENERIC_FREE_FUNC_1: Pattern/ExprSpecific:               ['(']{#t: τ_0_0...#})[#Void#]{{$}}
+// GENERIC_FREE_FUNC_1: Pattern/ExprSpecific:               ['(']{#t: τ_0_0...#})[#Void#]{{; name=.+$}}
 // GENERIC_FREE_FUNC_1: End completions
 
 
@@ -106,5 +106,5 @@ func testInterestingType() {
   interestingType1(#^INTERESTING_TYPE_1^#
 }
 // INTERESTING_TYPE_1: Begin completions, 1 items
-// INTERESTING_TYPE_1: Pattern/ExprSpecific:               ['(']{#x: (Int, (Int, String))...#})[#Void#]{{$}}
+// INTERESTING_TYPE_1: Pattern/ExprSpecific:               ['(']{#x: (Int, (Int, String))...#})[#Void#]{{; name=.+$}}
 // INTERESTING_TYPE_1: End completions

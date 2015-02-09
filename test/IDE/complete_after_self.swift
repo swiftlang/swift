@@ -109,38 +109,38 @@ class ThisDerived1 : ThisBase1 {
   class func derivedStaticFunc0() {}
 
 // COMMON_SELF_NO_DOT_1: Begin completions
-// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    .derivedInstanceVar[#Int#]{{$}}
-// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: .derivedFunc0()[#Void#]{{$}}
-// COMMON_SELF_NO_DOT_1-DAG: Decl[Subscript]/CurrNominal:       [{#Double#}][#Int#]{{$}}
-// COMMON_SELF_NO_DOT_1-DAG: Decl[Subscript]/CurrNominal:       [{#s: String#}][#Int#]{{$}}
-// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: .test1()[#Void#]{{$}}
-// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: .test2()[#Void#]{{$}}
-// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    .derivedExtProp[#Int#]{{$}}
-// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: .derivedExtInstanceFunc0()[#Void#]{{$}}
-// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    .derivedExtStaticProp[#Int#]{{$}}
-// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/Super:          .baseInstanceVar[#Int#]{{$}}
-// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/Super:       .baseFunc0()[#Void#]{{$}}
-// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/Super:       .baseFunc1({#(a): Int#})[#Void#]{{$}}
-// COMMON_SELF_NO_DOT_1-DAG: Decl[Subscript]/Super:            [{#Int#}][#Double#]{{$}}
-// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/Super:          .baseExtProp[#Int#]{{$}}
-// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/Super:       .baseExtInstanceFunc0()[#Void#]{{$}}
-// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/Super:          .baseExtStaticProp[#Int#]{{$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    .derivedInstanceVar[#Int#]{{; name=.+$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: .derivedFunc0()[#Void#]{{; name=.+$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[Subscript]/CurrNominal:       [{#Double#}][#Int#]{{; name=.+$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[Subscript]/CurrNominal:       [{#s: String#}][#Int#]{{; name=.+$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: .test1()[#Void#]{{; name=.+$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: .test2()[#Void#]{{; name=.+$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    .derivedExtProp[#Int#]{{; name=.+$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: .derivedExtInstanceFunc0()[#Void#]{{; name=.+$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    .derivedExtStaticProp[#Int#]{{; name=.+$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/Super:          .baseInstanceVar[#Int#]{{; name=.+$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/Super:       .baseFunc0()[#Void#]{{; name=.+$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/Super:       .baseFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[Subscript]/Super:            [{#Int#}][#Double#]{{; name=.+$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/Super:          .baseExtProp[#Int#]{{; name=.+$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/Super:       .baseExtInstanceFunc0()[#Void#]{{; name=.+$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/Super:          .baseExtStaticProp[#Int#]{{; name=.+$}}
 // COMMON_SELF_NO_DOT_1: End completions
 
 // COMMON_SELF_DOT_1: Begin completions
-// COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    derivedInstanceVar[#Int#]{{$}}
-// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: derivedFunc0()[#Void#]{{$}}
-// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: test1()[#Void#]{{$}}
-// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: test2()[#Void#]{{$}}
-// COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    derivedExtProp[#Int#]{{$}}
-// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: derivedExtInstanceFunc0()[#Void#]{{$}}
-// COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    derivedExtStaticProp[#Int#]{{$}}
-// COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/Super:          baseInstanceVar[#Int#]{{$}}
-// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/Super:       baseFunc0()[#Void#]{{$}}
-// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/Super:       baseFunc1({#(a): Int#})[#Void#]{{$}}
-// COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/Super:          baseExtProp[#Int#]{{$}}
-// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/Super:       baseExtInstanceFunc0()[#Void#]{{$}}
-// COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/Super:          baseExtStaticProp[#Int#]{{$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    derivedInstanceVar[#Int#]{{; name=.+$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: derivedFunc0()[#Void#]{{; name=.+$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: test1()[#Void#]{{; name=.+$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: test2()[#Void#]{{; name=.+$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    derivedExtProp[#Int#]{{; name=.+$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: derivedExtInstanceFunc0()[#Void#]{{; name=.+$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    derivedExtStaticProp[#Int#]{{; name=.+$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/Super:          baseInstanceVar[#Int#]{{; name=.+$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/Super:       baseFunc0()[#Void#]{{; name=.+$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/Super:       baseFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/Super:          baseExtProp[#Int#]{{; name=.+$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/Super:       baseExtInstanceFunc0()[#Void#]{{; name=.+$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/Super:          baseExtStaticProp[#Int#]{{; name=.+$}}
 // COMMON_SELF_DOT_1: End completions
 
   init() {
@@ -267,4 +267,3 @@ extension ThisDerived1 {
 
   typealias DerivedExtNestedTypealias = Int
 }
-

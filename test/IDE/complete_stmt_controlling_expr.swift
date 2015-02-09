@@ -448,24 +448,23 @@ func testSwitchCaseWhereExprIJ1(fooObject: FooStruct) {
 }
 
 // COND_COMMON: Begin completions
-// COND_COMMON-DAG: Keyword/None: true[#Bool#]{{$}}
-// COND_COMMON-DAG: Keyword/None: false[#Bool#]{{$}}
-// COND_COMMON-DAG: Decl[LocalVar]/Local:        fooObject[#FooStruct#]{{$}}
-// COND_COMMON-DAG: Decl[LocalVar]/Local:        localInt[#Int#]{{$}}
-// COND_COMMON-DAG: Decl[LocalVar]/Local:        localFooObject[#FooStruct#]{{$}}
-// COND_COMMON-DAG: Decl[Struct]/CurrModule:     FooStruct[#FooStruct#]{{$}}
+// COND_COMMON-DAG: Keyword/None: true[#Bool#]{{; name=.+$}}
+// COND_COMMON-DAG: Keyword/None: false[#Bool#]{{; name=.+$}}
+// COND_COMMON-DAG: Decl[LocalVar]/Local:        fooObject[#FooStruct#]{{; name=.+$}}
+// COND_COMMON-DAG: Decl[LocalVar]/Local:        localInt[#Int#]{{; name=.+$}}
+// COND_COMMON-DAG: Decl[LocalVar]/Local:        localFooObject[#FooStruct#]{{; name=.+$}}
+// COND_COMMON-DAG: Decl[Struct]/CurrModule:     FooStruct[#FooStruct#]{{; name=.+$}}
 // COND_COMMON: End completions
 
-// WITH_I_INT_LOCAL: Decl[LocalVar]/Local: i[#Int#]{{$}}
+// WITH_I_INT_LOCAL: Decl[LocalVar]/Local: i[#Int#]{{; name=.+$}}
 
-// WITH_I_INT_EXPR_SPECIFIC: Decl[LocalVar]/ExprSpecific: i[#Int#]{{$}}
+// WITH_I_INT_EXPR_SPECIFIC: Decl[LocalVar]/ExprSpecific: i[#Int#]{{; name=.+$}}
 
-// WITH_I_ERROR_LOCAL: Decl[LocalVar]/Local: i[#<<error type>>#]{{$}}
+// WITH_I_ERROR_LOCAL: Decl[LocalVar]/Local: i[#<<error type>>#]{{; name=.+$}}
 
-// WITH_I_ERROR_EXPR_SPECIFIC: Decl[LocalVar]/ExprSpecific: i[#<<error type>>#]{{$}}
+// WITH_I_ERROR_EXPR_SPECIFIC: Decl[LocalVar]/ExprSpecific: i[#<<error type>>#]{{; name=.+$}}
 
-// WITH_J_INT: Decl[LocalVar]/Local: j[#Int#]{{$}}
+// WITH_J_INT: Decl[LocalVar]/Local: j[#Int#]{{; name=.+$}}
 
-// WITH_I_E_EXPR_SPECIFIC: Decl[LocalVar]/ExprSpecific: i[#Int#]{{$}}
-// WITH_I_E_EXPR_SPECIFIC: Decl[LocalVar]/Local:        e[#Int#]{{$}}
-
+// WITH_I_E_EXPR_SPECIFIC: Decl[LocalVar]/ExprSpecific: i[#Int#]{{; name=.+$}}
+// WITH_I_E_EXPR_SPECIFIC: Decl[LocalVar]/Local:        e[#Int#]{{; name=.+$}}

@@ -8,15 +8,14 @@
 // RUN: FileCheck %s -check-prefix=TOP_LEVEL_1 < %t.txt
 // RUN: FileCheck %s -check-prefix=NO_DUPLICATES < %t.txt
 
-// TOP_LEVEL_1: Decl[FreeFunction]/OtherModule:     overlayedFoo()[#Void#]{{$}}
-// TOP_LEVEL_1: Decl[FreeFunction]/OtherModule:     onlyInFooOverlay()[#Void#]{{$}}
+// TOP_LEVEL_1: Decl[FreeFunction]/OtherModule:     overlayedFoo()[#Void#]{{; name=.+$}}
+// TOP_LEVEL_1: Decl[FreeFunction]/OtherModule:     onlyInFooOverlay()[#Void#]{{; name=.+$}}
 
 // FIXME: there should be only one instance of this completion result.
-// NO_DUPLICATES: overlayedFoo
-// NO_DUPLICATES: overlayedFoo
-// NO_DUPLICATES-NOT: overlayedFoo
+// NO_DUPLICATES: overlayedFoo()[#Void#]{{; name=.+$}}
+// NO_DUPLICATES: overlayedFoo()[#Void#]{{; name=.+$}}
+// NO_DUPLICATES-NOT: overlayedFoo()[#Void#]{{; name=.+$}}
 
 import FooSwiftModuleOverlay
 
 #^TOP_LEVEL_1^#
-

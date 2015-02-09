@@ -19,8 +19,8 @@ func testDefaultArgs1() {
   #^DEFAULT_ARGS_1^#
 }
 // DEFAULT_ARGS_1: Begin completions
-// DEFAULT_ARGS_1-DAG: Decl[FreeFunction]/CurrModule:      freeFuncWithDefaultArgs1({#(a): Int#}, {#b: Int#})[#Void#]{{$}}
-// DEFAULT_ARGS_1-DAG: Decl[FreeFunction]/CurrModule:      freeFuncWithDefaultArgs2()[#Void#]{{$}}
+// DEFAULT_ARGS_1-DAG: Decl[FreeFunction]/CurrModule:      freeFuncWithDefaultArgs1({#(a): Int#}, {#b: Int#})[#Void#]{{; name=.+$}}
+// DEFAULT_ARGS_1-DAG: Decl[FreeFunction]/CurrModule:      freeFuncWithDefaultArgs2()[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_1: End completions
 
 let globalVar = 1
@@ -29,5 +29,5 @@ func testDefaultArgInit2(_: Int = #^DEFAULT_ARG_INIT_2^#) { }
 func testDefaultArgInit3(Int = #^DEFAULT_ARG_INIT_3^#) { }
 func testDefaultArgInit4(x: Int = #^DEFAULT_ARG_INIT_4^#) { }
 // DEFAULT_ARG_INIT: Begin completions
-// DEFAULT_ARG_INIT: Decl[GlobalVar]/CurrModule:         globalVar[#Int#]{{$}}
+// DEFAULT_ARG_INIT: Decl[GlobalVar]/CurrModule:         globalVar[#Int#]{{; name=.+$}}
 // DEFAULT_ARG_INIT: End completions

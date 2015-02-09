@@ -189,22 +189,22 @@ extension SuperBaseA {
 // VERIFY_END
 
 // COMMON_BASE_A_NO_DOT: Begin completions
-// COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .baseInstanceVar[#Int#]{{$}}
-// COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .baseProp[#Int#]{{$}}
-// COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseFunc0()[#Void#]{{$}}
-// COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseFunc1({#(a): Int#})[#Void#]{{$}}
-// COMMON_BASE_A_NO_DOT-DAG: Decl[Subscript]/CurrNominal:      [{#Int#}][#Double#]{{$}}
-// COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .baseExtProp[#Int#]{{$}}
-// COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseExtFunc0()[#Void#]{{$}}
+// COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .baseInstanceVar[#Int#]{{; name=.+$}}
+// COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .baseProp[#Int#]{{; name=.+$}}
+// COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseFunc0()[#Void#]{{; name=.+$}}
+// COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// COMMON_BASE_A_NO_DOT-DAG: Decl[Subscript]/CurrNominal:      [{#Int#}][#Double#]{{; name=.+$}}
+// COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .baseExtProp[#Int#]{{; name=.+$}}
+// COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseExtFunc0()[#Void#]{{; name=.+$}}
 // COMMON_BASE_A_NO_DOT: End completions
 
 // COMMON_BASE_A_DOT: Begin completions
-// COMMON_BASE_A_DOT-DAG: Decl[InstanceVar]/CurrNominal:    baseInstanceVar[#Int#]{{$}}
-// COMMON_BASE_A_DOT-DAG: Decl[InstanceVar]/CurrNominal:    baseProp[#Int#]{{$}}
-// COMMON_BASE_A_DOT-DAG: Decl[InstanceMethod]/CurrNominal: baseFunc0()[#Void#]{{$}}
-// COMMON_BASE_A_DOT-DAG: Decl[InstanceMethod]/CurrNominal: baseFunc1({#(a): Int#})[#Void#]{{$}}
-// COMMON_BASE_A_DOT-DAG: Decl[InstanceVar]/CurrNominal:    baseExtProp[#Int#]{{$}}
-// COMMON_BASE_A_DOT-DAG: Decl[InstanceMethod]/CurrNominal: baseExtFunc0()[#Void#]{{$}}
+// COMMON_BASE_A_DOT-DAG: Decl[InstanceVar]/CurrNominal:    baseInstanceVar[#Int#]{{; name=.+$}}
+// COMMON_BASE_A_DOT-DAG: Decl[InstanceVar]/CurrNominal:    baseProp[#Int#]{{; name=.+$}}
+// COMMON_BASE_A_DOT-DAG: Decl[InstanceMethod]/CurrNominal: baseFunc0()[#Void#]{{; name=.+$}}
+// COMMON_BASE_A_DOT-DAG: Decl[InstanceMethod]/CurrNominal: baseFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// COMMON_BASE_A_DOT-DAG: Decl[InstanceVar]/CurrNominal:    baseExtProp[#Int#]{{; name=.+$}}
+// COMMON_BASE_A_DOT-DAG: Decl[InstanceMethod]/CurrNominal: baseExtFunc0()[#Void#]{{; name=.+$}}
 // COMMON_BASE_A_DOT: End completions
 
 class SuperDerivedA : SuperBaseA {
@@ -215,21 +215,21 @@ class SuperDerivedA : SuperBaseA {
   init() {
     super#^CONSTRUCTOR_SUPER_NO_DOT_1^#
 // CONSTRUCTOR_SUPER_NO_DOT_1: Begin completions, 8 items
-// CONSTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[Constructor]/ExprSpecific: .init()[#SuperBaseA#]{{$}}
+// CONSTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[Constructor]/ExprSpecific: .init()[#SuperBaseA#]{{; name=.+$}}
 // CONSTRUCTOR_SUPER_NO_DOT_1: End completions
   }
 
   init(a: Int) {
     super.#^CONSTRUCTOR_SUPER_DOT_1^#
 // CONSTRUCTOR_SUPER_DOT_1: Begin completions, 7 items
-// CONSTRUCTOR_SUPER_DOT_1-DAG: Decl[Constructor]/CurrNominal: init()[#SuperBaseA#]{{$}}
+// CONSTRUCTOR_SUPER_DOT_1-DAG: Decl[Constructor]/CurrNominal: init()[#SuperBaseA#]{{; name=.+$}}
 // CONSTRUCTOR_SUPER_DOT_1: End completions
   }
 
   init (a: Float) {
     super.init(#^CONSTRUCTOR_SUPER_INIT_PAREN_1^#
 // CONSTRUCTOR_SUPER_INIT_PAREN_1: Begin completions
-// CONSTRUCTOR_SUPER_INIT_PAREN_1-DAG: Decl[LocalVar]/Local: a[#Float#]{{$}}
+// CONSTRUCTOR_SUPER_INIT_PAREN_1-DAG: Decl[LocalVar]/Local: a[#Float#]{{; name=.+$}}
 // CONSTRUCTOR_SUPER_INIT_PAREN_1: End completions
   }
 
@@ -261,22 +261,22 @@ class SuperDerivedA : SuperBaseA {
 //===--- Testcase B, with explicit constructors in the base class.
 
 // COMMON_BASE_B_NO_DOT: Begin completions
-// COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .baseInstanceVar[#Int#]{{$}}
-// COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .baseProp[#Int#]{{$}}
-// COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseFunc0()[#Void#]{{$}}
-// COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseFunc1({#(a): Int#})[#Void#]{{$}}
-// COMMON_BASE_B_NO_DOT-DAG: Decl[Subscript]/CurrNominal:      [{#Int#}][#Double#]{{$}}
-// COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .baseExtProp[#Int#]{{$}}
-// COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseExtFunc0()[#Void#]{{$}}
+// COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .baseInstanceVar[#Int#]{{; name=.+$}}
+// COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .baseProp[#Int#]{{; name=.+$}}
+// COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseFunc0()[#Void#]{{; name=.+$}}
+// COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// COMMON_BASE_B_NO_DOT-DAG: Decl[Subscript]/CurrNominal:      [{#Int#}][#Double#]{{; name=.+$}}
+// COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .baseExtProp[#Int#]{{; name=.+$}}
+// COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseExtFunc0()[#Void#]{{; name=.+$}}
 // COMMON_BASE_B_NO_DOT: End completions
 
 // COMMON_BASE_B_DOT: Begin completions
-// COMMON_BASE_B_DOT-DAG: Decl[InstanceVar]/CurrNominal:    baseInstanceVar[#Int#]{{$}}
-// COMMON_BASE_B_DOT-DAG: Decl[InstanceVar]/CurrNominal:    baseProp[#Int#]{{$}}
-// COMMON_BASE_B_DOT-DAG: Decl[InstanceMethod]/CurrNominal: baseFunc0()[#Void#]{{$}}
-// COMMON_BASE_B_DOT-DAG: Decl[InstanceMethod]/CurrNominal: baseFunc1({#(a): Int#})[#Void#]{{$}}
-// COMMON_BASE_B_DOT-DAG: Decl[InstanceVar]/CurrNominal:    baseExtProp[#Int#]{{$}}
-// COMMON_BASE_B_DOT-DAG: Decl[InstanceMethod]/CurrNominal: baseExtFunc0()[#Void#]{{$}}
+// COMMON_BASE_B_DOT-DAG: Decl[InstanceVar]/CurrNominal:    baseInstanceVar[#Int#]{{; name=.+$}}
+// COMMON_BASE_B_DOT-DAG: Decl[InstanceVar]/CurrNominal:    baseProp[#Int#]{{; name=.+$}}
+// COMMON_BASE_B_DOT-DAG: Decl[InstanceMethod]/CurrNominal: baseFunc0()[#Void#]{{; name=.+$}}
+// COMMON_BASE_B_DOT-DAG: Decl[InstanceMethod]/CurrNominal: baseFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// COMMON_BASE_B_DOT-DAG: Decl[InstanceVar]/CurrNominal:    baseExtProp[#Int#]{{; name=.+$}}
+// COMMON_BASE_B_DOT-DAG: Decl[InstanceMethod]/CurrNominal: baseExtFunc0()[#Void#]{{; name=.+$}}
 // COMMON_BASE_B_DOT: End completions
 
 // VERIFY_BEGIN
@@ -369,18 +369,18 @@ class SuperDerivedB : SuperBaseB {
   init() {
     super#^CONSTRUCTOR_SUPER_NO_DOT_2^#
 // CONSTRUCTOR_SUPER_NO_DOT_2: Begin completions, 10 items
-// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[Constructor]/ExprSpecific: .init()[#SuperBaseB#]{{$}}
-// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[Constructor]/CurrNominal: .init({#a: Double#})[#SuperBaseB#]{{$}}
-// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[Constructor]/CurrNominal: .init({#int: Int#})[#SuperBaseB#]{{$}}
+// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[Constructor]/ExprSpecific: .init()[#SuperBaseB#]{{; name=.+$}}
+// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[Constructor]/CurrNominal: .init({#a: Double#})[#SuperBaseB#]{{; name=.+$}}
+// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[Constructor]/CurrNominal: .init({#int: Int#})[#SuperBaseB#]{{; name=.+$}}
 // CONSTRUCTOR_SUPER_NO_DOT_2: End completions
   }
 
   init(int a: Int) {
     super.#^CONSTRUCTOR_SUPER_DOT_2^#
 // CONSTRUCTOR_SUPER_DOT_2: Begin completions, 9 items
-// CONSTRUCTOR_SUPER_DOT_2-DAG: Decl[Constructor]/CurrNominal: init()[#SuperBaseB#]{{$}}
-// CONSTRUCTOR_SUPER_DOT_2-DAG: Decl[Constructor]/CurrNominal: init({#a: Double#})[#SuperBaseB#]{{$}}
-// CONSTRUCTOR_SUPER_DOT_2-DAG: Decl[Constructor]/ExprSpecific: init({#int: Int#})[#SuperBaseB#]{{$}}
+// CONSTRUCTOR_SUPER_DOT_2-DAG: Decl[Constructor]/CurrNominal: init()[#SuperBaseB#]{{; name=.+$}}
+// CONSTRUCTOR_SUPER_DOT_2-DAG: Decl[Constructor]/CurrNominal: init({#a: Double#})[#SuperBaseB#]{{; name=.+$}}
+// CONSTRUCTOR_SUPER_DOT_2-DAG: Decl[Constructor]/ExprSpecific: init({#int: Int#})[#SuperBaseB#]{{; name=.+$}}
 // CONSTRUCTOR_SUPER_DOT_2: End completions
   }
 
@@ -423,36 +423,36 @@ class SemanticContextDerived1 : SemanticContextBase1 {
   init(a: Int) {
     #^SEMANTIC_CONTEXT_OVERRIDDEN_DECL_1^#
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_1: Begin completions
-// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1()[#Void#]{{$}}
-// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#(a): Int#})[#Void#]{{$}}
+// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1()[#Void#]{{; name=.+$}}
+// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_1: End completions
 
     super.#^SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2^#
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2: Begin completions
-// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: Decl[Constructor]/CurrNominal:    init()[#SemanticContextBase1#]{{$}}
-// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: Decl[Constructor]/ExprSpecific:    init({#a: Int#})[#SemanticContextBase1#]{{$}}
-// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc1()[#Void#]{{$}}
-// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#(a): Int#})[#Void#]{{$}}
+// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: Decl[Constructor]/CurrNominal:    init()[#SemanticContextBase1#]{{; name=.+$}}
+// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: Decl[Constructor]/ExprSpecific:    init({#a: Int#})[#SemanticContextBase1#]{{; name=.+$}}
+// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc1()[#Void#]{{; name=.+$}}
+// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: End completions
   }
   func instanceFunc1() {
     #^SEMANTIC_CONTEXT_OVERRIDDEN_DECL_3^#
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_3: Begin completions
-// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_3-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1()[#Void#]{{$}}
-// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_3-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#(a): Int#})[#Void#]{{$}}
+// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_3-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1()[#Void#]{{; name=.+$}}
+// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_3-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_3: End completions
 
     super.#^SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4^#
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4: Begin completions
-// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: Decl[InstanceMethod]/ExprSpecific: instanceFunc1()[#Void#]{{$}}
-// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: Decl[InstanceMethod]/CurrNominal:  instanceFunc1({#(a): Int#})[#Void#]{{$}}
+// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: Decl[InstanceMethod]/ExprSpecific: instanceFunc1()[#Void#]{{; name=.+$}}
+// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: Decl[InstanceMethod]/CurrNominal:  instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: End completions
   }
   func instanceFunc1(a: Int) {
     super.#^SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5^#
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5: Begin completions
-// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5-NEXT: Decl[InstanceMethod]/CurrNominal:  instanceFunc1()[#Void#]{{$}}
-// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5-NEXT: Decl[InstanceMethod]/ExprSpecific: instanceFunc1({#(a): Int#})[#Void#]{{$}}
+// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5-NEXT: Decl[InstanceMethod]/CurrNominal:  instanceFunc1()[#Void#]{{; name=.+$}}
+// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5-NEXT: Decl[InstanceMethod]/ExprSpecific: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5-NEXT: End completions
   }
 }

@@ -102,48 +102,48 @@ public class TestPublicABC : ProtocolAPrivate, ProtocolBInternal, ProtocolCPubli
 }
 
 // TEST_PRIVATE_ABC: Begin completions, 12 items
-// TEST_PRIVATE_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolA: TagPA) {|}{{$}}
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoAFunc(x: TagPA) {|}{{$}}
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoAFuncOptional(x: TagPA) {|}{{$}}
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private @noreturn func protoAFuncWithAttr(x: TagPA) {|}{{$}}
-// TEST_PRIVATE_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolB: TagPB) {|}{{$}}
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoBFunc(x: TagPB) {|}{{$}}
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoBFuncOptional(x: TagPB) {|}{{$}}
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private @noreturn func protoBFuncWithBttr(x: TagPB) {|}{{$}}
-// TEST_PRIVATE_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolC: TagPC) {|}{{$}}
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoCFunc(x: TagPC) {|}{{$}}
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoCFuncOptional(x: TagPC) {|}{{$}}
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private @noreturn func protoCFuncWithCttr(x: TagPC) {|}{{$}}
+// TEST_PRIVATE_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolA: TagPA) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoAFunc(x: TagPA) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoAFuncOptional(x: TagPA) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private @noreturn func protoAFuncWithAttr(x: TagPA) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolB: TagPB) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoBFunc(x: TagPB) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoBFuncOptional(x: TagPB) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private @noreturn func protoBFuncWithBttr(x: TagPB) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolC: TagPC) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoCFunc(x: TagPC) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoCFuncOptional(x: TagPC) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private @noreturn func protoCFuncWithCttr(x: TagPC) {|}{{; name=.+$}}
 // TEST_PRIVATE_ABC: End completions
 
 // TEST_INTERNAL_ABC: Begin completions, 12 items
-// TEST_INTERNAL_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolA: TagPA) {|}{{$}}
-// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: private func protoAFunc(x: TagPA) {|}{{$}}
-// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: private func protoAFuncOptional(x: TagPA) {|}{{$}}
-// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: private @noreturn func protoAFuncWithAttr(x: TagPA) {|}{{$}}
-// TEST_INTERNAL_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolB: TagPB) {|}{{$}}
-// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoBFunc(x: TagPB) {|}{{$}}
-// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoBFuncOptional(x: TagPB) {|}{{$}}
-// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: @noreturn func protoBFuncWithBttr(x: TagPB) {|}{{$}}
-// TEST_INTERNAL_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolC: TagPC) {|}{{$}}
-// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoCFunc(x: TagPC) {|}{{$}}
-// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoCFuncOptional(x: TagPC) {|}{{$}}
-// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: @noreturn func protoCFuncWithCttr(x: TagPC) {|}{{$}}
+// TEST_INTERNAL_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolA: TagPA) {|}{{; name=.+$}}
+// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: private func protoAFunc(x: TagPA) {|}{{; name=.+$}}
+// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: private func protoAFuncOptional(x: TagPA) {|}{{; name=.+$}}
+// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: private @noreturn func protoAFuncWithAttr(x: TagPA) {|}{{; name=.+$}}
+// TEST_INTERNAL_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolB: TagPB) {|}{{; name=.+$}}
+// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoBFunc(x: TagPB) {|}{{; name=.+$}}
+// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoBFuncOptional(x: TagPB) {|}{{; name=.+$}}
+// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: @noreturn func protoBFuncWithBttr(x: TagPB) {|}{{; name=.+$}}
+// TEST_INTERNAL_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolC: TagPC) {|}{{; name=.+$}}
+// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoCFunc(x: TagPC) {|}{{; name=.+$}}
+// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoCFuncOptional(x: TagPC) {|}{{; name=.+$}}
+// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: @noreturn func protoCFuncWithCttr(x: TagPC) {|}{{; name=.+$}}
 // TEST_INTERNAL_ABC: End completions
 
 // TEST_PUBLIC_ABC: Begin completions, 12 items
-// TEST_PUBLIC_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolA: TagPA) {|}{{$}}
-// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: private func protoAFunc(x: TagPA) {|}{{$}}
-// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: private func protoAFuncOptional(x: TagPA) {|}{{$}}
-// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: private @noreturn func protoAFuncWithAttr(x: TagPA) {|}{{$}}
-// TEST_PUBLIC_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolB: TagPB) {|}{{$}}
-// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: func protoBFunc(x: TagPB) {|}{{$}}
-// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: func protoBFuncOptional(x: TagPB) {|}{{$}}
-// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: @noreturn func protoBFuncWithBttr(x: TagPB) {|}{{$}}
-// TEST_PUBLIC_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolC: TagPC) {|}{{$}}
-// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: public func protoCFunc(x: TagPC) {|}{{$}}
-// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: public func protoCFuncOptional(x: TagPC) {|}{{$}}
-// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: public @noreturn func protoCFuncWithCttr(x: TagPC) {|}{{$}}
+// TEST_PUBLIC_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolA: TagPA) {|}{{; name=.+$}}
+// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: private func protoAFunc(x: TagPA) {|}{{; name=.+$}}
+// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: private func protoAFuncOptional(x: TagPA) {|}{{; name=.+$}}
+// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: private @noreturn func protoAFuncWithAttr(x: TagPA) {|}{{; name=.+$}}
+// TEST_PUBLIC_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolB: TagPB) {|}{{; name=.+$}}
+// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: func protoBFunc(x: TagPB) {|}{{; name=.+$}}
+// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: func protoBFuncOptional(x: TagPB) {|}{{; name=.+$}}
+// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: @noreturn func protoBFuncWithBttr(x: TagPB) {|}{{; name=.+$}}
+// TEST_PUBLIC_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolC: TagPC) {|}{{; name=.+$}}
+// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: public func protoCFunc(x: TagPC) {|}{{; name=.+$}}
+// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: public func protoCFuncOptional(x: TagPC) {|}{{; name=.+$}}
+// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: public @noreturn func protoCFuncWithCttr(x: TagPC) {|}{{; name=.+$}}
 // TEST_PUBLIC_ABC: End completions
 
 private class TestPrivateDE : ProtocolDPrivate, ProtocolEPublic {
@@ -159,21 +159,21 @@ public class TestPublicDE : ProtocolDPrivate, ProtocolEPublic {
 // FIXME: there should be no duplicates in the results below.
 
 // TEST_PRIVATE_DE: Begin completions, 3 items
-// TEST_PRIVATE_DE-NEXT: Decl[InstanceMethod]/Super: private func colliding() {|}{{$}}
-// TEST_PRIVATE_DE-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{$}}
-// TEST_PRIVATE_DE-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{$}}
+// TEST_PRIVATE_DE-NEXT: Decl[InstanceMethod]/Super: private func colliding() {|}{{; name=.+$}}
+// TEST_PRIVATE_DE-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_PRIVATE_DE-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 // TEST_PRIVATE_DE-NEXT: End completions
 
 // TEST_INTERNAL_DE: Begin completions, 3 items
-// TEST_INTERNAL_DE-NEXT: Decl[InstanceMethod]/Super: func colliding() {|}{{$}}
-// TEST_INTERNAL_DE-NEXT: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{$}}
-// TEST_INTERNAL_DE-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{$}}
+// TEST_INTERNAL_DE-NEXT: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
+// TEST_INTERNAL_DE-NEXT: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_INTERNAL_DE-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 // TEST_INTERNAL_DE-NEXT: End completions
 
 // TEST_PUBLIC_DE: Begin completions, 3 items
-// TEST_PUBLIC_DE-NEXT: Decl[InstanceMethod]/Super: public func colliding() {|}{{$}}
-// TEST_PUBLIC_DE-NEXT: Decl[InstanceMethod]/Super: public func collidingGeneric<T>(x: T) {|}{{$}}
-// TEST_PUBLIC_DE-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{$}}
+// TEST_PUBLIC_DE-NEXT: Decl[InstanceMethod]/Super: public func colliding() {|}{{; name=.+$}}
+// TEST_PUBLIC_DE-NEXT: Decl[InstanceMethod]/Super: public func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_PUBLIC_DE-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 // TEST_PUBLIC_DE-NEXT: End completions
 
 private class TestPrivateED : ProtocolEPublic, ProtocolDPrivate {
@@ -189,21 +189,21 @@ public class TestPublicED : ProtocolEPublic, ProtocolDPrivate {
 // FIXME: there should be no duplicates in the results below.
 
 // TEST_PRIVATE_ED: Begin completions, 3 items
-// TEST_PRIVATE_ED-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{$}}
-// TEST_PRIVATE_ED-NEXT: Decl[InstanceMethod]/Super: private func colliding() {|}{{$}}
-// TEST_PRIVATE_ED-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{$}}
+// TEST_PRIVATE_ED-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_PRIVATE_ED-NEXT: Decl[InstanceMethod]/Super: private func colliding() {|}{{; name=.+$}}
+// TEST_PRIVATE_ED-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 // TEST_PRIVATE_ED-NEXT: End completions
 
 // TEST_INTERNAL_ED: Begin completions, 3 items
-// TEST_INTERNAL_ED-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{$}}
-// TEST_INTERNAL_ED-NEXT: Decl[InstanceMethod]/Super: func colliding() {|}{{$}}
-// TEST_INTERNAL_ED-NEXT: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{$}}
+// TEST_INTERNAL_ED-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_INTERNAL_ED-NEXT: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
+// TEST_INTERNAL_ED-NEXT: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 // TEST_INTERNAL_ED-NEXT: End completions
 
 // TEST_PUBLIC_ED: Begin completions, 3 items
-// TEST_PUBLIC_ED-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{$}}
-// TEST_PUBLIC_ED-NEXT: Decl[InstanceMethod]/Super: public func colliding() {|}{{$}}
-// TEST_PUBLIC_ED-NEXT: Decl[InstanceMethod]/Super: public func collidingGeneric<T>(x: T) {|}{{$}}
+// TEST_PUBLIC_ED-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_PUBLIC_ED-NEXT: Decl[InstanceMethod]/Super: public func colliding() {|}{{; name=.+$}}
+// TEST_PUBLIC_ED-NEXT: Decl[InstanceMethod]/Super: public func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 // TEST_PUBLIC_ED-NEXT: End completions
 
 private class TestPrivateEF : ProtocolEPublic, ProtocolFPublic {
@@ -219,20 +219,19 @@ public class TestPublicEF : ProtocolEPublic, ProtocolFPublic {
 // FIXME: there should be no duplicates in the results below.
 
 // TEST_PRIVATE_EF: Begin completions, 3 items
-// TEST_PRIVATE_EF-NEXT: Decl[InstanceMethod]/Super: private func colliding() {|}{{$}}
-// TEST_PRIVATE_EF-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{$}}
-// TEST_PRIVATE_EF-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{$}}
+// TEST_PRIVATE_EF-NEXT: Decl[InstanceMethod]/Super: private func colliding() {|}{{; name=.+$}}
+// TEST_PRIVATE_EF-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_PRIVATE_EF-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 // TEST_PRIVATE_EF-NEXT: End completions
 
 // TEST_INTERNAL_EF: Begin completions, 3 items
-// TEST_INTERNAL_EF-NEXT: Decl[InstanceMethod]/Super: func colliding() {|}{{$}}
-// TEST_INTERNAL_EF-NEXT: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{$}}
-// TEST_INTERNAL_EF-NEXT: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{$}}
+// TEST_INTERNAL_EF-NEXT: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
+// TEST_INTERNAL_EF-NEXT: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_INTERNAL_EF-NEXT: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 // TEST_INTERNAL_EF-NEXT: End completions
 
 // TEST_PUBLIC_EF: Begin completions, 3 items
-// TEST_PUBLIC_EF-NEXT: Decl[InstanceMethod]/Super: public func colliding() {|}{{$}}
-// TEST_PUBLIC_EF-NEXT: Decl[InstanceMethod]/Super: public func collidingGeneric<T>(x: T) {|}{{$}}
-// TEST_PUBLIC_EF-NEXT: Decl[InstanceMethod]/Super: public func collidingGeneric<T>(x: T) {|}{{$}}
+// TEST_PUBLIC_EF-NEXT: Decl[InstanceMethod]/Super: public func colliding() {|}{{; name=.+$}}
+// TEST_PUBLIC_EF-NEXT: Decl[InstanceMethod]/Super: public func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_PUBLIC_EF-NEXT: Decl[InstanceMethod]/Super: public func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 // TEST_PUBLIC_EF-NEXT: End completions
-

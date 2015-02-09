@@ -679,9 +679,9 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex() const {
     case CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
     case CodeCompletionString::Chunk::ChunkKind::LeftParen:
+    case CodeCompletionString::Chunk::ChunkKind::LeftBracket:
       return i;
     case CodeCompletionString::Chunk::ChunkKind::RightParen:
-    case CodeCompletionString::Chunk::ChunkKind::LeftBracket:
     case CodeCompletionString::Chunk::ChunkKind::RightBracket:
     case CodeCompletionString::Chunk::ChunkKind::LeftAngle:
     case CodeCompletionString::Chunk::ChunkKind::RightAngle:
@@ -720,15 +720,23 @@ StringRef CodeCompletionString::getFirstTextChunk() const {
 }
 
 void CodeCompletionString::getName(raw_ostream &OS) const {
-  for (auto C : getChunks().slice(*getFirstTextChunkIndex())) {
-    if (C.getKind() == CodeCompletionString::Chunk::ChunkKind::BraceStmtWithCursor)
-      break;
-    if (C.getKind() == CodeCompletionString::Chunk::ChunkKind::TypeAnnotation)
-      continue;
-    if (C.hasText() && !C.isAnnotation()) {
-      OS << C.getText();
+  auto FirstTextChunk = getFirstTextChunkIndex();
+  int TextSize = 0;
+  if (FirstTextChunk.hasValue()) {
+    for (auto C : getChunks().slice(*FirstTextChunk)) {
+      using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
+      if (C.getKind() == ChunkKind::BraceStmtWithCursor)
+        break;
+      if (C.getKind() == ChunkKind::TypeAnnotation)
+        continue;
+      if (C.hasText() && !C.isAnnotation()) {
+        TextSize += C.getText().size();
+        OS << C.getText();
+      }
     }
   }
+  assert((TextSize > 0) &&
+         "code completion string should have non-empty name!");
 }
 
 void CodeCompletionContext::sortCompletionResults(
@@ -2617,6 +2625,13 @@ void PrintingCodeCompletionConsumer::handleResults(
     if (!IncludeKeywords && Result->getKind() == CodeCompletionResult::Keyword)
       continue;
     Result->print(OS);
+
+    llvm::SmallString<64> Name;
+    llvm::raw_svector_ostream NameOs(Name);
+    Result->getCompletionString()->getName(NameOs);
+    NameOs.flush();
+    OS << "; name=" << Name;
+
     OS << "\n";
   }
   OS << "End completions\n";

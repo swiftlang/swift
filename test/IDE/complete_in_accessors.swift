@@ -125,46 +125,46 @@ struct FooStruct {
 func returnsInt() -> Int {}
 
 // FOO_OBJECT_DOT: Begin completions
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc0()[#Void#]{{$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc0()[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: End completions
 
 // WITH_GLOBAL_DECLS: Begin completions
-// WITH_GLOBAL_DECLS-DAG: Decl[Struct]/CurrModule:       FooStruct[#FooStruct#]{{$}}
-// WITH_GLOBAL_DECLS-DAG: Decl[FreeFunction]/CurrModule: returnsInt()[#Int#]{{$}}
+// WITH_GLOBAL_DECLS-DAG: Decl[Struct]/CurrModule:       FooStruct[#FooStruct#]{{; name=.+$}}
+// WITH_GLOBAL_DECLS-DAG: Decl[FreeFunction]/CurrModule: returnsInt()[#Int#]{{; name=.+$}}
 // WITH_GLOBAL_DECLS: End completions
 
 // WITH_MEMBER_DECLS: Begin completions
-// WITH_MEMBER_DECLS-DAG: Decl[Struct]/CurrModule:          FooStruct[#FooStruct#]{{$}}
-// WITH_MEMBER_DECLS-DAG: Decl[FreeFunction]/CurrModule:    returnsInt()[#Int#]{{$}}
-// WITH_MEMBER_DECLS-DAG: Decl[LocalVar]/Local:             self[#MemberAccessors#]{{$}}
-// WITH_MEMBER_DECLS-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Double#]{{$}}
-// WITH_MEMBER_DECLS-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Float#]{{$}}
+// WITH_MEMBER_DECLS-DAG: Decl[Struct]/CurrModule:          FooStruct[#FooStruct#]{{; name=.+$}}
+// WITH_MEMBER_DECLS-DAG: Decl[FreeFunction]/CurrModule:    returnsInt()[#Int#]{{; name=.+$}}
+// WITH_MEMBER_DECLS-DAG: Decl[LocalVar]/Local:             self[#MemberAccessors#]{{; name=.+$}}
+// WITH_MEMBER_DECLS-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Double#]{{; name=.+$}}
+// WITH_MEMBER_DECLS-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Float#]{{; name=.+$}}
 // WITH_MEMBER_DECLS: End completions
 
 // WITH_MEMBER_DECLS_INIT: Begin completions
-// WITH_MEMBER_DECLS_INIT-DAG: Decl[Struct]/CurrModule:          FooStruct[#FooStruct#]{{$}}
-// WITH_MEMBER_DECLS_INIT-DAG: Decl[FreeFunction]/CurrModule:    returnsInt()[#Int#]{{$}}
-// WITH_MEMBER_DECLS_INIT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#self: MemberAccessors#})[#(Int) -> Float#]{{$}}
+// WITH_MEMBER_DECLS_INIT-DAG: Decl[Struct]/CurrModule:          FooStruct[#FooStruct#]{{; name=.+$}}
+// WITH_MEMBER_DECLS_INIT-DAG: Decl[FreeFunction]/CurrModule:    returnsInt()[#Int#]{{; name=.+$}}
+// WITH_MEMBER_DECLS_INIT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#self: MemberAccessors#})[#(Int) -> Float#]{{; name=.+$}}
 // WITH_MEMBER_DECLS_INIT: End completions
 
 // WITH_MEMBER_DECLS_INIT_WRONG-NOT: self[
 // WITH_MEMBER_DECLS_INIT_WRONG-NOT: instanceVar
 
 // WITH_LOCAL_DECLS: Begin completions
-// WITH_LOCAL_DECLS-DAG: Decl[Struct]/CurrModule:          FooStruct[#FooStruct#]{{$}}
-// WITH_LOCAL_DECLS-DAG: Decl[FreeFunction]/CurrModule:    returnsInt()[#Int#]{{$}}
-// WITH_LOCAL_DECLS-DAG: Decl[LocalVar]/Local:             functionParam[#Int#]{{$}}
-// WITH_LOCAL_DECLS-DAG: Decl[FreeFunction]/Local:         localFunc({#(a): Int#})[#Float#]{{$}}
+// WITH_LOCAL_DECLS-DAG: Decl[Struct]/CurrModule:          FooStruct[#FooStruct#]{{; name=.+$}}
+// WITH_LOCAL_DECLS-DAG: Decl[FreeFunction]/CurrModule:    returnsInt()[#Int#]{{; name=.+$}}
+// WITH_LOCAL_DECLS-DAG: Decl[LocalVar]/Local:             functionParam[#Int#]{{; name=.+$}}
+// WITH_LOCAL_DECLS-DAG: Decl[FreeFunction]/Local:         localFunc({#(a): Int#})[#Float#]{{; name=.+$}}
 // WITH_LOCAL_DECLS: End completions
 
 
 // WITH_OLDVALUE: Begin completions
-// WITH_OLDVALUE-DAG: Decl[LocalVar]/Local: oldValue[#Int#]{{$}}
+// WITH_OLDVALUE-DAG: Decl[LocalVar]/Local: oldValue[#Int#]{{; name=.+$}}
 // WITH_OLDVALUE: End completions
 
 // WITH_NEWVALUE: Begin completions
-// WITH_NEWVALUE-DAG: Decl[LocalVar]/Local: newValue[#Int#]{{$}}
+// WITH_NEWVALUE-DAG: Decl[LocalVar]/Local: newValue[#Int#]{{; name=.+$}}
 // WITH_NEWVALUE: End completions
 
 
@@ -469,4 +469,3 @@ struct AccessorsInMemberFunction {
     }
   }
 }
-

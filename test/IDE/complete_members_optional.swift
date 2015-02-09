@@ -29,16 +29,15 @@ func optionalMembers1(a: HasOptionalMembers1) {
   a.#^OPTIONAL_MEMBERS_1^#
 }
 // OPTIONAL_MEMBERS_1: Begin completions, 2 items
-// OPTIONAL_MEMBERS_1-DAG: Decl[InstanceMethod]/CurrNominal:   optionalInstanceFunc!()[#Int#]{{$}}
-// OPTIONAL_MEMBERS_1-DAG: Decl[InstanceVar]/CurrNominal:      optionalInstanceProperty[#Int?#]{{$}}
+// OPTIONAL_MEMBERS_1-DAG: Decl[InstanceMethod]/CurrNominal:   optionalInstanceFunc!()[#Int#]{{; name=.+$}}
+// OPTIONAL_MEMBERS_1-DAG: Decl[InstanceVar]/CurrNominal:      optionalInstanceProperty[#Int?#]{{; name=.+$}}
 // OPTIONAL_MEMBERS_1: End completions
 
 func optionalMembers2<T : HasOptionalMembers1>(a: T) {
   T.#^OPTIONAL_MEMBERS_2^#
 }
 // OPTIONAL_MEMBERS_2: Begin completions, 3 items
-// OPTIONAL_MEMBERS_2-DAG: Decl[InstanceMethod]/Super:         optionalInstanceFunc!({#self: Self#})[#() -> Int#]{{$}}
-// OPTIONAL_MEMBERS_2-DAG: Decl[StaticMethod]/Super:           optionalClassFunc!()[#Int#]{{$}}
-// OPTIONAL_MEMBERS_2-DAG: Decl[StaticVar]/Super:              optionalClassProperty[#Int?#]{{$}}
+// OPTIONAL_MEMBERS_2-DAG: Decl[InstanceMethod]/Super:         optionalInstanceFunc!({#self: Self#})[#() -> Int#]{{; name=.+$}}
+// OPTIONAL_MEMBERS_2-DAG: Decl[StaticMethod]/Super:           optionalClassFunc!()[#Int#]{{; name=.+$}}
+// OPTIONAL_MEMBERS_2-DAG: Decl[StaticVar]/Super:              optionalClassProperty[#Int?#]{{; name=.+$}}
 // OPTIONAL_MEMBERS_2: End completions
-

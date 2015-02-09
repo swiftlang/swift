@@ -99,10 +99,10 @@ protocol ProtocolA {
   var protoAVarRO: Int { get }
 }
 // WITH_PA: Begin completions
-// WITH_PA-DAG: Decl[Constructor]/Super:    init(fromProtocolA: Int) {|}{{$}}
-// WITH_PA-DAG: Decl[InstanceMethod]/Super: func protoAFunc() {|}{{$}}
-// WITH_PA-DAG: Decl[InstanceMethod]/Super: func protoAFuncOptional() {|}{{$}}
-// WITH_PA-DAG: Decl[InstanceMethod]/Super: @noreturn func protoAFuncWithAttr() {|}{{$}}
+// WITH_PA-DAG: Decl[Constructor]/Super:    init(fromProtocolA: Int) {|}{{; name=.+$}}
+// WITH_PA-DAG: Decl[InstanceMethod]/Super: func protoAFunc() {|}{{; name=.+$}}
+// WITH_PA-DAG: Decl[InstanceMethod]/Super: func protoAFuncOptional() {|}{{; name=.+$}}
+// WITH_PA-DAG: Decl[InstanceMethod]/Super: @noreturn func protoAFuncWithAttr() {|}{{; name=.+$}}
 // WITH_PA: End completions
 
 struct TagPB {}
@@ -117,11 +117,11 @@ protocol ProtocolB : ProtocolA {
   var protoBVarRO: Int { get }
 }
 // WITH_PB: Begin completions
-// WITH_PB-DAG: Decl[Constructor]/Super:    init(fromProtocolA: Int) {|}{{$}}
-// WITH_PB-DAG: Decl[InstanceMethod]/Super: func protoAFunc() {|}{{$}}
-// WITH_PB-DAG: Decl[InstanceMethod]/Super: @noreturn func protoAFuncWithAttr() {|}{{$}}
-// WITH_PB-DAG: Decl[Constructor]/Super:    init(fromProtocolB: Int) {|}{{$}}
-// WITH_PB-DAG: Decl[InstanceMethod]/Super: func protoBFunc() {|}{{$}}
+// WITH_PB-DAG: Decl[Constructor]/Super:    init(fromProtocolA: Int) {|}{{; name=.+$}}
+// WITH_PB-DAG: Decl[InstanceMethod]/Super: func protoAFunc() {|}{{; name=.+$}}
+// WITH_PB-DAG: Decl[InstanceMethod]/Super: @noreturn func protoAFuncWithAttr() {|}{{; name=.+$}}
+// WITH_PB-DAG: Decl[Constructor]/Super:    init(fromProtocolB: Int) {|}{{; name=.+$}}
+// WITH_PB-DAG: Decl[InstanceMethod]/Super: func protoBFunc() {|}{{; name=.+$}}
 // WITH_PB: End completions
 
 struct TagPE {}
@@ -136,8 +136,8 @@ protocol ProtocolE {
   var protoEVarRO: Int { get }
 }
 // WITH_PE: Begin completions
-// WITH_PE-DAG: Decl[Constructor]/Super:    init(fromProtocolE: Int) {|}{{$}}
-// WITH_PE-DAG: Decl[InstanceMethod]/Super: func protoEFunc() {|}{{$}}
+// WITH_PE-DAG: Decl[Constructor]/Super:    init(fromProtocolE: Int) {|}{{; name=.+$}}
+// WITH_PE-DAG: Decl[InstanceMethod]/Super: func protoEFunc() {|}{{; name=.+$}}
 // WITH_PE: End completions
 
 @noreturn @asmname("exit")
@@ -162,11 +162,11 @@ class BaseA {
   var baseAVarRO: Int { return 0 }
 }
 // WITH_BA: Begin completions
-// WITH_BA-DAG: Decl[Constructor]/Super:    init(fromBaseA: Int) {|}{{$}}
-// WITH_BA-DAG: Decl[Constructor]/Super:    init(fromBaseAWithParamName foo: Int, withOther bar: Double) {|}{{$}}
-// WITH_BA-DAG: Decl[InstanceMethod]/Super: override func baseAFunc(foo x: Int) {|}{{$}}
-// WITH_BA-DAG: Decl[InstanceMethod]/Super: override func baseAFunc2(foo x: Int) {|}{{$}}
-// WITH_BA-DAG: Decl[InstanceMethod]/Super: override @noreturn func baseAFuncWithAttr() {|}{{$}}
+// WITH_BA-DAG: Decl[Constructor]/Super:    init(fromBaseA: Int) {|}{{; name=.+$}}
+// WITH_BA-DAG: Decl[Constructor]/Super:    init(fromBaseAWithParamName foo: Int, withOther bar: Double) {|}{{; name=.+$}}
+// WITH_BA-DAG: Decl[InstanceMethod]/Super: override func baseAFunc(foo x: Int) {|}{{; name=.+$}}
+// WITH_BA-DAG: Decl[InstanceMethod]/Super: override func baseAFunc2(foo x: Int) {|}{{; name=.+$}}
+// WITH_BA-DAG: Decl[InstanceMethod]/Super: override @noreturn func baseAFuncWithAttr() {|}{{; name=.+$}}
 // WITH_BA: End completions
 
 class BaseB : BaseA {
@@ -183,11 +183,11 @@ class BaseB : BaseA {
   var baseBVarRO: Int { return 0 }
 }
 // WITH_BB: Begin completions
-// WITH_BB-DAG: Decl[InstanceMethod]/Super: override func baseAFunc(foo x: Int) {|}{{$}}
-// WITH_BB-DAG: Decl[InstanceMethod]/Super: override func baseAFunc2(foo x: Int) {|}{{$}}
-// WITH_BB-DAG: Decl[InstanceMethod]/Super: override @noreturn func baseAFuncWithAttr() {|}{{$}}
-// WITH_BB-DAG: Decl[Constructor]/Super:    init(fromBaseB: Int) {|}{{$}}
-// WITH_BB-DAG: Decl[InstanceMethod]/Super: override func baseBFunc() {|}{{$}}
+// WITH_BB-DAG: Decl[InstanceMethod]/Super: override func baseAFunc(foo x: Int) {|}{{; name=.+$}}
+// WITH_BB-DAG: Decl[InstanceMethod]/Super: override func baseAFunc2(foo x: Int) {|}{{; name=.+$}}
+// WITH_BB-DAG: Decl[InstanceMethod]/Super: override @noreturn func baseAFuncWithAttr() {|}{{; name=.+$}}
+// WITH_BB-DAG: Decl[Constructor]/Super:    init(fromBaseB: Int) {|}{{; name=.+$}}
+// WITH_BB-DAG: Decl[InstanceMethod]/Super: override func baseBFunc() {|}{{; name=.+$}}
 // WITH_BB: End completions
 
 class BaseE : ProtocolE {
@@ -208,10 +208,10 @@ class BaseE : ProtocolE {
   var baseEVarRO: Int { return 0 }
 }
 // WITH_BE: Begin completions
-// WITH_BE-DAG: Decl[Constructor]/Super:    init(fromProtocolE: Int) {|}{{$}}
-// WITH_BE-DAG: Decl[InstanceMethod]/Super: override func protoEFunc() {|}{{$}}
-// WITH_BE-DAG: Decl[Constructor]/Super:    init(fromBaseE: Int) {|}{{$}}
-// WITH_BE-DAG: Decl[InstanceMethod]/Super: override func baseEFunc() {|}{{$}}
+// WITH_BE-DAG: Decl[Constructor]/Super:    init(fromProtocolE: Int) {|}{{; name=.+$}}
+// WITH_BE-DAG: Decl[InstanceMethod]/Super: override func protoEFunc() {|}{{; name=.+$}}
+// WITH_BE-DAG: Decl[Constructor]/Super:    init(fromBaseE: Int) {|}{{; name=.+$}}
+// WITH_BE-DAG: Decl[InstanceMethod]/Super: override func baseEFunc() {|}{{; name=.+$}}
 // WITH_BE: End completions
 
 class ProtocolEImpl /* : ProtocolE but does not implement the protocol */ {
@@ -225,8 +225,8 @@ class ProtocolEImpl /* : ProtocolE but does not implement the protocol */ {
   var protoEVarRO: Int { return 0 }
 }
 // WITH_PEI: Begin completions
-// WITH_PEI-DAG: Decl[Constructor]/Super:    init(fromProtocolE: Int) {|}{{$}}
-// WITH_PEI-DAG: Decl[InstanceMethod]/Super: override func protoEFunc() {|}{{$}}
+// WITH_PEI-DAG: Decl[Constructor]/Super:    init(fromProtocolE: Int) {|}{{; name=.+$}}
+// WITH_PEI-DAG: Decl[InstanceMethod]/Super: override func protoEFunc() {|}{{; name=.+$}}
 // WITH_PEI: End completions
 
 // NO_ERRORS_UP_TO_HERE
@@ -319,4 +319,3 @@ class OuterNominal : ProtocolA {
 }
 // NESTED_NOMINAL: found code completion token
 // NESTED_NOMINAL-NOT: Begin completions
-

@@ -17,7 +17,7 @@ import Foundation
 #^PLAIN_TOP_LEVEL_1^#
 
 // PLAIN_TOP_LEVEL: Begin completions
-// PLAIN_TOP_LEVEL-DAG: Decl[GlobalVar]/OtherModule: NSJapaneseEUCStringEncoding[#UInt#]{{$}}
+// PLAIN_TOP_LEVEL-DAG: Decl[GlobalVar]/OtherModule: NSJapaneseEUCStringEncoding[#UInt#]{{; name=.+$}}
 // PLAIN_TOP_LEVEL: End completions
 
 func privateNominalMembers(a: String) {
@@ -25,6 +25,5 @@ func privateNominalMembers(a: String) {
 }
 
 // PRIVATE_NOMINAL_MEMBERS_1: Begin completions
-// PRIVATE_NOMINAL_MEMBERS_1-DAG: Decl[InstanceVar]/CurrNominal: startIndex[#String.Index#]{{$}}
+// PRIVATE_NOMINAL_MEMBERS_1-DAG: Decl[InstanceVar]/CurrNominal: startIndex[#String.Index#]{{; name=.+$}}
 // PRIVATE_NOMINAL_MEMBERS_1: End completions
-

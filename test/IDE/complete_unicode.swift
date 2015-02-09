@@ -15,12 +15,11 @@ func unicode_test_1() {
   Unicode1().#^UNICODE_1^#
 }
 // UNICODE_1: Begin completions
-// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: Идентификаторы_с_кириллицей_допустимы()[#Void#]{{$}}
-// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: Ідентіфікатори_українською_також_працюють()[#Void#]{{$}}
-// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: 識別子は()[#Void#]{{$}}
-// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: ひらがなでも()[#Void#]{{$}}
-// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: カタカナでも()[#Void#]{{$}}
-// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: 漢字でも()[#Void#]{{$}}
-// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: いいです()[#Void#]{{$}}
+// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: Идентификаторы_с_кириллицей_допустимы()[#Void#]{{; name=.+$}}
+// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: Ідентіфікатори_українською_також_працюють()[#Void#]{{; name=.+$}}
+// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: 識別子は()[#Void#]{{; name=.+$}}
+// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: ひらがなでも()[#Void#]{{; name=.+$}}
+// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: カタカナでも()[#Void#]{{; name=.+$}}
+// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: 漢字でも()[#Void#]{{; name=.+$}}
+// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: いいです()[#Void#]{{; name=.+$}}
 // UNICODE_1-NEXT: End completions
-

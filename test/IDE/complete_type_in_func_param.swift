@@ -213,11 +213,11 @@ typealias FooTypealias = Int
 
 // WITH_GLOBAL_TYPES: Begin completions
 // Global completions
-// WITH_GLOBAL_TYPES-DAG: Decl[Struct]/CurrModule:    FooStruct[#FooStruct#]{{$}}
-// WITH_GLOBAL_TYPES-DAG: Decl[Enum]/CurrModule:      FooEnum[#FooEnum#]{{$}}
-// WITH_GLOBAL_TYPES-DAG: Decl[Class]/CurrModule:     FooClass[#FooClass#]{{$}}
-// WITH_GLOBAL_TYPES-DAG: Decl[Protocol]/CurrModule:  FooProtocol[#FooProtocol#]{{$}}
-// WITH_GLOBAL_TYPES-DAG: Decl[TypeAlias]/CurrModule: FooTypealias[#Int#]{{$}}
+// WITH_GLOBAL_TYPES-DAG: Decl[Struct]/CurrModule:    FooStruct[#FooStruct#]{{; name=.+$}}
+// WITH_GLOBAL_TYPES-DAG: Decl[Enum]/CurrModule:      FooEnum[#FooEnum#]{{; name=.+$}}
+// WITH_GLOBAL_TYPES-DAG: Decl[Class]/CurrModule:     FooClass[#FooClass#]{{; name=.+$}}
+// WITH_GLOBAL_TYPES-DAG: Decl[Protocol]/CurrModule:  FooProtocol[#FooProtocol#]{{; name=.+$}}
+// WITH_GLOBAL_TYPES-DAG: Decl[TypeAlias]/CurrModule: FooTypealias[#Int#]{{; name=.+$}}
 // WITH_GLOBAL_TYPES: End completions
 
 // GLOBAL_NEGATIVE-NOT: fooObject
@@ -320,7 +320,7 @@ func testTypeInResult12(a: Int, b: unknown_type)(c: Int) -> #^TYPE_IN_FUNC_RESUL
 func testTypeInResult13(a: Int, b: unknown_type)(c: Int,) -> #^TYPE_IN_FUNC_RESULT_13^#
 
 // TYPE_IN_PARAM_FORWARD: Begin completions
-// TYPE_IN_PARAM_FORWARD-DAG: Decl[TypeAlias]/CurrNominal: NestedTypealias[#Int#]{{$}}
+// TYPE_IN_PARAM_FORWARD-DAG: Decl[TypeAlias]/CurrNominal: NestedTypealias[#Int#]{{; name=.+$}}
 // TYPE_IN_PARAM_FORWARD: End completions
 
 class TestTypesForwardInParam1 {
@@ -370,4 +370,3 @@ class TestTypesForwardInParam8 {
   }
   typealias NestedTypealias = Int
 }
-

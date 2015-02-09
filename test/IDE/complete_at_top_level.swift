@@ -77,8 +77,8 @@ func resyncParser1() {}
 
 fooObject#^TYPE_CHECKED_EXPR_1^#
 // TYPE_CHECKED_EXPR_1: Begin completions
-// TYPE_CHECKED_EXPR_1-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{$}}
-// TYPE_CHECKED_EXPR_1-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{$}}
+// TYPE_CHECKED_EXPR_1-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{; name=.+$}}
+// TYPE_CHECKED_EXPR_1-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_1-NEXT: End completions
 
 func resyncParser2() {}
@@ -88,32 +88,32 @@ var _tmpVar1 : FooStruct
 
 fooObject#^TYPE_CHECKED_EXPR_2^#
 // TYPE_CHECKED_EXPR_2: Begin completions
-// TYPE_CHECKED_EXPR_2-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{$}}
-// TYPE_CHECKED_EXPR_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{$}}
+// TYPE_CHECKED_EXPR_2-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{; name=.+$}}
+// TYPE_CHECKED_EXPR_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_2-NEXT: End completions
 
 func resyncParser3() {}
 
 fooObject#^TYPE_CHECKED_EXPR_3^#.bar
 // TYPE_CHECKED_EXPR_3: Begin completions
-// TYPE_CHECKED_EXPR_3-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{$}}
-// TYPE_CHECKED_EXPR_3-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{$}}
+// TYPE_CHECKED_EXPR_3-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{; name=.+$}}
+// TYPE_CHECKED_EXPR_3-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_3-NEXT: End completions
 
 func resyncParser4() {}
 
 fooObject.#^TYPE_CHECKED_EXPR_4^#
 // TYPE_CHECKED_EXPR_4: Begin completions
-// TYPE_CHECKED_EXPR_4-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{$}}
-// TYPE_CHECKED_EXPR_4-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Void#]{{$}}
+// TYPE_CHECKED_EXPR_4-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}
+// TYPE_CHECKED_EXPR_4-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_4-NEXT: End completions
 
 func resyncParser5() {}
 
 fooObject.#^TYPE_CHECKED_EXPR_5^#.bar
 // TYPE_CHECKED_EXPR_5: Begin completions
-// TYPE_CHECKED_EXPR_5-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{$}}
-// TYPE_CHECKED_EXPR_5-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Void#]{{$}}
+// TYPE_CHECKED_EXPR_5-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}
+// TYPE_CHECKED_EXPR_5-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_5-NEXT: End completions
 
 func resyncParser6() {}
@@ -134,16 +134,16 @@ var fooObjectWithErrorInInit : FooStruct = unknown_var
 
 fooObjectWithErrorInInit.#^TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1^#
 // TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1: Begin completions
-// TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{$}}
-// TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Void#]{{$}}
+// TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}
+// TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1-NEXT: End completions
 
 func resyncParser6a() {}
 
 var topLevelVar1 = #^TOP_LEVEL_VAR_INIT_1^#
 // TOP_LEVEL_VAR_INIT_1: Begin completions
-// TOP_LEVEL_VAR_INIT_1-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{$}}
-// TOP_LEVEL_VAR_INIT_1-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{$}}
+// TOP_LEVEL_VAR_INIT_1-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{; name=.+$}}
+// TOP_LEVEL_VAR_INIT_1-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
 // TOP_LEVEL_VAR_INIT_1: End completions
 
 // Check that the variable itself does not show up.
@@ -153,22 +153,22 @@ func resyncParser7() {}
 
 var topLevelVar2 = FooStruct#^TOP_LEVEL_VAR_INIT_2^#
 // TOP_LEVEL_VAR_INIT_2: Begin completions
-// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#self: FooStruct#})[#(Int) -> Void#]{{$}}
-// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ({#instanceVar: Int#})[#FooStruct#]{{$}}
-// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ()[#FooStruct#]{{$}}
+// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#self: FooStruct#})[#(Int) -> Void#]{{; name=.+$}}
+// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ({#instanceVar: Int#})[#FooStruct#]{{; name=.+$}}
+// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ()[#FooStruct#]{{; name=.+$}}
 // TOP_LEVEL_VAR_INIT_2-NEXT: End completions
 
 func resyncParser8() {}
 
 #^PLAIN_TOP_LEVEL_1^#
 // PLAIN_TOP_LEVEL: Begin completions
-// PLAIN_TOP_LEVEL-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{$}}
-// PLAIN_TOP_LEVEL-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{$}}
+// PLAIN_TOP_LEVEL-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{; name=.+$}}
+// PLAIN_TOP_LEVEL-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
 // PLAIN_TOP_LEVEL: End completions
 
 // PLAIN_TOP_LEVEL_NO_DUPLICATES: Begin completions
-// PLAIN_TOP_LEVEL_NO_DUPLICATES-DAG: Decl[FreeFunction]/CurrModule: fooFunc1()[#Void#]{{$}}
-// PLAIN_TOP_LEVEL_NO_DUPLICATES-DAG: Decl[FreeFunction]/CurrModule: fooFunc2({#(a): Int#}, {#(b): Double#})[#Void#]{{$}}
+// PLAIN_TOP_LEVEL_NO_DUPLICATES-DAG: Decl[FreeFunction]/CurrModule: fooFunc1()[#Void#]{{; name=.+$}}
+// PLAIN_TOP_LEVEL_NO_DUPLICATES-DAG: Decl[FreeFunction]/CurrModule: fooFunc2({#(a): Int#}, {#(b): Double#})[#Void#]{{; name=.+$}}
 // PLAIN_TOP_LEVEL_NO_DUPLICATES-NOT: fooFunc1
 // PLAIN_TOP_LEVEL_NO_DUPLICATES-NOT: fooFunc2
 // PLAIN_TOP_LEVEL_NO_DUPLICATES: End completions
@@ -188,7 +188,7 @@ func resyncParserA1() {}
 
 var topLevelVarType1 : #^TOP_LEVEL_VAR_TYPE_1^#
 // TOP_LEVEL_VAR_TYPE_1: Begin completions
-// TOP_LEVEL_VAR_TYPE_1-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{$}}
+// TOP_LEVEL_VAR_TYPE_1-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{; name=.+$}}
 // TOP_LEVEL_VAR_TYPE_1: End completions
 
 func resyncParserA2() {}
@@ -224,7 +224,7 @@ func resyncParserB5() {}
 for var i = 0; ; {
   #^TOP_LEVEL_STMT_5^#
 // TOP_LEVEL_STMT_5: Begin completions
-// TOP_LEVEL_STMT_5: Decl[LocalVar]/Local: i[#Int#]{{$}}
+// TOP_LEVEL_STMT_5: Decl[LocalVar]/Local: i[#Int#]{{; name=.+$}}
 // TOP_LEVEL_STMT_5: End completions
 }
 
@@ -233,7 +233,7 @@ func resyncParserB6() {}
 for i in [] {
   #^TOP_LEVEL_STMT_6^#
 // TOP_LEVEL_STMT_6: Begin completions
-// TOP_LEVEL_STMT_6: Decl[LocalVar]/Local: i[#<<error type>>#]{{$}}
+// TOP_LEVEL_STMT_6: Decl[LocalVar]/Local: i[#<<error type>>#]{{; name=.+$}}
 // TOP_LEVEL_STMT_6: End completions
 }
 
@@ -242,7 +242,7 @@ func resyncParserB7() {}
 for i in [1, 2, 3] {
   #^TOP_LEVEL_STMT_7^#
 // TOP_LEVEL_STMT_7: Begin completions
-// TOP_LEVEL_STMT_7: Decl[LocalVar]/Local: i[#Int#]{{$}}
+// TOP_LEVEL_STMT_7: Decl[LocalVar]/Local: i[#Int#]{{; name=.+$}}
 // TOP_LEVEL_STMT_7: End completions
 }
 
@@ -251,7 +251,7 @@ func resyncParserB8() {}
 for i in unknown_var {
   #^TOP_LEVEL_STMT_8^#
 // TOP_LEVEL_STMT_8: Begin completions
-// TOP_LEVEL_STMT_8: Decl[LocalVar]/Local: i[#<<error type>>#]{{$}}
+// TOP_LEVEL_STMT_8: Decl[LocalVar]/Local: i[#<<error type>>#]{{; name=.+$}}
 // TOP_LEVEL_STMT_8: End completions
 }
 
@@ -278,4 +278,3 @@ extension FooStruct {
 
 var varAtEOF : Int
 // NEGATIVE-NOT: varAtEOF
-
