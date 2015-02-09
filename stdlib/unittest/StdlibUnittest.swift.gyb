@@ -1492,11 +1492,11 @@ public func expectEqualsUnordered<
     collectMoreInfo: (()->String)? = nil
 ) {
   let x: [Expected.Generator.Element] = sorted(
-    Array(expected), compose(compare, { $0.isLT() }))
+    Array(expected), { $0.isLT() } • compare)
   let y: [Actual.Generator.Element] = sorted(
-    Array(actual), compose(compare, { $0.isLT() }))
+    Array(actual), { $0.isLT() } • compare)
   expectEqualSequence(
-    x, y, compose(compare, { $0.isEQ() }), stackTrace: stackTrace,
+    x, y, { $0.isEQ() } • compare, stackTrace: stackTrace,
     file: file, line: line, collectMoreInfo: collectMoreInfo)
 }
 
@@ -1592,10 +1592,19 @@ public func expectDebugPrinted<T>(
   expectDebugPrinted(expectedOneOf: [expected], object, file: file, line: line)
 }
 
-func compose<A, B, C>(f: A -> B, g: B -> C) -> A -> C {
-  return { a in
-    return g(f(a))
-  }
+// Utility functions
+
+infix operator • {
+  associativity left
+  precedence 100
+}
+
+public func •<T, U, V>(g: U -> V, f: T -> U) -> (T -> V) {
+  return { g(f($0)) }
+}
+
+public func curry<A, B, C>(f: (A, B) -> C) -> A -> B -> C {
+  return { a in return { b in return f(a, b) }}
 }
 
 // ${'Local Variables'}:
