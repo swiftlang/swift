@@ -42,7 +42,9 @@ import Darwin
 import ObjectiveC
 #else
 func autoreleasepool(@noescape code: () -> ()) {
-  // Do nothing.
+  // Native runtime does not have autorelease pools.  Execute the code
+  // directly.
+  code()
 }
 #endif
 
