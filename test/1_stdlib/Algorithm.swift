@@ -320,6 +320,48 @@ Algorithm.test("filter/eager") {
   expectEqual(10, count)
 }
 
+Algorithm.test("map/SequenceType") {
+  if true {
+    let s = DrainableSequence<Int>([])
+    var result = map(s) {
+      (x: Int) -> Int in
+      expectUnreachable()
+      return 42
+    }
+    expectType([Int].self, &result)
+    expectEqual([], result)
+    expectEqual([], Array(s))
+    expectLE(s._underestimatedCount, result.capacity)
+  }
+  if true {
+    let s = DrainableSequence([ 0, 30, 10, 90 ])
+    let result = map(s) { $0 + 1 }
+    expectEqual([ 1, 31, 11, 91 ], result)
+    expectEqual([], Array(s))
+    expectLE(s._underestimatedCount, result.capacity)
+  }
+}
+
+Algorithm.test("map/CollectionType") {
+  if true {
+    let c = MinimalForwardCollection<Int>([])
+    var result = map(c) {
+      (x: Int) -> Int in
+      expectUnreachable()
+      return 42
+    }
+    expectType([Int].self, &result)
+    expectEqual([], result)
+    expectLE(c._underestimatedCount, result.capacity)
+  }
+  if true {
+    let c = MinimalForwardCollection([ 0, 30, 10, 90 ])
+    let result = map(c) { $0 + 1 }
+    expectEqual([ 1, 31, 11, 91 ], result)
+    expectLE(c._underestimatedCount, result.capacity)
+  }
+}
+
 Algorithm.test("sorted/strings") {
   expectEqual(
     [ "Banana", "apple", "cherry" ],
