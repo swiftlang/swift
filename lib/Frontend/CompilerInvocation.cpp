@@ -932,8 +932,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_use_jit))
     Opts.UseJIT = true;
   
-  if (Args.hasArg(OPT_verify_type_layout))
-    Opts.VerifyTypeLayout = true;
+  for (const Arg *A : make_range(Args.filtered_begin(OPT_verify_type_layout),
+                                 Args.filtered_end())) {
+    Opts.VerifyTypeLayoutNames.push_back(A->getValue());
+  }
   
   return false;
 }

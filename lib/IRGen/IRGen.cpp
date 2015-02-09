@@ -178,7 +178,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   IGM.emitVTableStubs();
 
   // Verify type layout if we were asked to.
-  if (Opts.VerifyTypeLayout)
+  if (!Opts.VerifyTypeLayoutNames.empty())
     IGM.emitTypeVerifier();
 
   // Register our info with the runtime if needed.

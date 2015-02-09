@@ -286,7 +286,6 @@ public:
   
 private:
   TypeConverter &Types;
-  std::vector<CanType> TypesToVerify;
   friend class TypeConverter;
 
   const clang::ASTContext *ClangASTContext;

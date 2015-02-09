@@ -101,8 +101,9 @@ public:
   /// Special codegen for playgrounds.
   unsigned Playground : 1;
   
-  /// Emit code to verify that static and runtime type layout are consistent.
-  unsigned VerifyTypeLayout : 1;
+  /// Emit code to verify that static and runtime type layout are consistent for
+  /// the given type names.
+  SmallVector<StringRef, 1> VerifyTypeLayoutNames;
 
   IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
                    Optimize(false), DebugInfoKind(IRGenDebugInfoKind::None),
@@ -110,7 +111,7 @@ public:
                    DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
                    DisableLLVMSLPVectorizer(false),
                    DisableFPElim(true), HasUnderlyingModule(false),
-                   Playground(false), VerifyTypeLayout(false) {}
+                   Playground(false) {}
 };
 
 } // end namespace swift

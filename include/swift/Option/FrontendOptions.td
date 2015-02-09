@@ -250,8 +250,9 @@ def disable_func_sig_opts : Flag<["-"], "disable-func-sig-opts">,
 
 def interpret : Flag<["-"], "interpret">, HelpText<"Immediate mode">, ModeOpt;
 
-def verify_type_layout : Flag<["-"], "verify-type-layout">,
-  HelpText<"Verify compile-time and runtime type layout information">;
+def verify_type_layout : JoinedOrSeparate<["-"], "verify-type-layout">,
+  HelpText<"Verify compile-time and runtime type layout information for type">,
+  MetaVarName<"<type>">;
 
 def enable_guaranteed_self : Flag<["-"], "enable-guaranteed-self">,
   HelpText<"Enable the passing of self as a guaranteed parameter">;

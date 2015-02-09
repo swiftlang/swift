@@ -1182,16 +1182,6 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
     convertedTI->NextConverted = FirstType;
     FirstType = convertedTI;
   }
-  
-  // Verify fixed-layout, non-dependent, nominal types.
-  // TODO: A better mechanism to control what types get verified.
-  if (IGM.Opts.VerifyTypeLayout
-      && isa<FixedTypeInfo>(convertedTI)
-      && canonicalTy->getAnyNominal()
-      && !canonicalTy->isDependentType()
-      && !canonicalTy->hasArchetype()) {
-    IGM.TypesToVerify.push_back(canonicalTy);
-  }
 
   return convertedTI;
 }

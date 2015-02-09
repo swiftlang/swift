@@ -18,6 +18,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -789,6 +791,53 @@ void IRGenModule::emitVTableStubs() {
 }
 
 void IRGenModule::emitTypeVerifier() {
+  // Look up the types to verify.
+  
+  SmallVector<CanType, 4> TypesToVerify;
+  for (auto name : Opts.VerifyTypeLayoutNames) {
+    // Look up the name in the module.
+    SmallVector<ValueDecl*, 1> lookup;
+    swift::Module *M = SILMod->getSwiftModule();
+    M->lookupMember(lookup, M, DeclName(Context.getIdentifier(name)),
+                    Identifier());
+    if (lookup.empty()) {
+      Context.Diags.diagnose(SourceLoc(), diag::type_to_verify_not_found,
+                             name);
+      continue;
+    }
+    
+    TypeDecl *typeDecl = nullptr;
+    for (auto decl : lookup) {
+      if (auto td = dyn_cast<TypeDecl>(decl)) {
+        if (typeDecl) {
+          Context.Diags.diagnose(SourceLoc(), diag::type_to_verify_ambiguous,
+                                 name);
+          goto next;
+        }
+        typeDecl = td;
+        break;
+      }
+    }
+    if (!typeDecl) {
+      Context.Diags.diagnose(SourceLoc(), diag::type_to_verify_not_found, name);
+      continue;
+    }
+    
+    {
+      auto type = typeDecl->getDeclaredInterfaceType();
+      if (type->isDependentType()) {
+        Context.Diags.diagnose(SourceLoc(), diag::type_to_verify_dependent,
+                               name);
+        continue;
+      }
+      
+      TypesToVerify.push_back(type->getCanonicalType());
+    }
+  next:;
+  }
+  if (TypesToVerify.empty())
+    return;
+
   // Find the entry point.
   SILFunction *EntryPoint = SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
 
@@ -814,7 +863,7 @@ void IRGenModule::emitTypeVerifier() {
     Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
     Builder.CreateCall(VerifierFunction);
   }
-  
+
   IRGenFunction VerifierIGF(*this, VerifierFunction);
   emitTypeLayoutVerifier(VerifierIGF, TypesToVerify);
   VerifierIGF.Builder.CreateRetVoid();

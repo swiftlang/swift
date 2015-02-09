@@ -46,6 +46,13 @@ ERROR(irgen_unimplemented,irgen,none,
       "unimplemented IR generation feature %0", (StringRef))
 ERROR(irgen_failure,irgen,none, "IR generation failure: %0", (StringRef))
 
+ERROR(type_to_verify_not_found,irgen,none, "unable to find type '%0' to verify",
+      (StringRef))
+ERROR(type_to_verify_ambiguous,irgen,none, "type to verify '%0' is ambiguous",
+      (StringRef))
+ERROR(type_to_verify_dependent,irgen,none,
+      "type to verify '%0' has unbound generic parameters",
+      (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
