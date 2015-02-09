@@ -123,6 +123,8 @@ int update_main(ArrayRef<const char *> Args, const char *Argv0, void *MainAddr){
     return 1;
   }
 
+  Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError = true;
+
   std::error_code EC;
   llvm::raw_fd_ostream OutOS(Invocation.getOutputFilename(), EC, llvm::sys::fs::F_None);
 
