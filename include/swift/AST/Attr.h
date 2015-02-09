@@ -19,6 +19,8 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/UUID.h"
+#include "swift/Basic/STLExtras.h"
+#include "swift/Basic/Range.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Ownership.h"
@@ -1281,6 +1283,35 @@ public:
       if (Attr->getKind() == DK && (Attr->isValid() || AllowInvalid))
         return Attr;
     return nullptr;
+  }
+
+private:
+  /// Predicate used to filter MatchingAttributeRange.
+  template <typename ATTR> struct ToAttributeKind {
+    bool AllowInvalid;
+
+    ToAttributeKind(bool AllowInvalid) : AllowInvalid(AllowInvalid) {}
+
+    Optional<const DeclAttribute *>
+    operator()(const DeclAttribute *Attr) const {
+      if (isa<ATTR>(Attr) && (Attr->isValid() || AllowInvalid))
+        return Attr;
+      return None;
+    }
+  };
+
+public:
+  template <typename ATTR>
+  using AttributeKindRange =
+      OptionalTransformRange<llvm::iterator_range<const_iterator>,
+                             ToAttributeKind<ATTR>>;
+
+  /// Return a range with all attributes in DeclAttributes with AttrKind
+  /// ATTR.
+  template <typename ATTR>
+  AttributeKindRange<ATTR> getAttributes() const {
+    return AttributeKindRange<ATTR>(make_range(begin(), end()),
+                                    ToAttributeKind<ATTR>());
   }
 
   // Remove the given attribute from the list of attributes. Used when

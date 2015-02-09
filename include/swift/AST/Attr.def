@@ -140,7 +140,7 @@ DECL_ATTR(inline, Inline, OnFunc | OnConstructor, 20)
 
 DECL_ATTR(_semantics, Semantics,
           OnFunc | OnConstructor | OnDestructor | OnSubscript |
-          UserInaccessible, 21)
+          AllowMultipleAttributes | UserInaccessible, 21)
 
 SIMPLE_DECL_ATTR(dynamic, Dynamic,
                  OnFunc | OnVar | OnSubscript | OnConstructor | DeclModifier, 22)
