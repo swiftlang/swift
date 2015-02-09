@@ -269,6 +269,19 @@ public func assertionFailure() -> AssertionResult {
   return AssertionResult(isPass: false)
 }
 
+public func expectUnreachable(
+  stackTrace: SourceLocStack? = nil,
+  file: String = __FILE__, line: UWord = __LINE__,
+  collectMoreInfo: (()->String)? = nil
+) {
+  _anyExpectFailed = true
+  println("check failed at \(file), line \(line)")
+  _printStackTrace(stackTrace)
+  println("this code should not be executed")
+  if collectMoreInfo != nil { println(collectMoreInfo!()) }
+  println()
+}
+
 %for BoolType in ['Bool', 'AssertionResult']:
 
 public func expectTrue(

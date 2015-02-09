@@ -303,5 +303,19 @@ TestSuiteWithTearDownFails.tearDown {
 // CHECK: [     FAIL ] TestSuiteWithTearDownFails.fails
 // CHECK: TestSuiteWithTearDownFails: Some tests failed, aborting
 
+//
+// Test assertions
+//
+
+var AssertionsTestSuite = TestSuite("Assertions")
+
+AssertionsTestSuite.test("expectUnreachable") {
+  expectUnreachable()
+}
+// CHECK: [ RUN      ] Assertions.expectUnreachable
+// CHECK: out>>> check failed at
+// CHECK: out>>> this code should not be executed
+// CHECK: [     FAIL ] Assertions.expectUnreachable
+
 runAllTests()
 
