@@ -45,7 +45,7 @@ public enum ImplicitlyUnwrappedOptional<T>
   }
 
   /// If `self == nil`, returns `nil`.  Otherwise, returns `f(self!)`.
-  public func map<U>(f: (T)->U) -> ImplicitlyUnwrappedOptional<U> {
+  public func map<U>(@noescape f: (T) -> U) -> ImplicitlyUnwrappedOptional<U> {
     switch self {
     case .Some(let y):
       return .Some(f(y))

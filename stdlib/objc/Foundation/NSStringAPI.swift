@@ -20,7 +20,7 @@
 // Property Lists need to be properly bridged
 //
 
-func _toNSArray<T, U:AnyObject>(a: [T], f: (T)->U) -> NSArray {
+func _toNSArray<T, U:AnyObject>(a: [T], @noescape f: (T) -> U) -> NSArray {
   var result = NSMutableArray(capacity: a.count)
   for s in a {
     result.addObject(f(s))
@@ -97,7 +97,7 @@ extension String {
   /// memory referred to by `index`
   func _withOptionalOutParameter<Result>(
     index: UnsafeMutablePointer<Index>,
-    body: (UnsafeMutablePointer<Int>)->Result
+    @noescape body: (UnsafeMutablePointer<Int>)->Result
   ) -> Result {
     var utf16Index: Int = 0
     let result = index._withBridgeValue(&utf16Index) {
@@ -112,7 +112,7 @@ extension String {
   /// it into the memory referred to by `range`
   func _withOptionalOutParameter<Result>(
     range: UnsafeMutablePointer<Range<Index>>,
-    body: (UnsafeMutablePointer<NSRange>)->Result
+    @noescape body: (UnsafeMutablePointer<NSRange>)->Result
   ) -> Result {
     var nsRange = NSRange(location: 0, length: 0)
     let result = range._withBridgeValue(&nsRange) {

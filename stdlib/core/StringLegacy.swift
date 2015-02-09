@@ -52,7 +52,7 @@ extension String {
     self = String(count: 1, repeatedValue: _c)
   }
 
-  func _isAll(predicate: (UnicodeScalar) -> Bool) -> Bool {
+  func _isAll(@noescape predicate: (UnicodeScalar) -> Bool) -> Bool {
     for c in unicodeScalars { if !predicate(c) { return false } }
 
     return true
@@ -233,7 +233,7 @@ extension String {
   /// predicate returns true. Returns the string before that character, the 
   /// character that matches, the string after that character, and a boolean value
   /// indicating whether any character was found.
-  public func _splitFirstIf(predicate: (UnicodeScalar) -> Bool)
+  public func _splitFirstIf(@noescape predicate: (UnicodeScalar) -> Bool)
     -> (before: String, found: UnicodeScalar, after: String, wasFound: Bool)
   {
     var rng = unicodeScalars
