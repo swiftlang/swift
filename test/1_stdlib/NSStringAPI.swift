@@ -1830,8 +1830,8 @@ NSStringAPIs.test("MixedTypeComparisons") {
   expectTrue(ys != "\u{1e69}")
   expectFalse("\u{1e69}" == ys)
   expectTrue("\u{1e69}" != ys)
-  expectTrue(xs == ys)
-  expectFalse(xs != ys)
+  expectFalse(xs == ys)
+  expectTrue(xs != ys)
   expectTrue(ys == ys)
   expectFalse(ys != ys)
 }

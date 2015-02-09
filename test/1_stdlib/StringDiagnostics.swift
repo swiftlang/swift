@@ -23,15 +23,15 @@ func testAmbiguousStringComparisons(s: String) {
   let nsString = s as NSString
   let a1 = s == nsString
   let a2 = s != nsString
-  let a3 = s < nsString
-  let a4 = s <= nsString
-  let a5 = s >= nsString
-  let a6 = s > nsString
+  let a3 = s < nsString // expected-error{{'NSString' is not convertible to 'String'; did you mean to use 'as!' to force downcast?}}
+  let a4 = s <= nsString // expected-error{{'NSString' is not convertible to 'String'; did you mean to use 'as!' to force downcast?}}
+  let a5 = s >= nsString // expected-error{{'NSString' is not convertible to 'String'; did you mean to use 'as!' to force downcast?}}
+  let a6 = s > nsString // expected-error{{'NSString' is not convertible to 'String'; did you mean to use 'as!' to force downcast?}}
   // now the other way
   let a7 = nsString == s
   let a8 = nsString != s
-  let a9 = nsString < s
-  let a10 = nsString <= s
-  let a11 = nsString >= s
-  let a12 = nsString > s
+  let a9 = nsString < s // expected-error{{'NSString' is not convertible to 'String'; did you mean to use 'as!' to force downcast?}}
+  let a10 = nsString <= s // expected-error{{'NSString' is not convertible to 'String'; did you mean to use 'as!' to force downcast?}}
+  let a11 = nsString >= s // expected-error{{'NSString' is not convertible to 'String'; did you mean to use 'as!' to force downcast?}}
+  let a12 = nsString > s // expected-error{{'NSString' is not convertible to 'String'; did you mean to use 'as!' to force downcast?}}
 }
