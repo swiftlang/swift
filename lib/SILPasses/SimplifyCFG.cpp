@@ -1380,10 +1380,6 @@ static bool isThreadableSwitchEnumInst(SwitchEnumInst *SEI,
   if (!E0 || !E1)
     return false;
 
-  if (E0->getParent() != IncomingBr0->getParent() ||
-      E1->getParent() != IncomingBr1->getParent())
-    return false;
-
   // We also need to check for the absence of payload uses. we are not handling
   // them.
   auto SwitchDestBB0 = SEI->getCaseDestination(E0->getElement());
@@ -1538,10 +1534,9 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
     // incoming edges.
     auto SwitchDestBB0 = SEI->getCaseDestination(EnumInst0->getElement());
     auto SwitchDestBB1 = SEI->getCaseDestination(EnumInst1->getElement());
-    assert(EnumInst0->getParent() == SrcBB);
 
     auto ClonedSEI = SrcBB->getTerminator();
-    auto &InstList0 = EnumInst0->getParent()->getInstList();
+    auto &InstList0 = SrcBB->getInstList();
     InstList0.insert(InstList0.end(),
                      BranchInst::create(SEI->getLoc(), SwitchDestBB0,
                                         *SEI->getFunction()));

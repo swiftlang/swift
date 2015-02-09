@@ -951,6 +951,32 @@ bb8(%40 : $Builtin.Int32):
   return %41 : $Int32
 }
 
+// CHECK-LABEL: @jumpthread_switch_enum2
+// CHECK-NOT: switch_enum
+// CHECK: return
+
+sil @jumpthread_switch_enum2 : $@thin (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %1 = integer_literal $Builtin.Int32, 0
+  %3 = enum $Optional<Int32>, #Optional.Some!enumelt.1, %0 : $Int32
+  %4 = enum $Optional<Int32>, #Optional.None!enumelt
+  br bb1(%1 : $Builtin.Int32, %3 : $Optional<Int32>)
+
+bb1(%6 : $Builtin.Int32, %7 : $Optional<Int32>):
+  switch_enum %7 : $Optional<Int32>, case #Optional.Some!enumelt.1: bb2, case #Optional.None!enumelt: bb3
+
+bb2:
+  %9 = unchecked_enum_data %7 : $Optional<Int32>, #Optional.Some!enumelt.1
+  %10 = struct_extract %9 : $Int32, #Int32.value
+  %11 = integer_literal $Builtin.Int1, 0
+  %12 = builtin "sadd_with_overflow_Int32"(%6 : $Builtin.Int32, %10 : $Builtin.Int32, %11 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %13 = tuple_extract %12 : $(Builtin.Int32, Builtin.Int1), 0
+  br bb1(%13 : $Builtin.Int32, %4 : $Optional<Int32>)
+
+bb3:
+  %17 = struct $Int32 (%6 : $Builtin.Int32)
+  return %17 : $Int32
+}
 
 /// Don't jumpthread blocks that contain objc method instructions. We don't
 /// support building phis with objc method values.
