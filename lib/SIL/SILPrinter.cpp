@@ -229,8 +229,13 @@ void SILDeclRef::print(raw_ostream &OS) const {
     const char *Suffix;
     switch (FD->getAccessorKind()) {
     case AccessorKind::IsWillSet:
+      Suffix = "!willSet";
+      decl = FD->getAccessorStorageDecl();
+      break;
     case AccessorKind::IsDidSet:
-      llvm_unreachable("Shouldn't reach here");
+      Suffix = "!didSet";
+      decl = FD->getAccessorStorageDecl();
+      break;
     case AccessorKind::NotAccessor:
       Suffix = "";
       isDot = false;
