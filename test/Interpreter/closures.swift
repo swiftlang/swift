@@ -32,3 +32,18 @@ func test() {
 }
 
 test()
+
+// <rdar://problem/19776288>
+func map<T>(fn: T->()) {
+    println("Void overload")
+}
+
+func map<T,U>(fn: T->U) {
+    println("Non-void overload")
+}
+
+map({()})
+// CHECK: Void overload
+
+map({(x: Int) -> Int in x})
+// CHECK: Non-void overload
