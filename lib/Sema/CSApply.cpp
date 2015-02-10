@@ -5141,20 +5141,6 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
         }
       }
 
-      // Fixing an invalid function conversion comes from a mismatch on the
-      // input or result type, which we strip.
-      if (fix.first.getKind() == FixKind::FunctionConversion) {
-        auto path = locator->getPath();
-        if (path.empty())
-          continue;
-        if (path.back().getKind() != ConstraintLocator::FunctionArgument &&
-            path.back().getKind() != ConstraintLocator::FunctionResult)
-          continue;
-        path = path.drop_back();
-        auto newFlags = ConstraintLocator::getSummaryFlagsForPath(path);
-        locator = getConstraintLocator(locator->getAnchor(), path, newFlags);
-      }
-
       // Resolve the locator to a specific expression.
       SourceRange range1, range2;
       ConstraintLocator *resolved
@@ -5381,55 +5367,6 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
           TC.diagnose(affected->getLoc(), diag::migrate_to_raw_to_raw_value);
         }
         diagnosed = true;
-        break;
-      }
-
-      case FixKind::FunctionConversion: {
-        Type fromType =
-          solution.simplifyType(TC, affected->getType())->getRValueObjectType();
-        Type toType = solution.simplifyType(TC,
-                                            fix.first.getTypeArgument(*this));
-
-        // Strip @noescape from the destination type. It's not relevant: any
-        // function type with otherwise matching flags can be converted to a
-        // noescape function type.
-        auto toFnType = toType->castTo<AnyFunctionType>();
-        auto prettyExtInfo = toFnType->getExtInfo().withNoEscape(false);
-        toType = toFnType->withExtInfo(prettyExtInfo);
-
-        TC.diagnose(affected->getLoc(), diag::invalid_function_conversion,
-                    fromType, toType);
-        diagnosed = true;
-
-        if (!isa<ClosureExpr>(affected) && !isa<CaptureListExpr>(affected)) {
-          // If the function value we're converting isn't a closure, suggest
-          // wrapping it in one
-          bool needsParens = !affected->canAppendCallParentheses();
-
-          SourceLoc endLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
-                                                        affected->getEndLoc());
-          auto activeDiag =
-              TC.diagnose(affected->getLoc(),
-                          diag::invalid_function_conversion_closure);
-
-          auto hasAnyLabeledParams = [](const AnyFunctionType *fnTy) -> bool {
-            auto *params = fnTy->getInput()->getAs<TupleType>();
-            if (!params)
-              return false;
-            return std::any_of(params->getFields().begin(),
-                               params->getFields().end(),
-                               [](TupleTypeElt field) {
-              return field.hasName();
-            });
-          };
-
-          if (!hasAnyLabeledParams(toType->castTo<AnyFunctionType>())) {
-            activeDiag.fixItInsert(affected->getStartLoc(),
-                                   needsParens ? "{ (" : "{ ");
-            activeDiag.fixItInsert(endLoc, needsParens ? ")($0) }" : "($0) }");
-          }
-        }
-
         break;
       }
 

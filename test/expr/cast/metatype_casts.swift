@@ -22,7 +22,7 @@ use(any as! P.Protocol)
 
 let anyP: Any.Protocol = Any.self
 use(anyP is Any.Type) // expected-warning{{always true}}
-use(anyP as! Int.Type) // expected-warning{{always fails}}
+use(anyP as! Int.Type) // TODO: always fails
 
 let anyObj: AnyObject.Type = D.self
 use(anyObj as! Int.Type) // TODO: always fails
