@@ -324,11 +324,11 @@ Algorithm.test("map/SequenceType") {
   if true {
     let s = DrainableSequence<Int>([])
     var result = map(s) {
-      (x: Int) -> Int in
+      (x: Int) -> Int16 in
       expectUnreachable()
       return 42
     }
-    expectType([Int].self, &result)
+    expectType([Int16].self, &result)
     expectEqual([], result)
     expectEqual([], Array(s))
     expectLE(s._underestimatedCount, result.capacity)
@@ -346,11 +346,11 @@ Algorithm.test("map/CollectionType") {
   if true {
     let c = MinimalForwardCollection<Int>([])
     var result = map(c) {
-      (x: Int) -> Int in
+      (x: Int) -> Int16 in
       expectUnreachable()
       return 42
     }
-    expectType([Int].self, &result)
+    expectType([Int16].self, &result)
     expectEqual([], result)
     expectLE(c._underestimatedCount, result.capacity)
   }
