@@ -309,9 +309,12 @@ Algorithm.test("filter/CollectionType") {
   }
 }
 
-Algorithm.test("filter/simple") {
+
+Algorithm.test("map") {
   let x: [Float] = [1,2,3]
-  expectEqual([1, 2], filter(x, curry((>))(1.5) • sqrtf))
+  expectEqual([1.0, 1.41421354, 1.73205078], map(x, sqrtf))
+  // FIXME(19769879): This references foundation!
+  // expectEqual([1.0, 1.41421354], map(x, curry((<))(2) • sqrtf))
 }
 
 Algorithm.test("filter/eager") {
@@ -324,11 +327,6 @@ Algorithm.test("filter/eager") {
   expectEqual(10, count)
   for x in one {}
   expectEqual(10, count)
-}
-
-Algorithm.test("map/simple") {
-  let x: [Float] = [1,2,3]
-  expectEqual([1.0, 1.41421354, 1.73205078], map(x, sqrtf))
 }
 
 Algorithm.test("map/SequenceType") {
