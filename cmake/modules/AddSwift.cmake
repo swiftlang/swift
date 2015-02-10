@@ -302,8 +302,15 @@ function(_compile_swift_files dependency_target_out_var_name)
       "${SWIFT_STDLIB_ASSERTIONS}"
       swift_flags)
 
+  # Determine the subdirectory where the binary should be placed.
+  compute_library_subdir(library_subdir
+      "${SWIFTFILE_SDK}" "${SWIFTFILE_ARCHITECTURE}")
+
   # Allow import of other Swift modules we just built.
-  list(APPEND swift_flags "-resource-dir" "${SWIFTLIB_DIR}")
+  list(APPEND swift_flags
+      "-I" "${SWIFTLIB_DIR}/${library_subdir}")
+  # FIXME: should we use '-resource-dir' here?  Seems like it has no advantage
+  # over '-I' in this case.
 
   # If we have a custom module cache path, use it.
   if (SWIFT_MODULE_CACHE_PATH)
@@ -351,10 +358,6 @@ function(_compile_swift_files dependency_target_out_var_name)
   endif()
 
   list(APPEND swift_flags ${SWIFTFILE_FLAGS})
-
-  # Determine the subdirectory where the binary should be placed.
-  compute_library_subdir(library_subdir
-      "${SWIFTFILE_SDK}" "${SWIFTFILE_ARCHITECTURE}")
 
   get_filename_component(objdir "${SWIFTFILE_OUTPUT}" PATH)
   set(command_create_dirs
@@ -424,6 +427,11 @@ function(_compile_swift_files dependency_target_out_var_name)
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
   set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
+  set(swift_compiler_tool_dep)
+  if(SWIFT_BUILD_TOOLS)
+    # Depend on the binary itself, in addition to the symlink.
+    set(swift_compiler_tool_dep "swift")
+  endif()
 
   add_custom_command_target(
       dependency_target
@@ -439,7 +447,8 @@ function(_compile_swift_files dependency_target_out_var_name)
         "${SWIFTFILE_OUTPUT}" "${module_file}" "${module_doc_file}"
         ${apinote_files}
       DEPENDS
-        "swift" ${source_files} ${SWIFTFILE_DEPENDS}
+        "${swift_compiler_tool}" ${swift_compiler_tool_dep}
+        ${source_files} ${SWIFTFILE_DEPENDS}
         ${swift_ide_test_dependency} ${depends_create_apinotes}
       COMMENT "Compiling ${SWIFTFILE_OUTPUT}")
   set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
@@ -1002,11 +1011,12 @@ function(_add_swift_library_single target name)
   string(REPLACE ";" " " c_compile_flags "${c_compile_flags}")
   string(REPLACE ";" " " link_flags "${link_flags}")
 
+
   # Set compilation and link flags.
   set_property(TARGET "${target}" APPEND_STRING PROPERTY
       COMPILE_FLAGS " ${c_compile_flags}")
   set_property(TARGET "${target}" APPEND_STRING PROPERTY
-      LINK_FLAGS " ${link_flags} -L${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
+      LINK_FLAGS " ${link_flags} -L${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR} -L${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR} -L${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
   target_link_libraries("${target}" PRIVATE
       ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
   set_property(TARGET "${target}" PROPERTY
@@ -1016,7 +1026,7 @@ function(_add_swift_library_single target name)
     set_property(TARGET "${target_static}" APPEND_STRING PROPERTY
         COMPILE_FLAGS " ${c_compile_flags}")
     set_property(TARGET "${target_static}" APPEND_STRING PROPERTY
-        LINK_FLAGS " ${link_flags} -L${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
+        LINK_FLAGS " ${link_flags} -L${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR} -L${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR} -L${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
     target_link_libraries("${target_static}" PRIVATE
         ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
   endif()
@@ -1130,7 +1140,7 @@ function(add_swift_library name)
     set(SWIFTLIB_TARGET_LIBRARY TRUE)
 
     # There are no experimental SDK overlays.
-    set(SWIFTLIB_INSTALL_IN_COMPONENT stdlib)
+    set(SWIFTLIB_INSTALL_IN_COMPONENT sdk-overlay)
   endif()
 
   # Standard library is always a target library.
@@ -1147,10 +1157,12 @@ function(add_swift_library name)
     set(SWIFTLIB_TARGET_SDKS ${SWIFT_SDKS})
   endif()
 
-  # All Swift code depends on the standard library, except for the standard
-  # library itself.
-  if(SWIFTLIB_TARGET_LIBRARY AND NOT SWIFTLIB_IS_STDLIB_CORE)
-    list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS Core)
+  if(SWIFT_BUILD_STDLIB)
+    # All Swift code depends on the standard library, except for the standard
+    # library itself.
+    if(SWIFTLIB_TARGET_LIBRARY AND NOT SWIFTLIB_IS_STDLIB_CORE)
+      list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS Core)
+    endif()
   endif()
 
   translate_flags(SWIFTLIB "${SWIFTLIB_options}")
@@ -1512,8 +1524,10 @@ function(add_swift_target_executable name)
       "DISABLE_ASLR"
       SWIFTEXE_DISABLE_ASLR_FLAG)
 
-  # All Swift executables depend on the standard library.
-  list(APPEND SWIFTEXE_TARGET_LINK_FAT_LIBRARIES swiftCore)
+  if(SWIFT_BUILD_STDLIB)
+    # All Swift executables depend on the standard library.
+    list(APPEND SWIFTEXE_TARGET_LINK_FAT_LIBRARIES swiftCore)
+  endif()
 
   foreach(sdk ${SWIFT_SDKS})
     foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})

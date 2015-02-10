@@ -1,29 +1,29 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 
-// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foo -F %S/Inputs/mock-sdk -function-definitions=false -print-regular-comments > %t/Foo.printed.txt
+// RUN: %target-swift-ide-test(mock-sdk: -F %S/Inputs/mock-sdk) -print-module -source-filename %s -module-to-print=Foo -function-definitions=false -print-regular-comments > %t/Foo.printed.txt
 // RUN: diff -u %t/Foo.printed.txt %S/Inputs/mock-sdk/Foo.printed.txt
 
-// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foo -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=true -module-print-submodules > %t/Foo.printed.recursive.txt
+// RUN: %target-swift-ide-test(mock-sdk: -F %S/Inputs/mock-sdk) -print-module -source-filename %s -module-to-print=Foo -function-definitions=false -prefer-type-repr=true -module-print-submodules > %t/Foo.printed.recursive.txt
 // RUN: diff -u %t/Foo.printed.recursive.txt %S/Inputs/mock-sdk/Foo.printed.recursive.txt
 
-// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foo.FooSub -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=true > %t/Foo.FooSub.printed.txt
+// RUN: %target-swift-ide-test(mock-sdk: -F %S/Inputs/mock-sdk) -print-module -source-filename %s -module-to-print=Foo.FooSub -function-definitions=false -prefer-type-repr=true > %t/Foo.FooSub.printed.txt
 // RUN: diff -u %t/Foo.FooSub.printed.txt %S/Inputs/mock-sdk/Foo.FooSub.printed.txt
 
-// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=FooHelper -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=true > %t/FooHelper.printed.txt
+// RUN: %target-swift-ide-test(mock-sdk: -F %S/Inputs/mock-sdk) -print-module -source-filename %s -module-to-print=FooHelper -function-definitions=false -prefer-type-repr=true > %t/FooHelper.printed.txt
 // RUN: diff -u %t/FooHelper.printed.txt %S/Inputs/mock-sdk/FooHelper.printed.txt
 
-// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=FooHelper.FooHelperSub -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=true > %t/FooHelper.FooHelperSub.printed.txt
+// RUN: %target-swift-ide-test(mock-sdk: -F %S/Inputs/mock-sdk) -print-module -source-filename %s -module-to-print=FooHelper.FooHelperSub -function-definitions=false -prefer-type-repr=true > %t/FooHelper.FooHelperSub.printed.txt
 // RUN: diff -u %t/FooHelper.FooHelperSub.printed.txt %S/Inputs/mock-sdk/FooHelper.FooHelperSub.printed.txt
 
-// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=FooHelper.FooHelperExplicit -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=true > %t/FooHelper.FooHelperExplicit.printed.txt
+// RUN: %target-swift-ide-test(mock-sdk: -F %S/Inputs/mock-sdk) -print-module -source-filename %s -module-to-print=FooHelper.FooHelperExplicit -function-definitions=false -prefer-type-repr=true > %t/FooHelper.FooHelperExplicit.printed.txt
 // RUN: diff -u %t/FooHelper.FooHelperExplicit.printed.txt %S/Inputs/mock-sdk/FooHelper.FooHelperExplicit.printed.txt
 
-// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foo -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=true -annotate-print > %t/Foo.annotated.txt
+// RUN: %target-swift-ide-test(mock-sdk: -F %S/Inputs/mock-sdk) -print-module -source-filename %s -module-to-print=Foo -function-definitions=false -prefer-type-repr=true -annotate-print > %t/Foo.annotated.txt
 // RUN: diff -u %t/Foo.annotated.txt %S/Inputs/mock-sdk/Foo.annotated.txt
 
-// RUN: %target-swift-frontend -emit-module -o %t -I %t %clang-importer-sdk %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
-// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foundation -sdk %S/../Inputs/clang-importer-sdk -I %t -function-definitions=false -prefer-type-repr=true > %t.printed.txt
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=Foundation -function-definitions=false -prefer-type-repr=true > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=FOUNDATION -strict-whitespace < %t.printed.txt
 
 // This test is in general platform-independent, but it happens to check

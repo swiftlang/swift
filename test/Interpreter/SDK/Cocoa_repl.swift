@@ -1,4 +1,4 @@
-// RUN: %swift -sdk %sdk -target %target-triple -repl < %s | FileCheck %s
+// RUN: %target-repl-run-simple-swift | FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_repl

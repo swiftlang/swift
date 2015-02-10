@@ -1,6 +1,6 @@
 // Make sure that we can deserialize objective c.
-// RUN: %target-sil-opt -verify %platform-module-dir/ObjectiveC.swiftmodule > /dev/null
-// RUN: llvm-bcanalyzer %platform-module-dir/ObjectiveC.swiftmodule | FileCheck %s
+// RUN: %target-sil-opt -verify %platform-sdk-overlay-dir/ObjectiveC.swiftmodule > /dev/null
+// RUN: llvm-bcanalyzer %platform-sdk-overlay-dir/ObjectiveC.swiftmodule | FileCheck %s
 
 // REQUIRES: objc_interop
 

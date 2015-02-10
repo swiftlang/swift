@@ -1,4 +1,5 @@
-// RUN: %swift -repl < %s | FileCheck %s
+// RUN: %target-repl-run-simple-swift | FileCheck %s
+
 // REQUIRES: swift_repl
 
 :print_decl String

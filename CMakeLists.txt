@@ -28,12 +28,20 @@ option(SWIFT_STDLIB_ASSERTIONS
     "Enable internal checks for the Swift standard library (useful for debugging the library itself, does not affect checks required for safety)"
     "${SWIFT_STDLIB_ASSERTIONS_default}")
 
+option(SWIFT_BUILD_TOOLS
+    "Build the Swift compiler and other tools"
+    TRUE)
+
 option(SWIFT_BUILD_STDLIB
-    "Build Swift standard library and SDK overlays"
+    "Build the Swift standard library (independent of the SDK headers)"
+    TRUE)
+
+option(SWIFT_BUILD_SDK_OVERLAY
+    "Build Swift SDK overlay"
     TRUE)
 
 option(SWIFT_BUILD_STATIC_STDLIB
-    "Build static variants of the Swift standard library and SDK overlays"
+    "Build static variants of the Swift standard library and SDK overlay"
     FALSE)
 
 
@@ -50,7 +58,7 @@ set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
 
 set(_SWIFT_KNOWN_INSTALL_COMPONENTS
-    "compiler;clang-builtin-headers;clang-resource-dir-symlink;arclite-symlink;stdlib;stdlib-experimental;editor-integration;lang-docs;tools;testsuite-tools;dev")
+    "compiler;clang-builtin-headers;clang-resource-dir-symlink;arclite-symlink;stdlib;stdlib-experimental;sdk-overlay;editor-integration;lang-docs;tools;testsuite-tools;dev")
 
 set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
     "A semicolon-separated list of components to install ${_SWIFT_KNOWN_INSTALL_COMPONENTS}")
@@ -65,9 +73,10 @@ set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
 # * clang-resource-dir-symlink -- install a symlink to the Clang resource
 #   directory (which contains builtin headers) under 'lib/swift/clang'.  This is
 #   useful when Clang and Swift are installed side-by-side.
-# * stdlib -- the Swift standard library and SDK overlays.
+# * stdlib -- the Swift standard library.
 # * stdlib-experimental -- the Swift standard library module for experimental
 #   APIs.
+# * sdk-overlay -- the Swift SDK overlay.
 # * editor-integration -- scripts for Swift integration in IDEs other than
 #   Xcode;
 # * tools -- tools (other than the compiler) useful for developers writing
@@ -457,13 +466,13 @@ foreach(file ${SWIFT_API_NOTES_INPUT_FILES})
 endforeach()
 
 # Add all of the subdirectories, where we actually do work.
-add_subdirectory(include)
-add_subdirectory(lib)
-add_subdirectory(tools)
-add_subdirectory(utils)
-if(SWIFT_BUILD_STDLIB)
-  add_subdirectory(stdlib)
+if(SWIFT_BUILD_TOOLS)
+  add_subdirectory(include)
+  add_subdirectory(lib)
+  add_subdirectory(tools)
+  add_subdirectory(utils)
 endif()
+add_subdirectory(stdlib)
 if(SWIFT_INCLUDE_TESTS)
   add_subdirectory(test)
   add_subdirectory(unittests)

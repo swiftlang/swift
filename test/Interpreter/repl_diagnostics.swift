@@ -1,4 +1,5 @@
-// RUN: %swift -repl < %s 2>&1 | FileCheck %s
+// RUN: %target-repl-run-simple-swift | FileCheck %s
+
 // REQUIRES: swift_repl
 
 var tooLarge = 11111111111111111111111111111

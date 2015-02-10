@@ -1,5 +1,7 @@
-// RUN: %swift -repl < %s | FileCheck %s
+// RUN: %target-repl-run-simple-swift | FileCheck %s
+
 // REQUIRES: swift_repl
+
 // <rdar://problem/13694699> - Type metadata was getting re-emitted with every
 
 struct X {}

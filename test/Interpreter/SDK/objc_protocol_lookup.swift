@@ -1,5 +1,5 @@
 // Check JIT mode
-// RUN: %swift -sdk %sdk -interpret %s | FileCheck %s
+// RUN: %target-jit-run %s | FileCheck %s
 
 // REQUIRES: swift_interpreter
 // REQUIRES: objc_interop

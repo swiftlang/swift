@@ -1,4 +1,6 @@
-# All libraries in this directory tree are overlays.
+# All libraries in this directory tree are overlays that depend on Darwin SDK.
+
+# Please keep this list sorted.
 add_subdirectory(AppKit)
 add_subdirectory(AssetsLibrary)
 add_subdirectory(CoreAudio)

@@ -29,11 +29,22 @@ function(add_swift_unittest test_dirname)
   endif()
 endfunction()
 
-# FIXME: cross-compile runtime unittests.
-file(GLOB entries *)
-foreach(entry ${entries})
-  if(IS_DIRECTORY ${entry} AND EXISTS ${entry}/CMakeLists.txt)
-    add_subdirectory(${entry})
+if(SWIFT_BUILD_TOOLS)
+  # We can't link C++ unit tests unless we build the tools.
+
+  add_subdirectory(Availability)
+  add_subdirectory(Basic)
+  add_subdirectory(Driver)
+  add_subdirectory(FunctionNameDemangle)
+  add_subdirectory(IDE)
+  add_subdirectory(Parse)
+  add_subdirectory(ReST)
+
+  if(SWIFT_BUILD_SDK_OVERLAY)
+    # Runtime tests depend on symbols in StdlibUnittest.
+    #
+    # FIXME: cross-compile runtime unittests.
+    add_subdirectory(runtime)
   endif()
-endforeach()
+endif()
 

@@ -1,5 +1,6 @@
 // RUN: rm -rf %t  &&  mkdir %t
-// RUN: ulimit -c unlimited && %swift -I %S -enable-source-import -interpret %s | FileCheck %s
+// RUN: ulimit -c unlimited && %target-jit-run %s -I %S -enable-source-import | FileCheck %s
+
 // REQUIRES: swift_interpreter
 
 // FIXME: iOS: -enable-source-import plus %target-build-swift equals link errors

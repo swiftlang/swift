@@ -1,4 +1,4 @@
-// RUN: %swift -interpret -parse-stdlib -sdk %sdk -target %target-triple %s | FileCheck %s
+// RUN: %target-jit-run -parse-stdlib %s | FileCheck %s
 
 // REQUIRES: swift_interpreter
 // XFAIL: linux
