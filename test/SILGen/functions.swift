@@ -88,11 +88,11 @@ class SomeClass {
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $SomeClass):
   func curried_method(x: Int)(y: Int) {}
 
-  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClass13static_method{{.*}} : $@thin (Builtin.Int64, @thick SomeClass.Type) -> ()
+  // CHECK-LABEL: sil hidden @_TZFC9functions9SomeClass13static_method{{.*}} : $@thin (Builtin.Int64, @thick SomeClass.Type) -> ()
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $@thick SomeClass.Type):
   class func static_method(x: Int) {}
 
-  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClass21static_curried_method{{.*}} : $@thin (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> ()
+  // CHECK-LABEL: sil hidden @_TZFC9functions9SomeClass21static_curried_method{{.*}} : $@thin (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> ()
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $@thick SomeClass.Type):
   class func static_curried_method(x: Int)(y: Int) {}
 

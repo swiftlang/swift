@@ -104,7 +104,7 @@ class Hoozit : NSObject {
 // CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
 // CHECK:     i8* getelementptr inbounds ([8 x i8]* @"\01L_selector_data(blobble)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([8 x i8]* [[STR]], i64 0, i64 0),
-// CHECK:     i8* bitcast (void (i8*, i8*)* @_TToFC15objc_extensions6Hoozit7blobblefMS0_FT_T_ to i8*)
+// CHECK:     i8* bitcast (void (i8*, i8*)* @_TToZFC15objc_extensions6Hoozit7blobblefMS0_FT_T_ to i8*)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 

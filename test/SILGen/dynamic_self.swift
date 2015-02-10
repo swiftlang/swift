@@ -14,7 +14,7 @@ class X : P, CP {
   // CHECK-LABEL: sil hidden @_TFC12dynamic_self1X1ffDS0_FT_DS0_ : $@cc(method) @thin (@owned X) -> @owned
   func f() -> Self { return self }
 
-  // CHECK-LABEL: sil hidden @_TFC12dynamic_self1X7factory{{.*}} : $@thin (Int, @thick X.Type) -> @owned X
+  // CHECK-LABEL: sil hidden @_TZFC12dynamic_self1X7factory{{.*}} : $@thin (Int, @thick X.Type) -> @owned X
   // CHECK: bb0([[I:%[0-9]+]] : $Int, [[SELF:%[0-9]+]] : $@thick X.Type):
   // CHECK: [[CTOR:%[0-9]+]] = class_method [[SELF]] : $@thick X.Type, #X.init!allocator.1 : X.Type -> (int: Int) -> X , $@thin (Int, @thick X.Type) -> @owned X
   // CHECK: apply [[CTOR]]([[I]], [[SELF]]) : $@thin (Int, @thick X.Type) -> @owned X

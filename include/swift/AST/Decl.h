@@ -2098,10 +2098,18 @@ public:
   /// Dump a reference to the given declaration.
   void dumpRef() const;
 
+  /// Returns true if the declaration is a static member of a type.
+  ///
+  /// This is not necessarily the opposite of "isInstanceMember()". Both
+  /// predicates will be false for declarations that either categorically
+  /// can't be "static" or are in a context where "static" doesn't make sense.
+  bool isStatic() const;
+
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_ValueDecl &&
            D->getKind() <= DeclKind::Last_ValueDecl;
   }
+  
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -5303,6 +5311,15 @@ inline DeclIterator &DeclIterator::operator++() {
 inline bool AbstractFunctionDecl::hasForcedStaticDispatch() const {
   if (auto func = dyn_cast<FuncDecl>(this))
     return func->hasForcedStaticDispatch();
+  return false;
+}
+
+inline bool ValueDecl::isStatic() const {
+  // Currently, only storage and function decls can be static/class.
+  if (auto storage = dyn_cast<AbstractStorageDecl>(this))
+    return storage->isStatic();
+  if (auto func = dyn_cast<FuncDecl>(this))
+    return func->isStatic();
   return false;
 }
 

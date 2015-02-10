@@ -433,13 +433,13 @@ struct StaticProperty {
 }
 
 // CHECK-LABEL: sil hidden @_TF10properties10static_get
-// CHECK:   function_ref @_TFV10properties14StaticPropertyg3foo{{.*}} : $@thin (@thin StaticProperty.Type) -> Int
+// CHECK:   function_ref @_TZFV10properties14StaticPropertyg3foo{{.*}} : $@thin (@thin StaticProperty.Type) -> Int
 func static_get() -> Int {
   return StaticProperty.foo
 }
 
 // CHECK-LABEL: sil hidden @_TF10properties10static_set
-// CHECK:   function_ref @_TFV10properties14StaticPropertys3foo{{.*}} : $@thin (Int, @thin StaticProperty.Type) -> ()
+// CHECK:   function_ref @_TZFV10properties14StaticPropertys3foo{{.*}} : $@thin (Int, @thin StaticProperty.Type) -> ()
 func static_set(x: Int) {
   StaticProperty.foo = x
 }

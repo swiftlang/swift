@@ -43,7 +43,7 @@ func foo(var a: Int64, var b: Int64) -> Int64 {
        // CHECK-DAG: smul{{.*}}, !dbg ![[MUL:[0-9]+]]
        // CHECK-DAG: [[MUL]] = !MDLocation(line: [[@LINE+4]], column: 16,
        // Runtime call to multiply function:
-       // CHECK-NOSIL: @_TFSsoi1mFTVSs5Int64S__S_{{.*}}, !dbg ![[MUL:[0-9]+]]
+       // CHECK-NOSIL: @_TZFSsoi1mFTVSs5Int64S__S_{{.*}}, !dbg ![[MUL:[0-9]+]]
        // CHECK-NOSIL: [[MUL]] = !MDLocation(line: [[@LINE+1]], column: 16,
        return a*b
      } else {

@@ -19,28 +19,28 @@ private func privateFunc() -> Int {
 }
 
 public struct PublicStruct {
-  // CHECK-LABEL: sil private @_TFV16mangling_private12PublicStructP33_A3CCBB841DB59E79A4AD4EE45865506813privateMethodfMS0_FT_T_
+  // CHECK-LABEL: sil private @_TZFV16mangling_private12PublicStructP33_A3CCBB841DB59E79A4AD4EE45865506813privateMethodfMS0_FT_T_
   private static func privateMethod() {}
 }
 
 public struct InternalStruct {
-  // CHECK-LABEL: sil private @_TFV16mangling_private14InternalStructP33_A3CCBB841DB59E79A4AD4EE45865506813privateMethodfMS0_FT_T_
+  // CHECK-LABEL: sil private @_TZFV16mangling_private14InternalStructP33_A3CCBB841DB59E79A4AD4EE45865506813privateMethodfMS0_FT_T_
   private static func privateMethod() {}
 }
 
 private struct PrivateStruct {
-  // CHECK-LABEL: sil private @_TFV16mangling_privateP33_A3CCBB841DB59E79A4AD4EE45865506813PrivateStruct13privateMethodfMS0_FT_T_
+  // CHECK-LABEL: sil private @_TZFV16mangling_privateP33_A3CCBB841DB59E79A4AD4EE45865506813PrivateStruct13privateMethodfMS0_FT_T_
   private static func privateMethod() {}
 
   struct Inner {
-    // CHECK-LABEL: sil private @_TFVV16mangling_privateP33_A3CCBB841DB59E79A4AD4EE45865506813PrivateStruct5Inner13privateMethodfMS1_FT_T_
+    // CHECK-LABEL: sil private @_TZFVV16mangling_privateP33_A3CCBB841DB59E79A4AD4EE45865506813PrivateStruct5Inner13privateMethodfMS1_FT_T_
     private static func privateMethod() {}
   }
 }
 
 func localTypes() {
   struct LocalStruct {
-    // CHECK-LABEL: sil shared @_TFVF16mangling_private10localTypesFT_T_L_11LocalStruct13privateMethodfMS0_FT_T_
+    // CHECK-LABEL: sil shared @_TZFVF16mangling_private10localTypesFT_T_L_11LocalStruct13privateMethodfMS0_FT_T_
     private static func privateMethod() {}
   }
 }

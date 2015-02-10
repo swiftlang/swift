@@ -14,7 +14,7 @@ class Hoozit : Gizmo {
     super.init()
   }
 
-  // CHECK-LABEL: sil hidden  @_TFC10objc_super6Hoozit5runcefMS0_FT_T_ : $@thin (@thick Hoozit.Type) -> ()
+  // CHECK-LABEL: sil hidden  @_TZFC10objc_super6Hoozit5runcefMS0_FT_T_ : $@thin (@thick Hoozit.Type) -> ()
   override class func runce() {
     // CHECK: super_method [volatile] {{%.*}} : $@thick Hoozit.Type, #Gizmo.runce!1.foreign
     super.runce()

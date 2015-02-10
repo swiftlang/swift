@@ -28,10 +28,10 @@ class Hoozit : Gizmo {
 
   // NS_CONSUMED 'gizmo' argument by inheritance
   override class func consume(gizmo: Gizmo?) { }
-   // CHECK-LABEL: sil hidden @_TToFC11objc_thunks6Hoozit7consumefMS0_FGSqCSo5Gizmo_T_ : $@cc(objc_method) @thin (@owned Optional<Gizmo>, @objc_metatype Hoozit.Type) -> () {
+   // CHECK-LABEL: sil hidden @_TToZFC11objc_thunks6Hoozit7consumefMS0_FGSqCSo5Gizmo_T_ : $@cc(objc_method) @thin (@owned Optional<Gizmo>, @objc_metatype Hoozit.Type) -> () {
   // CHECK-NEXT: bb0([[GIZMO:%.*]] : $Optional<Gizmo>, [[THIS:%.*]] : $@objc_metatype Hoozit.Type):
   // CHECK-NEXT: [[THICK_THIS:%[0-9]+]] = objc_to_thick_metatype [[THIS]] : $@objc_metatype Hoozit.Type to $@thick Hoozit.Type
-  // CHECK:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozit7consumefMS0_FGSqCSo5Gizmo_T_ : $@thin (@owned Optional<Gizmo>, @thick Hoozit.Type) -> ()
+  // CHECK:   [[NATIVE:%.*]] = function_ref @_TZFC11objc_thunks6Hoozit7consumefMS0_FGSqCSo5Gizmo_T_ : $@thin (@owned Optional<Gizmo>, @thick Hoozit.Type) -> ()
   // CHECK-NEXT:   apply [[NATIVE]]([[GIZMO]], [[THICK_THIS]])
   // CHECK-NEXT:   return
   // CHECK-NEXT: }

@@ -760,7 +760,7 @@ Globals
   global ::= 'TW' protocol-conformance entity
                                          // protocol witness thunk
   entity ::= nominal-type                // named type declaration
-  entity ::= entity-kind context entity-name
+  entity ::= static? entity-kind context entity-name
   entity-kind ::= 'F'                    // function (ctor, accessor, etc.)
   entity-kind ::= 'v'                    // variable (let/var)
   entity-kind ::= 's'                    // subscript itself (not the individual accessors)
@@ -781,6 +781,7 @@ Globals
   entity-name ::= 'u' index type         // implicit anonymous closure
   entity-name ::= 'w' decl-name type     // willSet
   entity-name ::= 'W' decl-name type     // didSet
+  static ::= 'Z'                         // entity is a static member of a type
   decl-name ::= identifier
   decl-name ::= local-decl-name
   decl-name ::= private-decl-name

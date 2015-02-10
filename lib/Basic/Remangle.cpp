@@ -823,6 +823,11 @@ void Remangler::mangleImplicitClosure(Node *node, EntityContext &ctx) {
   mangleNamedAndTypedEntity(node, 'F', "u", ctx); // name is index
 }
 
+void Remangler::mangleStatic(Node *node) {
+  Out << 'Z';
+  mangle(node->getChild(0).get());
+}
+
 void Remangler::mangleSimpleEntity(Node *node, char basicKind,
                                    StringRef entityKind,
                                    EntityContext &ctx) {

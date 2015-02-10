@@ -24,7 +24,7 @@ bb0(%0 : $X):
 }
 
 // [objc] X.g (ObjectiveC.X.Type)() -> ()
-sil @_TToFC14dynamic_lookup1X1gfMS0_FT_T_ : $@thin (@thick X.Type) -> () {
+sil @_TToZFC14dynamic_lookup1X1gfMS0_FT_T_ : $@thin (@thick X.Type) -> () {
 bb0(%0 : $@thick X.Type):
   %14 = tuple ()                                  // user: %15
   return %14 : $()

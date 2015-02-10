@@ -30,7 +30,7 @@
 
   /// Aaa.  v2.
   class var v2: Int { return 0 }
-  // CHECK: swift:[[@LINE-1]]:13: Var/A010_AttachToEntities.v2 {{.*}} FullCommentAsXML=[<Other file="{{[^"]+}}swift" line="[[@LINE-1]]" column="13"><Name>v2</Name><USR>s:vC14swift_ide_test21A010_AttachToEntities2v2Si</USR><Declaration>class var v2: Int { get }</Declaration><Abstract><Para>Aaa.  v2.</Para></Abstract></Other>]
+  // CHECK: swift:[[@LINE-1]]:13: Var/A010_AttachToEntities.v2 {{.*}} FullCommentAsXML=[<Other file="{{[^"]+}}swift" line="[[@LINE-1]]" column="13"><Name>v2</Name><USR>s:ZvC14swift_ide_test21A010_AttachToEntities2v2Si</USR><Declaration>class var v2: Int { get }</Declaration><Abstract><Para>Aaa.  v2.</Para></Abstract></Other>]
 }
 
 /// Aaa.  A011.

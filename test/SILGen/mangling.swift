@@ -32,22 +32,22 @@ prefix operator +- {}
 postfix operator +- {}
 infix operator +- {}
 
-// CHECK-LABEL: sil hidden @_TF8manglingop2psU__FQ_T_
+// CHECK-LABEL: sil hidden @_TZF8manglingop2psU__FQ_T_
 prefix func +- <T>(a: T) {}
-// CHECK-LABEL: sil hidden @_TF8manglingoP2psU__FQ_T_
+// CHECK-LABEL: sil hidden @_TZF8manglingoP2psU__FQ_T_
 postfix func +- <T>(a: T) {}
 
-// CHECK-LABEL: sil hidden @_TF8manglingoi2psU__FTQ_Q__T_
+// CHECK-LABEL: sil hidden @_TZF8manglingoi2psU__FTQ_Q__T_
 func +- <T>(a: T, b: T) {}
 
-// CHECK-LABEL: sil hidden @_TF8manglingop2psU__FT1aQ_1bQ__T_
+// CHECK-LABEL: sil hidden @_TZF8manglingop2psU__FT1aQ_1bQ__T_
 prefix func +- <T>(_: (a: T, b: T)) {}
-// CHECK-LABEL: sil hidden @_TF8manglingoP2psU__FT1aQ_1bQ__T_
+// CHECK-LABEL: sil hidden @_TZF8manglingoP2psU__FT1aQ_1bQ__T_
 postfix func +- <T>(_: (a: T, b: T)) {}
 
 infix operator «+» {}
 
-// CHECK-LABEL: sil hidden @_TF8manglingXoi7p_qcaDcFTSiSi_Si
+// CHECK-LABEL: sil hidden @_TZF8manglingXoi7p_qcaDcFTSiSi_Si
 func «+»(a: Int, b: Int) -> Int { return a + b }
 
 // Curried function entry points mangle in terms of their original types, not
@@ -106,8 +106,8 @@ enum GenericUnion<T> {
 struct HasVarInit {
   static var state = true && false
 }
-// CHECK-LABEL: // function_ref mangling.HasVarInit.(state : Swift.Bool).(variable initialization expression).(implicit closure #1)
-// CHECK-NEXT:  function_ref @_TFIvV8mangling10HasVarInit5stateSbiu_KT_Sb
+// CHECK-LABEL: // function_ref static mangling.HasVarInit.(state : Swift.Bool).(variable initialization expression).(implicit closure #1)
+// CHECK-NEXT:  function_ref @_TFIZvV8mangling10HasVarInit5stateSbiu_KT_Sb
 
 // auto_closures should not collide with the equivalent non-auto_closure
 // function type.
@@ -139,5 +139,20 @@ func fooA<T: HasAssocType>() {}
 // CHECK-LABEL: sil hidden @_TF8mangling4fooBUS_12HasAssocType_US_9AssocReqt__FT_T_ : $@thin <T where T : HasAssocType, T.Assoc : AssocReqt> () -> ()
 func fooB<T: HasAssocType where T.Assoc: AssocReqt>() {}
 
-// CHECK-LABEL: sil hidden @_TF8manglingoi2qqFTSiSi_T_
+// CHECK-LABEL: sil hidden @_TZF8manglingoi2qqFTSiSi_T_
 func ??(x: Int, y: Int) {}
+
+struct InstanceAndClassProperty {
+  var property: Int {
+    // CHECK-LABEL: sil hidden @_TFV8mangling24InstanceAndClassPropertyg8propertySi
+    get { return 0 }
+    // CHECK-LABEL: sil hidden @_TFV8mangling24InstanceAndClassPropertys8propertySi
+    set {}
+  }
+  static var property: Int {
+    // CHECK-LABEL: sil hidden @_TZFV8mangling24InstanceAndClassPropertyg8propertySi
+    get { return 0 }
+    // CHECK-LABEL: sil hidden @_TZFV8mangling24InstanceAndClassPropertys8propertySi
+    set {}
+  }
+}

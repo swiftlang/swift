@@ -162,6 +162,7 @@ static bool isStartOfEntity(char c) {
   case 'v':
   case 'P':
   case 's':
+  case 'Z':
     return true;
   default:
     return isStartOfNominalType(c);
@@ -1173,6 +1174,9 @@ private:
   // entity ::= entity-kind context entity-name
   // entity ::= nominal-type
   NodePointer demangleEntity() {
+    // static?
+    bool isStatic = Mangled.nextIf('Z');
+  
     // entity-kind
     Node::Kind entityBasicKind;
     if (Mangled.nextIf('F')) {
@@ -1298,6 +1302,12 @@ private:
       auto type = demangleType();
       if (!type) return nullptr;
       entity->addChild(type);
+    }
+    
+    if (isStatic) {
+      auto staticNode = NodeFactory::create(Node::Kind::Static);
+      staticNode->addChild(entity);
+      return staticNode;
     }
 
     return entity;
@@ -2285,6 +2295,7 @@ private:
     case Node::Kind::ReabstractionThunkHelper:
     case Node::Kind::Setter:
     case Node::Kind::SpecializationPassID:
+    case Node::Kind::Static:
     case Node::Kind::Subscript:
     case Node::Kind::Suffix:
     case Node::Kind::ThinFunctionType:
@@ -2577,6 +2588,10 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
 
   Node::Kind kind = pointer->getKind();
   switch (kind) {
+  case Node::Kind::Static:
+    Printer << "static ";
+    print(pointer->getChild(0), asContext, suppressType);
+    return;
   case Node::Kind::Directness:
     Printer << toString(Directness(pointer->getIndex())) << " ";
     return;

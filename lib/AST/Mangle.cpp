@@ -1434,6 +1434,10 @@ void Mangler::mangleEntity(const ValueDecl *decl,
   assert(!isa<ConstructorDecl>(decl));
   assert(!isa<DestructorDecl>(decl));
   
+  // entity ::= static? entity-kind context entity-name
+  if (decl->isStatic())
+    Buffer << 'Z';
+
   // Handle accessors specially, they are mangled as modifiers on the accessed
   // declaration.
   if (auto func = dyn_cast<FuncDecl>(decl)) {
@@ -1446,7 +1450,6 @@ void Mangler::mangleEntity(const ValueDecl *decl,
   
   BindGenerics shouldBindParent = BindGenerics::All;
 
-  // entity ::= entity-kind context entity-name
   if (isa<VarDecl>(decl)) {
     Buffer << 'v';
   } else if (isa<SubscriptDecl>(decl)) {

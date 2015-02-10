@@ -172,7 +172,7 @@ func small_closure_capture_with_argument(var x: Int) -> (y: Int) -> Int {
 }
 // CHECK: sil shared @[[CLOSURE_NAME]] : $@thin (Int, @owned Builtin.NativeObject, @inout Int) -> Int
 // CHECK: bb0([[DOLLAR0:%[0-9]+]] : $Int, [[XBOX:%[0-9]+]] : $Builtin.NativeObject, [[XADDR:%[0-9]+]] : $*Int):
-// CHECK: [[PLUS:%[0-9]+]] = function_ref @_TFSsoi1pFTSiSi_Si{{.*}}
+// CHECK: [[PLUS:%[0-9]+]] = function_ref @_TZFSsoi1pFTSiSi_Si{{.*}}
 // CHECK: [[LHS:%[0-9]+]] = load [[XADDR]]
 // CHECK: [[RET:%[0-9]+]] = apply [transparent] [[PLUS]]([[LHS]], [[DOLLAR0]])
 // CHECK: release [[XBOX]]

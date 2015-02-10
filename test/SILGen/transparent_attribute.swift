@@ -153,7 +153,7 @@ struct testVarDeclShortenedSyntax {
   func testVarDeclShortenedSyntaxfoo () {
     var z: Int = testVarDeclShortenedSyntax.max
     // CHECK-APPLY: sil hidden @_TFV21transparent_attribute26testVarDeclShortenedSyntax29testVarDeclShortenedSyntaxfoofRS0_FT_T_
-    // CHECK: [[TR5:%[0-9]+]] = function_ref @_TFV21transparent_attribute26testVarDeclShortenedSyntaxg3maxSi
+    // CHECK: [[TR5:%[0-9]+]] = function_ref @_TZFV21transparent_attribute26testVarDeclShortenedSyntaxg3maxSi
     // CHECK: apply [transparent] [[TR5]]
   }
 };

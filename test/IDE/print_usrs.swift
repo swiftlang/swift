@@ -42,7 +42,7 @@ class GenericClass {
 
   // CHECK: [[@LINE+1]]:8 s:FC14swift_ide_test12GenericClass12instanceFuncFS0_FT_T_{{$}}
   func instanceFunc() {
-    // CHECK: [[@LINE+2]]:18 s:FC14swift_ide_test12GenericClass9classFuncFMS0_FS0_T_{{$}}
+    // CHECK: [[@LINE+2]]:18 s:ZFC14swift_ide_test12GenericClass9classFuncFMS0_FS0_T_{{$}}
     // CHECK: [[@LINE+1]]:28 s:vFC14swift_ide_test12GenericClass12instanceFuncFS0_FT_T_L_4selfS0_{{$}}
     GenericClass.classFunc(self)
   }
@@ -58,13 +58,13 @@ class GenericClass {
 
   // CHECK: [[@LINE+1]]:3 s:FC14swift_ide_test12GenericClassd{{$}}
   deinit {
-    // CHECK: [[@LINE+2]]:18 s:FC14swift_ide_test12GenericClass9classFuncFMS0_FS0_T_{{$}}
+    // CHECK: [[@LINE+2]]:18 s:ZFC14swift_ide_test12GenericClass9classFuncFMS0_FS0_T_{{$}}
     // CHECK: [[@LINE+1]]:28 ERROR:no-usr{{$}}
     GenericClass.classFunc(self)
   }
 
-  // CHECK: [[@LINE+2]]:14 s:FC14swift_ide_test12GenericClass9classFuncFMS0_FS0_T_{{$}}
-  // CHECK: [[@LINE+1]]:24 s:vFC14swift_ide_test12GenericClass9classFuncFMS0_FS0_T_L_1aS0_{{$}}
+  // CHECK: [[@LINE+2]]:14 s:ZFC14swift_ide_test12GenericClass9classFuncFMS0_FS0_T_{{$}}
+  // CHECK: [[@LINE+1]]:24 s:vZFC14swift_ide_test12GenericClass9classFuncFMS0_FS0_T_L_1aS0_{{$}}
   class func classFunc(a: GenericClass) {}
 }
 
@@ -101,7 +101,7 @@ class GenCls<T> {
   init() {}
   // CHECK: [[@LINE+1]]:3 s:FC14swift_ide_test6GenClsd{{$}}
   deinit {}
-  // CHECK: [[@LINE+1]]:14 s:FC14swift_ide_test6GenCls4cfooU__FMGS0_Q__FT_T_{{$}}
+  // CHECK: [[@LINE+1]]:14 s:ZFC14swift_ide_test6GenCls4cfooU__FMGS0_Q__FT_T_{{$}}
   class func cfoo() {}
 
   // CHECK: [[@LINE+1]]:3 s:sC14swift_ide_test6GenCls9subscriptFTSiSi_Si{{$}}
@@ -120,7 +120,7 @@ class GenCls<T> {
 class C4 {
   // CHECK: [[@LINE+1]]:9 s:CC14swift_ide_test2C42In{{$}}
   class In {
-    // CHECK: [[@LINE+1]]:16 s:FCC14swift_ide_test2C42In3gooFMS1_FT_T_{{$}}
+    // CHECK: [[@LINE+1]]:16 s:ZFCC14swift_ide_test2C42In3gooFMS1_FT_T_{{$}}
     class func goo() {}
   }
 }
@@ -156,7 +156,7 @@ class Observers {
 class ObjCClass1 {
   // CHECK: [[@LINE+1]]:8 s:FC14swift_ide_test10ObjCClass113instanceFunc1FS0_FSiT_{{$}}
   func instanceFunc1(a: Int) {}
-  // CHECK: [[@LINE+1]]:14 s:FC14swift_ide_test10ObjCClass111staticFunc1FMS0_FSiT_{{$}}
+  // CHECK: [[@LINE+1]]:14 s:ZFC14swift_ide_test10ObjCClass111staticFunc1FMS0_FSiT_{{$}}
   class func staticFunc1(a: Int) {}
 }
 

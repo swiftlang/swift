@@ -14,7 +14,7 @@ class Foo: Fooable {
   // CHECK:         class_method
 
   class func bar() {}
-  // CHECK-LABEL: sil hidden [thunk] @_TTWC15witnesses_class3FooS_7FooableS_FS1_3barUS1___fMQPS1_FT_T_
+  // CHECK-LABEL: sil hidden [thunk] @_TTWC15witnesses_class3FooS_7FooableS_ZFS1_3barUS1___fMQPS1_FT_T_
   // CHECK-NOT:     function_ref
   // CHECK:         class_method
 

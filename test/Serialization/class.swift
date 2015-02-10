@@ -73,7 +73,7 @@ var rsrc = Resource()
 
 getReqPairLike()
 
-// SIL-LABEL: sil public_external [transparent] [fragile] @_TFSsoi1pFTSiSi_Si : $@thin (Int, Int) -> Int {
+// SIL-LABEL: sil public_external [transparent] [fragile] @_TZFSsoi1pFTSiSi_Si : $@thin (Int, Int) -> Int {
 
 func test(sharer: ResourceSharer) {}
 

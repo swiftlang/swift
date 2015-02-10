@@ -57,7 +57,7 @@
 // CHECK:   %swift.opaque* @_objc_empty_cache,
 // CHECK:   %swift.opaque* {{(@_objc_empty_vtable|null)}},
 // CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC17objc_class_export3Foo to i64), i64 1),
-// CHECK:   [[FOO]]* (%swift.type*)* @_TFC17objc_class_export3Foo6createfMS0_FT_S0_,
+// CHECK:   [[FOO]]* (%swift.type*)* @_TZFC17objc_class_export3Foo6createfMS0_FT_S0_,
 // CHECK:   void (double, double, double, double, [[FOO]]*)* @_TFC17objc_class_export3Foo10drawInRectfS0_FT5dirtyVSC6NSRect_T_
 // CHECK: }, section "__DATA,__objc_data, regular, no_dead_strip"
 // -- TODO: The OBJC_CLASS symbol should reflect the qualified runtime name of

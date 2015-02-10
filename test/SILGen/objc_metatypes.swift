@@ -22,12 +22,12 @@ class A {
     return m
   }
 
-  // CHECK-LABEL: sil hidden @_TFC14objc_metatypes1A3bar
+  // CHECK-LABEL: sil hidden @_TZFC14objc_metatypes1A3bar
 
-  // CHECK-LABEL: sil hidden @_TToFC14objc_metatypes1A3bar
+  // CHECK-LABEL: sil hidden @_TToZFC14objc_metatypes1A3bar
   // CHECK: bb0([[SELF:%[0-9]+]] : $@objc_metatype A.Type):
   // CHECK-NEXT:   [[OBJC_SELF:%[0-9]+]] = objc_to_thick_metatype [[SELF]] : $@objc_metatype A.Type to $@thick A.Type
-  // CHECK:   [[BAR:%[0-9]+]] = function_ref @_TFC14objc_metatypes1A3barfMS0_FT_T_ : $@thin (@thick A.Type) -> ()
+  // CHECK:   [[BAR:%[0-9]+]] = function_ref @_TZFC14objc_metatypes1A3barfMS0_FT_T_ : $@thin (@thick A.Type) -> ()
   // CHECK-NEXT:   [[RESULT:%[0-9]+]] = apply [[BAR]]([[OBJC_SELF]]) : $@thin (@thick A.Type) -> ()
   // CHECK-NEXT:   return [[RESULT]] : $()
   dynamic class func bar() { }

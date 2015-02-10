@@ -146,12 +146,12 @@ struct ConformingStruct : X {
   // CHECK-NEXT:  }
 }
 func <~>(x: ConformingStruct, y: ConformingStruct) -> ConformingStruct { return x }
-// CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_oi3ltgUS1___fMQPS1_FTS2_S2__S2_ : $@cc(witness_method) @thin (@out ConformingStruct, @in ConformingStruct, @in ConformingStruct, @thick ConformingStruct.Type) -> () {
+// CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses16ConformingStructS_1XS_ZFS1_oi3ltgUS1___fMQPS1_FTS2_S2__S2_ : $@cc(witness_method) @thin (@out ConformingStruct, @in ConformingStruct, @in ConformingStruct, @thick ConformingStruct.Type) -> () {
 // CHECK-NEXT:  bb0(%0 : $*ConformingStruct, %1 : $*ConformingStruct, %2 : $*ConformingStruct, %3 : $@thick ConformingStruct.Type):
 // CHECK-NEXT:    %4 = load %1 : $*ConformingStruct
 // CHECK-NEXT:    %5 = load %2 : $*ConformingStruct
 // CHECK-NEXT:    // function_ref
-// CHECK-NEXT:    %6 = function_ref @_TF9witnessesoi3ltgFTVS_16ConformingStructS0__S0_ : $@thin (ConformingStruct, ConformingStruct) -> ConformingStruct
+// CHECK-NEXT:    %6 = function_ref @_TZF9witnessesoi3ltgFTVS_16ConformingStructS0__S0_ : $@thin (ConformingStruct, ConformingStruct) -> ConformingStruct
 // CHECK-NEXT:    %7 = apply %6(%4, %5) : $@thin (ConformingStruct, ConformingStruct) -> ConformingStruct
 // CHECK-NEXT:    store %7 to %0 : $*ConformingStruct
 // CHECK-NEXT:    %9 = tuple ()
@@ -267,7 +267,7 @@ struct ConformsWithMoreGeneric : X, Y {
   // CHECK-NEXT:  }
 }
 func <~> <J: Y, K: Y>(x: J, y: K) -> K { return y }
-// CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_oi3ltgUS1___fMQPS1_FTS2_S2__S2_ : $@cc(witness_method) @thin (@out ConformsWithMoreGeneric, @in ConformsWithMoreGeneric, @in ConformsWithMoreGeneric, @thick ConformsWithMoreGeneric.Type) -> () {
+// CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_ZFS1_oi3ltgUS1___fMQPS1_FTS2_S2__S2_ : $@cc(witness_method) @thin (@out ConformsWithMoreGeneric, @in ConformsWithMoreGeneric, @in ConformsWithMoreGeneric, @thick ConformsWithMoreGeneric.Type) -> () {
 // CHECK-NEXT:  bb0(%0 : $*ConformsWithMoreGeneric, %1 : $*ConformsWithMoreGeneric, %2 : $*ConformsWithMoreGeneric, %3 : $@thick ConformsWithMoreGeneric.Type):
 // CHECK-NEXT:    %4 = load %1 : $*ConformsWithMoreGeneric
 // CHECK-NEXT:    %5 = load %2 : $*ConformsWithMoreGeneric
@@ -277,7 +277,7 @@ func <~> <J: Y, K: Y>(x: J, y: K) -> K { return y }
 // CHECK-NEXT:    store %5 to %8#1 : $*ConformsWithMoreGeneric
 // CHECK-NEXT:    %10 = alloc_stack $ConformsWithMoreGeneric
 // CHECK-NEXT:    // function_ref
-// CHECK-NEXT:    %11 = function_ref @_TF9witnessesoi3ltgUS_1Y_S0___FTQ_Q0__Q0_ : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Y, τ_0_1 : Y> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
+// CHECK-NEXT:    %11 = function_ref @_TZF9witnessesoi3ltgUS_1Y_S0___FTQ_Q0__Q0_ : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Y, τ_0_1 : Y> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
 // CHECK-NEXT:    %12 = apply %11<ConformsWithMoreGeneric, ConformsWithMoreGeneric>(%10#1, %6#1, %8#1) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Y, τ_0_1 : Y> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
 // CHECK-NEXT:    %13 = load %10#1 : $*ConformsWithMoreGeneric
 // CHECK-NEXT:    store %13 to %0 : $*ConformsWithMoreGeneric

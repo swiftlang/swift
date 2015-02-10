@@ -41,7 +41,7 @@ struct Conformer: Q, QQ {
 // -- FIXME: associated type and witness table
 // CHECK:   i8* null,
 // CHECK:   i8* null,
-// CHECK:   i8* bitcast (void (%swift.type*, %swift.type*)* @_TTWV18sil_witness_tables9ConformerS_1PS_FS1_12staticMethodUS1__US_1A__fMQPS1_FT_T_ to i8*),
+// CHECK:   i8* bitcast (void (%swift.type*, %swift.type*)* @_TTWV18sil_witness_tables9ConformerS_1PS_ZFS1_12staticMethodUS1__US_1A__fMQPS1_FT_T_ to i8*),
 // CHECK:   i8* bitcast (void (%V18sil_witness_tables9Conformer*, %swift.type*)* @_TTWV18sil_witness_tables9ConformerS_1PS_FS1_14instanceMethodUS1__US_1A__fQPS1_FT_T_ to i8*)
 // CHECK: ]
 // CHECK: [[CONFORMER_Q_WITNESS_TABLE:@_TWPV18sil_witness_tables9ConformerS_1QS_]] = hidden constant [2 x i8*] [

@@ -27,7 +27,7 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden void @_TFC10objc_super6Hoozit5runcefMS0_FT_T_([[TYPE]]*) {
+  // CHECK: define hidden void @_TZFC10objc_super6Hoozit5runcefMS0_FT_T_([[TYPE]]*) {
   override class func runce() {
     // CHECK: store [[CLASS]]* @"OBJC_METACLASS_$__TtC10objc_super6Hoozit", [[CLASS]]** {{.*}}, align 8
     // CHECK: load i8** @"\01L_selector(runce)"

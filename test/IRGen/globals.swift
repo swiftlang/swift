@@ -46,7 +46,7 @@ extension A {
 // CHECK: @_Tv7globals2g3Sb = global [[BOOL]] zeroinitializer, align 1
 // CHECK: @_Tv7globals2g6Sd = global [[DOUBLE]] zeroinitializer, align 8
 // CHECK: @_Tv7globals2g7Sf = global [[FLOAT]] zeroinitializer, align 4
-// CHECK: @_TvV7globals1A3fooSi = global [[INT]] zeroinitializer, align 8
+// CHECK: @_TZvV7globals1A3fooSi = global [[INT]] zeroinitializer, align 8
 
 // CHECK-NOT: g8
 // CHECK-NOT: g9
@@ -56,4 +56,4 @@ extension A {
 
 // FIXME: give these initializers a real mangled name
 // CHECK: define internal void @globalinit_{{.*}}func0() {
-// CHECK:      store i64 5, i64* getelementptr inbounds (%Si* @_TvV7globals1A3fooSi, i32 0, i32 0), align 8
+// CHECK:      store i64 5, i64* getelementptr inbounds (%Si* @_TZvV7globals1A3fooSi, i32 0, i32 0), align 8
