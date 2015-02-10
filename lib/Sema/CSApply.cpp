@@ -1489,6 +1489,10 @@ namespace {
     }
 
     Expr *visitBooleanLiteralExpr(BooleanLiteralExpr *expr) {
+      if (expr->getType() && expr->getType()->is<BuiltinIntegerType>()) {
+        return expr;
+      }
+
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *protocol
         = tc.getProtocol(expr->getLoc(),

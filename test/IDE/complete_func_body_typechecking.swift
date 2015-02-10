@@ -201,3 +201,11 @@ class TestTypeCheckExprPostfixBeginInDestructor1 {
     #^EXPR_POSTFIX_BEGIN_IN_DESTRUCTOR_1^#
   }
 }
+
+// rdar://19634354
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_19634354
+while true {
+    func f() {
+        a#^RDAR_19634354^#
+    }
+}
