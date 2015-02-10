@@ -188,66 +188,67 @@ static bool loadSwiftRuntime(StringRef runtimeLibPath) {
 static bool tryLoadLibrary(LinkLibrary linkLib,
                            SearchPathOptions searchPathOpts) {
   llvm::SmallString<128> path = linkLib.getName();
-  bool success = false;
 
   // If we have an absolute or relative path, just try to load it now.
   if (llvm::sys::path::has_parent_path(path.str())) {
-    success = dlopen(path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
-  } else {
-    switch (linkLib.getKind()) {
-    case LibraryKind::Library: {
-      llvm::SmallString<32> stem;
-      if (llvm::sys::path::has_extension(path.str())) {
-        stem = std::move(path);
-      } else {
-        // FIXME: Try the appropriate extension for the current platform?
-        stem = "lib";
-        stem += path;
-        stem += LTDL_SHLIB_EXT;
-      }
-
-      // Try user-provided library search paths first.
-      for (auto &libDir : searchPathOpts.LibrarySearchPaths) {
-        path = libDir;
-        llvm::sys::path::append(path, stem.str());
-        success = dlopen(path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
-        if (success)
-          break;
-      }
-
-      // Let dlopen determine the best search paths.
-      if (!success)
-        success = dlopen(stem.c_str(), RTLD_LAZY | RTLD_GLOBAL);
-
-      // If that fails, try our runtime library path.
-      if (!success)
-        success = loadRuntimeLib(stem, searchPathOpts.RuntimeLibraryPath);
-      break;
-    }
-    case LibraryKind::Framework: {
-      // If we have a framework, mangle the name to point to the framework
-      // binary.
-      llvm::SmallString<64> frameworkPart{std::move(path)};
-      frameworkPart += ".framework";
-      llvm::sys::path::append(frameworkPart, linkLib.getName());
-
-      // Try user-provided framework search paths first; frameworks contain
-      // binaries as well as modules.
-      for (auto &frameworkDir : searchPathOpts.FrameworkSearchPaths) {
-        path = frameworkDir;
-        llvm::sys::path::append(path, frameworkPart.str());
-        success = dlopen(path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
-        if (success)
-          break;
-      }
-
-      // If that fails, let dlopen search for system frameworks.
-      if (!success)
-        success = dlopen(frameworkPart.c_str(), RTLD_LAZY | RTLD_GLOBAL);
-      break;
-    }
-    }
+    return dlopen(path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
   }
+
+  bool success = false;
+  switch (linkLib.getKind()) {
+  case LibraryKind::Library: {
+    llvm::SmallString<32> stem;
+    if (llvm::sys::path::has_extension(path.str())) {
+      stem = std::move(path);
+    } else {
+      // FIXME: Try the appropriate extension for the current platform?
+      stem = "lib";
+      stem += path;
+      stem += LTDL_SHLIB_EXT;
+    }
+
+    // Try user-provided library search paths first.
+    for (auto &libDir : searchPathOpts.LibrarySearchPaths) {
+      path = libDir;
+      llvm::sys::path::append(path, stem.str());
+      success = dlopen(path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
+      if (success)
+        break;
+    }
+
+    // Let dlopen determine the best search paths.
+    if (!success)
+      success = dlopen(stem.c_str(), RTLD_LAZY | RTLD_GLOBAL);
+
+    // If that fails, try our runtime library path.
+    if (!success)
+      success = loadRuntimeLib(stem, searchPathOpts.RuntimeLibraryPath);
+    break;
+  }
+  case LibraryKind::Framework: {
+    // If we have a framework, mangle the name to point to the framework
+    // binary.
+    llvm::SmallString<64> frameworkPart{std::move(path)};
+    frameworkPart += ".framework";
+    llvm::sys::path::append(frameworkPart, linkLib.getName());
+
+    // Try user-provided framework search paths first; frameworks contain
+    // binaries as well as modules.
+    for (auto &frameworkDir : searchPathOpts.FrameworkSearchPaths) {
+      path = frameworkDir;
+      llvm::sys::path::append(path, frameworkPart.str());
+      success = dlopen(path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
+      if (success)
+        break;
+    }
+
+    // If that fails, let dlopen search for system frameworks.
+    if (!success)
+      success = dlopen(frameworkPart.c_str(), RTLD_LAZY | RTLD_GLOBAL);
+    break;
+  }
+  }
+
   return success;
 }
 
