@@ -45,7 +45,9 @@ option(SWIFT_INCLUDE_DOCS
     TRUE)
 
 set(SWIFT_VERSION "1.2" CACHE STRING
-    "User-visible version of the Swift compiler")
+    "The user-visible version of the Swift compiler")
+set(SWIFT_VENDOR "" CACHE STRING
+    "The vendor name of the Swift compiler")
 
 set(_SWIFT_KNOWN_INSTALL_COMPONENTS
     "compiler;clang-builtin-headers;clang-resource-dir-symlink;arclite-symlink;stdlib;stdlib-experimental;editor-integration;lang-docs;tools;testsuite-tools;dev")

@@ -37,11 +37,6 @@ add_swift_library(swiftBasic
   LINK_LIBRARIES ${UUID_LIBRARIES}
   COMPONENT_DEPENDS support)
 
-set(SWIFT_VERSION "99.99" CACHE STRING
-    "The user-visible version of the Swift compiler")
-set(SWIFT_VENDOR "" CACHE STRING
-    "The vendor name of the Swift compiler")
-
 message(STATUS "Swift version: ${SWIFT_VERSION}")
 message(STATUS "Swift vendor: ${SWIFT_VENDOR}")
 
