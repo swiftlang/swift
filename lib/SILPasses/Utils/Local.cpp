@@ -911,16 +911,16 @@ static bool isARCOperationRemovableIfObjectIsDead(const SILInstruction *I) {
   }
 }
 
-/// TODO: Generalize this to general objects. We are using the fact that
-/// closures
+/// TODO: Generalize this to general objects.
 bool swift::tryDeleteDeadClosure(SILInstruction *Closure) {
-  // We currently only handle locally distinct values.
+  // We currently only handle locally identified values that do not escape.
   if (!isa<PartialApplyInst>(Closure) && !isa<ThinToThickFunctionInst>(Closure))
     return false;
 
   // We only accept a user if it is an ARC object that can be removed if the
   // object is dead. This should be expanded in the future. This also ensures
-  // that we are locally distinct since we only allow for specific ARC users.
+  // that we are locally identified and non-escaping since we only allow for
+  // specific ARC users.
   ReleaseTracker Tracker([](const SILInstruction *I) -> bool {
     return isARCOperationRemovableIfObjectIsDead(I);
   });
