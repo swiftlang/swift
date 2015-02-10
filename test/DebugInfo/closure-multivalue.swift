@@ -9,9 +9,9 @@
 // CHECK: call void @llvm.dbg.value(metadata i{{[0-9]+}} {{.*}}, metadata ![[B]], metadata ![[P3]])
 // CHECK-DAG: ![[A]] = {{.*}} [ DW_TAG_a{{.*}}_variable ] [a] [line 15]
 // CHECK-DAG: ![[B]] = {{.*}} [ DW_TAG_a{{.*}}_variable ] [b] [line 15]
-// CHECK-DAG: ![[P1]] = {{.*}}; [ DW_TAG_expression ] [DW_OP_piece offset=0, size={{(4|8)}}]
-// CHECK-DAG: ![[P2]] = {{.*}}; [ DW_TAG_expression ] [DW_OP_piece offset={{(4|8)}}, size={{(4|8)}}]
-// CHECK-DAG: ![[P3]] = {{.*}}; [ DW_TAG_expression ] [DW_OP_piece offset={{(8|16)}}, size={{(4|8)}}]
+// CHECK-DAG: ![[P1]] = {{.*}}; [ DW_TAG_expression ] [DW_OP_bit_piece offset=0, size={{(32|64)}}]
+// CHECK-DAG: ![[P2]] = {{.*}}; [ DW_TAG_expression ] [DW_OP_bit_piece offset={{(32|64)}}, size={{(32|64)}}]
+// CHECK-DAG: ![[P3]] = {{.*}}; [ DW_TAG_expression ] [DW_OP_bit_piece offset={{(64|128)}}, size={{(32|64)}}]
 func sort(a : String, b : String) -> Bool {
   println("Sorting..\(a) & \(b)")
   return (a < b)

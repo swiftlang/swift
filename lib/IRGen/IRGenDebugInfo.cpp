@@ -1078,11 +1078,12 @@ void IRGenDebugInfo::emitVariableDeclaration(
   }
 
   // Insert a debug intrinsic into the current block.
-  unsigned OffsetInBytes = 0;
+  unsigned OffsetInBits = 0;
   auto *BB = Builder.GetInsertBlock();
   bool IsPiece = Storage.size() > 1;
   uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
   ElementSizes EltSizes(DITy, DIRefMap);
+  auto Dim = EltSizes.getNext();
   for (llvm::Value *Piece : Storage) {
     assert(Piece && "already-claimed explosion value?");
 
@@ -1097,37 +1098,34 @@ void IRGenDebugInfo::emitVariableDeclaration(
         return;
 
       // Try to get the size from the type if possible.
-      auto Dim = EltSizes.getNext();
       auto StorageSize = getSizeFromExplosionValue(CI.getTargetInfo(), Piece);
       // FIXME: Occasionally, there is a discrepancy between the AST
       // type and the Storage type. Usually this is due to reference
       // counting.
       if (!Dim.SizeInBits || (StorageSize && Dim.SizeInBits > StorageSize))
         Dim.SizeInBits = StorageSize;
-      if (!Dim.AlignInBits)
-        Dim.AlignInBits = SizeOfByte;
-
-      unsigned SizeInBytes =
-        llvm::RoundUpToAlignment(Dim.SizeInBits, Dim.AlignInBits) / SizeOfByte;
 
       // FIXME: Occasionally we miss out that the Storage is acually a
       // refcount wrapper. Silently skip these for now.
       unsigned VarSizeInBits = getSizeInBits(Var, DIRefMap);
       assert(VarSizeInBits > 0 && "zero-sized variable");
-      if ((OffsetInBytes+SizeInBytes)*SizeOfByte > VarSizeInBits)
+      if (OffsetInBits+Dim.SizeInBits > VarSizeInBits)
         break;
-      if ((OffsetInBytes == 0) &&
-          SizeInBytes*SizeOfByte == VarSizeInBits)
+      if (OffsetInBits == 0 && Dim.SizeInBits == VarSizeInBits)
         break;
-      if (SizeInBytes == 0)
+      if (Dim.SizeInBits == 0)
         break;
 
-      assert(SizeInBytes < VarSizeInBits
+      assert(Dim.SizeInBits < VarSizeInBits
              && "piece covers entire var");
-      assert((OffsetInBytes+SizeInBytes)*SizeOfByte<=VarSizeInBits
-             && "pars > totum");
-      Expr = DBuilder.createPieceExpression(OffsetInBytes, SizeInBytes);
-      OffsetInBytes += SizeInBytes;
+      assert(OffsetInBits+Dim.SizeInBits <= VarSizeInBits && "pars > totum");
+      Expr = DBuilder.createBitPieceExpression(OffsetInBits, Dim.SizeInBits);
+
+      auto Size = Dim.SizeInBits;
+      Dim = EltSizes.getNext();
+      OffsetInBits +=
+        llvm::RoundUpToAlignment(Size, Dim.AlignInBits ? Dim.AlignInBits
+                                                       : SizeOfByte);
     }
     emitDbgIntrinsic(BB, Piece, Var, Expr, Line, Loc.Col, Scope, DS);
   }
