@@ -17,6 +17,7 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Function.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "Explosion.h"
@@ -184,6 +185,33 @@ void IRGenFunction::emitFakeExplosion(const TypeInfo &type,
     
     explosion.add(llvm::UndefValue::get(elementType));
   }
+}
+
+llvm::Value *IRGenFunction::tryGetLocalTypeData(CanType type,
+                                                LocalTypeData index) {
+  
+  // First try to lookup in the unscoped cache (= definitions in the entry block
+  // of the function).
+  auto key = getLocalTypeDataKey(type, index);
+  auto it = LocalTypeDataMap.find(key);
+  if (it != LocalTypeDataMap.end())
+    return it->second;
+  
+  // Now try to lookup in the scoped cache.
+  auto it2 = ScopedTypeDataMap.find(type);
+  if (it2 == ScopedTypeDataMap.end())
+    return nullptr;
+  
+  llvm::Instruction *I = it2->second;
+  
+  // This is a very very simple dominance check: either the definition is in the
+  // entry block or in the current block.
+  // TODO: do a better dominance check.
+  if (I->getParent() == &CurFn->getEntryBlock() ||
+      I->getParent() == Builder.GetInsertBlock()) {
+    return I;
+  }
+  return nullptr;
 }
 
 void IRGenFunction::unimplemented(SourceLoc Loc, StringRef Message) {

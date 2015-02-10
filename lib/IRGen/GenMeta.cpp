@@ -337,7 +337,7 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
     result->setDoesNotThrow();
     result->addAttribute(llvm::AttributeSet::FunctionIndex,
                          llvm::Attribute::ReadNone);
-    // FIXME: Save scope type metadata.
+    IGF.setScopedLocalTypeData(theType, result);
     return result;
   }
 
@@ -364,7 +364,7 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
   result->addAttribute(llvm::AttributeSet::FunctionIndex,
                        llvm::Attribute::ReadOnly);
 
-  // FIXME: Save scope type metadata.
+  IGF.setScopedLocalTypeData(theType, result);
   return result;
 }
 
@@ -897,8 +897,8 @@ namespace {
     }
 
     /// Set the metatype in local data.
-    llvm::Value *setLocal(CanType type, llvm::Value *metatype) {
-      // FIXME: Save scope type metadata.
+    llvm::Value *setLocal(CanType type, llvm::Instruction *metatype) {
+      IGF.setScopedLocalTypeData(type, metatype);
       return metatype;
     }
   };
@@ -1203,8 +1203,8 @@ namespace {
     }
 
     /// Set the metatype in local data.
-    llvm::Value *setLocal(CanType type, llvm::Value *metatype) {
-      // FIXME: Save scope type metadata.
+    llvm::Value *setLocal(CanType type, llvm::Instruction *metatype) {
+      IGF.setScopedLocalTypeData(type, metatype);
       return metatype;
     }
   };

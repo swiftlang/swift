@@ -255,13 +255,9 @@ public:
 //--- Type emission ------------------------------------------------------------
 public:
   /// Look for a mapping for a local type-metadata reference.
-  llvm::Value *tryGetLocalTypeData(CanType type, LocalTypeData index) {
-    auto key = getLocalTypeDataKey(type, index);
-    auto it = LocalTypeDataMap.find(key);
-    if (it == LocalTypeDataMap.end())
-      return nullptr;
-    return it->second;
-  }
+  /// The lookup is done for the current block which is the Builder's
+  /// insert-block.
+  llvm::Value *tryGetLocalTypeData(CanType type, LocalTypeData index);
 
   /// Retrieve a local type-metadata reference which is known to exist.
   llvm::Value *getLocalTypeData(CanType type, LocalTypeData index) {
@@ -282,6 +278,14 @@ public:
     LocalTypeDataMap.insert(std::make_pair(key, data));
   }
   
+  /// Add a local type-metadata reference, which is valid for the containing
+  /// block.
+  void setScopedLocalTypeData(CanType type, llvm::Instruction *data) {
+    assert(data->getParent() == Builder.GetInsertBlock() &&
+           "metadata instruction not inserted into the Builder's insert-block");
+    ScopedTypeDataMap[type] = data;
+  }
+
   /// The kind of value LocalSelf is.
   enum LocalSelfKind {
     /// An object reference.
@@ -303,6 +307,8 @@ private:
   }
 
   llvm::DenseMap<LocalTypeDataPair, llvm::Value*> LocalTypeDataMap;
+
+  llvm::DenseMap<CanType, llvm::Instruction*> ScopedTypeDataMap;
   
   /// The value that satisfies metadata lookups for dynamic Self.
   llvm::Value *LocalSelf = nullptr;
