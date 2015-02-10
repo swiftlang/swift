@@ -603,9 +603,15 @@ extension ${Self} : _ArrayType {
   /// `transform(x)` on each element `x` of `self`
   public func map<U>(transform: (T) -> U) -> ${Self}<U> {
     // 'transform' should be @noescape, but there's a compiler bug:
+    // Should call Swift.map here, but there's a compiler bug:
     // <rdar://problem/19763792> Calling Swift.map from Array.map causes
     // Assertion failed: UnresolvedDot in wrong phase
-    return ${Self}<U>(lazy(self).map(transform))
+    var result: ${Self}<U> = []
+    result.reserveCapacity(underestimateCount(self))
+    for element in self {
+      result.append(transform(element))
+    }
+    return result
   }
 
   /// A ${Self} containing the elements of `self` in reverse order
@@ -615,11 +621,17 @@ extension ${Self} : _ArrayType {
 
   /// Return ${a_Self} containing the elements `x` of `self` for which
   /// `includeElement(x)` is `true`
-  public func filter(includeElement: (T) -> Bool) -> ${Self} {
-    // 'includeElement' should be @noescape, but there's a compiler bug:
+  public func filter(@noescape includeElement: (T) -> Bool) -> ${Self} {
+    // Should call Swift.filter() here, but there's a compiler bug:
     // <rdar://problem/19763792> Calling Swift.map from Array.map causes
     // Assertion failed: UnresolvedDot in wrong phase
-    return ${Self}(lazy(self).filter(includeElement))
+    var result: ${Self}<T> = []
+    for element in self {
+      if includeElement(element) {
+        result.append(element)
+      }
+    }
+    return result
   }
 }
 

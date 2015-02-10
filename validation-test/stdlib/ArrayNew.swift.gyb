@@ -136,6 +136,58 @@ ArrayTestSuite.test("${array_type}/emptyAllocation") {
   expectTrue(emptyLiteralsShareBuffer)
 }
 
+ArrayTestSuite.test("${array_type}/filter") {
+  if true {
+    let arr: ${array_type}<Int> = []
+    var result = arr.filter() {
+      (x: Int) -> Bool in
+      expectUnreachable()
+      return true
+    }
+    expectType(${array_type}<Int>.self, &result)
+    expectEqual([], result)
+    expectEqual(0, result.capacity)
+  }
+  if true {
+    let arr: ${array_type}<Int> = [ 0, 30, 10, 90 ]
+    let result = arr.filter() { (x: Int) -> Bool in true }
+    expectEqual([ 0, 30, 10, 90 ], result)
+    expectGE(2 * result.count, result.capacity)
+  }
+  if true {
+    let arr: ${array_type}<Int> = [ 0, 30, 10, 90 ]
+    let result = arr.filter() { (x: Int) -> Bool in false }
+    expectEqual([], result)
+    expectGE(2 * result.count, result.capacity)
+  }
+  if true {
+    let arr: ${array_type}<Int> = [ 0, 30, 10, 90 ]
+    let result = arr.filter() { $0 % 3 == 0 }
+    expectEqual([ 0, 30, 90 ], result)
+    expectGE(2 * result.count, result.capacity)
+  }
+}
+
+ArrayTestSuite.test("${array_type}/map") {
+  if true {
+    let arr: ${array_type}<Int> = []
+    var result = arr.map() {
+      (x: Int) -> Int16 in
+      expectUnreachable()
+      return 42
+    }
+    expectType(${array_type}<Int16>.self, &result)
+    expectEqual([], result)
+    expectEqual(0, result.capacity)
+  }
+  if true {
+    let arr: ${array_type}<Int> = [ 0, 30, 10, 90 ]
+    let result = arr.map() { $0 + 1 }
+    expectEqual([ 1, 31, 11, 91 ], result)
+    expectGE(2 * result.count, result.capacity)
+  }
+}
+
 % end
 
 //===----------------------------------------------------------------------===//
