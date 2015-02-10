@@ -3452,11 +3452,28 @@ final internal class _Cocoa${Self}Generator : GeneratorType {
   // guarantee that the fast enumeration struct is pinned to a certain memory
   // location.
 
-  internal let cocoa${Self}: _NS${Self}Type
-  internal var fastEnumerationState = _makeSwiftNSFastEnumerationState()
-  internal var fastEnumerationStackBuf = _CocoaFastEnumerationStackBuf()
+  // This stored property should be stored at offset zero.  There's code below
+  // relying on this.
+  internal var _fastEnumerationState: _SwiftNSFastEnumerationState =
+    _makeSwiftNSFastEnumerationState()
 
-  // These members have to be full-sized integers, they can not be limited to
+  // This stored property should be stored right after `_fastEnumerationState`.
+  // There's code below relying on this.
+  internal var _fastEnumerationStackBuf = _CocoaFastEnumerationStackBuf()
+
+  internal let cocoa${Self}: _NS${Self}Type
+
+  internal var _fastEnumerationStatePtr:
+    UnsafeMutablePointer<_SwiftNSFastEnumerationState> {
+    return UnsafeMutablePointer(_getUnsafePointerToStoredProperties(self))
+  }
+
+  internal var _fastEnumerationStackBufPtr:
+    UnsafeMutablePointer<_CocoaFastEnumerationStackBuf> {
+    return UnsafeMutablePointer(_fastEnumerationStatePtr + 1)
+  }
+
+  // These members have to be word-sized integers, they can not be limited to
   // Int8 just because our buffer holds 16 elements: fast enumeration is
   // allowed to return inner pointers to the container, which can be much
   // larger.
@@ -3473,14 +3490,15 @@ final internal class _Cocoa${Self}Generator : GeneratorType {
     }
     let cocoa${Self} = self.cocoa${Self}
     if itemIndex == itemCount {
-      let stackBufLength = fastEnumerationStackBuf.length
-      itemCount = withUnsafeMutablePointers(
-        &fastEnumerationState, &fastEnumerationStackBuf) {
-          (statePtr, bufPtr) -> Int in
-            cocoa${Self}.countByEnumeratingWithState(
-              statePtr, objects: UnsafeMutablePointer(bufPtr),
-              count: stackBufLength)
-      }
+      let stackBufLength = _fastEnumerationStackBuf.length
+      // We can't use `withUnsafeMutablePointers` here to get pointers to
+      // properties, because doing so might introduce a writeback buffer, but
+      // fast enumeration relies on the pointer identity of the enumeration
+      // state struct.
+      itemCount = cocoa${Self}.countByEnumeratingWithState(
+        _fastEnumerationStatePtr,
+        objects: UnsafeMutablePointer(_fastEnumerationStackBufPtr),
+        count: stackBufLength)
       if itemCount == 0 {
         itemIndex = -1
         return .None
@@ -3488,7 +3506,7 @@ final internal class _Cocoa${Self}Generator : GeneratorType {
       itemIndex = 0
     }
     let itemsPtrUP: UnsafeMutablePointer<AnyObject> =
-      UnsafeMutablePointer(fastEnumerationState.itemsPtr)
+      UnsafeMutablePointer(_fastEnumerationState.itemsPtr)
     let itemsPtr = _UnmanagedAnyObjectArray(itemsPtrUP)
     let key: AnyObject = itemsPtr[itemIndex]
     ++itemIndex
