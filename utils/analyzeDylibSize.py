@@ -74,7 +74,7 @@ Prefix = {
   "__TM"  : "Type Metadata",
   "__TF"  : "Swift Function",
   "__TTS" : "Specialization",
-
+  "__TZF" : "Static Func",
   # Default
   ""      : "Unknown",
 }
