@@ -126,18 +126,28 @@ namespace {
     
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       
-      if (dyn_cast<IntegerLiteralExpr>(expr)) {
+      if (isa<IntegerLiteralExpr>(expr)) {
         LTI.haveIntLiteral = true;
         return {false, expr};
       }
       
-      if (dyn_cast<FloatLiteralExpr>(expr)) {
+      if (isa<FloatLiteralExpr>(expr)) {
         LTI.haveFloatLiteral = true;
         return {false, expr};
       }
       
-      if (dyn_cast<StringLiteralExpr>(expr)) {
+      if (isa<StringLiteralExpr>(expr)) {
         LTI.haveStringLiteral = true;
+        return {false, expr};
+      }
+      
+      if (auto UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+        
+        if (UDE->getType() &&
+            !isa<TypeVariableType>(UDE->getType().getPointer()))
+          LTI.collectedTypes.insert(UDE->getType().getPointer());
+        
+        // Don't recurse into the base expression.
         return {false, expr};
       }
       

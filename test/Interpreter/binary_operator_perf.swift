@@ -174,3 +174,27 @@ println(cc)
 let dd = 1 + 1 + Double(1) + 1 + Double(1)
 println(dd)
 // CHECK: 5.0
+
+struct Point2D {
+	var x: Float
+	var y: Float
+}
+
+let points: (Point2D, Point2D, Point2D) = ( Point2D(x: 1.0, y:1.0),
+											Point2D(x: 1.0, y: 1.0), 
+											Point2D(x: 1.0, y: 1.0))
+
+var signedArea: Float {
+    get {
+        let (a, b, c) = points
+        let signedArea = 0.5 * (
+            a.x * (b.y - c.y) +
+            b.x * (c.y - a.y) +
+            c.x * (a.y - b.y)
+        )
+        return signedArea
+    }
+}
+
+println(signedArea)
+// CHECK: 0.0

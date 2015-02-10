@@ -1867,6 +1867,8 @@ bool FailureDiagnosis::diagnoseFailureForSubscriptExpr() {
                   baseTypeName,
                   indexTypeName);
   
+  expr->setType(ErrorType::get(CS->getASTContext()));
+  
   return true;
 }
 
