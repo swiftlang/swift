@@ -66,7 +66,7 @@ public protocol DebugPrintable {
 /// Do our best to print a value that can not be printed directly, using one of
 /// its conformances to `Streamable`, `Printable` or `DebugPrintable`.
 func _adHocPrint<T, TargetStream : OutputStreamType>(
-    value: T, inout target: TargetStream
+    object: T, inout target: TargetStream
 ) {
   var mirror = reflect(object)
   // Checking the mirror kind is not a good way to implement this, but we don't
@@ -103,7 +103,7 @@ func _adHocPrint<T, TargetStream : OutputStreamType>(
 /// protocols mentioned above.
 @inline(never)
 public func print<T, TargetStream : OutputStreamType>(
-    value: T, inout target: TargetStream
+    object: T, inout target: TargetStream
 ) {
   if let streamableObject = object as? Streamable {
     streamableObject.writeTo(&target)
@@ -134,7 +134,7 @@ public func print<T, TargetStream : OutputStreamType>(
 /// protocols mentioned above.
 @inline(never)
 public func println<T, TargetStream : OutputStreamType>(
-    value: T, inout target: TargetStream
+    object: T, inout target: TargetStream
 ) {
   print(object, &target)
   target.write("\n")
@@ -150,7 +150,7 @@ public func println<T, TargetStream : OutputStreamType>(
 /// protocols mentioned above.
 @inline(never)
 @semantics("stdlib_binary_only")
-public func print<T>(value: T) {
+public func print<T>(object: T) {
   var stdoutStream = _Stdout()
   print(object, &stdoutStream)
 }
@@ -166,7 +166,7 @@ public func print<T>(value: T) {
 /// protocols mentioned above.
 @inline(never)
 @semantics("stdlib_binary_only")
-public func println<T>(value: T) {
+public func println<T>(object: T) {
   var stdoutStream = _Stdout()
   print(object, &stdoutStream)
   stdoutStream.write("\n")
@@ -229,7 +229,7 @@ public func toDebugString<T>(x: T) -> String {
 /// See also: `debugPrintln(x, &target)`
 @inline(never)
 public func debugPrint<T, TargetStream : OutputStreamType>(
-    value: T, inout target: TargetStream
+    object: T, inout target: TargetStream
 ) {
   if let debugPrintableObject = object as? DebugPrintable {
     debugPrintableObject.debugDescription.writeTo(&target)
