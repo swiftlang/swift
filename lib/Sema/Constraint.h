@@ -230,7 +230,7 @@ enum class FixKind : uint8_t {
   /// Introduce a '!' to force an optional unwrap.
   ForceOptional,
 
-  /// Introduce a '!' to force a downcast to the specified type.
+  /// Append 'as! T' to force a downcast to the specified type.
   ForceDowncast,
 
   /// Introduce a '&' to take the address of an lvalue.

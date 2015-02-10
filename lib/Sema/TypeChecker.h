@@ -37,6 +37,7 @@ class TopLevelContext;
 class TypeChecker;
 
 namespace constraints {
+  enum class ConstraintKind : char;
   class ConstraintSystem;
   class Solution;
 }
@@ -527,7 +528,33 @@ public:
   ///
   /// \returns true if \c t1 can be implicitly converted to \c t2.
   bool isConvertibleTo(Type t1, Type t2, DeclContext *dc);
+
+  /// \brief Determine whether one type is explicitly convertible to another,
+  /// i.e. using an 'as' expression.
+  ///
+  /// \param t1 The potential source type of the conversion.
+  ///
+  /// \param t2 The potential destination type of the conversion.
+  ///
+  /// \param dc The context of the conversion.
+  ///
+  /// \returns true if \c t1 can be explicitly converted to \c t2.
+  bool isExplicitlyConvertibleTo(Type t1, Type t2, DeclContext *dc);
   
+  /// \brief Determine whether a constraint of the given kind can be satisfied
+  /// by the two types.
+  ///
+  /// \param t1 The first type of the constrant.
+  ///
+  /// \param t2 The second type of the constrant.
+  ///
+  /// \param dc The context of the conversion.
+  ///
+  /// \returns true if \c t1 and \c t2 satisfy the constraint.
+  bool typesSatisfyConstraint(Type t1, Type t2,
+                              constraints::ConstraintKind kind,
+                              DeclContext *dc);
+
   /// \brief Determine whether one type would be a valid substitution for an
   /// archetype.
   ///

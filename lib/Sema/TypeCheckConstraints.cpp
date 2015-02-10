@@ -1618,24 +1618,26 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   return false;
 }
 
-bool TypeChecker::isSubtypeOf(Type type1, Type type2, DeclContext *dc) {
+bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
+                                         ConstraintKind kind, DeclContext *dc) {
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
-  cs.addConstraint(ConstraintKind::Subtype,
-                   type1,
-                   type2,
-                   cs.getConstraintLocator(nullptr));
+  cs.addConstraint(kind, type1, type2, cs.getConstraintLocator(nullptr));
   SmallVector<Solution, 1> solutions;
   return !cs.solve(solutions);
 }
 
+bool TypeChecker::isSubtypeOf(Type type1, Type type2, DeclContext *dc) {
+  return typesSatisfyConstraint(type1, type2, ConstraintKind::Subtype, dc);
+}
+
 bool TypeChecker::isConvertibleTo(Type type1, Type type2, DeclContext *dc) {
-  ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
-  cs.addConstraint(ConstraintKind::Conversion,
-                   type1,
-                   type2,
-                   cs.getConstraintLocator(nullptr));
-  SmallVector<Solution, 1> solutions;
-  return !cs.solve(solutions);
+  return typesSatisfyConstraint(type1, type2, ConstraintKind::Conversion, dc);
+}
+
+bool TypeChecker::isExplicitlyConvertibleTo(Type type1, Type type2,
+                                            DeclContext *dc) {
+  return typesSatisfyConstraint(type1, type2,
+                                ConstraintKind::ExplicitConversion, dc);
 }
 
 bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,

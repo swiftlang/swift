@@ -93,7 +93,7 @@ func arrayToNSArray() {
 
 // NSArray -> Array
 func nsArrayToArray(nsa: NSArray) {
-  var arr1: [AnyObject] = nsa // expected-error{{'NSArray' is not convertible to '[AnyObject]'}}
+  var arr1: [AnyObject] = nsa // expected-error{{'NSArray' is not implicitly convertible to '[AnyObject]'; did you mean to use 'as' to explicitly convert?}}
   var arr2: [BridgedClass] = nsa // expected-error{{'NSArray' is not convertible to '[BridgedClass]'}}
   var arr3: [OtherClass] = nsa // expected-error{{'NSArray' is not convertible to '[OtherClass]'}}
   var arr4: [BridgedStruct] = nsa // expected-error{{'NSArray' is not convertible to '[BridgedStruct]'}}
@@ -174,10 +174,10 @@ func rdar18330319(s: String, d: [String : AnyObject]) {
   let t = d[s] as! String?
 }
 
-// rdar://problm/rdar19551164
+// rdar://problem/19551164
 func rdar19551164a(s: String, a: [String]) {}
 func rdar19551164b(s: NSString, a: NSArray) {
-  rdar19551164a(s, a) // expected-error{{'NSString' is not convertible to 'String'; did you mean to use 'as!' to force downcast?}}{{18-18= as! String}}
+  rdar19551164a(s, a) // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}{{18-18= as String}}
   // expected-error@-1{{'NSArray' is not convertible to '[String]'; did you mean to use 'as!' to force downcast?}}{{21-21= as! [String]}}
 }
 

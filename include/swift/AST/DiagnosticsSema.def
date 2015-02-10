@@ -355,6 +355,9 @@ ERROR(missing_unwrap_optional,sema_tcc,none,
 ERROR(missing_forced_downcast,sema_tcc,none,
       "%0 is not convertible to %1; "
       "did you mean to use 'as!' to force downcast?", (Type, Type))
+ERROR(missing_explicit_conversion,sema_tcc,none,
+      "%0 is not implicitly convertible to %1; "
+      "did you mean to use 'as' to explicitly convert?", (Type, Type))
 ERROR(missing_address_of,sema_tcc,none,
       "passing value of type %0 to an inout parameter requires explicit '&'",
       (Type))

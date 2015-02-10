@@ -470,7 +470,7 @@ void Fix::print(llvm::raw_ostream &Out, ConstraintSystem *cs) const {
   }
 
   if (getKind() == FixKind::ForceDowncast && cs) {
-    Out << " as ";
+    Out << " as! ";
     Out << getTypeArgument(*cs).getString();
   }
   Out << "]";

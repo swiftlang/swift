@@ -5230,15 +5230,23 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
         SourceLoc afterAffectedLoc
           = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
                                        affected->getEndLoc());
+        if (TC.isExplicitlyConvertibleTo(fromType, toType, DC)) {
+          llvm::SmallString<32> asCastStr;
+          asCastStr += " as ";
+          asCastStr += toType.getString();
+          TC.diagnose(affected->getLoc(), diag::missing_explicit_conversion,
+                      fromType, toType)
+            .fixItInsert(afterAffectedLoc, asCastStr);
+        } else {
+          llvm::SmallString<32> asCastStr;
+          asCastStr += " as! ";
+          asCastStr += toType.getString();
+          TC.diagnose(affected->getLoc(), diag::missing_forced_downcast,
+                      fromType, toType)
+            .fixItInsert(afterAffectedLoc, asCastStr);
+        }
 
-        llvm::SmallString<32> asCastStr;
-        asCastStr += " as! ";
-        asCastStr += toType.getString();
-        TC.diagnose(affected->getLoc(), diag::missing_forced_downcast, fromType,
-                    toType)
-          .fixItInsert(afterAffectedLoc, asCastStr);
         diagnosed = true;
-
         // FIXME: Add parentheses if we now need them.
         break;
       }
