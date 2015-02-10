@@ -4,7 +4,6 @@
 
 import StdlibUnittest
 import Swift
-import func Darwin.sqrtf
 
 var Algorithm = TestSuite("Algorithm")
 
@@ -307,14 +306,6 @@ Algorithm.test("filter/CollectionType") {
     expectEqual([ 0, 30, 90 ], result)
     expectGE(2 * result.count, result.capacity)
   }
-}
-
-
-Algorithm.test("map") {
-  let x: [Float] = [1,2,3]
-  expectEqual([1.0, 1.41421354, 1.73205078], map(x, sqrtf))
-  // FIXME(19769879): This references foundation!
-  // expectEqual([1.0, 1.41421354], map(x, curry((<))(2) • sqrtf))
 }
 
 Algorithm.test("filter/eager") {
