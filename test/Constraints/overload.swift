@@ -96,3 +96,13 @@ func f5(i: Int) -> A { return A() } // expected-note{{candidate}}
 func f5(i: Int) -> B { return B() } // expected-note{{candidate}}
 
 f5(5) // expected-error{{ambiguous use of 'f5'}}
+
+struct HasX1aProperty {
+  func write(_: X1a) {}
+  func write(_: P1) {}
+
+  var prop = X1a()
+  func test() {
+    write(prop) // no error, not ambiguous
+  }
+}

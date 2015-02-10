@@ -76,7 +76,7 @@ getAnyObject().map(castToClass) // expected-error{{function signature '(Any) -> 
 
 let _ = { (_: Any) -> Void in
   return
-} as ((Int) -> Void) // expected-error {{'Any -> Void' is not convertible to '(Int) -> Void'}}
+} as ((Int) -> Void) // expected-error {{function signature 'Any -> Void' is not compatible with expected type '(Int) -> Void'}}
 
 let _: (Int) -> Void = {  // expected-error {{function signature 'Any -> Void' is not compatible with expected type '(Int) -> Void'}}
   (_: Any) -> Void in

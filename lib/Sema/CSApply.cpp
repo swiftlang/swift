@@ -4136,6 +4136,112 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(Expr *expr) {
   return newClosure;
 }
 
+// FIXME: This is duplicating work that should really only exist at the SIL
+// level. Once we have support for arbitrary function conversions, we should
+// rip this whole thing out.
+static bool areConvertibleTypesABICompatible(CanType lhs, CanType rhs) {
+  // Match identical types.
+  if (lhs == rhs)
+    return true;
+
+  // Recursively match tuple types.
+  auto lhsTuple = dyn_cast<TupleType>(lhs);
+  auto rhsTuple = dyn_cast<TupleType>(rhs);
+  if (lhsTuple && rhsTuple) {
+    if (lhsTuple->getNumElements() != rhsTuple->getNumElements())
+      return false;
+    return std::equal(lhsTuple.getElementTypes().begin(),
+                      lhsTuple.getElementTypes().end(),
+                      rhsTuple.getElementTypes().begin(),
+                      [](CanType lhsElem, CanType rhsElem) -> bool {
+      return areConvertibleTypesABICompatible(lhsElem, rhsElem);
+    });
+  } else if (lhsTuple) {
+    return areConvertibleTypesABICompatible(lhsTuple.getElementTypes().front(),
+                                            rhs);
+  } else if (rhsTuple) {
+    return areConvertibleTypesABICompatible(lhs,
+                                            rhsTuple.getElementTypes().front());
+  }
+
+  // Recursively match function types.
+  CanAnyFunctionType lhsFn = dyn_cast<AnyFunctionType>(lhs);
+  CanAnyFunctionType rhsFn = dyn_cast<AnyFunctionType>(rhs);
+  if (lhsFn && rhsFn) {
+    return
+      areConvertibleTypesABICompatible(lhsFn.getInput(), rhsFn.getInput()) &&
+      areConvertibleTypesABICompatible(lhsFn.getResult(), rhsFn.getResult());
+  }
+
+  // Match possibly-optional class reference types.
+  auto lhsUnwrapped = lhs.getAnyOptionalObjectType();
+  auto rhsUnwrapped = rhs.getAnyOptionalObjectType();
+
+  auto lhsObject = lhsUnwrapped ? lhsUnwrapped : lhs;
+  auto rhsObject = rhsUnwrapped ? rhsUnwrapped : rhs;
+  if (lhsObject->isAnyClassReferenceType() &&
+      rhsObject->isAnyClassReferenceType()) {
+    return true;
+  }
+
+  if (lhsUnwrapped && rhsUnwrapped)
+    return areConvertibleTypesABICompatible(lhsUnwrapped, rhsUnwrapped);
+
+  // Nothing else is ABI-compatible.
+  return false;
+}
+
+static void
+maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
+                                           AnyFunctionType *toType) {
+  Type fromType = expr->getType();
+  if (areConvertibleTypesABICompatible(fromType->getCanonicalType(),
+                                       toType->getCanonicalType())) {
+    return;
+  }
+
+  // Strip @noescape from the types. It's not relevant: any function type with
+  // otherwise matching flags can be converted to a noescape function type.
+  {
+    auto fromFnType = fromType->castTo<AnyFunctionType>();
+    auto prettyFromExtInfo = fromFnType->getExtInfo().withNoEscape(false);
+    fromType = fromFnType->withExtInfo(prettyFromExtInfo);
+
+    auto prettyToExtInfo = toType->getExtInfo().withNoEscape(false);
+    toType = toType->withExtInfo(prettyToExtInfo);
+  }
+
+  tc.diagnose(expr->getLoc(), diag::invalid_function_conversion,
+              fromType, toType);
+
+  if (!isa<ClosureExpr>(expr) && !isa<CaptureListExpr>(expr)) {
+    // If the function value we're converting isn't a closure, suggest
+    // wrapping it in one
+    bool needsParens = !expr->canAppendCallParentheses();
+
+    SourceLoc endLoc = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
+                                                  expr->getEndLoc());
+    auto insertClosureNote = tc.diagnose(expr->getLoc(),
+                                  diag::invalid_function_conversion_closure);
+
+    auto hasAnyLabeledParams = [](const AnyFunctionType *fnTy) -> bool {
+      auto *params = fnTy->getInput()->getAs<TupleType>();
+      if (!params)
+        return false;
+      return std::any_of(params->getFields().begin(),
+                         params->getFields().end(),
+                         [](TupleTypeElt field) {
+                           return field.hasName();
+                         });
+    };
+
+    if (!hasAnyLabeledParams(toType->castTo<AnyFunctionType>())) {
+      insertClosureNote.fixItInsert(expr->getStartLoc(),
+                                    needsParens ? "{ (" : "{ ");
+      insertClosureNote.fixItInsert(endLoc, needsParens ? ")($0) }" : "($0) }");
+    }
+  }
+}
 
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  ConstraintLocatorBuilder locator) {
@@ -4518,6 +4624,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
             return expr;
         }
       }
+
+      maybeDiagnoseUnsupportedFunctionConversion(tc, expr, toFunc);
 
       return new (tc.Context) FunctionConversionExpr(expr, toType);
     }
