@@ -41,7 +41,6 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
   unsigned naturalUncurryLevel;
 
   // FIXME: restructure to use a "switch".
-
   if (auto *func = dyn_cast<FuncDecl>(vd)) {
     assert(kind == Kind::Func &&
            "can only create a Func SILDeclRef for a func decl");

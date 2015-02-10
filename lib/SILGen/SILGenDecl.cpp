@@ -1272,6 +1272,10 @@ public:
     // ObjC decls don't go in vtables.
     if (fd->hasClangNode())
       return;
+    
+    // Observers don't get separate vtable entries.
+    if (fd->isObservingAccessor())
+      return;
 
     addEntry(SILDeclRef(fd));
   }

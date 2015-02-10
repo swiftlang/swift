@@ -139,3 +139,18 @@ class SimpleInitBase { }
 class RequiredInitDerived : SimpleInitBase {
   required override init() { }
 }
+
+class Observed {
+  var x: Int = 0 {
+    didSet {
+    }
+    willSet {
+    }
+  }
+}
+
+// CHECK-LABEL: sil_vtable Observed {
+// CHECK-NOT:     #Observed.x!didSet
+// CHECK-NOT:     #Observed.x!willSet
+// CHECK:         #Observed.x!getter
+// CHECK:         #Observed.x!setter

@@ -2697,6 +2697,11 @@ void SILVTable::verify(const SILModule &M) const {
     assert(entry.first.hasDecl() && "vtable entry is not a decl");
     auto baseInfo = M.Types.getConstantInfo(entry.first);
     ValueDecl *decl = entry.first.getDecl();
+    
+    assert((!isa<FuncDecl>(decl)
+            || !cast<FuncDecl>(decl)->isObservingAccessor())
+           && "observing accessors shouldn't have vtable entries");
+    
     auto theClass = dyn_cast_or_null<ClassDecl>(decl->getDeclContext());
     assert(theClass && "vtable entry must refer to a class member");
 
