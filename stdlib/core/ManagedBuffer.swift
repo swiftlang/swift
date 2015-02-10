@@ -200,6 +200,20 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// `Element`\ s.
   public init(unsafeBufferObject buffer: AnyObject) {
     ManagedBufferPointer._checkValidBufferClass(buffer.dynamicType)
+
+    self._nativeBuffer = Builtin.castToNativeObject(buffer)
+  }
+
+  /// Internal version for use by _ContiguousArrayBuffer where we know that we
+  /// have a valid buffer class.
+  /// This version of the init function gets called from
+  ///  _ContiguousArrayBuffer's deinit function. Since 'deinit' does not get
+  /// specialized with current versions of the compiler, we can't get rid of the
+  /// _debugPreconditions in _checkValidBufferClass for any array. Since we know
+  /// for the _ContiguousArrayBuffer that this check must always succeed we omit
+  /// it in this specialized constructor.
+  internal init(_uncheckedUnsafeBufferObject buffer: AnyObject) {
+    ManagedBufferPointer._sanityCheckValidBufferClass(buffer.dynamicType)
     self._nativeBuffer = Builtin.castToNativeObject(buffer)
   }
 
@@ -308,6 +322,26 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     self._nativeBuffer = Builtin.castToNativeObject(newBuffer)
   }
 
+  /// Internal version for use by _ContiguousArrayBuffer.init where we know that
+  /// we have a valid buffer class and that the capacity is >= 0.
+  internal init(
+    _uncheckedBufferClass: AnyClass,
+    minimumCapacity: Int
+  ) {
+    ManagedBufferPointer._sanityCheckValidBufferClass(_uncheckedBufferClass, creating: true)
+    _sanityCheck(
+      minimumCapacity >= 0,
+      "ManagedBufferPointer must have non-negative capacity")
+
+    let totalSize = _My._elementOffset
+      +  minimumCapacity * strideof(Element.self)
+
+    let newBuffer: AnyObject = _swift_bufferAllocate(
+      _uncheckedBufferClass, totalSize, _My._alignmentMask)
+
+    self._nativeBuffer = Builtin.castToNativeObject(newBuffer)
+  }
+
   /// Manage the given `buffer`.
   ///
   /// **Note:** it is an error to use the `value` property of the resulting
@@ -335,6 +369,28 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     )
 #endif
     _debugPrecondition(
+      _usesNativeSwiftReferenceCounting(bufferClass),
+      "ManagedBufferPointer buffer class must be non-@objc"
+    )
+  }
+
+  internal static func _sanityCheckValidBufferClass(
+    bufferClass: AnyClass, creating: Bool = false
+  ) {
+#if !arch(arm) && !arch(i386)
+    // FIXME: test disabled until we figure out what's wrong on this
+    // platform: <rdar://problem/18682097> Generic and non-generic
+    // class instances have different sizes on armv7
+    _sanityCheck(
+      _class_getInstancePositiveExtentSize(bufferClass) == sizeof(_HeapObject.self)
+      || (
+        !creating
+        && _class_getInstancePositiveExtentSize(bufferClass)
+          == _valueOffset + sizeof(Value.self)),
+      "ManagedBufferPointer buffer class has illegal stored properties"
+    )
+#endif
+    _sanityCheck(
       _usesNativeSwiftReferenceCounting(bufferClass),
       "ManagedBufferPointer buffer class must be non-@objc"
     )

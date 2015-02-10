@@ -174,7 +174,7 @@ final class _ContiguousArrayStorage<T> : _ContiguousArrayStorage1 {
 
   internal // private
   var __manager : Manager {
-    return Manager(unsafeBufferObject: self)
+    return Manager(_uncheckedUnsafeBufferObject: self)
   }
 }
 
@@ -191,7 +191,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     }
     else {
       __bufferPointer = ManagedBufferPointer(
-        bufferClass: _ContiguousArrayStorage<T>.self,
+        _uncheckedBufferClass: _ContiguousArrayStorage<T>.self,
         minimumCapacity: realMinimumCapacity)
 
 #if _runtime(_ObjC)
@@ -212,7 +212,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
 
   init(_ storage: _ContiguousArrayStorageBase) {
     __bufferPointer = ManagedBufferPointer(
-      unsafeBufferObject: storage)
+      _uncheckedUnsafeBufferObject: storage)
   }
 
   /// If the elements are stored contiguously, a pointer to the first
@@ -249,7 +249,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   /// create an empty buffer
   public init() {
     __bufferPointer = ManagedBufferPointer(
-      unsafeBufferObject: _emptyArrayStorage)
+      _uncheckedUnsafeBufferObject: _emptyArrayStorage)
   }
 
   /// Adopt the storage of x
