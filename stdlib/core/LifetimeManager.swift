@@ -68,11 +68,9 @@ public func withUnsafeMutablePointers<A0, A1, Result>(
   inout arg1: A1,
   @noescape body: (UnsafeMutablePointer<A0>, UnsafeMutablePointer<A1>) -> Result
 ) -> Result {
-  return withUnsafeMutablePointer(&arg0) {
-    arg0 in withUnsafeMutablePointer(&arg1) {
-      arg1 in body(arg0, arg1)
-    }
-  }
+  return body(
+    UnsafeMutablePointer<A0>(Builtin.addressof(&arg0)),
+    UnsafeMutablePointer<A1>(Builtin.addressof(&arg1)))
 }
 
 /// Like `withUnsafeMutablePointer`, but passes pointers to `arg0`, `arg1`,
@@ -87,13 +85,10 @@ public func withUnsafeMutablePointers<A0, A1, A2, Result>(
     UnsafeMutablePointer<A2>
   ) -> Result
 ) -> Result {
-  return withUnsafeMutablePointer(&arg0) {
-    arg0 in withUnsafeMutablePointer(&arg1) {
-      arg1 in withUnsafeMutablePointer(&arg2) {
-        arg2 in body(arg0, arg1, arg2)
-      }
-    }
-  }
+  return body(
+    UnsafeMutablePointer<A0>(Builtin.addressof(&arg0)),
+    UnsafeMutablePointer<A1>(Builtin.addressof(&arg1)),
+    UnsafeMutablePointer<A2>(Builtin.addressof(&arg2)))
 }
 
 /// Invokes `body` with an `UnsafePointer` to `arg` and returns the
@@ -113,11 +108,9 @@ public func withUnsafePointers<A0, A1, Result>(
   inout arg1: A1,
   @noescape body: (UnsafePointer<A0>, UnsafePointer<A1>) -> Result
 ) -> Result {
-  return withUnsafePointer(&arg0) {
-    arg0 in withUnsafePointer(&arg1) {
-      arg1 in body(arg0, arg1)
-    }
-  }
+  return body(
+    UnsafePointer<A0>(Builtin.addressof(&arg0)),
+    UnsafePointer<A1>(Builtin.addressof(&arg1)))
 }
 
 /// Like `withUnsafePointer`, but passes pointers to `arg0`, `arg1`,
@@ -132,11 +125,8 @@ public func withUnsafePointers<A0, A1, A2, Result>(
     UnsafePointer<A2>
   ) -> Result
 ) -> Result {
-  return withUnsafePointer(&arg0) {
-    arg0 in withUnsafePointer(&arg1) {
-      arg1 in withUnsafePointer(&arg2) {
-        arg2 in body(arg0, arg1, arg2)
-      }
-    }
-  }
+  return body(
+    UnsafePointer<A0>(Builtin.addressof(&arg0)),
+    UnsafePointer<A1>(Builtin.addressof(&arg1)),
+    UnsafePointer<A2>(Builtin.addressof(&arg2)))
 }
