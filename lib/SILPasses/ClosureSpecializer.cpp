@@ -529,11 +529,11 @@ void ClosureSpecCloner::populateCloned() {
       SILBasicBlock *OpBB = BBMap[BB];
 
       TermInst *TI = OpBB->getTerminator();
+      auto Loc = CleanupLocation::getCleanupLocation(NewClosure->getLoc());
+
       // If we have a return, we place the release right before it so we know
       // that it will be executed at the end of the epilogue.
       if (isa<ReturnInst>(TI)) {
-        /// TODO: What is the correct location to use here?
-        auto Loc = SILFileLocation(SourceLoc());
         Builder.setInsertionPoint(TI);
         Builder.createReleaseValue(Loc, SILValue(NewClosure));
         continue;
@@ -551,7 +551,7 @@ void ClosureSpecCloner::populateCloned() {
       // value, we will retain the partial apply before we release it and
       // potentially eliminate it.
       Builder.setInsertionPoint(NoReturnApply);
-      Builder.createReleaseValue(NoReturnApply->getLoc(), SILValue(NewClosure));
+      Builder.createReleaseValue(Loc, SILValue(NewClosure));
     }
   }
 }
