@@ -33,7 +33,7 @@ public protocol Streamable {
 
 /// A type with a customized textual representation.
 ///
-/// This textual representation is used when objects are written to an
+/// This textual representation is used when values are written to an
 /// *output stream*, for example, by `print` and `println`.
 ///
 /// In order to generate a textual representation for an instance of any
@@ -46,7 +46,7 @@ public protocol Printable {
 /// A type with a customized textual representation for debugging
 /// purposes.
 ///
-/// This textual representation is used when objects are written to an
+/// This textual representation is used when values are written to an
 /// *output stream* by `debugPrint` and `debugPrintln`, and is
 /// typically more verbose than the text provided by a `Printable`\ 's
 /// `description` property.
@@ -66,9 +66,9 @@ public protocol DebugPrintable {
 /// Do our best to print a value that can not be printed directly, using one of
 /// its conformances to `Streamable`, `Printable` or `DebugPrintable`.
 func _adHocPrint<T, TargetStream : OutputStreamType>(
-    object: T, inout target: TargetStream
+    value: T, inout target: TargetStream
 ) {
-  var mirror = reflect(object)
+  var mirror = reflect(value)
   // Checking the mirror kind is not a good way to implement this, but we don't
   // have a more expressive reflection API now.
   if mirror is _TupleMirror {
@@ -93,9 +93,9 @@ func _adHocPrint<T, TargetStream : OutputStreamType>(
   print(mirror.summary, &target)
 }
 
-/// Writes the textual representation of `object` into the stream `target`.
+/// Writes the textual representation of `value` into the stream `target`.
 ///
-/// The textual representation is obtained from the `object` using its protocol
+/// The textual representation is obtained from the `value` using its protocol
 /// conformances, in the following order of preference: `Streamable`,
 /// `Printable`, `DebugPrintable`.
 ///
@@ -103,30 +103,30 @@ func _adHocPrint<T, TargetStream : OutputStreamType>(
 /// protocols mentioned above.
 @inline(never)
 public func print<T, TargetStream : OutputStreamType>(
-    object: T, inout target: TargetStream
+    value: T, inout target: TargetStream
 ) {
-  if let streamableObject = object as? Streamable {
+  if let streamableObject = value as? Streamable {
     streamableObject.writeTo(&target)
     return
   }
 
-  if var printableObject = object as? Printable {
+  if var printableObject = value as? Printable {
     printableObject.description.writeTo(&target)
     return
   }
 
-  if let debugPrintableObject = object as? DebugPrintable {
+  if let debugPrintableObject = value as? DebugPrintable {
     debugPrintableObject.debugDescription.writeTo(&target)
     return
   }
 
-  _adHocPrint(object, &target)
+  _adHocPrint(value, &target)
 }
 
-/// Writes the textual representation of `object` and a newline character into
+/// Writes the textual representation of `value` and a newline character into
 /// the stream `target`.
 ///
-/// The textual representation is obtained from the `object` using its protocol
+/// The textual representation is obtained from the `value` using its protocol
 /// conformances, in the following order of preference: `Streamable`,
 /// `Printable`, `DebugPrintable`.
 ///
@@ -134,15 +134,15 @@ public func print<T, TargetStream : OutputStreamType>(
 /// protocols mentioned above.
 @inline(never)
 public func println<T, TargetStream : OutputStreamType>(
-    object: T, inout target: TargetStream
+    value: T, inout target: TargetStream
 ) {
-  print(object, &target)
+  print(value, &target)
   target.write("\n")
 }
 
-/// Writes the textual representation of `object` into the standard output.
+/// Writes the textual representation of `value` into the standard output.
 ///
-/// The textual representation is obtained from the `object` using its protocol
+/// The textual representation is obtained from the `value` using its protocol
 /// conformances, in the following order of preference: `Streamable`,
 /// `Printable`, `DebugPrintable`.
 ///
@@ -150,15 +150,15 @@ public func println<T, TargetStream : OutputStreamType>(
 /// protocols mentioned above.
 @inline(never)
 @semantics("stdlib_binary_only")
-public func print<T>(object: T) {
+public func print<T>(value: T) {
   var stdoutStream = _Stdout()
-  print(object, &stdoutStream)
+  print(value, &stdoutStream)
 }
 
-/// Writes the textual representation of `object` and a newline character into
+/// Writes the textual representation of `value` and a newline character into
 /// the standard output.
 ///
-/// The textual representation is obtained from the `object` using its protocol
+/// The textual representation is obtained from the `value` using its protocol
 /// conformances, in the following order of preference: `Streamable`,
 /// `Printable`, `DebugPrintable`.
 ///
@@ -166,9 +166,9 @@ public func print<T>(object: T) {
 /// protocols mentioned above.
 @inline(never)
 @semantics("stdlib_binary_only")
-public func println<T>(object: T) {
+public func println<T>(value: T) {
   var stdoutStream = _Stdout()
-  print(object, &stdoutStream)
+  print(value, &stdoutStream)
   stdoutStream.write("\n")
 }
 
@@ -229,24 +229,24 @@ public func toDebugString<T>(x: T) -> String {
 /// See also: `debugPrintln(x, &target)`
 @inline(never)
 public func debugPrint<T, TargetStream : OutputStreamType>(
-    object: T, inout target: TargetStream
+    value: T, inout target: TargetStream
 ) {
-  if let debugPrintableObject = object as? DebugPrintable {
+  if let debugPrintableObject = value as? DebugPrintable {
     debugPrintableObject.debugDescription.writeTo(&target)
     return
   }
 
-  if var printableObject = object as? Printable {
+  if var printableObject = value as? Printable {
     printableObject.description.writeTo(&target)
     return
   }
 
-  if let streamableObject = object as? Streamable {
+  if let streamableObject = value as? Streamable {
     streamableObject.writeTo(&target)
     return
   }
 
-  _adHocPrint(object, &target)
+  _adHocPrint(value, &target)
 }
 
 /// Write to `target` the textual representation of `x` most suitable
