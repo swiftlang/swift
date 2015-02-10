@@ -532,8 +532,10 @@ void ClosureSpecCloner::populateCloned() {
       // If we have a return, we place the release right before it so we know
       // that it will be executed at the end of the epilogue.
       if (isa<ReturnInst>(TI)) {
+        /// TODO: What is the correct location to use here?
+        auto Loc = SILFileLocation(SourceLoc());
         Builder.setInsertionPoint(TI);
-        Builder.createReleaseValue(TI->getLoc(), SILValue(NewClosure));
+        Builder.createReleaseValue(Loc, SILValue(NewClosure));
         continue;
       }
 
