@@ -150,9 +150,12 @@ CGFloatTestSuite.test("bridging") {
 
 CGFloatTestSuite.test("varargs") {
   let v: CVarArgType = CGFloat(0)
-	expectEqual("0.023230", NSString(format: "%.6f", CGFloat(0.02323) as CVarArgType))
-	expectEqual("0.123450", NSString(format: "%.6f", CGFloat(0.12345) as CVarArgType))
-	expectEqual("1.234560", NSString(format: "%.6f", CGFloat(1.23456) as CVarArgType))
+  expectEqual(
+    "0.023230", NSString(format: "%.6f", CGFloat(0.02323) as CVarArgType))
+  expectEqual(
+    "0.123450", NSString(format: "%.6f", CGFloat(0.12345) as CVarArgType))
+  expectEqual(
+    "1.234560", NSString(format: "%.6f", CGFloat(1.23456) as CVarArgType))
 }
 
 runAllTests()
