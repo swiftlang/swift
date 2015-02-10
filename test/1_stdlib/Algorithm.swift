@@ -197,28 +197,28 @@ Algorithm.test("filter/SequenceType") {
     expectType([Int].self, &result)
     expectEqual([], result)
     expectEqual([], Array(s))
-    expectLE(s._underestimatedCount, result.capacity)
+    expectEqual(0, result.capacity)
   }
   if true {
     let s = DrainableSequence([ 0, 30, 10, 90 ])
     let result = filter(s) { (x: Int) -> Bool in false }
     expectEqual([], result)
     expectEqual([], Array(s))
-    expectLE(s._underestimatedCount, result.capacity)
+    expectEqual(0, result.capacity)
   }
   if true {
     let s = DrainableSequence([ 0, 30, 10, 90 ])
     let result = filter(s) { (x: Int) -> Bool in true }
     expectEqual([ 0, 30, 10, 90 ], result)
     expectEqual([], Array(s))
-    expectLE(s._underestimatedCount, result.capacity)
+    expectGE(2 * result.count, result.capacity)
   }
   if true {
     let s = DrainableSequence([ 0, 30, 10, 90 ])
     let result = filter(s) { $0 % 3 == 0 }
     expectEqual([ 0, 30, 90 ], result)
     expectEqual([], Array(s))
-    expectLE(s._underestimatedCount, result.capacity)
+    expectGE(2 * result.count, result.capacity)
   }
 }
 
@@ -287,25 +287,25 @@ Algorithm.test("filter/CollectionType") {
     }
     expectEqual([], result)
     expectType([Int].self, &result)
-    expectLE(c._underestimatedCount, result.capacity)
+    expectEqual(0, result.capacity)
   }
   if true {
     let c = MinimalForwardCollection([ 0, 30, 10, 90 ])
     let result = filter(c) { (x: Int) -> Bool in false }
     expectEqual([], result)
-    expectLE(c._underestimatedCount, result.capacity)
+    expectEqual(0, result.capacity)
   }
   if true {
     let c = MinimalForwardCollection([ 0, 30, 10, 90 ])
     let result = filter(c) { (x: Int) -> Bool in true }
     expectEqual([ 0, 30, 10, 90 ], result)
-    expectLE(c._underestimatedCount, result.capacity)
+    expectGE(2 * result.count, result.capacity)
   }
   if true {
     let c = MinimalForwardCollection([ 0, 30, 10, 90 ])
     let result = filter(c) { $0 % 3 == 0 }
     expectEqual([ 0, 30, 90 ], result)
-    expectLE(c._underestimatedCount, result.capacity)
+    expectGE(2 * result.count, result.capacity)
   }
 }
 

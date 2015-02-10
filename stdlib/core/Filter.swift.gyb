@@ -173,7 +173,6 @@ public func filter<S : SequenceType>(
   source: S, @noescape includeElement: (S.Generator.Element) -> Bool
 ) -> [S.Generator.Element] {
   var result: [S.Generator.Element] = []
-  result.reserveCapacity(underestimateCount(source))
   for element in source {
     if includeElement(element) {
       result.append(element)
