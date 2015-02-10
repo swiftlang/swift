@@ -188,7 +188,7 @@ static bool loadSwiftRuntime(StringRef runtimeLibPath) {
 static bool tryLoadLibrary(LinkLibrary linkLib,
                            SearchPathOptions searchPathOpts) {
   llvm::SmallString<128> path = linkLib.getName();
-  bool success;
+  bool success = false;
 
   // If we have an absolute or relative path, just try to load it now.
   if (llvm::sys::path::has_parent_path(path.str())) {
