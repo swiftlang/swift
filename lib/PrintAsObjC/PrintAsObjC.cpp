@@ -21,6 +21,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CommentConversion.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
@@ -593,19 +594,18 @@ private:
       MAP(Int, "NSInteger", false);
       MAP(UInt, "NSUInteger", false);
       MAP(Bool, "BOOL", false);
-      MAP(String, "NSString *", true);
 
-      MAP(COpaquePointer, "void *", false);
-      MAP(CMutableVoidPointer, "void *", false);
-      MAP(CConstVoidPointer, "void const *", false);
+      MAP(COpaquePointer, "void *", true);
+      MAP(CMutableVoidPointer, "void *", true);
+      MAP(CConstVoidPointer, "void const *", true);
 
       Identifier ID_ObjectiveC = ctx.getIdentifier(OBJC_MODULE_NAME);
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("ObjCBool")}] 
         = { "BOOL", false};
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("Selector")}] 
-        = { "SEL", false };
+        = { "SEL", true };
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("NSZone")}] 
-        = { "NSZone *", false };
+        = { "NSZone *", true };
     }
 
     auto iter = specialNames.find({moduleName, name});
@@ -613,8 +613,10 @@ private:
       return false;
 
     os << iter->second.first;
-    if (iter->second.second)
-      printNullability(optionalKind);
+    if (iter->second.second) {
+      // FIXME: Selectors and pointers should be nullable.
+      printNullability(OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional);
+    }
     return true;
   }
 
@@ -625,6 +627,18 @@ private:
     os << " */";
   }
 
+  bool isClangObjectPointerType(const clang::TypeDecl *clangTypeDecl) const {
+    auto &clangASTContext = ctx.getClangModuleLoader()->getClangASTContext();
+    clang::QualType clangTy = clangASTContext.getTypeDeclType(clangTypeDecl);
+    return clangTy->isObjCRetainableType();
+  }
+
+  bool isClangPointerType(const clang::TypeDecl *clangTypeDecl) const {
+    auto &clangASTContext = ctx.getClangModuleLoader()->getClangASTContext();
+    clang::QualType clangTy = clangASTContext.getTypeDeclType(clangTypeDecl);
+    return clangTy->isPointerType();
+  }
+
   void visitNameAliasType(NameAliasType *aliasTy,
                           Optional<OptionalTypeKind> optionalKind) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
@@ -633,7 +647,17 @@ private:
       return;
 
     if (alias->hasClangNode()) {
-      os << cast<clang::NamedDecl>(alias->getClangDecl())->getName();
+      auto *clangTypeDecl = cast<clang::TypeDecl>(alias->getClangDecl());
+      os << clangTypeDecl->getName();
+
+      // Print proper nullability for CF types, but __null_unspecified for
+      // all other non-object Clang pointer types.
+      if (aliasTy->hasReferenceSemantics() ||
+          isClangObjectPointerType(clangTypeDecl)) {
+        printNullability(optionalKind);
+      } else if (isClangPointerType(clangTypeDecl)) {
+        printNullability(OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional);
+      }
       return;
     }
 
@@ -663,6 +687,12 @@ private:
   void visitStructType(StructType *ST, 
                        Optional<OptionalTypeKind> optionalKind) {
     const StructDecl *SD = ST->getStructOrBoundGenericStruct();
+    if (SD == ctx.getStringDecl()) {
+      os << "NSString *";
+      printNullability(optionalKind);
+      return;
+    }
+
     if (printIfKnownTypeName(SD->getModuleContext()->Name, SD->getName(),
                              optionalKind))
       return;
@@ -758,6 +788,8 @@ private:
     if (isConst)
       os << " const";
     os << " *";
+    // FIXME: Pointer types should be nullable.
+    printNullability(OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional);
     return true;
   }
 
@@ -794,6 +826,7 @@ private:
       } else {
         maybePrintTagKeyword(CD);
         os << clangDecl->getName();
+        printNullability(optionalKind);
       }
     } else {
       os << CD->getName() << " *";
@@ -1167,7 +1200,7 @@ public:
     forwardDeclare(ED, [&]{
       os << "typedef SWIFT_ENUM(";
       printer.print(ED->getRawType(), OTK_None);
-      os << ", " << ED->getName() << ");\n";
+      os << ", " <<ED->getName() << ");\n";
     });
   }
 

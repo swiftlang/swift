@@ -82,9 +82,9 @@ class NotObjC {}
 // CHECK-LABEL: @interface Methods{{$}}
 // CHECK-NEXT: - (void)test;
 // CHECK-NEXT: + (void)test2;
-// CHECK-NEXT: - (void *)testPrimitives:(BOOL)b i:(NSInteger)i f:(float)f d:(double)d u:(NSUInteger)u;
+// CHECK-NEXT: - (void * __null_unspecified)testPrimitives:(BOOL)b i:(NSInteger)i f:(float)f d:(double)d u:(NSUInteger)u;
 // CHECK-NEXT: - (void)testString:(NSString * __nonnull)s;
-// CHECK-NEXT: - (void)testSelector:(SEL)sel boolean:(BOOL)b;
+// CHECK-NEXT: - (void)testSelector:(SEL __null_unspecified)sel boolean:(BOOL)b;
 // CHECK-NEXT: - (void)testCSignedTypes:(signed char)a b:(short)b c:(int)c d:(long)d e:(long long)e;
 // CHECK-NEXT: - (void)testCUnsignedTypes:(unsigned char)a b:(unsigned short)b c:(unsigned int)c d:(unsigned long)d e:(unsigned long long)e;
 // CHECK-NEXT: - (void)testCChars:(char)basic wchar:(wchar_t)wide char16:(char16_t)char16 char32:(char32_t)char32;
@@ -167,12 +167,12 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: - (CGFloat)getOriginY:(CGRect)r;
 // CHECK-NEXT: - (NSArray * __nonnull)emptyArray;
 // CHECK-NEXT: - (NSArray * __nullable)maybeArray;
-// CHECK-NEXT: - (enum NSRuncingMode)someEnum;
-// CHECK-NEXT: - (NSZone *)zone;
+// CHECK-NEXT: - (NSRuncingMode)someEnum;
+// CHECK-NEXT: - (NSZone * __null_unspecified)zone;
 // CHECK-NEXT: - (struct FooStruct1)tagStruct;
 // CHECK-NEXT: - (enum Tribool)tagEnum;
 // CHECK-NEXT: - (FooStructTypedef2)anonStructTypedef;
-// CHECK-NEXT: - (CFTypeRef)cf:(CFTreeRef)x str:(CFStringRef)str str2:(CFMutableStringRef)str2 obj:(CFAliasForTypeRef)obj;
+// CHECK-NEXT: - (CFTypeRef __nullable)cf:(CFTreeRef __nonnull)x str:(CFStringRef __nonnull)str str2:(CFMutableStringRef __nonnull)str2 obj:(CFAliasForTypeRef __nonnull)obj;
 // CHECK-NEXT: - (void)appKitInImplementation;
 // CHECK-NEXT: - (NSURL * __nullable)returnsURL;
 // CHECK-NEXT: init
@@ -203,10 +203,10 @@ typealias AliasForNSRect = NSRect
 }
 
 // CHECK-LABEL: @interface MethodsWithPointers
-// CHECK-NEXT: - (id __nonnull *)test:(NSInteger *)a;
-// CHECK-NEXT: - (void)testNested:(NSInteger * *)a;
-// CHECK-NEXT: - (void)testBridging:(NSInteger const *)a b:(NSInteger *)b c:(Methods * __nonnull *)c;
-// CHECK-NEXT: - (void)testBridgingVoid:(void *)a b:(void const *)b;
+// CHECK-NEXT: - (id __nonnull * __null_unspecified)test:(NSInteger * __null_unspecified)a;
+// CHECK-NEXT: - (void)testNested:(NSInteger * __null_unspecified * __null_unspecified)a;
+// CHECK-NEXT: - (void)testBridging:(NSInteger const * __null_unspecified)a b:(NSInteger * __null_unspecified)b c:(Methods * __nonnull * __null_unspecified)c;
+// CHECK-NEXT: - (void)testBridgingVoid:(void * __null_unspecified)a b:(void const * __null_unspecified)b;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class MethodsWithPointers {
@@ -315,8 +315,8 @@ private class Private : A1 {}
 // CHECK-NEXT: @property (nonatomic, assign) Properties * __nonnull unownedOther;
 // CHECK-NEXT: @property (nonatomic, unsafe_unretained) Properties * __nonnull unmanagedOther;
 // CHECK-NEXT: @property (nonatomic, weak) id <MyProtocol> __nullable weakProto;
-// CHECK-NEXT: @property (nonatomic) CFTypeRef weakCF;
-// CHECK-NEXT: @property (nonatomic) CFStringRef weakCFString;
+// CHECK-NEXT: @property (nonatomic) CFTypeRef __nullable weakCF;
+// CHECK-NEXT: @property (nonatomic) CFStringRef __nullable weakCFString;
 // CHECK-NEXT: @property (nonatomic, weak) IBOutlet id  __null_unspecified outlet;
 // CHECK-NEXT: @property (nonatomic) IBOutlet Properties * __null_unspecified typedOutlet;
 // CHECK-NEXT: @property (nonatomic, copy) NSString * __nonnull string;
