@@ -68,15 +68,16 @@ public func ==(x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
 }
 
 /// The sum of types that can be used as a quick look representation.
-//
-// This type must be binary-compatible with the 'QuickLookObject' struct in
-// stdlib/Runtime/Reflection.mm, and 'QuickLookObject?' must be binary
-// compatible with 'OptionalQuickLookObject' from the same.
-//
-// NB: This type is somewhat carefully laid out to *suppress* enum layout
-// optimization so that it is easier to manufacture in the C++ runtime
-// implementation.
 public enum QuickLookObject {
+  //
+  // This type must be binary-compatible with the 'QuickLookObject' struct in
+  // stdlib/Runtime/Reflection.mm, and 'QuickLookObject?' must be binary
+  // compatible with 'OptionalQuickLookObject' from the same.
+  //
+  // NB: This type is somewhat carefully laid out to *suppress* enum layout
+  // optimization so that it is easier to manufacture in the C++ runtime
+  // implementation.
+
   /// Plain text.
   case Text(String)
 
