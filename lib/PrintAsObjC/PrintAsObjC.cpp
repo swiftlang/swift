@@ -780,9 +780,7 @@ private:
   void visitEnumType(EnumType *ET, Optional<OptionalTypeKind> optionalKind) {
     const EnumDecl *ED = ET->getDecl();
     maybePrintTagKeyword(ED);
-    
-    // Use the "enum" introducer to safely reference forward declarations.
-    os << "enum " << ED->getName();
+    os << ED->getName();
   }
 
   void visitClassType(ClassType *CT, Optional<OptionalTypeKind> optionalKind) {
@@ -1167,9 +1165,9 @@ public:
     assert(ED->isObjC() || ED->hasClangNode());
     
     forwardDeclare(ED, [&]{
-      os << "enum " << ED->getName() << " : ";
+      os << "typedef SWIFT_ENUM(";
       printer.print(ED->getRawType(), OTK_None);
-      os << ";\n";
+      os << ", " << ED->getName() << ");\n";
     });
   }
 
@@ -1205,10 +1203,10 @@ public:
           }
         } else if (auto PD = dyn_cast<ProtocolDecl>(TD))
           forwardDeclare(PD);
-        else if (auto ED = dyn_cast<EnumDecl>(TD))
-          forwardDeclare(ED);
         else if (addImport(TD))
           return;
+        else if (auto ED = dyn_cast<EnumDecl>(TD))
+          forwardDeclare(ED);
         else if (auto TAD = dyn_cast<TypeAliasDecl>(TD))
           finder.visit(TAD->getUnderlyingType());
         else if (isa<AbstractTypeParamDecl>(TD))

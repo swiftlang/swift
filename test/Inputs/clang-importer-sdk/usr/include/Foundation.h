@@ -249,6 +249,10 @@ typedef NS_ENUM(unsigned char, NSAliasesEnum) {
   NSAliasesByName = NSAliasesOriginal,
 };
 
+NS_ENUM(NSInteger, NSMalformedEnumMissingTypedef) {
+  NSMalformedEnumMissingTypedefValue
+};
+
 typedef NS_ENUM(NSUInteger, NSNumberFormatterBehavior) {
   NSNumberFormatterBehaviorDefault = 0,
   NSNumberFormatterBehavior10_0 = 1000,
