@@ -4055,7 +4055,7 @@ public:
 
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.
-  ObjCSubscriptKind getObjCSubscriptKind() const;
+  ObjCSubscriptKind getObjCSubscriptKind(LazyResolver *resolver) const;
 
   SubscriptDecl *getOverriddenDecl() const {
     return cast_or_null<SubscriptDecl>(

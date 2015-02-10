@@ -3,6 +3,8 @@
 
 // REQUIRES: objc_interop
 
+import Foundation
+
 class PlainClass {}
 struct PlainStruct {}
 enum PlainEnum {}
@@ -371,9 +373,9 @@ class subject_subscriptKeyed7 {
 
 
 
-class subject_subscriptInvalid1 {
+class subject_subscriptBridgedFloat {
   @objc
-  subscript(a: Float32) -> Int { // expected-error {{subscript cannot be marked @objc because its key type is neither an integer nor an object}}
+  subscript(a: Float32) -> Int {
     get { return 0 }
   }
 }

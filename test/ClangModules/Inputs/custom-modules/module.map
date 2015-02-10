@@ -84,6 +84,11 @@ module ObjCImplicitProperties {
   export *
 }
 
+module ObjCSubscripts {
+  header "ObjCSubscripts.h"
+  export *
+}
+
 module ProtoWithInitializer {
   header "ProtoWithInitializer.h"
   export *

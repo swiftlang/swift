@@ -2412,7 +2412,7 @@ ObjCSelector AbstractStorageDecl::getObjCGetterSelector() const {
   // Subscripts use a specific selector.
   auto &ctx = getASTContext();
   if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
-    switch (SD->getObjCSubscriptKind()) {
+    switch (SD->getObjCSubscriptKind(nullptr)) {
     case ObjCSubscriptKind::None:
       llvm_unreachable("Not an Objective-C subscript");
     case ObjCSubscriptKind::Indexed:
@@ -2439,7 +2439,7 @@ ObjCSelector AbstractStorageDecl::getObjCSetterSelector() const {
   // Subscripts use a specific selector.
   auto &ctx = getASTContext();
   if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
-    switch (SD->getObjCSubscriptKind()) {
+    switch (SD->getObjCSubscriptKind(nullptr)) {
     case ObjCSubscriptKind::None:
       llvm_unreachable("Not an Objective-C subscript");
 
@@ -2645,33 +2645,6 @@ StaticSpellingKind VarDecl::getCorrectStaticSpelling() const {
   return getCorrectStaticSpellingForDecl(this);
 }
 
-/// Determine whether the given type is (or bridges to) an
-/// Objective-C object type.
-static bool isObjCObjectOrBridgedType(Type type) {
-  // FIXME: Bridged types info should be available here in the AST
-  // library, rather than hard-coding them.
-  if (auto structTy = type->getAs<StructType>())
-    return structTy->getDecl() == type->getASTContext().getStringDecl();
-
-  // Unwrap metatypes for remaining checks.
-  bool allowExistential = true;
-  if (auto metaTy = type->getAs<AnyMetatypeType>()) {
-    // Foo.Protocol is not an @objc type.
-    allowExistential = !isa<MetatypeType>(metaTy);
-    type = metaTy->getInstanceType();
-  }
-
-  // Class types are Objective-C object types.
-  if (type->is<ClassType>())
-    return true;
-
-  // @objc protocols
-  if (allowExistential && type->isObjCExistentialType())
-    return true;
-  
-  return false;
-}
-
 /// Determine whether the given Swift type is an integral type, i.e.,
 /// a type that wraps a builtin integer.
 static bool isIntegralType(Type type) {
@@ -2717,7 +2690,8 @@ Type SubscriptDecl::getIndicesInterfaceType() const {
   return getInterfaceType()->castTo<AnyFunctionType>()->getInput();
 }
 
-ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
+ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind(
+                    LazyResolver *resolver) const {
   auto indexTy = getIndicesType();
 
   // Look through a named 1-tuple.
@@ -2735,7 +2709,11 @@ ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
 
   // If the index type is an object type in Objective-C, we have a
   // keyed subscript.
-  if (isObjCObjectOrBridgedType(indexTy))
+  if (Type objectTy = indexTy->getAnyOptionalObjectType())
+    indexTy = objectTy;
+
+  if (getASTContext().getBridgedToObjC(getDeclContext(), false, indexTy,
+                                       resolver))
     return ObjCSubscriptKind::Keyed;
 
   return ObjCSubscriptKind::None;

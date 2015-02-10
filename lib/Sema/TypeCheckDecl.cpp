@@ -4288,7 +4288,7 @@ public:
       if (method)
         methodSelector = method->getObjCSelector();
       else if (auto *subscript = dyn_cast<SubscriptDecl>(abstractStorage))
-        subscriptKind = subscript->getObjCSubscriptKind();
+        subscriptKind = subscript->getObjCSubscriptKind(&TC);
     }
 
     // Look for members with the same name and matching types as this
@@ -4338,7 +4338,7 @@ public:
         } else if (auto *parentSubscript =
                      dyn_cast<SubscriptDecl>(parentStorage)) {
           // If the subscript kinds don't match, it's not an override.
-          if (subscriptKind != parentSubscript->getObjCSubscriptKind())
+          if (subscriptKind != parentSubscript->getObjCSubscriptKind(&TC))
             continue;
 
           objCMatch = true;
