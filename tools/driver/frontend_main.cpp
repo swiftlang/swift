@@ -483,6 +483,8 @@ static bool performCompile(CompilerInstance &Instance,
       if (opts.SerializeBridgingHeader)
         serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
       serializationOpts.ModuleLinkName = opts.ModuleLinkName;
+      serializationOpts.ExtraClangOptions =
+          Invocation.getClangImporterOptions().ExtraArgs;
       if (!IRGenOpts.ForceLoadSymbolName.empty())
         serializationOpts.AutolinkForceLoad = true;
       serializationOpts.HasUnderlyingModule = opts.ImportUnderlyingModule;

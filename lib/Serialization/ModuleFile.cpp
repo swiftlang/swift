@@ -30,6 +30,9 @@ using namespace swift;
 using namespace swift::serialization;
 using namespace llvm::support;
 
+using ValidationInfo = SerializedModuleLoader::ValidationInfo;
+using ExtendedValidationInfo = SerializedModuleLoader::ExtendedValidationInfo;
+
 static bool checkModuleSignature(llvm::BitstreamCursor &cursor) {
   for (unsigned char byte : MODULE_SIGNATURE)
     if (cursor.AtEndOfStream() || cursor.Read(8) != byte)
@@ -70,12 +73,55 @@ static bool enterTopLevelModuleBlock(llvm::BitstreamCursor &cursor,
   return true;
 }
 
-static SerializedModuleLoader::ValidationInfo
+/// Populate \p extendedInfo with the data from the options block.
+///
+/// Returns true on success.
+static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
+                             SmallVectorImpl<uint64_t> &scratch,
+                             ExtendedValidationInfo &extendedInfo) {
+  auto next = cursor.advance();
+  while (next.Kind != llvm::BitstreamEntry::EndBlock) {
+    if (next.Kind == llvm::BitstreamEntry::Error)
+      return false;
+
+    if (next.Kind == llvm::BitstreamEntry::SubBlock) {
+      // Unknown metadata sub-block, possibly for use by a future version of
+      // the module format.
+      if (cursor.SkipBlock())
+        return false;
+      next = cursor.advance();
+      continue;
+    }
+
+    scratch.clear();
+    StringRef blobData;
+    unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
+    switch (kind) {
+    case options_block::SDK_PATH:
+      extendedInfo.setSDKPath(blobData);
+      break;
+    case options_block::XCC:
+      extendedInfo.addClangImporterOption(blobData);
+      break;
+    default:
+      // Unknown options record, possibly for use by a future version of the
+      // module format.
+      break;
+    }
+
+    next = cursor.advance();
+  }
+
+  return true;
+}
+
+static ValidationInfo
 validateControlBlock(llvm::BitstreamCursor &cursor,
-                     SmallVectorImpl<uint64_t> &scratch) {
+                     SmallVectorImpl<uint64_t> &scratch,
+                     ExtendedValidationInfo *extendedInfo) {
   // The control block is malformed until we've at least read a major version
   // number.
-  SerializedModuleLoader::ValidationInfo result;
+  ValidationInfo result;
   bool versionSeen = false;
 
   auto next = cursor.advance();
@@ -86,11 +132,19 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
     }
 
     if (next.Kind == llvm::BitstreamEntry::SubBlock) {
-      // Unknown metadata sub-block, possibly for use by a future version of the
-      // module format.
-      if (cursor.SkipBlock()) {
-        result.status = ModuleStatus::Malformed;
-        return result;
+      if (next.ID == OPTIONS_BLOCK_ID && extendedInfo) {
+        cursor.EnterSubBlock(OPTIONS_BLOCK_ID);
+        if (!readOptionsBlock(cursor, scratch, *extendedInfo)) {
+          result.status = ModuleStatus::Malformed;
+          return result;
+        }
+      } else {
+        // Unknown metadata sub-block, possibly for use by a future version of
+        // the module format.
+        if (cursor.SkipBlock()) {
+          result.status = ModuleStatus::Malformed;
+          return result;
+        }
       }
       next = cursor.advance();
       continue;
@@ -146,8 +200,9 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
   return result;
 }
 
-SerializedModuleLoader::ValidationInfo
-SerializedModuleLoader::validateSerializedAST(StringRef data) {
+ValidationInfo SerializedModuleLoader::validateSerializedAST(
+    StringRef data,
+    ExtendedValidationInfo *extendedInfo) {
   ValidationInfo result;
 
   // Check 32-bit alignment.
@@ -168,7 +223,7 @@ SerializedModuleLoader::validateSerializedAST(StringRef data) {
   while (topLevelEntry.Kind == llvm::BitstreamEntry::SubBlock) {
     if (topLevelEntry.ID == CONTROL_BLOCK_ID) {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
-      result = validateControlBlock(cursor, scratch);
+      result = validateControlBlock(cursor, scratch, extendedInfo);
       if (result.status == ModuleStatus::Malformed)
         return result;
 
@@ -677,7 +732,7 @@ ModuleFile::ModuleFile(
     case CONTROL_BLOCK_ID: {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
 
-      auto info = validateControlBlock(cursor, scratch);
+      auto info = validateControlBlock(cursor, scratch, nullptr);
       if (info.status != ModuleStatus::Valid) {
         error(info.status);
         return;

@@ -397,6 +397,10 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(control_block, MODULE_NAME);
   BLOCK_RECORD(control_block, TARGET);
 
+  BLOCK(OPTIONS_BLOCK);
+  BLOCK_RECORD(options_block, SDK_PATH);
+  BLOCK_RECORD(options_block, XCC);
+
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
   BLOCK_RECORD(input_block, LINK_LIBRARY);
@@ -507,7 +511,8 @@ void Serializer::writeDocBlockInfoBlock() {
 #undef BLOCK_RECORD
 }
 
-void Serializer::writeHeader() {
+void Serializer::writeHeader(bool serializeOptionsForDebugging,
+                             ArrayRef<std::string> extraClangOptions) {
   {
     BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 3);
     control_block::ModuleNameLayout ModuleName(Out);
@@ -527,6 +532,17 @@ void Serializer::writeHeader() {
 #undef EXTRA_VERSION_STRING
 
     Target.emit(ScratchRecord, M->Ctx.LangOpts.Target.str());
+
+    if (serializeOptionsForDebugging) {
+      llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 3);
+      options_block::SDKPathLayout SDKPath(Out);
+      options_block::XCCLayout XCC(Out);
+
+      SDKPath.emit(ScratchRecord, M->Ctx.SearchPathOpts.SDKPath);
+      for (const std::string &arg : extraClangOptions) {
+        XCC.emit(ScratchRecord, arg);
+      }
+    }
   }
 }
 
@@ -3472,7 +3488,8 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
 
   {
     BCBlockRAII moduleBlock(S.Out, MODULE_BLOCK_ID, 2);
-    S.writeHeader();
+    S.writeHeader(options.SerializeOptionsForDebugging,
+                  options.ExtraClangOptions);
     S.writeInputBlock(options);
     S.writeSIL(SILMod, options.SerializeAllSIL);
     S.writeAST(DC);

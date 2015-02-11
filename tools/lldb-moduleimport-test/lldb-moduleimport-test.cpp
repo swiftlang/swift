@@ -16,9 +16,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Dwarf.h"
-#include "swift/Frontend/Frontend.h"
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
+#include "swift/Frontend/Frontend.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Basic/Dwarf.h"
 #include "llvm/Object/MachO.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Support/CommandLine.h"
@@ -56,6 +57,25 @@ FrameworkPaths("F", llvm::cl::desc("add a directory to the framework search path
 void anchorForGetMainExecutable() {}
 
 using namespace llvm::MachO;
+
+static void printValidationInfo(llvm::StringRef data) {
+  swift::SerializedModuleLoader::ExtendedValidationInfo extendedInfo;
+  swift::SerializedModuleLoader::ValidationInfo info =
+      swift::SerializedModuleLoader::validateSerializedAST(data,
+                                                           &extendedInfo);
+  if (info.status != swift::ModuleStatus::Valid)
+    return;
+
+  llvm::outs() << "- Target: " << info.targetTriple << "\n";
+  if (!extendedInfo.getSDKPath().empty())
+    llvm::outs() << "- SDK path: " << extendedInfo.getSDKPath() << "\n";
+  if (!extendedInfo.getClangImporterOptions().empty()) {
+    llvm::outs() << "- -Xcc options:";
+    for (llvm::StringRef option : extendedInfo.getClangImporterOptions())
+      llvm::outs() << " " << option;
+    llvm::outs() << "\n";
+  }
+}
 
 int main(int argc, char **argv) {
   llvm::sys::PrintStackTraceOnErrorSignal();
@@ -126,13 +146,15 @@ int main(int argc, char **argv) {
                              modules)) {
           exit(1);
         }
-        // Deliberately leak the llvm::MemoryBuffer. We can't delete it
-        // while it's in use anyway.
-        fileBuf.get().release();
 
         for (auto path : modules)
           llvm::outs() << "Loaded module " << path << " from " << name
                        << "\n";
+        printValidationInfo(fileBuf.get()->getBuffer());
+
+        // Deliberately leak the llvm::MemoryBuffer. We can't delete it
+        // while it's in use anyway.
+        fileBuf.get().release();
       }
     }
     for (auto &Section : Obj->sections()) {
@@ -147,6 +169,7 @@ int main(int argc, char **argv) {
         for (auto path : modules)
           llvm::outs() << "Loaded module " << path << " from " << name
                        << "\n";
+        printValidationInfo(Buf);
       }
     }
     ObjFiles.push_back(std::move(*OF));

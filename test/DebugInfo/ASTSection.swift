@@ -34,6 +34,9 @@ println(foo.bar())
 func objCUser(obj: ObjCClass) {}
 #endif
 
+// CHECK: Loaded module ASTSection from
+// CHECK: - Target: {{.+}}-{{.+}}-{{.+}}
 // CHECK: Importing ASTSection... ok!
-// LINETABLE-CHECK-NOT: Importing ASTSection... ok!
+
+// LINETABLE-CHECK-NOT: ASTSection
 

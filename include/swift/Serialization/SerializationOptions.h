@@ -32,6 +32,7 @@ namespace swift {
 
     StringRef ImportedHeader;
     StringRef ModuleLinkName;
+    ArrayRef<std::string> ExtraClangOptions;
 
     bool AutolinkForceLoad = false;
     bool HasUnderlyingModule = false;

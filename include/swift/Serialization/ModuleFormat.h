@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 171; // Last change: Thunk flag in SILFunction.
+const uint16_t VERSION_MINOR = 172; // Last change: Compilation options.
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -344,6 +344,12 @@ enum BlockID {
   /// \sa sil_index_block
   SIL_INDEX_BLOCK_ID,
 
+  /// A sub-block of the control block that contains configuration options
+  /// needed to successfully load this module.
+  ///
+  /// \sa options_block
+  OPTIONS_BLOCK_ID,
+
   /// The module documentation container block, which contains all other
   /// documentation blocks.
   MODULE_DOC_BLOCK_ID = 96,
@@ -381,6 +387,29 @@ namespace control_block {
   using TargetLayout = BCRecordLayout<
     TARGET,
     BCBlob // LLVM triple
+  >;
+}
+
+/// The record types within the options block (a sub-block of the control
+/// block).
+///
+/// \sa OPTIONS_BLOCK_ID
+namespace options_block {
+  // These IDs must \em not be renumbered or reordered without incrementing
+  // VERSION_MAJOR.
+  enum {
+    SDK_PATH = 1,
+    XCC
+  };
+
+  using SDKPathLayout = BCRecordLayout<
+    SDK_PATH,
+    BCBlob // path
+  >;
+
+  using XCCLayout = BCRecordLayout<
+    XCC,
+    BCBlob // -Xcc flag, as string
   >;
 }
 

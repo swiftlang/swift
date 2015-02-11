@@ -137,6 +137,33 @@ public:
     ModuleStatus status = ModuleStatus::Malformed;
   };
 
+  /// A collection of options that can be used to set up a new AST context
+  /// before it has been created.
+  ///
+  /// Note that this is intended to be a transient data structure; as such,
+  /// <strong>none of the string values added to it are copied</strong>.
+  ///
+  /// \sa validateSerializedAST()
+  class ExtendedValidationInfo {
+    SmallVector<StringRef, 4> ClangImporterOpts;
+    StringRef SDKPath;
+  public:
+    ExtendedValidationInfo() = default;
+
+    StringRef getSDKPath() const { return SDKPath; }
+    void setSDKPath(StringRef path) {
+      assert(SDKPath.empty());
+      SDKPath = path;
+    }
+
+    ArrayRef<StringRef> getClangImporterOptions() const {
+      return ClangImporterOpts;
+    }
+    void addClangImporterOption(StringRef option) {
+      ClangImporterOpts.push_back(option);
+    }
+  };
+
   /// Returns info about the serialized AST in the given data.
   ///
   /// If the returned status is anything but ModuleStatus::Valid, the
@@ -147,7 +174,15 @@ public:
   ///
   /// Note that this does not actually try to load the module or validate any
   /// of its dependencies; it only checks that it /can/ be loaded.
-  static ValidationInfo validateSerializedAST(StringRef data);
+  ///
+  /// \param data A buffer containing the serialized AST. Result information
+  /// refers directly into this buffer.
+  /// \param[out] extendedInfo If present, will be populated with additional
+  /// compilation options serialized into the AST at build time that may be
+  /// necessary to load it properly.
+  static ValidationInfo
+  validateSerializedAST(StringRef data,
+                        ExtendedValidationInfo *extendedInfo = nullptr);
 
   virtual void verifyAllModules() override;
 };

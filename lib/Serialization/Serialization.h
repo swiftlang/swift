@@ -206,9 +206,10 @@ private:
   /// Writes the BLOCKINFO block for the module documentation file.
   void writeDocBlockInfoBlock();
 
-  /// Writes the Swift module file header, BLOCKINFO block, and
-  /// non-module-specific metadata, other than the module name.
-  void writeHeader();
+  /// Writes the Swift module file header and name, plus metadata determining
+  /// if the module can be loaded.
+  void writeHeader(bool serializeOptionsForDebugging = false,
+                   ArrayRef<std::string> extraClangOptions = {});
 
   /// Writes the dependencies used to build this module: its imported
   /// modules and its source files.
