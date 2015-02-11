@@ -925,6 +925,12 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
     return getImplementationForClass(Value);
   }
       
+  case MetadataKind::Metatype:
+  case MetadataKind::ExistentialMetatype: {
+    return std::make_tuple(T, &MetatypeMirrorMetadata,
+                           &MetatypeMirrorWitnessTable);
+  }
+      
   case MetadataKind::Opaque: {
 #if SWIFT_OBJC_INTEROP
     // If this is the Builtin.UnknownObject type, use the dynamic type of the
@@ -943,13 +949,7 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
     }
     SWIFT_FALLTHROUGH;
   }
-  
-  case MetadataKind::Metatype:
-  case MetadataKind::ExistentialMetatype: {
-    return std::make_tuple(T, &MetatypeMirrorMetadata,
-                           &MetatypeMirrorWitnessTable);
-  }
-      
+    
   /// TODO: Implement specialized mirror witnesses for all kinds.
   case MetadataKind::Enum:
   case MetadataKind::Function:

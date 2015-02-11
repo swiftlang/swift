@@ -1,11 +1,12 @@
 // RUN: rm -rf %t  &&  mkdir %t
-// RUN: %target-build-swift %s -module-name Reflection -o %t/a.out
+// RUN: %target-build-swift -parse-stdlib %s -module-name Reflection -o %t/a.out
 // RUN: %S/timeout.sh 360 %target-run %t/a.out %S/Inputs/shuffle.jpg | FileCheck %s
 // FIXME: timeout wrapper is necessary because the ASan test runs for hours
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
 // XFAIL: linux
 
+import Swift
 import Foundation
 import SpriteKit
 
@@ -528,5 +529,11 @@ testQLO(HasStringQLO.self)
 // CHECK-NEXT: HasStringQLO overboard
 // CHECK-NEXT: CanaryBase overboard
 
+// Don't crash on types with opaque metadata. rdar://problem/19791252
+var rawPointer = unsafeBitCast(0 as Int, Builtin.RawPointer.self)
+dump(rawPointer)
+// CHECK: - (Opaque Value)
+
 // CHECK-LABEL: and now our song is done
 println("and now our song is done")
+
