@@ -18,6 +18,7 @@
 #define SWIFT_AST_AST_NODE_H
 
 #include "llvm/ADT/PointerUnion.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/TypeAlignments.h"
 
 namespace swift {
@@ -38,6 +39,8 @@ namespace swift {
   
     /// \brief Return the location of the end of the statement.
     SourceLoc getEndLoc() const;
+
+    void walk(ASTWalker &Walker);
   };
   
 } // namespace swift

@@ -15,6 +15,7 @@
 
 #include "ASTVisitor.h"
 #include "Cleanup.h"
+#include "SILGenProfiling.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -52,7 +53,11 @@ public:
   /// TopLevelSGF - The SILGenFunction used to visit top-level code, or null if
   /// the current source file is not a script source file.
   SILGenFunction /*nullable*/ *TopLevelSGF;
-  
+
+  /// The profiler for instrumentation based profiling, or null if profiling is
+  /// disabled.
+  std::unique_ptr<SILGenProfiling> Profiler;
+
   /// Mapping from SILDeclRefs to emitted SILFunctions.
   llvm::DenseMap<SILDeclRef, SILFunction*> emittedFunctions;
   /// Mapping from ProtocolConformances to emitted SILWitnessTables.

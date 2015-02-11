@@ -42,6 +42,7 @@
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetSubtargetInfo.h"
+#include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/ObjCARC.h"
@@ -332,6 +333,10 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   // the swift AA pass after the other ones.
   if (!Opts.DisableLLVMARCOpts)
     ModulePasses.add(createSwiftAliasAnalysisPass());
+
+  // If we're generating a profile, add the lowering pass now.
+  if (Opts.GenerateProfile)
+    ModulePasses.add(createInstrProfilingPass());
 
   if (Opts.Verify)
     ModulePasses.add(createVerifierPass());

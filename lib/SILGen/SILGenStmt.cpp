@@ -129,6 +129,7 @@ emitStmtConditionWithBodyRec(StmtCondition C, Stmt *Body,
   // condition.  There is nothing to do except to finally emit the Body, which
   // will be in the scope of any emitted patterns.
   if (C.empty()) {
+    gen.emitProfilerIncrement(Body);
     gen.visit(Body);
     return;
   }
@@ -542,6 +543,7 @@ void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
     Condition Cond = emitCondition(S->getCond(), /*hasFalseCode*/ false);
     
     Cond.enterTrue(B);
+    emitProfilerIncrement(S->getBody());
     if (B.hasValidInsertionPoint()) {
       B.createBranch(S->getCond(), LoopBB);
     }
@@ -592,6 +594,7 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
   // If there's a true edge, emit the body in it.
   if (Cond.hasTrue()) {
     Cond.enterTrue(B);
+    emitProfilerIncrement(S->getBody());
     visit(S->getBody());
     
     emitOrDeleteBlock(B, IncBB, S);
@@ -680,6 +683,7 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
 
   if (Cond.hasTrue()) {
     Cond.enterTrue(B);
+    emitProfilerIncrement(S->getBody());
     
     // Emit the loop body.
     // The declared variable(s) for the current element are destroyed

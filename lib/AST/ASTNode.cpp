@@ -41,3 +41,14 @@ SourceLoc ASTNode::getStartLoc() const {
 SourceLoc ASTNode::getEndLoc() const {
   return getSourceRange().End;
 }
+
+void ASTNode::walk(ASTWalker &Walker) {
+  if (Expr *E = this->dyn_cast<Expr*>())
+    E->walk(Walker);
+  else if (Stmt *S = this->dyn_cast<Stmt*>())
+    S->walk(Walker);
+  else if (Decl *D = this->dyn_cast<Decl*>())
+    D->walk(Walker);
+  else
+    llvm_unreachable("unsupported AST node");
+}

@@ -105,13 +105,16 @@ public:
   /// the given type names.
   SmallVector<StringRef, 1> VerifyTypeLayoutNames;
 
+  /// Instrument code to generate profiling information.
+  unsigned GenerateProfile : 1;
+
   IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
                    Optimize(false), DebugInfoKind(IRGenDebugInfoKind::None),
                    UseJIT(false), EnableDynamicValueTypeLayout(false),
                    DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
                    DisableLLVMSLPVectorizer(false),
                    DisableFPElim(true), HasUnderlyingModule(false),
-                   Playground(false) {}
+                   Playground(false), GenerateProfile(false) {}
 };
 
 } // end namespace swift

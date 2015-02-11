@@ -832,6 +832,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_external_pass_pipeline_filename))
     Opts.ExternalPassPipelineFilename = A->getValue();
 
+  Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
+
   return false;
 }
 
@@ -937,6 +939,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.VerifyTypeLayoutNames.push_back(A->getValue());
   }
   
+  Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
+
   return false;
 }
 

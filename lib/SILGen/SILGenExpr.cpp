@@ -3231,7 +3231,10 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   Type resultTy = fd->getResultType();
   emitProlog(fd, fd->getBodyParamPatterns(), resultTy);
   prepareEpilog(resultTy, CleanupLocation(fd));
+
+  emitProfilerIncrement(fd->getBody());
   visit(fd->getBody());
+
   emitEpilog(fd);
 }
 
@@ -3240,12 +3243,14 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   
   emitProlog(ace, ace->getParams(), ace->getResultType());
   prepareEpilog(ace->getResultType(), CleanupLocation(ace));
-  if (auto *ce = dyn_cast<ClosureExpr>(ace))
+  if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
+    emitProfilerIncrement(ce);
     visit(ce->getBody());
-  else {
+  } else {
     auto *autoclosure = cast<AutoClosureExpr>(ace);
     // Closure expressions implicitly return the result of their body
     // expression.
+    emitProfilerIncrement(autoclosure);
     emitReturnExpr(ImplicitReturnLocation(ace),
                    autoclosure->getSingleExpressionBody());
   }
@@ -5529,6 +5534,7 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
                                        SGF.getLoweredType(E->getType()));
     
     cond.enterTrue(SGF.B);
+    SGF.emitProfilerIncrement(E);
     SILValue trueValue;
     {
       auto TE = E->getThenExpr();
@@ -5562,6 +5568,7 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
                                        /*hasFalse*/ true,
                                        /*invertCondition*/ false);
     cond.enterTrue(SGF.B);
+    SGF.emitProfilerIncrement(E);
     {
       auto TE = E->getThenExpr();
       FullExpr trueScope(SGF.Cleanups, CleanupLocation(TE));

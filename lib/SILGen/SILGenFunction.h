@@ -360,6 +360,12 @@ public:
   /// expansion to report the location of the call, instead of the location
   /// of the original expr.
   Optional<SourceLoc> overrideLocationForMagicIdentifiers;
+
+  /// Emit code to increment a counter for profiling.
+  void emitProfilerIncrement(ASTNode N) {
+    if (SGM.Profiler)
+      SGM.Profiler->emitCounterIncrement(B, N);
+  }
   
   SILGenFunction(SILGenModule &SGM, SILFunction &F);
   ~SILGenFunction();

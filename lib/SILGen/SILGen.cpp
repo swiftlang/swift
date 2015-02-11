@@ -57,7 +57,7 @@ SILGenFunction::~SILGenFunction() {
 
 SILGenModule::SILGenModule(SILModule &M, Module *SM, bool makeModuleFragile)
   : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr),
-    makeModuleFragile(makeModuleFragile) {
+    Profiler(nullptr), makeModuleFragile(makeModuleFragile) {
 }
 
 SILGenModule::~SILGenModule() {
@@ -410,7 +410,11 @@ bool SILGenModule::hasFunction(SILDeclRef constant) {
 }
 
 void SILGenModule::visitFuncDecl(FuncDecl *fd) {
+  const auto &Opts = M.getOptions();
+  if (Opts.GenerateProfile)
+    Profiler = llvm::make_unique<SILGenProfiling>(*this);
   emitFunction(fd);
+  Profiler = nullptr;
 }
 
 template<typename T>
@@ -501,6 +505,8 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
 
     SILDeclRef constant(decl);
     SILFunction *f = preEmitFunction(constant, fd, fd);
+    if (Profiler && !Profiler->hasRegionCounters())
+      Profiler->assignRegionCounters(fd, *f);
     SILGenFunction(*this, *f).emitFunction(fd);
     postEmitFunction(constant, f);
   }

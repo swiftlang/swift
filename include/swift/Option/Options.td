@@ -375,4 +375,8 @@ def target_legacy_spelling : Joined<["--"], "target=">,
 def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption]>,
   HelpText<"Generate code for a particular CPU variant">;
 
+def profile_generate : Flag<["-"], "profile-generate">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Generate instrumented code to collect execution counts">;
+
 include "FrontendOptions.td"

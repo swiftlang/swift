@@ -21,6 +21,7 @@
 #include "swift/Driver/Job.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Option/Options.h"
+#include "clang/Basic/Version.h"
 #include "clang/Driver/Util.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/Arg.h"
@@ -115,7 +116,8 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_resource_dir);
   inputArgs.AddLastArg(arguments, options::OPT_split_objc_selectors);
   inputArgs.AddLastArg(arguments, options::OPT_solver_memory_threshold);
-  
+  inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
+
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
 
@@ -601,6 +603,19 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
   Arguments.push_back("-L");
   Arguments.push_back(Args.MakeArgString(RuntimeLibPath));
 
+  if (Args.hasArg(options::OPT_profile_generate)) {
+    SmallString<128> LibProfile(RuntimeLibPath);
+    llvm::sys::path::remove_filename(LibProfile); // remove platform name
+    llvm::sys::path::append(LibProfile, "clang", CLANG_VERSION_STRING);
+
+    StringRef RT = Triple.isiOS() ? "ios" : "osx";
+    llvm::sys::path::append(LibProfile, "lib", "darwin",
+                            "libclang_rt.profile_" + RT + ".a");
+    Arguments.push_back(Args.MakeArgString(LibProfile));
+  }
+
+
+
   // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
   // of time the standard library won't be copied.
   Arguments.push_back("-rpath");
@@ -688,6 +703,16 @@ Job *linux::Linker::constructJob(const JobAction &JA,
                           getPlatformNameForTriple(TC.getTriple()));
   Arguments.push_back("-L");
   Arguments.push_back(Args.MakeArgString(RuntimeLibPath));
+
+  if (Args.hasArg(options::OPT_profile_generate)) {
+    SmallString<128> LibProfile(RuntimeLibPath);
+    llvm::sys::path::remove_filename(LibProfile); // remove platform name
+    llvm::sys::path::append(LibProfile, "clang", CLANG_VERSION_STRING);
+
+    llvm::sys::path::append(LibProfile, "lib", TC.getOS(),
+                            "libclang_rt.profile-" + TC.getArchName() + ".a");
+    Arguments.push_back(Args.MakeArgString(LibProfile));
+  }
 
   // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
   // of time the standard library won't be copied.
