@@ -601,8 +601,7 @@ extension ${Self} : _ArrayType {
 
   /// Return ${a_Self} containing the results of calling
   /// `transform(x)` on each element `x` of `self`
-  public func map<U>(transform: (T) -> U) -> ${Self}<U> {
-    // 'transform' should be @noescape, but there's a compiler bug:
+  public func map<U>(@noescape transform: (T) -> U) -> ${Self}<U> {
     // Should call Swift.map here, but there's a compiler bug:
     // <rdar://problem/19763792> Calling Swift.map from Array.map causes
     // Assertion failed: UnresolvedDot in wrong phase
