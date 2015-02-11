@@ -1324,32 +1324,35 @@ namespace {
       constructor->setAccessibility(Accessibility::Public);
 
       // Use a builtin to produce a zero initializer, and assign it to self.
-      
-      // Construct the left-hand reference to self.
-      Expr *lhs = new (context) DeclRefExpr(selfDecl, SourceLoc(),
-                                            /*Implicit=*/true);
-      
-      // Construct the right-hand call to Builtin.zeroInitializer.
-      auto zeroInitializerFunc = cast<FuncDecl>(getBuiltinValueDecl(context,
-                                     context.getIdentifier("zeroInitializer")));
-      auto zeroInitializerRef = new (context) DeclRefExpr(zeroInitializerFunc,
-                                                          SourceLoc(),
-                                                          /*implicit*/ true);
-      auto emptyTuple = TupleExpr::create(context, SourceLoc(), {}, {}, {},
-                                          SourceLoc(),
-                                          /*trailing closure*/ false,
-                                          /*implicit*/ true,
-                                          emptyTy);
-      auto call = new (context) CallExpr(zeroInitializerRef, emptyTuple,
-                                         /*implicit*/ true);
-      
-      auto assign = new (context) AssignExpr(lhs, SourceLoc(), call,
-                                             /*implicit*/ true);
-      
-      // Create the function body.
-      ASTNode bodyElts = assign;
-      auto body = BraceStmt::create(context, SourceLoc(), bodyElts, SourceLoc());
-      constructor->setBody(body);
+      constructor->setBodySynthesizer([](AbstractFunctionDecl *constructor) {
+        ASTContext &context = constructor->getASTContext();
+
+        // Construct the left-hand reference to self.
+        Expr *lhs =
+            new (context) DeclRefExpr(constructor->getImplicitSelfDecl(),
+                                      SourceLoc(), /*implicit=*/true);
+
+        // Construct the right-hand call to Builtin.zeroInitializer.
+        Identifier zeroInitID = context.getIdentifier("zeroInitializer");
+        auto zeroInitializerFunc =
+            cast<FuncDecl>(getBuiltinValueDecl(context, zeroInitID));
+        auto zeroInitializerRef = new (context) DeclRefExpr(zeroInitializerFunc,
+                                                            SourceLoc(),
+                                                            /*implicit*/ true);
+        auto emptyTuple = TupleExpr::createEmpty(context, SourceLoc(),
+                                                 SourceLoc(),
+                                                 /*implicit*/ true);
+        auto call = new (context) CallExpr(zeroInitializerRef, emptyTuple,
+                                           /*implicit*/ true);
+
+        auto assign = new (context) AssignExpr(lhs, SourceLoc(), call,
+                                               /*implicit*/ true);
+
+        // Create the function body.
+        auto body = BraceStmt::create(context, SourceLoc(), { assign },
+                                      SourceLoc());
+        constructor->setBody(body);
+      });
 
       // Add this as an external definition.
       Impl.registerExternalDecl(constructor);
