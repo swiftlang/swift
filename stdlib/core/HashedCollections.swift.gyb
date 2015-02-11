@@ -3544,11 +3544,6 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
 
   internal typealias _NativeIndex = _Native${Self}Index<${TypeParameters}>
 
-%if Self == 'Set':
-  internal typealias Key = ${TypeParameters}
-  internal typealias Value = ${TypeParameters}
-%end
-
   internal var _state: ${Self}GeneratorRepresentation<${TypeParameters}>
 
   internal static func _Native(
@@ -3566,7 +3561,11 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
 
   @transparent
   internal var _guaranteedNative: Bool {
+%if Self == 'Set':
+    return _canBeClass(T.self) == 0
+%elif Self == 'Dictionary':
     return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
+%end
   }
 
   internal mutating func _nativeNext() -> ${SequenceType}? {
@@ -3598,9 +3597,8 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
     case ._Cocoa(var cocoaGenerator):
 #if _runtime(_ObjC)
 %if Self == 'Set':
-      if let anyObjectKey: AnyObject = cocoaGenerator.next() {
-        let nativeKey = _forceBridgeFromObjectiveC(anyObjectKey, Key.self)
-        return nativeKey
+      if let anyObjectElement: AnyObject = cocoaGenerator.next() {
+        return _forceBridgeFromObjectiveC(anyObjectElement, T.self)
       }
 %elif Self == 'Dictionary':
       if let (anyObjectKey: AnyObject, anyObjectValue: AnyObject) =
