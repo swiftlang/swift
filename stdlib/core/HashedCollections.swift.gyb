@@ -466,7 +466,8 @@ public struct Set<T : Hashable> :
     }
   }
 
-  /// A member of the set, or `nil` if the set is empty.
+  /// The first element obtained when iterating, or `nil` if `self` is
+  /// empty.  Equivalent to `self.generate().next()`
   public var first: T? {
     return count > 0 ? self[startIndex] : .None
   }
