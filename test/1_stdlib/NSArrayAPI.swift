@@ -26,6 +26,14 @@ NSArrayAPI.test("Printable") {
   expectEqual(expect, result)
 }
 
+NSArrayAPI.test("copy construction") {
+  let expected = ["A", "B", "C", "D"]
+  let x = NSArray(array: expected as NSArray)
+  expectEqual(expected, x as! Array)
+  let y = NSMutableArray(array: expected as NSArray)
+  expectEqual(expected, y as NSArray as! Array)
+}
+
 var NSMutableArrayAPI = TestSuite("NSMutableArrayAPI")
 
 NSMutableArrayAPI.test("Printable") {

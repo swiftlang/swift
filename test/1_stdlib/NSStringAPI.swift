@@ -1849,6 +1849,14 @@ NSStringAPIs.test("CompareStringsWithUnpairedSurrogates")
     acceptor[advance(donor.startIndex, 1)..<advance(donor.startIndex, 5)])
 }
 
+NSStringAPIs.test("copy construction") {
+  let expected = "abcd"
+  let x = NSString(string: expected as NSString)
+  expectEqual(expected, x as String)
+  let y = NSMutableString(string: expected as NSString)
+  expectEqual(expected, y as String)
+}
+
 var CStringTests = TestSuite("CStringTests")
 
 func getNullCString() -> UnsafeMutablePointer<CChar> {

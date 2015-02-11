@@ -61,6 +61,14 @@ NSOrderedSetAPI.test("Printable") {
   expectEqual(expect, result)
 }
 
+NSSetAPI.test("copy construction") {
+  let expected: Set = ["A", "B", "C", "D"]
+  let x = NSSet(set: expected as NSSet)
+  expectEqual(expected, x as! Set)
+  let y = NSMutableSet(set: expected as NSSet)
+  expectEqual(expected, y as NSSet as! Set)
+}
+
 var NSIndexSetAPI = TestSuite("NSIndexSetAPI")
 
 NSIndexSetAPI.test("SequenceType") {

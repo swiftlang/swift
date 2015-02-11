@@ -1131,3 +1131,64 @@ extension NSOrderedSet : ArrayLiteralConvertible {
     self.init(array: elements)
   }
 }
+
+//===--- "Copy constructors" ----------------------------------------------===//
+// These are needed to make Cocoa feel natural since we eliminated
+// implicit briding conversions from Objective-C to Swift
+//===----------------------------------------------------------------------===//
+
+extension NSArray {
+  /// Initializes a newly allocated array by placing in it the objects
+  /// contained in a given array.
+  ///
+  /// :returns: An array initialized to contain the objects in
+  ///    `anArray``. The returned object might be different than the
+  ///    original receiver.
+  /// 
+  /// Discussion: After an immutable array has been initialized in
+  /// this way, it cannot be modified.
+  @objc(_swiftInitWithArray_NSArray:)
+  public convenience init(array anArray: NSArray) {
+    self.init(array: anArray as Array)
+  }
+}
+
+extension NSString {
+  /// Returns an `NSString` object initialized by copying the characters
+  /// from another given string.
+  ///
+  /// :returns: An `NSString` object initialized by copying the
+  ///   characters from `aString`. The returned object may be different
+  ///   from the original receiver.
+  @objc(_swiftInitWithString_NSString:)
+  public convenience init(string aString: NSString) {
+    self.init(string: aString as String)
+  }
+}
+
+extension NSSet {
+  /// Initializes a newly allocated set and adds to it objects from
+  /// another given set.
+  ///
+  /// :returns: An initialized objects set containing the objects from
+  /// `set`. The returned set might be different than the original
+  /// receiver.
+  @objc(_swiftInitWithSet_NSSet:)
+  public convenience init(set anSet: NSSet) {
+    self.init(set: anSet as Set)
+  }
+}
+
+extension NSDictionary {
+  /// Initializes a newly allocated dictionary and adds to it objects from
+  /// another given dictionary.
+  ///
+  /// :returns: An initialized dictionary—which might be different
+  ///   than the original receiver—containing the keys and values
+  ///   found in `otherDictionary`.
+  @objc(_swiftInitWithDictionary_NSDictionary:)
+  public convenience init(dictionary otherDictionary: NSDictionary) {
+    self.init(dictionary: otherDictionary as Dictionary)
+  }
+}
+
