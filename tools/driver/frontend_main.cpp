@@ -480,7 +480,6 @@ static bool performCompile(CompilerInstance &Instance,
       serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
       serializationOpts.DocOutputPath = opts.ModuleDocOutputPath.c_str();
       serializationOpts.SerializeAllSIL = opts.SILSerializeAll;
-      serializationOpts.InputFilenames = opts.InputFilenames;
       if (opts.SerializeBridgingHeader)
         serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
       serializationOpts.ModuleLinkName = opts.ModuleLinkName;

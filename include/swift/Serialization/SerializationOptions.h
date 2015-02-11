@@ -30,7 +30,6 @@ namespace swift {
     const char *OutputPath = nullptr;
     const char *DocOutputPath = nullptr;
 
-    ArrayRef<std::string> InputFilenames;
     StringRef ImportedHeader;
     StringRef ModuleLinkName;
 
