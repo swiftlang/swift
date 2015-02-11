@@ -89,7 +89,7 @@ def numeric_type_names_Macintosh_only():
 # Swift_Programming_Language/Expressions.html
 
 def all_integer_binary_operator_names():
-    return ['<<', '>>', '&*', '&%', '&', '&+', '&-', '|', '^']
+    return ['<<', '>>', '&*', '&', '&+', '&-', '|', '^']
     
 def all_integer_or_real_binary_operator_names():
     return ['*', '/', '%', '+', '-', '..<', '...']
