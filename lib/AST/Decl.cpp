@@ -3330,7 +3330,12 @@ Type EnumElementDecl::getArgumentInterfaceType() const {
   if (!hasArgumentType())
     return nullptr;
 
-  auto funcTy = getInterfaceType()->castTo<AnyFunctionType>();
+  auto interfaceType = getInterfaceType();
+  if (interfaceType->is<ErrorType>()) {
+    return interfaceType;
+  }
+
+  auto funcTy = interfaceType->castTo<AnyFunctionType>();
   funcTy = funcTy->getResult()->castTo<AnyFunctionType>();
   return funcTy->getInput();
 }

@@ -43,7 +43,7 @@ var custHash: Int = CustomHashable.A.hashValue
 
 // We still synthesize conforming overloads of '==' and 'hashValue' if
 // explicit definitions don't satisfy the protocol requirements. Probably
-// not what we actually want. 
+// not what we actually want.
 enum InvalidCustomHashable {
   case A, B
 
@@ -87,3 +87,16 @@ enum Complex {
 }
 
 if Complex.A(1) == .B { } // expected-error{{could not find member 'B'}}
+
+
+// rdar://19773050
+private enum Bar<T> {
+  case E(Unknown<T>)  // expected-error {{use of undeclared type 'Unknown'}}
+
+  mutating func value() -> T {
+    switch self {
+    case let E(x):
+      return x.value
+    }
+  }
+}
