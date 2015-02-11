@@ -59,7 +59,13 @@ static bool isTypeMetadataEmittedLazily(CanType type) {
   // All classes have eagerly-emitted metadata (at least for now).
   if (type.getClassOrBoundGenericClass()) return false;
 
-  switch (getTypeLinkage(type)) {
+  // Non-nominal metadata (e.g. for builtins) is provided by the runtime and
+  // doesn't need lazy instantiation.
+  auto nom = type->getAnyNominal();
+  if (!nom)
+    return false;
+
+  switch (getDeclLinkage(nom)) {
   case FormalLinkage::PublicUnique:
   case FormalLinkage::HiddenUnique:
   case FormalLinkage::Private:
