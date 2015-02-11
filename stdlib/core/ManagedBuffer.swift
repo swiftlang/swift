@@ -238,7 +238,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// idea to store this information in the "value" area when
   /// an instance is created.
   public var allocatedElementCount: Int {
-    return (_allocatedByteCount &- _My._elementOffset) &/ strideof(Element)
+    return (_allocatedByteCount &- _My._elementOffset) / strideof(Element)
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the stored

@@ -57,11 +57,13 @@ public func ${op} <T: _IntegerArithmeticType>(lhs: T, rhs: T) -> T {
   return _overflowChecked(T.${name}WithOverflow(lhs, rhs))
 }
 
+% if op != '/':
 /// ${name} `lhs` and `rhs`, silently discarding any overflow.
 @transparent
 public func &${op} <T: _IntegerArithmeticType>(lhs: T, rhs: T) -> T {
   return T.${name}WithOverflow(lhs, rhs).0
 }
+% end
 
 /// ${name} `lhs` and `rhs` and store the result in `lhs`, trapping in
 /// case of arithmetic overflow (except in -Ounchecked builds).
