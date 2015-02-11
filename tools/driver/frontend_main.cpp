@@ -172,6 +172,8 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     case DeclKind::Class:
     case DeclKind::Protocol: {
       auto *NTD = cast<NominalTypeDecl>(D);
+      if (!NTD->hasName())
+        break;
       if (NTD->hasAccessibility() &&
           NTD->getAccessibility() == Accessibility::Private) {
         break;
@@ -186,6 +188,8 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     case DeclKind::Var:
     case DeclKind::Func: {
       auto *VD = cast<ValueDecl>(D);
+      if (!VD->hasName())
+        break;
       if (VD->hasAccessibility() &&
           VD->getAccessibility() == Accessibility::Private) {
         break;
@@ -246,6 +250,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
   // FIXME: Sort these?
   out << "top-level:\n";
   for (auto &entry : tracker->getTopLevelNames()) {
+    assert(!entry.first.empty());
     out << "- ";
     if (!entry.second)
       out << "!private ";
@@ -255,6 +260,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
   // FIXME: Sort these?
   out << "member-access:\n";
   for (auto &entry : tracker->getUsedNominals()) {
+    assert(entry.first != nullptr);
     if (entry.first->hasAccessibility() &&
         entry.first->getAccessibility() == Accessibility::Private)
       continue;
@@ -271,6 +277,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
   // FIXME: Sort these?
   out << "dynamic-lookup:\n";
   for (auto &entry : tracker->getDynamicLookupNames()) {
+    assert(!entry.first.empty());
     out << "- ";
     if (!entry.second)
       out << "!private ";

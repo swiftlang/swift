@@ -18,6 +18,7 @@
 // CHECK-NEXT: "ThreeTildeType"
 // CHECK-NEXT: "overloadedOnProto"
 // CHECK-NEXT: "overloadedOnProto"
+// CHECK-NEXT: "topLevelComputedProperty"
 // CHECK-NEXT: "lookUpManyTopLevelNames"
 // CHECK-NEXT: "Outer"
 // CHECK: "eof"
@@ -93,6 +94,10 @@ func overloadedOnProto<T: ThreeTildeType>(_: T) {}
 
 // CHECK-DAG: !private "~~~"
 private prefix func ~~~(_: ThreeTildeTypeImpl) {}
+
+var topLevelComputedProperty: Bool {
+  return true
+}
 
 func lookUpManyTopLevelNames() {
   // CHECK-DAG: !private "Dictionary"
