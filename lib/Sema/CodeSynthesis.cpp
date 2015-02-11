@@ -235,6 +235,9 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
   if (storage->isFinal())
     makeFinal(TC.Context, getter);
 
+  if (storage->isStatic())
+    getter->setStatic();
+
   return getter;
 }
 
@@ -263,7 +266,7 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
       Identifier(), loc, /*generic=*/nullptr, Type(), params,
       TypeLoc::withoutLoc(setterRetTy), storage->getDeclContext());
   setter->setImplicit();
-  
+
   // Setters for truly stored properties default to mutating.
   // Setters for addressed properties follow the mutable addressor.
   auto requiresMutatingSetter = [](const AbstractStorageDecl *storage) {
@@ -295,6 +298,9 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   // If the var is marked final, then so is the getter.
   if (storage->isFinal())
     makeFinal(TC.Context, setter);
+
+  if (storage->isStatic())
+    setter->setStatic();
 
   return setter;
 }

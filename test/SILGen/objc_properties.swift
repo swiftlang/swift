@@ -31,7 +31,7 @@ class A {
     method(prop)
     prop = 6
   }
-  
+
   // rdar://15858869 - However, direct access only applies to (implicit or
   // explicit) 'self' ivar references, not ALL ivar refs.
   // CHECK-LABEL: sil hidden @_TFC15objc_properties1AcfMS0_FT5otherS0_1xSi_S0_
@@ -128,5 +128,27 @@ class TestComputedOutlet {
 
   func foo() {
     _disclosedView != nil ? () : self.disclosedView.foo()
+  }
+}
+
+class Singleton : NSObject {
+  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong14sharedInstanceS0_ : $@thin (@thick Singleton.Type) -> @owned Singleton
+  // CHECK-DAG: sil hidden [transparent] @_TToZFC15objc_properties9Singletong14sharedInstanceS0_ : $@cc(objc_method) @thin (@objc_metatype Singleton.Type) -> @autoreleased Singleton {
+  static let sharedInstance = Singleton()
+
+  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong1iSi : $@thin (@thick Singleton.Type) -> Int
+  // CHECK-DAG: sil hidden [transparent] @_TToZFC15objc_properties9Singletong1iSi : $@cc(objc_method) @thin (@objc_metatype Singleton.Type) -> Int
+  static let i = 2
+
+  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong1jSS : $@thin (@thick Singleton.Type) -> @owned String
+  // CHECK-DAG: sil hidden [transparent] @_TToZFC15objc_properties9Singletong1jSS : $@cc(objc_method) @thin (@objc_metatype Singleton.Type) -> @autoreleased NSString
+  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletons1jSS : $@thin (@owned String, @thick Singleton.Type) -> ()
+  // CHECK-DAG: sil hidden [transparent] @_TToZFC15objc_properties9Singletons1jSS : $@cc(objc_method) @thin (NSString, @objc_metatype Singleton.Type) -> ()
+  static var j = "Hello"
+
+  // CHECK-DAG: sil hidden @_TToZFC15objc_properties9Singletong1kSd : $@cc(objc_method) @thin (@objc_metatype Singleton.Type) -> Double
+  // CHECK-DAG: sil hidden @_TZFC15objc_properties9Singletong1kSd : $@thin (@thick Singleton.Type) -> Double
+  static var k: Double {
+    return 7.7
   }
 }

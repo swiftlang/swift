@@ -2394,6 +2394,13 @@ public:
         TC.diagnose(VD->getLoc(), diag::extension_stored_property);
         VD->setInvalid();
         VD->overwriteType(ErrorType::get(TC.Context));
+      } else if (auto C = VD->getDeclContext()->isClassOrClassExtensionContext()) {
+        // Objective-C compatible class types with static stored properties
+        // can be accessed as Objective-C class methods but need accessors
+        // to do so.
+        if (VD->isStatic() && VD->hasStorage() && C->isObjC())
+          if (!VD->hasAccessorFunctions())
+            addTrivialAccessorsToStorage(VD, TC);
       }
     }
 

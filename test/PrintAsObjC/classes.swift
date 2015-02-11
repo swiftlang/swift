@@ -45,7 +45,7 @@ import CoreFoundation
 // CHECK-NEXT: @end
 @objc class BridgedTypes {
   func dictBridge(x: Dictionary<NSObject, AnyObject>) -> Dictionary<NSObject, AnyObject> { 
-    return x 
+    return x
   }
 
   func setBridge(x: Set<NSObject>) -> Set<NSObject> {
@@ -326,6 +326,10 @@ private class Private : A1 {}
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray * __nullable outletCollectionOptional;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * __nullable outletCollectionAnyObject;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * __nullable outletCollectionProto;
+// CHECK-NEXT: + (NSInteger)i;
+// CHECK-NEXT: + (NSString * __nonnull)j;
+// CHECK-NEXT: + (void)setJ:(NSString * __nonnull)value;
+// CHECK-NEXT: + (double)k;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Properties {
@@ -367,6 +371,12 @@ private class Private : A1 {}
   @IBOutlet var outletCollectionOptional: [Properties]? = []
   @IBOutlet var outletCollectionAnyObject: [AnyObject]?
   @IBOutlet var outletCollectionProto: [NSObjectProtocol]?
+
+  static let staticInt = 2
+  static var staticString = "Hello"
+  static var staticDouble: Double {
+    return 2.0
+  }
 }
 
 // CHECK-LABEL: @interface PropertiesOverridden
@@ -436,7 +446,7 @@ private class Private : A1 {}
       println("nope")
     }
   }
-  
+
   // <rdar://problem/17165953> Swift: lazy property reflects back into Objective-C with two properties, one for underlying storage
   lazy var cardPaths : [String] = []
 }
