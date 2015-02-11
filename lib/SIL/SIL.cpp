@@ -100,9 +100,6 @@ FormalLinkage swift::getTypeLinkage(CanType type) {
     // For any nominal type reference, look at the type declaration.
     if (auto nominal = type->getAnyNominal()) {
       result ^= getDeclLinkage(nominal);
-      // The generic parameters or parent of the nominal type don't affect the
-      // declaration's linkage. We can stop.
-      return true;
 
     // For polymorphic function types, look at the generic parameters.
     // FIXME: findIf should do this, once polymorphic function types can be
