@@ -2547,14 +2547,14 @@ struct ASTNodeBase {};
 }
 
 void swift::verify(SourceFile &SF) {
-#ifndef NDEBUG
+#if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))
   Verifier verifier(SF, &SF);
   SF.walk(verifier);
 #endif
 }
 
 void swift::verify(Decl *D) {
-#ifndef NDEBUG
+#if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))
   Verifier V = Verifier::forDecl(D);
   D->walk(V);
 #endif
