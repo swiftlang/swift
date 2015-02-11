@@ -772,6 +772,10 @@ NSStringAPIs.test("init(format:_:...)") {
   let world: NSString = "world"
   expectEqual("Hello, world!%42",
       String(format: "Hello, %@!%%%ld", world, 42))
+
+  // test for rdar://problem/18317906
+  expectEqual("3.12", String(format: "%.2f", 3.123456789))
+  expectEqual("3.12", NSString(format: "%.2f", 3.123456789))
 }
 
 NSStringAPIs.test("init(format:arguments:)") {
