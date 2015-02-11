@@ -534,6 +534,13 @@ var rawPointer = unsafeBitCast(0 as Int, Builtin.RawPointer.self)
 dump(rawPointer)
 // CHECK: - (Opaque Value)
 
+// Don't crash on null pointers. rdar://problem/19708338
+var sequence = COpaquePointer()
+var mirror = reflect(sequence)
+var child = mirror[0]
+println(child.1.summary)
+// CHECK-NEXT: (Opaque Value)
+
 // CHECK-LABEL: and now our song is done
 println("and now our song is done")
 
