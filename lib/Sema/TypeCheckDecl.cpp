@@ -2381,7 +2381,7 @@ public:
                       diag::protocol_property_must_be_computed_var);
         else
           TC.diagnose(VD->getLoc(), diag::protocol_property_must_be_computed);
-        
+
         convertStoredVarInProtocolToComputed(VD, TC);
       } else if (isa<EnumDecl>(VD->getDeclContext()) &&
                  !VD->isStatic()) {
@@ -2394,14 +2394,12 @@ public:
         TC.diagnose(VD->getLoc(), diag::extension_stored_property);
         VD->setInvalid();
         VD->overwriteType(ErrorType::get(TC.Context));
-      } else if (auto C = VD->getDeclContext()->isClassOrClassExtensionContext()) {
-        // Objective-C compatible class types with static stored properties
+      } // Objective-C compatible class types with static stored properties
         // can be accessed as Objective-C class methods but need accessors
         // to do so.
-        if (VD->isStatic() && VD->hasStorage() && C->isObjC())
+        else if (VD->isObjC() && VD->isStatic() && VD->hasStorage())
           if (!VD->hasAccessorFunctions())
             addTrivialAccessorsToStorage(VD, TC);
-      }
     }
 
     // Synthesize accessors for lazy, all checking already been performed.

@@ -44,7 +44,7 @@ import CoreFoundation
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class BridgedTypes {
-  func dictBridge(x: Dictionary<NSObject, AnyObject>) -> Dictionary<NSObject, AnyObject> { 
+  func dictBridge(x: Dictionary<NSObject, AnyObject>) -> Dictionary<NSObject, AnyObject> {
     return x
   }
 
@@ -326,10 +326,10 @@ private class Private : A1 {}
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray * __nullable outletCollectionOptional;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * __nullable outletCollectionAnyObject;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * __nullable outletCollectionProto;
-// CHECK-NEXT: + (NSInteger)i;
-// CHECK-NEXT: + (NSString * __nonnull)j;
-// CHECK-NEXT: + (void)setJ:(NSString * __nonnull)value;
-// CHECK-NEXT: + (double)k;
+// CHECK-NEXT: + (NSInteger)staticInt;
+// CHECK-NEXT: + (NSString * __nonnull)staticString;
+// CHECK-NEXT: + (void)setStaticString:(NSString * __nonnull)value;
+// CHECK-NEXT: + (double)staticDouble;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Properties {

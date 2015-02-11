@@ -43,8 +43,8 @@ import CoreFoundation
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class BridgedTypes {
-  func dictBridge(x: Dictionary<NSObject, AnyObject>) -> Dictionary<NSObject, AnyObject> { 
-    return x 
+  func dictBridge(x: Dictionary<NSObject, AnyObject>) -> Dictionary<NSObject, AnyObject> {
+    return x
   }
 
   func setBridge(x: Set<NSObject>) -> Set<NSObject> {
@@ -318,6 +318,10 @@ private class Private : A1 {}
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NS_ARRAY(Properties *)  __nullable outletCollectionOptional;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * __nullable outletCollectionAnyObject;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NS_ARRAY(id <NSObject>) __nullable outletCollectionProto;
+// CHECK-NEXT: + (NSInteger)staticInt;
+// CHECK-NEXT: + (NSString * __nonnull)staticString;
+// CHECK-NEXT: + (void)setStaticString:(NSString * __nonnull)value;
+// CHECK-NEXT: + (double)staticDouble;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Properties {
@@ -359,6 +363,12 @@ private class Private : A1 {}
   @IBOutlet var outletCollectionOptional: [Properties]? = []
   @IBOutlet var outletCollectionAnyObject: [AnyObject]?
   @IBOutlet var outletCollectionProto: [NSObjectProtocol]?
+
+  static let staticInt = 2
+  static var staticString = "Hello"
+  static var staticDouble: Double {
+    return 2.0
+  }
 }
 
 // CHECK-LABEL: @interface PropertiesOverridden
@@ -428,7 +438,7 @@ private class Private : A1 {}
       println("nope")
     }
   }
-  
+
   // <rdar://problem/17165953> Swift: lazy property reflects back into Objective-C with two properties, one for underlying storage
   lazy var cardPaths : [String] = []
 }
