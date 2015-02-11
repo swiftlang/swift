@@ -17,6 +17,6 @@ foreach(config ${configs})
 endforeach()
 
 swift_install_in_component(testsuite-tools
-    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/llvm-opt"
+    PROGRAMS "${SWIFT_RUNTIME_OUTPUT_INTDIR}/llvm-opt"
     DESTINATION "bin")
 
