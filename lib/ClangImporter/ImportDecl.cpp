@@ -2238,7 +2238,7 @@ namespace {
         return nullptr;
 
       auto type = Impl.importType(decl->getType(),
-                                  ImportTypeKind::Variable,
+                                  ImportTypeKind::RecordField,
                                   isInSystemModule(dc));
       if (!type)
         return nullptr;

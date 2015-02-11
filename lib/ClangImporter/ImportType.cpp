@@ -720,6 +720,7 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
   case ImportTypeKind::AuditedVariable:
   case ImportTypeKind::Pointee:
   case ImportTypeKind::Enum:
+  case ImportTypeKind::RecordField:
     return false;
   case ImportTypeKind::Result:
   case ImportTypeKind::AuditedResult:
@@ -741,6 +742,7 @@ static bool isCFAudited(ImportTypeKind importKind) {
   case ImportTypeKind::Result:
   case ImportTypeKind::Pointee:
   case ImportTypeKind::Enum:
+  case ImportTypeKind::RecordField:
     return false;
   case ImportTypeKind::AuditedVariable:
   case ImportTypeKind::AuditedResult:

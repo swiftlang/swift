@@ -114,3 +114,12 @@ enum RawEnumInGizmo {
   InGizmoTwo,
   InGizmoThree
 };
+
+struct StructOfNSStrings {
+  __unsafe_unretained NSString *a;
+  __unsafe_unretained NSString *b;
+  __unsafe_unretained NSString *c;
+  __unsafe_unretained NSString *d;
+};
+
+struct StructOfNSStrings useStructOfNSStringsInObjC(struct StructOfNSStrings);

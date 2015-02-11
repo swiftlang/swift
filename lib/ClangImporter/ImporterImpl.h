@@ -95,13 +95,16 @@ enum class ImportTypeKind {
 
   /// \brief Import the declared type of a variable.
   Variable,
-
+  
   /// \brief Import the declared type of an audited variable.
   ///
   /// This is exactly like ImportTypeKind::Variable, except it
   /// disables wrapping CF class types in Unmanaged.
   AuditedVariable,
 
+  /// \brief Import the declared type of a struct or union field.
+  RecordField,
+  
   /// \brief Import the result type of a function.
   ///
   /// This provides special treatment for 'void', among other things, and

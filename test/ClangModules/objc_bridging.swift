@@ -3,6 +3,7 @@
 // REQUIRES: objc_interop
 
 import Foundation
+import objc_structs
 
 extension String {
   func onlyOnString() -> String { return self }
@@ -53,4 +54,9 @@ func constPointerToObjC(objects: [AnyObject?]) -> NSArray {
 func mutablePointerToObjC(path: String) -> NSString {
   var err: NSError? = nil
   return NSString(contentsOfFile: path, error:&err)
+}
+
+func objcStructs(s: StructOfNSStrings) {
+  // Struct fields must not be bridged.
+  let x: NSString = s.nsstr!
 }

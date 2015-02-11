@@ -61,3 +61,8 @@ func convertRectFromBase(v: NSView, r: NSRect) -> NSRect {
 }
 // CHECK: }
 
+// CHECK: define hidden void @_TF12objc_structs20useStructOfNSStringsFVSC17StructOfNSStringsS0_(%VSC17StructOfNSStrings* noalias sret, i64, i64, i64, i64)
+// CHECK:   call void @useStructOfNSStringsInObjC(%VSC17StructOfNSStrings* noalias sret {{%.*}}, %VSC17StructOfNSStrings* byval align 8 {{%.*}})
+func useStructOfNSStrings(s: StructOfNSStrings) -> StructOfNSStrings {
+  return useStructOfNSStringsInObjC(s)
+}
