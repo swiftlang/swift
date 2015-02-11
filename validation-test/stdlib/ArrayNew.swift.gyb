@@ -188,6 +188,34 @@ ArrayTestSuite.test("${array_type}/map") {
   }
 }
 
+//===---
+// Check that generators traverse a snapshot of the collection.
+//===---
+
+ArrayTestSuite.test(
+  "${array_type}/mutationDoesNotAffectGenerator/subscript/store") {
+  var arr: ${array_type}<Int> = [ 1010, 1020, 1030 ]
+  var g = arr.generate()
+  arr[0] = 1011
+  expectEqual([ 1010, 1020, 1030 ], Array(GeneratorSequence(g)))
+}
+
+ArrayTestSuite.test(
+  "${array_type}/mutationDoesNotAffectGenerator/subscript/append") {
+  var arr: ${array_type}<Int> = [ 1010, 1020, 1030 ]
+  var g = arr.generate()
+  arr.append(1040)
+  expectEqual([ 1010, 1020, 1030 ], Array(GeneratorSequence(g)))
+}
+
+ArrayTestSuite.test(
+  "${array_type}/mutationDoesNotAffectGenerator/subscript/replaceRange") {
+  var arr: ${array_type}<Int> = [ 1010, 1020, 1030 ]
+  var g = arr.generate()
+  arr.replaceRange(1..<3, with: [ 1040, 1050, 1060 ])
+  expectEqual([ 1010, 1020, 1030 ], Array(GeneratorSequence(g)))
+}
+
 % end
 
 //===----------------------------------------------------------------------===//
