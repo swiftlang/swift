@@ -2542,7 +2542,12 @@ bool VarDecl::isSettable(DeclContext *UseDC) const {
       }
     } else {
       // Normal variables (e.g. globals) are only mutable in the context of the
-      // declaration.
+      // declaration.  To handle top-level code properly, we look through
+      // the TopLevelCode decl on the use (if present) since the vardecl will be
+      // one level up.
+      if (UseDC && isa<TopLevelCodeDecl>(UseDC))
+        UseDC = UseDC->getParent();
+      
       if (getDeclContext() != UseDC)
         return false;
     }
