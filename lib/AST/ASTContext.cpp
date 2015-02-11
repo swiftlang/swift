@@ -1783,11 +1783,11 @@ bool ASTContext::diagnoseObjCMethodConflicts(SourceFile &sf) {
     auto origDiagInfo = getObjCMethodDiagInfo(originalMethod);
     for (auto conflictingDecl : conflictingMethods) {
       auto diagInfo = getObjCMethodDiagInfo(conflictingDecl);
-      Diags.diagnose(conflictingDecl->getLoc(), diag::objc_redecl,
+      Diags.diagnose(conflictingDecl, diag::objc_redecl,
                      diagInfo.first,
                      diagInfo.second,
                      selector);
-      Diags.diagnose(originalMethod->getLoc(), diag::objc_redecl_prev,
+      Diags.diagnose(originalMethod, diag::objc_redecl_prev,
                      origDiagInfo.first,
                      origDiagInfo.second,
                      selector);
