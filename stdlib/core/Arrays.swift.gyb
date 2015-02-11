@@ -606,7 +606,7 @@ extension ${Self} : _ArrayType {
     // <rdar://problem/19763792> Calling Swift.map from Array.map causes
     // Assertion failed: UnresolvedDot in wrong phase
     var result: ${Self}<U> = []
-    result.reserveCapacity(underestimateCount(self))
+    result.reserveCapacity(count)
     for element in self {
       result.append(transform(element))
     }
