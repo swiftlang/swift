@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %clang-importer-sdk -parse -verify %s -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify %s -disable-objc-attr-requires-foundation-module
 
 // REQUIRES: objc_interop
 

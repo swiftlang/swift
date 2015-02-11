@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -parse -verify %clang-importer-sdk -disable-objc-attr-requires-foundation-module %s
-// RUN: %target-swift-ide-test -print-usrs -source-filename %s %clang-importer-sdk | FileCheck %s -strict-whitespace
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify -disable-objc-attr-requires-foundation-module %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-usrs -source-filename %s | FileCheck %s -strict-whitespace
 
 // XFAIL: linux
 

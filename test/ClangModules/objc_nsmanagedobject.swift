@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %clang-importer-sdk -I %S/Inputs/custom-modules -parse -parse-as-library -verify %s %S/Inputs/objc_nsmanaged_other.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -parse -parse-as-library -verify %s %S/Inputs/objc_nsmanaged_other.swift
 
 // REQUIRES: objc_interop
 

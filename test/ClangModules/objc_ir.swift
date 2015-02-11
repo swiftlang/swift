@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %clang-importer-sdk -I %S/Inputs/custom-modules -emit-ir -o - -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -emit-ir -o - -primary-file %s | FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx

@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %target-swift-frontend %clang-importer-sdk %s -parse -emit-objc-header-path %t/empty.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -parse -emit-objc-header-path %t/empty.h
 // RUN: FileCheck %s < %t/empty.h
 // RUN: %check-in-clang %t/empty.h
 // RUN: %check-in-clang -fno-modules %t/empty.h

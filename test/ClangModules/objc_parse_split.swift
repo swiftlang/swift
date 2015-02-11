@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %clang-importer-sdk -emit-sil -I %S/Inputs/custom-modules -split-objc-selectors %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules -split-objc-selectors %s -verify
 
 // REQUIRES: objc_interop
 

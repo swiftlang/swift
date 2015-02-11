@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend %clang-importer-sdk %s -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-silgen | FileCheck %s
 
 // REQUIRES: objc_interop
 
 // FIXME: The -emit-sil line is there only to check that the generated
 // SIL doesn't freak out DI.
-// RUN: %target-swift-frontend %clang-importer-sdk %s -emit-sil | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-sil | FileCheck %s
 
 // REQUIRES: objc_interop
 

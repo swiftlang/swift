@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %clang-importer-sdk -emit-ir -o - -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir -o - -primary-file %s | FileCheck %s
 
 // REQUIRES: OS=macosx
 

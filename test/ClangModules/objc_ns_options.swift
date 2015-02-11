@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend %clang-importer-sdk -parse %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse %s -verify
 // -- Check that we can successfully round-trip.
-// RUN: %target-swift-frontend %clang-importer-sdk -emit-ir %s >/dev/null
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir %s >/dev/null
 
 // REQUIRES: objc_interop
 

@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %target-swift-frontend %clang-importer-sdk -emit-module -o %t %s
-// RUN: %target-swift-ide-test -print-module -module-to-print=print -I %t -source-filename=%s %clang-importer-sdk | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -module-to-print=print -I %t -source-filename=%s | FileCheck %s
 
 // REQUIRES: objc_interop
 

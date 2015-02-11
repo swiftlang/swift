@@ -1,8 +1,8 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %target-swift-frontend %clang-importer-sdk -parse -verify %s -DCHECK_SCOPING
-// RUN: %target-swift-frontend %clang-importer-sdk -emit-module -o %t %s -module-name submodules
-// RUN: echo 'import submodules; println("\(x), \(y)")' | %target-swift-frontend %clang-importer-sdk -parse - -I %t
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify %s -DCHECK_SCOPING
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s -module-name submodules
+// RUN: echo 'import submodules; println("\(x), \(y)")' | %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse - -I %t
 // RUN: echo 'import submodules; println("\(x), \(y)")' | not %target-swift-frontend -parse - -I %t 2>&1 | FileCheck -check-prefix=MISSING %s
 
 // XFAIL: linux

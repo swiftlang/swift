@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %clang-importer-sdk -I %S/Inputs/custom-modules -emit-silgen -o - %s | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -emit-silgen -o - %s | FileCheck %s
 
 // REQUIRES: objc_interop
 

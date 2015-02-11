@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir %t
-// RUN: %target-swift-frontend %clang-importer-sdk -emit-module -I %S/Inputs/custom-modules -o %t %s
-// RUN: %target-swift-frontend %clang-importer-sdk -parse-as-library %t/override.swiftmodule -parse -emit-objc-header-path %t/override.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -I %S/Inputs/custom-modules -o %t %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/override.swiftmodule -parse -emit-objc-header-path %t/override.h
 // RUN: FileCheck %s < %t/override.h
 // RUN: %check-in-clang %t/override.h -I %S/Inputs/custom-modules -Wno-super-class-method-mismatch -Wno-overriding-method-mismatch
 // RUN: not %check-in-clang %t/override.h -Wno-super-class-method-mismatch -I %S/Inputs/custom-modules 2>&1 | FileCheck -check-prefix=CLANG %s

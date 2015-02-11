@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %clang-importer-sdk -I %S/Inputs/user-module -parse %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/user-module -parse %s -verify
 
 // REQUIRES: objc_interop
 

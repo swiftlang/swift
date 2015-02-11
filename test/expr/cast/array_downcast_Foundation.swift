@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend %clang-importer-sdk -parse %s -verify
-// RUN: %target-swift-frontend %clang-importer-sdk %s -dump-ast -verify 2>&1 | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -dump-ast -verify 2>&1 | FileCheck %s
 
 // REQUIRES: objc_interop
 

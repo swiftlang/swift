@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %target-swift-frontend %s -import-objc-header %S/Inputs/bridging-header.h %clang-importer-sdk -parse -emit-objc-header-path %t/pragma-clang.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -import-objc-header %S/Inputs/bridging-header.h -parse -emit-objc-header-path %t/pragma-clang.h
 // RUN: %check-in-clang -fsyntax-only -Werror %t/pragma-clang.h
 // RUN: FileCheck %s < %t/pragma-clang.h
 
