@@ -1366,6 +1366,13 @@ Reflection.test("FieldNamesBug") {
   }
 }
 
+Reflection.test("COpaquePointer/null") {
+  // Don't crash on null pointers. rdar://problem/19708338
+  var sequence = COpaquePointer()
+  var mirror = reflect(sequence)
+  var child = mirror[0]
+  expectEqual("(Opaque Value)", child.1.summary)
+}
 
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 
