@@ -4106,18 +4106,25 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(Expr *expr) {
                                          singleExpr->getEndLoc(),
                                          /*implicit*/true);
   returnStmt->setResult(voidExpr);
-  
+
+  auto discardExpr =
+      new (tc.Context) DiscardAssignmentExpr(singleExpr->getStartLoc(),
+                                             /*implicit*/true);
+  auto assignExpr =
+      new (tc.Context) AssignExpr(discardExpr, SourceLoc(), singleExpr,
+                                  /*implicit*/true);
+
   SmallVector<ASTNode, 2> elements;
-  elements.push_back(singleExpr);
+  elements.push_back(assignExpr);
   elements.push_back(returnStmt);
   
-  auto braceStmt = BraceStmt::create(cs.getASTContext(),
+  auto braceStmt = BraceStmt::create(tc.Context,
                                      closureExpr->getStartLoc(),
                                      elements,
                                      closureExpr->getEndLoc(),
                                      /*implicit*/true);
 
-  auto newClosure = new (cs.getASTContext())
+  auto newClosure = new (tc.Context)
                       ClosureExpr(closureExpr->getParams(),
                                   SourceLoc(),
                                   SourceLoc(),
@@ -5696,10 +5703,21 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
 
   class ExprWalker : public ASTWalker {
     ExprRewriter &Rewriter;
+    SmallVector<ClosureExpr *, 4> closuresToTypeCheck;
     unsigned LeftSideOfAssignment = 0;
 
   public:
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
+
+    ~ExprWalker() {
+      auto &cs = Rewriter.getConstraintSystem();
+      auto &tc = cs.getTypeChecker();
+      for (auto *closure : closuresToTypeCheck) {
+        if (!closure->hasSingleExpressionBody())
+          tc.typeCheckClosureBody(closure);
+        tc.computeCaptures(closure);
+      }
+    }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // For a default-value expression, do nothing.
@@ -5747,13 +5765,12 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
               closure->setSingleExpressionBody(body);
             }
           }
-        } else {
-          // For other closures, type-check the body.
-          tc.typeCheckClosureBody(closure);
         }
 
-        // Compute the capture list, now that we have type-checked the body.
-        tc.computeCaptures(closure);
+        // For other closures, type-check the body once we've finished with
+        // the expression.
+        closuresToTypeCheck.push_back(closure);
+
         return { false, closure };
       }
 
@@ -5804,8 +5821,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
   };
 
   ExprRewriter rewriter(*this, solution, suppressDiagnostics);
-  ExprWalker walker(rewriter);
-  auto result = expr->walk(walker);
+  auto result = expr->walk(ExprWalker(rewriter));
   return result;
 }
 

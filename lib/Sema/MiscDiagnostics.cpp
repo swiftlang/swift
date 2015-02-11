@@ -383,12 +383,14 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
 /// Within a closure, we require that the source code contain "self." explicitly
 /// because 'self' is captured, not the property value.  This is a common source
 /// of confusion, so we force an explicit self.
-static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
+static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
+                                             const DeclContext *DC) {
   class DiagnoseWalker : public ASTWalker {
     TypeChecker &TC;
-    unsigned InClosure = 0;
+    unsigned InClosure;
   public:
-    explicit DiagnoseWalker(TypeChecker &TC) : TC(TC) {}
+    explicit DiagnoseWalker(TypeChecker &TC, bool isAlreadyInClosure)
+        : TC(TC), InClosure(isAlreadyInClosure) {}
 
     /// Return true if this is an implicit reference to self.
     static bool isImplicitSelfUse(Expr *E) {
@@ -399,15 +401,10 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
 
     /// Return true if this is a closure expression that will require "self."
     /// qualification of member references.
-    static bool isClosureRequiringSelfQualification(Expr *E) {
-      if (auto *CE = dyn_cast<ClosureExpr>(E))
-        // If the closure's type was inferred to be noescape, then it doesn't
-        // need qualification.
-        return !AnyFunctionRef(CE).isKnownNoEscape();
-
-
-      // Not a closure?
-      return false;
+    static bool isClosureRequiringSelfQualification(const ClosureExpr *CE) {
+      // If the closure's type was inferred to be noescape, then it doesn't
+      // need qualification.
+      return !AnyFunctionRef(const_cast<ClosureExpr *>(CE)).isKnownNoEscape();
     }
 
 
@@ -417,11 +414,16 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (auto *CE = dyn_cast<ClosureExpr>(E)) {
+        if (!CE->hasSingleExpressionBody())
+          return { false, E };
 
-      // If this is an explicit closure expression - not an autoclosure - then
-      // we keep track of the fact that recursive walks are within the closure.
-      if (isClosureRequiringSelfQualification(E))
-        ++InClosure;
+        // If this is a potentially-escaping closure expression, start looking
+        // for references to self if we aren't already.
+        if (isClosureRequiringSelfQualification(CE))
+          ++InClosure;
+      }
+
 
       // If we aren't in a closure, no diagnostics will be produced.
       if (!InClosure)
@@ -460,16 +462,29 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
     }
     
     Expr *walkToExprPost(Expr *E) {
-      if (isClosureRequiringSelfQualification(E)) {
-        assert(InClosure);
-        --InClosure;
+      if (auto *CE = dyn_cast<ClosureExpr>(E)) {
+        if (isClosureRequiringSelfQualification(CE)) {
+          assert(InClosure);
+          --InClosure;
+        }
       }
       
       return E;
     }
   };
-  
-  const_cast<Expr *>(E)->walk(DiagnoseWalker(TC));
+
+  bool isAlreadyInClosure = false;
+  if (DC->isLocalContext()) {
+    while (DC->getParent()->isLocalContext() && !isAlreadyInClosure) {
+      if (isa<FuncDecl>(DC))
+        isAlreadyInClosure = true;
+      if (auto *closure = dyn_cast<ClosureExpr>(DC))
+        if (DiagnoseWalker::isClosureRequiringSelfQualification(closure))
+          isAlreadyInClosure = true;
+      DC = DC->getParent();
+    }
+  }
+  const_cast<Expr *>(E)->walk(DiagnoseWalker(TC, isAlreadyInClosure));
 }
 
 //===--------------------------------------------------------------------===//
@@ -720,7 +735,7 @@ void swift::performExprDiagnostics(TypeChecker &TC, const Expr *E,
   diagSelfAssignment(TC, E);
   diagSyntacticUseRestrictions(TC, E);
   diagRecursivePropertyAccess(TC, E, DC);
-  diagnoseImplicitSelfUseInClosure(TC, E);
+  diagnoseImplicitSelfUseInClosure(TC, E, DC);
   diagAvailability(TC, E, DC);
 }
 

@@ -358,7 +358,7 @@ class SuperSub : SuperBase {
     // CHECK: = apply [[SUPER_METHOD]]([[SUPER]])
     // CHECK: return
     func a1() {
-      boom() // FIXME: should require "self."
+      self.boom()
       super.boom()
     }
     a1()
@@ -382,7 +382,7 @@ class SuperSub : SuperBase {
       // CHECK: = apply [[METHOD]]([[SUPER]])
       // CHECK: return
       func b2() {
-        boom() // FIXME: should require "self."
+        self.boom()
         super.boom()
       }
       b2()

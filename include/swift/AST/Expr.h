@@ -2827,6 +2827,12 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Closure;
   }
+  static bool classof(const AbstractClosureExpr *E) {
+    return E->getKind() == ExprKind::Closure;
+  }
+  static bool classof(const DeclContext *C) {
+    return isa<AbstractClosureExpr>(C) && classof(cast<AbstractClosureExpr>(C));
+  }
 };
 
 
@@ -2863,6 +2869,12 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::AutoClosure;
+  }
+  static bool classof(const AbstractClosureExpr *E) {
+    return E->getKind() == ExprKind::AutoClosure;
+  }
+  static bool classof(const DeclContext *C) {
+    return isa<AbstractClosureExpr>(C) && classof(cast<AbstractClosureExpr>(C));
   }
 };
 
