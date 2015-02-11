@@ -3,16 +3,14 @@
 // CHECK-LABEL: define{{.*}}2fn
 func fn() {
   println("two")
+// CHECK-DAG: ![[LOC:.*]] = !MDLocation(line: [[@LINE+1]], column 13,
   println(0 - UInt(Process.arguments.count))
+// CHECK-DAG: ![[LOC2:.*]] = !MDLocation(line: [[@LINE+1]], column 13,
   println(1 - UInt(Process.arguments.count))
   println("three")
 }
 
-// CHECK: ret
-// CHECK-NOT: define
-// CHECK: call void @llvm.trap(), !dbg ![[LOC:.*]]
-// CHECK-NEXT: unreachable, !dbg ![[LOC]]
-// CHECK: call void @llvm.trap(), !dbg ![[LOC2:.*]]
-// CHECK-NEXT: unreachable, !dbg ![[LOC2]]
-// CHECK: ![[LOC]] = !MDLocation(line: 6, column
-// CHECK: ![[LOC2]] = !MDLocation(line: 7, column
+// CHECK-DAG: call void @llvm.trap(), !dbg ![[LOC]]
+// CHECK-DAG: unreachable, !dbg ![[LOC]]
+// CHECK-DAG: call void @llvm.trap(), !dbg ![[LOC2]]
+// CHECK-DAG: unreachable, !dbg ![[LOC2]]
