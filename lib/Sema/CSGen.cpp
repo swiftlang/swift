@@ -867,11 +867,11 @@ namespace {
             if (isLValueBase)
               outputTy = LValueType::get(outputTy);
           }
-        } else if (auto dictTy =
-                      dyn_cast<DictionaryType>(baseTy.getPointer())) {
-          auto valueTy = dictTy->getValueType();
+        } else if (auto dictTy = CS.isDictionaryType(baseTy)) {
+          auto keyTy = dictTy->first;
+          auto valueTy = dictTy->second;
           
-          if (!dictTy->getAs<TypeVariableType>()) {
+          if (isFavoredParamAndArg(CS, keyTy, index->getType(), Type())) {
             outputTy = OptionalType::get(valueTy);
             
             if (isLValueBase)
