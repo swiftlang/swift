@@ -89,17 +89,6 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
   return E;
 }
 
-/// Precedences for intrinsic operators.
-namespace {
-  namespace IntrinsicPrecedences {
-    enum : unsigned char {
-      IfExpr = 100, // ?:
-      AssignExpr = 90, // =
-      ExplicitCastExpr = 132, // 'is' and 'as'
-    };
-  }
-}
-
 /// getInfixData - If the specified expression is an infix binary
 /// operator, return its infix operator attributes.
 static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {

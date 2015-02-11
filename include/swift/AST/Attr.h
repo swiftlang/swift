@@ -133,6 +133,16 @@ public:
   }
 };
 
+namespace IntrinsicPrecedences {
+  enum : unsigned char {
+    MinPrecedence = 0,
+    IfExpr = 100, // ?:
+    AssignExpr = 90, // =
+    ExplicitCastExpr = 132, // 'is' and 'as'
+    MaxPrecedence = 255
+  };
+}
+
 /// ABI resilience.  Language structures are resilient if the details
 /// of their implementation may be changed without requiring
 /// associated code to be reprocessed.  Different structures are resilient

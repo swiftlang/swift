@@ -5226,6 +5226,144 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
   return true;
 }
 
+// Return the precedence-yielding parent of 'expr', along with the index of
+// 'expr' as the child of that parent. The precedence-yielding parent is the
+// nearest ancestor of 'expr' which imposes a minimum precedence on 'expr'.
+// Right now that just means skipping over TupleExpr instances that only exist
+// to hold arguments to binary operators.
+static std::pair<Expr *, unsigned> getPrecedenceParentAndIndex(Expr *expr,
+                                                               Expr *rootExpr)
+{
+  auto parentMap = rootExpr->getParentMap();
+  auto it = parentMap.find(expr);
+  if (it == parentMap.end()) {
+    return { nullptr, 0 };
+  }
+  Expr *parent = it->second;
+
+  // Handle all cases where the answer isn't just going to be { parent, 0 }.
+  if (auto tuple = dyn_cast<TupleExpr>(parent)) {
+    // Get index of expression in tuple.
+    auto tupleElems = tuple->getElements();
+    auto elemIt = std::find(tupleElems.begin(), tupleElems.end(), expr);
+    assert(elemIt != tupleElems.end() && "expr not found in parent TupleExpr");
+    unsigned index = elemIt - tupleElems.begin();
+
+    it = parentMap.find(parent);
+    if (it != parentMap.end()) {
+      Expr *gparent = it->second;
+
+      // Was this tuple just constructed for a binop?
+      if (isa<BinaryExpr>(gparent)) {
+        return { gparent, index };
+      }
+    }
+
+    // Must be a tuple literal, function arg list, collection, etc.
+    return { parent, index };
+  } else if (auto ifExpr = dyn_cast<IfExpr>(parent)) {
+    unsigned index;
+    if (expr == ifExpr->getCondExpr()) {
+      index = 0;
+    } else if (expr == ifExpr->getThenExpr()) {
+      index = 1;
+    } else if (expr == ifExpr->getElseExpr()) {
+      index = 2;
+    } else {
+      llvm_unreachable("expr not found in parent IfExpr");
+    }
+    return { ifExpr, index };
+  } else if (auto assignExpr = dyn_cast<AssignExpr>(parent)) {
+    unsigned index;
+    if (expr == assignExpr->getSrc()) {
+      index = 0;
+    } else if (expr == assignExpr->getDest()) {
+      index = 1;
+    } else {
+      llvm_unreachable("expr not found in parent AssignExpr");
+    }
+    return { assignExpr, index };
+  }
+
+  return { parent, 0 };
+}
+
+// Return infix data representing the precedence of E.
+// FIXME: unify this with getInfixData() in lib/Sema/TypeCheckExpr.cpp; the
+// function there is meant to return infix data for expressions that have not
+// yet been folded, so currently the correct behavor for this infixData() and
+// that one are mutually exclusive.
+static InfixData getInfixData(DeclContext *DC, Expr *E) {
+  assert(E);
+  if (isa<IfExpr>(E)) {
+    return InfixData(IntrinsicPrecedences::IfExpr,
+                     Associativity::Right,
+                     /*assignment*/ false);
+  } else if (isa<AssignExpr>(E)) {
+    return InfixData(IntrinsicPrecedences::AssignExpr,
+                     Associativity::Right,
+                     /*assignment*/ true);
+  } else if (isa<ExplicitCastExpr>(E)) {
+    return InfixData(IntrinsicPrecedences::ExplicitCastExpr,
+                     Associativity::None,
+                     /*assignment*/ false);
+  } else if (auto *binary = dyn_cast<BinaryExpr>(E)) {
+    auto *fn = binary->getFn();
+    if (auto *DRE = dyn_cast<DeclRefExpr>(fn)) {
+      SourceFile *SF = DC->getParentSourceFile();
+      Identifier name = DRE->getDecl()->getName();
+      bool isCascading = DC->isCascadingContextForLookup(true);
+      if (InfixOperatorDecl *op = SF->lookupInfixOperator(name, isCascading,
+                                                          E->getLoc()))
+        return op->getInfixData();
+    } else if (auto *OO = dyn_cast<OverloadedDeclRefExpr>(fn)) {
+      SourceFile *SF = DC->getParentSourceFile();
+      Identifier name = OO->getDecls()[0]->getName();
+      bool isCascading = DC->isCascadingContextForLookup(true);
+      if (InfixOperatorDecl *op = SF->lookupInfixOperator(name, isCascading,
+                                                          E->getLoc()))
+        return op->getInfixData();
+    }
+  }
+  
+  return InfixData(IntrinsicPrecedences::MaxPrecedence,
+                   Associativity::Left,
+                   /*assignment*/ false);
+}
+
+// Return the minimum precedence that an expression in the place of 'expr' must
+// have without needing to be surrounded by parentheses.
+static unsigned char getMinPrecedenceForExpr(DeclContext *DC, Expr *expr,
+                                             Expr *rootExpr) {
+  Expr *parent;
+  unsigned index;
+  std::tie(parent, index) = getPrecedenceParentAndIndex(expr, rootExpr);
+  if (!parent || isa<TupleExpr>(parent) || isa<ParenExpr>(parent)) {
+    return IntrinsicPrecedences::MinPrecedence;
+  } else if (isa<BinaryExpr>(parent) || isa<IfExpr>(parent) ||
+             isa<AssignExpr>(parent) || isa<ExplicitCastExpr>(parent)) {
+    auto infixData = getInfixData(DC, parent);
+    unsigned result = infixData.getPrecedence();
+    if (result < IntrinsicPrecedences::MaxPrecedence &&
+        ((index == 0 && !infixData.isLeftAssociative()) ||
+         (index > 0 && !infixData.isRightAssociative()))) {
+      result++;
+    }
+    return result;
+  } else {
+    return IntrinsicPrecedences::MaxPrecedence;
+  }
+}
+
+// Return true if, when replacing "<expr>" with "<expr> as T", parentheses need
+// to be added around the new expression in order to maintain the correct
+// precedence.
+static bool exprNeedsParensWhenAddingAs(DeclContext *DC, Expr *expr,
+                                        Expr *rootExpr) {
+  return (IntrinsicPrecedences::ExplicitCastExpr <
+          getMinPrecedenceForExpr(DC, expr, rootExpr));
+}
+
 /// \brief Apply a given solution to the expression, producing a fully
 /// type-checked expression.
 Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
@@ -5328,24 +5466,34 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
         SourceLoc afterAffectedLoc
           = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
                                        affected->getEndLoc());
+        bool needsParens = exprNeedsParensWhenAddingAs(DC, affected, expr);
         if (TC.isExplicitlyConvertibleTo(fromType, toType, DC)) {
           llvm::SmallString<32> asCastStr;
           asCastStr += " as ";
           asCastStr += toType.getString();
-          TC.diagnose(affected->getLoc(), diag::missing_explicit_conversion,
-                      fromType, toType)
-            .fixItInsert(afterAffectedLoc, asCastStr);
+          auto diagnosis = TC.diagnose(affected->getLoc(),
+                                       diag::missing_explicit_conversion,
+                                       fromType, toType);
+          if (needsParens) {
+            diagnosis.fixItInsert(affected->getStartLoc(), "(");
+            asCastStr += ")";
+          }
+          diagnosis.fixItInsert(afterAffectedLoc, asCastStr);
         } else {
           llvm::SmallString<32> asCastStr;
           asCastStr += " as! ";
           asCastStr += toType.getString();
-          TC.diagnose(affected->getLoc(), diag::missing_forced_downcast,
-                      fromType, toType)
-            .fixItInsert(afterAffectedLoc, asCastStr);
+          auto diagnosis = TC.diagnose(affected->getLoc(),
+                                       diag::missing_forced_downcast,
+                                       fromType, toType);
+          if (needsParens) {
+            diagnosis.fixItInsert(affected->getStartLoc(), "(");
+            asCastStr += ")";
+          }
+          diagnosis.fixItInsert(afterAffectedLoc, asCastStr);
         }
 
         diagnosed = true;
-        // FIXME: Add parentheses if we now need them.
         break;
       }
 
