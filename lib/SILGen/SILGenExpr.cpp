@@ -3195,6 +3195,10 @@ static DeclName getMagicFunctionName(DeclContext *dc) {
   if (auto m = dyn_cast<Module>(dc)) {
     return m->Name;
   }
+  if (auto e = dyn_cast<ExtensionDecl>(dc)) {
+    assert(e->getExtendedType()->getAnyNominal() && "extension for nonnominal");
+    return e->getExtendedType()->getAnyNominal()->getName();
+  }
   llvm_unreachable("unexpected __FUNCTION__ context");
 }
 

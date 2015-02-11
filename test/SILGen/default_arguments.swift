@@ -197,3 +197,7 @@ func testDSOHandle() {
   takeDSOHandle()
 }
 
+// Test __FUNCTION__ in an extension initializer. rdar://problem/19792181
+extension SuperDefArg {
+  static let extensionInitializerWithClosure: Int = { return 22 }()
+}
