@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %clang-importer-sdk -emit-sil -I %S/Inputs/custom-modules %s -verify
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 // rdar://problem/17687082
