@@ -257,7 +257,7 @@ namespace swift {
 
     llvm::SmallPtrSet<SILInstruction *, 4> Endpoints;
 
-    bool lifetimeComputed = false;
+    bool LifetimeComputed = false;
 
   public:
     LifetimeTracker(SILValue Value) : TheValue(Value) { }
@@ -268,7 +268,7 @@ namespace swift {
     SILValue getStart() { return TheValue; }
 
     EndpointRange getEndpoints() {
-      if (!lifetimeComputed)
+      if (!LifetimeComputed)
         computeLifetime();
 
       return EndpointRange(Endpoints.begin(), Endpoints.end());

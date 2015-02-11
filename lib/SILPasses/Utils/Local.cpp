@@ -1041,5 +1041,5 @@ void LifetimeTracker::computeLifetime() {
     if (!successorHasLiveIn(BB, LiveIn))
         addLastUser(TheValue, BB, Endpoints);
 
-  lifetimeComputed = true;
+  LifetimeComputed = true;
 }
