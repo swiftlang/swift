@@ -99,3 +99,8 @@ __weak id globalWeakVar;
 - (void)anotherMethod;
 - (void)repeatedMethod __attribute__((deprecated("use something newer")));
 @end
+
+// rdar://problem/19726164
+@protocol FooDelegate <NSObject>
+@property (nonatomic, assign, readonly, getter=isStarted) BOOL started;
+@end

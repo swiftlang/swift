@@ -6386,18 +6386,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       auto func = cast<FuncDecl>(D);
       if (func->isOperator())
         error = diag::invalid_objc_decl;
-      else if (func->isGetterOrSetter()) {
-        auto storage = func->getAccessorStorageDecl();
-        if (!storage->isObjC()) {
-          error = func->isGetter()
-                    ? (isa<VarDecl>(storage) 
-                         ? diag::objc_getter_for_nonobjc_property
-                         : diag::objc_getter_for_nonobjc_subscript)
-                    : (isa<VarDecl>(storage)
-                         ? diag::objc_setter_for_nonobjc_property
-                         : diag::objc_setter_for_nonobjc_subscript);
-        }
-      } else if (func->isAccessor()) {
+      else if (func->isAccessor() && !func->isGetterOrSetter()) {
         error= diag::objc_observing_accessor;
       }
     } else if (isa<ConstructorDecl>(D) && isInClassOrProtocolContext(D)) {

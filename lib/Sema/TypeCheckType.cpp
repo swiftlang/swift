@@ -2081,6 +2081,7 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
     if (FD->isAccessor()) {
       // Accessors can only be @objc if the storage declaration is.
       auto storage = FD->getAccessorStorageDecl();
+      validateDecl(storage);
       if (!storage->isObjC()) {
         if (Diagnose) {
           auto error = FD->isGetter()
