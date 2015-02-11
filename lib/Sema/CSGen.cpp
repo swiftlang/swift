@@ -1720,13 +1720,7 @@ namespace {
       } else if (auto TE = dyn_cast<TypeExpr>(fnExpr)) {
         outputTy = TE->getType()->getAs<MetatypeType>()->getInstanceType();
         
-        if (auto enumType = outputTy->getAs<EnumType>()) {
-          auto enumDecl = enumType->getDecl();
-          
-          if (enumDecl->hasRawType() || hasFailableInits(enumDecl, &CS)) {
-            outputTy = getOptionalType(fnExpr->getLoc(), outputTy);
-          }
-        } else if (auto nominalType = outputTy->getAs<NominalType>()) {
+        if (auto nominalType = outputTy->getAs<NominalType>()) {
           auto NTD = nominalType->getDecl();
           if (!(isa<ClassDecl>(NTD) || isa<StructDecl>(NTD)) ||
               hasFailableInits(NTD, &CS)) {

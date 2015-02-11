@@ -478,3 +478,13 @@ struct Goof {
 let oofs = [Oof()]
 let goofs = [Goof()]
 
+enum Planet: String {
+    case Mercury = "Mercury", Venus = "Venus"
+    init() {
+        self = Planet.Venus
+    }
+}
+var pl1 = Planet()
+println(pl1.rawValue)
+// CHECK: Venus
+
