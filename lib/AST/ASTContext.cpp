@@ -1690,37 +1690,6 @@ static void removeValidObjCConflictingMethods(
                                  return false;
                                });
   methods = methods.slice(0, newEnd - methods.begin());
-
-  // Identify the method that occurs in a class definition (not an
-  // extension).
-  Optional<unsigned> methodInClass;
-  for (unsigned i = 0, n = methods.size(); i != n; ++i) {
-    auto method = methods[i];
-
-    if (isa<ClassDecl>(method->getDeclContext())) {
-      if (methodInClass)
-        return;
-
-      methodInClass = i;
-      break;
-    }
-  }
-
-  if (!methodInClass)
-    return;
-
-  // Verify that at least one other declaration comes from a different module.
-  auto classModule
-    = methods[*methodInClass]->getDeclContext()->getParentModule();
-  for (auto method : methods) {
-    if (method->getDeclContext()->getParentModule() != classModule) {
-      // Remove the method that comes from the class.
-      std::copy(methods.begin() + *methodInClass + 1, methods.end(),
-                methods.begin() + *methodInClass);
-      methods = methods.slice(0, methods.size() - 1);
-      return;
-    }
-  }
 }
 
 /// Determine whether the should associate a conflict among the given

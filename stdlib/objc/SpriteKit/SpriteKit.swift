@@ -18,11 +18,15 @@ public typealias SKColor = UIColor
 
 extension SKNode {
   public subscript (name: String) -> [SKNode] {
-     var nodes = [SKNode]()
-     enumerateChildNodesWithName(name) { node, stop in
-       if let n = node { nodes.append(n) }
-     }
-     return nodes
+    // Note: Don't stomp on objectForKeyedSubscript:
+    @objc(_swiftObjectForKeyedSubscript:) get {
+       var nodes = [SKNode]()
+       enumerateChildNodesWithName(name) { node, stop in
+         if let n = node { nodes.append(n) }
+       }
+
+       return nodes
+    }
   }
 }
 

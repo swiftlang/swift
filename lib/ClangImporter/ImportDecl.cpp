@@ -2422,8 +2422,15 @@ namespace {
       // Make sure we don't search in Clang modules for this method.
       ++Impl.ActiveSelectors[{selector, isInstance}];
 
-      // Look for a matching member.
-      auto result = !classDecl->lookupDirect(selector, isInstance).empty();
+      // Look for a matching imported or deserialized member.
+      bool result = false;
+      for (auto decl : classDecl->lookupDirect(selector, isInstance)) {
+        if (decl->getClangDecl()
+            || !decl->getDeclContext()->getParentSourceFile()) {
+          result = true;
+          break;
+        }
+      }
 
       // Restore the previous active count in the active-selector mapping.
       auto activeCount = Impl.ActiveSelectors.find({selector, isInstance});

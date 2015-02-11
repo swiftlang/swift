@@ -3354,8 +3354,6 @@ public:
           if (auto ctor = createDesignatedInitOverride(
                             TC, CD, superclassCtor,
                             DesignatedInitKind::Stub)) {
-            assert(ctor->getOverriddenDecl() == superclassCtor && 
-                   "Not an override?");
             CD->addMember(ctor);
             visit(ctor);
           }
