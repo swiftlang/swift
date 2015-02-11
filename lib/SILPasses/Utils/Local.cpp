@@ -16,6 +16,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Intrinsics.h"
@@ -956,4 +957,89 @@ bool swift::tryDeleteDeadClosure(SILInstruction *Closure) {
   Closure->eraseFromParent();
 
   return true;
+}
+
+// Is any successor of BB in the LiveIn set?
+static bool successorHasLiveIn(SILBasicBlock *BB,
+                         const llvm::SmallPtrSetImpl<SILBasicBlock *> &LiveIn) {
+  for (auto &Succ : BB->getSuccs())
+    if (LiveIn.count(Succ))
+      return true;
+
+  return false;
+}
+
+
+// Walk backwards in BB looking for last use of value V and adding the
+// instruction using the value to LastUsers.
+static void addLastUser(SILValue V, SILBasicBlock *BB,
+                        llvm::SmallPtrSetImpl<SILInstruction *> &LastUsers) {
+  for (auto I = BB->rbegin(); I != BB->rend(); ++I) {
+    assert(V.getDef() != &*I && "Found def before finding use!");
+
+    for (auto &O : I->getAllOperands()) {
+      if (O.get() != V)
+        continue;
+
+      LastUsers.insert(&*I);
+      return;
+    }
+  }
+
+  llvm_unreachable("Expected to find use of value in block!");
+}
+
+// Propagate liveness backwards from an initial set of blocks in our
+// LiveIn set.
+static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn,
+                              SILBasicBlock *DefBB) {
+
+  // First populate a worklist of predecessors.
+  llvm::SmallVector<SILBasicBlock *, 64> Worklist;
+  for (auto *BB : LiveIn)
+    for (auto Pred : BB->getPreds())
+      Worklist.push_back(Pred);
+
+  // Now propagate liveness backwards until we hit the block that
+  // defines the value.
+  while (!Worklist.empty()) {
+    auto *BB = Worklist.pop_back_val();
+
+    // If it's already in the set, then we've already queued and/or
+    // processed the predecessors.
+    if (BB == DefBB || !LiveIn.insert(BB).second)
+      continue;
+
+    for (auto Pred : BB->getPreds())
+      Worklist.push_back(Pred);
+  }
+}
+
+void LifetimeTracker::computeLifetime() {
+  llvm::SmallPtrSet<SILBasicBlock *, 16> LiveIn;
+  llvm::SmallPtrSet<SILBasicBlock *, 16> UseBlocks;
+
+  auto *DefInst = cast<SILInstruction>(TheValue.getDef());
+  auto *DefBB = DefInst->getParent();
+
+  if (TheValue->hasOneUse()) {
+    Endpoints.insert(TheValue->use_begin().getUser());
+    return;
+  }
+
+  for (auto UI : TheValue.getUses()) {
+    auto *BB = UI->getUser()->getParent();
+
+    UseBlocks.insert(BB);
+    if (BB != DefBB)
+      LiveIn.insert(BB);
+  }
+
+  propagateLiveness(LiveIn, DefBB);
+
+  for (auto *BB : UseBlocks)
+    if (!successorHasLiveIn(BB, LiveIn))
+        addLastUser(TheValue, BB, Endpoints);
+
+  lifetimeComputed = true;
 }

@@ -15,6 +15,7 @@
 
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILBuilder.h"
+#include "llvm/ADT/SmallPtrSet.h"
 
 namespace swift {
   class DominanceInfo;
@@ -247,6 +248,38 @@ namespace swift {
   ///
   /// In the future this should be extended to be less conservative with users.
   bool tryDeleteDeadClosure(SILInstruction *Closure);
+
+  /// This helper class represents the lifetime of a single
+  /// SILValue. The value itself is held and the lifetime endpoints of
+  /// that value are computed.
+  class LifetimeTracker {
+    SILValue TheValue;
+
+    llvm::SmallPtrSet<SILInstruction *, 4> Endpoints;
+
+    bool lifetimeComputed = false;
+
+  public:
+    LifetimeTracker(SILValue Value) : TheValue(Value) { }
+
+    using EndpointRange =
+      Range<llvm::SmallPtrSetImpl<SILInstruction *>::iterator>;
+
+    SILValue getStart() { return TheValue; }
+
+    EndpointRange getEndpoints() {
+      if (!lifetimeComputed)
+        computeLifetime();
+
+      return EndpointRange(Endpoints.begin(), Endpoints.end());
+    }
+
+  private:
+    void computeLifetime();
+  };
+
+
+
 } // end namespace swift
 
 #endif
