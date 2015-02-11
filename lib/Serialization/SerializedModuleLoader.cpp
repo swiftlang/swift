@@ -331,13 +331,11 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
     // FIXME: Right now this works only with access paths of length 1.
     // Once submodules are designed, this needs to support suffix
     // matching and a search path.
-    llvm::SmallString<256> spath;
-    for (auto el : path)
-      llvm::sys::path::append(spath, el.first.str());
-
-    auto bs = MemoryBuffers.find(spath.str());
-    if (bs != MemoryBuffers.end())
-      moduleInputBuffer.reset(bs->second.release());
+    auto bufIter = MemoryBuffers.find(moduleID.first.str());
+    if (bufIter != MemoryBuffers.end()) {
+      moduleInputBuffer = std::move(bufIter->second);
+      MemoryBuffers.erase(bufIter);
+    }
   }
 
   // Otherwise look on disk.

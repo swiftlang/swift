@@ -60,7 +60,7 @@ enum class ModuleStatus {
 class SerializedModuleLoader : public ModuleLoader {
 private:
   ASTContext &Ctx;
-  std::map<std::string, std::unique_ptr<llvm::MemoryBuffer> > MemoryBuffers;
+  llvm::StringMap<std::unique_ptr<llvm::MemoryBuffer>> MemoryBuffers;
   /// A { module, generation # } pair.
   using LoadedModulePair = std::pair<std::unique_ptr<ModuleFile>, unsigned>;
   std::vector<LoadedModulePair> LoadedModuleFiles;
@@ -113,7 +113,7 @@ public:
   /// FIXME: make this an actual access *path* once submodules are designed.
   void registerMemoryBuffer(StringRef AccessPath,
                             std::unique_ptr<llvm::MemoryBuffer> input) {
-    MemoryBuffers[AccessPath].reset(input.release());
+    MemoryBuffers[AccessPath] = std::move(input);
   }
 
   virtual void loadExtensions(NominalTypeDecl *nominal,
