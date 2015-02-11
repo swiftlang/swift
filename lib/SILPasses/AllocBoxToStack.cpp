@@ -679,7 +679,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
 
     // Otherwise insert releases after each point where the
     // partial_apply becomes dead.
-    for (auto *User : Lifetime.getEndpoints()) {
+    for (auto *User : Endpoints) {
       assert((isa<StrongReleaseInst>(User) || isa<ApplyInst>(User)) &&
              "Unexpected end of lifetime for partial_apply!");
       emitStrongReleaseAfter(O.get(), User);
