@@ -40,6 +40,11 @@ module HasSubmodule {
   }
 }
 
+module ImportsMissingHeader {
+  header "ImportsMissingHeader.h"
+  export *
+}
+
 module IndirectFramework {
   link framework "Indirect"
 }

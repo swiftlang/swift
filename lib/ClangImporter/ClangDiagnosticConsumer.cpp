@@ -103,18 +103,21 @@ SourceLoc ClangDiagnosticConsumer::resolveSourceLocation(
     return loc;
 
   auto buffer = clangSrcMgr.getBuffer(decomposedLoc.first);
+  unsigned mirrorID;
 
-  auto mirrorID =
-    swiftSrcMgr.getIDForBufferIdentifier(buffer->getBufferIdentifier());
-  if (!mirrorID) {
+  auto mirrorIter = mirroredBuffers.find(buffer);
+  if (mirrorIter != mirroredBuffers.end()) {
+    mirrorID = mirrorIter->second;
+  } else {
     std::unique_ptr<llvm::MemoryBuffer> mirrorBuffer{
       llvm::MemoryBuffer::getMemBuffer(buffer->getBuffer(),
                                        buffer->getBufferIdentifier(),
                                        /*nullTerminated=*/true)
     };
     mirrorID = swiftSrcMgr.addNewSourceBuffer(std::move(mirrorBuffer));
+    mirroredBuffers[buffer] = mirrorID;
   }
-  loc = swiftSrcMgr.getLocForOffset(mirrorID.getValue(), decomposedLoc.second);
+  loc = swiftSrcMgr.getLocForOffset(mirrorID, decomposedLoc.second);
 
   auto presumedLoc = clangSrcMgr.getPresumedLoc(clangLoc);
   if (!presumedLoc.getFilename())
@@ -130,7 +133,7 @@ SourceLoc ClangDiagnosticConsumer::resolveSourceLocation(
     swiftSrcMgr.openVirtualFile(startOfLine, presumedFile,
                                 presumedLoc.getLine() - bufferLineNumber);
   if (isNewVirtualFile) {
-    SourceLoc endOfLine = findEndOfLine(swiftSrcMgr, loc, mirrorID.getValue());
+    SourceLoc endOfLine = findEndOfLine(swiftSrcMgr, loc, mirrorID);
     swiftSrcMgr.closeVirtualFile(endOfLine);
   }
 

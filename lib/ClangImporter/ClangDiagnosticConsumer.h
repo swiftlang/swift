@@ -64,6 +64,7 @@ private:
   // IntrusiveRefCntPtr to stay a ref-counting pointer.
   SmallVector<llvm::IntrusiveRefCntPtr<const clang::SourceManager>, 4>
     sourceManagersWithDiagnostics;
+  llvm::DenseMap<const llvm::MemoryBuffer *, unsigned> mirroredBuffers;
 
   const clang::IdentifierInfo *CurrentImport = nullptr;
   SourceLoc DiagLoc;
