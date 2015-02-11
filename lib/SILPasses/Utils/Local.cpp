@@ -914,7 +914,8 @@ static bool isARCOperationRemovableIfObjectIsDead(const SILInstruction *I) {
 
 /// TODO: Generalize this to general objects.
 bool swift::tryDeleteDeadClosure(SILInstruction *Closure) {
-  // We currently only handle locally identified values that do not escape.
+  // We currently only handle locally identified values that do not escape. We
+  // also assume that the partial apply does not capture any addresses.
   if (!isa<PartialApplyInst>(Closure) && !isa<ThinToThickFunctionInst>(Closure))
     return false;
 
