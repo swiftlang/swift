@@ -448,11 +448,11 @@ bb0(%0 : $*T):
   %4 = alloc_box $T
   // CHECK: copy_addr %0 to [initialization] [[STACK]]#1 : $*T
   copy_addr %0 to [initialization] %4#1 : $*T
-  // CHECK: destroy_addr [[STACK]]#1 : $*T
   // CHECK: [[CLOSURE:%[0-9a-zA-Z]+]] = function_ref @_TTSf0n_d_n__closure_to_specialize
   // CHECK: partial_apply [[CLOSURE]]<T>([[STACK]]#1)
   %6 = partial_apply %3<T>(%4#0, %4#1) : $@thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @owned Builtin.NativeObject, @inout τ_0_0) -> ()
   %7 = apply [transparent] %2<T>(%6) : $@thin <τ_0_0 where τ_0_0 : P> (@owned @callee_owned (@out τ_0_0) -> ()) -> ()
+  // CHECK: destroy_addr [[STACK]]#1 : $*T
   destroy_addr %0 : $*T
   %9 = tuple ()
  // CHECK: dealloc_stack [[STACK]]#0 : $*@local_storage T
@@ -588,3 +588,51 @@ bb0(%0 : $Int, %1 : $Builtin.NativeObject, %2 : $*S<T>):
 
 // CHECK-LABEL: sil [transparent] [fragile] @binary
 sil [transparent] [fragile] @binary : $@thin (Int, Int) -> Bool
+
+// CHECK-LABEL: sil @destroy_stack_value_after_closure
+sil @destroy_stack_value_after_closure : $@thin <T> (@out T, @in T) -> () {
+// CHECK: bb0
+bb0(%0 : $*T, %1 : $*T):
+  // CHECK: [[STACK:%.*]] = alloc_stack
+  // CHECK: copy_addr %1 to [initialization] [[STACK]]#1
+  // CHECK: [[APPLIED:%.*]] = function_ref
+  %3 = function_ref @applied : $@thin <τ_0_0> (@owned Builtin.NativeObject, @inout τ_0_0) -> ()
+  %4 = alloc_box $T
+  copy_addr %1 to [initialization] %4#1 : $*T
+  // CHECK: [[PARTIAL:%.*]] = partial_apply [[APPLIED]]<T>([[STACK]]#1)
+  %6 = partial_apply %3<T>(%4#0, %4#1) : $@thin <τ_0_0> (@owned Builtin.NativeObject, @inout τ_0_0) -> ()
+  // CHECK: debug_value [[PARTIAL]]
+  debug_value %6 : $@callee_owned () -> ()
+  // CHECK: strong_retain [[PARTIAL]]
+  strong_retain %6 : $@callee_owned () -> ()
+  // CHECK: apply [[PARTIAL]]
+  %9 = apply %6() : $@callee_owned () -> ()
+  copy_addr %1 to [initialization] %0 : $*T
+  // CHECK: strong_release [[PARTIAL]]
+  strong_release %6 : $@callee_owned () -> ()
+  // CHECK: destroy_addr [[STACK]]#1
+  // CHECK: destroy_addr %1
+  destroy_addr %1 : $*T
+  %13 = tuple ()
+  return %13 : $()
+}
+
+sil @applied : $@thin <T> (@owned Builtin.NativeObject, @inout T) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $*T):
+  %2 = function_ref @consume : $@thin <τ_0_0> (@in τ_0_0) -> ()
+  %3 = alloc_stack $T
+  copy_addr %1 to [initialization] %3#1 : $*T
+  %5 = apply %2<T>(%3#1) : $@thin <τ_0_0> (@in τ_0_0) -> ()
+  dealloc_stack %3#0 : $*@local_storage T
+  strong_release %0 : $Builtin.NativeObject
+  %8 = tuple ()
+  return %8 : $()
+}
+
+sil hidden [noinline] @consume : $@thin <T> (@in T) -> () {
+bb0(%0 : $*T):
+  debug_value_addr %0 : $*T
+  destroy_addr %0 : $*T
+  %3 = tuple ()
+  return %3 : $()
+}

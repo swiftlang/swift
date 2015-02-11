@@ -18,6 +18,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallSet.h"
@@ -615,6 +616,11 @@ DeadParamCloner::visitStrongRetainInst(StrongRetainInst *Inst) {
   SILCloner<DeadParamCloner>::visitStrongRetainInst(Inst);
 }
 
+static void emitStrongReleaseAfter(SILValue V, SILInstruction *I) {
+  SILBuilderWithScope<2> Builder(std::next(SILBasicBlock::iterator(I)));
+  Builder.emitStrongRelease(I->getLoc(), V);
+}
+
 /// Specialize a partial_apply by removing the parameters indicated by
 /// indices. We expect these parameters to be either dead, or used
 /// only by retains and releases.
@@ -644,7 +650,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
   // Now create the new partial_apply using the cloned function.
   llvm::SmallVector<SILValue, 16> Args;
 
-  SILBuilderWithScope<2> Builder(PartialApply);
+  LifetimeTracker Lifetime(PartialApply);
 
   // Only use the arguments that are not dead.
   for (auto &O : PartialApply->getArgumentOperands()) {
@@ -655,17 +661,32 @@ specializePartialApply(PartialApplyInst *PartialApply,
       continue;
     }
 
+    auto Endpoints = Lifetime.getEndpoints();
+
     // If this argument is marked dead, it is a box that we're
     // removing from the partial_apply because we've proven we can
     // keep this value on the stack. The partial_apply has ownership
-    // of this box so we must now release it explicitly.
+    // of this box so we must now release it explicitly when the
+    // partial_apply is released.
     assert(cast<AllocBoxInst>(O.get())->getContainerResult() == O.get() &&
            "Expected dead param to be an alloc_box container!");
-    assert(getParameterForOperand(F, &O)->getParameterInfo().isConsumed() &&
-           "Expected alloc_box container to be consumed by partial_apply!");
 
-    Builder.emitStrongRelease(PartialApply->getLoc(), O.get());
+    // If the partial_apply is dead, insert a release after it.
+    if (Endpoints.empty()) {
+      emitStrongReleaseAfter(O.get(), PartialApply);
+      continue;
+    }
+
+    // Otherwise insert releases after each point where the
+    // partial_apply becomes dead.
+    for (auto *User : Lifetime.getEndpoints()) {
+      assert((isa<StrongReleaseInst>(User) || isa<ApplyInst>(User)) &&
+             "Unexpected end of lifetime for partial_apply!");
+      emitStrongReleaseAfter(O.get(), User);
+    }
   }
+
+  SILBuilderWithScope<2> Builder(PartialApply);
 
   // Build the function_ref and partial_apply.
   SILValue FunctionRef = Builder.createFunctionRef(PartialApply->getLoc(),
