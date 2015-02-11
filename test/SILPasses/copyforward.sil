@@ -5,8 +5,10 @@ sil_stage canonical
 import Builtin
 import Swift
 
+class AClass {}
 sil @f_in : $@thin <T> (@in T) -> ()
 sil @f_out : $@thin <T> (@out T) -> ()
+sil @f_owned : $@thin <T> (@owned T) -> ()
 
 protocol P  {
   init(_ i : Int32)
@@ -313,4 +315,42 @@ bb0(%0 : $*AnyObject):
   dealloc_stack %g0#0 : $*@local_storage GeneratorOfOne<AnyObject>
   %p0 = tuple ()
   return %p0 : $()
+}
+
+// <rdar://problem/19779711> Premature release of optional NSData
+// after optimization
+//
+// Check that destroy is not hoisted above a retain of a transitively
+// referenced object.
+//
+// CHECK-LABEL: load_nontrivial
+// CHECK: load %0#1 : $*Optional<AClass>
+// CHECK-NOT: destroy_addr
+// CHECK: unchecked_enum_data %{{.*}} : $Optional<AClass>
+// CHECK-NOT: destroy_addr
+// CHECK: strong_retain %{{.*}} : $AClass
+// CHECK: destroy_addr %0#1
+sil hidden @load_nontrivial : $@thin () -> () {
+bb0:
+  %v0 = alloc_stack $Optional<AClass>
+  %v1 = alloc_stack $Optional<AClass>
+
+  %f0 = function_ref @f_out : $@thin <A> (@out A) -> ()
+  %c0 = apply %f0<AClass?>(%v0#1) : $@thin <τ_0_0> (@out τ_0_0) -> ()
+
+  copy_addr %v0#1 to [initialization] %v1#1 : $*Optional<AClass>
+
+  %f1 = function_ref @f_in : $@thin <A> (@in A) -> ()
+  %c1 = apply %f1<AClass?>(%v1#1) : $@thin <τ_0_0> (@in τ_0_0) -> ()
+
+  dealloc_stack %v1#0 : $*@local_storage Optional<AClass>
+  %l1 = load %v0#1 : $*Optional<AClass>
+  %d1 = unchecked_enum_data %l1 : $Optional<AClass>, #Optional.Some!enumelt.1
+  %f2 = function_ref @f_owned : $@thin <A> (@owned A) -> ()
+  %c2 = apply %f2<AClass>(%d1) : $@thin <τ_0_0> (@owned τ_0_0) -> ()
+  strong_retain %d1 : $AClass
+  destroy_addr %v0#1 : $*Optional<AClass>
+  %34 = tuple ()
+  dealloc_stack %v0#0 : $*@local_storage Optional<AClass>
+  return %34 : $()
 }

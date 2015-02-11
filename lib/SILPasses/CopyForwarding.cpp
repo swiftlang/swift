@@ -284,6 +284,12 @@ class CopyForwarding {
 
   // Transient state for the current Def valid during forwardCopiesOf.
   SILValue CurrentDef;
+
+  // Is the addressed defined by CurrentDef ever loaded from?
+  // This indicates that lifetime of any transitively referenced objects lives
+  // beyond the value's immediate uses.
+  bool IsLoadedFrom;
+
   bool HasForwardedToCopy;
   SmallPtrSet<SILInstruction*, 16> SrcUserInsts;
   SmallVector<CopyAddrInst*, 4> TakePoints;
@@ -292,7 +298,7 @@ class CopyForwarding {
 public:
   CopyForwarding(PostOrderAnalysis *PO):
     PostOrder(PO), DoGlobalHoisting(false), HasChanged(false),
-    HasChangedCFG(false), HasForwardedToCopy(false) {}
+    HasChangedCFG(false), IsLoadedFrom(false), HasForwardedToCopy(false) {}
 
   void reset(SILFunction *F) {
     // Don't hoist destroy_addr globally in transparent functions. Avoid cloning
@@ -305,6 +311,7 @@ public:
     if (HasChangedCFG)
       PostOrder->invalidate(F, SILAnalysis::InvalidationKind::CFG);
     CurrentDef = SILValue();
+    IsLoadedFrom = false;
     HasForwardedToCopy = false;
     SrcUserInsts.clear();
     TakePoints.clear();
@@ -369,9 +376,12 @@ bool CopyForwarding::collectUsers() {
       continue;
     }
     switch (UserInst->getKind()) {
+    case ValueKind::LoadInst:
+      IsLoadedFrom = true;
+      SrcUserInsts.insert(UserInst);
+      break;
     case ValueKind::ExistentialMetatypeInst:
     case ValueKind::InjectEnumAddrInst:
-    case ValueKind::LoadInst:
     case ValueKind::StoreInst:
     case ValueKind::DebugValueAddrInst:
       SrcUserInsts.insert(UserInst);
@@ -685,6 +695,14 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
   // need to hoist Destroy for these.
   for (auto *CopyInst : TakePoints)
     propagateCopy(CopyInst);
+
+  // If the copied address is also loaded from, then destroy hoisting is unsafe.
+  //
+  // TODO: Record all loads during collectUsers. Implement findRetainPoints to
+  // peek though projections of the load, like unchecked_enum_data to find the
+  // true extent of the lifetime including transitively referenced objects.
+  if (IsLoadedFrom)
+    return;
 
   SILInstruction *HoistedDestroy = nullptr;
   for (auto *Destroy : DestroyPoints) {
