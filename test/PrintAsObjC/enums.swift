@@ -11,12 +11,12 @@
 
 import Foundation
 
-// NEGATIVE-NOT: SWIFT_ENUM({{.+}}, NSMalformedEnumMissingTypedef)
-// CHECK: typedef SWIFT_ENUM(NSInteger, FooComments);
-// CHECK: typedef SWIFT_ENUM(int16_t, NegativeValues);
+// NEGATIVE-NOT: NSMalformedEnumMissingTypedef :
+// CHECK-LABEL: enum FooComments : NSInteger;
+// CHECK-LABEL: enum NegativeValues : int16_t;
 
 // CHECK-LABEL: @interface AnEnumMethod
-// CHECK-NEXT: - (NegativeValues)takeAndReturnEnum:(FooComments)foo;
+// CHECK-NEXT: - (enum NegativeValues)takeAndReturnEnum:(enum FooComments)foo;
 // CHECK-NEXT: - (void)acceptPlainEnum:(enum NSMalformedEnumMissingTypedef)_;
 // CHECK: @end
 @objc class AnEnumMethod {
@@ -65,7 +65,7 @@ import Foundation
 
 // CHECK-NOT: enum {{[A-Z]+}}
 // CHECK-LABEL: @interface ZEnumMethod
-// CHECK-NEXT: - (NegativeValues)takeAndReturnEnum:(FooComments)foo;
+// CHECK-NEXT: - (enum NegativeValues)takeAndReturnEnum:(enum FooComments)foo;
 // CHECK: @end
 @objc class ZEnumMethod {
   @objc func takeAndReturnEnum(foo: FooComments) -> NegativeValues {

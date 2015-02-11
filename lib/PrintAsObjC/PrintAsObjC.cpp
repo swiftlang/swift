@@ -670,6 +670,11 @@ private:
   }
 
   void maybePrintTagKeyword(const NominalTypeDecl *NTD) {
+    if (isa<EnumDecl>(NTD) && !NTD->hasClangNode()) {
+      os << "enum ";
+      return;
+    }
+
     auto clangDecl = dyn_cast_or_null<clang::TagDecl>(NTD->getClangDecl());
     if (!clangDecl)
       return;
@@ -1198,9 +1203,9 @@ public:
     assert(ED->isObjC() || ED->hasClangNode());
     
     forwardDeclare(ED, [&]{
-      os << "typedef SWIFT_ENUM(";
+      os << "enum " << ED->getName() << " : ";
       printer.print(ED->getRawType(), OTK_None);
-      os << ", " <<ED->getName() << ");\n";
+      os << ";\n";
     });
   }
 
