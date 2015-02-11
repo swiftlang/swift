@@ -195,7 +195,7 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
 
   if (IGM.SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)) {
     IsLibrary = false;
-    EntryPointFn = DBuilder.createReplaceableForwardDecl(
+    EntryPointFn = DBuilder.createReplaceableCompositeType(
         llvm::dwarf::DW_TAG_subroutine_type, SWIFT_ENTRY_POINT_FUNCTION,
         MainFile, MainFile, 0);
   }
@@ -1260,7 +1260,7 @@ llvm::DICompositeType IRGenDebugInfo::createStructType(
   StringRef Name = Decl->getName().str();
 
   // Forward declare this first because types may be recursive.
-  auto FwdDecl = DBuilder.createReplaceableForwardDecl(
+  auto FwdDecl = DBuilder.createReplaceableCompositeType(
       llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, Line,
         llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits);
 
@@ -1332,7 +1332,7 @@ IRGenDebugInfo::createEnumType(DebugTypeInfo DbgTy, EnumDecl *Decl,
   // FIXME: Is DW_TAG_union_type the right thing here?
   // Consider using a DW_TAG_variant_type instead.
   auto FwdDecl =
-    DBuilder.createReplaceableForwardDecl(
+    DBuilder.createReplaceableCompositeType(
       llvm::dwarf::DW_TAG_union_type, MangledName, Scope, File, Line,
         llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits);
 
@@ -1641,7 +1641,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     else if (DbgTy.size)
       SizeInBits = DbgTy.size.getValue() * SizeOfByte;
 
-    auto FwdDecl = DBuilder.createReplaceableForwardDecl(
+    auto FwdDecl = DBuilder.createReplaceableCompositeType(
       llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, L.Line,
         llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits);
 
