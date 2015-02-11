@@ -3392,6 +3392,64 @@ ObjCThunks.test("Dictionary/Return") {
 }
 
 //===---
+// Check that generators traverse a snapshot of the collection.
+//===---
+
+DictionaryTestSuite.test("mutationDoesNotAffectGenerator/subscript/store") {
+  var dict = getDerivedAPIsDictionary()
+  var g = dict.generate()
+  dict[10] = 1011
+
+  expectEqualsUnordered(
+    [ (10, 1010), (20, 1020), (30, 1030) ],
+    Array(GeneratorSequence(g)))
+}
+
+DictionaryTestSuite.test("mutationDoesNotAffectGenerator/removeValueForKey,1") {
+  var dict = getDerivedAPIsDictionary()
+  var g = dict.generate()
+  expectOptionalEqual(1010, dict.removeValueForKey(10))
+
+  expectEqualsUnordered(
+    [ (10, 1010), (20, 1020), (30, 1030) ],
+    Array(GeneratorSequence(g)))
+}
+
+DictionaryTestSuite.test("mutationDoesNotAffectGenerator/removeValueForKey,all") {
+  var dict = getDerivedAPIsDictionary()
+  var g = dict.generate()
+  expectOptionalEqual(1010, dict.removeValueForKey(10))
+  expectOptionalEqual(1020, dict.removeValueForKey(20))
+  expectOptionalEqual(1030, dict.removeValueForKey(30))
+
+  expectEqualsUnordered(
+    [ (10, 1010), (20, 1020), (30, 1030) ],
+    Array(GeneratorSequence(g)))
+}
+
+DictionaryTestSuite.test(
+  "mutationDoesNotAffectGenerator/removeAll,keepCapacity=false") {
+  var dict = getDerivedAPIsDictionary()
+  var g = dict.generate()
+  dict.removeAll(keepCapacity: false)
+
+  expectEqualsUnordered(
+    [ (10, 1010), (20, 1020), (30, 1030) ],
+    Array(GeneratorSequence(g)))
+}
+
+DictionaryTestSuite.test(
+  "mutationDoesNotAffectGenerator/removeAll,keepCapacity=true") {
+  var dict = getDerivedAPIsDictionary()
+  var g = dict.generate()
+  dict.removeAll(keepCapacity: true)
+
+  expectEqualsUnordered(
+    [ (10, 1010), (20, 1020), (30, 1030) ],
+    Array(GeneratorSequence(g)))
+}
+
+//===---
 // Misc tests.
 //===---
 

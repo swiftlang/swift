@@ -1500,6 +1500,93 @@ public func expectEqualsUnordered<
     file: file, line: line, collectMoreInfo: collectMoreInfo)
 }
 
+public func expectEqualsUnordered<T : Comparable>(
+  expected: [T], actual: [T],
+  stackTrace: SourceLocStack? = nil,
+  file: String = __FILE__, line: UWord = __LINE__,
+  collectMoreInfo: (()->String)? = nil
+) {
+  let x = sorted(expected)
+  let y = sorted(actual)
+  expectEqualSequence(
+    x, y, { $0 == $1 }, stackTrace: stackTrace,
+    file: file, line: line, collectMoreInfo: collectMoreInfo)
+}
+
+/// A nominal type that is equivalent to a tuple of two elements.
+///
+/// We need a nominal type because we can't add protocol conformances to
+/// tuples.
+struct Pair<T : Comparable> : Comparable {
+  init(_ first: T, _ second: T) {
+    self.first = first
+    self.second = second
+  }
+
+  var first: T
+  var second: T
+}
+
+func == <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
+  return lhs.first == rhs.first && lhs.second == rhs.second
+}
+
+func < <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
+  return lexicographicalCompare(
+    [ lhs.first, lhs.second ],
+    [ rhs.first, rhs.second ])
+}
+
+public func expectEqualsUnordered<T : Comparable>(
+  expected: [(T, T)], actual: [(T, T)],
+  stackTrace: SourceLocStack? = nil,
+  file: String = __FILE__, line: UWord = __LINE__,
+  collectMoreInfo: (()->String)? = nil
+) {
+  let x = sorted(expected, { Pair($0.0, $0.1) < Pair($1.0, $1.1) })
+  let y = sorted(actual, { Pair($0.0, $0.1) < Pair($1.0, $1.1) })
+  expectEqualSequence(
+    x, y, { Pair($0.0, $0.1) == Pair($1.0, $1.1) }, stackTrace: stackTrace,
+    file: file, line: line, collectMoreInfo: collectMoreInfo)
+}
+
+/*
+
+This code crashes the compiler.  If we could use this code, we wouldn't need
+the explicit overload for [(T, T)].
+
+rdar://problem/19792730
+rdar://problem/19792768
+
+public func expectEqualsUnordered<
+    Expected : SequenceType,
+    Actual : SequenceType,
+    T : Comparable
+    where
+      Expected.Generator.Element == Actual.Generator.Element,
+      Expected.Generator.Element == (T, T)
+>(
+    expected: Expected, actual: Actual,
+    stackTrace: SourceLocStack? = nil,
+    file: String = __FILE__, line: UWord = __LINE__,
+    collectMoreInfo: (()->String)? = nil
+) {
+  func comparePairLess(lhs: (T, T), rhs: (T, T)) -> Bool {
+    return lexicographicalCompare([ lhs.0, lhs.1 ], [ rhs.0, rhs.1 ])
+  }
+
+  let x: [(T, T)] = sorted(Array(expected), comparePairLess)
+  let y: [(T, T)] = sorted(Array(actual), comparePairLess)
+
+  func comparePairEquals(lhs: (T, T), rhs: (T, T)) -> Bool {
+    return lhs.0 == rhs.0 && lhs.1 == rhs.1
+  }
+
+  expectEqualSequence(
+    x, y, comparePairEquals, stackTrace: stackTrace,
+    file: file, line: line, collectMoreInfo: collectMoreInfo)
+}*/
+
 public func expectEqualFunctionsForDomain<ArgumentType, Result : Equatable>(
     arguments: [ArgumentType], function1: ArgumentType -> Result,
     function2: ArgumentType -> Result

@@ -3307,4 +3307,42 @@ SetTestSuite.test("Operator.Precedence") {
   expectEqual(Set([1010, 3030]), s8)
 }
 
+//===---
+// Check that generators traverse a snapshot of the collection.
+//===---
+
+SetTestSuite.test("mutationDoesNotAffectGenerator/remove,1") {
+  var set = Set([ 1010, 1020, 1030 ])
+  var g = set.generate()
+  expectOptionalEqual(1010, set.remove(1010))
+
+  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(GeneratorSequence(g)))
+}
+
+SetTestSuite.test("mutationDoesNotAffectGenerator/remove,all") {
+  var set = Set([ 1010, 1020, 1030 ])
+  var g = set.generate()
+  expectOptionalEqual(1010, set.remove(1010))
+  expectOptionalEqual(1020, set.remove(1020))
+  expectOptionalEqual(1030, set.remove(1030))
+
+  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(GeneratorSequence(g)))
+}
+
+SetTestSuite.test("mutationDoesNotAffectGenerator/removeAll,keepCapacity=false") {
+  var set = Set([ 1010, 1020, 1030 ])
+  var g = set.generate()
+  set.removeAll(keepCapacity: false)
+
+  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(GeneratorSequence(g)))
+}
+
+SetTestSuite.test("mutationDoesNotAffectGenerator/removeAll,keepCapacity=true") {
+  var set = Set([ 1010, 1020, 1030 ])
+  var g = set.generate()
+  set.removeAll(keepCapacity: true)
+
+  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(GeneratorSequence(g)))
+}
+
 runAllTests()

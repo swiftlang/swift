@@ -3149,8 +3149,9 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
   /// Complexity: O(1)
   internal func generate() -> ${Self}Generator<${TypeParameters}> {
     switch self {
-    case .Native:
-      return ._Native(start: native.startIndex, end: native.endIndex)
+    case .Native(let owner):
+      return
+        ._Native(start: native.startIndex, end: native.endIndex, owner: owner)
     case .Cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
       return ._Cocoa(_Cocoa${Self}Generator(cocoaStorage.cocoa${Self}))
@@ -3525,8 +3526,19 @@ final internal class _Cocoa${Self}Generator {}
 
 internal enum ${Self}GeneratorRepresentation<${TypeParametersDecl}> {
   internal typealias _Generator = ${Self}Generator<${TypeParameters}>
+  internal typealias _NativeStorageOwner =
+    _Native${Self}StorageOwner<${TypeParameters}>
   internal typealias _NativeIndex = _Generator._NativeIndex
-  case _Native(start: _NativeIndex, end: _NativeIndex)
+
+  // For native storage, we keep two indices to keep track of the iteration
+  // progress and the storage owner to make the storage non-uniquely
+  // referenced.
+  //
+  // While indices keep the storage alive, they don't affect reference count of
+  // the storage.  Generator is iterating over a frozen view of the collection
+  // state, so it should keep its own reference to the storage owner.
+  case _Native(
+    start: _NativeIndex, end: _NativeIndex, owner: _NativeStorageOwner)
   case _Cocoa(_Cocoa${Self}Generator)
 }
 
@@ -3542,14 +3554,17 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
   // Index, which is multi-pass, it is suitable for implementing a
   // GeneratorType, which is being consumed as iteration proceeds.
 
+  internal typealias _NativeStorageOwner =
+    _Native${Self}StorageOwner<${TypeParameters}>
   internal typealias _NativeIndex = _Native${Self}Index<${TypeParameters}>
 
   internal var _state: ${Self}GeneratorRepresentation<${TypeParameters}>
 
   internal static func _Native(
-    #start: _NativeIndex, end: _NativeIndex
+    #start: _NativeIndex, end: _NativeIndex, owner: _NativeStorageOwner
   ) -> ${Self}Generator {
-    return ${Self}Generator(_state: ._Native(start: start, end: end))
+    return ${Self}Generator(
+      _state: ._Native(start: start, end: end, owner: owner))
   }
 #if _runtime(_ObjC)
   internal static func _Cocoa(
@@ -3570,12 +3585,13 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
 
   internal mutating func _nativeNext() -> ${SequenceType}? {
     switch _state {
-    case ._Native(var startIndex, var endIndex):
+    case ._Native(let startIndex, let endIndex, let owner):
       if startIndex == endIndex {
         return .None
       }
       let result = startIndex.nativeStorage.assertingGet(startIndex)
-      _state = ._Native(start: startIndex.successor(), end: endIndex)
+      _state =
+        ._Native(start: startIndex.successor(), end: endIndex, owner: owner)
       return result
     case ._Cocoa:
       _sanityCheckFailure("internal error: not backed by NS${Self}")
@@ -3592,7 +3608,7 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
     }
 
     switch _state {
-    case ._Native(var startIndex, var endIndex):
+    case ._Native:
       return _nativeNext()
     case ._Cocoa(var cocoaGenerator):
 #if _runtime(_ObjC)
