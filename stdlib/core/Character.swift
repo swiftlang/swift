@@ -273,7 +273,7 @@ public struct Character :
     return String(self).utf16
   }
 
-  internal var _representation: Representation;
+  internal var _representation: Representation
 }
 
 extension String {
