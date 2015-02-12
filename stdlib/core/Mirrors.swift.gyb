@@ -10,28 +10,39 @@
 //
 //===----------------------------------------------------------------------===//
 
-% Types = []
-% for IntSize in [8,16,32,64]:
-%   Types.append( ('Int'+str(IntSize),'.Int','Int64($0)') )
-% for UIntSize in [8,16,32,64]:
-%   Types.append( ('UInt'+str(UIntSize),'.UInt','UInt64($0)') )
-% Types.append(('Float','.Float','$0'))
-% Types.append(('Double','.Double','$0'))
-% Types.append(('String','.Text','$0'))
-% Types.append(('Bool','.Logical','$0'))
-% Types.append(('Int','.Int','Int64($0)'))
-% Types.append(('UInt','.UInt','UInt64($0)'))
-% Types.append(('Character','.Text','String($0)'))
-% Types.append(('UnicodeScalar','.UInt','UInt64($0)'))
+%{
+
+from SwiftIntTypes import *
+
+# Number of bits in the Builtin.Word type
+word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
+
+Types = [
+    ('Float', '.Float', '$0'),
+    ('Double', '.Double', '$0'),
+    ('Bool', '.Logical', '$0'),
+    ('String', '.Text', '$0'),
+    ('Character', '.Text', 'String($0)'),
+    ('UnicodeScalar', '.UInt', 'UInt64($0)'),
+]
+
+for self_ty in all_integer_types(word_bits):
+  Self = self_ty.stdlib_name
+  if self_ty.is_signed:
+    Types.append( (Self, '.Int', 'Int64($0)') )
+  else:
+    Types.append( (Self, '.UInt', 'UInt64($0)') )
+
+}%
 
 % for Type in Types:
 extension ${Type[0]} : Reflectable {
   /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
-    return _LeafMirror(self, { "\($0)" }, { .Some(${Type[1]}(${Type[2]})) })
+    return _LeafMirror(self, toString, { .Some(${Type[1]}(${Type[2]})) })
   }
 }
-
+% end
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
