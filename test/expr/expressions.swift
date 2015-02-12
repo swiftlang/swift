@@ -630,3 +630,22 @@ func testOptionalChaining(a : Int?, b : Int!, c : Int??) {
 
   var y: Int? = c?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
 }
+
+
+// <rdar://problem/19657458> Nil Coalescing operator (??) should have a higher precedence
+
+func testNilCoalescePrecedence(cond: Bool, a: Int?, r: Range<Int>?) {
+  // ?? should have higher precedence than logical operators like || and comparisons.
+  if cond || (a ?? 42 > 0) {}  // Ok.
+  if (cond || a) ?? 42 > 0 {}  // Not ok: expected-error {{could not find an overload for '??' that accepts the supplied arguments}}
+  if (cond || a) ?? (42 > 0) {}  // Not ok: expected-error {{cannot be used as a boolean}}
+
+  if cond || a ?? 42 > 0 {}    // Parses as the first one, not the others.
+
+
+  // ?? should have lower precedence than range and arithmetic operators.
+  let r1 = r ?? (0...42) // ok
+  let r2 = (r ?? 0)...42 // not ok: expected-error {{could not find an overload for '??' that accepts the supplied arguments}}
+  let r3 = r ?? 0...42 // parses as the first one, not the second.
+}
+

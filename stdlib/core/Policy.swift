@@ -391,6 +391,9 @@ infix operator  ..< { associativity none precedence 135 }
 // following attributes:
 // infix operator as { associativity none precedence 132 }
 
+// "Coalescing"
+infix operator ?? { associativity right precedence 131 }
+
 // "Comparative"
 
 infix operator  <  { associativity none precedence 130 }
@@ -411,7 +414,6 @@ infix operator && { associativity left precedence 120 }
 // "Disjunctive"
 
 infix operator || { associativity left precedence 110 }
-infix operator ?? { associativity right precedence 110 }
 
 
 // User-defined ternary operators are not supported. The ? : operator is
