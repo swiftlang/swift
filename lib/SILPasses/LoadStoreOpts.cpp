@@ -1400,7 +1400,7 @@ namespace {
 class GlobalLoadStoreOpts : public SILFunctionTransform {
 
   /// The entry point to the transformation.
-  void run() {
+  void run() override {
     SILFunction *F = getFunction();
 
     DEBUG(llvm::dbgs() << "***** Load Store Elimination on function: "

@@ -596,16 +596,21 @@ namespace {
   struct EmptyTypeInfo : ScalarTypeInfo<EmptyTypeInfo, LoadableTypeInfo> {
     EmptyTypeInfo(llvm::Type *ty)
       : ScalarTypeInfo(ty, Size(0), SpareBitVector{}, Alignment(1), IsPOD) {}
-    unsigned getExplosionSize() const { return 0; }
-    void getSchema(ExplosionSchema &schema) const {}
-    void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e) const {}
-    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {}
-    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {}
-    void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {}
-    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {}
-    void consume(IRGenFunction &IGF, Explosion &src) const {}
-    void fixLifetime(IRGenFunction &IGF, Explosion &src) const {}
-    void destroy(IRGenFunction &IGF, Address addr, SILType T) const {}
+    unsigned getExplosionSize() const override { return 0; }
+    void getSchema(ExplosionSchema &schema) const override {}
+    void loadAsCopy(IRGenFunction &IGF, Address addr,
+                    Explosion &e) const override {}
+    void loadAsTake(IRGenFunction &IGF, Address addr,
+                    Explosion &e) const override {}
+    void assign(IRGenFunction &IGF, Explosion &e,
+                Address addr) const override {}
+    void initialize(IRGenFunction &IGF, Explosion &e,
+                    Address addr) const override {}
+    void copy(IRGenFunction &IGF, Explosion &src,
+              Explosion &dest) const override {}
+    void consume(IRGenFunction &IGF, Explosion &src) const override {}
+    void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {}
+    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {}
     llvm::Value *packEnumPayload(IRGenFunction &IGF, Explosion &src,
                                   unsigned bitWidth,
                                   unsigned offset) const override {

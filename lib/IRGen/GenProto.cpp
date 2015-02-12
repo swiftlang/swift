@@ -723,7 +723,7 @@ namespace {
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                        SILType T) const {
+                        SILType T) const override {
       Address destValue = projectValue(IGF, dest);
       Address srcValue = projectValue(IGF, dest);
       IGF.emitUnknownWeakCopyAssign(destValue, srcValue);
@@ -732,7 +732,7 @@ namespace {
 
     void initializeWithCopy(IRGenFunction &IGF,
                             Address dest, Address src,
-                            SILType T) const {
+                            SILType T) const override {
       Address destValue = projectValue(IGF, dest);
       Address srcValue = projectValue(IGF, dest);
       IGF.emitUnknownWeakCopyInit(destValue, srcValue);
@@ -741,7 +741,7 @@ namespace {
 
     void assignWithTake(IRGenFunction &IGF,
                         Address dest, Address src,
-                        SILType T) const {
+                        SILType T) const override {
       Address destValue = projectValue(IGF, dest);
       Address srcValue = projectValue(IGF, dest);
       IGF.emitUnknownWeakTakeAssign(destValue, srcValue);
@@ -750,7 +750,7 @@ namespace {
 
     void initializeWithTake(IRGenFunction &IGF,
                             Address dest, Address src,
-                            SILType T) const {
+                            SILType T) const override {
       Address destValue = projectValue(IGF, dest);
       Address srcValue = projectValue(IGF, dest);
       IGF.emitUnknownWeakTakeInit(destValue, srcValue);
@@ -758,7 +758,7 @@ namespace {
     }
 
     void destroy(IRGenFunction &IGF, Address existential,
-                 SILType T) const {
+                 SILType T) const override {
       Address valueAddr = projectValue(IGF, existential);
       IGF.emitUnknownWeakDestroy(valueAddr);
     }
@@ -1396,13 +1396,13 @@ namespace {
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                        SILType T) const {
+                        SILType T) const override {
       emitAssignWithCopyCall(IGF, IGF.emitTypeMetadataRefForLayout(T),
                              dest.getAddress(), src.getAddress());
     }
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
-                        SILType T) const {
+                        SILType T) const override {
       emitAssignWithTakeCall(IGF, IGF.emitTypeMetadataRefForLayout(T),
                              dest.getAddress(), src.getAddress());
     }
@@ -1463,7 +1463,7 @@ namespace {
       return std::make_pair(size, align);
     }
 
-    llvm::Value *getSize(IRGenFunction &IGF, SILType T) const {
+    llvm::Value *getSize(IRGenFunction &IGF, SILType T) const override {
       llvm::Value *wtable = getValueWitnessTable(IGF, T);
       return emitLoadOfSize(IGF, wtable);
     }
@@ -1473,14 +1473,14 @@ namespace {
       return emitLoadOfAlignmentMask(IGF, wtable);
     }
 
-    llvm::Value *getStride(IRGenFunction &IGF, SILType T) const {
+    llvm::Value *getStride(IRGenFunction &IGF, SILType T) const override {
       llvm::Value *wtable = getValueWitnessTable(IGF, T);
       return emitLoadOfStride(IGF, wtable);
     }
 
-    llvm::Constant *getStaticSize(IRGenModule &IGM) const { return nullptr; }
+    llvm::Constant *getStaticSize(IRGenModule &IGM) const override { return nullptr; }
     llvm::Constant *getStaticAlignment(IRGenModule &IGM) const { return nullptr; }
-    llvm::Constant *getStaticStride(IRGenModule &IGM) const { return nullptr; }
+    llvm::Constant *getStaticStride(IRGenModule &IGM) const override { return nullptr; }
 
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,

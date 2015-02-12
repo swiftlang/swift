@@ -168,7 +168,7 @@ public:
 /// components that can be accessed as address manipulations.  See the
 /// comment for PathComponent for more information.
 class PhysicalPathComponent : public PathComponent {
-  virtual void _anchor();
+  virtual void _anchor() override;
 
 protected:
   PhysicalPathComponent(LValueTypeData typeData, KindTy Kind)

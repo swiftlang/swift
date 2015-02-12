@@ -77,7 +77,7 @@ class DCE : public SILFunctionTransform {
   llvm::DenseMap<SILBasicBlock *, ControllingInfo> ControllingInfoMap;
 
   /// The entry point to the transformation.
-  void run() {
+  void run() override {
     SILFunction *F = getFunction();
 
     DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();

@@ -126,7 +126,7 @@ public:
   }
 
   /// The standard schema is just all the fields jumbled together.
-  void getSchema(ExplosionSchema &schema) const {
+  void getSchema(ExplosionSchema &schema) const override {
     for (auto &field : getFields()) {
       field.getTypeInfo().getSchema(schema);
     }
@@ -200,7 +200,7 @@ public:
     }
   }
 
-  void destroy(IRGenFunction &IGF, Address addr, SILType T) const {
+  void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
     auto offsets = asImpl().getNonFixedOffsets(IGF, T);
     for (auto &field : getFields()) {
       if (field.isPOD()) continue;
@@ -272,42 +272,47 @@ private:
 public:
   using super::getFields;
 
-  void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &out) const {
+  void loadAsCopy(IRGenFunction &IGF, Address addr,
+                  Explosion &out) const override {
     forAllFields<&LoadableTypeInfo::loadAsCopy>(IGF, addr, out);
   }
 
-  void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &out) const {
+  void loadAsTake(IRGenFunction &IGF, Address addr,
+                  Explosion &out) const override {
     forAllFields<&LoadableTypeInfo::loadAsTake>(IGF, addr, out);
   }
   
-  void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
+  void assign(IRGenFunction &IGF, Explosion &e, Address addr) const override {
     forAllFields<&LoadableTypeInfo::assign>(IGF, e, addr);
   }
 
-  void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
+  void initialize(IRGenFunction &IGF, Explosion &e,
+                  Address addr) const override {
     forAllFields<&LoadableTypeInfo::initialize>(IGF, e, addr);
   }
 
-  unsigned getExplosionSize() const {
+  unsigned getExplosionSize() const override {
     return ExplosionSize;
   }
 
-  void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+  void reexplode(IRGenFunction &IGF, Explosion &src,
+                 Explosion &dest) const override {
     for (auto &field : getFields())
       cast<LoadableTypeInfo>(field.getTypeInfo()).reexplode(IGF, src, dest);
   }
 
-  void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+  void copy(IRGenFunction &IGF, Explosion &src,
+            Explosion &dest) const override {
     for (auto &field : getFields())
       cast<LoadableTypeInfo>(field.getTypeInfo()).copy(IGF, src, dest);
   }
       
-  void consume(IRGenFunction &IGF, Explosion &src) const {
+  void consume(IRGenFunction &IGF, Explosion &src) const override {
     for (auto &field : getFields())
       cast<LoadableTypeInfo>(field.getTypeInfo()).consume(IGF, src);
   }
 
-  void fixLifetime(IRGenFunction &IGF, Explosion &src) const {
+  void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
     for (auto &field : getFields())
       cast<LoadableTypeInfo>(field.getTypeInfo()).fixLifetime(IGF, src);
   }

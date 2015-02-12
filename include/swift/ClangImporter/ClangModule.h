@@ -55,7 +55,7 @@ public:
   /// Returns the Swift module that overlays this Clang module.
   Module *getAdapterModule() const;
 
-  virtual bool isSystemModule() const;
+  virtual bool isSystemModule() const override;
 
   virtual void lookupValue(Module::AccessPathTy accessPath,
                            DeclName name, NLKind lookupKind,

@@ -235,7 +235,7 @@ public:
     asDerived().emitScalarUnownedRelease(IGF, value);
   }
 
-  const WeakTypeInfo *createWeakStorageType(TypeConverter &TC) const {
+  const WeakTypeInfo *createWeakStorageType(TypeConverter &TC) const override {
     switch (asDerived().getReferenceCounting()) {
     case ReferenceCounting::Native:
       return TC.createSwiftWeakStorageType(this->getStorageType());
@@ -247,7 +247,8 @@ public:
     }
   }
 
-  const UnownedTypeInfo *createUnownedStorageType(TypeConverter &TC) const {
+  const UnownedTypeInfo *
+  createUnownedStorageType(TypeConverter &TC) const override {
     switch (asDerived().getReferenceCounting()) {
     case ReferenceCounting::Native:
       return TC.createSwiftUnownedStorageType(this->getStorageType());
@@ -259,7 +260,7 @@ public:
     }
   }
 
-  const TypeInfo *createUnmanagedStorageType(TypeConverter &TC) const {
+  const TypeInfo *createUnmanagedStorageType(TypeConverter &TC) const override {
     return TC.createUnmanagedStorageType(this->getStorageType());
   }
 

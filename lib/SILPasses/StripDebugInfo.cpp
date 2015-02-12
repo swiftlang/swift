@@ -38,7 +38,7 @@ class StripDebugInfo : public swift::SILFunctionTransform {
   virtual ~StripDebugInfo() {}
 
   /// The entry point to the transformation.
-  void run() {
+  void run() override {
     stripFunction(getFunction());
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }

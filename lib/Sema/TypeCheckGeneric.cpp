@@ -388,8 +388,6 @@ addRequirements(
     ArchetypeBuilder::PotentialArchetype *pa,
     llvm::SmallPtrSet<ArchetypeBuilder::PotentialArchetype *, 16> &knownPAs,
     SmallVectorImpl<Requirement> &requirements) {
-  using PotentialArchetype = ArchetypeBuilder::PotentialArchetype;
-  
   // If the potential archetype has been bound away to a concrete type,
   // it needs no requirements.
   if (pa->isConcreteType())

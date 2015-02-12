@@ -959,7 +959,7 @@ processFunction(SILFunction *F, SmallVectorImpl<SILFunction*> &Worklist) {
 namespace {
 class CapturePromotionPass : public SILModuleTransform {
   /// The entry point to the transformation.
-  virtual void run() {
+  void run() override {
     SmallVector<SILFunction*, 128> Worklist;
     for (auto &F : *getModule())
       processFunction(&F, Worklist);

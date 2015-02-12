@@ -623,7 +623,7 @@ public:
   virtual ~SILDevirtualizationPass() {}
 
   /// The entry point to the transformation.
-  virtual void run() {
+  void run() override {
 
     bool Changed = false;
 
@@ -1020,7 +1020,7 @@ namespace {
   public:
     virtual ~SILInlineCaches() {}
 
-    virtual void run() {
+    void run() override {
       ClassHierarchyAnalysis *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();
 
       bool Changed = false;

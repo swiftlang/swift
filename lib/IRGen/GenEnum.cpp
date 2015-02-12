@@ -86,7 +86,7 @@ namespace {
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
                                      SILType Type,
                                      EnumDecl *theEnum,
-                                     llvm::StructType *enumTy) {
+                                     llvm::StructType *enumTy) override {
       llvm_unreachable("should not call this");
     }
 
@@ -123,15 +123,17 @@ namespace {
       return Address(llvm::UndefValue::get(IGF.IGM.OpaquePtrTy), Alignment(1));
     }
 
-    virtual llvm::Value *emitValueCaseTest(IRGenFunction &IGF,
-                                           Explosion &value,
-                                           EnumElementDecl *Case) const {
+    virtual llvm::Value *
+    emitValueCaseTest(IRGenFunction &IGF,
+                      Explosion &value,
+                      EnumElementDecl *Case) const override {
       value.claim(getExplosionSize());
       return llvm::UndefValue::get(IGF.IGM.Int1Ty);
     }
-    virtual llvm::Value *emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
-                                              Address enumAddr,
-                                              EnumElementDecl *Case) const {
+    virtual llvm::Value *
+    emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
+                         Address enumAddr,
+                         EnumElementDecl *Case) const override {
       return llvm::UndefValue::get(IGF.IGM.Int1Ty);
     }
 
@@ -328,15 +330,17 @@ namespace {
                                       EnumDecl *theEnum,
                                       llvm::StructType *enumTy) override;
 
-    virtual llvm::Value *emitValueCaseTest(IRGenFunction &IGF,
-                                           Explosion &value,
-                                           EnumElementDecl *Case) const {
+    virtual llvm::Value *
+    emitValueCaseTest(IRGenFunction &IGF,
+                      Explosion &value,
+                      EnumElementDecl *Case) const override {
       value.claim(getExplosionSize());
       return IGF.Builder.getInt1(true);
     }
-    virtual llvm::Value *emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
-                                              Address enumAddr,
-                                              EnumElementDecl *Case) const {
+    virtual llvm::Value *
+    emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
+                         Address enumAddr,
+                         EnumElementDecl *Case) const override {
       return IGF.Builder.getInt1(true);
     }
 
@@ -407,7 +411,7 @@ namespace {
       // No tag, nothing to do.
     }
 
-    void getSchema(ExplosionSchema &schema) const {
+    void getSchema(ExplosionSchema &schema) const override {
       if (!getSingleton()) return;
       // If the payload is loadable, forward its explosion schema.
       if (TIK >= Loadable)
@@ -418,12 +422,13 @@ namespace {
                                       getSingleton()->getBestKnownAlignment()));
     }
 
-    unsigned getExplosionSize() const {
+    unsigned getExplosionSize() const override {
       if (!getLoadableSingleton()) return 0;
       return getLoadableSingleton()->getExplosionSize();
     }
 
-    void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e) const {
+    void loadAsCopy(IRGenFunction &IGF, Address addr,
+                    Explosion &e) const override {
       if (!getLoadableSingleton()) return;
       getLoadableSingleton()->loadAsCopy(IGF, getSingletonAddress(IGF, addr),e);
     }
@@ -433,18 +438,19 @@ namespace {
       return;
     }
 
-    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
+    void loadAsTake(IRGenFunction &IGF, Address addr,
+                    Explosion &e) const override {
       if (!getLoadableSingleton()) return;
       getLoadableSingleton()->loadAsTake(IGF, getSingletonAddress(IGF, addr),e);
     }
 
-    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
+    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const override {
       if (!getLoadableSingleton()) return;
       getLoadableSingleton()->assign(IGF, e, getSingletonAddress(IGF, addr));
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                        SILType T) const {
+                        SILType T) const override {
       if (!getSingleton()) return;
       dest = getSingletonAddress(IGF, dest);
       src = getSingletonAddress(IGF, src);
@@ -453,7 +459,7 @@ namespace {
     }
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
-                        SILType T) const {
+                        SILType T) const override {
       if (!getSingleton()) return;
       dest = getSingletonAddress(IGF, dest);
       src = getSingletonAddress(IGF, src);
@@ -461,7 +467,8 @@ namespace {
                                      getSingletonType(IGF.IGM, T));
     }
 
-    void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
+    void initialize(IRGenFunction &IGF, Explosion &e,
+                    Address addr) const override {
       if (!getLoadableSingleton()) return;
       getLoadableSingleton()->initialize(IGF, e, getSingletonAddress(IGF, addr));
     }
@@ -702,7 +709,7 @@ namespace {
 
     llvm::Value *emitValueCaseTest(IRGenFunction &IGF,
                                    Explosion &value,
-                                   EnumElementDecl *Case) const {
+                                   EnumElementDecl *Case) const override {
       // True if the discriminator matches the specified element.
       llvm::Value *discriminator = value.claimNext();
       return IGF.Builder.CreateICmpEQ(discriminator,
@@ -712,7 +719,7 @@ namespace {
     
     llvm::Value *emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
                                       Address enumAddr,
-                                      EnumElementDecl *Case) const {
+                                      EnumElementDecl *Case) const override {
       Explosion value;
       loadAsTake(IGF, enumAddr, value);
       return emitValueCaseTest(IGF, value, Case);
@@ -766,7 +773,7 @@ namespace {
     void emitValueInjection(IRGenFunction &IGF,
                             EnumElementDecl *elt,
                             Explosion &params,
-                            Explosion &out) const {
+                            Explosion &out) const override {
       out.add(getDiscriminatorIdxConst(elt));
     }
 
@@ -823,15 +830,16 @@ namespace {
 
     static constexpr IsPOD_t IsScalarPOD = IsPOD;
 
-    ClusteredBitVector getTagBitsForPayloads(IRGenModule &IGM) const {
+    ClusteredBitVector getTagBitsForPayloads(IRGenModule &IGM) const override {
       // No tag bits; no-payload enums always use fixed representations.
       return ClusteredBitVector::getConstant(
                     cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits(),
                     false);
     }
 
-    ClusteredBitVector getBitPatternForNoPayloadElement(IRGenModule &IGM,
-                                               EnumElementDecl *theCase) const {
+    ClusteredBitVector
+    getBitPatternForNoPayloadElement(IRGenModule &IGM,
+                                     EnumElementDecl *theCase) const override {
       auto bits
         = getBitVectorFromAPInt(getDiscriminatorIdxConst(theCase)->getValue());
       bits.extendWithClearBits(cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits());
@@ -1393,9 +1401,10 @@ namespace {
       }
     }
 
-    virtual llvm::Value *emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
-                                              Address enumAddr,
-                                              EnumElementDecl *Case) const {
+    virtual llvm::Value *
+    emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
+                         Address enumAddr,
+                         EnumElementDecl *Case) const override {
       if (TIK >= Fixed) {
         // Load the fixed-size representation and switch directly.
         Explosion value;
@@ -1423,9 +1432,10 @@ namespace {
       return Phi;
     }
 
-    virtual llvm::Value *emitValueCaseTest(IRGenFunction &IGF,
-                                           Explosion &value,
-                                           EnumElementDecl *Case) const {
+    virtual llvm::Value *
+    emitValueCaseTest(IRGenFunction &IGF,
+                      Explosion &value,
+                      EnumElementDecl *Case) const override {
       // If we're testing for the payload element, we cannot directly check to
       // see whether it is present (in full generality) without doing a switch.
       // Try some easy cases, then bail back to the general case.
@@ -1812,7 +1822,7 @@ namespace {
     void emitValueInjection(IRGenFunction &IGF,
                             EnumElementDecl *elt,
                             Explosion &params,
-                            Explosion &out) const {
+                            Explosion &out) const override {
       // The payload case gets its native representation. If there are extra
       // tag bits, set them to zero.
       unsigned payloadSize
@@ -2774,9 +2784,10 @@ namespace {
     }
   public:
     
-    virtual llvm::Value *emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
-                                              Address enumAddr,
-                                              EnumElementDecl *Case) const {
+    virtual llvm::Value *
+    emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
+                         Address enumAddr,
+                         EnumElementDecl *Case) const override {
       if (TIK >= Fixed) {
         // Load the fixed-size representation and switch directly.
         Explosion value;
@@ -2788,9 +2799,9 @@ namespace {
       llvm_unreachable("dynamic switch for multi-payload enum not implemented");
     }
     
-    virtual llvm::Value *emitValueCaseTest(IRGenFunction &IGF,
-                                           Explosion &value,
-                                           EnumElementDecl *Case) const {
+    virtual llvm::Value *
+    emitValueCaseTest(IRGenFunction &IGF, Explosion &value,
+                      EnumElementDecl *Case) const override {
       auto &C = IGF.IGM.getLLVMContext();
       llvm::Value *payload = value.claimNext();
       llvm::Value *extraTagBits = nullptr;
@@ -3140,7 +3151,7 @@ namespace {
     void emitValueInjection(IRGenFunction &IGF,
                             EnumElementDecl *elt,
                             Explosion &params,
-                            Explosion &out) const {
+                            Explosion &out) const override {
       // See whether this is a payload or empty case we're emitting.
       auto payloadI = std::find_if(ElementsWithPayload.begin(),
                                    ElementsWithPayload.end(),

@@ -447,7 +447,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
 namespace {
 class MandatoryInlining : public SILModuleTransform {
   /// The entry point to the transformation.
-  void run() {
+  void run() override {
     SILModule *M = getModule();
     SILModule::LinkingMode Mode = getOptions().LinkMode;
     bool ShouldCleanup = !getOptions().DebugSerialization;

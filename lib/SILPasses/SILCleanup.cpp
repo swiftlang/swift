@@ -60,7 +60,7 @@ namespace {
 class SILCleanup : public swift::SILFunctionTransform {
 
   /// The entry point to the transformation.
-  void run() {
+  void run() override {
     cleanFunction(*getFunction());
     invalidateAnalysis(SILAnalysis::InvalidationKind::All);
   }

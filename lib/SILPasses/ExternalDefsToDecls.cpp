@@ -22,7 +22,7 @@ namespace {
 class ExternalDefsToDecls : public SILModuleTransform {
   virtual ~ExternalDefsToDecls() {}
 
-  void run() {
+  void run() override {
     for (auto &F : *getModule())
       if (isAvailableExternally(F.getLinkage()) && F.isDefinition())
         F.convertToDeclaration();

@@ -990,7 +990,7 @@ static bool isObjCClassExtensionInOverlay(DeclContext *dc) {
   // Check whether we have an extension.
   auto ext = dyn_cast<ExtensionDecl>(dc);
   if (!ext)
-    return nullptr;
+    return false;
 
   // Find the extended class.
   auto classDecl = ext->getExtendedType()->getClassOrBoundGenericClass();

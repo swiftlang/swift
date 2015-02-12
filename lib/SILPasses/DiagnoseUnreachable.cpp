@@ -746,7 +746,7 @@ void swift::performSILDiagnoseUnreachable(SILModule *M) {
 
 namespace {
   class NoReturnFolding : public SILModuleTransform {
-    void run() {
+    void run() override {
       performNoReturnFunctionProcessing(getModule());
       invalidateAnalysis(SILAnalysis::InvalidationKind::All);
     }
@@ -762,7 +762,7 @@ SILTransform *swift::createNoReturnFolding() {
 
 namespace {
   class DiagnoseUnreachable : public SILModuleTransform {
-    void run() {
+    void run() override {
       performSILDiagnoseUnreachable(getModule());
       invalidateAnalysis(SILAnalysis::InvalidationKind::All);
     }

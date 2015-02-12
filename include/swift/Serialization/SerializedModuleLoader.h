@@ -88,7 +88,7 @@ public:
                  ObjCSelector selector,
                  bool isInstanceMethod,
                  unsigned previousGeneration,
-                 llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);
+                 llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) override;
 
   virtual void verifyAllModules() override;
 };

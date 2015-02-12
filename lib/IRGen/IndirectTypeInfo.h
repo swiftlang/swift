@@ -46,7 +46,7 @@ protected:
   }
 
 public:
-  void getSchema(ExplosionSchema &schema) const {
+  void getSchema(ExplosionSchema &schema) const override {
     schema.add(ExplosionSchema::Element::forAggregate(this->getStorageType(),
                                               this->getBestKnownAlignment()));
   }
@@ -56,7 +56,7 @@ public:
   }
 
   void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                            Address dest, SILType T) const {
+                            Address dest, SILType T) const override {
     Address src = this->getAddressForPointer(params.claimNext());
     asDerived().Derived::initializeWithTake(IGF, dest, src, T);
   }

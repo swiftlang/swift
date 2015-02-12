@@ -854,7 +854,7 @@ public:
     PassName.append(" Performance Inliner");
   }
 
-  void run() {
+  void run() override {
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
     DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();

@@ -149,7 +149,7 @@ class EmitDFDiagnostics : public SILFunctionTransform {
   StringRef getName() override { return "Emit Dataflow Diagnostics"; }
 
   /// The entry point to the transformation.
-  void run() {
+  void run() override {
     SILModule &M = getFunction()->getModule();
     for (auto &BB : *getFunction())
       for (auto &I : BB) {

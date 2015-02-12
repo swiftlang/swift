@@ -285,7 +285,7 @@ public:
 
 /// A consumer that inserts found decls into an externally-owned SmallVector.
 class VectorDeclConsumer : public VisibleDeclConsumer {
-  virtual void anchor();
+  virtual void anchor() override;
 public:
   SmallVectorImpl<ValueDecl *> &results;
   explicit VectorDeclConsumer(SmallVectorImpl<ValueDecl *> &decls)

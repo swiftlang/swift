@@ -1392,7 +1392,7 @@ public:
   SILCodeMotion(bool TryReleaseHoisting) : HoistReleases(TryReleaseHoisting) {}
 
   /// The entry point to the transformation.
-  void run() {
+  void run() override {
     auto *F = getFunction();
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *POTA = getAnalysis<PostOrderAnalysis>();

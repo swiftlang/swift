@@ -601,7 +601,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
 
 namespace {
 class SILCSE : public SILFunctionTransform {
-  void run() {
+  void run() override {
     DEBUG(llvm::dbgs() << "***** CSE on function: " << getFunction()->getName()
           << " *****\n");
 

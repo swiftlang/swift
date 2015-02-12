@@ -774,7 +774,7 @@ class FunctionSignatureOpts : public SILModuleTransform {
 public:
   FunctionSignatureOpts() {}
 
-  void run() {
+  void run() override {
     SILModule *M = getModule();
     auto *CGA = getAnalysis<CallGraphAnalysis>();
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();

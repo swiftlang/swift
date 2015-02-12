@@ -902,7 +902,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
 
     // Type-check the type parameter.
     if (validateType(IP->getCastTypeLoc(), dc, TR_InExpression))
-      return nullptr;
+      return false;
 
     auto castType = IP->getCastTypeLoc().getType();
 
@@ -939,7 +939,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                              /*suppressDiagnostics=*/ false);
     switch (castKind) {
     case CheckedCastKind::Unresolved:
-      return nullptr;
+      return false;
     case CheckedCastKind::Coercion:
       diagnose(IP->getLoc(), diag::isa_is_always_true,
                type,
@@ -1036,7 +1036,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     
     // Type-check the type.
     if (validateType(NP->getCastTypeLoc(), dc, TR_InExpression))
-      return nullptr;
+      return false;
     
     Type patTy = NP->getCastTypeLoc().getType();
 
@@ -1045,7 +1045,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     if (!nomTy) {
       diagnose(NP->getLoc(), diag::nominal_type_pattern_not_nominal_type,
                patTy);
-      return nullptr;
+      return false;
     }
     
     // Check that the type matches the pattern type.
@@ -1057,12 +1057,12 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       if (type->getNominalOrBoundGenericNominal() != nomTy) {
         diagnose(NP->getLoc(), diag::nominal_type_pattern_type_mismatch,
                  patTy, type);
-        return nullptr;
+        return false;
       }
     } else if (!patTy->isEqual(type)) {
       diagnose(NP->getLoc(), diag::nominal_type_pattern_type_mismatch,
                patTy, type);
-      return nullptr;
+      return false;
     }
     
     // Coerce each subpattern to its corresponding property's type, or raise an

@@ -407,7 +407,7 @@ namespace {
       return 2;
     }
 
-    void getSchema(ExplosionSchema &schema) const {
+    void getSchema(ExplosionSchema &schema) const override {
       llvm::StructType *structTy = cast<llvm::StructType>(getStorageType());
       schema.add(ExplosionSchema::Element::forScalar(structTy->getElementType(0)));
       schema.add(ExplosionSchema::Element::forScalar(structTy->getElementType(1)));
@@ -423,7 +423,8 @@ namespace {
                                          address->getName() + ".data");
     }
 
-    void loadAsCopy(IRGenFunction &IGF, Address address, Explosion &e) const {
+    void loadAsCopy(IRGenFunction &IGF, Address address,
+                    Explosion &e) const override {
       // Load the function.
       Address fnAddr = projectFunction(IGF, address);
       e.add(IGF.Builder.CreateLoad(fnAddr, fnAddr->getName()+".load"));
@@ -432,7 +433,8 @@ namespace {
       IGF.emitLoadAndRetain(dataAddr, e);
     }
 
-    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
+    void loadAsTake(IRGenFunction &IGF, Address addr,
+                    Explosion &e) const override {
       // Load the function.
       Address fnAddr = projectFunction(IGF, addr);
       e.add(IGF.Builder.CreateLoad(fnAddr));
@@ -441,7 +443,8 @@ namespace {
       e.add(IGF.Builder.CreateLoad(dataAddr));
     }
 
-    void assign(IRGenFunction &IGF, Explosion &e, Address address) const {
+    void assign(IRGenFunction &IGF, Explosion &e,
+                Address address) const override {
       // Store the function pointer.
       Address fnAddr = projectFunction(IGF, address);
       IGF.Builder.CreateStore(e.claimNext(), fnAddr);
@@ -450,7 +453,8 @@ namespace {
       IGF.emitAssignRetained(e.claimNext(), dataAddr);
     }
 
-    void initialize(IRGenFunction &IGF, Explosion &e, Address address) const {
+    void initialize(IRGenFunction &IGF, Explosion &e,
+                    Address address) const override {
       // Store the function pointer.
       Address fnAddr = projectFunction(IGF, address);
       IGF.Builder.CreateStore(e.claimNext(), fnAddr);
@@ -477,32 +481,32 @@ namespace {
       IGF.emitFixLifetime(src.claimNext());
     }
 
-    void retain(IRGenFunction &IGF, Explosion &e) const {
+    void retain(IRGenFunction &IGF, Explosion &e) const override {
       e.claimNext();
       IGF.emitRetainCall(e.claimNext());
     }
     
-    void release(IRGenFunction &IGF, Explosion &e) const {
+    void release(IRGenFunction &IGF, Explosion &e) const override {
       e.claimNext();
       IGF.emitRelease(e.claimNext());
     }
 
-    void retainUnowned(IRGenFunction &IGF, Explosion &e) const {
+    void retainUnowned(IRGenFunction &IGF, Explosion &e) const override {
       e.claimNext();
       IGF.emitRetainUnowned(e.claimNext());
     }
     
-    void unownedRetain(IRGenFunction &IGF, Explosion &e) const {
+    void unownedRetain(IRGenFunction &IGF, Explosion &e) const override {
       e.claimNext();
       IGF.emitUnownedRetain(e.claimNext());
     }
 
-    void unownedRelease(IRGenFunction &IGF, Explosion &e) const {
+    void unownedRelease(IRGenFunction &IGF, Explosion &e) const override {
       e.claimNext();
       IGF.emitUnownedRelease(e.claimNext());
     }
     
-    void destroy(IRGenFunction &IGF, Address addr, SILType T) const {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
       IGF.emitRelease(IGF.Builder.CreateLoad(projectData(IGF, addr)));
     }
     

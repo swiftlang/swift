@@ -210,7 +210,7 @@ struct ASTNodeBase {};
       llvm_unreachable("not all cases handled!");
     }
 
-    Pattern *walkToPatternPost(Pattern *P) {
+    Pattern *walkToPatternPost(Pattern *P) override {
       switch (P->getKind()) {
 #define DISPATCH(ID) \
         return dispatchVisitPost(static_cast<ID##Pattern*>(P))

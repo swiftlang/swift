@@ -2862,17 +2862,6 @@ namespace {
       return Impl.mapSelectorToDeclName(selector, /*initializer*/true);
     }
 
-    /// Determine whether the given class is NSNumber or a subclass thereof.
-    static bool isNSNumberSubclass(const clang::ObjCInterfaceDecl *classDecl) {
-      if (!classDecl)
-        return nullptr;
-
-      if (classDecl->getName() == "NSNumber")
-        return true;
-
-      return isNSNumberSubclass(classDecl->getSuperClass());
-    }
-
     /// \brief Given an imported method, try to import it as a constructor.
     ///
     /// Objective-C methods in the 'init' family are imported as

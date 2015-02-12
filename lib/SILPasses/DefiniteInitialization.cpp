@@ -1921,7 +1921,7 @@ namespace {
 class DefiniteInitialization : public SILFunctionTransform {
 
   /// The entry point to the transformation.
-  void run() {
+  void run() override {
     // Walk through and promote all of the alloc_box's that we can.
     if (checkDefiniteInitialization(*getFunction()))
       invalidateAnalysis(SILAnalysis::InvalidationKind::All);

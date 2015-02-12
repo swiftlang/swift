@@ -254,7 +254,7 @@ namespace {
 class SILLowerAggregate : public SILFunctionTransform {
 
   /// The entry point to the transformation.
-  void run() {
+  void run() override {
     SILFunction *F = getFunction();
     DEBUG(llvm::dbgs() << "***** LowerAggregate on function: " <<
           F->getName() << " *****\n");

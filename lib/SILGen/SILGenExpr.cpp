@@ -1773,7 +1773,7 @@ namespace {
       return valueAddr;
     }
     
-    void finishInitialization(SILGenFunction &gen) {
+    void finishInitialization(SILGenFunction &gen) override {
       // FIXME: Disable the DeinitExistential cleanup and enable the
       // DestroyAddr cleanup for the existential container.
     }
@@ -5519,7 +5519,7 @@ namespace {
       return valueAddr;
     }
     
-    void finishInitialization(SILGenFunction &gen) {
+    void finishInitialization(SILGenFunction &gen) override {
     }
   };
 }

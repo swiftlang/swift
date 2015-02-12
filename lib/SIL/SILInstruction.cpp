@@ -48,10 +48,11 @@ Optional<SILLocation> SILValue::getLoc() const {
 // The trait object is embedded into a basic block.  Use dirty hacks to
 // reconstruct the BB from the 'self' pointer of the trait.
 SILBasicBlock *llvm::ilist_traits<SILInstruction>::getContainingBlock() {
-  typedef iplist<SILInstruction> SILBasicBlock::*Sublist;
-size_t Offset(size_t(&((SILBasicBlock*)0->*SILBasicBlock::getSublistAccess())));
-  iplist<SILInstruction>* Anchor(static_cast<iplist<SILInstruction>*>(this));
-return reinterpret_cast<SILBasicBlock*>(reinterpret_cast<char*>(Anchor)-Offset);
+  size_t Offset(
+      size_t(&((SILBasicBlock *)0->*SILBasicBlock::getSublistAccess())));
+  iplist<SILInstruction> *Anchor(static_cast<iplist<SILInstruction> *>(this));
+  return reinterpret_cast<SILBasicBlock *>(reinterpret_cast<char *>(Anchor) -
+                                           Offset);
 }
 
 

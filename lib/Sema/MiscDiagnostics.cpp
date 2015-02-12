@@ -463,7 +463,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
       return { true, E };
     }
     
-    Expr *walkToExprPost(Expr *E) {
+    Expr *walkToExprPost(Expr *E) override {
       if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
         if (isClosureRequiringSelfQualification(CE)) {
           assert(InClosure);

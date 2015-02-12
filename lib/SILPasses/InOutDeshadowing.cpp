@@ -291,7 +291,7 @@ namespace {
 class InOutDeshadowing : public SILFunctionTransform {
 
   /// The entry point to the transformation.
-  void run() {
+  void run() override {
     SILFunction &F = *getFunction();
     SILBasicBlock &EntryBlock = F.front();
 

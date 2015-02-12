@@ -910,7 +910,7 @@ namespace {
 
     void writeback(SILGenFunction &gen, SILLocation loc,
                    ManagedValue base, Materialize temporary,
-                   ArrayRef<SILValue> extraInfo) && {
+                   ArrayRef<SILValue> extraInfo) && override {
       // If we don't have otherInfo, we don't have to conditionalize
       // the writeback.
       if (extraInfo.empty()) {

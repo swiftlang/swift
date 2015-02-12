@@ -949,7 +949,7 @@ public:
 
 private:
   /// The entry point to the transformation.
-  void run() {
+  void run() override {
     if (CCPFunctionBody(*getFunction(), EnableDiagnostics,
                         getOptions().AssertConfig))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);

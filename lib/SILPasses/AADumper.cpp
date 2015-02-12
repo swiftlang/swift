@@ -53,7 +53,7 @@ namespace {
 
 class SILAADumper : public SILFunctionTransform {
 
-  void run() {
+  void run() override {
     SILFunction &Fn = *getFunction();
     llvm::outs() << "@" << Fn.getName() << "\n";
     // Gather up all Values in Fn.

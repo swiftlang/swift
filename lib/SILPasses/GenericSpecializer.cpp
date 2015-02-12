@@ -357,7 +357,7 @@ class SILGenericSpecializerTransform : public SILModuleTransform {
 public:
   SILGenericSpecializerTransform() {}
 
-  void run() {
+  void run() override {
     if (!EnableSpecializer)
       return;
 

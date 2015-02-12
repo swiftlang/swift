@@ -50,27 +50,28 @@ public:
   }
 
   void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                          SILType T) const {
+                          SILType T) const override {
     Explosion temp;
     asDerived().Derived::loadAsCopy(IGF, src, temp);
     asDerived().Derived::initialize(IGF, temp, dest);
   }
 
   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                      SILType T) const {
+                      SILType T) const override {
     Explosion temp;
     asDerived().Derived::loadAsCopy(IGF, src, temp);
     asDerived().Derived::assign(IGF, temp, dest);
   }
 
   void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
-                      SILType T) const {
+                      SILType T) const override {
     Explosion temp;
     asDerived().Derived::loadAsTake(IGF, src, temp);
     asDerived().Derived::assign(IGF, temp, dest);
   }
 
-  void reexplode(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
+  void reexplode(IRGenFunction &IGF, Explosion &in,
+                 Explosion &out) const override {
     unsigned size = asDerived().Derived::getExplosionSize();
     in.transferInto(out, size);
   }
@@ -109,33 +110,36 @@ public:
   // Make the scalar -1.
   // void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const;
 
-  unsigned getExplosionSize() const {
+  unsigned getExplosionSize() const override {
     return 1;
   }
 
-  void getSchema(ExplosionSchema &schema) const {
+  void getSchema(ExplosionSchema &schema) const override {
     llvm::Type *ty = asDerived().getScalarType();
     schema.add(ExplosionSchema::Element::forScalar(ty));
   }
 
-  void initialize(IRGenFunction &IGF, Explosion &src, Address addr) const {
+  void initialize(IRGenFunction &IGF, Explosion &src,
+                  Address addr) const override {
     addr = asDerived().projectScalar(IGF, addr);
     IGF.Builder.CreateStore(src.claimNext(), addr);
   }
 
-  void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &out) const {
+  void loadAsCopy(IRGenFunction &IGF, Address addr,
+                  Explosion &out) const override {
     addr = asDerived().projectScalar(IGF, addr);
     llvm::Value *value = IGF.Builder.CreateLoad(addr);
     asDerived().emitScalarRetain(IGF, value);
     out.add(value);
   }
 
-  void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &out) const {
+  void loadAsTake(IRGenFunction &IGF, Address addr,
+                  Explosion &out) const override {
     addr = asDerived().projectScalar(IGF, addr);
     out.add(IGF.Builder.CreateLoad(addr));
   }
 
-  void assign(IRGenFunction &IGF, Explosion &src, Address dest) const {
+  void assign(IRGenFunction &IGF, Explosion &src, Address dest) const override {
     // Project down.
     dest = asDerived().projectScalar(IGF, dest);
 
@@ -155,23 +159,23 @@ public:
     }
   }
 
-  void copy(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
+  void copy(IRGenFunction &IGF, Explosion &in, Explosion &out) const override {
     llvm::Value *value = in.claimNext();
     asDerived().emitScalarRetain(IGF, value);
     out.add(value);
   }
   
-  void consume(IRGenFunction &IGF, Explosion &in) const {
+  void consume(IRGenFunction &IGF, Explosion &in) const override {
     llvm::Value *value = in.claimNext();
     asDerived().emitScalarRelease(IGF, value);
   }
 
-  void fixLifetime(IRGenFunction &IGF, Explosion &in) const {
+  void fixLifetime(IRGenFunction &IGF, Explosion &in) const override {
     llvm::Value *value = in.claimNext();
     asDerived().emitScalarFixLifetime(IGF, value);
   }
   
-  void destroy(IRGenFunction &IGF, Address addr, SILType T) const {
+  void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
     if (!Derived::IsScalarPOD) {
       addr = asDerived().projectScalar(IGF, addr);
       llvm::Value *value = IGF.Builder.CreateLoad(addr, "toDestroy");

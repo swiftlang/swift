@@ -722,7 +722,7 @@ class SILClosureSpecializerTransform : public SILModuleTransform {
 public:
   SILClosureSpecializerTransform() {}
 
-  virtual void run() {
+  void run() override {
     auto *CGA = getAnalysis<CallGraphAnalysis>();
 
     bool Changed = false;

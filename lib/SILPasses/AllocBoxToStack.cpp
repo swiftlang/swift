@@ -770,7 +770,7 @@ rewritePromotedBoxes(llvm::SmallVectorImpl<AllocBoxInst *> &Promoted,
 namespace {
 class AllocBoxToStack : public SILFunctionTransform {
   /// The entry point to the transformation.
-  void run() {
+  void run() override {
     llvm::SmallVector<AllocBoxInst *, 8> Promotable;
     llvm::SmallVector<Operand *, 8> ElidedOperands;
     llvm::SmallVector<TermInst *, 8> Returns;

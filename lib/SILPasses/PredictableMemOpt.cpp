@@ -988,7 +988,7 @@ namespace {
 class PredictableMemoryOptimizations : public SILFunctionTransform {
 
   /// The entry point to the transformation.
-  void run() {
+  void run() override {
     if (optimizeMemoryAllocations(*getFunction()))
       invalidateAnalysis(SILAnalysis::InvalidationKind::All);
   }

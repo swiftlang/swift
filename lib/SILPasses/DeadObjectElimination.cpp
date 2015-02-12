@@ -300,7 +300,7 @@ class DeadObjectElimination : public SILFunctionTransform {
     return Changed;
   }
 
-  void run() {
+  void run() override {
     if (processFunction(*getFunction()))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }

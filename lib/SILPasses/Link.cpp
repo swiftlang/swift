@@ -39,7 +39,7 @@ namespace {
 class SILLinker : public SILModuleTransform {
 
   /// The entry point to the transformation.
-  void run() {
+  void run() override {
     // Copies code from the standard library into the user program to enable
     // optimizations.
     bool Changed = false;
