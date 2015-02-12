@@ -476,7 +476,7 @@ public struct Set<T : Hashable> :
   public func isSubsetOf<
     S: SequenceType where S.Generator.Element == T
   >(sequence: S) -> Bool {
-    let other = (sequence as? Set<T>) ?? Set(sequence)
+    let other = sequence as? Set<T> ?? Set(sequence)
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset || isEqual
   }
@@ -486,7 +486,7 @@ public struct Set<T : Hashable> :
   public func isStrictSubsetOf<
     S: SequenceType where S.Generator.Element == T
   >(sequence: S) -> Bool {
-    let other = (sequence as? Set<T>) ?? Set(sequence)
+    let other = sequence as? Set<T> ?? Set(sequence)
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset && !isEqual
   }
@@ -495,7 +495,7 @@ public struct Set<T : Hashable> :
   public func isSupersetOf<
     S: SequenceType where S.Generator.Element == T
   >(sequence: S) -> Bool {
-    let other = (sequence as? Set<T>) ?? Set(sequence)
+    let other = sequence as? Set<T> ?? Set(sequence)
     return other.isSubsetOf(self)
   }
 
@@ -504,7 +504,7 @@ public struct Set<T : Hashable> :
   public func isStrictSupersetOf<
     S: SequenceType where S.Generator.Element == T
   >(sequence: S) -> Bool {
-    let other = (sequence as? Set<T>) ?? Set(sequence)
+    let other = sequence as? Set<T> ?? Set(sequence)
     return other.isStrictSubsetOf(self)
   }
 
@@ -512,7 +512,7 @@ public struct Set<T : Hashable> :
   public func isDisjointWith<
     S: SequenceType where S.Generator.Element == T
   >(sequence: S) -> Bool {
-    let other = (sequence as? Set<T>) ?? Set(sequence)
+    let other = sequence as? Set<T> ?? Set(sequence)
     for member in self {
       if other.contains(member) {
         return false
@@ -562,7 +562,7 @@ public struct Set<T : Hashable> :
   public func intersect<
     S: SequenceType where S.Generator.Element == T
   >(sequence: S) -> Set<T> {
-    let other = (sequence as? Set<T>) ?? Set(sequence)
+    let other = sequence as? Set<T> ?? Set(sequence)
     var newSet = Set<T>()
     for member in self {
       if other.contains(member) {
@@ -608,7 +608,7 @@ public struct Set<T : Hashable> :
   public mutating func exclusiveOrInPlace<
     S: SequenceType where S.Generator.Element == T
   >(sequence: S) {
-    var other = (sequence as? Set<T>) ?? Set(sequence)
+    var other = sequence as? Set<T> ?? Set(sequence)
     for member in other {
       if contains(member) {
         remove(member)

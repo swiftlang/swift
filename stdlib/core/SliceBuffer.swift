@@ -57,7 +57,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   var nativeBuffer: NativeBuffer {
     _sanityCheck(_hasNativeBuffer)
     return NativeBuffer(
-      (owner as? _ContiguousArrayStorageBase) ?? _emptyArrayStorage)
+      owner as? _ContiguousArrayStorageBase ?? _emptyArrayStorage)
   }
 
   /// Replace the given subRange with the first newCount elements of
