@@ -34,6 +34,7 @@
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Sema/SourceLoader.h"
+#include "swift/Serialization/Validation.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Option/ArgList.h"
@@ -66,7 +67,7 @@ class CompilerInvocation {
 public:
   CompilerInvocation();
 
-  /// \brief Initializes the compiler invocation for the list of arguments.
+  /// Initializes the compiler invocation for the list of arguments.
   ///
   /// All parsing should be additive, i.e. options should not be reset to their
   /// default values given the /absence/ of a flag. This is because \c parseArgs
@@ -75,7 +76,22 @@ public:
   /// \returns true if there was an error, false on success.
   bool parseArgs(ArrayRef<const char *> Args, DiagnosticEngine &Diags);
 
-  /// \brief Serialize the command line arguments for emitting them
+  /// Sets specific options based on the given serialized Swift binary data.
+  ///
+  /// This is additive, i.e. options are not reset to their default values given
+  /// the /absence/ of a flag. However, flags that only have a single value may
+  /// (and should) be overwritten by this method.
+  ///
+  /// Invoking this on more than one serialized AST is likely to result in
+  /// one or both of them failing to load. Please pick one AST to provide base
+  /// flags for the entire ASTContext and let the others succeed or fail the
+  /// normal way. (Some additive flags, like search paths, will be handled
+  /// properly during normal module loading.)
+  ///
+  /// \returns Status::Valid on success, one of the Status issues on error.
+  serialization::Status loadFromSerializedAST(StringRef data);
+
+  /// Serialize the command line arguments for emitting them
   /// to DWARF and inject SDKPath if necessary.
   static void buildDWARFDebugFlags(std::string &Output,
                                    const ArrayRef<const char*> &Args,

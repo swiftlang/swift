@@ -1008,3 +1008,24 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
 
   return false;
 }
+
+
+serialization::Status
+CompilerInvocation::loadFromSerializedAST(StringRef data) {
+  serialization::ExtendedValidationInfo extendedInfo;
+  serialization::ValidationInfo info =
+      serialization::validateSerializedAST(data, &extendedInfo);
+
+  if (info.status != serialization::Status::Valid)
+    return info.status;
+
+  setTargetTriple(info.targetTriple);
+  if (!extendedInfo.getSDKPath().empty())
+    setSDKPath(extendedInfo.getSDKPath());
+
+  auto &extraClangArgs = getClangImporterOptions().ExtraArgs;
+  extraClangArgs.insert(extraClangArgs.end(),
+                        extendedInfo.getExtraClangImporterOptions().begin(),
+                        extendedInfo.getExtraClangImporterOptions().end());
+  return info.status;
+}

@@ -78,6 +78,7 @@ enum class ActionType {
   PrintLocalTypes,
   ParseReST,
   TestCreateCompilerInvocation,
+  CompilerInvocationFromModule,
   GenerateModuleAPIDescription,
   DiffModuleAPI,
 };
@@ -164,6 +165,10 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "Test swift::driver::createCompilerInvocation using the "
                       "arguments passed to swift-ide-test (must be specified "
                       "before all other arguments)"),
+           clEnumValN(ActionType::CompilerInvocationFromModule,
+                      "test-CompilerInvocation-from-module",
+                      "Test CompilerInvocation::loadFromSerializedAST on the "
+                      "\"source\" file"),
            clEnumValN(ActionType::GenerateModuleAPIDescription,
                       "generate-module-api-description",
                       "Generate a machine-readable description of module API"),
@@ -1971,6 +1976,22 @@ static int doTestCreateCompilerInvocation(ArrayRef<const char *> Args) {
   return 0;
 }
 
+static int doTestCompilerInvocationFromModule(StringRef ModuleFilePath) {
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+      llvm::MemoryBuffer::getFile(ModuleFilePath);
+  if (!FileBufOrErr) {
+    llvm::errs() << "error opening input file: "
+      << FileBufOrErr.getError().message() << '\n';
+    return -1;
+  }
+
+  CompilerInvocation CI;
+  StringRef Data = FileBufOrErr.get()->getBuffer();
+  static_assert(static_cast<int>(serialization::Status::Valid) == 0,
+                "Status::Valid should be a successful exit");
+  return static_cast<int>(CI.loadFromSerializedAST(Data));
+}
+
 // This function isn't referenced outside its translation unit, but it
 // can't use the "static" keyword because its address is used for
 // getMainExecutable (since some platforms don't support taking the
@@ -2024,6 +2045,10 @@ int main(int argc, char *argv[]) {
     llvm::errs() << "source file required\n";
     llvm::cl::PrintHelpMessage();
     return 1;
+  }
+
+  if (options::Action == ActionType::CompilerInvocationFromModule) {
+    return doTestCompilerInvocationFromModule(options::SourceFilename);
   }
 
   // If no SDK was specified via -sdk, check environment variable SDKROOT.
@@ -2088,6 +2113,7 @@ int main(int argc, char *argv[]) {
   switch (options::Action) {
   case ActionType::None:
   case ActionType::TestCreateCompilerInvocation:
+  case ActionType::CompilerInvocationFromModule:
   case ActionType::GenerateModuleAPIDescription:
   case ActionType::DiffModuleAPI:
     llvm_unreachable("should be handled above");
