@@ -77,3 +77,12 @@ struct S : P2 {
       // expected-error@-1 {{cannot find an overload for 'overloadedEach' that accepts an argument list of type '(S, @autoclosure () -> ())'}}
   }
 }
+
+
+// <rdar://problem/19783405> @autoclosure parameters 'escape' from compiler-generated default initilizers
+struct AutoclosureEscapeTest {
+  // Autoclosure disables synthesis of the default initializer.
+  @autoclosure let delayed: () -> Int
+}
+let _ = AutoclosureEscapeTest(delayed: 4)  // expected-error {{'AutoclosureEscapeTest' cannot be constructed because it has no accessible initializers}}
+

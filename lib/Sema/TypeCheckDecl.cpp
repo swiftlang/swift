@@ -6147,16 +6147,16 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
   // variable.
   bool FoundInstanceVar = false;
   bool FoundUninitializedVars = false;
-  bool FoundDesignatedInit = false;
   decl->setAddedImplicitInitializers();
   SmallPtrSet<CanType, 4> initializerParamTypes;
   for (auto member : decl->getMembers()) {
     if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
       validateDecl(ctor);
 
-      if (ctor->isDesignatedInit()) {
-        FoundDesignatedInit = true;
-      }
+      // If we found a designated initializer, don't add any implicit
+      // initializers.
+      if (ctor->isDesignatedInit())
+        return;
 
       if (!ctor->isInvalid())
         initializerParamTypes.insert(getInitializerParamType(ctor));
@@ -6164,8 +6164,19 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
     }
 
     if (auto var = dyn_cast<VarDecl>(member)) {
-      if (var->hasStorage() && !var->isStatic() && !var->isInvalid())
+      if (var->hasStorage() && !var->isStatic() && !var->isInvalid()) {
         FoundInstanceVar = true;
+
+        // If we have a stored property of closure type, with the autoclosure
+        // attribute on it, don't synthesize any initializers: there is no way
+        // reasonable way to initialize the property.  We eventually want to
+        // remove autoclosure on properties, so disabling the initializer is a
+        // reasonable middle step.
+        // FIXME: Remove @autoclosure on properties.
+        if (var->getAttrs().hasAttribute<AutoClosureAttr>())
+          return;
+        
+      }
       continue;
     }
 
@@ -6177,11 +6188,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
       continue;
     }
   }
-
-  // If we found a designated initializer, don't add any implicit
-  // initializers.
-  if (FoundDesignatedInit)
-    return;
 
   if (isa<StructDecl>(decl)) {
     // For a struct, we add a memberwise constructor.
