@@ -39,6 +39,34 @@ interesting, and x32 ABIs for 64-bit CPUs are also important.  We agree that
 32-bit platforms is pretty marginal, and for code that nevertheless needs to do
 that there is always the option of doing a bitcast to ``UInt`` or using C.
 
+Type Conversions
+----------------
+
+The canonical way to convert from an instance `x` of type ``T`` to
+type ``U`` is ``U(x)``, a precedent set by ``Int(someUInt32)``.
+Conversions that can fail should use failable initializers,
+e.g. ``String(32)``, yielding a ``String?``. When other forms provide
+added convenience, they may be provided as well. For example::
+
+  String.Index(s.utf16.startIndex.successor(), within: s) // canonical
+  s.utf16.startIndex.successor().samePositionIn(s)        // alternate
+
+Converting initializers generally take one parameter. A converting
+initializer's first parameter should not have an argument label unless
+it indicates a lossy, non-typesafe, or non-standard conversion method,
+e.g. ``Int(bitPattern: someUInt)``.  When a converting initializer
+requires a parameter for context, it should not come first, and
+generally *should* use a keyword.  For example, ``String(33, radix:
+2)``.
+
+:Rationale: First, type conversions are typical trouble spots, and we
+   like the idea that people are explicit about the types to which
+   they're converting.  Secondly, avoiding method or property syntax
+   provides a distinct context for code completion.  Rather than
+   appearing in completions offered after ``.``, for example, the
+   available conversions could show up whenever the user hit the “tab”
+   key after an expression.
+
 Possible future directions
 ==========================
 
