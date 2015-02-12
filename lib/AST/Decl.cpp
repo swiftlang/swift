@@ -2477,11 +2477,13 @@ SourceLoc AbstractStorageDecl::getOverrideLoc() const {
 static bool isSettable(const AbstractStorageDecl *decl) {
   switch (decl->getStorageKind()) {
   case AbstractStorageDecl::Stored:
-  case AbstractStorageDecl::StoredWithTrivialAccessors:
     return true;
 
-    case AbstractStorageDecl::Addressed:
-    case AbstractStorageDecl::AddressedWithTrivialAccessors:
+  case AbstractStorageDecl::StoredWithTrivialAccessors:
+    return decl->getSetter() != nullptr;
+
+  case AbstractStorageDecl::Addressed:
+  case AbstractStorageDecl::AddressedWithTrivialAccessors:
     return decl->getMutableAddressor() != nullptr;
 
   case AbstractStorageDecl::StoredWithObservers:
