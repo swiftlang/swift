@@ -673,7 +673,8 @@ void Lexer::lexOperatorIdentifier() {
   }
 
   if (leftBound == rightBound)
-    return formToken(tok::oper_binary, TokStart);
+    return formToken(leftBound ? tok::oper_binary_unspaced :
+                                 tok::oper_binary_spaced, TokStart);
 
   return formToken(leftBound ? tok::oper_postfix : tok::oper_prefix, TokStart);
 }

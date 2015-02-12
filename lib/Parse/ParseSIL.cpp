@@ -283,7 +283,8 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
     Result = P.Context.getIdentifier(rawString);
     break;
   }
-  case tok::oper_binary:
+  case tok::oper_binary_unspaced:  // fixme?
+  case tok::oper_binary_spaced:
     // A binary operator can be part of a SILDeclRef.
     Result = P.Context.getIdentifier(P.Tok.getText());
     break;

@@ -663,10 +663,12 @@ bool Parser::isOptionalToken(const Token &T) const {
   // A postfix '?' by itself is obviously optional.
   if (T.is(tok::question_postfix))
     return true;
+  
   // A postfix or bound infix operator token that begins with '?' can be
   // optional too. We'll munch off the '?'.
-  if ((T.is(tok::oper_postfix) || T.is(tok::oper_binary))
-      && T.getText().startswith("?"))
+  if ((T.is(tok::oper_postfix) || T.is(tok::oper_binary_unspaced) ||
+       T.is(tok::oper_binary_spaced)) &&
+      T.getText().startswith("?"))
     return true;
   return false;
 }
@@ -678,8 +680,9 @@ bool Parser::isImplicitlyUnwrappedOptionalToken(const Token &T) const {
     return true;
   // A postfix or bound infix operator token that begins with '!' can be
   // implicitly unwrapped optional too. We'll munch off the '!'.
-  if ((T.is(tok::oper_postfix) || T.is(tok::oper_binary))
-      && T.getText().startswith("!"))
+  if ((T.is(tok::oper_postfix) || T.is(tok::oper_binary_unspaced) ||
+       T.is(tok::oper_binary_spaced)) &&
+      T.getText().startswith("!"))
     return true;
   return false;
 }
@@ -734,7 +737,8 @@ static bool isGenericTypeDisambiguatingToken(Parser &P,
   case tok::question_postfix:
     return true;
   
-  case tok::oper_binary:
+  case tok::oper_binary_unspaced:
+  case tok::oper_binary_spaced:
   case tok::oper_postfix:
     // These might be '?' or '!' type modifiers.
     return P.isOptionalToken(tok) || P.isImplicitlyUnwrappedOptionalToken(tok);

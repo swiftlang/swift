@@ -228,7 +228,8 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
     
 parse_operator:
     switch (Tok.getKind()) {
-    case tok::oper_binary: {
+    case tok::oper_binary_spaced:
+    case tok::oper_binary_unspaced: {
       // If '>' is not an operator and this token starts with a '>', we're done.
       if (!GreaterThanIsOperator && startsWithGreater(Tok))
         goto done;
@@ -384,7 +385,8 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   case tok::oper_prefix:
     Operator = parseExprOperator();
     break;
-  case tok::oper_binary: {
+  case tok::oper_binary_spaced:
+  case tok::oper_binary_unspaced: {
     // For recovery purposes, accept an oper_binary here.
     SourceLoc OperEndLoc = Tok.getLoc().getAdvancedLoc(Tok.getLength());
     Tok.setKind(tok::oper_prefix);
@@ -420,7 +422,8 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
 
 static DeclRefKind getDeclRefKindForOperator(tok kind) {
   switch (kind) {
-  case tok::oper_binary:  return DeclRefKind::BinaryOperator;
+  case tok::oper_binary_spaced:
+  case tok::oper_binary_unspaced:  return DeclRefKind::BinaryOperator;
   case tok::oper_postfix: return DeclRefKind::PostfixOperator;
   case tok::oper_prefix:  return DeclRefKind::PrefixOperator;
   default: llvm_unreachable("bad operator token kind");
@@ -861,7 +864,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       }
       
       // We don't allow binary operators to combine specs.
-      if (Tok.is(tok::oper_binary)) {
+      if (Tok.isBinaryOperator()) {
         diagnose(Tok, diag::avail_query_disallowed_operator, Tok.getText());
         consumeToken();
         continue;
@@ -1879,8 +1882,7 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
     // follows a proper subexpression.
     ParserStatus Status;
     Expr *SubExpr = nullptr;
-    if (Tok.is(tok::oper_binary) &&
-        (peekToken().is(RightTok) || peekToken().is(tok::comma))) {
+    if (Tok.isBinaryOperator() && peekToken().isAny(RightTok, tok::comma)) {
       SourceLoc Loc;
       Identifier OperName;
       if (parseAnyIdentifier(OperName, Loc, diag::expected_operator_ref)) {
@@ -2213,7 +2215,7 @@ Parser::parseVersionConstraintSpec() {
 
 bool Parser::parseVersionComparison(VersionComparison &Comparison,
                                     SourceLoc &OpLoc) {
-  if (!Tok.is(tok::oper_binary)) {
+  if (!Tok.isBinaryOperator()) {
     diagnose(Tok, diag::avail_query_config_expected_comparison);
     return true;
   }

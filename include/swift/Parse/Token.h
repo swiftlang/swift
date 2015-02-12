@@ -28,7 +28,8 @@ enum class tok {
   eof,
   code_complete,
   identifier,
-  oper_binary,
+  oper_binary_unspaced,   // "x+y"
+  oper_binary_spaced,     // "x + y"
   oper_postfix,
   oper_prefix,
   dollarident,
@@ -104,8 +105,12 @@ public:
   template <typename ...T>
   bool isNot(tok K1, T... K) const { return !isAny(K1, K...); }
 
+  bool isBinaryOperator() const {
+    return Kind == tok::oper_binary_spaced || Kind == tok::oper_binary_unspaced;
+  }
+  
   bool isAnyOperator() const {
-    return Kind == tok::oper_binary || Kind == tok::oper_postfix ||
+    return isBinaryOperator() || Kind == tok::oper_postfix ||
            Kind == tok::oper_prefix;
   }
   bool isNotAnyOperator() const {
