@@ -324,7 +324,16 @@ static NSString *_getDescription(SwiftObject *obj) {
 
 - (BOOL)conformsToProtocol:(Protocol*)proto {
   if (!proto) return NO;
-  return class_conformsToProtocol((Class) _swift_getClassOfAllocated(self), proto);
+  auto selfClass = (Class) _swift_getClassOfAllocated(self);
+  
+  // Walk the superclass chain.
+  while (selfClass) {
+    if (class_conformsToProtocol(selfClass, proto))
+      return YES;
+    selfClass = class_getSuperclass(selfClass);
+  }
+
+  return NO;
 }
 
 + (BOOL)conformsToProtocol:(Protocol*)proto {
