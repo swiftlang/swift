@@ -494,3 +494,58 @@ class SuperSub : SuperBase {
     g1()
   }
 }
+
+// CHECK-LABEL: sil hidden @_TFC8closures24UnownedSelfNestedCapture13nestedCapturefS0_FT_T_ : $@cc(method) @thin (@owned UnownedSelfNestedCapture) -> ()
+// CHECK:         [[OUTER_SELF_CAPTURE:%.*]] = alloc_box $@sil_unowned UnownedSelfNestedCapture
+// CHECK:         [[UNOWNED_SELF:%.*]] = ref_to_unowned [[SELF_PARAM:%.*]] :
+// -- TODO: A lot of fussy r/r traffic and owned/unowned conversions here.
+// -- strong +1, unowned +1
+// CHECK:         unowned_retain [[UNOWNED_SELF]]
+// CHECK:         store [[UNOWNED_SELF]] to [[OUTER_SELF_CAPTURE]]
+// CHECK:         [[UNOWNED_SELF:%.*]] = load [[OUTER_SELF_CAPTURE]]
+// -- strong +2, unowned +1
+// CHECK:         strong_retain_unowned [[UNOWNED_SELF]]
+// CHECK:         [[SELF:%.*]] = unowned_to_ref [[UNOWNED_SELF]]
+// CHECK:         [[UNOWNED_SELF2:%.*]] = ref_to_unowned [[SELF]]
+// -- strong +2, unowned +2
+// CHECK:         unowned_retain [[UNOWNED_SELF2]]
+// -- strong +1, unowned +2
+// CHECK:         strong_release [[SELF]]
+// -- closure takes unowned ownership
+// CHECK:         [[OUTER_CLOSURE:%.*]] = partial_apply {{%.*}}([[UNOWNED_SELF2]])
+// -- call consumes closure
+// -- strong +1, unowned +1
+// CHECK:         [[INNER_CLOSURE:%.*]] = apply [[OUTER_CLOSURE]]
+// CHECK:         apply [[INNER_CLOSURE]]()
+// -- releases unowned self in box
+// -- strong +1, unowned +0
+// CHECK:         strong_release [[OUTER_SELF_CAPTURE]]
+// -- strong +0, unowned +0
+// CHECK:         strong_release [[SELF_PARAM]]
+// CHECK:         return
+
+// -- outer closure
+// -- strong +0, unowned +1
+// CHECK-LABEL: sil shared @_TFFC8closures24UnownedSelfNestedCapture13nestedCaptureFS0_FT_T_U_FT_FT_S0_
+// -- strong +0, unowned +2
+// CHECK:         unowned_retain [[CAPTURED_SELF:%.*]] :
+// -- closure takes ownership of unowned ref
+// CHECK:         [[INNER_CLOSURE:%.*]] = partial_apply {{%.*}}([[CAPTURED_SELF]])
+// -- strong +0, unowned +1 (claimed by closure)
+// CHECK:         unowned_release [[CAPTURED_SELF]]
+// CHECK:         return [[INNER_CLOSURE]]
+
+// -- inner closure
+// -- strong +0, unowned +1
+// CHECK-LABEL: sil shared @_TFFFC8closures24UnownedSelfNestedCapture13nestedCaptureFS0_FT_T_U_FT_FT_S0_U_FT_S0_
+// -- strong +1, unowned +1
+// CHECK:         strong_retain_unowned [[CAPTURED_SELF:%.*]] :
+// CHECK:         [[SELF:%.*]] = unowned_to_ref [[CAPTURED_SELF]]
+// -- strong +1, unowned +0 (claimed by return)
+// CHECK:         unowned_release [[CAPTURED_SELF]]
+// CHECK:         return [[SELF]]
+class UnownedSelfNestedCapture {
+  func nestedCapture() {
+    {[unowned self] in { self } }()()
+  }
+}
