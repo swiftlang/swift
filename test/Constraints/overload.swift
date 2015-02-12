@@ -106,3 +106,11 @@ struct HasX1aProperty {
     write(prop) // no error, not ambiguous
   }
 }
+
+// rdar://problem/16554496
+@availability(*, unavailable)
+func availTest(x: Int) {}
+func availTest(x: Any) { println("this one") }
+func doAvailTest(x: Int) {
+  availTest(x)
+}

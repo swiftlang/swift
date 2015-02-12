@@ -144,3 +144,10 @@ class View: NSView {
     var p = MyViewController.init()
   }
 }
+
+// rdar://problem/19726164
+class NonNullDefaultInitSubSub : NonNullDefaultInitSub {
+  func foo() {
+    var x: NonNullDefaultInitSubSub? = NonNullDefaultInitSubSub()
+  }
+}

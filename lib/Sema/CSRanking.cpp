@@ -37,7 +37,11 @@ void ConstraintSystem::increaseScore(ScoreKind kind) {
       log.indent(solverState->depth * 2);
     log << "(increasing score due to ";
     switch (kind) {
-      case SK_Fix:
+    case SK_Unavailable:
+      log << "use of an unavailable declaration";
+      break;
+
+    case SK_Fix:
       log << "attempting to fix the source";
       break;
 
@@ -669,17 +673,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
             }
           }
         }
-      }
-
-      // If one declaration is available and the other is not,
-      bool unavail1 = decl1->getAttrs().isUnavailable(cs.getASTContext());
-      bool unavail2 = decl2->getAttrs().isUnavailable(cs.getASTContext());
-      if (unavail1 != unavail2) {
-        if (unavail1)
-          ++score2;
-        else
-          ++score1;
-        continue;
       }
 
       // If both declarations come from Clang, and one is a type and the other

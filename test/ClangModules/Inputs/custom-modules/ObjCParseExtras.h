@@ -104,3 +104,12 @@ __weak id globalWeakVar;
 @protocol FooDelegate <NSObject>
 @property (nonatomic, assign, readonly, getter=isStarted) BOOL started;
 @end
+
+// rdar://problem/18847642
+@interface NonNullDefaultInit
+-(nonnull instancetype)init;
+@end
+
+@interface NonNullDefaultInitSub : NonNullDefaultInit
++ (null_unspecified instancetype)sub;
+@end

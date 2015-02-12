@@ -1311,6 +1311,11 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       refType = ImplicitlyUnwrappedOptionalType::get(refType->getRValueType());
     } 
 
+    // If the declaration is unavailable, note that in the score.
+    if (choice.getDecl()->getAttrs().isUnavailable(getASTContext())) {
+      increaseScore(SK_Unavailable);
+    }
+
     break;
   }
 
