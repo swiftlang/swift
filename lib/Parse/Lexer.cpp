@@ -80,7 +80,7 @@ static bool EncodeToUTF8(unsigned CharValue,
 
 /// CLO8 - Return the number of leading ones in the specified 8-bit value.
 static unsigned CLO8(unsigned char C) {
-  return llvm::CountLeadingOnes_32(uint32_t(C) << 24);
+  return llvm::countLeadingOnes(uint32_t(C) << 24);
 }
 
 /// isStartOfUTF8Character - Return true if this isn't a UTF8 continuation

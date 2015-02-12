@@ -520,7 +520,7 @@ public:
     if (isInlineAndAllClear()) return 0;
     size_t count = 0;
     for (ChunkType chunk : getChunks()) {
-      count += llvm::CountPopulation_64(chunk);
+      count += llvm::countPopulation(chunk);
     }
     return count;
   }
