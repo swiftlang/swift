@@ -9,6 +9,11 @@
 // RUN: not %target-swift-frontend -parse %s -I %S/Inputs/custom-modules/ -show-diagnostics-after-fatal -D INDIRECT 2> %t/err.txt
 // RUN: FileCheck -check-prefix CHECK -check-prefix CHECK-INDIRECT %s < %t/err.txt
 
+// FIXME: not every test here depends on Objective-C syntax, this test can be
+// split.
+//
+// REQUIRES: objc_interop
+
 #if MISSING_FROM_MODULE
 import MissingHeader
 // CHECK-MODULE-MAP: {{.*}}/Inputs/custom-modules/module.map:{{[0-9]+:[0-9]+}}: error: header 'this-header-does-not-exist.h' not found
