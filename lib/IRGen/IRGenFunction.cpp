@@ -187,8 +187,8 @@ void IRGenFunction::emitFakeExplosion(const TypeInfo &type,
   }
 }
 
-llvm::Value *IRGenFunction::tryGetLocalTypeData(CanType type,
-                                                LocalTypeData index) {
+llvm::Value *IRGenFunction::lookupTypeDataMap(CanType type, LocalTypeData index,
+                                              const TypeDataMap &scopedMap) {
   
   // First try to lookup in the unscoped cache (= definitions in the entry block
   // of the function).
@@ -198,8 +198,8 @@ llvm::Value *IRGenFunction::tryGetLocalTypeData(CanType type,
     return it->second;
   
   // Now try to lookup in the scoped cache.
-  auto it2 = ScopedTypeDataMap.find(type);
-  if (it2 == ScopedTypeDataMap.end())
+  auto it2 = scopedMap.find(type);
+  if (it2 == scopedMap.end())
     return nullptr;
   
   llvm::Instruction *I = it2->second;

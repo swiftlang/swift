@@ -1199,12 +1199,12 @@ namespace {
 
     /// Try to find the metatype in local data.
     llvm::Value *tryGetLocal(CanType type) {
-      return IGF.tryGetLocalTypeData(type, LocalTypeData::Metatype);
+      return IGF.tryGetLocalTypeDataForLayout(type, LocalTypeData::Metatype);
     }
 
     /// Set the metatype in local data.
     llvm::Value *setLocal(CanType type, llvm::Instruction *metatype) {
-      IGF.setScopedLocalTypeData(type, metatype);
+      IGF.setScopedLocalTypeDataForLayout(type, metatype);
       return metatype;
     }
   };

@@ -257,7 +257,14 @@ public:
   /// Look for a mapping for a local type-metadata reference.
   /// The lookup is done for the current block which is the Builder's
   /// insert-block.
-  llvm::Value *tryGetLocalTypeData(CanType type, LocalTypeData index);
+  llvm::Value *tryGetLocalTypeData(CanType type, LocalTypeData index) {
+    return lookupTypeDataMap(type, index, ScopedTypeDataMap);
+  }
+
+  /// The same as tryGetLocalTypeData, just for the Layout metadata.
+  llvm::Value *tryGetLocalTypeDataForLayout(CanType type, LocalTypeData index) {
+    return lookupTypeDataMap(type, index, ScopedTypeDataMapForLayout);
+  }
 
   /// Retrieve a local type-metadata reference which is known to exist.
   llvm::Value *getLocalTypeData(CanType type, LocalTypeData index) {
@@ -286,6 +293,14 @@ public:
     ScopedTypeDataMap[type] = data;
   }
 
+  /// Add a local type-metadata reference, which is valid for the containing
+  /// block.
+  void setScopedLocalTypeDataForLayout(CanType type, llvm::Instruction *data) {
+    assert(data->getParent() == Builder.GetInsertBlock() &&
+           "metadata instruction not inserted into the Builder's insert-block");
+    ScopedTypeDataMapForLayout[type] = data;
+  }
+
   /// The kind of value LocalSelf is.
   enum LocalSelfKind {
     /// An object reference.
@@ -306,9 +321,16 @@ private:
     return LocalTypeDataPair(type.getPointer(), unsigned(index));
   }
 
+  typedef llvm::DenseMap<CanType, llvm::Instruction*> TypeDataMap;
+
+  llvm::Value *lookupTypeDataMap(CanType type, LocalTypeData index,
+                                 const TypeDataMap &scopedMap);
+
   llvm::DenseMap<LocalTypeDataPair, llvm::Value*> LocalTypeDataMap;
 
-  llvm::DenseMap<CanType, llvm::Instruction*> ScopedTypeDataMap;
+  TypeDataMap ScopedTypeDataMap;
+
+  TypeDataMap ScopedTypeDataMapForLayout;
   
   /// The value that satisfies metadata lookups for dynamic Self.
   llvm::Value *LocalSelf = nullptr;
