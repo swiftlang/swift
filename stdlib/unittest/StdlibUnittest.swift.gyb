@@ -366,7 +366,6 @@ public func _setTestSuiteFailedCallback(callback: () -> ()) {
   _testSuiteFailedCallback = callback
 }
 
-public // @testable
 func _stdlib_getline() -> String? {
   var result = _UnitTestArray<UInt8>()
   while true {
@@ -467,10 +466,6 @@ func _childProcess() {
 
     var stderr = _Stderr()
     println("\(_stdlibUnittestStreamPrefix);end", &stderr)
-
-    if testSuite._testByName(testName).dontReuseChildProcessAfter {
-      return
-    }
   }
 }
 
@@ -509,7 +504,7 @@ struct _ParentProcess {
   }
 
   /// Returns the values of the corresponding variables in the child process.
-  mutating func _runTestInChild(testSuite: TestSuite, _ testName: String)
+  mutating func _runTestInChild(testSuiteName: String, _ testName: String)
     -> (anyExpectFailed: Bool, seenExpectCrash: Bool,
         status: ProcessTerminationStatus?,
         crashStdout: _UnitTestArray<String>, crashStderr: _UnitTestArray<String>) {
@@ -521,11 +516,7 @@ struct _ParentProcess {
     var childStdout = _FDInputStream(fd: _childStdoutFD)
     var childStderr = _FDInputStream(fd: _childStderrFD)
 
-    println("\(testSuite.name);\(testName)", &childStdin)
-
-    if let stdinText = testSuite._testByName(testName).stdinText {
-      println(stdinText, &childStdin)
-    }
+    println("\(testSuiteName);\(testName)", &childStdin)
 
     var readfds = _stdlib_fd_set()
     var writefds = _stdlib_fd_set()
@@ -610,29 +601,16 @@ struct _ParentProcess {
         continue
       }
     }
-
-    // Check if the child has sent us "end" markers for the current test.
     if stdoutEnd && stderrEnd {
-      var status: ProcessTerminationStatus? = nil
-      if testSuite._testByName(testName).dontReuseChildProcessAfter {
-        status = _waitForChild()
-        switch status! {
-        case .Exit(0):
-          status = nil
-        default:
-          ()
-        }
-      }
       return (
         anyExpectFailedInChild,
-        stdoutSeenCrashDelimiter || stderrSeenCrashDelimiter, status,
+        stdoutSeenCrashDelimiter || stderrSeenCrashDelimiter, nil,
         capturedCrashStdout, capturedCrashStderr)
     }
 
-    // We reached EOF on stdout and stderr and we did not see "end" markers, so
-    // it looks like child crashed (of course it could have closed the file
-    // descriptors, but we assume it did not, since it prevent further
-    // communication with the parent).
+    // We reached EOF on stdout and stderr, it looks like child crashed (of
+    // course it could have closed the file descriptors, but we assume it did
+    // not).
     let status = _waitForChild()
     return (
       anyExpectFailedInChild,
@@ -673,17 +651,12 @@ struct _ParentProcess {
         var crashStdout = _UnitTestArray<String>()
         var crashStderr = _UnitTestArray<String>()
         if _runTestsInProcess {
-          if t.stdinText != nil {
-            println("This test requires stdin input and can't be run in-process, marking as failed")
-            _anyExpectFailed = true
-          } else {
-            _anyExpectFailed = false
-            testSuite._runTest(t.name)
-          }
+          _anyExpectFailed = false
+          testSuite._runTest(t.name)
         } else {
           (_anyExpectFailed, expectCrash, childTerminationStatus, crashStdout,
            crashStderr) =
-            _runTestInChild(testSuite, t.name)
+            _runTestInChild(testSuite.name, t.name)
         }
 
         // Determine if the test passed, not taking XFAILs into account.
@@ -845,29 +818,18 @@ public class TestSuite {
     if let f = _testSetUpCode {
       f()
     }
-    _testByName(testName).code()
+    _tests[_testNameToIndex[testName]!].code()
     if let f = _testTearDownCode {
       f()
     }
-  }
-
-  func _testByName(testName: String) -> _Test {
-    return _tests[_testNameToIndex[testName]!]
   }
 
   struct _Test {
     let name: String
     let xfail: _UnitTestArray<TestRunPredicate>
     let skip: _UnitTestArray<TestRunPredicate>
-    let stdinText: String?
-    let crashOutputMatches: [String]
+    let crashOutputMatches: [String] = []
     let code: () -> ()
-
-    /// Whether the test harness should stop reusing the child process after
-    /// running this test.
-    var dontReuseChildProcessAfter: Bool {
-      return stdinText == nil ? false : true
-    }
 
     func getActiveXFailPredicates() -> _UnitTestArray<TestRunPredicate> {
       return xfail.filter { $0.evaluate() }
@@ -886,7 +848,6 @@ public class TestSuite {
     class _Data {
       var _xfail: _UnitTestArray<TestRunPredicate> = []
       var _skip: _UnitTestArray<TestRunPredicate> = []
-      var _stdinText: String? = nil
       var _crashOutputMatches: [String] = []
     }
 
@@ -905,11 +866,6 @@ public class TestSuite {
       return self
     }
 
-    public func stdin(stdinText: String) -> _TestBuilder {
-      _data._stdinText = stdinText
-      return self
-    }
-
     public func crashOutputMatches(string: String) -> _TestBuilder {
       _data._crashOutputMatches.append(string)
       return self
@@ -918,7 +874,6 @@ public class TestSuite {
     public func code(testFunction: () -> ()) {
       _testSuite._tests.append(_Test(
         name: _name, xfail: _data._xfail, skip: _data._skip,
-        stdinText: _data._stdinText,
         crashOutputMatches: _data._crashOutputMatches, code: testFunction))
       _testSuite._testNameToIndex[_name] = _testSuite._tests.count - 1
     }

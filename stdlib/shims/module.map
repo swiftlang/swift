@@ -6,7 +6,6 @@ module SwiftShims {
   header "HeapObject.h"
   header "RefCount.h"
   header "RuntimeShims.h"
-  header "RuntimeStubs.h"
   header "SwiftStddef.h"
   header "SwiftStdint.h"
   header "UnicodeShims.h"
