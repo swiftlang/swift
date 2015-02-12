@@ -244,10 +244,10 @@ extension UnicodeScalar {
 extension UInt8 {
   /// Construct with value `v.value`.
   ///
-  /// Requires: `v.value` can be represented as UInt8.
-  public init(_ v : UnicodeScalar) {
-    _precondition(v.value <= UInt32(UInt8.max),
-        "Code point value does not fit into UInt8")
+  /// Requires: `v.value` can be represented as ASCII (0..<128).
+  public init(ascii v : UnicodeScalar) {
+    _precondition(v.value < 128,
+        "Code point value does not fit into ASCII")
     self = UInt8(v.value)
   }
 }

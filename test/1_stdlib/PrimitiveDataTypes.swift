@@ -4,7 +4,7 @@
 
 var CharA: UnicodeScalar = "A" // 65 in decimal.
 
-println(UInt8(CharA)) // CHECK: {{^65$}}
+println(UInt8(ascii: CharA)) // CHECK: {{^65$}}
 println(UInt32(CharA)) // CHECK: {{^65$}}
 println(UInt64(CharA)) // CHECK: {{^65$}}
 
