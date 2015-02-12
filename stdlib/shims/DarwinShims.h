@@ -22,6 +22,7 @@
 #include "SwiftStddef.h"
 
 __swift_size_t swift_malloc_size(const void *ptr);
+void free(void *);
 __swift_size_t strlen(const char *s);
 char *strcpy(char *restrict dst, const char *restrict src);
 int strcmp(const char *s1, const char *s2);

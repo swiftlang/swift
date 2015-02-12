@@ -51,9 +51,10 @@ set(SWIFTLIB_ESSENTIAL
   HeapBuffer.swift
   ImplicitlyUnwrappedOptional.swift
   Index.swift
+  InputStream.swift
   IntegerArithmetic.swift.gyb
-  Join.swift
   Interval.swift.gyb
+  Join.swift
   LazyCollection.swift.gyb
   LazySequence.swift
   LifetimeManager.swift

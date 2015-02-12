@@ -6,6 +6,7 @@ set(sources
   HeapObject.h
   RefCount.h
   RuntimeShims.h
+  RuntimeStubs.h
   SwiftStddef.h
   SwiftStdint.h
   UnicodeShims.h
