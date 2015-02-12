@@ -86,3 +86,37 @@ struct AutoclosureEscapeTest {
 }
 let _ = AutoclosureEscapeTest(delayed: 4)  // expected-error {{'AutoclosureEscapeTest' cannot be constructed because it has no accessible initializers}}
 
+// @autoclosure(escaping)
+func func10(@autoclosure(escaping () -> ()) { } // expected-error{{expected ')' in '@autoclosure' attribute}}
+// expected-note@-1{{to match this opening '('}}
+
+func func11(@autoclosure(escaping) @noescape () -> ()) { } // expected-error{{'noescape' attribute conflicts with '@autoclosure(escaping)'}}
+
+
+class Super {
+  func f1(@autoclosure(escaping) x: () -> ()) { }
+  func f2(@autoclosure(escaping) x: () -> ()) { }
+  func f3(@autoclosure x: () -> ()) { }
+}
+
+class Sub : Super {
+  override func f1(@autoclosure(escaping) x: () -> ()) { }
+  override func f2(@autoclosure x: () -> ()) { } // expected-error{{does not override any method}}
+  override func f3(@autoclosure(escaping) x: () -> ()) { }  // expected-error{{does not override any method}}
+}
+
+func func12a(@autoclosure x: () -> Int) { }
+func func12b(@autoclosure(escaping) x: () -> Int) { }
+
+class TestFunc12 {
+  var x: Int = 5
+
+  func foo() -> Int { return 0 }
+
+  func test() {
+    func12a(x + foo()) // okay
+    func12b(x + foo()) 
+    // expected-error@-1{{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}}
+    // expected-error@-2{{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}}
+  }
+}

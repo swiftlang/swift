@@ -2663,6 +2663,9 @@ public:
   /// \brief Retrieve the result type of this closure.
   Type getResultType() const;
 
+  /// Whether this closure consists of a single expression.
+  bool hasSingleExpressionBody() const;
+
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_AbstractClosureExpr &&
            E->getKind() <= ExprKind::Last_AbstractClosureExpr;

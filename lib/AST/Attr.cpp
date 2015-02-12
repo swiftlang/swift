@@ -182,7 +182,11 @@ void DeclAttribute::print(ASTPrinter &Printer,
     Printer << ")";
     break;
   }
-
+  case DAK_AutoClosure:
+    Printer << "@autoclosure";
+    if (cast<AutoClosureAttr>(this)->isEscaping())
+      Printer << "(escaping)";
+    break;
   case DAK_ObjC: {
     if (Options.PrintForSIL && isImplicit())
       break;
@@ -247,6 +251,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "semantics";
   case DAK_Availability:
     return "availability";
+  case DAK_AutoClosure:
+    return "autoclosure";
   case DAK_ObjC:
     return "objc";
   case DAK_Inline: {

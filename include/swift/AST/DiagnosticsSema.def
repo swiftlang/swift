@@ -1132,6 +1132,8 @@ ERROR(noescape_function_type,attribute_parsing,none,
 ERROR(noescape_implied_by_autoclosure,attribute_parsing,none,
       "'noescape' attribute is implied by @autoclosure and should not be "
       "redundantly specified", ())
+ERROR(noescape_conflicts_escaping_autoclosure,attribute_parsing,none,
+      "'noescape' attribute conflicts with '@autoclosure(escaping)'", ())
 
 
 // NSManaged attribute

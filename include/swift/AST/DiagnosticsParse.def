@@ -990,6 +990,10 @@ ERROR(attr_availability_expected_equal,attribute_parsing,none,
 ERROR(attr_availability_expected_version,attribute_parsing,none,
       "expected version number in '%0' attribute", (StringRef))
 
+// autoclosure
+ERROR(attr_autoclosure_expected_r_paren,attribute_parsing,PointsToFirstBadToken,
+      "expected ')' in '@autoclosure' attribute", ())
+
 // cc
 ERROR(cc_attribute_expected_lparen,attribute_parsing,none,
       "expected '(' after 'cc' attribute", ())

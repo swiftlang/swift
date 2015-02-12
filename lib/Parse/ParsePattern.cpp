@@ -276,7 +276,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           diagnose(AtLoc, diag::autoclosure_is_decl_attribute)
             .fixItRemove(SourceRange(AtLoc, ACLoc))
             .fixItInsert(StartLoc, "@autoclosure ");
-          param.Attrs.add(new (Context) AutoClosureAttr(StartLoc));
+          param.Attrs.add(new (Context) AutoClosureAttr(AtLoc, ACLoc,
+                                                        false, false));
         }
 
         auto type = parseType(diag::expected_parameter_type);

@@ -605,6 +605,13 @@ Type AbstractClosureExpr::getResultType() const {
   return getType()->castTo<FunctionType>()->getResult();
 }
 
+bool AbstractClosureExpr::hasSingleExpressionBody() const {
+  if (auto closure = dyn_cast<ClosureExpr>(this))
+    return closure->hasSingleExpressionBody();
+
+  return true;
+}
+
 SourceRange ClosureExpr::getSourceRange() const {
   return Body.getPointer()->getSourceRange();
 }

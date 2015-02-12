@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 172; // Last change: Compilation options.
+const uint16_t VERSION_MINOR = 173; // Last change: autoclosure.
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -1234,6 +1234,12 @@ namespace decls_block {
   >;
 
 #undef BC_AVAIL_TUPLE
+
+  using AutoClosureDeclAttrLayout = BCRecordLayout<
+    AutoClosure_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCFixed<1>  // escaping
+  >;
 
   using ObjCDeclAttrLayout = BCRecordLayout<
     ObjC_DECL_ATTR,

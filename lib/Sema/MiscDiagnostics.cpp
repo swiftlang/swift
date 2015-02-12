@@ -401,10 +401,12 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
 
     /// Return true if this is a closure expression that will require "self."
     /// qualification of member references.
-    static bool isClosureRequiringSelfQualification(const ClosureExpr *CE) {
+    static bool isClosureRequiringSelfQualification(
+                  const AbstractClosureExpr *CE) {
       // If the closure's type was inferred to be noescape, then it doesn't
       // need qualification.
-      return !AnyFunctionRef(const_cast<ClosureExpr *>(CE)).isKnownNoEscape();
+      return !AnyFunctionRef(const_cast<AbstractClosureExpr *>(CE))
+               .isKnownNoEscape();
     }
 
 
@@ -414,7 +416,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      if (auto *CE = dyn_cast<ClosureExpr>(E)) {
+      if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
         if (!CE->hasSingleExpressionBody())
           return { false, E };
 
@@ -462,7 +464,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
     }
     
     Expr *walkToExprPost(Expr *E) {
-      if (auto *CE = dyn_cast<ClosureExpr>(E)) {
+      if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
         if (isClosureRequiringSelfQualification(CE)) {
           assert(InClosure);
           --InClosure;
@@ -478,7 +480,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
     while (DC->getParent()->isLocalContext() && !isAlreadyInClosure) {
       if (isa<FuncDecl>(DC))
         isAlreadyInClosure = true;
-      if (auto *closure = dyn_cast<ClosureExpr>(DC))
+      if (auto *closure = dyn_cast<AbstractClosureExpr>(DC))
         if (DiagnoseWalker::isClosureRequiringSelfQualification(closure))
           isAlreadyInClosure = true;
       DC = DC->getParent();

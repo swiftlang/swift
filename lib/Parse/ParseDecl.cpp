@@ -334,6 +334,38 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   case DAK_Count:
     llvm_unreachable("DAK_Count should not appear in parsing switch");
 
+  case DAK_AutoClosure: {
+    // If we don't have "(escaping", it's just a bare @autoclosure.
+    if (!Tok.is(tok::l_paren) ||
+        !peekToken().is(tok::identifier) ||
+        peekToken().getText() != "escaping") {
+      if (!DiscardAttribute)
+        Attributes.add(new (Context) AutoClosureAttr(AtLoc, Loc, false,
+                                                     false));
+      break;
+    }
+
+    // Consume the '('.
+    SourceLoc lParenLoc = consumeToken(tok::l_paren);
+
+    // Consume the 'escaping'.
+    (void)consumeToken();
+
+    // Parse the closing ')'.
+    SourceLoc rParenLoc;
+    parseMatchingToken(tok::r_paren, rParenLoc,
+                       diag::attr_autoclosure_expected_r_paren,
+                       lParenLoc);
+
+    // Add the attribute.
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) AutoClosureAttr(AtLoc,
+                                                   SourceRange(Loc, rParenLoc),
+                                                   true, false));
+
+    break;
+  }
+
   case DAK_RawDocComment:
   case DAK_ObjCBridged:
     llvm_unreachable("virtual attributes should not be parsed "

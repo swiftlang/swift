@@ -1167,16 +1167,19 @@ void TypeChecker::checkAutoClosureAttr(VarDecl *VD, AutoClosureAttr *attr) {
   VD->overwriteType(FunctionType::get(FuncTyInput, FTy->getResult(),
                                     FTy->getExtInfo().withIsAutoClosure(true)));
 
-  // Autoclosure implies noescape, so add a noescape attribute if this is a
+  // Autoclosure may imply noescape, so add a noescape attribute if this is a
   // function parameter.
   if (auto *PD = dyn_cast<ParamDecl>(VD)) {
     if (auto *NEAttr = VD->getAttrs().getAttribute<NoEscapeAttr>()) {
       // If the parameter has both @noescape and @autoclosure, reject the
       // explicit @noescape.
       if (!NEAttr->isImplicit())
-        diagnose(NEAttr->getLocation(), diag::noescape_implied_by_autoclosure)
+        diagnose(NEAttr->getLocation(),
+                 attr->isEscaping()
+                   ? diag::noescape_conflicts_escaping_autoclosure
+                   : diag::noescape_implied_by_autoclosure)
           .fixItRemove(NEAttr->getRange());
-    } else {
+    } else if (!attr->isEscaping()) {
       auto *newAttr = new (Context) NoEscapeAttr(/*isImplicit*/true);
       VD->getAttrs().add(newAttr);
       checkNoEscapeAttr(PD, newAttr);

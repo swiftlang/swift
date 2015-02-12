@@ -148,8 +148,8 @@ SIMPLE_DECL_ATTR(transparent, Transparent,
                  OnFunc|OnConstructor|OnVar|OnExtension, 26)
 SIMPLE_DECL_ATTR(requires_stored_property_inits, RequiresStoredPropertyInits,
                  OnClass, 27)
-SIMPLE_DECL_ATTR(autoclosure, AutoClosure,
-                 OnVar|OnParam, 28)
+DECL_ATTR(autoclosure, AutoClosure,
+          OnVar|OnParam, 28)
 SIMPLE_DECL_ATTR(noescape, NoEscape, OnParam, 29)
 
 // Non-serialized attributes.

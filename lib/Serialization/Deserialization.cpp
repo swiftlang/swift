@@ -1863,6 +1863,16 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 #undef DECODE_VER_TUPLE
       }
 
+      case decls_block::AutoClosure_DECL_ATTR: {
+        bool isImplicit;
+        bool isEscaping;
+        serialization::decls_block::AutoClosureDeclAttrLayout::readRecord(
+          scratch, isImplicit, isEscaping);
+        Attr = new (ctx) AutoClosureAttr(SourceLoc(), SourceRange(),
+                                         isEscaping, isImplicit);
+        break;
+      }
+
       case decls_block::ObjC_DECL_ATTR: {
         bool isImplicit;
         bool isImplicitName;
