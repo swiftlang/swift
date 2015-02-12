@@ -19,7 +19,7 @@ public prefix func !<T : BooleanType>(a: T) -> Bool {
 
 /// If `lhs` is `false`, return it.  Otherwise, evaluate `rhs` and
 /// return its `boolValue`.
-@inline(__always)
+@transparent
 public func && <T: BooleanType, U: BooleanType>(
   lhs: T, @autoclosure rhs: () -> U
 ) -> Bool {
@@ -28,26 +28,9 @@ public func && <T: BooleanType, U: BooleanType>(
 
 /// If `lhs` is `true`, return it.  Otherwise, evaluate `rhs` and
 /// return its `boolValue`.
-@inline(__always)
+@transparent
 public func || <T: BooleanType, U: BooleanType>(
   lhs: T, @autoclosure rhs: () -> U
-) -> Bool {
-  return lhs.boolValue ? true : rhs().boolValue
-}
-
-// FIXME: We can't make the above @transparent due to
-// rdar://problem/17872402, so here are some @transparent overloads
-// for Bool.  We've done the same for ObjCBool
-@transparent
-public func && <T: BooleanType>(
-  lhs: T, @autoclosure rhs: () -> Bool
-) -> Bool {
-  return lhs.boolValue ? rhs().boolValue : false
-}
-
-@transparent
-public func || <T: BooleanType>(
-  lhs: T, @autoclosure rhs: () -> Bool
 ) -> Bool {
   return lhs.boolValue ? true : rhs().boolValue
 }
