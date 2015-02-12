@@ -977,3 +977,20 @@ func addressOnlyNonmutatingProperty<T>(x: AddressOnlyNonmutatingSet<T>)
 // CHECK:         apply [[GET]]<T>([[TMP:%.*]]#1)
 // CHECK-NOT:     destroy_addr [[TMP]]
 // CHECK:         dealloc_stack [[TMP]]
+
+protocol MakeAddressOnly {}
+struct AddressOnlyReadOnlySubscript {
+  var x: MakeAddressOnly?
+
+  subscript(z: Int) -> Int { return z }
+}
+
+// CHECK-LABEL: sil hidden @_TF10properties43addressOnlyReadOnlySubscriptFromMutableBaseFSiT_
+// CHECK:         [[BASE:%.*]] = alloc_box $AddressOnlyReadOnlySubscript
+// CHECK:         copy_addr [[BASE:%.*]]#1 to [initialization] [[COPY:%.*]]#1
+// CHECK:         [[GETTER:%.*]] = function_ref @_TFV10properties28AddressOnlyReadOnlySubscriptg9subscriptFSiSi
+// CHECK:         apply [[GETTER]]({{%.*}}, [[COPY]]#1)
+func addressOnlyReadOnlySubscriptFromMutableBase(x: Int) {
+  var base = AddressOnlyReadOnlySubscript()
+  _ = base[x]
+}

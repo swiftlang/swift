@@ -3113,7 +3113,11 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
       // base isn't a temporary.  We aren't allowed to pass aliased
       // memory to 'in', and we have pass at +1.
       case ParameterConvention::Indirect_In:
-        return base.isPlusZeroRValueOrTrivial();
+        // TODO: We shouldn't be able to get an lvalue here, but the AST
+        // sometimes produces an inout base for non-mutating accessors.
+        // rdar://problem/19782170
+        // assert(!base.isLValue());
+        return base.isLValue() || base.isPlusZeroRValueOrTrivial();
 
       case ParameterConvention::Indirect_Out:
         llvm_unreachable("out parameter not expected here");
