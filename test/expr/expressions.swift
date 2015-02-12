@@ -633,7 +633,6 @@ func testOptionalChaining(a : Int?, b : Int!, c : Int??) {
 
 
 // <rdar://problem/19657458> Nil Coalescing operator (??) should have a higher precedence
-
 func testNilCoalescePrecedence(cond: Bool, a: Int?, r: Range<Int>?) {
   // ?? should have higher precedence than logical operators like || and comparisons.
   if cond || (a ?? 42 > 0) {}  // Ok.
@@ -648,4 +647,10 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: Range<Int>?) {
   let r2 = (r ?? 0)...42 // not ok: expected-error {{could not find an overload for '??' that accepts the supplied arguments}}
   let r3 = r ?? 0...42 // parses as the first one, not the second.
 }
+
+// <rdar://problem/19772570> Parsing of as and ?? regressed
+func testOptionalTypeParsing(a : AnyObject) -> String {
+  return a as? String ?? "default name string here"
+}
+
 

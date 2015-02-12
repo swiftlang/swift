@@ -499,16 +499,16 @@ Base=1 as Base=1  // expected-error {{cannot assign to the result of this expres
 // <rdar://problem/18634543> Parser hangs at swift::Parser::parseType
 public enum TestA {
   public static func convertFromExtenndition(
-    // expected-error@+3{{expected parameter type following ':'}}
-    // expected-error@+2{{expected ',' separator}}
+    // expected-error@+3 2{{expected parameter type following ':'}}
+    // expected-error@+2 3{{expected ',' separator}}
     // expected-error@+1{{use of undeclared type 's'}}
     s._core.count != 0, "Can't form a Character from an empty String")
 }
 
 public enum TestB {
   public static func convertFromExtenndition(
-    // expected-error@+3{{expected parameter type following ':'}}
-    // expected-error@+2{{expected ',' separator}}
+    // expected-error@+3 2{{expected parameter type following ':'}}
+    // expected-error@+2 3{{expected ',' separator}}
     // expected-error@+1{{use of undeclared type 's'}}
     s._core.count ?= 0, "Can't form a Character from an empty String")
 }
@@ -518,7 +518,7 @@ public enum TestB {
 // <rdar://problem/18634543> Infinite loop and unbounded memory consumption in parser
 class bar {}
 var baz: bar
-func foo1(bar != baz) {}
+func foo1(bar!=baz) {}
 func foo2(bar! = baz) {}
 
 
@@ -526,8 +526,8 @@ func foo2(bar! = baz) {}
 // <rdar://problem/18662272> Infinite loop and unbounded memory consumption in parser
 class Baz {}
 class Bar<T> {}
-func f1(a: Bar<Baz !>) {}
-func f2(a: Bar<Baz /* some comment */ !>) {}
+func f1(a: Bar<Baz!>) {}
+func f2(a: Bar<Baz /* some comment */!>) {}
 
 
 // rdar://19605567

@@ -665,9 +665,9 @@ bool Parser::isOptionalToken(const Token &T) const {
     return true;
   
   // A postfix or bound infix operator token that begins with '?' can be
-  // optional too. We'll munch off the '?'.
-  if ((T.is(tok::oper_postfix) || T.is(tok::oper_binary_unspaced) ||
-       T.is(tok::oper_binary_spaced)) &&
+  // optional too. We'll munch off the '?', so long as it is left-bound with
+  // the type (i.e., parsed as a postfix or unspaced binary operator).
+  if ((T.is(tok::oper_postfix) || T.is(tok::oper_binary_unspaced)) &&
       T.getText().startswith("?"))
     return true;
   return false;
@@ -679,9 +679,10 @@ bool Parser::isImplicitlyUnwrappedOptionalToken(const Token &T) const {
   if (T.is(tok::exclaim_postfix) || T.is(tok::sil_exclamation))
     return true;
   // A postfix or bound infix operator token that begins with '!' can be
-  // implicitly unwrapped optional too. We'll munch off the '!'.
-  if ((T.is(tok::oper_postfix) || T.is(tok::oper_binary_unspaced) ||
-       T.is(tok::oper_binary_spaced)) &&
+  // implicitly unwrapped optional too. We'll munch off the '!', so long as it
+  // is left-bound with the type (i.e., parsed as a postfix or unspaced binary
+  // operator).
+  if ((T.is(tok::oper_postfix) || T.is(tok::oper_binary_unspaced)) &&
       T.getText().startswith("!"))
     return true;
   return false;
