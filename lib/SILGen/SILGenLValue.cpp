@@ -1981,18 +1981,29 @@ void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc,
 
 void SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
                                                       SILValue addr) {
-  SILType optType = addr.getType().getObjectType();
-  OptionalTypeKind optionalKind;
-  CanType valueType = getOptionalValueType(optType, optionalKind);
+  OptionalTypeKind OTK;
+  getOptionalValueType(addr.getType().getObjectType(), OTK);
 
-  FuncDecl *fn =
-    getASTContext().getPreconditionOptionalHasValueDecl(nullptr, optionalKind);
-  Substitution sub = getSimpleSubstitution(fn, valueType);
+  // Generate code to the optional is present, and if not abort with a message
+  // (provided by the stdlib).
+  SILBasicBlock *failBB = createBasicBlock(), *contBB = createBasicBlock();
 
-  // The argument to _preconditionOptionalHasValue is passed by reference.
-  emitApplyOfLibraryIntrinsic(loc, fn, sub,
-                              ManagedValue::forUnmanaged(addr),
-                              SGFContext());
+  auto NoneEnumElementDecl = getASTContext().getOptionalNoneDecl(OTK);
+  B.createSwitchEnumAddr(loc, addr, /*defaultDest*/contBB,
+                         { { NoneEnumElementDecl, failBB }});
+
+  B.emitBlock(failBB);
+
+  // Call the standard library implementation of _diagnoseUnexpectedNilOptional.
+  if (auto diagnoseFailure =
+        getASTContext().getDiagnoseUnexpectedNilOptional(nullptr)) {
+    emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, {}, {},
+                                SGFContext());
+  }
+
+  B.createUnreachable(loc);
+  B.clearInsertionPoint();
+  B.emitBlock(contBB);
 }
 
 SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc,

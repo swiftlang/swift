@@ -77,19 +77,6 @@ extension ImplicitlyUnwrappedOptional : Printable {
   }
 }
 
-// Intrinsics for use by language features.
-@transparent
-public // COMPILER_INTRINSIC
-func _preconditionImplicitlyUnwrappedOptionalHasValue<T>(inout v: T!) {
-  switch v {
-  case .Some:
-    break
-  case .None:
-    _preconditionFailure(
-      "unexpectedly found nil while unwrapping an Optional value")
-  }
-}
-
 @transparent
 public // COMPILER_INTRINSIC
 func _getImplicitlyUnwrappedOptionalValue<T>(v: T!) -> T {

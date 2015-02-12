@@ -395,11 +395,6 @@ public:
   FuncDecl *get##Name(LazyResolver *resolver) const;
 #include "swift/AST/KnownDecls.def"
 
-  /// Retrieve the declaration of
-  /// Swift._precondition{,ImplicitlyUnwrapped}OptionalHasValue.
-  FuncDecl *getPreconditionOptionalHasValueDecl(LazyResolver *resolver,
-                                                OptionalTypeKind kind) const;
-
   /// Swift._does{,ImplicitlyUnwrapped}OptionalHaveValueAsBool.
   FuncDecl *getDoesOptionalHaveValueAsBoolDecl(LazyResolver *resolver,
                                                OptionalTypeKind kind) const;

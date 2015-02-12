@@ -87,8 +87,8 @@ func _doesOptionalHaveValueAsBool<T>(v: T?) -> Bool {
 
 @transparent
 public // COMPILER_INTRINSIC
-func _preconditionOptionalHasValue<T>(inout v: T?) {
-  _precondition(v != nil,
+func _diagnoseUnexpectedNilOptional() {
+  _preconditionFailure(
                 "unexpectedly found nil while unwrapping an Optional value")
 }
 

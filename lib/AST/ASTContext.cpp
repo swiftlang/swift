@@ -870,34 +870,6 @@ static unsigned asIndex(OptionalTypeKind optionalKind) {
     ? (PREFIX "Optional" SUFFIX)                       \
     : (PREFIX "ImplicitlyUnwrappedOptional" SUFFIX))
 
-FuncDecl *ASTContext::getPreconditionOptionalHasValueDecl(
-                  LazyResolver *resolver, OptionalTypeKind optionalKind) const {
-  auto &cache = Impl.PreconditionOptionalHasValueDecls[asIndex(optionalKind)];
-  if (cache) return cache;
-
-  auto name
-    = getOptionalIntrinsicName("_precondition", optionalKind, "HasValue");
-
-  // Look for a generic function.
-  CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, name, resolver);
-  if (!decl || !isGenericIntrinsic(decl, input, output, param))
-    return nullptr;
-
-  // Input must be inout Optional<T>.
-  auto inputInOut = dyn_cast<InOutType>(input);
-  if (!inputInOut || !isOptionalType(*this, optionalKind,
-                                     inputInOut.getObjectType(), param))
-    return nullptr;
-
-  // Output must be ().
-  if (output != CanType(TheEmptyTupleType))
-    return nullptr;
-
-  cache = decl;
-  return decl;
-}
-
 FuncDecl *ASTContext::getDoesOptionalHaveValueAsBoolDecl(
     LazyResolver *resolver, OptionalTypeKind optionalKind) const {
   auto &cache = Impl.DoesOptionalHaveValueAsBoolDecls[asIndex(optionalKind)];
@@ -954,8 +926,7 @@ FuncDecl *ASTContext::getGetOptionalValueDecl(LazyResolver *resolver,
 
 static bool hasOptionalIntrinsics(const ASTContext &ctx, LazyResolver *resolver,
                                   OptionalTypeKind optionalKind) {
-  return ctx.getPreconditionOptionalHasValueDecl(resolver, optionalKind) &&
-         ctx.getGetOptionalValueDecl(resolver, optionalKind);
+  return ctx.getGetOptionalValueDecl(resolver, optionalKind);
 }
 
 bool ASTContext::hasOptionalIntrinsics(LazyResolver *resolver) const {

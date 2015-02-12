@@ -1003,3 +1003,20 @@ struct StructMutatingMethodTest {
 
 @transparent
 func myTransparentFunction(inout x : Int) {}
+
+
+// <rdar://problem/19782264> Immutable, optional class members can't have their subproperties read from during init()
+class MyClassWithAnInt {
+  let channelCount : Int = 42
+}
+class MyClassTestExample {
+  let clientFormat : MyClassWithAnInt!
+
+  init(){
+    clientFormat = MyClassWithAnInt()
+    let channels = clientFormat.channelCount
+  }
+}
+
+
+
