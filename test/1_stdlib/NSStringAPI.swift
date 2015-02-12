@@ -813,8 +813,8 @@ NSStringAPIs.test("lastPathComponent") {
 }
 
 NSStringAPIs.test("utf16Count") {
-  expectEqual(1, "a".utf16Count)
-  expectEqual(2, "\u{0001F60A}".utf16Count)
+  expectEqual(1, count("a".utf16))
+  expectEqual(2, count("\u{0001F60A}".utf16))
 }
 
 NSStringAPIs.test("lengthOfBytesUsingEncoding(_:)") {

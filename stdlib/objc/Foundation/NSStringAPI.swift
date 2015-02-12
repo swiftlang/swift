@@ -933,6 +933,8 @@ extension String {
   // @property NSUInteger length;
 
   /// Returns the number of Unicode characters in the `String`.
+  @availability(*, unavailable,
+    message="Take the count of a UTF16 view instead")
   public var utf16Count: Int {
     return _ns.length
   }
