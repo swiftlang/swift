@@ -11,10 +11,25 @@ StdinTestSuite.test("passes1")
 }
 
 StdinTestSuite.test("passes2")
+  .stdin("\n")
+  .code {
+  let line = _stdlib_getline()
+  expectOptionalEqual("", line)
+}
+
+StdinTestSuite.test("passes3")
   .stdin("abc\n")
   .code {
   let line = _stdlib_getline()
   expectOptionalEqual("abc", line)
+}
+
+StdinTestSuite.test("passes3")
+  .stdin("abc\ndefghi\n")
+  .code {
+  let line = _stdlib_getline()
+  expectOptionalEqual("abc", line)
+  expectOptionalEqual("defghi", line)
 }
 
 runAllTests()
