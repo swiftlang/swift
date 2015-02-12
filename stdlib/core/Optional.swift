@@ -20,7 +20,7 @@ public enum Optional<T> : Reflectable, NilLiteralConvertible {
   @transparent
   public init() { self = .None }
 
-  /// Construct a non-\ `nil` instance that stores `some`.
+  /// Construct a non-`nil` instance that stores `some`.
   @transparent
   public init(_ some: T) { self = .Some(some) }
 

@@ -32,7 +32,7 @@ public protocol BooleanType {
 /// **Note:** While it is safe to copy a *generator*, advancing one
 /// copy may invalidate the others.
 ///
-/// Any code that uses multiple generators (or `for`\ ...\ `in` loops)
+/// Any code that uses multiple generators (or `for`...`in` loops)
 /// over a single *sequence* should have static knowledge that the
 /// specific *sequence* is multi-pass, either because its concrete
 /// type is known or because it is constrained to `CollectionType`.
@@ -72,21 +72,21 @@ public protocol _Sequence_Type : _SequenceType {
   typealias Generator : GeneratorType
 
   /// Return a *generator* over the elements of this *sequence*.  The
-  /// *generator*\ 's next element is the first element of the
+  /// *generator*'s next element is the first element of the
   /// sequence.
   ///
   /// Complexity: O(1)
   func generate() -> Generator
 }
 
-/// A type that can be iterated with a `for`\ ...\ `in` loop.
+/// A type that can be iterated with a `for`...`in` loop.
 ///
 /// `SequenceType` makes no requirement on conforming types regarding
 /// whether they will be destructively "consumed" by iteration.  To
 /// ensure non-destructive iteration, constrain your *sequence* to
 /// `CollectionType`.
 public protocol SequenceType : _Sequence_Type {
-  /// A type that provides the *sequence*\ 's iteration interface and
+  /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
   typealias Generator : GeneratorType
 
@@ -179,7 +179,7 @@ internal func _preprocessingPass<Args>(args: Args)
 // pass a GeneratorType through GeneratorSequence to give it "SequenceType-ness"
 /// A sequence built around a generator of type `G`.
 ///
-/// Useful mostly to recover the ability to use `for`\ ...\ `in`,
+/// Useful mostly to recover the ability to use `for`...`in`,
 /// given just a generator `g`::
 ///
 ///   for x in GeneratorSequence(g) { ... }
@@ -401,11 +401,11 @@ public protocol DictionaryLiteralConvertible {
 }
 
 /// Conforming types can be initialized with string interpolations
-/// containing `\(`\ ...\ `)` clauses.
+/// containing `\(` ... `)` clauses.
 public protocol StringInterpolationConvertible {
   /// Create an instance by concatenating the elements of `strings`
   init(stringInterpolation strings: Self...)
-  /// Create an instance containing `expr`\ 's `print` representation
+  /// Create an instance containing `expr`'s `print` representation
   init<T>(stringInterpolationSegment expr: T)
 }
 

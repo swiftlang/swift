@@ -24,7 +24,7 @@ public enum ImplicitlyUnwrappedOptional<T>
   /// Construct a `nil` instance.
   public init() { self = .None }
   
-  /// Construct a non-\ `nil` instance that stores `some`.
+  /// Construct a non-`nil` instance that stores `some`.
   public init(_ some : T) { self = .Some(some) }
   
   /// Construct an instance from an explicitly unwrapped optional

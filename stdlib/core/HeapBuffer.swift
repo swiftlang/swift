@@ -191,7 +191,7 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
     }
   }
 
-  /// True if storage is non-\ `nil`
+  /// True if storage is non-`nil`
   var hasStorage: Bool {
     return _storage != nil
   }

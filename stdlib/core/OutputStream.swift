@@ -48,7 +48,7 @@ public protocol Printable {
 ///
 /// This textual representation is used when values are written to an
 /// *output stream* by `debugPrint` and `debugPrintln`, and is
-/// typically more verbose than the text provided by a `Printable`\ 's
+/// typically more verbose than the text provided by a `Printable`'s
 /// `description` property.
 ///
 /// In order to generate a textual representation for an instance of any
@@ -180,7 +180,7 @@ public func println() {
   stdoutStream.write("\n")
 }
 
-/// Returns the result of `print`\ 'ing `x` into a `String`
+/// Returns the result of `print`'ing `x` into a `String`
 @inline(never)
 public func toString<T>(x: T) -> String {
   var result = ""
@@ -188,7 +188,7 @@ public func toString<T>(x: T) -> String {
   return result
 }
 
-/// Returns the result of `print`\ 'ing `x` into a `String`
+/// Returns the result of `print`'ing `x` into a `String`
 ///
 /// Exactly the same as `toString`, but annotated 'readonly' to allow the optimizer
 /// to remove calls where results are unused.
@@ -207,7 +207,7 @@ func _toStringReadOnlyPrintable<T : Printable>(x: T) -> String {
   return x.description
 }
 
-/// Returns the result of `debugPrint`\ 'ing `x` into a `String`
+/// Returns the result of `debugPrint`'ing `x` into a `String`
 public func toDebugString<T>(x: T) -> String {
   var result = ""
   debugPrint(x, &result)

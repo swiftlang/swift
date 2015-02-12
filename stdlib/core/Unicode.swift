@@ -69,7 +69,7 @@ public protocol UnicodeCodecType {
     G : GeneratorType where G.Element == CodeUnit
   >(inout next: G) -> UnicodeDecodingResult
 
-  /// Encode a `UnicodeScalar` as a series of `CodeUnit`\ s by `put`\
+  /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by `put`\
   /// 'ing each `CodeUnit` to `output`.
   static func encode<
     S : SinkType where S.Element == CodeUnit
@@ -446,7 +446,7 @@ public struct UTF8 : UnicodeCodecType {
     return .Result(UnicodeScalar(result & 0x001fffff)) // 21 bits
   }
 
-  /// Encode a `UnicodeScalar` as a series of `CodeUnit`\ s by `put`\
+  /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by `put`\
   /// 'ing each `CodeUnit` to `output`.
   public static func encode<
     S : SinkType where S.Element == CodeUnit
@@ -614,7 +614,7 @@ public struct UTF16 : UnicodeCodecType {
     }
   }
 
-  /// Encode a `UnicodeScalar` as a series of `CodeUnit`\ s by `put`\
+  /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by `put`\
   /// 'ing each `CodeUnit` to `output`.
   public static func encode<
       S : SinkType where S.Element == CodeUnit
@@ -674,7 +674,7 @@ public struct UTF32 : UnicodeCodecType {
     return .EmptyInput
   }
 
-  /// Encode a `UnicodeScalar` as a series of `CodeUnit`\ s by `put`\
+  /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by `put`\
   /// 'ing each `CodeUnit` to `output`.
   public static func encode<
     S : SinkType where S.Element == CodeUnit

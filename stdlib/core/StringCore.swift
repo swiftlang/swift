@@ -636,8 +636,8 @@ var _emptyStringBase: COpaquePointer {
 extension _StringCore : RangeReplaceableCollectionType {
   /// Replace the given `subRange` of elements with `newElements`.
   ///
-  /// Complexity: O(\ `count(subRange)`\ ) if `subRange.endIndex
-  /// == self.endIndex` and `isEmpty(newElements)`\ , O(N) otherwise.
+  /// Complexity: O(`count(subRange)`) if `subRange.endIndex
+  /// == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == UTF16.CodeUnit
   >(

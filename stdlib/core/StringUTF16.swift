@@ -183,7 +183,7 @@ extension String {
     return nil
   }
   
-  /// The index type for subscripting a `String`\ 's `utf16` view.
+  /// The index type for subscripting a `String`'s `utf16` view.
   public typealias UTF16Index = UTF16View.Index
 }
 

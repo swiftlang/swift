@@ -24,7 +24,7 @@ public struct EmptyGenerator<T> : GeneratorType, SequenceType {
   /// Construct an instance
   public init() {}
   
-  /// `EmptyGenerator` is also a `SequenceType`, so it `generate`\ 's
+  /// `EmptyGenerator` is also a `SequenceType`, so it `generate`'s
   /// a copy of itself
   public func generate() -> EmptyGenerator {
     return self

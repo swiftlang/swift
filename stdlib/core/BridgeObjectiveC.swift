@@ -24,7 +24,7 @@ public protocol _ObjectiveCBridgeable {
   /// instance of `Self._ObjectiveCType` may, or may not, convert
   /// successfully to `Self`; for example, an `NSArray` will only
   /// convert successfully to `[String]` if it contains only
-  /// `NSString`\ s.
+  /// `NSString`s.
   static func _isBridgedToObjectiveC() -> Bool
   
   // _getObjectiveCType is a workaround: right now protocol witness
@@ -298,7 +298,7 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
     }
   }
 
-  /// Access the `i`\ th element of the raw array pointed to by
+  /// Access the `i`th element of the raw array pointed to by
   /// `self`.
   ///
   /// Requires: `self != nil`

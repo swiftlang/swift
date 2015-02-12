@@ -167,7 +167,7 @@ public protocol MutableCollectionType : CollectionType {
 
 /// A *generator* for an arbitrary *collection*.  Provided `C`
 /// conforms to the other requirements of *CollectionType*,
-/// `IndexingGenerator<C>` can be used as the result of `C`\ 's
+/// `IndexingGenerator<C>` can be used as the result of `C`'s
 /// `generate()` method.  For example:
 ///
 /// .. parsed-literal::
@@ -301,7 +301,7 @@ public protocol Sliceable : _Sliceable {
 /// .. parsed-literal:
 ///
 ///      x[i..<j] = *someExpression*
-///      x[i..<j].\ *mutatingMethod*\ ()
+///      x[i..<j].*mutatingMethod*()
 public protocol MutableSliceable : Sliceable, MutableCollectionType {
   subscript(_: Range<Index>) -> SubSlice {get set}
 }

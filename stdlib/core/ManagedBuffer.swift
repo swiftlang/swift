@@ -12,7 +12,7 @@
 
 import SwiftShims
 
-/// A common base class for classes that need to be non-\ `@objc`, 
+/// A common base class for classes that need to be non-`@objc`, 
 /// recognizably in the type system.
 ///
 /// See `isUniquelyReferenced`
@@ -22,7 +22,7 @@ public class NonObjectiveCBase {}
 /// instance creation.
 ///
 /// During instance creation, in particular during
-/// `ManagedBuffer.create`\ 's call to initialize, `ManagedBuffer`\ 's
+/// `ManagedBuffer.create`'s call to initialize, `ManagedBuffer`'s
 /// `value` property is as-yet uninitialized, and therefore
 /// `ManagedProtoBuffer` does not offer access to the as-yet
 /// uninitialized `value` property of `ManagedBuffer`.
@@ -55,7 +55,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
     return withUnsafeMutablePointers { return body($0.1) }
   }
 
-  /// Call `body` with `UnsafeMutablePointer`\ s to the stored `Value`
+  /// Call `body` with `UnsafeMutablePointer`s to the stored `Value`
   /// and raw `Element` storage.  **Note**: these pointers are only valid
   /// for the duration of the call to `body`.
   public final func withUnsafeMutablePointers<R>(
@@ -129,7 +129,7 @@ public class ManagedBuffer<Value, Element>
 ///
 /// A valid buffer class is non-`@objc`, with no declared stored
 ///   properties.  Its `deinit` must destroy its
-///   stored `Value` and any constructed `Element`\ s.
+///   stored `Value` and any constructed `Element`s.
 ///
 /// Example Buffer Class
 /// --------------------
@@ -158,10 +158,10 @@ public class ManagedBuffer<Value, Element>
 public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// Create with new storage containing an initial `Value` and space
-  /// for at least `minimumCapacity` `element`\ s.
+  /// for at least `minimumCapacity` `element`s.
   ///
   /// :param: `bufferClass` the class of the object used for storage.
-  /// :param: `minimumCapacity` the minimum number of `Element`\ s that
+  /// :param: `minimumCapacity` the minimum number of `Element`s that
   ///   must be able to be stored in the new buffer.
   /// :param: `initialValue` a function that produces the initial
   ///   `Value` instance stored in the buffer, given the `buffer`
@@ -171,7 +171,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// Requires: minimumCapacity >= 0, and the type indicated by
   /// `bufferClass` is a non-`@objc` class with no declared stored
   /// properties.  The `deinit` of `bufferClass` must destroy its
-  /// stored `Value` and any constructed `Element`\ s.
+  /// stored `Value` and any constructed `Element`s.
   public init(
     bufferClass: AnyClass,
     minimumCapacity: Int,
@@ -197,7 +197,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   ///
   /// Requires: `buffer` is an instance of a non-`@objc` class whose
   /// `deinit` destroys its stored `Value` and any constructed
-  /// `Element`\ s.
+  /// `Element`s.
   public init(unsafeBufferObject buffer: AnyObject) {
     ManagedBufferPointer._checkValidBufferClass(buffer.dynamicType)
 
@@ -259,7 +259,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     return withUnsafeMutablePointers { return body($0.1) }
   }
 
-  /// Call `body` with `UnsafeMutablePointer`\ s to the stored `Value`
+  /// Call `body` with `UnsafeMutablePointer`s to the stored `Value`
   /// and raw `Element` storage.  **Note**: these pointers are only valid
   /// for the duration of the call to `body`.
   public func withUnsafeMutablePointers<R>(
@@ -294,16 +294,16 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   //===--- internal/private API -------------------------------------------===//
   
   /// Create with new storage containing space for an initial `Value`
-  /// and at least `minimumCapacity` `element`\ s.
+  /// and at least `minimumCapacity` `element`s.
   ///
   /// :param: `bufferClass` the class of the object used for storage.
-  /// :param: `minimumCapacity` the minimum number of `Element`\ s that
+  /// :param: `minimumCapacity` the minimum number of `Element`s that
   ///   must be able to be stored in the new buffer.
   ///
   /// Requires: minimumCapacity >= 0, and the type indicated by
   /// `bufferClass` is a non-`@objc` class with no declared stored
   /// properties.  The `deinit` of `bufferClass` must destroy its
-  /// stored `Value` and any constructed `Element`\ s.
+  /// stored `Value` and any constructed `Element`s.
   internal init(
     bufferClass: AnyClass,
     minimumCapacity: Int
@@ -425,7 +425,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     return UnsafeMutablePointer(_address + _My._valueOffset)
   }
 
-  /// An **unmanaged** pointer to the storage for `Element`\ s.  Not
+  /// An **unmanaged** pointer to the storage for `Element`s.  Not
   /// safe to use without _fixLifetime calls to guarantee it doesn't
   /// dangle.
   internal var _elementPointer: UnsafeMutablePointer<Element> {
@@ -451,7 +451,7 @@ public func == <Value, Element>(
 // FIXME: when our calling convention changes to pass self at +0,
 // inout should be dropped from the arguments to these functions.
 
-/// Returns `true` iff `object` is a non-\ `@objc` class instance with
+/// Returns `true` iff `object` is a non-`@objc` class instance with
 /// a single strong reference.
 ///
 /// * Does *not* modify `object`; the use of `inout` is an
@@ -493,7 +493,7 @@ internal func isUniquelyReferencedOrPinnedNonObjC<T: AnyObject>(inout object: T)
   return result
 }
 
-/// Returns `true` iff `object` is a non-\ `@objc` class instance with a single
+/// Returns `true` iff `object` is a non-`@objc` class instance with a single
 /// strong reference.
 ///
 /// * Does *not* modify `object`; the use of `inout` is an
@@ -526,7 +526,7 @@ public func isUniquelyReferenced<T: NonObjectiveCBase>(
   return result
 }
 
-/// Returns `true` iff `object` is a non-\ `@objc` class instance with
+/// Returns `true` iff `object` is a non-`@objc` class instance with
 /// a single strong reference.
 ///
 /// * Does *not* modify `object`; the use of `inout` is an

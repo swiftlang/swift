@@ -23,9 +23,9 @@ public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(subRange)`\ ) if
-  /// `subRange.endIndex == self.endIndex` and `isEmpty(newElements)`\ ,
-  /// O(\ `count(self)`\ + \`count(newElements)`\ ) otherwise.
+  /// Complexity: O(`count(subRange)`) if
+  /// `subRange.endIndex == self.endIndex` and `isEmpty(newElements)`,
+  /// O(`count(self)` + `count(newElements)`) otherwise.
   mutating func replaceRange<
     C: CollectionType where C.Generator.Element == Self.Generator.Element
   >(
@@ -37,7 +37,7 @@ public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self)`\ ).
+  /// Complexity: O(`count(self)`).
   ///
   /// Can be implemented as::
   ///
@@ -48,7 +48,7 @@ public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self) + count(newElements)`\ ).
+  /// Complexity: O(`count(self) + count(newElements)`).
   ///
   /// Can be implemented as::
   ///
@@ -61,7 +61,7 @@ public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self)`\ ).
+  /// Complexity: O(`count(self)`).
   ///
   /// Can be implemented as::
   ///
@@ -72,7 +72,7 @@ public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self)`\ ).
+  /// Complexity: O(`count(self)`).
   ///
   /// Can be implemented as::
   ///
@@ -87,7 +87,7 @@ public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
   ///    avoid releasing storage, which can be a useful optimization
   ///    when `self` is going to be grown again.
   ///
-  /// Complexity: O(\ `count(self)`\ ).
+  /// Complexity: O(`count(self)`).
   ///
   /// Can be implemented as::
   ///
@@ -99,7 +99,7 @@ public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
 ///
 /// Invalidates all indices with respect to `x`.
 ///
-/// Complexity: O(\ `count(x)`\ ).
+/// Complexity: O(`count(x)`).
 public func insert<
   C: RangeReplaceableCollectionType
 >(inout x: C, newElement: C.Generator.Element, atIndex i: C.Index) {
@@ -110,7 +110,7 @@ public func insert<
 ///
 /// Invalidates all indices with respect to `x`.
 ///
-/// Complexity: O(\ `count(x) + count(newElements)`\ ).
+/// Complexity: O(`count(x) + count(newElements)`).
 public func splice<
   C: RangeReplaceableCollectionType,
   S : CollectionType where S.Generator.Element == C.Generator.Element
@@ -134,7 +134,7 @@ internal func _replaceRange<
 ///
 /// Invalidates all indices with respect to `x`.
 ///
-/// Complexity: O(\ `count(x)`\ ).
+/// Complexity: O(`count(x)`).
 public func removeAtIndex<
   C: RangeReplaceableCollectionType
 >(inout x: C, index: C.Index) -> C.Generator.Element {
@@ -148,7 +148,7 @@ public func removeAtIndex<
 ///
 /// Invalidates all indices with respect to `x`.
 ///
-/// Complexity: O(\ `count(x)`\ ).
+/// Complexity: O(`count(x)`).
 public func removeRange<
   C: RangeReplaceableCollectionType
 >(inout x: C, subRange: Range<C.Index>) {
@@ -163,7 +163,7 @@ public func removeRange<
 ///    avoid releasing storage, which can be a useful optimization
 ///    when `x` is going to be grown again.
 ///
-/// Complexity: O(\ `count(x)`\ ).
+/// Complexity: O(`count(x)`).
 public func removeAll<
   C: RangeReplaceableCollectionType
 >(inout x: C, keepCapacity: Bool = false) {

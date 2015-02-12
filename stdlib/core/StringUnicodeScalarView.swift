@@ -198,7 +198,7 @@ extension String {
       var _generator: IndexingGenerator<_StringCore>!
     }
 
-    /// Return a *generator* over the `UnicodeScalar`\ s that comprise
+    /// Return a *generator* over the `UnicodeScalar`s that comprise
     /// this *sequence*.
     ///
     /// Complexity: O(1)
@@ -228,7 +228,7 @@ extension String {
     self.init(unicodeScalars._core)
   }
 
-  /// The index type for subscripting a `String`\ 's `.unicodeScalars`
+  /// The index type for subscripting a `String`'s `.unicodeScalars`
   /// view.
   public typealias UnicodeScalarIndex = UnicodeScalarView.Index
 }
@@ -281,8 +281,8 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(subRange)`\ ) if `subRange.endIndex
-  /// == self.endIndex` and `isEmpty(newElements)`\ , O(N) otherwise.
+  /// Complexity: O(`count(subRange)`) if `subRange.endIndex
+  /// == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == UnicodeScalar
   >(
@@ -300,7 +300,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self)`\ ).
+  /// Complexity: O(`count(self)`).
   public mutating func insert(newElement: UnicodeScalar, atIndex i: Index) {
     Swift.insert(&self, newElement, atIndex: i)
   }
@@ -309,7 +309,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self) + count(newElements)`\ ).
+  /// Complexity: O(`count(self) + count(newElements)`).
   public mutating func splice<
     S : CollectionType where S.Generator.Element == UnicodeScalar
   >(newElements: S, atIndex i: Index) {
@@ -320,7 +320,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self)`\ ).
+  /// Complexity: O(`count(self)`).
   public mutating func removeAtIndex(i: Index) -> UnicodeScalar {
     return Swift.removeAtIndex(&self, i)
   }
@@ -329,7 +329,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self)`\ ).
+  /// Complexity: O(`count(self)`).
   public mutating func removeRange(subRange: Range<Index>) {
     Swift.removeRange(&self, subRange)
   }
