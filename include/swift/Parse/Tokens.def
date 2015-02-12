@@ -70,6 +70,7 @@ KEYWORD(sil_stage)  // This is only enabled when parsing .sil files.
 KEYWORD(sil_vtable) // This is only enabled when parsing .sil files.
 KEYWORD(sil_global) // This is only enabled when parsing .sil files.
 KEYWORD(sil_witness_table) // This is only enabled when parsing .sil files.
+KEYWORD(sil_coverage_map)  // This is only enabled when parsing .sil files.
 
 // Statement keywords.
 STMT_KEYWORD(if)

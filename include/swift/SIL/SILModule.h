@@ -23,6 +23,7 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Range.h"
+#include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
@@ -77,10 +78,12 @@ public:
   using GlobalListType = llvm::ilist<SILGlobalVariable>;
   using VTableListType = llvm::ilist<SILVTable>;
   using WitnessTableListType = llvm::ilist<SILWitnessTable>;
+  using CoverageMapListType = llvm::ilist<SILCoverageMap>;
   using LinkingMode = SILOptions::LinkingMode;
 
 private:
   friend class SILBasicBlock;
+  friend class SILCoverageMap;
   friend class SILFunction;
   friend class SILGlobalVariable;
   friend class SILType;
@@ -136,6 +139,9 @@ private:
 
   /// The list of SILGlobalVariables in the module.
   GlobalListType silGlobals;
+
+  // The list of SILCoverageMaps in the module.
+  CoverageMapListType coverageMaps;
 
   /// This is a cache of intrinsic Function declarations to numeric ID mappings.
   llvm::DenseMap<Identifier, IntrinsicInfo> IntrinsicIDCache;
@@ -318,6 +324,25 @@ public:
   Range<sil_global_const_iterator> getSILGlobals() const {
     return {silGlobals.begin(), silGlobals.end()};
   }
+
+  using coverage_map_iterator = CoverageMapListType::iterator;
+  using coverage_map_const_iterator = CoverageMapListType::const_iterator;
+  CoverageMapListType &getCoverageMapList() { return coverageMaps; }
+  const CoverageMapListType &getCoverageMapList() const { return coverageMaps; }
+  coverage_map_iterator coverage_map_begin() { return coverageMaps.begin(); }
+  coverage_map_iterator coverage_map_end() { return coverageMaps.end(); }
+  coverage_map_const_iterator coverage_map_begin() const {
+    return coverageMaps.begin();
+  }
+  coverage_map_const_iterator coverage_map_end() const {
+    return coverageMaps.end();
+  }
+  Range<coverage_map_iterator> getCoverageMaps() {
+    return {coverageMaps.begin(), coverageMaps.end()};
+  }
+  Range<coverage_map_const_iterator> getCoverageMaps() const {
+    return {coverageMaps.begin(), coverageMaps.end()};
+ }
 
   /// Look for a global variable by name.
   ///

@@ -690,6 +690,7 @@ void IRGenModule::prepare() {
 void IRGenModule::emitGlobalTopLevel() {
   for (SILGlobalVariable &v : SILMod->getSILGlobals())
     emitSILGlobalVariable(&v);
+  emitCoverageMapping();
   
   // Emit SIL functions.
   bool isWholeModule = SILMod->isWholeModule();

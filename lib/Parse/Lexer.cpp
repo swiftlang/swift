@@ -524,7 +524,8 @@ tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
   // These keywords are only active in SIL mode.
   if ((Kind == tok::kw_sil || Kind == tok::kw_sil_stage ||
        Kind == tok::kw_sil_vtable || Kind == tok::kw_sil_global ||
-       Kind == tok::kw_sil_witness_table || Kind == tok::kw_undef) &&
+       Kind == tok::kw_sil_witness_table || Kind == tok::kw_sil_coverage_map ||
+       Kind == tok::kw_undef) &&
       !InSILMode)
     Kind = tok::identifier;
   return Kind;

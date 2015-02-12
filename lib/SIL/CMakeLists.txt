@@ -6,6 +6,7 @@ add_swift_library(swiftSIL
   SILArgument.cpp
   SILBasicBlock.cpp
   SILBuilder.cpp
+  SILCoverageMap.cpp
   SILFunction.cpp
   SILFunctionType.cpp
   SILGlobalVariable.cpp

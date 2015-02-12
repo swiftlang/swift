@@ -17,6 +17,7 @@
 #include "swift/Strings.h"
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/QuotedString.h"
+#include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
@@ -1602,6 +1603,27 @@ printSILWitnessTables(llvm::raw_ostream &OS, bool Verbose,
     wt->print(OS, Verbose);
 }
 
+static void
+printSILCoverageMaps(llvm::raw_ostream &OS, bool Verbose, bool ShouldSort,
+                     const SILModule::CoverageMapListType &CoverageMaps) {
+  if (!ShouldSort) {
+    for (const SILCoverageMap &M : CoverageMaps)
+      M.print(OS, ShouldSort, Verbose);
+    return;
+  }
+
+  std::vector<const SILCoverageMap *> Maps;
+  Maps.reserve(CoverageMaps.size());
+  for (const SILCoverageMap &M : CoverageMaps)
+    Maps.push_back(&M);
+  std::sort(Maps.begin(), Maps.end(),
+            [](const SILCoverageMap *LHS, const SILCoverageMap *RHS) -> bool {
+              return LHS->getName().compare(RHS->getName()) == -1;
+            });
+  for (const SILCoverageMap *M : Maps)
+    M->print(OS, ShouldSort, Verbose);
+}
+
 /// Pretty-print the SILModule to the designated stream.
 void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
                       Module *M, bool ShouldSort, bool PrintASTDecls) const {
@@ -1650,6 +1672,7 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
   printSILFunctions(OS, Verbose, ShouldSort, getFunctionList());
   printSILVTables(OS, Verbose, ShouldSort, getVTableList());
   printSILWitnessTables(OS, Verbose, ShouldSort, getWitnessTableList());
+  printSILCoverageMaps(OS, Verbose, ShouldSort, getCoverageMapList());
   
   OS << "\n\n";
 }
@@ -1755,5 +1778,28 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
 }
 
 void SILWitnessTable::dump() const {
+  print(llvm::errs());
+}
+
+void SILCoverageMap::print(llvm::raw_ostream &OS, bool ShouldSort,
+                           bool Verbose) const {
+  OS << "sil_coverage_map " << getName() << " " << getHash() << " {\t// "
+     << demangleSymbolAsString(getName()) << "\n";
+  if (ShouldSort)
+    std::sort(MappedRegions, MappedRegions + NumMappedRegions,
+              [](const MappedRegion &LHS, const MappedRegion &RHS) {
+      return std::tie(LHS.StartLine, LHS.StartCol, LHS.EndLine, LHS.EndCol) <
+             std::tie(RHS.StartLine, RHS.StartCol, RHS.EndLine, RHS.EndCol);
+    });
+  for (auto &MR : getMappedRegions()) {
+    OS << "  " << MR.StartLine << ":" << MR.StartCol << " -> " << MR.EndLine
+       << ":" << MR.EndCol << " : ";
+    printCounter(OS, MR.Counter);
+    OS << "\n";
+  }
+  OS << "}\n\n";
+}
+
+void SILCoverageMap::dump() const {
   print(llvm::errs());
 }

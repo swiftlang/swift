@@ -6,6 +6,7 @@ add_swift_library(swiftIRGen
   GenClangType.cpp
   GenClass.cpp
   GenControl.cpp
+  GenCoverage.cpp
   GenDecl.cpp
   GenFunc.cpp
   GenHeap.cpp

@@ -173,6 +173,16 @@ namespace {
 
     bool parseVerbatim(StringRef identifier);
 
+    template <typename T> bool parseInteger(T &Result, const Diagnostic &D) {
+      if (!P.Tok.is(tok::integer_literal)) {
+        P.diagnose(P.Tok, D);
+        return true;
+      }
+      P.Tok.getText().getAsInteger(0, Result);
+      P.consumeToken(tok::integer_literal);
+      return false;
+    }
+
     /// @}
 
     // Parsing logic.
@@ -255,6 +265,9 @@ namespace {
       GenericParamList *gp;
       return parseProtocolConformance(dummy, gp, builder, true);
     }
+
+    Optional<llvm::coverage::Counter>
+    parseSILCoverageExpr(llvm::coverage::CounterExpressionBuilder &Builder);
   };
 } // end anonymous namespace.
 
@@ -4094,5 +4107,137 @@ bool Parser::parseSILWitnessTable() {
     wt = SILWitnessTable::create(*SIL->M, *Linkage, theConformance);
   wt->convertToDefinition(witnessEntries, isFragile);
   BodyScope.reset();
+  return false;
+}
+
+llvm::Optional<llvm::coverage::Counter> SILParser::parseSILCoverageExpr(
+    llvm::coverage::CounterExpressionBuilder &Builder) {
+  if (P.Tok.is(tok::integer_literal)) {
+    unsigned CounterId;
+    if (parseInteger(CounterId, diag::sil_coverage_invalid_counter))
+      return None;
+    return llvm::coverage::Counter::getCounter(CounterId);
+  }
+
+  if (P.Tok.is(tok::identifier)) {
+    Identifier Zero;
+    SourceLoc Loc;
+    if (parseSILIdentifier(Zero, Loc, diag::sil_coverage_invalid_counter))
+      return None;
+    if (Zero.str() != "zero") {
+      P.diagnose(Loc, diag::sil_coverage_invalid_counter);
+      return None;
+    }
+    return llvm::coverage::Counter::getZero();
+  }
+
+  if (P.Tok.is(tok::l_paren)) {
+    P.consumeToken(tok::l_paren);
+    auto LHS = parseSILCoverageExpr(Builder);
+    if (!LHS)
+      return None;
+    Identifier Operator;
+    SourceLoc Loc;
+    if (P.parseAnyIdentifier(Operator, Loc,
+                             diag::sil_coverage_invalid_operator))
+      return None;
+    if (Operator.str() != "+" && Operator.str() != "-") {
+      P.diagnose(Loc, diag::sil_coverage_invalid_operator);
+      return None;
+    }
+    auto RHS = parseSILCoverageExpr(Builder);
+    if (!RHS)
+      return None;
+    if (P.parseToken(tok::r_paren, diag::sil_coverage_expected_rparen))
+      return None;
+
+    if (Operator.str() == "+")
+      return Builder.add(*LHS, *RHS);
+    return Builder.subtract(*LHS, *RHS);
+  }
+
+  P.diagnose(P.Tok, diag::sil_coverage_invalid_counter);
+  return None;
+}
+
+/// decl-sil-coverage-map ::= 'sil_coverage_map' CoveredName CoverageHash
+///                           decl-sil-coverage-body
+/// decl-sil-coverage-body:
+///   '{' sil-coverage-entry* '}'
+/// sil-coverage-entry:
+///   sil-coverage-loc ':' sil-coverage-expr
+/// sil-coverage-loc:
+///   StartLine ':' StartCol '->' EndLine ':' EndCol
+/// sil-coverage-expr:
+///   ...
+bool Parser::parseSILCoverageMap() {
+  consumeToken(tok::kw_sil_coverage_map);
+  SILParser State(*this);
+
+  // Parse the covered name.
+  Identifier FuncName;
+  SourceLoc FuncLoc;
+  if (State.parseSILIdentifier(FuncName, FuncLoc,
+                               diag::expected_sil_value_name))
+    return true;
+
+  SILFunction *Func = SIL->M->lookUpFunction(FuncName.str());
+  if (!Func) {
+    diagnose(FuncLoc, diag::sil_coverage_func_not_found, FuncName);
+    return true;
+  }
+
+  uint64_t Hash;
+  if (State.parseInteger(Hash, diag::sil_coverage_invalid_hash))
+    return true;
+
+  if (!Tok.is(tok::l_brace)) {
+    diagnose(Tok, diag::sil_coverage_expected_lbrace);
+    return true;
+  }
+  SourceLoc LBraceLoc = Tok.getLoc();
+  consumeToken(tok::l_brace);
+
+  llvm::coverage::CounterExpressionBuilder Builder;
+  std::vector<SILCoverageMap::MappedRegion> Regions;
+  bool BodyHasError = false;
+  if (Tok.isNot(tok::r_brace)) {
+    do {
+      unsigned StartLine, StartCol, EndLine, EndCol;
+      if (State.parseInteger(StartLine, diag::sil_coverage_expected_loc) ||
+          parseToken(tok::colon, diag::sil_coverage_expected_loc) ||
+          State.parseInteger(StartCol, diag::sil_coverage_expected_loc) ||
+          parseToken(tok::arrow, diag::sil_coverage_expected_arrow) ||
+          State.parseInteger(EndLine, diag::sil_coverage_expected_loc) ||
+          parseToken(tok::colon, diag::sil_coverage_expected_loc) ||
+          State.parseInteger(EndCol, diag::sil_coverage_expected_loc)) {
+        BodyHasError = true;
+        break;
+      }
+
+      if (parseToken(tok::colon, diag::sil_coverage_expected_colon)) {
+        BodyHasError = true;
+        break;
+      }
+
+      auto Counter = State.parseSILCoverageExpr(Builder);
+      if (!Counter) {
+        BodyHasError = true;
+        break;
+      }
+
+      Regions.emplace_back(StartLine, StartCol, EndLine, EndCol, *Counter);
+    } while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof));
+  }
+  if (BodyHasError)
+    skipUntilDeclRBrace();
+
+  SourceLoc RBraceLoc;
+  parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
+                     LBraceLoc);
+
+  if (!BodyHasError)
+    SILCoverageMap::create(*SIL->M, *Func, Hash, Regions,
+                           Builder.getExpressions());
   return false;
 }

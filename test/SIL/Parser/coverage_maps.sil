@@ -1,0 +1,29 @@
+// RUN: %target-sil-opt %s -module-name=coverage_maps -verify | %target-sil-opt -verify -module-name=coverage_maps | FileCheck %s
+
+sil @someFunction : $@thin () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: sil_coverage_map someFunction 0 {
+// CHECK: }
+sil_coverage_map someFunction 0 {
+}
+
+// CHECK-LABEL: sil_coverage_map someFunction 0 {
+// CHECK: 4:19 -> 31:1 : 0
+// CHECK: 7:9 -> 7:16 : (0 + 1)
+// CHECK: 7:18 -> 9:3 : zero
+// CHECK: 17:9 -> 17:17 : ((0 + 2) - 3)
+// CHECK: 17:9 -> 17:17 : ((0 + 2) - 3)
+// CHECK: 22:11 -> 139:2 : 1
+// CHECK: }
+sil_coverage_map someFunction 0 {
+  4:19 -> 31:1 : 0
+  7:9  -> 7:16 : (0 + 1)
+  7:18 -> 9:3  : zero
+  17:9 -> 17:17: ((0 + 2) - 3)
+  17:9 -> 17:17: (0 + (2 - 3))
+  22:11->139:2 : (zero + 1)
+}

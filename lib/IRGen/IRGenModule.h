@@ -425,6 +425,7 @@ public:
   void emitClassDecl(ClassDecl *D);
   void emitExtension(ExtensionDecl *D);
   Address emitSILGlobalVariable(SILGlobalVariable *gv);
+  void emitCoverageMapping();
   void emitSILFunction(SILFunction *f);
   void emitSILWitnessTable(SILWitnessTable *wt);
   void emitSILStaticInitializer();

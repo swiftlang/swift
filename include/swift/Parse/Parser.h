@@ -790,6 +790,7 @@ public:
   bool parseSILVTable();
   bool parseSILGlobal();
   bool parseSILWitnessTable();
+  bool parseSILCoverageMap();
 
   //===--------------------------------------------------------------------===//
   // Type Parsing

@@ -529,6 +529,26 @@ ERROR(sil_witness_assoc_not_found, decl_parsing,none,
 ERROR(sil_witness_protocol_conformance_not_found, decl_parsing,none,
       "sil protocol conformance not found", ())
 
+// SIL Coverage Map
+ERROR(sil_coverage_func_not_found, decl_parsing, none,
+      "sil function not found %0", (Identifier))
+ERROR(sil_coverage_invalid_hash, decl_parsing, none,
+      "expected coverage hash", ())
+ERROR(sil_coverage_expected_lbrace, decl_parsing, none,
+      "expected '{' in coverage map", ())
+ERROR(sil_coverage_expected_loc, decl_parsing, none,
+      "expected line:column pair", ())
+ERROR(sil_coverage_expected_arrow, decl_parsing, none,
+      "expected '->' after start location", ())
+ERROR(sil_coverage_expected_colon, decl_parsing, none,
+      "expected ':' after source range", ())
+ERROR(sil_coverage_invalid_counter, decl_parsing, none,
+      "expected counter expression, id, or 'zero'", ())
+ERROR(sil_coverage_expected_rparen, decl_parsing, none,
+      "expected ')' to end counter expression", ())
+ERROR(sil_coverage_invalid_operator, decl_parsing, none,
+      "expected '+' or '-'", ())
+
 //------------------------------------------------------------------------------
 // Type parsing diagnostics
 //------------------------------------------------------------------------------
