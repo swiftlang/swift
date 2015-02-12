@@ -20,8 +20,8 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/TypeLoc.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/ModuleFormat.h"
+#include "swift/Serialization/Validation.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -43,6 +43,7 @@ class ProtocolConformance;
 /// A serialized module, along with the tools to access it.
 class ModuleFile : public LazyMemberLoader {
   friend class SerializedASTFile;
+  using Status = serialization::Status;
 
   /// A reference back to the AST representation of the file.
   FileUnit *FileContext = nullptr;
@@ -317,7 +318,7 @@ private:
   } Bits = {};
   static_assert(sizeof(Bits) <= 8, "The bit set should be small");
 
-  void setStatus(ModuleStatus status) {
+  void setStatus(Status status) {
     Bits.Status = static_cast<unsigned>(status);
     assert(status == getStatus() && "not enough bits for status");
   }
@@ -340,9 +341,9 @@ private:
 public:
   /// Change the status of the current module. Default argument marks the module
   /// as being malformed.
-  ModuleStatus error(ModuleStatus issue = ModuleStatus::Malformed) {
-    assert(issue != ModuleStatus::Valid);
-    assert((!FileContext || issue != ModuleStatus::Malformed) &&
+  Status error(Status issue = Status::Malformed) {
+    assert(issue != Status::Valid);
+    assert((!FileContext || issue != Status::Malformed) &&
            "error deserializing an individual record");
     setStatus(issue);
     return getStatus();
@@ -444,7 +445,7 @@ public:
   /// \param[out] theModule The loaded module.
   /// \returns Whether the module was successfully loaded, or what went wrong
   ///          if it was not.
-  static ModuleStatus
+  static Status
   load(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
        bool isFramework, std::unique_ptr<ModuleFile> &theModule) {
@@ -461,11 +462,11 @@ public:
   ///
   /// Returns any error that occurred during association, including validation
   /// that the module file is compatible with the module it's being loaded as.
-  ModuleStatus associateWithFileContext(FileUnit *file, SourceLoc diagLoc);
+  Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc);
 
   /// Checks whether this module can be used.
-  ModuleStatus getStatus() const {
-    return static_cast<ModuleStatus>(Bits.Status);
+  Status getStatus() const {
+    return static_cast<Status>(Bits.Status);
   }
 
   /// Returns the list of modules this module depends on.

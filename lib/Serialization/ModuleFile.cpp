@@ -20,6 +20,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Serialization/BCReadingExtras.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -29,9 +30,6 @@
 using namespace swift;
 using namespace swift::serialization;
 using namespace llvm::support;
-
-using ValidationInfo = SerializedModuleLoader::ValidationInfo;
-using ExtendedValidationInfo = SerializedModuleLoader::ExtendedValidationInfo;
 
 static bool checkModuleSignature(llvm::BitstreamCursor &cursor) {
   for (unsigned char byte : MODULE_SIGNATURE)
@@ -101,7 +99,7 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
       extendedInfo.setSDKPath(blobData);
       break;
     case options_block::XCC:
-      extendedInfo.addClangImporterOption(blobData);
+      extendedInfo.addExtraClangImporterOption(blobData);
       break;
     default:
       // Unknown options record, possibly for use by a future version of the
@@ -127,7 +125,7 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
   auto next = cursor.advance();
   while (next.Kind != llvm::BitstreamEntry::EndBlock) {
     if (next.Kind == llvm::BitstreamEntry::Error) {
-      result.status = ModuleStatus::Malformed;
+      result.status = Status::Malformed;
       return result;
     }
 
@@ -135,14 +133,14 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
       if (next.ID == OPTIONS_BLOCK_ID && extendedInfo) {
         cursor.EnterSubBlock(OPTIONS_BLOCK_ID);
         if (!readOptionsBlock(cursor, scratch, *extendedInfo)) {
-          result.status = ModuleStatus::Malformed;
+          result.status = Status::Malformed;
           return result;
         }
       } else {
         // Unknown metadata sub-block, possibly for use by a future version of
         // the module format.
         if (cursor.SkipBlock()) {
-          result.status = ModuleStatus::Malformed;
+          result.status = Status::Malformed;
           return result;
         }
       }
@@ -156,26 +154,26 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
     switch (kind) {
     case control_block::METADATA: {
       if (versionSeen) {
-        result.status = ModuleStatus::Malformed;
+        result.status = Status::Malformed;
         break;
       }
 
       uint16_t versionMajor = scratch[0];
       if (versionMajor > VERSION_MAJOR)
-        result.status = ModuleStatus::FormatTooNew;
+        result.status = Status::FormatTooNew;
       else if (versionMajor < VERSION_MAJOR)
-        result.status = ModuleStatus::FormatTooOld;
+        result.status = Status::FormatTooOld;
       else
-        result.status = ModuleStatus::Valid;
+        result.status = Status::Valid;
 
       // Major version 0 does not have stable minor versions.
       if (versionMajor == 0) {
         uint16_t versionMinor = scratch[1];
         if (versionMinor != VERSION_MINOR) {
           if (versionMinor < VERSION_MINOR)
-            result.status = ModuleStatus::FormatTooOld;
+            result.status = Status::FormatTooOld;
           else
-            result.status = ModuleStatus::FormatTooNew;
+            result.status = Status::FormatTooNew;
         }
       }
 
@@ -200,7 +198,13 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
   return result;
 }
 
-ValidationInfo SerializedModuleLoader::validateSerializedAST(
+bool serialization::isSerializedAST(StringRef data) {
+  StringRef signatureStr(reinterpret_cast<const char *>(MODULE_SIGNATURE),
+                         llvm::array_lengthof(MODULE_SIGNATURE));
+  return data.startswith(signatureStr);
+}
+
+ValidationInfo serialization::validateSerializedAST(
     StringRef data,
     ExtendedValidationInfo *extendedInfo) {
   ValidationInfo result;
@@ -224,12 +228,12 @@ ValidationInfo SerializedModuleLoader::validateSerializedAST(
     if (topLevelEntry.ID == CONTROL_BLOCK_ID) {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
       result = validateControlBlock(cursor, scratch, extendedInfo);
-      if (result.status == ModuleStatus::Malformed)
+      if (result.status == Status::Malformed)
         return result;
 
     } else {
       if (cursor.SkipBlock()) {
-        result.status = ModuleStatus::Malformed;
+        result.status = Status::Malformed;
         return result;
       }
     }
@@ -242,7 +246,7 @@ ValidationInfo SerializedModuleLoader::validateSerializedAST(
     assert(cursor.GetCurrentBitNo() % CHAR_BIT == 0);
     result.bytes = cursor.GetCurrentBitNo() / CHAR_BIT;
   } else {
-    result.status = ModuleStatus::Malformed;
+    result.status = Status::Malformed;
   }
 
   return result;
@@ -708,7 +712,7 @@ ModuleFile::ModuleFile(
                         getEndBytePtr(this->ModuleInputBuffer.get())),
       ModuleDocInputReader(getStartBytePtr(this->ModuleDocInputBuffer.get()),
                            getEndBytePtr(this->ModuleDocInputBuffer.get())) {
-  assert(getStatus() == ModuleStatus::Valid);
+  assert(getStatus() == Status::Valid);
   Bits.IsFramework = isFramework;
 
   PrettyModuleFileDeserialization stackEntry(*this);
@@ -733,7 +737,7 @@ ModuleFile::ModuleFile(
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
 
       auto info = validateControlBlock(cursor, scratch, nullptr);
-      if (info.status != ModuleStatus::Valid) {
+      if (info.status != Status::Valid) {
         error(info.status);
         return;
       }
@@ -938,7 +942,7 @@ ModuleFile::ModuleFile(
   llvm::BitstreamCursor docCursor{ModuleDocInputReader};
   if (!checkModuleDocSignature(docCursor) ||
       !enterTopLevelModuleBlock(docCursor, MODULE_DOC_BLOCK_ID)) {
-    error(ModuleStatus::MalformedDocumentation);
+    error(Status::MalformedDocumentation);
     return;
   }
 
@@ -947,7 +951,7 @@ ModuleFile::ModuleFile(
     switch (topLevelEntry.ID) {
     case COMMENT_BLOCK_ID: {
       if (!hasValidControlBlock || !readCommentBlock(docCursor)) {
-        error(ModuleStatus::MalformedDocumentation);
+        error(Status::MalformedDocumentation);
         return;
       }
       break;
@@ -957,7 +961,7 @@ ModuleFile::ModuleFile(
       // Unknown top-level block, possibly for use by a future version of the
       // module format.
       if (docCursor.SkipBlock()) {
-        error(ModuleStatus::MalformedDocumentation);
+        error(Status::MalformedDocumentation);
         return;
       }
       break;
@@ -967,30 +971,30 @@ ModuleFile::ModuleFile(
   }
 
   if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock) {
-    error(ModuleStatus::MalformedDocumentation);
+    error(Status::MalformedDocumentation);
     return;
   }
 }
 
-ModuleStatus ModuleFile::associateWithFileContext(FileUnit *file,
-                                                  SourceLoc diagLoc) {
+Status ModuleFile::associateWithFileContext(FileUnit *file,
+                                            SourceLoc diagLoc) {
   PrettyModuleFileDeserialization stackEntry(*this);
 
-  assert(getStatus() == ModuleStatus::Valid && "invalid module file");
+  assert(getStatus() == Status::Valid && "invalid module file");
   assert(!FileContext && "already associated with an AST module");
   FileContext = file;
 
   if (file->getParentModule()->Name.str() != Name)
-    return error(ModuleStatus::NameMismatch);
+    return error(Status::NameMismatch);
 
   ASTContext &ctx = getContext();
 
   llvm::Triple moduleTarget(llvm::Triple::normalize(TargetTriple));
   if (!areCompatibleArchitectures(moduleTarget, ctx.LangOpts.Target) ||
       !areCompatibleOSs(moduleTarget, ctx.LangOpts.Target)) {
-    return error(ModuleStatus::TargetIncompatible);
+    return error(Status::TargetIncompatible);
   } else if (isTargetTooNew(moduleTarget, ctx.LangOpts.Target)) {
-    return error(ModuleStatus::TargetTooNew);
+    return error(Status::TargetTooNew);
   }
 
   auto clangImporter = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
@@ -1044,7 +1048,7 @@ ModuleStatus ModuleFile::associateWithFileContext(FileUnit *file,
       // If we're missing the module we're shadowing, treat that specially.
       if (modulePath.size() == 1 &&
           modulePath.front() == file->getParentModule()->Name) {
-        return error(ModuleStatus::MissingShadowedModule);
+        return error(Status::MissingShadowedModule);
       }
 
       // Otherwise, continue trying to load dependencies, so that we can list
@@ -1065,7 +1069,7 @@ ModuleStatus ModuleFile::associateWithFileContext(FileUnit *file,
   }
 
   if (missingDependency) {
-    return error(ModuleStatus::MissingDependency);
+    return error(Status::MissingDependency);
   }
 
   if (Bits.HasUnderlyingModule)

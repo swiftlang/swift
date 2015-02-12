@@ -19,6 +19,7 @@
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Serialization/Validation.h"
 #include "swift/Basic/Dwarf.h"
 #include "llvm/Object/MachO.h"
 #include "llvm/Object/ObjectFile.h"
@@ -59,19 +60,18 @@ void anchorForGetMainExecutable() {}
 using namespace llvm::MachO;
 
 static void printValidationInfo(llvm::StringRef data) {
-  swift::SerializedModuleLoader::ExtendedValidationInfo extendedInfo;
-  swift::SerializedModuleLoader::ValidationInfo info =
-      swift::SerializedModuleLoader::validateSerializedAST(data,
-                                                           &extendedInfo);
-  if (info.status != swift::ModuleStatus::Valid)
+  swift::serialization::ExtendedValidationInfo extendedInfo;
+  swift::serialization::ValidationInfo info =
+      swift::serialization::validateSerializedAST(data, &extendedInfo);
+  if (info.status != swift::serialization::Status::Valid)
     return;
 
   llvm::outs() << "- Target: " << info.targetTriple << "\n";
   if (!extendedInfo.getSDKPath().empty())
     llvm::outs() << "- SDK path: " << extendedInfo.getSDKPath() << "\n";
-  if (!extendedInfo.getClangImporterOptions().empty()) {
+  if (!extendedInfo.getExtraClangImporterOptions().empty()) {
     llvm::outs() << "- -Xcc options:";
-    for (llvm::StringRef option : extendedInfo.getClangImporterOptions())
+    for (llvm::StringRef option : extendedInfo.getExtraClangImporterOptions())
       llvm::outs() << " " << option;
     llvm::outs() << "\n";
   }

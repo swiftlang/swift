@@ -18,6 +18,7 @@
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Serialization/Validation.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -25,17 +26,17 @@ using namespace swift;
 
 bool swift::parseASTSection(SerializedModuleLoader *SML, StringRef buf,
                             SmallVectorImpl<std::string> &foundModules) {
-  if (!SerializedModuleLoader::isSerializedAST(buf))
+  if (!serialization::isSerializedAST(buf))
     return false;
 
   // An AST section consists of one or more AST modules, optionally with
   // headers. Iterate over all AST modules.
   while (!buf.empty()) {
-    auto info = SerializedModuleLoader::validateSerializedAST(buf);
+    auto info = serialization::validateSerializedAST(buf);
 
     assert(info.name.size() < (2 << 10) && "name failed sanity check");
 
-    if (info.status == ModuleStatus::Valid) {
+    if (info.status == serialization::Status::Valid) {
       assert(info.bytes != 0);
       if (!info.name.empty()) {
         StringRef moduleData = buf.substr(0, info.bytes);

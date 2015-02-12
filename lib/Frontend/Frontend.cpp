@@ -130,7 +130,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     auto Copy = std::unique_ptr<llvm::MemoryBuffer>(
         llvm::MemoryBuffer::getMemBufferCopy(
             InputBuffer->getBuffer(), InputBuffer->getBufferIdentifier()));
-    if (SerializedModuleLoader::isSerializedAST(Copy->getBuffer())) {
+    if (serialization::isSerializedAST(Copy->getBuffer())) {
       PartialModules.push_back({ std::move(Copy), nullptr });
     } else {
       unsigned BufferID = SourceMgr.addNewSourceBuffer(std::move(Copy));
@@ -171,8 +171,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
       return true;
     }
 
-    if (SerializedModuleLoader::isSerializedAST(
-                                          InputFileOrErr.get()->getBuffer())) {
+    if (serialization::isSerializedAST(InputFileOrErr.get()->getBuffer())) {
       llvm::SmallString<128> ModuleDocFilePath(File);
       llvm::sys::path::replace_extension(ModuleDocFilePath,
                                          SERIALIZED_MODULE_DOC_EXTENSION);

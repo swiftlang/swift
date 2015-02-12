@@ -161,10 +161,10 @@ FileUnit *SerializedModuleLoader::loadAST(
   }
 
   std::unique_ptr<ModuleFile> loadedModuleFile;
-  ModuleStatus err = ModuleFile::load(std::move(moduleInputBuffer),
-                                      std::move(moduleDocInputBuffer),
-                                      isFramework, loadedModuleFile);
-  if (err == ModuleStatus::Valid) {
+  serialization::Status err = ModuleFile::load(std::move(moduleInputBuffer),
+                                               std::move(moduleDocInputBuffer),
+                                               isFramework, loadedModuleFile);
+  if (err == serialization::Status::Valid) {
     Ctx.bumpGeneration();
 
     // We've loaded the file. Now try to bring it into the AST.
@@ -174,7 +174,7 @@ FileUnit *SerializedModuleLoader::loadAST(
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     err = loadedModuleFile->associateWithFileContext(fileUnit,
                                                      diagLocOrInvalid);
-    if (err == ModuleStatus::Valid) {
+    if (err == serialization::Status::Valid) {
       LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
                                      Ctx.getCurrentGeneration());
       return fileUnit;
@@ -188,29 +188,29 @@ FileUnit *SerializedModuleLoader::loadAST(
     return nullptr;
 
   switch (loadedModuleFile->getStatus()) {
-  case ModuleStatus::Valid:
+  case serialization::Status::Valid:
     llvm_unreachable("At this point we know loading has failed");
 
-  case ModuleStatus::FormatTooNew:
+  case serialization::Status::FormatTooNew:
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_module_too_new,
                        moduleBufferID);
     break;
-  case ModuleStatus::FormatTooOld:
+  case serialization::Status::FormatTooOld:
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_module_too_old,
                        moduleBufferID);
     break;
-  case ModuleStatus::Malformed:
+  case serialization::Status::Malformed:
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module,
                        moduleBufferID);
     break;
 
-  case ModuleStatus::MalformedDocumentation:
+  case serialization::Status::MalformedDocumentation:
     assert(moduleDocBufferID);
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module,
                        moduleDocBufferID ? moduleDocBufferID : "");
     break;
 
-  case ModuleStatus::MissingDependency: {
+  case serialization::Status::MissingDependency: {
     // Figure out /which/ dependencies are missing.
     // FIXME: Dependencies should be de-duplicated at serialization time,
     // not now.
@@ -255,7 +255,7 @@ FileUnit *SerializedModuleLoader::loadAST(
     break;
   }
 
-  case ModuleStatus::MissingShadowedModule: {
+  case serialization::Status::MissingShadowedModule: {
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_shadowed_module,
                        M.Name);
     if (Ctx.SearchPathOpts.SDKPath.empty()) {
@@ -265,7 +265,7 @@ FileUnit *SerializedModuleLoader::loadAST(
     break;
   }
 
-  case ModuleStatus::NameMismatch: {
+  case serialization::Status::NameMismatch: {
     // FIXME: This doesn't handle a non-debugger REPL, which should also treat
     // this as a non-fatal error.
     auto diagKind = diag::serialization_name_mismatch;
@@ -276,7 +276,7 @@ FileUnit *SerializedModuleLoader::loadAST(
     break;
   }
 
-  case ModuleStatus::TargetIncompatible: {
+  case serialization::Status::TargetIncompatible: {
     // FIXME: This doesn't handle a non-debugger REPL, which should also treat
     // this as a non-fatal error.
     auto diagKind = diag::serialization_target_incompatible;
@@ -287,7 +287,7 @@ FileUnit *SerializedModuleLoader::loadAST(
     break;
   }
 
-  case ModuleStatus::TargetTooNew: {
+  case serialization::Status::TargetTooNew: {
     StringRef moduleTargetTriple = loadedModuleFile->getTargetTriple();
     llvm::Triple moduleTarget(llvm::Triple::normalize(moduleTargetTriple));
 
@@ -385,13 +385,6 @@ void SerializedModuleLoader::loadObjCMethods(
     modulePair.first->loadObjCMethods(classDecl, selector, isInstanceMethod,
                                       methods);
   }
-}
-
-bool SerializedModuleLoader::isSerializedAST(StringRef data) {
-  using serialization::MODULE_SIGNATURE;
-  StringRef signatureStr(reinterpret_cast<const char *>(MODULE_SIGNATURE),
-                         llvm::array_lengthof(MODULE_SIGNATURE));
-  return data.startswith(signatureStr);
 }
 
 void SerializedModuleLoader::verifyAllModules() {

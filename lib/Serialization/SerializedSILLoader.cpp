@@ -11,9 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "serialized-sil-loader"
+#include "swift/Serialization/SerializedSILLoader.h"
 #include "DeserializeSIL.h"
 #include "swift/Serialization/ModuleFile.h"
-#include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/Support/Debug.h"
 
@@ -24,6 +25,7 @@ SerializedSILLoader::SerializedSILLoader(ASTContext &Ctx,
                                          Callback *callback) {
 
   // Get a list of SerializedModules from ASTContext.
+  // FIXME: Iterating over LoadedModules is not a good way to do this.
   for (auto &Entry : Ctx.LoadedModules) {
     for (auto File : Entry.second->getFiles()) {
       if (auto LoadedAST = dyn_cast<SerializedASTFile>(File)) {

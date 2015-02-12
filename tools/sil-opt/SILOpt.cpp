@@ -372,7 +372,7 @@ int main(int argc, char **argv) {
   // name of the module to the file's name.
   Invocation.addInputBuffer(FileBufOrErr.get().get());
   bool IsModule = false;
-  if (SerializedModuleLoader::isSerializedAST(FileBufOrErr.get()->getBuffer())){
+  if (serialization::isSerializedAST(FileBufOrErr.get()->getBuffer())) {
     IsModule = true;
     const StringRef Stem = ModuleName.size() ?
                              StringRef(ModuleName) :

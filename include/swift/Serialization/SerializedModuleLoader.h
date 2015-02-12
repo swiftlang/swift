@@ -16,45 +16,9 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include <map>
 
 namespace swift {
 class ModuleFile;
-
-/// Describes whether a loaded module can be used.
-enum class ModuleStatus {
-  /// The module is valid.
-  Valid,
-
-  /// The module file format is too old to be used by this version of the
-  /// compiler.
-  FormatTooOld,
-
-  /// The module file format is too new to be used by this version of the
-  /// compiler.
-  FormatTooNew,
-
-  /// The module file depends on another module that can't be loaded.
-  MissingDependency,
-
-  /// The module file is an overlay for a Clang module, which can't be found.
-  MissingShadowedModule,
-
-  /// The module file is malformed in some way.
-  Malformed,
-
-  /// The module documentation file is malformed in some way.
-  MalformedDocumentation,
-
-  /// The module file's name does not match the module it is being loaded into.
-  NameMismatch,
-
-  /// The module file was built for a different target platform.
-  TargetIncompatible,
-
-  /// The module file was built for a target newer than the current target.
-  TargetTooNew
-};
 
 /// \brief Imports serialized Swift modules into an ASTContext.
 class SerializedModuleLoader : public ModuleLoader {
@@ -125,64 +89,6 @@ public:
                  bool isInstanceMethod,
                  unsigned previousGeneration,
                  llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);
-
-  /// Returns true if the data looks like it contains a serialized AST.
-  static bool isSerializedAST(StringRef data);
-
-  /// \see validateSerializedAST()
-  struct ValidationInfo {
-    StringRef name = {};
-    StringRef targetTriple = {};
-    size_t bytes = 0;
-    ModuleStatus status = ModuleStatus::Malformed;
-  };
-
-  /// A collection of options that can be used to set up a new AST context
-  /// before it has been created.
-  ///
-  /// Note that this is intended to be a transient data structure; as such,
-  /// <strong>none of the string values added to it are copied</strong>.
-  ///
-  /// \sa validateSerializedAST()
-  class ExtendedValidationInfo {
-    SmallVector<StringRef, 4> ClangImporterOpts;
-    StringRef SDKPath;
-  public:
-    ExtendedValidationInfo() = default;
-
-    StringRef getSDKPath() const { return SDKPath; }
-    void setSDKPath(StringRef path) {
-      assert(SDKPath.empty());
-      SDKPath = path;
-    }
-
-    ArrayRef<StringRef> getClangImporterOptions() const {
-      return ClangImporterOpts;
-    }
-    void addClangImporterOption(StringRef option) {
-      ClangImporterOpts.push_back(option);
-    }
-  };
-
-  /// Returns info about the serialized AST in the given data.
-  ///
-  /// If the returned status is anything but ModuleStatus::Valid, the
-  /// serialized data cannot be loaded by this version of the compiler. If the
-  /// returned size is non-zero, it's possible to skip over this module's data,
-  /// in case there is more data in the buffer. The returned name, which may
-  /// be empty, directly points into the given data buffer.
-  ///
-  /// Note that this does not actually try to load the module or validate any
-  /// of its dependencies; it only checks that it /can/ be loaded.
-  ///
-  /// \param data A buffer containing the serialized AST. Result information
-  /// refers directly into this buffer.
-  /// \param[out] extendedInfo If present, will be populated with additional
-  /// compilation options serialized into the AST at build time that may be
-  /// necessary to load it properly.
-  static ValidationInfo
-  validateSerializedAST(StringRef data,
-                        ExtendedValidationInfo *extendedInfo = nullptr);
 
   virtual void verifyAllModules() override;
 };
