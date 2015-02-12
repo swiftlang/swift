@@ -899,7 +899,7 @@ public:
 class AutoClosureAttr : public DeclAttribute {
 public:
   AutoClosureAttr(SourceLoc atLoc, SourceRange range, bool escaping,
-                  bool implicit)
+                  bool implicit = false)
     : DeclAttribute(DAK_AutoClosure, atLoc, range, implicit)
   {
     AutoClosureAttrBits.Escaping = escaping;

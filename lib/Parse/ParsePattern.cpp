@@ -277,7 +277,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
             .fixItRemove(SourceRange(AtLoc, ACLoc))
             .fixItInsert(StartLoc, "@autoclosure ");
           param.Attrs.add(new (Context) AutoClosureAttr(AtLoc, ACLoc,
-                                                        false, false));
+                                                        /*escaping=*/false));
         }
 
         auto type = parseType(diag::expected_parameter_type);

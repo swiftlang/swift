@@ -336,12 +336,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
   case DAK_AutoClosure: {
     // If we don't have "(escaping", it's just a bare @autoclosure.
-    if (!Tok.is(tok::l_paren) ||
-        !peekToken().is(tok::identifier) ||
-        peekToken().getText() != "escaping") {
+    if (Tok.isNot(tok::l_paren) || peekToken().getText() != "escaping") {
       if (!DiscardAttribute)
-        Attributes.add(new (Context) AutoClosureAttr(AtLoc, Loc, false,
-                                                     false));
+        Attributes.add(new (Context) AutoClosureAttr(AtLoc, Loc,
+                                                     /*escaping=*/false));
       break;
     }
 
@@ -361,7 +359,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     if (!DiscardAttribute)
       Attributes.add(new (Context) AutoClosureAttr(AtLoc,
                                                    SourceRange(Loc, rParenLoc),
-                                                   true, false));
+                                                   /*escaping=*/true));
 
     break;
   }
