@@ -3927,10 +3927,6 @@ public:
     VarDeclBits.IsDebuggerVar = IsDebuggerVar;
   }
 
-  /// Retrieve the name of the Objective-C property that would
-  /// correspond to this variable.
-  Identifier getObjCPropertyName() const;
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
     return D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param; 

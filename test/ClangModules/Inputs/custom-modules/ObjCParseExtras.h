@@ -113,8 +113,3 @@ __weak id globalWeakVar;
 @interface NonNullDefaultInitSub : NonNullDefaultInit
 + (null_unspecified instancetype)sub;
 @end
-
-@interface SomeCell : NSObject
--(instancetype)initString:(NSString *)string;
-@property (nonatomic,readonly,getter=isEnabled) BOOL enabled;
-@end

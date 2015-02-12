@@ -1581,7 +1581,7 @@ namespace {
       buildPropertyAttributes(prop, propertyAttributes);
       
       llvm::Constant *fields[] = {
-        IGM.getAddrOfGlobalString(prop->getObjCPropertyName().str()),
+        IGM.getAddrOfGlobalString(prop->getName().str()),
         IGM.getAddrOfGlobalString(propertyAttributes)
       };
       return llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), fields);

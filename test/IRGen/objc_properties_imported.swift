@@ -10,10 +10,10 @@ import Properties
 // CHECK: @_INSTANCE_METHODS__TtC24objc_properties_imported21OverridesBoolProperty{{.*}}_selector_data(isEnabled){{.*}}L_selector_data(setIsEnabled:)
 class OverridesBoolProperty : HasProperties {
   override var enabled : Bool {
-    @objc(isEnabled) get {
+    get {
       return super.enabled
     }
-    @objc(setIsEnabled:) set {
+    set {
       super.enabled = newValue
     }
   }

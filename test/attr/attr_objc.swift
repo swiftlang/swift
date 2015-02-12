@@ -1639,27 +1639,11 @@ class BadClass2 {
 // Swift overrides that aren't also @objc overrides.
 class Super {
   @objc(renamedFoo)
-  var foo: Int { get { return 3 } } // expected-note 3{{overridden declaration is here}}
+  var foo: Int { get { return 3 } } // expected-note{{overridden declaration is here}}
 }
 
-class Sub1 : Super {
-  @objc(foo) // expected-error{{Objective-C property has a different name from the property it overrides ('foo' vs. 'renamedFoo')}}{{9-12=renamedFoo}}
-  override var foo: Int { get { return 5 } }
-}
-
-class Sub2 : Super {
-  // FIXME: The @objc name should be inherited.
-  @objc // expected-error{{Objective-C property has a different name from the property it overrides ('foo' vs. 'renamedFoo')}}{{8-8=(renamedFoo)}}
-  override var foo: Int { get { return 5 } }
-}
-
-class Sub3 : Super {
-  // FIXME: The @objc name should be inherited.
-  override var foo: Int { get { return 5 } } // expected-error{{Objective-C property has a different name from the property it overrides ('foo' vs. 'renamedFoo')}}{{3-3=@objc(renamedFoo) }}
-}
-
-class Sub4 : Super {
-  @objc(renamedFoo)
+class Sub : Super {
+  @objc(foo) // expected-error{{declaration has a different @objc name from the declaration it overrides ('foo' vs. 'renamedFoo')}}
   override var foo: Int { get { return 5 } }
 }
 
