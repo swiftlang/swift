@@ -29,6 +29,21 @@ In the Xcode UI, one can modify the current optimization level as follows:
 
 ...
 
+
+Whole Module Optimizations
+==========================
+
+By default Swift compiles each file individually. This allows Xcode to
+compile multiple files in parallel very quickly. However, compiling each file
+separately prevents certain compiler optimizations. Swift can also compile
+the entire program as if it were one file and optimize the program as if it
+were a single compilation unit. This mode is enabled using the command
+line flag ``-whole-module-optimizations``. Programs that are compiled in
+this mode will most likely take longer to compile, but may run faster.
+
+This mode can be enabled using the Xcode build setting 'Whole Module Optimization'.
+
+
 Limiting Language Dynamicism
 ============================
 
