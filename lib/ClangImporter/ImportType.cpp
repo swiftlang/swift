@@ -1065,13 +1065,10 @@ static Type applyNoEscape(Type type) {
     return OptionalType::get(optKind, applyNoEscape(objectType));
   }
 
-  // Apply @noescape to @objc_block function types.
+  // Apply @noescape to function types.
   if (auto funcType = type->getAs<FunctionType>()) {
-    if (funcType->getExtInfo().getRepresentation()
-          == AnyFunctionType::Representation::Block) {
-      return FunctionType::get(funcType->getInput(), funcType->getResult(),
-                               funcType->getExtInfo().withNoEscape());
-    }
+    return FunctionType::get(funcType->getInput(), funcType->getResult(),
+                             funcType->getExtInfo().withNoEscape());
   }
 
   return type;

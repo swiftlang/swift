@@ -3,7 +3,7 @@
 
 @interface NSString ()
 
-- (void)enumerateLinesUsingBlock:(void (^)(NSString *line)) f;
+- (void)enumerateLinesUsingBlock:(__attribute__((noescape)) void (^)(NSString *line)) f;
 // FIXME: The importer drops this.
 //- (void)enumerateLinesUsingBlock:(void (^)(NSString *line, BOOL *b)) f;
 
