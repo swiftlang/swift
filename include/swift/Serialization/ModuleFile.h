@@ -28,6 +28,7 @@
 #include "llvm/ADT/Fixnum.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Bitcode/BitstreamReader.h"
+#include "llvm/Support/MemoryBuffer.h"
 
 namespace llvm {
   class BitstreamCursor;
