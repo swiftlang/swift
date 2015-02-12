@@ -105,8 +105,14 @@ class Sub : Super {
   override func f3(@autoclosure(escaping) x: () -> ()) { }  // expected-error{{does not override any method}}
 }
 
-func func12a(@autoclosure x: () -> Int) { }
-func func12b(@autoclosure(escaping) x: () -> Int) { }
+func func12_sink(x: () -> Int) { }
+
+func func12a(@autoclosure x: () -> Int) { 
+  func12_sink(x) // expected-error{{invalid use of non-escaping function in escaping context '() -> Int'}}
+}
+func func12b(@autoclosure(escaping) x: () -> Int) { 
+  func12_sink(x)
+}
 
 class TestFunc12 {
   var x: Int = 5
