@@ -205,7 +205,7 @@ func withSwiftObjectCanary<T>(
   let stackTrace = SourceLocStack(SourceLoc(file, line))
 
   swiftObjectCanaryCount = 0
-  if true {
+  autoreleasepool {
     var valueWithCanary = createValue()
     expectEqual(1, swiftObjectCanaryCount, stackTrace: stackTrace)
     check(valueWithCanary)
@@ -673,7 +673,7 @@ var RuntimeFoundationWrappers = TestSuite("RuntimeFoundationWrappers")
 
 RuntimeFoundationWrappers.test("_stdlib_NSObject_isEqual/NoLeak") {
   nsObjectCanaryCount = 0
-  if true {
+  autoreleasepool {
     let a = NSObjectCanary()
     let b = NSObjectCanary()
     expectEqual(2, nsObjectCanaryCount)
@@ -706,7 +706,7 @@ RuntimeFoundationWrappers.test(
   "_stdlib_compareNSStringDeterministicUnicodeCollation/NoLeak"
 ) {
   nsStringCanaryCount = 0
-  if true {
+  autoreleasepool {
     let a = NSStringCanary()
     let b = NSStringCanary()
     expectEqual(2, nsStringCanaryCount)
@@ -717,7 +717,7 @@ RuntimeFoundationWrappers.test(
 
 RuntimeFoundationWrappers.test("_stdlib_NSStringNFDHashValue/NoLeak") {
   nsStringCanaryCount = 0
-  if true {
+  autoreleasepool {
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
     _stdlib_NSStringNFDHashValue(a)
@@ -727,7 +727,7 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringNFDHashValue/NoLeak") {
 
 RuntimeFoundationWrappers.test("_stdlib_NSStringASCIIHashValue/NoLeak") {
   nsStringCanaryCount = 0
-  if true {
+  autoreleasepool {
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
     _stdlib_NSStringASCIIHashValue(a)
@@ -737,7 +737,7 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringASCIIHashValue/NoLeak") {
 
 RuntimeFoundationWrappers.test("_stdlib_NSStringHasPrefixNFD/NoLeak") {
   nsStringCanaryCount = 0
-  if true {
+  autoreleasepool {
     let a = NSStringCanary()
     let b = NSStringCanary()
     expectEqual(2, nsStringCanaryCount)
@@ -748,7 +748,7 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringHasPrefixNFD/NoLeak") {
 
 RuntimeFoundationWrappers.test("_stdlib_NSStringHasSuffixNFD/NoLeak") {
   nsStringCanaryCount = 0
-  if true {
+  autoreleasepool {
     let a = NSStringCanary()
     let b = NSStringCanary()
     expectEqual(2, nsStringCanaryCount)
@@ -759,7 +759,7 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringHasSuffixNFD/NoLeak") {
 
 RuntimeFoundationWrappers.test("_stdlib_NSStringLowercaseString/NoLeak") {
   nsStringCanaryCount = 0
-  if true {
+  autoreleasepool {
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
     _stdlib_NSStringLowercaseString(a)
@@ -769,7 +769,7 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringLowercaseString/NoLeak") {
 
 RuntimeFoundationWrappers.test("_stdlib_NSStringUppercaseString/NoLeak") {
   nsStringCanaryCount = 0
-  if true {
+  autoreleasepool {
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
     _stdlib_NSStringUppercaseString(a)
@@ -779,7 +779,7 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringUppercaseString/NoLeak") {
 
 RuntimeFoundationWrappers.test("_stdlib_CFStringCreateCopy/NoLeak") {
   nsStringCanaryCount = 0
-  if true {
+  autoreleasepool {
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
     _stdlib_binary_CFStringCreateCopy(a)
@@ -789,7 +789,7 @@ RuntimeFoundationWrappers.test("_stdlib_CFStringCreateCopy/NoLeak") {
 
 RuntimeFoundationWrappers.test("_stdlib_CFStringGetLength/NoLeak") {
   nsStringCanaryCount = 0
-  if true {
+  autoreleasepool {
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
     _stdlib_binary_CFStringGetLength(a)
@@ -799,7 +799,7 @@ RuntimeFoundationWrappers.test("_stdlib_CFStringGetLength/NoLeak") {
 
 RuntimeFoundationWrappers.test("_stdlib_CFStringGetCharactersPtr/NoLeak") {
   nsStringCanaryCount = 0
-  if true {
+  autoreleasepool {
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
     _stdlib_binary_CFStringGetCharactersPtr(a)
@@ -1296,7 +1296,7 @@ Reflection.test("Unmanaged/not-nil") {
 Reflection.test("TupleMirror/NoLeak") {
   if true {
     nsObjectCanaryCount = 0
-    if true {
+    autoreleasepool {
       var tuple = (1, NSObjectCanary())
       expectEqual(1, nsObjectCanaryCount)
       var output = ""
@@ -1306,7 +1306,7 @@ Reflection.test("TupleMirror/NoLeak") {
   }
   if true {
     nsObjectCanaryCount = 0
-    if true {
+    autoreleasepool {
       var tuple = (1, NSObjectCanaryStruct())
       expectEqual(1, nsObjectCanaryCount)
       var output = ""
@@ -1316,7 +1316,7 @@ Reflection.test("TupleMirror/NoLeak") {
   }
   if true {
     swiftObjectCanaryCount = 0
-    if true {
+    autoreleasepool {
       var tuple = (1, SwiftObjectCanary())
       expectEqual(1, swiftObjectCanaryCount)
       var output = ""
@@ -1326,7 +1326,7 @@ Reflection.test("TupleMirror/NoLeak") {
   }
   if true {
     swiftObjectCanaryCount = 0
-    if true {
+    autoreleasepool {
       var tuple = (1, SwiftObjectCanaryStruct())
       expectEqual(1, swiftObjectCanaryCount)
       var output = ""
