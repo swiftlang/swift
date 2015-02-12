@@ -249,5 +249,10 @@ CharacterTests.test(
     { x in { String(Character(x)) < String(Character($0)) } } as PredicateFn)
 }
 
+CharacterTests.test("non-ascii should trap") {
+  expectCrashLater()
+  let theNumber229 = UInt8(ascii: "å")
+}
+
 runAllTests()
 
