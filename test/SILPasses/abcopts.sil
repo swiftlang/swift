@@ -25,6 +25,18 @@ struct IntTupleStruct {
 // CHECK-LABEL: sil @abcopt_singleblock
 sil @abcopt_singleblock : $@thin(@inout ArrayInt, @inout ArrayInt) -> () {
 bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
+  // Don't assert on functions that are marked with array semantics but are not
+  // methods.
+  %302 = function_ref @checkbounds_no_meth : $@thin (Int32, @owned ArrayInt) -> ()
+  %303 = load %0 : $*ArrayInt
+  %304 = struct_extract %303 : $ArrayInt, #ArrayInt.buffer
+  %305 = struct_extract %304 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %305 : $Builtin.NativeObject
+  %306 = integer_literal $Builtin.Int32, 0
+  %307 = struct $Int32(%306 : $Builtin.Int32)
+  %308 = apply %302(%307, %303) : $@thin (Int32, @owned ArrayInt) -> ()
+  // CHECK: [[CHECKBOUNDSNO:%[0-9]+]] = function_ref @checkbounds_no_meth
+
   %200 = function_ref @arrayinit: $@thin () -> @owned ArrayInt
   %201 = apply %200() : $@thin () -> @owned ArrayInt
 
@@ -697,6 +709,10 @@ bb3:
   return %23 : $Int32
 }
 
+sil public_external [semantics "array.check_subscript"] @checkbounds_no_meth : $@thin (Int32, @owned ArrayInt) -> () {
+  bb0(%0: $Int32, %1: $ArrayInt):
+    unreachable
+}
 sil public_external [semantics "array.check_subscript"] @checkbounds : $@cc(method) @thin (Int32, @owned ArrayInt) -> () {
   bb0(%0: $Int32, %1: $ArrayInt):
     unreachable

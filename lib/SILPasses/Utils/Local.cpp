@@ -336,17 +336,16 @@ swift::ArraySemanticsCall::ArraySemanticsCall(ValueBase *V,
   if (auto AI = dyn_cast<ApplyInst>(V))
     if (auto FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
       if (auto FunRef = FRI->getReferencedFunction()) {
-        if (MatchPartialName) {
-          if (FunRef->hasDefinedSemantics() &&
-              FunRef->getSemanticsString().startswith(SemanticStr)) {
-            SemanticsCall = AI;
-            return;
-          }
-        } else {
-          if (FunRef->hasSemanticsString(SemanticStr)) {
-            SemanticsCall = AI;
-            return;
-          }
+        if ((MatchPartialName &&
+             (FunRef->hasDefinedSemantics() &&
+              FunRef->getSemanticsString().startswith(SemanticStr))) ||
+            (!MatchPartialName && FunRef->hasSemanticsString(SemanticStr))) {
+          SemanticsCall = AI;
+          // Need a 'self' argument otherwise this is not a semantic call that
+          // we recognize.
+          if (getKind() < ArrayCallKind::kArrayInit && !hasSelf())
+            SemanticsCall = nullptr;
+          return;
         }
       }
   // Otherwise, this is not the semantic call we are looking for.
