@@ -170,15 +170,9 @@ public struct FilterCollectionView<Base: CollectionType> : CollectionType {
 /// Return an `Array` containing the elements of `source`,
 /// in order, that satisfy the predicate `includeElement`.
 public func filter<S : SequenceType>(
-  source: S, @noescape includeElement: (S.Generator.Element) -> Bool
+  source: S, includeElement: (S.Generator.Element) -> Bool
 ) -> [S.Generator.Element] {
-  var result: [S.Generator.Element] = []
-  for element in source {
-    if includeElement(element) {
-      result.append(element)
-    }
-  }
-  return result
+  return lazy(source).filter(includeElement).array
 }
 
 % traversals = ('Forward', 'Bidirectional', 'RandomAccess')

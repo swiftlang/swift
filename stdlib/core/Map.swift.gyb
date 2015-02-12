@@ -62,14 +62,9 @@ public struct MapSequenceView<Base: SequenceType, T> : SequenceType {
 /// Return an `Array` containing the results of mapping `transform`
 /// over `source`.
 public func map<S : SequenceType, T>(
-  source: S, @noescape transform: (S.Generator.Element) -> T
+  source: S, transform: (S.Generator.Element) -> T
 ) -> [T] {
-  var result: [T] = []
-  result.reserveCapacity(underestimateCount(source))
-  for element in source {
-    result.append(transform(element))
-  }
-  return result
+  return lazy(source).map(transform).array
 }
 
 //===--- Collections ------------------------------------------------------===//
@@ -117,14 +112,9 @@ public struct MapCollectionView<Base: CollectionType, T> : CollectionType {
 /// Return an `Array` containing the results of mapping `transform`
 /// over `source`.
 public func map<C : CollectionType, T>(
-  source: C, @noescape transform: (C.Generator.Element) -> T
+  source: C, transform: (C.Generator.Element) -> T
 ) -> [T] {
-  var result: [T] = []
-  result.reserveCapacity(underestimateCount(source))
-  for element in source {
-    result.append(transform(element))
-  }
-  return result
+  return lazy(source).map(transform).array
 }
 
 //===--- Support for lazy(s) ----------------------------------------------===//

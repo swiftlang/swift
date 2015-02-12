@@ -240,7 +240,7 @@ public func ~= <I : ForwardIndexType where I: Comparable> (
 extension Range {
   /// Return an array containing the results of calling
   /// `transform(x)` on each element `x` of `self`.
-  public func map<U>(@noescape transform: (T)->U) -> [U] {
+  public func map<U>(transform: (T)->U) -> [U] {
     return Swift.map(self, transform)
   }
 }
