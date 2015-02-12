@@ -138,6 +138,7 @@ func test_StdlibTypesPrinted() {
 
   var ch: Character = "a"
   printedIs(ch, "a")
+  debugPrintedIs(ch, "\"a\"")
 
   var us: UnicodeScalar = "a"
   printedIs(us, "a")

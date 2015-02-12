@@ -276,6 +276,13 @@ public struct Character :
   internal var _representation: Representation
 }
 
+extension Character : DebugPrintable {
+  /// A textual representation of `self`, suitable for debugging.
+  public var debugDescription: String {
+    return String(self).debugDescription
+  }
+}
+
 extension String {
   /// Construct an instance containing just the given `Character`.
   public init(_ c: Character) {
