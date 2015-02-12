@@ -168,14 +168,14 @@ swift_stdlib_NSStringHasSuffixNFD(NSString *NS_RELEASES_ARGUMENT theString,
   return Result;
 }
 
-extern "C" NSString *
+extern "C" NS_RETURNS_RETAINED NSString *
 swift_stdlib_NSStringLowercaseString(NSString *NS_RELEASES_ARGUMENT str) {
   NSString *Result = objc_retain(str.lowercaseString);
   swift_unknownRelease(str);
   return Result;
 }
 
-extern "C" NSString *
+extern "C" NS_RETURNS_RETAINED NSString *
 swift_stdlib_NSStringUppercaseString(NSString *NS_RELEASES_ARGUMENT str) {
   NSString *Result = objc_retain(str.uppercaseString);
   swift_unknownRelease(str);
