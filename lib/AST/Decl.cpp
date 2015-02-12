@@ -2652,6 +2652,17 @@ StaticSpellingKind VarDecl::getCorrectStaticSpelling() const {
   return getCorrectStaticSpellingForDecl(this);
 }
 
+Identifier VarDecl::getObjCPropertyName() const {
+  // If we have an @objc attribute with a name, use that.
+  if (auto objc = getAttrs().getAttribute<ObjCAttr>()) {
+    if (objc->hasName())
+      return objc->getName()->getSelectorPieces()[0];
+  }
+
+  // Otherwise, just use the name.
+  return getName();
+}
+
 /// Determine whether the given Swift type is an integral type, i.e.,
 /// a type that wraps a builtin integer.
 static bool isIntegralType(Type type) {

@@ -4267,6 +4267,9 @@ public:
 
     auto abstractStorage = dyn_cast<AbstractStorageDecl>(decl);
     assert((method || abstractStorage) && "Not a method or abstractStorage?");
+    SubscriptDecl *subscript = nullptr;
+    if (abstractStorage)
+      subscript = dyn_cast<SubscriptDecl>(abstractStorage);
 
     // Figure out the type of the declaration that we're using for comparisons.
     auto declTy = decl->getInterfaceType()->getUnlabeledType(TC.Context);
@@ -4281,17 +4284,6 @@ public:
     // we'll enforce this separately
     if (ctor) {
       declTy = dropResultOptionality(declTy, 1);
-    }
-      
-    // If the method is an Objective-C method, compute its selector.
-    Optional<ObjCSelector> methodSelector;
-    ObjCSubscriptKind subscriptKind = ObjCSubscriptKind::None;
-
-    if (decl->isObjC()) {
-      if (method)
-        methodSelector = method->getObjCSelector();
-      else if (auto *subscript = dyn_cast<SubscriptDecl>(abstractStorage))
-        subscriptKind = subscript->getObjCSubscriptKind(&TC);
     }
 
     // Look for members with the same name and matching types as this
@@ -4328,27 +4320,23 @@ public:
       auto parentStorage = dyn_cast<AbstractStorageDecl>(parentDecl);
       assert(parentMethod || parentStorage);
 
-      // If both are Objective-C, then match based on selectors or subscript
-      // kind and check the types separately.
+      // If both are Objective-C, then match based on selectors or
+      // subscript kind and check the types separately.
       bool objCMatch = false;
-      if (decl->isObjC() && parentDecl->isObjC()) {
+      if (parentDecl->isObjC() && decl->isObjC()) {
         if (method) {
-          // If the selectors don't match, it's not an override.
-          if (*methodSelector != parentMethod->getObjCSelector())
-            continue;
-
-          objCMatch = true;
+          if (method->getObjCSelector() == parentMethod->getObjCSelector())
+            objCMatch = true;
         } else if (auto *parentSubscript =
                      dyn_cast<SubscriptDecl>(parentStorage)) {
           // If the subscript kinds don't match, it's not an override.
-          if (subscriptKind != parentSubscript->getObjCSubscriptKind(&TC))
-            continue;
-
-          objCMatch = true;
+          if (subscript->getObjCSubscriptKind(&TC)
+                == parentSubscript->getObjCSubscriptKind(&TC))
+            objCMatch = true;
         }
 
-        // Properties don't need anything here since they are always checked by
-        // name.
+        // Properties don't need anything here since they are always
+        // checked by name.
       }
 
       // Check whether the types are identical.
@@ -4367,6 +4355,11 @@ public:
       // we'll enforce this separately
       if (ctor) {
         parentDeclTy = dropResultOptionality(parentDeclTy, 1);
+
+        // Factory methods cannot be overridden.
+        auto parentCtor = cast<ConstructorDecl>(parentDecl);
+        if (parentCtor->isFactoryInit())
+          continue;
       }
 
       if (declTy->isEqual(parentDeclTy)) {
@@ -4396,10 +4389,12 @@ public:
       if (objCMatch) {
         if (method) {
           TC.diagnose(decl, diag::override_objc_type_mismatch_method,
-                      *methodSelector, declTy);
+                      method->getObjCSelector(), declTy);
         } else {
           TC.diagnose(decl, diag::override_objc_type_mismatch_subscript,
-                      static_cast<unsigned>(subscriptKind), declTy);
+                      static_cast<unsigned>(
+                        subscript->getObjCSubscriptKind(&TC)),
+                      declTy);
         }
         TC.diagnose(parentDecl, diag::overridden_here_with_type,
                     parentDeclTy);
@@ -4687,41 +4682,121 @@ public:
       }
     }
 
+    /// FIXME: Hack that returns the "true" starting source location
+    /// for a declaration, which includes looking at the attributes.
+    SourceLoc getTrueStartLoc(Decl *decl) {
+      // Find the last attribute in the list (which is first in the source).
+      DeclAttribute *lastAttr = nullptr;
+      for (auto attr : decl->getAttrs()) {
+        if (attr->getRangeWithAt().Start.isValid())
+          lastAttr = attr;
+      }
+
+      return lastAttr ? lastAttr->getRangeWithAt().Start : decl->getStartLoc();
+    }
+
+
     void visitObjCAttr(ObjCAttr *attr) {
-      // If the attribute on the base does not have a name, there's nothing
-      // to check.
-      if (!attr->hasName())
-        return;
+      // For methods, check the Objective-C selector.
+      if (auto overrideFunc = dyn_cast<AbstractFunctionDecl>(Override)) {
+        auto baseFunc = cast<AbstractFunctionDecl>(Base);
 
-      // If the overriding declaration already has an @objc attribute, check
-      // whether the names are consistent.
-      auto name = *attr->getName();
-      if (auto overrideAttr = Override->getAttrs().getAttribute<ObjCAttr>()) {
-        if (overrideAttr->hasName()) {
-          auto overrideName =  *overrideAttr->getName();
+        // If the selectors match, we're done.
+        ObjCSelector baseSelector = baseFunc->getObjCSelector();
+        if (baseSelector == overrideFunc->getObjCSelector())
+          return;
 
-          // If the names (and kind) match, we're done.
-          if (overrideName == name) {
+        // The selectors differ. Complain.
+        overrideFunc->setInvalid();
+        llvm::SmallString<64> baseScratch;
+        StringRef baseSelectorStr = baseSelector.getString(baseScratch);
+
+        // If we already have an explicitly-specified @objc attribute...
+        if (auto overrideAttr
+              = overrideFunc->getAttrs().getAttribute<ObjCAttr>()) {
+          if (!overrideAttr->isImplicit()) {
+            // The user specified a selector: replace it with the correct name.
+            if (overrideAttr->hasName() && !overrideAttr->isNameImplicit()) {
+              TC.diagnose(overrideAttr->AtLoc,
+                          diag::objc_override_method_selector_mismatch,
+                          *overrideAttr->getName(), baseSelector)
+                .fixItReplaceChars(overrideAttr->getNameLocs().front(),
+                                   overrideAttr->getRParenLoc(),
+                                   baseSelectorStr);
+              TC.diagnose(baseFunc, diag::overridden_here);
+              return;
+            }
+
+            // The user did not specify a selector; add one.
+            TC.diagnose(overrideAttr->AtLoc,
+                        diag::objc_override_method_selector_mismatch,
+                        overrideFunc->getObjCSelector(), baseSelector)
+              .fixItInsert(Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                                      overrideAttr->Range.End),
+                           ("(" + baseSelectorStr + ")").str());
+            TC.diagnose(baseFunc, diag::overridden_here);
             return;
           }
-
-          // The names don't match, which indicates that this is a Swift
-          // override that is not going to be reflected in Objective-C.
-          llvm::SmallString<64> baseScratch, overrideScratch;
-          TC.diagnose(overrideAttr->AtLoc, diag::objc_override_name_mismatch,
-                      overrideName, name);
-          TC.diagnose(Base, diag::overridden_here);
         }
 
-        // Set the name on the attribute.
-        const_cast<ObjCAttr *>(overrideAttr)->setName(name, /*implicit=*/true);
+        SourceLoc trueStartLoc = getTrueStartLoc(overrideFunc);
+        TC.diagnose(overrideFunc->getStartLoc(),
+                    diag::objc_override_method_selector_mismatch,
+                    overrideFunc->getObjCSelector(), baseSelector)
+          .fixItInsert(trueStartLoc,
+                       ("@objc(" + baseSelectorStr + ") ").str());
+        TC.diagnose(baseFunc, diag::overridden_here);
         return;
       }
 
-      // Copy the name from the base declaration to the overriding
-      // declaration.
-      Override->getAttrs().add(attr->clone(TC.Context));
-      return;
+      // Check the name of properties.
+      if (auto overrideVar = dyn_cast<VarDecl>(Override)) {
+        auto baseVar = cast<VarDecl>(Base);
+
+        // If the names match, we're done.
+        Identifier baseName = baseVar->getObjCPropertyName();
+        Identifier overrideName = overrideVar->getObjCPropertyName();
+        if (overrideName == baseName)
+          return;
+
+        // Complain about the mismatch in Objective-C property names.
+        if (auto overrideAttr
+              = overrideVar->getAttrs().getAttribute<ObjCAttr>()) {
+          if (!overrideAttr->isImplicit()) {
+            // The user specified a name: replace it with the correct name.
+            if (overrideAttr->hasName() && !overrideAttr->isNameImplicit()) {
+              TC.diagnose(overrideAttr->AtLoc,
+                          diag::objc_override_property_name_mismatch,
+                          overrideName, 
+                          baseName)
+                .fixItReplaceChars(overrideAttr->getNameLocs().front(),
+                                   overrideAttr->getRParenLoc(),
+                                   baseName.str());
+              TC.diagnose(baseVar, diag::overridden_here);
+              return;
+            }
+
+            // The user did not specify a selector; add one.
+            TC.diagnose(overrideAttr->AtLoc,
+                        diag::objc_override_property_name_mismatch,
+                        overrideName, baseName)
+              .fixItInsert(Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                                      overrideAttr->Range.End),
+                           ("(" + baseName.str() + ")").str());
+            TC.diagnose(baseVar, diag::overridden_here);
+            return;
+          }
+        }
+
+        SourceLoc trueStartLoc = getTrueStartLoc(overrideVar);
+        TC.diagnose(overrideVar->getStartLoc(),
+                    diag::objc_override_property_name_mismatch,
+                    overrideName, baseName)
+          .fixItInsert(trueStartLoc,
+                       ("@objc(" + baseName.str() + ") ").str());
+        TC.diagnose(baseVar, diag::overridden_here);
+        return;
+      }
     }
             
     void visitDynamicAttr(DynamicAttr *attr) {
@@ -4820,8 +4895,7 @@ public:
       else
         TC.diagnose(override, diag::missing_override);
       TC.diagnose(base, diag::overridden_here);
-      override->getAttrs().add(
-          new (TC.Context) OverrideAttr(SourceLoc()));
+      override->getAttrs().add(new (TC.Context) OverrideAttr(true));
     }
 
     // FIXME: Possibly should extend to more availability checking.
@@ -4879,9 +4953,8 @@ public:
 
         // FIXME: Egregious hack to set an 'override' attribute.
         if (!overridingAccessor->getAttrs().hasAttribute<OverrideAttr>()) {
-          auto loc = overridingASD->getOverrideLoc();
           overridingAccessor->getAttrs().add(
-              new (TC.Context) OverrideAttr(loc));
+              new (TC.Context) OverrideAttr(true));
         }
 
         recordOverride(TC, overridingAccessor, baseAccessor);

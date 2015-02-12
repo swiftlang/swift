@@ -1818,9 +1818,13 @@ ERROR(objc_invalid_on_foreign_class,sema_objc,none,
 
 #undef OBJC_ATTR_SELECT
 
-ERROR(objc_override_name_mismatch,sema_objc,none,
-      "declaration has a different @objc name from the declaration it "
-      "overrides (%0 vs. %1)", (ObjCSelector, ObjCSelector))
+ERROR(objc_override_method_selector_mismatch,sema_objc,none,
+      "Objective-C method has a different selector from the "
+      "method it overrides (%0 vs. %1)", (ObjCSelector, ObjCSelector))
+
+ERROR(objc_override_property_name_mismatch,sema_objc,none,
+      "Objective-C property has a different name from the "
+      "property it overrides (%0 vs. %1)", (Identifier, Identifier))
 
 ERROR(broken_bridged_to_objc_protocol,sema_tcd,none,
       "_BridgedToObjectiveC protocol is broken", ())

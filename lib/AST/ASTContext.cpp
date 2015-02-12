@@ -1622,13 +1622,13 @@ bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
     // Diagnose the override.
     auto methodDiagInfo = getObjCMethodDiagInfo(method);
     auto overriddenDiagInfo = getObjCMethodDiagInfo(overriddenMethod);
-    Diags.diagnose(method->getLoc(), diag::objc_override_other,
+    Diags.diagnose(method, diag::objc_override_other,
                    methodDiagInfo.first,
                    methodDiagInfo.second,
                    selector,
                    overriddenMethod->getDeclContext()
                      ->getDeclaredInterfaceType());
-    Diags.diagnose(overriddenMethod->getLoc(), diag::objc_override_other_here,
+    Diags.diagnose(overriddenMethod, diag::objc_override_other_here,
                    overriddenDiagInfo.first,
                    overriddenDiagInfo.second,
                    selector);
