@@ -1166,6 +1166,32 @@ Reflection.test("ObjectIdentity") {
   expectEqual(.Class, reflect(x).disposition)
 }
 
+Reflection.test("String/Mirror") {
+  if true {
+    var output = ""
+    dump("", &output)
+
+    let expected =
+      "- \n"
+
+    expectEqual(expected, output)
+  }
+
+  if true {
+    // U+0061 LATIN SMALL LETTER A
+    // U+304B HIRAGANA LETTER KA
+    // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
+    // U+1F425 FRONT-FACING BABY CHICK
+    var output = ""
+    dump("\u{61}\u{304b}\u{3099}\u{1f425}", &output)
+
+    let expected =
+      "- \u{61}\u{304b}\u{3099}\u{1f425}\n"
+
+    expectEqual(expected, output)
+  }
+}
+
 Reflection.test("String.UTF8View/Mirror") {
   // U+0061 LATIN SMALL LETTER A
   // U+304B HIRAGANA LETTER KA
@@ -1221,6 +1247,186 @@ Reflection.test("String.UnicodeScalarView/Mirror") {
     "  - [3]: \u{1f425}\n"
 
   expectEqual(expected, output)
+}
+
+Reflection.test("Character/Mirror") {
+  if true {
+    // U+0061 LATIN SMALL LETTER A
+    let input: Character = "\u{61}"
+    var output = ""
+    dump(input, &output)
+
+    let expected =
+      "- \u{61}\n"
+
+    expectEqual(expected, output)
+  }
+
+  if true {
+    // U+304B HIRAGANA LETTER KA
+    // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
+    let input: Character = "\u{304b}\u{3099}"
+    var output = ""
+    dump(input, &output)
+
+    let expected =
+      "- \u{304b}\u{3099}\n"
+
+    expectEqual(expected, output)
+  }
+
+  if true {
+    // U+1F425 FRONT-FACING BABY CHICK
+    let input: Character = "\u{1f425}"
+    var output = ""
+    dump(input, &output)
+
+    let expected =
+      "- \u{1f425}\n"
+
+    expectEqual(expected, output)
+  }
+}
+
+Reflection.test("UnicodeScalar") {
+  if true {
+    // U+0061 LATIN SMALL LETTER A
+    let input: UnicodeScalar = "\u{61}"
+    var output = ""
+    dump(input, &output)
+
+    let expected =
+      "- \u{61}\n"
+
+    expectEqual(expected, output)
+  }
+
+  if true {
+    // U+304B HIRAGANA LETTER KA
+    let input: UnicodeScalar = "\u{304b}"
+    var output = ""
+    dump(input, &output)
+
+    let expected =
+      "- \u{304b}\n"
+
+    expectEqual(expected, output)
+  }
+
+  if true {
+    // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
+    let input: UnicodeScalar = "\u{3099}"
+    var output = ""
+    dump(input, &output)
+
+    let expected =
+      "- \u{3099}\n"
+
+    expectEqual(expected, output)
+  }
+
+  if true {
+    // U+1F425 FRONT-FACING BABY CHICK
+    let input: UnicodeScalar = "\u{1f425}"
+    var output = ""
+    dump(input, &output)
+
+    let expected =
+      "- \u{1f425}\n"
+
+    expectEqual(expected, output)
+  }
+}
+
+Reflection.test("Bool") {
+  if true {
+    var output = ""
+    dump(false, &output)
+
+    let expected =
+      "- false\n"
+
+    expectEqual(expected, output)
+  }
+
+  if true {
+    var output = ""
+    dump(true, &output)
+
+    let expected =
+      "- true\n"
+
+    expectEqual(expected, output)
+  }
+}
+
+// FIXME: these tests should cover Float80.
+// FIXME: these tests should be automatically generated from the list of
+// available floating point types.
+Reflection.test("Float") {
+  if true {
+    var output = ""
+    dump(Float.NaN, &output)
+
+    let expected =
+      "- nan\n"
+
+    expectEqual(expected, output)
+  }
+
+  if true {
+    var output = ""
+    dump(Float.infinity, &output)
+
+    let expected =
+      "- inf\n"
+
+    expectEqual(expected, output)
+  }
+
+  if true {
+    var input: Float = 42.125
+    var output = ""
+    dump(input, &output)
+
+    let expected =
+      "- 42.125\n"
+
+    expectEqual(expected, output)
+  }
+}
+
+Reflection.test("Double") {
+  if true {
+    var output = ""
+    dump(Double.NaN, &output)
+
+    let expected =
+      "- nan\n"
+
+    expectEqual(expected, output)
+  }
+
+  if true {
+    var output = ""
+    dump(Double.infinity, &output)
+
+    let expected =
+      "- inf\n"
+
+    expectEqual(expected, output)
+  }
+
+  if true {
+    var input: Double = 42.125
+    var output = ""
+    dump(input, &output)
+
+    let expected =
+      "- 42.125\n"
+
+    expectEqual(expected, output)
+  }
 }
 
 Reflection.test("CGPoint") {
