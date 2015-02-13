@@ -1016,6 +1016,11 @@ bool TypeChecker::typeCheckExpression(
 class TypeNullifier : public ASTWalker {
 public:
   std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    
+    // Preserve module expr type data to prevent further lookups.
+    if (isa<ModuleExpr>(expr))
+      return { false, expr };
+    
     expr->setType(nullptr);
     
     if (auto cast = dyn_cast<ExplicitCastExpr>(expr)) {

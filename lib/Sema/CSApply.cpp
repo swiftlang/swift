@@ -4113,6 +4113,11 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(Expr *expr) {
   auto assignExpr =
       new (tc.Context) AssignExpr(discardExpr, SourceLoc(), singleExpr,
                                   /*implicit*/true);
+  
+  discardExpr->setType(LValueType::get(singleExpr->
+                                       getType()->
+                                       getLValueOrInOutObjectType()));
+  assignExpr->setType(singleExpr->getType());
 
   SmallVector<ASTNode, 2> elements;
   elements.push_back(assignExpr);
@@ -4133,6 +4138,7 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(Expr *expr) {
                                   cs.DC);
   
   newClosure->setImplicit();
+  newClosure->setIsVoidConversionClosure();
   newClosure->setBody(braceStmt, false);
   
   auto fnType = closureExpr->getType()->getAs<FunctionType>();
@@ -5713,7 +5719,8 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
       auto &cs = Rewriter.getConstraintSystem();
       auto &tc = cs.getTypeChecker();
       for (auto *closure : closuresToTypeCheck) {
-        if (!closure->hasSingleExpressionBody())
+        if (!(closure->hasSingleExpressionBody() ||
+              closure->isVoidConversionClosure()))
           tc.typeCheckClosureBody(closure);
         tc.computeCaptures(closure);
       }
