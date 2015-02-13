@@ -2,4 +2,4 @@
 
 // RUN: rm -f %t.*
 // RUN: %target-sil-opt -sil-disable-ast-dump -verify %platform-module-dir/Swift.swiftmodule -module-name=Swift -o %t.sil
-// RUN: %target-sil-opt -verify %t.sil > /dev/null
+// RUN: %target-sil-opt %t.sil > /dev/null
