@@ -717,9 +717,10 @@ public func transcode<
     case .Error:
       if stopOnError {
         return (hadError: true)
+      } else {
+        OutputEncoding.encode("\u{fffd}", output: &output)
+        hadError = true
       }
-      OutputEncoding.encode("\u{fffd}", output: &output)
-      hadError = true
     }
   }
   return hadError
