@@ -117,15 +117,15 @@ enum EnumWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {} //
 // NO-TYREPR: {{^}}enum EnumWithInheritance2 : <<error type>>, <<error type>> {{{$}}
 // TYREPR: {{^}}enum EnumWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {{{$}}
 
-enum EnumWithInheritance3 : FooClass { case X } // expected-error {{raw type 'FooClass' is not convertible from any literal}} expected-error{{enum cases require explicit raw values when the raw type is not integer literal convertible}}
+enum EnumWithInheritance3 : FooClass { case X } // expected-error {{raw type 'FooClass' is not convertible from any literal}}
 // NO-TYREPR: {{^}}enum EnumWithInheritance3 : <<error type>> {{{$}}
 // TYREPR: {{^}}enum EnumWithInheritance3 : FooClass {{{$}}
 
-enum EnumWithInheritance4 : FooClass, FooProtocol { case X } // expected-error {{raw type 'FooClass' is not convertible from any literal}} expected-error{{enum cases require explicit raw values when the raw type is not integer literal convertible}}
+enum EnumWithInheritance4 : FooClass, FooProtocol { case X } // expected-error {{raw type 'FooClass' is not convertible from any literal}}
 // NO-TYREPR: {{^}}enum EnumWithInheritance4 : <<error type>>, FooProtocol {{{$}}
 // TYREPR: {{^}}enum EnumWithInheritance4 : FooClass, FooProtocol {{{$}}
 
-enum EnumWithInheritance5 : FooClass, BarClass { case X } // expected-error {{raw type 'FooClass' is not convertible from any literal}} expected-error {{multiple enum raw types 'FooClass' and 'BarClass'}} expected-error{{enum cases require explicit raw values when the raw type is not integer literal convertible}}
+enum EnumWithInheritance5 : FooClass, BarClass { case X } // expected-error {{raw type 'FooClass' is not convertible from any literal}} expected-error {{multiple enum raw types 'FooClass' and 'BarClass'}}
 // NO-TYREPR: {{^}}enum EnumWithInheritance5 : <<error type>>, <<error type>> {{{$}}
 // TYREPR: {{^}}enum EnumWithInheritance5 : FooClass, BarClass {{{$}}
 

@@ -2282,6 +2282,189 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D, bool isObjC) {
     attr->setInvalid();
 }
 
+/// Given the raw value literal expression for an enum case, produces the
+/// auto-incremented raw value for the subsequent case, or returns null if
+/// the value is not auto-incrementable.
+static LiteralExpr *getAutoIncrementedLiteralExpr(TypeChecker &TC,
+                                                  Type rawTy,
+                                                  EnumElementDecl *forElt,
+                                                  LiteralExpr *prevValue) {
+  // If there was no previous value, start from zero.
+  if (!prevValue) {
+    // The raw type must be integer literal convertible for this to work.
+    ProtocolDecl *ilcProto =
+      TC.getProtocol(forElt->getLoc(),
+                     KnownProtocolKind::IntegerLiteralConvertible);
+    if (!TC.conformsToProtocol(rawTy, ilcProto, forElt->getDeclContext(),
+                               false)) {
+      TC.diagnose(forElt->getLoc(),
+                  diag::enum_non_integer_convertible_raw_type_no_value);
+      return nullptr;
+    }
+    
+    return new (TC.Context) IntegerLiteralExpr("0", SourceLoc(),
+                                               /*Implicit=*/true);
+  }
+  
+  if (auto intLit = dyn_cast<IntegerLiteralExpr>(prevValue)) {
+    APInt nextVal = intLit->getValue() + 1;
+    bool negative = nextVal.slt(0);
+    if (negative)
+      nextVal = -nextVal;
+    
+    llvm::SmallString<10> nextValStr;
+    nextVal.toStringSigned(nextValStr);
+    auto expr = new (TC.Context)
+      IntegerLiteralExpr(TC.Context.AllocateCopy(StringRef(nextValStr)),
+                         SourceLoc(), /*Implicit=*/true);
+    if (negative)
+      expr->setNegative(SourceLoc());
+    
+    return expr;
+  }
+  
+  TC.diagnose(forElt->getLoc(),
+              diag::enum_non_integer_raw_value_auto_increment);
+  return nullptr;
+}
+
+static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
+  Type rawTy = ED->getRawType();
+
+  if (!rawTy) {
+    // @objc enums must have a raw type.
+    if (ED->isObjC())
+      TC.diagnose(ED->getNameLoc(), diag::objc_enum_no_raw_type);
+    return;
+  }
+
+  rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, rawTy);
+
+  if (ED->isObjC()) {
+    // @objc enums must have a raw type that's an ObjC-representable
+    // integer type.
+    if (!TC.isCIntegerType(ED, rawTy)) {
+      TC.diagnose(ED->getInherited().front().getSourceRange().Start,
+                  diag::objc_enum_raw_type_not_integer,
+                  rawTy);
+      ED->getInherited().front().setInvalidType(TC.Context);
+      return;
+    }
+  } else {
+    // Swift enums require that the raw type is convertible from one of the
+    // primitive literal protocols.
+    static auto literalProtocolKinds = {
+      KnownProtocolKind::IntegerLiteralConvertible,
+      KnownProtocolKind::FloatLiteralConvertible,
+      KnownProtocolKind::UnicodeScalarLiteralConvertible,
+      KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible,
+      KnownProtocolKind::StringLiteralConvertible
+    };
+    bool literalConvertible = std::any_of(literalProtocolKinds.begin(),
+                                          literalProtocolKinds.end(),
+                                          [&](KnownProtocolKind protoKind) {
+      ProtocolDecl *proto = TC.getProtocol(ED->getLoc(), protoKind);
+      return TC.conformsToProtocol(rawTy, proto, ED->getDeclContext(),
+                                   /*inExpression*/false);
+    });
+
+    if (!literalConvertible) {
+      TC.diagnose(ED->getInherited().front().getSourceRange().Start,
+                  diag::raw_type_not_literal_convertible,
+                  rawTy);
+      ED->getInherited().front().setInvalidType(TC.Context);
+      return;
+    }
+  }
+
+  // We need at least one case to have a raw value.
+  if (ED->getAllElements().empty()) {
+    TC.diagnose(ED->getInherited().front().getSourceRange().Start,
+                diag::empty_enum_raw_type);
+    return;
+  }
+
+  // Check the raw values of the cases.
+  LiteralExpr *prevValue = nullptr;
+  EnumElementDecl *lastExplicitValueElt = nullptr;
+
+  // Keep a map we can use to check for duplicate case values.
+  llvm::SmallDenseMap<RawValueKey, RawValueSource, 8> uniqueRawValues;
+
+  for (auto elt : ED->getAllElements()) {
+    if (elt->isInvalid())
+      continue;
+
+    // We don't yet support raw values on payload cases.
+    if (elt->hasArgumentType()) {
+      TC.diagnose(elt->getLoc(),
+                  diag::enum_with_raw_type_case_with_argument);
+      TC.diagnose(ED->getInherited().front().getSourceRange().Start,
+                  diag::enum_raw_type_here, rawTy);
+      continue;
+    }
+    
+    // Check the raw value expr, if we have one.
+    if (auto *rawValue = elt->getRawValueExpr()) {
+      Expr *typeCheckedExpr = rawValue;
+      if (!TC.typeCheckExpression(typeCheckedExpr, ED, rawTy,
+                                  /*contextualType=*/Type(),
+                                  /*discarded=*/false)) {
+        elt->setTypeCheckedRawValueExpr(typeCheckedExpr);
+      }
+      lastExplicitValueElt = elt;
+    } else {
+      // If the enum element has no explicit raw value, try to
+      // autoincrement from the previous value, or start from zero if this
+      // is the first element.
+      auto nextValue = getAutoIncrementedLiteralExpr(TC, rawTy, elt, prevValue);
+      if (!nextValue) {
+        break;
+      }
+      elt->setRawValueExpr(nextValue);
+      Expr *typeChecked = nextValue;
+      if (!TC.typeCheckExpression(typeChecked, ED, rawTy, Type(), false))
+        elt->setTypeCheckedRawValueExpr(typeChecked);
+    }
+    prevValue = elt->getRawValueExpr();
+    assert(prevValue && "continued without setting raw value of enum case");
+    
+    // Check that the raw value is unique.
+    RawValueKey key(elt->getRawValueExpr());
+    RawValueSource source{elt, lastExplicitValueElt};
+
+    auto insertIterPair = uniqueRawValues.insert({key, source});
+    if (insertIterPair.second)
+      continue;
+
+    // Diagnose the duplicate value.
+    SourceLoc diagLoc = elt->getRawValueExpr()->isImplicit()
+        ? elt->getLoc() : elt->getRawValueExpr()->getLoc();
+    TC.diagnose(diagLoc, diag::enum_raw_value_not_unique);
+    assert(lastExplicitValueElt &&
+           "should not be able to have non-unique raw values when "
+           "relying on autoincrement");
+    if (lastExplicitValueElt != elt)
+      TC.diagnose(lastExplicitValueElt->getRawValueExpr()->getLoc(),
+                  diag::enum_raw_value_incrementing_from_here);
+
+    RawValueSource prevSource = insertIterPair.first->second;
+    auto foundElt = prevSource.sourceElt;
+    diagLoc = foundElt->getRawValueExpr()->isImplicit()
+        ? foundElt->getLoc() : foundElt->getRawValueExpr()->getLoc();
+    TC.diagnose(diagLoc, diag::enum_raw_value_used_here);
+    if (foundElt != prevSource.lastExplicitValueElt) {
+      if (prevSource.lastExplicitValueElt)
+        TC.diagnose(prevSource.lastExplicitValueElt
+                      ->getRawValueExpr()->getLoc(),
+                    diag::enum_raw_value_incrementing_from_here);
+      else
+        TC.diagnose(ED->getAllElements().front()->getLoc(),
+                    diag::enum_raw_value_incrementing_from_zero);
+    }
+  }
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -2740,51 +2923,6 @@ public:
     TC.checkDeclAttributes(assocType);
   }
 
-  // Given the raw value literal expression for an enum case, produces the
-  // auto-incremented raw value for the subsequent case, or returns null if
-  // the value is not auto-incrementable.
-  LiteralExpr *getAutoIncrementedLiteralExpr(Type rawTy,
-                                             EnumElementDecl *forElt,
-                                             LiteralExpr *prevValue) {
-    // If there was no previous value, start from zero.
-    if (!prevValue) {
-      // The raw type must be integer literal convertible for this to work.
-      ProtocolDecl *ilcProto =
-        TC.getProtocol(forElt->getLoc(),
-                       KnownProtocolKind::IntegerLiteralConvertible);
-      if (!TC.conformsToProtocol(rawTy, ilcProto, forElt->getDeclContext(),
-                                 false)) {
-        TC.diagnose(forElt->getLoc(),
-                    diag::enum_non_integer_convertible_raw_type_no_value);
-        return nullptr;
-      }
-      
-      return new (TC.Context) IntegerLiteralExpr("0", SourceLoc(),
-                                                 /*Implicit=*/true);
-    }
-    
-    if (auto intLit = dyn_cast<IntegerLiteralExpr>(prevValue)) {
-      APInt nextVal = intLit->getValue() + 1;
-      bool negative = nextVal.slt(0);
-      if (negative)
-        nextVal = -nextVal;
-      
-      llvm::SmallString<10> nextValStr;
-      nextVal.toStringSigned(nextValStr);
-      auto expr = new (TC.Context)
-        IntegerLiteralExpr(TC.Context.AllocateCopy(StringRef(nextValStr)),
-                           SourceLoc(), /*Implicit=*/true);
-      if (negative)
-        expr->setNegative(SourceLoc());
-      
-      return expr;
-    }
-    
-    TC.diagnose(forElt->getLoc(),
-                diag::enum_non_integer_raw_value_auto_increment);
-    return nullptr;
-  }
-  
   bool checkUnsupportedNestedGeneric(NominalTypeDecl *NTD) {
     // We don't support nested types in generics yet.
     if (NTD->isGenericContext()) {
@@ -2813,7 +2951,7 @@ public:
     }
     return false;
   }
-  
+
   void visitEnumDecl(EnumDecl *ED) {
     // This enum declaration is technically a parse error, so do not type
     // check.
@@ -2856,137 +2994,16 @@ public:
       }
     }
 
-    Type rawTy;
     if (!IsFirstPass) {
       checkAccessibility(TC, ED);
 
-      if (ED->hasRawType()) {
-        rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, ED->getRawType());
-
-        // Check that the raw type is convertible from one of the primitive
-        // literal protocols.
-        bool literalConvertible = false;
-        for (auto literalProtoKind : {
-                 KnownProtocolKind::CharacterLiteralConvertible,
-                 KnownProtocolKind::UnicodeScalarLiteralConvertible,
-                 KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible,
-                 KnownProtocolKind::FloatLiteralConvertible,
-                 KnownProtocolKind::IntegerLiteralConvertible,
-                 KnownProtocolKind::StringLiteralConvertible})
-        {
-          ProtocolDecl *literalProto =
-            TC.getProtocol(ED->getLoc(), literalProtoKind);
-          if (TC.conformsToProtocol(rawTy, literalProto, ED->getDeclContext(),
-                                    false)) {
-            literalConvertible = true;
-            break;
-          }
-        }
-        
-        if (!literalConvertible) {
-          TC.diagnose(ED->getInherited()[0].getSourceRange().Start,
-                      diag::raw_type_not_literal_convertible,
-                      rawTy);
-          ED->getInherited()[0].setInvalidType(TC.Context);
-        }
-        
-        // We need at least one case to have a raw value.
-        if (ED->getAllElements().empty())
-          TC.diagnose(ED->getInherited()[0].getSourceRange().Start,
-                      diag::empty_enum_raw_type);
+      if (ED->hasRawType() && !ED->isObjC()) {
+        // ObjC enums have already had their raw values checked, but pure Swift
+        // enums haven't.
+        checkEnumRawValues(TC, ED);
       }
 
       checkExplicitConformance(ED, ED->getDeclaredTypeInContext());
-    }
-
-    if (!IsFirstPass) {
-      if (ED->isObjC()) {
-        if (rawTy) {
-          // @objc enums must have a raw type that's an ObjC-representable
-          // integer type.
-          if (!TC.isCIntegerType(ED, rawTy))
-            TC.diagnose(ED->getInherited().front().getSourceRange().Start,
-                        diag::objc_enum_raw_type_not_integer,
-                        rawTy);
-        } else {
-          // @objc enums must have a raw type.
-          TC.diagnose(ED->getNameLoc(), diag::objc_enum_no_raw_type);
-        }
-      }
-    
-      if (rawTy) {
-        // Check the raw values of the cases.
-        LiteralExpr *prevValue = nullptr;
-        EnumElementDecl *lastExplicitValueElt = nullptr;
-        // Keep a map we can use to check for duplicate case values.
-        llvm::DenseMap<RawValueKey, RawValueSource> uniqueRawValues;
-
-        auto rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, ED->getRawType());
-
-        for (auto elt : ED->getAllElements()) {
-          if (elt->isInvalid())
-            continue;
-
-          // We don't yet support raw values on payload cases.
-          if (elt->hasArgumentType()) {
-            TC.diagnose(elt->getLoc(),
-                        diag::enum_with_raw_type_case_with_argument);
-            TC.diagnose(ED->getInherited()[0].getSourceRange().Start,
-                        diag::enum_raw_type_here, rawTy);
-          }
-          
-          // If the enum element has no explicit raw value, try to
-          // autoincrement from the previous value, or start from zero if this
-          // is the first element.
-          if (!elt->hasRawValueExpr()) {
-            auto nextValue = getAutoIncrementedLiteralExpr(rawTy,elt,prevValue);
-            if (!nextValue) {
-              break;
-            }
-            elt->setRawValueExpr(nextValue);
-            Expr *typeChecked = nextValue;
-            if (!TC.typeCheckExpression(typeChecked, ED, rawTy, Type(), false))
-              elt->setTypeCheckedRawValueExpr(typeChecked);
-          } else {
-            lastExplicitValueElt = elt;
-          }
-          prevValue = elt->getRawValueExpr();
-          assert(prevValue &&
-                 "continued without setting raw value of enum case");
-          
-          // Check that the raw value is unique.
-          RawValueKey key(elt->getRawValueExpr());
-          auto found = uniqueRawValues.find(key);
-          if (found != uniqueRawValues.end()) {
-            SourceLoc diagLoc = elt->getRawValueExpr()->isImplicit()
-              ? elt->getLoc() : elt->getRawValueExpr()->getLoc();
-            TC.diagnose(diagLoc, diag::enum_raw_value_not_unique);
-            assert(lastExplicitValueElt &&
-                   "should not be able to have non-unique raw values when "
-                   "relying on autoincrement");
-            if (lastExplicitValueElt != elt)
-              TC.diagnose(lastExplicitValueElt->getRawValueExpr()->getLoc(),
-                          diag::enum_raw_value_incrementing_from_here);
-            
-            auto foundElt = found->second.sourceElt;
-            diagLoc = foundElt->getRawValueExpr()->isImplicit()
-              ? foundElt->getLoc() : foundElt->getRawValueExpr()->getLoc();
-            TC.diagnose(diagLoc, diag::enum_raw_value_used_here);
-            if (foundElt != found->second.lastExplicitValueElt) {
-              if (found->second.lastExplicitValueElt)
-                TC.diagnose(found->second.lastExplicitValueElt
-                              ->getRawValueExpr()->getLoc(),
-                            diag::enum_raw_value_incrementing_from_here);
-              else
-                TC.diagnose(ED->getAllElements().front()->getLoc(),
-                            diag::enum_raw_value_incrementing_from_zero);
-            }
-          } else {
-            uniqueRawValues.insert({RawValueKey(elt->getRawValueExpr()),
-                                    RawValueSource{elt, lastExplicitValueElt}});
-          }
-        }
-      }
     }
     
     for (Decl *member : ED->getMembers())
@@ -4939,27 +4956,31 @@ public:
       
       validateAttributes(TC, EED);
       
-      if (!EED->getArgumentTypeLoc().isNull())
+      if (!EED->getArgumentTypeLoc().isNull()) {
         if (TC.validateType(EED->getArgumentTypeLoc(), EED->getDeclContext(),
                             TR_EnumCase)) {
           EED->overwriteType(ErrorType::get(TC.Context));
           EED->setInvalid();
           return;
         }
+      }
       
-      // Check the raw value, if we have one.
+      // If we have a raw value, make sure there's a raw type as well.
       if (auto *rawValue = EED->getRawValueExpr()) {
         
         Type rawTy;
-        if (ED->hasRawType()) {
-          rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, ED->getRawType());
-        } else {
+        if (!ED->hasRawType()) {
           TC.diagnose(rawValue->getLoc(), diag::enum_raw_value_without_raw_type);
           // Recover by setting the raw type as this element's type.
+          Expr *typeCheckedExpr = rawValue;
+          if (!TC.typeCheckExpression(typeCheckedExpr, ED, rawTy, Type(),
+                                      /*inExpression=*/false)) {
+            EED->setTypeCheckedRawValueExpr(typeCheckedExpr);
+          }
+        } else {
+          // Wait until the second pass, when all the raw value expressions
+          // can be checked together.
         }
-        Expr *typeCheckedExpr = rawValue;
-        if (!TC.typeCheckExpression(typeCheckedExpr, ED, rawTy, Type(), false))
-          EED->setTypeCheckedRawValueExpr(typeCheckedExpr);
       }
     } else if (EED->getRecursiveness() ==
                 ElementRecursiveness::PotentiallyRecursive) {
@@ -5494,6 +5515,13 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       if (CD->getAttrs().hasAttribute<RequiresStoredPropertyInitsAttr>() ||
           (superclassDecl && superclassDecl->requiresStoredPropertyInits()))
         CD->setRequiresStoredPropertyInits(true);
+    }
+
+    if (auto *ED = dyn_cast<EnumDecl>(nominal)) {
+      // @objc enums use their raw values as the value representation, so we
+      // need to force the values to be checked.
+      if (ED->isObjC())
+        checkEnumRawValues(*this, ED);
     }
 
     ValidatedTypes.insert(nominal);

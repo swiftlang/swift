@@ -132,7 +132,7 @@ enum RawTypeNotFirst : RawTypeNotFirstProtocol, Int { // expected-error {{raw ty
 }
 
 enum RawTypeNotLiteralConvertible : Array<Int> { // expected-error {{raw type 'Array<Int>' is not convertible from any literal}}
-  case Ladd, Elliott, Sixteenth, Harrison // expected-error {{enum cases require explicit raw values when the raw type is not integer literal convertible}}
+  case Ladd, Elliott, Sixteenth, Harrison
 }
 
 enum RawTypeCircularityA : RawTypeCircularityB, IntegerLiteralConvertible { // expected-error {{circular enum raw types 'RawTypeCircularityA' -> 'RawTypeCircularityB' -> 'RawTypeCircularityA'}} FIXME: expected-error{{RawRepresentable}}
