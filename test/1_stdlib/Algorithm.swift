@@ -161,33 +161,9 @@ Algorithm.test("minElement,maxElement") {
   // condition.
 }
 
-/// A SequenceType that is consumed when iterated over.
-public struct DrainableSequence<T> : SequenceType {
-  public init<S : SequenceType where S.Generator.Element == T>(_ s: S) {
-    let data = Array(s)
-    _generator = GeneratorOf(data.generate())
-
-    // Overestimate count so that it we can test how algorithms reserve memory.
-    _underestimatedCount = data.count * 10 + 5
-  }
-
-  public func generate() -> GeneratorOf<T> {
-    return _generator
-  }
-
-  internal let _generator: GeneratorOf<T>
-  internal let _underestimatedCount: Int
-}
-
-public func ~> <T> (
-  s: DrainableSequence<T>, _: (_UnderestimateCount, ())
-) -> Int {
-  return s._underestimatedCount
-}
-
 Algorithm.test("filter/SequenceType") {
   if true {
-    let s = DrainableSequence<Int>([])
+    let s = MinimalSequence<Int>([], underestimatedCount: .Overestimate)
     var result = filter(s) {
       (x: Int) -> Bool in
       expectUnreachable()
@@ -199,81 +175,37 @@ Algorithm.test("filter/SequenceType") {
     expectEqual(0, result.capacity)
   }
   if true {
-    let s = DrainableSequence([ 0, 30, 10, 90 ])
+    let s = MinimalSequence(
+      [ 0, 30, 10, 90 ], underestimatedCount: .Overestimate)
     let result = filter(s) { (x: Int) -> Bool in false }
     expectEqual([], result)
     expectEqual([], Array(s))
     expectEqual(0, result.capacity)
   }
   if true {
-    let s = DrainableSequence([ 0, 30, 10, 90 ])
+    let s = MinimalSequence(
+      [ 0, 30, 10, 90 ], underestimatedCount: .Overestimate)
     let result = filter(s) { (x: Int) -> Bool in true }
     expectEqual([ 0, 30, 10, 90 ], result)
     expectEqual([], Array(s))
     expectGE(2 * result.count, result.capacity)
   }
   if true {
-    let s = DrainableSequence([ 0, 30, 10, 90 ])
+    let s = MinimalSequence(
+      [ 0, 30, 10, 90 ], underestimatedCount: .Value(0))
     let result = filter(s) { $0 % 3 == 0 }
     expectEqual([ 0, 30, 90 ], result)
     expectEqual([], Array(s))
     expectGE(2 * result.count, result.capacity)
   }
-}
-
-public struct MinimalForwardIndex : ForwardIndexType {
-  public init(position: Int, endIndex: Int) {
-    self._position = position
-    self._endIndex = endIndex
+  if true {
+    let s = MinimalSequence(
+      [ 0, 30, 10, 90 ], underestimatedCount: .Overestimate)
+    let result = filter(s) { $0 % 3 == 0 }
+    expectEqual([ 0, 30, 90 ], result)
+    expectEqual([], Array(s))
+    expectGE(2 * result.count, result.capacity)
   }
-
-  public func successor() -> MinimalForwardIndex {
-    expectNotEqual(_endIndex, _position)
-    return MinimalForwardIndex(position: _position + 1, endIndex: _endIndex)
-  }
-
-  internal var _position: Int
-  internal var _endIndex: Int
-}
-
-public func == (lhs: MinimalForwardIndex, rhs: MinimalForwardIndex) -> Bool {
-  return lhs._position == rhs._position
-}
-
-/// A minimal implementation of CollectionType with extra checks.
-public struct MinimalForwardCollection<T> : CollectionType {
-  public init<S : SequenceType where S.Generator.Element == T>(_ s: S) {
-    self._data = Array(s)
-
-    // Overestimate count so that it we can test how algorithms reserve memory.
-    _underestimatedCount = _data.count * 10 + 5
-  }
-
-  public func generate() -> IndexingGenerator<MinimalForwardCollection<T>> {
-    return IndexingGenerator(self)
-  }
-
-  public var startIndex: MinimalForwardIndex {
-    return MinimalForwardIndex(position: 0, endIndex: _data.endIndex)
-  }
-
-  public var endIndex: MinimalForwardIndex {
-    return MinimalForwardIndex(
-      position: _data.endIndex, endIndex: _data.endIndex)
-  }
-
-  public subscript(i: MinimalForwardIndex) -> T {
-    return _data[i._position]
-  }
-
-  internal let _data: [T]
-  internal let _underestimatedCount: Int
-}
-
-public func ~> <T> (
-  c: MinimalForwardCollection<T>, _:(_UnderestimateCount, ())
-) -> Int {
-  return c._underestimatedCount
 }
 
 Algorithm.test("filter/CollectionType") {
@@ -322,7 +254,7 @@ Algorithm.test("filter/eager") {
 
 Algorithm.test("map/SequenceType") {
   if true {
-    let s = DrainableSequence<Int>([])
+    let s = MinimalSequence<Int>([], underestimatedCount: .Overestimate)
     var result = map(s) {
       (x: Int) -> Int16 in
       expectUnreachable()
@@ -335,7 +267,17 @@ Algorithm.test("map/SequenceType") {
     // expectLE(s._underestimatedCount, result.capacity)
   }
   if true {
-    let s = DrainableSequence([ 0, 30, 10, 90 ])
+    let s = MinimalSequence(
+      [ 0, 30, 10, 90 ], underestimatedCount: .Value(0))
+    let result = map(s) { $0 + 1 }
+    expectEqual([ 1, 31, 11, 91 ], result)
+    expectEqual([], Array(s))
+    // FIXME: <rdar://problem/19810841> Reserve capacity when running map() over a SequenceType
+    // expectLE(s._underestimatedCount, result.capacity)
+  }
+  if true {
+    let s = MinimalSequence(
+      [ 0, 30, 10, 90 ], underestimatedCount: .Overestimate)
     let result = map(s) { $0 + 1 }
     expectEqual([ 1, 31, 11, 91 ], result)
     expectEqual([], Array(s))
@@ -358,7 +300,16 @@ Algorithm.test("map/CollectionType") {
     // expectLE(c._underestimatedCount, result.capacity)
   }
   if true {
-    let c = MinimalForwardCollection([ 0, 30, 10, 90 ])
+    let c = MinimalForwardCollection(
+      [ 0, 30, 10, 90 ], underestimatedCount: .Value(0))
+    let result = map(c) { $0 + 1 }
+    expectEqual([ 1, 31, 11, 91 ], result)
+    // FIXME: <rdar://problem/19810841> Reserve capacity when running map() over a SequenceType
+    // expectLE(c._underestimatedCount, result.capacity)
+  }
+  if true {
+    let c = MinimalForwardCollection(
+      [ 0, 30, 10, 90 ], underestimatedCount: .Overestimate)
     let result = map(c) { $0 + 1 }
     expectEqual([ 1, 31, 11, 91 ], result)
     // FIXME: <rdar://problem/19810841> Reserve capacity when running map() over a SequenceType

@@ -1685,6 +1685,183 @@ func compose<A, B, C>(f: A -> B, g: B -> C) -> A -> C {
   }
 }
 
+/// State that is created every time a fresh generator is created with
+/// `MinimalSequence.generate()`.
+internal class _MinimalGeneratorPrivateState<T> {
+  internal init() {}
+
+  internal var returnedNilCounter: Int = 0
+}
+
+/// State shared by all generators of a MinimalSequence.
+internal class _MinimalGeneratorSharedState<T> {
+  internal init(_ data: [T]) {
+    self.data = data
+  }
+
+  internal let data: [T]
+  internal var i: Int = 0
+}
+
+/// A GeneratorType that implements the protocol contract in the most
+/// narrow way possible.
+///
+/// This generator will return `nil` only once.
+public struct MinimalGenerator<T> : GeneratorType {
+  public init<S : SequenceType where S.Generator.Element == T>(_ s: S) {
+    self._sharedState = _MinimalGeneratorSharedState(Array(s))
+  }
+
+  public init(_ data: [T]) {
+    self._sharedState = _MinimalGeneratorSharedState(data)
+  }
+
+  internal init(_ _sharedState: _MinimalGeneratorSharedState<T>) {
+    self._sharedState = _sharedState
+  }
+
+  public func next() -> T? {
+    if _sharedState.i == _sharedState.data.count {
+      if isConsumed {
+        expectUnreachable() { "next() was called on a consumed generator" }
+      }
+      ++_privateState.returnedNilCounter
+      return nil
+    }
+    return _sharedState.data[_sharedState.i++]
+  }
+
+  public var isConsumed: Bool {
+    return returnedNilCounter >= 1
+  }
+
+  public var returnedNilCounter: Int {
+    return _privateState.returnedNilCounter
+  }
+
+  internal let _privateState: _MinimalGeneratorPrivateState<T> =
+    _MinimalGeneratorPrivateState()
+  internal let _sharedState: _MinimalGeneratorSharedState<T>
+}
+
+public enum UnderestimateCountBehavior {
+  /// Return the actual number of elements.
+  case Precise
+
+  /// Return an overestimated count.  Useful to test how algorithms reserve
+  /// memory.
+  case Overestimate
+
+  /// Return the provided value.
+  case Value(Int)
+}
+
+/// A SequenceType that implements the protocol contract in the most
+/// narrow way possible.
+///
+/// This sequence is consumed when its generator is advanced.
+public struct MinimalSequence<T> : SequenceType {
+  public init<S : SequenceType where S.Generator.Element == T>(
+    _ s: S,
+    underestimatedCount: UnderestimateCountBehavior = .Value(0)
+  ) {
+    let data = Array(s)
+    self._sharedState = _MinimalGeneratorSharedState(data)
+
+    switch underestimatedCount {
+    case .Precise:
+      self.underestimatedCount = data.count
+
+    case .Overestimate:
+      self.underestimatedCount = data.count * 3 + 5
+
+    case .Value(let count):
+      self.underestimatedCount = count
+    }
+  }
+
+  public func generate() -> MinimalGenerator<T> {
+    return MinimalGenerator(_sharedState)
+  }
+
+  public var underestimatedCount: Int
+
+  internal let _sharedState: _MinimalGeneratorSharedState<T>
+}
+
+public func ~> <T> (
+  s: MinimalSequence<T>, _: (_UnderestimateCount, ())
+) -> Int {
+  return s.underestimatedCount
+}
+
+public struct MinimalForwardIndex : ForwardIndexType {
+  public init(position: Int, endIndex: Int) {
+    self._position = position
+    self._endIndex = endIndex
+  }
+
+  public func successor() -> MinimalForwardIndex {
+    expectNotEqual(_endIndex, _position)
+    return MinimalForwardIndex(position: _position + 1, endIndex: _endIndex)
+  }
+
+  internal var _position: Int
+  internal var _endIndex: Int
+}
+
+public func == (lhs: MinimalForwardIndex, rhs: MinimalForwardIndex) -> Bool {
+  return lhs._position == rhs._position
+}
+
+/// A minimal implementation of CollectionType with extra checks.
+public struct MinimalForwardCollection<T> : CollectionType {
+  public init<S : SequenceType where S.Generator.Element == T>(
+    _ s: S,
+    underestimatedCount: UnderestimateCountBehavior = .Value(0)
+  ) {
+    self._data = Array(s)
+
+    switch underestimatedCount {
+    case .Precise:
+      self.underestimatedCount = _data.count
+
+    case .Overestimate:
+      self.underestimatedCount = _data.count * 3 + 5
+
+    case .Value(let count):
+      self.underestimatedCount = count
+    }
+  }
+
+  public func generate() -> MinimalGenerator<T> {
+    return MinimalGenerator(_data)
+  }
+
+  public var startIndex: MinimalForwardIndex {
+    return MinimalForwardIndex(position: 0, endIndex: _data.endIndex)
+  }
+
+  public var endIndex: MinimalForwardIndex {
+    return MinimalForwardIndex(
+      position: _data.endIndex, endIndex: _data.endIndex)
+  }
+
+  public subscript(i: MinimalForwardIndex) -> T {
+    return _data[i._position]
+  }
+
+  public var underestimatedCount: Int
+
+  internal let _data: [T]
+}
+
+public func ~> <T> (
+  c: MinimalForwardCollection<T>, _:(_UnderestimateCount, ())
+) -> Int {
+  return c.underestimatedCount
+}
+
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:
