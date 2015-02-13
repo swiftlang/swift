@@ -18,3 +18,13 @@ swift*:::deallocateObject
 {
         @counts["num deallocated objects"] = count();
 }
+
+swift*:::isUniquelyReferenced
+{
+        @counts["num calls to isUniquelyReferenced"] = count();
+}
+
+swift*:::isUniquelyReferencedOrPinned
+{
+        @counts["num calls to isUniquelyReferencedOrPinned"] = count();
+}

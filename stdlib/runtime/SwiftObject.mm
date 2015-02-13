@@ -38,9 +38,15 @@
 #include <mutex>
 #include <unordered_map>
 #if SWIFT_OBJC_INTEROP
-#import <CoreFoundation/CFBase.h> // for CFTypeID
-#include <malloc/malloc.h>
-#include <dispatch/dispatch.h>
+# import <CoreFoundation/CFBase.h> // for CFTypeID
+# include <malloc/malloc.h>
+# include <dispatch/dispatch.h>
+#endif
+#if SWIFT_RUNTIME_ENABLE_DTRACE
+# include "SwiftRuntimeDTraceProbes.h"
+#else
+#define SWIFT_ISUNIQUELYREFERENCED()
+#define SWIFT_ISUNIQUELYREFERENCEDORPINNED()
 #endif
 
 #if SWIFT_OBJC_INTEROP
@@ -995,6 +1001,7 @@ bool swift::_swift_isUniquelyReferenced_nonNull_native(
 ) {
   assert(object != nullptr);
   assert(!object->refCount.isDeallocating());
+  SWIFT_ISUNIQUELYREFERENCED();
   return object->refCount.isUniquelyReferenced();
 }
 
@@ -1106,6 +1113,7 @@ bool swift::_swift_isUniquelyReferencedOrPinned_native(
 /// pinned flag is set.
 bool swift::_swift_isUniquelyReferencedOrPinned_nonNull_native(
                                                     const HeapObject* object) {
+  SWIFT_ISUNIQUELYREFERENCEDORPINNED();
   assert(object != nullptr);
   assert(!object->refCount.isDeallocating());
   return object->refCount.isUniquelyReferencedOrPinned();

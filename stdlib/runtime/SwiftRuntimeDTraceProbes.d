@@ -4,4 +4,6 @@ provider swift {
   probe release();
   probe allocateObject();
   probe deallocateObject();
+  probe isUniquelyReferenced();
+  probe isUniquelyReferencedOrPinned();
 };
