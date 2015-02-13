@@ -4214,7 +4214,20 @@ namespace {
         return metatype;
       }
 
-      case SourceKind::WitnessSelf:
+      case SourceKind::WitnessSelf: {
+        // The 'Self' parameter is provided last.
+        // TODO: For default implementations, the witness table pointer for
+        // the 'Self : P' conformance must be provided last along with the
+        // metatype.
+        llvm::Value *metatype = in.takeLast();
+        metatype->setName("Self");
+        
+        // Mark this as the cached metatype for Self.
+        CanType argTy = getArgTypeInContext(FnType->getParameters().size() - 1);
+        IGF.setUnscopedLocalTypeData(argTy, LocalTypeData::Metatype, metatype);
+        return metatype;
+      }
+          
       case SourceKind::WitnessExtraData: {
         // The 'Self' parameter is provided last.
         // TODO: For default implementations, the witness table pointer for
