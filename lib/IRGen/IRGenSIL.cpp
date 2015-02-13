@@ -783,9 +783,8 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
       SILInstruction &I = *silBB->begin();
       auto DS = I.getDebugScope();
       // FIXME: This should be an assertion.
-      if (DS && DS->SILFn != IGF.CurSILFn && !DS->InlinedCallSite)
+      if (!DS || (DS->SILFn != IGF.CurSILFn && !DS->InlinedCallSite))
         DS = IGF.CurSILFn->getDebugScope();
-      if (!DS) DS = IGF.CurSILFn->getDebugScope();
       IGF.IGM.DebugInfo->setCurrentLoc(IGF.Builder, DS, I.getLoc());
     }
   }
