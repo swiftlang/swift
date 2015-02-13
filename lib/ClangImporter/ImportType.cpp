@@ -935,7 +935,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
 
   // Wrap class, class protocol, function, and metatype types in an
   // optional type.
-  if (canImportAsOptional(hint)) {
+  if (importedType && canImportAsOptional(hint)) {
     importedType = getOptionalType(importedType, importKind, optKind);
   }
 

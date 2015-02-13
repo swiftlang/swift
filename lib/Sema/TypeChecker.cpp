@@ -387,7 +387,8 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
         if (!prop)
           continue;
 
-        if (prop->getAttrs().hasAttribute<LazyAttr>() && !prop->isStatic()) {
+        if (prop->getAttrs().hasAttribute<LazyAttr>() && !prop->isStatic()
+                                                      && prop->getGetter()) {
           bool hasImplementation = prop->getGetter()->hasBody();
 
           if (lazyVarsAlreadyHaveImplementation.hasValue()) {
