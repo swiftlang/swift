@@ -1,6 +1,14 @@
+// RUN: rm -rf %t && mkdir %t
 // RUN: %target-swift-frontend -module-name main -primary-file %s %S/Inputs/objc_enum_multi_file_helper.swift -emit-ir | FileCheck %s
 
-// CHECK-LABEL: define hidden i32 @_TF4main6useFooFOS_3FooVSs5Int32(i32) {
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -emit-module %S/Inputs/objc_enum_multi_file_helper.swift -o %t
+// RUN: %target-swift-frontend -module-name main -primary-file %s -I %t -DIMPORT -emit-ir | FileCheck %s
+
+#if IMPORT
+import objc_enum_multi_file_helper
+#endif
+
+// CHECK-LABEL: define hidden i32 @_TF4main6useFooFO{{S_|27objc_enum_multi_file_helper}}3FooVSs5Int32(i32) {
 func useFoo(x: Foo) -> Int32 {
   // CHECK: switch i32 %0, label %[[DEFAULT:.+]] [
   // CHECK-DAG: i32 1, label %[[CASE_B:.+]]
