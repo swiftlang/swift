@@ -514,10 +514,16 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework) {
 void ClangImporter::Implementation::importHeader(
     Module *adapter, StringRef headerName, SourceLoc diagLoc,
     std::unique_ptr<llvm::MemoryBuffer> sourceBuffer) {
+  // Don't even try to load the bridging header if the Clang AST is in a bad
+  // state. It could cause a crash.
+  auto &clangDiags = getClangASTContext().getDiagnostics();
+  if (clangDiags.hasFatalErrorOccurred())
+    return;
+
   assert(adapter);
   ImportedHeaderOwners.push_back(adapter);
 
-  bool hadError = getClangASTContext().getDiagnostics().hasErrorOccurred();
+  bool hadError = clangDiags.hasErrorOccurred();
 
   clang::Preprocessor &pp = getClangPreprocessor();
   clang::SourceManager &sourceMgr = getClangASTContext().getSourceManager();
@@ -538,7 +544,7 @@ void ClangImporter::Implementation::importHeader(
   while (!Parser->ParseTopLevelDecl(parsed)) {}
   pp.EndSourceFile();
 
-  if (!hadError && getClangASTContext().getDiagnostics().hasErrorOccurred()) {
+  if (!hadError && clangDiags.hasErrorOccurred()) {
     SwiftContext.Diags.diagnose(diagLoc, diag::bridging_header_error,
                                 headerName);
   }
@@ -637,6 +643,12 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
 Module *ClangImporter::loadModule(
     SourceLoc importLoc,
     ArrayRef<std::pair<Identifier, SourceLoc>> path) {
+  // Don't even try to load the module if the Clang context is in a bad way.
+  // It could cause a crash.
+  auto &clangContext = Impl.getClangASTContext();
+  auto &clangDiags = clangContext.getDiagnostics();
+  if (clangDiags.hasFatalErrorOccurred())
+    return nullptr;
 
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
 
@@ -647,7 +659,6 @@ Module *ClangImporter::loadModule(
     return nullptr;
 
   // Convert the Swift import path over to a Clang import path.
-  auto &clangContext = Impl.Instance->getASTContext();
   SmallVector<std::pair<clang::IdentifierInfo *, clang::SourceLocation>, 4>
     clangPath;
   for (auto component : path) {
