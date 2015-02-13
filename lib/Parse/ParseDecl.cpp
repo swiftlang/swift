@@ -1061,12 +1061,18 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       // Otherwise this is a valid decl attribute so they should have put it on
       // the decl instead of the type.
 
-      // Special case handling of @autoclosure attribute on the type, which
-      // was supported in Swift 1.0 and 1.1, but removed in Swift 1.2.
       auto diagID = diag::decl_attribute_applied_to_type;
-      if (declAttrID == DAK_AutoClosure)
+      if (declAttrID == DAK_AutoClosure) {
+        // Special case handling of @autoclosure attribute on the type, which
+        // was supported in Swift 1.0 and 1.1, but removed in Swift 1.2.
         diagID = diag::autoclosure_is_decl_attribute;
-      
+
+        // Further special case handling of @autoclosure attribute in
+        // enumerators in EnumDecl's to produce a nice diagnostic.
+        if (CurDeclContext && isa<EnumDecl>(CurDeclContext))
+          diagID = diag::autoclosure_not_on_enums;
+      }
+
       // If this is the first attribute, and if we are on a simple decl, emit a
       // fixit to move the attribute.  Otherwise, we don't have the location of
       // the @ sign, or we don't have confidence that the fixit will be right.

@@ -193,6 +193,9 @@ ERROR(decl_already_static,decl_parsing,none,
 ERROR(autoclosure_is_decl_attribute,attribute_parsing,none,
       "'autoclosure' attribute is now an attribute of the parameter "
       "declaration, not its type", ())
+ERROR(autoclosure_not_on_enums,attribute_parsing,none,
+      "'autoclosure' attribute is only allowed on parameters, not on enum"
+      " cases", ())
 
 
 // Variable getters/setters

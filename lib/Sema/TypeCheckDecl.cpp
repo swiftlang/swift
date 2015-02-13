@@ -6164,19 +6164,8 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
     }
 
     if (auto var = dyn_cast<VarDecl>(member)) {
-      if (var->hasStorage() && !var->isStatic() && !var->isInvalid()) {
+      if (var->hasStorage() && !var->isStatic() && !var->isInvalid())
         FoundInstanceVar = true;
-
-        // If we have a stored property of closure type, with the autoclosure
-        // attribute on it, don't synthesize any initializers: there is no way
-        // reasonable way to initialize the property.  We eventually want to
-        // remove autoclosure on properties, so disabling the initializer is a
-        // reasonable middle step.
-        // FIXME: Remove @autoclosure on properties.
-        if (var->getAttrs().hasAttribute<AutoClosureAttr>())
-          return;
-        
-      }
       continue;
     }
 

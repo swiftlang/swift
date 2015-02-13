@@ -118,12 +118,6 @@ struct ASTContext::Implementation {
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownDecls.def"
   
-  /// func _preconditionOptionalHasValue<T>(inout v: Optional<T>)
-  FuncDecl *PreconditionOptionalHasValueDecls[NumOptionalTypeKinds] = {};
-
-  /// func _doesOptionalHaveValue<T>(inout v: Optional<T>) -> Builtin.Int1
-  FuncDecl *DoesOptionalHaveValueDecls[NumOptionalTypeKinds] = {};
-
   /// func _doesOptionalHaveValueAsBool<T>(v: Optional<T>) -> Bool
   FuncDecl *DoesOptionalHaveValueAsBoolDecls[NumOptionalTypeKinds] = {};
 

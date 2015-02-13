@@ -1,10 +1,11 @@
 // RUN: %target-parse-verify-swift
 
 // Simple case.
-@autoclosure var fn : () -> Int = 4
+@autoclosure var fn : () -> Int = 4  // expected-error {{'autoclosure' may only be used on 'parameter' declarations}} expected-error {{'Int' is not convertible to '() -> Int'}}
 
-@autoclosure func func1() {}  // expected-error {{'autoclosure' attribute cannot be applied to this declaration}}
-@autoclosure var v1 : Int = 4 // expected-error {{'autoclosure' attribute may only be applied to values of function type}}
+@autoclosure func func1() {}  // expected-error {{'autoclosure' may only be used on 'parameter' declarations}}
+
+func func1a(@autoclosure v1 : Int) {} // expected-error {{'autoclosure' attribute may only be applied to values of function type}}
 
 
 func func2(@autoclosure fp : () -> Int) { func2(4)}
@@ -39,18 +40,15 @@ let migrate4 : @autoclosure() -> ()   // expected-error {{'autoclosure' attribut
 
 
 struct SomeStruct {
-  @autoclosure let property : () -> Int  // autoclosures work as an property as well.
+  @autoclosure let property : () -> Int  // expected-error {{'autoclosure' may only be used on 'parameter' declarations}}
 
   init() {
-    property = 4
-    let a : Int = property()
   }
 }
 
 class BaseClass {
-  // FIXME: rdar://19311652 - class properties don't work due to synthesized code issues
-  @autoclosure var property : () -> Int = 4 // autoclosures work as an property as well.
-
+  @autoclosure var property : () -> Int // expected-error {{'autoclosure' may only be used on 'parameter' declarations}}
+  init() {}
 }
 
 class DerivedClass {
@@ -79,12 +77,9 @@ struct S : P2 {
 }
 
 
-// <rdar://problem/19783405> @autoclosure parameters 'escape' from compiler-generated default initilizers
 struct AutoclosureEscapeTest {
-  // Autoclosure disables synthesis of the default initializer.
-  @autoclosure let delayed: () -> Int
+  @autoclosure let delayed: () -> Int  // expected-error {{'autoclosure' may only be used on 'parameter' declarations}}
 }
-let _ = AutoclosureEscapeTest(delayed: 4)  // expected-error {{'AutoclosureEscapeTest' cannot be constructed because it has no accessible initializers}}
 
 // @autoclosure(escaping)
 func func10(@autoclosure(escaping () -> ()) { } // expected-error{{expected ')' in '@autoclosure' attribute}}
@@ -126,3 +121,11 @@ class TestFunc12 {
     // expected-error@-2{{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}}
   }
 }
+
+
+enum AutoclosureFailableOf<T> {
+  case Success(@autoclosure () -> T)  // expected-error {{'autoclosure' attribute is only allowed on parameters, not on enum cases}}
+  case Failure()
+}
+
+
