@@ -1330,12 +1330,19 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   // Insert into the lowered basic block.
   llvm::BasicBlock *llBB = getLoweredBB(BB).bb;
   Builder.SetInsertPoint(llBB);
-
   // FIXME: emit a phi node to bind the bb arguments from all the predecessor
   // branches.
 
   bool InEntryBlock = BB->pred_empty();
   bool ArgsEmitted = false;
+
+  // The basic blocks are visited in a random order. Reset the debug location.
+  std::unique_ptr<AutoRestoreLocation> ScopedLoc;
+  if (InEntryBlock)
+    ScopedLoc = llvm::make_unique<PrologueLocation>(IGM.DebugInfo, Builder);
+  else
+    ScopedLoc = llvm::make_unique<ArtificialLocation>(
+        CurSILFn->getDebugScope(), IGM.DebugInfo, Builder);
 
   if (InEntryBlock) {
     // Establish a mapping from VarDecl -> ArgNo to be used by

@@ -70,6 +70,7 @@ enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
 /// CompileUnit, File, LexicalScope, and translates SILLocations into
 /// <llvm::DebugLoc>s.
 class IRGenDebugInfo {
+  friend class ArtificialLocation;
   const IRGenOptions &Opts;
   ClangImporter &CI;
   SourceManager &SM;
@@ -289,54 +290,50 @@ private:
   TypeAliasDecl *getMetadataType();
 };
 
-/// ArtificialLocation - An RAII object that temporarily switches to
+/// \brief An RAII object that autorestores the debug location.
+class AutoRestoreLocation {
+  IRGenDebugInfo *DI;
+public:
+  AutoRestoreLocation(IRGenDebugInfo *DI) : DI(DI) {
+    if (DI)
+      DI->pushLoc();
+  }
+
+  /// \brief Autorestore everything back to normal.
+  ~AutoRestoreLocation() {
+    if (DI)
+      DI->popLoc();
+  }
+};
+
+/// \brief An RAII object that temporarily switches to
 /// an artificial debug location that has a valid scope, but no line
 /// information. This is useful when emitting compiler-generated
 /// instructions (e.g., ARC-inserted calls to release()) that have no
 /// source location associated with them. The DWARF specification
 /// allows the compiler to use the special line number 0 to indicate
 /// code that can not be attributed to any source location.
-class ArtificialLocation {
-  IRGenDebugInfo *DI;
-
+class ArtificialLocation : public AutoRestoreLocation {
 public:
-  /// Set the current location to line 0, but within the current scope
-  /// (= the top of the LexicalBlockStack).
-  ArtificialLocation(IRGenDebugInfo *DI, IRBuilder &Builder) : DI(DI) {
+  /// \brief Set the current location to line 0, but within scope DS.
+  ArtificialLocation(SILDebugScope *DS, IRGenDebugInfo *DI, IRBuilder &Builder)
+    : AutoRestoreLocation(DI) {
     if (DI) {
-      DI->pushLoc();
-      llvm::DIDescriptor Scope(
-          Builder.getCurrentDebugLocation().getScope(Builder.getContext()));
-      auto DL = llvm::DebugLoc::get(0, 0, Scope);
+      auto DL = llvm::DebugLoc::get(0, 0, DI->getOrCreateScope(DS));
       Builder.SetCurrentDebugLocation(DL);
     }
   }
-
-  /// ~ArtificialLocation - Autorestore everything back to normal.
-  ~ArtificialLocation() {
-    if (DI)
-      DI->popLoc();
-  }
 };
 
-/// PrologueLocation - An RAII object that temporarily switches to an
+/// \brief An RAII object that temporarily switches to an
 /// empty location. This is how the function prologue is represented.
-class PrologueLocation {
-  IRGenDebugInfo *DI;
-
+class PrologueLocation : public AutoRestoreLocation {
 public:
-  /// Set the current location to an empty location.
-  PrologueLocation(IRGenDebugInfo *DI, IRBuilder &Builder) : DI(DI) {
-    if (DI) {
-      DI->pushLoc();
-      DI->clearLoc(Builder);
-    }
-  }
-
-  /// ~PrologueLocation - Autorestore everything back to normal.
-  ~PrologueLocation() {
+  /// \brief Set the current location to an empty location.
+  PrologueLocation(IRGenDebugInfo *DI, IRBuilder &Builder)
+    : AutoRestoreLocation(DI) {
     if (DI)
-      DI->popLoc();
+      DI->clearLoc(Builder);
   }
 };
 
