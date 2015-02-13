@@ -305,7 +305,7 @@ public protocol _RandomAccessIndexType : _BidirectionalIndexType, Strideable {
   ///
   /// :returns: If `n > 0`, the result of applying `successor` to
   /// `self` `n` times.  If `n < 0`, the result of applying
-  /// `predecessor` to `self` `-n` times. Otherwise, `self`.
+  /// `predecessor` to `self` `n` times. Otherwise, `self`.
   ///
   /// Complexity: O(1)
   ///
