@@ -11,9 +11,9 @@ import objc_enum_multi_file_helper
 // CHECK-LABEL: define hidden i32 @_TF4main6useFooFO{{S_|27objc_enum_multi_file_helper}}3FooVSs5Int32(i32) {
 func useFoo(x: Foo) -> Int32 {
   // CHECK: switch i32 %0, label %[[DEFAULT:.+]] [
-  // CHECK-DAG: i32 1, label %[[CASE_B:.+]]
-  // CHECK-DAG: i32 2, label %[[CASE_C:.+]]
-  // CHECK-DAG: i32 0, label %[[CASE_A:.+]]
+  // CHECK-DAG: i32 6, label %[[CASE_B:.+]]
+  // CHECK-DAG: i32 7, label %[[CASE_C:.+]]
+  // CHECK-DAG: i32 5, label %[[CASE_A:.+]]
   // CHECK: ]
 
   // CHECK: <label>:[[DEFAULT]]
