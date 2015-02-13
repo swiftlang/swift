@@ -1167,6 +1167,8 @@ public:
 };
 
 bool ArchetypeBuilder::inferRequirements(TypeLoc type) {
+  if (!type.getType())
+    return true;
   // FIXME: Crummy source-location information.
   InferRequirementsWalker walker(*this, type.getSourceRange().Start);
   type.getType().walk(walker);
@@ -1174,6 +1176,8 @@ bool ArchetypeBuilder::inferRequirements(TypeLoc type) {
 }
 
 bool ArchetypeBuilder::inferRequirements(Pattern *pattern) {
+  if (!pattern->hasType())
+    return true;
   // FIXME: Crummy source-location information.
   InferRequirementsWalker walker(*this, pattern->getSourceRange().Start);
   pattern->getType().walk(walker);

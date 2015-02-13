@@ -539,6 +539,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
                                       AbstractFunctionDecl *func,
                                       GenericTypeResolver &resolver) {
   bool badType = false;
+  func->setIsBeingTypeChecked();
 
   // Check the generic parameter list.
   checkGenericParameters(tc, builder, func->getGenericParams(),
@@ -573,6 +574,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
     }
   }
 
+  func->setIsBeingTypeChecked(false);
   return badType;
 }
 
