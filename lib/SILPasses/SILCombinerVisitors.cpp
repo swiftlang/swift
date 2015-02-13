@@ -21,7 +21,6 @@
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/Statistic.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
