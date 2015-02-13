@@ -36,7 +36,7 @@ public func || <T: BooleanType, U: BooleanType>(
 }
 
 // FIXME: We can't make the above @transparent due to
-// rdar://problem/17872402, so here are some @transparent overloads
+// rdar://problem/19418937, so here are some @transparent overloads
 // for Bool.  We've done the same for ObjCBool
 @transparent
 public func && <T: BooleanType>(

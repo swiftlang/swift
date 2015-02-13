@@ -211,7 +211,7 @@ let YES = ObjCBool(true)
 let NO = ObjCBool(false)
 
 // FIXME: We can't make the fully-generic versions @transparent due to
-// rdar://problem/17872402, so here are some @transparent overloads
+// rdar://problem/19418937, so here are some @transparent overloads
 // for ObjCBool
 @transparent
 public func && <T: BooleanType>(
