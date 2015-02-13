@@ -316,7 +316,8 @@ bool Decl::isTransparent() const {
   // extension.
   if (const AbstractFunctionDecl *FD = dyn_cast<AbstractFunctionDecl>(this)) {
     if (const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(FD->getParent()))
-      return ED->isTransparent();
+      if (ED->isTransparent())
+        return true;
   }
 
   // If this is an accessor, check if the transparent attribute was set

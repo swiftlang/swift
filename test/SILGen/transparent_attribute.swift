@@ -85,6 +85,7 @@ func testProperty(z: MySt) {
 }
 
 var _tr2 = MySt()
+var _tr3 = MySt()
 struct MyTranspStruct {}
 @transparent extension MyTranspStruct {
   init(input : MySt) {}
@@ -99,10 +100,24 @@ struct MyTranspStruct {}
     }
   }
 }
+
+extension MyTranspStruct {
+    @transparent
+    var tr3: MySt {
+    get {
+      return _tr3
+    }
+    set {
+      _tr3 = newValue
+    }
+  }
+}
+
 func testStructExtension() {
   var c : MyTranspStruct = MyTranspStruct(input: _x)
   c.tr1()
   var s : MySt = c.tr2
+  var t : MySt = c.tr3
   // CHECK-APPLY: sil hidden @_TF21transparent_attribute13testStructExtensionFT_T_
   // CHECK: [[INIT:%[0-9]+]] = function_ref @_TFV21transparent_attribute14MyTranspStructCfMS0_FT5inputVS_4MySt_S0_
   // CHECK: apply [transparent] [[INIT]]
@@ -110,6 +125,8 @@ func testStructExtension() {
   // CHECK: apply [transparent] [[TR1]]
   // CHECK: [[TR2:%[0-9]+]] = function_ref @_TFV21transparent_attribute14MyTranspStructg3tr2VS_4MySt
   // CHECK: apply [transparent] [[TR2]]
+  // CHECK: [[TR3:%[0-9]+]] = function_ref @_TFV21transparent_attribute14MyTranspStructg3tr3VS_4MySt
+  // CHECK: apply [transparent] [[TR3]]
 }
 
 enum MyEnum {
