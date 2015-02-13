@@ -891,7 +891,11 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
                     CI->getIdentifier()).highlight(Attr->getRange());
       return true;
     }
-    
+
+    if (auto *Attr = TypeDecl->getAttrs().getDeprecated(TC.Context)) {
+      TC.diagnoseDeprecated(Loc, Attr, CI->getIdentifier());
+    }
+
     // Check for potential unavailability because of the minimum
     // deployment version.
     // We should probably unify this checking for deployment-version API

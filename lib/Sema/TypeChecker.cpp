@@ -1199,6 +1199,22 @@ void TypeChecker::diagnosePotentialAccessorUnavailability(
            Reason.getRequiredOSVersionRange().getLowerEndpoint());
 }
 
+void TypeChecker::diagnoseDeprecated(SourceLoc ReferenceLoc,
+                                     const AvailabilityAttr *Attr,
+                                     DeclName Name) {
+  StringRef Platform = Attr->prettyPlatformString();
+  clang::VersionTuple DeprecatedVersion = Attr->Deprecated.getValue();
+
+  if (Attr->Message.empty()) {
+    diagnose(ReferenceLoc, diag::availability_deprecated, Name, Platform,
+             DeprecatedVersion).highlight(Attr->getRange());
+    return;
+  }
+
+  diagnose(ReferenceLoc, diag::availability_deprecated_msg, Name, Platform,
+           DeprecatedVersion, Attr->Message).highlight(Attr->getRange());
+}
+
 // checkForForbiddenPrefix is for testing purposes.
 
 void TypeChecker::checkForForbiddenPrefix(const Decl *D) {

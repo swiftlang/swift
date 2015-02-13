@@ -25,3 +25,30 @@ func doSomethingReallyOld() { }
 // expected-note @-1{{'doSomethingReallyOld()' was obsoleted in OS X version 10}}
 
 doSomethingReallyOld() // expected-error{{'doSomethingReallyOld()' is unavailable}}
+
+// Test deprecations in 10.10 and later
+
+@availability(OSX, introduced=10.5, deprecated=10.10,
+              message="Use another function")
+func deprecatedFunctionWithMessage() { }
+
+deprecatedFunctionWithMessage() // expected-warning{{'deprecatedFunctionWithMessage()' was deprecated in OS X version 10.10: Use another function}}
+
+
+@availability(OSX, introduced=10.5, deprecated=10.10)
+func deprecatedFunctionWithoutMessage() { }
+
+deprecatedFunctionWithoutMessage() // expected-warning{{'deprecatedFunctionWithoutMessage()' was deprecated in OS X version 10.10}}
+
+@availability(OSX, introduced=10.5, deprecated=10.10,
+              message="Use BetterClass instead")
+class DeprecatedClass { }
+
+func functionWithDeprecatedParameter(p: DeprecatedClass) { } // expected-warning{{'DeprecatedClass' was deprecated in OS X version 10.10: Use BetterClass instead}}
+
+@availability(OSX, introduced=10.5, deprecated=10.11,
+              message="Use BetterClass instead")
+class DeprecatedClassIn10_11 { }
+
+// Elements deprecated later than the minimum deployment target (which is 10.10, in this case) should not generate warnings
+func functionWithDeprecatedLaterParameter(p: DeprecatedClassIn10_11) { }

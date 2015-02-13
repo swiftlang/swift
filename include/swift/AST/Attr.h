@@ -1052,6 +1052,10 @@ public:
   /// a declaration is unavailable, or null otherwise.
   const AvailabilityAttr *getUnavailable(const ASTContext &ctx) const;
 
+  /// Returns the first @availability attribute that indicates
+  /// a declaration is deprecated on all deployment targets, or null otherwise.
+  const AvailabilityAttr *getDeprecated(const ASTContext &ctx) const;
+
   void dump() const;
   void print(ASTPrinter &Printer, const PrintOptions &Options) const;
 

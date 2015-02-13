@@ -1273,6 +1273,10 @@ public:
   void diagnosePotentialAccessorUnavailability(
       FuncDecl *Accessor, SourceLoc referenceLoc,
       const UnavailabilityReason &Reason, bool ForInout);
+
+  /// Emits a diagnostic for a reference to a declaration that is deprecated.
+  void diagnoseDeprecated(SourceLoc ReferenceLoc, const AvailabilityAttr *Attr,
+                          DeclName Name);
   /// @}
 
   /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl
