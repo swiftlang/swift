@@ -48,8 +48,8 @@
 #include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Linker/Linker.h"
-#include "llvm/PassManager.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
@@ -436,7 +436,7 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   llvm::PassManagerBuilder PMBuilder;
   PMBuilder.OptLevel = 2;
   PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
-  llvm::PassManager ModulePasses;
+  llvm::legacy::PassManager ModulePasses;
   ModulePasses.add(new llvm::DataLayoutPass());
   PMBuilder.populateModulePassManager(ModulePasses);
   ModulePasses.run(*Module);

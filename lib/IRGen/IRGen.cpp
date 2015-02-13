@@ -29,12 +29,12 @@
 #include "llvm/CodeGen/BasicTTIImpl.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/MC/SubtargetFeature.h"
-#include "llvm/PassManager.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
@@ -302,7 +302,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   }
   
   // Configure the function passes.
-  FunctionPassManager FunctionPasses(Module);
+  legacy::FunctionPassManager FunctionPasses(Module);
   FunctionPasses.add(new llvm::DataLayoutPass());
   FunctionPasses.add(createTargetTransformInfoWrapperPass(
       TargetMachine->getTargetIRAnalysis()));
@@ -323,7 +323,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   FunctionPasses.doFinalization();
 
   // Configure the module passes.
-  PassManager ModulePasses;
+  legacy::PassManager ModulePasses;
   ModulePasses.add(new llvm::DataLayoutPass());
   ModulePasses.add(createTargetTransformInfoWrapperPass(
       TargetMachine->getTargetIRAnalysis()));
@@ -344,7 +344,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   // Do it.
   ModulePasses.run(*Module);
 
-  PassManager EmitPasses;
+  legacy::PassManager EmitPasses;
 
   // Set up the final emission passes.
   switch (Opts.OutputKind) {
