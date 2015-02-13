@@ -10,6 +10,13 @@ if(SWIFT_HAVE_CRASH_REPORTER_CLIENT)
       "-DSWIFT_HAVE_CRASHREPORTERCLIENT=1")
 endif()
 
+set(swift_runtime_dtrace_sources)
+if (SWIFT_RUNTIME_ENABLE_DTRACE)
+  set(swift_runtime_dtrace_sources SwiftRuntimeDTraceProbes.d)
+  list(APPEND swift_runtime_compile_flags
+      "-DSWIFT_RUNTIME_ENABLE_DTRACE=1")
+endif()
+
 set(swift_runtime_objc_sources)
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   set(swift_runtime_objc_sources
@@ -35,6 +42,7 @@ add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
   Errors.cpp
   UnicodeExtendedGraphemeClusters.cpp.gyb
   ${swift_runtime_objc_sources}
+  ${swift_runtime_dtrace_sources}
   C_COMPILE_FLAGS ${swift_runtime_compile_flags}
   INSTALL_IN_COMPONENT stdlib)
 

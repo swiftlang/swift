@@ -750,6 +750,13 @@ function(_add_swift_library_single target name)
       SWIFTLIB_SINGLE_SOURCES
       "${SWIFTLIB_SINGLE_ARCHITECTURE}")
 
+  if (SWIFT_RUNTIME_ENABLE_DTRACE)
+    handle_dtrace_sources(
+      dtrace_dependency_targets
+      SWIFTLIB_SINGLE_SOURCES
+      dtrace_include_directories)
+  endif()
+
   # Figure out whether and which API notes to create.
   set(SWIFTLIB_SINGLE_API_NOTES)
   if(SWIFTLIB_SINGLE_API_NOTES_NON_OVERLAY)
@@ -795,6 +802,12 @@ function(_add_swift_library_single target name)
   add_library("${target}" ${libkind}
       ${SWIFTLIB_SINGLE_SOURCES}
       ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES})
+
+  if (dtrace_dependency_targets)
+    add_dependencies("${target}" ${dtrace_dependency_targets})
+    include_directories(${dtrace_include_directories})
+  endif()
+
   llvm_update_compile_flags(${target})
 
   set_output_directory(${target}

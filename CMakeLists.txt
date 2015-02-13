@@ -145,6 +145,10 @@ set(SWIFT_EXPERIMENTAL_EXTRA_FLAGS "" CACHE STRING
 set(SWIFT_EXPERIMENTAL_EXTRA_REGEXP_FLAGS "" CACHE STRING
     "A list of [module_regexp1,flags1,module_regexp2,flags2,...] which can be used to apply specific flags to modules that match a cmake regexp. It always applies the first regexp that matches.")
 
+option(SWIFT_RUNTIME_ENABLE_DTRACE
+  "Should the runtime be built with dtrace instrumentation enabled"
+  FALSE)
+
 option(SWIFT_STDLIB_USE_ASSERT_CONFIG_RELEASE
     "Should the stdlib be build with assert config set to release"
     FALSE)
@@ -173,6 +177,7 @@ endif()
 include(CMakeParseArguments)
 include(SwiftTranslateFlag)
 include(SwiftHandleGybSources)
+include(SwiftHandleDTraceSources)
 include(SwiftSetIfArchBitness)
 include(AddSwift)
 include(SwiftConfigureSDK)
@@ -449,6 +454,14 @@ foreach(SDK ${SWIFT_SDKS})
     endif()
   endforeach()
 endforeach()
+
+# Find dtrace if it is enabled. We currently only support this on OSX builds.
+if (SWIFT_RUNTIME_ENABLE_DTRACE)
+  find_program(SWIFT_DTRACE "dtrace")
+  if (NOT SWIFT_DTRACE)
+    message(FATAL_ERROR "Failed to find dtrace!")
+  endif()
+endif()
 
 #
 # Set up global CMake variables for API notes.

@@ -32,6 +32,14 @@
 #if SWIFT_OBJC_INTEROP
 # include <objc/objc-runtime.h>
 #endif
+#if SWIFT_RUNTIME_ENABLE_DTRACE
+# include "SwiftRuntimeDTraceProbes.h"
+#else
+# define SWIFT_ALLOCATEOBJECT()
+# define SWIFT_DEALLOCATEOBJECT()
+# define SWIFT_RELEASE()
+# define SWIFT_RETAIN()
+#endif
 
 using namespace swift;
 
@@ -39,6 +47,7 @@ HeapObject *
 swift::swift_allocObject(HeapMetadata const *metadata,
                          size_t requiredSize,
                          size_t requiredAlignmentMask) {
+  SWIFT_ALLOCATEOBJECT();
   return _swift_allocObject(metadata, requiredSize, requiredAlignmentMask);
 }
 static HeapObject *
@@ -261,6 +270,7 @@ swift::swift_retain_noresult(HeapObject *object) {
 
 
 HeapObject *swift::swift_retain(HeapObject *object) {
+  SWIFT_RETAIN();
   return _swift_retain(object);
 }
 static HeapObject *_swift_retain_(HeapObject *object) {
@@ -269,6 +279,7 @@ static HeapObject *_swift_retain_(HeapObject *object) {
 auto swift::_swift_retain = _swift_retain_;
 
 void swift::swift_release(HeapObject *object) {
+  SWIFT_RELEASE();
   return _swift_release(object);
 }
 static void _swift_release_(HeapObject *object) {
@@ -390,6 +401,7 @@ static inline void memset_pattern8(void *b, const void *pattern8, size_t len) {
 
 void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
                                 size_t allocatedAlignMask) {
+  SWIFT_DEALLOCATEOBJECT();
   assert(isAlignmentMask(allocatedAlignMask));
   assert(object->refCount.isDeallocating());
 #ifdef SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
