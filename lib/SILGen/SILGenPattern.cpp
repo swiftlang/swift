@@ -994,6 +994,8 @@ void SwitchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
   // Enter the row.
   CaseStmt *caseBlock = clauses[row].getCaseBlock();
 
+  SGF.emitProfilerIncrement(caseBlock);
+
   // Certain case statements can be entered along multiple paths,
   // either because they have multiple labels or because of
   // fallthrough.  However, in both situations, the case cannot have
@@ -1839,6 +1841,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
         S->print(llvm::dbgs());
         llvm::dbgs() << '\n');
   SILBasicBlock *contBB = createBasicBlock();
+  emitProfilerIncrement(S);
   JumpDest contDest(contBB, Cleanups.getCleanupsDepth(), CleanupLocation(S));
 
   SwitchEmission emission(*this, S);

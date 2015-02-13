@@ -833,6 +833,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.ExternalPassPipelineFilename = A->getValue();
 
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
+  Opts.EmitProfileCoverageMapping |= Args.hasArg(OPT_profile_coverage_mapping);
 
   return false;
 }

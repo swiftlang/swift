@@ -117,6 +117,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_split_objc_selectors);
   inputArgs.AddLastArg(arguments, options::OPT_solver_memory_threshold);
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
+  inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);

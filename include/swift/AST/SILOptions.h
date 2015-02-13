@@ -95,6 +95,9 @@ public:
   /// Instrument code to generate profiling information.
   bool GenerateProfile = false;
 
+  /// Emit a mapping of profile counters for use in coverage.
+  bool EmitProfileCoverageMapping = false;
+
   /// Should we use a pass pipeline passed in via a json file? Null by default.
   StringRef ExternalPassPipelineFilename;
 };

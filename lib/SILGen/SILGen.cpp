@@ -412,7 +412,8 @@ bool SILGenModule::hasFunction(SILDeclRef constant) {
 void SILGenModule::visitFuncDecl(FuncDecl *fd) {
   const auto &Opts = M.getOptions();
   if (Opts.GenerateProfile)
-    Profiler = llvm::make_unique<SILGenProfiling>(*this);
+    Profiler = llvm::make_unique<SILGenProfiling>(
+        *this, Opts.EmitProfileCoverageMapping);
   emitFunction(fd);
   Profiler = nullptr;
 }

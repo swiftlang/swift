@@ -367,6 +367,14 @@ public:
   StmtCondition getCond() const { return Cond; }
   void setCond(StmtCondition e) { Cond = e; }
 
+  Expr *getCondExpr() const {
+    auto isCond = [](const StmtConditionElement &E) { return E.isCondition(); };
+    assert(std::count_if(Cond.begin(), Cond.end(), isCond) == 1 &&
+           "multiple condition exprs");
+    auto I = std::find_if(Cond.begin(), Cond.end(), isCond);
+    return I->getCondition();
+  }
+
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
   

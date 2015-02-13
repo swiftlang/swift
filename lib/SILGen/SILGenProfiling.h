@@ -43,6 +43,7 @@ namespace Lowering {
 class SILGenProfiling {
 private:
   SILGenModule &SGM;
+  bool EmitCoverageMapping;
 
   // The current function's name and counter data.
   std::string CurrentFuncName;
@@ -50,9 +51,12 @@ private:
   uint64_t FunctionHash;
   llvm::DenseMap<ASTNode, unsigned> RegionCounterMap;
 
+  std::vector<std::tuple<std::string, uint64_t, std::string>> CoverageData;
+
 public:
-  SILGenProfiling(SILGenModule &SGM)
-      : SGM(SGM), NumRegionCounters(0), FunctionHash(0) {}
+  SILGenProfiling(SILGenModule &SGM, bool EmitCoverageMapping)
+      : SGM(SGM), EmitCoverageMapping(EmitCoverageMapping),
+        NumRegionCounters(0), FunctionHash(0) {}
 
   bool hasRegionCounters() const { return NumRegionCounters != 0; }
 

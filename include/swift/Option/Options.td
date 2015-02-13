@@ -379,4 +379,8 @@ def profile_generate : Flag<["-"], "profile-generate">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Generate instrumented code to collect execution counts">;
 
+def profile_coverage_mapping : Flag<["-"], "profile-coverage-mapping">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Generate coverage data for use with profiled execution counts">;
+
 include "FrontendOptions.td"
