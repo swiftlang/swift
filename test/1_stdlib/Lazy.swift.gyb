@@ -1,0 +1,92 @@
+//===--- Lazy.swift - Tests for LazySequence and LazyCollection -----------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+// RUN: %S/../../utils/gyb %s -o %t/Lazy.swift
+// RUN: %S/../../utils/line-directive %t/Lazy.swift -- %target-build-swift %t/Lazy.swift -o %t/a.out_Debug
+// RUN: %S/../../utils/line-directive %t/Lazy.swift -- %target-build-swift %t/Lazy.swift -o %t/a.out_Release -O
+//
+// RUN: %S/../../utils/line-directive %t/Lazy.swift -- %target-run %t/a.out_Debug
+// RUN: %S/../../utils/line-directive %t/Lazy.swift -- %target-run %t/a.out_Release
+
+// XFAIL: linux
+
+import StdlibUnittest
+
+var LazyTestSuite = TestSuite("Lazy")
+
+LazyTestSuite.test("isEmpty") {
+  expectTrue(lazy(0..<0).isEmpty)
+  expectFalse(lazy(0...0).isEmpty)
+}
+
+LazyTestSuite.test("firstLast") {
+  expectOptionalEqual(7, lazy(7..<42).first)
+  expectOptionalEqual(41, lazy(7..<42).last)
+  expectEmpty(lazy(7..<7).first)
+  expectEmpty(lazy(7..<7).last)
+}
+
+//===----------------------------------------------------------------------===//
+// LazySequence
+//===----------------------------------------------------------------------===//
+
+LazyTestSuite.test("LazySequence<Sequence>/underestimateCount") {
+  let s = MinimalSequence(
+    [ 0, 30, 10, 90 ], underestimatedCount: .Value(42))
+  var lazySeq = lazy(s)
+  expectType(LazySequence<MinimalSequence<Int>>.self, &lazySeq)
+  expectEqual(42, underestimateCount(lazySeq))
+}
+
+%for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+
+LazyTestSuite.test("LazySequence<${traversal}Collection>/underestimateCount") {
+  let s = Minimal${traversal}Collection(
+    [ 0, 30, 10, 90 ], underestimatedCount: .Value(42))
+  var lazySeq = lazy(s)
+  expectType(
+    Lazy${traversal}Collection<Minimal${traversal}Collection<Int>>.self, &lazySeq)
+  expectEqual(42, underestimateCount(lazySeq))
+}
+
+%end
+
+//===----------------------------------------------------------------------===//
+// MapSequenceView
+//===----------------------------------------------------------------------===//
+
+LazyTestSuite.test("MapSequenceView<Sequence>/underestimateCount") {
+  let s = MinimalSequence(
+    [ 0, 30, 10, 90 ], underestimatedCount: .Value(42))
+  var lazyMap = lazy(s).map({ $0 })
+  expectType(
+    LazySequence<MapSequenceView<MinimalSequence<Int>, Int>>.self, &lazyMap)
+  expectEqual(42, underestimateCount(lazyMap))
+}
+
+%for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+
+LazyTestSuite.test("MapCollectionView<${traversal}Collection>/underestimateCount") {
+  let s = Minimal${traversal}Collection(
+    [ 0, 30, 10, 90 ], underestimatedCount: .Value(42))
+  var lazyMap = lazy(s).map({ $0 })
+  expectType(
+    Lazy${traversal}Collection<MapCollectionView<Minimal${traversal}Collection<Int>, Int>>.self,
+    &lazyMap)
+  expectEqual(42, underestimateCount(lazyMap))
+}
+
+%end
+
+runAllTests()
+

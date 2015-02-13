@@ -59,6 +59,12 @@ public struct MapSequenceView<Base: SequenceType, T> : SequenceType {
   var _transform: (Base.Generator.Element)->T
 }
 
+public func ~> <Base : SequenceType, T> (
+  s: MapSequenceView<Base, T>, _: (_UnderestimateCount, ())
+) -> Int {
+  return underestimateCount(s._base)
+}
+
 /// Return an `Array` containing the results of mapping `transform`
 /// over `source`.
 public func map<S : SequenceType, T>(
@@ -107,6 +113,12 @@ public struct MapCollectionView<Base: CollectionType, T> : CollectionType {
 
   var _base: Base
   var _transform: (Base.Generator.Element)->T
+}
+
+public func ~> <Base: CollectionType, T> (
+  s: MapCollectionView<Base, T>, _: (_UnderestimateCount, ())
+) -> Int {
+  return underestimateCount(s._base)
 }
 
 /// Return an `Array` containing the results of mapping `transform`

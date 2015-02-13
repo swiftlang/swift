@@ -83,6 +83,12 @@ public struct ${Self}<S: CollectionType ${whereClause}> : CollectionType {
   var _base: S
 }
 
+public func ~> <S : CollectionType ${whereClause}> (
+  s: ${Self}<S>, _: (_UnderestimateCount, ())
+) -> Int {
+  return underestimateCount(s._base)
+}
+
 /// Augment `s` with lazy methods such as `map`, `filter`, etc.
 public
 func lazy<S: CollectionType ${whereClause}>(s: S) -> ${Self}<S> {

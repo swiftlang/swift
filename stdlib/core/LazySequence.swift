@@ -36,6 +36,12 @@ struct LazySequence<S: SequenceType> : SequenceType {
   var _base: S
 }
 
+public func ~> <S : SequenceType> (
+  s: LazySequence<S>, _: (_UnderestimateCount, ())
+) -> Int {
+  return underestimateCount(s._base)
+}
+
 /// Augment `s` with lazy methods such as `map`, `filter`, etc.
 public
 func lazy<S: SequenceType>(s: S) -> LazySequence<S> {

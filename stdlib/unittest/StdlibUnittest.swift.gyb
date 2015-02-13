@@ -1703,6 +1703,10 @@ internal class _MinimalGeneratorSharedState<T> {
   internal var i: Int = 0
 }
 
+//===----------------------------------------------------------------------===//
+// MinimalGenerator
+//===----------------------------------------------------------------------===//
+
 /// A GeneratorType that implements the protocol contract in the most
 /// narrow way possible.
 ///
@@ -1743,6 +1747,10 @@ public struct MinimalGenerator<T> : GeneratorType {
     _MinimalGeneratorPrivateState()
   internal let _sharedState: _MinimalGeneratorSharedState<T>
 }
+
+//===----------------------------------------------------------------------===//
+// MinimalSequence
+//===----------------------------------------------------------------------===//
 
 public enum UnderestimateCountBehavior {
   /// Return the actual number of elements.
@@ -1795,8 +1803,17 @@ public func ~> <T> (
   return s.underestimatedCount
 }
 
+//===----------------------------------------------------------------------===//
+// MinimalForwardIndex
+//===----------------------------------------------------------------------===//
+
 public struct MinimalForwardIndex : ForwardIndexType {
   public init(position: Int, endIndex: Int) {
+    self._position = position
+    self._endIndex = endIndex
+  }
+
+  public init(position: Int, startIndex _: Int, endIndex: Int) {
     self._position = position
     self._endIndex = endIndex
   }
@@ -1814,8 +1831,99 @@ public func == (lhs: MinimalForwardIndex, rhs: MinimalForwardIndex) -> Bool {
   return lhs._position == rhs._position
 }
 
+//===----------------------------------------------------------------------===//
+// MinimalBidirectionalIndex
+//===----------------------------------------------------------------------===//
+
+public struct MinimalBidirectionalIndex : BidirectionalIndexType {
+  public init(position: Int, startIndex: Int, endIndex: Int) {
+    self._position = position
+    self._startIndex = startIndex
+    self._endIndex = endIndex
+  }
+
+  public func successor() -> MinimalBidirectionalIndex {
+    expectNotEqual(_endIndex, _position)
+    return MinimalBidirectionalIndex(
+      position: _position + 1, startIndex: _startIndex, endIndex: _endIndex)
+  }
+
+  public func predecessor() -> MinimalBidirectionalIndex {
+    expectNotEqual(_startIndex, _position)
+    return MinimalBidirectionalIndex(
+      position: _position - 1, startIndex: _startIndex, endIndex: _endIndex)
+  }
+
+  internal var _position: Int
+  internal var _startIndex: Int
+  internal var _endIndex: Int
+}
+
+public func == (
+  lhs: MinimalBidirectionalIndex,
+  rhs: MinimalBidirectionalIndex
+) -> Bool {
+  return lhs._position == rhs._position
+}
+
+//===----------------------------------------------------------------------===//
+// MinimalRandomAccessIndex
+//===----------------------------------------------------------------------===//
+
+public struct MinimalRandomAccessIndex : RandomAccessIndexType {
+  public init(position: Int, startIndex: Int, endIndex: Int) {
+    self._position = position
+    self._startIndex = startIndex
+    self._endIndex = endIndex
+  }
+
+  public func successor() -> MinimalRandomAccessIndex {
+    expectNotEqual(_endIndex, _position)
+    return MinimalRandomAccessIndex(
+      position: _position + 1, startIndex: _startIndex, endIndex: _endIndex)
+  }
+
+  public func predecessor() -> MinimalRandomAccessIndex {
+    expectNotEqual(_startIndex, _position)
+    return MinimalRandomAccessIndex(
+      position: _position - 1, startIndex: _startIndex, endIndex: _endIndex)
+  }
+
+  public func distanceTo(other: MinimalRandomAccessIndex) -> Int {
+    return other._position - _position
+  }
+
+  public func advancedBy(n: Int) -> MinimalRandomAccessIndex {
+    expectNotEqual(_endIndex, _position)
+    let newPosition = _position + n
+    expectLE(_startIndex, newPosition)
+    expectGE(_endIndex, newPosition)
+    return MinimalRandomAccessIndex(
+      position: newPosition, startIndex: _startIndex, endIndex: _endIndex)
+  }
+
+  internal var _position: Int
+  internal var _startIndex: Int
+  internal var _endIndex: Int
+}
+
+public func == (
+  lhs: MinimalRandomAccessIndex,
+  rhs: MinimalRandomAccessIndex
+) -> Bool {
+  return lhs._position == rhs._position
+}
+
+//===----------------------------------------------------------------------===//
+// Minimal***Collection
+//===----------------------------------------------------------------------===//
+
+%for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+%  Self = 'Minimal%sCollection' % traversal
+%  Index = 'Minimal%sIndex' % traversal
+
 /// A minimal implementation of CollectionType with extra checks.
-public struct MinimalForwardCollection<T> : CollectionType {
+public struct ${Self}<T> : CollectionType {
   public init<S : SequenceType where S.Generator.Element == T>(
     _ s: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
@@ -1838,16 +1946,16 @@ public struct MinimalForwardCollection<T> : CollectionType {
     return MinimalGenerator(_data)
   }
 
-  public var startIndex: MinimalForwardIndex {
-    return MinimalForwardIndex(position: 0, endIndex: _data.endIndex)
+  public var startIndex: ${Index} {
+    return ${Index}(position: 0, startIndex: 0, endIndex: _data.endIndex)
   }
 
-  public var endIndex: MinimalForwardIndex {
-    return MinimalForwardIndex(
-      position: _data.endIndex, endIndex: _data.endIndex)
+  public var endIndex: ${Index} {
+    return ${Index}(
+      position: _data.endIndex, startIndex: 0, endIndex: _data.endIndex)
   }
 
-  public subscript(i: MinimalForwardIndex) -> T {
+  public subscript(i: ${Index}) -> T {
     return _data[i._position]
   }
 
@@ -1857,10 +1965,12 @@ public struct MinimalForwardCollection<T> : CollectionType {
 }
 
 public func ~> <T> (
-  c: MinimalForwardCollection<T>, _:(_UnderestimateCount, ())
+  c: ${Self}<T>, _: (_UnderestimateCount, ())
 ) -> Int {
   return c.underestimatedCount
 }
+
+%end
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
