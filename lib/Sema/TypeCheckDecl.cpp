@@ -3494,6 +3494,8 @@ public:
       }
     }
 
+    FD->setIsBeingTypeChecked();
+
     bool badType = false;
     if (!FD->getBodyResultTypeLoc().isNull()) {
       if (TC.validateType(FD->getBodyResultTypeLoc(), FD, TR_FunctionResult,
@@ -3503,12 +3505,10 @@ public:
     }
 
     if (!badType) {
-      FD->setIsBeingTypeChecked();
-      
       badType = semaFuncParamPatterns(FD, resolver);
-      
-      FD->setIsBeingTypeChecked(false);
     }
+
+    FD->setIsBeingTypeChecked(false);
 
     // Checking the function parameter patterns might (recursively)
     // end up setting the type.
