@@ -17,25 +17,27 @@ public func == (
 Algorithm.test("split") {
   expectEqual(
     [ "foo", "  bar baz " ].map { $0.unicodeScalars },
-    split("  foo   bar baz ".unicodeScalars, { $0._isSpace() }, maxSplit: 1))
+    split("  foo   bar baz ".unicodeScalars, maxSplit: 1) { $0._isSpace() })
 
   expectEqual(
     [ "foo", "bar", "baz" ].map { $0.unicodeScalars },
     split(
-      "  foo   bar baz ".unicodeScalars, { $0._isSpace() },
-      allowEmptySlices: false))
+      "  foo   bar baz ".unicodeScalars, allowEmptySlices: false) { 
+      $0._isSpace() 
+    })
 
   expectEqual(
     [ "", "", "foo", "", "", "bar", "baz", "" ].map { $0.unicodeScalars },
     split(
-      "  foo   bar baz ".unicodeScalars, { $0._isSpace() },
-      allowEmptySlices: true))
+      "  foo   bar baz ".unicodeScalars, allowEmptySlices: true) { 
+      $0._isSpace() 
+    })
 
   expectEqual(
     [ "", "", "foo   bar baz " ].map { $0.unicodeScalars },
     split(
-      "  foo   bar baz ".unicodeScalars, { $0._isSpace() },
-      allowEmptySlices: true, maxSplit: 2))
+      "  foo   bar baz ".unicodeScalars, allowEmptySlices: true, maxSplit: 2,
+      isSeparator: { $0._isSpace() }))
 }
 
 struct StartsWithTest {

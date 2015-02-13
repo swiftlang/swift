@@ -116,9 +116,9 @@ public func max<T : Comparable>(x: T, y: T, z: T, rest: T...) -> T {
 /// the result for each pair of consecutive 
 public func split<S: Sliceable, R:BooleanType>(
   elements: S, 
-  @noescape isSeparator: (S.Generator.Element) -> R,
   maxSplit: Int = Int.max,
-  allowEmptySlices: Bool = false
+  allowEmptySlices: Bool = false,
+  @noescape #isSeparator: (S.Generator.Element) -> R
   ) -> [S.SubSlice] {
 
   var result = Array<S.SubSlice>()

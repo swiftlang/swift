@@ -37,7 +37,7 @@ extension String {
   }
   
   public func _split(separator: UnicodeScalar) -> [String] {
-    var scalarSlices = Swift.split(unicodeScalars, { $0 == separator })
+    var scalarSlices = Swift.split(unicodeScalars) { $0 == separator }
     return scalarSlices.map { String($0) }
   }
 
@@ -252,7 +252,7 @@ extension String {
   /// the given predicate evaluates true, returning an array of strings that
   /// before/between/after those delimiters.
   func _splitIf(predicate: (UnicodeScalar) -> Bool) -> [String] {
-    var scalarSlices = Swift.split(unicodeScalars, predicate)
+    var scalarSlices = Swift.split(unicodeScalars, isSeparator: predicate)
     return scalarSlices.map { String($0) }
   }
 }
