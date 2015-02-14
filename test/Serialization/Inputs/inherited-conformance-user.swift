@@ -24,5 +24,5 @@ public struct OneToAThousand : CollectionType {
   public init() {}
 }
 
-public protocol SignedComparable: Comparable, SignedNumberType {}
-extension Int: SignedComparable {}
+public protocol SpecialProto : IntegerLiteralConvertible {}
+extension Int : SpecialProto {}
