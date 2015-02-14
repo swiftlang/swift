@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 173; // Last change: autoclosure.
+const uint16_t VERSION_MINOR = 174; // Last change: inherited conformances
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -1066,10 +1066,11 @@ namespace decls_block {
                 // If set, the data array is empty and only inherited
                 // conformances trail the record.
     BCArray<DeclIDField>
-    // The array contains value-value-substitutionCount triplets,
+    // The array contains protocol-conformer-module triplets for inherited
+    // conformances, then value-value-substitutionCount triplets,
     // then type declarations, then defaulted definitions.
-    // The inherited conformances trail the record, followed by substitution
-    // records for the values and then types.
+    // The inherited conformances that can't be cross-referenced trail the
+    // record, followed by substitution records for the values and then types.
   >;
 
   using SpecializedProtocolConformanceLayout = BCRecordLayout<
