@@ -972,16 +972,33 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
   case ProtocolConformanceKind::Normal: {
     auto conf = cast<NormalProtocolConformance>(conformance);
 
-    SmallVector<DeclID, 16> data;
+    SmallVector<DeclID, 32> data;
     unsigned numValueWitnesses = 0;
     unsigned numTypeWitnesses = 0;
     unsigned numDefaultedDefinitions = 0;
+
+    SmallVector<ProtocolDecl *, 8> inheritedProtos;
+    SmallVector<ProtocolConformance *, 8> inheritedConformance;
+    for (auto inheritedMapping : conf->getInheritedConformances()) {
+      DeclID typeDeclID;
+      ModuleID confModuleID;
+      if (encodeReferencedConformance(inheritedMapping.second, typeDeclID,
+                                      confModuleID,
+                                      /*allowReferencingCurrent=*/false)) {
+        inheritedProtos.push_back(inheritedMapping.first);
+        inheritedConformance.push_back(inheritedMapping.second);
+      }
+      data.push_back(addDeclRef(inheritedMapping.first));
+      data.push_back(typeDeclID);
+      data.push_back(confModuleID);
+    }
 
     // If we have an incomplete conformance, it might have just not been
     // deserialized. That's okay if this is just a reference to it.
     if (conformance->isIncomplete()) {
       assert(writeIncomplete && "trying to write an incomplete conformance");
     } else {
+      size_t initialSize = data.size();
       conformance->forEachValueWitness(nullptr,
                                        [&](ValueDecl *req,
                                            ConcreteDeclRef witness) {
@@ -995,9 +1012,9 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
       conformance->forEachTypeWitness(/*resolver=*/nullptr,
                                       [&](AssociatedTypeDecl *assocType,
                                           const Substitution &witness) {
-         data.push_back(addDeclRef(assocType));
-         // The substitution record is serialized later.
-         ++numTypeWitnesses;
+        data.push_back(addDeclRef(assocType));
+        // The substitution record is serialized later.
+        ++numTypeWitnesses;
         return false;
       });
 
@@ -1006,8 +1023,10 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
         ++numDefaultedDefinitions;
       }
 
-      if (writeIncomplete)
-        data.clear();
+      if (writeIncomplete) {
+        data.resize(initialSize);
+        numValueWitnesses = numTypeWitnesses = numDefaultedDefinitions = 0;
+      }
     }
 
     unsigned numInheritedConformances = conf->getInheritedConformances().size();
@@ -1023,13 +1042,6 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
                                                 writeIncomplete,
                                                 data);
 
-    // FIXME: Unfortunate to have to copy these.
-    SmallVector<ProtocolDecl *, 8> inheritedProtos;
-    SmallVector<ProtocolConformance *, 8> inheritedConformance;
-    for (auto inheritedMapping : conf->getInheritedConformances()) {
-      inheritedProtos.push_back(inheritedMapping.first);
-      inheritedConformance.push_back(inheritedMapping.second);
-    }
     writeConformances(inheritedProtos, inheritedConformance, associatedDecl,
                       abbrCodes, writeIncomplete);
     if (writeIncomplete)

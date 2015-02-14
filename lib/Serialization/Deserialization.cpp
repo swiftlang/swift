@@ -550,12 +550,16 @@ ModuleFile::maybeReadConformance(Type conformingType,
                                         ProtocolConformanceState::Incomplete);
 
   InheritedConformanceMap inheritedConformances;
+  ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
 
   while (inheritedCount--) {
-    auto inherited = maybeReadConformance(conformingType, Cursor);
-    assert(inherited.hasValue());
-
-    inheritedConformances[(*inherited)->getProtocol()] = *inherited;
+    auto proto = cast<ProtocolDecl>(getDecl(*rawIDIter++));
+    DeclID typeDeclID = *rawIDIter++;
+    ModuleID conformanceModuleID = *rawIDIter++;
+    auto inherited = readReferencedConformance(proto, typeDeclID,
+                                               conformanceModuleID, Cursor);
+    assert(inherited);
+    inheritedConformances[inherited->getProtocol()] = inherited;
   }
 
   // Reset the offset RAII to the end of the trailing records.
@@ -570,7 +574,6 @@ ModuleFile::maybeReadConformance(Type conformingType,
     return conformance;
 
   WitnessMap witnesses;
-  ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
   while (valueCount--) {
     auto first = cast<ValueDecl>(getDecl(*rawIDIter++));
     auto second = cast_or_null<ValueDecl>(getDecl(*rawIDIter++));

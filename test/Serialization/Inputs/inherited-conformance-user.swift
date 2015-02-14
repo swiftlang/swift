@@ -23,3 +23,6 @@ public struct OneToAThousand : CollectionType {
 
   public init() {}
 }
+
+public protocol SignedComparable: Comparable, SignedNumberType {}
+extension Int: SignedComparable {}

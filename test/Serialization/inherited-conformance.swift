@@ -8,3 +8,6 @@ import User
 
 var test = User.OneToAThousand()
 println(test[test.startIndex])
+
+func useSigned<T: SignedComparable>(_: T) {}
+useSigned(5 as Int)
