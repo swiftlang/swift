@@ -1411,12 +1411,22 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
     return ROPI->use_empty() ? eraseInstFromFunction(*ROPI) : nullptr;
   }
 
-  // (ref_to_raw_pointer (open_existential_ref (init_existential_ref x))) ->
-  // (ref_to_raw_pointer x)
-  if (auto *OER = dyn_cast<OpenExistentialRefInst>(RRPI->getOperand()))
-    if (auto *IER = dyn_cast<InitExistentialRefInst>(OER->getOperand()))
+  // (ref_to_raw_pointer (open_existential_ref (init_existential_ref x)))
+  //  -> (ref_to_raw_pointer x)
+  //
+  //  and
+  //
+  // (ref_to_raw_pointer (open_existential_ref x))
+  //  -> (ref_to_raw_pointer x)
+  if (auto *OER = dyn_cast<OpenExistentialRefInst>(RRPI->getOperand())) {
+    if (auto *IER = dyn_cast<InitExistentialRefInst>(OER->getOperand())) {
       return new (RRPI->getModule()) RefToRawPointerInst(
           RRPI->getLoc(), IER->getOperand(), RRPI->getType());
+    } else {
+      return new (RRPI->getModule()) RefToRawPointerInst(
+          RRPI->getLoc(), OER->getOperand(), RRPI->getType());
+    }
+  }
 
   // (ref_to_raw_pointer (unchecked_ref_bit_cast x))
   //    -> (unchecked_trivial_bit_cast x)
@@ -1792,12 +1802,22 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
     return new (URCI->getModule())
         UpcastInst(URCI->getLoc(), URCI->getOperand(), URCI->getType());
 
-  // (unchecked_ref_cast (open_existential_ref (init_existential_ref X))) ->
-  // (unchecked_ref_cast X)
-  if (auto *OER = dyn_cast<OpenExistentialRefInst>(URCI->getOperand()))
-    if (auto *IER = dyn_cast<InitExistentialRefInst>(OER->getOperand()))
+  // (unchecked_ref_cast (open_existential_ref (init_existential_ref X)))
+  //   -> (unchecked_ref_cast X)
+  //
+  //   and
+  //
+  // (unchecked_ref_cast (open_existential_ref X))
+  //   -> (unchecked_ref_cast X)
+  if (auto *OER = dyn_cast<OpenExistentialRefInst>(URCI->getOperand())) {
+    if (auto *IER = dyn_cast<InitExistentialRefInst>(OER->getOperand())) {
       return new (URCI->getModule()) UncheckedRefCastInst(
           URCI->getLoc(), IER->getOperand(), URCI->getType());
+    } else {
+      return new (URCI->getModule()) UncheckedRefCastInst(
+          URCI->getLoc(), OER->getOperand(), URCI->getType());
+    }
+  }
 
   return nullptr;
 }

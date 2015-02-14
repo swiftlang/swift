@@ -2188,3 +2188,26 @@ bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.NativeObject, %2 : $Builtin.Nati
   %9999 = tuple()
   return %9999 : $()
 }
+
+
+// CHECK-LABEL: unchecked_ref_cast_open_existential_ref_peephole
+// CHECK: bb0
+// CHECK-NEXT: unchecked_ref_cast
+// CHECK-NEXT: return
+sil @unchecked_ref_cast_open_existential_ref_peephole : $@thin (AnyObject) -> (Builtin.NativeObject) {
+bb0(%0 : $AnyObject):
+  %1 = open_existential_ref %0 : $AnyObject to $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject
+  %2 = unchecked_ref_cast %1 : $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject to $Builtin.NativeObject
+  return %2 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: ref_to_raw_pointer_open_existential_ref_peephole
+// CHECK: bb0
+// CHECK-NEXT: ref_to_raw_pointer
+// CHECK-NEXT: return
+sil @ref_to_raw_pointer_open_existential_ref_peephole : $@thin (AnyObject) -> (Builtin.RawPointer) {
+bb0(%0 : $AnyObject):
+  %1 = open_existential_ref %0 : $AnyObject to $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject
+  %2 = ref_to_raw_pointer %1 : $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject to $Builtin.RawPointer
+  return %2 : $Builtin.RawPointer
+}
