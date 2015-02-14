@@ -2170,12 +2170,28 @@ namespace {
         emitShuffle(shuffle, origParamType);
         return;
       }
+      
+      if (auto scalarToTuple = dyn_cast<ScalarToTupleExpr>(e)) {
+        emitScalarToTuple(scalarToTuple, origParamType);
+        return;
+      }
 
       // Fall back to the r-value case.
       emitExpanded({ e, SGF.emitRValue(e) }, origParamType);
     }
+    
+    void emitShuffle(Expr *inner,
+                     Expr *outer,
+                     ArrayRef<TupleTypeElt> innerElts,
+                     ConcreteDeclRef defaultArgsOwner,
+                     ArrayRef<Expr*> callerDefaultArgs,
+                     ArrayRef<int> elementMapping,
+                     Type varargsArrayType,
+                     AbstractionPattern origParamType);
 
     void emitShuffle(TupleShuffleExpr *shuffle, AbstractionPattern origType);
+    void emitScalarToTuple(ScalarToTupleExpr *scalar,
+                           AbstractionPattern origType);
 
     ManagedValue emitIndirect(ArgumentSource &&arg,
                               SILType loweredSubstArgType,
@@ -2316,15 +2332,22 @@ namespace {
   };
 }
 
-void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
+void ArgEmitter::emitShuffle(Expr *inner,
+                             Expr *outer,
+                             ArrayRef<TupleTypeElt> innerElts,
+                             ConcreteDeclRef defaultArgsOwner,
+                             ArrayRef<Expr*> callerDefaultArgs,
+                             ArrayRef<int> elementMapping,
+                             Type varargsArrayType,
                              AbstractionPattern origParamType) {
+  auto outerTuple = cast<TupleType>(outer->getType()->getCanonicalType());
+  CanType canVarargsArrayType;
+  if (varargsArrayType)
+    canVarargsArrayType = varargsArrayType->getCanonicalType();
+  
   // We could support dest addrs here, but it can't actually happen
   // with the current limitations on default arguments in tuples.
   assert(!SpecialDests && "shuffle nested within varargs expansion?");
-
-  auto inner = E->getSubExpr();
-  auto innerTuple = cast<TupleType>(inner->getType()->getCanonicalType());
-  auto outerTuple = cast<TupleType>(E->getType()->getCanonicalType());
 
   struct ElementExtent {
     /// The parameters which go into this tuple element.
@@ -2356,7 +2379,7 @@ void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
   // Flattened inner parameter sequence.
   SmallVector<SILParameterInfo, 8> innerParams;
   // Extents of the inner elements.
-  SmallVector<ElementExtent, 8> innerExtents(innerTuple->getNumElements());
+  SmallVector<ElementExtent, 8> innerExtents(innerElts.size());
 
   Optional<VarargsInfo> varargsInfo;
   SILParameterInfo variadicParamInfo; // innerExtents will point at this
@@ -2365,8 +2388,8 @@ void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
   // First, construct an abstraction pattern and parameter sequence
   // which we can use to emit the inner tuple.
   {
-    SmallVector<TupleTypeElt, 8> origInnerElts(innerTuple->getFields().begin(),
-                                               innerTuple->getFields().end());
+    SmallVector<TupleTypeElt, 8> origInnerElts(innerElts.begin(),
+                                               innerElts.end());
 
     unsigned nextParamIndex = 0;
     for (unsigned outerIndex : indices(outerTuple.getElementTypes())) {
@@ -2380,7 +2403,7 @@ void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
       auto eltParams = ParamInfos.slice(nextParamIndex, numParams);
       nextParamIndex += numParams;
 
-      int innerIndex = E->getElementMapping()[outerIndex];
+      int innerIndex = elementMapping[outerIndex];
       if (innerIndex >= 0) {
 #ifndef NDEBUG
         assert(!innerExtents[innerIndex].Used && "using element twice");
@@ -2397,13 +2420,12 @@ void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
         assert(!varargsInfo.hasValue() && "already had varargs entry?");
 
         CanType varargsEltType = CanType(varargsField.getVarargBaseTy());
-        unsigned numVarargs = E->getElementMapping().size() - (outerIndex + 1);
-        assert(E->getVarargsArrayType()->isEqual(substEltType));
-        CanType varargsArrayType = substEltType;
+        unsigned numVarargs = elementMapping.size() - (outerIndex + 1);
+        assert(canVarargsArrayType == substEltType);
 
         // Create the array value.
-        varargsInfo.emplace(emitBeginVarargs(SGF, E, varargsEltType,
-                                             varargsArrayType, numVarargs));
+        varargsInfo.emplace(emitBeginVarargs(SGF, outer, varargsEltType,
+                                             canVarargsArrayType, numVarargs));
 
         // If we have any varargs, we'll need to actually initialize
         // the array buffer.
@@ -2425,7 +2447,7 @@ void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
 
           for (unsigned i = 0; i != numVarargs; ++i) {
             // Find out where the next varargs element is coming from.
-            int innerIndex = E->getElementMapping()[outerIndex + 1 + i];
+            int innerIndex = elementMapping[outerIndex + 1 + i];
             assert(innerIndex >= 0 && "special source for varargs element??");
 #ifndef NDEBUG
             assert(!innerExtents[innerIndex].Used && "using element twice");
@@ -2454,7 +2476,8 @@ void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
     innerOrigParamType = origParamType;
     if (!origParamType.isOpaque()) {
       auto origInnerTuple = TupleType::get(origInnerElts, SGF.getASTContext());
-      innerOrigParamType = AbstractionPattern(CanType(origInnerTuple));
+      innerOrigParamType
+        = AbstractionPattern(origInnerTuple->getCanonicalType());
     }
 
     // Flatten the parameters from innerExtents into innerParams, and
@@ -2490,7 +2513,7 @@ void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
   ArgEmitter(SGF, CC, innerParams, innerArgs, innerInOutArgs,
              (innerSpecialDests ? ArgSpecialDestArray(*innerSpecialDests)
                                 : Optional<ArgSpecialDestArray>()))
-    .emit(ArgumentSource(E->getSubExpr()), innerOrigParamType);
+    .emit(ArgumentSource(inner), innerOrigParamType);
 
   // Make a second pass to split the inner arguments correctly.
   {  
@@ -2524,7 +2547,7 @@ void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
          outerIndex != e; ++outerIndex) {
     // If this comes from an inner element, move the appropriate
     // inner element values over.
-    int innerIndex = E->getElementMapping()[outerIndex];
+    int innerIndex = elementMapping[outerIndex];
     if (innerIndex >= 0) {
       auto &extent = innerExtents[innerIndex];
 
@@ -2543,15 +2566,15 @@ void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
       // default argument.
       CanType eltType = outerTuple.getElementType(outerIndex);
       ManagedValue value =
-        SGF.emitApplyOfDefaultArgGenerator(E, E->getDefaultArgsOwner(),
+        SGF.emitApplyOfDefaultArgGenerator(outer, defaultArgsOwner,
                                            outerIndex, eltType);
-      emit(ArgumentSource(E, RValue(SGF, E, eltType, value)),
+      emit(ArgumentSource(outer, RValue(SGF, outer, eltType, value)),
            origParamType.getTupleElementType(outerIndex));
 
      // If this is caller default initialization, generate the
      // appropriate value.
     } else if (innerIndex == TupleShuffleExpr::CallerDefaultInitialize) {
-      auto arg = E->getCallerDefaultArgs()[nextCallerDefaultArg++];
+      auto arg = callerDefaultArgs[nextCallerDefaultArg++];
       emit(ArgumentSource(arg), origParamType.getTupleElementType(outerIndex));
       
     // If we're supposed to create a varargs array with the rest, do so.
@@ -2572,8 +2595,8 @@ void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
       }
 
       CanType eltType = outerTuple.getElementType(outerIndex);
-      ManagedValue varargs = emitEndVarargs(SGF, E, std::move(*varargsInfo));
-      emit(ArgumentSource(E, RValue(SGF, E, eltType, varargs)),
+      ManagedValue varargs = emitEndVarargs(SGF, outer, std::move(*varargsInfo));
+      emit(ArgumentSource(outer, RValue(SGF, outer, eltType, varargs)),
            origParamType.getTupleElementType(outerIndex));
 
     // That's the last special case defined so far.
@@ -2581,6 +2604,67 @@ void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
       llvm_unreachable("unexpected special case in tuple shuffle!");
     }
   }
+}
+
+void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
+                             AbstractionPattern origParamType) {
+  auto innerTuple
+    = cast<TupleType>(E->getSubExpr()->getType()->getCanonicalType());
+  emitShuffle(E->getSubExpr(), E, innerTuple->getFields(),
+              E->getDefaultArgsOwner(),
+              E->getCallerDefaultArgs(),
+              E->getElementMapping(),
+              E->getVarargsArrayTypeOrNull(),
+              origParamType);
+}
+
+void ArgEmitter::emitScalarToTuple(ScalarToTupleExpr *scalarToTuple,
+                                   AbstractionPattern origType) {
+  // A scalar-to-tuple is like a tuple shuffle with one element.
+  TupleTypeElt innerElt(scalarToTuple->getSubExpr()->getType());
+
+  SmallVector<Expr*, 4> callerDefaultArgs;
+  ConcreteDeclRef defaultArgsOwner;
+  SmallVector<int, 4> elementMapping;
+  
+  auto tupleElts = scalarToTuple->getType()->castTo<TupleType>()->getFields();
+  
+  bool isVararg = false;
+  for (unsigned i : indices(scalarToTuple->getElements())) {
+    auto element = scalarToTuple->getElements()[i];
+    if (element.isNull()) {
+      // Scalar element goes here. It might go into the varargs.
+      if (tupleElts[i].isVararg()) {
+        isVararg = true;
+        elementMapping.push_back(TupleShuffleExpr::FirstVariadic);
+      }
+      elementMapping.push_back(0);
+      continue;
+    }
+    if (auto callerDefault = element.dyn_cast<Expr*>()) {
+      // We have a caller-side default.
+      callerDefaultArgs.push_back(callerDefault);
+      elementMapping.push_back(TupleShuffleExpr::CallerDefaultInitialize);
+      continue;
+    }
+    auto owner = element.get<ConcreteDeclRef>();
+    assert((!defaultArgsOwner || defaultArgsOwner == owner)
+           && "different default args owners?!");
+    defaultArgsOwner = owner;
+    elementMapping.push_back(TupleShuffleExpr::DefaultInitialize);
+  }
+  
+  if (!isVararg && scalarToTuple->getVarargsArrayType())
+    elementMapping.push_back(TupleShuffleExpr::FirstVariadic);
+  
+  assert(elementMapping.size()
+           == scalarToTuple->getElements().size()
+                 + (scalarToTuple->getVarargsArrayType() ? 1 : 0));
+
+  emitShuffle(scalarToTuple->getSubExpr(), scalarToTuple, innerElt,
+              defaultArgsOwner, callerDefaultArgs,
+              elementMapping, scalarToTuple->getVarargsArrayType(),
+              origType);
 }
 
 namespace {
