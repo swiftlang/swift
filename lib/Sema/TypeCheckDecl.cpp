@@ -4025,6 +4025,57 @@ public:
     inferDynamic(TC.Context, FD);
 
     TC.checkDeclAttributes(FD);
+
+    // Check whether we have parameters with default arguments that follow a
+    // closure parameter; warn about such things, because the closure will not
+    // be treated as a trailing closure.
+    if (!FD->isImplicit()) {
+      auto paramPattern = FD->getBodyParamPatterns()[
+                            FD->getDeclContext()->isTypeContext() ? 1 : 0];
+      if (auto paramTuple = dyn_cast<TuplePattern>(paramPattern)) {
+        ArrayRef<TuplePatternElt> fields = paramTuple->getFields();
+        unsigned n = fields.size();
+        bool anyDefaultArguments = false;
+        for (unsigned i = n; i > 0; --i) {
+          // Determine whether the parameter is of (possibly lvalue, possibly
+          // optional), non-autoclosure function type, which could receive a
+          // closure. We look at the type sugar directly, so that one can
+          // suppress this warning by adding parentheses.
+          auto paramType = fields[i-1].getPattern()->getType();
+
+          if (!isa<ParenType>(paramType.getPointer())) {
+            // Look through lvalue-ness.
+            paramType = paramType->getRValueType();
+
+            // Look through optionality.
+            if (auto objectType = paramType->getAnyOptionalObjectType())
+              paramType = objectType;
+
+            if (auto funcTy = paramType->getAs<AnyFunctionType>()) {
+              // If we saw any default arguments before this, complain.
+              // This doesn't apply to autoclosures.
+              if (anyDefaultArguments && !funcTy->getExtInfo().isAutoClosure()) {
+                TC.diagnose(fields[i-1].getPattern()->getStartLoc(),
+                            diag::non_trailing_closure_before_default_args)
+                .highlight(SourceRange(fields[i].getPattern()->getStartLoc(),
+                                       fields[n-1].getPattern()->getEndLoc()));
+              }
+
+              break;
+            }
+          }
+
+          // If we have a default argument, keep going.
+          if (fields[i-1].getDefaultArgKind() != DefaultArgumentKind::None) {
+            anyDefaultArguments = true;
+            continue;
+          }
+
+          // We're done.
+          break;
+        }
+      }
+    }
   }
 
   /// Adjust the type of the given declaration to appear as if it were

@@ -652,7 +652,9 @@ ERROR(function_type_access,sema_tcd,none,
       "%select{parameter|result}4 uses "
       "%select{a private|an internal|PUBLIC}2 type",
       (bool, Accessibility, Accessibility, unsigned, bool))
-
+WARNING(non_trailing_closure_before_default_args,sema_tcd,none,
+        "closure parameter prior to parameters with default arguments will "
+        "not be treated as a trailing closure", ())
 
 // Extensions
 ERROR(non_nominal_extension,sema_tcd,none,
