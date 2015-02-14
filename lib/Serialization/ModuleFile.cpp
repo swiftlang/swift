@@ -1503,8 +1503,9 @@ Identifier ModuleFile::getDiscriminatorForPrivateValue(const ValueDecl *D) {
 
 void ModuleFile::verify() const {
 #ifndef NDEBUG
+  const auto &Context = getContext();
   for (const Serialized<Decl*> &next : Decls)
-    if (next.isComplete())
+    if (next.isComplete() && swift::shouldVerify(next, Context))
       swift::verify(next);
 #endif
 }

@@ -70,6 +70,11 @@ namespace swift {
 
   /// @{
 
+  /// \returns true if the declaration should be verified.  This can return
+  /// false to decrease the number of declarations we verify in a single
+  /// compilation.
+  bool shouldVerify(const Decl *D, const ASTContext &Context);
+
   /// \brief Check that the source file is well formed, aborting and spewing
   /// errors if not.
   ///

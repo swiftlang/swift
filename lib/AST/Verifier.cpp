@@ -2553,6 +2553,32 @@ void swift::verify(SourceFile &SF) {
 #endif
 }
 
+bool swift::shouldVerify(const Decl *D, const ASTContext &Context) {
+#if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))
+  unsigned ProcessCount = Context.LangOpts.ASTVerifierProcessCount;
+  unsigned ProcessId = Context.LangOpts.ASTVerifierProcessId;
+  if (ProcessCount == 1) {
+    // No parallelism, verify all declarations.
+    return true;
+  }
+
+  if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    return shouldVerify(ED->getExtendedType()->getAnyNominal(), Context);
+  }
+
+  const auto *VD = dyn_cast<ValueDecl>(D);
+  if (!VD) {
+    // Verify declarations without names everywhere.
+    return true;
+  }
+
+  size_t Hash = llvm::hash_value(VD->getNameStr());
+  return Hash % ProcessCount == ProcessId;
+#else
+  return false;
+#endif
+}
+
 void swift::verify(Decl *D) {
 #if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))
   Verifier V = Verifier::forDecl(D);

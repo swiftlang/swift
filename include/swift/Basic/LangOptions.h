@@ -53,6 +53,12 @@ namespace swift {
     /// This is for testing purposes.
     std::string DebugForbidTypecheckPrefix;
 
+    /// Number of paralellel processes performing AST verification.
+    unsigned ASTVerifierProcessCount = 1U;
+
+    /// ID of the current process for the purposes of AST verification.
+    unsigned ASTVerifierProcessId = 1U;
+
     /// \brief The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
     unsigned SolverMemoryThreshold = 15000000;

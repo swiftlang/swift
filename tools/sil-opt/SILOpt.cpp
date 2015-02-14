@@ -287,6 +287,14 @@ DisableASTDump("sil-disable-ast-dump", llvm::cl::Hidden,
                llvm::cl::init(false),
                llvm::cl::desc("Do not dump AST."));
 
+static llvm::cl::opt<unsigned>
+ASTVerifierProcessCount("ast-verifier-process-count", llvm::cl::Hidden,
+                        llvm::cl::init(1));
+
+static llvm::cl::opt<unsigned>
+ASTVerifierProcessId("ast-verifier-process-id", llvm::cl::Hidden,
+                     llvm::cl::init(1));
+
 static void runCommandLineSelectedPasses(SILModule *Module) {
   SILPassManager PM(Module);
 
@@ -351,6 +359,12 @@ int main(int argc, char **argv) {
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.setParseStdlib();
   Invocation.getLangOptions().EnableAccessControl = false;
+
+  Invocation.getLangOptions().ASTVerifierProcessCount =
+      ASTVerifierProcessCount;
+  Invocation.getLangOptions().ASTVerifierProcessId =
+      ASTVerifierProcessId;
+
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();
   SILOpts.InlineThreshold = SILInlineThreshold;
