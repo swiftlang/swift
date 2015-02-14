@@ -9,5 +9,5 @@ import User
 var test = User.OneToAThousand()
 println(test[test.startIndex])
 
-func useSigned<T: SpecialProto>(_: T) {}
-useSigned(5 as MyType)
+func useSigned<T: SignedComparable>(_: T) {}
+useSigned(5 as Int)
