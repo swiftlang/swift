@@ -33,7 +33,12 @@ Because this construct is generic, `s` could be
 * etc.
 
 In Swift, all of the above are called **sequences**, an abstraction
-represented by the `SequenceType` protocol:
+represented by the `SequenceType` protocol::
+
+  protocol SequenceType { 
+    typealias Generator : GeneratorType
+    func generate() -> Generator
+  }
 
 .. sidebar:: Hiding Generator Type Details
 
@@ -50,13 +55,6 @@ represented by the `SequenceType` protocol:
   .. |GeneratorOf| replace:: `GeneratorOf<T>`
 
   __ http://swiftdoc.org/type/GeneratorOf/
-
-::
-
-  protocol SequenceType { 
-    typealias Generator : GeneratorType
-    func generate() -> Generator
-  }
 
 As you can see, sequence does nothing more than deliver a generator.
 To understand the need for generators, it's important to distinguish
@@ -149,7 +147,7 @@ you can do anything that requires reading elements from beginning to
 end.  For example::
 
   // Return an array containing the elements of `source`, with
-  // `separator` interposed between each consecutive pair of elements.
+  // `separator` interposed between each consecutive pair.
   func array<S: SequenceType>(
     source: S, 
     withSeparator separator: S.Generator.Element
@@ -166,7 +164,8 @@ end.  For example::
     return result
   }
 
-  let s = String(array("Swift", withSeparator: "|")) // "S|w|i|f|t"
+  let s = String(array("Swift", withSeparator: "|"))
+  println(s)        // "S|w|i|f|t"
 
 Because sequences may be volatile, though, you can—in general—only
 make a single traversal.  This capability is quite enough for many
