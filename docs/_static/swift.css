@@ -7,3 +7,7 @@ div.content ul > li {
   padding-left: 0;
   margin-left: 2em;
 }
+
+div.highlight {
+  background-color: inherit; /* highlighting was overflowing boxes */
+}
