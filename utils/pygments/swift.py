@@ -31,12 +31,12 @@ class SwiftLexer(RegexLexer):
             (r'//.*?\n', Comment.Single, '#pop'),
             (r'/\*', Comment.Multiline, 'comment'),
 
-            (r'\bvar\s', Keyword.Declaration, 'var-decl'),
+            (r'\b(var|let)\s', Keyword.Declaration, 'var-decl'),
             (r'\bfor\s', Keyword.Reserved, 'for-loop'),
-            (r'\b(func|init|destructor)\b\s?', Keyword.Declaration, 'func-decl'),
+            (r'\b(func|init|deinit)\s', Keyword.Declaration, 'func-decl'),
             (r'(\bset\b)(\s?)(\()', bygroups(Keyword.Declaration, Whitespace, Punctuation), 'arg-list'),
             (r'(set|get)(:)', bygroups(Keyword.Reserved, Punctuation)),
-            (r'\b(this|This)\b', Name.Builtin.Pseudo),
+            (r'\b(self|Self)\b', Name.Builtin.Pseudo),
             (r'\bid\b', Name.Builtin),
 
             (r'\bimport\s+', Keyword.Namespace, 'import'),
