@@ -11,3 +11,7 @@ div.content ul > li {
 div.highlight {
   background-color: inherit; /* highlighting was overflowing boxes */
 }
+
+tt, pre {
+  font-family: "menlo", "Lucida Console", monospace, sans-serif;
+}
