@@ -141,6 +141,17 @@ FloatingPoint.test("Double/Int64") {
   expectEqual(Int64.max, Int64(Double(Int64.max)))
 }
 
+FloatingPoint.test("Float/HashValueZero") {
+  let zero: Float = 0.0
+  let negativeZero: Float = -0.0
+  expectEqual(zero.hashValue, negativeZero.hashValue)
+}
+
+FloatingPoint.test("Double/HashValueZero") {
+  let zero: Double = 0.0
+  let negativeZero: Double = -0.0
+  expectEqual(zero.hashValue, negativeZero.hashValue)
+}
 // FIXME: implement Float80 tests after Float80 is implemented.
 
 FloatingPoint.test("Float32/Literals") {
