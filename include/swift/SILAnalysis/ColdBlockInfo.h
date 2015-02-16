@@ -30,8 +30,8 @@ class ColdBlockInfo {
   llvm::DenseMap<const SILBasicBlock*, bool> ColdBlockMap;
 
   // This is a cache and shouldn't be copied around.
-  ColdBlockInfo(const ColdBlockInfo &) LLVM_DELETED_FUNCTION;
-  ColdBlockInfo &operator=(const ColdBlockInfo &) LLVM_DELETED_FUNCTION;
+  ColdBlockInfo(const ColdBlockInfo &) = delete;
+  ColdBlockInfo &operator=(const ColdBlockInfo &) = delete;
 
 public:
   ColdBlockInfo(DominanceAnalysis *DA): DA(DA) {}

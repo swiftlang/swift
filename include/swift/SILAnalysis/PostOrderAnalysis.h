@@ -36,8 +36,8 @@ class PostOrderAnalysis : public SILAnalysis {
     std::vector<SILBasicBlock *> PostOrder;
 
     FunctionPOTInfo() : IsInvalidated(true), PostOrder() {}
-    FunctionPOTInfo(const FunctionPOTInfo &) LLVM_DELETED_FUNCTION;
-    FunctionPOTInfo &operator=(const FunctionPOTInfo &) LLVM_DELETED_FUNCTION;
+    FunctionPOTInfo(const FunctionPOTInfo &) = delete;
+    FunctionPOTInfo &operator=(const FunctionPOTInfo &) = delete;
 
     FunctionPOTInfo(const FunctionPOTInfo &&F) {
       IsInvalidated = F.IsInvalidated;

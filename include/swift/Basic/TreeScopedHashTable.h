@@ -89,8 +89,8 @@ public:
 
   unsigned RefCount;
 
-  TreeScopedHashTableScopeImpl(TreeScopedHashTableScopeImpl &) LLVM_DELETED_FUNCTION;
-  void operator=(TreeScopedHashTableScopeImpl &) LLVM_DELETED_FUNCTION;
+  TreeScopedHashTableScopeImpl(TreeScopedHashTableScopeImpl &) = delete;
+  void operator=(TreeScopedHashTableScopeImpl &) = delete;
 
   TreeScopedHashTableScopeImpl()
       : HT(0), ID(0), ParentScope(0), MovedFrom(true), RefCount(0) {}
@@ -132,8 +132,8 @@ class TreeScopedHashTableDetachedScope {
 
   ImplTy *DetachedImpl;
 
-  TreeScopedHashTableDetachedScope(TreeScopedHashTableDetachedScope &) LLVM_DELETED_FUNCTION;
-  void operator=(TreeScopedHashTableDetachedScope &) LLVM_DELETED_FUNCTION;
+  TreeScopedHashTableDetachedScope(TreeScopedHashTableDetachedScope &) = delete;
+  void operator=(TreeScopedHashTableDetachedScope &) = delete;
 
   TreeScopedHashTableDetachedScope(ImplTy *DetachedImpl)
       : DetachedImpl(DetachedImpl) {
@@ -183,8 +183,8 @@ class TreeScopedHashTableScope {
     return InlineImpl.MovedFrom ? DetachedImpl : &InlineImpl;
   }
 
-  TreeScopedHashTableScope(TreeScopedHashTableScope &) LLVM_DELETED_FUNCTION;
-  void operator=(TreeScopedHashTableScope &) LLVM_DELETED_FUNCTION;
+  TreeScopedHashTableScope(TreeScopedHashTableScope &) = delete;
+  void operator=(TreeScopedHashTableScope &) = delete;
 
 public:
   /// Install this as the current scope for the hash table.
@@ -294,8 +294,8 @@ private:
     return NextScopeID++;
   }
 
-  TreeScopedHashTable(const TreeScopedHashTable &) LLVM_DELETED_FUNCTION;
-  void operator=(const TreeScopedHashTable &) LLVM_DELETED_FUNCTION;
+  TreeScopedHashTable(const TreeScopedHashTable &) = delete;
+  void operator=(const TreeScopedHashTable &) = delete;
   friend class TreeScopedHashTableScopeImpl<K, V, AllocatorTy>;
 
 public:
