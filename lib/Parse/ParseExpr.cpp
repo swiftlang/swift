@@ -1755,20 +1755,15 @@ ParserResult<Expr> Parser::parseExprClosure() {
   if (!Status.hasCodeCompletion() && bodyElements.size() == 1) {
     // If the closure's only body element is a single return statement,
     // use that instead of creating a new wrapping return expression.
-    Expr* returnExpr = nullptr;
-    
     if (bodyElements[0].is<Stmt *>()) {
       if (auto returnStmt =
                   dyn_cast<ReturnStmt>(bodyElements[0].get<Stmt*>())) {
         
         if (!returnStmt->hasResult()) {
-          
-          returnExpr = TupleExpr::createEmpty(Context,
-                                              SourceLoc(),
-                                              SourceLoc(),
-                                              /*implicit*/true);
-          
-          returnStmt->setResult(returnExpr);
+          returnStmt->setResult(TupleExpr::createEmpty(Context,
+                                                       SourceLoc(),
+                                                       SourceLoc(),
+                                                       /*implicit*/true));
         }
         
         hasSingleExpressionBody = true;
@@ -1778,13 +1773,9 @@ ParserResult<Expr> Parser::parseExprClosure() {
     // Otherwise, create the wrapping return.
     if (bodyElements[0].is<Expr *>()) {
       hasSingleExpressionBody = true;
-      returnExpr = bodyElements[0].get<Expr*>();
       bodyElements[0] = new (Context) ReturnStmt(SourceLoc(),
-                                                 returnExpr);
+                                                 bodyElements[0].get<Expr*>());
     }
-    
-    if (returnExpr)
-      returnExpr->setReturnExpr();
   }
 
   // Set the body of the closure.

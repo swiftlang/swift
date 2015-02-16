@@ -52,5 +52,3 @@ class A {
         // expected-note@-3 5{{use '.self' to reference the type object}}
     }
 }
-
-func retV() { return true } // expected-error {{unexpected non-void return value in void function}}
