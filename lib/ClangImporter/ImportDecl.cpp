@@ -4277,9 +4277,9 @@ namespace {
 
       // Create the extension declaration and record it.
       auto loc = Impl.importSourceLoc(decl->getLocStart());
-      ExtensionDecl::RefComponent refComponent{objcClass->getName(),
-                                               SourceLoc(),
-                                               nullptr};
+      auto TyR = new (Impl.SwiftContext) SimpleIdentTypeRepr(SourceLoc(),
+                                                          objcClass->getName());
+      ExtensionDecl::RefComponent refComponent{TyR, nullptr};
       auto result = ExtensionDecl::create(Impl.SwiftContext, loc,
                                           refComponent, { }, dc, decl);
       result->setExtendedType(objcClass->getDeclaredType());

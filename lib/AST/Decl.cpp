@@ -802,9 +802,9 @@ ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
 
 SourceRange ExtensionDecl::getExtendedTypeRange() const {
   SourceRange range;
-  range.Start = getRefComponents().front().NameLoc;
+  range.Start = getRefComponents().front().IdentTypeR->getIdLoc();
   // FIXME: Consider generic parameters.
-  range.End = getRefComponents().back().NameLoc;
+  range.End = getRefComponents().back().IdentTypeR->getIdLoc();
   return range;
 }
 

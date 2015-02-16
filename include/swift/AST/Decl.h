@@ -1476,11 +1476,8 @@ class ExtensionDecl final : public Decl, public DeclContext,
 public:
   /// A single component within the reference to the extended type.
   struct RefComponent {
-    /// The name of the type being extended.
-    Identifier Name;
-
-    /// The location of the name.
-    SourceLoc NameLoc;
+    /// The type being extended.
+    SimpleIdentTypeRepr *IdentTypeR;
     
     /// The generic parameters associated with this name.
     GenericParamList *GenericParams;

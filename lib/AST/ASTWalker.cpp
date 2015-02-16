@@ -637,7 +637,11 @@ public:
           return true;
 
     } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
-      // FIXME: Walk ref-components?
+      for (auto &Ref : ED->getRefComponents()) {
+        if (TypeRepr *T = Ref.IdentTypeR)
+          if (doIt(T))
+            return true;
+      }
       for (auto Inherit : ED->getInherited()) {
         if (TypeRepr *T = Inherit.getTypeRepr())
           if (doIt(T))

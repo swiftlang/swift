@@ -2029,7 +2029,8 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       genericParams = maybeParseGenericParams();
     }
 
-    refComponents.push_back(RefComponent{name,nameLoc,genericParams});
+    auto TyR = new (Context) SimpleIdentTypeRepr(nameLoc, name);
+    refComponents.push_back(RefComponent{TyR, genericParams});
 
     if (consumeIf(tok::period))
       continue;

@@ -271,3 +271,14 @@ class C11 {
 
 // CHECK: var <Var>g1</Var> = { (<Param>x</Param>: <iStruct@>Int</iStruct>) -> <iStruct@>Int</iStruct> in return 0 }
 var g1 = { (x: Int) -> Int in return 0 }
+
+class C12 {
+  class Inn {}
+  typealias AliasInn = Inn
+}
+typealias AliasC12 = C12
+
+// CHECK: extension <Class@[[@LINE-6]]:7>C12</Class>.<Class@[[@LINE-5]]:9>Inn</Class> {}
+extension C12.Inn {}
+// CHECK: extension <TypeAlias@[[@LINE-4]]:11>AliasC12</TypeAlias>.<TypeAlias@[[@LINE-6]]:13>AliasInn</TypeAlias> {}
+extension AliasC12.AliasInn {}

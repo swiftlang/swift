@@ -201,16 +201,16 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   // Synthesize a type representation for the extended type.
   SmallVector<ComponentIdentTypeRepr *, 2> components;
   for (auto &ref : ED->getRefComponents()) {
+    auto *TyR = ref.IdentTypeR;
     // A reference to ".Type" is an attempt to extend the metatype.
-    if (ref.Name == TC.Context.Id_Type && !components.empty()) {
-      TC.diagnose(ref.NameLoc, diag::extension_metatype);
+    if (TyR->getIdentifier() == TC.Context.Id_Type && !components.empty()) {
+      TC.diagnose(TyR->getIdLoc(), diag::extension_metatype);
       ED->setInvalid();
       ED->setExtendedType(ErrorType::get(TC.Context));
       return;
     }
 
-    components.push_back(
-      new (TC.Context) SimpleIdentTypeRepr(ref.NameLoc, ref.Name));
+    components.push_back(TyR);
   }
 
   // Validate the representation.
@@ -246,8 +246,10 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
       // FIXME: This diagnostic is awful. It should point at what we did find,
       // e.g., a type, module, etc.
       if (ref.GenericParams) {
-        TC.diagnose(ref.NameLoc, diag::extension_generic_params_for_non_generic,
-                    ref.Name);
+        auto *TyR = ref.IdentTypeR;
+        TC.diagnose(TyR->getIdLoc(),
+                    diag::extension_generic_params_for_non_generic,
+                    TyR->getIdentifier());
         ref.GenericParams = nullptr;
       }
 
@@ -264,7 +266,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
     // The extended type is non-generic but the extension has generic
     // parameters. Complain and drop them.
     if (!typeDecl->getGenericParams() && ref.GenericParams) {
-      TC.diagnose(ref.NameLoc,
+      TC.diagnose(ref.IdentTypeR->getIdLoc(),
                   diag::extension_generic_params_for_non_generic_type,
                   typeDecl->getDeclaredType())
         .highlight(ref.GenericParams->getSourceRange());
@@ -283,7 +285,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
     if (ref.GenericParams->size() != typeDecl->getGenericParams()->size()) {
       unsigned numHave = ref.GenericParams->size();
       unsigned numExpected = typeDecl->getGenericParams()->size();
-      TC.diagnose(ref.NameLoc,
+      TC.diagnose(ref.IdentTypeR->getIdLoc(),
                   diag::extension_generic_wrong_number_of_parameters,
                   typeDecl->getDeclaredType(), numHave > numExpected,
                   numHave, numExpected)

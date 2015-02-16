@@ -2912,8 +2912,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return declOrOffset;
 
     auto nominal = baseTy->getAnyNominal();
-    ExtensionDecl::RefComponent component{nominal->getName(), SourceLoc(),
-                                          nominal->getGenericParams()};
+    auto TyR = new (ctx) SimpleIdentTypeRepr(SourceLoc(), nominal->getName());
+    ExtensionDecl::RefComponent component{TyR, nominal->getGenericParams()};
     auto extension = ExtensionDecl::create(ctx, SourceLoc(), component, { },
                                            DC);
     extension->setEarlyAttrValidation();

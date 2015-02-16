@@ -94,18 +94,11 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
       NameLen = VD->getName().getLength();
 
   } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
-    if (!ED->isInvalid() && ED->getExtendedType()) {
-      // FIXME: Handle all of the ref-components in extensions, as well as
-      // the generic parameter lists.
-      if (auto nominal = ED->getExtendedType()->getAnyNominal()) {
-        passReference(nominal, ED->getRefComponents().back().NameLoc);
-      }
-    }
-
     SourceRange SR = ED->getExtendedTypeRange();
     Loc = SR.Start;
     if (Loc.isValid())
       NameLen = ED->getASTContext().SourceMgr.getByteDistance(SR.Start, SR.End);
+
   } else if (auto Import = dyn_cast<ImportDecl>(D)) {
     if (!handleImports(Import))
       return false;
