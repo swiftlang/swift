@@ -2217,14 +2217,32 @@ visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
       }
     }
 
-    // If type is private or internal, its conformances cannot be changed
-    // at run-time. Therefore it is safe to make a negative decision
-    // at compile-time.
-    if (SourceNominalTy->getAccessibility() < Accessibility::Public) {
-      // This cast is always fasle. Replace it with a branch to the
+    // If the source type is private or target protocol is private,
+    // then conformances cannot be changed at run-time, because only this
+    // file could have implemented them, but no conformances were found.
+    // Therefore it is safe to make a negative decision at compile-time.
+    if (SourceNominalTy->getAccessibility() == Accessibility::Private ||
+        TargetProtocol->getAccessibility() == Accessibility::Private) {
+      // This cast is always false. Replace it with a branch to the
       // failure block.
       Builder->createBranch(CCABI->getLoc(), CCABI->getFailureBB());
       eraseInstFromFunction(*CCABI);
+      return nullptr;
+    }
+
+    // If we are in a whole-module compilation and
+    // if the source type is internal or target protocol is internal,
+    // then conformances cannot be changed at run-time, because only this
+    // module could have implemented them, but no conformances were found.
+    // Therefore it is safe to make a negative decision at compile-time.
+    if (CCABI->getModule().isWholeModule() &&
+        (SourceNominalTy->getAccessibility() == Accessibility::Internal ||
+        TargetProtocol->getAccessibility() == Accessibility::Internal)) {
+      // This cast is always false. Replace it with a branch to the
+      // failure block.
+      Builder->createBranch(CCABI->getLoc(), CCABI->getFailureBB());
+      eraseInstFromFunction(*CCABI);
+      return nullptr;
     }
   }
   return nullptr;
