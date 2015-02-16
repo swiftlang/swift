@@ -131,6 +131,11 @@ public:
     return getState() == ProtocolConformanceState::Incomplete;
   }
 
+  /// Return true if the conformance has a witness for the given associated
+  /// type.
+  bool hasTypeWitness(AssociatedTypeDecl *assocType,
+                      LazyResolver *resolver = nullptr) const;
+
   /// Retrieve the type witness for the given associated type.
   const Substitution &getTypeWitness(AssociatedTypeDecl *assocType,
                                     LazyResolver *resolver) const;
@@ -338,9 +343,8 @@ public:
                                     
   /// Determine whether the protocol conformance has a type witness for the
   /// given associated type.
-  bool hasTypeWitness(AssociatedTypeDecl *assocType) const {
-    return TypeWitnesses.count(assocType) > 0;
-  }
+  bool hasTypeWitness(AssociatedTypeDecl *assocType,
+                      LazyResolver *resolver = nullptr) const;
 
   /// Set the type witness for the given associated type.
   void setTypeWitness(AssociatedTypeDecl *assocType,
@@ -476,6 +480,9 @@ public:
     return GenericConformance->getState();
   }
 
+  bool hasTypeWitness(AssociatedTypeDecl *assocType,
+                      LazyResolver *resolver = nullptr) const;
+
   /// Retrieve the type witness for the given associated type.
   const Substitution &getTypeWitness(AssociatedTypeDecl *assocType, 
                                      LazyResolver *resolver) const;
@@ -562,6 +569,11 @@ public:
   /// Retrieve the state of this conformance.
   ProtocolConformanceState getState() const {
     return InheritedConformance->getState();
+  }
+
+  bool hasTypeWitness(AssociatedTypeDecl *assocType,
+                      LazyResolver *resolver = nullptr) const {
+    return InheritedConformance->hasTypeWitness(assocType, resolver);
   }
 
   /// Retrieve the type witness for the given associated type.

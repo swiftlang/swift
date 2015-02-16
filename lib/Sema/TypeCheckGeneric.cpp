@@ -963,7 +963,7 @@ Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
                                  Diag<> brokenProtocolDiag) {
   Type ty = ProtocolConformance::getTypeWitnessByName(type, conformance,
                                                       name, this);
-  if (!ty)
+  if (!ty && !conformance->isInvalid())
     diagnose(protocol->getLoc(), brokenProtocolDiag);
 
   return ty;

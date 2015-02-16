@@ -57,7 +57,7 @@ func chaining() {
   var length : meters = 17;
   // FIXME: missing truncation warning <rdar://problem/14070127>.
   var long_length : meters = 500;
-  var really_long_length : supermeters = 10 // expected-error {{'Int32' is not convertible to 'supermeters'}}
+  var really_long_length : supermeters = 10
 }
 
 func memberaccess() {

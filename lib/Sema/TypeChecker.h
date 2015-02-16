@@ -1059,6 +1059,10 @@ public:
   /// be checked and diagnosed as a fallback.
   ///
   /// \returns true if T conforms to the protocol Proto, false otherwise.
+  ///
+  /// \note If this method returns 'true', it only means that there exists a
+  /// declared conformance of \c T to \c Proto. It does not mean that this
+  /// conformance is valid. Check \c (*Conformance)->getState() for that.
   bool conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
                           bool InExpression,
                           ProtocolConformance **Conformance = 0,

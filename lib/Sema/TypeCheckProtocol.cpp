@@ -93,6 +93,11 @@ namespace {
     llvm::DenseMap<ValueDecl *, llvm::SmallVector<AssociatedTypeDecl *, 2>>
       ReferencedAssociatedTypes;
 
+    /// True if we shouldn't complain about problems with this conformance
+    /// right now, i.e. if methods are being called outside
+    /// checkConformance().
+    bool SuppressDiagnostics = true;
+
     /// Whether we've already complained about problems with this conformance.
     bool AlreadyComplained = false;
 
@@ -2090,8 +2095,10 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
   // Complain that this type does not conform to this protocol.
   if (!AlreadyComplained) {
-    TC.diagnose(Loc, diag::type_does_not_conform,
-                Adoptee, Proto->getDeclaredType());
+    if (!SuppressDiagnostics) {
+      TC.diagnose(Loc, diag::type_does_not_conform,
+                  Adoptee, Proto->getDeclaredType());
+    }
     AlreadyComplained = true;
   }
 
@@ -2102,24 +2109,26 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     return ResolveWitnessResult::ExplicitFailed;
   }
 
-  // Determine the type that the requirement is expected to have.
-  Type reqType = getRequirementTypeForDisplay(TC, DC->getParentModule(),
-                                              Conformance, requirement);
+  if (!SuppressDiagnostics) {
+    // Determine the type that the requirement is expected to have.
+    Type reqType = getRequirementTypeForDisplay(TC, DC->getParentModule(),
+                                                Conformance, requirement);
 
-  // Point out the requirement that wasn't met.
-  TC.diagnose(requirement,
-              numViable > 0 ? (ignoringNames
-                                 ? diag::ambiguous_witnesses_wrong_name
-                                 : diag::ambiguous_witnesses)
-                            : diag::no_witnesses,
-              getRequirementKind(requirement),
-              requirement->getFullName(),
-              reqType);
-    
-  if (!didDerive) {
-    // Diagnose each of the matches.
-    for (const auto &match : matches)
-      diagnoseMatch(TC, DC->getParentModule(), Conformance, requirement, match);
+    // Point out the requirement that wasn't met.
+    TC.diagnose(requirement,
+                numViable > 0 ? (ignoringNames
+                                   ? diag::ambiguous_witnesses_wrong_name
+                                   : diag::ambiguous_witnesses)
+                              : diag::no_witnesses,
+                getRequirementKind(requirement),
+                requirement->getFullName(),
+                reqType);
+      
+    if (!didDerive) {
+      // Diagnose each of the matches.
+      for (const auto &match : matches)
+        diagnoseMatch(TC, DC->getParentModule(), Conformance, requirement, match);
+    }
   }
 
   // FIXME: Suggest a new declaration that does match?
@@ -2157,8 +2166,10 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
 
   // Derivation failed.
   if (!AlreadyComplained) {
-    TC.diagnose(Loc, diag::protocol_derivation_is_broken,
-                Proto->getDeclaredType(), Adoptee);
+    if (!SuppressDiagnostics) {
+      TC.diagnose(Loc, diag::protocol_derivation_is_broken,
+                  Proto->getDeclaredType(), Adoptee);
+    }
     AlreadyComplained = true;
   }
   return ResolveWitnessResult::ExplicitFailed;
@@ -2180,20 +2191,24 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
 
   // Complain that this type does not conform to this protocol.
   if (!AlreadyComplained) {
-    TC.diagnose(Loc, diag::type_does_not_conform,
-                Adoptee, Proto->getDeclaredType());
+    if (!SuppressDiagnostics) {
+      TC.diagnose(Loc, diag::type_does_not_conform,
+                  Adoptee, Proto->getDeclaredType());
+    }
     AlreadyComplained = true;
   }
 
-  // Determine the type that the requirement is expected to have.
-  Type reqType = getRequirementTypeForDisplay(TC, DC->getParentModule(),
-                                              Conformance, requirement);
+  if (!SuppressDiagnostics) {
+    // Determine the type that the requirement is expected to have.
+    Type reqType = getRequirementTypeForDisplay(TC, DC->getParentModule(),
+                                                Conformance, requirement);
 
-  // Point out the requirement that wasn't met.
-  TC.diagnose(requirement, diag::no_witnesses,
-              getRequirementKind(requirement),
-              requirement->getName(),
-              reqType);
+    // Point out the requirement that wasn't met.
+    TC.diagnose(requirement, diag::no_witnesses,
+                getRequirementKind(requirement),
+                requirement->getName(),
+                reqType);
+  }
   return ResolveWitnessResult::ExplicitFailed;
 }
 
@@ -2272,8 +2287,10 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   // If we had multiple viable types, diagnose the ambiguity.
   if (!viable.empty()) {
     if (!AlreadyComplained) {
-      TC.diagnose(Loc, diag::type_does_not_conform, Adoptee, 
-                  Proto->getDeclaredType());
+      if (!SuppressDiagnostics) {
+        TC.diagnose(Loc, diag::type_does_not_conform, Adoptee, 
+                    Proto->getDeclaredType());
+      }
       AlreadyComplained = true;
     }
 
@@ -2288,19 +2305,23 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
   // None of the candidates were viable.
   if (!AlreadyComplained) {
-    TC.diagnose(Loc, diag::type_does_not_conform, Adoptee, 
-                Proto->getDeclaredType());
+    if (!SuppressDiagnostics) {
+      TC.diagnose(Loc, diag::type_does_not_conform, Adoptee, 
+                  Proto->getDeclaredType());
+    }
     AlreadyComplained = true;
   }
 
-  TC.diagnose(assocType, diag::no_witnesses_type,
-              assocType->getName());
+  if (!SuppressDiagnostics) {
+    TC.diagnose(assocType, diag::no_witnesses_type,
+                assocType->getName());
 
-  for (auto candidate : nonViable) {
-    TC.diagnose(candidate.first,
-                diag::protocol_witness_nonconform_type,
-                candidate.first->getDeclaredType(),
-                candidate.second->getDeclaredType());
+    for (auto candidate : nonViable) {
+      TC.diagnose(candidate.first,
+                  diag::protocol_witness_nonconform_type,
+                  candidate.first->getDeclaredType(),
+                  candidate.second->getDeclaredType());
+    }
   }
 
   return ResolveWitnessResult::ExplicitFailed;
@@ -2333,13 +2354,17 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaDefault(
 
   if (auto checkResult = checkTypeWitness(TC, DC, assocType, defaultType)) {
     if (!AlreadyComplained) {
-      TC.diagnose(Loc, diag::type_does_not_conform, Adoptee, 
-                  Proto->getDeclaredType());
+      if (!SuppressDiagnostics) {
+        TC.diagnose(Loc, diag::type_does_not_conform, Adoptee, 
+                    Proto->getDeclaredType());
+      }
       AlreadyComplained = true;
     }
 
-    TC.diagnose(assocType, diag::default_assocated_type_req_fail,
-                defaultType, checkResult.getProtocol()->getDeclaredType());
+    if (!SuppressDiagnostics) {
+      TC.diagnose(assocType, diag::default_assocated_type_req_fail,
+                  defaultType, checkResult.getProtocol()->getDeclaredType());
+    }
 
     return ResolveWitnessResult::ExplicitFailed;
   } 
@@ -2479,11 +2504,13 @@ ConformanceChecker::resolveSingleTypeWitness(AssociatedTypeDecl *assocType) {
 
   // FIXME: Note this failure so we don't try again?
 
-  TC.diagnose(Loc, diag::type_does_not_conform,
-              Adoptee, Proto->getDeclaredType());
+  if (!SuppressDiagnostics) {
+    TC.diagnose(Loc, diag::type_does_not_conform,
+                Adoptee, Proto->getDeclaredType());
 
-  TC.diagnose(assocType, diag::no_witnesses_type,
-              assocType->getName());
+    TC.diagnose(assocType, diag::no_witnesses_type,
+                assocType->getName());
+  }
   Conformance->setState(ProtocolConformanceState::Invalid);
 }
 
@@ -2606,9 +2633,23 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   }
 }
 
+namespace {
+  template <typename T>
+  class RestoreValueRAII {
+    T &Var;
+    T OldValue;
+  public:
+    RestoreValueRAII(T &var) : Var(var), OldValue(var) {}
+    ~RestoreValueRAII() { Var = OldValue; }
+  };
+}
+
 #pragma mark Protocol conformance checking
 void ConformanceChecker::checkConformance() {
   assert(!Conformance->isComplete() && "Conformance is already complete");
+
+  RestoreValueRAII<bool> restoreSuppressDiagnostics(SuppressDiagnostics);
+  SuppressDiagnostics = false;
 
   // FIXME: Caller checks that this the type conforms to all of the
   // inherited protocols.
@@ -3127,7 +3168,7 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
         *Conformance = Known->getPointer();
 
       recordDependency(Known->getPointer());
-      return !(Known->getPointer()->isInvalid());
+      return true;
     }
 
     // If we're just checking for conformance, we already know the answer.

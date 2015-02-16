@@ -161,7 +161,7 @@ Type Solution::computeSubstitutions(Type origType, DeclContext *dc,
 /// \param diag The diagnostic to emit if the protocol definition doesn't
 /// have a requirement with the given name.
 ///
-/// \returns The named witness.
+/// \returns The named witness, or nullptr if no witness could be found.
 template <typename DeclTy>
 static DeclTy *findNamedWitnessImpl(TypeChecker &tc, DeclContext *dc, Type type,
                                     ProtocolDecl *proto, DeclName name,
@@ -198,7 +198,8 @@ static DeclTy *findNamedWitnessImpl(TypeChecker &tc, DeclContext *dc, Type type,
 
   assert(conformance && "Missing conformance information");
   // FIXME: Dropping substitutions here.
-  return cast<DeclTy>(conformance->getWitness(requirement, &tc).getDecl());
+  return cast_or_null<DeclTy>(
+    conformance->getWitness(requirement, &tc).getDecl());
 }
 
 static VarDecl *findNamedPropertyWitness(TypeChecker &tc, DeclContext *dc,

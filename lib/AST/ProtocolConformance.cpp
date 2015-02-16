@@ -66,6 +66,12 @@ ProtocolConformanceState ProtocolConformance::getState() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getState, ())
 }
 
+bool
+ProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
+                                    LazyResolver *resolver) const {
+  CONFORMANCE_SUBCLASS_DISPATCH(hasTypeWitness, (assocType, resolver));
+}
+
 const Substitution &
 ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType, 
                                     LazyResolver *resolver) const {
@@ -96,6 +102,9 @@ ProtocolConformance::getTypeWitnessByName(Type type,
     return nullptr;
   
   assert(conformance && "Missing conformance information");
+  if (!conformance->hasTypeWitness(assocType, resolver)) {
+    return nullptr;
+  }
   return conformance->getTypeWitness(assocType, resolver).getReplacement();
 }
 
@@ -236,6 +245,20 @@ GenericSignature *ProtocolConformance::getGenericSignature() const {
     ->getGenericSignatureOfContext();
 }
 
+bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
+                                               LazyResolver *resolver) const {
+  if (TypeWitnesses.find(assocType) != TypeWitnesses.end()) {
+    return true;
+  }
+  if (resolver) {
+    resolver->resolveTypeWitness(this, assocType);
+    if (TypeWitnesses.find(assocType) != TypeWitnesses.end()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 const Substitution &NormalProtocolConformance::getTypeWitness(
                       AssociatedTypeDecl *assocType, 
                       LazyResolver *resolver) const {
@@ -264,17 +287,20 @@ void NormalProtocolConformance::setTypeWitness(
 ConcreteDeclRef NormalProtocolConformance::getWitness(
                   ValueDecl *requirement, 
                   LazyResolver *resolver) const {
-    assert(!isa<AssociatedTypeDecl>(requirement) && "Request type witness");
-    auto known = Mapping.find(requirement);
-    if (known == Mapping.end()) {
-      assert(resolver && "Unable to resolve witness without resolver");
-      resolver->resolveWitness(this, requirement);
-      known = Mapping.find(requirement);
-      assert(known != Mapping.end() && "Resolver did not resolve requirement");
-    }
-
-    return known->second;
+  assert(!isa<AssociatedTypeDecl>(requirement) && "Request type witness");
+  auto known = Mapping.find(requirement);
+  if (known == Mapping.end()) {
+    assert(resolver && "Unable to resolve witness without resolver");
+    resolver->resolveWitness(this, requirement);
+    known = Mapping.find(requirement);
   }
+  if (known != Mapping.end()) {
+    return known->second;
+  } else {
+    assert(!isComplete() && "Resolver did not resolve requirement");
+    return ConcreteDeclRef();
+  }
+}
 
 void NormalProtocolConformance::setWitness(ValueDecl *requirement,
                                            ConcreteDeclRef witness) const {
@@ -295,6 +321,13 @@ SpecializedProtocolConformance::SpecializedProtocolConformance(
     GenericSubstitutions(substitutions)
 {
   assert(genericConformance->getKind() != ProtocolConformanceKind::Specialized);
+}
+
+bool SpecializedProtocolConformance::hasTypeWitness(
+                      AssociatedTypeDecl *assocType, 
+                      LazyResolver *resolver) const {
+  return TypeWitnesses.find(assocType) != TypeWitnesses.end() ||
+         GenericConformance->hasTypeWitness(assocType, resolver);
 }
 
 const Substitution &SpecializedProtocolConformance::getTypeWitness(
