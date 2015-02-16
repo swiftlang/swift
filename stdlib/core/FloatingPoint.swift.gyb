@@ -437,14 +437,30 @@ extension ${Self} : Hashable {
   /// different invocations of the same program.  Do not persist the
   /// hash value across program runs.
   public var hashValue: Int {
-    var asBuiltinInt = Builtin.bitcast_FPIEEE${bits}_Int${bits}(value)
-%   if bits >= 64:
-    return Int(Builtin.truncOrBitCast_Int${bits}_Word(asBuiltinInt))
-%   elif bits <= 32:
-    return Int(Builtin.sextOrBitCast_Int${bits}_Word(asBuiltinInt))
-%   else:
+  // FIXME: Float80 does not have _toBitPattern.
+  % if bits != 80:
+  // -0.0.hashValue must == 0.0.hashValue. So we need to check for -0.0.
+  % if bits == 32:
+    if self._toBitPattern() == 2147483648 {
+  % elif bits == 64:
+    if self._toBitPattern() == 9223372036854775808 {
+  % else:
     error unhandled float size ${bits}
-%   end
+  % end
+      return 0.0.hashValue
+    } else {
+  % end
+      let asBuiltinInt = Builtin.bitcast_FPIEEE${bits}_Int${bits}(value)
+  %   if bits >= 64:
+      return Int(Builtin.truncOrBitCast_Int${bits}_Word(asBuiltinInt))
+  %   elif bits <= 32:
+      return Int(Builtin.sextOrBitCast_Int${bits}_Word(asBuiltinInt))
+  %   else:
+      error unhandled float size ${bits}
+  %   end
+  % if bits != 80:
+    }
+  % end
   }
 }
 

@@ -52,6 +52,22 @@ extension Float80 {
 
 #endif
 
+func noinlinePlusZero() -> Float {
+  return 0.0
+}
+
+func noinlineMinusZero() -> Float {
+  return -0.0
+}
+
+func noinlinePlusZero() -> Double {
+  return 0.0
+}
+
+func noinlineMinusZero() -> Double {
+  return -0.0
+}
+
 var FloatingPoint = TestSuite("FloatingPoint")
 
 // Tests the float and int conversions work correctly. Each case is special.
@@ -139,6 +155,18 @@ FloatingPoint.test("Double/Int64") {
   expectEqual(Int64.min, Int64(Double(Int64.min)))
   expectCrashLater()
   expectEqual(Int64.max, Int64(Double(Int64.max)))
+}
+
+FloatingPoint.test("Float/HashValueZero") {
+  let zero: Float = noinlinePlusZero()
+  let negativeZero: Float = noinlineMinusZero()
+  expectEqual(zero.hashValue, negativeZero.hashValue)
+}
+
+FloatingPoint.test("Double/HashValueZero") {
+  let zero: Double = noinlinePlusZero()
+  let negativeZero: Double = noinlineMinusZero()
+  expectEqual(zero.hashValue, negativeZero.hashValue)
 }
 
 // FIXME: implement Float80 tests after Float80 is implemented.
