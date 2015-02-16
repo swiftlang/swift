@@ -1,5 +1,27 @@
 // RUN: %target-swift-frontend -O -emit-sil -Xllvm -debug-only=cowarray-opts -primary-file %s 2>&1 | FileCheck %s
-// REQUIRES: asserts
+// REQUIRES: asserts swift_stdlib_no_asserts optimized_stdlib
+
+// CHECK-LABEL: COW Array Opts in Func {{.*}}inoutarr{{.*}}
+// CHECK: Hoisting make_mutable
+// CHECK: COW Array Opts
+func inoutarr(inout a: [Int]) {
+  for i in 0..<a.count {
+    a[i] = 0
+  }
+}
+
+struct S {
+  var a: [Int]
+}
+
+// CHECK-LABEL: COW Array Opts in Func {{.*}}arrelt{{.*}}
+// CHECK: Hoisting make_mutable
+// CHECK: COW Array Opts
+func arrelt(inout s: S) {
+  for i in 0..<s.a.count {
+    s.a[i] = 0
+  }
+}
 
 class ArrayInClass {
   final var A : [Int]
@@ -12,6 +34,24 @@ class ArrayInClass {
     C = [[]]
   }
 
+  // CHECK-LABEL: COW Array Opts in Func {{.*}}hoistInClass{{.*}}
+  // CHECK: Hoisting make_mutable
+  // CHECK: COW Array Opts
+  func hoistInClass() {
+    for i in 0..<A.count {
+      A[i] = 0
+    }
+  }
+
+  // CHECK-LABEL: COW Array Opts in Func {{.*}}hoistInClass2Arr{{.*}}
+  // CHECK: Hoisting make_mutable
+  // CHECK: COW Array Opts
+  func hoistInClass2Arr() {
+    for i in 0..<A.count {
+      A[i] = 0
+      B[i] = 2
+    }
+  }
 
   // CHECK-LABEL: COW Array Opts in Func {{.*}}dontHoistInClassAppend{{.*}}
   // CHECK-NOT: Hoisting make_mutable
