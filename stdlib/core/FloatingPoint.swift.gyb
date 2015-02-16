@@ -437,14 +437,18 @@ extension ${Self} : Hashable {
   /// different invocations of the same program.  Do not persist the
   /// hash value across program runs.
   public var hashValue: Int {
-    var asBuiltinInt = Builtin.bitcast_FPIEEE${bits}_Int${bits}(value)
-%   if bits >= 64:
-    return Int(Builtin.truncOrBitCast_Int${bits}_Word(asBuiltinInt))
-%   elif bits <= 32:
-    return Int(Builtin.sextOrBitCast_Int${bits}_Word(asBuiltinInt))
-%   else:
-    error unhandled float size ${bits}
-%   end
+    if self == 0.0 {
+      return 0.0.hashValue
+    } else {
+      var asBuiltinInt = Builtin.bitcast_FPIEEE${bits}_Int${bits}(value)
+  %   if bits >= 64:
+      return Int(Builtin.truncOrBitCast_Int${bits}_Word(asBuiltinInt))
+  %   elif bits <= 32:
+      return Int(Builtin.sextOrBitCast_Int${bits}_Word(asBuiltinInt))
+  %   else:
+      error unhandled float size ${bits}
+  %   end
+    }
   }
 }
 
