@@ -305,6 +305,13 @@ public:
   /// checker doesn't have any point where that happens. Moreover, this
   /// check wouldn't even be needed if we could handle captures within SILGen.
   std::vector<LocalFunctionCapture> LocalFunctionCaptures;
+  
+  /// A set of local functions from which C function pointers are derived.
+  ///
+  /// This is used to diagnose the use of local functions with captured context
+  /// as C function pointers when the function's captures have not yet been
+  /// computed.
+  llvm::DenseMap<AnyFunctionRef, std::vector<Expr*>> LocalCFunctionPointers;
 
 private:
   Type IntLiteralType;

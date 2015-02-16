@@ -560,6 +560,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalUnavailableAsOptional |=
       Args.hasArg(OPT_enable_experimental_unavailable_as_optional);
   
+  Opts.EnableCFunctionPointers |=
+      Args.hasArg(OPT_enable_c_function_pointers);
+  
   Opts.EnableCharacterLiterals |= Args.hasArg(OPT_enable_character_literals);
   Opts.UsePrivateDiscriminators |=
     Args.hasArg(OPT_enable_private_discriminators);

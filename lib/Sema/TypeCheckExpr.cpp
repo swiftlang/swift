@@ -740,5 +740,17 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
       Context.AllocateCopy<ValueDecl *>(Captures.begin(), Captures.end());
   AFR.getCaptureInfo().setCaptures(
       llvm::makeArrayRef(CaptureCopy, Captures.size()));
+  
+  // Diagnose if we have local captures and there were C pointers formed to
+  // this function before we computed captures.
+  auto cFunctionPointers = LocalCFunctionPointers.find(AFR);
+  if (cFunctionPointers != LocalCFunctionPointers.end()
+      && AFR.getCaptureInfo().hasLocalCaptures()) {
+    for (auto *expr : cFunctionPointers->second) {
+      diagnose(expr->getLoc(),
+               diag::c_function_pointer_from_function_with_context,
+               /*closure*/ AFR.getAbstractClosureExpr() != nullptr);
+    }
+  }
 }
 

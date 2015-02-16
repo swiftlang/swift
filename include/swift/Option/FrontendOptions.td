@@ -165,7 +165,11 @@ def enable_experimental_availability_checking : Flag<["-"],
 def enable_experimental_unavailable_as_optional : Flag<["-"],
   "enable-experimental-unavailable-as-optional">,
   HelpText<"Enable experimental treat unavailable symbols as optional">;
-    
+
+def enable_c_function_pointers : Flag<["-"],
+  "enable-c-function-pointers">,
+  HelpText<"Enable native C function pointer types">;
+
 def enable_character_literals : Flag<["-"], "enable-character-literals">,
   HelpText<"Enable legacy character literals">;
 

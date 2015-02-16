@@ -77,6 +77,9 @@ namespace swift {
     /// symbols as optionals.
     bool EnableExperimentalUnavailableAsOptional = false;
     
+    /// \brief Enable support for native C function pointer types.
+    bool EnableCFunctionPointers = false;
+    
     /// \brief Enable features useful for running in the debugger.
     bool DebuggerSupport = false;
 

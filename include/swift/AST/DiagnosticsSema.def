@@ -404,6 +404,17 @@ ERROR(invalid_function_conversion,sema_tcc,none,
 NOTE(invalid_function_conversion_closure,sema_tcc,none,
      "use a closure to safely wrap calls to the function", ())
 
+ERROR(invalid_c_function_pointer_conversion_expr,sema_tcc,none,
+      "a C function pointer can only be formed from a reference to a 'func' or "
+      "a literal closure", ())
+ERROR(c_function_pointer_from_method,sema_tcc,none,
+      "a C function pointer cannot be formed from a method", ())
+ERROR(c_function_pointer_from_function_with_context,sema_tcc,none,
+      "a C function pointer cannot be formed from a "
+      "%select{local function|closure}0 that captures context", (bool))
+NOTE(c_function_pointer_captures_here,sema_tcc,none,
+     "%0 captured here", (Identifier))
+
 //------------------------------------------------------------------------------
 // Type Check Declarations
 //------------------------------------------------------------------------------

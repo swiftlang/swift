@@ -1249,10 +1249,14 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // source level, but we want to support them there in SIL files.
   auto SF = DC->getParentSourceFile();
   if (!SF || SF->Kind != SourceFileKind::SIL) {
-    for (auto silOnlyAttr : {TAK_cc, TAK_thin, TAK_thick}) {
+    for (auto silOnlyAttr : {TAK_thin, TAK_thick}) {
       checkUnsupportedAttr(silOnlyAttr);
     }
-  }  
+    // TODO: Pick a real syntax for C function pointers.
+    // For now admit @cc(cdecl) as a syntax for C function pointers.
+    if (!Context.LangOpts.EnableCFunctionPointers)
+      checkUnsupportedAttr(TAK_cc);
+  }
   
   bool hasFunctionAttr = false;
   for (auto i : FunctionAttrs)

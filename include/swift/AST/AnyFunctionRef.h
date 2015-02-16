@@ -17,6 +17,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
@@ -26,6 +27,11 @@ class CaptureInfo;
 /// represent functions and exposes a common interface to them.
 class AnyFunctionRef {
   PointerUnion<AbstractFunctionDecl *, AbstractClosureExpr *> TheFunction;
+
+  friend struct llvm::DenseMapInfo<AnyFunctionRef>;
+  
+  AnyFunctionRef(decltype(TheFunction) TheFunction)
+    : TheFunction(TheFunction) {}
 
 public:
   AnyFunctionRef(AbstractFunctionDecl *AFD) : TheFunction(AFD) {
@@ -116,6 +122,30 @@ public:
 };
 
 } // namespace swift
+
+namespace llvm {
+
+template<>
+struct DenseMapInfo<swift::AnyFunctionRef> {
+  using PointerUnion = decltype(swift::AnyFunctionRef::TheFunction);
+  using PointerUnionTraits = DenseMapInfo<PointerUnion>;
+  using AnyFunctionRef = swift::AnyFunctionRef;
+
+  static inline AnyFunctionRef getEmptyKey() {
+    return AnyFunctionRef(PointerUnionTraits::getEmptyKey());
+  }
+  static inline AnyFunctionRef getTombstoneKey() {
+    return AnyFunctionRef(PointerUnionTraits::getTombstoneKey());
+  }
+  static inline unsigned getHashValue(AnyFunctionRef ref) {
+    return PointerUnionTraits::getHashValue(ref.TheFunction);
+  }
+  static bool isEqual(AnyFunctionRef a, AnyFunctionRef b) {
+    return a.TheFunction == b.TheFunction;
+  }
+};
+
+}
 
 #endif // LLVM_SWIFT_AST_ANY_FUNCTION_REF_H
 

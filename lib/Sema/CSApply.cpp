@@ -4212,6 +4212,77 @@ static void
 maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
                                            AnyFunctionType *toType) {
   Type fromType = expr->getType();
+  auto fromFnType = fromType->getAs<AnyFunctionType>();
+  
+  // Conversions to C function pointer type are limited. Since a C function
+  // pointer captures no context, we can only do the necessary thunking or
+  // codegen if the original function is a direct reference to a global function
+  // or context-free closure or local function.
+  if (toType->getExtInfo().getCC() == AbstractCC::C) {
+    // Can convert from an ABI-compatible C function pointer.
+    if (fromFnType && fromFnType->getExtInfo().getCC() == AbstractCC::C
+        && areConvertibleTypesABICompatible(fromType->getCanonicalType(),
+                                            toType->getCanonicalType()))
+      return;
+    
+    // Can convert a decl ref to a global or local function that doesn't
+    // capture context. Look through ignored bases too.
+    // TODO: Look through static method applications to the type.
+    auto semanticExpr = expr->getSemanticsProvidingExpr();
+    while (auto ignoredBase = dyn_cast<DotSyntaxBaseIgnoredExpr>(semanticExpr)){
+      semanticExpr = ignoredBase->getRHS()->getSemanticsProvidingExpr();
+    }
+    
+    auto maybeDiagnoseFunctionRef = [&](FuncDecl *fn) {
+      // TODO: We could allow static (or class final) functions too by
+      // "capturing" the metatype in a thunk.
+      if (fn->getDeclContext()->isTypeContext()) {
+        tc.diagnose(expr->getLoc(),
+                    diag::c_function_pointer_from_method);
+      } else if (fn->getCaptureInfo().hasLocalCaptures()) {
+        tc.diagnose(expr->getLoc(),
+                    diag::c_function_pointer_from_function_with_context,
+                    /*closure*/ false);
+      } else if (fn->getCaptureInfo().empty()) {
+        // The capture list is not always initialized by the point we reference
+        // it. Remember we formed a C function pointer so we can diagnose later
+        // if necessary.
+        tc.LocalCFunctionPointers[fn].push_back(expr);
+      }
+      return;
+    };
+    
+    if (auto declRef = dyn_cast<DeclRefExpr>(semanticExpr)) {
+      if (auto fn = dyn_cast<FuncDecl>(declRef->getDecl())) {
+        return maybeDiagnoseFunctionRef(fn);
+      }
+    }
+    
+    if (auto memberRef = dyn_cast<MemberRefExpr>(semanticExpr)) {
+      if (auto fn = dyn_cast<FuncDecl>(memberRef->getMember().getDecl())) {
+        return maybeDiagnoseFunctionRef(fn);
+      }
+    }
+    
+    // Can convert a literal closure that doesn't capture context.
+    if (auto closure = dyn_cast<ClosureExpr>(semanticExpr)) {
+      if (closure->getCaptureInfo().hasLocalCaptures()) {
+        tc.diagnose(expr->getLoc(),
+                    diag::c_function_pointer_from_function_with_context,
+                    /*closure*/ true);
+      }
+      return;
+    }
+    
+    tc.diagnose(expr->getLoc(),
+                diag::invalid_c_function_pointer_conversion_expr);
+
+    return;
+  }
+  
+  // Check ABI compatibility of thick functions. TODO: In the fullness of time
+  // these ought to be implementable by thunking.
+  
   if (areConvertibleTypesABICompatible(fromType->getCanonicalType(),
                                        toType->getCanonicalType())) {
     return;
@@ -4220,7 +4291,7 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
   // Strip @noescape from the types. It's not relevant: any function type with
   // otherwise matching flags can be converted to a noescape function type.
   {
-    auto fromFnType = fromType->castTo<AnyFunctionType>();
+    assert(fromFnType);
     auto prettyFromExtInfo = fromFnType->getExtInfo().withNoEscape(false);
     fromType = fromFnType->withExtInfo(prettyFromExtInfo);
 
