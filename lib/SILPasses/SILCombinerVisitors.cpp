@@ -2133,6 +2133,43 @@ SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *FLI) {
 }
 
 SILInstruction *
+SILCombiner::visitCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
+
+  // %0 = metatype $@thick AnyObject.Protocol
+  // checked_cast_br %0 : $@thick AnyObject.Protocol to $@thick B.Type, bb1, bb2
+  //
+  //   ->
+  //
+  // br bb2
+  auto *MetatypeOperand = dyn_cast<MetatypeInst>(CBI->getOperand());
+  if (!MetatypeOperand)
+    return nullptr;
+  SILType InstanceType =
+    MetatypeOperand->getType().getMetatypeInstanceType(CBI->getModule());
+  if (!InstanceType.isAnyObject())
+    return nullptr;
+
+  // We know we are casting from AnyObject.protocol. Let's check the target
+  // type.
+  auto TargetType = CBI->getCastType();
+  if (!TargetType.is<MetatypeType>())
+    return nullptr;
+
+  TargetType =
+    TargetType.getMetatypeInstanceType(CBI->getModule());
+
+  bool IsTargetAnyObject = TargetType.isAnyObject();
+  if (TargetType.getClassOrBoundGenericClass() && !IsTargetAnyObject) {
+    // We have a cast from an AnyObject metatype to a class. This will fail.
+    Builder->createBranch(CBI->getLoc(), CBI->getFailureBB());
+    eraseInstFromFunction(*CBI);
+    return nullptr;
+  }
+
+  return nullptr;
+}
+
+SILInstruction *
 SILCombiner::
 visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
   // Try to determine the outcome of the cast from a known type

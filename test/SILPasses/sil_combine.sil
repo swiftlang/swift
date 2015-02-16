@@ -2188,3 +2188,22 @@ bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.NativeObject, %2 : $Builtin.Nati
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil @checked_cast_anyobject_metatypeinst_to_class
+// CHECK: bb0
+// CHECK-NOT: checked_cast_br
+// CHECK: br bb2
+sil @checked_cast_anyobject_metatypeinst_to_class : $@thin() -> () {
+bb0:
+  %0 = metatype $@thick AnyObject.Protocol
+  checked_cast_br %0 : $@thick AnyObject.Protocol to $@thick B.Type, bb1, bb2
+
+bb1(%3 : $@thick B.Type):
+  br bb3
+bb2:
+  br bb3
+
+bb3:
+ %2 = tuple()
+ return %2 : $()
+}

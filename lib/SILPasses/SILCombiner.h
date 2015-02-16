@@ -218,6 +218,8 @@ public:
   SILInstruction *visitSelectValueInst(SelectValueInst *SVI);
   SILInstruction *
   visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI);
+  SILInstruction *
+  visitCheckedCastBranchInst(CheckedCastBranchInst *CBI);
 
 
   /// Instruction visitor helpers.
