@@ -4117,7 +4117,7 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(Expr *expr) {
   discardExpr->setType(LValueType::get(singleExpr->
                                        getType()->
                                        getLValueOrInOutObjectType()));
-  assignExpr->setType(singleExpr->getType());
+  assignExpr->setType(voidExpr->getType());
 
   SmallVector<ASTNode, 2> elements;
   elements.push_back(assignExpr);

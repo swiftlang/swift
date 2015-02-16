@@ -24,7 +24,7 @@ func tupleTypes() {
 }
 
 func returnWithDefault() -> (a: Int, b: Int = 42) { // expected-error{{default argument not permitted in a tuple type}}
-  return 5 // expected-error{{'Int' is not convertible to '(a: Int, b: Int)'}}
+  return 5 // expected-error{{cannot convert return expression of type 'Int' to expected result type '(a: Int, b: Int)'}}
 }
 
 // Only the first parameter list of a curried function can have a

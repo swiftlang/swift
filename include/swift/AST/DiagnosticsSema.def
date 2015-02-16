@@ -158,6 +158,13 @@ ERROR(unsupported_objc_metatype_conversion,sema,none,
       "converting a metatype to a reference is only supported with an "
       "Objective-C runtime", ())
 
+ERROR(cannot_convert_to_return_type,sema,none,
+      "cannot convert return expression of type %0 to expected result type %1",
+      (Type,Type))
+
+ERROR(cannot_return_value_from_void_func,sema,none,
+      "unexpected non-void return value in void function",())
+
 //------------------------------------------------------------------------------
 // Name Binding
 //------------------------------------------------------------------------------

@@ -1957,7 +1957,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       
       while (!parts.empty()) {
         if (parts.back().getKind() == ConstraintLocator::ClosureResult) {
-          increaseScore(SK_FunctionConversion);
+          //increaseScore(SK_FunctionConversion);
           return SolutionKind::Solved;
         }
         parts.pop_back();
