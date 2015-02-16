@@ -3045,11 +3045,14 @@ existentialConformsToItself(TypeChecker &tc,
   return true;
 }
 
-/// Check whether the given archetype conforms to the protocol.
-static bool archetypeConformsToProtocol(TypeChecker &tc, Type type,
-                                        ArchetypeType *archetype,
-                                        ProtocolDecl *protocol,
-                                        SourceLoc complainLoc) {
+/// Check whether the given archetype requires conformance to 'protocol',
+/// either explicitly or indirectly through another protocol requirement.
+///
+/// NOTE: This method does not check for the archetype's conformance to a
+/// protocol via any superclass requirement.
+static bool archetypeRequiresProtocol(TypeChecker &tc, Type type,
+                                      ArchetypeType *archetype,
+                                      ProtocolDecl *protocol) {
   // An archetype that must be a class trivially conforms to AnyObject.
   if (archetype->requiresClass() &&
       protocol == tc.Context.getProtocol(KnownProtocolKind::AnyObject))
@@ -3058,14 +3061,6 @@ static bool archetypeConformsToProtocol(TypeChecker &tc, Type type,
   for (auto ap : archetype->getConformsTo()) {
     if (ap == protocol || ap->inheritsFrom(protocol))
       return true;
-  }
-
-  // If we need to complain, do so.
-  if (complainLoc.isValid()) {
-    // FIXME: Fix-It to add a requirement on the corresponding type
-    // parameter?
-    tc.diagnose(complainLoc, diag::type_does_not_conform, type,
-                protocol->getDeclaredType());
   }
 
   return false;
@@ -3117,17 +3112,29 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
 
   // If we have an archetype, check whether this archetype's requirements
   // include this protocol (or something that inherits from it).
-  if (auto Archetype = T->getAs<ArchetypeType>())
-    return archetypeConformsToProtocol(*this, T, Archetype, Proto, ComplainLoc);
+  if (auto Archetype = T->getAs<ArchetypeType>()) {
+    if (archetypeRequiresProtocol(*this, T, Archetype, Proto)) {
+      return true;
+    }
+  }
 
   // If we have an existential type, check whether this type includes this
   // protocol we're looking for (or something that inherits from it).
   if (T->isExistentialType())
     return existentialConformsToProtocol(*this, T, Proto, ComplainLoc);
 
-  // Only nominal types conform to protocols.
+  // Only nominal types and class-bound archetypes conform concretely to
+  // protocols.
   auto canT = T->getCanonicalType();
-  auto nominal = canT->getAnyNominal();
+  NominalTypeDecl *nominal = nullptr;
+  if (auto *archetype = canT->getAs<ArchetypeType>()) {
+    if (auto super = archetype->getSuperclass()) {
+      nominal = super->getAnyNominal();
+    }
+  } else {
+    nominal = canT->getAnyNominal();
+  }
+
   if (!nominal) {
     // If we need to complain, do so.
     if (ComplainLoc.isValid()) {

@@ -413,7 +413,7 @@ class DoesntConformToObjCProtocol : ObjCProtocol { // expected-error{{type 'Does
 
 // <rdar://problem/16079878>
 protocol P1 {
-  typealias Assoc // expected-note{{protocol requires nested type 'Assoc'}}
+  typealias Assoc // expected-note 2{{protocol requires nested type 'Assoc'}}
 }
 
 protocol P2 {
@@ -443,4 +443,20 @@ protocol FirstProtocol {
 
 protocol SecondProtocol {
     func aMethod(object : FirstProtocol)
+}
+
+// <rdar://problem/19495341> Can't upcast to parent types of type constraints without forcing
+class C1 : P2 {}
+func f<T : C1>(x : T) {
+  x as P2
+}
+
+class C2 {}
+func g<T : C2>(x : T) {
+  x as P2 // expected-error{{'T' is not convertible to 'P2'; did you mean to use 'as!' to force downcast?}}
+}
+
+class C3 : P1 {} // expected-error{{type 'C3' does not conform to protocol 'P1'}}
+func h<T : C3>(x : T) {
+  x as P1 // expected-error{{protocol 'P1' can only be used as a generic constraint because it has Self or associated type requirements}}
 }

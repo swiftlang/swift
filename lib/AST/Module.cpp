@@ -867,7 +867,9 @@ LookupConformanceResult Module::lookupConformance(Type type,
         return { nullptr, ConformanceKind::Conforms };
     }
 
-    return { nullptr, ConformanceKind::DoesNotConform };
+    if (!archetype->getSuperclass()) {
+      return { nullptr, ConformanceKind::DoesNotConform };
+    }
   }
 
   // An existential conforms to a protocol if the protocol is listed in the
@@ -921,6 +923,24 @@ LookupConformanceResult Module::lookupConformance(Type type,
 
     // We don't conform.
     return { nullptr, ConformanceKind::DoesNotConform };
+  }
+
+  // Check for protocol conformance of archetype via superclass requirement.
+  if (auto archetype = type->getAs<ArchetypeType>()) {
+    if (auto super = archetype->getSuperclass()) {
+      auto inheritedConformance = lookupConformance(super, protocol, resolver);
+      switch (inheritedConformance.getInt()) {
+      case ConformanceKind::DoesNotConform:
+        return { nullptr, ConformanceKind::DoesNotConform };
+      case ConformanceKind::UncheckedConforms:
+        return inheritedConformance;
+      case ConformanceKind::Conforms:
+        auto result =
+          ctx.getInheritedConformance(type, inheritedConformance.getPointer());
+        ctx.setConformsTo(canType, protocol, ConformanceEntry(result, true));
+        return { result, ConformanceKind::Conforms };
+      }
+    }
   }
 
   auto nominal = type->getAnyNominal();

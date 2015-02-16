@@ -4908,15 +4908,17 @@ static llvm::Value *getProtocolWitnessTable(IRGenFunction &IGF,
   assert(requiresProtocolWitnessTable(proto)
          && "protocol does not have witness tables?!");
 
-  // If the source type is an archetype, look at what's locally bound.
+  // If the source type is an archetype and we don't have concrete conformance
+  // info, the conformance must be via one of the protocol requirements of the
+  // archetype. Look at what's locally bound.
   if (auto archetype = dyn_cast<ArchetypeType>(srcType)) {
-    assert(!conformance
-           && "should not have concrete conformance info for archetype");
-    auto &archTI = getArchetypeInfo(IGF, archetype, srcTI);
-    ProtocolPath path(IGF.IGM, archTI.getStoredProtocols(), proto);
-    llvm::Value *rootTable = archTI.getWitnessTable(IGF, archetype,
-                                                    path.getOriginIndex());
-    return path.apply(IGF, rootTable);
+    if (!conformance) {
+      auto &archTI = getArchetypeInfo(IGF, archetype, srcTI);
+      ProtocolPath path(IGF.IGM, archTI.getStoredProtocols(), proto);
+      llvm::Value *rootTable = archTI.getWitnessTable(IGF, archetype,
+                                                      path.getOriginIndex());
+      return path.apply(IGF, rootTable);
+    }
   }
 
   // All other source types should be concrete enough that we have conformance
