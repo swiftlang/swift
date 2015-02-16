@@ -245,10 +245,6 @@ ClangImporter::create(ASTContext &ctx,
       "-DSWIFT_ENUM_EXTRA=__attribute__((annotate(\""
         SWIFT_NATIVE_ANNOTATION_STRING "\")))",
 
-      // Tell CoreFoundation to mark toll-free bridged types with attributes.
-      "-DCF_ENABLE_BRIDGED_TYPES_SO_YOU_CAN_FIX_BUILD_FAILURES",
-      "-DCF_ENABLE_BRIDGED_TYPES",
-
       // Avoid including the iso646.h header because some headers from OS X
       // frameworks are broken by it.
       "-D_ISO646_H_", "-D__ISO646_H",
