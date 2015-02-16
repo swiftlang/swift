@@ -6,3 +6,9 @@ extension UIImage : ImagePresentingView {
     set { }
   }
 }
+
+class A : NSObject {
+  init(foo: Int) {
+    super.init()
+  }
+}

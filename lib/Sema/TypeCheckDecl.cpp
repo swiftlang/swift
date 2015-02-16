@@ -3151,108 +3151,6 @@ public:
     }
   }
 
-  /// AST stream printer that adds extra indentation to each line.
-  class ExtraIndentStreamPrinter : public StreamPrinter {
-    StringRef ExtraIndent;
-
-  public:
-    ExtraIndentStreamPrinter(raw_ostream &out, StringRef extraIndent)
-      : StreamPrinter(out), ExtraIndent(extraIndent) { }
-
-    virtual void printIndent() {
-      printText(ExtraIndent);
-      StreamPrinter::printIndent();
-    }
-  };
-
-  /// Diagnose a missing required initializer.
-  void diagnoseMissingRequiredInitializer(ClassDecl *classDecl,
-                                          ConstructorDecl *superInitializer) {
-    // Find the location at which we should insert the new initializer.
-    SourceLoc insertionLoc;
-    SourceLoc indentationLoc;
-    for (auto member : classDecl->getMembers()) {
-      // If we don't have an indentation location yet, grab one from this
-      // member.
-      if (indentationLoc.isInvalid()) {
-        indentationLoc = member->getLoc();
-      }
-
-      // We only want to look at explicit constructors.
-      auto ctor = dyn_cast<ConstructorDecl>(member);
-      if (!ctor)
-        continue;
-
-      if (ctor->isImplicit())
-        continue;
-
-      insertionLoc = ctor->getEndLoc();
-      indentationLoc = ctor->getLoc();
-    }
-
-    // If no initializers were listed, start at the opening '{' for the class.
-    if (insertionLoc.isInvalid()) {
-      insertionLoc = classDecl->getBraces().Start;
-    }
-    if (indentationLoc.isInvalid()) {
-      indentationLoc = classDecl->getBraces().End;
-    }
-
-    // Adjust the insertion location to point at the end of this line (i.e.,
-    // the start of the next line).
-    insertionLoc = Lexer::getLocForEndOfLine(TC.Context.SourceMgr,
-                                             insertionLoc);
-
-    // Find the indentation used on the indentation line.
-    StringRef indentation = Lexer::getIndentationForLine(TC.Context.SourceMgr,
-                                                         indentationLoc);
-
-    // Pretty-print the superclass initializer into a string.
-    // FIXME: Form a new initializer by performing the appropriate
-    // substitutions of subclass types into the superclass types, so that
-    // we get the right generic parameters.
-    std::string initializerText;
-    {
-      PrintOptions options;
-      options.PrintDefaultParameterPlaceholder = false;
-      options.PrintImplicitAttrs = false;
-
-      // Render the text.
-      llvm::raw_string_ostream out(initializerText);
-      {
-        ExtraIndentStreamPrinter printer(out, indentation);
-        printer.printNewline();
-
-        // If there is no explicit 'required', print one.
-        bool hasExplicitRequiredAttr = false;
-        if (auto requiredAttr
-              = superInitializer->getAttrs().getAttribute<RequiredAttr>())
-            hasExplicitRequiredAttr = !requiredAttr->isImplicit();
-
-        if (!hasExplicitRequiredAttr)
-          printer << "required ";
-
-        superInitializer->print(printer, options);
-      }
-
-      // FIXME: Infer body indentation from the source rather than hard-coding
-      // 4 spaces.
-
-      // Add a dummy body.
-      out << " {\n";
-      out << indentation << "    fatalError(\"";
-      superInitializer->getFullName().printPretty(out);
-      out << " has not been implemented\")\n";
-      out << indentation << "}\n";
-    }
-
-    // Complain.
-    TC.diagnose(insertionLoc, diag::required_initializer_missing,
-                superInitializer->getFullName(),
-                superInitializer->getDeclContext()->getDeclaredTypeOfContext())
-      .fixItInsert(insertionLoc, initializerText);
-    TC.diagnose(superInitializer, diag::required_initializer_here);
-  }
 
   void visitClassDecl(ClassDecl *CD) {
     // This class declaration is technically a parse error, so do not type
@@ -3317,64 +3215,6 @@ public:
         if (superclassTy->getAs<BoundGenericClassType>() &&
             !CD->getDeclaredTypeInContext()->getAs<BoundGenericClassType>())
           TC.diagnose(CD, diag::non_generic_class_with_generic_superclass);
-              
-        // Look for any required constructors or designated initializers in the
-        // subclass that have not been overridden or otherwise provided.
-        // Collect the set of initializers we override in superclass.
-        llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenCtors;
-        for (auto member : CD->getMembers()) {
-          auto ctor = dyn_cast<ConstructorDecl>(member);
-          if (!ctor)
-            continue;
-
-          if (auto overridden = ctor->getOverriddenDecl())
-            overriddenCtors.insert(overridden);
-        }
-
-        for (auto superclassMember : TC.lookupConstructors(superclassTy, CD)) {
-          // We only care about required or designated initializers.
-          auto superclassCtor = cast<ConstructorDecl>(superclassMember);
-          if (!superclassCtor->isRequired() && 
-              !superclassCtor->isDesignatedInit())
-            continue;
-
-          // Skip invalid superclass initializers.
-          if (superclassCtor->isInvalid())
-            continue;
-
-          // If we have an override for this constructor, it's okay.
-          if (overriddenCtors.count(superclassCtor) > 0)
-            continue;
-
-          // If the superclass constructor is a convenience initializer
-          // that is inherited into the current class, it's okay.
-          if (superclassCtor->isInheritable() &&
-              CD->inheritsSuperclassInitializers(&TC)) {
-            assert(superclassCtor->isRequired());
-            continue;
-          }
-
-          // Diagnose a missing override of a required initializer.
-          if (superclassCtor->isRequired()) {
-            diagnoseMissingRequiredInitializer(CD, superclassCtor);
-            continue;
-          }
-
-          // A designated initializer has not been overridden. 
-
-          // Skip this designated initializer if it's in an extension.
-          // FIXME: We shouldn't allow this.
-          if (isa<ExtensionDecl>(superclassCtor->getDeclContext()))
-            continue;
-
-          // Create an override for it.
-          if (auto ctor = createDesignatedInitOverride(
-                            TC, CD, superclassCtor,
-                            DesignatedInitKind::Stub)) {
-            CD->addMember(ctor);
-            visit(ctor);
-          }
-        }
       }
     }
     if (!(IsFirstPass || CD->isInvalid())) {
@@ -6193,6 +6033,113 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
   }
 }
 
+namespace {
+  /// AST stream printer that adds extra indentation to each line.
+  class ExtraIndentStreamPrinter : public StreamPrinter {
+    StringRef ExtraIndent;
+
+  public:
+    ExtraIndentStreamPrinter(raw_ostream &out, StringRef extraIndent)
+    : StreamPrinter(out), ExtraIndent(extraIndent) { }
+
+    virtual void printIndent() {
+      printText(ExtraIndent);
+      StreamPrinter::printIndent();
+    }
+  };
+}
+
+/// Diagnose a missing required initializer.
+static void diagnoseMissingRequiredInitializer(
+              TypeChecker &TC,
+              ClassDecl *classDecl,
+              ConstructorDecl *superInitializer) {
+  // Find the location at which we should insert the new initializer.
+  SourceLoc insertionLoc;
+  SourceLoc indentationLoc;
+  for (auto member : classDecl->getMembers()) {
+    // If we don't have an indentation location yet, grab one from this
+    // member.
+    if (indentationLoc.isInvalid()) {
+      indentationLoc = member->getLoc();
+    }
+
+    // We only want to look at explicit constructors.
+    auto ctor = dyn_cast<ConstructorDecl>(member);
+    if (!ctor)
+      continue;
+
+    if (ctor->isImplicit())
+      continue;
+
+    insertionLoc = ctor->getEndLoc();
+    indentationLoc = ctor->getLoc();
+  }
+
+  // If no initializers were listed, start at the opening '{' for the class.
+  if (insertionLoc.isInvalid()) {
+    insertionLoc = classDecl->getBraces().Start;
+  }
+  if (indentationLoc.isInvalid()) {
+    indentationLoc = classDecl->getBraces().End;
+  }
+
+  // Adjust the insertion location to point at the end of this line (i.e.,
+  // the start of the next line).
+  insertionLoc = Lexer::getLocForEndOfLine(TC.Context.SourceMgr,
+                                           insertionLoc);
+
+  // Find the indentation used on the indentation line.
+  StringRef indentation = Lexer::getIndentationForLine(TC.Context.SourceMgr,
+                                                       indentationLoc);
+
+  // Pretty-print the superclass initializer into a string.
+  // FIXME: Form a new initializer by performing the appropriate
+  // substitutions of subclass types into the superclass types, so that
+  // we get the right generic parameters.
+  std::string initializerText;
+  {
+    PrintOptions options;
+    options.PrintDefaultParameterPlaceholder = false;
+    options.PrintImplicitAttrs = false;
+
+    // Render the text.
+    llvm::raw_string_ostream out(initializerText);
+    {
+      ExtraIndentStreamPrinter printer(out, indentation);
+      printer.printNewline();
+
+      // If there is no explicit 'required', print one.
+      bool hasExplicitRequiredAttr = false;
+      if (auto requiredAttr
+            = superInitializer->getAttrs().getAttribute<RequiredAttr>())
+          hasExplicitRequiredAttr = !requiredAttr->isImplicit();
+
+      if (!hasExplicitRequiredAttr)
+        printer << "required ";
+
+      superInitializer->print(printer, options);
+    }
+
+    // FIXME: Infer body indentation from the source rather than hard-coding
+    // 4 spaces.
+
+    // Add a dummy body.
+    out << " {\n";
+    out << indentation << "    fatalError(\"";
+    superInitializer->getFullName().printPretty(out);
+    out << " has not been implemented\")\n";
+    out << indentation << "}\n";
+  }
+
+  // Complain.
+  TC.diagnose(insertionLoc, diag::required_initializer_missing,
+              superInitializer->getFullName(),
+              superInitializer->getDeclContext()->getDeclaredTypeOfContext())
+    .fixItInsert(insertionLoc, initializerText);
+  TC.diagnose(superInitializer, diag::required_initializer_here);
+}
+
 void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
                                           SmallVectorImpl<Decl*> &Results) {
   // We can only synthesize implicit constructors for classes and structs.
@@ -6226,19 +6173,23 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
   // variable.
   bool FoundInstanceVar = false;
   bool FoundUninitializedVars = false;
+  bool FoundDesignatedInit = false;
   decl->setAddedImplicitInitializers();
   SmallPtrSet<CanType, 4> initializerParamTypes;
+  llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
   for (auto member : decl->getMembers()) {
     if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
       validateDecl(ctor);
 
-      // If we found a designated initializer, don't add any implicit
-      // initializers.
       if (ctor->isDesignatedInit())
-        return;
+        FoundDesignatedInit = true;
 
       if (!ctor->isInvalid())
         initializerParamTypes.insert(getInitializerParamType(ctor));
+
+      if (auto overridden = ctor->getOverriddenDecl())
+        overriddenInits.insert(overridden);
+
       continue;
     }
 
@@ -6258,18 +6209,19 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
   }
 
   if (isa<StructDecl>(decl)) {
-    // For a struct, we add a memberwise constructor.
+    if (!FoundDesignatedInit) {
+      // For a struct, we add a memberwise constructor.
 
-    // Create the implicit memberwise constructor.
-    auto ctor = createImplicitConstructor(*this, decl,
-                                          ImplicitConstructorKind::Memberwise);
-    decl->addMember(ctor);
-    Results.push_back(ctor);
+      // Create the implicit memberwise constructor.
+      auto ctor = createImplicitConstructor(
+                    *this, decl, ImplicitConstructorKind::Memberwise);
+      decl->addMember(ctor);
+      Results.push_back(ctor);
 
-    // If we found a stored property, add a default constructor.
-    if (FoundInstanceVar && !FoundUninitializedVars)
-      Results.push_back(defineDefaultConstructor(decl));
-
+      // If we found a stored property, add a default constructor.
+      if (FoundInstanceVar && !FoundUninitializedVars)
+        Results.push_back(defineDefaultConstructor(decl));
+    }
     return;
   }
  
@@ -6282,21 +6234,54 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
            ->addedImplicitInitializers());
   if (classDecl->hasSuperclass() && !classDecl->isGenericContext() &&
       !classDecl->getSuperclass()->isSpecialized()) {
+    bool canInheritInitializers = !FoundDesignatedInit;
+
     // We can't define these overrides if we have any uninitialized
     // stored properties.
-    if (FoundUninitializedVars) {
+    if (FoundUninitializedVars && !FoundDesignatedInit) {
       diagnoseClassWithoutInitializers(*this, classDecl);
       return;
     }
 
     auto superclassTy = classDecl->getSuperclass();
     for (auto member : lookupConstructors(superclassTy, classDecl)) {
+      // Skip unavailable superclass initializers.
       if (AvailabilityAttr::isUnavailable(member))
         continue;
 
+      // Skip invalid superclass initializers.
       auto superclassCtor = dyn_cast<ConstructorDecl>(member);
-      if (!superclassCtor || !superclassCtor->isDesignatedInit()
-          || superclassCtor->isInvalid())
+      if (superclassCtor->isInvalid())
+        continue;
+
+      // We only care about required or designated initializers.
+      if (!superclassCtor->isRequired() &&
+          !superclassCtor->isDesignatedInit())
+        continue;
+
+      // If we have an override for this constructor, it's okay.
+      if (overriddenInits.count(superclassCtor) > 0)
+        continue;
+
+      // If the superclass constructor is a convenience initializer
+      // that is inherited into the current class, it's okay.
+      if (superclassCtor->isInheritable() &&
+          classDecl->inheritsSuperclassInitializers(this)) {
+        assert(superclassCtor->isRequired());
+        continue;
+      }
+
+      // Diagnose a missing override of a required initializer.
+      if (superclassCtor->isRequired() && FoundDesignatedInit) {
+        diagnoseMissingRequiredInitializer(*this, classDecl, superclassCtor);
+        continue;
+      }
+
+      // A designated or required initializer has not been overridden.
+
+      // Skip this designated initializer if it's in an extension.
+      // FIXME: We shouldn't allow this.
+      if (isa<ExtensionDecl>(superclassCtor->getDeclContext()))
         continue;
 
       // If we have already introduced an initializer with this parameter type,
@@ -6308,7 +6293,9 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
       // We have a designated initializer. Create an override of it.
       if (auto ctor = createDesignatedInitOverride(
                         *this, classDecl, superclassCtor,
-                        DesignatedInitKind::Chaining)) {
+                        canInheritInitializers
+                          ? DesignatedInitKind::Chaining
+                          : DesignatedInitKind::Stub)) {
         classDecl->addMember(ctor);
         Results.push_back(classDecl);
       }
@@ -6317,17 +6304,18 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
     return;
   }
 
+  if (!FoundDesignatedInit) {
+    // For a class with no superclass, automatically define a default
+    // constructor.
 
-  // For a class with no superclass, automatically define a default
-  // constructor.
+    // ... unless there are uninitialized stored properties.
+    if (FoundUninitializedVars) {
+      diagnoseClassWithoutInitializers(*this, classDecl);
+      return;
+    }
 
-  // ... unless there are uninitialized stored properties.
-  if (FoundUninitializedVars) {
-    diagnoseClassWithoutInitializers(*this, classDecl);
-    return;
+    Results.push_back(defineDefaultConstructor(decl));
   }
-
-  Results.push_back(defineDefaultConstructor(decl));
 }
 
 void TypeChecker::addImplicitStructConformances(StructDecl *SD) {

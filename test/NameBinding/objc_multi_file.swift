@@ -10,3 +10,10 @@ class UIImage : NSObject { }
 protocol ImagePresentingView {
   var hidden: Bool { @objc(isHidden) get set }
 }
+
+// rdar://problem/19794036
+class B : A {
+  init() {
+    super.init(foo: 42)
+  }
+}
