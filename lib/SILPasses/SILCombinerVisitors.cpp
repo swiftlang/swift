@@ -2169,6 +2169,28 @@ SILCombiner::visitCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
   return nullptr;
 }
 
+static bool canClassOrSuperclassesHaveExtensions(ClassDecl *CD,
+                                                 bool isWholeModuleOpts) {
+  while (CD) {
+    // Public classes can always be extended
+    if (CD->getAccessibility() == Accessibility::Public)
+      return true;
+
+    // Internal classes can be extended, if we are not in a
+    // whole-module-optimizations mode.
+    if (CD->getAccessibility() == Accessibility::Internal &&
+        !isWholeModuleOpts)
+      return true;
+
+    if (!CD->hasSuperclass())
+      break;
+
+    CD = CD->getSuperclass()->getClassOrBoundGenericClass();
+  }
+
+  return false;
+}
+
 SILInstruction *
 SILCombiner::
 visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
@@ -2215,6 +2237,16 @@ visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
           return nullptr;
         }
       }
+    }
+
+    // If it is a class and it can be proven that this class and its
+    // superclasses cannot be extended, then it is safe to proceed.
+    // No need to check this for structs, as they do not have any
+    // superclasses.
+    if (auto *CD = CCABI->getSourceType().getClassOrBoundGenericClass()) {
+      if (canClassOrSuperclassesHaveExtensions(CD,
+               CCABI->getModule().isWholeModule()))
+        return nullptr;
     }
 
     // If the source type is private or target protocol is private,
