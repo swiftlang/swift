@@ -67,7 +67,9 @@ private:
   SILValue getRCIdentityRootInner(SILValue V, unsigned RecursionDepth);
   SILValue stripRCIdentityPreservingOps(SILValue V, unsigned RecursionDepth);
   SILValue stripRCIdentityPreservingArgs(SILValue V, unsigned RecursionDepth);
-
+  SILValue stripOneRCIdentityIncomingValue(SILArgument *Arg, SILValue V);
+  bool findDominatingNonPayloadedEdge(SILBasicBlock *IncomingEdgeBB,
+                                      SILValue RCIdentity);
 };
 
 } // end swift namespace

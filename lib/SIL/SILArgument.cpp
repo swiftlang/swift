@@ -96,6 +96,43 @@ bool SILArgument::getIncomingValues(llvm::SmallVectorImpl<SILValue> &OutArray) {
   return true;
 }
 
+bool SILArgument::getIncomingValues(
+    llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>> &OutArray) {
+  SILBasicBlock *Parent = getParent();
+
+  if (Parent->pred_empty())
+    return false;
+
+  unsigned Index = getIndex();
+  for (SILBasicBlock *Pred : getParent()->getPreds()) {
+    TermInst *TI = Pred->getTerminator();
+
+    if (auto *BI = dyn_cast<BranchInst>(TI)) {
+      OutArray.push_back({Pred, BI->getArg(Index)});
+      continue;
+    }
+
+    if (auto *CBI = dyn_cast<CondBranchInst>(TI)) {
+      OutArray.push_back({Pred, CBI->getArgForDestBB(getParent(), this)});
+      continue;
+    }
+
+    if (auto *CCBI = dyn_cast<CheckedCastBranchInst>(TI)) {
+      OutArray.push_back({Pred, CCBI->getOperand()});
+      continue;
+    }
+
+    if (auto *SWEI = dyn_cast<SwitchEnumInst>(TI)) {
+      OutArray.push_back({Pred, SWEI->getOperand()});
+      continue;
+    }
+
+    return false;
+  }
+
+  return true;
+}
+
 SILValue SILArgument::getIncomingValue(unsigned BBIndex) {
   SILBasicBlock *Parent = getParent();
 

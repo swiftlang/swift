@@ -79,6 +79,11 @@ public:
   /// of this arguments basic block. The found values are stored in OutArray.
   bool getIncomingValues(llvm::SmallVectorImpl<SILValue> &OutArray);
 
+  /// Returns true if we were able to find incoming values for each predecessor
+  /// of this arguments basic block. The found values are stored in OutArray.
+  bool getIncomingValues(
+      llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>> &OutArray);
+
   /// Returns true if this SILArgument is the self argument of its
   /// function. This means that this will return false always for SILArguments
   /// of SILFunctions that do not have self argument and for non-function

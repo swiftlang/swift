@@ -108,9 +108,11 @@ bb3(%2 : $FakeOptional<Builtin.NativeObject>):
   return %3 : $()
 }
 
+// This is supposed to fail b/c %0 is not .None down bb1.
+//
 // CHECK-LABEL: sil @silargument_strip_single_payload_case_enum3 : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
-// CHECK-NOT: retain
-// CHECK-NOT: release
+// CHECK: retain
+// CHECK: release
 sil @silargument_strip_single_payload_case_enum3 : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
 bb0(%0 : $FakeOptional<Builtin.NativeObject>):
   switch_enum %0 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
@@ -129,7 +131,7 @@ bb3(%2 : $FakeOptional<Builtin.NativeObject>):
   return %3 : $()
 }
 
-// Make sure we do not do anything dubm when we have two enums without payloads.
+// Make sure we do not do anything dumb when we have two enums without payloads.
 // CHECK-LABEL: sil @silargument_strip_single_payload_case_enum4 : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
 // CHECK: retain_value
 // CHECK: release_value
@@ -190,6 +192,156 @@ bb7(%5 : $FakeCasesOptional<Builtin.NativeObject>):
   return %6 : $()
 }
 
+// This looks like we are reforming an enum, but we are not really. Make sure
+// that we do not remove the retain, release in this case.
+// CHECK-LABEL: sil @silargument_fake_enum_reform : $@thin (Builtin.NativeObject) -> () {
+// CHECK: retain_value
+// CHECK: release_value
+sil @silargument_fake_enum_reform : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.None!enumelt
+  br bb3(%1 : $FakeOptional<Builtin.NativeObject>)
+
+bb2:
+  %2 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.Some!enumelt.1, %0 : $Builtin.NativeObject
+  br bb3(%2 : $FakeOptional<Builtin.NativeObject>)
+
+bb3(%3 : $FakeOptional<Builtin.NativeObject>):
+  retain_value %0 : $Builtin.NativeObject
+  release_value %3 : $FakeOptional<Builtin.NativeObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that we can handle multiple-iterated enum args where the
+// switch_enum or unchecked_enum_data is before the next diamond.
+// CHECK-LABEL: sil @silargument_iterated_silargument_strips : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK-NOT: retain_value
+// CHECK-NOT: release_value
+sil @silargument_iterated_silargument_strips : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
+bb0(%0 : $FakeOptional<Builtin.NativeObject>):
+  switch_enum %0 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
+
+bb1:
+  br bb3(%0 : $FakeOptional<Builtin.NativeObject>)
+
+bb2:
+  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.None!enumelt
+  br bb3(%1 : $FakeOptional<Builtin.NativeObject>)
+
+bb3(%2 : $FakeOptional<Builtin.NativeObject>):
+  switch_enum %2 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.Some!enumelt.1: bb4, case #FakeOptional.None!enumelt: bb5
+
+bb4:
+  br bb6(%2 : $FakeOptional<Builtin.NativeObject>)
+
+bb5:
+  %3 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.None!enumelt
+  br bb6(%3 : $FakeOptional<Builtin.NativeObject>)
+
+bb6(%4 : $FakeOptional<Builtin.NativeObject>):
+  retain_value %0 : $FakeOptional<Builtin.NativeObject>
+  release_value %4 : $FakeOptional<Builtin.NativeObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that (for now) we do not look past %2 to see that %0 can be matched
+// up with %0, %4.
+//
+// I think this is in general safe, but for now I want to be more than less
+// conservative.
+//
+// CHECK-LABEL: sil @silargument_iterated_silargument_strips_too_far_up_domtree : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK: retain_value
+// CHECK: release_value
+sil @silargument_iterated_silargument_strips_too_far_up_domtree : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
+bb0(%0 : $FakeOptional<Builtin.NativeObject>):
+  switch_enum %0 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
+
+bb1:
+  br bb3(%0 : $FakeOptional<Builtin.NativeObject>)
+
+bb2:
+  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.None!enumelt
+  br bb3(%1 : $FakeOptional<Builtin.NativeObject>)
+
+bb3(%2 : $FakeOptional<Builtin.NativeObject>):
+  cond_br undef, bb4, bb5
+
+bb4:
+  br bb6(%2 : $FakeOptional<Builtin.NativeObject>)
+
+bb5:
+  %3 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.None!enumelt
+  br bb6(%3 : $FakeOptional<Builtin.NativeObject>)
+
+bb6(%4 : $FakeOptional<Builtin.NativeObject>):
+  retain_value %0 : $FakeOptional<Builtin.NativeObject>
+  release_value %4 : $FakeOptional<Builtin.NativeObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @silargument_dont_strip_over_relevent_loop : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK: retain_value
+// CHECK: release_value
+sil @silargument_dont_strip_over_relevent_loop : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
+bb0(%0 : $FakeOptional<Builtin.NativeObject>):
+  switch_enum %0 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
+
+bb1:
+  br bb3(%0 : $FakeOptional<Builtin.NativeObject>)
+
+bb2:
+  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.None!enumelt
+  br bb3(%1 : $FakeOptional<Builtin.NativeObject>)
+
+bb3(%2 : $FakeOptional<Builtin.NativeObject>):
+  cond_br undef, bb3(%2 : $FakeOptional<Builtin.NativeObject>), bb4
+
+bb4:
+  retain_value %0 : $FakeOptional<Builtin.NativeObject>
+  release_value %2 : $FakeOptional<Builtin.NativeObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure we are properly iterating up the domtree by checking if we properly
+// look past the loop in bb4 and match up %0 and %2.
+//
+// CHECK-LABEL: sil @silargument_do_strip_over_irrelevent_loop : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK-NOT: retain_value
+// CHECK-NOT: release_value
+sil @silargument_do_strip_over_irrelevent_loop : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
+bb0(%0 : $FakeOptional<Builtin.NativeObject>):
+  switch_enum %0 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
+
+bb1:
+  br bb3(%0 : $FakeOptional<Builtin.NativeObject>)
+
+bb2:
+  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.None!enumelt
+  br bb3(%1 : $FakeOptional<Builtin.NativeObject>)
+
+bb3(%2 : $FakeOptional<Builtin.NativeObject>):
+  cond_br undef, bb4, bb5
+
+bb4:
+  cond_br undef, bb4, bb5
+
+bb5:
+  retain_value %0 : $FakeOptional<Builtin.NativeObject>
+  release_value %2 : $FakeOptional<Builtin.NativeObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+
+
 // CHECK-LABEL: sil @silargument_nondominated_strip : $@thin (@in FakeOptional<Builtin.NativeObject>) -> () {
 // CHECK: retain_value
 // CHECK: release_value
@@ -220,11 +372,11 @@ struct _SwiftEmptyArrayStorage {
 
 sil_global [fragile] @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
 
-// CHECK-LABEL: sil @dont_strip_rawpointer_to_adress
+// CHECK-LABEL: sil @dont_strip_rawpointer_to_address
 // CHECK: raw_pointer_to_ref
 // CHECK: strong_retain
 // CHECK: return
-sil @dont_strip_rawpointer_to_adress : $@thin(FakeOptional<Builtin.NativeObject>) -> () {
+sil @dont_strip_rawpointer_to_address : $@thin(FakeOptional<Builtin.NativeObject>) -> () {
 bb0(%0 : $FakeOptional<Builtin.NativeObject>):
   %2 = global_addr @_swiftEmptyArrayStorage : $*_SwiftEmptyArrayStorage
   %3 = address_to_pointer %2 : $*_SwiftEmptyArrayStorage to $Builtin.RawPointer
@@ -423,7 +575,6 @@ bb0(%0 : $C):
 // CHECK-LABEL: sil @strip_off_bridge_object
 // CHECK-NOT: strong_retain
 // CHECK-NOT: strong_release
-
 sil @strip_off_bridge_object : $@thin (Builtin.BridgeObject, C) -> () {
 bb0(%0 : $Builtin.BridgeObject, %5 : $C):
   %1 = bridge_object_to_ref %0 : $Builtin.BridgeObject to $C
@@ -436,3 +587,4 @@ bb0(%0 : $Builtin.BridgeObject, %5 : $C):
   %3 = tuple()
   return %3 : $()
 }
+

@@ -112,8 +112,163 @@ static SILValue stripRCIdentityPreservingInsts(SILValue V) {
   return SILValue();
 }
 
+SILValue RCIdentityAnalysis::stripOneRCIdentityIncomingValue(SILArgument *A,
+                                                             SILValue V) {
+  // Strip off any non-argument instructions from IV. We know that this will
+  // always result in RCIdentical values without additional analysis.
+  while (SILValue NewIV = stripRCIdentityPreservingInsts(V))
+    V = NewIV;
+
+  // Then make sure that this incoming value is from a BB which is different
+  // from our BB and dominates our BB. Otherwise, just return SILValue() there
+  // is nothing we can do hter.
+  DominanceInfo *DI = DA->getDomInfo(A->getFunction());
+  if (!dominatesArgument(DI, A, V))
+    return SILValue();
+
+  // In the future attempt to recursively strip here. We are being more
+  // conservative than most likely necessary.
+  return V;
+}
+
+/// Returns true if we proved that RCIdentity has a non-payloaded enum case,
+/// false if RCIdentity has a payloaded enum case, and None if we failed to find
+/// anything.
+static llvm::Optional<bool> proveNonPayloadedEnumCase(SILBasicBlock *BB,
+                                                      SILValue RCIdentity) {
+  // First iterate through all of the instructions in BB and see if we can find
+  // an unchecked_enum_data on RCIdentity.
+
+  // For each II in BB...
+  for (auto &II : *BB) {
+    // If we do not have a UEDI that is applied to RCIdentity, continue.
+    auto *UEDI = dyn_cast<UncheckedEnumDataInst>(&II);
+    if (!UEDI || UEDI->getOperand() != RCIdentity)
+      continue;
+
+    // Otherwise, return true if UEDI is extracting a non-payloaded enum case
+    // and false otherwise.
+    return !UEDI->getElement()->hasArgumentType();
+  }
+
+  // Then see if BB has one predecessor... if it does not, return None so we
+  // keep searching up the domtree.
+  SILBasicBlock *SinglePred = BB->getSinglePredecessor();
+  if (!SinglePred)
+    return None;
+
+  // Check if SinglePred has a switch_enum terminator switching on
+  // RCIdentity... If it does not, return None so we keep searching up the
+  // domtree.
+  auto *SEI = dyn_cast<SwitchEnumInst>(SinglePred->getTerminator());
+  if (!SEI || SEI->getOperand() != RCIdentity)
+    return None;
+
+  // Then return true if along the edge from the SEI to BB, RCIdentity has a
+  // non-payloaded enum value.
+  return !SEI->getUniqueCaseForDestination(BB)->hasArgumentType();
+}
+
+bool RCIdentityAnalysis::
+findDominatingNonPayloadedEdge(SILBasicBlock *IncomingEdgeBB,
+                               SILValue RCIdentity) {
+  // First grab the NonPayloadedEnumBB and RCIdentityBB. If we can not find
+  // either of them, return false.
+  SILBasicBlock *RCIdentityBB = RCIdentity->getParentBB();
+  if (!RCIdentityBB)
+    return false;
+
+  // Make sure that the incoming edge bb is not the RCIdentityBB. We are not
+  // trying to handle this case here, so simplify by just bailing if we detect
+  // it.
+  //
+  // I think the only way this can happen is if we have a switch_enum of some
+  // sort with multiple incoming values going into the destination BB. We are
+  // not interested in handling that case anyways.
+  if (IncomingEdgeBB == RCIdentityBB)
+    return false;
+
+  // Now we know that RCIdentityBB and IncomingEdgeBB are different. Prove that
+  // RCIdentityBB dominates IncomingEdgeBB.
+  SILFunction *F = RCIdentityBB->getParent();
+
+  // First make sure that IncomingEdgeBB dominates NonPayloadedEnumBB. If not,
+  // return false.
+  DominanceInfo *DI = DA->getDomInfo(F);
+  if (!DI->dominates(RCIdentityBB, IncomingEdgeBB))
+    return false;
+
+  // Now walk up the dominator tree from IncomingEdgeBB to RCIdentityBB and see
+  // if we can find a use of RCIdentity that dominates IncomingEdgeBB and
+  // enables us to know that RCIdentity must be a no-payload enum along
+  // IncomingEdge. We don't care if the case or enum of RCIdentity match the
+  // case or enum along RCIdentityBB since a pairing of retain, release of two
+  // non-payloaded enums can always be eliminated (since we can always eliminate
+  // ref count operations on non-payloaded enums).
+
+  // RCIdentityBB must never have a non
+  auto *EndDomNode = DI->getNode(RCIdentityBB);
+  if (!EndDomNode)
+    return false;
+
+  for (auto *Node = DI->getNode(IncomingEdgeBB); Node; Node = Node->getIDom()) {
+    // Search for uses of RCIdentity in Node->getBB() that will enable us to
+    // know that it has a non-payloaded enum case.
+    SILBasicBlock *DominatingBB = Node->getBlock();
+    llvm::Optional<bool> Result =
+        proveNonPayloadedEnumCase(DominatingBB, RCIdentity);
+
+    // If we found either a signal of a payloaded or a non-payloaded enum,
+    // return that value.
+    if (Result.hasValue())
+      return Result.getValue();
+
+    // If we didn't reach RCIdentityBB, keep processing up the DomTree.
+    if (DominatingBB != RCIdentityBB)
+      continue;
+
+    // Otherwise, we failed to find any interesting information, return false.
+    return false;
+  }
+
+  return false;
+}
+
 /// Return the underlying SILValue after stripping off SILArguments that can not
-/// affect RC identity if our BB has only one predecessor.
+/// affect RC identity.
+///
+/// This code is meant to enable RCIdentity to be ascertained in the following
+/// cases:
+///
+/// 1. Where we have an unneeded phi node (i.e. all incoming values are the same
+/// argument). This helps to avoid phase ordering issues (simplify-cfg *should*
+/// catch this).
+///
+/// 2. Cases where we break apart an enum and then reform it from its individual
+/// cases. The main problem here is when the non-payloaded cases are created
+/// with new enum instructions (which happens when casting sometimes):
+///
+///   bb9:
+///     ...
+///     switch_enum %0 : $Optional<T>, #Optional.None: bb10,
+///                                    #Optional.Some: bb11
+///
+///   bb10:
+///     %1 = enum $Optional<U>, #Optional.None
+///     br bb12(%1 : $Optional<U>)
+///
+///   bb11:
+///     %2 = some_cast_to_u %0 : ...
+///     %3 = enum $Optional<U>, #Optional.Some, %2 : $U
+///     br bb12(%3 : $Optional<U>)
+///
+///   bb12(%4 : $Optional<U>):
+///     ...
+///
+/// In this case, we want to be able to infer that %0 and %4 have the same ref
+/// count identity. The key thing we have to be careful of is that %0 must have
+/// the same enum case as %1 along the edge from bb10 to bb12. Otherwise, we can
+/// potentially mismatch
 SILValue
 RCIdentityAnalysis::
 stripRCIdentityPreservingArgs(SILValue V, unsigned RecursionDepth) {
@@ -140,57 +295,70 @@ stripRCIdentityPreservingArgs(SILValue V, unsigned RecursionDepth) {
   // If we only have one incoming value, just return the identity root of that
   // incoming value. There can be no loop problems.
   if (IVListSize == 1) {
-    return getRCIdentityRootInner(IncomingValues[0], RecursionDepth+1);
+    return IncomingValues[0];
   }
 
   // Ok, we have multiple predecessors. First find the first non-payloaded enum.
+  llvm::SmallVector<SILValue, 8> NoPayloadEnums;
   unsigned i = 0;
-  for (; i < IVListSize && isNoPayloadEnum(IncomingValues[i]); ++i) {}
+  for (; i < IVListSize && isNoPayloadEnum(IncomingValues[i]); ++i) {
+    NoPayloadEnums.push_back(IncomingValues[i]);
+  }
 
   // If we did not find any non-payloaded enum, there is no RC associated with
   // this Phi node. Just return SILValue().
   if (i == IVListSize)
     return SILValue();
 
-  SILValue FirstIV = IncomingValues[i];
-
-  // Strip off any non-argument instructions from IV. We know that 
-  while (SILValue NewIV = stripRCIdentityPreservingInsts(FirstIV))
-    FirstIV = NewIV;
-
-  // Then make sure that this incoming value is from a BB which is different
-  // from our BB and dominates our BB. Otherwise, just return SILValue() there
-  // is nothing we can do hter.
-  DominanceInfo *DI = DA->getDomInfo(A->getFunction());
-  if (!dominatesArgument(DI, A, FirstIV))
+  SILValue FirstIV = stripOneRCIdentityIncomingValue(A, IncomingValues[i]);
+  if (!FirstIV)
     return SILValue();
 
-  // Ok, it is safe to continue stripping from this argument. Perform the
-  // recursive stripping.
-  FirstIV = getRCIdentityRootInner(FirstIV, RecursionDepth+1);
   while (i < IVListSize) {
     SILValue IV = IncomingValues[i++];
 
     // If IV is a no payload enum, we don't care about it. Skip it.
-    if (isNoPayloadEnum(IV))
+    if (isNoPayloadEnum(IV)) {
+      NoPayloadEnums.push_back(IV);
+      continue;
+    }
+
+    // Try to strip off the RCIdentityPresrvingArg for IV. If it matches
+    // FirstIV, we may be able to succeed here.
+    if (FirstIV == stripOneRCIdentityIncomingValue(A, IV))
       continue;
 
-    // Strip off any non-argument instructions from IV. We know that 
-    while (SILValue NewIV = stripRCIdentityPreservingInsts(IV))
-      IV = NewIV;
-
-    // Then make sure that this incoming value is from a BB which is different
-    // from our BB and dominates our BB. Otherwise, just return SILValue() there
-    // is nothing we can do hter.
-    if (!dominatesArgument(DI, A, IV))
-      return SILValue();
-
-    // Ok, it is safe to continue stripping incoming values. Perform the
-    // stripping and check if the stripped value equals FirstIV. If it is not
-    // so, then bail. We found a conflicting value in our merging.
-    if (getRCIdentityRootInner(IV, RecursionDepth+1) != FirstIV)
-      return SILValue();
+    // Otherwise, just return SILValue().
+    return SILValue();
   }
+
+  // Ok, we now know that all of our incoming values that are not no-payload
+  // enums are equal to FirstIV after just stripping RCIdentical instructions
+  // (*NOTE* not args). If we have no NonPayloadEnums, then we know that this
+  // Arg's RCIdentity must be FirstIV.
+  if (NoPayloadEnums.empty())
+    return FirstIV;
+
+  // At this point, we know that we have *some* no-payload enums. If FirstIV is
+  // not an enum, then we must bail. We do not try to analyze this case.
+  if (!FirstIV.getType().getEnumOrBoundGenericEnum())
+    return SILValue();
+
+  // Now we know that FirstIV is an enum and that all payloaded enum cases after
+  // just stripping off instructions are FirstIV. Now we need to make sure that
+  // each non-payloaded enum value is safe to ignore.
+  //
+  // Let IVE be the edge for the non-payloaded enum. It is only safe to perform
+  // this operation when there exists a dominating edge E' of IVE for which
+  // FirstIV also takes on a non-payloaded enum value.
+  if (std::any_of(NoPayloadEnums.begin(), NoPayloadEnums.end(),
+                  [&](const SILValue V) -> bool {
+                    auto *BB = V->getParentBB();
+                    if (!BB)
+                      return true;
+                    return !findDominatingNonPayloadedEdge(BB, FirstIV);
+                  }))
+    return SILValue();
 
   // Ok all our values match! Return FirstIV.
   return FirstIV;
