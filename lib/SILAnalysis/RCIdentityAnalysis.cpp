@@ -196,6 +196,10 @@ stripRCIdentityPreservingArgs(SILValue V, unsigned RecursionDepth) {
   return FirstIV;
 }
 
+llvm::cl::opt<bool> StripOffArgs(
+    "enable-rc-identity-arg-strip", llvm::cl::init(true),
+    llvm::cl::desc("Should RC identity try to strip off arguments"));
+
 SILValue
 RCIdentityAnalysis::
 stripRCIdentityPreservingOps(SILValue V, unsigned RecursionDepth) {
@@ -205,6 +209,9 @@ stripRCIdentityPreservingOps(SILValue V, unsigned RecursionDepth) {
       V = NewV;
       continue;
     }
+
+    if (!StripOffArgs)
+      break;
 
     // Once we have done all of the easy work, try to see if we can strip off
     // any RCIdentityPreserving args. This is potentially expensive since we
