@@ -465,9 +465,9 @@ extension ${Self} : Hashable {
   % if bits != 80:
   // -0.0.hashValue must == 0.0.hashValue. So we need to check for -0.0.
   % if bits == 32:
-    if self._toBitPattern() == 2147483648 {
+    if self._toBitPattern() == 0x8000_0000 {
   % elif bits == 64:
-    if self._toBitPattern() == 9223372036854775808 {
+    if self._toBitPattern() == 0x8000_0000_0000_0000 {
   % else:
     error unhandled float size ${bits}
   % end
