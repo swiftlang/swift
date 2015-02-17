@@ -32,6 +32,9 @@ public func _blackHole<T>(var x: T) {
 }
 
 @inline(never)
+public func getBool(x: Bool) -> Bool { return _opaqueIdentity(x) }
+
+@inline(never)
 public func getInt8(x: Int8) -> Int8 { return _opaqueIdentity(x) }
 
 @inline(never)

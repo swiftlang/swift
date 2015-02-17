@@ -416,5 +416,19 @@ BoolTestSuite.test("==,!=") {
   }
 }
 
+BoolTestSuite.test("&&") {
+  expectTrue(getBool(true) && getBool(true))
+  expectFalse(getBool(true) && getBool(false))
+  expectFalse(getBool(false) && getBool(true))
+  expectFalse(getBool(false) && getBool(false))
+}
+
+BoolTestSuite.test("||") {
+  expectTrue(getBool(true) || getBool(true))
+  expectTrue(getBool(true) || getBool(false))
+  expectTrue(getBool(false) || getBool(true))
+  expectFalse(getBool(false) || getBool(false))
+}
+
 runAllTests()
 

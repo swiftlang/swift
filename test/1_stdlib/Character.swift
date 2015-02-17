@@ -249,9 +249,50 @@ CharacterTests.test(
     { x in { String(Character(x)) < String(Character($0)) } } as PredicateFn)
 }
 
-CharacterTests.test("non-ascii should trap") {
+var UnicodeScalarTests = TestSuite("UnicodeScalar")
+
+UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)") {
+  for i in 0..<0x7f {
+    let us = UnicodeScalar(i)
+    expectEqual(UInt8(i), UInt8(ascii: us))
+  }
+}
+
+UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)/non-ASCII should trap") {
+  let us: UnicodeScalar = "\u{E5}"
   expectCrashLater()
-  let theNumber229 = UInt8(ascii: "å")
+  _blackHole(UInt8(ascii: us))
+}
+
+UnicodeScalarTests.test("UInt32(_: UnicodeScalar),UInt64(_: UnicodeScalar)") {
+  for us in map(baseScalars, { first($0.unicodeScalars)! }) {
+    expectEqual(us.value, UInt32(us))
+    expectEqual(UInt64(us.value), UInt64(us))
+  }
+}
+
+UnicodeScalarTests.test("isASCII()") {
+  expectTrue(UnicodeScalar(0).isASCII())
+  expectTrue(("A" as UnicodeScalar).isASCII())
+  expectTrue(UnicodeScalar(127).isASCII())
+  expectFalse(UnicodeScalar(128).isASCII())
+  expectFalse(UnicodeScalar(256).isASCII())
+}
+
+UnicodeScalarTests.test("Comparable") {
+  // FIXME: these tests are insufficient.
+
+  var CharA: UnicodeScalar = "A"
+
+  expectTrue(CharA == "A")
+  expectTrue("A" == CharA)
+  expectTrue(CharA != "B")
+  expectTrue("B" != CharA)
+
+  expectTrue(CharA < "B")
+  expectTrue("B" > CharA)
+  expectTrue(CharA <= "B")
+  expectTrue("B" >= CharA)
 }
 
 runAllTests()
