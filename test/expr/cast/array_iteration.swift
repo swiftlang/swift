@@ -14,8 +14,8 @@ for view in rootView.subviews as! [View] {
 	println("found subview")
 }
 
-// FIXME: Somewhat misleading diagnostic here.
-for view:View in rootView.subviews { // expected-error{{'Array<AnyObject>!' is not convertible to 'View'; did you mean to use 'as!' to force downcast?}}
+// FIXME: Unhelpful diagnostic here.
+for view:View in rootView.subviews { // expected-error{{'@lvalue Array<AnyObject>!' is not convertible to 'SequenceType'}}
 	println("found subview")
 }
 

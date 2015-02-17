@@ -547,6 +547,19 @@ public:
   ///
   /// \returns true if \c t1 can be explicitly converted to \c t2.
   bool isExplicitlyConvertibleTo(Type t1, Type t2, DeclContext *dc);
+
+  /// \brief Return true if performing a checked cast from one type to another
+  /// with the "as!" operator could possibly succeed.
+  ///
+  /// \param t1 The potential source type of the cast.
+  ///
+  /// \param t2 The potential destination type of the cast.
+  ///
+  /// \param dc The context of the cast.
+  ///
+  /// \returns true if a checked cast from \c t1 to \c t2 may succeed, and
+  /// false if it will certainly fail, e.g. because the types are unrelated.
+  bool checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc);
   
   /// \brief Determine whether a constraint of the given kind can be satisfied
   /// by the two types.

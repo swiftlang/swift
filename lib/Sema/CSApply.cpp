@@ -5564,7 +5564,8 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
             asCastStr += ")";
           }
           diagnosis.fixItInsert(afterAffectedLoc, asCastStr);
-        } else {
+          diagnosed = true;
+        } else if (TC.checkedCastMaySucceed(fromType, toType, DC)) {
           llvm::SmallString<32> asCastStr;
           asCastStr += " as! ";
           asCastStr += toType.getString();
@@ -5576,9 +5577,9 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
             asCastStr += ")";
           }
           diagnosis.fixItInsert(afterAffectedLoc, asCastStr);
+          diagnosed = true;
         }
 
-        diagnosed = true;
         break;
       }
 

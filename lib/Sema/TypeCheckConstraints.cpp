@@ -1645,6 +1645,14 @@ bool TypeChecker::isExplicitlyConvertibleTo(Type type1, Type type2,
                                 ConstraintKind::ExplicitConversion, dc);
 }
 
+bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
+  auto kind = typeCheckCheckedCast(t1, t2, dc,
+                                   SourceLoc(), SourceRange(), SourceRange(),
+                                   /*convertToType=*/ nullptr,
+                                   /*suppressDiagnostics=*/ true);
+  return (kind != CheckedCastKind::Unresolved);
+}
+
 bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
                                      DeclContext *dc) {
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
