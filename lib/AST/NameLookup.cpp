@@ -1072,8 +1072,7 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
   assert(method->isObjC() && "Not an Objective-C method");
 
   // Record the method.
-  bool isInstanceMethod
-    = method->isInstanceMember() || isa<ConstructorDecl>(method);
+  bool isInstanceMethod = method->isObjCInstanceMethod();
   auto selector = method->getObjCSelector();
   auto &vec = (*ObjCMethodLookup)[{selector, isInstanceMethod}].Methods;
 

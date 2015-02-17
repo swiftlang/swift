@@ -1185,14 +1185,9 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::EnumCase:
     return false;
 
-  case DeclKind::Constructor: {
-    // Never serialize a constructor with a stub implementation.
-    auto ctor = cast<ConstructorDecl>(D);
-    return !ctor->hasStubImplementation();
-  }
-
   case DeclKind::EnumElement:
   case DeclKind::Protocol:
+  case DeclKind::Constructor:
   case DeclKind::Destructor:
   case DeclKind::PatternBinding:
   case DeclKind::Subscript:
@@ -2342,6 +2337,7 @@ void Serializer::writeDecl(const Decl *D) {
                                     ctor->getFailability()),
                                   ctor->isImplicit(),
                                   ctor->isObjC(),
+                                  ctor->hasStubImplementation(),
                                   getStableCtorInitializerKind(
                                     ctor->getInitKind()),
                                   addTypeRef(ctor->getType()),
@@ -3373,7 +3369,7 @@ static void addOperatorsAndTopLevel(Serializer &S, Range members,
           = S.addTypeRef(func->getDeclContext()->getDeclaredInterfaceType());
         objcMethods[func->getObjCSelector()].push_back(
           std::make_tuple(owningTypeID,
-                          func->isInstanceMember(),
+                          func->isObjCInstanceMethod(),
                           S.addDeclRef(memberValue)));
       }
     }

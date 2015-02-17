@@ -78,7 +78,9 @@ public:
   }
 
   bool shouldInclude(const ValueDecl *VD) {
-    return VD->isObjC() && VD->getAccessibility() >= minRequiredAccess;
+    return VD->isObjC() && VD->getAccessibility() >= minRequiredAccess &&
+      !(isa<ConstructorDecl>(VD) && 
+        cast<ConstructorDecl>(VD)->hasStubImplementation());
   }
 
 private:

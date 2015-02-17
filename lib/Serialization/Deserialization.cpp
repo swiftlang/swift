@@ -2139,7 +2139,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::CONSTRUCTOR_DECL: {
     DeclContextID contextID;
     uint8_t rawFailability;
-    bool isImplicit, isObjC;
+    bool isImplicit, isObjC, hasStubImplementation;
     uint8_t storedInitKind, rawAccessLevel;
     TypeID signatureID;
     TypeID interfaceID;
@@ -2148,7 +2148,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     decls_block::ConstructorLayout::readRecord(scratch, contextID,
                                                rawFailability, isImplicit, 
-                                               isObjC, storedInitKind,
+                                               isObjC, hasStubImplementation,
+                                               storedInitKind,
                                                signatureID, interfaceID,
                                                overriddenID, rawAccessLevel,
                                                argNameIDs);
@@ -2226,6 +2227,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     if (isImplicit)
       ctor->setImplicit();
+    if (hasStubImplementation)
+      ctor->setStubImplementation(true);
     if (auto initKind = getActualCtorInitializerKind(storedInitKind))
       ctor->setInitKind(*initKind);
     if (auto overridden

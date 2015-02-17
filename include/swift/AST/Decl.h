@@ -4227,6 +4227,10 @@ public:
   /// Retrieve the Objective-C selector that names this method.
   ObjCSelector getObjCSelector() const;
 
+  /// Determine whether the given method would produce an Objective-C
+  /// instance method.
+  bool isObjCInstanceMethod() const;
+
   /// Determine the default argument kind and type for the given argument index
   /// in this declaration, which must be a function or constructor.
   ///

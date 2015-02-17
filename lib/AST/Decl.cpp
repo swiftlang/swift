@@ -3008,6 +3008,10 @@ ObjCSelector AbstractFunctionDecl::getObjCSelector() const {
   llvm_unreachable("Unhandled AbstractFunctionDecl subclass");
 }
 
+bool AbstractFunctionDecl::isObjCInstanceMethod() const {
+  return isInstanceMember() || isa<ConstructorDecl>(this);
+}
+
 AbstractFunctionDecl *AbstractFunctionDecl::getOverriddenDecl() const {
   if (auto func = dyn_cast<FuncDecl>(this))
     return func->getOverriddenDecl();
