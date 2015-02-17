@@ -1507,7 +1507,8 @@ getNonMemberVarDeclSubstitutions(SILGenFunction &gen, VarDecl *var) {
   if (auto genericParams
       = gen.SGM.Types.getEffectiveGenericParamsForContext(
                                                       var->getDeclContext()))
-    substitutions = gen.buildForwardingSubstitutions(genericParams);
+    substitutions =
+        genericParams->getForwardingSubstitutions(gen.getASTContext());
   return substitutions;
 }
 

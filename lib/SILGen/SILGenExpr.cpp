@@ -4094,38 +4094,6 @@ namespace {
   };
 } // end anonymous namespace
 
-ArrayRef<Substitution>
-SILGenFunction::buildForwardingSubstitutions(GenericParamList *params) {
-  if (!params)
-    return {};
-  
-  ASTContext &C = F.getASTContext();
-  
-  SmallVector<Substitution, 4> subs;
-  
-  // TODO: IRGen wants substitutions for secondary archetypes.
-  //for (auto &param : params->getNestedGenericParams()) {
-  //  ArchetypeType *archetype = param.getAsTypeParam()->getArchetype();
-  
-  for (auto archetype : params->getAllNestedArchetypes()) {
-    // "Check conformance" on each declared protocol to build a
-    // conformance map.
-    SmallVector<ProtocolConformance*, 2> conformances;
-    
-    for (ProtocolDecl *conformsTo : archetype->getConformsTo()) {
-      (void)conformsTo;
-      conformances.push_back(nullptr);
-    }
-    
-    // Build an identity mapping with the derived conformances.
-    auto replacement = SubstitutedType::get(archetype, archetype, C);
-    subs.push_back({archetype, replacement,
-                    C.AllocateCopy(conformances)});
-  }
-  
-  return C.AllocateCopy(subs);
-}
-
 bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
   while (true) {
     // If the root class was implemented in Objective-C, use Objective-C's
@@ -4211,8 +4179,10 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   
   ArrayRef<Substitution> subs;
   // Call the initializer.
-  auto forwardingSubs
-    = buildForwardingSubstitutions(ctor->getGenericParamsOfContext());
+  ArrayRef<Substitution> forwardingSubs;
+  if (auto *genericParamList = ctor->getGenericParamsOfContext())
+    forwardingSubs =
+        genericParamList->getForwardingSubstitutions(getASTContext());
   std::tie(initVal, initTy, subs)
     = emitSiblingMethodRef(Loc, selfValue, initConstant, forwardingSubs);
   SILType resultTy = getLoweredLoadableType(ctor->getResultType());
@@ -4694,7 +4664,7 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
   // Forward substitutions.
   ArrayRef<Substitution> subs;
   if (auto gp = getConstantInfo(to).ContextGenericParams) {
-    subs = buildForwardingSubstitutions(gp);
+    subs = gp->getForwardingSubstitutions(getASTContext());
   }
   
   SILValue toFn = getNextUncurryLevelRef(*this, fd, to, curriedArgs, subs);

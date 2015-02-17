@@ -1184,10 +1184,6 @@ public:
   /// (without going through getters or setters).
   LValue emitDirectIVarLValue(SILLocation loc, ManagedValue base, VarDecl *var,
                               AccessKind accessKind);
-
-  /// Build an identity substitution map for the given generic parameter list.
-  ArrayRef<Substitution>
-  buildForwardingSubstitutions(GenericParamList *params);
   
   /// Return forwarding substitutions for the archetypes in the current
   /// function.

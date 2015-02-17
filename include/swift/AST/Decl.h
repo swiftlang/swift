@@ -1255,6 +1255,8 @@ public:
   deriveAllArchetypes(ArrayRef<GenericTypeParamDecl*> params,
                       SmallVectorImpl<ArchetypeType*> &archetypes);
 
+  ArrayRef<Substitution> getForwardingSubstitutions(ASTContext &C);
+
   void setBuilder(ArchetypeBuilder *builder) {
     Builder = builder;
   }
