@@ -1485,10 +1485,13 @@ void ASTContext::recordObjCMethod(AbstractFunctionDecl *func) {
 
 /// Lookup for an Objective-C method with the given selector in the
 /// given class type or any of its superclasses.
-static AbstractFunctionDecl *lookupObjCMethodInType(Type classType,
-                                                    ObjCSelector selector,
-                                                    bool isInstanceMethod,
-                                                    SourceManager &srcMgr) {
+static AbstractFunctionDecl *lookupObjCMethodInType(
+                               Type classType,
+                               ObjCSelector selector,
+                               bool isInstanceMethod,
+                               bool isInitializer,
+                               SourceManager &srcMgr,
+                               bool inheritingInits = true) {
   // Dig out the declaration of the class.
   auto classDecl = classType->getClassOrBoundGenericClass();
   if (!classDecl)
@@ -1497,6 +1500,26 @@ static AbstractFunctionDecl *lookupObjCMethodInType(Type classType,
   // Look for an Objective-C method in this class.
   auto methods = classDecl->lookupDirect(selector, isInstanceMethod);
   if (!methods.empty()) {
+    // If we aren't inheriting initializers, remove any initializers from the
+    // list.
+    if (!inheritingInits &&
+        std::find_if(methods.begin(), methods.end(),
+                     [](AbstractFunctionDecl *func) {
+                       return isa<ConstructorDecl>(func);
+                     }) != methods.end()) {
+      SmallVector<AbstractFunctionDecl *, 4> nonInitMethods;
+      std::copy_if(methods.begin(), methods.end(),
+                   std::back_inserter(nonInitMethods),
+                   [&](AbstractFunctionDecl *func) {
+                     return !isa<ConstructorDecl>(func);
+                   });
+      if (nonInitMethods.empty())
+        return nullptr;
+
+      return *std::min_element(nonInitMethods.begin(), nonInitMethods.end(),
+                               OrderDeclarations(srcMgr));
+    }
+
     return *std::min_element(methods.begin(), methods.end(),
                              OrderDeclarations(srcMgr));
   }
@@ -1505,8 +1528,15 @@ static AbstractFunctionDecl *lookupObjCMethodInType(Type classType,
   if (!classDecl->hasSuperclass())
     return nullptr;
 
+  // Determine whether we are (still) inheriting initializers.
+  inheritingInits = inheritingInits &&
+                    classDecl->inheritsSuperclassInitializers(nullptr);
+  if (isInitializer && !inheritingInits)
+    return nullptr;
+
   return lookupObjCMethodInType(classDecl->getSuperclass(), selector,
-                                isInstanceMethod, srcMgr);
+                                isInstanceMethod, isInitializer, srcMgr,
+                                inheritingInits);
 }
 
 bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
@@ -1569,11 +1599,11 @@ bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
     // Look for a method that we have overridden in one of our
     // superclasses.
     auto selector = method->getObjCSelector();
-    bool isInstanceMethod
-      = method->isInstanceMember() || isa<ConstructorDecl>(method);
     AbstractFunctionDecl *overriddenMethod
       = lookupObjCMethodInType(classDecl->getSuperclass(),
-                               selector, isInstanceMethod,
+                               selector,
+                               method->isObjCInstanceMethod(),
+                               isa<ConstructorDecl>(method),
                                SourceMgr);
     if (!overriddenMethod)
       continue;

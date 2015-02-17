@@ -25,3 +25,14 @@ class SubA : SuperA {
     super.init(foo: 42)
   }
 }
+
+class SubSubB : SubB {
+  // okay: don't conflict with hidden initializers.
+  init(wibble: String) { super.init(bar: wibble) }
+  init(foo: String) { super.init(bar: foo) }
+}
+
+class SubSubB2 : SubB {
+  // okay: doesn't conflict with hidden initializer
+  func initWithWibble(s: String) { } 
+}
