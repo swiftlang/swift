@@ -351,9 +351,9 @@ public:
    
     if (needsTemporaryBuffer) {
       address = gen.emitTemporaryAllocation(vd, lowering.getLoweredType());
-      DestroyCleanup = gen.enterDormantTemporaryCleanup(address, lowering);
       if (isUninitialized)
         address = gen.B.createMarkUninitializedVar(vd, address);
+      DestroyCleanup = gen.enterDormantTemporaryCleanup(address, lowering);
       gen.VarLocs[vd] = SILGenFunction::VarLoc::get(address);
     } else {
       // Push a cleanup to destroy the let declaration.  This has to be

@@ -510,3 +510,14 @@ struct LetDeclInStruct {
     }
 }
 
+// rdar://19854166 - Swift 1.2 uninitialized constant causes crash
+// The destroy_addr for a let stack temporary should be generated against 
+// mark_uninitialized instruction, so DI will see it.
+func test_unassigned_let_constant() {
+  let string : String
+}
+// CHECK: [[S:%[0-9]+]] = alloc_stack $String  // let string
+// CHECK-NEXT:  [[MUI:%[0-9]+]] = mark_uninitialized [var] [[S]]#1 : $*String
+// CHECK-NEXT:  destroy_addr [[MUI]] : $*String
+// CHECK-NEXT:  dealloc_stack [[S]]#0 : $*@local_storage String
+
