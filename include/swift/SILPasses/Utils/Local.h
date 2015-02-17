@@ -196,48 +196,9 @@ namespace swift {
 
   };
 
-  /// This is a helper class that performs optimization of string literals
-  /// concatenation.
-  class StringConcatenationOptimizer {
-    /// Apply instruction being optimized.
-    ApplyInst *AI;
-    /// Builder to be used for creation of new instructions.
-    SILBuilder *Builder;
-    /// Left string literal operand of a string concatenation.
-    StringLiteralInst *SLILeft = nullptr;
-    /// Right string literal operand of a string concatenation.
-    StringLiteralInst *SLIRight = nullptr;
-    /// Function used to construct the left string literal.
-    FunctionRefInst *FRILeft = nullptr;
-    /// Function used to construct the right string literal.
-    FunctionRefInst *FRIRight = nullptr;
-    /// Apply instructions used to construct left string literal.
-    ApplyInst *AILeft = nullptr;
-    /// Apply instructions used to construct right string literal.
-    ApplyInst *AIRight = nullptr;
-    /// String literal conversion function to be used.
-    FunctionRefInst *FRIConvertFromBuiltin = nullptr;
-    /// Set if a String literal conversion function to be used is transparent.
-    bool IsTransparent = false;
-    /// Result type of a function producing the concatenated string literal.
-    SILValue FuncResultType;
-
-    /// Internal helper methods
-    bool extractStringConcatOperands();
-    void adjustEncodings();
-    APInt getConcatenatedLength();
-    bool isAscii() const;
-
-  public:
-    StringConcatenationOptimizer(ApplyInst *AI, SILBuilder *Builder): AI(AI),
-      Builder(Builder) { }
-
-    /// Tries to optimize a given apply instruction if it is a
-    /// concatenation of string literals.
-    ///
-    /// Returns a new instruction if optimization was possible.
-    SILInstruction *optimize();
-  };
+  /// Tries to optimize a given apply instruction if it is a concatenation of
+  /// string literals. Returns a new instruction if optimization was possible.
+  SILInstruction *tryToConcatenateStrings(ApplyInst *AI, SILBuilder &B);
 
   /// If Closure is a partial_apply or thin_to_thick_function with only local
   /// ref count users and a set of post-dominating releases:

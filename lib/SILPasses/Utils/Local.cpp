@@ -684,6 +684,56 @@ void swift::removeDeadBlock(SILBasicBlock *BB) {
   BB->eraseFromParent();
 }
 
+//===----------------------------------------------------------------------===//
+//                       String Concatenation Optimizer
+//===----------------------------------------------------------------------===//
+
+namespace {
+/// This is a helper class that performs optimization of string literals
+/// concatenation.
+class StringConcatenationOptimizer {
+  /// Apply instruction being optimized.
+  ApplyInst *AI;
+  /// Builder to be used for creation of new instructions.
+  SILBuilder &Builder;
+  /// Left string literal operand of a string concatenation.
+  StringLiteralInst *SLILeft = nullptr;
+  /// Right string literal operand of a string concatenation.
+  StringLiteralInst *SLIRight = nullptr;
+  /// Function used to construct the left string literal.
+  FunctionRefInst *FRILeft = nullptr;
+  /// Function used to construct the right string literal.
+  FunctionRefInst *FRIRight = nullptr;
+  /// Apply instructions used to construct left string literal.
+  ApplyInst *AILeft = nullptr;
+  /// Apply instructions used to construct right string literal.
+  ApplyInst *AIRight = nullptr;
+  /// String literal conversion function to be used.
+  FunctionRefInst *FRIConvertFromBuiltin = nullptr;
+  /// Set if a String literal conversion function to be used is transparent.
+  bool IsTransparent = false;
+  /// Result type of a function producing the concatenated string literal.
+  SILValue FuncResultType;
+
+  /// Internal helper methods
+  bool extractStringConcatOperands();
+  void adjustEncodings();
+  APInt getConcatenatedLength();
+  bool isAscii() const;
+
+public:
+  StringConcatenationOptimizer(ApplyInst *AI, SILBuilder &Builder)
+      : AI(AI), Builder(Builder) {}
+
+  /// Tries to optimize a given apply instruction if it is a
+  /// concatenation of string literals.
+  ///
+  /// Returns a new instruction if optimization was possible.
+  SILInstruction *optimize();
+};
+
+} // end anonymous namespace
+
 /// Checks operands of a string concatenation operation to see if
 /// optimization is applicable.
 ///
@@ -780,8 +830,8 @@ void StringConcatenationOptimizer::adjustEncodings() {
     FRIConvertFromBuiltin = FRIRight;
     IsTransparent = AIRight->isTransparent();
     // Convert UTF8 representation into UTF16.
-    SLILeft = Builder->createStringLiteral(AI->getLoc(), SLILeft->getValue(),
-                                           StringLiteralInst::Encoding::UTF16);
+    SLILeft = Builder.createStringLiteral(AI->getLoc(), SLILeft->getValue(),
+                                          StringLiteralInst::Encoding::UTF16);
     SLILeft->setDebugScope(AI->getDebugScope());
   }
 
@@ -791,8 +841,8 @@ void StringConcatenationOptimizer::adjustEncodings() {
     FRIConvertFromBuiltin = FRILeft;
     IsTransparent = AILeft->isTransparent();
     // Convert UTF8 representation into UTF16.
-    SLIRight = Builder->createStringLiteral(AI->getLoc(), SLIRight->getValue(),
-                                            StringLiteralInst::Encoding::UTF16);
+    SLIRight = Builder.createStringLiteral(AI->getLoc(), SLIRight->getValue(),
+                                           StringLiteralInst::Encoding::UTF16);
     SLIRight->setDebugScope(AI->getDebugScope());
   }
 
@@ -856,16 +906,14 @@ SILInstruction *StringConcatenationOptimizer::optimize() {
   // Create a concatenated string literal.
   auto LV = SLILeft->getValue();
   auto RV = SLIRight->getValue();
-  auto *NewSLI = Builder->createStringLiteral(AI->getLoc(),
-                                              LV + Twine(RV),
-                                              Encoding);
+  auto *NewSLI =
+      Builder.createStringLiteral(AI->getLoc(), LV + Twine(RV), Encoding);
   NewSLI->setDebugScope(AI->getDebugScope());
   Arguments.push_back(NewSLI);
 
   // Length of the concatenated literal according to its encoding.
-  auto *Len = Builder->createIntegerLiteral(AI->getLoc(),
-                                            AILeft->getOperand(2).getType(),
-                                            getConcatenatedLength());
+  auto *Len = Builder.createIntegerLiteral(
+      AI->getLoc(), AILeft->getOperand(2).getType(), getConcatenatedLength());
   Len->setDebugScope(AI->getDebugScope());
   Arguments.push_back(Len);
 
@@ -873,9 +921,8 @@ SILInstruction *StringConcatenationOptimizer::optimize() {
   if (Encoding == StringLiteralInst::Encoding::UTF8) {
     bool IsAscii = isAscii();
     auto ILType = AILeft->getOperand(3).getType();
-    auto *Ascii = Builder->createIntegerLiteral(AI->getLoc(),
-                                                ILType,
-                                                intmax_t(IsAscii));
+    auto *Ascii =
+        Builder.createIntegerLiteral(AI->getLoc(), ILType, intmax_t(IsAscii));
     Ascii->setDebugScope(AI->getDebugScope());
     Arguments.push_back(Ascii);
   }
@@ -893,6 +940,11 @@ SILInstruction *StringConcatenationOptimizer::optimize() {
                            Arguments,
                            IsTransparent,
                            *FRIConvertFromBuiltin->getReferencedFunction());
+}
+
+/// Top level entry point
+SILInstruction *swift::tryToConcatenateStrings(ApplyInst *AI, SILBuilder &B) {
+  return StringConcatenationOptimizer(AI, B).optimize();
 }
 
 //===----------------------------------------------------------------------===//

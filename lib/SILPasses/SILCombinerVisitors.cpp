@@ -713,8 +713,7 @@ static bool recursivelyCollectARCUsers(UserListTy &Uses, SILInstruction *Inst) {
 SILInstruction *
 SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
   // String literals concatenation optimizer.
-  StringConcatenationOptimizer SLConcatenationOptimizer(AI, Builder);
-  return SLConcatenationOptimizer.optimize();
+  return tryToConcatenateStrings(AI, *Builder);
 }
 
 /// \brief Returns a list of instructions that only write into the uninitialized

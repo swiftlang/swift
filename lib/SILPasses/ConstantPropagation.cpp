@@ -723,8 +723,7 @@ constantFoldStringConcatenation(ApplyInst *AI,
                                 llvm::SetVector<SILInstruction *> &WorkList) {
   SILBuilder B(AI);
   // Try to apply the string literal concatenation optimization.
-  StringConcatenationOptimizer SLConcatenationOptimizer(AI, &B);
-  auto *Concatenated = SLConcatenationOptimizer.optimize();
+  auto *Concatenated = tryToConcatenateStrings(AI, B);
   // Bail if string literal concatenation could not be performed.
   if (!Concatenated)
     return;
