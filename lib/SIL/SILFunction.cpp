@@ -441,3 +441,34 @@ void SILFunction::convertToDeclaration() {
   dropAllReferences();
   getBlocks().clear();
 }
+
+ArrayRef<Substitution> SILFunction::getForwardingSubstitutions() {
+  auto *params = getContextGenericParams();
+
+  if (!params)
+    return {};
+
+  ASTContext &C = getASTContext();
+  llvm::SmallVector<Substitution, 4> subs;
+
+  // TODO: IRGen wants substitutions for secondary archetypes.
+  // for (auto &param : params->getNestedGenericParams()) {
+  //  ArchetypeType *archetype = param.getAsTypeParam()->getArchetype();
+
+  for (auto archetype : params->getAllNestedArchetypes()) {
+    // "Check conformance" on each declared protocol to build a
+    // conformance map.
+    llvm::SmallVector<ProtocolConformance *, 2> conformances;
+
+    for (ProtocolDecl *conformsTo : archetype->getConformsTo()) {
+      (void)conformsTo;
+      conformances.push_back(nullptr);
+    }
+
+    // Build an identity mapping with the derived conformances.
+    auto replacement = SubstitutedType::get(archetype, archetype, C);
+    subs.push_back({archetype, replacement, C.AllocateCopy(conformances)});
+  }
+
+  return C.AllocateCopy(subs);
+}

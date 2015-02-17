@@ -423,6 +423,10 @@ public:
   /// Converts the given function if it is a definition to a deaclaration.
   void convertToDeclaration();
 
+  /// Return the identity substitutions necessary to forward this call if it is
+  /// generic.
+  ArrayRef<Substitution> getForwardingSubstitutions();
+
   //===--------------------------------------------------------------------===//
   // Block List Access
   //===--------------------------------------------------------------------===//

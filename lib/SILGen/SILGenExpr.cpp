@@ -3161,8 +3161,9 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
 
   // Generate the closure value (if any) for the closure expr's function
   // reference.
-  return RValue(SGF, e, SGF.emitClosureValue(e, SILDeclRef(e),
-                                          SGF.getForwardingSubstitutions(), e));
+  return RValue(SGF, e,
+                SGF.emitClosureValue(e, SILDeclRef(e),
+                                     SGF.getForwardingSubstitutions(), e));
 }
 
 // Get the __FUNCTION__ name for a declaration.

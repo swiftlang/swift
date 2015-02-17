@@ -141,9 +141,7 @@ namespace {
 }
 
 ArrayRef<Substitution> SILGenFunction::getForwardingSubstitutions() {
-  if (auto gp = F.getContextGenericParams())
-    return buildForwardingSubstitutions(gp);
-  return {};
+  return F.getForwardingSubstitutions();
 }
 
 void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
@@ -154,9 +152,9 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
   // closure value for the function and store it as a local constant.
   if (fd->getCaptureInfo().hasLocalCaptures()
       || F.getContextGenericParams()) {
-    SILValue closure = emitClosureValue(fd, SILDeclRef(fd),
-                                        getForwardingSubstitutions(), fd)
-      .forward(*this);
+    SILValue closure =
+        emitClosureValue(fd, SILDeclRef(fd), F.getForwardingSubstitutions(), fd)
+            .forward(*this);
     Cleanups.pushCleanup<CleanupClosureConstant>(closure);
     LocalFunctions[SILDeclRef(fd)] = closure;
   }
@@ -1890,7 +1888,7 @@ void SILGenFunction::emitObjCMethodThunk(SILDeclRef thunk) {
 
   // Call the native entry point.
   SILValue nativeFn = emitGlobalFunctionRef(loc, native, nativeInfo);
-  auto subs = buildForwardingSubstitutions(F.getContextGenericParams());
+  auto subs = F.getForwardingSubstitutions();
   auto substTy = nativeFn.getType().castTo<SILFunctionType>()
     ->substGenericArgs(SGM.M, SGM.M.getSwiftModule(), subs);
   SILValue result = B.createApply(loc, nativeFn,
@@ -1920,7 +1918,7 @@ void SILGenFunction::emitObjCGetter(SILDeclRef getter) {
     .transform([&](Type t) { return F.mapTypeIntoContext(t); });
 
   SILValue nativeFn = emitGlobalFunctionRef(loc, native, nativeInfo);
-  auto subs = buildForwardingSubstitutions(F.getContextGenericParams());
+  auto subs = F.getForwardingSubstitutions();
   auto substTy = nativeFn.getType().castTo<SILFunctionType>()
     ->substGenericArgs(SGM.M, SGM.M.getSwiftModule(), subs);
   SILValue result = B.createApply(loc, nativeFn,
@@ -1945,7 +1943,7 @@ void SILGenFunction::emitObjCSetter(SILDeclRef setter) {
 
   // If the native property is computed, store to the native setter.
   SILValue nativeFn = emitGlobalFunctionRef(loc, native, nativeInfo);
-  auto subs = buildForwardingSubstitutions(F.getContextGenericParams());
+  auto subs = F.getForwardingSubstitutions();
   auto substTy = nativeFn.getType().castTo<SILFunctionType>()
     ->substGenericArgs(SGM.M, SGM.M.getSwiftModule(), subs);
   SILValue result = B.createApply(loc, nativeFn,
