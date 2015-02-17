@@ -2867,6 +2867,7 @@ namespace {
         cs.getConstraintLocator(expr, ConstraintLocator::CheckedCastOperand);
       if (cs.shouldAttemptFixes()) {
         unsigned choice = solution.getDisjunctionChoice(locator);
+        (void) choice;
         assert(choice == 0 &&
           "checked cast branch of disjunction should have resulted in Fix");
       }
