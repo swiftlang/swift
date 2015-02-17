@@ -1555,6 +1555,23 @@ bool GeneralFailureDiagnosis::diagnoseGeneralConversionFailure() {
       return true;
     }
     
+    // Special case the diagnostic for a function result-type mismatch.
+    if (expr->isReturnExpr()) {
+      if (toType->isVoid()) {
+        CS->TC.diagnose(expr->getLoc(),
+                        diag::cannot_return_value_from_void_func);
+        
+        return true;
+      }
+      
+      CS->TC.diagnose(expr->getLoc(),
+                      diag::cannot_convert_to_return_type,
+                      fromType,
+                      toType).highlight(anchor->getSourceRange());
+      
+      return true;
+    }
+    
     auto failureKind =
     Failure::TypesNotConvertible - Failure::TypesNotEqual;
     
