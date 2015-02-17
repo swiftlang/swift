@@ -27,6 +27,7 @@
 #include "clang/Basic/Module.h"
 #include "clang/Lex/Lexer.h"
 #include "clang/Lex/MacroInfo.h"
+#include <queue>
 #include <utility>
 
 using namespace swift;
@@ -325,12 +326,28 @@ void swift::ide::printSubmoduleInterface(
     if (D->print(Printer, AdjustedOptions)) {
       Printer << "\n";
       if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
-        for (auto Ext : NTD->getExtensions()) {
-          if (Ext->hasClangNode())
-            continue; // will be printed in its source location, see above.
-          Printer << "\n";
-          Ext->print(Printer, AdjustedOptions);
-          Printer << "\n";
+        std::queue<NominalTypeDecl *> SubDecls{{NTD}};
+
+        while (!SubDecls.empty()) {
+          auto NTD = SubDecls.front();
+          SubDecls.pop();
+
+          // Add sub-types of NTD.
+          for (auto Sub : NTD->getMembers())
+            if (auto N = dyn_cast<NominalTypeDecl>(Sub))
+              SubDecls.push(N);
+
+          // Print Ext and add sub-types of Ext.
+          for (auto Ext : NTD->getExtensions()) {
+            if (Ext->hasClangNode())
+              continue; // will be printed in its source location, see above.
+            Printer << "\n";
+            Ext->print(Printer, AdjustedOptions);
+            Printer << "\n";
+            for (auto Sub : Ext->getMembers())
+              if (auto N = dyn_cast<NominalTypeDecl>(Sub))
+                SubDecls.push(N);
+          }
         }
       }
       return true;

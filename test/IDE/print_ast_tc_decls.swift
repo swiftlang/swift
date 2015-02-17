@@ -303,6 +303,24 @@ extension d0100_FooStruct {
 }
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 
+extension d0100_FooStruct.NestedStruct {
+// PASS_COMMON-LABEL: {{^}}extension d0100_FooStruct.NestedStruct {{{$}}
+  struct ExtNestedStruct2 {}
+// PASS_COMMON-NEXT: {{^}}  struct ExtNestedStruct2 {{{$}}
+// PASS_COMMON-NEXT: {{^}}    init(){{$}}
+// PASS_COMMON-NEXT: {{^}}  }{{$}}
+}
+
+extension d0100_FooStruct.ExtNestedStruct {
+// PASS_COMMON-LABEL: {{^}}extension d0100_FooStruct.ExtNestedStruct {{{$}}
+  struct ExtNestedStruct3 {}
+// PASS_COMMON-NEXT: {{^}}  struct ExtNestedStruct3 {{{$}}
+// PASS_COMMON-NEXT: {{^}}    init(){{$}}
+// PASS_COMMON-NEXT: {{^}}  }{{$}}
+}
+
+// PASS_COMMON-NEXT: {{^}}}{{$}}
+
 var fooObject: d0100_FooStruct = d0100_FooStruct()
 // PASS_ONE_LINE-DAG: {{^}}var fooObject: d0100_FooStruct{{$}}
 
