@@ -7,9 +7,9 @@
  Sequences And Collections in Swift
 ====================================
 
-Swift's standard library provides a rich taxonomy of abstractions for
-processing series of elements.  This document explains how and why
-each one is structured as it is.
+Unlike many languages, Swift provides a rich taxonomy of abstractions
+for processing series of elements.  This document explains why that
+taxonomy exists and how it is structured.
 
 Sequences
 =========
@@ -97,6 +97,26 @@ it must trap when `current` is called twice without an intervening
 call to `moveToNext`.  Both semantics have a performance cost, and
 the latter unnecessarily adds the possibility of incorrect usage.
 
+.. sidebar:: `NSEnumerator`
+
+  You might recognize the influence on generators of the
+  `NSEnumerator` API::
+
+    class NSEnumerator : NSObject {
+      func nextObject() -> AnyObject?
+    }
+
+Therefore, Swift's `GeneratorType` merges the three operations into one,
+returning `nil` when the generator is exhausted::
+
+  protocol GeneratorType {
+    typealias Element
+    mutating func next() -> Element?
+  }
+
+Combined with `SequenceType`, we now have everything we need to
+implement a generic `for`\ …\ `in` loop.
+
 .. sidebar:: Adding a Buffer
 
   The use-cases for singly-buffered generators are rare enough that it
@@ -127,17 +147,6 @@ the latter unnecessarily adds the possibility of incorrect usage.
         latest: G.Element? = nil
       private var _baseGenerator: G
     }
-
-Therefore, Swift's `GeneratorType` combines the three methods into one
-that returns `nil` when the generator is exhausted::
-
-  protocol GeneratorType {
-    typealias Element
-    mutating func next() -> Element?
-  }
-
-Combined with `SequenceType`, we now have everything we need to
-implement a generic `for`\ …\ `in` loop.
 
 Operating on Sequences Generically
 ----------------------------------
@@ -210,7 +219,7 @@ A **collection** is a stable sequence with addressable “positions,”
 represented by an associated `Index` type::
  
   protocol CollectionType : SequenceType {
-    typealias Index : ForwardIndexType
+    typealias Index : ForwardIndexType             // a position
     subscript(i: Index) -> Generator.Element {get}
 
     var startIndex: Index {get}
@@ -226,11 +235,18 @@ how we interact with arrays: we subscript the collection using its
 An **index**\ —which must model `ForwardIndexType`\ —is a type with a
 linear series of discrete values that can be compared for equality:
 
-.. parsed-literal::
+.. sidebar:: Dictionary Keys
+
+   Although dictionaries overload `subscript` to also operate on keys,
+   a `Dictionary`\ 's `Key` type is distinct from its `Index` type.
+   Subscripting on an index is expected to offer direct access,
+   without introducing overheads like searching or hashing.
+
+::
 
   protocol ForwardIndexType : Equatable {
-    typealias Distance : SignedIntegerType // represents a difference in position
-    func successor() -> Self               // return the next discrete value
+    typealias Distance : SignedIntegerType
+    func successor() -> Self
   }
 
 While one can use `successor()` to create an incremented index value,
@@ -317,11 +333,19 @@ loaded) and, of course, array indices.  Many common sorting and
 selection algorithms, among others, depend on these capabilities.
 
 All direct operations on indices are intended to be lightweight, with
-O(1) complexity.  In fact, indices into `Dictionary` and `Set` *could*
-be bidirectional, but are limited to modeling `ForwardIndexType`
-because the APIs of `NSDictionary` and `NSSet`—which can act as
-backing stores of `Dictionary` and `Set`—do not efficiently support
-reverse traversal.
+amortized O(1) complexity.  In fact, indices into `Dictionary` and
+`Set` *could* be bidirectional, but are limited to modeling
+`ForwardIndexType` because the APIs of `NSDictionary` and
+`NSSet`—which can act as backing stores of `Dictionary` and `Set`—do
+not efficiently support reverse traversal.
+
+Conclusion
+==========
+
+Swift's sequence, collection, and index protocols allow us to write
+general algorithms that apply to a wide variety of series and data
+structures.  The system has been both easy to extend, and predictably
+performant.  Thanks for taking the tour!
 
 ------
 
