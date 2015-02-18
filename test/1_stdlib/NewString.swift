@@ -13,7 +13,7 @@ func hexAddrVal<T>(x: T) -> String {
 }
 
 func hexAddr(x: AnyObject?) -> String {
-  if let owner: AnyObject = x {
+  if let owner = x {
     if let y = owner as? _StringBuffer._Storage.Storage {
       return ".Native\(hexAddrVal(y))"
     }

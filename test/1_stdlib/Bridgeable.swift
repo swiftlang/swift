@@ -22,7 +22,7 @@ func bridgedStatus<T>(_: T.Type) -> String {
 func testBridging<T>(x: T, name: String) {
   println("\(name) \(bridgedStatus(T.self))")
   var b : String
-  if let result: AnyObject = _bridgeToObjectiveC(x) {
+  if let result = _bridgeToObjectiveC(x) {
     b = "bridged as " + (
       (result as? C) != nil ? "C" : (result as? T) != nil ? "itself" : "an unknown type")
   }

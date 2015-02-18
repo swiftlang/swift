@@ -51,8 +51,8 @@ var aot2 = aot1          // expected-warning {{variable 'aot2' inferred to have 
                        // expected-note {{add an explicit type annotation to silence this warning}}{{9-9=: AnyObject.Type}}
 
 
-for item in [AnyObject]() {  // No warning in for-each loop.
-}
+if let x = Optional(ao1) { }  // No warning here for if/let pattern
+for item in [AnyObject]() { } // No warning in for-each loop.
 
 
 // <rdar://problem/16574105> Type inference of _Nil very coherent but kind of useless
