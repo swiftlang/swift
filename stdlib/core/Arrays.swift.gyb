@@ -608,6 +608,16 @@ extension ${Self} : _ArrayType {
     return ${Self}<U>(lazy(self).map(transform))
   }
 
+  /// Return ${a_Self} containing the results of calling
+  /// `transform(x)` on each element `x` of `self` and flattening the result.
+  public func flatMap<U>(@noescape transform: (T) -> ${Self}<U>) -> ${Self}<U> {
+    var result: ${Self}<U> = []
+    for element in self {
+      result.extend(transform(element))
+    }
+    return result
+  }
+
   /// A ${Self} containing the elements of `self` in reverse order
   public func reverse() -> ${Self} {
     return ${Self}(lazy(self).reverse())

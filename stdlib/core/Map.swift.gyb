@@ -73,6 +73,18 @@ public func map<S : SequenceType, T>(
   return lazy(source).map(transform).array
 }
 
+/// Return an `Array` containing the results of mapping `transform`
+/// over `source` and flattening the result.
+public func flatMap<S : SequenceType, T>(
+  source: S, @noescape transform: (S.Generator.Element) -> [T]
+) -> [T] {
+  var result: [T] = []
+  for element in source {
+    result.extend(transform(element))
+  }
+  return result
+}
+
 //===--- Collections ------------------------------------------------------===//
 
 /// A `CollectionType` whose elements consist of those in a `Base`
@@ -127,6 +139,18 @@ public func map<C : CollectionType, T>(
   source: C, transform: (C.Generator.Element) -> T
 ) -> [T] {
   return lazy(source).map(transform).array
+}
+
+/// Return an `Array` containing the results of mapping `transform`
+/// over `source` and flattening the result.
+public func flatMap<C : CollectionType, T>(
+  source: C, transform: (C.Generator.Element) -> [T]
+) -> [T] {
+  var result: [T] = []
+  for elements in map(source, transform) {
+    result.extend(elements)
+  }
+  return result
 }
 
 //===--- Support for lazy(s) ----------------------------------------------===//

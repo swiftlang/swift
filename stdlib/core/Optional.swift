@@ -34,6 +34,21 @@ public enum Optional<T> : Reflectable, NilLiteralConvertible {
     }
   }
 
+  /// Returns `f(self)!` iff `self` and `f(self)` are not nil.
+  public func flatMap<U>(@noescape f: (T)->U?) -> U? {
+    switch self {
+    case .Some(let y):
+      switch f(y) {
+      case .Some(let z):
+        return .Some(z)
+      case .None:
+        return .None
+      }
+    case .None:
+      return .None
+    }
+  }
+
   /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
     return _OptionalMirror(self)
@@ -74,6 +89,22 @@ public func map<T, U>(x: T?, @noescape f: (T)->U) -> U? {
     case .Some(var y):
     return .Some(f(y))
     case .None:
+    return .None
+  }
+}
+
+
+/// Returns `f(self)!` iff `self` and `f(self)` are not nil.
+public func flatMap<T, U>(x: T?, @noescape f: (T)->U?) -> U? {
+  switch x {
+  case .Some(let y):
+    switch f(y) {
+    case .Some(let z):
+      return .Some(z)
+    case .None:
+      return .None
+    }
+  case .None:
     return .None
   }
 }

@@ -36,3 +36,24 @@ if c === nil {
   println("x is not nil!")
 }
 // CHECK: an empty class optional should equal nil
+
+import StdlibUnittest
+import Swift
+
+var ImplicitlyUnwrappedOptionalTests = TestSuite("ImplicitlyUnwrappedOptional")
+
+let half : Int -> Int! =
+  { if $0 % 2 == 0 { return $0 / 2 } else { return .None } }
+
+ImplicitlyUnwrappedOptionalTests.test("flatMap") {
+  // FIXME(19798684): can't call map or flatMap on ImplicitlyUnwrappedOptional
+  // expectTrue(ImplicitlyUnwrappedOptional<Int>.None.flatMap(half) ==
+  //   ImplicitlyUnwrappedOptional<Int>.None)
+  // expectTrue(half(4) == ImplicitlyUnwrappedOptional<Int>.Some(2))
+  // expectTrue(half(4).flatMap(half) == ImplicitlyUnwrappedOptional<Int>.Some(1))
+  // expectTrue(half(4).flatMap(half).flatMap(half) ==
+  //   ImplicitlyUnwrappedOptional<Int>.None)
+}
+
+runAllTests()
+

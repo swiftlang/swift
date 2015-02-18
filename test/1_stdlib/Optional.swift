@@ -203,3 +203,21 @@ debugPrintln(c ?? nextCounter2())      // CHECK-NEXT: Optional(4)
 debugPrintln(d ?? nextCounter2())      // CHECK-NEXT: Optional(456)
 debugPrintln(e ?? d ?? nextCounter2()) // CHECK-NEXT: Optional(456)
 debugPrintln(f ?? nextCounter2())      // CHECK-NEXT: Optional(5)
+
+import StdlibUnittest
+import Swift
+
+var OptionalTests = TestSuite("Optional")
+
+let half : Int -> Int? =
+  { if $0 % 2 == 0 { return $0 / 2 } else { return .None } }
+
+OptionalTests.test("flatMap") {
+  // FIXME: type inference stops expectEqual from working
+  expectTrue((.None as Int?).flatMap(half) == .None)
+  expectTrue(half(4) == .Some(2))
+  expectTrue(half(4).flatMap(half) == .Some(1))
+  expectTrue(half(4).flatMap(half).flatMap(half) == .None)
+}
+
+runAllTests()

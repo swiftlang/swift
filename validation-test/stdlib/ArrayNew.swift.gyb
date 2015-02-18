@@ -188,6 +188,17 @@ ArrayTestSuite.test("${array_type}/map") {
   }
 }
 
+ArrayTestSuite.test("${array_type}/flatMap") {
+  let enumerate : Int -> ${array_type}<Int> =
+    { return ${array_type}(1..<($0 + 1)) }
+  expectEqual(${array_type}([]), ${array_type}().flatMap(enumerate))
+  expectEqual(${array_type}([1]), ${array_type}([1]).flatMap(enumerate))
+  expectEqual(${array_type}([1, 1, 2]),
+    ${array_type}([1, 2]).flatMap(enumerate))
+  expectEqual(${array_type}([1, 1, 1, 2]),
+    ${array_type}([1, 2]).flatMap(enumerate).flatMap(enumerate))
+}
+
 //===---
 // Check that generators traverse a snapshot of the collection.
 //===---

@@ -54,6 +54,22 @@ public enum ImplicitlyUnwrappedOptional<T>
     }
   }
 
+  /// Returns `f(self)!` iff `self` and `f(self)` are not nil.
+  public func flatMap<U>(@noescape f: (T) -> ImplicitlyUnwrappedOptional<U>)
+    -> ImplicitlyUnwrappedOptional<U> {
+    switch self {
+    case .Some(let y):
+      switch f(y) {
+      case .Some(let z):
+        return .Some(z)
+      case .None:
+        return .None
+      }
+    case .None:
+      return .None
+    }
+  }
+
   /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
     // FIXME: This should probably use _OptionalMirror in both cases.

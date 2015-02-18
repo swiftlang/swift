@@ -319,6 +319,45 @@ Algorithm.test("map/CollectionType") {
   }
 }
 
+// FIXME(19789546): move to FlatMap test file
+Algorithm.test("flatMap/SequenceType") {
+  if true {
+    let s = DrainableSequence<Int>([])
+    var result = flatMap(s) {
+      (x: Int) -> [Int16] in
+      expectUnreachable()
+      return [42]
+    }
+    expectType([Int16].self, &result)
+    expectEqual([], result)
+    expectEqual([], Array(s))
+  }
+  if true {
+    let s = DrainableSequence([ 0, 30, 10, 90 ])
+    let result = flatMap(s) { [$0 + 1] }
+    expectEqual([ 1, 31, 11, 91 ], result)
+    expectEqual([], Array(s))
+  }
+}
+
+Algorithm.test("flatMap/CollectionType") {
+  if true {
+    let c = MinimalForwardCollection<Int>([])
+    var result = flatMap(c) {
+      (x: Int) -> [Int16] in
+      expectUnreachable()
+      return [42]
+    }
+    expectType([Int16].self, &result)
+    expectEqual([], result)
+  }
+  if true {
+    let c = MinimalForwardCollection([ 0, 30, 10, 90 ])
+    let result = flatMap(c) { [$0 + 1] }
+    expectEqual([ 1, 31, 11, 91 ], result)
+  }
+}
+
 Algorithm.test("sorted/strings") {
   expectEqual(
     [ "Banana", "apple", "cherry" ],
