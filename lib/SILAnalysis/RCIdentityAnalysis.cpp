@@ -112,6 +112,10 @@ static SILValue stripRCIdentityPreservingInsts(SILValue V) {
   return SILValue();
 }
 
+/// V is the incoming value for the SILArgument A on at least one path.  Find a
+/// value that is trivially RC-identical to V and dominates the argument's
+/// block. If such a value exists, it is a candidate for RC-indentity with the
+/// argument itself--the caller must verify this after evaluating all paths.
 SILValue RCIdentityAnalysis::stripOneRCIdentityIncomingValue(SILArgument *A,
                                                              SILValue V) {
   // Strip off any non-argument instructions from IV. We know that this will
@@ -120,8 +124,7 @@ SILValue RCIdentityAnalysis::stripOneRCIdentityIncomingValue(SILArgument *A,
     V = NewIV;
 
   // Then make sure that this incoming value is from a BB which is different
-  // from our BB and dominates our BB. Otherwise, just return SILValue() there
-  // is nothing we can do hter.
+  // from our BB and dominates our BB. Otherwise, return SILValue() to bail.
   DominanceInfo *DI = DA->getDomInfo(A->getFunction());
   if (!dominatesArgument(DI, A, V))
     return SILValue();
@@ -196,7 +199,7 @@ findDominatingNonPayloadedEdge(SILBasicBlock *IncomingEdgeBB,
   // non-payloaded enums can always be eliminated (since we can always eliminate
   // ref count operations on non-payloaded enums).
 
-  // RCIdentityBB must never have a non
+  // RCIdentityBB must have a valid dominator tree node.
   auto *EndDomNode = DI->getNode(RCIdentityBB);
   if (!EndDomNode)
     return false;
@@ -325,14 +328,13 @@ stripRCIdentityPreservingArgs(SILValue V, unsigned RecursionDepth) {
     return SILValue();
   }
 
-  // Ok, we now know that all of our incoming values that are not no-payload
-  // enums are equal to FirstIV after just stripping RCIdentical instructions
-  // (*NOTE* not args). If we have no NonPayloadEnums, then we know that this
-  // Arg's RCIdentity must be FirstIV.
-  if (NoPayloadEnumBBs.empty())
+  // We now know that all incoming values, other than NoPayloadEnums, are
+  // FirstIV after trivially stripping RCIdentical instructions. If we have no
+  // NoPayloadEnums, then we know that this Arg's RCIdentity must be FirstIV.
+  if (NoPayloadEnums.empty())
     return FirstIV;
 
-  // At this point, we know that we have *some* no-payload enums. If FirstIV is
+  // At this point, we know that we have *some* NoPayloadEnums. If FirstIV is
   // not an enum, then we must bail. We do not try to analyze this case.
   if (!FirstIV.getType().getEnumOrBoundGenericEnum())
     return SILValue();
