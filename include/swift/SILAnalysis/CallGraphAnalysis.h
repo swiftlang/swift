@@ -46,7 +46,10 @@ class CallGraphNode;
 
 class CallGraphEdge {
 public:
-  typedef llvm::DenseSet<CallGraphNode *> CalleeSetType;
+  // SmallSize = 1, because direct calls only need a single entry in the set and
+  // currently we don't handle method calls.
+  // TODO: Consider increasing SmallSize when we handle method calls.
+  typedef llvm::SmallPtrSet<CallGraphNode *, 1> CalleeSetType;
 
 private:
   // The call site represented by this call graph edge.
