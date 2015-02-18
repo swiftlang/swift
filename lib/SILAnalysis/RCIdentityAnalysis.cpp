@@ -136,21 +136,6 @@ SILValue RCIdentityAnalysis::stripOneRCIdentityIncomingValue(SILArgument *A,
 /// anything.
 static llvm::Optional<bool> proveNonPayloadedEnumCase(SILBasicBlock *BB,
                                                       SILValue RCIdentity) {
-  // First iterate through all of the instructions in BB and see if we can find
-  // an unchecked_enum_data on RCIdentity.
-
-  // For each II in BB...
-  for (auto &II : *BB) {
-    // If we do not have a UEDI that is applied to RCIdentity, continue.
-    auto *UEDI = dyn_cast<UncheckedEnumDataInst>(&II);
-    if (!UEDI || UEDI->getOperand() != RCIdentity)
-      continue;
-
-    // Otherwise, return true if UEDI is extracting a non-payloaded enum case
-    // and false otherwise.
-    return !UEDI->getElement()->hasArgumentType();
-  }
-
   // Then see if BB has one predecessor... if it does not, return None so we
   // keep searching up the domtree.
   SILBasicBlock *SinglePred = BB->getSinglePredecessor();
@@ -166,7 +151,10 @@ static llvm::Optional<bool> proveNonPayloadedEnumCase(SILBasicBlock *BB,
 
   // Then return true if along the edge from the SEI to BB, RCIdentity has a
   // non-payloaded enum value.
-  return !SEI->getUniqueCaseForDestination(BB)->hasArgumentType();
+  auto *Decl = SEI->getUniqueCaseForDestination(BB);
+  if (!Decl)
+    return None;
+  return !Decl->hasArgumentType();
 }
 
 bool RCIdentityAnalysis::
@@ -185,6 +173,8 @@ findDominatingNonPayloadedEdge(SILBasicBlock *IncomingEdgeBB,
   // I think the only way this can happen is if we have a switch_enum of some
   // sort with multiple incoming values going into the destination BB. We are
   // not interested in handling that case anyways.
+  //
+  // FIXME: If we ever split all critical edges, this should be relooked at.
   if (IncomingEdgeBB == RCIdentityBB)
     return false;
 
@@ -212,7 +202,7 @@ findDominatingNonPayloadedEdge(SILBasicBlock *IncomingEdgeBB,
     return false;
 
   for (auto *Node = DI->getNode(IncomingEdgeBB); Node; Node = Node->getIDom()) {
-    // Search for uses of RCIdentity in Node->getBB() that will enable us to
+    // Search for uses of RCIdentity in Node->getBlock() that will enable us to
     // know that it has a non-payloaded enum case.
     SILBasicBlock *DominatingBB = Node->getBlock();
     llvm::Optional<bool> Result =
@@ -285,7 +275,7 @@ stripRCIdentityPreservingArgs(SILValue V, unsigned RecursionDepth) {
   // Ok, this is the first time that we have visited this BB. Get the
   // SILArgument's incoming values. If we don't have an incoming value for each
   // one of our predecessors, just return SILValue().
-  llvm::SmallVector<SILValue, 8> IncomingValues;
+  llvm::SmallVector<std::pair<SILBasicBlock *, SILValue>, 8> IncomingValues;
   if (!A->getIncomingValues(IncomingValues) || IncomingValues.empty()) {
     return SILValue();
   }
@@ -295,14 +285,14 @@ stripRCIdentityPreservingArgs(SILValue V, unsigned RecursionDepth) {
   // If we only have one incoming value, just return the identity root of that
   // incoming value. There can be no loop problems.
   if (IVListSize == 1) {
-    return IncomingValues[0];
+    return IncomingValues[0].second;
   }
 
   // Ok, we have multiple predecessors. First find the first non-payloaded enum.
-  llvm::SmallVector<SILValue, 8> NoPayloadEnums;
+  llvm::SmallVector<SILBasicBlock *, 8> NoPayloadEnumBBs;
   unsigned i = 0;
-  for (; i < IVListSize && isNoPayloadEnum(IncomingValues[i]); ++i) {
-    NoPayloadEnums.push_back(IncomingValues[i]);
+  for (; i < IVListSize && isNoPayloadEnum(IncomingValues[i].second); ++i) {
+    NoPayloadEnumBBs.push_back(IncomingValues[i].first);
   }
 
   // If we did not find any non-payloaded enum, there is no RC associated with
@@ -310,16 +300,19 @@ stripRCIdentityPreservingArgs(SILValue V, unsigned RecursionDepth) {
   if (i == IVListSize)
     return SILValue();
 
-  SILValue FirstIV = stripOneRCIdentityIncomingValue(A, IncomingValues[i]);
+  SILValue FirstIV =
+      stripOneRCIdentityIncomingValue(A, IncomingValues[i].second);
   if (!FirstIV)
     return SILValue();
 
   while (i < IVListSize) {
-    SILValue IV = IncomingValues[i++];
+    SILBasicBlock *IVBB;
+    SILValue IV;
+    std::tie(IVBB, IV) = IncomingValues[i++];
 
     // If IV is a no payload enum, we don't care about it. Skip it.
     if (isNoPayloadEnum(IV)) {
-      NoPayloadEnums.push_back(IV);
+      NoPayloadEnumBBs.push_back(IVBB);
       continue;
     }
 
@@ -336,7 +329,7 @@ stripRCIdentityPreservingArgs(SILValue V, unsigned RecursionDepth) {
   // enums are equal to FirstIV after just stripping RCIdentical instructions
   // (*NOTE* not args). If we have no NonPayloadEnums, then we know that this
   // Arg's RCIdentity must be FirstIV.
-  if (NoPayloadEnums.empty())
+  if (NoPayloadEnumBBs.empty())
     return FirstIV;
 
   // At this point, we know that we have *some* no-payload enums. If FirstIV is
@@ -351,11 +344,8 @@ stripRCIdentityPreservingArgs(SILValue V, unsigned RecursionDepth) {
   // Let IVE be the edge for the non-payloaded enum. It is only safe to perform
   // this operation when there exists a dominating edge E' of IVE for which
   // FirstIV also takes on a non-payloaded enum value.
-  if (std::any_of(NoPayloadEnums.begin(), NoPayloadEnums.end(),
-                  [&](const SILValue V) -> bool {
-                    auto *BB = V->getParentBB();
-                    if (!BB)
-                      return true;
+  if (std::any_of(NoPayloadEnumBBs.begin(), NoPayloadEnumBBs.end(),
+                  [&](SILBasicBlock *BB) -> bool {
                     return !findDominatingNonPayloadedEdge(BB, FirstIV);
                   }))
     return SILValue();
