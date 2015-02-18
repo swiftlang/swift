@@ -1977,7 +1977,14 @@ namespace {
 
           auto member = Impl.importDecl(nd);
           if (!member || !isa<VarDecl>(member)) {
-            // We couldn't import the field, so we can't reference it in Swift.
+            // We don't import nested struct decls from C as nested structs,
+            // which wouldn't match C or ObjC semantics. It's OK to skip these.
+            // TODO: For C++ types we *would* want to preserve the nesting.
+            if (dyn_cast_or_null<TypeDecl>(member))
+              continue;
+            
+            // Otherwise, we don't know what this field is. Assume it may be
+            // important in C.
             hasUnreferenceableStorage = true;
             continue;
           }
@@ -1991,7 +1998,7 @@ namespace {
       if (hasZeroInitializableStorage) {
         // Add constructors for the struct.
         members.push_back(createDefaultConstructor(result));
-        if (hasReferenceableFields) {
+        if (hasReferenceableFields && !hasUnreferenceableStorage) {
           // The default zero initializer suppresses the implicit value
           // constructor that would normally be formed, so we have to add that
           // explicitly as well. We leave the body implicit in order to match

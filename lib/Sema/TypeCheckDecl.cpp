@@ -6208,9 +6208,10 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
     }
   }
 
-  if (isa<StructDecl>(decl)) {
-    if (!FoundDesignatedInit) {
-      // For a struct, we add a memberwise constructor.
+  if (auto structDecl = dyn_cast<StructDecl>(decl)) {
+    if (!FoundDesignatedInit && !structDecl->hasUnreferenceableStorage()) {
+      // For a struct we have full visibility of, we add a memberwise
+      // constructor.
 
       // Create the implicit memberwise constructor.
       auto ctor = createImplicitConstructor(
