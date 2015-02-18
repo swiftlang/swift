@@ -33,7 +33,9 @@ func referencesToGlobalVariables() {
   // Potentially unavailable declarations with optional types should be doubly optional
   
   let _: Int? =  globalOptionalAvailableOn10_10 // expected-error {{value of optional type 'Int??' not unwrapped; did you mean to use '!' or '?'?}}
-  let _: Int?? = globalOptionalAvailableOn10_10
+  if let level1: Int? = globalOptionalAvailableOn10_10 {
+    if let _:   Int = level1 {}
+  } 
 }
 
 // Multiple unavailable references in a single statement
@@ -78,7 +80,7 @@ func callOverloadedFunctions() {
   
   let _: Int = overloadedFunction()
   let _: Int = overloadedFunction!(0)
-  let _: Int? = overloadedFunction?(0)
+  if let _: Int = overloadedFunction?(0) {}
 }
 
 // Unavailable methods
@@ -99,10 +101,10 @@ class ClassWithUnavailableMethod {
     
     let _: () -> Int = methAvailableOn10_9
     let _: () -> Int = methAvailableOn10_10 // expected-error {{value of optional type '(() -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}
-    let _: (() -> Int)? = methAvailableOn10_10
+    if let _: () -> Int = methAvailableOn10_10 {}
     
     let _: Int = methAvailableOn10_10!()
-    let _: Int? = methAvailableOn10_10?()
+    if let _: Int = methAvailableOn10_10?() {}
   }
 }
 
@@ -110,8 +112,7 @@ func callUnavailableMethods(o: ClassWithUnavailableMethod) {
   let m10_9 = o.methAvailableOn10_9
   m10_9()
   
-  let m10_10 : (() -> Int)? = o.methAvailableOn10_10
-  if let m10_10 = o.methAvailableOn10_10 {
+  if let m10_10 : () -> Int = o.methAvailableOn10_10 {
     m10_10()
   }
   
@@ -119,14 +120,14 @@ func callUnavailableMethods(o: ClassWithUnavailableMethod) {
   o.methAvailableOn10_10() // expected-error {{value of optional type '(() -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}
   
   let _: Int = o.methAvailableOn10_10!()
-  let _: Int? = o.methAvailableOn10_10?()
+  if let _: Int = o.methAvailableOn10_10?() {}
 }
 
 func callUnavailableMethodsViaIUO(o: ClassWithUnavailableMethod!) {
   let m10_9 = o.methAvailableOn10_9
   m10_9()
   
-  if let m10_10 = o.methAvailableOn10_10 {
+  if let m10_10 : () -> Int = o.methAvailableOn10_10 {
     m10_10()
   }
   
@@ -134,16 +135,16 @@ func callUnavailableMethodsViaIUO(o: ClassWithUnavailableMethod!) {
   o.methAvailableOn10_10() // expected-error {{value of optional type '(() -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}
   
   let _: Int = o.methAvailableOn10_10!()
-  let _: Int? = o.methAvailableOn10_10?()
+  if let _: Int = o.methAvailableOn10_10?() {}
 }
 
 func callUnavailableClassMethod() {
   ClassWithUnavailableMethod.classMethAvailableOn10_10() // expected-error {{value of optional type '(() -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}
   
-  let _: (() -> Int)? = ClassWithUnavailableMethod.classMethAvailableOn10_10
+  if let _: () -> Int = ClassWithUnavailableMethod.classMethAvailableOn10_10 {}
 
   let _: Int = ClassWithUnavailableMethod.classMethAvailableOn10_10!()
-  let _: Int? = ClassWithUnavailableMethod.classMethAvailableOn10_10?()
+  if let _: Int = ClassWithUnavailableMethod.classMethAvailableOn10_10?() {}
 }
 
 class ClassWithUnavailableOverloadedMethod {
@@ -159,7 +160,7 @@ func callUnavailableOverloadedMethod(o: ClassWithUnavailableOverloadedMethod) {
   o.overloadedMethod(0) // expected-error {{value of optional type '((Int) -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}
   
   let _: Int = o.overloadedMethod!(0)
-  let _: Int? = o.overloadedMethod?(0)
+  if let _: Int = o.overloadedMethod?(0) { } 
 }
 
 class ClassWithMethodReturningOptional {
