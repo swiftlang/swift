@@ -785,6 +785,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       // Removal of cond_fail (overflow on binary operations).
       Opts.RemoveRuntimeAsserts = true;
       Opts.AssertConfig = SILOptions::Fast;
+    } else if (A->getOption().matches(OPT_Oplayground)) {
+      // For now -Oplayground is equivalent to -Onone.
+      IRGenOpts.Optimize = false;
     } else {
       assert(A->getOption().matches(OPT_O));
       IRGenOpts.Optimize = true;

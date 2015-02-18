@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -module-name OptimizationOptions -disable-func-sig-opts -Onone -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=DEBUG
 // RUN: %target-swift-frontend -module-name OptimizationOptions -disable-func-sig-opts -O -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=RELEASE
 // RUN: %target-swift-frontend -module-name OptimizationOptions -disable-func-sig-opts -Ounchecked -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=UNCHECKED
+// RUN: %target-swift-frontend -module-name OptimizationOptions -disable-func-sig-opts -Oplayground -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=PLAYGROUND
 
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_stdlib_asserts
@@ -34,6 +35,12 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // DEBUG: "assertion failed"
 // DEBUG: cond_fail
 
+// In playground mode keep user asserts and runtime checks.
+// PLAYGROUND-LABEL: _TF19OptimizationOptions11test_assertfT_FT1xSi1ySi_Si
+// PLAYGROUND: "x smaller than y"
+// PLAYGROUND: "assertion failed"
+// PLAYGROUND: cond_fail
+
 // In release mode remove user asserts and keep runtime checks.
 // RELEASE-LABEL: _TF19OptimizationOptions11test_assertfT_FT1xSi1ySi_Si
 // RELEASE-NOT: "x smaller than y"
@@ -53,6 +60,13 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // DEBUG-DAG: %[[FATAL_ERROR:.+]] = function_ref @_TTOS_nndd__TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_
 // DEBUG: apply %[[FATAL_ERROR]]{{.*}} @noreturn
 // DEBUG: unreachable
+
+// In playground mode keep verbose fatal errors.
+// PLAYGROUND-LABEL: _TF19OptimizationOptions10test_fatalFTSiSi_Si
+// PLAYGROUND-DAG: "Human nature ..."
+// PLAYGROUND-DAG: %[[FATAL_ERROR:.+]] = function_ref @_TTOS_nndd__TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_
+// PLAYGROUND: apply %[[FATAL_ERROR]]{{.*}} @noreturn
+// PLAYGROUND: unreachable
 
 // In release mode keep succinct fatal errors (trap).
 // RELEASE-LABEL: _TF19OptimizationOptions10test_fatalFTSiSi_Si
@@ -78,6 +92,14 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // DEBUG: unreachable
 // DEBUG: return
 
+// In playground mode keep verbose library precondition checks.
+// PLAYGROUND-LABEL: _TF19OptimizationOptions23test_precondition_checkFTSiSi_Si
+// PLAYGROUND-DAG: "fatal error"
+// PLAYGROUND-DAG: %[[FATAL_ERROR:.+]] = function_ref @_TTOS_nndd__TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_
+// PLAYGROUND: apply %[[FATAL_ERROR]]{{.*}} @noreturn
+// PLAYGROUND: unreachable
+// PLAYGROUND: return
+
 // In release mode keep succinct library precondition checks (trap).
 // RELEASE-LABEL: _TF19OptimizationOptions23test_precondition_checkFTSiSi_Si
 // RELEASE-NOT:  "fatal error"
@@ -100,6 +122,13 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // DEBUG-DAG: %[[FATAL_ERROR:.+]] = function_ref @_TTOS_nndd__TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_
 // DEBUG: apply %[[FATAL_ERROR]]{{.*}} @noreturn
 // DEBUG: unreachable
+
+// In playground mode keep verbose partial safety checks.
+// PLAYGROUND-LABEL: _TF19OptimizationOptions25test_partial_safety_checkFTSiSi_Si
+// PLAYGROUND-DAG: "fatal error"
+// PLAYGROUND-DAG: %[[FATAL_ERROR:.+]] = function_ref @_TTOS_nndd__TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_
+// PLAYGROUND: apply %[[FATAL_ERROR]]{{.*}} @noreturn
+// PLAYGROUND: unreachable
 
 // In release mode remove partial safety checks.
 // RELEASE-LABEL: _TF19OptimizationOptions25test_partial_safety_checkFTSiSi_Si
