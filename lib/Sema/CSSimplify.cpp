@@ -1523,12 +1523,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       auto meta1 = cast<AnyMetatypeType>(desugar1);
       auto meta2 = cast<AnyMetatypeType>(desugar2);
 
-      // metatype<B> < metatype<A> if A < B and both A and B are classes.
+      // metatype<A> < metatype<B> if A < B and both A and B are classes.
       TypeMatchKind subKind = TypeMatchKind::SameType;
       if (isa<MetatypeType>(desugar1) &&
           kind != TypeMatchKind::SameType &&
-          (meta1->getInstanceType()->mayHaveSuperclass() ||
-           meta2->getInstanceType()->getClassOrBoundGenericClass()))
+          meta1->getInstanceType()->mayHaveSuperclass() &&
+          meta2->getInstanceType()->getClassOrBoundGenericClass())
         subKind = std::min(kind, TypeMatchKind::Subtype);
       
       return matchTypes(meta1->getInstanceType(), meta2->getInstanceType(),
