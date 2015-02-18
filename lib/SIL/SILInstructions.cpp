@@ -427,6 +427,7 @@ StructInst *StructInst::create(SILLocation Loc, SILType Ty,
 
 StructInst::StructInst(SILLocation Loc, SILType Ty, ArrayRef<SILValue> Elems)
   : SILInstruction(ValueKind::StructInst, Loc, Ty), Operands(this, Elems) {
+  assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
 }
 
 TupleInst *TupleInst::create(SILLocation Loc, SILType Ty,

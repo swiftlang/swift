@@ -30,6 +30,16 @@ STATISTIC(NumAllocRemoved, "Number of allocations completely removed");
 // Subelement Analysis Implementation
 //===----------------------------------------------------------------------===//
 
+// We can only analyze components of structs whose storage is fully accessible
+// from Swift.
+static StructDecl *
+getFullyReferenceableStruct(SILType Ty) {
+  auto SD = Ty.getStructOrBoundGenericStruct();
+  if (!SD || SD->hasUnreferenceableStorage())
+    return nullptr;
+  return SD;
+}
+
 static unsigned getNumSubElements(SILType T, SILModule &M) {
   if (!M.getTypeLowering(T).isValid())
     return 0;
@@ -41,7 +51,7 @@ static unsigned getNumSubElements(SILType T, SILModule &M) {
     return NumElements;
   }
   
-  if (auto *SD = T.getStructOrBoundGenericStruct()) {
+  if (auto *SD = getFullyReferenceableStruct(T)) {
     unsigned NumElements = 0;
     for (auto *D : SD->getStoredProperties())
       NumElements += getNumSubElements(T.getFieldType(D, M), M);
@@ -142,7 +152,7 @@ static SILValue ExtractSubElement(SILValue Val, unsigned SubElementNumber,
   }
   
   // Extract struct elements.
-  if (auto *SD = ValTy.getStructOrBoundGenericStruct()) {
+  if (auto *SD = getFullyReferenceableStruct(ValTy)) {
     for (auto *D : SD->getStoredProperties()) {
       auto fieldType = ValTy.getFieldType(D, B.getModule());
       unsigned NumSubElt = getNumSubElements(fieldType, B.getModule());
@@ -539,8 +549,8 @@ AggregateAvailableValues(SILInstruction *Inst, SILType LoadTy,
     return B.createTuple(Inst->getLoc(), LoadTy, ResultElts);
   }
   
-  // Extract struct elements.
-  if (auto *SD = LoadTy.getStructOrBoundGenericStruct()) {
+  // Extract struct elements from fully referenceable structs.
+  if (auto *SD = getFullyReferenceableStruct(LoadTy)) {
     SmallVector<SILValue, 4> ResultElts;
     
     for (auto *FD : SD->getStoredProperties()) {
