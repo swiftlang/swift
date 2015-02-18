@@ -125,7 +125,7 @@ public:
   
   /// Get or create the declaration of a reabstraction thunk with the
   /// given signature.
-  SILFunction *getOrCreateReabstractionThunk(SILLocation loc,
+  SILFunction *getOrCreateReabstractionThunk(
                                            GenericParamList *thunkContextParams,
                                            CanSILFunctionType thunkType,
                                            CanSILFunctionType fromType,

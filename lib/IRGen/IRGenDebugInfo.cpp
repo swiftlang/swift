@@ -714,11 +714,11 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
 
   Location L = {};
   unsigned ScopeLine = 0; /// The source line used for the function prologue.
-  // Bare functions such as thunks should not have a line number. This
+  // Bare functions and thunks should not have any line numbers. This
   // is especially important for shared functions like reabstraction
   // thunk helpers, where getLocation() returns an arbitrary location
   // of whichever use was emitted first.
-  if (DS && !(DS->SILFn && DS->SILFn->isBare())) {
+  if (DS && (!DS->SILFn || (!DS->SILFn->isBare() && !DS->SILFn->isThunk()))) {
     auto FL = getLocation(SM, DS->Loc);
     L = FL.Loc;
     ScopeLine = FL.LocForLinetable.Line;
