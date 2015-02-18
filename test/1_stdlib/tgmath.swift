@@ -2,7 +2,7 @@
 
 // XFAIL: linux
 
-import Darwin
+import Darwin.C.tgmath
 import CoreGraphics
 
 // verifiers
