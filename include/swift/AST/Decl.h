@@ -3063,7 +3063,7 @@ public:
   }
   
   void setHasUnreferenceableStorage(bool v) {
-    StructDeclBits.HasUnreferenceableStorage = true;
+    StructDeclBits.HasUnreferenceableStorage = v;
   }
 };
 
