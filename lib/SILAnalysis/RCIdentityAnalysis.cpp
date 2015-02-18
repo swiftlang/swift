@@ -331,7 +331,7 @@ stripRCIdentityPreservingArgs(SILValue V, unsigned RecursionDepth) {
   // We now know that all incoming values, other than NoPayloadEnums, are
   // FirstIV after trivially stripping RCIdentical instructions. If we have no
   // NoPayloadEnums, then we know that this Arg's RCIdentity must be FirstIV.
-  if (NoPayloadEnums.empty())
+  if (NoPayloadEnumBBs.empty())
     return FirstIV;
 
   // At this point, we know that we have *some* NoPayloadEnums. If FirstIV is
