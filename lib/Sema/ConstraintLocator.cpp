@@ -31,14 +31,58 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
   id.AddInteger(path.size());
   for (auto elt : path) {
     id.AddInteger(elt.getKind());
-    unsigned numValues = numNumericValuesInPathElement(elt.getKind());
-    if (numValues > 0) {
-      id.AddInteger(elt.getValue());
-      if (numValues > 1)
-        id.AddInteger(elt.getValue2());
-    }
-    else if (elt.getKind() == ConstraintLocator::Archetype)
+    switch (elt.getKind()) {
+    case Archetype:
       id.AddPointer(elt.getArchetype()->getCanonicalType().getPointer());
+      break;
+
+    case Witness:
+      id.AddPointer(elt.getWitness());
+      break;
+
+    case AssociatedType:
+      id.AddPointer(elt.getAssociatedType());
+      break;
+
+    case ApplyArgument:
+    case ApplyFunction:
+    case FunctionArgument:
+    case FunctionResult:
+    case Member:
+    case MemberRefBase:
+    case UnresolvedMember:
+    case SubscriptIndex:
+    case SubscriptMember:
+    case SubscriptResult:
+    case ConstructorMember:
+    case AddressOf:
+    case RvalueAdjustment:
+    case ClosureResult:
+    case ParentType:
+    case InstanceType:
+    case SequenceGeneratorType:
+    case GeneratorElementType:
+    case ArrayElementType:
+    case LvalueObjectType:
+    case ScalarToTuple:
+    case Load:
+    case IfThen:
+    case IfElse:
+    case AssignSource:
+    case AssignDest:
+    case CheckedCastOperand:
+    case GenericArgument:
+    case InterpolationArgument:
+    case NamedTupleElement:
+    case TupleElement:
+    case ApplyArgToParam:
+      if (unsigned numValues = numNumericValuesInPathElement(elt.getKind())) {
+        id.AddInteger(elt.getValue());
+        if (numValues > 1)
+          id.AddInteger(elt.getValue2());
+      }
+      break;
+    }
   }
 }
 
