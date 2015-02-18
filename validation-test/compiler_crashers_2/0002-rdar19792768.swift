@@ -1,5 +1,4 @@
-// RUN: not --crash %target-swift-frontend %s -emit-silgen
-// XFAIL: no_asserts
+// RUN: %target-swift-frontend %s -emit-silgen
 
 // rdar://problem/19792768
 

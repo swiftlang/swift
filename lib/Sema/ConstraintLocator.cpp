@@ -71,7 +71,12 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
     case Archetype:
       out << "archetype '" << elt.getArchetype()->getString() << "'";
       break;
-        
+
+    case AssociatedType:
+      out << "associated type '"
+          << elt.getAssociatedType()->getNameStr() << "'";
+      break;
+
     case ApplyArgument:
       out << "apply argument";
       break;
@@ -111,6 +116,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case FunctionResult:
       out << "function result";
+      break;
+
+    case GeneratorElementType:
+      out << "generator element type";
       break;
 
     case GenericArgument:
@@ -167,6 +176,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case ScalarToTuple:
       out << "scalar to tuple";
+      break;
+
+    case SequenceGeneratorType:
+      out << "sequence generator type";
       break;
 
     case SubscriptIndex:

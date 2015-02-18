@@ -459,12 +459,15 @@ namespace {
           archetype = implArchetype;
         }
                                 
-        ConstraintLocator *locator = nullptr;
-        if (archetype)
+        ConstraintLocator *locator;
+        if (archetype) {
           locator = CS.getConstraintLocator(
                       Locator.withPathElement(LocatorPathElt(archetype)));
-        else
-          locator = CS.getConstraintLocator(Locator);
+        } else {
+          // FIXME: Occurs when the nested type is a concrete type,
+          // in which case it's quite silly to create a type variable at all.
+          locator = CS.getConstraintLocator(Locator.withPathElement(member));
+        }
                                 
         auto memberTypeVar = CS.createTypeVariable(locator,
                                                    TVO_PrefersSubtypeBinding);
@@ -772,19 +775,56 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
   return type;
 }
 
+void ConstraintSystem::recordOpenedTypes(
+       ConstraintLocatorBuilder locator,
+       const llvm::DenseMap<CanType, TypeVariableType *> &replacements) {
+  if (replacements.empty())
+    return;
+
+  // If the last path element is an archetype or associated type, ignore it.
+  SmallVector<LocatorPathElt, 2> pathElts;
+  Expr *anchor = locator.getLocatorParts(pathElts);
+  if (!pathElts.empty() &&
+      (pathElts.back().getKind() == ConstraintLocator::Archetype ||
+       pathElts.back().getKind() == ConstraintLocator::AssociatedType))
+    return;
+
+  // If the locator is empty, ignore it.
+  if (!anchor && pathElts.empty())
+    return;
+
+  ConstraintLocator *locatorPtr = getConstraintLocator(locator);
+  assert(locatorPtr && "No locator for opened types?");
+  assert(std::find_if(OpenedTypes.begin(), OpenedTypes.end(),
+                      [&](const std::pair<ConstraintLocator *,
+                          ArrayRef<OpenedType>> &entry) {
+                        return entry.first == locatorPtr;
+                      }) == OpenedTypes.end() &&
+         "already registered opened types for this locator");
+
+  OpenedType* openedTypes
+    = Allocator.Allocate<OpenedType>(replacements.size());
+  std::copy(replacements.begin(), replacements.end(), openedTypes);
+  OpenedTypes.push_back({ locatorPtr,
+    llvm::makeArrayRef(openedTypes,
+                       replacements.size()) });
+}
+
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      bool isTypeReference,
                                      bool isSpecialized,
                                      ConstraintLocatorBuilder locator,
                                      DependentTypeOpener *opener) {
+  llvm::DenseMap<CanType, TypeVariableType *> replacements;
+
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
     // Unqualified lookup can find operator names within nominal types.
     auto func = cast<FuncDecl>(value);
     assert(func->isOperator() && "Lookup should only find operators");
 
     auto openedType = openType(func->getInterfaceType(), locator,
-                               func, false, opener);
+                               replacements, func, false, opener);
     auto openedFnType = openedType->castTo<FunctionType>();
     
     // If this is a method whose result type is dynamic Self, replace
@@ -806,6 +846,9 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     addArchetypeConstraint(openedFnType->getInput()->getRValueInstanceType(),
                            getConstraintLocator(locator));
 
+    // If we opened up any type variables, record the replacements.
+    recordOpenedTypes(locator, replacements);
+
     // The reference implicitly binds 'self'.
     return { openedType, openedFnType->getResult() };
   }
@@ -819,8 +862,11 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
       return { nullptr, nullptr };
 
     // Open the type.
-    type = openType(type, locator, value->getInnermostDeclContext(), false, 
-                    opener);
+    type = openType(type, locator, replacements,
+                    value->getInnermostDeclContext(), false, opener);
+
+    // If we opened up any type variables, record the replacements.
+    recordOpenedTypes(locator, replacements);
 
     // If it's a type reference, we're done.
     if (isTypeReference)
@@ -837,9 +883,14 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
   // Adjust the type of the reference.
   valueType = openType(valueType, locator,
+                       replacements,
                        value->getPotentialGenericDeclContext(),
                        /*skipProtocolSelfConstraint=*/false,
                        opener);
+
+  // If we opened up any type variables, record the replacements.
+  recordOpenedTypes(locator, replacements);
+
   return { valueType, valueType };
 }
 
@@ -1049,8 +1100,9 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
   // Open the type of the generic function or member of a generic type.
   Type openedType;
+  llvm::DenseMap<CanType, TypeVariableType *> replacements;
   if (auto genericFn = value->getInterfaceType()->getAs<GenericFunctionType>()){
-    openedType = openType(genericFn, locator, dc, 
+    openedType = openType(genericFn, locator, replacements, dc,
                           /*skipProtocolSelfConstraint=*/true, opener);
   } else {
     openedType = TC.getUnopenedTypeOfReference(value, baseTy, DC,
@@ -1059,7 +1111,6 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     Type selfTy;
     if (auto sig = dc->getGenericSignatureOfContext()) {
       // Open up the generic parameter list for the container.
-      llvm::DenseMap<CanType, TypeVariableType *> replacements;
       openGeneric(dc, sig->getGenericParams(), sig->getRequirements(),
                   /*skipProtocolSelfConstraint=*/true,
                   opener, locator, replacements);
@@ -1208,6 +1259,9 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                fnType->getExtInfo());
     }
   }
+
+  // If we opened up any type variables, record the replacements.
+  recordOpenedTypes(locator, replacements);
 
   return { openedType, type };
 }

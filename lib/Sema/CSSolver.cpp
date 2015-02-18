@@ -165,6 +165,19 @@ Solution ConstraintSystem::finalize(
     solution.DisjunctionChoices.insert(choice);
   }
 
+  // Remember the opened types.
+  for (const auto &opened : OpenedTypes) {
+    // We shouldn't ever register opened types multiple times,
+    // but saving and re-applying solutions can cause us to get
+    // multiple entries.  We should use an optimized PartialSolution
+    // structure for that use case, which would optimize a lot of
+    // stuff here.
+    assert((solution.OpenedTypes.count(opened.first) == 0 ||
+            solution.OpenedTypes[opened.first] == opened.second)
+            && "Already recorded");
+    solution.OpenedTypes.insert(opened);
+  }
+
   return std::move(solution);
 }
 
@@ -209,6 +222,11 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   // Register the solution's disjunction choices.
   for (auto &choice : solution.DisjunctionChoices) {
     DisjunctionChoices.push_back(choice);
+  }
+
+  // Register the solution's opened types.
+  for (const auto &opened : solution.OpenedTypes) {
+    OpenedTypes.push_back(opened);
   }
 
   // Register any fixes produced along this path.
@@ -403,6 +421,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numConstraintRestrictions = cs.ConstraintRestrictions.size();
   numFixes = cs.Fixes.size();
   numDisjunctionChoices = cs.DisjunctionChoices.size();
+  numOpenedTypes = cs.OpenedTypes.size();
   numGeneratedConstraints = cs.solverState->generatedConstraints.size();
   PreviousScore = cs.CurrentScore;
 
@@ -452,6 +471,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any disjunction choices.
   truncate(cs.DisjunctionChoices, numDisjunctionChoices);
+
+  // Remove any opened types.
+  truncate(cs.OpenedTypes, numOpenedTypes);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;

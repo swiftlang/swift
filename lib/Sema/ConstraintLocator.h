@@ -63,6 +63,10 @@ public:
     ///
     /// Also contains the archetype itself.
     Archetype,
+    /// An associated type reference.
+    ///
+    /// Contains the associated type itself.
+    AssociatedType,
     /// \brief The argument type of a function.
     FunctionArgument,
     /// \brief The result type of a function.
@@ -101,6 +105,10 @@ public:
     ParentType,
     /// \brief The instance of a metatype type.
     InstanceType,
+    /// \brief The generic type of a sequence.
+    SequenceGeneratorType,
+    /// \brief The element type of a generator.
+    GeneratorElementType,
     /// \brief The element of an array type.
     ArrayElementType,
     /// \brief The object type of an lvalue type.
@@ -130,6 +138,7 @@ public:
     case ApplyArgument:
     case ApplyFunction:
     case Archetype:
+    case AssociatedType:
     case FunctionArgument:
     case FunctionResult:
     case Member:
@@ -144,6 +153,8 @@ public:
     case ClosureResult:
     case ParentType:
     case InstanceType:
+    case SequenceGeneratorType:
+    case GeneratorElementType:
     case ArrayElementType:
     case LvalueObjectType:
     case ScalarToTuple:
@@ -188,6 +199,8 @@ public:
     case ApplyArgument:
     case ApplyFunction:
     case ApplyArgToParam:
+    case SequenceGeneratorType:
+    case GeneratorElementType:
     case ArrayElementType:
     case CheckedCastOperand:
     case ClosureResult:
@@ -215,6 +228,7 @@ public:
       return IsFunctionConversion;
 
     case Archetype:
+    case AssociatedType:
     case GenericArgument:
     case InterpolationArgument:
     case NamedTupleElement:
@@ -234,6 +248,7 @@ public:
     /// \brief Describes the kind of data stored here.
     enum StoredKind : unsigned char {
       StoredArchetype,
+      StoredAssociatedType,
       StoredWitness,
       StoredKindAndValue
     };
@@ -312,6 +327,13 @@ public:
       assert(getWitness() == decl);
     }
 
+    PathElement(AssociatedTypeDecl *decl)
+      : storage((reinterpret_cast<uintptr_t>(decl) >> 2)),
+        storedKind(StoredAssociatedType)
+    {
+      assert(getAssociatedType() == decl);
+    }
+
     /// \brief Retrieve a path element for a tuple element referred to by
     /// its position.
     static PathElement getTupleElement(unsigned position) {
@@ -347,6 +369,9 @@ public:
       switch (static_cast<StoredKind>(storedKind)) {
       case StoredArchetype:
         return Archetype;
+
+      case StoredAssociatedType:
+        return AssociatedType;
 
       case StoredWitness:
         return Witness;
@@ -391,6 +416,12 @@ public:
     ArchetypeType *getArchetype() const {
       assert(getKind() == Archetype && "Not an archetype path element");
       return reinterpret_cast<ArchetypeType *>(storage << 2);
+    }
+
+      /// Retrieve the declaration for an associated type path element.
+    AssociatedTypeDecl *getAssociatedType() const {
+      assert(getKind() == AssociatedType && "Is not an associated type");
+      return reinterpret_cast<AssociatedTypeDecl *>(storage << 2);
     }
 
     /// \brief Return the summary flags for this particular element.

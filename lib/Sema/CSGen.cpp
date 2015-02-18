@@ -1486,10 +1486,11 @@ namespace {
                                               locatorBuilder.withPathElement(
                                                 ConstraintLocator::Member),
                                               /*options=*/0);
+      /// FIXME: ArrayElementType is a total hack here.
       auto dictionaryValueTy = CS.getMemberType(dictionaryTy,
                                                 valueAssocTy,
                                                 locatorBuilder.withPathElement(
-                                                  ConstraintLocator::Member),
+                                                  ConstraintLocator::ArrayElementType),
                                                 /*options=*/0);
       
       TupleTypeElt tupleElts[2] = { TupleTypeElt(dictionaryKeyTy),

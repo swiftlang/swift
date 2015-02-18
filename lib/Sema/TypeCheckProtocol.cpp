@@ -1264,6 +1264,7 @@ matchWitness(ConformanceChecker &cc, TypeChecker &tc,
       solution.computeSubstitutions(witness->getInterfaceType(),
                                     witnessDC,
                                     openedFullWitnessType,
+                                    witnessLocator,
                                     result.WitnessSubstitutions);
     }
     

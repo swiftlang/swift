@@ -37,22 +37,27 @@ Type Solution::getFixedType(TypeVariableType *typeVar) const {
   return knownBinding->second;
 }
 
-Type Solution::computeSubstitutions(Type origType, DeclContext *dc,
-                                    Type openedType,
-                 SmallVectorImpl<Substitution> &substitutions) const {
+Type Solution::computeSubstitutions(
+       Type origType, DeclContext *dc,
+       Type openedType,
+       ConstraintLocator *locator,
+       SmallVectorImpl<Substitution> &substitutions) const {
   auto &tc = getConstraintSystem().getTypeChecker();
   auto &ctx = tc.Context;
 
-  // Gather the substitutions from archetypes to concrete types, found
-  // by identifying all of the type variables in the original type
-  // FIXME: It's unfortunate that we're using archetypes here, but we don't
-  // have another way to map from type variables back to dependent types (yet);
+  // Gather the substitutions from dependent types to concrete types.
+  auto openedTypes = OpenedTypes.find(locator);
+  assert(openedTypes != OpenedTypes.end() && "Missing opened type information");
   TypeSubstitutionMap typeSubstitutions;
+  for (const auto &opened : openedTypes->second) {
+    typeSubstitutions[opened.first.getPointer()] = getFixedType(opened.second);
+  }
+
+  // Produce the concrete form of the opened type.
   auto type = openedType.transform([&](Type type) -> Type {
                 if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
                   auto archetype = tv->getImpl().getArchetype();
                   auto simplified = getFixedType(tv);
-                  typeSubstitutions[archetype] = simplified;
                   return SubstitutedType::get(archetype, simplified,
                                               tc.Context);
                 }
@@ -126,7 +131,7 @@ Type Solution::computeSubstitutions(Type origType, DeclContext *dc,
 
       // Each witness marker starts a new substitution.
       currentArchetype = firstArchetype;
-      currentReplacement = tc.substType(currentModule, currentArchetype,
+      currentReplacement = tc.substType(currentModule, req.getFirstType(),
                                         typeSubstitutions);
       break;
     }
@@ -417,7 +422,7 @@ namespace {
         Expr *base = TypeExpr::createImplicitHack(loc, baseTy, ctx);
         auto result = buildMemberRef(base, openedType, SourceLoc(), decl,
                                      loc, openedFnType->getResult(),
-                                     locator, implicit, semantics);
+                                     locator, locator, implicit, semantics);
         if (!result)
           return nullptr;;
 
@@ -444,8 +449,10 @@ namespace {
         auto dc = decl->getPotentialGenericDeclContext();
 
         SmallVector<Substitution, 4> substitutions;
-        auto type = solution.computeSubstitutions(genericFn, dc, openedType,
-                                                  substitutions);
+        auto type = solution.computeSubstitutions(
+                      genericFn, dc, openedType,
+                      getConstraintSystem().getConstraintLocator(locator),
+                      substitutions);
         return new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, decl, substitutions),
                                      loc, implicit, semantics, type);
       }
@@ -534,6 +541,7 @@ namespace {
     Expr *buildMemberRef(Expr *base, Type openedFullType, SourceLoc dotLoc,
                          ValueDecl *member, SourceLoc memberLoc,
                          Type openedType, ConstraintLocatorBuilder locator,
+                         ConstraintLocatorBuilder memberLocator,
                          bool Implicit, AccessSemantics semantics) {
       auto &tc = cs.getTypeChecker();
       auto &context = tc.Context;
@@ -575,10 +583,12 @@ namespace {
 
         // Build a reference to the generic member.
         SmallVector<Substitution, 4> substitutions;
-        refTy = solution.computeSubstitutions(member->getInterfaceType(),
-                                              dc,
-                                              openedFullType,
-                                              substitutions);
+        refTy = solution.computeSubstitutions(
+                  member->getInterfaceType(),
+                  dc,
+                  openedFullType,
+                  getConstraintSystem().getConstraintLocator(memberLocator),
+                  substitutions);
 
         memberRef = ConcreteDeclRef(context, member, substitutions);
 
@@ -785,13 +795,15 @@ namespace {
                                     SourceLoc dotLoc, ValueDecl *member,
                                     SourceLoc memberLoc, Type openedType,
                                     ConstraintLocatorBuilder locator,
+                                    ConstraintLocatorBuilder memberLocator,
                                     bool implicit,
                                     AccessSemantics semantics,
                                     Optional<UnavailabilityReason> reason) {
 
       // Let buildMemberRef() do the heavy lifting.
       Expr *ref = buildMemberRef(base, openedFullType, dotLoc, member, memberLoc,
-                                 openedType, locator, implicit, semantics);
+                                 openedType, locator, memberLocator, implicit,
+                                 semantics);
 
       // Wrap in a conversion expression if the member reference
       // may not be available.
@@ -1072,10 +1084,13 @@ namespace {
 
         // Compute the substitutions used to reference the subscript.
         SmallVector<Substitution, 4> substitutions;
-        solution.computeSubstitutions(subscript->getInterfaceType(),
-                                      dc,
-                                      selected.openedFullType,
-                                      substitutions);
+        solution.computeSubstitutions(
+          subscript->getInterfaceType(),
+          dc,
+          selected.openedFullType,
+          getConstraintSystem().getConstraintLocator(
+            locator.withPathElement(ConstraintLocator::SubscriptMember)),
+          substitutions);
 
         // Convert the base.
         auto openedFullFnType = selected.openedFullType->castTo<FunctionType>();
@@ -1123,6 +1138,7 @@ namespace {
     /// \brief Build a new reference to another constructor.
     Expr *buildOtherConstructorRef(Type openedFullType,
                                    ConstructorDecl *ctor, SourceLoc loc,
+                                   ConstraintLocatorBuilder locator,
                                    bool isDelegating,
                                    bool implicit) {
       auto &tc = cs.getTypeChecker();
@@ -1138,6 +1154,7 @@ namespace {
                      ctor->getInterfaceType(),
                      ctor,
                      openedFullType,
+                     getConstraintSystem().getConstraintLocator(locator),
                      substitutions);
 
         ref = ConcreteDeclRef(ctx, ctor, substitutions);
@@ -1822,10 +1839,11 @@ namespace {
                        tc.Context));
 
         auto memberRef = buildMemberRef(
-            typeRef, choice.openedFullType,
-            segment->getStartLoc(), choice.choice.getDecl(),
-            segment->getStartLoc(), choice.openedType,
-            locatorBuilder, /*Implicit=*/true, AccessSemantics::Ordinary);
+                           typeRef, choice.openedFullType,
+                           segment->getStartLoc(), choice.choice.getDecl(),
+                           segment->getStartLoc(), choice.openedType,
+                           locator, locator, /*Implicit=*/true,
+                           AccessSemantics::Ordinary);
         ApplyExpr *apply =
             new (tc.Context) CallExpr(memberRef, arg, /*Implicit=*/true);
 
@@ -1940,10 +1958,10 @@ namespace {
 
     Expr *visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *expr) {
       // Resolve the callee to the constructor declaration selected.
-      auto selected = getOverloadChoice(
-                        cs.getConstraintLocator(
-                          expr,
-                          ConstraintLocator::ConstructorMember));
+      auto ctorLocator = cs.getConstraintLocator(
+                           expr,
+                           ConstraintLocator::ConstructorMember);
+      auto selected = getOverloadChoice(ctorLocator);
       auto choice = selected.choice;
       auto *ctor = cast<ConstructorDecl>(choice.getDecl());
 
@@ -1961,6 +1979,7 @@ namespace {
                               expr->getType(),
                               ConstraintLocatorBuilder(
                                 cs.getConstraintLocator(expr)),
+                              ctorLocator,
                               expr->isImplicit(),
                               AccessSemantics::Ordinary);
       }
@@ -2019,6 +2038,9 @@ namespace {
       Expr *ctorRef = buildOtherConstructorRef(
                         selected.openedFullType,
                         ctor, expr->getConstructorLoc(),
+                        cs.getConstraintLocator(
+                          expr,
+                          ConstraintLocator::ConstructorMember),
                         !expr->getSubExpr()->isSuperExpr(),
                         expr->isImplicit());
       auto *call
@@ -2055,15 +2077,16 @@ namespace {
     }
 
     Expr *visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *expr) {
-      auto selected = getOverloadChoice(
-                        cs.getConstraintLocator(expr,
-                                                ConstraintLocator::Member));
+      auto memberLocator = cs.getConstraintLocator(expr,
+                                                   ConstraintLocator::Member);
+      auto selected = getOverloadChoice(memberLocator);
       return buildMemberRef(expr->getBase(),
                             selected.openedFullType,
                             expr->getDotLoc(),
                             selected.choice.getDecl(), expr->getMemberLoc(),
                             selected.openedType,
                             cs.getConstraintLocator(expr),
+                            memberLocator,
                             expr->isImplicit(), expr->getAccessSemantics());
     }
 
@@ -2089,9 +2112,9 @@ namespace {
     }
 
     Expr *visitMemberRefExpr(MemberRefExpr *expr) {
-      auto selected = getOverloadChoice(
-                        cs.getConstraintLocator(expr,
-                                                ConstraintLocator::Member));
+      auto memberLocator = cs.getConstraintLocator(expr,
+                                                   ConstraintLocator::Member);
+      auto selected = getOverloadChoice(memberLocator);
       Optional<UnavailabilityReason> reason;
       if (selected.choice.isPotentiallyUnavailable()) {
         reason = selected.choice.getReasonUnavailable(cs);
@@ -2102,6 +2125,7 @@ namespace {
                             selected.choice.getDecl(), expr->getNameLoc(),
                             selected.openedType,
                             cs.getConstraintLocator(expr),
+                            memberLocator,
                             expr->isImplicit(),
                             expr->getAccessSemantics(),
                             reason);
@@ -2126,9 +2150,9 @@ namespace {
       auto &tc = cs.getTypeChecker();
 
       // Find the selected member.
-      auto selected = getOverloadChoice(
-                        cs.getConstraintLocator(
-                          expr, ConstraintLocator::UnresolvedMember));
+      auto memberLocator = cs.getConstraintLocator(
+                             expr, ConstraintLocator::UnresolvedMember);
+      auto selected = getOverloadChoice(memberLocator);
       auto member = selected.choice.getDecl();
       
       // If the member came by optional unwrapping, then unwrap the base type.
@@ -2151,7 +2175,9 @@ namespace {
                                    expr->getNameLoc(),
                                    selected.openedType,
                                    cs.getConstraintLocator(expr),
-                                   expr->isImplicit(), AccessSemantics::Ordinary);
+                                   memberLocator,
+                                   expr->isImplicit(),
+                                   AccessSemantics::Ordinary);
       if (!result)
         return nullptr;
 
@@ -2201,10 +2227,9 @@ namespace {
                              SourceLoc nameLoc,
                              bool implicit) {
       // Determine the declaration selected for this overloaded reference.
-      auto selected = getOverloadChoice(
-                        cs.getConstraintLocator(
-                          expr,
-                          ConstraintLocator::Member));
+      auto memberLocator = cs.getConstraintLocator(expr,
+                                                   ConstraintLocator::Member);
+      auto selected = getOverloadChoice(memberLocator);
 
       Optional<UnavailabilityReason> reason;
       if (selected.choice.isPotentiallyUnavailable()) {
@@ -2248,6 +2273,7 @@ namespace {
                                                 nameLoc,
                                                 selected.openedType,
                                                 cs.getConstraintLocator(expr),
+                                                memberLocator,
                                                 implicit,
                                                 AccessSemantics::Ordinary,
                                                 reason);
@@ -3229,9 +3255,10 @@ findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
                 Type openedType) -> ConcreteDeclRef {
               if (decl->getPotentialGenericDeclContext()->isGenericContext()) {
                 SmallVector<Substitution, 4> subs;
-                solution.computeSubstitutions(decl->getType(),
-                                              decl->getPotentialGenericDeclContext(),
-                                              openedType, subs);
+                solution.computeSubstitutions(
+                  decl->getType(),
+                  decl->getPotentialGenericDeclContext(),
+                  openedType, locator, subs);
                 return ConcreteDeclRef(cs.getASTContext(), decl, subs);
               }
               
@@ -5097,10 +5124,10 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // enum element to use.
   assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
          ty->hasDependentProtocolConformances());
-  auto selected = getOverloadChoiceIfAvailable(
-                    cs.getConstraintLocator(
-                      locator.withPathElement(
-                        ConstraintLocator::ConstructorMember)));
+  auto ctorLocator = cs.getConstraintLocator(
+                       locator.withPathElement(
+                         ConstraintLocator::ConstructorMember));
+  auto selected = getOverloadChoiceIfAvailable(ctorLocator);
 
   // We have the constructor.
   auto choice = selected->choice;
@@ -5118,7 +5145,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                  selected->openedFullType,
                                  /*DotLoc=*/SourceLoc(),
                                  decl, fn->getEndLoc(),
-                                 selected->openedType, locator,
+                                 selected->openedType,
+                                 locator,
+                                 ctorLocator,
                                  /*Implicit=*/true, AccessSemantics::Ordinary);
   declRef->setImplicit(apply->isImplicit());
   apply->setFn(declRef);
@@ -6047,7 +6076,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   auto memberRef = rewriter.buildMemberRef(base, openedFullType,
                                            base->getStartLoc(),
                                            witness, base->getEndLoc(),
-                                           openedType, locator,
+                                           openedType, locator, locator,
                                            /*Implicit=*/true,
                                            AccessSemantics::Ordinary);
 

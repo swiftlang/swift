@@ -810,6 +810,10 @@ struct Score {
 /// Display a score.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &out, const Score &score);
 
+/// Describes a dependent type that has been opened to a particular type
+/// variable.
+typedef std::pair<CanType, TypeVariableType *> OpenedType;
+
 /// \brief A complete solution to a constraint system.
 ///
 /// A solution to a constraint system consists of type variable bindings to
@@ -856,6 +860,9 @@ public:
   /// The set of disjunction choices used to arrive at this solution,
   /// which informs constraint application.
   llvm::SmallDenseMap<ConstraintLocator *, unsigned> DisjunctionChoices;
+
+  /// The set of opened types for a given locator.
+  llvm::SmallDenseMap<ConstraintLocator *, ArrayRef<OpenedType>> OpenedTypes;
 
   /// \brief Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
@@ -918,6 +925,9 @@ public:
   ///
   /// \param dc          The declaration context that owns the generic type
   ///
+  /// \param locator The locator that describes where the substitutions came
+  /// from.
+  ///
   /// \param substitutions Will be populated with the set of substitutions
   /// to be applied to the generic function type.
   ///
@@ -925,6 +935,7 @@ public:
   Type computeSubstitutions(Type origType,
                             DeclContext *dc,
                             Type openedType,
+                            ConstraintLocator *locator,
                             SmallVectorImpl<Substitution> &substitutions) const;
 
   /// Return the disjunction choice for the given constraint location.
@@ -1329,6 +1340,11 @@ private:
   /// The constraint graph.
   ConstraintGraph &CG;
 
+  /// A mapping from constraint locators to the set of opened types associated
+  /// with that locator.
+  SmallVector<std::pair<ConstraintLocator *, ArrayRef<OpenedType>>, 4>
+    OpenedTypes;
+
   /// \brief Describes the current solver state.
   struct SolverState {
     SolverState(ConstraintSystem &cs);
@@ -1432,6 +1448,9 @@ public:
 
     /// \brief The length of \c DisjunctionChoices.
     unsigned numDisjunctionChoices;
+
+    /// The length of \c OpenedTypes.
+    unsigned numOpenedTypes;
 
     /// The previous score.
     Score PreviousScore;
@@ -1937,6 +1956,11 @@ public:
                    DependentTypeOpener *opener,
                    ConstraintLocatorBuilder locator,
                    llvm::DenseMap<CanType, TypeVariableType *> &replacements);
+
+  /// Record the set of opened types for the given locator.
+  void recordOpenedTypes(
+         ConstraintLocatorBuilder locator,
+         const llvm::DenseMap<CanType, TypeVariableType *> &replacements);
 
   /// \brief Retrieve the type of a reference to the given value declaration.
   ///
