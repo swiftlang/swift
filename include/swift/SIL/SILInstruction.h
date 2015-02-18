@@ -2025,8 +2025,8 @@ public:
   }
   
   /// \brief If the default refers to exactly one case decl, return it.
-  EnumElementDecl *getUniqueCaseForDefault();
-      
+  NullablePtr<EnumElementDecl> getUniqueCaseForDefault();
+
   SILValue getDefaultResult() const {
     assert(HasDefault && "doesn't have a default");
     return Operands[NumCases + 1].get();
@@ -2038,7 +2038,7 @@ public:
   // FIXME: This is used to interoperate with passes that reasoned about the
   // old enum_is_tag insn. Ideally those passes would become general enough
   // not to need this.
-  EnumElementDecl *getSingleTrueElement() const;
+  NullablePtr<EnumElementDecl> getSingleTrueElement() const;
 };
   
 /// Select one of a set of values based on the case of an enum.
@@ -3354,11 +3354,11 @@ public:
   }
 
   /// \brief If the default refers to exactly one case decl, return it.
-  EnumElementDecl *getUniqueCaseForDefault();
+  NullablePtr<EnumElementDecl> getUniqueCaseForDefault();
 
   /// \brief If the given block only has one enum element decl matched to it,
   /// return it.
-  EnumElementDecl *getUniqueCaseForDestination(SILBasicBlock *BB);
+  NullablePtr<EnumElementDecl> getUniqueCaseForDestination(SILBasicBlock *BB);
 
   bool hasDefault() const { return HasDefault; }
   SILBasicBlock *getDefaultBB() const {

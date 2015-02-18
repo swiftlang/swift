@@ -58,6 +58,8 @@ public:
   
   T *getPtrOrNull() { return Ptr; }
   const T *getPtrOrNull() const { return Ptr; }
+
+  explicit operator bool() const { return Ptr; }
 };
   
 } // end namespace swift

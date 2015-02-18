@@ -501,8 +501,8 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
   // Try to find a single literal "true" case.
   // TODO: More general conditions in which we can relate the BB to a single
   // case, such as when there's a single literal "false" case.
-  EnumElementDecl *TrueElement = SEI->getSingleTrueElement();
-  if (!TrueElement)
+  NullablePtr<EnumElementDecl> TrueElement = SEI->getSingleTrueElement();
+  if (TrueElement.isNull())
     return false;
   
   // Next go over all instructions after I in the basic block. If none of them
@@ -527,7 +527,7 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
   // Work out which enum element is the true branch, and which is false.
   // If the enum only has 2 values and its tag isn't the true branch, then we
   // know the true branch must be the other tag.
-  EnumElementDecl *Elts[2] = {TrueElement, nullptr};
+  EnumElementDecl *Elts[2] = {TrueElement.get(), nullptr};
   EnumDecl *E = SEI->getEnumOperand().getType().getEnumOrBoundGenericEnum();
   if (!E)
     return false;
@@ -536,7 +536,7 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
   EnumElementDecl *OtherElt = nullptr;
   for (EnumElementDecl *Elt : E->getAllElements()) {
     // Skip the case where we find the select_enum element
-    if (Elt == TrueElement)
+    if (Elt == TrueElement.get())
       continue;
     // If we find another element, then we must have more than 2, so bail.
     if (OtherElt)
@@ -847,9 +847,9 @@ void BBEnumTagDataflowState::handlePredCondSelectEnum(CondBranchInst *CondBr) {
   SelectEnumInst *EITI = dyn_cast<SelectEnumInst>(CondBr->getCondition());
   if (!EITI)
     return;
-  
-  auto TrueElement = EITI->getSingleTrueElement();
-  if (!TrueElement)
+
+  NullablePtr<EnumElementDecl> TrueElement = EITI->getSingleTrueElement();
+  if (TrueElement.isNull())
     return;
 
   // Find the tag associated with our BB and set the state of the
@@ -859,7 +859,7 @@ void BBEnumTagDataflowState::handlePredCondSelectEnum(CondBranchInst *CondBr) {
   // Check if we are the true case, ie, we know that we are the given tag.
   const auto &Operand = EITI->getEnumOperand();
   if (CondBr->getTrueBB() == getBB()) {
-    ValueToCaseMap[Operand] = TrueElement;
+    ValueToCaseMap[Operand] = TrueElement.get();
     return;
   }
 
@@ -870,7 +870,7 @@ void BBEnumTagDataflowState::handlePredCondSelectEnum(CondBranchInst *CondBr) {
     EnumElementDecl *OtherElt = nullptr;
     for (EnumElementDecl *Elt : E->getAllElements()) {
       // Skip the case where we find the select_enum element
-      if (Elt == TrueElement)
+      if (Elt == TrueElement.get())
         continue;
       // If we find another element, then we must have more than 2, so bail.
       if (OtherElt)

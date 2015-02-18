@@ -399,8 +399,8 @@ getOtherElementOfTwoElementEnum(EnumDecl *E, EnumElementDecl *Element) {
 
 /// If PredTerm is a (cond_br (select_enum)) or a (switch_enum), return the decl
 /// that will yield DomBB.
-static EnumElementDecl *
-getEnumEltTaken(TermInst *PredTerm, SILBasicBlock *DomBB) {
+static NullablePtr<EnumElementDecl> getEnumEltTaken(TermInst *PredTerm,
+                                                    SILBasicBlock *DomBB) {
   // First check if we have a (cond_br (select_enum)).
   if (auto *CBI = dyn_cast<CondBranchInst>(PredTerm)) {
     auto *SEI = dyn_cast<SelectEnumInst>(CBI->getCondition());
@@ -410,14 +410,14 @@ getEnumEltTaken(TermInst *PredTerm, SILBasicBlock *DomBB) {
     // Try to find a single literal "true" case.
     // TODO: More general conditions in which we can relate the BB to a single
     // case, such as when there's a single literal "false" case.
-    EnumElementDecl *TrueElement = SEI->getSingleTrueElement();
-    if (!TrueElement)
+    NullablePtr<EnumElementDecl> TrueElement = SEI->getSingleTrueElement();
+    if (TrueElement.isNull())
       return nullptr;
 
     // If DomBB is the taken branch, we know that the EnumElementDecl is the one
     // checked for by enum is tag. Return it.
     if (getBranchTaken(CBI, DomBB)) {
-      return TrueElement;
+      return TrueElement.get();
     }
 
     // Ok, DomBB is not the taken branch. If we have an enum with only two
@@ -425,7 +425,7 @@ getEnumEltTaken(TermInst *PredTerm, SILBasicBlock *DomBB) {
     EnumDecl *E = SEI->getEnumOperand().getType().getEnumOrBoundGenericEnum();
 
     // This will return nullptr if we have more than two cases in our decl.
-    return getOtherElementOfTwoElementEnum(E, TrueElement);
+    return getOtherElementOfTwoElementEnum(E, TrueElement.get());
   }
 
   auto *SWEI = dyn_cast<SwitchEnumInst>(PredTerm);
@@ -484,8 +484,10 @@ static bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
     // Inst to optimize Inst.
     switch (Kind) {
     case ValueKind::SwitchEnumInst: {
-      if (EnumElementDecl *EltDecl = getEnumEltTaken(PredTerm, DomBB)) {
-        simplifySwitchEnumInst(cast<SwitchEnumInst>(Term), EltDecl, DomBB);
+      if (NullablePtr<EnumElementDecl> EltDecl =
+              getEnumEltTaken(PredTerm, DomBB)) {
+        simplifySwitchEnumInst(cast<SwitchEnumInst>(Term), EltDecl.get(),
+                               DomBB);
         return true;
       }
 
@@ -501,8 +503,9 @@ static bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
       // If this CBI has an 
       if (auto *SEI = dyn_cast<SelectEnumInst>(CBI->getCondition())) {
         if (auto TrueElement = SEI->getSingleTrueElement()) {
-          if (EnumElementDecl *Element = getEnumEltTaken(PredTerm, DomBB)) {
-            simplifyCondBranchInst(CBI, Element == TrueElement);
+          if (NullablePtr<EnumElementDecl> Element =
+                  getEnumEltTaken(PredTerm, DomBB)) {
+            simplifyCondBranchInst(CBI, Element.get() == TrueElement.get());
             return true;
           }
         }
@@ -2129,8 +2132,8 @@ void SimplifyCFG::canonicalizeSwitchEnums() {
     
     if (!SWI->hasDefault())
       continue;
-    
-    EnumElementDecl *elementDecl = SWI->getUniqueCaseForDefault();
+
+    NullablePtr<EnumElementDecl> elementDecl = SWI->getUniqueCaseForDefault();
     if (!elementDecl)
       continue;
     
@@ -2140,8 +2143,8 @@ void SimplifyCFG::canonicalizeSwitchEnums() {
       CaseBBs.push_back(SWI->getCase(idx));
     }
     // Add the default-entry of the original instruction as case-entry.
-    CaseBBs.push_back(std::make_pair(elementDecl, SWI->getDefaultBB()));
-    
+    CaseBBs.push_back(std::make_pair(elementDecl.get(), SWI->getDefaultBB()));
+
     if (SWI->getKind() == ValueKind::SwitchEnumInst) {
       SILBuilderWithScope<1>(SWI).createSwitchEnum(SWI->getLoc(),
                                   SWI->getOperand(), nullptr, CaseBBs);

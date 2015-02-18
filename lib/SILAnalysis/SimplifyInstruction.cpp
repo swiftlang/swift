@@ -201,9 +201,9 @@ SILValue InstSimplifier::visitSelectEnumInst(SelectEnumInst *SEI) {
   // replace the default with that case.
   if (!SEI->hasDefault())
     return SILValue();
-  
-  EnumElementDecl *elementDecl = SEI->getUniqueCaseForDefault();
-  if (!elementDecl)
+
+  NullablePtr<EnumElementDecl> elementDecl = SEI->getUniqueCaseForDefault();
+  if (elementDecl.isNull())
     return SILValue();
   
   // Construct a new instruction by copying all the case entries.
@@ -212,8 +212,9 @@ SILValue InstSimplifier::visitSelectEnumInst(SelectEnumInst *SEI) {
     CaseValues.push_back(SEI->getCase(idx));
   }
   // Add the default-entry of the original instruction as case-entry.
-  CaseValues.push_back(std::make_pair(elementDecl, SEI->getDefaultResult()));
-  
+  CaseValues.push_back(
+      std::make_pair(elementDecl.get(), SEI->getDefaultResult()));
+
   return SILBuilderWithScope<1>(SEI).createSelectEnum(SEI->getLoc(),
                  SEI->getEnumOperand(), SEI->getType(), SILValue(), CaseValues);
 }
@@ -223,9 +224,9 @@ SILValue InstSimplifier::visitSelectEnumAddrInst(SelectEnumAddrInst *SEI) {
   // then replace the default with that case.
   if (!SEI->hasDefault())
     return SILValue();
-  
-  EnumElementDecl *elementDecl = SEI->getUniqueCaseForDefault();
-  if (!elementDecl)
+
+  NullablePtr<EnumElementDecl> elementDecl = SEI->getUniqueCaseForDefault();
+  if (elementDecl.isNull())
     return SILValue();
   
   // Construct a new instruction by copying all the case entries.
@@ -234,8 +235,9 @@ SILValue InstSimplifier::visitSelectEnumAddrInst(SelectEnumAddrInst *SEI) {
     CaseValues.push_back(SEI->getCase(idx));
   }
   // Add the default-entry of the original instruction as case-entry.
-  CaseValues.push_back(std::make_pair(elementDecl, SEI->getDefaultResult()));
-  
+  CaseValues.push_back(
+      std::make_pair(elementDecl.get(), SEI->getDefaultResult()));
+
   return SILBuilderWithScope<1>(SEI).createSelectEnumAddr(SEI->getLoc(),
                     SEI->getEnumOperand(), SEI->getType(), nullptr, CaseValues);
 }
@@ -260,7 +262,7 @@ SILValue InstSimplifier::visitEnumInst(EnumInst *EI) {
     if (EI->getType() != SEI->getOperand().getType())
       return SILValue();
 
-    if (EI->getElement() == SEI->getUniqueCaseForDestination(BB))
+    if (EI->getElement() == SEI->getUniqueCaseForDestination(BB).getPtrOrNull())
       return SEI->getOperand();
   }
 

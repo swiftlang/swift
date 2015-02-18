@@ -840,12 +840,11 @@ namespace {
   }
 }
 
-EnumElementDecl *SelectEnumInstBase::getUniqueCaseForDefault() {
+NullablePtr<EnumElementDecl> SelectEnumInstBase::getUniqueCaseForDefault() {
   return getUniqueCaseForDefaultValue(this, getEnumOperand());
 }
 
-EnumElementDecl *
-SelectEnumInstBase::getSingleTrueElement() const {
+NullablePtr<EnumElementDecl> SelectEnumInstBase::getSingleTrueElement() const {
   auto SEIType = getType().getAs<BuiltinIntegerType>();
   if (!SEIType)
     return nullptr;
@@ -899,11 +898,11 @@ SwitchEnumInstBase::createSwitchEnum(SILLocation Loc, SILValue Operand,
   return ::new (buf) SWITCH_ENUM_INST(Loc, Operand, DefaultBB, CaseBBs);
 }
 
-EnumElementDecl *SwitchEnumInstBase::getUniqueCaseForDefault() {
+NullablePtr<EnumElementDecl> SwitchEnumInstBase::getUniqueCaseForDefault() {
   return getUniqueCaseForDefaultValue(this, getOperand());
 }
 
-EnumElementDecl *
+NullablePtr<EnumElementDecl>
 SwitchEnumInstBase::getUniqueCaseForDestination(SILBasicBlock *BB) {
   SILValue value = getOperand();
   SILType enumType = value.getType();

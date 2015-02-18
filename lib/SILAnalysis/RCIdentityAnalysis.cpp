@@ -154,10 +154,10 @@ static llvm::Optional<bool> proveNonPayloadedEnumCase(SILBasicBlock *BB,
 
   // Then return true if along the edge from the SEI to BB, RCIdentity has a
   // non-payloaded enum value.
-  auto *Decl = SEI->getUniqueCaseForDestination(BB);
-  if (!Decl)
+  NullablePtr<EnumElementDecl> Decl = SEI->getUniqueCaseForDestination(BB);
+  if (Decl.isNull())
     return None;
-  return !Decl->hasArgumentType();
+  return !Decl.get()->hasArgumentType();
 }
 
 bool RCIdentityAnalysis::
