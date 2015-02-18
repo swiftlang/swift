@@ -248,7 +248,7 @@ def Ounchecked : Flag<["-"], "Ounchecked">, Group<O_Group>,
   Flags<[FrontendOption]>,
   HelpText<"Compile with optimizations and remove runtime safety checks">;
 def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
-  Flags<[FrontendOption]>,
+  Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Compile with optimizations appropriate for a playground">;
 
 
