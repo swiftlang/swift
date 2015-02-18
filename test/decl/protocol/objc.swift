@@ -61,3 +61,12 @@ class C1b : P1 { // expected-error{{type 'C1b' does not conform to protocol 'P1'
     @objc(method) get { return ObjCClass() } // expected-error{{Objective-C method 'method' provided by getter for 'someProp' conflicts with optional requirement method 'method()' in protocol 'OptP1'}}
   }
 }
+
+// rdar://problem/19879598
+@objc protocol Foo {
+  init() // expected-note{{protocol requires initializer 'init()' with type '()'}}
+}
+
+class Bar: Foo { // expected-error{{type 'Bar' does not conform to protocol 'Foo'}}
+  required init() {} // expected-note{{candidate is not '@objc', but protocol requires it}}{{3-3=@objc }}
+}

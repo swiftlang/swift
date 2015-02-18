@@ -1471,6 +1471,10 @@ diagnoseMatch(TypeChecker &tc, Module *module,
     break;
   case MatchKind::NotObjC: {
     SourceLoc witnessStartLoc = match.Witness->getStartLoc();
+    SourceLoc attrStartLoc = match.Witness->getAttrs().getStartLoc();
+    if (attrStartLoc.isValid())
+      witnessStartLoc = attrStartLoc;
+
     if (auto varWitness = dyn_cast<VarDecl>(match.Witness)) {
       if (auto patternBinding = varWitness->getParentPattern())
         witnessStartLoc = patternBinding->getStartLoc();

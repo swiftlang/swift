@@ -922,7 +922,7 @@ public:
       Kind(kind) {}
 
   InlineAttr(InlineKind kind)
-  : InlineAttr(SourceLoc(), SourceRange(), kind) {}
+    : InlineAttr(SourceLoc(), SourceRange(), kind) {}
 
   InlineKind getKind() const { return Kind; }
   static bool classof(const DeclAttribute *DA) {
@@ -1148,6 +1148,8 @@ public:
   void setRawAttributeChain(DeclAttribute *Chain) {
     DeclAttrs = Chain;
   }
+
+  SourceLoc getStartLoc(bool forModifiers = false) const;
 };
 
 } // end namespace swift

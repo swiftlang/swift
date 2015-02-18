@@ -169,6 +169,20 @@ void DeclAttributes::print(ASTPrinter &Printer,
     DA->print(Printer, Options);
 }
 
+SourceLoc DeclAttributes::getStartLoc(bool forModifiers) const {
+  if (isEmpty())
+    return SourceLoc();
+
+  const DeclAttribute *lastAttr = nullptr;
+  for (auto attr : *this) {
+    if (attr->getRangeWithAt().Start.isValid() &&
+        (!forModifiers || attr->isDeclModifier()))
+      lastAttr = attr;
+  }
+
+  return lastAttr ? lastAttr->getRangeWithAt().Start : SourceLoc();
+}
+
 void DeclAttribute::print(ASTPrinter &Printer,
                           const PrintOptions &Options) const {
   switch (getKind()) {

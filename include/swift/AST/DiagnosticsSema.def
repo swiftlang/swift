@@ -1000,7 +1000,7 @@ ERROR(override_mutable_covariant_subscript,sema_tcd,none,
       "cannot override mutable subscript of type %0 with covariant type %1",
       (Type, Type))
 ERROR(decl_already_final,sema_tcd,none,
-"static declarations are already final", ())
+      "static declarations are already final", ())
 ERROR(decl_no_default_init,sema_tcd,none,
       "cannot default-initialize variable of type %0", (Type))
 ERROR(decl_no_default_init_ivar_hole,sema_tcd,none,
