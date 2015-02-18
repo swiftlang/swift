@@ -319,10 +319,9 @@ Algorithm.test("map/CollectionType") {
   }
 }
 
-// FIXME(19789546): move to FlatMap test file
 Algorithm.test("flatMap/SequenceType") {
   if true {
-    let s = DrainableSequence<Int>([])
+    let s = MinimalSequence<Int>([])
     var result = flatMap(s) {
       (x: Int) -> [Int16] in
       expectUnreachable()
@@ -333,7 +332,7 @@ Algorithm.test("flatMap/SequenceType") {
     expectEqual([], Array(s))
   }
   if true {
-    let s = DrainableSequence([ 0, 30, 10, 90 ])
+    let s = MinimalSequence([ 0, 30, 10, 90 ])
     let result = flatMap(s) { [$0 + 1] }
     expectEqual([ 1, 31, 11, 91 ], result)
     expectEqual([], Array(s))
