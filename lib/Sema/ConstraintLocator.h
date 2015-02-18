@@ -119,6 +119,8 @@ public:
     AssignDest,
     /// \brief The operand of a checked cast.
     CheckedCastOperand,
+    /// The candidate witness during protocol conformance checking.
+    Witness,
   };
 
   /// \brief Determine the number of numeric values used for the given path
@@ -151,6 +153,7 @@ public:
     case AssignSource:
     case AssignDest:
     case CheckedCastOperand:
+    case Witness:
       return 0;
 
     case GenericArgument:
@@ -216,6 +219,7 @@ public:
     case InterpolationArgument:
     case NamedTupleElement:
     case TupleElement:
+    case Witness:
       return IsNotSimple;
     }
     llvm_unreachable("bad path element kind");
@@ -230,6 +234,7 @@ public:
     /// \brief Describes the kind of data stored here.
     enum StoredKind : unsigned char {
       StoredArchetype,
+      StoredWitness,
       StoredKindAndValue
     };
 
@@ -281,7 +286,7 @@ public:
     }
 
     friend class ConstraintLocator;
-    
+
   public:
     PathElement(PathElementKind kind)
       : storage(encodeStorage(kind, 0)), storedKind(StoredKindAndValue)
@@ -297,6 +302,14 @@ public:
       static_assert(alignof(ArchetypeType) >= 4,
                     "archetypes insufficiently aligned");
       assert(getArchetype() == archetype);
+    }
+
+    PathElement(PathElementKind kind, ValueDecl *decl)
+      : storage((reinterpret_cast<uintptr_t>(decl) >> 2)),
+        storedKind(StoredWitness)
+    {
+      assert(kind == Witness && "Not a witness element");
+      assert(getWitness() == decl);
     }
 
     /// \brief Retrieve a path element for a tuple element referred to by
@@ -335,6 +348,9 @@ public:
       case StoredArchetype:
         return Archetype;
 
+      case StoredWitness:
+        return Witness;
+
       case StoredKindAndValue:
         return decodeStorage(storage).first;
       }
@@ -363,6 +379,12 @@ public:
 
       auto value = decodeStorage(storage).second;
       return value & 0x00FFFF;
+    }
+
+    /// Retrieve the declaration for a witness path element.
+    ValueDecl *getWitness() const {
+      assert(getKind() == Witness && "Is not a witness");
+      return reinterpret_cast<ValueDecl *>(storage << 2);
     }
 
     /// \brief Retrieve the actual archetype for an archetype path element.

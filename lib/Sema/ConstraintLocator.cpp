@@ -16,6 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "ConstraintLocator.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/StringExtras.h"
@@ -182,6 +183,11 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case TupleElement:
       out << "tuple element #" << llvm::utostr(elt.getValue());
+      break;
+
+    case Witness:
+      out << "witness ";
+      elt.getWitness()->dumpRef(out);
       break;
     }
   }

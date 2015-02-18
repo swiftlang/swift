@@ -1153,9 +1153,12 @@ static RequirementMatch
 matchWitness(ConformanceChecker &cc, TypeChecker &tc,
              NormalProtocolConformance *conformance,
              DeclContext *dc, ValueDecl *req, ValueDecl *witness) {
+  using namespace constraints;
+
   // Initialized by the setup operation.
-  Optional<constraints::ConstraintSystem> cs;
-  constraints::ConstraintLocator *locator = nullptr;
+  Optional<ConstraintSystem> cs;
+  ConstraintLocator *locator = nullptr;
+  ConstraintLocator *witnessLocator = nullptr;
   Type witnessType, openWitnessType;
   Type openedFullWitnessType;
   Type reqType, openedFullReqType;
@@ -1165,27 +1168,31 @@ matchWitness(ConformanceChecker &cc, TypeChecker &tc,
   auto setup = [&]() -> std::tuple<Optional<RequirementMatch>, Type, Type> {
     // Construct a constraint system to use to solve the equality between
     // the required type and the witness type.
-    cs.emplace(tc, dc, constraints::ConstraintSystemOptions());
+    cs.emplace(tc, dc, ConstraintSystemOptions());
     
     auto model = conformance->getType();
 
     // Open up the witness type.
     witnessType = witness->getInterfaceType();
+
     // FIXME: witness as a base locator?
     locator = cs->getConstraintLocator(nullptr);
+    witnessLocator = cs->getConstraintLocator(
+                       static_cast<Expr *>(nullptr),
+                       LocatorPathElt(ConstraintLocator::Witness, witness));
     if (witness->getDeclContext()->isTypeContext()) {
       std::tie(openedFullWitnessType, openWitnessType) 
         = cs->getTypeOfMemberReference(model, witness,
                                       /*isTypeReference=*/false,
                                       /*isDynamicResult=*/false,
-                                      locator,
+                                      witnessLocator,
                                       /*opener=*/nullptr);
     } else {
       std::tie(openedFullWitnessType, openWitnessType) 
         = cs->getTypeOfReference(witness,
                                 /*isTypeReference=*/false,
                                 /*isDynamicResult=*/false,
-                                locator,
+                                witnessLocator,
                                 /*opener=*/nullptr);
     }
     openWitnessType = openWitnessType->getRValueType();
@@ -1210,8 +1217,7 @@ matchWitness(ConformanceChecker &cc, TypeChecker &tc,
   // Match a type in the requirement to a type in the witness.
   auto matchTypes = [&](Type reqType, Type witnessType) 
                       -> Optional<RequirementMatch> {
-    cs->addConstraint(constraints::ConstraintKind::Equal, reqType, witnessType,
-                      locator);
+    cs->addConstraint(ConstraintKind::Equal, reqType, witnessType, locator);
     // FIXME: Check whether this has already failed.
     return None;
   };
@@ -1221,7 +1227,7 @@ matchWitness(ConformanceChecker &cc, TypeChecker &tc,
                       ArrayRef<OptionalAdjustment> optionalAdjustments) 
                         -> RequirementMatch {
     // Try to solve the system.
-    SmallVector<constraints::Solution, 1> solutions;
+    SmallVector<Solution, 1> solutions;
     if (cs->solve(solutions, FreeTypeVariableBinding::Allow)) {
       return RequirementMatch(witness, MatchKind::TypeConflict,
                               witnessType);
