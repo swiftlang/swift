@@ -242,3 +242,38 @@ func if_multi_where() {
   // CHECK:   dealloc_stack [[OPT_BUF1]]#0
   // CHECK:   return
 }
+
+
+// <rdar://problem/19797158> Swift 1.2's "if" has 2 behaviours. They could be unified.
+// CHECK-LABEL: sil hidden @_TF16if_while_binding18if_leading_booleanFSiT_
+func if_leading_boolean(a : Int) {
+  // Test the boolean condition.
+  
+  // CHECK: debug_value %0 : $Int  // let a
+  // CHECK:   [[OPT_BUF:%.*]] = alloc_stack $Optional<String>
+  // CHECK: [[EQRESULT:%[0-9]+]] = apply {{.*}}(%0, %0) : $@thin (Int, Int) -> Bool
+  // CHECK-NEXT: [[EQRESULTI1:%[0-9]+]] = apply [transparent] %3([[EQRESULT]]) : $@cc(method) @thin (Bool) -> Builtin.Int1
+  // CHECK-NEXT: cond_br [[EQRESULTI1]], [[CHECKFOO:bb[0-9]+]], [[IFDONE:bb[0-9]+]]
+
+  // Call Foo and test for the optional being present.
+// CHECK: [[CHECKFOO]]:
+  // CHECK: [[OPTRESULT:%[0-9]+]] = apply {{.*}}() : $@thin () -> @owned Optional<String>
+  // CHECK-NEXT: store [[OPTRESULT]] to [[OPT_BUF]]#1 : $*Optional<String>
+  // CHECK: [[OPT_PRESENT:%[0-9]+]] = select_enum_addr [[OPT_BUF]]#1 : $*Optional<String>,
+  // CHECK-NEXT: cond_br [[OPT_PRESENT]], [[SUCCESS:bb[0-9]+]], [[IFDONE]]
+
+// CHECK: [[SUCCESS]]:
+  // CHECK:   [[VAL_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF]]#1
+  // CHECK-NEXT:   [[VAL:%[0-9]+]] = load [[VAL_BUF]] : $*String
+  // CHECK-NEXT:   debug_value [[VAL:%[0-9]+]] : $String  // let b
+  // CHECK-NEXT:   debug_value [[VAL:%[0-9]+]] : $String  // let c
+  // CHECK-NEXT:   release_value [[VAL]]
+  // CHECK-NEXT:   br [[IFDONE:bb[0-9]+]]
+  if a == a, let b = foo() {
+    let c = b
+  }
+  // CHECK: [[IFDONE]]:
+  // CHECK-NEXT: dealloc_stack [[OPT_BUF]]#0
+
+}
+

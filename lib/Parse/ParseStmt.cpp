@@ -624,6 +624,7 @@ ParserResult<Stmt> Parser::parseStmtReturn() {
 ///
 ///   condition:
 ///     expr-basic
+///     expr-basic ',' conditional-binding (',' conditional-binding)*
 ///     conditional-binding (',' conditional-binding)*
 ///   condition-binding:
 ///     ('var' | 'let') condition-bind (',' condition-bind)* condition-where
@@ -641,12 +642,26 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
   Condition = StmtCondition();
 
   SmallVector<StmtConditionElement, 4> result;
+  // Parse the leading condition if present.
   if (Tok.isNot(tok::kw_var) && Tok.isNot(tok::kw_let)) {
     ParserResult<Expr> Expr = parseExprBasic(ID);
     Status |= Expr;
     result.push_back(Expr.getPtrOrNull());
-    Condition = Context.AllocateCopy(result);
-    return Status;
+    
+    // If there is a comma after the expression, parse a list of let/var
+    // bindings.
+    if (!consumeIf(tok::comma)) {
+      Condition = Context.AllocateCopy(result);
+      return Status;
+    }
+    
+    // If a let-binding doesn't follow, diagnose the problem.
+    if (Tok.isNot(tok::kw_var) && Tok.isNot(tok::kw_let)) {
+      diagnose(Tok, diag::expected_expr_conditional_letbinding);
+      Condition = Context.AllocateCopy(result);
+      Status.setIsParseError();
+      return Status;
+    }
   }
 
   // We're parsing a conditional binding.
