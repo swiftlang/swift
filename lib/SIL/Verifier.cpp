@@ -926,6 +926,9 @@ public:
   void checkStructInst(StructInst *SI) {
     auto *structDecl = SI->getType().getStructOrBoundGenericStruct();
     require(structDecl, "StructInst must return a struct");
+    require(!structDecl->hasUnreferenceableStorage(),
+            "Cannot build a struct with unreferenceable storage from elements "
+            "using StructInst");
     require(SI->getType().isObject(),
             "StructInst must produce an object");
 
