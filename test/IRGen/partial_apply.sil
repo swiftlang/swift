@@ -311,3 +311,26 @@ bb0(%a : $SwiftClass, %b : $*T, %c : $Int):
   %p = partial_apply %f<T>(%a, %b, %c) : $@thin <C> (@owned SwiftClass, @in C, Int) -> ()
   return %p : $@callee_owned () -> ()
 }
+
+sil public_external @captured_dependent_out_param : $@thin <A> (@out A, @in A) -> ()
+
+sil @partial_apply_with_out_param : $@thin <T> (@in T) -> @callee_owned (@out T) -> () {
+bb0(%x : $*T):
+  %f = function_ref @captured_dependent_out_param : $@thin <B> (@out B, @in B) -> ()
+  %p = partial_apply %f<T>(%x) : $@thin <C> (@out C, @in C) -> ()
+  return %p : $@callee_owned (@out T) -> ()
+}
+
+// CHECK-LABEL: define internal void @_TPA_captured_dependent_out_param(%swift.opaque* noalias sret, %swift.refcounted*) {
+// CHECK:         call void @captured_dependent_out_param(%swift.opaque* noalias sret
+
+sil @partial_apply_dynamic_with_out_param : $@thin <T> (Int32, @owned @callee_owned (@out T, Int32) -> ()) -> @callee_owned (@out T) -> () {
+bb0(%x : $Int32, %f : $@callee_owned (@out T, Int32) -> ()):
+  %p = partial_apply %f(%x) : $@callee_owned (@out T, Int32) -> ()
+  return %p : $@callee_owned (@out T) -> ()
+}
+
+// CHECK-LABEL: define { i8*, %swift.refcounted* } @partial_apply_dynamic_with_out_param
+// CHECK:         insertvalue {{.*}} [[FORWARDER:@_TPA[A-Za-z0-9_]*]]
+// CHECK:       define internal void [[FORWARDER]]
+// CHECK:         call void {{%.*}}(%swift.opaque* noalias sret

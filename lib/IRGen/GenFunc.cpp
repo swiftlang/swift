@@ -3038,18 +3038,19 @@ static void emitApplyArgument(IRGenFunction &IGF,
 static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                    llvm::Function *staticFnPtr,
                                    llvm::Type *fnTy,
+                                   const llvm::AttributeSet &origAttrs,
                                    CanSILFunctionType origType,
                                    CanSILFunctionType substType,
                                    CanSILFunctionType outType,
                                    ArrayRef<Substitution> subs,
                                    HeapLayout const &layout,
                                    ArrayRef<ParameterConvention> conventions) {
-  llvm::AttributeSet attrs;
+  llvm::AttributeSet outAttrs;
   ExtraData extraData
     = layout.isKnownEmpty() ? ExtraData::None : ExtraData::Retainable;
   llvm::FunctionType *fwdTy = IGM.getFunctionType(outType,
                                                   extraData,
-                                                  attrs);
+                                                  outAttrs);
   // Build a name for the thunk. If we're thunking a static function reference,
   // include its symbol name in the thunk name.
   llvm::SmallString<20> thunkName;
@@ -3063,7 +3064,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   llvm::Function *fwd =
     llvm::Function::Create(fwdTy, llvm::Function::InternalLinkage,
                            llvm::StringRef(thunkName), &IGM.Module);
-  fwd->setAttributes(attrs);
+  fwd->setAttributes(outAttrs);
 
   IRGenFunction subIGF(IGM, fwd);
   if (IGM.DebugInfo)
@@ -3237,10 +3238,16 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   
   llvm::CallInst *call = subIGF.Builder.CreateCall(fnPtr, params.claimAll());
   
-  // FIXME: Default Swift attributes for indirect calls?
   if (staticFnPtr) {
+    // Use the attributes and calling convention from the static definition if
+    // we have it.
     call->setAttributes(staticFnPtr->getAttributes());
     call->setCallingConv(staticFnPtr->getCallingConv());
+  } else {
+    // Otherwise, use the default attributes for the dynamic type.
+    // TODO: Currently all indirect function values use some variation of the
+    // "C" calling convention, but that may change.
+    call->setAttributes(origAttrs);
   }
   if (!consumesContext || !dependsOnContextLifetime)
     call->setTailCall();
@@ -3464,6 +3471,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   llvm::Function *forwarder = emitPartialApplicationForwarder(IGF.IGM,
                                                               staticFn,
                                                               fnPtrTy,
+                                                              attrs,
                                                               origType,
                                                               substType,
                                                               outType,
