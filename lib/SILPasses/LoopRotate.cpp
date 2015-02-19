@@ -147,7 +147,11 @@ updateSSAForUseOfInst(SILSSAUpdater &Updater,
   // For each use of a specific result value of the instruction.
   for (unsigned i = 0, e = Inst->getNumTypes(); i != e; ++i) {
     SILValue Res(Inst, i);
-    SILValue MappedRes(MappedInst, i);
+    // For block arguments the MappedValue stores the result index to use (see
+    // also comment in mapOperands).
+    SILValue MappedRes =
+        isa<SILArgument>(Inst) ? MappedValue : SILValue(MappedInst, i);
+    assert(Res.getType() == MappedRes.getType() && "The types must match");
 
     InsertedPHIs.clear();
     Updater.Initialize(Res.getType());
