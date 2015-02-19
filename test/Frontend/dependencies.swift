@@ -1,3 +1,5 @@
+// XFAIL: linux
+
 // RUN: rm -rf %t && mkdir %t
 
 // RUN: %target-swift-frontend -emit-dependencies-path - -parse %S/../Inputs/empty.swift | FileCheck -check-prefix=CHECK-BASIC %s
@@ -6,8 +8,6 @@
 // RUN: %target-swift-frontend -emit-dependencies-path %t.d -emit-reference-dependencies-path %t.swiftdeps -parse -primary-file %S/../Inputs/empty.swift
 // FileCheck -check-prefix=CHECK-BASIC < %t.d
 // FileCheck -check-prefix=CHECK-BASIC-YAML < %t.swiftdeps
-
-// XFAIL: linux
 
 // CHECK-BASIC-LABEL: - :
 // CHECK-BASIC: Inputs/empty.swift
@@ -18,6 +18,11 @@
 // CHECK-BASIC-YAML-NOT: empty.swift
 // CHECK-BASIC-YAML: "{{.*}}/Swift.swiftmodule"
 // CHECK-BASIC-YAML-NOT: {{:$}}
+
+
+// RUN: %target-swift-frontend -emit-dependencies-path %t.d -emit-reference-dependencies-path %t.swiftdeps -parse %S/../Inputs/empty.swift 2>&1 | FileCheck -check-prefix=NO-PRIMARY-FILE %s
+
+// NO-PRIMARY-FILE: warning: ignoring -emit-reference-dependencies (requires -primary-file)
 
 
 // RUN: %target-swift-frontend -emit-dependencies-path - -emit-module %S/../Inputs/empty.swift -o %t/empty.swiftmodule -emit-module-doc-path %t/empty.swiftdoc -emit-objc-header-path %t/empty.h | FileCheck -check-prefix=CHECK-MULTIPLE-OUTPUTS %s

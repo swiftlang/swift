@@ -123,6 +123,12 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
                                       SourceFile *SF,
                                       DependencyTracker &depTracker,
                                       const FrontendOptions &opts) {
+  if (!SF) {
+    diags.diagnose(SourceLoc(),
+                   diag::emit_reference_dependencies_without_primary_file);
+    return true;
+  }
+
   std::error_code EC;
   llvm::raw_fd_ostream out(opts.ReferenceDependenciesFilePath, EC,
                            llvm::sys::fs::F_None);

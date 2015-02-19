@@ -80,6 +80,9 @@ ERROR(error_mode_cannot_emit_module,frontend,none,
 ERROR(error_mode_cannot_emit_module_doc,frontend,none,
   "this mode does not support emitting module documentation files", ())
 
+WARNING(emit_reference_dependencies_without_primary_file,frontend,none,
+  "ignoring -emit-reference-dependencies (requires -primary-file)", ())
+
 ERROR(error_bad_module_name,frontend,none,
       "module name \"%0\" is not a valid identifier"
       "%select{|; use -module-name flag to specify an alternate name}1",
