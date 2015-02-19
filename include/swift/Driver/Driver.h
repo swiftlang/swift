@@ -218,11 +218,13 @@ public:
   /// cross-build information.
   /// \param ArgsHash A hash of the input arguments, to decide if we need a full
   /// rebuild.
+  /// \param IsIncremental True if we're planning on the built actions being
+  /// run incrementally.
   /// \param[out] Actions The list in which to store the resulting Actions.
   void buildActions(const ToolChain &TC, const llvm::opt::DerivedArgList &Args,
                     const InputList &Inputs, const OutputInfo &OI,
                     const OutputFileMap *OFM, StringRef ArgsHash,
-                    ActionList &Actions) const;
+                    bool IsIncremental, ActionList &Actions) const;
 
   /// Construct the OutputFileMap for the driver from the given arguments.
   std::unique_ptr<OutputFileMap>

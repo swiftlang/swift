@@ -181,7 +181,9 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   bool DriverPrintJobs = ArgList->hasArg(options::OPT_driver_print_jobs);
   bool DriverSkipExecution =
     ArgList->hasArg(options::OPT_driver_skip_execution);
-  bool Incremental = ArgList->hasArg(options::OPT_incremental);
+
+  bool Incremental = ArgList->hasArg(options::OPT_incremental) &&
+    !ArgList->hasArg(options::OPT_whole_module_optimization);
 
   std::unique_ptr<DerivedArgList> TranslatedArgList(
     translateInputArgs(*ArgList));
@@ -245,7 +247,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   // Construct the graph of Actions.
   ActionList Actions;
   buildActions(*TC, *TranslatedArgList, Inputs, OI, OFM.get(), ArgsHash,
-               Actions);
+               Incremental, Actions);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -937,6 +939,7 @@ void Driver::buildActions(const ToolChain &TC,
                           const OutputInfo &OI,
                           const OutputFileMap *OFM,
                           StringRef ArgsHash,
+                          bool IsIncremental,
                           ActionList &Actions) const {
   if (!SuppressNoInputFilesError && Inputs.empty()) {
     Diags.diagnose(SourceLoc(), diag::error_no_input_files);
@@ -950,7 +953,7 @@ void Driver::buildActions(const ToolChain &TC,
                 "relying on default-initialization");
   // FIXME: This should work without an output file map. We should have another
   // way to specify a build record.
-  if (OFM && Args.hasArg(options::OPT_incremental)) {
+  if (OFM && IsIncremental) {
     if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput()) {
       if (populateOutOfDateMap(outOfDateMap, ArgsHash, Inputs,
                                masterOutputMap->lookup(types::TY_SwiftDeps))) {
