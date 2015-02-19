@@ -232,8 +232,9 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
     if (typeDecl->getDeclContext() != fromDC) {
       if (auto fromProto = dyn_cast<ProtocolDecl>(fromDC)) {
         return substMemberTypeWithBase(fromDC->getParentModule(),
-                                       typeDecl->getDeclaredType(), typeDecl,
-                                       fromProto->getSelf()->getArchetype());
+                                       typeDecl,
+                                       fromProto->getSelf()->getArchetype(),
+                                       /*isTypeReference=*/true);
       }
     }
   }
@@ -1843,15 +1844,6 @@ Type TypeChecker::substMemberTypeWithBase(Module *module,
   }
 
   return baseTy->getTypeOfMember(module, member, this, memberType);
-}
-
-Type TypeChecker::substMemberTypeWithBase(Module *module, Type T,
-                                          const ValueDecl *Member,
-                                          Type BaseTy) {
-  if (!BaseTy)
-    return T;
-
-  return BaseTy->getTypeOfMember(module, Member, this, T);
 }
 
 Type TypeChecker::getSuperClassOf(Type type) {

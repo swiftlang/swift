@@ -510,11 +510,13 @@ public:
 
   /// \brief Substitute the given base type into the type of the given member,
   /// producing the effective type that the member will have.
-  Type substMemberTypeWithBase(Module *module, Type T, const ValueDecl *Member,
-                               Type BaseTy);
-
-  /// \brief Substitute the given base type into the type of the given member,
-  /// producing the effective type that the member will have.
+  ///
+  /// \param module The module in which the substitution will be performed.
+  /// \param member The member whose type projection is being computed.
+  /// \param baseTy The base type that will be substituted for the 'Self' of the
+  /// member.
+  /// \param isTypeReference Whether this is a reference to a type declaration
+  /// within a type context.
   Type substMemberTypeWithBase(Module *module, const ValueDecl *member,
                                Type baseTy, bool isTypeReference);
 

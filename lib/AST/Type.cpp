@@ -2258,8 +2258,6 @@ Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
       auto params = curGenericParams->getParams();
       auto args = boundGeneric->getGenericArgs();
       for (unsigned i = 0, n = args.size(); i != n; ++i) {
-        // FIXME: Shouldn't need both archetype and generic parameter mappings.
-        substitutions[params[i]->getArchetype()] = args[i];
         substitutions[params[i]->getDeclaredType()->getCanonicalType()
                         ->castTo<GenericTypeParamType>()]
           = args[i];
