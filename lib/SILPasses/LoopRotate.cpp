@@ -147,8 +147,9 @@ updateSSAForUseOfInst(SILSSAUpdater &Updater,
   // For each use of a specific result value of the instruction.
   for (unsigned i = 0, e = Inst->getNumTypes(); i != e; ++i) {
     SILValue Res(Inst, i);
-    // For block arguments the MappedValue stores the result index to use (see
-    // also comment in mapOperands).
+    // For block arguments, MappedValue is already indexed to indicate the
+    // single result value that feeds the argument. In this case, i==0 because
+    // SILArgument only produces one value.
     SILValue MappedRes =
         isa<SILArgument>(Inst) ? MappedValue : SILValue(MappedInst, i);
     assert(Res.getType() == MappedRes.getType() && "The types must match");
