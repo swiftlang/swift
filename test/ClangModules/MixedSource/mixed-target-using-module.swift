@@ -36,11 +36,11 @@ class Derived : Base {
     return ForwardClass()
   }
 
-  override func unsafeOverrideParam(arg: ForwardClass) -> NSObject { // expected-error{{incompatible type}}
+  override func unsafeOverrideParam(arg: ForwardClass) -> NSObject { // expected-error{{does not override}}
     return arg
   }
 
-  override func unsafeOverrideReturn(arg: ForwardClass) -> NSObject { // expected-error{{incompatible type}}
+  override func unsafeOverrideReturn(arg: ForwardClass) -> NSObject { // expected-error{{does not override}}
     return arg
   }
 
@@ -48,11 +48,11 @@ class Derived : Base {
     return PartialSubClass()
   }
 
-  override func unsafeOverridePartialSubParam(arg: PartialSubClass) -> NSObject { // expected-error{{incompatible type}}
+  override func unsafeOverridePartialSubParam(arg: PartialSubClass) -> NSObject { // expected-error{{does not override}}
     return arg
   }
 
-  override func unsafeOverridePartialSubReturn(arg: PartialSubClass) -> NSObject { // expected-error{{incompatible type}}
+  override func unsafeOverridePartialSubReturn(arg: PartialSubClass) -> NSObject { // expected-error{{does not override}}
     return arg
   }
 }

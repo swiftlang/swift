@@ -24,7 +24,7 @@ extension Sub {
 
 // CHECK-LABEL: sil hidden @_TF15objc_extensions20testOverridePropertyFCS_3SubT_
 func testOverrideProperty(obj: Sub) {
-  // CHECK: = class_method [volatile] %0 : $Sub, #Sub.prop!setter.1
+  // CHECK: = function_ref @_TFC15objc_extensions3Subs4propGSQSS_
   obj.prop = "abc"
 } // CHECK: }
 
@@ -36,4 +36,24 @@ testOverrideProperty(Sub())
 // CHECK:         class_method [volatile] %0 : $Sub, #Sub.foo!1.foreign
 func testCurry(x: Sub) {
   let _ = x.foo
+}
+
+extension Sub {
+  var otherProp: String {
+    get { return "hello" }
+    set { }
+  }
+}
+
+class SubSub : Sub { }
+
+extension SubSub {
+  // CHECK-LABEL: sil hidden @_TFC15objc_extensions6SubSubs9otherPropSS
+  // CHECK: = super_method [volatile] %1 : $SubSub, #Sub.otherProp!getter.1.foreign
+  // CHECK: = super_method [volatile] %1 : $SubSub, #Sub.otherProp!setter.1.foreign
+  override var otherProp: String {
+    didSet {
+      println("set!")
+    }
+  }
 }

@@ -58,7 +58,7 @@ class Sub : Base {
 
   func method2(x: Sub, withInt y: Int) { }
 
-  func method3(x: Base, withInt y: Int) { } // expected-note{{overridden declaration here has type '(Base, Int) -> ()'}}
+  func method3(x: Base, withInt y: Int) { } // expected-note{{Objective-C method 'method3:withInt:' defined by method 'method3(_:withInt:)' here}}
 }
 
 class ObjCSub : ObjCSuper {
@@ -66,5 +66,5 @@ class ObjCSub : ObjCSuper {
 
   override func method2(x: Base, withInt y: Int) { } // okay, overrides trivially
 
-  func method3(x: Sub, withInt y: Int) { } // expected-error{{overriding method with selector 'method3:withInt:' has incompatible type '(Sub, Int) -> ()'}}
+  func method3(x: Sub, withInt y: Int) { } // expected-error{{method 'method3(_:withInt:)' overrides Objective-C method 'method3:withInt:' from superclass 'ObjCSuper'}}
 }

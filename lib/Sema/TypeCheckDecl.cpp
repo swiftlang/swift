@@ -2151,6 +2151,14 @@ static bool isImplicitlyObjC(const ValueDecl *VD, bool allowImplicit = false) {
     return false;
   if (!allowImplicit && VD->isImplicit())
     return false;
+
+  // If this declaration overrides an @objc declaration, it is
+  // implicitly @objc.
+  if (auto overridden = VD->getOverriddenDecl()) {
+    if (overridden->isObjC())
+      return true;
+  }
+
   if (VD->getAccessibility() == Accessibility::Private)
     return false;
 
@@ -2260,6 +2268,37 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D, bool isObjC) {
     if (auto classDecl
           = D->getDeclContext()->isClassOrClassExtensionContext()) {
       if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
+        // If we are overriding another method, make sure the
+        // selectors line up.
+        if (auto baseMethod = method->getOverriddenDecl()) {
+          ObjCSelector baseSelector = baseMethod->getObjCSelector();
+          if (baseSelector != method->getObjCSelector()) {
+            // The selectors differ. If the method's selector was
+            // explicitly specified, this is an error. Otherwise, we
+            // inherit the selector.
+            if (auto attr = method->getAttrs().getAttribute<ObjCAttr>()) {
+              if (attr->hasName() && !attr->isNameImplicit()) {
+                llvm::SmallString<64> baseScratch;
+                TC.diagnose(attr->AtLoc,
+                            diag::objc_override_method_selector_mismatch,
+                            *attr->getName(), baseSelector)
+                  .fixItReplaceChars(attr->getNameLocs().front(),
+                                     attr->getRParenLoc(),
+                                     baseSelector.getString(baseScratch));
+                TC.diagnose(baseMethod, diag::overridden_here);
+              }
+
+              // Override the name on the attribute.
+              const_cast<ObjCAttr *>(attr)->setName(baseSelector,
+                                                    /*implicit=*/true);
+            } else {
+              method->getAttrs().add(ObjCAttr::create(TC.Context,
+                                                      baseSelector,
+                                                      true));
+            }
+          }
+        }
+
         classDecl->recordObjCMethod(method);
 
         // Swift does not permit class methods named "load".
@@ -2270,6 +2309,37 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D, bool isObjC) {
             auto diagInfo = getObjCMethodDiagInfo(method);
             TC.diagnose(method, diag::objc_class_method_load,
                         diagInfo.first, diagInfo.second);
+          }
+        }
+      } else if (auto var = dyn_cast<VarDecl>(D)) {
+        // If we are overriding a property, make sure that the
+        // Objective-C names of the properties match.
+        if (auto baseVar = var->getOverriddenDecl()) {
+          if (var->getObjCPropertyName() != baseVar->getObjCPropertyName()) {
+            Identifier baseName = baseVar->getObjCPropertyName();
+            ObjCSelector baseSelector(TC.Context, 0, baseName);
+
+            // If not, see whether we can implicitly adjust.
+            if (auto attr = var->getAttrs().getAttribute<ObjCAttr>()) {
+              if (attr->hasName() && !attr->isNameImplicit()) {
+                TC.diagnose(attr->AtLoc,
+                            diag::objc_override_property_name_mismatch,
+                            attr->getName()->getSelectorPieces()[0],
+                            baseName)
+                  .fixItReplaceChars(attr->getNameLocs().front(),
+                                     attr->getRParenLoc(),
+                                     baseName.str());
+                TC.diagnose(baseVar, diag::overridden_here);
+              }
+
+              // Override the name on the attribute.
+              const_cast<ObjCAttr *>(attr)->setName(baseSelector,
+                                                    /*implicit=*/true);
+            } else {
+              var->getAttrs().add(ObjCAttr::create(TC.Context,
+                                                   baseSelector,
+                                                   true));
+            }
           }
         }
       }
@@ -2778,6 +2848,18 @@ public:
 
     validateAttributes(TC, SD);
 
+    if (!checkOverrides(TC, SD)) {
+      // If a subscript has an override attribute but does not override
+      // anything, complain.
+      if (auto *OA = SD->getAttrs().getAttribute<OverrideAttr>()) {
+        if (!SD->getOverriddenDecl()) {
+          TC.diagnose(SD, diag::subscript_does_not_override)
+              .highlight(OA->getLocation());
+          OA->setInvalid();
+        }
+      }
+    }
+
     // Member subscripts need some special validation logic.
     if (auto contextType = dc->getDeclaredTypeInContext()) {
       // If this is a class member, mark it final if the class is final.
@@ -2828,18 +2910,6 @@ public:
     if (SD->getStorageKind() == SubscriptDecl::ComputedWithMutableAddress &&
         !SD->getSetter()->getBody()) {
       synthesizeSetterForMutableAddressedStorage(SD, TC);
-    }
-
-    if (!checkOverrides(TC, SD)) {
-      // If a subscript has an override attribute but does not override
-      // anything, complain.
-      if (auto *OA = SD->getAttrs().getAttribute<OverrideAttr>()) {
-        if (!SD->getOverriddenDecl()) {
-          TC.diagnose(SD, diag::subscript_does_not_override)
-              .highlight(OA->getLocation());
-          OA->setInvalid();
-        }
-      }
     }
 
     inferDynamic(TC.Context, SD);
@@ -3800,6 +3870,18 @@ public:
         }
       }
 
+      if (!checkOverrides(TC, FD)) {
+        // If a method has an 'override' keyword but does not
+        // override anything, complain.
+        if (auto *OA = FD->getAttrs().getAttribute<OverrideAttr>()) {
+          if (!FD->getOverriddenDecl()) {
+            TC.diagnose(FD, diag::method_does_not_override)
+              .highlight(OA->getLocation());
+            OA->setInvalid();
+          }
+        }
+      }
+
       // A method is ObjC-compatible if:
       // - it's explicitly @objc or dynamic,
       // - it's a member of an ObjC-compatible class, or
@@ -3851,18 +3933,6 @@ public:
       markAsObjC(TC, FD, isObjC);
     }
     
-    if (!checkOverrides(TC, FD)) {
-      // If a method has an 'override' keyword but does not override anything,
-      // complain.
-      if (auto *OA = FD->getAttrs().getAttribute<OverrideAttr>()) {
-        if (!FD->getOverriddenDecl()) {
-          TC.diagnose(FD, diag::method_does_not_override)
-              .highlight(OA->getLocation());
-          OA->setInvalid();
-        }
-      }
-    }
-
     inferDynamic(TC.Context, FD);
 
     TC.checkDeclAttributes(FD);
@@ -4176,6 +4246,9 @@ public:
 
     auto abstractStorage = dyn_cast<AbstractStorageDecl>(decl);
     assert((method || abstractStorage) && "Not a method or abstractStorage?");
+    SubscriptDecl *subscript = nullptr;
+    if (abstractStorage)
+      subscript = dyn_cast<SubscriptDecl>(abstractStorage);
 
     // Figure out the type of the declaration that we're using for comparisons.
     auto declTy = decl->getInterfaceType()->getUnlabeledType(TC.Context);
@@ -4190,17 +4263,6 @@ public:
     // we'll enforce this separately
     if (ctor) {
       declTy = dropResultOptionality(declTy, 1);
-    }
-      
-    // If the method is an Objective-C method, compute its selector.
-    Optional<ObjCSelector> methodSelector;
-    ObjCSubscriptKind subscriptKind = ObjCSubscriptKind::None;
-
-    if (decl->isObjC()) {
-      if (method)
-        methodSelector = method->getObjCSelector();
-      else if (auto *subscript = dyn_cast<SubscriptDecl>(abstractStorage))
-        subscriptKind = subscript->getObjCSubscriptKind(&TC);
     }
 
     // Look for members with the same name and matching types as this
@@ -4237,27 +4299,23 @@ public:
       auto parentStorage = dyn_cast<AbstractStorageDecl>(parentDecl);
       assert(parentMethod || parentStorage);
 
-      // If both are Objective-C, then match based on selectors or subscript
-      // kind and check the types separately.
+      // If both are Objective-C, then match based on selectors or
+      // subscript kind and check the types separately.
       bool objCMatch = false;
-      if (decl->isObjC() && parentDecl->isObjC()) {
+      if (parentDecl->isObjC() && decl->isObjC()) {
         if (method) {
-          // If the selectors don't match, it's not an override.
-          if (*methodSelector != parentMethod->getObjCSelector())
-            continue;
-
-          objCMatch = true;
+          if (method->getObjCSelector() == parentMethod->getObjCSelector())
+            objCMatch = true;
         } else if (auto *parentSubscript =
                      dyn_cast<SubscriptDecl>(parentStorage)) {
           // If the subscript kinds don't match, it's not an override.
-          if (subscriptKind != parentSubscript->getObjCSubscriptKind(&TC))
-            continue;
-
-          objCMatch = true;
+          if (subscript->getObjCSubscriptKind(&TC)
+                == parentSubscript->getObjCSubscriptKind(&TC))
+            objCMatch = true;
         }
 
-        // Properties don't need anything here since they are always checked by
-        // name.
+        // Properties don't need anything here since they are always
+        // checked by name.
       }
 
       // Check whether the types are identical.
@@ -4276,6 +4334,11 @@ public:
       // we'll enforce this separately
       if (ctor) {
         parentDeclTy = dropResultOptionality(parentDeclTy, 1);
+
+        // Factory methods cannot be overridden.
+        auto parentCtor = cast<ConstructorDecl>(parentDecl);
+        if (parentCtor->isFactoryInit())
+          continue;
       }
 
       if (declTy->isEqual(parentDeclTy)) {
@@ -4305,10 +4368,12 @@ public:
       if (objCMatch) {
         if (method) {
           TC.diagnose(decl, diag::override_objc_type_mismatch_method,
-                      *methodSelector, declTy);
+                      method->getObjCSelector(), declTy);
         } else {
           TC.diagnose(decl, diag::override_objc_type_mismatch_subscript,
-                      static_cast<unsigned>(subscriptKind), declTy);
+                      static_cast<unsigned>(
+                        subscript->getObjCSubscriptKind(&TC)),
+                      declTy);
         }
         TC.diagnose(parentDecl, diag::overridden_here_with_type,
                     parentDeclTy);
@@ -4525,6 +4590,7 @@ public:
     UNINTERESTING_ATTR(NSApplicationMain)
     UNINTERESTING_ATTR(NSCopying)
     UNINTERESTING_ATTR(NSManaged)
+    UNINTERESTING_ATTR(ObjC)
     UNINTERESTING_ATTR(ObjCBridged)
     UNINTERESTING_ATTR(Optional)
     UNINTERESTING_ATTR(Override)
@@ -4596,43 +4662,6 @@ public:
       }
     }
 
-    void visitObjCAttr(ObjCAttr *attr) {
-      // If the attribute on the base does not have a name, there's nothing
-      // to check.
-      if (!attr->hasName())
-        return;
-
-      // If the overriding declaration already has an @objc attribute, check
-      // whether the names are consistent.
-      auto name = *attr->getName();
-      if (auto overrideAttr = Override->getAttrs().getAttribute<ObjCAttr>()) {
-        if (overrideAttr->hasName()) {
-          auto overrideName =  *overrideAttr->getName();
-
-          // If the names (and kind) match, we're done.
-          if (overrideName == name) {
-            return;
-          }
-
-          // The names don't match, which indicates that this is a Swift
-          // override that is not going to be reflected in Objective-C.
-          llvm::SmallString<64> baseScratch, overrideScratch;
-          TC.diagnose(overrideAttr->AtLoc, diag::objc_override_name_mismatch,
-                      overrideName, name);
-          TC.diagnose(Base, diag::overridden_here);
-        }
-
-        // Set the name on the attribute.
-        const_cast<ObjCAttr *>(overrideAttr)->setName(name, /*implicit=*/true);
-        return;
-      }
-
-      // Copy the name from the base declaration to the overriding
-      // declaration.
-      Override->getAttrs().add(attr->clone(TC.Context));
-      return;
-    }
-            
     void visitDynamicAttr(DynamicAttr *attr) {
       if (!Override->getAttrs().hasAttribute<DynamicAttr>())
         // Dynamic is inherited.
@@ -4655,7 +4684,7 @@ public:
   ///
   /// \returns true if an error occurred.
   static bool recordOverride(TypeChecker &TC, ValueDecl *override,
-                             ValueDecl *base) {
+                             ValueDecl *base, bool isKnownObjC = false) {
     // Check property and subscript overriding.
     if (auto *baseASD = dyn_cast<AbstractStorageDecl>(base)) {
       auto *overrideASD = cast<AbstractStorageDecl>(override);
@@ -4709,7 +4738,7 @@ public:
     // be overridden.
     if ((base->getDeclContext()->isExtensionContext() ||
          override->getDeclContext()->isExtensionContext()) &&
-        !base->isObjC()) {
+        !base->isObjC() && !isKnownObjC) {
       TC.diagnose(override, diag::override_decl_extension,
                   !override->getDeclContext()->isExtensionContext());
       TC.diagnose(base, diag::overridden_here);
@@ -4793,7 +4822,8 @@ public:
               new (TC.Context) OverrideAttr(loc));
         }
 
-        recordOverride(TC, overridingAccessor, baseAccessor);
+        recordOverride(TC, overridingAccessor, baseAccessor,
+                       baseASD->isObjC());
       };
 
       recordAccessorOverride(AccessorKind::IsGetter);
@@ -5093,29 +5123,6 @@ public:
 
     validateAttributes(TC, CD);
 
-    // An initializer is ObjC-compatible if it's explicitly @objc or a member
-    // of an ObjC-compatible class.
-    Type ContextTy = CD->getDeclContext()->getDeclaredTypeInContext();
-    if (ContextTy) {
-      ProtocolDecl *protocolContext =
-          dyn_cast<ProtocolDecl>(CD->getDeclContext());
-      bool isMemberOfObjCProtocol =
-          protocolContext && protocolContext->isObjC();
-      ObjCReason reason = ObjCReason::DontDiagnose;
-      if (CD->getAttrs().hasAttribute<ObjCAttr>())
-        reason = ObjCReason::ExplicitlyObjC;
-      else if (CD->getAttrs().hasAttribute<DynamicAttr>())
-        reason = ObjCReason::ExplicitlyDynamic;
-      else if (isMemberOfObjCProtocol)
-        reason = ObjCReason::MemberOfObjCProtocol;
-      bool isObjC = (reason != ObjCReason::DontDiagnose) ||
-                    isImplicitlyObjC(CD, /*allowImplicit=*/true);
-      if (isObjC &&
-          (CD->isInvalid() || !TC.isRepresentableInObjC(CD, reason)))
-        isObjC = false;
-      markAsObjC(TC, CD, isObjC);
-    }
-
     // Check whether this initializer overrides an initializer in its
     // superclass.
     if (!checkOverrides(TC, CD)) {
@@ -5167,6 +5174,29 @@ public:
                     diag::nonfailable_initializer_override_here,
                     CD->getOverriddenDecl()->getFullName());
       }
+    }
+
+    // An initializer is ObjC-compatible if it's explicitly @objc or a member
+    // of an ObjC-compatible class.
+    Type ContextTy = CD->getDeclContext()->getDeclaredTypeInContext();
+    if (ContextTy) {
+      ProtocolDecl *protocolContext =
+          dyn_cast<ProtocolDecl>(CD->getDeclContext());
+      bool isMemberOfObjCProtocol =
+          protocolContext && protocolContext->isObjC();
+      ObjCReason reason = ObjCReason::DontDiagnose;
+      if (CD->getAttrs().hasAttribute<ObjCAttr>())
+        reason = ObjCReason::ExplicitlyObjC;
+      else if (CD->getAttrs().hasAttribute<DynamicAttr>())
+        reason = ObjCReason::ExplicitlyDynamic;
+      else if (isMemberOfObjCProtocol)
+        reason = ObjCReason::MemberOfObjCProtocol;
+      bool isObjC = (reason != ObjCReason::DontDiagnose) ||
+                    isImplicitlyObjC(CD, /*allowImplicit=*/true);
+      if (isObjC &&
+          (CD->isInvalid() || !TC.isRepresentableInObjC(CD, reason)))
+        isObjC = false;
+      markAsObjC(TC, CD, isObjC);
     }
 
     // If this initializer overrides a 'required' initializer, it must itself
@@ -5540,9 +5570,23 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       // validation is a hack. It's necessary because properties can get types
       // before validateDecl is called.
 
+      if (!DeclChecker::checkOverrides(*this, VD)) {
+        // If a property has an override attribute but does not override
+        // anything, complain.
+        auto overridden = VD->getOverriddenDecl();
+        if (auto *OA = VD->getAttrs().getAttribute<OverrideAttr>()) {
+          if (!overridden) {
+            diagnose(VD, diag::property_does_not_override)
+              .highlight(OA->getLocation());
+            OA->setInvalid();
+          }
+        }
+      }
+
       // Properties need some special validation logic.
       if (Type contextType = VD->getDeclContext()->getDeclaredTypeInContext()) {
-        // If this is a property, check if it needs to be exposed to Objective-C.
+        // If this is a property, check if it needs to be exposed to
+        // Objective-C.
         auto protocolContext = dyn_cast<ProtocolDecl>(VD->getDeclContext());
         ObjCReason reason = ObjCReason::DontDiagnose;
         if (VD->getAttrs().hasAttribute<ObjCAttr>())
@@ -5590,24 +5634,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         }
       }
 
-      if (!DeclChecker::checkOverrides(*this, VD)) {
-        // If a property has an override attribute but does not override
-        // anything, complain.
-        auto overridden = VD->getOverriddenDecl();
-        if (auto *OA = VD->getAttrs().getAttribute<OverrideAttr>()) {
-          if (!overridden) {
-            diagnose(VD, diag::property_does_not_override)
-              .highlight(OA->getLocation());
-            OA->setInvalid();
-          }
-        }
-
-        // FIXME: Weird hack because override checking depends on
-        // @objc, but it can also infer @objc. The former is wrong.
-        if (overridden && overridden->isObjC() && !VD->isObjC()) {
-          markAsObjC(*this, VD, true);
-        }
-      }
 
       // If this variable is marked final and has a getter or setter, mark the
       // getter and setter as final as well.

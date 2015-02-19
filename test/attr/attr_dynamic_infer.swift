@@ -42,9 +42,9 @@ extension Sub {
 
   // CHECK: @objc override dynamic subscript (sup: Super) -> Super
   override subscript (sup: Super) -> Super {
-    // CHECK: @objc dynamic override get
+    // CHECK: @objc override dynamic get
     get { return sup }
-    // CHECK: @objc dynamic override set
+    // CHECK: @objc override dynamic set
     set { }
   }
 }
