@@ -188,7 +188,7 @@ let _ = OptionsDerived(OptionsInt64.Constant)
 // CHECK: = icmp slt i8 %0, 0
 // CHECK: <label>
 // CHECK: [[EXT:%.+]] = sext i8 %0 to i32
-// CHECK: = call { i32, i1 } @_TFOSC11EnumDerivedCfMS_FT8rawValueVSs6UInt32_GSqS__(i32 %6)
+// CHECK: = call { i32, i1 } @_TFOSC11EnumDerivedCfMS_FT8rawValueVSs6UInt32_GSqS__(i32 [[EXT]])
 // CHECK: }
 
 // CHECK-LABEL: define linkonce_odr hidden { i32, i1 } @_TFOSC11EnumDerivedCfMS_FVSC12OpaqueUInt32GSQS__(i32) {
