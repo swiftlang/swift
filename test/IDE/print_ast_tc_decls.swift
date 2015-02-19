@@ -1109,7 +1109,7 @@ protocol d2700_ProtocolWithAssociatedType1 {
 
 // PASS_COMMON: {{^}}protocol d2700_ProtocolWithAssociatedType1 {{{$}}
 // PASS_COMMON-NEXT: {{^}}  typealias TA1{{$}}
-// PASS_COMMON-NEXT: {{^}}  func returnsTA1() -> TA1{{$}}
+// PASS_COMMON-NEXT: {{^}}  func returnsTA1() -> Self.TA1{{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 
 struct d2800_ProtocolWithAssociatedType1Impl : d2700_ProtocolWithAssociatedType1 {

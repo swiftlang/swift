@@ -258,9 +258,28 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
       // the member type declaration. Substitute the type we're coming from as
       // the base of the member type to produce the projected type result.
       if (fromType->getAnyNominal() == ownerNominal) {
-        return substMemberTypeWithBase(fromDC->getParentModule(),
-                                       typeDecl->getDeclaredType(), typeDecl,
-                                       fromType);
+        // If we are referring into a protocol, the base type is the 'Self'.
+        if (auto proto = dyn_cast<ProtocolDecl>(ownerNominal)) {
+          auto selfTy = proto->getSelf()->getDeclaredType()
+                          ->castTo<GenericTypeParamType>();
+          fromType = resolver->resolveGenericTypeParamType(selfTy);
+        }
+
+        // If we are referring to a generic nominal type declaration, the
+        // interface type will be a bound generic type. We want the unbound
+        // form.
+        Type memberType = typeDecl->getDeclaredInterfaceType();
+        if (auto nominalTypeDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
+          if (auto boundGenericTy = memberType->getAs<BoundGenericType>()) {
+            memberType = UnboundGenericType::get(nominalTypeDecl,
+                                                 boundGenericTy->getParent(),
+                                                 Context);
+          }
+        }
+
+        // Perform the substitution.
+        return substMemberTypeWithBase(fromDC->getParentModule(), memberType,
+                                       typeDecl, fromType);
       }
     }
   }
