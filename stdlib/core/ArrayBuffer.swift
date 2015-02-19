@@ -102,7 +102,7 @@ extension _ArrayBuffer {
   mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
     -> NativeBuffer?
   {
-    if _fastPath(isUniquelyReferenced()) {
+    if _fastPath(isUniquelyReferenced() && _isNative) {
       let b = _native
       if _fastPath(b.capacity >= minimumCapacity) {
         return b

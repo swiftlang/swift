@@ -807,6 +807,17 @@ RuntimeFoundationWrappers.test("_stdlib_CFStringGetCharactersPtr/NoLeak") {
   expectEqual(0, nsStringCanaryCount)
 }
 
+RuntimeFoundationWrappers.test("bridgedNSArray") {
+  var c = [NSObject]()
+  autoreleasepool {
+    let a = [NSObject]()
+    let b = a as NSArray
+    c = b as! [NSObject]
+  }
+  c.append(NSObject())
+  // expect no crash.
+}
+
 var Reflection = TestSuite("Reflection")
 
 Reflection.test("dumpToAStream") {
