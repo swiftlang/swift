@@ -34,7 +34,7 @@ public let DISPATCH_QUEUE_PRIORITY_BACKGROUND = dispatch_queue_priority_t(-32768
 
 public func dispatch_get_global_queue(identifier: qos_class_t,
                                       flags: UInt) -> dispatch_queue_t {
-  return dispatch_get_global_queue(Int(identifier.value), flags);
+  return dispatch_get_global_queue(Int(identifier.rawValue), flags);
 }
 
 public var DISPATCH_QUEUE_CONCURRENT : dispatch_queue_attr_t {

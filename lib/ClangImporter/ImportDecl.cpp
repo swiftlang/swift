@@ -412,12 +412,16 @@ static StringRef getCommonPluralPrefix(StringRef singular, StringRef plural) {
 }
 
 
-// Build the 'raw' property trivial getter for an option set.
-// struct NSSomeOptionSet : RawOptionSet {
-//   let raw: Raw
-// }
-static FuncDecl *makeOptionSetRawTrivialGetter(StructDecl *optionSetDecl,
-                                               ValueDecl *rawDecl) {
+/// Build the \c rawValue property trivial getter for an option set or
+/// unknown enum.
+///
+/// \code
+/// struct NSSomeOptionSet : RawOptionSet {
+///   let rawValue: Raw
+/// }
+/// \endcode
+static FuncDecl *makeRawValueTrivialGetter(StructDecl *optionSetDecl,
+                                           ValueDecl *rawDecl) {
   ASTContext &C = optionSetDecl->getASTContext();
   auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
   auto rawType = rawDecl->getType();
@@ -457,6 +461,71 @@ static FuncDecl *makeOptionSetRawTrivialGetter(StructDecl *optionSetDecl,
   C.addedExternalDecl(getterDecl);
 
   return getterDecl;
+}
+
+/// Build the \c rawValue property trivial setter for an unknown enum.
+///
+/// \code
+/// struct SomeRandomCEnum {
+///   var rawValue: Raw
+/// }
+/// \endcode
+static FuncDecl *makeRawValueTrivialSetter(StructDecl *importedDecl,
+                                           ValueDecl *rawDecl) {
+  // FIXME: Largely duplicated from the type checker.
+  ASTContext &C = importedDecl->getASTContext();
+  auto selfType = importedDecl->getDeclaredTypeInContext();
+  auto rawType = rawDecl->getType();
+
+  VarDecl *selfDecl = new (C) ParamDecl(/*IsLet*/false, SourceLoc(),
+                                        Identifier(), SourceLoc(),
+                                        C.Id_self, selfType,
+                                        importedDecl);
+  selfDecl->setImplicit();
+  Pattern *selfParam = createTypedNamedPattern(selfDecl);
+
+  VarDecl *newValueDecl = new (C) ParamDecl(/*IsLet*/true, SourceLoc(),
+                                            Identifier(), SourceLoc(),
+                                            C.Id_value, rawType, importedDecl);
+  newValueDecl->setImplicit();
+  Pattern *newValueParam = createTypedNamedPattern(newValueDecl);
+  newValueParam = new (C) ParenPattern(SourceLoc(), newValueParam, SourceLoc());
+  newValueParam->setType(ParenType::get(C, rawType));
+
+  Pattern *params[] = {selfParam, newValueParam};
+  Type voidTy = TupleType::getEmpty(C);
+
+  FuncDecl *setterDecl = FuncDecl::create(
+      C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
+      DeclName(), SourceLoc(), nullptr, Type(), params,
+      TypeLoc::withoutLoc(voidTy), importedDecl);
+  setterDecl->setImplicit();
+  setterDecl->setMutating();
+  
+  Type fnTy = FunctionType::get(newValueParam->getType(), voidTy);
+  fnTy = FunctionType::get(selfType, fnTy);
+  setterDecl->setType(fnTy);
+  setterDecl->setBodyResultType(voidTy);
+  setterDecl->setAccessibility(Accessibility::Public);
+
+  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
+  auto dest = new (C) MemberRefExpr(selfRef, SourceLoc(), rawDecl, SourceLoc(),
+                                    /*implicit*/ true);
+
+  auto paramRef = new (C) DeclRefExpr(newValueDecl, SourceLoc(),
+                                      /*implicit*/true);
+
+  auto assign = new (C) AssignExpr(dest, SourceLoc(), paramRef,
+                                   /*implicit*/true);
+
+  auto body = BraceStmt::create(C, SourceLoc(), { assign }, SourceLoc(),
+                                /*implicit*/ true);
+  setterDecl->setBody(body);
+
+  // Add as an external definition.
+  C.addedExternalDecl(setterDecl);
+
+  return setterDecl;
 }
 
 /// Returns an operator from the standard library that can be used to import
@@ -1620,11 +1689,6 @@ namespace {
       }
 
       case EnumKind::Unknown: {
-        auto Loc = Impl.importSourceLoc(decl->getLocation());
-        auto structDecl = Impl.createDeclWithClangNode<StructDecl>(decl,
-          Loc, name, Loc, None, nullptr, dc);
-        structDecl->computeType();
-
         // Compute the underlying type of the enumeration.
         auto underlyingType = Impl.importType(decl->getIntegerType(),
                                               ImportTypeKind::Enum,
@@ -1632,8 +1696,21 @@ namespace {
         if (!underlyingType)
           return nullptr;
 
+        auto Loc = Impl.importSourceLoc(decl->getLocation());
+        auto structDecl = Impl.createDeclWithClangNode<StructDecl>(decl,
+          Loc, name, Loc, None, nullptr, dc);
+        structDecl->computeType();
+
+        DelayedProtocolDecl delayedProtocols[] = {
+          [&]() {return cxt.getProtocol(
+              KnownProtocolKind::RawRepresentable);},
+        };
+        auto delayedProtoList = Impl.SwiftContext.AllocateCopy(
+                                                      delayedProtocols);
+        structDecl->setDelayedProtocolDecls(delayedProtoList);
+
         // Create a variable to store the underlying value.
-        auto varName = Impl.SwiftContext.getIdentifier("value");
+        auto varName = Impl.SwiftContext.Id_rawValue;
         auto var = new (Impl.SwiftContext) VarDecl(/*static*/ false,
                                                    /*IsLet*/ false,
                                                    SourceLoc(), varName,
@@ -1652,13 +1729,33 @@ namespace {
 
         // Create a constructor to initialize that value from a value of the
         // underlying type.
-        Decl *varDecl = var;
-        auto constructor = createValueConstructor(structDecl, varDecl,
-                                                  /*wantCtorParamNames=*/false,
-                                                  /*wantBody=*/true);
+        auto valueConstructor =
+            createValueConstructor(structDecl, var,
+                                   /*wantCtorParamNames=*/false,
+                                   /*wantBody=*/true);
+        auto labeledValueConstructor =
+            createValueConstructor( structDecl, var,
+                                   /*wantCtorParamNames=*/true,
+                                   /*wantBody=*/true);
+
+        // Add delayed implicit members to the type.
+        DelayedDecl delayedMembers[] = {
+          [=](SmallVectorImpl<Decl *> &NewDecls) {
+            auto rawGetter = makeRawValueTrivialGetter(structDecl, var);
+            NewDecls.push_back(rawGetter);
+            auto rawSetter = makeRawValueTrivialSetter(structDecl, var);
+            NewDecls.push_back(rawSetter);
+            // FIXME: MaterializeForSet?
+            var->addTrivialAccessors(rawGetter, rawSetter, nullptr);
+          }
+        };
+
+        structDecl->setDelayedMemberDecls(
+            Impl.SwiftContext.AllocateCopy(delayedMembers));
 
         // Set the members of the struct.
-        structDecl->addMember(constructor);
+        structDecl->addMember(valueConstructor);
+        structDecl->addMember(labeledValueConstructor);
         structDecl->addMember(patternBinding);
         structDecl->addMember(var);
 
@@ -1799,7 +1896,7 @@ namespace {
           [=](SmallVectorImpl<Decl *> &NewDecls) {
             makeOptionSetAllZerosProperty(structDecl, NewDecls);
             NewDecls.push_back(makeNilLiteralConformance(structDecl, var));
-            auto rawGetter = makeOptionSetRawTrivialGetter(structDecl, var);
+            auto rawGetter = makeRawValueTrivialGetter(structDecl, var);
             NewDecls.push_back(rawGetter);
             var->addTrivialAccessors(rawGetter, nullptr, nullptr);
           }

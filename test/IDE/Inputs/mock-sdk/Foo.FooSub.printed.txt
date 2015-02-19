@@ -1,9 +1,10 @@
 @exported import FooHelper
 
 func fooSubFunc1(a: Int32) -> Int32
-struct FooSubEnum1 {
-  init(_ value: UInt32)
-  var value: UInt32
+struct FooSubEnum1 : RawRepresentable {
+  init(_ rawValue: UInt32)
+  init(rawValue: UInt32)
+  var rawValue: UInt32
 }
 var FooSubEnum1X: FooSubEnum1 { get }
 var FooSubEnum1Y: FooSubEnum1 { get }

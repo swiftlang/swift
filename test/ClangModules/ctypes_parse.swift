@@ -10,16 +10,19 @@ import CoreFoundation
 
 var cgPointVar: CGPoint
 
+func checkRawRepresentable<T: RawRepresentable>(_: T) {}
+
 func testColor() {
   var c: Color = red
   c = blue
-  let _ = c.value
+  let _ = c.rawValue
+  checkRawRepresentable(c)
 }
 
 func testTribool() {
   var b = Indeterminate
   b = True
-  let _ = b.value
+  let _ = b.rawValue
 }
 
 func testAnonEnum() {
