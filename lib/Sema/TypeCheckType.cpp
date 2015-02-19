@@ -265,21 +265,9 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
           fromType = resolver->resolveGenericTypeParamType(selfTy);
         }
 
-        // If we are referring to a generic nominal type declaration, the
-        // interface type will be a bound generic type. We want the unbound
-        // form.
-        Type memberType = typeDecl->getDeclaredInterfaceType();
-        if (auto nominalTypeDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
-          if (auto boundGenericTy = memberType->getAs<BoundGenericType>()) {
-            memberType = UnboundGenericType::get(nominalTypeDecl,
-                                                 boundGenericTy->getParent(),
-                                                 Context);
-          }
-        }
-
         // Perform the substitution.
-        return substMemberTypeWithBase(fromDC->getParentModule(), memberType,
-                                       typeDecl, fromType);
+        return substMemberTypeWithBase(fromDC->getParentModule(), typeDecl,
+                                       fromType, /*isTypeReference=*/true);
       }
     }
   }
@@ -1832,6 +1820,29 @@ Type TypeChecker::substType(Module *module, Type type,
                             TypeSubstitutionMap &Substitutions,
                             bool IgnoreMissing) {
   return type.subst(module, Substitutions, IgnoreMissing, this);
+}
+
+Type TypeChecker::substMemberTypeWithBase(Module *module,
+                                          const ValueDecl *member,
+                                          Type baseTy, bool isTypeReference) {
+  Type memberType = isTypeReference
+                      ? cast<TypeDecl>(member)->getDeclaredInterfaceType()
+                      : member->getInterfaceType();
+
+  if (isTypeReference) {
+    // The declared interface type for a generic type will have the type
+    // arguments; strip them off.
+    if (auto nominalTypeDecl = dyn_cast<NominalTypeDecl>(member)) {
+      if (auto boundGenericTy = memberType->getAs<BoundGenericType>()) {
+        memberType = UnboundGenericType::get(
+                       const_cast<NominalTypeDecl *>(nominalTypeDecl),
+                       boundGenericTy->getParent(),
+                       Context);
+      }
+    }
+  }
+
+  return baseTy->getTypeOfMember(module, member, this, memberType);
 }
 
 Type TypeChecker::substMemberTypeWithBase(Module *module, Type T,

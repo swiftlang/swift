@@ -508,10 +508,15 @@ public:
                              bool isNominalInheritanceClause,
                              GenericTypeResolver *resolver);
 
-  /// \brief Replace the type \c T of a protocol member \c Member given the
-  /// type of the base of a member access, \c BaseTy.
+  /// \brief Substitute the given base type into the type of the given member,
+  /// producing the effective type that the member will have.
   Type substMemberTypeWithBase(Module *module, Type T, const ValueDecl *Member,
                                Type BaseTy);
+
+  /// \brief Substitute the given base type into the type of the given member,
+  /// producing the effective type that the member will have.
+  Type substMemberTypeWithBase(Module *module, const ValueDecl *member,
+                               Type baseTy, bool isTypeReference);
 
   /// \brief Retrieve the superclass type of the given type, or a null type if
   /// the type has no supertype.

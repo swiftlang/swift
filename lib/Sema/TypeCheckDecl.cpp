@@ -4000,9 +4000,9 @@ public:
     auto superclass = subclass;
     while (superclass->getClassOrBoundGenericClass() != superclassDecl)
       superclass = TC.getSuperClassOf(superclass);
-    auto type = TC.substMemberTypeWithBase(decl->getModuleContext(),
-                                           decl->getInterfaceType(), decl, 
-                                           superclass);
+    auto type = TC.substMemberTypeWithBase(decl->getModuleContext(), decl,
+                                           superclass,
+                                           /*isTypeReference=*/false);
     if (auto func = dyn_cast<FuncDecl>(decl)) {
       if (func->hasDynamicSelf()) {
         type = type.transform([subclass](Type type) -> Type {

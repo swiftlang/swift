@@ -131,8 +131,6 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
     // FIXME: This should happen before we attempt shadowing checks.
     validateDecl(typeDecl);
 
-    Type memberType;
-
     // If we found a member of a protocol type when looking into a non-protocol,
     // non-archetype type, only include this member in the result set if
     // this member was used as the default definition or otherwise inferred.
@@ -143,20 +141,14 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
       }
     }
 
-    // If we didn't assign a member type above, derive it based on the declared
-    // type of the declaration.
-    if (!memberType) {
-      // Substitute the the base into the member's type.
-      memberType = substMemberTypeWithBase(dc->getParentModule(),
-                                           typeDecl->getDeclaredType(),
-                                           typeDecl, type);
+    // Substitute the the base into the member's type.
+    if (Type memberType = substMemberTypeWithBase(dc->getParentModule(),
+                                                  typeDecl, type,
+                                                  /*isTypeReference=*/true)) {
+      // If we haven't seen this type result yet, add it to the result set.
+      if (types.insert(memberType->getCanonicalType()).second)
+        result.Results.push_back({typeDecl, memberType});
     }
-    if (!memberType)
-      continue;
-
-    // If we haven't seen this type result yet, add it to the result set.
-    if (types.insert(memberType->getCanonicalType()).second)
-      result.Results.push_back({typeDecl, memberType});
   }
 
   if (result.Results.empty()) {
