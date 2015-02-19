@@ -1490,13 +1490,22 @@ Type TypeDecl::getDeclaredType() const {
     }
     return TAD->getAliasType();
   }
-  if (auto typeParam = dyn_cast<AbstractTypeParamDecl>(this))
-    return typeParam->getType()->castTo<MetatypeType>()->getInstanceType();
+  if (auto typeParam = dyn_cast<AbstractTypeParamDecl>(this)) {
+    auto type = typeParam->getType();
+    if (type->is<ErrorType>())
+      return type;
+
+    return type->castTo<MetatypeType>()->getInstanceType();
+  }
   return cast<NominalTypeDecl>(this)->getDeclaredType();
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {
-  return getInterfaceType()->castTo<MetatypeType>()->getInstanceType();
+  Type interfaceType = getInterfaceType();
+  if (interfaceType->is<ErrorType>())
+    return interfaceType;
+
+  return interfaceType->castTo<MetatypeType>()->getInstanceType();
 }
 
 ArrayRef<ProtocolDecl *> TypeDecl::getProtocols(bool forceDelayedMembers) const {
