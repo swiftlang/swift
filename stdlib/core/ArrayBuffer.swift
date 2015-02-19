@@ -71,7 +71,7 @@ extension _ArrayBuffer {
     if !_isClassOrObjCExistential(T.self) {
       return _storage.isUniquelyReferenced_native_noSpareBits()
     }
-    return _storage.isUniquelyReferencedNative()
+    return _storage.isUniquelyReferencedNative() && _isNative
   }
 
   /// Return true iff this buffer's storage is either
@@ -80,7 +80,7 @@ extension _ArrayBuffer {
     if !_isClassOrObjCExistential(T.self) {
       return _storage.isUniquelyReferencedOrPinned_native_noSpareBits()
     }
-    return _storage.isUniquelyReferencedOrPinnedNative()
+    return _storage.isUniquelyReferencedOrPinnedNative() && _isNative
   }
 
   /// Convert to an NSArray.
@@ -102,7 +102,7 @@ extension _ArrayBuffer {
   mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
     -> NativeBuffer?
   {
-    if _fastPath(isUniquelyReferenced() && _isNative) {
+    if _fastPath(isUniquelyReferenced()) {
       let b = _native
       if _fastPath(b.capacity >= minimumCapacity) {
         return b
