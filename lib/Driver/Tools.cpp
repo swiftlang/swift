@@ -491,16 +491,6 @@ llvm::Triple::ArchType darwin::getArchTypeForDarwinArchName(StringRef Arch) {
     .Default(llvm::Triple::UnknownArch);
 }
 
-void darwin::DarwinTool::anchor() {}
-
-void darwin::DarwinTool::AddDarwinArch(const ArgList &Args,
-                                       ArgStringList &CmdArgs) const {
-  StringRef ArchName = getDarwinToolChain().getDarwinArchName(Args);
-
-  CmdArgs.push_back("-arch");
-  CmdArgs.push_back(Args.MakeArgString(ArchName));
-}
-
 static void addVersionString(const ArgList &inputArgs, ArgStringList &arguments,
                              unsigned major, unsigned minor, unsigned micro) {
   llvm::SmallString<8> buf;
@@ -518,7 +508,7 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
   assert(Output->getPrimaryOutputType() == types::TY_Image &&
          "Invalid linker output type.");
 
-  const toolchains::Darwin &TC = getDarwinToolChain();
+  auto &TC = static_cast<const toolchains::Darwin &>(getToolChain());
   const Driver &D = TC.getDriver();
   const llvm::Triple &Triple = TC.getTriple();
 
@@ -582,7 +572,10 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
   }
 
   Arguments.push_back("-lSystem");
-  AddDarwinArch(Args, Arguments);
+
+  StringRef ArchName = TC.getDarwinArchName(Args);
+  Arguments.push_back("-arch");
+  Arguments.push_back(Args.MakeArgString(ArchName));
 
   // Add the runtime library link path, which is platform-specific and found
   // relative to the compiler.

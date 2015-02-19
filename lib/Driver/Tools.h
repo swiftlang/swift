@@ -93,26 +93,10 @@ namespace darwin {
 
 llvm::Triple::ArchType getArchTypeForDarwinArchName(StringRef DarwinArchName);
 
-class LLVM_LIBRARY_VISIBILITY DarwinTool : public Tool {
-  virtual void anchor();
-protected:
-  /// Add the appropriate -arch argument based on \p Args.
-  void AddDarwinArch(const llvm::opt::ArgList &Args,
-                     llvm::opt::ArgStringList &CmdArgs) const;
-
-  const toolchains::Darwin &getDarwinToolChain() const {
-    return reinterpret_cast<const toolchains::Darwin &>(getToolChain());
-  }
-
-public:
-  DarwinTool(const char *Name, const char *ShortName, const ToolChain &TC)
-    : Tool(Name, ShortName, TC) {}
-};
-
-class LLVM_LIBRARY_VISIBILITY Linker : public DarwinTool {
+class LLVM_LIBRARY_VISIBILITY Linker : public Tool {
 public:
   explicit Linker(const ToolChain &TC)
-    : DarwinTool("darwin::Linker", "linker", TC) {}
+    : Tool("darwin::Linker", "linker", TC) {}
 
   virtual Job *constructJob(const JobAction &JA,
                             std::unique_ptr<JobList> Inputs,
