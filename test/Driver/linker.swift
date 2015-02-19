@@ -22,6 +22,8 @@
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -module-name LINKER | FileCheck -check-prefix INFERRED_NAME %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -o libLINKER.dylib | FileCheck -check-prefix INFERRED_NAME %s
 
+// There are more RUN lines further down in the file.
+
 // REQUIRES: X86
 
 // FIXME: Need to set up a sysroot for osx so the DEBUG checks work on linux
@@ -111,3 +113,20 @@
 // INFERRED_NAME: -module-name LINKER
 // INFERRED_NAME: bin/ld{{"? }}
 // INFERRED_NAME: -o libLINKER.dylib
+
+
+// Test ld detection. We use hard links to make sure
+// the Swift driver really thinks it's been moved.
+
+// RUN: rm -rf %t
+// RUN: mkdir -p %t/DISTINCTIVE-PATH/usr/bin/
+// RUN: touch %t/DISTINCTIVE-PATH/usr/bin/ld
+// RUN: ln %swift_driver_plain %t/DISTINCTIVE-PATH/usr/bin/swiftc
+// RUN: %t/DISTINCTIVE-PATH/usr/bin/swiftc %s -### | FileCheck -check-prefix=RELATIVE-LINKER %s
+
+// RELATIVE-LINKER: /DISTINCTIVE-PATH/usr/bin/swift
+// RELATIVE-LINKER: /DISTINCTIVE-PATH/usr/bin/ld
+// RELATIVE-LINKER: -o {{[^ ]+}}
+
+// Clean up the test executable because hard links are expensive.
+// RUN: rm -rf %t/DISTINCTIVE-PATH/usr/bin/swiftc

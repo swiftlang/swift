@@ -58,15 +58,32 @@ public:
                             const OutputInfo &OI) const;
 };
 
-class LLVM_LIBRARY_VISIBILITY LLDB : public Tool {
-  mutable std::string Path;
+/// A ToolchainTool may be installed in a location relative to the driver
+/// binary. The relative tool should be preferred over the one in the user's
+/// \$PATH.
+class LLVM_LIBRARY_VISIBILITY ToolchainTool : public Tool {
+  mutable std::string NameOrPath;
   struct {
     mutable unsigned DidCheckRelativeToDriver : 1;
+    mutable unsigned IsPresentRelativeToDriver : 1;
   } Bits;
-public:
-  explicit LLDB(const ToolChain &TC) : Tool("LLDB", "LLDB REPL", TC), Bits() {}
 
+protected:
+  ToolchainTool(StringRef BinaryName, StringRef ToolName, StringRef DiagName,
+                const ToolChain &TC)
+      : Tool(ToolName, DiagName, TC), NameOrPath(BinaryName), Bits() {}
+  ToolchainTool(StringRef Name, const ToolChain &TC)
+      : ToolchainTool(Name, Name, Name, TC) {}
+
+public:
+  const char *getPath() const;
   bool isPresentRelativeToDriver() const;
+};
+
+class LLVM_LIBRARY_VISIBILITY LLDB : public ToolchainTool {
+public:
+  explicit LLDB(const ToolChain &TC)
+      : ToolchainTool("lldb", "LLDB", "LLDB REPL", TC) {}
 
   virtual Job *constructJob(const JobAction &JA,
                             std::unique_ptr<JobList> Inputs,
@@ -76,9 +93,9 @@ public:
                             const OutputInfo &OI) const;
 };
 
-class LLVM_LIBRARY_VISIBILITY Dsymutil : public Tool {
+class LLVM_LIBRARY_VISIBILITY Dsymutil : public ToolchainTool {
 public:
-  explicit Dsymutil(const ToolChain &TC) : Tool("dsymutil", TC) {}
+  explicit Dsymutil(const ToolChain &TC) : ToolchainTool("dsymutil", TC) {}
 
   virtual Job *constructJob(const JobAction &JA,
                             std::unique_ptr<JobList> Inputs,
@@ -93,10 +110,10 @@ namespace darwin {
 
 llvm::Triple::ArchType getArchTypeForDarwinArchName(StringRef DarwinArchName);
 
-class LLVM_LIBRARY_VISIBILITY Linker : public Tool {
+class LLVM_LIBRARY_VISIBILITY Linker : public ToolchainTool {
 public:
   explicit Linker(const ToolChain &TC)
-    : Tool("darwin::Linker", "linker", TC) {}
+    : ToolchainTool("ld", "darwin::Linker", "linker", TC) {}
 
   virtual Job *constructJob(const JobAction &JA,
                             std::unique_ptr<JobList> Inputs,

@@ -404,13 +404,27 @@ Job *MergeModule::constructJob(const JobAction &JA,
                  Arguments);
 }
 
-bool LLDB::isPresentRelativeToDriver() const {
+const char *ToolchainTool::getPath() const {
   if (!Bits.DidCheckRelativeToDriver) {
     const Driver &D = getToolChain().getDriver();
-    Path = findRelativeExecutable(D.getSwiftProgramPath(), "lldb");
+    std::string RelativePath =
+        findRelativeExecutable(D.getSwiftProgramPath(), NameOrPath);
+    if (RelativePath.empty()) {
+      NameOrPath = getToolChain().getProgramPath(NameOrPath);
+    } else {
+      NameOrPath = std::move(RelativePath);
+      Bits.IsPresentRelativeToDriver = true;
+    }
     Bits.DidCheckRelativeToDriver = true;
   }
-  return !Path.empty();
+  return NameOrPath.c_str();
+}
+
+bool ToolchainTool::isPresentRelativeToDriver() const {
+  if (!Bits.DidCheckRelativeToDriver) {
+    (void)getPath();
+  }
+  return Bits.IsPresentRelativeToDriver;
 }
 
 Job *LLDB::constructJob(const JobAction &JA,
@@ -437,15 +451,7 @@ Job *LLDB::constructJob(const JobAction &JA,
   ArgStringList Arguments;
   Arguments.push_back(Args.MakeArgString(std::move(SingleArg)));
 
-  const char *Exec;
-  if (isPresentRelativeToDriver()) {
-    Exec = Path.c_str();
-  } else {
-    auto &TC = getToolChain();
-    Exec = Args.MakeArgString(TC.getProgramPath("lldb"));
-  }
-
-  return new Job(JA, *this, std::move(Inputs), std::move(Output), Exec,
+  return new Job(JA, *this, std::move(Inputs), std::move(Output), getPath(),
                  Arguments);
 }
 
@@ -467,9 +473,8 @@ Job *Dsymutil::constructJob(const JobAction &JA,
   Arguments.push_back("-o");
   Arguments.push_back(Args.MakeArgString(Output->getPrimaryOutputFilename()));
 
-  std::string Exec = getToolChain().getProgramPath("dsymutil");
-  return new Job(JA, *this, std::move(Inputs), std::move(Output),
-                 Args.MakeArgString(Exec), Arguments);
+  return new Job(JA, *this, std::move(Inputs), std::move(Output), getPath(),
+                 Arguments);
 }
 
 /// Darwin Tools
@@ -638,10 +643,8 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
   Arguments.push_back("-o");
   Arguments.push_back(Output->getPrimaryOutputFilename().c_str());
 
-  std::string Exec = getToolChain().getProgramPath("ld");
-
-  return new Job(JA, *this, std::move(Inputs), std::move(Output),
-                 Args.MakeArgString(Exec), Arguments);
+  return new Job(JA, *this, std::move(Inputs), std::move(Output), getPath(),
+                 Arguments);
 }
 
 /// Linux Tools
