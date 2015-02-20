@@ -31,8 +31,7 @@ unsigned getFunctionCost(SILFunction *F, SILFunction *Callee, unsigned Cutoff);
 // adding more categories.
 enum class InlineCost : unsigned {
   Free = 0,
-  Expensive = 1,
-  CannotBeInlined = UINT_MAX,
+  Expensive = 1
 };
 
 /// Return the 'cost' of one instruction. Instructions that are expected to

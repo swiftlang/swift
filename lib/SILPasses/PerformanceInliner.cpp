@@ -664,8 +664,6 @@ bool SILPerformanceInliner::isProfitableToInline(ApplyInst *AI,
       constTracker.trackInst(&I);
       
       auto ICost = instructionInlineCost(I);
-      if (ICost == InlineCost::CannotBeInlined)
-        return false;
       
       if (testThreshold >= 0) {
         // We are in test-mode: use a simplified cost model.

@@ -389,8 +389,6 @@ unsigned swift::getFunctionCost(SILFunction *F, SILFunction *Caller,
   for (auto &BB : *F) {
     for (auto &I : BB) {
       auto ICost = instructionInlineCost(I);
-      if (ICost == InlineCost::CannotBeInlined)
-        return UINT_MAX;
 
       Cost += unsigned(ICost);
 
