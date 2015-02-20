@@ -24,9 +24,6 @@ if let x = nonOptional() { } // expected-error{{bound value in a conditional bin
 class B {}
 class D : B {}
 
-let d: D? = .None
-if let x: B = d { }
-
 if let x {} // expected-error{{requires an initializer}}
 
 // TODO poor recovery in these cases
@@ -58,4 +55,33 @@ if var x = opt {}
 if let x = opt, y = opt where x != y,
    let a = opt, var b = opt {
 }
+
+// Leading boolean conditional.
+if 1 != 2, let x = opt, y = opt where x != y,
+   let a = opt, var b = opt {
+}
+
+// Test error recovery.
+if 1 != 2, {  // expected-error {{expected 'let' or 'var' in conditional}}
+}
+if 1 != 2, 4 == 57 {}   // expected-error {{expected 'let' or 'var' in conditional; use '&&' to join boolean conditions}}
+if 1 != 2, 4 == 57, let x = opt {} // expected-error {{expected 'let' or 'var' in conditional; use '&&' to join boolean conditions}}
+
+// Test that these don't cause the parser to crash.
+if true { if a == 0; {} }   // expected-error {{expected '{' after 'if' condition}} expected-error 2{{}}
+if a == 0, where b == 0 {}  // expected-error {{expected 'let' or 'var' in conditional; use '&&' to join boolean conditions}} expected-error 4{{}} expected-note {{}}
+
+
+
+// Limit optional unwrapping to trivial identifier patterns.
+if let (x) = opt {}  // expected-error {{expected simple identifier pattern in optional binding condition}}
+if let (var (x)) = opt {}  // expected-error {{expected simple identifier pattern in optional binding condition}}
+
+let d: D? = .None
+if let x: B = d { }  // expected-error {{expected simple identifier pattern in optional binding condition}}
+
+
+
+
+
 

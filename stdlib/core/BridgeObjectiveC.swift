@@ -110,7 +110,7 @@ func _bridgeToObjectiveCUnconditionalAutorelease<T>(x: T) -> AnyObject
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return unsafeBitCast(x, AnyObject.self)
   }
-  if let bridged: AnyObject = _bridgeNonVerbatimToObjectiveC(x) {
+  if let bridged = _bridgeNonVerbatimToObjectiveC(x) {
     _autorelease(bridged)
     return bridged
   } else {
