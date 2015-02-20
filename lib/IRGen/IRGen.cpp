@@ -75,35 +75,167 @@ enum ImageInfoFlags {
   eImageInfo_ImageIsSimulated    = (1 << 5)
 };
 
-std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>>
-swift::getIRTargetOptions(IRGenOptions &Opts, swift::Module *M) {
+static std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>>
+getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx) {
   // Things that maybe we should collect from the command line:
   //   - relocation model
   //   - code model
   // FIXME: We should do this entirely through Clang, for consistency.
   TargetOptions TargetOpts;
   TargetOpts.NoFramePointerElim = Opts.DisableFPElim;
-  
-  auto *Clang = static_cast<ClangImporter *>(M->Ctx.getClangModuleLoader());
+
+  auto *Clang = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
   clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
   return std::make_tuple(TargetOpts, ClangOpts.CPU, ClangOpts.Features);
 }
 
-static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
-                                                         swift::Module *M,
-                                                         SILModule *SILMod,
-                                                         StringRef ModuleName,
-                                                 llvm::LLVMContext &LLVMContext,
-                                                       SourceFile *SF = nullptr,
-                                                       unsigned StartElem = 0) {
-  assert(!M->Ctx.hadError());
-  const llvm::Triple &Triple = M->Ctx.LangOpts.Target;
+std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>>
+swift::getIRTargetOptions(IRGenOptions &Opts, swift::Module *M) {
+  return ::getIRTargetOptions(Opts, M->Ctx);
+}
 
+static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,
+                        llvm::Module *Module,
+                        llvm::TargetMachine *TargetMachine) {
+  std::unique_ptr<raw_fd_ostream> RawOS;
+  formatted_raw_ostream FormattedOS;
+  if (!Opts.OutputFilename.empty()) {
+    // Try to open the output file.  Clobbering an existing file is fine.
+    // Open in binary mode if we're doing binary output.
+    llvm::sys::fs::OpenFlags OSFlags = llvm::sys::fs::F_None;
+    std::error_code EC;
+    RawOS.reset(new raw_fd_ostream(Opts.OutputFilename, EC, OSFlags));
+    if (RawOS->has_error() || EC) {
+      Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                     Opts.OutputFilename, EC.message());
+      RawOS->clear_error();
+      return true;
+    }
+
+    // Most output kinds want a formatted output stream.  It's not clear
+    // why writing an object file does.
+    if (Opts.OutputKind != IRGenOutputKind::LLVMBitcode)
+      FormattedOS.setStream(*RawOS, formatted_raw_ostream::PRESERVE_STREAM);
+  }
+
+  // Set up a pipeline.
+  PassManagerBuilder PMBuilder;
+
+  if (Opts.Optimize && !Opts.DisableLLVMOptzns) {
+    PMBuilder.OptLevel = 3;
+    PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
+    PMBuilder.SLPVectorize = !Opts.DisableLLVMSLPVectorizer;
+    PMBuilder.LoopVectorize = true;
+    PMBuilder.MergeFunctions = true;
+  } else {
+    PMBuilder.OptLevel = 0;
+    if (!Opts.DisableLLVMOptzns)
+      PMBuilder.Inliner =
+        llvm::createAlwaysInlinerPass(/*insertlifetime*/false);
+  }
+
+  // If the optimizer is enabled, we run the ARCOpt pass in the scalar optimizer
+  // and the Expand pass as late as possible.
+  if (!Opts.DisableLLVMARCOpts) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_ScalarOptimizerLate,
+                           addSwiftARCOptPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addSwiftExpandPass);
+  }
+  
+  // Configure the function passes.
+  legacy::FunctionPassManager FunctionPasses(Module);
+  FunctionPasses.add(new llvm::DataLayoutPass());
+  FunctionPasses.add(createTargetTransformInfoWrapperPass(
+      TargetMachine->getTargetIRAnalysis()));
+  if (Opts.Verify)
+    FunctionPasses.add(createVerifierPass());
+  PMBuilder.populateFunctionPassManager(FunctionPasses);
+
+  // The PMBuilder only knows about LLVM AA passes.  We should explicitly add
+  // the swift AA pass after the other ones.
+  if (!Opts.DisableLLVMARCOpts)
+    FunctionPasses.add(createSwiftAliasAnalysisPass());
+
+  // Run the function passes.
+  FunctionPasses.doInitialization();
+  for (auto I = Module->begin(), E = Module->end(); I != E; ++I)
+    if (!I->isDeclaration())
+      FunctionPasses.run(*I);
+  FunctionPasses.doFinalization();
+
+  // Configure the module passes.
+  legacy::PassManager ModulePasses;
+  ModulePasses.add(new llvm::DataLayoutPass());
+  ModulePasses.add(createTargetTransformInfoWrapperPass(
+      TargetMachine->getTargetIRAnalysis()));
+  PMBuilder.populateModulePassManager(ModulePasses);
+
+  // The PMBuilder only knows about LLVM AA passes.  We should explicitly add
+  // the swift AA pass after the other ones.
+  if (!Opts.DisableLLVMARCOpts)
+    ModulePasses.add(createSwiftAliasAnalysisPass());
+
+  // If we're generating a profile, add the lowering pass now.
+  if (Opts.GenerateProfile)
+    ModulePasses.add(createInstrProfilingPass());
+
+  if (Opts.Verify)
+    ModulePasses.add(createVerifierPass());
+
+  // Do it.
+  ModulePasses.run(*Module);
+
+  legacy::PassManager EmitPasses;
+
+  // Set up the final emission passes.
+  switch (Opts.OutputKind) {
+  case IRGenOutputKind::Module:
+    break;
+  case IRGenOutputKind::LLVMAssembly:
+    EmitPasses.add(createPrintModulePass(FormattedOS));
+    break;
+  case IRGenOutputKind::LLVMBitcode:
+    EmitPasses.add(createBitcodeWriterPass(*RawOS));
+    break;
+  case IRGenOutputKind::NativeAssembly:
+  case IRGenOutputKind::ObjectFile: {
+    llvm::TargetMachine::CodeGenFileType FileType;
+    FileType = (Opts.OutputKind == IRGenOutputKind::NativeAssembly
+                  ? llvm::TargetMachine::CGFT_AssemblyFile
+                  : llvm::TargetMachine::CGFT_ObjectFile);
+
+    EmitPasses.add(createTargetTransformInfoWrapperPass(
+        TargetMachine->getTargetIRAnalysis()));
+
+    // Make sure we do ARC contraction under optimization.  We don't
+    // rely on any other LLVM ARC transformations, but we do need ARC
+    // contraction to add the objc_retainAutoreleasedReturnValue
+    // assembly markers.
+    if (Opts.Optimize)
+      EmitPasses.add(createObjCARCContractPass());
+
+    bool fail = TargetMachine->addPassesToEmitFile(EmitPasses, FormattedOS,
+                                                   FileType, !Opts.Verify);
+    if (fail) {
+      Diags.diagnose(SourceLoc(), diag::error_codegen_init_fail);
+      return true;
+    }
+    break;
+  }
+  }
+
+  EmitPasses.run(*Module);
+  return false;
+}
+
+static llvm::TargetMachine *createTargetMachine(IRGenOptions &Opts,
+                                                ASTContext &Ctx) {
+  const llvm::Triple &Triple = Ctx.LangOpts.Target;
   std::string Error;
   const Target *Target = TargetRegistry::lookupTarget(Triple.str(), Error);
   if (!Target) {
-    M->Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
-                          Triple.str(), Error);
+    Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target, Triple.str(), Error);
     return nullptr;
   }
 
@@ -115,7 +247,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   std::string CPU;
   std::vector<std::string> targetFeaturesArray;
   std::tie(TargetOpts, CPU, targetFeaturesArray)
-    = getIRTargetOptions(Opts, M);
+    = getIRTargetOptions(Opts, Ctx);
   std::string targetFeatures;
   if (!targetFeaturesArray.empty()) {
     llvm::SubtargetFeatures features;
@@ -130,10 +262,25 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                                   targetFeatures, TargetOpts, Reloc::PIC_,
                                   CodeModel::Default, OptLevel);
   if (!TargetMachine) {
-    M->Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
-                          Triple.str(), "no LLVM target machine");
+    Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
+                       Triple.str(), "no LLVM target machine");
     return nullptr;
   }
+  return TargetMachine;
+}
+
+static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
+                                                         swift::Module *M,
+                                                         SILModule *SILMod,
+                                                         StringRef ModuleName,
+                                                 llvm::LLVMContext &LLVMContext,
+                                                       SourceFile *SF = nullptr,
+                                                       unsigned StartElem = 0) {
+  assert(!M->Ctx.hadError());
+
+  llvm::TargetMachine *TargetMachine = createTargetMachine(Opts, M->Ctx);
+  if (!TargetMachine)
+    return nullptr;
 
   const llvm::DataLayout *DataLayout = TargetMachine->getDataLayout();
   assert(DataLayout && "target machine didn't set DataLayout?");
@@ -144,6 +291,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   auto *Module = IGM.getModule();
   assert(Module && "Expected llvm:Module for IR generation!");
 
+  const llvm::Triple &Triple = M->Ctx.LangOpts.Target;
   Module->setTargetTriple(Triple.str());
   // Set the dwarf version to 3, which is what the Xcode 5.0 tool chain
   // understands.  FIXME: Increase this to 4 once we have a build
@@ -256,134 +404,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   // Bail out if there are any errors.
   if (M->Ctx.hadError()) return nullptr;
 
-  std::unique_ptr<raw_fd_ostream> RawOS;
-  formatted_raw_ostream FormattedOS;
-  if (!Opts.OutputFilename.empty()) {
-    // Try to open the output file.  Clobbering an existing file is fine.
-    // Open in binary mode if we're doing binary output.
-    llvm::sys::fs::OpenFlags OSFlags = llvm::sys::fs::F_None;
-    std::error_code EC;
-    RawOS.reset(new raw_fd_ostream(Opts.OutputFilename, EC, OSFlags));
-    if (RawOS->has_error() || EC) {
-      M->Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                            Opts.OutputFilename, EC.message());
-      RawOS->clear_error();
-      return nullptr;
-    }
-
-    // Most output kinds want a formatted output stream.  It's not clear
-    // why writing an object file does.
-    if (Opts.OutputKind != IRGenOutputKind::LLVMBitcode)
-      FormattedOS.setStream(*RawOS, formatted_raw_ostream::PRESERVE_STREAM);
-  }
-
-  // Set up a pipeline.
-  PassManagerBuilder PMBuilder;
-
-  if (Opts.Optimize && !Opts.DisableLLVMOptzns) {
-    PMBuilder.OptLevel = 3;
-    PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
-    PMBuilder.SLPVectorize = !Opts.DisableLLVMSLPVectorizer;
-    PMBuilder.LoopVectorize = true;
-    PMBuilder.MergeFunctions = true;
-  } else {
-    PMBuilder.OptLevel = 0;
-    if (!Opts.DisableLLVMOptzns)
-      PMBuilder.Inliner = llvm::createAlwaysInlinerPass(/*insertlifetime*/false);
-  }
-
-  // If the optimizer is enabled, we run the ARCOpt pass in the scalar optimizer
-  // and the Expand pass as late as possible.
-  if (!Opts.DisableLLVMARCOpts) {
-    PMBuilder.addExtension(PassManagerBuilder::EP_ScalarOptimizerLate,
-                           addSwiftARCOptPass);
-    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
-                           addSwiftExpandPass);
-  }
-  
-  // Configure the function passes.
-  legacy::FunctionPassManager FunctionPasses(Module);
-  FunctionPasses.add(new llvm::DataLayoutPass());
-  FunctionPasses.add(createTargetTransformInfoWrapperPass(
-      TargetMachine->getTargetIRAnalysis()));
-  if (Opts.Verify)
-    FunctionPasses.add(createVerifierPass());
-  PMBuilder.populateFunctionPassManager(FunctionPasses);
-
-  // The PMBuilder only knows about LLVM AA passes.  We should explicitly add
-  // the swift AA pass after the other ones.
-  if (!Opts.DisableLLVMARCOpts)
-    FunctionPasses.add(createSwiftAliasAnalysisPass());
-
-  // Run the function passes.
-  FunctionPasses.doInitialization();
-  for (auto I = Module->begin(), E = Module->end(); I != E; ++I)
-    if (!I->isDeclaration())
-      FunctionPasses.run(*I);
-  FunctionPasses.doFinalization();
-
-  // Configure the module passes.
-  legacy::PassManager ModulePasses;
-  ModulePasses.add(new llvm::DataLayoutPass());
-  ModulePasses.add(createTargetTransformInfoWrapperPass(
-      TargetMachine->getTargetIRAnalysis()));
-  PMBuilder.populateModulePassManager(ModulePasses);
-
-  // The PMBuilder only knows about LLVM AA passes.  We should explicitly add
-  // the swift AA pass after the other ones.
-  if (!Opts.DisableLLVMARCOpts)
-    ModulePasses.add(createSwiftAliasAnalysisPass());
-
-  // If we're generating a profile, add the lowering pass now.
-  if (Opts.GenerateProfile)
-    ModulePasses.add(createInstrProfilingPass());
-
-  if (Opts.Verify)
-    ModulePasses.add(createVerifierPass());
-
-  // Do it.
-  ModulePasses.run(*Module);
-
-  legacy::PassManager EmitPasses;
-
-  // Set up the final emission passes.
-  switch (Opts.OutputKind) {
-  case IRGenOutputKind::Module:
-    break;
-  case IRGenOutputKind::LLVMAssembly:
-    EmitPasses.add(createPrintModulePass(FormattedOS));
-    break;
-  case IRGenOutputKind::LLVMBitcode:
-    EmitPasses.add(createBitcodeWriterPass(*RawOS));
-    break;
-  case IRGenOutputKind::NativeAssembly:
-  case IRGenOutputKind::ObjectFile: {
-    llvm::TargetMachine::CodeGenFileType FileType;
-    FileType = (Opts.OutputKind == IRGenOutputKind::NativeAssembly
-                  ? llvm::TargetMachine::CGFT_AssemblyFile
-                  : llvm::TargetMachine::CGFT_ObjectFile);
-
-    EmitPasses.add(createTargetTransformInfoWrapperPass(
-        TargetMachine->getTargetIRAnalysis()));
-
-    // Make sure we do ARC contraction under optimization.  We don't
-    // rely on any other LLVM ARC transformations, but we do need ARC
-    // contraction to add the objc_retainAutoreleasedReturnValue
-    // assembly markers.
-    if (Opts.Optimize)
-      EmitPasses.add(createObjCARCContractPass());
-
-    bool fail = TargetMachine->addPassesToEmitFile(EmitPasses, FormattedOS,
-                                                   FileType, !Opts.Verify);
-    if (fail) {
-      M->Ctx.Diags.diagnose(SourceLoc(), diag::error_codegen_init_fail);
-      return nullptr;
-    }
-    break;
-  }
-  }
-
-  EmitPasses.run(*Module);
+  if (performLLVM(Opts, M->Ctx.Diags, Module, TargetMachine))
+    return nullptr;
   return std::unique_ptr<llvm::Module>(IGM.releaseModule());
 }
 
