@@ -1353,13 +1353,15 @@ void PrintAST::printOneParameter(const Pattern *BodyPattern,
 
   // If the parameter is autoclosure, or noescape, print it.  This is stored
   // on the type of the pattern, not on the typerepr.
-  auto bodyCanType = BodyPattern->getType()->getCanonicalType();
-  if (auto patternType = dyn_cast_or_null<AnyFunctionType>(bodyCanType)) {
-    switch (patternType->isAutoClosure()*2 + patternType->isNoEscape()) {
-    case 0: break; // neither.
-    case 1: Printer << "@noescape "; break;
-    case 2: Printer << "@autoclosure(escaping) "; break;
-    case 3: Printer << "@autoclosure "; break;
+  if (BodyPattern->hasType()) {
+    auto bodyCanType = BodyPattern->getType()->getCanonicalType();
+    if (auto patternType = dyn_cast<AnyFunctionType>(bodyCanType)) {
+      switch (patternType->isAutoClosure()*2 + patternType->isNoEscape()) {
+      case 0: break; // neither.
+      case 1: Printer << "@noescape "; break;
+      case 2: Printer << "@autoclosure(escaping) "; break;
+      case 3: Printer << "@autoclosure "; break;
+      }
     }
   }
 
