@@ -20,6 +20,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/Support/Allocator.h"
 #include <vector>
 
 namespace swift {
@@ -144,11 +145,6 @@ public:
            "Cannot build a call graph node with a null function pointer!");
   }
 
-  ~CallGraphNode() {
-    for (auto *CallSite : getCallSites())
-      delete CallSite;
-  }
-
   SILFunction *getFunction() {
     return Function;
   }
@@ -224,14 +220,13 @@ class CallGraph {
   llvm::DenseMap<SILFunction *, CallGraphNode *> FunctionToNodeMap;
   llvm::SmallVector<CallGraphSCC *, 16> BottomUpSCCOrder;
   std::vector<SILFunction *> BottomUpFunctionOrder;
+  llvm::BumpPtrAllocator NodeAllocator;
+  llvm::SpecificBumpPtrAllocator<CallGraphEdge> EdgeAllocator;
 
 public:
   CallGraph(SILModule *M, bool completeModule);
 
   ~CallGraph() {
-    for (auto &MapEntry : FunctionToNodeMap)
-      delete MapEntry.second;
-
     for (auto *SCC : BottomUpSCCOrder)
       delete SCC;
   }

@@ -47,7 +47,7 @@ void CallGraph::addCallGraphNode(SILFunction *F, unsigned NodeOrdinal) {
   // TODO: Compute this from the call graph itself after stripping
   //       unreachable nodes from graph.
   ++NumCallGraphNodes;
-  auto *Node = new CallGraphNode(F, NodeOrdinal);
+  auto *Node = new (NodeAllocator) CallGraphNode(F, NodeOrdinal);
 
   assert(!FunctionToNodeMap.count(F) &&
          "Added function already has a call graph node!");
@@ -135,7 +135,8 @@ void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
   bool Complete = false;
 
   if (tryGetCalleeSet(AI->getCallee(), CalleeSet, Complete)) {
-    auto *CallSite = new CallGraphEdge(AI, CalleeSet, Complete);
+    auto *CallSite = new (EdgeAllocator.Allocate()) CallGraphEdge(AI, CalleeSet,
+                                                                  Complete);
     CallerNode->addCallSite(CallSite);
     for (auto *CalleeNode : CalleeSet)
       CalleeNode->addCaller(CallSite);
