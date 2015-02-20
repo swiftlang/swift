@@ -142,10 +142,12 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
     message(FATAL_ERROR "Not found: ${LLVMCONFIG_FILE}")
   endif()
 
-  # Save and restore LLVM_TOOLS_BINARY_DIR.
+  # Save and restore variables that LLVM configuration overrides.
   set(LLVM_TOOLS_BINARY_DIR_saved "${LLVM_TOOLS_BINARY_DIR}")
+  set(LLVM_ENABLE_ASSERTIONS_saved "${LLVM_ENABLE_ASSERTIONS}")
   include(${LLVMCONFIG_FILE})
   set(LLVM_TOOLS_BINARY_DIR "${LLVM_TOOLS_BINARY_DIR_saved}")
+  set(LLVM_ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS_saved}")
 
   # Clang
   set(${product}_PATH_TO_LLVM_SOURCE "${LLVM_MAIN_SRC_DIR}")
