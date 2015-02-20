@@ -27,6 +27,7 @@
 #include "swift/AST/TypeWalker.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
 
@@ -2644,22 +2645,11 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   }
 }
 
-namespace {
-  template <typename T>
-  class RestoreValueRAII {
-    T &Var;
-    T OldValue;
-  public:
-    RestoreValueRAII(T &var) : Var(var), OldValue(var) {}
-    ~RestoreValueRAII() { Var = OldValue; }
-  };
-}
-
 #pragma mark Protocol conformance checking
 void ConformanceChecker::checkConformance() {
   assert(!Conformance->isComplete() && "Conformance is already complete");
 
-  RestoreValueRAII<bool> restoreSuppressDiagnostics(SuppressDiagnostics);
+  llvm::SaveAndRestore<bool> restoreSuppressDiagnostics(SuppressDiagnostics);
   SuppressDiagnostics = false;
 
   // FIXME: Caller checks that this the type conforms to all of the
