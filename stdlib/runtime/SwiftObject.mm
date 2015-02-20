@@ -372,8 +372,26 @@ static NSString *_getDescription(SwiftObject *obj) {
 - (NSString *)description {
   return _getDescription(self);
 }
++ (NSString *)description {
+  return _getDescription(self);
+}
 - (NSString *)debugDescription {
   return _getDescription(self);
+}
++ (NSString *)debugDescription {
+  return _getDescription(self);
+}
+- (NSString *)_copyDescription {
+  // The NSObject version of this pushes an autoreleasepool in case -description
+  // autoreleases, but we're OK with leaking things if we're at the top level
+  // of the main thread with no autorelease pool.
+  return [[self description] retain];
+}
++ (NSString *)_copyDescription {
+  // The NSObject version of this pushes an autoreleasepool in case -description
+  // autoreleases, but we're OK with leaking things if we're at the top level
+  // of the main thread with no autorelease pool.
+  return [[self description] retain];
 }
 
 - (CFTypeID)_cfTypeID {
