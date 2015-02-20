@@ -1233,3 +1233,23 @@ struct d2900_TypeSugar1 {
 // PASS_COMMON-NEXT: {{^}}  init(){{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 
+
+// Parameter Attributes.
+
+
+// <rdar://problem/19775868> Swift 1.2b1: Header gen puts @autoclosure in the wrong place
+// PASS_PRINT_AST: public func ParamAttrs1(@autoclosure a: () -> ())
+public func ParamAttrs1(@autoclosure a : () -> ()) {
+  a()
+}
+
+// PASS_PRINT_AST: public func ParamAttrs2(@autoclosure(escaping) a: () -> ())
+public func ParamAttrs2(@autoclosure(escaping) a : () -> ()) {
+  a()
+}
+
+// PASS_PRINT_AST: public func ParamAttrs3(@noescape a: () -> ())
+public func ParamAttrs3(@noescape a : () -> ()) {
+  a()
+}
+
