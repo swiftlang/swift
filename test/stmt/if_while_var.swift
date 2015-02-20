@@ -74,11 +74,13 @@ if a == 0, where b == 0 {}  // expected-error {{expected 'let' or 'var' in condi
 
 
 // Limit optional unwrapping to trivial identifier patterns.
-if let (x) = opt {}  // expected-error {{expected simple identifier pattern in optional binding condition}}
-if let (var (x)) = opt {}  // expected-error {{expected simple identifier pattern in optional binding condition}}
+if let (x) = opt {}  // expected-error {{expected single identifier in optional binding condition}}
+if let (var (x)) = opt {}  // expected-error {{expected single identifier in optional binding condition}}
 
 let d: D? = .None
-if let x: B = d { }  // expected-error {{expected simple identifier pattern in optional binding condition}}
+if let x: B = d { }  // expected-error {{expected single identifier in optional binding condition}}
+
+if let AO : AnyObject = AnyObject?() {}    // expected-error {{expected single identifier in optional binding condition}} {{8-22=AO}}
 
 
 

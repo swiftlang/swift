@@ -717,7 +717,24 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
         // Syntactically restrict the pattern to being exactly "identifier ="
         // until we are ready to support the full generality of refutable
         // patterns.
-        if (!isa<NamedPattern>(Pattern.get()) &&
+        bool Diagnosed = false;
+        if (auto TP = dyn_cast<TypedPattern>(Pattern.get())) {
+          // This is gross, but this is just to improve QoI for an error
+          // condition.
+          if (auto *NP = dyn_cast_or_null<NamedPattern>(TP->getSubPattern()))
+            if (auto *TR =
+                dyn_cast_or_null<SimpleIdentTypeRepr>(TP->getTypeLoc().getTypeRepr())) {
+              if (TR->getIdentifier().str() == "AnyObject") {
+                diagnose(Pattern.get()->getLoc(),
+                         diag::expected_simple_identifier_pattern)
+                .fixItReplace(TP->getSourceRange(),
+                              NP->getSingleVar()->getNameStr());
+                Diagnosed = true;
+              }
+            }
+        }
+        if (!Diagnosed &&
+            !isa<NamedPattern>(Pattern.get()) &&
             !isa<AnyPattern>(Pattern.get())) {
           diagnose(Pattern.get()->getLoc(),
                    diag::expected_simple_identifier_pattern);
