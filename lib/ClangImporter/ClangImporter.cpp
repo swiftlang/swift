@@ -1567,8 +1567,10 @@ static Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>> loo
 
 Optional<api_notes::ObjCMethodInfo>
 ClangImporter::Implementation::getKnownObjCMethod(
-    const clang::ObjCMethodDecl *method) {
-  auto *container = cast<clang::ObjCContainerDecl>(method->getDeclContext());
+    const clang::ObjCMethodDecl *method,
+    const clang::ObjCContainerDecl *container) {
+  if (!container)
+    container = cast<clang::ObjCContainerDecl>(method->getDeclContext());
 
   // Figure out where to look for context information.
   StringRef contextName;
@@ -1768,10 +1770,15 @@ bool ClangImporter::Implementation::isDesignatedInitializer(
        const clang::ObjCInterfaceDecl *classDecl,
        const clang::ObjCMethodDecl *method) {
   // If the information is on the AST, use it.
-  if (classDecl->hasDesignatedInitializers())
-    return method->hasAttr<clang::ObjCDesignatedInitializerAttr>();
+  if (classDecl->hasDesignatedInitializers()) {
+    auto *methodParent = method->getClassInterface();
+    if (!methodParent ||
+        methodParent->getCanonicalDecl() == classDecl->getCanonicalDecl()) {
+      return method->hasAttr<clang::ObjCDesignatedInitializerAttr>();
+    }
+  }
 
-  if (auto info = getKnownObjCMethod(method))
+  if (auto info = getKnownObjCMethod(method, classDecl))
     return info->DesignatedInit;
 
   return false;
@@ -1790,7 +1797,7 @@ bool ClangImporter::Implementation::isRequiredInitializer(
 FactoryAsInitKind ClangImporter::Implementation::getFactoryAsInit(
                     const clang::ObjCInterfaceDecl *classDecl,
                     const clang::ObjCMethodDecl *method) {
-  if (auto info = getKnownObjCMethod(method))
+  if (auto info = getKnownObjCMethod(method, classDecl))
     return info->getFactoryAsInitKind();
 
   return FactoryAsInitKind::Infer;

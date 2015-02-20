@@ -118,3 +118,11 @@ __weak id globalWeakVar;
 -(instancetype)initString:(NSString *)string;
 @property (nonatomic,readonly,getter=isEnabled) BOOL enabled;
 @end
+
+@interface DesignatedInitRoot : NSObject
+- (instancetype)init __attribute__((objc_designated_initializer));
+@end
+
+@interface DesignatedInitBase : DesignatedInitRoot
+- (instancetype)initDesignated __attribute__((objc_designated_initializer));
+@end

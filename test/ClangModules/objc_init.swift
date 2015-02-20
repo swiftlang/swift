@@ -89,7 +89,7 @@ class MyView : NSView {
 } // expected-error{{'required' initializer 'init(coder:)' must be provided by subclass of 'NSView'}}
 
 class MyMenu : NSMenu {
-  override init() { super.init() }
+  override init(title: String) { super.init(title: title) }
 } // expected-error{{'required' initializer 'init(coder:)' must be provided by subclass of 'NSMenu'}}
 
 class MyTableViewController : NSTableViewController {
@@ -149,5 +149,15 @@ class View: NSView {
 class NonNullDefaultInitSubSub : NonNullDefaultInitSub {
   func foo() {
     var x: NonNullDefaultInitSubSub? = NonNullDefaultInitSubSub()
+  }
+}
+
+class DesignatedInitSub : DesignatedInitBase {
+  var foo: Int?
+
+  override init(designated: ()) {}
+
+  class func testInheritedInit() -> DesignatedInitSub {
+    return DesignatedInitSub()
   }
 }

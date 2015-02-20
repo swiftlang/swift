@@ -307,8 +307,12 @@ public:
 
   /// Retrieve any information known a priori about the given Objective-C
   /// method, if we have it.
+  ///
+  /// If \p container is specified, we're looking for a method with the same
+  /// selector and instance-ness in \p container.
   Optional<api_notes::ObjCMethodInfo>
-  getKnownObjCMethod(const clang::ObjCMethodDecl *method);
+  getKnownObjCMethod(const clang::ObjCMethodDecl *method,
+                     const clang::ObjCContainerDecl *container = nullptr);
 
   /// For ObjC property accessor, if the property is known, lookup
   /// the property info and merge it in.

@@ -4418,6 +4418,8 @@ namespace {
           // If this initializer came from a factory method, inherit
           // it as an initializer.
           if (objcMethod->isClassMethod()) {
+            assert(ctor->getInitKind() ==
+                     CtorInitializerKind::ConvenienceFactory);
             bool redundant;
             if (auto newCtor = importConstructor(objcMethod, dc, 
                                                  /*implicit=*/true,

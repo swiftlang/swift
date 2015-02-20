@@ -129,6 +129,7 @@
 @end
 
 @interface NSMenu : NSObject <NSCopying, NSCoding>
+- (instancetype)initWithTitle:(NSString *)title;
 @end
 
 @interface NSMenuItem : NSObject <NSCopying, NSCoding>
