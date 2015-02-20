@@ -217,7 +217,7 @@ namespace swift {
 
   /// Get the CPU and subtarget feature options to use when emitting code.
   std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>>
-  getIRTargetOptions(IRGenOptions &Opts, swift::Module *M);
+  getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx);
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.

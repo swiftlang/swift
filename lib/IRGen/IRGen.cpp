@@ -75,8 +75,8 @@ enum ImageInfoFlags {
   eImageInfo_ImageIsSimulated    = (1 << 5)
 };
 
-static std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>>
-getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx) {
+std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>>
+swift::getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx) {
   // Things that maybe we should collect from the command line:
   //   - relocation model
   //   - code model
@@ -87,11 +87,6 @@ getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx) {
   auto *Clang = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
   clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
   return std::make_tuple(TargetOpts, ClangOpts.CPU, ClangOpts.Features);
-}
-
-std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>>
-swift::getIRTargetOptions(IRGenOptions &Opts, swift::Module *M) {
-  return ::getIRTargetOptions(Opts, M->Ctx);
 }
 
 static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,

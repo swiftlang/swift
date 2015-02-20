@@ -454,7 +454,7 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   std::string CPU;
   std::vector<std::string> Features;
   std::tie(TargetOpt, CPU, Features)
-    = getIRTargetOptions(IRGenOpts, swiftModule);
+    = getIRTargetOptions(IRGenOpts, swiftModule->Ctx);
   builder.setRelocationModel(llvm::Reloc::PIC_);
   builder.setTargetOptions(TargetOpt);
   builder.setMCPU(CPU);
@@ -1240,7 +1240,7 @@ public:
     std::string CPU;
     std::vector<std::string> Features;
     std::tie(TargetOpt, CPU, Features)
-      = getIRTargetOptions(IRGenOpts, CI.getMainModule());
+      = getIRTargetOptions(IRGenOpts, CI.getMainModule()->Ctx);
     
     builder.setRelocationModel(llvm::Reloc::PIC_);
     builder.setTargetOptions(TargetOpt);
