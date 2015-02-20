@@ -18,7 +18,7 @@ bool DestructorAnalysis::mayStoreToMemoryOnDestruction(SILType T) {
   bool IsSafe = isSafeType(T.getSwiftRValueType());
   DEBUG(llvm::dbgs() << " DestructorAnalysis::mayStoreToMemoryOnDestruction is"
                      << (IsSafe ? " false: " : " true: "));
-  DEBUG(T.getSwiftRValueType()->dump());
+  DEBUG(T.getSwiftRValueType()->print(llvm::errs()));
   return !IsSafe;
 }
 

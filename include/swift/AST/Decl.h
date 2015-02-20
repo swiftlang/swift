@@ -2091,7 +2091,10 @@ public:
   /// DeclRefExpr or MemberRefExpr use of this value in the specified
   /// context.
   AccessSemantics getAccessSemanticsFromContext(const DeclContext *DC) const;
-  
+
+  /// Print a reference to the given declaration.
+  std::string printRef() const;
+
   /// Dump a reference to the given declaration.
   void dumpRef(raw_ostream &os) const;
 
@@ -2557,6 +2560,7 @@ public:
   
   void print(raw_ostream &OS) const;
   void dump() const;
+  std::string getAsString() const;
 };
   
 inline

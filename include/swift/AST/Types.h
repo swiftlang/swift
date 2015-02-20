@@ -675,9 +675,8 @@ public:
   bool isAnyObject();
 
   void dump() const;
-  void dumpVerbose() const {
-    Type(const_cast<TypeBase *>(this)).dumpVerbose();
-  }
+  void dump(raw_ostream &os, unsigned indent = 0) const;
+
   void print(raw_ostream &OS,
              const PrintOptions &PO = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &PO) const;

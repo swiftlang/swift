@@ -128,7 +128,7 @@ public:
   bool isPrivateStdlibType() const;
 
   void dump() const;
-  void dumpVerbose() const;
+  void dump(raw_ostream &os, unsigned indent = 0) const;
 
   void print(raw_ostream &OS, const PrintOptions &PO = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &PO) const;

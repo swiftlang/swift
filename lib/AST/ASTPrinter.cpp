@@ -2730,10 +2730,6 @@ public:
 };
 } // unnamed namespace
 
-void Type::dump() const {
-  print(llvm::errs());
-  llvm::errs() << '\n';
-}
 void Type::print(raw_ostream &OS, const PrintOptions &PO) const {
   StreamPrinter Printer(OS);
   print(Printer, PO);
@@ -2745,34 +2741,6 @@ void Type::print(ASTPrinter &Printer, const PrintOptions &PO) const {
     TypePrinter(Printer, PO).visit(*this);
 }
 
-void Type::dumpVerbose() const {
-  class TypeDumper : public TypeWalker {
-    unsigned indentation = 0;
-
-    Action walkToTypePre(Type ty) override {
-      llvm::errs().indent(indentation * 2);
-      switch (ty->getKind()) {
-#define TYPE(CLASS, ...) \
-      case TypeKind::CLASS: \
-        llvm::errs() << #CLASS "Type: "; \
-        break;
-#include "swift/AST/TypeNodes.def"
-      }
-      ty->print(llvm::errs());
-      llvm::errs() << '\n';
-      ++indentation;
-      return Action::Continue;
-    }
-
-    Action walkToTypePost(Type ty) override {
-      --indentation;
-      return Action::Continue;
-    }
-  };
-  walk(TypeDumper());
-}
-
-
 void GenericSignature::print(raw_ostream &OS) const {
   StreamPrinter Printer(OS);
   TypePrinter(Printer, PrintOptions())
@@ -2781,6 +2749,13 @@ void GenericSignature::print(raw_ostream &OS) const {
 void GenericSignature::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
+}
+
+std::string GenericSignature::getAsString() const {
+  std::string result;
+  llvm::raw_string_ostream out(result);
+  print(out);
+  return out.str();
 }
 
 static StringRef getStringForParameterConvention(ParameterConvention conv) {
@@ -2869,11 +2844,6 @@ std::string TypeBase::getString(const PrintOptions &PO) const {
   llvm::raw_string_ostream OS(Result);
   print(OS, PO);
   return OS.str();
-}
-
-void TypeBase::dump() const {
-  print(llvm::errs());
-  llvm::errs() << '\n';
 }
 
 void TypeBase::print(raw_ostream &OS, const PrintOptions &PO) const {

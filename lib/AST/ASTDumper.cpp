@@ -18,6 +18,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/Optional.h"
@@ -34,6 +35,8 @@ DEF_COLOR(Func, YELLOW)
 DEF_COLOR(Extension, MAGENTA)
 DEF_COLOR(Pattern, RED)
 DEF_COLOR(TypeRepr, GREEN)
+DEF_COLOR(Type, BLUE)
+DEF_COLOR(TypeField, CYAN)
 
 #undef DEF_COLOR
 
@@ -292,6 +295,7 @@ namespace {
     void printRec(Stmt *S) { S->print(OS, Indent+2); }
     void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
     void printRec(TypeRepr *T);
+    void printRec(Type T) { T->dump(OS, Indent+2); }
 
     void printCommon(Decl *D, const char *Name,
                      llvm::Optional<llvm::raw_ostream::Colors> Color =
@@ -396,11 +400,10 @@ namespace {
 
     void visitTypeAliasDecl(TypeAliasDecl *TAD) {
       printCommon(TAD, "typealias");
-      OS << " type='";
       if (TAD->hasUnderlyingType())
-        TAD->getUnderlyingType().print(OS);
+        printRec(TAD->getUnderlyingType());
       else
-        OS << "<<<unresolved>>>";
+        OS << "type = <<<unresolved>>>";
       printInherited(TAD->getInherited());
       OS << "')";
     }
@@ -873,6 +876,13 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
     break;
   }
   }
+}
+
+std::string ValueDecl::printRef() const {
+  std::string result;
+  llvm::raw_string_ostream os(result);
+  dumpRef(os);
+  return os.str();
 }
 
 void ValueDecl::dumpRef(raw_ostream &os) const {
@@ -1981,3 +1991,534 @@ void ProtocolConformance::dump() const {
   llvm::errs() << '\n';
 }
 
+//===----------------------------------------------------------------------===//
+// Dumping for Types.
+//===----------------------------------------------------------------------===//
+
+namespace {
+  /// RAII object that prints with the given color, if color is supported on the
+  /// given stream.
+  class PrintWithColorRAII {
+    raw_ostream &OS;
+    bool ShowColors;
+
+  public:
+    PrintWithColorRAII(raw_ostream &os, llvm::raw_ostream::Colors color)
+      : OS(os), ShowColors(false)
+    {
+      if (&os == &llvm::errs() || &os == &llvm::outs())
+        ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
+
+      if (ShowColors) {
+        if (auto str = llvm::sys::Process::OutputColor(color, false, false)) {
+          OS << str;
+        }
+      }
+    }
+
+    ~PrintWithColorRAII() {
+      if (ShowColors) {
+        OS << llvm::sys::Process::ResetColor();
+      }
+    }
+
+    template<typename T>
+    friend raw_ostream &operator<<(PrintWithColorRAII &&printer,
+                                   const T &value){
+      printer.OS << value;
+      return printer.OS;
+    }
+  };
+
+  class PrintType : public TypeVisitor<PrintType, void, StringRef> {
+    raw_ostream &OS;
+    unsigned Indent;
+
+    raw_ostream &printCommon(const TypeBase *T, StringRef label,
+                             StringRef name) {
+      OS.indent(Indent) << '(';
+      if (!label.empty()) {
+        PrintWithColorRAII(OS, TypeFieldColor) << label;
+        OS << "=";
+      }
+
+      PrintWithColorRAII(OS, TypeColor) << name;
+      return OS;
+    }
+
+    // Print a single flag.
+    raw_ostream &printFlag(StringRef name) {
+      PrintWithColorRAII(OS, TypeFieldColor) << " " << name;
+      return OS;
+    }
+
+    // Print a single flag if it is set.
+    raw_ostream &printFlag(bool isSet, StringRef name) {
+      if (isSet)
+        printFlag(name);
+
+      return OS;
+    }
+
+    // Print a field with a value.
+    template<typename T>
+    raw_ostream &printField(StringRef name, const T &value) {
+      OS << " ";
+      PrintWithColorRAII(OS, TypeFieldColor) << name;
+      OS << "=" << value;
+      return OS;
+    }
+
+  public:
+    PrintType(raw_ostream &os, unsigned indent) : OS(os), Indent(indent) { }
+
+    void printRec(Type type) {
+      printRec("", type);
+    }
+
+    void printRec(StringRef label, Type type) {
+      OS << "\n";
+
+      if (type.isNull())
+        OS << "<<null>>";
+      else {
+        Indent += 2;
+        visit(type, label);
+        Indent -=2;
+      }
+    }
+
+#define TRIVIAL_TYPE_PRINTER(Class,Name)                        \
+    void visit##Class##Type(Class##Type *T, StringRef label) {  \
+      printCommon(T, label, #Name "_type") << ")";              \
+    }
+
+    TRIVIAL_TYPE_PRINTER(Error, error)
+
+    void visitBuiltinIntegerType(BuiltinIntegerType *T, StringRef label) {
+      printCommon(T, label, "builtin_integer_type");
+      if (T->isFixedWidth())
+        printField("bit_width", T->getFixedWidth());
+      else
+        printFlag("word_sized");
+      OS << ")";
+    }
+
+    void visitBuiltinFloatType(BuiltinFloatType *T, StringRef label) {
+      printCommon(T, label, "builtin_float_type");
+      printField("bit_width", T->getBitWidth());
+      OS << ")";
+    }
+
+    TRIVIAL_TYPE_PRINTER(BuiltinRawPointer, builtin_raw_pointer)
+    TRIVIAL_TYPE_PRINTER(BuiltinNativeObject, builtin_native_object)
+    TRIVIAL_TYPE_PRINTER(BuiltinBridgeObject, builtin_bridge_object)
+    TRIVIAL_TYPE_PRINTER(BuiltinUnknownObject, builtin_unknown_object)
+    TRIVIAL_TYPE_PRINTER(BuiltinUnsafeValueBuffer, builtin_unsafe_value_buffer)
+
+    void visitBuiltinVectorType(BuiltinVectorType *T, StringRef label) {
+      printCommon(T, label, "builtin_vector_type");
+      printField("num_elements", T->getNumElements());
+      printRec(T->getElementType());
+      OS << ")";
+    }
+
+    void visitNameAliasType(NameAliasType *T, StringRef label) {
+      printCommon(T, label, "name_alias_type");
+      printField("decl", T->getDecl()->printRef());
+      OS << ")";
+    }
+
+    void visitParenType(ParenType *T, StringRef label) {
+      printCommon(T, label, "paren_type");
+      printRec(T->getUnderlyingType());
+      OS << ")";
+    }
+
+    void visitTupleType(TupleType *T, StringRef label) {
+      printCommon(T, label, "tuple_type");
+      printField("num_elements", T->getNumElements());
+      Indent += 2;
+      for (const auto &elt : T->getFields()) {
+        OS << "\n";
+        OS.indent(Indent) << "(";
+        PrintWithColorRAII(OS, TypeFieldColor) << "tuple_type_elt";
+        if (elt.hasName())
+          printField("name", elt.getName().str());
+        if (elt.isVararg())
+          printFlag("vararg");
+        switch (elt.getDefaultArgKind()) {
+        case DefaultArgumentKind::None:
+          break;
+
+        case DefaultArgumentKind::Column:
+          printFlag("default_arg", "__COLUMN__");
+          break;
+
+        case DefaultArgumentKind::DSOHandle:
+          printFlag("default_arg", "__DSO_HANDLE__");
+          break;
+
+        case DefaultArgumentKind::File:
+          printFlag("default_arg", "__FILE__");
+          break;
+
+        case DefaultArgumentKind::Function:
+          printFlag("default_arg", "__FUNCTION__");
+          break;
+
+        case DefaultArgumentKind::Inherited:
+          printFlag("default_arg", "inherited");
+          break;
+
+        case DefaultArgumentKind::Line:
+          printFlag("default_arg", "__LINE__");
+          break;
+
+        case DefaultArgumentKind::Normal:
+          printFlag("default_arg", "normal");
+          break;
+        }
+
+        printRec(elt.getType());
+        OS << ")";
+      }
+      Indent -= 2;
+      OS << ")";
+    }
+
+    void visitUnownedStorageType(UnownedStorageType *T, StringRef label) {
+      printCommon(T, label, "unowned_storage_type");
+      printRec(T->getReferentType());
+      OS << ")";
+    }
+
+    void visitUnmanagedStorageType(UnmanagedStorageType *T, StringRef label) {
+      printCommon(T, label, "unmanaged_storage_type");
+      printRec(T->getReferentType());
+      OS << ")";
+    }
+
+    void visitWeakStorageType(WeakStorageType *T, StringRef label) {
+      printCommon(T, label, "weak_storage_type");
+      printRec(T->getReferentType());
+      OS << ")";
+    }
+
+    void visitEnumType(EnumType *T, StringRef label) {
+      printCommon(T, label, "enum_type");
+      printField("decl", T->getDecl()->printRef());
+      if (T->getParent())
+        printRec("parent", T->getParent());
+      OS << ")";
+    }
+
+    void visitStructType(StructType *T, StringRef label) {
+      printCommon(T, label, "struct_type");
+      printField("decl", T->getDecl()->printRef());
+      if (T->getParent())
+        printRec("parent", T->getParent());
+      OS << ")";
+    }
+
+    void visitClassType(ClassType *T, StringRef label) {
+      printCommon(T, label, "class_type");
+      printField("decl", T->getDecl()->printRef());
+      if (T->getParent())
+        printRec("parent", T->getParent());
+      OS << ")";
+    }
+
+    void visitProtocolType(ProtocolType *T, StringRef label) {
+      printCommon(T, label, "protocol_type");
+      printField("decl", T->getDecl()->printRef());
+      OS << ")";
+    }
+
+    void visitMetatypeType(MetatypeType *T, StringRef label) {
+      printCommon(T, label, "metatype_type");
+      printRec(T->getInstanceType());
+      OS << ")";
+    }
+
+    void visitExistentialMetatypeType(ExistentialMetatypeType *T,
+                                      StringRef label) {
+      printCommon(T, label, "existential_metatype_type");
+      printRec(T->getInstanceType());
+      OS << ")";
+    }
+
+    void visitModuleType(ModuleType *T, StringRef label) {
+      printCommon(T, label, "module_type");
+      printField("module", T->getModule()->Name);
+      OS << ")";
+    }
+
+    void visitDynamicSelfType(DynamicSelfType *T, StringRef label) {
+      printCommon(T, label, "dynamic_self_type");
+      printRec(T->getSelfType());
+      OS << ")";
+    }
+
+    void visitArchetypeType(ArchetypeType *T, StringRef label) {
+      printCommon(T, label, "archetype_type");
+      printField("name", T->getFullName());
+      printField("address", static_cast<void *>(T));
+      printFlag(T->requiresClass(), "class");
+      for (auto proto : T->getConformsTo())
+        printField("conforms_to", proto->printRef());
+      if (auto parent = T->getParent())
+        printField("parent", static_cast<void *>(parent));
+      if (auto assocType = T->getAssocType())
+        printField("assoc_type", assocType->printRef());
+      if (auto selfProto = T->getSelfProtocol())
+        printField("self_proto", selfProto->printRef());
+      if (auto superclass = T->getSuperclass())
+        printRec("superclass", superclass);
+      if (auto openedExistential = T->getOpenedExistentialType())
+        printRec("opened_existential", openedExistential);
+
+      Indent += 2;
+      for (auto nestedType : T->getNestedTypes()) {
+        OS << "\n";
+        OS.indent(Indent) << "(";
+        PrintWithColorRAII(OS, TypeFieldColor) << "nested_type";
+        OS << "=";
+        OS << nestedType.first.str() << " ";
+        if (auto concrete = nestedType.second.getAsConcreteType()) {
+          PrintWithColorRAII(OS, TypeColor) << "concrete";
+          OS << "=" << concrete.getString();
+        } else {
+          PrintWithColorRAII(OS, TypeColor) << "archetype";
+          OS << "=" << static_cast<void *>(nestedType.second.getAsArchetype());
+        }
+        OS << ")";
+      }
+      Indent -= 2;
+
+      OS << ")";
+    }
+
+    void visitGenericTypeParamType(GenericTypeParamType *T, StringRef label) {
+      printCommon(T, label, "generic_type_param_type");
+      printField("depth", T->getDepth());
+      printField("index", T->getIndex());
+      if (auto decl = T->getDecl())
+        printField("decl", decl->printRef());
+      OS << ")";
+    }
+
+    void visitAssociatedTypeType(AssociatedTypeType *T, StringRef label) {
+      printCommon(T, label, "associated_type_type");
+      printField("decl", T->getDecl()->printRef());
+      OS << ")";
+    }
+
+    void visitSubstitutedType(SubstitutedType *T, StringRef label) {
+      printCommon(T, label, "substituted_type");
+      printRec("original", T->getOriginal());
+      printRec("replacement", T->getReplacementType());
+      OS << ")";
+    }
+
+    void visitDependentMemberType(DependentMemberType *T, StringRef label) {
+      printCommon(T, label, "dependent_member_type");
+      if (auto assocType = T->getAssocType()) {
+        printField("assoc_type", assocType->printRef());
+      } else {
+        printField("name", T->getName().str());
+      }
+      OS << ")";
+    }
+
+    void printAnyFunctionTypeCommon(AnyFunctionType *T, StringRef label,
+                                    StringRef name) {
+      printCommon(T, label, name);
+
+      switch (T->getAbstractCC()) {
+      case AbstractCC::C:
+        printField("calling_convention", "C");
+        break;
+
+      case AbstractCC::Freestanding:
+        break;
+
+      case AbstractCC::Method:
+        printField("calling_convention", "method");
+        break;
+
+      case AbstractCC::ObjCMethod:
+        printField("calling_convention", "Objective-CC");
+        break;
+
+      case AbstractCC::WitnessMethod:
+        printField("calling_convention", "witness");
+        break;
+      }
+
+      switch (T->getRepresentation()) {
+      case AnyFunctionType::Representation::Block:
+        printField("representation", "block");
+        break;
+
+      case AnyFunctionType::Representation::Thick:
+        break;
+
+      case AnyFunctionType::Representation::Thin:
+        printField("representation", "thin");
+        break;
+      }
+
+      printFlag(T->isNoReturn(), "noreturn");
+      printFlag(T->isAutoClosure(), "autoclosure");
+      printFlag(T->isNoEscape(), "noescape");
+
+      printRec("input", T->getInput());
+      printRec("output", T->getResult());
+    }
+
+    void visitFunctionType(FunctionType *T, StringRef label) {
+      printAnyFunctionTypeCommon(T, label, "function_type");
+      OS << ")";
+    }
+
+    void visitPolymorphicFunctionType(PolymorphicFunctionType *T,
+                                      StringRef label) {
+      printAnyFunctionTypeCommon(T, label, "polymorphic_function_type");
+      // FIXME: generic parameters
+      OS << ")";
+    }
+
+    void visitGenericFunctionType(GenericFunctionType *T, StringRef label) {
+      printAnyFunctionTypeCommon(T, label, "generic_function_type");
+      // FIXME: generic signature dumping needs improvement
+      OS << "\n";
+      OS.indent(Indent + 2) << "(";
+      printField("generic_sig", T->getGenericSignature()->getAsString());
+      OS << ")";
+      OS << ")";
+    }
+
+    void visitSILFunctionType(SILFunctionType *T, StringRef label) {
+      printCommon(T, label, "sil_function_type") << ")";
+      // FIXME: Make this useful.
+      OS << ")";
+    }
+
+    void visitSILBlockStorageType(SILBlockStorageType *T, StringRef label) {
+      printCommon(T, label, "sil_block_storage_type");
+      printRec(T->getCaptureType());
+      OS << ")";
+    }
+
+    void visitArraySliceType(ArraySliceType *T, StringRef label) {
+      printCommon(T, label, "array_slice_type");
+      printRec(T->getBaseType());
+      OS << ")";
+    }
+
+    void visitOptionalType(OptionalType *T, StringRef label) {
+      printCommon(T, label, "optional_type");
+      printRec(T->getBaseType());
+      OS << ")";
+    }
+
+    void visitImplicitlyUnwrappedOptionalType(
+           ImplicitlyUnwrappedOptionalType *T, StringRef label) {
+      printCommon(T, label, "implicitly_unwrapped_optional_type");
+      printRec(T->getBaseType());
+      OS << ")";
+    }
+
+    void visitDictionaryType(DictionaryType *T, StringRef label) {
+      printCommon(T, label, "dictionary_type");
+      printRec("key", T->getKeyType());
+      printRec("value", T->getValueType());
+      OS << ")";
+    }
+
+    void visitProtocolCompositionType(ProtocolCompositionType *T,
+                                      StringRef label) {
+      printCommon(T, label, "protocol_composition_type");
+      for (auto proto : T->getProtocols()) {
+        printRec(proto);
+      }
+      OS << ")";
+    }
+
+    void visitLValueType(LValueType *T, StringRef label) {
+      printCommon(T, label, "lvalue_type");
+      printRec(T->getObjectType());
+      OS << ")";
+    }
+
+    void visitInOutType(InOutType *T, StringRef label) {
+      printCommon(T, label, "inout_type");
+      printRec(T->getObjectType());
+      OS << ")";
+    }
+
+    void visitUnboundGenericType(UnboundGenericType *T, StringRef label) {
+      printCommon(T, label, "unbound_generic_type");
+      printField("decl", T->getDecl()->printRef());
+      if (T->getParent())
+        printRec("parent", T->getParent());
+      OS << ")";
+    }
+
+    void visitBoundGenericClassType(BoundGenericClassType *T, StringRef label) {
+      printCommon(T, label, "bound_generic_class_type");
+      printField("decl", T->getDecl()->printRef());
+      if (T->getParent())
+        printRec("parent", T->getParent());
+      for (auto arg : T->getGenericArgs())
+        printRec(arg);
+      OS << ")";
+    }
+
+    void visitBoundGenericStructType(BoundGenericStructType *T,
+                                     StringRef label) {
+      printCommon(T, label, "bound_generic_struct_type");
+      printField("decl", T->getDecl()->printRef());
+      if (T->getParent())
+        printRec("parent", T->getParent());
+      for (auto arg : T->getGenericArgs())
+        printRec(arg);
+      OS << ")";
+    }
+
+    void visitBoundGenericEnumType(BoundGenericEnumType *T, StringRef label) {
+      printCommon(T, label, "bound_generic_enum_type");
+      printField("decl", T->getDecl()->printRef());
+      if (T->getParent())
+        printRec("parent", T->getParent());
+      for (auto arg : T->getGenericArgs())
+        printRec(arg);
+      OS << ")";
+    }
+
+    void visitTypeVariableType(TypeVariableType *T, StringRef label) {
+      printCommon(T, label, "type_variable_type");
+      printField("id", T->getID());
+      OS << ")";
+    }
+
+#undef TRIVIAL_TYPE_PRINTER
+  };
+}
+
+void Type::dump() const {
+  dump(llvm::errs());
+}
+
+void Type::dump(raw_ostream &os, unsigned indent) const {
+  PrintType(os, indent).printRec(*this);
+}
+
+void TypeBase::dump() const {
+  Type(const_cast<TypeBase *>(this)).dump();
+}
+
+void TypeBase::dump(raw_ostream &os, unsigned indent) const {
+  Type(const_cast<TypeBase *>(this)).dump(os, indent);
+}
