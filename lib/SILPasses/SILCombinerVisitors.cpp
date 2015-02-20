@@ -962,6 +962,38 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
     if (Replacement)
       return Replacement;
   }
+
+  // Optimize this case for unsigned and equality comparisons:
+  //   cmp_*_T . (zext U->T x, zext U->T y)
+  //      => cmp_*_T (x, y)
+  switch (I->getBuiltinInfo().ID) {
+  case BuiltinValueKind::ICMP_EQ:
+  case BuiltinValueKind::ICMP_NE:
+  case BuiltinValueKind::ICMP_ULE:
+  case BuiltinValueKind::ICMP_ULT:
+  case BuiltinValueKind::ICMP_UGE:
+  case BuiltinValueKind::ICMP_UGT: {
+    SILValue LCast, RCast;
+    if (match(I->getArguments()[0],
+              m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
+                          m_SILValue(LCast))) &&
+        match(I->getArguments()[1],
+              m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
+                          m_SILValue(RCast))) &&
+        LCast->getType(0) == RCast->getType(0)) {
+
+      auto Name = getCmpFunction(getBuiltinName(I->getBuiltinInfo().ID),
+                                 LCast->getType(0),
+                                 Builder->getASTContext());
+
+      return BuiltinInst::create(I->getLoc(), Name, I->getType(),
+                                 {}, {LCast, RCast}, *I->getFunction());
+    }
+    break;
+  }
+  default:
+    break;
+  }
   
   if (I->getBuiltinInfo().ID == BuiltinValueKind::ICMP_EQ)
     return optimizeBuiltinCompareEq(I, /*Negate Eq result*/ false);

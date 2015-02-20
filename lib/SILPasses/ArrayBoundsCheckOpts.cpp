@@ -591,22 +591,6 @@ static bool dominates(DominanceInfo *DT, SILValue V, SILBasicBlock *B) {
   return false;
 }
 
-/// Get a builtin compare function reference.
-static Identifier getCmpFunction(SILLocation Loc, StringRef Name,
-                                 SILType IntSILTy, SILBuilder &B) {
-  CanType IntTy = IntSILTy.getSwiftRValueType();
-  auto BuiltinIntTy = cast<BuiltinIntegerType>(IntTy);
-  std::string NameStr = Name;
-  if (BuiltinIntTy == BuiltinIntegerType::getWordType(B.getASTContext())) {
-    NameStr += "_Word";
-  } else {
-    unsigned NumBits = BuiltinIntTy->getWidth().getFixedWidth();
-    NameStr += "_Int" + llvm::utostr(NumBits);
-  }
-
-  return B.getASTContext().getIdentifier(NameStr);
-}
-
 /// Subtract a constant from a builtin integer value.
 static SILValue getSub(SILLocation Loc, SILValue Val, unsigned SubVal,
                        SILBuilder &B) {
@@ -677,7 +661,7 @@ struct InductionInfo {
 
     auto Loc = Inc->getLoc();
     auto Scope = Inc->getDebugScope();
-    auto FName = getCmpFunction(Loc, "cmp_sge", Start.getType(), Builder);
+    auto FName = getCmpFunction("cmp_sge", Start.getType(), Builder.getASTContext());
 
     SmallVector<SILValue, 4> Args(1, Start);
     Args.push_back(End);

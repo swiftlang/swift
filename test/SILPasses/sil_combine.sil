@@ -2207,3 +2207,56 @@ bb3:
  %2 = tuple()
  return %2 : $()
 }
+
+// CHECK-LABEL: sil @cmp_zext_peephole
+// CHECK: bb0([[Arg1:%.*]] : $Builtin.Word, [[Arg2:%.*]] : $Builtin.Word):
+// CHECK:   [[ZA1:%.*]] = builtin "zextOrBitCast_Word_Int64"([[Arg1]] : $Builtin.Word) : $Builtin.Int64
+// CHECK:   [[ZA2:%.*]] = builtin "zextOrBitCast_Word_Int64"([[Arg2]] : $Builtin.Word) : $Builtin.Int64
+// CHECK: builtin "cmp_eq_Word"([[Arg1]] : $Builtin.Word, [[Arg2]] : $Builtin.Word)
+// CHECK: builtin "cmp_ne_Word"([[Arg1]] : $Builtin.Word, [[Arg2]] : $Builtin.Word)
+// CHECK: builtin "cmp_ule_Word"([[Arg1]] : $Builtin.Word, [[Arg2]] : $Builtin.Word)
+// CHECK: builtin "cmp_ult_Word"([[Arg1]] : $Builtin.Word, [[Arg2]] : $Builtin.Word)
+// CHECK: builtin "cmp_uge_Word"([[Arg1]] : $Builtin.Word, [[Arg2]] : $Builtin.Word)
+// CHECK: builtin "cmp_ugt_Word"([[Arg1]] : $Builtin.Word, [[Arg2]] : $Builtin.Word)
+// CHECK: builtin "cmp_sle_Int64"([[ZA1]] : $Builtin.Int64, [[ZA2]] : $Builtin.Int64)
+// CHECK: builtin "cmp_slt_Int64"([[ZA1]] : $Builtin.Int64, [[ZA2]] : $Builtin.Int64)
+// CHECK: builtin "cmp_sge_Int64"([[ZA1]] : $Builtin.Int64, [[ZA2]] : $Builtin.Int64)
+// CHECK: builtin "cmp_sgt_Int64"([[ZA1]] : $Builtin.Int64, [[ZA2]] : $Builtin.Int64)
+sil @cmp_zext_peephole : $@thin (Builtin.Word, Builtin.Word) -> () {
+bb0(%0 : $Builtin.Word, %1 : $Builtin.Word):
+  %2 = builtin "zextOrBitCast_Word_Int64"(%0 : $Builtin.Word) : $Builtin.Int64
+  %3 = builtin "zextOrBitCast_Word_Int64"(%1 : $Builtin.Word) : $Builtin.Int64
+
+  %4 = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %4 : $Builtin.Int1
+
+  %6 = builtin "cmp_ne_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %6 : $Builtin.Int1
+
+  %8 = builtin "cmp_ule_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %8 : $Builtin.Int1
+
+  %10 = builtin "cmp_ult_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %10 : $Builtin.Int1
+
+  %12 = builtin "cmp_uge_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %12 : $Builtin.Int1
+
+  %14 = builtin "cmp_ugt_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %14 : $Builtin.Int1
+
+  %16 = builtin "cmp_sle_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %16 : $Builtin.Int1
+
+  %18 = builtin "cmp_slt_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %18 : $Builtin.Int1
+
+  %20 = builtin "cmp_sge_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %20 : $Builtin.Int1
+
+  %22 = builtin "cmp_sgt_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %22 : $Builtin.Int1
+
+  %24 = tuple()
+  return %24 : $()
+}

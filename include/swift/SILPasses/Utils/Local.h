@@ -105,6 +105,9 @@ namespace swift {
   /// the given linkage.
   SILLinkage getSpecializedLinkage(SILLinkage L);
 
+  /// Get a builtin compare function reference.
+  Identifier getCmpFunction(StringRef Name, SILType IntSILTy, ASTContext &AC);
+
   /// The kind of array operation identified by looking at the semantics attribute
   /// of the called function.
   enum class ArrayCallKind {
