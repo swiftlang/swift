@@ -238,7 +238,7 @@ public:
                                 ArrayRef<SILValue> Args) {
     CanType IntTy = CmpTy.getSwiftRValueType();
     auto BuiltinIntTy = cast<BuiltinIntegerType>(IntTy);
-    std::string NameStr = Name;
+    llvm::SmallString<16> NameStr = Name;
     if (BuiltinIntTy == BuiltinIntegerType::getWordType(getASTContext())) {
       NameStr += "_Word";
     } else {

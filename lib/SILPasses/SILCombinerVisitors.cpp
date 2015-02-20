@@ -982,7 +982,7 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
                           m_SILValue(RCast))) &&
         LCast->getType(0) == RCast->getType(0)) {
 
-      auto NewCmp =
+      auto *NewCmp =
         Builder->createBuiltinCmp(I->getLoc(),
                                   getBuiltinName(I->getBuiltinInfo().ID),
                                   LCast->getType(0), I->getType(),

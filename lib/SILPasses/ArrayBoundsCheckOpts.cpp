@@ -662,8 +662,8 @@ struct InductionInfo {
     auto Loc = Inc->getLoc();
     auto Scope = Inc->getDebugScope();
     auto ResultTy = SILType::getBuiltinIntegerType(1, Builder.getASTContext());
-    auto CmpSGE = Builder.createBuiltinCmp(Loc, "cmp_sge", Start.getType(),
-                                           ResultTy, {Start, End});
+    auto *CmpSGE = Builder.createBuiltinCmp(Loc, "cmp_sge", Start.getType(),
+                                            ResultTy, {Start, End});
     CmpSGE->setDebugScope(Scope);
     Builder.createCondFail(Loc, CmpSGE)->setDebugScope(Scope);
     IsOverflowCheckInserted = true;
