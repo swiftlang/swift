@@ -4175,6 +4175,13 @@ bool Parser::parseSILCoverageMap() {
   consumeToken(tok::kw_sil_coverage_map);
   SILParser State(*this);
 
+  // Parse the filename.
+  Identifier Filename;
+  SourceLoc FileLoc;
+  if (State.parseSILIdentifier(Filename, FileLoc,
+                               diag::expected_sil_value_name))
+    return true;
+
   // Parse the covered name.
   Identifier FuncName;
   SourceLoc FuncLoc;
@@ -4238,7 +4245,7 @@ bool Parser::parseSILCoverageMap() {
                      LBraceLoc);
 
   if (!BodyHasError)
-    SILCoverageMap::create(*SIL->M, FuncName.str(), Hash, Regions,
-                           Builder.getExpressions());
+    SILCoverageMap::create(*SIL->M, Filename.str(), FuncName.str(), Hash,
+                           Regions, Builder.getExpressions());
   return false;
 }

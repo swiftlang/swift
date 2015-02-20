@@ -1783,8 +1783,9 @@ void SILWitnessTable::dump() const {
 
 void SILCoverageMap::print(llvm::raw_ostream &OS, bool ShouldSort,
                            bool Verbose) const {
-  OS << "sil_coverage_map " << getName() << " " << getHash() << " {\t// "
-     << demangleSymbolAsString(getName()) << "\n";
+  OS << "sil_coverage_map " << QuotedString(getFile()) << " " << getName()
+     << " " << getHash() << " {\t// " << demangleSymbolAsString(getName())
+     << "\n";
   if (ShouldSort)
     std::sort(MappedRegions, MappedRegions + NumMappedRegions,
               [](const MappedRegion &LHS, const MappedRegion &RHS) {

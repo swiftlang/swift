@@ -35,25 +35,22 @@ void IRGenModule::emitCoverageMapping() {
   if (Mappings.empty())
     return;
 
-  // Find the filename of the swift module being covered.
-  // TODO: This is pretty hacky - how is this sort of thing supposed to be done?
-  StringRef File;
-  for (const auto *F : SILMod->getSwiftModule()->getFiles())
-    if (const auto *SF = dyn_cast<SourceFile>(F))
-      File = SF->getFilename();
-  // If this isn't a file, don't emit coverage.
-  if (File.empty())
-    return;
+  std::vector<StringRef> Files;
+  for (const auto &M : Mappings)
+    if (std::find(Files.begin(), Files.end(), M.getFile()) == Files.end())
+      Files.push_back(M.getFile());
 
-  // Awkwardly munge the absolute filename into a vector of StringRefs.
+  // Awkwardly munge absolute filenames into a vector of StringRefs.
   // TODO: This is heinous - the same thing is happening in clang, but the API
   // really needs to be cleaned up for both.
-  llvm::SmallVector<std::string, 1> FilenameStrs;
-  llvm::SmallVector<StringRef, 1> FilenameRefs;
-  llvm::SmallString<256> Path(File);
-  llvm::sys::fs::make_absolute(Path);
-  FilenameStrs.push_back(std::string(Path.begin(), Path.end()));
-  FilenameRefs.push_back(FilenameStrs[0]);
+  llvm::SmallVector<std::string, 8> FilenameStrs;
+  llvm::SmallVector<StringRef, 8> FilenameRefs;
+  for (StringRef Name : Files) {
+    llvm::SmallString<256> Path(Name);
+    llvm::sys::fs::make_absolute(Path);
+    FilenameStrs.push_back(std::string(Path.begin(), Path.end()));
+    FilenameRefs.push_back(FilenameStrs.back());
+  }
 
   // Encode the filenames first.
   std::string EncodedDataBuf;
@@ -72,13 +69,16 @@ void IRGenModule::emitCoverageMapping() {
   std::vector<llvm::Constant *> FunctionRecords;
   std::vector<CounterMappingRegion> Regions;
   for (const auto &M : Mappings) {
+    unsigned FileID =
+        std::find(Files.begin(), Files.end(), M.getFile()) - Files.begin();
     Regions.clear();
     for (const auto &MR : M.getMappedRegions())
       Regions.emplace_back(CounterMappingRegion::makeRegion(
           MR.Counter, /*FileID=*/0, MR.StartLine, MR.StartCol, MR.EndLine,
           MR.EndCol));
     // Append each function's regions into the encoded buffer.
-    llvm::coverage::CoverageMappingWriter W({0}, M.getExpressions(), Regions);
+    llvm::coverage::CoverageMappingWriter W({FileID}, M.getExpressions(),
+                                            Regions);
     W.write(OS);
 
     auto *NameVal =

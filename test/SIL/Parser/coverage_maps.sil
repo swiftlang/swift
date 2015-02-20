@@ -6,12 +6,12 @@ bb0:
   return %0 : $()
 }
 
-// CHECK-LABEL: sil_coverage_map someFunction 0 {
+// CHECK-LABEL: sil_coverage_map "coverage_maps.sil" someFunction 0 {
 // CHECK: }
-sil_coverage_map someFunction 0 {
+sil_coverage_map "coverage_maps.sil" someFunction 0 {
 }
 
-// CHECK-LABEL: sil_coverage_map someFunction 0 {
+// CHECK-LABEL: sil_coverage_map "/some/other/file.sil" someFunction 0 {
 // CHECK: 4:19 -> 31:1 : 0
 // CHECK: 7:9 -> 7:16 : (0 + 1)
 // CHECK: 7:18 -> 9:3 : zero
@@ -19,7 +19,7 @@ sil_coverage_map someFunction 0 {
 // CHECK: 17:9 -> 17:17 : ((0 + 2) - 3)
 // CHECK: 22:11 -> 139:2 : 1
 // CHECK: }
-sil_coverage_map someFunction 0 {
+sil_coverage_map "/some/other/file.sil" "someFunction" 0 {
   4:19 -> 31:1 : 0
   7:9  -> 7:16 : (0 + 1)
   7:18 -> 9:3  : zero

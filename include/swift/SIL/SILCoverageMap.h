@@ -54,6 +54,9 @@ public:
   };
 
 private:
+  // The name of the source file where this mapping is found.
+  StringRef Filename;
+
   // The mangled name of the function covered by this mapping.
   StringRef Name;
 
@@ -83,9 +86,12 @@ public:
   ~SILCoverageMap();
 
   static SILCoverageMap *
-  create(SILModule &M, StringRef Name, uint64_t Hash,
+  create(SILModule &M, StringRef Filename, StringRef Name, uint64_t Hash,
          ArrayRef<MappedRegion> MappedRegions,
          ArrayRef<llvm::coverage::CounterExpression> Expressions);
+
+  /// Return the name of the source file where this mapping is found.
+  StringRef getFile() const { return Filename; }
 
   /// Return the mangled name of the function this mapping covers.
   StringRef getName() const { return Name; }
