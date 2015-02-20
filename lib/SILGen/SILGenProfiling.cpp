@@ -392,6 +392,8 @@ public:
   }
 
   bool walkToDeclPre(Decl *D) override {
+    if (D->isImplicit())
+      return false;
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
       assignCounter(AFD->getBody());
     return true;

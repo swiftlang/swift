@@ -41,7 +41,24 @@ func f2(x : Algebraic) -> Int32 {
   return 0
 }
 
+public enum Simple {
+  case First, Second
+}
+
+// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_switch.f3
+func f3(x : Simple) -> Int32 {
+  switch (x) {
+  case .First: // CHECK: [[@LINE]]:3 -> [[@LINE+1]]:13 : 2
+    return 1
+  case .Second: // CHECK: [[@LINE]]:3 -> [[@LINE+1]]:10 : 3
+    break
+  } // CHECK: [[@LINE]]:4 -> [[@LINE+2]]:11 : 1
+
+  return 0
+}
+
 f1(3)
 f2(Algebraic.Type1(1, 1))
 f2(Algebraic.Type2(false))
 f2(Algebraic.Type3)
+f3(Simple.Second)
