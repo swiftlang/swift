@@ -32,9 +32,6 @@ ExperimentalTestSuite.test("ComposeOperator/Types") {
 }
 */
 
-/*
-FIXME: this test causes an LLVM verifier failure.
-<rdar://problem/19150564> LLVM error: invalid linkage type for global declaration
 ExperimentalTestSuite.test("ComposeOperator/CountCalls") {
   struct A {}
   struct B {}
@@ -52,7 +49,6 @@ ExperimentalTestSuite.test("ComposeOperator/CountCalls") {
   expectEqual(1, aCalled)
   expectEqual(1, bCalled)
 }
-*/
 
 // A modified variant of the test above.
 struct A {}
