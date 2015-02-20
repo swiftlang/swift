@@ -4238,7 +4238,7 @@ bool Parser::parseSILCoverageMap() {
                      LBraceLoc);
 
   if (!BodyHasError)
-    SILCoverageMap::create(*SIL->M, *Func, Hash, Regions,
+    SILCoverageMap::create(*SIL->M, FuncName.str(), Hash, Regions,
                            Builder.getExpressions());
   return false;
 }

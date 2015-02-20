@@ -55,7 +55,7 @@ public:
 
 private:
   // The mangled name of the function covered by this mapping.
-  SILFunction &Fn;
+  StringRef Name;
 
   // The coverage hash of the function covered by this mapping.
   uint64_t Hash;
@@ -77,18 +77,18 @@ private:
   SILCoverageMap &operator=(const SILCoverageMap &) = delete;
 
   /// Private constructor. Create these using SILCoverageMap::create.
-  SILCoverageMap(SILFunction &Fn, uint64_t Hash);
+  SILCoverageMap(uint64_t Hash);
 
 public:
   ~SILCoverageMap();
 
   static SILCoverageMap *
-  create(SILModule &M, SILFunction &Fn, uint64_t Hash,
+  create(SILModule &M, StringRef Name, uint64_t Hash,
          ArrayRef<MappedRegion> MappedRegions,
          ArrayRef<llvm::coverage::CounterExpression> Expressions);
 
   /// Return the mangled name of the function this mapping covers.
-  StringRef getName() const { return Fn.getName(); }
+  StringRef getName() const { return Name; }
 
   /// Return the coverage hash for function this mapping covers.
   uint64_t getHash() const { return Hash; }

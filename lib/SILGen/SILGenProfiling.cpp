@@ -372,7 +372,7 @@ public:
   /// \brief Generate the coverage counter mapping regions from collected
   /// source regions.
   SILCoverageMap *
-  emitSourceRegions(SILModule &M, SILFunction &Fn, uint64_t Hash,
+  emitSourceRegions(SILModule &M, StringRef Name, uint64_t Hash,
                     llvm::DenseMap<ASTNode, unsigned> &CounterIndices) {
     llvm::coverage::CounterExpressionBuilder Builder;
     std::vector<SILCoverageMap::MappedRegion> Regions;
@@ -387,7 +387,7 @@ public:
       Regions.emplace_back(Start.first, Start.second, End.first, End.second,
                            Region.getCounter().expand(Builder, CounterIndices));
     }
-    return SILCoverageMap::create(M, Fn, Hash, Regions,
+    return SILCoverageMap::create(M, Name, Hash, Regions,
                                   Builder.getExpressions());
   }
 
@@ -537,7 +537,8 @@ void SILGenProfiling::assignRegionCounters(ASTNode Root, SILFunction &Fn) {
     CoverageMapping Coverage(SGM.M.getASTContext().SourceMgr);
     Root.walk(Coverage);
     if (!Coverage.empty())
-      Coverage.emitSourceRegions(SGM.M, Fn, FunctionHash, RegionCounterMap);
+      Coverage.emitSourceRegions(SGM.M, CurrentFuncName, FunctionHash,
+                                 RegionCounterMap);
   }
 }
 
