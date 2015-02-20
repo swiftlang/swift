@@ -113,6 +113,10 @@ option(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT_REQUIRED
 # User-configurable debugging options.
 #
 
+option(SWIFT_AST_VERIFIER
+    "Enable the AST verifier in the built compiler, and run it on every compilation"
+    TRUE)
+
 option(SWIFT_VERIFY_ALL
     "Run SIL verification after each transform when building Swift files in the build process"
     FALSE)

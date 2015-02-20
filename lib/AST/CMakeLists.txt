@@ -66,3 +66,13 @@ if(NOT SWIFT_BUILT_STANDALONE)
   add_dependencies(swiftAST intrinsics_gen)
 endif()
 
+set(swift_ast_verifier_flag)
+if(SWIFT_AST_VERIFIER)
+  set(swift_ast_verifier_flag " -USWIFT_DISABLE_AST_VERIFIER")
+else()
+  set(swift_ast_verifier_flag " -DSWIFT_DISABLE_AST_VERIFIER=1")
+endif()
+
+set_property(SOURCE Verifier.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
+  "${swift_ast_verifier_flag}")
+
