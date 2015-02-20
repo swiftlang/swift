@@ -1688,7 +1688,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
 
   var gen = s.generate()
   var members = Array<Int>()
-  while let (member: AnyObject) = gen.next() {
+  while let member = gen.next() {
     members.append((member as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered(members, [1010, 2020, 3030]))
@@ -1756,7 +1756,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
 
   var gen = s.generate()
   var members = [Int]()
-  while let member: AnyObject = gen.next() {
+  while let member = gen.next() {
     members.append((member as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered(members, hugeNumberArray))
@@ -1775,8 +1775,8 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
 
   var gen = s.generate()
   var members = [Int]()
-  while let member: AnyObject = gen.next() {
-    members.append((member as! TestBridgedKeyTy).value)
+  while let member = gen.next() {
+    members.append(member.value)
   }
   expectTrue(equalsUnordered(members, hugeNumberArray))
   // The following is not required by the GeneratorType protocol, but
@@ -1876,7 +1876,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfSets") {
     var s = a[i]
     var gen = s.generate()
     var items = Array<Int>()
-    while let value: AnyObject = gen.next() {
+    while let value = gen.next() {
       let v = (value as! TestObjCKeyTy).value
       items.append(v)
     }
@@ -1934,7 +1934,7 @@ SetTestSuite.test("BridgingRoundtrip") {
   let enumerator = s.objectEnumerator()
 
   var items = Array<Int>()
-  while let value: AnyObject = enumerator.nextObject() {
+  while let value = enumerator.nextObject() {
     let v = (value as! TestObjCKeyTy).value
     items.append(v)
   }
@@ -2068,7 +2068,7 @@ SetTestSuite.test("BridgedToObjC.ObjectEnumerator.NextObject") {
   let enumerator = s.objectEnumerator()
 
   var members = [Int]()
-  while let nextObject: AnyObject = enumerator.nextObject() {
+  while let nextObject = enumerator.nextObject() {
     members.append((nextObject as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered([1010, 2020, 3030], members))
@@ -2098,7 +2098,7 @@ SetTestSuite.test("BridgedToObjC.MemberTypesCustomBridged") {
   let enumerator = s.objectEnumerator()
 
   var members = [Int]()
-  while let nextObject: AnyObject = enumerator.nextObject() {
+  while let nextObject = enumerator.nextObject() {
     members.append((nextObject as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered([ 1010, 2020, 3030 ], members))
@@ -2115,7 +2115,7 @@ SetTestSuite.test("BridgingRoundTrip") {
   let enumerator = s.objectEnumerator()
 
   var members = [Int]()
-  while let nextObject: AnyObject = enumerator.nextObject() {
+  while let nextObject = enumerator.nextObject() {
     members.append((nextObject as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered([1010, 2020, 3030] ,members))
@@ -2276,7 +2276,7 @@ SetTestSuite.test("SetDowncastConditionalEntryPoint") {
   }
 
   // Successful downcast.
-  if let sCC: Set<TestObjCKeyTy> = _setDownCastConditional(s) {
+  if let sCC = _setDownCastConditional(s) as Set<TestObjCKeyTy>? {
     expectEqual(3, sCC.count)
     expectTrue(sCC.contains(TestObjCKeyTy(1010)))
     expectTrue(sCC.contains(TestObjCKeyTy(2020)))
@@ -2287,8 +2287,7 @@ SetTestSuite.test("SetDowncastConditionalEntryPoint") {
 
   // Unsuccessful downcast
   s.insert("Hello, world")
-  if let sCC: Set<TestObjCKeyTy>
-       = _setDownCastConditional(s) {
+  if let sCC = _setDownCastConditional(s) as Set<TestObjCKeyTy>? {
     expectTrue(false)
   }
 }
@@ -2366,7 +2365,8 @@ SetTestSuite.test("SetBridgeFromObjectiveCConditionalEntryPoint") {
   }
 
   // Successful downcast.
-  if let sVC: Set<TestBridgedKeyTy> = _setBridgeFromObjectiveCConditional(s) {
+  if let sVC =
+    _setBridgeFromObjectiveCConditional(s) as Set<TestBridgedKeyTy>? {
     expectEqual(3, sVC.count)
     expectTrue(sVC.contains(TestBridgedKeyTy(1010)))
     expectTrue(sVC.contains(TestBridgedKeyTy(2020)))
@@ -2377,7 +2377,8 @@ SetTestSuite.test("SetBridgeFromObjectiveCConditionalEntryPoint") {
 
   // Unsuccessful downcasts
   s.insert("Hello, world, I'm your wild girl. I'm your ch-ch-ch-ch-ch-ch cherry bomb")
-  if let sVC: Set<TestBridgedKeyTy> = _setBridgeFromObjectiveCConditional(s) {
+  if let sVC =
+    _setBridgeFromObjectiveCConditional(s) as Set<TestBridgedKeyTy>? {
     expectTrue(false)
   }
 }
