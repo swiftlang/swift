@@ -796,38 +796,40 @@ ParserResult<Stmt> Parser::parseStmtIf() {
   {
     Scope S(this, ScopeKind::IfVars);
   
-    ParserPosition ConditionStartState;
-    DiagnosticTransaction diagTransaction(Diags);
-    if (Tok.is(tok::l_brace)) {
-      // It is unusual for the condition expression to start with a left brace,
-      // and we anticipate the need to do recovery.  Save the parser state so
-      // that we can rewind.
-      ConditionStartState = getParserPosition();
-      diagTransaction.begin();
-    }
+    {
+      ParserPosition ConditionStartState;
+      Optional<DiagnosticTransaction> diagTransaction;
+      if (Tok.is(tok::l_brace)) {
+        // It is unusual for the condition expression to start with a left
+        // brace, and we anticipate the need to do recovery.  Save the parser
+        // state so that we can rewind.
+        ConditionStartState = getParserPosition();
+        diagTransaction.emplace(Diags);
+      }
 
-    Status |= parseStmtCondition(Condition, diag::expected_condition_if);
-    if (Status.isError() || Status.hasCodeCompletion())
-      return makeParserResult<Stmt>(Status, nullptr); // FIXME: better recovery
+      Status |= parseStmtCondition(Condition, diag::expected_condition_if);
+      if (Status.isError() || Status.hasCodeCompletion()) {
+        // FIXME: better recovery
+        return makeParserResult<Stmt>(Status, nullptr);
+      }
 
-    if (Condition.size() == 1 && Condition[0].isCondition() &&
-        isa<ClosureExpr>(Condition[0].getCondition())) {
+      if (Condition.size() == 1 && Condition[0].isCondition() &&
+          isa<ClosureExpr>(Condition[0].getCondition())) {
 
-      auto *CE = cast<ClosureExpr>(Condition[0].getCondition());
-      // If we parsed closure after 'if', then it was not the condition, but
-      // the 'if' statement body.  We could not have had a bare closure in an
-      // 'if' condition because closures don't conform to BooleanType.
-      SourceLoc LBraceLoc = CE->getBody()->getStartLoc();
-      Condition[0] = StmtConditionElement(new (Context) ErrorExpr(LBraceLoc));
+        auto *CE = cast<ClosureExpr>(Condition[0].getCondition());
+        // If we parsed closure after 'if', then it was not the condition, but
+        // the 'if' statement body.  We could not have had a bare closure in an
+        // 'if' condition because closures don't conform to BooleanType.
+        SourceLoc LBraceLoc = CE->getBody()->getStartLoc();
+        Condition[0] = StmtConditionElement(new (Context) ErrorExpr(LBraceLoc));
 
-      // We did not actually want to parse the next statement.
-      backtrackToPosition(ConditionStartState);
-      diagTransaction.abort();
+        // We did not actually want to parse the next statement.
+        backtrackToPosition(ConditionStartState);
+        diagTransaction->abort();
 
-      diagnose(IfLoc, diag::missing_condition_after_if)
-          .highlight(SourceRange(IfLoc, LBraceLoc));
-    } else {
-      diagTransaction.commitIfOpen();
+        diagnose(IfLoc, diag::missing_condition_after_if)
+            .highlight(SourceRange(IfLoc, LBraceLoc));
+      }
     }
 
     NormalBody = parseBraceItemList(diag::expected_lbrace_after_if);
@@ -1050,41 +1052,40 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
 
   Scope S(this, ScopeKind::WhileVars);
   
-  ParserPosition ConditionStartState;
-  DiagnosticTransaction diagTransaction(Diags);
-  if (Tok.is(tok::l_brace)) {
-    // It is unusual for the condition expression to start with a left brace,
-    // and we anticipate the need to do recovery.  Save the parser state so
-    // that we can rewind.
-    ConditionStartState = getParserPosition();
-    diagTransaction.begin();
-  }
-
   ParserStatus Status;
   StmtCondition Condition;
+  {
+    ParserPosition ConditionStartState;
+    Optional<DiagnosticTransaction> diagTransaction;
+    if (Tok.is(tok::l_brace)) {
+      // It is unusual for the condition expression to start with a left brace,
+      // and we anticipate the need to do recovery.  Save the parser state so
+      // that we can rewind.
+      ConditionStartState = getParserPosition();
+      diagTransaction.emplace(Diags);
+    }
 
-  Status |= parseStmtCondition(Condition, diag::expected_condition_while);
-  if (Status.isError() || Status.hasCodeCompletion())
-    return makeParserResult<Stmt>(Status, nullptr); // FIXME: better recovery
+    Status |= parseStmtCondition(Condition, diag::expected_condition_while);
+    if (Status.isError() || Status.hasCodeCompletion())
+      return makeParserResult<Stmt>(Status, nullptr); // FIXME: better recovery
 
-  if (Condition.size() == 1 && Condition[0].isCondition() &&
-      isa<ClosureExpr>(Condition[0].getCondition())) {
+    if (Condition.size() == 1 && Condition[0].isCondition() &&
+        isa<ClosureExpr>(Condition[0].getCondition())) {
 
-    auto *CE = cast<ClosureExpr>(Condition[0].getCondition());
-    // If we parsed closure after 'while', then it was not the condition, but
-    // the 'while' statement body.  We could not have had a bare closure in an
-    // 'while' condition because closures don't conform to BooleanType.
-    SourceLoc LBraceLoc = CE->getBody()->getStartLoc();
-    Condition[0] = StmtConditionElement(new (Context) ErrorExpr(LBraceLoc));
+      auto *CE = cast<ClosureExpr>(Condition[0].getCondition());
+      // If we parsed closure after 'while', then it was not the condition, but
+      // the 'while' statement body.  We could not have had a bare closure in
+      // an 'while' condition because closures don't conform to BooleanType.
+      SourceLoc LBraceLoc = CE->getBody()->getStartLoc();
+      Condition[0] = StmtConditionElement(new (Context) ErrorExpr(LBraceLoc));
 
-    // We did not actually want to parse the next statement.
-    backtrackToPosition(ConditionStartState);
-    diagTransaction.abort();
+      // We did not actually want to parse the next statement.
+      backtrackToPosition(ConditionStartState);
+      diagTransaction->abort();
 
-    diagnose(WhileLoc, diag::missing_condition_after_while)
-        .highlight(SourceRange(WhileLoc, LBraceLoc));
-  } else {
-    diagTransaction.commitIfOpen();
+      diagnose(WhileLoc, diag::missing_condition_after_while)
+          .highlight(SourceRange(WhileLoc, LBraceLoc));
+    }
   }
 
   ParserResult<BraceStmt> Body =
@@ -1118,36 +1119,37 @@ ParserResult<Stmt> Parser::parseStmtDoWhile(LabeledStmtInfo LabelInfo) {
   if (parseToken(tok::kw_while, WhileLoc, diag::expected_while_in_dowhile))
     return nullptr; // FIXME: better recovery
 
-  ParserPosition ConditionStartState;
-  DiagnosticTransaction diagTransaction(Diags);
-  if (Tok.is(tok::l_brace)) {
-    // It is unusual for the condition expression to start with a left brace,
-    // and we anticipate the need to do recovery.  Save the parser state so
-    // that we can rewind.
-    ConditionStartState = getParserPosition();
-    diagTransaction.begin();
-  }
+  ParserResult<Expr> Condition;
+  {
+    ParserPosition ConditionStartState;
+    Optional<DiagnosticTransaction> diagTransaction;
+    if (Tok.is(tok::l_brace)) {
+      // It is unusual for the condition expression to start with a left brace,
+      // and we anticipate the need to do recovery.  Save the parser state so
+      // that we can rewind.
+      ConditionStartState = getParserPosition();
+      diagTransaction.emplace(Diags);
+    }
 
-  ParserResult<Expr> Condition = parseExpr(diag::expected_expr_do_while);
-  Status |= Condition;
-  if (Condition.isNull() || Condition.hasCodeCompletion())
-    return makeParserResult<Stmt>(Status, nullptr); // FIXME: better recovery
+    Condition = parseExpr(diag::expected_expr_do_while);
+    Status |= Condition;
+    if (Condition.isNull() || Condition.hasCodeCompletion())
+      return makeParserResult<Stmt>(Status, nullptr); // FIXME: better recovery
 
-  if (auto *CE = dyn_cast<ClosureExpr>(Condition.get())) {
-    // If we parsed a closure after 'do ... while', then it was not the
-    // condition, but a beginning of the next statement.  We can not have a
-    // bare closure in a 'do ... while' condition because closures don't
-    // conform to LogicValue.
-    SourceLoc LBraceLoc = CE->getBody()->getStartLoc();
-    Condition = makeParserErrorResult(new (Context) ErrorExpr(LBraceLoc));
+    if (auto *CE = dyn_cast<ClosureExpr>(Condition.get())) {
+      // If we parsed a closure after 'do ... while', then it was not the
+      // condition, but a beginning of the next statement.  We can not have a
+      // bare closure in a 'do ... while' condition because closures don't
+      // conform to LogicValue.
+      SourceLoc LBraceLoc = CE->getBody()->getStartLoc();
+      Condition = makeParserErrorResult(new (Context) ErrorExpr(LBraceLoc));
 
-    // We did not actually want to parse the next statement.
-    backtrackToPosition(ConditionStartState);
-    diagTransaction.abort();
+      // We did not actually want to parse the next statement.
+      backtrackToPosition(ConditionStartState);
+      diagTransaction->abort();
 
-    diagnose(WhileLoc, diag::missing_condition_after_while);
-  } else {
-    diagTransaction.commitIfOpen();
+      diagnose(WhileLoc, diag::missing_condition_after_while);
+    }
   }
 
   return makeParserResult(
@@ -1429,39 +1431,39 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
   SourceLoc InLoc;
   parseToken(tok::kw_in, InLoc, diag::expected_foreach_in);
 
-  ParserPosition ContainerStartState;
-  DiagnosticTransaction diagTransaction(Diags);
-  if (Tok.is(tok::l_brace)) {
-    // It is unusual for the container expression to start with a left brace,
-    // and we anticipate the need to do recovery.  Save the parser state so
-    // that we can rewind.
-    ContainerStartState = getParserPosition();
-    diagTransaction.begin();
-  }
+  ParserResult<Expr> Container;
+  {
+    ParserPosition ContainerStartState;
+    Optional<DiagnosticTransaction> diagTransaction;
+    if (Tok.is(tok::l_brace)) {
+      // It is unusual for the container expression to start with a left brace,
+      // and we anticipate the need to do recovery.  Save the parser state so
+      // that we can rewind.
+      ContainerStartState = getParserPosition();
+      diagTransaction.emplace(Diags);
+    }
 
-  ParserResult<Expr> Container =
-      parseExprBasic(diag::expected_foreach_container);
-  if (Container.hasCodeCompletion())
-    return makeParserCodeCompletionResult<Stmt>();
-  if (Container.isNull())
-    Container = makeParserErrorResult(new (Context) ErrorExpr(Tok.getLoc()));
+    Container = parseExprBasic(diag::expected_foreach_container);
+    if (Container.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Stmt>();
+    if (Container.isNull())
+      Container = makeParserErrorResult(new (Context) ErrorExpr(Tok.getLoc()));
 
-  if (auto *CE = dyn_cast<ClosureExpr>(Container.get())) {
-    // If the container expression turns out to be a closure, then it was not
-    // the container expression, but the 'for' statement body.  We can not have
-    // a bare closure as a container expression because closures don't conform
-    // to Sequence.
-    Container =
-        makeParserErrorResult(new (Context) ErrorExpr(CE->getStartLoc()));
+    if (auto *CE = dyn_cast<ClosureExpr>(Container.get())) {
+      // If the container expression turns out to be a closure, then it was not
+      // the container expression, but the 'for' statement body.  We can not
+      // have a bare closure as a container expression because closures don't
+      // conform to Sequence.
+      Container =
+          makeParserErrorResult(new (Context) ErrorExpr(CE->getStartLoc()));
 
-    // Backtrack to the '{' so that we can re-parse the body in the correct
-    // lexical scope.
-    backtrackToPosition(ContainerStartState);
-    diagTransaction.abort();
+      // Backtrack to the '{' so that we can re-parse the body in the correct
+      // lexical scope.
+      backtrackToPosition(ContainerStartState);
+      diagTransaction->abort();
 
-    diagnose(CE->getStartLoc(), diag::expected_foreach_container);
-  } else {
-    diagTransaction.commitIfOpen();
+      diagnose(CE->getStartLoc(), diag::expected_foreach_container);
+    }
   }
 
   // Introduce a new scope and place the variables in the pattern into that

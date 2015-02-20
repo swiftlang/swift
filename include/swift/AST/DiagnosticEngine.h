@@ -614,30 +614,27 @@ namespace swift {
     unsigned Depth;
 
     /// \brief Whether this transaction is currently open.
-    bool IsOpen = false;
+    bool IsOpen = true;
 
   public:
     explicit DiagnosticTransaction(DiagnosticEngine &engine)
-      : Engine(engine)
+      : Engine(engine),
+        PrevDiagnostics(Engine.TentativeDiagnostics.size()),
+        Depth(Engine.TransactionCount),
+        IsOpen(true)
     {
-    }
-
-    ~DiagnosticTransaction() {
-      commitIfOpen();
-    }
-
-    /// \brief Open a new transaction.
-    void begin() {
-      assert(!IsOpen && "only closed transactions may be opened");
-      assert(!Engine.ActiveDiagnostic); // TODO: reasonable?
-      IsOpen = true;
-      PrevDiagnostics = Engine.TentativeDiagnostics.size();
-      Depth = Engine.TransactionCount;
+      assert(!Engine.ActiveDiagnostic);
       Engine.TransactionCount++;
     }
 
-    /// \brief Abort this transaction and erase all diagnostics record while it
-    /// was open.
+    ~DiagnosticTransaction() {
+      if (IsOpen) {
+        commit();
+      }
+    }
+
+    /// \brief Abort and close this transaction and erase all diagnostics
+    /// record while it was open.
     void abort() {
       close();
       Engine.TentativeDiagnostics.erase(
@@ -645,20 +642,13 @@ namespace swift {
         Engine.TentativeDiagnostics.end());
     }
 
-    /// \brief Commit this transaction. If this is the top-level transaction,
-    /// emit any diagnostics that were recorded while it was open.
+    /// \brief Commit and close this transaction. If this is the top-level
+    /// transaction, emit any diagnostics that were recorded while it was open.
     void commit() {
       close();
       if (Depth == 0) {
         assert(PrevDiagnostics == 0);
         Engine.emitTentativeDiagnostics();
-      }
-    }
-
-    /// \brief If this transaction is open, commit it and close it.
-    void commitIfOpen() {
-      if (IsOpen) {
-        commit();
       }
     }
 
