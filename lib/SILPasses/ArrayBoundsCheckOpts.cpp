@@ -661,13 +661,9 @@ struct InductionInfo {
 
     auto Loc = Inc->getLoc();
     auto Scope = Inc->getDebugScope();
-    auto FName = getCmpFunction("cmp_sge", Start.getType(), Builder.getASTContext());
-
-    SmallVector<SILValue, 4> Args(1, Start);
-    Args.push_back(End);
-    auto CmpSGE = Builder.createBuiltin(Loc, FName,
-                    SILType::getBuiltinIntegerType(1, Builder.getASTContext()),
-                    {}, Args);
+    auto ResultTy = SILType::getBuiltinIntegerType(1, Builder.getASTContext());
+    auto CmpSGE = Builder.createBuiltinCmp(Loc, "cmp_sge", Start.getType(),
+                                           ResultTy, {Start, End});
     CmpSGE->setDebugScope(Scope);
     Builder.createCondFail(Loc, CmpSGE)->setDebugScope(Scope);
     IsOverflowCheckInserted = true;

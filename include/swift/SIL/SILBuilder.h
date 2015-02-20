@@ -16,6 +16,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "llvm/ADT/StringExtras.h"
 
 namespace swift {
 
@@ -230,6 +231,22 @@ public:
                              SILType ResultTy, ArrayRef<Substitution> Subs,
                              ArrayRef<SILValue> Args) {
     return insert(BuiltinInst::create(Loc, Name, ResultTy, Subs, Args, F));
+  }
+
+  BuiltinInst *createBuiltinCmp(SILLocation Loc, StringRef Name,
+                                SILType CmpTy, SILType ResultTy,
+                                ArrayRef<SILValue> Args) {
+    CanType IntTy = CmpTy.getSwiftRValueType();
+    auto BuiltinIntTy = cast<BuiltinIntegerType>(IntTy);
+    std::string NameStr = Name;
+    if (BuiltinIntTy == BuiltinIntegerType::getWordType(getASTContext())) {
+      NameStr += "_Word";
+    } else {
+      unsigned NumBits = BuiltinIntTy->getWidth().getFixedWidth();
+      NameStr += "_Int" + llvm::utostr(NumBits);
+    }
+    auto Ident = getASTContext().getIdentifier(NameStr);
+    return insert(BuiltinInst::create(Loc, Ident, ResultTy, {}, Args, F));
   }
   
   FunctionRefInst *createFunctionRef(SILLocation loc, SILFunction *f) {

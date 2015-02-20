@@ -18,7 +18,6 @@
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/CommandLine.h"
@@ -328,19 +327,6 @@ SILLinkage swift::getSpecializedLinkage(SILLinkage L) {
     // functions from the stdlib which are specialized in another module).
     return SILLinkage::Private;
   }
-}
-
-Identifier swift::getCmpFunction(StringRef Name, SILType IntSILTy, ASTContext &AC) {
-  CanType IntTy = IntSILTy.getSwiftRValueType();
-  auto BuiltinIntTy = cast<BuiltinIntegerType>(IntTy);
-  std::string NameStr = Name;
-  if (BuiltinIntTy == BuiltinIntegerType::getWordType(AC)) {
-    NameStr += "_Word";
-  } else {
-    unsigned NumBits = BuiltinIntTy->getWidth().getFixedWidth();
-    NameStr += "_Int" + llvm::utostr(NumBits);
-  }
-  return AC.getIdentifier(NameStr);
 }
 
 /// Match array semantic calls.
