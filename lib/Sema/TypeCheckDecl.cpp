@@ -6198,7 +6198,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
 
   // Check whether there is a user-declared constructor or an instance
   // variable.
-  bool FoundInstanceVar = false;
+  bool FoundMemberwiseInitializedProperty = false;
   bool FoundUninitializedVars = false;
   bool FoundDesignatedInit = false;
   decl->setAddedImplicitInitializers();
@@ -6221,8 +6221,28 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
     }
 
     if (auto var = dyn_cast<VarDecl>(member)) {
-      if (var->hasStorage() && !var->isStatic() && !var->isInvalid())
-        FoundInstanceVar = true;
+      if (var->hasStorage() && !var->isStatic() && !var->isInvalid()) {
+        // Initialized 'let' properties have storage, but don't get an argument
+        // to the memberwise initializer since they already have an initial
+        // value that cannot be overridden.
+        if (var->isLet() && var->getParentPattern() &&
+            var->getParentPattern()->hasInit()) {
+          
+          // We cannot handle properties like:
+          //   let (a,b) = (1,2)
+          // for now, just disable implicit init synthesization in structs in
+          // this case.
+          auto SP = var->getParentPattern()->getPattern();
+          if (auto *TP = dyn_cast<TypedPattern>(SP))
+            SP = TP->getSubPattern();
+          if (!isa<NamedPattern>(SP) && isa<StructDecl>(decl))
+            return;
+          
+          continue;
+        }
+        
+        FoundMemberwiseInitializedProperty = true;
+      }
       continue;
     }
 
@@ -6237,17 +6257,18 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
 
   if (auto structDecl = dyn_cast<StructDecl>(decl)) {
     if (!FoundDesignatedInit && !structDecl->hasUnreferenceableStorage()) {
-      // For a struct we have full visibility of, we add a memberwise
-      // constructor.
-
-      // Create the implicit memberwise constructor.
-      auto ctor = createImplicitConstructor(
-                    *this, decl, ImplicitConstructorKind::Memberwise);
-      decl->addMember(ctor);
-      Results.push_back(ctor);
+      // For a struct with memberwise initialized properties, we add a
+      // memberwise init.
+      if (FoundMemberwiseInitializedProperty) {
+        // Create the implicit memberwise constructor.
+        auto ctor = createImplicitConstructor(
+                      *this, decl, ImplicitConstructorKind::Memberwise);
+        decl->addMember(ctor);
+        Results.push_back(ctor);
+      }
 
       // If we found a stored property, add a default constructor.
-      if (FoundInstanceVar && !FoundUninitializedVars)
+      if (!FoundUninitializedVars)
         Results.push_back(defineDefaultConstructor(decl));
     }
     return;

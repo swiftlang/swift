@@ -3681,6 +3681,7 @@ namespace {
   };
 }
 
+
 static void emitImplicitValueConstructor(SILGenFunction &gen,
                                          ConstructorDecl *ctor) {
   RegularLocation Loc(ctor);
@@ -3713,7 +3714,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
   }
 
   emitConstructorMetatypeArg(gen, ctor);
-
+  
   auto *decl = selfTy.getStructOrBoundGenericStruct();
   assert(decl && "not a struct?!");
   
@@ -3722,13 +3723,28 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
     
     auto elti = elements.begin(), eltEnd = elements.end();
     for (VarDecl *field : decl->getStoredProperties()) {
-      assert(elti != eltEnd && "number of args does not match number of fields");
-      (void)eltEnd;
       auto fieldTy = selfTy.getFieldType(field, gen.SGM.M);
       auto &fieldTL = gen.getTypeLowering(fieldTy);
       SILValue slot = gen.B.createStructElementAddr(Loc, resultSlot, field,
-                                    fieldTL.getLoweredType().getAddressType());
+                                                    fieldTL.getLoweredType().getAddressType());
       InitializationPtr init(new ImplicitValueInitialization(slot));
+
+      // An initialized 'let' property has a single value specified by the
+      // initializer - it doesn't come from an argument.
+      if (!field->isStatic() && field->isLet() && field->getParentPattern() &&
+          field->getParentPattern()->hasInit()) {
+        assert(field->getType()->isEqual(field->getParentPattern()->getInit()
+                                         ->getType()) && "Checked by sema");
+        
+        // Cleanup after this initialization.
+        FullExpr scope(gen.Cleanups, field->getParentPattern());
+        gen.emitRValue(field->getParentPattern()->getInit())
+          .forwardInto(gen, init.get(), Loc);
+        continue;
+      }
+      
+      assert(elti != eltEnd && "number of args does not match number of fields");
+      (void)eltEnd;
       std::move(*elti).forwardInto(gen, init.get(), Loc);
       ++elti;
     }
@@ -3742,16 +3758,25 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
   
   auto elti = elements.begin(), eltEnd = elements.end();
   for (VarDecl *field : decl->getStoredProperties()) {
-    assert(elti != eltEnd && "number of args does not match number of fields");
-    (void)eltEnd;
     auto fieldTy = selfTy.getFieldType(field, gen.SGM.M);
-    
-    SILValue v
-      = std::move(*elti).forwardAsSingleStorageValue(gen, fieldTy, Loc);
+    SILValue v;
+
+    // An initialized 'let' property has a single value specified by the
+    // initializer - it doesn't come from an argument.
+    if (!field->isStatic() && field->isLet() && field->getParentPattern() &&
+        field->getParentPattern()->hasInit()) {
+      // Cleanup after this initialization.
+      FullExpr scope(gen.Cleanups, field->getParentPattern());
+      v = gen.emitRValue(field->getParentPattern()->getInit())
+             .forwardAsSingleStorageValue(gen, fieldTy, Loc);
+    } else {
+      assert(elti != eltEnd && "number of args does not match number of fields");
+      (void)eltEnd;
+      v = std::move(*elti).forwardAsSingleStorageValue(gen, fieldTy, Loc);
+      ++elti;
+    }
     
     eltValues.push_back(v);
-    
-    ++elti;
   }
   
   SILValue selfValue = gen.B.createStruct(Loc, selfTy, eltValues);
@@ -4390,29 +4415,30 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   }
 }
 
+
 /// Emit a member initialization for the members described in the
 /// given pattern from the given source value.
-static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl, 
+static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
                            Pattern *pattern, RValue &&src) {
   switch (pattern->getKind()) {
   case PatternKind::Paren:
-    return emitMemberInit(SGF, selfDecl, 
-                          cast<ParenPattern>(pattern)->getSubPattern(), 
+    return emitMemberInit(SGF, selfDecl,
+                          cast<ParenPattern>(pattern)->getSubPattern(),
                           std::move(src));
-
+    
   case PatternKind::Tuple: {
     auto tuple = cast<TuplePattern>(pattern);
     auto fields = tuple->getFields();
-
+    
     SmallVector<RValue, 4> elements;
     std::move(src).extractElements(elements);
     for (unsigned i = 0, n = fields.size(); i != n; ++i) {
-      emitMemberInit(SGF, selfDecl, fields[i].getPattern(), 
+      emitMemberInit(SGF, selfDecl, fields[i].getPattern(),
                      std::move(elements[i]));
     }
     break;
   }
-
+    
   case PatternKind::Named: {
     auto named = cast<NamedPattern>(pattern);
     // Form the lvalue referencing this member.
@@ -4426,10 +4452,10 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
       self = SGF.emitLValueForDecl(loc, selfDecl, src.getType(),
                                    AccessKind::Write,
                                    AccessSemantics::DirectToStorage);
-
+    
     LValue memberRef =
       SGF.emitDirectIVarLValue(loc, self, named->getDecl(), AccessKind::Write);
-
+    
     // Assign to it.
     SGF.emitAssignToLValue(loc, std::move(src), std::move(memberRef));
     return;
@@ -4437,17 +4463,17 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
     
   case PatternKind::Any:
     return;
-
+    
   case PatternKind::Typed:
-    return emitMemberInit(SGF, selfDecl, 
-                          cast<TypedPattern>(pattern)->getSubPattern(), 
+    return emitMemberInit(SGF, selfDecl,
+                          cast<TypedPattern>(pattern)->getSubPattern(),
                           std::move(src));
-
+    
   case PatternKind::Var:
-    return emitMemberInit(SGF, selfDecl, 
-                          cast<VarPattern>(pattern)->getSubPattern(), 
+    return emitMemberInit(SGF, selfDecl,
+                          cast<VarPattern>(pattern)->getSubPattern(),
                           std::move(src));
-
+    
 #define PATTERN(Name, Parent)
 #define REFUTABLE_PATTERN(Name, Parent) case PatternKind::Name:
 #include "swift/AST/PatternNodes.def"
@@ -4455,7 +4481,7 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
   }
 }
 
-void SILGenFunction::emitMemberInitializers(VarDecl *selfDecl, 
+void SILGenFunction::emitMemberInitializers(VarDecl *selfDecl,
                                             NominalTypeDecl *nominal) {
   for (auto member : nominal->getMembers()) {
     // Find pattern binding declarations that have initializers.

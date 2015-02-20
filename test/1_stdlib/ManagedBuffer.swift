@@ -19,7 +19,7 @@ import Foundation
 
 struct CountAndCapacity {
   var count: LifetimeTracked
-  let capacity: Int = 0
+  let capacity: Int
 }
 
 // An example of ManagedBuffer, very similar to what Array will use.

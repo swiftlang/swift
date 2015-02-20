@@ -166,7 +166,7 @@ func test_StdlibTypesPrinted() {
   }
   if true {
     struct Wrapper: Printable {
-      let x: Printable? = nil
+      var x: Printable? = nil
 
       var description: String {
         return "Wrapper(" + x.debugDescription + ")"

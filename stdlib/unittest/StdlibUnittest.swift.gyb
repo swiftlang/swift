@@ -828,7 +828,7 @@ public class TestSuite {
     let name: String
     let xfail: _UnitTestArray<TestRunPredicate>
     let skip: _UnitTestArray<TestRunPredicate>
-    let crashOutputMatches: [String] = []
+    let crashOutputMatches: [String]
     let code: () -> ()
 
     func getActiveXFailPredicates() -> _UnitTestArray<TestRunPredicate> {

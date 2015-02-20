@@ -1889,6 +1889,15 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       if (var->isImplicit())
         continue;
       tc.validateDecl(var);
+      
+      
+      // Initialized 'let' properties have storage, but don't get an argument
+      // to the memberwise initializer since they already have an initial
+      // value that cannot be overridden.
+      if (var->isLet() && var->getParentPattern() &&
+          var->getParentPattern()->hasInit())
+        continue;
+      
       accessLevel = std::min(accessLevel, var->getAccessibility());
 
       auto varType = tc.getTypeOfRValue(var);

@@ -25,8 +25,8 @@ struct BA_DefaultStruct {
 
 // CHECK-LABEL: private{{(\*/)?}} struct BB_PrivateStruct {
 private struct BB_PrivateStruct {
-  // CHECK: /*private*/ let x
-  let x = 0
+  // CHECK: /*private*/ var x
+  var x = 0
   // CHECK: /*private*/ init(x: Int)
   // CHECK: /*private*/ init()
 } // CHECK: {{^[}]}}
@@ -35,22 +35,21 @@ private struct BB_PrivateStruct {
 internal struct BC_InternalStruct {
   // CHECK: /*internal*/ let x
   let x = 0
-  // CHECK: /*internal*/ init(x: Int)
   // CHECK: /*internal*/ init()
 } // CHECK: {{^[}]}}
 
 // CHECK-LABEL: public{{(\*/)?}} struct BD_PublicStruct {
 public struct BD_PublicStruct {
-  // CHECK: /*internal*/ let x
-  let x = 0
+  // CHECK: /*internal*/ var x
+  var x = 0
   // CHECK: /*internal*/ init(x: Int)
   // CHECK: /*internal*/ init()
 } // CHECK: {{^[}]}}
 
 // CHECK-LABEL: public{{(\*/)?}} struct BE_PublicStructPrivateMembers {
 public struct BE_PublicStructPrivateMembers {
-  // CHECK: private{{(\*/)?}} let x
-  private let x = 0
+  // CHECK: private{{(\*/)?}} var x
+  private var x = 0
   // CHECK: /*private*/ init(x: Int)
   // CHECK: /*internal*/ init()
 } // CHECK: {{^[}]}}
