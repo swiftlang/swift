@@ -14,6 +14,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
@@ -278,6 +279,7 @@ public:
 class CopyForwarding {
   // Per-function state.
   PostOrderAnalysis *PostOrder;
+  DominanceAnalysis *DomAnalysis;
   bool DoGlobalHoisting;
   bool HasChanged;
   bool HasChangedCFG;
@@ -296,9 +298,10 @@ class CopyForwarding {
   SmallVector<DestroyAddrInst*, 4> DestroyPoints;
   SmallPtrSet<SILBasicBlock*, 32> DeadInBlocks;
 public:
-  CopyForwarding(PostOrderAnalysis *PO):
-    PostOrder(PO), DoGlobalHoisting(false), HasChanged(false),
-    HasChangedCFG(false), IsLoadedFrom(false), HasForwardedToCopy(false) {}
+  CopyForwarding(PostOrderAnalysis *PO, DominanceAnalysis *DA)
+      : PostOrder(PO), DomAnalysis(DA), DoGlobalHoisting(false),
+        HasChanged(false), HasChangedCFG(false), IsLoadedFrom(false),
+        HasForwardedToCopy(false) {}
 
   void reset(SILFunction *F) {
     // Don't hoist destroy_addr globally in transparent functions. Avoid cloning
@@ -308,8 +311,10 @@ public:
     // be reapplied after the transparent function is inlined at which point
     // global hoisting will be done.
     DoGlobalHoisting = !F->isTransparent();
-    if (HasChangedCFG)
+    if (HasChangedCFG) {
+      DomAnalysis->invalidate(F, SILAnalysis::InvalidationKind::CFG);
       PostOrder->invalidate(F, SILAnalysis::InvalidationKind::CFG);
+    }
     CurrentDef = SILValue();
     IsLoadedFrom = false;
     HasForwardedToCopy = false;
@@ -336,6 +341,9 @@ protected:
   bool backwardPropagateCopy(CopyAddrInst *CopyInst,
                              SmallPtrSetImpl<SILInstruction*> &DestUserInsts);
   bool hoistDestroy(SILInstruction *DestroyPoint, SILLocation DestroyLoc);
+
+  bool isSourceDeadAtCopy(CopyAddrInst *);
+  bool areCopyDestUsersDominatedBy(CopyAddrInst *, SmallVectorImpl<Operand *> &);
 };
 } // namespace
 
@@ -457,6 +465,61 @@ bool CopyForwarding::propagateCopy(CopyAddrInst *CopyInst) {
   return false;
 }
 
+/// Check that the lifetime of %src ends at the copy and is not reinitialized
+/// thereafter with a new value.
+bool CopyForwarding::isSourceDeadAtCopy(CopyAddrInst *Copy) {
+  // A single copy_addr [take] %Src.
+  if (TakePoints.size() == 1 && DestroyPoints.empty() && SrcUserInsts.empty())
+    return true;
+
+  if (TakePoints.empty() && DestroyPoints.size() == 1 &&
+      SrcUserInsts.size() == 1) {
+    assert(*SrcUserInsts.begin() == Copy);
+    return true;
+  }
+  // For now just check for a single copy_addr that destroys its source.
+  return false;
+}
+
+/// Check that all users of the destination address of the copy are dominated by
+/// the copy. There is no path around copy that could initialize %dest with a
+/// different value.
+bool CopyForwarding::areCopyDestUsersDominatedBy(
+    CopyAddrInst *Copy, SmallVectorImpl<Operand *> &DestUses) {
+
+  SILValue CopyDest = Copy->getDest();
+  DominanceInfo *DT = nullptr;
+
+  for (auto *Use : CopyDest.getUses()) {
+    auto *UserInst = Use->getUser();
+    if (UserInst == Copy)
+      continue;
+
+    // Initialize the dominator tree info.
+    if (!DT)
+      DT = DomAnalysis->getDomInfo(Copy->getFunction());
+
+    // Check dominance of the parent blocks.
+    if (!DT->dominates(Copy->getParent(), UserInst->getParent()))
+      return false;
+
+    bool CheckDominanceInBlock = Copy->getParent() == UserInst->getParent();
+    // Check whether Copy is before UserInst.
+    if (CheckDominanceInBlock) {
+      SILBasicBlock::iterator SI = Copy, SE = Copy->getParent()->end();
+      for (++SI; SI != SE; ++SI)
+        if (&*SI == UserInst)
+          break;
+      if (SI == SE)
+        return false;
+    }
+
+    // We can forward to this use.
+    DestUses.push_back(Use);
+  }
+  return true;
+}
+
 /// Perform forward copy-propagation. Find a set of uses that the given copy can
 /// forward to and replace them with the copy's source.
 ///
@@ -482,8 +545,35 @@ bool CopyForwarding::forwardPropagateCopy(
   CopyAddrInst *CopyInst,
   SmallPtrSetImpl<SILInstruction*> &DestUserInsts) {
 
-  if (DestUserInsts.empty())
-    return false;
+  // Looking at
+  //    copy_addr %Src, [init] %Dst
+  // We can reuse %Src if it is destroyed at %Src and not initialized again. To
+  // know that we can safely replace all uses of %Dst with source we must know
+  // that there no aliasing accesses through other names (an alloc_stack
+  // instruction qualifies for this, an inout parameter does not).  Furthermore,
+  // we must know that all accesses to %Dst must observe this copy (there must
+  // no be path around this copy that performs a copy to %Dst with a different
+  // value).
+  SmallVector<Operand *, 16> DestUses;
+  if (isa<AllocStackInst>(CopyInst->getDest()) && /* Uniquely identified name */
+      isSourceDeadAtCopy(CopyInst) &&
+      areCopyDestUsersDominatedBy(CopyInst, DestUses)) {
+
+    // Replace all uses of Dest with a use of Src.
+    for (auto *Oper : DestUses) {
+      Oper->set(CopyInst->getSrc());
+      if (isa<CopyAddrInst>(Oper->getUser()))
+        HasForwardedToCopy = true;
+    }
+
+    // The caller will Remove the destroy_addr of %src.
+    assert((DestroyPoints.empty() ||
+            (!CopyInst->isTakeOfSrc() && DestroyPoints.size() == 1)) &&
+           "Must only have one destroy");
+
+    // The caller will remove the copy_addr.
+    return true;
+  }
 
   SILValue CopyDest = CopyInst->getDest();
   SILInstruction *DefDealloc = nullptr;
@@ -899,7 +989,8 @@ class CopyForwardingPass : public SILFunctionTransform
       return;
 
     auto *PO = getAnalysis<PostOrderAnalysis>();
-    auto Forwarding = CopyForwarding(PO);
+    auto *DA = getAnalysis<DominanceAnalysis>();
+    auto Forwarding = CopyForwarding(PO, DA);
 
     for (SILValue Def : CopiedDefs) {
 #ifndef NDEBUG

@@ -354,3 +354,80 @@ bb0:
   dealloc_stack %v0#0 : $*@local_storage Optional<AClass>
   return %34 : $()
 }
+
+// CHECK-LABEL: sil @nil_comparison
+// CHECK:  alloc_stack
+// CHECK-NOT: copy_addr
+// CHECK-NOT destroy_addr
+// CHECK: switch_enum_addr %0
+// CHECK: [[D:%.*]] = unchecked_take_enum_data_addr %0
+// CHECK: destroy_addr [[D]]
+// CHECK: return
+sil @nil_comparison : $@thin <T> (@in Optional<T>) -> Bool {
+bb0(%0 : $*Optional<T>):
+  %2 = alloc_stack $Optional<T>
+  copy_addr %0 to [initialization] %2#1 : $*Optional<T>
+  destroy_addr %0 : $*Optional<T>
+  switch_enum_addr %2#1 : $*Optional<T>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: bb2
+
+bb1:
+  %6 = unchecked_take_enum_data_addr %2#1 : $*Optional<T>, #Optional.Some!enumelt.1
+  destroy_addr %6 : $*T
+  %8 = integer_literal $Builtin.Int1, -1
+  br bb3(%8 : $Builtin.Int1)
+
+bb2:
+  %10 = integer_literal $Builtin.Int1, 0
+  br bb3(%10 : $Builtin.Int1)
+
+bb3(%12 : $Builtin.Int1):
+  %13 = struct $Bool (%12 : $Builtin.Int1)
+  dealloc_stack %2#0 : $*@local_storage Optional<T>
+  return %13 : $Bool
+}
+
+sil @use: $@thin <T> (@inout T) -> ()
+
+// We currently don't handle reasoning about multiple copy_addr instructions at
+// once. With the current logic we must not optimize this case (we would have to
+// prove that we can replace both copy_addr to be able to optimize).
+
+// CHECK-LABEL: sil @not_dominated_uses
+// CHECK: alloc_stack
+// CHECK: cond_br
+// CHECK: bb1
+// CHECK: copy_addr
+// CHECK: apply
+// CHECK: br bb3
+// CHECK: bb2
+// CHECK: copy_addr
+// CHECK: apply
+// CHECK: br bb3
+// CHECK: bb3
+// CHECK: apply
+// CHECK: destroy_addr
+
+sil @not_dominated_uses: $@thin <T> (@in Optional<T>, @in Optional<T>, Bool) -> () {
+bb0(%0 : $*Optional<T>, %1 : $*Optional<T>, %3 : $Bool):
+  %4 = alloc_stack $Optional<T>
+  %5 = struct_extract %3 : $Bool, #Bool.value
+  %f = function_ref @use : $@thin <T2> (@inout T2) -> ()
+  cond_br %5, bb1, bb2
+
+bb1:
+  copy_addr [take] %0 to [initialization] %4#1 : $*Optional<T>
+  %r1 = apply %f<Optional<T>>(%4#1) : $@thin <T2> (@inout T2) -> ()
+  br bb3
+
+bb2:
+  copy_addr [take] %1 to  [initialization] %4#1 : $*Optional<T>
+  %r2 = apply %f<Optional<T>>(%4#1) : $@thin <T2> (@inout T2) -> ()
+  br bb3
+
+bb3:
+  %r3 = apply %f<Optional<T>>(%4#1) : $@thin <T2> (@inout T2) -> ()
+  destroy_addr %4#1 : $*Optional<T>
+  dealloc_stack %4#0 : $*@local_storage Optional<T>
+  %13 = tuple()
+  return %13 : $()
+}

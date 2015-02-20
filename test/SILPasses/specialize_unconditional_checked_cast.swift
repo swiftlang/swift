@@ -44,15 +44,13 @@ ArchetypeToArchetype(t: b, t2: c)
 // y -> x where x is not a class but y is.
 // CHECK-LABEL: sil shared @_TTSg5C37specialize_unconditional_checked_cast1C_VSs5UInt8___TF37specialize_unconditional_checked_cast20ArchetypeToArchetypeU___FT1tQ_2t2Q0__Q0_ : $@thin (@out UInt8, @in C, @in UInt8) -> () {
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
-// CHECK-NOT: unconditional_checked_cast archetype_to_archetype
-// CHECK:      retain
-// CHECK-NEXT: builtin "int_trap"
+// CHECK: builtin "int_trap"
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
 ArchetypeToArchetype(t: c, t2: b)
 
 // x -> y where x is a super class of y.
 // CHECK-LABEL: sil shared @_TTSg5C37specialize_unconditional_checked_cast1C_CS_1D___TF37specialize_unconditional_checked_cast20ArchetypeToArchetypeU___FT1tQ_2t2Q0__Q0_ : $@thin (@out D, @in C, @in D) -> () {
-// CHECK: unconditional_checked_cast_addr take_always C in {{%[0-9]+#1}} : $*C to D in
+// CHECK: unconditional_checked_cast_addr take_always C in %1 : $*C to D in
 ArchetypeToArchetype(t: c, t2: d)
 
 // y -> x where x is a super class of y.
@@ -65,9 +63,7 @@ ArchetypeToArchetype(t: d, t2: c)
 // x -> y where x and y are unrelated classes.
 // CHECK-LABEL: sil shared @_TTSg5C37specialize_unconditional_checked_cast1C_CS_1E___TF37specialize_unconditional_checked_cast20ArchetypeToArchetypeU___FT1tQ_2t2Q0__Q0_ : $@thin (@out E, @in C, @in E) -> () {
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
-// CHECK-NOT: unconditional_checked_cast archetype_to_archetype
-// CHECK:      retain
-// CHECK-NEXT: builtin "int_trap"
+// CHECK: builtin "int_trap"
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
 ArchetypeToArchetype(t: c, t2: e)
 
@@ -106,8 +102,6 @@ ArchetypeToConcreteConvertUInt8(t: b)
 // x -> y where y is a class but x is not.
 // CHECK-LABEL: sil shared @_TTSg5C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast31ArchetypeToConcreteConvertUInt8U__FT1tQ__VSs5UInt8 : $@thin (@in C) -> UInt8 {
 // CHECK: bb0
-// CHECK-NEXT: load
-// CHECK-NEXT: strong_retain
 // CHECK-NEXT: builtin "int_trap"
 ArchetypeToConcreteConvertUInt8(t: c)
 
@@ -141,8 +135,6 @@ ArchetypeToConcreteConvertC(t: d)
 // x -> y where x,y are classes, but x is unrelated to y.
 // CHECK-LABEL: sil shared @_TTSg5C37specialize_unconditional_checked_cast1E___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertCU__FT1tQ__CS_1C : $@thin (@in E) -> @owned C {
 // CHECK: bb0
-// CHECK-NEXT: load
-// CHECK-NEXT: strong_retain
 // CHECK-NEXT: builtin "int_trap"
 ArchetypeToConcreteConvertC(t: e)
 
@@ -150,16 +142,9 @@ ArchetypeToConcreteConvertC(t: e)
 // CHECK-LABEL: sil shared @_TTSg5C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertDU__FT1tQ__CS_1D : $@thin (@in C) -> @owned D {
 // CHECK: bb0
 // CHECK-NEXT: alloc_stack
-// CHECK-NEXT: load
-// CHECK-NEXT: store
-// CHECK-NEXT: alloc_stack $D
-// CHECK-NEXT: strong_retain
 // CHECK-NEXT: unconditional_checked_cast_addr take_always
 // CHECK-NEXT: load
 // CHECK-NEXT: dealloc_stack
-// CHECK-NEXT: dealloc_stack
-// CHECK-NEXT: load
-// CHECK-NEXT: strong_release
 // CHECK-NEXT: return
 ArchetypeToConcreteConvertD(t: c)
 
@@ -168,8 +153,6 @@ ArchetypeToConcreteConvertD(t: c)
 // result.
 // CHECK-LABEL: sil shared @_TTSg5C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertEU__FT1tQ__CS_1E : $@thin (@in C) -> @owned E {
 // CHECK: bb0
-// CHECK-NEXT: load
-// CHECK-NEXT: strong_retain
 // CHECK-NEXT: builtin "int_trap"
 ArchetypeToConcreteConvertE(t: c)
 
