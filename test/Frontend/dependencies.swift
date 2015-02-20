@@ -6,8 +6,8 @@
 // RUN: %target-swift-frontend -emit-reference-dependencies-path - -parse -primary-file %S/../Inputs/empty.swift | FileCheck -check-prefix=CHECK-BASIC-YAML %s
 
 // RUN: %target-swift-frontend -emit-dependencies-path %t.d -emit-reference-dependencies-path %t.swiftdeps -parse -primary-file %S/../Inputs/empty.swift
-// FileCheck -check-prefix=CHECK-BASIC < %t.d
-// FileCheck -check-prefix=CHECK-BASIC-YAML < %t.swiftdeps
+// RUN: FileCheck -check-prefix=CHECK-BASIC %s < %t.d
+// RUN: FileCheck -check-prefix=CHECK-BASIC-YAML %s < %t.swiftdeps
 
 // CHECK-BASIC-LABEL: - :
 // CHECK-BASIC: Inputs/empty.swift
