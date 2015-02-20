@@ -89,12 +89,15 @@ func missingControllingExprInIf() {
 
   // It is debatable if we should do recovery here and parse { true } as the
   // body, but the error message should be sensible.
-  if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{type of expression is ambiguous without more context}}
+  if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{type of expression is ambiguous without more context}} expected-error{{consecutive statements on a line must be separated by ';'}}
   }
 
   // Ensure that we don't have recovery here.
   if { true }() {
   }
+
+  // <rdar://problem/18940198>
+  if { { } } // expected-error{{missing condition in an 'if' statement}} expected-error{{braced block of statements is an unused closure}}
 }
 
 func missingControllingExprInWhile() {
@@ -109,12 +112,15 @@ func missingControllingExprInWhile() {
 
   // It is debatable if we should do recovery here and parse { true } as the
   // body, but the error message should be sensible.
-  while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{type of expression is ambiguous without more context}}
+  while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{type of expression is ambiguous without more context}} expected-error{{consecutive statements on a line must be separated by ';'}}
   }
 
   // Ensure that we don't do recovery here.
   while { true }() {
   }
+
+  // <rdar://problem/18940198>
+  while { { } } // expected-error{{missing condition in a 'while' statement}} expected-error{{braced block of statements is an unused closure}}
 }
 
 func missingControllingExprInDoWhile() {
