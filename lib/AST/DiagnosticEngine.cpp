@@ -348,8 +348,24 @@ static void formatDiagnosticText(StringRef InText,
 
 void DiagnosticEngine::flushActiveDiagnostic() {
   assert(ActiveDiagnostic && "No active diagnostic to flush");
+  if (TransactionCount == 0) {
+    emitDiagnostic(*ActiveDiagnostic);
+  } else {
+    TentativeDiagnostics.emplace_back(std::move(*ActiveDiagnostic));
+  }
+  ActiveDiagnostic.reset();
+}
+
+void DiagnosticEngine::emitTentativeDiagnostics() {
+  for (auto &diag : TentativeDiagnostics) {
+    emitDiagnostic(diag);
+  }
+  TentativeDiagnostics.clear();
+}
+
+void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
   const StoredDiagnosticInfo &StoredInfo
-    = StoredDiagnosticInfos[(unsigned)ActiveDiagnostic->getID()];
+    = StoredDiagnosticInfos[(unsigned)diagnostic.getID()];
 
   if (FatalState != FatalErrorState::None) {
     bool shouldIgnore = true;
@@ -359,7 +375,6 @@ void DiagnosticEngine::flushActiveDiagnostic() {
       FatalState = FatalErrorState::Fatal;
 
     if (shouldIgnore && !ShowDiagnosticsAfterFatalError) {
-      ActiveDiagnostic.reset();
       return;
     }
   }
@@ -368,7 +383,7 @@ void DiagnosticEngine::flushActiveDiagnostic() {
   switch (StoredInfo.Kind) {
   case DiagnosticKind::Error:
     HadAnyError = true;
-    if (isDiagnosticFatal(ActiveDiagnostic->getID()))
+    if (isDiagnosticFatal(diagnostic.getID()))
       FatalState = FatalErrorState::JustEmitted;
     break;
     
@@ -378,22 +393,23 @@ void DiagnosticEngine::flushActiveDiagnostic() {
   }
 
   // Figure out the source location.
-  SourceLoc loc = ActiveDiagnosticLoc;
-  if (loc.isInvalid() && ActiveDiagnosticDecl) {
+  SourceLoc loc = diagnostic.getLoc();
+  if (loc.isInvalid() && diagnostic.getDecl()) {
+    const Decl *decl = diagnostic.getDecl();
     // If a declaration was provided instead of a location, and that declaration
     // has a location we can point to, use that location.
-    loc = ActiveDiagnosticDecl->getLoc();
+    loc = decl->getLoc();
     // With an implicit parameter try to point to its type.
-    if (loc.isInvalid() && isa<ParamDecl>(ActiveDiagnosticDecl)) {
+    if (loc.isInvalid() && isa<ParamDecl>(decl)) {
       if (auto Pat =
-            cast<ParamDecl>(ActiveDiagnosticDecl)->getParamParentPattern())
+            cast<ParamDecl>(decl)->getParamParentPattern())
         loc = Pat->getLoc();
     }
 
     if (loc.isInvalid()) {
       // There is no location we can point to. Pretty-print the declaration
       // so we can point to it.
-      SourceLoc ppLoc = PrettyPrintedDeclarations[ActiveDiagnosticDecl];
+      SourceLoc ppLoc = PrettyPrintedDeclarations[decl];
       if (ppLoc.isInvalid()) {
         class TrackingPrinter : public StreamPrinter {
           SmallVectorImpl<std::pair<const Decl *, uint64_t>> &Entries;
@@ -414,14 +430,12 @@ void DiagnosticEngine::flushActiveDiagnostic() {
         {
           // Figure out which declaration to print. It's the top-most
           // declaration (not a module).
-          const Decl *ppDecl = ActiveDiagnosticDecl;
-          auto dc = ActiveDiagnosticDecl->getDeclContext();
+          const Decl *ppDecl = decl;
+          auto dc = decl->getDeclContext();
 
           // FIXME: Horrible, horrible hackaround. We're not getting a
           // DeclContext everywhere we should.
           if (!dc) {
-            // Reset the active diagnostic.
-            ActiveDiagnostic.reset();
             return;
           }
 
@@ -474,7 +488,7 @@ void DiagnosticEngine::flushActiveDiagnostic() {
 
           // Don't print bodies if we're looking at a top-level decl.
           PrintOptions options;
-          if (ActiveDiagnosticDecl->getDeclContext()->isModuleScopeContext())
+          if (decl->getDeclContext()->isModuleScopeContext())
             options = PrintOptions();
           else
             options = PrintOptions::printVerbose();
@@ -497,7 +511,7 @@ void DiagnosticEngine::flushActiveDiagnostic() {
         }
 
         // Grab the pretty-printed location.
-        ppLoc = PrettyPrintedDeclarations[ActiveDiagnosticDecl];
+        ppLoc = PrettyPrintedDeclarations[decl];
       }
 
       loc = ppLoc;
@@ -508,18 +522,16 @@ void DiagnosticEngine::flushActiveDiagnostic() {
   llvm::SmallString<256> Text;
   {
     llvm::raw_svector_ostream Out(Text);
-    formatDiagnosticText(StoredInfo.Text, ActiveDiagnostic->getArgs(), Out);
+    formatDiagnosticText(StoredInfo.Text, diagnostic.getArgs(), Out);
   }
 
   // Pass the diagnostic off to the consumer.
   DiagnosticInfo Info;
-  Info.ID = ActiveDiagnostic->getID();
-  Info.Ranges = ActiveDiagnostic->getRanges();
-  Info.FixIts = ActiveDiagnostic->getFixIts();
-  for (auto &Consumer : Consumers)
+  Info.ID = diagnostic.getID();
+  Info.Ranges = diagnostic.getRanges();
+  Info.FixIts = diagnostic.getFixIts();
+  for (auto &Consumer : Consumers) {
     Consumer->handleDiagnostic(SourceMgr, loc, StoredInfo.Kind, Text, Info);
-  
-  // Reset the active diagnostic.
-  ActiveDiagnostic.reset();
+  }
 }
 

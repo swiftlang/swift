@@ -255,6 +255,8 @@ namespace swift {
     SmallVector<DiagnosticArgument, 3> Args;
     SmallVector<CharSourceRange, 2> Ranges;
     SmallVector<FixIt, 2> FixIts;
+    SourceLoc Loc;
+    const Decl *Decl = nullptr;
 
   public:
     // All constructors are intentionally implicit.
@@ -276,6 +278,11 @@ namespace swift {
     ArrayRef<DiagnosticArgument> getArgs() const { return Args; }
     ArrayRef<CharSourceRange> getRanges() const { return Ranges; }
     ArrayRef<FixIt> getFixIts() const { return FixIts; }
+    SourceLoc getLoc() const { return Loc; }
+    const class Decl *getDecl() const { return Decl; }
+
+    void setLoc(SourceLoc loc) { Loc = loc; }
+    void setDecl(const class Decl *decl) { Decl = decl; }
 
     /// Returns true if this object represents a particular diagnostic.
     ///
@@ -401,22 +408,23 @@ namespace swift {
 
     bool ShowDiagnosticsAfterFatalError = false;
 
-    /// \brief The declaration of the currently active diagnostic, if there is
-    /// one.
-    const Decl *ActiveDiagnosticDecl = nullptr;
-
-    /// \brief The source location of the currently active diagnostic, if there
-    /// is one.
-    SourceLoc ActiveDiagnosticLoc;
-    
     /// \brief The currently active diagnostic, if there is one.
     Optional<Diagnostic> ActiveDiagnostic;
+
+    /// \brief All diagnostics that have are no longer active but have not yet
+    /// been emitted due to an open transaction.
+    SmallVector<Diagnostic, 4> TentativeDiagnostics;
 
     /// \brief The set of declarations for which we have pretty-printed
     /// results that we can point to on the command line.
     llvm::DenseMap<const Decl *, SourceLoc> PrettyPrintedDeclarations;
 
+    /// \brief The number of open diagnostic transactions. Diagnostics are only
+    /// emitted once all transactions have closed.
+    unsigned TransactionCount = 0;
+
     friend class InFlightDiagnostic;
+    friend class DiagnosticTransaction;
     
   public:
     explicit DiagnosticEngine(SourceManager &SourceMgr)
@@ -470,9 +478,8 @@ namespace swift {
     InFlightDiagnostic diagnose(SourceLoc Loc, DiagID ID, 
                                 ArrayRef<DiagnosticArgument> Args) {
       assert(!ActiveDiagnostic && "Already have an active diagnostic");
-      ActiveDiagnosticLoc = Loc;
-      ActiveDiagnosticDecl = nullptr;
       ActiveDiagnostic = Diagnostic(ID, Args);
+      ActiveDiagnostic->setLoc(Loc);
       return InFlightDiagnostic(*this);
     }
 
@@ -487,9 +494,8 @@ namespace swift {
     /// be attached.
     InFlightDiagnostic diagnose(SourceLoc Loc, const Diagnostic &D) {
       assert(!ActiveDiagnostic && "Already have an active diagnostic");
-      ActiveDiagnosticLoc = Loc;
-      ActiveDiagnosticDecl = nullptr;
       ActiveDiagnostic = D;
+      ActiveDiagnostic->setLoc(Loc);
       return InFlightDiagnostic(*this);
     }
     
@@ -507,9 +513,8 @@ namespace swift {
     diagnose(SourceLoc Loc, Diag<ArgTypes...> ID,
              typename detail::PassArgument<ArgTypes>::type... Args) {
       assert(!ActiveDiagnostic && "Already have an active diagnostic");
-      ActiveDiagnosticLoc = Loc;
-      ActiveDiagnosticDecl = nullptr;
       ActiveDiagnostic = Diagnostic(ID, std::move(Args)...);
+      ActiveDiagnostic->setLoc(Loc);
       return InFlightDiagnostic(*this);
     }
 
@@ -529,9 +534,8 @@ namespace swift {
     InFlightDiagnostic diagnose(const Decl *decl, DiagID id,
                                 ArrayRef<DiagnosticArgument> args) {
       assert(!ActiveDiagnostic && "Already have an active diagnostic");
-      ActiveDiagnosticLoc = SourceLoc();
-      ActiveDiagnosticDecl = decl;
       ActiveDiagnostic = Diagnostic(id, args);
+      ActiveDiagnostic->setDecl(decl);
       return InFlightDiagnostic(*this);
     }
 
@@ -547,9 +551,8 @@ namespace swift {
     /// be attached.
     InFlightDiagnostic diagnose(const Decl *decl, const Diagnostic &diag) {
       assert(!ActiveDiagnostic && "Already have an active diagnostic");
-      ActiveDiagnosticLoc = SourceLoc();
-      ActiveDiagnosticDecl = decl;
       ActiveDiagnostic = diag;
+      ActiveDiagnostic->setDecl(decl);
       return InFlightDiagnostic(*this);
     }
 
@@ -566,9 +569,8 @@ namespace swift {
     InFlightDiagnostic
     diagnose(const Decl *decl, Diag<ArgTypes...> id,
              typename detail::PassArgument<ArgTypes>::type... args) {
-      ActiveDiagnosticLoc = SourceLoc();
-      ActiveDiagnosticDecl = decl;
       ActiveDiagnostic = Diagnostic(id, std::move(args)...);
+      ActiveDiagnostic->setDecl(decl);
       return InFlightDiagnostic(*this);
     }
 
@@ -585,6 +587,89 @@ namespace swift {
     
     /// \brief Retrieve the active diagnostic.
     Diagnostic &getActiveDiagnostic() { return *ActiveDiagnostic; }
+
+    /// \brief Send \c diag to all diagnostic consumers.
+    void emitDiagnostic(const Diagnostic &diag);
+
+    /// \brief Send all tentative diagnostics to all diagnostic consumers and
+    /// delete them.
+    void emitTentativeDiagnostics();
+  };
+
+  /// \brief Represents a diagnostic transaction. While a transaction is
+  /// open, all recorded diagnostics are saved until the transaction commits,
+  /// at which point they are emitted. If the transaction is instead aborted,
+  /// the diagnostics are erased. Transactions may be nested but must be closed
+  /// in LIFO order. An open transaction is implicitly committed upon
+  /// destruction.
+  class DiagnosticTransaction {
+    DiagnosticEngine &Engine;
+
+    /// \brief How many tentative diagnostics there were when the transaction
+    /// was opened.
+    unsigned PrevDiagnostics;
+
+    /// \brief How many other transactions were open when this transaction was
+    /// opened.
+    unsigned Depth;
+
+    /// \brief Whether this transaction is currently open.
+    bool IsOpen = false;
+
+  public:
+    explicit DiagnosticTransaction(DiagnosticEngine &engine)
+      : Engine(engine)
+    {
+    }
+
+    ~DiagnosticTransaction() {
+      commitIfOpen();
+    }
+
+    /// \brief Open a new transaction.
+    void begin() {
+      assert(!IsOpen && "only closed transactions may be opened");
+      assert(!Engine.ActiveDiagnostic); // TODO: reasonable?
+      IsOpen = true;
+      PrevDiagnostics = Engine.TentativeDiagnostics.size();
+      Depth = Engine.TransactionCount;
+      Engine.TransactionCount++;
+    }
+
+    /// \brief Abort this transaction and erase all diagnostics record while it
+    /// was open.
+    void abort() {
+      close();
+      Engine.TentativeDiagnostics.erase(
+        Engine.TentativeDiagnostics.begin() + PrevDiagnostics,
+        Engine.TentativeDiagnostics.end());
+    }
+
+    /// \brief Commit this transaction. If this is the top-level transaction,
+    /// emit any diagnostics that were recorded while it was open.
+    void commit() {
+      close();
+      if (Depth == 0) {
+        assert(PrevDiagnostics == 0);
+        Engine.emitTentativeDiagnostics();
+      }
+    }
+
+    /// \brief If this transaction is open, commit it and close it.
+    void commitIfOpen() {
+      if (IsOpen) {
+        commit();
+      }
+    }
+
+  private:
+    void close() {
+      assert(IsOpen && "only open transactions may be closed");
+      IsOpen = false;
+      Engine.TransactionCount--;
+      assert(Depth == Engine.TransactionCount &&
+             "transactions must be closed LIFO");
+    }
   };
 } // end namespace swift
 
