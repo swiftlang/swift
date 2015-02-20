@@ -416,6 +416,18 @@ llvm::Module *IRGenModule::releaseModule() {
   return ClangCodeGen->ReleaseModule();
 }
 
+llvm::AttributeSet IRGenModule::getAllocAttrs() {
+  if (AllocAttrs.isEmpty()) {
+    AllocAttrs = llvm::AttributeSet::get(LLVMContext,
+                                         llvm::AttributeSet::ReturnIndex,
+                                         llvm::Attribute::NoAlias);
+    AllocAttrs = AllocAttrs.addAttribute(LLVMContext,
+                               llvm::AttributeSet::FunctionIndex,
+                               llvm::Attribute::NoUnwind);
+  }
+  return AllocAttrs;
+}
+
 llvm::Constant *IRGenModule::getSize(Size size) {
   return llvm::ConstantInt::get(SizeTy, size.getValue());
 }

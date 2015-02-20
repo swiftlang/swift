@@ -28,6 +28,7 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/ValueHandle.h"
+#include "llvm/IR/Attributes.h"
 #include "IRGen.h"
 #include "SwiftTargetInfo.h"
 #include "ValueWitness.h"
@@ -387,6 +388,7 @@ public:
   ClassDecl *getSwiftRootClass();
   llvm::Module *getModule() const;
   llvm::Module *releaseModule();
+  llvm::AttributeSet getAllocAttrs();
 
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
@@ -395,6 +397,7 @@ private:
   llvm::Constant *ObjCISAMaskPtr = nullptr;
   Optional<llvm::Value*> ObjCRetainAutoreleasedReturnValueMarker;
   ClassDecl *SwiftRootClass = nullptr;
+  llvm::AttributeSet AllocAttrs;  
 
 #define FUNCTION_ID(Id)             \
 public:                             \

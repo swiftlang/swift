@@ -78,21 +78,11 @@ void IRGenFunction::emitMemCpy(Address dest, Address src, llvm::Value *size) {
              std::min(dest.getAlignment(), src.getAlignment()));
 }
 
-static llvm::AttributeSet getAllocAttrs(llvm::LLVMContext &ctx) {
-  auto attrs = llvm::AttributeSet::get(ctx,
-                                       llvm::AttributeSet::ReturnIndex,
-                                       llvm::Attribute::NoAlias);
-  attrs = attrs.addAttribute(ctx,
-                             llvm::AttributeSet::FunctionIndex,
-                             llvm::Attribute::NoUnwind);
-  return attrs;
-}
-
 static llvm::Value *emitAllocatingCall(IRGenFunction &IGF,
                                        llvm::Value *fn,
                                        std::initializer_list<llvm::Value*> args,
                                        const llvm::Twine &name) {
-  static auto allocAttrs = getAllocAttrs(IGF.IGM.LLVMContext);
+  auto allocAttrs = IGF.IGM.getAllocAttrs();
   llvm::CallInst *call =
     IGF.Builder.CreateCall(fn, makeArrayRef(args.begin(), args.size()));
   call->setCallingConv(IGF.IGM.RuntimeCC);
