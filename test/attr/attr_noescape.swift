@@ -199,3 +199,10 @@ func r19763676Caller(@noescape g: (Int) -> Int) {
 }
 
 
+// <rdar://problem/19763732> False positive in @noescape analysis triggered by default arguments
+func calleeWithDefaultParameters(@noescape f: () -> (), x : Int = 1) {}  // expected-warning {{closure parameter prior to parameters with default arguments will not be treated as a trailing closure}}
+
+func callerOfDefaultParams(@noescape g: () -> ()) {
+  calleeWithDefaultParameters(g)
+}
+

@@ -156,17 +156,22 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
 
         // The argument is either a ParenExpr or TupleExpr.
         ArrayRef<Expr*> arguments;
-        if (auto *PE = dyn_cast<ParenExpr>(Call->getArg()))
-          arguments = PE->getSubExpr();
-        else if (auto *TE = dyn_cast<TupleExpr>(Call->getArg()))
+        if (auto *TE = dyn_cast<TupleExpr>(Call->getArg()))
           arguments = TE->getElements();
         else
           arguments = Call->getArg();
 
         // Check each argument.
         for (auto arg : arguments) {
-          while (auto conv = dyn_cast<ImplicitConversionExpr>(arg))
-            arg = conv->getSubExpr();
+          while (1) {
+            if (auto conv = dyn_cast<ImplicitConversionExpr>(arg))
+              arg = conv->getSubExpr();
+            else if (auto *PE = dyn_cast<ParenExpr>(arg))
+              arg = PE->getSubExpr();
+            else
+              break;
+          }
+
           if (auto *DRE = dyn_cast<DeclRefExpr>(arg))
             checkNoEscapeParameterUse(DRE, Call);
         }
