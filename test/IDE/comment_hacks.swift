@@ -23,3 +23,10 @@ class A270_BackslashSpace {
 // CHECK: swift:[[@LINE-1]]:8: Func/A270_BackslashSpace.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test19A270_BackslashSpace2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>a string of <rawHTML><![CDATA[<code>]]></rawHTML>X<rawHTML><![CDATA[</code>]]></rawHTML>s.</Para></Abstract></Function>]
 }
 
+class A280_TitleUnderline {
+  /// Generate
+  /// ========
+  func f0() {}
+// CHECK: swift:[[@LINE-1]]:8: Func/A280_TitleUnderline.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test19A280_TitleUnderline2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Generate</Para></Abstract></Function>]
+}
+

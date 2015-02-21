@@ -43,10 +43,14 @@ static std::pair<ColumnNum, unsigned> measureIndentation(StringRef Text) {
 }
 
 void LineListBuilder::addLine(StringRef Text, SourceRange Range) {
-  if (Context.LangOpts.TemporaryHacks && !Text.empty() &&
-      (std::all_of(Text.begin(), Text.end(), [](char C) { return C == '='; }) ||
-       std::all_of(Text.begin(), Text.end(), [](char C) { return C == '-'; })))
-    return;
+  if (Context.LangOpts.TemporaryHacks) {
+    auto Trimmed = Text.trim();
+    if (!Trimmed.empty() && (std::all_of(Trimmed.begin(), Trimmed.end(),
+                                         [](char C) { return C == '='; }) ||
+                             std::all_of(Trimmed.begin(), Trimmed.end(),
+                                         [](char C) { return C == '-'; })))
+      return;
+  }
   Line L;
   L.Text = Text;
   L.Range = Range;
