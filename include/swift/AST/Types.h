@@ -674,9 +674,10 @@ public:
   /// Whether this is the AnyObject type.
   bool isAnyObject();
 
-  void dump() const;
+  void dump() const LLVM_ATTRIBUTE_USED;
   void dump(raw_ostream &os, unsigned indent = 0) const;
 
+  void dumpPrint() const LLVM_ATTRIBUTE_USED;
   void print(raw_ostream &OS,
              const PrintOptions &PO = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &PO) const;

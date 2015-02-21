@@ -2846,6 +2846,10 @@ std::string TypeBase::getString(const PrintOptions &PO) const {
   return OS.str();
 }
 
+void TypeBase::dumpPrint() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
 void TypeBase::print(raw_ostream &OS, const PrintOptions &PO) const {
   Type(const_cast<TypeBase *>(this)).print(OS, PO);
 }
