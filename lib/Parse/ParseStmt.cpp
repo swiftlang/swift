@@ -1498,39 +1498,43 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
   SourceLoc SwitchLoc = consumeToken(tok::kw_switch);
 
   bool SubjectStartsWithLBrace = Tok.is(tok::l_brace);
-  ParserPosition SubjectStartState;
-  if (SubjectStartsWithLBrace) {
-    // It is unusual for the subject expression to start with a left brace, and
-    // we anticipate the need to do recovery.  Save the parser state so that we
-    // can rewind.
-    SubjectStartState = getParserPosition();
-  }
-
-  ParserResult<Expr> SubjectExpr = parseExprBasic(diag::expected_switch_expr);
-  if (SubjectExpr.hasCodeCompletion())
-    return makeParserCodeCompletionResult<Stmt>();
-
-  if (!Tok.is(tok::l_brace)) {
-    if (!SubjectStartsWithLBrace) {
-      diagnose(Tok, diag::expected_lbrace_after_switch);
-      return nullptr;
+  ParserResult<Expr> SubjectExpr;
+  {
+    ParserPosition SubjectStartState;
+    Optional<DiagnosticTransaction> diagTransaction;
+    if (SubjectStartsWithLBrace) {
+      // It is unusual for the subject expression to start with a left brace,
+      // and we anticipate the need to do recovery.  Save the parser state so
+      // that we can rewind.
+      SubjectStartState = getParserPosition();
+      diagTransaction.emplace(Diags);
     }
 
-    diagnose(SwitchLoc, diag::expected_switch_expr);
+    SubjectExpr = parseExprBasic(diag::expected_switch_expr);
+    if (SubjectExpr.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Stmt>();
 
-    // We are going to reparse what we parsed as subject expr.
-    SubjectExpr = nullptr;
+    if (!Tok.is(tok::l_brace)) {
+      if (!SubjectStartsWithLBrace) {
+        diagnose(Tok, diag::expected_lbrace_after_switch);
+        return nullptr;
+      }
 
-    // Backtrack to the '{' so that we can re-parse the switch body correctly.
-    //
-    // FIXME: Even though we are going to re-parse the body, we have already
-    // emitted errors about 'case' outside of switch, when we were parsing this
-    // as a subject expr.
-    backtrackToPosition(SubjectStartState);
+      // We are going to reparse what we parsed as subject expr.
+      SubjectExpr = nullptr;
+
+      // Backtrack to the '{' so that we can re-parse the switch body correctly.
+      backtrackToPosition(SubjectStartState);
+      diagTransaction->abort();
+
+      diagnose(SwitchLoc, diag::expected_switch_expr);
+    }
+
+    if (SubjectExpr.isNull()) {
+      SubjectExpr =
+          makeParserErrorResult(new (Context) ErrorExpr(Tok.getLoc()));
+    }
   }
-
-  if (SubjectExpr.isNull())
-    SubjectExpr = makeParserErrorResult(new (Context) ErrorExpr(Tok.getLoc()));
 
   SourceLoc lBraceLoc = consumeToken(tok::l_brace);
   SourceLoc rBraceLoc;

@@ -205,14 +205,13 @@ func missingControllingExprInSwitch() {
   {
   } // expected-error {{'switch' statement body must have at least one 'case' or 'default' block}}
 
-  // FIXME: we should not produce diagnostics about 'case' here, because we actually recover.
   switch { // expected-error {{expected expression in 'switch' statement}}
-    case _: return // expected-error {{'case' label can only appear inside a 'switch' statement}}
+    case _: return
   }
 
   switch { // expected-error {{expected expression in 'switch' statement}}
-    case Int: return // expected-error {{'case' label can only appear inside a 'switch' statement}}
-    case _: return // expected-error {{'case' label can only appear inside a 'switch' statement}}
+    case Int: return
+    case _: return
   }
 
   // Ensure that we don't do recovery in the following cases.
