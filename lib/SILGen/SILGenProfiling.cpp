@@ -25,6 +25,18 @@
 using namespace swift;
 using namespace Lowering;
 
+ProfilerRAII::ProfilerRAII(SILGenModule &SGM, AbstractFunctionDecl *D)
+    : SGM(SGM) {
+  const auto &Opts = SGM.M.getOptions();
+  if (!Opts.GenerateProfile)
+    return;
+  SGM.Profiler =
+      llvm::make_unique<SILGenProfiling>(SGM, Opts.EmitProfileCoverageMapping);
+  SGM.Profiler->assignRegionCounters(D);
+}
+
+ProfilerRAII::~ProfilerRAII() { SGM.Profiler = nullptr; }
+
 namespace {
 
 /// An ASTWalker that maps ASTNodes to profiling counters.
@@ -547,7 +559,7 @@ public:
 
 } // end anonymous namespace
 
-void SILGenProfiling::assignRegionCounters(FuncDecl *Root) {
+void SILGenProfiling::assignRegionCounters(AbstractFunctionDecl *Root) {
   SmallString<128> NameBuffer;
   SILDeclRef(Root).mangle(NameBuffer);
   CurrentFuncName = NameBuffer.str();

@@ -3551,7 +3551,8 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   // of releasing the elements and calling the superclass destructor.
   // We won't actually emit the block until we finish with the destructor body.
   prepareEpilog(Type(), CleanupLocation::getCleanupLocation(Loc));
-  
+
+  emitProfilerIncrement(dd->getBody());
   // Emit the destructor body.
   visit(dd->getBody());
 
@@ -3881,6 +3882,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     emitMemberInitializers(selfDecl, nominal);
   }
 
+  emitProfilerIncrement(ctor->getBody());
   // Emit the constructor body.
   visit(ctor->getBody());
 
@@ -4361,6 +4363,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     emitMemberInitializers(selfDecl, selfClassDecl);
   }
 
+  emitProfilerIncrement(ctor->getBody());
   // Emit the constructor body.
   visit(ctor->getBody());
 

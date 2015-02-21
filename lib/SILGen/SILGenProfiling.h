@@ -39,6 +39,15 @@ template <> struct DenseMapInfo<ASTNode> {
 namespace swift {
 namespace Lowering {
 
+class SILGenModule;
+
+/// RAII object to set up profiling for a function.
+struct ProfilerRAII {
+  SILGenModule &SGM;
+  ProfilerRAII(SILGenModule &SGM, AbstractFunctionDecl *D);
+  ~ProfilerRAII();
+};
+
 /// Profiling state.
 class SILGenProfiling {
 private:
@@ -61,7 +70,7 @@ public:
   bool hasRegionCounters() const { return NumRegionCounters != 0; }
 
   /// Map counters to ASTNodes and set them up for profiling the given function.
-  void assignRegionCounters(FuncDecl *Root);
+  void assignRegionCounters(AbstractFunctionDecl *Root);
 
   /// Emit SIL to increment the counter for \c Node.
   void emitCounterIncrement(SILBuilder &Builder, ASTNode Node);

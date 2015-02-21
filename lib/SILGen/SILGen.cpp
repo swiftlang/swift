@@ -410,12 +410,8 @@ bool SILGenModule::hasFunction(SILDeclRef constant) {
 }
 
 void SILGenModule::visitFuncDecl(FuncDecl *fd) {
-  const auto &Opts = M.getOptions();
-  if (Opts.GenerateProfile)
-    Profiler = llvm::make_unique<SILGenProfiling>(
-        *this, Opts.EmitProfileCoverageMapping);
+  ProfilerRAII Profiler(*this, fd);
   emitFunction(fd);
-  Profiler = nullptr;
 }
 
 template<typename T>
@@ -496,17 +492,12 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 
 void SILGenModule::emitFunction(FuncDecl *fd) {
   SILDeclRef::Loc decl = fd;
-  bool IsBodySynthesized = fd->getBody(/*canSynthesize=*/false) != nullptr;
-
-  // If we have a body and a profiler, make sure we have region counters.
-  if (IsBodySynthesized && Profiler && !Profiler->hasRegionCounters())
-    Profiler->assignRegionCounters(fd);
 
   emitAbstractFuncDecl(fd);
 
   // Emit the actual body of the function to a new SILFunction.  Ignore
   // prototypes and methods whose bodies weren't synthesized by now.
-  if (IsBodySynthesized) {
+  if (fd->getBody(/*canSynthesize=*/false)) {
     PrettyStackTraceDecl stackTrace("emitting SIL for", fd);
 
     SILDeclRef constant(decl);
