@@ -295,7 +295,6 @@ namespace {
     void printRec(Stmt *S) { S->print(OS, Indent+2); }
     void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
     void printRec(TypeRepr *T);
-    void printRec(Type T) { T->dump(OS, Indent+2); }
 
     void printCommon(Decl *D, const char *Name,
                      llvm::Optional<llvm::raw_ostream::Colors> Color =
@@ -400,10 +399,11 @@ namespace {
 
     void visitTypeAliasDecl(TypeAliasDecl *TAD) {
       printCommon(TAD, "typealias");
+      OS << " type=";
       if (TAD->hasUnderlyingType())
-        printRec(TAD->getUnderlyingType());
+        OS << TAD->getUnderlyingType().getString();
       else
-        OS << "type = <<<unresolved>>>";
+        OS << "<<<unresolved>>>";
       printInherited(TAD->getInherited());
       OS << "')";
     }
@@ -2512,7 +2512,8 @@ void Type::dump() const {
 }
 
 void Type::dump(raw_ostream &os, unsigned indent) const {
-  PrintType(os, indent).printRec(*this);
+  PrintType(os, indent).visit(*this, "");
+  os << "\n";
 }
 
 void TypeBase::dump() const {
