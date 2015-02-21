@@ -4723,21 +4723,26 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return Closure;
     }
 
-    // Coercion from one function type to another.
+    // Coercion from one function type to another, this produces a
+    // FunctionConversionExpr in its full generality.
     if (auto fromFunc = fromType->getAs<FunctionType>()) {
-      // If the input and output types match, then the difference is a change
-      // in the ExtInfo bits.
-      if (fromFunc->getInput()->isEqual(toFunc->getInput()) &&
-          fromFunc->getResult()->isEqual(toFunc->getResult())) {
-        // If the only difference is in the noreturn or noescape bits, try to
-        // propagate them into the expression.
-        auto fromEI = fromFunc->getExtInfo(), toEI = toFunc->getExtInfo();
-        if (fromEI.withIsNoReturn(false).withNoEscape(false) ==
-            toEI.withIsNoReturn(false).withNoEscape(false) &&
-            // Adding - not stripping off - the bits.
-            (!fromEI.isNoReturn() || toEI.isNoReturn()) &&
-            (!fromEI.isNoEscape() || toEI.isNoEscape())) {
-          if (applyTypeToClosureExpr(expr, toType))
+      // If toType is a NoEscape or NoReturn function type and the expression is
+      // a ClosureExpr, propagate these bits onto the ClosureExpr.  Do not
+      // *remove* any bits that are already on the closure though.
+
+      auto fromEI = fromFunc->getExtInfo(), toEI = toFunc->getExtInfo();
+      if ((toEI.isNoEscape() && !fromEI.isNoEscape()) ||
+          (toEI.isNoReturn() && !fromEI.isNoReturn())) {
+        auto newToEI =
+          toEI.withIsNoReturn(toEI.isNoReturn()|fromEI.isNoReturn())
+                .withNoEscape(toEI.isNoEscape()|fromEI.isNoEscape());
+        auto newToType = FunctionType::get(fromFunc->getInput(),
+                                           fromFunc->getResult(), newToEI);
+        if (applyTypeToClosureExpr(expr, newToType)) {
+          fromFunc = newToType;
+          // Propagating the bits in might have satisfied the entire
+          // conversion.  If so, we're done, otherwise keep converting.
+          if (fromFunc->isEqual(toType))
             return expr;
         }
       }

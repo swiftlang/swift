@@ -188,3 +188,14 @@ struct S : P2 {
       // expected-error@-2 {{cannot find an overload for 'overloadedEach' that accepts an argument list of type '(S, @noescape Int -> ())'}}
   }
 }
+
+
+
+// rdar://19763676 - False positive in @noescape analysis triggered by parameter label
+func r19763676Callee(@noescape f: (param: Int) -> Int) {}
+
+func r19763676Caller(@noescape g: (Int) -> Int) {
+  r19763676Callee({ _ in g(1) })
+}
+
+
