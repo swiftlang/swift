@@ -65,10 +65,6 @@ public:
 
   /// Emit SIL to increment the counter for \c Node.
   void emitCounterIncrement(SILBuilder &Builder, ASTNode Node);
-
-private:
-  /// Set the current function's name.
-  void setFuncName(SILFunction &Fn);
 };
 
 } // end namespace Lowering
