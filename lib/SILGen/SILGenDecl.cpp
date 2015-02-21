@@ -1586,11 +1586,13 @@ public:
     SILGenType(SGM, ntd).emitType();
   }
   void visitFuncDecl(FuncDecl *fd) {
+    ProfilerRAII Profiler(SGM, fd);
     SGM.emitFunction(fd);
     if (SGM.requiresObjCMethodEntryPoint(fd))
       SGM.emitObjCMethodThunk(fd);
   }
   void visitConstructorDecl(ConstructorDecl *cd) {
+    ProfilerRAII Profiler(SGM, cd);
     SGM.emitConstructor(cd);
     if (SGM.requiresObjCMethodEntryPoint(cd))
       SGM.emitObjCConstructorThunk(cd);

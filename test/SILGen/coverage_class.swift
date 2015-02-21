@@ -9,6 +9,11 @@ class C {
   deinit {}
 }
 
+extension C {
+  // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_class.C.bar
+  func bar() {}
+}
+
 struct S {
   // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_class.S.foo
   func foo() {}
