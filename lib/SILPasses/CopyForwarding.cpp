@@ -546,14 +546,16 @@ bool CopyForwarding::forwardPropagateCopy(
   SmallPtrSetImpl<SILInstruction*> &DestUserInsts) {
 
   // Looking at
+  //
   //    copy_addr %Src, [init] %Dst
+  //
   // We can reuse %Src if it is destroyed at %Src and not initialized again. To
   // know that we can safely replace all uses of %Dst with source we must know
-  // that there no aliasing accesses through other names (an alloc_stack
-  // instruction qualifies for this, an inout parameter does not).  Furthermore,
-  // we must know that all accesses to %Dst must observe this copy (there must
-  // no be path around this copy that performs a copy to %Dst with a different
-  // value).
+  // that it is uniquely named and cannot be accessed outside of the function
+  // (an alloc_stack instruction qualifies for this, an inout parameter does
+  // not).  Additionally, we must know that all accesses to %Dst further on must
+  // have had this copy on their path (there might be reinitialization of %Dst
+  // later, but there must no be a path around this copy that reads from %Dst).
   SmallVector<Operand *, 16> DestUses;
   if (isa<AllocStackInst>(CopyInst->getDest()) && /* Uniquely identified name */
       isSourceDeadAtCopy(CopyInst) &&
