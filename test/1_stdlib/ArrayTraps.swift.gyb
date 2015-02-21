@@ -93,6 +93,7 @@ ${ArrayTy}Traps.test("${'removeAtIndex(_:)/%s' % index}") {
 
 class Base { }
 class Derived : Base { }
+class Derived2 : Derived { }
 
 ArrayTraps.test("downcast1") {
   let ba: [Base] = [ Derived(), Base() ]
@@ -110,6 +111,29 @@ ArrayTraps.test("downcast2") {
   let s0 = sa[0]
   expectCrashLater()
   sa[1]
+}
+
+ArrayTraps.test("downcast3") {
+  let ba: [Base] = [ Derived2(), Derived(), Base() ]
+  let d2a = ba as! [Derived2]
+  let d2a0 = d2a[0]
+  let d1a = d2a as [Derived]
+  let d1a0 = d1a[0]
+  let d1a1 = d1a[1]
+  expectCrashLater()
+  d1a[2]
+}
+
+@objc protocol ObjCProto { }
+class ObjCBase : NSObject, ObjCProto { }
+class ObjCDerived : ObjCBase { }
+
+ArrayTraps.test("downcast4") {
+  let ba: [ObjCProto] = [ ObjCDerived(), ObjCBase() ]
+  let da = ba as! [ObjCDerived]
+  let d0 = da[0]
+  expectCrashLater()
+  da[1]
 }
 
 ArrayTraps.test("unsafeLength") {

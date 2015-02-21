@@ -58,6 +58,9 @@ public func _arrayForceCast<SourceElement, TargetElement>(
       if _fastPath(native!.storesOnlyElementsOfType(TargetElement.self)) {
         return Array(source._buffer.castToBufferOf(TargetElement.self))
       }
+      return Array(
+        source._buffer.downcastToBufferWithDeferredTypeCheckOf(
+          TargetElement.self))
     }
     // This result has deferred element typechecking
     return Array(_fromCocoaArray: source._buffer._asCocoaArray())

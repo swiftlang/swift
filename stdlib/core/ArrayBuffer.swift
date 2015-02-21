@@ -36,6 +36,7 @@ public struct _ArrayBuffer<T> : _ArrayBufferType {
   }
 
   /// Returns an `_ArrayBuffer<U>` containing the same elements.
+  ///
   /// Requires: the elements actually have dynamic type `U`, and `U`
   /// is a class or `@objc` existential.
   func castToBufferOf<U>(_: U.Type) -> _ArrayBuffer<U> {
@@ -44,11 +45,30 @@ public struct _ArrayBuffer<T> : _ArrayBufferType {
     return _ArrayBuffer<U>(storage: _storage)
   }
 
+  /// The spare bits that are set when a native array needs deferred
+  /// element type checking.
+  var deferredTypeCheckMask : Int { return 1 }
+  
+  /// Returns an `_ArrayBuffer<U>` containing the same elements,
+  /// deffering checking each element's `U`-ness until it is accessed.
+  ///
+  /// Requires: `U` is a class or `@objc` existential derived from `T`.
+  func downcastToBufferWithDeferredTypeCheckOf<U>(
+    _: U.Type
+  ) -> _ArrayBuffer<U> {
+    _sanityCheck(_isClassOrObjCExistential(T.self))
+    _sanityCheck(_isClassOrObjCExistential(U.self))
+    // _sanityCheck(U.self is T.Type)
+    return _ArrayBuffer<U>(
+      storage: _ArrayBridgeStorage(
+        native: _native._storage, bits: deferredTypeCheckMask))
+  }
+
   var needsElementTypeCheck: Bool {
     // NSArray's need an element typecheck when the element type isn't AnyObject
-    return _isClassOrObjCExistential(T.self)
-      && _storage.isObjC
-      && !(AnyObject.self is T.Type)
+    return _isClassOrObjCExistential(T.self) && (
+      _storage.isObjC || (_storage.spareBits & deferredTypeCheckMask != 0)
+    ) && !(AnyObject.self is T.Type)
   }
   
   //===--- private --------------------------------------------------------===//
@@ -150,17 +170,25 @@ extension _ArrayBuffer {
   func _typeCheck(index: Int) {
     if !_isClassOrObjCExistential(T.self) {
       return
-    }
-    
+    }    
     if _slowPath(needsElementTypeCheck) {
-      _sanityCheck(
-        !_isNative, "A native array that needs a type check?")
+      _typeCheckSlowPath(index)
+    }
+  }
 
+  @inline(never)
+  internal func _typeCheckSlowPath(index: Int) {
+    if _fastPath(_isNative) {
+      let element: AnyObject = unsafeBitCast(_native[index], AnyObject.self)
+      _precondition(
+        element is T,
+        "Down-casted Array element failed to match the target type")
+    }
+    else  {
       let ns = _nonNative
-      // Could be sped up, e.g. by using
-      // enumerateObjectsAtIndexes:options:usingBlock:
-      _precondition(ns.objectAtIndex(index) is T,
-                    "NSArray element failed to match the Swift Array Element type")
+      _precondition(
+        ns.objectAtIndex(index) is T,
+        "NSArray element failed to match the Swift Array Element type")
     }
   }
 
@@ -170,6 +198,9 @@ extension _ArrayBuffer {
     }
 
     if _slowPath(needsElementTypeCheck) {
+      // Could be sped up, e.g. by using
+      // enumerateObjectsAtIndexes:options:usingBlock: in the
+      // non-native case.
       for i in subRange {
         _typeCheck(i)
       }
