@@ -509,9 +509,9 @@ extension String : CollectionType {
       return Index(_base: _endBase)
     }
 
-  /// Returns the previous consecutive value before `self`.
-  ///
-  /// Requires: the previous value is representable.
+    /// Returns the previous consecutive value before `self`.
+    ///
+    /// Requires: the previous value is representable.
     public func predecessor() -> Index {
       _precondition(_base != _base._viewStartIndex,
           "can not decrement startIndex")
