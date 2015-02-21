@@ -220,7 +220,18 @@ struct CommentToXMLConverter {
   }
 
   void printPlainText(const PlainText *PT) {
-    appendWithXMLEscaping(OS, PT->getLinePart().Text);
+    bool HacksEnabled =
+        TheCommentContext.TheReSTContext.LangOpts.TemporaryHacks;
+
+    if (HacksEnabled) {
+      for (auto Parts = std::make_pair(StringRef(), PT->getLinePart().Text);
+           !Parts.first.empty() || !Parts.second.empty();
+           Parts = Parts.second.split("\\ ")) {
+        appendWithXMLEscaping(OS, Parts.first);
+      }
+    } else {
+      appendWithXMLEscaping(OS, PT->getLinePart().Text);
+    }
   }
 
   void printEmphasis(const Emphasis *E) {
@@ -670,8 +681,20 @@ struct CommentToDoxygenConverter {
   void printPlainText(const PlainText *PT) {
     if (PT->getLinePart().Text == "\n")
       printNewline();
-    else
-      print(PT->getLinePart().Text);
+    else {
+      bool HacksEnabled =
+          TheCommentContext.TheReSTContext.LangOpts.TemporaryHacks;
+
+      if (HacksEnabled) {
+        for (auto Parts = std::make_pair(StringRef(), PT->getLinePart().Text);
+             !Parts.first.empty() || !Parts.second.empty();
+             Parts = Parts.second.split("\\ ")) {
+          print(Parts.first);
+        }
+      } else {
+        print(PT->getLinePart().Text);
+      }
+    }
   }
 
   void printEmphasis(const Emphasis *E) {
