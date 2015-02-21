@@ -1240,7 +1240,7 @@ public:
     std::string CPU;
     std::vector<std::string> Features;
     std::tie(TargetOpt, CPU, Features)
-      = getIRTargetOptions(IRGenOpts, CI.getMainModule()->Ctx);
+      = getIRTargetOptions(IRGenOpts, CI.getASTContext());
     
     builder.setRelocationModel(llvm::Reloc::PIC_);
     builder.setTargetOptions(TargetOpt);
