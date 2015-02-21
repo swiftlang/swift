@@ -391,6 +391,11 @@ PrintRegularComments("print-regular-comments",
              llvm::cl::desc("Print regular comments from clang module headers"),
              llvm::cl::init(false));
 
+static llvm::cl::opt<bool>
+ReSTTemporaryHacks("rest-temporary-hacks",
+                  llvm::cl::desc("Temporary hacks to correct ReST rendering as XML."),
+                  llvm::cl::init(false));
+
 static llvm::cl::opt<std::string>
 CommentsXMLSchema("comments-xml-schema",
                   llvm::cl::desc("Filename of the RelaxNG schema for documentation comments"));
@@ -1738,10 +1743,12 @@ public:
 
 static int doPrintComments(const CompilerInvocation &InitInvok,
                            StringRef SourceFilename,
-                           StringRef CommentsXMLSchema) {
+                           StringRef CommentsXMLSchema,
+                           bool ReSTTemporaryHacks) {
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
+  Invocation.getLangOptions().ReSTTemporaryHacks = ReSTTemporaryHacks;
 
   CompilerInstance CI;
   // Display diagnostics to stderr.
@@ -2208,7 +2215,8 @@ int main(int argc, char *argv[]) {
 
   case ActionType::PrintComments:
     ExitCode = doPrintComments(InitInvok, options::SourceFilename,
-                               options::CommentsXMLSchema);
+                               options::CommentsXMLSchema,
+                               options::ReSTTemporaryHacks);
     break;
 
   case ActionType::PrintModuleComments:

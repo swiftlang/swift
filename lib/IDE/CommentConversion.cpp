@@ -195,11 +195,22 @@ struct CommentToXMLConverter {
   }
 
   void printBlockQuote(const BlockQuote *BQ) {
-    printRawHTML("<blockquote>");
+    bool HacksEnabled =
+        TheCommentContext.TheReSTContext.LangOpts.TemporaryHacks;
+
+    if (HacksEnabled)
+      OS << "<Verbatim kind=\"code\" xml:space=\"preserve\">";
+    else
+      printRawHTML("<blockquote>");
+
     for (const auto *N : BQ->getChildren()) {
       printASTNode(N);
     }
-    printRawHTML("</blockquote>");
+
+    if (HacksEnabled)
+      OS << "</Verbatim>";
+    else
+      printRawHTML("</blockquote>");
   }
 
   void printTextAndInline(const TextAndInline *T) {
@@ -380,14 +391,21 @@ void CommentToXMLConverter::visitFullComment(const FullComment *FC) {
   if (!Parts.MiscTopLevelNodes.empty()) {
     OS << "<Discussion>";
     for (const auto *N : Parts.MiscTopLevelNodes) {
-      OS << "<Para>";
+      bool Verbatim =
+         TheCommentContext.TheReSTContext.LangOpts.TemporaryHacks &&
+         isa<BlockQuote>(N);
+
+      if (!Verbatim)
+        OS << "<Para>";
+
       if (const auto *F = dyn_cast<Field>(N)) {
         printOrphanField(F);
         OS << "</Para>";
         continue;
       }
       printASTNode(N);
-      OS << "</Para>";
+      if (!Verbatim)
+        OS << "</Para>";
     }
     OS << "</Discussion>";
   }
@@ -439,6 +457,9 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
   }
 
   CommentContext TheCommentContext;
+  TheCommentContext.TheReSTContext.LangOpts.TemporaryHacks =
+      D->getASTContext().LangOpts.ReSTTemporaryHacks;
+
   auto *FC = getFullComment(TheCommentContext, D);
   if (!FC)
     return false;
@@ -628,11 +649,16 @@ struct CommentToDoxygenConverter {
   }
 
   void printBlockQuote(const BlockQuote *BQ) {
-    print("<blockquote>");
+    bool HacksEnabled =
+        TheCommentContext.TheReSTContext.LangOpts.TemporaryHacks;
+
+    print(HacksEnabled ? "<pre>" : "<blockquote>");
+
     for (const auto *N : BQ->getChildren()) {
       printASTNode(N);
     }
-    print("</blockquote>");
+
+    print(HacksEnabled ? "</pre>" : "</blockquote>");
   }
 
   void printTextAndInline(const TextAndInline *T) {
@@ -781,4 +807,3 @@ void ide::getDocumentationCommentAsDoxygen(CommentContext &TheCommentContext,
   if (Converter.PendingNewlines != 0)
     OS << "\n";
 }
-
