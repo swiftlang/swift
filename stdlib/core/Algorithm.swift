@@ -180,8 +180,9 @@ public func startsWith<
 }
 
 /// Return true iff `s` begins with elements equivalent to those of
-/// `prefix`, using `isEquivalent` as the equivalence test.  Requires:
-/// `isEquivalent` is an `equivalence relation
+/// `prefix`, using `isEquivalent` as the equivalence test.
+///
+/// Requires: `isEquivalent` is an `equivalence relation
 /// <http://en.wikipedia.org/wiki/Equivalence_relation>`_
 public func startsWith<
   S0 : SequenceType, S1 : SequenceType
@@ -243,8 +244,8 @@ public struct EnumerateGenerator<
   /// sequence, in order.
   public typealias Generator = EnumerateGenerator<Base>
   
-  /// `EnumerateGenerator` is also a `SequenceType`, so it `generate`\
-  /// 's a copy of itself
+  /// `EnumerateGenerator` is also a `SequenceType`, so it
+  /// `generate`\ s a copy of itself
   public func generate() -> Generator {
     return self
   }

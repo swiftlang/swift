@@ -18,8 +18,8 @@ public struct GeneratorOfOne<T> : GeneratorType, SequenceType {
     self.elements = element
   }
 
-  /// `GeneratorOfOne` is also a `SequenceType`, so it `generate`\
-  /// 's a copy of itself
+  /// `GeneratorOfOne` is also a `SequenceType`, so it `generate`\ s a
+  /// copy of itself
   public func generate() -> GeneratorOfOne {
     return self
   }

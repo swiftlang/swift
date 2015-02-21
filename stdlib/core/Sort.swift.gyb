@@ -86,11 +86,13 @@ func _insertionSort<
 }
 
 /// Re-order the given `range` of `elements` and return a pivot index
-/// *p*.  Postcondition: for all *i* in `range.startIndex..<`\ *p*,
-/// and *j* in *p*\ `..<range.endIndex`, `less(elements[`\ *i*\ `],
-/// elements[`\ *j*\ `]) && !less(elements[`\ *j*\ `], elements[`\
-/// *p*\ `])`.  Only returns `range.endIndex` when `elements` is
-/// empty.
+/// *p*.  
+///
+/// Postcondition: for all *i* in `range.startIndex..<`\ *p*, and *j*
+/// in *p*\ `..<range.endIndex`, `less(elements[`\ *i*\ `],
+/// elements[`\ *j*\ `]) && !less(elements[`\ *j*\ `], 
+/// elements[`\ *p*\ `])`.  Only returns `range.endIndex` when 
+/// `elements` is empty.
 ${orderingRequirement}
 public func partition<
   C: MutableCollectionType where C.Index: RandomAccessIndexType

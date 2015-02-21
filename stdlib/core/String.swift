@@ -830,8 +830,8 @@ extension String : RangeReplaceableCollectionType {
   /// Invalidates all indices with respect to `self`.
   ///
   /// :param: `keepCapacity`, if `true`, prevents the release of
-  ////   allocated storage, which can be a useful optimization
-  ///    when `self` is going to be grown again.
+  ///   allocated storage, which can be a useful optimization
+  ///   when `self` is going to be grown again.
   public mutating func removeAll(keepCapacity: Bool = false) {
     Swift.removeAll(&self, keepCapacity: keepCapacity)
   }

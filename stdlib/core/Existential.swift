@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-//////////////////////////////////////////
+//===----------------------------------------------------------------------===//
 // FIXME: Workaround for inability to create existentials of protocols
 // with associated types <rdar://problem/11689181>
 
@@ -48,8 +48,8 @@ public struct GeneratorOf<T> : GeneratorType, SequenceType {
     return _next()
   }
 
-  /// `GeneratorOf<T>` is also a `SequenceType`, so it `generate`\
-  /// 's a copy of itself
+  /// `GeneratorOf<T>` is also a `SequenceType`, so it `generate`\ s
+  /// a copy of itself
   public func generate() -> GeneratorOf {
     return self
   }

@@ -326,6 +326,7 @@ public struct Set<T : Hashable> :
   /// Private initializer used for bridging.
   ///
   /// Only use this initializer when both conditions are true:
+  /// 
   /// * it is statically known that the given `NSSet` is immutable;
   /// * `T` is bridged verbatim to Objective-C (i.e.,
   ///   is a reference type).
@@ -971,6 +972,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// Private initializer used for bridging.
   ///
   /// Only use this initializer when both conditions are true:
+  ///
   /// * it is statically known that the given `NSDictionary` is immutable;
   /// * `Key` and `Value` are bridged verbatim to Objective-C (i.e.,
   ///   are reference types).
