@@ -2400,8 +2400,9 @@ namespace {
     }
 
     void visitSILFunctionType(SILFunctionType *T, StringRef label) {
-      printCommon(T, label, "sil_function_type") << ")";
+      printCommon(T, label, "sil_function_type");
       // FIXME: Make this useful.
+      printField("type", T->getString());
       OS << ")";
     }
 
