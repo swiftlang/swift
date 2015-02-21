@@ -14,6 +14,7 @@
 #include "SILGen.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/ProfileData/CoverageMapping.h"
@@ -500,12 +501,21 @@ public:
   }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-    extendRegion(E);
+    if (!RegionStack.empty())
+      extendRegion(E);
 
     switch (E->getKind()) {
     default:
       break;
     case ExprKind::AutoClosure:
+      // Autoclosures look strange if there isn't a region, since it looks like
+      // control flow starts partway through an expression. For now we skip
+      // these so we don't get odd behaviour in default arguments and the like,
+      // but in the future we should consider creating appropriate regions for
+      // those expressions.
+      if (RegionStack.empty())
+        break;
+      SWIFT_FALLTHROUGH;
     case ExprKind::Closure:
       assignCounter(E);
       break;
@@ -526,11 +536,13 @@ public:
 
 } // end anonymous namespace
 
-void SILGenProfiling::assignRegionCounters(ASTNode Root, SILFunction &Fn) {
-  setFuncName(Fn);
+void SILGenProfiling::assignRegionCounters(FuncDecl *Root) {
+  SmallString<128> NameBuffer;
+  SILDeclRef(Root).mangle(NameBuffer);
+  CurrentFuncName = NameBuffer.str();
 
   MapRegionCounters Mapper(RegionCounterMap);
-  Root.walk(Mapper);
+  Root->walk(Mapper);
 
   NumRegionCounters = Mapper.NextCounter;
   // TODO: Mapper needs to calculate a function hash as it goes.
@@ -538,15 +550,10 @@ void SILGenProfiling::assignRegionCounters(ASTNode Root, SILFunction &Fn) {
 
   if (EmitCoverageMapping) {
     CoverageMapping Coverage(SGM.M.getASTContext().SourceMgr);
-    Root.walk(Coverage);
+    Root->walk(Coverage);
     Coverage.emitSourceRegions(SGM.M, CurrentFuncName, FunctionHash,
                                RegionCounterMap);
   }
-}
-
-void SILGenProfiling::setFuncName(SILFunction &Fn) {
-  // TODO: Are SIL's mangled names sufficiently unique for the profile?
-  CurrentFuncName = Fn.getName();
 }
 
 static SILLocation getLocation(ASTNode Node) {

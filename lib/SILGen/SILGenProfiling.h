@@ -61,7 +61,7 @@ public:
   bool hasRegionCounters() const { return NumRegionCounters != 0; }
 
   /// Map counters to ASTNodes and set them up for profiling the given function.
-  void assignRegionCounters(ASTNode Root, SILFunction &Fn);
+  void assignRegionCounters(FuncDecl *Root);
 
   /// Emit SIL to increment the counter for \c Node.
   void emitCounterIncrement(SILBuilder &Builder, ASTNode Node);

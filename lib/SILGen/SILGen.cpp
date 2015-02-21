@@ -496,18 +496,21 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 
 void SILGenModule::emitFunction(FuncDecl *fd) {
   SILDeclRef::Loc decl = fd;
+  bool IsBodySynthesized = fd->getBody(/*canSynthesize=*/false) != nullptr;
+
+  // If we have a body and a profiler, make sure we have region counters.
+  if (IsBodySynthesized && Profiler && !Profiler->hasRegionCounters())
+    Profiler->assignRegionCounters(fd);
 
   emitAbstractFuncDecl(fd);
 
   // Emit the actual body of the function to a new SILFunction.  Ignore
   // prototypes and methods whose bodies weren't synthesized by now.
-  if (fd->getBody(/*canSynthesize=*/false)) {
+  if (IsBodySynthesized) {
     PrettyStackTraceDecl stackTrace("emitting SIL for", fd);
 
     SILDeclRef constant(decl);
     SILFunction *f = preEmitFunction(constant, fd, fd);
-    if (Profiler && !Profiler->hasRegionCounters())
-      Profiler->assignRegionCounters(fd, *f);
     SILGenFunction(*this, *f).emitFunction(fd);
     postEmitFunction(constant, f);
   }
