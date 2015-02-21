@@ -550,17 +550,17 @@ public struct _StringCore {
 }
 
 extension _StringCore : CollectionType {
-  public
+  public // @testable
   var startIndex: Int {
     return 0
   }
 
-  public
+  public // @testable
   var endIndex: Int {
     return count
   }
 
-  public
+  public // @testable
   func generate() -> IndexingGenerator<_StringCore> {
     return IndexingGenerator(self)
   }
