@@ -106,10 +106,10 @@ public:
     if (CurInstruction) {
       llvm::dbgs() << "Verifying instruction:\n";
       CurInstruction->printInContext(llvm::dbgs());
-      llvm::dbgs() << "In function @" << F.getName() <<" basic block:\n";
-      CurInstruction->getParent()->print(llvm::dbgs());
+      llvm::dbgs() << "In function:\n";
+      F.print(llvm::dbgs());
     } else {
-      llvm::dbgs() << "In function @" << F.getName() <<" basic block:\n";
+      llvm::dbgs() << "In function:\n";
       F.print(llvm::dbgs());
     }
 
@@ -595,7 +595,8 @@ public:
     require(!AI->getSubstCalleeType()->isPolymorphic(),
             "substituted callee type should not be generic");
 
-    require(substTy == AI->getSubstCalleeType(),
+    requireSameType(SILType::getPrimitiveObjectType(substTy),
+                    SILType::getPrimitiveObjectType(AI->getSubstCalleeType()),
             "substituted callee type does not match substitutions");
 
     // Check that the arguments and result match.
@@ -683,7 +684,8 @@ public:
     require(!PAI->getSubstCalleeType()->isPolymorphic(),
             "substituted callee type should not be generic");
 
-    require(substTy == PAI->getSubstCalleeType(),
+    requireSameType(SILType::getPrimitiveObjectType(substTy),
+                    SILType::getPrimitiveObjectType(PAI->getSubstCalleeType()),
             "substituted callee type does not match substitutions");
 
     // The arguments must match the suffix of the original function's input
