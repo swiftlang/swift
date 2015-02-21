@@ -813,7 +813,8 @@ DictionaryTestSuite.test("COW.Slow.GenerateDoesNotReallocate") {
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
   while let elt = gen.next() {
-    pairs += [elt]
+    let kv = (elt.0.value, elt.1.value)
+    pairs += [kv]
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
   assert(identity1 == unsafeBitCast(d, Word.self))
@@ -1960,7 +1961,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
   while let kv = gen.next() {
-    pairs.append(kv)
+    pairs.append((kv.0.value, kv.1.value))
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
   // The following is not required by the GeneratorType protocol, but
@@ -2041,7 +2042,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
   while let kv = gen.next() {
-    pairs.append(kv)
+    pairs.append((kv.0.value, kv.1.value))
   }
   var expectedPairs = Array<(Int, Int)>()
   for i in 1...32 {
@@ -2096,7 +2097,7 @@ autoreleasepool {
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
   while let kv = gen.next() {
-    pairs.append(kv)
+    pairs.append((kv.0.value, kv.1.value))
   }
   var expectedPairs = [ (10, 1111), (20, 1111), (30, 1111), (40, 1111) ]
   assert(equalsUnordered(pairs, expectedPairs))
@@ -2282,7 +2283,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfDictionaries") {
     var gen = d.generate()
     var pairs = Array<(Int, Int)>()
     while let kv = gen.next() {
-      pairs.append(kv)
+      pairs.append((kv.0.value, kv.1.value))
     }
     var expectedPairs = [ (10, 1010 + i), (20, 1020 + i), (30, 1030 + i) ]
     assert(equalsUnordered(pairs, expectedPairs))
