@@ -575,10 +575,7 @@ public:
     IGNORED_ATTR(SILStored)
 #undef IGNORED_ATTR
 
-  void visitAvailabilityAttr(AvailabilityAttr *attr) {
-    // FIXME: Check that this declaration is at least as available as the
-    // one it overrides.
-  }
+  void visitAvailabilityAttr(AvailabilityAttr *attr);
 
   void visitClassProtocolAttr(ClassProtocolAttr *attr);
   void visitFinalAttr(FinalAttr *attr);
@@ -718,6 +715,56 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
 
   if (!Valid)
     attr->setInvalid();
+}
+
+/// Get the innermost enclosing declaration for a declaration.
+static Decl *getEnclosingDeclForDecl(Decl *D) {
+  // If the declaration is an accessor, treat its storage declaration
+  // as the enclosing declaration.
+  if (auto *FD = dyn_cast<FuncDecl>(D)) {
+    if (FD->isAccessor()) {
+      return FD->getAccessorStorageDecl();
+    }
+  }
+
+  return D->getDeclContext()->getInnermostDeclarationDeclContext();
+}
+
+void AttributeChecker::visitAvailabilityAttr(AvailabilityAttr *attr) {
+  if (!TC.getLangOpts().EnableExperimentalAvailabilityChecking)
+    return;
+
+  if (!attr->isActivePlatform(TC.Context) || !attr->Introduced.hasValue())
+    return;
+
+  // Find the innermost enclosing declaration with an availability
+  // range annotation and ensure that this attribute's available version range
+  // is fully contained within that declaration's range. If there is no such
+  // enclosing declaration, then there is nothing to check.
+  Optional<VersionRange> EnclosingAnnotatedRange;
+  Decl *EnclosingDecl = getEnclosingDeclForDecl(D);
+
+  while (EnclosingDecl) {
+    EnclosingAnnotatedRange =
+        TypeChecker::annotatedAvailableRange(EnclosingDecl, TC.Context);
+
+    if (EnclosingAnnotatedRange.hasValue())
+      break;
+
+    EnclosingDecl = getEnclosingDeclForDecl(EnclosingDecl);
+  }
+
+  if (!EnclosingDecl)
+    return;
+
+  VersionRange AttrRange = VersionRange::allGTE(attr->Introduced.getValue());
+
+  if (!AttrRange.isContainedIn(EnclosingAnnotatedRange.getValue())) {
+    TC.diagnose(attr->getLocation(),
+                diag::availability_decl_more_than_enclosing);
+    TC.diagnose(EnclosingDecl->getLoc(),
+                diag::availability_decl_more_than_enclosing_enclosing_here);
+  }
 }
 
 void AttributeChecker::visitClassProtocolAttr(ClassProtocolAttr *attr) {

@@ -210,6 +210,16 @@ public:
     return const_cast<DeclContext *>(this)->getInnermostTypeContext();
   }
 
+  /// Returns the innermost context that is a declaration.
+  ///
+  /// This routine looks through contexts to find the innermost
+  /// declaration context that is itself a declaration.
+  Decl *getInnermostDeclarationDeclContext();
+  const Decl *getInnermostDeclarationDeclContext() const {
+    return
+        const_cast<DeclContext *>(this)->getInnermostDeclarationDeclContext();
+  }
+
   /// Returns the semantic parent of this context.  A context has a
   /// parent if and only if it is not a module context.
   DeclContext *getParent() const {

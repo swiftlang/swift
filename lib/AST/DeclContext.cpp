@@ -273,6 +273,36 @@ DeclContext *DeclContext::getInnermostTypeContext() {
   }
 }
 
+Decl *DeclContext::getInnermostDeclarationDeclContext() {
+  DeclContext *DC = this;
+  while (DC) {
+    switch (DC->getContextKind()) {
+    case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::Initializer:
+    case DeclContextKind::SerializedLocal:
+    case DeclContextKind::Module:
+    case DeclContextKind::FileUnit:
+      break;
+
+    case DeclContextKind::TopLevelCodeDecl:
+      return cast<TopLevelCodeDecl>(DC);
+
+    case DeclContextKind::AbstractFunctionDecl:
+      return cast<AbstractFunctionDecl>(DC);
+
+    case DeclContextKind::NominalTypeDecl:
+      return cast<NominalTypeDecl>(DC);
+
+    case DeclContextKind::ExtensionDecl:
+      return cast<ExtensionDecl>(DC);
+    }
+
+    DC = DC->getParent();
+  }
+
+  return nullptr;
+}
+
 Module *DeclContext::getParentModule() const {
   const DeclContext *DC = this;
   while (!DC->isModuleContext())

@@ -1932,6 +1932,12 @@ WARNING(availability_deprecated_msg, sema_avail, none,
         "%0 was deprecated in %1 version %2: %3",
         (DeclName, StringRef, clang::VersionTuple, StringRef))
 
+ERROR(availability_decl_more_than_enclosing, sema_avail, none,
+      "declaration cannot be more available than enclosing scope", ())
+
+NOTE(availability_decl_more_than_enclosing_enclosing_here, sema_avail, none,
+     "enclosing scope here", ())
+
 ERROR(availability_decl_only_version_greater, sema_avail, none,
       "%0 is only available on %1 version %2 or greater",
       (DeclName, StringRef, clang::VersionTuple))

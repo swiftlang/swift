@@ -687,8 +687,9 @@ void TypeChecker::diagnoseAmbiguousMemberType(Type baseTy,
   }
 }
 
-VersionRange TypeChecker::availableRange(const Decl *D, ASTContext &Ctx) {
-  VersionRange Avail = VersionRange::all();
+Optional<VersionRange> TypeChecker::annotatedAvailableRange(const Decl *D,
+                                                            ASTContext &Ctx) {
+  Optional<VersionRange> AnnotatedRange;
 
   for (auto Attr : D->getAttrs()) {
     auto *AvailAttr = dyn_cast<AvailabilityAttr>(Attr);
@@ -703,10 +704,25 @@ VersionRange TypeChecker::availableRange(const Decl *D, ASTContext &Ctx) {
     // If we have multiple introduction versions, we will conservatively
     // assume the worst case scenario. We may want to be more precise here
     // in the future or emit a diagnostic.
-    Avail.meetWith(AttrRange);
+
+    if (AnnotatedRange.hasValue()) {
+      AnnotatedRange.getValue().meetWith(AttrRange);
+    } else {
+      AnnotatedRange = AttrRange;
+    }
   }
 
-  return Avail;
+  return AnnotatedRange;
+}
+
+VersionRange TypeChecker::availableRange(const Decl *D, ASTContext &Ctx) {
+  Optional<VersionRange> AnnotatedRange = annotatedAvailableRange(D, Ctx);
+  if (AnnotatedRange.hasValue()) {
+    return AnnotatedRange.getValue();
+  }
+
+  // Treat unannotated declarations as always available.
+  return VersionRange::all();
 }
 
 namespace {

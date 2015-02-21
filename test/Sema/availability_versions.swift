@@ -466,12 +466,21 @@ class ClassAvailableOn10_9 {
 }
 
 @availability(OSX, introduced=10.10)
-class ClassAvailableOn10_10 {  
+class ClassAvailableOn10_10 { // expected-note {{enclosing scope here}}
   func someMethod() {}
   class func someClassMethod() {
     let _ = ClassAvailableOn10_10()
   }
   var someProp : Int = 22
+
+  @availability(OSX, introduced=10.9) // expected-error {{declaration cannot be more available than enclosing scope}}
+  func someMethodAvailableOn10_9() { }
+
+  @availability(OSX, introduced=10.11)
+  var propWithGetter: Int { // expected-note{{enclosing scope here}}
+    @availability(OSX, introduced=10.10) // expected-error {{declaration cannot be more available than enclosing scope}}
+    get { return 0 }
+  }
 }
 
 func classAvailability() {

@@ -19,6 +19,7 @@
 
 #include "swift/AST/AST.h"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
@@ -1261,6 +1262,13 @@ public:
   /// \brief Returns the version range on which a declaration is available
   ///  We assume a declaration without an annotation is always available.
   static VersionRange availableRange(const Decl *D, ASTContext &C);
+
+  /// \brief Returns the version range on which the declaration for which
+  /// declaration is annotated as available, or None if the declaration
+  /// has not availability annotation.
+  static Optional<VersionRange> annotatedAvailableRange(const Decl *D,
+                                                        ASTContext &C);
+
 
   /// Walk the AST to build the hierarchy of TypeRefinementContexts
   ///
