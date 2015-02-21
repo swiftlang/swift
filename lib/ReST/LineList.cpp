@@ -43,6 +43,10 @@ static std::pair<ColumnNum, unsigned> measureIndentation(StringRef Text) {
 }
 
 void LineListBuilder::addLine(StringRef Text, SourceRange Range) {
+  if (Context.LangOpts.TemporaryHacks && !Text.empty() &&
+      (std::all_of(Text.begin(), Text.end(), [](char C) { return C == '='; }) ||
+       std::all_of(Text.begin(), Text.end(), [](char C) { return C == '-'; })))
+    return;
   Line L;
   L.Text = Text;
   L.Range = Range;
@@ -52,7 +56,7 @@ void LineListBuilder::addLine(StringRef Text, SourceRange Range) {
   Lines.push_back(L);
 }
 
-LineList LineListBuilder::takeLineList(ReSTContext &Context) {
+LineList LineListBuilder::takeLineList() {
   return LineList(Context.allocateCopy(ArrayRef<Line>(Lines)));
 }
 

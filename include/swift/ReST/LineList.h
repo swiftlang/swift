@@ -520,11 +520,13 @@ public:
 
 class LineListBuilder {
   std::vector<Line> Lines;
-
+  ReSTContext &Context;
 public:
+  LineListBuilder(ReSTContext &Context) : Context(Context) {}
+  
   void addLine(StringRef Text, SourceRange Range);
 
-  LineList takeLineList(ReSTContext &Context);
+  LineList takeLineList();
 };
 
 inline LineListRef LineList::subList(unsigned StartIndex, unsigned Size) const {

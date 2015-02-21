@@ -77,26 +77,26 @@ struct ReSTTest : public ::testing::Test {
   SourceManager<unsigned> SM;
 
   LineList toLineList(ReSTContext &Context, StringRef Text) {
-    LineListBuilder Result;
+    LineListBuilder Result(Context);
     Result.addLine(Text, SM.registerLine(Text, 0));
-    return Result.takeLineList(Context);
+    return Result.takeLineList();
   }
 
   LineList toLineList(ReSTContext &Context, std::vector<const char *> Lines) {
-    LineListBuilder Result;
+    LineListBuilder Result(Context);
     for (auto S : Lines) {
       Result.addLine(S, SM.registerLine(S, 0));
     }
-    return Result.takeLineList(Context);
+    return Result.takeLineList();
   }
 
   LineList toLineList(ReSTContext &Context, std::vector<std::string> Lines) {
-    LineListBuilder Result;
+    LineListBuilder Result(Context);
     for (auto S : Lines) {
       StringRef Copy = Context.allocateCopy(S);
       Result.addLine(Copy, SM.registerLine(Copy, 0));
     }
-    return Result.takeLineList(Context);
+    return Result.takeLineList();
   }
 
   void checkInlineMarkup(const std::vector<std::string> &InText,
@@ -2054,6 +2054,49 @@ struct ExtractBriefTestData ExtractBriefTests[] = {
 INSTANTIATE_TEST_CASE_P(
     ReSTTest, ExtractBriefTest,
     ::testing::ValuesIn(ExtractBriefTests));
+
+
+struct TemporaryHacksTest
+    : public ReSTTest,
+      public ::testing::WithParamInterface<ExtractBriefTestData> {};
+
+
+TEST_P(TemporaryHacksTest, Test) {
+  const auto &Test = GetParam();
+  ReSTContext Context;
+  Context.LangOpts.TemporaryHacks = true;
+  auto LL = toLineList(Context, Test.InText);
+  llvm::SmallString<64> Str;
+
+  extractBrief(LL, Str);
+  EXPECT_EQ(Test.Brief, Str.str().str())
+      << "ReST document: " << ::testing::PrintToString(Test.InText);
+  Str.clear();
+
+  auto *TheDocument = parseDocument(Context, LL);
+  {
+    llvm::raw_svector_ostream OS(Str);
+    convertToDocutilsXML(TheDocument, OS);
+  }
+  StringRef DocutilsXML = stripDocumentTag(Str.str());
+  EXPECT_EQ(Test.DocutilsXML, DocutilsXML.str())
+      << "ReST document: " << ::testing::PrintToString(Test.InText);
+}
+
+struct ExtractBriefTestData TemporaryHacksTests[] = {
+  { { "Valid", "=====" }, "Valid",
+    "<paragraph>Valid</paragraph>"
+  },
+  { { "Valid", "-----" }, "Valid",
+    "<paragraph>Valid</paragraph>"
+  },
+  { { "Valid", "--x---" }, "Valid --x---",
+    "<paragraph>Valid\n--x---</paragraph>"
+  },
+};
+INSTANTIATE_TEST_CASE_P(
+    ReSTTest, TemporaryHacksTest,
+    ::testing::ValuesIn(TemporaryHacksTests));
 
 struct ExtractBriefTest_UnicodeSubstitutions
     : public ReSTTest,

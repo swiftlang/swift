@@ -176,7 +176,7 @@ static unsigned measureASCIIArt(StringRef S, unsigned NumLeadingSpaces) {
 static llvm::rest::LineList
 toLineList(llvm::rest::ReSTContext &TheReSTContext,
            llvm::rest::SourceManager<SourceLoc> &RSM, RawComment RC) {
-  llvm::rest::LineListBuilder Result;
+  llvm::rest::LineListBuilder Result(TheReSTContext);
   for (const auto &C : RC.Comments) {
     if (C.isLine()) {
       // Skip comment marker.
@@ -232,7 +232,7 @@ toLineList(llvm::rest::ReSTContext &TheReSTContext,
       }
     }
   }
-  return Result.takeLineList(TheReSTContext);
+  return Result.takeLineList();
 }
 
 static StringRef extractBriefComment(ASTContext &Context, RawComment RC,

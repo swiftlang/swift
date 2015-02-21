@@ -1944,11 +1944,11 @@ static int doParseReST(StringRef SourceFilename) {
   {
     SmallVector<StringRef, 16> Lines;
     splitIntoLines(FileBufOrErr.get()->getBuffer(), Lines);
-    llvm::rest::LineListBuilder Builder;
+    llvm::rest::LineListBuilder Builder(Context);
     for (auto S : Lines) {
       Builder.addLine(S, SM.registerLine(S, 0));
     }
-    LL = Builder.takeLineList(Context);
+    LL = Builder.takeLineList();
   }
   auto *TheDocument = parseDocument(Context, LL);
   {

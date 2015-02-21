@@ -118,6 +118,7 @@ struct LangOptions final {
   ///   |  aaa
   /// \code
   bool IgnoreUniformIndentation = false;
+  bool TemporaryHacks = false;
 };
 
 class ReSTContext final {
