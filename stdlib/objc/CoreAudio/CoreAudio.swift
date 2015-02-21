@@ -64,7 +64,7 @@ extension AudioBuffer {
 
 extension AudioBufferList {
   /// :returns: the size in bytes of an `AudioBufferList` that can hold up to
-  /// `maximumBuffers` `AudioBuffer`s.
+  /// `maximumBuffers` `AudioBuffer`\ s.
   public static func sizeInBytes(#maximumBuffers: Int) -> Int {
     _precondition(maximumBuffers >= 1,
       "AudioBufferList should contain at least one AudioBuffer")
@@ -73,7 +73,7 @@ extension AudioBufferList {
   }
 
   /// Allocate an `AudioBufferList` with a capacity for the specified number of
-  /// `AudioBuffer`s.
+  /// `AudioBuffer`\ s.
   ///
   /// The `count` property of the new `AudioBufferList` is initialized to
   /// `maximumBuffers`.
@@ -104,7 +104,7 @@ public struct UnsafeMutableAudioBufferListPointer {
     unsafeMutablePointer = p
   }
 
-  /// The number of `AudioBuffer`s in the `AudioBufferList`
+  /// The number of `AudioBuffer`\ s in the `AudioBufferList`
   /// (`mNumberBuffers`).
   public var count: Int {
     get {

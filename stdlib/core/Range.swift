@@ -38,7 +38,7 @@ public struct RangeGenerator<
   public typealias Generator = RangeGenerator<T>
 
   /// `RangeGenerator` is also a `SequenceType`, so it
-  /// `generate`'s a copy of itself
+  /// `generate`\ 's a copy of itself
   public func generate() -> Generator {
     return self
   }

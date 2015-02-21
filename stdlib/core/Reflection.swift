@@ -186,10 +186,10 @@ public protocol MirrorType {
   /// otherwise.
   var objectIdentifier: ObjectIdentifier? { get }
 
-  /// The count of `value`'s logical children 
+  /// The count of `value`\ 's logical children 
   var count: Int { get }
 
-  /// Get a name and mirror for the `i`th logical child.
+  /// Get a name and mirror for the `i`\ th logical child.
   subscript(i: Int) -> (String, MirrorType) { get }
 
   /// A string description of `value`.

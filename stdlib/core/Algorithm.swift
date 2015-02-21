@@ -41,7 +41,7 @@ public func maxElement<
 /// Returns the first index where `value` appears in `domain` or `nil` if
 /// `value` is not found.
 ///
-/// Complexity: O(`count(domain)`)
+/// Complexity: O(\ `count(domain)`\ )
 public func find<
   C: CollectionType where C.Generator.Element : Equatable
 >(domain: C, value: C.Generator.Element) -> C.Index? {
@@ -252,8 +252,8 @@ public struct EnumerateGenerator<
 }
 
 /// The `SequenceType` returned by `enumerate()`.  `EnumerateSequence`
-/// is a sequence of pairs (*n*, *x*), where *n*s are consecutive
-/// `Int`s starting at zero, and *x*s are the elements of a `Base`
+/// is a sequence of pairs (*n*, *x*), where *n*\ s are consecutive
+/// `Int`\ s starting at zero, and *x*\ s are the elements of a `Base`
 /// `SequenceType`::
 ///
 ///   var s = EnumerateSequence(["foo", "bar"])
@@ -278,7 +278,7 @@ public struct EnumerateSequence<Base : SequenceType> : SequenceType {
 }
 
 /// Return a lazy `SequenceType` containing pairs (*n*, *x*), where
-/// *n*s are consecutive `Int`s starting at zero, and *x*s are
+/// *n*\ s are consecutive `Int`\ s starting at zero, and *x*\ s are
 /// the elements of `base`::
 ///
 ///   > for (n, c) in enumerate("Swift") { println("\(n): '\(c)'" )}

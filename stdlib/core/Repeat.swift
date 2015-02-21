@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A collection whose elements are all identical `T`s.
+/// A collection whose elements are all identical `T`\ s.
 public struct Repeat<T> : CollectionType {
   
   /// A type that represents a valid position in the collection.

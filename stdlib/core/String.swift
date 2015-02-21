@@ -38,7 +38,7 @@ import SwiftShims
 /// locale settings.  That's because, for example, the validity of a
 /// `Dictionary<String, T>` in a running program depends on a given
 /// string comparison having a single, stable result.  Therefore,
-/// Swift always uses the default, un-`tailored
+/// Swift always uses the default, un-\ `tailored
 /// <http://www.unicode.org/glossary/#tailorable>`_ Unicode algorithms
 /// for basic string operations.
 ///
@@ -442,7 +442,7 @@ extension String : StringInterpolationConvertible {
     }
   }
 
-  /// Create an instance containing `expr`'s `print` representation
+  /// Create an instance containing `expr`\ 's `print` representation
   public
   init<T>(stringInterpolationSegment expr: T) {
     self = toString(expr)
@@ -627,7 +627,7 @@ extension String : CollectionType {
     return Index(_base: unicodeScalars.startIndex)
   }
 
-  /// The `String`'s "past the end" position.
+  /// The `String`\ 's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
@@ -772,8 +772,8 @@ extension String : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(`count(subRange)`) if `subRange.endIndex
-  /// == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
+  /// Complexity: O(\ `count(subRange)`\ ) if `subRange.endIndex
+  /// == self.endIndex` and `isEmpty(newElements)`\ , O(N) otherwise.
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == Character
   >(
@@ -791,7 +791,7 @@ extension String : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(`count(self)`).
+  /// Complexity: O(\ `count(self)`\ ).
   public mutating func insert(newElement: Character, atIndex i: Index) {
     Swift.insert(&self, newElement, atIndex: i)
   }
@@ -800,7 +800,7 @@ extension String : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(`count(self) + count(newElements)`).
+  /// Complexity: O(\ `count(self) + count(newElements)`\ ).
   public mutating func splice<
     S : CollectionType where S.Generator.Element == Character
   >(newElements: S, atIndex i: Index) {
@@ -811,7 +811,7 @@ extension String : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(`count(self)`).
+  /// Complexity: O(\ `count(self)`\ ).
   public mutating func removeAtIndex(i: Index) -> Character {
     return Swift.removeAtIndex(&self, i)
   }
@@ -820,7 +820,7 @@ extension String : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(`count(self)`).
+  /// Complexity: O(\ `count(self)`\ ).
   public mutating func removeRange(subRange: Range<Index>) {
     Swift.removeRange(&self, subRange)
   }

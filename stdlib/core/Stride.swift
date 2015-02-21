@@ -26,7 +26,7 @@ public protocol _Strideable {
   ///
   /// Complexity: O(1).
   ///
-  /// See also: `RandomAccessIndexType`'s `distanceTo`, which provides a
+  /// See also: `RandomAccessIndexType`\ 's `distanceTo`, which provides a
   /// stronger semantic guarantee.
   func distanceTo(other: Self) -> Stride
 
@@ -35,7 +35,7 @@ public protocol _Strideable {
   ///
   /// Complexity: O(1).
   ///
-  /// See also: `RandomAccessIndexType`'s `advancedBy`, which
+  /// See also: `RandomAccessIndexType`\ 's `advancedBy`, which
   /// provides a stronger semantic guarantee.
   func advancedBy(n: Stride) -> Self
 }
