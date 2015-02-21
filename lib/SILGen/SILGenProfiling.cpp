@@ -365,6 +365,14 @@ private:
     replaceCount(CounterExpr::Zero());
   }
 
+  Expr *getConditionNode(StmtCondition SC) {
+    assert(!SC.empty() && "Empty condition");
+    StmtConditionElement SCE = SC.front();
+    if (!SCE.isCondition())
+      return nullptr;
+    return SCE.getCondition();
+  }
+
 public:
   CoverageMapping(const SourceManager &SM) : SM(SM) {}
 
@@ -418,7 +426,8 @@ public:
 
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
       assignCounter(WS, CounterExpr::Zero());
-      assignCounter(WS->getCondExpr(), CounterExpr::Ref(getCurrentCounter()));
+      if (auto *E = getConditionNode(WS->getCond()))
+        assignCounter(E, CounterExpr::Ref(getCurrentCounter()));
       assignCounter(WS->getBody());
 
     } else if (auto *DWS = dyn_cast<DoWhileStmt>(S)) {
@@ -459,7 +468,8 @@ public:
 
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
       // Update the condition with the backedge count.
-      addToCounter(WS->getCondExpr(), getExitCounter());
+      if (auto *E = getConditionNode(WS->getCond()))
+        addToCounter(E, getExitCounter());
 
     } else if (auto *FS = dyn_cast<ForStmt>(S)) {
       // Both the condition and the increment are reached through the backedge.
@@ -471,9 +481,10 @@ public:
     } else if (auto *CS = dyn_cast<ContinueStmt>(S)) {
       // Continues create extra backedges, add them to the appropriate counters.
       addToCounter(CS->getTarget(), getCurrentCounter());
-      if (auto *WS = dyn_cast<WhileStmt>(CS->getTarget()))
-        addToCounter(WS->getCondExpr(), getCurrentCounter());
-      else if (auto *FS = dyn_cast<ForStmt>(CS->getTarget()))
+      if (auto *WS = dyn_cast<WhileStmt>(CS->getTarget())) {
+        if (auto *E = getConditionNode(WS->getCond()))
+          addToCounter(E, getCurrentCounter());
+      } else if (auto *FS = dyn_cast<ForStmt>(CS->getTarget()))
         if (Expr *E = FS->getCond().getPtrOrNull())
           addToCounter(E, getCurrentCounter());
       terminateRegion(S);

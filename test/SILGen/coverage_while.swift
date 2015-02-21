@@ -34,6 +34,16 @@ func foo() -> Int32 {
     }
     ++x
   }
+
+  var y : Int32? = 2
+  // CHECK: [[@LINE+1]]:9 -> [[@LINE+1]]:15 : ((0 + 12) - 11)
+  while x > 30, let z = y {
+    y = nil
+  }
+
+  // TODO: [[@LINE+1]]:9 -> [[@LINE+1]]:18 : ((0 + 13) - 11)
+  while let z = y {
+  }
   // CHECK: [[@LINE-1]]:4 -> [[@LINE+1]]:11 : (0 - 11)
   return x
 }
