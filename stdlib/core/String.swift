@@ -522,26 +522,27 @@ extension String : CollectionType {
           _utf16Index - predecessorLengthUTF16, _base._core))
     }
 
-    let _base: UnicodeScalarView.Index
+    internal let _base: UnicodeScalarView.Index
 
     /// The length of this extended grapheme cluster in UTF-16 code units.
-    let _lengthUTF16: Int
+    internal let _lengthUTF16: Int
 
     /// The integer offset of this index in UTF-16 code units.
-    public var _utf16Index: Int {
+    public // SPI(Foundation)
+    var _utf16Index: Int {
       return _base._position
     }
 
     /// The one past end index for this extended grapheme cluster in Unicode
     /// scalars.
-    var _endBase: UnicodeScalarView.Index {
+    internal var _endBase: UnicodeScalarView.Index {
       return UnicodeScalarView.Index(
           _utf16Index + _lengthUTF16, _base._core)
     }
 
     /// Returns the length of the first extended grapheme cluster in UTF-16
     /// code units.
-    static func _measureExtendedGraphemeClusterForward(
+    internal static func _measureExtendedGraphemeClusterForward(
         var start: UnicodeScalarView.Index
     ) -> Int {
       let end = start._viewEndIndex
@@ -579,7 +580,7 @@ extension String : CollectionType {
 
     /// Returns the length of the previous extended grapheme cluster in UTF-16
     /// code units.
-    static func _measureExtendedGraphemeClusterBackward(
+    internal static func _measureExtendedGraphemeClusterBackward(
         end: UnicodeScalarView.Index
     ) -> Int {
       var start = end._viewStartIndex
