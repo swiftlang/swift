@@ -729,7 +729,7 @@ extension String : ExtensibleCollectionType {
       let bytes = Character._smallValue(_63bits)
       _core.extend(Character._SmallUTF16(bytes))
     case .Large(let storage):
-      _core.append(_StringCore(_StringBuffer(storage)))
+      _core.append(String(c)._core)
     }
   }
   

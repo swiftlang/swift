@@ -1025,5 +1025,88 @@ StringTests.test("indexConversion") {
 
   expectEqual(["furth", "lard", "bart"], matches)
 }
+
+StringTests.test("String.append(_: UnicodeScalar)") {
+  var s = ""
+
+  if true {
+    // U+0061 LATIN SMALL LETTER A
+    let input: UnicodeScalar = "\u{61}"
+    s.append(input)
+    expectEqual([ "\u{61}" ], Array(s.unicodeScalars))
+  }
+  if true {
+    // U+304B HIRAGANA LETTER KA
+    let input: UnicodeScalar = "\u{304b}"
+    s.append(input)
+    expectEqual([ "\u{61}", "\u{304b}" ], Array(s.unicodeScalars))
+  }
+  if true {
+    // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
+    let input: UnicodeScalar = "\u{3099}"
+    s.append(input)
+    expectEqual([ "\u{61}", "\u{304b}", "\u{3099}" ], Array(s.unicodeScalars))
+  }
+  if true {
+    // U+1F425 FRONT-FACING BABY CHICK
+    let input: UnicodeScalar = "\u{1f425}"
+    s.append(input)
+    expectEqual(
+      [ "\u{61}", "\u{304b}", "\u{3099}", "\u{1f425}" ],
+      Array(s.unicodeScalars))
+  }
+}
+
+StringTests.test("String.append(_: Character)") {
+  let baseCharacters: [Character] = [
+    // U+0061 LATIN SMALL LETTER A
+    "\u{61}",
+
+    // U+304B HIRAGANA LETTER KA
+    // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
+    "\u{304b}\u{3099}",
+
+    // U+3072 HIRAGANA LETTER HI
+    // U+309A COMBINING KATAKANA-HIRAGANA SEMI-VOICED SOUND MARK
+    "\u{3072}\u{309A}",
+
+    // U+1F425 FRONT-FACING BABY CHICK
+    "\u{1f425}",
+
+    // U+0061 LATIN SMALL LETTER A
+    // U+0300 COMBINING GRAVE ACCENT
+    // U+0301 COMBINING ACUTE ACCENT
+    "\u{61}\u{0300}\u{0301}",
+
+    // U+0061 LATIN SMALL LETTER A
+    // U+0300 COMBINING GRAVE ACCENT
+    // U+0301 COMBINING ACUTE ACCENT
+    // U+0302 COMBINING CIRCUMFLEX ACCENT
+    "\u{61}\u{0300}\u{0301}\u{0302}",
+
+    // U+0061 LATIN SMALL LETTER A
+    // U+0300 COMBINING GRAVE ACCENT
+    // U+0301 COMBINING ACUTE ACCENT
+    // U+0302 COMBINING CIRCUMFLEX ACCENT
+    // U+0303 COMBINING TILDE
+    "\u{61}\u{0300}\u{0301}\u{0302}\u{0303}",
+  ]
+  let baseStrings = [ "" ] + map(baseCharacters) { String($0) }
+
+  for baseIdx in indices(baseStrings) {
+    for prefix in ["", " "] {
+      let base = baseStrings[baseIdx]
+      for inputIdx in indices(baseCharacters) {
+        let input = last(prefix + String(baseCharacters[inputIdx]))!
+        var s = base
+        s.append(input)
+        expectEqual(Array(base) + [ input ], Array(s)) {
+          "baseIdx=\(baseIdx) inputIdx=\(inputIdx)"
+        }
+      }
+    }
+  }
+}
+
 runAllTests()
 

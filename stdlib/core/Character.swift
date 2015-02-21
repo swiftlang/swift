@@ -35,6 +35,8 @@ public struct Character :
   // If the grapheme cluster can be represented as Small, it
   // should be represented as such.
   internal enum Representation {
+    // A _StringBuffer whose first grapheme cluster is self.
+    // NOTE: may be more than 1 Character long.
     case Large(_StringBuffer._Storage)
     case Small(Builtin.Int63)
   }
@@ -240,8 +242,8 @@ public struct Character :
       _sanityCheck(position < Int(count))
       // Note: using unchecked arthmetic because overflow can not happen if the
       // above sanity checks hold.
-      return UTF16.CodeUnit(
-        truncatingBitPattern: data >> (UInt64(position) &* 16))
+      return UTF16.CodeUnit(truncatingBitPattern:
+        data >> ((UInt64(count) - UInt64(position) - 1) &* 16))
     }
 
     /// Return a *generator* over the elements of this *sequence*.
@@ -293,7 +295,8 @@ extension String {
       self = String._fromWellFormedCodeUnitSequence(
         UTF8.self, input: smallUTF8)
     case let .Large(value):
-      self = String(_StringCore(_StringBuffer(value)))
+      let buf = String(_StringCore(_StringBuffer(value)))
+      self = buf[buf.startIndex..<buf.startIndex.successor()]
     }
   }
 }
