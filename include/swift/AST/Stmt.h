@@ -55,7 +55,7 @@ class alignas(8) Stmt {
 protected:
   /// Return the given value for the 'implicit' flag if present, or if None,
   /// return true if the location is invalid.
-  bool getDefaultImplicitFlag(Optional<bool> implicit, SourceLoc keyLoc) {
+  static bool getDefaultImplicitFlag(Optional<bool> implicit, SourceLoc keyLoc){
     return implicit.hasValue() ? *implicit : keyLoc.isInvalid();
   }
   
