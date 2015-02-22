@@ -1387,8 +1387,16 @@ static CanAnyFunctionType getBridgedFunctionType(TypeConverter &tc,
                                             CanAnyFunctionType t,
                                             AnyFunctionType::ExtInfo extInfo,
                                             const clang::Decl *decl) {
-  // Blocks are always cdecl.
+  // C functions are always thin.
+  // FIXME: Should have an AST-level Representation enumeration for
+  // "C function pointer".
   AbstractCC effectiveCC = t->getAbstractCC();
+  if (effectiveCC == AbstractCC::C
+      && t->getRepresentation() != FunctionType::Representation::Block) {
+    extInfo = extInfo.withRepresentation(FunctionType::Representation::Thin);
+  }
+  
+  // Blocks are always cdecl.
   if (t->getRepresentation() == FunctionType::Representation::Block) {
     effectiveCC = AbstractCC::C;
     extInfo = extInfo.withCallingConv(AbstractCC::C);
