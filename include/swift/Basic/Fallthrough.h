@@ -24,7 +24,13 @@
 # define __has_attribute(x) 0
 #endif
 
+#ifndef __has_cpp_attribute
+# define __has_cpp_attribute(x) 0
+#endif
+
 #if __has_attribute(fallthrough)
+# define SWIFT_FALLTHROUGH [[clang::fallthrough]]
+#elif __has_cpp_attribute(clang::fallthrough)
 # define SWIFT_FALLTHROUGH [[clang::fallthrough]]
 #else
 # define SWIFT_FALLTHROUGH
