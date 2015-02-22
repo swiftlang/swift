@@ -52,17 +52,18 @@ public func _arrayForceCast<SourceElement, TargetElement>(
   case (.Reference, .Verbatim):
     let native = source._buffer.requestNativeBuffer()
     
-    // Fast path: a native buffer that already stores elements of the
-    // Derived type.
     if _fastPath(native != nil) {
       if _fastPath(native!.storesOnlyElementsOfType(TargetElement.self)) {
+        // A native buffer that is known to store only elements of the
+        // TargetElement can be used directly
         return Array(source._buffer.castToBufferOf(TargetElement.self))
       }
+      // Other native buffers must use deferred element type checking
       return Array(
         source._buffer.downcastToBufferWithDeferredTypeCheckOf(
           TargetElement.self))
     }
-    // This result has deferred element typechecking
+    // All non-native buffers use deferred element typechecking
     return Array(_fromCocoaArray: source._buffer._asCocoaArray())
     
   case (.Reference, .Explicit):

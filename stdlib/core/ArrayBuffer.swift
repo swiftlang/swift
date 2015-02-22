@@ -58,7 +58,11 @@ public struct _ArrayBuffer<T> : _ArrayBufferType {
   ) -> _ArrayBuffer<U> {
     _sanityCheck(_isClassOrObjCExistential(T.self))
     _sanityCheck(_isClassOrObjCExistential(U.self))
+    
+    // FIXME: can't check that U is derived from T pending
+    // <rdar://problem/19915280> generic metatype casting doesn't work
     // _sanityCheck(U.self is T.Type)
+
     return _ArrayBuffer<U>(
       storage: _ArrayBridgeStorage(
         native: _native._storage, bits: deferredTypeCheckMask))
@@ -179,7 +183,7 @@ extension _ArrayBuffer {
   @inline(never)
   internal func _typeCheckSlowPath(index: Int) {
     if _fastPath(_isNative) {
-      let element: AnyObject = unsafeBitCast(_native[index], AnyObject.self)
+      let element: AnyObject = castToBufferOf(AnyObject.self)._native[index]
       _precondition(
         element is T,
         "Down-casted Array element failed to match the target type")
