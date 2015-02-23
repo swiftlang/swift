@@ -50,9 +50,104 @@ mayBridgeToObjectiveC(Module *M, CanType T) {
   return false;
 }
 
+static bool canClassOrSuperclassesHaveExtensions(ClassDecl *CD,
+                                                 bool isWholeModuleOpts) {
+  while (CD) {
+    // Public classes can always be extended
+    if (CD->getAccessibility() == Accessibility::Public)
+      return true;
+
+    // Internal classes can be extended, if we are not in a
+    // whole-module-optimizations mode.
+    if (CD->getAccessibility() == Accessibility::Internal &&
+        !isWholeModuleOpts)
+      return true;
+
+    if (!CD->hasSuperclass())
+      break;
+
+    CD = CD->getSuperclass()->getClassOrBoundGenericClass();
+  }
+
+  return false;
+}
+
+/// Try to classify a conversion from non-existential type
+/// into an existential type by performing a static check
+/// of protocol conformances if it is possible.
+static DynamicCastFeasibility
+classifyDynamicCastToProtocol(CanType source,
+                              CanType target,
+                              bool isWholeModuleOpts) {
+  auto *SourceNominalTy = source.getAnyNominal();
+
+  assert(!source.isExistentialType() && SourceNominalTy &&
+         "source should be a non-existential nominal type");
+
+  assert(target.isExistentialType() &&
+         "target should be an existential type");
+
+  if (target.isExistentialType()) {
+    auto *TargetProtocol = target.getAnyNominal();
+    auto SourceProtocols = SourceNominalTy->getProtocols();
+    auto SourceExtensions = SourceNominalTy->getExtensions();
+
+    // Check all protocols implemented by the type.
+    for (auto *Protocol : SourceProtocols) {
+      if (Protocol == TargetProtocol)
+        return DynamicCastFeasibility::WillSucceed;
+    }
+
+    // Check all protocols implemented by the type extensions.
+    for(auto *Extension: SourceExtensions) {
+      SourceProtocols = Extension->getProtocols();
+      for (auto *Protocol: SourceProtocols) {
+        if (Protocol == TargetProtocol)
+          return DynamicCastFeasibility::WillSucceed;
+      }
+    }
+
+    // If it is a class and it can be proven that this class and its
+    // superclasses cannot be extended, then it is safe to proceed.
+    // No need to check this for structs, as they do not have any
+    // superclasses.
+    if (auto *CD = source.getClassOrBoundGenericClass()) {
+      if (canClassOrSuperclassesHaveExtensions(CD, isWholeModuleOpts))
+      return DynamicCastFeasibility::MaySucceed;
+    }
+
+    // If the source type is private or target protocol is private,
+    // then conformances cannot be changed at run-time, because only this
+    // file could have implemented them, but no conformances were found.
+    // Therefore it is safe to make a negative decision at compile-time.
+    if (SourceNominalTy->getAccessibility() == Accessibility::Private ||
+        TargetProtocol->getAccessibility() == Accessibility::Private) {
+      // This cast is always false. Replace it with a branch to the
+      // failure block.
+      return DynamicCastFeasibility::WillFail;
+    }
+
+    // If we are in a whole-module compilation and
+    // if the source type is internal or target protocol is internal,
+    // then conformances cannot be changed at run-time, because only this
+    // module could have implemented them, but no conformances were found.
+    // Therefore it is safe to make a negative decision at compile-time.
+    if (isWholeModuleOpts &&
+        (SourceNominalTy->getAccessibility() == Accessibility::Internal ||
+        TargetProtocol->getAccessibility() == Accessibility::Internal)) {
+      return DynamicCastFeasibility::WillFail;
+    }
+  }
+  return DynamicCastFeasibility::MaySucceed;
+}
+
 /// Try to classify the dynamic-cast relationship between two types.
 DynamicCastFeasibility
-swift::classifyDynamicCast(Module *M, CanType source, CanType target) {
+swift::classifyDynamicCast(Module *M,
+                           CanType source,
+                           CanType target,
+                           bool isSourceTypeExact,
+                           bool isWholeModuleOpts) {
   if (source == target) return DynamicCastFeasibility::WillSucceed;
 
   auto sourceObject = source.getAnyOptionalObjectType();
@@ -75,8 +170,18 @@ swift::classifyDynamicCast(Module *M, CanType source, CanType target) {
   // Assume that casts to or from existential types or involving
   // dependent types can always succeed.  This is over-conservative.
   if (source->hasArchetype() || source.isExistentialType() ||
-      target->hasArchetype() || target.isExistentialType())
+      target->hasArchetype() || target.isExistentialType()) {
+
+    auto *SourceNominalTy = source.getAnyNominal();
+
+    // Check conversions from non-protocol types into protocol types.
+    if (!source.isExistentialType() &&
+        SourceNominalTy &&
+        target.isExistentialType())
+      return classifyDynamicCastToProtocol(source, target, isWholeModuleOpts);
+
     return DynamicCastFeasibility::MaySucceed;
+  }
 
   // Metatype casts.
   while (auto sourceMetatype = dyn_cast<AnyMetatypeType>(source)) {
@@ -485,6 +590,13 @@ void swift::emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, Module *M,
 
   assert(src.getType().isAddress());
   assert(dest.getType().isAddress());
+
+  if (!src.getType().isExistentialType() && dest.getType().isExistentialType()) {
+    B.createUnconditionalCheckedCastAddr(
+        loc, consumption, src,
+        sourceType, dest, targetType);
+    return;
+  }
 
   Source source(src, sourceType, consumption);
   Target target(dest, targetType);

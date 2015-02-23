@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-combine"
 #include "SILCombiner.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
@@ -2202,113 +2203,37 @@ SILCombiner::visitCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
   return nullptr;
 }
 
-static bool canClassOrSuperclassesHaveExtensions(ClassDecl *CD,
-                                                 bool isWholeModuleOpts) {
-  while (CD) {
-    // Public classes can always be extended
-    if (CD->getAccessibility() == Accessibility::Public)
-      return true;
-
-    // Internal classes can be extended, if we are not in a
-    // whole-module-optimizations mode.
-    if (CD->getAccessibility() == Accessibility::Internal &&
-        !isWholeModuleOpts)
-      return true;
-
-    if (!CD->hasSuperclass())
-      break;
-
-    CD = CD->getSuperclass()->getClassOrBoundGenericClass();
-  }
-
-  return false;
-}
 
 SILInstruction *
 SILCombiner::
 visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
   // Try to determine the outcome of the cast from a known type
   // to a protocol type at compile-time.
-  if (!CCABI->getTargetType().isAnyExistentialType())
+  bool isSourceTypeExact = isa<MetatypeInst>(CCABI->getSrc());
+
+  // Check if we can statically predict the outcome of the cast.
+  auto Feasibility = classifyDynamicCast(CCABI->getModule().getSwiftModule(),
+                          CCABI->getSrc().getType().getSwiftRValueType(),
+                          CCABI->getDest().getType().getSwiftRValueType(),
+                          isSourceTypeExact,
+                          CCABI->getModule().isWholeModule());
+
+  if (Feasibility == DynamicCastFeasibility::WillFail) {
+    Builder->createBranch(CCABI->getLoc(), CCABI->getFailureBB());
+    eraseInstFromFunction(*CCABI);
     return nullptr;
-  auto SILSourceTy = CCABI->getSrc().getType().getObjectType();
-  auto SILTargetTy = CCABI->getDest().getType().getObjectType();
-  // Check if we can statically figure out the outcome of this cast.
-  auto *SourceNominalTy = CCABI->getSourceType().getAnyNominal();
-  if (SILSourceTy.isExistentialType() || !SourceNominalTy)
-    return nullptr;
-
-  if (SILTargetTy.isExistentialType()) {
-    auto *TargetProtocol = SILTargetTy.getSwiftRValueType().getAnyNominal();
-    auto SourceProtocols = SourceNominalTy->getProtocols();
-    auto SourceExtensions = SourceNominalTy->getExtensions();
-
-    // Check all protocols implemented by the type.
-    for (auto *Protocol : SourceProtocols) {
-      if (Protocol == TargetProtocol) {
-        auto *UCCA = Builder->createUnconditionalCheckedCastAddr(
-            CCABI->getLoc(), CCABI->getConsumptionKind(), CCABI->getSrc(),
-            CCABI->getSourceType(), CCABI->getDest(), CCABI->getTargetType());
-        (void)UCCA;
-        Builder->createBranch(CCABI->getLoc(), CCABI->getSuccessBB());
-        eraseInstFromFunction(*CCABI);
-        return nullptr;
-      }
-    }
-
-    // Check all protocols implemented by the type extensions.
-    for(auto *Extension: SourceExtensions) {
-      SourceProtocols = Extension->getProtocols();
-      for (auto *Protocol: SourceProtocols) {
-        if (Protocol == TargetProtocol) {
-          auto *UCCA = Builder->createUnconditionalCheckedCastAddr(
-              CCABI->getLoc(), CCABI->getConsumptionKind(), CCABI->getSrc(),
-              CCABI->getSourceType(), CCABI->getDest(), CCABI->getTargetType());
-          (void)UCCA;
-          Builder->createBranch(CCABI->getLoc(), CCABI->getSuccessBB());
-          eraseInstFromFunction(*CCABI);
-          return nullptr;
-        }
-      }
-    }
-
-    // If it is a class and it can be proven that this class and its
-    // superclasses cannot be extended, then it is safe to proceed.
-    // No need to check this for structs, as they do not have any
-    // superclasses.
-    if (auto *CD = CCABI->getSourceType().getClassOrBoundGenericClass()) {
-      if (canClassOrSuperclassesHaveExtensions(CD,
-               CCABI->getModule().isWholeModule()))
-        return nullptr;
-    }
-
-    // If the source type is private or target protocol is private,
-    // then conformances cannot be changed at run-time, because only this
-    // file could have implemented them, but no conformances were found.
-    // Therefore it is safe to make a negative decision at compile-time.
-    if (SourceNominalTy->getAccessibility() == Accessibility::Private ||
-        TargetProtocol->getAccessibility() == Accessibility::Private) {
-      // This cast is always false. Replace it with a branch to the
-      // failure block.
-      Builder->createBranch(CCABI->getLoc(), CCABI->getFailureBB());
-      eraseInstFromFunction(*CCABI);
-      return nullptr;
-    }
-
-    // If we are in a whole-module compilation and
-    // if the source type is internal or target protocol is internal,
-    // then conformances cannot be changed at run-time, because only this
-    // module could have implemented them, but no conformances were found.
-    // Therefore it is safe to make a negative decision at compile-time.
-    if (CCABI->getModule().isWholeModule() &&
-        (SourceNominalTy->getAccessibility() == Accessibility::Internal ||
-        TargetProtocol->getAccessibility() == Accessibility::Internal)) {
-      // This cast is always false. Replace it with a branch to the
-      // failure block.
-      Builder->createBranch(CCABI->getLoc(), CCABI->getFailureBB());
-      eraseInstFromFunction(*CCABI);
-      return nullptr;
-    }
   }
+
+  if (Feasibility == DynamicCastFeasibility::WillSucceed) {
+    if (CCABI->getSrc().getType() != CCABI->getDest().getType())
+      // Replace by unconditional_addr_cast, followed by a branch.
+      Builder->createUnconditionalCheckedCastAddr(
+          CCABI->getLoc(), CCABI->getConsumptionKind(), CCABI->getSrc(),
+          CCABI->getSourceType(), CCABI->getDest(), CCABI->getTargetType());
+    Builder->createBranch(CCABI->getLoc(), CCABI->getSuccessBB());
+    eraseInstFromFunction(*CCABI);
+    return nullptr;
+  }
+
   return nullptr;
 }

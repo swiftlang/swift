@@ -44,7 +44,9 @@ enum class DynamicCastFeasibility {
 /// types should be unlowered formal types.
 DynamicCastFeasibility classifyDynamicCast(Module *context,
                                            CanType sourceType,
-                                           CanType targetType);
+                                           CanType targetType,
+                                           bool isSourceTypeExact = false,
+                                           bool isWholdModuleOpts = false);
 
 SILValue emitSuccessfulScalarUnconditionalCast(SILBuilder &B, Module *M,
                                                SILLocation loc, SILValue value,

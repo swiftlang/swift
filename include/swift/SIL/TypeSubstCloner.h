@@ -248,8 +248,11 @@ protected:
     CanType formalTargetType = targetType.getSwiftRValueType();
 
     SILValue operand = getOpValue(inst->getOperand());
+    bool isSourceTypeExact = isa<MetatypeInst>(inst->getOperand());
 
-    switch (classifyDynamicCast(SwiftMod, formalSourceType, formalTargetType)) {
+    switch (classifyDynamicCast(SwiftMod, formalSourceType,
+                                formalTargetType, isSourceTypeExact,
+                                inst->getModule().isWholeModule())) {
     case DynamicCastFeasibility::WillSucceed: {
       SILValue result =
         emitSuccessfulScalarUnconditionalCast(B, SwiftMod, loc, operand,
@@ -288,7 +291,8 @@ protected:
     CanType sourceType = getOpASTType(inst->getSourceType());
     CanType targetType = getOpASTType(inst->getTargetType());
 
-    switch (classifyDynamicCast(SwiftMod, sourceType, targetType)) {
+    switch (classifyDynamicCast(SwiftMod, sourceType, targetType,
+                                false, inst->getModule().isWholeModule())) {
     case DynamicCastFeasibility::WillSucceed: {
       emitSuccessfulIndirectUnconditionalCast(B, SwiftMod, loc,
                                               inst->getConsumptionKind(),
@@ -337,7 +341,8 @@ protected:
     SILBasicBlock *failBB = getOpBasicBlock(inst->getFailureBB());
 
     SILBuilderWithPostProcess<TypeSubstCloner, 16> B(this, inst);
-    switch (classifyDynamicCast(SwiftMod, sourceType, targetType)) {
+    switch (classifyDynamicCast(SwiftMod, sourceType, targetType,
+                                false, inst->getModule().isWholeModule())) {
     case DynamicCastFeasibility::WillSucceed: {
       emitSuccessfulIndirectUnconditionalCast(B, SwiftMod, loc,
                                               inst->getConsumptionKind(),
@@ -393,13 +398,16 @@ protected:
     SILBuilderWithPostProcess<TypeSubstCloner, 16> B(this, inst);
 
     SILValue operand = getOpValue(inst->getOperand());
+    bool isSourceTypeExact = isa<MetatypeInst>(inst->getOperand());
 
     // The non-addr CheckedCastInsts can currently only be used for
     // types that don't have abstraction differences, so this is okay.
     CanType sourceType = loweredSourceType.getSwiftRValueType();
     CanType targetType = loweredTargetType.getSwiftRValueType();
 
-    switch (classifyDynamicCast(SwiftMod, sourceType, targetType)) {
+    switch (classifyDynamicCast(SwiftMod, sourceType,
+                                targetType, isSourceTypeExact,
+                                inst->getModule().isWholeModule())) {
     case DynamicCastFeasibility::WillSucceed: {
       // FIXME: this is a temporary workaround to the fact that
       // we're still using checked_cast_branch for address-only stuff.
