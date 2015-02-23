@@ -123,6 +123,22 @@ static SILType bindSuperclass(Module *Module,
   return SILType();
 }
 
+// Returns true if any generic types parameters of the class are
+// unbound.
+static bool isClassWithUnboundGenericParameters(SILType C, SILModule &M) {
+  auto *CD = C.getClassOrBoundGenericClass();
+  if (CD && CD->getGenericSignature()) {
+    auto InstanceTypeSubsts =
+        C.gatherAllSubstitutions(M);
+
+    if (!InstanceTypeSubsts.empty()) {
+      if (hasUnboundGenericTypes(InstanceTypeSubsts))
+        return true;
+    }
+  }
+  return false;
+}
+
 /// \brief Devirtualize an Apply instruction and a class member obtained
 /// using the class_method instruction into a direct call to a specific
 /// member of a specific class.
@@ -168,6 +184,12 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
   // Class F belongs to.
   CanType FSelfClass = GenCalleeType->getSelfParameter().getType();
   SILType ClassInstanceType = ClassInstance.getType();
+
+  // Bail if any generic types parameters of the class instance type are
+  // unbound.
+  // We cannot devirtualize unbound generic calls yet.
+  if (isClassWithUnboundGenericParameters(ClassInstanceType, AI->getModule()))
+    return nullptr;
 
   // *NOTE*:
   // Apply instruction substitutions are for the Member from a protocol or
@@ -912,6 +934,12 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
     // ClassInstance and InstanceType should match for devirtMethod to work.
     ClassInstance = ClassInstance.stripUpCasts();
   }
+
+  // Bail if any generic types parameters of the class instance type are
+  // unbound.
+  // We cannot devirtualize unbound generic calls yet.
+  if (isClassWithUnboundGenericParameters(InstanceType, AI->getModule()))
+    return nullptr;
 
   if (!CHA->hasKnownDirectSubclasses(CD)) {
     DEBUG(llvm::dbgs() << "Inserting monomorphic inline caches for class " <<
