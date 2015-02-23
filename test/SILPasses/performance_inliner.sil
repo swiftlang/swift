@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -inline -sil-inline-threshold=50 -sil-combine -verify | FileCheck %s
+// RUN: %target-sil-opt %s -inline -sil-inline-test-threshold=50 -sil-combine -verify | FileCheck %s
 
 sil_stage canonical
 
@@ -363,138 +363,107 @@ sil @trivial_objc_caller : $@thin () -> () {
 // 264 which is greater than our inline cost limit.
 sil @large_function : $@thin (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
+  // Each builtin counts as cost-value 1 for the sil-inline-test-threshold
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+  %c23 = builtin "assert_configuration"() : $Builtin.Int32
+  %c24 = builtin "assert_configuration"() : $Builtin.Int32
+  %c25 = builtin "assert_configuration"() : $Builtin.Int32
+  %c26 = builtin "assert_configuration"() : $Builtin.Int32
+  %c27 = builtin "assert_configuration"() : $Builtin.Int32
+  %c28 = builtin "assert_configuration"() : $Builtin.Int32
+  %c29 = builtin "assert_configuration"() : $Builtin.Int32
+  %c30 = builtin "assert_configuration"() : $Builtin.Int32
+  %c31 = builtin "assert_configuration"() : $Builtin.Int32
+  %c32 = builtin "assert_configuration"() : $Builtin.Int32
+  %c33 = builtin "assert_configuration"() : $Builtin.Int32
+  %c34 = builtin "assert_configuration"() : $Builtin.Int32
+  %c35 = builtin "assert_configuration"() : $Builtin.Int32
+  %c36 = builtin "assert_configuration"() : $Builtin.Int32
+  %c37 = builtin "assert_configuration"() : $Builtin.Int32
+  %c38 = builtin "assert_configuration"() : $Builtin.Int32
+  %c39 = builtin "assert_configuration"() : $Builtin.Int32
+  %c40 = builtin "assert_configuration"() : $Builtin.Int32
+  %c41 = builtin "assert_configuration"() : $Builtin.Int32
+  %c42 = builtin "assert_configuration"() : $Builtin.Int32
+  %c43 = builtin "assert_configuration"() : $Builtin.Int32
+  %c44 = builtin "assert_configuration"() : $Builtin.Int32
+  %c45 = builtin "assert_configuration"() : $Builtin.Int32
+  %c46 = builtin "assert_configuration"() : $Builtin.Int32
+  %c47 = builtin "assert_configuration"() : $Builtin.Int32
+  %c48 = builtin "assert_configuration"() : $Builtin.Int32
+  %c49 = builtin "assert_configuration"() : $Builtin.Int32
+  %c50 = builtin "assert_configuration"() : $Builtin.Int32
+  %c51 = builtin "assert_configuration"() : $Builtin.Int32
+  %c52 = builtin "assert_configuration"() : $Builtin.Int32
+  %c53 = builtin "assert_configuration"() : $Builtin.Int32
+  %c54 = builtin "assert_configuration"() : $Builtin.Int32
+  %c55 = builtin "assert_configuration"() : $Builtin.Int32
+  %c56 = builtin "assert_configuration"() : $Builtin.Int32
+  %c57 = builtin "assert_configuration"() : $Builtin.Int32
+  %c58 = builtin "assert_configuration"() : $Builtin.Int32
+  %c59 = builtin "assert_configuration"() : $Builtin.Int32
+  %c60 = builtin "assert_configuration"() : $Builtin.Int32
+  %c61 = builtin "assert_configuration"() : $Builtin.Int32
+  %c62 = builtin "assert_configuration"() : $Builtin.Int32
+  %c63 = builtin "assert_configuration"() : $Builtin.Int32
+  %c64 = builtin "assert_configuration"() : $Builtin.Int32
+  %c65 = builtin "assert_configuration"() : $Builtin.Int32
+  %c66 = builtin "assert_configuration"() : $Builtin.Int32
+  %c67 = builtin "assert_configuration"() : $Builtin.Int32
+  %c68 = builtin "assert_configuration"() : $Builtin.Int32
+  %c69 = builtin "assert_configuration"() : $Builtin.Int32
+  %c70 = builtin "assert_configuration"() : $Builtin.Int32
+  %c71 = builtin "assert_configuration"() : $Builtin.Int32
+  %c72 = builtin "assert_configuration"() : $Builtin.Int32
+  %c73 = builtin "assert_configuration"() : $Builtin.Int32
+  %c74 = builtin "assert_configuration"() : $Builtin.Int32
+  %c75 = builtin "assert_configuration"() : $Builtin.Int32
+  %c76 = builtin "assert_configuration"() : $Builtin.Int32
+  %c77 = builtin "assert_configuration"() : $Builtin.Int32
+  %c78 = builtin "assert_configuration"() : $Builtin.Int32
+  %c79 = builtin "assert_configuration"() : $Builtin.Int32
+  %c80 = builtin "assert_configuration"() : $Builtin.Int32
+  %c81 = builtin "assert_configuration"() : $Builtin.Int32
+  %c82 = builtin "assert_configuration"() : $Builtin.Int32
+  %c83 = builtin "assert_configuration"() : $Builtin.Int32
+  %c84 = builtin "assert_configuration"() : $Builtin.Int32
+  %c85 = builtin "assert_configuration"() : $Builtin.Int32
+  %c86 = builtin "assert_configuration"() : $Builtin.Int32
+  %c87 = builtin "assert_configuration"() : $Builtin.Int32
+  %c88 = builtin "assert_configuration"() : $Builtin.Int32
+  %c89 = builtin "assert_configuration"() : $Builtin.Int32
+  %c90 = builtin "assert_configuration"() : $Builtin.Int32
+  %c91 = builtin "assert_configuration"() : $Builtin.Int32
+  %c92 = builtin "assert_configuration"() : $Builtin.Int32
+  %c93 = builtin "assert_configuration"() : $Builtin.Int32
+  %c94 = builtin "assert_configuration"() : $Builtin.Int32
+  %c95 = builtin "assert_configuration"() : $Builtin.Int32
+  %c96 = builtin "assert_configuration"() : $Builtin.Int32
+  %c97 = builtin "assert_configuration"() : $Builtin.Int32
+  %c98 = builtin "assert_configuration"() : $Builtin.Int32
+  %c99 = builtin "assert_configuration"() : $Builtin.Int32
+  %c100 = builtin "assert_configuration"() : $Builtin.Int32
   %1 = tuple()
   return %1 : $()
 }
