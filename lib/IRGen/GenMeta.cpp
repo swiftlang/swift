@@ -1588,7 +1588,6 @@ namespace {
 #define BEGIN_METADATA_SEARCHER_0(SEARCHER, DECLKIND)                   \
   struct SEARCHER                                                       \
     : MetadataSearcher<DECLKIND##MetadataScanner<SEARCHER>> {           \
-    using super = MetadataSearcher;                                     \
     SEARCHER(IRGenModule &IGM, DECLKIND##Decl *target)                  \
       : MetadataSearcher(IGM, target) {}
 #define BEGIN_METADATA_SEARCHER_1(SEARCHER, DECLKIND, TYPE_1, NAME_1)   \
