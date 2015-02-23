@@ -64,11 +64,6 @@ module MissingHeader {
   header "this-header-does-not-exist.h"
 }
 
-module ObjCEnumExtras {
-  header "ObjCEnumExtras.h"
-  export *
-}
-
 module ObjCIRExtras {
   header "ObjCIRExtras.h"
   export *

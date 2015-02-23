@@ -884,105 +884,6 @@ static FuncDecl *makeEnumRawValueGetter(EnumDecl *enumDecl,
   return getterDecl;
 }
 
-/// Add a converting initializer from \p otherEnum to \p importedEnum.
-///
-/// \code
-/// init!(_ value: OtherEnum) {
-///   self.init(rawValue: RawType(value.rawValue))
-/// }
-/// \endcode
-static void makeAndAddConvertingInitializer(ClangImporter::Implementation &Impl,
-                                            NominalTypeDecl *importedEnum,
-                                            const clang::EnumDecl *otherEnum) {
-  auto *importedOther =
-      dyn_cast_or_null<NominalTypeDecl>(Impl.importDecl(otherEnum));
-  if (!importedOther)
-    return;
-
-  ASTContext &C = Impl.SwiftContext;
-  auto selfTy = importedEnum->getDeclaredTypeInContext();
-  auto metaTy = MetatypeType::get(selfTy);
-
-  // Set up the parameters.
-  VarDecl *selfDecl = createSelfDecl(importedEnum, false);
-  Pattern *selfPattern = createTypedNamedPattern(selfDecl);
-
-  auto param = new (C) ParamDecl(/*let*/ true,
-                                 SourceLoc(), Identifier(),
-                                 SourceLoc(), C.Id_value,
-                                 importedOther->getDeclaredType(),
-                                 importedEnum);
-  Pattern *paramPattern = createTypedNamedPattern(param);
-  paramPattern = new (C) ParenPattern(SourceLoc(), paramPattern, SourceLoc());
-  paramPattern->setType(ParenType::get(C, param->getType()));
-
-  /// Create the initializer itself.
-  auto optionality =
-      isa<EnumDecl>(importedEnum) ? OTK_ImplicitlyUnwrappedOptional : OTK_None;
-  DeclName name(C, C.Id_init, { Identifier() });
-  auto *initDecl = new (C) ConstructorDecl(name, SourceLoc(),
-                                           optionality, SourceLoc(),
-                                           selfPattern, paramPattern,
-                                           nullptr, importedEnum);
-  initDecl->setImplicit();
-  initDecl->setAccessibility(Accessibility::Public);
-
-  // Set the type.
-  auto resultTy = selfTy;
-  if (optionality != OTK_None)
-    resultTy = OptionalType::get(optionality, resultTy);
-  auto fnTy = FunctionType::get(paramPattern->getType(), resultTy);
-  auto allocFnTy = FunctionType::get(metaTy, fnTy);
-  auto initFnTy = FunctionType::get(selfTy, fnTy);
-  initDecl->setType(allocFnTy);
-  initDecl->setInitializerType(initFnTy);
-
-  // Construct the body.
-  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
-  auto selfRaw = importedEnum->lookupDirect(C.Id_rawValue).front();
-
-  auto paramRef = new (C) DeclRefExpr(param, SourceLoc(), /*implicit*/true);
-  auto paramRaw = importedOther->lookupDirect(C.Id_rawValue).front();
-  auto paramRawRef = new (C) MemberRefExpr(paramRef, SourceLoc(), paramRaw,
-                                           SourceLoc(), /*implicit*/ true);
-
-  Expr *paramConverted = paramRawRef;
-  if (!paramRaw->getType()->isEqual(selfRaw->getType())) {
-    // Add a conversion between raw types if necessary.
-    auto rawTypeRef = TypeExpr::createImplicit(selfRaw->getType(), C);
-    auto initConvertRef = new (C) UnresolvedConstructorExpr(rawTypeRef,
-                                                            SourceLoc(),
-                                                            SourceLoc(),
-                                                            /*implicit*/true);
-    auto parenParamRaw = new (C) ParenExpr(SourceLoc(), paramRawRef,
-                                           SourceLoc(),
-                                           /*trailing closure=*/false);
-    parenParamRaw->setImplicit();
-    paramConverted = new (C) CallExpr(initConvertRef, parenParamRaw,
-                                      /*implicit=*/true);
-  }
-
-  // Finish constructing the body.
-  auto initRawParams = TupleExpr::createImplicit(C, paramConverted,
-                                                 C.Id_rawValue);
-
-  auto initRawRef = new (C) UnresolvedConstructorExpr(selfRef, SourceLoc(),
-                                                      SourceLoc(),
-                                                      /*implicit*/true);
-
-  auto initRawCall = new (C) CallExpr(initRawRef, initRawParams,
-                                      /*implicit=*/true);
-
-  auto rebindSelf = new (C) RebindSelfInConstructorExpr(initRawCall, selfDecl);
-
-  auto body = BraceStmt::create(C, SourceLoc(), {rebindSelf}, SourceLoc(),
-                                /*implicit*/ true);
-
-  initDecl->setBody(body);
-  importedEnum->addMember(initDecl);
-  C.addedExternalDecl(initDecl);
-}
-
 namespace {
   class CFPointeeInfo {
     bool IsValid;
@@ -1778,7 +1679,7 @@ namespace {
       ASTContext &cxt = Impl.SwiftContext;
       
       // Create the enum declaration and record it.
-      NominalTypeDecl *result = nullptr;
+      NominalTypeDecl *result;
       auto enumKind = Impl.classifyEnum(decl);
       switch (enumKind) {
       case EnumKind::Constants: {
@@ -2016,7 +1917,6 @@ namespace {
         break;
       }
       }
-      assert(result);
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
       // Import each of the enumerators.
@@ -2024,7 +1924,6 @@ namespace {
       bool addEnumeratorsAsMembers;
       switch (enumKind) {
       case EnumKind::Constants:
-        llvm_unreachable("handled above");
       case EnumKind::Unknown:
         addEnumeratorsAsMembers = false;
         break;
@@ -2033,43 +1932,21 @@ namespace {
         addEnumeratorsAsMembers = true;
         break;
       }
-
-      llvm::SmallSetVector<const clang::EnumDecl *, 4> otherEnumsUsedAsValues;
-      for (auto ec : decl->enumerators()) {
-        bool isAlias = false;
-
-        // If this enumerator is defined in terms of another enum, record that
-        // so that we can add a converting initializer later.
-        if (const clang::Expr *initExpr = ec->getInitExpr()) {
-          initExpr = initExpr->IgnoreParenCasts();
-          if (auto *constantRef = dyn_cast<clang::DeclRefExpr>(initExpr)) {
-            auto *constant = constantRef->getDecl();
-            if (auto *otherEC = dyn_cast<clang::EnumConstantDecl>(constant)) {
-              auto *otherDC = otherEC->getDeclContext();
-              if (otherDC != decl)
-                otherEnumsUsedAsValues.insert(cast<clang::EnumDecl>(otherDC));
-              else
-                isAlias = true;
-            }
-          }
-        }
-
+      
+      for (auto ec = decl->enumerator_begin(), ecEnd = decl->enumerator_end();
+           ec != ecEnd; ++ec) {
         Decl *enumeratorDecl;
         switch (enumKind) {
         case EnumKind::Constants:
-          llvm_unreachable("handled above");
         case EnumKind::Unknown:
-          enumeratorDecl = Impl.importDecl(ec);
+          enumeratorDecl = Impl.importDecl(*ec);
           break;
         case EnumKind::Options:
-          enumeratorDecl = importOptionConstant(ec, decl,
+          enumeratorDecl = importOptionConstant(*ec, decl,
                                                 cast<StructDecl>(result));
           break;
         case EnumKind::Enum:
-          // FIXME: Import alias enumerators using static var, instead of
-          // silently dropping them.
-          (void)isAlias;
-          enumeratorDecl = importEnumCase(ec, decl, cast<EnumDecl>(result));
+          enumeratorDecl = importEnumCase(*ec, decl, cast<EnumDecl>(result));
           break;
         }
         if (!enumeratorDecl)
@@ -2078,9 +1955,6 @@ namespace {
         if (addEnumeratorsAsMembers)
           result->addMember(enumeratorDecl);
       }
-
-      for (const clang::EnumDecl *otherEnum : otherEnumsUsedAsValues)
-        makeAndAddConvertingInitializer(Impl, result, otherEnum);
 
       // Add the type decl to ExternalDefinitions so that we can type-check
       // raw values and IRGen can emit metadata for it.
