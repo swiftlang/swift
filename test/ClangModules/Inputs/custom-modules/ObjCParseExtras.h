@@ -124,5 +124,5 @@ __weak id globalWeakVar;
 @end
 
 @interface DesignatedInitBase : DesignatedInitRoot
-- (instancetype)initDesignated __attribute__((objc_designated_initializer));
+- (instancetype)initWithInt:(NSInteger)value __attribute__((objc_designated_initializer));
 @end

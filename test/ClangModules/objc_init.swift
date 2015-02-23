@@ -155,9 +155,10 @@ class NonNullDefaultInitSubSub : NonNullDefaultInitSub {
 class DesignatedInitSub : DesignatedInitBase {
   var foo: Int?
 
-  override init(designated: ()) {}
+  override init(int: Int) {}
+}
 
-  class func testInheritedInit() -> DesignatedInitSub {
-    return DesignatedInitSub()
-  }
+class DesignedInitSubSub : DesignatedInitSub {
+  init(double: Double) { super.init(int: 0) } // okay
+  init(string: String) { super.init() } // expected-error {{must call a designated initializer of the superclass 'DesignatedInitSub'}}
 }

@@ -960,9 +960,13 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
   auto ctor = otherCtorRef->getDecl();
   if (!ctor->isDesignatedInit()) {
     if (!implicitlyGenerated) {
-      tc.diagnose(apply->getArg()->getLoc(), diag::chain_convenience_init,
-                  apply->getArg()->getType());
-      tc.diagnose(ctor, diag::convenience_init_here);
+      auto contextTy = fromCtor->getDeclContext()->getDeclaredTypeInContext();
+      if (auto classTy = contextTy->getClassOrBoundGenericClass()) {
+        assert(classTy->getSuperclass());
+        tc.diagnose(apply->getArg()->getLoc(), diag::chain_convenience_init,
+                    classTy->getSuperclass());
+        tc.diagnose(ctor, diag::convenience_init_here);
+      }
     }
     return true;
   }
