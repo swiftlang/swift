@@ -821,7 +821,7 @@ static bool diagnoseFailure(ConstraintSystem &cs,
   case Failure::IsNotOptional: {
     if (auto force = dyn_cast_or_null<ForceValueExpr>(anchor)) {
       // If there was an 'as' cast in the subexpression, note it.
-      if (auto cast = findForcedDowncast(tc.Context, force->getSubExpr())) {
+      if (auto *cast = findForcedDowncast(tc.Context, force->getSubExpr())) {
         tc.diagnose(force->getLoc(), diag::forcing_explicit_downcast,
                     failure.getFirstType())
           .highlight(cast->getLoc())

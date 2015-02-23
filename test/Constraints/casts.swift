@@ -195,10 +195,10 @@ func metatype_casts<T, U>(b: B.Type) {
 // <rdar://problem/17017851>
 func forcedDowncastToOptional(b: B) {
   var dOpt: D? = b as! D // expected-warning{{treating a forced downcast to 'D' as optional will never produce 'nil'}}
-  // expected-note@-1{{use 'as?' to perform a conditional downcast to 'D'}}{{22-22=?}}
+  // expected-note@-1{{use 'as?' to perform a conditional downcast to 'D'}}{{22-23=?}}
   // expected-note@-2{{add parentheses around the cast to silence this warning}}{{18-18=(}}{{25-25=)}}
   dOpt = b as! D // expected-warning{{treating a forced downcast to 'D' as optional will never produce 'nil'}}
-  // expected-note@-1{{use 'as?' to perform a conditional downcast to 'D'}}{{14-14=?}}
+  // expected-note@-1{{use 'as?' to perform a conditional downcast to 'D'}}{{14-15=?}}
   // expected-note@-2{{add parentheses around the cast to silence this warning}}{{10-10=(}}{{17-17=)}}
   dOpt = (b as! D)
 }

@@ -1177,16 +1177,14 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding,
       if (Binding->isConditional()) {
         auto exprType = solution.simplifyType(tc, expr->getType());
         if (!exprType->getAnyOptionalObjectType()) {
-          // Special-case diagnostics for 'as' downcasts that should have been
+          // Special-case diagnostics for 'as!' downcasts that should have been
           // 'as?' conditional downcasts.
           bool diagnosed = false;
-          if (auto forced = findForcedDowncast(tc.Context, expr)) {
+          if (auto *forced = findForcedDowncast(tc.Context, expr)) {
             tc.diagnose(forced->getLoc(),
                         diag::forced_downcast_should_be_conditional,
                         exprType)
-              .fixItInsert(Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
-                                                      forced->getLoc()),
-                           "?");
+              .fixItReplace(forced->getExclaimLoc(), "?");
             diagnosed = true;
           }
 
@@ -2220,7 +2218,7 @@ static Expr *lookThroughBridgeFromObjCCall(ASTContext &ctx, Expr *expr) {
 
 /// If the expression has the effect of a forced downcast, find the
 /// underlying forced downcast expression.
-ExplicitCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
+ForcedCheckedCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   expr = expr->getSemanticsProvidingExpr();
   
   // Simple case: forced checked cast.
@@ -2260,16 +2258,14 @@ ExplicitCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   auto sub = skipOptionalEvalAndBinds(expr);
   
   // If we have an explicit cast, we're done.
-  if (isa<ForcedCheckedCastExpr>(sub) || 
-      isa<ConditionalCheckedCastExpr>(sub))
-    return cast<ExplicitCastExpr>(sub);
+  if (auto *FCE = dyn_cast<ForcedCheckedCastExpr>(sub))
+    return FCE;
 
   // Otherwise, try to look through an implicit _forceBridgeFromObjectiveC() call.
   if (auto arg = lookThroughBridgeFromObjCCall(ctx, sub)) {
     sub = skipOptionalEvalAndBinds(arg);
-    if (isa<ForcedCheckedCastExpr>(sub) || 
-        isa<ConditionalCheckedCastExpr>(sub))
-      return cast<ExplicitCastExpr>(sub);
+    if (auto *FCE = dyn_cast<ForcedCheckedCastExpr>(sub))
+      return FCE;
   }
 
   return nullptr;
