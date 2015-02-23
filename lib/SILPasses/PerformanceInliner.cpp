@@ -721,6 +721,41 @@ bool SILPerformanceInliner::isProfitableToInline(ApplyInst *AI,
   return true;
 }
 
+/// Return true if inlining this call site into a cold block is profitable.
+static bool isProfitableInColdBlock(ApplyInst *AI) {
+  /// Always inline transparent calls.
+  if (AI->isTransparent())
+    return true;
+  
+  SILFunction *Callee = getReferencedFunction(AI);
+  
+  if (Callee->getInlineStrategy() == AlwaysInline)
+    return true;
+
+  // Testing with the TestThreshold disables inlining into cold blocks.
+  if (TestThreshold >= 0)
+    return false;
+  
+  unsigned CalleeCost = 0;
+  
+  for (SILBasicBlock &Block : *Callee) {
+    for (SILInstruction &I : Block) {
+      auto ICost = instructionInlineCost(I);
+      CalleeCost += (unsigned)ICost;
+    }
+  }
+
+  if (CalleeCost > TrivialFunctionThreshold) {
+    return false;
+  }
+  
+  DEBUG(llvm::dbgs() << "        YES: ready to inline into cold block, cost:"
+        << CalleeCost << "\n");
+  return true;
+}
+
+
+
 /// \brief Attempt to inline all calls smaller than our threshold.
 /// returns True if a function was inlined.
 bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
@@ -824,10 +859,11 @@ void SILPerformanceInliner::visitColdBlocks(SmallVectorImpl<ApplyInst *> &
     for (SILInstruction &I : *block) {
       if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
         auto *Callee = getEligibleFunction(AI);
-        if (Callee && (Callee->getInlineStrategy() == AlwaysInline ||
-                       AI->isTransparent())) {
-          DEBUG(llvm::dbgs() << "    mandatory inline in cold block:" <<  *AI);
-          CallSitesToInline.push_back(AI);
+        if (Callee) {
+          if (isProfitableInColdBlock(AI)) {
+            DEBUG(llvm::dbgs() << "    inline in cold block:" <<  *AI);
+            CallSitesToInline.push_back(AI);
+          }
         }
       }
     }
