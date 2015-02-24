@@ -719,6 +719,11 @@ ERROR(expected_expr_return,stmt_parsing,PointsToFirstBadToken,
 // If/While Conditions
 ERROR(expected_expr_conditional_letbinding,stmt_parsing,none,
       "expected 'let' or 'var' in conditional", ())
+ERROR(expected_expr_conditional_letbinding_bool_conditions,stmt_parsing,none,
+      "expected 'let' or 'var' in conditional; "
+      "use '&&' to join boolean conditions", ())
+ERROR(expected_simple_identifier_pattern,stmt_parsing,none,
+      "expected simple identifier pattern in optional binding condition", ())
 ERROR(expected_expr_conditional_var,stmt_parsing,PointsToFirstBadToken,
       "expected expression after '=' in conditional binding", ())
 ERROR(expected_expr_conditional_where,stmt_parsing,PointsToFirstBadToken,
