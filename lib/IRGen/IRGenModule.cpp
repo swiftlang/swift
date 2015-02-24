@@ -512,9 +512,6 @@ static int pointerPODSortComparator(T * const *lhs, T * const *rhs) {
 }
 
 void IRGenModule::emitAutolinkInfo() {
-  // FIXME: This constant should be vended by LLVM somewhere.
-  static const char * const LinkerOptionsFlagName = "Linker Options";
-
   // Remove duplicates.
   llvm::SmallPtrSet<llvm::Metadata*, 4> knownAutolinkEntries;
   AutolinkEntries.erase(std::remove_if(AutolinkEntries.begin(),
@@ -525,9 +522,46 @@ void IRGenModule::emitAutolinkInfo() {
                                        }),
                         AutolinkEntries.end());
 
-  llvm::LLVMContext &ctx = Module.getContext();
-  Module.addModuleFlag(llvm::Module::AppendUnique, LinkerOptionsFlagName,
-                       llvm::MDNode::get(ctx, AutolinkEntries));
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::MachO: {
+    // FIXME: This constant should be vended by LLVM somewhere.
+    static const char * const LinkerOptionsFlagName = "Linker Options";
+
+    llvm::LLVMContext &ctx = Module.getContext();
+    Module.addModuleFlag(llvm::Module::AppendUnique, LinkerOptionsFlagName,
+                         llvm::MDNode::get(ctx, AutolinkEntries));
+
+    break;
+  }
+  case llvm::Triple::ELF: {
+    // Merge the entries into null-separated string.
+    llvm::SmallString<64> EntriesString;
+    for (auto &EntryNode : AutolinkEntries) {
+      const llvm::MDNode *MD = cast<llvm::MDNode>(EntryNode);
+      for (auto &Entry : MD->operands()) {
+        const llvm::MDString *MS = cast<llvm::MDString>(Entry);
+        EntriesString += MS->getString();
+        EntriesString += '\0';
+      }
+    }
+    auto EntriesConstant = llvm::ConstantDataArray::getString(
+      LLVMContext, EntriesString, /*AddNull=*/false);
+
+    auto var = new llvm::GlobalVariable(*getModule(), 
+                                        EntriesConstant->getType(), true,
+                                        llvm::GlobalValue::PrivateLinkage,
+                                        EntriesConstant, 
+                                        "_swift1_autolink_entries");
+    var->setSection(".swift1_autolink_entries");
+    var->setAlignment(getPointerAlignment().getValue());
+
+    addUsedGlobal(var);
+    break;
+  }
+  default:
+    llvm_unreachable("Don't know how to emit autolink entries for "
+                     "the selected object format.");
+  }
 
   if (!Opts.ForceLoadSymbolName.empty()) {
     llvm::SmallString<64> buf;
