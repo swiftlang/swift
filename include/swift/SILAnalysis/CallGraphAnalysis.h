@@ -216,9 +216,25 @@ struct CallGraphSCC {
 };
 
 class CallGraph {
+  /// The module that this call graph belongs to.
+  SILModule &M;
+
+  /// The root nodes of the call graph. This consists of functions that are
+  /// definitions in our module currently. It can be expanded to only include
+  /// functions clearly visible from outside our compilation scope (i.e. ignore
+  /// private functions that don't escape).
   llvm::SmallVector<CallGraphNode *, 16> CallGraphRoots;
+
+  /// A map from a function to the function's node in the call graph.
   llvm::DenseMap<SILFunction *, CallGraphNode *> FunctionToNodeMap;
+
+  /// A map from an apply inst to its call edge in the call graph.
+  llvm::DenseMap<ApplyInst *, CallGraphEdge *> ApplyToEdgeMap;
+
+  /// A vector of SCCs in bottom up SCC order.
   llvm::SmallVector<CallGraphSCC *, 16> BottomUpSCCOrder;
+
+  /// A vector of functions in bottom up function order.
   std::vector<SILFunction *> BottomUpFunctionOrder;
 
   /// An allocator used by the callgraph.
@@ -233,6 +249,10 @@ public:
     return CallGraphRoots;
   }
 
+  CallGraphNode *getCallGraphNode(SILFunction *F) const {
+    return const_cast<CallGraph *>(this)->getCallGraphNode(F);
+  }
+
   CallGraphNode *getCallGraphNode(SILFunction *F) {
     auto Found = FunctionToNodeMap.find(F);
     if (Found == FunctionToNodeMap.end())
@@ -240,6 +260,19 @@ public:
 
     assert(Found->second && "Unexpected null call graph node in map!");
     return Found->second;
+  }
+
+  CallGraphEdge *getCallGraphEdge(ApplyInst *AI) {
+    auto Found = ApplyToEdgeMap.find(AI);
+    if (Found == ApplyToEdgeMap.end())
+      return nullptr;
+
+    assert(Found->second && "Unexpected null call graph edge in map!");
+    return Found->second;
+  }
+
+  CallGraphEdge *getCallGraphEdge(ApplyInst *AI) const {
+    return const_cast<CallGraph *>(this)->getCallGraphEdge(AI);
   }
 
   llvm::SmallVectorImpl<CallGraphSCC *> &getBottomUpSCCOrder() {

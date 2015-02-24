@@ -29,16 +29,16 @@ STATISTIC(NumAppliesWithoutEdges,
           "# of call sites without call graph edges");
 STATISTIC(NumAppliesOfBuiltins, "# of call sites calling builtins");
 
-CallGraph::CallGraph(SILModule *M, bool completeModule) {
+CallGraph::CallGraph(SILModule *Mod, bool completeModule) : M(*Mod) {
   // Build the initial call graph by creating a node for each
   // function, and an edge for each direct call to a free function.
   // TODO: Handle other kinds of applies.
 
   unsigned NodeOrdinal = 0;
-  for (auto &F : *M)
+  for (auto &F : M)
     addCallGraphNode(&F, NodeOrdinal++);
 
-  for (auto &F : *M)
+  for (auto &F : M)
     if (F.isDefinition())
       addEdges(&F);
 }
@@ -136,8 +136,8 @@ void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
 
   if (tryGetCalleeSet(AI->getCallee(), CalleeSet, Complete)) {
     auto *Edge = new (Allocator) CallGraphEdge(AI, CalleeSet, Complete);
+    ApplyToEdgeMap[AI] = Edge;
     CallerNode->addCalleeEdge(Edge);
-
     for (auto *CalleeNode : CalleeSet)
       CalleeNode->addCallerEdge(Edge);
 
