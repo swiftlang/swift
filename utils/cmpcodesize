@@ -1,0 +1,343 @@
+#!/usr/bin/env ruby
+
+def die(msg)
+	STDERR.puts(msg)
+	exit 1
+end
+
+def help
+	STDOUT.puts <<"END"
+cmpcodesize [options] <old-files> [--] <new-files>
+
+Compares code sizes of "new" files, taking "old" files as a reference.
+
+Options:
+    -a           Show sizes of additional sections
+    -c           Show functions by category
+    -l           List all functions (can be a very long list)
+
+Environment variables:
+    SWIFT_NEW_BUILDDIR   The old build-dir
+E.g. $HOME/swift-work/build/Ninja-ReleaseAssert+stdlib-Release/swift-macosx-x86_64
+    SWIFT_OLD_BUILDDIR   The new build-dir
+E.g. $HOME/swift-reference/build/Ninja-ReleaseAssert+stdlib-Release/swift-macosx-x86_64
+
+How to specify files:
+1) No files:
+    Compares codesize of the PerfTests_* executables and the swiftCore dylib in the new and old build-dirs.
+    Example:
+        cmpcodesize
+
+2) One ore more pathes relative to the build-dirs (can be a pattern):
+    Compares that files in the new and old build-dirs.
+    Aliases:
+        O          => bin/PerfTests_O
+        Ounchecked => bin/PerfTests_Ounchecked
+        Onone      => bin/PerfTests_Onone
+        dylib      => lib/swift/macosx/x86_64/libswiftCore.dylib
+    Examples:
+        cmpcodesize Onone
+        cmpcodesize benchmark/PerfTestSuite/O/*.o
+
+3) Two files:
+    Compares these two files (the first is the old file).
+    Example:
+        cmpcodesize test.o newversion.o
+
+4) Two lists of files, separated by '--':
+    Compares a set a files.
+    Example:
+        cmpcodesize olddir/*.o -- newdir/*.o
+
+5) One file (only available with the -l option):
+    Lists function sizes for that file
+    Example:
+        cmpcodesize -l test.o
+END
+end
+
+$Prefixes = {
+	# Cpp
+	"__Z" => "CPP",
+	"_swift" => "CPP",
+	"__swift" => "CPP",
+
+	# Objective-C
+	"+[" => "CPP",
+	"-[" => "CPP",
+
+	# Swift
+	"__TP"  => "Partial Apply",
+	"__TTW" => "Protocol Witness",
+	"__Tw"  => "Value Witness",
+	"__TM"  => "Type Metadata",
+	"__TF"  => "Swift Function",
+	"__TTS" => "Specialization",
+	"__TZF" => "Static Func"
+}
+
+def addFunction(sizes, function, startAddr, endAddr, groupByPrefix)
+	return if not function or not startAddr or not endAddr
+
+	size = endAddr - startAddr
+
+# puts("add function #{function}: #{size}")
+
+	if groupByPrefix
+		$Prefixes.each { |prefix, name|
+			if function.index(prefix) == 0
+				sizes[name] += size
+				return
+			end
+		}
+		sizes["Unknown"] += size
+	else
+		sizes[function] += size
+	end
+end
+
+def readSizes(sizes, fileName, functionDetails, groupByPrefix)
+	opts = functionDetails ? "-v -t" : ""
+	otool = `otool -l #{opts} #{fileName}`
+
+	sectName = nil
+	currFunc = nil
+	startAddr = nil
+	endAddr = nil
+
+	otool.split("\n").each { |line|
+		if line == "Section"
+			sectName = nil
+		elsif line =~ / sectname ([\S]+)/
+			sectName = $1
+		elsif line =~ / size ([\da-fx]+)/ and sectName and groupByPrefix
+			size = $1.to_i(16)
+			sizes[sectName] = size
+		elsif line =~ /^([^\/\s]+):$/
+			# A function header
+			funcName = $1
+			addFunction(sizes, currFunc, startAddr, endAddr, groupByPrefix)
+			currFunc = funcName
+			startAddr = nil
+			endAddr = nil
+		elsif line =~ /^([0-9a-f]+)\s/
+			# A disassembly line, starting with the hex address
+			addr = $1.to_i(16)
+			startAddr = addr if not startAddr
+			endAddr = addr
+		end
+	}
+	addFunction(sizes, currFunc, startAddr, endAddr, groupByPrefix)
+end
+
+def compareSizes(oldSizes, newSizes, nameKey, title)
+	oldSize = oldSizes[nameKey]
+	newSize = newSizes[nameKey]
+	if oldSize != nil and newSize != nil
+		perc = "%.1f" % ((1.0 - newSize.to_f / oldSize.to_f) * 100.0)
+		printf("%-26s%16s: %8d  %8d  %6s%%\n", title, nameKey, oldSize, newSize, perc)
+	end
+end
+
+def compareSizesOfFile(oldFile, newFile, allSections, listCategories)
+	oldSizes = Hash.new(0)
+	newSizes = Hash.new(0)
+	readSizes(oldSizes, oldFile, listCategories, true)
+	readSizes(newSizes, newFile, listCategories, true)
+
+	oldBase = File.basename(oldFile)
+	newBase = File.basename(newFile)
+	title = oldBase
+	title += "-#{newBase}" if oldBase != newBase
+	compareSizes(oldSizes, newSizes, "__text", title)
+	if listCategories
+		($Prefixes.values.uniq + ["Unknown"]).each { |detail|
+			compareSizes(oldSizes, newSizes, detail, "")
+		}
+	end
+	if allSections
+		sectionTitle = "    section"
+		compareSizes(oldSizes, newSizes, "__stubs", sectionTitle)
+		compareSizes(oldSizes, newSizes, "__const", sectionTitle)
+		compareSizes(oldSizes, newSizes, "__cstring", sectionTitle)
+		compareSizes(oldSizes, newSizes, "__objc_methname", sectionTitle)
+		compareSizes(oldSizes, newSizes, "__const", sectionTitle)
+		compareSizes(oldSizes, newSizes, "__objc_const", sectionTitle)
+		compareSizes(oldSizes, newSizes, "__data", sectionTitle)
+		compareSizes(oldSizes, newSizes, "__swift1_proto", sectionTitle)
+		compareSizes(oldSizes, newSizes, "__common", sectionTitle)
+		compareSizes(oldSizes, newSizes, "__bss", sectionTitle)
+	end
+end
+
+def listFunctionSizes(sizeArray)
+	sorted = sizeArray.sort { |a, b| a[1] <=> b[1] }
+	sorted.each { |pair|
+		name = pair[0]
+		size = pair[1]
+		printf("%8d %s\n", size, name)
+	}
+end
+
+def compareFunctionSizes(oldFiles, newFiles)
+	oldSizes = Hash.new(0)
+	newSizes = Hash.new(0)
+	oldFiles.each { |name|
+		readSizes(oldSizes, name, true, false)
+	}
+	newFiles.each { |name|
+		readSizes(newSizes, name, true, false)
+	}
+
+	onlyInFile1 = []
+	onlyInFile2 = []
+	inBoth = []
+
+	oldSizes.each { |func, oldSize|
+		newSize = newSizes[func]
+		if newSize != 0
+			inBoth.push([func, oldSize, newSize])
+		else
+			onlyInFile1.push([func, oldSize])
+		end
+	}
+	newSizes.each { |func, newSize|
+		oldSize = oldSizes[func]
+		if oldSize == 0
+			onlyInFile2.push([func, newSize])
+		end
+	}
+	if not onlyInFile1.empty?
+		puts("Only in old file(s)")
+		listFunctionSizes(onlyInFile1)
+		puts
+	end
+	if not onlyInFile2.empty?
+		puts("Only in new files(s)")
+		listFunctionSizes(onlyInFile2)
+		puts
+	end
+	if not inBoth.empty?
+		printf("%8s %8s %8s\n", "old", "new", "diff")
+		sorted = inBoth.sort { |a, b|
+			diffA = a[2] - a[1]
+			diffB =	b[2] - b[1]
+			if diffA != diffB
+				diffA <=> diffB
+			else
+				a[1] <=> b[1]
+			end
+		}
+		sorted.each { |triple|
+			func = triple[0]
+			oldSize = triple[1]
+			newSize = triple[2]
+			printf("%8d %8d %8d %s\n", oldSize, newSize, newSize - oldSize, func)
+		}
+	end
+
+end
+
+def main
+
+	allSections = false
+	listCategories = false
+	listFunctions = false
+	separatorFound = false
+	oldFileArgs = []
+	newFileArgs = []
+	curFiles = oldFileArgs
+	while not ARGV.empty?
+		arg = ARGV.delete_at(0)
+		if arg == "-a"
+			allSections = true
+		elsif arg == "-c"
+			listCategories = true
+		elsif arg == "-l"
+			listFunctions = true
+		elsif arg == "--"
+			curFiles = newFileArgs
+			separatorFound = true
+		elsif arg == "-h"
+			help
+			return
+		elsif arg =~ /^-/
+			die("Unknown option. Use -h to display usage.")
+		else
+			curFiles << arg
+		end
+	end
+
+	oldBuildDir = ENV["SWIFT_OLD_BUILDDIR"]
+	newBuildDir = ENV["SWIFT_NEW_BUILDDIR"]
+
+	if separatorFound
+		oldFiles = oldFileArgs
+		newFiles = newFileArgs
+	else
+		if oldFileArgs.empty?
+			die("Must specify file for the -l option") if listFunctions
+			die("$SWIFT_OLD_BUILDDIR not specified") if not oldBuildDir
+			die("$SWIFT_NEW_BUILDDIR not specified") if not newBuildDir
+			oldFileArgs = %w{ O Ounchecked Onone dylib }
+		end
+		oldFiles = []
+		newFiles = []
+		numExpanded = 0
+		oldFileArgs.each { |arg|
+			shortcuts = {
+				"O"          => "bin/PerfTests_O",
+				"Ounchecked" => "bin/PerfTests_Ounchecked",
+				"Onone"      => "bin/PerfTests_Onone",
+				"dylib"      => "lib/swift/macosx/x86_64/libswiftCore.dylib"
+			}
+			shortcuts.default = arg
+			file = shortcuts[arg]
+
+			if file !~ /^\.\.?\// and oldBuildDir and newBuildDir
+				oldExpanded = Dir.glob("#{oldBuildDir}/#{file}")
+				newExpanded = Dir.glob("#{newBuildDir}/#{file}")
+				if not oldExpanded.empty? and not newExpanded.empty?
+					oldFiles += oldExpanded
+					newFiles += newExpanded
+					numExpanded += 1
+				end
+			end
+		}
+		die("mix of expanded/not-expanded arguments") if numExpanded != 0 and numExpanded != oldFileArgs.size
+		if numExpanded == 0
+			die("too many arguments") if oldFileArgs.size > 2
+			oldFiles = oldFileArgs[0..0]
+			newFiles = oldFileArgs[1..1]
+		end
+	end
+	(oldFiles + newFiles).each { |file|
+		die("file #{file} not found") if not File.file?(file)
+	}
+
+	if listFunctions
+		STDERR.puts("Warning: options -a and -c ignored when using -l") if allSections or listCategories
+		if newFiles.empty?
+			sizes = Hash.new(0)
+			oldFiles.each { |file|
+				readSizes(sizes, file, true, false)
+			}
+			listFunctionSizes(sizes.to_a)
+		else
+			compareFunctionSizes(oldFiles, newFiles)
+		end
+	else
+		die("number of new files must be the same of old files") if oldFiles.size != newFiles.size
+
+		oldFiles.sort!
+		newFiles.sort!
+
+		printf("%-26s%16s  %8s  %8s  %s\n", "", "Section", "Old", "New", "Percent")
+		oldFiles.each_with_index { |oldFile, idx|
+			newFile = newFiles[idx]
+			compareSizesOfFile(oldFile, newFile, allSections, listCategories)
+		}
+	end
+end
+
+main
