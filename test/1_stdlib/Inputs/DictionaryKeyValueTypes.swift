@@ -223,7 +223,7 @@ class TestObjCKeyTy : NSObject, NSCopying, Printable {
   }
 
   override func isEqual(object: AnyObject!) -> Bool {
-    if let other = object {
+    if let other: AnyObject = object {
       if let otherObjcKey = other as? TestObjCKeyTy {
         return self.value == otherObjcKey.value
       }
@@ -304,7 +304,7 @@ class TestObjCEquatableValueTy : NSObject, Equatable, Printable {
   }
 
   override func isEqual(object: AnyObject!) -> Bool {
-    if let other = object {
+    if let other: AnyObject = object {
       if let otherObjcKey = other as? TestObjCEquatableValueTy {
         return self.value == otherObjcKey.value
       }
@@ -709,7 +709,7 @@ func slurpFastEnumerationOfNSEnumeratorFromSwift<
 ) {
   slurpFastEnumerationFromSwift(
     a, enumerator, &sink, maxItems: maxFastEnumerationItems)
-  while let value = enumerator.nextObject() {
+  while let value: AnyObject = enumerator.nextObject() {
     sink.put(value)
   }
 }
@@ -722,7 +722,7 @@ func slurpFastEnumerationOfNSEnumeratorFromSwift<
 ) {
   slurpFastEnumerationFromSwift(
     d, enumerator, &sink, maxItems: maxFastEnumerationItems)
-  while let key = enumerator.nextObject() {
+  while let key: AnyObject = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)!
     let kv = (key, value)
     sink.put(kv)
@@ -987,7 +987,7 @@ func slurpFastEnumerationOfNSEnumeratorFromSwift<
 ) {
   slurpFastEnumerationFromSwift(
     s, enumerator, &sink, maxItems: maxFastEnumerationItems)
-  while let value = enumerator.nextObject() {
+  while let value: AnyObject = enumerator.nextObject() {
     sink.put(value)
   }
 }

@@ -799,8 +799,8 @@ DictionaryTestSuite.test("COW.Fast.GenerateDoesNotReallocate") {
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
-  while let next = gen.next() {
-    pairs += [next]
+  while let (key, value) = gen.next() {
+    pairs += [(key, value)]
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
   assert(identity1 == unsafeBitCast(d, Word.self))
@@ -812,8 +812,18 @@ DictionaryTestSuite.test("COW.Slow.GenerateDoesNotReallocate") {
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
-  while let elt = gen.next() {
-    let kv = (elt.0.value, elt.1.value)
+  while let (key, value) = gen.next() {
+    // FIXME: This doesn't work (<rdar://problem/17751308> Can't +=
+    // with array literal of pairs)
+    // pairs += [(key.value, value.value)]
+
+    // FIXME: This doesn't work (<rdar://problem/17750582> generics over tuples)
+    // pairs.append((key.value, value.value))
+
+    // FIXME: This doesn't work (<rdar://problem/17751359>)
+    // pairs.append(key.value, value.value)
+
+    let kv = (key.value, value.value)
     pairs += [kv]
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
@@ -1939,8 +1949,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
-  while let elt = gen.next() {
-    let (key, value: AnyObject) = elt
+  while let (key, value: AnyObject) = gen.next() {
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
@@ -1960,8 +1969,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
-  while let kv = gen.next() {
-    pairs.append((kv.0.value, kv.1.value))
+  while let (key, value) = gen.next() {
+    let kv = (key.value, value.value)
+    pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
   // The following is not required by the GeneratorType protocol, but
@@ -2016,8 +2026,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
-  while let elt = gen.next() {
-    let (key, value : AnyObject) = elt
+  while let (key, value: AnyObject) = gen.next() {
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
@@ -2041,8 +2050,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
-  while let kv = gen.next() {
-    pairs.append((kv.0.value, kv.1.value))
+  while let (key, value) = gen.next() {
+    let kv = (key.value, value.value)
+    pairs.append(kv)
   }
   var expectedPairs = Array<(Int, Int)>()
   for i in 1...32 {
@@ -2069,8 +2079,7 @@ autoreleasepool {
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
-  while let kv = gen.next() {
-    let (key, value: AnyObject) = kv
+  while let (key, value: AnyObject) = gen.next() {
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
@@ -2096,8 +2105,9 @@ autoreleasepool {
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
-  while let kv = gen.next() {
-    pairs.append((kv.0.value, kv.1.value))
+  while let (key, value) = gen.next() {
+    let kv = (key.value, value.value)
+    pairs.append(kv)
   }
   var expectedPairs = [ (10, 1111), (20, 1111), (30, 1111), (40, 1111) ]
   assert(equalsUnordered(pairs, expectedPairs))
@@ -2260,8 +2270,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfDictionaries") {
     var d = a[i]
     var gen = d.generate()
     var pairs = Array<(Int, Int)>()
-    while let elt = gen.next() {
-      let (key, value: AnyObject) = elt
+    while let (key, value: AnyObject) = gen.next() {
       let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
       pairs.append(kv)
     }
@@ -2282,8 +2291,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfDictionaries") {
     var d = a[i]
     var gen = d.generate()
     var pairs = Array<(Int, Int)>()
-    while let kv = gen.next() {
-      pairs.append((kv.0.value, kv.1.value))
+    while let (key, value) = gen.next() {
+      let kv = (key.value, value.value)
+      pairs.append(kv)
     }
     var expectedPairs = [ (10, 1010 + i), (20, 1020 + i), (30, 1030 + i) ]
     assert(equalsUnordered(pairs, expectedPairs))
@@ -2344,7 +2354,7 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.NextObject") {
 
     var dataPairs = Array<(Int, Int)>()
     var identityPairs = Array<(UWord, UWord)>()
-    while let key = enumerator.nextObject() {
+    while let key: AnyObject = enumerator.nextObject() {
       let value: AnyObject = d.objectForKey(key)!
 
       let dataPair =
@@ -2468,7 +2478,7 @@ DictionaryTestSuite.test("BridgedToObjC.KeyValue_ValueTypesCustomBridged") {
   let enumerator = d.keyEnumerator()
 
   var pairs = Array<(Int, Int)>()
-  while let key = enumerator.nextObject() {
+  while let key: AnyObject = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)!
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
@@ -2575,7 +2585,7 @@ DictionaryTestSuite.test("BridgedToObjC.Key_ValueTypeCustomBridged") {
   let enumerator = d.keyEnumerator()
 
   var pairs = Array<(Int, Int)>()
-  while let key = enumerator.nextObject() {
+  while let key: AnyObject = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)!
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
@@ -2605,7 +2615,7 @@ DictionaryTestSuite.test("BridgedToObjC.Value_ValueTypeCustomBridged") {
   let enumerator = d.keyEnumerator()
 
   var pairs = Array<(Int, Int)>()
-  while let key = enumerator.nextObject() {
+  while let key: AnyObject = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)!
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
@@ -2648,7 +2658,7 @@ DictionaryTestSuite.test("BridgingRoundtrip") {
   let enumerator = d.keyEnumerator()
 
   var pairs = Array<(Int, Int)>()
-  while let key = enumerator.nextObject() {
+  while let key: AnyObject = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)!
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
@@ -2894,9 +2904,8 @@ DictionaryTestSuite.test("DictionaryDowncastConditionalEntryPoint") {
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
 
   // Successful downcast.
-  if let dCC =
-    _dictionaryDownCastConditional(d) as
-    Dictionary<TestObjCKeyTy, TestObjCValueTy>? {
+  if let dCC: Dictionary<TestObjCKeyTy, TestObjCValueTy>
+       = _dictionaryDownCastConditional(d) {
     assert(dCC.count == 3)
     var v = dCC[TestObjCKeyTy(10)]
     assert(v!.value == 1010)
@@ -2912,10 +2921,10 @@ DictionaryTestSuite.test("DictionaryDowncastConditionalEntryPoint") {
 
   // Unsuccessful downcast
   d["hello"] = 17
-  let dCC =
-    _dictionaryDownCastConditional(d) as
-    Dictionary<TestObjCKeyTy, TestObjCValueTy>?
-  expectEmpty(dCC)
+  if let dCC: Dictionary<TestObjCKeyTy, TestObjCValueTy>
+       = _dictionaryDownCastConditional(d) {
+    assert(false)
+  }
 }
 
 DictionaryTestSuite.test("DictionaryDowncastConditional") {
@@ -3054,9 +3063,8 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditionalEntryPoint") 
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
 
   // Successful downcast.
-  if let dCV =
-    _dictionaryBridgeFromObjectiveCConditional(d) as
-    Dictionary<TestObjCKeyTy, TestBridgedValueTy>? {
+  if let dCV: Dictionary<TestObjCKeyTy, TestBridgedValueTy>
+       = _dictionaryBridgeFromObjectiveCConditional(d) {
     assert(dCV.count == 3)
     var v = dCV[TestObjCKeyTy(10)]
     assert(v!.value == 1010)
@@ -3071,9 +3079,8 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditionalEntryPoint") 
   }
 
   // Successful downcast.
-  if let dVC =
-    _dictionaryBridgeFromObjectiveCConditional(d) as
-    Dictionary<TestBridgedKeyTy, TestObjCValueTy>? {
+  if let dVC: Dictionary<TestBridgedKeyTy, TestObjCValueTy>
+       = _dictionaryBridgeFromObjectiveCConditional(d) {
     assert(dVC.count == 3)
     var v = dVC[TestBridgedKeyTy(10)]
     assert(v!.value == 1010)
@@ -3088,9 +3095,8 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditionalEntryPoint") 
   }
 
   // Successful downcast.
-  if let dVV =
-    _dictionaryBridgeFromObjectiveCConditional(d) as
-    Dictionary<TestBridgedKeyTy, TestBridgedValueTy>? {
+  if let dVV: Dictionary<TestBridgedKeyTy, TestBridgedValueTy>
+       = _dictionaryBridgeFromObjectiveCConditional(d) {
     assert(dVV.count == 3)
     var v = dVV[TestBridgedKeyTy(10)]
     assert(v!.value == 1010)
@@ -3106,21 +3112,18 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditionalEntryPoint") 
 
   // Unsuccessful downcasts
   d["hello"] = 17
-
-  let dCV =
-    _dictionaryBridgeFromObjectiveCConditional(d) as
-    Dictionary<TestObjCKeyTy, TestBridgedValueTy>?
-  expectEmpty(dCV)
-
-  let dVC =
-    _dictionaryBridgeFromObjectiveCConditional(d) as
-    Dictionary<TestBridgedKeyTy, TestObjCValueTy>?
-  expectEmpty(dVC)
-
-  let dVV =
-    _dictionaryBridgeFromObjectiveCConditional(d) as
-    Dictionary<TestBridgedKeyTy, TestBridgedValueTy>?
-  expectEmpty(dVV)
+  if let dCV: Dictionary<TestObjCKeyTy, TestBridgedValueTy>
+       = _dictionaryBridgeFromObjectiveCConditional(d) {
+    assert(false)
+  }
+  if let dVC: Dictionary<TestBridgedKeyTy, TestObjCValueTy>
+       = _dictionaryBridgeFromObjectiveCConditional(d) {
+    assert(false)
+  }
+  if let dVV: Dictionary<TestBridgedKeyTy, TestBridgedValueTy>
+       = _dictionaryBridgeFromObjectiveCConditional(d) {
+    assert(false)
+  }
 }
 
 DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditional") {
