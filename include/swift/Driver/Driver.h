@@ -110,9 +110,10 @@ public:
   /// DriverKind determines how later arguments are parsed, as well as the
   /// allowable OutputInfo::Mode values.
   enum class DriverKind {
-    Interactive, // swift
-    Batch,       // swiftc
-    UpdateCode,  // swift-update
+    Interactive,     // swift
+    Batch,           // swiftc
+    UpdateCode,      // swift-update
+    AutolinkExtract, // swift-autolink-extract
   };
 
 private:

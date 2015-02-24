@@ -44,12 +44,14 @@ class ToolChain {
   mutable std::unique_ptr<Tool> LLDB;
   mutable std::unique_ptr<Tool> Linker;
   mutable std::unique_ptr<Tool> Dsymutil;
+  mutable std::unique_ptr<Tool> AutolinkExtract;
 
   Tool *getSwift() const;
   Tool *getMergeModule() const;
   Tool *getLLDB() const;
   Tool *getLinker() const;
   Tool *getDsymutil() const;
+  Tool *getAutolinkExtract() const;
 
 protected:
   ToolChain(const Driver &D, const llvm::Triple &T) : D(D), Triple(T) {}

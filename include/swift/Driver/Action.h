@@ -38,6 +38,7 @@ public:
     Input = 0,
     CompileJob,
     MergeModuleJob,
+    AutolinkExtractJob,
     REPLJob,
     LinkJob,
     GenerateDSYMJob,
@@ -173,6 +174,17 @@ public:
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::MergeModuleJob;
+  }
+};
+
+class AutolinkExtractJobAction : public JobAction {
+  virtual void anchor();
+public:
+  AutolinkExtractJobAction(ArrayRef<Action *> Inputs)
+      : JobAction(Action::AutolinkExtractJob, Inputs, types::TY_AutolinkFile) {}
+
+  static bool classof(const Action *A) {
+    return A->getKind() == Action::AutolinkExtractJob;
   }
 };
 

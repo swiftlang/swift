@@ -51,6 +51,10 @@ extern int frontend_main(ArrayRef<const char *> Args, const char *Argv0,
 extern int update_main(ArrayRef<const char *> Args, const char *Argv0,
                        void *MainAddr);
 
+/// Run 'swift-autolink-extract'.
+extern int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
+                                 void *MainAddr);
+
 int main(int argc_, const char **argv_) {
   // Print a stack trace if we signal out.
   llvm::sys::PrintStackTraceOnErrorSignal();
@@ -87,10 +91,17 @@ int main(int argc_, const char **argv_) {
   Diags.addConsumer(PDC);
 
   Driver TheDriver(Path, llvm::sys::path::stem(argv[0]), argv, Diags);
-  if (TheDriver.getDriverKind() == Driver::DriverKind::UpdateCode) {
+  switch (TheDriver.getDriverKind()) {
+  case Driver::DriverKind::UpdateCode:
     return update_main(TheDriver.getArgsWithoutProgramNameAndDriverMode(argv),
                        argv[0],
                        (void *)(intptr_t)getExecutablePath);
+  case Driver::DriverKind::AutolinkExtract:
+    return autolink_extract_main(
+      TheDriver.getArgsWithoutProgramNameAndDriverMode(argv),
+      argv[0], (void *)(intptr_t)getExecutablePath);
+  default:
+    break;
   }
 
   llvm::InitializeAllTargets();

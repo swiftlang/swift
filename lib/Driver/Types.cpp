@@ -73,6 +73,7 @@ bool types::isTextual(ID Id) {
   case types::TY_RawSIL:
   case types::TY_LLVM_IR:
   case types::TY_ObjCHeader:
+  case types::TY_AutolinkFile:
     return true;
   case types::TY_Image:
   case types::TY_Object:

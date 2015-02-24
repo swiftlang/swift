@@ -195,6 +195,7 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
       break;
     case types::TY_Swift:
     case types::TY_dSYM:
+    case types::TY_AutolinkFile:
     case types::TY_Dependencies:
     case types::TY_SwiftModuleDocFile:
     case types::TY_ClangModuleFile:
@@ -477,6 +478,25 @@ Job *Dsymutil::constructJob(const JobAction &JA,
                  Arguments);
 }
 
+Job *AutolinkExtract::constructJob(const JobAction &JA,
+                                   std::unique_ptr<JobList> Inputs,
+                                   std::unique_ptr<CommandOutput> Output,
+                                   const ActionList &InputActions,
+                                   const ArgList &Args,
+                                   const OutputInfo &OI) const {
+  assert(Output->getPrimaryOutputType() == types::TY_AutolinkFile);
+
+  ArgStringList Arguments;
+  addPrimaryInputsOfType(Arguments, *Inputs, types::TY_Object);
+  addInputsOfType(Arguments, InputActions, types::TY_Object);
+
+  Arguments.push_back("-o");
+  Arguments.push_back(Args.MakeArgString(Output->getPrimaryOutputFilename()));
+
+  return new Job(JA, *this, std::move(Inputs), std::move(Output), getPath(),
+                 Arguments);
+}
+
 /// Darwin Tools
 
 llvm::Triple::ArchType darwin::getArchTypeForDarwinArchName(StringRef Arch) {
@@ -718,7 +738,16 @@ Job *linux::Linker::constructJob(const JobAction &JA,
   Arguments.push_back("-Xlinker");
   Arguments.push_back(Args.MakeArgString(RuntimeLibPath));
 
+  // Always add the stdlib
   Arguments.push_back("-lswiftCore");
+
+  // Add any autolinking scripts to the arguments
+  for (const Job *Cmd : *Inputs) {
+    auto &OutputInfo = Cmd->getOutput();
+    if (OutputInfo.getPrimaryOutputType() == types::TY_AutolinkFile)
+      Arguments.push_back(Args.MakeArgString(
+        Twine("@") + OutputInfo.getPrimaryOutputFilename()));
+  }
 
   // Add the linker script that coalesces protocol conformance sections.
   Arguments.push_back("-Xlinker");

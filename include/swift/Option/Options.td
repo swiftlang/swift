@@ -23,6 +23,9 @@ include "llvm/Option/OptParser.td"
 // The option should be accepted by swift -frontend.
 def FrontendOption : OptionFlag;
 
+// The option should be accepted by swift-autolink-extract
+def AutolinkExtractOption : OptionFlag;
+
 // The option should not be accepted by the driver.
 def NoDriverOption : OptionFlag;
 
@@ -83,7 +86,8 @@ def driver_use_frontend_path : Separate<["-"], "driver-use-frontend-path">,
 def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc' or 'swift-update'">;
 
-def help : Flag<["-", "--"], "help">, Flags<[FrontendOption]>,
+def help : Flag<["-", "--"], "help">,
+  Flags<[FrontendOption, AutolinkExtractOption]>,
   HelpText<"Display available options">;
 def h : Flag<["-"], "h">, Alias<help>;
 def help_hidden : Flag<["-", "--"], "help-hidden">,
@@ -104,7 +108,7 @@ def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>;
 
 def o : JoinedOrSeparate<["-"], "o">,
-  Flags<[FrontendOption, NoInteractiveOption]>,
+  Flags<[FrontendOption, AutolinkExtractOption, NoInteractiveOption]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
 def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,

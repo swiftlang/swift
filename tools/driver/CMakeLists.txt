@@ -1,5 +1,6 @@
 add_swift_executable(swift
   driver.cpp
+  autolink_extract_main.cpp
   frontend_main.cpp
   update_main.cpp
   LINK_LIBRARIES
@@ -23,6 +24,10 @@ add_custom_command(TARGET swift POST_BUILD
 
 add_custom_command(TARGET swift POST_BUILD
     COMMAND "${CMAKE_COMMAND}" "-E" "create_symlink" "swift" "swift-update"
+    WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+
+add_custom_command(TARGET swift POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" "-E" "create_symlink" "swift" "swift-autolink-extract"
     WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 
 # If building as part of clang, make sure the headers are installed.
@@ -56,3 +61,10 @@ swift_install_in_component(compiler
 swift_install_in_component(compiler
     FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-update"
     DESTINATION "bin")
+
+if(SWIFT_HOST_VARIANT STREQUAL "LINUX")
+# No need for this on other platforms.
+  swift_install_in_component(compiler
+      FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-autolink-extract"
+      DESTINATION "bin")
+endif()

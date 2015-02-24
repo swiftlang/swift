@@ -36,6 +36,7 @@ CACHE_TOOL(Swift)
 CACHE_TOOL(MergeModule)
 CACHE_TOOL(LLDB)
 CACHE_TOOL(Dsymutil)
+CACHE_TOOL(AutolinkExtract)
 
 Tool *ToolChain::getLinker() const {
   if (!Linker)
@@ -53,6 +54,8 @@ Tool *ToolChain::selectTool(const JobAction &JA) const {
     return getLinker();
   case Action::GenerateDSYMJob:
     return getDsymutil();
+  case Action::AutolinkExtractJob:
+    return getAutolinkExtract();
   case Action::REPLJob:
     switch (cast<REPLJobAction>(JA).getRequestedMode()) {
     case REPLJobAction::Mode::Integrated:

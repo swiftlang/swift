@@ -105,6 +105,18 @@ public:
                             const OutputInfo &OI) const;
 };
 
+class LLVM_LIBRARY_VISIBILITY AutolinkExtract : public ToolchainTool {
+public:
+  explicit AutolinkExtract(const ToolChain &TC)
+    : ToolchainTool("swift-autolink-extract", TC) {}
+
+  virtual Job *constructJob(const JobAction &JA,
+                            std::unique_ptr<JobList> Inputs,
+                            std::unique_ptr<CommandOutput> Output,
+                            const ActionList &InputActions,
+                            const llvm::opt::ArgList &Args,
+                            const OutputInfo &OI) const;
+};
 
 namespace darwin {
 

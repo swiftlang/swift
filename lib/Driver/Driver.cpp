@@ -93,6 +93,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   .Case("swift", DriverKind::Interactive)
   .Case("swiftc", DriverKind::Batch)
   .Case("swift-update", DriverKind::UpdateCode)
+  .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
   .Default(None);
   
   if (Kind.hasValue())
@@ -1009,6 +1010,7 @@ void Driver::buildActions(const ToolChain &TC,
         if (OI.ShouldGenerateModule)
           break;
         SWIFT_FALLTHROUGH;
+      case types::TY_AutolinkFile:
       case types::TY_Object:
         // Object inputs are only okay if linking.
         if (OI.shouldLink())
@@ -1092,6 +1094,18 @@ void Driver::buildActions(const ToolChain &TC,
 
   if (OI.shouldLink()) {
     Action *LinkAction = new LinkJobAction(CompileActions, OI.LinkAction);
+
+    if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF) {
+      // On ELF platforms there's no built in autolinking mechanism, so we
+      // pull the info we need from the .o files directly and pass them as an
+      // argument input file to the linker.
+      Action *AutolinkExtractAction = new AutolinkExtractJobAction(CompileActions);
+      // Takes the same inputs as the linker, but doesn't own them.
+      AutolinkExtractAction->setOwnsInputs(false);
+      // And gives its output to the linker.
+      LinkAction->addInput(AutolinkExtractAction);
+    }
+
     if (MergeModuleAction) {
       // We have a MergeModuleJobAction; this needs to be an input to the
       // LinkJobAction. It shares inputs with the LinkAction, so tell it that it
@@ -1767,6 +1781,7 @@ void Driver::printHelp(bool ShowHidden) const {
     break;
   case DriverKind::Batch:
   case DriverKind::UpdateCode:
+  case DriverKind::AutolinkExtract:
     ExcludedFlagsBitmask |= options::NoBatchOption;
     break;
   }
