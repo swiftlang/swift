@@ -891,6 +891,7 @@ Types
   type ::= associated-type
   type ::= 'a' context identifier            // Type alias (DWARF only)
   type ::= 'b' type type                     // objc block function type
+  type ::= 'c' type type                     // C function pointer type
   type ::= 'F' type type                     // function type
   type ::= 'f' type type                     // uncurried function type
   type ::= 'G' type <type>+ '_'              // generic type application
@@ -1140,6 +1141,7 @@ Predefined Substitutions
 
 ::
 
+  known-module ::= 'SC'                      // C
   known-module ::= 'So'                      // Objective-C
   known-module ::= 'Ss'                      // Swift
   known-nominal-type ::= 'Sa'                // Swift.Array

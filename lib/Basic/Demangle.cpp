@@ -1680,18 +1680,10 @@ private:
       return demangleDeclarationName(Node::Kind::TypeAlias);
 
     if (c == 'b') {
-      NodePointer in_args = demangleType();
-      if (!in_args)
-        return nullptr;
-      NodePointer out_args = demangleType();
-      if (!out_args)
-        return nullptr;
-      NodePointer block = NodeFactory::create(Node::Kind::ObjCBlock);
-      NodePointer in_node = NodeFactory::create(Node::Kind::ArgumentTuple);
-      block->addChild(in_node);
-      in_node->addChild(in_args);
-      block->addChild(postProcessReturnTypeNode(out_args));
-      return block;
+      return demangleFunctionType(Node::Kind::ObjCBlock);
+    }
+    if (c == 'c') {
+      return demangleFunctionType(Node::Kind::CFunctionPointer);
     }
     if (c == 'D') {
       NodePointer type = demangleType();
@@ -2223,6 +2215,7 @@ private:
     case Node::Kind::Allocator:
     case Node::Kind::ArgumentTuple:
     case Node::Kind::AutoClosureType:
+    case Node::Kind::CFunctionPointer:
     case Node::Kind::Constructor:
     case Node::Kind::Deallocator:
     case Node::Kind::DeclContext:
@@ -3002,6 +2995,15 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::DynamicSelf:
     Printer << "Self";
     return;
+  case Node::Kind::CFunctionPointer: {
+    // TODO: spelling for C function pointer types
+    Printer << "@__c_function_pointer ";
+    NodePointer tuple = pointer->getChild(0);
+    NodePointer rettype = pointer->getChild(1);
+    print(tuple);
+    print(rettype);
+    return;
+  }
   case Node::Kind::ObjCBlock: {
     Printer << "@objc_block ";
     NodePointer tuple = pointer->getChild(0);

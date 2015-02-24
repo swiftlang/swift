@@ -1260,6 +1260,7 @@ void Mangler::mangleFunctionType(AnyFunctionType *fn,
   // type ::= 'F' type type (curried)
   // type ::= 'f' type type (uncurried)
   // type ::= 'b' type type (objc block)
+  // type ::= 'c' type type (c function pointer)
   // type ::= 'Xf' type type (thin)
   // type ::= 'K' type type (auto closure)
   //
@@ -1283,6 +1284,9 @@ void Mangler::mangleFunctionType(AnyFunctionType *fn,
   case AnyFunctionType::Representation::Thick:
     if (fn->isAutoClosure())
       Buffer << 'K';
+    // FIXME: proper representation for C function types
+    else if (fn->getAbstractCC() == AbstractCC::C)
+      Buffer << 'c';
     else
       Buffer << (uncurryLevel > 0 ? 'f' : 'F');
     break;

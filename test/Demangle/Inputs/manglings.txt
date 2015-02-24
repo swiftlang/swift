@@ -24,7 +24,9 @@ _TtVSs7CString ---> Swift.CString
 _TtCSo8NSObject ---> ObjectiveC.NSObject
 _TtO6Monads6Either ---> Monads.Either
 _TtbSiSu ---> @objc_block (Swift.Int) -> Swift.UInt
+_TtcSiSu ---> @__c_function_pointer (Swift.Int) -> Swift.UInt
 _TtbTSiSc_Su ---> @objc_block (Swift.Int, Swift.UnicodeScalar) -> Swift.UInt
+_TtcTSiSc_Su ---> @__c_function_pointer (Swift.Int, Swift.UnicodeScalar) -> Swift.UInt
 _TtFSiSu ---> (Swift.Int) -> Swift.UInt
 _TtKSiSu ---> @autoclosure (Swift.Int) -> Swift.UInt
 _TtfSiFScSu ---> (Swift.Int)(Swift.UnicodeScalar) -> Swift.UInt

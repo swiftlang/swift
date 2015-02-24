@@ -1002,6 +1002,11 @@ void Remangler::mangleObjCBlock(Node *node) {
   mangleChildNodes(node); // argument tuple, result type
 }
 
+void Remangler::mangleCFunctionPointer(Node *node) {
+  Out << 'c';
+  mangleChildNodes(node); // argument tuple, result type
+}
+
 void Remangler::mangleAutoClosureType(Node *node) {
   Out << 'K';
   mangleChildNodes(node); // argument tuple, result type
