@@ -483,8 +483,6 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
   bool isAlreadyInClosure = false;
   if (DC->isLocalContext()) {
     while (DC->getParent()->isLocalContext() && !isAlreadyInClosure) {
-      if (isa<FuncDecl>(DC))
-        isAlreadyInClosure = true;
       if (auto *closure = dyn_cast<AbstractClosureExpr>(DC))
         if (DiagnoseWalker::isClosureRequiringSelfQualification(closure))
           isAlreadyInClosure = true;
