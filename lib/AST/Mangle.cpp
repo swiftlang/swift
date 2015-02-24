@@ -1013,7 +1013,8 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     while (it == Archetypes.end()) {
       // This should be treated like an error, but we don't want
       // clients like lldb to crash because of corrupted input.
-      assert(DC && "empty decl context");
+      // FIXME: TEMPORARILY DISABLED (rdar://19937951+19773096).
+      // assert(DC && "empty decl context");
       if (!DC) return;
 
       // This Archetype comes from an enclosing context -- proceed to
