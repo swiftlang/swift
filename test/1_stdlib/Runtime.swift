@@ -1654,5 +1654,18 @@ BitTwiddlingTestSuite.test("_floorLog2") {
   expectEqual(_floorLog2(Int64.max), 62) // 63 minus 1 for sign bit.
 }
 
+class SomeSubclass: SomeClass {}
+
+var ObjCConformsToProtocolTestSuite = TestSuite("ObjCConformsToProtocol")
+
+ObjCConformsToProtocolTestSuite.test("cast/instance") {
+  expectTrue(SomeClass() is SomeObjCProto)
+  expectTrue(SomeSubclass() is SomeObjCProto)
+}
+ObjCConformsToProtocolTestSuite.test("cast/metatype") {
+  expectTrue(SomeClass.self is SomeObjCProto.Type)
+  expectTrue(SomeSubclass.self is SomeObjCProto.Type)
+}
+
 runAllTests()
 
