@@ -811,7 +811,7 @@ public:
         continue;
 
       // Now that we have our call graph, grab the CallSites of F.
-      auto CallSites = FNode->getKnownCallerCallSites();
+      auto CallSites = FNode->getPartialCallerEdgesApplies();
 
       // If this function is not called anywhere, for now don't do anything.
       //
@@ -823,7 +823,7 @@ public:
 
       // Check if we know the callgraph is complete with respect to this
       // function. In such a case, we don't need to generate the thunk.
-      bool CallerSetIsComplete = FNode->isCallerSetComplete();
+      bool CallerSetIsComplete = FNode->isCallerEdgesComplete();
 
       // Otherwise, try to optimize the function signature of F.
       Changed |= optimizeFunctionSignature(Allocator, RCIA, &F, CallSites,

@@ -54,7 +54,7 @@ public:
 
 private:
   // The call site represented by this call graph edge.
-  ApplyInst *CallSite;
+  ApplyInst *TheApply;
 
   // The set of functions potentially called from this call site. This
   // might include functions that are not actually callable based on
@@ -65,8 +65,8 @@ private:
 public:
   /// Create a call graph edge for a call site where we will fill in
   /// the set of potentially called functions later.
-  CallGraphEdge(ApplyInst *CallSite, CalleeSetType &KnownCallees, bool Complete)
-    : CallSite(CallSite),
+  CallGraphEdge(ApplyInst *TheApply, CalleeSetType &KnownCallees, bool Complete)
+    : TheApply(TheApply),
       // FIXME: Do not allocate memory for the singleton callee case.
       CalleeSet(new CalleeSetType, Complete) {
 
@@ -80,18 +80,18 @@ public:
     delete CalleeSet.getPointer();
   }
 
-  const ApplyInst *getCallSite() const {
-    return CallSite;
+  const ApplyInst *getApply() const {
+    return TheApply;
   }
 
   /// Return a callee set that is known to be complete.
-  const CalleeSetType &getCalleeSet() const {
+  const CalleeSetType &getCompleteCalleeSet() const {
     assert(isCalleeSetComplete() && "Attempt to get an incomplete call set!");
     return *CalleeSet.getPointer();
   }
 
   /// Return a callee set that is not known to be complete.
-  const CalleeSetType &getKnownCalleeSet() {
+  const CalleeSetType &getPartialCalleeSet() {
     return *CalleeSet.getPointer();
   }
 
@@ -109,10 +109,10 @@ public:
   }
 };
 
-/// A helper method for use with ArrayRefView. Just returns the CallSite
+/// A helper method for use with ArrayRefView. Just returns the
 /// ApplyInst of E.
 inline const ApplyInst *getEdgeApplyInst(CallGraphEdge * const &E) {
-  return E->getCallSite();
+  return E->getApply();
 }
 
 class CallGraphNode {
@@ -122,25 +122,25 @@ class CallGraphNode {
   /// The call graph node ordinal within the SILModule.
   const unsigned Ordinal;
 
-  /// The known call sites that call into this function. The
-  /// caller's call graph node owns these.
-  llvm::SmallVector<CallGraphEdge *, 4> Callers;
+  /// Edges representing the known call sites that could call into
+  /// this function.
+  llvm::SmallVector<CallGraphEdge *, 4> CallerEdges;
 
-  /// The call sites within this function. This CallGraph node owns these.
-  llvm::SmallVector<CallGraphEdge *, 4> CallSites;
+  /// Edges representing the call sites within this function.
+  llvm::SmallVector<CallGraphEdge *, 4> CalleeEdges;
 
   /// Do we know all the potential callers of this function? We initialize this
   /// to !canHaveIndirectUses(F) optimistically and if we find any use that we
   /// can not prove does not cause a reference to a function_ref to escape in a
   /// we set this to false.
-  bool CallerSetComplete;
+  bool CallerEdgesComplete;
 
 public:
   friend class CallGraph;
 
   CallGraphNode(SILFunction *Function, unsigned Ordinal)
     : Function(Function), Ordinal(Ordinal),
-      CallerSetComplete(!canHaveIndirectUses(Function)) {
+      CallerEdgesComplete(!canHaveIndirectUses(Function)) {
     assert(Function &&
            "Cannot build a call graph node with a null function pointer!");
   }
@@ -151,10 +151,10 @@ public:
 
   /// Get the complete set of edges associated with call sites that can call
   /// into this function.
-  const llvm::SmallVectorImpl<CallGraphEdge *> &getCallers() const {
-    assert(isCallerSetComplete() &&
+  const llvm::SmallVectorImpl<CallGraphEdge *> &getCompleteCallerEdges() const {
+    assert(isCallerEdgesComplete() &&
            "Attempt to get an incomplete caller set!");
-    return Callers;
+    return CallerEdges;
   }
 
   // An adaptor that is used to show all of the apply insts which call the
@@ -163,31 +163,31 @@ public:
                                           getEdgeApplyInst>;
 
   /// Return the set of apply insts that can call into this function.
-  CallerCallSiteList getCallerCallSites() const {
-    return CallerCallSiteList(getCallers());
+  CallerCallSiteList getCompleteCallerEdgesApplies() const {
+    return CallerCallSiteList(getCompleteCallerEdges());
   }
 
-  /// Get the known set of call graph edges that represent calls into this
-  /// function.
-  llvm::SmallVectorImpl<CallGraphEdge *> &getKnownCallers() {
-    return Callers;
+  /// Get the known set of call graph edges that represent possible
+  /// calls into this function.
+  llvm::SmallVectorImpl<CallGraphEdge *> &getPartialCallerEdges() {
+    return CallerEdges;
   }
 
   /// Return the known set of apply insts that can call into this function.
-  CallerCallSiteList getKnownCallerCallSites() {
-    return CallerCallSiteList(getKnownCallers());
+  CallerCallSiteList getPartialCallerEdgesApplies() {
+    return CallerCallSiteList(getPartialCallerEdges());
   }
 
-  /// Get the known set of call sites in this function.
-  llvm::SmallVectorImpl<CallGraphEdge *> &getCallSites() {
-    return CallSites;
+  /// Get the set of call sites in this function.
+  llvm::SmallVectorImpl<CallGraphEdge *> &getCalleeEdges() {
+    return CalleeEdges;
   }
 
   /// Do we know that the set of call sites is complete - i.e. that
   /// there is no other place that we can call from that can reach
   /// this function?
-  bool isCallerSetComplete() const {
-    return CallerSetComplete;
+  bool isCallerEdgesComplete() const {
+    return CallerEdgesComplete;
   }
 
   unsigned getOrdinal() const {
@@ -196,18 +196,18 @@ public:
 
 private:
   /// Mark a set of callers as known to not be complete.
-  void markCallerSetIncomplete() {
-    CallerSetComplete = false;
+  void markCallerEdgesIncomplete() {
+    CallerEdgesComplete = false;
   }
 
   /// Add an edge representing a call site within this function.
-  void addCallSite(CallGraphEdge *CallSite) {
-    CallSites.push_back(CallSite);
+  void addCalleeEdge(CallGraphEdge *CallSite) {
+    CalleeEdges.push_back(CallSite);
   }
 
   /// Add an edge representing a call site that calls into this function.
-  void addCaller(CallGraphEdge *CallerCallSite) {
-    Callers.push_back(CallerCallSite);
+  void addCallerEdge(CallGraphEdge *CallerCallSite) {
+    CallerEdges.push_back(CallerCallSite);
   }
 };
 

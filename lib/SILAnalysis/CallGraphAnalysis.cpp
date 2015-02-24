@@ -24,10 +24,10 @@ using namespace swift;
 #define DEBUG_TYPE "call-graph"
 
 STATISTIC(NumCallGraphNodes, "# of call graph nodes created");
-STATISTIC(NumCallSitesWithEdges, "# of call sites with edges");
-STATISTIC(NumCallSitesWithoutEdges,
+STATISTIC(NumAppliesWithEdges, "# of call sites with edges");
+STATISTIC(NumAppliesWithoutEdges,
           "# of call sites without call graph edges");
-STATISTIC(NumCallSitesOfBuiltins, "# of call sites calling builtins");
+STATISTIC(NumAppliesOfBuiltins, "# of call sites calling builtins");
 
 CallGraph::CallGraph(SILModule *M, bool completeModule) {
   // Build the initial call graph by creating a node for each
@@ -110,7 +110,7 @@ bool CallGraph::tryGetCalleeSet(SILValue Callee,
     return false;
 
   case ValueKind::BuiltinInst:
-    ++NumCallSitesOfBuiltins;
+    ++NumAppliesOfBuiltins;
     return false;
 
   case ValueKind::PartialApplyInst:
@@ -135,19 +135,20 @@ void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
   bool Complete = false;
 
   if (tryGetCalleeSet(AI->getCallee(), CalleeSet, Complete)) {
-    auto *CallSite = new (EdgeAllocator.Allocate()) CallGraphEdge(AI, CalleeSet,
-                                                                  Complete);
-    CallerNode->addCallSite(CallSite);
+    auto *Edge = new (EdgeAllocator.Allocate()) CallGraphEdge(AI, CalleeSet,
+                                                              Complete);
+    CallerNode->addCalleeEdge(Edge);
+
     for (auto *CalleeNode : CalleeSet)
-      CalleeNode->addCaller(CallSite);
+      CalleeNode->addCallerEdge(Edge);
 
     // TODO: Compute this from the call graph itself after stripping
     //       unreachable nodes from graph.
-    ++NumCallSitesWithEdges;
+    ++NumAppliesWithEdges;
     return;
   }
 
-  ++NumCallSitesWithoutEdges;
+  ++NumAppliesWithoutEdges;
 }
 
 void CallGraph::addEdges(SILFunction *F) {
@@ -172,7 +173,7 @@ void CallGraph::addEdges(SILFunction *F) {
           // as being incomplete.
           if (!hasAllApplyUsers) {
             auto *CalleeNode = getCallGraphNode(CalleeFn);
-            CalleeNode->markCallerSetIncomplete();
+            CalleeNode->markCallerEdgesIncomplete();
           }
         }
       }
@@ -214,9 +215,9 @@ public:
 
     DFSStack.insert(Node);
 
-    for (auto *CallSite : Node->getCallSites()) {
+    for (auto *ApplyEdge : Node->getCalleeEdges()) {
       llvm::SmallVector<CallGraphNode *, 4> OrderedNodes;
-      orderCallees(CallSite->getKnownCalleeSet(), OrderedNodes);
+      orderCallees(ApplyEdge->getPartialCalleeSet(), OrderedNodes);
 
       for (auto *CalleeNode : OrderedNodes) {
         if (DFSNum.find(CalleeNode) == DFSNum.end()) {
