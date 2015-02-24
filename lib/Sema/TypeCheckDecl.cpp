@@ -1215,8 +1215,7 @@ static bool contextAllowsPatternBindingWithoutVariables(DeclContext *dc) {
 
 /// Validate the given pattern binding declaration.
 static void validatePatternBindingDecl(TypeChecker &tc,
-                                       PatternBindingDecl *binding,
-                                       TypeResolutionOptions extraOptions = {}){
+                                       PatternBindingDecl *binding) {
   // If the pattern already has a type, we're done.
   if (binding->getPattern()->hasType() || binding->isBeingTypeChecked())
     return;
@@ -1260,7 +1259,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   // If the pattern didn't get a type, it's because we ran into some
   // unknown types along the way. We'll need to check the initializer.
   if (!binding->getPattern()->hasType()) {
-    if (tc.typeCheckBinding(binding, extraOptions)) {
+    if (tc.typeCheckBinding(binding)) {
       setBoundVarsTypeError(binding->getPattern(), tc.Context);
       binding->setInvalid();
       binding->getPattern()->setType(ErrorType::get(tc.Context));
@@ -6613,13 +6612,13 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
 
 bool TypeChecker::typeCheckConditionalPatternBinding(PatternBindingDecl *PBD,
                                                      DeclContext *dc) {
-  validatePatternBindingDecl(*this, PBD, TR_ForIn_IfLetVariable);
+  validatePatternBindingDecl(*this, PBD);
   if (PBD->isInvalid())
     return true;
   
   assert(PBD->getInit() && "conditional pattern binding should always have init");
   if (!PBD->wasInitChecked()) {
-    if (typeCheckBinding(PBD, TR_ForIn_IfLetVariable)) {
+    if (typeCheckBinding(PBD)) {
       PBD->setInvalid();
       if (!PBD->getPattern()->hasType()) {
         PBD->getPattern()->setType(ErrorType::get(Context));

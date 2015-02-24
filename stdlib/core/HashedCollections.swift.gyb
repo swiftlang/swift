@@ -693,7 +693,7 @@ public func == <T : Hashable>(lhs: Set<T>, rhs: Set<T>) -> Bool {
       let key = lhsNative.assertingGet(i)
       let bridgedKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
       let optRhsValue: AnyObject? = rhsCocoa.maybeGet(bridgedKey)
-      if let rhsValue = optRhsValue {
+      if let rhsValue: AnyObject = optRhsValue {
         if key == _forceBridgeFromObjectiveC(rhsValue, T.self) {
           continue
         }
@@ -1207,7 +1207,7 @@ public func == <Key : Equatable, Value : Equatable>(
       let (key, value) = lhsNative.assertingGet(index)
       let optRhsValue: AnyObject? =
         rhsCocoa.maybeGet(_bridgeToObjectiveCUnconditional(key))
-      if let rhsValue = optRhsValue {
+      if let rhsValue: AnyObject = optRhsValue {
         if value == _forceBridgeFromObjectiveC(rhsValue, Value.self) {
           continue
         }
@@ -2134,7 +2134,7 @@ internal struct _BridgedNative${Self}Storage {
 
   @objc
   internal func member(member: AnyObject?) -> AnyObject? {
-    if let nonNullKey = member {
+    if let nonNullKey : AnyObject = member {
       return bridgingObjectForKey(nonNullKey, dummy:())
     }
     return nil
@@ -2185,7 +2185,7 @@ internal struct _BridgedNative${Self}Storage {
 
   @objc
   internal func objectForKey(aKey: AnyObject?) -> AnyObject? {
-    if let nonNullKey = aKey {
+    if let nonNullKey: AnyObject = aKey {
       return bridgingObjectForKey(nonNullKey, dummy: ())
     }
     return nil
@@ -2300,7 +2300,8 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   /// The storage for bridged ${Self} elements, if present.
   internal var _heapBufferBridged:
     BridgedNativeStorage.StorageImpl.HeapBufferStorage? {
-    if let ref = _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
+    if let ref: AnyObject =
+      _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
       // FIXME: this cast is invalid.
       return unsafeBitCast(
         ref,
@@ -2875,7 +2876,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
     case .Cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
       let anyObjectKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
-      if let anyObjectValue = cocoaStorage.maybeGet(anyObjectKey) {
+      if let anyObjectValue: AnyObject = cocoaStorage.maybeGet(anyObjectKey) {
         return _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
       }
       return .None

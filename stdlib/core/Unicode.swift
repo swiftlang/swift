@@ -651,7 +651,7 @@ public struct UTF32 : UnicodeCodecType {
   /// can have an internal buffer that is pre-filled with data from the input
   /// generator.
   ///
-  /// Because of buffering, it is impossible to find the corresponding position
+  /// Because of buffering, it is impossible to find the corresponing position
   /// in the generator for a given returned `UnicodeScalar` or an error.
   ///
   /// :param: `next`: a *generator* of code units to be decoded.
@@ -664,7 +664,7 @@ public struct UTF32 : UnicodeCodecType {
   static func _decode<
     G : GeneratorType where G.Element == CodeUnit
   >(inout input: G) -> UnicodeDecodingResult {
-    if let x = input.next() as UInt32? {
+    if let x: UInt32 = input.next() {
       if _fastPath((x >> 11) != 0b1101_1 && x <= 0x10ffff) {
         return .Result(UnicodeScalar(x))
       } else {

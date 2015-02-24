@@ -783,7 +783,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     
     if (shouldRequireType && 
         !(options & TR_FromNonInferredPattern) &&
-        !(options & TR_ForIn_IfLetVariable)) {
+        !(options & TR_EnumerationVariable)) {
       diagnose(NP->getLoc(), diag::type_inferred_to_undesirable_type,
                NP->getDecl()->getName(), type, NP->getDecl()->isLet());
 

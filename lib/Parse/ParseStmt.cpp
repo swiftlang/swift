@@ -643,47 +643,24 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
 
   SmallVector<StmtConditionElement, 4> result;
   // Parse the leading condition if present.
-  if (Tok.isNot(tok::kw_var, tok::kw_let)) {
-    ParserResult<Expr> CondExpr = parseExprBasic(ID);
-    Status |= CondExpr;
-    result.push_back(CondExpr.getPtrOrNull());
+  if (Tok.isNot(tok::kw_var) && Tok.isNot(tok::kw_let)) {
+    ParserResult<Expr> Expr = parseExprBasic(ID);
+    Status |= Expr;
+    result.push_back(Expr.getPtrOrNull());
     
     // If there is a comma after the expression, parse a list of let/var
     // bindings.
-    SourceLoc CommaLoc = Tok.getLoc();
     if (!consumeIf(tok::comma)) {
       Condition = Context.AllocateCopy(result);
       return Status;
     }
     
     // If a let-binding doesn't follow, diagnose the problem.
-    if (Tok.isNot(tok::kw_var, tok::kw_let)) {
-      // If an { exists after the comma, assume it is a stray comma and this is
-      // the start of the if/while body.  If a non-expression thing exists after
-      // the comma, then we don't know what is going on.
-      if (Tok.is(tok::l_brace) || isStartOfDecl() || isStartOfStmt()) {
-        diagnose(Tok, diag::expected_expr_conditional_letbinding);
-        Condition = Context.AllocateCopy(result);
-        if (Tok.isNot(tok::l_brace)) Status.setIsParseError();
-        return Status;
-      }
-     
-      // If an expression follows the comma, then it is a second boolean
-      // condition.  Produce a fix-it hint to rewrite the comma to &&.
-      diagnose(CommaLoc,
-               diag::expected_expr_conditional_letbinding_bool_conditions)
-        .fixItReplace(CommaLoc, "&&");
-      do {
-        ParserResult<Expr> CondExpr = parseExprBasic(ID);
-        Status |= CondExpr;
-        result.push_back(CondExpr.getPtrOrNull());
-      } while (consumeIf(tok::comma) &&
-               Tok.isNot(tok::kw_var, tok::kw_let));
-      
-      if (Tok.isNot(tok::kw_var, tok::kw_let)) {
-        Condition = Context.AllocateCopy(result);
-        return Status;
-      }
+    if (Tok.isNot(tok::kw_var) && Tok.isNot(tok::kw_let)) {
+      diagnose(Tok, diag::expected_expr_conditional_letbinding);
+      Condition = Context.AllocateCopy(result);
+      Status.setIsParseError();
+      return Status;
     }
   }
 
@@ -700,7 +677,6 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     do {
       auto Pattern = parsePattern(IsLet);
       Status |= Pattern;
-      
       if (Pattern.isNull() || Pattern.hasCodeCompletion())
         return Status;
 
@@ -713,33 +689,6 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
         if (InitExpr.isNull() || InitExpr.hasCodeCompletion())
           return Status;
         Init = InitExpr.get();
-        
-        // Syntactically restrict the pattern to being exactly "identifier ="
-        // until we are ready to support the full generality of refutable
-        // patterns.
-        bool Diagnosed = false;
-        if (auto TP = dyn_cast<TypedPattern>(Pattern.get())) {
-          // This is gross, but this is just to improve QoI for an error
-          // condition.
-          if (auto *NP = dyn_cast_or_null<NamedPattern>(TP->getSubPattern()))
-            if (auto *TR =
-                dyn_cast_or_null<SimpleIdentTypeRepr>(TP->getTypeLoc().getTypeRepr())) {
-              if (TR->getIdentifier().str() == "AnyObject") {
-                diagnose(Pattern.get()->getLoc(),
-                         diag::expected_simple_identifier_pattern)
-                .fixItReplace(TP->getSourceRange(),
-                              NP->getSingleVar()->getNameStr());
-                Diagnosed = true;
-              }
-            }
-        }
-        if (!Diagnosed &&
-            !isa<NamedPattern>(Pattern.get()) &&
-            !isa<AnyPattern>(Pattern.get())) {
-          diagnose(Pattern.get()->getLoc(),
-                   diag::expected_simple_identifier_pattern);
-        }
-        
       } else {
         // Although we require an initializer, recover by parsing as if it were
         // merely omitted.

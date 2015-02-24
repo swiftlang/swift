@@ -93,11 +93,16 @@ public func XCTAssertNil(@autoclosure expression: () -> AnyObject?, _ message: S
     // test both Optional and value to treat .None and nil as synonymous
     var passed: Bool
     var expressionValueStr: String = "nil"
-    if expressionValueOptional === nil {
-      passed = true
+    if let expressionValueUnwrapped: AnyObject! = expressionValueOptional {
+      // TODO: passed = (expressionValueUnwrapped === nil)
+      if expressionValueUnwrapped === nil {
+        passed = true
+      } else {
+        passed = false
+        expressionValueStr = "\(expressionValueUnwrapped)"
+      }
     } else {
-      passed = false
-      expressionValueStr = "\(expressionValueOptional!)"
+      passed = true
     }
     
     if !passed {
@@ -127,13 +132,18 @@ public func XCTAssertNotNil(@autoclosure expression: () -> AnyObject?, _ message
   switch result {
   case .Success:
     // test both Optional and value to treat .None and nil as synonymous
-    let passed: Bool
+    var passed: Bool
     var expressionValueStr: String = "nil"
-    if expressionValueOptional === nil {
-      passed = false
+    if let expressionValueUnwrapped: AnyObject! = expressionValueOptional {
+      // TODO: passed = !(expressionValueUnwrapped === nil)
+      if expressionValueUnwrapped === nil {
+        passed = false
+      } else {
+        passed = true
+        expressionValueStr = "\(expressionValueUnwrapped)"
+      }
     } else {
-      passed = true
-      expressionValueStr = "\(expressionValueOptional!)"
+      passed = false
     }
     
     if !passed {

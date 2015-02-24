@@ -1120,15 +1120,12 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
   return false;
 }
 
-bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding,
-                                   TypeResolutionOptions extraOptions) {
+bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
 
   /// Type checking listener for pattern binding initializers.
   class BindingListener : public ExprTypeCheckListener {
     /// The pattern binding declaration whose initializer we're checking.
     PatternBindingDecl *Binding;
-
-    TypeResolutionOptions extraOptions;
 
     /// The locator we're using.
     ConstraintLocator *Locator;
@@ -1137,9 +1134,7 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding,
     Type InitType;
     
   public:
-    explicit BindingListener(PatternBindingDecl *binding,
-                             TypeResolutionOptions extraOptions)
-      : Binding(binding), extraOptions(extraOptions) { }
+    explicit BindingListener(PatternBindingDecl *binding) : Binding(binding) { }
 
     virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
       // Save the locator we're using for the expression.
@@ -1222,7 +1217,6 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding,
       TypeResolutionOptions options;
       options |= TR_OverrideType;
       options |= TR_InExpression;
-      options |= extraOptions;
       if (tc.coercePatternToType(pattern, Binding->getDeclContext(),
                                  patternType, options)) {
         return nullptr;
@@ -1233,7 +1227,7 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding,
     }
   };
 
-  BindingListener listener(binding, extraOptions);
+  BindingListener listener(binding);
   Expr *init = binding->getInit();
   assert(init && "type-checking an uninitialized binding?");
 
@@ -1386,7 +1380,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       Pattern *pattern = Stmt->getPattern();
       TypeResolutionOptions options;
       options |= TR_OverrideType;
-      options |= TR_ForIn_IfLetVariable;
+      options |= TR_EnumerationVariable;
       options |= TR_InExpression;
       if (tc.coercePatternToType(pattern, cs.DC, InitType, options)) {
         return nullptr;

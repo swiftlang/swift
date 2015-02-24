@@ -206,9 +206,8 @@ enum TypeResolutionFlags {
   /// Whether this is a resolution based on a non-inferred type pattern.
   TR_FromNonInferredPattern = 0x100,
   
-  /// Whether we are the variable type in a for/in statement or if/let
-  /// condition.
-  TR_ForIn_IfLetVariable = 0x200,
+  /// Whether we are the variable type in a for/in statement.
+  TR_EnumerationVariable = 0x200,
   
   /// Whether this type is being used in an inheritance clause.
   TR_InheritanceClause = 0x400,
@@ -943,8 +942,7 @@ public:
                             Type type);
 
   /// Type-check an initialized variable pattern declaration.
-  bool typeCheckBinding(PatternBindingDecl *D,
-                        TypeResolutionOptions options = {});
+  bool typeCheckBinding(PatternBindingDecl *D);
 
   /// Type-check a for-each loop's pattern binding and sequence together.
   bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);
