@@ -344,7 +344,16 @@ static NSString *_getDescription(SwiftObject *obj) {
 
 + (BOOL)conformsToProtocol:(Protocol*)proto {
   if (!proto) return NO;
-  return class_conformsToProtocol(self, proto);
+
+  // Walk the superclass chain.
+  Class selfClass = self;
+  while (selfClass) {
+    if (class_conformsToProtocol(selfClass, proto))
+      return YES;
+    selfClass = class_getSuperclass(selfClass);
+  }
+  
+  return NO;
 }
 
 - (NSUInteger)hash {
