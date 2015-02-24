@@ -33,7 +33,7 @@
 }%
 
 @availability(*, unavailable, renamed="ArraySlice")
-struct Slice<T> {}
+public struct Slice<T> {}
 
 % for (Self, a_Self) in arrayTypes:
 
