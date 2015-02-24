@@ -47,7 +47,7 @@ void CallGraph::addCallGraphNode(SILFunction *F, unsigned NodeOrdinal) {
   // TODO: Compute this from the call graph itself after stripping
   //       unreachable nodes from graph.
   ++NumCallGraphNodes;
-  auto *Node = new (NodeAllocator) CallGraphNode(F, NodeOrdinal);
+  auto *Node = new (Allocator) CallGraphNode(F, NodeOrdinal);
 
   assert(!FunctionToNodeMap.count(F) &&
          "Added function already has a call graph node!");
@@ -135,8 +135,7 @@ void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
   bool Complete = false;
 
   if (tryGetCalleeSet(AI->getCallee(), CalleeSet, Complete)) {
-    auto *Edge = new (EdgeAllocator.Allocate()) CallGraphEdge(AI, CalleeSet,
-                                                              Complete);
+    auto *Edge = new (Allocator) CallGraphEdge(AI, CalleeSet, Complete);
     CallerNode->addCalleeEdge(Edge);
 
     for (auto *CalleeNode : CalleeSet)
@@ -197,9 +196,19 @@ static void orderCallees(const CallGraphEdge::CalleeSetType &Callees,
 /// point to multiple call graph nodes in the case where we can call
 /// one of several different functions.
 class CallGraphSCCFinder {
+  unsigned NextDFSNum;
+  llvm::SmallVectorImpl<CallGraphSCC *> &TheSCCs;
+
+  llvm::DenseMap<CallGraphNode *, unsigned> DFSNum;
+  llvm::DenseMap<CallGraphNode *, unsigned> MinDFSNum;
+  llvm::SetVector<CallGraphNode *> DFSStack;
+
+  llvm::BumpPtrAllocator &BPA;
+
 public:
-  CallGraphSCCFinder(llvm::SmallVectorImpl<CallGraphSCC *> &TheSCCs)
-    : NextDFSNum(0), TheSCCs(TheSCCs) {}
+  CallGraphSCCFinder(llvm::SmallVectorImpl<CallGraphSCC *> &TheSCCs,
+                     llvm::BumpPtrAllocator &BPA)
+    : NextDFSNum(0), TheSCCs(TheSCCs), BPA(BPA) {}
 
   void DFS(CallGraphNode *Node) {
     // Set the DFSNum for this node if we haven't already, and if we
@@ -232,7 +241,7 @@ public:
     // If this node is the root of an SCC (including SCCs with a
     // single node), pop the SCC and push it on our SCC stack.
     if (DFSNum[Node] == MinDFSNum[Node]) {
-      auto *SCC = new CallGraphSCC();
+      auto *SCC = new (BPA) CallGraphSCC();
 
       CallGraphNode *Popped;
       do {
@@ -243,14 +252,6 @@ public:
       TheSCCs.push_back(SCC);
     }
   }
-
-private:
-  unsigned NextDFSNum;
-  llvm::SmallVectorImpl<CallGraphSCC *> &TheSCCs;
-
-  llvm::DenseMap<CallGraphNode *, unsigned> DFSNum;
-  llvm::DenseMap<CallGraphNode *, unsigned> MinDFSNum;
-  llvm::SetVector<CallGraphNode *> DFSStack;
 };
 
 void CallGraph::computeBottomUpSCCOrder() {
@@ -261,7 +262,7 @@ void CallGraph::computeBottomUpSCCOrder() {
     BottomUpSCCOrder.clear();
   }
 
-  CallGraphSCCFinder SCCFinder(BottomUpSCCOrder);
+  CallGraphSCCFinder SCCFinder(BottomUpSCCOrder, Allocator);
   for (auto *Node : getCallGraphRoots())
     SCCFinder.DFS(Node);
 }

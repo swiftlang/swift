@@ -220,16 +220,14 @@ class CallGraph {
   llvm::DenseMap<SILFunction *, CallGraphNode *> FunctionToNodeMap;
   llvm::SmallVector<CallGraphSCC *, 16> BottomUpSCCOrder;
   std::vector<SILFunction *> BottomUpFunctionOrder;
-  llvm::BumpPtrAllocator NodeAllocator;
-  llvm::SpecificBumpPtrAllocator<CallGraphEdge> EdgeAllocator;
+
+  /// An allocator used by the callgraph.
+  llvm::BumpPtrAllocator Allocator;
 
 public:
   CallGraph(SILModule *M, bool completeModule);
 
-  ~CallGraph() {
-    for (auto *SCC : BottomUpSCCOrder)
-      delete SCC;
-  }
+  ~CallGraph() {}
 
   llvm::SmallVectorImpl<CallGraphNode *> &getCallGraphRoots() {
     return CallGraphRoots;
