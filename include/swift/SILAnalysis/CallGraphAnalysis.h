@@ -80,9 +80,9 @@ public:
     delete CalleeSet.getPointer();
   }
 
-  const ApplyInst *getApply() const {
-    return TheApply;
-  }
+  const ApplyInst *getApply() const { return TheApply; }
+
+  ApplyInst *getApply() { return TheApply; }
 
   /// Return a callee set that is known to be complete.
   const CalleeSetType &getCompleteCalleeSet() const {
@@ -289,6 +289,8 @@ public:
     return BottomUpFunctionOrder;
   }
 
+  void verify() const;
+
 private:
   void addCallGraphNode(SILFunction *F, unsigned Ordinal);
   void addEdges(SILFunction *F);
@@ -319,7 +321,6 @@ public:
   CallGraph &getCallGraph() {
     if (!CG)
       CG = new CallGraph(M, false);
-
     return *CG;
   }
 
@@ -332,6 +333,8 @@ public:
   }
 
   virtual void invalidate(SILFunction*, InvalidationKind K) { invalidate(K); }
+
+  virtual void verify() const;
 };
 
 } // end namespace swift

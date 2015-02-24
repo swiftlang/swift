@@ -276,3 +276,68 @@ void CallGraph::computeBottomUpFunctionOrder() {
     for (auto *Node : SCC->SCCNodes)
       BottomUpFunctionOrder.push_back(Node->getFunction());
 }
+
+void CallGraph::verify() const {
+#ifndef NDEBUG
+  // For every function in the module, add it to our SILFunction set.
+  llvm::DenseSet<SILFunction *> Functions;
+  for (auto &F : M)
+    Functions.insert(&F);
+
+  // For every (SILFunction, CallGraphNode) pair FuncPair in the SILFunction to
+  // CallGraphNode map check that:
+  //
+  //    a. FuncPair.first is a SILFunction in the current module.
+  //    b. FuncPair.first is the SILFunction inside the CallGraphNode
+  //    FuncPair.second.
+  //    c. All callee CallGraphEdges mapped to FuncPair.second have ApplyInsts
+  //       which are in the SILFunction FuncPair.first.
+  //
+  for (auto &P : FunctionToNodeMap) {
+    assert(Functions.count(P.first) && "Func in FunctionToNodeMap but not "
+                                       "in module!?");
+    assert(P.second->getFunction() == P.first &&
+           "Func mapped to node, but node has different Function inside?!");
+    for (CallGraphEdge *Edge : P.second->getCalleeEdges()) {
+      assert(Edge->getApply()->getFunction() == P.first &&
+             "ApplyInst in callee set that is not in the Callee function?!");
+    }
+  }
+
+  // For every pair (ApplyInst, CallGraphEdge) ApplyPair in the Apply to
+  // CallGraphEdge map, check that:
+  //
+  //    a. ApplyPair.second.getApply() == ApplyPair.first.
+  //    b. ApplyPair.first->getFunction() is in the SILFunction to
+  //       CallGraphNode map and the CallGraphEdge for ApplyPair is one of
+  //       CallSiteEdges in the mapped to CallGraphNode.
+  //
+  for (auto &P : ApplyToEdgeMap) {
+    assert(P.second->getApply() == P.first &&
+           "Apply mapped to CallSiteEdge but not vis-a-versa?!");
+    assert(Functions.count(P.first->getFunction()) &&
+           "Apply in func not in module?!");
+    CallGraphNode *Node = getCallGraphNode(P.first->getFunction());
+    assert(Node && "Apply without call graph node");
+
+    bool FoundEdge = false;
+    for (CallGraphEdge *Edge : Node->getCalleeEdges()) {
+      if (Edge == P.second) {
+        FoundEdge = true;
+        break;
+      }
+    }
+    assert(FoundEdge && "Failed to find Apply CallGraphEdge in Apply inst "
+                        "parent function's caller");
+  }
+#endif
+}
+
+void CallGraphAnalysis::verify() const {
+#ifndef NDEBUG
+  // If we don't have a callgraph, return.
+  if (!CG)
+    return;
+  CG->verify();
+#endif
+}
