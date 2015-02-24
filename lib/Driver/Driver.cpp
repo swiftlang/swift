@@ -947,18 +947,36 @@ void Driver::buildActions(const ToolChain &TC,
   }
 
   OutOfDateMap outOfDateMap;
-  bool rebuildEverything = false;
+  bool rebuildEverything = true;
   static_assert(CompileJobAction::BuildState() ==
                   CompileJobAction::BuildState::UpToDate,
                 "relying on default-initialization");
-  // FIXME: This should work without an output file map. We should have another
-  // way to specify a build record.
-  if (OFM && IsIncremental) {
-    if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput()) {
-      if (populateOutOfDateMap(outOfDateMap, ArgsHash, Inputs,
-                               masterOutputMap->lookup(types::TY_SwiftDeps))) {
-        // FIXME: Distinguish errors from "file removed".
-        rebuildEverything = true;
+  if (IsIncremental) {
+    if (!OFM) {
+      // FIXME: This should work without an output file map. We should have
+      // another way to specify a build record and where to put intermediates.
+      Diags.diagnose(SourceLoc(), diag::incremental_requires_output_file_map);
+
+    } else {
+      StringRef buildRecordPath;
+      if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput())
+        buildRecordPath = masterOutputMap->lookup(types::TY_SwiftDeps);
+
+      if (buildRecordPath.empty()) {
+        Diags.diagnose(SourceLoc(),
+                       diag::incremental_requires_build_record_entry,
+                       types::getTypeName(types::TY_SwiftDeps));
+        // FIXME: Some of our dependencies tests still don't have build records.
+        // Allow them to run "incrementally".
+        rebuildEverything = false;
+
+      } else {
+        if (populateOutOfDateMap(outOfDateMap, ArgsHash, Inputs,
+                                 buildRecordPath)) {
+          // FIXME: Distinguish errors from "file removed", which is benign.
+        } else {
+          rebuildEverything = false;
+        }
       }
     }
   }

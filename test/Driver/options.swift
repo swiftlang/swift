@@ -108,3 +108,11 @@
 
 // RUN: not %swift_driver -target abc -### %s 2>&1 | FileCheck -check-prefix=BAD_TARGET %s
 // BAD_TARGET: error: unknown target 'abc'
+
+// RUN: %swiftc_driver -incremental %s -### 2>&1 | FileCheck -check-prefix=INCREMENTAL_WITHOUT_OFM %s
+// INCREMENTAL_WITHOUT_OFM: warning: ignoring -incremental (currently requires an output file map)
+// INCREMENTAL_WITHOUT_OFM: swift -frontend
+
+// RUN: %swiftc_driver -incremental -output-file-map %S/Inputs/empty-ofm.json %s -### 2>&1 | FileCheck -check-prefix=INCREMENTAL_WITHOUT_OFM_ENTRY %s
+// INCREMENTAL_WITHOUT_OFM_ENTRY: ignoring -incremental; output file map has no master dependencies entry ("swift-dependencies" under "")
+// INCREMENTAL_WITHOUT_OFM_ENTRY: swift -frontend

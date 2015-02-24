@@ -91,6 +91,12 @@ ERROR(error_unsupported_option,driver,none,
       "unsupported option '%0' for '%1'; did you mean '%2 %0'?",
       (StringRef, StringRef, StringRef))
 
+WARNING(incremental_requires_output_file_map,driver,none,
+        "ignoring -incremental (currently requires an output file map)", ())
+WARNING(incremental_requires_build_record_entry,driver,none,
+        "ignoring -incremental; output file map has no master dependencies "
+        "entry (\"%0\" under \"\")", (StringRef))
+
 ERROR(error_os_minimum_deployment,driver,none,
       "Swift requires a minimum deployment target of %0", (StringRef))
 ERROR(error_sdk_too_old,driver,none,
