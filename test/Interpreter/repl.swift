@@ -2,9 +2,6 @@
 
 // REQUIRES: swift_repl
 
-// XFAIL: asan
-// FIXME: <rdar://problem/19919467> Interpreter/repl.swift regressed under ASan
-
 :print_decl String
 // CHECK: struct String
 // CHECK: extension String : StringInterpolationConvertible
