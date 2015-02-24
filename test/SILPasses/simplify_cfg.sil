@@ -1256,3 +1256,28 @@ bb7(%23 : $Optional<IntEnum>):
   return %23 : $Optional<IntEnum>
 }
 
+
+class B {}
+
+// CHECK-LABEL: sil @checked_cast_anyobject_metatypeinst_to_class
+// CHECK: bb0
+// CHECK-NOT: checked_cast
+// CHECK-NOT: bb1
+// CHECK: [[RET:%.*]] = tuple ()
+// CHECK: return [[RET]] : $()
+
+sil @checked_cast_anyobject_metatypeinst_to_class : $@thin() -> () {
+bb0:
+  %0 = metatype $@thick AnyObject.Protocol
+  checked_cast_br %0 : $@thick AnyObject.Protocol to $@thick B.Type, bb1, bb2
+
+bb1(%3 : $@thick B.Type):
+  br bb3
+bb2:
+  br bb3
+
+bb3:
+ %2 = tuple()
+ return %2 : $()
+}
+

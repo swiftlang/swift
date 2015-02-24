@@ -2169,40 +2169,150 @@ SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *FLI) {
 SILInstruction *
 SILCombiner::visitCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
 
-  // %0 = metatype $@thick AnyObject.Protocol
-  // checked_cast_br %0 : $@thick AnyObject.Protocol to $@thick B.Type, bb1, bb2
-  //
-  //   ->
-  //
-  // br bb2
-  auto *MetatypeOperand = dyn_cast<MetatypeInst>(CBI->getOperand());
-  if (!MetatypeOperand)
-    return nullptr;
-  SILType InstanceType =
-    MetatypeOperand->getType().getMetatypeInstanceType(CBI->getModule());
-  if (!InstanceType.isAnyObject())
-    return nullptr;
+  // Try to simplify checked_cond_br instructions using existential
+  // metatypes by propagating a concrete type whenever it can be
+  // determined statically.
 
-  // We know we are casting from AnyObject.protocol. Let's check the target
-  // type.
-  auto TargetType = CBI->getCastType();
-  if (!TargetType.is<MetatypeType>())
-    return nullptr;
+  // %0 = metatype $A.Type
+  // %1 = init_existential_metatype ..., %0: $A
+  // checked_cond_br %1, ....
+  // ->
+  // %1 = metatype $A.Type
+  // checked_cond_br %1, ....
+  if (auto *IEMI = dyn_cast<InitExistentialMetatypeInst>(CBI->getOperand())) {
+    if (auto *MI = dyn_cast<MetatypeInst>(IEMI->getOperand())) {
+      SILBuilderWithScope<1> B(CBI);
+      B.createCheckedCastBranch(CBI->getLoc(), CBI->isExact(), MI,
+                                CBI->getCastType(),
+                                CBI->getSuccessBB(),
+                                CBI->getFailureBB());
+      CBI->eraseFromParent();
+      return nullptr;
+    }
+  }
 
-  TargetType =
-    TargetType.getMetatypeInstanceType(CBI->getModule());
+  if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(CBI->getOperand())) {
+    // Operand of the existential_metatype instruction.
+    auto Op = EMI->getOperand();
+    auto EmiTy = EMI->getType();
 
-  bool IsTargetAnyObject = TargetType.isAnyObject();
-  if (TargetType.getClassOrBoundGenericClass() && !IsTargetAnyObject) {
-    // We have a cast from an AnyObject metatype to a class. This will fail.
-    Builder->createBranch(CBI->getLoc(), CBI->getFailureBB());
-    eraseInstFromFunction(*CBI);
-    return nullptr;
+    // %0 = alloc_stack ..
+    // %1 = init_existential %0: $A
+    // %2 = existential_metatype %0, ...
+    // checked_cond_br %2, ....
+    // ->
+    // %1 = metatype $A.Type
+    // checked_cond_br %1, ....
+
+    if (auto *ASI = dyn_cast<AllocStackInst>(Op)) {
+      // Should be in the same BB.
+      if (ASI->getParent() != EMI->getParent())
+        return nullptr;
+      // Check if this alloc_stac is is only initialized once by means of
+      // single init_existential.
+      bool isLegal = true;
+      // init_existental instruction used to initialize this alloc_stack.
+      InitExistentialInst *FoundIEI = nullptr;
+      for (auto Use: ASI->getUses()) {
+        auto *User = Use->getUser();
+        if (isa<ExistentialMetatypeInst>(User) ||
+            isa<DestroyAddrInst>(User) ||
+            isa<DeallocStackInst>(User))
+           continue;
+        if (auto *IEI = dyn_cast<InitExistentialInst>(User)) {
+          if (!FoundIEI) {
+            FoundIEI = IEI;
+            continue;
+          }
+        }
+        isLegal = false;
+        break;
+      }
+
+      if (isLegal && FoundIEI) {
+        // Should be in the same BB.
+        if (FoundIEI->getParent() != EMI->getParent())
+          return nullptr;
+        // Get the type used to initialize the existential.
+        auto LoweredConcreteTy = FoundIEI->getLoweredConcreteType();
+        if (LoweredConcreteTy.isAnyExistentialType())
+          return nullptr;
+        // Get the metatype of this type.
+        auto EMT = dyn_cast<AnyMetatypeType>(EmiTy.getSwiftRValueType());
+        auto *MetaTy = MetatypeType::get(LoweredConcreteTy.getSwiftRValueType(),
+                                         EMT->getRepresentation());
+        auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
+        auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
+        SILBuilderWithScope<1> B(CBI);
+        auto *MI = B.createMetatype(FoundIEI->getLoc(), SILMetaTy);
+
+        B.createCheckedCastBranch(CBI->getLoc(), CBI->isExact(), MI,
+                                  CBI->getCastType(),
+                                  CBI->getSuccessBB(),
+                                  CBI->getFailureBB());
+        CBI->eraseFromParent();
+        return nullptr;
+      }
+    }
+
+    // %0 = alloc_ref $A
+    // %1 = init_existential_ref %0: $A, $...
+    // %2 = existential_metatype ..., %1 :  ...
+    // checked_cond_br %2, ....
+    // ->
+    // %1 = metatype $A.Type
+    // checked_cond_br %1, ....
+    if (auto *FoundIERI = dyn_cast<InitExistentialRefInst>(Op)) {
+      auto *ASRI = dyn_cast<AllocRefInst>(FoundIERI->getOperand());
+      if (!ASRI)
+        return nullptr;
+      // Should be in the same BB.
+      if (ASRI->getParent() != EMI->getParent())
+        return nullptr;
+      // Check if this alloc_stac is is only initialized once by means of
+      // a single initt_existential_ref.
+      bool isLegal = true;
+      for (auto Use: ASRI->getUses()) {
+        auto *User = Use->getUser();
+        if (isa<ExistentialMetatypeInst>(User) || isa<StrongReleaseInst>(User))
+           continue;
+        if (auto *IERI = dyn_cast<InitExistentialRefInst>(User)) {
+          if (IERI == FoundIERI) {
+            continue;
+          }
+        }
+        isLegal = false;
+        break;
+      }
+
+      if (isLegal && FoundIERI) {
+        // Should be in the same BB.
+        if (FoundIERI->getParent() != EMI->getParent())
+          return nullptr;
+        // Get the type used to initialize the existential.
+        auto ConcreteTy = FoundIERI->getFormalConcreteType();
+        if (ConcreteTy.isAnyExistentialType())
+          return nullptr;
+        // Get the SIL metatype of this type.
+        auto EMT = dyn_cast<AnyMetatypeType>(EMI->getType().getSwiftRValueType());
+        auto *MetaTy = MetatypeType::get(ConcreteTy, EMT->getRepresentation());
+        auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
+        auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
+        SILBuilderWithScope<1> B(CBI);
+        auto *MI = B.createMetatype(FoundIERI->getLoc(), SILMetaTy);
+
+        B.createCheckedCastBranch(CBI->getLoc(), CBI->isExact(), MI,
+                                  CBI->getCastType(),
+                                  CBI->getSuccessBB(),
+                                  CBI->getFailureBB());
+        CBI->eraseFromParent();
+        return nullptr;
+      }
+    }
   }
 
   return nullptr;
 }
-
 
 SILInstruction *
 SILCombiner::

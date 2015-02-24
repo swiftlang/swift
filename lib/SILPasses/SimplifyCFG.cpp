@@ -121,6 +121,7 @@ namespace {
     bool simplifyBranchOperands(OperandValueArrayRef Operands);
     bool simplifyBranchBlock(BranchInst *BI);
     bool simplifyCondBrBlock(CondBranchInst *BI);
+    bool simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI);
     bool simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI);
     bool simplifySwitchEnumBlock(SwitchEnumInst *SEI);
     bool simplifyUnreachableBlock(UnreachableInst *UI);
@@ -2046,6 +2047,59 @@ bool SimplifyCFG::simplifyUnreachableBlock(UnreachableInst *UI) {
   return Changed;
 }
 
+bool SimplifyCFG::simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI) {
+  // [exact] does not perform any cast. It checks that the types are exactly the same.
+  if (CCBI->isExact())
+    return false;
+
+  bool isSourceTypeExact = isa<MetatypeInst>(CCBI->getOperand());
+
+  // Check if we can statically predict the outcome of the cast.
+  auto Feasibility = classifyDynamicCast(CCBI->getModule().getSwiftModule(),
+                          CCBI->getOperand().getType().getSwiftRValueType(),
+                          CCBI->getCastType().getSwiftRValueType(),
+                          isSourceTypeExact);
+
+  if (Feasibility == DynamicCastFeasibility::MaySucceed)
+    return false;
+
+  auto *FailureBB = CCBI->getFailureBB();
+  auto *SuccessBB = CCBI->getSuccessBB();
+  auto *ThisBB = CCBI->getParent();
+
+
+  if (Feasibility == DynamicCastFeasibility::WillFail) {
+    SILBuilderWithScope<1> Builder(CCBI);
+    Builder.createBranch(CCBI->getLoc(), FailureBB);
+    CCBI->eraseFromParent();
+    removeIfDead(SuccessBB);
+    addToWorklist(ThisBB);
+    return true;
+  }
+
+  if (Feasibility == DynamicCastFeasibility::WillSucceed) {
+    SILBuilderWithScope<1> Builder(CCBI);
+    SmallVector<SILValue, 1> Args;
+    SILValue CastedValue;
+    if (CCBI->getOperand().getType() != CCBI->getCastType())
+      // Replace by unconditional_cast, followed by a branch.
+      CastedValue = Builder.createUnconditionalCheckedCast(
+          CCBI->getLoc(), CCBI->getOperand(), CCBI->getCastType());
+    else
+      // No need to cast.
+      CastedValue = CCBI->getOperand();
+    Args.push_back(CastedValue);
+    Builder.createBranch(CCBI->getLoc(), SuccessBB, Args);
+    CCBI->eraseFromParent();
+    removeIfDead(FailureBB);
+    addToWorklist(ThisBB);
+    return true;
+  }
+
+  return false;
+}
+
+
 void RemoveUnreachable::visit(SILBasicBlock *BB) {
   if (!Visited.insert(BB).second)
     return;
@@ -2108,6 +2162,9 @@ bool SimplifyCFG::simplifyBlocks() {
       break;
     case ValueKind::UnreachableInst:
       Changed |= simplifyUnreachableBlock(cast<UnreachableInst>(TI));
+      break;
+    case ValueKind::CheckedCastBranchInst:
+      Changed |= simplifyCheckedCastBranchBlock(cast<CheckedCastBranchInst>(TI));
       break;
     default:
       break;

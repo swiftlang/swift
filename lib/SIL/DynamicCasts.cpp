@@ -191,6 +191,36 @@ swift::classifyDynamicCast(Module *M,
     source = sourceMetatype.getInstanceType();
     target = targetMetatype.getInstanceType();
 
+    // Casts from a metatype of a non-existential type into a metatype
+    // of an existential type always fail.
+    if (target.isAnyExistentialType() && !source.isAnyExistentialType())
+      return DynamicCastFeasibility::WillFail;
+
+    // Casts from a metatype of an existential type into a metatype
+    // of a non-existential type always fail.
+    if (!target.isAnyExistentialType() && source.isAnyExistentialType() && isSourceTypeExact)
+      return DynamicCastFeasibility::WillFail;
+
+    // Casts from a metatype of an existential type into a metatype
+    // of an existential type can only succeed if this is the same type.
+    if (target.isAnyExistentialType() && source.isAnyExistentialType() &&
+        target != source)
+      return DynamicCastFeasibility::WillFail;
+
+    // Handle casts from AnyObject.
+    //
+    // If isSourceTypeExact is true, we know we are casting from AnyObject.protocol.
+    // %0 = metatype $@thick AnyObject.Protocol
+    // checked_cast_br %0 : $@thick AnyObject.Protocol to $@thick Target.Type, bb1, bb2
+    //
+    // This cast will always fail unless target is AnyObject
+    if (isSourceTypeExact && source->isAnyObject() && !target->isAnyObject())
+      return DynamicCastFeasibility::WillFail;
+
+    // This cast will always fail unless source is AnyObject
+    if (isSourceTypeExact && !source->isAnyObject() && target->isAnyObject())
+      return DynamicCastFeasibility::WillFail;
+
     // TODO: prove that some conversions to existential metatype will
     // obviously succeed/fail.
     // TODO: prove that some conversions from class existential metatype

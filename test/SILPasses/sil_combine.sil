@@ -2189,25 +2189,6 @@ bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.NativeObject, %2 : $Builtin.Nati
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @checked_cast_anyobject_metatypeinst_to_class
-// CHECK: bb0
-// CHECK-NOT: checked_cast_br
-// CHECK: br bb2
-sil @checked_cast_anyobject_metatypeinst_to_class : $@thin() -> () {
-bb0:
-  %0 = metatype $@thick AnyObject.Protocol
-  checked_cast_br %0 : $@thick AnyObject.Protocol to $@thick B.Type, bb1, bb2
-
-bb1(%3 : $@thick B.Type):
-  br bb3
-bb2:
-  br bb3
-
-bb3:
- %2 = tuple()
- return %2 : $()
-}
-
 // CHECK-LABEL: sil @cmp_zext_peephole
 // CHECK: bb0([[Arg1:%.*]] : $Builtin.Word, [[Arg2:%.*]] : $Builtin.Word):
 // CHECK:   [[ZA1:%.*]] = builtin "zextOrBitCast_Word_Int64"([[Arg1]] : $Builtin.Word) : $Builtin.Int64
