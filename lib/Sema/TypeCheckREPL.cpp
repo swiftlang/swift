@@ -120,14 +120,12 @@ void StmtBuilder::printReplExpr(VarDecl *Arg, SourceLoc Loc) {
 
 Identifier TypeChecker::getNextResponseVariableName(DeclContext *DC) {
   llvm::SmallString<4> namebuf;
-  llvm::raw_svector_ostream names(namebuf);
   Identifier ident;
 
   bool nameUsed = false;
   do {
-    names.flush();
     namebuf.clear();
-
+    llvm::raw_svector_ostream names(namebuf);
     names << "r" << NextResponseVariableIndex++;
 
     ident = Context.getIdentifier(names.str());
