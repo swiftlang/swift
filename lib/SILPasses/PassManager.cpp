@@ -48,6 +48,10 @@ llvm::cl::list<std::string>
                    llvm::cl::desc("Print out the sil before and after passes "
                                   "which contain a string from this list"));
 
+llvm::cl::opt<bool> SILValidateAnalyses(
+    "sil-validate-analyses", llvm::cl::init(false),
+    llvm::cl::desc("Validate analyses when running with -sil-verify-all"));
+
 static bool doPrintBefore(SILTransform *T, SILFunction *F) {
   if (!SILPrintOnlyFun.empty() && F && F->getName() != SILPrintOnlyFun)
     return false;
@@ -155,7 +159,8 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
       }
       if (CompleteFuncs->hasChanged() && Options.VerifyAll) {
         F.verify();
-        verifyAnalyses();
+        if (SILValidateAnalyses)
+          verifyAnalyses();
       }
 
       ++NumPassesRun;
@@ -235,7 +240,8 @@ void SILPassManager::runOneIteration() {
 
       if (CompleteFuncs->hasChanged() && Options.VerifyAll) {
         Mod->verify();
-        verifyAnalyses();
+        if (SILValidateAnalyses)
+          verifyAnalyses();
       }
 
       ++NumPassesRun;
