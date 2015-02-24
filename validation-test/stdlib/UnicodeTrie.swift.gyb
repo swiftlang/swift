@@ -14,6 +14,9 @@
 // RUN: %S/../../utils/line-directive %t/UnicodeTrie.swift -- %target-build-swift %t/UnicodeTrie.swift -o %t/a.out -g -Xfrontend -disable-access-control
 // RUN: %S/../../utils/line-directive %t/UnicodeTrie.swift -- %target-run %t/a.out
 
+// FIXME: rdar://problem/19648117 Needs splitting objc parts out
+// XFAIL: linux
+
 %{
 
 from GYBUnicodeDataUtils import *

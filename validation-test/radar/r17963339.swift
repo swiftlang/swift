@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift
 
+// XFAIL: linux
 
 protocol MyClassDelegate: class {
     func didFindCureForCancer()

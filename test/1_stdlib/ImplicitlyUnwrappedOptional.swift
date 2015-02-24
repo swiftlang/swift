@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
+// XFAIL: linux
+
 var x : Int! = .None
 if x != nil {
   println("x is non-empty!")

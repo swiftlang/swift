@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift 2>&1 | FileCheck %s
 
+// XFAIL: linux
+
 import StdlibUnittest
 
 _setOverrideOSVersion(.OSX(major: 10, minor: 9, bugFix: 3))

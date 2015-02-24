@@ -2,6 +2,8 @@
 // RUN: %S/../../utils/line-directive %t/FixedPoint.swift -- %target-build-swift %t/FixedPoint.swift -o %t/a.out
 // RUN: %S/../../utils/line-directive %t/FixedPoint.swift -- %target-run %t/a.out
 
+// XFAIL: linux
+
 import StdlibUnittest
 
 var FixedPoint = TestSuite("FixedPoint")

@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir
 
+// REQUIRES: objc_interop
+
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // https://twitter.com/nuoji/status/507991706294558721

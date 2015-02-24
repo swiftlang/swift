@@ -1,5 +1,8 @@
 // RUN: %target-run-simple-swift
 
+// FIXME: rdar://problem/19648117 Needs splitting objc parts out
+// XFAIL: linux
+
 import StdlibUnittest
 import Foundation
 

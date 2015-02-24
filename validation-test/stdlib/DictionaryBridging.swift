@@ -9,6 +9,8 @@
 // RUN: %target-build-swift -Xfrontend -disable-access-control -I %S/Inputs/SlurpFastEnumeration/ %t/main.swift %S/Inputs/DictionaryKeyValueTypes.swift -Xlinker %t/SlurpFastEnumeration.o -o %t.out -O
 // RUN: %target-run %t.out
 
+// REQUIRES: objc_interop
+
 import StdlibUnittest
 import Foundation
 import SlurpFastEnumeration

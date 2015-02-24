@@ -1,4 +1,7 @@
 // RUN: %target-run-simple-swift
+
+// REQUIRES: objc_interop
+
 /*
 
 <rdar://problem/14196462> Hashing in the standard library

@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-silgen
 
+// REQUIRES: objc_interop
+
 // Distributed under the terms of the MIT license
 // Test case submitted to project by http://github.com/martijnwalraven (Martijn Walraven)
 // rdar://18662915

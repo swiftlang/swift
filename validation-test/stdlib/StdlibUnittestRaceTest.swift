@@ -1,6 +1,8 @@
 // RUN: %target-build-swift -Xfrontend -disable-access-control -module-name a %s -o %t.out
 // RUN: %target-run %t.out | FileCheck %s
 
+// XFAIL: linux
+
 import StdlibUnittest
 
 _setTestSuiteFailedCallback() { println("abort()") }
