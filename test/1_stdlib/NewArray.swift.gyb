@@ -181,8 +181,8 @@ test(_UnitTestArray<X>.self, "_UnitTestArray")
 test(Array<X>.self, "Array")
 // CHECK-NEXT: test: Array...done
 
-test(Slice<X>.self, "Slice")
-// CHECK-NEXT: test: Slice...done
+test(ArraySlice<X>.self, "ArraySlice")
+// CHECK-NEXT: test: ArraySlice...done
 
 func testAsArray() {
   println("== AsArray ==")
@@ -203,7 +203,7 @@ func testAsArray() {
   println(bufferID(y1) == bufferID(y))
   // CHECK-NEXT: true
   
-  let z = Slice(y)
+  let z = ArraySlice(y)
   println(bufferID(y) == bufferID(z))
   // CHECK-NEXT: true
 
@@ -276,20 +276,20 @@ func testCocoa() {
 }
 testCocoa()
 
-extension Slice {
+extension ArraySlice {
   mutating func qsort(compare: (T,T)->Bool) {
     _introSort(&self, indices(self), compare)
   }
 }
 
 func testSlice() {
-  println("== Slice ==")
-  // CHECK: == Slice ==
+  println("== ArraySlice ==")
+  // CHECK: == ArraySlice ==
   
   // do some tests on the shared semantics
   var b = ContiguousArray(X(0)..<X(7))
 
-  // Slice it
+  // ArraySlice it
   var bSlice = b[3..<5]
   println("<\(bSlice.count)>")
   // CHECK-NEXT: <2>
@@ -345,7 +345,7 @@ testSlice()
 // testing time grows roughly as the cube of this constant
 let testWidth = 11
 
-%arrayTypes = ['ContiguousArray', '_UnitTestArray', 'Array', 'Slice']
+%arrayTypes = ['ContiguousArray', '_UnitTestArray', 'Array', 'ArraySlice']
 %for A in arrayTypes:
 
 func testReplace(make: ()->${A}<X>) {
@@ -383,8 +383,8 @@ testReplace${A}()
 // case is interesting because when the buffer is uniquely referenced
 // we can expect to expand the slice in-place
 for (maxValue, label) in [(testWidth, "trailing"), (testWidth*2, "interior")] {
-  println("testing subrange replacement in \(label) Sub-Slice")
-  testReplaceSlice {
+  println("testing subrange replacement in \(label) Sub-ArraySlice")
+  testReplaceArraySlice {
     var a = ContiguousArray(X(-testWidth)..<X(maxValue))
     a.reserveCapacity(a.count * 3 / 2)
     return a[testWidth..<(2 * testWidth)]
@@ -394,9 +394,9 @@ for (maxValue, label) in [(testWidth, "trailing"), (testWidth*2, "interior")] {
 // CHECK-NEXT: testing subrange replacement in ContiguousArray
 // CHECK-NEXT: testing subrange replacement in _UnitTestArray
 // CHECK-NEXT: testing subrange replacement in Array
-// CHECK-NEXT: testing subrange replacement in Slice
-// CHECK-NEXT: testing subrange replacement in trailing Sub-Slice
-// CHECK-NEXT: testing subrange replacement in interior Sub-Slice
+// CHECK-NEXT: testing subrange replacement in ArraySlice
+// CHECK-NEXT: testing subrange replacement in trailing Sub-ArraySlice
+// CHECK-NEXT: testing subrange replacement in interior Sub-ArraySlice
 
 //===--- inout violations -------------------------------------------------===//
 

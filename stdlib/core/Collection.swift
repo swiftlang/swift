@@ -274,7 +274,7 @@ public protocol _Sliceable : CollectionType {}
 /// A *collection* from which a sub-range of elements (a "slice")
 /// can be efficiently extracted.
 public protocol Sliceable : _Sliceable {
-  // FIXME: Slice should also be Sliceable but we can't express
+  // FIXME: ArraySlice should also be Sliceable but we can't express
   // that constraint (<rdar://problem/14375973> Include associated
   // type information in protocol witness tables) Instead we constrain
   // to _Sliceable; at least error messages will be more informative.

@@ -180,7 +180,7 @@ func GGWrap<G1: GeneratorType, G2: GeneratorType where G1.Element == G2.Element>
   g2.next()
 }
 
-func testSameTypeTuple(a: Array<(Int,Int)>, s: Slice<(Int,Int)>) {
+func testSameTypeTuple(a: Array<(Int,Int)>, s: ArraySlice<(Int,Int)>) {
   GGWrap(a.generate(), s.generate())
   TTGenWrap(a.generate())
   IntIntGenWrap(s.generate())

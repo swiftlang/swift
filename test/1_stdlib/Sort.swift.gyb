@@ -55,7 +55,7 @@ func expectSortedCollection(
   expectSortedCollection(sortedAry, Array(originalAry))
 }
 
-func expectSortedCollection(sortedAry: Slice<Int>, originalAry: Slice<Int>) {
+func expectSortedCollection(sortedAry: ArraySlice<Int>, originalAry: ArraySlice<Int>) {
   expectSortedCollection([Int](sortedAry), [Int](originalAry))
 }
 

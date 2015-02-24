@@ -15,7 +15,7 @@ import StdlibUnittest
 import Foundation
 
 %{
-all_array_types = [ 'ContiguousArray', 'Slice', 'Array', '_UnitTestArray' ]
+all_array_types = [ 'ContiguousArray', 'ArraySlice', 'Array', '_UnitTestArray' ]
 }%
 
 extension Array {
@@ -24,7 +24,7 @@ extension Array {
   }
 }
 
-extension Slice {
+extension ArraySlice {
   var identity: UnsafePointer<Void> {
     return self._buffer.identity
   }
@@ -361,7 +361,7 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW
   checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutT(&a[0..<1]) {
-    (inout x: Slice<${array_type}<${element_type}>>) in
+    (inout x: ArraySlice<${array_type}<${element_type}>>) in
     x[0][3].value += 1000
   }
 

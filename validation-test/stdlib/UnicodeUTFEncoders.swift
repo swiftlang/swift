@@ -97,7 +97,7 @@ class ArraySink<T: IntegerLiteralConvertible> : SinkType {
   func clear() {
     count = 0
   }
-  var elements: Slice<T> {
+  var elements: ArraySlice<T> {
     return storage[0..<count]
   }
   var count = 0

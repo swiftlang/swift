@@ -15,7 +15,7 @@ import StdlibUnittest
 # We test for bounds-checking traps for both reading and writing
 # both single elements and slices of all three different array
 # types.
-array_types = ('Array', 'ContiguousArray', 'Slice', '_UnitTestArray')
+array_types = ('Array', 'ContiguousArray', 'ArraySlice', '_UnitTestArray')
 
 def bounds_trap(index, expr_to_write):
   global io
@@ -48,22 +48,22 @@ ${ArrayTy}Traps.test("bounds3/${io}") {
 
 ${ArrayTy}Traps.test("sliceBounds0/${io}") {
   var a: ${ArrayTy}<Int> = []
-  ${bounds_trap(index='-1..<1', expr_to_write='Slice()')}
+  ${bounds_trap(index='-1..<1', expr_to_write='ArraySlice()')}
 }
 
 ${ArrayTy}Traps.test("sliceBounds1/${io}") {
   var a: ${ArrayTy} = [ 1 ]
-  ${bounds_trap(index='-1..<1', expr_to_write='Slice()')}
+  ${bounds_trap(index='-1..<1', expr_to_write='ArraySlice()')}
 }
 
 ${ArrayTy}Traps.test("sliceBounds2/${io}") {
   var a: ${ArrayTy} = [ 1 ]
-  ${bounds_trap(index='0..<2', expr_to_write='Slice()')}
+  ${bounds_trap(index='0..<2', expr_to_write='ArraySlice()')}
 }
 
 ${ArrayTy}Traps.test("sliceBounds3/${io}") {
   var a: ${ArrayTy} = [ 1 ]
-  ${bounds_trap(index='1..<2', expr_to_write='Slice()')}
+  ${bounds_trap(index='1..<2', expr_to_write='ArraySlice()')}
 }
 
 %   end

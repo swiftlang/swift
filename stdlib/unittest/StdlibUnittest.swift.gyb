@@ -155,7 +155,7 @@ public func expectOptionalEqual<T : Equatable>(
 %for (Generic, EquatableType) in [
 %    ('<T : Equatable>', 'ContiguousArray<T>'),
 %    ('<T : Equatable>', '_UnitTestArray<T>'),
-%    ('<T : Equatable>', 'Slice<T>'),
+%    ('<T : Equatable>', 'ArraySlice<T>'),
 %    ('<T : Equatable>', 'Array<T>'),
 %    ('<T, U : Equatable>', 'Dictionary<T, U>'),
 %    ('<T : ForwardIndexType>', 'T')]:

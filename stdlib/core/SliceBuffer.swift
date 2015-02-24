@@ -1,4 +1,4 @@
-//===--- SliceBuffer.swift - Backing storage for Slice<T> -----------------===//
+//===--- SliceBuffer.swift - Backing storage for ArraySlice<T> ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Buffer type for Slice<T>
+/// Buffer type for ArraySlice<T>
 public
 struct _SliceBuffer<T> : _ArrayBufferType {
   typealias Element = T

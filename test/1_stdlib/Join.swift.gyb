@@ -20,7 +20,7 @@ import StdlibUnittest
 
 var JoinTestSuite = TestSuite("Join")
 
-%for ArrayType in ['ContiguousArray', 'Slice', 'Array']:
+%for ArrayType in ['ContiguousArray', 'ArraySlice', 'Array']:
 
 JoinTestSuite.test("${ArrayType}") {
   typealias ArrayType = ${ArrayType}<Int>

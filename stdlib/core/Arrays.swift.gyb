@@ -1,4 +1,4 @@
-//===--- Arrays.swift.gyb - ContiguousArray, Array, and Slice -*- swift -*-===//
+//===--- Arrays.swift.gyb -------------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,8 +15,8 @@
 //  - ContiguousArray<T> is a fast, contiguous array of T with a known
 //    backing store.
 //
-//  - Slice<T> presents an arbitrary subsequence of some contiguous sequence
-//    of Ts.
+//  - ArraySlice<T> presents an arbitrary subsequence of some
+//    contiguous sequence of Ts.
 //
 //  - Array<T> is like ContiguousArray<T> when T is not an ObjC type.
 //    Otherwise, it may use an NSArray bridged from Cocoa for storage
@@ -26,11 +26,14 @@
 %{
   arrayTypes = [
     ('ContiguousArray', 'a ContiguousArray'),
-    ('Slice', 'a `Slice`'),
+    ('ArraySlice', 'an `ArraySlice`'),
     ('Array', 'an `Array`'),
     ('_UnitTestArray', 'a `_UnitTestArray`')
   ]
 }%
+
+@availability(*, unavailable, renamed="ArraySlice")
+struct Slice<T> {}
 
 % for (Self, a_Self) in arrayTypes:
 
@@ -56,21 +59,21 @@ if True:
 /// `ContiguousArray` does not bridge to Objective-C.  See `Array`,
 /// with which `ContiguousArray` shares most properties, for more
 /// detail."""
-    elif Self == 'Slice':
+    elif Self == 'ArraySlice':
       SelfDocComment = """\
 /// The `Array`-like type that represents a sub-sequence of any
-/// `Array`, `ContiguousArray`, or other `Slice`.
+/// `Array`, `ContiguousArray`, or other `ArraySlice`.
 ///
-/// `Slice` always uses contiguous storage and does not bridge to
+/// `ArraySlice` always uses contiguous storage and does not bridge to
 /// Objective-C.
 ///
-/// .. Warning:: Long-term storage of `Slice` instances is discouraged
+/// .. Warning:: Long-term storage of `ArraySlice` instances is discouraged
 ///
-///    Because a `Slice` presents a *view* onto the storage of some
+///    Because a `ArraySlice` presents a *view* onto the storage of some
 ///    larger array even after the original array's lifetime ends,
 ///    storing the slice may prolong the lifetime of elements that are
 ///    no longer accessible, which can manifest as apparent memory and
-///    object leakage.  To prevent this effect, use `Slice` only for
+///    object leakage.  To prevent this effect, use `ArraySlice` only for
 ///    transient computation."""
     elif Self == 'Array':
       SelfDocComment = '''\
@@ -81,7 +84,7 @@ if True:
 /// ================================
 ///
 /// The information in this section applies to all three of Swift's
-/// array types, `Array<T>`, `ContiguousArray<T>`, and `Slice<T>`.
+/// array types, `Array<T>`, `ContiguousArray<T>`, and `ArraySlice<T>`.
 /// When you read the word "array" here in a normal typeface, it
 /// applies to all three of them.
 ///
@@ -112,7 +115,7 @@ if True:
 ///
 /// When an array's contiguous storage fills up, new storage must be
 /// allocated and elements must be moved to the new storage.  `Array`,
-/// `ContiguousArray`, and `Slice` share an exponential growth
+/// `ContiguousArray`, and `ArraySlice` share an exponential growth
 /// strategy that makes `append` a constant time operation *when
 /// amortized over many invocations*.  In addition to a `count`
 /// property, these array types have a `capacity` that reflects their
@@ -200,8 +203,8 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
       return _getElement(index)
     }
     // on non-Objective-C, this should just be NativeOwner for all other
-    // cases, including Slice.
-%elif Self == 'Slice':
+    // cases, including ArraySlice.
+%elif Self == 'ArraySlice':
     addressWithOwner {
       _checkSubscript(index)
       return (UnsafePointer(_buffer.baseAddress + index),
@@ -247,7 +250,7 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
   }
 
   /// A type that can represent a sub-range of ${a_Self} 
-  public typealias SubSlice = Slice<T>
+  public typealias SubSlice = ArraySlice<T>
 
   /// Access the elements indicated by the given half-open
   /// `subRange`.  O(1)
@@ -255,7 +258,7 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
     get {
       _checkIndex(subRange.startIndex)
       _checkIndex(subRange.endIndex)
-      return Slice(_buffer[subRange])
+      return ArraySlice(_buffer[subRange])
     }
     set(rhs) {
       _checkIndex(subRange.startIndex)
@@ -333,6 +336,8 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
 #else
   typealias _Buffer = _ContiguousArrayBuffer<T>
 #endif
+%elif Self == 'ArraySlice':
+  typealias _Buffer = _SliceBuffer<T>
 %else:
   typealias _Buffer = _${Self.strip('_')}Buffer<T>
 %end
@@ -1164,7 +1169,7 @@ func _arrayAppendSequence<
 % for (Self, a_Self) in arrayTypes:
 // NOTE: The '==' and '!=' below only handles array types
 // that are the same, e.g. Array<Int> and Array<Int>, not
-// Slice<Int> and Array<Int>.
+// ArraySlice<Int> and Array<Int>.
 
 /// Returns true if these arrays contain the same elements.
 public func ==<T : Equatable>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {

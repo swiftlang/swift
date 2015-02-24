@@ -520,7 +520,7 @@ Algorithm.test("sorted/complexity") {
 }
 
 Algorithm.test("sorted/return type") {
-  let x: Array = sorted([5, 4, 3, 2, 1] as Slice)
+  let x: Array = sorted([5, 4, 3, 2, 1] as ArraySlice)
 }
 runAllTests()
 

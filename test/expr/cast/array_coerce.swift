@@ -30,12 +30,12 @@ var das: [D] = [d1]
 cas = das
 das = cas // expected-error{{cannot assign a value of type '[C]' to a value of type '[D]'}}
 
-// Slice<T>
+// ArraySlice<T>
 var cs = ca[0...0]
 var ds = da[0...0]
 
-cs = ds // expected-error{{cannot assign a value of type 'Slice<D>' to a value of type 'Slice<C>'}}
-ds = cs // expected-error{{cannot assign a value of type 'Slice<C>' to a value of type 'Slice<D>'}}
+cs = ds // expected-error{{cannot assign a value of type 'ArraySlice<D>' to a value of type 'ArraySlice<C>'}}
+ds = cs // expected-error{{cannot assign a value of type 'ArraySlice<C>' to a value of type 'ArraySlice<D>'}}
 
 // ContiguousArray<T>
 var cna: ContiguousArray<C> = [c1]
