@@ -155,6 +155,7 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
       }
       if (CompleteFuncs->hasChanged() && Options.VerifyAll) {
         F.verify();
+        verifyAnalyses();
       }
 
       ++NumPassesRun;
@@ -234,6 +235,7 @@ void SILPassManager::runOneIteration() {
 
       if (CompleteFuncs->hasChanged() && Options.VerifyAll) {
         Mod->verify();
+        verifyAnalyses();
       }
 
       ++NumPassesRun;

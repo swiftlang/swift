@@ -53,8 +53,11 @@ namespace swift {
       Destructor
     };
 
+  private:
     /// Stores the kind of derived class.
     const AnalysisKind Kind;
+
+  public:
 
     /// Returns the kind of derived class.
     AnalysisKind getKind() const { return Kind; }
@@ -70,6 +73,9 @@ namespace swift {
 
     /// Invalidate all of the information for a specific function.
     virtual void invalidate(SILFunction *F, InvalidationKind K) {}
+
+    /// Verify the state of this analysis.
+    virtual void verify() const {}
   };
 
   /// Keep track of functions that are completely optimized.

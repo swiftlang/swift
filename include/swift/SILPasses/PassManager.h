@@ -111,6 +111,13 @@ namespace swift {
     /// D'tor.
     ~SILPassManager();
 
+    /// Verify all analyses.
+    void verifyAnalyses() const {
+      for (auto *A : Analysis) {
+        A->verify();
+      }
+    }
+
   protected:
     bool runFunctionPasses(
       llvm::ArrayRef<SILFunctionTransform*> FuncTransforms);
