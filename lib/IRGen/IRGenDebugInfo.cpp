@@ -704,13 +704,15 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
   else
     llvm_unreachable("function has no mangled name");
 
-  StringRef Name = LinkageName;
+  StringRef Name;
   if (DS) {
     if (DS->Loc.getKind() == SILLocation::SILFileKind)
       Name = DS->SILFn->getName();
     else
       Name = getName(DS->Loc);
   }
+  if (Name.empty())
+    Name = LinkageName;
 
   Location L = {};
   unsigned ScopeLine = 0; /// The source line used for the function prologue.
