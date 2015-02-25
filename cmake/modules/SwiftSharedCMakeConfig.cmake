@@ -1,5 +1,10 @@
 include(CMakeParseArguments)
 
+# Use ${cmake_2_8_12_KEYWORD} intead of KEYWORD in target_link_libraries().
+# These variables are used by LLVM's CMake code.
+set(cmake_2_8_12_INTERFACE INTERFACE)
+set(cmake_2_8_12_PRIVATE PRIVATE)
+
 # Invokes llvm_config to get various configuration information needed to compile
 # programs which use llvm.
 #

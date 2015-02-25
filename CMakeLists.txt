@@ -192,11 +192,6 @@ include(SwiftList)
 
 swift_configure_install_components("${SWIFT_INSTALL_COMPONENTS}")
 
-# Use ${cmake_2_8_12_KEYWORD} intead of KEYWORD in target_link_libraries().
-# These variables are used by LLVM's CMake code.
-set(cmake_2_8_12_INTERFACE INTERFACE)
-set(cmake_2_8_12_PRIVATE PRIVATE)
-
 if("${CMAKE_VERSION}" VERSION_LESS "3.0")
   set(SWIFT_CMAKE_HAS_GENERATOR_EXPRESSIONS FALSE)
 else()
