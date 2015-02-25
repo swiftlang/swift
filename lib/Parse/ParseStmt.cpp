@@ -672,7 +672,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       // condition.  Produce a fix-it hint to rewrite the comma to &&.
       diagnose(CommaLoc,
                diag::expected_expr_conditional_letbinding_bool_conditions)
-        .fixItReplace(CommaLoc, "&&");
+        .fixItReplace(CommaLoc, " &&");
       do {
         ParserResult<Expr> CondExpr = parseExprBasic(ID);
         Status |= CondExpr;

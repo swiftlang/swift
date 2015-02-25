@@ -65,7 +65,7 @@ if 1 != 2, let x = opt, y = opt where x != y,
 // <rdar://problem/19939746> Improve error recovery for malformed if statements
 if 1 != 2, {  // expected-error {{expected 'let' or 'var' in conditional}}
 }
-if 1 != 2, 4 == 57 {}   // expected-error {{expected 'let' or 'var' in conditional; use '&&' to join boolean conditions}}
+if 1 != 2, 4 == 57 {}   // expected-error {{expected 'let' or 'var' in conditional; use '&&' to join boolean conditions}}{{10-11= &&}}
 if 1 != 2, 4 == 57, let x = opt {} // expected-error {{expected 'let' or 'var' in conditional; use '&&' to join boolean conditions}}
 
 // Test that these don't cause the parser to crash.
