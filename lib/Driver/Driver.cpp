@@ -960,8 +960,11 @@ void Driver::buildActions(const ToolChain &TC,
 
     } else {
       StringRef buildRecordPath;
-      if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput())
-        buildRecordPath = masterOutputMap->lookup(types::TY_SwiftDeps);
+      if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput()) {
+        auto iter = masterOutputMap->find(types::TY_SwiftDeps);
+        if (iter != masterOutputMap->end())
+          buildRecordPath = iter->second;
+      }
 
       if (buildRecordPath.empty()) {
         Diags.diagnose(SourceLoc(),
