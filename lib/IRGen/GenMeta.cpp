@@ -3081,9 +3081,8 @@ namespace {
         IGF.Builder.CreateCall5(IGF.IGM.getInitClassMetadataUniversalFn(),
                                 metadata, superMetadata, numFields,
                                 firstField.getAddress(), fieldVector);
-      }
 
-      if (IGF.IGM.ObjCInterop) {
+      } else if (IGF.IGM.ObjCInterop) {
         // Register the class with the ObjC runtime.
         llvm::Value *instantiateObjC = IGF.IGM.getInstantiateObjCClassFn();
         IGF.Builder.CreateCall(instantiateObjC, metadata);

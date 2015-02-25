@@ -3,7 +3,6 @@
 // RUN: %target-run %t/a.out | FileCheck %s
 
 // TODO: Nongeneric subclasses of generic classes
-// TODO: Generic subclasses of ObjC classes
 
 protocol MyPrintable {
   func myPrint()

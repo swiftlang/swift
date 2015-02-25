@@ -408,7 +408,5 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   [[ALIGN_ADDR:%.*]] = getelementptr inbounds [2 x i64]* [[TYPES]], i32 0, i32 1
 // CHECK:   store i64 [[ALIGN]], i64* [[ALIGN_ADDR]], align 8
 // CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], %swift.type* [[SUPER]], i64 1, i64* [[SIZE_ADDR]], i64* [[OFFSETS]])
-//   Initialize the ObjC class.
-// CHECK:   call void @swift_instantiateObjCClass(%swift.type* [[METADATA]])
 // CHECK:   ret %swift.type* [[METADATA]]
 // CHECK: }

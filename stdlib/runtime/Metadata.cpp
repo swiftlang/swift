@@ -1379,53 +1379,29 @@ void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
   // Start layout by appending to a standard heap object header.
   size_t size, alignMask;
 
+#if SWIFT_OBJC_INTEROP
+  ClassROData *rodata = (ClassROData*) (self->Data & ~uintptr_t(1));
+#endif
+
   // If we have a superclass, start from its size and alignment instead.
   if (super) {
     // This is straightforward if the superclass is Swift.
+#if SWIFT_OBJC_INTEROP
     if (super->isTypeMetadata()) {
+#endif
       size = super->getInstanceSize();
       alignMask = super->getInstanceAlignMask();
 
-    // If it's Objective-C, we need to clone the ivar descriptors.
-    // The data pointer will still be the value we set up according
-    // to the compiler ABI.
+#if SWIFT_OBJC_INTEROP
+    // If it's Objective-C, start layout from our static notion of
+    // where the superclass starts.  Objective-C expects us to have
+    // generated a correct ivar layout, which it will simply slide if
+    // it needs to.
     } else {
-      ClassROData *rodata = (ClassROData*) (self->Data & ~uintptr_t(1));
-
-      // Do layout starting from our notion of where the superclass starts.
       size = rodata->InstanceStart;
       alignMask = 0xF; // malloc alignment guarantee
-
-      if (numFields) {
-        // Clone the ivar list.
-        const ClassIvarList *dependentIvars = rodata->IvarList;
-        assert(dependentIvars->Count == numFields);
-        assert(dependentIvars->EntrySize == sizeof(ClassIvarEntry));
-
-        auto ivarListSize = sizeof(ClassIvarList) +
-                            numFields * sizeof(ClassIvarEntry);
-        auto ivars = (ClassIvarList*) permanentAlloc(ivarListSize);
-        memcpy(ivars, dependentIvars, ivarListSize);
-        rodata->IvarList = ivars;
-
-        for (unsigned i = 0; i != numFields; ++i) {
-          ClassIvarEntry &ivar = ivars->getIvars()[i];
-
-          // The offset variable for the ivar is the respective entry in
-          // the field-offset vector.
-          ivar.Offset = &fieldOffsets[i];
-
-          // If the ivar's size doesn't match the field layout we
-          // computed, overwrite it and give it better type information.
-          if (ivar.Size != fieldLayouts[i].Size) {
-            ivar.Size = fieldLayouts[i].Size;
-            ivar.Type = nullptr;
-            ivar.Log2Alignment =
-              getLog2AlignmentFromMask(fieldLayouts[i].AlignMask);
-          }
-        }
-      }
     }
+#endif
 
   // If we don't have a formal superclass, start with the basic heap header.
   } else {
@@ -1434,6 +1410,94 @@ void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
     alignMask = heapLayout.flags.getAlignmentMask();
   }
 
+#if SWIFT_OBJC_INTEROP
+  // In ObjC interop mode, we have up to two places we need each correct
+  // ivar offset to end up:
+  //
+  // - the global ivar offset in the RO-data; this should only exist
+  //   if the class layout (up to this ivar) is not actually dependent
+  //
+  // - the field offset vector (fieldOffsets)
+  //
+  // When we ask the ObjC runtime to lay out this class, we need the
+  // RO-data to point to the field offset vector, even if the layout
+  // is not dependent.  The RO-data is not shared between
+  // instantiations, but the global ivar offset is (by definition).
+  // If the compiler didn't have the correct static size for the
+  // superclass (i.e. if rodata->InstanceStart is wrong), a previous
+  // instantiation might have already slid the global offset to the
+  // correct place; we need the ObjC runtime to see a pre-slid value,
+  // and it's not safe to briefly unslide it and let the runtime slide
+  // it back because there might already be concurrent code relying on
+  // the global ivar offset.
+  //
+  // So we need to the remember the addresses of the global ivar offsets.
+  // We use this lazily-filled SmallVector to do so.
+  const unsigned NumInlineGlobalIvarOffsets = 8;
+  size_t *_inlineGlobalIvarOffsets[NumInlineGlobalIvarOffsets];
+  size_t **_globalIvarOffsets = nullptr;
+  auto getGlobalIvarOffsets = [&]() -> size_t** {
+    if (!_globalIvarOffsets) {
+      if (numFields <= NumInlineGlobalIvarOffsets) {
+        _globalIvarOffsets = _inlineGlobalIvarOffsets;
+      } else {
+        _globalIvarOffsets = new size_t*[numFields];
+      }
+
+      // Make sure all the entries start out null.
+      memset(_globalIvarOffsets, 0, sizeof(size_t*) * numFields);
+    }
+    return _globalIvarOffsets;
+  };
+
+  // Ensure that Objective-C does layout starting from the right
+  // offset.  This needs to exactly match the superclass rodata's
+  // InstanceSize in cases where the compiler decided that we didn't
+  // really have a resilient ObjC superclass, because the compiler
+  // might hardcode offsets in that case, so we can't slide ivars.
+  // Fortunately, the cases where that happens are exactly the
+  // situations where our entire superclass hierarchy is defined
+  // in Swift.  (But note that ObjC might think we have a superclass
+  // even if Swift doesn't, because of SwiftObject.)
+  rodata->InstanceStart = size;
+
+  // Always clone the ivar descriptors.
+  if (numFields) {
+    const ClassIvarList *dependentIvars = rodata->IvarList;
+    assert(dependentIvars->Count == numFields);
+    assert(dependentIvars->EntrySize == sizeof(ClassIvarEntry));
+
+    auto ivarListSize = sizeof(ClassIvarList) +
+                        numFields * sizeof(ClassIvarEntry);
+    auto ivars = (ClassIvarList*) permanentAlloc(ivarListSize);
+    memcpy(ivars, dependentIvars, ivarListSize);
+    rodata->IvarList = ivars;
+
+    for (unsigned i = 0; i != numFields; ++i) {
+      ClassIvarEntry &ivar = ivars->getIvars()[i];
+
+      // Remember the global ivar offset if present.
+      if (ivar.Offset) {
+        getGlobalIvarOffsets()[i] = ivar.Offset;
+      }
+
+      // Change the ivar offset to point to the respective entry of
+      // the field-offset vector, as discussed above.
+      ivar.Offset = &fieldOffsets[i];
+
+      // If the ivar's size doesn't match the field layout we
+      // computed, overwrite it and give it better type information.
+      if (ivar.Size != fieldLayouts[i].Size) {
+        ivar.Size = fieldLayouts[i].Size;
+        ivar.Type = nullptr;
+        ivar.Log2Alignment =
+          getLog2AlignmentFromMask(fieldLayouts[i].AlignMask);
+      }
+    }
+  }
+#endif
+
+  // Okay, now do layout.
   for (unsigned i = 0; i != numFields; ++i) {
     auto offset = roundUpToAlignMask(size, fieldLayouts[i].AlignMask);
     fieldOffsets[i] = offset;
@@ -1445,6 +1509,32 @@ void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
   assert(self->isTypeMetadata());
   self->setInstanceSize(size);
   self->setInstanceAlignMask(alignMask);
+
+#if SWIFT_OBJC_INTEROP
+  // Save the size into the Objective-C metadata as well.
+  rodata->InstanceSize = size;
+
+  // Register this class with the runtime.  This will also cause the
+  // runtime to lay us out.
+  swift_instantiateObjCClass(self);
+
+  // If we saved any global ivar offsets, make sure we write back to them.
+  if (_globalIvarOffsets) {
+    for (unsigned i = 0; i != numFields; ++i) {
+      if (!_globalIvarOffsets[i]) continue;
+
+      // To avoid dirtying memory, only write to the global ivar
+      // offset if it's actually wrong.
+      if (*_globalIvarOffsets[i] != fieldOffsets[i])
+        *_globalIvarOffsets[i] = fieldOffsets[i];
+    }
+
+    // Free the out-of-line if we allocated one.
+    if (_globalIvarOffsets != _inlineGlobalIvarOffsets) {
+      delete [] _globalIvarOffsets;
+    }
+  }
+#endif
 }
 
 /// \brief Fetch the type metadata associated with the formal dynamic

@@ -924,10 +924,11 @@ extern "C" id swift_dynamicCastObjCProtocolConditional(id object,
   return object;
 }
 
-extern "C" void swift_instantiateObjCClass(Class c) {
+extern "C" void swift::swift_instantiateObjCClass(const ClassMetadata *_c) {
   static const objc_image_info ImageInfo = {0, 0};
 
   // Ensure the superclass is realized.
+  Class c = (Class) _c;
   [class_getSuperclass(c) class];
 
   // Register the class.

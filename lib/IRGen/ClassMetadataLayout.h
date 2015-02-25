@@ -41,12 +41,6 @@ protected:
   /// The most-derived class.
   ClassDecl *const Target;
 
-  /// Is the object layout globally resilient at this point?
-  bool IsObjectResilient = false;
-
-  /// Is the metadata layout globally resilient at this point?
-  bool IsMetadataResilient = false;
-
   ClassMetadataLayout(IRGenModule &IGM, ClassDecl *target)
     : super(IGM), Target(target) {}
 
@@ -104,16 +98,14 @@ private:
       addGenericClassFields(theClass, *generics);
     }
 
-    // If there exists a potential context from which the class is
-    // resilient, subsequent fields will require indirect offsets.
-    if (IGM.isResilient(theClass, ResilienceScope::Universal)) {
-      IsObjectResilient = true;
-      IsMetadataResilient = true;
-    }
-    
     // Add entries for the methods.
     for (auto member : theClass->getMembers()) {
       // If this is a non-overriding final member, we don't need table entries.
+      // FIXME: do we really need entries for final overrides?  The
+      // superclass should provide the entries it needs, and
+      // reabstracting overrides shouldn't be required: if we know
+      // enough to call the override, we know enough to call it
+      // directly.
       if (auto *VD = dyn_cast<ValueDecl>(member))
         if (VD->isFinal() && VD->getOverriddenDecl() == nullptr)
           continue;
@@ -133,7 +125,7 @@ private:
         // Add entries for constructors.
         addMethodEntries(ctor);
       } else if (auto *asd = dyn_cast<AbstractStorageDecl>(member)) {
-        // FIXME: Stored properties shouldn't be represented this way.
+        // FIXME: Stored properties should either be final or have accessors.
         if (!asd->hasAccessorFunctions()) continue;
 
         // @NSManaged properties don't have vtable entries.
@@ -146,19 +138,23 @@ private:
           addMethodEntries(materializeForSet);
       }
     }
-    
-    // Add field offsets.
-    for (auto member : theClass->getMembers()) {
-      if (auto field = dyn_cast<VarDecl>(member))
-        if (field->hasStorage())
-          updateForFieldSize(field);
-    }
 
+    // A class only really *needs* a field-offset vector in the
+    // metadata if:
+    //   - it's in a generic context and
+    //   - there might exist a context which
+    //     - can access the class's field storage directly and
+    //     - sees the class as having a possibly dependent layout.
+    //
+    // A context which knows that the class does not have a dependent
+    // layout should be able to just use a direct field offset
+    // (possibly a constant one).
+    //
+    // But we currently always give classes field-offset vectors,
+    // whether they need them or not.
     asImpl().noteStartOfFieldOffsets(theClass);
-    for (auto member : theClass->getMembers()) {
-      if (auto field = dyn_cast<VarDecl>(member))
-        if (field->hasStorage() && !(field->isStatic() && field->isFinal()))
-          addFieldEntries(field);
+    for (auto field : theClass->getStoredProperties()) {
+      addFieldEntries(field);
     }
     asImpl().noteEndOfFieldOffsets(theClass);
   }
@@ -183,26 +179,6 @@ private:
 
   void addFieldEntries(VarDecl *field) {
     asImpl().addFieldOffset(field);
-  }
-
-  void updateForFieldSize(VarDecl *field) {
-    assert(field->hasStorage());
-
-    // Update the class layout based on abstract, globally-known
-    // characteristics of the type.
-    SILType fieldType = IGM.getLoweredType(AbstractionPattern(field->getType()),
-                                           field->getType());
-    switch (IGM.classifyTypeSize(fieldType, ResilienceScope::Universal)) {
-    case ObjectSize::Fixed:
-      return;
-    case ObjectSize::Resilient:
-      IsObjectResilient = true;
-      return;
-    case ObjectSize::Dependent:
-      IsObjectResilient = true;
-      return;
-    }
-    llvm_unreachable("invalid type size classification");
   }
 
   void addMethodEntries(AbstractFunctionDecl *fn) {
