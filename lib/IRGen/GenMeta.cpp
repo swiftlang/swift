@@ -1716,7 +1716,7 @@ namespace {
   /// function that lazily instantiates the type metadata for all of the
   /// types of the stored properties of an instance of a nominal type.
   static llvm::Function *
-  buildFieldTypeAccessorFn(IRGenModule &IGM,
+  getFieldTypeAccessorFn(IRGenModule &IGM,
                          NominalTypeDecl *type,
                          NominalTypeDecl::StoredPropertyRange storedProperties){
     // The accessor function has the following signature:
@@ -1729,120 +1729,12 @@ namespace {
                                      llvm::Twine("get_field_types_")
                                        + type->getName().str(),
                                      IGM.getModule());
-    IRGenFunction IGF(IGM, fn);
     
-    llvm::Value *metadata = IGF.collectParameters().claimNext();
-    
-    // Get the address at which the field type vector reference should be
-    // cached.
-    llvm::Value *vectorPtr;
-    auto nullVector = llvm::ConstantPointerNull::get(metadataArrayPtrTy);
-    
-    // If the type is not generic, we can use a global variable to cache the
-    // address of the field type vector for the single instance.
-    if (!type->getGenericParamsOfContext()) {
-      vectorPtr = new llvm::GlobalVariable(*IGM.getModule(),
-                                           metadataArrayPtrTy,
-                                           /*constant*/ false,
-                                           llvm::GlobalValue::PrivateLinkage,
-                                           nullVector,
-                                           llvm::Twine("field_type_vector_")
-                                             + type->getName().str());
-    // For a generic type, use a slot we saved in the generic metadata pattern
-    // immediately after the metadata object itself, which should be
-    // instantiated with every generic metadata instance.
-    } else {
-      Size offset = getSizeOfMetadata(IGM, type).getOffsetToEnd();
-      vectorPtr = IGF.Builder.CreateBitCast(metadata,
-                                            metadataArrayPtrTy->getPointerTo());
-      vectorPtr = IGF.Builder.CreateConstInBoundsGEP1_32(vectorPtr,
-                                              getOffsetInWords(IGM, offset));
-    }
-    
-    // First, see if the field type vector has already been populated. This
-    // load can be nonatomic; if we race to build the field offset vector, we
-    // will detect so when we try to commit our pointer and simply discard the
-    // redundant work.
-    llvm::Value *initialVector
-      = IGF.Builder.CreateLoad(vectorPtr, IGM.getPointerAlignment());
-    
-    auto entryBB = IGF.Builder.GetInsertBlock();
-    auto buildBB = IGF.createBasicBlock("build_field_types");
-    auto raceLostBB = IGF.createBasicBlock("race_lost");
-    auto doneBB = IGF.createBasicBlock("done");
-    
-    llvm::Value *isNull
-      = IGF.Builder.CreateICmpEQ(initialVector, nullVector);
-    IGF.Builder.CreateCondBr(isNull, buildBB, doneBB);
-    
-    // Build the field type vector if we didn't already.
-    IGF.Builder.emitBlock(buildBB);
-    
-    // Bind the metadata instance to our local type data so we
-    // use it to provide metadata for generic parameters in field types.
-    emitPolymorphicParametersForGenericValueWitness(IGF, type, metadata);
-    
-    // Allocate storage for the field vector.
-    SmallVector<VarDecl*, 4> fields(storedProperties.begin(),
-                                    storedProperties.end());
-    unsigned allocSize = fields.size() * IGM.getPointerSize().getValue();
-    auto allocSizeVal = llvm::ConstantInt::get(IGM.IntPtrTy, allocSize);
-    auto allocAlignMaskVal =
-      IGM.getSize(IGM.getPointerAlignment().asSize() - Size(1));
-    llvm::Value *builtVectorAlloc
-      = IGF.emitAllocRawCall(allocSizeVal, allocAlignMaskVal);
-    
-    llvm::Value *builtVector
-      = IGF.Builder.CreateBitCast(builtVectorAlloc, metadataArrayPtrTy);
-    
-    // Emit type metadata for the fields into the vector.
-    for (unsigned i : indices(fields)) {
-      auto field = fields[i];
-      auto slot = IGF.Builder.CreateInBoundsGEP(builtVector,
-                        llvm::ConstantInt::get(IGM.Int32Ty, i));
-      auto fieldTy = field->getType()->getCanonicalType();
-      
-      // Strip reference storage qualifiers like unowned and weak.
-      // FIXME: Some clients probably care about them.
-      if (auto refStorTy = dyn_cast<ReferenceStorageType>(fieldTy))
-        fieldTy = refStorTy.getReferentType();
-      
-      auto metadata = IGF.emitTypeMetadataRef(fieldTy);
-      IGF.Builder.CreateStore(metadata, slot, IGM.getPointerAlignment());
-    }
-    
-    // Atomically compare-exchange a pointer to our vector into the slot.
-    auto vectorIntPtr = IGF.Builder.CreateBitCast(vectorPtr,
-                                                  IGM.IntPtrTy->getPointerTo());
-    auto builtVectorInt = IGF.Builder.CreatePtrToInt(builtVector,
-                                                     IGM.IntPtrTy);
-    auto zero = llvm::ConstantInt::get(IGM.IntPtrTy, 0);
-    
-    llvm::Value *raceVectorInt = IGF.Builder.CreateAtomicCmpXchg(vectorIntPtr,
-                                 zero, builtVectorInt,
-                                 llvm::AtomicOrdering::SequentiallyConsistent,
-                                 llvm::AtomicOrdering::SequentiallyConsistent);
-    // The pointer in the slot should still have been null.
-    auto didStore = IGF.Builder.CreateExtractValue(raceVectorInt, 1);
-    raceVectorInt = IGF.Builder.CreateExtractValue(raceVectorInt, 0);
-    IGF.Builder.CreateCondBr(didStore, doneBB, raceLostBB);
-    
-    // If the cmpxchg failed, someone beat us to landing their field type
-    // vector. Deallocate ours and return the winner.
-    IGF.Builder.emitBlock(raceLostBB);
-    IGF.emitDeallocRawCall(builtVectorAlloc, allocSizeVal, allocAlignMaskVal);
-    auto raceVector = IGF.Builder.CreateIntToPtr(raceVectorInt,
-                                                 metadataArrayPtrTy);
-    IGF.Builder.CreateBr(doneBB);
-    
-    // Return the result.
-    IGF.Builder.emitBlock(doneBB);
-    auto phi = IGF.Builder.CreatePHI(metadataArrayPtrTy, 3);
-    phi->addIncoming(initialVector, entryBB);
-    phi->addIncoming(builtVector, buildBB);
-    phi->addIncoming(raceVector, raceLostBB);
-    
-    IGF.Builder.CreateRet(phi);
+    // Emit the body of the field type accessor later. We need to access
+    // the type metadata for the fields, which could lead to infinite recursion
+    // in recursive types if we build the field type accessor during metadata
+    // generation.
+    IGM.addLazyFieldTypeAccessor(type, storedProperties, fn);
     
     return fn;
   }
@@ -1934,7 +1826,7 @@ namespace {
       
       // Build the field type accessor function.
       llvm::Function *fieldTypeVectorAccessor
-        = buildFieldTypeAccessorFn(IGM, Target,
+        = getFieldTypeAccessorFn(IGM, Target,
                                    Target->getStoredProperties());
       
       addWord(fieldTypeVectorAccessor);
@@ -2035,7 +1927,7 @@ namespace {
       
       // Build the field type accessor function.
       llvm::Function *fieldTypeVectorAccessor
-        = buildFieldTypeAccessorFn(IGM, Target,
+        = getFieldTypeAccessorFn(IGM, Target,
                                    Target->getStoredProperties());
       
       addWord(fieldTypeVectorAccessor);
@@ -2104,6 +1996,135 @@ namespace {
   };
 }
 
+void
+IRGenModule::addLazyFieldTypeAccessor(NominalTypeDecl *type,
+                          NominalTypeDecl::StoredPropertyRange storedProperties,
+                          llvm::Function *fn) {
+  LazyFieldTypeAccessors.push_back({type, storedProperties, fn});
+}
+
+void
+irgen::emitFieldTypeAccessor(IRGenModule &IGM,
+                         NominalTypeDecl *type,
+                         llvm::Function *fn,
+                         NominalTypeDecl::StoredPropertyRange storedProperties)
+{
+  IRGenFunction IGF(IGM, fn);
+  auto metadataArrayPtrTy = IGM.TypeMetadataPtrTy->getPointerTo();
+
+  llvm::Value *metadata = IGF.collectParameters().claimNext();
+  
+  // Get the address at which the field type vector reference should be
+  // cached.
+  llvm::Value *vectorPtr;
+  auto nullVector = llvm::ConstantPointerNull::get(metadataArrayPtrTy);
+  
+  // If the type is not generic, we can use a global variable to cache the
+  // address of the field type vector for the single instance.
+  if (!type->getGenericParamsOfContext()) {
+    vectorPtr = new llvm::GlobalVariable(*IGM.getModule(),
+                                         metadataArrayPtrTy,
+                                         /*constant*/ false,
+                                         llvm::GlobalValue::PrivateLinkage,
+                                         nullVector,
+                                         llvm::Twine("field_type_vector_")
+                                           + type->getName().str());
+  // For a generic type, use a slot we saved in the generic metadata pattern
+  // immediately after the metadata object itself, which should be
+  // instantiated with every generic metadata instance.
+  } else {
+    Size offset = getSizeOfMetadata(IGM, type).getOffsetToEnd();
+    vectorPtr = IGF.Builder.CreateBitCast(metadata,
+                                          metadataArrayPtrTy->getPointerTo());
+    vectorPtr = IGF.Builder.CreateConstInBoundsGEP1_32(vectorPtr,
+                                            getOffsetInWords(IGM, offset));
+  }
+  
+  // First, see if the field type vector has already been populated. This
+  // load can be nonatomic; if we race to build the field offset vector, we
+  // will detect so when we try to commit our pointer and simply discard the
+  // redundant work.
+  llvm::Value *initialVector
+    = IGF.Builder.CreateLoad(vectorPtr, IGM.getPointerAlignment());
+  
+  auto entryBB = IGF.Builder.GetInsertBlock();
+  auto buildBB = IGF.createBasicBlock("build_field_types");
+  auto raceLostBB = IGF.createBasicBlock("race_lost");
+  auto doneBB = IGF.createBasicBlock("done");
+  
+  llvm::Value *isNull
+    = IGF.Builder.CreateICmpEQ(initialVector, nullVector);
+  IGF.Builder.CreateCondBr(isNull, buildBB, doneBB);
+  
+  // Build the field type vector if we didn't already.
+  IGF.Builder.emitBlock(buildBB);
+  
+  // Bind the metadata instance to our local type data so we
+  // use it to provide metadata for generic parameters in field types.
+  emitPolymorphicParametersForGenericValueWitness(IGF, type, metadata);
+  
+  // Allocate storage for the field vector.
+  SmallVector<VarDecl*, 4> fields(storedProperties.begin(),
+                                  storedProperties.end());
+  unsigned allocSize = fields.size() * IGM.getPointerSize().getValue();
+  auto allocSizeVal = llvm::ConstantInt::get(IGM.IntPtrTy, allocSize);
+  auto allocAlignMaskVal =
+    IGM.getSize(IGM.getPointerAlignment().asSize() - Size(1));
+  llvm::Value *builtVectorAlloc
+    = IGF.emitAllocRawCall(allocSizeVal, allocAlignMaskVal);
+  
+  llvm::Value *builtVector
+    = IGF.Builder.CreateBitCast(builtVectorAlloc, metadataArrayPtrTy);
+  
+  // Emit type metadata for the fields into the vector.
+  for (unsigned i : indices(fields)) {
+    auto field = fields[i];
+    auto slot = IGF.Builder.CreateInBoundsGEP(builtVector,
+                      llvm::ConstantInt::get(IGM.Int32Ty, i));
+    auto fieldTy = field->getType()->getCanonicalType();
+    
+    // Strip reference storage qualifiers like unowned and weak.
+    // FIXME: Some clients probably care about them.
+    if (auto refStorTy = dyn_cast<ReferenceStorageType>(fieldTy))
+      fieldTy = refStorTy.getReferentType();
+    
+    auto metadata = IGF.emitTypeMetadataRef(fieldTy);
+    IGF.Builder.CreateStore(metadata, slot, IGM.getPointerAlignment());
+  }
+  
+  // Atomically compare-exchange a pointer to our vector into the slot.
+  auto vectorIntPtr = IGF.Builder.CreateBitCast(vectorPtr,
+                                                IGM.IntPtrTy->getPointerTo());
+  auto builtVectorInt = IGF.Builder.CreatePtrToInt(builtVector,
+                                                   IGM.IntPtrTy);
+  auto zero = llvm::ConstantInt::get(IGM.IntPtrTy, 0);
+  
+  llvm::Value *raceVectorInt = IGF.Builder.CreateAtomicCmpXchg(vectorIntPtr,
+                               zero, builtVectorInt,
+                               llvm::AtomicOrdering::SequentiallyConsistent,
+                               llvm::AtomicOrdering::SequentiallyConsistent);
+  // The pointer in the slot should still have been null.
+  auto didStore = IGF.Builder.CreateExtractValue(raceVectorInt, 1);
+  raceVectorInt = IGF.Builder.CreateExtractValue(raceVectorInt, 0);
+  IGF.Builder.CreateCondBr(didStore, doneBB, raceLostBB);
+  
+  // If the cmpxchg failed, someone beat us to landing their field type
+  // vector. Deallocate ours and return the winner.
+  IGF.Builder.emitBlock(raceLostBB);
+  IGF.emitDeallocRawCall(builtVectorAlloc, allocSizeVal, allocAlignMaskVal);
+  auto raceVector = IGF.Builder.CreateIntToPtr(raceVectorInt,
+                                               metadataArrayPtrTy);
+  IGF.Builder.CreateBr(doneBB);
+  
+  // Return the result.
+  IGF.Builder.emitBlock(doneBB);
+  auto phi = IGF.Builder.CreatePHI(metadataArrayPtrTy, 3);
+  phi->addIncoming(initialVector, entryBB);
+  phi->addIncoming(builtVector, buildBB);
+  phi->addIncoming(raceVector, raceLostBB);
+  
+  IGF.Builder.CreateRet(phi);
+}
 
 /*****************************************************************************/
 /** Metadata Emission ********************************************************/

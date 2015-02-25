@@ -18,6 +18,7 @@
 #ifndef SWIFT_IRGEN_IRGENMODULE_H
 #define SWIFT_IRGEN_IRGENMODULE_H
 
+#include "swift/AST/Decl.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/SuccessorMap.h"
@@ -310,6 +311,10 @@ public:
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
   void addProtocolConformanceRecord(llvm::Constant *record);
 
+  void addLazyFieldTypeAccessor(NominalTypeDecl *type,
+                          NominalTypeDecl::StoredPropertyRange storedProperties,
+                          llvm::Function *fn);
+
 private:
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
@@ -361,6 +366,15 @@ private:
 
   /// The queue of lazy type metadata to emit.
   llvm::SmallVector<CanType, 4> LazyTypeMetadata;
+
+  struct LazyFieldTypeAccessor {
+    NominalTypeDecl *type;
+    NominalTypeDecl::StoredPropertyRange storedProperties;
+    llvm::Function *fn;
+  };
+  
+  /// Field type accessors we need to emit.
+  llvm::SmallVector<LazyFieldTypeAccessor, 4> LazyFieldTypeAccessors;
 
   /// SIL functions that we need to emit lazily.
   llvm::SmallVector<SILFunction*, 4> LazyFunctionDefinitions;

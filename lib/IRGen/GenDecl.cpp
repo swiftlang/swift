@@ -749,13 +749,19 @@ static void emitLazyTypeMetadata(IRGenModule &IGM, CanType type) {
 /// else) that we require.
 void IRGenModule::emitLazyDefinitions() {
   while (!LazyTypeMetadata.empty() ||
-         !LazyFunctionDefinitions.empty()) {
+         !LazyFunctionDefinitions.empty() ||
+         !LazyFieldTypeAccessors.empty()) {
 
     // Emit any lazy type metadata we require.
     while (!LazyTypeMetadata.empty()) {
       CanType type = LazyTypeMetadata.pop_back_val();
       assert(isTypeMetadataEmittedLazily(type));
       emitLazyTypeMetadata(*this, type);
+    }
+    while (!LazyFieldTypeAccessors.empty()) {
+      auto accessor = LazyFieldTypeAccessors.pop_back_val();
+      emitFieldTypeAccessor(*this, accessor.type, accessor.fn,
+                            accessor.storedProperties);
     }
 
     // Emit any lazy function definitions we require.

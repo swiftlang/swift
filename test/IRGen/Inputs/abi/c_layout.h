@@ -59,3 +59,9 @@ struct SIMDStruct {
 };
 
 void takesSIMDStruct(struct SIMDStruct);
+
+struct HasRecursivePointers {
+  struct HasRecursivePointers *next;
+  void (*getNext)(struct HasRecursivePointers);
+};
+

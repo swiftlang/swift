@@ -4,6 +4,7 @@
 
 sil_stage canonical
 import c_layout
+import Builtin
 
 // CHECK: %VSC11BitfieldOne = type <{ %VSs6UInt32, %VSC6Nested, [1 x i8], [4 x i8], [4 x i8], %Sf, [1 x i8], [7 x i8], %VSs6UInt64, %VSs6UInt32 }>
 // CHECK: %VSC6Nested = type <{ %Sf, [3 x i8] }>
@@ -114,4 +115,11 @@ bb0:
   %g = function_ref @consumeSIMDStruct : $@thin @cc(cdecl) SIMDStruct -> ()
   %z = apply %g(%x) : $@thin @cc(cdecl) SIMDStruct -> ()
   return undef : $()
+}
+
+sil @testRecursive : $@thin () -> Builtin.Word {
+bb0:
+  %m = metatype $@thin HasRecursivePointers.Type
+  %s = builtin "sizeof"<HasRecursivePointers>(%m : $@thin HasRecursivePointers.Type) : $Builtin.Word
+  return %s : $Builtin.Word
 }

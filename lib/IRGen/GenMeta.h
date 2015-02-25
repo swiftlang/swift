@@ -211,6 +211,14 @@ namespace irgen {
   llvm::Value *emitObjCMetadataRefForMetadata(IRGenFunction &IGF,
                                               llvm::Value *classPtr);
   
+  /// Emit the field type accessor for a nominal type's metadata. This function
+  /// lazily generates the metadata for the types of all of the nominal type's
+  /// fields for reflection purposes.
+  void emitFieldTypeAccessor(IRGenModule &IGM,
+                         NominalTypeDecl *type,
+                         llvm::Function *fn,
+                         NominalTypeDecl::StoredPropertyRange storedProperties);
+  
   /// Adjustment indices for the address points of various metadata.
   /// Size is in words.
   namespace MetadataAdjustmentIndex {

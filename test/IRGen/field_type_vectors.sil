@@ -5,7 +5,6 @@
 
 import Swift
 
-// CHECK:       [[FOO_TYPE_VECTOR_SLOT:@.*]] = private global %swift.type** null
 // CHECK-LABEL: @_TMnV18field_type_vectors3Foo = constant 
 // CHECK:         %swift.type** (%swift.type*)* [[FOO_TYPES_ACCESSOR:@[^,]*]],
 struct Foo {
@@ -72,6 +71,8 @@ class StorageQualified {
   }
 }
 sil_vtable StorageQualified {}
+
+// CHECK:       [[FOO_TYPE_VECTOR_SLOT:@.*Foo.*]] = private global %swift.type** null
 
 // CHECK: define private %swift.type** [[FOO_TYPES_ACCESSOR]](%swift.type*)
 // CHECK:   [[EXISTING:%.*]] = load %swift.type*** [[FOO_TYPE_VECTOR_SLOT]]
