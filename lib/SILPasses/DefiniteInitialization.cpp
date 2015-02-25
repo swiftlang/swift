@@ -954,6 +954,30 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
       }
     }
   }
+  
+  // If this is a copy_addr into the 'self' argument, and the memory object is a
+  // rootself struct/enum or a non-delegating initializer, then we're looking at
+  // the implicit "return self" in an address-only initializer.  Emit a specific
+  // diagnostic.
+  if (auto *CA = dyn_cast<CopyAddrInst>(Inst)) {
+    if (CA->isInitializationOfDest() &&
+        !CA->getFunction()->getArguments().empty() &&
+        CA->getFunction()->getArgument(0) && CA->getDest()) {
+      if (TheMemory.isEnumInitSelf()) {
+        if (!shouldEmitError(Inst)) return;
+        diagnose(Module, Inst->getLoc(),
+                 diag::return_from_init_without_initing_self);
+        return;
+      } else if (TheMemory.isAnyInitSelf() && !TheMemory.isClassInitSelf() &&
+                 !TheMemory.isDelegatingInit()) {
+        if (!shouldEmitError(Inst)) return;
+        diagnose(Module, Inst->getLoc(),
+                 diag::return_from_init_without_initing_stored_properties);
+        noteUninitializedMembers(Use);
+        return;
+      }
+    }
+  }
 
   // Check to see if we're returning self in a class initializer before all the
   // ivars/super.init are set up.

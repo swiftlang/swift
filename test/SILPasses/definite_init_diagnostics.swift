@@ -1019,4 +1019,24 @@ class MyClassTestExample {
 }
 
 
+// <rdar://problem/19746552> QoI: variable "used before being initialized" instead of "returned uninitialized" in address-only enum/struct
+
+struct AddressOnlyStructWithInit<T, U> {
+  let a : T?
+  let b : U?   // expected-note {{unexpected diagnostic produced: 'self.b' not initialized}}
+  
+  init(a : T) {
+    self.a = a
+  }     // expected-error {{return from initializer without initializing all stored properties}}
+}
+
+enum AddressOnlyEnumWithInit<T> {
+  case X(T), Y
+  
+  init() {
+  }  // expected-error {{return from enum initializer method without storing to 'self'}}
+}
+
+
+
 
