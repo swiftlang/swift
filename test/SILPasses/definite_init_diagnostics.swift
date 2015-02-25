@@ -1023,7 +1023,7 @@ class MyClassTestExample {
 
 struct AddressOnlyStructWithInit<T, U> {
   let a : T?
-  let b : U?   // expected-note {{unexpected diagnostic produced: 'self.b' not initialized}}
+  let b : U?   // expected-note {{'self.b' not initialized}}
   
   init(a : T) {
     self.a = a
