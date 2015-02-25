@@ -354,6 +354,9 @@ def whole_module_optimization : Flag<["-"], "whole-module-optimization">,
   HelpText<"Optimize input files together instead of individually">,
   Flags<[FrontendOption, NoInteractiveOption]>;
 
+def wmo : Flag<["-"], "wmo">, Alias<whole_module_optimization>,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>;
+
 def force_single_frontend_invocation :
   Flag<["-"], "force-single-frontend-invocation">,
   Alias<whole_module_optimization>,
