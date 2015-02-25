@@ -334,3 +334,31 @@ bb0(%x : $Int32, %f : $@callee_owned (@out T, Int32) -> ()):
 // CHECK:         insertvalue {{.*}} [[FORWARDER:@_TPA[A-Za-z0-9_]*]]
 // CHECK:       define internal void [[FORWARDER]]
 // CHECK:         call void {{%.*}}(%swift.opaque* noalias sret
+
+class Base {
+}
+sil_vtable Base {}
+
+class Sub : Base {
+}
+
+sil_vtable Sub {}
+
+sil @parametric_casting_closure : $@thin <C where C : Base> (@owned Base) -> @owned C {
+bb0(%0 : $Base):
+  %1 = unconditional_checked_cast %0 : $Base to $C
+   return %1 : $C
+}
+
+// CHECK-LABEL: define internal %C13partial_apply3Sub* @_TPA_parametric_casting_closure(%C13partial_apply4Base*)
+// CHECK: [[RES:%.*]] = tail call %C13partial_apply4Base* @parametric_casting_closure
+// CHECK: [[CASTED:%.*]] = bitcast %C13partial_apply4Base* [[RES]] to %C13partial_apply3Sub*
+// CHECK: ret %C13partial_apply3Sub* [[CASTED]]
+
+sil @test_partial_apply : $@thin () -> () {
+bb0:
+ %0 = function_ref @parametric_casting_closure : $@thin <C where C : Base> (@owned Base) -> @owned C
+ %1 = partial_apply %0<Sub>() : $@thin <C where C : Base> (@owned Base) -> @owned C
+ %2 = tuple ()
+ return %2 : $()
+}

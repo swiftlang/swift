@@ -3266,8 +3266,16 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
   if (call->getType()->isVoidTy())
     subIGF.Builder.CreateRetVoid();
-  else
-    subIGF.Builder.CreateRet(call);
+  else {
+    llvm::Value *callResult = call;
+    // If the result type is dependent on a type parameter we might have to cast
+    // to the result type - it could be substituted.
+    if (origType->getSILResult().isDependentType()) {
+      auto ResType = fwd->getReturnType();
+      callResult = subIGF.Builder.CreateBitCast(callResult, ResType);
+    }
+    subIGF.Builder.CreateRet(callResult);
+  }
   
   return fwd;
 }
