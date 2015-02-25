@@ -43,6 +43,23 @@ CallGraph::CallGraph(SILModule *Mod, bool completeModule) : M(*Mod) {
       addEdges(&F);
 }
 
+CallGraph::~CallGraph() {
+  // Clean up all call graph nodes.
+  for (auto &P : FunctionToNodeMap) {
+    P.second->~CallGraphNode();
+  }
+
+  // Clean up all call graph edges.
+  for (auto &P : ApplyToEdgeMap) {
+    P.second->~CallGraphEdge();
+  }
+
+  // Clean up all SCCs.
+  for (CallGraphSCC *SCC : BottomUpSCCOrder) {
+    SCC->~CallGraphSCC();
+  }
+}
+
 void CallGraph::addCallGraphNode(SILFunction *F, unsigned NodeOrdinal) {
   // TODO: Compute this from the call graph itself after stripping
   //       unreachable nodes from graph.
@@ -136,6 +153,8 @@ void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
 
   if (tryGetCalleeSet(AI->getCallee(), CalleeSet, Complete)) {
     auto *Edge = new (Allocator) CallGraphEdge(AI, CalleeSet, Complete);
+    assert(!ApplyToEdgeMap.count(AI) &&
+           "Added apply that already has an edge node!\n");
     ApplyToEdgeMap[AI] = Edge;
     CallerNode->addCalleeEdge(Edge);
     for (auto *CalleeNode : CalleeSet)
@@ -203,6 +222,8 @@ class CallGraphSCCFinder {
   llvm::DenseMap<CallGraphNode *, unsigned> MinDFSNum;
   llvm::SetVector<CallGraphNode *> DFSStack;
 
+  /// The CallGraphSCCFinder does not own this bump ptr allocator, so does not
+  /// call the destructor of objects allocated from it.
   llvm::BumpPtrAllocator &BPA;
 
 public:
@@ -257,8 +278,7 @@ public:
 void CallGraph::computeBottomUpSCCOrder() {
   if (!BottomUpSCCOrder.empty()) {
     for (auto *SCC : BottomUpSCCOrder)
-      delete SCC;
-
+      SCC->~CallGraphSCC();
     BottomUpSCCOrder.clear();
   }
 
@@ -268,6 +288,7 @@ void CallGraph::computeBottomUpSCCOrder() {
 }
 
 void CallGraph::computeBottomUpFunctionOrder() {
+  // We do not need to call any destructors here.
   BottomUpFunctionOrder.clear();
 
   computeBottomUpSCCOrder();
@@ -276,6 +297,10 @@ void CallGraph::computeBottomUpFunctionOrder() {
     for (auto *Node : SCC->SCCNodes)
       BottomUpFunctionOrder.push_back(Node->getFunction());
 }
+
+//===----------------------------------------------------------------------===//
+//                           CallGraph Verification
+//===----------------------------------------------------------------------===//
 
 void CallGraph::verify() const {
 #ifndef NDEBUG

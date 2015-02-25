@@ -60,6 +60,8 @@ private:
   // might include functions that are not actually callable based on
   // dynamic types. If the int bit is non-zero, the set is complete in
   // the sense that no function outside the set could be called.
+  //
+  // This is currently owned by the CallGraphEdge.
   llvm::PointerIntPair<CalleeSetType *, 1> CalleeSet;
 
 public:
@@ -124,9 +126,13 @@ class CallGraphNode {
 
   /// Edges representing the known call sites that could call into
   /// this function.
+  ///
+  /// This is owned by the callgraph itself, not the callgraph node.
   llvm::SmallVector<CallGraphEdge *, 4> CallerEdges;
 
   /// Edges representing the call sites within this function.
+  ///
+  /// This is owned by the callgraph itself, not the callgraph node.
   llvm::SmallVector<CallGraphEdge *, 4> CalleeEdges;
 
   /// Do we know all the potential callers of this function? We initialize this
@@ -144,6 +150,8 @@ public:
     assert(Function &&
            "Cannot build a call graph node with a null function pointer!");
   }
+
+  ~CallGraphNode() = default;
 
   SILFunction *getFunction() {
     return Function;
@@ -212,6 +220,8 @@ private:
 };
 
 struct CallGraphSCC {
+  /// The CallGraphSCC does not own these CallGraphNodes. They are owned by the
+  /// CallGraph itself where they are allocated via a bump ptr allocator.
   llvm::SmallVector<CallGraphNode *, 1> SCCNodes;
 };
 
@@ -223,6 +233,9 @@ class CallGraph {
   /// definitions in our module currently. It can be expanded to only include
   /// functions clearly visible from outside our compilation scope (i.e. ignore
   /// private functions that don't escape).
+  ///
+  /// These are allocated via Allocator so are owned by the CallGraph. Thus the
+  /// callgraph calls the CallGraphNode's destructors in its destructor.
   llvm::SmallVector<CallGraphNode *, 16> CallGraphRoots;
 
   /// A map from a function to the function's node in the call graph.
@@ -242,8 +255,7 @@ class CallGraph {
 
 public:
   CallGraph(SILModule *M, bool completeModule);
-
-  ~CallGraph() {}
+  ~CallGraph();
 
   llvm::SmallVectorImpl<CallGraphNode *> &getCallGraphRoots() {
     return CallGraphRoots;
