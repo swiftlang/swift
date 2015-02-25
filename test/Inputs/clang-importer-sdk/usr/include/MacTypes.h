@@ -10,6 +10,8 @@ typedef Fract *                         FractPtr;
 
 typedef SInt16                          OSErr;
 typedef SInt32                          OSStatus;
+typedef unsigned long                   ByteCount;
+typedef unsigned long                   ItemCount;
 typedef UInt32                          FourCharCode;
 typedef FourCharCode                    OSType;
 

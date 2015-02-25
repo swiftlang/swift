@@ -21,6 +21,11 @@ module Darwin {
   }
 }
 
+module CoreMIDI {
+  header "CoreMIDI.h"
+  export *
+}
+
 module Dispatch {
   header "dispatch.h"
   export *

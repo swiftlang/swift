@@ -60,6 +60,8 @@ MAP_STDLIB_TYPE("Float80", FloatX87DoubleExtended, 80, "Float80", All, true,
 MAP_STDLIB_TYPE("Byte",       UnsignedInt, 8,  "UInt8", All, false, DoNothing)
 MAP_STDLIB_TYPE("SignedByte", SignedInt,   8,  "Int8",  All, false, DoNothing)
 
+MAP_STDLIB_TYPE("ItemCount", UnsignedWord, 0, "Int", All, false, DoNothing)
+MAP_STDLIB_TYPE("ByteCount", UnsignedWord, 0, "Int", All, false, DoNothing)
 MAP_STDLIB_TYPE("UniCharCount", UnsignedWord, 0, "Int", All, false, DoNothing)
 
 
