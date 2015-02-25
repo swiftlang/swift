@@ -507,8 +507,6 @@ ERROR(ibaction_nonobjc_class_argument,sema_tcd,none,
       (Type))
 ERROR(ibaction_nonobject_argument,sema_tcd,none,
       "argument to @IBAction method cannot have non-object type %0", (Type))
-ERROR(classbound_protocol_not_protocol,sema_tcd,none,
-      "': class' can only be applied to protocols to mark them class bound", ())
 ERROR(no_objc_tagged_pointer_not_class_protocol,sema_tcd,none,
       "@unsafe_no_objc_tagged_pointer can only be applied to class protocols",
       ())

@@ -93,8 +93,6 @@ SIMPLE_DECL_ATTR(required, Required,
 SIMPLE_DECL_ATTR(optional, Optional,
                  OnConstructor|OnFunc|OnVar|OnSubscript|DeclModifier, 5)
 
-SIMPLE_DECL_ATTR(class_protocol, ClassProtocol, OnProtocol, 6)
-
 SIMPLE_DECL_ATTR(noreturn, NoReturn, OnFunc, 7)
 
 SIMPLE_DECL_ATTR(exported, Exported, OnImport, 8)

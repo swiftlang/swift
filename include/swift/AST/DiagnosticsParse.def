@@ -1068,9 +1068,6 @@ ERROR(redundant_class_requirement,decl_parsing,none,
       "redundant 'class' requirement", ())
 ERROR(late_class_requirement,decl_parsing,none,
       "'class' must come first in the requirement list", ())
-ERROR(class_protocol_removed,decl_class,none,
-      "the 'class_protocol' attribute has been replaced with a 'class' "
-      "requirement", ())
 
 //------------------------------------------------------------------------------
 // Build configuration parsing diagnostics

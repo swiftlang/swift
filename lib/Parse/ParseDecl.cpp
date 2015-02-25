@@ -4174,34 +4174,6 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   if (classRequirementLoc.isValid())
     Proto->setRequiresClass();
 
-  // If the "class_protocol" attribute was provided, replace it with a 'class'
-  // requirement.
-  if (auto classProto = Attributes.getAttribute<ClassProtocolAttr>()) {
-    StringRef addString;
-    SourceLoc insertLoc;
-    if (InheritedProtocols.empty()) {
-      insertLoc = Lexer::getLocForEndOfToken(SourceMgr, NameLoc);
-      addString = " : class";
-    } else {
-      insertLoc = InheritedProtocols[0].getSourceRange().Start;
-      addString = "class, ";
-    }
-
-    // Remove @class_protocol and the character following it.
-    SourceLoc removeEndLoc = Lexer::getLocForEndOfToken(SourceMgr,
-                                                        classProto->Range.End)
-      .getAdvancedLoc(1);
-    diagnose(classProto->AtLoc, diag::class_protocol_removed)
-      .fixItRemoveChars(classProto->AtLoc, removeEndLoc)
-      .fixItInsert(insertLoc, addString);
-
-    // Act as if we saw a 'class' requirement.
-    Proto->setRequiresClass();
-
-    // Drop the attribute.
-    Attributes.removeAttribute(classProto);
-  }
-
   Proto->getAttrs() = Attributes;
 
   ContextChange CC(*this, Proto);

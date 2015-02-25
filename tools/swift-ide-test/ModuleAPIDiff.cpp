@@ -254,7 +254,6 @@ namespace sma {
 using llvm::Optional;
 
 #define SMA_FOR_EVERY_DECL_ATTRIBUTE(MACRO) \
-  MACRO(IsClassProtocol) \
   MACRO(IsDynamic) \
   MACRO(IsFinal) \
   MACRO(IsLazy) \

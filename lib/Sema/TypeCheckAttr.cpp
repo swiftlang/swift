@@ -49,7 +49,6 @@ public:
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
   IGNORED_ATTR(Asmname)
   IGNORED_ATTR(Availability)
-  IGNORED_ATTR(ClassProtocol)
   IGNORED_ATTR(Final)
   IGNORED_ATTR(NSApplicationMain)
   IGNORED_ATTR(NSCopying)
@@ -577,7 +576,6 @@ public:
 
   void visitAvailabilityAttr(AvailabilityAttr *attr);
 
-  void visitClassProtocolAttr(ClassProtocolAttr *attr);
   void visitFinalAttr(FinalAttr *attr);
   void visitIBActionAttr(IBActionAttr *attr);
   void visitNSCopyingAttr(NSCopyingAttr *attr);
@@ -764,16 +762,6 @@ void AttributeChecker::visitAvailabilityAttr(AvailabilityAttr *attr) {
                 diag::availability_decl_more_than_enclosing);
     TC.diagnose(EnclosingDecl->getLoc(),
                 diag::availability_decl_more_than_enclosing_enclosing_here);
-  }
-}
-
-void AttributeChecker::visitClassProtocolAttr(ClassProtocolAttr *attr) {
-  // FIXME: The @class_protocol attribute is dead. Retain this code so that we
-  // diagnose uses of @class_protocol for non-protocols.
-  if (!isa<ProtocolDecl>(D)) {
-    TC.diagnose(attr->getLocation(),
-                diag::classbound_protocol_not_protocol);
-    attr->setInvalid();
   }
 }
 
