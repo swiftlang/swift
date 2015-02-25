@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-@noescape var fn : () -> Int = { 4 }  // expected-error {{'noescape' may only be used on 'parameter' declarations}}
+@noescape var fn : () -> Int = { 4 }  // expected-error {{@noescape may only be used on 'parameter' declarations}}
 
 func doesEscape(fn : () -> Int) {}
 
@@ -164,7 +164,7 @@ func testAutoclosure(@autoclosure a : () -> Int) { // expected-note{{parameter '
 
 
 // <rdar://problem/19470858> QoI: @autoclosure implies @noescape, so you shouldn't be allowed to specify both
-func redundant(@noescape  // expected-error {{'noescape' attribute is implied by @autoclosure and should not be redundantly specified}}
+func redundant(@noescape  // expected-error {{@noescape is implied by @autoclosure and should not be redundantly specified}}
                @autoclosure fn : () -> Int) {
 }
 

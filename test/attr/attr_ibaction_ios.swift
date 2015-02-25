@@ -56,11 +56,11 @@ class IBActionWrapperTy {
 
   @IBAction func watchKitLike(_: Int) {}
   // CHECK-ios-NOT: attr_ibaction_ios.swift:[[@LINE-1]]
-  // CHECK-macosx: attr_ibaction_ios.swift:[[@LINE-2]]:18: error: argument to 'IBAction' method cannot have non-object type
+  // CHECK-macosx: attr_ibaction_ios.swift:[[@LINE-2]]:18: error: argument to @IBAction method cannot have non-object type
 
   @IBAction func watchKitLikeBad(_: IntWrapper) {}
-  // CHECK-BOTH: attr_ibaction_ios.swift:[[@LINE-1]]:18: error: argument to 'IBAction' method cannot have non-object type
+  // CHECK-BOTH: attr_ibaction_ios.swift:[[@LINE-1]]:18: error: argument to @IBAction method cannot have non-object type
 
   @IBAction func watchKitLikeOpt(_: Int?) {}
-  // CHECK-BOTH: attr_ibaction_ios.swift:[[@LINE-1]]:18: error: argument to 'IBAction' method cannot have non-object type
+  // CHECK-BOTH: attr_ibaction_ios.swift:[[@LINE-1]]:18: error: argument to @IBAction method cannot have non-object type
 }

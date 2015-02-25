@@ -772,7 +772,7 @@ void AttributeChecker::visitClassProtocolAttr(ClassProtocolAttr *attr) {
   // diagnose uses of @class_protocol for non-protocols.
   if (!isa<ProtocolDecl>(D)) {
     TC.diagnose(attr->getLocation(),
-                diag::class_protocol_not_protocol);
+                diag::classbound_protocol_not_protocol);
     attr->setInvalid();
   }
 }

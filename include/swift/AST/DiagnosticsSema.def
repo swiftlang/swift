@@ -462,58 +462,56 @@ ERROR(static_functions_not_mutating,sema_tcd,none,
       "static functions may not be declared mutating", ())
 
 ERROR(transparent_stored_property,sema_tcd,none,
-      "'transparent' attribute cannot be applied to stored properties", ())
+      "@transparent cannot be applied to stored properties", ())
 ERROR(transparent_on_invalid_extension,sema_tcd,none,
-      "'transparent' attribute is only supported on struct and enum extensions", ())
+      "@transparent is only supported on struct and enum extensions", ())
 ERROR(transparent_in_protocols_not_supported,sema_tcd,none,
-      "'transparent' attribute is not supported on declarations within protocols",
-      ())
+      "@transparent is not supported on declarations within protocols", ())
 ERROR(transparent_in_classes_not_supported,sema_tcd,none,
-      "'transparent' attribute is not supported on declarations within classes",
-      ())
+      "@transparent is not supported on declarations within classes", ())
 
 ERROR(invalid_iboutlet,sema_tcd,none,
-      "only instance properties can be declared 'IBOutlet'", ())
+      "only instance properties can be declared @IBOutlet", ())
 ERROR(iboutlet_nonobjc_class,sema_tcd,none,
-      "'IBOutlet' property cannot %select{have|be an array of}0 "
+      "@IBOutlet property cannot %select{have|be an array of}0 "
       "non-'@objc' class type %1", (bool, Type))
 ERROR(iboutlet_nonobjc_protocol,sema_tcd,none,
-      "'IBOutlet' property cannot %select{have|be an array of}0 "
+      "@IBOutlet property cannot %select{have|be an array of}0 "
       "non-'@objc' protocol type %1", (bool, Type))
 ERROR(iboutlet_nonobject_type,sema_tcd,none,
-      "'IBOutlet' property cannot %select{have|be an array of}0 "
+      "@IBOutlet property cannot %select{have|be an array of}0 "
       "non-object type %1", (bool, Type))
 ERROR(iboutlet_only_mutable,sema_tcd,none,
-      "'IBOutlet' attribute requires property to be mutable", ())
+      "@IBOutlet attribute requires property to be mutable", ())
 ERROR(iboutlet_non_optional,sema_tcd,none,
-      "'IBOutlet' property has non-optional type %0", (Type))
+      "@IBOutlet property has non-optional type %0", (Type))
 NOTE(note_make_optional,sema_tcd,none,
       "add '?' to form the optional type %0", (Type))
 NOTE(note_make_implicitly_unwrapped_optional,sema_tcd,none,
       "add '!' to form the implicitly unwrapped optional type %0", (Type))
 
 ERROR(invalid_ibdesignable_extension,sema_tcd,none,
-      "'IBDesignable' attribute can only be applied to classes and extensions "
+      "@IBDesignable can only be applied to classes and extensions "
       "of classes", ())
 ERROR(invalid_ibinspectable,sema_tcd,none,
-      "only instance properties can be declared 'IBInspectable'", ())
+      "only instance properties can be declared @IBInspectable", ())
 ERROR(invalid_ibaction_decl,sema_tcd,none,
-      "only instance methods can be declared 'IBAction'", ())
+      "only instance methods can be declared @IBAction", ())
 ERROR(invalid_ibaction_result,sema_tcd,none,
-      "methods declared 'IBAction' must return 'Void' (not %0)", (Type))
+      "methods declared @IBAction must return 'Void' (not %0)", (Type))
 ERROR(invalid_ibaction_argument_count,sema_tcd,none,
       "'IBAction' methods %select{must have a single argument"
       "|can only have up to 2 arguments}0", (bool))
 ERROR(ibaction_nonobjc_class_argument,sema_tcd,none,
-      "argument to 'IBAction' method cannot have non-'@objc' class type %0",
+      "argument to @IBAction method cannot have non-'@objc' class type %0",
       (Type))
 ERROR(ibaction_nonobject_argument,sema_tcd,none,
-      "argument to 'IBAction' method cannot have non-object type %0", (Type))
-ERROR(class_protocol_not_protocol,sema_tcd,none,
-      "'class_protocol' attribute can only be applied to protocols", ())
+      "argument to @IBAction method cannot have non-object type %0", (Type))
+ERROR(classbound_protocol_not_protocol,sema_tcd,none,
+      "': class' can only be applied to protocols to mark them class bound", ())
 ERROR(no_objc_tagged_pointer_not_class_protocol,sema_tcd,none,
-      "'unsafe_no_objc_tagged_pointer' attribute can only be applied to "
-      "class protocols", ())
+      "@unsafe_no_objc_tagged_pointer can only be applied to class protocols",
+      ())
 ERROR(access_control_in_protocol,sema_tcd,none,
       "%0 modifier cannot be used in protocols", (DeclAttribute))
 ERROR(access_control_setter,sema_tcd,none,
@@ -546,7 +544,7 @@ ERROR(access_control_extension_more,sema_tcd,none,
 ERROR(invalid_decl_attribute_simple,sema_tcd,none,
       "attribute cannot be applied to declaration", ())
 ERROR(invalid_decl_attribute,sema_tcd,none,
-      "%0 attribute cannot be applied to this declaration", (DeclAttribute))
+      "%0 cannot be applied to this declaration", (DeclAttribute))
 ERROR(invalid_decl_modifier,sema_tcd,none,
       "%0 modifier cannot be applied to this declaration", (DeclAttribute))
 ERROR(attribute_does_not_apply_to_type,type_parsing,none,
@@ -824,7 +822,7 @@ NOTE(protocol_witness_mutating_conflict,sema_tcd,none,
 NOTE(protocol_witness_settable_conflict,sema_tcd,none,
      "candidate is not settable, but protocol requires it", ())
 NOTE(protocol_witness_noreturn_conflict,sema_tcd,none,
-     "candidate is not 'noreturn', but protocol requires it", ())
+     "candidate is not @noreturn, but protocol requires it", ())
 NOTE(protocol_witness_not_objc,sema_tcd,none,
      "candidate is not '@objc', but protocol requires it", ())
 
@@ -1136,50 +1134,49 @@ ERROR(final_not_on_accessors,sema_tcd,none,
       "%select{var|let|subscript}0", (unsigned))
 
 ERROR(override_noreturn_with_return,sema_tcd,none,
-      "an override of a 'noreturn' method should also be 'noreturn'", ())
+      "an override of a @noreturn method should also be @noreturn", ())
 
 ERROR(inconsistent_attribute_override,sema_tcd,none,
-      "'%0' attribute must be consistent between a method and its"
-      " override", (StringRef))
+      "@%0 must be consistent between a method and its override", (StringRef))
 ERROR(autoclosure_function_type,attribute_parsing,none,
-      "'autoclosure' attribute may only be applied to values of function type",
+      "@autoclosure may only be applied to values of function type",
       ())
 ERROR(autoclosure_function_input_nonunit,attribute_parsing,none,
       "autoclosure argument type must be '()'", ())
 ERROR(noescape_function_type,attribute_parsing,none,
-      "'noescape' attribute may only be applied to parameters of function type",
+      "@noescape may only be applied to parameters of function type",
       ())
 ERROR(noescape_implied_by_autoclosure,attribute_parsing,none,
-      "'noescape' attribute is implied by @autoclosure and should not be "
+      "@noescape is implied by @autoclosure and should not be "
       "redundantly specified", ())
 ERROR(noescape_conflicts_escaping_autoclosure,attribute_parsing,none,
-      "'noescape' attribute conflicts with '@autoclosure(escaping)'", ())
+      "@noescape conflicts with @autoclosure(escaping)", ())
 
 
 // NSManaged attribute
 ERROR(attr_NSManaged_not_property,sema_tcd,none,
-      "'NSManaged' attribute only allowed on a property in a class", ())
+      "@NSManaged only allowed on a property in a class", ())
 ERROR(attr_NSManaged_not_stored,sema_tcd,none,
-      "'NSManaged' not allowed on %select{computed|observing|adressed}0 "
+      "@NSManaged not allowed on %select{computed|observing|adressed}0 "
       "properties", (unsigned))
 ERROR(attr_NSManaged_let_property,sema_tcd,none,
-      "'NSManaged' attribute not allowed on a 'let' property", ())
+      "@NSManaged not allowed on a 'let' property", ())
 ERROR(attr_NSManaged_initial_value,sema_tcd,none,
-      "'NSManaged' property cannot have an initial value", ())
+      "@NSManaged property cannot have an initial value", ())
 ERROR(attr_NSManaged_NSCopying,sema_tcd,none,
-      "'NSManaged' property cannot also be marked @NSCopying", ())
+      "@NSManaged property cannot also be marked @NSCopying", ())
 
 
 // NSCopying attribute
 ERROR(nscopying_only_on_class_properties,sema_tcd,none,
-      "'NSCopying' attribute may only be used on properties in classes",
+      "@NSCopying may only be used on properties in classes",
       ())
 ERROR(nscopying_only_mutable,sema_tcd,none,
-      "'NSCopying' attribute requires property to be mutable", ())
+      "@NSCopying requires property to be mutable", ())
 ERROR(nscopying_only_stored_property,sema_tcd,none,
-      "'NSCopying' attribute is only valid on stored properties", ())
+      "@NSCopying is only valid on stored properties", ())
 ERROR(nscopying_doesnt_conform,sema_tcd,none,
-      "'NSCopying' attribute is only valid with types that conform to"
+      "@NSCopying is only valid with types that conform to"
       " the NSCopying protocol", ())
 
 // UIApplicationMain/NSApplicationMain attribute
@@ -1657,8 +1654,6 @@ ERROR(array_literal_intrinsics_not_found,sema_tct,none,
       "Array<T>", ())
 ERROR(bool_intrinsics_not_found,sema_tct,none,
       "broken standard library: cannot find intrinsic operations on Bool", ())
-ERROR(unchecked_not_optional_type,sema_tct,none,
-      "type following '@unchecked' must be an optional type", ())
 ERROR(self_in_nominal,sema_tct,none,
       "'Self' is only available in a protocol or as the result of a "
       "method in a class; did you mean %0?", (Identifier))
@@ -1753,7 +1748,7 @@ ERROR(objc_decl_used_without_required_module, sema_tcd, none,
 
 ERROR(invalid_objc_decl,sema_tcd,none,
       "only classes, protocols, methods, properties, and subscript "
-      "declarations can be declared '@objc'", ())
+      "declarations can be declared @objc", ())
 ERROR(objc_in_generic_context,sema_objc,none,
       "%select{method|initializer|variable|subscript}0 in a generic class "
       "cannot be represented in Objective-C", (int))

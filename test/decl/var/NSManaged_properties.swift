@@ -8,23 +8,23 @@ import Foundation
   func foo() -> X { return self }
 }
 
-@NSManaged var global: Int // expected-error {{'NSManaged' attribute only allowed on a property in a class}}
+@NSManaged var global: Int // expected-error {{@NSManaged only allowed on a property in a class}}
 
-@NSManaged     // expected-error {{'NSManaged' may only be used on 'var' declarations}}
+@NSManaged     // expected-error {{@NSManaged may only be used on 'var' declarations}}
 func managedFunction() {}
 
 class SwiftGizmo : A {
   @NSManaged var a: X
   @NSManaged var b: Int
-  @NSManaged let c: Int  // expected-error {{'NSManaged' attribute not allowed on a 'let' property}}
+  @NSManaged let c: Int  // expected-error {{@NSManaged not allowed on a 'let' property}}
 
-  @NSManaged class var d: Int = 4  // expected-error {{'NSManaged' attribute only allowed on a property in a class}} \
+  @NSManaged class var d: Int = 4  // expected-error {{@NSManaged only allowed on a property in a class}} \
             // expected-error {{class stored properties not yet supported}}
 
 
-  @NSManaged var e: Int { return 4 } // expected-error {{'NSManaged' not allowed on computed properties}}
+  @NSManaged var e: Int { return 4 } // expected-error {{@NSManaged not allowed on computed properties}}
 
-  @NSCopying @NSManaged var optionalProperty : NSString?  // expected-error {{'NSManaged' property cannot also be marked @NSCopying}}
+  @NSCopying @NSManaged var optionalProperty : NSString?  // expected-error {{@NSManaged property cannot also be marked @NSCopying}}
 
   override init() {}
 }

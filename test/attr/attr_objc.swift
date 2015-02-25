@@ -27,24 +27,24 @@ protocol Protocol_Class2 : class {}
 //===--- Subjects of @objc attribute.
 
 @objc  
-var subject_globalVar: Int // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+var subject_globalVar: Int // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared @objc}}
 
 var subject_getterSetter: Int {
   @objc 
-  get { // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+  get { // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared @objc}}
     return 0
   }
   @objc
-  set {  // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+  set {  // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared @objc}}
   }
 }
 
 var subject_global_observingAccesorsVar1: Int = 0 {
   @objc 
-  willSet { // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+  willSet { // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared @objc}}
   }
   @objc 
-  didSet { // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+  didSet { // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared @objc}}
   }
 }
 
@@ -94,49 +94,49 @@ class subject_staticVar1 {
 }
 
 @objc
-func subject_freeFunc() { // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+func subject_freeFunc() { // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared @objc}}
   @objc
-  var subject_localVar: Int // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+  var subject_localVar: Int // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared @objc}}
 
   @objc
-  func subject_nestedFreeFunc() { // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+  func subject_nestedFreeFunc() { // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared @objc}}
   }
 }
 
 @objc
-func subject_genericFunc<T>(t: T) { // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+func subject_genericFunc<T>(t: T) { // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared @objc}}
   @objc
-  var subject_localVar: Int // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+  var subject_localVar: Int // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared @objc}}
 
   @objc
-  func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+  func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared @objc}}
 }
 
 func subject_funcParam(a: @objc Int) { // expected-error {{attribute can only be applied to declarations, not types}}
 }
 
-@objc // expected-error {{'objc' attribute cannot be applied to this declaration}}
+@objc // expected-error {{@objc cannot be applied to this declaration}}
 struct subject_struct {
   @objc
-  var subject_instanceVar: Int // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+  var subject_instanceVar: Int // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared @objc}}
 
   @objc
-  init() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+  init() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared @objc}}
 
   @objc
-  func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+  func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared @objc}}
 }
 
-@objc   // expected-error {{'objc' attribute cannot be applied to this declaration}}
+@objc   // expected-error {{@objc cannot be applied to this declaration}}
 struct subject_genericStruct<T> {
   @objc
-  var subject_instanceVar: Int // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+  var subject_instanceVar: Int // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared @objc}}
 
   @objc
-  init() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+  init() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared @objc}}
 
   @objc
-  func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+  func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared @objc}}
 }
 
 @objc
@@ -169,14 +169,14 @@ class subject_genericClass<T> { // no-error
 
 @objc
 enum subject_enum: Int {
-  @objc   // expected-error {{'objc' attribute cannot be applied to this declaration}}
+  @objc   // expected-error {{@objc cannot be applied to this declaration}}
   case subject_enumElement1
 
   @objc   
-  init() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+  init() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared @objc}}
 
   @objc
-  func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+  func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared @objc}}
 }
 
 @objc
@@ -1488,7 +1488,7 @@ class HasIBOutlet {
   // CHECK-LABEL: {{^}} @IBOutlet @objc weak var goodOutlet: @sil_weak Class_ObjC1!
 
   @IBOutlet var badOutlet: PlainStruct
-  // expected-error@-1 {{'IBOutlet' property cannot have non-object type 'PlainStruct'}}
+  // expected-error@-1 {{@IBOutlet property cannot have non-object type 'PlainStruct'}}
   // CHECK-LABEL: {{^}}  @IBOutlet var badOutlet: PlainStruct
 }
 
@@ -1550,7 +1550,7 @@ class Class_ObjC2 {
   // CHECK-LABEL: @objc(isFoo) func foo() -> Bool {
 }
 
-@objc() // expected-error{{expected name within parentheses of '@objc' attribute}}
+@objc() // expected-error{{expected name within parentheses of @objc attribute}}
 class Class_ObjC3 { 
 }
 
@@ -1567,8 +1567,8 @@ extension PlainClass {
   // CHECK-LABEL: @objc(createWithRed:green:blue:alpha:) dynamic class func createWith
   @objc(createWithRed:green blue:alpha)
   class func createWithRed(Float, green: Float, blue: Float, alpha: Float) { }
-  // expected-error@-2{{missing ':' after selector piece in '@objc' attribute}}{{28-28=:}}
-  // expected-error@-3{{missing ':' after selector piece in '@objc' attribute}}{{39-39=:}}
+  // expected-error@-2{{missing ':' after selector piece in @objc attribute}}{{28-28=:}}
+  // expected-error@-3{{missing ':' after selector piece in @objc attribute}}{{39-39=:}}
 
   // CHECK-LABEL: @objc(::) dynamic func badlyNamed
   @objc(::)

@@ -191,11 +191,10 @@ ERROR(decl_already_static,decl_parsing,none,
       "%0 specified twice", (StaticSpellingKind))
 
 ERROR(autoclosure_is_decl_attribute,attribute_parsing,none,
-      "'autoclosure' attribute is now an attribute of the parameter "
+      "@autoclosure is now an attribute of the parameter "
       "declaration, not its type", ())
 ERROR(autoclosure_not_on_enums,attribute_parsing,none,
-      "'autoclosure' attribute is only allowed on parameters, not on enum"
-      " cases", ())
+      "@autoclosure is only allowed on parameters, not on enum cases", ())
 
 
 // Variable getters/setters
@@ -1002,7 +1001,7 @@ ERROR(attr_availability_expected_version,attribute_parsing,none,
 
 // autoclosure
 ERROR(attr_autoclosure_expected_r_paren,attribute_parsing,PointsToFirstBadToken,
-      "expected ')' in '@autoclosure' attribute", ())
+      "expected ')' in @autoclosure", ())
 
 // cc
 ERROR(cc_attribute_expected_lparen,attribute_parsing,none,
@@ -1016,11 +1015,11 @@ ERROR(cc_attribute_expected_rparen,attribute_parsing,none,
 
 // objc
 ERROR(attr_objc_missing_colon,attribute_parsing,none,
-      "missing ':' after selector piece in '@objc' attribute", ())
+      "missing ':' after selector piece in @objc attribute", ())
 ERROR(attr_objc_expected_rparen,attribute_parsing,none,
-      "expected ')' after name for '@objc' attribute", ())
+      "expected ')' after name for @objc", ())
 ERROR(attr_objc_empty_name,attribute_parsing,none,
-      "expected name within parentheses of '@objc' attribute", ())
+      "expected name within parentheses of @objc attribute", ())
 
 // opened
 ERROR(opened_attribute_expected_lparen,attribute_parsing,none,
@@ -1046,7 +1045,7 @@ ERROR(effects_attribute_unknown_option,attribute_parsing,none,
 ERROR(attr_unowned_invalid_specifier,attribute_parsing,none,
       "expected 'safe' or 'unsafe'", ())
 ERROR(attr_unowned_expected_rparen,attribute_parsing,none,
-      "expected ')' after specifier for 'unowned' attribute", ())
+      "expected ')' after specifier for 'unowned'", ())
 
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics
@@ -1110,12 +1109,6 @@ ERROR(avail_query_unrecognized_platform_name,parsing,
 ERROR(avail_query_disallowed_operator,parsing, PointsToFirstBadToken,
       "'%0' cannot be used in an availability condition", (StringRef))
 
-//------------------------------------------------------------------------------
-// Code Migration.
-//------------------------------------------------------------------------------
-
-ERROR(unchecked_attr_going_away, parsing, none,
-  "'@unchecked T?' syntax is going away, use 'T!'", ())
 
 
 #ifndef DIAG_NO_UNDEF

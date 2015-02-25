@@ -1,11 +1,11 @@
 // RUN: %target-parse-verify-swift
 
 // Simple case.
-@autoclosure var fn : () -> Int = 4  // expected-error {{'autoclosure' may only be used on 'parameter' declarations}} expected-error {{'Int' is not convertible to '() -> Int'}}
+@autoclosure var fn : () -> Int = 4  // expected-error {{@autoclosure may only be used on 'parameter' declarations}} expected-error {{'Int' is not convertible to '() -> Int'}}
 
-@autoclosure func func1() {}  // expected-error {{'autoclosure' may only be used on 'parameter' declarations}}
+@autoclosure func func1() {}  // expected-error {{@autoclosure may only be used on 'parameter' declarations}}
 
-func func1a(@autoclosure v1 : Int) {} // expected-error {{'autoclosure' attribute may only be applied to values of function type}}
+func func1a(@autoclosure v1 : Int) {} // expected-error {{@autoclosure may only be applied to values of function type}}
 
 
 func func2(@autoclosure fp : () -> Int) { func2(4)}
@@ -19,35 +19,35 @@ func func6(@autoclosure () -> Int) {func6(0)}
 func func7(@autoclosure @noreturn () -> Int) {func7(0)}
 
 // autoclosure + inout don't make sense.
-func func8(@autoclosure inout x: () -> Bool) -> Bool {  // expected-error {{'autoclosure' attribute may only be applied to values of function type}}
+func func8(@autoclosure inout x: () -> Bool) -> Bool {  // expected-error {{@autoclosure may only be applied to values of function type}}
 }
 
 
 // Should have good QoI:
-func migrate1(fp fpx : @autoclosure () -> Int) {}   // expected-error {{'autoclosure' attribute is now an attribute of the parameter declaration, not its type}} {{15-15=@autoclosure }} {{24-36=}}
+func migrate1(fp fpx : @autoclosure () -> Int) {}   // expected-error {{@autoclosure is now an attribute of the parameter declaration, not its type}} {{15-15=@autoclosure }} {{24-36=}}
 struct MethodHolder {
-  func migrate2(a : Int, _ fp : @autoclosure () -> Int) {}    // expected-error {{'autoclosure' attribute is now an attribute of the parameter declaration, not its type}} {{26-26=@autoclosure }} {{33-45=}}
+  func migrate2(a : Int, _ fp : @autoclosure () -> Int) {}    // expected-error {{@autoclosure is now an attribute of the parameter declaration, not its type}} {{26-26=@autoclosure }} {{33-45=}}
 }
-func migrate3(#fp : @autoclosure () -> Int) {}    // expected-error {{'autoclosure' attribute is now an attribute of the parameter declaration, not its type}} {{15-15=@autoclosure }} {{21-33=}}
+func migrate3(#fp : @autoclosure () -> Int) {}    // expected-error {{@autoclosure is now an attribute of the parameter declaration, not its type}} {{15-15=@autoclosure }} {{21-33=}}
 public func || <T: BooleanType>(
-  lhs: T, rhs: @autoclosure () -> Bool    // expected-error {{'autoclosure' attribute is now an attribute of the parameter declaration, not its type}} {{11-11=@autoclosure }} {{16-28=}}
+  lhs: T, rhs: @autoclosure () -> Bool    // expected-error {{@autoclosure is now an attribute of the parameter declaration, not its type}} {{11-11=@autoclosure }} {{16-28=}}
   ) -> Bool {
     return lhs.boolValue ? true : rhs().boolValue
 }
 
 // <rdar://problem/19707366> QoI: @autoclosure declaration change fixit
-let migrate4 : @autoclosure() -> ()   // expected-error {{'autoclosure' attribute is now an attribute of the parameter declaration, not its type}} {{1-1=@autoclosure }} {{16-28=}}
+let migrate4 : @autoclosure() -> ()   // expected-error {{@autoclosure is now an attribute of the parameter declaration, not its type}} {{1-1=@autoclosure }} {{16-28=}}
 
 
 struct SomeStruct {
-  @autoclosure let property : () -> Int  // expected-error {{'autoclosure' may only be used on 'parameter' declarations}}
+  @autoclosure let property : () -> Int  // expected-error {{@autoclosure may only be used on 'parameter' declarations}}
 
   init() {
   }
 }
 
 class BaseClass {
-  @autoclosure var property : () -> Int // expected-error {{'autoclosure' may only be used on 'parameter' declarations}}
+  @autoclosure var property : () -> Int // expected-error {{@autoclosure may only be used on 'parameter' declarations}}
   init() {}
 }
 
@@ -78,14 +78,14 @@ struct S : P2 {
 
 
 struct AutoclosureEscapeTest {
-  @autoclosure let delayed: () -> Int  // expected-error {{'autoclosure' may only be used on 'parameter' declarations}}
+  @autoclosure let delayed: () -> Int  // expected-error {{@autoclosure may only be used on 'parameter' declarations}}
 }
 
 // @autoclosure(escaping)
-func func10(@autoclosure(escaping () -> ()) { } // expected-error{{expected ')' in '@autoclosure' attribute}}
+func func10(@autoclosure(escaping () -> ()) { } // expected-error{{expected ')' in @autoclosure}}
 // expected-note@-1{{to match this opening '('}}
 
-func func11(@autoclosure(escaping) @noescape () -> ()) { } // expected-error{{'noescape' attribute conflicts with '@autoclosure(escaping)'}}
+func func11(@autoclosure(escaping) @noescape () -> ()) { } // expected-error{{@noescape conflicts with @autoclosure(escaping)}}
 
 
 class Super {
@@ -124,7 +124,7 @@ class TestFunc12 {
 
 
 enum AutoclosureFailableOf<T> {
-  case Success(@autoclosure () -> T)  // expected-error {{'autoclosure' attribute is only allowed on parameters, not on enum cases}}
+  case Success(@autoclosure () -> T)  // expected-error {{@autoclosure is only allowed on parameters, not on enum cases}}
   case Failure()
 }
 
