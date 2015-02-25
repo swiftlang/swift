@@ -500,7 +500,7 @@ ERROR(invalid_ibaction_decl,sema_tcd,none,
 ERROR(invalid_ibaction_result,sema_tcd,none,
       "methods declared @IBAction must return 'Void' (not %0)", (Type))
 ERROR(invalid_ibaction_argument_count,sema_tcd,none,
-      "'IBAction' methods %select{must have a single argument"
+      "@IBAction methods %select{must have a single argument"
       "|can only have up to 2 arguments}0", (bool))
 ERROR(ibaction_nonobjc_class_argument,sema_tcd,none,
       "argument to @IBAction method cannot have non-'@objc' class type %0",
