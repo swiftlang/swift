@@ -209,8 +209,10 @@ public:
           CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
     }
 
+    PrintOptions PO;
+    PO.SkipAttributes = true;
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::CallParameterType,
-                     Ty->getString());
+                     Ty->getString(PO));
 
     // Look through optional types and type aliases to find out if we have
     // function/closure parameter type that is not an autoclosure.
@@ -220,6 +222,7 @@ public:
         // If this is a closure type, add ChunkKind::CallParameterClosureType.
         PrintOptions PO;
         PO.PrintFunctionRepresentationAttrs = false;
+        PO.SkipAttributes = true;
         addChunkWithText(
             CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType,
             AFT->getString(PO));
