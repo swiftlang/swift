@@ -421,7 +421,7 @@ public func ==(lhs: ${Self}, rhs: ${Self}) -> Bool {
 
 @transparent
 public func != (lhs: ${Self}, rhs: ${Self}) -> Bool {
-  return Bool(Builtin.fcmp_one_FPIEEE${bits}(lhs.value, rhs.value))
+  return Bool(Builtin.fcmp_une_FPIEEE${bits}(lhs.value, rhs.value))
 }
 
 @transparent

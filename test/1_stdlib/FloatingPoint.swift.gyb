@@ -237,9 +237,11 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
           ExpectedComparisonResult.EQ,
           lhs, rhs, SourceLocStack().withCurrentLoc())
       } else if lhs.isNaN || rhs.isNaN {
-        // Special case: any comparison with NaN returns false.
+        // Special case: NaN is unordered wrt other values.
+        // - equality comparison with NaN returns false,
+        // - NaN is not equal to anything, including NaN.
         expectFalse(lhs == rhs)
-        expectFalse(lhs != rhs)
+        expectTrue(lhs != rhs)
 
         expectFalse(lhs < rhs)
         expectFalse(lhs <= rhs)
