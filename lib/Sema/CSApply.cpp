@@ -392,13 +392,6 @@ namespace {
     void diagnoseIfOverloadChoiceUnavailable(OverloadChoice choice,
                                              SourceLoc referenceLoc);
     
-    
-    /// \brief Emit a diagnostic if any type parameter actuals for an
-    /// apply expression are potentially unavailable. These must be available
-    /// at the call site because the callee may use the type parameter formals
-    /// to get at the metadata for the type.
-    void diagnoseIfTypeParameterActualsUnavailable(ApplyExpr *applyExpr);
-    
     /// \brief Emit a diagnostic if the declaration is not available at
     /// the reference location.
     void diagnoseIfDeclUnavailable(ValueDecl *D, SourceLoc refLoc);
@@ -2603,9 +2596,6 @@ namespace {
     }
 
     Expr *visitApplyExpr(ApplyExpr *expr) {
-      
-      diagnoseIfTypeParameterActualsUnavailable(expr);
-      
       auto result = finishApply(expr, expr->getType(),
                          ConstraintLocatorBuilder(
                            cs.getConstraintLocator(expr)));
@@ -4954,24 +4944,6 @@ ExprRewriter::diagnoseIfOverloadChoiceUnavailable(OverloadChoice choice,
     assert(cs.TC.getLangOpts().EnableExperimentalAvailabilityChecking);
     cs.TC.diagnosePotentialUnavailability(choice.getDecl(), referenceLoc,
                                           choice.getReasonUnavailable(cs));
-  }
-}
-
-
-void
-ExprRewriter::diagnoseIfTypeParameterActualsUnavailable(ApplyExpr *applyExpr) {
-  auto *DRE =
-      dyn_cast<DeclRefExpr>(applyExpr->getFn()->getValueProvidingExpr());
-  
-  if (!DRE)
-    return;
-  
-  for (Substitution sub : DRE->getDeclRef().getSubstitutions()) {
-    NominalTypeDecl *D = sub.getReplacement()->getAnyNominal();
-    if (!D)
-      continue;
-    
-    diagnoseIfDeclUnavailable(D, DRE->getLoc());
   }
 }
 

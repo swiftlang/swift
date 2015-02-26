@@ -519,12 +519,27 @@ func create<T : Createable>() -> T {
   return T()
 }
 
+class ClassWithGenericTypeParameter<T> { }
+
+class ClassWithTwoGenericTypeParameter<T, S> { }
+
 func classViaTypeParameter() {
   let _ : ClassAvailableOn10_10_Createable = // expected-error {{'ClassAvailableOn10_10_Createable' is only available on OS X version 10.10 or greater}}
-      create() // expected-error {{'ClassAvailableOn10_10_Createable' is only available on OS X version 10.10 or greater}}
+      create()
       
-      
+  let _ = create() as
+      ClassAvailableOn10_10_Createable // expected-error {{'ClassAvailableOn10_10_Createable' is only available on OS X version 10.10 or greater}}
+
   let _ = [ClassAvailableOn10_10]() // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+
+  let _: ClassWithGenericTypeParameter<ClassAvailableOn10_10> = ClassWithGenericTypeParameter() // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+
+  let _: ClassWithTwoGenericTypeParameter<ClassAvailableOn10_10, String> = ClassWithTwoGenericTypeParameter() // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+  let _: ClassWithTwoGenericTypeParameter<String, ClassAvailableOn10_10> = ClassWithTwoGenericTypeParameter() // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+  let _: ClassWithTwoGenericTypeParameter<ClassAvailableOn10_10, ClassAvailableOn10_10> = ClassWithTwoGenericTypeParameter() // expected-error 2{{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+
+  let _: ClassAvailableOn10_10? = nil // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+
 }
 
 // Unavailable class used in declarations
