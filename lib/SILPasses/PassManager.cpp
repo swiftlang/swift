@@ -310,7 +310,7 @@ SILPassManager::~SILPassManager() {
 
 /// \brief Reset the state of the pass manager and remove all transformation
 /// owned by the pass manager. Anaysis passes will be kept.
-void SILPassManager::resetAndRemoveTransformations(StringRef NextStage) {
+void SILPassManager::resetAndRemoveTransformations() {
   for (auto T : Transformations)
     delete T;
 
@@ -319,6 +319,9 @@ void SILPassManager::resetAndRemoveTransformations(StringRef NextStage) {
   anotherIteration = false;
   CompleteFunctions *CompleteFuncs = getAnalysis<CompleteFunctions>();
   CompleteFuncs->reset();
+}
+
+void SILPassManager::setStageName(llvm::StringRef NextStage) {
   StageName = NextStage;
 }
 

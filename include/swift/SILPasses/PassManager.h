@@ -106,7 +106,10 @@ namespace swift {
 
     /// \brief Reset the state of the pass manager and remove all transformation
     /// owned by the pass manager. Anaysis passes will be kept.
-    void resetAndRemoveTransformations(llvm::StringRef NextStage = "");
+    void resetAndRemoveTransformations();
+
+    // Sets the name of the current optimization stage used for debugging.
+    void setStageName(llvm::StringRef NextStage = "");
 
     /// D'tor.
     ~SILPassManager();

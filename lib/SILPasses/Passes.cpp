@@ -217,26 +217,31 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.add(createSILLinker());
   PM.add(createGenericSpecializer());
   PM.run();
-  PM.resetAndRemoveTransformations("HighLevel");
+  PM.resetAndRemoveTransformations();
 
   // Run two iterations of the high-level SSA passes.
+  PM.setStageName("HighLevel");
   AddSSAPasses(PM, OptimizationLevelKind::HighLevel);
   PM.runOneIteration();
   PM.runOneIteration();
+  PM.resetAndRemoveTransformations();
 
-  // Run the high-level loop optimization passes.
-  PM.resetAndRemoveTransformations("EarlyLoopOpt");
+
+  PM.setStageName("EarlyLoopOpt");
   AddHighLevelLoopOptPasses(PM);
   PM.runOneIteration();
-  PM.resetAndRemoveTransformations("MidLevel");
+  PM.resetAndRemoveTransformations();
+
 
   // Run two iterations of the mid-level SSA passes.
+  PM.setStageName("MidLevel");
   AddSSAPasses(PM, OptimizationLevelKind::MidLevel);
   PM.runOneIteration();
   PM.runOneIteration();
-  PM.resetAndRemoveTransformations("Lower");
+  PM.resetAndRemoveTransformations();
 
   // Perform lowering optimizations.
+  PM.setStageName("Lower");
   PM.add(createDeadFunctionElimination());
   PM.add(createDeadObjectElimination());
 
@@ -268,15 +273,18 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
     PM.add(createFunctionSignatureOpts());
 
   PM.run();
-  PM.resetAndRemoveTransformations("LowLevel");
+  PM.resetAndRemoveTransformations();
 
   // Run another iteration of the SSA optimizations to optimize the
   // devirtualized inline caches and constants propagated into closures
   // (CapturePropagation).
+
+  PM.setStageName("LowLevel");
   AddSSAPasses(PM, OptimizationLevelKind::LowLevel);
   PM.runOneIteration();
+  PM.resetAndRemoveTransformations();
 
-  PM.resetAndRemoveTransformations("LateLoopOpt");
+  PM.setStageName("LateLoopOpt");
   AddLowLevelLoopOptPasses(PM);
   PM.add(createExternalFunctionDefinitionsElimination());
   PM.add(createDeadFunctionElimination());
