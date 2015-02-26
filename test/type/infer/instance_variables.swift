@@ -15,6 +15,6 @@ func testX(inout x: X) {
 }
 
 struct Broken {
-  var b = True // expected-error{{use of unresolved identifier 'True'}}
+  var b = True // expected-error{{use of unresolved identifier 'True'}} expected-error {{could not infer type for 'b'}}
 }
 
