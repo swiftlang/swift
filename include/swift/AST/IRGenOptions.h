@@ -108,6 +108,12 @@ public:
   /// Instrument code to generate profiling information.
   unsigned GenerateProfile : 1;
 
+  /// Whether we should embed the bitcode file.
+  unsigned EmbedBitcode : 1;
+
+  /// List of backend command-line options for -embed-bitcode.
+  std::vector<uint8_t> CmdArgs;
+
   IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
                    Optimize(false), DebugInfoKind(IRGenDebugInfoKind::None),
                    UseJIT(false), EnableDynamicValueTypeLayout(false),
