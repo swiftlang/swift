@@ -441,6 +441,17 @@ protected:
     }
   }
 
+  void visitUpcastInst(UpcastInst *Upcast) {
+    // If the type substituted type of the operand type and result types match
+    // there is no need for an upcast and we can just use the operand.
+    if (getOpType(Upcast->getType()) ==
+        getOpValue(Upcast->getOperand()).getType()) {
+      ValueMap.insert({SILValue(Upcast), getOpValue(Upcast->getOperand())});
+      return;
+    }
+    super::visitUpcastInst(Upcast);
+  }
+
   /// The Swift module that the cloned function belongs to.
   Module *SwiftMod;
   /// The substitutions list for the specialization.

@@ -231,4 +231,24 @@ bb0(%0 : $*UInt8, %1 : $@callee_owned () -> UInt8):
 }
 
 
+class Base {
+}
+sil_vtable Base {
+}
 
+sil @generic_upcast : $@thin <T where T : Base> (@owned T) -> @owned Base {
+bb0(%0 : $T):
+  %2 = upcast %0 : $T to $Base
+  return %2 : $Base
+}
+
+sil @specialize_generic_upcast : $@thin(@owned Base) -> @owned Base {
+bb0(%0 : $Base):
+  %1 = function_ref @generic_upcast : $@thin<T where T : Base> (@owned T) -> @owned Base
+  %2 = apply %1<Base>(%0) : $@thin<T where T : Base> (@owned T) -> @owned Base
+  return %2 : $Base
+}
+
+// CHECK-LABEL: sil shared @_TTS{{.*}}generic_upcast : $@thin (@owned Base) -> @owned Base {
+// CHECK: bb0(%0 : $Base):
+// CHECK:  return %0 : $Base
