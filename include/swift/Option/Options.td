@@ -394,4 +394,8 @@ def profile_coverage_mapping : Flag<["-"], "profile-coverage-mapping">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Generate coverage data for use with profiled execution counts">;
 
+def embed_bitcode : Flag<["-"], "embed-bitcode">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Embed LLVM IR bitcode as data">;
+
 include "FrontendOptions.td"

@@ -184,7 +184,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     ArgList->hasArg(options::OPT_driver_skip_execution);
 
   bool Incremental = ArgList->hasArg(options::OPT_incremental) &&
-    !ArgList->hasArg(options::OPT_whole_module_optimization);
+    !ArgList->hasArg(options::OPT_whole_module_optimization) &&
+    !ArgList->hasArg(options::OPT_embed_bitcode);
 
   std::unique_ptr<DerivedArgList> TranslatedArgList(
     translateInputArgs(*ArgList));
@@ -1002,9 +1003,16 @@ void Driver::buildActions(const ToolChain &TC,
           CompileJobAction::BuildState::NeedsCascadingBuild;
         if (!rebuildEverything)
           previousBuildState = outOfDateMap.lookup(InputArg);
-        Current.reset(new CompileJobAction(Current.release(),
-                                           OI.CompilerOutputType,
-                                           previousBuildState));
+        if (Args.hasArg(options::OPT_embed_bitcode)) {
+          Current.reset(new CompileJobAction(Current.release(),
+                                             types::TY_LLVM_BC,
+                                             previousBuildState));
+          Current.reset(new BackendJobAction(Current.release(),
+                                             OI.CompilerOutputType));
+        } else
+          Current.reset(new CompileJobAction(Current.release(),
+                                             OI.CompilerOutputType,
+                                             previousBuildState));
         break;
       }
       case types::TY_SwiftModuleFile:

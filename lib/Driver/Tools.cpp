@@ -227,13 +227,22 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   
   Arguments.push_back(FrontendModeOption);
   
-  assert(Inputs->empty() &&
+  assert((Inputs->empty() || isa<BackendJobAction>(JA)) &&
          "The Swift frontend does not expect to be fed any input Jobs!");
 
   // Add input arguments.
   switch (OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::UpdateCode: {
+    if (isa<BackendJobAction>(JA)) {
+      assert(Inputs->size() == 1 && "The Swift backend expects one input!");
+      Arguments.push_back("-primary-file");
+      const Job *Cmd = Inputs->front();
+      Arguments.push_back(
+        Cmd->getOutput().getPrimaryOutputFilename().c_str());
+      break;
+    }
+
     assert(InputActions.size() == 1 &&
            "The Swift frontend expects exactly one input (the primary file)!");
 
@@ -347,6 +356,14 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
 
   if (OI.CompilerMode == OutputInfo::Mode::Immediate)
     Args.AddLastArg(Arguments, options::OPT__DASH_DASH);
+
+  if (Args.hasArg(options::OPT_embed_bitcode) &&
+      isa<BackendJobAction>(JA)) {
+    // Add flags implied by -embed-bitcode.
+    Arguments.push_back("-embed-bitcode");
+    // Disable all llvm IR level optimizations.
+    Arguments.push_back("-disable-llvm-optzns");
+  }
 
   return new Job(JA, *this, std::move(Inputs), std::move(Output), Exec,
                  Arguments);

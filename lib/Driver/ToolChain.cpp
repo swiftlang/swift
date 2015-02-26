@@ -47,6 +47,7 @@ Tool *ToolChain::getLinker() const {
 Tool *ToolChain::selectTool(const JobAction &JA) const {
   switch (JA.getKind()) {
   case Action::CompileJob:
+  case Action::BackendJob:
     return getSwift();
   case Action::MergeModuleJob:
     return getMergeModule();
