@@ -223,11 +223,9 @@ func checkQNaN(qnan: TestFloat) {
 func testNaN() {
   var stdlibDefaultNaN = TestFloat.NaN
   checkQNaN(stdlibDefaultNaN)
-  _precondition(stdlibDefaultNaN != stdlibDefaultNaN)
 
   var stdlibQNaN = TestFloat.quietNaN
   checkQNaN(stdlibQNaN)
-  _precondition(stdlibQNaN != stdlibQNaN)
 
   println("testNaN done")
 }

@@ -1,6 +1,6 @@
-// RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-build-swift %s -parse-stdlib -Xfrontend -disable-access-control -o %t/FloatingPoint
-// RUN: %target-run %t/FloatingPoint
+// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/FloatingPoint.swift
+// RUN: %S/../../utils/line-directive %t/FloatingPoint.swift -- %target-build-swift -parse-stdlib -Xfrontend -disable-access-control %t/FloatingPoint.swift -o %t/a.out
+// RUN: %S/../../utils/line-directive %t/FloatingPoint.swift -- %target-run %t/a.out
 
 // XFAIL: interpret
 // XFAIL: linux
@@ -144,14 +144,122 @@ FloatingPoint.test("Double/Int64") {
 FloatingPoint.test("Float/HashValueZero") {
   let zero: Float = getFloat32(0.0)
   let negativeZero: Float = getFloat32(-0.0)
+  expectNotEqual(zero._toBitPattern(), negativeZero._toBitPattern())
   expectEqual(zero.hashValue, negativeZero.hashValue)
 }
 
 FloatingPoint.test("Double/HashValueZero") {
   let zero: Double = getFloat64(0.0)
   let negativeZero: Double = getFloat64(-0.0)
+  expectNotEqual(zero._toBitPattern(), negativeZero._toBitPattern())
   expectEqual(zero.hashValue, negativeZero.hashValue)
 }
+
+#if arch(i386) || arch(x86_64)
+
+FloatingPoint.test("Float80/HashValueZero") {
+  let zero: Float80 = getFloat80(0.0)
+  let negativeZero: Float80 = getFloat80(-0.0)
+  expectNotEqual(zero._toBitPattern(), negativeZero._toBitPattern())
+  expectEqual(zero.hashValue, negativeZero.hashValue)
+}
+
+#endif
+
+func getPositiveSubnormal_Float32() -> Float32 {
+  var result: Float32 = 1.0
+  for i in 0..<127 {
+    result /= 2.0 as Float32
+  }
+  expectTrue(result.isSubnormal)
+  return result
+}
+
+func getPositiveSubnormal_Float64() -> Float64 {
+  var result: Float64 = 1.0
+  for i in 0..<1023 {
+    result /= 2.0 as Float64
+  }
+  expectTrue(result.isSubnormal)
+  return result
+}
+
+// FIXME: Float80
+% for FloatSelf in ['Float32', 'Float64']:
+
+func checkFloatingPointComparison_${FloatSelf}(
+  expected: ExpectedComparisonResult,
+  lhs: ${FloatSelf}, rhs: ${FloatSelf}, stackTrace: SourceLocStack
+) {
+  let collectMoreInfo = { () -> String in
+    "expected: lhs=\(lhs) \(expected) rhs=\(rhs)"
+  }
+  expectEqual(expected.isEQ(), lhs == rhs,
+    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
+  expectEqual(expected.isNE(), lhs != rhs,
+    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
+  checkHashable(expected.isEQ(), lhs, rhs,
+    stackTrace.withCurrentLoc(), collectMoreInfo: collectMoreInfo)
+
+  expectEqual(expected.isLT(), lhs < rhs,
+    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
+  expectEqual(expected.isLE(), lhs <= rhs,
+    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
+  expectEqual(expected.isGE(), lhs >= rhs,
+    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
+  expectEqual(expected.isGT(), lhs > rhs,
+    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
+  checkComparable(expected, lhs, rhs,
+    stackTrace.withCurrentLoc(), collectMoreInfo: collectMoreInfo)
+}
+
+FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
+  let interestingValues: [${FloatSelf}] = [
+    // Interesting floating point values, sorted.
+    -${FloatSelf}.infinity,
+    -1.0,
+    -getPositiveSubnormal_${FloatSelf}(),
+    -0.0,
+    0.0,
+    getPositiveSubnormal_${FloatSelf}(),
+    1.0,
+    ${FloatSelf}.infinity,
+    ${FloatSelf}.quietNaN,
+  ]
+
+  for lhsIdx in indices(interestingValues) {
+    for rhsIdx in indices(interestingValues) {
+      let lhs = interestingValues[lhsIdx]
+      let rhs = interestingValues[rhsIdx]
+      if lhs.isZero && rhs.isZero {
+        // Special case: 0.0 and -0.0 compare equal.
+        checkFloatingPointComparison_${FloatSelf}(
+          ExpectedComparisonResult.EQ,
+          lhs, rhs, SourceLocStack().withCurrentLoc())
+      } else if lhs.isNaN || rhs.isNaN {
+        // Special case: any comparison with NaN returns false.
+        expectFalse(lhs == rhs)
+        expectFalse(lhs != rhs)
+
+        expectFalse(lhs < rhs)
+        expectFalse(lhs <= rhs)
+        expectFalse(lhs >= rhs)
+        expectFalse(lhs > rhs)
+      } else {
+        // The sane case.
+        checkFloatingPointComparison_${FloatSelf}(
+          lhsIdx < rhsIdx ?
+            ExpectedComparisonResult.LT :
+            (lhsIdx == rhsIdx ?
+              ExpectedComparisonResult.EQ :
+              ExpectedComparisonResult.GT),
+          lhs, rhs, SourceLocStack().withCurrentLoc())
+      }
+    }
+  }
+}
+
+% end
 
 // FIXME: implement Float80 tests after Float80 is implemented.
 

@@ -1231,22 +1231,42 @@ public enum ExpectedComparisonResult {
   }
 }
 
+extension ExpectedComparisonResult : Printable {
+  public var description: String {
+    switch self {
+    case .LT:
+      return "<"
+    case .EQ:
+      return "=="
+    case .GT:
+      return ">"
+    }
+  }
+}
+
 public func checkComparable<T : Comparable>(
   expected: ExpectedComparisonResult,
-  lhs: T, rhs: T, stackTrace: SourceLocStack
+  lhs: T, rhs: T, stackTrace: SourceLocStack,
+  collectMoreInfo: (()->String)? = nil
 ) {
-  expectEqual(expected.isLT(), lhs < rhs, stackTrace: stackTrace)
-  expectEqual(expected.isLE(), lhs <= rhs, stackTrace: stackTrace)
-  expectEqual(expected.isGE(), lhs >= rhs, stackTrace: stackTrace)
-  expectEqual(expected.isGT(), lhs > rhs, stackTrace: stackTrace)
+  expectEqual(expected.isLT(), lhs < rhs,
+    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
+  expectEqual(expected.isLE(), lhs <= rhs,
+    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
+  expectEqual(expected.isGE(), lhs >= rhs,
+    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
+  expectEqual(expected.isGT(), lhs > rhs,
+    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
 }
 
 public func checkComparable<T : Comparable>(
   expected: ExpectedComparisonResult,
   lhs: T, rhs: T,
-  file: String = __FILE__, line: UWord = __LINE__
+  file: String = __FILE__, line: UWord = __LINE__,
+  collectMoreInfo: (()->String)? = nil
 ) {
-  checkComparable(expected, lhs, rhs, SourceLocStack(SourceLoc(file, line)))
+  checkComparable(expected, lhs, rhs, SourceLocStack(SourceLoc(file, line)),
+    collectMoreInfo: collectMoreInfo)
 }
 
 // Generate two overloads: one for _UnitTestArray (which will get

@@ -421,8 +421,7 @@ public func ==(lhs: ${Self}, rhs: ${Self}) -> Bool {
 
 @transparent
 public func != (lhs: ${Self}, rhs: ${Self}) -> Bool {
-  // FIXME: added for type checking performance.
-  return !(lhs == rhs)
+  return Bool(Builtin.fcmp_one_FPIEEE${bits}(lhs.value, rhs.value))
 }
 
 @transparent
@@ -432,20 +431,17 @@ public func <(lhs: ${Self}, rhs: ${Self}) -> Bool {
 
 @transparent
 public func > (lhs: ${Self}, rhs: ${Self}) -> Bool {
-  // FIXME: added for type checking performance.
-  return rhs < lhs
+  return Bool(Builtin.fcmp_ogt_FPIEEE${bits}(lhs.value, rhs.value))
 }
 
 @transparent
 public func <= (lhs: ${Self}, rhs: ${Self}) -> Bool {
-  // FIXME: added for type checking performance.
-  return !(rhs < lhs)
+  return Bool(Builtin.fcmp_ole_FPIEEE${bits}(lhs.value, rhs.value))
 }
 
 @transparent
 public func >= (lhs: ${Self}, rhs: ${Self}) -> Bool {
-  // FIXME: added for type checking performance.
-  return !(lhs < rhs)
+  return Bool(Builtin.fcmp_oge_FPIEEE${bits}(lhs.value, rhs.value))
 }
 
 @transparent
