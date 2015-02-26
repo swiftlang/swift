@@ -373,7 +373,7 @@ static bool performCompile(CompilerInstance &Instance,
       Action == FrontendOptions::PrintAST) {
     SourceFile *SF = PrimarySourceFile;
     if (!SF) {
-      SourceFileKind Kind = Invocation.getInputKind();
+      SourceFileKind Kind = Invocation.getSourceFileKind();
       SF = &Instance.getMainModule()->getMainSourceFile(Kind);
     }
     if (Action == FrontendOptions::PrintAST)

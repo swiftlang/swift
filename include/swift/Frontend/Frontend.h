@@ -202,13 +202,15 @@ public:
     return FrontendOpts.ParseStdlib;
   }
 
-  void setInputKind(SourceFileKind K) {
+  void setInputKind(InputFileKind K) {
     FrontendOpts.InputKind = K;
   }
 
-  SourceFileKind getInputKind() const {
+  InputFileKind getInputKind() const {
     return FrontendOpts.InputKind;
   }
+
+  SourceFileKind getSourceFileKind() const;
 
   void setModuleName(StringRef Name) {
     FrontendOpts.ModuleName = Name.str();

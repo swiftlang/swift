@@ -113,8 +113,8 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
                                      CodeCompletePoint.second);
   }
 
-  bool MainMode = (Invocation.getInputKind() == SourceFileKind::Main);
-  bool SILMode = (Invocation.getInputKind() == SourceFileKind::SIL);
+  bool MainMode = (Invocation.getInputKind() == InputFileKind::IFK_Swift);
+  bool SILMode = (Invocation.getInputKind() == InputFileKind::IFK_SIL);
 
   if (SILMode)
     Invocation.getLangOptions().EnableAccessControl = false;
@@ -222,13 +222,13 @@ Module *CompilerInstance::getMainModule() {
 
 void CompilerInstance::performSema() {
   const FrontendOptions &options = Invocation.getFrontendOptions();
-  const SourceFileKind Kind = Invocation.getInputKind();
+  const InputFileKind Kind = Invocation.getInputKind();
   Module *MainModule = getMainModule();
   Context->LoadedModules[MainModule->Name] = MainModule;
 
   auto modImpKind = SourceFile::ImplicitModuleImportKind::Stdlib;
 
-  if (Kind == SourceFileKind::SIL) {
+  if (Kind == InputFileKind::IFK_SIL) {
     assert(BufferIDs.size() == 1);
     assert(MainBufferID != NO_SUCH_BUFFER);
     createSILModule();
@@ -306,9 +306,10 @@ void CompilerInstance::performSema() {
     SF->setImports(Context->AllocateCopy(initialImportsBuf));
   };
 
-  if (Kind == SourceFileKind::REPL) {
+  if (Kind == InputFileKind::IFK_Swift_REPL) {
     auto *SingleInputFile =
-      new (*Context) SourceFile(*MainModule, Kind, None, modImpKind);
+      new (*Context) SourceFile(*MainModule, Invocation.getSourceFileKind(),
+                                None, modImpKind);
     MainModule->addFile(*SingleInputFile);
     addAdditionalInitialImports(SingleInputFile);
     return;
@@ -329,13 +330,14 @@ void CompilerInstance::performSema() {
   // We parse it last, though, to make sure that it can use decls from other
   // files in the module.
   if (MainBufferID != NO_SUCH_BUFFER) {
-    assert(Kind == SourceFileKind::Main || Kind == SourceFileKind::SIL);
+    assert(Kind == InputFileKind::IFK_Swift || Kind == InputFileKind::IFK_SIL);
 
-    if (Kind == SourceFileKind::Main)
+    if (Kind == InputFileKind::IFK_Swift)
       SourceMgr.setHashbangBufferID(MainBufferID);
 
-    auto *MainFile = new (*Context) SourceFile(*MainModule, Kind, MainBufferID,
-                                               modImpKind);
+    auto *MainFile = new (*Context) SourceFile(*MainModule,
+                                               Invocation.getSourceFileKind(),
+                                               MainBufferID, modImpKind);
     MainModule->addFile(*MainFile);
     addAdditionalInitialImports(MainFile);
 
@@ -404,7 +406,8 @@ void CompilerInstance::performSema() {
     bool mainIsPrimary =
       (PrimaryBufferID == NO_SUCH_BUFFER || MainBufferID == PrimaryBufferID);
 
-    SourceFile &MainFile = MainModule->getMainSourceFile(Kind);
+    SourceFile &MainFile =
+      MainModule->getMainSourceFile(Invocation.getSourceFileKind());
     SILParserState SILContext(TheSILModule.get());
     unsigned CurTUElem = 0;
     bool Done;
@@ -455,18 +458,18 @@ void CompilerInstance::performSema() {
 }
 
 void CompilerInstance::performParseOnly() {
-  const SourceFileKind Kind = Invocation.getInputKind();
+  const InputFileKind Kind = Invocation.getInputKind();
   Module *MainModule = getMainModule();
   Context->LoadedModules[MainModule->Name] = MainModule;
 
-  assert(Kind == SourceFileKind::Main || Kind == SourceFileKind::Library);
+  assert(Kind == InputFileKind::IFK_Swift || Kind == InputFileKind::IFK_Swift_Library);
   assert(BufferIDs.size() == 1 && "only supports parsing a single file");
 
-  if (Kind == SourceFileKind::Main)
+  if (Kind == InputFileKind::IFK_Swift)
     SourceMgr.setHashbangBufferID(BufferIDs[0]);
 
   auto *Input = new (*Context) SourceFile(*MainModule,
-                                          Kind,
+                                          Invocation.getSourceFileKind(),
                                           BufferIDs[0],
                                     SourceFile::ImplicitModuleImportKind::None);
   MainModule->addFile(*Input);

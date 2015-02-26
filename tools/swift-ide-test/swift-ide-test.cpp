@@ -495,7 +495,7 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
     BufferText = BufferText.drop_back(1);
 
   CompilerInvocation Invocation(InitInvok);
-  Invocation.setInputKind(SourceFileKind::REPL);
+  Invocation.setInputKind(InputFileKind::IFK_Swift_REPL);
 
   CompilerInstance CI;
 
@@ -1161,8 +1161,8 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
 
   if (MangledNameToFind.empty()) {
     Module *M = CI.getMainModule();
-    M->getMainSourceFile(Invocation.getInputKind()).print(llvm::outs(),
-                                                          Options);
+    M->getMainSourceFile(Invocation.getSourceFileKind()).print(llvm::outs(),
+                                                               Options);
     return EXIT_SUCCESS;
   }
 
@@ -2073,7 +2073,7 @@ int main(int argc, char *argv[]) {
   for (auto &File : options::InputFilenames)
     InitInvok.addInputFilename(File);
   if (!options::InputFilenames.empty())
-    InitInvok.setInputKind(SourceFileKind::Library);
+    InitInvok.setInputKind(InputFileKind::IFK_Swift_Library);
 
   InitInvok.setMainExecutablePath(
       llvm::sys::fs::getMainExecutable(argv[0],

@@ -168,10 +168,10 @@ int main(int argc, char **argv) {
                              StringRef(ModuleName) :
                              llvm::sys::path::stem(InputFilename);
     Invocation.setModuleName(Stem);
-    Invocation.setInputKind(SourceFileKind::Library);
+    Invocation.setInputKind(InputFileKind::IFK_Swift_Library);
   } else {
     Invocation.setModuleName("main");
-    Invocation.setInputKind(SourceFileKind::SIL);
+    Invocation.setInputKind(InputFileKind::IFK_SIL);
   }
 
   CompilerInstance CI;

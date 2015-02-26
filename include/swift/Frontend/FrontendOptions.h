@@ -52,6 +52,14 @@ public:
   bool isBuffer() const { return Kind == InputKind::Buffer; }
 };
 
+enum class InputFileKind {
+  IFK_None,
+  IFK_Swift,
+  IFK_Swift_Library,
+  IFK_Swift_REPL,
+  IFK_SIL
+};
+
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
 public:
@@ -66,7 +74,7 @@ public:
   Optional<SelectedInput> PrimaryInput;
 
   /// The kind of input on which the frontend should operate.
-  SourceFileKind InputKind = SourceFileKind::Main;
+  InputFileKind InputKind = InputFileKind::IFK_Swift;
 
   /// The name of the primary output file which should be created
   /// by the frontend.

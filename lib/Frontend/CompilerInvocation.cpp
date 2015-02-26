@@ -61,6 +61,21 @@ void CompilerInvocation::setTargetTriple(StringRef Triple) {
   updateRuntimeLibraryPath(SearchPathOpts, LangOpts.Target);
 }
 
+SourceFileKind CompilerInvocation::getSourceFileKind() const {
+  switch(getInputKind()) {
+  case InputFileKind::IFK_Swift:
+    return SourceFileKind::Main;
+  case InputFileKind::IFK_Swift_Library:
+    return SourceFileKind::Library;
+  case InputFileKind::IFK_Swift_REPL:
+    return SourceFileKind::REPL;
+  case InputFileKind::IFK_SIL:
+        return SourceFileKind::SIL;
+  case InputFileKind::IFK_None:
+    llvm_unreachable("Trying to convert from unsupported InputFileKind");
+  }
+}
+
 static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                               DiagnosticEngine &Diags) {
   using namespace options;
@@ -206,13 +221,13 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   }
 
   if (TreatAsSIL)
-    Opts.InputKind = SourceFileKind::SIL;
+    Opts.InputKind = InputFileKind::IFK_SIL;
   else if (Args.hasArg(OPT_parse_as_library))
-    Opts.InputKind = SourceFileKind::Library;
+    Opts.InputKind = InputFileKind::IFK_Swift_Library;
   else if (Action == FrontendOptions::REPL)
-    Opts.InputKind = SourceFileKind::REPL;
+    Opts.InputKind = InputFileKind::IFK_Swift_REPL;
   else
-    Opts.InputKind = SourceFileKind::Main;
+    Opts.InputKind = InputFileKind::IFK_Swift;
 
   if (const Arg *A = Args.getLastArg(OPT_o)) {
     Opts.OutputFilename = A->getValue();
@@ -251,7 +266,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     if (!Lexer::isIdentifier(ModuleName) ||
         (ModuleName == STDLIB_NAME && !Opts.ParseStdlib)) {
       if (!Opts.actionHasOutput() ||
-          (Opts.InputKind == SourceFileKind::Main &&
+          (Opts.InputKind == InputFileKind::IFK_Swift &&
            Opts.InputFilenames.size() == 1)) {
         ModuleName = "main";
       } else {
