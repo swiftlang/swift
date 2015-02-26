@@ -111,6 +111,9 @@ public:
   /// Whether we should embed the bitcode file.
   unsigned EmbedBitcode : 1;
 
+  /// Whether we should embed the marker.
+  unsigned EmbedMarkerOnly : 1;
+
   /// List of backend command-line options for -embed-bitcode.
   std::vector<uint8_t> CmdArgs;
 

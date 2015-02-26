@@ -365,6 +365,9 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     Arguments.push_back("-disable-llvm-optzns");
   }
 
+  if (Args.hasArg(options::OPT_embed_bitcode_marker))
+    Arguments.push_back("-embed-bitcode-marker");
+
   return new Job(JA, *this, std::move(Inputs), std::move(Output), Exec,
                  Arguments);
 }

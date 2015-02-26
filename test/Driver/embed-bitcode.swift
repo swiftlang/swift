@@ -10,3 +10,9 @@
 // CHECK-FRONT: -c
 // CHECK-FRONT: -embed-bitcode
 // CHECK-FRONT: -disable-llvm-optzns
+
+// RUN: %swiftc_driver -embed-bitcode-marker %s 2>&1 -### | FileCheck %s -check-prefix=CHECK-MARKER
+// CHECK-MARKER: -frontend
+// CHECK-MARKER: -c
+// CHECK-MARKER: -embed-bitcode-marker
+// CHECK-MARKER-NOT: -frontend

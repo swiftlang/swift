@@ -356,13 +356,14 @@ static IRGenOutputKind getOutputKind(FrontendOptions::ActionType Action) {
 // __LLVM,__cmdline section.
 static void EmbedBitcode(llvm::Module *M, const IRGenOptions &Opts)
 {
-  if (!Opts.EmbedBitcode)
+  if (!Opts.EmbedBitcode && !Opts.EmbedMarkerOnly)
     return;
 
   // Embed the bitcode for the llvm module.
   std::string Data;
   llvm::raw_string_ostream OS(Data);
-  llvm::WriteBitcodeToFile(M, OS);
+  if (!Opts.EmbedMarkerOnly)
+    llvm::WriteBitcodeToFile(M, OS);
 
   ArrayRef<uint8_t> ModuleData((uint8_t*)OS.str().data(), OS.str().size());
   llvm::Constant *ModuleConstant =
@@ -445,7 +446,7 @@ static bool performCompile(CompilerInstance &Instance,
     // TODO: remove once the frontend understands what action it should perform
     IRGenOpts.OutputKind = getOutputKind(Action);
 
-    if (IRGenOpts.EmbedBitcode)
+    if (IRGenOpts.EmbedBitcode || IRGenOpts.EmbedMarkerOnly)
       EmbedBitcode(Module.get(), IRGenOpts);
     return performLLVM(IRGenOpts, Instance.getASTContext(), Module.get());
   }

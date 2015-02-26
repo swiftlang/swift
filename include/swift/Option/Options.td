@@ -398,4 +398,8 @@ def embed_bitcode : Flag<["-"], "embed-bitcode">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Embed LLVM IR bitcode as data">;
 
+def embed_bitcode_marker : Flag<["-"], "embed-bitcode-marker">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Embed placeholder LLVM IR data as a marker">;
+
 include "FrontendOptions.td"
