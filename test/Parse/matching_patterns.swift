@@ -185,6 +185,44 @@ case imported_enums.ImportedEnum.Compound,
   ()
 }
 
+// Check that single-element tuple payloads work sensibly in patterns.
+
+enum LabeledScalarPayload {
+  case Payload(name: Int)
+}
+
+var lsp: LabeledScalarPayload = .Payload(name: 0)
+func acceptInt(_: Int) {}
+func acceptString(_: String) {}
+
+switch lsp {
+case .Payload(0):
+  ()
+case .Payload(name: 0):
+  ()
+case let .Payload(x):
+  acceptInt(x)
+  acceptString("\(x)")
+case let .Payload(name: x):
+  acceptInt(x)
+  acceptString("\(x)")
+case let .Payload((name: x)):
+  acceptInt(x)
+  acceptString("\(x)")
+case .Payload(let (name: x)):
+  acceptInt(x)
+  acceptString("\(x)")
+case .Payload(let (name: x)):
+  acceptInt(x)
+  acceptString("\(x)")
+case .Payload(let x):
+  acceptInt(x)
+  acceptString("\(x)")
+case .Payload((let x)):
+  acceptInt(x)
+  acceptString("\(x)")
+}
+
 // Property patterns.
 
 struct S {

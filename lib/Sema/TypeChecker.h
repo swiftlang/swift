@@ -233,6 +233,9 @@ enum TypeResolutionFlags {
 
   /// Whether we should allow references to unavailable types.
   TR_AllowUnavailable = 0x10000,
+  
+  /// Whether this is the payload subpattern of an enum pattern.
+  TR_EnumPatternPayload = 0x20000,
 };
 
 /// Option set describing how type resolution should work.

@@ -687,12 +687,35 @@ static bool coercePatternViaConditionalDowncast(TypeChecker &tc,
 bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                                       TypeResolutionOptions options,
                                       GenericTypeResolver *resolver) {
-  TypeResolutionOptions subOptions = options - TR_Variadic;
+  TypeResolutionOptions subOptions
+    = options - TR_Variadic - TR_EnumPatternPayload;
   switch (P->getKind()) {
   // For parens and vars, just set the type annotation and propagate inwards.
   case PatternKind::Paren: {
     auto PP = cast<ParenPattern>(P);
-    Pattern *sub = PP->getSubPattern();
+    auto sub = PP->getSubPattern();
+    auto semantic = P->getSemanticsProvidingPattern();
+    // If this is the payload of an enum, and the type is a single-element
+    // labeled tuple, treat this as a tuple pattern. It's unlikely that the
+    // user is interested in binding a variable of type (foo: Int).
+    if ((options & TR_EnumPatternPayload)
+        && !isa<TuplePattern>(semantic)) {
+      if (auto tupleType = type->getAs<TupleType>()) {
+        if (tupleType->getNumElements() == 1) {
+          auto elementTy = tupleType->getElementType(0);
+          if (coercePatternToType(sub, dc, elementTy, subOptions, resolver))
+            return true;
+          TuplePatternElt elt(sub);
+          P = TuplePattern::create(Context, PP->getLParenLoc(), elt,
+                                   PP->getRParenLoc());
+          if (PP->isImplicit())
+            P->setImplicit();
+          P->setType(type);
+          return false;
+        }
+      }
+    }
+  
     if (coercePatternToType(sub, dc, type, subOptions, resolver))
       return true;
     PP->setSubPattern(sub);
@@ -738,10 +761,11 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     return hadError;
   }
 
-  // For wildcard and name patterns, just set the type.
+  // For wildcard and name patterns, set the type.
   case PatternKind::Named: {
     NamedPattern *NP = cast<NamedPattern>(P);
     VarDecl *var = NP->getDecl();
+    // If the
     if (var->isInvalid())
       var->overwriteType(ErrorType::get(Context));
     else
@@ -1017,7 +1041,8 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
         elementType = TupleType::getEmpty(Context);
       Pattern *sub = OP->getSubPattern();
       if (coercePatternToType(sub, dc, elementType,
-                              subOptions|TR_FromNonInferredPattern, resolver))
+                     subOptions|TR_FromNonInferredPattern|TR_EnumPatternPayload,
+                     resolver))
         return true;
       OP->setSubPattern(sub);
     }

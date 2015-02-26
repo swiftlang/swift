@@ -1318,3 +1318,20 @@ func testTupleWildcards(x: ABC, y: ABC) {
     e()
   }
 }
+
+enum LabeledScalarPayload {
+  case Payload(name: Int)
+}
+
+// CHECK-LABEL: sil hidden @_TF6switch24testLabeledScalarPayloadFOS_20LabeledScalarPayloadP_
+func testLabeledScalarPayload(lsp: LabeledScalarPayload) -> Any {
+  // CHECK: switch_enum {{%.*}}, case #LabeledScalarPayload.Payload!enumelt.1: bb1
+  switch lsp {
+  // CHECK: bb1([[TUPLE:%.*]] : $(name: Int)):
+  // CHECK:   [[X:%.*]] = tuple_extract [[TUPLE]]
+  // CHECK:   [[ANY_X_ADDR:%.*]] = init_existential {{%.*}}, $Int
+  // CHECK:   store [[X]] to [[ANY_X_ADDR]]
+  case let .Payload(x):
+    return x
+  }
+}
