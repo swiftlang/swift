@@ -6192,7 +6192,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // Check whether there is a user-declared constructor or an instance
   // variable.
   bool FoundMemberwiseInitializedProperty = false;
-  bool FoundUninitializedVars = false;
+  bool SuppressDefaultInitializer = false;
   bool FoundDesignatedInit = false;
   decl->setAddedImplicitInitializers();
   SmallPtrSet<CanType, 4> initializerParamTypes;
@@ -6239,10 +6239,23 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       continue;
     }
 
+    // If a stored property lacks an initial value and if there is no way to
+    // synthesize an initial value (e.g. for an optional) then we suppress
+    // generation of the default initializer.
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
       if (pbd->hasStorage() && !pbd->isStatic() && !pbd->isImplicit() &&
-          !isDefaultInitializable(pbd)) {
-        FoundUninitializedVars = true;
+          !pbd->hasInit()) {
+        // If we cannot create a default initializer, we cannot make a default
+        // init.
+        if (!isDefaultInitializable(pbd))
+          SuppressDefaultInitializer = true;
+
+        // If one of the bound variables is a let constant, suppress the default
+        // initializer.  Synthesizing an initializer that initializes the
+        // constant to nil isn't useful.
+        pbd->getPattern()->forEachVariable([&](VarDecl *vd) {
+          SuppressDefaultInitializer |= vd->isLet();
+        });
       }
       continue;
     }
@@ -6260,7 +6273,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       }
 
       // If we found a stored property, add a default constructor.
-      if (!FoundUninitializedVars)
+      if (!SuppressDefaultInitializer)
         defineDefaultConstructor(decl);
     }
     return;
@@ -6279,7 +6292,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
 
     // We can't define these overrides if we have any uninitialized
     // stored properties.
-    if (FoundUninitializedVars && !FoundDesignatedInit) {
+    if (SuppressDefaultInitializer && !FoundDesignatedInit) {
       diagnoseClassWithoutInitializers(*this, classDecl);
       return;
     }
@@ -6349,7 +6362,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     // constructor.
 
     // ... unless there are uninitialized stored properties.
-    if (FoundUninitializedVars) {
+    if (SuppressDefaultInitializer) {
       diagnoseClassWithoutInitializers(*this, classDecl);
       return;
     }

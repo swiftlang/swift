@@ -60,3 +60,18 @@ class F : E { }
 // CHECK-NEXT: strong_retain [[SELFP]] : $F
 // CHECK-NEXT: strong_release [[SELF_BOX]]#0 : $Builtin.NativeObject
 // CHECK-NEXT: return [[SELFP]] : $F
+
+
+// <rdar://problem/19780343> Default constructor for a struct with optional doesn't compile
+
+// This shouldn't get a default init, since it would be pointless (bar can never
+// be reassigned).  It should get a memberwise init though.
+struct G {
+  let bar: Int32?
+}
+
+// CHECK-NOT: default_constructor.G.init (default_constructor.G.Type)()
+// CHECK-LABEL: default_constructor.G.init (default_constructor.G.Type)(bar : Swift.Optional<Swift.Int32>)
+// CHECK-NEXT: sil hidden @_TFV19default_constructor1GCfMS0_FT3barGSqVSs5Int32__S0_
+// CHECK-NOT: default_constructor.G.init (default_constructor.G.Type)()
+
