@@ -56,8 +56,7 @@ TypeChecker::~TypeChecker() {
 
 void TypeChecker::handleExternalDecl(Decl *decl) {
   if (auto SD = dyn_cast<StructDecl>(decl)) {\
-    SmallVector<Decl*, 2> NewInits;
-    addImplicitConstructors(SD, NewInits);
+    addImplicitConstructors(SD);
     addImplicitStructConformances(SD);
   }
   if (auto CD = dyn_cast<ClassDecl>(decl)) {
@@ -407,8 +406,7 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       }
 
       if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
-        SmallVector<Decl *, 4> ignoredCtors;
-        TC.addImplicitConstructors(CD, ignoredCtors);
+        TC.addImplicitConstructors(CD);
         TC.addImplicitDestructor(CD);
       }
     }

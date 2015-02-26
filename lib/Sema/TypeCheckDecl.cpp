@@ -3099,9 +3099,7 @@ public:
 
       TC.validateDecl(SD);
       TC.ValidatedTypes.remove(SD);
-
-      SmallVector<Decl*, 2> NewDecls;
-      TC.addImplicitConstructors(SD, NewDecls);
+      TC.addImplicitConstructors(SD);
     }
 
     if (!IsFirstPass) {
@@ -3247,10 +3245,8 @@ public:
     }
     
     // If this class needs an implicit constructor, add it.
-    if (!IsFirstPass) {
-      SmallVector<Decl*, 2> ImplicitInits;
-      TC.addImplicitConstructors(CD, ImplicitInits);
-    }
+    if (!IsFirstPass)
+      TC.addImplicitConstructors(CD);
 
     TC.addImplicitDestructor(CD);
 
@@ -6165,8 +6161,7 @@ static void diagnoseMissingRequiredInitializer(
   TC.diagnose(superInitializer, diag::required_initializer_here);
 }
 
-void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
-                                          SmallVectorImpl<Decl*> &Results) {
+void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // We can only synthesize implicit constructors for classes and structs.
  if (!isa<ClassDecl>(decl) && !isa<StructDecl>(decl))
    return;
@@ -6262,12 +6257,11 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
         auto ctor = createImplicitConstructor(
                       *this, decl, ImplicitConstructorKind::Memberwise);
         decl->addMember(ctor);
-        Results.push_back(ctor);
       }
 
       // If we found a stored property, add a default constructor.
       if (!FoundUninitializedVars)
-        Results.push_back(defineDefaultConstructor(decl));
+        defineDefaultConstructor(decl);
     }
     return;
   }
@@ -6344,7 +6338,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
                           ? DesignatedInitKind::Chaining
                           : DesignatedInitKind::Stub)) {
         classDecl->addMember(ctor);
-        Results.push_back(classDecl);
       }
     }
 
@@ -6361,7 +6354,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
       return;
     }
 
-    Results.push_back(defineDefaultConstructor(decl));
+    defineDefaultConstructor(decl);
   }
 }
 
@@ -6390,14 +6383,14 @@ void TypeChecker::addImplicitEnumConformances(EnumDecl *ED) {
     .checkExplicitConformance(ED, ED->getDeclaredTypeInContext());
 }
 
-ConstructorDecl *TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
+void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   PrettyStackTraceDecl stackTrace("defining default constructor for",
                                   decl);
 
   // Clang-imported types should never get a default constructor, just a
   // memberwise one.
   if (decl->hasClangNode())
-    return nullptr;
+    return;
 
   // For a class, check whether the superclass (if it exists) is
   // default-initializable.
@@ -6407,7 +6400,7 @@ ConstructorDecl *TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
       // If there are no default ctors for our supertype, we can't do anything.
       auto ctors = lookupConstructors(superTy, decl);
       if (!ctors)
-        return nullptr;
+        return;
 
       // Check whether we have a constructor that can be called with an empty
       // tuple.
@@ -6423,7 +6416,7 @@ ConstructorDecl *TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
           // A designated initializer other than a default initializer
           // means we can't call super.init().
           if (ctor->isDesignatedInit())
-            return nullptr;
+            return;
 
           continue;
         }
@@ -6441,7 +6434,7 @@ ConstructorDecl *TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
           // A designated initializer other than a default initializer
           // means we can't call super.init().
           if (ctor->isDesignatedInit())
-            return nullptr;
+            return;
 
           continue;
         }
@@ -6457,13 +6450,13 @@ ConstructorDecl *TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
       }
 
       // If our superclass isn't default constructible, we aren't either.
-      if (!foundDefaultConstructor) return nullptr;
+      if (!foundDefaultConstructor) return;
     }
   }
 
   // Create the default constructor.
-  auto ctor = createImplicitConstructor(
-                *this, decl, ImplicitConstructorKind::Default);
+  auto ctor = createImplicitConstructor(*this, decl,
+                                        ImplicitConstructorKind::Default);
 
   // Add the constructor.
   decl->addMember(ctor);
@@ -6471,7 +6464,6 @@ ConstructorDecl *TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   // Create an empty body for the default constructor. The type-check of the
   // constructor body will introduce default initializations of the members.
   ctor->setBody(BraceStmt::create(Context, SourceLoc(), { }, SourceLoc()));
-  return ctor;
 }
 
 static void validateAttributes(TypeChecker &TC, Decl *D) {
