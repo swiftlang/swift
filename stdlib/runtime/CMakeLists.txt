@@ -10,6 +10,13 @@ if(SWIFT_HAVE_CRASH_REPORTER_CLIENT)
       "-DSWIFT_HAVE_CRASHREPORTERCLIENT=1")
 endif()
 
+set(swift_runtime_leaks_sources)
+if(SWIFT_RUNTIME_ENABLE_LEAK_ENTRYPOINTS)
+  list(APPEND swift_runtime_compile_flags
+       "-DSWIFT_RUNTIME_ENABLE_LEAK_ENTRYPOINTS=1")
+  set(swift_runtime_leaks_sources Leaks.mm)
+endif()
+
 set(swift_runtime_dtrace_sources)
 if (SWIFT_RUNTIME_ENABLE_DTRACE)
   set(swift_runtime_dtrace_sources SwiftRuntimeDTraceProbes.d)
@@ -43,6 +50,7 @@ add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
   UnicodeExtendedGraphemeClusters.cpp.gyb
   ${swift_runtime_objc_sources}
   ${swift_runtime_dtrace_sources}
+  ${swift_runtime_leaks_sources}
   C_COMPILE_FLAGS ${swift_runtime_compile_flags}
   INSTALL_IN_COMPONENT stdlib)
 

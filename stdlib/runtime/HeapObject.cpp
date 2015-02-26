@@ -40,6 +40,7 @@
 # define SWIFT_RELEASE()
 # define SWIFT_RETAIN()
 #endif
+#include "Leaks.h"
 
 using namespace swift;
 
@@ -60,6 +61,10 @@ _swift_allocObject_(HeapMetadata const *metadata, size_t requiredSize,
   object->metadata = metadata;
   object->refCount.init();
   object->weakRefCount.init();
+
+  // If leak tracking is enabled, start tracking this object.
+  SWIFT_LEAKS_START_TRACKING_OBJECT(object);
+
   return object;
 }
 auto swift::_swift_allocObject = _swift_allocObject_;
@@ -268,7 +273,6 @@ swift::swift_retain_noresult(HeapObject *object) {
   swift_retain(object);
 }
 
-
 HeapObject *swift::swift_retain(HeapObject *object) {
   SWIFT_RETAIN();
   return _swift_retain(object);
@@ -410,6 +414,9 @@ void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
                   allocatedSize - sizeof(HeapObject));
 #endif
 
+  // If we are tracking leaks, stop tracking this object.
+  SWIFT_LEAKS_STOP_TRACKING_OBJECT(object);
+
   // Drop the initial weak retain of the object.
   //
   // If the outstanding weak retain count is 1 (i.e. only the initial
@@ -475,7 +482,6 @@ void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
   // release, we will fall back on swift_weakRelease, which does an
   // atomic decrement (and has the ability to reconstruct
   // allocatedSize and allocatedAlignMask).
-
   if (object->weakRefCount.getCount() == 1) {
     swift_slowDealloc(object, allocatedSize, allocatedAlignMask);
   } else {

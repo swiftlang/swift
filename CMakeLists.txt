@@ -153,6 +153,10 @@ option(SWIFT_RUNTIME_ENABLE_DTRACE
   "Should the runtime be built with dtrace instrumentation enabled"
   FALSE)
 
+option(SWIFT_RUNTIME_ENABLE_LEAK_ENTRYPOINTS
+  "Should the runtime be built with support for non-thread-safe leak detecting entrypoints"
+  FALSE)
+
 option(SWIFT_STDLIB_USE_ASSERT_CONFIG_RELEASE
     "Should the stdlib be build with assert config set to release"
     FALSE)
