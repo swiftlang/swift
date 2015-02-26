@@ -405,6 +405,9 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
         }
       }
 
+      // FIXME: We need to add implicit initializers and dtors when a decl is
+      // touched, because it affects vtable layout.  If you're not defining the
+      // class, you shouldn't have to know what the vtable layout is.
       if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
         TC.addImplicitConstructors(CD);
         TC.addImplicitDestructor(CD);
