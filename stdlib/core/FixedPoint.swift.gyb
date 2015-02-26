@@ -37,12 +37,14 @@ def maskBits(n):
     """Return an n-bit mask in hex"""
     return hexify((1 << n) - 1)
 
+IntMax = 'Int%s' % int_max_bits
+UIntMax = 'UInt%s' % int_max_bits
 }%
 
 /// The largest native signed integer type
-public typealias IntMax = Int${int_max_bits}
+public typealias IntMax = ${IntMax}
 /// The largest native unsigned integer type
-public typealias UIntMax = UInt${int_max_bits}
+public typealias UIntMax = ${UIntMax}
 
 /// This protocol is an implementation detail of `IntegerType`; do
 /// not use it directly.
@@ -164,6 +166,81 @@ T : _UnsignedIntegerType, U : _SignedIntegerType
   return U(IntMax(x.toUIntMax()))
 }
 
+//===--- Parsing helpers --------------------------------------------------===//
+
+/// Return c as a UTF16.CodeUnit.  Meant to be used as _ascii("x").
+internal func _ascii(c: UnicodeScalar) -> UTF16.CodeUnit {
+  _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")
+  return UTF16.CodeUnit(c.value)
+}
+
+/// If text can be interpreted in the given `radix` as an unsigned
+/// number <= `maximum`, return that number.  Otherwise, return `nil`.
+///
+/// Note: if `text` begins with `"-"`, even if the rest of the
+/// characters are `"0"`, the result is nil.
+internal func _parseAsciiAsUIntMax(
+  text: String, radix: Int, maximum: UIntMax
+) -> UIntMax? {
+  if isEmpty(text) { return nil }
+  
+  let digit = _ascii("0")..._ascii("9")
+  let lower = _ascii("a")..._ascii("z")
+  let upper = _ascii("A")..._ascii("Z")
+  
+  _precondition(radix > 1, "Radix must be greater than 1")
+  _precondition(
+    radix <= numericCast(10 + count(lower)),
+    "Radix exceeds what can be expressed using the English alphabet")
+  
+  let uRadix = UIntMax(bitPattern: IntMax(radix))
+  var result: UIntMax = 0
+  for c in text.utf16 {
+    let n: UIntMax
+    switch c {
+    case digit: n = UIntMax(c - digit.startIndex)
+    case lower: n = UIntMax(c - lower.startIndex) + 10
+    case upper: n = UIntMax(c - upper.startIndex) + 10
+    // case _ascii("_"): continue
+    default: return nil
+    }
+    if n >= uRadix { return nil }
+    let (result1, overflow1) = UIntMax.multiplyWithOverflow(result, uRadix)
+    let (result2, overflow2) = UIntMax.addWithOverflow(result1, n)
+    result = result2
+    if overflow1 || overflow2 || result > maximum { return nil }
+  }
+  return result
+}
+
+/// If text can be interpreted in the given `radix` as a signed number
+/// between `-maximum - 1` and `maximum`, return that number.
+/// Otherwise, return `nil`.
+///
+/// Note: for text matching the regular expression "-0+", the result
+/// is `0`, not `nil`.
+internal func _parseAsciiAsIntMax(
+  text: String, radix: Int, maximum: IntMax
+) -> IntMax? {
+  _sanityCheck(maximum > 0, "maximum should be positive")
+  
+  let u16 = text.utf16
+  if isEmpty(u16) { return nil }
+  
+  // Drop any leading "-"
+  let negative = first(u16) == _ascii("-")
+  let absResultText = negative ? _unsafeUnwrap(String(dropFirst(u16))) : text
+
+  let absResultMax = UIntMax(bitPattern: maximum) + (negative ? 1 : 0)
+
+  // Parse the result as unsigned
+  if let absResult = _parseAsciiAsUIntMax(absResultText, radix, absResultMax) {
+    return IntMax(bitPattern: negative ? 0 &- absResult : absResult)
+  }
+  return nil
+}
+
+//===--- Loop over all integer types --------------------------------------===//
 % for self_ty in all_integer_types(word_bits):
 %   bits = self_ty.bits
 %   signed = self_ty.is_signed
@@ -334,6 +411,18 @@ extension ${Self} : Printable {
   }
 }
 
+extension ${Self} {
+  public init?(_ text: String, radix: Int = 10) {
+    if let value = _parseAsciiAs${'' if signed else 'U'}IntMax(
+      text, radix, ${'' if signed else 'U'}IntMax(${Self}.max)) {
+      self.init(
+        ${'' if Self in (IntMax,UIntMax) else 'truncatingBitPattern:'} value)
+    }
+    else {
+      return nil
+    }
+  }
+}
 // When ${Self} is used as an index, there are always bounds---more
 // restrictive than the full range of ${Self}---against which we're
 // not able to check.  Overflows are not useful indicators of
@@ -641,7 +730,8 @@ public func _assumeNonNegative(x: ${Self}) -> ${Self} {
 }
 % end
 
-% end  # for bits in allInts
+% end
+//===--- End loop over all integer types ----------------------------------===//
 
 /// A signed integer type that occupies one machine word
 public typealias Word = Int

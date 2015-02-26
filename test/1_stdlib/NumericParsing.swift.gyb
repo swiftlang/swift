@@ -1,0 +1,112 @@
+//===--- NumericParsing.swift.gyb ----------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// -*- swift -*-
+// RUN: rm -rf %t ; mkdir -p %t
+// RUN: %S/../../utils/gyb -Dtarget_ptrsize=%target-ptrsize -Dtest_path=%s %s -o %t/NumericParsing.swift
+// RUN: %S/../../utils/line-directive %t/NumericParsing.swift -- %target-build-swift %t/NumericParsing.swift -o %t/a.out
+// RUN: %S/../../utils/line-directive %t/NumericParsing.swift -- %target-run %t/a.out
+%{
+from SwiftIntTypes import *
+
+word_bits = int(target_ptrsize)
+  
+def maskOfWidth(n):
+  return (1 << n) - 1
+
+def inRadix(radix, n, zero = '0'):
+    if n < 0: return '-' + inRadix(radix, -n, '')
+    elif n == 0: return zero
+    else:
+        r = n % radix
+        digit = chr((ord('0') + r) if r < 10 else (ord('a') + r - 10))
+        return inRadix(radix, n / radix, '') + digit
+
+# Is this is a validation test or just a smoke test?
+# (this file is symlinked into the validation-test directory)
+is_smoke_test = '/test/1_stdlib/NumericParsing' in test_path
+if not is_smoke_test and not '/validation-test/stdlib/NumericParsing' in test_path:
+  raise RuntimeError('Unexpected test location: %r' % test_path)
+
+# Do a lot less testing if it's just a smoke test
+max_radix = ord('z') - ord('a') + 1 + 10
+
+# All the radices we might want to test.  Need to skip by 5s or it just takes too long.
+all_radices = set(range(2, max_radix, 5) + [max_radix])
+
+# Important radices that we keep in the smoke test
+smoke_radices = [2, 8, 10, 16]
+
+# Which radices actually going to be tested?
+non_smoke_radices = [r for r in all_radices if r not in smoke_radices]
+radices_to_test = smoke_radices if is_smoke_test else non_smoke_radices
+
+# How many values are we going to test in each radix?
+number_of_values = 23 if is_smoke_test else 101
+}% 
+
+import StdlibUnittest
+
+var tests = TestSuite("NumericParsing")
+
+% for type in all_integer_types(word_bits):
+%   Self = type.stdlib_name
+%   maxValue = maskOfWidth((type.bits - 1) if type.is_signed else type.bits)
+%   minValue = -maxValue - 1 if type.is_signed else 0
+%   required_values = [minValue, 0, maxValue] if is_smoke_test else []
+tests.test("${Self}/success") {
+  let isSigned = ${str(type.is_signed).lower()}
+
+%   if is_smoke_test:
+  // Check some important special cases
+  expectEqual(0, ${Self}("0"))
+  expectEqual(10, ${Self}("10"))
+  expectEqual(10, ${Self}("010"))
+  expectEqual(15, ${Self}("00F", radix: 16))
+  expectEqual(${-128 if type.is_signed else 'nil'}, ${Self}("-0080", radix: 16))
+  expectEqual(isSigned ? 0 : nil, ${Self}("-0"))
+  expectEqual(isSigned ? 0 : nil, ${Self}("-00", radix: 16))
+  expectEqual(${max_radix} - 1, ${Self}("z", radix: ${max_radix}))
+%   end
+
+  // Do more exhaustive testing
+  % for radix in radices_to_test:
+  %   for n in required_values + range(
+  %     minValue + 1, maxValue - 1,
+  %     (maxValue - minValue) / (number_of_values - len(required_values))):
+  // This line is a workaround for a gyb parsing bug.
+  %     text = inRadix(radix, n)
+  expectEqual(${n}, ${Self}("${text}", radix: ${radix}))
+  %     if text != text.upper():
+  expectEqual(${n}, ${Self}("${text.upper()}", radix: ${radix}))
+  %     end
+  %   end
+  % end
+}
+
+% if is_smoke_test:
+tests.test("${Self}/radixTooLow") {
+  ${Self}("0", radix: 2)
+  expectCrashLater()
+  ${Self}("0", radix: 1)
+}
+
+tests.test("${Self}/radixTooHigh") {
+  let maxRadix = ${ord('z') - ord('a') + 1 + 10}
+  ${Self}("0", radix: maxRadix)
+  expectCrashLater()
+  let y = ${Self}("0", radix: maxRadix + 1)
+}
+% end
+
+% end
+
+runAllTests()
