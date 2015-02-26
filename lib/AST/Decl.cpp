@@ -268,6 +268,13 @@ void Decl::setDeclContext(DeclContext *DC) {
   Context = DC;
 }
 
+bool Decl::isUserAccessible() const {
+  if (auto VD = dyn_cast<VarDecl>(this)){
+    return VD->isUserAccessible();
+  }
+  return true;
+}
+
 Module *Decl::getModuleContext() const {
   return getDeclContext()->getParentModule();
 }

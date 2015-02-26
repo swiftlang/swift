@@ -352,8 +352,12 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// \brief Whether this is a property used in expressions in the debugger.
     /// It is up to the debugger to instruct SIL how to access this variable.
     unsigned IsDebuggerVar : 1;
+
+    /// Whether the decl can be accessed by swift users; for instance,
+    /// a.storage for lazy var a is a decl that cannot be accessed.
+    unsigned IsUserAccessible : 1;
   };
-  enum { NumVarDeclBits = NumAbstractStorageDeclBits + 4 };
+  enum { NumVarDeclBits = NumAbstractStorageDeclBits + 5 };
   static_assert(NumVarDeclBits <= 32, "fits in an unsigned");
   
   class EnumElementDeclBitfields {
@@ -674,6 +678,12 @@ public:
   /// Produce a name for the given descriptive declaration kind, which
   /// is suitable for use in diagnostics.
   static StringRef getDescriptiveKindName(DescriptiveDeclKind K);
+
+  /// Whether swift users should be able to access this decl. For instance,
+  /// var a.storage for lazy var a is an inaccessible decl. An inaccessible decl
+  /// has to be implicit; but an implicit decl does not have to be inaccessible,
+  /// for instance, self.
+  bool isUserAccessible() const;
 
   DeclContext *getDeclContext() const { return Context; }
   void setDeclContext(DeclContext *DC);
@@ -3862,6 +3872,7 @@ protected:
           Identifier Name, Type Ty, DeclContext *DC)
     : AbstractStorageDecl(Kind, DC, Name, NameLoc) 
   {
+    VarDeclBits.IsUserAccessible = true;
     VarDeclBits.IsStatic = IsStatic;
     VarDeclBits.IsLet = IsLet;
     VarDeclBits.IsDebuggerVar = false;
@@ -3876,6 +3887,14 @@ public:
 
   SourceLoc getStartLoc() const { return getNameLoc(); }
   SourceRange getSourceRange() const;
+
+  void setUserAccessible(bool Accessible) {
+    VarDeclBits.IsUserAccessible = Accessible;
+  }
+
+  bool isUserAccessible() const {
+    return VarDeclBits.IsUserAccessible;
+  }
 
   /// \brief Retrieve the source range of the variable type.
   ///

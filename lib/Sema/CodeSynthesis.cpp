@@ -1721,7 +1721,7 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   auto *Storage = new (Context) VarDecl(/*isStatic*/false, /*isLet*/false,
                                         VD->getLoc(), StorageName, StorageTy,
                                         VD->getDeclContext());
-
+  Storage->setUserAccessible(false);
   addMemberToContextIfNeeded(Storage, VD->getDeclContext(), VD);
 
   // Create the pattern binding decl for the storage decl.  This will get

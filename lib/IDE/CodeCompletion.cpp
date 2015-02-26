@@ -1224,6 +1224,8 @@ public:
   void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason) {
     if (!VD->hasName())
       return;
+    if (!VD->isUserAccessible())
+      return;
 
     StringRef Name = VD->getName().get();
     assert(!Name.empty() && "name should not be empty");
