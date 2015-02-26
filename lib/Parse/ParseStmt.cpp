@@ -207,7 +207,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
   Optional<Scope> initScope;
   if (!isActiveConfigBlock) {
     auto scopeKind =  IsTopLevel ? ScopeKind::TopLevel : ScopeKind::Brace;
-    initScope.emplace(this, scopeKind);
+    initScope.emplace(this, scopeKind, /*inactiveConfigBlock=*/isConfigBlock);
   }
 
   ParserStatus BraceItemsStatus;

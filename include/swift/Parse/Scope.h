@@ -50,7 +50,9 @@ public:
 
   /// addToScope - Register the specified decl as being in the current lexical
   /// scope.
-  void addToScope(ValueDecl *D, Parser &TheParser);  
+  void addToScope(ValueDecl *D, Parser &TheParser);
+
+  bool isInactiveConfigBlock() const;
 
   SavedScope saveCurrentScope();
 };
@@ -86,20 +88,21 @@ class SavedScope {
   ScopeInfo::ScopedHTDetachedScopeTy HTDetachedScope;
   unsigned Depth;
   ScopeKind Kind;
+  bool IsInactiveConfigBlock;
 
   SavedScope() = delete;
   SavedScope(const SavedScope &) = delete;
   void operator=(const SavedScope &) = delete;
 
 public:
-  SavedScope(SavedScope &&Other)
-    : HTDetachedScope(std::move(Other.HTDetachedScope)),
-      Depth(Other.Depth), Kind(Other.Kind) {}
+  SavedScope(SavedScope &&Other) = default;
+  SavedScope &operator=(SavedScope &&) = default;
+  ~SavedScope() = default;
 
   SavedScope(ScopeInfo::ScopedHTDetachedScopeTy &&HTDetachedScope,
-             unsigned Depth,
-             ScopeKind Kind)
-    : HTDetachedScope(std::move(HTDetachedScope)), Depth(Depth), Kind(Kind) {}
+             unsigned Depth, ScopeKind Kind, bool IsInactiveConfigBlock)
+    : HTDetachedScope(std::move(HTDetachedScope)), Depth(Depth), Kind(Kind),
+      IsInactiveConfigBlock(IsInactiveConfigBlock) {}
 };
 
 /// Scope - This class represents lexical scopes.  These objects are created
@@ -119,11 +122,12 @@ class Scope {
   unsigned PrevResolvableDepth;
   unsigned Depth;
   ScopeKind Kind;
+  bool IsInactiveConfigBlock;
 
   /// \brief Save this scope so that it can be re-entered later.  Transfers the
   /// ownership of the scope frame to returned object.
   SavedScope saveScope() {
-    return std::move(SavedScope(HTScope.detach(), Depth, Kind));
+    return SavedScope(HTScope.detach(), Depth, Kind, IsInactiveConfigBlock);
   }
 
   unsigned getDepth() const {
@@ -134,7 +138,7 @@ class Scope {
 
 public:
   /// \brief Create a lexical scope of the specified kind.
-  Scope(Parser *P, ScopeKind SC);
+  Scope(Parser *P, ScopeKind SC, bool IsInactiveConfigBlock = false);
 
   /// \brief Re-enter the specified scope, transferring the ownership of the
   /// scope frame to the new object.
@@ -162,6 +166,12 @@ inline ValueDecl *ScopeInfo::lookupValueName(Identifier Name) {
   if (Res.first < ResolvableDepth)
     return 0;
   return Res.second;
+}
+
+inline bool ScopeInfo::isInactiveConfigBlock() const {
+  if (!CurScope)
+    return false;
+  return CurScope->IsInactiveConfigBlock;
 }
 
 inline SavedScope ScopeInfo::saveCurrentScope() {

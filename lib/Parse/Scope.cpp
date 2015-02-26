@@ -50,18 +50,20 @@ static bool isResolvableScope(ScopeKind SK) {
   }
 }
 
-Scope::Scope(Parser *P, ScopeKind SC):
-    SI(P->getScopeInfo()),
+Scope::Scope(Parser *P, ScopeKind SC, bool InactiveConfigBlock)
+  : SI(P->getScopeInfo()),
     HTScope(SI.HT, SI.CurScope ? &SI.CurScope->HTScope : 0),
     PrevScope(SI.CurScope),
     PrevResolvableDepth(SI.ResolvableDepth),
-    Kind(SC) {
+    Kind(SC), IsInactiveConfigBlock(InactiveConfigBlock) {
   assert(PrevScope || Kind == ScopeKind::TopLevel);
   
-  if (SI.CurScope)
+  if (SI.CurScope) {
     Depth = SI.CurScope->Depth + 1;
-  else
+    IsInactiveConfigBlock |= SI.CurScope->IsInactiveConfigBlock;
+  } else {
     Depth = 0;
+  }
   SI.CurScope = this;
   if (!isResolvableScope(Kind))
     SI.ResolvableDepth = Depth + 1;
@@ -73,7 +75,7 @@ Scope::Scope(Parser *P, SavedScope &&SS):
     PrevScope(SI.CurScope),
     PrevResolvableDepth(SI.ResolvableDepth),
     Depth(SI.CurScope ? SI.CurScope->Depth + 1 : 0),
-    Kind(SS.Kind) {
+    Kind(SS.Kind), IsInactiveConfigBlock(SS.IsInactiveConfigBlock) {
     
     SI.CurScope = this;
     if (!isResolvableScope(Kind))

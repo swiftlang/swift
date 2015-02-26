@@ -1442,7 +1442,8 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
     return;
 
   if (auto TD = dyn_cast<TypeDecl>(D))
-    SF.LocalTypeDecls.push_back(TD);
+    if (!getScopeInfo().isInactiveConfigBlock())
+      SF.LocalTypeDecls.push_back(TD);
 
   Identifier name = D->getName();
   unsigned discriminator = CurLocalContext->claimNextNamedDiscriminator(name);
@@ -2199,6 +2200,9 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
     if (!Tok.isAtStartOfLine())
       diagnose(Tok.getLoc(), diag::extra_tokens_config_directive);
 
+    Optional<Scope> scope;
+    if (!ClauseIsActive)
+      scope.emplace(this, ScopeKind::Brace, /*inactiveConfigBlock=*/true);
     
     SmallVector<Decl*, 8> Decls;
     ParserStatus Status;
