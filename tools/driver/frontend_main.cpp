@@ -329,6 +329,25 @@ static bool printAsObjC(const std::string &path, Module *M,
   return printAsObjC(out, M, bridgingHeader, requiredAccess);
 }
 
+/// Returns the OutputKind for the given Action.
+static IRGenOutputKind getOutputKind(FrontendOptions::ActionType Action) {
+  switch (Action) {
+  case FrontendOptions::EmitIR:
+    return IRGenOutputKind::LLVMAssembly;
+  case FrontendOptions::EmitBC:
+    return IRGenOutputKind::LLVMBitcode;
+  case FrontendOptions::EmitAssembly:
+    return IRGenOutputKind::NativeAssembly;
+  case FrontendOptions::EmitObject:
+    return IRGenOutputKind::ObjectFile;
+  case FrontendOptions::Immediate:
+    return IRGenOutputKind::Module;
+  default:
+    llvm_unreachable("Unknown ActionType which requires IRGen");
+    return IRGenOutputKind::ObjectFile;
+  }
+}
+
 /// Performs the compile requested by the user.
 /// \returns true on error
 static bool performCompile(CompilerInstance &Instance,
@@ -530,22 +549,9 @@ static bool performCompile(CompilerInstance &Instance,
   performSILCleanup(SM.get());
 
   // TODO: remove once the frontend understands what action it should perform
-  switch (Action) {
-  case FrontendOptions::EmitIR:
-    IRGenOpts.OutputKind = IRGenOutputKind::LLVMAssembly;
-    break;
-  case FrontendOptions::EmitBC:
-    IRGenOpts.OutputKind = IRGenOutputKind::LLVMBitcode;
-    break;
-  case FrontendOptions::EmitAssembly:
-    IRGenOpts.OutputKind = IRGenOutputKind::NativeAssembly;
-    break;
-  case FrontendOptions::EmitObject:
-    IRGenOpts.OutputKind = IRGenOutputKind::ObjectFile;
-    break;
-  case FrontendOptions::Immediate: {
+  IRGenOpts.OutputKind = getOutputKind(Action);
+  if (Action == FrontendOptions::Immediate) {
     assert(!PrimarySourceFile && "-i doesn't work in -primary-file mode");
-    IRGenOpts.OutputKind = IRGenOutputKind::Module;
     IRGenOpts.UseJIT = true;
     IRGenOpts.DebugInfoKind = IRGenDebugInfoKind::Normal;
     const ProcessCmdLine &CmdLine = ProcessCmdLine(opts.ImmediateArgv.begin(),
@@ -553,10 +559,6 @@ static bool performCompile(CompilerInstance &Instance,
     Instance.setSILModule(std::move(SM));
     RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions());
     return false;
-  }
-  default:
-    llvm_unreachable("Unknown ActionType which requires IRGen");
-    return true;
   }
 
   // FIXME: We shouldn't need to use the global context here, but
