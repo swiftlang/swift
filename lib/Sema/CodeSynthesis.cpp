@@ -1887,9 +1887,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
 
     // Computed and static properties are not initialized.
     for (auto var : decl->getStoredProperties()) {
-      tc.validateDecl(var);
-      
-      
+
       // Initialized 'let' properties have storage, but don't get an argument
       // to the memberwise initializer since they already have an initial
       // value that cannot be overridden.
