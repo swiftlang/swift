@@ -189,7 +189,7 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
   // unbound.
   // We cannot devirtualize unbound generic calls yet.
   if (isClassWithUnboundGenericParameters(ClassInstanceType, AI->getModule()))
-    return nullptr;
+    return false;
 
   // *NOTE*:
   // Apply instruction substitutions are for the Member from a protocol or
@@ -939,7 +939,7 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   // unbound.
   // We cannot devirtualize unbound generic calls yet.
   if (isClassWithUnboundGenericParameters(InstanceType, AI->getModule()))
-    return nullptr;
+    return false;
 
   if (!CHA->hasKnownDirectSubclasses(CD)) {
     DEBUG(llvm::dbgs() << "Inserting monomorphic inline caches for class " <<
