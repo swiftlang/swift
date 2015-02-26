@@ -480,8 +480,7 @@ ParserResult<Stmt> Parser::parseStmt() {
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     return parseStmtReturn();
   case tok::kw_if:
-    if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
-    return parseStmtIf();
+    return parseStmtIf(LabelInfo);
   case tok::pound_if:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     return parseStmtIfConfig();
@@ -758,7 +757,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
 ///   stmt-if-else:
 ///    'else' stmt-brace
 ///    'else' stmt-if
-ParserResult<Stmt> Parser::parseStmtIf() {
+ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo) {
   SourceLoc IfLoc = consumeToken(tok::kw_if);
 
   ParserStatus Status;
@@ -819,14 +818,15 @@ ParserResult<Stmt> Parser::parseStmtIf() {
   if (Tok.is(tok::kw_else)) {
     ElseLoc = consumeToken(tok::kw_else);
     if (Tok.is(tok::kw_if))
-      ElseBody = parseStmtIf();
+      ElseBody = parseStmtIf(LabeledStmtInfo());
     else
       ElseBody = parseBraceItemList(diag::expected_lbrace_after_else);
     Status |= ElseBody;
   }
 
   return makeParserResult(
-      Status, new (Context) IfStmt(IfLoc, Condition, NormalBody.get(),
+      Status, new (Context) IfStmt(LabelInfo,
+                                   IfLoc, Condition, NormalBody.get(),
                                    ElseLoc, ElseBody.getPtrOrNull()));
 }
 

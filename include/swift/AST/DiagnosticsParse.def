@@ -692,7 +692,7 @@ ERROR(statement_same_line_without_semi,stmt_parsing,none,
 ERROR(brace_stmt_invalid,stmt_parsing,none,
       "braced block of statements is an unused closure", ())
 ERROR(invalid_label_on_stmt,stmt_parsing,none,
-      "labels are only valid on loops and switch statement", ())
+      "labels are only valid on loops, if, and switch statements", ())
 
 NOTE(discard_result_of_closure,stmt_parsing,none,
      "explicitly discard the result of the closure by assigning to '_'", ())

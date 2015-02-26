@@ -1575,11 +1575,15 @@ ERROR(generator_protocol_broken,sema_tcs,none,
 ERROR(label_shadowed,sema_tcs, none,
       "label %0 cannot be reused on an inner statement", (Identifier))
 ERROR(break_outside_loop,sema_tcs,none,
-      "'break' is only allowed inside a loop or switch", ())
+      "'break' is only allowed inside a loop, if, or switch", ())
+ERROR(unlabeled_break_outside_loop,sema_tcs,none,
+      "unlabeled 'break' is only allowed inside a loop or switch, a"
+      " labeled break is required to exit an if", ())
+
 ERROR(continue_outside_loop,sema_tcs,none,
       "'continue' is only allowed inside a loop", ())
-ERROR(continue_not_in_switch,sema_tcs,none,
-      "'continue' cannot be used with switch statements", ())
+ERROR(continue_not_in_this_stmt,sema_tcs,none,
+      "'continue' cannot be used with %0 statements", (StringRef))
 
 // Switch Stmt
 ERROR(no_match_operator,sema_tcs,none,

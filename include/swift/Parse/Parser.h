@@ -1127,7 +1127,7 @@ public:
   ParserResult<Stmt> parseStmtContinue();
   ParserResult<Stmt> parseStmtReturn();
   ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID);
-  ParserResult<Stmt> parseStmtIf();
+  ParserResult<Stmt> parseStmtIf(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtIfConfig(BraceItemListKind Kind
                                         = BraceItemListKind::Brace);
   ParserResult<Stmt> parseStmtWhile(LabeledStmtInfo LabelInfo);

@@ -412,6 +412,18 @@ void SILGenFunction::visitIfStmt(IfStmt *S) {
   std::vector<ConditionalBinding> condBuffers =
     emitConditionalBindingBuffers(*this, S->getCond());
 
+  // Create a continuation block.  We need it if there is a labeled break out
+  // of the if statement or if there is an if/then/else.
+  auto *ContBB = createBasicBlock();
+
+  // Set the destinations for any 'break' and 'continue' statements inside the
+  // body.  Note that "continue" is not valid out of a labeled 'if'.
+  BreakContinueDestStack.push_back({
+    S,
+    JumpDest(ContBB, getCleanupsDepth(), CleanupLocation(S->getThenStmt())),
+    JumpDest(CleanupLocation(S))
+  });
+
   // Emit the condition, along with the "then" part of the if properly guarded
   // by the condition.  The insertion point is left at the end of the 'then'
   // block, with any bound variables cleaned up already.
@@ -431,21 +443,31 @@ void SILGenFunction::visitIfStmt(IfStmt *S) {
     // Move all of the cleanup blocks into reasonable spots, leaving the
     // insertion point in the fully cleaned up block.
     emitCleanupBlocks(CleanupBlocks, *this);
+
+    // If the continuation block was used, emit it now, otherwise remove it.
+
+    if (ContBB->pred_empty())
+      ContBB->eraseFromParent();
+    else {
+      RegularLocation L(S->getThenStmt());
+      L.pointToEnd();
+      B.emitBlock(ContBB, L);
+    }
+    BreakContinueDestStack.pop_back();
     return;
   }
 
-  // If there is 'else' logic, create a new ContBB to be the merge point and
-  // jump to it from the true case.
-  auto *ContBB = createBasicBlock();
+  // If there is 'else' logic, the end of the 'then' block branches to the
+  // continue point.
   if (B.hasValidInsertionPoint()) {
     RegularLocation L(S->getThenStmt());
     L.pointToEnd();
     B.createBranch(L, ContBB);
   }
 
-  // With the true side done, work on the 'else' logic.  Start by moving all of
-  // the cleanup blocks into reasonable spots, leaving the insertion point in
-  // the fully cleaned up block.
+  // With the true side done, work on the 'else' logic.  Start by moving all
+  // of the cleanup blocks into reasonable spots, leaving the insertion point
+  // in the fully cleaned up block.
   emitCleanupBlocks(CleanupBlocks, *this);
 
   visit(S->getElseStmt());
@@ -460,6 +482,7 @@ void SILGenFunction::visitIfStmt(IfStmt *S) {
     ContBB->eraseFromParent();
   else
     B.emitBlock(ContBB);
+  BreakContinueDestStack.pop_back();
 }
 
 void SILGenFunction::visitIfConfigStmt(IfConfigStmt *S) {
@@ -483,9 +506,11 @@ void SILGenFunction::visitWhileStmt(WhileStmt *S) {
 
   // Set the destinations for any 'break' and 'continue' statements inside the
   // body.
-  BreakContinueDestStack.push_back(std::make_tuple(S,
-         JumpDest(BreakBB, getCleanupsDepth(), CleanupLocation(S->getBody())),
-         JumpDest(LoopBB, getCleanupsDepth(), CleanupLocation(S->getBody()))));
+  BreakContinueDestStack.push_back({
+    S,
+    JumpDest(BreakBB, getCleanupsDepth(), CleanupLocation(S->getBody())),
+    JumpDest(LoopBB , getCleanupsDepth(), CleanupLocation(S->getBody()))
+  });
   
   // Evaluate the condition, leaving the insertion point in the "true" block
   // after the loop body has been evaluated.
@@ -525,10 +550,11 @@ void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
   // Set the destinations for 'break' and 'continue'
   SILBasicBlock *EndBB = createBasicBlock();
   SILBasicBlock *CondBB = createBasicBlock();
-  BreakContinueDestStack.push_back(std::make_tuple(
-      S,
-      JumpDest(EndBB, getCleanupsDepth(), CleanupLocation(S->getBody())),
-      JumpDest(CondBB, getCleanupsDepth(), CleanupLocation(S->getBody()))));
+  BreakContinueDestStack.push_back({
+    S,
+    JumpDest(EndBB , getCleanupsDepth(), CleanupLocation(S->getBody())),
+    JumpDest(CondBB, getCleanupsDepth(), CleanupLocation(S->getBody()))
+  });
 
   // Emit the body, which is always evaluated the first time around.
   visit(S->getBody());

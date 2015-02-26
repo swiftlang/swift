@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -emit-silgen -verify %s | FileCheck %s
 
 class MyClass { 
   func foo() { }
@@ -232,4 +232,110 @@ func test_break(i : Int) {
   }
 }
 
+
+// <rdar://problem/19150249> Allow labeled "break" from an "if" statement
+
+// CHECK-LABEL: sil hidden @_TF10statements13test_if_breakFGSqCS_1C_T_
+func test_if_break(c : C?) {
+label1:
+  // CHECK: cond_br {{.*}}, [[TRUE:bb[0-9]+]], [[FALSE:bb[0-9]+]]
+  if let x = c {
+// CHECK: [[TRUE]]:
+
+    // CHECK: apply
+    foo()
+
+    // CHECK: strong_release
+    // CHECK: br [[BREAK:bb[0-9]+]]
+    break label1
+    use(x)  // expected-warning {{will never be executed}}
+  }
+
+  // CHECK: [[FALSE]]:
+  // CHECK: br [[BREAK]]
+  // CHECK: [[BREAK]]:
+  // CHECK: return
+}
+
+// CHECK-LABEL: sil hidden @_TF10statements18test_if_else_breakFGSqCS_1C_T_
+func test_if_else_break(c : C?) {
+label2:
+  // CHECK: cond_br {{.*}}, [[TRUE:bb[0-9]+]], [[FALSE:bb[0-9]+]]
+  if let x = c {
+    // CHECK: [[TRUE]]:
+    use(x)
+    // CHECK: br [[CONT:bb[0-9]+]]
+  } else {
+    // CHECK: [[FALSE]]:
+    // CHECK: apply
+    // CHECK: br [[CONT]]
+    foo()
+    break label2
+    foo() // expected-warning {{will never be executed}}
+  }
+  // CHECK: [[CONT]]:
+  // CHECK: return
+}
+
+// CHECK-LABEL: sil hidden @_TF10statements23test_if_else_then_breakFTSbGSqCS_1C__T_
+func test_if_else_then_break(a : Bool, c : C?) {
+  label3:
+  // CHECK: cond_br {{.*}}, [[TRUE:bb[0-9]+]], [[FALSE:bb[0-9]+]]
+  if let x = c {
+    // CHECK: [[TRUE]]:
+    use(x)
+    // CHECK: br [[CONT:bb[0-9]+]]
+  } else if a {
+    // CHECK: [[FALSE]]:
+    // CHECK: cond_br {{.*}}, [[TRUE2:bb[0-9]+]], [[FALSE2:bb[0-9]+]]
+    // CHECK: apply
+    // CHECK: br [[CONT]]
+    foo()
+    break label3
+    foo()    // expected-warning {{will never be executed}}
+  }
+
+  // CHECK: [[FALSE2]]:
+  // CHECK: br [[CONT]]
+  // CHECK: [[CONT]]:
+  // CHECK: return
+
+
+}
+
+
+// sil hidden @_TF10statements13test_if_breakFSbT_
+func test_if_break(a : Bool) {
+  // CHECK: br [[LOOP:bb[0-9]+]]
+  // CHECK: [[LOOP]]:
+  // CHECK: function_ref @_TFSb21_getBuiltinLogicValuefSbFT_Bi1_
+  // CHECK-NEXT: apply
+  // CHECK-NEXT: cond_br {{.*}}, [[LOOPTRUE:bb[0-9]+]], [[OUT:bb[0-9]+]]
+  while a {
+    if a {
+      foo()
+      break  // breaks out of while, not if.
+    }
+    foo()
+  }
+
+  // CHECK: [[LOOPTRUE]]:
+  // CHECK: function_ref @_TFSb21_getBuiltinLogicValuefSbFT_Bi1_
+  // CHECK-NEXT: apply
+  // CHECK-NEXT: cond_br {{.*}}, [[IFTRUE:bb[0-9]+]], [[IFFALSE:bb[0-9]+]]
+
+  // [[IFTRUE]]:
+  // CHECK: function_ref statements.foo
+  // CHECK: br [[WHILEBREAK:bb[0-9]+]]
+
+  // CHECK: [[IFFALSE]]:
+  // CHECK: function_ref statements.foo
+  // CHECK: br [[LOOP]]
+
+  // CHECK: [[WHILEBREAK]]:
+  // CHECK: br [[OUT]]
+
+  // CHECK: [[OUT]]:
+  // CHECK:   return
+}
 

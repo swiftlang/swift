@@ -432,6 +432,7 @@ public:
         pushRegion(BS);
 
     } else if (auto *IS = dyn_cast<IfStmt>(S)) {
+      assignCounter(IS, CounterExpr::Zero());
       CounterExpr &ThenCounter = assignCounter(IS->getThenStmt());
       assignCounter(IS->getElseStmt(),
                     CounterExpr::Sub(getCurrentCounter(), ThenCounter));

@@ -136,7 +136,24 @@ while true {
     break // expected-error {{'break' is only allowed inside a loop}}
     continue // expected-error {{'continue' is only allowed inside a loop}}
   }
+
+  // Labeled if
+  MyIf: if 1 != 2 {
+    break MyIf
+    continue MyIf  // expected-error {{'continue' cannot be used with if statements}}
+    break          // break the while
+    continue       // continue the while.
+  }
 }
+
+// Labeled if
+MyOtherIf: if 1 != 2 {
+  break MyOtherIf
+  continue MyOtherIf  // expected-error {{'continue' cannot be used with if statements}}
+  break          // expected-error {{unlabeled 'break' is only allowed inside a loop or switch, a labeled break is required to exit an if}}
+  continue       // expected-error {{'continue' is only allowed inside a loop}}
+}
+
 
 func tuple_assign() {
   var a,b,c,d : Int

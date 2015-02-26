@@ -102,7 +102,8 @@ static StmtCondition exprToCond(Expr *C, ASTContext &Ctx) {
 
 IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
                Stmt *Else, Optional<bool> implicit, ASTContext &Ctx)
-  : IfStmt(IfLoc, exprToCond(Cond, Ctx), Then, ElseLoc, Else, implicit) {
+  : IfStmt(LabeledStmtInfo(), IfLoc, exprToCond(Cond, Ctx), Then, ElseLoc, Else,
+           implicit) {
 }
 
 
@@ -112,7 +113,7 @@ SourceRange IfStmt::getSourceRange() const {
     End = Else->getEndLoc();
   else
     End = Then->getEndLoc();
-  return SourceRange(IfLoc, End);
+  return SourceRange(getLabelLocOrKeywordLoc(IfLoc), End);
 }
 
 SourceRange IfConfigStmt::getSourceRange() const {

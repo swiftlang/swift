@@ -214,6 +214,45 @@ public:
   }
 };
 
+struct LabeledStmtInfo {
+  Identifier Name;
+  SourceLoc Loc;
+  
+  // Evaluates to true if set.
+  operator bool() const { return !Name.empty(); }
+};
+  
+/// LabeledStmt - Common base class between the labeled statements (loops and
+/// switch).
+class LabeledStmt : public Stmt {
+  LabeledStmtInfo LabelInfo;
+protected:
+  SourceLoc getLabelLocOrKeywordLoc(SourceLoc L) const {
+    return LabelInfo ? LabelInfo.Loc : L;
+  }
+public:
+  LabeledStmt(StmtKind Kind, bool Implicit, LabeledStmtInfo LabelInfo)
+    : Stmt(Kind, Implicit), LabelInfo(LabelInfo) {}
+  
+  LabeledStmtInfo getLabelInfo() const { return LabelInfo; }
+  void setLabelInfo(LabeledStmtInfo L) { LabelInfo = L; }
+
+  // Switch and If statements are not targets of "continue".
+  bool isPossibleContinueTarget() const {
+    return getKind() != StmtKind::If && getKind() != StmtKind::Switch;
+  }
+
+  // If statement isn't the target of a non-labeled "break" or "continue".
+  bool requiresLabelOnJump() const {
+    return getKind() == StmtKind::If;
+  }
+
+  static bool classof(const Stmt *S) {
+    return S->getKind() >= StmtKind::First_LabeledStmt &&
+           S->getKind() <= StmtKind::Last_LabeledStmt;
+  }
+};
+
 
 /// Either an "if let" case or a simple boolean expression can appear as the
 /// condition of an 'if' or 'while' statement.
@@ -222,7 +261,7 @@ using StmtCondition = MutableArrayRef<StmtConditionElement>;
 /// IfStmt - if/then/else statement.  If no 'else' is specified, then the
 /// ElseLoc location is not specified and the Else statement is null. After
 /// type-checking, the condition is of type Builtin.Int1.
-class IfStmt : public Stmt {
+class IfStmt : public LabeledStmt {
   SourceLoc IfLoc;
   SourceLoc ElseLoc;
   StmtCondition Cond;
@@ -230,9 +269,11 @@ class IfStmt : public Stmt {
   Stmt *Else;
   
 public:
-  IfStmt(SourceLoc IfLoc, StmtCondition Cond, Stmt *Then, SourceLoc ElseLoc,
-         Stmt *Else, Optional<bool> implicit = None)
-  : Stmt(StmtKind::If, getDefaultImplicitFlag(implicit, IfLoc)),
+  IfStmt(LabeledStmtInfo LabelInfo, SourceLoc IfLoc, StmtCondition Cond,
+         Stmt *Then, SourceLoc ElseLoc, Stmt *Else,
+         Optional<bool> implicit = None)
+  : LabeledStmt(StmtKind::If, getDefaultImplicitFlag(implicit, IfLoc),
+                LabelInfo),
     IfLoc(IfLoc), ElseLoc(ElseLoc), Cond(Cond), Then(Then), Else(Else) {}
 
   IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
@@ -314,36 +355,6 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::IfConfig;
-  }
-};
- 
-
-struct LabeledStmtInfo {
-  Identifier Name;
-  SourceLoc Loc;
-  
-  // Evaluates to true if set.
-  operator bool() const { return !Name.empty(); }
-};
-  
-/// LabeledStmt - Common base class between the labeled statements (loops and
-/// switch).
-class LabeledStmt : public Stmt {
-  LabeledStmtInfo LabelInfo;
-protected:
-  SourceLoc getLabelLocOrKeywordLoc(SourceLoc L) const {
-    return LabelInfo ? LabelInfo.Loc : L;
-  }
-public:
-  LabeledStmt(StmtKind Kind, bool Implicit, LabeledStmtInfo LabelInfo)
-    : Stmt(Kind, Implicit), LabelInfo(LabelInfo) {}
-  
-  LabeledStmtInfo getLabelInfo() const { return LabelInfo; }
-  void setLabelInfo(LabeledStmtInfo L) { LabelInfo = L; }
-  
-  static bool classof(const Stmt *S) {
-    return S->getKind() >= StmtKind::First_LabeledStmt &&
-           S->getKind() <= StmtKind::Last_LabeledStmt;
   }
 };
 

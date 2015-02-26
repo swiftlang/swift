@@ -355,6 +355,8 @@ public:
     if (TC.typeCheckCondition(C, DC)) return 0;
     IS->setCond(C);
 
+    AddLabeledStmt ifNest(*this, IS);
+
     Stmt *S = IS->getThenStmt();
     if (typeCheckStmt(S)) return 0;
     IS->setThenStmt(S);
@@ -572,8 +574,14 @@ public:
     LabeledStmt *Target = nullptr;
     // Pick the nearest break target that matches the specified name.
     if (S->getTargetName().empty()) {
-      if (!ActiveLabeledStmts.empty())
-        Target = ActiveLabeledStmts.back();
+      for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
+           I != E; ++I) {
+        // 'break' with no label looks through if.
+        if (!(*I)->requiresLabelOnJump()) {
+          Target = *I;
+          break;
+        }
+      }
 
     } else {
       // Scan inside out until we find something with the right label.
@@ -586,7 +594,15 @@ public:
       }
     }
     if (!Target) {
-      TC.diagnose(S->getLoc(), diag::break_outside_loop);
+      auto diagid = diag::break_outside_loop;
+
+      // If someone is using an unlabeled break inside of an 'if' statement,
+      // produce a more specific error.
+      if (S->getTargetName().empty() && !ActiveLabeledStmts.empty() &&
+          isa<IfStmt>(ActiveLabeledStmts.back()))
+        diagid = diag::unlabeled_break_outside_loop;
+
+      TC.diagnose(S->getLoc(), diagid);
       return nullptr;
     }
     S->setTarget(Target);
@@ -600,8 +616,8 @@ public:
     if (S->getTargetName().empty()) {
       for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
            I != E; ++I) {
-        // 'continue' with no label looks through switches.
-        if (!isa<SwitchStmt>(*I)) {
+        // 'continue' with no label looks through if and switch.
+        if ((*I)->isPossibleContinueTarget()) {
           Target = *I;
           break;
         }
@@ -623,8 +639,9 @@ public:
     }
 
     // Continue cannot be used to repeat switches, use fallthrough instead.
-    if (isa<SwitchStmt>(Target)) {
-      TC.diagnose(S->getLoc(), diag::continue_not_in_switch);
+    if (!Target->isPossibleContinueTarget()) {
+      TC.diagnose(S->getLoc(), diag::continue_not_in_this_stmt,
+                  isa<SwitchStmt>(Target) ? "switch" : "if");
       return nullptr;
     }
 
