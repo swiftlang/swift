@@ -38,6 +38,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Config/config.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/OptTable.h"
@@ -1322,10 +1323,10 @@ static StringRef getOutputFilename(const JobAction *JA,
       BaseName = llvm::sys::path::stem(BaseInput);
     if (auto link = dyn_cast<LinkJobAction>(JA)) {
       if (link->getKind() == LinkKind::DynamicLibrary) {
-        // FIXME: This should be platform-specific.
+        // FIXME: This should be target-specific.
         Buffer = "lib";
         Buffer.append(BaseName);
-        Buffer.append(".dylib");
+        Buffer.append(LTDL_SHLIB_EXT);
         return Buffer.str();
       }
     }
