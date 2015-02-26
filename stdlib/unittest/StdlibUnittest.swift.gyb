@@ -150,6 +150,20 @@ public func expectOptionalEqual<T : Equatable>(
   }
 }
 
+public func expectEqual<T : Equatable>(
+    expected: T?, actual: T?,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if (actual == nil) != (expected == nil)
+    || actual != nil && expected! != actual! {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
+    println("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
+    println()
+  }
+}
+
 // Array<T> is not Equatable if T is.  Provide additional overloads.
 // Same for Dictionary.
 %for (Generic, EquatableType) in [
