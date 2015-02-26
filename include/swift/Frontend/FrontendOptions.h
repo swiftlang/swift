@@ -57,7 +57,8 @@ enum class InputFileKind {
   IFK_Swift,
   IFK_Swift_Library,
   IFK_Swift_REPL,
-  IFK_SIL
+  IFK_SIL,
+  IFK_LLVM_IR
 };
 
 /// Options for controlling the behavior of the frontend.

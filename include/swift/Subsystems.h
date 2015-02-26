@@ -236,6 +236,10 @@ namespace swift {
                                                  llvm::LLVMContext &LLVMContext,
                                                     unsigned StartElem = 0);
 
+  /// Turn the given LLVM module into native code and return true on error.
+  bool performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
+                   llvm::Module *Module);
+
   /// A convenience wrapper for Parser functionality.
   class ParserUnit {
   public:

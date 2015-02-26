@@ -122,6 +122,9 @@ ERROR(error_doing_code_completion,frontend,none,
 ERROR(verify_encountered_fatal,frontend,none,
       "fatal error encountered while in -verify mode", ())
 
+ERROR(error_parse_input_file,frontend,none,
+  "error parsing input file '%0' (%1)", (StringRef, StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

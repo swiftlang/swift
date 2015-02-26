@@ -417,3 +417,15 @@ performIRGeneration(IRGenOptions &Opts, SourceFile &SF, SILModule *SILMod,
   return ::performIRGeneration(Opts, SF.getParentModule(), SILMod, ModuleName,
                                LLVMContext, &SF, StartElem);
 }
+
+bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
+                        llvm::Module *Module) {
+  // Build TargetMachine.
+  llvm::TargetMachine *TargetMachine = createTargetMachine(Opts, Ctx);
+  if (!TargetMachine)
+    return true;
+
+  if (::performLLVM(Opts, Ctx.Diags, Module, TargetMachine))
+    return true;
+  return false;
+}

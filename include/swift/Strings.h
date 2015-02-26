@@ -20,6 +20,9 @@ namespace swift {
   static const char SERIALIZED_MODULE_DOC_EXTENSION[] = "swiftdoc";
   /// The extension for SIL files.
   static const char SIL_EXTENSION[] = "sil";
+  /// The extension for LLVM IR files.
+  static const char LLVM_BC_EXTENSION[] = "bc";
+  static const char LLVM_IR_EXTENSION[] = "ll";
   /// The name of the standard library, which is a reserved module name.
   static const char STDLIB_NAME[] = "Swift";
   /// The name of the ObjectiveC module.

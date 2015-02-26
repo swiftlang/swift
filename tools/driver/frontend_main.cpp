@@ -37,6 +37,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IRReader/IRReader.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Option/OptTable.h"
 #include "llvm/Support/FileSystem.h"
@@ -356,6 +357,46 @@ static bool performCompile(CompilerInstance &Instance,
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
 
+  IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
+
+  bool inputIsLLVMIr = Invocation.getInputKind() == InputFileKind::IFK_LLVM_IR;
+  if (inputIsLLVMIr) {
+    auto &LLVMContext = llvm::getGlobalContext();
+
+    // Load in bitcode file.
+    assert(Invocation.getInputFilenames().size() == 1 &&
+           "We expect a single input for bitcode input!");
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+      llvm::MemoryBuffer::getFileOrSTDIN(Invocation.getInputFilenames()[0]);
+    if (!FileBufOrErr) {
+      Instance.getASTContext().Diags.diagnose(SourceLoc(),
+                                              diag::error_open_input_file,
+                                              Invocation.getInputFilenames()[0],
+                                              FileBufOrErr.getError().message());
+      return true;
+    }
+    llvm::MemoryBuffer *MainFile = FileBufOrErr.get().get();
+
+    llvm::SMDiagnostic Err;
+    std::unique_ptr<llvm::Module> Module = llvm::parseIR(
+                                             MainFile->getMemBufferRef(),
+                                             Err, LLVMContext);
+    if (!Module) {
+      // TODO: Translate from the diagnostic info to the SourceManager location
+      // if available.
+      Instance.getASTContext().Diags.diagnose(SourceLoc(),
+                                              diag::error_parse_input_file,
+                                              Invocation.getInputFilenames()[0],
+                                              Err.getMessage());
+      return true;
+    }
+
+    // TODO: remove once the frontend understands what action it should perform
+    IRGenOpts.OutputKind = getOutputKind(Action);
+
+    return performLLVM(IRGenOpts, Instance.getASTContext(), Module.get());
+  }
+
   ReferencedNameTracker nameTracker;
   bool shouldTrackReferences = !opts.ReferenceDependenciesFilePath.empty();
   if (shouldTrackReferences)
@@ -467,7 +508,6 @@ static bool performCompile(CompilerInstance &Instance,
 
   // Perform SIL optimization passes if optimizations haven't been disabled.
   // These may change across compiler versions.
-  IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
   if (IRGenOpts.Optimize) {
     StringRef CustomPipelinePath =
       Invocation.getSILOptions().ExternalPassPipelineFilename;

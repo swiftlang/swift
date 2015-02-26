@@ -13,7 +13,7 @@ add_swift_executable(swift
     swiftIDE
     swiftOption
   COMPONENT_DEPENDS
-    bitreader bitwriter codegen ipo linker mcjit asmparser selectiondag
+    bitreader bitwriter codegen irreader ipo linker mcjit asmparser selectiondag
     objcarcopts option support ${LLVM_TARGETS_TO_BUILD})
 
 target_link_libraries(swift edit)

@@ -72,6 +72,7 @@ SourceFileKind CompilerInvocation::getSourceFileKind() const {
   case InputFileKind::IFK_SIL:
         return SourceFileKind::SIL;
   case InputFileKind::IFK_None:
+  case InputFileKind::IFK_LLVM_IR:
     llvm_unreachable("Trying to convert from unsupported InputFileKind");
   }
 }
@@ -193,6 +194,16 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     TreatAsSIL = llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
   }
 
+  // If we have exactly one input filename, and its extension is "bc" or "ll",
+  // treat the input as LLVM_IR.
+  bool TreatAsLLVM = false;
+  if (Opts.InputFilenames.size() == 1) {
+    StringRef Input(Opts.InputFilenames[0]);
+    TreatAsLLVM =
+      llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
+      llvm::sys::path::extension(Input).endswith(LLVM_IR_EXTENSION);
+  }
+
   if (Opts.RequestedAction == FrontendOptions::REPL) {
     if (!Opts.InputFilenames.empty()) {
       Diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
@@ -222,6 +233,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
   if (TreatAsSIL)
     Opts.InputKind = InputFileKind::IFK_SIL;
+  else if (TreatAsLLVM)
+    Opts.InputKind = InputFileKind::IFK_LLVM_IR;
   else if (Args.hasArg(OPT_parse_as_library))
     Opts.InputKind = InputFileKind::IFK_Swift_Library;
   else if (Action == FrontendOptions::REPL)
