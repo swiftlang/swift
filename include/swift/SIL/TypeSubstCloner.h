@@ -199,17 +199,6 @@ protected:
 
     auto Conformance = sub.getConformances()[0];
 
-    // If we don't have a witness table for this conformance, create a witness
-    // table declaration for it.
-    SILFunction &Cloned = getBuilder().getFunction();
-    SILModule &OtherMod = Cloned.getModule();
-    if (Conformance && !OtherMod.lookUpWitnessTable(Conformance).first) {
-      auto normal = Conformance->getRootNormalConformance();
-      auto linkage = Lowering::TypeConverter
-                  ::getLinkageForProtocolConformance(normal, NotForDefinition);
-      OtherMod.createWitnessTableDeclaration(Conformance, linkage);
-    }
-
     auto newLookupType = getOpASTType(Inst->getLookupType());
     if (Conformance) {
       CanType Ty = Conformance->getType()->getCanonicalType();
