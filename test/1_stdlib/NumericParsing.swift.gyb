@@ -75,6 +75,8 @@ tests.test("${Self}/success") {
   expectEqual(isSigned ? 0 : nil, ${Self}("-0"))
   expectEqual(isSigned ? 0 : nil, ${Self}("-00", radix: 16))
   expectEqual(${max_radix} - 1, ${Self}("z", radix: ${max_radix}))
+  expectEqual(nil, ${Self}("${maxValue + 1}"))
+  expectEqual(nil, ${Self}("${minValue - 1}"))
 %   end
 
   // Do more exhaustive testing
