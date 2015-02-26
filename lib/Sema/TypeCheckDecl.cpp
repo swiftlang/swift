@@ -1103,6 +1103,14 @@ static Expr *buildDefaultInitializer(TypeChecker &tc, Type type) {
 
 /// Check whether \c current is a declaration.
 static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
+  // Check it for redeclaration if it got a type. We have some unfortunate
+  // cases with synthesized code (i.e. accessors for lazy properties) where
+  // the getter and setter don't get filled in until some other decl gets
+  // processed).
+  if (!current->hasType() && isa<AbstractFunctionDecl>(current))
+    return;
+ 
+
   // If we've already checked this declaration, don't do it again.
   if (current->alreadyCheckedRedeclaration())
     return;
@@ -1136,7 +1144,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
                                               otherDefinitionsVec);
     otherDefinitions = otherDefinitionsVec;
   }
-
+  
   // Compare this signature against the signature of other
   // declarations with the same name.
   OverloadSignature currentSig = current->getOverloadSignature();
@@ -3099,7 +3107,6 @@ public:
 
       TC.validateDecl(SD);
       TC.ValidatedTypes.remove(SD);
-      TC.addImplicitConstructors(SD);
     }
 
     if (!IsFirstPass) {
@@ -3111,6 +3118,10 @@ public:
       visit(Member);
     for (Decl *global : SD->getDerivedGlobalDecls())
       visit(global);
+
+    if (!IsSecondPass) {
+      TC.addImplicitConstructors(SD);
+    }
 
     if (!(IsFirstPass || SD->isInvalid())) {
       checkExplicitConformance(SD, SD->getDeclaredTypeInContext());
@@ -3244,16 +3255,17 @@ public:
       }
     }
     
-    // If this class needs an implicit constructor, add it.
-    if (!IsFirstPass)
-      TC.addImplicitConstructors(CD);
-
     TC.addImplicitDestructor(CD);
 
     for (Decl *Member : CD->getMembers())
       visit(Member);
     for (Decl *global : CD->getDerivedGlobalDecls())
       visit(global);
+
+    // If this class needs an implicit constructor, add it.
+    if (!IsFirstPass)
+      TC.addImplicitConstructors(CD);
+
 
     // If this class requires all of its stored properties to have
     // in-class initializers, diagnose this now.
@@ -6464,6 +6476,9 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   // Create an empty body for the default constructor. The type-check of the
   // constructor body will introduce default initializations of the members.
   ctor->setBody(BraceStmt::create(Context, SourceLoc(), { }, SourceLoc()));
+  
+  typeCheckDecl(ctor, true);
+  typeCheckDecl(ctor, false);
 }
 
 static void validateAttributes(TypeChecker &TC, Decl *D) {

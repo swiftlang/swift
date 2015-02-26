@@ -1881,13 +1881,12 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   // Determine the parameter type of the implicit constructor.
   SmallVector<TuplePatternElt, 8> patternElts;
   SmallVector<Identifier, 8> argNames;
+
   if (ICK == ImplicitConstructorKind::Memberwise) {
     assert(isa<StructDecl>(decl) && "Only struct have memberwise constructor");
 
     // Computed and static properties are not initialized.
     for (auto var : decl->getStoredProperties()) {
-      if (var->isImplicit())
-        continue;
       tc.validateDecl(var);
       
       
@@ -1898,22 +1897,24 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
           var->getParentPattern()->hasInit())
         continue;
       
-      accessLevel = std::min(accessLevel, var->getAccessibility());
+      if (!var->isImplicit())
+        accessLevel = std::min(accessLevel, var->getAccessibility());
 
-      auto varType = tc.getTypeOfRValue(var);
-
-      // If var is a lazy property, its value is provided for the underlying
-      // storage.  We thus take an optional of the properties type.  We only
-      // need to do this because the implicit constructor is added before all
-      // the properties are type checked.  Perhaps init() synth should be moved
-      // later.
-      if (var->getAttrs().hasAttribute<LazyAttr>())
-        varType = OptionalType::get(varType);
+      // If this is an implicitly generated stored property, it may have a
+      // mangled name (e.g. "myvar.storage" for a lazy property).  Remove the
+      // suffix if it is present.
+      auto name = var->getName();
+      if (var->isImplicit()) {
+        auto DotLoc = name.str().rfind('.');
+        if (DotLoc != StringRef::npos)
+          name = context.getIdentifier(name.str().slice(0, DotLoc));
+      }
 
       // Create the parameter.
-      auto *arg = new (context) ParamDecl(/*IsLet*/true, Loc, var->getName(),
-                                          Loc, var->getName(), varType, decl);
-      argNames.push_back(var->getName());
+      auto varType = tc.getTypeOfRValue(var);
+      auto *arg = new (context) ParamDecl(/*IsLet*/true, Loc, name,
+                                          Loc, name, varType, decl);
+      argNames.push_back(name);
       Pattern *pattern = new (context) NamedPattern(arg);
       TypeLoc tyLoc = TypeLoc::withoutLoc(varType);
       pattern = new (context) TypedPattern(pattern, tyLoc);
@@ -2217,6 +2218,8 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   if (kind == DesignatedInitKind::Stub) {
     // Make this a stub implementation.
     createStubBody(tc, ctor);
+    tc.typeCheckDecl(ctor, true);
+    tc.typeCheckDecl(ctor, false);
     return ctor;
   }
 
@@ -2240,6 +2243,8 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
     // initializers and _ parameters. Fail somewhat gracefully by
     // generating a stub here.
     createStubBody(tc, ctor);
+    tc.typeCheckDecl(ctor, true);
+    tc.typeCheckDecl(ctor, false);
     return ctor;
   }
 
@@ -2250,6 +2255,8 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                                   SourceLoc(),
                                   /*Implicit=*/true));
 
+  tc.typeCheckDecl(ctor, true);
+  tc.typeCheckDecl(ctor, false);
   return ctor;
 }
 
