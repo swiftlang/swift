@@ -233,3 +233,10 @@ func rdar19831698() {
   var v73 = true + [] // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'NSArray'}}
   var v75 = true + "str" // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'String'}} expected-note{{}}
 }
+
+// <rdar://problem/19836341> Incorrect fixit for NSString? to String? conversions
+func rdar19836341(s: NSString?) {
+  let x: String? = s // expected-error{{'NSString?' is not convertible to 'String?'}}
+  // FIXME: there should be a fixit appending "as String?" to the line; for now
+  // it's sufficient that it doesn't suggest appending "as String"
+}

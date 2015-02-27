@@ -3684,7 +3684,9 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     assert(generic2->getDecl()->classifyAsOptionalType());
     return matchTypes(generic1->getGenericArgs()[0],
                       generic2->getGenericArgs()[0],
-                      matchKind, subFlags, locator);
+                      matchKind, subFlags,
+                      locator.withPathElement(
+                        LocatorPathElt::getGenericArgument(0)));
   }
 
   // T <c U ===> T! <c U
@@ -3705,7 +3707,9 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     Type valueType1 = boundGenericType1->getGenericArgs()[0];
     increaseScore(SK_ForceUnchecked);
     return matchTypes(valueType1, type2,
-                      matchKind, subFlags, locator);
+                      matchKind, subFlags,
+                      locator.withPathElement(
+                        LocatorPathElt::getGenericArgument(0)));
   }
       
   case ConversionRestrictionKind::ClassMetatypeToAnyObject:
