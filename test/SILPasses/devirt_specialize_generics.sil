@@ -1,0 +1,57 @@
+// RUN: %target-sil-opt -devirtualize %s | FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class foo<T> {
+  init(_ x : T) {}
+  func ping() {}
+}
+
+sil_global private_external [fragile] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_token4 : $Builtin.Word
+sil_global [fragile] @_TZvOSs7Process5_argcVSs5Int32 : $Int32
+sil_global private_external [fragile] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_token5 : $Builtin.Word
+sil_global [fragile] @_TZvOSs7Process11_unsafeArgvGVSs20UnsafeMutablePointerGS0_VSs4Int8__ : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
+
+// CHECK-LABEL: @_TF4main7analyzeFT_T_
+sil hidden @_TF4main7analyzeFT_T_ : $@thin () -> () {
+bb0:
+  %0 = alloc_ref $foo<Int>                        // users: %1, %2
+  %1 = class_method %0 : $foo<Int>, #foo.ping!1 : <T> foo<T> -> () -> () , $@cc(method) @thin <τ_0_0> (@owned foo<τ_0_0>) -> () // user: %2
+// Make sure that we are specializing this generic call.
+// CHECK: apply %2(%0)
+  %2 = apply %1<Int>(%0) : $@cc(method) @thin <τ_0_0> (@owned foo<τ_0_0>) -> ()
+  %3 = tuple ()                                   // user: %4
+// CHECK: return
+  return %3 : $()                                 // id: %4
+}
+
+sil @main : $@cc(cdecl) @thin (Int32, UnsafeMutablePointer<UnsafeMutablePointer<Int8>>) -> Int32
+sil public_external [transparent] [fragile] @_TFSs13_didEnterMainFTVSs5Int32GVSs20UnsafeMutablePointerGS0_VSs4Int8___T_ : $@thin (Int32, UnsafeMutablePointer<UnsafeMutablePointer<Int8>>) -> ()
+sil shared @_TTSg5Si___TFC4main3foocU__fMGS0_Q__FQ_GS0_Q__ : $@cc(method) @thin (@in Int, @owned foo<Int>) -> @owned foo<Int>
+sil hidden @_TFC4main3foocU__fMGS0_Q__FQ_GS0_Q__ : $@cc(method) @thin <T> (@in T, @owned foo<T>) -> @owned foo<T>
+sil shared @_TTSg5Si___TFC4main3fooCU__fMGS0_Q__FQ_GS0_Q__ : $@thin (@in Int, @thick foo<Int>.Type) -> @owned foo<Int>
+sil hidden @_TFC4main3fooCU__fMGS0_Q__FQ_GS0_Q__ : $@thin <T> (@in T, @thick foo<T>.Type) -> @owned foo<T>
+
+sil hidden @_TFC4main3foo4pingU__fGS0_Q__FT_T_ : $@cc(method) @thin <T> (@owned foo<T>) -> () {
+bb0:
+  %3 = tuple ()                                   // user: %4
+  return %3 : $()                                 // id: %4
+}
+
+sil hidden @_TFC4main3fooD : $@cc(method) @thin <T> (@owned foo<T>) -> ()
+sil hidden @_TFC4main3food : $@cc(method) @thin <T> (@owned foo<T>) -> @owned Builtin.NativeObject
+sil public_external [transparent] [fragile] @_TFSiCfMSiFT22_builtinIntegerLiteralBi2048__Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
+sil private_external [fragile] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_func4 : $@thin () -> ()
+sil private_external [fragile] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_func5 : $@thin () -> ()
+
+sil_vtable foo {
+  #foo.init!initializer.1: _TFC4main3foocU__fMGS0_Q__FQ_GS0_Q__	// main.foo.init <A>(main.foo<A>.Type)(A) -> main.foo<A>
+  #foo.ping!1: _TFC4main3foo4pingU__fGS0_Q__FT_T_	// main.foo.ping <A>(main.foo<A>)() -> ()
+  #foo.deinit!deallocator: _TFC4main3fooD	// main.foo.__deallocating_deinit
+}
+
+
+

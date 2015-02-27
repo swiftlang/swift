@@ -12,6 +12,7 @@
 
 #include "swift/SILPasses/Utils/Generics.h"
 #include "llvm/ADT/Statistic.h"
+#define DEBUG_TYPE "generic-specializer"
 
 using namespace swift;
 

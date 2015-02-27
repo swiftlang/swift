@@ -23,6 +23,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILAnalysis/ClassHierarchyAnalysis.h"
+#include "swift/SILPasses/Utils/Generics.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/PassManager.h"
@@ -651,6 +652,9 @@ public:
   /// The entry point to the transformation.
   void run() override {
 
+    /// A list of devirtualized calls.
+    SmallVector<ApplyInst *, 16> DevirtualizedCalls;
+
     bool Changed = false;
 
     // Perform devirtualization locally and compute potential polymorphic
@@ -667,7 +671,8 @@ public:
           if (!AI)
             continue;
 
-          if (optimizeApplyInst(AI)) {
+          if (ApplyInst *NewAI = optimizeApplyInst(AI)) {
+            DevirtualizedCalls.push_back(NewAI);
             Changed |= true;
           }
         }
@@ -676,6 +681,18 @@ public:
     }
 
     if (Changed) {
+      // Try to specialize the devirtualized calls.
+      auto GS = GenericSpecializer(getModule());
+
+      // Register all of the new direct calls with the specializer.
+      for (auto AI : DevirtualizedCalls)
+        GS.addApplyInst(AI);
+
+      // Try to specialize the newly devirtualized calls.
+      if (GS.specialize()) {
+        DEBUG(llvm::dbgs() << "Specialized some generic functions\n");
+      }
+
       PM->scheduleAnotherIteration();
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
     }
