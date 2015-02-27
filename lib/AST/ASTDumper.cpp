@@ -2328,6 +2328,7 @@ namespace {
       } else {
         printField("name", T->getName().str());
       }
+      printRec("base", T->getBase());
       OS << ")";
     }
 
