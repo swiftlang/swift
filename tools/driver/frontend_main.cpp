@@ -35,8 +35,6 @@
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/SILPasses/Passes.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Bitcode/ReaderWriter.h"
-#include "llvm/IR/Constants.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IRReader/IRReader.h"
@@ -351,56 +349,6 @@ static IRGenOutputKind getOutputKind(FrontendOptions::ActionType Action) {
   }
 }
 
-// With -embed-bitcode, save a copy of the llvm IR as data in the
-// __LLVM,__bitcode section and save the command-line options in the
-// __LLVM,__cmdline section.
-static void EmbedBitcode(llvm::Module *M, const IRGenOptions &Opts)
-{
-  if (!Opts.EmbedBitcode && !Opts.EmbedMarkerOnly)
-    return;
-
-  // Embed the bitcode for the llvm module.
-  std::string Data;
-  llvm::raw_string_ostream OS(Data);
-  if (!Opts.EmbedMarkerOnly)
-    llvm::WriteBitcodeToFile(M, OS);
-
-  ArrayRef<uint8_t> ModuleData((uint8_t*)OS.str().data(), OS.str().size());
-  llvm::Constant *ModuleConstant =
-    llvm::ConstantDataArray::get(M->getContext(), ModuleData);
-  // Use Appending linkage so it doesn't get optimized out.
-  llvm::GlobalVariable *GV = new llvm::GlobalVariable(*M,
-                                       ModuleConstant->getType(), true,
-                                       llvm::GlobalValue::AppendingLinkage,
-                                       ModuleConstant);
-  GV->setSection("__LLVM,__bitcode");
-  if (llvm::GlobalVariable *Old =
-      M->getGlobalVariable("llvm.embedded.module")) {
-    GV->takeName(Old);
-    Old->replaceAllUsesWith(GV);
-    delete Old;
-  } else {
-    GV->setName("llvm.embedded.module");
-  }
-
-  // Embed command-line options.
-  ArrayRef<uint8_t> CmdData((uint8_t*)Opts.CmdArgs.data(),
-                            Opts.CmdArgs.size());
-  llvm::Constant *CmdConstant =
-    llvm::ConstantDataArray::get(M->getContext(), CmdData);
-  GV = new llvm::GlobalVariable(*M, CmdConstant->getType(), true,
-                                llvm::GlobalValue::AppendingLinkage,
-                                CmdConstant);
-  GV->setSection("__LLVM,__cmdline");
-  if (llvm::GlobalVariable *Old = M->getGlobalVariable("llvm.cmdline")) {
-    GV->takeName(Old);
-    Old->replaceAllUsesWith(GV);
-    delete Old;
-  } else {
-    GV->setName("llvm.cmdline");
-  }
-}
-
 /// Performs the compile requested by the user.
 /// \returns true on error
 static bool performCompile(CompilerInstance &Instance,
@@ -446,8 +394,6 @@ static bool performCompile(CompilerInstance &Instance,
     // TODO: remove once the frontend understands what action it should perform
     IRGenOpts.OutputKind = getOutputKind(Action);
 
-    if (IRGenOpts.EmbedBitcode || IRGenOpts.EmbedMarkerOnly)
-      EmbedBitcode(Module.get(), IRGenOpts);
     return performLLVM(IRGenOpts, Instance.getASTContext(), Module.get());
   }
 

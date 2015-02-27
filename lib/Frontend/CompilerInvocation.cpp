@@ -999,6 +999,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       }
     }
   }
+  Opts.EmbedMarkerOnly |= Args.hasArg(OPT_embed_bitcode_marker);
 
   return false;
 }

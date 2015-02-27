@@ -123,7 +123,8 @@ public:
                    DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
                    DisableLLVMSLPVectorizer(false),
                    DisableFPElim(true), HasUnderlyingModule(false),
-                   Playground(false), GenerateProfile(false) {}
+                   Playground(false), GenerateProfile(false),
+                   EmbedBitcode(false), EmbedMarkerOnly(false) {}
 };
 
 } // end namespace swift

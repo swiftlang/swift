@@ -27,6 +27,7 @@
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/CodeGen/BasicTTIImpl.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -264,6 +265,56 @@ static llvm::TargetMachine *createTargetMachine(IRGenOptions &Opts,
   return TargetMachine;
 }
 
+// With -embed-bitcode, save a copy of the llvm IR as data in the
+// __LLVM,__bitcode section and save the command-line options in the
+// __LLVM,__cmdline section.
+static void EmbedBitcode(llvm::Module *M, const IRGenOptions &Opts)
+{
+  if (!Opts.EmbedBitcode && !Opts.EmbedMarkerOnly)
+    return;
+
+  // Embed the bitcode for the llvm module.
+  std::string Data;
+  llvm::raw_string_ostream OS(Data);
+  if (!Opts.EmbedMarkerOnly)
+    llvm::WriteBitcodeToFile(M, OS);
+
+  ArrayRef<uint8_t> ModuleData((uint8_t*)OS.str().data(), OS.str().size());
+  llvm::Constant *ModuleConstant =
+    llvm::ConstantDataArray::get(M->getContext(), ModuleData);
+  // Use Appending linkage so it doesn't get optimized out.
+  llvm::GlobalVariable *GV = new llvm::GlobalVariable(*M,
+                                       ModuleConstant->getType(), true,
+                                       llvm::GlobalValue::AppendingLinkage,
+                                       ModuleConstant);
+  GV->setSection("__LLVM,__bitcode");
+  if (llvm::GlobalVariable *Old =
+      M->getGlobalVariable("llvm.embedded.module")) {
+    GV->takeName(Old);
+    Old->replaceAllUsesWith(GV);
+    delete Old;
+  } else {
+    GV->setName("llvm.embedded.module");
+  }
+
+  // Embed command-line options.
+  ArrayRef<uint8_t> CmdData((uint8_t*)Opts.CmdArgs.data(),
+                            Opts.CmdArgs.size());
+  llvm::Constant *CmdConstant =
+    llvm::ConstantDataArray::get(M->getContext(), CmdData);
+  GV = new llvm::GlobalVariable(*M, CmdConstant->getType(), true,
+                                llvm::GlobalValue::AppendingLinkage,
+                                CmdConstant);
+  GV->setSection("__LLVM,__cmdline");
+  if (llvm::GlobalVariable *Old = M->getGlobalVariable("llvm.cmdline")) {
+    GV->takeName(Old);
+    Old->replaceAllUsesWith(GV);
+    delete Old;
+  } else {
+    GV->setName("llvm.cmdline");
+  }
+}
+
 static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                                                          swift::Module *M,
                                                          SILModule *SILMod,
@@ -399,6 +450,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   // Bail out if there are any errors.
   if (M->Ctx.hadError()) return nullptr;
 
+  EmbedBitcode(Module, Opts);
   if (performLLVM(Opts, M->Ctx.Diags, Module, TargetMachine))
     return nullptr;
   return std::unique_ptr<llvm::Module>(IGM.releaseModule());
@@ -425,6 +477,7 @@ bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
   if (!TargetMachine)
     return true;
 
+  EmbedBitcode(Module, Opts);
   if (::performLLVM(Opts, Ctx.Diags, Module, TargetMachine))
     return true;
   return false;
