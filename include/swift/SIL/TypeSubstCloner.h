@@ -183,8 +183,6 @@ protected:
   }
 
   void visitWitnessMethodInst(WitnessMethodInst *Inst) {
-    DEBUG(llvm::dbgs()<<"Specializing : " << *Inst << "\n");
-
     // Specialize the Self substitution of the witness_method.
     //
     // FIXME: This needs to not only handle Self but all Self derived types so
