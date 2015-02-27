@@ -224,6 +224,15 @@ struct S2 {
   func xx() -> Int { return self.x + C2.x }
 }
 
+// rdar://problem/19887250
+protocol Proto {
+  static var name: String {get set}
+}
+struct ProtoAdopter : Proto {
+  static var name: String = "name" // no error, even though static setters aren't mutating
+}
+
+
 // rdar://18990358
 public struct Foo {
   public static let S { a // expected-error{{computed property must have an explicit type}}

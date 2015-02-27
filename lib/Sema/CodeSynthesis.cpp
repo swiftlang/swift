@@ -273,7 +273,7 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
     switch (storage->getStorageKind()) {
     case AbstractStorageDecl::Stored:
     case AbstractStorageDecl::StoredWithObservers:
-      return true;
+      return storage->isInstanceMember();
 
     case AbstractStorageDecl::InheritedWithObservers:
       return storage->getOverriddenDecl()->getSetter()->isMutating();

@@ -850,7 +850,7 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
     // A stored property on a value type will have a mutating setter
     // and a non-mutating getter.
     case AbstractStorageDecl::Stored:
-      witnessMutating = 
+      witnessMutating = requirement->isInstanceMember() &&
         shouldUseSetterRequirements(requirement->getAccessorKind());
       break;
 
