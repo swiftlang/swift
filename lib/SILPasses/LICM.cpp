@@ -276,6 +276,7 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
         continue;
       }
 
+      DEBUG(llvm::dbgs() << " hoisting to preheader.\n");
       Changed = true;
       Inst->moveBefore(Preheader->getTerminator());
     }
