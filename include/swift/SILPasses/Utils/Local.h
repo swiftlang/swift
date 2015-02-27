@@ -155,6 +155,9 @@ namespace swift {
     /// Get the self argument.
     SILValue getSelf();
 
+    /// Get the self argument operand.
+    Operand &getSelfOperand();
+
     /// Get the index for operations that have one.
     SILValue getIndex();
 

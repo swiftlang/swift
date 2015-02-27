@@ -390,6 +390,10 @@ SILValue swift::ArraySemanticsCall::getSelf() {
   return SemanticsCall->getSelfArgument();
 }
 
+Operand &swift::ArraySemanticsCall::getSelfOperand() {
+  return SemanticsCall->getSelfArgumentOperand();
+}
+
 SILValue swift::ArraySemanticsCall::getIndex() {
   assert(SemanticsCall && "Must have a semantics call");
   assert(SemanticsCall->getNumArguments() && "Must have arguments");
