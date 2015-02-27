@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 // -*- swift -*-
 // RUN: rm -rf %t ; mkdir -p %t
-// RUN: %S/../../utils/gyb -Dtarget_ptrsize=%target-ptrsize -Dtest_path=%s %s -o %t/NumericParsing.swift
+// RUN: %S/../../utils/gyb -Dtarget_ptrsize=%target-ptrsize %s -o %t/NumericParsing.swift
 // RUN: %S/../../utils/line-directive %t/NumericParsing.swift -- %target-build-swift %t/NumericParsing.swift -o %t/a.out
 // RUN: %S/../../utils/line-directive %t/NumericParsing.swift -- %target-run %t/a.out
 %{
@@ -23,34 +23,25 @@ def maskOfWidth(n):
   return (1 << n) - 1
 
 def inRadix(radix, n, zero = '0'):
-    if n < 0: return '-' + inRadix(radix, -n, '')
-    elif n == 0: return zero
-    else:
-        r = n % radix
-        digit = chr((ord('0') + r) if r < 10 else (ord('a') + r - 10))
-        return inRadix(radix, n / radix, '') + digit
+  """
+Represent the int n in the given radix.  
+Note: the third parameter, zero, is not for user consumption.
+  """
+  if n < 0: return '-' + inRadix(radix, -n, '')
+  elif n == 0: return zero
+  else:
+    r = n % radix
+    digit = chr((ord('0') + r) if r < 10 else (ord('a') + r - 10))
+    return inRadix(radix, n / radix, '') + digit
 
-# Is this is a validation test or just a smoke test?
-# (this file is symlinked into the validation-test directory)
-is_smoke_test = '/test/1_stdlib/NumericParsing' in test_path
-if not is_smoke_test and not '/validation-test/stdlib/NumericParsing' in test_path:
-  raise RuntimeError('Unexpected test location: %r' % test_path)
-
-# Do a lot less testing if it's just a smoke test
+# The maximal legal radix
 max_radix = ord('z') - ord('a') + 1 + 10
 
-# All the radices we might want to test.  Need to skip by 5s or it just takes too long.
-all_radices = set(range(2, max_radix, 5) + [max_radix])
+# Test a few important radices
+radices_to_test = [2, 8, 10, 16, max_radix]
 
-# Important radices that we keep in the smoke test
-smoke_radices = [2, 8, 10, 16]
-
-# Which radices actually going to be tested?
-non_smoke_radices = [r for r in all_radices if r not in smoke_radices]
-radices_to_test = smoke_radices if is_smoke_test else non_smoke_radices
-
-# How many values are we going to test in each radix?
-number_of_values = 23 if is_smoke_test else 101
+# How many values to test in each radix?  A nice prime number of course.
+number_of_values = 23
 }% 
 
 import StdlibUnittest
@@ -61,11 +52,10 @@ var tests = TestSuite("NumericParsing")
 %   Self = type.stdlib_name
 %   maxValue = maskOfWidth((type.bits - 1) if type.is_signed else type.bits)
 %   minValue = -maxValue - 1 if type.is_signed else 0
-%   required_values = [minValue, 0, maxValue] if is_smoke_test else []
+%   required_values = [minValue, 0, maxValue]
 tests.test("${Self}/success") {
   let isSigned = ${str(type.is_signed).lower()}
 
-%   if is_smoke_test:
   // Check some important special cases
   expectEqual(0, ${Self}("0"))
   expectEqual(10, ${Self}("10"))
@@ -77,13 +67,12 @@ tests.test("${Self}/success") {
   expectEqual(${max_radix} - 1, ${Self}("z", radix: ${max_radix}))
   expectEqual(nil, ${Self}("${maxValue + 1}"))
   expectEqual(nil, ${Self}("${minValue - 1}"))
-%   end
 
   // Do more exhaustive testing
   % for radix in radices_to_test:
   %   for n in required_values + range(
   %     minValue + 1, maxValue - 1,
-  %     (maxValue - minValue) / (number_of_values - len(required_values))):
+  %     (maxValue - minValue - 2) / (number_of_values - len(required_values))):
   // This line is a workaround for a gyb parsing bug.
   %     text = inRadix(radix, n)
   expectEqual(${n}, ${Self}("${text}", radix: ${radix}))
@@ -94,7 +83,6 @@ tests.test("${Self}/success") {
   % end
 }
 
-% if is_smoke_test:
 tests.test("${Self}/radixTooLow") {
   ${Self}("0", radix: 2)
   expectCrashLater()
@@ -107,7 +95,6 @@ tests.test("${Self}/radixTooHigh") {
   expectCrashLater()
   let y = ${Self}("0", radix: maxRadix + 1)
 }
-% end
 
 % end
 
