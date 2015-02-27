@@ -509,6 +509,13 @@ public:
     return getArgument(getNumArguments()-1);
   }
 
+  Operand &getSelfArgumentOperand() {
+    assert(hasSelfArgument() && "Must have a self argument");
+    assert(getNumArguments() && "Should only be called when Callee has "
+           "arguments.");
+    return getArgumentOperands()[getNumArguments()-1];
+  }
+
   void setSelfArgument(SILValue V) {
     assert(hasSelfArgument() && "Must have a self argument");
     assert(getNumArguments() && "Should only be called when Callee has "
