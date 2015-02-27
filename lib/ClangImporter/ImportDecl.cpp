@@ -5676,6 +5676,9 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                   ASTNode(ret),
                                   SourceLoc()));
 
+  // Mark the function transparent so that we inline it away completely.
+  func->getAttrs().add(new (context) TransparentAttr(/*implicit*/ true));
+  
   // Set the function up as the getter.
   var->makeComputed(SourceLoc(), func, nullptr, nullptr, SourceLoc());
 
