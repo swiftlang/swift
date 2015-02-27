@@ -97,6 +97,9 @@ struct PrintOptions {
   /// Whether to print keywords like 'func'.
   bool SkipIntroducerKeywords = false;
 
+  /// Whether to print destructors.
+  bool SkipDeinit = false;
+
   /// Whether to print a long attribute like '\@availability' on a separate line
   /// from the declaration or other attributes.
   bool PrintLongAttrsOnSeparateLines = false;

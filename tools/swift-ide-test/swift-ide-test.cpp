@@ -214,6 +214,11 @@ EnableSourceImport("enable-source-import", llvm::cl::Hidden,
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+SkipDeinit("skip-deinit",
+                   llvm::cl::desc("Whether to skip printing destructors"),
+                   llvm::cl::init(true));
+
+static llvm::cl::opt<bool>
 DisableAccessControl("disable-access-control",
     llvm::cl::desc("Disables access control, like a debugger"));
 
@@ -1121,6 +1126,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
                       bool PrintImplicitAttrs,
                       bool PrintAccessibility,
                       bool PrintUnavailableDecls,
+                      bool SkipDeinit,
                       Accessibility AccessibilityFilter,
                       StringRef MangledNameToFind,
                       StringRef DebugClientDiscriminator) {
@@ -1156,6 +1162,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
   Options.ExplodePatternBindingDecls = ExplodePatternBindingDecls;
   Options.PrintImplicitAttrs = PrintImplicitAttrs;
   Options.PrintAccessibility = PrintAccessibility;
+  Options.SkipDeinit = SkipDeinit;
   Options.AccessibilityFilter = AccessibilityFilter;
   Options.SkipUnavailable = !PrintUnavailableDecls;
 
@@ -1409,6 +1416,7 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
                           bool PrintAccessibility,
                           bool PrintUnavailableDecls,
                           bool PrintRegularComments,
+                          bool SkipDeinit,
                           Accessibility AccessibilityFilter,
                           bool PrintPrivateStdlibDecls) {
   CompilerInvocation Invocation(InitInvok);
@@ -1439,6 +1447,7 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
   Options.PrintRegularClangComments = PrintRegularComments;
   Options.SkipPrivateStdlibDecls = !PrintPrivateStdlibDecls;
   Options.SkipUnavailable = !PrintUnavailableDecls;
+  Options.SkipDeinit = SkipDeinit;
 
   std::unique_ptr<ASTPrinter> Printer;
   if (AnnotatePrint)
@@ -2175,6 +2184,7 @@ int main(int argc, char *argv[]) {
                           options::PrintImplicitAttrs,
                           options::PrintAccessibility,
                           !options::SkipUnavailable,
+                          options::SkipDeinit,
                           options::AccessibilityFilter,
                           options::MangledNameToFind,
                           options::DebugClientDiscriminator);
@@ -2203,6 +2213,7 @@ int main(int argc, char *argv[]) {
         options::PrintAccessibility,
         !options::SkipUnavailable,
         options::PrintRegularComments,
+        options::SkipDeinit,
         options::AccessibilityFilter,
         !options::SkipPrivateStdlibDecls);
     break;
