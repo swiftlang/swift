@@ -62,6 +62,9 @@ struct GenericSpecializer {
   /// A list of ApplyInst instructions.
   typedef SmallVector<ApplyInst *, 16> AIList;
 
+  GenericSpecializer(SILModule *Mod) : M(Mod) {}
+
+private:
   /// The SIL Module.
   SILModule *M;
 
@@ -70,8 +73,6 @@ struct GenericSpecializer {
 
   /// A worklist of functions to specialize.
   std::vector<SILFunction*> Worklist;
-
-  GenericSpecializer(SILModule *Mod) : M(Mod) {}
 
   bool specializeApplyInstGroup(SILFunction *F, AIList &List);
 
@@ -82,45 +83,13 @@ struct GenericSpecializer {
   /// Add the call \p AI into the list of calls to inspect.
   void addApplyInst(ApplyInst *AI);
 
-  bool specialize() {
-    for (auto &P : ApplyInstMap)
-      Worklist.push_back(P.first);
-
-    bool Changed = false;
-
-    // Try to specialize generic calls.
-    while (Worklist.size()) {
-      SILFunction *F = Worklist.back();
-      Worklist.pop_back();
-      if (ApplyInstMap.count(F))
-        Changed |= specializeApplyInstGroup(F, ApplyInstMap[F]);
-    }
-
-    return Changed;
-  }
+public:
+  /// Try to specialize a list of calls specified in \p calls.
+  bool specialize(AIList &calls);
 
   /// Collect and specialize calls in a specific order specified by
   /// \p BotUpFuncList.
-  bool specialize(const std::vector<SILFunction *> &BotUpFuncList) {
-    for (auto &F : *M)
-      collectApplyInst(F);
-
-    // Initialize the worklist with a call-graph bottom-up list of functions.
-    // We specialize the functions in a top-down order, starting from the end
-    // of the list.
-    Worklist.insert(Worklist.begin(), BotUpFuncList.begin(),
-                    BotUpFuncList.end());
-
-    bool Changed = false;
-    // Try to specialize generic calls.
-    while (Worklist.size()) {
-      SILFunction *F = Worklist.back();
-      Worklist.pop_back();
-      if (ApplyInstMap.count(F))
-        Changed |= specializeApplyInstGroup(F, ApplyInstMap[F]);
-    }
-    return Changed;
-  }
+  bool specialize(const std::vector<SILFunction *> &BotUpFuncList);
 };
 
 #endif

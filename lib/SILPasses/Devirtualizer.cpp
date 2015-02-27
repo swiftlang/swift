@@ -653,7 +653,7 @@ public:
   void run() override {
 
     /// A list of devirtualized calls.
-    SmallVector<ApplyInst *, 16> DevirtualizedCalls;
+    GenericSpecializer::AIList DevirtualizedCalls;
 
     bool Changed = false;
 
@@ -684,12 +684,8 @@ public:
       // Try to specialize the devirtualized calls.
       auto GS = GenericSpecializer(getModule());
 
-      // Register all of the new direct calls with the specializer.
-      for (auto AI : DevirtualizedCalls)
-        GS.addApplyInst(AI);
-
       // Try to specialize the newly devirtualized calls.
-      if (GS.specialize()) {
+      if (GS.specialize(DevirtualizedCalls)) {
         DEBUG(llvm::dbgs() << "Specialized some generic functions\n");
       }
 
