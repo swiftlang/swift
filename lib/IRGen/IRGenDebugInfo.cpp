@@ -1027,6 +1027,14 @@ public:
   }
 };
 
+static Size
+getStorageSize(const llvm::DataLayout &DL, ArrayRef<llvm::Value *> Storage) {
+  unsigned size = 0;
+  for (llvm::Value *Piece : Storage)
+    size += DL.getTypeSizeInBits(Piece->getType());
+  return Size(size);
+}
+
 void IRGenDebugInfo::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
     SILDebugScope *DS, StringRef Name, unsigned Tag, unsigned ArgNo,
@@ -1039,19 +1047,20 @@ void IRGenDebugInfo::emitVariableDeclaration(
   if (Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables)
     return;
 
+  if (!DbgTy.size)
+    DbgTy.size = getStorageSize(IGM.DataLayout, Storage);
+
   llvm::DIDescriptor Scope = getOrCreateScope(DS);
   Location Loc = getLoc(SM, DbgTy.getDecl());
 
+  // FIXME: this should be the scope of the type's declaration.
   // If this is an argument, attach it to the current function scope.
   if (ArgNo > 0) {
     while (Scope.isLexicalBlock())
       Scope = llvm::DILexicalBlock(Scope).getContext();
   }
-
   assert(Scope.Verify() && Scope.isScope() && "variable has no scope");
-
   llvm::DIFile Unit = getFile(Scope);
-  // FIXME: this should be the scope of the type's declaration.
   llvm::DIType DITy = getOrCreateType(DbgTy);
   assert(DITy && "could not determine debug type of variable");
 
@@ -1084,10 +1093,13 @@ void IRGenDebugInfo::emitVariableDeclaration(
   auto *BB = Builder.GetInsertBlock();
   bool IsPiece = Storage.size() > 1;
   uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
+  unsigned VarSizeInBits = getSizeInBits(Var, DIRefMap);
   ElementSizes EltSizes(DITy, DIRefMap);
   auto Dim = EltSizes.getNext();
   for (llvm::Value *Piece : Storage) {
     assert(Piece && "already-claimed explosion value?");
+    assert((Piece->getType()->isPointerTy() || VarSizeInBits > 0)
+           && "zero-sized variable");
 
     // There are variables without storage, such as "struct { func foo() {} }".
     // Emit them as constant 0.
@@ -1109,8 +1121,6 @@ void IRGenDebugInfo::emitVariableDeclaration(
 
       // FIXME: Occasionally we miss out that the Storage is acually a
       // refcount wrapper. Silently skip these for now.
-      unsigned VarSizeInBits = getSizeInBits(Var, DIRefMap);
-      assert(VarSizeInBits > 0 && "zero-sized variable");
       if (OffsetInBits+Dim.SizeInBits > VarSizeInBits)
         break;
       if (OffsetInBits == 0 && Dim.SizeInBits == VarSizeInBits)
@@ -1428,6 +1438,12 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   // to emit the (target!) size of the underlying basic type.
   uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
   uint64_t SizeInBits = DbgTy.size.getValue() * SizeOfByte;
+  // Prefer the actual storage size over the DbgTy.
+  if (DbgTy.StorageType && DbgTy.StorageType->isSized()) {
+    uint64_t Storage = IGM.DataLayout.getTypeSizeInBits(DbgTy.StorageType);
+    if (Storage)
+      SizeInBits = Storage;
+  }
   uint64_t AlignInBits = DbgTy.align.getValue() * SizeOfByte;
   unsigned Encoding = 0;
   unsigned Flags = 0;
@@ -1611,6 +1627,9 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     unsigned RealSize;
     auto Elements = getTupleElements(TupleTy, Scope, MainFile, Flags,
                                      DbgTy.getDeclContext(), RealSize);
+    // FIXME: Handle %swift.opaque members and make this into an assertion.
+    if (!RealSize)
+      RealSize = SizeInBits;
     return DBuilder.createStructType(
         Scope, MangledName, File, 0, RealSize, AlignInBits, Flags,
         llvm::DIType(), // DerivedFrom
@@ -1635,14 +1654,6 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto DerivedFrom = Superclass.isNull()
                            ? llvm::DIType()
                            : getOrCreateDesugaredType(Superclass, DbgTy);
-    // Essentially a %swift.opaque pointer.
-    unsigned SizeInBits = 0;
-    // Prefere the actual storage size over the DbgTy, over a safe default.
-    if (DbgTy.StorageType->isSized())
-      SizeInBits = IGM.DataLayout.getTypeSizeInBits(DbgTy.StorageType);
-    else if (DbgTy.size)
-      SizeInBits = DbgTy.size.getValue() * SizeOfByte;
-
     auto FwdDecl = DBuilder.createReplaceableCompositeType(
       llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, L.Line,
         llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits);
