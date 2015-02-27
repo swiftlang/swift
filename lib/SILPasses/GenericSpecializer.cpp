@@ -159,6 +159,9 @@ struct GenericSpecializer {
   /// substitutions into buckets according to the called function.
   void collectApplyInst(SILFunction &F);
 
+  /// Add the call \p AI into the list of calls to inspect.
+  void addApplyInst(ApplyInst *AI);
+
   /// The driver for the generic specialization pass.
   bool specialize(const std::vector<SILFunction *> &BotUpFuncList) {
     bool Changed = false;
@@ -183,6 +186,26 @@ struct GenericSpecializer {
 
 } // end anonymous namespace.
 
+void GenericSpecializer::addApplyInst(ApplyInst *AI) {
+  if (!AI || !AI->hasSubstitutions())
+    return;
+
+  SILValue CalleeVal = AI->getCallee();
+  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
+
+  if (!FRI)
+    return;
+
+  SILFunction *Callee = FRI->getReferencedFunction();
+  if (Callee->isExternalDeclaration())
+    if (!M->linkFunction(Callee, SILModule::LinkingMode::LinkAll))
+      return;
+
+  // Save the ApplyInst into the function/bucket that it calls.
+  ApplyInstMap[Callee].push_back(AI);
+}
+
+
 void GenericSpecializer::collectApplyInst(SILFunction &F) {
   // Don't collect apply inst from transparent functions since we do not want to
   // expose shared functions in the mandatory inliner. We will specialize the
@@ -194,23 +217,8 @@ void GenericSpecializer::collectApplyInst(SILFunction &F) {
   for (auto &BB : F)
     for (auto &I : BB) {
       ApplyInst *AI = dyn_cast<ApplyInst>(&I);
-
-      if (!AI || !AI->hasSubstitutions())
-        continue;
-
-      SILValue CalleeVal = AI->getCallee();
-      FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
-
-      if (!FRI)
-        continue;
-
-      SILFunction *Callee = FRI->getReferencedFunction();
-      if (Callee->isExternalDeclaration())
-        if (!M->linkFunction(Callee, SILModule::LinkingMode::LinkAll))
-          continue;
-
-      // Save the ApplyInst into the function/bucket that it calls.
-      ApplyInstMap[Callee].push_back(AI);
+      if (AI)
+        addApplyInst(AI);
     }
 }
 
