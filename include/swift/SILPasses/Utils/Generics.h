@@ -83,10 +83,17 @@ struct GenericSpecializer {
   void addApplyInst(ApplyInst *AI);
 
   bool specialize() {
+    for (auto &P : ApplyInstMap)
+      Worklist.push_back(P.first);
+
     bool Changed = false;
 
-    for (auto &P : ApplyInstMap) {
-      Changed |= specializeApplyInstGroup(P.first, P.second);
+    // Try to specialize generic calls.
+    while (Worklist.size()) {
+      SILFunction *F = Worklist.back();
+      Worklist.pop_back();
+      if (ApplyInstMap.count(F))
+        Changed |= specializeApplyInstGroup(F, ApplyInstMap[F]);
     }
 
     return Changed;
