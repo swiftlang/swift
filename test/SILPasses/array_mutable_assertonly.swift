@@ -63,3 +63,25 @@ class ArrayInClass {
     }
   }
 }
+
+struct Array2d {
+  var A : [Int]
+  var cols : Int
+  var rows : Int
+}
+
+// CHECK-LABEL: COW Array Opts in Func {{.*}}test2DArrayLoop{{.*}}
+// CHECK:        Array Opts in Loop Loop at depth 2
+// CHECK-NOT:   COW Array Opts in
+// CHECK:        Hoisting make_mutable
+// CHECK:        Array Opts in Loop Loop at depth 1
+// CHECK-NOT:   COW Array Opts in
+// CHECK:        Hoisting make_mutable
+
+func test2DArrayLoop(inout A : Array2d) {
+  for r in 0 ..< A.rows {
+    for c in 0 ..< A.cols {
+      A.A[r*A.cols+c] += 1
+    }
+  }
+}

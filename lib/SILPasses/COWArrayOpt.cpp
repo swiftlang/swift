@@ -351,6 +351,8 @@ protected:
   bool checkSafeArrayElementUse(SILInstruction *UseInst, SILValue ArrayVal);
   bool checkSafeElementValueUses(UserOperList &ElementValueUsers);
   bool hoistMakeMutable(ArraySemanticsCall MakeMutable, SILValue ArrayAddr);
+  void hoistMakeMutableAndSelfProjection(ArraySemanticsCall MakeMutable,
+                                         bool HoistProjection);
   bool hasLoopOnlyDestructorSafeArrayOperations();
 };
 } // namespace
@@ -760,16 +762,38 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
   return true;
 }
 
+/// Hoist the make_mutable call and optionally the projection chain that feeds
+/// the array self argument.
+void COWArrayOpt::hoistMakeMutableAndSelfProjection(
+    ArraySemanticsCall MakeMutable, bool HoistProjection) {
+  // Hoist projections.
+  if (HoistProjection)
+    MakeMutable.getSelfOperand().hoistAddressProjections(
+      Preheader->getTerminator(), DomTree);
+
+  assert(MakeMutable.canHoist(Preheader->getTerminator(), DomTree) &&
+         "Should be able to hoist make_mutable");
+
+  // Hoist this call to make_mutable.
+  DEBUG(llvm::dbgs() << "    Hoisting make_mutable: " << *MakeMutable);
+  MakeMutable.hoist(Preheader->getTerminator(), DomTree);
+}
+
 /// Check if this call to "make_mutable" is hoistable, and move it, or delete it
 /// if it's already hoisted.
 bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable, SILValue ArrayAddr) {
   DEBUG(llvm::dbgs() << "    Checking mutable array: " << ArrayAddr);
 
-  SILBasicBlock *ArrayBB = ArrayAddr.getDef()->getParentBB();
-  if (ArrayBB && !DomTree->dominates(ArrayBB, Preheader)) {
+  // We can hoist address projections (even if they are only conditionally
+  // executed).
+  auto ArrayAddrBase = ArrayAddr.stripAddressProjections();
+  SILBasicBlock *ArrayAddrBaseBB = ArrayAddrBase.getDef()->getParentBB();
+
+  if (ArrayAddrBaseBB && !DomTree->dominates(ArrayAddrBaseBB, Preheader)) {
     DEBUG(llvm::dbgs() << "    Skipping Array: does not dominate loop!\n");
     return false;
   }
+
   SmallVector<unsigned, 4> AccessPath;
   SILValue ArrayContainer = getAccessPath(ArrayAddr, AccessPath);
 
@@ -778,12 +802,8 @@ bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable, SILValue Arra
     // Check whether we can hoist make_mutable based on the operations that are
     // in the loop.
     if (hasLoopOnlyDestructorSafeArrayOperations()) {
-      assert(MakeMutable.canHoist(Preheader->getTerminator(), DomTree) &&
-             "Should be able to hoist make_mutable");
-
-      // Hoist this call to make_mutable.
-      DEBUG(llvm::dbgs() << "    Hoisting make_mutable: " << *MakeMutable);
-      MakeMutable.hoist(Preheader->getTerminator(), DomTree);
+      hoistMakeMutableAndSelfProjection(MakeMutable,
+                                        ArrayAddr != ArrayAddrBase);
       return true;
     }
     return false;
@@ -803,12 +823,7 @@ bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable, SILValue Arra
       !StructUses.ElementAddressUsers.empty())
     return false;
 
-  assert(MakeMutable.canHoist(Preheader->getTerminator(), DomTree) &&
-         "Should be able to hoist make_mutable");
-
-  // Hoist this call to make_mutable.
-  DEBUG(llvm::dbgs() << "    Hoisting make_mutable: " << *MakeMutable);
-  MakeMutable.hoist(Preheader->getTerminator(), DomTree);
+  hoistMakeMutableAndSelfProjection(MakeMutable, ArrayAddr != ArrayAddrBase);
   return true;
 }
 
