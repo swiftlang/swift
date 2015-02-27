@@ -387,8 +387,6 @@ bool swift::ArraySemanticsCall::hasSelf() {
 }
 
 SILValue swift::ArraySemanticsCall::getSelf() {
-  assert(hasSelf() && "Must have a self argument");
-  assert(SemanticsCall->getNumArguments() && "Must have arguments");
   return SemanticsCall->getSelfArgument();
 }
 
