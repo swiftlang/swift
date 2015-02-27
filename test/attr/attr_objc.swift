@@ -668,6 +668,12 @@ class infer_constructor1 {
 
   init(a: PlainStruct) {}
   // CHECK: {{^}} init(a: PlainStruct)
+
+  init(malice: ()) {}
+  // CHECK: @objc init(malice: ())
+
+  init(forMurder _: ()) {}
+  // CHECK: @objc init(forMurder _: ())
 }
 
 @objc
@@ -1544,6 +1550,15 @@ class HasNSManaged {
 @objc(NSObjC2)
 class Class_ObjC2 {
 // CHECK-LABEL: @objc(NSObjC2) class Class_ObjC2
+
+  @objc(initWithMalice)
+  init(foo: ()) { }
+
+  @objc(initWithIntent)
+  init(bar _: ()) { }
+
+  @objc(initForMurder)
+  init() { }
 
   @objc(isFoo)
   func foo() -> Bool {}

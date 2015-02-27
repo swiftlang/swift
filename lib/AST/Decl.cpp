@@ -3253,6 +3253,26 @@ void ConstructorDecl::setBodyParams(Pattern *selfPattern, Pattern *bodyParams) {
           == bodyParams->numTopLevelVariables()));
 }
 
+bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
+  // The initializer must have a single, non-empty argument name.
+  if (getFullName().getArgumentNames().size() != 1 ||
+      getFullName().getArgumentNames()[0].empty())
+    return false;
+
+  const Pattern *paramPattern = getBodyParamPatterns()[1];
+  Type paramType;
+  if (auto tuplePattern = dyn_cast<TuplePattern>(paramPattern)) {
+    if (tuplePattern->getFields().size() != 1 || tuplePattern->hasVararg())
+      return false;
+
+    paramType = tuplePattern->getFields()[0].getPattern()->getType();
+  } else {
+    paramType = paramPattern->getType();
+  }
+
+  return paramType->isEqual(TupleType::getEmpty(getASTContext()));
+}
+
 DestructorDecl::DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,
                                Pattern *SelfPattern, DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Destructor, Parent, NameHack,

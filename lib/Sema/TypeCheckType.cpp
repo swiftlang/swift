@@ -2152,7 +2152,22 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
     }
   }
 
-  if (!isParamPatternRepresentableInObjC(*this, AFD,
+  // As a special case, an initializer with a single, named parameter of type
+  // '()' is always representable in Objective-C. This allows us to cope with
+  // zero-parameter methods with selectors that are longer than "init". For
+  // example, this allows:
+  //
+  // \code
+  // class Foo {
+  //   @objc init(malice: ()) { } // selector is "initWithMalice"
+  // }
+  // \endcode
+  bool isSpecialInit = false;
+  if (auto init = dyn_cast<ConstructorDecl>(AFD))
+    isSpecialInit = init->isObjCZeroParameterWithLongSelector();
+
+  if (!isSpecialInit &&
+      !isParamPatternRepresentableInObjC(*this, AFD,
                                          AFD->getBodyParamPatterns()[1],
                                          Reason)) {
     if (!Diagnose) {

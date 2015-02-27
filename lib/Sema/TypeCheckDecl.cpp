@@ -6554,8 +6554,11 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
         auto func = cast<AbstractFunctionDecl>(D);
         auto bodyPattern = func->getBodyParamPatterns()[1];
         unsigned numParameters;
-        if (auto tuple = dyn_cast<TuplePattern>(bodyPattern))
-          numParameters = tuple->getNumFields() - tuple->hasVararg();
+        if (isa<ConstructorDecl>(func) &&
+            cast<ConstructorDecl>(func)->isObjCZeroParameterWithLongSelector())
+          numParameters = 0;
+        else if (auto tuple = dyn_cast<TuplePattern>(bodyPattern))
+          numParameters = tuple->getNumFields();
         else
           numParameters = 1;
 

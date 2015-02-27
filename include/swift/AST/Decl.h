@@ -5037,6 +5037,18 @@ public:
     over->setIsOverridden();
   }
 
+  /// Determine whether this initializer falls into the special case for
+  /// Objective-C initializers with selectors longer than "init", e.g.,
+  /// \c initForMemory.
+  ///
+  /// In such cases, one can write the Swift initializer
+  /// with a single parameter of type '()', e.g,
+  ///
+  /// \code
+  /// @objc init(forMemory: ())
+  /// \endcode
+  bool isObjCZeroParameterWithLongSelector() const;
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;
   }
