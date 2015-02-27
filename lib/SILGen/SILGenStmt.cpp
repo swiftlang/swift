@@ -418,11 +418,11 @@ void SILGenFunction::visitIfStmt(IfStmt *S) {
 
   // Set the destinations for any 'break' and 'continue' statements inside the
   // body.  Note that "continue" is not valid out of a labeled 'if'.
-  BreakContinueDestStack.push_back({
+  BreakContinueDestStack.push_back(std::make_tuple(
     S,
     JumpDest(ContBB, getCleanupsDepth(), CleanupLocation(S->getThenStmt())),
     JumpDest(CleanupLocation(S))
-  });
+  ));
 
   // Emit the condition, along with the "then" part of the if properly guarded
   // by the condition.  The insertion point is left at the end of the 'then'
@@ -506,11 +506,11 @@ void SILGenFunction::visitWhileStmt(WhileStmt *S) {
 
   // Set the destinations for any 'break' and 'continue' statements inside the
   // body.
-  BreakContinueDestStack.push_back({
+  BreakContinueDestStack.push_back(std::make_tuple(
     S,
     JumpDest(BreakBB, getCleanupsDepth(), CleanupLocation(S->getBody())),
     JumpDest(LoopBB , getCleanupsDepth(), CleanupLocation(S->getBody()))
-  });
+  ));
   
   // Evaluate the condition, leaving the insertion point in the "true" block
   // after the loop body has been evaluated.
@@ -550,11 +550,11 @@ void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
   // Set the destinations for 'break' and 'continue'
   SILBasicBlock *EndBB = createBasicBlock();
   SILBasicBlock *CondBB = createBasicBlock();
-  BreakContinueDestStack.push_back({
+  BreakContinueDestStack.push_back(std::make_tuple(
     S,
     JumpDest(EndBB , getCleanupsDepth(), CleanupLocation(S->getBody())),
     JumpDest(CondBB, getCleanupsDepth(), CleanupLocation(S->getBody()))
-  });
+  ));
 
   // Emit the body, which is always evaluated the first time around.
   visit(S->getBody());
