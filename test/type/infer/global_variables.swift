@@ -1,7 +1,5 @@
 // RUN: %target-parse-verify-swift
 
-// XFAIL: linux
-
 var b = true, i = 17
 
 var d : Dictionary = [0 : "Zero", 1 : "One", 2 : "Two" ]

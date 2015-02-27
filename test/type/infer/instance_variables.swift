@@ -1,7 +1,5 @@
 // RUN: %target-parse-verify-swift
 
-// XFAIL: linux
-
 struct X { 
   var b = true, i = 17
 

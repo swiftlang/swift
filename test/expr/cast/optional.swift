@@ -13,3 +13,12 @@ func f1(i: Int?, ii: Int??, a: [Base]?, d: [Base : Base]?) {
   let a2 = a as! [Base] // expected-error{{downcast from '[Base]?' to '[Base]' only unwraps optionals; did you mean to use '!'?}}
   let d2 = d as! [Base : Base] // expected-error{{downcast from '[Base : Base]?' to '[Base : Base]' only unwraps optionals; did you mean to use '!'?}}
 }
+
+func implicitCastOfLiteralToOptional() {
+  var optinalInt: Int? = 0
+  var optionalString: String? = ""
+  var optionalArray: [Int] = []
+  var optionalDictionary: [Int : Int]? = [:]
+  var optionalSet: Set<Int> = []
+}
+
