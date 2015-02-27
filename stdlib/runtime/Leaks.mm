@@ -109,14 +109,8 @@ extern "C" void swift_leaks_startTrackingObjects(const char *name) {
   pthread_mutex_unlock(&LeaksMutex);
 }
 
-extern "C" int swift_leaks_stopTrackingObjects(const char *name) {
-  pthread_mutex_lock(&LeaksMutex);
-  unsigned Result = TrackedSwiftObjects.size() + TrackedObjCObjects.size();
-
-  fprintf(stderr, "{\"name\":\"%s\", \"swift_count\": %u, \"objc_count\": %u, "
-                  "\"swift_objects\": [",
-          name, unsigned(TrackedSwiftObjects.size()),
-          unsigned(TrackedObjCObjects.size()));
+/// This assumes that the LeaksMutex is already being held.
+static void dumpSwiftHeapObjects() {
   const char *comma = "";
   for (HeapObject *Obj : TrackedSwiftObjects) {
     const HeapMetadata *Metadata = Obj->metadata;
@@ -129,22 +123,86 @@ extern "C" int swift_leaks_stopTrackingObjects(const char *name) {
       continue;
     }
 
+    const char *kindDescriptor = "";
+    switch (Metadata->getKind()) {
+    case MetadataKind::Class:
+      kindDescriptor = "Class";
+      break;
+    case MetadataKind::ObjCClassWrapper:
+      kindDescriptor = "ObjCClassWrapper";
+      break;
+    case MetadataKind::ForeignClass:
+      kindDescriptor = "ForeignClass";
+      break;
+    case MetadataKind::Block:
+      kindDescriptor = "Block";
+      break;
+    case MetadataKind::Struct:
+      kindDescriptor = "Struct";
+      break;
+    case MetadataKind::Enum:
+      kindDescriptor = "Enum";
+      break;
+    case MetadataKind::Opaque:
+      kindDescriptor = "Opaque";
+      break;
+    case MetadataKind::Tuple:
+      kindDescriptor = "Tuple";
+      break;
+    case MetadataKind::Function:
+      kindDescriptor = "Function";
+      break;
+    case MetadataKind::ThinFunction:
+      kindDescriptor = "ThinFunction";
+      break;
+    case MetadataKind::PolyFunction:
+      kindDescriptor = "PolyFunction";
+      break;
+    case MetadataKind::Existential:
+      kindDescriptor = "Existential";
+      break;
+    case MetadataKind::Metatype:
+      kindDescriptor = "Metatype";
+      break;
+    case MetadataKind::ExistentialMetatype:
+      kindDescriptor = "ExistentialMetatype";
+      break;
+    case MetadataKind::HeapLocalVariable:
+      kindDescriptor = "HeapLocalVariable";
+      break;
+    }
+
     if (const NominalTypeDescriptor *NTD =
             Metadata->getNominalTypeDescriptor()) {
-      fprintf(stderr, "{\"type\": \"nominal\", \"name\": \"%s\"}", NTD->Name);
+      fprintf(stderr, "{\"type\": \"nominal\", \"name\": \"%s\", \"kind\": \"%s\"}" , NTD->Name, kindDescriptor);
       continue;
     }
 
-    fprintf(stderr, "{\"type\": \"unknown\"}");
+    fprintf(stderr, "{\"type\": \"unknown\", \"kind\": \"%s\"}", kindDescriptor);
   }
+}
 
-  comma = "";
-  fprintf(stderr, "], \"objc_objects\": [");
+/// This assumes that the LeaksMutex is already being held.
+static void dumpObjCHeapObjects() {
+  const char *comma = "";
   for (id Obj : TrackedObjCObjects) {
     // Just print out the class of Obj.
     fprintf(stderr, "%s\"%s\"", comma, object_getClassName(Obj));
     comma = ",";
   }
+}
+
+extern "C" int swift_leaks_stopTrackingObjects(const char *name) {
+  pthread_mutex_lock(&LeaksMutex);
+  unsigned Result = TrackedSwiftObjects.size() + TrackedObjCObjects.size();
+
+  fprintf(stderr, "{\"name\":\"%s\", \"swift_count\": %u, \"objc_count\": %u, "
+                  "\"swift_objects\": [",
+          name, unsigned(TrackedSwiftObjects.size()),
+          unsigned(TrackedObjCObjects.size()));
+  dumpSwiftHeapObjects();
+  fprintf(stderr, "], \"objc_objects\": [");
+  dumpObjCHeapObjects();
   fprintf(stderr, "]}\n");
 
   fflush(stderr);
