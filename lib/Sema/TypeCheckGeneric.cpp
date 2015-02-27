@@ -48,6 +48,7 @@ Type DependentGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
   if (auto nominal = dyn_cast<NominalTypeDecl>(dc))
     return nominal->getDeclaredInterfaceType();
 
+  // FIXME: Should be the interface type of the extension.
   auto ext = dyn_cast<ExtensionDecl>(dc);
   return ext->getExtendedType()->getAnyNominal()->getDeclaredInterfaceType();
 }
@@ -188,6 +189,7 @@ Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
   if (auto nominal = dyn_cast<NominalTypeDecl>(dc))
     return nominal->getDeclaredInterfaceType();
 
+  // FIXME: Should be the interface type of the extension.
   auto ext = dyn_cast<ExtensionDecl>(dc);
   return ext->getExtendedType()->getAnyNominal()->getDeclaredInterfaceType();
 }
@@ -196,19 +198,12 @@ Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
 /// archetype builder.
 static void addContextParamsAndRequirements(ArchetypeBuilder &builder,
                                             DeclContext *dc) {
-  auto type = dc->getDeclaredTypeOfContext();
-  if (!type || type->is<ErrorType>())
+  if (!dc->isTypeContext())
     return;
 
-  auto nominal = type->getAnyNominal();
-  assert(nominal && "Parent context is not a nominal type?");
-
-  if (auto sig = nominal->getGenericSignature()) {
+  if (auto sig = dc->getGenericSignatureOfContext()) {
     // Add generic signature from this context.
     builder.addGenericSignature(sig, false);
-  } else if (auto parentDC = dc->getParent()) {
-    // Recurse into parent context.
-    addContextParamsAndRequirements(builder, parentDC);
   }
 }
 

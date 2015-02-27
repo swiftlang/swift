@@ -761,19 +761,12 @@ static void revertDependentPattern(Pattern *pattern) {
 /// archetype builder.
 static void addContextParamsAndRequirements(ArchetypeBuilder &builder,
                                             DeclContext *dc) {
-  auto type = dc->getDeclaredTypeOfContext();
-  if (!type || type->is<ErrorType>())
+  if (!dc->isTypeContext())
     return;
 
-  auto nominal = type->getAnyNominal();
-  assert(nominal && "Parent context is not a nominal type?");
-
-  if (auto sig = nominal->getGenericSignature()) {
+  if (auto sig = dc->getGenericSignatureOfContext()) {
     // Add generic signature from this context.
     builder.addGenericSignature(sig, true);
-  } else if (auto parentDC = dc->getParent()) {
-    // Recurse into parent context.
-    addContextParamsAndRequirements(builder, parentDC);
   }
 }
 
