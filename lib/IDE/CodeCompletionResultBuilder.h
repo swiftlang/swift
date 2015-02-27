@@ -209,6 +209,15 @@ public:
           CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
     }
 
+    // If the parameter is of the type @autoclosure ()->output, then the
+    // code completion should show the parameter of the output type
+    // instead of the function type ()->output.
+    if (auto FuncType = Ty->getAs<AnyFunctionType>()) {
+      if (FuncType->isAutoClosure()) {
+        Ty = FuncType->getResult();
+      }
+    }
+
     PrintOptions PO;
     PO.SkipAttributes = true;
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::CallParameterType,
