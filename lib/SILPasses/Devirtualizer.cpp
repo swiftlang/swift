@@ -148,7 +148,8 @@ static bool isClassWithUnboundGenericParameters(SILType C, SILModule &M) {
 /// \p ClassInstance is the operand for the ClassMethodInst or an alternative
 ///    reference (such as downcasted class reference).
 /// \p KnownClass (can be null) is a specific class type to devirtualize to.
-static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
+/// return the new ApplyInst if created one or null.
+static ApplyInst *devirtMethod(ApplyInst *AI, SILDeclRef Member,
                          SILValue ClassInstance, ClassDecl *CD) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
 
@@ -169,7 +170,7 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
   if (!F) {
     DEBUG(llvm::dbgs() << "        FAIL: Could not find matching VTable or "
                           "vtable method for this class.\n");
-    return false;
+    return nullptr;
   }
 
   // Ok, we found a function F that we can devirtualize our class method
@@ -189,7 +190,7 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
   // unbound.
   // We cannot devirtualize unbound generic calls yet.
   if (isClassWithUnboundGenericParameters(ClassInstanceType, AI->getModule()))
-    return false;
+    return nullptr;
 
   // *NOTE*:
   // Apply instruction substitutions are for the Member from a protocol or
@@ -249,7 +250,7 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
 
       // Bail if it was not possible to determine the bound generic class.
       if (FSelfSubstType == SILType()) {
-        return false;
+        return nullptr;
       }
 
       if (!isa<BoundGenericType>(ClassInstanceType.getSwiftRValueType()) &&
@@ -274,7 +275,7 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
   else if (CalleeGenericParamsNum != Substitutions.size())
     // Bail if the number of generic parameters of the callee does not match
     // the number of substitutions, because we don't know how to handle this.
-    return false;
+    return nullptr;
 
   CanSILFunctionType SubstCalleeType =
     GenCalleeType->substGenericArgs(M, M.getSwiftModule(), Substitutions);
@@ -291,7 +292,7 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
   assert(!paramTypes.empty() &&
          "Must have a this pointer when calling a class method inst.");
   if (paramTypes.empty())
-    return false;
+    return nullptr;
 
   // Grab the self type from the function ref and the self type from the class
   // method inst.
@@ -414,7 +415,7 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
 
   DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
   NumDevirtualized++;
-  return true;
+  return NewAI;
 }
 
 //===----------------------------------------------------------------------===//
@@ -445,7 +446,8 @@ static SILValue upcastArgument(SILValue Arg, SILType SuperTy, ApplyInst *AI) {
 
 /// Devirtualize the application of a witness_method. Replace this application
 /// by invocation of a witness thunk which was found by findFuncInWitnessTable.
-bool devirtualizeWitness(ApplyInst *AI,
+/// /// return the new ApplyInst or null.
+ApplyInst *devirtualizeWitness(ApplyInst *AI,
                         SILFunction *F,
                         ArrayRef<Substitution> Subs) {
   // We know the witness thunk and the corresponding set of substitutions
@@ -503,7 +505,7 @@ bool devirtualizeWitness(ApplyInst *AI,
   AI->replaceAllUsesWith(SAI);
   AI->eraseFromParent();
   NumAMI++;
-  return true;
+  return SAI;
 }
 
 /// Devirtualize apply instructions that call witness_method instructions:
@@ -511,7 +513,8 @@ bool devirtualizeWitness(ApplyInst *AI,
 ///   %8 = witness_method $Optional<UInt16>, #LogicValue.boolValue!getter.1
 ///   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
 ///
-static bool optimizeWitnessMethod(ApplyInst *AI, WitnessMethodInst *WMI) {
+/// return the new ApplyInst if created one or null.
+static ApplyInst *optimizeWitnessMethod(ApplyInst *AI, WitnessMethodInst *WMI) {
   // Use findFuncInWitnessTable to walk the inherited/specialized conformances
   // chain until it finds a NormalProtocolConformance. If such a conformance
   // is found, it would return the witness thunk as F, the corresponding
@@ -530,7 +533,7 @@ static bool optimizeWitnessMethod(ApplyInst *AI, WitnessMethodInst *WMI) {
   ProtocolConformance *C = WMI->getConformance();
   if (!C) {
     DEBUG(llvm::dbgs() << "        FAIL: Null conformance.\n");
-    return false;
+    return nullptr;
   }
 
   // Lookup the witness method in the witness tables.
@@ -545,7 +548,7 @@ static bool optimizeWitnessMethod(ApplyInst *AI, WitnessMethodInst *WMI) {
     assert(!WT && "WitnessTable should always be null if F is.");
     DEBUG(llvm::dbgs() << "        FAIL: Did not find a matching witness "
                           "table or witness method.\n");
-    return false;
+    return nullptr;
   }
   assert(WT && "WitnessTable should never be null if F is not.");
 
@@ -597,7 +600,8 @@ static ClassDecl *getClassFromAccessControl(ClassMethodInst *CMI) {
   return selfTypeInMember->getClassOrBoundGenericClass();
 }
 
-static bool optimizeApplyInst(ApplyInst *AI) {
+/// Try to devirtualize a call. Return a new ApplyInst or null.
+static ApplyInst *optimizeApplyInst(ApplyInst *AI) {
   DEBUG(llvm::dbgs() << "    Trying to optimize ApplyInst : " << *AI);
 
   // Devirtualize apply instructions that call witness_method instructions:
@@ -635,7 +639,7 @@ static bool optimizeApplyInst(ApplyInst *AI) {
                           CMI->getOperand().stripUpCasts(), C);
   }
 
-  return false;
+  return nullptr;
 }
 
 namespace {
@@ -663,7 +667,9 @@ public:
           if (!AI)
             continue;
 
-          Changed |= optimizeApplyInst(AI);
+          if (optimizeApplyInst(AI)) {
+            Changed |= true;
+          }
         }
       }
       DEBUG(llvm::dbgs() << "\n");
