@@ -268,7 +268,7 @@ static llvm::TargetMachine *createTargetMachine(IRGenOptions &Opts,
 // With -embed-bitcode, save a copy of the llvm IR as data in the
 // __LLVM,__bitcode section and save the command-line options in the
 // __LLVM,__cmdline section.
-static void EmbedBitcode(llvm::Module *M, const IRGenOptions &Opts)
+static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
 {
   if (!Opts.EmbedBitcode && !Opts.EmbedMarkerOnly)
     return;
@@ -450,7 +450,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   // Bail out if there are any errors.
   if (M->Ctx.hadError()) return nullptr;
 
-  EmbedBitcode(Module, Opts);
+  embedBitcode(Module, Opts);
   if (performLLVM(Opts, M->Ctx.Diags, Module, TargetMachine))
     return nullptr;
   return std::unique_ptr<llvm::Module>(IGM.releaseModule());
@@ -477,7 +477,7 @@ bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
   if (!TargetMachine)
     return true;
 
-  EmbedBitcode(Module, Opts);
+  embedBitcode(Module, Opts);
   if (::performLLVM(Opts, Ctx.Diags, Module, TargetMachine))
     return true;
   return false;
