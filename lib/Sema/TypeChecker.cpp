@@ -732,8 +732,7 @@ VersionRange TypeChecker::availableRange(const Decl *D, ASTContext &Ctx) {
   // extensions.
 
   DeclContext *DC = D->getDeclContext();
-  if (DC->getContextKind() == DeclContextKind::ExtensionDecl) {
-    auto *ED = cast<ExtensionDecl>(DC);
+  if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
     AnnotatedRange = annotatedAvailableRange(ED, Ctx);
     if (AnnotatedRange.hasValue()) {
       return AnnotatedRange.getValue();

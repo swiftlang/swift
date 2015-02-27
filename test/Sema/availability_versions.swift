@@ -697,6 +697,13 @@ extension ClassToExtend {
   extension ClassToExtend { } // expected-error {{declaration is only valid at file scope}}
 }
 
+
+@availability(OSX, introduced=10.10)
+extension ClassToExtend { // expected-note {{enclosing scope here}}
+  @availability(OSX, introduced=10.9) // expected-error {{declaration cannot be more available than enclosing scope}}
+  func extensionMethod10_9() { }
+}
+
 func useUnavailableExtension() {
   let o = ClassToExtend()
 
