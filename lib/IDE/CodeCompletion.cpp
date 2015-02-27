@@ -1649,7 +1649,14 @@ public:
     Builder.addTextChunk(EED->getName().str());
     if (EED->hasArgumentType())
       addPatternFromType(Builder, EED->getArgumentType());
-    addTypeAnnotation(Builder, EED->getType());
+    Type EnumType = EED->getType();
+
+    // Enum element is of function type such as EnumName.type -> Int ->
+    // EnumName; however we should show Int -> EnumName as the type
+    if (auto FuncType = EED->getType()->getAs<AnyFunctionType>()) {
+      EnumType = FuncType->getResult();
+    }
+    addTypeAnnotation(Builder, EnumType);
   }
 
   void addKeyword(StringRef Name, Type TypeAnnotation) {
