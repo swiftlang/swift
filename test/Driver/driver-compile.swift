@@ -42,6 +42,10 @@
 // RUN: FileCheck %s < %t.wmo-inc.txt
 // RUN: FileCheck -check-prefix NO-REFERENCE-DEPENDENCIES %s < %t.wmo-inc.txt
 
+// RUN: %swiftc_driver -driver-print-jobs -embed-bitcode -incremental %s 2>&1 > %t.embed-inc.txt
+// RUN: FileCheck %s < %t.embed-inc.txt
+// RUN: FileCheck -check-prefix NO-REFERENCE-DEPENDENCIES %s < %t.embed-inc.txt
+
 // REQUIRES: X86
 
 
