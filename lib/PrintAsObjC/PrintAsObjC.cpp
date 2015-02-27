@@ -476,7 +476,7 @@ private:
     if (!clangTy.isNull() && isNSUInteger(clangTy)) {
       os << "NSUInteger " << VD->getName().str();
     } else {
-      print(ty, OTK_None, VD->getName().str());
+      print(ty, OTK_None, VD->getObjCPropertyName().str());
     }
 
     os << ";\n";

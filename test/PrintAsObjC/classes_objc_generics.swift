@@ -325,6 +325,7 @@ private class Private : A1 {}
 // CHECK-NEXT: + (NSString * __nonnull)staticString;
 // CHECK-NEXT: + (void)setStaticString:(NSString * __nonnull)value;
 // CHECK-NEXT: + (double)staticDouble;
+// CHECK-NEXT: @property (nonatomic) Properties * __nullable wobble;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Properties {
@@ -372,6 +373,8 @@ private class Private : A1 {}
   static var staticDouble: Double {
     return 2.0
   }
+
+  @objc(wobble) var wibble: Properties?
 }
 
 // CHECK-LABEL: @interface PropertiesOverridden
