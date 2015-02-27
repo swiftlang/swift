@@ -180,34 +180,37 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
     return false;
   }
 
-  // Only handle innermost loops for now.
-  if (!Loop->getSubLoops().empty())
-    return false;
+  // Only analyze memory in innermost loops for now until we cache the
+  // information for subloops. For outer loops don't recognize safe reads but
+  // only hoist side-effect free expressions.
+  bool ShouldAnalyzeMemory = Loop->getSubLoops().empty();
 
   DEBUG(llvm::dbgs() << "hoisting in " << *Loop);
   DEBUG(HeaderBB->getParent()->dump());
 
   // Collect loads that are not clobbered.
-  ReadSet Reads;
-  WriteSet Writes;
-  for (auto *BB : Loop->getBlocks()) {
-    for (auto &Inst : *BB) {
-      // Ignore fix_lifetime instructions.
-      if (isa<FixLifetimeInst>(&Inst))
-        continue;
-      // Collect loads.
-      auto LI = dyn_cast<LoadInst>(&Inst);
-      if (LI) {
-        if (!mayWriteTo(AA, Writes, LI))
-          Reads.insert(LI);
-        continue;
+  ReadSet SafeReads;
+  if (ShouldAnalyzeMemory) {
+    WriteSet Writes;
+    for (auto *BB : Loop->getBlocks()) {
+      for (auto &Inst : *BB) {
+        // Ignore fix_lifetime instructions.
+        if (isa<FixLifetimeInst>(&Inst))
+          continue;
+        // Collect loads.
+        auto LI = dyn_cast<LoadInst>(&Inst);
+        if (LI) {
+          if (!mayWriteTo(AA, Writes, LI))
+            SafeReads.insert(LI);
+          continue;
+        }
+
+        // Remove clobbered loads we have seen before.
+        removeWrittenTo(AA, SafeReads, &Inst);
+
+        if (mayHaveSideEffects(&Inst))
+          Writes.push_back(&Inst);
       }
-
-      // Remove clobbered loads we have seen before.
-      removeWrittenTo(AA, Reads, &Inst);
-
-      if (mayHaveSideEffects(&Inst))
-        Writes.push_back(&Inst);
     }
   }
 
@@ -262,7 +265,7 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
       // as safe.
       LoadInst *LI = nullptr;
       if (mayRead(Inst) && !isa<CondFailInst>(Inst) &&
-          (!(LI = dyn_cast<LoadInst>(Inst)) || !Reads.count(LI))) {
+          (!(LI = dyn_cast<LoadInst>(Inst)) || !SafeReads.count(LI))) {
         DEBUG(llvm::dbgs() << " may read aliased writes\n");
         continue;
       }

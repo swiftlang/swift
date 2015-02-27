@@ -90,3 +90,34 @@ bb2(%48 : $Builtin.Word):
   %101 = builtin "cmp_eq_Word"(%58 : $Builtin.Word, %60 : $Builtin.Word) : $Builtin.Int1
   cond_br %101, bb1, bb2(%58 : $Builtin.Word)
 }
+
+
+// CHECK-LABEL: sil @hoist_outer_loop
+// CHECK: bb0(
+// CHECK:  integer_literal $Builtin.Word, 101
+// CHECK: br bb1
+// CHECK: return
+
+sil @hoist_outer_loop : $@thin (@inout Builtin.Int1, Int) -> () {
+bb0(%0 : $*Builtin.Int1, %1 : $Int):
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = integer_literal $Builtin.Word, 0
+  br bb1
+
+// Outer loop.
+bb1:
+  %5 = load %0 : $*Builtin.Int1
+  %6 = integer_literal $Builtin.Word, 101
+  cond_br %5, bb2, bb3
+
+bb2:
+  cond_br %5, bb4, bb1
+
+// Inner loop.
+bb3:
+  cond_br %5, bb2, bb3
+
+bb4:
+  %10 = tuple ()
+  return %10 : $()
+}
