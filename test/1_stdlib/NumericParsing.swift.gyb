@@ -14,6 +14,8 @@
 // RUN: %S/../../utils/gyb -Dtarget_ptrsize=%target-ptrsize %s -o %t/NumericParsing.swift
 // RUN: %S/../../utils/line-directive %t/NumericParsing.swift -- %target-build-swift %t/NumericParsing.swift -o %t/a.out
 // RUN: %S/../../utils/line-directive %t/NumericParsing.swift -- %target-run %t/a.out
+//
+// XFAIL: linux
 %{
 from SwiftIntTypes import *
 
