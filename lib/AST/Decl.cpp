@@ -2466,7 +2466,8 @@ ObjCSelector AbstractStorageDecl::getObjCGetterSelector() const {
   }
 
   // The getter selector is the property name itself.
-  return ObjCSelector(ctx, 0, getName());
+  auto var = cast<VarDecl>(this);
+  return ObjCSelector(ctx, 0, var->getObjCPropertyName());
 }
 
 ObjCSelector AbstractStorageDecl::getObjCSetterSelector() const {
@@ -2498,9 +2499,10 @@ ObjCSelector AbstractStorageDecl::getObjCSetterSelector() const {
 
   // The setter selector for, e.g., 'fooBar' is 'setFooBar:', with the
   // property name capitalized and preceded by 'set'.
+  auto var = cast<VarDecl>(this);
   llvm::SmallString<16> scratch;
   scratch += "set";
-  camel_case::appendSentenceCase(scratch, getName().str());
+  camel_case::appendSentenceCase(scratch, var->getObjCPropertyName().str());
 
   auto result = ObjCSelector(ctx, 1, ctx.getIdentifier(scratch));
 

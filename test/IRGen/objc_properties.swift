@@ -21,8 +21,11 @@
 
   var bareIvar : SomeObject
 
+  @objc(wobble) var wibble : SomeObject
+
   init() { 
     bareIvar = SomeObject()
+    wibble  = SomeObject()
   }
 }
 
@@ -76,10 +79,13 @@ class Class17127126 {
 // CHECK: [[BAREIVAR_NAME:@.*]] = private unnamed_addr constant [9 x i8] c"bareIvar\00"
 // CHECK: [[BAREIVAR_ATTRS:@.*]] = private unnamed_addr constant [29 x i8] c"T@\22SomeObject\22,N,&,VbareIvar\00"
 
+// CHECK: [[WIBBLE_NAME:@.*]] = private unnamed_addr constant [7 x i8] c"wobble\00"
+// CHECK: [[WIBBLE_ATTRS:@.*]] = private unnamed_addr constant [27 x i8] c"T@\22SomeObject\22,N,&,Vwibble\00"
+
 // CHECK: @_INSTANCE_METHODS__TtC15objc_properties10SomeObject = private constant { {{.*}}] } {
 // CHECK:   i32 24,
-// CHECK:   i32 6,
-// CHECK:   [6 x { i8*, i8*, i8* }] [{
+// CHECK:   i32 8,
+// CHECK:   [8 x { i8*, i8*, i8* }] [{
 // CHECK:     i8* getelementptr inbounds ([9 x i8]* @"\01L_selector_data(readonly)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:     i8* bitcast ([[OPAQUE0:%.*]]* ([[OPAQUE1:%.*]]*, i8*)* @_TToFC15objc_properties10SomeObjectg8readonlyS0_ to i8*)
@@ -100,7 +106,15 @@ class Class17127126 {
 // CHECK:     i8* getelementptr inbounds ([11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:     i8* bitcast (void ([[OPAQUE3]]*, i8*, [[OPAQUE4]]*)* @_TToFC15objc_properties10SomeObjects8bareIvarS0_ to i8*)
 // CHECK:   }, {
-// CHECK:     i8* getelementptr inbounds ([5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0), 
+// CHECK:     i8* getelementptr inbounds ([7 x i8]* @"\01L_selector_data(wobble)", i64 0, i64 0),
+// CHECK:     i8* getelementptr inbounds ([8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:     i8* bitcast (%0* (%0*, i8*)* @_TToFC15objc_properties10SomeObjectg6wibbleS0_ to i8*)
+// CHECK:   }, {
+// CHECK:     i8* getelementptr inbounds ([11 x i8]* @"\01L_selector_data(setWobble:)", i64 0, i64 0),
+// CHECK:     i8* getelementptr inbounds ([11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:     i8* bitcast (void (%0*, i8*, %0*)* @_TToFC15objc_properties10SomeObjects6wibbleS0_ to i8*)
+// CHECK:   }, {
+// CHECK:     i8* getelementptr inbounds ([5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:     i8* bitcast ([[OPAQUE5:%.*]]* ([[OPAQUE6:%.*]]*, i8*)* @_TToFC15objc_properties10SomeObjectcfMS0_FT_S0_ to i8*)
 // CHECK:   }]
@@ -108,8 +122,8 @@ class Class17127126 {
 
 // CHECK: @_PROPERTIES__TtC15objc_properties10SomeObject = private constant { {{.*}}] } {
 // CHECK:   i32 16,
-// CHECK:   i32 3,
-// CHECK:   [3 x { i8*, i8* }] [{
+// CHECK:   i32 4,
+// CHECK:   [4 x { i8*, i8* }] [{
 // CHECK:     i8* getelementptr inbounds ([9 x i8]* [[READONLY_NAME]], i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([19 x i8]* [[READONLY_ATTRS]], i64 0, i64 0)
 // CHECK:   }, {
@@ -118,6 +132,9 @@ class Class17127126 {
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([9 x i8]* [[BAREIVAR_NAME]], i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([29 x i8]* [[BAREIVAR_ATTRS]], i64 0, i64 0)
+// CHECK:   }, {
+// CHECK:     i8* getelementptr inbounds ([7 x i8]* [[WIBBLE_NAME]], i64 0, i64 0),
+// CHECK:     i8* getelementptr inbounds ([27 x i8]* [[WIBBLE_ATTRS]], i64 0, i64 0)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 

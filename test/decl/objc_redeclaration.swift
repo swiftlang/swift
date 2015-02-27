@@ -9,6 +9,10 @@
   func method1() { } // expected-note 2{{Objective-C method 'method1' previously declared by method 'method1()' here}}
 
   @objc var value: Int // expected-note{{Objective-C method 'setValue:' previously declared by setter for 'value' here}}
+
+  @objc(wibble) var other: Int
+  // expected-note@-1{{Objective-C method 'setWibble:' previously declared by setter for 'other' here}}
+  // expected-note@-2{{Objective-C method 'wibble' previously declared by getter for 'other' here}}
 }
 
 extension Redecl1 {
@@ -43,4 +47,9 @@ extension Redecl1 {
   func dealloc() { } // expected-error{{method 'dealloc()' redeclares Objective-C method 'dealloc'}}
 
   @objc func setValue(x: Int) { } // expected-error{{method 'setValue' redeclares Objective-C method 'setValue:'}}
+}
+
+extension Redecl1 {
+  @objc func setWibble(other: Int) { } // expected-error{{method 'setWibble' redeclares Objective-C method 'setWibble:'}}
+  @objc func wibble() -> Int { return 0 } // expected-error{{method 'wibble()' redeclares Objective-C method 'wibble'}}
 }
