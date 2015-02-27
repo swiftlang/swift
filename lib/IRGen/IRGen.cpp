@@ -270,13 +270,13 @@ static llvm::TargetMachine *createTargetMachine(IRGenOptions &Opts,
 // __LLVM,__cmdline section.
 static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
 {
-  if (!Opts.EmbedBitcode && !Opts.EmbedMarkerOnly)
+  if (Opts.EmbedMode == IRGenEmbedMode::None)
     return;
 
   // Embed the bitcode for the llvm module.
   std::string Data;
   llvm::raw_string_ostream OS(Data);
-  if (!Opts.EmbedMarkerOnly)
+  if (Opts.EmbedMode == IRGenEmbedMode::EmbedBitcode)
     llvm::WriteBitcodeToFile(M, OS);
 
   ArrayRef<uint8_t> ModuleData((uint8_t*)OS.str().data(), OS.str().size());

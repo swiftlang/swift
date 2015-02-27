@@ -47,6 +47,12 @@ enum class IRGenDebugInfoKind : unsigned {
   Normal      /// Line tables + DWARF types.
 };
 
+enum class IRGenEmbedMode : unsigned {
+  None,
+  EmbedMarker,
+  EmbedBitcode
+};
+
 /// The set of options supported by IR generation.
 class IRGenOptions {
 public:
@@ -109,10 +115,7 @@ public:
   unsigned GenerateProfile : 1;
 
   /// Whether we should embed the bitcode file.
-  unsigned EmbedBitcode : 1;
-
-  /// Whether we should embed the marker.
-  unsigned EmbedMarkerOnly : 1;
+  IRGenEmbedMode EmbedMode : 2;
 
   /// List of backend command-line options for -embed-bitcode.
   std::vector<uint8_t> CmdArgs;
@@ -124,7 +127,7 @@ public:
                    DisableLLVMSLPVectorizer(false),
                    DisableFPElim(true), HasUnderlyingModule(false),
                    Playground(false), GenerateProfile(false),
-                   EmbedBitcode(false), EmbedMarkerOnly(false) {}
+                   EmbedMode(IRGenEmbedMode::None) {}
 };
 
 } // end namespace swift

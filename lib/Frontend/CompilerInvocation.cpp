@@ -976,8 +976,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
 
-  Opts.EmbedBitcode |= Args.hasArg(OPT_embed_bitcode);
-  if (Opts.EmbedBitcode) {
+  if (Args.hasArg(OPT_embed_bitcode))
+    Opts.EmbedMode = IRGenEmbedMode::EmbedBitcode;
+  else if (Args.hasArg(OPT_embed_bitcode_marker))
+    Opts.EmbedMode = IRGenEmbedMode::EmbedMarker;
+
+  if (Opts.EmbedMode == IRGenEmbedMode::EmbedBitcode) {
     // Keep track of backend options so we can embed them in a separate data
     // section and use them when building from the bitcode. This can be removed
     // when all the backend options are recorded in the IR.
@@ -999,7 +1003,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       }
     }
   }
-  Opts.EmbedMarkerOnly |= Args.hasArg(OPT_embed_bitcode_marker);
 
   return false;
 }
