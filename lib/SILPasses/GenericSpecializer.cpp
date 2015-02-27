@@ -41,10 +41,11 @@ public:
     // functions in reverse order.
     auto &CG = CGA->getCallGraph();
     auto GS = GenericSpecializer(getModule());
-    GS.addApplyInst(CG.getBottomUpFunctionOrder());
 
     // Try to specialize generic calls.
-    if (GS.specialize()) {
+    bool Changed = GS.specialize(CG.getBottomUpFunctionOrder());
+
+    if (Changed) {
       // Schedule another iteration of the transformation pipe.
       PM->scheduleAnotherIteration();
 
