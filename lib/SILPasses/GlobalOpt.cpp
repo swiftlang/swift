@@ -314,7 +314,7 @@ class SILGlobalOptPass : public SILModuleTransform
   void run() override {
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     if (SILGlobalOpt(getModule(), DA).run())
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
   }
 
   StringRef getName() override { return "SIL Global Optimization"; }
