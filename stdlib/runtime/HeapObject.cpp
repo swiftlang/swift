@@ -86,7 +86,7 @@ static void destroyPOD(HeapObject *o);
 /// Heap metadata for POD allocations.
 static const FullMetadata<HeapMetadata> PODHeapMetadata{
   HeapMetadataHeader{{destroyPOD}, {nullptr}},
-  HeapMetadata{{MetadataKind::HeapLocalVariable}}
+  HeapMetadata{Metadata{MetadataKind::HeapLocalVariable}}
 };
 
 namespace {
@@ -205,7 +205,7 @@ static void destroyGenericBox(HeapObject *o) {
 /// heap metadata at runtime.
 static const FullMetadata<HeapMetadata> GenericBoxHeapMetadata{
   HeapMetadataHeader{{destroyGenericBox}, {nullptr}},
-  HeapMetadata{{MetadataKind::HeapLocalVariable}}
+  HeapMetadata{Metadata{MetadataKind::HeapLocalVariable}}
 };
 
 BoxPair::Return
