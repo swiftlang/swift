@@ -668,6 +668,44 @@ class SubclassAvailableOn10_9OfClassAvailableOn10_10 : ClassAvailableOn10_10 { /
 class ClassAvailableOn10_9AdoptingProtocolAvailableOn10_10 : ProtocolAvailableOn10_10 { // expected-error {{'ProtocolAvailableOn10_10' is only available on OS X version 10.10 or greater}}
 }
 
+// Extensions
+
+extension ClassAvailableOn10_10 { } // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+
+@availability(OSX, introduced=10.10)
+extension ClassAvailableOn10_10 {
+  func m() {
+    let _ = globalAvailableOn10_10
+    let _ = globalAvailableOn10_11 // expected-error {{'globalAvailableOn10_11' is only available on OS X version 10.11 or greater}}
+  }
+}
+
+class ClassToExtend { }
+
+@availability(OSX, introduced=10.10)
+extension ClassToExtend {
+
+  func extensionMethod() { }
+
+  @availability(OSX, introduced=10.11)
+  func extensionMethod10_11() { }
+
+  class ExtensionClass { }
+
+  // We rely on not allowing nesting of extensions, so test to make sure
+  // this emits an error.
+  extension ClassToExtend { } // expected-error {{declaration is only valid at file scope}}
+}
+
+func useUnavailableExtension() {
+  let o = ClassToExtend()
+
+  o.extensionMethod() // expected-error {{'extensionMethod()' is only available on OS X version 10.10 or greater}}
+  let _ = ClassToExtend.ExtensionClass() // expected-error {{'ExtensionClass' is only available on OS X version 10.10 or greater}}
+
+  o.extensionMethod10_11() // expected-error {{'extensionMethod10_11()' is only available on OS X version 10.11 or greater}}
+}
+
 // Useless #os(...) checks
 
 func functionWithDefaultAvailabilityAndUselessCheck() {

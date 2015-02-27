@@ -471,6 +471,12 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   // in the AST.
   (void) TC.getStdlibModule(&SF);
 
+  if (Ctx.LangOpts.EnableExperimentalAvailabilityChecking ) {
+    // Build the type refinement hierarchy for the primary
+    // file before type checking.
+    TypeChecker::buildTypeRefinementContextHierarchy(SF, StartElem);
+  }
+
   // Resolve extensions. This has to occur first during type checking,
   // because the extensions need to be wired into the AST for name lookup
   // to work.
@@ -498,11 +504,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   });
 
   // FIXME: Check for cycles in class inheritance here?
-
-  if (Ctx.LangOpts.EnableExperimentalAvailabilityChecking ) {
-    // Build the type refinement hierarchy for the file before type checking.
-    TypeChecker::buildTypeRefinementContextHierarchy(SF, StartElem);
-  }
   
   // Type check the top-level elements of the source file.
   for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
@@ -722,6 +723,23 @@ VersionRange TypeChecker::availableRange(const Decl *D, ASTContext &Ctx) {
     return AnnotatedRange.getValue();
   }
 
+  // Unlike other declarations, extensions can be used without referring to them
+  // by name (they don't have one) in the source. For this reason, when checking
+  // the available range of a declaration we also need to check to see if it is
+  // immediately contained in an extension and use the extension's availability
+  // if the declaration does not have an explicit @availability attribute
+  // itself. This check relies on the fact that we cannot have nested
+  // extensions.
+
+  DeclContext *DC = D->getDeclContext();
+  if (DC->getContextKind() == DeclContextKind::ExtensionDecl) {
+    auto *ED = cast<ExtensionDecl>(DC);
+    AnnotatedRange = annotatedAvailableRange(ED, Ctx);
+    if (AnnotatedRange.hasValue()) {
+      return AnnotatedRange.getValue();
+    }
+  }
+
   // Treat unannotated declarations as always available.
   return VersionRange::all();
 }
@@ -822,7 +840,7 @@ private:
   
   /// Returns true if the declaration should introduce a new refinement context.
   bool declarationIntroducesNewContext(Decl *D) {
-    if (!dyn_cast<ValueDecl>(D)) {
+    if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D)) {
       return false;
     }
     

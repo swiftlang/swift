@@ -124,9 +124,11 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
 
   if (getReason() == Reason::Decl) {
     Decl *D = getIntroductionNode().get<Decl *>();
+    OS << " decl=";
     if (auto VD = dyn_cast<ValueDecl>(D)) {
-      OS << " decl=";
       VD->dumpRef(OS);
+    } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+      OS << "extension." << ED->getExtendedType().getString();
     }
   }
 
