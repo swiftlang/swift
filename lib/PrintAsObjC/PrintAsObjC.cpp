@@ -303,7 +303,11 @@ private:
     llvm::SmallString<128> selectorBuf;
     StringRef selectorString = AFD->getObjCSelector().getString(selectorBuf);
 
-    if (isa<ParenPattern>(bodyPatterns.back())) {
+    if (isa<ConstructorDecl>(AFD) &&
+        cast<ConstructorDecl>(AFD)->isObjCZeroParameterWithLongSelector()) {
+      os << selectorString;
+      selectorString = "";
+    } else if (isa<ParenPattern>(bodyPatterns.back())) {
       // One argument.
       auto bodyPattern = bodyPatterns.back()->getSemanticsProvidingPattern();
       auto clangParam = clangMethod ? clangMethod->parameters()[0] : nullptr;

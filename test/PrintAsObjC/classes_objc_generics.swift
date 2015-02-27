@@ -63,6 +63,7 @@ class ClassWithNSObjectProtocol : NSObject, NSObjectProtocol {}
 // CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)initWithFloat:(float)f;
 // CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)initWithString:(NSString * __nonnull)s boolean:(BOOL)b;
 // CHECK-NEXT: - (SWIFT_NULLABILITY(nullable) instancetype)initWithBoolean:(BOOL)b;
+// CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)initForFun OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 @objc class Initializers {
   init() {}
@@ -73,6 +74,8 @@ class ClassWithNSObjectProtocol : NSObject, NSObjectProtocol {}
   convenience init(string s: String, boolean b: ObjCBool) { self.init() }
 
   convenience init?(boolean b: ObjCBool) { self.init() }
+
+  init(forFun: ()) { }
 }
 
 // NEGATIVE-NOT: NotObjC

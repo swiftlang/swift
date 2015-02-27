@@ -3272,7 +3272,7 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
     paramType = paramPattern->getType();
   }
 
-  return paramType->isEqual(TupleType::getEmpty(getASTContext()));
+  return paramType->isVoid();
 }
 
 DestructorDecl::DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,
