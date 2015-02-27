@@ -37,6 +37,8 @@
 
 #include "GenTuple.h"
 
+#pragma clang diagnostic ignored "-Winconsistent-missing-override"
+
 using namespace swift;
 using namespace irgen;
 
