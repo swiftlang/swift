@@ -10,8 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Misc stubs for functions which should be in swift.swift, but are difficult
-// or impossible to write in swift at the moment.
+// Misc stubs for functions which should be defined in the core standard
+// library, but are difficult or impossible to write in Swift at the
+// moment.
 //
 //===----------------------------------------------------------------------===//
 
@@ -173,6 +174,20 @@ extern "C" uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
                                           long double Value) {
   return swift_floatingPointToString<long double>(Buffer, BufferLength, Value,
                                                   "%0.*Lg");
+}
+
+/// \param[out] LinePtr Replaced with the pointer to the malloc()-allocated
+/// line.  Can be NULL if no characters were read.
+///
+/// \returns Size of character data returned in \c LinePtr, or \c SIZE_MAX
+/// if an error occured, or EOF was reached.
+extern "C" size_t swift_stdlib_readLine_stdin(char **LinePtr) {
+  size_t Capacity = 0;
+  ssize_t ReadBytes = getline(LinePtr, &Capacity, stdin);
+  if (ReadBytes < 0) {
+    return SIZE_MAX;
+  }
+  return ReadBytes;
 }
 
 extern "C" float _swift_fmodf(float lhs, float rhs) {

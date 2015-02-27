@@ -1,0 +1,149 @@
+//===--- InputStream.swift.gyb --------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// -*- swift -*-
+// RUN: rm -rf %t ; mkdir -p %t
+// RUN: %S/../../utils/gyb %s -o %t/InputStream.swift
+// RUN: %S/../../utils/line-directive %t/InputStream.swift -- %target-build-swift %t/InputStream.swift -o %t/a.out
+// RUN: %S/../../utils/line-directive %t/InputStream.swift -- %target-run %t/a.out
+
+// XFAIL: interpret
+// XFAIL: linux
+
+import StdlibUnittest
+import Swift
+
+var ReadLineTestSuite = TestSuite("ReadLine")
+
+% for strip_newline in [ 'false', 'true' ]:
+%   newline = '' if strip_newline == 'true' else '\\n'
+
+ReadLineTestSuite.test("EmptyLine/stripNewline=${strip_newline}")
+  .stdin("\n")
+  .code {
+  expectOptionalEqual("${newline}", readLine(stripNewline: ${strip_newline}))
+}
+
+ReadLineTestSuite.test("Whitespace/stripNewline=${strip_newline}")
+  .stdin(" \t\u{0b}\u{0c}\u{85}\u{2028}\u{2029}\n")
+  .code {
+  expectOptionalEqual(
+    " \t\u{0b}\u{0c}\u{85}\u{2028}\u{2029}${newline}",
+    readLine(stripNewline: ${strip_newline}))
+}
+
+ReadLineTestSuite.test("ASCII/length=1/stripNewline=${strip_newline}")
+  .stdin("a\n")
+  .code {
+  expectOptionalEqual("a${newline}", readLine(stripNewline: ${strip_newline}))
+}
+
+ReadLineTestSuite.test("ASCII/length=2/stripNewline=${strip_newline}")
+  .stdin("ab\n")
+  .code {
+  expectOptionalEqual("ab${newline}", readLine(stripNewline: ${strip_newline}))
+}
+
+ReadLineTestSuite.test("ASCII/length=3/stripNewline=${strip_newline}")
+  .stdin("abc\n")
+  .code {
+  expectOptionalEqual("abc${newline}", readLine(stripNewline: ${strip_newline}))
+}
+
+ReadLineTestSuite.test("Unicode/stripNewline=${strip_newline}")
+  // U+0065 LATIN SMALL LETTER E
+  // U+00A9 COPYRIGHT SIGN
+  // U+0521 CYRILLIC SMALL LETTER EL WITH MIDDLE HOOK
+  // U+304B HIRAGANA LETTER KA
+  // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
+  // U+4587 CJK UNIFIED IDEOGRAPH-4587
+  // U+1F425 FRONT-FACING BABY CHICK
+  .stdin("\u{0065}\u{00a9}\u{0521}\u{304b}\u{3099}\u{4587}\u{1f425}\u{10b9c4}\n")
+  .code {
+  expectOptionalEqual(
+    "\u{0065}\u{00a9}\u{0521}\u{304b}\u{3099}\u{4587}\u{1f425}\u{10b9c4}${newline}",
+    readLine(stripNewline: ${strip_newline}))
+}
+
+ReadLineTestSuite.test("EOF/1/stripNewline=${strip_newline}")
+  .stdin("", eof: true)
+  .code {
+  expectEmpty(readLine(stripNewline: ${strip_newline}))
+}
+
+ReadLineTestSuite.test("EOF/2/stripNewline=${strip_newline}")
+  .stdin("abcd 123\n", eof: true)
+  .code {
+  expectOptionalEqual("abcd 123${newline}", readLine(stripNewline: ${strip_newline}))
+  expectEmpty(readLine(stripNewline: ${strip_newline}))
+}
+
+ReadLineTestSuite.test("MissingNewlineAtEOF/1/stripNewline=${strip_newline}")
+  .stdin("a", eof: true)
+  .code {
+  expectOptionalEqual("a", readLine(stripNewline: ${strip_newline}))
+}
+
+ReadLineTestSuite.test("MissingNewlineAtEOF/2/stripNewline=${strip_newline}")
+  .stdin("abcd 123", eof: true)
+  .code {
+  expectOptionalEqual("abcd 123", readLine(stripNewline: ${strip_newline}))
+}
+
+% end
+
+ReadLineTestSuite.test("stripNewline=default")
+  .stdin("abcd 123\n")
+  .code {
+  // Check that the default for stripNewline is true.
+  expectOptionalEqual("abcd 123", readLine())
+}
+
+ReadLineTestSuite.test("StripNewline/JustCR")
+  .stdin("\r", eof: true)
+  .code {
+  // FIXME: CR by itself is not recognized as a newline.
+  expectOptionalEqual("\r", readLine(stripNewline: true))
+}
+
+ReadLineTestSuite.test("StripNewline/JustLF")
+  .stdin("\n")
+  .code {
+  expectOptionalEqual("", readLine(stripNewline: true))
+}
+
+ReadLineTestSuite.test("StripNewline/JustCR+LF")
+  .stdin("\r\n")
+  .code {
+  expectOptionalEqual("", readLine(stripNewline: true))
+}
+
+ReadLineTestSuite.test("StripNewline/CR")
+  .stdin("abcd 123\r", eof: true)
+  .code {
+  // FIXME: CR by itself is not recognized as a newline.
+  expectOptionalEqual("abcd 123\r", readLine(stripNewline: true))
+}
+
+ReadLineTestSuite.test("StripNewline/LF")
+  .stdin("abcd 123\n")
+  .code {
+  expectOptionalEqual("abcd 123", readLine(stripNewline: true))
+}
+
+ReadLineTestSuite.test("StripNewline/CR+LF")
+  .stdin("abcd 123\r\n")
+  .code {
+  expectOptionalEqual("abcd 123", readLine(stripNewline: true))
+}
+
+runAllTests()
+
