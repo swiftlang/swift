@@ -385,7 +385,10 @@ func _stdlib_getline() -> String? {
   while true {
     let c = getchar()
     if c == EOF {
-      return nil
+      if result.count == 0 {
+        return nil
+      }
+      return String._fromWellFormedCodeUnitSequence(UTF8.self, input: result)
     }
     if c == CInt(UnicodeScalar("\n").value) {
       return String._fromWellFormedCodeUnitSequence(UTF8.self, input: result)
@@ -396,6 +399,7 @@ func _stdlib_getline() -> String? {
 
 struct _FDInputStream {
   let fd: CInt
+  var isClosed: Bool = false
   var isEOF: Bool = false
   var _buffer = _UnitTestArray<UInt8>(count: 256, repeatedValue: 0)
   var _bufferUsed: Int = 0
@@ -449,6 +453,17 @@ struct _FDInputStream {
     }
     _bufferUsed += readResult
   }
+
+  mutating func close() {
+    if isClosed {
+      return
+    }
+    let result = Darwin.close(fd)
+    if result < 0 {
+      fatalError("close() returned an error")
+    }
+    isClosed = true
+  }
 }
 
 func _printDebuggingAdvice(fullTestName: String) {
@@ -480,14 +495,18 @@ func _childProcess() {
 
     var stderr = _Stderr()
     println("\(_stdlibUnittestStreamPrefix);end", &stderr)
+
+    if !testSuite._testByName(testName).canReuseChildProcessAfterTest {
+      return
+    }
   }
 }
 
 struct _ParentProcess {
-  var _pid: pid_t = -1
-  var _childStdinFD: CInt = -1
-  var _childStdoutFD: CInt = -1
-  var _childStderrFD: CInt = -1
+  internal var _pid: pid_t = -1
+  internal var _childStdin: _FDOutputStream = _FDOutputStream(fd: -1)
+  internal var _childStdout: _FDInputStream = _FDInputStream(fd: -1)
+  internal var _childStderr: _FDInputStream = _FDInputStream(fd: -1)
 
   internal var _runTestsInProcess: Bool
   internal var _filter: String?
@@ -498,27 +517,28 @@ struct _ParentProcess {
   }
 
   mutating func _spawnChild() {
-    (_pid, _childStdinFD, _childStdoutFD, _childStderrFD) =
+    let (pid, childStdinFD, childStdoutFD, childStderrFD) =
       spawnChild([ "--stdlib-unittest-run-child" ])
+    _pid = pid
+    _childStdin = _FDOutputStream(fd: childStdinFD)
+    _childStdout = _FDInputStream(fd: childStdoutFD)
+    _childStderr = _FDInputStream(fd: childStderrFD)
   }
 
   mutating func _waitForChild() -> ProcessTerminationStatus {
     let status = posixWaitpid(_pid)
     _pid = -1
-    if close(_childStdinFD) != 0 {
-      preconditionFailure("close() failed")
-    }
-    if close(_childStdoutFD) != 0 {
-      preconditionFailure("close() failed")
-    }
-    if close(_childStderrFD) != 0 {
-      preconditionFailure("close() failed")
-    }
+    _childStdin.close()
+    _childStdout.close()
+    _childStderr.close()
+    _childStdin = _FDOutputStream(fd: -1)
+    _childStdout = _FDInputStream(fd: -1)
+    _childStderr = _FDInputStream(fd: -1)
     return status
   }
 
   /// Returns the values of the corresponding variables in the child process.
-  mutating func _runTestInChild(testSuiteName: String, _ testName: String)
+  mutating func _runTestInChild(testSuite: TestSuite, _ testName: String)
     -> (anyExpectFailed: Bool, seenExpectCrash: Bool,
         status: ProcessTerminationStatus?,
         crashStdout: _UnitTestArray<String>, crashStderr: _UnitTestArray<String>) {
@@ -526,11 +546,15 @@ struct _ParentProcess {
       _spawnChild()
     }
 
-    var childStdin = _FDOutputStream(fd: _childStdinFD)
-    var childStdout = _FDInputStream(fd: _childStdoutFD)
-    var childStderr = _FDInputStream(fd: _childStderrFD)
+    println("\(testSuite.name);\(testName)", &_childStdin)
 
-    println("\(testSuiteName);\(testName)", &childStdin)
+    let currentTest = testSuite._testByName(testName)
+    if let stdinText = currentTest.stdinText {
+      print(stdinText, &_childStdin)
+    }
+    if currentTest.stdinEndsWithEOF {
+      _childStdin.close()
+    }
 
     var readfds = _stdlib_fd_set()
     var writefds = _stdlib_fd_set()
@@ -542,18 +566,18 @@ struct _ParentProcess {
     var capturedCrashStdout = _UnitTestArray<String>()
     var capturedCrashStderr = _UnitTestArray<String>()
     var anyExpectFailedInChild = false
-    while !((childStdout.isEOF && childStderr.isEOF) ||
+    while !((_childStdout.isEOF && _childStderr.isEOF) ||
       (stdoutEnd && stderrEnd)) {
 
       readfds.zero()
       errorfds.zero()
-      if !childStdout.isEOF {
-        readfds.set(_childStdoutFD)
-        errorfds.set(_childStdoutFD)
+      if !_childStdout.isEOF {
+        readfds.set(_childStdout.fd)
+        errorfds.set(_childStdout.fd)
       }
-      if !childStderr.isEOF {
-        readfds.set(_childStderrFD)
-        errorfds.set(_childStderrFD)
+      if !_childStderr.isEOF {
+        readfds.set(_childStderr.fd)
+        errorfds.set(_childStderr.fd)
       }
       var ret: CInt
       do {
@@ -562,9 +586,9 @@ struct _ParentProcess {
       if ret <= 0 {
         fatalError("select() returned an error")
       }
-      if readfds.isset(_childStdoutFD) || errorfds.isset(_childStdoutFD) {
-        childStdout.read()
-        while var line = childStdout.getline() {
+      if readfds.isset(_childStdout.fd) || errorfds.isset(_childStdout.fd) {
+        _childStdout.read()
+        while var line = _childStdout.getline() {
           if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
             let controlMessage = line[index..<line.endIndex]._split(";")
             switch controlMessage[1] {
@@ -589,9 +613,9 @@ struct _ParentProcess {
         }
         continue
       }
-      if readfds.isset(_childStderrFD) || errorfds.isset(_childStderrFD) {
-        childStderr.read()
-        while var line = childStderr.getline() {
+      if readfds.isset(_childStderr.fd) || errorfds.isset(_childStderr.fd) {
+        _childStderr.read()
+        while var line = _childStderr.getline() {
           if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
             let controlMessage = line[index..<line.endIndex]._split(";")
             switch controlMessage[1] {
@@ -615,16 +639,30 @@ struct _ParentProcess {
         continue
       }
     }
+
+    // Check if the child has sent us "end" markers for the current test.
     if stdoutEnd && stderrEnd {
+      testSuite._testByName(testName)
+      var status: ProcessTerminationStatus? = nil
+      if !testSuite._testByName(testName).canReuseChildProcessAfterTest {
+        status = _waitForChild()
+        switch status! {
+        case .Exit(0):
+          status = nil
+        default:
+          ()
+        }
+      }
       return (
         anyExpectFailedInChild,
-        stdoutSeenCrashDelimiter || stderrSeenCrashDelimiter, nil,
+        stdoutSeenCrashDelimiter || stderrSeenCrashDelimiter, status,
         capturedCrashStdout, capturedCrashStderr)
     }
 
-    // We reached EOF on stdout and stderr, it looks like child crashed (of
-    // course it could have closed the file descriptors, but we assume it did
-    // not).
+    // We reached EOF on stdout and stderr and we did not see "end" markers, so
+    // it looks like child crashed (of course it could have closed the file
+    // descriptors, but we assume it did not, since it prevent further
+    // communication with the parent).
     let status = _waitForChild()
     return (
       anyExpectFailedInChild,
@@ -665,12 +703,17 @@ struct _ParentProcess {
         var crashStdout = _UnitTestArray<String>()
         var crashStderr = _UnitTestArray<String>()
         if _runTestsInProcess {
-          _anyExpectFailed = false
-          testSuite._runTest(t.name)
+          if t.stdinText != nil {
+            println("The test \(fullTestName) requires stdin input and can't be run in-process, marking as failed")
+            _anyExpectFailed = true
+          } else {
+            _anyExpectFailed = false
+            testSuite._runTest(t.name)
+          }
         } else {
           (_anyExpectFailed, expectCrash, childTerminationStatus, crashStdout,
            crashStderr) =
-            _runTestInChild(testSuite.name, t.name)
+            _runTestInChild(testSuite, t.name)
         }
 
         // Determine if the test passed, not taking XFAILs into account.
@@ -832,18 +875,30 @@ public class TestSuite {
     if let f = _testSetUpCode {
       f()
     }
-    _tests[_testNameToIndex[testName]!].code()
+    _testByName(testName).code()
     if let f = _testTearDownCode {
       f()
     }
+  }
+
+  func _testByName(testName: String) -> _Test {
+    return _tests[_testNameToIndex[testName]!]
   }
 
   struct _Test {
     let name: String
     let xfail: _UnitTestArray<TestRunPredicate>
     let skip: _UnitTestArray<TestRunPredicate>
+    let stdinText: String?
+    let stdinEndsWithEOF: Bool
     let crashOutputMatches: [String]
     let code: () -> ()
+
+    /// Whether the test harness should stop reusing the child process after
+    /// running this test.
+    var canReuseChildProcessAfterTest: Bool {
+      return stdinText == nil
+    }
 
     func getActiveXFailPredicates() -> _UnitTestArray<TestRunPredicate> {
       return xfail.filter { $0.evaluate() }
@@ -862,6 +917,8 @@ public class TestSuite {
     class _Data {
       var _xfail: _UnitTestArray<TestRunPredicate> = []
       var _skip: _UnitTestArray<TestRunPredicate> = []
+      var _stdinText: String? = nil
+      var _stdinEndsWithEOF: Bool = false
       var _crashOutputMatches: [String] = []
     }
 
@@ -880,6 +937,12 @@ public class TestSuite {
       return self
     }
 
+    public func stdin(stdinText: String, eof: Bool = false) -> _TestBuilder {
+      _data._stdinText = stdinText
+      _data._stdinEndsWithEOF = eof
+      return self
+    }
+
     public func crashOutputMatches(string: String) -> _TestBuilder {
       _data._crashOutputMatches.append(string)
       return self
@@ -888,6 +951,8 @@ public class TestSuite {
     public func code(testFunction: () -> ()) {
       _testSuite._tests.append(_Test(
         name: _name, xfail: _data._xfail, skip: _data._skip,
+        stdinText: _data._stdinText,
+        stdinEndsWithEOF: _data._stdinEndsWithEOF,
         crashOutputMatches: _data._crashOutputMatches, code: testFunction))
       _testSuite._testNameToIndex[_name] = _testSuite._tests.count - 1
     }

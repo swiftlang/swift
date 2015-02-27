@@ -117,6 +117,11 @@ public struct _Stderr : OutputStreamType {
 
 struct _FDOutputStream : OutputStreamType {
   let fd: CInt
+  var isClosed: Bool = false
+
+  init(fd: CInt) {
+    self.fd = fd
+  }
 
   mutating func write(string: String) {
     let utf8 = string.nulTerminatedUTF8
@@ -134,6 +139,17 @@ struct _FDOutputStream : OutputStreamType {
         writtenBytes += size_t(result)
       }
     }
+  }
+
+  mutating func close() {
+    if isClosed {
+      return
+    }
+    let result = Darwin.close(fd)
+    if result < 0 {
+      fatalError("close() returned an error")
+    }
+    isClosed = true
   }
 }
 
