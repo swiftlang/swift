@@ -38,9 +38,6 @@ static bool canSpecializeFunction(SILFunction *F) {
   return !F->isExternalDeclaration();
 }
 
-llvm::cl::opt<bool> EnableSpecializer("enable-specializer",
-                                      llvm::cl::init(true));
-
 namespace {
 
 class SpecializingCloner : public TypeSubstCloner<SpecializingCloner> {
@@ -366,9 +363,6 @@ public:
   SILGenericSpecializerTransform() {}
 
   void run() override {
-    if (!EnableSpecializer)
-      return;
-
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
 
     // Collect a call-graph bottom-up list of functions and specialize the
