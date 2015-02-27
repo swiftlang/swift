@@ -56,15 +56,29 @@ var tests = TestSuite("NumericParsing")
 tests.test("${Self}/success") {
   let isSigned = ${str(type.is_signed).lower()}
 
-  // Check some important special cases
-  expectEqual(0, ${Self}("0"))
-  expectEqual(10, ${Self}("10"))
+  //===--- Important cases ------------------------------------------------===//
+  expectEqual(0, ${Self}("0"))      // zero
+  expectEqual(17, ${Self}("17"))    // non-zero with no radix
+  
+  // Leading zeroes, with and without a radix
   expectEqual(10, ${Self}("010"))
   expectEqual(15, ${Self}("00F", radix: 16))
+
+  // Leading '+'
+  expectEqual(0, ${Self}("+0"))
+  expectEqual(10, ${Self}("+10"))
+  expectEqual(10, ${Self}("+010"))
+  expectEqual(15, ${Self}("+00F", radix: 16))
+
+  // Negative numbers
   expectEqual(${-128 if type.is_signed else 'nil'}, ${Self}("-0080", radix: 16))
-  expectEqual(isSigned ? 0 : nil, ${Self}("-0"))
-  expectEqual(isSigned ? 0 : nil, ${Self}("-00", radix: 16))
+  expectEqual(0, ${Self}("-0"))
+  expectEqual(0, ${Self}("-00", radix: 16))
+
+  // Maximum radix
   expectEqual(${max_radix} - 1, ${Self}("z", radix: ${max_radix}))
+
+  // Out-of-range values
   expectEqual(nil, ${Self}("${maxValue + 1}"))
   expectEqual(nil, ${Self}("${minValue - 1}"))
 
@@ -74,10 +88,11 @@ tests.test("${Self}/success") {
   %     minValue + 1, maxValue - 1,
   %     (maxValue - minValue - 2) / (number_of_values - len(required_values))):
   // This line is a workaround for a gyb parsing bug.
+  %     prefix = '+' if n > 0 and n % 2 == 0 else '' # leading '+'
   %     text = inRadix(radix, n)
-  expectEqual(${n}, ${Self}("${text}", radix: ${radix}))
+  expectEqual(${n}, ${Self}("${prefix + text}", radix: ${radix}))
   %     if text != text.upper():
-  expectEqual(${n}, ${Self}("${text.upper()}", radix: ${radix}))
+  expectEqual(${n}, ${Self}("${prefix + text.upper()}", radix: ${radix}))
   %     end
   %   end
   % end

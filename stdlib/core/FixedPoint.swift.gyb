@@ -174,12 +174,13 @@ internal func _ascii(c: UnicodeScalar) -> UTF16.CodeUnit {
   return UTF16.CodeUnit(c.value)
 }
 
-/// If text can be interpreted in the given `radix` as an unsigned
-/// number <= `maximum`, return that number.  Otherwise, return `nil`.
+/// If text is an ASCII representation in the given `radix` of a
+/// non-negative number <= `maximum`, return that number.  Otherwise,
+/// return `nil`.
 ///
-/// Note: if `text` begins with `"-"`, even if the rest of the
-/// characters are `"0"`, the result is nil.
-internal func _parseAsciiAsUIntMax(
+/// Note: if `text` begins with `"+"` or `"-"`, even if the rest of
+/// the characters are `"0"`, the result is nil.
+internal func _parseUnsignedAsciiAsUIntMax(
   text: String, radix: Int, maximum: UIntMax
 ) -> UIntMax? {
   if isEmpty(text) { return nil }
@@ -201,7 +202,6 @@ internal func _parseAsciiAsUIntMax(
     case digit: n = UIntMax(c - digit.startIndex)
     case lower: n = UIntMax(c - lower.startIndex) + 10
     case upper: n = UIntMax(c - upper.startIndex) + 10
-    // case _ascii("_"): continue
     default: return nil
     }
     if n >= uRadix { return nil }
@@ -213,8 +213,30 @@ internal func _parseAsciiAsUIntMax(
   return result
 }
 
-/// If text can be interpreted in the given `radix` as a signed number
-/// between `-maximum - 1` and `maximum`, return that number.
+/// If text is an ASCII representation in the given `radix` of a
+/// non-negative number <= `maximum`, return that number.  Otherwise,
+/// return `nil`.
+///
+/// Note: if `text` begins with `"+"` or `"-"`, even if the rest of
+/// the characters are `"0"`, the result is nil.
+internal func _parseAsciiAsUIntMax(
+  text: String, radix: Int, maximum: UIntMax
+) -> UIntMax? {
+  let u16 = text.utf16
+  if isEmpty(u16) { return nil }
+  let c = first(u16)
+  if _fastPath(c != _ascii("-")) {
+    let unsignedText
+      = c == _ascii("+") ? unsafeUnwrap(String(dropFirst(u16))) : text
+    return _parseUnsignedAsciiAsUIntMax(unsignedText, radix, maximum)
+  }
+  else {
+    return _parseAsciiAsIntMax(text, radix, 0) == 0 ? 0 : nil
+  }
+}
+
+/// If text is an ASCII representation in the given `radix` of a
+/// number >= -`maximum` - 1 and <= `maximum`, return that number.
 /// Otherwise, return `nil`.
 ///
 /// Note: for text matching the regular expression "-0+", the result
@@ -222,7 +244,7 @@ internal func _parseAsciiAsUIntMax(
 internal func _parseAsciiAsIntMax(
   text: String, radix: Int, maximum: IntMax
 ) -> IntMax? {
-  _sanityCheck(maximum > 0, "maximum should be positive")
+  _sanityCheck(maximum >= 0, "maximum should be non-negative")
   
   let u16 = text.utf16
   if isEmpty(u16) { return nil }
@@ -412,6 +434,11 @@ extension ${Self} : Printable {
 }
 
 extension ${Self} {
+  /// Construct from an ASCII representation in the given `radix`.
+  ///
+  /// If `text` does not match the regular expression
+  /// “[+-][0-9a-zA-Z]+”, or the value it denotes in the given `radix`
+  /// is not representable, the result is `nil`.
   public init?(_ text: String, radix: Int = 10) {
     if let value = _parseAsciiAs${'' if signed else 'U'}IntMax(
       text, radix, ${'' if signed else 'U'}IntMax(${Self}.max)) {
