@@ -503,12 +503,15 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
          ((Header == Latch) &&
           DT->getNode(Header)->getIDom() == DT->getNode(Preheader)));
 
-  // Create a new preheader.
-  splitIfCriticalEdge(Preheader, NewHeader, DT, LI);
-
   // Beautify the IR. Move the old header to after the old latch as it is now
   // the latch.
   Header->moveAfter(Latch);
+
+  // Merge the the old latch with the old header if possible.
+  mergeBasicBlockWithSuccessor(Latch, DT, LI);
+
+  // Create a new preheader.
+  splitIfCriticalEdge(Preheader, NewHeader, DT, LI);
 
   if (ShouldVerify) {
     DT->verify();

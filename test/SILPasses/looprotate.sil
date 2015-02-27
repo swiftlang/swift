@@ -8,19 +8,16 @@ import Swift
 // CHECK-LABEL: looprotate
 // CHECK: bb0(%0 : $Int32, %1 : $Bar):
 // CHECK:  class_method
-// CHECK:  cond_br {{.*}}, bb4({{.*}} : $Builtin.Int32), bb1
+// CHECK:  cond_br {{.*}}, bb3({{.*}} : $Builtin.Int32), bb1
 
-// CHECK:bb1:
+// CHECK: bb1:
 // CHECK:  br bb2({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}}: $Int32)
 
 // CHECK: bb2({{.*}}: $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Int32):
-// CHECK:   br bb3({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}})
-
-// CHECK: bb3({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}}):
 // CHECK:   class_method
-// CHECK:   cond_br {{%.*}}, bb4({{.*}} : $Builtin.Int32), bb2({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Int32)
+// CHECK:   cond_br {{%.*}}, bb3({{.*}} : $Builtin.Int32), bb2({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Int32)
 
-// CHECK: bb4({{.*}} : $Builtin.Int32):
+// CHECK: bb3({{.*}} : $Builtin.Int32):
 // CHECK:   [[STRUCT:%.*]] = struct $Int32 ({{%.*}} : $Builtin.Int32)
 // CHECK:   return [[STRUCT]] : $Int32
 
@@ -220,10 +217,8 @@ bb0(%a0 : $Int32):
 // CHECK: bb2([[WORD:%[0-9]+]]
 // CHECK:  [[STRUCT:%[0-9]+]] = struct $Int32 ([[WORD]]
 // CHECK:  apply {{.*}}([[STRUCT]])
-// CHECK:  br bb3
-// CHECK: bb3
 // CHECK:  cond_br
-// CHECK: bb4:
+// CHECK: bb3:
 // CHECK:  return
 sil @struct_arg : $@thin () -> () {
 bb0:
@@ -261,18 +256,16 @@ bb2:
 // CHECK: bb1:
 // CHECK-NEXT: br bb2
 // CHECK: bb2:
-// CHECK:   cond_br %{{.*}}, bb3, bb6
+// CHECK:   cond_br %{{.*}}, bb3, bb5
 // CHECK: bb3:
 // CHECK:   apply
 // CHECK:   br bb4(
 // CHECK: bb4(%[[ARG:[0-9]*]]
-// CHECK-NEXT: br bb5(%[[ARG]]
-// CHECK: bb5(%
-// CHECK-NEXT: cond_br %{{.*}}, bb7, bb2
-// CHECK: bb6:
+// CHECK-NEXT: cond_br %{{.*}}, bb6, bb2
+// CHECK: bb5:
 // CHECK:   apply
 // CHECK:   br bb4(%
-// CHECK: bb7
+// CHECK: bb6
 // CHECK:   return
 sil @insert_backedge_block : $@thin (@owned @callee_owned () -> Builtin.Int32) -> () {
 bb0(%0 : $@callee_owned () -> Builtin.Int32):
