@@ -652,6 +652,9 @@ public:
   /// The entry point to the transformation.
   void run() override {
 
+    /// A list of devirtualized calls.
+    GenericSpecializer::AIList DevirtualizedCalls;
+
     bool Changed = false;
 
     // Perform devirtualization locally and compute potential polymorphic
@@ -668,7 +671,8 @@ public:
           if (!AI)
             continue;
 
-          if (optimizeApplyInst(AI)) {
+          if (ApplyInst *NewAI = optimizeApplyInst(AI)) {
+            DevirtualizedCalls.push_back(NewAI);
             Changed |= true;
           }
         }
@@ -677,6 +681,14 @@ public:
     }
 
     if (Changed) {
+      // Try to specialize the devirtualized calls.
+      auto GS = GenericSpecializer(getModule());
+
+      // Try to specialize the newly devirtualized calls.
+      if (GS.specialize(DevirtualizedCalls)) {
+        DEBUG(llvm::dbgs() << "Specialized some generic functions\n");
+      }
+
       PM->scheduleAnotherIteration();
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
     }

@@ -15,7 +15,8 @@ sil @_TF4main7analyzeFT_T_ : $@thin () -> () {
 bb0:
   %0 = alloc_ref $foo<Int>                        // users: %1, %2
   %1 = class_method %0 : $foo<Int>, #foo.ping!1 : <T> foo<T> -> () -> () , $@cc(method) @thin <τ_0_0> (@owned foo<τ_0_0>) -> () // user: %2
-// CHECK-NOT: apply %2(%0)
+// Make sure that we are specializing this generic call.
+// CHECK: apply %2(%0)
   %2 = apply %1<Int>(%0) : $@cc(method) @thin <τ_0_0> (@owned foo<τ_0_0>) -> ()
   %3 = tuple ()                                   // user: %4
 // CHECK: return
