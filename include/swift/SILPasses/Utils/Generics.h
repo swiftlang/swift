@@ -82,18 +82,21 @@ struct GenericSpecializer {
   /// Add the call \p AI into the list of calls to inspect.
   void addApplyInst(ApplyInst *AI);
 
-  /// The driver for the generic specialization pass.
-  bool specialize(const std::vector<SILFunction *> &BotUpFuncList) {
-    bool Changed = false;
+  void addApplyInst(const std::vector<SILFunction *> &BotUpFuncList) {
     for (auto &F : *M)
       collectApplyInst(F);
 
     // Initialize the worklist with a call-graph bottom-up list of functions.
     // We specialize the functions in a top-down order, starting from the end
     // of the list.
-    Worklist.insert(Worklist.begin(),
-                    BotUpFuncList.begin(), BotUpFuncList.end());
+    Worklist.insert(Worklist.begin(), BotUpFuncList.begin(),
+                    BotUpFuncList.end());
+  }
 
+  /// The driver for the generic specialization procedure.
+  bool specialize() {
+    bool Changed = false;
+    // Try to specialize generic calls.
     while (Worklist.size()) {
       SILFunction *F = Worklist.back();
       Worklist.pop_back();

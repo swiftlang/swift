@@ -40,10 +40,11 @@ public:
     // Collect a call-graph bottom-up list of functions and specialize the
     // functions in reverse order.
     auto &CG = CGA->getCallGraph();
-    bool Changed = GenericSpecializer(getModule()).
-      specialize(CG.getBottomUpFunctionOrder());
+    auto GS = GenericSpecializer(getModule());
+    GS.addApplyInst(CG.getBottomUpFunctionOrder());
 
-    if (Changed) {
+    // Try to specialize generic calls.
+    if (GS.specialize()) {
       // Schedule another iteration of the transformation pipe.
       PM->scheduleAnotherIteration();
 
