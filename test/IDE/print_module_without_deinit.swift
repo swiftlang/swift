@@ -9,32 +9,13 @@ import Foundation
 // SKIP1: class PropertyOwnership {
 // NOSKIP1: class PropertyOwnership {
 class PropertyOwnership {
-  // SKIP1-NEXT:  @NSCopying var copying: NSCopying?
-  // NOSKIP1-NEXT:  @NSCopying var copying: NSCopying?
-  @NSCopying var copying: NSCopying?
-
-  // SKIP1-NEXT:  weak var weakVar: @sil_weak AnyObject?
-  // NOSKIP1-NEXT:  weak var weakVar: @sil_weak AnyObject?
-  weak var weakVar: AnyObject?
-
-  // SKIP1-NEXT:  unowned var unownedVar: @sil_unowned PropertyOwnership
-  // NOSKIP1-NEXT:  unowned var unownedVar: @sil_unowned PropertyOwnership
-  unowned var unownedVar: PropertyOwnership
-
-  // SKIP1-NEXT:  unowned(unsafe) var unownedUnsafeVar: @sil_unmanaged PropertyOwnership
-  // NOSKIP1-NEXT:  unowned(unsafe) var unownedUnsafeVar: @sil_unmanaged PropertyOwnership
-  unowned(unsafe) var unownedUnsafeVar: PropertyOwnership
-
-  // SKIP1-NEXT:  init(other: PropertyOwnership)
-  // NOSKIP1-NEXT:  init(other: PropertyOwnership)
-  init(other: PropertyOwnership) {
-    unownedVar = other
-    unownedUnsafeVar = other
-  }
-  // NOSKIP1: deinit
+  // NOSKIP1-NEXT: deinit
   deinit {
   }
-// SKIP1-NEXT:   }
+  // SKIP1-NEXT:    init()
+  // NOSKIP1-NEXT:  init()
+
+// SKIP1-NEXT:     }
 // NOSKIP1-NEXT:   }
 }
 
