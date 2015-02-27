@@ -218,6 +218,19 @@ func _expectNotEqual${Generic}(
   }
 }
 
+public func expectOptionalEqual${Generic}(
+    expected: ${EquatableType}, actual: ${EquatableType}?,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if (actual == nil) || expected != actual! {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
+    println("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
+    println()
+  }
+}
+
 %end
 
 %for ComparableType in ['Int']:
