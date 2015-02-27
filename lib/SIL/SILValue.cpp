@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
@@ -196,3 +197,49 @@ SILBasicBlock *ValueBase::getParentBB() {
     return Arg->getParent();
   return nullptr;
 }
+
+void Operand::hoistAddressProjections(SILInstruction *InsertBefore,
+                                      DominanceInfo *DomTree) {
+  SILValue V = get();
+  SILInstruction *Prev = nullptr;
+  while (true) {
+    SILValue Incoming = stripSinglePredecessorArgs(V);
+
+    // Forward the incoming arg from a single predeccessor.
+    if (V != Incoming) {
+      if (V == get()) {
+        // If we are the operand itself set the operand to the incoming
+        // arugment.
+        set(Incoming);
+      } else {
+        // Otherwise, set the previous projections operand to the incoming
+        // argument.
+        assert(Prev && "Must have seen a projection");
+        Prev->setOperand(0, Incoming);
+      }
+    }
+
+    switch (V->getKind()) {
+    case ValueKind::StructElementAddrInst:
+    case ValueKind::TupleElementAddrInst:
+    case ValueKind::RefElementAddrInst:
+    case ValueKind::UncheckedTakeEnumDataAddrInst: {
+      auto *Inst = cast<SILInstruction>(V);
+      // We are done once the current projection dominates the insert point.
+      if (DomTree->dominates(Inst->getParent(), InsertBefore->getParent()))
+        return;
+
+      // Move the current projection and memorize it for the next iteration.
+      Prev = Inst;
+      Inst->moveBefore(InsertBefore);
+      V = Inst->getOperand(0);
+      continue;
+    }
+    default:
+      assert(DomTree->dominates(V->getParentBB(), InsertBefore->getParent()) &&
+             "The projected value must dominate the insertion point");
+      return;
+    }
+  }
+}
+

@@ -33,6 +33,7 @@ namespace swift {
   class SILBasicBlock;
   class SILInstruction;
   class SILLocation;
+  class DominanceInfo;
 
   enum class ValueKind {
 #define VALUE(Id, Parent) Id,
@@ -349,6 +350,13 @@ public:
   /// getOperandNumber - Return which operand this is in the operand list of the
   /// using instruction.
   unsigned getOperandNumber() const;
+
+  // Hoist the address projection rooted in this operand to \p InsertBefore.
+  // Requires the projected value to dominate the insertion point.
+  //
+  // Will look through single basic block predeccessor arguments.
+  void hoistAddressProjections(SILInstruction *InsertBefore,
+                               DominanceInfo *DomTree);
 
 private:
   void removeFromCurrent() {
