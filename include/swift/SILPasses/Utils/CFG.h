@@ -87,5 +87,11 @@ SILBasicBlock *splitBasicBlockAndBranch(SILInstruction *SplitBeforeInst,
 bool splitAllCriticalEdges(SILFunction &F, bool OnlyNonCondBr,
                            DominanceInfo *DT, SILLoopInfo *LI);
 
+/// \brief Merge a basic block ending in a branch with its successor
+/// if possible. If dominance information or loop info is non null update it.
+/// Return true if block was merged.
+bool mergeBasicBlockWithSuccessor(SILBasicBlock *BB, DominanceInfo *DT,
+                                  SILLoopInfo *LI);
+
 } // End namespace swift.
 #endif

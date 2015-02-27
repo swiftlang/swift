@@ -512,3 +512,47 @@ bool swift::splitAllCriticalEdges(SILFunction &F, bool OnlyNonCondBr,
   }
   return Changed;
 }
+
+/// Merge the basic block with its successor if possible. If dominance
+/// information or loop info is non null update it. Return true if block was
+/// merged.
+bool swift::mergeBasicBlockWithSuccessor(SILBasicBlock *BB, DominanceInfo *DT,
+                                         SILLoopInfo *LI) {
+  auto *Branch = dyn_cast<BranchInst>(BB->getTerminator());
+  if (!Branch)
+    return false;
+
+  auto *SuccBB = Branch->getDestBB();
+  if (BB == SuccBB || !SuccBB->getSinglePredecessor())
+    return false;
+
+  // If there are any BB arguments in the destination, replace them with the
+  // branch operands, since they must dominate the dest block.
+  for (unsigned i = 0, e = Branch->getArgs().size(); i != e; ++i)
+    SILValue(SuccBB->getBBArg(i)).replaceAllUsesWith(Branch->getArg(i));
+
+  Branch->eraseFromParent();
+
+  // Move the instruction from the successor block to the current block.
+  BB->getInstList().splice(BB->end(), SuccBB->getInstList());
+
+  if (DT)
+    if (auto *SuccBBNode = DT->getNode(SuccBB)) {
+      // Change the immediate dominator for children of the successor to be the
+      // current block.
+      auto *BBNode = DT->getNode(BB);
+      SmallVector<DominanceInfoNode *, 8> Children(SuccBBNode->begin(),
+                                                   SuccBBNode->end());
+      for (auto *ChildNode : *SuccBBNode)
+        DT->changeImmediateDominator(ChildNode, BBNode);
+
+      DT->eraseNode(SuccBB);
+    }
+
+  if (LI)
+    LI->removeBlock(SuccBB);
+
+  SuccBB->eraseFromParent();
+
+  return true;
+}
