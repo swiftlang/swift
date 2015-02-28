@@ -187,3 +187,26 @@ sil_vtable RequiredBase {
   #RequiredBase.init!allocator.1: alloc_RequiredBase
 }
 
+// rdar://problem/19902523
+
+protocol ClassConstraint: class {}
+class ClassConstraintConformance: ClassConstraint {}
+sil_vtable ClassConstraintConformance {}
+
+class ClassConstrainedGenericField<T: ClassConstraint> {
+  var field: T
+  init()
+}
+sil_vtable ClassConstrainedGenericField {}
+
+sil @fixed_class_generic_field : $@thin (@owned ClassConstrainedGenericField<ClassConstraintConformance>) -> @owned ClassConstraintConformance {
+entry(%x : $ClassConstrainedGenericField<ClassConstraintConformance>):
+  %a = ref_element_addr %x : $ClassConstrainedGenericField<ClassConstraintConformance>, #ClassConstrainedGenericField.field
+  %b = load %a : $*ClassConstraintConformance
+  return %b : $ClassConstraintConformance
+}
+// CHECK-LABEL: define %C5class26ClassConstraintConformance* @fixed_class_generic_field(%C5class28ClassConstrainedGenericField*)
+// CHECK:         [[FIELD_ADDR_GENERIC:%.*]] = getelementptr inbounds %C5class28ClassConstrainedGenericField* %0, i32 0, i32 1
+// CHECK:         [[FIELD_ADDR_CONCRETE:%.*]] = bitcast %objc_object** [[FIELD_ADDR_GENERIC]] to %C5class26ClassConstraintConformance**
+// CHECK:         load %C5class26ClassConstraintConformance** [[FIELD_ADDR_CONCRETE]]
+
