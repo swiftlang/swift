@@ -138,65 +138,9 @@ extension String {
   /// If the string represents an integer that fits into an Int, returns
   /// the corresponding integer.  This accepts strings that match the regular
   /// expression "[-+]?[0-9]+" only.
+  @availability(*, unavailable, message="please use Int(aString) instead")
   public func toInt() -> Int? {
-    var scalars = self.unicodeScalars
-
-    var start = scalars.startIndex
-    if start == scalars.endIndex {
-      return .None
-    }
-    
-    // Interpet '+' or '-' before the number.
-    var negativeFactor = -1
-    var firstC = scalars[start]
-    if (firstC == "+") {
-      ++start
-      
-      // Reject "+" alone.
-      if start == scalars.endIndex {
-        return .None
-      }
-    } else if (firstC == "-") {
-      ++start
-      negativeFactor = 1
-
-      // Reject "-" alone.
-      if start == scalars.endIndex {
-        return .None
-      }
-    }
-
-    // Interpret the string as an integer.
-    // Since Int.min has a larger absolute value, perform addition with
-    // negative numbers; detect underflows before they happen. 
-    var res : Int = 0
-    for c in scalars[start..<scalars.endIndex] {
-      if !c._isASCIIDigit() {
-        // Conversion failed if a non-digit is encountered.
-        return .None
-      }
-
-      // Underflow occurs if res * 10 < Int.min.
-      if res < Int.min / 10 {
-        return .None
-      }
-      res = res * 10
-
-      var d = Int(c.value - UnicodeScalar("0").value)
-      // Underflow occurs if res - d < Int.min.
-      if res < Int.min + d {
-        return .None
-      }
-      res = res - d
-    }
-
-    // If res is Int.min and the result should be positive, the next
-    // operation will overflow.
-    if negativeFactor == -1 && res == Int.min {
-      return .None
-    }
-
-    return .Some(res * negativeFactor)
+    return Int(self)
   }
 }
 
