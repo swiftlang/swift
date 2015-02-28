@@ -72,8 +72,11 @@ bool _swift_usesNativeSwiftReferenceCounting_class(const void *);
 __swift_size_t _swift_class_getInstancePositiveExtentSize(const void *);
 
 /// Return an NSString to be used as the Mirror summary of the object
-void* _swift_objCMirrorSummary(const void * nsObject);
+void *_swift_objCMirrorSummary(const void * nsObject);
 
+/// Call strtold, changing arguments so we can operate on Float80
+const char *_swift_strtold(const char *nptr, void *outResult);
+  
 #ifdef __cplusplus
 }} // extern "C", namespace swift
 #endif

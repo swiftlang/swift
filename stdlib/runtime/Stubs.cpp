@@ -311,3 +311,10 @@ extern "C" uint64_t swift_stdlib_atomicFetchAddUInt64(
   return __c11_atomic_fetch_add(object, operand, memory_order_seq_cst);
 }
 
+// We can't return Float80, but we can receive a pointer to one, so
+// switch the return type and the out parameter on strtold.
+extern "C" const char *_swift_strtold(const char * nptr, void *outResult) {
+  char *endPtr;
+  *static_cast<long double*>(outResult) = std::strtold(nptr, &endPtr);
+  return endPtr;
+}

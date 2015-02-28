@@ -9,6 +9,7 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+import SwiftShims
 
 %{
 #
@@ -58,6 +59,8 @@ def cFuncSuffix(bits):
         return ''
     if bits == 80:
         return 'l'
+
+cFuncSuffix2 = {32: 'f', 64: 'd', 80: 'ld'}
 
 def llvmIntrinsicSuffix(bits):
     if bits == 32:
@@ -197,6 +200,44 @@ extension ${Self} : Printable {
   /// A textual representation of `self`.
   public var description: String {
     return _float${bits}ToString(self)
+  }
+}
+
+//===--- Parsing ----------------------------------------------------------===//
+extension ${Self} {
+  /// Construct from an ASCII representation.
+  ///
+  /// The result is `nil` if `text` contains non-ASCII text or
+  /// whitespace, or if it is not completely consumed by the POSIX
+  /// function `strto${cFuncSuffix2[bits]}`.  Otherwise, the result is
+  /// the value returned by `strto${cFuncSuffix2[bits]}`.  See the
+  /// `strto${cFuncSuffix2[bits]} (3)` man page for details of the
+  /// exact format accepted.
+  public init?(_ text: String) {
+    let u16 = text.utf16
+    // Any non-ASCII or whitespace? return nil.
+    if contains(u16, { $0 > 127 || isspace(Int32($0)) != 0 }) {
+      return nil
+    }
+    
+    func parseNTBS(chars: UnsafePointer<CChar>) -> (${Self}, Int) {
+% if bits == 80:
+      var result: Float80 = 0
+      let endPtr = withUnsafeMutablePointer(&result) {
+        _swift_strtold(chars, UnsafeMutablePointer($0))
+      }
+% else:
+      var endPtr: UnsafeMutablePointer<CChar> = nil
+      let result = withUnsafeMutablePointer(&endPtr) {
+        strto${cFuncSuffix2[bits]}(chars, $0)
+      }
+% end
+      return (result, endPtr == nil ? 0 : UnsafePointer(endPtr) - chars)
+    }
+    
+    let (result, n) = text.withCString(parseNTBS)
+    if n == 0 || n != count(u16) { return nil }
+    self = result
   }
 }
 

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 // -*- swift -*-
 // RUN: rm -rf %t ; mkdir -p %t
-// RUN: %S/../../utils/gyb -Dtarget_ptrsize=%target-ptrsize %s -o %t/NumericParsing.swift
+// RUN: %S/../../utils/gyb -DCMAKE_SIZEOF_VOID_P=%target-ptrsize %s -o %t/NumericParsing.swift
 // RUN: %S/../../utils/line-directive %t/NumericParsing.swift -- %target-build-swift %t/NumericParsing.swift -o %t/a.out
 // RUN: %S/../../utils/line-directive %t/NumericParsing.swift -- %target-run %t/a.out
 //
@@ -19,7 +19,7 @@
 %{
 from SwiftIntTypes import *
 
-word_bits = int(target_ptrsize)
+word_bits = int(CMAKE_SIZEOF_VOID_P)
   
 def maskOfWidth(n):
   return (1 << n) - 1
@@ -47,6 +47,7 @@ number_of_values = 23
 }% 
 
 import StdlibUnittest
+import Darwin
 
 var tests = TestSuite("NumericParsing")
 
@@ -115,4 +116,48 @@ tests.test("${Self}/radixTooHigh") {
 
 % end
 
+% for Self in 'Float', 'Double', 'Float80':
+
+% if Self == 'Float80':
+#if arch(i386) || arch(x86_64)
+% end
+
+tests.test("${Self}/Basics") {
+  setlocale(LC_ALL, "")
+  
+% if Self != 'Float80': # Inf/NaN are not defined for Float80
+  expectEqual(.infinity, ${Self}("Inf"))
+  expectEqual(-(.infinity), ${Self}("-Inf"))
+  expectEqual(toString(${Self}.NaN), toString(${Self}("NaN")!))
+% end
+  
+  expectEqual(-0.0, ${Self}("-0"))
+  expectEqual(-0.0, ${Self}("-0.0"))
+  expectEqual(0.0, ${Self}("0"))
+  expectEqual(0.0, ${Self}("0.0"))
+  expectEqual(64206, ${Self}("0xFACE")) // Yes, strtoXXX supports hex.
+
+  // Check that we can round-trip the string representation of 2^100,
+  // which requires an exponent to express...
+  let large = reduce(Repeat(count: 10, repeatedValue: 1024 as ${Self}), 1, *)
+  let largeText = toString(large)
+  expectEqual(largeText, toString(${Self}(largeText)!))
+  
+  // ...ditto for its inverse.
+  let smallText = toString(1 / large)
+  expectEqual(smallText, toString(${Self}(smallText)!))
+  
+  // Cases that should fail to parse
+  expectEmpty(${Self}(""))       // EMPTY
+  expectEmpty(${Self}("0FACE"))  // Hex characters without 0x
+  expectEmpty(${Self}("99x"))
+  expectEmpty(${Self}(" 0"))  // Leading whitespace
+  expectEmpty(${Self}("0 "))  // Trailing whitespace
+}
+
+% if Self == 'Float80':
+#endif
+% end
+
+% end
 runAllTests()

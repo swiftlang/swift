@@ -29,5 +29,10 @@ int strcmp(const char *s1, const char *s2);
 int memcmp(const void *s1, const void *s2, __swift_size_t n);
 int putchar(int c);
 
+double strtod(const char *restrict nptr, char **restrict endptr);
+float strtof(const char *restrict nptr, char **restrict endptr);
+
+int isspace(int c);
+
 #endif // SWIFT_STDLIB_SHIMS_DARWINSHIMS_H
 
