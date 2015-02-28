@@ -595,7 +595,7 @@ ModuleFile::maybeReadConformance(Type conformingType,
       witness = ConcreteDeclRef(ctx, second, substitutions);
 
     witnesses.insert(std::make_pair(first, witness));
-    if (second)
+    if (second && second != first)
       ctx.recordConformingDecl(second, first);
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
@@ -3782,16 +3782,25 @@ Type ModuleFile::getType(TypeID TID) {
   return typeOrOffset;
 }
 
-void ModuleFile::loadAllMembers(const Decl *D,
+void ModuleFile::loadAllMembers(Decl *D,
                                 uint64_t contextData,
-                                SmallVectorImpl<Decl *> &Members,
                                 bool *) {
   // FIXME: Add PrettyStackTrace.
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(contextData);
-  bool Err = readMembers(Members);
+  SmallVector<Decl *, 16> members;
+  bool Err = readMembers(members);
   assert(!Err && "unable to read members");
   (void)Err;
+
+  IterableDeclContext *IDC;
+  if (auto nominal = dyn_cast<NominalTypeDecl>(D))
+    IDC = nominal;
+  else
+    IDC = cast<ExtensionDecl>(D);
+
+  for (auto member : members)
+    IDC->addMember(member);
 }
 
 void

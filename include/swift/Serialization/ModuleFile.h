@@ -574,9 +574,8 @@ public:
   /// Has no effect in NDEBUG builds.
   void verify() const;
 
-  virtual void loadAllMembers(const Decl *D,
+  virtual void loadAllMembers(Decl *D,
                               uint64_t contextData,
-                              SmallVectorImpl<Decl *> &Members,
                               bool *ignored) override;
 
   virtual void

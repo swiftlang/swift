@@ -955,8 +955,7 @@ public:
   }
 
   virtual void
-  loadAllMembers(const Decl *D, uint64_t unused,
-                 SmallVectorImpl<Decl *> &Members,
+  loadAllMembers(Decl *D, uint64_t unused,
                  bool *hasMissingRequiredMembers) override;
 
   template <typename DeclTy, typename ...Targs>

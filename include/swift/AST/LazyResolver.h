@@ -114,13 +114,12 @@ public:
 
   /// Populates the given vector with all member decls for \p D.
   ///
-  /// The implementation should \em not call setMembers on \p D.
+  /// The implementation should add the members to D.
   ///
   /// \param[out] hasMissingRequiredMembers If present, set to true if any
   /// members failed to import and were non-optional protocol requirements.
   virtual void
-  loadAllMembers(const Decl *D, uint64_t contextData,
-                 SmallVectorImpl<Decl *> &Members,
+  loadAllMembers(Decl *D, uint64_t contextData,
                  bool *hasMissingRequiredMembers = nullptr) {
     llvm_unreachable("unimplemented");
   }

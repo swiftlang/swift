@@ -6,6 +6,12 @@
 import Foundation
 import StdlibUnittest
 
+// rdar://problem/18884272
+// Make sure that NSObject conforms to NSObjectProtocol. This
+// particular bug is ridiculously hard to trigger without a complete
+// SDK, so it sits here.
+let objcProtocol: NSObjectProtocol = NSObject()
+
 var FoundationTestSuite = TestSuite("Foundation")
 
 func asNSString(s: String) -> NSString { return s as NSString }

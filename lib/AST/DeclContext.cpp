@@ -683,12 +683,8 @@ void IterableDeclContext::loadAllMembers() const {
   }
 
   bool hasMissingRequiredMembers = false;
-  SmallVector<Decl *, 16> Members;
-  resolver->loadAllMembers(container, contextData, Members,
+  resolver->loadAllMembers(const_cast< Decl *>(container), contextData,
                            &hasMissingRequiredMembers);
-  for (auto member : Members) {
-    const_cast<IterableDeclContext *>(this)->addMember(member);
-  }
 
   if (hasMissingRequiredMembers)
     if (auto proto = dyn_cast<ProtocolDecl>(this))

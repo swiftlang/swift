@@ -5717,31 +5717,35 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
 
 
 void
-ClangImporter::Implementation::loadAllMembers(const Decl *D, uint64_t unused,
-                                              SmallVectorImpl<Decl *> &members,
+ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t unused,
                                               bool *hasMissingRequiredMembers) {
   assert(D->hasClangNode());
   auto clangDecl = cast<clang::ObjCContainerDecl>(D->getClangDecl());
 
   SwiftDeclConverter converter(*this);
 
-  const DeclContext *DC;
+  DeclContext *DC;
+  IterableDeclContext *IDC;
   ArrayRef<ProtocolDecl *> protos;
 
   // Figure out the declaration context we're importing into.
   if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
     DC = nominal;
+    IDC = nominal;
   } else {
-    DC = cast<ExtensionDecl>(D);
+    auto ext = cast<ExtensionDecl>(D);
+    DC = ext;
+    IDC = ext;
   }
 
   ImportingEntityRAII Importing(*this);
 
+  SmallVector<Decl *, 16> members;
   bool scratch;
   if (!hasMissingRequiredMembers)
     hasMissingRequiredMembers = &scratch;
   *hasMissingRequiredMembers = false;
-  converter.importObjCMembers(clangDecl, const_cast<DeclContext *>(DC),
+  converter.importObjCMembers(clangDecl, DC,
                               members, *hasMissingRequiredMembers);
 
   if (auto clangClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
@@ -5766,9 +5770,15 @@ ClangImporter::Implementation::loadAllMembers(const Decl *D, uint64_t unused,
   // Import mirrored declarations for protocols to which this category
   // or extension conforms.
   // FIXME: This is supposed to be a short-term hack.
-  converter.importMirroredProtocolMembers(clangDecl,
-                                          const_cast<DeclContext *>(DC),
+  converter.importMirroredProtocolMembers(clangDecl, DC,
                                           protos, members, SwiftContext);
+
+  // Add the members now, before ~ImportingEntityRAII does work that might
+  // involve them.
+  for (auto member : members) {
+    IDC->addMember(member);
+  }
+
 }
 
 Optional<MappedTypeNameKind>
