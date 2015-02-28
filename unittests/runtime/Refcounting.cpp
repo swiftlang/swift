@@ -31,7 +31,7 @@ static void destroyTestObject(HeapObject *_object) {
 
 static const FullMetadata<HeapMetadata> TestObjectMetadata{
   HeapMetadataHeader{{destroyTestObject}, {nullptr}},
-  HeapMetadata{{MetadataKind::HeapLocalVariable}}
+  HeapMetadata{Metadata{MetadataKind::HeapLocalVariable}}
 };
 
 /// Create an object that, when deallocated, stores the given value to
