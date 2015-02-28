@@ -555,7 +555,7 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
 }
 
 bool PrintAST::shouldPrint(const Decl *D) {
-  if (Options.SkipDeinit && dyn_cast<DestructorDecl>(D)) {
+  if (Options.SkipDeinit && isa<DestructorDecl>(D)) {
     return false;
   }
 
