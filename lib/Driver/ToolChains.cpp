@@ -29,8 +29,12 @@ StringRef Darwin::getDarwinArchName(const ArgList &Args) const {
   return getArchName();
 }
 
+#if defined(SWIFT_ENABLE_TARGET_LINUX)
+
 /// Linux
 
 std::unique_ptr<Tool> Linux::buildLinker() const {
   return std::unique_ptr<Tool>(new tools::linux::Linker(*this));
 }
+
+#endif // SWIFT_ENABLE_TARGET_LINUX

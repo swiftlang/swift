@@ -687,6 +687,8 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
                  Arguments);
 }
 
+#if defined(SWIFT_ENABLE_TARGET_LINUX)
+
 /// Linux Tools
 
 Job *linux::Linker::constructJob(const JobAction &JA,
@@ -787,3 +789,6 @@ Job *linux::Linker::constructJob(const JobAction &JA,
   return new Job(JA, *this, std::move(Inputs), std::move(Output),
                  Args.MakeArgString(Exec), Arguments);
 }
+
+#endif // SWIFT_ENABLE_TARGET_LINUX
+
