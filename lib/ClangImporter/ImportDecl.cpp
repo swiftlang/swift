@@ -4009,6 +4009,25 @@ namespace {
       return result;
     }
 
+    static bool
+    isPotentiallyConflictingSetter(const clang::ObjCProtocolDecl *proto,
+                                   const clang::ObjCMethodDecl *method) {
+      auto sel = method->getSelector();
+      if (sel.getNumArgs() != 1)
+        return false;
+
+      clang::IdentifierInfo *setterID = sel.getIdentifierInfoForSlot(0);
+      if (!setterID || !setterID->getName().startswith("set"))
+        return false;
+
+      for (auto *prop : proto->properties()) {
+        if (prop->getSetterName() == sel)
+          return true;
+      }
+
+      return false;
+    }
+
     /// Import members of the given Objective-C container and add them to the
     /// list of corresponding Swift members.
     void importObjCMembers(const clang::ObjCContainerDecl *decl,
@@ -4107,6 +4126,9 @@ namespace {
                   continue;
                 }
               }
+            } else if (auto *proto = dyn_cast<clang::ObjCProtocolDecl>(decl)) {
+              if (isPotentiallyConflictingSetter(proto, objcMethod))
+                continue;
             }
           }
         }

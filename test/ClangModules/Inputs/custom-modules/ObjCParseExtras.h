@@ -126,3 +126,15 @@ __weak id globalWeakVar;
 @interface DesignatedInitBase : DesignatedInitRoot
 - (instancetype)initWithInt:(NSInteger)value __attribute__((objc_designated_initializer));
 @end
+
+
+@protocol ExplicitSetterProto
+@property (readonly) id foo;
+- (void)setFoo:(id)foo;
+@end
+
+@protocol OptionalSetterProto
+@property (readonly) id bar;
+@optional
+- (void)setBar:(id)bar;
+@end

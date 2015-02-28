@@ -469,3 +469,8 @@ class FooDelegateImpl : NSObject, FooDelegate {
     set { _started = newValue }
   }
 }
+
+class ProtoAdopter : NSObject, ExplicitSetterProto, OptionalSetterProto {
+  var foo: AnyObject? // no errors about conformance
+  var bar: AnyObject? // no errors about conformance
+}
