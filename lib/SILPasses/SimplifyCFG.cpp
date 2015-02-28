@@ -1150,6 +1150,9 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
     if (DomCCBI->getCastType() != CCBI->getCastType())
       continue;
 
+    if (DomCCBI->isExact() != CCBI->isExact())
+      continue;
+
     // Initialize state variables for the current round of checks
     // based on the found dominating checked_cast_br.
     DomSuccessBB = DomCCBI->getSuccessBB();
