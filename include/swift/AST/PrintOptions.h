@@ -170,6 +170,24 @@ struct PrintOptions {
     return result;
   }
 
+  /// Retrieve the set of options suitable for interface generation.
+  static PrintOptions printInterface() {
+    PrintOptions result = printVerbose();
+    result.Indent = 4;
+    result.FullyQualifiedTypesIfAmbiguous = true;
+    result.SynthesizeSugarOnTypes = true;
+    result.SkipUnavailable = true;
+    result.SkipImplicit = true;
+    result.SkipPrivateStdlibDecls = true;
+    result.SkipDeinit = true;
+    result.PrintImplicitAttrs = false;
+    result.ExcludeAttrList.push_back(DAK_Exported);
+    result.PrintFunctionRepresentationAttrs = false;
+    result.PrintOverrideKeyword = false;
+    result.AccessibilityFilter = Accessibility::Public;
+    return result;
+  }
+
   /// Retrieve the set of options suitable for printing SIL functions.
   static PrintOptions printSIL() {
     PrintOptions result;
