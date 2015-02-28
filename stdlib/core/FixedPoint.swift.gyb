@@ -437,7 +437,7 @@ extension ${Self} {
   /// Construct from an ASCII representation in the given `radix`.
   ///
   /// If `text` does not match the regular expression
-  /// “[+-][0-9a-zA-Z]+”, or the value it denotes in the given `radix`
+  /// "[+-][0-9a-zA-Z]+", or the value it denotes in the given `radix`
   /// is not representable, the result is `nil`.
   public init?(_ text: String, radix: Int = 10) {
     if let value = _parseAsciiAs${'' if signed else 'U'}IntMax(
