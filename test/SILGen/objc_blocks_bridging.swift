@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -verify -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
+// RUN: %target-swift-frontend -verify -enable-c-function-pointers -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -35,7 +35,15 @@ import Foundation
     return f(x)
   }
 
-  // Blocks must not be reabstracted when placed in optionals.
+  // CHECK-LABEL: sil hidden @_TToFC20objc_blocks_bridging3Foo16cFunctionPointerfS0_FTcSiSi1xSi_Si : $@cc(objc_method) @thin (@cc(cdecl) @thin (Int) -> Int, Int, Foo) -> Int
+  // CHECK:       bb0([[F:%.*]] : $@cc(cdecl) @thin (Int) -> Int, [[X:%.*]] : $Int, [[SELF:%.*]] : $Foo):
+  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo16cFunctionPointerfS0_FTcSiSi1xSi_Si
+  // CHECK:         apply [[NATIVE]]([[F]], [[X]], [[SELF]])
+  dynamic func cFunctionPointer(fp: @cc(cdecl) Int -> Int, x: Int) -> Int {
+    fp(x)
+  }
+
+  // Blocks and C function pointers must not be reabstracted when placed in optionals.
   // CHECK-LABEL: sil hidden @_TToFC20objc_blocks_bridging3Foo7optFunc
   // CHECK:         [[COPY:%.*]] = copy_block %0
   // CHECK:         store [[COPY]]

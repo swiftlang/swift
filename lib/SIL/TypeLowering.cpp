@@ -2276,6 +2276,10 @@ Type TypeConverter::getLoweredCBridgedType(Type t,
       // TODO: Bridge thin functions to C function pointers?
       return t;
     case AnyFunctionType::Representation::Thick:
+      // C function pointers don't bridge.
+      // TODO: A proper representation for C function pointers.
+      if (funTy->getAbstractCC() == AbstractCC::C)
+        return funTy;
       // Thick functions (TODO: conditionally) get bridged to blocks.
       return FunctionType::get(funTy->getInput(), funTy->getResult(),
                                funTy->getExtInfo().withRepresentation(
