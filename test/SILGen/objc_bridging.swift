@@ -407,11 +407,11 @@ func forceNSArrayMembers() -> (NSArray, NSArray) {
 // CHECK-i386:         function_ref @getBOOL : $@cc(cdecl) @thin () -> ObjCBool
 // CHECK-i386:         function_ref @getBool : $@cc(cdecl) @thin () -> Bool
 
-// CHECK-macsox-x86_64-LABEL: sil hidden @_TF13objc_bridging5boolsFSbTSbSb_
-// CHECK-macsox-x86_64:         function_ref @useBOOL : $@cc(cdecl) @thin (ObjCBool) -> ()
-// CHECK-macsox-x86_64:         function_ref @useBool : $@cc(cdecl) @thin (Bool) -> ()
-// CHECK-macsox-x86_64:         function_ref @getBOOL : $@cc(cdecl) @thin () -> ObjCBool
-// CHECK-macsox-x86_64:         function_ref @getBool : $@cc(cdecl) @thin () -> Bool
+// CHECK-macosx-x86_64-LABEL: sil hidden @_TF13objc_bridging5boolsFSbTSbSb_
+// CHECK-macosx-x86_64:         function_ref @useBOOL : $@cc(cdecl) @thin (ObjCBool) -> ()
+// CHECK-macosx-x86_64:         function_ref @useBool : $@cc(cdecl) @thin (Bool) -> ()
+// CHECK-macosx-x86_64:         function_ref @getBOOL : $@cc(cdecl) @thin () -> ObjCBool
+// CHECK-macosx-x86_64:         function_ref @getBool : $@cc(cdecl) @thin () -> Bool
 
 // FIXME: no distinction on x86_64 and arm64, since SILGen looks at the
 // underlying Clang decl of the bridged decl to decide whether it needs
