@@ -28,8 +28,8 @@ struct Gen<T> {
 // CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_TwTKV20weak_value_witnesses8JustWeak(
 // CHECK:      [[DEST:%.*]] = bitcast [24 x i8]* %dest to %V20weak_value_witnesses8JustWeak*
 // CHECK-NEXT: [[SRC:%.*]] = bitcast [24 x i8]* %src to %V20weak_value_witnesses8JustWeak*
-// CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds %V20weak_value_witnesses8JustWeak* [[DEST]], i32 0, i32 0
-// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds %V20weak_value_witnesses8JustWeak* [[SRC]], i32 0, i32 0
+// CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds %V20weak_value_witnesses8JustWeak, %V20weak_value_witnesses8JustWeak* [[DEST]], i32 0, i32 0
+// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds %V20weak_value_witnesses8JustWeak, %V20weak_value_witnesses8JustWeak* [[SRC]], i32 0, i32 0
 // CHECK-NEXT: call void @swift_weakTakeInit(%swift.weak* [[DEST_X]], %swift.weak* [[SRC_X]])
 // CHECK-NEXT: [[T0:%.*]] = bitcast %V20weak_value_witnesses8JustWeak* [[DEST]] to %swift.opaque*
 // CHECK-NEXT: ret %swift.opaque* [[T0]]
@@ -46,12 +46,12 @@ struct Gen<T> {
 // CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_TwTKV20weak_value_witnesses8SomeWeak(
 // CHECK:      [[DEST:%.*]] = bitcast [24 x i8]* %dest to %V20weak_value_witnesses8SomeWeak*
 // CHECK-NEXT: [[SRC:%.*]] = bitcast [24 x i8]* %src to %V20weak_value_witnesses8SomeWeak*
-// CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds %V20weak_value_witnesses8SomeWeak* [[DEST]], i32 0, i32 0
-// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds %V20weak_value_witnesses8SomeWeak* [[SRC]], i32 0, i32 0
-// CHECK-NEXT: [[T0:%.*]] = load %C20weak_value_witnesses1C** [[SRC_X]], align 8
+// CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds %V20weak_value_witnesses8SomeWeak, %V20weak_value_witnesses8SomeWeak* [[DEST]], i32 0, i32 0
+// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds %V20weak_value_witnesses8SomeWeak, %V20weak_value_witnesses8SomeWeak* [[SRC]], i32 0, i32 0
+// CHECK-NEXT: [[T0:%.*]] = load %C20weak_value_witnesses1C*, %C20weak_value_witnesses1C** [[SRC_X]], align 8
 // CHECK-NEXT: store %C20weak_value_witnesses1C* [[T0]], %C20weak_value_witnesses1C** [[DEST_X]], align 8
-// CHECK-NEXT: [[DEST_Y:%.*]] = getelementptr inbounds %V20weak_value_witnesses8SomeWeak* [[DEST]], i32 0, i32 1
-// CHECK-NEXT: [[SRC_Y:%.*]] = getelementptr inbounds %V20weak_value_witnesses8SomeWeak* [[SRC]], i32 0, i32 1
+// CHECK-NEXT: [[DEST_Y:%.*]] = getelementptr inbounds %V20weak_value_witnesses8SomeWeak, %V20weak_value_witnesses8SomeWeak* [[DEST]], i32 0, i32 1
+// CHECK-NEXT: [[SRC_Y:%.*]] = getelementptr inbounds %V20weak_value_witnesses8SomeWeak, %V20weak_value_witnesses8SomeWeak* [[SRC]], i32 0, i32 1
 // CHECK-NEXT: call void @swift_weakTakeInit(%swift.weak* [[DEST_Y]], %swift.weak* [[SRC_Y]])
 // CHECK-NEXT: [[T0:%.*]] = bitcast %V20weak_value_witnesses8SomeWeak* [[DEST]] to %swift.opaque*
 // CHECK-NEXT: ret %swift.opaque* [[T0]]

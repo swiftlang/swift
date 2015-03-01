@@ -22,9 +22,9 @@ class OverridesBoolProperty : HasProperties {
 // CHECK-LABEL: define hidden void @_TF24objc_properties_imported16testBoolProperty
 func testBoolProperty(hp: HasProperties) {
   // CHECK-NOT: ret void
-  // CHECK: load i8** @"\01L_selector(isEnabled)"
+  // CHECK: load i8*, i8** @"\01L_selector(isEnabled)"
   // CHECK-NOT: ret void
-  // CHECK: load i8** @"\01L_selector(setIsEnabled:)"
+  // CHECK: load i8*, i8** @"\01L_selector(setIsEnabled:)"
   hp.enabled = !hp.enabled
   // CHECK: ret void
 }

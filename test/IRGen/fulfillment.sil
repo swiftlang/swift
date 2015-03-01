@@ -27,16 +27,16 @@ bb0(%0 : $@thick A<T>.Type):
 
 // CHECK-LABEL: define hidden void @class_pointer(%C11fulfillment1B*, i8** %T.P)
 // CHECK:      [[T0:%.*]] = bitcast %C11fulfillment1B* %0 to %swift.type**
-// CHECK-NEXT: [[METADATA:%.*]] = load %swift.type** [[T0]], align 8
+// CHECK-NEXT: [[METADATA:%.*]] = load %swift.type*, %swift.type** [[T0]], align 8
 // CHECK:      [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %swift.type** [[T0]], i64 9
-// CHECK-NEXT:  %T = load %swift.type** [[T1]], align 8
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 9
+// CHECK-NEXT:  %T = load %swift.type*, %swift.type** [[T1]], align 8
 // CHECK:      [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %swift.type** [[T0]], i64 10
-// CHECK-NEXT:  %U = load %swift.type** [[T1]], align 8
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 10
+// CHECK-NEXT:  %U = load %swift.type*, %swift.type** [[T1]], align 8
 // CHECK:      [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8*** [[T0]], i64 11
-// CHECK-NEXT:  %U.P = load i8*** [[T1]], align 8
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 11
+// CHECK-NEXT:  %U.P = load i8**, i8*** [[T1]], align 8
 sil hidden @class_pointer : $@thin <T, U where T : P, U : P> (@guaranteed B<T, U>) -> () {
 bb0(%0 : $B<T, U>):
   %3 = tuple ()

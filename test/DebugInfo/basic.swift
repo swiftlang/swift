@@ -31,8 +31,8 @@ func foo(var a: Int64, var b: Int64) -> Int64 {
      // Check that a is the first and b is the second argument.
      // CHECK-DAG: store i64 %0, i64* [[AVAL:.*]], align 8
      // CHECK-DAG: store i64 %1, i64* [[BVAL:.*]], align 8
-     // CHECK-DAG: [[AVAL]] = getelementptr inbounds [[AMEM:.*]], i32 0, i32 0
-     // CHECK-DAG: [[BVAL]] = getelementptr inbounds [[BMEM:.*]], i32 0, i32 0
+     // CHECK-DAG: [[AVAL]] = getelementptr inbounds {{.*}}, [[AMEM:.*]], i32 0, i32 0
+     // CHECK-DAG: [[BVAL]] = getelementptr inbounds {{.*}}, [[BMEM:.*]], i32 0, i32 0
      // CHECK-DAG: call void @llvm.dbg.declare(metadata [[AMEM]], metadata ![[AARG:.*]], metadata !{{[0-9]+}}), !dbg ![[ASCOPE]]
      // CHECK-DAG: call void @llvm.dbg.declare(metadata [[BMEM]], metadata ![[BARG:.*]], metadata !{{[0-9]+}})
      // CHECK-DAG: ![[AARG]] ={{.*}}[ DW_TAG_arg_variable ] [a]

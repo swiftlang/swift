@@ -42,7 +42,7 @@ bb0(%0 : $*A, %1 : $Optional<C>):
   return %4 : $()
 }
 // CHECK:    define void @test_weak_load_store([[A]]* noalias, i64) {
-// CHECK:      [[X:%.*]] = getelementptr inbounds [[A]]* %0, i32 0, i32 0
+// CHECK:      [[X:%.*]] = getelementptr inbounds [[A]], [[A]]* %0, i32 0, i32 0
 // CHECK-NEXT: [[T0:%.*]] = call [[C]]* bitcast ([[REF]]* ([[WEAK]]*)* @swift_weakLoadStrong to [[C]]* ([[WEAK]]*)*)([[WEAK]]* [[X]])
 // CHECK-NEXT: %3 = ptrtoint  %C4weak1C* %2 to i64
 // CHECK-NEXT: %4 = inttoptr
@@ -65,16 +65,16 @@ bb0(%0 : $*B, %1 : $Optional<P>):
   return %4 : $()
 }
 // CHECK:    define void @test_weak_load_store_proto([[B]]* noalias, i128)
-// CHECK:      [[X:%.*]] = getelementptr inbounds [[B]]* %0, i32 0, i32 0
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }* [[X]], i32 0, i32 0
+// CHECK:      [[X:%.*]] = getelementptr inbounds [[B]], [[B]]* %0, i32 0, i32 0
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 0
 // CHECK-NEXT: [[T1:%.*]] = call [[UNKNOWN]]* @swift_unknownWeakLoadStrong([[WEAK]]* [[T0]])
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }* [[X]], i32 0, i32 1
-// CHECK-NEXT: [[W:%.*]] = load i8*** [[T0]], align 8
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 1
+// CHECK-NEXT: [[W:%.*]] = load i8**, i8*** [[T0]], align 8
 // CHECK: [[TMPOBJ:%.*]] = inttoptr {{.*}} to %objc_object*
 // CHECK: [[TMPTAB:%.*]] = inttoptr {{.*}} to i8**
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }* [[X]], i32 0, i32 1
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 1
 // CHECK-NEXT: store i8** [[TMPTAB]], i8*** [[T0]], align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }* [[X]], i32 0, i32 0
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 0
 // CHECK-NEXT: call void @swift_unknownWeakAssign([[WEAK]]* [[T0]], [[UNKNOWN]]* [[TMPOBJ]])
 // CHECK: [[RECOMPUTED_TMPOBJ:%.*]] = inttoptr {{.*}} to %objc_object*
 // CHECK: call void bitcast (void (%swift.refcounted*)* @swift_unknownRelease to void (%objc_object*)*)(%objc_object* [[RECOMPUTED_TMPOBJ]])
@@ -92,11 +92,11 @@ bb0(%0 : $Optional<P>):
 // CHECK:      [[X:%.*]] = alloca { [[WEAK]], i8** }, align 8
 // CHECK: [[TMPOBJ:%.*]] = inttoptr {{.*}} to %objc_object*
 // CHECK: [[TMPTAB:%.*]] = inttoptr {{.*}} to i8**
-// CHECK: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }* [[X]], i32 0, i32 1
+// CHECK: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 1
 // CHECK-NEXT: store i8** [[TMPTAB:%.*]], i8*** [[T0]], align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }* [[X]], i32 0, i32 0
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 0
 // CHECK-NEXT: call void @swift_unknownWeakInit([[WEAK]]* [[T0]], [[UNKNOWN]]* [[TMPOBJ:%.*]])
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }* [[X]], i32 0, i32 0
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 0
 // CHECK-NEXT: call void @swift_unknownWeakDestroy([[WEAK]]* [[T0]])
 // CHECK-NEXT: ret void
 
@@ -106,7 +106,7 @@ bb0(%0 : $Optional<P>):
 //     The value is stored out of line so that the buffer is bitwise-takable.
 // CHECK:    define linkonce_odr hidden void @_TwXXV4weak1A([[BUFFER:\[24 x i8\]]]* [[ARG:%.*]], [[TYPE]]*
 // CHECK:      [[T0:%.*]] = bitcast [[BUFFER]]* [[ARG]] to [[A]]*
-// CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds [[A]]* [[T0]], i32 0, i32 0
+// CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds [[A]], [[A]]* [[T0]], i32 0, i32 0
 // CHECK-NEXT: call void @swift_weakDestroy([[WEAK]]* [[T2]])
 // CHECK-NEXT: ret void
 
@@ -114,8 +114,8 @@ bb0(%0 : $Optional<P>):
 // CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_TwCPV4weak1A([[BUFFER]]* [[DESTBUF:%.*]], [[BUFFER]]* [[SRCBUF:%.*]], [[TYPE]]*
 // CHECK:      [[DEST:%.*]] = bitcast [[BUFFER]]* [[DESTBUF]] to [[A]]*
 // CHECK-NEXT: [[SRC:%.*]] = bitcast [[BUFFER]]* [[SRCBUF]] to [[A]]*
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]]* [[DEST]], i32 0, i32 0
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]]* [[SRC]], i32 0, i32 0
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]], [[A]]* [[DEST]], i32 0, i32 0
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]], [[A]]* [[SRC]], i32 0, i32 0
 // CHECK-NEXT: call void @swift_weakCopyInit([[WEAK]]* [[T0]], [[WEAK]]* [[T1]])
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
@@ -123,7 +123,7 @@ bb0(%0 : $Optional<P>):
 //   destroy
 // CHECK:    define linkonce_odr hidden void @_TwxxV4weak1A([[OPAQUE]]* [[ARG:%.*]], [[TYPE]]*
 // CHECK:      [[T0:%.*]] = bitcast [[OPAQUE]]* [[ARG]] to [[A]]*
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]]* [[T0]], i32 0, i32 0
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]], [[A]]* [[T0]], i32 0, i32 0
 // CHECK-NEXT: call void @swift_weakDestroy([[WEAK]]* [[T1]])
 // CHECK-NEXT: ret void
 
@@ -131,8 +131,8 @@ bb0(%0 : $Optional<P>):
 // CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_TwCpV4weak1A([[BUFFER]]* [[DESTBUF:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
 // CHECK:      [[SRC:%.*]] = bitcast [[OPAQUE]]* [[SRC_OPQ]] to [[A]]*
 // CHECK-NEXT: [[DEST:%.*]] = bitcast [[BUFFER]]* [[DESTBUF]] to [[A]]*
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]]* [[DEST]], i32 0, i32 0
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]]* [[SRC]], i32 0, i32 0
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]], [[A]]* [[DEST]], i32 0, i32 0
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]], [[A]]* [[SRC]], i32 0, i32 0
 // CHECK-NEXT: call void @swift_weakCopyInit([[WEAK]]* [[T0]], [[WEAK]]* [[T1]])
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
@@ -141,8 +141,8 @@ bb0(%0 : $Optional<P>):
 // CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_TwcpV4weak1A([[OPAQUE]]* [[DEST_OPQ:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
 // CHECK:      [[DEST:%.*]] = bitcast [[OPAQUE]]* [[DEST_OPQ]] to [[A]]*
 // CHECK-NEXT: [[SRC:%.*]] = bitcast [[OPAQUE]]* [[SRC_OPQ]] to [[A]]*
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]]* [[DEST]], i32 0, i32 0
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]]* [[SRC]], i32 0, i32 0
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]], [[A]]* [[DEST]], i32 0, i32 0
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]], [[A]]* [[SRC]], i32 0, i32 0
 // CHECK-NEXT: call void @swift_weakCopyInit([[WEAK]]* [[T0]], [[WEAK]]* [[T1]])
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
@@ -151,8 +151,8 @@ bb0(%0 : $Optional<P>):
 // CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_TwcaV4weak1A([[OPAQUE]]* [[DEST_OPQ:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
 // CHECK:      [[DEST:%.*]] = bitcast [[OPAQUE]]* [[DEST_OPQ]] to [[A]]*
 // CHECK-NEXT: [[SRC:%.*]] = bitcast [[OPAQUE]]* [[SRC_OPQ]] to [[A]]*
-// CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds [[A]]* [[DEST]], i32 0, i32 0
-// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds [[A]]* [[SRC]], i32 0, i32 0
+// CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds [[A]], [[A]]* [[DEST]], i32 0, i32 0
+// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds [[A]], [[A]]* [[SRC]], i32 0, i32 0
 // CHECK-NEXT: call void @swift_weakCopyAssign([[WEAK]]* [[DEST_X]], [[WEAK]]* [[SRC_X]])
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
@@ -161,8 +161,8 @@ bb0(%0 : $Optional<P>):
 // CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_TwtaV4weak1A([[OPAQUE]]* [[DEST_OPQ:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
 // CHECK:      [[DEST:%.*]] = bitcast [[OPAQUE]]* [[DEST_OPQ]] to [[A]]*
 // CHECK-NEXT: [[SRC:%.*]] = bitcast [[OPAQUE]]* [[SRC_OPQ]] to [[A]]*
-// CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds [[A]]* [[DEST]], i32 0, i32 0
-// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds [[A]]* [[SRC]], i32 0, i32 0
+// CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds [[A]], [[A]]* [[DEST]], i32 0, i32 0
+// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds [[A]], [[A]]* [[SRC]], i32 0, i32 0
 // CHECK-NEXT: call void @swift_weakTakeAssign([[WEAK]]* [[DEST_X]], [[WEAK]]* [[SRC_X]])
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]

@@ -18,10 +18,10 @@ func dup<T>(var x: T) -> (T, T) { return (x,x) }
 // CHECK-NEXT: [[XBUF:%.*]] = alloca [[BUFFER:.*]], align 8
 // CHECK-NEXT: store %swift.type*
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8*** [[T0]], i64 -1
-// CHECK-NEXT: [[T_VALUE:%.*]] = load i8*** [[T1]], align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8** [[T_VALUE]], i32 11
-// CHECK-NEXT: [[T1:%.*]] = load i8** [[T0]], align 8
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
+// CHECK-NEXT: [[T_VALUE:%.*]] = load i8**, i8*** [[T1]], align 8
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE]], i32 11
+// CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]], align 8
 // CHECK-NEXT: [[ALLOCATE_FN:%.*]] = bitcast i8* [[T1]] to [[OPAQUE]]* ([[BUFFER]]*, [[TYPE]]*)*
 // CHECK-NEXT: [[X:%.*]] = call [[OPAQUE]]* [[ALLOCATE_FN]]([[BUFFER]]* [[XBUF]], [[TYPE]]* %T)
 //   Get value witnesses for T.
@@ -32,23 +32,23 @@ func dup<T>(var x: T) -> (T, T) { return (x,x) }
 // CHECK-NEXT: [[TT_PAIR:%.*]] = call [[TYPE]]* @swift_getTupleTypeMetadata2([[TYPE]]* %T, [[TYPE]]* %T, i8* null, i8** null)
 //   Pull out the offset of the second element and GEP to that.
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* [[TT_PAIR]] to [[TUPLE_TYPE]]*
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[TUPLE_TYPE]]* [[T0]], i64 0, i32 3, i64 1, i32 1
-// CHECK-NEXT: [[T2:%.*]] = load i64* [[T1]], align 8
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[TUPLE_TYPE]], [[TUPLE_TYPE]]* [[T0]], i64 0, i32 3, i64 1, i32 1
+// CHECK-NEXT: [[T2:%.*]] = load i64, i64* [[T1]], align 8
 // CHECK-NEXT: [[T3:%.*]] = bitcast <{}>* [[RET]] to i8*
-// CHECK-NEXT: [[T4:%.*]] = getelementptr inbounds i8* [[T3]], i64 [[T2]]
+// CHECK-NEXT: [[T4:%.*]] = getelementptr inbounds i8, i8* [[T3]], i64 [[T2]]
 // CHECK-NEXT: [[SND:%.*]] = bitcast i8* [[T4]] to [[OPAQUE]]*
 //   Copy 'x' into the first element.
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8*** [[T0]], i64 -1
-// CHECK-NEXT: [[T_VALUE:%.*]] = load i8*** [[T1]], align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8** [[T_VALUE]], i32 6
-// CHECK-NEXT: [[T1:%.*]] = load i8** [[T0]], align 8
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
+// CHECK-NEXT: [[T_VALUE:%.*]] = load i8**, i8*** [[T1]], align 8
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE]], i32 6
+// CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]], align 8
 // CHECK-NEXT: [[COPY_FN:%.*]] = bitcast i8* [[T1]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
 // CHECK-NEXT: call [[OPAQUE]]* [[COPY_FN]]([[OPAQUE]]* [[FST]], [[OPAQUE]]* [[X]], [[TYPE]]* %T)
 //   Copy 'x' into the second element.
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8*** [[T0]], i64 -1
-// CHECK-NEXT: [[T_VALUE:%.*]] = load i8*** [[T1]], align 8
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
+// CHECK-NEXT: [[T_VALUE:%.*]] = load i8**, i8*** [[T1]], align 8
 
 // CHECK: ret void
 

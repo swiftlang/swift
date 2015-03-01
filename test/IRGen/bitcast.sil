@@ -13,8 +13,8 @@ sil_vtable C {}
 // CHECK-i386:         [[BUF:%.*]] = alloca %C7bitcast1C*, align 4
 // CHECK-i386:         store %C7bitcast1C* %0, %C7bitcast1C** [[BUF]]
 // CHECK-i386:         [[OUT_BUF:%.*]] = bitcast %C7bitcast1C** [[BUF]] to %Si*
-// CHECK-i386:         [[VALUE_BUF:%.*]] = getelementptr inbounds %Si* [[OUT_BUF]], i32 0, i32 0
-// CHECK-i386:         [[VALUE:%.*]] = load i32* [[VALUE_BUF]], align 4
+// CHECK-i386:         [[VALUE_BUF:%.*]] = getelementptr inbounds %Si, %Si* [[OUT_BUF]], i32 0, i32 0
+// CHECK-i386:         [[VALUE:%.*]] = load i32, i32* [[VALUE_BUF]], align 4
 // CHECK-i386:         ret i32 [[VALUE]]
 // CHECK-i386:       }
 
@@ -22,8 +22,8 @@ sil_vtable C {}
 // CHECK-x86_64:         [[BUF:%.*]] = alloca %C7bitcast1C*, align 8
 // CHECK-x86_64:         store %C7bitcast1C* %0, %C7bitcast1C** [[BUF]]
 // CHECK-x86_64:         [[OUT_BUF:%.*]] = bitcast %C7bitcast1C** [[BUF]] to %Si*
-// CHECK-x86_64:         [[VALUE_BUF:%.*]] = getelementptr inbounds %Si* [[OUT_BUF]], i32 0, i32 0
-// CHECK-x86_64:         [[VALUE:%.*]] = load i64* [[VALUE_BUF]], align 8
+// CHECK-x86_64:         [[VALUE_BUF:%.*]] = getelementptr inbounds %Si, %Si* [[OUT_BUF]], i32 0, i32 0
+// CHECK-x86_64:         [[VALUE:%.*]] = load i64, i64* [[VALUE_BUF]], align 8
 // CHECK-x86_64:         ret i64 [[VALUE]]
 // CHECK-x86_64:       }
 sil @bitcast_trivial: $@thin (C) -> Int {
@@ -37,7 +37,7 @@ entry(%c : $C):
 // CHECK-i386:         store %C7bitcast1C* %0, %C7bitcast1C** [[BUF]]
 // CHECK-i386:         [[OUT_BUF:%.*]] = bitcast %C7bitcast1C** [[BUF]] to %Sq*
 // CHECK-i386:         [[VALUE_BUF:%.*]] = bitcast %Sq* [[OUT_BUF]] to i32*
-// CHECK-i386:         [[VALUE:%.*]] = load i32* [[VALUE_BUF]], align 4
+// CHECK-i386:         [[VALUE:%.*]] = load i32, i32* [[VALUE_BUF]], align 4
 // CHECK-i386:         ret i32 [[VALUE]]
 // CHECK-i386:       }
 
@@ -46,7 +46,7 @@ entry(%c : $C):
 // CHECK-x86_64:         store %C7bitcast1C* %0, %C7bitcast1C** [[BUF]]
 // CHECK-x86_64:         [[OUT_BUF:%.*]] = bitcast %C7bitcast1C** [[BUF]] to %Sq*
 // CHECK-x86_64:         [[VALUE_BUF:%.*]] = bitcast %Sq* [[OUT_BUF]] to i64*
-// CHECK-x86_64:         [[VALUE:%.*]] = load i64* [[VALUE_BUF]], align 8
+// CHECK-x86_64:         [[VALUE:%.*]] = load i64, i64* [[VALUE_BUF]], align 8
 // CHECK-x86_64:         ret i64 [[VALUE]]
 // CHECK-x86_64:       }
 sil @bitcast_ref: $@thin (C) -> Optional<C> {

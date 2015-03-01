@@ -11,7 +11,7 @@ class Subclass : LazyContainerClass {
 
   // CHECK-LABEL: @_TFC15lazy_multi_file8Subclass6getStrfS0_FT_SS(%C15lazy_multi_file8Subclass*) {
   func getStr() -> String {
-    // CHECK: = getelementptr inbounds %C15lazy_multi_file8Subclass* %0, i32 0, i32 3
+    // CHECK: = getelementptr inbounds %C15lazy_multi_file8Subclass, %C15lazy_multi_file8Subclass* %0, i32 0, i32 3
     return str
   }
 }

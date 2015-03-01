@@ -23,7 +23,7 @@ struct Huge {
 
 // CHECK:    define linkonce_odr hidden void @_TwdeV4main4Huge(
 // CHECK:      [[T0:%.*]] = bitcast [[BUFFER:.[0-9]+ x i8.]]* {{%.*}} to i8**
-// CHECK-NEXT: [[T1:%.*]] = load i8** [[T0]]
+// CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
 // CHECK-NEXT: call void @swift_slowDealloc(i8* [[T1]], [[SIZE_T]] 4097, [[SIZE_T]] 7)
 // CHECK-NEXT: ret void
 

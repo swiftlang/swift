@@ -40,15 +40,15 @@ func allToInt<T>(x: T) -> Int {
   // CHECK: call %swift.opaque* {{%.*}}(%swift.opaque* [[TEMP]], %swift.opaque* %0, %swift.type* %T)
   // CHECK: [[T0:%.*]] = bitcast %Si* [[INT_TEMP]] to %swift.opaque*
   // CHECK: call i1 @swift_dynamicCast(%swift.opaque* [[T0]], %swift.opaque* [[TEMP]], %swift.type* %T, %swift.type* getelementptr inbounds ({{.*}} @_TMdSi, {{.*}}), i64 7)
-  // CHECK: [[T0:%.*]] = getelementptr inbounds %Si* [[INT_TEMP]], i32 0, i32 0
-  // CHECK: [[INT_RESULT:%.*]] = load i64* [[T0]],
+  // CHECK: [[T0:%.*]] = getelementptr inbounds %Si, %Si* [[INT_TEMP]], i32 0, i32 0
+  // CHECK: [[INT_RESULT:%.*]] = load i64, i64* [[T0]],
   // CHECK: ret i64 [[INT_RESULT]]
 }
 
 // CHECK: define hidden void @_TF13generic_casts8intToAll{{.*}}(%swift.opaque* noalias sret, i64, %swift.type* %T) {
 func intToAll<T>(x: Int) -> T {
   // CHECK: [[INT_TEMP:%.*]] = alloca %Si,
-  // CHECK: [[T0:%.*]] = getelementptr inbounds %Si* [[INT_TEMP]], i32 0, i32 0
+  // CHECK: [[T0:%.*]] = getelementptr inbounds %Si, %Si* [[INT_TEMP]], i32 0, i32 0
   // CHECK: store i64 %1, i64* [[T0]],
   // CHECK: [[T0:%.*]] = bitcast %Si* [[INT_TEMP]] to %swift.opaque*
   // CHECK: call i1 @swift_dynamicCast(%swift.opaque* %0, %swift.opaque* [[T0]], %swift.type* getelementptr inbounds ({{.*}} @_TMdSi, {{.*}}), %swift.type* %T, i64 7)
@@ -73,8 +73,8 @@ func anyToInt(x: protocol<>) -> Int {
 
 // CHECK: define hidden %objc_object* @_TF13generic_casts9protoCast{{.*}}(%C13generic_casts9ObjCClass*) {
 func protoCast(x: ObjCClass) -> protocol<ObjCProto1, NSRuncing> {
-  // CHECK: load i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP13generic_casts10ObjCProto1_"
-  // CHECK: load i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$_NSRuncing"
+  // CHECK: load i8*, i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP13generic_casts10ObjCProto1_"
+  // CHECK: load i8*, i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$_NSRuncing"
   // CHECK: call %objc_object* @swift_dynamicCastObjCProtocolUnconditional(%objc_object* {{%.*}}, i64 2, i8** {{%.*}})
   return x as! protocol<ObjCProto1, NSRuncing>
 }

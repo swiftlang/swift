@@ -21,7 +21,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $Int):
 // CHECK-LABEL: define void @alloc_small([24 x i8]* noalias, i64)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[T0:%.*]] = bitcast [24 x i8]* %0 to %Si*
-// CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds %Si* [[T0]], i32 0, i32 0
+// CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
 // CHECK-NEXT: store i64 %1, i64* [[T2]], align 8
 // CHECK-NEXT: ret void
 
@@ -35,7 +35,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $Int):
 // CHECK-LABEL: define void @project_small([24 x i8]* noalias, i64)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[T0:%.*]] = bitcast [24 x i8]* %0 to %Si*
-// CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds %Si* [[T0]], i32 0, i32 0
+// CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
 // CHECK-NEXT: store i64 %1, i64* [[T2]], align 8
 // CHECK-NEXT: ret void
 
@@ -62,17 +62,17 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $BigStruct):
 // CHECK-NEXT: [[T1:%.*]] = bitcast [24 x i8]* %0 to i8**
 // CHECK-NEXT: store i8* [[T0]], i8** [[T1]], align 8
 // CHECK-NEXT: [[ADDR:%.*]] = bitcast i8* [[T0]] to %V13value_buffers9BigStruct*
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 0
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si* [[T0]], i32 0, i32 0
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct, %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 0
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
 // CHECK-NEXT: store i64 %1, i64* [[T1]], align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 1
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si* [[T0]], i32 0, i32 0
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct, %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 1
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
 // CHECK-NEXT: store i64 %2, i64* [[T1]], align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 2
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si* [[T0]], i32 0, i32 0
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct, %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 2
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
 // CHECK-NEXT: store i64 %3, i64* [[T1]], align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 3
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si* [[T0]], i32 0, i32 0
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct, %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 3
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
 // CHECK-NEXT: store i64 %4, i64* [[T1]], align 8
 // CHECK-NEXT: ret void
 
@@ -86,18 +86,18 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $BigStruct):
 // CHECK-LABEL: define void @project_big([24 x i8]* noalias, i64, i64, i64, i64)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[T0:%.*]] = bitcast [24 x i8]* %0 to %V13value_buffers9BigStruct**
-// CHECK-NEXT: [[ADDR:%.*]] = load %V13value_buffers9BigStruct** [[T0]], align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 0
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si* [[T0]], i32 0, i32 0
+// CHECK-NEXT: [[ADDR:%.*]] = load %V13value_buffers9BigStruct*, %V13value_buffers9BigStruct** [[T0]], align 8
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct, %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 0
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
 // CHECK-NEXT: store i64 %1, i64* [[T1]], align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 1
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si* [[T0]], i32 0, i32 0
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct, %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 1
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
 // CHECK-NEXT: store i64 %2, i64* [[T1]], align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 2
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si* [[T0]], i32 0, i32 0
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct, %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 2
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
 // CHECK-NEXT: store i64 %3, i64* [[T1]], align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 3
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si* [[T0]], i32 0, i32 0
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct, %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 3
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
 // CHECK-NEXT: store i64 %4, i64* [[T1]], align 8
 // CHECK-NEXT: ret void
 
@@ -110,6 +110,6 @@ entry(%b : $*Builtin.UnsafeValueBuffer):
 // CHECK-LABEL: define void @dealloc_big([24 x i8]* noalias)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[T0:%.*]] = bitcast [24 x i8]* %0 to i8**
-// CHECK-NEXT: [[ADDR:%.*]] = load i8** [[T0]], align 8
+// CHECK-NEXT: [[ADDR:%.*]] = load i8*, i8** [[T0]], align 8
 // CHECK-NEXT: call void @swift_slowDealloc(i8* [[ADDR]], i64 32, i64 7)
 // CHECK-NEXT: ret void

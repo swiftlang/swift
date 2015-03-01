@@ -50,19 +50,19 @@ class Foo {
   // with unexploaded ABI-coerced type.
   // x86_64-macosx: define hidden float @_TFC8abitypes3Foo17getXFromRectSwift{{.*}}(float, float, float, float, [[SELF:%.*]]*) {
   // x86_64-macosx: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
-  // x86_64-macosx: [[SEL:%.*]] = load i8** @"\01L_selector(getXFromRect:)", align 8
+  // x86_64-macosx: [[SEL:%.*]] = load i8*, i8** @"\01L_selector(getXFromRect:)", align 8
   // x86_64-macosx: [[CAST:%.*]] = bitcast [[MYRECT]]* [[COERCED]] to { <2 x float>, <2 x float> }*
-  // x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }* [[CAST]], i32 0, i32 0
-  // x86_64-macosx: [[FIRST_HALF:%.*]] = load <2 x float>* [[T0]]
-  // x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }* [[CAST]], i32 0, i32 1
-  // x86_64-macosx: [[SECOND_HALF:%.*]] = load <2 x float>* [[T0]]
+  // x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }, { <2 x float>, <2 x float> }* [[CAST]], i32 0, i32 0
+  // x86_64-macosx: [[FIRST_HALF:%.*]] = load <2 x float>, <2 x float>* [[T0]]
+  // x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }, { <2 x float>, <2 x float> }* [[CAST]], i32 0, i32 1
+  // x86_64-macosx: [[SECOND_HALF:%.*]] = load <2 x float>, <2 x float>* [[T0]]
   // x86_64-macosx: [[SELFCAST:%.*]] = bitcast [[SELF]]* %4 to i8*
   // x86_64-macosx: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*,  <2 x float>, <2 x float>)*)(i8* [[SELFCAST]], i8* [[SEL]], <2 x float> [[FIRST_HALF]], <2 x float> [[SECOND_HALF]])
   // armv7-ios: define hidden float @_TFC8abitypes3Foo17getXFromRectSwift{{.*}}(float, float, float, float, [[SELF:%.*]]*) {
   // armv7-ios: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
-  // armv7-ios: [[SEL:%.*]] = load i8** @"\01L_selector(getXFromRect:)", align 4
+  // armv7-ios: [[SEL:%.*]] = load i8*, i8** @"\01L_selector(getXFromRect:)", align 4
   // armv7-ios: [[CAST:%.*]] = bitcast [[MYRECT]]* [[COERCED]] to [4 x i32]*
-  // armv7-ios: [[LOADED:%.*]] = load [4 x i32]* [[CAST]]
+  // armv7-ios: [[LOADED:%.*]] = load [4 x i32], [4 x i32]* [[CAST]]
   // armv7-ios: [[SELFCAST:%.*]] = bitcast [[SELF]]* %4 to i8*
   // armv7-ios: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, [4 x i32])*)(i8* [[SELFCAST]], i8* [[SEL]], [4 x i32] [[LOADED]])
   func getXFromRectSwift(r: MyRect) -> Float {
@@ -91,20 +91,20 @@ class Foo {
 
   // x86_64 returns an HA of four floats directly in two <2 x float>
   // x86_64-macosx:      define hidden float @_TFC8abitypes3Foo4barc{{.*}}(%CSo13StructReturns*, %C8abitypes3Foo*) {
-  // x86_64-macosx:      load i8** @"\01L_selector(newRect)", align 8
+  // x86_64-macosx:      load i8*, i8** @"\01L_selector(newRect)", align 8
   // x86_64-macosx:      [[RESULT:%.*]] = call { <2 x float>, <2 x float> } bitcast (void ()* @objc_msgSend
   // x86_64-macosx:      store { <2 x float>, <2 x float> } [[RESULT]]
   // x86_64-macosx:      [[CAST:%.*]] = bitcast { <2 x float>, <2 x float> }*
-  // x86_64-macosx:      load { float, float, float, float }* [[CAST]]
+  // x86_64-macosx:      load { float, float, float, float }, { float, float, float, float }* [[CAST]]
   // x86_64-macosx:      ret float
   // armv7 returns an HA of four floats indirectly
   // armv7-ios: define hidden float @_TFC8abitypes3Foo4barc{{.*}}(%CSo13StructReturns*, %C8abitypes3Foo*) {
   // armv7-ios: [[RESULT:%.*]] = alloca [[RECTTYPE:%.*MyRect.*]], align 4
-  // armv7-ios: load i8** @"\01L_selector(newRect)", align 4
+  // armv7-ios: load i8*, i8** @"\01L_selector(newRect)", align 4
   // armv7-ios: call void bitcast (void ()* @objc_msgSend_stret to void ([[RECTTYPE]]*, [[RECEIVER:.*]]*, i8*)*)([[RECTTYPE]]* noalias sret %call.aggresult
-  // armv7-ios: [[GEP1:%.*]] = getelementptr inbounds [[RECTTYPE]]* [[RESULT]], i32 0, i32 1
-  // armv7-ios: [[GEP2:%.*]] = getelementptr inbounds {{.*}}* [[GEP1]], i32 0, i32 0
-  // armv7-ios: [[RETVAL:%.*]] = load float* [[GEP2]], align 4
+  // armv7-ios: [[GEP1:%.*]] = getelementptr inbounds [[RECTTYPE]], [[RECTTYPE]]* [[RESULT]], i32 0, i32 1
+  // armv7-ios: [[GEP2:%.*]] = getelementptr inbounds {{.*}}, {{.*}}* [[GEP1]], i32 0, i32 0
+  // armv7-ios: [[RETVAL:%.*]] = load float, float* [[GEP2]], align 4
   // armv7-ios: ret float [[RETVAL]]
   func barc(p: StructReturns) -> Float {
     return p.newRect().y
@@ -117,7 +117,7 @@ class Foo {
   }
 
   // x86_64-macosx:      define hidden double @_TFC8abitypes3Foo4bazc{{.*}}(%CSo13StructReturns*, %C8abitypes3Foo*) {
-  // x86_64-macosx:      load i8** @"\01L_selector(newTrio)", align 8
+  // x86_64-macosx:      load i8*, i8** @"\01L_selector(newTrio)", align 8
   // x86_64-macosx:      [[CAST:%[0-9]+]] = bitcast {{%.*}}* %0
   // x86_64-macosx:      call void bitcast (void ()* @objc_msgSend_stret to void (%VSC4Trio*, [[OPAQUE:.*]]*, i8*)*)
   func bazc(p: StructReturns) -> Double {
@@ -128,7 +128,7 @@ class Foo {
   // x86_64-macosx:      [[RESULT:%.*]] = call i64 bitcast (void ()* @objc_msgSend to i64 ([[OPAQUE:.*]]*, i8*)*)
   // x86_64-macosx:      store i64 [[RESULT]]
   // x86_64-macosx:      [[CAST:%.*]] = bitcast i64* {{%.*}} to { i32, i32 }*
-  // x86_64-macosx:      load { i32, i32 }* [[CAST]]
+  // x86_64-macosx:      load { i32, i32 }, { i32, i32 }* [[CAST]]
   // x86_64-macosx:      ret { i32, i32 }
   func getpair(p: StructReturns) -> IntPair {
     return p.newPair()
@@ -143,7 +143,7 @@ class Foo {
   // x86_64-macosx:      call i64 bitcast (void ()* @objc_msgSend to i64 ([[OPAQUE:.*]]*, i8*)*)
   // x86_64-macosx-NEXT: store i64
   // x86_64-macosx-NEXT: bitcast i64* {{[^ ]*}} to { i32, i32 }*
-  // x86_64-macosx-NEXT: load { i32, i32 }*
+  // x86_64-macosx-NEXT: load { i32, i32 }, { i32, i32 }*
   // x86_64-macosx:      ret { i32, i32 }
   func getnested(p: StructReturns) -> NestedInts {
     return p.newNestedInts()
@@ -213,7 +213,7 @@ class Foo {
 
   // x86_64-macosx: define hidden i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {
   // x86_64-macosx: [[TOOBJCBOOL:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 %0)
-  // x86_64-macosx: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(negate:)", align 8
+  // x86_64-macosx: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(negate:)", align 8
   // x86_64-macosx: [[NEG:%[0-9]+]] = call i8 bitcast (void ()* @objc_msgSend to i8 ([[RECEIVER:.*]]*, i8*, i8)*)([[RECEIVER]]* {{%[0-9]+}}, i8* [[SEL]], i8 [[TOOBJCBOOL]])
   // x86_64-macosx: [[TOBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBool{{.*}}(i8 [[NEG]])
   // x86_64-macosx: ret i1 [[TOBOOL]]
@@ -225,7 +225,7 @@ class Foo {
   // x86_64-macosx: ret i8 [[TOOBJCBOOL]]
   //
   // x86_64-ios: define hidden i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {
-  // x86_64-ios: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(negate:)", align 8
+  // x86_64-ios: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(negate:)", align 8
   // x86_64-ios: [[NEG:%[0-9]+]] = call i1 bitcast (void ()* @objc_msgSend to i1 ([[RECEIVER:.*]]*, i8*, i1)*)([[RECEIVER]]* {{%[0-9]+}}, i8* [[SEL]], i1 %0)
   // x86_64-ios: ret i1 [[NEG]]
   //
@@ -236,7 +236,7 @@ class Foo {
   //
   // armv7-ios: define hidden i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {
   // armv7-ios: [[TOOBJCBOOL:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 %0)
-  // armv7-ios: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(negate:)", align 4
+  // armv7-ios: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(negate:)", align 4
   // armv7-ios: [[NEG:%[0-9]+]] = call i8 bitcast (void ()* @objc_msgSend to i8 ([[RECEIVER:.*]]*, i8*, i8)*)([[RECEIVER]]* {{%[0-9]+}}, i8* [[SEL]], i8 [[TOOBJCBOOL]])
   // armv7-ios: [[TOBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBool{{.*}}(i8 [[NEG]])
   // armv7-ios: ret i1 [[TOBOOL]]
@@ -248,7 +248,7 @@ class Foo {
   // armv7-ios: ret i8 [[TOOBJCBOOL]]
   //
   // arm64-ios: define hidden i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {
-  // arm64-ios: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(negate:)", align 8
+  // arm64-ios: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(negate:)", align 8
   // arm64-ios: [[NEG:%[0-9]+]] = call i1 bitcast (void ()* @objc_msgSend to i1 ([[RECEIVER:.*]]*, i8*, i1)*)([[RECEIVER]]* {{%[0-9]+}}, i8* [[SEL]], i1 %0)
   // arm64-ios: ret i1 [[NEG]]
   //
@@ -259,7 +259,7 @@ class Foo {
   //
   // i386-ios: define hidden i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {
   // i386-ios: [[TOOBJCBOOL:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 %0)
-  // i386-ios: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(negate:)", align 4
+  // i386-ios: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(negate:)", align 4
   // i386-ios: [[NEG:%[0-9]+]] = call i8 bitcast (void ()* @objc_msgSend to i8 ([[RECEIVER:.*]]*, i8*, i8)*)([[RECEIVER]]* {{%[0-9]+}}, i8* [[SEL]], i8 [[TOOBJCBOOL]])
   // i386-ios: [[TOBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBool{{.*}}(i8 [[NEG]])
   // i386-ios: ret i1 [[TOBOOL]]
@@ -347,10 +347,10 @@ class Foo {
 // x86_64-macosx: store float %2,
 // x86_64-macosx: store float %3,
 // x86_64-macosx: [[CAST:%.*]] = bitcast %VSC6MyRect* [[COERCED]] to { <2 x float>, <2 x float> }*
-// x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }* [[CAST]], i32 0, i32 0
-// x86_64-macosx: [[FIRST_HALF:%.*]] = load <2 x float>* [[T0]], align 4
-// x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }* [[CAST]], i32 0, i32 1
-// x86_64-macosx: [[SECOND_HALF:%.*]] = load <2 x float>* [[T0]], align 4
+// x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }, { <2 x float>, <2 x float> }* [[CAST]], i32 0, i32 0
+// x86_64-macosx: [[FIRST_HALF:%.*]] = load <2 x float>, <2 x float>* [[T0]], align 4
+// x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }, { <2 x float>, <2 x float> }* [[CAST]], i32 0, i32 1
+// x86_64-macosx: [[SECOND_HALF:%.*]] = load <2 x float>, <2 x float>* [[T0]], align 4
 // x86_64-macosx: [[RESULT:%.*]] = call float @MyRect_Area(<2 x float> [[FIRST_HALF]], <2 x float> [[SECOND_HALF]])
 // x86_64-macosx: ret float [[RESULT]]
 public func testInlineAgg(rect: MyRect) -> Float {

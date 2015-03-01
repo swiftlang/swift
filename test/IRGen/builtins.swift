@@ -122,13 +122,13 @@ func !=(lhs: Int, rhs: Int) -> Bool {
 func gep_test(ptr: Builtin.RawPointer, offset: Builtin.Int64)
    -> Builtin.RawPointer {
   return Builtin.gep_Int64(ptr, offset)
-  // CHECK: getelementptr inbounds i8*
+  // CHECK: getelementptr inbounds i8, i8*
 }
 
 // CHECK: define hidden i64 @_TF8builtins9load_test
 func load_test(ptr: Builtin.RawPointer) -> Builtin.Int64 {
   // CHECK: [[CASTPTR:%.*]] = bitcast i8* [[PTR:%.*]] to i64*
-  // CHECK-NEXT: load i64* [[CASTPTR]]
+  // CHECK-NEXT: load i64, i64* [[CASTPTR]]
   // CHECK: ret
   return Builtin.load(ptr)
 }
@@ -141,7 +141,7 @@ func assign_test(value: Builtin.Int64, ptr: Builtin.RawPointer) {
 
 // CHECK: define hidden %swift.refcounted* @_TF8builtins16load_object_test
 func load_object_test(ptr: Builtin.RawPointer) -> Builtin.NativeObject {
-  // CHECK: [[T0:%.*]] = load [[REFCOUNT]]**
+  // CHECK: [[T0:%.*]] = load [[REFCOUNT]]*, [[REFCOUNT]]**
   // CHECK: call void @swift_retain_noresult([[REFCOUNT]]* [[T0]])
   // CHECK: ret [[REFCOUNT]]* [[T0]]
   return Builtin.load(ptr)
@@ -205,13 +205,13 @@ func sizeof_alignof_test() {
 
 // CHECK: define hidden void @_TF8builtins27generic_sizeof_alignof_testU__FT_T_(
 func generic_sizeof_alignof_test<T>() {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8** [[T:%.*]], i32 17
-  // CHECK-NEXT: [[T1:%.*]] = load i8** [[T0]]
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 17
+  // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[SIZE:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: store i64 [[SIZE]], i64* [[S:%.*]]
   var s = Builtin.sizeof(T.self)
-  // CHECK: [[T0:%.*]] = getelementptr inbounds i8** [[T:%.*]], i32 18
-  // CHECK-NEXT: [[T1:%.*]] = load i8** [[T0]]
+  // CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 18
+  // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[T2:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: [[T3:%.*]] = and i64 [[T2]], 65535
   // CHECK-NEXT: [[ALIGN:%.*]] = add i64 [[T3]], 1
@@ -221,8 +221,8 @@ func generic_sizeof_alignof_test<T>() {
 
 // CHECK: define hidden void @_TF8builtins21generic_strideof_testU__FT_T_(
 func generic_strideof_test<T>() {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8** [[T:%.*]], i32 19
-  // CHECK-NEXT: [[T1:%.*]] = load i8** [[T0]]
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 19
+  // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[STRIDE:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: store i64 [[STRIDE]], i64* [[S:%.*]]
   var s = Builtin.strideof(T.self)
@@ -230,8 +230,8 @@ func generic_strideof_test<T>() {
 
 // CHECK: define hidden void @_TF8builtins29generic_strideof_nonzero_testU__FT_T_(
 func generic_strideof_nonzero_test<T>() {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8** [[T:%.*]], i32 19
-  // CHECK-NEXT: [[T1:%.*]] = load i8** [[T0]]
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 19
+  // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[STRIDE:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: [[CMP:%.*]] = icmp eq i64 [[STRIDE]], 0
   // CHECK-NEXT: [[SELECT:%.*]] = select i1 [[CMP]], i64 1, i64 [[STRIDE]]
@@ -246,7 +246,7 @@ func move(ptr: Builtin.RawPointer) {
   var temp : Y = Builtin.take(ptr)
   // CHECK:      define hidden void @_TF8builtins4move
   // CHECK:        [[SRC:%.*]] = bitcast i8* {{%.*}} to [[Y]]**
-  // CHECK-NEXT:   [[VAL:%.*]] = load [[Y]]** [[SRC]]
+  // CHECK-NEXT:   [[VAL:%.*]] = load [[Y]]*, [[Y]]** [[SRC]]
   // CHECK-NEXT:   store [[Y]]* [[VAL]], [[Y]]** {{%.*}}
 }
 

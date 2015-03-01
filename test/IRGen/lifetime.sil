@@ -25,42 +25,42 @@ bb0(%x : $*T):
 // CHECK-NEXT: store %swift.type
 //   Allocate it.
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8*** [[T0]], i64 -1
-// CHECK-NEXT: [[T2:%.*]] = load i8*** [[T1]], align 8
-// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8** [[T2]], i32 11
-// CHECK-NEXT: [[T4:%.*]] = load i8** [[T3]], align 8
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
+// CHECK-NEXT: [[T2:%.*]] = load i8**, i8*** [[T1]], align 8
+// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[T2]], i32 11
+// CHECK-NEXT: [[T4:%.*]] = load i8*, i8** [[T3]], align 8
 // CHECK-NEXT: [[ALLOCATE_FN:%.*]] = bitcast i8* [[T4]] to [[OPAQUE]]* ([[BUFFER]]*, [[TYPE]]*)*
 // CHECK-NEXT: [[Y:%.*]] = call [[OPAQUE]]* [[ALLOCATE_FN]]([[BUFFER]]* [[YBUF]], [[TYPE]]* %T)
 //   Copy 'x' into 'y'.
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8*** [[T0]], i64 -1
-// CHECK-NEXT: [[T2:%.*]] = load i8*** [[T1]], align 8
-// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8** [[T2]], i32 6
-// CHECK-NEXT: [[T4:%.*]] = load i8** [[T3]], align 8
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
+// CHECK-NEXT: [[T2:%.*]] = load i8**, i8*** [[T1]], align 8
+// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[T2]], i32 6
+// CHECK-NEXT: [[T4:%.*]] = load i8*, i8** [[T3]], align 8
 // CHECK-NEXT: [[COPY_FN:%.*]] = bitcast i8* [[T4]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
 // CHECK-NEXT: call [[OPAQUE]]* [[COPY_FN]]([[OPAQUE]]* [[Y]], [[OPAQUE]]* [[X:%.*]], [[TYPE]]* %T)
 //   Destroy 'y'.
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8*** [[T0]], i64 -1
-// CHECK-NEXT: [[T2:%.*]] = load i8*** [[T1]], align 8
-// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8** [[T2]], i32 4
-// CHECK-NEXT: [[T4:%.*]] = load i8** [[T3]], align 8
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
+// CHECK-NEXT: [[T2:%.*]] = load i8**, i8*** [[T1]], align 8
+// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[T2]], i32 4
+// CHECK-NEXT: [[T4:%.*]] = load i8*, i8** [[T3]], align 8
 // CHECK-NEXT: [[DESTROY_FN:%.*]] = bitcast i8* [[T4]] to void ([[OPAQUE]]*, [[TYPE]]*)*
 // CHECK-NEXT: call void [[DESTROY_FN]]([[OPAQUE]]* [[Y]], [[TYPE]]* %T)
 //   Deallocate 'y'.
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8*** [[T0]], i64 -1
-// CHECK-NEXT: [[T2:%.*]] = load i8*** [[T1]], align 8
-// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8** [[T2]], i32 3
-// CHECK-NEXT: [[T4:%.*]] = load i8** [[T3]], align 8
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
+// CHECK-NEXT: [[T2:%.*]] = load i8**, i8*** [[T1]], align 8
+// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[T2]], i32 3
+// CHECK-NEXT: [[T4:%.*]] = load i8*, i8** [[T3]], align 8
 // CHECK-NEXT: [[DEALLOC_FN:%.*]] = bitcast i8* [[T4]] to void ([[BUFFER]]*, [[TYPE]]*)*
 // CHECK-NEXT: call void [[DEALLOC_FN]]([[BUFFER]]* [[YBUF]], [[TYPE]]* %T)
 //   Destroy 'x'.
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8*** [[T0]], i64 -1
-// CHECK-NEXT: [[T2:%.*]] = load i8*** [[T1]], align 8
-// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8** [[T2]], i32 4
-// CHECK-NEXT: [[T4:%.*]] = load i8** [[T3]], align 8
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
+// CHECK-NEXT: [[T2:%.*]] = load i8**, i8*** [[T1]], align 8
+// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[T2]], i32 4
+// CHECK-NEXT: [[T4:%.*]] = load i8*, i8** [[T3]], align 8
 // CHECK-NEXT: [[DESTROY_FN:%.*]] = bitcast i8* [[T4]] to void ([[OPAQUE]]*, [[TYPE]]*)*
 // CHECK-NEXT: call void [[DESTROY_FN]]([[OPAQUE]]* [[X]], [[TYPE]]* %T)
 //   Return.

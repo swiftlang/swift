@@ -26,7 +26,7 @@ bb0:
 }
 
 // CHECK-LABEL: define %swift.type* @_TMaC12typemetadata1C()
-// CHECK:      [[T0:%.*]] = load %swift.type**  @_TMLC12typemetadata1C, align 8
+// CHECK:      [[T0:%.*]] = load %swift.type*, %swift.type**  @_TMLC12typemetadata1C, align 8
 // CHECK-NEXT: [[T1:%.*]] = icmp eq %swift.type* [[T0]], null
 // CHECK-NEXT: br i1 [[T1]]
 // CHECK:      [[T0:%.*]] = call %objc_class* @swift_getInitializedObjCClass({{.*}} @_TMdC12typemetadata1C {{.*}})
@@ -37,7 +37,7 @@ bb0:
 // CHECK-NEXT: ret %swift.type* [[RES]]
 
 // CHECK-LABEL: define linkonce_odr hidden %swift.type* @_TMaTV12typemetadata1SCS_1C_()
-// CHECK:      [[T0:%.*]] = load %swift.type**  @_TMLTV12typemetadata1SCS_1C_, align 8
+// CHECK:      [[T0:%.*]] = load %swift.type*, %swift.type**  @_TMLTV12typemetadata1SCS_1C_, align 8
 // CHECK-NEXT: [[T1:%.*]] = icmp eq %swift.type* [[T0]], null
 // CHECK-NEXT: br i1 [[T1]]
 // CHECK:      [[T0:%.*]] = call %swift.type* @_TMaC12typemetadata1C()

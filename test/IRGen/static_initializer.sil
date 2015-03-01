@@ -51,7 +51,7 @@ bb0:
 
 // CHECK-LABEL: define i32 @_TF2ch1fFT_Si() {
 // CHECK-NEXT: entry:
-// CHECK-NEXT: load i32* getelementptr inbounds (%VSs5Int32* @_Tv2ch1xSi, i32 0, i32 0)
+// CHECK-NEXT: load i32, i32* getelementptr inbounds (%VSs5Int32* @_Tv2ch1xSi, i32 0, i32 0)
 // CHECK-NEXT: ret
 sil @_TF2ch1fFT_Si : $@thin () -> Int32 {
 bb0:
@@ -88,9 +88,9 @@ bb0:
 
 // CHECK-LABEL: define { i32, i32, i32 } @_TF6nested1fFT_VS_2S2() {
 // CHECK-NEXT: entry:
-// CHECK-NEXT: load i32* getelementptr inbounds (%V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 0, i32 0)
-// CHECK-NEXT: load i32* getelementptr inbounds (%V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 1, i32 0)
-// CHECK-NEXT: load i32* getelementptr inbounds (%V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 2, i32 0, i32 0)
+// CHECK-NEXT: load i32, i32* getelementptr inbounds (%V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 0, i32 0)
+// CHECK-NEXT: load i32, i32* getelementptr inbounds (%V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 1, i32 0)
+// CHECK-NEXT: load i32, i32* getelementptr inbounds (%V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 2, i32 0, i32 0)
 sil @_TF6nested1fFT_VS_2S2 : $@thin () -> S2 {
 bb0:
   %0 = global_addr @_Tv6nested1xVS_2S2 : $*S2

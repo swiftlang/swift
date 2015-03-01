@@ -134,13 +134,13 @@ sil_vtable D {
 sil @alloc_ref_dynamic : $@thin (@thick C.Type) -> @owned C {
 bb0(%0 : $@thick C.Type):
   // CHECK:   [[META_PTR:%[0-9]+]] = bitcast %swift.type* %0 to i8*
-  // CHECK:   [[T0:%.*]] = getelementptr inbounds i8* [[META_PTR]], i32 48
+  // CHECK:   [[T0:%.*]] = getelementptr inbounds i8, i8* [[META_PTR]], i32 48
   // CHECK:   [[T1:%.*]] = bitcast i8* [[T0]] to i32*
-  // CHECK:   [[SIZE32:%.*]] = load i32* [[T1]], align 8
+  // CHECK:   [[SIZE32:%.*]] = load i32, i32* [[T1]], align 8
   // CHECK:   [[SIZE:%.*]] = zext i32 [[SIZE32]] to i64
-  // CHECK:   [[T0:%.*]] = getelementptr inbounds i8* [[META_PTR]], i32 52
+  // CHECK:   [[T0:%.*]] = getelementptr inbounds i8, i8* [[META_PTR]], i32 52
   // CHECK:   [[T1:%.*]] = bitcast i8* [[T0]] to i32*
-  // CHECK:   [[ALIGN32:%.*]] = load i32* [[T1]], align 4
+  // CHECK:   [[ALIGN32:%.*]] = load i32, i32* [[T1]], align 4
   // CHECK:   [[ALIGN:%.*]] = zext i32 [[ALIGN32]] to i64
   // CHECK:   [[RESULT:%[0-9]+]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* %0, i64 [[SIZE]], i64 [[ALIGN]])
   %1 = alloc_ref_dynamic %0 : $@thick C.Type, $C
@@ -206,7 +206,7 @@ entry(%x : $ClassConstrainedGenericField<ClassConstraintConformance>):
   return %b : $ClassConstraintConformance
 }
 // CHECK-LABEL: define %C5class26ClassConstraintConformance* @fixed_class_generic_field(%C5class28ClassConstrainedGenericField*)
-// CHECK:         [[FIELD_ADDR_GENERIC:%.*]] = getelementptr inbounds %C5class28ClassConstrainedGenericField* %0, i32 0, i32 1
+// CHECK:         [[FIELD_ADDR_GENERIC:%.*]] = getelementptr inbounds %C5class28ClassConstrainedGenericField, %C5class28ClassConstrainedGenericField* %0, i32 0, i32 1
 // CHECK:         [[FIELD_ADDR_CONCRETE:%.*]] = bitcast %objc_object** [[FIELD_ADDR_GENERIC]] to %C5class26ClassConstraintConformance**
-// CHECK:         load %C5class26ClassConstraintConformance** [[FIELD_ADDR_CONCRETE]]
+// CHECK:         load %C5class26ClassConstraintConformance*, %C5class26ClassConstraintConformance** [[FIELD_ADDR_CONCRETE]]
 

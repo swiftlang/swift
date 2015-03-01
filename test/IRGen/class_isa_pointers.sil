@@ -19,7 +19,7 @@ sil_vtable Purebred {}
 
 // CHECK-LABEL: define void @purebred_method(%C18class_isa_pointers8Purebred*) {
 // CHECK:         [[ISA_PTR:%.*]] = bitcast %C18class_isa_pointers8Purebred* %0 to %swift.type**
-// CHECK:         [[ISA:%.*]] = load %swift.type** [[ISA_PTR]]
+// CHECK:         [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_PTR]]
 // CHECK:         [[VTABLE:%.*]] = bitcast %swift.type* [[ISA]]
 // CHECK:         getelementptr inbounds {{.*}} [[VTABLE]]
 sil @purebred_method : $@thin (@owned Purebred) -> () {
@@ -40,8 +40,8 @@ sil_vtable Mongrel {}
 
 // CHECK-LABEL: define void @mongrel_method(%C18class_isa_pointers7Mongrel*) {
 // CHECK:         [[T0:%.*]] = bitcast {{.*}} %0 to i64*
-// CHECK-NEXT:    [[T1:%.*]] = load i64* [[T0]], align 8
-// CHECK-NEXT:    [[T2:%.*]] = load i64* @swift_isaMask, align 8
+// CHECK-NEXT:    [[T1:%.*]] = load i64, i64* [[T0]], align 8
+// CHECK-NEXT:    [[T2:%.*]] = load i64, i64* @swift_isaMask, align 8
 // CHECK-NEXT:    [[T3:%.*]] = and i64 [[T1]], [[T2]]
 // CHECK:         [[ISA:%.*]] = inttoptr i64 [[T3]] to %swift.type*
 // CHECK:         [[VTABLE:%.*]] = bitcast %swift.type* [[ISA]]

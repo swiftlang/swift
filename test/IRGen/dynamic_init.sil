@@ -20,8 +20,8 @@ sil @_TFC12dynamic_init1CD : $@cc(method) @thin (@owned C) -> ()
 sil @_TF12dynamic_init15testDynamicInitFT2cmMCS_1C_T_ : $@thin (@thick C.Type) -> () {
 bb0(%0 : $@thick C.Type):
   // CHECK:   [[META:%[0-9]+]] = bitcast %swift.type* %0 to %C12dynamic_init1C* (%swift.type*)**
-  // CHECK:   [[VTABLE_OFFSET:%[0-9]+]] = getelementptr inbounds %C12dynamic_init1C* (%swift.type*)** [[META]], i64 9
-  // CHECK:   [[CTOR:%[0-9]+]] = load %C12dynamic_init1C* (%swift.type*)** [[VTABLE_OFFSET]], align 8
+  // CHECK:   [[VTABLE_OFFSET:%[0-9]+]] = getelementptr inbounds %C12dynamic_init1C* (%swift.type*)*, %C12dynamic_init1C* (%swift.type*)** [[META]], i64 9
+  // CHECK:   [[CTOR:%[0-9]+]] = load %C12dynamic_init1C* (%swift.type*)*, %C12dynamic_init1C* (%swift.type*)** [[VTABLE_OFFSET]], align 8
   // CHECK:   [[CTOR_I8:%[0-9]+]] = bitcast %C12dynamic_init1C* (%swift.type*)* [[CTOR]] to i8*
   // CHECK:   [[CTOR_FN:%[0-9]+]] = bitcast i8* [[CTOR_I8]] to %C12dynamic_init1C* (%swift.type*)*
   %2 = class_method %0 : $@thick C.Type, #C.init!allocator.1 : C.Type -> () -> C , $@thin (@thick C.Type) -> @owned C

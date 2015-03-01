@@ -125,7 +125,7 @@ func mixed_heritage_erasure(x: Zim) -> Frungible {
 // CHECK-LABEL: define hidden void @_TF14objc_protocols12objc_generic{{.*}}(%objc_object*, %swift.type* %T) {
 func objc_generic<T : NSRuncing>(x: T) {
   x.runce()
-  // CHECK: [[SELECTOR:%.*]] = load i8** @"\01L_selector(runce)", align 8
+  // CHECK: [[SELECTOR:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
   // CHECK: bitcast %objc_object* %0 to [[OBJTYPE:.*]]*
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJTYPE]]*, i8*)*)([[OBJTYPE]]* {{%.*}}, i8* [[SELECTOR]])
 }
@@ -139,7 +139,7 @@ func call_objc_generic<T : NSRuncing>(x: T) {
 // CHECK-LABEL: define hidden void @_TF14objc_protocols13objc_protocol{{.*}}(%objc_object*) {
 func objc_protocol(x: NSRuncing) {
   x.runce()
-  // CHECK: [[SELECTOR:%.*]] = load i8** @"\01L_selector(runce)", align 8
+  // CHECK: [[SELECTOR:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
   // CHECK: bitcast %objc_object* %0 to [[OBJTYPE:.*]]*
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJTYPE]]*, i8*)*)([[OBJTYPE]]* {{%.*}}, i8* [[SELECTOR]])
 }
@@ -154,11 +154,11 @@ func objc_erasure(x: NSSpoon) -> NSRuncing {
 // CHECK: define hidden void @_TF14objc_protocols25objc_protocol_composition{{.*}}(%objc_object*)
 func objc_protocol_composition(x: protocol<NSRuncing, NSFunging>) {
   x.runce()
-  // CHECK: [[RUNCE:%.*]] = load i8** @"\01L_selector(runce)", align 8
+  // CHECK: [[RUNCE:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
   // CHECK: bitcast %objc_object* %0 to [[OBJTYPE:.*]]*
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJTYPE]]*, i8*)*)([[OBJTYPE]]* {{%.*}}, i8* [[RUNCE]])
   x.funge()
-  // CHECK: [[FUNGE:%.*]] = load i8** @"\01L_selector(funge)", align 8
+  // CHECK: [[FUNGE:%.*]] = load i8*, i8** @"\01L_selector(funge)", align 8
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJTYPE]]*, i8*)*)([[OBJTYPE]]* {{%.*}}, i8* [[FUNGE]])
 }
 
@@ -166,7 +166,7 @@ func objc_protocol_composition(x: protocol<NSRuncing, NSFunging>) {
 func objc_swift_protocol_composition
 (x:protocol<NSRuncing, Ansible, NSFunging>) {
   x.runce()
-  // CHECK: [[RUNCE:%.*]] = load i8** @"\01L_selector(runce)", align 8
+  // CHECK: [[RUNCE:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
   // CHECK: bitcast %objc_object* %0 to [[OBJTYPE:.*]]*
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJTYPE]]*, i8*)*)([[OBJTYPE]]* {{%.*}}, i8* [[RUNCE]])
   /* TODO: Abstraction difference from ObjC protocol composition to 
@@ -174,7 +174,7 @@ func objc_swift_protocol_composition
   x.anse()
    */
   x.funge()
-  // CHECK: [[FUNGE:%.*]] = load i8** @"\01L_selector(funge)", align 8
+  // CHECK: [[FUNGE:%.*]] = load i8*, i8** @"\01L_selector(funge)", align 8
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJTYPE]]*, i8*)*)([[OBJTYPE]]* {{%.*}}, i8* [[FUNGE]])
 }
 

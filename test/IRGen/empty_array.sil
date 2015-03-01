@@ -14,11 +14,11 @@ import Builtin
 
 // CHECK-32-LABEL: define void @empty_array(%swift.opaque* noalias) {
 // CHECK-32:         %1 = bitcast %swift.opaque* %0 to i8*
-// CHECK-32:         %2 = getelementptr inbounds i8* %1, i32 0
+// CHECK-32:         %2 = getelementptr inbounds i8, i8* %1, i32 0
 
 // CHECK-64-LABEL: define void @empty_array(%swift.opaque* noalias) {
 // CHECK-64:         %1 = bitcast %swift.opaque* %0 to i8*
-// CHECK-64:         %2 = getelementptr inbounds i8* %1, i64 0
+// CHECK-64:         %2 = getelementptr inbounds i8, i8* %1, i64 0
 
 sil @empty_array : $@thin (@in ()) -> () {
 entry(%0 : $*()):

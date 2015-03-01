@@ -75,7 +75,7 @@ sil_vtable StorageQualified {}
 // CHECK:       [[FOO_TYPE_VECTOR_SLOT:@.*Foo.*]] = private global %swift.type** null
 
 // CHECK: define private %swift.type** [[FOO_TYPES_ACCESSOR]](%swift.type*)
-// CHECK:   [[EXISTING:%.*]] = load %swift.type*** [[FOO_TYPE_VECTOR_SLOT]]
+// CHECK:   [[EXISTING:%.*]] = load %swift.type**, %swift.type*** [[FOO_TYPE_VECTOR_SLOT]]
 // CHECK:   [[IS_NULL:%.*]] = icmp eq %swift.type** [[EXISTING]], null
 // CHECK:   br i1 [[IS_NULL]], label %[[BUILD_FIELD_TYPES:.*]], label %[[DONE:.*]]
 // CHECK: [[BUILD_FIELD_TYPES]]:
@@ -85,8 +85,8 @@ sil_vtable StorageQualified {}
 // CHECK: define private %swift.type** [[BAR_TYPES_ACCESSOR]](%swift.type*)
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %0 to %swift.type***
 // -- 5 words between the address point and the slot
-// CHECK:   [[SLOT:%.*]] = getelementptr inbounds %swift.type*** [[T0]], i32 5
-// CHECK:   load %swift.type*** [[SLOT]], align 8
+// CHECK:   [[SLOT:%.*]] = getelementptr inbounds %swift.type**, %swift.type*** [[T0]], i32 5
+// CHECK:   load %swift.type**, %swift.type*** [[SLOT]], align 8
 // CHECK:   br
 // CHECK:   store {{.*}} @_TMdSi
 
@@ -94,8 +94,8 @@ sil_vtable StorageQualified {}
 // CHECK: define private %swift.type** [[BAS_TYPES_ACCESSOR]](%swift.type*)
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %0 to %swift.type***
 // -- 7 words between the address point and the slot
-// CHECK:   [[SLOT:%.*]] = getelementptr inbounds %swift.type*** [[T0]], i32 7
-// CHECK:   load %swift.type*** [[SLOT]], align 8
+// CHECK:   [[SLOT:%.*]] = getelementptr inbounds %swift.type**, %swift.type*** [[T0]], i32 7
+// CHECK:   load %swift.type**, %swift.type*** [[SLOT]], align 8
 // CHECK:   br
 // CHECK:   store {{.*}} @_TMdV18field_type_vectors3Foo
 // CHECK:   [[T:%.*]] = bitcast %swift.type* %T to i8*
@@ -104,12 +104,12 @@ sil_vtable StorageQualified {}
 // CHECK: define private %swift.type** [[ZIM_TYPES_ACCESSOR]](%swift.type*)
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %0 to %swift.type***
 // -- 14 words between the address point and the slot
-// CHECK:   [[SLOT:%.*]] = getelementptr inbounds %swift.type*** [[T0]], i32 15
-// CHECK:   load %swift.type*** [[SLOT]], align 8
+// CHECK:   [[SLOT:%.*]] = getelementptr inbounds %swift.type**, %swift.type*** [[T0]], i32 15
+// CHECK:   load %swift.type**, %swift.type*** [[SLOT]], align 8
 
 // CHECK: define private %swift.type** [[ZANG_TYPES_ACCESSOR]](%swift.type*)
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %0 to %swift.type***
 // -- 16 words between the address point and the slot
-// CHECK:   [[SLOT:%.*]] = getelementptr inbounds %swift.type*** [[T0]], i32 17
-// CHECK:   load %swift.type*** [[SLOT]], align 8
+// CHECK:   [[SLOT:%.*]] = getelementptr inbounds %swift.type**, %swift.type*** [[T0]], i32 17
+// CHECK:   load %swift.type**, %swift.type*** [[SLOT]], align 8
 

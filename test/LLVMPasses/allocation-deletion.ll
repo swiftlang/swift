@@ -42,9 +42,9 @@ entry:
 @trivial_dtor_metadata = internal constant %swift.heapmetadata { i64 (%swift.refcounted*)* @trivial_dtor, i64 (%swift.refcounted*)* null }
 define internal i64 @trivial_dtor(%swift.refcounted* nocapture) nounwind readonly {
 entry:
-  %1 = getelementptr inbounds %swift.refcounted* %0, i64 1
+  %1 = getelementptr inbounds %swift.refcounted, %swift.refcounted* %0, i64 1
   %2 = bitcast %swift.refcounted* %1 to i64*
-  %length = load i64* %2, align 8
+  %length = load i64, i64* %2, align 8
   %3 = shl i64 %length, 3
   %4 = add i64 %3, 24
   ret i64 %4
@@ -66,7 +66,7 @@ entry:
 @trivial_dtor_metadata2 = internal constant %swift.heapmetadata { i64 (%swift.refcounted*)* @trivial_dtor2, i64 (%swift.refcounted*)* null }
 define internal i64 @trivial_dtor2(%swift.refcounted* nocapture %this) nounwind readonly {
 entry:
-  %0 = getelementptr inbounds %swift.refcounted* %this, i64 1, i32 0
+  %0 = getelementptr inbounds %swift.refcounted, %swift.refcounted* %this, i64 1, i32 0
   store %swift.heapmetadata* inttoptr (i64 4 to %swift.heapmetadata*), %swift.heapmetadata** %0, align 8
   tail call %swift.refcounted* @swift_retain(%swift.refcounted* %this)
   ret i64 48

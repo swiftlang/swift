@@ -21,7 +21,7 @@ bb0:
 sil @_TFCSo4HiveCfMS_FT5queenGSQCSo1B__S_ : $@thin (@owned ImplicitlyUnwrappedOptional<B>, @thick Hive.Type) -> @owned ImplicitlyUnwrappedOptional<Hive> {
 bb0(%0 : $ImplicitlyUnwrappedOptional<B>, %1 : $@thick Hive.Type):
   %2 = thick_to_objc_metatype %1 : $@thick Hive.Type to $@objc_metatype Hive.Type // users: %3, %4
-  // CHECK: load i8** @"\01L_selector(hiveWithQueen:)"
+  // CHECK: load i8*, i8** @"\01L_selector(hiveWithQueen:)"
   %3 = class_method %2 : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : Hive.Type -> (queen: ImplicitlyUnwrappedOptional<B>) -> Hive! , $@cc(objc_method) @thin (ImplicitlyUnwrappedOptional<B>, @objc_metatype Hive.Type) -> @autoreleased ImplicitlyUnwrappedOptional<Hive> // user: %4
   // CHECK: call {{.*}} @objc_msgSend 
   %4 = apply %3(%0, %2) : $@cc(objc_method) @thin (ImplicitlyUnwrappedOptional<B>, @objc_metatype Hive.Type) -> @autoreleased ImplicitlyUnwrappedOptional<Hive> // users: %5, %6

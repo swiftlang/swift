@@ -18,7 +18,7 @@ enum NullableRefcounted {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %object to %O34enum_value_semantics_special_cases18NullableRefcounted*
 // CHECK:   %1 = bitcast %O34enum_value_semantics_special_cases18NullableRefcounted* %0 to %swift.refcounted**
-// CHECK:   %2 = load %swift.refcounted** %1, align 8
+// CHECK:   %2 = load %swift.refcounted*, %swift.refcounted** %1, align 8
 // CHECK:   call void @swift_release(%swift.refcounted* %2) #0
 // CHECK:   ret void
 // CHECK: }
@@ -29,7 +29,7 @@ enum NullableRefcounted {
 // CHECK:   %1 = bitcast %swift.opaque* %src to %O34enum_value_semantics_special_cases18NullableRefcounted*
 // CHECK:   %2 = bitcast %O34enum_value_semantics_special_cases18NullableRefcounted* %0 to %swift.refcounted**
 // CHECK:   %3 = bitcast %O34enum_value_semantics_special_cases18NullableRefcounted* %1 to %swift.refcounted**
-// CHECK:   %4 = load %swift.refcounted** %3, align 8
+// CHECK:   %4 = load %swift.refcounted*, %swift.refcounted** %3, align 8
 // CHECK:   call void @swift_retain_noresult(%swift.refcounted* %4) #0
 // CHECK:   store %swift.refcounted* %4, %swift.refcounted** %2, align 8
 // CHECK:   %5 = bitcast %O34enum_value_semantics_special_cases18NullableRefcounted* %0 to %swift.opaque*
@@ -42,8 +42,8 @@ enum NullableRefcounted {
 // CHECK:   %1 = bitcast %swift.opaque* %src to %O34enum_value_semantics_special_cases18NullableRefcounted*
 // CHECK:   %2 = bitcast %O34enum_value_semantics_special_cases18NullableRefcounted* %0 to %swift.refcounted**
 // CHECK:   %3 = bitcast %O34enum_value_semantics_special_cases18NullableRefcounted* %1 to %swift.refcounted**
-// CHECK:   %4 = load %swift.refcounted** %2, align 8
-// CHECK:   %5 = load %swift.refcounted** %3, align 8
+// CHECK:   %4 = load %swift.refcounted*, %swift.refcounted** %2, align 8
+// CHECK:   %5 = load %swift.refcounted*, %swift.refcounted** %3, align 8
 // CHECK:   call void @swift_retain_noresult(%swift.refcounted* %5) #0
 // CHECK:   store %swift.refcounted* %5, %swift.refcounted** %2, align 8
 // CHECK:   call void @swift_release(%swift.refcounted* %4) #0
@@ -57,8 +57,8 @@ enum NullableRefcounted {
 // CHECK:   %1 = bitcast %swift.opaque* %src to %O34enum_value_semantics_special_cases18NullableRefcounted*
 // CHECK:   %2 = bitcast %O34enum_value_semantics_special_cases18NullableRefcounted* %0 to %swift.refcounted**
 // CHECK:   %3 = bitcast %O34enum_value_semantics_special_cases18NullableRefcounted* %1 to %swift.refcounted**
-// CHECK:   %4 = load %swift.refcounted** %2, align 8
-// CHECK:   %5 = load %swift.refcounted** %3, align 8
+// CHECK:   %4 = load %swift.refcounted*, %swift.refcounted** %2, align 8
+// CHECK:   %5 = load %swift.refcounted*, %swift.refcounted** %3, align 8
 // CHECK:   store %swift.refcounted* %5, %swift.refcounted** %2, align 8
 // CHECK:   call void @swift_release(%swift.refcounted* %4) #0
 // CHECK:   %6 = bitcast %O34enum_value_semantics_special_cases18NullableRefcounted* %0 to %swift.opaque*
@@ -76,14 +76,14 @@ enum MultipleEmptyRefcounted {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %object to %O34enum_value_semantics_special_cases23MultipleEmptyRefcounted*
 // CHECK:   %1 = bitcast %O34enum_value_semantics_special_cases23MultipleEmptyRefcounted* %0 to i64*
-// CHECK:   %2 = load i64* %1, align 8
+// CHECK:   %2 = load i64, i64* %1, align 8
 // CHECK:   switch i64 %2, label %3 [
 // CHECK:     i64 0, label %5
 // CHECK:     i64 2, label %5
 // CHECK:   ]
 // CHECK: ; <label>:3                                       ; preds = %entry
 // CHECK:   %4 = bitcast %O34enum_value_semantics_special_cases23MultipleEmptyRefcounted* %0 to %swift.refcounted**
-// CHECK:   %toDestroy = load %swift.refcounted** %4, align 8
+// CHECK:   %toDestroy = load %swift.refcounted*, %swift.refcounted** %4, align 8
 // CHECK:   call void @swift_release(%swift.refcounted* %toDestroy) #0
 // CHECK:   br label %5
 // CHECK: ; <label>:5                                       ; preds = %3, %entry, %entry
@@ -99,7 +99,7 @@ enum NullableObjCRefcounted {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %object to %O34enum_value_semantics_special_cases22NullableObjCRefcounted*
 // CHECK:   %1 = bitcast %O34enum_value_semantics_special_cases22NullableObjCRefcounted* %0 to %objc_object**
-// CHECK:   %2 = load %objc_object** %1, align 8
+// CHECK:   %2 = load %objc_object*, %objc_object** %1, align 8
 // CHECK:   call void bitcast (void (%swift.refcounted*)* @swift_unknownRelease to void (%objc_object*)*)(%objc_object* %2) #0
 // CHECK:   ret void
 // CHECK: }
@@ -127,7 +127,7 @@ enum AllRefcounted {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %object to %O34enum_value_semantics_special_cases13AllRefcounted*
 // CHECK:   %1 = bitcast %O34enum_value_semantics_special_cases13AllRefcounted* %0 to i64*
-// CHECK:   %2 = load i64* %1, align 8
+// CHECK:   %2 = load i64, i64* %1, align 8
 // --                         0x3fffffffffffffff
 // CHECK:   %3 = and i64 %2, 4611686018427387903
 // CHECK:   %4 = inttoptr i64 %3 to %swift.refcounted*
@@ -157,7 +157,7 @@ enum AllMixedRefcounted {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %object to %O34enum_value_semantics_special_cases18AllMixedRefcounted*
 // CHECK:   %1 = bitcast %O34enum_value_semantics_special_cases18AllMixedRefcounted* %0 to i64*
-// CHECK:   %2 = load i64* %1, align 8
+// CHECK:   %2 = load i64, i64* %1, align 8
 // --                         0x3fffffffffffffff
 // CHECK:   %3 = and i64 %2, 4611686018427387903
 // CHECK:   %4 = inttoptr i64 %3 to %objc_object*

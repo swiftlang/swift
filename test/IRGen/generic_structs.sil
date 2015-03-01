@@ -134,30 +134,30 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
   %a = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.a2
 
   // CHECK: [[METADATA:%.*]] = bitcast %swift.type* {{%.*}} to i64*
-  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64* [[METADATA]], i32 3
-  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i64* [[FIELD_OFFSET_VECTOR]], i32 2
-  // CHECK: [[FIELD_OFFSET:%.*]] = load i64* [[FIELD_OFFSET_ADDR]], align 8
+  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64, i64* [[METADATA]], i32 3
+  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[FIELD_OFFSET_VECTOR]], i32 2
+  // CHECK: [[FIELD_OFFSET:%.*]] = load i64, i64* [[FIELD_OFFSET_ADDR]], align 8
   // CHECK: [[BYTES:%.*]] = bitcast %V15generic_structs14ComplexDynamic* %0 to i8*
-  // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8* [[BYTES]], i64 [[FIELD_OFFSET]]
+  // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8, i8* [[BYTES]], i64 [[FIELD_OFFSET]]
   // CHECK: bitcast i8* [[BYTE_OFFSET]] to %swift.opaque*
   %b = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.b
 
   // CHECK: [[METADATA:%.*]] = bitcast %swift.type* {{%.*}} to i64*
-  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64* [[METADATA]], i32 3
-  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i64* [[FIELD_OFFSET_VECTOR]], i32 3
-  // CHECK: [[FIELD_OFFSET:%.*]] = load i64* [[FIELD_OFFSET_ADDR]], align 8
+  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64, i64* [[METADATA]], i32 3
+  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[FIELD_OFFSET_VECTOR]], i32 3
+  // CHECK: [[FIELD_OFFSET:%.*]] = load i64, i64* [[FIELD_OFFSET_ADDR]], align 8
   // CHECK: [[BYTES:%.*]] = bitcast %V15generic_structs14ComplexDynamic* %0 to i8*
-  // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8* [[BYTES]], i64 [[FIELD_OFFSET]]
+  // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8, i8* [[BYTES]], i64 [[FIELD_OFFSET]]
   // CHECK: bitcast i8* [[BYTE_OFFSET]] to %V15generic_structs13SingleDynamic
   %5 = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.c
   %c = struct_element_addr %5 : $*SingleDynamic<B>, #SingleDynamic.x
 
   // CHECK: [[METADATA:%.*]] = bitcast %swift.type* {{%.*}} to i64*
-  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64* [[METADATA]], i32 3
-  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i64* [[FIELD_OFFSET_VECTOR]], i32 4
-  // CHECK: [[FIELD_OFFSET:%.*]] = load i64* [[FIELD_OFFSET_ADDR]], align 8
+  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64, i64* [[METADATA]], i32 3
+  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[FIELD_OFFSET_VECTOR]], i32 4
+  // CHECK: [[FIELD_OFFSET:%.*]] = load i64, i64* [[FIELD_OFFSET_ADDR]], align 8
   // CHECK: [[BYTES:%.*]] = bitcast %V15generic_structs14ComplexDynamic* %0 to i8*
-  // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8* [[BYTES]], i64 [[FIELD_OFFSET]]
+  // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8, i8* [[BYTES]], i64 [[FIELD_OFFSET]]
   // CHECK: bitcast i8* [[BYTE_OFFSET]] to %V15generic_structs7Chareth
   %d = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.d
   copy_addr %a to %1 : $*Byteful
@@ -169,23 +169,23 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
 }
 
 // CHECK: define linkonce_odr hidden void @_TwXXV15generic_structs13SingleDynamic([24 x i8]* %buffer, %swift.type* %Self) {
-// CHECK:   [[T0:%.*]] = load i8** %1, align 8
+// CHECK:   [[T0:%.*]] = load i8*, i8** %1, align 8
 // CHECK:   %T = bitcast i8* [[T0]] to %swift.type*
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_pattern* %0, i8** %1)
 // CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 //   Fill type argument.
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %T to i8*
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8** [[SELF_ARRAY]], i32 4
+// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i32 4
 // CHECK:   store i8* [[T0]], i8** [[T1]], align 8
 //   Fill vwtable reference.
-// CHECK:   [[VWTABLE_ADDR:%.*]] = getelementptr inbounds i8** [[SELF_ARRAY]], i32 6
+// CHECK:   [[VWTABLE_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i32 6
 // CHECK:   [[VWTABLE_VAL:%.*]] = bitcast i8** [[VWTABLE_ADDR]] to i8*
-// CHECK:   [[VWTABLE_SLOT_ADDR:%.*]] = getelementptr inbounds i8** [[SELF_ARRAY]], i32 -1
+// CHECK:   [[VWTABLE_SLOT_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i32 -1
 // CHECK:   store i8* [[VWTABLE_VAL]], i8** [[VWTABLE_SLOT_ADDR]], align 8
 //   Lay out fields.
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to i64*
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i64* [[T0]], i32 3
-// CHECK:   [[T2:%.*]] = getelementptr inbounds %swift.type** [[TYPES:%.*]], i32 0
+// CHECK:   [[T1:%.*]] = getelementptr inbounds i64, i64* [[T0]], i32 3
+// CHECK:   [[T2:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[TYPES:%.*]], i32 0
 // CHECK:   store %swift.type* %T, %swift.type** [[T2]], align 8
 // CHECK:   call void @swift_initStructMetadata_UniversalStrategy(i64 1, %swift.type** [[TYPES]], i64* [[T1]], i8** [[VWTABLE_ADDR]])
 // CHECK:   ret %swift.type* [[METADATA]]

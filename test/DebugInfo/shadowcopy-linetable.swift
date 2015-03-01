@@ -8,7 +8,7 @@ func foo(inout x : Int) {
   // CHECK: store %Si* %0, %Si** %[[X]], align {{(4|8)}}
   // CHECK-NOT: !dbg
   // CHECK-NEXT: call void @llvm.dbg.declare
-  // CHECK-NEXT: getelementptr inbounds %Si* %0, i32 0, i32 0, !dbg
+  // CHECK-NEXT: getelementptr inbounds %Si, %Si* %0, i32 0, i32 0, !dbg
 }
 
 func main() {

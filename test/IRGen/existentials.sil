@@ -19,9 +19,9 @@ bb0(%0 : $*protocol<>, %1 : $T):
   return %3 : $()
 }
 // CHECK-DAG:   define void @init_opaque_existential([[ANY:%"protocol<>"]]* noalias sret, [[GIZMO:%.*]]*, [[TYPE:%.*]]* %T)
-// CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]]* %0, i32 0, i32 1
+// CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* %0, i32 0, i32 1
 // CHECK-NEXT:    store [[TYPE]]* %T, [[TYPE]]** [[T0]], align 8
-// CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]]* %0, i32 0, i32 0
+// CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* %0, i32 0, i32 0
 // CHECK-NEXT:    [[T1:%.*]] = bitcast [24 x i8]* [[T0]] to [[GIZMO]]**
 // CHECK-NEXT:    store [[GIZMO]]* %1, [[GIZMO]]** [[T1]], align 8
 // CHECK-NEXT:    ret void
@@ -34,17 +34,17 @@ bb0(%0 : $*protocol<>, %1 : $*protocol<>):
 }
 
 // CHECK-DAG:   define void @take_opaque_existential([[ANY:%"protocol<>"]]* noalias sret, %"protocol<>"* noalias) {
-// CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]]* [[SRC:%1]], i32 0, i32 1
-// CHECK-NEXT:    [[TYPE:%.*]] = load %swift.type** [[T0]], align 8
-// CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]]* [[DEST:%0]], i32 0, i32 1
+// CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[SRC:%1]], i32 0, i32 1
+// CHECK-NEXT:    [[TYPE:%.*]] = load %swift.type*, %swift.type** [[T0]], align 8
+// CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[DEST:%0]], i32 0, i32 1
 // CHECK-NEXT:    store %swift.type* [[TYPE]], %swift.type** [[T0]], align 8
-// CHECK-NEXT:    [[SRC_BUF:%.*]] = getelementptr inbounds [[ANY]]* [[SRC]], i32 0, i32 0
-// CHECK-NEXT:    [[DEST_BUF:%.*]] = getelementptr inbounds [[ANY]]* [[DEST]], i32 0, i32 0
+// CHECK-NEXT:    [[SRC_BUF:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[SRC]], i32 0, i32 0
+// CHECK-NEXT:    [[DEST_BUF:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[DEST]], i32 0, i32 0
 // CHECK-NEXT:    [[T0:%.*]] = bitcast %swift.type* [[TYPE]] to i8***
-// CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds i8*** [[T0]], i64 -1
-// CHECK-NEXT:    [[VWTABLE:%.*]] = load i8*** [[T1]], align 8
-// CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds i8** [[VWTABLE]], i32 12
-// CHECK-NEXT:    [[T1:%.*]] = load i8** [[T0]], align 8
+// CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
+// CHECK-NEXT:    [[VWTABLE:%.*]] = load i8**, i8*** [[T1]], align 8
+// CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds i8*, i8** [[VWTABLE]], i32 12
+// CHECK-NEXT:    [[T1:%.*]] = load i8*, i8** [[T0]], align 8
 // CHECK-NEXT:    [[INIT:%.*]] = bitcast i8* [[T1]] to %swift.opaque* ([24 x i8]*, [24 x i8]*, %swift.type*)*
 // CHECK-NEXT:    call %swift.opaque* [[INIT]]([24 x i8]* noalias [[DEST_BUF]], [24 x i8]* [[SRC_BUF]], %swift.type* [[TYPE]])
 // CHECK-NEXT:    ret void

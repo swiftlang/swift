@@ -18,7 +18,7 @@ import gizmo
 
 // CHECK: define hidden void @_TF12objc_structs8getFrame{{.*}}([[NSRECT]]* noalias sret, [[GIZMO]]*) {
 func getFrame(g: Gizmo) -> NSRect {
-  // CHECK: load i8** @"\01L_selector(frame)"
+  // CHECK: load i8*, i8** @"\01L_selector(frame)"
   // CHECK: call void bitcast (void ()* @objc_msgSend_stret to void ([[NSRECT]]*, [[OPAQUE0:.*]]*, i8*)*)([[NSRECT]]* noalias sret {{.*}}, [[OPAQUE0:.*]]* {{.*}}, i8* {{.*}})
   return g.frame()
 }
@@ -26,7 +26,7 @@ func getFrame(g: Gizmo) -> NSRect {
 
 // CHECK: define hidden void @_TF12objc_structs8setFrame{{.*}}(%CSo5Gizmo*, double, double, double, double) {
 func setFrame(g: Gizmo, frame: NSRect) {
-  // CHECK: load i8** @"\01L_selector(setFrame:)"
+  // CHECK: load i8*, i8** @"\01L_selector(setFrame:)"
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OPAQUE0:.*]]*, i8*, [[NSRECT]]*)*)([[OPAQUE0:.*]]* {{.*}}, i8* {{.*}}, [[NSRECT]]* byval align 8 {{.*}})
   g.setFrame(frame)
 }
@@ -55,7 +55,7 @@ func insetRect(r: NSRect, x: Double, y: Double) -> NSRect {
 
 // CHECK: define hidden void @_TF12objc_structs19convertRectFromBase{{.*}}([[NSRECT]]* noalias sret, [[NSVIEW]]*, double, double, double, double)
 func convertRectFromBase(v: NSView, r: NSRect) -> NSRect {
-  // CHECK: load i8** @"\01L_selector(convertRectFromBase:)", align 8
+  // CHECK: load i8*, i8** @"\01L_selector(convertRectFromBase:)", align 8
   // CHECK: call void bitcast (void ()* @objc_msgSend_stret to void ([[NSRECT]]*, [[OPAQUE0:.*]]*, i8*, [[NSRECT]]*)*)([[NSRECT]]* noalias sret {{.*}}, [[OPAQUE0:.*]]* {{.*}}, i8* {{.*}}, [[NSRECT]]* byval align 8 {{.*}})
   return v.convertRectFromBase(r)
 }

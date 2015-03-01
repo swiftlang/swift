@@ -31,8 +31,8 @@ bb0(%0 : $@thick X.Type):
 // CHECK-LABEL: define %objc_class* @foreign_thick_to_objc(%swift.type*)
 sil @foreign_thick_to_objc : $@thin (@thick Gizmo.Type) -> @objc_metatype Gizmo.Type {
 bb0(%0 : $@thick Gizmo.Type):
-  // CHECK: [[KIND_GEP:%[0-9A-Za-z_.]+]] = getelementptr inbounds %swift.type* %0, i32 0, i32 0
-  // CHECK-NEXT: [[KIND:%[0-9A-Za-z_.]+]] = load i64* [[KIND_GEP]], align 8
+  // CHECK: [[KIND_GEP:%[0-9A-Za-z_.]+]] = getelementptr inbounds %swift.type, %swift.type* %0, i32 0, i32 0
+  // CHECK-NEXT: [[KIND:%[0-9A-Za-z_.]+]] = load i64, i64* [[KIND_GEP]], align 8
   // CHECK-NEXT: [[IS_WRAPPER:%[0-9A-Za-z_.]+]] = icmp eq i64 [[KIND]], 14
   // CHECK-NEXT: br i1
   %1 = thick_to_objc_metatype %0 : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
@@ -64,7 +64,7 @@ protocol CP: class {}
 // CHECK:         [[IS_OBJC_WRAPPER:%.*]] = icmp eq i64 {{%.*}}, 14
 // CHECK:         br i1 [[IS_OBJC_WRAPPER]], label %isWrapper, label %metadataForClass.cont
 // CHECK:       isWrapper:
-// CHECK:         [[WRAPPED_CLASS:%.*]] = load %swift.type**
+// CHECK:         [[WRAPPED_CLASS:%.*]] = load %swift.type*, %swift.type**
 // CHECK:       metadataForClass.cont:
 // CHECK:         phi %swift.type* [ %T, %entry ], [ [[WRAPPED_CLASS]], %isWrapper ]
 sil @archetype_objc_metatype : $@thin <T: CP> () -> @objc_metatype T.Type {

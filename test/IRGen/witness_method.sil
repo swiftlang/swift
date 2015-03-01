@@ -13,8 +13,8 @@ protocol DefCon {
 sil @defcon : $@thin <T: DefCon> (@out T, @thick T.Type) -> () {
 entry(%0: $*T, %1: $@thick T.Type):
 
-  // CHECK-i386:   [[WITNESS:%.*]] = load i8** %T.DefCon, align 4
-  // CHECK-x86_64: [[WITNESS:%.*]] = load i8** %T.DefCon, align 8
+  // CHECK-i386:   [[WITNESS:%.*]] = load i8*, i8** %T.DefCon, align 4
+  // CHECK-x86_64: [[WITNESS:%.*]] = load i8*, i8** %T.DefCon, align 8
   // CHECK: [[METHOD:%.*]] = bitcast i8* [[WITNESS]] to void (%swift.opaque*, %swift.type*, %swift.type*)*
   // CHECK: call void [[METHOD]]
   %m = witness_method $T, #DefCon.init!allocator.1 : $@thin @cc(witness_method) <U: DefCon> (@out U, @thick U.Type) -> ()

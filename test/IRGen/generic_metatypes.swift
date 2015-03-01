@@ -43,24 +43,24 @@ protocol Bas {}
 
 // CHECK: define hidden { %swift.type*, i8** } @_TF17generic_metatypes14protocolTypeof{{.*}}(%P17generic_metatypes3Bas_* noalias)
 func protocolTypeof(x: Bas) -> Bas.Type {
-  // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %P17generic_metatypes3Bas_* [[X:%.*]], i32 0, i32 1
-  // CHECK: [[METADATA:%.*]] = load %swift.type** [[METADATA_ADDR]]
-  // CHECK: [[BUFFER:%.*]] = getelementptr inbounds %P17generic_metatypes3Bas_* [[X]], i32 0, i32 0
+  // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %P17generic_metatypes3Bas_, %P17generic_metatypes3Bas_* [[X:%.*]], i32 0, i32 1
+  // CHECK: [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]]
+  // CHECK: [[BUFFER:%.*]] = getelementptr inbounds %P17generic_metatypes3Bas_, %P17generic_metatypes3Bas_* [[X]], i32 0, i32 0
   // CHECK: [[METADATA_I8:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
-  // CHECK-32: [[VW_ADDR:%.*]] = getelementptr inbounds i8*** [[METADATA_I8]], i32 -1
-  // CHECK-64: [[VW_ADDR:%.*]] = getelementptr inbounds i8*** [[METADATA_I8]], i64 -1
-  // CHECK: [[VW:%.*]] = load i8*** [[VW_ADDR]]
-  // CHECK: [[PROJECT_ADDR:%.*]] = getelementptr inbounds i8** [[VW]], i32 2
-  // CHECK-32: [[PROJECT_PTR:%.*]] = load i8** [[PROJECT_ADDR]], align 4
-  // CHECK-64: [[PROJECT_PTR:%.*]] = load i8** [[PROJECT_ADDR]], align 8
+  // CHECK-32: [[VW_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_I8]], i32 -1
+  // CHECK-64: [[VW_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_I8]], i64 -1
+  // CHECK: [[VW:%.*]] = load i8**, i8*** [[VW_ADDR]]
+  // CHECK: [[PROJECT_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VW]], i32 2
+  // CHECK-32: [[PROJECT_PTR:%.*]] = load i8*, i8** [[PROJECT_ADDR]], align 4
+  // CHECK-64: [[PROJECT_PTR:%.*]] = load i8*, i8** [[PROJECT_ADDR]], align 8
   // CHECK-32: [[PROJECT:%.*]] = bitcast i8* [[PROJECT_PTR]] to %swift.opaque* ([12 x i8]*, %swift.type*)*
   // CHECK-64: [[PROJECT:%.*]] = bitcast i8* [[PROJECT_PTR]] to %swift.opaque* ([24 x i8]*, %swift.type*)*
   // CHECK-32: [[PROJECTION:%.*]] = call %swift.opaque* [[PROJECT]]([12 x i8]* [[BUFFER]], %swift.type* [[METADATA]])
   // CHECK-64: [[PROJECTION:%.*]] = call %swift.opaque* [[PROJECT]]([24 x i8]* [[BUFFER]], %swift.type* [[METADATA]])
   // CHECK: [[METATYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* [[PROJECTION]], %swift.type* [[METADATA]])
-  // CHECK: [[T0:%.*]] = getelementptr inbounds %P17generic_metatypes3Bas_* [[X]], i32 0, i32 2
-  // CHECK-32: [[WTABLE:%.*]] = load i8*** [[T0]], align 4
-  // CHECK-64: [[WTABLE:%.*]] = load i8*** [[T0]], align 8
+  // CHECK: [[T0:%.*]] = getelementptr inbounds %P17generic_metatypes3Bas_, %P17generic_metatypes3Bas_* [[X]], i32 0, i32 2
+  // CHECK-32: [[WTABLE:%.*]] = load i8**, i8*** [[T0]], align 4
+  // CHECK-64: [[WTABLE:%.*]] = load i8**, i8*** [[T0]], align 8
   // CHECK: [[T0:%.*]] = insertvalue { %swift.type*, i8** } undef, %swift.type* [[METATYPE]], 0
   // CHECK: [[T1:%.*]] = insertvalue { %swift.type*, i8** } [[T0]], i8** [[WTABLE]], 1
   // CHECK: ret { %swift.type*, i8** } [[T1]]
@@ -130,15 +130,15 @@ func makeGenericMetatypes() {
 // CHECK:   [[BUFFER:%.*]] = alloca [[BUFFER_T:.*]], align
 // CHECK:   [[BAR0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
 // CHECK:   [[BAR1:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
-// CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]]* [[BUFFER]], i32 0, i32 0
+// CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]], [[BUFFER_T]]* [[BUFFER]], i32 0, i32 0
 // CHECK:   store %swift.type* getelementptr {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, %swift.type** [[T0]]
-// CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]]* [[BUFFER]], i32 0, i32 1
+// CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]], [[BUFFER_T]]* [[BUFFER]], i32 0, i32 1
 // CHECK:   store %swift.type* [[BAR0]], %swift.type** [[T0]]
-// CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]]* [[BUFFER]], i32 0, i32 2
+// CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]], [[BUFFER_T]]* [[BUFFER]], i32 0, i32 2
 // CHECK:   store %swift.type* getelementptr {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, %swift.type** [[T0]]
-// CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]]* [[BUFFER]], i32 0, i32 3
+// CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]], [[BUFFER_T]]* [[BUFFER]], i32 0, i32 3
 // CHECK:   store %swift.type* [[BAR1]], %swift.type** [[T0]]
-// CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]]* [[BUFFER]], i32 0, i32 4
+// CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]], [[BUFFER_T]]* [[BUFFER]], i32 0, i32 4
 // CHECK:   store %swift.type* getelementptr {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, %swift.type** [[T0]]
 
 // CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }

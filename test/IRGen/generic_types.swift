@@ -80,26 +80,26 @@ import Swift
 
 // CHECK: define private %swift.type* [[A_METADATA_CREATE]](%swift.type_pattern*, i8**) {
 // CHECK: entry:
-// CHECK:   [[T0:%.*]] = load i8** %1
+// CHECK:   [[T0:%.*]] = load i8*, i8** %1
 // CHECK:   %T = bitcast i8* [[T0]] to %swift.type*
 // CHECK:   [[SUPER:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* @"OBJC_CLASS_$_SwiftObject")
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER]])
 // CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %T to i8*
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8** [[SELF_ARRAY]], i32 9
+// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i32 9
 // CHECK:   store i8* [[T0]], i8** [[T1]], align 8
 // CHECK:   ret %swift.type* [[METADATA]]
 // CHECK: }
 
 // CHECK: define private %swift.type* [[B_METADATA_CREATE]](%swift.type_pattern*, i8**) {
 // CHECK: entry:
-// CHECK:   [[T0:%.*]] = load i8** %1
+// CHECK:   [[T0:%.*]] = load i8*, i8** %1
 // CHECK:   %T = bitcast i8* [[T0]] to %swift.type*
 // CHECK:   [[SUPER:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* @"OBJC_CLASS_$_SwiftObject")
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER]])
 // CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %T to i8*
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8** [[SELF_ARRAY]], i32 9
+// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i32 9
 // CHECK:   store i8* [[T0]], i8** [[T1]], align 8
 // CHECK:   ret %swift.type* [[METADATA]]
 // CHECK: }

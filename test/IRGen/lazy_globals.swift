@@ -38,8 +38,8 @@ var (x, y, z) = (1, 2, 3)
 // CHECK: entry:
 // CHECK:   %0 = call i8* @_TF12lazy_globalsau1xSi()
 // CHECK:   %1 = bitcast i8* %0 to %Si*
-// CHECK:   %.value = getelementptr inbounds %Si* %1, i32 0, i32 0
-// CHECK:   %2 = load i64* %.value, align 8
+// CHECK:   %.value = getelementptr inbounds %Si, %Si* %1, i32 0, i32 0
+// CHECK:   %2 = load i64, i64* %.value, align 8
 // CHECK:   ret i64 %2
 // CHECK: }
 func getX() -> Int { return x }

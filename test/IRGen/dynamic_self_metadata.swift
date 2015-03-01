@@ -14,7 +14,7 @@ class C {
   // CHECK: [[CAST1:%[a-zA-Z0-9]+]] = bitcast [[TYPE]]* [[ALLOCA]] to i64*
   // CHECK: store i64 0, i64* [[CAST1]], align 8
   // CHECK: [[CAST2:%[a-zA-Z0-9]+]] = bitcast [[TYPE]]* [[ALLOCA]] to i64*
-  // CHECK: [[LOAD:%[a-zA-Z0-9]+]] = load i64* [[CAST2]], align 8
+  // CHECK: [[LOAD:%[a-zA-Z0-9]+]] = load i64, i64* [[CAST2]], align 8
   // CHECK: ret i64 [[LOAD]]
 
   func fromInstance() -> Self? { return nil }
@@ -22,7 +22,7 @@ class C {
   // CHECK: [[CAST1:%[a-zA-Z0-9]+]] = bitcast [[TYPE]]* [[ALLOCA]] to i64*
   // CHECK: store i64 0, i64* [[CAST1]], align 8
   // CHECK: [[CAST2:%[a-zA-Z0-9]+]] = bitcast [[TYPE]]* [[ALLOCA]] to i64*
-  // CHECK: [[LOAD:%[a-zA-Z0-9]+]] = load i64* [[CAST2]], align 8
+  // CHECK: [[LOAD:%[a-zA-Z0-9]+]] = load i64, i64* [[CAST2]], align 8
   // CHECK: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%C21dynamic_self_metadata1C*)*)(%C21dynamic_self_metadata1C* %0)
   // CHECK: ret i64 [[LOAD]]
 }

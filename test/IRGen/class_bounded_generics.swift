@@ -85,14 +85,14 @@ func superclass_bounded_archetype_call(x: SomeClass, y: SomeSubclass) -> (SomeCl
 // CHECK-LABEL: define hidden void @_TF22class_bounded_generics30class_bounded_archetype_method{{.*}}(%objc_object*, %objc_object*, %swift.type* %T, i8** %T.ClassBoundBinary)
 func class_bounded_archetype_method<T : ClassBoundBinary>(x: T, y: T) {
   x.classBoundMethod()
-  // CHECK: [[INHERITED:%.*]] = load i8** %T.ClassBoundBinary, align 8
+  // CHECK: [[INHERITED:%.*]] = load i8*, i8** %T.ClassBoundBinary, align 8
   // CHECK: [[INHERITED_WTBL:%.*]] = bitcast i8* [[INHERITED]] to i8**
-  // CHECK: [[WITNESS:%.*]] = load i8** [[INHERITED_WTBL]], align 8
+  // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[INHERITED_WTBL]], align 8
   // CHECK: [[WITNESS_FUNC:%.*]] = bitcast i8* [[WITNESS]] to void (%objc_object*, %swift.type*)
   // CHECK: call void [[WITNESS_FUNC]](%objc_object* %0, %swift.type* {{.*}})
   x.classBoundBinaryMethod(y)
-  // CHECK: [[WITNESS_ENTRY:%.*]] = getelementptr inbounds i8** %T.ClassBoundBinary, i32 1
-  // CHECK: [[WITNESS:%.*]] = load i8** [[WITNESS_ENTRY]], align 8
+  // CHECK: [[WITNESS_ENTRY:%.*]] = getelementptr inbounds i8*, i8** %T.ClassBoundBinary, i32 1
+  // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ENTRY]], align 8
   // CHECK: call void bitcast (void (%swift.refcounted*)* @swift_unknownRetain to void (%objc_object*)*)(%objc_object* %0)
   // CHECK: call void bitcast (void (%swift.refcounted*)* @swift_unknownRetain to void (%objc_object*)*)(%objc_object* [[Y:%.*]])
   // CHECK: [[WITNESS_FUNC:%.*]] = bitcast i8* [[WITNESS]] to void (%objc_object*, %objc_object*, %swift.type*)
@@ -154,7 +154,7 @@ func class_bounded_erasure(x: ConcreteClass) -> ClassBound {
 // CHECK-LABEL: define hidden void @_TF22class_bounded_generics29class_bounded_protocol_method{{.*}}(%objc_object*, i8**) {
 func class_bounded_protocol_method(x: ClassBound) {
   x.classBoundMethod()
-  // CHECK: [[WITNESS:%.*]] = load i8** [[WITNESS_TABLE:%.*]], align 8
+  // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_TABLE:%.*]], align 8
   // CHECK: [[WITNESS_FN:%.*]] = bitcast i8* [[WITNESS]] to void (%objc_object*, %swift.type*)
   // CHECK: call void [[WITNESS_FN]](%objc_object* %0, %swift.type* {{.*}})
 }
@@ -240,9 +240,9 @@ func class_protocol_field_struct_fields
 func class_generic_field_class_fields<T : ClassBound>
 (x:ClassGenericFieldClass<T>) -> (Int, T, Int) {
   return (x.x, x.y, x.z)
-  // CHECK: getelementptr inbounds %C22class_bounded_generics22ClassGenericFieldClass* %0, i32 0, i32 1
-  // CHECK: getelementptr inbounds %C22class_bounded_generics22ClassGenericFieldClass* %0, i32 0, i32 2
-  // CHECK: getelementptr inbounds %C22class_bounded_generics22ClassGenericFieldClass* %0, i32 0, i32 3
+  // CHECK: getelementptr inbounds %C22class_bounded_generics22ClassGenericFieldClass, %C22class_bounded_generics22ClassGenericFieldClass* %0, i32 0, i32 1
+  // CHECK: getelementptr inbounds %C22class_bounded_generics22ClassGenericFieldClass, %C22class_bounded_generics22ClassGenericFieldClass* %0, i32 0, i32 2
+  // CHECK: getelementptr inbounds %C22class_bounded_generics22ClassGenericFieldClass, %C22class_bounded_generics22ClassGenericFieldClass* %0, i32 0, i32 3
 }
 
 // CHECK-LABEL: define hidden void @_TF22class_bounded_generics33class_protocol_field_class_fields{{.*}}(<{ %Si, %P22class_bounded_generics10ClassBound_, %Si }>* noalias sret, %C22class_bounded_generics23ClassProtocolFieldClass*)
@@ -260,11 +260,11 @@ class SomeSwiftClass {
 
 // T must have a Swift loayout, so we can load this metatype with a direct access.
 // CHECK-LABEL: define hidden void @_TF22class_bounded_generics22class_bounded_metatype
-// CHECK:      [[T0:%.*]] = getelementptr inbounds %C22class_bounded_generics14SomeSwiftClass* {{%.*}}, i32 0, i32 0, i32 0
-// CHECK-NEXT: [[T1:%.*]] = load %swift.type** [[T0]], align 8
+// CHECK:      [[T0:%.*]] = getelementptr inbounds %C22class_bounded_generics14SomeSwiftClass, %C22class_bounded_generics14SomeSwiftClass* {{%.*}}, i32 0, i32 0, i32 0
+// CHECK-NEXT: [[T1:%.*]] = load %swift.type*, %swift.type** [[T0]], align 8
 // CHECK-NEXT: [[T2:%.*]] = bitcast %swift.type* [[T1]] to void (%swift.type*)**
-// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds void (%swift.type*)** [[T2]], i64 9
-// CHECK-NEXT: load void (%swift.type*)** [[T3]], align 8
+// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[T2]], i64 9
+// CHECK-NEXT: load void (%swift.type*)*, void (%swift.type*)** [[T3]], align 8
 func class_bounded_metatype<T: SomeSwiftClass>(t : T) {
   t.dynamicType.foo()
 }

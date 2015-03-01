@@ -38,8 +38,8 @@ import gizmo
 
 // CHECK-LABEL: define i8* @project_block_storage({ %objc_block, i8* }* noalias) {
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    %1 = getelementptr inbounds { %objc_block, i8* }* %0, i32 0, i32 1
-// CHECK-NEXT:    %2 = load i8** %1, align 8
+// CHECK-NEXT:    %1 = getelementptr inbounds { %objc_block, i8* }, { %objc_block, i8* }* %0, i32 0, i32 1
+// CHECK-NEXT:    %2 = load i8*, i8** %1, align 8
 // CHECK-NEXT:    ret i8* %2
 // CHECK-NEXT:  }
 sil @project_block_storage : $@thin (@inout @block_storage Builtin.RawPointer) -> Builtin.RawPointer {
@@ -51,8 +51,8 @@ entry(%0 : $*@block_storage Builtin.RawPointer):
 
 // CHECK-LABEL: define fp128 @overaligned_project_block_storage({ %objc_block, fp128 }* noalias) {
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    %1 = getelementptr inbounds { %objc_block, fp128 }* %0, i32 0, i32 1
-// CHECK-NEXT:    %2 = load fp128* %1, align 16
+// CHECK-NEXT:    %1 = getelementptr inbounds { %objc_block, fp128 }, { %objc_block, fp128 }* %0, i32 0, i32 1
+// CHECK-NEXT:    %2 = load fp128, fp128* %1, align 16
 // CHECK-NEXT:    ret fp128 %2
 // CHECK-NEXT:  }
 sil @overaligned_project_block_storage : $@thin (@inout @block_storage Builtin.FPIEEE128) -> Builtin.FPIEEE128 {
@@ -63,7 +63,7 @@ entry(%0 : $*@block_storage Builtin.FPIEEE128):
 }
 
 // CHECK-LABEL: define %objc_block* @init_block_header_trivial({ %objc_block, i8* }* noalias) {
-// CHECK:         %1 = getelementptr inbounds { %objc_block, i8* }* %0, i32 0, i32 0
+// CHECK:         %1 = getelementptr inbounds { %objc_block, i8* }, { %objc_block, i8* }* %0, i32 0, i32 0
 // CHECK:         store %objc_block {
 // CHECK:           %objc_class* [[BLOCK_ISA]]
 // --                  0x4000_0000 -- HAS_SIGNATURE
@@ -83,7 +83,7 @@ entry(%0 : $*@block_storage Builtin.RawPointer):
 
 // CHECK-LABEL: define void @invoke_trivial(void (...)*) {
 // CHECK:         %1 = bitcast void (...)* %0 to { %objc_block, i8* }*
-// CHECK:         %2 = getelementptr inbounds { %objc_block, i8* }* %1, i32 0, i32 1
+// CHECK:         %2 = getelementptr inbounds { %objc_block, i8* }, { %objc_block, i8* }* %1, i32 0, i32 1
 sil @invoke_trivial : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer) -> () {
 entry(%0 : $*@block_storage Builtin.RawPointer):
   %c = project_block_storage %0 : $*@block_storage Builtin.RawPointer
@@ -124,17 +124,17 @@ entry(%0 : $*@block_storage Builtin.NativeObject):
 
 // CHECK:       define internal void [[NONTRIVIAL_BLOCK_COPY]]
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    %2 = getelementptr inbounds { %objc_block, %swift.refcounted* }* %0, i32 0, i32 1
-// CHECK-NEXT:    %3 = getelementptr inbounds { %objc_block, %swift.refcounted* }* %1, i32 0, i32 1
-// CHECK-NEXT:    %4 = load %swift.refcounted** %3, align 8
+// CHECK-NEXT:    %2 = getelementptr inbounds { %objc_block, %swift.refcounted* }, { %objc_block, %swift.refcounted* }* %0, i32 0, i32 1
+// CHECK-NEXT:    %3 = getelementptr inbounds { %objc_block, %swift.refcounted* }, { %objc_block, %swift.refcounted* }* %1, i32 0, i32 1
+// CHECK-NEXT:    %4 = load %swift.refcounted*, %swift.refcounted** %3, align 8
 // CHECK-NEXT:    call void @swift_retain_noresult(%swift.refcounted* %4) #0
 // CHECK-NEXT:    store %swift.refcounted* %4, %swift.refcounted** %2, align 8
 // CHECK-NEXT:    ret void
 
 // CHECK:       define internal void [[NONTRIVIAL_BLOCK_DISPOSE]]
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    %1 = getelementptr inbounds { %objc_block, %swift.refcounted* }* %0, i32 0, i32 1
-// CHECK-NEXT:    %toDestroy = load %swift.refcounted** %1, align 8
+// CHECK-NEXT:    %1 = getelementptr inbounds { %objc_block, %swift.refcounted* }, { %objc_block, %swift.refcounted* }* %0, i32 0, i32 1
+// CHECK-NEXT:    %toDestroy = load %swift.refcounted*, %swift.refcounted** %1, align 8
 // CHECK-NEXT:    call void @swift_release(%swift.refcounted* %toDestroy) #0
 // CHECK-NEXT:    ret void
 

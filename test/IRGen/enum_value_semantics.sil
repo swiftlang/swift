@@ -131,7 +131,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 
 // -- NoPayload getExtraInhabitants
 // CHECK: define linkonce_odr hidden i32 @_TwxgO20enum_value_semantics9NoPayload
-// CHECK:   [[VALUE:%.*]] = load i8* {{%.*}}, align 1
+// CHECK:   [[VALUE:%.*]] = load i8, i8* {{%.*}}, align 1
 // CHECK:   [[ZEXT:%.*]] = zext i8 [[VALUE]] to i32
 // CHECK:   [[SUB:%.*]] = sub i32 [[ZEXT]], 3
 // CHECK:   [[EXTRA:%.*]] = icmp slt i32 [[SUB]], 0
@@ -143,7 +143,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK: entry:
 // CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* [[OBJ]] to %O20enum_value_semantics23SinglePayloadNontrivial*
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O20enum_value_semantics23SinglePayloadNontrivial* [[ADDR]] to i64*
-// CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]], align 8
 // CHECK:   switch i64 %2, label %[[RELEASE_PAYLOAD:[0-9]+]] [
 // CHECK:     i64 0, label %[[DONE:[0-9]+]]
 // CHECK:     i64 2, label %[[DONE]]
@@ -151,7 +151,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK:   ]
 // CHECK: ; <label>:[[RELEASE_PAYLOAD]]
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %O20enum_value_semantics23SinglePayloadNontrivial* [[ADDR]] to %swift.refcounted**
-// CHECK:   [[DATA:%.*]] = load %swift.refcounted** [[DATA_ADDR]], align 8
+// CHECK:   [[DATA:%.*]] = load %swift.refcounted*, %swift.refcounted** [[DATA_ADDR]], align 8
 // CHECK:   call void @swift_release(%swift.refcounted* [[DATA]])
 // CHECK:   br label %[[DONE]]
 // CHECK: ; <label>:[[DONE]]
@@ -181,10 +181,10 @@ enum MultiPayloadNontrivial {
 // CHECK: entry:
 // CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* [[OBJ]] to %O20enum_value_semantics22MultiPayloadNontrivial*
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O20enum_value_semantics22MultiPayloadNontrivial* [[ADDR]] to i128*
-// CHECK:   [[PAYLOAD:%.*]] = load i128* [[PAYLOAD_ADDR]], align 8
-// CHECK:   [[T0:%.*]] = getelementptr inbounds %O20enum_value_semantics22MultiPayloadNontrivial* %0, i32 0, i32 1
+// CHECK:   [[PAYLOAD:%.*]] = load i128, i128* [[PAYLOAD_ADDR]], align 8
+// CHECK:   [[T0:%.*]] = getelementptr inbounds %O20enum_value_semantics22MultiPayloadNontrivial, %O20enum_value_semantics22MultiPayloadNontrivial* %0, i32 0, i32 1
 // CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i3*
-// CHECK:   [[TAG:%.*]] = load i3* [[TAG_ADDR]], align 8
+// CHECK:   [[TAG:%.*]] = load i3, i3* [[TAG_ADDR]], align 8
 // CHECK:   switch i3 [[TAG]], label %[[END:[0-9]+]] [
 // CHECK:     i3 0, label %[[PAYLOAD1_DESTROY:[0-9]+]]
 // CHECK:     i3 2, label %[[PAYLOAD3_DESTROY:[0-9]+]]
@@ -218,7 +218,7 @@ enum MultiPayloadNontrivialSpareBits {
 // CHECK: entry:
 // CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* [[OBJ]] to %O20enum_value_semantics31MultiPayloadNontrivialSpareBits*
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O20enum_value_semantics31MultiPayloadNontrivialSpareBits* [[ADDR]] to i128*
-// CHECK:   [[PAYLOAD:%.*]] = load i128* [[PAYLOAD_ADDR]], align 8
+// CHECK:   [[PAYLOAD:%.*]] = load i128, i128* [[PAYLOAD_ADDR]], align 8
 // CHECK:   switch i2 [[SPARE_BITS:%.*]], label %[[END:[0-9]+]] [
 // CHECK:     i2 0, label %[[PAYLOAD1_DESTROY:[0-9]+]]
 // CHECK:     i2 -2, label %[[PAYLOAD3_DESTROY:[0-9]+]]
