@@ -40,6 +40,7 @@ namespace swift {
   class SILFunctionType;
   enum class SILLinkage : unsigned char;
   class SILModule;
+  class SILLocation;
 
 enum ForDefinition_t : bool {
   NotForDefinition = false,
@@ -197,6 +198,8 @@ struct SILDeclRef {
     return dyn_cast<AutoClosureExpr>(getAbstractClosureExpr());
   }
   FuncDecl *getFuncDecl() const { return dyn_cast<FuncDecl>(getDecl()); }
+  
+  SILLocation getAsRegularLocation() const;
 
   /// Produce a mangled form of this constant.
   ///
@@ -288,8 +291,12 @@ struct SILDeclRef {
   }
 
   /// True if the decl ref references a thunk from a natively foreign
-  /// declaration to Swift (or vice versa).
-  bool isForeignThunk() const;
+  /// declaration to Swift calling convention.
+  bool isForeignToNativeThunk() const;
+  
+  /// True if the decl ref references a thunk from a natively Swift declaration
+  /// to foreign C or ObjC calling convention.
+  bool isNativeToForeignThunk() const;
   
   /// Produces a SILDeclRef from an opaque value.
   explicit SILDeclRef(void *opaqueLoc,

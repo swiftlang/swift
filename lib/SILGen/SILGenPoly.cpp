@@ -1492,7 +1492,7 @@ static SILValue getWitnessFunctionRef(SILGenFunction &gen,
   // A natively ObjC method witness referenced this way will end up going
   // through its native thunk, which will redispatch the method after doing
   // bridging just like we want.
-  if (isFinal || isExtension || witness.isForeignThunk()
+  if (isFinal || isExtension || witness.isForeignToNativeThunk()
       // Hack--We emit a static thunk for ObjC allocating constructors.
       || (witness.getDecl()->hasClangNode()
           && witness.kind == SILDeclRef::Kind::Allocator))

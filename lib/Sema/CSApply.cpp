@@ -4236,6 +4236,7 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
   // pointer captures no context, we can only do the necessary thunking or
   // codegen if the original function is a direct reference to a global function
   // or context-free closure or local function.
+  // TODO: Also need to account for capture of generic type parameters.
   if (toType->getExtInfo().getCC() == AbstractCC::C) {
     // Can convert from an ABI-compatible C function pointer.
     if (fromFnType && fromFnType->getExtInfo().getCC() == AbstractCC::C

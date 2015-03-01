@@ -279,8 +279,8 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
   }
   
   // If the constant is a curry thunk we haven't emitted yet, emit it.
-  if (constant.isCurried) {
-    if (!SGM.hasFunction(constant)) {
+  if (!SGM.hasFunction(constant)) {
+    if (constant.isCurried) {
       // Non-functions can't be referenced uncurried.
       FuncDecl *fd = cast<FuncDecl>(constant.getDecl());
       
@@ -308,11 +308,13 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
       
       SGM.emitCurryThunk(constant, next, fd);
     }
-  }
-  // Otherwise, if this is a foreign thunk we haven't emitted yet, emit it.
-  else if (constant.isForeignThunk()) {
-    if (!SGM.hasFunction(constant))
-      SGM.emitForeignThunk(constant);
+    // Otherwise, if this is a calling convention thunk we haven't emitted yet,
+    // emit it.
+    else if (constant.isForeignToNativeThunk()) {
+      SGM.emitForeignToNativeThunk(constant);
+    } else if (constant.isNativeToForeignThunk()) {
+      SGM.emitNativeToForeignThunk(constant);
+    }
   }
   
   return B.createFunctionRef(loc, SGM.getFunction(constant, NotForDefinition));
@@ -335,7 +337,7 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
     // an ObjC method. This would change if we introduced a native
     // runtime-hookable mechanism.
     SILGenFunction SGF(*this, *F);
-    SGF.emitForeignThunk(constant);
+    SGF.emitForeignToNativeThunk(constant);
   }
 
   return F;
@@ -503,9 +505,9 @@ SILValue SILGenFunction::emitDynamicMethodRef(SILLocation loc,
                                               SILConstantInfo constantInfo) {
   // If the method is foreign, its foreign thunk will handle the dynamic
   // dispatch for us.
-  if (constant.isForeignThunk()) {
+  if (constant.isForeignToNativeThunk()) {
     if (!SGM.hasFunction(constant))
-      SGM.emitForeignThunk(constant);
+      SGM.emitForeignToNativeThunk(constant);
     return B.createFunctionRef(loc, SGM.getFunction(constant, NotForDefinition));
   }
   
@@ -1643,9 +1645,59 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
   return emitManagedRValueWithCleanup(thunkedFn);
 }
 
+static RValue emitCFunctionPointer(SILGenFunction &gen,
+                                   FunctionConversionExpr *conversionExpr) {
+  auto expr = conversionExpr->getSubExpr();
+  
+  // Look through base-ignored exprs to get to the function ref.
+  auto semanticExpr = expr->getSemanticsProvidingExpr();
+  while (auto ignoredBase = dyn_cast<DotSyntaxBaseIgnoredExpr>(semanticExpr)){
+    gen.emitIgnoredExpr(ignoredBase->getLHS());
+    semanticExpr = ignoredBase->getRHS()->getSemanticsProvidingExpr();
+  }
+
+  // Recover the decl reference.
+  SILDeclRef::Loc loc;
+  
+  auto setLocFromConcreteDeclRef = [&](ConcreteDeclRef declRef) {
+    // TODO: Handle generic instantiations, where we need to eagerly specialize
+    // on the given generic parameters, and static methods, where we need to drop
+    // in the metatype.
+    assert(!declRef.getDecl()->getDeclContext()->isTypeContext()
+           && "c pointers to static methods not implemented");
+    assert(declRef.getSubstitutions().empty()
+           && "c pointers to generics not implemented");
+    loc = declRef.getDecl();
+  };
+  
+  if (auto declRef = dyn_cast<DeclRefExpr>(semanticExpr)) {
+    setLocFromConcreteDeclRef(declRef->getDeclRef());
+  } else if (auto memberRef = dyn_cast<MemberRefExpr>(semanticExpr)) {
+    setLocFromConcreteDeclRef(memberRef->getMember());
+  } else if (auto closure = dyn_cast<AbstractClosureExpr>(semanticExpr)) {
+    loc = closure;
+    // Emit the closure body.
+    gen.SGM.emitClosure(closure);
+  } else {
+    llvm_unreachable("c function pointer converted from a non-concrete decl ref");
+  }
+
+  // Produce a reference to the C-compatible entry point for the function.
+  SILDeclRef cEntryPoint(loc, ResilienceExpansion::Minimal,
+                         /*uncurryLevel*/ 0,
+                         /*foreign*/ true);
+  SILValue cRef = gen.emitGlobalFunctionRef(expr, cEntryPoint);
+  return RValue(gen, conversionExpr, ManagedValue::forUnmanaged(cRef));
+}
+
 RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
                                                   SGFContext C)
 {
+  // A "conversion" to a C function pointer is done by referencing the thunk
+  // (or original C function) with the C calling convention.
+  if (e->getType()->castTo<AnyFunctionType>()->getAbstractCC() == AbstractCC::C)
+    return emitCFunctionPointer(SGF, e);
+
   ManagedValue original = SGF.emitRValueAsSingleValue(e->getSubExpr());
   
   // Break the conversion into two stages:
@@ -4742,9 +4794,8 @@ getThunkedForeignFunctionRef(SILGenFunction &gen,
   return gen.emitGlobalFunctionRef(loc, foreign);
 }
 
-void SILGenFunction::emitForeignThunk(SILDeclRef thunk) {
-  // FIXME: native-to-foreign thunk
-  assert(!thunk.isForeign && "native to foreign thunk not implemented");
+void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
+  assert(!thunk.isForeign && "foreign-to-native thunks only");
   
   // Wrap the function in its original form.
 
@@ -4753,8 +4804,6 @@ void SILGenFunction::emitForeignThunk(SILDeclRef thunk) {
   auto resultTy = ci.LoweredInterfaceType->getResult();
   
   // Forward the arguments.
-  // FIXME: For native-to-foreign thunks, use emitObjCThunkArguments to retain
-  // inputs according to the foreign convention.
   auto forwardedPatterns = fd->getBodyParamPatterns();
   // For allocating constructors, 'self' is a metatype, not the 'self' value
   // formally present in the constructor body.
@@ -4828,7 +4877,6 @@ void SILGenFunction::emitForeignThunk(SILDeclRef thunk) {
                                   managedArgs, resultTy->getCanonicalType())
       .forward(*this);
   }
-  // FIXME: use correct convention for native-to-foreign return
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(fd), result);
 }
 

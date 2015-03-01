@@ -181,8 +181,11 @@ public:
                       SILDeclRef nextEntryPoint,
                       FuncDecl *fd);
   
-  /// Emits a thunk from a foreign function to the native Swift conventions.
-  void emitForeignThunk(SILDeclRef thunk);
+  /// Emits a thunk from a foreign function to the native Swift convention.
+  void emitForeignToNativeThunk(SILDeclRef thunk);
+
+  /// Emits a thunk from a Swift function to the native Swift convention.
+  void emitNativeToForeignThunk(SILDeclRef thunk);
 
   template<typename T>
   SILFunction *preEmitFunction(SILDeclRef constant, T *astNode,

@@ -495,20 +495,13 @@ public:
   /// Generates code for a curry thunk from one uncurry level
   /// of a function to another.
   void emitCurryThunk(FuncDecl *fd, SILDeclRef fromLevel, SILDeclRef toLevel);
-  /// Generates a thunk from a foreign function to the native Swift conventions.
-  void emitForeignThunk(SILDeclRef thunk);
+  /// Generates a thunk from a foreign function to the native Swift convention.
+  void emitForeignToNativeThunk(SILDeclRef thunk);
+  /// Generates a thunk from a native function to the  conventions.
+  void emitNativeToForeignThunk(SILDeclRef thunk);
   
   // Generate a nullary function that returns the given value.
   void emitGeneratorFunction(SILDeclRef function, Expr *value);
-
-  /// Generate an ObjC-compatible thunk for a method.
-  void emitObjCMethodThunk(SILDeclRef thunk);
-  
-  /// Generate an ObjC-compatible getter for a property or subscript.
-  void emitObjCGetter(SILDeclRef getter);
-  
-  /// Generate an ObjC-compatible setter for a property or subscript.
-  void emitObjCSetter(SILDeclRef setter);
 
   /// Generate an ObjC-compatible destructor (-dealloc).
   void emitObjCDestructor(SILDeclRef dtor);

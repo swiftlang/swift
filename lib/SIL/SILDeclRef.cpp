@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILLocation.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Mangle.h"
 #include "swift/Basic/Fallthrough.h"
@@ -181,7 +182,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   }
   
   // Currying and calling convention thunks have shared linkage.
-  if (isCurried || isForeignThunk())
+  if (isCurried || isForeignToNativeThunk() || isNativeToForeignThunk())
     return SILLinkage::Shared;
   
   // Declarations imported from Clang modules have shared linkage.
@@ -267,8 +268,9 @@ EffectsKind SILDeclRef::getEffectsAttribute() const {
   return MA->getKind();
 }
 
-bool SILDeclRef::isForeignThunk() const {
-  // Non-decl entry points are never thunks.
+bool SILDeclRef::isForeignToNativeThunk() const {
+  // Non-decl entry points are never natively foreign, so they would never
+  // have a foreign-to-native thunk.
   if (!hasDecl())
     return false;
   // Otherwise, match whether we have a clang node with whether we're foreign.
@@ -281,6 +283,20 @@ bool SILDeclRef::isForeignThunk() const {
           || cast<ConstructorDecl>(getDecl())->isFactoryInit())
       && getDecl()->hasClangNode())
     return !isForeign;
+  return false;
+}
+
+bool SILDeclRef::isNativeToForeignThunk() const {
+  // We can have native-to-foreign thunks over closures.
+  if (!hasDecl())
+    return isForeign;
+  // We can have native-to-foreign thunks over global or local native functions.
+  // TODO: Static functions too.
+  if (auto func = dyn_cast<FuncDecl>(getDecl())) {
+    if (!func->getDeclContext()->isTypeContext()
+        && !func->hasClangNode())
+      return isForeign;
+  }
   return false;
 }
 
@@ -299,7 +315,7 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
   } else if (c.isForeign) {
     assert(prefix.empty() && "can't have custom prefix on thunk");
     introducer = "_TTo";
-  } else if (c.isForeignThunk()) {
+  } else if (c.isForeignToNativeThunk()) {
     assert(prefix.empty() && "can't have custom prefix on thunk");
     introducer = "_TTO";
   }
@@ -319,7 +335,8 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
     // Use the asm name only for the original non-thunked, non-curried entry
     // point.
     if (auto AsmA = c.getDecl()->getAttrs().getAttribute<AsmnameAttr>())
-      if (!c.isForeignThunk() && !c.isCurried) {
+      if (!c.isForeignToNativeThunk() && !c.isNativeToForeignThunk()
+          && !c.isCurried) {
         buffer << AsmA->Name;
         return;
       }
@@ -331,7 +348,8 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
     // As a special case, Clang functions and globals don't get mangled at all.
     // FIXME: When we can import C++, use Clang's mangler.
     if (auto clangDecl = c.getDecl()->getClangDecl()) {
-      if (!c.isForeignThunk() && !c.isCurried) {
+      if (!c.isForeignToNativeThunk() && !c.isNativeToForeignThunk()
+          && !c.isCurried) {
         if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
           if (auto asmLabel = namedClangDecl->getAttr<clang::AsmLabelAttr>()) {
             buffer << '\01' << asmLabel->getLabel();
@@ -450,4 +468,10 @@ SILDeclRef SILDeclRef::getOverriddenVTableEntry() const {
     return overridden;
   }
   return SILDeclRef();
+}
+
+SILLocation SILDeclRef::getAsRegularLocation() const {
+  if (hasDecl())
+    return RegularLocation(getDecl());
+  return RegularLocation(getAbstractClosureExpr());
 }

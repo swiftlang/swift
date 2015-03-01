@@ -518,11 +518,26 @@ void SILGenModule::emitCurryThunk(SILDeclRef entryPoint,
   postEmitFunction(entryPoint, f);
 }
 
-void SILGenModule::emitForeignThunk(SILDeclRef thunk) {
-  assert(!thunk.isForeign && "native-to-foreign thunk not implemented");
+void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
+  assert(!thunk.isForeign && "foreign-to-native thunks only");
   SILFunction *f = preEmitFunction(thunk, thunk.getDecl(), thunk.getDecl());
-  PrettyStackTraceSILFunction X("silgen emitForeignThunk", f);
-  SILGenFunction(*this, *f).emitForeignThunk(thunk);
+  PrettyStackTraceSILFunction X("silgen emitForeignToNativeThunk", f);
+  SILGenFunction(*this, *f).emitForeignToNativeThunk(thunk);
+  postEmitFunction(thunk, f);
+}
+
+void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
+  assert(thunk.isForeign && "native-to-foreign thunks only");
+  
+  SILFunction *f;
+  if (thunk.hasDecl())
+    f = preEmitFunction(thunk, thunk.getDecl(), thunk.getDecl());
+  else
+    f = preEmitFunction(thunk, thunk.getAbstractClosureExpr(),
+                        thunk.getAbstractClosureExpr());
+  PrettyStackTraceSILFunction X("silgen emitNativeToForeignThunk", f);
+  f->setBare(IsBare);
+  SILGenFunction(*this, *f).emitNativeToForeignThunk(thunk);
   postEmitFunction(thunk, f);
 }
 
@@ -777,7 +792,7 @@ void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
   SILFunction *f = preEmitFunction(thunk, method, method);
   PrettyStackTraceSILFunction X("silgen emitObjCMethodThunk", f);
   f->setBare(IsBare);
-  SILGenFunction(*this, *f).emitObjCMethodThunk(thunk);
+  SILGenFunction(*this, *f).emitNativeToForeignThunk(thunk);
   postEmitFunction(thunk, f);
 }
 
@@ -801,7 +816,7 @@ void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
   SILFunction *f = preEmitFunction(getter, prop, ThunkBodyLoc);
   PrettyStackTraceSILFunction X("silgen objc property getter thunk", f);
   f->setBare(IsBare);
-  SILGenFunction(*this, *f).emitObjCGetter(getter);
+  SILGenFunction(*this, *f).emitNativeToForeignThunk(getter);
   postEmitFunction(getter, f);
   }
 
@@ -817,7 +832,7 @@ void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
   SILFunction *f = preEmitFunction(setter, prop, ThunkBodyLoc);
   PrettyStackTraceSILFunction X("silgen objc property setter thunk", f);
   f->setBare(IsBare);
-  SILGenFunction(*this, *f).emitObjCSetter(setter);
+  SILGenFunction(*this, *f).emitNativeToForeignThunk(setter);
   postEmitFunction(setter, f);
 }
 
@@ -834,7 +849,7 @@ void SILGenModule::emitObjCConstructorThunk(ConstructorDecl *constructor) {
   SILFunction *f = preEmitFunction(thunk, constructor, constructor);
   PrettyStackTraceSILFunction X("silgen objc constructor thunk", f);
   f->setBare(IsBare);
-  SILGenFunction(*this, *f).emitObjCMethodThunk(thunk);
+  SILGenFunction(*this, *f).emitNativeToForeignThunk(thunk);
   postEmitFunction(thunk, f);
 }
 
@@ -851,7 +866,7 @@ void SILGenModule::emitObjCDestructorThunk(DestructorDecl *destructor) {
   SILFunction *f = preEmitFunction(thunk, destructor, destructor);
   PrettyStackTraceSILFunction X("silgen objc destructor thunk", f);
   f->setBare(IsBare);
-  SILGenFunction(*this, *f).emitObjCMethodThunk(thunk);
+  SILGenFunction(*this, *f).emitNativeToForeignThunk(thunk);
   postEmitFunction(thunk, f);
 }
 

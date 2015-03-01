@@ -991,6 +991,9 @@ static SelectorFamily getSelectorFamily(Identifier name) {
 static SelectorFamily getSelectorFamily(SILDeclRef c) {
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
+    if (!c.hasDecl())
+      return SelectorFamily::None;
+      
     auto *FD = cast<FuncDecl>(c.getDecl());
     switch (FD->getAccessorKind()) {
     case AccessorKind::NotAccessor:
@@ -1142,16 +1145,15 @@ getUncachedSILFunctionTypeForConstant(SILModule &M, SILDeclRef constant,
 
   // If we have a clang decl associated with the Swift decl, derive its
   // ownership conventions.
-  // FIXME: When we support calling ObjC blocks, we'll need to handle anonymous
-  // SILDeclRefs here too.
+  if (constant.hasDecl()) {
+    auto decl = constant.getDecl();
 
-  auto decl = constant.loc.get<ValueDecl*>();
-
-  if (auto clangDecl = findClangMethod(decl))
-    return getSILFunctionTypeForClangDecl(M, clangDecl,
-                                          origLoweredType, substLoweredType,
-                                          substLoweredInterfaceType,
-                                          extInfo);
+    if (auto clangDecl = findClangMethod(decl))
+      return getSILFunctionTypeForClangDecl(M, clangDecl,
+                                            origLoweredType, substLoweredType,
+                                            substLoweredInterfaceType,
+                                            extInfo);
+  }
 
   // If the decl belongs to an ObjC method family, use that family's
   // ownership conventions.
