@@ -434,8 +434,8 @@ message(STATUS "  Assertions: ${SWIFT_STDLIB_ASSERTIONS}")
 message(STATUS "")
 
 message(STATUS "Building Swift runtime with:")
-message(STATUS "  Dtrace Enabled: ${SWIFT_RUNTIME_ENABLE_DTRACE}")
-message(STATUS "  Leak Detection Checker Entrypoints Enabled: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
+message(STATUS "  Dtrace:                             ${SWIFT_RUNTIME_ENABLE_DTRACE}")
+message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
 message(STATUS "")
 
 #
