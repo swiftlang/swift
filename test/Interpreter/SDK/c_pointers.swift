@@ -1,4 +1,5 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-build-swift %s -Xfrontend -enable-c-function-pointers -o %t/a.out
+// RUN: %target-run %t/a.out | FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -129,3 +130,14 @@ autoreleasepool {
 let s = "Hello World"
 puts(s)
 // CHECK-NEXT: Hello World
+
+//
+// C function pointers
+//
+
+var unsorted = [3, 14, 15, 9, 2, 6, 5]
+qsort(&unsorted, unsorted.count, sizeofValue(unsorted[0])) { a, b in
+  return Int32(UnsafePointer<Int>(a).memory - UnsafePointer<Int>(b).memory)
+}
+// CHECK-NEXT: [2, 3, 5, 6, 9, 14, 15]
+println(unsorted)
