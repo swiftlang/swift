@@ -467,14 +467,6 @@ foreach(SDK ${SWIFT_SDKS})
   endforeach()
 endforeach()
 
-# Find dtrace if it is enabled. We currently only support this on OSX builds.
-if (SWIFT_RUNTIME_ENABLE_DTRACE)
-  find_program(SWIFT_DTRACE "dtrace")
-  if (NOT SWIFT_DTRACE)
-    message(FATAL_ERROR "Failed to find dtrace!")
-  endif()
-endif()
-
 #
 # Set up global CMake variables for API notes.
 #

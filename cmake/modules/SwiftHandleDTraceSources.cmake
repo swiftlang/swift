@@ -1,6 +1,7 @@
 
 # Try to find dtrace if we are asked to use it.
 if (SWIFT_RUNTIME_ENABLE_DTRACE)
+  find_program(SWIFT_DTRACE "dtrace")
   if (NOT SWIFT_DTRACE)
     message(FATAL_ERROR "DTrace was not found!")
   endif()
