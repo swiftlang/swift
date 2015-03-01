@@ -83,6 +83,9 @@ namespace {
 
       /// The source type is a block pointer type.
       Block,
+      
+      /// The source type is a function pointer type.
+      CFunctionPointer,
     };
 
     ImportHintKind Kind;
@@ -106,6 +109,7 @@ namespace {
       case CFPointer:
       case Reference:
       case Block:
+      case CFunctionPointer:
         return 0;
 
       case NSArray:
@@ -149,6 +153,7 @@ namespace {
     case ImportHint::NSSet:
     case ImportHint::NSString:
     case ImportHint::ObjCPointer:
+    case ImportHint::CFunctionPointer:
       return true;
     }
   }
@@ -318,9 +323,16 @@ namespace {
         return getOpaquePointerType();
       
       if (pointeeQualType->isFunctionType()) {
-        // FIXME: Function pointer types can be mapped to Swift function types
-        // once we have the notion of a "thin" function that does not capture
-        // anything.
+        if (Impl.SwiftContext.LangOpts.EnableCFunctionPointers) {
+          auto funcTy = pointeeType->castTo<FunctionType>();
+          // TODO: Proper spelling for C function pointers
+          return {
+            FunctionType::get(funcTy->getInput(), funcTy->getResult(),
+                           funcTy->getExtInfo().withCallingConv(AbstractCC::C)),
+            ImportHint::CFunctionPointer
+          };
+        }
+      
         return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
                                                     "CFunctionPointer",
                                                     pointeeType);
