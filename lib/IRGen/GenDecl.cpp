@@ -1007,7 +1007,10 @@ llvm::GlobalValue::VISIBILITY##Visibility }
         linkage = SILLinkage::Public;
         break;
 
-      default:
+      case SILLinkage::Public:
+      case SILLinkage::PublicExternal:
+      case SILLinkage::HiddenExternal:
+      case SILLinkage::PrivateExternal:
         break;
     }
   }
