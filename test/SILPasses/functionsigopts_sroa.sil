@@ -584,7 +584,6 @@ bb0(%0 : $S1):
 // CHECK: bb0([[IN1:%.*]] : $C1, [[IN2:%.*]] : $Builtin.Int32):
 // CHECK: [[FN:%.*]] = function_ref @_TTSf4g_n__class_callee_1 : $@thin (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
 // CHECK: apply [[FN]]([[IN1]], [[IN2]]) : $@thin (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
-// CHECK: fix_lifetime [[IN1]]
 // CHECK: release_value [[IN1]]
 sil [fragile] @class_callee_1 : $@thin (@owned C1, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $C1, %1 : $Builtin.Int32):
@@ -596,7 +595,6 @@ bb0(%0 : $C1, %1 : $Builtin.Int32):
 // CHECK: bb0([[IN1:%.*]] : $C1, [[IN2:%.*]] : $Builtin.Int32):
 // CHECK: [[FN:%.*]] = function_ref @_TTSf4g_n__class_callee_1 : $@thin (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
 // CHECK: apply [[FN]]([[IN1]], [[IN2]]) : $@thin (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
-// CHECK: fix_lifetime [[IN1]]
 // CHECK: release_value [[IN1]]
 sil [fragile] @class_caller_1 : $@thin (@owned C1, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $C1, %1 : $Builtin.Int32):

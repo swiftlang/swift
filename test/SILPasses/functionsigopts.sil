@@ -127,7 +127,6 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
 // CHECK-LABEL: sil [fragile] [thunk] @owned_to_guaranteed_simple_singlebb_callee : $@thin (@owned Builtin.NativeObject) -> () {
 // CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSf4g__owned_to_guaranteed_simple_singlebb_callee : $@thin (@guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[FUNC_REF]]
-// CHECK: fix_lifetime
 // CHECK: release_value
 sil [fragile] @owned_to_guaranteed_simple_singlebb_callee : $@thin (@owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
@@ -138,7 +137,6 @@ bb0(%0 : $Builtin.NativeObject):
 
 // Callee to make sure we handle multiple callees properly.
 // CHECK-LABEL: sil [fragile] @owned_to_guaranteed_simple_singlebb_caller1 : $@thin (Builtin.NativeObject) -> () {
-// CHECK: fix_lifetime
 // CHECK: release_value
 sil [fragile] @owned_to_guaranteed_simple_singlebb_caller1 : $@thin (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
@@ -149,7 +147,6 @@ bb0(%0 : $Builtin.NativeObject):
 }
 
 // CHECK-LABEL: sil [fragile] @owned_to_guaranteed_simple_singlebb_caller2 : $@thin (Builtin.NativeObject) -> () {
-// CHECK: fix_lifetime
 // CHECK: release_value
 sil [fragile] @owned_to_guaranteed_simple_singlebb_caller2 : $@thin (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
@@ -161,7 +158,7 @@ bb0(%0 : $Builtin.NativeObject):
 
 // We should not optimize this call due to the user.
 // CHECK-LABEL: sil [fragile] @owned_to_guaranteed_sideeffectblock_singlebb_callee
-// CHECK-NOT: fix_lifetime
+// CHECK-NOT: @guaranteed
 sil [fragile] @owned_to_guaranteed_sideeffectblock_singlebb_callee : $@thin (@owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   release_value %0 : $Builtin.NativeObject
@@ -175,7 +172,6 @@ bb0(%0 : $Builtin.NativeObject):
 // BB. Additionally this test makes sure that we delete dead parameters before
 // invalidating the owned argument -> release map.
 // CHECK-LABEL: sil [fragile] [thunk] @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@thin (Builtin.Int1, @owned Builtin.NativeObject) -> () {
-// CHECK: fix_lifetime %1 : $Builtin.NativeObject
 // CHECK: release_value %1 : $Builtin.NativeObject
 sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@thin (Builtin.Int1, @owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.NativeObject):
@@ -192,7 +188,7 @@ bb2:
 
 // In this case the release is not in the exit, so we can not specialize.
 // CHECK-LABEL: sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@thin (@owned Builtin.NativeObject) -> () {
-// CHECK-NOT: fix_lifetime
+// CHECK-NOT: @guaranteed
 sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@thin (@owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   strong_release %0 : $Builtin.NativeObject
@@ -266,38 +262,28 @@ bb2(%5 : $Builtin.NativeObject):
 // CHECK: bb0([[INPUT_PTR_1:%.*]] : $Builtin.NativeObject, [[INPUT_PTR_2:%.*]] : $Builtin.NativeObject):
 // CHECK: [[SINGLEBB_MULTIPLEARG_CALLEE:%.*]] = function_ref @_TTSf4n_g_n__owned_to_guaranteed_simple_singlebb_multiple_arg_callee : $@thin (Builtin.Int1, @guaranteed Builtin.NativeObject, Builtin.Int1) -> ()
 // CHECK: apply [[SINGLEBB_MULTIPLEARG_CALLEE]]({{%.*}}, [[INPUT_PTR_1]], {{%.*}})
-// CHECK: fix_lifetime [[INPUT_PTR_1]]
 // CHECK: release_value [[INPUT_PTR_1]]
 // CHECK: [[MULTIBB_RELEASENOTINEXIT_CALLEE:%.*]] = function_ref @owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@thin (@owned Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASENOTINEXIT_CALLEE]]([[INPUT_PTR_1]])
 // CHECK: [[MULTIBB_RELEASEINEXIT_CALLEE:%.*]] = function_ref @_TTSf4d_g__owned_to_guaranteed_multibb_callee_with_release_in_exit : $@thin (@guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASEINEXIT_CALLEE]]([[INPUT_PTR_1]])
-// CHECK-NEXT: fix_lifetime [[INPUT_PTR_1]] : $Builtin.NativeObject
 // CHECK-NEXT: release_value [[INPUT_PTR_1]] : $Builtin.NativeObject
 // CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS1:%.*]] = function_ref @_TTSf4g_g__owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@thin (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS1]]([[INPUT_PTR_1]], [[INPUT_PTR_2]])
-// CHECK: fix_lifetime [[INPUT_PTR_1]]
 // CHECK: release_value [[INPUT_PTR_1]]
-// CHECK: fix_lifetime [[INPUT_PTR_2]]
 // CHECK: release_value [[INPUT_PTR_2]]
 // CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS1:%.*]] = function_ref @_TTSf4g_g__owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@thin (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS1]]([[INPUT_PTR_2]], [[INPUT_PTR_1]])
-// CHECK: fix_lifetime [[INPUT_PTR_2]]
 // CHECK: release_value [[INPUT_PTR_2]]
-// CHECK: fix_lifetime [[INPUT_PTR_1]]
 // CHECK: release_value [[INPUT_PTR_1]]
 
 // CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS2:%.*]] = function_ref @_TTSf4g_g__owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@thin (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS2]]([[INPUT_PTR_2]], [[INPUT_PTR_1]])
-// CHECK: fix_lifetime [[INPUT_PTR_2]]
 // CHECK: release_value [[INPUT_PTR_2]]
-// CHECK: fix_lifetime [[INPUT_PTR_1]]
 // CHECK: release_value [[INPUT_PTR_1]]
 // CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS2:%.*]] = function_ref @_TTSf4g_g__owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@thin (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS2]]([[INPUT_PTR_1]], [[INPUT_PTR_2]])
-// CHECK: fix_lifetime [[INPUT_PTR_1]]
 // CHECK: release_value [[INPUT_PTR_1]]
-// CHECK: fix_lifetime [[INPUT_PTR_2]]
 // CHECK: release_value [[INPUT_PTR_2]]
 
 sil [fragile] @owned_to_guaranteed_simple_singlebb_multiple_arg_caller : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
@@ -327,7 +313,6 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
 // CHECK-LABEL: sil [fragile] [thunk] [semantics "array.foobar"] @array_semantic : $@cc(method) @thin (@owned Builtin.NativeObject) -> () {
 // CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSf4g__array_semantic : $@thin (@guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[FUNC_REF]]
-// CHECK: fix_lifetime
 // CHECK: release_value
 sil [fragile] [semantics "array.foobar"] @array_semantic : $@cc(method) @thin (@owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
@@ -339,7 +324,6 @@ bb0(%0 : $Builtin.NativeObject):
 // CHECK-LABEL: sil [fragile] @array_semantic_caller : $@thin (Builtin.NativeObject) -> () {
 // CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSf4g__array_semantic : $@thin (@guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[FUNC_REF]]
-// CHECK: fix_lifetime
 // CHECK: release_value
 sil [fragile] @array_semantic_caller : $@thin (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):

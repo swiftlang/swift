@@ -553,8 +553,6 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
     for (auto &ArgDesc : ArgDescs) {
       if (!ArgDesc.CalleeRelease)
         continue;
-
-      Builder.createFixLifetime(Loc, AI->getArgument(ArgDesc.Index));
       Builder.createReleaseValue(Loc, AI->getArgument(ArgDesc.Index));
     }
 
