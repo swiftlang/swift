@@ -433,6 +433,11 @@ message(STATUS "  Build type: ${SWIFT_STDLIB_BUILD_TYPE}")
 message(STATUS "  Assertions: ${SWIFT_STDLIB_ASSERTIONS}")
 message(STATUS "")
 
+message(STATUS "Building Swift runtime with:")
+message(STATUS "  Dtrace Enabled: ${SWIFT_RUNTIME_ENABLE_DTRACE}")
+message(STATUS "  Leak Detection Checker Entrypoints Enabled: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
+message(STATUS "")
+
 #
 # Find optional dependencies.
 #
