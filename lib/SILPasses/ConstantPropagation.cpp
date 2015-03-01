@@ -675,7 +675,6 @@ static SILValue constantFoldInstruction(SILInstruction &I,
   // Constant fold function calls.
   if (BuiltinInst *BI = dyn_cast<BuiltinInst>(&I)) {
     return constantFoldBuiltin(BI, ResultsInError);
-    return SILValue();
   }
 
   // Constant fold extraction of a constant element.
