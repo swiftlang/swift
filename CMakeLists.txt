@@ -157,7 +157,7 @@ option(SWIFT_RUNTIME_ENABLE_DTRACE
   "Should the runtime be built with dtrace instrumentation enabled"
   FALSE)
 
-option(SWIFT_RUNTIME_ENABLE_LEAK_ENTRYPOINTS
+option(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
   "Should the runtime be built with support for non-thread-safe leak detecting entrypoints"
   FALSE)
 

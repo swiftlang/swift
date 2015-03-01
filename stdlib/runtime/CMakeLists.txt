@@ -11,9 +11,9 @@ if(SWIFT_HAVE_CRASH_REPORTER_CLIENT)
 endif()
 
 set(swift_runtime_leaks_sources)
-if(SWIFT_RUNTIME_ENABLE_LEAK_ENTRYPOINTS)
+if(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   list(APPEND swift_runtime_compile_flags
-       "-DSWIFT_RUNTIME_ENABLE_LEAK_ENTRYPOINTS=1")
+       "-DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER=1")
   set(swift_runtime_leaks_sources Leaks.mm)
 endif()
 

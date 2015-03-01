@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if SWIFT_RUNTIME_ENABLE_LEAK_ENTRYPOINTS
+#if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
 
 #include "Leaks.h"
 #include "swift/Runtime/HeapObject.h"
