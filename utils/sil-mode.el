@@ -28,7 +28,8 @@
    `(,(regexp-opt '("class" "init" "deinit" "extension" "func"
                     "import" "protocol" "static" "struct" "subscript"
                     "typealias" "enum" "var" "let" "where"  "sil_vtable"
-                    "sil_global" "private" "sil_witness_table")
+                    "sil_global" "private" "public" "internal" "override"
+                    "sil_witness_table")
                   'words) . font-lock-keyword-face)
    ;; SIL Types
    '("\\b[$][*]?[A-Z][z-aA-Z_[0-9]*\\b" . font-lock-type-face)
@@ -44,7 +45,7 @@
                   'words) . font-lock-keyword-face)
    ;; SIL Linkage
    `(,(regexp-opt '("public" "hidden" "private" "shared" "public_external"
-                    "hidden_external")
+                    "hidden_external" "shared_external" "private_external")
                   'words) . font-lock-keyword-face)
    ;; SIL Declaration
    `(,(regexp-opt '("getter" "setter" "allocator" "initializer" "enumelt"
@@ -67,7 +68,8 @@
                     "strong_release" "strong_retain_unowned" "ref_to_unowned"
                     "unowned_to_ref" "unowned_retain" "unowned_release"
                     "ref_to_unmanaged" "unmanaged_to_ref"
-                    "load_weak" "store_weak" "fix_lifetime")
+                    "load_weak" "store_weak" "fix_lifetime" "mark_dependence"
+                    "strong_unpin" "strong_pin")
 		  'words) . font-lock-keyword-face)
    ;; Literals
    `(,(regexp-opt '("function_ref"
@@ -94,7 +96,7 @@
    ;; swift declaration as well handled at the top.
    `(,(regexp-opt '("init_enum_data_addr" "unchecked_enum_data"
                     "unchecked_take_enum_data_addr" "inject_enum_addr"
-                    "select_enum" "select_value")
+                    "select_enum" "select_value" "select_enum_addr")
                   'words) . font-lock-keyword-face)
    ;; Protocol and Protocol Composition Types
    `(,(regexp-opt '("init_existential" "deinit_existential"
