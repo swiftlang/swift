@@ -999,6 +999,7 @@ llvm::GlobalValue::VISIBILITY##Visibility }
     // module it must be able to access this (not-inlined) function/global.
     switch (linkage) {
       case SILLinkage::Shared:
+      case SILLinkage::SharedExternal:
         return RESULT(LinkOnceODR, Default);
         
       case SILLinkage::Hidden:
@@ -1013,7 +1014,7 @@ llvm::GlobalValue::VISIBILITY##Visibility }
   
   switch (linkage) {
   case SILLinkage::Public: return RESULT(External, Default);
-  case SILLinkage::Shared: return RESULT(LinkOnceODR, Hidden);
+  case SILLinkage::Shared:
   case SILLinkage::SharedExternal: return RESULT(LinkOnceODR, Hidden);
   case SILLinkage::Hidden: return RESULT(External, Hidden);
   case SILLinkage::Private: return RESULT(Internal, Default);
