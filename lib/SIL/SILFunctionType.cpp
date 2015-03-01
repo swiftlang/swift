@@ -634,6 +634,12 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
 
   case AnyFunctionType::Representation::Thin:
   case AnyFunctionType::Representation::Thick: {
+    // TODO: Proper representation for C function pointer types.
+    if (extInfo.getCC() == AbstractCC::C)
+      return getSILFunctionType(M, origType, substType, substInterfaceType,
+                                extInfo, DefaultBlockConventions());
+    
+  
     bool enableGuaranteedSelf = M.getOptions().EnableGuaranteedSelf;
     switch (kind) {
     case SILDeclRef::Kind::Initializer:

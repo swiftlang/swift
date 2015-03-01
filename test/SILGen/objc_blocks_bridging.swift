@@ -60,6 +60,14 @@ import Foundation
   dynamic func optFunc(f: (String -> String)?, x: String) -> String? {
     return f?(x)
   }
+
+  // CHECK-LABEL: sil hidden @_TFC20objc_blocks_bridging3Foo19optCFunctionPointerfS0_FTGSqcSSSS_1xSS_GSqSS_
+  // CHECK:         [[OPT_BUF:%.*]] = alloc_stack $Optional<@cc(cdecl) String -> String>
+  // CHECK:         [[FP_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF]]
+  // CHECK:         load [[FP_BUF]] : $*@cc(cdecl) @thin (NSString) -> @autoreleased NSString
+  dynamic func optCFunctionPointer(fp: (@cc(cdecl) String -> String)?, x: String) -> String? {
+    return fp?(x)
+  }
 }
 
 // CHECK-LABEL: sil hidden @_TF20objc_blocks_bridging10callBlocks
