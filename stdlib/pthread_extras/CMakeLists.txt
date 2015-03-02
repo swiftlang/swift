@@ -5,6 +5,8 @@ add_swift_library(swiftSwiftUnstablePthreadExtras SHARED IS_STDLIB
   PthreadBarriers.swift
   SwiftBlockToCFunctionThunks.cpp
 
+  SWIFT_MODULE_DEPENDS
+    Darwin
   SWIFT_COMPILE_FLAGS -Xfrontend -sil-serialize-all
   INSTALL_IN_COMPONENT stdlib-experimental)
 
