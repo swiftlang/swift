@@ -185,6 +185,8 @@ func getPositiveSubnormal_Float64() -> Float64 {
 }
 
 // FIXME: Float80
+// <rdar://problem/17958458> Int(Float80.quietNaN) is garbage
+
 % for FloatSelf in ['Float32', 'Float64']:
 
 func checkFloatingPointComparison_${FloatSelf}(
@@ -264,6 +266,7 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
 % end
 
 // FIXME: implement Float80 tests after Float80 is implemented.
+// <rdar://problem/20005438> Float80 does not conform to FloatingPointType
 
 FloatingPoint.test("Float32/Literals") {
   if true {
