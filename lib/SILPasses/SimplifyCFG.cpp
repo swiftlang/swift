@@ -2132,7 +2132,8 @@ bool SimplifyCFG::simplifyUnreachableBlock(UnreachableInst *UI) {
 }
 
 bool SimplifyCFG::simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI) {
-  // [exact] does not perform any cast. It checks that the types are exactly the same.
+  // [exact] does not perform any cast.
+  // It checks that the types are exactly the same.
   if (CCBI->isExact())
     return false;
 

@@ -2316,6 +2316,60 @@ SILCombiner::visitCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
 SILInstruction *
 SILCombiner::
 visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
+  // %1 = metatype $A.Type
+  // [%2 = init_existential_metatype %1 ...]
+  // %3 = alloc_stack
+  // store %1 to %3 or store %2 to %3
+  // checked_cast_addr_br %3 to ...
+  // ->
+  // %1 = metatype $A.Type
+  // checked_cast_addr_br %1 to ...
+  if (auto *ASI = dyn_cast<AllocStackInst>(CCABI->getSrc().getDef())) {
+    // Check if the value of this alloc_stack is set only once by a store
+    // instruction, used only by CCABI and then deallocated.
+    bool isLegal = true;
+    StoreInst *Store = nullptr;
+    for (auto Use : ASI->getUses()) {
+      auto *User = Use->getUser();
+      if (isa<DeallocStackInst>(User) || User == CCABI)
+        continue;
+      if (auto *SI = dyn_cast<StoreInst>(User)) {
+        if (!Store) {
+          Store = SI;
+          continue;
+        }
+      }
+      isLegal = false;
+      break;
+    }
+
+    if (isLegal && Store) {
+      // Check what was the value stored in the allocated stack slot.
+      auto Src = Store->getSrc();
+      MetatypeInst *MI = nullptr;
+      if (auto *IEMI = dyn_cast<InitExistentialMetatypeInst>(Src)) {
+        MI = dyn_cast<MetatypeInst>(IEMI->getOperand());
+      }
+
+      if (!MI)
+        MI = dyn_cast<MetatypeInst>(Src);
+
+      if (MI) {
+        SILBuilderWithScope<1> B(CCABI);
+        B.createCheckedCastAddrBranch(CCABI->getLoc(),
+                                  CCABI->getConsumptionKind(),
+                                  MI,
+                                  MI->getType().getSwiftRValueType(),
+                                  CCABI->getDest(),
+                                  CCABI->getTargetType(),
+                                  CCABI->getSuccessBB(),
+                                  CCABI->getFailureBB());
+        CCABI->eraseFromParent();
+        return nullptr;
+      }
+    }
+  }
+
   // Try to determine the outcome of the cast from a known type
   // to a protocol type at compile-time.
   bool isSourceTypeExact = isa<MetatypeInst>(CCABI->getSrc());

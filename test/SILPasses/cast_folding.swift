@@ -8,29 +8,51 @@
 
 protocol P {}
 
+protocol Q: P {}
+
 class A:P {}
 
 class X {}
 
 class B:P {}
 
+private struct S:P {}
+
+struct T:Q {}
+
+private struct U {}
+
+public protocol CP1: class {}
+
+public protocol CP2: class {}
+
+// Class D implements only one of class protocols
+// and it cannot be extended elsewhere as it is private
+private class D: CP1 {}
+
+// Class E implements both class protocols at once
+class E: CP1, CP2 {}
 
 func cast0<T>(a:T) -> Bool {
+  // Succeeds if T is A
   return A().dynamicType is T.Type
 }
 
 
 func cast1<T>(a:T) -> Bool {
+  // Succeeds if T is A
   return (A() as AnyObject).dynamicType is T.Type
 }
 
 func cast2<T>(a:T) -> Bool {
+  // Succeeds if T is A
   let ao:AnyObject = A() as AnyObject
   return ao.dynamicType is T.Type
 }
 
 
 func cast3(p:AnyObject) -> Bool {
+  // Always fails
   return p.dynamicType is AnyObject.Protocol
 }
 
@@ -39,23 +61,28 @@ func cast4(p:AnyObject) -> Bool {
 }
 
 func cast5(t:AnyObject.Type) -> Bool {
+  // Succeeds if t is B.self
   return t is B.Type
 }
 
 func cast6<T>(t:T) -> Bool {
+  // Always fails
   return AnyObject.self is T.Type
 }
 
 func cast7<T>(t:T.Type) -> Bool {
+  // Succeeds if t is AnyObject.self
   return t is AnyObject.Protocol
 }
 
 
 func cast8<T>(a:T) -> Bool {
+  // Succeeds if T is A
   return (A() as P).dynamicType is T.Type
 }
 
 func cast9<T>(a:T) -> Bool {
+  // Succeeds if T is A
   let ao:P = A() as P
   return ao.dynamicType is T.Type
 }
@@ -66,6 +93,7 @@ func cast10(p:P) -> Bool {
 }
 
 func cast11(p:P) -> Bool {
+  // Succeeds if p is of type A
   return p.dynamicType is A.Type
 }
 
@@ -75,32 +103,84 @@ func cast12(t:P.Type) -> Bool {
 
 
 func cast13<T>(t:T) -> Bool {
+  // Succeeds if T is P
   return P.self is T.Type
 }
 
 
 func cast14<T>(t:T.Type) -> Bool {
+  // Succeeds if p is P.self
   return t is P.Protocol
 }
 
 func cast15<T>(t:T) -> Bool {
+  // Succeeds if T is P
   return P.self is T.Type
 }
 
 func cast16<T>(t:T) -> Bool {
+  // Succeeds if T is P
   return T.self is P.Protocol
 }
 
 
 func cast17<T>(t:T) -> Bool {
+  // Succeeds if T is AnyObject
   return AnyObject.self is T.Type
 }
 
 func cast18<T>(t:T) -> Bool {
+  // Succeeds if T is AnyObject
   return T.self is AnyObject.Protocol
 }
 
+func cast20<T>(t:T) -> Bool {
+  // Succeeds if T is P
+  return T.self is P.Type
+}
 
+func cast21<T>(t:T) -> Bool {
+  // Succeeds if T is P
+  return T.self is P.Protocol
+}
+
+func cast22(existential: P.Type) -> Bool {
+  // Succeeds if existential is S.self
+  return existential is S.Type
+}
+
+func cast23(concrete: P.Protocol) -> Bool {
+  // Always fails
+  return concrete is S.Type
+}
+
+
+func cast24(existential: P.Type) -> Bool {
+  // Succeeds if existential is Q.self
+  return existential is Q.Type
+}
+
+
+func cast25(concrete: P.Protocol) -> Bool {
+  // Always fails, because P != Q
+  return concrete is Q.Type
+}
+
+func cast26(existential: Q.Type) -> Bool {
+  // Succeeds always, because Q:P
+  return existential is P.Type
+}
+
+func cast27(existential: CP1.Type) -> Bool {
+  // Fails always, because existential is a class
+  // and it cannot be struct
+  return existential is S.Type
+}
+
+func cast28(existential: CP1.Type) -> Bool {
+  // Succeds if existential conforms to CP1 and CP2
+  return existential is CP2.Type
+}
 
 // CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test0FT_Sb : $@thin () -> Bool
 // CHECK: bb0
@@ -421,6 +501,155 @@ func test19() -> Bool {
     return t is Int.Type
 }
 
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test20_1FT_Sb : $@thin () -> Bool
+@inline(never)
+func test20_1() -> Bool {
+    return cast20(S.self)
+}
+
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test20_2FT_Sb : $@thin () -> Bool
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1 
+@inline(never)
+func test20_2() -> Bool {
+    return cast20(U())
+}
+
+
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test21_1FT_Sb : $@thin () -> Bool
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1 
+@inline(never)
+func test21_1() -> Bool {
+    return cast21(S.self)
+}
+
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test21_2FT_Sb : $@thin () -> Bool
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1 
+@inline(never)
+func test21_2() -> Bool {
+    return cast21(A() as P)
+}
+
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test22_1FT_Sb : $@thin () -> Bool
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1 
+@inline(never)
+func test22_1() -> Bool {
+    return cast22(T.self)
+}
+
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test22_2FT_Sb : $@thin () -> Bool
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1 
+@inline(never)
+func test22_2() -> Bool {
+    return cast22(S.self)
+}
+
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test23FT_Sb : $@thin () -> Bool
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1 
+@inline(never)
+func test23() -> Bool {
+    return cast23(P.self)
+}
+
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test24_1FT_Sb : $@thin () -> Bool
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1 
+@inline(never)
+func test24_1() -> Bool {
+    return cast24(T.self)
+}
+
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test24_2FT_Sb : $@thin () -> Bool
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1 
+@inline(never)
+func test24_2() -> Bool {
+    return cast24(S.self)
+}
+
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test24_3FT_Sb : $@thin () -> Bool
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1 
+@inline(never)
+func test24_3() -> Bool {
+    return cast24(Q.self)
+}
+
+
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test25FT_Sb : $@thin () -> Bool
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1 
+@inline(never)
+func test25() -> Bool {
+    return cast25(P.self)
+}
+
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test26FT_Sb
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1 
+@inline(never)
+func test26() -> Bool {
+    return cast26(T.self)
+}
+
+
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test27FT_Sb
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1 
+@inline(never)
+func test27() -> Bool {
+    return cast27(D.self)
+}
+
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test28_1FT_Sb
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1 
+@inline(never)
+func test28_1() -> Bool {
+    return cast28(D.self)
+}
+
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test28_2FT_Sb
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1 
+@inline(never)
+func test28_2() -> Bool {
+    return cast28(E.self)
+}
+
 println("test0=\(test0())")
 
 println("test1=\(test1())")
@@ -484,3 +713,33 @@ println("test18_1=\(test18_1())")
 println("test18_2=\(test18_2())")
 
 println("test19=\(test19())")
+
+println("test20_1=\(test20_1())")
+
+println("test20_2=\(test20_2())")
+
+println("test21_1=\(test21_1())")
+
+println("test21_2=\(test21_2())")
+
+println("test22_1=\(test22_1())")
+
+println("test22_2=\(test22_2())")
+
+println("test23=\(test23())")
+
+println("test24_1=\(test24_1())")
+
+println("test24_2=\(test24_2())")
+
+println("test24_3=\(test24_3())")
+
+println("test25=\(test25())")
+
+println("test26=\(test26())")
+
+println("test27=\(test27())")
+
+println("test28_1=\(test28_1())")
+
+println("test28_2=\(test28_2())")

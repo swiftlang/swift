@@ -303,9 +303,9 @@ func ExistentialToArchetype<T>(#o : AnyObject, #t : T) -> T {
 // CHECK: unconditional_checked_cast_addr take_always AnyObject in {{%.*}} : $*AnyObject to C
 ExistentialToArchetype(o: o, t: c)
 
-// AnyObject -> Non Class.
+// AnyObject -> Non Class (should always fail)
 // CHECK-LABEL: sil shared @_TTSg5VSs5UInt8___TF37specialize_unconditional_checked_cast22ExistentialToArchetypeU__FT1oPSs9AnyObject_1tQ__Q_ : $@thin (@out UInt8, @owned AnyObject, @in UInt8) -> () {
-// CHECK: unconditional_checked_cast_addr take_always AnyObject in
+// CHECK: builtin "int_trap"()
 ExistentialToArchetype(o: o, t: b)
 
 // AnyObject -> AnyObject

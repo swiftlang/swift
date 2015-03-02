@@ -279,7 +279,8 @@ protected:
     CanType targetType = getOpASTType(inst->getTargetType());
 
     switch (classifyDynamicCast(SwiftMod, sourceType, targetType,
-                                false, inst->getModule().isWholeModule())) {
+                                /* isSourceTypeExact*/ false,
+                                inst->getModule().isWholeModule())) {
     case DynamicCastFeasibility::WillSucceed: {
       emitSuccessfulIndirectUnconditionalCast(B, SwiftMod, loc,
                                               inst->getConsumptionKind(),
@@ -329,7 +330,8 @@ protected:
 
     SILBuilderWithPostProcess<TypeSubstCloner, 16> B(this, inst);
     switch (classifyDynamicCast(SwiftMod, sourceType, targetType,
-                                false, inst->getModule().isWholeModule())) {
+                                /* isSourceTypeExact */ false,
+                                inst->getModule().isWholeModule())) {
     case DynamicCastFeasibility::WillSucceed: {
       emitSuccessfulIndirectUnconditionalCast(B, SwiftMod, loc,
                                               inst->getConsumptionKind(),
