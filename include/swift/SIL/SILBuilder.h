@@ -233,10 +233,11 @@ public:
     return insert(BuiltinInst::create(Loc, Name, ResultTy, Subs, Args, F));
   }
 
-  BuiltinInst *createBuiltinCmp(SILLocation Loc, StringRef Name,
-                                SILType CmpTy, SILType ResultTy,
-                                ArrayRef<SILValue> Args) {
-    CanType IntTy = CmpTy.getSwiftRValueType();
+  /// Create a binary function with the signature: OpdTy, OpdTy -> ResultTy.
+  BuiltinInst *createBuiltinBinaryFunction(SILLocation Loc, StringRef Name,
+                                           SILType OpdTy, SILType ResultTy,
+                                           ArrayRef<SILValue> Args) {
+    CanType IntTy = OpdTy.getSwiftRValueType();
     auto BuiltinIntTy = cast<BuiltinIntegerType>(IntTy);
     llvm::SmallString<16> NameStr = Name;
     if (BuiltinIntTy == BuiltinIntegerType::getWordType(getASTContext())) {
@@ -248,7 +249,30 @@ public:
     auto Ident = getASTContext().getIdentifier(NameStr);
     return insert(BuiltinInst::create(Loc, Ident, ResultTy, {}, Args, F));
   }
-  
+
+  /// Create a binary function with the signature:
+  /// OpdTy, OpdTy, Int1 -> (OpdTy, Int1)
+  BuiltinInst *createBuiltinBinaryFunctionWithOverflow(
+      SILLocation Loc, StringRef Name, ArrayRef<SILValue> Args) {
+    assert(Args.size() == 3 && "Need three arguments");
+    assert(Args[0].getType() == Args[1].getType() &&
+           "Binary operands must match");
+    assert(Args[2].getType().is<BuiltinIntegerType>() &&
+           Args[2].getType().getSwiftRValueType()->isBuiltinIntegerType(1) &&
+           "Must have a third Int1 operand");
+
+    SILType OpdTy = Args[0].getType();
+    SILType Int1Ty = Args[2].getType();
+
+    TupleTypeElt ResultElts[] = {OpdTy.getSwiftRValueType(),
+                                 Int1Ty.getSwiftRValueType()};
+    Type ResultTy = TupleType::get(ResultElts, getASTContext());
+    SILType SILResultTy =
+        SILType::getPrimitiveObjectType(ResultTy->getCanonicalType());
+
+    return createBuiltinBinaryFunction(Loc, Name, OpdTy, SILResultTy, Args);
+  }
+
   FunctionRefInst *createFunctionRef(SILLocation loc, SILFunction *f) {
     return insert(new (F.getModule()) FunctionRefInst(loc, f));
   }
