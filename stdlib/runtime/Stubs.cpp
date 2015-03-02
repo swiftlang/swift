@@ -318,16 +318,14 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
     const char * nptr, T* outResult, T huge,
     T (*posixImpl)(const char *, char **, locale_t)
 ) {
-  const auto CLocale = newlocale(LC_ALL_MASK, NULL, NULL);
   char *EndPtr;
   errno = 0;
-  const auto result = posixImpl(nptr, &EndPtr, CLocale);
+  const auto result = posixImpl(nptr, &EndPtr, NULL);
   *outResult = result;
   if (result == huge || result == -huge || result == 0.0 || result == -0.0) {
       if (errno == ERANGE)
           EndPtr = NULL;
   }
-  freelocale(CLocale);
   return EndPtr;
 }
     
