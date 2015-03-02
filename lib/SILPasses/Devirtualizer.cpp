@@ -49,32 +49,12 @@ static const int MaxNumPolymorphicInlineCaches = 6;
 //                         Class Method Optimization
 //===----------------------------------------------------------------------===//
 
-/// Is this an instruction kind which allows us to conclude definitively what
-/// the class decls of its results are.
-///
-/// FIXME: We can expand this to use typed GEPs.
-static bool isClassDeclOracle(ValueKind Kind) {
-  switch (Kind) {
-  case ValueKind::AllocRefInst:
-  case ValueKind::AllocRefDynamicInst:
-  case ValueKind::MetatypeInst:
-    return true;
-  default:
-    return false;
-  }
-}
-
 /// Return the dynamic class type of the value S, or nullptr if it
 /// cannot be determined whether S has a class type or what type that
 /// is.
 static ClassDecl *getClassFromConstructor(SILValue S) {
   // First strip off casts.
   S = S.stripCasts();
-
-  // Then if S is not a class decl oracle, we can not ascertain what its results
-  // "true" type is.
-  if (!isClassDeclOracle(S->getKind()))
-    return nullptr;
 
   // Look for a a static ClassTypes in AllocRefInst or MetatypeInst.
   if (AllocRefInst *ARI = dyn_cast<AllocRefInst>(S))
