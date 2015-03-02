@@ -132,7 +132,7 @@ static bool isClassWithUnboundGenericParameters(SILType C, SILModule &M) {
 /// \p KnownClass (can be null) is a specific class type to devirtualize to.
 /// return the new ApplyInst if created one or null.
 static ApplyInst *devirtualizeMethod(ApplyInst *AI, SILDeclRef Member,
-                         SILValue ClassInstance, ClassDecl *CD) {
+                                     SILValue ClassInstance, ClassDecl *CD) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
 
   // First attempt to lookup the origin for our class method. The origin should
@@ -211,16 +211,16 @@ static ApplyInst *devirtualizeMethod(ApplyInst *AI, SILDeclRef Member,
     if (auto *FSelfTypeDecl = FSelfClass.getNominalOrBoundGenericNominal()) {
       // Get the unbound generic type F belongs to.
       CanType FSelfGenericType =
-          FSelfTypeDecl->getDeclaredType()->getCanonicalType();
+        FSelfTypeDecl->getDeclaredType()->getCanonicalType();
 
       assert((isa<BoundGenericType>(ClassInstanceType.getSwiftRValueType()) ||
               isa<NominalType>(ClassInstanceType.getSwiftRValueType())) &&
-              "Self type should be either a bound generic type"
-              "or a non-generic type");
+             "Self type should be either a bound generic type"
+             "or a non-generic type");
 
       assert((isa<UnboundGenericType>(FSelfGenericType) ||
               isa<NominalType>(FSelfGenericType)) &&
-              "Method implementation self type should be generic");
+             "Method implementation self type should be generic");
 
       // We know that ClassInstanceType is derived from FSelfGenericType.
       // We need to determine the proper substitutions for FGenericSILClass
@@ -351,9 +351,9 @@ static ApplyInst *devirtualizeMethod(ApplyInst *AI, SILDeclRef Member,
 
   SILType SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
   ApplyInst *NewAI =
-      B.createApply(AI->getLoc(), FRI, SubstCalleeSILType, ReturnType,
-                    Substitutions, NewArgs,
-                    FRI->getReferencedFunction()->isTransparent());
+    B.createApply(AI->getLoc(), FRI, SubstCalleeSILType, ReturnType,
+                  Substitutions, NewArgs,
+                  FRI->getReferencedFunction()->isTransparent());
 
   // If our return type differs from AI's return type, then we know that we have
   // a covariant return type. Cast it before we RAUW. This can not happen 
@@ -408,7 +408,7 @@ static ApplyInst *devirtualizeMethod(ApplyInst *AI, SILDeclRef Member,
 /// witness_method when we've determined the actual function we'll end
 /// up calling.
 static ApplyInst *devirtualizeWitness(ApplyInst *AI, SILFunction *F,
-                               ArrayRef<Substitution> Subs) {
+                                      ArrayRef<Substitution> Subs) {
   // We know the witness thunk and the corresponding set of substitutions
   // required to invoke the protocol method at this point.
   auto &Module = AI->getModule();
@@ -429,7 +429,7 @@ static ApplyInst *devirtualizeWitness(ApplyInst *AI, SILFunction *F,
   // applying all substitutions.
   auto CalleeCanType = F->getLoweredFunctionType();
   auto SubstCalleeCanType = CalleeCanType->substGenericArgs(
-      Module, Module.getSwiftModule(), NewSubstList);
+    Module, Module.getSwiftModule(), NewSubstList);
 
   // Collect arguments from the apply instruction.
   auto Arguments = SmallVector<SILValue, 4>();
@@ -459,7 +459,7 @@ static ApplyInst *devirtualizeWitness(ApplyInst *AI, SILFunction *F,
   auto ResultSILType = SubstCalleeCanType->getSILResult();
   auto *SAI = Builder.createApply(Loc, FRI, SubstCalleeSILType,
                                   ResultSILType, NewSubstList, Arguments,
-                                 FRI->getReferencedFunction()->isTransparent());
+                                  FRI->getReferencedFunction()->isTransparent());
   AI->replaceAllUsesWith(SAI);
   AI->eraseFromParent();
   NumAMI++;
