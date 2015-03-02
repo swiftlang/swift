@@ -426,9 +426,9 @@ static SILValue upcastArgument(SILValue Arg, SILType SuperTy, ApplyInst *AI) {
   return Arg;
 }
 
-/// Devirtualize the application of a witness_method. Replace this application
-/// by invocation of a witness thunk which was found by findFuncInWitnessTable.
-/// /// return the new ApplyInst or null.
+/// Generate a new apply of a function_ref to replace an apply of a
+/// witness_method when we've determined the actual function we'll end
+/// up calling.
 ApplyInst *devirtualizeWitness(ApplyInst *AI, SILFunction *F,
                                ArrayRef<Substitution> Subs) {
   // We know the witness thunk and the corresponding set of substitutions
@@ -487,49 +487,20 @@ ApplyInst *devirtualizeWitness(ApplyInst *AI, SILFunction *F,
   return SAI;
 }
 
-/// Devirtualize apply instructions that call witness_method instructions:
-///
-///   %8 = witness_method $Optional<UInt16>, #LogicValue.boolValue!getter.1
-///   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
-///
-/// return the new ApplyInst if created one or null.
+/// In the cases where we can statically determine the function that
+/// we'll call to, replace an apply of a witness_method with an apply
+/// of a function_ref, returning the new apply.
 static ApplyInst *optimizeWitnessMethod(ApplyInst *AI, WitnessMethodInst *WMI) {
-  // Use findFuncInWitnessTable to walk the inherited/specialized conformances
-  // chain until it finds a NormalProtocolConformance. If such a conformance
-  // is found, it would return the witness thunk as F, the corresponding
-  // WitnessTable and a set of substitutions.
-  //
-  // Once we have this information, we essentially only need to replace the
-  // current apply instruction by a new apply instruction that would invoke the
-  // witness thunk and use proper substitutions. Creation of the new apply
-  // instruction may also involve upcasting the arguments to the types required
-  // by the witness thunk.
-  //
-  // Later on, the invocation of this witness thunk will be inlined by the
-  // compiler, which would create an opportunity for a speculative
-  // devirtualization of class_method invocations inside the body of this thunk.
-
-  ProtocolConformance *C = WMI->getConformance();
-  if (!C) {
-    DEBUG(llvm::dbgs() << "        FAIL: Null conformance.\n");
-    return nullptr;
-  }
-
-  // Lookup the witness method in the witness tables.
-
   SILFunction *F;
   ArrayRef<Substitution> Subs;
   SILWitnessTable *WT;
-  std::tie(F, WT, Subs) =
-      AI->getModule().findFuncInWitnessTable(C, WMI->getMember());
 
-  if (!F) {
-    assert(!WT && "WitnessTable should always be null if F is.");
-    DEBUG(llvm::dbgs() << "        FAIL: Did not find a matching witness "
-                          "table or witness method.\n");
+  std::tie(F, WT, Subs) =
+    AI->getModule().findFuncInWitnessTable(WMI->getConformance(),
+                                           WMI->getMember());
+
+  if (!F)
     return nullptr;
-  }
-  assert(WT && "WitnessTable should never be null if F is not.");
 
   return devirtualizeWitness(AI, F, Subs);
 }
