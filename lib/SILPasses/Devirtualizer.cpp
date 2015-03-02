@@ -404,28 +404,6 @@ static ApplyInst *devirtualizeMethod(ApplyInst *AI, SILDeclRef Member,
 //                        Witness Method Optimization
 //===----------------------------------------------------------------------===//
 
-static SILValue upcastArgument(SILValue Arg, SILType SuperTy, ApplyInst *AI) {
-  SILType ArgTy = Arg.getType();
-  if (dyn_cast<MetatypeInst>(Arg) || dyn_cast<ValueMetatypeInst>(Arg)) {
-    // In case of metatypes passed as parameters, we need to upcast to a
-    // metatype of a superclass.
-    auto &Module = AI->getModule();
-    (void) Module;
-    assert (SuperTy.getSwiftRValueType()->is<AnyMetatypeType>() &&
-           "super type should be a metatype");
-    assert(SuperTy.getMetatypeInstanceType(Module)
-           .isSuperclassOf(ArgTy.getMetatypeInstanceType(Module)) &&
-           "Should only create upcasts for sub class devirtualization.");
-  } else {
-    assert(SuperTy.isSuperclassOf(ArgTy) &&
-           "Should only create upcasts for sub class devirtualization.");
-    (void)ArgTy;
-  }
-
-  Arg = SILBuilderWithScope<1>(AI).createUpcast(AI->getLoc(), Arg, SuperTy);
-  return Arg;
-}
-
 /// Generate a new apply of a function_ref to replace an apply of a
 /// witness_method when we've determined the actual function we'll end
 /// up calling.
@@ -459,13 +437,14 @@ ApplyInst *devirtualizeWitness(ApplyInst *AI, SILFunction *F,
   auto ParamTypes = SubstCalleeCanType->getParameterSILTypes();
   // Type of the current parameter being processed
   auto ParamType = ParamTypes.begin();
+
   // Iterate over the non self arguments and add them to the
   // new argument list, upcasting when required.
+  SILBuilderWithScope<8> B(AI);
   for (SILValue A : AI->getArguments()) {
-    if (A.getType() != *ParamType) {
-      // Upcast argument
-      A = upcastArgument(A, *ParamType, AI);
-    }
+    if (A.getType() != *ParamType)
+      A = B.createUpcast(AI->getLoc(), A, *ParamType);
+    
     Arguments.push_back(A);
     ++ParamType;
   }
