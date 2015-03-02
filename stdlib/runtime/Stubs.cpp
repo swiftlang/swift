@@ -313,31 +313,40 @@ extern "C" uint64_t swift_stdlib_atomicFetchAddUInt64(
 
 // We can't return Float80, but we can receive a pointer to one, so
 // switch the return type and the out parameter on strtold.
-extern "C" const char *_swift_stdlib_strtold_clocale(
-    const char * nptr, void *outResult) {
-  auto CLocale = newlocale(LC_ALL_MASK, NULL, NULL);
+template <typename T>
+static const char *_swift_stdlib_strtoX_clocale_impl(
+    const char * nptr, T* outResult, T huge,
+    T (*posixImpl)(const char *, char **, locale_t)
+) {
+  const auto CLocale = newlocale(LC_ALL_MASK, NULL, NULL);
   char *EndPtr;
-  *static_cast<long double*>(outResult) = strtold_l(nptr, &EndPtr, CLocale);
+  errno = 0;
+  const auto result = posixImpl(nptr, &EndPtr, CLocale);
+  *outResult = result;
+  if (result == huge || result == -huge || result == 0.0 || result == -0.0) {
+      if (errno == ERANGE)
+          EndPtr = NULL;
+  }
   freelocale(CLocale);
   return EndPtr;
+}
+    
+extern "C" const char *_swift_stdlib_strtold_clocale(
+  const char * nptr, void *outResult) {
+  return _swift_stdlib_strtoX_clocale_impl(
+    nptr, static_cast<long double*>(outResult), HUGE_VALL, strtold_l);
 }
 
 extern "C" const char *_swift_stdlib_strtod_clocale(
     const char * nptr, double *outResult) {
-  auto CLocale = newlocale(LC_ALL_MASK, NULL, NULL);
-  char *EndPtr;
-  *outResult = strtod_l(nptr, &EndPtr, CLocale);
-  freelocale(CLocale);
-  return EndPtr;
+  return _swift_stdlib_strtoX_clocale_impl(
+    nptr, outResult, HUGE_VAL, strtod_l);
 }
 
 extern "C" const char *_swift_stdlib_strtof_clocale(
     const char * nptr, float *outResult) {
-  auto CLocale = newlocale(LC_ALL_MASK, NULL, NULL);
-  char *EndPtr;
-  *outResult = strtof_l(nptr, &EndPtr, CLocale);
-  freelocale(CLocale);
-  return EndPtr;
+  return _swift_stdlib_strtoX_clocale_impl(
+    nptr, outResult, HUGE_VALF, strtof_l);
 }
 
 extern "C" int _swift_stdlib_putc_stderr(int C) {

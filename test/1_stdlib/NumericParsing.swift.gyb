@@ -153,6 +153,18 @@ tests.test("${Self}/Basics") {
   expectEmpty(${Self}(" 0"))  // Leading whitespace
   expectEmpty(${Self}("0 "))  // Trailing whitespace
   expectEmpty(${Self}("\u{1D7FF}"))  // MATHEMATICAL MONOSPACE DIGIT NINE
+
+  // Overflow and underflow.  Interleave with other checks to make
+  // sure we're not abusing errno
+  expectEqual(0.0, ${Self}("0"))
+  expectEmpty(${Self}("2e99999999999999"))  
+  expectEqual(0.0, ${Self}("0"))
+  expectEmpty(${Self}("2e-99999999999999"))  
+  expectEqual(0.0, ${Self}("0"))
+  expectEmpty(${Self}("-2e99999999999999"))  
+  expectEqual(0.0, ${Self}("0"))
+  expectEmpty(${Self}("-2e-99999999999999"))  
+  expectEqual(0.0, ${Self}("0"))
 }
 
 % if Self == 'Float80':

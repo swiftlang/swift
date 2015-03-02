@@ -213,19 +213,15 @@ extension ${Self} : Printable {
 extension ${Self} {
   /// Construct from an ASCII representation.
   ///
-  /// The result is `nil` if `text` contains non-ASCII text or
-  /// whitespace, or if it is not completely consumed by the POSIX
-  /// function `strto${cFuncSuffix2[bits]}`.  Otherwise, the result is
-  /// the value returned by `strto${cFuncSuffix2[bits]}`.  See the
-  /// `strto${cFuncSuffix2[bits]} (3)` man page for details of the
-  /// exact format accepted.
+  /// Returns the result of calling the POSIX function
+  /// `strto${cFuncSuffix2[bits]}_l` using the "C" locale, unless
+  /// `text` contains non-ASCII text or whitespace, or is not
+  /// completely consumed by the call. Otherwise, rerturns `nil`.
+  ///
+  /// See the `strto${cFuncSuffix2[bits]} (3)` man page for details of
+  /// the exact format accepted.
   public init?(_ text: String) {
     let u16 = text.utf16
-    // Any non-ASCII or whitespace? return nil.
-    if contains(u16, { $0 > 127 || _isspace_clocale($0) }) {
-      return nil
-    }
-    
     func parseNTBS(chars: UnsafePointer<CChar>) -> (${Self}, Int) {
       var result: ${Self} = 0
       let endPtr = withUnsafeMutablePointer(&result) {
@@ -236,7 +232,11 @@ extension ${Self} {
     }
     
     let (result, n) = text.withCString(parseNTBS)
-    if n == 0 || n != count(u16) { return nil }
+    
+    if n == 0 || n != count(u16)
+      || contains(u16, { $0 > 127 || _isspace_clocale($0) }) {
+      return nil
+    }
     self = result
   }
 }
