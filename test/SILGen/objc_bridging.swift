@@ -91,12 +91,12 @@ func getZim(f: Foo) -> Bool {
 // CHECK-i386:   return [[SWIFT_BOOL]] : $Bool
 // CHECK-i386: }
 
-// CHECK-macsox-x86_64-LABEL: sil hidden @_TF13objc_bridging6getZim
-// CHECK-macsox-x86_64:   [[OBJC_BOOL:%.*]] = apply {{.*}} : $@cc(objc_method) @thin (Foo) -> ObjCBool
-// CHECK-macsox-x86_64:   [[CONVERT:%.*]] = function_ref @swift_ObjCBoolToBool : $@thin (ObjCBool) -> Bool
-// CHECK-macsox-x86_64:   [[SWIFT_BOOL:%.*]] = apply [[CONVERT]]([[OBJC_BOOL]]) : $@thin (ObjCBool) -> Bool
-// CHECK-macsox-x86_64:   return [[SWIFT_BOOL]] : $Bool
-// CHECK-macsox-x86_64: }
+// CHECK-macosx-x86_64-LABEL: sil hidden @_TF13objc_bridging6getZim
+// CHECK-macosx-x86_64:   [[OBJC_BOOL:%.*]] = apply {{.*}} : $@cc(objc_method) @thin (Foo) -> ObjCBool
+// CHECK-macosx-x86_64:   [[CONVERT:%.*]] = function_ref @swift_ObjCBoolToBool : $@thin (ObjCBool) -> Bool
+// CHECK-macosx-x86_64:   [[SWIFT_BOOL:%.*]] = apply [[CONVERT]]([[OBJC_BOOL]]) : $@thin (ObjCBool) -> Bool
+// CHECK-macosx-x86_64:   return [[SWIFT_BOOL]] : $Bool
+// CHECK-macosx-x86_64: }
 
 // CHECK-ios-x86_64-LABEL: sil hidden @_TF13objc_bridging6getZim
 // CHECK-ios-x86_64:   [[SWIFT_BOOL:%.*]] = apply {{.*}} : $@cc(objc_method) @thin (Foo) -> Bool
@@ -118,11 +118,11 @@ func setZim(f: Foo, b: Bool) {
 // CHECK-i386:   apply {{%.*}}([[OBJC_BOOL]], {{%.*}}) : $@cc(objc_method) @thin (ObjCBool, Foo) -> ()
 // CHECK-i386: }
 
-// CHECK-macsox-x86_64-LABEL: sil hidden @_TF13objc_bridging6setZim
-// CHECK-macsox-x86_64:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@thin (Bool) -> ObjCBool
-// CHECK-macsox-x86_64:   [[OBJC_BOOL:%.*]] = apply [[CONVERT]]({{%.*}}) : $@thin (Bool) -> ObjCBool
-// CHECK-macsox-x86_64:   apply {{%.*}}([[OBJC_BOOL]], {{%.*}}) : $@cc(objc_method) @thin (ObjCBool, Foo) -> ()
-// CHECK-macsox-x86_64: }
+// CHECK-macosx-x86_64-LABEL: sil hidden @_TF13objc_bridging6setZim
+// CHECK-macosx-x86_64:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@thin (Bool) -> ObjCBool
+// CHECK-macosx-x86_64:   [[OBJC_BOOL:%.*]] = apply [[CONVERT]]({{%.*}}) : $@thin (Bool) -> ObjCBool
+// CHECK-macosx-x86_64:   apply {{%.*}}([[OBJC_BOOL]], {{%.*}}) : $@cc(objc_method) @thin (ObjCBool, Foo) -> ()
+// CHECK-macosx-x86_64: }
 
 // CHECK-ios-x86_64-LABEL: sil hidden @_TF13objc_bridging6setZim
 // CHECK-ios-x86_64: bb0([[FOO_OBJ:%[0-9]+]] : $Foo, [[SWIFT_BOOL:%[0-9]+]] : $Bool):
