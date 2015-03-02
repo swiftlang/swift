@@ -1281,3 +1281,44 @@ bb3:
  return %2 : $()
 }
 
+
+// CHECK-LABEL: sil @remove_cond_fail_trueblock
+// CHECK: bb0([[COND:%.*]] :
+// CHECK-NOT: bb
+// CHECK: cond_fail [[COND]]
+// CHECK-NOT: bb
+// CHECK: return
+sil @remove_cond_fail_trueblock : $@thin(Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+bb1:
+  %1 = integer_literal $Builtin.Int1, -1
+  cond_fail %1 : $Builtin.Int1
+  unreachable
+bb2:
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @remove_cond_fail_falseblock
+// CHECK: bb0([[COND:%.*]] :
+// CHECK-NOT: bb
+// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NOT: bb
+// CHECK: [[NOTCOND:%.*]] = builtin "xor_Int1"([[COND]]{{.*}}, [[TRUE]]
+// CHECK: cond_fail [[NOTCOND]]
+// CHECK-NOT: bb
+// CHECK: return
+sil @remove_cond_fail_falseblock : $@thin(Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb2, bb1
+
+bb1:
+  %1 = integer_literal $Builtin.Int1, -1
+  cond_fail %1 : $Builtin.Int1
+  unreachable
+
+bb2:
+  %2 = tuple()
+  return %2 : $()
+}

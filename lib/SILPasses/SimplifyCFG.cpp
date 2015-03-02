@@ -1735,6 +1735,26 @@ static bool wouldIntroduceCriticalEdge(TermInst *T, SILBasicBlock *DestBB) {
   return true;
 }
 
+/// \brief Is the first side-effect instruction in this block a cond_fail that
+/// is guarantueed to fail.
+static bool isCondFailBlock(SILBasicBlock *BB,
+                            CondFailInst *&OrigCondFailInst) {
+  auto It = BB->begin();
+  CondFailInst *CondFail = nullptr;
+  // Skip instructions that don't have side-effects.
+  while (It != BB->end() && !(CondFail = dyn_cast<CondFailInst>(It))) {
+    if (It->mayHaveSideEffects())
+      return false;
+    ++It;
+  }
+  if (!CondFail)
+    return false;
+  auto *IL = dyn_cast<IntegerLiteralInst>(CondFail->getOperand());
+  if (!IL)
+    return false;
+  OrigCondFailInst = CondFail;
+  return IL->getValue() != 0;
+}
 
 /// simplifyCondBrBlock - Simplify a basic block that ends with a conditional
 /// branch.
@@ -1895,6 +1915,44 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
         return true;
       }
     }
+  }
+
+  // Simplify a condition branch to a block starting with "cond_fail 1".
+  //
+  // cond_br %cond, TrueSide, FalseSide
+  // TrueSide:
+  //   cond_fail 1
+  //
+  bool IsTrueSideFailing;
+  CondFailInst *OrigCFI = nullptr;
+  if ((IsTrueSideFailing = isCondFailBlock(TrueSide, OrigCFI)) ||
+      isCondFailBlock(FalseSide, OrigCFI)) {
+    auto LiveArgs =  IsTrueSideFailing ? FalseArgs : TrueArgs;
+    auto *LiveBlock =  IsTrueSideFailing ? FalseSide : TrueSide;
+    auto *DeadBlock = !IsTrueSideFailing ? FalseSide : TrueSide;
+    auto *ThisBB = BI->getParent();
+    auto CFCondition = BI->getCondition();
+
+    // If the false side is failing, negate the branch condition.
+    if (!IsTrueSideFailing) {
+      auto *True = SILBuilderWithScope<1>(BI).createIntegerLiteral(
+          OrigCFI->getLoc(), OrigCFI->getOperand().getType(), 1);
+      CFCondition = SILBuilderWithScope<1>(BI).createBuiltinBinaryFunction(
+          OrigCFI->getLoc(), "xor", CFCondition.getType(),
+          CFCondition.getType(), {CFCondition, True});
+    }
+
+    // Create the cond_fail and a branch.
+    SILBuilderWithScope<1>(BI)
+        .createCondFail(OrigCFI->getLoc(), CFCondition);
+    SILBuilderWithScope<1>(BI).createBranch(BI->getLoc(), LiveBlock, LiveArgs);
+
+    BI->eraseFromParent();
+
+    addToWorklist(ThisBB);
+    simplifyAfterDroppingPredecessor(DeadBlock);
+    addToWorklist(LiveBlock);
+    return true;
   }
 
   return false;
