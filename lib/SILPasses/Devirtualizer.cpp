@@ -150,7 +150,7 @@ static bool isClassWithUnboundGenericParameters(SILType C, SILModule &M) {
 ///    reference (such as downcasted class reference).
 /// \p KnownClass (can be null) is a specific class type to devirtualize to.
 /// return the new ApplyInst if created one or null.
-static ApplyInst *devirtMethod(ApplyInst *AI, SILDeclRef Member,
+static ApplyInst *devirtualizeMethod(ApplyInst *AI, SILDeclRef Member,
                          SILValue ClassInstance, ClassDecl *CD) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
 
@@ -632,12 +632,12 @@ static ApplyInst *optimizeApplyInst(ApplyInst *AI) {
   if (auto *CMI = dyn_cast<ClassMethodInst>(AI->getCallee())) {
     // Check if the class member is known to be final.
     if (ClassDecl *C = getClassFromAccessControl(CMI))
-      return devirtMethod(AI, CMI->getMember(), CMI->getOperand(), C);
+      return devirtualizeMethod(AI, CMI->getMember(), CMI->getOperand(), C);
 
     // Try to search for the point of construction.
     if (ClassDecl *C = getClassFromConstructor(CMI->getOperand()))
-      return devirtMethod(AI, CMI->getMember(),
-                          CMI->getOperand().stripUpCasts(), C);
+      return devirtualizeMethod(AI, CMI->getMember(),
+                                CMI->getOperand().stripUpCasts(), C);
   }
 
   return nullptr;
@@ -817,7 +817,7 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   NumInlineCaches++;
 
   // Devirtualize the apply instruction on the identical path.
-  devirtMethod(IdenAI, CMI->getMember(), DownCastedClassInstance, CD);
+  devirtualizeMethod(IdenAI, CMI->getMember(), DownCastedClassInstance, CD);
 
   // Sink class_method instructions down to their single user.
   if (CMI->hasOneUse())
@@ -950,7 +950,8 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
     // be defined by one of the superclasses.
     if (!ClassInstance.getType().isSuperclassOf(InstanceType))
       return false;
-    // ClassInstance and InstanceType should match for devirtMethod to work.
+    // ClassInstance and InstanceType should match for
+    // devirtualizeMethod to work.
     ClassInstance = ClassInstance.stripUpCasts();
   }
 
@@ -1055,7 +1056,7 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   // implementation which is not covered by checked_cast_br checks yet.
   // So, it is safe to replace a class_method invocation by
   // a direct call of this remaining implementation.
-  devirtMethod(AI, CMI->getMember(), ClassInstance, CD);
+  devirtualizeMethod(AI, CMI->getMember(), ClassInstance, CD);
 
   return true;
 }
