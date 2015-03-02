@@ -27,8 +27,10 @@ static DynamicCastFeasibility weakenSuccess(DynamicCastFeasibility v) {
 
 static unsigned getAnyMetatypeDepth(CanType type) {
   unsigned depth = 0;
-  while (auto metatype = dyn_cast<AnyMetatypeType>(type))
+  while (auto metatype = dyn_cast<AnyMetatypeType>(type)) {
     type = metatype.getInstanceType();
+    depth++;
+  }
   return depth;
 }
 
