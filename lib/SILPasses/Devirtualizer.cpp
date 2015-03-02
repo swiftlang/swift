@@ -75,9 +75,11 @@ static SILType bindSuperclass(Module *Module,
                               CanType Superclass,
                               SILType BoundDerived,
                               ArrayRef<Substitution>& Subs) {
+  assert(BoundDerived && "Expected non-null type!");
+
   SILType BoundSuperclass = BoundDerived;
 
-  while (true) {
+  do {
     auto CanBoundSuperclass = BoundSuperclass.getSwiftRValueType();
     // Get declaration of the superclass.
     auto *Decl = CanBoundSuperclass.getNominalOrBoundGenericNominal();
@@ -95,12 +97,10 @@ static SILType bindSuperclass(Module *Module,
         Subs.empty();
       return BoundSuperclass;
     }
+
     // Get the superclass of current one
     BoundSuperclass = BoundSuperclass.getSuperclass(nullptr);
-    // Stop iteration if there is no superclass.
-    if (!BoundSuperclass)
-      return SILType();
-  }
+  } while (BoundSuperclass);
 
   return SILType();
 }
