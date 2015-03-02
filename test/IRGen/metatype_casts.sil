@@ -65,3 +65,25 @@ entry(%m : $@objc_metatype SomeClassProtocol.Type):
   return %o : $AnyObject
 }
 
+class OtherClass : SomeClass {}
+sil_vtable OtherClass {}
+
+// CHECK-LABEL: define void @value_metatype_cast(%C14metatype_casts9SomeClass*)
+// CHECK:         [[T0:%.*]] = bitcast %C14metatype_casts9SomeClass* %0 to %swift.type**
+// CHECK:         [[T1:%.*]] = load %swift.type*, %swift.type** [[T0]]
+// CHECK:         [[T2:%.*]] = icmp eq %swift.type* [[T1]], getelementptr {{.*}} @_TMdC14metatype_casts10OtherClass
+sil @value_metatype_cast : $@thin (SomeClass) -> () {
+entry(%0 : $SomeClass):
+  %1 = value_metatype $@thick SomeClass.Type, %0 : $SomeClass
+  checked_cast_br [exact] %1 : $@thick SomeClass.Type to $@thick OtherClass.Type, yes, no
+
+yes(%2 : $@thick OtherClass.Type):
+  br end
+
+no:
+  br end
+
+end:
+  return undef : $()
+}
+

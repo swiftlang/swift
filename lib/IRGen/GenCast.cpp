@@ -27,6 +27,7 @@
 
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/ABI/MetadataValues.h"
 
 using namespace swift;
@@ -84,6 +85,14 @@ llvm::Value *irgen::emitClassIdenticalCast(IRGenFunction &IGF,
                                            SILType fromType,
                                            SILType toType,
                                            CheckedCastMode mode) {
+  // Check metatype objects directly. Don't try to find their meta-metatype.
+  bool isMetatype = isa<MetatypeType>(fromType.getSwiftRValueType());
+  if (isMetatype) {
+    auto metaType = cast<MetatypeType>(toType.getSwiftRValueType());
+    assert(metaType->getRepresentation() != MetatypeRepresentation::ObjC &&
+           "not implemented");
+    toType = IGF.IGM.SILMod->Types.getLoweredType(metaType.getInstanceType());
+  }
   // Emit a reference to the heap metadata for the target type.
   const bool allowConservative = true;
 
@@ -104,7 +113,14 @@ llvm::Value *irgen::emitClassIdenticalCast(IRGenFunction &IGF,
                                  /*allowUninitialized*/ allowConservative);
   }
 
-  llvm::Value *objectMetadata =
+  // Handle checking a metatype object's type by directly comparing the address
+  // of the metatype value to the subclass's static metatype instance.
+  //
+  // %1 = value_metatype $Super.Type, %0 : $A
+  // checked_cast_br [exact] %1 : $Super.Type to $Sub.Type
+  // =>
+  // icmp eq %1, @metadata.Sub
+  llvm::Value *objectMetadata = isMetatype ? from :
     emitHeapMetadataRefForHeapObject(IGF, from, fromType);
 
   objectMetadata = IGF.Builder.CreateBitCast(objectMetadata, targetMetadata->getType());
