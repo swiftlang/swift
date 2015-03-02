@@ -64,8 +64,9 @@ static bool isClassDeclOracle(ValueKind Kind) {
   }
 }
 
-/// \brief Recursively searches the ClassDecl for a class_method operand.
-/// Return the ClassDecl from the point of construction of \p S or null.
+/// Return the dynamic class type of the value S, or nullptr if it
+/// cannot be determined whether S has a class type or what type that
+/// is.
 static ClassDecl *getClassFromConstructor(SILValue S) {
   // First strip off casts.
   S = S.stripCasts();
