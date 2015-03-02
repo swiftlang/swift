@@ -1,0 +1,196 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// Format-agnostic interfaces for serialization and deserialization.
+//
+//===----------------------------------------------------------------------===//
+
+%{
+
+from SwiftIntTypes import *
+
+# Number of bits in the Builtin.Word type
+word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
+
+}%
+
+public protocol SerializableScalarType {
+  init(forDeserialization: ())
+
+  mutating func serializeDeserialize<
+    Serializer : ScalarSerializerType
+  >(inout s: Serializer)
+}
+
+public protocol ScalarSerializerType {
+  mutating func add(inout value: Int64)
+  mutating func add(inout value: UInt64)
+  mutating func add(inout value: Float)
+  mutating func add(inout value: Double)
+  mutating func add(inout value: Bool)
+  mutating func add(inout value: String)
+}
+
+% for self_ty in all_integer_types(word_bits):
+%   Self = self_ty.stdlib_name
+%   serialized_self = 'Int64' if self_ty.is_signed else 'UInt64'
+
+extension ${Self} : SerializableScalarType {
+  public init(forDeserialization: ()) {
+    self = ${Self}()
+  }
+
+  public mutating func serializeDeserialize<
+    Serializer : ScalarSerializerType
+  >(inout s: Serializer) {
+    var serializedSelf = ${serialized_self}(self)
+    s.add(&serializedSelf)
+    self = ${Self}(serializedSelf)
+  }
+}
+
+% end
+
+% for Self in [ 'Float', 'Double', 'Bool', 'String' ]:
+
+extension ${Self} : SerializableScalarType {
+  public init(forDeserialization: ()) {
+    self = ${Self}()
+  }
+
+  public mutating func serializeDeserialize<
+    Serializer : ScalarSerializerType
+  >(inout s: Serializer) {
+    s.add(&self)
+  }
+}
+
+% end
+
+public protocol SerializableArrayType {
+  init(forDeserialization: ())
+
+  mutating func serializeDeserialize<
+    Serializer : ArraySerializerType
+  >(inout s: Serializer)
+}
+
+public protocol ArraySerializerType {
+  mutating func add<
+    Value : RangeReplaceableCollectionType
+    where
+      Value.Generator.Element : SerializableScalarType
+  >(inout value: Value)
+
+  mutating func add<
+    Value : RangeReplaceableCollectionType
+    where
+      Value.Generator.Element : SerializableArrayType
+  >(inout value: Value)
+
+  mutating func add<
+    Value : RangeReplaceableCollectionType
+    where
+      Value.Generator.Element : SerializableDictionaryType
+  >(inout value: Value)
+
+  mutating func add<
+    Value : RangeReplaceableCollectionType
+    where
+      Value.Generator.Element : SerializableFixedDictionaryType
+  >(inout value: Value)
+}
+
+/*
+error: extension of generic type '...' from a different module cannot provide public declarations
+
+% for Self in [ 'Array', 'ArraySlice', 'ContiguousArray' ]:
+
+extension ${Self} : SerializableArrayType {
+  public init(forDeserialization: ()) {
+    self = ${Self}()
+  }
+
+  public mutating func serializeDeserialize<
+    Serializer : ScalarSerializerType
+  >(inout s: Serializer) {
+    s.add(&self)
+  }
+}
+
+% end
+*/
+
+public protocol SerializableDictionaryType {
+  init(forDeserialization: ())
+
+  mutating func serializeDeserialize<
+    Serializer : DictionarySerializerType
+  >(inout s: Serializer)
+}
+
+public protocol DictionarySerializerType {
+  mutating func add<
+    Value : SerializableScalarType
+  >(inout value: [String : Value])
+
+  mutating func add<
+    Value : SerializableArrayType
+  >(inout value: [String : Value])
+
+  mutating func add<
+    Value : SerializableDictionaryType
+  >(inout value: [String : Value])
+
+  mutating func add<
+    Value : SerializableFixedDictionaryType
+  >(inout value: [String : Value])
+}
+
+public protocol SerializableFixedDictionaryType {
+  init(forDeserialization: ())
+
+  mutating func serializeDeserialize<
+    Serializer : FixedDictionarySerializerType
+  >(inout s: Serializer)
+}
+
+public protocol FixedDictionarySerializerType {
+  mutating func addKey<
+    Value : SerializableScalarType
+  >(key: String, inout value: Value)
+
+  mutating func addKey<
+    Value : SerializableArrayType
+  >(key: String, inout value: Value)
+
+  mutating func addKey<
+    Value : SerializableDictionaryType
+  >(key: String, inout value: Value)
+
+  mutating func addKey<
+    Value : SerializableFixedDictionaryType
+  >(key: String, inout value: Value)
+
+  // FIXME: workaround for compiler limitation: 'SerializableArrayType' is not
+  // useful since Array<T> can not conform to it.
+  mutating func addKey<
+    Value : SerializableScalarType
+  >(key: String, inout value: [Value])
+
+  // FIXME: workaround for compiler limitation: 'SerializableDictionaryType' is
+  // not useful since Array<T> can not conform to it.
+  mutating func addKey<
+    Value : SerializableScalarType
+  >(key: String, inout value: [String : Value])
+}
+
