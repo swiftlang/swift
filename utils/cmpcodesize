@@ -301,7 +301,7 @@ def main():
 
     for file in (oldFiles + newFiles):
         if not os.path.isfile(file):
-            sys.exit("file #{file} not found")
+            sys.exit("file " + file + " not found")
 
     if listFunctions:
         if allSections or listCategories:
