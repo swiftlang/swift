@@ -313,10 +313,31 @@ extern "C" uint64_t swift_stdlib_atomicFetchAddUInt64(
 
 // We can't return Float80, but we can receive a pointer to one, so
 // switch the return type and the out parameter on strtold.
-extern "C" const char *_swift_strtold(const char * nptr, void *outResult) {
-  char *endPtr;
-  *static_cast<long double*>(outResult) = std::strtold(nptr, &endPtr);
-  return endPtr;
+extern "C" const char *_swift_stdlib_strtold_clocale(
+    const char * nptr, void *outResult) {
+  auto CLocale = newlocale(LC_ALL_MASK, NULL, NULL);
+  char *EndPtr;
+  *static_cast<long double*>(outResult) = strtold_l(nptr, &EndPtr, CLocale);
+  freelocale(CLocale);
+  return EndPtr;
+}
+
+extern "C" const char *_swift_stdlib_strtod_clocale(
+    const char * nptr, double *outResult) {
+  auto CLocale = newlocale(LC_ALL_MASK, NULL, NULL);
+  char *EndPtr;
+  *outResult = strtod_l(nptr, &EndPtr, CLocale);
+  freelocale(CLocale);
+  return EndPtr;
+}
+
+extern "C" const char *_swift_stdlib_strtof_clocale(
+    const char * nptr, float *outResult) {
+  auto CLocale = newlocale(LC_ALL_MASK, NULL, NULL);
+  char *EndPtr;
+  *outResult = strtof_l(nptr, &EndPtr, CLocale);
+  freelocale(CLocale);
+  return EndPtr;
 }
 
 extern "C" int _swift_stdlib_putc_stderr(int C) {

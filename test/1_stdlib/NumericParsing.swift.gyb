@@ -84,6 +84,7 @@ tests.test("${Self}/success") {
   // Out-of-range values
   expectEqual(nil, ${Self}("${maxValue + 1}"))
   expectEqual(nil, ${Self}("${minValue - 1}"))
+  expectEqual(nil, ${Self}("\u{1D7FF}"))  // MATHEMATICAL MONOSPACE DIGIT NINE
 
   // Do more exhaustive testing
   % for radix in radices_to_test:
@@ -123,8 +124,6 @@ tests.test("${Self}/radixTooHigh") {
 % end
 
 tests.test("${Self}/Basics") {
-  setlocale(LC_ALL, "")
-  
 % if Self != 'Float80': # Inf/NaN are not defined for Float80
   expectEqual(.infinity, ${Self}("Inf"))
   expectEqual(-(.infinity), ${Self}("-Inf"))
@@ -153,6 +152,7 @@ tests.test("${Self}/Basics") {
   expectEmpty(${Self}("99x"))
   expectEmpty(${Self}(" 0"))  // Leading whitespace
   expectEmpty(${Self}("0 "))  // Trailing whitespace
+  expectEmpty(${Self}("\u{1D7FF}"))  // MATHEMATICAL MONOSPACE DIGIT NINE
 }
 
 % if Self == 'Float80':

@@ -74,8 +74,15 @@ __swift_size_t _swift_class_getInstancePositiveExtentSize(const void *);
 /// Return an NSString to be used as the Mirror summary of the object
 void *_swift_objCMirrorSummary(const void * nsObject);
 
-/// Call strtold, changing arguments so we can operate on Float80
-const char *_swift_strtold(const char *nptr, void *outResult);
+/// Call strtold_l with the C locale, swapping argument and return
+/// types so we can operate on Float80
+const char *_swift_stdlib_strtold_clocale(const char *nptr, void *outResult);
+/// Call strtod_l with the C locale, swapping argument and return
+/// types so we can operate constistently on Float80
+const char *_swift_stdlib_strtod_clocale(const char *nptr, double *outResult);
+/// Call strtof_l with the C locale, swapping argument and return
+/// types so we can operate constistently on Float80
+const char *_swift_stdlib_strtof_clocale(const char *nptr, float *outResult);
 
 int _swift_stdlib_putc_stderr(int C);
 

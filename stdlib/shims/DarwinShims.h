@@ -41,8 +41,6 @@ int close(int fildes);
 double strtod(const char *__restrict__ nptr, char **__restrict__ endptr);
 float strtof(const char *__restrict__ nptr, char **__restrict__ endptr);
 
-int isspace(int c);
-
 __swift_uint32_t arc4random(void);
 __swift_uint32_t arc4random_uniform(__swift_uint32_t upper_bound);
 

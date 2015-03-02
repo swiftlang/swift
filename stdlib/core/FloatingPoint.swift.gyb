@@ -168,6 +168,12 @@ def incIfSigned(bits, signed):
 
 }%
 
+/// Return true iff isspace(u) would return nonzero when the current
+/// locale is the C locale.
+internal func _isspace_clocale(u: UTF16.CodeUnit) -> Bool {
+  return contains("\t\n\u{b}\u{c}\r ".utf16, u)
+}
+
 % for bits in allFloatBits:
 %   Self = floatName(bits)
 
@@ -216,22 +222,16 @@ extension ${Self} {
   public init?(_ text: String) {
     let u16 = text.utf16
     // Any non-ASCII or whitespace? return nil.
-    if contains(u16, { $0 > 127 || isspace(Int32($0)) != 0 }) {
+    if contains(u16, { $0 > 127 || _isspace_clocale($0) }) {
       return nil
     }
     
     func parseNTBS(chars: UnsafePointer<CChar>) -> (${Self}, Int) {
-% if bits == 80:
-      var result: Float80 = 0
+      var result: ${Self} = 0
       let endPtr = withUnsafeMutablePointer(&result) {
-        _swift_strtold(chars, UnsafeMutablePointer($0))
+        _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(
+          chars, UnsafeMutablePointer($0))
       }
-% else:
-      var endPtr: UnsafeMutablePointer<CChar> = nil
-      let result = withUnsafeMutablePointer(&endPtr) {
-        strto${cFuncSuffix2[bits]}(chars, $0)
-      }
-% end
       return (result, endPtr == nil ? 0 : UnsafePointer(endPtr) - chars)
     }
     
