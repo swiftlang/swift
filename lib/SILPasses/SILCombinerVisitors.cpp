@@ -2388,11 +2388,24 @@ visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
   }
 
   if (Feasibility == DynamicCastFeasibility::WillSucceed) {
-    if (CCABI->getSrc().getType() != CCABI->getDest().getType())
+    if (CCABI->getSrc().getType() != CCABI->getDest().getType()) {
       // Replace by unconditional_addr_cast, followed by a branch.
-      Builder->createUnconditionalCheckedCastAddr(
-          CCABI->getLoc(), CCABI->getConsumptionKind(), CCABI->getSrc(),
-          CCABI->getSourceType(), CCABI->getDest(), CCABI->getTargetType());
+      // The unconditional_addr_cast can be skipped, if the result of a cast
+      // is not used afterwards.
+      bool isLegal = isa<AllocStackInst>(CCABI->getDest().getDef());
+      for (auto Use : CCABI->getDest().getUses()) {
+        auto *User = Use->getUser();
+        if (isa<DeallocStackInst>(User) || User == CCABI)
+          continue;
+        isLegal = false;
+        break;
+      }
+
+      if (!isLegal)
+        Builder->createUnconditionalCheckedCastAddr(
+            CCABI->getLoc(), CCABI->getConsumptionKind(), CCABI->getSrc(),
+            CCABI->getSourceType(), CCABI->getDest(), CCABI->getTargetType());
+    }
     Builder->createBranch(CCABI->getLoc(), CCABI->getSuccessBB());
     eraseInstFromFunction(*CCABI);
     return nullptr;

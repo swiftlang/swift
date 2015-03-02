@@ -2165,14 +2165,20 @@ bool SimplifyCFG::simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI) {
   if (Feasibility == DynamicCastFeasibility::WillSucceed) {
     SILBuilderWithScope<1> Builder(CCBI);
     SmallVector<SILValue, 1> Args;
-    SILValue CastedValue;
-    if (CCBI->getOperand().getType() != CCBI->getCastType())
-      // Replace by unconditional_cast, followed by a branch.
-      CastedValue = Builder.createUnconditionalCheckedCast(
-          CCBI->getLoc(), CCBI->getOperand(), CCBI->getCastType());
-    else
+    bool ResultHasNoUse = SuccessBB->getBBArg(0)->use_empty();
+    SILValue CastedValue ;
+    if (CCBI->getOperand().getType() != CCBI->getCastType()) {
+      if (!ResultHasNoUse) {
+        // Replace by unconditional_cast, followed by a branch.
+        CastedValue = Builder.createUnconditionalCheckedCast(
+            CCBI->getLoc(), CCBI->getOperand(), CCBI->getCastType());
+      } else {
+        CastedValue = SILUndef::get(CCBI->getCastType(), CCBI->getModule());
+      }
+    } else {
       // No need to cast.
       CastedValue = CCBI->getOperand();
+    }
     Args.push_back(CastedValue);
     Builder.createBranch(CCBI->getLoc(), SuccessBB, Args);
     CCBI->eraseFromParent();
