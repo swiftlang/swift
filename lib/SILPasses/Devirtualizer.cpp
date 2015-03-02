@@ -429,9 +429,8 @@ static SILValue upcastArgument(SILValue Arg, SILType SuperTy, ApplyInst *AI) {
 /// Devirtualize the application of a witness_method. Replace this application
 /// by invocation of a witness thunk which was found by findFuncInWitnessTable.
 /// /// return the new ApplyInst or null.
-ApplyInst *devirtualizeWitness(ApplyInst *AI,
-                        SILFunction *F,
-                        ArrayRef<Substitution> Subs) {
+ApplyInst *devirtualizeWitness(ApplyInst *AI, SILFunction *F,
+                               ArrayRef<Substitution> Subs) {
   // We know the witness thunk and the corresponding set of substitutions
   // required to invoke the protocol method at this point.
   auto &Module = AI->getModule();
@@ -441,14 +440,12 @@ ApplyInst *devirtualizeWitness(ApplyInst *AI,
   // The complete set of substitutions may be different, e.g. because the found
   // witness thunk F may have been created by a  specialization pass and have
   // additional generic parameters.
-  SmallVector<Substitution, 16> NewSubstList(Subs.begin(),
-                                             Subs.end());
+  SmallVector<Substitution, 16> NewSubstList(Subs.begin(), Subs.end());
 
   // Add the non-self-derived substitutions from the original application.
-  for (auto &origSub : AI->getSubstitutionsWithoutSelfSubstitution()) {
+  for (auto &origSub : AI->getSubstitutionsWithoutSelfSubstitution())
     if (!origSub.getArchetype()->isSelfDerived())
       NewSubstList.push_back(origSub);
-  }
 
   // Figure out the exact bound type of the function to be called by
   // applying all substitutions.
