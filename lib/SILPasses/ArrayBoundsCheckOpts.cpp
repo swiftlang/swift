@@ -594,32 +594,13 @@ static bool dominates(DominanceInfo *DT, SILValue V, SILBasicBlock *B) {
 /// Subtract a constant from a builtin integer value.
 static SILValue getSub(SILLocation Loc, SILValue Val, unsigned SubVal,
                        SILBuilder &B) {
-  CanType IntTy = Val.getType().getSwiftRValueType();
-  auto BuiltinIntTy = cast<BuiltinIntegerType>(IntTy);
-  std::string NameStr = "ssub_with_overflow";
-  if (BuiltinIntTy == BuiltinIntegerType::getWordType(B.getASTContext())) {
-    NameStr += "_Word";
-  } else {
-    unsigned NumBits = BuiltinIntTy->getWidth().getFixedWidth();
-    NameStr += "_Int" + llvm::utostr(NumBits);
-  }
-
-  CanType Int1Ty =
-      BuiltinIntegerType::get(1, B.getASTContext())->getCanonicalType();
-
-  TupleTypeElt ResultElts[] = {IntTy, Int1Ty};
-  Type ResultTy = TupleType::get(ResultElts, B.getASTContext());
-  SILType ResultSILTy = SILType::getPrimitiveObjectType(
-                                                  ResultTy->getCanonicalType());
   SmallVector<SILValue, 4> Args(1, Val);
   Args.push_back(B.createIntegerLiteral(Loc, Val.getType(), SubVal));
   Args.push_back(B.createIntegerLiteral(
       Loc, SILType::getBuiltinIntegerType(1, B.getASTContext()), -1));
 
-  auto NameID = B.getASTContext().getIdentifier(NameStr);
-  
-  auto AI = B.createBuiltin(Loc, NameID, ResultSILTy,
-                            {}, Args);
+  auto *AI = B.createBuiltinBinaryFunctionWithOverflow(
+      Loc, "ssub_with_overflow", Args);
   return B.createTupleExtract(Loc, AI, 0);
 }
 
