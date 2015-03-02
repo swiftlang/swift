@@ -952,7 +952,7 @@ where C.Generator.Element == T
     max(newCount, _growArrayCapacity(capacity))
     : newCount)
   
-    (lhs._buffer.baseAddress + oldCount).initializeFrom(rhs)
+  (lhs._buffer.baseAddress + oldCount).initializeFrom(rhs)
   lhs._buffer.count = newCount
 }
 % end
