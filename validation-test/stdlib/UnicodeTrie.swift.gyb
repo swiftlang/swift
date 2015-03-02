@@ -26,6 +26,7 @@ grapheme_cluster_break_property_table = \
 
 }%
 
+import SwiftUnstable
 import StdlibUnittest
 import Darwin
 import Foundation

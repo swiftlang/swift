@@ -7,6 +7,7 @@
 // XFAIL: linux
 
 import Swift
+import SwiftUnstable
 import StdlibUnittest
 
 final class HeapBool {

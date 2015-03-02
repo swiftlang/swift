@@ -10,7 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftUnstable
+import SwiftUnstablePthreadExtras
 import Darwin
+import SwiftUnstableDarwinExtras
 import ObjectiveC
 
 public struct SourceLoc {
@@ -393,6 +396,17 @@ public func _setTestSuiteFailedCallback(callback: () -> ()) {
   _testSuiteFailedCallback = callback
 }
 
+extension ProcessTerminationStatus {
+  var isSwiftTrap: Bool {
+    switch self {
+    case .Exit(var status):
+      return false
+    case .Signal(var signal):
+      return CInt(signal) == SIGILL || CInt(signal) == SIGTRAP
+    }
+  }
+}
+
 func _stdlib_getline() -> String? {
   var result = _UnitTestArray<UInt8>()
   while true {
@@ -407,75 +421,6 @@ func _stdlib_getline() -> String? {
       return String._fromWellFormedCodeUnitSequence(UTF8.self, input: result)
     }
     result.append(UInt8(c))
-  }
-}
-
-struct _FDInputStream {
-  let fd: CInt
-  var isClosed: Bool = false
-  var isEOF: Bool = false
-  var _buffer = _UnitTestArray<UInt8>(count: 256, repeatedValue: 0)
-  var _bufferUsed: Int = 0
-
-  init(fd: CInt) {
-    self.fd = fd
-  }
-
-  mutating func getline() -> String? {
-    if let newlineIndex =
-      find(_buffer[0..<_bufferUsed], UInt8(UnicodeScalar("\n").value)) {
-      var result = String._fromWellFormedCodeUnitSequence(
-        UTF8.self, input: _buffer[0..<newlineIndex])
-      _buffer.removeRange(0...newlineIndex)
-      _bufferUsed -= newlineIndex + 1
-      return result
-    }
-    if isEOF && _bufferUsed > 0 {
-      var result = String._fromWellFormedCodeUnitSequence(
-        UTF8.self, input: _buffer[0..<_bufferUsed])
-      _buffer.removeAll()
-      _bufferUsed = 0
-      return result
-    }
-    return nil
-  }
-
-  mutating func read() {
-    let minFree = 128
-    var bufferFree = _buffer.count - _bufferUsed
-    if bufferFree < minFree {
-      _buffer.reserveCapacity(minFree - bufferFree)
-      while bufferFree < minFree {
-        _buffer.append(0)
-        ++bufferFree
-      }
-    }
-    let readResult: ssize_t = _buffer.withUnsafeMutableBufferPointer {
-      (_buffer) in
-      let fd = self.fd
-      let addr = _buffer.baseAddress + self._bufferUsed
-      let size = size_t(bufferFree)
-      return Darwin.read(fd, addr, size)
-    }
-    if readResult == 0 {
-      isEOF = true
-      return
-    }
-    if readResult < 0 {
-      fatalError("read() returned error")
-    }
-    _bufferUsed += readResult
-  }
-
-  mutating func close() {
-    if isClosed {
-      return
-    }
-    let result = Darwin.close(fd)
-    if result < 0 {
-      fatalError("close() returned an error")
-    }
-    isClosed = true
   }
 }
 

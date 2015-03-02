@@ -41,6 +41,7 @@ add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
   KnownMetadata.cpp
   Metadata.cpp
   Reflection.cpp
+  ShimsChecker.cpp
   Stubs.cpp
   SwiftObject.cpp
   Enum.cpp

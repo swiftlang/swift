@@ -318,3 +318,8 @@ extern "C" const char *_swift_strtold(const char * nptr, void *outResult) {
   *static_cast<long double*>(outResult) = std::strtold(nptr, &endPtr);
   return endPtr;
 }
+
+extern "C" int _swift_stdlib_putc_stderr(int C) {
+  return putc(C, stderr);
+}
+

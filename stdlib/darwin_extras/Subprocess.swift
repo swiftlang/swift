@@ -10,79 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftUnstable
 import Darwin
-
-var _stdlib_FD_SETSIZE: CInt {
-  return 1024
-}
-
-struct _stdlib_fd_set {
-  var _data: _UnitTestArray<UInt32>
-  static var _wordBits: Int {
-    return sizeof(UInt32) * 8
-  }
-
-  init() {
-    _data = _UnitTestArray<UInt32>(
-      count: Int(_stdlib_FD_SETSIZE) / _stdlib_fd_set._wordBits,
-      repeatedValue: 0)
-  }
-
-  func isset(fd: CInt) -> Bool {
-    let fdInt = Int(fd)
-    return (
-        _data[fdInt / _stdlib_fd_set._wordBits] &
-          UInt32(1 << (fdInt % _stdlib_fd_set._wordBits))
-      ) != 0
-  }
-
-  mutating func set(fd: CInt) {
-    let fdInt = Int(fd)
-    _data[fdInt / _stdlib_fd_set._wordBits] |=
-      UInt32(1 << (fdInt % _stdlib_fd_set._wordBits))
-  }
-
-  mutating func clear(fd: CInt) {
-    let fdInt = Int(fd)
-    _data[fdInt / _stdlib_fd_set._wordBits] &=
-      ~UInt32(1 << (fdInt % _stdlib_fd_set._wordBits))
-  }
-
-  mutating func zero() {
-    let count = _data.count
-    return _data.withUnsafeMutableBufferPointer {
-      (_data) in
-      for i in 0..<count {
-        _data[i] = 0
-      }
-      return
-    }
-  }
-}
-
-func _stdlib_select(
-  inout readfds: _stdlib_fd_set, inout writefds: _stdlib_fd_set,
-  inout errorfds: _stdlib_fd_set, timeout: UnsafeMutablePointer<timeval>
-) -> CInt {
-  return readfds._data.withUnsafeMutableBufferPointer {
-    (readfds) in
-    writefds._data.withUnsafeMutableBufferPointer {
-      (writefds) in
-      errorfds._data.withUnsafeMutableBufferPointer {
-        (errorfds) in
-        let readAddr = readfds.baseAddress
-        let writeAddr = writefds.baseAddress
-        let errorAddr = errorfds.baseAddress
-        return select(
-          _stdlib_FD_SETSIZE,
-          UnsafeMutablePointer(readAddr),
-          UnsafeMutablePointer(writeAddr),
-          UnsafeMutablePointer(errorAddr),
-          timeout)
-      }
-    }
-  }
-}
 
 /// Calls POSIX `pipe()`.
 func posixPipe() -> (readFD: CInt, writeFD: CInt) {
@@ -99,7 +28,7 @@ func posixPipe() -> (readFD: CInt, writeFD: CInt) {
 
 /// Start the same executable as a child process, redirecting its stdout and
 /// stderr.
-func spawnChild(args: _UnitTestArray<String>)
+public func spawnChild(args: _UnitTestArray<String>)
   -> (pid: pid_t, stdinFD: CInt, stdoutFD: CInt, stderrFD: CInt) {
   var fileActions = posix_spawn_file_actions_t()
   if posix_spawn_file_actions_init(&fileActions) != 0 {
@@ -177,7 +106,7 @@ func spawnChild(args: _UnitTestArray<String>)
   return (pid, childStdin.writeFD, childStdout.readFD, childStderr.readFD)
 }
 
-func readAll(fd: CInt) -> String {
+internal func _readAll(fd: CInt) -> String {
   var buffer = _UnitTestArray<UInt8>(count: 1024, repeatedValue: 0)
   var usedBytes = 0
   while true {
@@ -199,7 +128,8 @@ func readAll(fd: CInt) -> String {
     UTF8.self, input: buffer[0..<usedBytes]).0
 }
 
-func signalToString(signal: Int) -> String {
+
+internal func _signalToString(signal: Int) -> String {
   switch CInt(signal) {
   case SIGILL:  return "SIGILL"
   case SIGTRAP: return "SIGTRAP"
@@ -212,30 +142,21 @@ func signalToString(signal: Int) -> String {
   }
 }
 
-enum ProcessTerminationStatus : Printable {
+public enum ProcessTerminationStatus : Printable {
   case Exit(Int)
   case Signal(Int)
 
-  var description: String {
+  public var description: String {
     switch self {
     case .Exit(var status):
       return "Exit(\(status))"
     case .Signal(var signal):
-      return "Signal(\(signalToString(signal)))"
-    }
-  }
-
-  var isSwiftTrap: Bool {
-    switch self {
-    case .Exit(var status):
-      return false
-    case .Signal(var signal):
-      return CInt(signal) == SIGILL || CInt(signal) == SIGTRAP
+      return "Signal(\(_signalToString(signal)))"
     }
   }
 }
 
-func posixWaitpid(pid: pid_t) -> ProcessTerminationStatus {
+public func posixWaitpid(pid: pid_t) -> ProcessTerminationStatus {
   var status: CInt = 0
   if waitpid(pid, &status, 0) < 0 {
     preconditionFailure("waitpid() failed")
@@ -249,15 +170,15 @@ func posixWaitpid(pid: pid_t) -> ProcessTerminationStatus {
   preconditionFailure("did not understand what happened to child process")
 }
 
-func runChild(args: _UnitTestArray<String>)
+public func runChild(args: _UnitTestArray<String>)
   -> (stdout: String, stderr: String, status: ProcessTerminationStatus) {
   let (pid, _, stdoutFD, stderrFD) = spawnChild(args)
 
   // FIXME: reading stdout and stderr sequentially can block.  Should use
   // select().  This is not so simple to implement because of:
   // <rdar://problem/17828358> Darwin module is missing fd_set-related macros
-  let stdout = readAll(stdoutFD)
-  let stderr = readAll(stderrFD)
+  let stdout = _readAll(stdoutFD)
+  let stderr = _readAll(stderrFD)
 
   if close(stdoutFD) != 0 {
     preconditionFailure("close() failed")
@@ -269,34 +190,6 @@ func runChild(args: _UnitTestArray<String>)
   return (stdout, stderr, status)
 }
 
-//
-// Functions missing in `Darwin` module.
-//
-func _WSTATUS(status: CInt) -> CInt {
-  return status & 0x7f
-}
-
-var _WSTOPPED: CInt {
-  return 0x7f
-}
-
-func WIFEXITED(status: CInt) -> Bool {
-  return _WSTATUS(status) == 0
-}
-
-func WIFSIGNALED(status: CInt) -> Bool {
-  return _WSTATUS(status) != _WSTOPPED && _WSTATUS(status) != 0
-}
-
-func WEXITSTATUS(status: CInt) -> CInt {
-  return (status >> 8) & 0xff
-}
-
-func WTERMSIG(status: CInt) -> CInt {
-  return _WSTATUS(status)
-}
-
 @asmname("_NSGetEnviron")
 func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>>>
-
 

@@ -1,4 +1,4 @@
-//===--- PthreadWrappers.swift --------------------------------------------===//
+//===--- SwiftUnstablePthreadExtras.swift ---------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,12 +9,13 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// This file contains wrappers for pthread APIs that are less painful to use
+// than the C APIs.
+//
+//===----------------------------------------------------------------------===//
 
 import Darwin
-
-//
-// This file contains wrappers for functions in Darwin module.
-//
 
 @asmname("swift_stdlib_getExecuteBlockFunctionPtr_VoidPtr_VoidPtr")
 func _stdlib_getExecuteBlockFunctionPtr_VoidPtr_VoidPtr()
@@ -49,7 +50,7 @@ func _stdlib_executeSwiftClosure<Param, Result>(
   return result
 }
 
-/// Block-based wrapper `pthread_create`.
+/// Block-based wrapper for `pthread_create`.
 public func _stdlib_pthread_create_block<Argument, Result>(
   attr: UnsafePointer<pthread_attr_t>,
   start_routine: (Argument) -> Result,
@@ -74,7 +75,7 @@ public func _stdlib_pthread_create_block<Argument, Result>(
   }
 }
 
-/// Block-based wrapper `pthread_join`.
+/// Block-based wrapper for `pthread_join`.
 public func _stdlib_pthread_join<Result>(
   thread: pthread_t,
   resultType: Result.Type
@@ -89,24 +90,6 @@ public func _stdlib_pthread_join<Result>(
   } else {
     return (result, nil)
   }
-}
-
-func _stdlib_sysctlbyname_Int32(name: String) -> Int32 {
-  return name.withCString {
-    (nameUtf8) -> Int32 in
-    var resultSize: size_t = 4
-    var result: Int32 = 0
-    sysctlbyname(nameUtf8, &result, &resultSize, nil, 0)
-    return result
-  }
-}
-
-func _stdlib_getHardwareConcurrency() -> Int {
-  let result = Int(_stdlib_sysctlbyname_Int32("hw.physicalcpu"))
-  if result < 1 {
-    fatalError("_stdlib_getHardwareConcurrency(): could not query sysctl")
-  }
-  return result
 }
 
 public class _stdlib_Barrier {

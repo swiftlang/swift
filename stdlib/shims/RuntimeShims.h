@@ -76,7 +76,9 @@ void *_swift_objCMirrorSummary(const void * nsObject);
 
 /// Call strtold, changing arguments so we can operate on Float80
 const char *_swift_strtold(const char *nptr, void *outResult);
-  
+
+int _swift_stdlib_putc_stderr(int C);
+
 #ifdef __cplusplus
 }} // extern "C", namespace swift
 #endif

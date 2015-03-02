@@ -36,6 +36,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
+import SwiftUnstable
+import SwiftUnstablePthreadExtras
 import Darwin
 
 #if _runtime(_ObjC)
@@ -401,8 +403,8 @@ func _masterThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
       let workerState = _RaceTestWorkerState<RT>()
 
       // Shuffle the data so that threads process it in different order.
-      let shuffle = _stdlib_randomShuffle(identityShuffle)
-      workerState.raceData = _stdlib_scatter(sharedState.raceData, shuffle)
+      let shuffle = randomShuffle(identityShuffle)
+      workerState.raceData = scatter(sharedState.raceData, shuffle)
       workerState.raceDataShuffle = shuffle
 
       workerState.observations = []
@@ -420,9 +422,9 @@ func _masterThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
   for i in 0..<racingThreadCount {
     let shuffle = sharedState.workerStates[i].raceDataShuffle
     sharedState.workerStates[i].raceData =
-      _stdlib_gather(sharedState.workerStates[i].raceData, shuffle)
+      gather(sharedState.workerStates[i].raceData, shuffle)
     sharedState.workerStates[i].observations =
-      _stdlib_gather(sharedState.workerStates[i].observations, shuffle)
+      gather(sharedState.workerStates[i].observations, shuffle)
   }
   if true {
     // FIXME: why doesn't the bracket syntax work?

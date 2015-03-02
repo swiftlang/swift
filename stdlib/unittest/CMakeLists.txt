@@ -3,17 +3,13 @@ add_swift_library(swiftStdlibUnittest SHARED IS_STDLIB
   # filename.
   StdlibUnittest.swift.gyb
 
-  DarwinExtras.swift
   GetOSVersion.mm
   InterceptTraps.cpp
   OpaqueIdentityFunctions.cpp
   OpaqueIdentityFunctions.swift
-  PthreadBarriers.swift
-  PthreadWrappers.swift
   RaceTest.swift
   Statistics.swift
   StdlibCoreExtras.swift
-  SwiftBlockToCFunctionThunks.cpp
   TestHelpers.swift
   LifetimeTracked.swift
 
@@ -23,7 +19,9 @@ add_swift_library(swiftStdlibUnittest SHARED IS_STDLIB
   #
   # SWIFT_COMPILE_FLAGS -Xfrontend -sil-serialize-all
 
-  SWIFT_MODULE_DEPENDS Darwin Foundation
+  SWIFT_MODULE_DEPENDS
+    SwiftUnstable SwiftUnstablePthreadExtras SwiftUnstableDarwinExtras
+    Darwin Foundation
   FRAMEWORK_DEPENDS Foundation
   INSTALL_IN_COMPONENT stdlib-experimental)
 

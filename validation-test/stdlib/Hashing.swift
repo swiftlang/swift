@@ -3,6 +3,7 @@
 // XFAIL: linux
 
 import Swift
+import SwiftUnstable
 import StdlibUnittest
 
 var HashingTestSuite = TestSuite("Hashing")

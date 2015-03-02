@@ -2,6 +2,7 @@
 
 // XFAIL: linux
 
+import SwiftUnstable
 import StdlibUnittest
 
 _setOverrideOSVersion(.OSX(major: 10, minor: 9, bugFix: 3))

@@ -4,6 +4,7 @@
 
 import Swift
 import StdlibUnittest
+import SwiftUnstablePthreadExtras
 import Dispatch
 
 var StringTestSuite = TestSuite("String")
