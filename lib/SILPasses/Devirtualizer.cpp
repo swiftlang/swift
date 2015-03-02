@@ -407,7 +407,7 @@ static ApplyInst *devirtualizeMethod(ApplyInst *AI, SILDeclRef Member,
 /// Generate a new apply of a function_ref to replace an apply of a
 /// witness_method when we've determined the actual function we'll end
 /// up calling.
-ApplyInst *devirtualizeWitness(ApplyInst *AI, SILFunction *F,
+static ApplyInst *devirtualizeWitness(ApplyInst *AI, SILFunction *F,
                                ArrayRef<Substitution> Subs) {
   // We know the witness thunk and the corresponding set of substitutions
   // required to invoke the protocol method at this point.
