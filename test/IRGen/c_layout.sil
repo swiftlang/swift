@@ -1,18 +1,19 @@
-// RUN: %target-swift-frontend -I %S/Inputs/abi %s -emit-ir -enable-union-import | FileCheck %s
-
-// REQUIRES: CPU=x86_64
+// RUN: %target-swift-frontend -I %S/Inputs/abi %s -emit-ir -enable-union-import | FileCheck %s --check-prefix=CHECK-%target-cpu
 
 sil_stage canonical
 import c_layout
 import Builtin
+import Swift
 
-// CHECK: %VSC11BitfieldOne = type <{ %VSs6UInt32, %VSC6Nested, [1 x i8], [4 x i8], [4 x i8], %Sf, [1 x i8], [7 x i8], %VSs6UInt64, %VSs6UInt32 }>
-// CHECK: %VSC6Nested = type <{ %Sf, [3 x i8] }>
+// TODO: Provide tests for other architectures
 
-// CHECK: %VSC26BitfieldSeparatorReference = type [[BITFIELD_SEP_TYPE:<{ %VSs5UInt8, \[3 x i8\], %VSs5UInt8 }>]]
-// CHECK: %VSC25BitfieldSeparatorSameName = type [[BITFIELD_SEP_TYPE]]
-// CHECK: %VSC36BitfieldSeparatorDifferentNameStruct = type [[BITFIELD_SEP_TYPE]]
-// CHECK: %VSC21BitfieldSeparatorAnon = type [[BITFIELD_SEP_TYPE]]
+// CHECK-x86_64: %VSC11BitfieldOne = type <{ %VSs6UInt32, %VSC6Nested, [1 x i8], [4 x i8], [4 x i8], %Sf, [1 x i8], [7 x i8], %VSs6UInt64, %VSs6UInt32 }>
+// CHECK-x86_64: %VSC6Nested = type <{ %Sf, [3 x i8] }>
+
+// CHECK-x86_64: %VSC26BitfieldSeparatorReference = type [[BITFIELD_SEP_TYPE:<{ %VSs5UInt8, \[3 x i8\], %VSs5UInt8 }>]]
+// CHECK-x86_64: %VSC25BitfieldSeparatorSameName = type [[BITFIELD_SEP_TYPE]]
+// CHECK-x86_64: %VSC36BitfieldSeparatorDifferentNameStruct = type [[BITFIELD_SEP_TYPE]]
+// CHECK-x86_64: %VSC21BitfieldSeparatorAnon = type [[BITFIELD_SEP_TYPE]]
 
 sil public_external @createBitfieldOne : $@thin @cc(cdecl) () -> BitfieldOne
 sil public_external @consumeBitfieldOne : $@thin @cc(cdecl) (BitfieldOne) -> ()
@@ -26,70 +27,70 @@ bb0:
   %r = tuple ()
   return %r : $()
 }
-// CHECK: define void @test0()
-// CHECK:   [[RESULT:%.*]] = alloca %VSC11BitfieldOne, align 8
-// CHECK:   [[ARG:%.*]] = alloca %VSC11BitfieldOne, align 8
+// CHECK-x86_64: define void @test0()
+// CHECK-x86_64:   [[RESULT:%.*]] = alloca %VSC11BitfieldOne, align 8
+// CHECK-x86_64:   [[ARG:%.*]] = alloca %VSC11BitfieldOne, align 8
 //   Make the first call and pull all the values out of the indirect result.
-// CHECK:   call void @createBitfieldOne(%VSC11BitfieldOne* noalias sret [[RESULT]])
-// CHECK:   [[ADDR_A:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 0
-// CHECK:   [[ADDR_A_V:%.*]] = getelementptr inbounds %VSs6UInt32, %VSs6UInt32* [[ADDR_A]], i32 0, i32 0
-// CHECK:   [[A:%.*]] = load i32, i32* [[ADDR_A_V]], align 8
-// CHECK:   [[ADDR_B:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 1
-// CHECK:   [[ADDR_B_X:%.*]] = getelementptr inbounds %VSC6Nested, %VSC6Nested* [[ADDR_B]], i32 0, i32 0
-// CHECK:   [[ADDR_B_X_V:%.*]] = getelementptr inbounds %Sf, %Sf* [[ADDR_B_X]], i32 0, i32 0
-// CHECK:   [[B_X:%.*]] = load float, float* [[ADDR_B_X_V]], align 4
-// CHECK:   [[ADDR_B_YZ:%.*]] = getelementptr inbounds %VSC6Nested, %VSC6Nested* [[ADDR_B]], i32 0, i32 1
-// CHECK:   [[ADDR_B_YZ_1:%.*]] = bitcast [3 x i8]* [[ADDR_B_YZ]] to i24*
-// CHECK:   [[B_YZ:%.*]] = load i24, i24* [[ADDR_B_YZ_1]], align 4
-// CHECK:   [[ADDR_CDE:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 3
-// CHECK:   [[ADDR_CDE_1:%.*]] = bitcast [4 x i8]* [[ADDR_CDE]] to i32*
-// CHECK:   [[CDE:%.*]] = load i32, i32* [[ADDR_CDE_1]], align 4
-// CHECK:   [[ADDR_FGH:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 4
-// CHECK:   [[ADDR_FGH_1:%.*]] = bitcast [4 x i8]* [[ADDR_FGH]] to i32*
-// CHECK:   [[FGH:%.*]] = load i32, i32* [[ADDR_FGH_1]], align 8
-// CHECK:   [[ADDR_I:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 5
-// CHECK:   [[ADDR_I_V:%.*]] = getelementptr inbounds %Sf, %Sf* [[ADDR_I]], i32 0, i32 0
-// CHECK:   [[I:%.*]] = load float, float* [[ADDR_I_V]], align 4
-// CHECK:   [[ADDR_JK:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 6
-// CHECK:   [[ADDR_JK_1:%.*]] = bitcast [1 x i8]* [[ADDR_JK]] to i8*
-// CHECK:   [[JK:%.*]] = load i8, i8* [[ADDR_JK_1]], align 8
-// CHECK:   [[ADDR_L:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 8
-// CHECK:   [[ADDR_L_V:%.*]] = getelementptr inbounds %VSs6UInt64, %VSs6UInt64* [[ADDR_L]], i32 0, i32 0
-// CHECK:   [[L:%.*]] = load i64, i64* [[ADDR_L_V]], align 8
-// CHECK:   [[ADDR_M:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 9
-// CHECK:   [[ADDR_M_V:%.*]] = getelementptr inbounds %VSs6UInt32, %VSs6UInt32* [[ADDR_M]], i32 0, i32 0
-// CHECK:   [[M:%.*]] = load i32, i32* [[ADDR_M_V]], align 8
+// CHECK-x86_64:   call void @createBitfieldOne(%VSC11BitfieldOne* noalias sret [[RESULT]])
+// CHECK-x86_64:   [[ADDR_A:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 0
+// CHECK-x86_64:   [[ADDR_A_V:%.*]] = getelementptr inbounds %VSs6UInt32, %VSs6UInt32* [[ADDR_A]], i32 0, i32 0
+// CHECK-x86_64:   [[A:%.*]] = load i32, i32* [[ADDR_A_V]], align 8
+// CHECK-x86_64:   [[ADDR_B:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 1
+// CHECK-x86_64:   [[ADDR_B_X:%.*]] = getelementptr inbounds %VSC6Nested, %VSC6Nested* [[ADDR_B]], i32 0, i32 0
+// CHECK-x86_64:   [[ADDR_B_X_V:%.*]] = getelementptr inbounds %Sf, %Sf* [[ADDR_B_X]], i32 0, i32 0
+// CHECK-x86_64:   [[B_X:%.*]] = load float, float* [[ADDR_B_X_V]], align 4
+// CHECK-x86_64:   [[ADDR_B_YZ:%.*]] = getelementptr inbounds %VSC6Nested, %VSC6Nested* [[ADDR_B]], i32 0, i32 1
+// CHECK-x86_64:   [[ADDR_B_YZ_1:%.*]] = bitcast [3 x i8]* [[ADDR_B_YZ]] to i24*
+// CHECK-x86_64:   [[B_YZ:%.*]] = load i24, i24* [[ADDR_B_YZ_1]], align 4
+// CHECK-x86_64:   [[ADDR_CDE:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 3
+// CHECK-x86_64:   [[ADDR_CDE_1:%.*]] = bitcast [4 x i8]* [[ADDR_CDE]] to i32*
+// CHECK-x86_64:   [[CDE:%.*]] = load i32, i32* [[ADDR_CDE_1]], align 4
+// CHECK-x86_64:   [[ADDR_FGH:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 4
+// CHECK-x86_64:   [[ADDR_FGH_1:%.*]] = bitcast [4 x i8]* [[ADDR_FGH]] to i32*
+// CHECK-x86_64:   [[FGH:%.*]] = load i32, i32* [[ADDR_FGH_1]], align 8
+// CHECK-x86_64:   [[ADDR_I:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 5
+// CHECK-x86_64:   [[ADDR_I_V:%.*]] = getelementptr inbounds %Sf, %Sf* [[ADDR_I]], i32 0, i32 0
+// CHECK-x86_64:   [[I:%.*]] = load float, float* [[ADDR_I_V]], align 4
+// CHECK-x86_64:   [[ADDR_JK:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 6
+// CHECK-x86_64:   [[ADDR_JK_1:%.*]] = bitcast [1 x i8]* [[ADDR_JK]] to i8*
+// CHECK-x86_64:   [[JK:%.*]] = load i8, i8* [[ADDR_JK_1]], align 8
+// CHECK-x86_64:   [[ADDR_L:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 8
+// CHECK-x86_64:   [[ADDR_L_V:%.*]] = getelementptr inbounds %VSs6UInt64, %VSs6UInt64* [[ADDR_L]], i32 0, i32 0
+// CHECK-x86_64:   [[L:%.*]] = load i64, i64* [[ADDR_L_V]], align 8
+// CHECK-x86_64:   [[ADDR_M:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 9
+// CHECK-x86_64:   [[ADDR_M_V:%.*]] = getelementptr inbounds %VSs6UInt32, %VSs6UInt32* [[ADDR_M]], i32 0, i32 0
+// CHECK-x86_64:   [[M:%.*]] = load i32, i32* [[ADDR_M_V]], align 8
 //   Put all of the values into the indirect argument and make the second call.
-// CHECK:   [[ADDR_A:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[ARG]], i32 0, i32 0
-// CHECK:   [[ADDR_A_V:%.*]] = getelementptr inbounds %VSs6UInt32, %VSs6UInt32* [[ADDR_A]], i32 0, i32 0
-// CHECK:   store i32 [[A]], i32* [[ADDR_A_V]], align 8
-// CHECK:   [[ADDR_B:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[ARG]], i32 0, i32 1
-// CHECK:   [[ADDR_B_X:%.*]] = getelementptr inbounds %VSC6Nested, %VSC6Nested* [[ADDR_B]], i32 0, i32 0
-// CHECK:   [[ADDR_B_X_V:%.*]] = getelementptr inbounds %Sf, %Sf* [[ADDR_B_X]], i32 0, i32 0
-// CHECK:   store float [[B_X]], float* [[ADDR_B_X_V]], align 4
-// CHECK:   [[ADDR_B_YZ:%.*]] = getelementptr inbounds %VSC6Nested, %VSC6Nested* [[ADDR_B]], i32 0, i32 1
-// CHECK:   [[ADDR_B_YZ_1:%.*]] = bitcast [3 x i8]* [[ADDR_B_YZ]] to i24*
-// CHECK:   store i24 [[B_YZ]], i24* [[ADDR_B_YZ_1]], align 4
-// CHECK:   [[ADDR_CDE:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[ARG]], i32 0, i32 3
-// CHECK:   [[ADDR_CDE_1:%.*]] = bitcast [4 x i8]* [[ADDR_CDE]] to i32*
-// CHECK:   store i32 [[CDE]], i32* [[ADDR_CDE_1]], align 4
-// CHECK:   [[ADDR_FGH:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[ARG]], i32 0, i32 4
-// CHECK:   [[ADDR_FGH_1:%.*]] = bitcast [4 x i8]* [[ADDR_FGH]] to i32*
-// CHECK:   store i32 [[FGH]], i32* [[ADDR_FGH_1]], align 8
-// CHECK:   [[ADDR_I:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[ARG]], i32 0, i32 5
-// CHECK:   [[ADDR_I_V:%.*]] = getelementptr inbounds %Sf, %Sf* [[ADDR_I]], i32 0, i32 0
-// CHECK:   store float [[I]], float* [[ADDR_I_V]], align 4
-// CHECK:   [[ADDR_JK:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[ARG]], i32 0, i32 6
-// CHECK:   [[ADDR_JK_1:%.*]] = bitcast [1 x i8]* [[ADDR_JK]] to i8*
-// CHECK:   store i8 [[JK]], i8* [[ADDR_JK_1]], align 8
-// CHECK:   [[ADDR_L:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[ARG]], i32 0, i32 8
-// CHECK:   [[ADDR_L_V:%.*]] = getelementptr inbounds %VSs6UInt64, %VSs6UInt64* [[ADDR_L]], i32 0, i32 0
-// CHECK:   store i64 [[L]], i64* [[ADDR_L_V]], align 8
-// CHECK:   [[ADDR_M:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[ARG]], i32 0, i32 9
-// CHECK:   [[ADDR_M_V:%.*]] = getelementptr inbounds %VSs6UInt32, %VSs6UInt32* [[ADDR_M]], i32 0, i32 0
-// CHECK:   store i32 [[M]], i32* [[ADDR_M_V]], align 8
-// CHECK:   call void @consumeBitfieldOne(%VSC11BitfieldOne* byval align 8 [[ARG]])
-// CHECK:   ret void
+// CHECK-x86_64:   [[ADDR_A:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[ARG]], i32 0, i32 0
+// CHECK-x86_64:   [[ADDR_A_V:%.*]] = getelementptr inbounds %VSs6UInt32, %VSs6UInt32* [[ADDR_A]], i32 0, i32 0
+// CHECK-x86_64:   store i32 [[A]], i32* [[ADDR_A_V]], align 8
+// CHECK-x86_64:   [[ADDR_B:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[ARG]], i32 0, i32 1
+// CHECK-x86_64:   [[ADDR_B_X:%.*]] = getelementptr inbounds %VSC6Nested, %VSC6Nested* [[ADDR_B]], i32 0, i32 0
+// CHECK-x86_64:   [[ADDR_B_X_V:%.*]] = getelementptr inbounds %Sf, %Sf* [[ADDR_B_X]], i32 0, i32 0
+// CHECK-x86_64:   store float [[B_X]], float* [[ADDR_B_X_V]], align 4
+// CHECK-x86_64:   [[ADDR_B_YZ:%.*]] = getelementptr inbounds %VSC6Nested, %VSC6Nested* [[ADDR_B]], i32 0, i32 1
+// CHECK-x86_64:   [[ADDR_B_YZ_1:%.*]] = bitcast [3 x i8]* [[ADDR_B_YZ]] to i24*
+// CHECK-x86_64:   store i24 [[B_YZ]], i24* [[ADDR_B_YZ_1]], align 4
+// CHECK-x86_64:   [[ADDR_CDE:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[ARG]], i32 0, i32 3
+// CHECK-x86_64:   [[ADDR_CDE_1:%.*]] = bitcast [4 x i8]* [[ADDR_CDE]] to i32*
+// CHECK-x86_64:   store i32 [[CDE]], i32* [[ADDR_CDE_1]], align 4
+// CHECK-x86_64:   [[ADDR_FGH:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[ARG]], i32 0, i32 4
+// CHECK-x86_64:   [[ADDR_FGH_1:%.*]] = bitcast [4 x i8]* [[ADDR_FGH]] to i32*
+// CHECK-x86_64:   store i32 [[FGH]], i32* [[ADDR_FGH_1]], align 8
+// CHECK-x86_64:   [[ADDR_I:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[ARG]], i32 0, i32 5
+// CHECK-x86_64:   [[ADDR_I_V:%.*]] = getelementptr inbounds %Sf, %Sf* [[ADDR_I]], i32 0, i32 0
+// CHECK-x86_64:   store float [[I]], float* [[ADDR_I_V]], align 4
+// CHECK-x86_64:   [[ADDR_JK:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[ARG]], i32 0, i32 6
+// CHECK-x86_64:   [[ADDR_JK_1:%.*]] = bitcast [1 x i8]* [[ADDR_JK]] to i8*
+// CHECK-x86_64:   store i8 [[JK]], i8* [[ADDR_JK_1]], align 8
+// CHECK-x86_64:   [[ADDR_L:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[ARG]], i32 0, i32 8
+// CHECK-x86_64:   [[ADDR_L_V:%.*]] = getelementptr inbounds %VSs6UInt64, %VSs6UInt64* [[ADDR_L]], i32 0, i32 0
+// CHECK-x86_64:   store i64 [[L]], i64* [[ADDR_L_V]], align 8
+// CHECK-x86_64:   [[ADDR_M:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[ARG]], i32 0, i32 9
+// CHECK-x86_64:   [[ADDR_M_V:%.*]] = getelementptr inbounds %VSs6UInt32, %VSs6UInt32* [[ADDR_M]], i32 0, i32 0
+// CHECK-x86_64:   store i32 [[M]], i32* [[ADDR_M_V]], align 8
+// CHECK-x86_64:   call void @consumeBitfieldOne(%VSC11BitfieldOne* byval align 8 [[ARG]])
+// CHECK-x86_64:   ret void
 
 
 sil public_external @testBitfields : $@thin () -> (BitfieldSeparatorReference, BitfieldSeparatorSameName, BitfieldSeparatorDifferentNameStruct, BitfieldSeparatorAnon)
@@ -105,9 +106,9 @@ bb0:
 sil public_external @createSIMDStruct : $@thin @cc(cdecl) () -> SIMDStruct
 sil public_external @consumeSIMDStruct : $@thin @cc(cdecl) SIMDStruct -> ()
 
-// CHECK-LABEL: define void @testSIMDStruct()
-// CHECK:         alloca <2 x double>, align 16
-// CHECK:         alloca i128, align 16
+// CHECK-x86_64-LABEL: define void @testSIMDStruct()
+// CHECK-x86_64:         alloca <2 x double>, align 16
+// CHECK-x86_64:         alloca i128, align 16
 sil @testSIMDStruct : $() -> () {
 bb0:
   %f = function_ref @createSIMDStruct : $@thin @cc(cdecl) () -> SIMDStruct
@@ -123,3 +124,102 @@ bb0:
   %s = builtin "sizeof"<HasRecursivePointers>(%m : $@thin HasRecursivePointers.Type) : $Builtin.Word
   return %s : $Builtin.Word
 }
+
+// CHECK-x86_64-LABEL: define void @testIntegerExtension
+// CHECK-x86_64:         call signext i8 @chareth(i8 signext %0)
+// CHECK-x86_64:         call signext i8 @signedChareth(i8 signext %1)
+// CHECK-x86_64:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
+// CHECK-x86_64:         call signext i16 @eatMyShorts(i16 signext %3)
+// CHECK-x86_64:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext %4)
+// CHECK-x86_64:         call i32 @ints(i32 %5)
+// CHECK-x86_64:         call i32 @unsigneds(i32 %6)
+// CHECK-x86_64-LABEL: declare signext i8 @chareth(i8 signext)
+// CHECK-x86_64-LABEL: declare signext i8 @signedChareth(i8 signext)
+// CHECK-x86_64-LABEL: declare zeroext i8 @unsignedChareth(i8 zeroext)
+// CHECK-x86_64-LABEL: declare signext i16 @eatMyShorts(i16 signext)
+// CHECK-x86_64-LABEL: declare zeroext i16 @eatMyUnsignedShorts(i16 zeroext)
+// CHECK-x86_64-LABEL: declare i32 @ints(i32)
+// CHECK-x86_64-LABEL: declare i32 @unsigneds(i32)
+
+// CHECK-i386-LABEL: define void @testIntegerExtension
+// CHECK-i386:         call signext i8 @chareth(i8 signext %0)
+// CHECK-i386:         call signext i8 @signedChareth(i8 signext %1)
+// CHECK-i386:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
+// CHECK-i386:         call signext i16 @eatMyShorts(i16 signext %3)
+// CHECK-i386:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext %4)
+// CHECK-i386:         call i32 @ints(i32 %5)
+// CHECK-i386:         call i32 @unsigneds(i32 %6)
+// CHECK-i386-LABEL: declare signext i8 @chareth(i8 signext)
+// CHECK-i386-LABEL: declare signext i8 @signedChareth(i8 signext)
+// CHECK-i386-LABEL: declare zeroext i8 @unsignedChareth(i8 zeroext)
+// CHECK-i386-LABEL: declare signext i16 @eatMyShorts(i16 signext)
+// CHECK-i386-LABEL: declare zeroext i16 @eatMyUnsignedShorts(i16 zeroext)
+// CHECK-i386-LABEL: declare i32 @ints(i32)
+// CHECK-i386-LABEL: declare i32 @unsigneds(i32)
+
+// CHECK-armv7-LABEL: define void @testIntegerExtension
+// CHECK-armv7:         call signext i8 @chareth(i8 signext %0)
+// CHECK-armv7:         call signext i8 @signedChareth(i8 signext %1)
+// CHECK-armv7:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
+// CHECK-armv7:         call signext i16 @eatMyShorts(i16 signext %3)
+// CHECK-armv7:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext %4)
+// CHECK-armv7:         call i32 @ints(i32 %5)
+// CHECK-armv7:         call i32 @unsigneds(i32 %6)
+// CHECK-armv7-LABEL: declare signext i8 @chareth(i8 signext)
+// CHECK-armv7-LABEL: declare signext i8 @signedChareth(i8 signext)
+// CHECK-armv7-LABEL: declare zeroext i8 @unsignedChareth(i8 zeroext)
+// CHECK-armv7-LABEL: declare signext i16 @eatMyShorts(i16 signext)
+// CHECK-armv7-LABEL: declare zeroext i16 @eatMyUnsignedShorts(i16 zeroext)
+// CHECK-armv7-LABEL: declare i32 @ints(i32)
+// CHECK-armv7-LABEL: declare i32 @unsigneds(i32)
+
+// CHECK-arm64-LABEL: define void @testIntegerExtension
+// CHECK-arm64:         call signext i8 @chareth(i8 signext %0)
+// CHECK-arm64:         call signext i8 @signedChareth(i8 signext %1)
+// CHECK-arm64:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
+// CHECK-arm64:         call signext i16 @eatMyShorts(i16 signext %3)
+// CHECK-arm64:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext %4)
+// CHECK-arm64:         call i32 @ints(i32 %5)
+// CHECK-arm64:         call i32 @unsigneds(i32 %6)
+// CHECK-arm64-LABEL: declare signext i8 @chareth(i8 signext)
+// CHECK-arm64-LABEL: declare signext i8 @signedChareth(i8 signext)
+// CHECK-arm64-LABEL: declare zeroext i8 @unsignedChareth(i8 zeroext)
+// CHECK-arm64-LABEL: declare signext i16 @eatMyShorts(i16 signext)
+// CHECK-arm64-LABEL: declare zeroext i16 @eatMyUnsignedShorts(i16 zeroext)
+// CHECK-arm64-LABEL: declare i32 @ints(i32)
+// CHECK-arm64-LABEL: declare i32 @unsigneds(i32)
+
+sil @testIntegerExtension : $@thin (CChar, CSignedChar, CUnsignedChar, CShort, CUnsignedShort, CInt, CUnsignedInt) -> () {
+entry(%a : $CChar, %b : $CSignedChar, %c : $CUnsignedChar, %d : $CShort, %e : $CUnsignedShort, %f : $CInt, %g : $CUnsignedInt):
+  %h = function_ref @chareth : $@thin @cc(cdecl) (CChar) -> CChar
+  %i = apply %h(%a) : $@thin @cc(cdecl) (CChar) -> CChar
+
+  %j = function_ref @signedChareth : $@thin @cc(cdecl) (CSignedChar) -> CSignedChar
+  %k = apply %j(%b) : $@thin @cc(cdecl) (CSignedChar) -> CSignedChar
+
+  %l = function_ref @unsignedChareth : $@thin @cc(cdecl) (CUnsignedChar) -> CUnsignedChar
+  %m = apply %l(%c) : $@thin @cc(cdecl) (CUnsignedChar) -> CUnsignedChar
+
+  %n = function_ref @eatMyShorts : $@thin @cc(cdecl) (CShort) -> CShort
+  %o = apply %n(%d) : $@thin @cc(cdecl) (CShort) -> CShort
+
+  %p = function_ref @eatMyUnsignedShorts : $@thin @cc(cdecl) (CUnsignedShort) -> CUnsignedShort
+  %q = apply %p(%e) : $@thin @cc(cdecl) (CUnsignedShort) -> CUnsignedShort
+
+  %r = function_ref @ints : $@thin @cc(cdecl) (CInt) -> CInt
+  %s = apply %r(%f) : $@thin @cc(cdecl) (CInt) -> CInt
+
+  %t = function_ref @unsigneds : $@thin @cc(cdecl) (CUnsignedInt) -> CUnsignedInt
+  %u = apply %t(%g) : $@thin @cc(cdecl) (CUnsignedInt) -> CUnsignedInt
+
+  return undef : $()
+}
+
+sil public_external @chareth : $@thin @cc(cdecl) (CChar) -> CChar
+sil public_external @signedChareth : $@thin @cc(cdecl) (CSignedChar) -> CSignedChar
+sil public_external @unsignedChareth : $@thin @cc(cdecl) (CUnsignedChar) -> CUnsignedChar
+sil public_external @eatMyShorts : $@thin @cc(cdecl) (CShort) -> CShort
+sil public_external @eatMyUnsignedShorts : $@thin @cc(cdecl) (CUnsignedShort) -> CUnsignedShort
+sil public_external @ints : $@thin @cc(cdecl) (CInt) -> CInt
+sil public_external @unsigneds : $@thin @cc(cdecl) (CUnsignedInt) -> CUnsignedInt
+

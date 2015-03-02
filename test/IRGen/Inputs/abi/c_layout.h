@@ -65,3 +65,14 @@ struct HasRecursivePointers {
   void (*getNext)(struct HasRecursivePointers);
 };
 
+// Test sign extension behavior
+
+char chareth(char a);
+signed char signedChareth(signed char a);
+unsigned char unsignedChareth(unsigned char a);
+
+short eatMyShorts(short a);
+unsigned short eatMyUnsignedShorts(unsigned short a);
+
+int ints(int a);
+unsigned unsigneds(unsigned a);

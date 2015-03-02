@@ -45,6 +45,23 @@ enum NSDecimalResult: StringLiteralConvertible, Equatable, Printable {
       return "NaN"
     }
   }
+
+  func pow10(power: Int) -> NSDecimalResult {
+    switch self {
+    case .Some(var decimal):
+      var result = NSDecimal()
+      let error = NSDecimalMultiplyByPowerOf10(&result, &decimal, Int16(power),
+                                               .RoundPlain)
+      if error != .NoError {
+        return .Error(error)
+      } else {
+        return .Some(result)
+      }
+    case .Error:
+      return self
+    }
+  }
+
 }
 
 func ==(x: NSDecimalResult, y: NSDecimalResult) -> Bool {
@@ -95,3 +112,7 @@ println(two == twoAgain) // CHECK: true
 println(two + "not a number") // CHECK: NaN
 println(two + "not a number" == "still not a number") // CHECK: false
 println(two + "not a number" == two) // CHECK: false
+
+let one: NSDecimalResult = "1"
+println(one.pow10(2)) // CHECK: 100
+println(one.pow10(-2)) // CHECK: 0.01

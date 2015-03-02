@@ -2667,7 +2667,7 @@ void irgen::emitClangExpandedParameter(IRGenFunction &IGF,
 
 static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
                                  Explosion &in, Explosion &out,
-                     SmallVectorImpl<std::pair<unsigned, Alignment>> &newByvals,
+                                 llvm::AttributeSet &attrs,
                                  ArrayRef<SILParameterInfo> &params) {
 
   SmallVector<clang::CanQualType,4> paramTys;
@@ -2722,6 +2722,21 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
     out.add(in.claimNext());
     firstParam = 2;
   }
+  
+  // Get the argument index base for attributes.
+  // If there's an indirect return, it will come before any "in" arguments.
+  unsigned attrBase = 0;
+  auto &returnInfo = FI.getReturnInfo();
+  if (returnInfo.isIndirect())
+    attrBase += 1;
+  
+  // Does the result need an extension attribute?
+  if (returnInfo.isExtend()) {
+    bool signExt = clangResultTy->hasSignedIntegerRepresentation();
+    assert((signExt || clangResultTy->hasUnsignedIntegerRepresentation()) &&
+           "Invalid attempt to add extension attribute to argument!");
+    addExtendAttribute(IGF.IGM, attrs, llvm::AttributeSet::ReturnIndex, signExt);
+  }
 
   for (auto i : indices(paramTys).slice(firstParam)) {
     auto &AI = FI.arg_begin()[i].info;
@@ -2732,9 +2747,13 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
 
     SILType paramType = params[i - firstParam].getSILType();
     switch (AI.getKind()) {
-    case clang::CodeGen::ABIArgInfo::Extend:
-      // FIXME: Handle extension attribute.
+    case clang::CodeGen::ABIArgInfo::Extend: {
+      bool signExt = paramTys[i]->hasSignedIntegerRepresentation();
+      assert((signExt || paramTys[i]->hasUnsignedIntegerRepresentation()) &&
+             "Invalid attempt to add extension attribute to argument!");
+      addExtendAttribute(IGF.IGM, attrs, attrBase + out.size() + 1, signExt);
       SWIFT_FALLTHROUGH;
+    }
     case clang::CodeGen::ABIArgInfo::Direct:
       emitDirectExternalArgument(IGF, paramType, AI.getCoerceToType(), in, out);
       break;
@@ -2745,7 +2764,8 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
       ti.initialize(IGF, in, addr);
 
       if (AI.getIndirectByVal())
-        newByvals.push_back({out.size(), addr.getAlignment()});
+        addByvalArgumentAttributes(IGF.IGM, attrs, attrBase + out.size(),
+                                   addr.getAlignment());
       out.add(addr.getAddress());
       break;
     }
@@ -2764,8 +2784,6 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
 
 /// Add a new set of arguments to the function.
 void CallEmission::addArg(Explosion &arg) {
-  SmallVector<std::pair<unsigned, Alignment>, 2> newByvals;
-
   auto origParams = getCallee().getOrigFunctionType()->getParameters();
 
   // Convert arguments to a representation appropriate to the calling
@@ -2774,8 +2792,7 @@ void CallEmission::addArg(Explosion &arg) {
   case AbstractCC::C:
   case AbstractCC::ObjCMethod: {
     Explosion externalized;
-    externalizeArguments(IGF, getCallee(), arg, externalized, newByvals,
-                         origParams);
+    externalizeArguments(IGF, getCallee(), arg, externalized, Attrs, origParams);
     arg = std::move(externalized);
     break;
   }
@@ -2801,15 +2818,6 @@ void CallEmission::addArg(Explosion &arg) {
     Args[--LastArgWritten] = CurCallee.getDataPointer(IGF);
   }
   
-  // Add byval attributes.
-  // FIXME: These should in theory be moved around with the arguments when
-  // isLeftToRight, but luckily ObjC methods and C functions should only ever
-  // have byvals in the last argument clause.
-  // FIXME: these argument indexes are probably nonsense
-  for (auto &byval : newByvals)
-    addByvalArgumentAttributes(IGF.IGM, Attrs, byval.first+targetIndex,
-                               byval.second);
-
   auto argIterator = Args.begin() + targetIndex;
   for (auto value : arg.claimAll()) {
     *argIterator++ = value;
