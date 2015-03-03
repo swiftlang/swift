@@ -17,6 +17,7 @@ public func f() {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: %[[ALLOCA:.*]] = alloca %V4self11stuffStruct, align {{(4|8)}}
 // CHECK: call void @llvm.dbg.declare(metadata %V4self11stuffStruct* %[[ALLOCA]], metadata ![[SELF:.*]], metadata !{{[0-9]+}}), !dbg
-// CHECK: ![[STUFFSTRUCT:[^,]+]]} ; [ DW_TAG_structure_type ] [stuffStruct]
-// CHECK: ![[SELF]] = {{.*}}![[STUFFSTRUCT]]} ; [ DW_TAG_auto_variable ] [self]
+// CHECK: !MDCompositeType(tag: DW_TAG_structure_type, name: "stuffStruct",
+// CHECK-SAME:             identifier: [[STUFFSTRUCT:"[^"]+"]]
+// CHECK: ![[SELF]] = !MDLocalVariable(tag: DW_TAG_auto_variable, name: "self",{{.*}} type: ![[STUFFSTRUCT]]
 

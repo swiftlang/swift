@@ -22,7 +22,7 @@ func &&&&&(lhs: BooleanType, @autoclosure rhs: ()->BooleanType) -> Bool {
 func call_me(var input: Int) -> Void {
 // rdar://problem/14627460
 // An autoclosure should have a line number in the debug info and a scope line of 0.
-// CHECK-DAG: \00_TFF11autoclosure7call_meFSiT_u_KT_PSs11BooleanType_{{.*}} [ DW_TAG_subprogram ] [line [[@LINE+3]]] [def] [scope 0]
+// CHECK-DAG: !MDSubprogram({{.*}}linkageName: "_TFF11autoclosure7call_meFSiT_u_KT_PSs11BooleanType_",{{.*}} line: [[@LINE+3]],{{.*}} isLocal: false, isDefinition: true
 // But not in the line table.
 // CHECK-DAG: ![[DBG]] = !MDLocation(line: [[@LINE+1]],
     if input != 0 &&&&& ( get_truth (input * 2 + 1) > 0 )

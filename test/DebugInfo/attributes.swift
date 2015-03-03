@@ -2,12 +2,12 @@
 
 // REQUIRES: objc_interop
 
-// CHECK-DAG: \0030"{{.*}}, null, ![[TY0:.*]]} ; [ DW_TAG_structure_type ] [{{.*}}ObjCClass{{.*}}] [line [[@LINE+1]]
+// CHECK-DAG: !MDCompositeType(tag: DW_TAG_structure_type, name: "ObjCClass",{{.*}} line: [[@LINE+1]],{{.*}} runtimeLang: DW_LANG_Swift,{{.*}} identifier: [[TY0:"[^"]*"]])
 @objc class ObjCClass {
       @IBAction func click(_: AnyObject?) -> () {}
 }
 // DW_LANG_Swift = 0xa000 [FIXME: this number will change!]
-// CHECK-DAG: ![[TY1:[0-9]+]] = {{.*}}\0030"{{.*}} [ DW_TAG_structure_type ] [{{.*}}SwiftClass{{.*}}] [line [[@LINE+1]]
+// CHECK-DAG: ![[TY1:[0-9]+]] = !MDCompositeType(tag: DW_TAG_structure_type, name: "SwiftClass",{{.*}} line: [[@LINE+1]],{{.*}} runtimeLang: DW_LANG_Swift
 class SwiftClass {
       @objc func objcmethod() -> () {}
       func swiftmethod() -> () {}
@@ -20,13 +20,13 @@ class SwiftClass {
 // an artificial variable.
 // DISABLED: [ DW_TAG_variable ] [OBJC_METACLASS_$__TtC10attributes9ObjCClass]
 
-// CHECK-DAG:  !"0x34\00strongRef0\00{{.*}}\00[[@LINE+1]]\000\001"{{, [^,]+, [^,]+}}, ![[TY0]], {{.*}}[ DW_TAG_variable ] [{{.*}}strongRef0{{.*}}]
+// CHECK-DAG: !MDGlobalVariable(name: "strongRef0",{{.*}}line: [[@LINE+1]],{{.*}} type: ![[TY0]],{{.*}} isLocal: false, isDefinition: true
 var strongRef0 : ObjCClass
 var strongRef1 : SwiftClass = SwiftClass()
 
-// CHECK-DAG: [ DW_TAG_typedef ] [_TtXwGSqC10attributes10SwiftClass_] [line [[@LINE+1]]
+// CHECK-DAG: !MDDerivedType(tag: DW_TAG_typedef, name: "_TtXwGSqC10attributes10SwiftClass_",{{.*}} line: [[@LINE+1]]
 weak var    weakRef1    : SwiftClass? = strongRef1
-// CHECK-DAG: [ DW_TAG_typedef ] [_TtXoC10attributes10SwiftClass] [line [[@LINE+1]]
+// CHECK-DAG: !MDDerivedType(tag: DW_TAG_typedef, name: "_TtXoC10attributes10SwiftClass",{{.*}} line: [[@LINE+1]]
 unowned var unownedRef1 : SwiftClass
 
 protocol Protocol1 : class {

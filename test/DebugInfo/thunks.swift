@@ -16,8 +16,10 @@ let i = foo.foo(-, x: y)
 // CHECK: define {{.*}}@_TTRXFdCb_dSi_dSi_XFo_dSi_dSi_
 // CHECK-NOT: ret
 // CHECK: call {{.*}}, !dbg ![[LOC:.*]]
-// CHECK-DAG: ![[LOC]] = !MDLocation(line: 0, scope: ![[THUNK:.*]])
-// CHECK-DAG: ![[THUNK]] = {{.*}}[ DW_TAG_subprogram ] [line 0]
+// CHECK: ![[LOC]] = !MDLocation(line: 0, scope: ![[THUNK:.*]])
+// CHECK: ![[THUNK]] = !MDSubprogram(
+// CHECK-NOT:                        line:
+// CHECK-SAME:                       ){{$}}
 
 // SIL-CHECK: sil shared {{.*}}@_TTRXFo_dSi_dSi_XFdCb_dSi_dSi_
 // SIL-CHECK-NOT: return

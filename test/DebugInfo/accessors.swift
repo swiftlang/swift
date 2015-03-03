@@ -1,8 +1,8 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
 
 // Verify that we generate appropriate names for accessors.
-// CHECK: DW_TAG_subprogram{{.*}}x.get
-// CHECK: DW_TAG_subprogram{{.*}}x.set
+// CHECK: !MDSubprogram(name: "x.get"
+// CHECK: !MDSubprogram(name: "x.set"
 
 // Variable getter/setter
 var _x : Int = 0

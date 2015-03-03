@@ -7,11 +7,11 @@
 // CHECK: call void @llvm.dbg.value(metadata i8*{{.*}}, metadata ![[B:.*]], metadata ![[P1]])
 // CHECK: call void @llvm.dbg.value(metadata i{{[0-9]+}} {{.*}}, metadata ![[B]], metadata ![[P2]])
 // CHECK: call void @llvm.dbg.value(metadata i{{[0-9]+}} {{.*}}, metadata ![[B]], metadata ![[P3]])
-// CHECK-DAG: ![[A]] = {{.*}} [ DW_TAG_a{{.*}}_variable ] [a] [line 15]
-// CHECK-DAG: ![[B]] = {{.*}} [ DW_TAG_a{{.*}}_variable ] [b] [line 15]
-// CHECK-DAG: ![[P1]] = {{.*}}; [ DW_TAG_expression ] [DW_OP_bit_piece offset=0, size={{(32|64)}}]
-// CHECK-DAG: ![[P2]] = {{.*}}; [ DW_TAG_expression ] [DW_OP_bit_piece offset={{(32|64)}}, size={{(32|64)}}]
-// CHECK-DAG: ![[P3]] = {{.*}}; [ DW_TAG_expression ] [DW_OP_bit_piece offset={{(64|128)}}, size={{(32|64)}}]
+// CHECK-DAG: ![[A]] = !MDLocalVariable({{.*}} name: "a",{{.*}} line: 15
+// CHECK-DAG: ![[B]] = !MDLocalVariable({{.*}} name: "b",{{.*}} line: 15
+// CHECK-DAG: ![[P1]] = !MDExpression(DW_OP_bit_piece, 0, {{(32|64)}})
+// CHECK-DAG: ![[P2]] = !MDExpression(DW_OP_bit_piece, {{(32, 32|64, 64)}})
+// CHECK-DAG: ![[P3]] = !MDExpression(DW_OP_bit_piece, {{(64, 64|128, 64)}})
 func sort(a : String, b : String) -> Bool {
   println("Sorting..\(a) & \(b)")
   return (a < b)
@@ -31,8 +31,12 @@ demo()
 // At -O0, we should have a single aggregate argument.
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s --check-prefix=CHECK-O0
 // Verify that a reabstraction thunk does not have a line number.
-// CHECK-O0: _TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_{{.*}}; [ DW_TAG_subprogram ] [line 0]
-// CHECK-O0: [ DW_TAG_arg_variable ] [a] [line 15]
-// CHECK-O0-NOT: piece
-// CHECK-O0: [ DW_TAG_arg_variable ] [b] [line 15]
-// CHECK-O0-NOT: piece
+// CHECK-O0-NOT: DW_OP_bit_piece
+// CHECK-O0: !MDSubprogram({{.*}}linkageName: "_TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_"
+// CHECK-O0-NOT: line:
+// CHECK-O0-SAME: ){{$}}
+// CHECK-O0-NOT: DW_OP_bit_piece
+// CHECK-O0: !MDLocalVariable(tag: DW_TAG_arg_variable, name: "a",{{.*}} line: 15,
+// CHECK-O0-NOT: DW_OP_bit_piece
+// CHECK-O0: !MDLocalVariable(tag: DW_TAG_arg_variable, name: "b",{{.*}} line: 15,
+// CHECK-O0-NOT: DW_OP_bit_piece

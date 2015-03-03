@@ -6,8 +6,8 @@ func makeIncrementor(inc : Int) -> () -> Int
   // CHECK: define {{.*}}5inner
   func inner() -> Int {
     // CHECK: call void @llvm.dbg.declare(metadata %Si** %{{.*}}, metadata ![[SUM_CAPTURE:[0-9]+]], metadata ![[DEREF:[0-9]+]])
-    // CHECK-DAG: ![[SUM_CAPTURE]] = {{.*}}; [ DW_TAG_arg_variable ] [sum] [line [[@LINE-4]]]
-    // CHECK-DAG: ![[DEREF]] = {{.*}}; [ DW_TAG_expression ] [DW_OP_deref
+    // CHECK-DAG: ![[SUM_CAPTURE]] = !MDLocalVariable(tag: DW_TAG_arg_variable, name: "sum",{{.*}} line: [[@LINE-4]]
+    // CHECK-DAG: ![[DEREF]] = !MDExpression(DW_OP_deref
     sum += inc
     return sum
   }

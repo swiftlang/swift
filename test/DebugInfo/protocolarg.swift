@@ -1,7 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
 // FIXME: Should be DW_TAG_interface_type
-// CHECK: ![[PT:[^,]+]]} ; [ DW_TAG_structure_type ] [IGiveOutInts]
+// CHECK: !MDCompositeType(tag: DW_TAG_structure_type, name: "IGiveOutInts"
+// CHECK-SAME:             identifier: [[PT:"[^"]+"]]
 protocol IGiveOutInts {
 	func callMe() -> Int
 }
@@ -24,7 +25,9 @@ class AFancierImplementor : IGiveOutInts {
 }
 
 func printSomeNumbers(var gen: IGiveOutInts) {
-  // CHECK: ![[PT]]} ; [ DW_TAG_arg_variable ] [gen] [line [[@LINE-1]]]
+  // CHECK: !MDLocalVariable(tag: DW_TAG_arg_variable, name: "gen",
+  // CHECK-SAME:             line: [[@LINE-2]]
+  // CHECK-SAME:             type: ![[PT]]
 	var i = 1
 	while i < 3 {
 		println("\(gen.callMe())")

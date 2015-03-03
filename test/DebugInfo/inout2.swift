@@ -21,13 +21,13 @@ struct Struct {
 }
 
 func foo (inout x : Class) {
-// CHECK: \000"{{.*}}[ DW_TAG_arg_variable ] [x] [line [[@LINE-1]]]
+// CHECK: !MDLocalVariable(tag: DW_TAG_arg_variable, name: "x",{{.*}} line: [[@LINE-1]]]
 	println(x.ivar)
 	x.ivar++ // Set breakpoint here
 }
 
 func foo(inout x : Struct) {
-// CHECK: \000"{{.*}}[ DW_TAG_arg_variable ] [x] [line [[@LINE-1]]]
+// CHECK: !MDLocalVariable(tag: DW_TAG_arg_variable, name: "x",{{.*}} line: [[@LINE-1]]]
 	println(x.ivar)
 	x.ivar++ // Set breakpoint here
 }

@@ -12,8 +12,8 @@ func foldl1<T>(list: [T], function: (a: T, b: T) -> T) -> T {
 var a = [Int](count: 10, repeatedValue: 0)
 for i in 0..<10 { a[i] = i }
 // A closure is not an artificial function (the last i32 0).
-// CHECK: !"0x2e\00_TF7closureU_FTSiSi_Si\00_TF7closureU_FTSiSi_Si\00_TF7closureU_FTSiSi_Si\0018\000\001\000\000\000\000\0018", {{.*}}[ DW_TAG_subprogram ]
-// CHECK: [ DW_TAG_arg_variable ] [$0] [line [[@LINE+2]]]
-// CHECK: [ DW_TAG_arg_variable ] [$1] [line [[@LINE+1]]]
+// CHECK: !MDSubprogram({{.*}}linkageName: "_TF7closureU_FTSiSi_Si",{{.*}} line: 18,{{.*}} scopeLine: 18,
+// CHECK: !MDLocalVariable(tag: DW_TAG_arg_variable, name: "$0",{{.*}} line: [[@LINE+2]],
+// CHECK: !MDLocalVariable(tag: DW_TAG_arg_variable, name: "$1",{{.*}} line: [[@LINE+1]],
 var sum:Int = foldl1(a, { $0 + $1 })
 println(sum)

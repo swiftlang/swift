@@ -10,7 +10,7 @@ class C {
 extension C {
   class func Factory() -> Self {
     // Currently we emit the static type C for r.
-    // CHECK: [ DW_TAG_auto_variable ] [r] [line [[@LINE+1]]]
+    // CHECK: !MDLocalVariable(tag: DW_TAG_auto_variable, name: "r", {{.*}}line: [[@LINE+1]]
     let r = self(number: 0)
     return r
   }

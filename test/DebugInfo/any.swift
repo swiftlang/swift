@@ -2,8 +2,8 @@
 
 func main() {
   // CHECK: call void @llvm.dbg.declare(metadata %"protocol<>"* {{.*}}, metadata ![[S:.*]], metadata !{{[0-9]+}}), !dbg ![[DBG:.*]]
-  // CHECK: ![[S]] ={{.*}}[ DW_TAG_auto_variable ] [s] [line [[@LINE+3]]]
-  // CHECK: ![[SCOPE:.*]] = !{!"0xb\003\0013\001"{{.*}}} ; [ DW_TAG_lexical_block ]
+  // CHECK: ![[S]] = !MDLocalVariable(tag: DW_TAG_auto_variable, name: "s", {{.*}}line: [[@LINE+3]]
+  // CHECK: ![[SCOPE:.*]] = distinct !MDLexicalBlock({{.*}}line: 3, column: 13)
   // CHECK: ![[DBG]] = !MDLocation(line: [[@LINE+1]], column: 6, scope: ![[SCOPE]])
 	var s : Any = "hello world"
 	var n : Any = 12

@@ -14,9 +14,9 @@ class AppDelegate {
     // CHECK-NOT: call void @llvm.dbg.value({{.*}}, metadata ![[SELF]], metadata !{{[0-9]+}})
     // CHECK: call void @llvm.dbg.declare({{.*}}, metadata ![[A:.*]], metadata !{{[0-9]+}})
     // CHECK-NOT: call void @llvm.dbg.value({{.*}}, metadata ![[A]], metadata !{{[0-9]+}})
-    // CHECK-DAG: ![[A]] = {{.*}}; [ DW_TAG_auto_variable ] [a] [line [[@LINE-4]]]
-    // CHECK-DAG: ![[SELF]] = {{.*}}; [ DW_TAG_arg_variable ] [self] [line [[@LINE-10]]]
-    // CHECK-DAG: ![[B]] = {{.*}}; [ DW_TAG_auto_variable ] [b] [line [[@LINE+1]]]
+    // CHECK-DAG: ![[A]] = !MDLocalVariable(tag: DW_TAG_auto_variable, name: "a",{{.*}} line: [[@LINE-4]],
+    // CHECK-DAG: ![[SELF]] = !MDLocalVariable(tag: DW_TAG_arg_variable, name: "self",{{.*}} line: [[@LINE-10]],
+    // CHECK-DAG: ![[B]] = !MDLocalVariable(tag: DW_TAG_auto_variable, name: "b",{{.*}} line: [[@LINE+1]],
     var b = "var"
     self.window = UIWindow()
     return true

@@ -3,8 +3,9 @@
 
 var puzzleInput = "great minds think alike"
 var puzzleOutput = ""
-// CHECK-NOT: [ DW_TAG_auto_variable ] [$letter$generator] [line [[@LINE+2]]]
-// CHECK: [ DW_TAG_auto_variable ] [letter] [line [[@LINE+1]]]
+// CHECK-NOT: !MDLocalVariable(tag: DW_TAG_auto_variable, name: "$letter$generator"
+// CHECK: !MDLocalVariable(tag: DW_TAG_auto_variable, name: "letter",
+// CHECK-SAME:             line: [[@LINE+1]]
 for letter in puzzleInput {
     switch letter {
         case "a", "e", "i", "o", "u", " ":
@@ -17,8 +18,9 @@ println(puzzleOutput)
 
 
 func count() {
-  // CHECK-NOT: [ DW_TAG_auto_variable ] [$i$generator] [line [[@LINE+2]]]
-  // CHECK: [ DW_TAG_auto_variable ] [i] [line [[@LINE+1]]]
+// CHECK-NOT: !MDLocalVariable(tag: DW_TAG_auto_variable, name: "$i$generator"
+// CHECK: !MDLocalVariable(tag: DW_TAG_auto_variable, name: "i",
+// CHECK-SAME:             line: [[@LINE+1]]
   for i in 0...100 {
     println(i)
   }

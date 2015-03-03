@@ -9,8 +9,12 @@ class AClass : AProtocol {
 
 // CHECK: define hidden void @{{.*}}aFunction
 // CHECK:  call void @llvm.dbg.declare(metadata %swift.type** %{{.*}}, metadata ![[TYPEARG:.*]], metadata !{{[0-9]+}}),
-// CHECK: ![[TYPEARG]] = !{!"{{.*}}$swift.type.T\000\0064", !{{[^,]+}}, !{{[^,]+}}, ![[SWIFTMETATYPE:.*]]} ; [ DW_TAG_auto_variable ] [$swift.type.T]
-// CHECK: ![[SWIFTMETATYPE]] = {{.*}} ; [ DW_TAG_typedef ] [$swift.type] [line 0, size 0, align 0, offset 0] [from _TtBp]
+// CHECK: ![[VOIDPTR:[0-9]+]] = !MDDerivedType(tag: DW_TAG_pointer_type, name: "_TtBp", baseType: null
+// CHECK: ![[TYPEARG]] = !MDLocalVariable(tag: DW_TAG_auto_variable, name: "$swift.type.T"
+// CHECK-SAME:                            type: ![[SWIFTMETATYPE:[^,)]+]]
+// CHECK-SAME:                            flags: DIFlagArtificial
+// CHECK: ![[SWIFTMETATYPE]] = !MDDerivedType(tag: DW_TAG_typedef, name: "$swift.type",
+// CHECK-SAME:                                baseType: ![[VOIDPTR]]
 func aFunction<T : AProtocol>(x: T) {
     println("I am in aFunction: \(x.f())")
 }
@@ -23,8 +27,8 @@ class Foo<Bar> {
       }
 
       func two<Baz>(x: Baz) {
-    // CHECK: [ DW_TAG_auto_variable ] [$swift.type.Bar]
-    // CHECK: [ DW_TAG_auto_variable ] [$swift.type.Baz]
+    // CHECK: !MDLocalVariable(tag: DW_TAG_auto_variable, name: "$swift.type.Bar"
+    // CHECK: !MDLocalVariable(tag: DW_TAG_auto_variable, name: "$swift.type.Baz"
       }
 }
 

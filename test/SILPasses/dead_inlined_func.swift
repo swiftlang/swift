@@ -8,7 +8,7 @@
 // CHECK-IR-NOT: define {{.*}}to_be_inlined
 
 // But: we want debug info for it.
-// CHECK-IR: [ DW_TAG_subprogram ] {{.*}}to_be_inlined
+// CHECK-IR: !MDSubprogram(name: "to_be_inlined"
 
 private func to_be_inlined(x: Int) -> Int {
 	return x + 1

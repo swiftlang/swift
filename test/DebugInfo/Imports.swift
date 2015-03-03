@@ -4,15 +4,15 @@
 // RUN: %target-swift-frontend -emit-ir -module-name Foo %s -I %t -g -o - | FileCheck %s
 // RUN: %target-swift-frontend -c -module-name Foo %s -I %t -g -o - | llvm-dwarfdump - | FileCheck --check-prefix=DWARF %s
 
-// CHECK-DAG: ![[FOOMODULE:[0-9]+]] = {{.*}}[ DW_TAG_module ] [Foo]
-// CHECK-DAG:  !"0x3a\001\00", ![[THISFILE:[0-9]+]], ![[FOOMODULE]]} ; [ DW_TAG_imported_module ]
-// CHECK-DAG: ![[THISFILE]] = {{.*}}[ DW_TAG_file_type ] [{{.*}}test/DebugInfo/Imports.swift]
-// CHECK-DAG: ![[SWIFTFILE:[0-9]+]] = {{.*}}[ DW_TAG_file_type ]{{.*}}Swift.swiftmodule
-// CHECK-DAG: ![[SWIFTMODULE:[0-9]+]] = {{.*}}[ DW_TAG_module ] [Swift]
-// CHECK-DAG:  !"0x3a\000\00", ![[SWIFTFILE]], ![[SWIFTMODULE]]} ; [ DW_TAG_imported_module ]
-// CHECK-DAG: ![[BASICFILE:[0-9]+]] = {{.*}}basic.swiftmodule
-// CHECK-DAG: ![[BASICMODULE:[0-9]+]] = {{.*}}[ DW_TAG_module ] [basic]
-// CHECK-DAG:  !"0x3a\00[[@LINE+1]]\00", ![[BASICFILE]], ![[BASICMODULE]]} ; [ DW_TAG_imported_module ]
+// CHECK-DAG: ![[FOOMODULE:[0-9]+]] = !MDModule(name: "Foo"
+// CHECK-DAG: !MDImportedEntity(tag: DW_TAG_imported_module, scope: ![[THISFILE:[0-9]+]], entity: ![[FOOMODULE]]
+// CHECK-DAG: ![[THISFILE]] = !MDFile(filename: "Imports.swift", directory: "{{.*}}test/DebugInfo")
+// CHECK-DAG: ![[SWIFTFILE:[0-9]+]] = !MDFile(filename: "Swift.swiftmodule"
+// CHECK-DAG: ![[SWIFTMODULE:[0-9]+]] = !MDModule(name: "Swift"
+// CHECK-DAG: !MDImportedEntity(tag: DW_TAG_imported_module, scope: ![[SWIFTFILE]], entity: ![[SWIFTMODULE]]
+// CHECK-DAG: ![[BASICFILE:[0-9]+]] = !MDFile(filename: "basic.swiftmodule"
+// CHECK-DAG: ![[BASICMODULE:[0-9]+]] = !MDModule(name: "basic"
+// CHECK-DAG: !MDImportedEntity(tag: DW_TAG_imported_module, scope: ![[BASICFILE]], entity: ![[BASICMODULE]]
 import basic
 import typealias Swift.Optional
 

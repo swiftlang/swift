@@ -1,16 +1,26 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
-// CHECK: [ DW_TAG_union_type ] [_TtO4enum5Color] [line [[@LINE+1]], size 8, align 8,
+// CHECK: !MDCompositeType(tag: DW_TAG_union_type, name: "_TtO4enum5Color"
+// CHECK-SAME:             line: [[@LINE+2]]
+// CHECK-SAME:             size: 8, align: 8,
 enum Color : UInt {
-// CHECK: [ DW_TAG_member ] [Red] [line 0, size 8, align 8, offset 0] [from _TtSu]
+// CHECK: !MDDerivedType(tag: DW_TAG_member, name: "Red"
+// CHECK-SAME:           baseType: !"_TtSu"
+// CHECK-SAME:           size: 8, align: 8{{[,)]}}
   case Red, Green, Blue
 }
 
-// CHECK: [ DW_TAG_union_type ] [_TtO4enum12MaybeIntPair] [line [[@LINE+1]], size 136, align 64,
+// CHECK: !MDCompositeType(tag: DW_TAG_union_type, name: "_TtO4enum12MaybeIntPair"
+// CHECK-SAME:             line: [[@LINE+2]],
+// CHECK-SAME:             size: 136, align: 64{{[,)]}}
 enum MaybeIntPair {
-// CHECK: [ DW_TAG_member ] [None] [line 0, size 136, align 64, offset 0] [from _TtSi]
+// CHECK: !MDDerivedType(tag: DW_TAG_member, name: "None"
+// CHECK-SAME:           baseType: !"_TtSi"
+// CHECK-SAME:           size: 136, align: 64{{[,)]}}
 case None
-// CHECK: [ DW_TAG_member ] [Just] [line 0, size 136, align 64, offset 0] [from _TtTVSs5Int64S__]
+// CHECK: !MDDerivedType(tag: DW_TAG_member, name: "Just"
+// CHECK-SAME:           baseType: !"_TtTVSs5Int64S__"
+// CHECK-SAME:           size: 136, align: 64{{[,)]}}
   case Just(Int64, Int64)
 }
 
@@ -21,5 +31,7 @@ enum Maybe<T> {
 
 let r = Color.Red
 let c = MaybeIntPair.Just(74, 75)
-// CHECK: [ DW_TAG_union_type ] [_TtGO4enum5MaybeOS_5Color_] [line [[@LINE-7]], size 8, align 8
+// CHECK: !MDCompositeType(tag: DW_TAG_union_type, name: "_TtGO4enum5MaybeOS_5Color_"
+// CHECK-SAME:             line: [[@LINE-8]],
+// CHECK-SAME:             size: 8, align: 8{{[,)]}}
 let movie : Maybe<Color> = .None

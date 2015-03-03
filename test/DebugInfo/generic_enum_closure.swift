@@ -9,8 +9,7 @@ struct CErrorOr<T>
     // CHECK-NOT: define
     // This is a SIL-level debug_value_addr instruction.
     // CHECK: call void @llvm.dbg.value({{.*}}, metadata ![[SELF:.*]], metadata !{{[0-9]+}})
-    // CHECK-DAG: ![[SELFTY:.*]] = {{.*}}_TtGV20generic_enum_closure8CErrorOrQq_S0__
-    // CHECK-DAG: ![[SELF]] = {{.*}}_TtGV20generic_enum_closure8CErrorOrQq_S0__{{.*}} ; [ DW_TAG_auto_variable ] [self]
+    // CHECK-DAG: ![[SELF]] = !MDLocalVariable(tag: DW_TAG_auto_variable, name: "self",{{.*}} type: !"_TtGV20generic_enum_closure8CErrorOrQq_S0__"
     value = .None
   }
   func isError() -> Bool {
