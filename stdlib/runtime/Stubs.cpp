@@ -179,15 +179,11 @@ extern "C" uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
 /// \param[out] LinePtr Replaced with the pointer to the malloc()-allocated
 /// line.  Can be NULL if no characters were read.
 ///
-/// \returns Size of character data returned in \c LinePtr, or \c SIZE_MAX
+/// \returns Size of character data returned in \c LinePtr, or -1
 /// if an error occured, or EOF was reached.
-extern "C" size_t swift_stdlib_readLine_stdin(char **LinePtr) {
+extern "C" ssize_t swift_stdlib_readLine_stdin(char **LinePtr) {
   size_t Capacity = 0;
-  ssize_t ReadBytes = getline(LinePtr, &Capacity, stdin);
-  if (ReadBytes < 0) {
-    return SIZE_MAX;
-  }
-  return ReadBytes;
+  return getline(LinePtr, &Capacity, stdin);
 }
 
 extern "C" float _swift_fmodf(float lhs, float rhs) {

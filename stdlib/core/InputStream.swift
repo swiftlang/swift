@@ -25,9 +25,11 @@ import SwiftShims
 public func readLine(stripNewline: Bool = true) -> String? {
   var linePtr: UnsafeMutablePointer<CChar> = nil
   var readBytes = swift_stdlib_readLine_stdin(&linePtr)
-  if readBytes == Int(bitPattern: UInt.max) {
+  if readBytes == -1 {
     return nil
   }
+  _sanityCheck(readBytes >= 0,
+    "unexpected return value from swift_stdlib_readLine_stdin")
   if readBytes == 0 {
     return ""
   }

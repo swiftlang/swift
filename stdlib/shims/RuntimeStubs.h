@@ -19,7 +19,9 @@
 #ifndef SWIFT_STDLIB_SHIMS_RUNTIMESTUBS_H_
 #define SWIFT_STDLIB_SHIMS_RUNTIMESTUBS_H_
 
-__swift_size_t swift_stdlib_readLine_stdin(char **LinePtr);
+#include "DarwinShims.h"
+
+__swift_ssize_t swift_stdlib_readLine_stdin(char **LinePtr);
 
 #endif // SWIFT_STDLIB_SHIMS_RUNTIMESTUBS_H_
 
