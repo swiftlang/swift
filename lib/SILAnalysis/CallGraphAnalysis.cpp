@@ -26,7 +26,7 @@ using namespace swift;
 STATISTIC(NumCallGraphNodes, "# of call graph nodes created");
 STATISTIC(NumAppliesWithEdges, "# of call sites with edges");
 STATISTIC(NumAppliesWithoutEdges,
-          "# of call sites without call graph edges");
+          "# of call sites without edges");
 STATISTIC(NumAppliesOfBuiltins, "# of call sites calling builtins");
 
 CallGraph::CallGraph(SILModule *Mod, bool completeModule) : M(*Mod) {
@@ -81,6 +81,8 @@ bool CallGraph::tryGetCalleeSet(SILValue Callee,
                                 CallGraphEdge::CalleeSetType &CalleeSet,
                                 bool &Complete) {
 
+  assert(CalleeSet.empty() && "Expected empty callee set!");
+
   switch (Callee->getKind()) {
   case ValueKind::ThinToThickFunctionInst:
     Callee = cast<ThinToThickFunctionInst>(Callee)->getOperand();
@@ -91,7 +93,6 @@ bool CallGraph::tryGetCalleeSet(SILValue Callee,
     assert(CalleeNode &&
            "Expected to have a call graph node for all functions!");
 
-    assert(CalleeSet.empty() && "Expected empty callee set!");
     CalleeSet.insert(CalleeNode);
     Complete = true;
     return true;
@@ -130,9 +131,30 @@ bool CallGraph::tryGetCalleeSet(SILValue Callee,
     ++NumAppliesOfBuiltins;
     return false;
 
+  case ValueKind::WitnessMethodInst: {
+    auto *WMI = cast<WitnessMethodInst>(Callee);
+    SILFunction *CalleeFn;
+    ArrayRef<Substitution> Subs;
+    SILWitnessTable *WT;
+
+    std::tie(CalleeFn, WT, Subs) =
+      WMI->getModule().lookUpFunctionInWitnessTable(WMI->getConformance(),
+                                                    WMI->getMember());
+
+    if (!CalleeFn)
+      return false;
+
+    auto *CalleeNode = getCallGraphNode(CalleeFn);
+    assert(CalleeNode &&
+           "Expected to have a call graph node for all functions!");
+
+    CalleeSet.insert(CalleeNode);
+    Complete = true;
+    return true;
+  }
+
   case ValueKind::PartialApplyInst:
   case ValueKind::ClassMethodInst:
-  case ValueKind::WitnessMethodInst:
   case ValueKind::SuperMethodInst:
     // TODO: Each of these requires specific handling.
     return false;
