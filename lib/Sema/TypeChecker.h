@@ -1315,7 +1315,9 @@ public:
       const UnavailabilityReason &Reason, bool ForInout);
 
   /// Emits a diagnostic for a reference to a declaration that is deprecated.
-  void diagnoseDeprecated(SourceLoc ReferenceLoc, const AvailabilityAttr *Attr,
+  void diagnoseDeprecated(SourceLoc ReferenceLoc,
+                          const DeclContext *ReferenceDC,
+                          const AvailabilityAttr *Attr,
                           DeclName Name);
   /// @}
 

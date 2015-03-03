@@ -440,7 +440,23 @@ typedef NS_ENUM(NSUInteger, NSEnumWithUnavailableElement) {
   NSEnumWithUnavailableElementThird __attribute__((availability(macosx, introduced=10.10))),
 };
 
+typedef NS_OPTIONS(NSUInteger, NSDeprecatedOptions) {
+  NSDeprecatedOptionsNone = 0,
+  NSDeprecatedOptionsFirst   = (1 << 0)
+}  __attribute__((availability(macosx, introduced=10.10, deprecated=10.10, message="Use a different API")));
 
+typedef NS_ENUM(NSUInteger, NSDeprecatedEnum) {
+  NSDeprecatedEnumFirst
+} __attribute__((availability(macosx, introduced=10.10, deprecated=10.10, message="Use a different API")));
+
+
+@interface NSClassWithDeprecatedOptionsInMethodSignature : NSObject
++ (NSClassWithDeprecatedOptionsInMethodSignature *) sharedInstance;
+@end
+
+@interface NSClassWithDeprecatedOptionsInMethodSignature (ActuallyUseDeprecatedOptions)
+  - (void)someMethodWithOptions:(NSDeprecatedOptions) options __attribute__((availability(macosx, introduced=10.10, deprecated=10.10, message="Use a different API")));
+@end
 
 @protocol NSWobbling
 -(void)wobble;

@@ -546,7 +546,7 @@ static bool diagAvailability(TypeChecker &TC, const ValueDecl *D,
 
   // Diagnose for deprecation
   if (const AvailabilityAttr *Attr = D->getAttrs().getDeprecated(TC.Context)) {
-    TC.diagnoseDeprecated(R.Start, Attr, D->getFullName());
+    TC.diagnoseDeprecated(R.Start, DC, Attr, D->getFullName());
   }
   
   // We only diagnose potentially unavailability here if availability checking
