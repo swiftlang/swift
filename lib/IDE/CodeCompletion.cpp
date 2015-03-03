@@ -1999,10 +1999,9 @@ public:
 
   void getAttributeDeclCompletions(DeclAttrKind AttrKind, int ParamIndex) {
     if(AttrKind == DAK_Availability && ParamIndex == 0) {
-      addKeyword("*", "Platform");
-      addKeyword("iOS", "Platform");
-      addKeyword("iOSApplicationExtension", "Platform");
-      addKeyword("OSX", "Platform");
+      addKeyword("*", "Any platform");
+#define AVAILABILITY_PLATFORM(X, PrettyName)   addKeyword(#X, PrettyName);
+#include "swift/AST/PlatformKinds.def"
     }
   }
 
