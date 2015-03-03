@@ -50,8 +50,11 @@
 // Check that B4.doSomething cannot be completely devirtualized
 // CHECK-NEXT: upcast
 // CHECK-NEXT: class_method
-// CHECK-NEXT: checked_cast_br
-// CHECK: strong_release
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: apply
+// CHECK-NEXT: class_method
+// CHECK-NEXT: apply
+// CHECK-NEXT: strong_release
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: strong_release

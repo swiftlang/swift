@@ -121,23 +121,41 @@ static bool isClassWithUnboundGenericParameters(SILType C, SILModule &M) {
   return false;
 }
 
-/// \brief Devirtualize an Apply instruction and a class member obtained
-/// using the class_method instruction into a direct call to a specific
-/// member of a specific class.
+/// A helper struct to keep information collected by
+/// the analysis which checks if it is possible to
+/// devirtualize a given class_method.
+struct DevirtClassMethodInfo {
+  SILFunctionType::ParameterSILTypeArrayRef ParamTypes;
+  SILFunction *F;
+  CanSILFunctionType SubstCalleeType;
+  ArrayRef<Substitution> Substitutions;
+
+  DevirtClassMethodInfo() : ParamTypes({}), F(nullptr) {}
+};
+
+/// \brief Check if it is possible to devirtualize an Apply instruction
+/// and a class member obtained using the class_method instruction into
+/// a direct call to a specific member of a specific class.
 ///
 /// \p AI is the apply to devirtualize.
 /// \p Member is the class member to devirtualize.
 /// \p ClassInstance is the operand for the ClassMethodInst or an alternative
 ///    reference (such as downcasted class reference).
-/// \p KnownClass (can be null) is a specific class type to devirtualize to.
-/// return the new ApplyInst if created one or null.
-static ApplyInst *devirtualizeClassMethod(ApplyInst *AI, SILDeclRef Member,
-                                     SILValue ClassInstance, ClassDecl *CD) {
+/// \p CD is the class declaration of the class, where the lookup of the member
+///    should be performed.
+/// \p DCMI is the devirt. class_method analysis result to be used for
+///    performing the transformation.
+/// return true if it is possible to devirtualize, false - otherwise.
+static bool canDevirtualizeClassMethod(ApplyInst *AI,
+                                       SILDeclRef Member,
+                                       SILType ClassInstanceType,
+                                       ClassDecl *CD,
+                                       DevirtClassMethodInfo& DCMI) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
 
   // First attempt to lookup the origin for our class method. The origin should
   // either be a metatype or an alloc_ref.
-  DEBUG(llvm::dbgs() << "        Origin: " << ClassInstance);
+  DEBUG(llvm::dbgs() << "        Origin Type: " << ClassInstanceType);
 
   assert(CD && "Invalid class type");
 
@@ -145,34 +163,33 @@ static ApplyInst *devirtualizeClassMethod(ApplyInst *AI, SILDeclRef Member,
   // the module vtables.
   SILModule &Mod = AI->getModule();
   // Find the implementation of the member which should be invoked.
-  SILFunction *F = Mod.lookUpFunctionInVTable(CD, Member);
+  DCMI.F = Mod.lookUpFunctionInVTable(CD, Member);
 
   // If we do not find any such function, we have no function to devirtualize
   // to... so bail.
-  if (!F) {
+  if (!DCMI.F) {
     DEBUG(llvm::dbgs() << "        FAIL: Could not find matching VTable or "
                           "vtable method for this class.\n");
-    return nullptr;
+    return false;
   }
 
   // Ok, we found a function F that we can devirtualize our class method
   // to. We want to do everything on the substituted type in the case of
   // generics. Thus construct our subst callee type for F.
-  SILModule &M = F->getModule();
-  CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
+  SILModule &M = DCMI.F->getModule();
+  CanSILFunctionType GenCalleeType = DCMI.F->getLoweredFunctionType();
   unsigned CalleeGenericParamsNum = 0;
   if (GenCalleeType->isPolymorphic())
     CalleeGenericParamsNum = GenCalleeType->getGenericSignature()
                                           ->getGenericParams().size();
   // Class F belongs to.
   CanType FSelfClass = GenCalleeType->getSelfParameter().getType();
-  SILType ClassInstanceType = ClassInstance.getType();
 
   // Bail if any generic types parameters of the class instance type are
   // unbound.
   // We cannot devirtualize unbound generic calls yet.
   if (isClassWithUnboundGenericParameters(ClassInstanceType, AI->getModule()))
-    return nullptr;
+    return false;
 
   // *NOTE*:
   // Apply instruction substitutions are for the Member from a protocol or
@@ -203,7 +220,6 @@ static ApplyInst *devirtualizeClassMethod(ApplyInst *AI, SILDeclRef Member,
   // with a bound type ClassInstanceType and checks its superclasses until it
   // finds a bound superclass matching D1 and returns its substitutions.
 
-  ArrayRef<Substitution> Substitutions;
   SILType FSelfSubstType;
 
   if (GenCalleeType->isPolymorphic()) {
@@ -228,57 +244,81 @@ static ApplyInst *devirtualizeClassMethod(ApplyInst *AI, SILDeclRef Member,
       FSelfSubstType = bindSuperclass(AI->getModule().getSwiftModule(),
                                       FSelfGenericType,
                                       ClassInstanceType,
-                                      Substitutions);
+                                      DCMI.Substitutions);
 
       // Bail if it was not possible to determine the bound generic class.
       if (FSelfSubstType == SILType()) {
-        return nullptr;
+        return false;
       }
 
       if (!isa<BoundGenericType>(ClassInstanceType.getSwiftRValueType()) &&
           CalleeGenericParamsNum &&
-          Substitutions.empty())
+          DCMI.Substitutions.empty())
         // If ClassInstance is not a bound generic type, try to derive
         // substitutions from the apply instruction.
-        Substitutions = AI->getSubstitutions();
+        DCMI.Substitutions = AI->getSubstitutions();
     } else {
       // It is not a type or bound type.
       // It could be that GenCalleeType is generic, but its arguments cannot
       // be derived from the type of self. In this case, we can try to
       // approach it from another end and take the AI substitutions.
-      Substitutions = AI->getSubstitutions();
+      DCMI.Substitutions = AI->getSubstitutions();
     }
   }
 
   // If implementing method is not polymorphic, there is no need to
   // use any substitutions.
-  if (CalleeGenericParamsNum == 0 && !Substitutions.empty())
-    Substitutions = {};
-  else if (CalleeGenericParamsNum != Substitutions.size())
+  if (CalleeGenericParamsNum == 0 && !DCMI.Substitutions.empty())
+    DCMI.Substitutions = {};
+  else if (CalleeGenericParamsNum != DCMI.Substitutions.size())
     // Bail if the number of generic parameters of the callee does not match
     // the number of substitutions, because we don't know how to handle this.
-    return nullptr;
+    return false;
 
-  CanSILFunctionType SubstCalleeType =
-    GenCalleeType->substGenericArgs(M, M.getSwiftModule(), Substitutions);
+  DCMI.SubstCalleeType =
+    GenCalleeType->substGenericArgs(M, M.getSwiftModule(), DCMI.Substitutions);
 
 
   // If F's this pointer has a different type from CMI's operand and the
   // "this" pointer type is a super class of the CMI's operand, insert an
   // upcast.
-  auto paramTypes =
-    SubstCalleeType->getParameterSILTypesWithoutIndirectResult();
+  DCMI.ParamTypes =
+    DCMI.SubstCalleeType->getParameterSILTypesWithoutIndirectResult();
 
   // We should always have a this pointer. Assert on debug builds, return
   // nullptr on release builds.
-  assert(!paramTypes.empty() &&
+  assert(!DCMI.ParamTypes.empty() &&
          "Must have a this pointer when calling a class method inst.");
-  if (paramTypes.empty())
-    return nullptr;
+  if (DCMI.ParamTypes.empty())
+    return false;
+
+  // If we reached this point, we can replace class_method by a concrete
+  // function ref for sure.
+
+  return true;
+}
+
+/// \brief Devirtualize an Apply instruction and a class member obtained
+/// using the class_method instruction into a direct call to a specific
+/// member of a specific class.
+///
+/// \p AI is the apply to devirtualize.
+/// \p Member is the class member to devirtualize.
+/// \p ClassInstance is the operand for the ClassMethodInst or an alternative
+///    reference (such as downcasted class reference).
+/// \p DCMI is the devirtualization class_method analysis result to be used for
+///    performing the transformation.
+/// return the new ApplyInst if created one or null.
+static ApplyInst *devirtualizeClassMethod(ApplyInst *AI,
+                                          SILDeclRef Member,
+                                          SILValue ClassInstance,
+                                          DevirtClassMethodInfo& DCMI) {
+
+  DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
 
   // Grab the self type from the function ref and the self type from the class
   // method inst.
-  SILType FuncSelfTy = paramTypes[paramTypes.size() - 1];
+  SILType FuncSelfTy = DCMI.ParamTypes[DCMI.ParamTypes.size() - 1];
   SILType OriginTy = ClassInstance.getType();
   SILBuilderWithScope<16> B(AI);
 
@@ -301,14 +341,14 @@ static ApplyInst *devirtualizeClassMethod(ApplyInst *AI, SILDeclRef Member,
   }
 
   // Success! Perform the devirtualization.
-  FunctionRefInst *FRI = B.createFunctionRef(AI->getLoc(), F);
+  FunctionRefInst *FRI = B.createFunctionRef(AI->getLoc(), DCMI.F);
 
   // Construct a new arg list. First process all non-self operands, ref, addr
   // casting them to the appropriate types for F so that we allow for covariant
   // indirect return types and contravariant arguments.
   llvm::SmallVector<SILValue, 8> NewArgs;
   auto Args = AI->getArguments();
-  auto allParamTypes = SubstCalleeType->getParameterSILTypes();
+  auto allParamTypes = DCMI.SubstCalleeType->getParameterSILTypes();
 
   // For each old argument Op...
   for (unsigned i = 0, e = Args.size() - 1; i != e; ++i) {
@@ -345,14 +385,14 @@ static ApplyInst *devirtualizeClassMethod(ApplyInst *AI, SILDeclRef Member,
   // type. If we have an indirect return type, AI's return type of the empty
   // tuple should be ok.
   SILType ReturnType = AI->getType();
-  if (!SubstCalleeType->hasIndirectResult()) {
-    ReturnType = SubstCalleeType->getSILResult();
+  if (!DCMI.SubstCalleeType->hasIndirectResult()) {
+    ReturnType = DCMI.SubstCalleeType->getSILResult();
   }
 
-  SILType SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
+  SILType SubstCalleeSILType = SILType::getPrimitiveObjectType(DCMI.SubstCalleeType);
   ApplyInst *NewAI =
     B.createApply(AI->getLoc(), FRI, SubstCalleeSILType, ReturnType,
-                  Substitutions, NewArgs,
+                  DCMI.Substitutions, NewArgs,
                   FRI->getReferencedFunction()->isTransparent());
 
   // If our return type differs from AI's return type, then we know that we have
@@ -395,10 +435,23 @@ static ApplyInst *devirtualizeClassMethod(ApplyInst *AI, SILDeclRef Member,
 
   AI->eraseFromParent();
 
-  DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
+  DEBUG(llvm::dbgs() << "        SUCCESS: " << DCMI.F->getName() << "\n");
   NumDevirtualized++;
   return NewAI;
 }
+
+/// This is a simplified version of devirtualizeClassMethod, which can
+/// be called without the previously prepared DevirtClassMethodInfo.
+static ApplyInst *devirtualizeClassMethod(ApplyInst *AI,
+                                          SILDeclRef Member,
+                                          SILValue ClassInstance,
+                                          ClassDecl *CD) {
+  DevirtClassMethodInfo DCMI;
+  if (!canDevirtualizeClassMethod(AI, Member, ClassInstance.getType(), CD, DCMI))
+    return nullptr;
+  return devirtualizeClassMethod(AI, Member, ClassInstance, CD, DCMI);
+}
+
 
 //===----------------------------------------------------------------------===//
 //                        Witness Method Optimization
@@ -680,6 +733,16 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
     IsValueMetatype = true;
   }
 
+  // Placeholder for keeping the results of analysis performed
+  // by canDevirtualizeClassMethod.
+  DevirtClassMethodInfo DCMI;
+
+  // Bail if this class_method cannot be devirtualized.
+  if (!canDevirtualizeClassMethod(AI, CMI->getMember(),
+                                  RealSubClassTy, CD, DCMI))
+    return nullptr;
+
+
   // Create a diamond shaped control flow and a checked_cast_branch
   // instruction that checks the exact type of the object.
   // This cast selects between two paths: one that calls the slow dynamic
@@ -748,8 +811,10 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   NumInlineCaches++;
 
   // Devirtualize the apply instruction on the identical path.
-  devirtualizeClassMethod(IdenAI, CMI->getMember(), DownCastedClassInstance,
-                          CD);
+  ApplyInst *NewAI = devirtualizeClassMethod(IdenAI, CMI->getMember(),
+                                             DownCastedClassInstance, CD, DCMI);
+  assert(NewAI && "Expected to be able to devirtualize apply!");
+  (void) NewAI;
 
   // Sink class_method instructions down to their single user.
   if (CMI->hasOneUse())
@@ -967,7 +1032,10 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
     }
 
     AI = insertMonomorphicInlineCaches(AI, InstanceType);
-    assert(AI && "Unable to insert inline caches!");
+    if (!AI) {
+      NotHandledSubsNum++;
+      continue;
+    }
     Changed = true;
   }
 
@@ -988,7 +1056,10 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   // implementation which is not covered by checked_cast_br checks yet.
   // So, it is safe to replace a class_method invocation by
   // a direct call of this remaining implementation.
-  devirtualizeClassMethod(AI, CMI->getMember(), ClassInstance, CD);
+  ApplyInst *NewAI = devirtualizeClassMethod(AI, CMI->getMember(),
+                                               ClassInstance, CD);
+  assert(NewAI && "Expected to be able to devirtualize apply!");
+  (void) NewAI;
 
   return true;
 }
