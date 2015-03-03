@@ -231,7 +231,7 @@ Passes(llvm::cl::desc("Passes:"),
                                    "Convert external definitions to decls"),
                         clEnumValN(PassKind::MergeCondFails,
                                    "merge-cond_fails",
-                                   "Convert external definitions to decls"),
+                                   "Merge cond_fail instructions"),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
