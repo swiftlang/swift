@@ -2923,15 +2923,18 @@ llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
   }
 
   // Otherwise we need to store, bitcast, and load.
-  assert(DL.getTypeSizeInBits(fromTy) >= DL.getTypeSizeInBits(toTy)
-         && "Coerced type should not be smaller!");
+  auto bufferTy = DL.getTypeSizeInBits(fromTy) >= DL.getTypeSizeInBits(toTy)
+    ? fromTy
+    : toTy;
 
   auto alignment = std::max(DL.getABITypeAlignment(fromTy),
                             DL.getABITypeAlignment(toTy));
 
-  auto address = createAlloca(fromTy, Alignment(alignment),
+  auto address = createAlloca(bufferTy, Alignment(alignment),
                               value->getName() + ".coerced");
-  Builder.CreateStore(value, address.getAddress());
+  auto *orig = Builder.CreateBitCast(address.getAddress(),
+                                     fromTy->getPointerTo());
+  Builder.CreateStore(value, orig);
   auto *coerced = Builder.CreateBitCast(address.getAddress(),
                                         toTy->getPointerTo());
   return Builder.CreateLoad(coerced);

@@ -107,7 +107,7 @@ sil public_external @createSIMDStruct : $@thin @cc(cdecl) () -> SIMDStruct
 sil public_external @consumeSIMDStruct : $@thin @cc(cdecl) SIMDStruct -> ()
 
 // CHECK-x86_64-LABEL: define void @testSIMDStruct()
-// CHECK-x86_64:         alloca <2 x double>, align 16
+// CHECK-x86_64:         alloca i128, align 16
 // CHECK-x86_64:         alloca i128, align 16
 sil @testSIMDStruct : $() -> () {
 bb0:
