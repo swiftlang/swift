@@ -2209,6 +2209,8 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
       }
     }
   }
+  if (superclassCtor->isRequired())
+    ctor->getAttrs().add(new (tc.Context) RequiredAttr(/*implicit=*/true));
 
   // Wire up the overrides.
   ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*Implicit=*/true));

@@ -5136,7 +5136,14 @@ public:
                 new (TC.Context) RequiredAttr(/*implicit=*/true));
             }
 
-            TC.diagnose(CD->getOverriddenDecl(),
+            auto requiredInit = CD->getOverriddenDecl();
+            while (requiredInit->isImplicit()) {
+              auto *overridden = requiredInit->getOverriddenDecl();
+              if (!overridden || !overridden->isRequired())
+                break;
+              requiredInit = overridden;
+            }
+            TC.diagnose(requiredInit,
                         diag::overridden_required_initializer_here);
           } else {
             // We tried to override a convenience initializer.
@@ -5192,8 +5199,15 @@ public:
       if (CD->getOverriddenDecl() && CD->getOverriddenDecl()->isRequired()) {
         TC.diagnose(CD, diag::required_initializer_missing_keyword)
           .fixItInsert(CD->getLoc(), "required ");
-        TC.diagnose(CD->getOverriddenDecl(),
-                    diag::overridden_required_initializer_here);
+
+        auto requiredInit = CD->getOverriddenDecl();
+        while (requiredInit->isImplicit()) {
+          auto *overridden = requiredInit->getOverriddenDecl();
+          if (!overridden || !overridden->isRequired())
+            break;
+          requiredInit = overridden;
+        }
+        TC.diagnose(requiredInit, diag::overridden_required_initializer_here);
 
         CD->getAttrs().add(
             new (TC.Context) RequiredAttr(/*IsImplicit=*/true));
@@ -6151,7 +6165,15 @@ static void diagnoseMissingRequiredInitializer(
               superInitializer->getFullName(),
               superInitializer->getDeclContext()->getDeclaredTypeOfContext())
     .fixItInsert(insertionLoc, initializerText);
-  TC.diagnose(superInitializer, diag::required_initializer_here);
+
+  auto requiredInit = superInitializer;
+  while (requiredInit->isImplicit()) {
+    auto *overridden = requiredInit->getOverriddenDecl();
+    if (!overridden || !overridden->isRequired())
+      break;
+    requiredInit = overridden;
+  }
+  TC.diagnose(requiredInit, diag::required_initializer_here);
 }
 
 void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {

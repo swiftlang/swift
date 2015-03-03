@@ -41,7 +41,7 @@ class C3 : C {
 
 class C4 : C3 {
   // implicitly required
-  init(string s: String) { } 
+  init(string s: String) { }
   // expected-error @-1{{'required' modifier must be present on all overrides of a required initializer}}
   // expected-note @-2{{'required' initializer is declared in superclass here}}
 }
@@ -57,7 +57,17 @@ class C5b : C4 {
 
 class Foo {
   required init() { }
+  // expected-note@-1{{'required' initializer is declared in superclass here}}
+  // expected-note@-2{{overridden required initializer is here}}
 }
 
 class Bar : Foo {
+}
+
+class Baz : Bar {
+  init(i: Int) { super.init() }
+} // expected-error{{'required' initializer 'init()' must be provided by subclass of 'Bar'}}
+
+class Baz2 : Bar {
+  init() { super.init() } // expected-error {{'required' modifier must be present on all overrides of a required initializer}}
 }
