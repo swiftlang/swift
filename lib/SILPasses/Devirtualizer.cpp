@@ -145,7 +145,7 @@ static ApplyInst *devirtualizeClassMethod(ApplyInst *AI, SILDeclRef Member,
   // the module vtables.
   SILModule &Mod = AI->getModule();
   // Find the implementation of the member which should be invoked.
-  SILFunction *F = Mod.lookUpFunctionFromVTable(CD, Member);
+  SILFunction *F = Mod.lookUpFunctionInVTable(CD, Member);
 
   // If we do not find any such function, we have no function to devirtualize
   // to... so bail.
@@ -476,8 +476,8 @@ static ApplyInst *devirtualizeWitnessMethod(ApplyInst *AI,
   SILWitnessTable *WT;
 
   std::tie(F, WT, Subs) =
-    AI->getModule().findFuncInWitnessTable(WMI->getConformance(),
-                                           WMI->getMember());
+    AI->getModule().lookUpFunctionInWitnessTable(WMI->getConformance(),
+                                                 WMI->getMember());
 
   if (!F)
     return nullptr;
@@ -666,7 +666,7 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   // Early exit guarantees that we do not create two
   // basic blocks which both perform virtual calls of a method.
   auto &Mod = AI->getModule();
-  auto *Method = Mod.lookUpFunctionFromVTable(CD, CMI->getMember());
+  auto *Method = Mod.lookUpFunctionInVTable(CD, CMI->getMember());
   if (!Method)
     return nullptr;
 

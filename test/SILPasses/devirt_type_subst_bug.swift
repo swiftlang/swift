@@ -9,10 +9,10 @@
 // rdar://17399536
 // rdar://17440222
 
-// SILModule::findFuncInWitnessTable returns a substitution array of size one.
-// GenericSignature::getSubstitutionMap expects the array to have size two
-// (t_0_0 and t_0_1).
-// We combine the substitution list from findFuncInWitnessTable and the list
+// SILModule::lookUpFunctionInWitnessTable returns a substitution
+// array of size one.  GenericSignature::getSubstitutionMap expects
+// the array to have size two (t_0_0 and t_0_1).  We combine the
+// substitution list from lookUpFunctionInWitnessTable and the list
 // from ApplyInst to match what GenericSignature expects.
 
 func asHex(a: [UInt8]) -> String {

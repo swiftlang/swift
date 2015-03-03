@@ -790,8 +790,8 @@ SerializedSILLoader *SILModule::getSILLoader() {
 /// required. Notice that we do not scan the class hierarchy, just the concrete
 /// class type.
 std::tuple<SILFunction *, SILWitnessTable *, ArrayRef<Substitution>>
-SILModule::findFuncInWitnessTable(const ProtocolConformance *C,
-                                  SILDeclRef Member) {
+SILModule::lookUpFunctionInWitnessTable(const ProtocolConformance *C,
+                                        SILDeclRef Member) {
   // Look up the witness table associated with our protocol conformance from the
   // SILModule.
   auto Ret = lookUpWitnessTable(C);
@@ -829,7 +829,7 @@ static ClassDecl *getClassDeclSuperClass(ClassDecl *Class) {
 
 SILFunction *
 SILModule::
-lookUpFunctionFromVTable(ClassDecl *Class, SILDeclRef Member) {
+lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
   // Until we reach the top of the class hierarchy...
   while (Class) {
     // Try to lookup a VTable for Class from the module...
