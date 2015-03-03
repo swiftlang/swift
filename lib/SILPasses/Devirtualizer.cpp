@@ -131,7 +131,7 @@ static bool isClassWithUnboundGenericParameters(SILType C, SILModule &M) {
 ///    reference (such as downcasted class reference).
 /// \p KnownClass (can be null) is a specific class type to devirtualize to.
 /// return the new ApplyInst if created one or null.
-static ApplyInst *devirtualizeMethod(ApplyInst *AI, SILDeclRef Member,
+static ApplyInst *devirtualizeClassMethod(ApplyInst *AI, SILDeclRef Member,
                                      SILValue ClassInstance, ClassDecl *CD) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
 
@@ -459,7 +459,7 @@ static ApplyInst *devirtualizeWitness(ApplyInst *AI, SILFunction *F,
   auto ResultSILType = SubstCalleeCanType->getSILResult();
   auto *SAI = Builder.createApply(Loc, FRI, SubstCalleeSILType,
                                   ResultSILType, NewSubstList, Arguments,
-                                  FRI->getReferencedFunction()->isTransparent());
+                                 FRI->getReferencedFunction()->isTransparent());
   AI->replaceAllUsesWith(SAI);
   AI->eraseFromParent();
   NumAMI++;
@@ -469,7 +469,8 @@ static ApplyInst *devirtualizeWitness(ApplyInst *AI, SILFunction *F,
 /// In the cases where we can statically determine the function that
 /// we'll call to, replace an apply of a witness_method with an apply
 /// of a function_ref, returning the new apply.
-static ApplyInst *optimizeWitnessMethod(ApplyInst *AI, WitnessMethodInst *WMI) {
+static ApplyInst *devirtualizeWitnessMethod(ApplyInst *AI,
+                                            WitnessMethodInst *WMI) {
   SILFunction *F;
   ArrayRef<Substitution> Subs;
   SILWitnessTable *WT;
@@ -529,9 +530,10 @@ static ClassDecl *getClassFromAccessControl(ClassMethodInst *CMI) {
   return selfTypeInMember->getClassOrBoundGenericClass();
 }
 
-/// Try to devirtualize a call. Return a new ApplyInst or null.
-static ApplyInst *optimizeApplyInst(ApplyInst *AI) {
-  DEBUG(llvm::dbgs() << "    Trying to optimize ApplyInst : " << *AI);
+/// Attempt to devirtualize the given apply if possible, and return a
+/// new apply in that case, or nullptr otherwise.
+static ApplyInst *devirtualizeApply(ApplyInst *AI) {
+  DEBUG(llvm::dbgs() << "    Trying to devirtualize: " << *AI);
 
   // Devirtualize apply instructions that call witness_method instructions:
   //
@@ -539,7 +541,7 @@ static ApplyInst *optimizeApplyInst(ApplyInst *AI) {
   //   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
   //
   if (auto *AMI = dyn_cast<WitnessMethodInst>(AI->getCallee()))
-    return optimizeWitnessMethod(AI, AMI);
+    return devirtualizeWitnessMethod(AI, AMI);
 
   /// Optimize a class_method and alloc_ref pair into a direct function
   /// reference:
@@ -560,12 +562,13 @@ static ApplyInst *optimizeApplyInst(ApplyInst *AI) {
   if (auto *CMI = dyn_cast<ClassMethodInst>(AI->getCallee())) {
     // Check if the class member is known to be final.
     if (ClassDecl *C = getClassFromAccessControl(CMI))
-      return devirtualizeMethod(AI, CMI->getMember(), CMI->getOperand(), C);
+      return devirtualizeClassMethod(AI, CMI->getMember(), CMI->getOperand(),
+                                     C);
 
     // Try to search for the point of construction.
     if (ClassDecl *C = getClassFromConstructor(CMI->getOperand()))
-      return devirtualizeMethod(AI, CMI->getMember(),
-                                CMI->getOperand().stripUpCasts(), C);
+      return devirtualizeClassMethod(AI, CMI->getMember(),
+                                     CMI->getOperand().stripUpCasts(), C);
   }
 
   return nullptr;
@@ -599,7 +602,7 @@ public:
           if (!AI)
             continue;
 
-          if (ApplyInst *NewAI = optimizeApplyInst(AI)) {
+          if (ApplyInst *NewAI = devirtualizeApply(AI)) {
             DevirtualizedCalls.push_back(NewAI);
             Changed |= true;
           }
@@ -745,7 +748,8 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   NumInlineCaches++;
 
   // Devirtualize the apply instruction on the identical path.
-  devirtualizeMethod(IdenAI, CMI->getMember(), DownCastedClassInstance, CD);
+  devirtualizeClassMethod(IdenAI, CMI->getMember(), DownCastedClassInstance,
+                          CD);
 
   // Sink class_method instructions down to their single user.
   if (CMI->hasOneUse())
@@ -879,7 +883,7 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
     if (!ClassInstance.getType().isSuperclassOf(InstanceType))
       return false;
     // ClassInstance and InstanceType should match for
-    // devirtualizeMethod to work.
+    // devirtualizeClassMethod to work.
     ClassInstance = ClassInstance.stripUpCasts();
   }
 
@@ -984,7 +988,7 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   // implementation which is not covered by checked_cast_br checks yet.
   // So, it is safe to replace a class_method invocation by
   // a direct call of this remaining implementation.
-  devirtualizeMethod(AI, CMI->getMember(), ClassInstance, CD);
+  devirtualizeClassMethod(AI, CMI->getMember(), ClassInstance, CD);
 
   return true;
 }
