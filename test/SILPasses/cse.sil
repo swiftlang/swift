@@ -669,7 +669,7 @@ bb0(%0 : $*D, %1 : $Builtin.Word):
 }
 
 
-sil [readnone] @readnonefun : $@thin (@inout Builtin.Int8) -> ()
+sil [readnone] @readnonefun : $@thin (@inout Builtin.Int8) -> Builtin.Int64
 
 // CHECK-LABEL: cse_readnone
 // CHECK: bb0
@@ -678,14 +678,13 @@ sil [readnone] @readnonefun : $@thin (@inout Builtin.Int8) -> ()
 // CHECK-NOT: function_ref @readnonefun
 // CHECK-NOT: apply
 // CHECK:return
-sil @cse_readnone : $@thin (@inout Builtin.Int8) -> () {
+sil @cse_readnone : $@thin (@inout Builtin.Int8) -> Builtin.Int64 {
 bb0(%0 : $*Builtin.Int8):
-  %1 = function_ref @readnonefun : $@thin (@inout Builtin.Int8) -> ()
-  apply %1(%0) : $@thin (@inout Builtin.Int8) -> ()
-  %2 = function_ref @readnonefun : $@thin (@inout Builtin.Int8) -> ()
-  apply %2(%0) : $@thin (@inout Builtin.Int8) -> ()
-  %3 = tuple()
-  return %3 : $()
+  %1 = function_ref @readnonefun : $@thin (@inout Builtin.Int8) -> Builtin.Int64
+  %3 = apply %1(%0) : $@thin (@inout Builtin.Int8) -> Builtin.Int64
+  %2 = function_ref @readnonefun : $@thin (@inout Builtin.Int8) -> Builtin.Int64
+  %4 = apply %2(%0) : $@thin (@inout Builtin.Int8) -> Builtin.Int64
+  return %4 : $Builtin.Int64
 }
 
 // CHECK-LABEL: sil @cse_unchecked_ref_cast

@@ -633,6 +633,31 @@ unsigned Operand::getOperandNumber() const {
 }
 
 SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
+
+  if (auto *BI = dyn_cast<BuiltinInst>(this)) {
+    // Handle Swift builtin functions.
+    const BuiltinInfo &BInfo = BI->getBuiltinInfo();
+    if (BInfo.ID != BuiltinValueKind::None)
+      return BInfo.isReadNone() ? MemoryBehavior::None
+                                : MemoryBehavior::MayHaveSideEffects;
+
+    // Handle LLVM intrinsic functions.
+    const IntrinsicInfo & IInfo = BI->getIntrinsicInfo();
+    if (IInfo.ID != llvm::Intrinsic::not_intrinsic)
+      return IInfo.hasAttribute(llvm::Attribute::ReadNone) &&
+                     IInfo.hasAttribute(llvm::Attribute::NoUnwind)
+                 ? MemoryBehavior::None
+                 : MemoryBehavior::MayHaveSideEffects;
+  }
+
+  // Handle functions that have an effects attribute.
+  if (auto *AI = dyn_cast<ApplyInst>(this))
+    if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
+      if (auto *F = FRI->getReferencedFunction())
+        return F->getEffectsKind() == EffectsKind::ReadNone
+                   ? MemoryBehavior::None
+                   : MemoryBehavior::MayHaveSideEffects;
+
   switch (getKind()) {
 #define INST(CLASS, PARENT, MEMBEHAVIOR) \
   case ValueKind::CLASS: return MemoryBehavior::MEMBEHAVIOR;
