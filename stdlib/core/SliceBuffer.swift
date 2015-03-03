@@ -212,7 +212,8 @@ struct _SliceBuffer<T> : _ArrayBufferType {
 
   /// Return whether the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`
-  internal func _isValidSubscript(index : Int, _ isNative: Bool) -> Bool {
+  internal func _isValidSubscript(index : Int,
+                                  hoistedIsNativeBuffer: Bool) -> Bool {
     return index >= 0 && index < count
   }
 
@@ -245,7 +246,8 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     return isUniquelyReferencedOrPinnedNonObjC(&owner)
   }
 
-  func getElement(i: Int, _ isNative: Bool, _ needsElementTypeCheck: Bool) -> T {
+  func getElement(i: Int, hoistedIsNativeBuffer: Bool,
+                  hoistedNeedsElementTypeCheck: Bool) -> T {
     _sanityCheck(i >= 0, "negative slice index is out of range")
     _sanityCheck(i < count, "slice index out of range")
    return start[i]
@@ -257,7 +259,8 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   /// `position != endIndex`.
   public subscript(position: Int) -> T {
     get {
-      return getElement(position, false, false)
+      return getElement(position, hoistedIsNativeBuffer: true,
+                        hoistedNeedsElementTypeCheck: false)
     }
     nonmutating set {
       _sanityCheck(position >= 0, "negative slice index is out of range")

@@ -306,8 +306,11 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     _arrayNonSliceInPlaceReplace(&self, subRange, newCount, newValues)
   }
 
-  func getElement(i: Int, _ isNative: Bool, _ needsTypeCheck: Bool) -> T {
-    _sanityCheck(_isValidSubscript(i, isNative), "Array index out of range")
+  func getElement(i: Int, hoistedIsNativeBuffer: Bool,
+                  hoistedNeedsElementTypeCheck: Bool) -> T {
+    _sanityCheck(
+      _isValidSubscript(i, hoistedIsNativeBuffer: hoistedIsNativeBuffer),
+      "Array index out of range")
     // If the index is in bounds, we can assume we have storage.
     return baseAddress[i]
   }
@@ -315,7 +318,8 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   /// Get/set the value of the ith element
   public subscript(i: Int) -> T {
     get {
-      return getElement(i, true, false)
+      return getElement(i, hoistedIsNativeBuffer: true,
+                        hoistedNeedsElementTypeCheck: false)
     }
     nonmutating set {
       _sanityCheck(i >= 0 && i < count, "Array index out of range")
@@ -349,7 +353,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
 
   /// Return whether the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`
-  func _isValidSubscript(index : Int, _ isNative : Bool) -> Bool {
+  func _isValidSubscript(index : Int, hoistedIsNativeBuffer : Bool) -> Bool {
     /// Instead of returning 0 for no storage, we explicitly check
     /// for the existance of storage.
     /// Note that this is better than folding hasStorage in to

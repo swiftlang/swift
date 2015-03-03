@@ -202,20 +202,21 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
     get {
       let isNative = _getArrayPropertyIsNative()
       let needsTypeCheck = _getArrayPropertyNeedsElementTypeCheck()
-      _checkSubscript(index, isNativeBuffer: isNative)
-      return _getElement(index, isNative, needsTypeCheck)
+      _checkSubscript(index, hoistedIsNativeBuffer: isNative)
+      return _getElement(index, hoistedIsNativeBuffer: isNative,
+                         hoistedNeedsElementTypeCheck: needsTypeCheck)
     }
     // on non-Objective-C, this should just be NativeOwner for all other
     // cases, including ArraySlice.
 %elif Self == 'ArraySlice':
     addressWithOwner {
-      _checkSubscript(index, isNativeBuffer: true)
+      _checkSubscript(index, hoistedIsNativeBuffer: true)
       return (UnsafePointer(_buffer.baseAddress + index),
               Builtin.castToUnknownObject(_buffer.owner))
     }
 %else:
     addressWithNativeOwner {
-      _checkSubscript(index, isNativeBuffer: true)
+      _checkSubscript(index, hoistedIsNativeBuffer: true)
       return (UnsafePointer(_buffer.baseAddress + index),
               Builtin.castToNativeObject(_buffer.owner))
     }
@@ -224,7 +225,7 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
       _makeMutableAndUniqueOrPinned()
       // When an array was made mutable we know it is a backed by a native array
       // buffer.
-      _checkSubscript(index, isNativeBuffer: true)
+      _checkSubscript(index, hoistedIsNativeBuffer: true)
       return (_getElementAddress(index),
               Builtin.tryPin(Builtin.castToNativeObject(_buffer.owner)))
     }
@@ -234,7 +235,7 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
   /// ${O1}.
   public subscript(index: Int) -> Element {
     addressWithNativeOwner {
-      _checkSubscript(index, isNativeBuffer: true)
+      _checkSubscript(index, hoistedIsNativeBuffer: true)
       return (UnsafePointer(_buffer.baseAddress + index),
               Builtin.castToNativeObject(_buffer.owner))
     }
@@ -242,7 +243,7 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
       _makeMutableAndUniqueOrPinned()
       // When an array was made mutable we know it is a backed by a native array
       // buffer.
-      _checkSubscript(index, isNativeBuffer: true)
+      _checkSubscript(index, hoistedIsNativeBuffer: true)
       return (_getElementAddress(index),
               Builtin.tryPin(Builtin.castToNativeObject(_buffer.owner)))
     }
@@ -325,8 +326,10 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
   /// Check that the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`
   @semantics("array.check_subscript")
-  func _checkSubscript(index: Int, isNativeBuffer: Bool) {
-    _precondition(_buffer._isValidSubscript(index, isNativeBuffer), "${Self} index out of range")
+  func _checkSubscript(index: Int, hoistedIsNativeBuffer: Bool) {
+    _precondition(_buffer._isValidSubscript(index,
+                                  hoistedIsNativeBuffer: hoistedIsNativeBuffer),
+                  "${Self} index out of range")
   }
 
   /// Check that the given `index` is valid, i.e. `0 ≤ index ≤ count`
@@ -338,8 +341,11 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
 
   @semantics("array.get_element")
   @inline(__always)
-  func _getElement(index: Int, _ isNative : Bool, _ needsElementTypeCheck: Bool) -> Element {
-    return _buffer.getElement(index, isNative, needsElementTypeCheck)
+  func _getElement(index: Int, hoistedIsNativeBuffer : Bool,
+                   hoistedNeedsElementTypeCheck: Bool) -> Element {
+    return _buffer.getElement(index,
+                    hoistedIsNativeBuffer : hoistedIsNativeBuffer,
+                    hoistedNeedsElementTypeCheck : hoistedNeedsElementTypeCheck)
   }
 
   @semantics("array.get_element_address")
