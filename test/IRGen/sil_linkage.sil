@@ -4,11 +4,11 @@ sil_stage canonical
 
 // CHECK: define void @public_fragile_function_test() {
 // CHECK: define void @hidden_fragile_function_test() {
-// CHECK: define linkonce_odr void @shared_fragile_function_test() {
+// CHECK: define linkonce_odr hidden void @shared_fragile_function_test() {
 // CHECK: define void @private_fragile_function_test() {
-// CHECK: define linkonce_odr void @public_external_fragile_function_def_test() {
+// CHECK: define linkonce_odr hidden void @public_external_fragile_function_def_test() {
 // CHECK: define available_externally void @hidden_external_fragile_function_def_test() {
-// CHECK: define linkonce_odr void @shared_external_fragile_function_def_test() {
+// CHECK: define linkonce_odr hidden void @shared_external_fragile_function_def_test() {
 // CHECK: define available_externally void @private_external_fragile_function_def_test() {
 // CHECK: define void @public_resilient_function_test() {
 // CHECK: define hidden void @hidden_resilient_function_test() {

@@ -998,19 +998,17 @@ llvm::GlobalValue::VISIBILITY##Visibility }
     // their accessibility. If a caller is also fragile and inlined into another
     // module it must be able to access this (not-inlined) function/global.
     switch (linkage) {
-      case SILLinkage::Shared:
-      case SILLinkage::SharedExternal:
-        return RESULT(LinkOnceODR, Default);
-        
       case SILLinkage::Hidden:
       case SILLinkage::Private:
         linkage = SILLinkage::Public;
         break;
 
       case SILLinkage::Public:
-      case SILLinkage::PublicExternal:
+      case SILLinkage::Shared:
       case SILLinkage::HiddenExternal:
       case SILLinkage::PrivateExternal:
+      case SILLinkage::PublicExternal:
+      case SILLinkage::SharedExternal:
         break;
     }
   }
