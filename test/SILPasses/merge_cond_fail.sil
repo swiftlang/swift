@@ -1,0 +1,36 @@
+// RUN: %target-sil-opt %s -merge-cond_fails -verify | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: sil @merge_cond_fail
+// CHECK: bb0([[ARG1:%.*]] : $Builtin.Int1, [[ARG2:%.*]] : $Builtin.Int1, [[ARG3:%.*]] : $Builtin.Int1, [[ARG4:%.*]] : $Builtin.Int1, [[ARG5:%.*]] : $*Builtin.Int64):
+// CHECK: [[COND1:%.*]] = builtin "or_Int1"([[ARG1]]{{.*}}, [[ARG2]]
+// CHECK: cond_fail [[COND1]]
+// CHECK-NOT: cond_fail
+// CHECK: [[LD:%.*]] = load [[ARG5]]
+// CHECK: [[COND2:%.*]] = builtin "or_Int1"([[ARG3]]{{.*}}, [[ARG4]]
+// CHECK: cond_fail [[COND2]]
+// CHECK:  [[TUPLE:%.*]] = builtin "sadd_with_overflow_Int64"
+// CHECK:  [[RES:%.*]] = tuple_extract [[TUPLE]]{{.*}}, 0
+// CHECK:  [[OVERFLOW:%.*]] = tuple_extract [[TUPLE]]{{.*}}, 1
+// CHECK: cond_fail [[OVERFLOW]]
+// CHECK: return [[RES]]
+
+sil @merge_cond_fail : $@thin (Builtin.Int1, Builtin.Int1, Builtin.Int1, Builtin.Int1, @inout Builtin.Int64) -> Builtin.Int64 {
+bb0 (%0 : $Builtin.Int1, %1 : $Builtin.Int1, %2 : $Builtin.Int1, %3: $Builtin.Int1, %4 : $*Builtin.Int64):
+  cond_fail %0 : $Builtin.Int1
+  cond_fail %1 : $Builtin.Int1
+  %5 = load %4 : $*Builtin.Int64
+  cond_fail %2 : $Builtin.Int1
+  cond_fail %3 : $Builtin.Int1
+  %6 = integer_literal $Builtin.Int1, -1
+  %7 = integer_literal $Builtin.Int64, 1
+  %8 = builtin "sadd_with_overflow_Int64"(%5 : $Builtin.Int64, %7 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 0
+  %10 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %10 : $Builtin.Int1
+  return %9 : $Builtin.Int64
+}
