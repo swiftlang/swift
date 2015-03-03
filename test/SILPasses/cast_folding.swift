@@ -6,6 +6,8 @@
 // In ideal world, all those testNN functions should be simplified down to a single basic block 
 // which returns either true or false, i.e. all type checks should folded statitcally.
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 class ObjCX : NSObject {

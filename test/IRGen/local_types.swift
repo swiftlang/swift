@@ -4,6 +4,8 @@
 // RUN: FileCheck %s < %t.ll
 // RUN: FileCheck -check-prefix=NEGATIVE %s < %t.ll
 
+// XFAIL: linux
+
 import local_types_helper
 
 // CHECK-DAG: @_TMdVF18local_types_helper4testFT_T_L_1S = external hidden global %swift.full_type

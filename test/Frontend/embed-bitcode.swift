@@ -3,6 +3,8 @@
 // RUN: llvm-objdump -m -section __LLVM,__bitcode %t.o | FileCheck -check-prefix=MARKER %s
 // RUN: llvm-objdump -m -section __LLVM,__cmdline %t.o | FileCheck -check-prefix=MARKER-CMD %s
 
+// UNSUPPORTED: OS=linux-gnu
+
 // MARKER: Contents of (__LLVM,__bitcode) section
 // MARKER-NEXT: 00
 // MARKER-CMD: Contents of (__LLVM,__cmdline) section
