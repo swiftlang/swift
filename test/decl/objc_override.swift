@@ -1,15 +1,15 @@
 // RUN: %target-parse-verify-swift
 
 class A {
-  @objc func a() { } // expected-note{{Objective-C method 'a' defined by method 'a()' here}}
+  @objc func a() { } // expected-note{{method 'a()' declared here}}
 
-  @objc var prop: Int // expected-note{{Objective-C method 'setProp:' defined by setter for 'prop' here}}
+  @objc var prop: Int // expected-note{{setter for 'prop' declared here}}
 
-  @objc init(prop: Int) { self.prop = prop } // expected-note{{Objective-C method 'initWithProp:' defined by initializer 'init(prop:)' here}}
+  @objc init(prop: Int) { self.prop = prop } // expected-note{{initializer 'init(prop:)' declared here}}
 
   @objc subscript (i: Int) -> AnyObject { 
     get { return self }
-    set { } // expected-note{{Objective-C method 'setObject:atIndexedSubscript:' defined by subscript setter here}}
+    set { } // expected-note{{subscript setter declared here}}
   }
 }
 
@@ -21,11 +21,11 @@ class B : A {
     super.init(prop: x)
   }
 
-  @objc(a) func f() { } // expected-error{{method 'f()' overrides Objective-C method 'a' from superclass 'A'}}
+  @objc(a) func f() { } // expected-error{{method 'f()' with Objective-C selector 'a' conflicts with method 'a()' from superclass 'A'}}
 
-  @objc(initWithProp:) func initializeWithProp(prop: Int) { } // expected-error{{method 'initializeWithProp' overrides Objective-C method 'initWithProp:' from superclass 'A'}}
+  @objc(initWithProp:) func initializeWithProp(prop: Int) { } // expected-error{{method 'initializeWithProp' with Objective-C selector 'initWithProp:' conflicts with initializer 'init(prop:)' from superclass 'A'}}
 
-  @objc(setProp:) func setProperty(prop: Int) { } // expected-error{{method 'setProperty' overrides Objective-C method 'setProp:' from superclass 'A'}}
+  @objc(setProp:) func setProperty(prop: Int) { } // expected-error{{method 'setProperty' with Objective-C selector 'setProp:' conflicts with setter for 'prop' from superclass 'A'}}
 
-  @objc(setObject:atIndexedSubscript:) func doSet(x: AnyObject, y: Int) { } // expected-error{{method 'doSet(_:y:)' overrides Objective-C method 'setObject:atIndexedSubscript:' from superclass 'A'}}
+  @objc(setObject:atIndexedSubscript:) func doSet(x: AnyObject, y: Int) { } // expected-error{{method 'doSet(_:y:)' with Objective-C selector 'setObject:atIndexedSubscript:' conflicts with subscript setter from superclass 'A'}}
 }

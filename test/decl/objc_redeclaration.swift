@@ -2,54 +2,54 @@
 
 // REQUIRES: objc_interop
 
-@objc class Redecl1 { // expected-note{{Objective-C method 'dealloc' previously declared by implicit deinitializer here}}
-  @objc init() { } // expected-note{{Objective-C method 'init' previously declared by initializer 'init()' here}}
+@objc class Redecl1 { // expected-note{{implicit deinitializer declared here}}
+  @objc init() { } // expected-note{{initializer 'init()' declared here}}
 
   @objc
-  func method1() { } // expected-note 2{{Objective-C method 'method1' previously declared by method 'method1()' here}}
+  func method1() { } // expected-note 2{{method 'method1()' declared here}}
 
-  @objc var value: Int // expected-note{{Objective-C method 'setValue:' previously declared by setter for 'value' here}}
+  @objc var value: Int // expected-note{{setter for 'value' declared here}}
 
   @objc(wibble) var other: Int
-  // expected-note@-1{{Objective-C method 'setWibble:' previously declared by setter for 'other' here}}
-  // expected-note@-2{{Objective-C method 'wibble' previously declared by getter for 'other' here}}
+  // expected-note@-1{{getter for 'other' declared here}}
+  // expected-note@-2{{setter for 'other' declared here}}
 }
 
 extension Redecl1 {
   @objc(method1)
-  func method1_alias() { } // expected-error{{method 'method1_alias()' redeclares Objective-C method 'method1'}}
+  func method1_alias() { } // expected-error{{method 'method1_alias()' with Objective-C selector 'method1' conflicts with method 'method1()'}}
 }
 
 extension Redecl1 {
   @objc var method1_var_alias: Int {
-    @objc(method1) get { return 5 } // expected-error{{getter for 'method1_var_alias' redeclares Objective-C method 'method1'}}
+    @objc(method1) get { return 5 } // expected-error{{getter for 'method1_var_alias' with Objective-C selector 'method1' conflicts with method 'method1()'}}
 
-    @objc(method2:) set { } // expected-note{{Objective-C method 'method2:' previously declared by setter for 'method1_var_alias' here}}
+    @objc(method2:) set { } // expected-note{{setter for 'method1_var_alias' declared here}}
   }
 
   @objc subscript (i: Int) -> Redecl1 {
-    get { return self } // expected-note{{Objective-C method 'objectAtIndexedSubscript:' previously declared by subscript getter here}}
+    get { return self } // expected-note{{subscript getter declared here}}
     set { }
   }
 }
 
 extension Redecl1 {
   @objc
-  func method2(x: Int) { } // expected-error{{method 'method2' redeclares Objective-C method 'method2:'}}
+  func method2(x: Int) { } // expected-error{{method 'method2' with Objective-C selector 'method2:' conflicts with setter for 'method1_var_alias'}}
 
   @objc(objectAtIndexedSubscript:)
-  func indexed(x: Int) { } // expected-error{{method 'indexed' redeclares Objective-C method 'objectAtIndexedSubscript:'}}
+  func indexed(x: Int) { } // expected-error{{method 'indexed' with Objective-C selector 'objectAtIndexedSubscript:' conflicts with subscript getter}}
 
   @objc(init)
-  func initialize() { } // expected-error{{method 'initialize()' redeclares Objective-C method 'init'}}
+  func initialize() { } // expected-error{{method 'initialize()' with Objective-C selector 'init' conflicts with initializer 'init()'}}
 
   @objc
-  func dealloc() { } // expected-error{{method 'dealloc()' redeclares Objective-C method 'dealloc'}}
+  func dealloc() { } // expected-error{{method 'dealloc()' with Objective-C selector 'dealloc' conflicts with implicit deinitializer}}
 
-  @objc func setValue(x: Int) { } // expected-error{{method 'setValue' redeclares Objective-C method 'setValue:'}}
+  @objc func setValue(x: Int) { } // expected-error{{method 'setValue' with Objective-C selector 'setValue:' conflicts with setter for 'value'}}
 }
 
 extension Redecl1 {
-  @objc func setWibble(other: Int) { } // expected-error{{method 'setWibble' redeclares Objective-C method 'setWibble:'}}
-  @objc func wibble() -> Int { return 0 } // expected-error{{method 'wibble()' redeclares Objective-C method 'wibble'}}
+  @objc func setWibble(other: Int) { } // expected-error{{method 'setWibble' with Objective-C selector 'setWibble:' conflicts with setter for 'other'}}
+  @objc func wibble() -> Int { return 0 } // expected-error{{method 'wibble()' with Objective-C selector 'wibble' conflicts with getter for 'other'}}
 }

@@ -6,10 +6,10 @@ import Foundation
 import ObjCParseExtras
 
 class MyArray : NSArray {
-  func setBoolProperty(x: Bool) { } // expected-error{{method 'setBoolProperty' overrides Objective-C method 'setBoolProperty:' from superclass 'NSArray'}}
+  func setBoolProperty(x: Bool) { } // expected-error{{method 'setBoolProperty' with Objective-C selector 'setBoolProperty:' conflicts with setter for 'boolProperty' from superclass 'NSArray'}}
 
   @objc(objectAtIndexedSubscript:)
-  func getObjectAt(i: Int) { } // expected-error{{method 'getObjectAt' overrides Objective-C method 'objectAtIndexedSubscript:' from superclass 'NSArray'}}
+  func getObjectAt(i: Int) { } // expected-error{{method 'getObjectAt' with Objective-C selector 'objectAtIndexedSubscript:' conflicts with method 'objectAtIndexedSubscript' from superclass 'NSArray'}}
 }
 
 class SomeCellSub1 : SomeCell {

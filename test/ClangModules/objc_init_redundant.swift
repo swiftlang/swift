@@ -8,12 +8,14 @@ import Foundation
 
 // rdar://problem/17687082
 extension NSObject {
-  convenience init() { self.init() } // expected-error{{initializer 'init()' redeclares Objective-C method 'init'}}
+  convenience init() { self.init() } // expected-error{{initializer 'init()' with Objective-C selector 'init' conflicts with previous declaration}}
+// CHECK: objc_init_redundant.swift:[[@LINE-1]]:15: error: initializer 'init()' with Objective-C selector 'init' conflicts
+// CHECK: ObjectiveC.NSObject{{.*}}note: 'init' previously declared here
 }
 
 extension NSObject {
-  @objc(class) func foo() { } // expected-error{{method 'foo()' redeclares Objective-C method 'class'}}
+  @objc(class) func foo() { } // expected-error{{method 'foo()' with Objective-C selector 'class' conflicts with method 'class()'}}
+// CHECK: objc_init_redundant.swift:[[@LINE-1]]:21: error: method 'foo()' with Objective-C selector 'class' conflicts
+// CHECK: ObjectiveC.NSObject{{.*}}note: method 'class()' declared here
 }
 
-// CHECK: objc_init_redundant.swift:11:15: error: initializer 'init()' redeclares
-// CHECK: ObjectiveC.NSObject{{.*}}note: Objective-C method 'init' previously 

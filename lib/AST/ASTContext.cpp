@@ -1449,7 +1449,7 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
   if (isa<DestructorDecl>(member))
     return { 2 + member->isImplicit(), member->getFullName() };
 
-  auto func = dyn_cast<FuncDecl>(member);
+  auto func = cast<FuncDecl>(member);
   switch (func->getAccessorKind()) {
   case AccessorKind::IsAddressor:
   case AccessorKind::IsDidSet:
@@ -1620,13 +1620,18 @@ bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
     Diags.diagnose(method, diag::objc_override_other,
                    methodDiagInfo.first,
                    methodDiagInfo.second,
+                   overriddenDiagInfo.first,
+                   overriddenDiagInfo.second,
                    selector,
                    overriddenMethod->getDeclContext()
                      ->getDeclaredInterfaceType());
-    Diags.diagnose(overriddenMethod, diag::objc_override_other_here,
-                   overriddenDiagInfo.first,
-                   overriddenDiagInfo.second,
-                   selector);
+    const ValueDecl *overriddenDecl = overriddenMethod;
+    if (overriddenMethod->isImplicit())
+      if (auto func = dyn_cast<FuncDecl>(overriddenMethod))
+        if (auto storage = func->getAccessorStorageDecl())
+          overriddenDecl = storage;
+    Diags.diagnose(overriddenDecl, diag::objc_declared_here,
+                   overriddenDiagInfo.first, overriddenDiagInfo.second);
 
     diagnosedAny = true;
   }
@@ -1778,14 +1783,28 @@ bool ASTContext::diagnoseObjCMethodConflicts(SourceFile &sf) {
     auto origDiagInfo = getObjCMethodDiagInfo(originalMethod);
     for (auto conflictingDecl : conflictingMethods) {
       auto diagInfo = getObjCMethodDiagInfo(conflictingDecl);
-      Diags.diagnose(conflictingDecl, diag::objc_redecl,
-                     diagInfo.first,
-                     diagInfo.second,
-                     selector);
-      Diags.diagnose(originalMethod, diag::objc_redecl_prev,
-                     origDiagInfo.first,
-                     origDiagInfo.second,
-                     selector);
+
+      const ValueDecl *originalDecl = originalMethod;
+      if (originalMethod->isImplicit())
+        if (auto func = dyn_cast<FuncDecl>(originalMethod))
+          if (auto storage = func->getAccessorStorageDecl())
+            originalDecl = storage;
+
+      if (diagInfo == origDiagInfo) {
+        Diags.diagnose(conflictingDecl, diag::objc_redecl_same,
+                       diagInfo.first, diagInfo.second, selector);
+        Diags.diagnose(originalDecl, diag::invalid_redecl_prev,
+                       originalDecl->getName());
+      } else {
+        Diags.diagnose(conflictingDecl, diag::objc_redecl,
+                       diagInfo.first,
+                       diagInfo.second,
+                       origDiagInfo.first,
+                       origDiagInfo.second,
+                       selector);
+        Diags.diagnose(originalDecl, diag::objc_declared_here,
+                       origDiagInfo.first, origDiagInfo.second);
+      }
     }
   }
 

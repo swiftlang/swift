@@ -1859,18 +1859,22 @@ ERROR(missing_bridging_function,sema_objc,Fatal,
 #define OBJC_DIAG_SELECT_2 "%select{initializer %3|implicit initializer %3|deinitializer|implicit deinitializer|method %3|getter for %3|subscript getter|setter for %3|subscript setter}2"
 
 ERROR(objc_redecl,sema_objc,none,
-      OBJC_DIAG_SELECT " redeclares Objective-C method %2",
+      OBJC_DIAG_SELECT " with Objective-C selector %4 conflicts with "
+      OBJC_DIAG_SELECT_2,
+      (unsigned, DeclName, unsigned, DeclName, ObjCSelector))
+NOTE(objc_declared_here,sema_objc,none,
+     OBJC_DIAG_SELECT " declared here",
+     (unsigned, DeclName))
+
+ERROR(objc_redecl_same,sema_objc,none,
+      OBJC_DIAG_SELECT " with Objective-C selector %2 conflicts with "
+      "previous declaration",
       (unsigned, DeclName, ObjCSelector))
-NOTE(objc_redecl_prev,sema_nb,none,
-     "Objective-C method %2 previously declared by " OBJC_DIAG_SELECT " here",
-     (unsigned, DeclName, ObjCSelector))
 
 ERROR(objc_override_other,sema_objc,none,
-      OBJC_DIAG_SELECT " overrides Objective-C method %2 from superclass %3",
-      (unsigned, DeclName, ObjCSelector, Type))
-NOTE(objc_override_other_here,sema_objc,none,
-     "Objective-C method %2 defined by " OBJC_DIAG_SELECT " here",
-      (unsigned, DeclName, ObjCSelector))
+      OBJC_DIAG_SELECT " with Objective-C selector %4 conflicts with "
+      OBJC_DIAG_SELECT_2 " from superclass %5",
+      (unsigned, DeclName, unsigned, DeclName, ObjCSelector, Type))
 
 ERROR(objc_class_method_load,sema_objc,none,
       OBJC_DIAG_SELECT " defines Objective-C class method 'load', which is "
