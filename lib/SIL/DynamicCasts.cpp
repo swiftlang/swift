@@ -157,6 +157,22 @@ classifyDynamicCastToProtocol(CanType source,
   return DynamicCastFeasibility::MaySucceed;
 }
 
+/// Check if a given type conforms to _BridgedToObjectiveC protocol.
+static bool isObjectiveCBridgeable(Module *M, CanType Ty) {
+  // Retrieve the _BridgedToObjectiveC protocol.
+  auto bridgedProto =
+      M->Ctx.getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
+
+  if (bridgedProto) {
+    // Find the conformance of the value type to _BridgedToObjectiveC.
+    // Check whether the type conforms to _BridgedToObjectiveC.
+    auto conformance = M->lookupConformance(Ty, bridgedProto, nullptr);
+
+    return (conformance.getInt() != ConformanceKind::DoesNotConform);
+  }
+  return false;
+}
+
 /// Try to classify the dynamic-cast relationship between two types.
 DynamicCastFeasibility
 swift::classifyDynamicCast(Module *M,
@@ -204,7 +220,8 @@ swift::classifyDynamicCast(Module *M,
     if (source->isClassExistentialType() &&
         !target.isAnyExistentialType() &&
         !target.getClassOrBoundGenericClass() &&
-        !isa<ArchetypeType>(target)) {
+        !isa<ArchetypeType>(target) &&
+        !isObjectiveCBridgeable(M, target)) {
       assert((target.getEnumOrBoundGenericEnum() ||
               target.getStructOrBoundGenericStruct() ||
               isa<TupleType>(target) ||

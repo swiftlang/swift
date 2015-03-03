@@ -6,6 +6,36 @@
 // In ideal world, all those testNN functions should be simplified down to a single basic block 
 // which returns either true or false, i.e. all type checks should folded statitcally.
 
+import Foundation
+
+class ObjCX : NSObject {
+
+}
+
+struct CX: _ObjectiveCBridgeable {
+   static func _isBridgedToObjectiveC() -> Bool {
+	return true
+   }   
+   
+   static func _getObjectiveCType() -> Any.Type {
+      return String.self
+   }
+   
+   func _bridgeToObjectiveC() -> ObjCX {
+	return ObjCX()   
+   }
+   
+   static func _forceBridgeFromObjectiveC(source: ObjCX, inout result: CX?) {
+   
+   }
+   
+   static func _conditionallyBridgeFromObjectiveC(source: ObjCX, inout result: CX?) -> Bool {
+	return false
+   }
+
+}
+
+
 protocol P {}
 
 protocol Q: P {}
@@ -180,6 +210,11 @@ func cast27(existential: CP1.Type) -> Bool {
 func cast28(existential: CP1.Type) -> Bool {
   // Succeds if existential conforms to CP1 and CP2
   return existential is CP2.Type
+}
+
+// Check casts to types which are _ObjectiveCBridgeable
+func cast29(o: AnyObject) -> Bool {
+  return o is CX
 }
 
 // CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test0FT_Sb : $@thin () -> Bool
@@ -650,6 +685,18 @@ func test28_2() -> Bool {
     return cast28(E.self)
 }
 
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test29FT_Sb
+// CHECK: bb0
+// Check that cast is not elmiminated even though cast29 is a conversion
+// from a class to struct, because it casts to a struct implementing
+// the _BridgedToObjectiveC protocol
+// CHECK: checked_cast
+// CHECK: return 
+@inline(never)
+func test29() -> Bool {
+  return cast29(NSNumber(integer:1))
+}
+
 println("test0=\(test0())")
 
 println("test1=\(test1())")
@@ -743,3 +790,5 @@ println("test27=\(test27())")
 println("test28_1=\(test28_1())")
 
 println("test28_2=\(test28_2())")
+
+println("test29=\(test29())")
