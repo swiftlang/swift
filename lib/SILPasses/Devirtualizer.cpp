@@ -449,7 +449,7 @@ static ApplyInst *devirtualizeClassMethod(ApplyInst *AI,
   DevirtClassMethodInfo DCMI;
   if (!canDevirtualizeClassMethod(AI, Member, ClassInstance.getType(), CD, DCMI))
     return nullptr;
-  return devirtualizeClassMethod(AI, Member, ClassInstance, CD, DCMI);
+  return devirtualizeClassMethod(AI, Member, ClassInstance, DCMI);
 }
 
 
@@ -812,7 +812,7 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
 
   // Devirtualize the apply instruction on the identical path.
   ApplyInst *NewAI = devirtualizeClassMethod(IdenAI, CMI->getMember(),
-                                             DownCastedClassInstance, CD, DCMI);
+                                             DownCastedClassInstance, DCMI);
   assert(NewAI && "Expected to be able to devirtualize apply!");
   (void) NewAI;
 
