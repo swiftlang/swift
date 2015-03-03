@@ -38,8 +38,8 @@ public func readLine(stripNewline: Bool = true) -> String? {
     // <rdar://problem/20013999> Recognize Unicode newlines in readLine()
     //
     // Recognize only LF and CR+LF combinations for now.
-    let cr = CChar(("\r" as UnicodeScalar).value)
-    let lf = CChar(("\n" as UnicodeScalar).value)
+    let cr = CChar(_ascii8("\r"))
+    let lf = CChar(_ascii8("\n"))
     if readBytes == 1 && linePtr[0] == lf {
       return ""
     }

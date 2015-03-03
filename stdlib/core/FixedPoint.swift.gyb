@@ -168,12 +168,6 @@ T : _UnsignedIntegerType, U : _SignedIntegerType
 
 //===--- Parsing helpers --------------------------------------------------===//
 
-/// Return c as a UTF16.CodeUnit.  Meant to be used as _ascii("x").
-internal func _ascii(c: UnicodeScalar) -> UTF16.CodeUnit {
-  _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")
-  return UTF16.CodeUnit(c.value)
-}
-
 /// If text is an ASCII representation in the given `radix` of a
 /// non-negative number <= `maximum`, return that number.  Otherwise,
 /// return `nil`.
@@ -185,9 +179,9 @@ internal func _parseUnsignedAsciiAsUIntMax(
 ) -> UIntMax? {
   if isEmpty(text) { return nil }
   
-  let digit = _ascii("0")..._ascii("9")
-  let lower = _ascii("a")..._ascii("z")
-  let upper = _ascii("A")..._ascii("Z")
+  let digit = _ascii16("0")..._ascii16("9")
+  let lower = _ascii16("a")..._ascii16("z")
+  let upper = _ascii16("A")..._ascii16("Z")
   
   _precondition(radix > 1, "Radix must be greater than 1")
   _precondition(
@@ -225,9 +219,9 @@ internal func _parseAsciiAsUIntMax(
   let u16 = text.utf16
   if isEmpty(u16) { return nil }
   let c = first(u16)
-  if _fastPath(c != _ascii("-")) {
+  if _fastPath(c != _ascii16("-")) {
     let unsignedText
-      = c == _ascii("+") ? unsafeUnwrap(String(dropFirst(u16))) : text
+      = c == _ascii16("+") ? unsafeUnwrap(String(dropFirst(u16))) : text
     return _parseUnsignedAsciiAsUIntMax(unsignedText, radix, maximum)
   }
   else {
@@ -250,7 +244,7 @@ internal func _parseAsciiAsIntMax(
   if isEmpty(u16) { return nil }
   
   // Drop any leading "-"
-  let negative = first(u16) == _ascii("-")
+  let negative = first(u16) == _ascii16("-")
   let absResultText = negative ? _unsafeUnwrap(String(dropFirst(u16))) : text
 
   let absResultMax = UIntMax(bitPattern: maximum) + (negative ? 1 : 0)
