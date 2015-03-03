@@ -2528,6 +2528,21 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
   }
 }
 
+/// Walks up the override chain for \p CD until it finds an initializer that is
+/// required and non-implicit. If no such initializer exists, returns the
+/// declaration where \c required was introduced (i.e. closest to the root
+/// class).
+static const ConstructorDecl *
+findNonImplicitRequiredInit(const ConstructorDecl *CD) {
+  while (CD->isImplicit()) {
+    auto *overridden = CD->getOverriddenDecl();
+    if (!overridden || !overridden->isRequired())
+      break;
+    CD = overridden;
+  }
+  return CD;
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -5136,14 +5151,7 @@ public:
                 new (TC.Context) RequiredAttr(/*implicit=*/true));
             }
 
-            auto requiredInit = CD->getOverriddenDecl();
-            while (requiredInit->isImplicit()) {
-              auto *overridden = requiredInit->getOverriddenDecl();
-              if (!overridden || !overridden->isRequired())
-                break;
-              requiredInit = overridden;
-            }
-            TC.diagnose(requiredInit,
+            TC.diagnose(findNonImplicitRequiredInit(CD->getOverriddenDecl()),
                         diag::overridden_required_initializer_here);
           } else {
             // We tried to override a convenience initializer.
@@ -5200,14 +5208,8 @@ public:
         TC.diagnose(CD, diag::required_initializer_missing_keyword)
           .fixItInsert(CD->getLoc(), "required ");
 
-        auto requiredInit = CD->getOverriddenDecl();
-        while (requiredInit->isImplicit()) {
-          auto *overridden = requiredInit->getOverriddenDecl();
-          if (!overridden || !overridden->isRequired())
-            break;
-          requiredInit = overridden;
-        }
-        TC.diagnose(requiredInit, diag::overridden_required_initializer_here);
+        TC.diagnose(findNonImplicitRequiredInit(CD->getOverriddenDecl()),
+                    diag::overridden_required_initializer_here);
 
         CD->getAttrs().add(
             new (TC.Context) RequiredAttr(/*IsImplicit=*/true));
@@ -6166,14 +6168,8 @@ static void diagnoseMissingRequiredInitializer(
               superInitializer->getDeclContext()->getDeclaredTypeOfContext())
     .fixItInsert(insertionLoc, initializerText);
 
-  auto requiredInit = superInitializer;
-  while (requiredInit->isImplicit()) {
-    auto *overridden = requiredInit->getOverriddenDecl();
-    if (!overridden || !overridden->isRequired())
-      break;
-    requiredInit = overridden;
-  }
-  TC.diagnose(requiredInit, diag::required_initializer_here);
+  TC.diagnose(findNonImplicitRequiredInit(superInitializer),
+              diag::required_initializer_here);
 }
 
 void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
