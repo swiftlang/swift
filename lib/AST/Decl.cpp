@@ -3017,6 +3017,7 @@ bool AbstractFunctionDecl::argumentNameIsAPIByDefault(unsigned i) const {
 SourceRange AbstractFunctionDecl::getBodySourceRange() const {
   switch (getBodyKind()) {
   case BodyKind::None:
+  case BodyKind::MemberwiseInitializer:
     return SourceRange();
 
   case BodyKind::Parsed:

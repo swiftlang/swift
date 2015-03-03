@@ -3841,8 +3841,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
 void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   MagicFunctionName = getMagicFunctionName(ctor);
   
-  // If there's no body, this is the implicit elementwise constructor.
-  if (!ctor->getBody())
+  if (ctor->isMemberwiseInitializer())
     return emitImplicitValueConstructor(*this, ctor);
 
   // True if this constructor delegates to a peer constructor with self.init().

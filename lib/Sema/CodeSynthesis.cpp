@@ -1934,6 +1934,9 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   ctor->setImplicit();
   ctor->setAccessibility(accessLevel);
 
+  if (ICK == ImplicitConstructorKind::Memberwise)
+    ctor->setIsMemberwiseInitializer();
+
   // If we are defining a default initializer for a class that has a superclass,
   // it overrides the default initializer of its superclass. Add an implicit
   // 'override' attribute.

@@ -2103,6 +2103,7 @@ namespace {
           auto valueCtor = createValueConstructor(result, members,
                                                   /*want param names*/true,
                                                   /*want body*/false);
+          valueCtor->setIsMemberwiseInitializer();
           members.push_back(valueCtor);
         }
       }
