@@ -779,6 +779,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     CaseStmtBeginning,
     CaseStmtDotPrefix,
     NominalMemberBeginning,
+    AttributeDeclParen,
   };
 
   CompletionKind Kind = CompletionKind::None;
@@ -787,6 +788,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   TypeLoc ParsedTypeLoc;
   DeclContext *CurDeclContext = nullptr;
   Decl *CStyleForLoopIterationVariable = nullptr;
+  DeclAttrKind AttrKind;
+  int AttrParamIndex;
 
   /// \brief Set to true when we have delivered code completion results
   /// to the \c Consumer.
@@ -891,7 +894,7 @@ public:
 
   void completeCaseStmtBeginning() override;
   void completeCaseStmtDotPrefix() override;
-
+  void completeAttributeDecl(DeclAttrKind DK, int Index) override;
   void completeNominalMemberBeginning() override;
 
   void addKeywords(CodeCompletionResultSink &Sink);
@@ -1994,6 +1997,15 @@ public:
     addKeyword("self", BaseType);
   }
 
+  void getAttributeDeclCompletions(DeclAttrKind AttrKind, int ParamIndex) {
+    if(AttrKind == DAK_Availability && ParamIndex == 0) {
+      addKeyword("*", "Platform");
+      addKeyword("iOS", "Platform");
+      addKeyword("iOSApplicationExtension", "Platform");
+      addKeyword("OSX", "Platform");
+    }
+  }
+
   void getTypeCompletionsInDeclContext(SourceLoc Loc) {
     Kind = LookupKind::TypeInDeclContext;
     lookupVisibleDecls(*this, CurrDeclContext, TypeResolver.get(),
@@ -2259,6 +2271,14 @@ void CodeCompletionCallbacksImpl::completeTypeSimpleBeginning() {
   CurDeclContext = P.CurDeclContext;
 }
 
+void CodeCompletionCallbacksImpl::completeAttributeDecl(
+    DeclAttrKind DK, int Index) {
+  Kind = CompletionKind::AttributeDeclParen;
+  AttrKind = DK;
+  AttrParamIndex = Index;
+  CurDeclContext = P.CurDeclContext;
+}
+
 void CodeCompletionCallbacksImpl::completeTypeIdentifierWithDot(
     IdentTypeRepr *ITR) {
   if (!ITR) {
@@ -2372,6 +2392,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
   switch (Kind) {
   case CompletionKind::None:
   case CompletionKind::DotExpr:
+  case CompletionKind::AttributeDeclParen:
     break;
 
   case CompletionKind::PostfixExprBeginning:
@@ -2526,6 +2547,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     CompletionOverrideLookup OverrideLookup(CompletionContext.getResultSink(),
                                             P.Context, CurDeclContext);
     OverrideLookup.getOverrideCompletions(SourceLoc());
+    break;
+  }
+  case CompletionKind::AttributeDeclParen: {
+    Lookup.getAttributeDeclCompletions(AttrKind, AttrParamIndex);
     break;
   }
   }

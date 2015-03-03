@@ -631,7 +631,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     //   *
     //   identifier
     if (!Tok.is(tok::identifier) &&
-        !(Tok.isAnyOperator() && Tok.getText() == "*")) {
+      !(Tok.isAnyOperator() && Tok.getText() == "*")) {
+        if (Tok.is(tok::code_complete) && CodeCompletion) {
+          CodeCompletion->completeAttributeDecl(DAK_Availability, 0);
+          consumeToken(tok::code_complete);
+      }
       diagnose(Tok.getLoc(), diag::attr_availability_platform, AttrName)
         .highlight(SourceRange(Tok.getLoc()));
       consumeIf(tok::r_paren);
