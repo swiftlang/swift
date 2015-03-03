@@ -89,7 +89,21 @@ extension _ArrayBuffer {
   init(_ source: NativeBuffer) {
     _storage = _ArrayBridgeStorage(native: source._storage)
   }
-  
+
+  var arrayPropertyIsNative : Bool {
+    if (!_isClassOrObjCExistential(T.self)) {
+      return true
+    }
+    return !_storage.isObjC
+  }
+
+  var arrayPropertyNeedsElementTypeCheck : Bool {
+    if (!_isClassOrObjCExistential(T.self)) {
+      return false
+    }
+    return needsElementTypeCheck
+  }
+
   /// Return true iff this buffer's storage is uniquely-referenced.
   mutating func isUniquelyReferenced() -> Bool {
     if !_isClassOrObjCExistential(T.self) {
@@ -171,13 +185,30 @@ extension _ArrayBuffer {
   // checks one element. The reason for this is that the ARC optimizer does not
   // handle loops atm. and so can get blocked by the presence of a loop (over
   // the range). This loop is not necessary for a single element access.
-  func _typeCheck(index: Int) {
+  func _typeCheck(index: Int, _ needsTypeCheck: Bool) {
     if !_isClassOrObjCExistential(T.self) {
       return
     }    
-    if _slowPath(needsElementTypeCheck) {
+    if _slowPath(needsTypeCheck) {
       _typeCheckSlowPath(index)
+    } else {
+      // For memory safety we need to check the actual storage. Because of
+      // hoisting of array properties needsTypeCheck might not be
+      // correct in case inout rules where violated. If inout rules are violated
+      // we want to catch this be failing.
+      // Example:
+      //  func f(inout a : A[AClass]) {
+      //    let b = a.props.isNative() // Hoisted.
+      //    for i in 0..a.count {
+      //              _typeCheck(a, i, b)
+      //       .. += _getElement(a, i, b)
+      //       g() // g should not be able to access 'a' but could if inout
+      //           // safety was violated.
+      //    }
+      //  }
+      _precondition(!needsElementTypeCheck, "inout rules were violated")
     }
+
   }
 
   @inline(never)
@@ -206,7 +237,7 @@ extension _ArrayBuffer {
       // enumerateObjectsAtIndexes:options:usingBlock: in the
       // non-native case.
       for i in subRange {
-        _typeCheck(i)
+        _typeCheck(i, true)
       }
     }
   }
@@ -278,6 +309,12 @@ extension _ArrayBuffer {
     return _SliceBuffer(result)
   }
 
+  /// Precondition: _isNative is true.
+  internal func _getBaseAddress() -> UnsafeMutablePointer<T> {
+    _sanityCheck(_isNative, "must be a native buffer")
+    return _native.baseAddress
+  }
+
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
   public
@@ -291,6 +328,7 @@ extension _ArrayBuffer {
   /// How many elements the buffer stores
   public
   var count: Int {
+    @inline(__always)
     get {
       return _fastPath(_isNative) ? _native.count : _nonNative.count
     }
@@ -302,11 +340,23 @@ extension _ArrayBuffer {
   
   /// Return whether the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`
-  internal func _isValidSubscript(index : Int) -> Bool {
-    if _fastPath(_isNative) {
+  internal func _isValidSubscript(index : Int, _ isNative: Bool) -> Bool {
+    if _fastPath(isNative) {
+      // We need this precondition check to ensure memory safety.
+      // This ensures that if due to inout violation a store a different
+      // representation to the array (an NSArray) happened we will still be
+      // memory safe. To do ensure safety we need to reload the 'isNative' flag
+      // from memory which _isNative will do - instead of relying on the
+      // value in 'isNative' which could have been invalidate by an intervening
+      // store since we obtained isNative. See also comment of _typeCheck.
+      if (_isClassOrObjCExistential(T.self)) {
+        // Only non value elements can have non native storage.
+        _precondition(_isNative, "inout rules were violated")
+      }
+
       /// Note we call through to the native buffer here as it has a more
       /// optimal implementation than just doing 'index < count'
-      return _native._isValidSubscript(index)
+      return _native._isValidSubscript(index, isNative)
     }
     return index >= 0 && index < count
   }
@@ -317,17 +367,22 @@ extension _ArrayBuffer {
     return _fastPath(_isNative) ? _native.capacity : _nonNative.count
   }
 
+  @inline(__always)
+  func getElement(i: Int, _ isNative: Bool, _ needsTypeCheck: Bool) -> T {
+    if _isClassOrObjCExistential(T.self) {
+      _typeCheck(i, needsTypeCheck)
+    }
+    if _fastPath(isNative) {
+      return _native[i]
+    }
+    return unsafeBitCast(_nonNative.objectAtIndex(i), T.self)
+  }
+
   /// Get/set the value of the ith element
   public
   subscript(i: Int) -> T {
     get {
-      if _isClassOrObjCExistential(T.self) {
-        _typeCheck(i)
-      }
-      if _fastPath(_isNative) {
-        return _native[i]
-      }
-      return unsafeBitCast(_nonNative.objectAtIndex(i), T.self)
+      return getElement(i, _storage.isObjC, needsElementTypeCheck)
     }
     
     nonmutating set {
@@ -444,8 +499,11 @@ extension _ArrayBuffer {
   }
 
   var _nonNative: _NSArrayCoreType {
-    _sanityCheck(_isClassOrObjCExistential(T.self))
-    return _storage.objCInstance
+    @inline(__always)
+    get {
+      _sanityCheck(_isClassOrObjCExistential(T.self))
+        return _storage.objCInstance
+    }
   }
 }
 #endif

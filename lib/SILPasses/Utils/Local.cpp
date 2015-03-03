@@ -26,7 +26,7 @@
 using namespace swift;
 
 // Do we use array.props?
-static bool HaveArrayProperty = false;
+static bool HaveArrayProperty = true;
 
 bool
 swift::isSideEffectFree(BuiltinInst *FR) {

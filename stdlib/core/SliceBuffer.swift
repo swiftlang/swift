@@ -178,9 +178,21 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     return target + c
   }
 
+  internal func _getBaseAddress() -> UnsafeMutablePointer<T> {
+    return baseAddress
+  }
+
   public
   var baseAddress: UnsafeMutablePointer<T> {
     return start
+  }
+
+  var arrayPropertyIsNative : Bool {
+    return _hasNativeBuffer
+  }
+
+  var arrayPropertyNeedsElementTypeCheck : Bool {
+    return false
   }
 
   public
@@ -200,7 +212,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
 
   /// Return whether the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`
-  internal func _isValidSubscript(index : Int) -> Bool {
+  internal func _isValidSubscript(index : Int, _ isNative: Bool) -> Bool {
     return index >= 0 && index < count
   }
 
@@ -233,15 +245,19 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     return isUniquelyReferencedOrPinnedNonObjC(&owner)
   }
 
+  func getElement(i: Int, _ isNative: Bool, _ needsElementTypeCheck: Bool) -> T {
+    _sanityCheck(i >= 0, "negative slice index is out of range")
+    _sanityCheck(i < count, "slice index out of range")
+   return start[i]
+  }
+
   /// Access the element at `position`.
   ///
   /// Requires: `position` is a valid position in `self` and
   /// `position != endIndex`.
   public subscript(position: Int) -> T {
     get {
-      _sanityCheck(position >= 0, "negative slice index is out of range")
-      _sanityCheck(position < count, "slice index out of range")
-      return start[position]
+      return getElement(position, false, false)
     }
     nonmutating set {
       _sanityCheck(position >= 0, "negative slice index is out of range")

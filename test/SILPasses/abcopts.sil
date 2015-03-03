@@ -25,16 +25,20 @@ struct IntTupleStruct {
 // CHECK-LABEL: sil @abcopt_singleblock
 sil @abcopt_singleblock : $@thin(@inout ArrayInt, @inout ArrayInt) -> () {
 bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
+  %100 = function_ref @arrayPropertyIsNative : $@cc(method) @thin (@owned ArrayInt) -> Bool
+  %101 = load %0 : $*ArrayInt
+  %102 = apply %100(%101) : $@cc(method) @thin (@owned ArrayInt) -> Bool
+
   // Don't assert on functions that are marked with array semantics but are not
   // methods.
-  %302 = function_ref @checkbounds_no_meth : $@thin (Int32, @owned ArrayInt) -> ()
+  %302 = function_ref @checkbounds_no_meth : $@thin (Int32, Bool, @owned ArrayInt) -> ()
   %303 = load %0 : $*ArrayInt
   %304 = struct_extract %303 : $ArrayInt, #ArrayInt.buffer
   %305 = struct_extract %304 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %305 : $Builtin.NativeObject
   %306 = integer_literal $Builtin.Int32, 0
   %307 = struct $Int32(%306 : $Builtin.Int32)
-  %308 = apply %302(%307, %303) : $@thin (Int32, @owned ArrayInt) -> ()
+  %308 = apply %302(%307, %102, %303) : $@thin (Int32, Bool, @owned ArrayInt) -> ()
   // CHECK: [[CHECKBOUNDSNO:%[0-9]+]] = function_ref @checkbounds_no_meth
 
   %200 = function_ref @arrayinit: $@thin () -> @owned ArrayInt
@@ -43,7 +47,7 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   // CHECK: [[CHECKBOUNDS:%[0-9]+]] = function_ref @checkbounds
   // CHECK: [[LD1:%[0-9]+]] = load %0
 
-  %2 = function_ref @checkbounds : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %2 = function_ref @checkbounds : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %3 = load %0 : $*ArrayInt
   %4 = struct_extract %3 : $ArrayInt, #ArrayInt.buffer
   %5 = struct_extract %4 : $ArrayIntBuffer, #ArrayIntBuffer.storage
@@ -52,19 +56,19 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   // First check.
   %6 = integer_literal $Builtin.Int32, 0
   %7 = struct $Int32(%6 : $Builtin.Int32)
-  %8 = apply %2(%7, %3) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %8 = apply %2(%7, %102, %3) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   // CHECK: [[IDX1:%[0-9]+]] = struct $Int32
   // CHECK: apply [[CHECKBOUNDS]]([[IDX1]]
 
   // Redundant same index and array.
   retain_value %5 : $Builtin.NativeObject
-  %9 = apply %2(%7, %3) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %9 = apply %2(%7, %102, %3) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   // CHECK-NOT: apply [[CHECKBOUNDS]]([[IDX1]]
 
   // Redundant same index and array and retain the array directly instead of
   // through the array buffer storage.
   retain_value %3 : $ArrayInt
-  %r9 = apply %2(%7, %3) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %r9 = apply %2(%7, %102, %3) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   // CHECK-NOT: apply [[CHECKBOUNDS]]([[IDX1]]
 
 
@@ -72,7 +76,7 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   %10 = integer_literal $Builtin.Int32, 1
   %11 = struct $Int32(%10 : $Builtin.Int32)
   retain_value %5 : $Builtin.NativeObject
-  %12 = apply %2(%11, %3) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %12 = apply %2(%11, %102, %3) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   // CHECK: [[IDX2:%[0-9]+]] = struct $Int32
   // CHECK: apply [[CHECKBOUNDS]]([[IDX2]]
 
@@ -81,51 +85,53 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   %14 = struct_extract %13 : $ArrayInt, #ArrayInt.buffer
   %15 = struct_extract %14 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %15 : $Builtin.NativeObject
-  %16 = apply %2(%7, %13) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %16 = apply %2(%7, %102, %13) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   // CHECK: [[LD2:%[0-9]+]] = load %1
-  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], [[LD2]]
+  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], {{.*}}[[LD2]]
 
   // Not redundant same index and array but append in between.
   %17 = function_ref @append : $@cc(method) @thin (@in Int32, @inout ArrayInt) -> ()
   %18 = alloc_stack $Int32
   %19 = apply %17(%18#1, %0) : $@cc(method) @thin (@in Int32, @inout ArrayInt) -> ()
   retain_value %5 : $Builtin.NativeObject
-  %20 = apply %2(%7, %3) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
-  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], [[LD1]]
+  %20 = apply %2(%7, %102, %3) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
+  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], {{.*}}[[LD1]]
 
   // Not redundant same index and array but unknown function in between.
   retain_value %5 : $Builtin.NativeObject
-  %21 = apply %2(%7, %3) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %21 = apply %2(%7, %102, %3) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %22 = function_ref @unknown_func : $@thin() -> ()
   %23 = apply %22() : $@thin() -> ()
   retain_value %5 : $Builtin.NativeObject
-  %24 = apply %2(%7, %3) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
-  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], [[LD1]]
+  %24 = apply %2(%7, %102, %3) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
+  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], {{.*}}[[LD1]]
   // CHECK: [[UNKNOWN:%[0-9]+]] = function_ref @unknown_func
   // CHECK: apply [[UNKNOWN]]()
-  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], [[LD1]]
+  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], {{.*}}[[LD1]]
 
   // Not redundant same index and array but odd store in between.
   retain_value %5 : $Builtin.NativeObject
-  %25 = apply %2(%7, %3) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %25 = apply %2(%7, %102, %3) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %26 = ref_to_raw_pointer %5 : $Builtin.NativeObject to $Builtin.RawPointer
   %27 = pointer_to_address %26 : $Builtin.RawPointer to $*Builtin.Int32
   %29 = store %6 to %27 : $*Builtin.Int32
   retain_value %5 : $Builtin.NativeObject
-  %30 = apply %2(%7, %3) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %30 = apply %2(%7, %102, %3) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   // CHECK: store
-  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], [[LD1]]
+  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], {{.*}}[[LD1]]
 
 
-  %99 = dealloc_stack %18#0 : $*@local_storage Int32
-  %100 = tuple ()
-  return %100 : $()
+  %98 = dealloc_stack %18#0 : $*@local_storage Int32
+  %99 = tuple ()
+  return %99 : $()
 // CHECK: return
 }
 
 // CHECK-LABEL: sil @not_dominating
 sil @not_dominating : $@thin (Int32, @inout ArrayInt, @inout ArrayInt) -> Int32 {
 bb0(%0 : $Int32, %24 : $*ArrayInt, %25 : $*ArrayInt):
+  %100 = integer_literal $Builtin.Int1, -1
+  %101 = struct $Bool(%100 : $Builtin.Int1)
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = integer_literal $Builtin.Int32, 0
   br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32)
@@ -143,12 +149,12 @@ bb4:
   // CHECK: [[IDX1:%[0-9]+]] = struct $Int32
 
 bb5:
-  %32 = function_ref @checkbounds : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %32 = function_ref @checkbounds : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %33 = load %24 : $*ArrayInt
   %34 = struct_extract %33 : $ArrayInt, #ArrayInt.buffer
   %35 = struct_extract %34 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %35 : $Builtin.NativeObject
-  %38 = apply %32(%37, %33) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %38 = apply %32(%37, %101, %33) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
  br bb2
   // CHECK: [[CHECKBOUNDS:%[0-9]+]] = function_ref @checkbounds
   // CHECK: [[LD1:%[0-9]+]] = load {{.*}} : $*ArrayInt
@@ -157,12 +163,12 @@ bb5:
 bb6:
   // CHECK: [[CHECKBOUNDS2:%[0-9]+]] = function_ref @checkbounds
   // CHECK: [[LD2:%[0-9]+]] = load {{.*}} : $*ArrayInt
-  %42 = function_ref @checkbounds : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %42 = function_ref @checkbounds : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %43 = load %24 : $*ArrayInt
   %44 = struct_extract %43 : $ArrayInt, #ArrayInt.buffer
   %45 = struct_extract %44 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %45 : $Builtin.NativeObject
-  %48 = apply %42(%37, %43) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %48 = apply %42(%37, %101, %43) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   // CHECK: apply [[CHECKBOUNDS2]]([[IDX1]]
  br bb2
 
@@ -188,6 +194,8 @@ bb3:
 // CHECK-LABEL: sil @dominating
 sil @dominating : $@thin (Int32, @inout ArrayInt, @inout ArrayInt) -> Int32 {
 bb0(%0 : $Int32, %24 : $*ArrayInt, %25 : $*ArrayInt):
+  %100 = integer_literal $Builtin.Int1, -1
+  %101 = struct $Bool(%100 : $Builtin.Int1)
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = integer_literal $Builtin.Int32, 0
   br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32)
@@ -204,38 +212,38 @@ bb4:
   // CHECK: [[IDX1:%[0-9]+]] = struct $Int32
   // CHECK: [[CHECKBOUNDS3:%[0-9]+]] = function_ref @checkbounds
   // CHECK: [[LD3:%[0-9]+]] = load {{.*}} : $*ArrayInt
-  %52 = function_ref @checkbounds : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %52 = function_ref @checkbounds : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %53 = load %24 : $*ArrayInt
   %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
   %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %55 : $Builtin.NativeObject
-  %58 = apply %52(%37, %53) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
-  // CHECK: apply [[CHECKBOUNDS3]]([[IDX1]], [[LD3]]
+  %58 = apply %52(%37, %101, %53) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
+  // CHECK: apply [[CHECKBOUNDS3]]([[IDX1]], {{.*}}[[LD3]]
   cond_br %8, bb5, bb6
 
 bb5:
   // CHECK: [[CHECKBOUNDS:%[0-9]+]] = function_ref @checkbounds
   // CHECK: [[LD1:%[0-9]+]] = load {{.*}} : $*ArrayInt
-  %32 = function_ref @checkbounds : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %32 = function_ref @checkbounds : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %33 = load %24 : $*ArrayInt
   %34 = struct_extract %33 : $ArrayInt, #ArrayInt.buffer
   %35 = struct_extract %34 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %35 : $Builtin.NativeObject
-  %38 = apply %32(%37, %33) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
-  // CHECK-NOT: apply [[CHECKBOUNDS]]([[IDX1]], [[LD1]]
+  %38 = apply %32(%37, %101, %33) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
+  // CHECK-NOT: apply [[CHECKBOUNDS]]([[IDX1]], {{.*}}[[LD1]]
 
  br bb2
 
 bb6:
   // CHECK: [[CHECKBOUNDS2:%[0-9]+]] = function_ref @checkbounds
   // CHECK: [[LD2:%[0-9]+]] = load {{.*}} : $*ArrayInt
-  %42 = function_ref @checkbounds : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %42 = function_ref @checkbounds : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %43 = load %24 : $*ArrayInt
   %44 = struct_extract %43 : $ArrayInt, #ArrayInt.buffer
   %45 = struct_extract %44 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %45 : $Builtin.NativeObject
-  %48 = apply %42(%37, %43) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
-  // CHECK-NOT: apply [[CHECKBOUNDS2]]([[IDX1]], [[LD2]]
+  %48 = apply %42(%37, %101, %43) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
+  // CHECK-NOT: apply [[CHECKBOUNDS2]]([[IDX1]], {{.*}}[[LD2]]
  br bb2
 
 bb2:
@@ -260,6 +268,8 @@ bb3:
 // CHECK-LABEL: sil @dominating_but_append
 sil @dominating_but_append : $@thin (Int32, @inout ArrayInt, @inout ArrayInt) -> Int32 {
 bb0(%0 : $Int32, %24 : $*ArrayInt, %25 : $*ArrayInt):
+  %100 = integer_literal $Builtin.Int1, -1
+  %101 = struct $Bool(%100 : $Builtin.Int1)
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = integer_literal $Builtin.Int32, 0
   br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32)
@@ -276,37 +286,37 @@ bb4:
   // CHECK: [[IDX1:%[0-9]+]] = struct $Int32
   // CHECK: [[CHECKBOUNDS3:%[0-9]+]] = function_ref @checkbounds
   // CHECK: [[LD3:%[0-9]+]] = load {{.*}} : $*ArrayInt
-  %52 = function_ref @checkbounds : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %52 = function_ref @checkbounds : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %53 = load %24 : $*ArrayInt
   %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
   %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %55 : $Builtin.NativeObject
-  %58 = apply %52(%37, %53) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
-  // CHECK: apply [[CHECKBOUNDS3]]([[IDX1]], [[LD3]]
+  %58 = apply %52(%37, %101, %53) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
+  // CHECK: apply [[CHECKBOUNDS3]]([[IDX1]], {{.*}}[[LD3]]
   cond_br %8, bb5, bb6
 
 bb5:
   // CHECK: [[CHECKBOUNDS:%[0-9]+]] = function_ref @checkbounds
   // CHECK: [[LD1:%[0-9]+]] = load {{.*}} : $*ArrayInt
-  %32 = function_ref @checkbounds : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %32 = function_ref @checkbounds : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %33 = load %24 : $*ArrayInt
   %34 = struct_extract %33 : $ArrayInt, #ArrayInt.buffer
   %35 = struct_extract %34 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %35 : $Builtin.NativeObject
-  %38 = apply %32(%37, %33) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
-  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], [[LD1]]
+  %38 = apply %32(%37, %101, %33) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
+  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], {{.*}}[[LD1]]
  br bb2
 
 bb6:
   // CHECK: [[CHECKBOUNDS2:%[0-9]+]] = function_ref @checkbounds
   // CHECK: [[LD2:%[0-9]+]] = load {{.*}} : $*ArrayInt
-  %42 = function_ref @checkbounds : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %42 = function_ref @checkbounds : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %43 = load %24 : $*ArrayInt
   %44 = struct_extract %43 : $ArrayInt, #ArrayInt.buffer
   %45 = struct_extract %44 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %45 : $Builtin.NativeObject
-  %48 = apply %42(%37, %43) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
-  // CHECK: apply [[CHECKBOUNDS2]]([[IDX1]], [[LD2]]
+  %48 = apply %42(%37, %101, %43) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
+  // CHECK: apply [[CHECKBOUNDS2]]([[IDX1]], {{.*}}[[LD2]]
  br bb2
 
 bb2:
@@ -324,7 +334,7 @@ bb2:
   %118 = alloc_stack $Int32
   %119 = apply %117(%118#1, %24) : $@cc(method) @thin (@in Int32, @inout ArrayInt) -> ()
   retain_value %55 : $Builtin.NativeObject
-  %120 = apply %52(%37, %53) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %120 = apply %52(%37, %101, %53) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   dealloc_stack %118#0 : $*@local_storage Int32
   // CHECK: [[APPEND:%[0-9]+]] = function_ref @append
   // CHECK: apply [[APPEND]]
@@ -354,7 +364,7 @@ bb3:
 // HOIST: [[S1:%[0-9]+]] = struct $Int32 ([[ZERO]] : $Builtin.Int32)
 // HOIST: [[L1:%[0-9]+]] = load %1 : $*ArrayInt
 // HOIST: retain_value [[L1]]
-// HOIST: apply [[CB1]]([[S1]], [[L1]])
+// HOIST: apply [[CB1]]([[S1]], {{.*}}[[L1]])
 
 // Check end.
 // HOIST: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int32, 1
@@ -363,7 +373,7 @@ bb3:
 // HOIST: [[SUB3:%[0-9]+]] = struct $Int32 ([[SUB2]]
 // HOIST: [[L2:%[0-9]+]] = load %1
 // HOIST: retain_value [[L2]]
-// HOIST: apply [[CB1]]([[SUB3]], [[L2]])
+// HOIST: apply [[CB1]]([[SUB3]], {{.*}}[[L2]])
 // HOIST: br bb2
 
 // HOIST: bb2
@@ -377,6 +387,8 @@ bb3:
 
 sil @hoist : $@thin (Int32, @inout ArrayInt) -> Int32 {
 bb0(%0 : $Int32, %24 : $*ArrayInt):
+  %100 = integer_literal $Builtin.Int1, -1
+  %101 = struct $Bool(%100 : $Builtin.Int1)
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = integer_literal $Builtin.Int32, 0
   br bb1(%2 : $Builtin.Int32)
@@ -387,12 +399,12 @@ bb1(%4 : $Builtin.Int32):
 
 bb4:
   %37 = struct $Int32(%4 : $Builtin.Int32)
-  %52 = function_ref @checkbounds : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %52 = function_ref @checkbounds : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %53 = load %24 : $*ArrayInt
   %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
   %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %55 : $Builtin.NativeObject
-  %58 = apply %52(%37, %53) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %58 = apply %52(%37, %101, %53) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %10 = integer_literal $Builtin.Int32, 1
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -430,6 +442,8 @@ bb3:
 
 sil @hoistinvariant : $@thin (Int32, @inout ArrayInt) -> Int32 {
 bb0(%0 : $Int32, %24 : $*ArrayInt):
+  %100 = integer_literal $Builtin.Int1, -1
+  %101 = struct $Bool(%100 : $Builtin.Int1)
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = integer_literal $Builtin.Int32, 0
   %37 = struct $Int32(%2 : $Builtin.Int32)
@@ -440,12 +454,12 @@ bb1(%4 : $Builtin.Int32):
   cond_br %8, bb3, bb4
 
 bb4:
-  %52 = function_ref @checkbounds : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %52 = function_ref @checkbounds : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %53 = load %24 : $*ArrayInt
   %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
   %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %55 : $Builtin.NativeObject
-  %58 = apply %52(%37, %53) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %58 = apply %52(%37, %101, %53) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %10 = integer_literal $Builtin.Int32, 1
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -475,6 +489,8 @@ bb3:
 
 sil @hoist_rangechecked : $@thin (Int32, @inout ArrayInt) -> Int32 {
 bb0(%0 : $Int32, %24 : $*ArrayInt):
+  %100 = integer_literal $Builtin.Int1, -1
+  %101 = struct $Bool(%100 : $Builtin.Int1)
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = integer_literal $Builtin.Int32, 0
   %3 = integer_literal $Builtin.Int1, -1
@@ -489,12 +505,12 @@ bb1(%4 : $Builtin.Int32):
 
 bb4:
   %37 = struct $Int32(%4 : $Builtin.Int32)
-  %52 = function_ref @checkbounds : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %52 = function_ref @checkbounds : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %53 = load %24 : $*ArrayInt
   %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
   %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %55 : $Builtin.NativeObject
-  %58 = apply %52(%37, %53) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %58 = apply %52(%37, %101, %53) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %10 = integer_literal $Builtin.Int32, 1
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -529,6 +545,8 @@ bb3:
 
 sil @hoist_rangechecked_addr_proj_store : $@thin (Int32, @inout ArrayInt) -> Int32 {
 bb0(%0 : $Int32, %24 : $*ArrayInt):
+  %100 = integer_literal $Builtin.Int1, -1
+  %101 = struct $Bool(%100 : $Builtin.Int1)
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = integer_literal $Builtin.Int32, 0
   %3 = integer_literal $Builtin.Int1, -1
@@ -543,12 +561,12 @@ bb1(%4 : $Builtin.Int32):
 
 bb4:
   %37 = struct $Int32(%4 : $Builtin.Int32)
-  %52 = function_ref @checkbounds : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %52 = function_ref @checkbounds : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %53 = load %24 : $*ArrayInt
   %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
   %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %55 : $Builtin.NativeObject
-  %58 = apply %52(%37, %53) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %58 = apply %52(%37, %101, %53) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %10 = integer_literal $Builtin.Int32, 1
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -583,6 +601,8 @@ bb3:
 // HOIST: return
 sil @hoist_inclusive_rangechecked : $@thin (Int32, @inout ArrayInt) -> Int32 {
 bb0(%0 : $Int32, %24 : $*ArrayInt):
+  %100 = integer_literal $Builtin.Int1, -1
+  %101 = struct $Bool(%100 : $Builtin.Int1)
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = integer_literal $Builtin.Int32, 0
   %3 = integer_literal $Builtin.Int1, -1
@@ -604,12 +624,12 @@ bb1(%4 : $Builtin.Int32):
 
 bb4:
   %37 = struct $Int32(%4 : $Builtin.Int32)
-  %52 = function_ref @checkbounds : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %52 = function_ref @checkbounds : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %53 = load %24 : $*ArrayInt
   %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
   %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %55 : $Builtin.NativeObject
-  %58 = apply %52(%37, %53) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %58 = apply %52(%37, %101, %53) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %10 = integer_literal $Builtin.Int32, 1
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -637,6 +657,8 @@ bb3:
 
 sil @dont_hoist_variant_array: $@thin (Int32, @inout ArrayInt) -> Int32 {
 bb0(%0 : $Int32, %24 : $*ArrayInt):
+  %100 = integer_literal $Builtin.Int1, -1
+  %101 = struct $Bool(%100 : $Builtin.Int1)
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = integer_literal $Builtin.Int32, 0
   %3 = integer_literal $Builtin.Int1, -1
@@ -652,12 +674,12 @@ bb1(%4 : $Builtin.Int32):
 bb4:
   %36 = alloc_stack $ArrayInt
   %37 = struct $Int32(%4 : $Builtin.Int32)
-  %52 = function_ref @checkbounds : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %52 = function_ref @checkbounds : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %53 = load %36#1 : $*ArrayInt
   %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
   %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %55 : $Builtin.NativeObject
-  %58 = apply %52(%37, %53) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %58 = apply %52(%37, %101, %53) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %10 = integer_literal $Builtin.Int32, 1
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -678,6 +700,8 @@ bb3:
 
 sil @dont_hoist_due_to_unknown_release : $@thin (Int32, @inout ArrayInt, Builtin.NativeObject) -> Int32 {
 bb0(%0 : $Int32, %24 : $*ArrayInt, %100: $Builtin.NativeObject):
+  %105 = integer_literal $Builtin.Int1, -1
+  %106 = struct $Bool(%105 : $Builtin.Int1)
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = integer_literal $Builtin.Int32, 0
   br bb1(%2 : $Builtin.Int32)
@@ -688,12 +712,12 @@ bb1(%4 : $Builtin.Int32):
 
 bb4:
   %37 = struct $Int32(%4 : $Builtin.Int32)
-  %52 = function_ref @checkbounds : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %52 = function_ref @checkbounds : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %53 = load %24 : $*ArrayInt
   %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
   %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %55 : $Builtin.NativeObject
-  %58 = apply %52(%37, %53) : $@cc(method) @thin (Int32, @owned ArrayInt) -> ()
+  %58 = apply %52(%37, %106, %53) : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> ()
   %10 = integer_literal $Builtin.Int32, 1
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -709,12 +733,18 @@ bb3:
   return %23 : $Int32
 }
 
-sil public_external [semantics "array.check_subscript"] @checkbounds_no_meth : $@thin (Int32, @owned ArrayInt) -> () {
-  bb0(%0: $Int32, %1: $ArrayInt):
+sil public_external [semantics "array.check_subscript"] @checkbounds_no_meth : $@thin (Int32, Bool, @owned ArrayInt) -> () {
+  bb0(%0: $Int32, %1: $Bool, %2: $ArrayInt):
     unreachable
 }
-sil public_external [semantics "array.check_subscript"] @checkbounds : $@cc(method) @thin (Int32, @owned ArrayInt) -> () {
-  bb0(%0: $Int32, %1: $ArrayInt):
+
+sil public_external [semantics "array.props.isNative"] @arrayPropertyIsNative : $@cc(method) @thin (@owned ArrayInt) -> Bool {
+  bb0(%0: $ArrayInt):
+    unreachable
+}
+
+sil public_external [semantics "array.check_subscript"] @checkbounds : $@cc(method) @thin (Int32, Bool, @owned ArrayInt) -> () {
+  bb0(%0: $Int32, %1: $Bool, %2: $ArrayInt):
     unreachable
 }
 

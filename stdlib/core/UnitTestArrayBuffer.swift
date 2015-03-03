@@ -50,10 +50,23 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
     return _base.hasStorage
   }
 
+  internal func _getBaseAddress() -> UnsafeMutablePointer<T> {
+    return _base.hasStorage ? _base.baseAddress : nil
+  }
+
+  var arrayPropertyIsNative : Bool {
+    return true
+  }
+
+  var arrayPropertyNeedsElementTypeCheck : Bool {
+    return false
+  }
+
+
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
   public var baseAddress: UnsafeMutablePointer<T> {
-    return _base.hasStorage ? _base.baseAddress : nil
+    return _getBaseAddress()
   }
 
   /// A pointer to the first element, assuming that the elements are stored
@@ -135,12 +148,17 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
     _arrayNonSliceInPlaceReplace(&self, subRange, newCount, newValues)
   }
 
+  @inline(__always)
+  func getElement(i: Int, _ isNative: Bool, _ needsElementTypeCheck: Bool) -> T {
+    _sanityCheck(_isValidSubscript(i, false), "Array index out of range")
+    // If the index is in bounds, we can assume we have storage.
+    return _unsafeElementStorage[i]
+  }
+
   /// Get/set the value of the ith element
   public subscript(i: Int) -> T {
     get {
-      _sanityCheck(_isValidSubscript(i), "Array index out of range")
-      // If the index is in bounds, we can assume we have storage.
-      return _unsafeElementStorage[i]
+      return getElement(i, true, false)
     }
     nonmutating set {
       _sanityCheck(i >= 0 && i < count, "Array index out of range")
@@ -178,7 +196,7 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
 
   /// Return whether the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`
-  func _isValidSubscript(index : Int) -> Bool {
+  func _isValidSubscript(index : Int, _ isNative: Bool) -> Bool {
     /// Instead of returning 0 for no storage, we explicitly check
     /// for the existance of storage.
     /// Note that this is better than folding hasStorage in to

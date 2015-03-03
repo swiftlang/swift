@@ -215,6 +215,14 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
       _uncheckedUnsafeBufferObject: storage)
   }
 
+  var arrayPropertyIsNative : Bool {
+    return true
+  }
+
+  var arrayPropertyNeedsElementTypeCheck : Bool {
+    return false
+  }
+
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
   public var baseAddress: UnsafeMutablePointer<T> {
@@ -240,6 +248,10 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
       UnsafeMutableBufferPointer(start: baseAddress, count: count))
     _fixLifetime(self)
     return ret
+  }
+
+  internal func _getBaseAddress() -> UnsafeMutablePointer<T> {
+    return baseAddress
   }
 
   //===--- _ArrayBufferType conformance -----------------------------------===//
@@ -294,12 +306,16 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     _arrayNonSliceInPlaceReplace(&self, subRange, newCount, newValues)
   }
 
+  func getElement(i: Int, _ isNative: Bool, _ needsTypeCheck: Bool) -> T {
+    _sanityCheck(_isValidSubscript(i, isNative), "Array index out of range")
+    // If the index is in bounds, we can assume we have storage.
+    return baseAddress[i]
+  }
+
   /// Get/set the value of the ith element
   public subscript(i: Int) -> T {
     get {
-      _sanityCheck(_isValidSubscript(i), "Array index out of range")
-      // If the index is in bounds, we can assume we have storage.
-      return baseAddress[i]
+      return getElement(i, true, false)
     }
     nonmutating set {
       _sanityCheck(i >= 0 && i < count, "Array index out of range")
@@ -333,7 +349,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
 
   /// Return whether the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`
-  func _isValidSubscript(index : Int) -> Bool {
+  func _isValidSubscript(index : Int, _ isNative : Bool) -> Bool {
     /// Instead of returning 0 for no storage, we explicitly check
     /// for the existance of storage.
     /// Note that this is better than folding hasStorage in to

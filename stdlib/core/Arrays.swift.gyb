@@ -23,6 +23,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+
 %{
   arrayTypes = [
     ('ContiguousArray', 'a ContiguousArray'),
@@ -199,27 +200,31 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
   public subscript(index: Int) -> Element {
 %if Self == 'Array':
     get {
-      _checkSubscript(index)
-      return _getElement(index)
+      let isNative = _getArrayPropertyIsNative()
+      let needsTypeCheck = _getArrayPropertyNeedsElementTypeCheck()
+      _checkSubscript(index, isNativeBuffer: isNative)
+      return _getElement(index, isNative, needsTypeCheck)
     }
     // on non-Objective-C, this should just be NativeOwner for all other
     // cases, including ArraySlice.
 %elif Self == 'ArraySlice':
     addressWithOwner {
-      _checkSubscript(index)
+      _checkSubscript(index, isNativeBuffer: true)
       return (UnsafePointer(_buffer.baseAddress + index),
               Builtin.castToUnknownObject(_buffer.owner))
     }
 %else:
     addressWithNativeOwner {
-      _checkSubscript(index)
+      _checkSubscript(index, isNativeBuffer: true)
       return (UnsafePointer(_buffer.baseAddress + index),
               Builtin.castToNativeObject(_buffer.owner))
     }
 %end
     mutableAddressWithPinnedNativeOwner {
       _makeMutableAndUniqueOrPinned()
-      _checkSubscript(index)
+      // When an array was made mutable we know it is a backed by a native array
+      // buffer.
+      _checkSubscript(index, isNativeBuffer: true)
       return (_getElementAddress(index),
               Builtin.tryPin(Builtin.castToNativeObject(_buffer.owner)))
     }
@@ -229,13 +234,15 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
   /// ${O1}.
   public subscript(index: Int) -> Element {
     addressWithNativeOwner {
-      _checkSubscript(index)
+      _checkSubscript(index, isNativeBuffer: true)
       return (UnsafePointer(_buffer.baseAddress + index),
               Builtin.castToNativeObject(_buffer.owner))
     }
     mutableAddressWithPinnedNativeOwner {
       _makeMutableAndUniqueOrPinned()
-      _checkSubscript(index)
+      // When an array was made mutable we know it is a backed by a native array
+      // buffer.
+      _checkSubscript(index, isNativeBuffer: true)
       return (_getElementAddress(index),
               Builtin.tryPin(Builtin.castToNativeObject(_buffer.owner)))
     }
@@ -270,6 +277,16 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
   }
 
   //===--- private --------------------------------------------------------===//
+
+  @semantics("array.props.isNative")
+  func _getArrayPropertyIsNative() -> Bool {
+   return _buffer.arrayPropertyIsNative
+  }
+
+  @semantics("array.props.needsElementTypeCheck")
+  func _getArrayPropertyNeedsElementTypeCheck() -> Bool {
+   return _buffer.arrayPropertyNeedsElementTypeCheck
+  }
 
   @semantics("array.get_count")
   func _getCount() -> Int {
@@ -308,8 +325,8 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
   /// Check that the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`
   @semantics("array.check_subscript")
-  func _checkSubscript(index: Int) {
-    _precondition(_buffer._isValidSubscript(index), "${Self} index out of range")
+  func _checkSubscript(index: Int, isNativeBuffer: Bool) {
+    _precondition(_buffer._isValidSubscript(index, isNativeBuffer), "${Self} index out of range")
   }
 
   /// Check that the given `index` is valid, i.e. `0 ≤ index ≤ count`
@@ -320,13 +337,14 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
   }
 
   @semantics("array.get_element")
-  func _getElement(index: Int) -> Element {
-    return _buffer[index]
+  @inline(__always)
+  func _getElement(index: Int, _ isNative : Bool, _ needsElementTypeCheck: Bool) -> Element {
+    return _buffer.getElement(index, isNative, needsElementTypeCheck)
   }
 
   @semantics("array.get_element_address")
   func _getElementAddress(index: Int) -> UnsafeMutablePointer<Element> {
-    return _buffer.baseAddress + index
+    return _buffer._getBaseAddress() + index
   }
 
   public
