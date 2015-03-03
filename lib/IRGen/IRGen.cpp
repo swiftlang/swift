@@ -267,7 +267,7 @@ static llvm::TargetMachine *createTargetMachine(IRGenOptions &Opts,
 
 // With -embed-bitcode, save a copy of the llvm IR as data in the
 // __LLVM,__bitcode section and save the command-line options in the
-// __LLVM,__cmdline section.
+// __LLVM,__swift_cmdline section.
 static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
 {
   if (Opts.EmbedMode == IRGenEmbedMode::None)
@@ -305,7 +305,7 @@ static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
   GV = new llvm::GlobalVariable(*M, CmdConstant->getType(), true,
                                 llvm::GlobalValue::AppendingLinkage,
                                 CmdConstant);
-  GV->setSection("__LLVM,__cmdline");
+  GV->setSection("__LLVM,__swift_cmdline");
   if (llvm::GlobalVariable *Old = M->getGlobalVariable("llvm.cmdline")) {
     GV->takeName(Old);
     Old->replaceAllUsesWith(GV);
