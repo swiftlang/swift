@@ -35,6 +35,8 @@ public func readLine(stripNewline: Bool = true) -> String? {
     // FIXME: Unicode conformance.  To fix this, we need to reimplement the
     // code we call above to get a line, since it will only stop on LF.
     //
+    // <rdar://problem/20013999> Recognize Unicode newlines in readLine()
+    //
     // Recognize only LF and CR+LF combinations for now.
     let cr = CChar(("\r" as UnicodeScalar).value)
     let lf = CChar(("\n" as UnicodeScalar).value)
