@@ -1999,8 +1999,8 @@ public:
 
   void getAttributeDeclCompletions(DeclAttrKind AttrKind, int ParamIndex) {
     if(AttrKind == DAK_Availability && ParamIndex == 0) {
-      addKeyword("*", "Any platform");
-#define AVAILABILITY_PLATFORM(X, PrettyName)   addKeyword(#X, PrettyName);
+      addKeyword("*", "Platform");
+#define AVAILABILITY_PLATFORM(X, PrettyName)   addKeyword(#X, "Platform");
 #include "swift/AST/PlatformKinds.def"
     }
   }
