@@ -29,17 +29,23 @@ class FuncDecl;
 /// CapturedValue includes both the declaration being captured, along with flags
 /// that indicate how it is captured.
 class CapturedValue {
-  llvm::PointerIntPair<ValueDecl*, 1, unsigned> Value;
+  llvm::PointerIntPair<ValueDecl*, 2, unsigned> Value;
 public:
   enum {
     /// IsDirect is set when a VarDecl with storage *and* accessors is captured
     /// by its storage address.  This happens in the accessors for the VarDecl.
-    IsDirect = 1 << 0
+    IsDirect = 1 << 0,
+
+    /// IsNoEscape is set when a vardecl is captured by a noescape closure, and
+    /// thus has its lifetime guaranteed.  It can be closed over by a fixed
+    /// address if it has storage.
+    IsNoEscape = 1 << 1
   };
 
   CapturedValue(ValueDecl *D, unsigned Flags) : Value(D, Flags) {}
 
   bool isDirect() const { return Value.getInt() & IsDirect; }
+  bool isNoEscape() const { return Value.getInt() & IsNoEscape; }
 
   ValueDecl *getDecl() const { return Value.getPointer(); }
 
