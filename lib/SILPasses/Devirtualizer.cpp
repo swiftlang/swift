@@ -389,7 +389,8 @@ static ApplyInst *devirtualizeClassMethod(ApplyInst *AI,
     ReturnType = DCMI.SubstCalleeType->getSILResult();
   }
 
-  SILType SubstCalleeSILType = SILType::getPrimitiveObjectType(DCMI.SubstCalleeType);
+  SILType SubstCalleeSILType =
+    SILType::getPrimitiveObjectType(DCMI.SubstCalleeType);
   ApplyInst *NewAI =
     B.createApply(AI->getLoc(), FRI, SubstCalleeSILType, ReturnType,
                   DCMI.Substitutions, NewArgs,
@@ -447,7 +448,8 @@ static ApplyInst *devirtualizeClassMethod(ApplyInst *AI,
                                           SILValue ClassInstance,
                                           ClassDecl *CD) {
   DevirtClassMethodInfo DCMI;
-  if (!canDevirtualizeClassMethod(AI, Member, ClassInstance.getType(), CD, DCMI))
+  if (!canDevirtualizeClassMethod(AI, Member, ClassInstance.getType(), CD,
+                                  DCMI))
     return nullptr;
   return devirtualizeClassMethod(AI, Member, ClassInstance, DCMI);
 }
