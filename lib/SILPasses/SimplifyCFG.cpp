@@ -2928,6 +2928,9 @@ bool simplifyToSelectValue(SILBasicBlock *MergeBlock, unsigned ArgNum,
   if (!defaultResult)
     return false;
 
+  if (!dominatingBlock)
+    return false;
+  
   // Generate the select_value right before the first cond_br of the pattern.
   SILInstruction *insertPos = dominatingBlock->getTerminator();
   SILBuilder B(insertPos);
