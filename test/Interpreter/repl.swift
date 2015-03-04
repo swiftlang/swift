@@ -208,14 +208,14 @@ chained
 true && true
 // CHECK: = true
 
-if {true}() { println("yeah") }
-// CHECK: yeah
-if true && true { println("yeah") }
-// CHECK: yeah
-if true && true { if true && true { println("yeah") } }
-// CHECK: yeah
-if true && (true && true) { if true && (true && true) { println("yeah") } }
-// CHECK: yeah
+if ({true}()) { println("yeah1") }
+// CHECK: yeah1
+if true && true { println("yeah2") }
+// CHECK: yeah2
+if true && true { if true && true { println("yeah3") } }
+// CHECK: yeah3
+if true && (true && true) { if true && (true && true) { println("yeah4") } }
+// CHECK: yeah4
 if true && true { if true && true { println(true && true) } }
 // CHECK: true
 

@@ -92,8 +92,7 @@ func missingControllingExprInIf() {
   if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{type of expression is ambiguous without more context}} expected-error{{consecutive statements on a line must be separated by ';'}}
   }
 
-  // Ensure that we don't have recovery here.
-  if { true }() {
+  if { true }() { // expected-error {{missing condition in an 'if' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} expected-error{{unexpected trailing closure}}
   }
 
   // <rdar://problem/18940198>
@@ -115,8 +114,7 @@ func missingControllingExprInWhile() {
   while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{type of expression is ambiguous without more context}} expected-error{{consecutive statements on a line must be separated by ';'}}
   }
 
-  // Ensure that we don't do recovery here.
-  while { true }() {
+  while { true }() { // expected-error {{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} expected-error{{unexpected trailing closure}}
   }
 
   // <rdar://problem/18940198>
@@ -130,9 +128,8 @@ func missingControllingExprInDoWhile() {
     missingControllingExprInDoWhile();
   }
 
-  // Ensure that we don't do recovery here.
   do {
-  } while { true }()
+  } while { true }() // expected-error{{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}}
 }
 
 func acceptsClosure<T>(t: T) -> Bool { return true }
@@ -214,13 +211,12 @@ func missingControllingExprInSwitch() {
     case _: return
   }
 
-  // Ensure that we don't do recovery in the following cases.
-  switch { 42 } {
-    case _: return
+  switch { 42 } { // expected-error {{expected expression in 'switch' statement}} expected-error{{all statements inside a switch must be covered by a 'case' or 'default'}} expected-error{{consecutive statements on a line must be separated by ';'}} expected-error{{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}}
+    case _: return // expected-error{{'case' label can only appear inside a 'switch' statement}}
   }
 
-  switch { 42 }() {
-    case _: return
+  switch { 42 }() { // expected-error {{expected expression in 'switch' statement}} expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-error {{unexpected trailing closure}}
+    case _: return // expected-error{{'case' label can only appear inside a 'switch' statement}}
   }
 }
 
