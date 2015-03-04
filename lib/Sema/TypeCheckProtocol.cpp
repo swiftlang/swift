@@ -14,7 +14,6 @@
 // whether a given type conforms to a given protocol.
 //===----------------------------------------------------------------------===//
 
-#include "CodeSynthesis.h"
 #include "ConstraintSystem.h"
 #include "DerivedConformances.h"
 #include "MiscDiagnostics.h"
@@ -903,14 +902,6 @@ static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
   // Otherwise, we have an abstract storage declaration.
   auto reqStorage = cast<AbstractStorageDecl>(req);
   auto witnessStorage = cast<AbstractStorageDecl>(witness);
-
-  // FIXME: Hack, because this should be handled as part of validation,
-  // or at least performed on-demand.
-  if (auto witnessVar = dyn_cast<VarDecl>(witnessStorage)) {
-    if (witnessVar->isObjC() && witnessVar->isStatic() &&
-        witnessVar->hasStorage() && !witnessVar->hasAccessorFunctions())
-      addTrivialAccessorsToStorage(witnessVar, tc);
-  }
 
   // Check the getter.
   if (auto reqGetter = reqStorage->getGetter()) {
