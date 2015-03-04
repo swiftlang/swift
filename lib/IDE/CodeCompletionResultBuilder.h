@@ -175,7 +175,7 @@ public:
                      DeclAttrParamKeyword, Name);
     if (NeedSpecify)
       addChunkWithText(CodeCompletionString::Chunk::ChunkKind::
-                       DeclAttrParamEqual, "= ");
+                       DeclAttrParamEqual, "=");
     if(!Annotation.empty())
       addTypeAnnotation(Annotation);
   }

@@ -15,8 +15,8 @@
 
 // AVAILABILITY2:             Begin completions, 5 items
 // AVAILABILITY2-NEXT:        Keyword/None:                       unavailable; name=unavailable{{$}}
-// AVAILABILITY2-NEXT:        Keyword/None:                       message= [#Specify message#]; name=message{{$}}
-// AVAILABILITY2-NEXT:        Keyword/None:                       renamed= [#Specify replacing name#]; name=renamed{{$}}
-// AVAILABILITY2-NEXT:        Keyword/None:                       introduced= [#Specify version number#]; name=introduced{{$}}
-// AVAILABILITY2-NEXT:        Keyword/None:                       deprecated= [#Specify version number#]; name=deprecated{{$}}
+// AVAILABILITY2-NEXT:        Keyword/None:                       message=[#Specify message#]; name=message{{$}}
+// AVAILABILITY2-NEXT:        Keyword/None:                       renamed=[#Specify replacing name#]; name=renamed{{$}}
+// AVAILABILITY2-NEXT:        Keyword/None:                       introduced=[#Specify version number#]; name=introduced{{$}}
+// AVAILABILITY2-NEXT:        Keyword/None:                       deprecated=[#Specify version number#]; name=deprecated{{$}}
 // AVAILABILITY2-NEXT:        End completions

@@ -2013,8 +2013,8 @@ public:
   }
 
   void getAttributeDeclCompletions(DeclAttrKind AttrKind, int ParamIndex) {
-    if(AttrKind == DAK_Availability) {
-      if(ParamIndex == 0) {
+    if (AttrKind == DAK_Availability) {
+      if (ParamIndex == 0) {
         addDeclAttrParamKeyword("*", "Platform", false);
 #define AVAILABILITY_PLATFORM(X, PrettyName)                                  \
         addDeclAttrParamKeyword(#X, "Platform", false);
