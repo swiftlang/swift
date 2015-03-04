@@ -1,0 +1,36 @@
+// RUN: %target-sil-opt %s -simplify-bb-args | FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+enum E {
+	case A
+	case B
+}
+
+// Check that we don't crash in simplifyToSelectValue (rdar://problem/20037686)
+
+// CHECK-LABEL: @test
+sil public @test : $@thin(Builtin.Int64, @inout E) -> () {
+
+bb0(%0 : $Builtin.Int64, %x : $*E):
+  %1 = integer_literal $Builtin.Int64, 0
+  %2 = builtin "cmp_eq_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %473
+  cond_br %2, bb3, bb1
+
+bb1:
+  %4 = enum $E, #E.A!enumelt
+  br bb2(%4 : $E)
+
+bb2(%6 : $E):
+  store %6 to %x : $*E
+  br bb3
+
+bb3:                                            // Preds: bb0 bb409
+  %8 = tuple ()                                // user: %4307
+  return %8 : $()                              // id: %4307
+}
+
+
