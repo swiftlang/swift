@@ -31,3 +31,14 @@ public class SuperB : NSObject {
 public class SubB : SuperB {
   public override init(bar: String) { super.init(bar: bar) }
 }
+
+// rdar://problem/19941580
+public class Foo : NSObject, FooProto {
+  public static var staticEntityName: String = "yo"
+  public var entityName: String = "yo"
+}
+
+@objc public protocol FooProto {
+  static var staticEntityName: String { get }
+  var entityName: String { get }
+}

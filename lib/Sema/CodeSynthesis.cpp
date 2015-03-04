@@ -1813,7 +1813,7 @@ void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
 }
 
 void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
-  if (var->getGetter() || var->isStatic() || var->isBeingTypeChecked())
+  if (var->getGetter() || var->isBeingTypeChecked())
     return;
 
   // Lazy variables need accessors.

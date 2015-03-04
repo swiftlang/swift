@@ -2655,12 +2655,7 @@ public:
         TC.diagnose(VD->getLoc(), diag::extension_stored_property);
         VD->setInvalid();
         VD->overwriteType(ErrorType::get(TC.Context));
-      } // Objective-C compatible class types with static stored properties
-        // can be accessed as Objective-C class methods but need accessors
-        // to do so.
-        else if (VD->isObjC() && VD->isStatic() && VD->hasStorage())
-          if (!VD->hasAccessorFunctions())
-            addTrivialAccessorsToStorage(VD, TC);
+      }
     }
 
     // Synthesize accessors for lazy, all checking already been performed.
