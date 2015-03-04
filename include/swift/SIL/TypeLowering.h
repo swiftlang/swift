@@ -508,10 +508,8 @@ public:
   TypeConverter(TypeConverter const &) = delete;
   TypeConverter &operator=(TypeConverter const &) = delete;
 
-  /// Return the CaptureKind to use when capturing a decl into the specified
-  /// closure.
-  CaptureKind getDeclCaptureKind(CapturedValue capture,
-                                 AnyFunctionRef TheClosure);
+  /// Return the CaptureKind to use when capturing a decl.
+  CaptureKind getDeclCaptureKind(CapturedValue capture);
 
   /// Return a most-general-possible abstraction pattern.
   AbstractionPattern getMostGeneralAbstraction();
