@@ -280,11 +280,13 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
   //===--- private --------------------------------------------------------===//
 
   @semantics("array.props.isNative")
+  public // @testable
   func _getArrayPropertyIsNative() -> Bool {
    return _buffer.arrayPropertyIsNative
   }
 
   @semantics("array.props.needsElementTypeCheck")
+  public // @testable
   func _getArrayPropertyNeedsElementTypeCheck() -> Bool {
    return _buffer.arrayPropertyNeedsElementTypeCheck
   }
@@ -326,6 +328,7 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
   /// Check that the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`
   @semantics("array.check_subscript")
+  public // @testable
   func _checkSubscript(index: Int, hoistedIsNativeBuffer: Bool) {
     _precondition(_buffer._isValidSubscript(index,
                                   hoistedIsNativeBuffer: hoistedIsNativeBuffer),
@@ -341,6 +344,7 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeCont
 
   @semantics("array.get_element")
   @inline(__always)
+  public // @testable
   func _getElement(index: Int, hoistedIsNativeBuffer : Bool,
                    hoistedNeedsElementTypeCheck: Bool) -> Element {
     return _buffer.getElement(index,
