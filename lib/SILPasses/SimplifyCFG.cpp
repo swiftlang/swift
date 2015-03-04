@@ -63,6 +63,19 @@ namespace {
       Fn(Fn), PM(PM) {}
 
     bool run();
+    
+    bool simplifyBlockArgs() {
+      DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
+      DT = DA->getDomInfo(&Fn);
+      PDT = DA->getPostDomInfo(&Fn);
+      bool Changed = false;
+      for (SILBasicBlock &BB : Fn) {
+        Changed |= simplifyArgs(&BB);
+      }
+      DT = nullptr;
+      PDT = nullptr;
+      return Changed;
+    }
 
   private:
     /// popWorklist - Return the next basic block to look at, or null if the
@@ -3104,6 +3117,22 @@ public:
 
   StringRef getName() override { return "Split Critical Edges"; }
 };
+  
+  
+class SimplifyBBArgs : public SILFunctionTransform {
+public:
+  SimplifyBBArgs() {}
+  
+  /// The entry point to the transformation.
+  void run() override {
+    if (SimplifyCFG(*getFunction(), PM).simplifyBlockArgs())
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CFG);
+  }
+  
+  StringRef getName() override { return "Simplify Block Args"; }
+};
+
+  
 } // End anonymous namespace.
 
 /// Splits all critical edges in a function.
@@ -3115,3 +3144,9 @@ SILTransform *swift::createSplitAllCriticalEdges() {
 SILTransform *swift::createSplitNonCondBrCriticalEdges() {
   return new SplitCriticalEdges(true);
 }
+
+// Simplifies basic block arguments.
+SILTransform *swift::createSimplifyBBArgs() {
+  return new SimplifyBBArgs();
+}
+
