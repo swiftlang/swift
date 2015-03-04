@@ -5,5 +5,6 @@ add_swift_library(swiftSILPassesUtils
   SILSSAUpdater.cpp
   ConstantFolding.cpp
   Generics.cpp
+  Devirtualize.cpp
   LINK_LIBRARIES swiftSIL swiftSILAnalysis)
 
