@@ -1786,15 +1786,13 @@ namespace {
         enumDecl->setRawType(underlyingType);
         
         // Add delayed protocol declarations to the enum declaration.
-        DelayedProtocolDecl delayedProtocols[] = {
-          [&]() {return cxt.getProtocol(
-              KnownProtocolKind::RawRepresentable);},
-          [&]() {return cxt.getProtocol(KnownProtocolKind::Hashable);},
-          [&]() {return cxt.getProtocol(KnownProtocolKind::Equatable);}
+        ProtocolDecl *protocols[] = {
+          cxt.getProtocol(KnownProtocolKind::RawRepresentable),
+          cxt.getProtocol(KnownProtocolKind::Hashable),
+          cxt.getProtocol(KnownProtocolKind::Equatable),
         };
-        auto delayedProtoList = Impl.SwiftContext.AllocateCopy(
-                                                      delayedProtocols);
-        enumDecl->setDelayedProtocolDecls(delayedProtoList);
+        auto protoList = Impl.SwiftContext.AllocateCopy(protocols);
+        enumDecl->setProtocols(protoList);
         
         // Provide custom implementations of the init(rawValue:) and rawValue
         // conversions that just do a bitcast. We can't reliably filter a
