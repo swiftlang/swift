@@ -11,7 +11,7 @@
 // CHECK-DAG: ![[B]] = !MDLocalVariable({{.*}} name: "b",{{.*}} line: 15
 // CHECK-DAG: ![[P1]] = !MDExpression(DW_OP_bit_piece, 0, {{(32|64)}})
 // CHECK-DAG: ![[P2]] = !MDExpression(DW_OP_bit_piece, {{(32, 32|64, 64)}})
-// CHECK-DAG: ![[P3]] = !MDExpression(DW_OP_bit_piece, {{(64, 64|128, 64)}})
+// CHECK-DAG: ![[P3]] = !MDExpression(DW_OP_bit_piece, {{(64, 32|128, 64)}})
 func sort(a : String, b : String) -> Bool {
   println("Sorting..\(a) & \(b)")
   return (a < b)
