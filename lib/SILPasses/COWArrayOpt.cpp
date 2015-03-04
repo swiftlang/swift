@@ -1644,7 +1644,6 @@ class SwiftArrayOptPass : public SILFunctionTransform {
 
     // We preserve the dominator tree.
     auto PreservedDT = DA->preserveDomAnalysis(getFunction());
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     invalidateAnalysis(SILAnalysis::InvalidationKind::CFG);
     DA->updateAnalysis(getFunction(), std::move(PreservedDT));
   }
