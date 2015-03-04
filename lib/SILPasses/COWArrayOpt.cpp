@@ -1635,10 +1635,18 @@ class SwiftArrayOptPass : public SILFunctionTransform {
     if (HasChanged) {
       DEBUG(getFunction()->viewCFG());
       DominanceInfo *DT = DA->getDomInfo(getFunction());
+
       // Process specialized loop-nests in loop-tree post-order (bottom-up).
       std::reverse(HoistableLoopNests.begin(), HoistableLoopNests.end());
+
+      // Hoist the loop nests.
       for (auto &HoistableLoopNest : HoistableLoopNests)
         ArrayPropertiesSpecializer(DT, LA, HoistableLoopNest).run();
+
+      // We might have cloned there might be critical edges that need splitting.
+      splitAllCriticalEdges(*getFunction(), true /* only cond_br terminators*/,
+                            DT, nullptr);
+
       DEBUG(getFunction()->viewCFG());
     }
 
