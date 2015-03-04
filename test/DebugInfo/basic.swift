@@ -58,7 +58,7 @@ func foo(var a: Int64, var b: Int64) -> Int64 {
 }
 
 // CHECK-DAG: ![[MAINFILE:[0-9]+]] = !MDFile(filename: "basic.swift", directory: "{{.*}}DebugInfo")
-// CHECK-DAG: !MDCompileUnit({{.*}}file: ![[MAINFILE]],{{.*}} producer: "Swift version{{.*}},{{.*}} flags: "{{[^"]*}}-emit-ir
+// CHECK-DAG: !MDCompileUnit({{.*}}file: ![[MAINFILE]],{{.*}} producer: "{{.*}}Swift version{{.*}},{{.*}} flags: "{{[^"]*}}-emit-ir
 // CHECK-DAG: !MDSubprogram(name: "main"
 
 // Function type for foo.
