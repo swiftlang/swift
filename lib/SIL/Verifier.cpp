@@ -2509,6 +2509,25 @@ public:
     }
   }
 
+  bool
+  isUnreachableAlongAllPathsStartingAt(SILBasicBlock *StartBlock,
+                                       SmallPtrSet<SILBasicBlock *, 16> &Visited) {
+    if (isa<UnreachableInst>(StartBlock->getTerminator()))
+      return true;
+    else if (isa<ReturnInst>(StartBlock->getTerminator()))
+      return false;
+    else if (isa<AutoreleaseReturnInst>(StartBlock->getTerminator()))
+      return false;
+
+    // Recursively check all successors.
+    for (const auto &SuccBB : StartBlock->getSuccs())
+      if (!Visited.insert(SuccBB.getBB()).second)
+        if (!isUnreachableAlongAllPathsStartingAt(SuccBB.getBB(), Visited))
+          return false;
+
+    return true;
+  }
+
   void verifySILFunctionType(CanSILFunctionType FTy) {
     // Make sure that if FTy's calling convention implies that it must have a
     // self parameter, it is not empty if we do not have canonical sil.
@@ -2565,8 +2584,12 @@ public:
             auto found = visitedBBs.find(SuccBB);
             if (found != visitedBBs.end()) {
               // Check that the stack height is consistent coming from all entry
-              // points into this BB.
-              require(stack == found->second,
+              // points into this BB. We only care about consistency if there is
+              // a possible return from this function along the path starting at
+              // this successor bb.
+              SmallPtrSet<SILBasicBlock *, 16> Visited;
+              require(isUnreachableAlongAllPathsStartingAt(SuccBB, Visited) ||
+                          stack == found->second,
                       "inconsistent stack heights entering basic block");
               continue;
             }

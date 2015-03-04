@@ -1,0 +1,47 @@
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: not --crash %target-sil-opt %s -verify 2> %t/err.txt
+// RUN: FileCheck %s < %t/err.txt
+
+// REQUIRES: asserts
+
+// The test in this file is meant to fail the verifier.
+
+import Builtin
+
+// CHECK: SIL verification failed: return with alloc_stacks that haven't been deallocated: stack.empty()
+
+sil @fail1: $@thin (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %2 = integer_literal $Builtin.Int1, -1
+  cond_br %0, bb1, bb5
+
+// Loop.
+bb1:
+  %4 = alloc_stack $Builtin.Int32
+  cond_br %0, bb2, bb3
+
+bb2:
+  dealloc_stack %4#0 : $*@local_storage Builtin.Int32
+  cond_br %0, bb4, bb1
+
+// Cloned loop.
+bb5:
+  %6 = alloc_stack $Builtin.Int32
+  cond_br %0, bb6, bb3
+
+bb6:
+  dealloc_stack %6#0 : $*@local_storage Builtin.Int32
+  cond_br %0, bb4, bb5
+
+// Shared partially unreachable exit block.
+bb3:
+  cond_br %0, bb7, bb4
+
+bb7:
+  cond_fail %2 : $Builtin.Int1
+  unreachable
+
+bb4:
+  %10 = tuple ()
+  return %10 : $()
+}
