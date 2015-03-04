@@ -206,7 +206,8 @@ extension _ArrayBuffer {
       //           // safety was violated.
       //    }
       //  }
-      _precondition(!needsElementTypeCheck, "inout rules were violated")
+      _precondition(!needsElementTypeCheck,
+           "inout rules were violated: the array was overwritten by an NSArray")
     }
 
   }
@@ -353,7 +354,8 @@ extension _ArrayBuffer {
       // 'hoistedIsNativeBuffer'. See also the comment of _typeCheck.
       if (_isClassOrObjCExistential(T.self)) {
         // Only non value elements can have non native storage.
-        _precondition(_isNative, "inout rules were violated")
+        _precondition(_isNative,
+          "inout rules were violated: the array was overwritten by an NSArray")
       }
 
       /// Note we call through to the native buffer here as it has a more
