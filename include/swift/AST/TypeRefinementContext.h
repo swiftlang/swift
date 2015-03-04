@@ -75,7 +75,7 @@ private:
 public:
   
   /// Create the root refinement context for the given SourceFile.
-  static TypeRefinementContext *createRoot(ASTContext &Ctx, SourceFile *SF,
+  static TypeRefinementContext *createRoot(SourceFile *SF,
                                            const VersionRange &Versions);
 
   /// Create a refinement context for the given declaration.

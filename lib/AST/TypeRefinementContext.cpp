@@ -36,9 +36,11 @@ TypeRefinementContext::TypeRefinementContext(ASTContext &Ctx, IntroNode Node,
 }
 
 TypeRefinementContext *
-TypeRefinementContext::createRoot(ASTContext &Ctx, SourceFile *SF,
+TypeRefinementContext::createRoot(SourceFile *SF,
                                   const VersionRange &Versions) {
   assert(SF);
+
+  ASTContext &Ctx = SF->getASTContext();
   return new (Ctx)
       TypeRefinementContext(Ctx, SF,
                             /*Parent=*/nullptr, SourceRange(), Versions);

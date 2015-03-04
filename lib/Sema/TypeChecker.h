@@ -1276,6 +1276,11 @@ public:
   static void buildTypeRefinementContextHierarchy(SourceFile &SF,
                                                   unsigned StartElem);
 
+  /// Build the hierarchy of TypeRefinementContexts for the entire
+  /// source file, if it has not already been built. Returns the root
+  /// TypeRefinementContext for the source file.
+  static TypeRefinementContext *getOrBuildTypeRefinementContext(SourceFile *SF);
+
   /// Checks whether a declaration is available when referred to at the given
   /// location (this reference location must be in the passed-in
   /// reference DeclContext).

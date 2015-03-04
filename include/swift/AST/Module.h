@@ -811,6 +811,8 @@ private:
   mutable Identifier PrivateDiscriminator;
 
   /// The root TypeRefinementContext for this SourceFile.
+  ///
+  /// This is set during type checking.
   TypeRefinementContext *TRC = nullptr;
 
   /// If non-null, used to track name lookups that happen within this file.
@@ -1006,9 +1008,14 @@ public:
     return isScriptMode() || hasMainClass();
   }
 
-  /// Get the root refinement context for the file.
+  /// Get the root refinement context for the file. The root context may be
+  /// null if the context hierarchy has not been built yet. Use
+  /// TypeChecker::getOrBuildTypeRefinementContext() to get a built
+  /// root of the hierarchy.
   TypeRefinementContext *getTypeRefinementContext();
 
+  /// Set the root refinement context for the file.
+  void setTypeRefinementContext(TypeRefinementContext *TRC);
 };
 
 

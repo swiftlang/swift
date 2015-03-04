@@ -25,7 +25,6 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/PrintOptions.h"
-#include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/SourceManager.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
@@ -1547,13 +1546,6 @@ SourceFile::SourceFile(Module &M, SourceFileKind K,
     assert(!problem && "multiple main files?");
     (void)problem;
   }
-
-  // The root type refinement context reflects the fact that all parts of
-  // the source file are guaranteed to be executing on at least the minimum
-  // platform version.
-  auto VersionRange =
-    VersionRange::allGTE(M.Ctx.LangOpts.getMinPlatformVersion());
-  TRC = TypeRefinementContext::createRoot(M.Ctx, this, VersionRange);
 }
 
 SourceFile::~SourceFile() {}
@@ -1634,6 +1626,10 @@ SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
 
 TypeRefinementContext *SourceFile::getTypeRefinementContext() {
   return TRC;
+}
+
+void SourceFile::setTypeRefinementContext(TypeRefinementContext *Root) {
+  TRC = Root;
 }
 
 //===----------------------------------------------------------------------===//

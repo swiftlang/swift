@@ -1068,15 +1068,41 @@ private:
 
 void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF,
                                                       unsigned StartElem) {
+  TypeRefinementContext *RootTRC = SF.getTypeRefinementContext();
+
+  // If we are not starting at the beginning of the source file, we had better
+  // already have a root type refinement context.
+  assert(StartElem == 0 || RootTRC);
+
   ASTContext &AC = SF.getASTContext();
 
-  TypeRefinementContext *RootTRC = SF.getTypeRefinementContext();
+  if (!RootTRC) {
+    // The root type refinement context reflects the fact that all parts of
+    // the source file are guaranteed to be executing on at least the minimum
+    // platform version.
+    auto VersionRange =
+        VersionRange::allGTE(AC.LangOpts.getMinPlatformVersion());
+    RootTRC = TypeRefinementContext::createRoot(&SF, VersionRange);
+    SF.setTypeRefinementContext(RootTRC);
+  }
+
   // Build refinement contexts, if necessary, for all declarations starting
   // with StartElem.
   TypeRefinementContextBuilder Builder(RootTRC, AC);
   for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
     Builder.build(D);
   }
+}
+
+TypeRefinementContext *
+TypeChecker::getOrBuildTypeRefinementContext(SourceFile *SF) {
+  TypeRefinementContext *TRC = SF->getTypeRefinementContext();
+  if (!TRC) {
+    buildTypeRefinementContextHierarchy(*SF, 0);
+    TRC = SF->getTypeRefinementContext();
+  }
+
+  return TRC;
 }
 
 /// Climbs the decl context hierarchy, starting from DC, to attempt to find a
@@ -1129,7 +1155,7 @@ bool TypeChecker::isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
                                   VersionRange &OutAvailableRange) {
   SourceFile *SF = referenceDC->getParentSourceFile();
   assert(SF);
-  
+
   SourceLoc lookupLoc;
   
   if (referenceLoc.isValid()) {
@@ -1146,7 +1172,7 @@ bool TypeChecker::isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
     lookupLoc = bestLocationInDeclContextHierarchy(referenceDC);
   }
   
-  TypeRefinementContext *rootTRC = SF->getTypeRefinementContext();
+  TypeRefinementContext *rootTRC = getOrBuildTypeRefinementContext(SF);
   TypeRefinementContext *TRC;
   
   if (lookupLoc.isValid()) {
