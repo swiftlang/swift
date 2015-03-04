@@ -1,8 +1,8 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 
-// RUN: %S/../../utils/line-directive %s -- %target-build-swift %s -o %t/ArraySemantic -Xfrontend -disable-access-control
-// RUN: %S/../../utils/line-directive %s -- %target-run %t/ArraySemantic 2>&1 | FileCheck %s
+// RUN: %target-build-swift %s -o %t/ArraySemantic -Xfrontend -disable-access-control
+// RUN: %target-run %t/ArraySemantic 2>&1 | FileCheck %s
 
 // XFAIL: linux
 
