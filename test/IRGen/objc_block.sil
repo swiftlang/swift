@@ -37,6 +37,6 @@ entry(%b : $*@cc(cdecl) @objc_block () -> ()):
   return %z : $()
 }
 
-// CHECK-LABEL: define void @generic_with_block(%objc_block** noalias)
+// CHECK-LABEL: define void @generic_with_block(%objc_block**)
 // CHECK:         call %swift.type* @swift_getBlockTypeMetadata
 

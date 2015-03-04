@@ -19,14 +19,14 @@ protocol P {
   func generic_method<Z>(x: Z)
 }
 
-// CHECK-LABEL: define %swift.type* @concrete_type_concrete_method_witness(%V19sil_witness_methods3Foo* noalias, %swift.type* %Self)
+// CHECK-LABEL: define %swift.type* @concrete_type_concrete_method_witness(%V19sil_witness_methods3Foo*, %swift.type* %Self)
 sil @concrete_type_concrete_method_witness : $@thin @cc(witness_method) (@in Foo) -> @thick Foo.Type {
 entry(%x : $*Foo):
   %m = metatype $@thick Foo.Type
   return %m : $@thick Foo.Type
 }
 
-// CHECK-LABEL: define %swift.type* @generic_type_concrete_method_witness(%C19sil_witness_methods3Bar** noalias, %swift.type* %Self)
+// CHECK-LABEL: define %swift.type* @generic_type_concrete_method_witness(%C19sil_witness_methods3Bar**, %swift.type* %Self)
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* %Self to %swift.type**
 // CHECK:         [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 9
 // CHECK:         %T = load %swift.type*, %swift.type** [[T1]], align 8
@@ -77,14 +77,14 @@ entry(%x : $@thick Bar<T, U, V>.Type):
 
 // TODO: %Self Type arg is redundant for class method witness
 
-// CHECK-LABEL: define %swift.type* @concrete_type_generic_method_witness(%swift.opaque* noalias, %V19sil_witness_methods3Foo* noalias, %swift.type* %Z, %swift.type* %Self)
+// CHECK-LABEL: define %swift.type* @concrete_type_generic_method_witness(%swift.opaque*, %V19sil_witness_methods3Foo*, %swift.type* %Z, %swift.type* %Self)
 sil @concrete_type_generic_method_witness : $@thin @cc(witness_method) <Z> (@in Z, @in Foo) -> @thick Foo.Type {
 entry(%z : $*Z, %x : $*Foo):
   %m = metatype $@thick Foo.Type
   return %m : $@thick Foo.Type
 }
 
-// CHECK-LABEL: define %swift.type* @generic_type_generic_method_witness(%swift.opaque* noalias, %C19sil_witness_methods3Bar** noalias, %swift.type* %Z, %swift.type* %Self)
+// CHECK-LABEL: define %swift.type* @generic_type_generic_method_witness(%swift.opaque*, %C19sil_witness_methods3Bar**, %swift.type* %Z, %swift.type* %Self)
 sil @generic_type_generic_method_witness : $@thin @cc(witness_method) <T, U, V, Z> (@in Z, @in Bar<T, U, V>) -> @thick Bar<T, U, V>.Type {
 entry(%z : $*Z, %x : $*Bar<T, U, V>):
   %t = metatype $@thick T.Type
@@ -95,14 +95,14 @@ entry(%z : $*Z, %x : $*Bar<T, U, V>):
   return %m : $@thick Bar<T, U, V>.Type
 }
 
-// CHECK-LABEL: define %swift.type* @concrete_type_generic_static_method_witness(%swift.opaque* noalias, %swift.type*, %swift.type* %Z, %swift.type* %Self)
+// CHECK-LABEL: define %swift.type* @concrete_type_generic_static_method_witness(%swift.opaque*, %swift.type*, %swift.type* %Z, %swift.type* %Self)
 sil @concrete_type_generic_static_method_witness : $@thin @cc(witness_method) <Z> (@in Z, @thick Foo.Type) -> @thick Foo.Type {
 entry(%z : $*Z, %x : $@thick Foo.Type):
   %m = metatype $@thick Foo.Type
   return %m : $@thick Foo.Type
 }
 
-// CHECK-LABEL: define %swift.type* @generic_type_generic_static_method_witness(%swift.opaque* noalias, %swift.type*, %swift.type* %Z, %swift.type* %Self)
+// CHECK-LABEL: define %swift.type* @generic_type_generic_static_method_witness(%swift.opaque*, %swift.type*, %swift.type* %Z, %swift.type* %Self)
 sil @generic_type_generic_static_method_witness : $@thin @cc(witness_method) <T, U, V, Z> (@in Z, @thick Bar<T, U, V>.Type) -> @thick Bar<T, U, V>.Type {
 entry(%z : $*Z, %x : $@thick Bar<T, U, V>.Type):
   %t = metatype $@thick T.Type

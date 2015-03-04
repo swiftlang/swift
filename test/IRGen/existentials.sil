@@ -33,7 +33,7 @@ bb0(%0 : $*protocol<>, %1 : $*protocol<>):
   return %3 : $()
 }
 
-// CHECK-DAG:   define void @take_opaque_existential([[ANY:%"protocol<>"]]* noalias sret, %"protocol<>"* noalias) {
+// CHECK-DAG:   define void @take_opaque_existential([[ANY:%"protocol<>"]]* noalias sret, %"protocol<>"*) {
 // CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[SRC:%1]], i32 0, i32 1
 // CHECK-NEXT:    [[TYPE:%.*]] = load %swift.type*, %swift.type** [[T0]], align 8
 // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[DEST:%0]], i32 0, i32 1

@@ -26,7 +26,7 @@ func b<T : Ordinable>(var #seq: T) -> (Int) -> Int {
 }
 
 // -- Closure entry point
-// CHECK: define linkonce_odr hidden i64 @[[CLOSURE:_TFF7closure1bUS_9Ordinable__FT3seqQ__FSiSiU_FSiSi]](i64, %swift.refcounted*, %swift.opaque* noalias, %swift.type* %T, i8** %T.Ordinable) {
+// CHECK: define linkonce_odr hidden i64 @[[CLOSURE:_TFF7closure1bUS_9Ordinable__FT3seqQ__FSiSiU_FSiSi]](i64, %swift.refcounted*, %swift.opaque*, %swift.type* %T, i8** %T.Ordinable) {
 // -- partial_apply stub
 // CHECK: define internal i64 @_TPA_[[CLOSURE]](i64, %swift.refcounted*) {
 // CHECK: entry:
@@ -43,12 +43,12 @@ func b<T : Ordinable>(var #seq: T) -> (Int) -> Int {
 // CHECK:   [[ADDRADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [16 x i8], %swift.refcounted*, %swift.opaque* }>, <{ %swift.refcounted, [16 x i8], %swift.refcounted*, %swift.opaque* }>* [[CONTEXT]], i32 0, i32 3
 // CHECK:   [[ADDR:%.*]] = load %swift.opaque*, %swift.opaque** [[ADDRADDR]], align 8
 // CHECK:   call void @swift_release(%swift.refcounted* %1)
-// CHECK:   [[RES:%.*]] = tail call i64 @[[CLOSURE]](i64 %0, %swift.refcounted* [[BOX]], %swift.opaque* noalias [[ADDR]], %swift.type* [[TYPE]], i8** [[WITNESS]])
+// CHECK:   [[RES:%.*]] = tail call i64 @[[CLOSURE]](i64 %0, %swift.refcounted* [[BOX]], %swift.opaque* [[ADDR]], %swift.type* [[TYPE]], i8** [[WITNESS]])
 // CHECK:   ret i64 [[RES]]
 // CHECK: }
 
 // -- <rdar://problem/14443343> Boxing of tuples with generic elements
-// CHECK: define hidden { i8*, %swift.refcounted* } @_TF7closure14captures_tupleU___FT1xTQ_Q0___FT_TQ_Q0__(%swift.opaque* noalias, %swift.opaque* noalias, %swift.type* %T, %swift.type* %U)
+// CHECK: define hidden { i8*, %swift.refcounted* } @_TF7closure14captures_tupleU___FT1xTQ_Q0___FT_TQ_Q0__(%swift.opaque*, %swift.opaque*, %swift.type* %T, %swift.type* %U)
 func captures_tuple<T, U>(var #x: (T, U)) -> () -> (T, U) {
   // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getTupleTypeMetadata2(%swift.type* %T, %swift.type* %U, i8* null, i8** null)
   // CHECK-NOT: @swift_getTupleTypeMetadata2

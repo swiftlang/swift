@@ -13,7 +13,7 @@ protocol P {
 
 struct S {}
 
-// CHECK-LABEL: define hidden void @_TF27sil_generic_witness_methods12call_methods{{.*}}(%swift.opaque* noalias, %swift.opaque* noalias, %swift.type* %T, i8** %T.P, %swift.type* %U)
+// CHECK-LABEL: define hidden void @_TF27sil_generic_witness_methods12call_methods{{.*}}(%swift.opaque*, %swift.opaque*, %swift.type* %T, i8** %T.P, %swift.type* %U)
 func call_methods<T: P, U>(x: T, y: S, z: U) {
   // CHECK: [[STATIC_METHOD_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.P, i32 1
   // CHECK: [[STATIC_METHOD_PTR:%.*]] = load i8*, i8** [[STATIC_METHOD_ADDR]], align 8
@@ -37,7 +37,7 @@ func call_methods<T: P, U>(x: T, y: S, z: U) {
   x.generic_method(z)
 }
 
-// CHECK-LABEL: define hidden void @_TF27sil_generic_witness_methods24call_existential_methods{{.*}}(%P27sil_generic_witness_methods1P_* noalias)
+// CHECK-LABEL: define hidden void @_TF27sil_generic_witness_methods24call_existential_methods{{.*}}(%P27sil_generic_witness_methods1P_*)
 func call_existential_methods(x: P, var y: S) {
   // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %P27sil_generic_witness_methods1P_, %P27sil_generic_witness_methods1P_* [[X:%0]], i32 0, i32 1
   // CHECK: [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]], align 8

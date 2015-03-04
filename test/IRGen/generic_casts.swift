@@ -31,7 +31,7 @@ import gizmo
 
 // CHECK: @_DATA__TtC13generic_casts10ObjCClass2 = private constant {{.*}} @_PROTOCOLS__TtC13generic_casts10ObjCClass2
 
-// CHECK: define hidden i64 @_TF13generic_casts8allToInt{{.*}}(%swift.opaque* noalias, %swift.type* %T)
+// CHECK: define hidden i64 @_TF13generic_casts8allToInt{{.*}}(%swift.opaque*, %swift.type* %T)
 func allToInt<T>(x: T) -> Int {
   return x as! Int
   // CHECK: [[BUF:%.*]] = alloca [[BUFFER:.24 x i8.]],
@@ -55,7 +55,7 @@ func intToAll<T>(x: Int) -> T {
   return x as! T
 }
 
-// CHECK: define hidden i64 @_TF13generic_casts8anyToInt{{.*}}(%"protocol<>"* noalias)
+// CHECK: define hidden i64 @_TF13generic_casts8anyToInt{{.*}}(%"protocol<>"*)
 func anyToInt(x: protocol<>) -> Int {
   return x as! Int
 }

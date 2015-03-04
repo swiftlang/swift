@@ -247,7 +247,7 @@ bb0(%x : $SwiftClass):
 
 sil public_external @indirect_guaranteed_captured_class_param : $@thin (Int, @in_guaranteed SwiftClass) -> Int
 
-// CHECK-LABEL: define { i8*, %swift.refcounted* } @partial_apply_indirect_guaranteed_class_param(%C13partial_apply10SwiftClass** noalias)
+// CHECK-LABEL: define { i8*, %swift.refcounted* } @partial_apply_indirect_guaranteed_class_param(%C13partial_apply10SwiftClass**)
 // CHECK:         [[CONTEXT_OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject
 // CHECK-NOT:     {{retain|release}}
 // CHECK:         [[X_ADDR:%.*]] = getelementptr
@@ -260,7 +260,7 @@ sil public_external @indirect_guaranteed_captured_class_param : $@thin (Int, @in
 // CHECK:         [[X_ADDR:%.*]] = getelementptr
 // CHECK-NOT:     load
 // CHECK-NOT:     retain
-// CHECK:         [[RESULT:%.*]] = call i64 @indirect_guaranteed_captured_class_param(i64 %0, %C13partial_apply10SwiftClass** noalias [[X_ADDR]])
+// CHECK:         [[RESULT:%.*]] = call i64 @indirect_guaranteed_captured_class_param(i64 %0, %C13partial_apply10SwiftClass** [[X_ADDR]])
 // CHECK:         release{{.*}}%1)
 // CHECK:         ret i64 [[RESULT]]
 
@@ -273,7 +273,7 @@ bb0(%x : $*SwiftClass):
 
 sil public_external @indirect_consumed_captured_class_param : $@thin (Int, @in SwiftClass) -> Int
 
-// CHECK-LABEL: define { i8*, %swift.refcounted* } @partial_apply_indirect_consumed_class_param(%C13partial_apply10SwiftClass** noalias)
+// CHECK-LABEL: define { i8*, %swift.refcounted* } @partial_apply_indirect_consumed_class_param(%C13partial_apply10SwiftClass**)
 // CHECK:         [[CONTEXT_OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject
 // CHECK-NOT:     {{retain|release}}
 // CHECK:         [[X_ADDR:%.*]] = getelementptr
@@ -290,7 +290,7 @@ sil public_external @indirect_consumed_captured_class_param : $@thin (Int, @in S
 // CHECK:         retain{{.*}}[[X_BITCAST]]
 // CHECK:         store %C13partial_apply10SwiftClass* [[X]], %C13partial_apply10SwiftClass** [[X_TMP]]
 // CHECK:         release{{.*}}%1)
-// CHECK:         [[RESULT:%.*]] = tail call i64 @indirect_consumed_captured_class_param(i64 %0, %C13partial_apply10SwiftClass** noalias [[X_TMP]])
+// CHECK:         [[RESULT:%.*]] = tail call i64 @indirect_consumed_captured_class_param(i64 %0, %C13partial_apply10SwiftClass** [[X_TMP]])
 // CHECK:         ret i64 [[RESULT]]
 
 sil @partial_apply_indirect_consumed_class_param : $@thin (@in SwiftClass) -> @callee_owned (Int) -> Int {
@@ -302,7 +302,7 @@ bb0(%x : $*SwiftClass):
 
 sil public_external @captured_fixed_and_dependent_params : $@thin <A> (@owned SwiftClass, @in A, Int) -> ()
 
-// CHECK-LABEL: define { i8*, %swift.refcounted* } @partial_apply_indirect_non_fixed_layout(%C13partial_apply10SwiftClass*, %swift.opaque* noalias, i64, %swift.type* %T)
+// CHECK-LABEL: define { i8*, %swift.refcounted* } @partial_apply_indirect_non_fixed_layout(%C13partial_apply10SwiftClass*, %swift.opaque*, i64, %swift.type* %T)
 // CHECK:         insertvalue {{.*}} [[PARTIAL_APPLY_STUB:@_TPA[A-Za-z0-9_]+]]
 // CHECK:       define internal void [[PARTIAL_APPLY_STUB]](%swift.refcounted*)
 sil @partial_apply_indirect_non_fixed_layout : $@thin <T> (@owned SwiftClass, @in T, Int) -> @callee_owned () -> () {

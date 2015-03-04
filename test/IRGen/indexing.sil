@@ -12,7 +12,7 @@ struct SameSizeStride { var x, y: Builtin.Int32 }
 // This type has unequal stride and size.
 struct DifferentSizeStride { var x: Builtin.Int32, y: Builtin.Int16 }
 
-// CHECK: define void @same_size_stride(%V8indexing14SameSizeStride* noalias, i64) {
+// CHECK: define void @same_size_stride(%V8indexing14SameSizeStride*, i64) {
 // CHECK:   getelementptr inbounds %V8indexing14SameSizeStride, %V8indexing14SameSizeStride* %0, i64 %1
 sil @same_size_stride : $@thin (@in SameSizeStride, Builtin.Word) -> () {
 entry(%p : $*SameSizeStride, %i: $Builtin.Word):
@@ -20,7 +20,7 @@ entry(%p : $*SameSizeStride, %i: $Builtin.Word):
   return undef : $()
 }
 
-// CHECK:      define void @different_size_stride(%V8indexing19DifferentSizeStride* noalias, i64) {
+// CHECK:      define void @different_size_stride(%V8indexing19DifferentSizeStride*, i64) {
 // CHECK:        %2 = bitcast %V8indexing19DifferentSizeStride* %0 to i8*
 // CHECK-NEXT:   %3 = mul nsw i64 %1, 8
 // CHECK-NEXT:   %4 = getelementptr inbounds i8, i8* %2, i64 %3
@@ -31,7 +31,7 @@ entry(%p : $*DifferentSizeStride, %i: $Builtin.Word):
   return undef : $()
 }
 
-// CHECK:      define void @dynamic_size(%swift.opaque* noalias, i64, %swift.type* %T) {
+// CHECK:      define void @dynamic_size(%swift.opaque*, i64, %swift.type* %T) {
 // CHECK:        %3 = bitcast %swift.type* %T to i8***
 // CHECK-NEXT:   %4 = getelementptr inbounds i8**, i8*** %3, i64 -1
 // CHECK-NEXT:   %5 = load i8**, i8*** %4, align 8

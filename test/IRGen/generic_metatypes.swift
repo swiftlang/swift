@@ -7,7 +7,7 @@
 
 // REQUIRES: X86
 
-// CHECK: define hidden %swift.type* [[GENERIC_TYPEOF:@_TF17generic_metatypes13genericTypeof.*]](%swift.opaque* noalias, %swift.type* [[TYPE:%.*]])
+// CHECK: define hidden %swift.type* [[GENERIC_TYPEOF:@_TF17generic_metatypes13genericTypeof.*]](%swift.opaque*, %swift.type* [[TYPE:%.*]])
 func genericTypeof<T>(x: T) -> T.Type {
   // CHECK: [[METATYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* {{.*}}, %swift.type* [[TYPE]])
   // CHECK: ret %swift.type* [[METATYPE]]
@@ -41,7 +41,7 @@ func genericMetatypes<T, U>(t: T.Type, u: U.Type) {}
 
 protocol Bas {}
 
-// CHECK: define hidden { %swift.type*, i8** } @_TF17generic_metatypes14protocolTypeof{{.*}}(%P17generic_metatypes3Bas_* noalias)
+// CHECK: define hidden { %swift.type*, i8** } @_TF17generic_metatypes14protocolTypeof{{.*}}(%P17generic_metatypes3Bas_*)
 func protocolTypeof(x: Bas) -> Bas.Type {
   // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %P17generic_metatypes3Bas_, %P17generic_metatypes3Bas_* [[X:%.*]], i32 0, i32 1
   // CHECK: [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]]

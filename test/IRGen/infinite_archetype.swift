@@ -6,5 +6,5 @@ protocol Fooable {
   typealias Foo
 }
 
-// CHECK: define hidden void @_TF18infinite_archetype3foo{{.*}}(%swift.opaque* noalias sret, %swift.opaque* noalias, %swift.type* %T, i8** %T.Fooable)
+// CHECK: define hidden void @_TF18infinite_archetype3foo{{.*}}(%swift.opaque* noalias sret, %swift.opaque*, %swift.type* %T, i8** %T.Fooable)
 func foo<T: Fooable where T == T.Foo>(x: T) -> T { return x }

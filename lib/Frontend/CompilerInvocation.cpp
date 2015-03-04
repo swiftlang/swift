@@ -810,6 +810,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     } else if (A->getOption().matches(OPT_Ounchecked)) {
       // Turn on optimizations and remove all runtime checks.
       IRGenOpts.Optimize = true;
+      IRGenOpts.Unchecked = true;
       // Removal of cond_fail (overflow on binary operations).
       Opts.RemoveRuntimeAsserts = true;
       Opts.AssertConfig = SILOptions::Fast;

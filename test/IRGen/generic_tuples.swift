@@ -52,22 +52,22 @@ func dup<T>(var x: T) -> (T, T) { return (x,x) }
 
 // CHECK: ret void
 
-// CHECK: define hidden void @_TF14generic_tuples4lump{{.*}}(<{ %Si }>* noalias sret, %swift.opaque* noalias, %swift.type* %T)
+// CHECK: define hidden void @_TF14generic_tuples4lump{{.*}}(<{ %Si }>* noalias sret, %swift.opaque*, %swift.type* %T)
 func lump<T>(x: T) -> (Int, T, T) { return (0,x,x) }
-// CHECK: define hidden void @_TF14generic_tuples5lump2{{.*}}(<{ %Si, %Si }>* noalias sret, %swift.opaque* noalias, %swift.type* %T)
+// CHECK: define hidden void @_TF14generic_tuples5lump2{{.*}}(<{ %Si, %Si }>* noalias sret, %swift.opaque*, %swift.type* %T)
 func lump2<T>(x: T) -> (Int, Int, T) { return (0,0,x) }
-// CHECK: define hidden void @_TF14generic_tuples5lump3{{.*}}(<{}>* noalias sret, %swift.opaque* noalias, %swift.type* %T)
+// CHECK: define hidden void @_TF14generic_tuples5lump3{{.*}}(<{}>* noalias sret, %swift.opaque*, %swift.type* %T)
 func lump3<T>(x: T) -> (T, T, T) { return (x,x,x) }
-// CHECK: define hidden void @_TF14generic_tuples5lump4{{.*}}(<{}>* noalias sret, %swift.opaque* noalias, %swift.type* %T)
+// CHECK: define hidden void @_TF14generic_tuples5lump4{{.*}}(<{}>* noalias sret, %swift.opaque*, %swift.type* %T)
 func lump4<T>(x: T) -> (T, Int, T) { return (x,0,x) }
 
-// CHECK: define hidden i64 @_TF14generic_tuples6unlump{{.*}}(i64, %swift.opaque* noalias, %swift.opaque* noalias, %swift.type* %T)
+// CHECK: define hidden i64 @_TF14generic_tuples6unlump{{.*}}(i64, %swift.opaque*, %swift.opaque*, %swift.type* %T)
 func unlump<T>(x: (Int, T, T)) -> Int { return x.0 }
-// CHECK: define hidden void @_TF14generic_tuples7unlump{{.*}}(%swift.opaque* noalias sret, i64, %swift.opaque* noalias, %swift.opaque* noalias, %swift.type* %T)
+// CHECK: define hidden void @_TF14generic_tuples7unlump{{.*}}(%swift.opaque* noalias sret, i64, %swift.opaque*, %swift.opaque*, %swift.type* %T)
 func unlump1<T>(x: (Int, T, T)) -> T { return x.1 }
-// CHECK: define hidden void @_TF14generic_tuples7unlump2{{.*}}(%swift.opaque* noalias sret, %swift.opaque* noalias, i64, %swift.opaque* noalias, %swift.type* %T)
+// CHECK: define hidden void @_TF14generic_tuples7unlump2{{.*}}(%swift.opaque* noalias sret, %swift.opaque*, i64, %swift.opaque*, %swift.type* %T)
 func unlump2<T>(x: (T, Int, T)) -> T { return x.0 }
-// CHECK: define hidden i64 @_TF14generic_tuples7unlump3{{.*}}(%swift.opaque* noalias, i64, %swift.opaque* noalias, %swift.type* %T)
+// CHECK: define hidden i64 @_TF14generic_tuples7unlump3{{.*}}(%swift.opaque*, i64, %swift.opaque*, %swift.type* %T)
 func unlump3<T>(x: (T, Int, T)) -> Int { return x.1 }
 
 

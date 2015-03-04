@@ -18,7 +18,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $Int):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define void @alloc_small([24 x i8]* noalias, i64)
+// CHECK-LABEL: define void @alloc_small([24 x i8]*, i64)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[T0:%.*]] = bitcast [24 x i8]* %0 to %Si*
 // CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
@@ -32,7 +32,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $Int):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define void @project_small([24 x i8]* noalias, i64)
+// CHECK-LABEL: define void @project_small([24 x i8]*, i64)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[T0:%.*]] = bitcast [24 x i8]* %0 to %Si*
 // CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
@@ -45,7 +45,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define void @dealloc_small([24 x i8]* noalias)
+// CHECK-LABEL: define void @dealloc_small([24 x i8]*)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: ret void
 
@@ -56,7 +56,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $BigStruct):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define void @alloc_big([24 x i8]* noalias, i64, i64, i64, i64)
+// CHECK-LABEL: define void @alloc_big([24 x i8]*, i64, i64, i64, i64)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[T0:%.*]] = call noalias i8* @swift_slowAlloc(i64 32, i64 7)
 // CHECK-NEXT: [[T1:%.*]] = bitcast [24 x i8]* %0 to i8**
@@ -83,7 +83,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $BigStruct):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define void @project_big([24 x i8]* noalias, i64, i64, i64, i64)
+// CHECK-LABEL: define void @project_big([24 x i8]*, i64, i64, i64, i64)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[T0:%.*]] = bitcast [24 x i8]* %0 to %V13value_buffers9BigStruct**
 // CHECK-NEXT: [[ADDR:%.*]] = load %V13value_buffers9BigStruct*, %V13value_buffers9BigStruct** [[T0]], align 8
@@ -107,7 +107,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define void @dealloc_big([24 x i8]* noalias)
+// CHECK-LABEL: define void @dealloc_big([24 x i8]*)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[T0:%.*]] = bitcast [24 x i8]* %0 to i8**
 // CHECK-NEXT: [[ADDR:%.*]] = load i8*, i8** [[T0]], align 8
