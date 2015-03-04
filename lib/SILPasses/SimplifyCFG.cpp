@@ -3097,6 +3097,8 @@ SILTransform *swift::createSimplifyCFG() {
 }
 
 namespace {
+
+// Used to test critical edge splitting with sil-opt.
 class SplitCriticalEdges : public SILFunctionTransform {
   bool OnlyNonCondBrEdges;
 
@@ -3117,8 +3119,8 @@ public:
 
   StringRef getName() override { return "Split Critical Edges"; }
 };
-  
-  
+
+// Used to test SimplifyCFG::simplifyArgs with sil-opt.
 class SimplifyBBArgs : public SILFunctionTransform {
 public:
   SimplifyBBArgs() {}
