@@ -66,5 +66,5 @@ class ObjCSub : ObjCSuper {
 
   override func method2(x: Base, withInt y: Int) { } // okay, overrides trivially
 
-  func method3(x: Sub, withInt y: Int) { } // expected-error{{method3(_:withInt:)' with Objective-C selector 'method3:withInt:' conflicts with method 'method3(_:withInt:)' from superclass 'ObjCSuper'}}
+  func method3(x: Sub, withInt y: Int) { } // expected-error{{method3(_:withInt:)' with Objective-C selector 'method3:withInt:' conflicts with method 'method3(_:withInt:)' from superclass 'ObjCSuper' with the same Objective-C selector}}
 }

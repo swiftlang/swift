@@ -1860,7 +1860,7 @@ ERROR(missing_bridging_function,sema_objc,Fatal,
 
 ERROR(objc_redecl,sema_objc,none,
       OBJC_DIAG_SELECT " with Objective-C selector %4 conflicts with "
-      OBJC_DIAG_SELECT_2,
+      OBJC_DIAG_SELECT_2 " with the same Objective-C selector",
       (unsigned, DeclName, unsigned, DeclName, ObjCSelector))
 NOTE(objc_declared_here,sema_objc,none,
      OBJC_DIAG_SELECT " declared here",
@@ -1868,12 +1868,13 @@ NOTE(objc_declared_here,sema_objc,none,
 
 ERROR(objc_redecl_same,sema_objc,none,
       OBJC_DIAG_SELECT " with Objective-C selector %2 conflicts with "
-      "previous declaration",
+      "previous declaration with the same Objective-C selector",
       (unsigned, DeclName, ObjCSelector))
 
 ERROR(objc_override_other,sema_objc,none,
       OBJC_DIAG_SELECT " with Objective-C selector %4 conflicts with "
-      OBJC_DIAG_SELECT_2 " from superclass %5",
+      OBJC_DIAG_SELECT_2 " from superclass %5 with the same Objective-C "
+      "selector",
       (unsigned, DeclName, unsigned, DeclName, ObjCSelector, Type))
 
 ERROR(objc_class_method_load,sema_objc,none,
