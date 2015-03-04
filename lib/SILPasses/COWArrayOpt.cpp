@@ -1245,7 +1245,6 @@ namespace {
 /// However, the client needs to update the dominator of the exit blocks.
 class RegionCloner : public SILCloner<RegionCloner> {
   DominanceInfo &DomTree;
-  SILLoopInfo *LoopInfo;
   SILBasicBlock *StartBB;
   SmallPtrSet<SILBasicBlock *, 16> OutsideBBs;
 
@@ -1254,11 +1253,9 @@ class RegionCloner : public SILCloner<RegionCloner> {
 
 public:
   RegionCloner(SILBasicBlock *EntryBB,
-               SmallVectorImpl<SILBasicBlock *> &ExitBlocks, DominanceInfo &DT,
-               SILLoopInfo *LI)
+               SmallVectorImpl<SILBasicBlock *> &ExitBlocks, DominanceInfo &DT)
       : SILCloner<RegionCloner>(*EntryBB->getParent()), DomTree(DT),
-        LoopInfo(LI), StartBB(EntryBB),
-        OutsideBBs(ExitBlocks.begin(), ExitBlocks.end()) {}
+        StartBB(EntryBB), OutsideBBs(ExitBlocks.begin(), ExitBlocks.end()) {}
 
   SILBasicBlock *cloneRegion() {
     assert (DomTree.getNode(StartBB) != nullptr && "Can't cloned dead code");
@@ -1409,15 +1406,21 @@ namespace {
 /// loop based on array.props calls.
 class ArrayPropertiesSpecializer {
   DominanceInfo *DomTree;
-  SILLoopInfo *LoopInfo;
+  SILLoopAnalysis *LoopAnalysis;
   SILBasicBlock *HoistableLoopPreheader;
 public:
-  ArrayPropertiesSpecializer(DominanceInfo *DT, SILLoopInfo *LI,
+  ArrayPropertiesSpecializer(DominanceInfo *DT, SILLoopAnalysis *LA,
                              SILBasicBlock *Hoistable)
-      : DomTree(DT), LoopInfo(LI), HoistableLoopPreheader(Hoistable) {}
+      : DomTree(DT), LoopAnalysis(LA), HoistableLoopPreheader(Hoistable) {}
 
   void run() {
     specializeLoopNest();
+  }
+
+  SILLoop *getLoop() {
+    auto *LoopInfo =
+        LoopAnalysis->getLoopInfo(HoistableLoopPreheader->getParent());
+    return LoopInfo->getLoopFor(HoistableLoopPreheader->getSingleSuccessor());
   }
 
 protected:
@@ -1531,6 +1534,9 @@ static void replaceArrayPropsCall(SILBuilder &B, ArraySemanticsCall C) {
 }
 
 void ArrayPropertiesSpecializer::specializeLoopNest() {
+  auto *Lp = getLoop();
+  assert(Lp);
+
   // Split of a new empty preheader. We don't want to duplicate the whole
   // original preheader it might contain instructions that we can't clone.
   // This will be block that will contain the check whether to execute the
@@ -1541,8 +1547,6 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
   // Get the exit blocks of the orignal loop.
   auto *Header = CheckBlock->getSingleSuccessor();
   assert(Header);
-  auto *Lp = LoopInfo->getLoopFor(Header);
-  assert(Lp);
 
   // Our loop info is not really completedly valid anymore since the cloner does
   // not update it. However, exit blocks of the original loop are still valid.
@@ -1555,7 +1559,7 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
 
   // Clone the region from the new preheader up to (not including) the exit
   // blocks. This creates a second loop nest.
-  RegionCloner Cloner(NewPreheader, ExitBlocks, *DomTree, LoopInfo);
+  RegionCloner Cloner(NewPreheader, ExitBlocks, *DomTree);
   auto *ClonedPreheader = Cloner.cloneRegion();
 
   // Collect the array.props call that we will specialize on that we have
@@ -1587,6 +1591,10 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
   SILBuilder B2(ClonedPreheader->getTerminator());
   for (auto C : ArrayPropCalls)
     replaceArrayPropsCall(B2, C);
+
+  // We have potentially cloned a loop - invalidate loop info.
+  LoopAnalysis->invalidate(Header->getParent(),
+                           SILAnalysis::InvalidationKind::CFG);
 }
 
 namespace {
@@ -1630,7 +1638,7 @@ class SwiftArrayOptPass : public SILFunctionTransform {
       // Process specialized loop-nests in loop-tree post-order (bottom-up).
       std::reverse(HoistableLoopNests.begin(), HoistableLoopNests.end());
       for (auto &HoistableLoopNest : HoistableLoopNests)
-        ArrayPropertiesSpecializer(DT, LI, HoistableLoopNest).run();
+        ArrayPropertiesSpecializer(DT, LA, HoistableLoopNest).run();
       DEBUG(getFunction()->viewCFG());
     }
 
