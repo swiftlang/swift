@@ -157,7 +157,7 @@ getDeclCaptureKind(CapturedValue capture, AnyFunctionRef TheClosure) {
     if (capture.isDirect() && var->getStorageKind() != VarDecl::Stored) {
       assert(var->hasStorage());
       return TheClosure.isKnownNoEscape() ?
-         CaptureKind::NoEscape : CaptureKind::Box;
+         CaptureKind::StorageAddress : CaptureKind::Box;
     }
 
     switch (var->getStorageKind()) {
@@ -190,7 +190,7 @@ getDeclCaptureKind(CapturedValue capture, AnyFunctionRef TheClosure) {
       // If we're capturing into a non-escaping closure, we can generally just
       // capture the address of the value as no-escape.
       return TheClosure.isKnownNoEscape() ?
-        CaptureKind::NoEscape : CaptureKind::Box;
+        CaptureKind::StorageAddress : CaptureKind::Box;
     }
     llvm_unreachable("bad storage kind");
   }
@@ -1873,7 +1873,7 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
       break;
     }
 
-    case CaptureKind::NoEscape:
+    case CaptureKind::StorageAddress:
       // No-escape stored decls are captured by their raw address.
       inputFields.push_back(TupleTypeElt(CanInOutType::get(captureType)));
       break;
@@ -1964,7 +1964,7 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
       inputFields.push_back(TupleTypeElt(getterTy));
       break;
     }
-    case CaptureKind::NoEscape:
+    case CaptureKind::StorageAddress:
       // No-escape stored decls are captured by their raw address.
       inputFields.push_back(TupleTypeElt(CanInOutType::get(captureType)));
       break;

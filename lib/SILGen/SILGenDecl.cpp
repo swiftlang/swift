@@ -1023,7 +1023,7 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
     gen.Cleanups.pushCleanup<StrongReleaseCleanup>(box);
     break;
   }
-  case CaptureKind::NoEscape: {
+  case CaptureKind::StorageAddress: {
     // Non-escaping stored decls are captured as the address of the value.
     SILType ty = gen.getLoweredType(type).getAddressType();
     SILValue addr = new (gen.SGM.M) SILArgument(gen.F.begin(), ty, VD);
