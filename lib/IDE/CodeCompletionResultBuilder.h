@@ -169,6 +169,17 @@ public:
         CodeCompletionString::Chunk::ChunkKind::QuestionMark, "?");
   }
 
+  void addDeclAttrParamKeyword(StringRef Name, StringRef Annotation,
+                            bool NeedSpecify) {
+    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::
+                     DeclAttrParamKeyword, Name);
+    if (NeedSpecify)
+      addChunkWithText(CodeCompletionString::Chunk::ChunkKind::
+                       DeclAttrParamEqual, "= ");
+    if(!Annotation.empty())
+      addTypeAnnotation(Annotation);
+  }
+
   void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,
                         bool IsVarArg) {
     CurrentNestingLevel++;

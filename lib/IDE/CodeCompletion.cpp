@@ -130,6 +130,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     }
     switch (C.getKind()) {
     case Chunk::ChunkKind::AccessControlKeyword:
+    case Chunk::ChunkKind::DeclAttrParamKeyword:
     case Chunk::ChunkKind::OverrideKeyword:
     case Chunk::ChunkKind::DeclIntroducer:
     case Chunk::ChunkKind::Text:
@@ -150,6 +151,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case Chunk::ChunkKind::CallParameterName:
     case Chunk::ChunkKind::CallParameterInternalName:
     case Chunk::ChunkKind::CallParameterColon:
+    case Chunk::ChunkKind::DeclAttrParamEqual:
     case Chunk::ChunkKind::CallParameterType:
     case Chunk::ChunkKind::CallParameterClosureType:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
@@ -680,6 +682,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex() const {
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
     case CodeCompletionString::Chunk::ChunkKind::LeftParen:
     case CodeCompletionString::Chunk::ChunkKind::LeftBracket:
+    case CodeCompletionString::Chunk::ChunkKind::DeclAttrParamKeyword:
       return i;
     case CodeCompletionString::Chunk::ChunkKind::RightParen:
     case CodeCompletionString::Chunk::ChunkKind::RightBracket:
@@ -695,6 +698,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex() const {
     case CodeCompletionString::Chunk::ChunkKind::OverrideKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclIntroducer:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterColon:
+    case CodeCompletionString::Chunk::ChunkKind::DeclAttrParamEqual:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterType:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType:
     case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
@@ -728,6 +732,8 @@ void CodeCompletionString::getName(raw_ostream &OS) const {
       if (C.getKind() == ChunkKind::BraceStmtWithCursor)
         break;
       if (C.getKind() == ChunkKind::TypeAnnotation)
+        continue;
+      if (C.getKind() == ChunkKind::DeclAttrParamEqual)
         continue;
       if (C.hasText() && !C.isAnnotation()) {
         TextSize += C.getText().size();
@@ -1684,6 +1690,15 @@ public:
       Builder.addTypeAnnotation(TypeAnnotation);
   }
 
+  void addDeclAttrParamKeyword(StringRef Name, StringRef Annotation,
+                             bool NeedSpecify) {
+    CodeCompletionResultBuilder Builder(
+        Sink,
+        CodeCompletionResult::ResultKind::Keyword,
+        SemanticContextKind::None);
+    Builder.addDeclAttrParamKeyword(Name, Annotation, NeedSpecify);
+  }
+
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
     // Hide private stdlib declarations.
@@ -1998,10 +2013,19 @@ public:
   }
 
   void getAttributeDeclCompletions(DeclAttrKind AttrKind, int ParamIndex) {
-    if(AttrKind == DAK_Availability && ParamIndex == 0) {
-      addKeyword("*", "Platform");
-#define AVAILABILITY_PLATFORM(X, PrettyName)   addKeyword(#X, "Platform");
+    if(AttrKind == DAK_Availability) {
+      if(ParamIndex == 0) {
+        addDeclAttrParamKeyword("*", "Platform", false);
+#define AVAILABILITY_PLATFORM(X, PrettyName)                                  \
+        addDeclAttrParamKeyword(#X, "Platform", false);
 #include "swift/AST/PlatformKinds.def"
+      } else {
+        addDeclAttrParamKeyword("unavailable", "", false);
+        addDeclAttrParamKeyword("message", "Specify message", true);
+        addDeclAttrParamKeyword("renamed", "Specify replacing name", true);
+        addDeclAttrParamKeyword("introduced", "Specify version number", true);
+        addDeclAttrParamKeyword("deprecated", "Specify version number", true);
+      }
     }
   }
 

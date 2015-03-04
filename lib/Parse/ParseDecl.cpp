@@ -652,10 +652,12 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     clang::VersionTuple Introduced, Deprecated, Obsoleted;
     bool Unavailable = false;
     bool AnyAnnotations = false;
+    int ParamIndex = 0;
 
     while (consumeIf(tok::comma)) {
       AnyAnnotations = true;
       StringRef ArgumentKindStr = Tok.getText();
+      ParamIndex ++;
 
       enum {
         IsMessage, IsRenamed,
@@ -681,7 +683,12 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         diagnose(Tok.getLoc(), diag::attr_availability_expected_option,
                  AttrName)
           .highlight(SourceRange(Tok.getLoc()));
-        consumeIf(tok::identifier);
+        if(Tok.is(tok::code_complete) && CodeCompletion) {
+          CodeCompletion->completeAttributeDecl(DAK_Availability, ParamIndex);
+          consumeToken(tok::code_complete);
+        } else {
+          consumeIf(tok::identifier);
+        }
         break;
       }
 

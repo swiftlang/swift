@@ -63,6 +63,9 @@ public:
       /// "internal", "private" or "public".
       AccessControlKeyword,
 
+      /// such as "unavailable" etc. for @availability
+      DeclAttrParamKeyword,
+
       /// The "override" keyword.
       OverrideKeyword,
 
@@ -110,6 +113,10 @@ public:
       /// A colon between parameter name and value.  Should be inserted in the
       /// editor buffer if the preceding CallParameterName was inserted.
       CallParameterColon,
+
+      /// A equal sign between parameter name and value. Used in decl attribute.
+      DeclAttrParamEqual,
+
       /// Required parameter type.
       CallParameterType,
       /// Desugared closure parameter type. This can be used to get the
@@ -165,6 +172,8 @@ public:
              Kind == ChunkKind::CallParameterName ||
              Kind == ChunkKind::CallParameterInternalName ||
              Kind == ChunkKind::CallParameterColon ||
+             Kind == ChunkKind::DeclAttrParamEqual ||
+             Kind == ChunkKind::DeclAttrParamKeyword ||
              Kind == ChunkKind::CallParameterType ||
              Kind == ChunkKind::CallParameterClosureType ||
              Kind == ChunkKind::GenericParameterName ||
