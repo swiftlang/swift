@@ -603,14 +603,14 @@ namespace {
   class FindCapturedVars : public ASTWalker {
     TypeChecker &TC;
     llvm::SetVector<CapturedValue> &captures;
+    DeclContext *CurDC;
     SourceLoc CaptureLoc;
     llvm::SmallPtrSet<ValueDecl *, 2> Diagnosed;
-    /// The AbstractClosureExpr or AbstractFunctionDecl being analyzed.
-    AnyFunctionRef AFR;
+
   public:
     FindCapturedVars(TypeChecker &tc, llvm::SetVector<CapturedValue> &captures,
                      AnyFunctionRef AFR)
-        : TC(tc), captures(captures), AFR(AFR) {
+        : TC(tc), captures(captures), CurDC(AFR.getAsDeclContext()) {
       if (auto AFD = AFR.getAbstractFunctionDecl())
         CaptureLoc = AFD->getLoc();
       else {
@@ -623,6 +623,13 @@ namespace {
       }
     }
 
+    void doWalk(Expr *E) {
+      E->walk(*this);
+    }
+    void doWalk(Stmt *S) {
+      S->walk(*this);
+    }
+
     /// Add the specified capture to the closure's capture list, diagnosing it
     /// if invalid.
     void addCapture(CapturedValue capture, SourceLoc Loc) {
@@ -632,22 +639,25 @@ namespace {
 
       // If VD is a noescape decl, then the closure we're computing this for
       // must also be noescape.
-      if (VD->getAttrs().hasAttribute<NoEscapeAttr>() &&
-          !capture.isNoEscape() &&
-          // Don't repeatedly diagnose the same thing.
-          Diagnosed.insert(VD).second) {
+      if (!VD->getAttrs().hasAttribute<NoEscapeAttr>())
+        return;
 
-        // Otherwise, diagnose this as an invalid capture.
-        bool isDecl = AFR.getAbstractFunctionDecl() != nullptr;
+      // Closure expressions are processed as part of expression checking.
+      if (isa<AbstractClosureExpr>(CurDC))
+        return;
 
-        TC.diagnose(Loc, isDecl ? diag::decl_closure_noescape_use :
-                    diag::closure_noescape_use, VD->getName());
+      // Don't repeatedly diagnose the same thing.
+      if (!Diagnosed.insert(VD).second)
+        return;
 
-        if (VD->getAttrs().hasAttribute<AutoClosureAttr>() &&
-            VD->getAttrs().getAttribute<NoEscapeAttr>()->isImplicit())
-          TC.diagnose(VD->getLoc(), diag::noescape_autoclosure,
-                      VD->getName());
-      }
+      // Otherwise, diagnose this as an invalid capture.
+      TC.diagnose(Loc, diag::decl_closure_noescape_use, VD->getName());
+
+      if (VD->getAttrs().hasAttribute<AutoClosureAttr>() &&
+          VD->getAttrs().getAttribute<NoEscapeAttr>()->isImplicit())
+        TC.diagnose(VD->getLoc(), diag::noescape_autoclosure,
+                    VD->getName());
+
     }
 
     std::pair<bool, Expr *> walkToDeclRefExpr(DeclRefExpr *DRE) {
@@ -655,7 +665,6 @@ namespace {
 
       // Decl references that are within the Capture are local references, ones
       // from parent context are captures.
-      auto CurDC = AFR.getAsDeclContext();
       if (!CurDC->isChildContextOf(D->getDeclContext()))
         return { false, DRE };
 
@@ -697,17 +706,12 @@ namespace {
           TC.LocalFunctionCaptures.push_back({FD, DRE->getLoc()});
       }
 
-      // We're going to capture this, compute flags for the capture.
       unsigned Flags = 0;
 
       // If this is a direct reference to underlying storage, then this is a
       // capture of the storage address - not a capture of the getter/setter.
       if (DRE->getAccessSemantics() == AccessSemantics::DirectToStorage)
         Flags |= CapturedValue::IsDirect;
-
-      // If the closure is noescape, then we can capture the decl as noescape.
-      if (AFR.isKnownNoEscape())
-        Flags |= CapturedValue::IsNoEscape;
 
       addCapture(CapturedValue(D, Flags), DRE->getStartLoc());
       return { false, DRE };
@@ -719,7 +723,6 @@ namespace {
 
       // When we see a reference to the 'super' expression, capture 'self' decl.
       if (auto *superE = dyn_cast<SuperRefExpr>(E)) {
-        auto CurDC = AFR.getAsDeclContext();
         if (CurDC->isChildContextOf(superE->getSelf()->getDeclContext()))
           addCapture(CapturedValue(superE->getSelf(), 0), superE->getLoc());
         return { false, superE };
@@ -729,25 +732,13 @@ namespace {
       // list computed; we just propagate it, filtering out stuff that they
       // capture from us.
       if (auto *SubCE = dyn_cast<AbstractClosureExpr>(E)) {
-        bool isNoEscapeClosure = AFR.isKnownNoEscape();
-
-        auto CurDC = AFR.getAsDeclContext();
         for (auto capture : SubCE->getCaptureInfo().getCaptures()) {
           // If the decl was captured from us, it isn't captured *by* us.
           if (capture.getDecl()->getDeclContext() == CurDC) continue;
 
-          // Compute adjusted flags.
-          unsigned Flags = capture.getFlags();
-
           // The decl is captured normally, even if it was captured directly
           // in the subclosure.
-          Flags &= ~CapturedValue::IsDirect;
-
-          // If this is an escaping closure, then any captured decls are also
-          // escaping, even if they are coming from an inner noescape closure.
-          if (!isNoEscapeClosure)
-            Flags &= ~CapturedValue::IsNoEscape;
-
+          unsigned Flags = capture.getFlags() & ~CapturedValue::IsDirect;
           addCapture(CapturedValue(capture.getDecl(), Flags), E->getStartLoc());
         }
         return { false, E };
@@ -760,7 +751,7 @@ namespace {
 void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   llvm::SetVector<CapturedValue> Captures;
   FindCapturedVars finder(*this, Captures, AFR);
-  AFR.getBody()->walk(finder);
+  finder.doWalk(AFR.getBody());
   CapturedValue *CaptureCopy =
       Context.AllocateCopy<CapturedValue>(Captures.begin(), Captures.end());
   AFR.getCaptureInfo().setCaptures(

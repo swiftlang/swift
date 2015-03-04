@@ -105,6 +105,7 @@ static void diagUnreachableCode(TypeChecker &TC, const Stmt *S) {
 ///   - Module values may only occur as part of qualification.
 ///   - Metatype names cannot generally be used as values: they need a "T.self"
 ///     qualification unless used in narrow case (e.g. T() for construction).
+///   - NoEscape parameters are only allowed to be called, not copied around.
 ///
 static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
   class DiagnoseWalker : public ASTWalker {
@@ -139,6 +140,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
           checkUseOfMetaTypeName(Base);
       if (isa<TypeExpr>(Base))
         checkUseOfMetaTypeName(Base);
+
+      if (auto *CE = dyn_cast<ClosureExpr>(E))
+        checkNoEscapeClosureCaptures(CE);
 
       // Check function calls, looking through implicit conversions on the
       // function and inspecting the arguments directly.
@@ -213,6 +217,28 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
           DRE->getDecl()->getAttrs().getAttribute<NoEscapeAttr>()->isImplicit())
         TC.diagnose(DRE->getDecl()->getLoc(), diag::noescape_autoclosure,
                     DRE->getDecl()->getName());
+    }
+
+    /// Check the specified closure to make sure it doesn't capture a noescape
+    /// value, or that it is itself noescape if so.
+    void checkNoEscapeClosureCaptures(ClosureExpr *CE) {
+      // If this closure is used in a noescape context, it can do anything.
+      if (AnyFunctionRef(CE).isKnownNoEscape()) return;
+
+      // Otherwise, check the capture list to make sure it isn't escaping
+      // something.
+      for (auto capture : CE->getCaptureInfo().getCaptures()) {
+        auto CapVD = capture.getDecl();
+        if (CapVD->getAttrs().hasAttribute<NoEscapeAttr>()) {
+          TC.diagnose(CE->getStartLoc(), diag::closure_noescape_use,
+                      CapVD->getName());
+
+          if (CapVD->getAttrs().hasAttribute<AutoClosureAttr>() &&
+              CapVD->getAttrs().getAttribute<NoEscapeAttr>()->isImplicit())
+            TC.diagnose(CapVD->getLoc(), diag::noescape_autoclosure,
+                        CapVD->getName());
+        }
+      }
     }
 
     // Diagnose metatype values that don't appear as part of a property,

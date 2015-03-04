@@ -149,9 +149,17 @@ AbstractionPattern TypeConverter::getMostGeneralAbstraction() {
   return AbstractionPattern(MostGeneralArchetype);
 }
 
-CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
+CaptureKind TypeConverter::
+getDeclCaptureKind(CapturedValue capture, AnyFunctionRef TheClosure) {
   auto decl = capture.getDecl();
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
+    // If captured directly, the variable is captured by box or pointer.
+    if (capture.isDirect() && var->getStorageKind() != VarDecl::Stored) {
+      assert(var->hasStorage());
+      return TheClosure.isKnownNoEscape() ?
+         CaptureKind::StorageAddress : CaptureKind::Box;
+    }
+
     switch (var->getStorageKind()) {
     case VarDecl::StoredWithTrivialAccessors:
       llvm_unreachable("stored local variable with trivial accessors?");
@@ -168,14 +176,6 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
     case VarDecl::AddressedWithTrivialAccessors:
     case VarDecl::AddressedWithObservers:
     case VarDecl::ComputedWithMutableAddress:
-
-      // If captured directly, the variable is captured by box or pointer.
-      if (capture.isDirect()) {
-        assert(var->hasStorage());
-        return capture.isNoEscape() ?
-          CaptureKind::StorageAddress : CaptureKind::Box;
-      }
-
       // FIXME: do we need a different capture kind for addressed
       // local vars?
       return CaptureKind::GetterSetter;
@@ -189,7 +189,7 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
 
       // If we're capturing into a non-escaping closure, we can generally just
       // capture the address of the value as no-escape.
-      return capture.isNoEscape() ?
+      return TheClosure.isKnownNoEscape() ?
         CaptureKind::StorageAddress : CaptureKind::Box;
     }
     llvm_unreachable("bad storage kind");
@@ -1852,7 +1852,7 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
     auto captureType =
       VD->getType()->getLValueOrInOutObjectType()->getCanonicalType();
 
-    switch (getDeclCaptureKind(capture)) {
+    switch (getDeclCaptureKind(capture, theClosure)) {
     case CaptureKind::None:
       break;
         
@@ -1942,7 +1942,7 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
     auto captureType =
       vd->getType()->getLValueOrInOutObjectType()->getCanonicalType();
 
-    switch (getDeclCaptureKind(capture)) {
+    switch (getDeclCaptureKind(capture, theClosure)) {
     case CaptureKind::None:
       break;
         

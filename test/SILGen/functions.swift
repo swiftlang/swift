@@ -554,32 +554,3 @@ final class r17828355Class {
 // CHECK-NEXT:  %1 = function_ref @_TFC9functions14r17828355Class6methodfS0_FBi64_T_ : $@cc(method) @thin (Builtin.Int64, @owned r17828355Class) -> ()
 // CHECK-NEXT:  partial_apply %1(%0) : $@cc(method) @thin (Builtin.Int64, @owned r17828355Class) -> ()
 // CHECK-NEXT:  return
-
-
-
-// <rdar://problem/19981118> Swift 1.2 beta 2: Closures nested in @noescape closures copy, rather than reference, captured vars.
-func noescapefunc(@noescape f: () -> ()) {}
-func escapefunc(f : () -> ()) {}
-
-func testNoescape() {
-  // "a" must be captured by-box into noescapefunc because the inner closure
-  // could escape it.
-  var a = 0
-  noescapefunc {
-    escapefunc { a = 42 }
-  }
-  println(a)
-}
-
-// CHECK-LABEL: functions.testNoescape () -> ()
-// CHECK-NEXT: sil hidden @_TF9functions12testNoescapeFT_T_ : $@thin () -> ()
-// CHECK: function_ref functions.(testNoescape () -> ()).(closure #1)
-// CHECK-NEXT: function_ref @_TFF9functions12testNoescapeFT_T_U_FT_T_ : $@thin (@owned Builtin.NativeObject, @inout Int) -> ()
-
-// Despite being a noescape closure, this needs to capture 'a' by-box so it can
-// be passed to the capturing closure.closure
-// CHECK: functions.(testNoescape () -> ()).(closure #1)
-// CHECK-NEXT: sil shared @_TFF9functions12testNoescapeFT_T_U_FT_T_ : $@thin (@owned Builtin.NativeObject, @inout Int) -> () {
-
-
-

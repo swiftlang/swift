@@ -978,12 +978,13 @@ emitReconstitutedConstantCaptureArguments(SILType ty,
   return gen.B.createTuple(capture, ty, Elts);
 }
 
-static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture) {
+static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
+                                 AnyFunctionRef theClosure) {
   ASTContext &c = gen.getASTContext();
 
   auto *VD = capture.getDecl();
   auto type = VD->getType();
-  switch (gen.SGM.Types.getDeclCaptureKind(capture)) {
+  switch (gen.SGM.Types.getDeclCaptureKind(capture, theClosure)) {
   case CaptureKind::None:
     break;
 
@@ -1076,7 +1077,7 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
   SmallVector<CapturedValue, 4> LocalCaptures;
   TheClosure.getLocalCaptures(LocalCaptures);
   for (auto capture : LocalCaptures)
-    emitCaptureArguments(*this, capture);
+    emitCaptureArguments(*this, capture, TheClosure);
 }
 
 void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
