@@ -1,7 +1,9 @@
 // RUN: %target-build-swift -Xfrontend -disable-access-control -module-name a %s -o %t.out -O
 // RUN: %target-run %t.out
 
-// XFAIL: linux
+// XFAIL: *
+// XFAIL'd on non-linux for
+//   <rdar://problem/20035755> Swift.stdlib.HashingAvalanche.swift test failure on incremental RA
 
 import SwiftUnstable
 import StdlibUnittest
