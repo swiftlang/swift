@@ -28,10 +28,8 @@ namespace swift {
     SwiftAliasAnalysis() : ImmutablePass(ID) {}
     
   private:
-    virtual void initializePass() override {
-      InitializeAliasAnalysis(this);
-    }
-    
+    bool doInitialization(llvm::Module &M) override;
+
     virtual void *getAdjustedAnalysisPointer(const void *PI) override {
       if (PI == &AliasAnalysis::ID)
         return static_cast<AliasAnalysis *>(this);

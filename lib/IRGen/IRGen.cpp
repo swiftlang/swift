@@ -141,7 +141,6 @@ static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,
   
   // Configure the function passes.
   legacy::FunctionPassManager FunctionPasses(Module);
-  FunctionPasses.add(new llvm::DataLayoutPass());
   FunctionPasses.add(createTargetTransformInfoWrapperPass(
       TargetMachine->getTargetIRAnalysis()));
   if (Opts.Verify)
@@ -162,7 +161,6 @@ static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,
 
   // Configure the module passes.
   legacy::PassManager ModulePasses;
-  ModulePasses.add(new llvm::DataLayoutPass());
   ModulePasses.add(createTargetTransformInfoWrapperPass(
       TargetMachine->getTargetIRAnalysis()));
   PMBuilder.populateModulePassManager(ModulePasses);

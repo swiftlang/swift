@@ -12,6 +12,7 @@
 
 #include "swift/LLVMPasses/Passes.h"
 #include "LLVMARCOpts.h"
+#include "llvm/IR/Module.h"
 
 using namespace llvm;
 using swift::SwiftAliasAnalysis;
@@ -21,6 +22,10 @@ char SwiftAliasAnalysis::ID = 0;
 INITIALIZE_AG_PASS(SwiftAliasAnalysis, AliasAnalysis, "swift-aa",
                    "Swift Alias Analysis", false, true, false)
 
+bool SwiftAliasAnalysis::doInitialization(Module &M) {
+  InitializeAliasAnalysis(this, &M.getDataLayout());
+  return true;
+}
 
 AliasAnalysis::ModRefResult
 SwiftAliasAnalysis::getModRefInfo(ImmutableCallSite CS, const Location &Loc) {

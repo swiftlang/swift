@@ -436,10 +436,6 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   llvm::PassManagerBuilder PMBuilder;
   PMBuilder.OptLevel = 2;
   PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
-  llvm::legacy::PassManager ModulePasses;
-  ModulePasses.add(new llvm::DataLayoutPass());
-  PMBuilder.populateModulePassManager(ModulePasses);
-  ModulePasses.run(*Module);
 
   if (!loadSwiftRuntime(Context.SearchPathOpts.RuntimeLibraryPath)) {
     CI.getDiags().diagnose(SourceLoc(),
