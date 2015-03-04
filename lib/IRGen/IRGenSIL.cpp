@@ -1768,6 +1768,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
 
     llvm::Value *selfArg;
     // Convert a metatype 'self' argument to the ObjC Class pointer.
+    // FIXME: Should be represented in SIL.
     if (selfValue.getType().is<AnyMetatypeType>()) {
       selfArg = getObjCClassForValue(*this, selfValue);
     } else {

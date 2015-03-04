@@ -215,6 +215,22 @@ entry(%a : $CChar, %b : $CSignedChar, %c : $CUnsignedChar, %d : $CShort, %e : $C
   return undef : $()
 }
 
+// CHECK-x86_64-LABEL: define i8 @testIntegerExtensionInBlock(%objc_block*, i8)
+sil @testIntegerExtensionInBlock : $@thin (@owned @objc_block @cc(cdecl) (CChar) -> CChar, CChar) -> CChar {
+entry(%b : $@objc_block @cc(cdecl) (CChar) -> CChar, %c : $CChar):
+// CHECK-x86_64: call signext i8 {{%.*}}(%objc_block* {{%.*}}, i8 signext {{%.*}})
+  %r = apply %b(%c) : $@objc_block @cc(cdecl) (CChar) -> CChar
+  return %r : $CChar
+}
+
+// CHECK-x86_64-LABEL: define void @testBitfieldInBlock
+// CHECK-x86_64:         call void {{%.*}}(%VSC11BitfieldOne* noalias sret {{%.*}}, %objc_block* {{%.*}}, %VSC11BitfieldOne* byval align 8 {{%.*}})
+sil @testBitfieldInBlock : $@thin (@owned @objc_block @cc(cdecl) (BitfieldOne) -> BitfieldOne, BitfieldOne) -> BitfieldOne  {
+entry(%b : $@objc_block @cc(cdecl) (BitfieldOne) -> BitfieldOne, %x : $BitfieldOne):
+  %r = apply %b(%x) : $@objc_block @cc(cdecl) (BitfieldOne) -> BitfieldOne
+  return %r : $BitfieldOne
+}
+
 sil public_external @chareth : $@thin @cc(cdecl) (CChar) -> CChar
 sil public_external @signedChareth : $@thin @cc(cdecl) (CSignedChar) -> CSignedChar
 sil public_external @unsignedChareth : $@thin @cc(cdecl) (CUnsignedChar) -> CUnsignedChar

@@ -1224,13 +1224,6 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
     paramTys.push_back(clangTy);
   }
 
-  // We shouldn't have any LLVM parameter types yet, aside from a block context
-  // pointer.
-  assert((FnType->getRepresentation() == FunctionType::Representation::Block
-            ? ParamIRTypes.size() == 1
-            : ParamIRTypes.empty())
-         && "Expected empty ParamIRTypes");
-
   // Generate function info for this signature.
   auto extInfo = clang::FunctionType::ExtInfo();
   auto &FI = IGM.ABITypes->arrangeFreeFunctionCall(clangResultTy, paramTys,
@@ -1253,6 +1246,10 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
   // If we return indirectly, that is the first parameter type.
   if (returnInfo.isIndirect())
     addIndirectResult();
+
+  // Blocks are passed into themselves as their first (non-sret) argument.
+  if (FnType->getRepresentation() == FunctionType::Representation::Block)
+    ParamIRTypes.push_back(IGM.ObjCBlockPtrTy);
 
   for (auto i : indices(paramTys)) {
     auto &AI = FI.arg_begin()[i].info;
@@ -1357,6 +1354,9 @@ void SignatureExpansion::expand(SILParameterInfo param) {
 /// Expand the abstract parameters of a SIL function type into the
 /// physical parameters of an LLVM function type.
 void SignatureExpansion::expandParameters() {
+  assert(FnType->getRepresentation() != AnyFunctionType::Representation::Block
+         && "block with non-C calling conv?!");
+         
   // Some CCs secretly rearrange the parameters.
   switch (FnType->getAbstractCC()) {
   case AbstractCC::Freestanding:
@@ -1381,7 +1381,7 @@ void SignatureExpansion::expandParameters() {
 }
 
 /// Expand the result and parameter types of a SIL function into the
-/// phyical parameter types of an LLVM function and return the result
+/// physical parameter types of an LLVM function and return the result
 /// type.
 llvm::Type *SignatureExpansion::expandSignatureTypes() {
   switch (FnType->getAbstractCC()) {
@@ -1410,10 +1410,6 @@ Signature FuncSignatureInfo::getSignature(IRGenModule &IGM,
 
   GenericContextScope scope(IGM, FormalType->getGenericSignature());
   SignatureExpansion expansion(IGM, FormalType);
-  
-  // Blocks are passed into themselves as their first argument.
-  if (FormalType->getRepresentation() == FunctionType::Representation::Block)
-    expansion.ParamIRTypes.push_back(IGM.ObjCBlockPtrTy);
   
   llvm::Type *resultType = expansion.expandSignatureTypes();
 
@@ -2792,6 +2788,13 @@ void CallEmission::addArg(Explosion &arg) {
   case AbstractCC::C:
   case AbstractCC::ObjCMethod: {
     Explosion externalized;
+    // If this is a block, add the block pointer before the other arguments.
+    if (CurCallee.getOrigFunctionType()->getRepresentation()
+          == FunctionType::Representation::Block) {
+      assert(CurCallee.hasDataPointer());
+      externalized.add(CurCallee.getDataPointer(IGF));
+    }
+  
     externalizeArguments(IGF, getCallee(), arg, externalized, Attrs, origParams);
     arg = std::move(externalized);
     break;
@@ -2800,6 +2803,9 @@ void CallEmission::addArg(Explosion &arg) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
   case AbstractCC::WitnessMethod:
+      assert(CurCallee.getOrigFunctionType()->getRepresentation()
+               != FunctionType::Representation::Block
+             && "block with non-C calling convention?!");
     // Nothing to do.
     break;
   }
@@ -2810,13 +2816,6 @@ void CallEmission::addArg(Explosion &arg) {
   size_t targetIndex = LastArgWritten - arg.size();
   assert(targetIndex <= 1);
   LastArgWritten = targetIndex;
-  
-  // If this is a block, add the block pointer before the written arguments.
-  if (CurCallee.getOrigFunctionType()->getRepresentation()
-        == FunctionType::Representation::Block) {
-    assert(CurCallee.hasDataPointer());
-    Args[--LastArgWritten] = CurCallee.getDataPointer(IGF);
-  }
   
   auto argIterator = Args.begin() + targetIndex;
   for (auto value : arg.claimAll()) {
