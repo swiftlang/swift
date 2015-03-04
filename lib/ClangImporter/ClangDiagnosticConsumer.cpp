@@ -122,8 +122,9 @@ SourceLoc ClangDiagnosticConsumer::resolveSourceLocation(
   auto presumedLoc = clangSrcMgr.getPresumedLoc(clangLoc);
   if (!presumedLoc.getFilename())
     return loc;
+  if (presumedLoc.getLine() == 0)
+    return SourceLoc();
 
-  assert(presumedLoc.getLine() > 0 && "can't handle non-positive lines");
   unsigned bufferLineNumber =
     clangSrcMgr.getLineNumber(decomposedLoc.first, decomposedLoc.second);
 
