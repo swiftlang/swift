@@ -38,7 +38,7 @@ SILValue swift::getUnderlyingObject(SILValue V) {
 /// builtin.
 static bool isNoReadBuiltinInst(SILValue V) {
   auto *BI = dyn_cast<BuiltinInst>(V);
-  return BI && isReadNone(BI);
+  return BI && !BI->mayReadOrWriteMemory();
 }
 
 /// Is Inst an instruction which escapes if and only if one of its results

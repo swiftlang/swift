@@ -1092,12 +1092,11 @@ bool LSBBForwarder::optimize(LSContext &Ctx,
       continue;
     }
 
-    if (auto *BI = dyn_cast<BuiltinInst>(Inst))
-      if (isReadNone(BI)) {
-        DEBUG(llvm::dbgs() << "        Found readnone builtin, does not "
-              "affect loads and stores.\n");
-        continue;
-      }
+    if (!Inst->mayReadOrWriteMemory()) {
+      DEBUG(llvm::dbgs() << "        Found readnone instruction, does not "
+                            "affect loads and stores.\n");
+      continue;
+    }
 
     // All other instructions that read from the memory location of the store
     // invalidates the store.

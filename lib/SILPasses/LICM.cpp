@@ -79,13 +79,6 @@ static bool hasLoopInvariantOperands(SILInstruction *I, SILLoop *L) {
   });
 }
 
-static bool mayRead(SILInstruction *I) {
-  if (auto *BI = dyn_cast<BuiltinInst>(I))
-    return !isReadNone(BI);
-
-  return I->mayReadFromMemory();
-}
-
 /// Check if an address does not depend on other values in a basic block.
 static SILInstruction *addressIndependent(SILValue Addr) {
   Addr = Addr.stripCasts();
@@ -257,7 +250,7 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
       // Can't hoist if the instruction could read from memory and is not marked
       // as safe.
       LoadInst *LI = nullptr;
-      if (mayRead(Inst) && !isa<CondFailInst>(Inst) &&
+      if (Inst->mayReadFromMemory() && !isa<CondFailInst>(Inst) &&
           (!(LI = dyn_cast<LoadInst>(Inst)) || !SafeReads.count(LI))) {
         DEBUG(llvm::dbgs() << " may read aliased writes\n");
         continue;

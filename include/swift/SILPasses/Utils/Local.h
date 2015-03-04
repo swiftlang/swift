@@ -64,12 +64,6 @@ namespace swift {
   /// dead when this instruction is removed.
   void eraseUsesOfInstruction(SILInstruction *Inst);
 
-  /// Does the passed in BuiltinInst touch memory at all?
-  bool isReadNone(BuiltinInst *FR);
-
-  /// Does the passed in FunctionRefInst touch memory at all?
-  bool isReadNone(FunctionRefInst *FR);
-
   // Rewrite a call, which may previously have been a dynmaic dispath, to a
   // known function reference.
   void replaceWithSpecializedFunction(ApplyInst *AI, SILFunction *NewF);

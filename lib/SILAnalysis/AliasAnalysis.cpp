@@ -154,14 +154,13 @@ static bool isAliasingFunctionArgument(SILValue V) {
 /// Returns true if V is an apply inst that may read or write to memory.
 static bool isReadWriteApplyInst(SILValue V) {
   // See if this is a normal function application.
-  if (isa<ApplyInst>(V)) {
-    // FIXME: Function attributes.
-    return true;
+  if (auto *AI = dyn_cast<ApplyInst>(V)) {
+    return AI->mayReadOrWriteMemory();
   }
   
   // Next, see if this is a builtin.
   if (auto *BI = dyn_cast<BuiltinInst>(V)) {
-    return !isReadNone(BI);
+    return BI->mayReadOrWriteMemory();
   }
 
   // If we fail, bail...
@@ -721,7 +720,7 @@ MemBehavior MemoryBehaviorVisitor::visitBuiltinInst(BuiltinInst *BI) {
   }
 
   // If the builtin is read none, it does not read or write memory.
-  if (isReadNone(BI)) {
+  if (!BI->mayReadOrWriteMemory()) {
     DEBUG(llvm::dbgs() << "  Found apply of read none builtin. Returning"
                           " None.\n");
     return MemBehavior::None;

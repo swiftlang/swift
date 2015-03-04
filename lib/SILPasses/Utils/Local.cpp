@@ -28,28 +28,6 @@ using namespace swift;
 // Do we use array.props?
 static bool HaveArrayProperty = true;
 
-bool swift::isReadNone(BuiltinInst *FR) {
-  // First, check if we are dealing with a swift builtin.
-  const BuiltinInfo &BInfo = FR->getBuiltinInfo();
-  if (BInfo.ID != BuiltinValueKind::None)
-    return BInfo.isReadNone();
-
-  // Second, specialcase llvm intrinsic.
-  const IntrinsicInfo & IInfo = FR->getIntrinsicInfo();
-  if (IInfo.ID != llvm::Intrinsic::not_intrinsic)
-    return IInfo.hasAttribute(llvm::Attribute::ReadNone) &&
-      IInfo.hasAttribute(llvm::Attribute::NoUnwind);
-
-  llvm_unreachable("All cases are covered.");
-}
-
-bool swift::isReadNone(FunctionRefInst *FR) {
-  auto *F = FR->getReferencedFunction();
-  if (!F)
-    return false;
-  return F->getEffectsKind() == EffectsKind::ReadNone;
-}
-
 llvm::cl::opt<bool>
 DebugValuesPropagateLiveness("debug-values-propagate-liveness",
                              llvm::cl::init(false));

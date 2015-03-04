@@ -59,11 +59,10 @@ struct SimpleValue {
 
   static bool canHandle(SILInstruction *Inst) {
     if (auto *AI = dyn_cast<ApplyInst>(Inst)) {
-      auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
-      if (FRI) return isReadNone(FRI);
+      return !AI->mayReadOrWriteMemory();
     }
     if (auto *BI = dyn_cast<BuiltinInst>(Inst)) {
-      return isReadNone(BI);
+      return !BI->mayReadOrWriteMemory();
     }
     switch (Inst->getKind()) {
     case ValueKind::FunctionRefInst:
