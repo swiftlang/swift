@@ -170,7 +170,7 @@ public:
   }
 
   void addDeclAttrParamKeyword(StringRef Name, StringRef Annotation,
-                            bool NeedSpecify) {
+                               bool NeedSpecify) {
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::
                      DeclAttrParamKeyword, Name);
     if (NeedSpecify)
