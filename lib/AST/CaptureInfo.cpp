@@ -46,9 +46,17 @@ void CaptureInfo::dump() const {
 
 void CaptureInfo::print(raw_ostream &OS) const {
   OS << "captures=(";
-  OS << getCaptures()[0].getDecl()->getName();
-  for (auto capture : getCaptures().slice(1)) {
-    OS << ", " << capture.getDecl()->getName();
+  bool isFirst = true;
+  
+  for (auto capture : getCaptures()) {
+    if (isFirst)
+      isFirst = false;
+    else
+      OS << ", ";
+    OS << capture.getDecl()->getName();
+    
+    if (capture.isDirect())
+      OS << "<direct>";
   }
   OS << ')';
 }

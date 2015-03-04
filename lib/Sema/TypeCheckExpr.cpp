@@ -708,12 +708,10 @@ namespace {
 
       unsigned Flags = 0;
 
-      // Determine whether this is a direct capture.  This is a direct capture
-      // if we're looking at an accessor capturing its underlying decl.
-      if (const FuncDecl *FuncContext = dyn_cast<FuncDecl>(CurDC))
-        if (auto *ASD = FuncContext->getAccessorStorageDecl())
-          if (ASD == D)
-            Flags |= CapturedValue::IsDirect;
+      // If this is a direct reference to underlying storage, then this is a
+      // capture of the storage address - not a capture of the getter/setter.
+      if (DRE->getAccessSemantics() == AccessSemantics::DirectToStorage)
+        Flags |= CapturedValue::IsDirect;
 
       addCapture(CapturedValue(D, Flags), DRE->getStartLoc());
       return { false, DRE };

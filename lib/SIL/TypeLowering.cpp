@@ -154,7 +154,7 @@ getDeclCaptureKind(CapturedValue capture, AnyFunctionRef TheClosure) {
   auto decl = capture.getDecl();
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
     // If captured directly, the variable is captured by box or pointer.
-    if (capture.isDirect()) {
+    if (capture.isDirect() && var->getStorageKind() != VarDecl::Stored) {
       assert(var->hasStorage());
       return TheClosure.isKnownNoEscape() ?
          CaptureKind::NoEscape : CaptureKind::Box;
