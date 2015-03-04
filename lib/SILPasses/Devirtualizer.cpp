@@ -39,8 +39,8 @@
 using namespace swift;
 
 STATISTIC(NumInlineCaches, "Number of monomorphic inline caches inserted");
-STATISTIC(NumDevirtualized, "Number of calls devirtualized");
-STATISTIC(NumAMI, "Number of witness_method devirtualized");
+STATISTIC(NumClassDevirt, "Number of calls devirtualized");
+STATISTIC(NumWitnessDevirt, "Number of witness_method devirtualized");
 
 // The number of subclasses to allow when placing polymorphic inline caches.
 static const int MaxNumPolymorphicInlineCaches = 6;
@@ -437,7 +437,7 @@ static ApplyInst *devirtualizeClassMethod(ApplyInst *AI,
   AI->eraseFromParent();
 
   DEBUG(llvm::dbgs() << "        SUCCESS: " << DCMI.F->getName() << "\n");
-  NumDevirtualized++;
+  NumClassDevirt++;
   return NewAI;
 }
 
@@ -517,7 +517,7 @@ static ApplyInst *devirtualizeWitness(ApplyInst *AI, SILFunction *F,
                                  FRI->getReferencedFunction()->isTransparent());
   AI->replaceAllUsesWith(SAI);
   AI->eraseFromParent();
-  NumAMI++;
+  NumWitnessDevirt++;
   return SAI;
 }
 
