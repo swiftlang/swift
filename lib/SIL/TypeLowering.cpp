@@ -150,11 +150,11 @@ AbstractionPattern TypeConverter::getMostGeneralAbstraction() {
 }
 
 CaptureKind TypeConverter::
-getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture,
-                   AnyFunctionRef TheClosure) {
-  if (VarDecl *var = dyn_cast<VarDecl>(capture.getPointer())) {
+getDeclCaptureKind(CapturedValue capture, AnyFunctionRef TheClosure) {
+  auto decl = capture.getDecl();
+  if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
     // If captured directly, the variable is captured by box or pointer.
-    if (capture.getInt()) {
+    if (capture.isDirect()) {
       assert(var->hasStorage());
       return TheClosure.isKnownNoEscape() ?
          CaptureKind::NoEscape : CaptureKind::Box;
@@ -196,11 +196,8 @@ getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture,
   }
   
   // "Captured" local types require no context.
-  if (isa<TypeAliasDecl>(capture.getPointer()))
-    return CaptureKind::None;
-  if (isa<GenericTypeParamDecl>(capture.getPointer()))
-    return CaptureKind::None;
-  if (isa<AssociatedTypeDecl>(capture.getPointer()))
+  if (isa<TypeAliasDecl>(decl) || isa<GenericTypeParamDecl>(decl) ||
+      isa<AssociatedTypeDecl>(decl))
     return CaptureKind::None;
   
   return CaptureKind::LocalFunction;
@@ -1822,7 +1819,7 @@ TypeConverter::getEffectiveGenericSignatureForContext(DeclContext *dc) {
 
 CanAnyFunctionType
 TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
-                                 ArrayRef<CaptureInfo::LocalCaptureTy> captures,
+                                           ArrayRef<CapturedValue> captures,
                                            AnyFunctionRef theClosure) {
   auto parentContext = theClosure.getAsDeclContext()->getParent();
   // Capture generic parameters from the enclosing context.
@@ -1849,7 +1846,7 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
   SmallVector<TupleTypeElt, 8> inputFields;
 
   for (auto capture : captures) {
-    auto VD = capture.getPointer();
+    auto VD = capture.getDecl();
     // A capture of a 'var' or 'inout' variable is done with the underlying
     // object type.
     auto captureType =
@@ -1913,8 +1910,8 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
 
 CanAnyFunctionType
 TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
-                                 ArrayRef<CaptureInfo::LocalCaptureTy> captures,
-                                           AnyFunctionRef theClosure) {
+                                              ArrayRef<CapturedValue> captures,
+                                                    AnyFunctionRef theClosure) {
   auto context = theClosure.getAsDeclContext();
 
   // Capture generic parameters from the enclosing context.
@@ -1941,7 +1938,7 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
   for (auto capture : captures) {
     // A capture of a 'var' or 'inout' variable is done with the underlying
     // object type.
-    auto vd = capture.getPointer();
+    auto vd = capture.getDecl();
     auto captureType =
       vd->getType()->getLValueOrInOutObjectType()->getCanonicalType();
 
@@ -2029,7 +2026,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
 
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
-    SmallVector<CaptureInfo::LocalCaptureTy, 4> captures;
+    SmallVector<CapturedValue, 4> captures;
     if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
       // TODO: Substitute out archetypes from the enclosing context with generic
       // parameters.
@@ -2037,7 +2034,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
       funcTy = cast<AnyFunctionType>(
                            getInterfaceTypeOutOfContext(funcTy, ACE->getParent()));
       if (!withCaptures) return funcTy;
-      ACE->getCaptureInfo().getLocalCaptures(nullptr, captures);
+      ACE->getCaptureInfo().getLocalCaptures(captures);
       return getFunctionInterfaceTypeWithCaptures(funcTy, captures, ACE);
     }
 
@@ -2157,11 +2154,11 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
 
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
-    SmallVector<CaptureInfo::LocalCaptureTy, 4> captures;
+    SmallVector<CapturedValue, 4> captures;
     if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
       auto funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
       if (!withCaptures) return funcTy;
-      ACE->getCaptureInfo().getLocalCaptures(nullptr, captures);
+      ACE->getCaptureInfo().getLocalCaptures(captures);
       return getFunctionTypeWithCaptures(funcTy, captures, ACE);
     }
 

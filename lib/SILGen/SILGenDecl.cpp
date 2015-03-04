@@ -978,12 +978,11 @@ emitReconstitutedConstantCaptureArguments(SILType ty,
   return gen.B.createTuple(capture, ty, Elts);
 }
 
-static void emitCaptureArguments(SILGenFunction &gen,
-                                 CaptureInfo::LocalCaptureTy capture,
+static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
                                  AnyFunctionRef theClosure) {
   ASTContext &c = gen.getASTContext();
 
-  auto *VD = capture.getPointer();
+  auto *VD = capture.getDecl();
   auto type = VD->getType();
   switch (gen.SGM.Types.getDeclCaptureKind(capture, theClosure)) {
   case CaptureKind::None:
@@ -1075,7 +1074,7 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
 
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
-  SmallVector<CaptureInfo::LocalCaptureTy, 4> LocalCaptures;
+  SmallVector<CapturedValue, 4> LocalCaptures;
   TheClosure.getLocalCaptures(LocalCaptures);
   for (auto capture : LocalCaptures)
     emitCaptureArguments(*this, capture, TheClosure);

@@ -4634,9 +4634,8 @@ public:
   /// Given that this is an Objective-C method declaration, get its selector.
   ObjCSelector getObjCSelector() const;
 
-  void getLocalCaptures(SmallVectorImpl<CaptureInfo::
-                           LocalCaptureTy> &Result) const {
-    return getCaptureInfo().getLocalCaptures(this, Result);
+  void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
+    return getCaptureInfo().getLocalCaptures(Result);
   }
   
   /// Get the supertype method this method overrides, if any.

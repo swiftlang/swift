@@ -602,13 +602,13 @@ Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
 namespace {
   class FindCapturedVars : public ASTWalker {
     TypeChecker &TC;
-    llvm::SetVector<ValueDecl*> &captures;
+    llvm::SetVector<CapturedValue> &captures;
     DeclContext *CurDC;
     SourceLoc CaptureLoc;
     llvm::SmallPtrSet<ValueDecl *, 2> Diagnosed;
 
   public:
-    FindCapturedVars(TypeChecker &tc, llvm::SetVector<ValueDecl*> &captures,
+    FindCapturedVars(TypeChecker &tc, llvm::SetVector<CapturedValue> &captures,
                      AnyFunctionRef AFR)
         : TC(tc), captures(captures), CurDC(AFR.getAsDeclContext()) {
       if (auto AFD = AFR.getAbstractFunctionDecl())
@@ -632,8 +632,10 @@ namespace {
 
     /// Add the specified capture to the closure's capture list, diagnosing it
     /// if invalid.
-    void addCapture(ValueDecl *VD, SourceLoc Loc) {
-      captures.insert(VD);
+    void addCapture(CapturedValue capture, SourceLoc Loc) {
+      captures.insert(capture);
+
+      auto VD = capture.getDecl();
 
       // If VD is a noescape decl, then the closure we're computing this for
       // must also be noescape.
@@ -703,8 +705,17 @@ namespace {
         if (!FD->getAccessorStorageDecl())
           TC.LocalFunctionCaptures.push_back({FD, DRE->getLoc()});
       }
-      
-      addCapture(D, DRE->getStartLoc());
+
+      unsigned Flags = 0;
+
+      // Determine whether this is a direct capture.  This is a direct capture
+      // if we're looking at an accessor capturing its underlying decl.
+      if (const FuncDecl *FuncContext = dyn_cast<FuncDecl>(CurDC))
+        if (auto *ASD = FuncContext->getAccessorStorageDecl())
+          if (ASD == D)
+            Flags |= CapturedValue::IsDirect;
+
+      addCapture(CapturedValue(D, Flags), DRE->getStartLoc());
       return { false, DRE };
     }
 
@@ -712,9 +723,10 @@ namespace {
       if (auto *DRE = dyn_cast<DeclRefExpr>(E))
         return walkToDeclRefExpr(DRE);
 
+      // When we see a reference to the 'super' expression, capture 'self' decl.
       if (auto *superE = dyn_cast<SuperRefExpr>(E)) {
         if (CurDC->isChildContextOf(superE->getSelf()->getDeclContext()))
-          addCapture(superE->getSelf(), superE->getLoc());
+          addCapture(CapturedValue(superE->getSelf(), 0), superE->getLoc());
         return { false, superE };
       }
 
@@ -722,9 +734,15 @@ namespace {
       // list computed; we just propagate it, filtering out stuff that they
       // capture from us.
       if (auto *SubCE = dyn_cast<AbstractClosureExpr>(E)) {
-        for (auto D : SubCE->getCaptureInfo().getCaptures())
-          if (D->getDeclContext() != CurDC)
-            addCapture(D, E->getStartLoc());
+        for (auto capture : SubCE->getCaptureInfo().getCaptures()) {
+          // If the decl was captured from us, it isn't captured *by* us.
+          if (capture.getDecl()->getDeclContext() == CurDC) continue;
+
+          // The decl is captured normally, even if it was captured directly
+          // in the subclosure.
+          unsigned Flags = capture.getFlags() & ~CapturedValue::IsDirect;
+          addCapture(CapturedValue(capture.getDecl(), Flags), E->getStartLoc());
+        }
         return { false, E };
       }
       return { true, E };
@@ -733,11 +751,11 @@ namespace {
 }
 
 void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
-  llvm::SetVector<ValueDecl *> Captures;
+  llvm::SetVector<CapturedValue> Captures;
   FindCapturedVars finder(*this, Captures, AFR);
   finder.doWalk(AFR.getBody());
-  ValueDecl **CaptureCopy =
-      Context.AllocateCopy<ValueDecl *>(Captures.begin(), Captures.end());
+  CapturedValue *CaptureCopy =
+      Context.AllocateCopy<CapturedValue>(Captures.begin(), Captures.end());
   AFR.getCaptureInfo().setCaptures(
       llvm::makeArrayRef(CaptureCopy, Captures.size()));
   

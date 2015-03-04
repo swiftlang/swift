@@ -509,7 +509,7 @@ public:
 
   /// Return the CaptureKind to use when capturing a decl into the specified
   /// closure.
-  CaptureKind getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture,
+  CaptureKind getDeclCaptureKind(CapturedValue capture,
                                  AnyFunctionRef TheClosure);
 
   /// Return a most-general-possible abstraction pattern.
@@ -660,12 +660,12 @@ public:
   
   /// Get a function type curried with its capture context.
   CanAnyFunctionType getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
-                                 ArrayRef<CaptureInfo::LocalCaptureTy> captures,
+                                               ArrayRef<CapturedValue> captures,
                                                  AnyFunctionRef closure);
   CanAnyFunctionType getFunctionInterfaceTypeWithCaptures(
-                                                 CanAnyFunctionType funcType,
-                                 ArrayRef<CaptureInfo::LocalCaptureTy> captures,
-                                                 AnyFunctionRef closure);
+                                              CanAnyFunctionType funcType,
+                                              ArrayRef<CapturedValue> captures,
+                                              AnyFunctionRef closure);
   
   /// Map an AST-level type to the corresponding foreign representation type we
   /// implicitly convert to for a given calling convention.

@@ -3067,11 +3067,11 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                              AbstractionPattern(expectedType), expectedType);
   }
 
-  SmallVector<CaptureInfo::LocalCaptureTy, 4> captures;
+  SmallVector<CapturedValue, 4> captures;
   TheClosure.getLocalCaptures(captures);
   SmallVector<SILValue, 4> capturedArgs;
   for (auto capture : captures) {
-    auto *vd = capture.getPointer();
+    auto *vd = capture.getDecl();
     
     switch (SGM.Types.getDeclCaptureKind(capture, TheClosure)) {
     case CaptureKind::None:
@@ -4609,7 +4609,7 @@ void SILGenFunction::emitClassMemberDestruction(SILValue selfValue,
 
 static void forwardCaptureArgs(SILGenFunction &gen,
                                SmallVectorImpl<SILValue> &args,
-                               CaptureInfo::LocalCaptureTy capture,
+                               CapturedValue capture,
                                AnyFunctionRef theClosure) {
   ASTContext &c = gen.getASTContext();
   
@@ -4617,7 +4617,7 @@ static void forwardCaptureArgs(SILGenFunction &gen,
     args.push_back(new (gen.SGM.M) SILArgument(gen.F.begin(), t, d));
   };
 
-  auto *vd = capture.getPointer();
+  auto *vd = capture.getDecl();
   
   switch (gen.SGM.Types.getDeclCaptureKind(capture, theClosure)) {
   case CaptureKind::None:
@@ -4735,7 +4735,7 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
 
   // Forward captures.
   if (hasCaptures) {
-    SmallVector<CaptureInfo::LocalCaptureTy, 4> LocalCaptures;
+    SmallVector<CapturedValue, 4> LocalCaptures;
     fd->getLocalCaptures(LocalCaptures);
     for (auto capture : LocalCaptures)
       forwardCaptureArgs(*this, curriedArgs, capture, fd);

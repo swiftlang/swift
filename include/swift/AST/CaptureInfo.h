@@ -26,30 +26,56 @@ namespace swift {
 class ValueDecl;
 class FuncDecl;
 
+/// CapturedValue includes both the declaration being captured, along with flags
+/// that indicate how it is captured.
+class CapturedValue {
+  llvm::PointerIntPair<ValueDecl*, 1, unsigned> Value;
+public:
+  enum {
+    /// IsDirect is set when a VarDecl with storage *and* accessors is captured
+    /// by its storage address.  This happens in the accessors for the VarDecl.
+    IsDirect = 1 << 0
+  };
+
+  CapturedValue(ValueDecl *D, unsigned Flags) : Value(D, Flags) {}
+
+  bool isDirect() const { return Value.getInt() & IsDirect; }
+
+  ValueDecl *getDecl() const { return Value.getPointer(); }
+
+  unsigned getFlags() const { return Value.getInt(); }
+
+  bool operator==(CapturedValue RHS) const {
+    return Value == RHS.Value;
+  }
+
+  bool operator!=(CapturedValue RHS) const {
+    return Value != RHS.Value;
+  }
+
+  bool operator<(CapturedValue RHS) const {
+    return Value < RHS.Value;
+  }
+};
+
+
+
 /// \brief Stores information about captured variables.
 class CaptureInfo {
-  ArrayRef<ValueDecl *> Captures;
+  ArrayRef<CapturedValue> Captures;
 
 public:
   bool empty() { return Captures.empty(); }
 
-  ArrayRef<ValueDecl *> getCaptures() const { return Captures; }
-  void setCaptures(ArrayRef<ValueDecl *> C) { Captures = C; }
+  ArrayRef<CapturedValue> getCaptures() const { return Captures; }
+  void setCaptures(ArrayRef<CapturedValue> C) { Captures = C; }
 
-  /// LocalCaptureTy includes both the declaration being captured, along with a
-  /// bit that indicates 'isDirect'.  This is set when a VarDecl with storage
-  /// *and* accessors is captured by its storage address.
-  typedef llvm::PointerIntPair<ValueDecl*, 1, bool> LocalCaptureTy;
 
   /// \brief Return a filtered list of the captures for this function,
   /// filtering out global variables.  This function returns the list that
   /// actually needs to be closed over.
   ///
-  /// In addition to the decl in question, this also includes a bool which
-  /// indicates whether this is a "direct" capture: a capture of a vardecl
-  /// address, even though the vardecl also has accessors.
-  void getLocalCaptures(const FuncDecl *Context,
-                        SmallVectorImpl<LocalCaptureTy> &Result) const;
+  void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const;
 
   /// \returns true if getLocalCaptures() will return a non-empty list.
   bool hasLocalCaptures() const;

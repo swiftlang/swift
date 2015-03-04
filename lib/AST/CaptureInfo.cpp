@@ -17,33 +17,25 @@
 using namespace swift;
 
 bool CaptureInfo::hasLocalCaptures() const {
-  for (auto VD : getCaptures())
-    if (VD->getDeclContext()->isLocalContext())
+  for (auto capture : getCaptures())
+    if (capture.getDecl()->getDeclContext()->isLocalContext())
       return true;
   return false;
 }
 
 
-void CaptureInfo::getLocalCaptures(const FuncDecl *FuncContext,
-                               SmallVectorImpl<LocalCaptureTy> &Result) const {
+void CaptureInfo::
+getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
   if (!hasLocalCaptures()) return;
 
   Result.reserve(Captures.size());
 
   // Filter out global variables.
-  for (auto VD : Captures) {
-    if (!VD->getDeclContext()->isLocalContext())
+  for (auto capture : Captures) {
+    if (!capture.getDecl()->getDeclContext()->isLocalContext())
       continue;
 
-    // Determine whether this is a direct capture.  This is a direct capture
-    // if we're looking at an accessor capturing its underlying decl.
-    bool isDirectCapture = false;
-    if (FuncContext)
-      if (auto *ASD = FuncContext->getAccessorStorageDecl())
-        if (ASD == VD)
-          isDirectCapture = true;
-
-    Result.push_back({VD, isDirectCapture} );
+    Result.push_back(capture);
   }
 }
 
@@ -54,9 +46,9 @@ void CaptureInfo::dump() const {
 
 void CaptureInfo::print(raw_ostream &OS) const {
   OS << "captures=(";
-  OS << getCaptures()[0]->getName();
-  for (auto VD : getCaptures().slice(1)) {
-    OS << ", " << VD->getName();
+  OS << getCaptures()[0].getDecl()->getName();
+  for (auto capture : getCaptures().slice(1)) {
+    OS << ", " << capture.getDecl()->getName();
   }
   OS << ')';
 }

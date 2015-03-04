@@ -227,7 +227,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
 
       // Otherwise, check the capture list to make sure it isn't escaping
       // something.
-      for (auto CapVD : CE->getCaptureInfo().getCaptures())
+      for (auto capture : CE->getCaptureInfo().getCaptures()) {
+        auto CapVD = capture.getDecl();
         if (CapVD->getAttrs().hasAttribute<NoEscapeAttr>()) {
           TC.diagnose(CE->getStartLoc(), diag::closure_noescape_use,
                       CapVD->getName());
@@ -237,6 +238,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
             TC.diagnose(CapVD->getLoc(), diag::noescape_autoclosure,
                         CapVD->getName());
         }
+      }
     }
 
     // Diagnose metatype values that don't appear as part of a property,

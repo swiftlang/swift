@@ -47,11 +47,8 @@ public:
     return TheFunction.get<AbstractClosureExpr *>()->getCaptureInfo();
   }
 
-  void getLocalCaptures(SmallVectorImpl<CaptureInfo::
-                        LocalCaptureTy> &Result) const {
-    auto FD = dyn_cast_or_null<FuncDecl>(
-                                TheFunction.dyn_cast<AbstractFunctionDecl *>());
-    getCaptureInfo().getLocalCaptures(FD, Result);
+  void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
+    getCaptureInfo().getLocalCaptures(Result);
   }
 
   ArrayRef<Pattern *> getBodyParamPatterns() const {

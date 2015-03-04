@@ -428,14 +428,14 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
   // Check all of the local function captures. One can only capture a local
   // function that itself has no captures.
   for (const auto &localFunctionCapture : TC.LocalFunctionCaptures) {
-    SmallVector<CaptureInfo::LocalCaptureTy, 2> localCaptures;
+    SmallVector<CapturedValue, 2> localCaptures;
     localFunctionCapture.LocalFunction->getLocalCaptures(localCaptures);
     for (const auto capture : localCaptures) {
       // The presence of any variable indicates a capture; we're (intentionally)
       // skipping over functions because any local functions that cannot be
       // captured will be diagnosed by the outer loop, and we don't need to
       // let the diagnostic cascade.
-      if (isa<VarDecl>(capture.getPointer())) {
+      if (isa<VarDecl>(capture.getDecl())) {
         TC.diagnose(localFunctionCapture.CaptureLoc,
                     diag::unsupported_local_function_reference);
         break;

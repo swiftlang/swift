@@ -472,13 +472,13 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
       TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint()) {
     SmallVector<SILValue, 4> Captures;
 
-    for (auto Capture : AFD->getCaptureInfo().getCaptures()) {
+    for (auto capture : AFD->getCaptureInfo().getCaptures()) {
       // Decls captured by value don't escape.
-      if (auto *CaptureVD = dyn_cast<VarDecl>(Capture))
+      if (auto *CaptureVD = dyn_cast<VarDecl>(capture.getDecl()))
         if (CaptureVD->isLet())
           continue;
 
-      auto It = TopLevelSGF->VarLocs.find(Capture);
+      auto It = TopLevelSGF->VarLocs.find(capture.getDecl());
       if (It == TopLevelSGF->VarLocs.end())
         continue;
 
