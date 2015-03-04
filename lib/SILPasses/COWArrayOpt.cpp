@@ -471,11 +471,8 @@ bool COWArrayOpt::isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
 
       if (ArrayUserSet.count(II)) // May be an array mutation.
         break;
-    } else if (II->mayHaveSideEffects()) {
-      if (auto *BI = dyn_cast<BuiltinInst>(II))
-        if(isSideEffectFree(BI))
-          continue;
-      break;
+    } else if (!II->mayHaveSideEffects()) {
+      continue;
     }
   }
   DEBUG(llvm::dbgs() << "    Skipping Array: retained in loop!\n    "
@@ -737,9 +734,6 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
       // Instructions without side effects are safe.
       if (!Inst->mayHaveSideEffects())
         continue;
-      if (auto *BI = dyn_cast<BuiltinInst>(Inst))
-        if(isSideEffectFree(BI))
-          continue;
       if (isa<CondFailInst>(Inst))
         continue;
       if (isa<AllocationInst>(Inst) || isa<DeallocStackInst>(Inst))

@@ -92,7 +92,7 @@ static bool canApplyDecrementRefCount(BuiltinInst *BI, SILValue Ptr,
                                       AliasAnalysis *AA) {
   // If we have a builtin that is side effect free, we can commute the
   // builtin and the retain.
-  if (isSideEffectFree(BI))
+  if (!BI->mayHaveSideEffects())
     return false;
   
   return canApplyDecrementRefCount(BI->getArguments(), Ptr, AA);

@@ -728,7 +728,7 @@ MemBehavior MemoryBehaviorVisitor::visitBuiltinInst(BuiltinInst *BI) {
   }
 
   // If the builtin is side effect free, then it can only read memory.
-  if (isSideEffectFree(BI)) {
+  if (!BI->mayHaveSideEffects()) {
     DEBUG(llvm::dbgs() << "  Found apply of side effect free builtin. "
                           "Returning MayRead.\n");
     return MemBehavior::MayRead;

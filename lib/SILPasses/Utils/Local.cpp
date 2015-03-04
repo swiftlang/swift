@@ -28,26 +28,6 @@ using namespace swift;
 // Do we use array.props?
 static bool HaveArrayProperty = true;
 
-bool
-swift::isSideEffectFree(BuiltinInst *FR) {
-
-  // First, check if we are dealing with a swift builtin.
-  const BuiltinInfo &BInfo = FR->getBuiltinInfo();
-  if (BInfo.ID != BuiltinValueKind::None) {
-    return BInfo.isReadNone();
-  }
-
-  // Second, specialcase llvm intrinsic.
-  const IntrinsicInfo & IInfo = FR->getIntrinsicInfo();
-  if (IInfo.ID != llvm::Intrinsic::not_intrinsic) {
-    return ( (IInfo.hasAttribute(llvm::Attribute::ReadNone) ||
-              IInfo.hasAttribute(llvm::Attribute::ReadOnly)) &&
-            IInfo.hasAttribute(llvm::Attribute::NoUnwind) );
-  }
-
-  llvm_unreachable("All cases are covered.");
-}
-
 bool swift::isReadNone(BuiltinInst *FR) {
   // First, check if we are dealing with a swift builtin.
   const BuiltinInfo &BInfo = FR->getBuiltinInfo();
@@ -87,7 +67,7 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
     return false;
 
   if (auto *BI = dyn_cast<BuiltinInst>(I)) {
-    return isSideEffectFree(BI);
+    return !BI->mayHaveSideEffects();
   }
 
   // condfail instructions that obviously can't fail are dead.

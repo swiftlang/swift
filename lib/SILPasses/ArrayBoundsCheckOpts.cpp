@@ -72,12 +72,6 @@ enum class ArrayBoundsEffect {
   kMayChangeAny  // Might change any array.
 };
 
-static bool mayHaveSideEffects(SILInstruction *I) {
-  if (auto *BI = dyn_cast<BuiltinInst>(I))
-    return !isSideEffectFree(BI);
-  return I->mayHaveSideEffects();
-}
-
 static SILValue getArrayStructPointer(ArrayCallKind K, SILValue Array) {
   assert(K != ArrayCallKind::kNone);
 
@@ -182,7 +176,7 @@ mayChangeArraySize(SILInstruction *I, ArrayCallKind &Kind, SILValue &Array,
     return ArrayBoundsEffect::kMayChangeArg;
   }
 
-  if (!mayHaveSideEffects(I))
+  if (!I->mayHaveSideEffects())
     return ArrayBoundsEffect::kNone;
 
   // A store to an alloc_stack can't possibly store to the array size which is

@@ -114,10 +114,6 @@ static bool canSinkInstruction(SILInstruction *Inst) {
 /// \brief Returns true if this instruction is a skip barrier, which means that
 /// we can't sink other instructions past it.
 static bool isSinkBarrier(SILInstruction *Inst) {
-  // We know that some calls do not have side effects.
-  if (auto *BI = dyn_cast<BuiltinInst>(Inst))
-    return !isSideEffectFree(BI);
-
   if (isa<TermInst>(Inst))
     return false;
 

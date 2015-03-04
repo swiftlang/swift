@@ -79,13 +79,6 @@ static bool hasLoopInvariantOperands(SILInstruction *I, SILLoop *L) {
   });
 }
 
-static bool mayHaveSideEffects(SILInstruction *I) {
-  if (auto *BI = dyn_cast<BuiltinInst>(I))
-    return !isSideEffectFree(BI);
-
-  return I->mayHaveSideEffects();
-}
-
 static bool mayRead(SILInstruction *I) {
   if (auto *BI = dyn_cast<BuiltinInst>(I))
     return !isReadNone(BI);
@@ -159,7 +152,7 @@ static bool sinkCondFail(SILLoop *Loop) {
           CFs.clear();
           LIOfPair = nullptr;
         }
-      } else if (mayHaveSideEffects(&Inst)) {
+      } else if (Inst.mayHaveSideEffects()) {
         CFs.clear();
         LIOfPair = nullptr;
       }
@@ -208,7 +201,7 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
         // Remove clobbered loads we have seen before.
         removeWrittenTo(AA, SafeReads, &Inst);
 
-        if (mayHaveSideEffects(&Inst))
+        if (Inst.mayHaveSideEffects())
           Writes.push_back(&Inst);
       }
     }
@@ -256,7 +249,7 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
       // invariant. We must hoist them so that we preserve memory safety. A
       // cond_fail that would have protected (executed before) a memory access
       // must - after hoisting - also be executed before said access.
-      if (mayHaveSideEffects(Inst) && !isa<CondFailInst>(Inst)) {
+      if (Inst->mayHaveSideEffects() && !isa<CondFailInst>(Inst)) {
         DEBUG(llvm::dbgs() << " not side effect free\n");
         continue;
       }
@@ -317,7 +310,7 @@ static bool sinkFixLiftime(SILLoop *Loop, DominanceInfo *DomTree,
     for (auto &Inst : *BB) {
       if (auto FLI = dyn_cast<FixLifetimeInst>(&Inst)) {
         FixLifetimeInsts.push_back(FLI);
-      } else if (mayHaveSideEffects(&Inst) && !isa<LoadInst>(&Inst) &&
+      } else if (Inst.mayHaveSideEffects() && !isa<LoadInst>(&Inst) &&
                  !isa<StoreInst>(&Inst)) {
         DEBUG(llvm::errs() << " mayhavesideeffects because of" << Inst);
         DEBUG(Inst.getParent()->dump());
