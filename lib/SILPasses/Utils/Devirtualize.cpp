@@ -55,30 +55,20 @@ static ClassDecl *getClassFromConstructor(SILValue S) {
 /// Return bound generic type for the unbound type Superclass,
 /// which is a superclass of a bound generic type BoundDerived
 /// (Base may be also the same as BoundDerived).
-static SILType bindSuperclass(Module *Module,
-                              CanType Superclass,
-                              SILType BoundDerived,
-                              ArrayRef<Substitution>& Subs) {
+static SILType bindSuperclass(CanType Superclass,
+                              SILType BoundDerived) {
   assert(BoundDerived && "Expected non-null type!");
-  assert(Subs.empty() && "Expected no precomputed substitutions!");
 
   SILType BoundSuperclass = BoundDerived;
 
   do {
-    auto CanBoundSuperclass = BoundSuperclass.getSwiftRValueType();
     // Get declaration of the superclass.
-    auto *Decl = CanBoundSuperclass.getNominalOrBoundGenericNominal();
+    auto *Decl = BoundSuperclass.getNominalOrBoundGenericNominal();
     // Obtain the unbound variant of the current superclass
     CanType UnboundSuperclass = Decl->getDeclaredType()->getCanonicalType();
     // Check if we found a superclass we are looking for.
-    if (UnboundSuperclass == Superclass) {
-      auto BoundBaseType = dyn_cast<BoundGenericType>(CanBoundSuperclass);
-      if (BoundBaseType)
-        // If it is a bound generic type, look up its substitutions
-        Subs = BoundBaseType->getSubstitutions(Module,
-                                               nullptr);
+    if (UnboundSuperclass == Superclass)
       return BoundSuperclass;
-    }
 
     // Get the superclass of current one
     BoundSuperclass = BoundSuperclass.getSuperclass(nullptr);
@@ -191,6 +181,7 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
   // finds a bound superclass matching D1 and returns its substitutions.
 
   SILType FSelfSubstType;
+  Module *Module = M.getSwiftModule();
 
   if (GenCalleeType->isPolymorphic()) {
     // Declaration of the class F belongs to.
@@ -211,14 +202,16 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
       // We know that ClassInstanceType is derived from FSelfGenericType.
       // We need to determine the proper substitutions for FGenericSILClass
       // based on the bound generic type of ClassInstanceType.
-      FSelfSubstType = bindSuperclass(AI->getModule().getSwiftModule(),
-                                      FSelfGenericType,
-                                      ClassInstanceType,
-                                      DCMI.Substitutions);
+      FSelfSubstType = bindSuperclass(FSelfGenericType, ClassInstanceType);
 
       // Bail if it was not possible to determine the bound generic class.
       if (!FSelfSubstType)
         return false;
+
+      // If it is a bound generic type, look up its substitutions
+      if (auto BoundBaseType =
+          dyn_cast<BoundGenericType>(FSelfSubstType.getSwiftRValueType()))
+        DCMI.Substitutions = BoundBaseType->getSubstitutions(Module, nullptr);
 
       if (!isa<BoundGenericType>(ClassInstanceType.getSwiftRValueType()) &&
           CalleeGenericParamsNum &&
@@ -245,7 +238,7 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
     return false;
 
   DCMI.SubstCalleeType =
-    GenCalleeType->substGenericArgs(M, M.getSwiftModule(), DCMI.Substitutions);
+    GenCalleeType->substGenericArgs(M, Module, DCMI.Substitutions);
 
 
   // If F's this pointer has a different type from CMI's operand and the
