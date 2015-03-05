@@ -4132,6 +4132,11 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(Expr *expr) {
       new (tc.Context) AssignExpr(discardExpr, SourceLoc(), singleExpr,
                                   /*implicit*/true);
   
+  // For l-value types, reset to the object type (as would have happened had
+  // the enclosing assignment expression not been synthesized).
+  if (singleExpr->getType()->getAs<LValueType>())
+    singleExpr->setType(singleExpr->getType()->getLValueOrInOutObjectType());
+
   discardExpr->setType(LValueType::get(singleExpr->
                                        getType()->
                                        getLValueOrInOutObjectType()));
@@ -5835,6 +5840,10 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
           // Enter the context of the closure when type-checking the body.
           llvm::SaveAndRestore<DeclContext *> savedDC(Rewriter.dc, closure);
           Expr *body = closure->getSingleExpressionBody()->walk(*this);
+          
+          if (body != closure->getSingleExpressionBody())
+            closure->setSingleExpressionBody(body);
+          
           if (body) {
             
             if (fnType->getResult()->isVoid() && !body->getType()->isVoid()) {
