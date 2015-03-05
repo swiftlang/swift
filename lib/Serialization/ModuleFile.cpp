@@ -101,6 +101,11 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::XCC:
       extendedInfo.addExtraClangImporterOption(blobData);
       break;
+    case options_block::IS_SIB:
+      bool IsSIB;
+      options_block::IsSIBLayout::readRecord(scratch, IsSIB);
+      extendedInfo.setIsSIB(IsSIB);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.

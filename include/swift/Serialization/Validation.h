@@ -78,6 +78,7 @@ namespace serialization {
   class ExtendedValidationInfo {
     SmallVector<StringRef, 4> ExtraClangImporterOpts;
     StringRef SDKPath;
+    bool IsSIB;
   public:
     ExtendedValidationInfo() = default;
 
@@ -92,6 +93,11 @@ namespace serialization {
     }
     void addExtraClangImporterOption(StringRef option) {
       ExtraClangImporterOpts.push_back(option);
+    }
+
+    bool isSIB() const { return IsSIB; }
+    void setIsSIB(bool val) {
+        IsSIB = val;
     }
   };
 

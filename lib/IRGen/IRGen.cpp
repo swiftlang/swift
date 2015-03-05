@@ -357,10 +357,14 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   } else {
     assert(StartElem == 0 && "no explicit source file provided");
     for (auto *File : M->getFiles()) {
-      auto nextSF = dyn_cast<SourceFile>(File);
-      if (!nextSF || nextSF->ASTStage < SourceFile::TypeChecked)
-        continue;
-      IGM.emitSourceFile(*nextSF, 0);
+      if (auto *nextSF = dyn_cast<SourceFile>(File)) {
+        if (nextSF->ASTStage >= SourceFile::TypeChecked)
+          IGM.emitSourceFile(*nextSF, 0);
+      } else {
+        File->collectLinkLibraries([&IGM](LinkLibrary LinkLib) {
+          IGM.addLinkLibrary(LinkLib);
+        });
+      }
     }
   }
 

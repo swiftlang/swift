@@ -78,6 +78,7 @@ bool types::isTextual(ID Id) {
   case types::TY_Image:
   case types::TY_Object:
   case types::TY_dSYM:
+  case types::TY_SIB:
   case types::TY_SwiftModuleFile:
   case types::TY_SwiftModuleDocFile:
   case types::TY_LLVM_BC:

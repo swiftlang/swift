@@ -537,6 +537,20 @@ static bool performCompile(CompilerInstance &Instance,
                       opts.ImplicitObjCHeaderPath, moduleIsPublic);
   }
 
+  if (Action == FrontendOptions::EmitSIB) {
+    auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
+                                  Instance.getMainModule();
+    if (!opts.ModuleOutputPath.empty()) {
+      SerializationOptions serializationOpts;
+      serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
+      serializationOpts.SerializeAllSIL = true;
+      serializationOpts.IsSIB = true;
+
+      serialize(DC, serializationOpts, SM.get());
+    }
+    return false;
+  }
+
   if (!opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty()) {
     auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
                                   Instance.getMainModule();

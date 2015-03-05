@@ -1648,9 +1648,12 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // Go through all the SILFunctions in SILMod and write out any
   // mandatory function bodies.
   for (const SILFunction &F : *SILMod) {
-    if (shouldEmitFunctionBody(F))
+    if (shouldEmitFunctionBody(F) || ShouldSerializeAll)
       writeSILFunction(F);
   }
+
+  if (ShouldSerializeAll)
+    return;
 
   // Now write function declarations for every function we've
   // emitted a reference to without emitting a function body for.

@@ -154,6 +154,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::EmitSIL;
     } else if (Opt.matches(OPT_emit_silgen)) {
       Action = FrontendOptions::EmitSILGen;
+    } else if (Opt.matches(OPT_emit_sib)) {
+      Action = FrontendOptions::EmitSIB;
     } else if (Opt.matches(OPT_parse)) {
       Action = FrontendOptions::Parse;
     } else if (Opt.matches(OPT_dump_parse)) {
@@ -324,6 +326,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       break;
     }
 
+    case FrontendOptions::EmitSIB:
+      Suffix = SIB_EXTENSION;
+      break;
+
     case FrontendOptions::EmitModuleOnly:
       Suffix = SERIALIZED_MODULE_EXTENSION;
       break;
@@ -463,12 +469,14 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                           OPT_emit_objc_header_path,
                           "h", false);
 
+  bool IsSIB = Opts.RequestedAction == FrontendOptions::EmitSIB;
   bool canUseMainOutputForModule =
-    Opts.RequestedAction == FrontendOptions::EmitModuleOnly;
+    Opts.RequestedAction == FrontendOptions::EmitModuleOnly || IsSIB;
+  auto ext = IsSIB ? SIB_EXTENSION : SERIALIZED_MODULE_EXTENSION;
   determineOutputFilename(Opts.ModuleOutputPath,
-                          OPT_emit_module,
+                          IsSIB ? OPT_emit_sib : OPT_emit_module,
                           OPT_emit_module_path,
-                          SERIALIZED_MODULE_EXTENSION,
+                          ext,
                           canUseMainOutputForModule);
 
   determineOutputFilename(Opts.ModuleDocOutputPath,
@@ -491,6 +499,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitModuleOnly:
     case FrontendOptions::EmitSILGen:
     case FrontendOptions::EmitSIL:
+    case FrontendOptions::EmitSIB:
     case FrontendOptions::EmitIR:
     case FrontendOptions::EmitBC:
     case FrontendOptions::EmitAssembly:
@@ -513,6 +522,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitModuleOnly:
     case FrontendOptions::EmitSILGen:
     case FrontendOptions::EmitSIL:
+    case FrontendOptions::EmitSIB:
     case FrontendOptions::EmitIR:
     case FrontendOptions::EmitBC:
     case FrontendOptions::EmitAssembly:
@@ -539,6 +549,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       return true;
     case FrontendOptions::EmitModuleOnly:
     case FrontendOptions::EmitSIL:
+    case FrontendOptions::EmitSIB:
     case FrontendOptions::EmitIR:
     case FrontendOptions::EmitBC:
     case FrontendOptions::EmitAssembly:

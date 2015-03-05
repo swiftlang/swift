@@ -20,6 +20,8 @@ namespace swift {
   static const char SERIALIZED_MODULE_DOC_EXTENSION[] = "swiftdoc";
   /// The extension for SIL files.
   static const char SIL_EXTENSION[] = "sil";
+  /// The extension for SIB files.
+  static const char SIB_EXTENSION[] = "sib";
   /// The extension for LLVM IR files.
   static const char LLVM_BC_EXTENSION[] = "bc";
   static const char LLVM_IR_EXTENSION[] = "ll";

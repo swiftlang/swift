@@ -675,6 +675,10 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerOutputType = types::TY_RawSIL;
       break;
 
+    case options::OPT_emit_sib:
+      OI.CompilerOutputType = types::TY_SIB;
+      break;
+
     case options::OPT_emit_ir:
       OI.CompilerOutputType = types::TY_LLVM_IR;
       break;
@@ -998,7 +1002,8 @@ void Driver::buildActions(const ToolChain &TC,
       std::unique_ptr<Action> Current(new InputAction(*InputArg, InputType));
       switch (InputType) {
       case types::TY_Swift:
-      case types::TY_SIL: {
+      case types::TY_SIL:
+      case types::TY_SIB: {
         // Source inputs always need to be compiled.
         auto previousBuildState =
           CompileJobAction::BuildState::NeedsCascadingBuild;

@@ -160,6 +160,11 @@ FileUnit *SerializedModuleLoader::loadAST(
     return nullptr;
   }
 
+  serialization::ExtendedValidationInfo extendedInfo;
+  serialization::validateSerializedAST(moduleInputBuffer.get()->getBuffer(),
+                                       &extendedInfo);
+  bool IsSIB = extendedInfo.isSIB();
+
   std::unique_ptr<ModuleFile> loadedModuleFile;
   serialization::Status err = ModuleFile::load(std::move(moduleInputBuffer),
                                                std::move(moduleDocInputBuffer),
@@ -168,7 +173,7 @@ FileUnit *SerializedModuleLoader::loadAST(
     Ctx.bumpGeneration();
 
     // We've loaded the file. Now try to bring it into the AST.
-    auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
+    auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile, IsSIB);
     M.addFile(*fileUnit);
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
@@ -406,7 +411,15 @@ void SerializedASTFile::getImportedModules(
 
 void SerializedASTFile::collectLinkLibraries(
     Module::LinkLibraryCallback callback) const {
-  File.collectLinkLibraries(callback);
+  if (isSIB()) {
+    llvm::SmallVector<Module::ImportedModule, 8> Imports;
+    File.getImportedModules(Imports, Module::ImportFilter::All);
+
+    for (auto Import : Imports)
+      Import.second->collectLinkLibraries(callback);
+  } else {
+    File.collectLinkLibraries(callback);
+  }
 }
 
 bool SerializedASTFile::isSystemModule() const {

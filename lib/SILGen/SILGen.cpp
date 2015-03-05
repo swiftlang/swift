@@ -20,6 +20,8 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -1043,6 +1045,16 @@ SILModule::constructSIL(Module *mod, SILOptions &options, SourceFile *sf,
     auto def = mod->Ctx.ExternalDefinitions[i];
     sgm.emitExternalDefinition(def);
   }
+
+  // Also make sure to process any intermediate files that may contain SIL
+  bool hasSIB = std::any_of(mod->getFiles().begin(),
+                            mod->getFiles().end(),
+                            [](const FileUnit *File) -> bool {
+    auto *SASTF = dyn_cast<SerializedASTFile>(File);
+    return SASTF && SASTF->isSIB();
+  });
+  if (hasSIB)
+    m->getSILLoader()->getAllForModule(mod->getName());
 
   return m;
 }

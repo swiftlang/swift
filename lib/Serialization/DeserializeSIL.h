@@ -16,6 +16,7 @@
 #include "swift/Serialization/SerializedSILLoader.h"
 
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 namespace llvm {
   template <typename Info> class OnDiskIterableChainedHashTable;
@@ -114,7 +115,12 @@ public:
     /// module and add them to SILMod.
     ///
     /// TODO: Globals.
-    void getAll() {
+    void getAll(bool UseCallback = true) {
+      llvm::SaveAndRestore<SerializedSILLoader::Callback *> SaveCB(Callback);
+
+      if (!UseCallback)
+        Callback = nullptr;
+
       getAllSILFunctions();
       getAllVTables();
       getAllWitnessTables();

@@ -18,6 +18,7 @@
 #define SWIFT_SERIALIZATION_SERIALIZATION_H
 
 #include "swift/Serialization/ModuleFormat.h"
+#include "swift/Serialization/SerializationOptions.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
@@ -208,8 +209,10 @@ private:
 
   /// Writes the Swift module file header and name, plus metadata determining
   /// if the module can be loaded.
-  void writeHeader(bool serializeOptionsForDebugging = false,
-                   ArrayRef<std::string> extraClangOptions = {});
+  void writeHeader(const SerializationOptions &options = {});
+
+  /// Writes the Swift doc module file header and name.
+  void writeDocHeader();
 
   /// Writes the dependencies used to build this module: its imported
   /// modules and its source files.

@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 176; // Last change: @class_protocol
+const uint16_t VERSION_MINOR = 177; // Last change: Flag for sib
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -399,7 +399,8 @@ namespace options_block {
   // VERSION_MAJOR.
   enum {
     SDK_PATH = 1,
-    XCC
+    XCC,
+    IS_SIB
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -410,6 +411,11 @@ namespace options_block {
   using XCCLayout = BCRecordLayout<
     XCC,
     BCBlob // -Xcc flag, as string
+  >;
+
+  using IsSIBLayout = BCRecordLayout<
+    IS_SIB,
+    BCFixed<1> // Is this an intermediate file?
   >;
 }
 

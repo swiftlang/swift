@@ -38,6 +38,7 @@
 // Input types
 TYPE("swift",           Swift,              "swift",           "")
 TYPE("sil",             SIL,                "sil",             "")
+TYPE("sib",             SIB,                "sib",             "")
 
 // Output types
 TYPE("image",           Image,              "out",             "")

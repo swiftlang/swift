@@ -99,14 +99,17 @@ class SerializedASTFile final : public LoadedFile {
   friend class SerializedSILLoader;
 
   ModuleFile &File;
+  bool IsSIB;
 
   ~SerializedASTFile() = default;
 
-  SerializedASTFile(Module &M, ModuleFile &file)
-    : LoadedFile(FileUnitKind::SerializedAST, M), File(file) {}
+  SerializedASTFile(Module &M, ModuleFile &file, bool isSIB = false)
+    : LoadedFile(FileUnitKind::SerializedAST, M), File(file), IsSIB(isSIB) {}
 
 public:
   ModuleFile &getFile() const { return File; }
+
+  bool isSIB() const { return IsSIB; }
 
   virtual bool isSystemModule() const override;
 

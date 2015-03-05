@@ -91,6 +91,10 @@ public:
   /// SILModules.
   void getAll();
 
+  /// Deserialize all SILFunctions, VTables, and WitnessTables for
+  /// a given Module.
+  void getAllForModule(Identifier Mod);
+
   /// Deserialize all SILFunctions in all SILModules.
   void getAllSILFunctions();
 

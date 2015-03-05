@@ -26,6 +26,7 @@ bool FrontendOptions::actionHasOutput() const {
     return false;
   case EmitSILGen:
   case EmitSIL:
+  case EmitSIB:
   case EmitModuleOnly:
     return true;
   case Immediate:
@@ -49,6 +50,7 @@ bool FrontendOptions::actionIsImmediate() const {
   case PrintAST:
   case EmitSILGen:
   case EmitSIL:
+  case EmitSIB:
   case EmitModuleOnly:
     return false;
   case Immediate:

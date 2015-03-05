@@ -400,6 +400,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK(OPTIONS_BLOCK);
   BLOCK_RECORD(options_block, SDK_PATH);
   BLOCK_RECORD(options_block, XCC);
+  BLOCK_RECORD(options_block, IS_SIB);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -511,8 +512,7 @@ void Serializer::writeDocBlockInfoBlock() {
 #undef BLOCK_RECORD
 }
 
-void Serializer::writeHeader(bool serializeOptionsForDebugging,
-                             ArrayRef<std::string> extraClangOptions) {
+void Serializer::writeHeader(const SerializationOptions &options) {
   {
     BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 3);
     control_block::ModuleNameLayout ModuleName(Out);
@@ -533,16 +533,43 @@ void Serializer::writeHeader(bool serializeOptionsForDebugging,
 
     Target.emit(ScratchRecord, M->Ctx.LangOpts.Target.str());
 
-    if (serializeOptionsForDebugging) {
+    {
       llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 3);
-      options_block::SDKPathLayout SDKPath(Out);
-      options_block::XCCLayout XCC(Out);
 
-      SDKPath.emit(ScratchRecord, M->Ctx.SearchPathOpts.SDKPath);
-      for (const std::string &arg : extraClangOptions) {
-        XCC.emit(ScratchRecord, arg);
+      options_block::IsSIBLayout IsSIB(Out);
+      IsSIB.emit(ScratchRecord, options.IsSIB);
+
+      if (options.SerializeOptionsForDebugging) {
+        options_block::SDKPathLayout SDKPath(Out);
+        options_block::XCCLayout XCC(Out);
+
+        SDKPath.emit(ScratchRecord, M->Ctx.SearchPathOpts.SDKPath);
+        for (const std::string &arg : options.ExtraClangOptions) {
+          XCC.emit(ScratchRecord, arg);
+        }
       }
     }
+  }
+}
+
+void Serializer::writeDocHeader() {
+  {
+    BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 3);
+    control_block::ModuleNameLayout ModuleName(Out);
+    control_block::MetadataLayout Metadata(Out);
+    control_block::TargetLayout Target(Out);
+
+    // FIXME: put a real version in here.
+#ifdef LLVM_VERSION_INFO
+# define EXTRA_VERSION_STRING PACKAGE_STRING LLVM_VERSION_INFO
+#else
+# define EXTRA_VERSION_STRING PACKAGE_STRING
+#endif
+    Metadata.emit(ScratchRecord,
+                  VERSION_MAJOR, VERSION_MINOR, EXTRA_VERSION_STRING);
+#undef EXTRA_VERSION_STRING
+
+    Target.emit(ScratchRecord, M->Ctx.LangOpts.Target.str());
   }
 }
 
@@ -3506,8 +3533,7 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
 
   {
     BCBlockRAII moduleBlock(S.Out, MODULE_BLOCK_ID, 2);
-    S.writeHeader(options.SerializeOptionsForDebugging,
-                  options.ExtraClangOptions);
+    S.writeHeader(options);
     S.writeInputBlock(options);
     S.writeSIL(SILMod, options.SerializeAllSIL);
     S.writeAST(DC);
@@ -3524,7 +3550,7 @@ void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC) {
 
   {
     BCBlockRAII moduleBlock(S.Out, MODULE_DOC_BLOCK_ID, 2);
-    S.writeHeader();
+    S.writeDocHeader();
     {
       BCBlockRAII restoreBlock(S.Out, COMMENT_BLOCK_ID, 4);
 
