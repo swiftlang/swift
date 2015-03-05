@@ -731,7 +731,8 @@ void CodeCompletionString::getName(raw_ostream &OS) const {
       using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
       if (C.getKind() == ChunkKind::BraceStmtWithCursor)
         break;
-      if (C.getKind() == ChunkKind::TypeAnnotation)
+      if (C.getKind() == ChunkKind::TypeAnnotation ||
+          C.getKind() == ChunkKind::CallParameterClosureType)
         continue;
       if (C.getKind() == ChunkKind::DeclAttrParamEqual)
         continue;

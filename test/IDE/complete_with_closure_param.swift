@@ -16,7 +16,7 @@ struct FooStruct {
 FooStruct().#^COMPLETE^#
 
 // CHECK: Begin completions, 7 items
-// CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod1({#(callback): (Int, Int) -> Void##(Int, Int) -> Void#})[#Void#]{{; name=.+$}}
+// CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod1({#(callback): (Int, Int) -> Void##(Int, Int) -> Void#})[#Void#]; name=instanceMethod1(callback: (Int, Int) -> Void){{$}}
 // CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod2({#(callback): ((Int, Int) -> Void)?##(Int, Int) -> Void#})[#Void#]{{; name=.+$}}
 // CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod3({#(callback): ((Int, Int) -> Void)??##(Int, Int) -> Void#})[#Void#]{{; name=.+$}}
 // CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod4({#(callback): ((Int, Int) -> Void)!##(Int, Int) -> Void#})[#Void#]{{; name=.+$}}
