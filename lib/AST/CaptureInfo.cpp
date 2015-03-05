@@ -28,10 +28,10 @@ void CaptureInfo::
 getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
   if (!hasLocalCaptures()) return;
 
-  Result.reserve(Captures.size());
+  Result.reserve(Count);
 
   // Filter out global variables.
-  for (auto capture : Captures) {
+  for (auto capture : getCaptures()) {
     if (!capture.getDecl()->getDeclContext()->isLocalContext())
       continue;
 

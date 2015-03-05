@@ -4263,17 +4263,16 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
       if (fn->getDeclContext()->isTypeContext()) {
         tc.diagnose(expr->getLoc(),
                     diag::c_function_pointer_from_method);
-      } else if (fn->getCaptureInfo().hasLocalCaptures()) {
-        tc.diagnose(expr->getLoc(),
-                    diag::c_function_pointer_from_function_with_context,
-                    /*closure*/ false);
-      } else if (fn->getCaptureInfo().empty()) {
+      } else if (!fn->getCaptureInfo().hasBeenComputed()) {
         // The capture list is not always initialized by the point we reference
         // it. Remember we formed a C function pointer so we can diagnose later
         // if necessary.
         tc.LocalCFunctionPointers[fn].push_back(expr);
+      } else if (fn->getCaptureInfo().hasLocalCaptures()) {
+        tc.diagnose(expr->getLoc(),
+                    diag::c_function_pointer_from_function_with_context,
+                    /*closure*/ false);
       }
-      return;
     };
     
     if (auto declRef = dyn_cast<DeclRefExpr>(semanticExpr)) {
@@ -4290,7 +4289,12 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
     
     // Can convert a literal closure that doesn't capture context.
     if (auto closure = dyn_cast<ClosureExpr>(semanticExpr)) {
-      if (closure->getCaptureInfo().hasLocalCaptures()) {
+      if (!closure->getCaptureInfo().hasBeenComputed()) {
+        // The capture list is not always initialized by the point we reference
+        // it. Remember we formed a C function pointer so we can diagnose later
+        // if necessary.
+        tc.LocalCFunctionPointers[closure].push_back(expr);
+      } else if (closure->getCaptureInfo().hasLocalCaptures()) {
         tc.diagnose(expr->getLoc(),
                     diag::c_function_pointer_from_function_with_context,
                     /*closure*/ true);
@@ -4704,18 +4708,18 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // We'll set discriminator values on all the autoclosures in a
       // later pass.
       auto discriminator = AutoClosureExpr::InvalidDiscriminator;
-      auto Closure = new (tc.Context) AutoClosureExpr(expr, toType,
+      auto closure = new (tc.Context) AutoClosureExpr(expr, toType,
                                                       discriminator, dc);
       Pattern *pattern = TuplePattern::create(tc.Context, expr->getLoc(),
                                               ArrayRef<TuplePatternElt>(),
                                               expr->getLoc());
       pattern->setType(TupleType::getEmpty(tc.Context));
-      Closure->setParams(pattern);
+      closure->setParams(pattern);
 
       // Compute the capture list, now that we have analyzed the expression.
-      tc.computeCaptures(Closure);
+      tc.ClosuresWithUncomputedCaptures.push_back(closure);
 
-      return Closure;
+      return closure;
     }
 
     // Coercion from one function type to another, this produces a
@@ -5803,12 +5807,8 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
     ~ExprWalker() {
       auto &cs = Rewriter.getConstraintSystem();
       auto &tc = cs.getTypeChecker();
-      for (auto *closure : closuresToTypeCheck) {
-        if (!(closure->hasSingleExpressionBody() ||
-              closure->isVoidConversionClosure()))
-          tc.typeCheckClosureBody(closure);
-        tc.computeCaptures(closure);
-      }
+      for (auto *closure : closuresToTypeCheck)
+        tc.typeCheckClosureBody(closure);
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
@@ -5861,11 +5861,13 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
               closure->setSingleExpressionBody(body);
             }
           }
+        } else {
+          // For other closures, type-check the body once we've finished with
+          // the expression.
+          closuresToTypeCheck.push_back(closure);
         }
 
-        // For other closures, type-check the body once we've finished with
-        // the expression.
-        closuresToTypeCheck.push_back(closure);
+        tc.ClosuresWithUncomputedCaptures.push_back(closure);
 
         return { false, closure };
       }

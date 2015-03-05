@@ -320,7 +320,6 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
     // Type check the body of each of the function in turn.  Note that outside
     // functions must be visited before nested functions for type-checking to
     // work correctly.
-    unsigned previousFunctionIdx = currentFunctionIdx;
     for (unsigned n = TC.definedFunctions.size(); currentFunctionIdx != n;
          ++currentFunctionIdx) {
       auto *AFD = TC.definedFunctions[currentFunctionIdx];
@@ -334,14 +333,6 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       TC.typeCheckAbstractFunctionBody(AFD);
 
       AFD->setBodyTypeCheckedIfPresent();
-    }
-
-    // Compute captures for functions we visited, in the opposite order of type
-    // checking. i.e., the nested DefinedFunctions will be visited before the
-    // outer DefinedFunctions.
-    for (unsigned i = currentFunctionIdx; i > previousFunctionIdx; --i) {
-      if (auto *FD = dyn_cast<AbstractFunctionDecl>(TC.definedFunctions[i-1]))
-        TC.computeCaptures(FD);
     }
 
     for (unsigned n = TC.Context.ExternalDefinitions.size();
@@ -424,6 +415,14 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
 
   // FIXME: Horrible hack. Store this somewhere more sane.
   TC.Context.LastCheckedExternalDefinition = currentExternalDef;
+
+  // Compute captures for functions and closures we visited.
+  for (AnyFunctionRef closure : TC.ClosuresWithUncomputedCaptures) {
+    TC.computeCaptures(closure);
+  }
+  for (AbstractFunctionDecl *FD : reversed(TC.definedFunctions)) {
+    TC.computeCaptures(FD);
+  }
 
   // Check all of the local function captures. One can only capture a local
   // function that itself has no captures.

@@ -293,6 +293,10 @@ public:
   // flag is set to 'true' once the bridge functions have been checked.
   bool HasCheckedBridgeFunctions = false;
 
+  /// A list of closures for the most recently type-checked function, which we
+  /// will need to compute captures for.
+  std::vector<AnyFunctionRef> ClosuresWithUncomputedCaptures;
+
   /// Describes an attempt to capture a local function.
   struct LocalFunctionCapture {
     FuncDecl *LocalFunction;

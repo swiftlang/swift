@@ -728,6 +728,44 @@ namespace {
       return { false, DRE };
     }
 
+    void propagateCaptures(AnyFunctionRef innerClosure, SourceLoc captureLoc) {
+      TC.computeCaptures(innerClosure);
+
+      auto CurDC = AFR.getAsDeclContext();
+      bool isNoEscapeClosure = AFR.isKnownNoEscape();
+
+      for (auto capture : innerClosure.getCaptureInfo().getCaptures()) {
+        // If the decl was captured from us, it isn't captured *by* us.
+        if (capture.getDecl()->getDeclContext() == CurDC)
+          continue;
+
+        // Compute adjusted flags.
+        unsigned Flags = capture.getFlags();
+
+        // The decl is captured normally, even if it was captured directly
+        // in the subclosure.
+        Flags &= ~CapturedValue::IsDirect;
+
+        // If this is an escaping closure, then any captured decls are also
+        // escaping, even if they are coming from an inner noescape closure.
+        if (!isNoEscapeClosure)
+          Flags &= ~CapturedValue::IsNoEscape;
+
+        addCapture(CapturedValue(capture.getDecl(), Flags), captureLoc);
+      }
+    }
+
+    bool walkToDeclPre(Decl *D) override {
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+        propagateCaptures(AFD, AFD->getLoc());
+        for (auto *paramPattern : AFD->getBodyParamPatterns())
+          paramPattern->walk(*this);
+        return false;
+      }
+
+      return true;
+    }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (auto *DRE = dyn_cast<DeclRefExpr>(E))
         return walkToDeclRefExpr(DRE);
@@ -744,27 +782,7 @@ namespace {
       // list computed; we just propagate it, filtering out stuff that they
       // capture from us.
       if (auto *SubCE = dyn_cast<AbstractClosureExpr>(E)) {
-        bool isNoEscapeClosure = AFR.isKnownNoEscape();
-
-        auto CurDC = AFR.getAsDeclContext();
-        for (auto capture : SubCE->getCaptureInfo().getCaptures()) {
-          // If the decl was captured from us, it isn't captured *by* us.
-          if (capture.getDecl()->getDeclContext() == CurDC) continue;
-
-          // Compute adjusted flags.
-          unsigned Flags = capture.getFlags();
-
-          // The decl is captured normally, even if it was captured directly
-          // in the subclosure.
-          Flags &= ~CapturedValue::IsDirect;
-
-          // If this is an escaping closure, then any captured decls are also
-          // escaping, even if they are coming from an inner noescape closure.
-          if (!isNoEscapeClosure)
-            Flags &= ~CapturedValue::IsNoEscape;
-
-          addCapture(CapturedValue(capture.getDecl(), Flags), E->getStartLoc());
-        }
+        propagateCaptures(SubCE, SubCE->getStartLoc());
         return { false, E };
       }
       return { true, E };
@@ -773,9 +791,17 @@ namespace {
 }
 
 void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
+  if (AFR.getCaptureInfo().hasBeenComputed())
+    return;
+
   SmallVector<CapturedValue, 4> Captures;
   FindCapturedVars finder(*this, Captures, AFR);
   AFR.getBody()->walk(finder);
+
+  if (Captures.empty()) {
+    AFR.getCaptureInfo().setCaptures(None);
+    return;
+  }
   AFR.getCaptureInfo().setCaptures(Context.AllocateCopy(Captures));
 
   // Diagnose if we have local captures and there were C pointers formed to

@@ -47,3 +47,20 @@ public class Sub : Base {
   // CHECK: return [[RET]]
   override var x: Bool { return call_auto_closure(super.x) }
 }
+
+// CHECK-LABEL: sil hidden @_TF13auto_closures20closureInAutoclosureFTVS_4BoolS0__S0_ : $@thin (Bool, Bool) -> Bool {
+// CHECK: }
+// CHECK-LABEL: sil shared @_TFF13auto_closures20closureInAutoclosureFTVS_4BoolS0__S0_u_KT_S0_ : $@thin (Bool, Bool) -> Bool {
+// CHECK: }
+// CHECK-LABEL: sil shared @_TFFF13auto_closures20closureInAutoclosureFTVS_4BoolS0__S0_u_KT_S0_U_FS0_S0_ : $@thin (Bool, Bool) -> Bool {
+// CHECK: }
+func compareBool(lhs: Bool, rhs: Bool) -> Bool { return false_ }
+func testBool(x: Bool, pred: (Bool) -> Bool) -> Bool {
+  return pred(x)
+}
+func delayBool(@autoclosure fn: () -> Bool) -> Bool {
+  return fn()
+}
+func closureInAutoclosure(lhs: Bool, rhs: Bool) -> Bool {
+  return delayBool(testBool(lhs, { compareBool($0, rhs) }))
+}

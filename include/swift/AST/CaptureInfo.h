@@ -68,14 +68,20 @@ public:
 
 /// \brief Stores information about captured variables.
 class CaptureInfo {
-  ArrayRef<CapturedValue> Captures;
+  llvm::PointerIntPair<const CapturedValue *, 1, bool> CapturesAndComputed;
+  size_t Count = 0;
 
 public:
-  bool empty() { return Captures.empty(); }
+  bool hasBeenComputed() { return CapturesAndComputed.getInt(); }
+  bool empty() { return Count == 0; }
 
-  ArrayRef<CapturedValue> getCaptures() const { return Captures; }
-  void setCaptures(ArrayRef<CapturedValue> C) { Captures = C; }
-
+  ArrayRef<CapturedValue> getCaptures() const {
+    return llvm::makeArrayRef(CapturesAndComputed.getPointer(), Count);
+  }
+  void setCaptures(ArrayRef<CapturedValue> C) {
+    CapturesAndComputed.setPointerAndInt(C.data(), true);
+    Count = C.size();
+  }
 
   /// \brief Return a filtered list of the captures for this function,
   /// filtering out global variables.  This function returns the list that
