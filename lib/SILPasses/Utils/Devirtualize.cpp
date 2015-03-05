@@ -60,6 +60,7 @@ static SILType bindSuperclass(Module *Module,
                               SILType BoundDerived,
                               ArrayRef<Substitution>& Subs) {
   assert(BoundDerived && "Expected non-null type!");
+  assert(Subs.empty() && "Expected no precomputed substitutions!");
 
   SILType BoundSuperclass = BoundDerived;
 
@@ -76,9 +77,6 @@ static SILType bindSuperclass(Module *Module,
         // If it is a bound generic type, look up its substitutions
         Subs = BoundBaseType->getSubstitutions(Module,
                                                nullptr);
-      else
-        // If it is a non-bound type, there are no substitutions.
-        Subs.empty();
       return BoundSuperclass;
     }
 
