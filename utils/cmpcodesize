@@ -19,6 +19,7 @@ Options:
     -a           Show sizes of additional sections
     -c           Show functions by category
     -l           List all functions (can be a very long list)
+    -s           Summarize the sizes of multiple files instead of listing each file separatly
 
 Environment variables:
     SWIFT_NEW_BUILDDIR   The old build-dir
@@ -98,8 +99,11 @@ def addFunction(sizes, function, startAddr, endAddr, groupByPrefix):
 
 def readSizes(sizes, fileName, functionDetails, groupByPrefix):
 
-    args = [ "-v", "-t", fileName ] if functionDetails else [ fileName ]
-    content = subprocess.check_output(["otool", "-l"] + args).split("\n")
+    if functionDetails:
+        content = subprocess.check_output(["otool", "-l", "-v", "-t", fileName]).split("\n")
+        content += subprocess.check_output(["otool", "-v", "-s", "__TEXT", "__textcoal_nt", fileName]).split("\n")
+    else:
+        content = subprocess.check_output(["otool", "-l", fileName]).split("\n")
 
     sectName = None
     currFunc = None
@@ -132,9 +136,11 @@ def readSizes(sizes, fileName, functionDetails, groupByPrefix):
                 endAddr = None
             elif sizeMatch and sectName and groupByPrefix:
                 size = int(sizeMatch.group(1), 16)
-                sizes[sectName] = size
+                sizes[sectName] += size
             elif sectionMatch:
                 sectName = sectionMatch.group(1)
+                if sectName == "__textcoal_nt":
+                    sectName = "__text"
 
     addFunction(sizes, currFunc, startAddr, endAddr, groupByPrefix)
 
@@ -148,17 +154,23 @@ def compareSizes(oldSizes, newSizes, nameKey, title):
             perc = "- "
         print "%-26s%16s: %8d  %8d  %6s" % (title, nameKey, oldSize, newSize, perc)
 
-def compareSizesOfFile(oldFile, newFile, allSections, listCategories):
+def compareSizesOfFile(oldFiles, newFiles, allSections, listCategories):
     oldSizes = collections.defaultdict(int)
     newSizes = collections.defaultdict(int)
-    readSizes(oldSizes, oldFile, listCategories, True)
-    readSizes(newSizes, newFile, listCategories, True)
+    for oldFile in oldFiles:
+        readSizes(oldSizes, oldFile, listCategories, True)
+    for newFile in newFiles:
+        readSizes(newSizes, newFile, listCategories, True)
 
-    oldBase = os.path.basename(oldFile)
-    newBase = os.path.basename(newFile)
-    title = oldBase
-    if oldBase != newBase:
-        title += "-" + newBase
+    if len(oldFiles) == 1 and len(newFiles) == 1:
+        oldBase = os.path.basename(oldFiles[0])
+        newBase = os.path.basename(newFiles[0])
+        title = oldBase
+        if oldBase != newBase:
+            title += "-" + newBase
+    else:
+        title = "old-new"
+
     compareSizes(oldSizes, newSizes, "__text", title)
     if listCategories:
         prev = None
@@ -169,6 +181,7 @@ def compareSizesOfFile(oldFile, newFile, allSections, listCategories):
 
     if allSections:
         sectionTitle = "    section"
+        compareSizes(oldSizes, newSizes, "__textcoal_nt", sectionTitle)
         compareSizes(oldSizes, newSizes, "__stubs", sectionTitle)
         compareSizes(oldSizes, newSizes, "__const", sectionTitle)
         compareSizes(oldSizes, newSizes, "__cstring", sectionTitle)
@@ -233,6 +246,7 @@ def main():
     listCategories = False
     listFunctions = False
     separatorFound = False
+    sumSizes = False
     oldFileArgs = []
     newFileArgs = []
     curFiles = oldFileArgs
@@ -241,6 +255,8 @@ def main():
             allSections = True
         elif arg == "-c":
             listCategories = True
+        elif arg == "-s":
+            sumSizes = True
         elif arg == "-l":
             listFunctions = True
         elif arg == "--":
@@ -314,16 +330,19 @@ def main():
         else:
             compareFunctionSizes(oldFiles, newFiles)
     else:
-        if len(oldFiles) != len(newFiles):
-            sys.exit("number of new files must be the same of old files")
-
-        oldFiles.sort
-        newFiles.sort
-
         print "%-26s%16s  %8s  %8s  %s" % ("", "Section", "Old", "New", "Percent")
-        for idx, oldFile in enumerate(oldFiles):
-            newFile = newFiles[idx]
-            compareSizesOfFile(oldFile, newFile, allSections, listCategories)
+        if sumSizes:
+            compareSizesOfFile(oldFiles, newFiles, allSections, listCategories)
+        else:
+            if len(oldFiles) != len(newFiles):
+                sys.exit("number of new files must be the same of old files")
+
+            oldFiles.sort
+            newFiles.sort
+
+            for idx, oldFile in enumerate(oldFiles):
+                newFile = newFiles[idx]
+                compareSizesOfFile([oldFile], [newFile], allSections, listCategories)
 
 main()
 
