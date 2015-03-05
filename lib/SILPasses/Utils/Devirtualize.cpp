@@ -55,8 +55,8 @@ static ClassDecl *getClassFromConstructor(SILValue S) {
 /// Return bound generic type for the unbound type Superclass,
 /// which is a superclass of a bound generic type BoundDerived
 /// (Base may be also the same as BoundDerived).
-static SILType bindSuperclass(CanType Superclass,
-                              SILType BoundDerived) {
+static CanBoundGenericType bindSuperclass(CanType Superclass,
+                                          SILType BoundDerived) {
   assert(BoundDerived && "Expected non-null type!");
 
   SILType BoundSuperclass = BoundDerived;
@@ -68,13 +68,13 @@ static SILType bindSuperclass(CanType Superclass,
     CanType UnboundSuperclass = Decl->getDeclaredType()->getCanonicalType();
     // Check if we found a superclass we are looking for.
     if (UnboundSuperclass == Superclass)
-      return BoundSuperclass;
+      return cast<BoundGenericType>(BoundSuperclass.getSwiftRValueType());
 
     // Get the superclass of current one
     BoundSuperclass = BoundSuperclass.getSuperclass(nullptr);
   } while (BoundSuperclass);
 
-  return SILType();
+  llvm_unreachable("Expected to find a bound generic superclass!");
 }
 
 // Returns true if any generic types parameters of the class are
@@ -138,10 +138,6 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
   // generics. Thus construct our subst callee type for F.
   SILModule &M = DCMI.F->getModule();
   CanSILFunctionType GenCalleeType = DCMI.F->getLoweredFunctionType();
-  unsigned CalleeGenericParamsNum = 0;
-  if (GenCalleeType->isPolymorphic())
-    CalleeGenericParamsNum = GenCalleeType->getGenericSignature()
-                                          ->getGenericParams().size();
   // Class F belongs to.
   CanType FSelfClass = GenCalleeType->getSelfParameter().getType();
 
@@ -199,26 +195,13 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
               isa<NominalType>(FSelfGenericType)) &&
              "Method implementation self type should be generic");
 
-      // We know that ClassInstanceType is derived from FSelfGenericType.
-      // We need to determine the proper substitutions for FGenericSILClass
-      // based on the bound generic type of ClassInstanceType.
-      FSelfSubstType = bindSuperclass(FSelfGenericType, ClassInstanceType);
-
-      // Bail if it was not possible to determine the bound generic class.
-      if (!FSelfSubstType)
-        return false;
-
-      // If it is a bound generic type, look up its substitutions
-      if (auto BoundBaseType =
-          dyn_cast<BoundGenericType>(FSelfSubstType.getSwiftRValueType()))
+      if (isa<BoundGenericType>(ClassInstanceType.getSwiftRValueType())) {
+        auto BoundBaseType = bindSuperclass(FSelfGenericType,
+                                            ClassInstanceType);
         DCMI.Substitutions = BoundBaseType->getSubstitutions(Module, nullptr);
-
-      if (!isa<BoundGenericType>(ClassInstanceType.getSwiftRValueType()) &&
-          CalleeGenericParamsNum &&
-          DCMI.Substitutions.empty())
-        // If ClassInstance is not a bound generic type, try to derive
-        // substitutions from the apply instruction.
+      } else {
         DCMI.Substitutions = AI->getSubstitutions();
+      }
     } else {
       // It is not a type or bound type.
       // It could be that GenCalleeType is generic, but its arguments cannot
@@ -228,14 +211,14 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
     }
   }
 
-  // If implementing method is not polymorphic, there is no need to
-  // use any substitutions.
-  if (CalleeGenericParamsNum == 0 && !DCMI.Substitutions.empty())
-    DCMI.Substitutions = {};
-  else if (CalleeGenericParamsNum != DCMI.Substitutions.size())
-    // Bail if the number of generic parameters of the callee does not match
-    // the number of substitutions, because we don't know how to handle this.
-    return false;
+  // For polymorphic functions, bail if the number of substitutions is
+  // not the same as the number of expected generic parameters.
+  if (GenCalleeType->isPolymorphic()) {
+    auto GenericSig = GenCalleeType->getGenericSignature();
+    auto CalleeGenericParamsNum = GenericSig->getGenericParams().size();
+    if (CalleeGenericParamsNum != DCMI.Substitutions.size())
+      return false;
+  }
 
   DCMI.SubstCalleeType =
     GenCalleeType->substGenericArgs(M, Module, DCMI.Substitutions);
