@@ -217,9 +217,8 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
                                       DCMI.Substitutions);
 
       // Bail if it was not possible to determine the bound generic class.
-      if (FSelfSubstType == SILType()) {
+      if (!FSelfSubstType)
         return false;
-      }
 
       if (!isa<BoundGenericType>(ClassInstanceType.getSwiftRValueType()) &&
           CalleeGenericParamsNum &&
