@@ -250,8 +250,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
   // enum SomeEnum : SomeType {
   //   case A = 111, B = 222
   //   @derived
-  //   init?(_ raw: SomeType) {
-  //     switch raw {
+  //   init?(rawValue: SomeType) {
+  //     switch rawValue {
   //     case 111:
   //       self = .A
   //     case 222:
@@ -266,6 +266,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
 
   Type rawTy = enumDecl->getRawType();
   assert(rawTy);
+  rawTy = ArchetypeBuilder::mapTypeIntoContext(initDecl, rawTy);
+  
   for (auto elt : enumDecl->getAllElements()) {
     if (!elt->getTypeCheckedRawValueExpr() ||
         !elt->getTypeCheckedRawValueExpr()->getType()->isEqual(rawTy)) {
@@ -404,6 +406,8 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   
   TupleTypeElt element(rawType, C.Id_rawValue);
   auto argType = TupleType::get(element, C);
+  TupleTypeElt interfaceElement(rawInterfaceType, C.Id_rawValue);
+  auto interfaceArgType = TupleType::get(interfaceElement, C);
   
   Type type = FunctionType::get(argType, retTy);
   Type selfType = initDecl->computeSelfType(&genericParams);
@@ -424,7 +428,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   // Compute the interface type of the initializer.
   Type retInterfaceType
     = OptionalType::get(enumDecl->getDeclaredInterfaceType());
-  Type interfaceType = FunctionType::get(rawInterfaceType, retInterfaceType);
+  Type interfaceType = FunctionType::get(interfaceArgType, retInterfaceType);
   Type selfInterfaceType = initDecl->computeInterfaceSelfType(/*init*/ false);
   Type selfInitializerInterfaceType
     = initDecl->computeInterfaceSelfType(/*init*/ true);
