@@ -73,7 +73,8 @@ TYPE_ATTR(opened)
 //
 
 DECL_ATTR(asmname, Asmname,
-          OnFunc | OnConstructor | OnDestructor | LongAttribute, 0)
+          OnFunc | OnConstructor | OnDestructor | LongAttribute |
+          UserInaccessible, 0)
 
 DECL_ATTR(availability, Availability,
           OnFunc | OnStruct | OnEnum | OnClass | OnProtocol | OnVar |
@@ -95,7 +96,7 @@ SIMPLE_DECL_ATTR(optional, Optional,
 
 SIMPLE_DECL_ATTR(noreturn, NoReturn, OnFunc, 7)
 
-SIMPLE_DECL_ATTR(exported, Exported, OnImport, 8)
+SIMPLE_DECL_ATTR(exported, Exported, OnImport | UserInaccessible, 8)
 
 /// NOTE: 9 is unused.
 
@@ -118,14 +119,14 @@ SIMPLE_DECL_ATTR(NSManaged, NSManaged, OnVar, 15)
 
 SIMPLE_DECL_ATTR(lazy, Lazy, OnVar|DeclModifier, 16)
 
-SIMPLE_DECL_ATTR(LLDBDebuggerFunction, LLDBDebuggerFunction,
+SIMPLE_DECL_ATTR(LLDBDebuggerFunction, LLDBDebuggerFunction, RejectByParser |
                  OnFunc, 17)
 
 SIMPLE_DECL_ATTR(UIApplicationMain, UIApplicationMain,
                  OnClass, 18)
 
 SIMPLE_DECL_ATTR(unsafe_no_objc_tagged_pointer, UnsafeNoObjCTaggedPointer,
-                 OnProtocol, 19)
+                 OnProtocol | UserInaccessible, 19)
 
 SIMPLE_DECL_ATTR(objc_non_lazy_realization, ObjCNonLazyRealization,
                  OnClass, 53)
@@ -133,7 +134,8 @@ SIMPLE_DECL_ATTR(objc_non_lazy_realization, ObjCNonLazyRealization,
 DECL_ATTR(inline, Inline, OnFunc | OnConstructor, 20)
 
 DECL_ATTR(semantics, Semantics,
-          OnFunc | OnConstructor | OnDestructor | OnSubscript, 21)
+          OnFunc | OnConstructor | OnDestructor | OnSubscript |
+          UserInaccessible, 21)
 
 SIMPLE_DECL_ATTR(dynamic, Dynamic,
                  OnFunc | OnVar | OnSubscript | OnConstructor | DeclModifier, 22)
@@ -143,7 +145,7 @@ SIMPLE_DECL_ATTR(prefix , Prefix , OnFunc | OnOperator | DeclModifier, 24)
 SIMPLE_DECL_ATTR(postfix, Postfix, OnFunc | OnOperator | DeclModifier, 25)
 
 SIMPLE_DECL_ATTR(transparent, Transparent,
-                 OnFunc|OnConstructor|OnVar|OnExtension, 26)
+                 OnFunc|OnConstructor|OnVar|OnExtension|UserInaccessible, 26)
 SIMPLE_DECL_ATTR(requires_stored_property_inits, RequiresStoredPropertyInits,
                  OnClass, 27)
 DECL_ATTR(autoclosure, AutoClosure, OnParam, 28)
@@ -187,7 +189,8 @@ DECL_ATTR(__raw_doc_comment, RawDocComment, OnAnyDecl |
 DECL_ATTR(weak,    Ownership, OnVar | OnParam | DeclModifier | NotSerialized,
           /* Not serialized */49)
 
-DECL_ATTR(effects, Effects, OnFunc | OnConstructor | OnDestructor, 50)
+DECL_ATTR(effects, Effects, OnFunc | OnConstructor | OnDestructor |
+          UserInaccessible, 50)
 
 DECL_ATTR_ALIAS(unowned, Ownership)
 

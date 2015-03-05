@@ -2029,7 +2029,8 @@ public:
   void getAttributeDeclCompletions(bool IsInSil) {
     // FIXME: also include user-defined attribute keywords
 #define DECL_ATTR(KEYWORD, NAME, ...)                                         \
-    if (!DeclAttribute::isDeclModifier(DAK_##NAME) &&                         \
+    if (!DeclAttribute::isUserInaccessible(DAK_##NAME) &&                     \
+        !DeclAttribute::isDeclModifier(DAK_##NAME) &&                         \
         !DeclAttribute::shouldBeRejectedByParser(DAK_##NAME) &&               \
         (!DeclAttribute::isSilOnly(DAK_##NAME) || IsInSil))                   \
       addDeclAttrKeyword(#KEYWORD, "Declaration Attribute");

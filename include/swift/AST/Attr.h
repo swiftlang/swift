@@ -403,6 +403,9 @@ public:
     /// The attribute should be reported by parser as unknown.
     RejectByParser = 1 << 5,
 
+    /// Whether client code cannot use the attribute.
+    UserInaccessible = 1 << 6,
+
     // There is one entry for each DeclKind here, and some higher level buckets
     // down below.  These are used in Attr.def to control which kinds of
     // declarations an attribute can be attached to.
@@ -509,6 +512,10 @@ public:
 
   static bool isSilOnly(DeclAttrKind DK) {
     return getOptions(DK) & SILOnly;
+  }
+
+  static bool isUserInaccessible(DeclAttrKind DK) {
+    return getOptions(DK) & UserInaccessible;
   }
 
   bool isDeclModifier() const {
