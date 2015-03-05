@@ -507,6 +507,10 @@ public:
     return getOptions(DK) & RejectByParser;
   }
 
+  static bool isSilOnly(DeclAttrKind DK) {
+    return getOptions(DK) & SILOnly;
+  }
+
   bool isDeclModifier() const {
     return isDeclModifier(getKind());
   }

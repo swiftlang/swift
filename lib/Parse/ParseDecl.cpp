@@ -1279,7 +1279,7 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
     if (peekToken().is(tok::code_complete) && CodeCompletion) {
       consumeToken(tok::at_sign);
       consumeToken(tok::code_complete);
-      CodeCompletion->completeDeclAttrKeyword();
+      CodeCompletion->completeDeclAttrKeyword(isInSILMode());
       continue;
     }
     SourceLoc AtLoc = Tok.getLoc();

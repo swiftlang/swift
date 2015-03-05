@@ -800,6 +800,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   Decl *CStyleForLoopIterationVariable = nullptr;
   DeclAttrKind AttrKind;
   int AttrParamIndex;
+  bool IsInSil;
 
   /// \brief Set to true when we have delivered code completion results
   /// to the \c Consumer.
@@ -904,7 +905,7 @@ public:
 
   void completeCaseStmtBeginning() override;
   void completeCaseStmtDotPrefix() override;
-  void completeDeclAttrKeyword() override;
+  void completeDeclAttrKeyword(bool Sil) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeNominalMemberBeginning() override;
 
@@ -2025,10 +2026,12 @@ public:
     addKeyword("self", BaseType);
   }
 
-  void getAttributeDeclCompletions() {
+  void getAttributeDeclCompletions(bool IsInSil) {
     // FIXME: also include user-defined attribute keywords
 #define DECL_ATTR(KEYWORD, NAME, ...)                                         \
-    if (!DeclAttribute::isDeclModifier(DAK_##NAME))                           \
+    if (!DeclAttribute::isDeclModifier(DAK_##NAME) &&                         \
+        !DeclAttribute::shouldBeRejectedByParser(DAK_##NAME) &&               \
+        (!DeclAttribute::isSilOnly(DAK_##NAME) || IsInSil))                   \
       addDeclAttrKeyword(#KEYWORD, "Declaration Attribute");
 #include "swift/AST/Attr.def"
   }
@@ -2323,8 +2326,9 @@ void CodeCompletionCallbacksImpl::completeDeclAttrParam(DeclAttrKind DK,
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeDeclAttrKeyword() {
+void CodeCompletionCallbacksImpl::completeDeclAttrKeyword(bool Sil) {
   Kind = CompletionKind::AttributeBegin;
+  IsInSil = Sil;
   CurDeclContext = P.CurDeclContext;
 }
 
@@ -2600,7 +2604,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
   case CompletionKind::AttributeBegin: {
-    Lookup.getAttributeDeclCompletions();
+    Lookup.getAttributeDeclCompletions(IsInSil);
     break;
   }
   case CompletionKind::AttributeDeclParen: {
