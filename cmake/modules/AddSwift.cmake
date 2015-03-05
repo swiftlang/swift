@@ -1185,12 +1185,15 @@ function(add_swift_library name)
     set(SWIFTLIB_TARGET_SDKS ${SWIFT_SDKS})
   endif()
 
-  if(SWIFT_BUILD_STDLIB)
-    # All Swift code depends on the standard library, except for the standard
-    # library itself.
-    if(SWIFTLIB_TARGET_LIBRARY AND NOT SWIFTLIB_IS_STDLIB_CORE)
-      list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS Core)
-    endif()
+  # All Swift code depends on the standard library, except for the standard
+  # library itself.
+  if(SWIFTLIB_TARGET_LIBRARY AND NOT SWIFTLIB_IS_STDLIB_CORE)
+    list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS Core)
+  endif()
+
+  if(NOT "${SWIFT_BUILD_STDLIB}")
+    list(REMOVE_ITEM SWIFTLIB_SWIFT_MODULE_DEPENDS
+        Core SwiftUnstable)
   endif()
 
   translate_flags(SWIFTLIB "${SWIFTLIB_options}")
@@ -1552,9 +1555,12 @@ function(add_swift_target_executable name)
       "DISABLE_ASLR"
       SWIFTEXE_DISABLE_ASLR_FLAG)
 
-  if(SWIFT_BUILD_STDLIB)
-    # All Swift executables depend on the standard library.
-    list(APPEND SWIFTEXE_TARGET_LINK_FAT_LIBRARIES swiftCore)
+  # All Swift executables depend on the standard library.
+  list(APPEND SWIFTEXE_TARGET_LINK_FAT_LIBRARIES swiftCore)
+
+  if(NOT "${SWIFT_BUILD_STDLIB}")
+    list(REMOVE_ITEM SWIFTEXE_TARGET_LINK_FAT_LIBRARIES
+        swiftCore swiftSwiftUnstable)
   endif()
 
   foreach(sdk ${SWIFT_SDKS})
