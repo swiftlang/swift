@@ -602,15 +602,17 @@ Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
 namespace {
   class FindCapturedVars : public ASTWalker {
     TypeChecker &TC;
-    llvm::SetVector<CapturedValue> &captures;
+    SmallVectorImpl<CapturedValue> &captureList;
+    llvm::SmallDenseMap<ValueDecl*, unsigned, 4> captureEntryNumber;
     SourceLoc CaptureLoc;
     llvm::SmallPtrSet<ValueDecl *, 2> Diagnosed;
     /// The AbstractClosureExpr or AbstractFunctionDecl being analyzed.
     AnyFunctionRef AFR;
   public:
-    FindCapturedVars(TypeChecker &tc, llvm::SetVector<CapturedValue> &captures,
+    FindCapturedVars(TypeChecker &tc,
+                     SmallVectorImpl<CapturedValue> &captureList,
                      AnyFunctionRef AFR)
-        : TC(tc), captures(captures), AFR(AFR) {
+        : TC(tc), captureList(captureList), AFR(AFR) {
       if (auto AFD = AFR.getAbstractFunctionDecl())
         CaptureLoc = AFD->getLoc();
       else {
@@ -626,9 +628,22 @@ namespace {
     /// Add the specified capture to the closure's capture list, diagnosing it
     /// if invalid.
     void addCapture(CapturedValue capture, SourceLoc Loc) {
-      captures.insert(capture);
-
       auto VD = capture.getDecl();
+
+      // Check to see if we already have an entry for this decl.
+      unsigned &entryNumber = captureEntryNumber[VD];
+      if (entryNumber == 0) {
+        captureList.push_back(capture);
+        entryNumber = captureList.size();
+      } else {
+        // If this already had an entry in the capture list, make sure to merge
+        // the information together.  If one is noescape but the other isn't,
+        // then the result is escaping.
+        unsigned Flags =
+          captureList[entryNumber-1].getFlags() & capture.getFlags();
+        capture = CapturedValue(VD, Flags);
+        captureList[entryNumber-1] = capture;
+      }
 
       // If VD is a noescape decl, then the closure we're computing this for
       // must also be noescape.
@@ -758,14 +773,11 @@ namespace {
 }
 
 void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
-  llvm::SetVector<CapturedValue> Captures;
+  SmallVector<CapturedValue, 4> Captures;
   FindCapturedVars finder(*this, Captures, AFR);
   AFR.getBody()->walk(finder);
-  CapturedValue *CaptureCopy =
-      Context.AllocateCopy<CapturedValue>(Captures.begin(), Captures.end());
-  AFR.getCaptureInfo().setCaptures(
-      llvm::makeArrayRef(CaptureCopy, Captures.size()));
-  
+  AFR.getCaptureInfo().setCaptures(Context.AllocateCopy(Captures));
+
   // Diagnose if we have local captures and there were C pointers formed to
   // this function before we computed captures.
   auto cFunctionPointers = LocalCFunctionPointers.find(AFR);

@@ -583,3 +583,24 @@ func testNoescape() {
 
 
 
+func testNoescape2() {
+  // "a" must be captured by-box into noescapefunc because the inner closure
+  // could escape it.  This also checks for when the outer closure captures it
+  // in a way that could be used with escape: the union of the two requirements
+  // doesn't allow a by-address capture.
+  var a = 0
+  noescapefunc {
+    escapefunc { a = 42 }
+    println(a)
+  }
+  println(a)
+}
+
+// CHECK-LABEL: sil hidden @_TF9functions13testNoescape2FT_T_ : $@thin () -> () {
+
+// CHECK: // functions.(testNoescape2 () -> ()).(closure #1)
+// CHECK-NEXT: sil shared @_TFF9functions13testNoescape2FT_T_U_FT_T_ : $@thin (@owned Builtin.NativeObject, @inout Int) -> () {
+
+// CHECK: // functions.(testNoescape2 () -> ()).(closure #1).(closure #1)
+// CHECK-NEXT: sil shared @_TFFF9functions13testNoescape2FT_T_U_FT_T_U_FT_T_ : $@thin (@owned Builtin.NativeObject, @inout Int) -> () {
+
