@@ -80,9 +80,6 @@ public:
   /// Whether or not to run optimization passes.
   unsigned Optimize : 1;
 
-  // Whether we compile with Ounchecked.
-  unsigned Unchecked : 1;
-
   /// Whether we should emit debug info.
   IRGenDebugInfoKind DebugInfoKind : 2;
 
@@ -123,14 +120,14 @@ public:
   /// List of backend command-line options for -embed-bitcode.
   std::vector<uint8_t> CmdArgs;
 
-  IRGenOptions()
-      : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
-        Optimize(false), Unchecked(false),
-        DebugInfoKind(IRGenDebugInfoKind::None), UseJIT(false),
-        EnableDynamicValueTypeLayout(false), DisableLLVMOptzns(false),
-        DisableLLVMARCOpts(false), DisableLLVMSLPVectorizer(false),
-        DisableFPElim(true), HasUnderlyingModule(false), Playground(false),
-        GenerateProfile(false), EmbedMode(IRGenEmbedMode::None) {}
+  IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
+                   Optimize(false), DebugInfoKind(IRGenDebugInfoKind::None),
+                   UseJIT(false), EnableDynamicValueTypeLayout(false),
+                   DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
+                   DisableLLVMSLPVectorizer(false),
+                   DisableFPElim(true), HasUnderlyingModule(false),
+                   Playground(false), GenerateProfile(false),
+                   EmbedMode(IRGenEmbedMode::None) {}
 };
 
 } // end namespace swift

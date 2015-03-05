@@ -1314,11 +1314,6 @@ void SignatureExpansion::expand(SILParameterInfo param) {
       assert(ParamIRTypes.empty());
       addIndirectReturnAttributes(IGM, Attrs);
       HasIndirectResult = true;
-    } else if (IGM.Opts.Unchecked){
-      // We can only add the noalias attribute under 'Ounchecked'. Adding
-      // noalias can violate memory safety in the presence of inout aliasing
-      // violations.
-      addNoAliasAttribute(IGM, Attrs, getCurParamIndex());
     }
     addPointerParameter(IGM.getStorageType(param.getSILType()));
     return;
