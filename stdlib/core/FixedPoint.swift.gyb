@@ -175,9 +175,9 @@ T : _UnsignedIntegerType, U : _SignedIntegerType
 /// Note: if `text` begins with `"+"` or `"-"`, even if the rest of
 /// the characters are `"0"`, the result is nil.
 internal func _parseUnsignedAsciiAsUIntMax(
-  text: String, radix: Int, maximum: UIntMax
+  u16: String.UTF16View, radix: Int, maximum: UIntMax
 ) -> UIntMax? {
-  if isEmpty(text) { return nil }
+  if isEmpty(u16) { return nil }
   
   let digit = _ascii16("0")..._ascii16("9")
   let lower = _ascii16("a")..._ascii16("z")
@@ -190,7 +190,7 @@ internal func _parseUnsignedAsciiAsUIntMax(
   
   let uRadix = UIntMax(bitPattern: IntMax(radix))
   var result: UIntMax = 0
-  for c in text.utf16 {
+  for c in u16 {
     let n: UIntMax
     switch c {
     case digit: n = UIntMax(c - digit.startIndex)
@@ -214,18 +214,17 @@ internal func _parseUnsignedAsciiAsUIntMax(
 /// Note: if `text` begins with `"+"` or `"-"`, even if the rest of
 /// the characters are `"0"`, the result is nil.
 internal func _parseAsciiAsUIntMax(
-  text: String, radix: Int, maximum: UIntMax
+  u16: String.UTF16View, radix: Int, maximum: UIntMax
 ) -> UIntMax? {
-  let u16 = text.utf16
   if isEmpty(u16) { return nil }
   let c = first(u16)
   if _fastPath(c != _ascii16("-")) {
     let unsignedText
-      = c == _ascii16("+") ? unsafeUnwrap(String(dropFirst(u16))) : text
+      = c == _ascii16("+") ? unsafeUnwrap(dropFirst(u16)) : u16
     return _parseUnsignedAsciiAsUIntMax(unsignedText, radix, maximum)
   }
   else {
-    return _parseAsciiAsIntMax(text, radix, 0) == 0 ? 0 : nil
+    return _parseAsciiAsIntMax(u16, radix, 0) == 0 ? 0 : nil
   }
 }
 
@@ -236,16 +235,15 @@ internal func _parseAsciiAsUIntMax(
 /// Note: for text matching the regular expression "-0+", the result
 /// is `0`, not `nil`.
 internal func _parseAsciiAsIntMax(
-  text: String, radix: Int, maximum: IntMax
+  u16: String.UTF16View, radix: Int, maximum: IntMax
 ) -> IntMax? {
   _sanityCheck(maximum >= 0, "maximum should be non-negative")
   
-  let u16 = text.utf16
   if isEmpty(u16) { return nil }
   
   // Drop any leading "-"
   let negative = first(u16) == _ascii16("-")
-  let absResultText = negative ? _unsafeUnwrap(String(dropFirst(u16))) : text
+  let absResultText = negative ? _unsafeUnwrap(dropFirst(u16)) : u16
 
   let absResultMax = UIntMax(bitPattern: maximum) + (negative ? 1 : 0)
 
@@ -435,7 +433,7 @@ extension ${Self} {
   /// is not representable, the result is `nil`.
   public init?(_ text: String, radix: Int = 10) {
     if let value = _parseAsciiAs${'' if signed else 'U'}IntMax(
-      text, radix, ${'' if signed else 'U'}IntMax(${Self}.max)) {
+      text.utf16, radix, ${'' if signed else 'U'}IntMax(${Self}.max)) {
       self.init(
         ${'' if Self in (IntMax,UIntMax) else 'truncatingBitPattern:'} value)
     }
