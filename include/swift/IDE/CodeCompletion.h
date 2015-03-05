@@ -63,6 +63,9 @@ public:
       /// "internal", "private" or "public".
       AccessControlKeyword,
 
+      /// such as @"availability"
+      DeclAttrKeyword,
+
       /// such as "unavailable" etc. for @availability
       DeclAttrParamKeyword,
 
@@ -155,6 +158,7 @@ public:
     static bool chunkHasText(ChunkKind Kind) {
       return Kind == ChunkKind::AccessControlKeyword ||
              Kind == ChunkKind::OverrideKeyword ||
+             Kind == ChunkKind::DeclAttrKeyword ||
              Kind == ChunkKind::DeclIntroducer ||
              Kind == ChunkKind::Text ||
              Kind == ChunkKind::LeftParen ||

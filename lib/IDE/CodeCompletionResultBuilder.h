@@ -180,6 +180,13 @@ public:
       addTypeAnnotation(Annotation);
   }
 
+  void addDeclAttrKeyword(StringRef Name, StringRef Annotation) {
+    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::
+                     DeclAttrKeyword, Name);
+    if(!Annotation.empty())
+      addTypeAnnotation(Annotation);
+  }
+
   void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,
                         bool IsVarArg) {
     CurrentNestingLevel++;

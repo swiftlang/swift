@@ -134,8 +134,12 @@ public:
   /// provided by user.
   virtual void completeNominalMemberBeginning() = 0;
 
-  /// Complete the parameters in attribute, for instance @availability.
-  virtual void completeAttributeDecl(DeclAttrKind DK, int Index) = 0;
+  /// Complete the keyword in attribute, for instance, @availability.
+  virtual void completeDeclAttrKeyword() = 0;
+
+  /// Complete the parameters in attribute, for instance, version specifier for
+  /// @availability.
+  virtual void completeDeclAttrParam(DeclAttrKind DK, int Index) = 0;
 
   /// \brief Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.

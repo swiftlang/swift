@@ -130,6 +130,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     }
     switch (C.getKind()) {
     case Chunk::ChunkKind::AccessControlKeyword:
+    case Chunk::ChunkKind::DeclAttrKeyword:
     case Chunk::ChunkKind::DeclAttrParamKeyword:
     case Chunk::ChunkKind::OverrideKeyword:
     case Chunk::ChunkKind::DeclIntroducer:
@@ -683,6 +684,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex() const {
     case CodeCompletionString::Chunk::ChunkKind::LeftParen:
     case CodeCompletionString::Chunk::ChunkKind::LeftBracket:
     case CodeCompletionString::Chunk::ChunkKind::DeclAttrParamKeyword:
+    case CodeCompletionString::Chunk::ChunkKind::DeclAttrKeyword:
       return i;
     case CodeCompletionString::Chunk::ChunkKind::RightParen:
     case CodeCompletionString::Chunk::ChunkKind::RightBracket:
@@ -786,6 +788,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     CaseStmtBeginning,
     CaseStmtDotPrefix,
     NominalMemberBeginning,
+    AttributeBegin,
     AttributeDeclParen,
   };
 
@@ -901,7 +904,8 @@ public:
 
   void completeCaseStmtBeginning() override;
   void completeCaseStmtDotPrefix() override;
-  void completeAttributeDecl(DeclAttrKind DK, int Index) override;
+  void completeDeclAttrKeyword() override;
+  void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeNominalMemberBeginning() override;
 
   void addKeywords(CodeCompletionResultSink &Sink);
@@ -1700,6 +1704,14 @@ public:
     Builder.addDeclAttrParamKeyword(Name, Annotation, NeedSpecify);
   }
 
+  void addDeclAttrKeyword(StringRef Name, StringRef Annotation) {
+    CodeCompletionResultBuilder Builder(
+        Sink,
+        CodeCompletionResult::ResultKind::Keyword,
+        SemanticContextKind::None);
+    Builder.addDeclAttrKeyword(Name, Annotation);
+  }
+
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
     // Hide private stdlib declarations.
@@ -2013,7 +2025,15 @@ public:
     addKeyword("self", BaseType);
   }
 
-  void getAttributeDeclCompletions(DeclAttrKind AttrKind, int ParamIndex) {
+  void getAttributeDeclCompletions() {
+    // FIXME: also include user-defined attribute keywords
+#define DECL_ATTR(KEYWORD, NAME, ...)                                         \
+    if (!DeclAttribute::isDeclModifier(DAK_##NAME))                           \
+      addDeclAttrKeyword(#KEYWORD, "Declaration Attribute");
+#include "swift/AST/Attr.def"
+  }
+
+  void getAttributeDeclParamCompletions(DeclAttrKind AttrKind, int ParamIndex) {
     if (AttrKind == DAK_Availability) {
       if (ParamIndex == 0) {
         addDeclAttrParamKeyword("*", "Platform", false);
@@ -2295,11 +2315,16 @@ void CodeCompletionCallbacksImpl::completeTypeSimpleBeginning() {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeAttributeDecl(
-    DeclAttrKind DK, int Index) {
+void CodeCompletionCallbacksImpl::completeDeclAttrParam(DeclAttrKind DK,
+                                                        int Index) {
   Kind = CompletionKind::AttributeDeclParen;
   AttrKind = DK;
   AttrParamIndex = Index;
+  CurDeclContext = P.CurDeclContext;
+}
+
+void CodeCompletionCallbacksImpl::completeDeclAttrKeyword() {
+  Kind = CompletionKind::AttributeBegin;
   CurDeclContext = P.CurDeclContext;
 }
 
@@ -2417,6 +2442,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
   case CompletionKind::None:
   case CompletionKind::DotExpr:
   case CompletionKind::AttributeDeclParen:
+  case CompletionKind::AttributeBegin:
     break;
 
   case CompletionKind::PostfixExprBeginning:
@@ -2573,8 +2599,12 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     OverrideLookup.getOverrideCompletions(SourceLoc());
     break;
   }
+  case CompletionKind::AttributeBegin: {
+    Lookup.getAttributeDeclCompletions();
+    break;
+  }
   case CompletionKind::AttributeDeclParen: {
-    Lookup.getAttributeDeclCompletions(AttrKind, AttrParamIndex);
+    Lookup.getAttributeDeclParamCompletions(AttrKind, AttrParamIndex);
     break;
   }
   }

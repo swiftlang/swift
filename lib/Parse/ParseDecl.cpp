@@ -633,7 +633,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     if (!Tok.is(tok::identifier) &&
         !(Tok.isAnyOperator() && Tok.getText() == "*")) {
         if (Tok.is(tok::code_complete) && CodeCompletion) {
-          CodeCompletion->completeAttributeDecl(DAK_Availability, 0);
+          CodeCompletion->completeDeclAttrParam(DAK_Availability, 0);
           consumeToken(tok::code_complete);
       }
       diagnose(Tok.getLoc(), diag::attr_availability_platform, AttrName)
@@ -683,8 +683,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         diagnose(Tok.getLoc(), diag::attr_availability_expected_option,
                  AttrName)
           .highlight(SourceRange(Tok.getLoc()));
-        if(Tok.is(tok::code_complete) && CodeCompletion) {
-          CodeCompletion->completeAttributeDecl(DAK_Availability, ParamIndex);
+        if (Tok.is(tok::code_complete) && CodeCompletion) {
+          CodeCompletion->completeDeclAttrParam(DAK_Availability, ParamIndex);
           consumeToken(tok::code_complete);
         } else {
           consumeIf(tok::identifier);
@@ -1276,6 +1276,12 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
 bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
                                     bool StopAtTypeAttributes) {
   while (Tok.is(tok::at_sign)) {
+    if (peekToken().is(tok::code_complete) && CodeCompletion) {
+      consumeToken(tok::at_sign);
+      consumeToken(tok::code_complete);
+      CodeCompletion->completeDeclAttrKeyword();
+      continue;
+    }
     SourceLoc AtLoc = Tok.getLoc();
 
     // If StopAtTypeAttributes is true, then we sniff to see if the following
