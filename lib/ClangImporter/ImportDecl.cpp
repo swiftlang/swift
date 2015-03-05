@@ -1785,14 +1785,29 @@ namespace {
         // Set up the C underlying type as its Swift raw type.
         enumDecl->setRawType(underlyingType);
         
-        // Add delayed protocol declarations to the enum declaration.
-        ProtocolDecl *protocols[] = {
-          cxt.getProtocol(KnownProtocolKind::RawRepresentable),
-          cxt.getProtocol(KnownProtocolKind::Hashable),
-          cxt.getProtocol(KnownProtocolKind::Equatable),
-        };
-        auto protoList = Impl.SwiftContext.AllocateCopy(protocols);
-        enumDecl->setProtocols(protoList);
+        // Add protocol declarations to the enum declaration.
+        // FIXME: Delay the protocol conformances in playground mode
+        // only as a performance hack. This is not generally handled
+        // correctly in multi-file builds. rdar://problem/20047340
+        if (Impl.SwiftContext.LangOpts.Playground) {
+          DelayedProtocolDecl delayedProtocols[] = {
+            [&]() {return cxt.getProtocol(
+                KnownProtocolKind::RawRepresentable);},
+            [&]() {return cxt.getProtocol(KnownProtocolKind::Hashable);},
+            [&]() {return cxt.getProtocol(KnownProtocolKind::Equatable);}
+          };
+          auto delayedProtoList = Impl.SwiftContext.AllocateCopy(
+                                                        delayedProtocols);
+          enumDecl->setDelayedProtocolDecls(delayedProtoList);
+        } else {
+          ProtocolDecl *protocols[] = {
+            cxt.getProtocol(KnownProtocolKind::RawRepresentable),
+            cxt.getProtocol(KnownProtocolKind::Hashable),
+            cxt.getProtocol(KnownProtocolKind::Equatable),
+          };
+          auto protoList = Impl.SwiftContext.AllocateCopy(protocols);
+          enumDecl->setProtocols(protoList);
+        }
         
         // Provide custom implementations of the init(rawValue:) and rawValue
         // conversions that just do a bitcast. We can't reliably filter a
