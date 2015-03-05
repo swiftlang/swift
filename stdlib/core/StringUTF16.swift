@@ -41,32 +41,15 @@ extension String {
       return _core.startIndex + _offset + i
     }
 
-    // This is to avoid printing "func generate() -> GeneratorOf<UInt16>"
-    public typealias _GeneratorType = GeneratorOf<UInt16>
-
-    /// A type whose instances can produce the elements of this
-    /// sequence, in order.
-    public typealias Generator = _GeneratorType
-
-    /// Return a *generator* over the code points that comprise this
-    /// *sequence*.
-    ///
-    /// Complexity: O(1)
-    public func generate() -> Generator {
-      var index = startIndex
-      return GeneratorOf<UInt16> {
-        if _fastPath(index != self.endIndex) {
-          return self[index++]
-        }
-        return .None
-      }
+    public func generate() -> IndexingGenerator<UTF16View> {
+      return IndexingGenerator(self)
     }
 
     /// Access the element at `position`.
     ///
     /// Requires: `position` is a valid position in `self` and
     /// `position != endIndex`.
-    public subscript(i: Index) -> Generator.Element {
+    public subscript(i: Index) -> UTF16.CodeUnit {
       let position = i._offset
       _precondition(position >= 0 && position < _length,
           "out-of-range access on a UTF16View")
@@ -104,7 +87,7 @@ extension String {
     @availability(
       *, unavailable,
       message="Indexing a String's UTF16View requires a String.UTF16View.Index, which can be constructed from Int when Foundation is imported")
-    public subscript(i: Int) -> Generator.Element {
+    public subscript(i: Int) -> UTF16.CodeUnit {
       return self[Index(_offset: i)]
     }
 
