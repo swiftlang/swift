@@ -347,3 +347,6 @@ extern "C" int _swift_stdlib_putc_stderr(int C) {
   return putc(C, stderr);
 }
 
+extern "C" size_t _swift_stdlib_getHardwareConcurrency() {
+  return sysconf(_SC_NPROCESSORS_ONLN);
+}

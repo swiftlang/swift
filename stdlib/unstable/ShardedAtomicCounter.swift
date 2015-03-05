@@ -12,22 +12,11 @@
 
 import SwiftShims
 
-func _stdlib_sysctlbyname_Int32(name: String) -> Int32 {
-  return name.withCString {
-    (nameUtf8) -> Int32 in
-    var resultSize = 4
-    var result: Int32 = 0
-    sysctlbyname(nameUtf8, &result, &resultSize, nil, 0)
-    return result
-  }
-}
-
 public func _stdlib_getHardwareConcurrency() -> Int {
-  let result = Int(_stdlib_sysctlbyname_Int32("hw.physicalcpu"))
-  if result < 1 {
-    fatalError("_stdlib_getHardwareConcurrency(): could not query sysctl")
-  }
-  return result
+  // This is effectively a re-export of this shims function
+  // for consumers of the unstable library (like unittest) to
+  // use.
+  return _swift_stdlib_getHardwareConcurrency()
 }
 
 /// An atomic counter for contended applications.

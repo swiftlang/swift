@@ -321,6 +321,9 @@ endfunction()
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
   configure_sdk_unix(LINUX "Linux" "linux" "linux" "x86_64" "x86_64-unknown-linux-gnu")
 
+  set(SWIFT_HOST_VARIANT "linux" CACHE STRING
+      "Deployment OS for Swift host tools (the compiler) [linux].")
+
   set(SWIFT_HOST_VARIANT_SDK "LINUX")
   set(SWIFT_HOST_VARIANT_ARCH "x86_64")
 

@@ -44,8 +44,5 @@ float strtof(const char *__restrict__ nptr, char **__restrict__ endptr);
 __swift_uint32_t arc4random(void);
 __swift_uint32_t arc4random_uniform(__swift_uint32_t upper_bound);
 
-int sysctlbyname(const char *name, void *oldp, __swift_size_t *oldlenp,
-                 void *newp, __swift_size_t newlen);
-
 #endif // SWIFT_STDLIB_SHIMS_DARWINSHIMS_H
 

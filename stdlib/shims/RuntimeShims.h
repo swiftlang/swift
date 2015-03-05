@@ -88,6 +88,8 @@ const char *_swift_stdlib_strtof_clocale(const char *nptr, float *outResult);
 
 int _swift_stdlib_putc_stderr(int C);
 
+__swift_size_t _swift_stdlib_getHardwareConcurrency();
+
 #ifdef __cplusplus
 }} // extern "C", namespace swift
 #endif
