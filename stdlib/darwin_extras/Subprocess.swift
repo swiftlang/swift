@@ -11,7 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftUnstable
+#if os(OSX) || os(iOS)
 import Darwin
+#elseif os(Linux)
+import Glibc
+#endif
 
 /// Calls POSIX `pipe()`.
 func posixPipe() -> (readFD: CInt, writeFD: CInt) {
@@ -77,7 +81,7 @@ public func spawnChild(args: _UnitTestArray<String>)
   var pid: pid_t = -1
   let spawnResult = withArrayOfCStrings([ Process.arguments[0] ] as _UnitTestArray + args) {
     posix_spawn(
-      &pid, Process.arguments[0], &fileActions, nil, $0, _NSGetEnviron().memory)
+      &pid, Process.arguments[0], &fileActions, nil, $0, _getEnviron())
   }
   if spawnResult != 0 {
     println(String.fromCString(strerror(spawnResult)))
@@ -190,6 +194,15 @@ public func runChild(args: _UnitTestArray<String>)
   return (stdout, stderr, status)
 }
 
+#if os(OSX) || os(iOS)
 @asmname("_NSGetEnviron")
 func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>>>
+#endif
 
+internal func _getEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>> {
+#if os(OSX) || os(iOS)
+  return _NSGetEnviron().memory
+#else
+  return __environ
+#endif
+}

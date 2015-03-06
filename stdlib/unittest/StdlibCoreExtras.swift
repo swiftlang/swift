@@ -11,9 +11,16 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftUnstable
-import Darwin
 import SwiftUnstableDarwinExtras
+#if os(OSX) || os(iOS)
+import Darwin
+#elseif os(Linux)
+import Glibc
+#endif
+
+#if _runtime(_ObjC)
 import Foundation
+#endif
 
 //
 // These APIs don't really belong in a unit testing library, but they are
@@ -24,14 +31,53 @@ func findSubstring(string: String, substring: String) -> String.Index? {
   if substring.isEmpty {
     return string.startIndex
   }
+#if _runtime(_ObjC)
   return string.rangeOfString(substring)?.startIndex
+#else
+  // FIXME(performance): This is a very non-optimal algorithm, with a worst
+  // case of O((n-m)*m). When non-objc String has a match function that's better,
+  // this should be removed in favour of using that.
+
+  // Operate on unicode scalars rather than codeunits.
+  let haystack = string.unicodeScalars
+  let needle = substring.unicodeScalars
+
+  for matchStartIndex in indices(haystack) {
+    var matchIndex = matchStartIndex
+    var needleIndex = needle.startIndex
+    while true {
+      if needleIndex == needle.endIndex {
+        // if we hit the end of the search string, we found the needle
+        return matchStartIndex.samePositionIn(string)
+      }
+      if matchIndex == haystack.endIndex {
+        // if we hit the end of the string before finding the end of the needle,
+        // we aren't going to find the needle after that.
+        return nil
+      }
+      if needle[needleIndex] == haystack[matchIndex] {
+        // keep advancing through both the string and search string on match
+        ++matchIndex
+        ++needleIndex
+      } else {
+        // no match, go back to finding a starting match in the string.
+        break
+      }
+    }
+  }
+  return nil
+#endif
 }
 
 public func createTemporaryFile(
   fileNamePrefix: String, fileNameSuffix: String, contents: String
 ) -> String {
+#if _runtime(_ObjC)
   var fileName = NSTemporaryDirectory().stringByAppendingPathComponent(
     fileNamePrefix + "XXXXXX" + fileNameSuffix)
+#else
+  var fileName = fileNamePrefix + "XXXXXX" + fileNameSuffix
+#endif
   let fd = _stdlib_mkstemps(
     &fileName, CInt(count(fileNameSuffix.utf8)))
   if fd < 0 {

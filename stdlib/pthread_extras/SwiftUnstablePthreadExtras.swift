@@ -15,7 +15,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if os(OSX) || os(iOS)
 import Darwin
+#elseif os(Linux)
+import Glibc
+#endif
 
 @asmname("swift_stdlib_getExecuteBlockFunctionPtr_VoidPtr_VoidPtr")
 func _stdlib_getExecuteBlockFunctionPtr_VoidPtr_VoidPtr()
@@ -119,4 +123,3 @@ public class _stdlib_Barrier {
     }
   }
 }
-

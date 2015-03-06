@@ -11,8 +11,6 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-stdlib-swift
 
-// XFAIL: linux
-
 import Swift
 import StdlibUnittest
 

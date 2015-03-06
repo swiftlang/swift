@@ -15,7 +15,6 @@
 // RUN: %target-run %t/Builtins
 
 // XFAIL: interpret
-// XFAIL: linux
 
 import Swift
 import SwiftShims

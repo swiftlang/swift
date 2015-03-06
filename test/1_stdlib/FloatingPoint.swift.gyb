@@ -3,7 +3,6 @@
 // RUN: %S/../../utils/line-directive %t/FloatingPoint.swift -- %target-run %t/a.out
 
 // XFAIL: interpret
-// XFAIL: linux
 
 import Swift
 import StdlibUnittest

@@ -2,8 +2,6 @@
 // RUN: %S/../../utils/line-directive %t/UnsafePointer.swift -- %target-build-swift %t/UnsafePointer.swift -o %t/a.out
 // RUN: %S/../../utils/line-directive %t/UnsafePointer.swift -- %target-run %t/a.out
 
-// XFAIL: linux
-
 import StdlibUnittest
 
 var UnsafePointerTestSuite = TestSuite("UnsafePointer")

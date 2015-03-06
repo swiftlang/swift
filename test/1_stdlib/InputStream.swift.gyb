@@ -16,7 +16,6 @@
 // RUN: %S/../../utils/line-directive %t/InputStream.swift -- %target-run %t/a.out
 
 // XFAIL: interpret
-// XFAIL: linux
 
 import StdlibUnittest
 import Swift

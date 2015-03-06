@@ -1,7 +1,5 @@
 // RUN: %target-run-simple-swift
 
-// XFAIL: linux
-
 import StdlibUnittest
 
 var StaticStringTestSuite = TestSuite("StaticString")

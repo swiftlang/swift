@@ -12,9 +12,17 @@
 
 import SwiftUnstable
 import SwiftUnstablePthreadExtras
-import Darwin
 import SwiftUnstableDarwinExtras
+
+#if os(OSX) || os(iOS)
+import Darwin
+#elseif os(Linux)
+import Glibc
+#endif
+
+#if _runtime(_ObjC)
 import ObjectiveC
+#endif
 
 public struct SourceLoc {
   let file: String
@@ -755,9 +763,11 @@ struct _ParentProcess {
 }
 
 public func runAllTests() {
+#if _runtime(ObjC)
   autoreleasepool {
     _stdlib_initializeReturnAutoreleased()
   }
+#endif
 
   let _isChildProcess: Bool =
     contains(Process.arguments, "--stdlib-unittest-run-child")
@@ -929,6 +939,7 @@ public class TestSuite {
   var _testNameToIndex: [String : Int] = [:]
 }
 
+#if os(OSX) || os(iOS)
 @asmname("swift_stdlib_getSystemVersionPlistProperty")
 func _stdlib_getSystemVersionPlistPropertyImpl(
   propertyName: UnsafePointer<CChar>) -> UnsafePointer<CChar>
@@ -937,11 +948,13 @@ func _stdlib_getSystemVersionPlistProperty(propertyName: String) -> String? {
   return String.fromCString(
     _stdlib_getSystemVersionPlistPropertyImpl(propertyName))
 }
+#endif
 
 public enum OSVersion : Printable {
   case OSX(major: Int, minor: Int, bugFix: Int)
   case iOS(major: Int, minor: Int, bugFix: Int)
   case iOSSimulator
+  case Linux
 
   public var description: String {
     switch self {
@@ -951,6 +964,8 @@ public enum OSVersion : Printable {
       return "iOS \(major).\(minor).\(bugFix)"
     case iOSSimulator:
       return "iOSSimulator"
+    case Linux:
+      return "Linux"
     }
   }
 }
@@ -977,6 +992,8 @@ func _getOSVersion() -> OSVersion {
   //
   // FIXME: how to get the simulator version *without* UIKit?
   return .iOSSimulator
+#elseif os(Linux)
+  return .Linux
 #else
   let productName = _stdlib_getSystemVersionPlistProperty("ProductName")!
   let productVersion = _stdlib_getSystemVersionPlistProperty("ProductVersion")!

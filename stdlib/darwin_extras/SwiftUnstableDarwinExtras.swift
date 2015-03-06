@@ -11,7 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftUnstable
+#if os(OSX) || os(iOS)
 import Darwin
+#elseif os(Linux)
+import Glibc
+#endif
 
 public func _stdlib_mkstemps(inout template: String, suffixlen: CInt) -> CInt {
   var utf8 = template.nulTerminatedUTF8

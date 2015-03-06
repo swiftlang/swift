@@ -1,7 +1,6 @@
 // RUN: %target-run-simple-swift
 
 // XFAIL: interpret
-// XFAIL: linux
 
 import StdlibUnittest
 

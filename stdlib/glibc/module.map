@@ -1,0 +1,173 @@
+//===--- module.map -------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+/// This is an incomplete modulemap that maps glibc's headers in a roughly 
+/// similar way to the Darwin SDK modulemap.
+/// It's not named just Glibc so that it doesn't conflict in the event of a
+/// future official glibc modulemap.
+module SwiftGlibc [system] {
+  // C standard library
+  module C {
+    module errno {
+      header "/usr/include/errno.h"
+      header "/usr/include/sys/errno.h"
+      export *
+    }
+    module signal {
+      header "/usr/include/signal.h"
+      export *
+    }
+    module stdio {
+      header "/usr/include/stdio.h"
+      export *
+    }
+
+    module stddef {
+      header "/usr/include/stddef.h"
+      export *
+    }
+
+    module stdlib {
+      header "/usr/include/stdlib.h"
+      export *
+      export stddef
+    }
+
+    module string {
+      header "/usr/include/string.h"
+      export *
+      export Glibc.POSIX.strings
+    }
+  }
+
+  // POSIX
+  module POSIX {
+    module pthread {
+      header "/usr/include/pthread.h"
+      export *
+    }
+    module spawn {
+      header "/usr/include/spawn.h"
+      export *
+    }
+    module fcntl {
+      header "/usr/include/fcntl.h"
+      export *
+    }
+    module sys {
+      export *
+      module types {
+        header "/usr/include/sys/types.h"
+        export *
+      }
+      module wait {
+        header "/usr/include/sys/wait.h"
+        export *
+      }
+    }
+    module unistd {
+      header "/usr/include/unistd.h"
+      header "/usr/include/sys/unistd.h"
+      export *
+    }
+    // Re-exported C headers.
+    module complex {
+      export cstd.complex
+    }
+
+    module ctype {
+      export cstd.ctype
+    }
+
+    module errno {
+      export cstd.errno
+    }
+
+    module fenv {
+      export cstd.fenv
+    }
+
+    module inttypes {
+      export cstd.inttypes
+    }
+
+    module iso646 {
+      export cstd.iso646
+    }
+
+    module limits {
+      export cstd.limits
+    }
+
+    module locale {
+      export cstd.locale
+    }
+
+    module math {
+      export cstd.math
+    }
+
+    module setjmp {
+      export cstd.setjmp
+    }
+
+    module signal {
+      export cstd.signal
+    }
+
+    module stdbool {
+      export cstd.stdbool
+    }
+
+    module stddef {
+      export cstd.stddef
+    }
+
+    module stdint {
+      export cstd.stdint
+    }
+
+    module stdio {
+      export cstd.stdio
+    }
+
+    module stdlib {
+      export cstd.stdlib
+    }
+
+    module string {
+      export cstd.string
+    }
+
+    module time {
+      export cstd.time
+    }
+
+    module wchar {
+      export cstd.wchar
+    }
+
+    module wctype {
+      export cstd.wctype
+    }
+  }
+
+  module bsd {
+    export *
+    link "bsd"
+
+    module stdlib {
+      header "/usr/include/bsd/stdlib.h"
+      export *
+    }
+  }
+}

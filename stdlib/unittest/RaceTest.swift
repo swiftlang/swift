@@ -38,7 +38,11 @@
 
 import SwiftUnstable
 import SwiftUnstablePthreadExtras
+#if os(OSX) || os(iOS)
 import Darwin
+#elseif os(Linux)
+import Glibc
+#endif
 
 #if _runtime(_ObjC)
 import ObjectiveC
@@ -528,4 +532,3 @@ public func consumeCPU(#units: Int) {
     }
   }
 }
-

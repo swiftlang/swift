@@ -1,7 +1,5 @@
 // RUN: %target-run-stdlib-swift
 
-// XFAIL: linux
-
 import Swift
 import SwiftUnstable
 import StdlibUnittest

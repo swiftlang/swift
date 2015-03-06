@@ -14,8 +14,6 @@
 // RUN: %S/../../utils/line-directive %t/Join.swift -- %target-build-swift %t/Join.swift -o %t/a.out
 // RUN: %S/../../utils/line-directive %t/Join.swift -- %target-run %t/a.out
 
-// XFAIL: linux
-
 import StdlibUnittest
 
 var JoinTestSuite = TestSuite("Join")
