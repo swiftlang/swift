@@ -119,8 +119,7 @@ SIMPLE_DECL_ATTR(NSManaged, NSManaged, OnVar, 15)
 
 SIMPLE_DECL_ATTR(lazy, Lazy, OnVar|DeclModifier, 16)
 
-SIMPLE_DECL_ATTR(LLDBDebuggerFunction, LLDBDebuggerFunction, RejectByParser |
-                 OnFunc, 17)
+SIMPLE_DECL_ATTR(LLDBDebuggerFunction, LLDBDebuggerFunction, OnFunc, 17)
 
 SIMPLE_DECL_ATTR(UIApplicationMain, UIApplicationMain,
                  OnClass, 18)
