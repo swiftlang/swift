@@ -174,9 +174,9 @@ public struct UnicodeScalar :
   // FIXME: Unicode and locales make this interesting
   var _uppercase: UnicodeScalar {
     if self >= "a" && self <= "z" {
-      return UnicodeScalar(UInt32(self) - 32)
+      return UnicodeScalar(UInt32(self) &- 32)
     } else if self >= "à" && self <= "þ" && self != "÷" {
-      return UnicodeScalar(UInt32(self) - 32)
+      return UnicodeScalar(UInt32(self) &- 32)
     }
     return self
   }
@@ -184,9 +184,9 @@ public struct UnicodeScalar :
   // FIXME: Unicode and locales make this interesting
   var _lowercase: UnicodeScalar {
     if self >= "A" && self <= "Z" {
-      return UnicodeScalar(UInt32(self) + 32)
+      return UnicodeScalar(UInt32(self) &+ 32)
     } else if self >= "À" && self <= "Þ" && self != "×" {
-      return UnicodeScalar(UInt32(self) + 32)
+      return UnicodeScalar(UInt32(self) &+ 32)
     }
     return self
   }
