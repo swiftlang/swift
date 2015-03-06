@@ -1078,9 +1078,14 @@ public struct Dictionary<Key : Hashable, Value> :
 
   /// Remove all elements.
   ///
-  /// Postcondition: `capacity == 0` iff `keepCapacity` is `false`.
+  /// Postcondition: `capacity == 0` if `keepCapacity` is `false`, otherwise
+  /// the capacity will not be decreased.
   ///
   /// Invalidates all indices with respect to `self`.
+  ///
+  /// :param: keepCapacity If `true`, the operation preserves the
+  /// storage capacity that the collection has, otherwise the underlying
+  /// storage is released.  The default is `false`.
   ///
   /// Complexity: O(\ `count`\ ).
   public mutating func removeAll(keepCapacity: Bool = false) {
