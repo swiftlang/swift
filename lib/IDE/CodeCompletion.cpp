@@ -801,6 +801,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   DeclAttrKind AttrKind;
   int AttrParamIndex;
   bool IsInSil;
+  bool IsInParam;
 
   /// \brief Set to true when we have delivered code completion results
   /// to the \c Consumer.
@@ -905,7 +906,7 @@ public:
 
   void completeCaseStmtBeginning() override;
   void completeCaseStmtDotPrefix() override;
-  void completeDeclAttrKeyword(bool Sil) override;
+  void completeDeclAttrKeyword(bool Sil, bool Param) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeNominalMemberBeginning() override;
 
@@ -2026,14 +2027,31 @@ public:
     addKeyword("self", BaseType);
   }
 
-  void getAttributeDeclCompletions(bool IsInSil) {
+  enum AttributeTarget {
+    // FIXME: support more target
+    Param,
+    Unknown,
+  };
+
+  void getAttributeDeclCompletions(bool IsInSil, bool IsInParam) {
     // FIXME: also include user-defined attribute keywords
+    AttributeTarget AT = Unknown;
+    if (IsInParam)
+      AT = Param;
 #define DECL_ATTR(KEYWORD, NAME, ...)                                         \
     if (!DeclAttribute::isUserInaccessible(DAK_##NAME) &&                     \
         !DeclAttribute::isDeclModifier(DAK_##NAME) &&                         \
         !DeclAttribute::shouldBeRejectedByParser(DAK_##NAME) &&               \
-        (!DeclAttribute::isSilOnly(DAK_##NAME) || IsInSil))                   \
-      addDeclAttrKeyword(#KEYWORD, "Declaration Attribute");
+        (!DeclAttribute::isSilOnly(DAK_##NAME) || IsInSil)) {                 \
+          switch (AT) {                                                       \
+              case Param:                                                     \
+                if (DeclAttribute::isOnParam(DAK_##NAME))                     \
+                  addDeclAttrKeyword(#KEYWORD, "Parameter Attribute");        \
+                break;                                                        \
+              case Unknown:                                                   \
+                addDeclAttrKeyword(#KEYWORD, "Declaration Attribute");        \
+          }                                                                   \
+      }
 #include "swift/AST/Attr.def"
   }
 
@@ -2327,9 +2345,10 @@ void CodeCompletionCallbacksImpl::completeDeclAttrParam(DeclAttrKind DK,
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeDeclAttrKeyword(bool Sil) {
+void CodeCompletionCallbacksImpl::completeDeclAttrKeyword(bool Sil, bool Param) {
   Kind = CompletionKind::AttributeBegin;
   IsInSil = Sil;
+  IsInParam = Param;
   CurDeclContext = P.CurDeclContext;
 }
 
@@ -2605,7 +2624,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
   case CompletionKind::AttributeBegin: {
-    Lookup.getAttributeDeclCompletions(IsInSil);
+    Lookup.getAttributeDeclCompletions(IsInSil, IsInParam);
     break;
   }
   case CompletionKind::AttributeDeclParen: {

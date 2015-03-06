@@ -1,7 +1,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAILABILITY1 | FileCheck %s -check-prefix=AVAILABILITY1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAILABILITY2 | FileCheck %s -check-prefix=AVAILABILITY2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD1 | FileCheck %s -check-prefix=KEYWORD1
-
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD2 | FileCheck %s -check-prefix=KEYWORD2
 
 @availability(#^AVAILABILITY1^#
 
@@ -23,7 +23,6 @@
 // AVAILABILITY2-NEXT:        Keyword/None:                       deprecated=[#Specify version number#]; name=deprecated{{$}}
 // AVAILABILITY2-NEXT:        End completions
 
-
 @#^KEYWORD1^#
 
 // KEYWORD1:                  Begin completions, 16 items
@@ -44,3 +43,10 @@
 // KEYWORD1-NEXT:             Keyword/None:                       noescape[#Declaration Attribute#]; name=noescape
 // KEYWORD1-NEXT:             Keyword/None:                       NSApplicationMain[#Declaration Attribute#]; name=NSApplicationMain
 // KEYWORD1-NEXT:             End completions
+
+func method(@#^KEYWORD2^#
+
+// KEYWORD2:                  Begin completions, 2 items
+// KEYWORD2-NEXT:             Keyword/None:                       autoclosure[#Parameter Attribute#]; name=autoclosure{{$}}
+// KEYWORD2-NEXT:             Keyword/None:                       noescape[#Parameter Attribute#]; name=noescape{{$}}
+// KEYWORD2-NEXT:             End completions

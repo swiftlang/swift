@@ -1274,12 +1274,13 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
 ///     '@' attribute
 /// \endverbatim
 bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
-                                    bool StopAtTypeAttributes) {
+                                    bool StopAtTypeAttributes,
+                                    bool InParam) {
   while (Tok.is(tok::at_sign)) {
     if (peekToken().is(tok::code_complete) && CodeCompletion) {
       consumeToken(tok::at_sign);
       consumeToken(tok::code_complete);
-      CodeCompletion->completeDeclAttrKeyword(isInSILMode());
+      CodeCompletion->completeDeclAttrKeyword(isInSILMode(), InParam);
       continue;
     }
     SourceLoc AtLoc = Tok.getLoc();

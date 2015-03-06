@@ -162,7 +162,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     unsigned defaultArgIndex = defaultArgs? defaultArgs->NextIndex++ : 0;
 
     // Attributes.
-    parseDeclAttributeList(param.Attrs, /*stop at type attributes*/true);
+    parseDeclAttributeList(param.Attrs, /*stop at type attributes*/true, true);
 
     // ('inout' | 'let' | 'var')?
     if (Tok.is(tok::kw_inout)) {

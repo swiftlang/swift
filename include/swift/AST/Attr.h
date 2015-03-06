@@ -525,6 +525,10 @@ public:
     return getOptions(DK) & DeclModifier;
   }
 
+  static bool isOnParam(DeclAttrKind DK) {
+    return getOptions(DK) & OnParam;
+  }
+
   static bool isNotSerialized(DeclAttrKind DK) {
     return getOptions(DK) & NotSerialized;
   }
