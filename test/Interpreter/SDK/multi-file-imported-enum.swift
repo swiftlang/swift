@@ -2,6 +2,8 @@
 // RUN: %target-build-swift -module-name test -whole-module-optimization %s %S/Inputs/multi-file-imported-enum/main.swift -o %t/a.out
 // RUN: %target-run %t/a.out | FileCheck %s
 
+// XFAIL: linux
+
 import Foundation
 
 class C {
