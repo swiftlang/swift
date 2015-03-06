@@ -174,7 +174,7 @@ getSubstitutionsForSuperclass(SILModule &M, CanSILFunctionType GenCalleeType,
 bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
                                        SILType ClassInstanceType,
                                        ClassDecl *CD,
-                                       DevirtClassMethodInfo& DCMI) {
+                                       DevirtClassMethodInfo &DCMI) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
 
   auto *CMI = cast<ClassMethodInst>(AI->getCallee());
@@ -256,7 +256,7 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
 /// return the new ApplyInst if created one or null.
 ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
                                           SILValue ClassInstance,
-                                          DevirtClassMethodInfo& DCMI) {
+                                          DevirtClassMethodInfo &DCMI) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
 
   // Grab the self type from the function ref and the self type from the class
