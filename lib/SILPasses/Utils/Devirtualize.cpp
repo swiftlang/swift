@@ -93,6 +93,71 @@ bool swift::isClassWithUnboundGenericParameters(SILType C, SILModule &M) {
   return false;
 }
 
+static ArrayRef<Substitution>
+getSubstitutionsForSuperclass(SILModule &M, CanSILFunctionType GenCalleeType,
+                              SILType ClassInstanceType, ApplyInst *AI) {
+  // *NOTE*:
+  // Apply instruction substitutions are for the Member from a protocol or
+  // class B, where this member was first defined, before it got overridden by
+  // derived classes.
+  //
+  // The implementation F (the implementing method) which was found may have
+  // a different set of generic parameters, e.g. because it is implemented by a
+  // class D1 derived from B.
+  //
+  // ClassInstanceType may have a type different from both the type B
+  // the Member belongs to and from the ClassInstanceType, e.g. if
+  // ClassInstance is of a class D2, which is derived from D1, but does not
+  // override the Member.
+  //
+  // As a result, substitutions provided by AI are for Member, whereas
+  // substitutions in ClassInstanceType are for D2. And substitutions for D1
+  // are not available directly in a general case. Therefore, they have to
+  // be computed.
+  //
+  // What we know for sure:
+  //   B is a superclass of D1
+  //   D1 is a superclass of D2.
+  // D1 can be the same as D2. D1 can be the same as B.
+  //
+  // So, substitutions from AI are for class B.
+  // Substitutions for class D1 by means of bindSuperclass(), which starts
+  // with a bound type ClassInstanceType and checks its superclasses until it
+  // finds a bound superclass matching D1 and returns its substitutions.
+
+  // Class F belongs to.
+  CanType FSelfClass = GenCalleeType->getSelfParameter().getType();
+
+  SILType FSelfSubstType;
+  Module *Module = M.getSwiftModule();
+
+  if (GenCalleeType->isPolymorphic()) {
+    // Declaration of the class F belongs to.
+    if (auto *FSelfTypeDecl = FSelfClass.getNominalOrBoundGenericNominal()) {
+      // Get the unbound generic type F belongs to.
+      CanType FSelfGenericType =
+        FSelfTypeDecl->getDeclaredType()->getCanonicalType();
+
+      assert((isa<BoundGenericType>(ClassInstanceType.getSwiftRValueType()) ||
+              isa<NominalType>(ClassInstanceType.getSwiftRValueType())) &&
+             "Self type should be either a bound generic type"
+             "or a non-generic type");
+
+      assert((isa<UnboundGenericType>(FSelfGenericType) ||
+              isa<NominalType>(FSelfGenericType)) &&
+             "Method implementation self type should be generic");
+
+      if (isa<BoundGenericType>(ClassInstanceType.getSwiftRValueType())) {
+        auto BoundBaseType = bindSuperclass(FSelfGenericType,
+                                            ClassInstanceType);
+        return BoundBaseType->getSubstitutions(Module, nullptr);
+      }
+    }
+  }
+
+  return AI->getSubstitutions();
+}
+
 /// \brief Check if it is possible to devirtualize an Apply instruction
 /// and a class member obtained using the class_method instruction into
 /// a direct call to a specific member of a specific class.
@@ -133,83 +198,17 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
     return false;
   }
 
-  // Ok, we found a function F that we can devirtualize our class method
-  // to. We want to do everything on the substituted type in the case of
-  // generics. Thus construct our subst callee type for F.
-  SILModule &M = DCMI.F->getModule();
-  CanSILFunctionType GenCalleeType = DCMI.F->getLoweredFunctionType();
-  // Class F belongs to.
-  CanType FSelfClass = GenCalleeType->getSelfParameter().getType();
-
   // Bail if any generic types parameters of the class instance type are
   // unbound.
   // We cannot devirtualize unbound generic calls yet.
   if (isClassWithUnboundGenericParameters(ClassInstanceType, AI->getModule()))
     return false;
 
-  // *NOTE*:
-  // Apply instruction substitutions are for the Member from a protocol or
-  // class B, where this member was first defined, before it got overridden by
-  // derived classes.
-  //
-  // The implementation F (the implementing method) which was found may have
-  // a different set of generic parameters, e.g. because it is implemented by a
-  // class D1 derived from B.
-  //
-  // ClassInstanceType may have a type different from both the type B
-  // the Member belongs to and from the ClassInstanceType, e.g. if
-  // ClassInstance is of a class D2, which is derived from D1, but does not
-  // override the Member.
-  //
-  // As a result, substitutions provided by AI are for Member, whereas
-  // substitutions in ClassInstanceType are for D2. And substitutions for D1
-  // are not available directly in a general case. Therefore, they have to
-  // be computed.
-  //
-  // What we know for sure:
-  //   B is a superclass of D1
-  //   D1 is a superclass of D2.
-  // D1 can be the same as D2. D1 can be the same as B.
-  //
-  // So, substitutions from AI are for class B.
-  // Substitutions for class D1 by means of bindSuperclass(), which starts
-  // with a bound type ClassInstanceType and checks its superclasses until it
-  // finds a bound superclass matching D1 and returns its substitutions.
+  CanSILFunctionType GenCalleeType = DCMI.F->getLoweredFunctionType();
+  SILModule &M = DCMI.F->getModule();
 
-  SILType FSelfSubstType;
-  Module *Module = M.getSwiftModule();
-
-  if (GenCalleeType->isPolymorphic()) {
-    // Declaration of the class F belongs to.
-    if (auto *FSelfTypeDecl = FSelfClass.getNominalOrBoundGenericNominal()) {
-      // Get the unbound generic type F belongs to.
-      CanType FSelfGenericType =
-        FSelfTypeDecl->getDeclaredType()->getCanonicalType();
-
-      assert((isa<BoundGenericType>(ClassInstanceType.getSwiftRValueType()) ||
-              isa<NominalType>(ClassInstanceType.getSwiftRValueType())) &&
-             "Self type should be either a bound generic type"
-             "or a non-generic type");
-
-      assert((isa<UnboundGenericType>(FSelfGenericType) ||
-              isa<NominalType>(FSelfGenericType)) &&
-             "Method implementation self type should be generic");
-
-      if (isa<BoundGenericType>(ClassInstanceType.getSwiftRValueType())) {
-        auto BoundBaseType = bindSuperclass(FSelfGenericType,
-                                            ClassInstanceType);
-        DCMI.Substitutions = BoundBaseType->getSubstitutions(Module, nullptr);
-      } else {
-        DCMI.Substitutions = AI->getSubstitutions();
-      }
-    } else {
-      // It is not a type or bound type.
-      // It could be that GenCalleeType is generic, but its arguments cannot
-      // be derived from the type of self. In this case, we can try to
-      // approach it from another end and take the AI substitutions.
-      DCMI.Substitutions = AI->getSubstitutions();
-    }
-  }
+  DCMI.Substitutions = getSubstitutionsForSuperclass(M, GenCalleeType,
+                                                     ClassInstanceType, AI);
 
   // For polymorphic functions, bail if the number of substitutions is
   // not the same as the number of expected generic parameters.
@@ -219,6 +218,8 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
     if (CalleeGenericParamsNum != DCMI.Substitutions.size())
       return false;
   }
+
+  Module *Module = M.getSwiftModule();
 
   DCMI.SubstCalleeType =
     GenCalleeType->substGenericArgs(M, Module, DCMI.Substitutions);
