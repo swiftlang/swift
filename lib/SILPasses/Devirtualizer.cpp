@@ -139,14 +139,15 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   if (!Method)
     return nullptr;
 
-  bool IsValueMetatype = false;
   SILType RealSubClassTy = SubClassTy;
 
   if (isa<ValueMetatypeInst>(ClassInstance.stripUpCasts())) {
     // Convert this type to its metatype type.
     Lowering::TypeConverter TC(AI->getModule());
     RealSubClassTy = TC.getLoweredLoadableType(CD->getType());
-    IsValueMetatype = true;
+  } else {
+    assert(SubClassTy.getClassOrBoundGenericClass() &&
+           "Dest type must be a class type");
   }
 
   // Placeholder for keeping the results of analysis performed
@@ -178,9 +179,6 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   SILBuilderWithScope<> Builder(Entry, AI->getDebugScope());
   // Create the checked_cast_branch instruction that checks at runtime if the
   // class instance is identical to the SILType.
-  if (!IsValueMetatype)
-    assert(SubClassTy.getClassOrBoundGenericClass() &&
-           "Dest type must be a class type");
 
   It = Builder.createCheckedCastBranch(AI->getLoc(), /*exact*/ true,
                                        ClassInstance, RealSubClassTy, Iden,
