@@ -549,8 +549,8 @@ extension ${Self} : _ArrayType {
   public mutating func removeLast() -> T {
     _precondition(count > 0, "can't removeLast from an empty ${Self}")
     let c = count
-    let result = self[c - 1]
-    self.replaceRange((c - 1)..<c, with: EmptyCollection())
+    let result = self[c &- 1]
+    self.replaceRange((c &- 1)..<c, with: EmptyCollection())
     return result
   }
   
