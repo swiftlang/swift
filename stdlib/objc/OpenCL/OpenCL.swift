@@ -12,8 +12,6 @@
 
 @exported import OpenCL // Clang module
 
-public let openCLOverlayWorks = true
-
 @availability(OSX, introduced=10.7)
 public func clSetKernelArgsListAPPLE(
   kernel: cl_kernel, uint: cl_uint, args: CVarArgType...
