@@ -143,8 +143,7 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   DevirtClassMethodInfo DCMI;
 
   // Bail if this class_method cannot be devirtualized.
-  if (!canDevirtualizeClassMethod(AI, CMI->getMember(),
-                                  RealSubClassTy, CD, DCMI))
+  if (!canDevirtualizeClassMethod(AI, RealSubClassTy, CD, DCMI))
     return nullptr;
 
 
@@ -213,8 +212,8 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   NumInlineCaches++;
 
   // Devirtualize the apply instruction on the identical path.
-  ApplyInst *NewAI = devirtualizeClassMethod(IdenAI, CMI->getMember(),
-                                             DownCastedClassInstance, DCMI);
+  ApplyInst *NewAI = devirtualizeClassMethod(IdenAI, DownCastedClassInstance,
+                                             DCMI);
   assert(NewAI && "Expected to be able to devirtualize apply!");
   (void) NewAI;
 
@@ -458,8 +457,7 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   // implementation which is not covered by checked_cast_br checks yet.
   // So, it is safe to replace a class_method invocation by
   // a direct call of this remaining implementation.
-  ApplyInst *NewAI = devirtualizeClassMethod(AI, CMI->getMember(),
-                                               ClassInstance, CD);
+  ApplyInst *NewAI = devirtualizeClassMethod(AI, ClassInstance, CD);
   assert(NewAI && "Expected to be able to devirtualize apply!");
   (void) NewAI;
 

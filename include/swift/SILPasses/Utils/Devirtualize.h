@@ -45,13 +45,13 @@ struct DevirtClassMethodInfo {
 
 ApplyInst *devirtualizeApply(ApplyInst *AI);
 bool isClassWithUnboundGenericParameters(SILType C, SILModule &M);
-bool canDevirtualizeClassMethod(ApplyInst *AI, SILDeclRef Member,
+bool canDevirtualizeClassMethod(ApplyInst *AI,
                                 SILType ClassInstanceType, ClassDecl *CD,
                                 DevirtClassMethodInfo& DCMI);
-ApplyInst *devirtualizeClassMethod(ApplyInst *AI, SILDeclRef Member,
+ApplyInst *devirtualizeClassMethod(ApplyInst *AI,
                                    SILValue ClassInstance,
                                    DevirtClassMethodInfo& DCMI);
-ApplyInst *devirtualizeClassMethod(ApplyInst *AI, SILDeclRef Member,
+ApplyInst *devirtualizeClassMethod(ApplyInst *AI,
                                    SILValue ClassInstance, ClassDecl *CD);
 
 }

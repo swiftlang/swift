@@ -172,11 +172,13 @@ getSubstitutionsForSuperclass(SILModule &M, CanSILFunctionType GenCalleeType,
 ///    performing the transformation.
 /// return true if it is possible to devirtualize, false - otherwise.
 bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
-                                       SILDeclRef Member,
                                        SILType ClassInstanceType,
                                        ClassDecl *CD,
                                        DevirtClassMethodInfo& DCMI) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
+
+  auto *CMI = cast<ClassMethodInst>(AI->getCallee());
+  auto Member = CMI->getMember();
 
   // First attempt to lookup the origin for our class method. The origin should
   // either be a metatype or an alloc_ref.
@@ -253,10 +255,8 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
 ///    performing the transformation.
 /// return the new ApplyInst if created one or null.
 ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
-                                          SILDeclRef Member,
                                           SILValue ClassInstance,
                                           DevirtClassMethodInfo& DCMI) {
-
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
 
   // Grab the self type from the function ref and the self type from the class
@@ -387,14 +387,12 @@ ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
 /// This is a simplified version of devirtualizeClassMethod, which can
 /// be called without the previously prepared DevirtClassMethodInfo.
 ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
-                                          SILDeclRef Member,
                                           SILValue ClassInstance,
                                           ClassDecl *CD) {
   DevirtClassMethodInfo DCMI;
-  if (!canDevirtualizeClassMethod(AI, Member, ClassInstance.getType(), CD,
-                                  DCMI))
+  if (!canDevirtualizeClassMethod(AI, ClassInstance.getType(), CD, DCMI))
     return nullptr;
-  return devirtualizeClassMethod(AI, Member, ClassInstance, DCMI);
+  return devirtualizeClassMethod(AI, ClassInstance, DCMI);
 }
 
 
@@ -560,13 +558,11 @@ ApplyInst *swift::devirtualizeApply(ApplyInst *AI) {
   if (auto *CMI = dyn_cast<ClassMethodInst>(AI->getCallee())) {
     // Check if the class member is known to be final.
     if (ClassDecl *C = getClassFromAccessControl(CMI))
-      return devirtualizeClassMethod(AI, CMI->getMember(), CMI->getOperand(),
-                                     C);
+      return devirtualizeClassMethod(AI, CMI->getOperand(), C);
 
     // Try to search for the point of construction.
     if (ClassDecl *C = getClassFromConstructor(CMI->getOperand()))
-      return devirtualizeClassMethod(AI, CMI->getMember(),
-                                     CMI->getOperand().stripUpCasts(), C);
+      return devirtualizeClassMethod(AI, CMI->getOperand().stripUpCasts(), C);
   }
 
   return nullptr;
