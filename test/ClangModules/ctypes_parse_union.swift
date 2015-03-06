@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-union-import -parse -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify %s
 
 // XFAIL: linux
 

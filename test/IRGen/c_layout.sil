@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -I %S/Inputs/abi %s -emit-ir -enable-union-import | FileCheck %s --check-prefix=CHECK-%target-cpu
+// RUN: %target-swift-frontend -I %S/Inputs/abi %s -emit-ir | FileCheck %s --check-prefix=CHECK-%target-cpu
 
 sil_stage canonical
 import c_layout

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -O -emit-sil -I %S/Inputs -enable-source-import -primary-file %s -enable-union-import | FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -O -emit-sil -I %S/Inputs -enable-source-import -primary-file %s | FileCheck %s
 
 import gizmo
 

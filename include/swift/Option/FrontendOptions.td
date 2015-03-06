@@ -181,10 +181,6 @@ def enable_private_discriminators :
   Flag<["-"], "enable-private-discriminators">,
   HelpText<"Mangle discriminators into the symbol names for private entities">;
 
-def enable_union_import :
-  Flag<["-"], "enable-union-import">,
-  HelpText<"Import C unions">;
-
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 

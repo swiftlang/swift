@@ -612,8 +612,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_access_control);
   }
   
-  Opts.ImportUnions |= Args.hasArg(OPT_enable_union_import);
-  
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 

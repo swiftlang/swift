@@ -1985,15 +1985,9 @@ namespace {
       // initialized.
       bool hasZeroInitializableStorage = true;
       
-      if (decl->isUnion()) {
-        if (Impl.SwiftContext.LangOpts.ImportUnions) {
-          // Import the union, but don't make its storage accessible for now.
-          hasUnreferenceableStorage = true;
-        } else {
-          // FIXME: Skip unions for now.
-          return nullptr;
-        }
-      }
+      if (decl->isUnion())
+        // Import the union, but don't make its storage accessible for now.
+        hasUnreferenceableStorage = true;
 
       // FIXME: Skip Microsoft __interfaces.
       if (decl->isInterface())
@@ -2028,16 +2022,9 @@ namespace {
       for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
            m != mEnd; ++m) {
         if (auto FD = dyn_cast<clang::FieldDecl>(*m))
-          if (FD->isBitField()) {
-            if (Impl.SwiftContext.LangOpts.ImportUnions) {
-              // We don't make bitfields accessible in Swift yet.
-              hasUnreferenceableStorage = true;
-            } else {
-              // We don't import structs with bitfields because we can not
-              // lay them out correctly in IRGen.
-              return nullptr;
-            }
-          }
+          if (FD->isBitField())
+            // We don't make bitfields accessible in Swift yet.
+            hasUnreferenceableStorage = true;
       }
 
       // Create the struct declaration and record it.
