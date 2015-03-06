@@ -201,7 +201,7 @@ public struct _StringCore {
   /// If the string does not have an ASCII buffer available (including the case
   /// when we don't have a utf16 buffer) then it equals 2.
   public var elementWidth: Int {
-    return elementShift + 1
+    return elementShift &+ 1
   }
 
   public var hasContiguousStorage: Bool {
