@@ -60,7 +60,7 @@ public struct _StringBuffer {
   public init(capacity: Int, initialSize: Int, elementWidth: Int) {
     _sanityCheck(elementWidth == 1 || elementWidth == 2)
     _sanityCheck(initialSize <= capacity)
-    let elementShift = elementWidth - 1
+    let elementShift = elementWidth &- 1
 
     // We need at least 1 extra byte if we're storing 8-bit elements,
     // because indexing will always grab 2 consecutive bytes at a
