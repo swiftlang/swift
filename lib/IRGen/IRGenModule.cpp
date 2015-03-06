@@ -566,8 +566,8 @@ void IRGenModule::emitAutolinkInfo() {
   if (!Opts.ForceLoadSymbolName.empty()) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, Opts.ForceLoadSymbolName);
-    (void)new llvm::GlobalVariable(Module, Int1Ty, /*constant=*/true,
-                                   llvm::GlobalValue::WeakAnyLinkage,
+    (void)new llvm::GlobalVariable(Module, Int1Ty, /*constant=*/false,
+                                   llvm::GlobalValue::CommonLinkage,
                                    llvm::Constant::getNullValue(Int1Ty),
                                    buf.str());
   }

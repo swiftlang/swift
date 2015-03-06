@@ -36,8 +36,8 @@ import someModule
 // FRAMEWORK-DAG: !{{[0-9]+}} = !{!"-framework", !"someModule"}
 
 // NO-FORCE-LOAD-NOT: FORCE_LOAD
-// FORCE-LOAD: @"_swift_FORCE_LOAD_$_module" = weak constant i1 false
-// FORCE-LOAD-HEX: @"_swift_FORCE_LOAD_$306d6f64756c65" = weak constant i1 false
+// FORCE-LOAD: @"_swift_FORCE_LOAD_$_module" = common global i1 false
+// FORCE-LOAD-HEX: @"_swift_FORCE_LOAD_$306d6f64756c65" = common global i1 false
 
 // FORCE-LOAD-CLIENT: @"_swift_FORCE_LOAD_$_module" = external global i1
 // FORCE-LOAD-CLIENT: @"_swift_FORCE_LOAD_$_module_$_autolinking" = weak hidden constant i1* @"_swift_FORCE_LOAD_$_module"
