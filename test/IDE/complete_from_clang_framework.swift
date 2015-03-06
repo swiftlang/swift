@@ -14,11 +14,14 @@
 // RUN: FileCheck %s -check-prefix=CLANG_QUAL_FOO_NEGATIVE < %t.compl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_QUAL_BAR_1 > %t.compl.txt
-// RUN: FileCheck %s -check-prefix=CLANG_QUAL_BAR_1 < %t.compl.txt
+
+// <rdar://problem/20064024> IDE tests need to be updated for clang
+// FIXME: FileCheck %s -check-prefix=CLANG_QUAL_BAR_1 < %t.compl.txt
 // RUN: FileCheck %s -check-prefix=CLANG_BAR < %t.compl.txt
 // RUN: FileCheck %s -check-prefix=CLANG_QUAL_BAR_NEGATIVE < %t.compl.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_QUAL_FOO_2 | FileCheck %s -check-prefix=CLANG_QUAL_FOO_2
+// <rdar://problem/20064024> IDE tests need to be updated for clang
+// FIXME: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_QUAL_FOO_2 | FileCheck %s -check-prefix=CLANG_QUAL_FOO_2
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=FUNCTION_CALL_1 | FileCheck %s -check-prefix=FUNCTION_CALL_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=FUNCTION_CALL_2 | FileCheck %s -check-prefix=FUNCTION_CALL_2
