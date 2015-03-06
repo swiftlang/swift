@@ -188,11 +188,11 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
   // the module vtables.
   SILModule &Mod = AI->getModule();
   // Find the implementation of the member which should be invoked.
-  DCMI.F = Mod.lookUpFunctionInVTable(CD, Member);
+  SILFunction *F = Mod.lookUpFunctionInVTable(CD, Member);
 
   // If we do not find any such function, we have no function to devirtualize
   // to... so bail.
-  if (!DCMI.F) {
+  if (!F) {
     DEBUG(llvm::dbgs() << "        FAIL: Could not find matching VTable or "
                           "vtable method for this class.\n");
     return false;
@@ -204,26 +204,28 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
   if (isClassWithUnboundGenericParameters(ClassInstanceType, AI->getModule()))
     return false;
 
-  CanSILFunctionType GenCalleeType = DCMI.F->getLoweredFunctionType();
-  SILModule &M = DCMI.F->getModule();
+  CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
+  SILModule &M = F->getModule();
 
-  DCMI.Substitutions = getSubstitutionsForSuperclass(M, GenCalleeType,
-                                                     ClassInstanceType, AI);
+  auto Subs = getSubstitutionsForSuperclass(M, GenCalleeType,
+                                            ClassInstanceType, AI);
 
   // For polymorphic functions, bail if the number of substitutions is
   // not the same as the number of expected generic parameters.
   if (GenCalleeType->isPolymorphic()) {
     auto GenericSig = GenCalleeType->getGenericSignature();
     auto CalleeGenericParamsNum = GenericSig->getGenericParams().size();
-    if (CalleeGenericParamsNum != DCMI.Substitutions.size())
+    if (CalleeGenericParamsNum != Subs.size())
       return false;
   }
 
   Module *Module = M.getSwiftModule();
 
+  DCMI.F = F;
+  DCMI.Substitutions = Subs;
+
   DCMI.SubstCalleeType =
     GenCalleeType->substGenericArgs(M, Module, DCMI.Substitutions);
-
 
   // If F's this pointer has a different type from CMI's operand and the
   // "this" pointer type is a super class of the CMI's operand, insert an
@@ -235,11 +237,6 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
   // nullptr on release builds.
   assert(!DCMI.ParamTypes.empty() &&
          "Must have a this pointer when calling a class method inst.");
-  if (DCMI.ParamTypes.empty())
-    return false;
-
-  // If we reached this point, we can replace class_method by a concrete
-  // function ref for sure.
 
   return true;
 }
