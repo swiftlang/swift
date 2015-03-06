@@ -243,7 +243,7 @@ public struct Character :
       // Note: using unchecked arthmetic because overflow can not happen if the
       // above sanity checks hold.
       return UTF16.CodeUnit(truncatingBitPattern:
-        data >> ((UInt64(count) - UInt64(position) - 1) &* 16))
+        data >> ((UInt64(count) &- UInt64(position) &- 1) &* 16))
     }
 
     /// Return a *generator* over the elements of this *sequence*.
