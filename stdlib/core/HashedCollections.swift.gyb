@@ -2742,7 +2742,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
       var oldCocoaGenerator = _Cocoa${Self}Generator(cocoa${Self})
 %if Self == 'Set':
 
-      while let key = oldCocoaGenerator.next() {
+      while let key: _Cocoa${Self}Generator.Element = oldCocoaGenerator.next() {
         newNativeStorage.unsafeAddNew(
             key: _forceBridgeFromObjectiveC(key, Value.self))
       }
@@ -3616,7 +3616,7 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
     case ._Cocoa(var cocoaGenerator):
 #if _runtime(_ObjC)
 %if Self == 'Set':
-      if let anyObjectElement = cocoaGenerator.next() {
+      if let anyObjectElement: _Cocoa${Self}Generator.Element = cocoaGenerator.next() {
         return _forceBridgeFromObjectiveC(anyObjectElement, T.self)
       }
 %elif Self == 'Dictionary':
