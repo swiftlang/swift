@@ -196,9 +196,9 @@ func _introSortImpl<
   let partIdx: C.Index = _partition(&elements, range
                                     ${", &isOrderedBefore" if p else ""})
   _introSortImpl(&elements, range.startIndex..<partIdx,
-                 ${"&isOrderedBefore, " if p else ""} depthLimit - 1);
+                 ${"&isOrderedBefore, " if p else ""} depthLimit &- 1);
   _introSortImpl(&elements, (partIdx.successor())..<range.endIndex,
-                 ${"&isOrderedBefore, " if p else ""} depthLimit - 1);
+                 ${"&isOrderedBefore, " if p else ""} depthLimit &- 1);
 }
 
 func _siftDown<
