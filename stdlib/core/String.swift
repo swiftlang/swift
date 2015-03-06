@@ -302,36 +302,14 @@ public func ==(lhs: String, rhs: String) -> Bool {
       UnsafeMutablePointer(rhs._core.startASCII),
       rhs._core.count) == 0
   }
-#if _runtime(_ObjC)
-  // Note: this operation should be consistent with equality comparison of
-  // Character.
-  return _stdlib_compareNSStringDeterministicUnicodeCollation(
-    lhs._bridgeToObjectiveCImpl(), rhs._bridgeToObjectiveCImpl()) == 0
-#else
-  // FIXME: Actually implement. For now, all strings are unequal.
-  // rdar://problem/18878343
-  return false
-#endif
+  return lhs._compareString(rhs) == 0
 }
 
 extension String : Comparable {
 }
 
 extension String {
-  @inline(never) @semantics("stdlib_binary_only") // Hide the CF dependency
-  public // @testable
-  func _lessThanUTF16(rhs: String) -> Bool {
 #if _runtime(_ObjC)
-    return _stdlib_compareNSStringDeterministicUnicodeCollation(
-      self._stdlib_binary_bridgeToObjectiveCImpl(),
-      rhs._stdlib_binary_bridgeToObjectiveCImpl()) < 0
-#else
-    // FIXME: Actually implement. For now, all strings are unequal
-    // rdar://problem/18878343
-    return false
-#endif
-  }
-
   /// This is consistent with Foundation, but incorrect as defined by Unicode.
   /// Unicode weights some ASCII punctuation in a different order than ASCII
   /// value. Such as:
@@ -342,24 +320,75 @@ extension String {
   /// 0027  ; [*02F8.0020.0002] # APOSTROPHE
   /// precondition: both self and rhs are ASCII strings
   public // @testable
-  func _lessThanASCII(rhs: String) -> Bool {
-    let compare = memcmp(
+  func _compareASCII(rhs: String) -> Int {
+    var compare = Int(memcmp(
       UnsafeMutablePointer(self._core.startASCII),
       UnsafeMutablePointer(rhs._core.startASCII),
-      min(self._core.count, rhs._core.count))
+      min(self._core.count, rhs._core.count)))
     if compare == 0 {
-      return self._core.count < rhs._core.count
-    } else {
-      return compare < 0
+      compare = self._core.count - rhs._core.count
     }
+    // This efficiently normalizes the result to -1, 0, or 1 to match the
+    // behaviour of NSString's compare function.
+    return (compare > 0 ? 1 : 0) - (compare < 0 ? 1 : 0)
+  }
+#endif
+
+  /// Compares two strings with the Unicode Collation Algorithm
+  @inline(never) @semantics("stdlib_binary_only") // Hide the CF/ICU dependency
+  public  // @testable
+  func _compareDeterministicUnicodeCollation(rhs: String) -> Int {
+    // Note: this operation should be consistent with equality comparison of
+    // Character.
+#if _runtime(_ObjC)
+    return Int(_stdlib_compareNSStringDeterministicUnicodeCollation(
+      _bridgeToObjectiveCImpl(), rhs._bridgeToObjectiveCImpl()))
+#else
+    switch (_core.isASCII, rhs._core.isASCII) {
+    case (true, false):
+      let lhsPtr = UnsafePointer<Int8>(_core.startASCII)
+      let rhsPtr = UnsafePointer<UTF16.CodeUnit>(rhs._core.startUTF16)
+
+      return Int(_swift_stdlib_unicode_compare_utf8_utf16(
+        lhsPtr, Int32(_core.count), rhsPtr, Int32(rhs._core.count)))
+    case (false, true):
+      // Just invert it and recurse for this case.
+      return -rhs._compareDeterministicUnicodeCollation(self)
+    case (false, false):
+      let lhsPtr = UnsafePointer<UTF16.CodeUnit>(_core.startUTF16)
+      let rhsPtr = UnsafePointer<UTF16.CodeUnit>(rhs._core.startUTF16)
+
+      return Int(_swift_stdlib_unicode_compare_utf16_utf16(
+        lhsPtr, Int32(_core.count),
+        rhsPtr, Int32(rhs._core.count)))
+    case (true, true):
+      let lhsPtr = UnsafePointer<Int8>(_core.startASCII)
+      let rhsPtr = UnsafePointer<Int8>(rhs._core.startASCII)
+
+      return Int(_swift_stdlib_unicode_compare_utf8_utf8(
+        lhsPtr, Int32(_core.count),
+        rhsPtr, Int32(rhs._core.count)))
+    default:
+      _preconditionFailure("Unreachable but necessary case for exhaustive switch")
+    }
+#endif
+  }
+
+  public  // @testable
+  func _compareString(rhs: String) -> Int {
+#if _runtime(_ObjC)
+    // We only want to perform this optimization on objc runtimes. Elsewhere,
+    // we will make it follow the unicode collation algorithm even for ASCII.
+    if (_core.isASCII && rhs._core.isASCII) {
+      return _compareASCII(rhs)
+    }
+#endif
+    return _compareDeterministicUnicodeCollation(rhs)
   }
 }
 
 public func <(lhs: String, rhs: String) -> Bool {
-  if lhs._core.isASCII && rhs._core.isASCII {
-    return lhs._lessThanASCII(rhs)
-  }
-  return lhs._lessThanUTF16(rhs)
+  return lhs._compareString(rhs) < 0
 }
 
 // Support for copy-on-write
@@ -404,6 +433,7 @@ extension String : Hashable {
   /// different invocations of the same program.  Do not persist the
   /// hash value across program runs.
   public var hashValue: Int {
+#if _runtime(_ObjC)
     // Mix random bits into NSString's hash so that clients don't rely on
     // Swift.String.hashValue and NSString.hash being the same.
 #if arch(i386) || arch(arm)
@@ -411,7 +441,6 @@ extension String : Hashable {
 #else
     let hashOffset = Int(bitPattern: 0x429b_1266_88dd_cc21)
 #endif
-#if _runtime(_ObjC)
     // FIXME(performance): constructing a temporary NSString is extremely
     // wasteful and inefficient.
     let cocoaString = unsafeBitCast(
@@ -424,9 +453,15 @@ extension String : Hashable {
       return hashOffset ^ _stdlib_NSStringNFDHashValue(cocoaString)
     }
 #else
-    // FIXME: Actually implement. For now, all strings have the same hash.
-    // rdar://problem/18878343
-    return hashOffset
+    if self._core.isASCII {
+      return _swift_stdlib_unicode_hash_ascii(
+        UnsafeMutablePointer<Int8>(_core.startASCII),
+        Int32(_core.count))
+    } else {
+      return _swift_stdlib_unicode_hash(
+        UnsafeMutablePointer<UInt16>(_core.startUTF16),
+        Int32(_core.count))
+    }
 #endif
   }
 }
@@ -844,6 +879,50 @@ func _stdlib_NSStringLowercaseString(str: AnyObject) -> _CocoaStringType
 
 @asmname("swift_stdlib_NSStringUppercaseString")
 func _stdlib_NSStringUppercaseString(str: AnyObject) -> _CocoaStringType
+#else
+internal func _nativeUnicodeLowercaseString(str: String) -> String {
+  var buffer = _StringBuffer(
+    capacity: str._core.count, initialSize: str._core.count, elementWidth: 2)
+
+  // Try to write it out to the same length.
+  var dest = UnsafeMutablePointer<UTF16.CodeUnit>(buffer.start)
+  let z = _swift_stdlib_unicode_strToLower(
+    dest, Int32(str._core.count),
+    str._core.startUTF16, Int32(str._core.count))
+  let correctSize = Int(z)
+
+  // If more space is needed, do it again with the correct buffer size.
+  if correctSize != str._core.count {
+    buffer = _StringBuffer(
+      capacity: correctSize, initialSize: correctSize, elementWidth: 2)
+    _swift_stdlib_unicode_strToLower(
+      dest, Int32(correctSize), str._core.startUTF16, Int32(str._core.count))
+  }
+
+  return String(_storage: buffer)
+}
+
+internal func _nativeUnicodeUppercaseString(str: String) -> String {
+  var buffer = _StringBuffer(
+    capacity: str._core.count, initialSize: str._core.count, elementWidth: 2)
+
+  // Try to write it out to the same length.
+  var dest = UnsafeMutablePointer<UTF16.CodeUnit>(buffer.start)
+  let z = _swift_stdlib_unicode_strToUpper(
+    dest, Int32(str._core.count),
+    str._core.startUTF16, Int32(str._core.count))
+  let correctSize = Int(z)
+
+  // If more space is needed, do it again with the correct buffer size.
+  if correctSize != str._core.count {
+    buffer = _StringBuffer(
+      capacity: correctSize, initialSize: correctSize, elementWidth: 2)
+    _swift_stdlib_unicode_strToUpper(
+      dest, Int32(correctSize), str._core.startUTF16, Int32(str._core.count))
+  }
+
+  return String(_storage: buffer)
+}
 #endif
 
 // Unicode algorithms
@@ -904,9 +983,7 @@ extension String {
     return _cocoaStringToSwiftString_NonASCII(
       _stdlib_NSStringLowercaseString(self._bridgeToObjectiveCImpl()))
 #else
-    // FIXME: Actually implement.  For now, don't change case.
-    // rdar://problem/18878343
-    return self
+    return _nativeUnicodeLowercaseString(self)
 #endif
   }
 
@@ -933,9 +1010,7 @@ extension String {
     return _cocoaStringToSwiftString_NonASCII(
       _stdlib_NSStringUppercaseString(self._bridgeToObjectiveCImpl()))
 #else
-    // FIXME: Actually implement.  For now, don't change case.
-    // rdar://problem/18878343
-    return self
+    return _nativeUnicodeUppercaseString(self)
 #endif
   }
 }

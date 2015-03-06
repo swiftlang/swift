@@ -47,4 +47,31 @@ _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadata;
 extern const __swift_uint16_t *
 _swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrix;
 
+__swift_int32_t _swift_stdlib_unicode_compare_utf16_utf16(
+  const __swift_uint16_t *Left, __swift_int32_t LeftLength,
+  const __swift_uint16_t *Right, __swift_int32_t RightLength);
+
+__swift_int32_t _swift_stdlib_unicode_compare_utf8_utf16(
+  const char *Left, __swift_int32_t LeftLength,
+  const __swift_uint16_t *Right, __swift_int32_t RightLength);
+
+__swift_int32_t _swift_stdlib_unicode_compare_utf8_utf8(
+  const char *Left, __swift_int32_t LeftLength,
+  const char *Right, __swift_int32_t RightLength);
+
+__swift_intptr_t _swift_stdlib_unicode_hash(
+  const __swift_uint16_t *Str, __swift_int32_t Length);
+
+__swift_intptr_t _swift_stdlib_unicode_hash_ascii(
+  const char *Str, __swift_int32_t Length);
+
+__swift_int32_t _swift_stdlib_unicode_strToUpper(
+  __swift_uint16_t *Destination, __swift_int32_t DestinationCapacity,
+  const __swift_uint16_t *Source, __swift_int32_t SourceLength);
+
+__swift_int32_t _swift_stdlib_unicode_strToLower(
+  __swift_uint16_t *Destination, __swift_int32_t DestinationCapacity,
+  const __swift_uint16_t *Source, __swift_int32_t SourceLength);
+
+
 #endif
