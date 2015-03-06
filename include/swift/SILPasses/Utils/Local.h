@@ -158,13 +158,9 @@ namespace swift {
     /// Get the array.props.needsElementTypeCheck argument.
     SILValue getArrayPropertyNeedsTypeCheck();
 
-    /// Remove instruction by replacing it with a retain_value of the array
-    /// argument.
-    void replaceByRetainValue();
-
-    /// Remove the instruction. This is to be used for calls that receive self
-    /// by reference (and hence need no matching retain).
-    void remove() { SemanticsCall->eraseFromParent(); }
+    /// Remove the semantics call replacing it by a release of any @owned
+    /// parameter.
+    void removeCall();
 
     /// Hoist the call to the insert point.
     void hoist(SILInstruction *InsertBefore, DominanceInfo *DT) {
@@ -183,6 +179,9 @@ namespace swift {
     operator bool() { return SemanticsCall != nullptr; }
 
   protected:
+    /// Validate the signature of this call.
+    bool isValidSignature();
+
     /// Hoist or copy the call to the insert point. If LeaveOriginal is true the
     /// call is copied to the insert point. Returns the copied call.
     ApplyInst *hoistOrCopy(SILInstruction *InsertBefore, DominanceInfo *DT,

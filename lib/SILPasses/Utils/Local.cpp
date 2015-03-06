@@ -287,6 +287,67 @@ SILLinkage swift::getSpecializedLinkage(SILLinkage L) {
   }
 }
 
+static ParameterConvention
+getSelfParameterConvention(ApplyInst *SemanticsCall) {
+  FunctionRefInst *FRI = cast<FunctionRefInst>(SemanticsCall->getCallee());
+  SILFunction *F = FRI->getReferencedFunction();
+  auto FnTy = F->getLoweredFunctionType();
+
+  return FnTy->getSelfParameter().getConvention();
+}
+
+/// \brief Make sure that all parameters are passed with a reference count
+/// neutral parameter convention except for self.
+bool swift::ArraySemanticsCall::isValidSignature() {
+  assert(SemanticsCall && getKind() != ArrayCallKind::kNone &&
+         "Need an array semantic call");
+  FunctionRefInst *FRI = cast<FunctionRefInst>(SemanticsCall->getCallee());
+  SILFunction *F = FRI->getReferencedFunction();
+  auto FnTy = F->getLoweredFunctionType();
+  auto &Mod = F->getModule();
+
+  // Check whether we have a valid signature for semantic calls that we hoist.
+  switch (getKind()) {
+  // All other calls can be consider valid.
+  default: break;
+  case ArrayCallKind::kArrayPropsIsNative:
+  case ArrayCallKind::kArrayPropsNeedsTypeCheck: {
+    // @guaranteed/@owned Self
+    if (SemanticsCall->getNumArguments() != 1)
+      return false;
+    auto SelfConvention = FnTy->getSelfParameter().getConvention();
+    return SelfConvention == ParameterConvention::Direct_Guaranteed ||
+           SelfConvention == ParameterConvention::Direct_Owned;
+  }
+  case ArrayCallKind::kCheckIndex: {
+    // Int, @guaranteed/@owned Self
+    if (SemanticsCall->getNumArguments() != 2 ||
+        !SemanticsCall->getArgument(0).getType().isTrivial(Mod))
+      return false;
+    auto SelfConvention = FnTy->getSelfParameter().getConvention();
+    return SelfConvention == ParameterConvention::Direct_Guaranteed ||
+           SelfConvention == ParameterConvention::Direct_Owned;
+  }
+  case ArrayCallKind::kCheckSubscript: {
+    // Int, Bool, Self
+    if (SemanticsCall->getNumArguments() != 3 ||
+        !SemanticsCall->getArgument(0).getType().isTrivial(Mod))
+      return false;
+    if (!SemanticsCall->getArgument(1).getType().isTrivial(Mod))
+      return false;
+    auto SelfConvention = FnTy->getSelfParameter().getConvention();
+    return SelfConvention == ParameterConvention::Direct_Guaranteed ||
+           SelfConvention == ParameterConvention::Direct_Owned;
+  }
+  case ArrayCallKind::kMakeMutable: {
+    auto SelfConvention = FnTy->getSelfParameter().getConvention();
+    return SelfConvention == ParameterConvention::Indirect_Inout;
+  }
+  }
+
+  return true;
+}
+
 /// Match array semantic calls.
 swift::ArraySemanticsCall::ArraySemanticsCall(ValueBase *V,
                                               StringRef SemanticStr,
@@ -302,6 +363,10 @@ swift::ArraySemanticsCall::ArraySemanticsCall(ValueBase *V,
           // Need a 'self' argument otherwise this is not a semantic call that
           // we recognize.
           if (getKind() < ArrayCallKind::kArrayInit && !hasSelf())
+            SemanticsCall = nullptr;
+
+          // A arguments must be passed reference count neutral except for self.
+          if (SemanticsCall && !isValidSignature())
             SemanticsCall = nullptr;
           return;
         }
@@ -363,8 +428,17 @@ SILValue swift::ArraySemanticsCall::getIndex() {
   return SemanticsCall->getArgument(0);
 }
 
-static bool canHoistArrayArgument(SILValue Arr, SILInstruction *InsertBefore,
+static bool canHoistArrayArgument(ApplyInst *SemanticsCall, SILValue Arr,
+                                  SILInstruction *InsertBefore,
                                   DominanceInfo *DT) {
+
+  // We only know how to hoist inout, owned or guaranteed parameters.
+  auto Convention = getSelfParameterConvention(SemanticsCall);
+  if (Convention != ParameterConvention::Indirect_Inout &&
+      Convention != ParameterConvention::Direct_Owned &&
+      Convention != ParameterConvention::Direct_Guaranteed)
+    return false;
+
   auto *SelfVal = Arr.getDef();
   auto *SelfBB = SelfVal->getParentBB();
   if (DT->dominates(SelfBB, InsertBefore->getParent()))
@@ -397,7 +471,7 @@ bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
   case ArrayCallKind::kArrayPropsIsNative:
   case ArrayCallKind::kArrayPropsNeedsTypeCheck:
   case ArrayCallKind::kGetElementAddress:
-    return canHoistArrayArgument(getSelf(), InsertBefore, DT);
+    return canHoistArrayArgument(SemanticsCall, getSelf(), InsertBefore, DT);
 
   case ArrayCallKind::kCheckSubscript:
   case ArrayCallKind::kGetElement: {
@@ -417,7 +491,7 @@ bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
         return false;
 
       if (Kind == ArrayCallKind::kCheckSubscript)
-        return canHoistArrayArgument(getSelf(), InsertBefore, DT);
+        return canHoistArrayArgument(SemanticsCall, getSelf(), InsertBefore, DT);
 
       // Can we hoist the needsElementTypeCheck argument.
       ArraySemanticsCall TypeCheck(getArrayPropertyNeedsTypeCheck().getDef(),
@@ -426,11 +500,11 @@ bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
         return false;
     }
 
-    return canHoistArrayArgument(getSelf(), InsertBefore, DT);
+    return canHoistArrayArgument(SemanticsCall, getSelf(), InsertBefore, DT);
   }
 
   case ArrayCallKind::kMakeMutable: {
-    return canHoistArrayArgument(getSelf(), InsertBefore, DT);
+    return canHoistArrayArgument(SemanticsCall, getSelf(), InsertBefore, DT);
   }
   } // End switch.
 
@@ -477,47 +551,65 @@ static ApplyInst *hoistOrCopyCall(ApplyInst *AI, SILInstruction *InsertBefore,
   return AI;
 }
 
+
+/// \brief Hoist or copy the self argument of the semantics call.
+/// Return the hoisted self argument.
+static SILValue hoistOrCopySelf(ApplyInst *SemanticsCall,
+                                SILInstruction *InsertBefore,
+                                DominanceInfo *DT, bool LeaveOriginal) {
+
+  auto SelfConvention = getSelfParameterConvention(SemanticsCall);
+
+  assert((SelfConvention == ParameterConvention::Direct_Owned ||
+          SelfConvention == ParameterConvention::Direct_Guaranteed) &&
+         "Expect @owned or @guaranteed self");
+
+  auto Self = SemanticsCall->getSelfArgument();
+  bool IsOwnedSelf = SelfConvention == ParameterConvention::Direct_Owned;
+
+  // Emit matching release for owned self if we are moving the original call.
+  if (!LeaveOriginal && IsOwnedSelf)
+    SILBuilder(SemanticsCall)
+        .createReleaseValue(SemanticsCall->getLoc(), Self)
+        ->setDebugScope(SemanticsCall->getDebugScope());
+
+  auto NewArrayStructValue = copyArrayLoad(Self, InsertBefore, DT);
+
+  // Retain the array.
+  if (IsOwnedSelf)
+    SILBuilder(InsertBefore)
+        .createRetainValue(SemanticsCall->getLoc(), NewArrayStructValue)
+        ->setDebugScope(SemanticsCall->getDebugScope());
+
+  return NewArrayStructValue;
+}
+
 ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
                                                   DominanceInfo *DT,
                                                   bool LeaveOriginal) {
+  assert(canHoist(InsertBefore, DT) &&
+         "Must be able to hoist the semantics call");
+
   auto Kind = getKind();
   switch (Kind) {
   case ArrayCallKind::kArrayPropsIsNative:
   case ArrayCallKind::kArrayPropsNeedsTypeCheck: {
-    auto Self = getSelf();
-    // Emit matching release if we are removing the original call.
-    if (!LeaveOriginal)
-      SILBuilder(SemanticsCall)
-          .createReleaseValue(SemanticsCall->getLoc(), Self);
+    assert(SemanticsCall->getNumArguments() == 1 &&
+           "Expect 'self' parameter only");
 
-    auto NewArrayStructValue = copyArrayLoad(Self, InsertBefore, DT);
-
-    SILBuilder B(InsertBefore);
-
-    // Retain the array.
-    B.createRetainValue(SemanticsCall->getLoc(), NewArrayStructValue);
+    auto HoistedSelf =
+        hoistOrCopySelf(SemanticsCall, InsertBefore, DT, LeaveOriginal);
 
     auto *Call =
         hoistOrCopyCall(SemanticsCall, InsertBefore, LeaveOriginal, DT);
-    Call->setSelfArgument(NewArrayStructValue);
+    Call->setSelfArgument(HoistedSelf);
     return Call;
   }
 
   case ArrayCallKind::kCheckSubscript:
   case ArrayCallKind::kCheckIndex: {
-    auto Self = getSelf();
-    // We are going to have a retain, emit a matching release.
-    if (!LeaveOriginal)
-      SILBuilderWithScope<1>(SemanticsCall)
-          .createReleaseValue(SemanticsCall->getLoc(), Self);
-
-    // Hoist the array load, if neccessary.
-    SILBuilder B(InsertBefore);
-    auto NewArrayStructValue = copyArrayLoad(Self, InsertBefore, DT);
-
-    // Retain the array.
-    B.createRetainValue(SemanticsCall->getLoc(), NewArrayStructValue)
-        ->setDebugScope(SemanticsCall->getDebugScope());
+    auto HoistedSelf =
+        hoistOrCopySelf(SemanticsCall, InsertBefore, DT, LeaveOriginal);
 
     SILValue NewArrayProps;
     if (HaveArrayProperty && Kind == ArrayCallKind::kCheckSubscript) {
@@ -545,7 +637,7 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
 
     // Hoist the call.
     auto Call = hoistOrCopyCall(SemanticsCall, InsertBefore, LeaveOriginal, DT);
-    Call->setSelfArgument(NewArrayStructValue);
+    Call->setSelfArgument(HoistedSelf);
 
     if (NewArrayProps) {
       // Set the array.props argument.
@@ -568,12 +660,14 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
   } // End switch.
 }
 
-void swift::ArraySemanticsCall::replaceByRetainValue() {
-  assert(getKind() < ArrayCallKind::kMakeMutable &&
-         "Must be a semantics call that passes the array by value");
-  SILBuilderWithScope<1>(SemanticsCall)
-      .createReleaseValue(SemanticsCall->getLoc(), getSelf());
+void swift::ArraySemanticsCall::removeCall() {
+  if (getSelfParameterConvention(SemanticsCall) ==
+      ParameterConvention::Direct_Owned)
+    SILBuilderWithScope<1>(SemanticsCall)
+        .createReleaseValue(SemanticsCall->getLoc(), getSelf());
+
   SemanticsCall->eraseFromParent();
+  SemanticsCall = nullptr;
 }
 
 static bool hasArrayPropertyNeedsTypeCheck(ArrayCallKind Kind,

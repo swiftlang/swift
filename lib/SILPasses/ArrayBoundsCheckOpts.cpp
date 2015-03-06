@@ -395,7 +395,7 @@ static bool removeRedundantChecksInBlock(SILBasicBlock &BB, ArraySet &Arrays,
     }
 
     // Remove the bounds check.
-    ArrayCall.replaceByRetainValue();
+    ArrayCall.removeCall();
     Changed = true;
   }
   return Changed;
@@ -453,7 +453,7 @@ static bool removeRedundantChecks(DominanceInfoNode *CurBB,
     }
 
     // Remove the bounds check.
-    ArrayCall.replaceByRetainValue();
+    ArrayCall.removeCall();
     Changed = true;
   }
 
@@ -848,7 +848,7 @@ static bool hoistCheck(SILBasicBlock *Preheader, ArraySemanticsCall CheckToHoist
   Access.hoistCheckToPreheader(CheckToHoist, Preheader, DT);
 
   // Remove the old check in the loop and the match the retain with a release.
-  CheckToHoist.replaceByRetainValue();
+  CheckToHoist.removeCall();
 
   DEBUG(llvm::dbgs() << "  Bounds check hoisted\n");
   return true;

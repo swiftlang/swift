@@ -847,7 +847,7 @@ bool COWArrayOpt::run() {
             ArrayMakeMutableMap[ArrayAddr] = nullptr;
         } else if (HoistedCallEntry->second) {
           DEBUG(llvm::dbgs() << "    Removing make_mutable call: " << *MakeMutableCall);
-          MakeMutableCall.remove();
+          MakeMutableCall.removeCall();
           HasChanged = true;
         }
       }
@@ -1524,7 +1524,7 @@ static void replaceArrayPropsCall(SILBuilder &B, ArraySemanticsCall C) {
 
   (*C).replaceAllUsesWith(BoolVal);
     // Remove call to array.props.read/write.
-  C.replaceByRetainValue();
+  C.removeCall();
 }
 
 void ArrayPropertiesSpecializer::specializeLoopNest() {
