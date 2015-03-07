@@ -60,16 +60,18 @@ public struct _StringBuffer {
   public init(capacity: Int, initialSize: Int, elementWidth: Int) {
     _sanityCheck(elementWidth == 1 || elementWidth == 2)
     _sanityCheck(initialSize <= capacity)
+    // We don't check for elementWidth overflow and underflow because
+    // elementWidth is known to be 1 or 2.
     let elementShift = elementWidth &- 1
 
     // We need at least 1 extra byte if we're storing 8-bit elements,
     // because indexing will always grab 2 consecutive bytes at a
     // time.
-    let capacityBump = 1 - elementShift
+    let capacityBump = 1 &- elementShift
 
     // Used to round capacity up to nearest multiple of 16 bits, the
     // element size of our storage.
-    let divRound = 1 - elementShift
+    let divRound = 1 &- elementShift
     _storage = _Storage(
       HeapBufferStorage.self,
       _StringBufferIVars(elementWidth),
