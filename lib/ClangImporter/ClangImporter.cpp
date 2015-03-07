@@ -2070,6 +2070,9 @@ public:
     if (ND->isModulePrivate())
       return;
 
+    if (!ND->isCanonicalDecl())
+      return;
+
     results.push_back(ND);
   }
 
