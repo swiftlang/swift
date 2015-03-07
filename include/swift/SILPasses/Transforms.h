@@ -17,6 +17,7 @@
 namespace swift {
   class SILModule;
   class SILFunction;
+  class PrettyStackTraceSILFunctionTransform;
 
   /// The base class for all SIL-level transformations.
   class SILTransform {
@@ -61,6 +62,7 @@ namespace swift {
 
   /// A transformation that operates on functions.
   class SILFunctionTransform : public SILTransform {
+    friend class PrettyStackTraceSILFunctionTransform;
     SILFunction *F;
 
   public:

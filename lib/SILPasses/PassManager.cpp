@@ -13,9 +13,10 @@
 #define DEBUG_TYPE "sil-passmanager"
 
 #include "swift/SILPasses/PassManager.h"
-#include "swift/SILPasses/Transforms.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILModule.h"
+#include "swift/SILPasses/PrettyStackTrace.h"
+#include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -123,6 +124,7 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
       continue;
 
     for (auto SFT : FuncTransforms) {
+      PrettyStackTraceSILFunctionTransform X(SFT);
       CompleteFuncs->resetChanged();
       SFT->injectPassManager(this);
       SFT->injectFunction(&F);
@@ -138,15 +140,15 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
                      << ") ***\n";
         F.dump();
       }
-      
+
       llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
       SFT->run();
 
       if (Options.TimeTransforms) {
         auto Delta = llvm::sys::TimeValue::now().nanoseconds() -
           StartTime.nanoseconds();
-        llvm::dbgs() << Delta << " (" << SFT->getName() << "," <<
-        F.getName() << ")\n";
+        llvm::dbgs() << Delta << " (" << SFT->getName() << "," << F.getName()
+                     << ")\n";
       }
 
       // If this pass invalidated anything, print and verify.
@@ -205,6 +207,8 @@ void SILPassManager::runOneIteration() {
 
       PendingFuncTransforms.clear();
 
+      PrettyStackTraceSILModuleTransform X(SMT);
+
       CompleteFuncs->resetChanged();
       SMT->injectPassManager(this);
       SMT->injectModule(Mod);
@@ -219,7 +223,7 @@ void SILPassManager::runOneIteration() {
                      << ") ***\n";
         printModule(Mod);
       }
-    
+
       llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
       SMT->run();
 

@@ -48,4 +48,5 @@ add_swift_library(swiftSILPasses
   SILCombinerVisitors.cpp
   ExternalDefsToDecls.cpp
   MergeCondFail.cpp
+  PrettyStackTrace.cpp
   LINK_LIBRARIES swiftSILPassesUtils swiftSILAnalysis)
