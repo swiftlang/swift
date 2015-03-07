@@ -751,17 +751,6 @@ void irgen::addIndirectReturnAttributes(IRGenModule &IGM,
   attrs = attrs.addAttributes(IGM.LLVMContext, 1, resultAttrs);
 }
 
-static void addNoAliasAttribute(IRGenModule &IGM,
-                                llvm::AttributeSet &attrs,
-                                unsigned argIndex) {
-  static const llvm::Attribute::AttrKind attrKinds[] = {
-    llvm::Attribute::NoAlias
-  };
-  auto resultAttrs = llvm::AttributeSet::get(IGM.LLVMContext, argIndex+1,
-                                             attrKinds);
-  attrs = attrs.addAttributes(IGM.LLVMContext, argIndex+1, resultAttrs);
-}
-
 void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
                                        llvm::AttributeSet &attrs,
                                        unsigned argIndex,
