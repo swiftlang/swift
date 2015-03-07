@@ -1529,6 +1529,8 @@ bool GeneralFailureDiagnosis::diagnoseGeneralConversionFailure() {
     
     if (fromType->getAs<ErrorType>())
       fromType = types.first.getPointer();
+
+    fromType = fromType->getRValueType();
     
     auto toType = CS->getConversionType(expr);
     

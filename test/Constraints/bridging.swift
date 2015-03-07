@@ -235,8 +235,14 @@ func rdar19831698() {
 }
 
 // <rdar://problem/19836341> Incorrect fixit for NSString? to String? conversions
-func rdar19836341(s: NSString?) {
-  let x: String? = s // expected-error{{'NSString?' is not convertible to 'String?'}}
+func rdar19836341(ns: NSString?, var vns: NSString?) {
+  let s: String? = ns // expected-error{{'NSString?' is not convertible to 'String?'}}
+  var s2: String? = ns // expected-error{{'NSString?' is not convertible to 'String?'}}
   // FIXME: there should be a fixit appending "as String?" to the line; for now
   // it's sufficient that it doesn't suggest appending "as String"
+
+  // Important part about below diagnostic is that from-type is described as
+  // 'NSString?' and not '@lvalue NSString?':
+  let vs: String? = vns // expected-error{{'NSString?' is not convertible to 'String?'}}
+  var vs2: String? = vns // expected-error{{'NSString?' is not convertible to 'String?'}}
 }
