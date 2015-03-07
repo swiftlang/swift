@@ -375,10 +375,14 @@ SILBasicBlock *swift::splitBasicBlockAndBranch(SILInstruction *SplitBeforeInst,
   if (DT) {
     auto OrigBBDTNode = DT->getNode(OrigBB);
     if (OrigBBDTNode) {
+      // Change the immediate dominators of the children of the block we
+      // splitted to the splitted block.
+      SmallVector<DominanceInfoNode *, 16> Adoptees(OrigBBDTNode->begin(),
+                                                    OrigBBDTNode->end());
+
       auto NewBBDTNode = DT->addNewBlock(NewBB, OrigBB);
-      for (auto *Child : *OrigBBDTNode)
-        if (Child != NewBBDTNode)
-          DT->changeImmediateDominator(Child, NewBBDTNode);
+      for (auto *Adoptee : Adoptees)
+        DT->changeImmediateDominator(Adoptee, NewBBDTNode);
     }
   }
 
