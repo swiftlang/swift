@@ -37,7 +37,7 @@ STATISTIC(NumConstantFolded, "Number of terminators constant folded");
 STATISTIC(NumDeadArguments,  "Number of unused arguments removed");
 
 //===----------------------------------------------------------------------===//
-//                           alloc_box Promotion
+//                             CFG Simplification
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -3095,6 +3095,10 @@ class SimplifyCFGPass : public SILFunctionTransform {
 SILTransform *swift::createSimplifyCFG() {
   return new SimplifyCFGPass();
 }
+
+//===----------------------------------------------------------------------===//
+//                          Passes only for Testing
+//===----------------------------------------------------------------------===//
 
 namespace {
 
