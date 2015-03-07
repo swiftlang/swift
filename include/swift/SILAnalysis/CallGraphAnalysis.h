@@ -159,7 +159,7 @@ public:
 
   /// Get the complete set of edges associated with call sites that can call
   /// into this function.
-  const llvm::SmallVectorImpl<CallGraphEdge *> &getCompleteCallerEdges() const {
+  ArrayRef<CallGraphEdge *> getCompleteCallerEdges() const {
     assert(isCallerEdgesComplete() &&
            "Attempt to get an incomplete caller set!");
     return CallerEdges;
@@ -177,7 +177,7 @@ public:
 
   /// Get the known set of call graph edges that represent possible
   /// calls into this function.
-  llvm::SmallVectorImpl<CallGraphEdge *> &getPartialCallerEdges() {
+  ArrayRef<CallGraphEdge *> getPartialCallerEdges() {
     return CallerEdges;
   }
 
@@ -187,7 +187,7 @@ public:
   }
 
   /// Get the set of call sites in this function.
-  llvm::SmallVectorImpl<CallGraphEdge *> &getCalleeEdges() {
+  ArrayRef<CallGraphEdge *> getCalleeEdges() {
     return CalleeEdges;
   }
 
@@ -257,7 +257,7 @@ public:
   CallGraph(SILModule *M, bool completeModule);
   ~CallGraph();
 
-  llvm::SmallVectorImpl<CallGraphNode *> &getCallGraphRoots() {
+  ArrayRef<CallGraphNode *> getCallGraphRoots() {
     return CallGraphRoots;
   }
 
@@ -287,14 +287,14 @@ public:
     return const_cast<CallGraph *>(this)->getCallGraphEdge(AI);
   }
 
-  llvm::SmallVectorImpl<CallGraphSCC *> &getBottomUpSCCOrder() {
+  ArrayRef<CallGraphSCC *> getBottomUpSCCOrder() {
     if (BottomUpSCCOrder.empty())
       computeBottomUpSCCOrder();
 
     return BottomUpSCCOrder;
   }
 
-  std::vector<SILFunction *> &getBottomUpFunctionOrder() {
+  ArrayRef<SILFunction *> getBottomUpFunctionOrder() {
     if (BottomUpFunctionOrder.empty())
       computeBottomUpFunctionOrder();
 
