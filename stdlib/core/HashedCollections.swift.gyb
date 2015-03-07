@@ -1060,7 +1060,7 @@ public struct Dictionary<Key : Hashable, Value> :
     return _variantStorage.updateValue(value, forKey: key)
   }
 
-  /// Remove the key-value pair at index `index`.
+  /// Remove the key-value pair at `index`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
