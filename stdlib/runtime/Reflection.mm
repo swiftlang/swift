@@ -206,11 +206,11 @@ struct MagicMirrorData {
 static_assert(sizeof(MagicMirrorData) == sizeof(ValueBuffer),
               "MagicMirrorData doesn't exactly fill a ValueBuffer");
   
-/// A magic implementation of Mirror that can^Wwill be able to look at runtime
-/// metadata to walk an arbitrary object.
+/// A magic implementation of Mirror that can use runtime metadata to walk an
+/// arbitrary object.
 ///
-/// This type is layout-compatible with a Swift existential
-/// container for the MirrorType protocol.
+/// This type is layout-compatible with a Swift existential container for the
+/// MirrorType protocol.
 class MagicMirror {
 public:
   // The data for the mirror.
@@ -399,7 +399,6 @@ intptr_t swift_StructMirror_count(HeapObject *owner,
   return Struct->Description->Struct.NumFields;
 }
 
-  
 extern "C"
 StringMirrorTuple swift_StructMirror_subscript(intptr_t i,
                                                HeapObject *owner,
@@ -426,7 +425,7 @@ StringMirrorTuple swift_StructMirror_subscript(intptr_t i,
   }
 
   result.first = String(fieldName);
-  
+  // 'owner' is consumed by this call.
   result.second = swift_unsafeReflectAny(owner, fieldData, fieldType);
   return result;
 }
@@ -521,7 +520,7 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
   }
 
   result.first = String(fieldName);
-  
+  // 'owner' is consumed by this call.
   result.second = swift_unsafeReflectAny(owner, fieldData, fieldType);
   return result;
 }
@@ -678,6 +677,7 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
   
   StringMirrorTuple result;
   result.first = String(name, strlen(name));
+  // 'owner' is consumed by this call.
   result.second = swift_unsafeReflectAny(owner, ivar, ivarType);
   return result;
 #else
