@@ -936,7 +936,7 @@ namespace {
 ///  }
 ///
 static llvm::cl::opt<bool> ShouldSpecializeArrayProps("sil-array-props",
-                                                      llvm::cl::init(false));
+                                                      llvm::cl::init(true));
 
 /// Analysis whether it is safe to specialize this loop nest based on the
 /// array.props function calls it constains. It is safe to hoist array.props
