@@ -863,14 +863,12 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // -Ounchecked might also set removal of runtime asserts (cond_fail).
   Opts.RemoveRuntimeAsserts |= Args.hasArg(OPT_remove_runtime_asserts);
 
-  Opts.EnableARCOptimizations |= !Args.hasArg(OPT_disable_arc_opts);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.PrintAll |= Args.hasArg(OPT_sil_print_all);
   Opts.PrintPassName |= Args.hasArg(OPT_sil_print_pass_name);
   Opts.TimeTransforms |= Args.hasArg(OPT_sil_time_transforms);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
   Opts.PrintInstCounts |= Args.hasArg(OPT_print_inst_counts);
-  Opts.EnableFuncSigOpts &= !Args.hasArg(OPT_disable_func_sig_opts);
   Opts.EnableGuaranteedSelf |= Args.hasArg(OPT_enable_guaranteed_self);
   if (const Arg *A = Args.getLastArg(OPT_external_pass_pipeline_filename))
     Opts.ExternalPassPipelineFilename = A->getValue();

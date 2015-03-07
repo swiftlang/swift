@@ -220,10 +220,6 @@ namespace {
 class GlobalARCOpts : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
-    // If ARC optimizations are disabled, don't optimize anything and bail.
-    if (!getOptions().EnableARCOptimizations)
-      return;
-
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *POTA = getAnalysis<PostOrderAnalysis>();
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
