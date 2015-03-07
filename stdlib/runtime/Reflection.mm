@@ -254,9 +254,11 @@ Any swift_MagicMirrorData_value(HeapObject *owner,
   result.Type = type;
   type->vw_initializeBufferWithCopy(&result.Buffer,
                                     const_cast<OpaqueValue*>(value));
-  
+
+#if !SWIFT_RUNTIME_ENABLE_GUARANTEED_SELF
   swift_release(owner);
-  
+#endif
+
   return result;
 }
 extern "C"
@@ -264,7 +266,9 @@ const Metadata *swift_MagicMirrorData_valueType(HeapObject *owner,
                                                 const OpaqueValue *value,
                                                 const Metadata *type) {
   auto r = swift_getDynamicType(const_cast<OpaqueValue*>(value), type);
+#if !SWIFT_RUNTIME_ENABLE_GUARANTEED_SELF
   swift_release(owner);
+#endif
   return r;
 }
 
@@ -279,7 +283,9 @@ Any swift_MagicMirrorData_objcValue(HeapObject *owner,
   auto isa = _swift_getClass(object);
   result.Type = swift_getObjCClassMetadata(isa);
   *reinterpret_cast<void **>(&result.Buffer) = swift_unknownRetain(object);
+#if !SWIFT_RUNTIME_ENABLE_GUARANTEED_SELF
   swift_release(owner);
+#endif
   return result;
 }
 #endif
@@ -342,7 +348,9 @@ const Metadata *swift_MagicMirrorData_objcValueType(HeapObject *owner,
                                                     const Metadata *type) {
   void *object = *reinterpret_cast<void * const *>(value);
   auto isa = _swift_getClass(object);
+#if !SWIFT_RUNTIME_ENABLE_GUARANTEED_SELF
   swift_release(owner);
+#endif
   return swift_getObjCClassMetadata(isa);
 }
   
@@ -353,7 +361,9 @@ intptr_t swift_TupleMirror_count(HeapObject *owner,
                                  const OpaqueValue *value,
                                  const Metadata *type) {
   auto Tuple = static_cast<const TupleTypeMetadata *>(type);
+#if !SWIFT_RUNTIME_ENABLE_GUARANTEED_SELF
   swift_release(owner);
+#endif
   return Tuple->NumElements;
 }
 
@@ -381,7 +391,11 @@ StringMirrorTuple swift_TupleMirror_subscript(intptr_t i,
   auto &elt = Tuple->getElements()[i];
   auto bytes = reinterpret_cast<const char*>(value);
   auto eltData = reinterpret_cast<const OpaqueValue *>(bytes + elt.Offset);
-  
+
+#if SWIFT_RUNTIME_ENABLE_GUARANTEED_SELF
+  // This retain matches the -1 in swift_unsafeReflectAny.
+  swift_retain(owner);
+#endif
   // 'owner' is consumed by this call.
   result.second = swift_unsafeReflectAny(owner, eltData, elt.Type);
 
@@ -395,7 +409,9 @@ intptr_t swift_StructMirror_count(HeapObject *owner,
                                   const OpaqueValue *value,
                                   const Metadata *type) {
   auto Struct = static_cast<const StructMetadata *>(type);
+#if !SWIFT_RUNTIME_ENABLE_GUARANTEED_SELF
   swift_release(owner);
+#endif
   return Struct->Description->Struct.NumFields;
 }
 
@@ -425,6 +441,10 @@ StringMirrorTuple swift_StructMirror_subscript(intptr_t i,
   }
 
   result.first = String(fieldName);
+#if SWIFT_RUNTIME_ENABLE_GUARANTEED_SELF
+  // This matches the -1 in swift_unsafeReflectAny.
+  swift_retain(owner);
+#endif
   // 'owner' is consumed by this call.
   result.second = swift_unsafeReflectAny(owner, fieldData, fieldType);
   return result;
