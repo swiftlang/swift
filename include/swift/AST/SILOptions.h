@@ -48,6 +48,9 @@ public:
   /// Remove all runtime assertions during optimizations.
   bool RemoveRuntimeAsserts = false;
 
+  /// Controls whether the SIL ARC optimizations are run.
+  bool EnableARCOptimizations = true;
+
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
 
@@ -82,6 +85,9 @@ public:
 
   /// Should we print out instruction counts if -print-stats is passed in?
   bool PrintInstCounts = false;
+
+  /// Should we optimize function signatures?
+  bool EnableFuncSigOpts = true;
 
   /// Should we emit self as a guaranteed parameter?
   bool EnableGuaranteedSelf = false;

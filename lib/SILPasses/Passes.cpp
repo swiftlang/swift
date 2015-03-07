@@ -269,7 +269,8 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // We do this late since it is a pass like the inline caches that we only want
   // to run once very late. Make sure to run at least one round of the ARC
   // optimizer after this.
-  PM.add(createFunctionSignatureOpts());
+  if (Module.getOptions().EnableFuncSigOpts)
+    PM.add(createFunctionSignatureOpts());
 
   PM.run();
   PM.resetAndRemoveTransformations();
