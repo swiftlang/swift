@@ -1195,7 +1195,8 @@ function(add_swift_library name)
     list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS Core)
   endif()
 
-  if(NOT "${SWIFT_BUILD_STDLIB}")
+  if((NOT "${SWIFT_BUILD_STDLIB}") AND
+     (NOT "${SWIFTLIB_SWIFT_MODULE_DEPENDS}" STREQUAL ""))
     list(REMOVE_ITEM SWIFTLIB_SWIFT_MODULE_DEPENDS
         Core SwiftUnstable)
   endif()
