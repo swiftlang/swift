@@ -549,6 +549,7 @@ extension ${Self} : _ArrayType {
   public mutating func removeLast() -> T {
     _precondition(count > 0, "can't removeLast from an empty ${Self}")
     let c = count
+    // We don't check for "c - 1"  underflow because C is known to be positive.
     let result = self[c &- 1]
     self.replaceRange((c &- 1)..<c, with: EmptyCollection())
     return result
