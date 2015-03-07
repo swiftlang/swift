@@ -192,7 +192,9 @@ func _introSortImpl<
     return
   }
 
-   // Partition and sort.
+  // Partition and sort.
+  // We don't check the depthLimit variable for underflow because this variable
+  // is always greater than zero (see check above).
   let partIdx: C.Index = _partition(&elements, range
                                     ${", &isOrderedBefore" if p else ""})
   _introSortImpl(&elements, range.startIndex..<partIdx,
