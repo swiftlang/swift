@@ -153,6 +153,8 @@ set(SWIFT_EXPERIMENTAL_EXTRA_FLAGS "" CACHE STRING
 set(SWIFT_EXPERIMENTAL_EXTRA_REGEXP_FLAGS "" CACHE STRING
     "A list of [module_regexp1,flags1,module_regexp2,flags2,...] which can be used to apply specific flags to modules that match a cmake regexp. It always applies the first regexp that matches.")
 
+option(SWIFT_EXPERIMENTAL_EXTRA_GUARANTEED_SELF "Enable guaranteed self" FALSE)
+
 option(SWIFT_RUNTIME_ENABLE_DTRACE
   "Should the runtime be built with dtrace instrumentation enabled"
   FALSE)

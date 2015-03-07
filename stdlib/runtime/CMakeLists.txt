@@ -24,6 +24,10 @@ if (SWIFT_RUNTIME_ENABLE_DTRACE)
       "-DSWIFT_RUNTIME_ENABLE_DTRACE=1")
 endif()
 
+if (SWIFT_EXPERIMENTAL_ENABLE_GUARANTEED_SELF)
+  list(APPEND swift_runtime_compile_flags "-DSWIFT_RUNTIME_ENABLE_GUARANTEED_SELF")
+endif()
+
 set(swift_runtime_objc_sources)
 set(swift_runtime_unicode_normalization_sources)
 set(swift_runtime_private_link_libraries)

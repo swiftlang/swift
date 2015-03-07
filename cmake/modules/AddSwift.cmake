@@ -368,6 +368,10 @@ function(_compile_swift_files dependency_target_out_var_name)
 
   list(APPEND swift_flags ${SWIFT_EXPERIMENTAL_EXTRA_FLAGS})
 
+  if (SWIFT_EXPERIMENTAL_ENABLE_GUARANTEED_SELF)
+    list(APPEND swift_flags "-Xfrontend" "-enable-guaranteed-self")
+  endif()
+
   if(SWIFTFILE_OPT_FLAGS)
     list(APPEND swift_flags ${SWIFTFILE_OPT_FLAGS})
   endif()
