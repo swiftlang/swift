@@ -1,11 +1,12 @@
-// RUN: %target-run-stdlib-swift
+// RUN: %target-run-simple-swift
 
-// XFAIL: linux
-
-import Swift
 import StdlibUnittest
 import SwiftUnstablePthreadExtras
-import Dispatch
+#if os(OSX) || os(iOS)
+import Darwin
+#elseif os(Linux)
+import Glibc
+#endif
 
 var StringTestSuite = TestSuite("String")
 
