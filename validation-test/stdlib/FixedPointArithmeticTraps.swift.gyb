@@ -7,8 +7,6 @@
 // RUN: %S/../../utils/line-directive %t/FixedPointArithmeticTraps.swift -- %target-run %t/a.out_Debug
 // RUN: %S/../../utils/line-directive %t/FixedPointArithmeticTraps.swift -- %target-run %t/a.out_Release
 
-// XFAIL: linux
-
 import StdlibUnittest
 
 // Note: in this file, we need to go through opaque functions to load

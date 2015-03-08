@@ -8,8 +8,6 @@
 // RUN: %target-run %t/Assert_Release
 // RUN: %target-run %t/Assert_Unchecked
 
-// XFAIL: linux
-
 import StdlibUnittest
 
 //===---
