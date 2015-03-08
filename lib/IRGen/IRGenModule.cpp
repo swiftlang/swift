@@ -574,8 +574,8 @@ void IRGenModule::emitAutolinkInfo() {
 }
 
 void IRGenModule::finalize() {
-  emitGlobalLists();
   emitAutolinkInfo();
+  emitGlobalLists();
   if (DebugInfo)
     DebugInfo->finalize();
 }

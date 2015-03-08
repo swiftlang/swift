@@ -18,8 +18,6 @@
 // RUN: %S/../../utils/line-directive %t/Lazy.swift -- %target-run %t/a.out_Debug
 // RUN: %S/../../utils/line-directive %t/Lazy.swift -- %target-run %t/a.out_Release
 
-// XFAIL: linux
-
 import StdlibUnittest
 
 var LazyTestSuite = TestSuite("Lazy")

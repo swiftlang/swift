@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-ir %s > %t
-// RUN: FileCheck %s < %t
+// RUN: FileCheck %s --check-prefix=CHECK-%target-object-format --check-prefix=CHECK < %t
 // RUN: FileCheck -check-prefix=NEGATIVE %s < %t
 
 // REQUIRES: CPU=x86_64
@@ -45,7 +45,8 @@ bb0:
   return %1 : $()
 }
 
-// CHECK: @llvm.used = appending global [1 x i8*] [i8* bitcast (void ()* @frieda to i8*)], section "llvm.metadata", align 8
+// CHECK-macho: @llvm.used = appending global [1 x i8*] [i8* bitcast (void ()* @frieda to i8*)], section "llvm.metadata", align 8
+// CHECK-elf: @llvm.used = appending global [2 x i8*] [i8* bitcast (void ()* @frieda to i8*), i8* getelementptr inbounds ([0 x i8]* @_swift1_autolink_entries, i32 0, i32 0)], section "llvm.metadata", align 8
 
 // CHECK: define linkonce_odr hidden void @qux()
 // CHECK: define hidden void @fred()

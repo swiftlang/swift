@@ -3,8 +3,6 @@
 //
 // RUN: %target-run %t/a.out
 
-// XFAIL: linux
-
 import StdlibUnittest
 
 var DictionaryUnchecked = TestSuite("DictionaryUnchecked")

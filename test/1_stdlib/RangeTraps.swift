@@ -17,8 +17,6 @@
 // RUN: %target-run %t/a.out_Debug
 // RUN: %target-run %t/a.out_Release
 
-// XFAIL: linux
-
 import StdlibUnittest
 
 var RangeTraps = TestSuite("RangeTraps")
