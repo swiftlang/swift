@@ -14,8 +14,6 @@
 // RUN: %S/../../utils/gyb -DCMAKE_SIZEOF_VOID_P=%target-ptrsize %s -o %t/NumericParsing.swift
 // RUN: %S/../../utils/line-directive %t/NumericParsing.swift -- %target-build-swift %t/NumericParsing.swift -o %t/a.out
 // RUN: %S/../../utils/line-directive %t/NumericParsing.swift -- %target-run %t/a.out
-//
-// XFAIL: linux
 %{
 from SwiftIntTypes import *
 
@@ -47,7 +45,6 @@ number_of_values = 23
 }% 
 
 import StdlibUnittest
-import Darwin
 
 var tests = TestSuite("NumericParsing")
 

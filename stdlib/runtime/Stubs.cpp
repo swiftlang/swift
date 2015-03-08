@@ -106,14 +106,34 @@ extern "C" uint64_t swift_uint64ToString(char *Buffer, intptr_t BufferLength,
                             /*Negative=*/false);
 }
 
+#if defined(__APPLE__) || defined(__FreeBSD__)
+static inline locale_t getCLocale() {
+  // On these platforms convenience functions from xlocale.h interpret nullptr
+  // as C locale.
+  return nullptr;
+}
+#else
+static locale_t makeCLocale() {
+  locale_t CLocale = newlocale(LC_ALL_MASK, "C", nullptr);
+  if (!CLocale) {
+    swift::crash("makeCLocale: newlocale() returned a null pointer");
+  }
+  return CLocale;
+}
+
+static locale_t getCLocale() {
+  static locale_t CLocale = makeCLocale();
+  return CLocale;
+}
+#endif
+
 #if defined(__APPLE__)
 #define swift_snprintf_l snprintf_l
 #else
 static int swift_snprintf_l(char *Str, size_t StrSize, locale_t Locale,
                             const char *Format, ...) {
   if (Locale == nullptr) {
-    static locale_t CLocale = newlocale(LC_ALL_MASK, NULL, NULL);
-    Locale = CLocale;
+    Locale = getCLocale();
   }
   locale_t OldLocale = uselocale(Locale);
 
@@ -316,7 +336,7 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
 ) {
   char *EndPtr;
   errno = 0;
-  const auto result = posixImpl(nptr, &EndPtr, NULL);
+  const auto result = posixImpl(nptr, &EndPtr, getCLocale());
   *outResult = result;
   if (result == huge || result == -huge || result == 0.0 || result == -0.0) {
       if (errno == ERANGE)
