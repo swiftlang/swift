@@ -524,6 +524,23 @@ public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
   println(aggregatedEvaluations)
 }
 
+internal func _divideRoundUp(lhs: Int, rhs: Int) -> Int {
+  return (lhs + rhs) / rhs
+}
+
+public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
+  test: RT.Type,
+  #operations: Int,
+  threads: Int? = nil
+) {
+  let racingThreadCount = threads ?? max(2, _stdlib_getHardwareConcurrency())
+
+  // Each trial runs threads^2 operations.
+  let operationsPerTrial = racingThreadCount * racingThreadCount
+  let trials = _divideRoundUp(operations, operationsPerTrial)
+  runRaceTest(test, trials: trials, threads: threads)
+}
+
 public func consumeCPU(#units: Int) {
   for i in 0..<units {
     let scale = 16

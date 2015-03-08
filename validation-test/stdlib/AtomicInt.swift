@@ -1,12 +1,9 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 //
-// RUN: %target-build-swift -Xfrontend -disable-access-control -module-name a %s -o %t.out -O
+// RUN: %target-build-swift -module-name a %s -o %t.out -O
 // RUN: %target-run %t.out
 
-// XFAIL: linux
-
-import Swift
 import SwiftUnstable
 import StdlibUnittest
 
@@ -540,31 +537,31 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
 var AtomicIntTestSuite = TestSuite("AtomicInt")
 
 AtomicIntTestSuite.test("fetchAndAdd/1") {
-  runRaceTest(AtomicInt_fetchAndAdd_1_RaceTest.self, trials: 100)
+  runRaceTest(AtomicInt_fetchAndAdd_1_RaceTest.self, operations: 6400)
 }
 
 AtomicIntTestSuite.test("fetchAndAdd/ReleaseAtomicStores/1") {
   runRaceTest(
     AtomicInt_fetchAndAdd_ReleaseAtomicStores_1_RaceTest.self,
-    trials: 200)
+    operations: 12800)
 }
 
 AtomicIntTestSuite.test("fetchAndAdd/ReleaseAtomicStores/2") {
   runRaceTest(
     AtomicInt_fetchAndAdd_ReleaseAtomicStores_2_RaceTest.self,
-    trials: 200)
+    operations: 12800)
 }
 
 AtomicIntTestSuite.test("fetchAndAdd/ReleaseNonAtomicStores/1") {
   runRaceTest(
     AtomicInt_fetchAndAdd_ReleaseNonAtomicStores_RaceTest.self,
-    trials: 400)
+    operations: 25600)
 }
 
 var AtomicARCRefTestSuite = TestSuite("AtomicARCRef")
 
 AtomicARCRefTestSuite.test("initialize,load") {
-  runRaceTest(AtomicInitializeARCRefRaceTest.self, trials: 400)
+  runRaceTest(AtomicInitializeARCRefRaceTest.self, operations: 25600)
   expectEqual(0, dummyObjectCount.getSum())
 }
 
