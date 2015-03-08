@@ -1,8 +1,6 @@
 // RUN: %target-build-swift -Xfrontend -disable-access-control -module-name a %s -o %t.out -O
 // RUN: %target-run %t.out
 
-// XFAIL: linux
-
 import SwiftUnstable
 import StdlibUnittest
 
