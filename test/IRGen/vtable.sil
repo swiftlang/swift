@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64
 
