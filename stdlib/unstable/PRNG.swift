@@ -42,3 +42,11 @@ public func randArray64(count: Int) -> _UnitTestArray<UInt64> {
   return result
 }
 
+public func randArray(count: Int) -> [Int] {
+  var result = [Int](count: count, repeatedValue: 0)
+  for i in indices(result) {
+    result[i] = randInt()
+  }
+  return result
+}
+

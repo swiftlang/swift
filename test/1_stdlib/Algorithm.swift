@@ -3,7 +3,7 @@
 // XFAIL: linux
 
 import StdlibUnittest
-import Swift
+import SwiftUnstable
 
 var Algorithm = TestSuite("Algorithm")
 
@@ -424,21 +424,12 @@ func withInvalidOrderings(body: ((Int,Int)->Bool)->Void) {
   body { (_,_) in i++ % 5 == 0 }
 }
 
-@asmname("random") func random() -> UInt32
-@asmname("srandomdev") func srandomdev()
-
 func randomArray() -> A<Int> {
-  let count = random() % 50
-  var a: [Int] = []
-  a.reserveCapacity(Int(count))
-  for i in 0..<count {
-    a.append(Int(random()))
-  }
-  return A(a)
+  let count = Int(rand32(exclusiveUpperBound: 50))
+  return A(randArray(count))
 }
 
 Algorithm.test("invalidOrderings") {
-  srandomdev()
   withInvalidOrderings {
     var a = randomArray()
     sort(&a, $0)
