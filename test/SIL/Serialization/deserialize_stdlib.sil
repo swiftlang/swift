@@ -2,6 +2,4 @@
 // RUN: %target-sil-opt -verify %platform-module-dir/Swift.swiftmodule > /dev/null
 // RUN: llvm-bcanalyzer %platform-module-dir/Swift.swiftmodule | FileCheck %s
 
-// XFAIL: linux
-
 // CHECK-NOT: Unknown
