@@ -17,3 +17,18 @@ entry:
   %p = objc_protocol #ObjCProto : $Protocol
   return %p : $Protocol
 }
+
+class SomeClass {}
+protocol SomeClassProtocol : class {}
+
+// CHECK-LABEL: sil @metatype_to_object
+// CHECK:         {{%.*}} = objc_metatype_to_object {{%.*}} : $@objc_metatype SomeClass.Type to $AnyObject
+// CHECK:         {{%.*}} = objc_existential_metatype_to_object {{%.*}} : $@objc_metatype SomeClassProtocol.Type to $AnyObject
+sil @metatype_to_object : $@thin (@objc_metatype SomeClass.Type, @objc_metatype SomeClassProtocol.Type) -> @owned (AnyObject, AnyObject) {
+entry(%a : $@objc_metatype SomeClass.Type, %b : $@objc_metatype SomeClassProtocol.Type):
+  %x = objc_metatype_to_object %a : $@objc_metatype SomeClass.Type to $AnyObject
+  %y = objc_existential_metatype_to_object %b : $@objc_metatype SomeClassProtocol.Type to $AnyObject
+  %z = tuple (%x : $AnyObject, %y : $AnyObject)
+  return %z : $(AnyObject, AnyObject)
+}
+
