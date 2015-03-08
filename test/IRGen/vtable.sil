@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
 
 // REQUIRES: CPU=x86_64
-// XFAIL: linux
 
 sil_stage canonical
 
@@ -19,20 +18,35 @@ sil @_TFC6vtable1CcfMS0_FT_S0_ : $@cc(method) @thin (@owned C) -> @owned C
 sil @_TFC6vtable1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.NativeObject
 sil @_TFC6vtable1CD : $@cc(method) @thin (@owned C) -> ()
 
-// CHECK: @_TMdC6vtable1C = global [[C_METADATA_T:{.*\* }]] { 
-// CHECK: void ([[C]]*)* @_TFC6vtable1CD, 
-// CHECK: i8** @_TWVBo, 
-// CHECK: i64 ptrtoint (%objc_class* @_TMmC6vtable1C to i64), 
-// CHECK: %objc_class* @"OBJC_CLASS_$_SwiftObject", 
-// CHECK: %swift.opaque* @_objc_empty_cache, 
-// CHECK: %swift.opaque* {{(@_objc_empty_vtable|null)}},
-// CHECK: i64 add (i64 ptrtoint ({ i32, i32, i32, i32, i8*, i8*, i8*, i8*, i8*, i8*, i8* }* @_DATA__TtC6vtable1C to i64), i64 1),
-// CHECK: i32 3, i32 0, i32 16, i16 7, i16 0,
-// CHECK: i32 104, i32 16,
-// CHECK: { i64, i8*, i32, i32, i8*, %swift.type** (%swift.type*)*, %swift.type_pattern*, i32, i32, i32 }* @_TMnC6vtable1C, 
-// CHECK: [[C]]* (%swift.type*)* @_TFC6vtable1CCfMS0_FT_S0_, 
-// CHECK: [[C]]* ([[C]]*)* @_TFC6vtable1CcfMS0_FT_S0_ 
-// CHECK: }
+// CHECK-objc: @_TMdC6vtable1C = global [[C_METADATA_T:{.*\* }]] {
+// CHECK-objc: void ([[C]]*)* @_TFC6vtable1CD,
+// CHECK-objc: i8** @_TWVBo,
+// CHECK-objc: i64 ptrtoint (%objc_class* @_TMmC6vtable1C to i64),
+// CHECK-objc: %objc_class* @"OBJC_CLASS_$_SwiftObject",
+// CHECK-objc: %swift.opaque* @_objc_empty_cache,
+// CHECK-objc: %swift.opaque* {{(@_objc_empty_vtable|null)}},
+// CHECK-objc: i64 add (i64 ptrtoint ({ i32, i32, i32, i32, i8*, i8*, i8*, i8*, i8*, i8*, i8* }* @_DATA__TtC6vtable1C to i64), i64 1),
+// CHECK-objc: i32 3, i32 0, i32 16, i16 7, i16 0,
+// CHECK-objc: i32 104, i32 16,
+// CHECK-objc: { i64, i8*, i32, i32, i8*, %swift.type** (%swift.type*)*, %swift.type_pattern*, i32, i32, i32 }* @_TMnC6vtable1C,
+// CHECK-objc: [[C]]* (%swift.type*)* @_TFC6vtable1CCfMS0_FT_S0_,
+// CHECK-objc: [[C]]* ([[C]]*)* @_TFC6vtable1CcfMS0_FT_S0_
+// CHECK-objc: }
+
+// CHECK-native: @_TMdC6vtable1C = global [[C_METADATA_T:{.*\* }]] {
+// CHECK-native: void ([[C]]*)* @_TFC6vtable1CD,
+// CHECK-native: i8** @_TWVBo,
+// CHECK-native: i64 0,
+// CHECK-native: %swift.type* null,
+// CHECK-native: %swift.opaque* null,
+// CHECK-native: %swift.opaque* null,
+// CHECK-native: i64 1,
+// CHECK-native: i32 3, i32 0, i32 16, i16 7, i16 0,
+// CHECK-native: i32 104, i32 16,
+// CHECK-native: { i64, i8*, i32, i32, i8*, %swift.type** (%swift.type*)*, %swift.type_pattern*, i32, i32, i32 }* @_TMnC6vtable1C,
+// CHECK-native: [[C]]* (%swift.type*)* @_TFC6vtable1CCfMS0_FT_S0_,
+// CHECK-native: [[C]]* ([[C]]*)* @_TFC6vtable1CcfMS0_FT_S0_
+// CHECK-native: }
 
 sil_vtable C {
   #C.init!allocator.1: _TFC6vtable1CCfMS0_FT_S0_
