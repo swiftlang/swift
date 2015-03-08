@@ -12,7 +12,6 @@
 // RUN: %target-run-simple-swift
 //
 // XFAIL: interpret
-// XFAIL: linux
 
 import StdlibUnittest
 
@@ -149,7 +148,9 @@ func == <T: Comparable>(lhs: X<T>, rhs: X<T>) -> Bool {
   return lhs.a == rhs.a
 }
 
-IntervalTestSuite.test("Printable/DebugPrintable") {
+IntervalTestSuite.test("Printable/DebugPrintable")
+  .xfail(.LinuxAny(reason: "dynamic casting is not implemented completely"))
+  .code {
   expectEqual("0.0..<0.1", toString(X(0.0)..<X(0.1)))
   expectEqual("0.0...0.1", toString(X(0.0)...X(0.1)))
   

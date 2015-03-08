@@ -1,7 +1,5 @@
 // RUN: %target-run-simple-swift
 
-// XFAIL: linux
-
 import StdlibUnittest
 import SwiftUnstable
 
@@ -357,7 +355,9 @@ Algorithm.test("flatMap/CollectionType") {
   }
 }
 
-Algorithm.test("sorted/strings") {
+Algorithm.test("sorted/strings")
+  .xfail(.LinuxAny(reason: "String comparison: ICU vs. Foundation"))
+  .code {
   expectEqual(
     [ "Banana", "apple", "cherry" ],
     sorted([ "apple", "Banana", "cherry" ]))
