@@ -14,8 +14,6 @@ for id in $(seq 0 $process_id_max); do
 // RUN: rm -f %t.*
 // RUN: %target-sil-opt -sil-disable-ast-dump -verify %platform-module-dir/Swift.swiftmodule -module-name=Swift -o %t.sil
 // RUN: %target-sil-opt %t.sil -ast-verifier-process-count=$process_count -ast-verifier-process-id=$id > /dev/null
-
-// XFAIL: linux
 __EOF__
 
 done
