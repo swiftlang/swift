@@ -9,11 +9,8 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-stdlib-swift
+// RUN: %target-run-simple-swift
 
-// XFAIL: linux
-
-import Swift
 import StdlibUnittest
 
 var ConcatenateTests = TestSuite("ConcatenateTests")

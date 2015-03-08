@@ -67,28 +67,29 @@ struct _ConcatenateSequenceGenerator<
 
 /// A `SequenceType` whose elements consist of those *contained in* in
 /// the elements of its `Base` sequence.
+public // @testable
 struct _ConcatenateSequenceView<
   Base: SequenceType where Base.Generator.Element: SequenceType
 > : SequenceType {
 
-
   /// Present the elmeents of the elements of `base`
-  init(_ base: Base) {
+  public init(_ base: Base) {
     self._base = base
   }
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// Complexity: O(1)
-  func generate() -> _ConcatenateSequenceGenerator<Base.Generator> {
+  public func generate() -> _ConcatenateSequenceGenerator<Base.Generator> {
     return _ConcatenateSequenceGenerator(_base.generate())
   }
 
-  var _base: Base
+  internal var _base: Base
 }
 
 /// Return a sequence that is a concatenation of the elements of
 /// `source`\ 's elements
+public // @testable
 func _lazyConcatenate<
   S:SequenceType
   where S.Generator.Element: SequenceType
@@ -98,6 +99,7 @@ func _lazyConcatenate<
 
 /// Return an `Array` containing the results of mapping `transform`
 /// over `source`.
+public // @testable
 func _concatenate<
   S:SequenceType
   where S.Generator.Element: SequenceType
