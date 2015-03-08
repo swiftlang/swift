@@ -1,17 +1,14 @@
 // RUN: %target-run-stdlib-swift
 
 // XFAIL: interpret
-// XFAIL: linux
 
 import StdlibUnittest
 import Swift
+import SwiftUnstable
 
 //===---
 // Utilities.
 //===---
-
-@asmname("random") func random() -> UInt32
-@asmname("srandomdev") func srandomdev()
 
 // Single Unicode scalars that occupy a variety of bits in UTF-8.
 //
@@ -96,10 +93,10 @@ let testCharacters = [
 ]
 
 func randomGraphemeCluster(minSize: Int, maxSize: Int) -> String {
-  var n = Int(random()) % (maxSize - minSize) + minSize - 1
-  var result = baseScalars[Int(random()) % baseScalars.count]
+  var n = pickRandom((minSize + 1)..<maxSize)
+  var result = pickRandom(baseScalars)
   for i in 0..<n {
-    result += continuingScalars[Int(random()) % continuingScalars.count]
+    result += pickRandom(continuingScalars)
   }
   return result
 }
@@ -214,8 +211,6 @@ CharacterTests.test("RoundTripping") {
 
 CharacterTests.test("RoundTripping/Random") {
   // Random tests
-  // Seed the random number generator
-  srandomdev()
   for x in 0..<500 {
     // Character's small representation variant has 63 bits. Making
     // the maximum length 9 scalars tests both sides of the limit.

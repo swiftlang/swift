@@ -50,3 +50,10 @@ public func randArray(count: Int) -> [Int] {
   return result
 }
 
+public func pickRandom<
+  C : CollectionType where C.Index : RandomAccessIndexType
+>(c: C) -> C.Generator.Element {
+  let i = Int(rand32(exclusiveUpperBound: numericCast(count(c))))
+  return c[advance(c.startIndex, numericCast(i))]
+}
+
