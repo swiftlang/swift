@@ -1,9 +1,11 @@
 // RUN: %target-run-simple-swift
 
-// XFAIL: linux
-
 import StdlibUnittest
+#if os(OSX) || os(iOS)
 import Darwin
+#elseif os(Linux)
+import Glibc
+#endif
 
 func simple_getline() -> [UInt8]? {
   var result = [UInt8]()
