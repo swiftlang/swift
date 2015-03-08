@@ -1041,6 +1041,8 @@ public enum TestRunPredicate : Printable {
 
   case iOSSimulatorAny(/*reason:*/ String)
 
+  case LinuxAny(reason: String)
+
   public var description: String {
     switch self {
     case Custom(_, let reason):
@@ -1073,6 +1075,9 @@ public enum TestRunPredicate : Printable {
 
     case iOSSimulatorAny(let reason):
       return "iOSSimulatorAny(*, reason: \(reason))"
+
+    case LinuxAny(reason: let reason):
+      return "LinuxAny(*, reason: \(reason))"
     }
   }
 
@@ -1180,6 +1185,14 @@ public enum TestRunPredicate : Printable {
     case iOSSimulatorAny:
       switch _getRunningOSVersion() {
       case .iOSSimulator:
+        return true
+      default:
+        return false
+      }
+
+    case LinuxAny:
+      switch _getRunningOSVersion() {
+      case .Linux:
         return true
       default:
         return false
