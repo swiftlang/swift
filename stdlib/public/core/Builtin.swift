@@ -223,7 +223,8 @@ public func unsafeUnwrap<T>(nonEmpty: T?) -> T {
 /// This version is for internal stdlib use; it avoids any checking
 /// overhead for users, even in Debug builds.
 @inline(__always)
-internal func _unsafeUnwrap<T>(nonEmpty: T?) -> T {
+public // SPI(SwiftExperimental)
+func _unsafeUnwrap<T>(nonEmpty: T?) -> T {
   if let x = nonEmpty {
     return x
   }

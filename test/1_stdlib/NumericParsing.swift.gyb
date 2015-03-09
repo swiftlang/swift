@@ -44,6 +44,7 @@ radices_to_test = [2, 8, 10, 16, max_radix]
 number_of_values = 23
 }% 
 
+import SwiftExperimental
 import StdlibUnittest
 
 var tests = TestSuite("NumericParsing")

@@ -324,13 +324,15 @@ extension UnicodeScalar.UTF16View : CollectionType {
 }
 
 /// Return c as a UTF8.CodeUnit.  Meant to be used as _ascii8("x").
-internal func _ascii8(c: UnicodeScalar) -> UTF8.CodeUnit {
+public // SPI(SwiftExperimental)
+func _ascii8(c: UnicodeScalar) -> UTF8.CodeUnit {
   _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")
   return UTF8.CodeUnit(c.value)
 }
 
 /// Return c as a UTF16.CodeUnit.  Meant to be used as _ascii16("x").
-internal func _ascii16(c: UnicodeScalar) -> UTF16.CodeUnit {
+public // SPI(SwiftExperimental)
+func _ascii16(c: UnicodeScalar) -> UTF16.CodeUnit {
   _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")
   return UTF16.CodeUnit(c.value)
 }

@@ -166,94 +166,6 @@ T : _UnsignedIntegerType, U : _SignedIntegerType
   return U(IntMax(x.toUIntMax()))
 }
 
-//===--- Parsing helpers --------------------------------------------------===//
-
-/// If text is an ASCII representation in the given `radix` of a
-/// non-negative number <= `maximum`, return that number.  Otherwise,
-/// return `nil`.
-///
-/// Note: if `text` begins with `"+"` or `"-"`, even if the rest of
-/// the characters are `"0"`, the result is nil.
-internal func _parseUnsignedAsciiAsUIntMax(
-  u16: String.UTF16View, radix: Int, maximum: UIntMax
-) -> UIntMax? {
-  if isEmpty(u16) { return nil }
-  
-  let digit = _ascii16("0")..._ascii16("9")
-  let lower = _ascii16("a")..._ascii16("z")
-  let upper = _ascii16("A")..._ascii16("Z")
-  
-  _precondition(radix > 1, "Radix must be greater than 1")
-  _precondition(
-    radix <= numericCast(10 + count(lower)),
-    "Radix exceeds what can be expressed using the English alphabet")
-  
-  let uRadix = UIntMax(bitPattern: IntMax(radix))
-  var result: UIntMax = 0
-  for c in u16 {
-    let n: UIntMax
-    switch c {
-    case digit: n = UIntMax(c - digit.startIndex)
-    case lower: n = UIntMax(c - lower.startIndex) + 10
-    case upper: n = UIntMax(c - upper.startIndex) + 10
-    default: return nil
-    }
-    if n >= uRadix { return nil }
-    let (result1, overflow1) = UIntMax.multiplyWithOverflow(result, uRadix)
-    let (result2, overflow2) = UIntMax.addWithOverflow(result1, n)
-    result = result2
-    if overflow1 || overflow2 || result > maximum { return nil }
-  }
-  return result
-}
-
-/// If text is an ASCII representation in the given `radix` of a
-/// non-negative number <= `maximum`, return that number.  Otherwise,
-/// return `nil`.
-///
-/// Note: if `text` begins with `"+"` or `"-"`, even if the rest of
-/// the characters are `"0"`, the result is nil.
-internal func _parseAsciiAsUIntMax(
-  u16: String.UTF16View, radix: Int, maximum: UIntMax
-) -> UIntMax? {
-  if isEmpty(u16) { return nil }
-  let c = first(u16)
-  if _fastPath(c != _ascii16("-")) {
-    let unsignedText
-      = c == _ascii16("+") ? unsafeUnwrap(dropFirst(u16)) : u16
-    return _parseUnsignedAsciiAsUIntMax(unsignedText, radix, maximum)
-  }
-  else {
-    return _parseAsciiAsIntMax(u16, radix, 0) == 0 ? 0 : nil
-  }
-}
-
-/// If text is an ASCII representation in the given `radix` of a
-/// number >= -`maximum` - 1 and <= `maximum`, return that number.
-/// Otherwise, return `nil`.
-///
-/// Note: for text matching the regular expression "-0+", the result
-/// is `0`, not `nil`.
-internal func _parseAsciiAsIntMax(
-  u16: String.UTF16View, radix: Int, maximum: IntMax
-) -> IntMax? {
-  _sanityCheck(maximum >= 0, "maximum should be non-negative")
-  
-  if isEmpty(u16) { return nil }
-  
-  // Drop any leading "-"
-  let negative = first(u16) == _ascii16("-")
-  let absResultText = negative ? _unsafeUnwrap(dropFirst(u16)) : u16
-
-  let absResultMax = UIntMax(bitPattern: maximum) + (negative ? 1 : 0)
-
-  // Parse the result as unsigned
-  if let absResult = _parseAsciiAsUIntMax(absResultText, radix, absResultMax) {
-    return IntMax(bitPattern: negative ? 0 &- absResult : absResult)
-  }
-  return nil
-}
-
 //===--- Loop over all integer types --------------------------------------===//
 % for self_ty in all_integer_types(word_bits):
 %   bits = self_ty.bits
@@ -425,23 +337,6 @@ extension ${Self} : Printable {
   }
 }
 
-extension ${Self} {
-  /// Construct from an ASCII representation in the given `radix`.
-  ///
-  /// If `text` does not match the regular expression
-  /// "[+-][0-9a-zA-Z]+", or the value it denotes in the given `radix`
-  /// is not representable, the result is `nil`.
-  public init?(_ text: String, radix: Int = 10) {
-    if let value = _parseAsciiAs${'' if signed else 'U'}IntMax(
-      text.utf16, radix, ${'' if signed else 'U'}IntMax(${Self}.max)) {
-      self.init(
-        ${'' if Self in (IntMax,UIntMax) else 'truncatingBitPattern:'} value)
-    }
-    else {
-      return nil
-    }
-  }
-}
 // When ${Self} is used as an index, there are always bounds---more
 // restrictive than the full range of ${Self}---against which we're
 // not able to check.  Overflows are not useful indicators of
