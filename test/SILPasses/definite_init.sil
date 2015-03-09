@@ -454,7 +454,7 @@ entry(%a : $*C):
   %p = alloc_stack $P
   %b = mark_uninitialized [var] %p#1 : $*P
 
-  %q = init_existential %b : $*P, $C
+  %q = init_existential_addr %b : $*P, $C
   
   // CHECK: copy_addr {{.*}} to [initialization] %2 : $*C
   copy_addr %a to [initialization] %q : $*C

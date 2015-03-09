@@ -400,7 +400,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                                        (unsigned)SI.getKind());
     break;
   }
-  case ValueKind::InitExistentialInst:
+  case ValueKind::InitExistentialAddrInst:
   case ValueKind::InitExistentialMetatypeInst:
   case ValueKind::InitExistentialRefInst: {
     SILValue operand;
@@ -410,8 +410,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     switch (SI.getKind()) {
     default: llvm_unreachable("out of sync with parent");
-    case ValueKind::InitExistentialInst: {
-      auto &IEI = cast<InitExistentialInst>(SI);
+    case ValueKind::InitExistentialAddrInst: {
+      auto &IEI = cast<InitExistentialAddrInst>(SI);
       operand = IEI.getOperand();
       Ty = IEI.getLoweredConcreteType();
       FormalConcreteType = IEI.getFormalConcreteType();
@@ -815,7 +815,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::AutoreleaseValueInst:
   case ValueKind::DeallocStackInst:
   case ValueKind::DeallocRefInst:
-  case ValueKind::DeinitExistentialInst:
+  case ValueKind::DeinitExistentialAddrInst:
   case ValueKind::DestroyAddrInst:
   case ValueKind::IsNonnullInst:
   case ValueKind::LoadInst:
@@ -959,7 +959,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   // Conversion instructions (and others of similar form).
-  case ValueKind::OpenExistentialInst:
+  case ValueKind::OpenExistentialAddrInst:
   case ValueKind::OpenExistentialRefInst:
   case ValueKind::OpenExistentialMetatypeInst:
   case ValueKind::UncheckedRefCastInst:

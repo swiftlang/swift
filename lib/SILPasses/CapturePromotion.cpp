@@ -648,10 +648,10 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
     return true;
   }
   // Recursively see through struct_element_addr, tuple_element_addr, and
-  // open_existential instructions.
+  // open_existential_addr instructions.
   if (isa<StructElementAddrInst>(U) || isa<TupleElementAddrInst>(U) ||
       isa<InitEnumDataAddrInst>(U) ||
-      isa<OpenExistentialInst>(U) || isa<UncheckedTakeEnumDataAddrInst>(U)) {
+      isa<OpenExistentialAddrInst>(U) || isa<UncheckedTakeEnumDataAddrInst>(U)) {
     // UncheckedTakeEnumDataAddr is additionally a mutation.
     if (isa<UncheckedTakeEnumDataAddrInst>(U))
       Mutations.push_back(U);

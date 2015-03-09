@@ -618,13 +618,13 @@ public:
   void visitProjectValueBufferInst(ProjectValueBufferInst *i);
   void visitDeallocValueBufferInst(DeallocValueBufferInst *i);
 
-  void visitOpenExistentialInst(OpenExistentialInst *i);
+  void visitOpenExistentialAddrInst(OpenExistentialAddrInst *i);
   void visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *i);
   void visitOpenExistentialRefInst(OpenExistentialRefInst *i);
-  void visitInitExistentialInst(InitExistentialInst *i);
+  void visitInitExistentialAddrInst(InitExistentialAddrInst *i);
   void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *i);
   void visitInitExistentialRefInst(InitExistentialRefInst *i);
-  void visitDeinitExistentialInst(DeinitExistentialInst *i);
+  void visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *i);
   
   void visitProjectBlockStorageInst(ProjectBlockStorageInst *i);
   void visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *i);
@@ -3676,7 +3676,7 @@ void IRGenSILFunction::visitDeallocValueBufferInst(
   emitDeallocateBuffer(*this, i->getValueType(), buffer);
 }
 
-void IRGenSILFunction::visitInitExistentialInst(swift::InitExistentialInst *i) {
+void IRGenSILFunction::visitInitExistentialAddrInst(swift::InitExistentialAddrInst *i) {
   Address container = getLoweredAddress(i->getOperand());
   SILType destType = i->getOperand().getType();
   Address buffer = emitOpaqueExistentialContainerInit(*this,
@@ -3712,14 +3712,14 @@ void IRGenSILFunction::visitInitExistentialRefInst(InitExistentialRefInst *i) {
   setLoweredExplosion(SILValue(i, 0), result);
 }
 
-void IRGenSILFunction::visitDeinitExistentialInst(
-                                              swift::DeinitExistentialInst *i) {
+void IRGenSILFunction::visitDeinitExistentialAddrInst(
+                                              swift::DeinitExistentialAddrInst *i) {
   Address container = getLoweredAddress(i->getOperand());
   emitOpaqueExistentialContainerDeinit(*this, container,
                                        i->getOperand().getType());
 }
 
-void IRGenSILFunction::visitOpenExistentialInst(OpenExistentialInst *i) {
+void IRGenSILFunction::visitOpenExistentialAddrInst(OpenExistentialAddrInst *i) {
   SILType baseTy = i->getOperand().getType();
   Address base = getLoweredAddress(i->getOperand());
 

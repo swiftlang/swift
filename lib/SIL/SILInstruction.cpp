@@ -731,7 +731,7 @@ bool SILInstruction::isTriviallyDuplicatable() const {
     return false;
   }
 
-  if (isa<OpenExistentialInst>(this) ||
+  if (isa<OpenExistentialAddrInst>(this) ||
       isa<OpenExistentialRefInst>(this) ||
       isa<OpenExistentialMetatypeInst>(this)) {
     // Don't know how to duplicate these properly yet. Inst.clone() per

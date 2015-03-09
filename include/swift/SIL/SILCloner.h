@@ -1109,7 +1109,7 @@ SILCloner<ImplClass>::visitDynamicMethodInst(DynamicMethodInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitOpenExistentialInst(OpenExistentialInst *Inst) {
+SILCloner<ImplClass>::visitOpenExistentialAddrInst(OpenExistentialAddrInst *Inst) {
   // Create a new archetype for this opened existential type.
   auto archetypeTy
     = Inst->getType().getSwiftRValueType()->castTo<ArchetypeType>();
@@ -1119,7 +1119,7 @@ SILCloner<ImplClass>::visitOpenExistentialInst(OpenExistentialInst *Inst) {
     = ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType());
 
   doPostProcess(Inst,
-    getBuilder().createOpenExistential(getOpLocation(Inst->getLoc()),
+    getBuilder().createOpenExistentialAddr(getOpLocation(Inst->getLoc()),
                                        getOpValue(Inst->getOperand()),
                                        getOpType(Inst->getType())));
 }
@@ -1163,14 +1163,14 @@ visitOpenExistentialRefInst(OpenExistentialRefInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitInitExistentialInst(InitExistentialInst *Inst) {
+SILCloner<ImplClass>::visitInitExistentialAddrInst(InitExistentialAddrInst *Inst) {
   CanType origFormalType = Inst->getFormalConcreteType();
   auto conformances =
     getOpConformancesForExistential(
                          Inst->getOperand().getType().getSwiftRValueType(),
                                     origFormalType, Inst->getConformances());
   doPostProcess(Inst,
-    getBuilder().createInitExistential(getOpLocation(Inst->getLoc()),
+    getBuilder().createInitExistentialAddr(getOpLocation(Inst->getLoc()),
                                    getOpValue(Inst->getOperand()),
                                    getOpASTType(origFormalType),
                                    getOpType(Inst->getLoweredConcreteType()),
@@ -1210,9 +1210,9 @@ visitInitExistentialRefInst(InitExistentialRefInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitDeinitExistentialInst(DeinitExistentialInst *Inst) {
+SILCloner<ImplClass>::visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *Inst) {
   doPostProcess(Inst,
-    getBuilder().createDeinitExistential(getOpLocation(Inst->getLoc()),
+    getBuilder().createDeinitExistentialAddr(getOpLocation(Inst->getLoc()),
                                          getOpValue(Inst->getOperand())));
 }
 

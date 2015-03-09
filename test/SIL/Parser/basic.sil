@@ -178,8 +178,8 @@ protocol P {
 
 sil @existentials : $@thin (@in P) -> () {
 bb0(%0 : $*P):
-  // CHECK: open_existential %0
-  %1 = open_existential %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P 
+  // CHECK: open_existential_addr %0
+  %1 = open_existential_addr %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P 
 
   // CHECK: witness_method ${{.*}}, #P.doIt!1
   %2 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.doIt!1, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@thin @cc(witness_method) <T: P> (@inout T) -> ()
@@ -895,10 +895,10 @@ sil @test_init_existential : $@thin (@out Bendable, Spoon) -> () {
 bb0(%0 : $*Bendable, %1 : $Spoon):
   %2 = alloc_box $Spoon
   store %1 to %2#1 : $*Spoon
-  // CHECK: init_existential %{{.*}} : $*Bendable, $Spoon
-  %4 = init_existential %0 : $*Bendable, $Spoon
-  // CHECK: deinit_existential %{{.*}} : $*Bendable
-  deinit_existential %0 : $*Bendable
+  // CHECK: init_existential_addr %{{.*}} : $*Bendable, $Spoon
+  %4 = init_existential_addr %0 : $*Bendable, $Spoon
+  // CHECK: deinit_existential_addr %{{.*}} : $*Bendable
+  deinit_existential_addr %0 : $*Bendable
   %5 = load %2#1 : $*Spoon
   store %5 to %4 : $*Spoon
   strong_release %2#0 : $Builtin.NativeObject

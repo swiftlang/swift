@@ -3077,13 +3077,13 @@ existential container for that type is loadable and referred to in the
 implementation as a *class existential container*. Class existential containers
 have reference semantics and can be ``retain``-ed and ``release``-d.
 
-init_existential
-````````````````
+init_existential_addr
+`````````````````````
 ::
   
-  sil-instruction ::= 'init_existential' sil-operand ',' sil-type
+  sil-instruction ::= 'init_existential_addr' sil-operand ',' sil-type
 
-  %1 = init_existential %0 : $*P, $T
+  %1 = init_existential_addr %0 : $*P, $T
   // %0 must be of a $*P address type for non-class protocol or protocol
   //   composition type P
   // $T must be a type that fulfills protocol(s) P
@@ -3095,34 +3095,34 @@ instruction is an address referencing the storage for the contained value, which
 remains uninitialized. The contained value must be ``store``-d or
 ``copy_addr``-ed to in order for the existential value to be fully initialized.
 If the existential container needs to be destroyed while the contained value
-is uninitialized, ``deinit_existential`` must be used to do so. A fully
+is uninitialized, ``deinit_existential_addr`` must be used to do so. A fully
 initialized existential container can be destroyed with ``destroy_addr`` as
 usual. It is undefined behavior to ``destroy_addr`` a partially-initialized
 existential container.
 
-deinit_existential
-``````````````````
+deinit_existential_addr
+``````````````````````
 ::
 
-  sil-instruction ::= 'deinit_existential' sil-operand
+  sil-instruction ::= 'deinit_existential_addr' sil-operand
 
-  deinit_existential %0 : $*P
+  deinit_existential_addr %0 : $*P
   // %0 must be of a $*P address type for non-class protocol or protocol
   // composition type P
 
 Undoes the partial initialization performed by
-``init_existential``.  ``deinit_existential`` is only valid for
+``init_existential_addr``.  ``deinit_existential_addr`` is only valid for
 existential containers that have been partially initialized by
-``init_existential`` but haven't had their contained value initialized.
+``init_existential_addr`` but haven't had their contained value initialized.
 A fully initialized existential must be destroyed with ``destroy_addr``.
 
-open_existential
-````````````````
+open_existential_addr
+`````````````````````
 ::
 
-  sil-instruction ::= 'open_existential' sil-operand 'to' sil-type
+  sil-instruction ::= 'open_existential_addr' sil-operand 'to' sil-type
 
-  %1 = open_existential %0 : $*P to $*@opened P
+  %1 = open_existential_addr %0 : $*P to $*@opened P
   // %0 must be of a $*P type for non-class protocol or protocol composition
   //   type P
   // $*@opened P must be a unique archetype that refers to an opened 

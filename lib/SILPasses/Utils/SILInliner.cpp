@@ -312,7 +312,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::DeallocRefInst:
     case ValueKind::DeallocStackInst:
     case ValueKind::DeallocValueBufferInst:
-    case ValueKind::DeinitExistentialInst:
+    case ValueKind::DeinitExistentialAddrInst:
     case ValueKind::DestroyAddrInst:
     case ValueKind::ProjectValueBufferInst:
     case ValueKind::ReleaseValueInst:
@@ -323,14 +323,14 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::IndexAddrInst:
     case ValueKind::IndexRawPointerInst:
     case ValueKind::InitEnumDataAddrInst:
-    case ValueKind::InitExistentialInst:
+    case ValueKind::InitExistentialAddrInst:
     case ValueKind::InitExistentialMetatypeInst:
     case ValueKind::InitExistentialRefInst:
     case ValueKind::InjectEnumAddrInst:
     case ValueKind::IsNonnullInst:
     case ValueKind::LoadInst:
     case ValueKind::LoadWeakInst:
-    case ValueKind::OpenExistentialInst:
+    case ValueKind::OpenExistentialAddrInst:
     case ValueKind::OpenExistentialMetatypeInst:
     case ValueKind::OpenExistentialRefInst:
     case ValueKind::PartialApplyInst:

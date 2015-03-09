@@ -1885,7 +1885,7 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
     bool isTake = subExistential.hasCleanup();
     SILValue subPayload;
     if (subExistential.getValue().getType().isAddress()) {
-      subPayload = gen.B.createOpenExistential(E, subExistential.forward(gen),
+      subPayload = gen.B.createOpenExistentialAddr(E, subExistential.forward(gen),
                                                subLoweredTy);
     } else {
       subPayload = gen.B.createOpenExistentialRef(E,subExistential.forward(gen),
@@ -1897,7 +1897,7 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
       : ManagedValue::forUnmanaged(subPayload);
     
     // Set up the destination existential, and forward the payload into it.
-    SILValue destAddr = gen.B.createInitExistential(E, existential,
+    SILValue destAddr = gen.B.createInitExistentialAddr(E, existential,
                                                 subFormalTy->getCanonicalType(),
                                                 subLoweredTy,
                                                 E->getConformances());
@@ -1915,7 +1915,7 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
     auto &concreteTL = gen.getTypeLowering(abstractionPattern,
                                            concreteFormalType);
     
-    SILValue valueAddr = gen.B.createInitExistential(E, existential,
+    SILValue valueAddr = gen.B.createInitExistentialAddr(E, existential,
                                 concreteFormalType,
                                 concreteTL.getLoweredType(),
                                 E->getConformances());
@@ -2016,7 +2016,7 @@ namespace {
       : existential(existential) {}
     
     void emit(SILGenFunction &gen, CleanupLocation l) override {
-      gen.B.createDeinitExistential(l, existential);
+      gen.B.createDeinitExistentialAddr(l, existential);
     }
   };
 
@@ -6488,7 +6488,7 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
   // Open the existential value into the opened archetype value.
   SILValue archetypeValue;
   if (existentialValue.getValue().getType().isAddress()) {
-    archetypeValue = SGF.B.createOpenExistential(
+    archetypeValue = SGF.B.createOpenExistentialAddr(
                        E, existentialValue.forward(SGF),
                        SGF.getLoweredType(E->getOpaqueValue()->getType()));
   } else {

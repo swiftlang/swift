@@ -1186,7 +1186,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("dealloc_value_buffer", ValueKind::DeallocValueBufferInst)
     .Case("debug_value", ValueKind::DebugValueInst)
     .Case("debug_value_addr", ValueKind::DebugValueAddrInst)
-    .Case("deinit_existential", ValueKind::DeinitExistentialInst)
+    .Case("deinit_existential_addr", ValueKind::DeinitExistentialAddrInst)
     .Case("destroy_addr", ValueKind::DestroyAddrInst)
     .Case("release_value", ValueKind::ReleaseValueInst)
     .Case("dynamic_method", ValueKind::DynamicMethodInst)
@@ -1198,7 +1198,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("index_raw_pointer", ValueKind::IndexRawPointerInst)
     .Case("init_block_storage_header", ValueKind::InitBlockStorageHeaderInst)
     .Case("init_enum_data_addr", ValueKind::InitEnumDataAddrInst)
-    .Case("init_existential", ValueKind::InitExistentialInst)
+    .Case("init_existential_addr", ValueKind::InitExistentialAddrInst)
     .Case("init_existential_metatype", ValueKind::InitExistentialMetatypeInst)
     .Case("init_existential_ref", ValueKind::InitExistentialRefInst)
     .Case("inject_enum_addr", ValueKind::InjectEnumAddrInst)
@@ -1216,7 +1216,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("objc_metatype_to_object", ValueKind::ObjCMetatypeToObjectInst)
     .Case("objc_protocol", ValueKind::ObjCProtocolInst)
     .Case("objc_to_thick_metatype", ValueKind::ObjCToThickMetatypeInst)
-    .Case("open_existential", ValueKind::OpenExistentialInst)
+    .Case("open_existential_addr", ValueKind::OpenExistentialAddrInst)
     .Case("open_existential_metatype", ValueKind::OpenExistentialMetatypeInst)
     .Case("open_existential_ref", ValueKind::OpenExistentialRefInst)
     .Case("partial_apply", ValueKind::PartialApplyInst)
@@ -1828,7 +1828,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createBuiltin(InstLoc, Id, ResultTy, subs, Args);
     break;
   }
-  case ValueKind::OpenExistentialInst:
+  case ValueKind::OpenExistentialAddrInst:
   case ValueKind::OpenExistentialMetatypeInst:
   case ValueKind::OpenExistentialRefInst: {
     SILType Ty;
@@ -1847,8 +1847,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
 
     switch (Opcode) {
-    case ValueKind::OpenExistentialInst:
-      ResultVal = B.createOpenExistential(InstLoc, Val, Ty);
+    case ValueKind::OpenExistentialAddrInst:
+      ResultVal = B.createOpenExistentialAddr(InstLoc, Val, Ty);
       break;
 
     case ValueKind::OpenExistentialMetatypeInst:
@@ -3045,13 +3045,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
                                     DefaultValue, CaseValues);
     break;
   }
-  case ValueKind::DeinitExistentialInst: {
+  case ValueKind::DeinitExistentialAddrInst: {
     if (parseTypedValueRef(Val))
       return true;
-    ResultVal = B.createDeinitExistential(InstLoc, Val);
+    ResultVal = B.createDeinitExistentialAddr(InstLoc, Val);
     break;
   }
-  case ValueKind::InitExistentialInst: {
+  case ValueKind::InitExistentialAddrInst: {
     CanType Ty;
     if (parseTypedValueRef(Val) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
@@ -3072,9 +3072,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ArrayRef<ProtocolConformance *> conformances
       = collectExistentialConformances(P, Ty, Val.getType().getSwiftRValueType());
     
-    // FIXME: Conformances in InitExistentialInst is currently not included in
+    // FIXME: Conformances in InitExistentialAddrInst is currently not included in
     // SIL.rst.
-    ResultVal = B.createInitExistential(InstLoc, Val, Ty, LoweredTy,
+    ResultVal = B.createInitExistentialAddr(InstLoc, Val, Ty, LoweredTy,
                                         conformances);
     break;
   }

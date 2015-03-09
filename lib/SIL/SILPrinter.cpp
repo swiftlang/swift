@@ -1067,8 +1067,8 @@ public:
     OS << ", ";
     OS << DMI->getType();
   }
-  void visitOpenExistentialInst(OpenExistentialInst *OI) {
-    OS << "open_existential " << getIDAndType(OI->getOperand())
+  void visitOpenExistentialAddrInst(OpenExistentialAddrInst *OI) {
+    OS << "open_existential_addr " << getIDAndType(OI->getOperand())
        << " to " << OI->getType();
   }
   void visitOpenExistentialRefInst(OpenExistentialRefInst *OI) {
@@ -1079,8 +1079,8 @@ public:
     OS << "open_existential_metatype " << getIDAndType(OI->getOperand())
        << " to " << OI->getType();
   }
-  void visitInitExistentialInst(InitExistentialInst *AEI) {
-    OS << "init_existential " << getIDAndType(AEI->getOperand()) << ", $";
+  void visitInitExistentialAddrInst(InitExistentialAddrInst *AEI) {
+    OS << "init_existential_addr " << getIDAndType(AEI->getOperand()) << ", $";
     AEI->getFormalConcreteType().print(OS);
   }
   void visitInitExistentialRefInst(InitExistentialRefInst *AEI) {
@@ -1092,8 +1092,8 @@ public:
     OS << "init_existential_metatype " << getIDAndType(AEI->getOperand())
        << " : " << AEI->getType();
   }
-  void visitDeinitExistentialInst(DeinitExistentialInst *DEI) {
-    OS << "deinit_existential " << getIDAndType(DEI->getOperand());
+  void visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *DEI) {
+    OS << "deinit_existential_addr " << getIDAndType(DEI->getOperand());
   }
   void visitProjectBlockStorageInst(ProjectBlockStorageInst *PBSI) {
     OS << "project_block_storage " << getIDAndType(PBSI->getOperand());

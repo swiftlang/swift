@@ -345,13 +345,13 @@ func calls(var i:Int, var j:Int, var k:Int) {
 
   // CHECK: [[TEMP:%.*]] = alloc_stack $SomeProtocol
   // CHECK: copy_addr [[PADDR]]#1 to [initialization] [[TEMP]]#1
-  // CHECK: [[PVALUE:%[0-9]+]] = open_existential [[TEMP]]#1 : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
+  // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr [[TEMP]]#1 : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
   // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method!1
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: apply [[PMETHOD]]<[[OPENED]]>([[I]], [[PVALUE]])
   p.method(i)
 
-  // CHECK: [[PVALUE:%[0-9]+]] = open_existential [[PADDR:%.*]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
+  // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr [[PADDR:%.*]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
   // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method!1
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: apply [[PMETHOD]]<[[OPENED]]>([[I]], [[PVALUE]])

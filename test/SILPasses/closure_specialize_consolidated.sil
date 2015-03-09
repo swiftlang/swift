@@ -235,7 +235,7 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.Int32, %2 : $Builtin.NativeObject,
 // CHECK: apply
 sil [noinline] @_TF4test3barFTPS_1P_Si_Si : $@thin (@in P, Int32) -> Int32 {
 bb0(%0 : $*P, %1 : $Int32):
-  %2 = open_existential %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P
+  %2 = open_existential_addr %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P
   %3 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.foo!1, %2 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@thin @cc(witness_method) @callee_owned <T: P> (@owned @callee_owned (Int32) -> Int32, Int32, @inout T) -> Int32
   %4 = integer_literal $Builtin.Int32, 2
   %5 = struct $Int32 (%4 : $Builtin.Int32)

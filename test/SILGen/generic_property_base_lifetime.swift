@@ -48,7 +48,7 @@ func setIntPropGeneric<T: ProtocolA>(a: T) {
 }
 
 // CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime21getIntPropExistentialFPS_9ProtocolB_Si
-// CHECK:         [[PROJECTION:%.*]] = open_existential %0
+// CHECK:         [[PROJECTION:%.*]] = open_existential_addr %0
 // CHECK:         apply {{%.*}}([[PROJECTION]])
 // CHECK:         destroy_addr %0
 func getIntPropExistential(a: ProtocolB) -> Int {

@@ -16,7 +16,7 @@ func foo<B : Runcible>(x: B) {
 func bar(var x: Runcible) {
   // CHECK: [[BOX:%.*]] = alloc_box $Runcible
   // CHECK: [[TEMP:%.*]] = alloc_stack $Runcible
-  // CHECK: [[EXIST:%.*]] = open_existential [[TEMP]]#1 : $*Runcible to $*[[OPENED:@opened(.*) Runcible]]
+  // CHECK: [[EXIST:%.*]] = open_existential_addr [[TEMP]]#1 : $*Runcible to $*[[OPENED:@opened(.*) Runcible]]
   // CHECK: [[METHOD:%.*]] = witness_method $[[OPENED]], #Runcible.runce!1
   // CHECK: apply [[METHOD]]<[[OPENED]], Int>
   x.runce(5)

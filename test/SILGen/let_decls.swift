@@ -290,12 +290,12 @@ protocol SimpleProtocol {
 // CHECK-NEXT: bb0(%0 : $*SimpleProtocol):
 func testLetProtocolBases(let p : SimpleProtocol) {
   // CHECK-NEXT: debug_value_addr
-  // CHECK-NEXT: open_existential
+  // CHECK-NEXT: open_existential_addr
   // CHECK-NEXT: witness_method
   // CHECK-NEXT: apply
   p.doSomethingGreat()
 
-  // CHECK-NEXT: open_existential
+  // CHECK-NEXT: open_existential_addr
   // CHECK-NEXT: witness_method
   // CHECK-NEXT: apply
   p.doSomethingGreat()

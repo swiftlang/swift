@@ -154,7 +154,7 @@ bb0(%0 : $*LogicValue, %1 : $@thin Bool.Type):
   %2 = alloc_box $LogicValue
 // CHECK:  %2 = alloc_stack $LogicValue
   copy_addr [take] %0 to [initialization] %2#1 : $*LogicValue
-  %6 = open_existential %2#1 : $*LogicValue to $*@opened("01234567-89ab-cdef-0123-000000000000") LogicValue
+  %6 = open_existential_addr %2#1 : $*LogicValue to $*@opened("01234567-89ab-cdef-0123-000000000000") LogicValue
   %7 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") LogicValue, #LogicValue.getLogicValue!1, %6 : $*@opened("01234567-89ab-cdef-0123-000000000000") LogicValue : $@thin @cc(witness_method) @callee_owned <T: LogicValue> (@inout T) -> Bool
   %8 = apply %7<@opened("01234567-89ab-cdef-0123-000000000000") LogicValue>(%6) : $@thin @cc(witness_method) @callee_owned <T: LogicValue> (@inout T) -> Bool
   strong_release %2#0 : $Builtin.NativeObject

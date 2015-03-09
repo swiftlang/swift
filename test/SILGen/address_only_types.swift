@@ -178,7 +178,7 @@ func address_only_materialize() -> Int {
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF18address_only_types28some_address_only_function_1
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
   // CHECK: apply [[FUNC]]([[TEMP]]#1)
-  // CHECK: [[TEMP_PROJ:%[0-9]+]] = open_existential [[TEMP]]#1 : $*Unloadable to $*[[OPENED:@opened(.*) Unloadable]]
+  // CHECK: [[TEMP_PROJ:%[0-9]+]] = open_existential_addr [[TEMP]]#1 : $*Unloadable to $*[[OPENED:@opened(.*) Unloadable]]
   // CHECK: [[FOO_METHOD:%[0-9]+]] = witness_method $[[OPENED]], #Unloadable.foo!1
   // CHECK: [[RET:%[0-9]+]] = apply [[FOO_METHOD]]<[[OPENED]]>([[TEMP_PROJ]])
   // CHECK: destroy_addr [[TEMP_PROJ]]

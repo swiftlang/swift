@@ -333,7 +333,7 @@ func archetype_member_ref<T : Runcible>(var x: T) {
 // CHECK-LABEL: sil hidden @_TF11expressions22existential_member_ref
 func existential_member_ref(x: Mincible) {
   x.free_method()
-  // CHECK: open_existential
+  // CHECK: open_existential_addr
   // CHECK-NEXT: witness_method
   // CHECK-NEXT: apply
 }
@@ -384,7 +384,7 @@ struct Hat<T> : Runcible {
 // CHECK-LABEL: sil hidden @_TF11expressions7erasure
 func erasure(x: Spoon) -> Mincible {
   return x
-  // CHECK: init_existential
+  // CHECK: init_existential_addr
   // CHECK: return
 }
 

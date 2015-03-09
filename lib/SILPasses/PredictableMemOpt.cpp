@@ -118,7 +118,7 @@ static unsigned computeSubelement(SILValue Pointer, SILInstruction *RootInst) {
       
       Pointer = SEAI->getOperand();
     } else {
-      assert((isa<InitExistentialInst>(Inst) || isa<InjectEnumAddrInst>(Inst))&&
+      assert((isa<InitExistentialAddrInst>(Inst) || isa<InjectEnumAddrInst>(Inst))&&
              "Unknown access path instruction");
       // Cannot promote loads and stores from within an existential projection.
       return ~0U;

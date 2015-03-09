@@ -693,11 +693,11 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    // init_existential is modeled as an initialization store, where the uses
+    // init_existential_addr is modeled as an initialization store, where the uses
     // are treated as subelement accesses.
-    if (isa<InitExistentialInst>(User)) {
+    if (isa<InitExistentialAddrInst>(User)) {
       assert(!InStructSubElement &&
-             "init_existential should not apply to struct subelements");
+             "init_existential_addr should not apply to struct subelements");
       Uses.push_back(DIMemoryUse(User, DIUseKind::Initialization,
                                  BaseEltNo, 1));
 
@@ -717,11 +717,11 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    // open_existential is a use of the protocol value,
+    // open_existential_addr is a use of the protocol value,
     // so it is modeled as a load.
-    if (isa<OpenExistentialInst>(User)) {
+    if (isa<OpenExistentialAddrInst>(User)) {
       Uses.push_back(DIMemoryUse(User, DIUseKind::Load, BaseEltNo, 1));
-      // TODO: Is it safe to ignore all uses of the open_existential?
+      // TODO: Is it safe to ignore all uses of the open_existential_addr?
       continue;
     }
 

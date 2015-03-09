@@ -719,10 +719,10 @@ public:
                                     Volatile));
   }
 
-  OpenExistentialInst *createOpenExistential(SILLocation Loc, SILValue Operand,
+  OpenExistentialAddrInst *createOpenExistentialAddr(SILLocation Loc, SILValue Operand,
                                              SILType SelfTy) {
     return insert(new (F.getModule())
-                    OpenExistentialInst(Loc, Operand, SelfTy));
+                    OpenExistentialAddrInst(Loc, Operand, SelfTy));
   }
   
   OpenExistentialMetatypeInst *
@@ -739,13 +739,13 @@ public:
                     OpenExistentialRefInst(Loc, Operand, Ty));
   }
 
-  InitExistentialInst *
-  createInitExistential(SILLocation Loc,
+  InitExistentialAddrInst *
+  createInitExistentialAddr(SILLocation Loc,
                         SILValue Existential,
                         CanType FormalConcreteType,
                         SILType LoweredConcreteType,
                         ArrayRef<ProtocolConformance*> Conformances) {
-    return insert(InitExistentialInst::create(Loc, Existential,
+    return insert(InitExistentialAddrInst::create(Loc, Existential,
                                               FormalConcreteType,
                                               LoweredConcreteType,
                                               Conformances, &F));
@@ -771,9 +771,9 @@ public:
                                                  Conformances, &F));
   }
 
-  DeinitExistentialInst *createDeinitExistential(SILLocation Loc,
+  DeinitExistentialAddrInst *createDeinitExistentialAddr(SILLocation Loc,
                                                  SILValue Existential) {
-    return insert(new (F.getModule()) DeinitExistentialInst(Loc, Existential));
+    return insert(new (F.getModule()) DeinitExistentialAddrInst(Loc, Existential));
   }
   
   ProjectBlockStorageInst *createProjectBlockStorage(SILLocation Loc,

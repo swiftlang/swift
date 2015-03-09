@@ -2494,14 +2494,14 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty, Member, Volatile) {}
 };
 
-/// OpenExistentialInst - Given the address of an existential, "opens" the
+/// OpenExistentialAddrInst - Given the address of an existential, "opens" the
 /// existential by returning a pointer to a fresh archetype T, which also
 /// captures the (dynamic) conformances.
-class OpenExistentialInst
-  : public UnaryInstructionBase<ValueKind::OpenExistentialInst>
+class OpenExistentialAddrInst
+  : public UnaryInstructionBase<ValueKind::OpenExistentialAddrInst>
 {
 public:
-  OpenExistentialInst(SILLocation Loc, SILValue Operand, SILType SelfTy);
+  OpenExistentialAddrInst(SILLocation Loc, SILValue Operand, SILType SelfTy);
 };
 
 /// OpenExistentialRefInst - Given a class existential, "opens" the
@@ -2525,17 +2525,17 @@ public:
   OpenExistentialMetatypeInst(SILLocation loc, SILValue operand, SILType ty);
 };
 
-/// InitExistentialInst - Given an address to an uninitialized buffer of
+/// InitExistentialAddrInst - Given an address to an uninitialized buffer of
 /// a protocol type, initializes its existential container to contain a concrete
 /// value of the given type, and returns the address of the uninitialized
 /// concrete value inside the existential container.
-class InitExistentialInst
-  : public UnaryInstructionBase<ValueKind::InitExistentialInst>
+class InitExistentialAddrInst
+  : public UnaryInstructionBase<ValueKind::InitExistentialAddrInst>
 {
   CanType ConcreteType;
   ArrayRef<ProtocolConformance*> Conformances;
 
-  InitExistentialInst(SILLocation Loc,
+  InitExistentialAddrInst(SILLocation Loc,
                       SILValue Existential,
                       CanType ConcreteType,
                       SILType ConcreteLoweredType,
@@ -2546,7 +2546,7 @@ class InitExistentialInst
       Conformances(Conformances)
   {}
 public:
-  static InitExistentialInst *
+  static InitExistentialAddrInst *
   create(SILLocation Loc, SILValue Existential, CanType ConcreteType,
          SILType ConcreteLoweredType,
          ArrayRef<ProtocolConformance *> Conformances, SILFunction *Parent);
@@ -2637,19 +2637,19 @@ public:
   }
 };
 
-/// DeinitExistentialInst - Given an address of an existential that has been
-/// partially initialized with an InitExistentialInst but whose value buffer
+/// DeinitExistentialAddrInst - Given an address of an existential that has been
+/// partially initialized with an InitExistentialAddrInst but whose value buffer
 /// has not been initialized, deinitializes the existential and deallocates
 /// the value buffer. This should only be used for partially-initialized
 /// existentials; a fully-initialized existential can be destroyed with
 /// DestroyAddrInst and deallocated with DeallocStackInst.
-class DeinitExistentialInst
-  : public UnaryInstructionBase<ValueKind::DeinitExistentialInst,
+class DeinitExistentialAddrInst
+  : public UnaryInstructionBase<ValueKind::DeinitExistentialAddrInst,
                                 SILInstruction,
                                 /*HAS_RESULT*/ false>
 {
 public:
-  DeinitExistentialInst(SILLocation Loc, SILValue Existential)
+  DeinitExistentialAddrInst(SILLocation Loc, SILValue Existential)
     : UnaryInstructionBase(Loc, Existential) {}
 };
 

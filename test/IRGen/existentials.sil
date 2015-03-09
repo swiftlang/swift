@@ -13,7 +13,7 @@ import gizmo
 
 sil @init_opaque_existential : $@thin <T where T : Gizmo> (@out protocol<>, @owned T) -> () {
 bb0(%0 : $*protocol<>, %1 : $T):
-  %2 = init_existential %0 : $*protocol<>, $T
+  %2 = init_existential_addr %0 : $*protocol<>, $T
   store %1 to %2 : $*T
   %3 = tuple ()
   return %3 : $()

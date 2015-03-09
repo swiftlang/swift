@@ -445,7 +445,7 @@ TupleInst::TupleInst(SILLocation Loc, SILType Ty, ArrayRef<SILValue> Elems)
 MetatypeInst::MetatypeInst(SILLocation Loc, SILType Metatype)
   : SILInstruction(ValueKind::MetatypeInst, Loc, Metatype) {}
 
-OpenExistentialInst::OpenExistentialInst(SILLocation Loc,
+OpenExistentialAddrInst::OpenExistentialAddrInst(SILLocation Loc,
                                          SILValue Operand,
                                          SILType SelfTy)
   : UnaryInstructionBase(Loc, Operand, SelfTy)
@@ -1021,18 +1021,18 @@ WitnessMethodInst::create(SILLocation Loc, CanType LookupType,
                                           Ty, OpenedExistential, Volatile);
 }
 
-InitExistentialInst *
-InitExistentialInst::create(SILLocation Loc, SILValue Existential,
+InitExistentialAddrInst *
+InitExistentialAddrInst::create(SILLocation Loc, SILValue Existential,
                             CanType ConcreteType,
                             SILType ConcreteLoweredType,
                             ArrayRef<ProtocolConformance *> Conformances,
                             SILFunction *F) {
   SILModule &Mod = F->getModule();
-  void *Buffer = Mod.allocate(sizeof(InitExistentialInst),
-                              alignof(InitExistentialInst));
+  void *Buffer = Mod.allocate(sizeof(InitExistentialAddrInst),
+                              alignof(InitExistentialAddrInst));
   for (ProtocolConformance *C : Conformances)
     declareWitnessTable(Mod, C);
-  return ::new (Buffer) InitExistentialInst(Loc, Existential,
+  return ::new (Buffer) InitExistentialAddrInst(Loc, Existential,
                                             ConcreteType,
                                             ConcreteLoweredType,
                                             Conformances);

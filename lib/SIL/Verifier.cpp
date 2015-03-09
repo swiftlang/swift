@@ -1506,19 +1506,19 @@ public:
             "lookup class type");
   }
 
-  void checkOpenExistentialInst(OpenExistentialInst *OEI) {
+  void checkOpenExistentialAddrInst(OpenExistentialAddrInst *OEI) {
     SILType operandType = OEI->getOperand().getType();
     require(operandType.isAddress(),
-            "open_existential must be applied to address");
+            "open_existential_addr must be applied to address");
 
     SmallVector<ProtocolDecl*, 4> protocols;
     require(operandType.getSwiftRValueType().isExistentialType(protocols),
-            "open_existential must be applied to address of existential");
+            "open_existential_addr must be applied to address of existential");
     require(OEI->getType().isAddress(),
-            "open_existential result must be an address");
+            "open_existential_addr result must be an address");
 
     require(isOpenedArchetype(OEI->getType().getSwiftRValueType()),
-            "open_existential result must be an opened existential archetype");
+            "open_existential_addr result must be an opened existential archetype");
   }
 
   void checkOpenExistentialRefInst(OpenExistentialRefInst *OEI) {
@@ -1608,14 +1608,14 @@ public:
             "metatype");
   }
 
-  void checkInitExistentialInst(InitExistentialInst *AEI) {
+  void checkInitExistentialAddrInst(InitExistentialAddrInst *AEI) {
     SILType exType = AEI->getOperand().getType();
     require(exType.isAddress(),
-            "init_existential must be applied to an address");
+            "init_existential_addr must be applied to an address");
     require(exType.isExistentialType(),
-            "init_existential must be applied to address of existential");
+            "init_existential_addr must be applied to address of existential");
     require(!exType.isClassExistentialType(),
-            "init_existential must be applied to non-class existential");
+            "init_existential_addr must be applied to non-class existential");
     
     // The lowered type must be the properly-abstracted form of the AST type.
     auto archetype = ArchetypeType::getOpened(exType.getSwiftRValueType());
@@ -1626,12 +1626,12 @@ public:
                       .getAddressType();
     
     requireSameType(loweredTy, AEI->getLoweredConcreteType(),
-                    "init_existential result type must be the lowered "
+                    "init_existential_addr result type must be the lowered "
                     "formal type at the right abstraction level");
 
     require(isLoweringOf(AEI->getLoweredConcreteType(),
                          AEI->getFormalConcreteType()),
-            "init_existential payload must be a lowering of the formal "
+            "init_existential_addr payload must be a lowering of the formal "
             "concrete type");
     
     for (ProtocolConformance *C : AEI->getConformances())
@@ -1670,14 +1670,14 @@ public:
               "Could not find witness table for conformance.");
   }
 
-  void checkDeinitExistentialInst(DeinitExistentialInst *DEI) {
+  void checkDeinitExistentialAddrInst(DeinitExistentialAddrInst *DEI) {
     SILType exType = DEI->getOperand().getType();
     require(exType.isAddress(),
-            "deinit_existential must be applied to an address");
+            "deinit_existential_addr must be applied to an address");
     require(exType.isExistentialType(),
-            "deinit_existential must be applied to address of existential");
+            "deinit_existential_addr must be applied to address of existential");
     require(!exType.isClassExistentialType(),
-            "deinit_existential must be applied to non-class existential");
+            "deinit_existential_addr must be applied to non-class existential");
   }
 
   void checkInitExistentialMetatypeInst(InitExistentialMetatypeInst *I) {

@@ -30,8 +30,8 @@ bb0(%0 : $*P):           // CHECK: bb0(%0 : $*P):
   %1 = alloc_stack $P
   copy_addr %0 to [initialization] %1#1 : $*P
   
-  // CHECK-NEXT: open_existential %0 : $*P
-  %3 = open_existential %1#1 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P
+  // CHECK-NEXT: open_existential_addr %0 : $*P
+  %3 = open_existential_addr %1#1 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P
   %4 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.foo!1, %3 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@thin @cc(witness_method) @callee_owned <T: P> (@inout T) -> ()
   
   // CHECK: apply

@@ -19,7 +19,7 @@ bb0(%0 : $*P):
   copy_addr %0 to [initialization] %2#1 : $*P     // id: %3
   // CHECK: call %swift.opaque*
   // CHECK: call %swift.opaque*
-  %4 = open_existential %2#1 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P // users: %8, %10
+  %4 = open_existential_addr %2#1 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P // users: %8, %10
   dealloc_stack %2#0 : $*@local_storage P         // id: %12
   destroy_addr %0 : $*P                           // id: %13
   %14 = tuple ()                                  // user: %15

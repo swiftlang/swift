@@ -153,30 +153,30 @@ SILInstruction *SILCombiner::visitSwitchValueInst(SwitchValueInst *SVI) {
   return nullptr;
 }
 SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
-  // init_existential instructions behave like memory allocation within
-  // the allocated object. We can promote the init_existential allocation
+  // init_existential_addr instructions behave like memory allocation within
+  // the allocated object. We can promote the init_existential_addr allocation
   // into a dedicated allocation.
 
   // Detect this pattern
   // %0 = alloc_stack $LogicValue
-  // %1 = init_existential %0#1 : $*LogicValue, $*Bool
+  // %1 = init_existential_addr %0#1 : $*LogicValue, $*Bool
   // ...
   // use of %1
   // ...
   // destroy_addr %0#1 : $*LogicValue
   // dealloc_stack %0#0 : $*@local_storage LogicValue
   bool LegalUsers = true;
-  InitExistentialInst *IEI = nullptr;
+  InitExistentialAddrInst *IEI = nullptr;
   // Scan all of the uses of the AllocStack and check if it is not used for
-  // anything other than the init_existential container.
+  // anything other than the init_existential_addr container.
   for (Operand *Op: AS->getUses()) {
     // Destroy and dealloc are both fine.
     if (isa<DestroyAddrInst>(Op->getUser()) ||
         isa<DeallocStackInst>(Op->getUser()))
       continue;
 
-    // Make sure there is exactly one init_existential.
-    if (auto *I = dyn_cast<InitExistentialInst>(Op->getUser())) {
+    // Make sure there is exactly one init_existential_addr.
+    if (auto *I = dyn_cast<InitExistentialAddrInst>(Op->getUser())) {
       if (IEI) {
         LegalUsers = false;
         break;
@@ -194,7 +194,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   auto OrigInsertionPoint = Builder->getInsertionPoint();
 
   // If the only users of the alloc_stack are alloc, destroy and
-  // init_existential then we can promote the allocation of the init
+  // init_existential_addr then we can promote the allocation of the init
   // existential.
   if (LegalUsers && IEI) {
     auto *ConcAlloc = Builder->createAllocStack(AS->getLoc(),
@@ -1039,7 +1039,7 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
   return nullptr;
 }
 
-/// Propagate information about a concrete type from init_existential
+/// Propagate information about a concrete type from init_existential_addr
 /// or init_existential_ref into witness_method conformances and into
 /// apply instructions.
 /// This helps the devirtualizer to replace witness_method by
@@ -1054,7 +1054,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
   CanType ConcreteType;
   SILValue LastArg;
 
-  if (auto IE = dyn_cast<InitExistentialInst>(InitExistential)) {
+  if (auto IE = dyn_cast<InitExistentialAddrInst>(InitExistential)) {
     Conformances = IE->getConformances();
     ConcreteType = IE->getFormalConcreteType();
     LastArg = IE;
@@ -1315,16 +1315,16 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   }
 
   // (apply (witness_method)) -> propagate information about
-  // a concrete type from init_existential or init_existential_ref.
+  // a concrete type from init_existential_addr or init_existential_ref.
   if (auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
     if (WMI->getConformance())
       return nullptr;
     auto LastArg = AI->getArguments().back();
     // Try to derive conformances from the apply_inst
-    if (auto *Instance = dyn_cast<OpenExistentialInst>(LastArg)) {
+    if (auto *Instance = dyn_cast<OpenExistentialAddrInst>(LastArg)) {
       auto Op = Instance->getOperand();
       for (auto Use : Op.getUses()) {
-        if (auto *IE = dyn_cast<InitExistentialInst>(Use->getUser())) {
+        if (auto *IE = dyn_cast<InitExistentialAddrInst>(Use->getUser())) {
           // IE should dominate Instance.
           // Without a DomTree we want to be very defensive
           // and only allow this optimization when it is used
@@ -2196,7 +2196,7 @@ SILCombiner::visitCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
     auto EmiTy = EMI->getType();
 
     // %0 = alloc_stack ..
-    // %1 = init_existential %0: $A
+    // %1 = init_existential_addr %0: $A
     // %2 = existential_metatype %0, ...
     // checked_cond_br %2, ....
     // ->
@@ -2208,17 +2208,17 @@ SILCombiner::visitCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
       if (ASI->getParent() != EMI->getParent())
         return nullptr;
       // Check if this alloc_stac is is only initialized once by means of
-      // single init_existential.
+      // single init_existential_addr.
       bool isLegal = true;
       // init_existental instruction used to initialize this alloc_stack.
-      InitExistentialInst *FoundIEI = nullptr;
+      InitExistentialAddrInst *FoundIEI = nullptr;
       for (auto Use: ASI->getUses()) {
         auto *User = Use->getUser();
         if (isa<ExistentialMetatypeInst>(User) ||
             isa<DestroyAddrInst>(User) ||
             isa<DeallocStackInst>(User))
            continue;
-        if (auto *IEI = dyn_cast<InitExistentialInst>(User)) {
+        if (auto *IEI = dyn_cast<InitExistentialAddrInst>(User)) {
           if (!FoundIEI) {
             FoundIEI = IEI;
             continue;

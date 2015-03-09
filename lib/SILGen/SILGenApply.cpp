@@ -815,7 +815,7 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
 
   } else {
     assert(existentialVal.getType().isAddress() && "should be address-only");
-    openingSite = gen.B.createOpenExistential(selfLoc,
+    openingSite = gen.B.createOpenExistentialAddr(selfLoc,
                                               existentialVal.getValue(),
                                SILType::getPrimitiveAddressType(openedTy));
     gen.setArchetypeOpeningSite(openedTy, openingSite);
@@ -1190,7 +1190,7 @@ public:
     //
     // In the last case, the AST has this call typed as being applied to an
     // rvalue, but the witness is actually expecting a pointer to the +0 value
-    // in memory.  We access this with the open_existential instruction, or
+    // in memory.  We access this with the open_existential_addr instruction, or
     // just pass in the address since archetypes are address-only.
 
     ArgumentSource selfValue = e->getBase();
@@ -3611,7 +3611,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
       proj = ManagedValue(val, existential.getCleanup());
     } else {
       assert(loweredOpenedType.isAddress() && "Self should be address-only");
-      SILValue val = B.createOpenExistential(e, operand, loweredOpenedType);
+      SILValue val = B.createOpenExistentialAddr(e, operand, loweredOpenedType);
       setArchetypeOpeningSite(openedType, val);
       proj = ManagedValue::forUnmanaged(val);
     }

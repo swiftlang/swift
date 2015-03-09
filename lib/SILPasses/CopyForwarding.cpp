@@ -171,7 +171,7 @@ public:
     Oper = &UserInst->getOperandRef();
     return false;
   }
-  bool visitOpenExistentialInst(OpenExistentialInst *UserInst) {
+  bool visitOpenExistentialAddrInst(OpenExistentialAddrInst *UserInst) {
     Oper = &UserInst->getOperandRef();
     return false;
   }
@@ -260,7 +260,7 @@ public:
     Oper = &UserInst->getOperandRef();
     return false;
   }
-  bool visitOpenExistentialInst(OpenExistentialInst *UserInst) {
+  bool visitOpenExistentialAddrInst(OpenExistentialAddrInst *UserInst) {
     Oper = &UserInst->getOperandRef();
     return false;
   }
@@ -397,7 +397,7 @@ bool CopyForwarding::collectUsers() {
     default:
       // Most likely one of:
       //   init_enum_data_addr
-      //   open_existential
+      //   open_existential_addr
       //   partial_apply
       //   struct_element_addr
       //   unchecked_take_enum_data_addr

@@ -759,7 +759,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                (SILValueCategory)TyCategory2)),                \
                   getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));\
     break;
-  ONEOPERAND_ONETYPE_INST(OpenExistential)
+  ONEOPERAND_ONETYPE_INST(OpenExistentialAddr)
   ONEOPERAND_ONETYPE_INST(OpenExistentialRef)
   ONEOPERAND_ONETYPE_INST(OpenExistentialMetatype)
   // Conversion instructions.
@@ -806,7 +806,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
 
-  case ValueKind::InitExistentialInst:
+  case ValueKind::InitExistentialAddrInst:
   case ValueKind::InitExistentialMetatypeInst:
   case ValueKind::InitExistentialRefInst: {
 
@@ -832,8 +832,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
     switch ((ValueKind)OpCode) {
     default: llvm_unreachable("Out of sync with parent switch");
-    case ValueKind::InitExistentialInst:
-      ResultVal = Builder.createInitExistential(Loc, operand,
+    case ValueKind::InitExistentialAddrInst:
+      ResultVal = Builder.createInitExistentialAddr(Loc, operand,
                                                 ConcreteTy,
                                                 Ty,
                                                 ctxConformances);
@@ -1106,7 +1106,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(RetainValue)
   UNARY_INSTRUCTION(ReleaseValue)
   UNARY_INSTRUCTION(AutoreleaseValue)
-  UNARY_INSTRUCTION(DeinitExistential)
+  UNARY_INSTRUCTION(DeinitExistentialAddr)
   UNARY_INSTRUCTION(DestroyAddr)
   UNARY_INSTRUCTION(IsNonnull)
   UNARY_INSTRUCTION(Load)

@@ -99,8 +99,8 @@
                     "select_enum" "select_value" "select_enum_addr")
                   'words) . font-lock-keyword-face)
    ;; Protocol and Protocol Composition Types
-   `(,(regexp-opt '("init_existential" "deinit_existential"
-                    "open_existential"
+   `(,(regexp-opt '("init_existential_addr" "deinit_existential_addr"
+                    "open_existential_addr"
                     "init_existential_ref"
                     "open_existential_ref")
 		  'words) . font-lock-keyword-face)

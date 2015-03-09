@@ -67,9 +67,9 @@ func testExistentialDispatch(p: P) {
 // CHECK: bb0([[P:%[0-9]+]] : $*P):
 // CHECK:   [[PCOPY:%[0-9]+]] = alloc_stack $P
 // CHECK:   copy_addr [[P]] to [initialization] [[PCOPY]]#1 : $*P
-// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential [[PCOPY]]#1 : $*P to $*@opened([[N:".*"]]) P
+// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr [[PCOPY]]#1 : $*P to $*@opened([[N:".*"]]) P
 // CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $P
-// CHECK:   [[P_RESULT_ADDR:%[0-9]+]] = init_existential [[P_RESULT]]#1 : $*P, $@opened([[N]]) P
+// CHECK:   [[P_RESULT_ADDR:%[0-9]+]] = init_existential_addr [[P_RESULT]]#1 : $*P, $@opened([[N]]) P
 // CHECK:   [[P_F_METHOD:%[0-9]+]] = witness_method $@opened([[N]]) P, #P.f!1, [[PCOPY_ADDR]]{{.*}} : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @in_guaranteed τ_0_0) -> ()
 // CHECK:   apply [[P_F_METHOD]]<@opened([[N]]) P>([[P_RESULT_ADDR]], [[PCOPY_ADDR]]) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @in_guaranteed τ_0_0) -> ()
 // CHECK:   destroy_addr [[P_RESULT]]#1 : $*P

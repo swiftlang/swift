@@ -563,14 +563,14 @@ public:
     return visitProtocolConformance(WMI->getConformance(), WMI->getMember());
   }
 
-  bool visitInitExistentialInst(InitExistentialInst *IEI) {
+  bool visitInitExistentialAddrInst(InitExistentialAddrInst *IEI) {
     // Link in all protocol conformances that this touches.
     //
     // TODO: There might be a two step solution where the init_existential_inst
     // causes the witness table to be brought in as a declaration and then the
     // protocol method inst causes the actual deserialization. For now we are
     // not going to be smart about this to enable avoiding any issues with
-    // visiting the open_existential/witness_method before the
+    // visiting the open_existential_addr/witness_method before the
     // init_existential_inst.
     bool performFuncDeserialization = false;
     for (ProtocolConformance *C : IEI->getConformances()) {

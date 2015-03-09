@@ -1329,7 +1329,7 @@ func testLabeledScalarPayload(lsp: LabeledScalarPayload) -> Any {
   switch lsp {
   // CHECK: bb1([[TUPLE:%.*]] : $(name: Int)):
   // CHECK:   [[X:%.*]] = tuple_extract [[TUPLE]]
-  // CHECK:   [[ANY_X_ADDR:%.*]] = init_existential {{%.*}}, $Int
+  // CHECK:   [[ANY_X_ADDR:%.*]] = init_existential_addr {{%.*}}, $Int
   // CHECK:   store [[X]] to [[ANY_X_ADDR]]
   case let .Payload(x):
     return x
