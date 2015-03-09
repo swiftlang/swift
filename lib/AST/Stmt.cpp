@@ -95,6 +95,14 @@ SourceRange ReturnStmt::getSourceRange() const {
   return SourceRange(Start, End);
 }
 
+SourceRange StmtConditionElement::getSourceRange() const {
+  if (auto *E = getCondition())
+    return E->getSourceRange();
+  if (auto *B = getBinding())
+    return B->getSourceRange();
+  return SourceRange();
+}
+
 static StmtCondition exprToCond(Expr *C, ASTContext &Ctx) {
   StmtConditionElement Arr[] = { StmtConditionElement(C) };
   return Ctx.AllocateCopy(Arr);

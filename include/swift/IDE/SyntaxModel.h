@@ -83,6 +83,14 @@ enum class SyntaxStructureKind : uint8_t {
   InstanceVariable,
   StaticVariable,
   ClassVariable,
+
+  ForEachStatement,
+  ForStatement,
+  WhileStatement,
+  DoWhileStatement,
+  IfStatement,
+  SwitchStatement,
+  CaseStatement,
   Parameter,
   BraceStatement,
   CallExpression,
@@ -91,6 +99,9 @@ enum class SyntaxStructureKind : uint8_t {
 enum class SyntaxStructureElementKind : uint8_t {
   Id,
   Expr,
+  InitExpr,
+  ConditionExpr,
+  Pattern,
   TypeRef,
 };
 

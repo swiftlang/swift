@@ -789,6 +789,13 @@ private:
       case SyntaxStructureKind::StaticVariable: return "svar";
       case SyntaxStructureKind::ClassVariable: return "cvar";
       case SyntaxStructureKind::Parameter: return "param";
+      case SyntaxStructureKind::ForEachStatement: return "foreach";
+      case SyntaxStructureKind::ForStatement: return "for";
+      case SyntaxStructureKind::WhileStatement: return "while";
+      case SyntaxStructureKind::DoWhileStatement: return "do-while";
+      case SyntaxStructureKind::IfStatement: return "if";
+      case SyntaxStructureKind::SwitchStatement: return "switch";
+      case SyntaxStructureKind::CaseStatement: return "case";
       case SyntaxStructureKind::BraceStatement: return "brace";
       case SyntaxStructureKind::CallExpression: return "call";
     }
@@ -799,6 +806,9 @@ private:
     switch (K) {
       case SyntaxStructureElementKind::Id: return "elem-id";
       case SyntaxStructureElementKind::Expr: return "elem-expr";
+      case SyntaxStructureElementKind::InitExpr: return "elem-initexpr";
+      case SyntaxStructureElementKind::ConditionExpr: return "elem-condexpr";
+      case SyntaxStructureElementKind::Pattern: return "elem-pattern";
       case SyntaxStructureElementKind::TypeRef: return "elem-typeref";
     }
     llvm_unreachable("unhandled tag?");

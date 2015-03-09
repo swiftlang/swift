@@ -212,6 +212,8 @@ public:
   void setBinding(PatternBindingDecl *D) {
     Data = D;
   }
+
+  SourceRange getSourceRange() const;
 };
 
 struct LabeledStmtInfo {

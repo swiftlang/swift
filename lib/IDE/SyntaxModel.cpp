@@ -350,7 +350,114 @@ Expr *ModelASTWalker::walkToExprPost(Expr *E) {
 }
 
 std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
-  if (isa<BraceStmt>(S) && shouldPassBraceStructureNode(cast<BraceStmt>(S))) {
+  if (auto *ForEachS = dyn_cast<ForEachStmt>(S)) {
+    SyntaxStructureNode SN;
+    SN.Kind = SyntaxStructureKind::ForEachStatement;
+    SN.Range = charSourceRangeFromSourceRange(SM, S->getSourceRange());
+    if (ForEachS->getPattern())
+      SN.Elements.emplace_back(SyntaxStructureElementKind::Id,
+                               charSourceRangeFromSourceRange(SM,
+                                     ForEachS->getPattern()->getSourceRange()));
+    if (ForEachS->getSequence())
+      SN.Elements.emplace_back(SyntaxStructureElementKind::Expr,
+                               charSourceRangeFromSourceRange(SM,
+                                    ForEachS->getSequence()->getSourceRange()));
+    pushStructureNode(SN, S);
+
+  } else if (auto *ForS = dyn_cast<ForStmt>(S)) {
+    SyntaxStructureNode SN;
+    SN.Kind = SyntaxStructureKind::ForStatement;
+    SN.Range = charSourceRangeFromSourceRange(SM, S->getSourceRange());
+
+    if (!ForS->getInitializerVarDecls().empty()) {
+      auto InitDs = ForS->getInitializerVarDecls();
+      // Initializer decls come with pairs of (VarDecl, PatternBindingDecl).
+      // For the range we use start loc of the first PatternBindingDecl which
+      // includes the var/let' keyword location.
+      assert(InitDs.size() % 2 == 0 && "not var/pattern pairs ?");
+      assert(isa<PatternBindingDecl>(InitDs[1]));
+      SourceRange ElemRange = SourceRange(InitDs[1]->getStartLoc(),
+                                          InitDs.back()->getEndLoc());
+      SN.Elements.emplace_back(SyntaxStructureElementKind::InitExpr,
+                               charSourceRangeFromSourceRange(SM, ElemRange));
+    } else if (ForS->getInitializer()) {
+      SN.Elements.emplace_back(SyntaxStructureElementKind::InitExpr,
+                               charSourceRangeFromSourceRange(SM,
+                               ForS->getInitializer().get()->getSourceRange()));
+    }
+
+    if (ForS->getCond()) {
+      SN.Elements.emplace_back(SyntaxStructureElementKind::Expr,
+                               charSourceRangeFromSourceRange(SM,
+                                      ForS->getCond().get()->getSourceRange()));
+    }
+    if (ForS->getIncrement()) {
+      SN.Elements.emplace_back(SyntaxStructureElementKind::Expr,
+                               charSourceRangeFromSourceRange(SM,
+                                 ForS->getIncrement().get()->getSourceRange()));
+    }
+    pushStructureNode(SN, S);
+
+  } else if (auto *WhileS = dyn_cast<WhileStmt>(S)) {
+    SyntaxStructureNode SN;
+    SN.Kind = SyntaxStructureKind::WhileStatement;
+    SN.Range = charSourceRangeFromSourceRange(SM, S->getSourceRange());
+    if (!WhileS->getCond().empty()) {
+      auto Conds = WhileS->getCond();
+      SourceRange ElemRange = SourceRange(Conds.front().getSourceRange().Start,
+                                          Conds.back().getSourceRange().End);
+      SN.Elements.emplace_back(SyntaxStructureElementKind::ConditionExpr,
+                               charSourceRangeFromSourceRange(SM, ElemRange));
+    }
+    pushStructureNode(SN, S);
+
+  } else if (auto *DoWhileS = dyn_cast<DoWhileStmt>(S)) {
+    SyntaxStructureNode SN;
+    SN.Kind = SyntaxStructureKind::DoWhileStatement;
+    SN.Range = charSourceRangeFromSourceRange(SM, S->getSourceRange());
+    if (DoWhileS->getCond()) {
+      SN.Elements.emplace_back(SyntaxStructureElementKind::Expr,
+                               charSourceRangeFromSourceRange(SM,
+                                        DoWhileS->getCond()->getSourceRange()));
+    }
+    pushStructureNode(SN, S);
+
+  } else if (auto *IfS = dyn_cast<IfStmt>(S)) {
+    SyntaxStructureNode SN;
+    SN.Kind = SyntaxStructureKind::IfStatement;
+    SN.Range = charSourceRangeFromSourceRange(SM, S->getSourceRange());
+    if (!IfS->getCond().empty()) {
+      auto Conds = IfS->getCond();
+      SourceRange ElemRange = SourceRange(Conds.front().getSourceRange().Start,
+                                          Conds.back().getSourceRange().End);
+      SN.Elements.emplace_back(SyntaxStructureElementKind::ConditionExpr,
+                               charSourceRangeFromSourceRange(SM, ElemRange));
+    }
+    pushStructureNode(SN, S);
+
+  } else if (auto *SwitchS = dyn_cast<SwitchStmt>(S)) {
+    SyntaxStructureNode SN;
+    SN.Kind = SyntaxStructureKind::SwitchStatement;
+    SN.Range = charSourceRangeFromSourceRange(SM, S->getSourceRange());
+    if (SwitchS->getSubjectExpr()) {
+      SN.Elements.emplace_back(SyntaxStructureElementKind::Expr,
+                               charSourceRangeFromSourceRange(SM,
+                                  SwitchS->getSubjectExpr()->getSourceRange()));
+    }
+    pushStructureNode(SN, S);
+
+  } else if (auto *CaseS = dyn_cast<CaseStmt>(S)) {
+    SyntaxStructureNode SN;
+    SN.Kind = SyntaxStructureKind::CaseStatement;
+    SN.Range = charSourceRangeFromSourceRange(SM, S->getSourceRange());
+    for (const CaseLabelItem &Item : CaseS->getCaseLabelItems()) {
+      SN.Elements.emplace_back(SyntaxStructureElementKind::Pattern,
+                               charSourceRangeFromSourceRange(SM,
+                                                        Item.getSourceRange()));
+    }
+    pushStructureNode(SN, S);
+
+  } else if (isa<BraceStmt>(S) && shouldPassBraceStructureNode(cast<BraceStmt>(S))) {
     // Pass BraceStatement structure node.
     SyntaxStructureNode SN;
     SN.Kind = SyntaxStructureKind::BraceStatement;
@@ -358,6 +465,7 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
                                                        S->getSourceRange());
     pushStructureNode(SN, S);
+
   } else if (auto *SW = dyn_cast<SwitchStmt>(S)) {
     if (SW->getLBraceLoc().isValid() && SW->getRBraceLoc().isValid()) {
       SourceRange BraceRange(SW->getLBraceLoc(), SW->getRBraceLoc());
