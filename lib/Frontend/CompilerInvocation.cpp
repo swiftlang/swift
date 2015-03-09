@@ -794,6 +794,13 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       return true;
     }
   }
+  if (const Arg *A = Args.getLastArg(OPT_num_threads)) {
+    if (StringRef(A->getValue()).getAsInteger(10, Opts.NumThreads)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return true;
+    }
+  }
   if (const Arg *A = Args.getLastArg(OPT_sil_opt_pass_count)) {
     if (StringRef(A->getValue()).getAsInteger(10, Opts.NumOptPassesToRun)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,

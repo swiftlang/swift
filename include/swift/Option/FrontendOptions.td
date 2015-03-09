@@ -207,6 +207,10 @@ def sil_devirt_threshold : Separate<["-"], "sil-devirt-threshold">,
   MetaVarName<"<0>">,
   HelpText<"Controls the aggressiveness of devirtualization">;
 
+def num_threads : Separate<["-"], "num-threads">,
+  MetaVarName<"<0>">,
+  HelpText<"Enables parallel compilation and specifies the number of threads">;
+
 def sil_link_all : Flag<["-"], "sil-link-all">,
   HelpText<"Link all SIL functions">;
 
