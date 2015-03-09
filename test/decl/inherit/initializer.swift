@@ -33,7 +33,7 @@ func testC() {
 // Okay to add convenience initializers.
 class D : C {
   convenience init(string s: String) {
-    self.init(int: Int(s)!)
+    self.init(int: s.toInt()!)
   }
 }
 

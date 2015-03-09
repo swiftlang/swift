@@ -971,7 +971,7 @@ public enum OSVersion : Printable {
 }
 
 func _parseDottedVersion(s: String) -> _UnitTestArray<Int> {
-  return _UnitTestArray(lazy(s._split(".")).map { Int($0)! })
+  return _UnitTestArray(lazy(s._split(".")).map { $0.toInt()! })
 }
 
 public func _parseDottedVersionTriple(s: String) -> (Int, Int, Int) {
