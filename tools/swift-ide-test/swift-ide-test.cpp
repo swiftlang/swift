@@ -728,9 +728,8 @@ class StructureAnnotator : public ide::SyntaxModelWalker {
   std::vector<SyntaxStructureNode> NodeStack;
 
 public:
-  StructureAnnotator(SourceManager &SM, unsigned BufID)
+  StructureAnnotator(StringRef Input, SourceManager &SM, unsigned BufID)
     : SM(SM), BufferID(BufID) {
-    StringRef Input = SM.getLLVMSourceMgr().getMemoryBuffer(BufID)->getBuffer();
     RewriteBuf.Initialize(Input);
     removeCheckLines(Input);
   }
@@ -854,8 +853,22 @@ private:
 
 static int doStructureAnnotation(const CompilerInvocation &InitInvok,
                                  StringRef SourceFilename) {
+  auto ErrOrBuf = llvm::MemoryBuffer::getFile(SourceFilename);
+  if (!ErrOrBuf) {
+    llvm::errs() << "error opening input file: "
+                 << ErrOrBuf.getError().message() << '\n';
+    return 1;
+  }
+
+  auto InputBuf = llvm::MemoryBuffer::getMemBufferCopy((*ErrOrBuf)->getBuffer(),
+                                                       (*ErrOrBuf)->getBufferIdentifier());
+  bool HadPH;
+  InputBuf = ide::replacePlaceholders(std::move(InputBuf), &HadPH);
+
   CompilerInvocation Invocation(InitInvok);
-  Invocation.addInputFilename(SourceFilename);
+  if (HadPH)
+    Invocation.getLangOptions().EnableDollarIdentifiers = true;
+  Invocation.addInputBuffer(InputBuf.get());
 
   CompilerInstance CI;
 
@@ -869,7 +882,8 @@ static int doStructureAnnotation(const CompilerInvocation &InitInvok,
   unsigned BufID = CI.getInputBufferIDs().back();
   ide::SyntaxModelContext StructureContext(
       CI.getMainModule()->getMainSourceFile(SourceFileKind::Main));
-  StructureAnnotator Annotator(CI.getSourceMgr(), BufID);
+  StructureAnnotator Annotator((*ErrOrBuf)->getBuffer(),
+                               CI.getSourceMgr(), BufID);
   StructureContext.walk(Annotator);
   Annotator.printResult(llvm::outs());
   return 0;
