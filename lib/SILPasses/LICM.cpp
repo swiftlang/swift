@@ -335,6 +335,133 @@ static bool sinkFixLiftime(SILLoop *Loop, DominanceInfo *DomTree,
 }
 
 namespace {
+/// \brief Summmary of may writes occuring in the loop tree rooted at \p
+/// Loop. This includes all writes of the sub loops and the loop itself.
+struct LoopNestSummary {
+  SILLoop *Loop;
+  WriteSet MayWrites;
+
+  LoopNestSummary(SILLoop *Curr) : Loop(Curr) {}
+
+
+  void copySummary(LoopNestSummary &Other) {
+    MayWrites.append(Other.MayWrites.begin(), Other.MayWrites.end());
+  }
+
+  LoopNestSummary(const LoopNestSummary &) = delete;
+  LoopNestSummary &operator=(const LoopNestSummary &) = delete;
+  LoopNestSummary(LoopNestSummary &&) = delete;
+};
+
+/// \brief Optimize the loop tree bottom up propagating loop's summaries up the
+/// loop tree.
+class LoopTreeOptimization {
+  llvm::DenseMap<SILLoop *, std::unique_ptr<LoopNestSummary>>
+      LoopNestSummaryMap;
+  SmallVector<SILLoop *, 8> BotUpWorkList;
+  SILLoopInfo *LoopInfo;
+  AliasAnalysis *AA;
+  DominanceInfo *DomTree;
+  bool Changed;
+
+public:
+  LoopTreeOptimization(SILLoop *TopLevelLoop, SILLoopInfo *LI,
+                       AliasAnalysis *AA, DominanceInfo *DT)
+      : LoopInfo(LI), AA(AA), DomTree(DT), Changed(false) {
+    // Collect loops for a recursive bottom-up traversal in the loop tree.
+    BotUpWorkList.push_back(TopLevelLoop);
+    for (unsigned i = 0; i < BotUpWorkList.size(); ++i) {
+      auto *L = BotUpWorkList[i];
+      for (auto *SubLoop : *L)
+        BotUpWorkList.push_back(SubLoop);
+    }
+  }
+
+  /// \brief Optimize this loop tree.
+  bool optimize();
+
+protected:
+  /// \brief Propagate the sub-loops' summaries up to the current loop.
+  void propagateSummaries(std::unique_ptr<LoopNestSummary> &CurrSummary);
+
+  /// \brief Collect a set of reads that can be hoisted to the loop's preheader.
+  void analyzeCurrentLoop(std::unique_ptr<LoopNestSummary> &CurrSummary,
+                          ReadSet &SafeReads);
+
+  /// \brief Optimize the current loop nest.
+  void optimizeLoop(SILLoop *CurrentLoop, ReadSet &SafeReads);
+};
+}
+
+bool LoopTreeOptimization::optimize() {
+  // Process loops bottom up in the loop tree.
+  while (!BotUpWorkList.empty()) {
+    SILLoop *CurrentLoop = BotUpWorkList.pop_back_val();
+    DEBUG(llvm::dbgs() << "Processing loop " << *CurrentLoop);
+
+    // Collect all summary of all sub loops of the current loop. Since we
+    // process the loop tree bottom up they are guaranteed to be available in
+    // the map.
+    auto CurrLoopSummary = llvm::make_unique<LoopNestSummary>(CurrentLoop);
+    propagateSummaries(CurrLoopSummary);
+
+    // Analyse the current loop for reads that can be hoisted.
+    ReadSet SafeReads;
+    analyzeCurrentLoop(CurrLoopSummary, SafeReads);
+
+    optimizeLoop(CurrentLoop, SafeReads);
+
+    // Store the summary for parent loops to use.
+    LoopNestSummaryMap[CurrentLoop] = std::move(CurrLoopSummary);
+  }
+  return Changed;
+}
+
+void LoopTreeOptimization::propagateSummaries(
+    std::unique_ptr<LoopNestSummary> &CurrSummary) {
+  for (auto *SubLoop : *CurrSummary->Loop) {
+    assert(LoopNestSummaryMap.count(SubLoop) && "Must have data for sub loops");
+    CurrSummary->copySummary(*LoopNestSummaryMap[SubLoop]);
+    LoopNestSummaryMap.erase(SubLoop);
+  }
+}
+
+void LoopTreeOptimization::analyzeCurrentLoop(
+    std::unique_ptr<LoopNestSummary> &CurrSummary, ReadSet &SafeReads) {
+  WriteSet &MayWrites = CurrSummary->MayWrites;
+  SILLoop *Loop = CurrSummary->Loop;
+  DEBUG(llvm::dbgs() << " Analysing accesses.\n");
+
+  for (auto *BB : Loop->getBlocks()) {
+    for (auto &Inst : *BB) {
+      // Ignore fix_lifetime instructions.
+      if (isa<FixLifetimeInst>(&Inst))
+        continue;
+
+      // Collect loads.
+      auto LI = dyn_cast<LoadInst>(&Inst);
+      if (LI) {
+        if (!mayWriteTo(AA, MayWrites, LI))
+          SafeReads.insert(LI);
+        continue;
+      }
+
+      // Remove clobbered loads we have seen before.
+      removeWrittenTo(AA, SafeReads, &Inst);
+
+      if (Inst.mayHaveSideEffects())
+        MayWrites.push_back(&Inst);
+    }
+  }
+}
+
+void LoopTreeOptimization::optimizeLoop(SILLoop *CurrentLoop,
+                                        ReadSet &SafeReads) {
+  (void)LoopInfo;
+  (void)DomTree;
+}
+
+namespace {
 /// Hoist loop invariant code out of innermost loops.
 class LICM : public SILFunctionTransform {
 
