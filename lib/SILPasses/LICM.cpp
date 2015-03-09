@@ -40,7 +40,7 @@ using WriteSet = SmallVector<SILInstruction *, 8>;
 static bool mayWriteTo(AliasAnalysis *AA, WriteSet &MayWrites, LoadInst *LI) {
   for (auto *W : MayWrites)
     if (AA->mayWriteToMemory(W, LI->getOperand().getDef())) {
-      DEBUG(llvm::dbgs() << " mayWriteTo\n" << *W << " to " << *LI << "\n");
+      DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *W << " to " << *LI << "\n");
       return true;
     }
   return false;
@@ -57,7 +57,7 @@ static void removeWrittenTo(AliasAnalysis *AA, ReadSet &Reads,
   SmallVector<LoadInst *, 8> RS(Reads.begin(), Reads.end());
   for (auto R : RS)
     if (AA->mayWriteToMemory(ByInst, R->getOperand())) {
-      DEBUG(llvm::dbgs() << " mayWriteTo\n" << *ByInst << " to " << *R << "\n");
+      DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *ByInst << " to " << *R << "\n");
       Reads.erase(R);
     }
 }
@@ -219,7 +219,7 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
             return true;
           return false;
         })) {
-      DEBUG(llvm::dbgs() << " skipping conditional block " << *CurBB << "\n");
+      DEBUG(llvm::dbgs() << "  skipping conditional block " << *CurBB << "\n");
       It.skipChildren();
       continue;
     }
@@ -228,11 +228,12 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
     for (auto InstIt = CurBB->begin(), E = CurBB->end(); InstIt != E; ) {
       SILInstruction *Inst = &*InstIt;
       ++InstIt;
-      DEBUG(llvm::dbgs() << " looking at " << *Inst);
+      DEBUG(llvm::dbgs() << "  looking at " << *Inst);
 
       // Can't hoist terminators.
       if (isa<TermInst>(Inst))
         continue;
+
       // Can't hoist allocation and dealloc stacks.
       if (isa<AllocationInst>(Inst) || isa<DeallocStackInst>(Inst))
         continue;
@@ -243,7 +244,7 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
       // cond_fail that would have protected (executed before) a memory access
       // must - after hoisting - also be executed before said access.
       if (Inst->mayHaveSideEffects() && !isa<CondFailInst>(Inst)) {
-        DEBUG(llvm::dbgs() << " not side effect free\n");
+        DEBUG(llvm::dbgs() << "   not side effect free.\n");
         continue;
       }
 
@@ -252,17 +253,17 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
       LoadInst *LI = nullptr;
       if (Inst->mayReadFromMemory() && !isa<CondFailInst>(Inst) &&
           (!(LI = dyn_cast<LoadInst>(Inst)) || !SafeReads.count(LI))) {
-        DEBUG(llvm::dbgs() << " may read aliased writes\n");
+        DEBUG(llvm::dbgs() << "   may read aliased writes\n");
         continue;
       }
 
       // The operands need to be loop invariant.
       if (!hasLoopInvariantOperands(Inst, Loop)) {
-        DEBUG(llvm::dbgs() << " loop variant operands\n");
+        DEBUG(llvm::dbgs() << "   loop variant operands\n");
         continue;
       }
 
-      DEBUG(llvm::dbgs() << " hoisting to preheader.\n");
+      DEBUG(llvm::dbgs() << "   hoisting to preheader.\n");
       Changed = true;
       Inst->moveBefore(Preheader->getTerminator());
     }
@@ -305,7 +306,7 @@ static bool sinkFixLiftime(SILLoop *Loop, DominanceInfo *DomTree,
         FixLifetimeInsts.push_back(FLI);
       } else if (Inst.mayHaveSideEffects() && !isa<LoadInst>(&Inst) &&
                  !isa<StoreInst>(&Inst)) {
-        DEBUG(llvm::errs() << " mayhavesideeffects because of" << Inst);
+        DEBUG(llvm::errs() << "  mayhavesideeffects because of" << Inst);
         DEBUG(Inst.getParent()->dump());
         return false;
       }
@@ -326,13 +327,13 @@ static bool sinkFixLiftime(SILLoop *Loop, DominanceInfo *DomTree,
           auto *OutsideBB = SplitBB ? SplitBB : ExitBB;
           // Update the ExitBB.
           ExitBB = OutsideBB;
-          DEBUG(llvm::errs() << " moving fix_lifetime to exit BB " << *FLI);
+          DEBUG(llvm::errs() << "  moving fix_lifetime to exit BB " << *FLI);
           FLI->moveBefore(&*OutsideBB->begin());
           Changed = true;
         }
       }
     } else {
-        DEBUG(llvm::errs() << " does not dominate " << *FLI);
+      DEBUG(llvm::errs() << "  does not dominate " << *FLI);
     }
   return Changed;
 }
