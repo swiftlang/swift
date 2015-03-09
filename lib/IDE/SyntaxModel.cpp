@@ -326,9 +326,13 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
   }
 
   auto addExprElem = [&](const Expr *Elem, SyntaxStructureNode &SN) {
+    if (isa<ErrorExpr>(Elem))
+      return;
+    SourceRange R = Elem->getSourceRange();
+    if (R.isInvalid())
+      return;
     SN.Elements.emplace_back(SyntaxStructureElementKind::Expr,
-                             charSourceRangeFromSourceRange(SM,
-                                                       Elem->getSourceRange()));
+                             charSourceRangeFromSourceRange(SM, R));
   };
 
   if (auto *CE = dyn_cast<CallExpr>(E)) {
@@ -378,6 +382,16 @@ Expr *ModelASTWalker::walkToExprPost(Expr *E) {
 }
 
 std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
+  auto addExprElem = [&](SyntaxStructureElementKind K, const Expr *Elem,
+                         SyntaxStructureNode &SN) {
+    if (isa<ErrorExpr>(Elem))
+      return;
+    SourceRange R = Elem->getSourceRange();
+    if (R.isInvalid())
+      return;
+    SN.Elements.emplace_back(K, charSourceRangeFromSourceRange(SM, R));
+  };
+
   if (auto *ForEachS = dyn_cast<ForEachStmt>(S)) {
     SyntaxStructureNode SN;
     SN.Kind = SyntaxStructureKind::ForEachStatement;
@@ -387,9 +401,7 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
                                charSourceRangeFromSourceRange(SM,
                                      ForEachS->getPattern()->getSourceRange()));
     if (ForEachS->getSequence())
-      SN.Elements.emplace_back(SyntaxStructureElementKind::Expr,
-                               charSourceRangeFromSourceRange(SM,
-                                    ForEachS->getSequence()->getSourceRange()));
+      addExprElem(SyntaxStructureElementKind::Expr, ForEachS->getSequence(),SN);
     pushStructureNode(SN, S);
 
   } else if (auto *ForS = dyn_cast<ForStmt>(S)) {
@@ -409,20 +421,16 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
       SN.Elements.emplace_back(SyntaxStructureElementKind::InitExpr,
                                charSourceRangeFromSourceRange(SM, ElemRange));
     } else if (ForS->getInitializer()) {
-      SN.Elements.emplace_back(SyntaxStructureElementKind::InitExpr,
-                               charSourceRangeFromSourceRange(SM,
-                               ForS->getInitializer().get()->getSourceRange()));
+      addExprElem(SyntaxStructureElementKind::InitExpr,
+                  ForS->getInitializer().get(), SN);
     }
 
     if (ForS->getCond()) {
-      SN.Elements.emplace_back(SyntaxStructureElementKind::Expr,
-                               charSourceRangeFromSourceRange(SM,
-                                      ForS->getCond().get()->getSourceRange()));
+      addExprElem(SyntaxStructureElementKind::Expr, ForS->getCond().get(), SN);
     }
     if (ForS->getIncrement()) {
-      SN.Elements.emplace_back(SyntaxStructureElementKind::Expr,
-                               charSourceRangeFromSourceRange(SM,
-                                 ForS->getIncrement().get()->getSourceRange()));
+      addExprElem(SyntaxStructureElementKind::Expr, ForS->getIncrement().get(),
+                  SN);
     }
     pushStructureNode(SN, S);
 
@@ -444,9 +452,7 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
     SN.Kind = SyntaxStructureKind::DoWhileStatement;
     SN.Range = charSourceRangeFromSourceRange(SM, S->getSourceRange());
     if (DoWhileS->getCond()) {
-      SN.Elements.emplace_back(SyntaxStructureElementKind::Expr,
-                               charSourceRangeFromSourceRange(SM,
-                                        DoWhileS->getCond()->getSourceRange()));
+      addExprElem(SyntaxStructureElementKind::Expr, DoWhileS->getCond(), SN);
     }
     pushStructureNode(SN, S);
 
@@ -468,9 +474,8 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
     SN.Kind = SyntaxStructureKind::SwitchStatement;
     SN.Range = charSourceRangeFromSourceRange(SM, S->getSourceRange());
     if (SwitchS->getSubjectExpr()) {
-      SN.Elements.emplace_back(SyntaxStructureElementKind::Expr,
-                               charSourceRangeFromSourceRange(SM,
-                                  SwitchS->getSubjectExpr()->getSourceRange()));
+      addExprElem(SyntaxStructureElementKind::Expr, SwitchS->getSubjectExpr(),
+                  SN);
     }
     pushStructureNode(SN, S);
 

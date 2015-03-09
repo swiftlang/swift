@@ -102,3 +102,6 @@ let myDict = [1:1, 2:2, 3:3]
 let myArray2 = [1]
 // CHECK: <gvar>let <name>myDict2</name> = <dictionary>[<elem-expr>1</elem-expr>:<elem-expr>1</elem-expr>]</dictionary></gvar>
 let myDict2 = [1:1]
+
+// CHECK: <for>for <brace>{}</brace></for>
+for {}
