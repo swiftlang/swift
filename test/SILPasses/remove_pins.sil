@@ -1,0 +1,73 @@
+// RUN: %target-sil-opt -remove-pins -verify %s | FileCheck %s
+
+sil_stage canonical
+
+import Swift
+import Builtin
+
+// CHECK-LABEL: sil @remove_pins
+// CHECK-NOT: strong_pin
+// CHECK-NOT: strong_unpin
+// CHECK: return
+
+sil @remove_pins : $@thin (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = strong_pin %0 : $Builtin.NativeObject
+  strong_unpin %1 : $Optional<Builtin.NativeObject>
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @dont_remove_pins
+// CHECK: strong_pin
+// CHECK: strong_release
+// CHECK: strong_unpin
+// CHECK: return
+
+sil @dont_remove_pins : $@thin (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = strong_pin %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_unpin %1 : $Optional<Builtin.NativeObject>
+  %2 = tuple()
+  return %2 : $()
+}
+
+struct ArrayIntBuffer {
+  var storage : Builtin.NativeObject
+}
+
+struct ArrayInt{
+  var buffer : ArrayIntBuffer
+}
+
+sil public_external [semantics "array.make_mutable"] @make_mutable : $@cc(method) @thin (@inout ArrayInt) -> Bool {
+  bb0(%0: $*ArrayInt):
+    unreachable
+}
+
+/// Due to the usage pattern of the array's uniquing there will always be a
+/// guarding make_mutable across the second access of a non-structural
+/// modification sequence.
+
+// CHECK-LABEL: sil @remove_pins_across_make_mutable
+// CHECK: [[MAKE_MUTABLE:%.*]] = function_ref @make_mutable
+// CHECK: apply [[MAKE_MUTABLE]]
+// CHECK-NOT: strong_pin
+// CHECK: apply [[MAKE_MUTABLE]]
+// CHECK-NOT: strong_unpin
+// CHECK: return
+
+sil @remove_pins_across_make_mutable : $@thin (@inout ArrayInt) -> () {
+bb0(%0 : $*ArrayInt):
+  %1 = load %0: $*ArrayInt
+  %2 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
+  %3 = struct_extract %2 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  %4 = function_ref @make_mutable : $@cc(method) @thin (@inout ArrayInt) -> Bool
+  %5 = apply %4(%0) : $@cc(method) @thin (@inout ArrayInt) -> Bool
+  %6 = strong_pin %3 : $Builtin.NativeObject
+  %7 = apply %4(%0) : $@cc(method) @thin (@inout ArrayInt) -> Bool
+  strong_unpin %6 : $Optional<Builtin.NativeObject>
+  %8 = tuple()
+  return %8 : $()
+}

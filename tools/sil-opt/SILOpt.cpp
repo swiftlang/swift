@@ -235,6 +235,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::MergeCondFails,
                                    "merge-cond_fails",
                                    "Merge cond_fail instructions"),
+                        clEnumValN(PassKind::RemovePins,
+                                   "remove-pins",
+                                   "Remove pin/unpin pairs"),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
