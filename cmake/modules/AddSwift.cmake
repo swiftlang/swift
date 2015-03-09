@@ -1224,7 +1224,11 @@ function(add_swift_library name)
         # Map dependencies over to the appropriate variants.
         set(swiftlib_link_libraries)
         foreach(lib ${SWIFTLIB_LINK_LIBRARIES})
-          list(APPEND swiftlib_link_libraries "${lib}${VARIANT_SUFFIX}")
+          if(TARGET "${lib}${VARIANT_SUFFIX}")
+            list(APPEND swiftlib_link_libraries "${lib}${VARIANT_SUFFIX}")
+          else()
+            list(APPEND swiftlib_link_libraries "${lib}")
+          endif()
         endforeach()
 
         set(swiftlib_module_depends_flattened ${SWIFTLIB_SWIFT_MODULE_DEPENDS})

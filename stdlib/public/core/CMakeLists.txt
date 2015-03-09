@@ -138,6 +138,9 @@ else()
   #set(LINK_FLAGS
   #  -Wl,--whole-archive swiftRuntime -Wl,--no-whole-archive)
   list(APPEND swift_core_private_link_libraries swiftRuntime)
+  find_package(ICU REQUIRED COMPONENTS uc i18n)
+  list(APPEND swift_core_private_link_libraries
+      ${ICU_UC_LIBRARY} ${ICU_I18N_LIBRARY})
 endif()
 
 option(SWIFT_CHECK_ESSENTIAL_STDLIB
