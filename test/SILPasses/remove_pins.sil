@@ -3,6 +3,7 @@
 sil_stage canonical
 
 import Swift
+import SwiftShims
 import Builtin
 
 // CHECK-LABEL: sil @remove_pins
@@ -70,4 +71,25 @@ bb0(%0 : $*ArrayInt):
   strong_unpin %6 : $Optional<Builtin.NativeObject>
   %8 = tuple()
   return %8 : $()
+}
+
+sil @_swift_isUniquelyReferencedOrPinned_nonNull_native : $@cc(cdecl) @thin (UnsafePointer<HeapObject>) -> Bool
+
+// CHECK-LABEL: sil @dont_remove_pins_across_pin_read
+// CHECK: [[PINREAD:%.*]] = function_ref @_swift_isUniquelyReferencedOrPinned_nonNull_native
+// CHECK: strong_pin
+// CHECK: apply [[PINREAD]]
+// CHECK: strong_unpin
+
+sil @dont_remove_pins_across_pin_read : $@thin (@inout ArrayInt) -> Bool {
+bb0(%0 : $*ArrayInt):
+  %1 = load %0: $*ArrayInt
+  %2 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
+  %3 = struct_extract %2 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  %4 = unchecked_trivial_bit_cast %3 : $Builtin.NativeObject to $UnsafePointer<HeapObject>
+  %5 = function_ref @_swift_isUniquelyReferencedOrPinned_nonNull_native : $@cc(cdecl) @thin (UnsafePointer<HeapObject>) -> Bool
+  %6 = strong_pin %3 : $Builtin.NativeObject
+  %7 = apply %5(%4) : $@cc(cdecl) @thin (UnsafePointer<HeapObject>) -> Bool
+  strong_unpin %6 : $Optional<Builtin.NativeObject>
+  return %7 : $Bool
 }

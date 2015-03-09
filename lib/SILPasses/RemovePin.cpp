@@ -34,6 +34,18 @@
 
 using namespace swift;
 
+/// \brief Can this instruction read the pinned bit of the reference count.
+/// Reading the pinned prevents us from moving the pin instructions accross it.
+static bool mayReadPinFlag(SILInstruction *I) {
+  auto Kind = I->getKind();
+  if (Kind != ValueKind::ApplyInst)
+    return false;
+  if (!I->mayReadFromMemory())
+    return false;
+  // Apply instructions that may read from memory can read the pin bit.
+  return true;
+}
+
 namespace {
 /// Trivial removal of pin/unpin instructions. This removes pin/unpin pairs
 /// within a basic block that are not interleaved by a may-release.
@@ -142,7 +154,8 @@ public:
     SmallVector<SILInstruction *, 16> RemovePin;
     for (auto *P : AvailablePins) {
       if (!isSafeArraySemanticFunction(I) &&
-          mayDecrementRefCount(I, P, AA))
+          (mayDecrementRefCount(I, P, AA) ||
+           mayReadPinFlag(I)))
           RemovePin.push_back(P);
     }
 
