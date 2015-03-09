@@ -614,6 +614,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
+  if (Opts.DebuggerSupport)
+    Opts.EnableDollarIdentifiers = true;
   Opts.Playground |= Args.hasArg(OPT_playground);
 
   if (auto A = Args.getLastArg(OPT_enable_objc_attr_requires_foundation_module,

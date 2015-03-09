@@ -86,6 +86,9 @@ namespace swift {
     /// \brief Enable features useful for running in the debugger.
     bool DebuggerSupport = false;
 
+    /// Allows using identifiers with a leading dollar.
+    bool EnableDollarIdentifiers = false;
+
     /// \brief Enable features useful for running playgrounds.
     // FIXME: This should probably be limited to the particular SourceFile.
     bool Playground = false;

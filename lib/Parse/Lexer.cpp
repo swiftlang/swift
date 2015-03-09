@@ -703,7 +703,7 @@ void Lexer::lexDollarIdent() {
   // It's always an error to see a standalone $, and we reserve
   // $nonNumeric for persistent bindings in the debugger.
   if (CurPtr == tokStart + 1 || !isAllDigits) {
-    if (!isAllDigits && !LangOpts.DebuggerSupport)
+    if (!isAllDigits && !LangOpts.EnableDollarIdentifiers)
       diagnose(tokStart, diag::expected_dollar_numeric);
 
     // Even if we diagnose, we go ahead and form an identifier token,
