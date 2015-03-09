@@ -155,7 +155,7 @@ static bool sinkCondFail(SILLoop *Loop) {
 }
 
 static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
-                              AliasAnalysis *AA, bool ShouldVerify) {
+                              AliasAnalysis *AA) {
   auto HeaderBB = Loop->getHeader();
   if (!HeaderBB)
     return false;
@@ -276,11 +276,7 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
 
 static bool sinkFixLiftime(SILLoop *Loop, DominanceInfo *DomTree,
                            SILLoopInfo *LI) {
-  DEBUG(llvm::errs() << "Sink fix_lifetime attempt\n");
-  auto HeaderBB = Loop->getHeader();
-  if (!HeaderBB)
-    return false;
-
+  DEBUG(llvm::errs() << " Sink fix_lifetime attempt\n");
   auto Preheader = Loop->getLoopPreheader();
   if (!Preheader)
     return false;
@@ -348,29 +344,21 @@ public:
   StringRef getName() override { return "SIL Loop Invariant Code Motion"; }
 
   void run() override {
-    SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
-    assert(LA);
-    DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
-    assert(DA);
-    AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>();
-    assert(AA);
-
     SILFunction *F = getFunction();
-    assert(F);
-    SILLoopInfo *LI = LA->getLoopInfo(F);
-    assert(LI);
-    DominanceInfo *DT = DA->getDomInfo(F);
-    assert(DT);
+    SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
+    SILLoopInfo *LoopInfo = LA->getLoopInfo(F);
 
-    if (LI->empty()) {
+    if (LoopInfo->empty()) {
       DEBUG(llvm::dbgs() << "No loops in " << F->getName() << "\n");
       return;
     }
 
-    bool ShouldVerify = getOptions().VerifyAll;
+    DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
+    AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>();
+    DominanceInfo *DomTree = DA->getDomInfo(F);
     bool Changed = false;
 
-    for (auto *LoopIt : *LI) {
+    for (auto *LoopIt : *LoopInfo) {
       // Process loops recursively bottom-up in the loop tree.
       SmallVector<SILLoop *, 8> Worklist;
       Worklist.push_back(LoopIt);
@@ -383,9 +371,8 @@ public:
       while (!Worklist.empty()) {
         SILLoop *work = Worklist.pop_back_val();
         Changed |= sinkCondFail(work);
-        Changed |= hoistInstructions(work, DT, LI, AA,
-                                     ShouldVerify);
-        Changed |= sinkFixLiftime(work, DT, LI);
+        Changed |= hoistInstructions(work, DomTree, LoopInfo, AA);
+        Changed |= sinkFixLiftime(work, DomTree, LoopInfo);
       }
     }
 
