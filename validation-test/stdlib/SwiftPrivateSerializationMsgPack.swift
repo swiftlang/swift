@@ -1,5 +1,9 @@
 // RUN: %target-run-simple-swift
 
+// UNSUPPORTED: OS=linux-gnu
+// FIXME: on Linux, this test does not finish in reasonable time because of:
+// <rdar://problem/20089729> Dictionary reallocates storage on every mutation
+
 import SwiftPrivateSerialization
 import StdlibUnittest
 
