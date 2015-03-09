@@ -35,7 +35,7 @@ static const UCollator *MakeRootCollator() {
   ucol_setAttribute(root, UCOL_NORMALIZATION_MODE, UCOL_ON, &ErrorCode);
   ucol_setAttribute(root, UCOL_STRENGTH, UCOL_TERTIARY, &ErrorCode);
   ucol_setAttribute(root, UCOL_NUMERIC_COLLATION, UCOL_OFF, &ErrorCode);
-  ucol_setAttribute(root, UCOL_CASE_LEVEL, UCOL_OFF, &ErrorCode);
+  ucol_setAttribute(root, UCOL_CASE_LEVEL, UCOL_ON, &ErrorCode);
   if (U_FAILURE(ErrorCode)) {
     swift::crash("ucol_setAttribute: Failure setting up default collation.");
   }
