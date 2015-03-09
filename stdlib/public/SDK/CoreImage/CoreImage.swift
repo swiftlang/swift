@@ -13,10 +13,10 @@
 import Foundation
 @exported import CoreImage  // Clang module
 
-// sdk overlays:
 extension CIFilter {
-  convenience init(name: String!,
-                   elements: (NSCopying, AnyObject)...) {
+  convenience init?(
+    name: String!, elements: (NSCopying, AnyObject)...
+  ) {
     var dict =  NSMutableDictionary()
         for (key, value) in elements {
             dict[key] = value
