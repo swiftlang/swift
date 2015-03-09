@@ -129,10 +129,20 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
 
   SILType RealSubClassTy = SubClassTy;
 
-  if (isa<ValueMetatypeInst>(ClassInstance.stripUpCasts())) {
-    // Convert this type to its metatype type.
-    Lowering::TypeConverter TC(AI->getModule());
-    RealSubClassTy = TC.getLoweredLoadableType(CD->getType());
+  if (auto *VMTI = dyn_cast<ValueMetatypeInst>(ClassInstance.stripUpCasts())) {
+    if (isa<AnyMetatypeType>(SubClassTy.getSwiftRValueType())) {
+      CD = SubClassTy.getMetatypeInstanceType(AI->getModule())
+               .getClassOrBoundGenericClass();
+    } else {
+      auto InstTy = SubClassTy.getSwiftRValueType();
+      CD = InstTy.getClassOrBoundGenericClass();
+      // Convert instance type to its metatype type.
+      auto EMT = dyn_cast<AnyMetatypeType>(VMTI->getType().
+                                                 getSwiftRValueType());
+      auto *MetaTy = MetatypeType::get(InstTy, EMT->getRepresentation());
+      auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
+      RealSubClassTy = SILType::getPrimitiveObjectType(CanMetaTy);
+    }
   } else {
     assert(SubClassTy.getClassOrBoundGenericClass() &&
            "Dest type must be a class type");
