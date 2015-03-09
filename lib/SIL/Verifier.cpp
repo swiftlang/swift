@@ -1616,9 +1616,6 @@ public:
             "init_existential must be applied to address of existential");
     require(!exType.isClassExistentialType(),
             "init_existential must be applied to non-class existential");
-    require(!AEI->getLoweredConcreteType().isExistentialType(),
-            "init_existential cannot put an existential container inside "
-            "an existential container");
     
     // The lowered type must be the properly-abstracted form of the AST type.
     auto archetype = ArchetypeType::getOpened(exType.getSwiftRValueType());
