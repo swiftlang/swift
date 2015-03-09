@@ -88,6 +88,20 @@ enum class SyntaxStructureKind : uint8_t {
   CallExpression,
 };
 
+enum class SyntaxStructureElementKind : uint8_t {
+  Id,
+  Expr,
+  TypeRef,
+};
+
+struct SyntaxStructureElement {
+  SyntaxStructureElementKind Kind;
+  CharSourceRange Range;
+
+  SyntaxStructureElement(SyntaxStructureElementKind Kind, CharSourceRange Range)
+    : Kind(Kind), Range(Range) { }
+};
+
 struct SyntaxStructureNode {
   const Decl *Dcl = nullptr;
   SyntaxStructureKind Kind;
@@ -97,6 +111,7 @@ struct SyntaxStructureNode {
   CharSourceRange NameRange;
   CharSourceRange TypeRange;
   std::vector<CharSourceRange> InheritedTypeRanges;
+  std::vector<SyntaxStructureElement> Elements;
 
   bool isVariable() const {
     switch (Kind) {

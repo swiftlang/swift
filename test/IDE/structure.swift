@@ -1,6 +1,6 @@
 // RUN: %swift-ide-test -structure -source-filename %s | FileCheck %s
 
-// CHECK: <class>class <name>MyCls</name> : <inherited>OtherClass</inherited> {
+// CHECK: <class>class <name>MyCls</name> : <inherited><elem-typeref>OtherClass</elem-typeref></inherited> {
 // CHECK:   <property>var <name>bar</name> : Int</property>
 // CHECK:   <property>var <name>anotherBar</name> : Int = 42</property>
 // CHECK:   <cvar>class var <name>cbar</name> : Int = 0</cvar>

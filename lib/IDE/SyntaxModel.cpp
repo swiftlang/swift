@@ -493,6 +493,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       CharSourceRange TR = charSourceRangeFromSourceRange(SM,
                                                           TL.getSourceRange());
       SN.InheritedTypeRanges.push_back(TR);
+      SN.Elements.emplace_back(SyntaxStructureElementKind::TypeRef, TR);
     }
 
     SN.Attrs = NTD->getAttrs();
@@ -511,6 +512,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       CharSourceRange TR = charSourceRangeFromSourceRange(SM,
                                                           TL.getSourceRange());
       SN.InheritedTypeRanges.push_back(TR);
+      SN.Elements.emplace_back(SyntaxStructureElementKind::TypeRef, TR);
     }
 
     SN.Attrs = ED->getAttrs();

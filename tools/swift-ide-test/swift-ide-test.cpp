@@ -753,6 +753,9 @@ private:
     for (auto &TyRange : Node.InheritedTypeRanges) {
       tagRange(TyRange, "inherited", Node);
     }
+    for (auto &Elem : Node.Elements) {
+      tagRange(Elem.Range, getTagName(Elem.Kind), Node);
+    }
 
     return true;
   }
@@ -788,6 +791,15 @@ private:
       case SyntaxStructureKind::Parameter: return "param";
       case SyntaxStructureKind::BraceStatement: return "brace";
       case SyntaxStructureKind::CallExpression: return "call";
+    }
+    llvm_unreachable("unhandled tag?");
+  }
+
+  static StringRef getTagName(SyntaxStructureElementKind K) {
+    switch (K) {
+      case SyntaxStructureElementKind::Id: return "elem-id";
+      case SyntaxStructureElementKind::Expr: return "elem-expr";
+      case SyntaxStructureElementKind::TypeRef: return "elem-typeref";
     }
     llvm_unreachable("unhandled tag?");
   }
