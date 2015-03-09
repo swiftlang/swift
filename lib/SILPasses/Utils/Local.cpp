@@ -25,9 +25,6 @@
 
 using namespace swift;
 
-// Do we use array.props?
-static bool HaveArrayProperty = true;
-
 llvm::cl::opt<bool>
 DebugValuesPropagateLiveness("debug-values-propagate-liveness",
                              llvm::cl::init(false));
@@ -475,30 +472,28 @@ bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
 
   case ArrayCallKind::kCheckSubscript:
   case ArrayCallKind::kGetElement: {
-    if (HaveArrayProperty) {
-      auto IsNativeArg = getArrayPropertyIsNative();
-      ArraySemanticsCall IsNative(IsNativeArg.getDef(),
-                                 "array.props.isNative", true);
-      if (!IsNative) {
-        // Do we have a constant parameter?
-        auto *SI = dyn_cast<StructInst>(IsNativeArg);
-        if (!SI)
-          return false;
-        if (!isa<IntegerLiteralInst>(SI->getOperand(0)))
-          return false;
-      } else if(!IsNative.canHoist(InsertBefore, DT))
-        // Otherwise, we must be able to hoist the function call.
+    auto IsNativeArg = getArrayPropertyIsNative();
+    ArraySemanticsCall IsNative(IsNativeArg.getDef(), "array.props.isNative",
+                                true);
+    if (!IsNative) {
+      // Do we have a constant parameter?
+      auto *SI = dyn_cast<StructInst>(IsNativeArg);
+      if (!SI)
         return false;
-
-      if (Kind == ArrayCallKind::kCheckSubscript)
-        return canHoistArrayArgument(SemanticsCall, getSelf(), InsertBefore, DT);
-
-      // Can we hoist the needsElementTypeCheck argument.
-      ArraySemanticsCall TypeCheck(getArrayPropertyNeedsTypeCheck().getDef(),
-                                  "array.props.needsElementTypeCheck", true);
-      if (!TypeCheck || !TypeCheck.canHoist(InsertBefore, DT))
+      if (!isa<IntegerLiteralInst>(SI->getOperand(0)))
         return false;
-    }
+    } else if (!IsNative.canHoist(InsertBefore, DT))
+      // Otherwise, we must be able to hoist the function call.
+      return false;
+
+    if (Kind == ArrayCallKind::kCheckSubscript)
+      return canHoistArrayArgument(SemanticsCall, getSelf(), InsertBefore, DT);
+
+    // Can we hoist the needsElementTypeCheck argument.
+    ArraySemanticsCall TypeCheck(getArrayPropertyNeedsTypeCheck().getDef(),
+                                 "array.props.needsElementTypeCheck", true);
+    if (!TypeCheck || !TypeCheck.canHoist(InsertBefore, DT))
+      return false;
 
     return canHoistArrayArgument(SemanticsCall, getSelf(), InsertBefore, DT);
   }
@@ -612,7 +607,7 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
         hoistOrCopySelf(SemanticsCall, InsertBefore, DT, LeaveOriginal);
 
     SILValue NewArrayProps;
-    if (HaveArrayProperty && Kind == ArrayCallKind::kCheckSubscript) {
+    if (Kind == ArrayCallKind::kCheckSubscript) {
       // Copy the array.props argument call.
       auto IsNativeArg = getArrayPropertyIsNative();
       ArraySemanticsCall IsNative(IsNativeArg.getDef(), "array.props.isNative",
