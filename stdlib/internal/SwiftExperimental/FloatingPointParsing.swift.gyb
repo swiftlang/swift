@@ -1,0 +1,81 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+import SwiftShims
+
+%{
+
+allFloatBits = [32, 64, 80]
+
+def floatName(bits):
+    if bits == 32:
+        return 'Float'
+    if bits == 64:
+        return 'Double'
+    if bits == 80:
+        return 'Float80'
+
+cFuncSuffix2 = {32: 'f', 64: 'd', 80: 'ld'}
+
+}%
+
+/// Return true iff isspace(u) would return nonzero when the current
+/// locale is the C locale.
+internal func _isspace_clocale(u: UTF16.CodeUnit) -> Bool {
+  return contains("\t\n\u{b}\u{c}\r ".utf16, u)
+}
+
+% for bits in allFloatBits:
+%   Self = floatName(bits)
+
+% if bits == 80:
+#if arch(i386) || arch(x86_64)
+% end
+
+//===--- Parsing ----------------------------------------------------------===//
+extension ${Self} {
+  /// Construct from an ASCII representation.
+  ///
+  /// Returns the result of calling the POSIX function
+  /// `strto${cFuncSuffix2[bits]}_l` using the "C" locale, unless
+  /// `text` contains non-ASCII text or whitespace, or is not
+  /// completely consumed by the call. Otherwise, rerturns `nil`.
+  ///
+  /// See the `strto${cFuncSuffix2[bits]} (3)` man page for details of
+  /// the exact format accepted.
+  public init?(_ text: String) {
+    let u16 = text.utf16
+    func parseNTBS(chars: UnsafePointer<CChar>) -> (${Self}, Int) {
+      var result: ${Self} = 0
+      let endPtr = withUnsafeMutablePointer(&result) {
+        _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(
+          chars, UnsafeMutablePointer($0))
+      }
+      return (result, endPtr == nil ? 0 : UnsafePointer(endPtr) - chars)
+    }
+
+    let (result, n) = text.withCString(parseNTBS)
+
+    if n == 0 || n != count(u16)
+      || contains(u16, { $0 > 127 || _isspace_clocale($0) }) {
+      return nil
+    }
+    self = result
+  }
+}
+
+% if bits == 80:
+#endif
+% end
+
+% end
+

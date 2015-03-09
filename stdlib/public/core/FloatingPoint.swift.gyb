@@ -60,8 +60,6 @@ def cFuncSuffix(bits):
     if bits == 80:
         return 'l'
 
-cFuncSuffix2 = {32: 'f', 64: 'd', 80: 'ld'}
-
 def llvmIntrinsicSuffix(bits):
     if bits == 32:
         return 'f32'
@@ -168,12 +166,6 @@ def incIfSigned(bits, signed):
 
 }%
 
-/// Return true iff isspace(u) would return nonzero when the current
-/// locale is the C locale.
-internal func _isspace_clocale(u: UTF16.CodeUnit) -> Bool {
-  return contains("\t\n\u{b}\u{c}\r ".utf16, u)
-}
-
 % for bits in allFloatBits:
 %   Self = floatName(bits)
 
@@ -206,38 +198,6 @@ extension ${Self} : Printable {
   /// A textual representation of `self`.
   public var description: String {
     return _float${bits}ToString(self)
-  }
-}
-
-//===--- Parsing ----------------------------------------------------------===//
-extension ${Self} {
-  /// Construct from an ASCII representation.
-  ///
-  /// Returns the result of calling the POSIX function
-  /// `strto${cFuncSuffix2[bits]}_l` using the "C" locale, unless
-  /// `text` contains non-ASCII text or whitespace, or is not
-  /// completely consumed by the call. Otherwise, rerturns `nil`.
-  ///
-  /// See the `strto${cFuncSuffix2[bits]} (3)` man page for details of
-  /// the exact format accepted.
-  public init?(_ text: String) {
-    let u16 = text.utf16
-    func parseNTBS(chars: UnsafePointer<CChar>) -> (${Self}, Int) {
-      var result: ${Self} = 0
-      let endPtr = withUnsafeMutablePointer(&result) {
-        _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(
-          chars, UnsafeMutablePointer($0))
-      }
-      return (result, endPtr == nil ? 0 : UnsafePointer(endPtr) - chars)
-    }
-    
-    let (result, n) = text.withCString(parseNTBS)
-    
-    if n == 0 || n != count(u16)
-      || contains(u16, { $0 > 127 || _isspace_clocale($0) }) {
-      return nil
-    }
-    self = result
   }
 }
 
