@@ -67,16 +67,17 @@ bool FrontendOptions::actionIsImmediate() const {
 
 void FrontendOptions::forAllOutputPaths(
     std::function<void(const std::string &)> fn) const {
+  if (RequestedAction != FrontendOptions::EmitModuleOnly) {
+    for (const std::string &OutputFileName : OutputFilenames) {
+      fn(OutputFileName);
+    }
+  }
   const std::string *outputs[] = {
-    &OutputFilename,
     &ModuleOutputPath,
     &ModuleDocOutputPath,
     &ObjCHeaderOutputPath
   };
   for (const std::string *next : outputs) {
-    if (RequestedAction == FrontendOptions::EmitModuleOnly &&
-        next == &OutputFilename)
-      continue;
     if (!next->empty())
       fn(*next);
   }

@@ -77,9 +77,9 @@ public:
   /// The kind of input on which the frontend should operate.
   InputFileKind InputKind = InputFileKind::IFK_Swift;
 
-  /// The name of the primary output file which should be created
-  /// by the frontend.
-  std::string OutputFilename;
+  /// The specified output files. If only a single outputfile is generated,
+  /// the name of the last specified file is taken.
+  std::vector<std::string> OutputFilenames;
 
   /// An arbitrary module to import and make implicitly visible.
   std::string ImplicitImportModuleName;
@@ -217,6 +217,20 @@ public:
   bool actionIsImmediate() const;
 
   void forAllOutputPaths(std::function<void(const std::string &)> fn) const;
+  
+  /// Gets the name of the specified output filename.
+  /// If multiple files are specified, the last one is returned.
+  StringRef getSingleOutputFilename() const {
+    if (OutputFilenames.size() >= 1)
+      return OutputFilenames.back();
+    return StringRef();
+  }
+
+  /// Sets a single filename as output filename.
+  void setSingleOutputFilename(const std::string &FileName) {
+    OutputFilenames.clear();
+    OutputFilenames.push_back(FileName);
+  }
 };
 
 }

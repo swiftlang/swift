@@ -242,11 +242,8 @@ public:
     return FrontendOpts.InputBuffers;
   }
 
-  void setOutputFilename(StringRef Filename) {
-    FrontendOpts.OutputFilename = Filename;
-  }
   StringRef getOutputFilename() const {
-    return FrontendOpts.OutputFilename;
+    return FrontendOpts.getSingleOutputFilename();
   }
 
   void setCodeCompletionPoint(llvm::MemoryBuffer *Buf, unsigned Offset) {

@@ -301,7 +301,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
 
 /// Writes SIL out to the given file.
 static bool writeSIL(SILModule &SM, Module *M, bool EmitVerboseSIL,
-                     std::string &OutputFilename, bool SortSIL) {
+                     StringRef OutputFilename, bool SortSIL) {
   std::error_code EC;
   llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::F_None);
   if (EC) {
@@ -492,7 +492,7 @@ static bool performCompile(CompilerInstance &Instance,
     if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
       performSILLinking(SM.get(), true);
     return writeSIL(*SM, Instance.getMainModule(), opts.EmitVerboseSIL,
-                    opts.OutputFilename, opts.EmitSortedSIL);
+                    opts.getSingleOutputFilename(), opts.EmitSortedSIL);
   }
 
   // Perform "stable" optimizations that are invariant across compiler versions.
@@ -587,7 +587,7 @@ static bool performCompile(CompilerInstance &Instance,
   // We've been told to write canonical SIL, so write it now.
   if (Action == FrontendOptions::EmitSIL) {
     return writeSIL(*SM, Instance.getMainModule(), opts.EmitVerboseSIL,
-                    opts.OutputFilename, opts.EmitSortedSIL);
+                    opts.getSingleOutputFilename(), opts.EmitSortedSIL);
   }
 
   assert(Action >= FrontendOptions::Immediate &&
@@ -620,10 +620,10 @@ static bool performCompile(CompilerInstance &Instance,
   auto &LLVMContext = llvm::getGlobalContext();
   if (PrimarySourceFile) {
     performIRGeneration(IRGenOpts, *PrimarySourceFile, SM.get(),
-                        opts.OutputFilename, LLVMContext);
+                        opts.getSingleOutputFilename(), LLVMContext);
   } else {
     performIRGeneration(IRGenOpts, Instance.getMainModule(), SM.get(),
-                        opts.OutputFilename, LLVMContext);
+                        opts.getSingleOutputFilename(), LLVMContext);
   }
 
   return false;

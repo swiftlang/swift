@@ -1246,7 +1246,7 @@ public:
     builder.setEngineKind(llvm::EngineKind::JIT);
     EE = builder.create();
 
-    IRGenOpts.OutputFilename = "";
+    IRGenOpts.OutputFilenames.clear();
     IRGenOpts.Optimize = false;
     IRGenOpts.OutputKind = IRGenOutputKind::Module;
     IRGenOpts.UseJIT = true;

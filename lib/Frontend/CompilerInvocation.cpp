@@ -244,9 +244,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   else
     Opts.InputKind = InputFileKind::IFK_Swift;
 
-  if (const Arg *A = Args.getLastArg(OPT_o)) {
-    Opts.OutputFilename = A->getValue();
-  }
+  Opts.OutputFilenames = Args.getAllArgValues(OPT_o);
 
   bool UserSpecifiedModuleName = false;
   {
@@ -266,7 +264,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
         // Default to a module named "REPL" if we're in REPL mode.
         ModuleName = "REPL";
       } else if (!Opts.InputFilenames.empty()) {
-        StringRef OutputFilename(Opts.OutputFilename);
+        StringRef OutputFilename = Opts.getSingleOutputFilename();
         if (OutputFilename.empty() || OutputFilename == "-" ||
             llvm::sys::fs::is_directory(OutputFilename)) {
           ModuleName = Opts.InputFilenames[0];
@@ -295,8 +293,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.ModuleName = ModuleName;
   }
 
-  if (Opts.OutputFilename.empty() ||
-      llvm::sys::fs::is_directory(Opts.OutputFilename)) {
+  if (Opts.OutputFilenames.empty() ||
+      llvm::sys::fs::is_directory(Opts.getSingleOutputFilename())) {
     // No output filename was specified, or an output directory was specified.
     // Determine the correct output filename.
 
@@ -314,13 +312,13 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
       // Textual modes.
-      Opts.OutputFilename = "-";
+      Opts.setSingleOutputFilename("-");
       break;
 
     case FrontendOptions::EmitSILGen:
     case FrontendOptions::EmitSIL: {
-      if (Opts.OutputFilename.empty())
-        Opts.OutputFilename = "-";
+      if (Opts.OutputFilenames.empty())
+        Opts.setSingleOutputFilename("-");
       else
         Suffix = SIL_EXTENSION;
       break;
@@ -337,20 +335,20 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
       // These modes have no frontend-generated output.
-      Opts.OutputFilename = "";
+      Opts.OutputFilenames.clear();
       break;
 
     case FrontendOptions::EmitAssembly: {
-      if (Opts.OutputFilename.empty())
-        Opts.OutputFilename = "-";
+      if (Opts.OutputFilenames.empty())
+        Opts.setSingleOutputFilename("-");
       else
         Suffix = "s";
       break;
     }
 
     case FrontendOptions::EmitIR: {
-      if (Opts.OutputFilename.empty())
-        Opts.OutputFilename = "-";
+      if (Opts.OutputFilenames.empty())
+        Opts.setSingleOutputFilename("-");
       else
         Suffix = "ll";
       break;
@@ -372,11 +370,11 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       // First, if we're reading from stdin and we don't have a directory,
       // output to stdout.
       if (Opts.InputFilenames.size() == 1 && Opts.InputFilenames[0] == "-" &&
-          Opts.OutputFilename.empty())
-        Opts.OutputFilename = "-";
+          Opts.OutputFilenames.empty())
+        Opts.setSingleOutputFilename("-");
       else {
         // We have a suffix, so determine an appropriate name.
-        llvm::SmallString<128> Path(Opts.OutputFilename);
+        llvm::SmallString<128> Path(Opts.getSingleOutputFilename());
 
         StringRef BaseName;
         if (Opts.PrimaryInput.hasValue() && Opts.PrimaryInput->isFilename()) {
@@ -392,21 +390,21 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
         llvm::sys::path::append(Path, BaseName);
         llvm::sys::path::replace_extension(Path, Suffix);
 
-        Opts.OutputFilename = Path.str();
+        Opts.setSingleOutputFilename(Path.str());
       }
     }
 
-    if (Opts.OutputFilename.empty()) {
+    if (Opts.OutputFilenames.empty()) {
       if (Opts.RequestedAction != FrontendOptions::REPL &&
           Opts.RequestedAction != FrontendOptions::Immediate &&
           Opts.RequestedAction != FrontendOptions::NoneAction) {
         Diags.diagnose(SourceLoc(), diag::error_no_output_filename_specified);
         return true;
       }
-    } else if (Opts.OutputFilename != "-" &&
-        llvm::sys::fs::is_directory(Opts.OutputFilename)) {
+    } else if (Opts.getSingleOutputFilename() != "-" &&
+        llvm::sys::fs::is_directory(Opts.getSingleOutputFilename())) {
       Diags.diagnose(SourceLoc(), diag::error_implicit_output_file_is_directory,
-                     Opts.OutputFilename);
+                     Opts.getSingleOutputFilename());
       return true;
     }
   }
@@ -425,8 +423,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     if (!Args.hasArg(optWithoutPath))
       return;
 
-    if (useMainOutput && !Opts.OutputFilename.empty()) {
-      output = Opts.OutputFilename;
+    if (useMainOutput && !Opts.OutputFilenames.empty()) {
+      output = Opts.getSingleOutputFilename();
       return;
     }
 
@@ -434,9 +432,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       return;
 
     StringRef OriginalPath;
-    if (!Opts.OutputFilename.empty() && Opts.OutputFilename != "-")
+    if (!Opts.OutputFilenames.empty() && Opts.getSingleOutputFilename() != "-")
       // Put the serialized diagnostics file next to the output file.
-      OriginalPath = Opts.OutputFilename;
+      OriginalPath = Opts.getSingleOutputFilename();
     else if (Opts.PrimaryInput.hasValue() && Opts.PrimaryInput->isFilename())
       // We have a primary input, so use that as the basis for the name of the
       // serialized diagnostics file.
@@ -979,7 +977,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   } else if (FrontendOpts.InputFilenames.size() == 1) {
     Opts.MainInputFilename = FrontendOpts.InputFilenames.front();
   }
-  Opts.OutputFilename = FrontendOpts.OutputFilename;
+  Opts.OutputFilenames = FrontendOpts.OutputFilenames;
   Opts.ModuleName = FrontendOpts.ModuleName;
 
   if (Args.hasArg(OPT_use_jit))

@@ -58,7 +58,7 @@ class IRGenOptions {
 public:
   /// The name of the first input file, used by the debug info.
   std::string MainInputFilename;
-  std::string OutputFilename;
+  std::vector<std::string> OutputFilenames;
   std::string ModuleName;
   // The command line string that is to be stored in the DWARF debug info.
   std::string DWARFDebugFlags;
@@ -128,6 +128,14 @@ public:
                    DisableFPElim(true), HasUnderlyingModule(false),
                    Playground(false), GenerateProfile(false),
                    EmbedMode(IRGenEmbedMode::None) {}
+  
+  /// Gets the name of the specified output filename.
+  /// If multiple files are specified, the last one is returned.
+  StringRef getSingleOutputFilename() const {
+    if (OutputFilenames.size() >= 1)
+      return OutputFilenames.back();
+    return StringRef();
+  }
 };
 
 } // end namespace swift
