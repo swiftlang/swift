@@ -798,6 +798,8 @@ private:
       case SyntaxStructureKind::CaseStatement: return "case";
       case SyntaxStructureKind::BraceStatement: return "brace";
       case SyntaxStructureKind::CallExpression: return "call";
+      case SyntaxStructureKind::ArrayExpression: return "array";
+      case SyntaxStructureKind::DictionaryExpression: return "dictionary";
     }
     llvm_unreachable("unhandled tag?");
   }

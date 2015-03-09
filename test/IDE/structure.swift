@@ -93,3 +93,12 @@ switch v {
   case 2 where foo(), 3 where bar(): break;
   default: break;
 }
+
+// CHECK: <gvar>let <name>myArray</name> = <array>[<elem-expr>1</elem-expr>, <elem-expr>2</elem-expr>, <elem-expr>3</elem-expr>]</array></gvar>
+let myArray = [1, 2, 3]
+// CHECK: <gvar>let <name>myDict</name> = <dictionary>[<elem-expr>1</elem-expr>:<elem-expr>1</elem-expr>, <elem-expr>2</elem-expr>:<elem-expr>2</elem-expr>, <elem-expr>3</elem-expr>:<elem-expr>3</elem-expr>]</dictionary></gvar>
+let myDict = [1:1, 2:2, 3:3]
+// CHECK: <gvar>let <name>myArray2</name> = <array>[<elem-expr>1</elem-expr>]</array></gvar>
+let myArray2 = [1]
+// CHECK: <gvar>let <name>myDict2</name> = <dictionary>[<elem-expr>1</elem-expr>:<elem-expr>1</elem-expr>]</dictionary></gvar>
+let myDict2 = [1:1]

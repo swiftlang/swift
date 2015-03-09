@@ -325,6 +325,12 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     }
   }
 
+  auto addExprElem = [&](const Expr *Elem, SyntaxStructureNode &SN) {
+    SN.Elements.emplace_back(SyntaxStructureElementKind::Expr,
+                             charSourceRangeFromSourceRange(SM,
+                                                       Elem->getSourceRange()));
+  };
+
   if (auto *CE = dyn_cast<CallExpr>(E)) {
     SyntaxStructureNode SN;
     SN.Kind = SyntaxStructureKind::CallExpression;
@@ -336,6 +342,28 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
       SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
                                                 CE->getArg()->getSourceRange());
     pushStructureNode(SN, CE);
+
+  } else if (auto *ArrayE = dyn_cast<ArrayExpr>(E)) {
+    SyntaxStructureNode SN;
+    SN.Kind = SyntaxStructureKind::ArrayExpression;
+    SN.Range = charSourceRangeFromSourceRange(SM, E->getSourceRange());
+    for (auto *Elem : ArrayE->getElements())
+      addExprElem(Elem, SN);
+    pushStructureNode(SN, E);
+
+  } else if (auto *DictE = dyn_cast<DictionaryExpr>(E)) {
+    SyntaxStructureNode SN;
+    SN.Kind = SyntaxStructureKind::DictionaryExpression;
+    SN.Range = charSourceRangeFromSourceRange(SM, E->getSourceRange());
+    for (auto *Elem : DictE->getElements()) {
+      if (auto *TupleE = dyn_cast<TupleExpr>(Elem)) {
+        for (auto *TE : TupleE->getElements())
+          addExprElem(TE, SN);
+      } else {
+        addExprElem(Elem, SN);
+      }
+    }
+    pushStructureNode(SN, E);
   }
 
   return { true, E };

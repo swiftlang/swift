@@ -94,6 +94,8 @@ enum class SyntaxStructureKind : uint8_t {
   Parameter,
   BraceStatement,
   CallExpression,
+  ArrayExpression,
+  DictionaryExpression,
 };
 
 enum class SyntaxStructureElementKind : uint8_t {
