@@ -3,7 +3,7 @@
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
 // XFAIL: linux
 
-import SwiftUnstable
+import SwiftPrivate
 import StdlibUnittest
 import Foundation
 

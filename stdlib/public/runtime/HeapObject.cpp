@@ -28,7 +28,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <unistd.h>
-#include "../shims/RuntimeShims.h"
+#include "../SwiftShims/RuntimeShims.h"
 #if SWIFT_OBJC_INTEROP
 # include <objc/objc-runtime.h>
 #endif

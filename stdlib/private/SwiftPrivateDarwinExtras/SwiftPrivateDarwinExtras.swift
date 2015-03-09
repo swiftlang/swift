@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SwiftUnstable
+import SwiftPrivate
 #if os(OSX) || os(iOS)
 import Darwin
 #elseif os(Linux)

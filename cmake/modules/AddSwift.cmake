@@ -785,7 +785,7 @@ function(_add_swift_library_single target name)
           ${SWIFTLIB_SINGLE_SDK} STREQUAL "OSX")
         # HACK: don't build WatchKit API notes for OS X.
       else()
-        if (NOT IS_DIRECTORY "${SWIFT_SOURCE_DIR}/stdlib/objc/${framework_name}")
+        if (NOT IS_DIRECTORY "${SWIFT_SOURCE_DIR}/stdlib/public/SDK/${framework_name}")
           list(APPEND SWIFTLIB_SINGLE_API_NOTES "${framework_name}")
         endif()
       endif()
@@ -1198,7 +1198,7 @@ function(add_swift_library name)
   if((NOT "${SWIFT_BUILD_STDLIB}") AND
      (NOT "${SWIFTLIB_SWIFT_MODULE_DEPENDS}" STREQUAL ""))
     list(REMOVE_ITEM SWIFTLIB_SWIFT_MODULE_DEPENDS
-        Core SwiftUnstable)
+        Core SwiftPrivate)
   endif()
 
   translate_flags(SWIFTLIB "${SWIFTLIB_options}")
@@ -1565,7 +1565,7 @@ function(add_swift_target_executable name)
 
   if(NOT "${SWIFT_BUILD_STDLIB}")
     list(REMOVE_ITEM SWIFTEXE_TARGET_LINK_FAT_LIBRARIES
-        swiftCore swiftSwiftUnstable)
+        swiftCore swiftSwiftPrivate)
   endif()
 
   foreach(sdk ${SWIFT_SDKS})

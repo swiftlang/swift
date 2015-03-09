@@ -4,7 +4,7 @@
 
 import StdlibUnittest
 import Swift
-import SwiftUnstable
+import SwiftPrivate
 
 //===---
 // Utilities.

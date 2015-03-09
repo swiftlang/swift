@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift
 
 import StdlibUnittest
-import SwiftUnstablePthreadExtras
+import SwiftPrivatePthreadExtras
 #if os(OSX) || os(iOS)
 import Darwin
 #elseif os(Linux)

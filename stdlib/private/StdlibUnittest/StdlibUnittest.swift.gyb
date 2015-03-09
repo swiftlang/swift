@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SwiftUnstable
-import SwiftUnstablePthreadExtras
-import SwiftUnstableDarwinExtras
+import SwiftPrivate
+import SwiftPrivatePthreadExtras
+import SwiftPrivateDarwinExtras
 
 #if os(OSX) || os(iOS)
 import Darwin

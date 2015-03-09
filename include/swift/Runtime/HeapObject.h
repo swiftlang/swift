@@ -22,7 +22,7 @@
 #include "swift/Runtime/Config.h"
 
 // Bring in the definition of HeapObject 
-#include "../../../stdlib/shims/HeapObject.h"
+#include "../../../stdlib/public/SwiftShims/HeapObject.h"
 
 namespace swift {
 

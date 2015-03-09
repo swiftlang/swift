@@ -1,7 +1,7 @@
 // RUN: %target-run-stdlib-swift
 
 import Swift
-import SwiftUnstable
+import SwiftPrivate
 import StdlibUnittest
 
 var HashingTestSuite = TestSuite("Hashing")

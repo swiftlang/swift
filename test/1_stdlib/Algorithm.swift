@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift
 
 import StdlibUnittest
-import SwiftUnstable
+import SwiftPrivate
 
 var Algorithm = TestSuite("Algorithm")
 

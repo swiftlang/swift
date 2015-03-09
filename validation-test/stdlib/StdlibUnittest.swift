@@ -1,6 +1,6 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
-import SwiftUnstable
+import SwiftPrivate
 import StdlibUnittest
 
 _setOverrideOSVersion(.OSX(major: 10, minor: 9, bugFix: 3))

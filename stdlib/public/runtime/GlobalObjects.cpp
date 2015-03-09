@@ -15,7 +15,7 @@
 //  defined here.
 //
 //===----------------------------------------------------------------------===//
-#include "../shims/GlobalObjects.h"
+#include "../SwiftShims/GlobalObjects.h"
 #include "swift/Runtime/Metadata.h"
 
 namespace swift {

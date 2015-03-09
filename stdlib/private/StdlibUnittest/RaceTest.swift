@@ -36,8 +36,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-import SwiftUnstable
-import SwiftUnstablePthreadExtras
+import SwiftPrivate
+import SwiftPrivatePthreadExtras
 #if os(OSX) || os(iOS)
 import Darwin
 #elseif os(Linux)

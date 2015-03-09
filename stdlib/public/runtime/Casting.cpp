@@ -26,7 +26,7 @@
 #include "Debug.h"
 #include "ExistentialMetadataImpl.h"
 #include "Private.h"
-#include "../shims/RuntimeShims.h"
+#include "../SwiftShims/RuntimeShims.h"
 #include "stddef.h"
 
 #if defined(__APPLE__) && defined(__MACH__)

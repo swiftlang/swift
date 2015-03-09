@@ -4,7 +4,7 @@
 // RUN: %target-build-swift -module-name a %s -o %t.out -O
 // RUN: %target-run %t.out
 
-import SwiftUnstable
+import SwiftPrivate
 import StdlibUnittest
 
 final class HeapBool {

@@ -16,7 +16,7 @@
 
 #include <type_traits>
 #include <unistd.h>
-#include "../shims/DarwinShims.h"
+#include "../SwiftShims/DarwinShims.h"
 
 static_assert(std::is_same<ssize_t, __swift_ssize_t>::value,
               "__swift_ssize_t is wrong");
