@@ -144,6 +144,12 @@ public:
            less(loc.Value.getPointer(), getEnd().Value.getPointer());
   }
 
+  bool contains(CharSourceRange Other) const {
+    auto less_equal = std::less_equal<const char *>();
+    return contains(Other.getStart()) &&
+     less_equal(Other.getEnd().Value.getPointer(), getEnd().Value.getPointer());
+  }
+
   /// \brief Return the length of this valid range in bytes.  Can be zero.
   unsigned getByteLength() const {
     assert(isValid() && "length does not make sense for an invalid range");

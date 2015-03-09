@@ -39,6 +39,7 @@
 #include "swift/ReST/Parser.h"
 #include "clang/APINotes/APINotesReader.h"
 #include "clang/APINotes/APINotesWriter.h"
+#include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
@@ -720,105 +721,111 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
 // Structure Annotation
 //============================================================================//
 
-class PrintStructureWalker : public ide::SyntaxModelWalker {
+class StructureAnnotator : public ide::SyntaxModelWalker {
   SourceManager &SM;
-  llvm::raw_ostream &OS;
-  unsigned indentLevel = 0;
+  unsigned BufferID;
+  clang::RewriteBuffer RewriteBuf;
+  std::vector<SyntaxStructureNode> NodeStack;
+
 public:
-  PrintStructureWalker(SourceManager &SM,
-                       llvm::raw_ostream &OS)
-    : SM(SM), OS(OS) {
+  StructureAnnotator(SourceManager &SM, unsigned BufID)
+    : SM(SM), BufferID(BufID) {
+    StringRef Input = SM.getLLVMSourceMgr().getMemoryBuffer(BufID)->getBuffer();
+    RewriteBuf.Initialize(Input);
+    removeCheckLines(Input);
   }
 
+  void printResult(raw_ostream &OS) {
+    RewriteBuf.write(OS);
+  }
+
+private:
   bool walkToSubStructurePre(SyntaxStructureNode Node) override {
-    auto Start = SM.getLineAndColumn(Node.Range.getStart());
-    auto End = SM.getLineAndColumn(Node.Range.getEnd());
+    const SyntaxStructureNode *Parent = nullptr;
+    if (!NodeStack.empty())
+      Parent = &NodeStack.back();
+    checkNode(Node, Parent);
+    NodeStack.push_back(Node);
 
-    OS << std::string(indentLevel * 2, ' ');
-    switch (Node.Kind) {
-    case swift::ide::SyntaxStructureKind::Class:
-      OS << "Class ";
-      break;
-    case swift::ide::SyntaxStructureKind::Struct:
-      OS << "Struct ";
-      break;
-    case swift::ide::SyntaxStructureKind::Protocol:
-      OS << "Protocol ";
-      break;
-    case swift::ide::SyntaxStructureKind::Enum:
-      OS << "Enum ";
-      break;
-    case swift::ide::SyntaxStructureKind::Extension:
-      OS << "Extension ";
-      break;
-    case swift::ide::SyntaxStructureKind::FreeFunction:
-      OS << "FFunc ";
-      break;
-    case swift::ide::SyntaxStructureKind::InstanceFunction:
-      OS << "IFunc ";
-      break;
-    case swift::ide::SyntaxStructureKind::StaticFunction:
-      OS << "SFunc ";
-      break;
-    case swift::ide::SyntaxStructureKind::ClassFunction:
-      OS << "CFunc ";
-      break;
-    case swift::ide::SyntaxStructureKind::GlobalVariable:
-      OS << "GVar ";
-      break;
-    case swift::ide::SyntaxStructureKind::InstanceVariable:
-      OS << "Property ";
-      break;
-    case swift::ide::SyntaxStructureKind::StaticVariable:
-      OS << "SVar ";
-      break;
-    case swift::ide::SyntaxStructureKind::ClassVariable:
-      OS << "CVar ";
-      break;
-    case swift::ide::SyntaxStructureKind::Parameter:
-      OS << "Parameter ";
-      break;
-    case swift::ide::SyntaxStructureKind::BraceStatement:
-      OS << "Brace ";
-      break;
-    case swift::ide::SyntaxStructureKind::CallExpression:
-      OS << "Call ";
-      break;
+    tagRange(Node.Range, getTagName(Node.Kind), Node);
+    if (Node.NameRange.isValid())
+      tagRange(Node.NameRange, "name", Node);
+    for (auto &TyRange : Node.InheritedTypeRanges) {
+      tagRange(TyRange, "inherited", Node);
     }
-
-    OS << "at " << Start.first << ":" << Start.second << " - " <<
-                   End.first << ":" << End.second;
-    if (Node.NameRange.isValid()) {
-      auto Start = SM.getLineAndColumn(Node.NameRange.getStart());
-      auto End = SM.getLineAndColumn(Node.NameRange.getEnd());
-
-      OS << ", name at " << Start.first << ":" << Start.second << " - " <<
-                            End.first << ":" << End.second;
-    }
-    if (!Node.InheritedTypeRanges.empty()) {
-      OS << ", inherited types at";
-      for (auto &Range : Node.InheritedTypeRanges) {
-        auto Start = SM.getLineAndColumn(Range.getStart());
-        auto End = SM.getLineAndColumn(Range.getEnd());
-
-        OS << " " << Start.first << ":" << Start.second << " - " <<
-                     End.first << ":" << End.second;
-
-      }
-    }
-
-    OS << "\n";
-    ++indentLevel;
 
     return true;
+  }
+
+  void tagRange(CharSourceRange Range, StringRef tagName,
+                const SyntaxStructureNode &Node) {
+    checkRange(Range, &Node);
+    std::string BeginTag;
+    llvm::raw_string_ostream(BeginTag) << '<' << tagName << '>';
+    std::string EndTag;
+    llvm::raw_string_ostream(EndTag) << "</" << tagName << '>';
+
+    unsigned Offset = SM.getLocOffsetInBuffer(Range.getStart(), BufferID);
+    RewriteBuf.InsertTextAfter(Offset, BeginTag);
+    RewriteBuf.InsertTextBefore(Offset+Range.getByteLength(), EndTag);
+  }
+
+  static StringRef getTagName(SyntaxStructureKind K) {
+    switch (K) {
+      case SyntaxStructureKind::Class: return "class";
+      case SyntaxStructureKind::Struct: return "struct";
+      case SyntaxStructureKind::Protocol: return "protocol";
+      case SyntaxStructureKind::Enum: return "enum";
+      case SyntaxStructureKind::Extension: return "extension";
+      case SyntaxStructureKind::FreeFunction: return "ffunc";
+      case SyntaxStructureKind::InstanceFunction: return "ifunc";
+      case SyntaxStructureKind::StaticFunction: return "sfunc";
+      case SyntaxStructureKind::ClassFunction: return "cfunc";
+      case SyntaxStructureKind::GlobalVariable: return "gvar";
+      case SyntaxStructureKind::InstanceVariable: return "property";
+      case SyntaxStructureKind::StaticVariable: return "svar";
+      case SyntaxStructureKind::ClassVariable: return "cvar";
+      case SyntaxStructureKind::Parameter: return "param";
+      case SyntaxStructureKind::BraceStatement: return "brace";
+      case SyntaxStructureKind::CallExpression: return "call";
+    }
+    llvm_unreachable("unhandled tag?");
   }
 
   bool walkToSubStructurePost(SyntaxStructureNode Node) override {
-    assert(indentLevel > 0);
-    --indentLevel;
+    NodeStack.pop_back();
     return true;
   }
 
+  static void checkNode(const SyntaxStructureNode &Node,
+                 const SyntaxStructureNode *Parent) {
+    checkRange(Node.Range, Parent);
+  }
+
+  static void checkRange(CharSourceRange Range,
+                         const SyntaxStructureNode *Parent) {
+    assert(Range.isValid());
+    if (Parent) {
+      assert(Parent->Range.contains(Range));
+    }
+  }
+
+  void removeCheckLines(StringRef Input) {
+    StringRef CheckStr = "CHECK";
+    size_t Pos = 0;
+    while (true) {
+      Pos = Input.find(CheckStr, Pos);
+      if (Pos == StringRef::npos)
+        break;
+      Pos = Input.substr(0, Pos).rfind("//");
+      assert(Pos != StringRef::npos);
+      size_t EndLine = Input.find('\n', Pos);
+      assert(EndLine != StringRef::npos);
+      ++EndLine;
+      RewriteBuf.RemoveText(Pos, EndLine-Pos);
+      Pos = EndLine;
+    }
+  }
 };
 
 static int doStructureAnnotation(const CompilerInvocation &InitInvok,
@@ -835,10 +842,12 @@ static int doStructureAnnotation(const CompilerInvocation &InitInvok,
     return 1;
   CI.performParseOnly();
 
+  unsigned BufID = CI.getInputBufferIDs().back();
   ide::SyntaxModelContext StructureContext(
       CI.getMainModule()->getMainSourceFile(SourceFileKind::Main));
-  PrintStructureWalker StructureWalker(CI.getSourceMgr(), llvm::outs());
-  StructureContext.walk(StructureWalker);
+  StructureAnnotator Annotator(CI.getSourceMgr(), BufID);
+  StructureContext.walk(Annotator);
+  Annotator.printResult(llvm::outs());
   return 0;
 }
 
