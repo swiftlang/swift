@@ -252,6 +252,20 @@ public struct MsgPackEncoder {
   }
 }
 
+internal func _safeUInt32ToInt(x: UInt32) -> Int? {
+#if arch(i386) || arch(arm)
+  if x > UInt32(Int.max) {
+    return nil
+  } else {
+    return Int(x)
+  }
+#elseif arch(x86_64) || arch(arm64)
+  return Int(x)
+#else
+  fatalError("unimplemented")
+#endif
+}
+
 /// A decoder for MessagePack.
 ///
 /// This decoder provides a StAX-like interface.
@@ -515,7 +529,7 @@ public struct MsgPackDecoder {
             // Reject overlong encodings.
             return nil
           }
-          return Int(length)
+          return _safeUInt32ToInt(length)
         }
       }
       return nil
@@ -544,7 +558,7 @@ public struct MsgPackDecoder {
             // Reject overlong encodings.
             return nil
           }
-          return Int(length)
+          return _safeUInt32ToInt(length)
         }
       }
       return nil

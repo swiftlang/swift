@@ -1378,8 +1378,15 @@ MsgPackTestSuite.test("Deserialize/Array/array32") {
   }
   if true {
     var d = MsgPackDecoder([ 0xdd, 0xff, 0xff, 0xff, 0xff ])
+#if arch(i386) || arch(arm)
+    expectEmpty(d.readBeginArray())
+    expectEqual(0, d.consumedCount)
+#elseif arch(x86_64) || arch(arm64)
     expectOptionalEqual(0xffff_ffff, d.readBeginArray())
     expectEqual(5, d.consumedCount)
+#else
+  fatalError("unimplemented")
+#endif
   }
 
   //
@@ -1524,8 +1531,15 @@ MsgPackTestSuite.test("Deserialize/Map/map32") {
   }
   if true {
     var d = MsgPackDecoder([ 0xdf, 0xff, 0xff, 0xff, 0xff ])
+#if arch(i386) || arch(arm)
+    expectEmpty(d.readBeginMap())
+    expectEqual(0, d.consumedCount)
+#elseif arch(x86_64) || arch(arm64)
     expectOptionalEqual(0xffff_ffff, d.readBeginMap())
     expectEqual(5, d.consumedCount)
+#else
+  fatalError("unimplemented")
+#endif
   }
 
   //
