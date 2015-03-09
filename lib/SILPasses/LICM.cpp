@@ -154,53 +154,17 @@ static bool sinkCondFail(SILLoop *Loop) {
   return Changed;
 }
 
-static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
-                              AliasAnalysis *AA) {
-  auto HeaderBB = Loop->getHeader();
-  if (!HeaderBB)
-    return false;
-
+static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT,
+                              ReadSet &SafeReads) {
   auto Preheader = Loop->getLoopPreheader();
-  if (!Preheader) {
-    // TODO: split off preheader
+  if (!Preheader)
     return false;
-  }
 
-  // Only analyze memory in innermost loops for now until we cache the
-  // information for subloops. For outer loops don't recognize safe reads but
-  // only hoist side-effect free expressions.
-  bool ShouldAnalyzeMemory = Loop->getSubLoops().empty();
+  DEBUG(llvm::dbgs() << " Hoisting instructions.\n");
 
-  DEBUG(llvm::dbgs() << "hoisting in " << *Loop);
-  DEBUG(HeaderBB->getParent()->dump());
-
-  // Collect loads that are not clobbered.
-  ReadSet SafeReads;
-  if (ShouldAnalyzeMemory) {
-    WriteSet Writes;
-    for (auto *BB : Loop->getBlocks()) {
-      for (auto &Inst : *BB) {
-        // Ignore fix_lifetime instructions.
-        if (isa<FixLifetimeInst>(&Inst))
-          continue;
-        // Collect loads.
-        auto LI = dyn_cast<LoadInst>(&Inst);
-        if (LI) {
-          if (!mayWriteTo(AA, Writes, LI))
-            SafeReads.insert(LI);
-          continue;
-        }
-
-        // Remove clobbered loads we have seen before.
-        removeWrittenTo(AA, SafeReads, &Inst);
-
-        if (Inst.mayHaveSideEffects())
-          Writes.push_back(&Inst);
-      }
-    }
-  }
-
+  auto HeaderBB = Loop->getHeader();
   bool Changed = false;
+
   // Traverse the dominator tree starting at the loop header. Hoisting
   // instructions as we go.
   auto DTRoot = DT->getNode(HeaderBB);
@@ -331,6 +295,7 @@ static bool sinkFixLiftime(SILLoop *Loop, DominanceInfo *DomTree,
     } else {
       DEBUG(llvm::errs() << "  does not dominate " << *FLI);
     }
+
   return Changed;
 }
 
@@ -457,8 +422,9 @@ void LoopTreeOptimization::analyzeCurrentLoop(
 
 void LoopTreeOptimization::optimizeLoop(SILLoop *CurrentLoop,
                                         ReadSet &SafeReads) {
-  (void)LoopInfo;
-  (void)DomTree;
+  Changed |= sinkCondFail(CurrentLoop);
+  Changed |= hoistInstructions(CurrentLoop, DomTree, SafeReads);
+  Changed |= sinkFixLiftime(CurrentLoop, DomTree, LoopInfo);
 }
 
 namespace {
@@ -482,25 +448,15 @@ public:
 
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>();
-    DominanceInfo *DomTree = DA->getDomInfo(F);
+    DominanceInfo *DomTree = nullptr;
+
+    DEBUG(llvm::dbgs() << "Processing loops in " << F->getName() << "\n");
     bool Changed = false;
 
-    for (auto *LoopIt : *LoopInfo) {
-      // Process loops recursively bottom-up in the loop tree.
-      SmallVector<SILLoop *, 8> Worklist;
-      Worklist.push_back(LoopIt);
-      for (unsigned i = 0; i < Worklist.size(); ++i) {
-        auto *L = Worklist[i];
-        for (auto *SubLoop : *L)
-          Worklist.push_back(SubLoop);
-      }
-
-      while (!Worklist.empty()) {
-        SILLoop *work = Worklist.pop_back_val();
-        Changed |= sinkCondFail(work);
-        Changed |= hoistInstructions(work, DomTree, LoopInfo, AA);
-        Changed |= sinkFixLiftime(work, DomTree, LoopInfo);
-      }
+    for (auto *TopLevelLoop : *LoopInfo) {
+      if (!DomTree) DomTree = DA->getDomInfo(F);
+      LoopTreeOptimization Opt(TopLevelLoop, LoopInfo, AA, DomTree);
+      Changed |= Opt.optimize();
     }
 
     if (Changed) {
