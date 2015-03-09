@@ -342,18 +342,9 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
 }
 
 Expr *ModelASTWalker::walkToExprPost(Expr *E) {
-  if (E->isImplicit())
-    return E;
-
-  if (isa<CallExpr>(E)) {
+  if (!SubStructureStack.empty() &&
+      SubStructureStack.back().ASTNode.getAsExpr() == E)
     popStructureNode();
-  }
-
-  if (dyn_cast_or_null<TupleExpr>(Parent.getAsExpr())) {
-    if (!SubStructureStack.empty() &&
-        SubStructureStack.back().ASTNode.getAsExpr() == E)
-      popStructureNode();
-  }
 
   return E;
 }
@@ -414,12 +405,9 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
 }
 
 Stmt *ModelASTWalker::walkToStmtPost(Stmt *S) {
-  if (isa<BraceStmt>(S) && shouldPassBraceStructureNode(cast<BraceStmt>(S)))
+  if (!SubStructureStack.empty() &&
+      SubStructureStack.back().ASTNode.getAsStmt() == S)
     popStructureNode();
-  else if (auto *SW = dyn_cast<SwitchStmt>(S)) {
-    if (SW->getLBraceLoc().isValid() && SW->getRBraceLoc().isValid())
-      popStructureNode();
-  }
 
   return S;
 }
@@ -605,27 +593,9 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
 }
 
 bool ModelASTWalker::walkToDeclPost(swift::Decl *D) {
-  if (isa<AbstractFunctionDecl>(D)) {
-    FuncDecl *FD = dyn_cast<FuncDecl>(D);
-    if (!(FD && FD->isAccessor())) {
-      popStructureNode();
-    }
-
-  } else if (isa<ParamDecl>(D)) {
+  if (!SubStructureStack.empty() &&
+      SubStructureStack.back().ASTNode.getAsDecl() == D)
     popStructureNode();
-
-  } else if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
-    const DeclContext *DC = VD->getDeclContext();
-    if (DC->isTypeContext() || DC->isModuleScopeContext()) {
-      popStructureNode();
-    }
-
-  } else if (isa<NominalTypeDecl>(D)) {
-    popStructureNode();
-
-  } else if (isa<ExtensionDecl>(D)) {
-    popStructureNode();
-  }
 
   return true;
 }
