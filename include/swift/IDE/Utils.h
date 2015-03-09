@@ -14,11 +14,13 @@
 #define SWIFT_IDE_UTILS_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/StringRef.h"
 #include <memory>
 #include <string>
 #include <functional>
 
 namespace llvm {
+  template<typename Fn> class function_ref;
   class MemoryBuffer;
 }
 
@@ -64,6 +66,29 @@ SourceCompleteResult isSourceInputComplete(StringRef Text);
 void walkOverriddenDecls(const ValueDecl *VD,
                          std::function<void(llvm::PointerUnion<
                              const ValueDecl*, const clang::NamedDecl*>)> Fn);
+
+struct PlaceholderOccurrence {
+  /// The complete placeholder string.
+  StringRef FullPlaceholder;
+  /// The inner string of the placeholder.
+  StringRef PlaceholderContent;
+  /// The dollar identifier that was used to replace the placeholder.
+  StringRef IdentifierReplacement;
+};
+
+/// Replaces Xcode editor placeholders (<#such as this#>) with dollar identifiers
+/// and returns a new memory buffer.
+///
+/// The replacement identifier will be the same size as the placeholder so that
+/// the new buffer will have the same size as the input buffer.
+std::unique_ptr<llvm::MemoryBuffer>
+  replacePlaceholders(std::unique_ptr<llvm::MemoryBuffer> InputBuf,
+              llvm::function_ref<void(const PlaceholderOccurrence &)> Callback);
+
+std::unique_ptr<llvm::MemoryBuffer>
+  replacePlaceholders(std::unique_ptr<llvm::MemoryBuffer> InputBuf,
+                      bool *HadPlaceholder = nullptr);
+
 
 } // namespace ide
 } // namespace swift

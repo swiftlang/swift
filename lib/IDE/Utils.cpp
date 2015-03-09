@@ -17,6 +17,7 @@
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 using namespace swift;
@@ -205,4 +206,95 @@ ide::walkOverriddenDecls(const ValueDecl *VD,
     for (auto Conf: const_cast<ValueDecl*>(CurrOver)->getConformances())
       Fn(Conf);
   }
+}
+
+/// \returns true if a placeholder was found.
+static bool findPlaceholder(StringRef Input, PlaceholderOccurrence &Occur) {
+  while (true) {
+    size_t Pos = Input.find("<#");
+    if (Pos == StringRef::npos)
+      return false;
+
+    const char *Begin = Input.begin() + Pos;
+    const char *Ptr = Begin + 2;
+    const char *End = Input.end();
+    for (; Ptr < End-1; ++Ptr) {
+      if (*Ptr == '\n')
+        break;
+      if (Ptr[0] == '<' && Ptr[1] == '#')
+        break;
+      if (Ptr[0] == '#' && Ptr[1] == '>') {
+        // Found it.
+        Occur.FullPlaceholder = Input.substr(Pos, Ptr-Begin + 2);
+        Occur.PlaceholderContent =
+          Occur.FullPlaceholder.drop_front(2).drop_back(2);
+        return true;
+      }
+    }
+
+    // Try again.
+    Input = Input.substr(Ptr - Input.begin());
+  }
+}
+
+std::unique_ptr<llvm::MemoryBuffer>
+ide::replacePlaceholders(std::unique_ptr<llvm::MemoryBuffer> InputBuf,
+             llvm::function_ref<void(const PlaceholderOccurrence &)> Callback) {
+  StringRef Input = InputBuf->getBuffer();
+  PlaceholderOccurrence Occur;
+  bool Found = findPlaceholder(Input, Occur);
+  if (!Found)
+    return InputBuf;
+
+  std::unique_ptr<llvm::MemoryBuffer> NewBuf =
+    llvm::MemoryBuffer::getMemBufferCopy(InputBuf->getBuffer(),
+                                         InputBuf->getBufferIdentifier());
+
+  unsigned Counter = 0;
+  auto replacePlaceholder = [&](PlaceholderOccurrence &Occur) {
+    llvm::SmallString<10> Id;
+    Id = "$_";
+    llvm::raw_svector_ostream(Id) << (Counter++);
+    assert(Occur.FullPlaceholder.size() >= 2);
+    if (Id.size() > Occur.FullPlaceholder.size()) {
+      // The identifier+counter exceeds placeholder size; replace it without
+      // using the counter.
+      Id = "$";
+      Id.append(Occur.FullPlaceholder.size()-1, '_');
+    } else {
+      Id.append(Occur.FullPlaceholder.size()-Id.size(), '_');
+    }
+    assert(Id.size() == Occur.FullPlaceholder.size());
+
+    unsigned Offset = Occur.FullPlaceholder.data() - InputBuf->getBufferStart();
+    char *Ptr = (char*)NewBuf->getBufferStart() + Offset;
+    std::copy(Id.begin(), Id.end(), Ptr);
+
+    Occur.IdentifierReplacement = Id.str();
+    Callback(Occur);
+  };
+
+  while (true) {
+    replacePlaceholder(Occur);
+    unsigned Offset = Occur.FullPlaceholder.data() - InputBuf->getBufferStart();
+    Input = InputBuf->getBuffer().substr(Offset+Occur.FullPlaceholder.size());
+
+    bool Found = findPlaceholder(Input, Occur);
+    if (!Found)
+      break;
+  }
+
+  return NewBuf;
+}
+
+std::unique_ptr<llvm::MemoryBuffer>
+ide::replacePlaceholders(std::unique_ptr<llvm::MemoryBuffer> InputBuf,
+                         bool *HadPlaceholder) {
+  if (HadPlaceholder)
+    *HadPlaceholder = false;
+  return replacePlaceholders(std::move(InputBuf),
+                             [&](const PlaceholderOccurrence &){
+    if (HadPlaceholder)
+      *HadPlaceholder = true;
+  });
 }
