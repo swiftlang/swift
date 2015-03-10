@@ -173,7 +173,7 @@ public:
   Pattern *visit##Id##Pattern(Id##Pattern *P) { return P; }
   ALWAYS_RESOLVED_PATTERN(Named)
   ALWAYS_RESOLVED_PATTERN(Any)
-  ALWAYS_RESOLVED_PATTERN(Isa)
+  ALWAYS_RESOLVED_PATTERN(Is)
   ALWAYS_RESOLVED_PATTERN(Paren)
   ALWAYS_RESOLVED_PATTERN(Tuple)
   ALWAYS_RESOLVED_PATTERN(NominalType)
@@ -242,7 +242,7 @@ public:
       return nullptr;
     
     Pattern *subPattern = getSubExprPattern(E->getElement(0));
-    return new (TC.Context) IsaPattern(cast->getLoc(),
+    return new (TC.Context) IsPattern(cast->getLoc(),
                                        cast->getCastTypeLoc(),
                                        subPattern,
                                        CheckedCastKind::Unresolved);
@@ -663,7 +663,7 @@ static bool coercePatternViaConditionalDowncast(TypeChecker &tc,
                                                 DeclContext *dc,
                                                 Type type,
                                                 TypeResolutionOptions options) {
-  auto isa = cast<IsaPattern>(pattern);
+  auto isa = cast<IsPattern>(pattern);
 
   // FIXME: We can't handle subpatterns here.
   if (isa->getSubPattern()) {
@@ -939,8 +939,8 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
   }
       
   // Coerce an 'is' pattern by determining the cast kind.
-  case PatternKind::Isa: {
-    auto IP = cast<IsaPattern>(P);
+  case PatternKind::Is: {
+    auto IP = cast<IsPattern>(P);
 
     // Type-check the type parameter.
     if (validateType(IP->getCastTypeLoc(), dc, TR_InExpression))
@@ -1141,7 +1141,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     }
     
     // Check that the type matches the pattern type.
-    // FIXME: We could insert an IsaPattern if a checked cast can do the
+    // FIXME: We could insert an IsPattern if a checked cast can do the
     // conversion.
     
     // If a generic type name was given without arguments, allow a match to

@@ -115,9 +115,9 @@ static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
     }
     return;
   }
-  case PatternKind::Isa:
+  case PatternKind::Is:
     os << "is ";
-    cast<IsaPattern>(p)->getCastTypeLoc().getType()->print(os);
+    cast<IsPattern>(p)->getCastTypeLoc().getType()->print(os);
     break;
   case PatternKind::NominalType: {
     auto np = cast<NominalTypePattern>(p);
@@ -165,7 +165,7 @@ static bool isDirectlyRefutablePattern(const Pattern *p) {
     return false;
 
   // isa and enum-element patterns are refutable, at least in theory.
-  case PatternKind::Isa:
+  case PatternKind::Is:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
     return true;
@@ -216,8 +216,8 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
   }
 
   // isa and enum-element patterns are refutable, at least in theory.
-  case PatternKind::Isa: {
-    auto isa = cast<IsaPattern>(p);
+  case PatternKind::Is: {
+    auto isa = cast<IsPattern>(p);
     n++;
     if (auto sub = isa->getSubPattern())
       return getNumSpecializationsRecursive(sub, n);
@@ -270,7 +270,7 @@ static bool isWildcardPattern(const Pattern *p) {
   
   // Non-wildcards.
   case PatternKind::Tuple:
-  case PatternKind::Isa:
+  case PatternKind::Is:
   case PatternKind::NominalType:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
@@ -1049,7 +1049,7 @@ void SwitchEmission::bindRefutablePattern(Pattern *pattern,
   case PatternKind::NominalType:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
-  case PatternKind::Isa:
+  case PatternKind::Is:
     llvm_unreachable("didn't specialize specializable pattern?");
 
   // Non-semantic patterns.
@@ -1109,7 +1109,7 @@ void SwitchEmission::bindIrrefutablePattern(Pattern *pattern,
   case PatternKind::NominalType:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
-  case PatternKind::Isa:
+  case PatternKind::Is:
     llvm_unreachable("didn't specialize specializable pattern?");
 
   // Non-semantic patterns.
@@ -1256,7 +1256,7 @@ void SwitchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
   
   case PatternKind::Tuple:
     return emitTupleDispatch(rowsToSpecialize, arg, handler, failure);
-  case PatternKind::Isa:
+  case PatternKind::Is:
     return emitIsaDispatch(rowsToSpecialize, arg, handler, failure);
   case PatternKind::NominalType:
     return emitNominalTypeDispatch(rowsToSpecialize, arg, handler, failure);
@@ -1436,7 +1436,7 @@ void SwitchEmission::emitNominalTypeDispatch(ArrayRef<RowToSpecialize> rows,
 }
 
 static CanType getTargetType(const RowToSpecialize &row) {
-  auto type = cast<IsaPattern>(row.Pattern)->getCastTypeLoc().getType();
+  auto type = cast<IsPattern>(row.Pattern)->getCastTypeLoc().getType();
   return type->getCanonicalType();
 }
 
@@ -1501,7 +1501,7 @@ emitSerialCastOperand(SILGenFunction &SGF, SILLocation loc,
   return ConsumableManagedValue::forOwned(origValue);
 }
 
-/// Perform specialized dispatch for a sequence of IsaPatterns.
+/// Perform specialized dispatch for a sequence of IsPatterns.
 void SwitchEmission::emitIsaDispatch(ArrayRef<RowToSpecialize> rows,
                                      ConsumableManagedValue src,
                                      const SpecializationHandler &handleCase,
@@ -1534,7 +1534,7 @@ void SwitchEmission::emitIsaDispatch(ArrayRef<RowToSpecialize> rows,
     specializedRows.resize(specEnd - specBegin);
     for (unsigned i = specBegin; i != specEnd; ++i) {
       auto &specRow = specializedRows[i - specBegin];
-      auto isa = cast<IsaPattern>(rows[i].Pattern);
+      auto isa = cast<IsPattern>(rows[i].Pattern);
       specRow.RowIndex = rows[i].RowIndex;
       specRow.Patterns.push_back(isa->getSubPattern());
       isIrrefutable = (isIrrefutable || rows[i].Irrefutable);

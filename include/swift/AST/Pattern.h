@@ -397,7 +397,7 @@ public:
 
 /// A pattern which matches a sub-pattern and annotates it with a
 /// type. It is a compile-time error if the pattern does not statically match
-/// a value of the type. This is different from IsaPattern, which is a refutable
+/// a value of the type. This is different from IsPattern, which is a refutable
 /// dynamic type match.
 class TypedPattern : public Pattern {
   Pattern *SubPattern;
@@ -450,7 +450,7 @@ public:
 /// class, archetype, or existential value is dynamically of the given type.
 ///
 /// TODO: Introduce type refinement of the value being matched.
-class IsaPattern : public Pattern {
+class IsPattern : public Pattern {
   SourceLoc IsLoc;
   
   Pattern *SubPattern;
@@ -463,11 +463,11 @@ class IsaPattern : public Pattern {
   TypeLoc CastType;
   
 public:
-  IsaPattern(SourceLoc IsLoc, TypeLoc CastTy,
+  IsPattern(SourceLoc IsLoc, TypeLoc CastTy,
              Pattern *SubPattern,
              CheckedCastKind Kind = CheckedCastKind::Unresolved,
              Optional<bool> implicit = None)
-    : Pattern(PatternKind::Isa),
+    : Pattern(PatternKind::Is),
       IsLoc(IsLoc),
       SubPattern(SubPattern),
       CastKind(Kind),
@@ -494,7 +494,7 @@ public:
   TypeLoc getCastTypeLoc() const { return CastType; }
   
   static bool classof(const Pattern *P) {
-    return P->getKind() == PatternKind::Isa;
+    return P->getKind() == PatternKind::Is;
   }
 };
 

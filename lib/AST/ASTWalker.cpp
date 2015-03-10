@@ -1001,7 +1001,7 @@ Pattern *Traversal::visitTypedPattern(TypedPattern *P) {
   return P;
 }
 
-Pattern *Traversal::visitIsaPattern(IsaPattern *P) {
+Pattern *Traversal::visitIsPattern(IsPattern *P) {
   return P;
 }
 

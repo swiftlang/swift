@@ -34,7 +34,7 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, PatternKind kind) {
     return OS << "'_' pattern";
   case PatternKind::Typed:
     return OS << "pattern type annotation";
-  case PatternKind::Isa:
+  case PatternKind::Is:
     return OS << "prefix 'is' pattern";
   case PatternKind::NominalType:
     return OS << "type destructuring pattern";
@@ -124,7 +124,7 @@ VarDecl *Pattern::getSingleVar() const {
 void Pattern::forEachVariable(const std::function<void(VarDecl*)> &fn) const {
   switch (getKind()) {
   case PatternKind::Any:
-  case PatternKind::Isa:
+  case PatternKind::Is:
   case PatternKind::Expr:
     return;
 
@@ -168,7 +168,7 @@ void Pattern::forEachNode(const std::function<void(Pattern*)> &f) {
   // Leaf patterns have no recursion.
   case PatternKind::Any:
   case PatternKind::Named:
-  case PatternKind::Isa:
+  case PatternKind::Is:
   case PatternKind::Expr:// FIXME: expr nodes are not modeled right in general.
     return;
 
@@ -326,9 +326,9 @@ Pattern *Pattern::clone(ASTContext &context,
     break;
   }
       
-  case PatternKind::Isa: {
-    auto isa = cast<IsaPattern>(this);
-    result = new(context) IsaPattern(isa->getLoc(),
+  case PatternKind::Is: {
+    auto isa = cast<IsPattern>(this);
+    result = new(context) IsPattern(isa->getLoc(),
                                      isa->getCastTypeLoc().clone(context),
                                      isa->getSubPattern()->clone(context,
                                                                  options),
@@ -410,7 +410,7 @@ Pattern *Pattern::cloneForwardable(ASTContext &context, DeclContext *DC,
   Pattern *result;
   switch (getKind()) {
   case PatternKind::Any:
-  case PatternKind::Isa:
+  case PatternKind::Is:
   case PatternKind::NominalType:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
@@ -493,7 +493,7 @@ Pattern *Pattern::cloneForwardable(ASTContext &context, DeclContext *DC,
 Expr *Pattern::buildForwardingRefExpr(ASTContext &context) const {
   switch (getKind()) {
   case PatternKind::Any:
-  case PatternKind::Isa:
+  case PatternKind::Is:
   case PatternKind::NominalType:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:

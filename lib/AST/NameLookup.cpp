@@ -280,7 +280,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
       return;
     }
     // Handle non-vars.
-    case PatternKind::Isa:
+    case PatternKind::Is:
     case PatternKind::Expr:
     case PatternKind::Any:
       return;

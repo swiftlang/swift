@@ -987,7 +987,7 @@ namespace decls_block {
     // The sub-pattern trails the record.
   >;
 
-  using IsaPatternLayout = BCRecordLayout<
+  using IsPatternLayout = BCRecordLayout<
     ISA_PATTERN,
     TypeIDField, // type
     BCFixed<1>   // implicit?

@@ -463,8 +463,8 @@ void PrintAST::printPattern(const Pattern *pattern) {
     printTypedPattern(cast<TypedPattern>(pattern));
     break;
 
-  case PatternKind::Isa: {
-    auto isa = cast<IsaPattern>(pattern);
+  case PatternKind::Is: {
+    auto isa = cast<IsPattern>(pattern);
     Printer << "is ";
     isa->getCastTypeLoc().getType().print(Printer, Options);
     break;

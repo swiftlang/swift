@@ -807,11 +807,11 @@ void Serializer::writePattern(const Pattern *pattern) {
     writePattern(typed->getSubPattern());
     break;
   }
-  case PatternKind::Isa: {
-    auto isa = cast<IsaPattern>(pattern);
+  case PatternKind::Is: {
+    auto isa = cast<IsPattern>(pattern);
 
-    unsigned abbrCode = DeclTypeAbbrCodes[IsaPatternLayout::Code];
-    IsaPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
+    unsigned abbrCode = DeclTypeAbbrCodes[IsPatternLayout::Code];
+    IsPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                  addTypeRef(isa->getCastTypeLoc().getType()),
                                  isa->isImplicit());
     break;
