@@ -347,24 +347,16 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   // actual dynamic type.
   auto SubTypeValue = ClassInstance.stripUpCasts();
   SILType SubType = SubTypeValue.getType();
-
-  // Bail if any generic types parameters of the class instance type are
-  // unbound.
-  // We cannot devirtualize unbound generic calls yet.
-  if (isClassWithUnboundGenericParameters(SubType, AI->getModule()))
-    return false;
-
   ClassDecl *CD = SubType.getClassOrBoundGenericClass();
-
-  // Check if it is legal to insert inline caches.
-  if (!CD)
-    return false;
 
   if (auto *VMTI = dyn_cast<ValueMetatypeInst>(SubTypeValue)) {
     CanType InstTy = VMTI->getType().castTo<MetatypeType>().getInstanceType();
     CD = InstTy.getClassOrBoundGenericClass();
-    assert(CD && "Non-class type for instance type of class metatype?!");
   }
+
+  // Check if it is legal to insert inline caches.
+  if (!CD)
+    return false;
 
   if (ClassInstance != SubTypeValue) {
     // The implementation of a method to be invoked may actually
@@ -379,6 +371,12 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
         return false;
     }
   }
+
+  // Bail if any generic types parameters of the class instance type are
+  // unbound.
+  // We cannot devirtualize unbound generic calls yet.
+  if (isClassWithUnboundGenericParameters(SubType, AI->getModule()))
+    return false;
 
   if (!CHA->hasKnownDirectSubclasses(CD)) {
     // If there is only one possible alternative for this method,
