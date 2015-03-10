@@ -178,7 +178,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
     // Redundant specifiers are fairly common, recognize, reject, and recover
     // from this gracefully.
-    if (Tok.is(tok::kw_inout) || Tok.is(tok::kw_let) || Tok.is(tok::kw_var)) {
+    if (Tok.isAny(tok::kw_inout, tok::kw_let, tok::kw_var)) {
       diagnose(Tok, diag::parameter_inout_var_let)
         .fixItRemove(Tok.getLoc());
       consumeToken();
@@ -685,7 +685,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   }
 
   // If there's a trailing arrow, parse the rest as the result type.
-  if (Tok.is(tok::arrow) || Tok.is(tok::colon)) {
+  if (Tok.isAny(tok::arrow, tok::colon)) {
     if (!consumeIf(tok::arrow)) {
       // FixIt ':' to '->'.
       diagnose(Tok, diag::func_decl_expected_arrow)
@@ -758,7 +758,7 @@ Parser::parseConstructorArguments(DeclName &FullName, Pattern *&BodyPattern,
 ///   pattern ::= 'let' pattern
 ParserResult<Pattern> Parser::parsePattern(bool isLet) {
   // If this is a let or var pattern parse it.
-  if (Tok.is(tok::kw_let) || Tok.is(tok::kw_var))
+  if (Tok.isAny(tok::kw_let, tok::kw_var))
     return parsePatternVarOrLet();
   
   // First, parse the pattern atom.
@@ -786,7 +786,7 @@ ParserResult<Pattern> Parser::parsePattern(bool isLet) {
 }
 
 ParserResult<Pattern> Parser::parsePatternVarOrLet() {
-  assert((Tok.is(tok::kw_let) || Tok.is(tok::kw_var)) && "expects let or var");
+  assert(Tok.isAny(tok::kw_let, tok::kw_var) && "expects let or var");
   bool isLet = Tok.is(tok::kw_let);
   SourceLoc varLoc = consumeToken();
 
@@ -959,7 +959,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
 
   // Parse productions that can only be patterns.
   // matching-pattern ::= matching-pattern-var
-  if (Tok.is(tok::kw_var) || Tok.is(tok::kw_let))
+  if (Tok.isAny(tok::kw_var, tok::kw_let))
     return parseMatchingPatternVarOrLet();
 
   // matching-pattern ::= 'is' type
@@ -979,7 +979,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
 }
 
 ParserResult<Pattern> Parser::parseMatchingPatternVarOrLet() {
-  assert((Tok.isAny(tok::kw_let, tok::kw_var)) && "expects var or let");
+  assert(Tok.isAny(tok::kw_let, tok::kw_var) && "expects var or let");
   bool isLet = Tok.is(tok::kw_let);
   SourceLoc varLoc = consumeToken();
 
@@ -1009,7 +1009,7 @@ ParserResult<Pattern> Parser::parseMatchingPatternIs() {
 }
 
 bool Parser::isOnlyStartOfMatchingPattern() {
-  return Tok.is(tok::kw_var) || Tok.is(tok::kw_let) || Tok.is(tok::kw_is);
+  return Tok.isAny(tok::kw_var, tok::kw_let, tok::kw_is);
 }
 
 bool Parser::canParsePattern() {
