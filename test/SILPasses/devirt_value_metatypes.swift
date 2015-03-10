@@ -44,3 +44,18 @@ public func testD(x: D) -> Int {
   return (x.dynamicType as C.Type).foo()
 }
 
+
+final class E : C {
+  @inline(never)
+  override class func foo() -> Int { return 1 }
+}
+
+// CHECK-LABEL: sil hidden @_TF22devirt_value_metatypes5testEFCS_1ESi
+// CHECK-NOT: value_metatype $@thick E.Type
+// CHECK_NOT: checked_cast_br
+// CHECK: function_ref
+// CHECK: apply
+// CHECK: return
+internal func testE(x: E) -> Int {
+  return (x.dynamicType as C.Type).foo()
+}

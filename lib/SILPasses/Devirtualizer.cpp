@@ -251,6 +251,9 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
   auto *Method = CMI->getMember().getFuncDecl();
   const DeclContext *DC = AI->getModule().getAssociatedContext();
 
+  if (CD->isFinal())
+    return true;
+
   // Without an associated context we cannot perform any
   // access-based optimizations.
   if (!DC)
@@ -381,6 +384,14 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
     return false;
 
   if (!CHA->hasKnownDirectSubclasses(CD)) {
+    // If there is only one possible alternative for this method,
+    // try to devirtualize it completely.
+    ClassHierarchyAnalysis::ClassList Subs;
+    if (isDefaultCaseKnown(CHA, AI, CD, Subs)) {
+      ApplyInst *NewAI = devirtualizeClassMethod(AI, ClassInstance, CD);
+      return NewAI != nullptr;
+    }
+
     DEBUG(llvm::dbgs() << "Inserting monomorphic inline caches for class " <<
           CD->getName() << "\n");
     return insertMonomorphicInlineCaches(AI, InstanceType);
