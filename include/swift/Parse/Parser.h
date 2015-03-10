@@ -1003,7 +1003,7 @@ public:
   // Pattern Parsing
 
   ParserResult<Pattern> parseMatchingPattern();
-  ParserResult<Pattern> parseMatchingPatternVarOrVal();
+  ParserResult<Pattern> parseMatchingPatternVarOrLet();
   ParserResult<Pattern> parseMatchingPatternIs();
   
   /// \brief Determine whether this token can only start a matching pattern
