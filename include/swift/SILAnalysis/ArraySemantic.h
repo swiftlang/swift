@@ -100,6 +100,12 @@ public:
   /// Is this an semantics call.
   operator bool() { return SemanticsCall != nullptr; }
 
+  /// Return whether this semantic call may release an object such that this is
+  /// observable from the caller. A balanced retain release is not observable
+  /// from the caller. A release for an @owned parameter is observable from the
+  /// caller.
+  bool isMayRelease();
+
 protected:
   /// Validate the signature of this call.
   bool isValidSignature();
