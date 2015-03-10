@@ -200,9 +200,6 @@ DECL_ATTR(__objc_bridged, ObjCBridged, OnClass | NotSerialized | RejectByParser,
 SIMPLE_DECL_ATTR(NSApplicationMain, NSApplicationMain,
                  OnClass, 52)
 
-SIMPLE_DECL_ATTR(__error_protocol, ErrorProtocol,
-                 OnProtocol | UserInaccessible, 54)
-
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef SIMPLE_DECL_ATTR

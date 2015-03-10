@@ -4599,7 +4599,6 @@ public:
     UNINTERESTING_ATTR(UIApplicationMain)
     UNINTERESTING_ATTR(ObjCNonLazyRealization)
     UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)
-    UNINTERESTING_ATTR(ErrorProtocol)
 
     UNINTERESTING_ATTR(Prefix)
     UNINTERESTING_ATTR(Postfix)

@@ -510,12 +510,6 @@ ERROR(ibaction_nonobject_argument,sema_tcd,none,
 ERROR(no_objc_tagged_pointer_not_class_protocol,sema_tcd,none,
       "@unsafe_no_objc_tagged_pointer can only be applied to class protocols",
       ())
-ERROR(error_protocol_not_protocol,sema_tcd,none,
-      "@__error_protocol can only be applied to protocols", ())
-ERROR(error_protocol_cannot_have_mutating_members,sema_tcd,none,
-      "@__error_protocol cannot contain mutating methods", ())
-NOTE(error_protocol_mutating_member_here,sema_tcd,none,
-      "mutating method here", ())
 ERROR(access_control_in_protocol,sema_tcd,none,
       "%0 modifier cannot be used in protocols", (DeclAttribute))
 ERROR(access_control_setter,sema_tcd,none,
