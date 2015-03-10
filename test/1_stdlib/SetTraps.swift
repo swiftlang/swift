@@ -160,7 +160,8 @@ SetTraps.test("BridgedKeyIsNotNSCopyable1") {
 
   // Unlike NSDictionary, NSSet does not require NSCopying from its element
   // type.
-  expectEqual(10, (nss.mutableCopy().anyObject as! TestObjCKeyTy).value)
+  let copiedSet = nss.mutableCopy() as! NSMutableSet
+  expectEqual(10, (copiedSet.anyObject() as! TestObjCKeyTy).value)
 }
 
 SetTraps.test("Downcast1") {
