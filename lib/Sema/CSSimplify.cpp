@@ -1352,6 +1352,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           return SolutionKind::Error;
         }
 
+        // A constraint that binds any pointer to a void pointer is
+        // ineffective, since any pointer can be converted to a void pointer.
+        if (kind == TypeMatchKind::BindToPointerType &&
+            desugar2->isEqual(getASTContext().TheEmptyTupleType)) {
+          return SolutionKind::Unsolved;
+        }
+
         assignFixedType(typeVar1, type2);
         return SolutionKind::Solved;
       }

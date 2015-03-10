@@ -170,3 +170,13 @@ func takeArrayRef(inout x:Array<String>) { }
 
 // FIXME: Poor diagnostic.
 takeArrayRef(["asdf", "1234"]) // expected-error{{cannot invoke 'takeArrayRef' with an argument list of type '([String])'}} expected-note{{expected an argument list of type '(inout Array<String>)'}}
+
+// <rdar://problem/19835413> Reference to value from array changed
+func rdar19835413() {
+  func f1(p: UnsafeMutablePointer<Void>) {}
+  func f2(var a: [Int], i: Int) {
+    f1(&a)
+    f1(&a[i])
+    f1(&a[0])
+  }
+}

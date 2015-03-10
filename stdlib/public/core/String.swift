@@ -298,8 +298,8 @@ public func ==(lhs: String, rhs: String) -> Bool {
       return false
     }
     return memcmp(
-      UnsafeMutablePointer(lhs._core.startASCII),
-      UnsafeMutablePointer(rhs._core.startASCII),
+      UnsafeMutablePointer<UTF8.CodeUnit>(lhs._core.startASCII),
+      UnsafeMutablePointer<UTF8.CodeUnit>(rhs._core.startASCII),
       rhs._core.count) == 0
   }
   return lhs._compareString(rhs) == 0
@@ -322,8 +322,8 @@ extension String {
   public // @testable
   func _compareASCII(rhs: String) -> Int {
     var compare = Int(memcmp(
-      UnsafeMutablePointer(self._core.startASCII),
-      UnsafeMutablePointer(rhs._core.startASCII),
+      UnsafeMutablePointer<UTF8.CodeUnit>(self._core.startASCII),
+      UnsafeMutablePointer<UTF8.CodeUnit>(rhs._core.startASCII),
       min(self._core.count, rhs._core.count)))
     if compare == 0 {
       compare = self._core.count - rhs._core.count
