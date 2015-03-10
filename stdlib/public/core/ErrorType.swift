@@ -12,6 +12,6 @@
 
 // The protocol for error values that can be thrown.
 // TODO: doc comment
-protocol ErrorType {
+public protocol _ErrorType {
   // TODO
 }
