@@ -177,10 +177,12 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
                                        DevirtClassMethodInfo &DCMI) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
 
+  SILModule &Mod = AI->getModule();
+
   // Bail if any generic types parameters of the class instance type are
   // unbound.
   // We cannot devirtualize unbound generic calls yet.
-  if (isClassWithUnboundGenericParameters(ClassInstanceType, AI->getModule()))
+  if (isClassWithUnboundGenericParameters(ClassInstanceType, Mod))
     return false;
 
   auto *CMI = cast<ClassMethodInst>(AI->getCallee());
@@ -192,9 +194,6 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
 
   assert(CD && "Invalid class type");
 
-  // Otherwise lookup from the module the least derived implementing method from
-  // the module vtables.
-  SILModule &Mod = AI->getModule();
   // Find the implementation of the member which should be invoked.
   SILFunction *F = Mod.lookUpFunctionInVTable(CD, Member);
 
@@ -207,9 +206,8 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
   }
 
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
-  SILModule &M = F->getModule();
 
-  auto Subs = getSubstitutionsForSuperclass(M, GenCalleeType,
+  auto Subs = getSubstitutionsForSuperclass(Mod, GenCalleeType,
                                             ClassInstanceType, AI);
 
   // For polymorphic functions, bail if the number of substitutions is
@@ -221,13 +219,12 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
       return false;
   }
 
-  Module *Module = M.getSwiftModule();
-
   DCMI.F = F;
   DCMI.Substitutions = Subs;
 
   DCMI.SubstCalleeType =
-    GenCalleeType->substGenericArgs(M, Module, DCMI.Substitutions);
+    GenCalleeType->substGenericArgs(Mod, Mod.getSwiftModule(),
+                                    DCMI.Substitutions);
 
   // If F's this pointer has a different type from CMI's operand and the
   // "this" pointer type is a super class of the CMI's operand, insert an
