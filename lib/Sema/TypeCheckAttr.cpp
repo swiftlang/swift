@@ -70,6 +70,7 @@ public:
   IGNORED_ATTR(Postfix)
   IGNORED_ATTR(Prefix)
   IGNORED_ATTR(RequiresStoredPropertyInits)
+  IGNORED_ATTR(ErrorProtocol)
 #undef IGNORED_ATTR
 
   void visitAutoClosureAttr(AutoClosureAttr *attr) {
@@ -594,6 +595,7 @@ public:
   void visitUIApplicationMainAttr(UIApplicationMainAttr *attr);
 
   void visitUnsafeNoObjCTaggedPointerAttr(UnsafeNoObjCTaggedPointerAttr *attr);
+  void visitErrorProtocolAttr(ErrorProtocolAttr *attr);
 
   void checkOperatorAttribute(DeclAttribute *attr);
 
@@ -780,6 +782,33 @@ void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(
     TC.diagnose(attr->getLocation(),
                 diag::no_objc_tagged_pointer_not_class_protocol);
     attr->setInvalid();    
+  }
+}
+
+void AttributeChecker::visitErrorProtocolAttr(ErrorProtocolAttr *attr) {
+  // The error protocol uses a boxed representation, so in order to maintain
+  // value semantics when value types, the protocol must not expose any
+  // mutating members.
+  auto proto = dyn_cast<ProtocolDecl>(D);
+  if (!proto) {
+    TC.diagnose(attr->getLocation(),
+                diag::error_protocol_not_protocol);
+    attr->setInvalid();
+    return;
+  }
+  
+  for (auto member : proto->getMembers()) {
+    auto fd = dyn_cast<FuncDecl>(member);
+    if (!fd)
+      continue;
+    if (fd->isMutating()) {
+      TC.diagnose(attr->getLocation(),
+                  diag::error_protocol_cannot_have_mutating_members);
+      TC.diagnose(fd->getLoc(),
+                  diag::error_protocol_mutating_member_here);
+      attr->setInvalid();
+      return;
+    }
   }
 }
 
