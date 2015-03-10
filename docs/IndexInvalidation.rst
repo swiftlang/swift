@@ -60,6 +60,7 @@ user:
 (3) If an index ``I`` is valid for a collection ``C``, indices obtained from
     ``I`` via ``I.successor()``, ``I.predecessor()``, and other index-specific
     APIs, are valid for ``C``.
+    FIXME: disallow startIndex.predecessor(), endIndex.successor()
 
 (4) If an index ``I`` is valid for a collection ``C``, it is also valid for
     a copy of ``C``.
@@ -91,6 +92,8 @@ Additional guarantees for ``Swift.String``
 **Slicing does not invalidate indexes.**  If an index ``I`` is valid for a
 ``String`` ``S``, it is also valid for a ``String`` instance obtained by
 slicing ``S``.
+
+FIXME: index should be in bounds of the slice.
 
 Additional guarantees for ``Swift.Array``, ``Swift.ContiguousArray``, ``Swift.Slice``
 =====================================================================================
