@@ -370,9 +370,6 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
       if (!ClassInstance.getType().isSuperclassOf(SubType))
         return false;
     }
-    // ClassInstance and SubType should match for
-    // devirtualizeClassMethod to work.
-    ClassInstance = SubTypeValue;
   }
 
   // Bail if any generic types parameters of the class instance type are
@@ -386,7 +383,7 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
     // try to devirtualize it completely.
     ClassHierarchyAnalysis::ClassList Subs;
     if (isDefaultCaseKnown(CHA, AI, CD, Subs)) {
-      ApplyInst *NewAI = devirtualizeClassMethod(AI, ClassInstance, CD);
+      ApplyInst *NewAI = devirtualizeClassMethod(AI, SubTypeValue, CD);
       return NewAI != nullptr;
     }
 
@@ -487,7 +484,7 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   // implementation which is not covered by checked_cast_br checks yet.
   // So, it is safe to replace a class_method invocation by
   // a direct call of this remaining implementation.
-  ApplyInst *NewAI = devirtualizeClassMethod(AI, ClassInstance, CD);
+  ApplyInst *NewAI = devirtualizeClassMethod(AI, SubTypeValue, CD);
   assert(NewAI && "Expected to be able to devirtualize apply!");
   (void) NewAI;
 
