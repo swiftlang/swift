@@ -35,6 +35,8 @@
 #include "SwiftTargetInfo.h"
 #include "ValueWitness.h"
 
+#include <atomic>
+
 namespace llvm {
   class Constant;
   class DataLayout;
