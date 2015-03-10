@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExprHandle.h"
@@ -162,7 +163,16 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     unsigned defaultArgIndex = defaultArgs? defaultArgs->NextIndex++ : 0;
 
     // Attributes.
-    parseDeclAttributeList(param.Attrs, /*stop at type attributes*/true, true);
+    bool FoundCCToken;
+    parseDeclAttributeList(param.Attrs, FoundCCToken,
+                          /*stop at type attributes*/true, true);
+    if (FoundCCToken) {
+      if (CodeCompletion) {
+        CodeCompletion->completeDeclAttrKeyword(nullptr, isInSILMode(), true);
+      } else {
+        status |= makeParserCodeCompletionStatus();
+      }
+    }
 
     // ('inout' | 'let' | 'var')?
     if (Tok.is(tok::kw_inout)) {

@@ -103,6 +103,13 @@ public:
     return Found;
   }
 };
+
+enum AttributeTarget {
+  ClassTarget,
+  FuncTarget,
+  ParamTarget,
+  UnknownTarget,
+};
 } // unnamed namespace
 
 static Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
@@ -801,7 +808,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   DeclAttrKind AttrKind;
   int AttrParamIndex;
   bool IsInSil;
-  bool IsInParam;
+  AttributeTarget Target;
 
   /// \brief Set to true when we have delivered code completion results
   /// to the \c Consumer.
@@ -906,7 +913,7 @@ public:
 
   void completeCaseStmtBeginning() override;
   void completeCaseStmtDotPrefix() override;
-  void completeDeclAttrKeyword(bool Sil, bool Param) override;
+  void completeDeclAttrKeyword(Decl* D, bool Sil, bool Param) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeNominalMemberBeginning() override;
 
@@ -2027,28 +2034,28 @@ public:
     addKeyword("self", BaseType);
   }
 
-  enum AttributeTarget {
-    // FIXME: support more target
-    Param,
-    Unknown,
-  };
 
-  void getAttributeDeclCompletions(bool IsInSil, bool IsInParam) {
+  void getAttributeDeclCompletions(bool IsInSil, AttributeTarget AT) {
     // FIXME: also include user-defined attribute keywords
-    AttributeTarget AT = Unknown;
-    if (IsInParam)
-      AT = Param;
-#define DECL_ATTR(KEYWORD, NAME, ...)                                         \
+    #define DECL_ATTR(KEYWORD, NAME, ...)                                     \
     if (!DeclAttribute::isUserInaccessible(DAK_##NAME) &&                     \
         !DeclAttribute::isDeclModifier(DAK_##NAME) &&                         \
         !DeclAttribute::shouldBeRejectedByParser(DAK_##NAME) &&               \
         (!DeclAttribute::isSilOnly(DAK_##NAME) || IsInSil)) {                 \
           switch (AT) {                                                       \
-              case Param:                                                     \
+              case ParamTarget:                                               \
                 if (DeclAttribute::isOnParam(DAK_##NAME))                     \
                   addDeclAttrKeyword(#KEYWORD, "Parameter Attribute");        \
                 break;                                                        \
-              case Unknown:                                                   \
+              case FuncTarget:                                                \
+                if (DeclAttribute::isOnFunc(DAK_##NAME))                      \
+                  addDeclAttrKeyword(#KEYWORD, "Function Attribute");         \
+                break;                                                        \
+              case ClassTarget:                                               \
+                if (DeclAttribute::isOnClass(DAK_##NAME))                     \
+                  addDeclAttrKeyword(#KEYWORD, "Class Attribute");            \
+                break;                                                        \
+              case UnknownTarget:                                             \
                 addDeclAttrKeyword(#KEYWORD, "Declaration Attribute");        \
           }                                                                   \
       }
@@ -2345,10 +2352,20 @@ void CodeCompletionCallbacksImpl::completeDeclAttrParam(DeclAttrKind DK,
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeDeclAttrKeyword(bool Sil, bool Param) {
+void CodeCompletionCallbacksImpl::completeDeclAttrKeyword(Decl* D,
+                                                          bool Sil,
+                                                          bool Param) {
   Kind = CompletionKind::AttributeBegin;
   IsInSil = Sil;
-  IsInParam = Param;
+  Target = UnknownTarget;
+  if (Param) {
+    Target = ParamTarget;
+  } else if (D) {
+    if (isa<FuncDecl>(D))
+      Target = FuncTarget;
+    if (isa<ClassDecl>(D))
+      Target = ClassTarget;
+  }
   CurDeclContext = P.CurDeclContext;
 }
 
@@ -2624,7 +2641,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
   case CompletionKind::AttributeBegin: {
-    Lookup.getAttributeDeclCompletions(IsInSil, IsInParam);
+    Lookup.getAttributeDeclCompletions(IsInSil, Target);
     break;
   }
   case CompletionKind::AttributeDeclParen: {

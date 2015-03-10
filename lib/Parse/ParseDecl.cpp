@@ -1274,13 +1274,15 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
 ///     '@' attribute
 /// \endverbatim
 bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
+                                    bool& FoundCCToken,
                                     bool StopAtTypeAttributes,
                                     bool InParam) {
+  FoundCCToken = false;
   while (Tok.is(tok::at_sign)) {
-    if (peekToken().is(tok::code_complete) && CodeCompletion) {
+    if (peekToken().is(tok::code_complete)) {
       consumeToken(tok::at_sign);
       consumeToken(tok::code_complete);
-      CodeCompletion->completeDeclAttrKeyword(isInSILMode(), InParam);
+      FoundCCToken = true;
       continue;
     }
     SourceLoc AtLoc = Tok.getLoc();
@@ -1468,6 +1470,18 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
   D->setLocalDiscriminator(discriminator);
 }
 
+void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
+                                           ParseDeclOptions Flags) {
+  auto CurLoc = Tok.getLoc();
+  backtrackToPosition(BeginParserPosition);
+  SourceLoc BeginLoc = Tok.getLoc();
+  SourceLoc EndLoc = CurLoc;
+  State->delayDecl(PersistentParserState::DelayedDeclKind::Decl,
+                   Flags.toRaw(),
+                   CurDeclContext, {BeginLoc, EndLoc},
+                   BeginParserPosition.PreviousLoc);
+  skipUntil(tok::eof);
+}
 /// \brief Parse a single syntactic declaration and return a list of decl
 /// ASTs.  This can return multiple results for var decls that bind to multiple
 /// values, structs that define a struct decl and a constructor, etc.
@@ -1498,7 +1512,8 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   DeclAttributes Attributes;
   if (Tok.hasComment())
     Attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
-  parseDeclAttributeList(Attributes);
+  bool FoundCCTokenInAttr;
+  parseDeclAttributeList(Attributes, FoundCCTokenInAttr);
 
   // Keep track of where and whether we see a contextual keyword on the decl.
   SourceLoc StaticLoc;
@@ -1616,6 +1631,14 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
 
     // Obvious nonsense.
     default:
+      if (FoundCCTokenInAttr) {
+        if (!CodeCompletion) {
+          delayParseFromBeginningToHere(BeginParserPosition, Flags);
+        } else {
+          CodeCompletion->completeDeclAttrKeyword(nullptr, isInSILMode(),
+                                                  false);
+        }
+      }
       diagnose(Tok, diag::expected_decl);
       return makeParserErrorResult<Decl>();
         
@@ -1709,6 +1732,16 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   
     // If we 'break' out of the switch, break out of the loop too.
     break;
+  }
+
+  if (FoundCCTokenInAttr) {
+    if (CodeCompletion) {
+      CodeCompletion->completeDeclAttrKeyword(DeclResult.get(), isInSILMode(),
+                                              false);
+    } else {
+      delayParseFromBeginningToHere(BeginParserPosition, Flags);
+      return makeParserSuccess();
+    }
   }
 
   if (Status.hasCodeCompletion() && isCodeCompletionFirstPass() &&
@@ -2731,7 +2764,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
 
       // Parse any leading attributes.
       DeclAttributes Attributes;
-      parseDeclAttributeList(Attributes);
+      bool FoundCCToken;
+      parseDeclAttributeList(Attributes, FoundCCToken);
 
       // Parse the contextual keywords for 'mutating' and 'nonmutating' before
       // get and set.
@@ -2823,7 +2857,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
 
     // Parse any leading attributes.
     DeclAttributes Attributes;
-    parseDeclAttributeList(Attributes);
+    bool FoundCCToken;
+    parseDeclAttributeList(Attributes, FoundCCToken);
 
     // Parse the contextual keywords for 'mutating' and 'nonmutating' before
     // get and set.

@@ -1137,7 +1137,8 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
   // Parse the first part, either a var, let, expr, or stmt-assign.
   if (Tok.is(tok::kw_var) || Tok.is(tok::kw_let) || Tok.is(tok::at_sign)) {
     DeclAttributes Attributes;
-    parseDeclAttributeList(Attributes);
+    bool FoundCCToken;
+    parseDeclAttributeList(Attributes, FoundCCToken);
 
     // After parsing optional attributes above we should be at 'var' or 'let'
     if (!Tok.is(tok::kw_var) && !Tok.is(tok::kw_let)) {

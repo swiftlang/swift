@@ -529,6 +529,14 @@ public:
     return getOptions(DK) & OnParam;
   }
 
+  static bool isOnFunc(DeclAttrKind DK) {
+    return getOptions(DK) & OnFunc;
+  }
+
+  static bool isOnClass(DeclAttrKind DK) {
+    return getOptions(DK) & OnClass;
+  }
+
   static bool isNotSerialized(DeclAttrKind DK) {
     return getOptions(DK) & NotSerialized;
   }

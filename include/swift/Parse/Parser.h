@@ -624,6 +624,8 @@ public:
   /// \returns true if any tokens were skipped.
   bool skipExtraTopLevelRBraces();
 
+  void delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
+                                     ParseDeclOptions Flags);
   void consumeDecl(ParserPosition BeginParserPosition, ParseDeclOptions Flags,
                    bool IsTopLevel);
 
@@ -659,6 +661,7 @@ public:
 
   /// Parse the optional attributes before a declaration.
   bool parseDeclAttributeList(DeclAttributes &Attributes,
+                              bool& FoundCodeCompletionToken,
                               bool StopAtTypeAttributes = false,
                               bool InParam = false);
 
