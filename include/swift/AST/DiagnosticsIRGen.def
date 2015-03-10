@@ -53,6 +53,8 @@ ERROR(type_to_verify_ambiguous,irgen,none, "type to verify '%0' is ambiguous",
 ERROR(type_to_verify_dependent,irgen,none,
       "type to verify '%0' has unbound generic parameters",
       (StringRef))
+ERROR(too_few_output_filenames,irgen,none,
+      "too few output file names specified", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

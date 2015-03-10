@@ -30,6 +30,7 @@
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/IR/Attributes.h"
+#include "llvm/Target/TargetMachine.h"
 #include "IRGen.h"
 #include "SwiftTargetInfo.h"
 #include "ValueWitness.h"
@@ -112,6 +113,143 @@ namespace irgen {
   class TypeInfo;
   enum class ValueWitness : unsigned;
 
+class IRGenModule;
+  
+/// Dispatches IR generation to a single or multiple IRGenModules.
+///
+/// In single-threaded compilation IRGenModuleDispatcher contains a single
+/// IRGenModule. In multi-threaded compilation it contains multiple
+/// IRGenModules - one for each LLVM module (= one for each input/output file).
+class IRGenModuleDispatcher {
+  
+public:
+  IRGenModuleDispatcher() :
+    QueueIndex(0)
+  {}
+
+  /// Add an IRGenModule for a source file.
+  void addGenModule(SourceFile *SF, IRGenModule *IGM);
+  
+  /// Get an IRGenModule for a source file.
+  IRGenModule *getGenModule(SourceFile *SF) {
+    IRGenModule *IGM = GenModules[SF];
+    assert(IGM);
+    return IGM;
+  }
+  
+  /// Get an IRGenModule for a declaration context.
+  /// Returns the IRGenModule of the containing source file, or if this cannot
+  /// be determined, returns the primary IRGenModule.
+  IRGenModule *getGenModule(DeclContext *ctxt) {
+    if (GenModules.size() == 1 || !ctxt) {
+      return getPrimaryIGM();
+    }
+    SourceFile *SF = ctxt->getParentSourceFile();
+    if (!SF)
+      return getPrimaryIGM();
+    IRGenModule *IGM = GenModules[SF];
+    assert(IGM);
+    return IGM;
+  }
+
+  /// Returns the primary IRGenModule. This is the first added IRGenModule.
+  /// It is used for everything which cannot be correlated to a specific source
+  /// file. And of course, in single-threaded compilation there is only the
+  /// primary IRGenModule.
+  IRGenModule *getPrimaryIGM() const {
+    assert(PrimaryIGM);
+    return PrimaryIGM;
+  }
+  
+  bool hasMultipleIGMs() const { return GenModules.size() >= 2; }
+  
+  llvm::DenseMap<SourceFile *, IRGenModule *>::iterator begin() {
+    return GenModules.begin();
+  }
+  
+  llvm::DenseMap<SourceFile *, IRGenModule *>::iterator end() {
+    return GenModules.end();
+  }
+  
+  /// Emit functions, variables and tables which are needed anyway, e.g. because
+  /// they are externally visible.
+  void emitGlobalTopLevel();
+  
+  /// Emit everthing which is reachable from already emitted IR.
+  void emitLazyDefinitions();
+  
+  void addLazyFunction(SILFunction *f) {
+    // Add it to the queue if it hasn't already been put there.
+    if (LazilyEmittedFunctions.insert(f).second)
+      LazyFunctionDefinitions.push_back(f);
+  }
+  
+  void addLazyTypeMetadata(CanType type) {
+    // Add it to the queue if it hasn't already been put there.
+    if (LazilyEmittedTypeMetadata.insert(type).second)
+      LazyTypeMetadata.push_back(type);
+  }
+  
+  void addLazyFieldTypeAccessor(NominalTypeDecl *type,
+                                NominalTypeDecl::StoredPropertyRange storedProperties,
+                                llvm::Function *fn,
+                                IRGenModule *IGM) {
+    LazyFieldTypeAccessors.push_back({type, storedProperties, fn, IGM});
+  }
+  
+  unsigned getFunctionOrder(SILFunction *F) {
+    auto it = FunctionOrder.find(F);
+    assert(it != FunctionOrder.end() &&
+           "no order number for SIL function definition?");
+    return it->second;
+  }
+  
+  /// In multi-threaded compilation fetch the next IRGenModule from the queue.
+  IRGenModule *fetchFromQueue() {
+    int idx = QueueIndex++;
+    if (idx < (int)Queue.size()) {
+      return Queue[idx];
+    }
+    return nullptr;
+  }
+
+private:
+  llvm::DenseMap<SourceFile *, IRGenModule *> GenModules;
+  
+  IRGenModule *PrimaryIGM = nullptr;
+  
+  /// The set of type metadata that have been enqueue for lazy emission.
+  llvm::SmallPtrSet<CanType, 4> LazilyEmittedTypeMetadata;
+  
+  /// The queue of lazy type metadata to emit.
+  llvm::SmallVector<CanType, 4> LazyTypeMetadata;
+  
+  llvm::SmallPtrSet<SILFunction*, 4> LazilyEmittedFunctions;
+
+  struct LazyFieldTypeAccessor {
+    NominalTypeDecl *type;
+    NominalTypeDecl::StoredPropertyRange storedProperties;
+    llvm::Function *fn;
+    IRGenModule *IGM;
+  };
+  
+  /// Field type accessors we need to emit.
+  llvm::SmallVector<LazyFieldTypeAccessor, 4> LazyFieldTypeAccessors;
+
+  /// SIL functions that we need to emit lazily.
+  llvm::SmallVector<SILFunction*, 4> LazyFunctionDefinitions;
+  
+  
+  /// The order in which all the SIL function definitions should
+  /// appear in the translation unit.
+  llvm::DenseMap<SILFunction*, unsigned> FunctionOrder;
+
+  /// The queue of IRGenModules for multi-threaded compilation.
+  SmallVector<IRGenModule *, 8> Queue;
+
+  std::atomic<int> QueueIndex;
+};
+
 /// IRGenModule - Primary class for emitting IR for global declarations.
 /// 
 class IRGenModule {
@@ -122,7 +260,12 @@ public:
   llvm::Module &Module;
   llvm::LLVMContext &LLVMContext;
   const llvm::DataLayout &DataLayout;
+  const llvm::Triple &Triple;
+  llvm::TargetMachine *TargetMachine;
   SILModule *SILMod;
+  llvm::SmallString<128> OutputFilename;
+  IRGenModuleDispatcher *dispatcher;
+  
   /// Order dependency -- TargetInfo must be initialized after Opts.
   const SwiftTargetInfo TargetInfo;
   /// Holds lexical scope info, etc. Is a nullptr if we compile without -g.
@@ -360,29 +503,6 @@ private:
   };
   
   llvm::DenseMap<ProtocolDecl*, ObjCProtocolPair> ObjCProtocols;
-
-  /// The set of type metadata that have been enqueue for lazy emission.
-  llvm::SmallPtrSet<CanType, 4> LazilyEmittedTypeMetadata;
-
-  /// The queue of lazy type metadata to emit.
-  llvm::SmallVector<CanType, 4> LazyTypeMetadata;
-
-  struct LazyFieldTypeAccessor {
-    NominalTypeDecl *type;
-    NominalTypeDecl::StoredPropertyRange storedProperties;
-    llvm::Function *fn;
-  };
-  
-  /// Field type accessors we need to emit.
-  llvm::SmallVector<LazyFieldTypeAccessor, 4> LazyFieldTypeAccessors;
-
-  /// SIL functions that we need to emit lazily.
-  llvm::SmallVector<SILFunction*, 4> LazyFunctionDefinitions;
-
-  /// The order in which all the SIL function definitions should
-  /// appear in the translation unit.
-  llvm::DenseMap<SILFunction*, unsigned> FunctionOrder;
-
   /// A mapping from order numbers to the LLVM functions which we
   /// created for the SIL functions with those orders.
   SuccessorMap<unsigned, llvm::Function*> EmittedFunctionsByOrder;
@@ -426,12 +546,15 @@ private:                            \
 public:
   IRGenModule(ASTContext &Context, llvm::LLVMContext &LLVMContext,
               IRGenOptions &Opts, StringRef ModuleName,
-              const llvm::DataLayout &DataLayout, SILModule *SILMod);
+              const llvm::DataLayout &DataLayout,
+              const llvm::Triple &Triple,
+              llvm::TargetMachine *TargetMachine,
+              SILModule *SILMod,
+              StringRef OutputFilename);
   ~IRGenModule();
 
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }
 
-  void prepare();
   void emitSourceFile(SourceFile &SF, unsigned StartElem);
   void addLinkLibrary(const LinkLibrary &linkLib);
   void finalize();
@@ -449,6 +572,7 @@ public:
   
   void emitNestedTypeDecls(DeclRange members);
   void emitClangDecl(clang::Decl *decl);
+  void finishEmitAfterTopLevel();
 
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       ExtraData extraData,
@@ -507,9 +631,7 @@ public:
 
 //--- Global context emission --------------------------------------------------
 public:
-  void emitGlobalTopLevel();
   void emitRuntimeRegistration();
-  void emitLazyDefinitions();
   void emitVTableStubs();
   void emitTypeVerifier();
 private:

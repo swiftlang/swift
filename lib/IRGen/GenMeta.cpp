@@ -2000,7 +2000,7 @@ void
 IRGenModule::addLazyFieldTypeAccessor(NominalTypeDecl *type,
                           NominalTypeDecl::StoredPropertyRange storedProperties,
                           llvm::Function *fn) {
-  LazyFieldTypeAccessors.push_back({type, storedProperties, fn});
+  dispatcher->addLazyFieldTypeAccessor(type, storedProperties, fn, this);
 }
 
 void

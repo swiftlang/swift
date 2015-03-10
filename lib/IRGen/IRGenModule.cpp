@@ -89,12 +89,17 @@ IRGenModule::IRGenModule(ASTContext &Context,
                          llvm::LLVMContext &LLVMContext,
                          IRGenOptions &Opts, StringRef ModuleName,
                          const llvm::DataLayout &DataLayout,
-                         SILModule *SILMod)
+                         const llvm::Triple &Triple,
+                         llvm::TargetMachine *TargetMachine,
+                         SILModule *SILMod,
+                         StringRef OutputFilename)
   : Context(Context), Opts(Opts),
     ClangCodeGen(createClangCodeGenerator(Context, LLVMContext, Opts, ModuleName)),
     Module(*ClangCodeGen->GetModule()),
     LLVMContext(Module.getContext()), DataLayout(DataLayout),
-    SILMod(SILMod), TargetInfo(SwiftTargetInfo::get(*this)),
+    Triple(Triple), TargetMachine(TargetMachine),
+    SILMod(SILMod), OutputFilename(OutputFilename), dispatcher(nullptr),
+    TargetInfo(SwiftTargetInfo::get(*this)),
     DebugInfo(0), ObjCInterop(Context.LangOpts.EnableObjCInterop),
     Types(*new TypeConverter(*this))
 {
@@ -595,3 +600,14 @@ void IRGenModule::error(SourceLoc loc, const Twine &message) {
   Context.Diags.diagnose(loc, diag::irgen_failure,
                          message.toStringRef(buffer));
 }
+
+void IRGenModuleDispatcher::addGenModule(SourceFile *SF, IRGenModule *IGM) {
+  assert(GenModules.count(SF) == 0);
+  GenModules[SF] = IGM;
+  if (!PrimaryIGM) {
+    PrimaryIGM = IGM;
+  }
+  IGM->dispatcher = this;
+  Queue.push_back(IGM);
+}
+

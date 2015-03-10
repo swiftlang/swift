@@ -675,41 +675,53 @@ void IRGenModule::emitGlobalLists() {
                  false);
 }
 
-/// Prepare for the emission of a program.
-void IRGenModule::prepare() {
+void IRGenModuleDispatcher::emitGlobalTopLevel() {
   // Generate order numbers for the functions in the SIL module that
   // correspond to definitions in the LLVM module.
   unsigned nextOrderNumber = 0;
-  for (auto &silFn : SILMod->getFunctions()) {
+  for (auto &silFn : PrimaryIGM->SILMod->getFunctions()) {
     // Don't bother adding external declarations to the function order.
     if (!silFn.isDefinition()) continue;
     FunctionOrder.insert(std::make_pair(&silFn, nextOrderNumber++));
   }
-}
 
-void IRGenModule::emitGlobalTopLevel() {
-  for (SILGlobalVariable &v : SILMod->getSILGlobals())
-    emitSILGlobalVariable(&v);
-  emitCoverageMapping();
+  for (SILGlobalVariable &v : PrimaryIGM->SILMod->getSILGlobals()) {
+    Decl *decl = v.getDecl();
+    IRGenModule *IGM = getGenModule(decl ? decl->getDeclContext() : nullptr);
+    IGM->emitSILGlobalVariable(&v);
+  }
+  PrimaryIGM->emitCoverageMapping();
   
   // Emit SIL functions.
-  bool isWholeModule = SILMod->isWholeModule();
-  for (SILFunction &f : *SILMod) {
+  bool isWholeModule = PrimaryIGM->SILMod->isWholeModule();
+  for (SILFunction &f : *PrimaryIGM->SILMod) {
     // Only eagerly emit functions that are externally visible.
     if (!isPossiblyUsedExternally(f.getLinkage(), isWholeModule))
       continue;
 
-    emitSILFunction(&f);
+    IRGenModule *IGM = getGenModule(f.getDeclContext());
+    IGM->emitSILFunction(&f);
   }
 
   // Emit static initializers.
-  emitSILStaticInitializer();
+  for (auto Iter : *this) {
+    IRGenModule *IGM = Iter.second;
+    IGM->emitSILStaticInitializer();
+  }
 
   // Emit witness tables.
-  for (SILWitnessTable &wt : SILMod->getWitnessTableList()) {
-    emitSILWitnessTable(&wt);
+  for (SILWitnessTable &wt : PrimaryIGM->SILMod->getWitnessTableList()) {
+    IRGenModule *IGM = getGenModule(wt.getConformance()->getDeclContext());
+    IGM->emitSILWitnessTable(&wt);
   }
   
+  for (auto Iter : *this) {
+    IRGenModule *IGM = Iter.second;
+    IGM->finishEmitAfterTopLevel();
+  }
+}
+
+void IRGenModule::finishEmitAfterTopLevel() {
   // Emit the implicit import of the swift standard libary.
   if (DebugInfo) {
     std::pair<swift::Identifier, swift::SourceLoc> AccessPath[] = {
@@ -747,7 +759,7 @@ static void emitLazyTypeMetadata(IRGenModule &IGM, CanType type) {
 
 /// Emit any lazy definitions (of globals or functions or whatever
 /// else) that we require.
-void IRGenModule::emitLazyDefinitions() {
+void IRGenModuleDispatcher::emitLazyDefinitions() {
   while (!LazyTypeMetadata.empty() ||
          !LazyFunctionDefinitions.empty() ||
          !LazyFieldTypeAccessors.empty()) {
@@ -756,20 +768,24 @@ void IRGenModule::emitLazyDefinitions() {
     while (!LazyTypeMetadata.empty()) {
       CanType type = LazyTypeMetadata.pop_back_val();
       assert(isTypeMetadataEmittedLazily(type));
-      emitLazyTypeMetadata(*this, type);
+      auto nom = type->getAnyNominal();
+      IRGenModule *IGM = getGenModule(nom->getDeclContext());
+      emitLazyTypeMetadata(*IGM, type);
     }
     while (!LazyFieldTypeAccessors.empty()) {
       auto accessor = LazyFieldTypeAccessors.pop_back_val();
-      emitFieldTypeAccessor(*this, accessor.type, accessor.fn,
+      emitFieldTypeAccessor(*accessor.IGM, accessor.type, accessor.fn,
                             accessor.storedProperties);
     }
 
     // Emit any lazy function definitions we require.
     while (!LazyFunctionDefinitions.empty()) {
       SILFunction *f = LazyFunctionDefinitions.pop_back_val();
-      assert(!isPossiblyUsedExternally(f->getLinkage(), SILMod->isWholeModule())
+      IRGenModule *IGM = getGenModule(f->getDeclContext());
+      assert(!isPossiblyUsedExternally(f->getLinkage(),
+                                       IGM->SILMod->isWholeModule())
              && "function with externally-visible linkage emitted lazily?");
-      emitSILFunction(f);
+      IGM->emitSILFunction(f);
     }
   }
 }
@@ -1018,7 +1034,13 @@ llvm::GlobalValue::VISIBILITY##Visibility }
   case SILLinkage::Shared:
   case SILLinkage::SharedExternal: return RESULT(LinkOnceODR, Hidden);
   case SILLinkage::Hidden: return RESULT(External, Hidden);
-  case SILLinkage::Private: return RESULT(Internal, Default);
+  case SILLinkage::Private:
+    if (IGM.dispatcher->hasMultipleIGMs()) {
+      // In case of multiple llvm modules (in multi-threaded compilation) all
+      // private decls must be visible from other files.
+      return RESULT(External, Hidden);
+    }
+    return RESULT(Internal, Default);
   case SILLinkage::PublicExternal:
     if (isDefinition) {
       return RESULT(AvailableExternally, Default);
@@ -1351,10 +1373,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   // number for it; make sure to insert it in that position relative
   // to other ordered functions.
   if (hasOrderNumber) {
-    auto it = FunctionOrder.find(f);
-    assert(it != FunctionOrder.end() &&
-           "no order number for SIL function definition?");
-    orderNumber = it->second;
+    orderNumber = dispatcher->getFunctionOrder(f);
     if (auto emittedFunctionIterator
           = EmittedFunctionsByOrder.findLeastUpperBound(orderNumber))
       insertBefore = *emittedFunctionIterator;
@@ -1362,7 +1381,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
     // Also, if we have a lazy definition for it, be sure to queue that up.
     if (!forDefinition &&
         !isPossiblyUsedExternally(f->getLinkage(), SILMod->isWholeModule()))
-      LazyFunctionDefinitions.push_back(f);
+      dispatcher->addLazyFunction(f);
   }
     
   llvm::AttributeSet attrs;
@@ -1383,15 +1402,6 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   if (hasOrderNumber) {
     EmittedFunctionsByOrder.insert(orderNumber, fn);
   }
-
-  // Unless this is an external reference, emit debug info for it.
-  // FIXME: Or if this is a witness. DebugInfo doesn't have an interface to
-  // correctly handle the generic parameters of a witness, which can come from
-  // both the requirement and witness contexts.
-  if (DebugInfo && !f->isExternalDeclaration()
-      && f->getAbstractCC() != AbstractCC::WitnessMethod)
-    DebugInfo->emitFunction(*f, fn);
-
   return fn;
 }
 
@@ -1633,9 +1643,7 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   // If this is a use, and the type metadata is emitted lazily,
   // trigger lazy emission of the metadata.
   if (!definitionType && isTypeMetadataEmittedLazily(concreteType)) {
-    // Add it to the queue if it hasn't already been put there.
-    if (LazilyEmittedTypeMetadata.insert(concreteType).second)
-      LazyTypeMetadata.push_back(concreteType);
+    dispatcher->addLazyTypeMetadata(concreteType);
   }
 
   // When indirect, this is always a pointer variable and has no

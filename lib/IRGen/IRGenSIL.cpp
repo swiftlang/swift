@@ -1145,6 +1145,13 @@ void IRGenSILFunction::emitSILFunction() {
   
   assert(!CurSILFn->empty() && "function has no basic blocks?!");
   
+  // FIXME: Or if this is a witness. DebugInfo doesn't have an interface to
+  // correctly handle the generic parameters of a witness, which can come from
+  // both the requirement and witness contexts.
+  if (IGM.DebugInfo && CurSILFn->getAbstractCC() != AbstractCC::WitnessMethod) {
+    IGM.DebugInfo->emitFunction(*CurSILFn, CurFn);
+  }
+
   // Map the entry bb.
   LoweredBBs[CurSILFn->begin()] = LoweredBB(CurFn->begin(), {});
   // Create LLVM basic blocks for the other bbs.
@@ -3936,6 +3943,12 @@ void IRGenModule::emitSILStaticInitializer() {
 
     auto *gvar = Module.getGlobalVariable(v.getName(),
                                           /*allowInternal*/true);
+
+    // A check for multi-threaded compilation: Is this the llvm module where the
+    // global is defined and not only referenced (or not referenced at all).
+    if (!gvar || !gvar->hasInitializer())
+      continue;
+
     auto *STy = dyn_cast<llvm::StructType>(gvar->getInitializer()->getType());
     assert(STy && "We only handle StructType for now!");
 
