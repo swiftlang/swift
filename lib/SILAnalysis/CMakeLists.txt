@@ -14,4 +14,5 @@ add_swift_library(swiftSILAnalysis
   RCIdentityAnalysis.cpp
   DestructorAnalysis.cpp
   CFG.cpp
+  ArraySemantic.cpp
   LINK_LIBRARIES swiftSILPassesUtils)

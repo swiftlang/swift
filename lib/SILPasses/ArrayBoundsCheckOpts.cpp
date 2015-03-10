@@ -18,6 +18,7 @@
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/Analysis.h"
+#include "swift/SILAnalysis/ArraySemantic.h"
 #include "swift/SILAnalysis/DestructorAnalysis.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/RCIdentityAnalysis.h"
