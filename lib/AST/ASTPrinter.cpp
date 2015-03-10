@@ -492,6 +492,11 @@ void PrintAST::printPattern(const Pattern *pattern) {
     break;
   }
 
+  case PatternKind::OptionalSome:
+    printPattern(cast<OptionalSomePattern>(pattern)->getSubPattern());
+    Printer << '?';
+    break;
+
   case PatternKind::Expr:
     // FIXME: Print expr.
     break;
