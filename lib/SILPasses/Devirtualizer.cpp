@@ -331,7 +331,6 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
 /// returns true if a change was made.
 static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   ClassMethodInst *CMI = cast<ClassMethodInst>(AI->getCallee());
-  assert(CMI && "Invalid class method instruction");
 
   SILValue ClassInstance = CMI->getOperand();
   // The static type used by the class_method instruction
