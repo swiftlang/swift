@@ -44,6 +44,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, PatternKind kind) {
     return OS << "'var' binding pattern";
   case PatternKind::EnumElement:
     return OS << "enum case matching pattern";
+  case PatternKind::OptionalSome:
+    return OS << "optional .Some matching pattern";
   }
   llvm_unreachable("bad PatternKind");
 }
@@ -151,6 +153,9 @@ void Pattern::forEachVariable(const std::function<void(VarDecl*)> &fn) const {
       OP->getSubPattern()->forEachVariable(fn);
     return;
   }
+  case PatternKind::OptionalSome:
+    cast<OptionalSomePattern>(this)->getSubPattern()->forEachVariable(fn);
+    return;
   }
 }
 
@@ -190,6 +195,9 @@ void Pattern::forEachNode(const std::function<void(Pattern*)> &f) {
       OP->getSubPattern()->forEachNode(f);
     return;
   }
+  case PatternKind::OptionalSome:
+    cast<OptionalSomePattern>(this)->getSubPattern()->forEachNode(f);
+    return;
   }
 }
 
@@ -361,7 +369,16 @@ Pattern *Pattern::clone(ASTContext &context,
                                               sub);
     break;
   }
-      
+
+  case PatternKind::OptionalSome: {
+    auto osp = cast<OptionalSomePattern>(this);
+    auto *sub = osp->getSubPattern()->clone(context, options);
+    auto *r = new (context) OptionalSomePattern(sub, osp->getQuestionLoc());
+    r->setElementDecl(osp->getElementDecl());
+    result = r;
+    break;
+  }
+
   case PatternKind::Expr: {
     auto expr = cast<ExprPattern>(this);
     result = new(context) ExprPattern(expr->getSubExpr(),
@@ -396,6 +413,7 @@ Pattern *Pattern::cloneForwardable(ASTContext &context, DeclContext *DC,
   case PatternKind::Isa:
   case PatternKind::NominalType:
   case PatternKind::EnumElement:
+  case PatternKind::OptionalSome:
   case PatternKind::Expr:
     llvm_unreachable("cannot forward this kind of pattern");
 
@@ -478,6 +496,7 @@ Expr *Pattern::buildForwardingRefExpr(ASTContext &context) const {
   case PatternKind::Isa:
   case PatternKind::NominalType:
   case PatternKind::EnumElement:
+  case PatternKind::OptionalSome:
   case PatternKind::Expr:
     llvm_unreachable("cannot forward this kind of pattern");
 

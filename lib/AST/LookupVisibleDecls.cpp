@@ -665,6 +665,10 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
         checkPattern(OP->getSubPattern(), Reason);
       return;
     }
+    case PatternKind::OptionalSome:
+      checkPattern(cast<OptionalSomePattern>(Pat)->getSubPattern(), Reason);
+      return;
+
     // Handle non-vars.
     case PatternKind::Isa:
     case PatternKind::Expr:

@@ -136,6 +136,11 @@ static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
     os << '.' << eep->getName();
     return;
   }
+
+  case PatternKind::OptionalSome:
+    os << ".Some";
+    return;
+
   case PatternKind::Paren:
   case PatternKind::Typed:
   case PatternKind::Var:
@@ -162,6 +167,7 @@ static bool isDirectlyRefutablePattern(const Pattern *p) {
   // isa and enum-element patterns are refutable, at least in theory.
   case PatternKind::Isa:
   case PatternKind::EnumElement:
+  case PatternKind::OptionalSome:
     return true;
 
   // Recur into simple wrapping patterns.
@@ -224,6 +230,10 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
       n = getNumSpecializationsRecursive(en->getSubPattern(), n);
     return n;
   }
+  case PatternKind::OptionalSome: {
+    auto en = cast<OptionalSomePattern>(p);
+    return getNumSpecializationsRecursive(en->getSubPattern(), n+1);
+  }
 
   // Recur into simple wrapping patterns.
   case PatternKind::Paren:
@@ -263,6 +273,7 @@ static bool isWildcardPattern(const Pattern *p) {
   case PatternKind::Isa:
   case PatternKind::NominalType:
   case PatternKind::EnumElement:
+  case PatternKind::OptionalSome:
     return false;
 
   // Recur into simple wrapping patterns.
@@ -1037,6 +1048,7 @@ void SwitchEmission::bindRefutablePattern(Pattern *pattern,
   case PatternKind::Tuple:
   case PatternKind::NominalType:
   case PatternKind::EnumElement:
+  case PatternKind::OptionalSome:
   case PatternKind::Isa:
     llvm_unreachable("didn't specialize specializable pattern?");
 
@@ -1096,6 +1108,7 @@ void SwitchEmission::bindIrrefutablePattern(Pattern *pattern,
   case PatternKind::Tuple:
   case PatternKind::NominalType:
   case PatternKind::EnumElement:
+  case PatternKind::OptionalSome:
   case PatternKind::Isa:
     llvm_unreachable("didn't specialize specializable pattern?");
 
@@ -1248,6 +1261,7 @@ void SwitchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
   case PatternKind::NominalType:
     return emitNominalTypeDispatch(rowsToSpecialize, arg, handler, failure);
   case PatternKind::EnumElement:
+  case PatternKind::OptionalSome:
     return emitEnumElementDispatch(rowsToSpecialize, arg, handler, failure);
   }
   llvm_unreachable("bad pattern kind");
@@ -1577,7 +1591,8 @@ void SwitchEmission::emitIsaDispatch(ArrayRef<RowToSpecialize> rows,
   failure(rows.back().Pattern);
 }
 
-/// Perform specialized dispatch for a sequence of EnumElementPatterns.
+/// Perform specialized dispatch for a sequence of EnumElementPattern or an
+/// OptionalSomePattern.
 void SwitchEmission::emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
                                              ConsumableManagedValue src,
                                        const SpecializationHandler &handleCase,
@@ -1601,15 +1616,23 @@ void SwitchEmission::emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
   SmallVector<CaseInfo, 4> caseInfos;
   SILBasicBlock *defaultBB = nullptr;
 
-  {
-    caseBBs.reserve(rows.size());
-    caseInfos.reserve(rows.size());
+  caseBBs.reserve(rows.size());
+  caseInfos.reserve(rows.size());
 
+  {
     // Create destination blocks for all the cases.
     llvm::DenseMap<EnumElementDecl*, unsigned> caseToIndex;
     for (auto &row : rows) {    
-      auto rowPattern = cast<EnumElementPattern>(row.Pattern);
-      EnumElementDecl *elt = rowPattern->getElementDecl();
+      EnumElementDecl *elt;
+      Pattern *subPattern = nullptr;
+      if (auto eep = dyn_cast<EnumElementPattern>(row.Pattern)) {
+        elt = eep->getElementDecl();
+        subPattern = eep->getSubPattern();
+      } else {
+        auto *osp = cast<OptionalSomePattern>(row.Pattern);
+        elt = osp->getElementDecl();
+        subPattern = osp->getSubPattern();
+      }
 
       unsigned index = caseInfos.size();
       auto insertionResult = caseToIndex.insert({elt, index});
@@ -1619,7 +1642,7 @@ void SwitchEmission::emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
         curBB = SGF.createBasicBlock(curBB);
         caseBBs.push_back({elt, curBB});
         caseInfos.resize(caseInfos.size() + 1);
-        caseInfos.back().FirstMatcher = rowPattern;
+        caseInfos.back().FirstMatcher = row.Pattern;
       }
       assert(caseToIndex[elt] == index);
       assert(caseBBs[index].first == elt);
@@ -1631,8 +1654,8 @@ void SwitchEmission::emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
       specRow.RowIndex = row.RowIndex;
 
       // Use the row pattern, if it has one.
-      if (rowPattern->hasSubPattern()) {
-        specRow.Patterns.push_back(rowPattern->getSubPattern());
+      if (subPattern) {
+        specRow.Patterns.push_back(subPattern);
       // It's also legal to write:
       //   case .Some { ... }
       // which is an implicit wildcard.

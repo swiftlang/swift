@@ -345,9 +345,6 @@ done:
 ///     expr-new
 ///     operator-prefix expr-unary(Mode)
 ///     '&' expr-unary(Mode)
-///     expr-discard
-///
-///   expr-discard: '_'
 ///
 ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   UnresolvedDeclRefExpr *Operator;
@@ -355,13 +352,6 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   default:
     // If the next token is not an operator, just parse this as expr-postfix.
     return parseExprPostfix(Message, isExprBasic);
-
-  // If the next token is '_', parse a discard expression.
-  case tok::kw__: {
-    SourceLoc Loc = consumeToken();
-    return makeParserResult(
-        new (Context) DiscardAssignmentExpr(Loc, /*Implicit=*/false));
-  }
 
   case tok::amp_prefix: {
     SourceLoc Loc = consumeToken(tok::amp_prefix);
@@ -682,9 +672,13 @@ MagicIdentifierLiteralExpr::Kind getMagicIdentifierLiteralKind(tok Kind) {
 ///     expr-delayed-identifier
 ///     expr-paren
 ///     expr-super
+///     expr-discard
 ///
 ///   expr-delayed-identifier:
 ///     '.' identifier
+///
+///   expr-discard:
+///     '_'
 ///
 ///   expr-dot:
 ///     expr-postfix '.' 'type'
@@ -786,6 +780,12 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     break;
   case tok::dollarident: // $1
     Result = makeParserResult(parseExprAnonClosureArg());
+    break;
+
+    // If the next token is '_', parse a discard expression.
+  case tok::kw__:
+    Result = makeParserResult(
+      new (Context) DiscardAssignmentExpr(consumeToken(), /*Implicit=*/false));
     break;
 
   case tok::l_brace:     // expr-closure

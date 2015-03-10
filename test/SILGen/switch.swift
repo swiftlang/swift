@@ -1335,3 +1335,16 @@ func testLabeledScalarPayload(lsp: LabeledScalarPayload) -> Any {
     return x
   }
 }
+
+// CHECK-LABEL: sil hidden @_TF6switch19testOptionalPatternFGSqSi_T_
+func testOptionalPattern(value : Int?) {
+  // CHECK: switch_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: bb1, default [[NILBB:bb[0-9]+]]
+  switch value {
+  case 1?: a()
+  case 2?: b()
+  case nil: d()
+  default: e()
+  }
+}
+
+

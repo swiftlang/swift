@@ -1052,6 +1052,14 @@ Pattern *Traversal::visitVarPattern(VarPattern *P) {
   return nullptr;
 }
 
+Pattern *Traversal::visitOptionalSomePattern(OptionalSomePattern *P) {
+  if (Pattern *newSub = doIt(P->getSubPattern())) {
+    P->setSubPattern(newSub);
+    return P;
+  }
+  return nullptr;
+}
+
 #pragma mark Type representation traversal
 bool Traversal::visitErrorTypeRepr(ErrorTypeRepr *T) {
   return false;

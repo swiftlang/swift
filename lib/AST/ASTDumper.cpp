@@ -275,6 +275,13 @@ namespace {
       }
       OS << ')';
     }
+    void visitOptionalSomePattern(OptionalSomePattern *P) {
+      printCommon(P, "optional_some_element");
+      OS << '\n';
+      printRec(P->getSubPattern());
+      OS << ')';
+    }
+
   };
 
   /// PrintDecl - Visitor implementation of Decl::print.

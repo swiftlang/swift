@@ -186,7 +186,13 @@ public:
     P->setSubPattern(newSub);
     return P;
   }
-  
+
+  Pattern *visitOptionalSomePattern(OptionalSomePattern *P) {
+    Pattern *newSub = visit(P->getSubPattern());
+    P->setSubPattern(newSub);
+    return P;
+  }
+
   Pattern *visitExprPattern(ExprPattern *P) {
     if (P->isResolved())
       return P;
@@ -264,7 +270,19 @@ public:
     return TuplePattern::create(TC.Context, E->getLoc(),
                                 patternElts, E->getRParenLoc());
   }
-  
+
+  // Convert a x? to OptionalSome pattern.  In the AST form, this will look like
+  // an OptionalEvaluationExpr with an immediate BindOptionalExpr inside of it.
+  Pattern *visitOptionalEvaluationExpr(OptionalEvaluationExpr *E) {
+    auto *Bind = dyn_cast<BindOptionalExpr>(E->getSubExpr()->
+                                            getSemanticsProvidingExpr());
+    if (!Bind) return nullptr;
+
+    Pattern *sub = getSubExprPattern(Bind->getSubExpr());
+    return new (TC.Context) OptionalSomePattern(sub, Bind->getQuestionLoc());
+  }
+
+
   // Unresolved member syntax '.Element' forms an EnumElement pattern. The
   // element will be resolved when we type-check the pattern.
   Pattern *visitUnresolvedMemberExpr(UnresolvedMemberExpr *ume) {
@@ -1055,6 +1073,55 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     
     return false;
   }
+
+  case PatternKind::OptionalSome: {
+    auto *OP = cast<OptionalSomePattern>(P);
+    auto *enumDecl = type->getEnumOrBoundGenericEnum();
+    if (!enumDecl) {
+      diagnose(OP->getLoc(), diag::optional_element_pattern_not_valid_type,
+               type);
+      return true;
+    }
+
+    // If the element decl was not resolved (because it was spelled without a
+    // type as `.Foo`), resolve it now that we have a type.
+    if (!OP->getElementDecl()) {
+      auto *element = lookupEnumMemberElement(*this, dc, type,
+                                              Context.getIdentifier("Some"));
+      if (!element) {
+        diagnose(OP->getLoc(), diag::enum_element_pattern_member_not_found,
+                 "Some", type);
+        return true;
+      }
+      OP->setElementDecl(element);
+    }
+
+    EnumElementDecl *elt = OP->getElementDecl();
+    // Is the enum element actually part of the enum type we're matching?
+    if (elt->getParentEnum() != enumDecl) {
+      diagnose(OP->getLoc(), diag::enum_element_pattern_not_member_of_enum,
+               "Some", type);
+      return true;
+    }
+
+    // Check the subpattern & push the enum element type down onto it.
+    Type elementType;
+    if (elt->hasArgumentType())
+      elementType = type->getTypeOfMember(elt->getModuleContext(),
+                                          elt, this,
+                                          elt->getArgumentInterfaceType());
+    else
+      elementType = TupleType::getEmpty(Context);
+    Pattern *sub = OP->getSubPattern();
+    if (coercePatternToType(sub, dc, elementType,
+                            subOptions|TR_FromNonInferredPattern|TR_EnumPatternPayload,
+                            resolver))
+      return true;
+    OP->setSubPattern(sub);
+    OP->setType(type);
+    return false;
+  }
+
       
   case PatternKind::NominalType: {
     auto NP = cast<NominalTypePattern>(P);

@@ -328,3 +328,21 @@ case let ds as [Derived]: // expected-error{{downcast pattern value of type '[De
 default:
   ()
 }
+
+
+// Optional patterns.
+let op1 : Int? = nil
+let op2 : Int?? = nil
+
+switch op1 {
+case nil: break
+case 1?: break
+case _?: break
+}
+
+switch op2 {
+case nil: break
+case _?: break
+case (1?)?: break
+case (_?)?: break
+}

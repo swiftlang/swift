@@ -653,6 +653,41 @@ public:
     return P->getKind() == PatternKind::EnumElement;
   }
 };
+
+/// A pattern "x?" which matches ".Some(x)".
+class OptionalSomePattern : public Pattern {
+  Pattern *SubPattern;
+  SourceLoc QuestionLoc;
+  EnumElementDecl *ElementDecl = nullptr;
+
+public:
+  explicit OptionalSomePattern(Pattern *SubPattern,
+                               SourceLoc QuestionLoc,
+                               Optional<bool> implicit = None)
+  : Pattern(PatternKind::OptionalSome), SubPattern(SubPattern),
+    QuestionLoc(QuestionLoc) {
+    if (implicit.hasValue() ? *implicit : !QuestionLoc.isValid())
+      setImplicit();
+  }
+
+  SourceLoc getQuestionLoc() const { return QuestionLoc; }
+  SourceRange getSourceRange() const {
+    return SourceRange(SubPattern->getStartLoc(), QuestionLoc);
+  }
+
+  const Pattern *getSubPattern() const { return SubPattern; }
+  Pattern *getSubPattern() { return SubPattern; }
+  void setSubPattern(Pattern *p) { SubPattern = p; }
+
+  EnumElementDecl *getElementDecl() const { return ElementDecl; }
+  void setElementDecl(EnumElementDecl *d) { ElementDecl = d; }
+
+  static bool classof(const Pattern *P) {
+    return P->getKind() == PatternKind::OptionalSome;
+  }
+};
+
+
   
 /// A pattern which matches a value obtained by evaluating an expression.
 /// The match will be tested using user-defined '~=' operator function lookup;

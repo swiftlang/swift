@@ -1002,10 +1002,6 @@ public:
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
 
-  // TODO: Depending on how robust our distributive-var design works out, we
-  // may be able to integrate exhaustive pattern parsing in var/func decls
-  // with matching pattern parsing when it matures.
-  
   ParserResult<Pattern> parseMatchingPattern();
   ParserResult<Pattern> parseMatchingPatternVarOrVal();
   ParserResult<Pattern> parseMatchingPatternIs();
