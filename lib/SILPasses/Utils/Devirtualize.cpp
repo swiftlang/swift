@@ -177,6 +177,12 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
                                        DevirtClassMethodInfo &DCMI) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
 
+  // Bail if any generic types parameters of the class instance type are
+  // unbound.
+  // We cannot devirtualize unbound generic calls yet.
+  if (isClassWithUnboundGenericParameters(ClassInstanceType, AI->getModule()))
+    return false;
+
   auto *CMI = cast<ClassMethodInst>(AI->getCallee());
   auto Member = CMI->getMember();
 
@@ -199,12 +205,6 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
                           "vtable method for this class.\n");
     return false;
   }
-
-  // Bail if any generic types parameters of the class instance type are
-  // unbound.
-  // We cannot devirtualize unbound generic calls yet.
-  if (isClassWithUnboundGenericParameters(ClassInstanceType, AI->getModule()))
-    return false;
 
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
   SILModule &M = F->getModule();
