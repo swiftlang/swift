@@ -10,21 +10,23 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// User code assertions.
-///
-/// User code assertions are only enabled in debug mode. In release and
-/// unchecked modes these checks are disabled.  This means they may have no
-/// effect on program semantics, depending on the assert configuration.
-
 /// Traditional C-style assert with an optional message.
 ///
-/// When assertions are enabled and `condition` is false, stop program
-/// execution in a debuggable state after printing a message.  When
-/// assertions are disabled in release and fast builds, `condition` is not even
-/// evaluated.
+/// Use this function for internal sanity checks that are active
+/// during testing but do not impact performance of shipping code.
+/// To check for invalid usage in Release builds; see `precondition`.
 ///
-/// When assertions are turned off, the optimizer can assume that the
-/// `condition` is true.
+/// * In playgrounds and -Onone builds (the default for Xcode's Debug
+///   configuration): if `condition` evaluates to false, stop program
+///   execution in a debuggable state after printing `message`.
+///
+/// * In -O builds (the default for Xcode's Release configuration),
+///   `condition` is not evaluated, and there are no effects.
+///
+/// * In -Ounchecked builds, `condition` is not evaluated, but the
+///   optimizer may assume that it *would* evaluate to `true`. Failure
+///   to satisfy that assumption in -Ounchecked builds is a serious
+///   programming error.
 @transparent
 public func assert(
   @autoclosure condition: () -> Bool,
@@ -39,11 +41,22 @@ public func assert(
   }
 }
 
-/// Ensure that the `condition` is true.
+/// Check a necessary condition for making forward progress.
 ///
-/// If the `condition` is false, in debug and release modes the program stops.
+/// Use this function to detect conditions that must prevent the
+/// program from proceeding even in shipping code.
 ///
-/// In unchecked mode the optimizer can assume that the `condition` is true.
+/// * In playgrounds and -Onone builds (the default for Xcode's Debug
+///   configuration): if `condition` evaluates to false, stop program
+///   execution in a debuggable state after printing `message`.
+///
+/// * In -O builds (the default for Xcode's Release configuration):
+///   if `condition` evaluates to false, stop program execution.
+///
+/// * In -Ounchecked builds, `condition` is not evaluated, but the
+///   optimizer may assume that it *would* evaluate to `true`. Failure
+///   to satisfy that assumption in -Ounchecked builds is a serious
+///   programming error.
 @transparent
 public func precondition(
   @autoclosure condition: () -> Bool,
@@ -61,9 +74,25 @@ public func precondition(
   }
 }
 
-/// A fatal error occurred and program execution should stop in debug mode.  In
-/// optimized builds this is a noop.
-@transparent @noreturn
+/// Indicate that an internal sanity check failed.
+///
+/// Use this function to stop the program, without impacting the
+/// performance of shipping code, when control flow is not expected to
+/// reach the call (e.g. in the `default` case of a `switch` where you
+/// have knowledge that one of the other cases must be satisfied). To
+/// protect code from invalid usage in Release builds; see
+/// `preconditionFailure`.
+///
+/// * In playgrounds and -Onone builds (the default for Xcode's Debug
+///   configuration) stop program execution in a debuggable state
+///   after printing `message`.
+///
+/// * In -O builds, has no effect.
+///
+/// * In -Ounchecked builds, the optimizer may assume that this
+///   function will never be called. Failure to satisfy that assumption
+///   is a serious programming error.
+@inline(__always)
 public func assertionFailure(
   @autoclosure _ message: () -> String = String(),
   file: StaticString = __FILE__, line: UWord = __LINE__
@@ -71,12 +100,26 @@ public func assertionFailure(
   if _isDebugAssertConfiguration() {
     _assertionFailed("fatal error", message(), file, line)
   }
-  _conditionallyUnreachable()
+  else if _isFastAssertConfiguration() {
+    _conditionallyUnreachable()
+  }
 }
 
-/// A fatal error occurred and program execution should stop in debug mode and
-/// in optimized mode.  In unchecked builds this is a noop, but the
-/// optimizer can still assume that the call is unreachable.
+/// Indicate that a precondition was violated.
+///
+/// Use this function to stop the program when control flow can only
+/// reach the call if your API was improperly used.
+///
+/// * In playgrounds and -Onone builds (the default for Xcode's Debug
+///   configuration), stop program execution in a debuggable state
+///   after printing `message`.
+///
+/// * In -O builds (the default for Xcode's Release configuration),
+///   stop program execution.
+///
+/// * In -Ounchecked builds, the optimizer may assume that this
+///   function will never be called. Failure to satisfy that assumption
+///   is a serious programming error.
 @transparent @noreturn
 public func preconditionFailure(
   @autoclosure _ message: () -> String = String(),
@@ -91,8 +134,7 @@ public func preconditionFailure(
   _conditionallyUnreachable()
 }
 
-/// A fatal error occurred and program execution should stop in debug,
-/// optimized and unchecked modes.
+/// Unconditionally print a `message` and stop execution.
 @transparent @noreturn
 public func fatalError(
   @autoclosure _ message: () -> String = String(),

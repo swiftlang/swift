@@ -11,14 +11,6 @@
 import StdlibUnittest
 
 //===---
-// Utilities.
-//===---
-
-func isDebugOrRelease() -> Bool {
-  return !_isFastAssertConfiguration()
-}
-
-//===---
 // Tests.
 //===---
 
@@ -26,8 +18,6 @@ func testTrapsAreNoreturn(i: Int) -> Int {
   // Don't need a return statement in 'case' statements because these functions
   // are @noreturn.
   switch i {
-  case 1:
-    assertionFailure("can not happen")
   case 2:
     preconditionFailure("can not happen")
   case 3:
