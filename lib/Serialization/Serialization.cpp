@@ -1070,7 +1070,7 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
                                                 writeIncomplete,
                                                 data);
 
-    writeConformances(inheritedProtos, inheritedConformance, associatedDecl,
+    writeConformances(inheritedConformance, associatedDecl,
                       abbrCodes, writeIncomplete);
     if (writeIncomplete)
       break;
@@ -1110,8 +1110,8 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     writeSubstitutions(substitutions, abbrCodes);
 
     if (appendGenericConformance) {
-      writeConformance(protocol, conf->getGenericConformance(), nullptr,
-                       abbrCodes);
+      writeConformance(conf->getProtocol(), conf->getGenericConformance(),
+                       nullptr, abbrCodes);
     }
     break;
   }
@@ -1133,8 +1133,8 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
                                                    typeID,
                                                    moduleID);
     if (appendInheritedConformance) {
-      writeConformance(protocol, conf->getInheritedConformance(), nullptr,
-                       abbrCodes);
+      writeConformance(conf->getProtocol(), conf->getInheritedConformance(),
+                       nullptr, abbrCodes);
     }
     break;
   }
@@ -1142,17 +1142,15 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
 }
 
 void
-Serializer::writeConformances(ArrayRef<ProtocolDecl *> protocols,
-                              ArrayRef<ProtocolConformance *> conformances,
+Serializer::writeConformances(ArrayRef<ProtocolConformance *> conformances,
                               const Decl *associatedDecl,
                               const std::array<unsigned, 256> &abbrCodes,
                               bool writeIncomplete) {
   using namespace decls_block;
 
-  for_each(protocols, conformances,
-           [&](const ProtocolDecl *proto, const ProtocolConformance *conf) {
-    writeConformance(proto, conf, associatedDecl, abbrCodes, writeIncomplete);
-  });
+  for (auto conformance : conformances)
+    writeConformance(conformance->getProtocol(), conformance, associatedDecl,
+                     abbrCodes, writeIncomplete);
 }
 
 void
@@ -1894,8 +1892,8 @@ void Serializer::writeDecl(const Decl *D) {
     }
 
     writeMembers(extension->getMembers(), isClassExtension);
-    writeConformances(extension->getProtocols(), extension->getConformances(),
-                      extension, DeclTypeAbbrCodes);
+    writeConformances(extension->getConformances(), extension,
+                      DeclTypeAbbrCodes);
 
     break;
   }
@@ -2069,8 +2067,8 @@ void Serializer::writeDecl(const Decl *D) {
     writeGenericParams(theStruct->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(theStruct->getGenericRequirements());
     writeMembers(theStruct->getMembers(), false);
-    writeConformances(theStruct->getProtocols(), theStruct->getConformances(),
-                      theStruct, DeclTypeAbbrCodes);
+    writeConformances(theStruct->getConformances(), theStruct,
+                      DeclTypeAbbrCodes);
     break;
   }
 
@@ -2099,8 +2097,7 @@ void Serializer::writeDecl(const Decl *D) {
     writeGenericParams(theEnum->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(theEnum->getGenericRequirements());
     writeMembers(theEnum->getMembers(), false);
-    writeConformances(theEnum->getProtocols(), theEnum->getConformances(),
-                      theEnum, DeclTypeAbbrCodes);
+    writeConformances(theEnum->getConformances(), theEnum, DeclTypeAbbrCodes);
     break;
   }
 
@@ -2132,8 +2129,7 @@ void Serializer::writeDecl(const Decl *D) {
     writeGenericParams(theClass->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(theClass->getGenericRequirements());
     writeMembers(theClass->getMembers(), true);
-    writeConformances(theClass->getProtocols(), theClass->getConformances(),
-                      theClass, DeclTypeAbbrCodes);
+    writeConformances(theClass->getConformances(), theClass, DeclTypeAbbrCodes);
     break;
   }
 

@@ -225,8 +225,7 @@ private:
   void writeRequirements(ArrayRef<Requirement> requirements);
 
   /// Writes a list of protocol conformances.
-  void writeConformances(ArrayRef<ProtocolDecl *> protocols,
-                         ArrayRef<ProtocolConformance *> conformances,
+  void writeConformances(ArrayRef<ProtocolConformance *> conformances,
                          const Decl *associatedDecl,
                          const std::array<unsigned, 256> &abbrCodes,
                          bool writeIncomplete = false);
