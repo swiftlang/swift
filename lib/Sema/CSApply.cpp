@@ -2656,7 +2656,7 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
 
-    Expr *visitIsaExpr(IsaExpr *expr) {
+    Expr *visitIsExpr(IsExpr *expr) {
       // Turn the subexpression into an rvalue.
       auto &tc = cs.getTypeChecker();
       auto toType = simplifyType(expr->getCastTypeLoc().getType());

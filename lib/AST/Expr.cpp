@@ -292,7 +292,7 @@ bool Expr::canAppendCallParentheses() const {
 
   case ExprKind::ForcedCheckedCast:
   case ExprKind::ConditionalCheckedCast:
-  case ExprKind::Isa:
+  case ExprKind::Is:
   case ExprKind::Coerce:
     return false;
 

@@ -128,7 +128,7 @@ ParserResult<Expr> Parser::parseExprIs() {
   if (type.isNull())
     return nullptr;
 
-  return makeParserResult(new (Context) IsaExpr(isLoc, type.get()));
+  return makeParserResult(new (Context) IsExpr(isLoc, type.get()));
 }
 
 /// parseExprAs

@@ -1963,7 +1963,7 @@ namespace {
       return OptionalType::get(toType);
     }
 
-    Type visitIsaExpr(IsaExpr *expr) {
+    Type visitIsExpr(IsExpr *expr) {
       // Validate the type.
       auto &tc = CS.getTypeChecker();
       TypeResolutionOptions options = TR_AllowUnboundGenerics;

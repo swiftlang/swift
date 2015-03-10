@@ -1718,7 +1718,7 @@ public:
   void visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E) {
     printExplicitCastExpr(E, "conditional_checked_cast_expr");
   }
-  void visitIsaExpr(IsaExpr *E) {
+  void visitIsExpr(IsExpr *E) {
     printExplicitCastExpr(E, "is_subtype_expr");
   }
   void visitCoerceExpr(CoerceExpr *E) {

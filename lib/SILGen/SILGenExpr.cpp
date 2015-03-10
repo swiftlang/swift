@@ -193,7 +193,7 @@ namespace {
                                       SGFContext C);
     RValue visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
                                            SGFContext C);
-    RValue visitIsaExpr(IsaExpr *E, SGFContext C);
+    RValue visitIsExpr(IsExpr *E, SGFContext C);
     RValue visitCoerceExpr(CoerceExpr *E, SGFContext C);
     RValue visitTupleExpr(TupleExpr *E, SGFContext C);
     RValue visitScalarToTupleExpr(ScalarToTupleExpr *E, SGFContext C);
@@ -2453,7 +2453,7 @@ visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
   return RValue(SGF, E, result);
 }
 
-RValue RValueEmitter::visitIsaExpr(IsaExpr *E, SGFContext C) {
+RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
   // Handle collection downcasts separately.
   auto castKind = E->getCastKind();
   if (castKind == CheckedCastKind::ArrayDowncast ||

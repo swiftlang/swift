@@ -3331,19 +3331,19 @@ public:
 /// of the type and 'a as T' would succeed, false otherwise.
 ///
 /// FIXME: We should support type queries with a runtime metatype value too.
-class IsaExpr : public CheckedCastExpr {
+class IsExpr : public CheckedCastExpr {
 public:
-  IsaExpr(Expr *sub, SourceLoc isLoc, TypeLoc type)
-    : CheckedCastExpr(ExprKind::Isa,
+  IsExpr(Expr *sub, SourceLoc isLoc, TypeLoc type)
+    : CheckedCastExpr(ExprKind::Is,
                       sub, isLoc, type, Type())
   {}
   
-  IsaExpr(SourceLoc isLoc, TypeLoc type)
-    : IsaExpr(nullptr, isLoc, type)
+  IsExpr(SourceLoc isLoc, TypeLoc type)
+    : IsExpr(nullptr, isLoc, type)
   {}
   
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::Isa;
+    return E->getKind() == ExprKind::Is;
   }
 };
 
