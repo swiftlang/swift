@@ -1355,8 +1355,23 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         // A constraint that binds any pointer to a void pointer is
         // ineffective, since any pointer can be converted to a void pointer.
         if (kind == TypeMatchKind::BindToPointerType &&
-            desugar2->isEqual(getASTContext().TheEmptyTupleType)) {
-          return SolutionKind::Unsolved;
+            desugar2->isEqual(getASTContext().TheEmptyTupleType) &&
+            (flags & TMF_GenerateConstraints)) {
+          // Create a disjunction where the favored branch doesn't constrain
+          // anything but the unfavored branch binds type1 to Void. type1 only
+          // gets bound to Void as a last resort.
+          Constraint *trivialConstraint = Constraint::create(*this,
+            ConstraintKind::Bind, typeVar1, typeVar1, DeclName(),
+            getConstraintLocator(locator));
+          trivialConstraint->setFavored();
+          Constraint *bindingConstraint = Constraint::create(*this,
+            ConstraintKind::Bind, typeVar1, type2, DeclName(),
+            getConstraintLocator(locator));
+          Constraint *constraints[] = { trivialConstraint, bindingConstraint };
+          addConstraint(
+            Constraint::createDisjunction(*this, constraints,
+                                          getConstraintLocator(locator)));
+          return SolutionKind::Solved;
         }
 
         assignFixedType(typeVar1, type2);
