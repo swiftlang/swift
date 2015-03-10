@@ -1354,8 +1354,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
         // A constraint that binds any pointer to a void pointer is
         // ineffective, since any pointer can be converted to a void pointer.
-        if (kind == TypeMatchKind::BindToPointerType &&
-            desugar2->isEqual(getASTContext().TheEmptyTupleType) &&
+        if (kind == TypeMatchKind::BindToPointerType && desugar2->isVoid() &&
             (flags & TMF_GenerateConstraints)) {
           // Create a disjunction where the favored branch doesn't constrain
           // anything but the unfavored branch binds type1 to Void. type1 only

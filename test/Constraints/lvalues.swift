@@ -174,9 +174,11 @@ takeArrayRef(["asdf", "1234"]) // expected-error{{cannot invoke 'takeArrayRef' w
 // <rdar://problem/19835413> Reference to value from array changed
 func rdar19835413() {
   func f1(p: UnsafeMutablePointer<Void>) {}
-  func f2(var a: [Int], i: Int) {
+  func f2(var a: [Int], i: Int, pi: UnsafeMutablePointer<Int>) {
     f1(&a)
     f1(&a[i])
     f1(&a[0])
+    f1(pi)
+    f1(UnsafeMutablePointer(pi))
   }
 }
