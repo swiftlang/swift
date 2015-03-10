@@ -1016,6 +1016,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       // Do not encode output and input.
       if ((*A)->getOption().getID() == options::OPT_o ||
           (*A)->getOption().getID() == options::OPT_INPUT ||
+          (*A)->getOption().getID() == options::OPT_primary_file ||
           (*A)->getOption().getID() == options::OPT_embed_bitcode)
         continue;
       ArgStringList ASL;
