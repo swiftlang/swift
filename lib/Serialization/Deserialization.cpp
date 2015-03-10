@@ -367,12 +367,12 @@ Pattern *ModuleFile::maybeReadPattern() {
     return result;
   }
   case decls_block::VAR_PATTERN: {
-    bool isImplicit;
-    VarPatternLayout::readRecord(scratch, isImplicit);
+    bool isImplicit, isLet;
+    VarPatternLayout::readRecord(scratch, isLet, isImplicit);
     Pattern *subPattern = maybeReadPattern();
     assert(subPattern);
 
-    auto result = new (getContext()) VarPattern(SourceLoc(), subPattern,
+    auto result = new (getContext()) VarPattern(SourceLoc(), isLet, subPattern,
                                                 isImplicit);
     result->setType(subPattern->getType());
     return result;

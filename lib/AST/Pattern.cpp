@@ -390,7 +390,7 @@ Pattern *Pattern::clone(ASTContext &context,
       
   case PatternKind::Var: {
     auto var = cast<VarPattern>(this);
-    result = new(context) VarPattern(var->getLoc(),
+    result = new(context) VarPattern(var->getLoc(), var->isLet(),
                                      var->getSubPattern()->clone(
                                        context,
                                        options|IsVar));
@@ -431,7 +431,7 @@ Pattern *Pattern::cloneForwardable(ASTContext &context, DeclContext *DC,
 
   case PatternKind::Var: {
     auto var = cast<VarPattern>(this);
-    result = new(context) VarPattern(var->getLoc(),
+    result = new(context) VarPattern(var->getLoc(), var->isLet(),
                                      var->getSubPattern()->cloneForwardable(
                                        context, DC, options|IsVar));
     break;

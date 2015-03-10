@@ -391,7 +391,8 @@ mapParsedParameters(Parser &parser,
     // If 'var' or 'let' was specified explicitly, create a pattern for it.
     if (specifierKind != Parser::ParsedParameter::InOut &&
         letVarInOutLoc.isValid()) {
-      param = new (ctx) VarPattern(letVarInOutLoc, param);
+      bool isLet = specifierKind == Parser::ParsedParameter::Let;
+      param = new (ctx) VarPattern(letVarInOutLoc, isLet, param);
     }
 
     if (var)
@@ -802,7 +803,8 @@ ParserResult<Pattern> Parser::parsePatternVarOrLet() {
     return makeParserCodeCompletionResult<Pattern>();
   if (subPattern.isNull())
     return nullptr;
-  return makeParserResult(new (Context) VarPattern(varLoc, subPattern.get()));
+  return makeParserResult(new (Context) VarPattern(varLoc, isLet,
+                                                   subPattern.get()));
 }
 
 /// \brief Determine whether this token can start a binding name, whether an
@@ -978,21 +980,22 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
 
 ParserResult<Pattern> Parser::parseMatchingPatternVarOrVal() {
   assert((Tok.is(tok::kw_let) || Tok.is(tok::kw_var)) && "expects val or var");
-  bool isVal = Tok.is(tok::kw_let);
+  bool isLet = Tok.is(tok::kw_let);
   SourceLoc varLoc = consumeToken();
 
   // 'var' and 'let' patterns shouldn't nest.
   if (InVarOrLetPattern)
-    diagnose(varLoc, diag::var_pattern_in_var, unsigned(isVal));
+    diagnose(varLoc, diag::var_pattern_in_var, unsigned(isLet));
 
   // In our recursive parse, remember that we're in a var/let pattern.
   llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-    T(InVarOrLetPattern, isVal ? IVOLP_InLet : IVOLP_InVar);
+    T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
 
   ParserResult<Pattern> subPattern = parseMatchingPattern();
   if (subPattern.isNull())
     return nullptr;
-  return makeParserResult(new (Context) VarPattern(varLoc, subPattern.get()));
+  return makeParserResult(new (Context) VarPattern(varLoc, isLet,
+                                                   subPattern.get()));
 }
 
 // matching-pattern ::= 'is' type

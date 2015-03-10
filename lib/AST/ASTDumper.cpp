@@ -259,7 +259,7 @@ namespace {
       OS << ')';
     }
     void visitVarPattern(VarPattern *P) {
-      printCommon(P, "pattern_var");
+      printCommon(P, P->isLet() ? "pattern_let" : "pattern_var");
       OS << '\n';
       printRec(P->getSubPattern());
       OS << ')';

@@ -498,7 +498,7 @@ void PrintAST::printPattern(const Pattern *pattern) {
 
   case PatternKind::Var:
     if (!Options.SkipIntroducerKeywords)
-      Printer << "var ";
+      Printer << (cast<VarPattern>(pattern)->isLet() ? "let " : "var ");
     printPattern(cast<VarPattern>(pattern)->getSubPattern());
   }
 }

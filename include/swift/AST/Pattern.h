@@ -757,14 +757,18 @@ public:
 /// parsed as expressions referencing existing entities.
 class VarPattern : public Pattern {
   SourceLoc VarLoc;
+  bool IsLet;  // True if this is a let pattern, false if a var pattern.
   Pattern *SubPattern;
 public:
-  VarPattern(SourceLoc loc, Pattern *sub, Optional<bool> implicit = None)
-    : Pattern(PatternKind::Var), VarLoc(loc), SubPattern(sub) {
+  VarPattern(SourceLoc loc, bool isLet, Pattern *sub,
+             Optional<bool> implicit = None)
+    : Pattern(PatternKind::Var), VarLoc(loc), IsLet(isLet), SubPattern(sub) {
     if (implicit.hasValue() ? *implicit : !loc.isValid())
       setImplicit();
   }
 
+  bool isLet() const { return IsLet; }
+  
   SourceLoc getLoc() const { return VarLoc; }
   SourceRange getSourceRange() const {
     SourceLoc EndLoc = SubPattern->getSourceRange().End;

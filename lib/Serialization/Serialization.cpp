@@ -842,7 +842,7 @@ void Serializer::writePattern(const Pattern *pattern) {
     auto var = cast<VarPattern>(pattern);
 
     unsigned abbrCode = DeclTypeAbbrCodes[VarPatternLayout::Code];
-    VarPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
+    VarPatternLayout::emitRecord(Out, ScratchRecord, abbrCode, var->isLet(),
                                  var->isImplicit());
     writePattern(var->getSubPattern());
     break;
