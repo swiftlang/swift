@@ -30,19 +30,19 @@
 func method(@#^KEYWORD1^#) {}
 
 // KEYWORD1:                  Begin completions, 2 items
-// KEYWORD1-NEXT:             Keyword/None:                       autoclosure[#Parameter Attribute#]; name=autoclosure{{$}}
-// KEYWORD1-NEXT:             Keyword/None:                       noescape[#Parameter Attribute#]; name=noescape{{$}}
+// KEYWORD1-NEXT:             Keyword/None:                       autoclosure[#Param Attribute#]; name=autoclosure{{$}}
+// KEYWORD1-NEXT:             Keyword/None:                       noescape[#Param Attribute#]; name=noescape{{$}}
 // KEYWORD1-NEXT:             End completions
 
 @#^KEYWORD2^#
 func method(){}
 
 // KEYWORD2:                  Begin completions, 5 items
-// KEYWORD2-NEXT:             Keyword/None:                       availability[#Function Attribute#]; name=availability{{$}}
-// KEYWORD2-NEXT:             Keyword/None:                       objc[#Function Attribute#]; name=objc{{$}}
-// KEYWORD2-NEXT:             Keyword/None:                       noreturn[#Function Attribute#]; name=noreturn{{$}}
-// KEYWORD2-NEXT:             Keyword/None:                       IBAction[#Function Attribute#]; name=IBAction{{$}}
-// KEYWORD2-NEXT:             Keyword/None:                       inline[#Function Attribute#]; name=inline{{$}}
+// KEYWORD2-NEXT:             Keyword/None:                       availability[#Func Attribute#]; name=availability{{$}}
+// KEYWORD2-NEXT:             Keyword/None:                       objc[#Func Attribute#]; name=objc{{$}}
+// KEYWORD2-NEXT:             Keyword/None:                       noreturn[#Func Attribute#]; name=noreturn{{$}}
+// KEYWORD2-NEXT:             Keyword/None:                       IBAction[#Func Attribute#]; name=IBAction{{$}}
+// KEYWORD2-NEXT:             Keyword/None:                       inline[#Func Attribute#]; name=inline{{$}}
 // KEYWORD2-NEXT:             End completions
 
 @#^KEYWORD3^#

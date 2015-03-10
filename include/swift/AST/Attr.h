@@ -312,6 +312,7 @@ protected:
 };
 
 class DeclAttributes;
+enum class DeclKind : uint8_t;
 
   /// Represents one declaration attribute.
 class DeclAttribute : public AttributeBase {
@@ -543,6 +544,8 @@ public:
   bool isNotSerialized() const {
     return isNotSerialized(getKind());
   }
+
+  static bool canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK);
 
   /// Returns the source name of the attribute, without the @ or any arguments.
   StringRef getAttrName() const;

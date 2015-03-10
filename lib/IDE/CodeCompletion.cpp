@@ -103,13 +103,6 @@ public:
     return Found;
   }
 };
-
-enum AttributeTarget {
-  ClassTarget,
-  FuncTarget,
-  ParamTarget,
-  UnknownTarget,
-};
 } // unnamed namespace
 
 static Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
@@ -808,7 +801,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   DeclAttrKind AttrKind;
   int AttrParamIndex;
   bool IsInSil;
-  AttributeTarget Target;
+  Optional<DeclKind> AttTargetDK;
 
   /// \brief Set to true when we have delivered code completion results
   /// to the \c Consumer.
@@ -2034,31 +2027,28 @@ public:
     addKeyword("self", BaseType);
   }
 
-
-  void getAttributeDeclCompletions(bool IsInSil, AttributeTarget AT) {
+  void getAttributeDeclCompletions(bool IsInSil, Optional<DeclKind> DK) {
     // FIXME: also include user-defined attribute keywords
-    #define DECL_ATTR(KEYWORD, NAME, ...)                                     \
+    StringRef TargetName = "Declaration";
+    if (DK.hasValue()) {
+      switch (DK.getValue()) {
+#define DECL(Id, ...)                                                         \
+    case DeclKind::Id:                                                        \
+      TargetName = #Id;                                                       \
+      break;
+#include "swift/AST/DeclNodes.def"
+      }
+    }
+    StringRef Description = (TargetName + llvm::Twine(" Attribute")).str();
+#define DECL_ATTR(KEYWORD, NAME, ...)                                         \
     if (!DeclAttribute::isUserInaccessible(DAK_##NAME) &&                     \
         !DeclAttribute::isDeclModifier(DAK_##NAME) &&                         \
         !DeclAttribute::shouldBeRejectedByParser(DAK_##NAME) &&               \
         (!DeclAttribute::isSilOnly(DAK_##NAME) || IsInSil)) {                 \
-          switch (AT) {                                                       \
-              case ParamTarget:                                               \
-                if (DeclAttribute::isOnParam(DAK_##NAME))                     \
-                  addDeclAttrKeyword(#KEYWORD, "Parameter Attribute");        \
-                break;                                                        \
-              case FuncTarget:                                                \
-                if (DeclAttribute::isOnFunc(DAK_##NAME))                      \
-                  addDeclAttrKeyword(#KEYWORD, "Function Attribute");         \
-                break;                                                        \
-              case ClassTarget:                                               \
-                if (DeclAttribute::isOnClass(DAK_##NAME))                     \
-                  addDeclAttrKeyword(#KEYWORD, "Class Attribute");            \
-                break;                                                        \
-              case UnknownTarget:                                             \
-                addDeclAttrKeyword(#KEYWORD, "Declaration Attribute");        \
-          }                                                                   \
-      }
+          if (!DK.hasValue() || DeclAttribute::canAttributeAppearOnDeclKind   \
+            (DAK_##NAME, DK.getValue()))                                      \
+              addDeclAttrKeyword(#KEYWORD, Description);                      \
+    }
 #include "swift/AST/Attr.def"
   }
 
@@ -2357,14 +2347,10 @@ void CodeCompletionCallbacksImpl::completeDeclAttrKeyword(Decl* D,
                                                           bool Param) {
   Kind = CompletionKind::AttributeBegin;
   IsInSil = Sil;
-  Target = UnknownTarget;
   if (Param) {
-    Target = ParamTarget;
+    AttTargetDK = DeclKind::Param;
   } else if (D) {
-    if (isa<FuncDecl>(D))
-      Target = FuncTarget;
-    if (isa<ClassDecl>(D))
-      Target = ClassTarget;
+    AttTargetDK = D->getKind();
   }
   CurDeclContext = P.CurDeclContext;
 }
@@ -2641,7 +2627,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
   case CompletionKind::AttributeBegin: {
-    Lookup.getAttributeDeclCompletions(IsInSil, Target);
+    Lookup.getAttributeDeclCompletions(IsInSil, AttTargetDK);
     break;
   }
   case CompletionKind::AttributeDeclParen: {

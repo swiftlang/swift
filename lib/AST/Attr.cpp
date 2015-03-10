@@ -61,8 +61,12 @@ DeclAttrKind DeclAttribute::getAttrKindFromString(StringRef Str) {
 
 /// Returns true if this attribute can appear on the specified decl.
 bool DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind DK, const Decl *D) {
-  unsigned Options = getOptions(DK);
-  switch (D->getKind()) {
+  return canAttributeAppearOnDeclKind(DK, D->getKind());
+}
+
+bool DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK) {
+  unsigned Options = getOptions(DAK);
+  switch (DK) {
 #define DECL(Id, Parent) case DeclKind::Id: return (Options & On##Id) != 0;
 #include "swift/AST/DeclNodes.def"
   }
