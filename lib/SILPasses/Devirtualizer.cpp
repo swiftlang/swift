@@ -340,12 +340,10 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   if (CMI->isVolatile())
     return false;
 
-  SILValue ClassInstance = CMI->getOperand();
-
   // Strip any upcasts off of our 'self' value, potentially leaving us
   // with a value whose type is closer (in the class hierarchy) to the
   // actual dynamic type.
-  auto SubTypeValue = ClassInstance.stripUpCasts();
+  auto SubTypeValue = CMI->getOperand().stripUpCasts();
   SILType SubType = SubTypeValue.getType();
 
   // Bail if any generic types parameters of the class instance type are
@@ -364,20 +362,6 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
     CanType InstTy = VMTI->getType().castTo<MetatypeType>().getInstanceType();
     CD = InstTy.getClassOrBoundGenericClass();
     assert(CD && "Non-class type for instance type of class metatype?!");
-  }
-
-  if (ClassInstance != SubTypeValue) {
-    // The implementation of a method to be invoked may actually
-    // be defined by one of the superclasses.
-    if (ClassInstance.getType().getAs<MetatypeType>()) {
-      auto &Module = AI->getModule();
-      if (!ClassInstance.getType().getMetatypeInstanceType(Module).
-             isSuperclassOf(SubType.getMetatypeInstanceType(Module)))
-        return false;
-    } else {
-      if (!ClassInstance.getType().isSuperclassOf(SubType))
-        return false;
-    }
   }
 
   if (!CHA->hasKnownDirectSubclasses(CD)) {
