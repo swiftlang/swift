@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -O -emit-object %s
+// RUN: %target-swift-frontend -emit-sil -O %s | FileCheck %s
 
 public class A {
   @inline(never)
@@ -45,17 +45,17 @@ public func testD(x: D) -> Int {
 }
 
 
-final class E : C {
+public final class E : C {
   @inline(never)
   override class func foo() -> Int { return 1 }
 }
 
-// CHECK-LABEL: sil hidden @_TF22devirt_value_metatypes5testEFCS_1ESi
+// CHECK-LABEL: sil @_TF22devirt_value_metatypes5testEFCS_1ESi
 // CHECK-NOT: value_metatype $@thick E.Type
 // CHECK_NOT: checked_cast_br
 // CHECK: function_ref
 // CHECK: apply
 // CHECK: return
-internal func testE(x: E) -> Int {
+public func testE(x: E) -> Int {
   return (x.dynamicType as C.Type).foo()
 }
