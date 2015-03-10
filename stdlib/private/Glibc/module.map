@@ -19,7 +19,6 @@ module SwiftGlibc [system] {
   module C {
     module errno {
       header "/usr/include/errno.h"
-      header "/usr/include/sys/errno.h"
       export *
     }
     module signal {
@@ -28,11 +27,6 @@ module SwiftGlibc [system] {
     }
     module stdio {
       header "/usr/include/stdio.h"
-      export *
-    }
-
-    module stddef {
-      header "/usr/include/stddef.h"
       export *
     }
 
@@ -45,7 +39,6 @@ module SwiftGlibc [system] {
     module string {
       header "/usr/include/string.h"
       export *
-      export Glibc.POSIX.strings
     }
   }
 
@@ -76,97 +69,6 @@ module SwiftGlibc [system] {
     }
     module unistd {
       header "/usr/include/unistd.h"
-      header "/usr/include/sys/unistd.h"
-      export *
-    }
-    // Re-exported C headers.
-    module complex {
-      export cstd.complex
-    }
-
-    module ctype {
-      export cstd.ctype
-    }
-
-    module errno {
-      export cstd.errno
-    }
-
-    module fenv {
-      export cstd.fenv
-    }
-
-    module inttypes {
-      export cstd.inttypes
-    }
-
-    module iso646 {
-      export cstd.iso646
-    }
-
-    module limits {
-      export cstd.limits
-    }
-
-    module locale {
-      export cstd.locale
-    }
-
-    module math {
-      export cstd.math
-    }
-
-    module setjmp {
-      export cstd.setjmp
-    }
-
-    module signal {
-      export cstd.signal
-    }
-
-    module stdbool {
-      export cstd.stdbool
-    }
-
-    module stddef {
-      export cstd.stddef
-    }
-
-    module stdint {
-      export cstd.stdint
-    }
-
-    module stdio {
-      export cstd.stdio
-    }
-
-    module stdlib {
-      export cstd.stdlib
-    }
-
-    module string {
-      export cstd.string
-    }
-
-    module time {
-      export cstd.time
-    }
-
-    module wchar {
-      export cstd.wchar
-    }
-
-    module wctype {
-      export cstd.wctype
-    }
-  }
-
-  module bsd {
-    export *
-    link "bsd"
-
-    module stdlib {
-      header "/usr/include/bsd/stdlib.h"
       export *
     }
   }
