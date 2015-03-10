@@ -1583,3 +1583,33 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   return %9999 : $()
 }
 
+struct ArrayIntBuffer {
+  var storage : Builtin.NativeObject
+}
+
+struct ArrayInt{
+  var buffer : ArrayIntBuffer
+}
+
+sil public_external [semantics "array.props.isNative"] @arrayPropertyIsNativeGuaranteed : $@cc(method) @thin (@guaranteed ArrayInt) -> Bool {
+  bb0(%0: $ArrayInt):
+    unreachable
+}
+
+// CHECK-LABEL: sil @array_semantic_not_may_release
+// CHECK: load
+// CHECK-NOT: retain_value
+// CHECK-NOT: strong_retain
+// CHECK: apply
+// CHECK-NOT: retain_value
+// CHECK-NOT: strong_retain
+// CHECK: return
+sil @array_semantic_not_may_release : $@cc(method) @thin (@inout ArrayInt) -> Bool {
+bb(%0 : $*ArrayInt):
+  %1 = load %0 : $*ArrayInt
+  retain_value %1 : $ArrayInt
+  %2 = function_ref @arrayPropertyIsNativeGuaranteed : $@cc(method) @thin (@guaranteed ArrayInt) -> Bool
+  %3 = apply %2(%1) : $@cc(method) @thin (@guaranteed ArrayInt) -> Bool
+  release_value %1 : $ArrayInt
+  return %3 : $Bool
+}

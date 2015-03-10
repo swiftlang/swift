@@ -16,6 +16,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
+#include "swift/SILAnalysis/ArraySemantic.h"
 #include "swift/SILAnalysis/RCIdentityAnalysis.h"
 #include "swift/SILAnalysis/ValueTracking.h"
 #include "swift/SILPasses/Utils/Local.h"
@@ -83,6 +84,12 @@ static bool canApplyDecrementRefCount(ApplyInst *AI, SILValue Ptr,
   if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
     if (isKnownToNotDecrementRefCount(FRI))
       return false;
+
+  // Certain array semantic calls are known not to decrement the reference
+  // count.
+  ArraySemanticsCall Call(AI);
+  if (Call && !Call.isMayRelease())
+    return false;
 
   return canApplyDecrementRefCount(AI->getArgumentsWithoutIndirectResult(),
                                    Ptr, AA);
@@ -415,6 +422,14 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
   // Ok, we have an apply. If the apply has no arguments, we don't need to worry
   // about any guaranteed parameters.
   if (!AI->getNumOperands())
+    return false;
+
+  // Certain array semantic calls are known not to decrement the reference
+  // count such that this would be visible to the caller i.e we don't need to
+  // guaranteed known safety at this point because retain/releases in the array
+  // semantic callee are balanced.
+  ArraySemanticsCall Call(AI);
+  if (Call && !Call.isMayRelease())
     return false;
 
   // Ok, we have an apply with arguments. Look at the function type and iterate
