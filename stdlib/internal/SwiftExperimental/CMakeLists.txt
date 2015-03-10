@@ -3,6 +3,7 @@ add_swift_library(swiftSwiftExperimental SHARED IS_STDLIB
   # filename.
   SwiftExperimental.swift
   FloatingPointParsing.swift.gyb
+  InputStream.swift
   IntegerParsing.swift.gyb
 
   SWIFT_COMPILE_FLAGS -Xfrontend -sil-serialize-all

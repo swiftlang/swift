@@ -17,6 +17,7 @@
 
 // XFAIL: interpret
 
+import SwiftExperimental
 import StdlibUnittest
 import Swift
 
