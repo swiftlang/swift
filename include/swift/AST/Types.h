@@ -2260,7 +2260,19 @@ enum class ParameterConvention {
   Direct_Guaranteed,
 };
 inline bool isIndirectParameter(ParameterConvention conv) {
-  return conv <= ParameterConvention::Indirect_Out;
+  switch (conv) {
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_Out:
+  case ParameterConvention::Indirect_In_Guaranteed:
+    return true;
+
+  case ParameterConvention::Direct_Unowned:
+  case ParameterConvention::Direct_Guaranteed:
+  case ParameterConvention::Direct_Owned:
+    return false;
+  }
+  llvm_unreachable("covered switch isn't covered?!");
 }
 inline bool isConsumedParameter(ParameterConvention conv) {
   switch (conv) {
