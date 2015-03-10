@@ -316,7 +316,10 @@ def emit_silgen : Flag<["-"], "emit-silgen">,
   HelpText<"Emit raw SIL file(s)">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def emit_sib : Flag<["-"], "emit-sib">,
-  HelpText<"Emit serialized AST + SIL file(s)">, ModeOpt,
+  HelpText<"Emit serialized AST + canonical SIL file(s)">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_sibgen : Flag<["-"], "emit-sibgen">,
+  HelpText<"Emit serialized AST + raw SIL file(s)">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 def c : Flag<["-"], "c">, Alias<emit_object>,

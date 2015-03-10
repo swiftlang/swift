@@ -131,7 +131,8 @@ public:
 
     EmitModuleOnly, ///< Emit module only
 
-    EmitSIB, ///< Emit serialized AST + SIL
+    EmitSIBGen, ///< Emit serialized AST + raw SIL
+    EmitSIB, ///< Emit serialized AST + canonical SIL
 
     Immediate, ///< Immediate mode
     REPL, ///< REPL mode

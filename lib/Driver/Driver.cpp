@@ -679,6 +679,10 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerOutputType = types::TY_SIB;
       break;
 
+    case options::OPT_emit_sibgen:
+      OI.CompilerOutputType = types::TY_RawSIB;
+      break;
+
     case options::OPT_emit_ir:
       OI.CompilerOutputType = types::TY_LLVM_IR;
       break;
@@ -1049,6 +1053,7 @@ void Driver::buildActions(const ToolChain &TC,
         Diags.diagnose(SourceLoc(), diag::error_unknown_file_type,
                        InputArg->getValue());
         continue;
+      case types::TY_RawSIB:
       case types::TY_RawSIL:
       case types::TY_Nothing:
       case types::TY_INVALID:

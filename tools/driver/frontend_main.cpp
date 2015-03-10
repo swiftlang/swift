@@ -495,6 +495,24 @@ static bool performCompile(CompilerInstance &Instance,
                     opts.getSingleOutputFilename(), opts.EmitSortedSIL);
   }
 
+  if (Action == FrontendOptions::EmitSIBGen) {
+    // If we are asked to link all, link all.
+    if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
+      performSILLinking(SM.get(), true);
+
+    auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
+                                  Instance.getMainModule();
+    if (!opts.ModuleOutputPath.empty()) {
+      SerializationOptions serializationOpts;
+      serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
+      serializationOpts.SerializeAllSIL = true;
+      serializationOpts.IsSIB = true;
+
+      serialize(DC, serializationOpts, SM.get());
+    }
+    return false;
+  }
+
   // Perform "stable" optimizations that are invariant across compiler versions.
   if (!Invocation.getDiagnosticOptions().SkipDiagnosticPasses &&
       runSILDiagnosticPasses(*SM))

@@ -172,6 +172,9 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     case types::TY_SIL:
       FrontendModeOption = "-emit-sil";
       break;
+    case types::TY_RawSIB:
+      FrontendModeOption = "-emit-sibgen";
+      break;
     case types::TY_SIB:
       FrontendModeOption = "-emit-sib";
       break;
