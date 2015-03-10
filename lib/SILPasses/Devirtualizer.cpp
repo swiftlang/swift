@@ -332,6 +332,11 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
 static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   ClassMethodInst *CMI = cast<ClassMethodInst>(AI->getCallee());
 
+  // We cannot devirtualize in cases where dynamic calls are
+  // semantically required.
+  if (CMI->isVolatile())
+    return false;
+
   SILValue ClassInstance = CMI->getOperand();
   // The static type used by the class_method instruction
   // is the class which a given method belongs to.
@@ -349,7 +354,7 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   }
 
   // Check if it is legal to insert inline caches.
-  if (!CD || CMI->isVolatile())
+  if (!CD)
     return false;
 
   if (ClassInstance.getType() != InstanceType) {
