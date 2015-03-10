@@ -360,8 +360,15 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   if (ClassInstance.getType() != InstanceType) {
     // The implementation of a method to be invoked may actually
     // be defined by one of the superclasses.
-    if (!ClassInstance.getType().isSuperclassOf(InstanceType))
-      return false;
+    if (ClassInstance.getType().getAs<MetatypeType>()) {
+      auto &Module = AI->getModule();
+      if (!ClassInstance.getType().getMetatypeInstanceType(Module).
+             isSuperclassOf(InstanceType.getMetatypeInstanceType(Module)))
+        return false;
+    } else {
+      if (!ClassInstance.getType().isSuperclassOf(InstanceType))
+        return false;
+    }
     // ClassInstance and InstanceType should match for
     // devirtualizeClassMethod to work.
     ClassInstance = ClassInstance.stripUpCasts();
