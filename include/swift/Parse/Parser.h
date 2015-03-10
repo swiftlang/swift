@@ -661,7 +661,7 @@ public:
 
   /// Parse the optional attributes before a declaration.
   bool parseDeclAttributeList(DeclAttributes &Attributes,
-                              bool& FoundCodeCompletionToken,
+                              bool &FoundCodeCompletionToken,
                               bool StopAtTypeAttributes = false,
                               bool InParam = false);
 

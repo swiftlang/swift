@@ -1274,7 +1274,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
 ///     '@' attribute
 /// \endverbatim
 bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
-                                    bool& FoundCCToken,
+                                    bool &FoundCCToken,
                                     bool StopAtTypeAttributes,
                                     bool InParam) {
   FoundCCToken = false;

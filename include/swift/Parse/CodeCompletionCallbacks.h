@@ -135,7 +135,7 @@ public:
   virtual void completeNominalMemberBeginning() = 0;
 
   /// Complete the keyword in attribute, for instance, @availability.
-  virtual void completeDeclAttrKeyword(Decl* D, bool Sil, bool Param) = 0;
+  virtual void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) = 0;
 
   /// Complete the parameters in attribute, for instance, version specifier for
   /// @availability.

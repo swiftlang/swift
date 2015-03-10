@@ -906,7 +906,7 @@ public:
 
   void completeCaseStmtBeginning() override;
   void completeCaseStmtDotPrefix() override;
-  void completeDeclAttrKeyword(Decl* D, bool Sil, bool Param) override;
+  void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeNominalMemberBeginning() override;
 
@@ -2033,9 +2033,9 @@ public:
     if (DK.hasValue()) {
       switch (DK.getValue()) {
 #define DECL(Id, ...)                                                         \
-    case DeclKind::Id:                                                        \
-      TargetName = #Id;                                                       \
-      break;
+      case DeclKind::Id:                                                      \
+        TargetName = #Id;                                                     \
+        break;
 #include "swift/AST/DeclNodes.def"
       }
     }
@@ -2342,7 +2342,7 @@ void CodeCompletionCallbacksImpl::completeDeclAttrParam(DeclAttrKind DK,
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeDeclAttrKeyword(Decl* D,
+void CodeCompletionCallbacksImpl::completeDeclAttrKeyword(Decl *D,
                                                           bool Sil,
                                                           bool Param) {
   Kind = CompletionKind::AttributeBegin;
