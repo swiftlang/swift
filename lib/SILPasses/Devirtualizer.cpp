@@ -341,15 +341,17 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
     return false;
 
   SILValue ClassInstance = CMI->getOperand();
+  // The static type used by the class_method instruction
+  // is the class which a given method belongs to.
+  // Is either the class of the instance itself or one of its superclasses.
+  // Therefore, strip all upcasts to get the real static type
+  // of the instance.
+  // Specifically, only the upcast to the static class which method belongs to
+  // should be stripped.
+  SILType InstanceType = ClassInstance.stripUpCasts().getType();
+  ClassDecl *CD = InstanceType.getClassOrBoundGenericClass();
 
-  // Strip any upcasts off of our 'self' value, potentially leaving us
-  // with a value whose type is closer (in the class hierarchy) to the
-  // actual dynamic type.
-  auto SubTypeValue = ClassInstance.stripUpCasts();
-  SILType SubType = SubTypeValue.getType();
-  ClassDecl *CD = SubType.getClassOrBoundGenericClass();
-
-  if (auto *VMTI = dyn_cast<ValueMetatypeInst>(SubTypeValue)) {
+  if (auto *VMTI = dyn_cast<ValueMetatypeInst>(ClassInstance.stripUpCasts())) {
     CanType InstTy = VMTI->getType().castTo<MetatypeType>().getInstanceType();
     CD = InstTy.getClassOrBoundGenericClass();
   }
@@ -358,27 +360,27 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   if (!CD)
     return false;
 
-  if (ClassInstance != SubTypeValue) {
+  if (ClassInstance.getType() != InstanceType) {
     // The implementation of a method to be invoked may actually
     // be defined by one of the superclasses.
     if (ClassInstance.getType().getAs<MetatypeType>()) {
       auto &Module = AI->getModule();
       if (!ClassInstance.getType().getMetatypeInstanceType(Module).
-             isSuperclassOf(SubType.getMetatypeInstanceType(Module)))
+             isSuperclassOf(InstanceType.getMetatypeInstanceType(Module)))
         return false;
     } else {
-      if (!ClassInstance.getType().isSuperclassOf(SubType))
+      if (!ClassInstance.getType().isSuperclassOf(InstanceType))
         return false;
     }
-    // ClassInstance and SubType should match for
+    // ClassInstance and InstanceType should match for
     // devirtualizeClassMethod to work.
-    ClassInstance = SubTypeValue;
+    ClassInstance = ClassInstance.stripUpCasts();
   }
 
   // Bail if any generic types parameters of the class instance type are
   // unbound.
   // We cannot devirtualize unbound generic calls yet.
-  if (isClassWithUnboundGenericParameters(SubType, AI->getModule()))
+  if (isClassWithUnboundGenericParameters(InstanceType, AI->getModule()))
     return false;
 
   if (!CHA->hasKnownDirectSubclasses(CD)) {
@@ -392,7 +394,7 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
 
     DEBUG(llvm::dbgs() << "Inserting monomorphic inline caches for class " <<
           CD->getName() << "\n");
-    return insertMonomorphicInlineCaches(AI, SubType);
+    return insertMonomorphicInlineCaches(AI, InstanceType);
   }
 
   // Collect the direct subclasses for the class.
@@ -480,7 +482,7 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
     //
     // But we can still try to devirtualize the static class of instance
     // if it is possible.
-    return insertMonomorphicInlineCaches(AI, SubType);
+    return insertMonomorphicInlineCaches(AI, InstanceType);
   }
 
   // At this point it is known that there is only one remaining method
