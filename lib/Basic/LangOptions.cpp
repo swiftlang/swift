@@ -17,6 +17,8 @@
 
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Range.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -36,20 +38,37 @@ bool LangOptions::hasBuildConfigOption(StringRef Name) const {
 
 void LangOptions::setTarget(llvm::Triple triple) {
   clearAllTargetConfigOptions();
-  Target = triple;
+
+  if (triple.getOS() == llvm::Triple::Darwin &&
+      triple.getVendor() == llvm::Triple::Apple) {
+    // Rewrite darwinX.Y triples to macosx10.X'.Y ones.
+    // It affects code generation on our platform.
+    llvm::SmallString<16> osxBuf;
+    llvm::raw_svector_ostream osx(osxBuf);
+    osx << llvm::Triple::getOSTypeName(llvm::Triple::MacOSX);
+
+    unsigned major, minor, micro;
+    triple.getMacOSXVersion(major, minor, micro);
+    osx << major << "." << minor;
+    if (micro != 0)
+      osx << "." << micro;
+
+    triple.setOSName(osx.str());
+  }
+  Target = std::move(triple);
 
   // Set the "os" target configuration.
-  if (triple.isMacOSX())
+  if (Target.isMacOSX())
     addTargetConfigOption("os", "OSX");
-  else if (triple.isiOS())
+  else if (Target.isiOS())
     addTargetConfigOption("os", "iOS");
-  else if (triple.isOSLinux())
+  else if (Target.isOSLinux())
     addTargetConfigOption("os", "Linux");
   else
     llvm_unreachable("Unsupported target OS");
 
   // Set the "arch" target configuration.
-  switch (triple.getArch()) {
+  switch (Target.getArch()) {
   case llvm::Triple::ArchType::arm:
     addTargetConfigOption("arch", "arm");
     break;
