@@ -3101,7 +3101,7 @@ usual. It is undefined behavior to ``destroy_addr`` a partially-initialized
 existential container.
 
 deinit_existential_addr
-``````````````````````
+```````````````````````
 ::
 
   sil-instruction ::= 'deinit_existential_addr' sil-operand
