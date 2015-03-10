@@ -1749,9 +1749,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                                       TC.Context.Id_CVarArgType;
       }
       
-      if (isBridgeableTargetType && TC.getBridgedToObjC(DC, true, type1) &&
-          (kind == TypeMatchKind::ExplicitConversion ||
-           !HandlingFavoredConstraint)) {
+      if (isBridgeableTargetType && TC.getBridgedToObjC(DC, true, type1)) {
         conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeToObjC);
       }
     }

@@ -246,3 +246,11 @@ func rdar19836341(ns: NSString?, var vns: NSString?) {
   let vs: String? = vns // expected-error{{'NSString?' is not convertible to 'String?'}}
   var vs2: String? = vns // expected-error{{'NSString?' is not convertible to 'String?'}}
 }
+
+// <rdar://problem/20029786> Swift compiler sometimes suggests changing "as!" to "as?!"
+func rdar20029786(ns: NSString?) {
+  var s: String = ns ?? "str" as String as String // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}
+  var s2 = ns ?? "str" as String as String
+
+  let s3: NSString? = "str" as String?
+}
