@@ -1276,11 +1276,17 @@ Expr *Parser::parseExprStringLiteral() {
   }
     
   SmallVector<Expr*, 4> Exprs;
+  bool First = true;
   for (auto Segment : Segments) {
     switch (Segment.Kind) {
     case Lexer::StringSegment::Literal: {
+      auto TokenLoc = First ? Loc : Segment.Loc;
       Exprs.push_back(
-          createStringLiteralExprFromSegment(Context, L, Segment, Loc));
+          createStringLiteralExprFromSegment(Context, L, Segment, TokenLoc));
+
+      // Since the string is already parsed, Tok already points to the first
+      // token after the whole string, but PreviousLoc is not exactly correct.
+      PreviousLoc = TokenLoc;
       break;
     }
         
@@ -1320,11 +1326,12 @@ Expr *Parser::parseExprStringLiteral() {
       break;
     }
     }
+    First = false;
   }
   
   if (Exprs.empty())
     return new (Context) ErrorExpr(Loc);
-  
+
   return new (Context) InterpolatedStringLiteralExpr(Loc,
                                         Context.AllocateCopy(Exprs));
 }

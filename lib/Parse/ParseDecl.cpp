@@ -2363,7 +2363,7 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
 /// This function creates an accessor function (with no body) for a computed
 /// property or subscript.
 static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
-                                    TypedPattern *NamePattern,
+                                    TypedPattern *TypedPattern,
                                     TypeLoc ElementTy,
                                     Pattern *Indices, SourceLoc StaticLoc,
                                     Parser::ParseDeclOptions Flags,
@@ -2380,10 +2380,14 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
   {
     SmallVector<TuplePatternElt, 2> ValueArgElements;
     SourceLoc StartLoc, EndLoc;
-    if (NamePattern) {
-      ValueArgElements.push_back(TuplePatternElt(NamePattern));
-      StartLoc = NamePattern->getStartLoc();
-      EndLoc = NamePattern->getEndLoc();
+    bool ExplicitArgument = TypedPattern &&
+      (!TypedPattern->isImplicit() ||
+       !TypedPattern->getSubPattern()->isImplicit());
+
+    if (TypedPattern) {
+      ValueArgElements.push_back(TuplePatternElt(TypedPattern));
+      StartLoc = TypedPattern->getStartLoc();
+      EndLoc = TypedPattern->getEndLoc();
     }
 
     bool isVararg = false;
@@ -2404,18 +2408,15 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
         isVararg = TP->hasVararg();
       }
 
-      StartLoc = Indices->getStartLoc();
-      EndLoc = Indices->getEndLoc();
-    }
-
-    if (NamePattern && Indices) {
-      StartLoc = Indices->getStartLoc();
-      EndLoc = NamePattern->getEndLoc();
+      if (!ExplicitArgument) {
+        StartLoc = Indices->getStartLoc();
+        EndLoc = Indices->getEndLoc();
+      }
     }
 
     ValueArg = TuplePattern::create(P->Context, StartLoc, ValueArgElements,
                                     EndLoc, isVararg);
-    if (NamePattern && !NamePattern->isImplicit())
+    if (!ExplicitArgument)
       ValueArg->setImplicit();
   }
 
@@ -3351,7 +3352,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
         auto binding = info.Binding;
         auto range = binding->getSourceRange();
         info.TopLevelCode->setBody(BraceStmt::create(P.Context, range.Start,
-                                               ASTNode(binding), range.End));
+                                            ASTNode(binding), range.End, true));
       }
     }
   } Bindings(*this);
@@ -3956,6 +3957,10 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
                                                  EqualsLoc,
                                                  LiteralRawValueExpr,
                                                  CurDeclContext);
+    if (NameLoc == CaseLoc) {
+      result->setImplicit(); // Parse error
+    }
+
     result->getAttrs() = Attributes;
     Elements.push_back(result);
     

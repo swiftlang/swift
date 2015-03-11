@@ -82,7 +82,7 @@ static TuplePatternElt buildArgumentPattern(SourceLoc loc, DeclContext *DC,
   param->setImplicit();
 
   Pattern *valuePattern
-    = new (Context) TypedPattern(new (Context) NamedPattern(param),
+    = new (Context) TypedPattern(new (Context) NamedPattern(param, true),
                                  TypeLoc::withoutLoc(type));
   valuePattern->setImplicit();
   
@@ -767,7 +767,7 @@ static void synthesizeTrivialGetter(FuncDecl *getter,
   ASTNode returnStmt = new (ctx) ReturnStmt(SourceLoc(), result, IsImplicit);
 
   SourceLoc loc = storage->getLoc();
-  getter->setBody(BraceStmt::create(ctx, loc, returnStmt, loc));
+  getter->setBody(BraceStmt::create(ctx, loc, returnStmt, loc, true));
 
   // Mark it transparent, there is no user benefit to this actually existing, we
   // just want it for abstraction purposes (i.e., to make access to the variable
@@ -789,7 +789,7 @@ static void synthesizeTrivialSetter(FuncDecl *setter,
   SmallVector<ASTNode, 1> setterBody;
   createPropertyStoreOrCallSuperclassSetter(setter, valueDRE, storage,
                                             setterBody, TC);
-  setter->setBody(BraceStmt::create(ctx, loc, setterBody, loc));
+  setter->setBody(BraceStmt::create(ctx, loc, setterBody, loc, true));
 
   // Mark it transparent, there is no user benefit to this actually existing.
   setter->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
@@ -839,7 +839,7 @@ static void synthesizeStoredMaterializeForSet(FuncDecl *materializeForSet,
   ASTNode returnStmt = new (ctx) ReturnStmt(SourceLoc(), result, IsImplicit);
 
   SourceLoc loc = storage->getLoc();
-  materializeForSet->setBody(BraceStmt::create(ctx, loc, returnStmt, loc));
+  materializeForSet->setBody(BraceStmt::create(ctx, loc, returnStmt, loc,true));
 
   // Mark it transparent, there is no user benefit to this actually existing.
   materializeForSet->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
@@ -1200,7 +1200,7 @@ static void synthesizeComputedMaterializeForSet(FuncDecl *materializeForSet,
   body.push_back(new (ctx) ReturnStmt(SourceLoc(), result, IsImplicit));
 
   SourceLoc loc = storage->getLoc();
-  materializeForSet->setBody(BraceStmt::create(ctx, loc, body, loc));
+  materializeForSet->setBody(BraceStmt::create(ctx, loc, body, loc, true));
 
   // Mark it transparent, there is no user benefit to this actually existing.
   materializeForSet->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
@@ -1535,7 +1535,7 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
       makeFinal(Ctx, didSet);
   }
 
-  Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc));
+  Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc, true));
 
   // Type check the body of the getter and setter.
   TC.typeCheckDecl(Get, true);
@@ -1913,8 +1913,10 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       // Create the parameter.
       auto *arg = new (context) ParamDecl(/*IsLet*/true, Loc, var->getName(),
                                           Loc, var->getName(), varType, decl);
+      arg->setImplicit();
       argNames.push_back(var->getName());
       Pattern *pattern = new (context) NamedPattern(arg);
+      pattern->setImplicit();
       TypeLoc tyLoc = TypeLoc::withoutLoc(varType);
       pattern = new (context) TypedPattern(pattern, tyLoc);
       patternElts.push_back(TuplePatternElt(pattern));
@@ -1922,6 +1924,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   }
 
   auto pattern = TuplePattern::create(context, Loc, patternElts, Loc);
+  pattern->setImplicit();
 
   // Create the constructor.
   DeclName name(context, context.Id_init, argNames);
@@ -2273,7 +2276,7 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   typeCheckDecl(DD, /*isFirstPass=*/true);
 
   // Create an empty body for the destructor.
-  DD->setBody(BraceStmt::create(Context, CD->getLoc(), { }, CD->getLoc()));
+  DD->setBody(BraceStmt::create(Context, CD->getLoc(), { }, CD->getLoc(),true));
   CD->addMember(DD);
   CD->setHasDestructor();
 }

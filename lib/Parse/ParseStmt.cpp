@@ -1638,7 +1638,8 @@ ParserResult<CaseStmt> Parser::parseStmtCase() {
     Body = BraceStmt::create(Context, PreviousLoc, ArrayRef<ASTNode>(),
                              PreviousLoc, /*implicit=*/true);
   } else {
-    Body = BraceStmt::create(Context, StartOfBody, BodyItems, PreviousLoc);
+    Body = BraceStmt::create(Context, StartOfBody, BodyItems,
+                             PreviousLoc, /*implicit=*/true);
   }
 
   return makeParserResult(

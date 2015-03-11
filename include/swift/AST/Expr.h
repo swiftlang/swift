@@ -675,7 +675,10 @@ public:
   Expr *getSemanticExpr() const { return SemanticExpr; }
   void setSemanticExpr(Expr *SE) { SemanticExpr = SE; }
   
-  SourceRange getSourceRange() const { return Loc; }
+  SourceRange getSourceRange() const {
+    return SourceRange(Segments.front()->getSourceRange().Start,
+                       Segments.back()->getSourceRange().End);
+  }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::InterpolatedStringLiteral;

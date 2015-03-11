@@ -3391,7 +3391,8 @@ SourceRange FuncDecl::getSourceRange() const {
   if (auto *B = getBody())
     return { StartLoc, B->getEndLoc() };
   if (getBodyResultTypeLoc().hasLocation() &&
-      getBodyResultTypeLoc().getSourceRange().End.isValid())
+      getBodyResultTypeLoc().getSourceRange().End.isValid() &&
+      !this->isAccessor())
     return { StartLoc, getBodyResultTypeLoc().getSourceRange().End };
   const Pattern *LastPat = getBodyParamPatterns().back();
   if (!LastPat->isImplicit())
