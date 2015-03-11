@@ -267,11 +267,13 @@ endfunction()
 #     [OPT_FLAGS]                       # Optimization flags (overrides SWIFT_OPTIMIZE)
 #     [MODULE_DIR]                      # Put .swiftmodule, .swiftdoc., and .o
 #                                       # into this directory.
+#     [MODULE_NAME]                     # The module name. If not specified, the name
+#                                       # is derived from the output name
 #     [IS_STDLIB]                       # Install produced files.
 #     )
 function(_compile_swift_files dependency_target_out_var_name)
   parse_arguments(SWIFTFILE
-    "OUTPUT;SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;API_NOTES;OPT_FLAGS;MODULE_DIR;INSTALL_IN_COMPONENT"
+    "OUTPUT;SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;API_NOTES;OPT_FLAGS;MODULE_DIR;MODULE_NAME;INSTALL_IN_COMPONENT"
     "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY"
     ${ARGN})
 
@@ -336,10 +338,6 @@ function(_compile_swift_files dependency_target_out_var_name)
     list(APPEND swift_flags "-split-objc-selectors")
   endif()
 
-  # FIXME: We shouldn't /have/ to build things in a single process.
-  # <rdar://problem/15972329>
-  list(APPEND swift_flags "-force-single-frontend-invocation")
-
   # Don't include libarclite in any build products by default.
   list(APPEND swift_flags "-no-link-objc-runtime")
 
@@ -387,7 +385,13 @@ function(_compile_swift_files dependency_target_out_var_name)
 
   if(NOT SWIFTFILE_IS_MAIN)
     # Determine the directory where the module file should be placed.
-    get_filename_component(module_name "${SWIFTFILE_OUTPUT}" NAME_WE)
+    if (SWIFTFILE_MODULE_NAME)
+      set(module_name "${SWIFTFILE_MODULE_NAME}")
+      list(APPEND swift_flags
+          "-module-name" "${module_name}")
+    else()
+      get_filename_component(module_name "${SWIFTFILE_OUTPUT}" NAME_WE)
+    endif()
     if(SWIFTFILE_MODULE_DIR)
       set(module_dir "${SWIFTFILE_MODULE_DIR}")
     elseif(SWIFTFILE_IS_STDLIB)
@@ -556,6 +560,10 @@ function(handle_swift_sources
 
     set(swift_obj
         "${CMAKE_CURRENT_BINARY_DIR}${objsubdir}/${swift_obj_base}${CMAKE_C_OUTPUT_EXTENSION}")
+
+    # FIXME: We shouldn't /have/ to build things in a single process.
+    # <rdar://problem/15972329>
+    list(APPEND swift_compile_flags "-force-single-frontend-invocation")
 
     _compile_swift_files(
         dependency_target
