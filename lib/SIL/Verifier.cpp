@@ -28,9 +28,18 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Support/CommandLine.h"
 using namespace swift;
 
 using Lowering::AbstractionPattern;
+
+// This flag is used only to check that sil-combine can properly
+// remove any code after unreachable, thus bringing SIL into
+// its canonical form which may get temporarily broken during
+// intermediate transformations.
+static llvm::cl::opt<bool> SkipUnreachableMustBeLastErrors(
+                              "verify-skip-unreachable-must-be-last",
+                              llvm::cl::init(false));
 
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
 // prevent release builds from triggering spurious unused variable warnings.
@@ -367,8 +376,10 @@ public:
       require(&*BB->getInstList().rbegin() != I,
               "Non-terminators cannot be the last in a block");
     } else {
-      require(&*BB->getInstList().rbegin() == I,
-              "Terminator must be the last in block");
+      // Skip the check for UnreachableInst, if explicitly asked to do so.
+      if (!isa<UnreachableInst>(I) || !SkipUnreachableMustBeLastErrors)
+        require(&*BB->getInstList().rbegin() == I,
+                "Terminator must be the last in block");
     }
 
     // Verify that all of our uses are in this function.

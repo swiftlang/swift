@@ -220,6 +220,7 @@ public:
   visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI);
   SILInstruction *
   visitCheckedCastBranchInst(CheckedCastBranchInst *CBI);
+  SILInstruction * visitUnreachableInst(UnreachableInst *UI);
 
 
   /// Instruction visitor helpers.

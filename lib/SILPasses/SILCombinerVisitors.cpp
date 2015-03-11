@@ -1837,6 +1837,29 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
 
 SILInstruction *
 SILCombiner::
+visitUnreachableInst(UnreachableInst *UI) {
+  // Make sure that this unreachable instruction
+  // is the last instruction in the basic block.
+  if (UI->getParent()->getTerminator() == UI)
+    return nullptr;
+
+  // Collect together all the instructions after this point
+  llvm::SmallVector<SILInstruction *, 32> ToRemove;
+  for (auto Inst = UI->getParent()->rbegin(); &*Inst != UI; ++Inst)
+    ToRemove.push_back(&*Inst);
+
+  for (auto *Inst : ToRemove) {
+    // Replace any non-dead results with SILUndef values
+    Inst->replaceAllUsesWithUndef();
+    // and remove the instruction itself
+    eraseInstFromFunction(*Inst);
+  }
+
+  return nullptr;
+}
+
+SILInstruction *
+SILCombiner::
 visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
   // FIXME: rename from RemoveCondFails to RemoveRuntimeAsserts.
   if (RemoveCondFails) {
