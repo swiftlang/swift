@@ -1,6 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
-
-// XFAIL: linux
+// RUN: %target-run-simple-swift | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // Note: JIT mode is checked in Interpreter/protocol_lookup_jit.swift.
 
@@ -111,17 +109,21 @@ protocol Runcible: class {
   func runce()
 }
 
+#if _runtime(_objc)
 @objc protocol Fungible: class {
   func funge()
 }
+#endif
 
 extension C: Runcible {
   func runce() { println("C") }
 }
 
+#if _runtime(_objc)
 extension D: Fungible {
   @objc func funge() { println("D") }
 }
+#endif
 
 let c1: AnyObject = C()
 let c2: Any = C()
@@ -138,13 +140,14 @@ if let fruncible = c2 as? protocol<Fooable, Runcible> {
   println("not fooable and runcible")
 }
 
+#if _runtime(_objc)
 let d: D = D()
 let d1: AnyObject = D()
 let d2: Any = D()
 if let frungible = d1 as? protocol<Fooable, Runcible, Fungible> {
-  frungible.foo() // CHECK-NEXT: D
-  frungible.runce() // CHECK-NEXT: C
-  frungible.funge() // CHECK-NEXT: D
+  frungible.foo() // CHECK-objc-NEXT: D
+  frungible.runce() // CHECK-objc-NEXT: C
+  frungible.funge() // CHECK-objc-NEXT: D
 } else {
   println("not fooable, runcible, and fungible")
 }
@@ -153,12 +156,12 @@ let inttype: Any.Type = Int.self
 if let frungibleType = inttype as? protocol<Fooable, Runcible, Fungible>.Type {
   println("is fooable, runcible, and fungible")
 } else {
-  println("not fooable, runcible, and fungible") // CHECK-NEXT: not
+  println("not fooable, runcible, and fungible") // CHECK-objc-NEXT: not
 }
 
 let dtype: Any.Type = D.self
 if let frungibleType = dtype as? protocol<Fooable, Runcible, Fungible>.Type {
-  println("is fooable, runcible, and fungible") // CHECK-NEXT: is
+  println("is fooable, runcible, and fungible") // CHECK-objc-NEXT: is
 } else {
   println("not fooable, runcible, and fungible")
 }
@@ -168,7 +171,9 @@ func genericCast<U: AnyObject>(x: AnyObject, _: U.Type) -> U? {
 }
 
 if let fungible = genericCast(d, Fungible.self) {
-  fungible.funge() // CHECK-NEXT: D
+  fungible.funge() // CHECK-objc-NEXT: D
 } else {
   println("not fungible")
 }
+#endif
+

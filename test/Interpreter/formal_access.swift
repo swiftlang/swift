@@ -1,7 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
-// XFAIL: linux
-
 class C: Printable {
   var value: Int
   init(_ v: Int) { value = v }

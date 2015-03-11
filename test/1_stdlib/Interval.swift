@@ -148,9 +148,7 @@ func == <T: Comparable>(lhs: X<T>, rhs: X<T>) -> Bool {
   return lhs.a == rhs.a
 }
 
-IntervalTestSuite.test("Printable/DebugPrintable")
-  .xfail(.LinuxAny(reason: "dynamic casting is not implemented completely"))
-  .code {
+IntervalTestSuite.test("Printable/DebugPrintable") {
   expectEqual("0.0..<0.1", toString(X(0.0)..<X(0.1)))
   expectEqual("0.0...0.1", toString(X(0.0)...X(0.1)))
   

@@ -1851,7 +1851,7 @@ namespace {
       return End;
     }
   };
-  
+
   struct ConformanceCacheEntry {
   private:
     const void *Type; 
@@ -1861,22 +1861,47 @@ namespace {
     // is more than enough invalid pointer values for any realistic generation
     // number. It's a little easier to overflow on 32-bit, so we need an extra
     // bit there.
-  #if !__LP64__
+#if !__LP64__
     bool Success;
-  #endif
- 
-  public:
+#endif
+
     ConformanceCacheEntry(const void *type,
                           const ProtocolDescriptor *proto,
                           uintptr_t Data, bool Success)
       : Type(type), Proto(proto), Data(Data)
-    #if !__LP64__
+#if !__LP64__
         , Success(Success)
-    #endif
-    {}
-    
+#endif
+    {
+#if __LP64__
+#  if __APPLE__
+      assert((!Success && Data <= 0xFFFFFFFFU) ||
+             (Success && Data > 0xFFFFFFFFU));
+#  elif __linux__
+      assert((!Success && Data <= 0x0FFFU) ||
+             (Success && Data > 0x0FFFU));
+#  else
+#    error "port me"
+#  endif
+#endif
+  }
+
+  public:
     ConformanceCacheEntry() = default;
-   
+
+    static ConformanceCacheEntry createSuccess(
+        const void *type, const ProtocolDescriptor *proto,
+        const swift::WitnessTable *witness) {
+      return ConformanceCacheEntry(type, proto, (uintptr_t) witness, true);
+    }
+
+    static ConformanceCacheEntry createFailure(
+        const void *type, const ProtocolDescriptor *proto,
+        unsigned failureGeneration) {
+      return ConformanceCacheEntry(type, proto, (uintptr_t) failureGeneration,
+          false);
+    }
+
     /// \returns true if the entry represents an entry for the pair \p type
     /// and \p proto.
     bool matches(const void *type, const ProtocolDescriptor *proto) {
@@ -1884,11 +1909,17 @@ namespace {
     }
    
     bool isSuccessful() const {
-    #if __LP64__
+#if __LP64__
+#  if __APPLE__
       return Data > 0xFFFFFFFFU;
-    #else
+#  elif __linux__
+      return Data > 0x0FFFU;
+#  else
+#    error "port me"
+#  endif
+#else
       return Success;
-    #endif
+#endif
     }
     
     /// Get the cached witness table, if successful.
@@ -1966,11 +1997,11 @@ static void _addImageProtocolConformances(const mach_header *mh,
 #elif defined(__ELF__)
 static int _addImageProtocolConformances(struct dl_phdr_info *info,
                                           size_t size, void * /*data*/) {
-  // Skip the executable and ld-linux.so, which both have a null or empty name.
-  if (!info->dlpi_name || info->dlpi_name[0] == '\0')
-    return 0;
-
-  void *handle = dlopen(info->dlpi_name, RTLD_LAZY | RTLD_NOLOAD);
+  void *handle;
+  if (!info->dlpi_name || info->dlpi_name[0] == '\0') {
+    handle = dlopen(nullptr, RTLD_LAZY);
+  } else
+    handle = dlopen(info->dlpi_name, RTLD_LAZY | RTLD_NOLOAD);
   auto conformances = reinterpret_cast<const uint8_t*>(
       dlsym(handle, SWIFT_PROTOCOL_CONFORMANCES_SECTION));
 
@@ -2120,9 +2151,8 @@ recur:
     size_t hash = hashTypeProtocolPair(type, protocol);
     ConcurrentList<ConformanceCacheEntry> &Bucket =
       ConformanceCache.findOrAllocateNode(hash);
-    Bucket.push_front(ConformanceCacheEntry(type, protocol,
-                                            ProtocolConformanceGeneration,
-                                            false));
+    Bucket.push_front(ConformanceCacheEntry::createFailure(
+        type, protocol, ProtocolConformanceGeneration));
     pthread_mutex_unlock(&SectionsToScanLock);
     return nullptr;
   }
@@ -2144,12 +2174,11 @@ recur:
 
         auto witness = record.getWitnessTable(metadata);
         if (witness)
-          Bucket.push_front(ConformanceCacheEntry(metadata, P,
-                                                  (uintptr_t)witness, true));
+          Bucket.push_front(
+              ConformanceCacheEntry::createSuccess(metadata, P, witness));
         else
-          Bucket.push_front(ConformanceCacheEntry(metadata, P, 
-                                                  ProtocolConformanceGeneration,
-                                                  false));
+          Bucket.push_front(ConformanceCacheEntry::createFailure(
+              metadata, P, ProtocolConformanceGeneration));
 
       // If the record provides a nondependent witness table for all instances
       // of a generic type, cache it for the generic pattern.
@@ -2168,9 +2197,8 @@ recur:
         size_t hash = hashTypeProtocolPair(R, P);
         ConcurrentList<ConformanceCacheEntry> &Bucket =
           ConformanceCache.findOrAllocateNode(hash);
-          Bucket.push_front(ConformanceCacheEntry(R, P,
-                              (uintptr_t) record.getStaticWitnessTable(),
-                              true));
+          Bucket.push_front(ConformanceCacheEntry::createSuccess(
+              R, P, record.getStaticWitnessTable()));
       }
     }
   }
