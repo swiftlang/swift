@@ -120,8 +120,23 @@ default:
   break
 }
 
+
+// <rdar://problem/19382878> Introduce new x? pattern
 switch Optional(42) {
 case let x?: break
 case nil: break
 }
+
+// Test x???? patterns.
+switch (nil as Int???) {
+case let x???: print(x)
+case let x??: print(x)
+case let x?: print(x)
+case 4???: break
+case nil??: break
+case nil?: break
+default: break
+}
+
+
 

@@ -271,15 +271,23 @@ public:
                                 patternElts, E->getRParenLoc());
   }
 
+  Pattern *convertBindingsToOptionalSome(Expr *E) {
+    auto *Bind = dyn_cast<BindOptionalExpr>(E->getSemanticsProvidingExpr());
+    if (!Bind) return getSubExprPattern(E);
+
+    auto sub = convertBindingsToOptionalSome(Bind->getSubExpr());
+    return new (TC.Context) OptionalSomePattern(sub, Bind->getQuestionLoc());
+  }
+
   // Convert a x? to OptionalSome pattern.  In the AST form, this will look like
   // an OptionalEvaluationExpr with an immediate BindOptionalExpr inside of it.
   Pattern *visitOptionalEvaluationExpr(OptionalEvaluationExpr *E) {
-    auto *Bind = dyn_cast<BindOptionalExpr>(E->getSubExpr()->
-                                            getSemanticsProvidingExpr());
-    if (!Bind) return nullptr;
+    // We only handle the case where one or more bind expressions are subexprs
+    // of the optional evaluation.  Other cases are not simple postfix ?'s.
+    if (!isa<BindOptionalExpr>(E->getSubExpr()->getSemanticsProvidingExpr()))
+      return nullptr;
 
-    Pattern *sub = getSubExprPattern(Bind->getSubExpr());
-    return new (TC.Context) OptionalSomePattern(sub, Bind->getQuestionLoc());
+    return convertBindingsToOptionalSome(E->getSubExpr());
   }
 
 
