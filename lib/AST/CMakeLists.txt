@@ -45,6 +45,7 @@ add_swift_library(swiftAST
     clangToolingCore
     clangFrontendTool
     clangFrontend
+    clangCodeGen
     clangDriver
     clangSerialization
     clangParse
