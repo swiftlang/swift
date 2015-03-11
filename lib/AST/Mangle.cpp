@@ -37,8 +37,6 @@
 using namespace swift;
 using namespace Mangle;
 
-bool Mangler::UsePrivateDiscriminators = true;
-
 static bool isNonAscii(StringRef str) {
   for (unsigned char c : str) {
     if (c >= 0x80)
@@ -400,7 +398,7 @@ void Mangler::mangleDeclName(const ValueDecl *decl) {
     Buffer << 'L' << Index(decl->getLocalDiscriminator());
     // Fall through to mangle the <identifier>.
 
-  } else if (UsePrivateDiscriminators && decl->hasAccessibility() &&
+  } else if (decl->hasAccessibility() &&
              decl->getAccessibility() == Accessibility::Private) {
     // Mangle non-local private declarations with a textual discriminator
     // based on their enclosing file.

@@ -693,9 +693,6 @@ int frontend_main(ArrayRef<const char *>Args,
     return 1;
   }
 
-  if (Invocation.getLangOptions().UsePrivateDiscriminators)
-    Mangle::Mangler::UsePrivateDiscriminators = true;
-
   // TODO: reorder, if possible, so that diagnostics emitted during
   // CompilerInvocation::parseArgs are included in the serialized file.
   std::unique_ptr<DiagnosticConsumer> SerializedConsumer;

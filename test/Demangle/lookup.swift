@@ -16,7 +16,7 @@
 // RUN: %target-swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtCC14swift_ide_test5OuterP33_5CB4BCC03C4B9CB2AEEDDFF10FE7BD1E12PrivateInner
 // RUN: %target-swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtCC14swift_ide_testP33_5CB4BCC03C4B9CB2AEEDDFF10FE7BD1E12PrivateOuter5Inner
 
-// RUN: %target-swiftc_driver -emit-module -o %t %s %S/Inputs/lookup_other.swift -module-name Lookup -Xfrontend -enable-private-discriminators
+// RUN: %target-swiftc_driver -emit-module -o %t %s %S/Inputs/lookup_other.swift -module-name Lookup
 // RUN: echo 'import Lookup' > %t/test.swift
 
 // RUN: %target-swift-ide-test -source-filename=%t/test.swift -print-ast-typechecked -I %t -find-mangled=_TtV6Lookup12PublicStruct

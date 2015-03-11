@@ -1826,23 +1826,21 @@ void Serializer::writeDecl(const Decl *D) {
       writeDeclAttribute(Attr);
   }
 
-  if (M->Ctx.LangOpts.UsePrivateDiscriminators) {
-    if (auto *value = dyn_cast<ValueDecl>(D)) {
-      if (value->hasAccessibility() &&
-          value->getAccessibility() == Accessibility::Private &&
-          !value->getDeclContext()->isLocalContext()) {
-        // FIXME: We shouldn't need to encode this for /all/ private decls.
-        // In theory we can follow the same rules as mangling and only include
-        // the outermost private context.
-        auto topLevelContext = value->getDeclContext()->getModuleScopeContext();
-        if (auto *enclosingFile = dyn_cast<FileUnit>(topLevelContext)) {
-          Identifier discriminator =
-            enclosingFile->getDiscriminatorForPrivateValue(value);
-          unsigned abbrCode =
-            DeclTypeAbbrCodes[PrivateDiscriminatorLayout::Code];
-          PrivateDiscriminatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                          addIdentifierRef(discriminator));
-        }
+  if (auto *value = dyn_cast<ValueDecl>(D)) {
+    if (value->hasAccessibility() &&
+        value->getAccessibility() == Accessibility::Private &&
+        !value->getDeclContext()->isLocalContext()) {
+      // FIXME: We shouldn't need to encode this for /all/ private decls.
+      // In theory we can follow the same rules as mangling and only include
+      // the outermost private context.
+      auto topLevelContext = value->getDeclContext()->getModuleScopeContext();
+      if (auto *enclosingFile = dyn_cast<FileUnit>(topLevelContext)) {
+        Identifier discriminator =
+          enclosingFile->getDiscriminatorForPrivateValue(value);
+        unsigned abbrCode =
+          DeclTypeAbbrCodes[PrivateDiscriminatorLayout::Code];
+        PrivateDiscriminatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                        addIdentifierRef(discriminator));
       }
     }
   }

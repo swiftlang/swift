@@ -177,10 +177,6 @@ def enable_objc_implicit_properties :
   Flag<["-"], "enable-objc-implicit-properties">,
   HelpText<"Import Objective-C \"implicit properties\" as properties">;
 
-def enable_private_discriminators :
-  Flag<["-"], "enable-private-discriminators">,
-  HelpText<"Mangle discriminators into the symbol names for private entities">;
-
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 

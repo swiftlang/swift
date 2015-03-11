@@ -2164,10 +2164,6 @@ int main(int argc, char *argv[]) {
   InitInvok.getLangOptions().DebugForbidTypecheckPrefix =
     options::DebugForbidTypecheckPrefix;
 
-  // Force these options, which are factored out for staging purposes.
-  InitInvok.getLangOptions().UsePrivateDiscriminators = true;
-  Mangle::Mangler::UsePrivateDiscriminators = true;
-
   for (auto ConfigName : options::BuildConfigs)
     InitInvok.getLangOptions().addBuildConfigOption(ConfigName);
 

@@ -114,13 +114,6 @@ namespace swift {
 
     /// Should access control be respected?
     bool EnableAccessControl = true;
-
-    /// If set, symbol mangling will include private discriminators.
-    ///
-    /// This option is for staging purposes only; it will soon go away.
-    /// In particular, setting this will not actually change the mangler's
-    /// behavior; it just affects what the compiler \em thinks will happen.
-    bool UsePrivateDiscriminators = true;
     
     /// The target we are building for.
     ///
