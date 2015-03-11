@@ -734,6 +734,23 @@ public func callFoo(c: CC) -> Int {
   return (c as! DD).foo()
 }
 
+
+@inline(never)
+func callFooGeneric<T : PP>(c: T) -> Int {
+  return (c as! DD).foo()
+}
+
+// Check that the inlined version of callFooGeneric contains only a trap
+// followed by unreachable and no code afterwards
+// CHECK-LABEL: sil @_TF12cast_folding16callForGenericCCFCS_2CCT_
+// CHECK: builtin "int_trap"
+// CHECK-NEXT: unreachable
+// CHECK-NEXT: }
+public func callForGenericCC(c: CC) {
+  callFoo(c)
+}
+
+
 println("test0=\(test0())")
 
 println("test1=\(test1())")

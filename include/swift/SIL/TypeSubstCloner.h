@@ -263,6 +263,7 @@ protected:
       B.createBuiltinTrap(loc);
       ValueMap.insert({SILValue(inst),
                        SILValue(SILUndef::get(targetType, inst->getModule()))});
+      B.createUnreachable(ArtificialUnreachableLocation());
       return;
     }
     llvm_unreachable("bad classification");
