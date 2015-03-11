@@ -105,6 +105,9 @@ set(SWIFT_NATIVE_CLANG_TOOLS_PATH "" CACHE STRING
 set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "" CACHE STRING
     "Path to the directory that contains Swift tools that are executable on the build machine")
 
+set(SWIFT_STDLIB_DYLIB_EXTRA_INSTALL_PATHS "" CACHE STRING
+    "Path to the directory where Swift dylibs for the [sdk_name1;path1;sdk_name2;path2;...]")
+
 #
 # User-configurable Darwin-specific options.
 #

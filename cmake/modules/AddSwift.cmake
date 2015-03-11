@@ -1335,10 +1335,30 @@ function(add_swift_library name)
               WORLD_READ)
         endif()
 
-        swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
-            FILES "${UNIVERSAL_LIBRARY_NAME}"
-            DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
-            PERMISSIONS ${file_permissions})
+        set(install_paths
+            "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}")
+        if(SWIFTLIB_SHARED AND
+           (NOT "${SWIFT_STDLIB_DYLIB_EXTRA_INSTALL_PATHS}" STREQUAL ""))
+          list(LENGTH SWIFT_STDLIB_DYLIB_EXTRA_INSTALL_PATHS listlen)
+          if(${listlen} GREATER 0)
+            math(EXPR listlen "${listlen}-1")
+            foreach(i RANGE 0 ${listlen} 2)
+              list(GET SWIFT_STDLIB_DYLIB_EXTRA_INSTALL_PATHS ${i} match_sdk_name)
+              if("${sdk}" STREQUAL "${match_sdk_name}")
+                math(EXPR ip1 "${i}+1")
+                list(GET SWIFT_STDLIB_DYLIB_EXTRA_INSTALL_PATHS ${ip1} dylib_install_path)
+                list(APPEND install_paths "${dylib_install_path}")
+              endif()
+            endforeach()
+          endif()
+        endif()
+
+        foreach(p ${install_paths})
+          swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
+              FILES "${UNIVERSAL_LIBRARY_NAME}"
+              DESTINATION "${p}"
+              PERMISSIONS ${file_permissions})
+        endforeach()
       endif()
 
       # If we built static variants of the library, create a lipo target for
