@@ -394,15 +394,9 @@ SILBasicBlock *swift::splitBasicBlockAndBranch(SILInstruction *SplitBeforeInst,
 
   return NewBB;
 }
-/// Splits the n-th critical edge from the terminator and updates dominance and
-/// loop info if set.
-/// Returns the newly created basic block on success or nullptr otherwise (if
-/// the edge was not critical.
-SILBasicBlock *swift::splitCriticalEdge(TermInst *T, unsigned EdgeIdx,
-                                        DominanceInfo *DT, SILLoopInfo *LI) {
-  if (!isCriticalEdge(T, EdgeIdx))
-    return nullptr;
 
+static SILBasicBlock *splitEdge(TermInst *T, unsigned EdgeIdx,
+                                DominanceInfo *DT, SILLoopInfo *LI) {
   auto *SrcBB = T->getParent();
   auto *Fn = SrcBB->getParent();
 
@@ -487,6 +481,30 @@ SILBasicBlock *swift::splitCriticalEdge(TermInst *T, unsigned EdgeIdx,
     Parent->addBasicBlockToLoop(EdgeBB, LI->getBase());
 
   return EdgeBB;
+}
+
+/// Split every edge between two basic blocks.
+void swift::splitEdgesFromTo(SILBasicBlock *From, SILBasicBlock *To,
+                             DominanceInfo *DT, SILLoopInfo *LI) {
+  for (unsigned EdgeIndex = 0, E = From->getSuccs().size(); EdgeIndex != E;
+       ++EdgeIndex) {
+    SILBasicBlock *SuccBB = From->getSuccs()[EdgeIndex];
+    if (SuccBB != To)
+      continue;
+    splitEdge(From->getTerminator(), EdgeIndex, DT, LI);
+  }
+}
+
+/// Splits the n-th critical edge from the terminator and updates dominance and
+/// loop info if set.
+/// Returns the newly created basic block on success or nullptr otherwise (if
+/// the edge was not critical.
+SILBasicBlock *swift::splitCriticalEdge(TermInst *T, unsigned EdgeIdx,
+                                        DominanceInfo *DT, SILLoopInfo *LI) {
+  if (!isCriticalEdge(T, EdgeIdx))
+    return nullptr;
+
+  return splitEdge(T, EdgeIdx, DT, LI);
 }
 
 /// Split all critical edges in the function updating the dominator tree and

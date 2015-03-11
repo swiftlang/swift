@@ -65,6 +65,13 @@ SILBasicBlock *splitCriticalEdge(TermInst *T, unsigned EdgeIdx,
                                  DominanceInfo *DT = nullptr,
                                  SILLoopInfo *LI = nullptr);
 
+/// \brief Splits the edges between two basic blocks.
+///
+/// Updates dominance information and loop information if not null.
+/// Returns the newly created basic block on success.
+void splitEdgesFromTo(SILBasicBlock *From, SILBasicBlock *To,
+                      DominanceInfo *DT = nullptr, SILLoopInfo *LI = nullptr);
+
 /// \brief Rotate a loop's header as long as it is exiting and not equal to the
 /// passed basic block.
 /// If \p RotateSingleBlockLoops is true a single basic block loop will be
