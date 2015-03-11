@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -parse-as-library -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend  -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | FileCheck %s
 
 var zero: Int = 0
 

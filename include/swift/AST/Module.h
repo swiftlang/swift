@@ -43,6 +43,7 @@ namespace swift {
   class ASTWalker;
   class BraceStmt;
   class Decl;
+  class DeclAttribute;
   class TypeDecl;
   enum class DeclKind : uint8_t;
   class ExtensionDecl;
@@ -839,7 +840,7 @@ public:
   TinyPtrVector<TypeDecl*> LocalTypeDecls;
 
   /// The first location where an @objc attribute appeared.
-  SourceLoc FirstObjCAttrLoc;
+  const DeclAttribute *FirstObjCAttr = nullptr;
 
   template <typename T>
   using OperatorMap = llvm::DenseMap<Identifier,llvm::PointerIntPair<T,1,bool>>;

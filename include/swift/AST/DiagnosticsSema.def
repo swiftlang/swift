@@ -1750,8 +1750,8 @@ ERROR(sil_metatype_multiple_reprs,type_parsing,none,
 // @objc
 //------------------------------------------------------------------------------
 
-ERROR(objc_decl_used_without_required_module, sema_tcd, none,
-  "@%0 attribute used without importing module %1", (StringRef, Identifier))
+ERROR(attr_used_without_required_module, sema_tcd, none,
+  "%0 attribute used without importing module %1", (DeclAttribute, Identifier))
 
 ERROR(invalid_objc_decl,sema_tcd,none,
       "only classes, protocols, methods, properties, and subscript "

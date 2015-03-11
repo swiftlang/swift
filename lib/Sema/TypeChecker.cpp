@@ -560,14 +560,13 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
   // Emit an error if there is a declaration with the @objc attribute
   // but we have not imported the Foundation module.
-  if (Ctx.LangOpts.EnableObjCAttrRequiresFoundation &&
-      SF.Kind == SourceFileKind::Main &&
-      StartElem == 0 &&
-      SF.FirstObjCAttrLoc.isValid() && !ImportsFoundationModule) {
-    auto L = SF.FirstObjCAttrLoc;
-    Ctx.Diags.diagnose(L, diag::objc_decl_used_without_required_module,
-                       "objc", FoundationModuleName)
-    .highlight(SourceRange(L));
+  if (!ImportsFoundationModule && StartElem == 0 &&
+      Ctx.LangOpts.EnableObjCAttrRequiresFoundation &&
+      SF.FirstObjCAttr && SF.Kind != SourceFileKind::SIL) {
+    SourceLoc L = SF.FirstObjCAttr->getLocation();
+    Ctx.Diags.diagnose(L, diag::attr_used_without_required_module,
+                       SF.FirstObjCAttr, FoundationModuleName)
+      .highlight(SF.FirstObjCAttr->getRangeWithAt());
   }
 
   // Verify the SourceFile.

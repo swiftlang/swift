@@ -291,10 +291,10 @@ getStringLiteralIfNotInterpolated(Parser &P, SourceLoc Loc, const Token &Tok,
                                                  Segments.front().Length));
 }
 
-void Parser::setFirstObjCAttributeLocation(SourceLoc L) {
-  if (auto SF = CurDeclContext->getParentSourceFile())
-    if (SF->FirstObjCAttrLoc.isInvalid())
-      SF->FirstObjCAttrLoc = L;
+static void recordObjCAttr(const DeclContext *DC, const ObjCAttr *attr) {
+  if (auto SF = DC->getParentSourceFile())
+    if (!SF->FirstObjCAttr)
+      SF->FirstObjCAttr = attr;
 }
 
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
@@ -809,8 +809,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   case DAK_ObjC: {
     // Unnamed @objc attribute.
     if (Tok.isNot(tok::l_paren)) {
-      Attributes.add(ObjCAttr::createUnnamed(Context, AtLoc, Loc));
-      setFirstObjCAttributeLocation(Loc);
+      auto attr = ObjCAttr::createUnnamed(Context, AtLoc, Loc);
+      Attributes.add(attr);
+      recordObjCAttr(CurDeclContext, attr);
       break;
     }
 
@@ -884,24 +885,25 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                       diag::attr_objc_expected_rparen,
                                       LParenLoc);
 
+    ObjCAttr *attr;
     if (Names.empty()) {
       // When there are no names, recover as if there were no parentheses.
       if (!Invalid)
         diagnose(LParenLoc, diag::attr_objc_empty_name);
-      Attributes.add(ObjCAttr::createUnnamed(Context, AtLoc, Loc));
+      attr = ObjCAttr::createUnnamed(Context, AtLoc, Loc);
     } else if (!sawColon) {
       // When we didn't see a colon, this is a nullary name.
       assert(Names.size() == 1 && "Forgot to set sawColon?");
-      Attributes.add(ObjCAttr::createNullary(Context, AtLoc, Loc, LParenLoc,
-                                             NameLocs.front(), Names.front(),
-                                             RParenLoc));
+      attr = ObjCAttr::createNullary(Context, AtLoc, Loc, LParenLoc,
+                                     NameLocs.front(), Names.front(),
+                                     RParenLoc);
     } else {
       // When we did see a colon, this is a selector.
-      Attributes.add(ObjCAttr::createSelector(Context, AtLoc, Loc,
-                                              LParenLoc, NameLocs, Names,
-                                              RParenLoc));
+      attr = ObjCAttr::createSelector(Context, AtLoc, Loc, LParenLoc,
+                                      NameLocs, Names, RParenLoc);
     }
-    setFirstObjCAttributeLocation(Loc);
+    Attributes.add(attr);
+    recordObjCAttr(CurDeclContext, attr);
     break;
   }
   }

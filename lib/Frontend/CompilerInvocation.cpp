@@ -62,7 +62,7 @@ void CompilerInvocation::setTargetTriple(StringRef Triple) {
 }
 
 SourceFileKind CompilerInvocation::getSourceFileKind() const {
-  switch(getInputKind()) {
+  switch (getInputKind()) {
   case InputFileKind::IFK_Swift:
     return SourceFileKind::Main;
   case InputFileKind::IFK_Swift_Library:
@@ -70,7 +70,7 @@ SourceFileKind CompilerInvocation::getSourceFileKind() const {
   case InputFileKind::IFK_Swift_REPL:
     return SourceFileKind::REPL;
   case InputFileKind::IFK_SIL:
-        return SourceFileKind::SIL;
+    return SourceFileKind::SIL;
   case InputFileKind::IFK_None:
   case InputFileKind::IFK_LLVM_IR:
     llvm_unreachable("Trying to convert from unsupported InputFileKind");

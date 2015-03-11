@@ -668,10 +668,6 @@ public:
   /// Parse a specific attribute.
   bool parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
 
-  /// Records in the SourceFile the first location where an @objc
-  /// appeared.
-  void setFirstObjCAttributeLocation(SourceLoc L);
-
   bool parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                              DeclAttrKind DK);
   
