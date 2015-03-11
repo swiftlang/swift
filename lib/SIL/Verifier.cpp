@@ -1434,18 +1434,6 @@ public:
                     "result must be of the method's type");
   }
 
-  static bool isClassOrClassMetatype(Type t) {
-    if (auto *meta = t->getAs<AnyMetatypeType>()) {
-      return bool(meta->getInstanceType()->getClassOrBoundGenericClass());
-    } else {
-      return bool(t->getClassOrBoundGenericClass());
-    }
-  }
-
-  static bool isClassOrClassMetatype(SILType t) {
-    return t.isObject() && isClassOrClassMetatype(t.getSwiftRValueType());
-  }
-
   void checkClassMethodInst(ClassMethodInst *CMI) {
     require(CMI->getType() == TC.getConstantType(CMI->getMember()),
             "result type of class_method must match type of method");
@@ -1454,9 +1442,9 @@ public:
     require(methodType->getRepresentation() == FunctionType::Representation::Thin,
             "result method must be of a thin function type");
     SILType operandType = CMI->getOperand().getType();
-    require(isClassOrClassMetatype(operandType.getSwiftType()),
+    require(operandType.isClassOrClassMetatype(),
             "operand must be of a class type");
-    require(isClassOrClassMetatype(getMethodSelfType(methodType)),
+    require(getMethodSelfType(methodType).isClassOrClassMetatype(),
             "result must be a method of a class");
     
     require(CMI->getMember().isForeign
@@ -1487,9 +1475,9 @@ public:
     require(methodType->getRepresentation() == FunctionType::Representation::Thin,
             "result method must be of a thin function type");
     SILType operandType = CMI->getOperand().getType();
-    require(isClassOrClassMetatype(operandType.getSwiftType()),
+    require(operandType.isClassOrClassMetatype(),
             "operand must be of a class type");
-    require(isClassOrClassMetatype(getMethodSelfType(methodType)),
+    require(getMethodSelfType(methodType).isClassOrClassMetatype(),
             "result must be a method of a class");
 
     Type methodClass;

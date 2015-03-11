@@ -307,6 +307,19 @@ public:
     return getSwiftRValueType()->isBridgeableObjectType();
   }
 
+  static bool isClassOrClassMetatype(Type t) {
+    if (auto *meta = t->getAs<AnyMetatypeType>()) {
+      return bool(meta->getInstanceType()->getClassOrBoundGenericClass());
+    } else {
+      return bool(t->getClassOrBoundGenericClass());
+    }
+  }
+
+  /// True if the type is a class type or class metatype type.
+  bool isClassOrClassMetatype() {
+    return isObject() && isClassOrClassMetatype(getSwiftRValueType());
+  }
+
   /// True if the type involves any archetypes.
   bool hasArchetype() const {
     return getSwiftRValueType()->hasArchetype();
