@@ -26,6 +26,7 @@ add_swift_library(swiftSIL
   LoopInfo.cpp
   Projection.cpp
   Mangle.cpp
+  Linker.cpp
   LINK_LIBRARIES
     swiftSerialization
     swiftSema)
