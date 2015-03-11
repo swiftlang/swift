@@ -26,9 +26,9 @@ void PrettyStackTraceSILFunctionTransform::print(llvm::raw_ostream &out) const {
   }
   out << "\"";
   SFT->getFunction()->printName(out);
-  out << "\".";
+  out << "\".\n";
 }
 
 void PrettyStackTraceSILModuleTransform::print(llvm::raw_ostream &out) const {
-  out << "While running SILModuleTransform \"" << SMT->getName() << "\".";
+  out << "While running SILModuleTransform \"" << SMT->getName() << "\".\n";
 }

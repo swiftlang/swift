@@ -324,7 +324,8 @@ public:
   }
 
   SILVerifier(const SILFunction &F)
-      : M(F.getModule().getSwiftModule()), F(F), TC(F.getModule().Types) {
+    : M(F.getModule().getSwiftModule()), F(F), TC(F.getModule().Types),
+      Dominance(nullptr) {
     if (F.isExternalDeclaration())
       return;
       
@@ -340,7 +341,8 @@ public:
   }
 
   ~SILVerifier() {
-    delete Dominance;
+    if (Dominance)
+      delete Dominance;
   }
 
   void visitSILArgument(SILArgument *arg) {
@@ -2586,6 +2588,43 @@ public:
     }
   }
 
+  void verifyBranches(SILFunction *F) {
+    // If we are not in canonical SIL return early.
+    if (F->getModule().getStage() != SILStage::Canonical)
+      return;
+
+    // Verify that there is no non_condbr critical edge.
+    auto isCriticalEdgePred = [](const TermInst *T, unsigned EdgeIdx) {
+      assert(T->getSuccessors().size() > EdgeIdx && "Not enough successors");
+
+      // A critical edge has more than one outgoing edges from the source
+      // block.
+      auto SrcSuccs = T->getSuccessors();
+      if (SrcSuccs.size() <= 1)
+        return false;
+
+      // And its destination block has more than one predecessor.
+      SILBasicBlock *DestBB = SrcSuccs[EdgeIdx];
+      assert(!DestBB->pred_empty() && "There should be a predecessor");
+      if (DestBB->getSinglePredecessor())
+        return false;
+
+      return true;
+    };
+
+    // Check for non-cond_br critical edges.
+    for (auto &BB : *F) {
+      TermInst *TI = BB.getTerminator();
+      if (isa<CondBranchInst>(TI))
+        continue;
+
+      for (unsigned Idx = 0, e = BB.getSuccs().size(); Idx != e; ++Idx) {
+        require(!isCriticalEdgePred(TI, Idx),
+                "non cond_br critical edges not allowed");
+      }
+    }
+  }
+
   void visitSILBasicBlock(SILBasicBlock *BB) {
     // Make sure that each of the successors/predecessors of this basic block
     // have this basic block in its predecessor/successor list.
@@ -2618,21 +2657,48 @@ public:
   void visitSILFunction(SILFunction *F) {
     PrettyStackTraceSILFunction stackTrace("verifying", F);
 
+    if (F->getLinkage() == SILLinkage::PrivateExternal) {
+      // FIXME: uncomment these checks.
+      // <rdar://problem/18635841> SILGen can create non-fragile external
+      // private_external declarations
+      //
+      // assert(!isExternalDeclaration() &&
+      //        "PrivateExternal should not be an external declaration");
+      // assert(isFragile() &&
+      //        "PrivateExternal should be fragile (otherwise, how did it appear "
+      //        "in this module?)");
+    }
+
     CanSILFunctionType FTy = F->getLoweredFunctionType();
-    if (FTy->isPolymorphic()) {
-      require(F->getContextGenericParams(),
+    verifySILFunctionType(FTy);
+
+    if (F->isExternalDeclaration()) {
+      assert(F->isAvailableExternally() &&
+             "external declaration of internal SILFunction not allowed");
+      assert(!hasSharedVisibility(F->getLinkage()) &&
+             "external declarations of SILFunctions with shared visiblity is not "
+             "allowed");
+      // If F is an external declaration, there is nothing further to do,
+      // return.
+      return;
+    }
+
+    // Make sure that our SILFunction only has context generic params if our
+    // SILFunctionType is non-polymorphic.
+    if (F->getContextGenericParams()) {
+      require(FTy->isPolymorphic(),
               "generic function definition must have context archetypes");
     } else {
-      require(!F->getContextGenericParams(),
+      require(!FTy->isPolymorphic(),
               "non-generic function definitions cannot have context "
               "archetypes");
     }
 
-    verifySILFunctionType(FTy);
+    // Otherwise, verify the body of the function.
     verifyEntryPointArguments(F->getBlocks().begin());
     verifyEpilogBlock(F);
     verifyStackHeight(F);
-
+    verifyBranches(F);
     SILVisitor::visitSILFunction(F);
   }
 
@@ -2650,55 +2716,10 @@ public:
 /// invariants.
 void SILFunction::verify() const {
 #ifndef NDEBUG
-  if (isExternalDeclaration()) {
-    assert(isAvailableExternally() &&
-           "external declaration of internal SILFunction not allowed");
-    assert(!hasSharedVisibility(getLinkage()) &&
-           "external declarations of SILFunctions with shared visiblity is not "
-           "allowed");
-  }
-  if (getLinkage() == SILLinkage::PrivateExternal) {
-    // FIXME: uncomment these checks.
-    // <rdar://problem/18635841> SILGen can create non-fragile external
-    // private_external declarations
-    //
-    // assert(!isExternalDeclaration() &&
-    //        "PrivateExternal should not be an external declaration");
-    // assert(isFragile() &&
-    //        "PrivateExternal should be fragile (otherwise, how did it appear "
-    //        "in this module?)");
-  }
-  if (!isExternalDeclaration())
-    SILVerifier(*this).verify();
-
-  // Verify that there is no non_condbr critical edge.
-  if (getModule().getStage() == SILStage::Canonical) {
-
-    auto isCriticalEdgePred = [](const TermInst *T, unsigned EdgeIdx) {
-      assert(T->getSuccessors().size() > EdgeIdx && "Not enough successors");
-
-      // A critical edge has more than one outgoing edges from the source
-      // block.
-      auto SrcSuccs = T->getSuccessors();
-      if (SrcSuccs.size() <= 1)
-        return false;
-
-      // And its destination block has more than one predecessor.
-      SILBasicBlock *DestBB = SrcSuccs[EdgeIdx];
-      assert(!DestBB->pred_empty() && "There should be a predecessor");
-      if (DestBB->getSinglePredecessor())
-        return false;
-
-      return true;
-    };
-
-    for (auto &BB : *this)
-      if (!isa<CondBranchInst>(BB.getTerminator()))
-        for (unsigned Idx = 0, e = BB.getSuccs().size(); Idx != e; ++Idx)
-          assert(!isCriticalEdgePred(BB.getTerminator(), Idx) &&
-                 "non cond_br critical edges not allowed");
-  }
-
+  // Please put all checks in visitSILFunction in SILVerifier, not here. This
+  // ensures that the pretty stack trace in the verifier is included with the
+  // back trace when the verifier crashes.
+  SILVerifier(*this).verify();
 #endif
 }
 
