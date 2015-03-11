@@ -52,7 +52,7 @@ bool SILLinkerVisitor::processFunction(SILFunction *F) {
     return false;
 
   // If F is a declaration, first deserialize it.
-  auto NewFn = F->isExternalDeclaration() ? Loader->lookupSILFunction(F) : F;
+  auto *NewFn = F->isExternalDeclaration() ? Loader->lookupSILFunction(F) : F;
   if (!NewFn || NewFn->empty())
     return false;
 
@@ -280,7 +280,7 @@ bool SILLinkerVisitor::process() {
   // worklist.
   bool Result = false;
   while (!Worklist.empty()) {
-    auto Fn = Worklist.pop_back_val();
+    auto *Fn = Worklist.pop_back_val();
 
     if (!shouldImportFunction(Fn))
       continue;
@@ -289,30 +289,32 @@ bool SILLinkerVisitor::process() {
       for (auto &I : BB) {
         // Should we try linking?
         if (visit(&I)) {
-          for (auto F : FunctionDeserializationWorklist) {
+          for (auto *F : FunctionDeserializationWorklist) {
 
             if (!shouldImportFunction(F))
               continue;
 
             // The ExternalSource may wish to rewrite non-empty bodies.
-            if (!F->empty() && ExternalSource)
-              if (auto NewFn = ExternalSource->lookupSILFunction(F)) {
+            if (!F->empty() && ExternalSource) {
+              if (auto *NewFn = ExternalSource->lookupSILFunction(F)) {
                 NewFn->verify();
                 Worklist.push_back(NewFn);
                 ++NumFuncLinked;
                 Result = true;
                 continue;
               }
+            }
 
             F->setBare(IsBare);
 
-            if (F->empty())
-              if (auto NewFn = Loader->lookupSILFunction(F)) {
+            if (F->empty()) {
+              if (auto *NewFn = Loader->lookupSILFunction(F)) {
                 NewFn->verify();
                 Worklist.push_back(NewFn);
                 Result = true;
                 ++NumFuncLinked;
               }
+            }
           }
           FunctionDeserializationWorklist.clear();
         } else {
