@@ -1277,7 +1277,7 @@ struct StructWithComputedProperty {
 // CHECK: function_ref{{.*}}StructWithComputedProperty.foo.getter
 func testStructWithComputedProperty(#s : StructWithComputedProperty) {
   switch s {
-  case let StructWithComputedProperty(foo: a):
+  case StructWithComputedProperty(foo: let a):
     println(a)
   }
 }

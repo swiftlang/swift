@@ -95,7 +95,7 @@ private enum Bar<T> {
 
   mutating func value() -> T {
     switch self {
-    case let E(x):
+    case E(let x):
       return x.value
     }
   }

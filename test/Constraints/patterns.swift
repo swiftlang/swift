@@ -119,3 +119,9 @@ case .HairForceOne: // expected-error{{enum case 'HairForceOne' not found in typ
 default:
   break
 }
+
+switch Optional(42) {
+case let x?: break
+case nil: break
+}
+

@@ -96,8 +96,9 @@ static Expr *addTrailingClosureToArgument(ASTContext &context,
 ///
 /// \param isExprBasic Whether we're only parsing an expr-basic.
 ParserResult<Expr> Parser::parseExprImpl(Diag<> Message, bool isExprBasic) {
-  // If we see a pattern in expr position, parse it to an UnresolvedPatternExpr.
-  // Name binding will resolve whether it's in a valid pattern position.
+  // If we see a let/var/is pattern in expr position, parse it to an
+  // UnresolvedPatternExpr.  Name binding will resolve whether it's in a valid
+  // pattern position.
   if (isOnlyStartOfMatchingPattern()) {
     ParserResult<Pattern> pattern = parseMatchingPattern();
     if (pattern.hasCodeCompletion())
@@ -198,32 +199,6 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
       return Primary;
     if (Primary.isNull())
       return nullptr;
-    
-    // If we got a bare identifier inside a 'var' pattern, it forms a variable
-    // binding pattern. Raise an error if the identifier shadows an existing
-    // binding.
-    //
-    // TODO: We could check for a bare identifier followed by a non-postfix
-    // token first thing with a lookahead.
-    if (InVarOrLetPattern) {
-      if (auto *declRef = dyn_cast<DeclRefExpr>(Primary.get())) {
-        // This is ill-formed, but the problem will be caught later by scope
-        // resolution.
-        auto pattern = createBindingFromPattern(declRef->getLoc(),
-                                              declRef->getDecl()->getName(),
-                                              InVarOrLetPattern == IVOLP_InLet);
-        Primary
-          = makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
-      }
-      if (auto *udre = dyn_cast<UnresolvedDeclRefExpr>(Primary.get())) {
-        auto pattern = createBindingFromPattern(udre->getLoc(),
-                                              udre->getName(),
-                                              InVarOrLetPattern == IVOLP_InLet);
-        Primary
-          = makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
-      }
-    }
-    
     SequencedExprs.push_back(Primary.get());
     
 parse_operator:
@@ -766,9 +741,24 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     break;
   }
       
+  case tok::identifier:  // foo
+    // If we are parsing a refutable pattern and are inside a let/var pattern,
+    // the identifiers change to be value bindings instead of decl references.
+    // Parse and return this as an UnresolvedPatternExpr around a binding.  This
+    // will be resolved (or rejected) by sema when the overall refutable pattern
+    // it transformed from an expression into a pattern.
+    if (InVarOrLetPattern) {
+      Identifier name;
+      SourceLoc loc = consumeIdentifier(&name);
+      auto pattern = createBindingFromPattern(loc, name,
+                                              InVarOrLetPattern == IVOLP_InLet);
+      Result = makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
+      break;
+    }
+
+    SWIFT_FALLTHROUGH;
   case tok::kw_self:     // self
   case tok::kw_Self:     // Self
-  case tok::identifier:  // foo
     Result = makeParserResult(parseExprIdentifier());
 
     // If there is an expr-call-suffix, parse it and form a call.
