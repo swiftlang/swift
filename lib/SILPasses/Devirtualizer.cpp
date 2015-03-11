@@ -341,29 +341,28 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
     return false;
 
   // Strip any upcasts off of our 'self' value, potentially leaving us
-  // with a class value or class metatype value whose type is closer
-  // (in the class hierarchy) to the actual dynamic type.
+  // with a value whose type is closer (in the class hierarchy) to the
+  // actual dynamic type.
   auto SubTypeValue = CMI->getOperand().stripUpCasts();
   SILType SubType = SubTypeValue.getType();
-
-  auto &M = AI->getModule();
 
   // Bail if any generic types parameters of the class instance type are
   // unbound.
   // We cannot devirtualize unbound generic calls yet.
-  if (isClassWithUnboundGenericParameters(SubType, M))
+  if (isClassWithUnboundGenericParameters(SubType, AI->getModule()))
     return false;
 
-  // We're operating on either a class-typed value or class
-  // metatype-typed value. In the latter case we need to get the
-  // instance type in order to obtain the ClassDecl, which is used to
-  // determine what kind of speculative devirtualizaton to do.
-  SILType ClassTy = SubType;
-  if (SubType.is<MetatypeType>())
-    ClassTy = SubType.getMetatypeInstanceType(M);
+  ClassDecl *CD = SubType.getClassOrBoundGenericClass();
 
-  ClassDecl *CD = ClassTy.getClassOrBoundGenericClass();
-  assert(CD && "Expected class decl for class type!");
+  if (auto *VMTI = dyn_cast<ValueMetatypeInst>(SubTypeValue)) {
+    CanType InstTy = VMTI->getType().castTo<MetatypeType>().getInstanceType();
+    CD = InstTy.getClassOrBoundGenericClass();
+    assert(CD && "Non-class type for instance type of class metatype?!");
+  }
+
+  // Check if it is legal to insert inline caches.
+  if (!CD)
+    return false;
 
   if (!CHA->hasKnownDirectSubclasses(CD)) {
     // If there is only one possible alternative for this method,
