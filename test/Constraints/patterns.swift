@@ -139,4 +139,24 @@ default: break
 }
 
 
+// Test some value patterns.
+let x : Int? = nil
+
+extension Int {
+  func method() -> Int { return 42 }
+}
+
+func ~= <T : Equatable>(lhs: T?, rhs: T?) -> Bool {
+  return lhs == rhs
+}
+
+switch 4 as Int? {
+case x?.method(): break // match value
+}
+
+switch 4 {
+case x ?? 42: break // match value
+default: break
+}
+
 
