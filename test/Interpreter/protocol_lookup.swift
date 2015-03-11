@@ -109,7 +109,7 @@ protocol Runcible: class {
   func runce()
 }
 
-#if _runtime(_objc)
+#if _runtime(_ObjC)
 @objc protocol Fungible: class {
   func funge()
 }
@@ -119,7 +119,7 @@ extension C: Runcible {
   func runce() { println("C") }
 }
 
-#if _runtime(_objc)
+#if _runtime(_ObjC)
 extension D: Fungible {
   @objc func funge() { println("D") }
 }
@@ -140,7 +140,7 @@ if let fruncible = c2 as? protocol<Fooable, Runcible> {
   println("not fooable and runcible")
 }
 
-#if _runtime(_objc)
+#if _runtime(_ObjC)
 let d: D = D()
 let d1: AnyObject = D()
 let d2: Any = D()
