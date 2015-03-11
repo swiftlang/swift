@@ -1861,6 +1861,26 @@ visitUnreachableInst(UnreachableInst *UI) {
 SILInstruction *
 SILCombiner::
 visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
+  bool isSourceTypeExact = isa<MetatypeInst>(UCCI->getOperand());
+
+  // Check if we can statically predict the outcome of the cast.
+  auto Feasibility = classifyDynamicCast(UCCI->getModule().getSwiftModule(),
+                          UCCI->getOperand().getType().getSwiftRValueType(),
+                          UCCI->getType().getSwiftRValueType(),
+                          isSourceTypeExact);
+
+  if (Feasibility == DynamicCastFeasibility::WillFail) {
+    // Remove the cast and insert a trap, followed by an
+    // unreachable instruction.
+    SILBuilderWithScope<1> Builder(UCCI);
+    auto *Trap = Builder.createBuiltinTrap(UCCI->getLoc());
+    UCCI->replaceAllUsesWithUndef();
+    eraseInstFromFunction(*UCCI);
+    Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(Trap)));
+    Builder.createUnreachable(ArtificialUnreachableLocation());
+    return nullptr;
+  }
+
   // FIXME: rename from RemoveCondFails to RemoveRuntimeAsserts.
   if (RemoveCondFails) {
     SILModule &Mod = UCCI->getModule();

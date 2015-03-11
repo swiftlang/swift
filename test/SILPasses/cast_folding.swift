@@ -699,6 +699,41 @@ func test29() -> Bool {
   return cast29(NSNumber(integer:1))
 }
 
+
+protocol PP {
+  func foo() -> Int
+}
+
+public class CC : PP {
+  func foo() -> Int { return 0 }
+}
+
+public class DD : PP {
+  func foo() -> Int { return 1 }
+}
+
+// Check that the body of the function
+// contains a trap followed by unreachable
+// and no code afterwards.
+// CHECK-LABEL: sil @_TF12cast_folding7getAsDDFCS_2CCCS_2DD
+// CHECK: builtin "int_trap"
+// CHECK-NEXT: unreachable
+// CHECK-NEXT: }
+public func getAsDD(c: CC) -> DD {
+  return c as! DD
+}
+
+// Check that the body of the function
+// contains a trap followed by unreachable
+// and no code afterwards.
+// CHECK-LABEL: sil @_TF12cast_folding7callFooFCS_2CCSi
+// CHECK: builtin "int_trap"
+// CHECK-NEXT: unreachable
+// CHECK-NEXT: }
+public func callFoo(c: CC) -> Int {
+  return (c as! DD).foo()
+}
+
 println("test0=\(test0())")
 
 println("test1=\(test1())")
