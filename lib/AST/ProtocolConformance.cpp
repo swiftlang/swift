@@ -147,47 +147,6 @@ static GenericParamList *genericParamListForType(Type ty) {
   return nullptr;
 }
 
-/// Return the list of generic params that were substituted if this conformance
-/// was specialized somewhere along the inheritence chain.
-GenericParamList *ProtocolConformance::getSubstitutedGenericParams() const {
-  const ProtocolConformance *C = this;
-
-  bool FoundSpecializedConformance = false;
-  while (true) {
-    switch (C->getKind()) {
-    case ProtocolConformanceKind::Inherited:
-      // If we have an inherited protocol conformance, grab our inherited
-      // conformance and continue. Inheritence in it of itself does not yield
-      // additional type variables.
-      C = cast<InheritedProtocolConformance>(C)->getInheritedConformance();
-      continue;
-    case ProtocolConformanceKind::Specialized:
-      // If we have a specialized protocol conformance, since we do not support
-      // currently partial specialization, we know that it can not have any open
-      // type variables.
-      C = cast<SpecializedProtocolConformance>(C)->getGenericConformance();
-      FoundSpecializedConformance = true;
-      continue;
-    case ProtocolConformanceKind::Normal: {
-      // If we have a normal protocol conformance and we have not seen a
-      // specialized protocol conformance yet, we know that the normal protocol
-      // conformance can only contain open types. Bail.
-      if (!FoundSpecializedConformance)
-        return nullptr;
-
-
-      // Otherwise, this must be the original conformance containing the
-      // specialized generic parameters.  Attempt to create the param list.
-      auto normal = cast<NormalProtocolConformance>(C);
-      if (auto ext = dyn_cast<ExtensionDecl>(normal->getDeclContext()))
-        return ext->getGenericParams();
-
-      return genericParamListForType(C->getType());
-    }
-    }
-  }
-}
-
 GenericParamList *ProtocolConformance::getGenericParams() const {
   const ProtocolConformance *C = this;
 
