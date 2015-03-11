@@ -1,0 +1,52 @@
+// RUN: %target-sil-opt %s -array-specialize -verify
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct ArrayIntBuffer {
+  var storage : Builtin.NativeObject
+}
+
+struct MyArray<T> {
+  var buffer : ArrayIntBuffer
+}
+
+enum MyBool{
+  case True
+  case False
+}
+
+class MyClass {
+}
+
+/// We need to split the loop exit edge from bb1 to bb3 before updating ssa form
+/// after cloning.
+sil @clone_switch_enum_exit : $@thin (@inout MyArray<MyClass>, @inout MyBool) -> MyBool {
+bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool):
+  %3 = load %0 : $*MyArray<MyClass>
+  br bb1
+
+bb1:
+  %2 = function_ref @arrayPropertyIsNative : $@cc(method) @thin (@owned MyArray<MyClass>) -> Bool
+  %4 = load %1 : $*MyBool
+  retain_value %3 : $MyArray<MyClass>
+  %5 = apply %2(%3) : $@cc(method) @thin (@owned MyArray<MyClass>) -> Bool
+  switch_enum %4 : $MyBool, case #MyBool.False!enumelt: bb3, case #MyBool.True!enumelt: bb2
+
+bb2:
+ %6 = integer_literal $Builtin.Int1, -1
+ cond_br %6, bb1, bb4
+
+bb3:
+ br bb4
+
+bb4:
+  return %4 : $MyBool
+}
+
+sil public_external [semantics "array.props.isNative"] @arrayPropertyIsNative : $@cc(method) @thin (@owned MyArray<MyClass>) -> Bool {
+bb0(%0: $MyArray<MyClass>):
+  unreachable
+}

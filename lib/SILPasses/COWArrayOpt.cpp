@@ -1264,6 +1264,16 @@ public:
     for (auto *BB : OutsideBBs)
       BBMap[BB] = BB;
 
+    // We need to split any edge from a non cond_br basic block leading to a
+    // exit block. After cloning this edge will become critical if it came from
+    // inside the cloned region. The SSAUpdater can't handle critical non
+    // cond_br edges.
+    for (auto *BB : OutsideBBs)
+      for (auto *Pred : BB->getPreds())
+        if (!isa<CondBranchInst>(Pred->getTerminator()) &&
+            !isa<BranchInst>(Pred->getTerminator()))
+          splitEdgesFromTo(Pred, BB, &DomTree, nullptr);
+
     // Create the cloned start basic block.
     auto *ClonedStartBB = new (Mod) SILBasicBlock(CurFun);
     BBMap[StartBB] = ClonedStartBB;
