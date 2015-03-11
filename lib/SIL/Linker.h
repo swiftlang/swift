@@ -90,4 +90,4 @@ private:
   bool process();
 };
 
-} // end anonymous namespace.
+} // end namespace swift
