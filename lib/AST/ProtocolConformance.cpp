@@ -124,69 +124,26 @@ bool ProtocolConformance::usesDefaultDefinition(ValueDecl *requirement) const {
   CONFORMANCE_SUBCLASS_DISPATCH(usesDefaultDefinition, (requirement))
 }
 
-/// FIXME: This should be an independent property of the conformance.
-/// Assuming a BoundGenericType conformance is always for the
-/// DeclaredTypeInContext is unsound if we ever add constrained extensions.
-static GenericParamList *genericParamListForType(Type ty) {
-  while (ty) {
-    if (auto nt = ty->getAs<NominalType>())
-      ty = nt->getParent();
-    else
-      break;
-  }
-
-  if (!ty)
-    return nullptr;
-
-  if (auto bgt = ty->getAs<BoundGenericType>()) {
-    auto decl = bgt->getDecl();
-    assert(bgt->isEqual(decl->getDeclaredTypeInContext()) &&
-           "conformance for constrained generic type not implemented");
-    return decl->getGenericParams();
-  }
-  return nullptr;
-}
-
 GenericParamList *ProtocolConformance::getGenericParams() const {
-  const ProtocolConformance *C = this;
-
-  while (true) {
-    switch (C->getKind()) {
-    case ProtocolConformanceKind::Inherited:
-      // If we have an inherited protocol conformance, grab our inherited
-      // conformance and continue.
-      C = cast<InheritedProtocolConformance>(C)->getInheritedConformance();
-      continue;
-    case ProtocolConformanceKind::Specialized:
-      // If we have a specialized protocol conformance, since we do not support
-      // currently partial specialization, we know that it can not have any open
-      // type variables.
-      return nullptr;
-    case ProtocolConformanceKind::Normal: {
-      // If we have a normal protocol conformance, attempt to look up its open
-      // generic type variables.
-      auto normal = cast<NormalProtocolConformance>(C);
-      if (auto ext = dyn_cast<ExtensionDecl>(normal->getDeclContext()))
-        return ext->getGenericParams();
-
-      return genericParamListForType(C->getType());
-    }
-    }
+  switch (getKind()) {
+  case ProtocolConformanceKind::Inherited:
+  case ProtocolConformanceKind::Normal:
+    // If we have a normal or inherited protocol conformance, look for its
+    // generic parameters.
+    return getDeclContext()->getGenericParamsOfContext();
+  case ProtocolConformanceKind::Specialized:
+    // If we have a specialized protocol conformance, since we do not support
+    // currently partial specialization, we know that it can not have any open
+    // type variables.
+    return nullptr;
   }
 }
 
 Type ProtocolConformance::getInterfaceType() const {
   switch (getKind()) {
   case ProtocolConformanceKind::Normal:
-    // FIXME: This should be the type stored in the protocol conformance.
-    // Assuming a generic conformance is always for the DeclaredTypeInContext
-    // is unsound if we ever add constrained extensions.
-    return getType()->getNominalOrBoundGenericNominal()
-      ->getDeclaredInterfaceType();
-  
   case ProtocolConformanceKind::Inherited:
-    return cast<InheritedProtocolConformance>(this)->getInheritedConformance()
-      ->getInterfaceType();
+    return getDeclContext()->getDeclaredInterfaceType();
 
   case ProtocolConformanceKind::Specialized:
     // Assume a specialized conformance is fully applied.
@@ -196,12 +153,7 @@ Type ProtocolConformance::getInterfaceType() const {
 }
 
 GenericSignature *ProtocolConformance::getGenericSignature() const {
-  // FIXME: Should be an independent property of the conformance.
-  // Assuming a BoundGenericType conformance is always for the
-  // DeclaredTypeInContext is unsound if we ever add constrained extensions.
-
-  return getType()->getNominalOrBoundGenericNominal()
-    ->getGenericSignatureOfContext();
+  return getDeclContext()->getGenericSignatureOfContext();
 }
 
 bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
