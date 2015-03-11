@@ -293,7 +293,7 @@ getStringLiteralIfNotInterpolated(Parser &P, SourceLoc Loc, const Token &Tok,
 
 void Parser::setFirstObjCAttributeLocation(SourceLoc L) {
   if (auto SF = CurDeclContext->getParentSourceFile())
-    if (!SF->FirstObjCAttrLoc)
+    if (SF->FirstObjCAttrLoc.isInvalid())
       SF->FirstObjCAttrLoc = L;
 }
 

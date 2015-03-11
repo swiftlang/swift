@@ -563,8 +563,8 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   if (Ctx.LangOpts.EnableObjCAttrRequiresFoundation &&
       SF.Kind == SourceFileKind::Main &&
       StartElem == 0 &&
-      SF.FirstObjCAttrLoc && !ImportsFoundationModule) {
-    auto L = SF.FirstObjCAttrLoc.getValue();
+      SF.FirstObjCAttrLoc.isValid() && !ImportsFoundationModule) {
+    auto L = SF.FirstObjCAttrLoc;
     Ctx.Diags.diagnose(L, diag::objc_decl_used_without_required_module,
                        "objc", FoundationModuleName)
     .highlight(SourceRange(L));

@@ -839,7 +839,7 @@ public:
   TinyPtrVector<TypeDecl*> LocalTypeDecls;
 
   /// The first location where an @objc attribute appeared.
-  Optional<SourceLoc> FirstObjCAttrLoc;
+  SourceLoc FirstObjCAttrLoc;
 
   template <typename T>
   using OperatorMap = llvm::DenseMap<Identifier,llvm::PointerIntPair<T,1,bool>>;
