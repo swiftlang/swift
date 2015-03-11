@@ -448,3 +448,21 @@ ArrayRef<Substitution> SILFunction::getForwardingSubstitutions() {
     return {};
   return params->getForwardingSubstitutions(getASTContext());
 }
+
+bool SILFunction::canHaveSharedLinkage() const {
+  // If this function is an external declaration, it can not have shared
+  // linkage.
+  if (isExternalDeclaration())
+    return false;
+
+  // If this function has the stdlib_binary_only semantics tag, it can not be
+  // shared.
+  //
+  // Technically, we just want to make sure that we do not serialize these. For
+  // now this is a good enough wya to check for this.
+  if (hasSemanticsString("stdlib_binary_only"))
+    return false;
+
+  // Otherwise, it is legal to have shared linkage.
+  return true;
+}

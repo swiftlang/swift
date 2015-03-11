@@ -325,6 +325,9 @@ public:
     return SemanticsAttr == Value;
   }
 
+  /// \returns True if it is legal for this function to have shared linkage.
+  bool canHaveSharedLinkage() const;
+
   /// Initialize the source location of the function.
   void setLocation(SILLocation L) { Location = L; }
 
