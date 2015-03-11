@@ -212,6 +212,12 @@ public:
   /// Get the underlying normal conformance.
   const NormalProtocolConformance *getRootNormalConformance() const;
 
+  NormalProtocolConformance *getRootNormalConformance() {
+    return const_cast<NormalProtocolConformance *>(
+             const_cast<const ProtocolConformance *>(this)
+               ->getRootNormalConformance());
+  }
+
   /// Determine whether the witness for the given requirement
   /// is either the default definition or was otherwise deduced.
   ///

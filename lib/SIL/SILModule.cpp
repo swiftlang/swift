@@ -131,28 +131,8 @@ SILModule::createWitnessTableDeclaration(ProtocolConformance *C,
   if (!C)
     return nullptr;
 
-  // Walk down to the base NormalProtocolConformance.
-  ProtocolConformance *ParentC = C;
-  ArrayRef<Substitution> Subs;
-  while (!isa<NormalProtocolConformance>(ParentC)) {
-    switch (ParentC->getKind()) {
-    case ProtocolConformanceKind::Normal:
-      llvm_unreachable("should have exited the loop?!");
-    case ProtocolConformanceKind::Inherited:
-      ParentC = cast<InheritedProtocolConformance>(ParentC)
-        ->getInheritedConformance();
-      break;
-    case ProtocolConformanceKind::Specialized: {
-      auto SC = cast<SpecializedProtocolConformance>(ParentC);
-      ParentC = SC->getGenericConformance();
-      assert(Subs.empty() && "multiple conformance specializations?!");
-      Subs = SC->getGenericSubstitutions();
-      break;
-    }
-    }
-  }
-  NormalProtocolConformance *NormalC
-    = cast<NormalProtocolConformance>(ParentC);
+  // Extract the base NormalProtocolConformance.
+  NormalProtocolConformance *NormalC = C->getRootNormalConformance();
 
   SILWitnessTable *WT = SILWitnessTable::create(*this,
                                                 linkage,
