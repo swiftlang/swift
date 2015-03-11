@@ -238,6 +238,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::RemovePins,
                                    "remove-pins",
                                    "Remove pin/unpin pairs"),
+                        clEnumValN(PassKind::SwiftArrayOpts,
+                                   "array-specialize",
+                                   "Specialize arrays"),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
