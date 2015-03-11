@@ -86,3 +86,36 @@ var c = is Int // expected-error{{prefix 'is' pattern cannot appear in an expres
 // expr-unary productions, it would be good to parse them anyway for recovery.
 //var e = 2 + var y
 //var e = var y + 2
+
+// 'E.Case' can be used in a dynamic type context as an equivalent to
+// '.Case as E'.
+protocol HairType {}
+enum MacbookHair: HairType {
+  case HairSupply(S)
+}
+
+enum iPadHair<T>: HairType {
+  case HairForceOne
+}
+
+enum Watch {
+  case Sport, Watch, Edition
+}
+
+let hair: HairType = MacbookHair.HairSupply(S())
+switch hair {
+case MacbookHair.HairSupply(let s):
+  s.s()
+case iPadHair<S>.HairForceOne:
+  ()
+case iPadHair<E>.HairForceOne:
+  ()
+case iPadHair.HairForceOne: // expected-error{{generic enum type 'iPadHair' is ambiguous without explicit generic parameters when matching value of type 'HairType'}}
+  ()
+case Watch.Edition: // TODO: should warn that cast can't succeed with currently known conformances
+  ()
+case .HairForceOne: // expected-error{{enum case 'HairForceOne' not found in type 'HairType'}}
+  ()
+default:
+  break
+}

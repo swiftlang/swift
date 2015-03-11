@@ -1631,6 +1631,9 @@ ERROR(nominal_type_pattern_static_property,sema_tcp,none,
       (StringRef, Type))
 ERROR(nominal_type_subpattern_without_property_name,pattern_parsing,none,
       "subpattern of a struct or class pattern must have a keyword name", ())
+ERROR(ambiguous_enum_pattern_type,sema_tcp,none,
+      "generic enum type %0 is ambiguous without explicit generic parameters "
+      "when matching value of type %1", (Type, Type))
 WARNING(type_inferred_to_undesirable_type,sema_tcp,none,
         "%select{variable|constant}2 %0 inferred to have type %1, "
         "which may be unexpected", (Identifier, Type, bool))

@@ -2137,7 +2137,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (toExistential || fromExistential || fromArchetype || toArchetype)
     return CheckedCastKind::ValueCast;
 
-  // Sanity check casts between concrete types.
+  // Reality check casts between concrete types.
 
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
   

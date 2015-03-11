@@ -138,7 +138,7 @@ case .Twain,
 var notAnEnum = 0
 
 switch notAnEnum {
-case .Foo: // expected-error{{enum case pattern cannot match values of the non-enum type 'Int'}}
+case .Foo: // expected-error{{enum case 'Foo' not found in type 'Int'}}
   ()
 }
 

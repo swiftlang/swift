@@ -1018,58 +1018,102 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
   }
       
   case PatternKind::EnumElement: {
-    auto *OP = cast<EnumElementPattern>(P);
-    
-    auto *enumDecl = type->getEnumOrBoundGenericEnum();
-    
-    if (!enumDecl) {
-      diagnose(OP->getLoc(), diag::enum_element_pattern_not_enum, type);
-      return true;
-    }
+    auto *EEP = cast<EnumElementPattern>(P);
     
     // If the element decl was not resolved (because it was spelled without a
     // type as `.Foo`), resolve it now that we have a type.
-    if (!OP->getElementDecl()) {
+    Optional<CheckedCastKind> castKind;
+    
+    Type enumTy;
+    if (!EEP->getElementDecl()) {
       EnumElementDecl *element
-        = lookupEnumMemberElement(*this, dc, type, OP->getName());
+        = lookupEnumMemberElement(*this, dc, type, EEP->getName());
       if (!element) {
-        diagnose(OP->getLoc(), diag::enum_element_pattern_member_not_found,
-                 OP->getName().str(), type);
+        diagnose(EEP->getLoc(), diag::enum_element_pattern_member_not_found,
+                 EEP->getName().str(), type);
         return true;
       }
-      OP->setElementDecl(element);
+      EEP->setElementDecl(element);
+      enumTy = type;
+    } else {
+      // Check if the explicitly-written enum type matches the type we're
+      // coercing to.
+      assert(!EEP->getParentType().isNull()
+             && "enum with resolved element doesn't specify parent type?!");
+      auto parentTy = EEP->getParentType().getType();
+      // If the type matches exactly, use it.
+      if (parentTy->isEqual(type)) {
+        enumTy = type;
+      }
+      // Otherwise, if the type is an unbound generic of the context type, use
+      // the context type to resolve the parameters.
+      else if (parentTy->is<UnboundGenericType>()) {
+        if (parentTy->getAnyNominal() == type->getAnyNominal()) {
+          enumTy = type;
+        } else {
+          diagnose(EEP->getLoc(), diag::ambiguous_enum_pattern_type,
+                   parentTy, type);
+          return true;
+        }
+      }
+      // Otherwise, see if we can introduce a cast pattern to get from an
+      // existential pattern type to the enum type.
+      else if (type->isAnyExistentialType()) {
+        auto foundCastKind = typeCheckCheckedCast(type, parentTy, dc,
+                                                  SourceLoc(),
+                                                  SourceRange(), SourceRange(),
+                                                  [](Type) { return false; },
+                                                  /*suppress diags*/ false);
+        // If the cast failed, we can't resolve the pattern.
+        if (foundCastKind < CheckedCastKind::First_Resolved)
+          return true;
+        
+        // Otherwise, we can type-check as the enum type, and insert a cast
+        // from the outer pattern type.
+        castKind = foundCastKind;
+        enumTy = parentTy;
+      } else {
+        diagnose(EEP->getLoc(),
+                 diag::enum_element_pattern_not_member_of_enum,
+                 EEP->getName().str(), type);
+        return true;
+      }
     }
 
-    EnumElementDecl *elt = OP->getElementDecl();
-    // Is the enum element actually part of the enum type we're matching?
-    if (elt->getParentEnum() != enumDecl) {
-      diagnose(OP->getLoc(), diag::enum_element_pattern_not_member_of_enum,
-               OP->getName().str(), type);
-      return true;
-    }
+    EnumElementDecl *elt = EEP->getElementDecl();
     
     // If there is a subpattern, push the enum element type down onto it.
-    if (OP->hasSubPattern()) {
+    if (EEP->hasSubPattern()) {
       Type elementType;
       if (elt->hasArgumentType())
-        elementType = type->getTypeOfMember(elt->getModuleContext(),
-                                            elt, this,
-                                            elt->getArgumentInterfaceType());
+        elementType = enumTy->getTypeOfMember(elt->getModuleContext(),
+                                              elt, this,
+                                              elt->getArgumentInterfaceType());
       else
         elementType = TupleType::getEmpty(Context);
-      Pattern *sub = OP->getSubPattern();
+      Pattern *sub = EEP->getSubPattern();
       if (coercePatternToType(sub, dc, elementType,
                      subOptions|TR_FromNonInferredPattern|TR_EnumPatternPayload,
                      resolver))
         return true;
-      OP->setSubPattern(sub);
+      EEP->setSubPattern(sub);
     }
-    OP->setType(type);
+    EEP->setType(enumTy);
     
     // Ensure that the type of our TypeLoc is fully resolved. If an unbound
     // generic type was spelled in the source (e.g. `case Optional.None:`) this
     // will fill in the generic parameters.
-    OP->getParentType().setType(type, /*validated*/ true);
+    EEP->getParentType().setType(enumTy, /*validated*/ true);
+    
+    // If we needed a cast, wrap the pattern in a cast pattern.
+    if (castKind) {
+      auto isPattern = new (Context) IsPattern(SourceLoc(),
+                                               TypeLoc::withoutLoc(enumTy),
+                                               EEP, *castKind,
+                                               /*implicit*/true);
+      isPattern->setType(type);
+      P = isPattern;
+    }
     
     return false;
   }

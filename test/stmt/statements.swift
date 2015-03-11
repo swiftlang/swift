@@ -248,7 +248,7 @@ func DoWhileStmt4() {
 
 func brokenSwitch(x: Int) -> Int {
   switch x {
-  case .Blah(var rep): // expected-error{{enum case pattern cannot match values of the non-enum type 'Int'}}
+  case .Blah(var rep): // expected-error{{enum case 'Blah' not found in type 'Int'}}
     return rep
   }
 }
