@@ -40,23 +40,6 @@ static bool isRCIdentityPreservingCast(ValueKind Kind) {
   }
 }
 
-// Similar to isRCIdentityPreservingCast, but does not
-// allow for UnconditionalCheckedCastInst, which may
-// perform downcasts.
-static bool isUpcastPreservingCast(ValueKind Kind) {
-  switch (Kind) {
-  case ValueKind::UpcastInst:
-  case ValueKind::UncheckedRefCastInst:
-  case ValueKind::UncheckedAddrCastInst:
-  case ValueKind::UncheckedRefBitCastInst:
-  case ValueKind::RefToBridgeObjectInst:
-  case ValueKind::BridgeObjectToRefInst:
-    return true;
-  default:
-    return false;
-  }
-}
-
 /// Return the underlying SILValue after stripping off identity SILArguments if
 /// we belong to a BB with one predecessor.
 static SILValue stripSinglePredecessorArgs(SILValue V) {
@@ -111,20 +94,15 @@ SILValue SILValue::stripCasts() {
 }
 
 SILValue SILValue::stripUpCasts() {
-  SILValue V = *this;
+  assert(getType().isClassOrClassMetatype() &&
+         "Expected class or class metatype!");
 
-  while (true) {
-    V = stripSinglePredecessorArgs(V);
+  SILValue V = stripSinglePredecessorArgs(*this);
 
-    auto K = V->getKind();
-    if (isUpcastPreservingCast(K) ||
-        K == ValueKind::UncheckedTrivialBitCastInst) {
-      V = cast<SILInstruction>(V.getDef())->getOperand(0);
-      continue;
-    }
+  while (isa<UpcastInst>(V))
+    V = stripSinglePredecessorArgs(cast<UpcastInst>(V)->getOperand());
 
-    return V;
-  }
+  return V;
 }
 
 SILValue SILValue::stripClassCasts() {

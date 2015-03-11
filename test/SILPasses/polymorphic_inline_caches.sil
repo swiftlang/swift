@@ -79,3 +79,104 @@ sil_vtable C {
 sil_vtable D {
   #A.ping!1: _TFC25polymorphic_inline_caches1D4pingfS0_FBi32_Bi32_
 }
+
+protocol P {
+  func foo()
+}
+
+public class E : P {
+  @inline(never) func foo()
+  deinit
+  init()
+}
+
+public class F : E {
+  @inline(never) override func foo()
+  deinit
+  override init()
+}
+
+public final class G : E {
+  @inline(never) override final func foo()
+  deinit
+  override init()
+}
+
+sil [noinline] @_TFC5casts1E3foofS0_FT_T_ : $@cc(method) @thin (@owned E) -> ()
+sil [noinline] @_TFC5casts1F3foofS0_FT_T_ : $@cc(method) @thin (@owned F) -> ()
+sil [noinline] @_TFC5casts1G3foofS0_FT_T_ : $@cc(method) @thin (@owned G) -> ()
+
+// CHECK-LABEL: sil [noinline] @_TF5casts18unchecked_ref_castFBoT_
+sil [noinline] @_TF5casts18unchecked_ref_castFBoT_ : $@thin (@owned Builtin.NativeObject) -> () {
+  // CHECK: bb0
+bb0(%0 : $Builtin.NativeObject):
+  // CHECK: strong_retain %0
+  strong_retain %0 : $Builtin.NativeObject
+  // CHECK: [[CAST:%.*]] = unchecked_ref_cast %0 : $Builtin.NativeObject to $E
+  %3 = unchecked_ref_cast %0 : $Builtin.NativeObject to $E
+  // CHECK-NOT: class_method
+  %4 = class_method %3 : $E, #E.foo!1 : E -> () -> () , $@cc(method) @thin (@owned E) -> ()
+  %5 = apply %4(%3) : $@cc(method) @thin (@owned E) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %7 = tuple ()
+  return %7 : $()
+  // CHECK: checked_cast_br [exact] [[CAST]] : $E to $F, bb2, bb3
+  // CHECK: bb1
+  // CHECK: return
+  // CHECK: bb2
+  // CHECK: [[FFOO:%.*]] = function_ref @_TFC5casts1F3foofS0_FT_T_
+  // CHECK: apply [[FFOO]]
+  // CHECK: bb3
+  // CHECK: checked_cast_br [exact] [[CAST]] : $E to $G, bb5, bb6
+  // CHECK: bb4
+  // CHECK: br bb1
+  // CHECK: bb5
+  // CHECK: [[GFOO:%.*]] = function_ref @_TFC5casts1G3foofS0_FT_T_
+  // CHECK: apply [[GFOO]]
+  // CHECK: bb6
+  // CHECK: checked_cast_br [exact] [[CAST]] : $E to $E, bb8, bb9
+  // CHECK: bb7
+  // CHECK: bb8
+  // CHECK: [[EFOO:%.*]] = function_ref @_TFC5casts1E3foofS0_FT_T_
+  // CHECK: apply [[EFOO]]
+  // CHECK: bb9
+  // CHECK: [[DYNAMIC:%.*]] = class_method [[CAST]] : $E, #E.foo!1
+  // CHECK: apply [[DYNAMIC]]
+}
+
+// CHECK-LABEL: sil [noinline] @_TF5casts22unchecked_ref_bit_castFCS_1ET_
+sil [noinline] @_TF5casts22unchecked_ref_bit_castFCS_1ET_ : $@thin (@owned E) -> () {
+// CHECK: bb0
+bb0(%0 : $E):
+  // CHECK: strong_retain %0
+  strong_retain %0 : $E
+  // CHECK: [[CAST:%.*]] = unchecked_ref_bit_cast %0 : $E to $F
+  %3 = unchecked_ref_bit_cast %0 : $E to $F
+  // CHECK-NOT: class_method
+  %4 = class_method %3 : $F, #F.foo!1 : F -> () -> () , $@cc(method) @thin (@owned F) -> ()
+  %5 = apply %4(%3) : $@cc(method) @thin (@owned F) -> ()
+  strong_release %0 : $E
+  %7 = tuple ()
+  return %7 : $()
+  // CHECK: checked_cast_br [exact] [[CAST]] : $F to $F, bb2, bb3
+  // CHECK: bb1
+  // CHECK: return
+  // CHECK: bb2
+  // CHECK: [[FFOO:%.*]] = function_ref @_TFC5casts1F3foofS0_FT_T_
+  // CHECK: apply [[FFOO]]
+  // CHECK: bb3
+  // CHECK: [[DYNAMIC:%.*]] = class_method [[CAST]] : $F, #F.foo!1
+  // CHECK: apply [[DYNAMIC]]
+}
+
+sil_vtable E {
+  #E.foo!1: _TFC5casts1E3foofS0_FT_T_
+}
+
+sil_vtable F {
+  #E.foo!1: _TFC5casts1F3foofS0_FT_T_
+}
+
+sil_vtable G {
+  #E.foo!1: _TFC5casts1G3foofS0_FT_T_
+}
