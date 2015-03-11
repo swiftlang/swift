@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -sil-combine -verify | FileCheck %s
+// RUN: %target-sil-opt %s -sil-combine -verify -verify-skip-unreachable-must-be-last | FileCheck %s
 
 // XFAIL: linux
 
@@ -2109,6 +2109,22 @@ bb0:
   %3 = struct $Int32 (%0 : $Builtin.Int32)
   return %3 : $Int32
 }
+
+
+// CHECK-LABEL:   sil @remove_dead_code_after_unreachable
+// CHECK-NEXT:      bb0
+// CHECK-NOT:       integer_literal $Builtin.Int32, -2
+// CHECK-NEXT:      unreachable
+// CHECK-NOT:       integer_literal $Builtin.Int32, -2
+// CHECK-NEXT:      }
+sil @remove_dead_code_after_unreachable : $@thin () -> (Int32) {
+bb0:
+  unreachable
+  %2 = integer_literal $Builtin.Int32, -2
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  return %3 : $Int32
+}
+
 
 // CHECK-LABEL:   sil @dont_remove_code_after_cond_fail
 // CHECK:         bb0([[Cond:%.*]] : $Builtin.Int1):
