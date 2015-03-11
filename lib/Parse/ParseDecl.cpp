@@ -1736,7 +1736,8 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
 
   if (FoundCCTokenInAttr) {
     if (CodeCompletion) {
-      CodeCompletion->completeDeclAttrKeyword(DeclResult.get(), isInSILMode(),
+      CodeCompletion->completeDeclAttrKeyword(DeclResult.getPtrOrNull(),
+                                              isInSILMode(),
                                               false);
     } else {
       delayParseFromBeginningToHere(BeginParserPosition, Flags);

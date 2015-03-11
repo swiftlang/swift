@@ -4,6 +4,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD2 | FileCheck %s -check-prefix=KEYWORD2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD3 | FileCheck %s -check-prefix=KEYWORD3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD4 | FileCheck %s -check-prefix=KEYWORD4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD5 | FileCheck %s -check-prefix=KEYWORD5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_LAST | FileCheck %s -check-prefix=KEYWORD_LAST
 
 @availability(#^AVAILABILITY1^#)
 
@@ -59,22 +61,37 @@ class C {}
 // KEYWORD3-NEXT:             End completions
 
 @#^KEYWORD4^#
-
-// KEYWORD4:                  Begin completions, 16 items
-// KEYWORD4-NEXT:             Keyword/None:                       availability[#Declaration Attribute#]; name=availability{{$}}
-// KEYWORD4-NEXT:             Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
-// KEYWORD4-NEXT:             Keyword/None:                       noreturn[#Declaration Attribute#]; name=noreturn{{$}}
-// KEYWORD4-NEXT:             Keyword/None:                       NSCopying[#Declaration Attribute#]; name=NSCopying{{$}}
-// KEYWORD4-NEXT:             Keyword/None:                       IBAction[#Declaration Attribute#]; name=IBAction{{$}}
-// KEYWORD4-NEXT:             Keyword/None:                       IBDesignable[#Declaration Attribute#]; name=IBDesignable{{$}}
-// KEYWORD4-NEXT:             Keyword/None:                       IBInspectable[#Declaration Attribute#]; name=IBInspectable{{$}}
-// KEYWORD4-NEXT:             Keyword/None:                       IBOutlet[#Declaration Attribute#]; name=IBOutlet{{$}}
-// KEYWORD4-NEXT:             Keyword/None:                       NSManaged[#Declaration Attribute#]; name=NSManaged{{$}}
-// KEYWORD4-NEXT:             Keyword/None:                       UIApplicationMain[#Declaration Attribute#]; name=UIApplicationMain{{$}}
-// KEYWORD4-NEXT:             Keyword/None:                       objc_non_lazy_realization[#Declaration Attribute#]; name=objc_non_lazy_realization{{$}}
-// KEYWORD4-NEXT:             Keyword/None:                       inline[#Declaration Attribute#]; name=inline{{$}}
-// KEYWORD4-NEXT:             Keyword/None:                       requires_stored_property_inits[#Declaration Attribute#]; name=requires_stored_property_inits{{$}}
-// KEYWORD4-NEXT:             Keyword/None:                       autoclosure[#Declaration Attribute#]; name=autoclosure{{$}}
-// KEYWORD4-NEXT:             Keyword/None:                       noescape[#Declaration Attribute#]; name=noescape{{$}}
-// KEYWORD4-NEXT:             Keyword/None:                       NSApplicationMain[#Declaration Attribute#]; name=NSApplicationMain{{$}}
+enum E {}
+// KEYWORD4:                  Begin completions, 2 items
+// KEYWORD4-NEXT:             Keyword/None:                       availability[#Enum Attribute#]; name=availability{{$}}
+// KEYWORD4-NEXT:             Keyword/None:                       objc[#Enum Attribute#]; name=objc{{$}}
 // KEYWORD4-NEXT:             End completions
+
+
+@#^KEYWORD5^#
+struct S{}
+// KEYWORD5:                  Begin completions, 1 items
+// KEYWORD5-NEXT:             Keyword/None:                       availability[#Struct Attribute#]; name=availability{{$}}
+// KEYWORD5-NEXT:             End completions
+
+
+@#^KEYWORD_LAST^#
+
+// KEYWORD_LAST:                  Begin completions, 16 items
+// KEYWORD_LAST-NEXT:             Keyword/None:                       availability[#Declaration Attribute#]; name=availability{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       noreturn[#Declaration Attribute#]; name=noreturn{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       NSCopying[#Declaration Attribute#]; name=NSCopying{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       IBAction[#Declaration Attribute#]; name=IBAction{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       IBDesignable[#Declaration Attribute#]; name=IBDesignable{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       IBInspectable[#Declaration Attribute#]; name=IBInspectable{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       IBOutlet[#Declaration Attribute#]; name=IBOutlet{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       NSManaged[#Declaration Attribute#]; name=NSManaged{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       UIApplicationMain[#Declaration Attribute#]; name=UIApplicationMain{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       objc_non_lazy_realization[#Declaration Attribute#]; name=objc_non_lazy_realization{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       inline[#Declaration Attribute#]; name=inline{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       requires_stored_property_inits[#Declaration Attribute#]; name=requires_stored_property_inits{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       autoclosure[#Declaration Attribute#]; name=autoclosure{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       noescape[#Declaration Attribute#]; name=noescape{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       NSApplicationMain[#Declaration Attribute#]; name=NSApplicationMain{{$}}
+// KEYWORD_LAST-NEXT:             End completions
