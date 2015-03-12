@@ -212,6 +212,10 @@ public:
     if (AI && BI) {
       APInt Ap = AI->getValue();
       APInt Bp = BI->getValue();
+
+      if (Ap.getBitWidth() != Bp.getBitWidth())
+        return false;
+
       switch (Rel) {
         case ValueRelation::EQ:  return Ap.eq(Bp);
         case ValueRelation::SLE: return Ap.sle(Bp);

@@ -428,3 +428,32 @@ bb0(%0 : $Int):
 // CHECK: return
   return %23 : $()                                // id: %24
 }
+
+
+// Make sure we are not crashing on this one (and that we are not removing the condfails)
+// This comes from the following test:
+//func foo(x : Int, y : Int8) {
+//  3 + x
+//  2 + y
+//}
+// CHECK-LABEL: @bitwidth_crash
+// CHECK: cond_fail
+// CHECK: cond_fail
+// CHECK: return
+sil hidden @bitwidth_crash : $@thin (Int, Int8) -> () {
+bb0(%0 : $Int, %1 : $Int8):
+  %2 = integer_literal $Builtin.Int64, 3          // user: %5
+  %3 = struct_extract %0 : $Int, #Int.value       // user: %5
+  %4 = integer_literal $Builtin.Int1, -1          // users: %5, %10
+  %5 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64, %4 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %6
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 1 // user: %7
+  cond_fail %6 : $Builtin.Int1                    // id: %7
+  %8 = integer_literal $Builtin.Int8, 2           // user: %10
+  %9 = struct_extract %1 : $Int8, #Int8.value     // user: %10
+  %10 = builtin "sadd_with_overflow_Int8"(%8 : $Builtin.Int8, %9 : $Builtin.Int8, %4 : $Builtin.Int1) : $(Builtin.Int8, Builtin.Int1) // user: %11
+  %11 = tuple_extract %10 : $(Builtin.Int8, Builtin.Int1), 1 // user: %12
+  cond_fail %11 : $Builtin.Int1                   // id: %12
+  %13 = tuple ()                                  // user: %14
+  return %13 : $()                                // id: %14
+}
+
