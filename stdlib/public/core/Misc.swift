@@ -90,7 +90,7 @@ public func _typeName(type: Any.Type) -> String {
   return result
 }
 
-/// Returns the mangled type name for the given value.
+/// Returns the human-readable type name for the given value.
 public func _stdlib_getDemangledTypeName<T>(value: T) -> String {
   // FIXME: this code should be using _withUninitializedString, but it leaks
   // when called from here.
