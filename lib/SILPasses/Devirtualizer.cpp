@@ -147,12 +147,8 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
            "Dest type must be a class type");
   }
 
-  // Placeholder for keeping the results of analysis performed
-  // by canDevirtualizeClassMethod.
-  DevirtClassMethodInfo DCMI;
-
   // Bail if this class_method cannot be devirtualized.
-  if (!canDevirtualizeClassMethod(AI, RealSubClassTy, CD, DCMI))
+  if (!canDevirtualizeClassMethod(AI, RealSubClassTy, CD))
     return nullptr;
 
 
@@ -221,8 +217,7 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   NumInlineCaches++;
 
   // Devirtualize the apply instruction on the identical path.
-  ApplyInst *NewAI = devirtualizeClassMethod(IdenAI, DownCastedClassInstance,
-                                             DCMI);
+  auto *NewAI = devirtualizeClassMethod(IdenAI, DownCastedClassInstance, CD);
   assert(NewAI && "Expected to be able to devirtualize apply!");
   (void) NewAI;
 
@@ -367,10 +362,8 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
     // If there is only one possible alternative for this method,
     // try to devirtualize it completely.
     ClassHierarchyAnalysis::ClassList Subs;
-    if (isDefaultCaseKnown(CHA, AI, CD, Subs)) {
-      ApplyInst *NewAI = devirtualizeClassMethod(AI, SubTypeValue, CD);
-      return NewAI != nullptr;
-    }
+    if (isDefaultCaseKnown(CHA, AI, CD, Subs))
+      return bool(tryDevirtualizeClassMethod(AI, SubTypeValue, CD));
 
     DEBUG(llvm::dbgs() << "Inserting monomorphic inline caches for class " <<
           CD->getName() << "\n");
@@ -469,7 +462,7 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   // implementation which is not covered by checked_cast_br checks yet.
   // So, it is safe to replace a class_method invocation by
   // a direct call of this remaining implementation.
-  ApplyInst *NewAI = devirtualizeClassMethod(AI, SubTypeValue, CD);
+  ApplyInst *NewAI = tryDevirtualizeClassMethod(AI, SubTypeValue, CD);
   assert(NewAI && "Expected to be able to devirtualize apply!");
   (void) NewAI;
 

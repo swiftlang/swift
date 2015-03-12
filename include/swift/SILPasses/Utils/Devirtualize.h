@@ -31,26 +31,14 @@
 
 namespace swift {
 
-/// A helper struct to keep information collected by
-/// the analysis which checks if it is possible to
-/// devirtualize a given class_method.
-struct DevirtClassMethodInfo {
-  ClassDecl *CD;
-  SILType ClassInstanceType;
-
-  DevirtClassMethodInfo() : CD(nullptr), ClassInstanceType(SILType()) {}
-};
-
 ApplyInst *devirtualizeApply(ApplyInst *AI);
 bool isClassWithUnboundGenericParameters(SILType C, SILModule &M);
-bool canDevirtualizeClassMethod(ApplyInst *AI,
-                                SILType ClassInstanceType, ClassDecl *CD,
-                                DevirtClassMethodInfo& DCMI);
-ApplyInst *devirtualizeClassMethod(ApplyInst *AI,
-                                   SILValue ClassInstance,
-                                   DevirtClassMethodInfo& DCMI);
-ApplyInst *devirtualizeClassMethod(ApplyInst *AI,
-                                   SILValue ClassInstance, ClassDecl *CD);
+bool canDevirtualizeClassMethod(ApplyInst *AI, SILType ClassInstanceType,
+                                ClassDecl *CD);
+ApplyInst *devirtualizeClassMethod(ApplyInst *AI, SILValue ClassInstance,
+                                   ClassDecl *CD);
+ApplyInst *tryDevirtualizeClassMethod(ApplyInst *AI, SILValue ClassInstance,
+                                      ClassDecl *CD);
 
 }
 

@@ -168,13 +168,10 @@ getSubstitutionsForSuperclass(SILModule &M, CanSILFunctionType GenCalleeType,
 ///    reference (such as downcasted class reference).
 /// \p CD is the class declaration of the class, where the lookup of the member
 ///    should be performed.
-/// \p DCMI is the devirt. class_method analysis result to be used for
-///    performing the transformation.
 /// return true if it is possible to devirtualize, false - otherwise.
 bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
                                        SILType ClassInstanceType,
-                                       ClassDecl *CD,
-                                       DevirtClassMethodInfo &DCMI) {
+                                       ClassDecl *CD) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
 
   SILModule &Mod = AI->getModule();
@@ -219,9 +216,6 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
       return false;
   }
 
-  DCMI.CD = CD;
-  DCMI.ClassInstanceType = ClassInstanceType;
-
   return true;
 }
 
@@ -230,16 +224,14 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
 /// \p AI is the apply to devirtualize.
 /// \p ClassInstance is the operand for the ClassMethodInst or an alternative
 ///    reference (such as downcasted class reference).
-/// \p DCMI is the devirtualization class_method analysis result to be used for
-///    performing the transformation.
+/// \p CD is the ClassDecl of the type hierarchy we are devirtualizing for.
 /// return the new ApplyInst if created one or null.
 ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
                                           SILValue ClassInstance,
-                                          DevirtClassMethodInfo &DCMI) {
+                                          ClassDecl *CD) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
 
-  auto *CD = DCMI.CD;
-  auto ClassInstanceType = DCMI.ClassInstanceType;
+  auto ClassInstanceType = ClassInstance.getType();
 
   SILModule &Mod = AI->getModule();
   auto *CMI = cast<ClassMethodInst>(AI->getCallee());
@@ -259,7 +251,7 @@ ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
   // Grab the self type from the function ref and the self type from the class
   // method inst.
   SILType FuncSelfTy = ParamTypes[ParamTypes.size() - 1];
-  SILType OriginTy = ClassInstance.getType();
+  SILType OriginTy = ClassInstanceType;
   SILBuilderWithScope<16> B(AI);
 
   // Then compare the two types and if they are unequal...
@@ -388,13 +380,12 @@ ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
 
 /// This is a simplified version of devirtualizeClassMethod, which can
 /// be called without the previously prepared DevirtClassMethodInfo.
-ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
-                                          SILValue ClassInstance,
-                                          ClassDecl *CD) {
-  DevirtClassMethodInfo DCMI;
-  if (!canDevirtualizeClassMethod(AI, ClassInstance.getType(), CD, DCMI))
+ApplyInst *swift::tryDevirtualizeClassMethod(ApplyInst *AI,
+                                             SILValue ClassInstance,
+                                             ClassDecl *CD) {
+  if (!canDevirtualizeClassMethod(AI, ClassInstance.getType(), CD))
     return nullptr;
-  return devirtualizeClassMethod(AI, ClassInstance, DCMI);
+  return devirtualizeClassMethod(AI, ClassInstance, CD);
 }
 
 
@@ -560,11 +551,12 @@ ApplyInst *swift::devirtualizeApply(ApplyInst *AI) {
   if (auto *CMI = dyn_cast<ClassMethodInst>(AI->getCallee())) {
     // Check if the class member is known to be final.
     if (ClassDecl *C = getClassFromAccessControl(CMI))
-      return devirtualizeClassMethod(AI, CMI->getOperand(), C);
+      return tryDevirtualizeClassMethod(AI, CMI->getOperand(), C);
 
     // Try to search for the point of construction.
     if (ClassDecl *C = getClassFromConstructor(CMI->getOperand()))
-      return devirtualizeClassMethod(AI, CMI->getOperand().stripUpCasts(), C);
+      return tryDevirtualizeClassMethod(AI, CMI->getOperand().stripUpCasts(),
+                                        C);
   }
 
   return nullptr;
