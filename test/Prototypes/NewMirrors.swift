@@ -112,7 +112,7 @@ extension Mirror {
   }
 }
 
-//===--- Horrible ad-hoc bidirectional collection adapter proof-of-concept. ---===//
+//===--- Horrible ad-hoc forward collection adapter proof-of-concept. -----===//
 public struct ForwardStructure<
   C: CollectionType where C.Index: ForwardIndexType
 > : StructuralDescriptionType {
