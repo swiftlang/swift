@@ -286,9 +286,12 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   PM.setStageName("LateLoopOpt");
   AddLowLevelLoopOptPasses(PM);
+
+  // Perform the final lowering transformations.
   PM.add(createExternalFunctionDefinitionsElimination());
   PM.add(createDeadFunctionElimination());
   PM.add(createMergeCondFails());
+  PM.add(createCropOverflowChecks());
   PM.runOneIteration();
 
   // Call the CFG viewer.
