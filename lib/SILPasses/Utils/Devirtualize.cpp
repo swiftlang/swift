@@ -219,6 +219,24 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
   return true;
 }
 
+/// Insert a cast for an address argument if its type is not the same
+/// as the expected parameter type, which can happen with covariant
+/// indirect return types and contravariant argument types.
+static SILValue conditionallyCastAddr(SILBuilderWithScope<16> &B,
+                                      SILLocation Loc, SILValue Arg,
+                                      SILType ParamTy) {
+  if (Arg.getType() == ParamTy)
+    return Arg;
+
+  if (Arg.getType().isAddress())
+    return B.createUncheckedAddrCast(Loc, Arg, ParamTy);
+
+  assert(Arg.getType().isHeapObjectReferenceType() &&
+         "Expected address type or heap object reference for argument!");
+
+  return B.createUncheckedRefCast(Loc, Arg, ParamTy);
+}
+
 /// \brief Devirtualize an apply of a class method.
 ///
 /// \p AI is the apply to devirtualize.
@@ -271,40 +289,16 @@ ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
 
   FunctionRefInst *FRI = B.createFunctionRef(AI->getLoc(), F);
 
-  // Construct a new arg list. First process all non-self operands, ref, addr
-  // casting them to the appropriate types for F so that we allow for covariant
-  // indirect return types and contravariant arguments.
+  // Create the argument list for the new apply, casting when needed
+  // in order to handle covariant indirect return types and
+  // contravariant argument types.
   llvm::SmallVector<SILValue, 8> NewArgs;
   auto Args = AI->getArguments();
   auto ParamTypes = SubstCalleeType->getParameterSILTypes();
 
-  // For each old argument Op...
-  for (unsigned i = 0, e = Args.size() - 1; i != e; ++i) {
-    SILValue Op = Args[i];
-    SILType OpTy = Op.getType();
-    SILType FOpTy = ParamTypes[i];
-
-    // If the type matches the type for the given parameter in F, just add it to
-    // our arg list and continue.
-    if (OpTy == FOpTy) {
-      NewArgs.push_back(Op);
-      continue;
-    }
-
-    // Otherwise we have either a covariant return type or a contravariant
-    // argument type. Cast it appropriately.
-    assert((OpTy.isAddress() || OpTy.isHeapObjectReferenceType()) &&
-           "Only addresses and refs can have their types changed due to "
-           "covariant return types or contravariant argument types.");
-
-    // If OpTy is an address, perform an unchecked_addr_cast.
-    if (OpTy.isAddress()) {
-      NewArgs.push_back(B.createUncheckedAddrCast(AI->getLoc(), Op, FOpTy));
-    } else {
-      // Otherwise perform a ref cast.
-      NewArgs.push_back(B.createUncheckedRefCast(AI->getLoc(), Op, FOpTy));
-    }
-  }
+  for (unsigned i = 0, e = Args.size() - 1; i != e; ++i)
+    NewArgs.push_back(conditionallyCastAddr(B, AI->getLoc(), Args[i],
+                                            ParamTypes[i]));
 
   // Add in self to the end.
   NewArgs.push_back(ClassInstance);
