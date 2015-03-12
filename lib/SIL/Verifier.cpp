@@ -2683,15 +2683,12 @@ public:
     CanSILFunctionType FTy = F->getLoweredFunctionType();
     verifySILFunctionType(FTy);
 
-    // If we have shared visibility, make sure that it is legal for this
-    // function to have shared linkage.
-    if (hasSharedVisibility(F->getLinkage()))
-      require(F->canHaveSharedLinkage(),
-              "Function can not legally have shared linkage");
-
     if (F->isExternalDeclaration()) {
-      require(F->isAvailableExternally(),
-              "external declaration of internal SILFunction not allowed");
+      assert(F->isAvailableExternally() &&
+             "external declaration of internal SILFunction not allowed");
+      assert(!hasSharedVisibility(F->getLinkage()) &&
+             "external declarations of SILFunctions with shared visiblity is not "
+             "allowed");
       // If F is an external declaration, there is nothing further to do,
       // return.
       return;

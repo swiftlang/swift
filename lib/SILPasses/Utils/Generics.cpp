@@ -147,7 +147,7 @@ void dumpTypeSubstitutionMap(const TypeSubstitutionMap &map) {
 
 /// Check if we can clone and remap types this function.
 static bool canSpecializeFunction(SILFunction *F) {
-  return !F->isExternalDeclaration() && F->canHaveSharedLinkage();
+  return !F->isExternalDeclaration();
 }
 
 bool

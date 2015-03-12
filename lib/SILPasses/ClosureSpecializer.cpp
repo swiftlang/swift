@@ -736,10 +736,6 @@ public:
           !getModule()->linkFunction(F, SILModule::LinkingMode::LinkAll))
         continue;
 
-      // If F can not have shared linkage, we can not clone it.
-      if (!F->canHaveSharedLinkage())
-        continue;
-
       Changed |= C.specialize(F);
     }
 
