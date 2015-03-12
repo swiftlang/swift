@@ -26,18 +26,8 @@ println("testing...")
 
 //===--- F "base" protocol (like ForwardIndexType) ------------------------===//
 
-// Protocols with default implementations are broken into two parts, a
-// base and a more-refined part.  From the user's point-of-view,
-// however, F_ and F should look like a single protocol.  This
-// technique gets used throughout the standard library to break
-// otherwise-cyclic protocol dependencies, which the compiler isn't
-// yet smart enough to handle.
-protocol F_ {
-  // Non-defaulted requirements of F go here
+protocol F {
   func successor() -> Self
-}
-
-protocol F : F_ {
   // This requirement allows generic distance() to find default
   // implementations.  Only the author of F and the author of a
   // refinement of F having a non-default distance implementation need
@@ -60,7 +50,7 @@ func _distance<I>(other: I) -> (_Distance, (I)) {
 }
 
 // Default Implementation of distance for F's
-func ~> <I: F_>(self_:I, (_Distance, (I))) -> Int {
+func ~> <I: F>(self_:I, (_Distance, (I))) -> Int {
   self_.successor() // Use an F-specific operation
   println("F")
   return 0
@@ -75,17 +65,15 @@ func distance<T: F>(x: T, y: T) -> Int {
 }
 
 //===--- R refined protocol (like RandomAccessIndexType) ------------------===//
-protocol R_ : F_ {
+protocol R : F {
   // Non-defaulted requirements of R go here, e.g. something to
   // measure the distance in O(1)
   static func sub(x: Self, y: Self)
 }
 
-protocol R : F, R_ {}
-
 // R has its own default implementation of distance, which is O(1).
 // Only the author of R needs to see this implementation.
-func ~> <I: R_>(x: I, args: (_Distance, (I))) -> Int {
+func ~> <I: R>(x: I, args: (_Distance, (I))) -> Int {
   let other = args.1
   I.sub(other, y: x)
   println("R")
@@ -94,15 +82,13 @@ func ~> <I: R_>(x: I, args: (_Distance, (I))) -> Int {
 
 //===--- D refined protocol (like R, but with a custom distance) ----------===//
 // Users who want to provide a custom distance function will use this protocol
-protocol D_ : R_ {
+protocol D : R {
   func distance(y: Self) -> Int
 }
 
-protocol D : R, D_ {}
-
 // Dispatch to D's distance() requirement
 // Only the author of D needs to see this implementation.
-func ~> <I: D_>(x:I, args: (_Distance, (I))) -> Int {
+func ~> <I: D>(x:I, args: (_Distance, (I))) -> Int {
   let other = args.1
   return x.distance(other)
 }
