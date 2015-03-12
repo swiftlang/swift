@@ -788,3 +788,21 @@ SourceRange AvailabilityQueryExpr::getSourceRange() const {
   }
   return SourceRange(PoundLoc, RParenLoc);
 }
+
+void AvailabilityQueryExpr::getPlatformKeywordRanges(
+    SmallVectorImpl<CharSourceRange> &PlatformRanges) {
+  for (unsigned int i = 0; i < NumQueries; i ++) {
+    auto Loc = (getQueriesBuf()[i])->getPlatformLoc();
+    auto Platform = (getQueriesBuf()[i])->getPlatform();
+    switch (Platform) {
+      case PlatformKind::none:
+        break;
+#define AVAILABILITY_PLATFORM(X, PrettyName)                                   \
+      case PlatformKind::X:                                                    \
+        PlatformRanges.push_back(CharSourceRange(Loc, strlen(#X)));            \
+        break;
+#include "swift/AST/PlatformKinds.def"
+#undef AVAILABILITY_PLATFORM
+    }
+  }
+}

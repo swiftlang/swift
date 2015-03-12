@@ -369,12 +369,11 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     }
     pushStructureNode(SN, E);
   } else if (auto *AQE = dyn_cast<AvailabilityQueryExpr>(E)) {
-    SmallVector<std::pair<SourceLoc, int>, 5> PlatformLocs;
-    AQE->getPlatformKeywordLocs(PlatformLocs);
-    std::for_each(PlatformLocs.begin(), PlatformLocs.end(),
-                  [&](std::pair<SourceLoc, int> &Pair) {
-      passNonTokenNode({SyntaxNodeKind::Keyword,
-                      CharSourceRange(Pair.first, Pair.second)});
+    SmallVector<CharSourceRange, 5> PlatformRanges;
+    AQE->getPlatformKeywordRanges(PlatformRanges);
+    std::for_each(PlatformRanges.begin(), PlatformRanges.end(),
+                  [&](CharSourceRange &Range) {
+      passNonTokenNode({SyntaxNodeKind::Keyword, Range});
     });
   }
 

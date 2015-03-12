@@ -17,7 +17,6 @@
 #ifndef SWIFT_AST_EXPR_H
 #define SWIFT_AST_EXPR_H
 
-#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DeclContext.h"
@@ -3568,22 +3567,8 @@ public:
     return E->getKind() == ExprKind::AvailabilityQuery;
   }
 
-  void getPlatformKeywordLocs(SmallVector<std::pair<SourceLoc, int>, 5>
-                              &PlatformLocs) {
-    for (unsigned int i = 0; i < NumQueries; i ++) {
-      auto Loc = (getQueriesBuf()[i])->getPlatformLoc();
-      auto Platform = (getQueriesBuf()[i])->getPlatform();
-      switch (Platform) {
-      case PlatformKind::none:
-        break;
-#define AVAILABILITY_PLATFORM(X, PrettyName)                                   \
-      case PlatformKind::X:                                                    \
-       PlatformLocs.push_back({Loc, strlen(#X)});                              \
-       break;
-#include "swift/AST/PlatformKinds.def"
-      }
-    }
-  }
+  void getPlatformKeywordRanges(SmallVectorImpl<CharSourceRange>
+                                &PlatformRanges);
 
 private:
   VersionConstraintAvailabilitySpec **getQueriesBuf() {
