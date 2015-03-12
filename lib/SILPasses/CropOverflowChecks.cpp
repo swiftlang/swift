@@ -183,7 +183,10 @@ public:
     return  false;
   }
 
-  static bool doesFormulateAbsolveOperation(Constraint &F, BuiltinInst *BI) {
+  /// Return true if the constraint \p F can prove that the overflow check
+  /// for \p BI is not needd.
+  static bool isOverflowCheckRemovedByConstraint(Constraint &F,
+                                                 BuiltinInst *BI) {
     switch (BI->getBuiltinInfo().ID) {
       default: return false;
       case BuiltinValueKind::SAddOver:
@@ -342,7 +345,8 @@ public:
     for (auto &F : Constraints) {
       // If we are dominated by a constraint
       if (DT->dominates(F.DominatingBlock, CFI->getParent())) {
-        if (doesFormulateAbsolveOperation(F, BI)) {
+        // Try to use the constraint to remove the overflow check.
+        if (isOverflowCheckRemovedByConstraint(F, BI)) {
           return true;
         }
       }
