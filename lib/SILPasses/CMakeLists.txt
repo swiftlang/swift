@@ -49,4 +49,5 @@ add_swift_library(swiftSILPasses
   ExternalDefsToDecls.cpp
   MergeCondFail.cpp
   PrettyStackTrace.cpp
+  CropOverflowChecks.cpp
   LINK_LIBRARIES swiftSILPassesUtils swiftSILAnalysis)

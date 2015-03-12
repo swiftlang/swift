@@ -1,0 +1,11 @@
+// RUN: %target-sil-opt %s -crop-overflow-checks | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+sil hidden [noinline] @sink_unsigned_int : $@thin () -> ()
+sil hidden [noinline] @sink_signed_int : $@thin () -> ()
+
