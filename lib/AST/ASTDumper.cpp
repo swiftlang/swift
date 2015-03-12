@@ -958,7 +958,9 @@ public:
   void printRec(StmtConditionElement C) {
     if (C.isCondition())
       return printRec(C.getCondition());
-    return printRec(C.getBinding());
+    if (C.getBinding())
+      return printRec(C.getBinding());
+    OS.indent(Indent+2) << "(**NULL CONDITION**)";
   }
   
   void visitBraceStmt(BraceStmt *S) {
