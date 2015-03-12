@@ -183,7 +183,7 @@ func == (lhs: TestEquatableValueTy, rhs: TestEquatableValueTy) -> Bool {
 var _objcKeyCount = _stdlib_AtomicInt(0)
 var _objcKeySerial = _stdlib_AtomicInt(0)
 
-class TestObjCKeyTy : NSObject, NSCopying, Printable {
+class TestObjCKeyTy : NSObject, NSCopying {
   class var objectCount: Int {
     get {
       return _objcKeyCount.load()
@@ -247,7 +247,7 @@ class TestObjCKeyTy : NSObject, NSCopying, Printable {
 var _objcValueCount = _stdlib_AtomicInt(0)
 var _objcValueSerial = _stdlib_AtomicInt(0)
 
-class TestObjCValueTy : NSObject, Printable {
+class TestObjCValueTy : NSObject {
   class var objectCount: Int {
     get {
       return _objcValueCount.load()
@@ -281,7 +281,7 @@ class TestObjCValueTy : NSObject, Printable {
 var _objcEquatableValueCount = _stdlib_AtomicInt(0)
 var _objcEquatableValueSerial = _stdlib_AtomicInt(0)
 
-class TestObjCEquatableValueTy : NSObject, Equatable, Printable {
+class TestObjCEquatableValueTy : NSObject {
   class var objectCount: Int {
     get {
       return _objcEquatableValueCount.load()

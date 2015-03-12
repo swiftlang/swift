@@ -44,7 +44,7 @@ var nextTrackedSerialNumber = 0
   func baz()
 }
 
-class Tracked : NSObject, Printable, Fooable {
+class Tracked : NSObject, Fooable {
   func foo() { }
 
   required init(_ value: Int) {
@@ -77,7 +77,7 @@ func == (x: Tracked, y: Tracked) -> Bool {
 }
 
 typealias Base = Tracked
-class Derived : Base, Printable, Barable {
+class Derived : Base, Barable {
   func bar() { }
 
   override var description: String {
@@ -86,7 +86,7 @@ class Derived : Base, Printable, Barable {
   }
 }
 
-class BridgedObjC : Base, Printable, Barable {
+class BridgedObjC : Base, Barable {
   func bar() { }
   override var description: String {
     assert(serialNumber > 0, "dead Tracked!")

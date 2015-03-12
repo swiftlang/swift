@@ -259,7 +259,7 @@ class XArray : ArrayLiteralConvertible {
   required init(arrayLiteral elements: Int...) { }
 }
 
-class YArray : XArray, ArrayLiteralConvertible {
+class YArray : XArray {
   typealias Element = Int
   required init(arrayLiteral elements: Int...) { 
     super.init()

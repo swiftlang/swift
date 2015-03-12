@@ -585,10 +585,14 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     unsigned DefaultAccessLevel : 2;
 
+    /// Whether the protocol conformance table has added the laoded
+    /// conformances for this nominal type.
+    unsigned AddedLoadedConformances : 1;
+
     /// The number of ref-components following the ExtensionDecl.
     unsigned NumRefComponents : 8;
   };
-  enum { NumExtensionDeclBits = NumDeclBits + 12 };
+  enum { NumExtensionDeclBits = NumDeclBits + 13 };
   static_assert(NumExtensionDeclBits <= 32, "fits in an unsigned");
 
 protected:
@@ -1535,11 +1539,24 @@ private:
   friend class ExtensionIterator;
   friend class NominalTypeDecl;
   friend class MemberLookupTable;
+  friend class ConformanceLookupTable;
   friend class IterableDeclContext;
 
   ExtensionDecl(SourceLoc extensionLoc, ArrayRef<RefComponent> refComponents,
                 MutableArrayRef<TypeLoc> inherited,
                 DeclContext *parent);
+
+  /// Determine whether we have already attempted to add any
+  /// loaded protocol conformances to the conformance table.
+  bool addedLoadedConformances() const {
+    return ExtensionDeclBits.AddedLoadedConformances;
+  }
+
+  /// Note that we have attempted to add loaded protocol conformances
+  /// to the conformance table.
+  void setAddedLoadedConformances() {
+    ExtensionDeclBits.AddedLoadedConformances = true;
+  }
 
 public:
   using Decl::getASTContext;
@@ -2405,6 +2422,7 @@ public:
 };
 
 class MemberLookupTable;
+class ConformanceLookupTable;
 
 /// Iterator that walks the generic parameter types declared in a generic
 /// signature and their dependent members.
@@ -2661,7 +2679,7 @@ class NominalTypeDecl : public TypeDecl, public DeclContext,
   ExtensionDecl *LastExtension = nullptr;
 
   /// \brief The generation at which we last loaded extensions.
-  unsigned ExtensionGeneration: 29;
+  unsigned ExtensionGeneration: 28;
                           
   /// \brief Whether or not the generic signature of the type declaration is
   /// currently being validated.
@@ -2671,6 +2689,10 @@ class NominalTypeDecl : public TypeDecl, public DeclContext,
   /// and whether or not we've actually searched for one.
   unsigned HasFailableInits : 1;
   unsigned SearchedForFailableInits : 1;
+
+  /// Whether the protocol conformance table has added the laoded
+  /// conformances for this nominal type.
+  unsigned AddedLoadedConformances : 1;
 
   /// Prepare to traverse the list of extensions.
   void prepareExtensions();
@@ -2691,8 +2713,18 @@ class NominalTypeDecl : public TypeDecl, public DeclContext,
   /// so that it can also be added to the lookup table (if needed).
   void addedMember(Decl *member);
 
+  /// \brief A lookup table used to find the protocol conformances of
+  /// a given nominal type.
+  mutable ConformanceLookupTable *ConformanceTable = nullptr;
+
+  /// Prepare the conformance table.
+  void prepareConformanceTable(LazyResolver *resolver) const;
+
+  friend class ASTContext;
   friend class MemberLookupTable;
+  friend class ConformanceLookupTable;
   friend class ExtensionDecl;
+  friend class DeclContext;
   friend class IterableDeclContext;
 
 protected:
@@ -2716,6 +2748,7 @@ protected:
     setGenericParams(GenericParams);
     NominalTypeDeclBits.HasDelayedMembers = false;
     NominalTypeDeclBits.AddedImplicitInitializers = false;
+    AddedLoadedConformances = false;
     ExtensionGeneration = 0;
     ValidatingGenericSignature = false;
     SearchedForFailableInits = false;
@@ -2723,6 +2756,18 @@ protected:
   }
 
   friend class ProtocolType;
+
+  /// Determine whether we have already attempted to add any
+  /// loaded protocol conformances to the conformance table.
+  bool addedLoadedConformances() const {
+    return AddedLoadedConformances;
+  }
+
+  /// Note that we have attempted to add loaded protocol conformances
+  /// to the conformance table.
+  void setAddedLoadedConformances() {
+    AddedLoadedConformances = true;
+  }
 
 public:
   using TypeDecl::getASTContext;
@@ -2851,6 +2896,43 @@ public:
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
   void getImplicitProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
+  /// Register a synthesized conformance for this nominal type declaration.
+  void registerSynthesizedConformance(ProtocolDecl *protocol,
+                                      LazyResolver *resolver);
+
+  /// Look for conformances of this nominal type to the given
+  /// protocol.
+  ///
+  /// \param module The module from which we initiate the search.
+  /// FIXME: This is currently unused.
+  ///
+  /// \param protocol The protocol whose conformance is requested.
+  ///
+  /// \param resolver Lazy resolver that will be used for the
+  /// resolution of inherited types (where required).
+  ///
+  /// \param conformances Will be populated with the set of protocol
+  /// conformances found for this protocol.
+  ///
+  /// \returns true if any conformances were found. 
+  bool lookupConformance(
+         Module *module, ProtocolDecl *protocol,
+         LazyResolver *resolver,
+         SmallVectorImpl<ProtocolConformance *> &conformances) const;
+
+  /// Retrieve all of the protocols that this nominal type conforms to.
+  ///
+  /// \param scratch Scratch spaced used to produce the resulting list.
+  ArrayRef<ProtocolDecl *> getAllProtocols(
+                             LazyResolver *resolver,
+                             SmallVectorImpl<ProtocolDecl *> &scratch) const;
+
+  /// Retrieve all of the protocol conformances for this nominal type.
+  ///
+  /// \param scratch Scratch spaced used to produce the resulting list.
+  ArrayRef<ProtocolConformance *>
+  getAllConformances(LazyResolver *resolver,
+                     SmallVectorImpl<ProtocolConformance *> &scratch) const;
 
   /// \brief True if the type can implicitly derive a conformance for the given
   /// protocol.

@@ -8,6 +8,8 @@ class B : A, A { } // expected-error{{duplicate inheritance from 'A'}}{{12-15=}}
 
 // Duplicate inheritance from protocol
 class B2 : P, P { } // expected-error{{duplicate inheritance from 'P'}}{{13-16=}}
+// expected-error@-1{{redundant conformance of 'B2' to protocol 'P'}}
+// expected-note@-2{{'B2' declares conformance to protocol 'P' here}}
 
 // Multiple inheritance
 class C : B, A { } // expected-error{{multiple inheritance from classes 'B' and 'A'}}

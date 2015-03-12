@@ -82,7 +82,7 @@ protocol TypeProto {
   typealias TheType // expected-note + {{protocol requires nested type 'TheType'}}
 }
 
-extension OriginallyEmpty : MethodProto {}
+extension OriginallyEmpty {}
 extension HiddenType : TypeProto {} // expected-error {{type 'HiddenType' does not conform to protocol 'TypeProto'}}
 #if !ACCESS_DISABLED
 extension Foo : TypeProto {} // expected-error {{type 'Foo' does not conform to protocol 'TypeProto'}}

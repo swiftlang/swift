@@ -91,6 +91,17 @@ public:
   /// consistency and provides the value a type.
   virtual void resolveDeclSignature(ValueDecl *VD) = 0;
 
+  /// Resolve the types in the inheritance clause of the given
+  /// declaration context, which will be a nominal type declaration or
+  /// extension declaration.
+  virtual void resolveInheritanceClause(DeclContext *dc) = 0;
+
+  /// Resolve the superclass of the given class.
+  virtual void resolveSuperclass(ClassDecl *classDecl) = 0;
+
+  /// Resolve the raw type of the given enum.
+  virtual void resolveRawType(EnumDecl *enumDecl) = 0;
+
   /// Resolve the type of an extension.
   ///
   /// This can be called to ensure that the members of an extension can be

@@ -718,6 +718,17 @@ public:
   /// dependent types.
   Type getInterfaceTypeFromInternalType(DeclContext *dc, Type type);
 
+  /// Resolve the superclass of the given class.
+  void resolveSuperclass(ClassDecl *classDecl) override;
+
+  /// Resolve the raw type of the given enum.
+  void resolveRawType(EnumDecl *enumDecl) override;
+
+  /// Resolve the types in the inheritance clause of the given
+  /// declaration context, which will be a nominal type declaration or
+  /// extension declaration.
+  void resolveInheritanceClause(DeclContext *dc) override;
+
   /// Check the inheritance clause of the given declaration.
   void checkInheritanceClause(Decl *decl, DeclContext *DC = nullptr,
                               GenericTypeResolver *resolver = nullptr);

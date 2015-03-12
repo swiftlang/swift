@@ -22,6 +22,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -43,11 +44,13 @@ namespace swift {
   class LazyMemberLoader;
   class GenericSignature;
   class GenericTypeParamType;
+  class ProtocolDecl;
   class Requirement;
   class SourceFile;
   class Type;
   class Module;
   class NominalTypeDecl;
+  class ProtocolConformance;
   class ValueDecl;
   class Initializer;
   class ClassDecl;
@@ -79,6 +82,81 @@ enum class LocalDeclContextKind : uint8_t {
   PatternBindingInitializer,
   DefaultArgumentInitializer,
   TopLevelCodeDecl
+};
+
+/// Describes the kind of a particular conformance.
+///
+/// The following code involves conformances of the three different kinds:
+/// \code
+/// protocol P { }
+/// protocol P2 : P { }
+///
+/// class Super : P2 { }
+/// class Sub : Super { }
+/// \endcode
+///
+/// \c Super conforms to \c P2 via an explicit conformance,
+/// specified on the class declaration itself.
+///
+/// \c Super conforms to \c P via an implied conformance, whose
+/// origin is the explicit conformance to \c P2.
+///
+/// \c Sub conforms to \c P2 and \c P via inherited conformances,
+/// which link back to the conformances described above.
+///
+/// The enumerators are ordered in terms of decreasing preference:
+/// an inherited conformance is best, followed by explicit
+/// conformances, then implied conformances. Earlier conformance
+/// kinds supersede later conformance kinds, possibly with a
+/// diagnostic (e.g., if an inherited conformance supersedes an
+/// explicit conformance).
+enum class ConformanceEntryKind : unsigned {
+  /// Inherited from a superclass conformance.
+  Inherited,
+
+  /// Explicitly specified.
+  Explicit,
+
+  /// Implied by an explicitly-specified conformance.
+  Implied,
+
+  /// Implicitly synthesized.
+  Synthesized,
+};
+
+/// Describes the kind of conformance lookup desired.
+enum class ConformanceLookupKind : unsigned {
+  /// All conformances.
+  All,
+  /// Only the explicit conformance.
+  OnlyExplicit,
+};
+
+/// Describes a diagnostic for a conflict between two protocol
+/// conformances.
+struct ConformanceDiagnostic {
+  /// The protocol with conflicting conformances.
+  ProtocolDecl *Protocol;
+
+  /// The location at which the diagnostic should occur.
+  SourceLoc Loc;
+
+  /// The kind of conformance that was superseded.
+  ConformanceEntryKind Kind;
+
+  /// The explicitly-specified protocol whose conformance implied the
+  /// conflicting conformance.
+  ProtocolDecl *ExplicitProtocol;
+
+  /// The declaration context that declares the existing conformance.
+  DeclContext *ExistingDC;
+
+  /// The kind of existing conformance.
+  ConformanceEntryKind ExistingKind;
+
+  /// The explicitly-specified protocol whose conformance implied the
+  /// existing conflicting conformance.
+  ProtocolDecl *ExistingExplicitProtocol;
 };
 
 /// A DeclContext is an AST object which acts as a semantic container
@@ -299,6 +377,26 @@ public:
   /// Return the ASTContext for a specified DeclContext by
   /// walking up to the enclosing module and returning its ASTContext.
   ASTContext &getASTContext() const;
+
+  /// Retrieve the set of protocol conformances associated with this
+  /// declaration context.
+  ///
+  /// \param lookupKind The kind of lookup to perform.
+  ///
+  /// \param scratch Scratch space to be used to place the resulting
+  /// set of conformances.
+  ///
+  /// \param diagnostics If non-null, will be populated with the set of
+  /// diagnostics that should be emitted for this declaration context.
+  ///
+  /// FIXME: This likely makes more sense on IterableDeclContext or
+  /// something similar.
+  ArrayRef<ProtocolConformance *>
+  getLocalConformances(LazyResolver *resolver,
+                       ConformanceLookupKind lookupKind,
+                       SmallVectorImpl<ProtocolConformance *> &scratch,
+                       SmallVectorImpl<ConformanceDiagnostic> *diagnostics
+                         = nullptr) const;
 
   /// \returns true if traversal was aborted, false otherwise.
   bool walkContext(ASTWalker &Walker);

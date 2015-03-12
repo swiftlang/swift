@@ -140,5 +140,6 @@ private extension Properties {
 }
 
 internal protocol EmptyProto {}
+internal protocol EmptyProto2 {}
 private extension Properties : EmptyProto {} // expected-error {{'private' modifier cannot be used with extensions that declare protocol conformances}}
-private(set) extension Properties : EmptyProto {} // expected-error {{'private' modifier cannot be applied to this declaration}}
+private(set) extension Properties : EmptyProto2 {} // expected-error {{'private' modifier cannot be applied to this declaration}}

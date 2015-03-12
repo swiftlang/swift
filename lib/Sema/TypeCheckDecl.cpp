@@ -230,7 +230,65 @@ static void addImplicitConformances(
 /// Check that the declaration attributes are ok.
 static void validateAttributes(TypeChecker &TC, Decl *VD);
 
-/// Check the inheritance clause of a type declaration or extension thereof.
+void TypeChecker::resolveSuperclass(ClassDecl *classDecl) {
+  // If we've already recorded a superclass, we're done.
+  if (classDecl->hasSuperclass())
+    return;
+
+  validateDecl(classDecl);
+
+  // Resolve the types in the inheritance clause.
+  resolveInheritanceClause(classDecl);
+
+  // Loop through the inheritance clause looking for a class type.
+  for (const auto &inherited : classDecl->getInherited()) {
+    if (inherited.getType()->getClassOrBoundGenericClass()) {
+      classDecl->setSuperclass(inherited.getType());
+    }
+  }
+}
+
+void TypeChecker::resolveRawType(EnumDecl *enumDecl) {
+  // If we've already recorded a raw type, we're done.
+  if (enumDecl->hasRawType())
+    return;
+
+  // Resolve the types in the inheritance clause.
+  resolveInheritanceClause(enumDecl);
+
+  // Loop through the inheritance clause looking for a class type.
+  for (const auto &inherited : enumDecl->getInherited()) {
+    if (!inherited.getType()->isExistentialType()) {
+      enumDecl->setRawType(inherited.getType());
+    }
+  }
+}
+
+void TypeChecker::resolveInheritanceClause(DeclContext *dc) {
+  TypeResolutionOptions options = TR_InheritanceClause;
+
+  // FIXME: Add a cached bit so this isn't O(n) in repeated calls.
+  MutableArrayRef<TypeLoc> inheritanceClause;
+  if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
+    inheritanceClause = nominal->getInherited();
+    options |= TR_NominalInheritanceClause;
+  } else {
+    auto ext = cast<ExtensionDecl>(dc);
+    inheritanceClause = ext->getInherited();
+  }
+
+  /// Check the inheritance clause of a type declaration or extension thereof.
+  PartialGenericTypeToArchetypeResolver resolver(*this);
+
+  for (auto &inherited : inheritanceClause) {
+    if (validateType(inherited, dc, options, &resolver)) {
+      inherited.setInvalidType(Context);
+      continue;
+    }
+  }
+}
+
+/// check the inheritance clause of a type declaration or extension thereof.
 ///
 /// This routine validates all of the types in the parsed inheritance clause,
 /// recording the superclass (if any and if allowed) as well as the protocols
@@ -2599,6 +2657,43 @@ public:
     }
 
     D->setConformances(D->getASTContext().AllocateCopy(conformances));
+
+    // Check for any ambiguities or collisions among conformances.
+    SmallVector<ProtocolConformance *, 4> conformancesScratch;
+    SmallVector<ConformanceDiagnostic, 4> diagnostics;
+    (void)D->getLocalConformances(&TC, ConformanceLookupKind::All,
+                                  conformancesScratch, &diagnostics);
+
+    // Diagnose any conflicts attributed to this declaration context.
+    for (const auto &diag : diagnostics) {
+      // Figure out the declaration of the existing conformance.
+      Decl *existingDecl = dyn_cast<NominalTypeDecl>(diag.ExistingDC);
+      if (!existingDecl)
+        existingDecl = cast<ExtensionDecl>(diag.ExistingDC);
+
+      // If both this conformance and the diagnosed conformance were
+      // implied, complain about the ambiguity.
+      if (diag.Kind == ConformanceEntryKind::Implied) {
+        TC.diagnose(diag.Loc, diag::ambiguous_conformance,
+                    D->getDeclaredTypeInContext(),
+                    diag.Protocol->getName(),
+                    diag.ExplicitProtocol->getName());
+        TC.diagnose(diag.Loc, diag::protocol_conformance_implied_here,
+                    diag.Protocol->getName())
+          .fixItInsert(diag.Loc, (diag.Protocol->getName().str() + ", ").str());
+      } else {
+        // Otherwise, complain about redundant conformances.
+        TC.diagnose(diag.Loc, diag::redundant_conformance,
+                    D->getDeclaredTypeInContext(),
+                    diag.Protocol->getName());
+      }
+
+      TC.diagnose(existingDecl, diag::declared_protocol_conformance_here,
+                  D->getDeclaredTypeInContext(),
+                  static_cast<unsigned>(diag.ExistingKind),
+                  diag.Protocol->getName(),
+                  diag.ExistingExplicitProtocol->getName());
+    }
   }
 
   //===--------------------------------------------------------------------===//

@@ -1888,6 +1888,7 @@ bool ASTContext::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
                    protocolName);
     Diags.diagnose(getDeclContextLoc(unsatisfied.first),
                    diag::protocol_conformance_here,
+                   true,
                    classDecl->getFullName(),
                    protocolName);
     Diags.diagnose(req, diag::protocol_requirement_here,

@@ -807,6 +807,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
   ExtensionDeclBits.CheckedInheritanceClause = false;
   ExtensionDeclBits.DefaultAccessLevel = 0;
   ExtensionDeclBits.NumRefComponents = refComponents.size();
+  ExtensionDeclBits.AddedLoadedConformances = false;
 
   std::copy(refComponents.begin(), refComponents.end(),
             getRefComponents().data());

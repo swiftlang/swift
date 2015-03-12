@@ -53,10 +53,13 @@ import CoreFoundation
   }
 }
 
-// CHECK-LABEL: @interface ClassWithNSObjectProtocol : NSObject <NSObject>
+// CHECK-LABEL: @interface ClassWithNSObjectProtocol <NSObject>
+// CHECK-NEXT: @property (nonatomic, readonly, copy) NSString * __nonnull description;
 // CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
-class ClassWithNSObjectProtocol : NSObject, NSObjectProtocol {}
+@objc class ClassWithNSObjectProtocol : NSObjectProtocol {
+  var description: String { return "me" }
+}
 
 // CHECK-LABEL: @interface Initializers
 // CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;

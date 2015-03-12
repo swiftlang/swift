@@ -2914,6 +2914,9 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     }
   }
 
+  if (conformance->isComplete())
+    return conformance;
+
   // The conformance checker we're using.
   ConformanceChecker checker(TC, conformance);
   checker.checkConformance();

@@ -832,8 +832,23 @@ NOTE(protocol_witness_nonconform_type,sema_tcd,none,
 NOTE(protocol_requirement_here,sema_tcd,none,
      "requirement %0 declared here", (DeclName))
 NOTE(protocol_conformance_here,sema_tcd,none,
-     "class %0 declares conformance to protocol %1 here",
-     (DeclName, DeclName))
+     "%select{|class }0%1 declares conformance to protocol %2 here",
+     (bool, DeclName, DeclName))
+NOTE(declared_protocol_conformance_here,sema_tcd,none,
+     "%select{%0 inherits conformance to protocol %2 from superclass|"
+     "%0 declares conformance to protocol %2|"
+     "%0 implicitly conforms to protocol %2 (via conformance to %3)|"
+     "%0 implicitly conforms to protocol %2}1 here",
+     (Type, unsigned, DeclName, DeclName))
+
+ERROR(redundant_conformance,sema_tcd,none,
+      "redundant conformance of %0 to protocol %1", (Type, DeclName))
+ERROR(ambiguous_conformance,sema_tcd,none,
+      "ambiguous implied conformance of %0 to protocol %1 (via %2) requires "
+      "explicit conformance",
+      (Type, DeclName, DeclName))
+NOTE(protocol_conformance_implied_here,sema_tcd,none,
+     "implied protocol conformance %0 here can be made explicit", (Identifier))
 
 // Protocols and existentials
 NOTE(protocol_existential_assoc_type,sema_tcd,none,
