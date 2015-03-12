@@ -219,23 +219,8 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
       return false;
   }
 
-  DCMI.F = F;
-  DCMI.Substitutions = Subs;
-
-  DCMI.SubstCalleeType =
-    GenCalleeType->substGenericArgs(Mod, Mod.getSwiftModule(),
-                                    DCMI.Substitutions);
-
-  // If F's this pointer has a different type from CMI's operand and the
-  // "this" pointer type is a super class of the CMI's operand, insert an
-  // upcast.
-  DCMI.ParamTypes =
-    DCMI.SubstCalleeType->getParameterSILTypesWithoutIndirectResult();
-
-  // We should always have a this pointer. Assert on debug builds, return
-  // nullptr on release builds.
-  assert(!DCMI.ParamTypes.empty() &&
-         "Must have a this pointer when calling a class method inst.");
+  DCMI.CD = CD;
+  DCMI.ClassInstanceType = ClassInstanceType;
 
   return true;
 }
@@ -253,9 +238,27 @@ ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
                                           DevirtClassMethodInfo &DCMI) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
 
+  auto *CD = DCMI.CD;
+  auto ClassInstanceType = DCMI.ClassInstanceType;
+
+  SILModule &Mod = AI->getModule();
+  auto *CMI = cast<ClassMethodInst>(AI->getCallee());
+  SILFunction *F = Mod.lookUpFunctionInVTable(CD, CMI->getMember());
+
+  CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
+
+  auto Subs = getSubstitutionsForSuperclass(Mod, GenCalleeType,
+                                            ClassInstanceType, AI);
+
+  auto SubstCalleeType =
+    GenCalleeType->substGenericArgs(Mod, Mod.getSwiftModule(), Subs);
+
+  auto ParamTypes =
+    SubstCalleeType->getParameterSILTypesWithoutIndirectResult();
+
   // Grab the self type from the function ref and the self type from the class
   // method inst.
-  SILType FuncSelfTy = DCMI.ParamTypes[DCMI.ParamTypes.size() - 1];
+  SILType FuncSelfTy = ParamTypes[ParamTypes.size() - 1];
   SILType OriginTy = ClassInstance.getType();
   SILBuilderWithScope<16> B(AI);
 
@@ -277,14 +280,14 @@ ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
     ClassInstance = B.createUpcast(AI->getLoc(), ClassInstance, FuncSelfTy);
   }
 
-  FunctionRefInst *FRI = B.createFunctionRef(AI->getLoc(), DCMI.F);
+  FunctionRefInst *FRI = B.createFunctionRef(AI->getLoc(), F);
 
   // Construct a new arg list. First process all non-self operands, ref, addr
   // casting them to the appropriate types for F so that we allow for covariant
   // indirect return types and contravariant arguments.
   llvm::SmallVector<SILValue, 8> NewArgs;
   auto Args = AI->getArguments();
-  auto allParamTypes = DCMI.SubstCalleeType->getParameterSILTypes();
+  auto allParamTypes = SubstCalleeType->getParameterSILTypes();
 
   // For each old argument Op...
   for (unsigned i = 0, e = Args.size() - 1; i != e; ++i) {
@@ -321,22 +324,22 @@ ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
   // type. If we have an indirect return type, AI's return type of the empty
   // tuple should be ok.
   SILType ReturnType = AI->getType();
-  if (!DCMI.SubstCalleeType->hasIndirectResult()) {
-    ReturnType = DCMI.SubstCalleeType->getSILResult();
+  if (!SubstCalleeType->hasIndirectResult()) {
+    ReturnType = SubstCalleeType->getSILResult();
   }
 
   SILType SubstCalleeSILType =
-    SILType::getPrimitiveObjectType(DCMI.SubstCalleeType);
+    SILType::getPrimitiveObjectType(SubstCalleeType);
   ApplyInst *NewAI =
     B.createApply(AI->getLoc(), FRI, SubstCalleeSILType, ReturnType,
-                  DCMI.Substitutions, NewArgs,
+                  Subs, NewArgs,
                   FRI->getReferencedFunction()->isTransparent());
 
   if (ReturnType == AI->getType()) {
     AI->replaceAllUsesWith(NewAI);
     AI->eraseFromParent();
 
-    DEBUG(llvm::dbgs() << "        SUCCESS: " << DCMI.F->getName() << "\n");
+    DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
     NumClassDevirt++;
     return NewAI;
   }
@@ -378,7 +381,7 @@ ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
 
   AI->eraseFromParent();
 
-  DEBUG(llvm::dbgs() << "        SUCCESS: " << DCMI.F->getName() << "\n");
+  DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
   NumClassDevirt++;
   return NewAI;
 }

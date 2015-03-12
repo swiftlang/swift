@@ -35,12 +35,10 @@ namespace swift {
 /// the analysis which checks if it is possible to
 /// devirtualize a given class_method.
 struct DevirtClassMethodInfo {
-  SILFunctionType::ParameterSILTypeArrayRef ParamTypes;
-  SILFunction *F;
-  CanSILFunctionType SubstCalleeType;
-  ArrayRef<Substitution> Substitutions;
+  ClassDecl *CD;
+  SILType ClassInstanceType;
 
-  DevirtClassMethodInfo() : ParamTypes({}), F(nullptr) {}
+  DevirtClassMethodInfo() : CD(nullptr), ClassInstanceType(SILType()) {}
 };
 
 ApplyInst *devirtualizeApply(ApplyInst *AI);
