@@ -7,7 +7,8 @@ add_swift_executable(swift-ide-test
     swiftFrontend
     swiftIDE
   COMPONENT_DEPENDS
-    bitreader bitwriter transformutils option support ${LLVM_TARGETS_TO_BUILD})
+    bitreader bitwriter ipo objcarcopts transformutils option support
+    ${LLVM_TARGETS_TO_BUILD})
 
 # If libxml2 is available, make it available for swift-ide-test.
 if(SWIFT_HAVE_LIBXML)

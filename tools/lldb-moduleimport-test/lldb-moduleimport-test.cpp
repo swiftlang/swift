@@ -34,27 +34,6 @@
 #include <fstream>
 #include <sstream>
 
-static llvm::cl::list<std::string>
-InputNames(llvm::cl::Positional, llvm::cl::desc("compiled_swift_file1.o ..."),
-           llvm::cl::OneOrMore);
-
-static llvm::cl::opt<std::string>
-SDK("sdk", llvm::cl::desc("path to the SDK to build against"));
-
-static llvm::cl::opt<bool>
-DumpModule("dump-module",
-           llvm::cl::desc("Dump the imported module after checking it imports just fine"));
-
-static llvm::cl::opt<std::string>
-ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"));
-
-static llvm::cl::list<std::string>
-ImportPaths("I", llvm::cl::desc("add a directory to the import search path"));
-
-static llvm::cl::list<std::string>
-FrameworkPaths("F", llvm::cl::desc("add a directory to the framework search path"));
-
-
 void anchorForGetMainExecutable() {}
 
 using namespace llvm::MachO;
@@ -80,7 +59,37 @@ static void printValidationInfo(llvm::StringRef data) {
 int main(int argc, char **argv) {
   llvm::sys::PrintStackTraceOnErrorSignal();
   llvm::PrettyStackTraceProgram ST(argc, argv);
+
+  // Command line handling.
+  llvm::cl::list<std::string> InputNames(
+    llvm::cl::Positional, llvm::cl::desc("compiled_swift_file1.o ..."),
+    llvm::cl::OneOrMore);
+
+  llvm::cl::opt<std::string> SDK(
+    "sdk", llvm::cl::desc("path to the SDK to build against"));
+
+  llvm::cl::opt<bool> DumpModule(
+    "dump-module", llvm::cl::desc(
+      "Dump the imported module after checking it imports just fine"));
+
+  llvm::cl::opt<std::string> ModuleCachePath(
+    "module-cache-path", llvm::cl::desc("Clang module cache path"));
+
+  llvm::cl::list<std::string> ImportPaths(
+    "I", llvm::cl::desc("add a directory to the import search path"));
+
+  llvm::cl::list<std::string> FrameworkPaths(
+    "F", llvm::cl::desc("add a directory to the framework search path"));
+
   llvm::cl::ParseCommandLineOptions(argc, argv);
+  // Unregister our options so they don't interfere with the command line
+  // parsing in CodeGen/BackendUtil.cpp.
+  FrameworkPaths.removeArgument();
+  ImportPaths.removeArgument();
+  ModuleCachePath.removeArgument();
+  DumpModule.removeArgument();
+  SDK.removeArgument();
+  InputNames.removeArgument();
 
   // If no SDK was specified via -sdk, check environment variable SDKROOT.
   if (SDK.getNumOccurrences() == 0) {

@@ -45,6 +45,7 @@ add_swift_library(swiftAST
     clangToolingCore
     clangFrontendTool
     clangFrontend
+    clangCodeGen
     clangDriver
     clangSerialization
     clangParse
@@ -59,8 +60,9 @@ add_swift_library(swiftAST
     clangBasic
 
   COMPONENT_DEPENDS
-    profiledata instrumentation object mc mcparser bitreader option core
-    support)
+    profiledata instrumentation object objcarcopts mc mcparser
+    bitreader bitwriter ipo option core support ${LLVM_TARGETS_TO_BUILD}
+  )
 
 if(NOT SWIFT_BUILT_STANDALONE)
   add_dependencies(swiftAST intrinsics_gen)
