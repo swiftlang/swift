@@ -47,6 +47,7 @@ namespace swift {
   class SourceFile;
   class Type;
   class Module;
+  class NominalTypeDecl;
   class ValueDecl;
   class Initializer;
   class ClassDecl;
@@ -153,6 +154,10 @@ public:
   bool isExtensionContext() const {
     return getContextKind() == DeclContextKind::ExtensionDecl;
   }
+
+  /// If this DeclContext is a nominal type declaration or an
+  /// extension thereof, return the nominal type declaration.
+  NominalTypeDecl *isNominalTypeOrNominalTypeExtensionContext() const;
 
   /// If this DeclContext is a class, or an extension on a class, return the
   /// ClassDecl, otherwise return null.
