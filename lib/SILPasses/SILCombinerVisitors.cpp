@@ -1860,6 +1860,31 @@ visitUnreachableInst(UnreachableInst *UI) {
 
 SILInstruction *
 SILCombiner::
+visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI) {
+  bool isSourceTypeExact = isa<MetatypeInst>(UCCAI->getSrc());
+
+  // Check if we can statically predict the outcome of the cast.
+  auto Feasibility = classifyDynamicCast(UCCAI->getModule().getSwiftModule(),
+                          UCCAI->getSourceType(),
+                          UCCAI->getTargetType(),
+                          isSourceTypeExact);
+
+  if (Feasibility == DynamicCastFeasibility::WillFail) {
+    // Remove the cast and insert a trap, followed by an
+    // unreachable instruction.
+    SILBuilderWithScope<1> Builder(UCCAI);
+    auto *Trap = Builder.createBuiltinTrap(UCCAI->getLoc());
+    UCCAI->replaceAllUsesWithUndef();
+    eraseInstFromFunction(*UCCAI);
+    Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(Trap)));
+    Builder.createUnreachable(ArtificialUnreachableLocation());
+  }
+
+  return nullptr;
+}
+
+SILInstruction *
+SILCombiner::
 visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
   bool isSourceTypeExact = isa<MetatypeInst>(UCCI->getOperand());
 

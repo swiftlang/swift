@@ -12,6 +12,8 @@ class C {
 }
 class D : C {
 }
+class E {
+}
 
 // CHECK-LABEL: sil @test_unconditional_checked_cast
 // CHECK: bb0
@@ -32,4 +34,17 @@ bb0(%0 : $Builtin.Int1):
   cond_fail %0 : $Builtin.Int1
   %2 = tuple ()
   return %2 : $()
+}
+
+// CHECK-LABEL: sil @test_unconditional_checked_cast_addr_fail
+// CHECK: bb0
+// CHECK-NEXT: builtin "int_trap"
+// CHECK-NEXT: unreachable
+sil @test_unconditional_checked_cast_addr_fail : $@thin (@out D, @in E, @in D) -> () {
+bb0(%0 : $*D, %1 : $*E, %2 : $*D):
+  unconditional_checked_cast_addr take_always E in %1 : $*E to D in %0 : $*D
+  %4 = load %2 : $*D
+  strong_release %4 : $D
+  %6 = tuple ()
+  return %6 : $()
 }
