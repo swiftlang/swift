@@ -291,6 +291,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.add(createExternalFunctionDefinitionsElimination());
   PM.add(createDeadFunctionElimination());
   PM.add(createMergeCondFails());
+  PM.add(createCropOverflowChecks());
   PM.runOneIteration();
 
   // Call the CFG viewer.
