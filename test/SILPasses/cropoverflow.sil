@@ -154,3 +154,89 @@ bb2:                                              // Preds: bb0 bb1
   return %22 : $()                                // id: %23
 }
 
+// CHECK-LABEL: @unsigned_sub_previous_traps
+// Keep the first cond-fail
+// CHECK: cond_fail
+// Keep the condfail with +10 because it is not guarded by the first condfail (+9)
+// CHECK: cond_fail
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @unsigned_sub_previous_traps : $@thin (UInt) -> () {
+bb0(%0 : $UInt):
+  %1 = integer_literal $Builtin.Int64, 9          // user: %4
+  %2 = struct_extract %0 : $UInt, #UInt.value     // users: %4, %10, %15, %20, %25
+  %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
+  %4 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
+  %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
+  cond_fail %5 : $Builtin.Int1                    // id: %6
+  // function_ref function signature specialization <Arg[0] = Dead> of cropoverflow.sink (Swift.UInt) -> ()
+  %7 = function_ref @sink_signed_int : $@thin () -> () // users: %8, %13, %18, %23, %28, %29
+  %8 = apply %7() : $@thin () -> ()
+  %9 = integer_literal $Builtin.Int64, 2          // user: %10
+  %10 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %9 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %11
+  %11 = tuple_extract %10 : $(Builtin.Int64, Builtin.Int1), 1 // user: %12
+  cond_fail %11 : $Builtin.Int1                   // id: %12
+  %13 = apply %7() : $@thin () -> ()
+  %14 = integer_literal $Builtin.Int64, 3         // user: %15
+  %15 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %14 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %16
+  %16 = tuple_extract %15 : $(Builtin.Int64, Builtin.Int1), 1 // user: %17
+  cond_fail %16 : $Builtin.Int1                   // id: %17
+  %18 = apply %7() : $@thin () -> ()
+  %19 = integer_literal $Builtin.Int64, 5         // user: %20
+  %20 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %19 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %21
+  %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 1 // user: %22
+  cond_fail %21 : $Builtin.Int1                   // id: %22
+  %23 = apply %7() : $@thin () -> ()
+  %24 = integer_literal $Builtin.Int64, 10        // user: %25
+  %25 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %24 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %26
+  %26 = tuple_extract %25 : $(Builtin.Int64, Builtin.Int1), 1 // user: %27
+  cond_fail %26 : $Builtin.Int1                   // id: %27
+  %28 = apply %7() : $@thin () -> ()
+  %29 = apply %7() : $@thin () -> ()
+  %30 = tuple ()                                  // user: %31
+  return %30 : $()                                // id: %31
+}
+
+// CHECK-LABEL: @signed_sub_previous_traps
+sil hidden @signed_sub_previous_traps : $@thin (Int) -> () {
+bb0(%0 : $Int):
+  %1 = integer_literal $Builtin.Int64, 9          // user: %4
+  %2 = struct_extract %0 : $Int, #Int.value       // users: %4, %10, %15, %20, %25
+  %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
+  %4 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
+  %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
+// Keep this condfail because it is the first one.
+// CHECK: cond_fail
+  cond_fail %5 : $Builtin.Int1                    // id: %6
+  // function_ref function signature specialization <Arg[0] = Dead> of cropoverflow.sink (Swift.Int) -> ()
+  %7 = function_ref @sink_unsigned_int : $@thin () -> () // users: %8, %13, %18, %23, %28, %29
+  %8 = apply %7() : $@thin () -> ()
+  %9 = integer_literal $Builtin.Int64, 2          // user: %10
+  %10 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %9 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %11
+  %11 = tuple_extract %10 : $(Builtin.Int64, Builtin.Int1), 1 // user: %12
+  cond_fail %11 : $Builtin.Int1                   // id: %12
+  %13 = apply %7() : $@thin () -> ()
+  %14 = integer_literal $Builtin.Int64, 3         // user: %15
+  %15 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %14 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %16
+  %16 = tuple_extract %15 : $(Builtin.Int64, Builtin.Int1), 1 // user: %17
+  cond_fail %16 : $Builtin.Int1                   // id: %17
+  %18 = apply %7() : $@thin () -> ()
+  %19 = integer_literal $Builtin.Int64, 5         // user: %20
+  %20 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %19 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %21
+  %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 1 // user: %22
+  cond_fail %21 : $Builtin.Int1                   // id: %22
+  %23 = apply %7() : $@thin () -> ()
+  %24 = integer_literal $Builtin.Int64, 10        // user: %25
+  %25 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %24 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %26
+  %26 = tuple_extract %25 : $(Builtin.Int64, Builtin.Int1), 1 // user: %27
+// Keep this condfail because it is not in the guraded range.
+// CHECK: cond_fail
+  cond_fail %26 : $Builtin.Int1                   // id: %27
+  %28 = apply %7() : $@thin () -> ()
+  %29 = apply %7() : $@thin () -> ()
+  %30 = tuple ()                                  // user: %31
+// CHECK-NOT: cond_fail
+// CHECK: return
+  return %30 : $()                                // id: %31
+}
+

@@ -210,6 +210,17 @@ public:
           }
         }
 
+        if (F.Relationship == ValueRelation::USub) {
+          // L - R already known to not trap at this point in the program.
+          // And the following applies:
+          // L <= A and B <= R.
+          SILValue A = BI->getOperand(0);
+          SILValue B = BI->getOperand(1);
+          if (knownRelation(F.Left, A, ValueRelation::ULE) &&
+              knownRelation(B, F.Right,  ValueRelation::ULE))
+            return true;
+        }
+
         return false;
       case BuiltinValueKind::SSubOver:
         //  A - B traps unless:
@@ -232,8 +243,20 @@ public:
             return true;
           }
         }
+
+        if (F.Relationship == ValueRelation::SSub) {
+          // L - R already known to not trap at this point in the program.
+          // And the following applies:
+          // L <= A and B <= R.
+          SILValue A = BI->getOperand(0);
+          SILValue B = BI->getOperand(1);
+          if (knownRelation(F.Left, A, ValueRelation::SLE) &&
+              knownRelation(B, F.Right,  ValueRelation::SLE))
+            return true;
+        }
+
+        return false;
     }
-    return false;
   }
 
   bool tryToRemoveCondFail(CondFailInst *CFI) {
