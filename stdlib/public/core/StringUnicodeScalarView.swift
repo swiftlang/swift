@@ -170,7 +170,7 @@ extension String {
         if _baseSet {
           if _ascii {
             switch self._asciiBase.next() {
-            case let .Some(x):
+            case let x?:
               result = .Result(UnicodeScalar(x))
             case .None:
               result = .EmptyInput

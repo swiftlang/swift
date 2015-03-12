@@ -305,9 +305,18 @@ static Pattern *getSimilarSpecializingPattern(Pattern *p, Pattern *first) {
   // Map down to the semantics-providing pattern.
   p = p->getSemanticsProvidingPattern();
 
-  // Currently, only patterns with exactly the same kind can be
-  // specialized the same way.
-  return (p->getKind() == first->getKind() ? p : nullptr);
+  // If the patterns are exactly the same kind, they can be treated similarly.
+  if (p->getKind() == first->getKind())
+    return p;
+
+  // If one is an OptionalSomePattern and one is an EnumElementPattern, then
+  // they are the same since the OptionalSomePattern is just sugar for .Some(x).
+  if ((isa<OptionalSomePattern>(p) && isa<EnumElementPattern>(first)) ||
+      (isa<OptionalSomePattern>(first) && isa<EnumElementPattern>(p)))
+    return p;
+
+  // Otherwise, they are different.
+  return nullptr;
 }
 
 namespace {

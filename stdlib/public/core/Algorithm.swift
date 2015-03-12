@@ -151,7 +151,7 @@ public func split<S: Sliceable, R:BooleanType>(
   }
 
   switch startIndex {
-  case .Some(var i):
+  case let i?:
     result.append(elements[i..<elements.endIndex])
   default:
     ()
@@ -408,10 +408,7 @@ public func lexicographicalCompare<
       }
       return false
     }
-    switch e2_ {
-    case .Some(_): return true
-    case .None: return false
-    }
+    return e2_ != nil
   }
 }
 

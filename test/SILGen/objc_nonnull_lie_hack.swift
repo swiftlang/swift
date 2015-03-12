@@ -16,7 +16,7 @@ import gizmo
 
 // OPT-LABEL: sil hidden @_TF21objc_nonnull_lie_hack10makeObjectFT_GSqCSo8NSObject_
 // OPT:         [[OPT:%.*]] = unchecked_ref_bit_cast
-// OPT:         switch_enum [[OPT]] : $Optional<NSObject>, case #Optional.None!enumelt: [[NIL:bb[0-9]+]]
+// OPT:         switch_enum [[OPT]] : $Optional<NSObject>{{.*}} case #Optional.None!enumelt: [[NIL:bb[0-9]+]]
 // OPT:       [[NIL]]:
 // OPT:         string_literal utf8 "nil"
 

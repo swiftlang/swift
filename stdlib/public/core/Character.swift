@@ -148,7 +148,7 @@ public struct Character :
   }
 
   internal struct _SmallUTF8 : CollectionType {
-    init(var _ u8: UInt64) {
+    init(_ u8: UInt64) {
       let count = Character._smallSize(u8)
       _sanityCheck(count <= 8, "Character with more than 8 UTF-8 code units")
       self.count = UInt16(count)
@@ -204,7 +204,7 @@ public struct Character :
   }
 
   struct _SmallUTF16 : CollectionType {
-    init(var _ u8: UInt64) {
+    init(_ u8: UInt64) {
       let count = UTF16.measure(
         UTF8.self, input: Character._makeSmallUTF8Generator(u8),
         repairIllFormedSequences: true)!.0

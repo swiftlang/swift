@@ -65,7 +65,7 @@ extension Optional : DebugPrintable {
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     switch self {
-    case .Some(var value):
+    case .Some(let value):
       var result = "Optional("
       debugPrint(value, &result)
       result += ")"
@@ -86,10 +86,10 @@ extension Optional : DebugPrintable {
 /// Haskell's fmap for Optionals.
 public func map<T, U>(x: T?, @noescape f: (T)->U) -> U? {
   switch x {
-    case .Some(var y):
-    return .Some(f(y))
+    case .Some(let y):
+      return .Some(f(y))
     case .None:
-    return .None
+      return .None
   }
 }
 
@@ -127,7 +127,7 @@ func _diagnoseUnexpectedNilOptional() {
 public // COMPILER_INTRINSIC
 func _getOptionalValue<T>(v: T?) -> T {
   switch v {
-  case .Some(var x):
+  case let x?:
     return x
   case .None:
     _preconditionFailure(
@@ -150,9 +150,9 @@ func _injectNothingIntoOptional<T>() -> T? {
 // Comparisons
 public func == <T : Equatable> (lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
-  case (.Some(let l), .Some(let r)):
+  case let (l?, r?):
     return l == r
-  case (.None, .None):
+  case (nil, nil):
     return true
   default:
     return false
@@ -243,7 +243,7 @@ internal struct _OptionalMirror<T> : MirrorType {
 
   var summary: String {
     switch _value {
-      case .Some(let contents): return reflect(contents).summary
+      case let contents?: return reflect(contents).summary
       default: return "nil"
     }
   }
@@ -256,9 +256,9 @@ internal struct _OptionalMirror<T> : MirrorType {
 
 public func < <T: _Comparable> (lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
-  case (.Some(let l), .Some(let r)):
+  case let (l?, r?):
     return l < r
-  case (.None, .Some):
+  case (nil, _?):
     return true
   default:
     return false
@@ -267,7 +267,7 @@ public func < <T: _Comparable> (lhs: T?, rhs: T?) -> Bool {
 
 public func > <T: _Comparable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
-  case (.Some(let l), .Some(let r)):
+  case let (l?, r?):
     return l > r
   default:
     return rhs < lhs
@@ -276,7 +276,7 @@ public func > <T: _Comparable>(lhs: T?, rhs: T?) -> Bool {
 
 public func <= <T: _Comparable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
-  case (.Some(let l), .Some(let r)):
+  case let (l?, r?):
     return l <= r
   default:
     return !(rhs < lhs)
@@ -285,7 +285,7 @@ public func <= <T: _Comparable>(lhs: T?, rhs: T?) -> Bool {
 
 public func >= <T: _Comparable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
-  case (.Some(let l), .Some(let r)):
+  case let (l?, r?):
     return l >= r
   default:
     return !(lhs < rhs)
