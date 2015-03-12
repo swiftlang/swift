@@ -41,24 +41,27 @@ namespace swift {
 enum class ExistentialRepresentation {
   /// The type is not existential.
   None,
-  /// The container uses a fixed-sized buffer. The type is address-only
-  /// and is manipulated using the {init,open,deinit}_existential_addr family
-  /// of instructions.
-  FixedBuffer,
-  /// The container holds a reference to the class instance that conforms to
-  /// the protocol. The type is reference-counted and is manipulated using the
+  /// The container uses an opaque existential container, with a fixed-sized
+  /// buffer. The type is address-only and is manipulated using the
+  /// {init,open,deinit}_existential_addr family of instructions.
+  Opaque,
+  /// The container uses a class existential container, which holds a reference
+  /// to the class instance that conforms to the protocol. The type is
+  /// reference-counted and is manipulated using the
   /// {init,open}_existential_ref family of instructions.
-  ClassReference,
-  /// The container holds a reference to the type metadata for a type that
+  Class,
+  /// The container uses a metatype existential container, which holds a
+  /// reference to the type metadata for a type that
   /// conforms to the protocol. The type is trivial, and is manipulated using
   /// the {init,open}_existential_metatype family of instructions.
   Metatype,
-  /// The container is a reference-counted box that indirectly contains the
-  /// conforming value. The type is reference-counted and is manipulated
+  /// The container uses a boxed existential container, which is a
+  /// reference-counted buffer that indirectly contains the
+  /// conforming value. The type is manipulated
   /// using the {alloc,open,dealloc}_existential_box family of instructions.
   /// The container may be able to directly adopt a class reference using
   /// init_existential_ref for some class types.
-  Box,
+  Boxed,
 };
 
 /// The value category.

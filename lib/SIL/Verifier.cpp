@@ -1512,8 +1512,8 @@ public:
     require(operandType.isAddress(),
             "open_existential_addr must be applied to address");
     require(operandType.canUseExistentialRepresentation(
-                                        ExistentialRepresentation::FixedBuffer),
-           "open_existential_addr must be applied to fixed-buffer existential");
+                                        ExistentialRepresentation::Opaque),
+           "open_existential_addr must be applied to opaque existential");
 
     require(OEI->getType().isAddress(),
             "open_existential_addr result must be an address");
@@ -1614,9 +1614,9 @@ public:
     require(exType.isAddress(),
             "init_existential_addr must be applied to an address");
     require(exType.canUseExistentialRepresentation(
-                                       ExistentialRepresentation::FixedBuffer,
+                                       ExistentialRepresentation::Opaque,
                                        AEI->getFormalConcreteType()),
-            "init_existential_addr must be used with a fixed-buffer "
+            "init_existential_addr must be used with an opaque "
             "existential type");
     
     // The lowered type must be the properly-abstracted form of the AST type.
@@ -1647,7 +1647,7 @@ public:
     require(concreteType.getSwiftType()->isBridgeableObjectType(),
             "init_existential_ref operand must be a class instance");
     require(IEI->getType().canUseExistentialRepresentation(
-                                     ExistentialRepresentation::ClassReference,
+                                     ExistentialRepresentation::Class,
                                      IEI->getFormalConcreteType()),
             "init_existential_ref must be used with a class existential type");
     require(IEI->getType().isObject(),
@@ -1679,8 +1679,8 @@ public:
     require(exType.isAddress(),
             "deinit_existential_addr must be applied to an address");
     require(exType.canUseExistentialRepresentation(
-                                       ExistentialRepresentation::FixedBuffer),
-            "deinit_existential_addr must be applied to a fixed-buffer "
+                                       ExistentialRepresentation::Opaque),
+            "deinit_existential_addr must be applied to an opaque "
             "existential");
   }
 

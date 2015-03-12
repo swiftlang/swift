@@ -3062,20 +3062,69 @@ in-line inside the existential container for small values or allocated
 separately into a buffer owned and managed by the existential container for
 larger values.
 
-If none of the protocols in a protocol type are class protocols, then
-the existential container for that type is address-only and referred to in
-the implementation as an *opaque existential container*. The value semantics of
-the existential container propagate to the contained concrete value. Applying
-``copy_addr`` to an opaque existential container copies the
-contained concrete value, deallocating or reallocating the destination
-container's owned buffer if necessary. Applying ``destroy_addr`` to an
-opaque existential container destroys the concrete value and deallocates any
-buffers owned by the existential container.
+Depending on the constraints applied to an existential type, an existential
+container may use one of several representations:
 
-If a protocol type is constrained by one or more class protocols, then the
-existential container for that type is loadable and referred to in the
-implementation as a *class existential container*. Class existential containers
-have reference semantics and can be ``retain``-ed and ``release``-d.
+- **Opaque existential containers**: If none of the protocols in a protocol
+  type are class protocols, then the existential container for that type is
+  address-only and referred to in the implementation as an *opaque existential
+  container*. The value semantics of the existential container propagate to the
+  contained concrete value. Applying ``copy_addr`` to an opaque existential
+  container copies the contained concrete value, deallocating or reallocating
+  the destination container's owned buffer if necessary. Applying
+  ``destroy_addr`` to an opaque existential container destroys the concrete
+  value and deallocates any buffers owned by the existential container. The
+  following instructions manipulate opaque existential containers:
+
+  * `init_existential_addr`_
+  * `open_existential_addr`_
+  * `deinit_existential_addr`_
+
+- **Class existential containers**: If a protocol type is constrained by one or
+  more class protocols, then the existential container for that type is
+  loadable and referred to in the implementation as a *class existential
+  container*. Class existential containers have reference semantics and can be
+  ``retain``-ed and ``release``-d. The following instructions manipulate class
+  existential containers:
+
+  * `init_existential_ref`_
+  * `open_existential_ref`_
+
+- **Metatype existential containers**: Existential metatypes use a
+  container consisting of the type metadata for the conforming type along with
+  the protocol conformances. Metatype existential containers are trivial types.
+  The following instructions manipulate metatype existential containers:
+
+  * init_existential_metatype (TBW)
+  * open_existential_metatype (TBW)
+
+- **Boxed existential containers**: The standard library ``ErrorType`` protocol
+  uses a size-optimized reference-counted container, which indirectly stores
+  the conforming value. Boxed existential containers can be ``retain``-ed
+  and ``release``-d. The following instructions manipulate boxed existential
+  containers:
+
+  * alloc_existential_box (TBW)
+  * open_existential_box (TBW)
+  * dealloc_existential_box (TBW)
+
+Some existential types may additionally support specialized representations
+when they contain certain known concrete types. For example, when Objective-C
+interop is available, the ``ErrorType`` protocol existential supports
+a class existential container representation for ``NSError`` objects, so it
+can be initialized from one using ``init_existential_ref`` instead of the
+more expensive ``alloc_existential_box``::
+
+  bb(%nserror: $NSError):
+    // The slow general way to form an ErrorType, allocating a box and
+    // storing to its value buffer:
+    %error1 = alloc_existential_box $ErrorType of $NSError
+    strong_retain %nserror: $NSError
+    store %nserror to %error1#1 : $NSError
+
+    // The fast path supported for NSError:
+    strong_retain %nserror: $NSError
+    %error2 = init_existential_ref %nserror: $NSError, $ErrorType
 
 init_existential_addr
 `````````````````````
