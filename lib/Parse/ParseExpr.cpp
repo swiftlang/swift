@@ -172,10 +172,10 @@ ParserResult<Expr> Parser::parseExprAs() {
 /// parseExprSequence
 ///
 ///   expr-sequence(Mode):
-///     expr-unary(Mode) expr-binary(Mode)*
+///     expr-sequence-element(Mode) expr-binary(Mode)*
 ///   expr-binary(Mode):
-///     operator-binary expr-unary(Mode)
-///     '?' expr-sequence(Mode) ':' expr-unary(Mode)
+///     operator-binary expr-sequence-element(Mode)
+///     '?' expr-sequence(Mode) ':' expr-sequence-element(Mode)
 ///     '=' expr-unary
 ///     expr-is
 ///     expr-as
@@ -183,6 +183,11 @@ ParserResult<Expr> Parser::parseExprAs() {
 /// The sequencing for binary exprs is not structural, i.e., binary operators
 /// are not inherently right-associative. If present, '?' and ':' tokens must
 /// match.
+///
+/// Similarly, the parsing of 'try' as part of expr-sequence-element
+/// is not structural.  'try' is not permitted at arbitrary points in
+/// a sequence; in the places it's permitted, it's hoisted out to
+/// apply to everything to its right.
 ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
                                              bool isExprBasic,
                                              bool isConfigCondition) {
@@ -194,7 +199,8 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
       break;
     
     // Parse a unary expression.
-    ParserResult<Expr> Primary = parseExprUnary(Message, isExprBasic);
+    ParserResult<Expr> Primary =
+      parseExprSequenceElement(Message, isExprBasic);
     if (Primary.hasCodeCompletion())
       return Primary;
     if (Primary.isNull())
@@ -313,9 +319,32 @@ done:
   return makeParserResult(SequenceExpr::create(Context, SequencedExprs));
 }
 
+/// parseExprSequenceElement
+///
+///   expr-sequence-element(Mode):
+///     'try' expr-unary(Mode)
+///     expr-unary(Mode)
+///
+/// 'try' is not actually allowed at an arbitrary position of a
+/// sequence, but this isn't enforced until sequence-folding.
+ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
+                                                    bool isExprBasic) {
+  SourceLoc tryLoc;
+  bool hadTry = consumeIf(tok::kw_try, tryLoc);
+
+  ParserResult<Expr> sub = parseExprUnary(message, isExprBasic);
+
+  if (hadTry && !sub.hasCodeCompletion() && !sub.isNull()) {
+    sub = makeParserResult(new (Context) TryExpr(tryLoc, sub.get()));
+  }
+
+  return sub;
+}
+
 /// parseExprUnary
 ///
 ///   expr-unary(Mode):
+///     expr-unary(Mode)
 ///     expr-postfix(Mode)
 ///     expr-new
 ///     operator-prefix expr-unary(Mode)

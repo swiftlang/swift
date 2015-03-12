@@ -139,10 +139,19 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
                    /*assignment*/ false);
 }
 
+// The way we compute isEndOfSequence relies on the assumption that
+// the sequence-folding algorithm never recurses with a prefix of the
+// entire sequence.
 static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
-                       const InfixData &infixData) {
+                       const InfixData &infixData, bool isEndOfSequence) {
   if (!LHS || !RHS)
     return nullptr;
+
+  // If the left-hand-side is a 'try', hoist it up.
+  TryExpr *tryEval = nullptr;
+  if ((tryEval = dyn_cast<TryExpr>(LHS))) {
+    LHS = tryEval->getSubExpr();
+  }
   
   // If this is an assignment operator, and the left operand is an optional
   // evaluation, pull the operator into the chain.
@@ -152,12 +161,46 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
       LHS = optEval->getSubExpr();
     }
   }
-  
-  // Fold the result into the optional evaluation, if we have one.
+
+  // If the right operand is a try, it's an error unless the operator
+  // is an assignment or conditional operator and there's nothing to
+  // the right that didn't parse as part of the right operand.
+  //
+  // Generally, nothing to the right will fail to parse as part of the
+  // right operand because there are no standard operators that have
+  // lower precedence than assignment operators or the conditional
+  // operator.
+  //
+  // We allow the right operand of the conditional operator to begin
+  // with 'try' for consistency with the middle operand.  This allows:
+  //   x ? try foo() : try bar()
+  // but not:
+  //   x ? try foo() : try bar() $#! 1
+  // assuming $#! is some crazy operator with lower precedence
+  // than the conditional operator.
+  if (auto tryRHS = dyn_cast<TryExpr>(RHS)) {
+    if (isa<IfExpr>(Op) || infixData.isAssignment()) {
+      if (!isEndOfSequence) {
+        if (isa<IfExpr>(Op)) {
+          TC.diagnose(tryRHS->getTryLoc(), diag::try_if_rhs_noncovering);
+        } else {
+          TC.diagnose(tryRHS->getTryLoc(), diag::try_assign_rhs_noncovering);
+        }
+      }
+    } else {
+      TC.diagnose(tryRHS->getTryLoc(), diag::try_rhs);
+    }
+  }
+
+  // Fold the result into the optional evaluation or try.
   auto makeResultExpr = [&](Expr *result) -> Expr * {
     if (optEval) {
       optEval->setSubExpr(result);
-      return optEval;
+      result = optEval;
+    }
+    if (tryEval) {
+      tryEval->setSubExpr(result);
+      result = tryEval;
     }
     return result;
   };
@@ -246,7 +289,7 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     // If the operator is a cast operator, the RHS can't extend past the type
     // that's part of the cast production.
     if (isa<ExplicitCastExpr>(Op1.op)) {
-      LHS = makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData);
+      LHS = makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData, S.empty());
       Op1 = getNextOperator();
       if (!Op1) return LHS;
       RHS = S[1];
@@ -267,7 +310,7 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     // both left-associative, fold LHS and RHS immediately.
     if (Op1.infixData.getPrecedence() > Op2Info.getPrecedence() ||
         (Op1.infixData == Op2Info && Op1.infixData.isLeftAssociative())) {
-      LHS = makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData);
+      LHS = makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData, S.empty());
       Op1 = getNextOperator();
       assert(Op1 && "should get a valid operator here");
       RHS = S[1];
@@ -290,7 +333,7 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     // immediately fold LHS and RHS.
     if (Op1.infixData == Op2Info && Op1.infixData.isRightAssociative()) {
       RHS = foldSequence(TC, DC, RHS, S, Op1.infixData.getPrecedence());
-      LHS = makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData);
+      LHS = makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData, S.empty());
 
       // If we've drained the entire sequence, we're done.
       if (S.empty()) return LHS;
@@ -315,12 +358,12 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     }
     
     // Recover by arbitrarily binding the first two.
-    LHS = makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData);
+    LHS = makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData, S.empty());
     return foldSequence(TC, DC, LHS, S, MinPrecedence);
   }
 
   // Fold LHS and RHS together and declare completion.
-  return makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData);
+  return makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData, S.empty());
 }
 
 Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {

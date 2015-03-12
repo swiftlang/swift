@@ -1603,6 +1603,13 @@ public:
     OS << ')';
   }
   
+  void visitTryExpr(TryExpr *E) {
+    printCommon(E, "try_expr");
+    OS << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
+
   void visitSequenceExpr(SequenceExpr *E) {
     printCommon(E, "sequence_expr");
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {

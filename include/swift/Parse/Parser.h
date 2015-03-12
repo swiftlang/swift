@@ -1053,6 +1053,8 @@ public:
   ParserResult<Expr> parseExprSequence(Diag<> ID,
                                        bool isExprBasic,
                                        bool isConfigCondition = false);
+  ParserResult<Expr> parseExprSequenceElement(Diag<> ID,
+                                              bool isExprBasic);
   ParserResult<Expr> parseExprPostfix(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprUnary(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprSuper();

@@ -281,6 +281,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitTryExpr(TryExpr *E) {
+    if (Expr *E2 = doIt(E->getSubExpr())) {
+      E->setSubExpr(E2);
+      return E;
+    }
+    return nullptr;
+  }
+
   Expr *visitInOutExpr(InOutExpr *E) {
     if (Expr *E2 = doIt(E->getSubExpr())) {
       E->setSubExpr(E2);

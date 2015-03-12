@@ -1317,6 +1317,14 @@ ERROR(non_assoc_adjacent,sema_tce,none,
 ERROR(incompatible_assoc,sema_tce,none,
       "operator is adjacent to operator of same precedence"
       " but incompatible associativity", ())
+ERROR(try_rhs,sema_tce,none,
+      "'try' cannot appear to the right of a non-assignment operator", ())
+ERROR(try_if_rhs_noncovering,sema_tce,none,
+      "'try' following conditional operator does not cover everything "
+      "to its right", ())
+ERROR(try_assign_rhs_noncovering,sema_tce,none,
+      "'try' following assignment operator does not cover everything "
+      "to its right", ())
 ERROR(reference_non_inout,sema_tce,none,
       "reference to %0 not used to initialize a inout parameter", (Type))
 NOTE(subscript_decl_here,sema_tca,none,

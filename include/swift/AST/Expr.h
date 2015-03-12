@@ -1317,8 +1317,9 @@ class IdentityExpr : public Expr {
 
 public:
   IdentityExpr(ExprKind kind,
-               Expr *subExpr, Type ty = Type())
-    : Expr(kind, /*implicit*/ false, ty), SubExpr(subExpr)
+               Expr *subExpr, Type ty = Type(),
+               bool implicit = false)
+    : Expr(kind, implicit, ty), SubExpr(subExpr)
   {}
   
   SourceLoc getLoc() const { return SubExpr->getLoc(); }
@@ -1353,6 +1354,29 @@ public:
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DotSelf;
+  }
+};
+
+/// TryExpr - A 'try' surrounding an expression, marking that the
+/// expression contains code which might throw.
+class TryExpr : public IdentityExpr {
+  SourceLoc Loc;
+
+public:
+  TryExpr(SourceLoc loc, Expr *sub, Type type = Type(),
+          bool implicit = false)
+    : IdentityExpr(ExprKind::Try, sub, type, implicit), Loc(loc) {}
+
+  SourceLoc getTryLoc() const { return Loc; }
+
+  SourceRange getSourceRange() const {
+    return { getStartLoc(), getEndLoc() };
+  }
+  SourceLoc getStartLoc() const { return Loc; }
+  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
+
+  static bool classof(const Expr *e) {
+    return e->getKind() == ExprKind::Try;
   }
 };
   
