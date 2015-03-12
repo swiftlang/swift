@@ -326,3 +326,65 @@ bb0(%0 : $Int):
   return %30 : $()                                // id: %31
 }
 
+// CHECK-LABEL: @add1_signed_branch
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @add1_signed_branch : $@thin (Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int):
+  %2 = struct_extract %0 : $Int, #Int.value       // users: %4, %8, %14
+  %3 = struct_extract %1 : $Int, #Int.value       // user: %4
+  %4 = builtin "cmp_slt_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1 // user: %5
+  cond_br %4, bb1, bb2                            // id: %5
+
+bb1:                                              // Preds: bb0
+  %6 = integer_literal $Builtin.Int64, 1          // user: %8
+  %7 = integer_literal $Builtin.Int1, -1          // users: %8, %14
+  %8 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %6 : $Builtin.Int64, %7 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %9
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 1 // user: %10
+  cond_fail %9 : $Builtin.Int1                    // id: %10
+  // function_ref function signature specialization <Arg[0] = Dead> of cropoverflow.sink (Swift.Int) -> ()
+  %11 = function_ref @sink_unsigned_int : $@thin () -> () // users: %12, %17
+  %12 = apply %11() : $@thin () -> ()
+  %13 = integer_literal $Builtin.Int64, 2         // user: %14
+  %14 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %13 : $Builtin.Int64, %7 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %15
+  %15 = tuple_extract %14 : $(Builtin.Int64, Builtin.Int1), 1 // user: %16
+  cond_fail %9 : $Builtin.Int1                   // id: %16
+  %17 = apply %11() : $@thin () -> ()
+  br bb2                                          // id: %18
+
+bb2:                                              // Preds: bb0 bb1
+  %19 = tuple ()                                  // user: %20
+  return %19 : $()                                // id: %20
+}
+
+// CHECK-LABEL: @add1_unsigned_branch
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @add1_unsigned_branch : $@thin (UInt, UInt) -> () {
+bb0(%0 : $UInt, %1 : $UInt):
+  %2 = struct_extract %0 : $UInt, #UInt.value     // users: %4, %8, %14
+  %3 = struct_extract %1 : $UInt, #UInt.value     // user: %4
+  %4 = builtin "cmp_ult_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1 // user: %5
+  cond_br %4, bb1, bb2                            // id: %5
+
+bb1:                                              // Preds: bb0
+  %6 = integer_literal $Builtin.Int64, 1          // user: %8
+  %7 = integer_literal $Builtin.Int1, -1          // users: %8, %14
+  %8 = builtin "uadd_with_overflow_Int64"(%2 : $Builtin.Int64, %6 : $Builtin.Int64, %7 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %9
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 1 // user: %10
+  cond_fail %9 : $Builtin.Int1                    // id: %10
+  // function_ref function signature specialization <Arg[0] = Dead> of cropoverflow.sink (Swift.UInt) -> ()
+  %11 = function_ref @sink_signed_int : $@thin () -> () // users: %12, %17
+  %12 = apply %11() : $@thin () -> ()
+  %13 = integer_literal $Builtin.Int64, 2         // user: %14
+  %14 = builtin "uadd_with_overflow_Int64"(%2 : $Builtin.Int64, %13 : $Builtin.Int64, %7 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %15
+  %15 = tuple_extract %14 : $(Builtin.Int64, Builtin.Int1), 1 // user: %16
+  cond_fail %9 : $Builtin.Int1                   // id: %16
+  %17 = apply %11() : $@thin () -> ()
+  br bb2                                          // id: %18
+
+bb2:                                              // Preds: bb0 bb1
+  %19 = tuple ()                                  // user: %20
+  return %19 : $()                                // id: %20
+}
+

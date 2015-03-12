@@ -202,6 +202,18 @@ public:
             return true;
         }
 
+        // A + 1 does not trap if A is smaller than anything.
+        if (F.Relationship == ValueRelation::SLT) {
+          SILValue A = BI->getOperand(0);
+          SILValue B = BI->getOperand(1);
+          IntegerLiteralInst *AI = dyn_cast<IntegerLiteralInst>(A);
+          IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
+          if (F.Left == A && BI && BI->getValue().getSExtValue() == 1)
+            return true;
+          if (F.Left == B && AI && AI->getValue().getSExtValue() == 1)
+            return true;
+        }
+
         return false;
       case BuiltinValueKind::UAddOver:
         //  A + B traps unless:
@@ -219,6 +231,17 @@ public:
             return true;
         }
 
+        // A + 1 does not trap if A is smaller than anything.
+        if (F.Relationship == ValueRelation::ULT) {
+          SILValue A = BI->getOperand(0);
+          SILValue B = BI->getOperand(1);
+          IntegerLiteralInst *AI = dyn_cast<IntegerLiteralInst>(A);
+          IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
+          if (F.Left == A && BI && BI->getValue().getZExtValue() == 1)
+            return true;
+          if (F.Left == B && AI && AI->getValue().getZExtValue() == 1)
+            return true;
+        }
         return false;
 
       case BuiltinValueKind::SMulOver:
@@ -254,6 +277,15 @@ public:
             return true;
         }
 
+        // A - 1 does not trap if A is greater than some other number.
+        if (F.Relationship == ValueRelation::ULT) {
+          SILValue A = BI->getOperand(0);
+          SILValue B = BI->getOperand(1);
+          IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
+          if (F.Right == A && BI && BI->getValue().getZExtValue() == 1)
+            return true;
+        }
+
         return false;
       case BuiltinValueKind::SSubOver:
         //  A - B traps unless:
@@ -285,6 +317,15 @@ public:
           SILValue B = BI->getOperand(1);
           if (knownRelation(F.Left, A, ValueRelation::SLE) &&
               knownRelation(B, F.Right,  ValueRelation::SLE))
+            return true;
+        }
+
+        // A - 1 does not trap if A is greater than some other number.
+        if (F.Relationship == ValueRelation::SLT) {
+          SILValue A = BI->getOperand(0);
+          SILValue B = BI->getOperand(1);
+          IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
+          if (F.Right == A && BI && BI->getValue().getSExtValue() == 1)
             return true;
         }
         return false;
