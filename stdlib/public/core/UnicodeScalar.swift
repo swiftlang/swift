@@ -268,11 +268,11 @@ extension UInt64 {
   }
 }
 
-public func ==(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
-  return lhs.value == rhs.value
+extension UnicodeScalar : Comparable, Equatable {
 }
 
-extension UnicodeScalar : Comparable {
+public func ==(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
+  return lhs.value == rhs.value
 }
 
 public func <(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {

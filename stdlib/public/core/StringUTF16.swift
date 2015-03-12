@@ -189,7 +189,7 @@ public func == (
   return lhs._offset == rhs._offset
 }
 
-extension String.UTF16View.Index : Comparable {}
+extension String.UTF16View.Index : Comparable, Equatable {}
 
 public func < (
   lhs: String.UTF16View.Index, rhs: String.UTF16View.Index

@@ -178,7 +178,8 @@ T : _UnsignedIntegerType, U : _SignedIntegerType
 /// A ${bits}-bit ${'un' if sign == 'u' else ''}signed integer value
 /// type.
 public struct ${Self}
-   : ${'SignedIntegerType' if sign == 's' else 'UnsignedIntegerType'} {
+   : ${'SignedIntegerType' if sign == 's' else 'UnsignedIntegerType'},
+     Comparable, Equatable {
   public var value: Builtin.${BuiltinName}
 
   // FIXME: this declaration should be inferred.

@@ -446,7 +446,7 @@ public func >= (lhs: ${Self}, rhs: ${Self}) -> Bool {
 }
 
 @transparent
-extension ${Self} : Comparable {
+extension ${Self} : Comparable, Equatable {
 }
 
 extension ${Self} : Hashable {

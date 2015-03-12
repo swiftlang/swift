@@ -16,7 +16,7 @@
 
 /// A `RandomAccessIndexType` that has two possible values.  Used as
 /// the `Index` type for `SequenceOfOne<T>`.
-public enum Bit : Int, RandomAccessIndexType, Reflectable {
+public enum Bit : Int, Comparable, RandomAccessIndexType, Reflectable {
   case Zero = 0, One = 1
 
   /// Returns the next consecutive value after `self`.

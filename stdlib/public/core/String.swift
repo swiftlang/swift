@@ -464,24 +464,6 @@ extension String : Hashable {
   }
 }
 
-extension String : StringInterpolationConvertible {
-  /// Create an instance by concatenating the elements of `strings`
-  @effects(readonly)
-  public
-  init(stringInterpolation strings: String...) {
-    self.init()
-    for str in strings {
-      self += str
-    }
-  }
-
-  /// Create an instance containing `expr`\ 's `print` representation
-  public
-  init<T>(stringInterpolationSegment expr: T) {
-    self = toString(expr)
-  }
-}
-
 @effects(readonly)
 @semantics("string.concat")
 public func +(var lhs: String, rhs: String) -> String {

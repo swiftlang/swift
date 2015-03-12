@@ -173,7 +173,7 @@ if True:
 }%
 
 ${SelfDocComment}
-public struct ${Self}<T> : MutableCollectionType, Sliceable, _DestructorSafeContainer {
+public struct ${Self}<T> : _CollectionType, MutableCollectionType, Sliceable, _DestructorSafeContainer {
   /// The type of element stored by this `${Self}`
   public typealias Element = T
 

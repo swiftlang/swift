@@ -214,12 +214,14 @@ extension CGFloat : Reflectable {
 }
 
 // Comparisons.
-@transparent extension CGFloat : Comparable { }
+@transparent extension CGFloat : Equatable { }
 
 @transparent
 public func ==(lhs: CGFloat, rhs: CGFloat) -> Bool {
   return lhs.native == rhs.native
 }
+
+@transparent extension CGFloat : Comparable { }
 
 @transparent
 public func <(lhs: CGFloat, rhs: CGFloat) -> Bool {

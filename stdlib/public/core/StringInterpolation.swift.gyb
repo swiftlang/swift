@@ -35,6 +35,22 @@ for int_ty in all_integer_types(word_bits):
 }%
 
 extension String : StringInterpolationConvertible {
+  /// Create an instance by concatenating the elements of `strings`
+  @effects(readonly)
+  public
+  init(stringInterpolation strings: String...) {
+    self.init()
+    for str in strings {
+      self += str
+    }
+  }
+
+  /// Create an instance containing `expr`\ 's `print` representation
+  public
+  init<T>(stringInterpolationSegment expr: T) {
+    self = toString(expr)
+  }
+
 % for Type in StreamableTypes:
   public init(stringInterpolationSegment expr: ${Type}) {
     self = _toStringReadOnlyStreamable(expr)
