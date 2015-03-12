@@ -528,7 +528,9 @@ public:
     if (FalseBB) Constraints.push_back(Constraint(FalseBB, Right, Left, Rel));
   }
 
-  StringRef getName() override { return "Removes overflow checks that are proven to be redundant"; }
+  StringRef getName() override {
+    return "Removes overflow checks that are proven to be redundant";
+  }
 };
 }
 
