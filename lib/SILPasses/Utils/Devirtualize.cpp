@@ -259,34 +259,10 @@ ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
 
   auto Subs = getSubstitutionsForSuperclass(Mod, GenCalleeType,
                                             ClassInstanceType, AI);
-
   auto SubstCalleeType =
     GenCalleeType->substGenericArgs(Mod, Mod.getSwiftModule(), Subs);
 
-  // Grab the self type from the function ref and the self type from the class
-  // method inst.
-  SILType FuncSelfTy = SubstCalleeType->getSelfParameter().getSILType();
-  SILType OriginTy = ClassInstanceType;
   SILBuilderWithScope<16> B(AI);
-
-  // Then compare the two types and if they are unequal...
-  if (FuncSelfTy != OriginTy) {
-    if (ClassInstance.stripUpCasts().getType().getAs<MetatypeType>()) {
-      auto &Module = AI->getModule();
-      (void) Module;
-      assert(FuncSelfTy.getMetatypeInstanceType(Module).
-             isSuperclassOf(OriginTy.getMetatypeInstanceType(Module)) &&
-             "Can not call a class method"
-             " on a non-subclass of the class_methods class.");
-    } else {
-      assert(FuncSelfTy.isSuperclassOf(OriginTy) &&
-             "Can not call a class method"
-             " on a non-subclass of the class_methods class.");
-    }
-    // Otherwise, upcast origin to the appropriate type.
-    ClassInstance = B.createUpcast(AI->getLoc(), ClassInstance, FuncSelfTy);
-  }
-
   FunctionRefInst *FRI = B.createFunctionRef(AI->getLoc(), F);
 
   // Create the argument list for the new apply, casting when needed
@@ -300,8 +276,13 @@ ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
     NewArgs.push_back(conditionallyCastAddr(B, AI->getLoc(), Args[i],
                                             ParamTypes[i]));
 
-  // Add in self to the end.
-  NewArgs.push_back(ClassInstance);
+  // Add the self argument, upcasting if required because we're
+  // calling a base class's method.
+  auto SelfParamTy = SubstCalleeType->getSelfParameter().getSILType();
+  if (ClassInstance.getType() == SelfParamTy)
+    NewArgs.push_back(ClassInstance);
+  else
+    NewArgs.push_back(B.createUpcast(AI->getLoc(), ClassInstance, SelfParamTy));
 
   // If we have a direct return type, make sure we use the subst callee return
   // type. If we have an indirect return type, AI's return type of the empty

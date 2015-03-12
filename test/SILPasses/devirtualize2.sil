@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -devirtualize  -verify | FileCheck %s
+// RUN: %target-sil-opt %s -devirtualize -dce -verify | FileCheck %s
 
 sil_stage canonical
 
@@ -17,11 +17,12 @@ class Foo : Bar {
 
 sil_global @x : $Bar
 
-//CHECK: function_with_cm_with_cast
-//CHECK: function_ref @_TFC4main3Bar4pingfS0_FT_T_
-//CHECK-NEXT: apply
-//CHECK-NOT: class_method
-//CHECK: return
+// CHECK-LABEL: sil @function_with_cm_with_cast
+// CHECK-NOT: class_method
+// CHECK: [[REF:%.*]] = function_ref @_TFC4main3Bar4pingfS0_FT_T_
+// CHECK: [[SELF:%.*]] = upcast
+// CHECK: apply [[REF]]([[SELF]])
+// CHECK: return
 sil @function_with_cm_with_cast : $@thin () -> () {
 bb0:
   %0 = global_addr @x : $*Bar                     // users: %7, %8
