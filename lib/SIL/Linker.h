@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_SIL_LINKER_H
+#define SWIFT_SIL_LINKER_H
+
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILExternalSource.h"
 #include "swift/SIL/SILVisitor.h"
@@ -91,3 +94,5 @@ private:
 };
 
 } // end namespace swift
+
+#endif
