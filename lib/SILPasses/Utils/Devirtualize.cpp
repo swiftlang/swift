@@ -245,12 +245,9 @@ ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
   auto SubstCalleeType =
     GenCalleeType->substGenericArgs(Mod, Mod.getSwiftModule(), Subs);
 
-  auto ParamTypes =
-    SubstCalleeType->getParameterSILTypesWithoutIndirectResult();
-
   // Grab the self type from the function ref and the self type from the class
   // method inst.
-  SILType FuncSelfTy = ParamTypes[ParamTypes.size() - 1];
+  SILType FuncSelfTy = SubstCalleeType->getSelfParameter().getSILType();
   SILType OriginTy = ClassInstanceType;
   SILBuilderWithScope<16> B(AI);
 
@@ -279,13 +276,13 @@ ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
   // indirect return types and contravariant arguments.
   llvm::SmallVector<SILValue, 8> NewArgs;
   auto Args = AI->getArguments();
-  auto allParamTypes = SubstCalleeType->getParameterSILTypes();
+  auto ParamTypes = SubstCalleeType->getParameterSILTypes();
 
   // For each old argument Op...
   for (unsigned i = 0, e = Args.size() - 1; i != e; ++i) {
     SILValue Op = Args[i];
     SILType OpTy = Op.getType();
-    SILType FOpTy = allParamTypes[i];
+    SILType FOpTy = ParamTypes[i];
 
     // If the type matches the type for the given parameter in F, just add it to
     // our arg list and continue.
