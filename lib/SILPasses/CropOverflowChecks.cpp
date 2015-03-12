@@ -170,7 +170,7 @@ public:
         case ValueRelation::ULE: return Ap.ule(Bp);
         case ValueRelation::SLT: return Ap.slt(Bp);
         case ValueRelation::ULT: return Ap.ult(Bp);
-        default: llvm_unreachable();
+        default: llvm_unreachable("Invalid value relation");
       }
     }
     return false;
