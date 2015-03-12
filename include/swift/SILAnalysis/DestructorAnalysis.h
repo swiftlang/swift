@@ -14,12 +14,14 @@
 
 #include "swift/SIL/SILValue.h"
 #include "swift/SILAnalysis/Analysis.h"
+#include "llvm/ADT/DenseMap.h"
 
 namespace swift {
 
 /// This analysis determines memory effects during destruction.
 class DestructorAnalysis : public SILAnalysis {
   SILModule *Mod;
+  llvm::DenseMap<CanType, bool> Cached;
 public:
 
   DestructorAnalysis(SILModule *M)
@@ -33,6 +35,7 @@ public:
   bool mayStoreToMemoryOnDestruction(SILType T);
 
 protected:
+  bool cacheResult(CanType Type, bool Result);
   bool isSafeType(Type);
   bool implementsDestructorSafeContainerProtocol(NominalTypeDecl *);
   bool areTypeParametersSafe(CanType);
