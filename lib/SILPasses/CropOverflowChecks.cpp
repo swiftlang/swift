@@ -184,7 +184,40 @@ public:
   }
 
   static bool doesFormulateAbsolveOperation(Constraint &F, BuiltinInst *BI) {
+    switch (BI->getBuiltinInfo().ID) {
+      default: return false;
+      case BuiltinValueKind::SAddOver:
         return false;
+      case BuiltinValueKind::UAddOver:
+        return false;
+      case BuiltinValueKind::SMulOver:
+      case BuiltinValueKind::UMulOver:
+        return false;
+      case BuiltinValueKind::USubOver:
+        return false;
+      case BuiltinValueKind::SSubOver:
+        //  A - B traps unless:
+        if (F.Relationship == ValueRelation::SLE ||
+            F.Relationship == ValueRelation::SLT) {
+          //  A >= B and B is positive.
+          // Notice that we need to handle underflow and overflow.
+
+          // Given the constraint L < R check if:
+          // 1. L is positive (because double negative can overflow)
+          // 2. R == A
+          // 3. B <= L (subtracting less than L is okay)
+          //
+          // Example: Given 2<X we know that X-2 can't trap.
+          SILValue A = BI->getOperand(0);
+          SILValue B = BI->getOperand(1);
+          if (isKnownPositive(F.Left) &&
+              knownRelation(F.Right, A, ValueRelation::EQ) &&
+              knownRelation(B, F.Left, ValueRelation::SLE)) {
+            return true;
+          }
+        }
+    }
+    return false;
   }
 
   bool tryToRemoveCondFail(CondFailInst *CFI) {
