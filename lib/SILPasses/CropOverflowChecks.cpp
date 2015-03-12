@@ -149,6 +149,44 @@ public:
     }
   }
 
+  /// Return True if the relationship \p Rel describes a known relation
+  /// between A and B.
+  static bool knownRelation(SILValue A, SILValue B, ValueRelation Rel) {
+    // Identical values are known to be equal, or less than or equal.
+    if ((A == B) && (Rel == ValueRelation::EQ   ||
+                     Rel == ValueRelation::SLE  ||
+                     Rel == ValueRelation::ULE))
+      return true;
+
+    // Evaluate literal integers.
+    IntegerLiteralInst *AI = dyn_cast<IntegerLiteralInst>(A);
+    IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
+    if (AI && BI) {
+      APInt Ap = AI->getValue();
+      APInt Bp = BI->getValue();
+      switch (Rel) {
+        case ValueRelation::EQ:  return Ap.eq(Bp);
+        case ValueRelation::SLE: return Ap.sle(Bp);
+        case ValueRelation::ULE: return Ap.ule(Bp);
+        case ValueRelation::SLT: return Ap.slt(Bp);
+        case ValueRelation::ULT: return Ap.ult(Bp);
+        default: llvm_unreachable();
+      }
+    }
+    return false;
+  }
+
+  /// Return True if we can deduct that \p N is always positive (N > 0).
+  static bool isKnownPositive(SILValue N) {
+    if (IntegerLiteralInst *NI = dyn_cast<IntegerLiteralInst>(N))
+      return NI->getValue().isStrictlyPositive();
+    return  false;
+  }
+
+  static bool doesFormulateAbsolveOperation(Constraint &F, BuiltinInst *BI) {
+        return false;
+  }
+
   bool tryToRemoveCondFail(CondFailInst *CFI) {
     // Was not able to remove this branch.
     return false;
