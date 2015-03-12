@@ -102,13 +102,17 @@ ArchetypeToConcreteConvertUInt8(t: b)
 // x -> y where y is a class but x is not.
 // CHECK-LABEL: sil shared @_TTSg5C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast31ArchetypeToConcreteConvertUInt8U__FT1tQ__VSs5UInt8 : $@thin (@in C) -> UInt8 {
 // CHECK: bb0
-// CHECK-NEXT: builtin "int_trap"
+// CHECK: builtin "int_trap"
+// CHECK: unreachable
+// CHECK-NEXT: }
 ArchetypeToConcreteConvertUInt8(t: c)
 
 // x -> y where x,y are not classes and x is a different type from y.
 // CHECK-LABEL: sil shared @_TTSg5VSs6UInt64___TF37specialize_unconditional_checked_cast31ArchetypeToConcreteConvertUInt8U__FT1tQ__VSs5UInt8 : $@thin (@in UInt64) -> UInt8 {
 // CHECK: bb0
-// CHECK-NEXT: builtin "int_trap"
+// CHECK: builtin "int_trap"
+// CHECK: unreachable
+// CHECK-NEXT: }
 ArchetypeToConcreteConvertUInt8(t: f)
 
 // x -> x where x is a class.
@@ -121,7 +125,9 @@ ArchetypeToConcreteConvertC(t: c)
 // x -> y where x is a class but y is not.
 // CHECK-LABEL: sil shared @_TTSg5VSs5UInt8___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertCU__FT1tQ__CS_1C : $@thin (@in UInt8) -> @owned C {
 // CHECK: bb0
-// CHECK-NEXT: builtin "int_trap"
+// CHECK: builtin "int_trap"
+// CHECK: unreachable
+// CHECK-NEXT: }
 ArchetypeToConcreteConvertC(t: b)
 
 // x -> y where x,y are classes and x is a super class of y.
@@ -135,7 +141,9 @@ ArchetypeToConcreteConvertC(t: d)
 // x -> y where x,y are classes, but x is unrelated to y.
 // CHECK-LABEL: sil shared @_TTSg5C37specialize_unconditional_checked_cast1E___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertCU__FT1tQ__CS_1C : $@thin (@in E) -> @owned C {
 // CHECK: bb0
-// CHECK-NEXT: builtin "int_trap"
+// CHECK: builtin "int_trap"
+// CHECK: unreachable
+// CHECK-NEXT: }
 ArchetypeToConcreteConvertC(t: e)
 
 // x -> y where x,y are classes and x is a sub class of y.
@@ -153,7 +161,9 @@ ArchetypeToConcreteConvertD(t: c)
 // result.
 // CHECK-LABEL: sil shared @_TTSg5C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertEU__FT1tQ__CS_1E : $@thin (@in C) -> @owned E {
 // CHECK: bb0
-// CHECK-NEXT: builtin "int_trap"
+// CHECK: builtin "int_trap"
+// CHECK: unreachable
+// CHECK-NEXT: }
 ArchetypeToConcreteConvertE(t: c)
 
 ///////////////////////////
@@ -181,13 +191,17 @@ ConcreteToArchetypeConvertUInt8(t: b, t2: b)
 // x -> y where x is not a class but y is a class.
 // CHECK-LABEL: sil shared @_TTSg5C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast31ConcreteToArchetypeConvertUInt8U__FT1tVSs5UInt82t2Q__Q_ : $@thin (@out C, UInt8, @in C) -> () {
 // CHECK: bb0
-// CHECK-NEXT: builtin "int_trap"
+// CHECK: builtin "int_trap"
+// CHECK: unreachable
+// CHECK-NEXT: }
 ConcreteToArchetypeConvertUInt8(t: b, t2: c)
 
 // x -> y where x,y are different non class types.
 // CHECK-LABEL: sil shared @_TTSg5VSs6UInt64___TF37specialize_unconditional_checked_cast31ConcreteToArchetypeConvertUInt8U__FT1tVSs5UInt82t2Q__Q_ : $@thin (@out UInt64, UInt8, @in UInt64) -> () {
 // CHECK: bb0
-// CHECK-NEXT: builtin "int_trap"
+// CHECK: builtin "int_trap"
+// CHECK: unreachable
+// CHECK-NEXT: }
 ConcreteToArchetypeConvertUInt8(t: b, t2: f)
 
 // x -> x where x is a class.
@@ -203,7 +217,9 @@ ConcreteToArchetypeConvertC(t: c, t2: c)
 // x -> y where x is a class but y is not.
 // CHECK-LABEL: sil shared @_TTSg5VSs5UInt8___TF37specialize_unconditional_checked_cast27ConcreteToArchetypeConvertCU__FT1tCS_1C2t2Q__Q_ : $@thin (@out UInt8, @owned C, @in UInt8) -> () {
 // CHECK: bb0
-// CHECK-NEXT: builtin "int_trap"
+// CHECK: builtin "int_trap"
+// CHECK: unreachable
+// CHECK-NEXT: }
 ConcreteToArchetypeConvertC(t: c, t2: b)
 
 // x -> y where x is a super class of y.
@@ -226,6 +242,8 @@ ConcreteToArchetypeConvertC(t: c, t2: d)
 // CHECK: bb0
 // CHECK-NEXT: strong_retain
 // CHECK-NEXT: builtin "int_trap"
+// CHECK: unreachable
+// CHECK-NEXT: }
 ConcreteToArchetypeConvertC(t: c, t2: e)
 
 // x -> y where x is a subclass of y.
@@ -270,7 +288,9 @@ SuperToArchetypeC(c: c, t: d)
 // x -> y where x is a class and y is not.
 // CHECK-LABEL: sil shared @_TTSg5VSs5UInt8___TF37specialize_unconditional_checked_cast17SuperToArchetypeCU__FT1cCS_1C1tQ__Q_ : $@thin (@out UInt8, @owned C, @in UInt8) -> () {
 // CHECK: bb0
-// CHECK-NEXT: builtin "int_trap"
+// CHECK: builtin "int_trap"
+// CHECK: unreachable
+// CHECK-NEXT: }
 SuperToArchetypeC(c: c, t: b)
 
 // *NOTE* The frontend is smart enough to turn this into an upcast. When this
@@ -306,6 +326,8 @@ ExistentialToArchetype(o: o, t: c)
 // AnyObject -> Non Class (should always fail)
 // CHECK-LABEL: sil shared @_TTSg5VSs5UInt8___TF37specialize_unconditional_checked_cast22ExistentialToArchetypeU__FT1oPSs9AnyObject_1tQ__Q_ : $@thin (@out UInt8, @owned AnyObject, @in UInt8) -> () {
 // CHECK: builtin "int_trap"()
+// CHECK: unreachable
+// CHECK-NEXT: }
 ExistentialToArchetype(o: o, t: b)
 
 // AnyObject -> AnyObject

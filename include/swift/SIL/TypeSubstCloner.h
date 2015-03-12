@@ -314,6 +314,8 @@ protected:
                                             B.getModule()));
         B.createStore(loc, undef, dest);
       }
+      addBlockWithUnreachable(B.getInsertionBB());
+      B.createUnreachable(ArtificialUnreachableLocation());
       return;
     }
 
