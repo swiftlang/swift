@@ -28,6 +28,8 @@
 
 using namespace swift;
 
+STATISTIC(NumCondFailRemoved,   "Number of cond_fail instructions removed");
+
 namespace {
 
 class CropOverflowChecksPass : public SILFunctionTransform {
@@ -88,7 +90,192 @@ public:
     }
   };
 
+  typedef SmallVector<Constraint, 16>  ConstraintList;
+  typedef SmallVector<CondFailInst*, 16>  CondFailList;
+
+  /// A list of constraints that represent the value relationships.
+  ConstraintList Constraints;
+
+  /// A list of cond_fail instructions to remove.
+  CondFailList ToRemove;
+
+  // Dominators info.
+  DominanceInfo *DT;
+
   void run() override {
+    DT = PM->getAnalysis<DominanceAnalysis>()->getDomInfo(getFunction());
+    Constraints.clear();
+    ToRemove.clear();
+
+    auto *POTA = getAnalysis<PostOrderAnalysis>();
+    auto ReversePostOrder = POTA->getReversePostOrder(getFunction());
+
+    // For each block in a Reverse Post Prder scan:
+    for (auto &BB : ReversePostOrder) {
+
+      // For each instruction:
+      for (auto Inst = BB->begin(), End = BB->end(); Inst != End; Inst++) {
+        // Use branch information for eliminating condfails.
+        if (auto *CBI = dyn_cast<CondBranchInst>(Inst))
+          registerBranchFormula(CBI);
+
+          // Handle cond_fail instructions.
+        if (auto *CFI = dyn_cast<CondFailInst>(Inst)) {
+          if (tryToRemoveCondFail(CFI)) {
+            ToRemove.push_back(CFI);
+            continue;
+          }
+
+          // We were not able to remove the condfail. Try to use this
+          // information to remove other cond_fails.
+          registerCondFailFormula(CFI);
+        }
+      }
+    }
+
+
+    // If we've collected redundant cond_fails then remove them.
+    if (ToRemove.size()) {
+      DEBUG(llvm::dbgs()<<"Removing "<<ToRemove.size()<<" condfails in "
+                  <<getFunction()->getName()<<"\n");
+
+      for (auto *CF : ToRemove) {
+        CF->eraseFromParent();
+        NumCondFailRemoved++;
+      }
+
+      PM->invalidateAnalysis(getFunction(),
+                             SILAnalysis::InvalidationKind::Instructions);
+    }
+  }
+
+  bool tryToRemoveCondFail(CondFailInst *CFI) {
+    // Was not able to remove this branch.
+    return false;
+  }
+
+  void registerCondFailFormula(CondFailInst *CFI) {
+    // Extract the arithmetic operation from the condfail.
+    auto *TEI = dyn_cast<TupleExtractInst>(CFI->getOperand());
+    if (!TEI) return;
+    auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand());
+    if (!BI) return;
+
+    // The relationship expressed in the builtin.
+    ValueRelation Rel;
+    switch (BI->getBuiltinInfo().ID) {
+      default: return;
+      case  BuiltinValueKind::SAddOver:
+        Rel = ValueRelation::SAdd;
+        break;
+      case BuiltinValueKind::UAddOver:
+        Rel = ValueRelation::UAdd;
+        break;
+      case BuiltinValueKind::SSubOver:
+        Rel = ValueRelation::SSub;
+        break;
+      case BuiltinValueKind::USubOver:
+        Rel = ValueRelation::USub;
+        break;
+      case BuiltinValueKind::SMulOver:
+        Rel = ValueRelation::SMul;
+        break;
+      case BuiltinValueKind::UMulOver:
+        Rel = ValueRelation::UMul;
+        break;
+    }
+
+    // Construct and register the constraint.
+    SILBasicBlock *Dom = CFI->getParent();
+    SILValue Left = BI->getOperand(0);
+    SILValue Right = BI->getOperand(1);
+    Constraint F = Constraint(Dom, Left, Right, Rel);
+    Constraints.push_back(F);
+  }
+
+  void registerBranchFormula(CondBranchInst *BI) {
+    // Extract the arithmetic operation from the Branch.
+    auto *CMP = dyn_cast<BuiltinInst>(BI->getCondition());
+    if (!CMP) return;
+
+    SILBasicBlock *TrueBB = BI->getTrueBB();
+    SILBasicBlock *FalseBB = BI->getFalseBB();
+
+    // Notice that we need to handle control-flow programs such as the one
+    // below. The rule here is that only blocks with a single predecessor
+    // and blocks that are dominated by them can rely on branch information.
+    // The reason is that if there is not a single predecessor then the code
+    // that is dominated by the block can be reachable from other blocks.
+    //
+    //        [ x > 2 ]
+    //         /   |
+    //        /    |
+    //       /     |
+    //    [ .. ]   |
+    //       \     |
+    //        \    |
+    //         \   |
+    //          \  v
+    //         [use(x)]
+    if (!TrueBB->getSinglePredecessor()) TrueBB = nullptr;
+    if (!FalseBB->getSinglePredecessor()) FalseBB = nullptr;
+
+    SILValue Left = CMP->getOperand(0);
+    SILValue Right = CMP->getOperand(1);
+
+    // The relationship expressed in the builtin.
+    ValueRelation Rel;
+    bool Swap = false;
+
+    switch (CMP->getBuiltinInfo().ID) {
+      default: return;
+      case BuiltinValueKind::ICMP_NE:
+        if (FalseBB)
+          Constraints.push_back(Constraint(TrueBB, Left, Right,
+                                     ValueRelation::EQ));
+        return;
+      case BuiltinValueKind::ICMP_EQ:
+        if (TrueBB)
+          Constraints.push_back(Constraint(TrueBB, Left, Right,
+                                     ValueRelation::EQ));
+        return;
+      case BuiltinValueKind::ICMP_SLE:
+        Rel = ValueRelation::SLE;
+        break;
+      case BuiltinValueKind::ICMP_SLT:
+        Rel = ValueRelation::SLT;
+        break;
+      case BuiltinValueKind::ICMP_SGE:
+        Rel = ValueRelation::SLT;
+        Swap = true;
+        break;
+      case BuiltinValueKind::ICMP_SGT:
+        Rel = ValueRelation::SLE;
+        Swap = true;
+        break;
+      case BuiltinValueKind::ICMP_ULE:
+        Rel = ValueRelation::ULE;
+        break;
+      case BuiltinValueKind::ICMP_ULT:
+        Rel = ValueRelation::ULT;
+        break;
+      case BuiltinValueKind::ICMP_UGT:
+        Rel = ValueRelation::ULE;
+        Swap = true;
+        break;
+      case BuiltinValueKind::ICMP_UGE:
+        Rel = ValueRelation::ULT;
+        Swap = true;
+        break;
+    }
+
+    if (Swap)
+      std::swap(Left, Right);
+
+    // Set the constraints for both side of the conditional branch, if
+    // that the condition is dominating the dest block (see comment above).
+    if (TrueBB)  Constraints.push_back(Constraint(TrueBB,  Left, Right, Rel));
+    if (FalseBB) Constraints.push_back(Constraint(FalseBB, Right, Left, Rel));
   }
 
   StringRef getName() override { return "Removes overflow checks that are proven to be redundant"; }
