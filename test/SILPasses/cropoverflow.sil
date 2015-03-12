@@ -6,8 +6,8 @@ import Builtin
 import Swift
 import SwiftShims
 
-sil hidden [noinline] @sink_unsigned_int : $@thin () -> ()
-sil hidden [noinline] @sink_signed_int : $@thin () -> ()
+sil [noinline] @sink_unsigned_int : $@thin () -> ()
+sil [noinline] @sink_signed_int : $@thin () -> ()
 
 // CHECK-LABEL: @sub_signed_branch_cond
 sil hidden @sub_signed_branch_cond : $@thin (Int) -> () {
