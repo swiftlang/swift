@@ -65,6 +65,8 @@ protected:
 
   void visitSILBasicBlock(SILBasicBlock* BB);
 
+  void visitSILFunction(SILFunction *F);
+
   // Derived classes of SILCloner using the CRTP can implement the following
   // functions to customize behavior; the remap functions are called before
   // cloning to modify constructor arguments and the post process function is
@@ -223,6 +225,11 @@ protected:
   SILBasicBlock *getOpBasicBlock(SILBasicBlock *BB) {
     return asImpl().remapBasicBlock(BB);
   }
+  void addBlockWithUnreachable(SILBasicBlock *BB) {
+    BlocksWithUnreachables.insert(BB);
+  }
+
+  void cleanUp(SILFunction *F);
 
 public:
   void doPostProcess(SILInstruction *Orig, SILInstruction *Cloned) {
@@ -239,6 +246,8 @@ protected:
   llvm::DenseMap<SILInstruction*, SILInstruction*> InstructionMap;
   llvm::DenseMap<SILBasicBlock*, SILBasicBlock*> BBMap;
   TypeSubstitutionMap OpenedExistentialSubs;
+  /// Set of basic blocks where unreachable was inserted.
+  SmallPtrSet<SILBasicBlock *, 32> BlocksWithUnreachables;
 };
 
 /// \brief A SILBuilder that automatically invokes postprocess on each
@@ -421,6 +430,50 @@ SILCloner<ImplClass>::visitSILBasicBlock(SILBasicBlock* BB) {
     }
   }
 }
+
+/// \brief Clean-up after cloning.
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::cleanUp(SILFunction *F) {
+
+  // Remove any code after unreachable instructions.
+
+  // NOTE: It is unfortunate that it essentially duplicates
+  // the code from sil-combine, but doing so allows for
+  // avoiding any cross-layer invocations between SIL and
+  // SILPasses layers.
+
+  for (auto *BB : BlocksWithUnreachables) {
+    for (auto &I : *BB) {
+      if (!isa<UnreachableInst>(&I))
+        continue;
+
+      // Collect together all the instructions after this point
+      llvm::SmallVector<SILInstruction *, 32> ToRemove;
+      for (auto Inst = BB->rbegin(); &*Inst != &I; ++Inst)
+        ToRemove.push_back(&*Inst);
+
+      for (auto *Inst : ToRemove) {
+        // Replace any non-dead results with SILUndef values
+        Inst->replaceAllUsesWithUndef();
+        // and remove the instruction itself
+        assert(Inst->use_empty() && "Cannot erase instruction that is used!");
+        Inst->eraseFromParent();
+      }
+    }
+  }
+
+  BlocksWithUnreachables.clear();
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitSILFunction(SILFunction *F) {
+  for (auto &BB : *F)
+    asImpl().visitSILBasicBlock(&BB);
+  cleanUp(F);
+}
+
 
 template<typename ImplClass>
 void

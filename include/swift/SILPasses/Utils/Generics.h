@@ -45,6 +45,7 @@ public:
     SpecializingCloner SC(F, InterfaceSubs, ContextSubs, NewName,
                           Caller->getSubstitutions());
     SC.populateCloned();
+    SC.cleanUp(SC.getCloned());
     return SC.getCloned();
   }
 

@@ -46,6 +46,7 @@ public:
   using SILClonerWithScopes<ImplClass>::getOpBasicBlock;
   using SILClonerWithScopes<ImplClass>::doPostProcess;
   using SILClonerWithScopes<ImplClass>::ValueMap;
+  using SILClonerWithScopes<ImplClass>::addBlockWithUnreachable;
 
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
@@ -263,6 +264,7 @@ protected:
       B.createBuiltinTrap(loc);
       ValueMap.insert({SILValue(inst),
                        SILValue(SILUndef::get(targetType, inst->getModule()))});
+      addBlockWithUnreachable(B.getInsertionBB());
       B.createUnreachable(ArtificialUnreachableLocation());
       return;
     }
