@@ -73,10 +73,10 @@ public:
   static StringRef getKindName(StmtKind kind);
 
   /// \brief Return the location of the start of the statement.
-  SourceLoc getStartLoc() const { return getSourceRange().Start; }
+  SourceLoc getStartLoc() const;
   
   /// \brief Return the location of the end of the statement.
-  SourceLoc getEndLoc() const { return getSourceRange().End; }
+  SourceLoc getEndLoc() const;
   
   SourceRange getSourceRange() const;
   SourceLoc TrailingSemiLoc;
@@ -157,8 +157,10 @@ public:
     : Stmt(StmtKind::Return, getDefaultImplicitFlag(implicit, ReturnLoc)),
       ReturnLoc(ReturnLoc), Result(Result) {}
 
-  SourceRange getSourceRange() const;
   SourceLoc getReturnLoc() const { return ReturnLoc; }
+
+  SourceLoc getStartLoc() const;
+  SourceLoc getEndLoc() const;
 
   bool hasResult() const { return Result != 0; }
   Expr *getResult() const {
@@ -213,6 +215,8 @@ public:
     Data = D;
   }
 
+  SourceLoc getStartLoc() const;
+  SourceLoc getEndLoc() const;
   SourceRange getSourceRange() const;
 };
 
@@ -284,7 +288,12 @@ public:
   SourceLoc getIfLoc() const { return IfLoc; }
   SourceLoc getElseLoc() const { return ElseLoc; }
 
-  SourceRange getSourceRange() const;
+  SourceLoc getStartLoc() const {
+    return getLabelLocOrKeywordLoc(IfLoc);
+  }
+  SourceLoc getEndLoc() const {
+    return (Else ? Else->getEndLoc() : Then->getEndLoc());
+  }
 
   StmtCondition getCond() const { return Cond; }
   void setCond(StmtCondition e) { Cond = e; }
@@ -339,12 +348,12 @@ public:
     Clauses(Clauses), EndLoc(EndLoc), HadMissingEnd(HadMissingEnd) {}
   
   SourceLoc getIfLoc() const { return Clauses[0].Loc; }
+
+  SourceLoc getStartLoc() const { return getIfLoc(); }
   SourceLoc getEndLoc() const { return EndLoc; }
 
   bool hadMissingEnd() const { return HadMissingEnd; }
 
-  SourceRange getSourceRange() const;
-  
   const ArrayRef<IfConfigStmtClause> &getClauses() const { return Clauses; }
   
   ArrayRef<ASTNode> getActiveClauseElements() const {
@@ -375,7 +384,8 @@ public:
                 LabelInfo),
     WhileLoc(WhileLoc), Cond(Cond), Body(Body) {}
 
-  SourceRange getSourceRange() const;
+  SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(WhileLoc); }
+  SourceLoc getEndLoc() const { return Body->getEndLoc(); }
 
   StmtCondition getCond() const { return Cond; }
   void setCond(StmtCondition e) { Cond = e; }
@@ -400,7 +410,8 @@ public:
                   LabelInfo),
       DoLoc(DoLoc), WhileLoc(WhileLoc), Body(Body), Cond(Cond) {}
   
-  SourceRange getSourceRange() const;
+  SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(DoLoc); }
+  SourceLoc getEndLoc() const;
   
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
@@ -439,7 +450,8 @@ public:
     Cond(Cond), Increment(Increment), Body(Body) {
   }
   
-  SourceRange getSourceRange() const;
+  SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(ForLoc); }
+  SourceLoc getEndLoc() const { return Body->getEndLoc(); }
   
   NullablePtr<Expr> getInitializer() const { return Initializer; }
   void setInitializer(Expr *V) { Initializer = V; }
@@ -521,7 +533,8 @@ public:
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *B) { Body = B; }
   
-  SourceRange getSourceRange() const;
+  SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(ForLoc); }
+  SourceLoc getEndLoc() const { return Body->getEndLoc(); }
   
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::ForEach;
@@ -544,6 +557,8 @@ public:
 
   SourceLoc getWhereLoc() const { return WhereLoc; }
 
+  SourceLoc getStartLoc() const;
+  SourceLoc getEndLoc() const;
   SourceRange getSourceRange() const;
 
   Pattern *getPattern() { return CasePattern; }
@@ -615,9 +630,8 @@ public:
   /// Get the source location of the 'case' or 'default' of the first label.
   SourceLoc getLoc() const { return CaseLoc; }
 
-  SourceRange getSourceRange() const {
-    return { getLoc(), getBody()->getEndLoc() };
-  }
+  SourceLoc getStartLoc() const { return getLoc(); }
+  SourceLoc getEndLoc() const { return getBody()->getEndLoc(); }
 
   bool isDefault() { return getCaseLabelItems()[0].isDefault(); }
 
@@ -664,7 +678,9 @@ public:
   SourceLoc getRBraceLoc() const { return RBraceLoc; }
   
   SourceLoc getLoc() const { return SwitchLoc; }
-  SourceRange getSourceRange() const;
+
+  SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(SwitchLoc); }
+  SourceLoc getEndLoc() const { return RBraceLoc; }
   
   /// Get the subject expression of the switch.
   Expr *getSubjectExpr() const { return SubjectExpr; }
@@ -704,9 +720,10 @@ public:
   // by sema during type checking.
   void setTarget(LabeledStmt *LS) { Target = LS; }
   LabeledStmt *getTarget() const { return Target; }
-  
-  SourceRange getSourceRange() const {
-    return { Loc, TargetLoc.isValid() ? TargetLoc : Loc };
+
+  SourceLoc getStartLoc() const { return Loc; }
+  SourceLoc getEndLoc() const {
+    return (TargetLoc.isValid() ? TargetLoc : Loc);
   }
 
   static bool classof(const Stmt *S) {
@@ -740,8 +757,9 @@ public:
   
   SourceLoc getLoc() const { return Loc; }
   
-  SourceRange getSourceRange() const {
-    return { Loc, TargetLoc.isValid() ? TargetLoc : Loc };
+  SourceLoc getStartLoc() const { return Loc; }
+  SourceLoc getEndLoc() const {
+    return (TargetLoc.isValid() ? TargetLoc : Loc);
   }
 
   static bool classof(const Stmt *S) {

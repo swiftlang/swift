@@ -41,25 +41,90 @@ StringRef Stmt::getKindName(StmtKind K) {
   llvm_unreachable("bad StmtKind");
 }
 
-// Helper functions to verify statically whether the getSourceRange()
-// function has been overridden.
-typedef const char (&TwoChars)[2];
+// Helper functions to check statically whether a method has been
+// overridden from its implementation in Stmt.  The sort of thing you
+// need when you're avoiding v-tables.
+namespace {
+  template <typename ReturnType, typename Class>
+  constexpr bool isOverriddenFromStmt(ReturnType (Class::*)() const) {
+    return true;
+  }
+  template <typename ReturnType>
+  constexpr bool isOverriddenFromStmt(ReturnType (Stmt::*)() const) {
+    return false;
+  }
 
-template<typename Class> 
-inline char checkSourceRangeType(SourceRange (Class::*)() const);
+  template <bool IsOverridden> struct Dispatch;
 
-inline TwoChars checkSourceRangeType(SourceRange (Stmt::*)() const);
+  /// Dispatch down to a concrete override.
+  template <> struct Dispatch<true> {
+    template <class T> static SourceLoc getStartLoc(const T *S) {
+      return S->getStartLoc();
+    }
+    template <class T> static SourceLoc getEndLoc(const T *S) {
+      return S->getEndLoc();
+    }
+    template <class T> static SourceRange getSourceRange(const T *S) {
+      return S->getSourceRange();
+    }
+  };
+
+  /// Default implementations for when a method isn't overridden.
+  template <> struct Dispatch<false> {
+    template <class T> static SourceLoc getStartLoc(const T *S) {
+      return S->getSourceRange().Start;
+    }
+    template <class T> static SourceLoc getEndLoc(const T *S) {
+      return S->getSourceRange().End;
+    }
+    template <class T> static SourceRange getSourceRange(const T *S) {
+      return { S->getStartLoc(), S->getEndLoc() };
+    }
+  };
+}
+
+template <class T> static SourceRange getSourceRangeImpl(const T *S) {
+  static_assert(isOverriddenFromStmt(&T::getSourceRange) ||
+                (isOverriddenFromStmt(&T::getStartLoc) &&
+                 isOverriddenFromStmt(&T::getEndLoc)),
+                "Stmt subclass must implement either getSourceRange() "
+                "or getStartLoc()/getEndLoc()");
+  return Dispatch<isOverriddenFromStmt(&T::getSourceRange)>::getSourceRange(S);
+}
 
 SourceRange Stmt::getSourceRange() const {
   switch (getKind()) {
-#define STMT(ID, PARENT) \
-case StmtKind::ID: \
-static_assert(sizeof(checkSourceRangeType(&ID##Stmt::getSourceRange)) == 1, \
-              #ID "Stmt is missing getSourceRange()"); \
-return cast<ID##Stmt>(this)->getSourceRange();
+#define STMT(ID, PARENT)                                           \
+  case StmtKind::ID: return getSourceRangeImpl(cast<ID##Stmt>(this));
 #include "swift/AST/StmtNodes.def"
   }
   
+  llvm_unreachable("statement type not handled!");
+}
+
+template <class T> static SourceLoc getStartLocImpl(const T *S) {
+  return Dispatch<isOverriddenFromStmt(&T::getStartLoc)>::getStartLoc(S);
+}
+SourceLoc Stmt::getStartLoc() const {
+  switch (getKind()) {
+#define STMT(ID, PARENT)                                           \
+  case StmtKind::ID: return getStartLocImpl(cast<ID##Stmt>(this));
+#include "swift/AST/StmtNodes.def"
+  }
+
+  llvm_unreachable("statement type not handled!");
+}
+
+template <class T> static SourceLoc getEndLocImpl(const T *S) {
+  return Dispatch<isOverriddenFromStmt(&T::getEndLoc)>::getEndLoc(S);
+}
+SourceLoc Stmt::getEndLoc() const {
+  switch (getKind()) {
+#define STMT(ID, PARENT)                                           \
+  case StmtKind::ID: return getEndLocImpl(cast<ID##Stmt>(this));
+#include "swift/AST/StmtNodes.def"
+  }
+
   llvm_unreachable("statement type not handled!");
 }
 
@@ -84,15 +149,13 @@ BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
   return ::new(Buffer) BraceStmt(lbloc, elts, rbloc, implicit);
 }
 
-SourceRange ReturnStmt::getSourceRange() const {
-  SourceLoc Start = ReturnLoc;
-  SourceLoc End = ReturnLoc;
-  if (Result)
-    End = Result->getEndLoc();
-  if (Start.isInvalid() && Result)
-    Start = Result->getStartLoc();
-  
-  return SourceRange(Start, End);
+SourceLoc ReturnStmt::getStartLoc() const {
+  if (ReturnLoc.isInvalid() && Result)
+    return Result->getStartLoc();
+  return ReturnLoc;
+}
+SourceLoc ReturnStmt::getEndLoc() const {
+  return (Result ? Result->getEndLoc() : ReturnLoc);
 }
 
 SourceRange StmtConditionElement::getSourceRange() const {
@@ -101,6 +164,22 @@ SourceRange StmtConditionElement::getSourceRange() const {
   if (auto *B = getBinding())
     return B->getSourceRange();
   return SourceRange();
+}
+
+SourceLoc StmtConditionElement::getStartLoc() const {
+  if (auto *E = getCondition())
+    return E->getStartLoc();
+  if (auto *B = getBinding())
+    return B->getStartLoc();
+  return SourceLoc();
+}
+
+SourceLoc StmtConditionElement::getEndLoc() const {
+  if (auto *E = getCondition())
+    return E->getEndLoc();
+  if (auto *B = getBinding())
+    return B->getEndLoc();
+  return SourceLoc();
 }
 
 static StmtCondition exprToCond(Expr *C, ASTContext &Ctx) {
@@ -114,46 +193,20 @@ IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
            implicit) {
 }
 
-
-SourceRange IfStmt::getSourceRange() const {
-  SourceLoc End;
-  if (Else)
-    End = Else->getEndLoc();
-  else
-    End = Then->getEndLoc();
-  return SourceRange(getLabelLocOrKeywordLoc(IfLoc), End);
-}
-
-SourceRange IfConfigStmt::getSourceRange() const {
-  return SourceRange(getIfLoc(), EndLoc);
-}
-
-SourceRange WhileStmt::getSourceRange() const {
-  return SourceRange(getLabelLocOrKeywordLoc(WhileLoc), Body->getEndLoc());
-}
-
-SourceRange DoWhileStmt::getSourceRange() const {
-  return SourceRange(getLabelLocOrKeywordLoc(DoLoc), Cond->getEndLoc());
-}
-
-SourceRange ForStmt::getSourceRange() const {
-  return SourceRange(getLabelLocOrKeywordLoc(ForLoc), Body->getEndLoc());
-}
-
-SourceRange ForEachStmt::getSourceRange() const {
-  return SourceRange(getLabelLocOrKeywordLoc(ForLoc), Body->getEndLoc());
-}
-
-SourceRange SwitchStmt::getSourceRange() const {
-  return {getLabelLocOrKeywordLoc(SwitchLoc), RBraceLoc};
-}
-
-
+SourceLoc DoWhileStmt::getEndLoc() const { return Cond->getEndLoc(); }
 
 SourceRange CaseLabelItem::getSourceRange() const {
   if (auto *E = getGuardExpr())
     return { CasePattern->getStartLoc(), E->getEndLoc() };
   return CasePattern->getSourceRange();
+}
+SourceLoc CaseLabelItem::getStartLoc() const {
+  return CasePattern->getStartLoc();
+}
+SourceLoc CaseLabelItem::getEndLoc() const {
+  if (auto *E = getGuardExpr())
+    return E->getEndLoc();
+  return CasePattern->getEndLoc();
 }
 
 CaseStmt::CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
