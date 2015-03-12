@@ -519,9 +519,9 @@ llvm::SmallString<64> FunctionAnalyzer::getOptimizedName() {
 /// callsites to call the new function.
 static void
 rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
-                                  CallGraphNode::CallerCallSiteList CallSites) {
-  for (const ApplyInst *CAI : CallSites) {
-    auto *AI = const_cast<ApplyInst *>(CAI);
+                      const llvm::SmallPtrSetImpl<CallGraphEdge *> &CallSites) {
+  for (const CallGraphEdge *Edge : CallSites) {
+    auto *AI = const_cast<ApplyInst *>(Edge->getApply());
 
     SILBuilderWithScope<16> Builder(AI);
 
@@ -652,7 +652,7 @@ static bool
 optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
                           RCIdentityAnalysis *RCIA,
                           SILFunction *F,
-                          CallGraphNode::CallerCallSiteList CallSites,
+                        const llvm::SmallPtrSetImpl<CallGraphEdge *> &CallSites,
                           bool CallerSetIsComplete,
                           std::vector<SILFunction *> &DeadFunctions) {
   DEBUG(llvm::dbgs() << "Optimizing Function Signature of " << F->getName()
@@ -675,8 +675,8 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
 
   ++NumFunctionSignaturesOptimized;
 
-  DEBUG(for (auto *AI : CallSites) {
-    llvm::dbgs()  << "        CALLSITE: " << *AI;
+  DEBUG(for (auto *Edge : CallSites) {
+    llvm::dbgs()  << "        CALLSITE: " << Edge->getApply();
   });
 
   llvm::SmallString<64> NewFName = Analyzer.getOptimizedName();
@@ -809,7 +809,7 @@ public:
         continue;
 
       // Now that we have our call graph, grab the CallSites of F.
-      auto CallSites = FNode->getPartialCallerEdgesApplies();
+      auto &CallSites = FNode->getPartialCallerEdges();
 
       // If this function is not called anywhere, for now don't do anything.
       //
