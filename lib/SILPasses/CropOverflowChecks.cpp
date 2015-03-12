@@ -102,6 +102,23 @@ public:
   // Dominators info.
   DominanceInfo *DT;
 
+  /// Remove the instructions that were marked as redundant
+  /// and return True if and instructions were removed.
+  bool removeCollectedRedundantInstructions() {
+    if (ToRemove.size()) {
+      DEBUG(llvm::dbgs()<<"Removing "<<ToRemove.size()<<" condfails in "
+                  <<getFunction()->getName()<<"\n");
+
+      for (auto *CF : ToRemove) {
+        CF->eraseFromParent();
+        NumCondFailRemoved++;
+      }
+      ToRemove.clear();
+      return true;
+    }
+    return false;
+  }
+
   void run() override {
     DT = PM->getAnalysis<DominanceAnalysis>()->getDomInfo(getFunction());
     Constraints.clear();
@@ -110,9 +127,11 @@ public:
     auto *POTA = getAnalysis<PostOrderAnalysis>();
     auto ReversePostOrder = POTA->getReversePostOrder(getFunction());
 
+    // Perform a forward scan and use control flow and previously detected
+    // overflow checks to remove the overflow checks.
+
     // For each block in a Reverse Post Prder scan:
     for (auto &BB : ReversePostOrder) {
-
       // For each instruction:
       for (auto Inst = BB->begin(), End = BB->end(); Inst != End; Inst++) {
         // Use branch information for eliminating condfails.
@@ -133,20 +152,12 @@ public:
       }
     }
 
+    // If we've collected redundant cond_fails then remove them now.
+    bool Changed = removeCollectedRedundantInstructions();
 
-    // If we've collected redundant cond_fails then remove them.
-    if (ToRemove.size()) {
-      DEBUG(llvm::dbgs()<<"Removing "<<ToRemove.size()<<" condfails in "
-                  <<getFunction()->getName()<<"\n");
-
-      for (auto *CF : ToRemove) {
-        CF->eraseFromParent();
-        NumCondFailRemoved++;
-      }
-
+    if (Changed)
       PM->invalidateAnalysis(getFunction(),
                              SILAnalysis::InvalidationKind::Instructions);
-    }
   }
 
   /// Return True if the relationship \p Rel describes a known relation
@@ -343,7 +354,7 @@ public:
     if (!BI) return false;
 
     for (auto &F : Constraints) {
-      // If we are dominated by a constraint
+      // If we are dominated by a constraint:
       if (DT->dominates(F.DominatingBlock, CFI->getParent())) {
         // Try to use the constraint to remove the overflow check.
         if (isOverflowCheckRemovedByConstraint(F, BI)) {
