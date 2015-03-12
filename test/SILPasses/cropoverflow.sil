@@ -388,3 +388,43 @@ bb2:                                              // Preds: bb0 bb1
   return %19 : $()                                // id: %20
 }
 
+// CHECK-LABEL: @remove_past_checks
+sil hidden @remove_past_checks : $@thin (Int) -> () {
+bb0(%0 : $Int):
+  %1 = integer_literal $Builtin.Int64, 1          // user: %4
+  %2 = struct_extract %0 : $Int, #Int.value       // users: %4, %8, %12, %16, %20
+  %3 = integer_literal $Builtin.Int1, -1          // users: %4, %8, %12, %16, %20
+// CHECK: sadd_with_overflow_Int64
+  %4 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
+  %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
+// CHECK-NOT: cond_fail
+  cond_fail %5 : $Builtin.Int1                    // id: %6
+  %7 = integer_literal $Builtin.Int64, 2          // user: %8
+// CHECK: sadd_with_overflow_Int64
+  %8 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %7 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %9
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 1 // user: %10
+// CHECK-NOT: cond_fail
+  cond_fail %9 : $Builtin.Int1                    // id: %10
+  %11 = integer_literal $Builtin.Int64, 3         // user: %12
+// CHECK: sadd_with_overflow_Int64
+  %12 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %11 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %13
+  %13 = tuple_extract %12 : $(Builtin.Int64, Builtin.Int1), 1 // user: %14
+// CHECK-NOT: cond_fail
+  cond_fail %13 : $Builtin.Int1                   // id: %14
+  %15 = integer_literal $Builtin.Int64, 4         // user: %16
+// CHECK: sadd_with_overflow_Int64
+  %16 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %15 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %17
+  %17 = tuple_extract %16 : $(Builtin.Int64, Builtin.Int1), 1 // user: %18
+// CHECK-NOT: cond_fail
+  cond_fail %17 : $Builtin.Int1                   // id: %18
+  %19 = integer_literal $Builtin.Int64, 5         // user: %20
+// CHECK: sadd_with_overflow_Int64
+  %20 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %19 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %21
+  %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 1 // user: %22
+// We keep the last cond-fail, which is enough to guard all the others.
+// CHECK: cond_fail
+  cond_fail %21 : $Builtin.Int1                   // id: %22
+  %23 = tuple ()                                  // user: %24
+// CHECK: return
+  return %23 : $()                                // id: %24
+}

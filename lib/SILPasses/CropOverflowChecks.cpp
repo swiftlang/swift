@@ -155,6 +155,43 @@ public:
     // If we've collected redundant cond_fails then remove them now.
     bool Changed = removeCollectedRedundantInstructions();
 
+    // Prform another check, this time in reverse and use future overflow
+    // checks that must be executed to eliminate earlier overflow checks.
+    // Notice that this scan is only block local because at this point we
+    // don't use post-dominators.
+
+    for (auto &BB : ReversePostOrder) {
+      // Clear the list of constraint on every block.
+      Constraints.clear();
+
+      // Notice: we scan the basic block in reverse.
+      for (auto Inst = BB->end(), End = BB->begin(); Inst != End; Inst--) {
+        if (auto *CFI = dyn_cast<CondFailInst>(Inst)) {
+          // Try to remove the cond_fail based on previous overflow checks.
+          if (tryToRemoveCondFail(CFI)) {
+            ToRemove.push_back(CFI);
+            continue;
+          }
+
+          // Record the overflow check and try to optimize other checks.
+          registerCondFailFormula(CFI);
+          continue;
+        }
+
+        // We do not optimzie overflow checks across instructions with side
+        // effects because we don't want to delay the trap past user-visible
+        // changes.
+        if (Inst->mayHaveSideEffects()) {
+          Constraints.clear();
+          continue;
+        }
+
+      }
+    }
+
+    // If we've collected more redundant cond_fails then remove them now.
+    Changed |= removeCollectedRedundantInstructions();
+
     if (Changed)
       PM->invalidateAnalysis(getFunction(),
                              SILAnalysis::InvalidationKind::Instructions);
