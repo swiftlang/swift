@@ -1318,21 +1318,24 @@ public:
   // Emits a diagnostic, if necessary, for a reference to a declaration
   // that is potentially unavailable at the given source location.
   void diagnosePotentialUnavailability(const ValueDecl *D,
-                                       SourceLoc referenceLoc,
+                                       SourceRange ReferenceRange,
+                                       const DeclContext *ReferenceDC,
                                        const UnavailabilityReason &Reason);
 
   // Emits a diagnostic, if necessary, for a reference to a declaration
   // that is potentially unavailable at the given source location, using
   // Name as the diagnostic name.
   void diagnosePotentialUnavailability(const Decl *D, DeclName Name,
-                                       SourceLoc referenceLoc,
+                                       SourceRange ReferenceRange,
+                                       const DeclContext *ReferenceDC,
                                        const UnavailabilityReason &Reason);
 
   /// Emits a diagnostic for a reference to a storage accessor that is
   /// potentially unavailable.
   void diagnosePotentialAccessorUnavailability(
-      FuncDecl *Accessor, SourceLoc referenceLoc,
-      const UnavailabilityReason &Reason, bool ForInout);
+      FuncDecl *Accessor, SourceRange ReferenceRange,
+      const DeclContext *ReferenceDC, const UnavailabilityReason &Reason,
+      bool ForInout);
 
   /// Emits a diagnostic for a reference to a declaration that is deprecated.
   void diagnoseDeprecated(SourceLoc ReferenceLoc,

@@ -911,7 +911,8 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
     Optional<UnavailabilityReason> Unavail =
         TC.checkDeclarationAvailability(TypeDecl, Loc, DC);
     if (Unavail.hasValue()) {
-      TC.diagnosePotentialUnavailability(TypeDecl, CI->getIdentifier(), Loc,
+      TC.diagnosePotentialUnavailability(TypeDecl, CI->getIdentifier(),
+                                         CI->getSourceRange(), DC,
                                          Unavail.getValue());
     }
   }

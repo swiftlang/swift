@@ -1972,6 +1972,14 @@ ERROR(availability_decl_only_version_greater, sema_avail, none,
       "%0 is only available on %1 version %2 or greater",
       (DeclName, StringRef, clang::VersionTuple))
 
+NOTE(availability_guard_with_version_check, sema_avail, none,
+     "guard with version check", ())
+
+NOTE(availability_add_attribute, sema_avail, none,
+     "add @availability attribute to enclosing "
+     "%select{declaration|type|function|property|extension|enum case}0",
+     (unsigned))
+
 ERROR(availability_accessor_only_version_greater, sema_avail, none,
       "%select{getter|setter}0 for %1 is only available on %2 version %3"
       " or greater",

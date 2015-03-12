@@ -390,11 +390,11 @@ namespace {
     /// \brief Emit a diagnostic if the chosen overload is potentially
     /// unavailable.
     void diagnoseIfOverloadChoiceUnavailable(OverloadChoice choice,
-                                             SourceLoc referenceLoc);
+                                             SourceRange referenceRange);
     
     /// \brief Emit a diagnostic if the declaration is not available at
     /// the reference location.
-    void diagnoseIfDeclUnavailable(ValueDecl *D, SourceLoc refLoc);
+    void diagnoseIfDeclUnavailable(ValueDecl *D, SourceRange ReferenceRange);
     
   public:
     /// \brief Build a reference to the given declaration.
@@ -4949,19 +4949,22 @@ ExprRewriter::convertUnavailableToOptional(Expr *expr, ValueDecl *decl,
 
 void
 ExprRewriter::diagnoseIfOverloadChoiceUnavailable(OverloadChoice choice,
-                                                  SourceLoc referenceLoc) {
+                                                  SourceRange referenceRange) {
   if (choice.isPotentiallyUnavailable()) {
     assert(cs.TC.getLangOpts().EnableExperimentalAvailabilityChecking);
-    cs.TC.diagnosePotentialUnavailability(choice.getDecl(), referenceLoc,
+    cs.TC.diagnosePotentialUnavailability(choice.getDecl(), referenceRange, dc,
                                           choice.getReasonUnavailable(cs));
   }
 }
 
-void ExprRewriter::diagnoseIfDeclUnavailable(ValueDecl *D, SourceLoc refLoc) {
-  auto unavailReason = cs.TC.checkDeclarationAvailability(D, refLoc, dc);
+void ExprRewriter::diagnoseIfDeclUnavailable(ValueDecl *D,
+                                             SourceRange referenceRange) {
+  auto unavailReason =
+      cs.TC.checkDeclarationAvailability(D, referenceRange.Start, dc);
   
   if (unavailReason.hasValue()) {
-    cs.TC.diagnosePotentialUnavailability(D, refLoc, unavailReason.getValue());
+    cs.TC.diagnosePotentialUnavailability(D, referenceRange, dc,
+                                          unavailReason.getValue());
   }
 }
 

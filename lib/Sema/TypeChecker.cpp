@@ -28,6 +28,7 @@
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -36,6 +37,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
+#include <algorithm>
 
 using namespace swift;
 
@@ -741,6 +743,26 @@ VersionRange TypeChecker::availableRange(const Decl *D, ASTContext &Ctx) {
   return VersionRange::all();
 }
 
+/// Returns the first availability attribute on the declaration that is active
+/// on the target platform.
+static const AvailabilityAttr *getActiveAvailabilityAttribute(const Decl *D,
+                                                              ASTContext &AC) {
+  for (auto Attr : D->getAttrs())
+    if (auto AvAttr = dyn_cast<AvailabilityAttr>(Attr)) {
+      if (!AvAttr->isInvalid() && AvAttr->isActivePlatform(AC)) {
+        return AvAttr;
+      }
+    }
+  return nullptr;
+}
+
+/// Returns true if there is any availability attribute on the declaration
+/// that is active on the target platform.
+static bool hasActiveAvailabilityAttribute(Decl *D,
+                                           ASTContext &AC) {
+  return getActiveAvailabilityAttribute(D, AC);
+}
+
 namespace {
 
 /// A class to walk the AST to build the type refinement context hierarchy.
@@ -843,7 +865,7 @@ private:
     
     // No need to introduce a context if the declaration does not have an
     // availability attribute.
-    if (!hasActiveAvailabilityAttribute(D)) {
+    if (!hasActiveAvailabilityAttribute(D, AC)) {
       return false;
     }
     
@@ -889,15 +911,6 @@ private:
     }
     
     return D->getSourceRange();
-  }
-  bool hasActiveAvailabilityAttribute(Decl *D) {
-    for (auto Attr : D->getAttrs())
-      if (auto AvAttr = dyn_cast<AvailabilityAttr>(Attr)) {
-        if (!AvAttr->isInvalid() && AvAttr->isActivePlatform(AC)) {
-          return true;
-        }
-      }
-    return false;
   }
 
   virtual std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
@@ -1221,14 +1234,536 @@ TypeChecker::checkDeclarationAvailability(const Decl *D, SourceLoc referenceLoc,
 }
 
 void TypeChecker::diagnosePotentialUnavailability(
-    const ValueDecl *D, SourceLoc referenceLoc,
+    const ValueDecl *D, SourceRange ReferenceRange,
+    const DeclContext *ReferenceDC,
     const UnavailabilityReason &Reason) {
-  diagnosePotentialUnavailability(D, D->getFullName(), referenceLoc, Reason);
+  diagnosePotentialUnavailability(D, D->getFullName(), ReferenceRange,
+                                  ReferenceDC, Reason);
+}
+
+/// A class that walks the AST to find locations to add availability fixits.
+/// Given a target source range and a root search node, this class will walk the
+/// search node to find:
+///   (1) the innermost (i.e., deepest) node (if any) that both contains the
+///       target source range and can be guarded with in an IfStmt; and
+///   (2) the innermost declaration (if any) that contains the target range.
+///
+/// We will use (1) to suggest a Fix-It that wraps an unavailable
+/// reference in if #os(...) { ... } and (2) to suggest Fix-Its for
+/// that add @availability annotations. This walker is only applied
+/// when emitting a diagnostic.
+///
+/// This class finds the innermost nodes of interest by walking
+/// down the root until it has found the target range (in a Pre-visitor)
+/// and then recording innermost nodes on the way back up in the
+/// the Post-visitors. It does its best to not search unnecessary subtrees,
+/// although this is complicated by the fact that not all nodes have
+/// source range information.
+class AvailabilityFixitParentFinder : private ASTWalker {
+
+  /// The source range of the potentially unavailable reference
+  /// for which we are trying to create Fix-Its.
+  const SourceRange TargetRange;
+  const SourceManager &SM;
+
+  bool FoundTarget = false;
+
+  Optional<ASTNode> InnermostGuardableNode;
+  Decl *InnermostDecl = nullptr;
+
+public:
+  AvailabilityFixitParentFinder(SourceRange TargetRange,
+                                const SourceManager &SM, const Decl *SearchNode)
+      : TargetRange(TargetRange), SM(SM) {
+    assert(TargetRange.isValid());
+
+    // Remove const to make walk() happy. This walker does not modify the
+    // declaration.
+    const_cast<Decl *>(SearchNode)->walk(*this);
+  }
+
+  /// Returns the innermost node containing the target range that can be guarded
+  /// with an if statement or None if no such node was found.
+  Optional<ASTNode> getInnermostGuardableNode() {
+    return InnermostGuardableNode;
+  }
+
+  /// Returns the innermost declaration that contains TargetRange or null
+  /// if no such declaration was found.
+  Decl *getInnermostDecl() {
+    return InnermostDecl;
+  }
+
+private:
+  virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    return std::make_pair(walkToRangePre(E->getSourceRange()), E);
+  }
+
+  virtual std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    return std::make_pair(walkToRangePre(S->getSourceRange()), S);
+  }
+
+  virtual bool walkToDeclPre(Decl *D) override {
+    return walkToRangePre(D->getSourceRange());
+  }
+
+  /// Returns true if the walker should traverse an AST node with
+  /// source range Range.
+  bool walkToRangePre(SourceRange Range) {
+    // When walking down the tree, we traverse until we have found a node
+    // inside the target range. Once we have found such a node, there is no
+    // need to traverse any deeper.
+    if (FoundTarget)
+      return false;
+
+    // If we haven't found our target yet and the node we are pre-visiting
+    // doesn't have a valid range, we still have to traverse it because its
+    // subtrees may have valid ranges.
+    if (Range.isInvalid())
+      return true;
+
+    // We have found our target if the range of the node we are visiting
+    // is contained in the range we are looking for.
+    FoundTarget = SM.rangeContains(TargetRange, Range);
+
+    if (FoundTarget)
+      return false;
+
+    // Search the subtree if the target range is inside its range.
+    return SM.rangeContains(Range, TargetRange);
+  }
+
+  virtual Expr *walkToExprPost(Expr *E) override {
+    if (walkToNodePost(E)) {
+      return E;
+    }
+
+    return nullptr;
+  }
+
+  virtual Stmt *walkToStmtPost(Stmt *S) override {
+    if (walkToNodePost(S)) {
+      return S;
+    }
+
+    return nullptr;
+  }
+
+  virtual bool walkToDeclPost(Decl *D) override {
+    return walkToNodePost(D);
+  }
+
+  /// Once we have found the target node, update the observed innermost nodes,
+  /// as we find them, on the way back up the spine of of the tree.
+  bool walkToNodePost(ASTNode Node) {
+    updateIfInnermostGuardableNode(Node);
+    updateIfInnermostDecl(Node);
+
+    return !foundAllFixitLocations();
+  }
+
+  void updateIfInnermostGuardableNode(ASTNode Node) {
+    // If the InnermostGuardableNode is already set, this node
+    // is not the innermost, so return early.
+    if (InnermostGuardableNode.hasValue())
+      return;
+
+    // Return early unless the parent is a closure with a single expression body
+    // or a BraceStmt.
+    if (Expr *ParentExpr = Parent.getAsExpr()) {
+      auto *ParentClosure = dyn_cast<ClosureExpr>(ParentExpr);
+      if (!ParentClosure || !ParentClosure->hasSingleExpressionBody()) {
+        return;
+      }
+    } else if (auto *ParentStmt = Parent.getAsStmt()) {
+      if (!isa<BraceStmt>(ParentStmt)) {
+        return;
+      }
+    } else {
+      return;
+    }
+
+    InnermostGuardableNode = Node;
+  }
+
+  void updateIfInnermostDecl(ASTNode Node) {
+    if (InnermostDecl)
+      return;
+
+    if (!Node.is<Decl *>())
+      return;
+
+    InnermostDecl = Node.get<Decl *>();
+  }
+
+  // Returns true if we have found all the locations we were looking for,
+  // including the target range (on the way down) and the innermost guardable
+  // node and declaration (on the way back up).
+  bool foundAllFixitLocations() {
+    return FoundTarget && InnermostGuardableNode.hasValue() && InnermostDecl;
+  }
+};
+
+/// Given a reference range and a declaration context containing the range,
+/// find an AST node that contains the source range and
+/// that can be walked to find suitable parents of the SourceRange
+/// for availability Fix-Its.
+const Decl *rootForAvailabilityFixitFinder(SourceRange ReferenceRange,
+                                           const DeclContext *ReferenceDC,
+                                           const SourceManager &SM) {
+  // Drop the const so we can return the decl context as an ASTNode.
+  const Decl *D = ReferenceDC->getInnermostDeclarationDeclContext();
+
+  if (D)
+    return D;
+
+  // We couldn't find a suitable node by climbing the DeclContext
+  // hierarchy, so fall back to looking for a top-level declaration
+  // that contains the reference range. We will hit this case for
+  // top-level elements that do not themselves introduce DeclContexts,
+  // such as extensions and global variables.
+  SourceFile *SF = ReferenceDC->getParentSourceFile();
+  if (!SF)
+    return nullptr;
+
+  for (Decl *D : SF->Decls) {
+    if (SM.rangeContains(D->getSourceRange(), ReferenceRange)) {
+      return D;
+    }
+  }
+
+  return nullptr;
+}
+
+/// Given a declaration, return a better related declaration for which
+/// to suggest an @availability fixit, or the original declaration
+/// if no such related declaration exists.
+static const Decl *relatedDeclForAvailabilityFixit(const Decl *D) {
+  if (auto *FD = dyn_cast<FuncDecl>(D)) {
+    // Suggest @availability Fix-Its on property rather than individual
+    // accessors.
+    if (FD->isAccessor()) {
+      D = FD->getAccessorStorageDecl();
+    }
+  } else if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    // Existing @availability attributes in the AST are attached to VarDecls
+    // rather than PatternBindingDecls, so we use the VarDecl as the
+    // suggested declaration rather than the VarDecl to detect when
+    // we want to update vs. add an attribute.
+    if (VarDecl *VD = PBD->getPattern()->getSingleVar()) {
+      D = VD;
+    }
+  } else if (auto *ECD = dyn_cast<EnumCaseDecl>(D)) {
+    // Suggest Fix-It on element rather than EnumCaseDecl.
+    ArrayRef<EnumElementDecl *> Elems = ECD->getElements();
+    if (Elems.size() > 0) {
+      D = Elems.front();
+    }
+  }
+
+  return D;
+}
+
+/// Walk the DeclContext hierarchy starting from D to find a declaration
+/// at the member level (i.e., declared in a type context) on which to provide an
+/// @availability() Fix-It.
+static const Decl *ancestorMemberLevelDeclForAvailabilityFixit(const Decl *D) {
+  while (D) {
+    D = relatedDeclForAvailabilityFixit(D);
+
+    if (D->getDeclContext()->isTypeContext() &&
+        DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::DAK_Availability,
+                                                D)) {
+      break;
+    }
+
+    D = cast_or_null<AbstractFunctionDecl>(
+        D->getDeclContext()->getInnermostMethodContext());
+  }
+
+  return D;
+}
+
+/// Returns true if the declaration is at the type level (either a nominal
+/// type, an extension, or a global function) and can support an @availability
+/// attribute.
+static bool isTypeLevelDeclForAvailabilityFixit(const Decl *D) {
+  if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::DAK_Availability,
+                                               D)) {
+    return false;
+  }
+
+  if (isa<ExtensionDecl>(D) || isa<NominalTypeDecl>(D)) {
+    return true;
+  }
+
+  bool IsModuleScopeContext = D->getDeclContext()->isModuleScopeContext();
+
+  // We consider global functions to be "type level"
+  if (isa<FuncDecl>(D)) {
+    return IsModuleScopeContext;
+  }
+
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    if (!IsModuleScopeContext)
+      return false;
+
+    if (PatternBindingDecl *PBD = VD->getParentPattern()) {
+      return PBD->getDeclContext()->isModuleScopeContext();
+    }
+  }
+
+  return false;
+}
+
+/// Walk the DeclContext hierarchy starting from D to find a declaration
+/// at a member level (i.e., declared in a type context) on which to provide an
+/// @availability() Fix-It.
+static const Decl *ancestorTypeLevelDeclForAvailabilityFixit(const Decl *D) {
+  assert(D);
+
+  D = relatedDeclForAvailabilityFixit(D);
+
+  while (D && !isTypeLevelDeclForAvailabilityFixit(D)) {
+    D = D->getDeclContext()->getInnermostDeclarationDeclContext();
+  }
+
+  return D;
+}
+
+/// Given the range of a reference to an unavailable symbol and the
+/// declaration context containing the reference, make a best effort find up to
+/// three locations for potential fixits.
+///
+/// \param  FoundVersionCheckNode Returns a node that can be wrapped in a
+/// if #os(...) { ... } version check to fix the unavailable reference, or None
+/// if such such a node cannot be found.
+///
+/// \param FoundMemberLevelDecl Returns memember-level declaration (i.e., the
+///  child of a type DeclContext) for which an @availability attribute would
+/// fix the unavailable reference.
+///
+/// \param FoundTypeLevelDecl returns a type-level declaration (a
+/// a nominal type, an extension, or a global function) for which an
+/// @availability attribute would fix the unavailable reference.
+static void findAvailabilityFixItNodes(SourceRange ReferenceRange,
+                                       const DeclContext *ReferenceDC,
+                                       const SourceManager &SM,
+                                       Optional<ASTNode> &FoundVersionCheckNode,
+                                       const Decl *&FoundMemberLevelDecl,
+                                       const Decl *&FoundTypeLevelDecl) {
+  FoundVersionCheckNode = None;
+  FoundMemberLevelDecl = nullptr;
+  FoundTypeLevelDecl = nullptr;
+
+  // Limit tree to search based on the DeclContext of the reference.
+  const Decl *NodeToSearch =
+      rootForAvailabilityFixitFinder(ReferenceRange, ReferenceDC, SM);
+  if (!NodeToSearch)
+    return;
+
+  AvailabilityFixitParentFinder Finder(ReferenceRange, SM,
+                                       NodeToSearch);
+
+  // The node to wrap in if #os(...) { ... } is the innermost node in
+  // NodeToSearch that (1) can be guarded with an if statement and (2)
+  // contains the ReferenceRange.
+  // We make no guarantee that the Fix-It, when applied, will result in
+  // semantically valid code -- but, at a minimum, it should parse. So,
+  // for example, we may suggest wrapping a variable declaration in a guard,
+  // which would not be valid if the variable is later used. The goal
+  // is discoverability of #os() (via the diagnostic and Fix-It) rather than
+  // magically fixing the code in all cases.
+  FoundVersionCheckNode = Finder.getInnermostGuardableNode();
+
+  // Find some Decl that contains the reference range. We use this declaration
+  // as a starting place to climb the DeclContext hierarchy to find
+  // places to suggest adding @availability() annotations.
+  const Decl *ContainingDecl = Finder.getInnermostDecl();
+  if (!ContainingDecl) {
+    ContainingDecl = ReferenceDC->getInnermostMethodContext();
+  }
+
+  // Try to find declarations on which @availability attributes can be added.
+  // The heuristics for finding these declarations are biased towards deeper
+  // nodes in the AST to limit the scope of suggested availability regions
+  // and provide a better IDE experience (it can get jumpy if Fix-It locations
+  // are far away from the error needing the Fix-It).
+  if (ContainingDecl) {
+    FoundMemberLevelDecl =
+        ancestorMemberLevelDeclForAvailabilityFixit(ContainingDecl);
+
+    FoundTypeLevelDecl =
+        ancestorTypeLevelDeclForAvailabilityFixit(ContainingDecl);
+  }
+}
+
+/// Emit a diagnostic note and Fix-It to add an @availability attribute
+/// on the given declaration for the given version range.
+static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
+                                   const VersionRange &RequiredRange,
+                                   TypeChecker &TC) {
+  assert(D);
+
+  if (getActiveAvailabilityAttribute(D, TC.Context)) {
+    // For QoI, in future should emit a fixit to update the existing attribute.
+    return;
+  }
+
+  // Attaching attributes to VarDecls is a problem for Fix-Its because
+  // the source range for VarDecls does not include 'var ' (and, in any
+  // event, multiple variables can be introduced with a single 'var'),
+  // so suggest adding an attribute to the PatterningBindingDecl instead.
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    assert(VD->getParentPattern());
+    D = VD->getParentPattern();
+  }
+
+  SourceLoc InsertLoc = D->getAttrs().getStartLoc(/*forModifiers=*/false);
+  if (InsertLoc.isInvalid()) {
+    InsertLoc = D->getStartLoc();
+  }
+
+  if (InsertLoc.isInvalid())
+    return;
+
+  StringRef OriginalIndent =
+      Lexer::getIndentationForLine(TC.Context.SourceMgr, InsertLoc);
+
+  std::string AttrText;
+  {
+    llvm::raw_string_ostream Out(AttrText);
+
+    PlatformKind Target = targetPlatform(TC.getLangOpts());
+    Out << "@availability(" << platformString(Target)
+        << ", introduced=" << RequiredRange.getLowerEndpoint().getAsString()
+        << ")\n" << OriginalIndent;
+  }
+
+  // This must stay in sync with diag::availability_add_attribute.
+  enum {
+    DK_Declaration = 0,
+    DK_Type,
+    DK_Function,
+    DK_Property,
+    DK_Extension,
+    DK_EnumCase,
+  } FixedDeclKind = DK_Declaration;
+
+  // The above kinds are not acceptable from a QoI perspective, but they
+  // are good enough for testing that the Fix-It adds the attribute
+  // attribute to the right declaration. In future, we will update these
+  // to distinguish, between enums and classes, and between functions,
+  // methods, and initializers, etc.
+
+  if (isa<NominalTypeDecl>(D)) {
+    FixedDeclKind = DK_Type;
+  } else if (isa<FuncDecl>(D)) {
+    FixedDeclKind = DK_Function;
+  } else if (isa<PatternBindingDecl>(D)) {
+    FixedDeclKind = DK_Property;
+  } else if (isa<ExtensionDecl>(D)) {
+    FixedDeclKind = DK_Extension;
+  } else if (isa<EnumElementDecl>(D)) {
+    FixedDeclKind = DK_EnumCase;
+  }
+
+  TC.diagnose(ReferenceRange.Start, diag::availability_add_attribute,
+              FixedDeclKind).fixItInsert(InsertLoc, AttrText);
+}
+
+/// Emit a diagnostic note and Fix-It to add an if #os(...) { } guard
+/// that checks for the given version range around the given node.
+static void fixAvailabilityByAddingVersionCheck(
+    ASTNode NodeToWrap, const VersionRange &RequiredRange,
+    SourceRange ReferenceRange, TypeChecker &TC) {
+  SourceRange RangeToWrap = NodeToWrap.getSourceRange();
+  if (RangeToWrap.isInvalid())
+    return;
+
+  SourceLoc ReplaceLocStart = RangeToWrap.Start;
+  StringRef OriginalIndent =
+      Lexer::getIndentationForLine(TC.Context.SourceMgr, ReplaceLocStart);
+
+  std::string IfText;
+  {
+    llvm::raw_string_ostream Out(IfText);
+
+    SourceLoc ReplaceLocEnd =
+        Lexer::getLocForEndOfToken(TC.Context.SourceMgr, RangeToWrap.End);
+
+    std::string GuardedText =
+        TC.Context.SourceMgr.extractText(CharSourceRange(TC.Context.SourceMgr,
+                                                         ReplaceLocStart,
+                                                         ReplaceLocEnd)).str();
+
+    // We'll indent with 4 spaces
+    std::string ExtraIndent = "    ";
+    std::string NewLine = "\n";
+
+    // Indent the body of the Fix-It if. Because the body may be a compound
+    // statement, we may have to indent multiple lines.
+    size_t StartAt = 0;
+    while ((StartAt = GuardedText.find(NewLine, StartAt)) !=
+           std::string::npos) {
+      GuardedText.replace(StartAt, NewLine.length(), NewLine + ExtraIndent);
+      StartAt += NewLine.length();
+    }
+
+    PlatformKind Target = targetPlatform(TC.getLangOpts());
+
+    Out << "if #os(" << platformString(Target)
+        << " >= " << RequiredRange.getLowerEndpoint().getAsString() << ") {\n";
+
+    Out << OriginalIndent << ExtraIndent << GuardedText << "\n";
+
+    // We emit an empty fallback case with a comment to encourage the developer
+    // to think explicitly about whether fallback on earlier versions is needed.
+    Out << OriginalIndent << "} else {\n";
+    Out << OriginalIndent << ExtraIndent << "// Fallback on earlier versions\n";
+    Out << OriginalIndent << "}";
+  }
+
+  TC.diagnose(ReferenceRange.Start, diag::availability_guard_with_version_check)
+      .fixItReplace(RangeToWrap, IfText);
+}
+
+/// Emit suggested Fix-Its for a reference with to an unavailable symbol
+/// requiting the given OS version range.
+static void fixAvailability(SourceRange ReferenceRange,
+                            const DeclContext *ReferenceDC,
+                            const VersionRange &RequiredRange,
+                            TypeChecker &TC) {
+  if (ReferenceRange.isInvalid())
+    return;
+
+  Optional<ASTNode> NodeToWrapInVersionCheck;
+  const Decl *FoundMemberDecl = nullptr;
+  const Decl *FoundTypeLevelDecl = nullptr;
+
+  findAvailabilityFixItNodes(ReferenceRange, ReferenceDC, TC.Context.SourceMgr,
+                             NodeToWrapInVersionCheck, FoundMemberDecl,
+                             FoundTypeLevelDecl);
+
+  // Suggest wrapping in if #os(...) { ... } if possible.
+  if (NodeToWrapInVersionCheck.hasValue()) {
+    fixAvailabilityByAddingVersionCheck(NodeToWrapInVersionCheck.getValue(),
+                                        RequiredRange, ReferenceRange, TC);
+  }
+
+  // Suggest adding availability attributes.
+  if (FoundMemberDecl) {
+    fixAvailabilityForDecl(ReferenceRange, FoundMemberDecl, RequiredRange, TC);
+  }
+
+  if (FoundTypeLevelDecl) {
+    fixAvailabilityForDecl(ReferenceRange, FoundTypeLevelDecl, RequiredRange, TC);
+  }
 }
 
 void TypeChecker::diagnosePotentialUnavailability(
-    const Decl *D, DeclName Name, SourceLoc referenceLoc,
-    const UnavailabilityReason &Reason) {
+    const Decl *D, DeclName Name, SourceRange ReferenceRange,
+    const DeclContext *ReferenceDC, const UnavailabilityReason &Reason) {
 
   // We only emit diagnostics for API unavailability, not for explicitly
   // weak-linked symbols.
@@ -1237,14 +1772,18 @@ void TypeChecker::diagnosePotentialUnavailability(
     return;
   }
 
-  diagnose(referenceLoc, diag::availability_decl_only_version_greater,
+  diagnose(ReferenceRange.Start, diag::availability_decl_only_version_greater,
            Name, prettyPlatformString(targetPlatform(Context.LangOpts)),
            Reason.getRequiredOSVersionRange().getLowerEndpoint());
+
+  fixAvailability(ReferenceRange, ReferenceDC,
+                  Reason.getRequiredOSVersionRange(), *this);
 }
 
 void TypeChecker::diagnosePotentialAccessorUnavailability(
-    FuncDecl *Accessor, SourceLoc ReferenceLoc,
-    const UnavailabilityReason &Reason, bool ForInout) {
+    FuncDecl *Accessor, SourceRange ReferenceRange,
+    const DeclContext *ReferenceDC, const UnavailabilityReason &Reason,
+    bool ForInout) {
   assert(Accessor->isGetterOrSetter());
 
   AbstractStorageDecl *ASD = Accessor->getAccessorStorageDecl();
@@ -1253,10 +1792,13 @@ void TypeChecker::diagnosePotentialAccessorUnavailability(
   auto &diag = ForInout ? diag::availability_inout_accessor_only_version_greater
                         : diag::availability_accessor_only_version_greater;
 
-  diagnose(ReferenceLoc, diag,
+  diagnose(ReferenceRange.Start, diag,
            static_cast<unsigned>(Accessor->getAccessorKind()), Name,
            prettyPlatformString(targetPlatform(Context.LangOpts)),
            Reason.getRequiredOSVersionRange().getLowerEndpoint());
+
+  fixAvailability(ReferenceRange, ReferenceDC,
+                  Reason.getRequiredOSVersionRange(), *this);
 }
 
 static bool isInsideImplicitFunction(const DeclContext *DC) {

@@ -536,7 +536,7 @@ static bool diagAvailability(TypeChecker &TC, const ValueDecl *D,
   // Diagnose for potential unavailability
   auto maybeUnavail = TC.checkDeclarationAvailability(D, Loc, DC);
   if (maybeUnavail.hasValue()) {
-    TC.diagnosePotentialUnavailability(D, Loc, maybeUnavail.getValue());
+    TC.diagnosePotentialUnavailability(D, R, DC, maybeUnavail.getValue());
     return true;
   }
   return false;
@@ -645,7 +645,7 @@ private:
 
     if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
       // Diagnose for appropriate accessors, given the access context.
-      diagStorageAccess(ASD, E->getLoc());
+      diagStorageAccess(ASD, E->getSourceRange(), DC);
     }
   }
   
@@ -661,7 +661,9 @@ private:
 
   /// Emit diagnostics, if necessary, for accesses to storage where
   /// the accessor for the AccessContext is not available.
-  void diagStorageAccess(AbstractStorageDecl *D, SourceLoc ReferenceLoc) const {
+  void diagStorageAccess(AbstractStorageDecl *D,
+                         SourceRange ReferenceRange,
+                         const DeclContext *ReferenceDC) const {
     if (!D->hasAccessorFunctions()) {
       return;
     }
@@ -669,20 +671,20 @@ private:
     // Check availability of accessor functions
     switch (AccessContext) {
     case MemberAccessContext::Getter:
-      diagAccessorAvailability(D->getGetter(), ReferenceLoc,
+      diagAccessorAvailability(D->getGetter(), ReferenceRange, ReferenceDC,
                                /*ForInout=*/false);
       break;
 
     case MemberAccessContext::Setter:
-      diagAccessorAvailability(D->getSetter(), ReferenceLoc,
+      diagAccessorAvailability(D->getSetter(), ReferenceRange, ReferenceDC,
                                /*ForInout=*/false);
       break;
 
     case MemberAccessContext::InOut:
-      diagAccessorAvailability(D->getGetter(), ReferenceLoc,
+      diagAccessorAvailability(D->getGetter(), ReferenceRange, ReferenceDC,
                                /*ForInout=*/true);
 
-      diagAccessorAvailability(D->getSetter(), ReferenceLoc,
+      diagAccessorAvailability(D->getSetter(), ReferenceRange, ReferenceDC,
                                /*ForInout=*/true);
       break;
     }
@@ -690,14 +692,16 @@ private:
 
   /// Emit a diagnostic, if necessary for a potentially unavailable accessor.
   /// Returns true if a diagnostic was emitted.
-  void diagAccessorAvailability(FuncDecl *D, SourceLoc ReferenceLoc,
+  void diagAccessorAvailability(FuncDecl *D, SourceRange ReferenceRange,
+                                const DeclContext *ReferenceDC,
                                 bool ForInout) const {
     if (!D) {
       return;
     }
-    auto MaybeUnavail = TC.checkDeclarationAvailability(D, ReferenceLoc, DC);
+    auto MaybeUnavail = TC.checkDeclarationAvailability(D, ReferenceRange.Start,
+                                                        DC);
     if (MaybeUnavail.hasValue()) {
-      TC.diagnosePotentialAccessorUnavailability(D, ReferenceLoc,
+      TC.diagnosePotentialAccessorUnavailability(D, ReferenceRange, ReferenceDC,
                                                  MaybeUnavail.getValue(),
                                                  ForInout);
     }
