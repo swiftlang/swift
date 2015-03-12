@@ -137,8 +137,7 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
       auto InstTy = SubClassTy.getSwiftRValueType();
       CD = InstTy.getClassOrBoundGenericClass();
       // Convert instance type to its metatype type.
-      auto EMT = dyn_cast<AnyMetatypeType>(VMTI->getType().
-                                                 getSwiftRValueType());
+      auto EMT = cast<AnyMetatypeType>(VMTI->getType().getSwiftRValueType());
       auto *MetaTy = MetatypeType::get(InstTy, EMT->getRepresentation());
       auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
       RealSubClassTy = SILType::getPrimitiveObjectType(CanMetaTy);
