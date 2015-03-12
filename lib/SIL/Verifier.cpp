@@ -1511,15 +1511,15 @@ public:
     SILType operandType = OEI->getOperand().getType();
     require(operandType.isAddress(),
             "open_existential_addr must be applied to address");
+    require(operandType.canUseExistentialRepresentation(
+                                        ExistentialRepresentation::FixedBuffer),
+           "open_existential_addr must be applied to fixed-buffer existential");
 
-    SmallVector<ProtocolDecl*, 4> protocols;
-    require(operandType.getSwiftRValueType().isExistentialType(protocols),
-            "open_existential_addr must be applied to address of existential");
     require(OEI->getType().isAddress(),
             "open_existential_addr result must be an address");
 
     require(isOpenedArchetype(OEI->getType().getSwiftRValueType()),
-            "open_existential_addr result must be an opened existential archetype");
+        "open_existential_addr result must be an opened existential archetype");
   }
 
   void checkOpenExistentialRefInst(OpenExistentialRefInst *OEI) {
@@ -1613,10 +1613,11 @@ public:
     SILType exType = AEI->getOperand().getType();
     require(exType.isAddress(),
             "init_existential_addr must be applied to an address");
-    require(exType.isExistentialType(),
-            "init_existential_addr must be applied to address of existential");
-    require(!exType.isClassExistentialType(),
-            "init_existential_addr must be applied to non-class existential");
+    require(exType.canUseExistentialRepresentation(
+                                       ExistentialRepresentation::FixedBuffer,
+                                       AEI->getFormalConcreteType()),
+            "init_existential_addr must be used with a fixed-buffer "
+            "existential type");
     
     // The lowered type must be the properly-abstracted form of the AST type.
     auto archetype = ArchetypeType::getOpened(exType.getSwiftRValueType());
@@ -1645,8 +1646,10 @@ public:
     SILType concreteType = IEI->getOperand().getType();
     require(concreteType.getSwiftType()->isBridgeableObjectType(),
             "init_existential_ref operand must be a class instance");
-    require(IEI->getType().isClassExistentialType(),
-            "init_existential_ref result must be a class existential type");
+    require(IEI->getType().canUseExistentialRepresentation(
+                                     ExistentialRepresentation::ClassReference,
+                                     IEI->getFormalConcreteType()),
+            "init_existential_ref must be used with a class existential type");
     require(IEI->getType().isObject(),
             "init_existential_ref result must not be an address");
     
@@ -1675,10 +1678,10 @@ public:
     SILType exType = DEI->getOperand().getType();
     require(exType.isAddress(),
             "deinit_existential_addr must be applied to an address");
-    require(exType.isExistentialType(),
-            "deinit_existential_addr must be applied to address of existential");
-    require(!exType.isClassExistentialType(),
-            "deinit_existential_addr must be applied to non-class existential");
+    require(exType.canUseExistentialRepresentation(
+                                       ExistentialRepresentation::FixedBuffer),
+            "deinit_existential_addr must be applied to a fixed-buffer "
+            "existential");
   }
 
   void checkInitExistentialMetatypeInst(InitExistentialMetatypeInst *I) {

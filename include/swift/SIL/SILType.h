@@ -37,6 +37,30 @@ namespace Lowering {
   
 namespace swift {
 
+/// How an existential type container is represented.
+enum class ExistentialRepresentation {
+  /// The type is not existential.
+  None,
+  /// The container uses a fixed-sized buffer. The type is address-only
+  /// and is manipulated using the {init,open,deinit}_existential_addr family
+  /// of instructions.
+  FixedBuffer,
+  /// The container holds a reference to the class instance that conforms to
+  /// the protocol. The type is reference-counted and is manipulated using the
+  /// {init,open}_existential_ref family of instructions.
+  ClassReference,
+  /// The container holds a reference to the type metadata for a type that
+  /// conforms to the protocol. The type is trivial, and is manipulated using
+  /// the {init,open}_existential_metatype family of instructions.
+  Metatype,
+  /// The container is a reference-counted box that indirectly contains the
+  /// conforming value. The type is reference-counted and is manipulated
+  /// using the {alloc,open,dealloc}_existential_box family of instructions.
+  /// The container may be able to directly adopt a class reference using
+  /// init_existential_ref for some class types.
+  Box,
+};
+
 /// The value category.
 enum class SILValueCategory {
   /// An object is a value of the type.
@@ -296,6 +320,21 @@ public:
   bool isClassExistentialType() const {
     return getSwiftRValueType()->isClassExistentialType();
   }
+  
+  /// Returns the representation used by an existential type. If the concrete
+  /// type is provided, this may return a specialized representation kind that
+  /// can be used for that type. Otherwise, returns the most general
+  /// representation kind for the type. Returns None if the type is not an
+  /// existential type.
+  ExistentialRepresentation
+  getPreferredExistentialRepresentation(Type containedType = Type()) const;
+  
+  /// Returns true if the existential type can use operations for the given
+  /// existential representation when working with values of the given type,
+  /// or when working with an unknown type if containedType is null.
+  bool
+  canUseExistentialRepresentation(ExistentialRepresentation repr,
+                                  Type containedType = Type()) const;
   
   /// True if the type is dependent on a generic signature.
   bool isDependentType() const {
