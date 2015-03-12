@@ -187,13 +187,29 @@ public:
     switch (BI->getBuiltinInfo().ID) {
       default: return false;
       case BuiltinValueKind::SAddOver:
-        return false;
       case BuiltinValueKind::UAddOver:
-        return false;
       case BuiltinValueKind::SMulOver:
       case BuiltinValueKind::UMulOver:
         return false;
+
       case BuiltinValueKind::USubOver:
+        //  A - B traps unless:
+        if (F.Relationship == ValueRelation::ULE ||
+            F.Relationship == ValueRelation::ULT) {
+          //  A >= B.
+          // Given the constraint L < R check if:
+          // 1. R == A
+          // 2. B <= L (subtracting less than L is okay)
+          //
+          // Example: Given 2<X we know that X-2 can't trap.
+          SILValue A = BI->getOperand(0);
+          SILValue B = BI->getOperand(1);
+          if (knownRelation(F.Right, A, ValueRelation::EQ) &&
+              knownRelation(B, F.Left, ValueRelation::ULE)) {
+            return true;
+          }
+        }
+
         return false;
       case BuiltinValueKind::SSubOver:
         //  A - B traps unless:

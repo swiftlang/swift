@@ -84,3 +84,73 @@ bb2:                                              // Preds: bb0 bb1
   return %22 : $()                                // id: %23
 }
 
+// CHECK-LABEL: @sub_unsigned_branch_cond
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @sub_unsigned_branch_cond : $@thin (UInt) -> () {
+bb0(%0 : $UInt):
+  %1 = integer_literal $Builtin.Int64, 2          // users: %3, %12
+  %2 = struct_extract %0 : $UInt, #UInt.value     // users: %3, %7, %12, %17
+  %3 = builtin "cmp_ult_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %4
+  cond_br %3, bb2, bb1                            // id: %4
+
+bb1:                                              // Preds: bb0
+  %5 = integer_literal $Builtin.Int64, 1          // user: %7
+  %6 = integer_literal $Builtin.Int1, -1          // users: %7, %12, %17
+  %7 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %5 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %8
+  %8 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 1 // user: %9
+  cond_fail %8 : $Builtin.Int1                    // id: %9
+  // function_ref function signature specialization <Arg[0] = Dead> of cropoverflow.sink (Swift.UInt) -> ()
+  %10 = function_ref @sink_signed_int : $@thin () -> () // users: %11, %15, %20
+  %11 = apply %10() : $@thin () -> ()
+  %12 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %13
+  %13 = tuple_extract %12 : $(Builtin.Int64, Builtin.Int1), 1 // user: %14
+  cond_fail %13 : $Builtin.Int1                   // id: %14
+  %15 = apply %10() : $@thin () -> ()
+  %16 = integer_literal $Builtin.Int64, 3         // user: %17
+  %17 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %16 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %18
+  %18 = tuple_extract %17 : $(Builtin.Int64, Builtin.Int1), 1 // user: %19
+  cond_fail %13 : $Builtin.Int1                   // id: %19
+  %20 = apply %10() : $@thin () -> ()
+  br bb2                                          // id: %21
+
+bb2:                                              // Preds: bb0 bb1
+  %22 = tuple ()                                  // user: %23
+  return %22 : $()                                // id: %23
+}
+
+// CHECK-LABEL: @sub_unsigned_branch_cond2
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @sub_unsigned_branch_cond2 : $@thin (UInt) -> () {
+bb0(%0 : $UInt):
+  %1 = integer_literal $Builtin.Int64, 2          // users: %3, %12
+  %2 = struct_extract %0 : $UInt, #UInt.value     // users: %3, %7, %12, %17
+  %3 = builtin "cmp_uge_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %4
+  cond_br %3, bb1, bb2                            // id: %4
+
+bb1:                                              // Preds: bb0
+  %5 = integer_literal $Builtin.Int64, 1          // user: %7
+  %6 = integer_literal $Builtin.Int1, -1          // users: %7, %12, %17
+  %7 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %5 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %8
+  %8 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 1 // user: %9
+  cond_fail %8 : $Builtin.Int1                    // id: %9
+  // function_ref function signature specialization <Arg[0] = Dead> of cropoverflow.sink (Swift.UInt) -> ()
+  %10 = function_ref @sink_signed_int : $@thin () -> () // users: %11, %15, %20
+  %11 = apply %10() : $@thin () -> ()
+  %12 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %13
+  %13 = tuple_extract %12 : $(Builtin.Int64, Builtin.Int1), 1 // user: %14
+  cond_fail %13 : $Builtin.Int1                   // id: %14
+  %15 = apply %10() : $@thin () -> ()
+  %16 = integer_literal $Builtin.Int64, 3         // user: %17
+  %17 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %16 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %18
+  %18 = tuple_extract %17 : $(Builtin.Int64, Builtin.Int1), 1 // user: %19
+  cond_fail %13 : $Builtin.Int1                   // id: %19
+  %20 = apply %10() : $@thin () -> ()
+  br bb2                                          // id: %21
+
+bb2:                                              // Preds: bb0 bb1
+  %22 = tuple ()                                  // user: %23
+  return %22 : $()                                // id: %23
+}
+
