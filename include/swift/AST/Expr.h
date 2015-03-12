@@ -337,10 +337,10 @@ public:
   SourceRange getSourceRange() const;
   
   /// getStartLoc - Return the location of the start of the expression.
-  SourceLoc getStartLoc() const { return getSourceRange().Start; }
+  SourceLoc getStartLoc() const;
 
   /// \brief Retrieve the location of the end of the expression.
-  SourceLoc getEndLoc() const { return getSourceRange().End; }
+  SourceLoc getEndLoc() const;
   
   /// getLoc - Return the caret location of this expression.
   SourceLoc getLoc() const;

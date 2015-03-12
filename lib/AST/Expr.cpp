@@ -47,40 +47,102 @@ StringRef Expr::getKindName(ExprKind K) {
   llvm_unreachable("bad ExprKind");
 }
 
-// Helper functions to verify statically whether the getSourceRange()
-// function has been overridden.
-typedef const char (&TwoChars)[2];
+template <class T> static SourceLoc getStartLocImpl(const T *E);
+template <class T> static SourceLoc getEndLocImpl(const T *E);
+template <class T> static SourceLoc getLocImpl(const T *E);
 
-template<typename Class> 
-inline char checkSourceRangeType(SourceRange (Class::*)() const);
+// Helper functions to check statically whether a method has been
+// overridden from its implementation in Expr.  The sort of thing you
+// need when you're avoiding v-tables.
+namespace {
+  template <typename ReturnType, typename Class>
+  constexpr bool isOverriddenFromExpr(ReturnType (Class::*)() const) {
+    return true;
+  }
+  template <typename ReturnType>
+  constexpr bool isOverriddenFromExpr(ReturnType (Expr::*)() const) {
+    return false;
+  }
 
-inline TwoChars checkSourceRangeType(SourceRange (Expr::*)() const);
+  template <bool IsOverridden> struct Dispatch;
+
+  /// Dispatch down to a concrete override.
+  template <> struct Dispatch<true> {
+    template <class T> static SourceLoc getStartLoc(const T *E) {
+      return E->getStartLoc();
+    }
+    template <class T> static SourceLoc getEndLoc(const T *E) {
+      return E->getEndLoc();
+    }
+    template <class T> static SourceLoc getLoc(const T *E) {
+      return E->getLoc();
+    }
+  };
+
+  /// Default implementations for when a method isn't overridden.
+  template <> struct Dispatch<false> {
+    template <class T> static SourceLoc getStartLoc(const T *E) {
+      return E->getSourceRange().Start;
+    }
+    template <class T> static SourceLoc getEndLoc(const T *E) {
+      return E->getSourceRange().End;
+    }
+    template <class T> static SourceLoc getLoc(const T *E) {
+      return getStartLocImpl(E);
+    }
+  };
+}
 
 SourceRange Expr::getSourceRange() const {
   switch (getKind()) {
-#define EXPR(ID, PARENT) \
-case ExprKind::ID: \
-static_assert(sizeof(checkSourceRangeType(&ID##Expr::getSourceRange)) == 1, \
-              #ID "Expr is missing getSourceRange()"); \
-return cast<ID##Expr>(this)->getSourceRange();
+#define EXPR(ID, PARENT)                                           \
+  case ExprKind::ID:                                               \
+    static_assert(isOverriddenFromExpr(&ID##Expr::getSourceRange), \
+                  #ID "Expr is missing getSourceRange()");         \
+    return cast<ID##Expr>(this)->getSourceRange();
 #include "swift/AST/ExprNodes.def"
   }
   
   llvm_unreachable("expression type not handled!");
 }
 
-/// getLoc - Return the caret location of the expression.
-SourceLoc Expr::getLoc() const {
+template <class T> static SourceLoc getStartLocImpl(const T *E) {
+  return Dispatch<isOverriddenFromExpr(&T::getStartLoc)>::getStartLoc(E);
+}
+SourceLoc Expr::getStartLoc() const {
   switch (getKind()) {
-#define EXPR(ID, PARENT) \
-  case ExprKind::ID: \
-    if (&Expr::getLoc != &ID##Expr::getLoc) \
-      return cast<ID##Expr>(this)->getLoc(); \
-    break;
+#define EXPR(ID, PARENT)                                           \
+  case ExprKind::ID: return getStartLocImpl(cast<ID##Expr>(this));
 #include "swift/AST/ExprNodes.def"
   }
 
-  return getStartLoc();
+  llvm_unreachable("expression type not handled!");
+}
+
+template <class T> static SourceLoc getEndLocImpl(const T *E) {
+  return Dispatch<isOverriddenFromExpr(&T::getEndLoc)>::getEndLoc(E);
+}
+SourceLoc Expr::getEndLoc() const {
+  switch (getKind()) {
+#define EXPR(ID, PARENT)                                           \
+  case ExprKind::ID: return getEndLocImpl(cast<ID##Expr>(this));
+#include "swift/AST/ExprNodes.def"
+  }
+
+  llvm_unreachable("expression type not handled!");
+}
+
+template <class T> static SourceLoc getLocImpl(const T *E) {
+  return Dispatch<isOverriddenFromExpr(&T::getLoc)>::getLoc(E);
+}
+SourceLoc Expr::getLoc() const {
+  switch (getKind()) {
+#define EXPR(ID, PARENT)                                           \
+  case ExprKind::ID: return getLocImpl(cast<ID##Expr>(this));
+#include "swift/AST/ExprNodes.def"
+  }
+
+  llvm_unreachable("expression type not handled!");
 }
 
 Expr *Expr::getSemanticsProvidingExpr() {
