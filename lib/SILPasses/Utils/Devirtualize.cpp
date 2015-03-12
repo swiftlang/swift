@@ -277,7 +277,6 @@ ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
     ClassInstance = B.createUpcast(AI->getLoc(), ClassInstance, FuncSelfTy);
   }
 
-  // Success! Perform the devirtualization.
   FunctionRefInst *FRI = B.createFunctionRef(AI->getLoc(), DCMI.F);
 
   // Construct a new arg list. First process all non-self operands, ref, addr
