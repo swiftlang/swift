@@ -345,6 +345,12 @@ public:
   /// getLoc - Return the caret location of this expression.
   SourceLoc getLoc() const;
 
+#define SWIFT_FORWARD_SOURCE_LOCS_TO(SUBEXPR) \
+  SourceLoc getStartLoc() const { return (SUBEXPR)->getStartLoc(); } \
+  SourceLoc getEndLoc() const { return (SUBEXPR)->getEndLoc(); } \
+  SourceLoc getLoc() const { return (SUBEXPR)->getLoc(); } \
+  SourceRange getSourceRange() const { return (SUBEXPR)->getSourceRange(); }
+
   SourceLoc TrailingSemiLoc;
 
   /// getSemanticsProvidingExpr - Find the smallest subexpression
@@ -675,9 +681,11 @@ public:
   Expr *getSemanticExpr() const { return SemanticExpr; }
   void setSemanticExpr(Expr *SE) { SemanticExpr = SE; }
   
-  SourceRange getSourceRange() const {
-    return SourceRange(Segments.front()->getSourceRange().Start,
-                       Segments.back()->getSourceRange().End);
+  SourceLoc getStartLoc() const {
+    return Segments.front()->getStartLoc();
+  }
+  SourceLoc getEndLoc() const {
+    return Segments.front()->getEndLoc();
   }
   
   static bool classof(const Expr *E) {
@@ -896,6 +904,7 @@ public:
   // metatype of what is stored as an operand type.
   
   SourceRange getSourceRange() const { return Info.getSourceRange(); }
+  // TODO: optimize getStartLoc() and getEndLoc() when TypeLoc allows it.
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Type;
@@ -951,9 +960,8 @@ public:
   SourceLoc getConstructorLoc() const { return ConstructorLoc; }
   SourceLoc getDotLoc() const { return DotLoc; }
   
-  SourceRange getSourceRange() const {
-    return SourceRange(SubExpr->getStartLoc(), ConstructorLoc);
-  }
+  SourceLoc getStartLoc() const { return SubExpr->getStartLoc(); }
+  SourceLoc getEndLoc() const { return ConstructorLoc; }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::UnresolvedConstructor;
@@ -1053,9 +1061,6 @@ public:
     return DotLoc.isValid()? SubExpr->getStartLoc() : MemberLoc;
   }
   SourceLoc getEndLoc() const { return MemberLoc; }
-  SourceRange getSourceRange() const {
-    return SourceRange(getStartLoc(), MemberLoc);
-  }
 
   AccessSemantics getAccessSemantics() const {
     return AccessSemantics(OverloadedMemberRefExprBits.Semantics);
@@ -1138,11 +1143,11 @@ public:
   void setIsSuper(bool isSuper) { MemberRefExprBits.IsSuper = isSuper; }
 
   SourceLoc getLoc() const { return NameRange.Start; }
-  SourceRange getSourceRange() const {
-    if (Base->isImplicit())
-      return NameRange;
-  
-    return SourceRange(Base->getStartLoc(), NameRange.End);
+  SourceLoc getStartLoc() const {
+    return (Base->isImplicit() ? NameRange.Start : Base->getStartLoc());
+  }
+  SourceLoc getEndLoc() const {
+    return NameRange.End;
   }
   
   static bool classof(const Expr *E) {
@@ -1210,12 +1215,10 @@ public:
 
   SourceLoc getLoc() const { return NameLoc; }
 
-  SourceRange getSourceRange() const {
-    if (Base->isImplicit())
-      return SourceRange(NameLoc);
-
-    return SourceRange(Base->getStartLoc(), NameLoc);
+  SourceLoc getStartLoc() const {
+    return (Base->isImplicit() ? NameLoc : Base->getStartLoc());
   }
+  SourceLoc getEndLoc() const { return NameLoc; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DynamicMemberRef;
@@ -1269,9 +1272,8 @@ public:
 
   SourceLoc getLoc() const { return Index->getStartLoc(); }
 
-  SourceRange getSourceRange() const {
-    return SourceRange(Base->getStartLoc(), Index->getEndLoc());
-  }
+  SourceLoc getStartLoc() const { return Base->getStartLoc(); }
+  SourceLoc getEndLoc() const { return Index->getEndLoc(); }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DynamicSubscript;
@@ -1301,7 +1303,11 @@ public:
   void setArgument(Expr *argument) { Argument = argument; }
 
   SourceLoc getLoc() const { return NameLoc; }
-  SourceRange getSourceRange() const;
+
+  SourceLoc getStartLoc() const { return DotLoc; }
+  SourceLoc getEndLoc() const {
+    return (Argument ? Argument->getEndLoc() : NameLoc);
+  }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::UnresolvedMember;
@@ -1348,9 +1354,9 @@ public:
   
   SourceLoc getDotLoc() const { return DotLoc; }
   SourceLoc getSelfLoc() const { return SelfLoc; }
-  SourceRange getSourceRange() const {
-    return {getSubExpr()->getStartLoc(), SelfLoc};
-  }
+
+  SourceLoc getStartLoc() const { return getSubExpr()->getStartLoc(); }
+  SourceLoc getEndLoc() const { return SelfLoc; }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DotSelf;
@@ -1369,9 +1375,6 @@ public:
 
   SourceLoc getTryLoc() const { return Loc; }
 
-  SourceRange getSourceRange() const {
-    return { getStartLoc(), getEndLoc() };
-  }
   SourceLoc getStartLoc() const { return Loc; }
   SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
 
@@ -1406,18 +1409,19 @@ public:
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
 
-  SourceRange getSourceRange() const {
-    // When the locations of the parentheses are invalid, ask our subexpression
-    // for its source range instead.
-    if (LParenLoc.isInvalid())
-      return getSubExpr()->getSourceRange();
+  // When the locations of the parens are invalid, ask our
+  // subexpression for its source range instead.  This isn't a
+  // hot path and so we don't both optimizing for it.
 
-    // If we have a trailing closure, our end point is the end of the trailing
-    // closure.
-    if (HasTrailingClosure)
-      return SourceRange(LParenLoc, getSubExpr()->getEndLoc());
-
-    return SourceRange(LParenLoc, RParenLoc);
+  SourceLoc getStartLoc() const {
+    return (LParenLoc.isInvalid() ? getSubExpr()->getStartLoc() : LParenLoc);
+  }
+  SourceLoc getEndLoc() const {
+    // If we have a trailing closure, our end point is the end of the
+    // trailing closure.
+    if (RParenLoc.isInvalid() || HasTrailingClosure)
+      return getSubExpr()->getEndLoc();
+    return RParenLoc;
   }
 
   /// \brief Whether this expression has a trailing closure as its argument.
@@ -1481,7 +1485,8 @@ public:
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
 
-  SourceRange getSourceRange() const;
+  SourceLoc getStartLoc() const;
+  SourceLoc getEndLoc() const;
 
   /// \brief Whether this expression has a trailing closure as its argument.
   bool hasTrailingClosure() const { return TupleExprBits.HasTrailingClosure; }
@@ -1677,9 +1682,8 @@ public:
     return TheDecl;
   }
 
-  SourceRange getSourceRange() const {
-    return SourceRange(Base->getStartLoc(), Index->getEndLoc());
-  }
+  SourceLoc getStartLoc() const { return Base->getStartLoc(); }
+  SourceLoc getEndLoc() const { return Index->getEndLoc(); }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Subscript;
@@ -1699,13 +1703,12 @@ public:
     NameLoc(nameloc), Name(name) {}
   
   SourceLoc getLoc() const { return NameLoc; }
-  
-  SourceRange getSourceRange() const {
-    if (DotLoc.isInvalid())
-      return SourceRange(NameLoc, NameLoc);
-    return SourceRange(SubExpr->getStartLoc(), NameLoc);
+
+  SourceLoc getStartLoc() const {
+    return (DotLoc.isInvalid() ? NameLoc : SubExpr->getStartLoc());
   }
-  
+  SourceLoc getEndLoc() const { return NameLoc; }
+
   SourceLoc getDotLoc() const { return DotLoc; }
   Expr *getBase() const { return SubExpr; }
   void setBase(Expr *e) { SubExpr = e; }
@@ -1757,10 +1760,9 @@ public:
   SourceLoc getLoc() const {
     return getComponentLocs().front().NameLoc;
   }
-  
-  SourceRange getSourceRange() const {
-    return {SubExpr->getStartLoc(), getComponentLocs().back().ColonLoc};
-  }
+
+  SourceLoc getStartLoc() const { return SubExpr->getStartLoc(); }
+  SourceLoc getEndLoc() const { return getComponentLocs().back().ColonLoc; }
   
   SourceLoc getDotLoc() const { return DotLoc; }
   Expr *getBase() const { return SubExpr; }
@@ -1818,9 +1820,8 @@ public:
   SourceLoc getNameLoc() const { return NameLoc; }  
   SourceLoc getDotLoc() const { return DotLoc; }
   
-  SourceRange getSourceRange() const { 
-    return SourceRange(getBase()->getStartLoc(), getNameLoc());
-  }
+  SourceLoc getStartLoc() const { return getBase()->getStartLoc(); }
+  SourceLoc getEndLoc() const { return getNameLoc(); }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::TupleElement;
@@ -1859,6 +1860,12 @@ public:
       return SubExpr->getSourceRange();
     return SourceRange(SubExpr->getStartLoc(), QuestionLoc);
   }
+  SourceLoc getStartLoc() const {
+    return SubExpr->getStartLoc();
+  }
+  SourceLoc getEndLoc() const {
+    return (QuestionLoc.isInvalid() ? SubExpr->getEndLoc() : QuestionLoc);
+  }
   SourceLoc getLoc() const { 
     if (isImplicit())
       return SubExpr->getLoc();
@@ -1893,8 +1900,7 @@ public:
     : Expr(ExprKind::OptionalEvaluation, /*Implicit=*/ true, ty),
       SubExpr(subExpr) {}
 
-  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
-  SourceLoc getLoc() const { return SubExpr->getLoc(); }
+  SWIFT_FORWARD_SOURCE_LOCS_TO(SubExpr)
 
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *expr) { SubExpr = expr; }
@@ -1927,6 +1933,12 @@ public:
       return SubExpr->getSourceRange();
 
     return SourceRange(SubExpr->getStartLoc(), ExclaimLoc);
+  }
+  SourceLoc getStartLoc() const {
+    return SubExpr->getStartLoc();
+  }
+  SourceLoc getEndLoc() const {
+    return (isImplicit() ? SubExpr->getEndLoc() : getExclaimLoc());
   }
   SourceLoc getLoc() const {
     if (!isImplicit())
@@ -1966,10 +1978,7 @@ public:
       ExistentialValue(existentialValue), OpaqueValue(opaqueValue), 
       SubExpr(subExpr) { }
 
-  SourceRange getSourceRange() const {
-    return SubExpr->getSourceRange();
-  }
-  SourceLoc getLoc() const { return SubExpr->getLoc(); }
+  SWIFT_FORWARD_SOURCE_LOCS_TO(SubExpr)
 
   /// Retrieve the expression that is being evaluated using the
   /// archetype value.
@@ -2007,8 +2016,7 @@ protected:
     : Expr(kind, /*Implicit=*/true, ty), SubExpr(subExpr) {}
 
 public:
-  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
-  SourceLoc getLoc() const { return SubExpr->getLoc(); }
+  SWIFT_FORWARD_SOURCE_LOCS_TO(SubExpr)
 
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *e) { SubExpr = e; }
@@ -2452,9 +2460,9 @@ public:
   SourceLoc getLoc() const { return LAngleLoc; }
   SourceLoc getLAngleLoc() const { return LAngleLoc; }
   SourceLoc getRAngleLoc() const { return RAngleLoc; }
-  SourceRange getSourceRange() const {
-    return SourceRange(SubExpr->getStartLoc(), RAngleLoc);
-  }
+
+  SourceLoc getStartLoc() const { return SubExpr->getStartLoc(); }
+  SourceLoc getEndLoc() const { return RAngleLoc; }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::UnresolvedSpecialize;
@@ -2535,9 +2543,8 @@ public:
     : Expr(ExprKind::InOut, isImplicit, type),
       SubExpr(subExpr), OperLoc(operLoc) {}
 
-  SourceRange getSourceRange() const {
-    return SourceRange(OperLoc, SubExpr->getEndLoc());
-  }
+  SourceLoc getStartLoc() const { return OperLoc; }
+  SourceLoc getEndLoc() const { return SubExpr->getEndLoc(); }
   SourceLoc getLoc() const { return OperLoc; }
 
   Expr *getSubExpr() const { return SubExpr; }
@@ -2570,9 +2577,11 @@ class SequenceExpr : public Expr {
 public:
   static SequenceExpr *create(ASTContext &ctx, ArrayRef<Expr*> elements);
 
-  SourceRange getSourceRange() const { 
-    return SourceRange(getElements()[0]->getStartLoc(),
-                       getElements()[getNumElements() - 1]->getEndLoc());
+  SourceLoc getStartLoc() const {
+    return getElements()[0]->getStartLoc();
+  }
+  SourceLoc getEndLoc() const {
+    return getElements()[getNumElements() - 1]->getEndLoc();
   }
   
   unsigned getNumElements() const { return NumElements; }
@@ -2634,9 +2643,7 @@ public:
 
   /// This is a bit weird, but the capture list is lexically contained within
   /// the closure, so the ClosureExpr has the full source range.
-  SourceRange getSourceRange() const {
-    return closureBody->getSourceRange();
-  }
+  SWIFT_FORWARD_SOURCE_LOCS_TO(closureBody)
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Expr *E) {
@@ -2797,6 +2804,8 @@ public:
   }
 
   SourceRange getSourceRange() const;
+  SourceLoc getStartLoc() const;
+  SourceLoc getEndLoc() const;
   SourceLoc getLoc() const;
 
   BraceStmt *getBody() const { return Body.getPointer(); }
@@ -2913,6 +2922,9 @@ public:
   }
 
   SourceRange getSourceRange() const;
+  SourceLoc getStartLoc() const;
+  SourceLoc getEndLoc() const;
+  SourceLoc getLoc() const;
 
   BraceStmt *getBody() const { return Body; }
   void setBody(Expr *E);
@@ -2956,7 +2968,12 @@ public:
   SourceLoc getLoc() const { return MetatypeLoc; }
   SourceLoc getMetatypeLoc() const { return MetatypeLoc; }
 
-  SourceRange getSourceRange() const;
+  SourceLoc getStartLoc() const {
+    return getBase()->getStartLoc();
+  }
+  SourceLoc getEndLoc() const {
+    return (MetatypeLoc.isValid() ? MetatypeLoc : getBase()->getEndLoc());
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DynamicType;
@@ -3041,7 +3058,14 @@ public:
   CallExpr(Expr *fn, Expr *arg, bool Implicit, Type ty = Type())
     : ApplyExpr(ExprKind::Call, fn, arg, Implicit, ty) {}
 
-  SourceRange getSourceRange() const;
+  SourceLoc getStartLoc() const {
+    SourceLoc fnLoc = getFn()->getStartLoc();
+    return (fnLoc.isValid() ? fnLoc : getArg()->getStartLoc());
+  }
+  SourceLoc getEndLoc() const {
+    SourceLoc argLoc = getArg()->getEndLoc();
+    return (argLoc.isValid() ? argLoc : getFn()->getEndLoc());
+  }
   
   SourceLoc getLoc() const { 
     SourceLoc FnLoc = getFn()->getLoc(); 
@@ -3059,8 +3083,11 @@ public:
 
   SourceLoc getLoc() const { return getFn()->getStartLoc(); }
 
-  SourceRange getSourceRange() const {
-    return SourceRange(getFn()->getStartLoc(), getArg()->getEndLoc()); 
+  SourceLoc getStartLoc() const {
+    return getFn()->getStartLoc();
+  }
+  SourceLoc getEndLoc() const {
+    return getArg()->getEndLoc();
   }
 
   static bool classof(const Expr *E) {
@@ -3076,9 +3103,12 @@ public:
 
   SourceLoc getLoc() const { return getFn()->getStartLoc(); }
   
-  SourceRange getSourceRange() const {
-    return SourceRange(getArg()->getStartLoc(), getFn()->getEndLoc()); 
-  }  
+  SourceLoc getStartLoc() const {
+    return getArg()->getStartLoc();
+  }
+  SourceLoc getEndLoc() const {
+    return getFn()->getEndLoc();
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::PostfixUnary;
@@ -3094,9 +3124,9 @@ public:
 
   SourceLoc getLoc() const { return getFn()->getLoc(); }
 
-  SourceRange getSourceRange() const {
-    return getArg()->getSourceRange();
-  }  
+  SourceRange getSourceRange() const { return getArg()->getSourceRange(); }
+  SourceLoc getStartLoc() const { return getArg()->getStartLoc(); }
+  SourceLoc getEndLoc() const { return getArg()->getEndLoc(); }
 
   TupleExpr *getArg() const { return cast<TupleExpr>(ApplyExpr::getArg()); }
 
@@ -3148,9 +3178,6 @@ public:
   SourceLoc getEndLoc() const {
     return isImplicit() ? getBase()->getEndLoc() : getFn()->getEndLoc();
   }
-  SourceRange getSourceRange() const {
-    return SourceRange(getStartLoc(), getEndLoc());
-  }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DotSyntaxCall;
@@ -3168,9 +3195,6 @@ public:
   SourceLoc getLoc() const { return getFn()->getLoc(); }
   SourceLoc getStartLoc() const { return getBase()->getStartLoc(); }
   SourceLoc getEndLoc() const { return getFn()->getEndLoc(); }
-  SourceRange getSourceRange() const {
-    return SourceRange(getStartLoc(), getEndLoc());
-  }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ConstructorRefCall;
@@ -3201,10 +3225,7 @@ public:
   SourceLoc getStartLoc() const {
     return DotLoc.isValid() ? LHS->getStartLoc() : RHS->getStartLoc();
   }
-  
-  SourceRange getSourceRange() const {
-    return SourceRange(getStartLoc(), RHS->getEndLoc());
-  }
+  SourceLoc getEndLoc() const { return RHS->getEndLoc(); }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DotSyntaxBaseIgnored;
@@ -3245,11 +3266,12 @@ public:
   }
 
   SourceRange getSourceRange() const {
-    if (CastTy.getSourceRange().isInvalid())
+    SourceRange castTyRange = CastTy.getSourceRange();
+    if (castTyRange.isInvalid())
       return SubExpr->getSourceRange();
     
     auto startLoc = SubExpr ? SubExpr->getStartLoc() : AsLoc;
-    auto endLoc = CastTy.getSourceRange().End;
+    auto endLoc = castTyRange.End;
     
     return {startLoc, endLoc};
   }
@@ -3410,8 +3432,7 @@ class RebindSelfInConstructorExpr : public Expr {
 public:
   RebindSelfInConstructorExpr(Expr *SubExpr, VarDecl *Self);
   
-  SourceLoc getLoc() const { return SubExpr->getLoc(); }
-  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
+  SWIFT_FORWARD_SOURCE_LOCS_TO(SubExpr)
   
   VarDecl *getSelf() const { return Self; }
   Expr *getSubExpr() const { return SubExpr; }
@@ -3441,10 +3462,11 @@ public:
   {}
   
   SourceLoc getLoc() const { return QuestionLoc; }
-  SourceRange getSourceRange() const {
-    if (isFolded())
-      return {CondExpr->getStartLoc(), ElseExpr->getEndLoc()};
-    return {QuestionLoc, ColonLoc};
+  SourceLoc getStartLoc() const {
+    return (isFolded() ? CondExpr->getStartLoc() : QuestionLoc);
+  }
+  SourceLoc getEndLoc() const {
+    return (isFolded() ? ElseExpr->getEndLoc() : ColonLoc);
   }
   SourceLoc getQuestionLoc() const { return QuestionLoc; }
   SourceLoc getColonLoc() const { return ColonLoc; }
@@ -3489,7 +3511,14 @@ public:
   SourceLoc getEqualLoc() const { return EqualLoc; }
   
   SourceLoc getLoc() const { return EqualLoc; }
-  SourceRange getSourceRange() const;
+  SourceLoc getStartLoc() const {
+    if (!isFolded()) return EqualLoc;
+    return (Dest->isImplicit() ? Src->getStartLoc() : Dest->getStartLoc());
+  }
+  SourceLoc getEndLoc() const {
+    if (!isFolded()) return EqualLoc;
+    return Src->getEndLoc();
+  }
   
   /// True if the node has been processed by binary expression folding.
   bool isFolded() const { return Dest && Src; }
@@ -3538,8 +3567,10 @@ public:
   Pattern *getSubPattern() { return subPattern; }
   void setSubPattern(Pattern *p) { subPattern = p; }
   
-  SourceLoc getLoc() const;
   SourceRange getSourceRange() const;
+  SourceLoc getStartLoc() const;
+  SourceLoc getEndLoc() const;
+  SourceLoc getLoc() const;
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::UnresolvedPattern;
@@ -3581,7 +3612,8 @@ public:
                                                          NumQueries);
   }
 
-  SourceRange getSourceRange() const;
+  SourceLoc getStartLoc() const { return PoundLoc; }
+  SourceLoc getEndLoc() const;
   SourceLoc getLoc() const { return PoundLoc; }
 
   const VersionRange &getAvailableRange() const { return AvailableRange; }
@@ -3603,6 +3635,8 @@ private:
     return const_cast<AvailabilityQueryExpr *>(this)->getQueriesBuf();
   }
 };
+
+#undef SWIFT_FORWARD_SOURCE_LOCS_TO
   
 } // end namespace swift
 

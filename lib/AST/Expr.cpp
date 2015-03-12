@@ -77,6 +77,9 @@ namespace {
     template <class T> static SourceLoc getLoc(const T *E) {
       return E->getLoc();
     }
+    template <class T> static SourceRange getSourceRange(const T *E) {
+      return E->getSourceRange();
+    }
   };
 
   /// Default implementations for when a method isn't overridden.
@@ -90,16 +93,25 @@ namespace {
     template <class T> static SourceLoc getLoc(const T *E) {
       return getStartLocImpl(E);
     }
+    template <class T> static SourceRange getSourceRange(const T *E) {
+      return { E->getStartLoc(), E->getEndLoc() };
+    }
   };
+}
+
+template <class T> static SourceRange getSourceRangeImpl(const T *E) {
+  static_assert(isOverriddenFromExpr(&T::getSourceRange) ||
+                (isOverriddenFromExpr(&T::getStartLoc) &&
+                 isOverriddenFromExpr(&T::getEndLoc)),
+                "Expr subclass must implement either getSourceRange() "
+                "or getStartLoc()/getEndLoc()");
+  return Dispatch<isOverriddenFromExpr(&T::getSourceRange)>::getSourceRange(E);
 }
 
 SourceRange Expr::getSourceRange() const {
   switch (getKind()) {
 #define EXPR(ID, PARENT)                                           \
-  case ExprKind::ID:                                               \
-    static_assert(isOverriddenFromExpr(&ID##Expr::getSourceRange), \
-                  #ID "Expr is missing getSourceRange()");         \
-    return cast<ID##Expr>(this)->getSourceRange();
+  case ExprKind::ID: return getSourceRangeImpl(cast<ID##Expr>(this));
 #include "swift/AST/ExprNodes.def"
   }
   
@@ -524,24 +536,18 @@ SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
   return ::new(Buffer) SequenceExpr(elements);
 }
 
-SourceRange TupleExpr::getSourceRange() const {
-  if (LParenLoc.isValid() && !hasTrailingClosure()) {
-    assert(RParenLoc.isValid() && "Mismatched parens?");
-    return SourceRange(LParenLoc, RParenLoc);
+SourceLoc TupleExpr::getStartLoc() const {
+  if (LParenLoc.isValid()) return LParenLoc;
+  if (getNumElements() == 0) return SourceLoc();
+  return getElement(0)->getStartLoc();
+}
+
+SourceLoc TupleExpr::getEndLoc() const {
+  if (hasTrailingClosure() || RParenLoc.isInvalid()) {
+    if (getNumElements() == 0) return SourceLoc();
+    return getElements().back()->getEndLoc();
   }
-  if (getElements().empty())
-    return SourceRange();
-  
-  SourceLoc Start = LParenLoc.isValid()? LParenLoc
-                                       : getElement(0)->getStartLoc();
-  SourceLoc End = getElements().back()->getEndLoc();
-
-  // Add an escape hatch for implicitly created tuples, usually for arguments
-  // in compiler-generated function calls.
-  if ((Start.isInvalid() || End.isInvalid()) && isImplicit())
-    return SourceRange();
-
-  return SourceRange(Start, End);
+  return RParenLoc;
 }
 
 TupleExpr::TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
@@ -635,14 +641,6 @@ ValueDecl *ApplyExpr::getCalledValue() const {
   return ::getCalledValue(Fn);
 }
 
-SourceRange CallExpr::getSourceRange() const {
-  SourceRange fnRange = getFn()->getSourceRange();
-  SourceRange argRange = getArg()->getSourceRange();
-  if (fnRange.isValid() && argRange.isValid())
-    return SourceRange(fnRange.Start, argRange.End);
-  return fnRange.isValid() ? fnRange : argRange;
-}
-
 RebindSelfInConstructorExpr::RebindSelfInConstructorExpr(Expr *SubExpr,
                                                          VarDecl *Self)
   : Expr(ExprKind::RebindSelfInConstructor, /*Implicit=*/true,
@@ -675,13 +673,21 @@ bool AbstractClosureExpr::hasSingleExpressionBody() const {
   return true;
 }
 
-SourceRange ClosureExpr::getSourceRange() const {
-  return Body.getPointer()->getSourceRange();
-}
+#define FORWARD_SOURCE_LOCS_TO(CLASS, NODE) \
+  SourceRange CLASS::getSourceRange() const {     \
+    return (NODE)->getSourceRange();              \
+  }                                               \
+  SourceLoc CLASS::getStartLoc() const {          \
+    return (NODE)->getStartLoc();                 \
+  }                                               \
+  SourceLoc CLASS::getEndLoc() const {            \
+    return (NODE)->getEndLoc();                   \
+  }                                               \
+  SourceLoc CLASS::getLoc() const {               \
+    return (NODE)->getStartLoc();                 \
+  }
 
-SourceLoc ClosureExpr::getLoc() const {
-  return Body.getPointer()->getStartLoc();
-}
+FORWARD_SOURCE_LOCS_TO(ClosureExpr, Body.getPointer())
 
 Expr *ClosureExpr::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
@@ -694,9 +700,7 @@ void ClosureExpr::setSingleExpressionBody(Expr *NewBody) {
     ->setResult(NewBody);
 }
 
-SourceRange AutoClosureExpr::getSourceRange() const {
-  return Body->getSourceRange();
-}
+FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
 
 void AutoClosureExpr::setBody(Expr *E) {
   auto &Context = getASTContext();
@@ -708,21 +712,7 @@ Expr *AutoClosureExpr::getSingleExpressionBody() const {
   return cast<ReturnStmt>(Body->getElements()[0].get<Stmt *>())->getResult();
 }
 
-SourceRange AssignExpr::getSourceRange() const {
-    if (isFolded()) {
-        auto dstStart = Dest->getStartLoc();
-        if (!dstStart.isValid() && Dest->isImplicit())
-            return Src->getSourceRange();
-        else
-            return SourceRange(Dest->getStartLoc(), Src->getEndLoc());
-    }
-  return EqualLoc;
-}
-
-SourceLoc UnresolvedPatternExpr::getLoc() const { return subPattern->getLoc(); }
-SourceRange UnresolvedPatternExpr::getSourceRange() const {
-  return subPattern->getSourceRange();
-}
+FORWARD_SOURCE_LOCS_TO(UnresolvedPatternExpr, subPattern)
 
 UnresolvedSelectorExpr::UnresolvedSelectorExpr(Expr *subExpr, SourceLoc dotLoc,
                                                DeclName name,
@@ -809,20 +799,6 @@ TypeExpr *TypeExpr::createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C) {
 }
 
 
-SourceRange DynamicTypeExpr::getSourceRange() const {
-  if (MetatypeLoc.isValid())
-    return SourceRange(getBase()->getStartLoc(), MetatypeLoc);
-
-  return getBase()->getSourceRange();
-}
-
-SourceRange UnresolvedMemberExpr::getSourceRange() const { 
-  if (Argument)
-    return SourceRange(DotLoc, Argument->getEndLoc());
-
-  return SourceRange(DotLoc, NameLoc);
-}
-
 ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   auto type = getOpaqueValue()->getType();
   if (auto metaTy = type->getAs<MetatypeType>())
@@ -841,15 +817,14 @@ AvailabilityQueryExpr *AvailabilityQueryExpr::create(
   return ::new (Buffer) AvailabilityQueryExpr(PoundLoc, queries, RParenLoc);
 }
 
-SourceRange AvailabilityQueryExpr::getSourceRange() const {
+SourceLoc AvailabilityQueryExpr::getEndLoc() const {
   if (RParenLoc.isInvalid()) {
     if (NumQueries == 0) {
-      return SourceRange(PoundLoc, PoundLoc);
+      return PoundLoc;
     }
-    return SourceRange(PoundLoc,
-                       getQueries()[NumQueries - 1]->getSourceRange().End);
+    return getQueries()[NumQueries - 1]->getSourceRange().End;
   }
-  return SourceRange(PoundLoc, RParenLoc);
+  return RParenLoc;
 }
 
 void AvailabilityQueryExpr::getPlatformKeywordRanges(
