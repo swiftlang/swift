@@ -188,6 +188,21 @@ public:
   }
 
   bool tryToRemoveCondFail(CondFailInst *CFI) {
+    // Extract the arithmetic operation from the condfail.
+    auto *TEI = dyn_cast<TupleExtractInst>(CFI->getOperand());
+    if (!TEI) return false;
+    auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand());
+    if (!BI) return false;
+
+    for (auto &F : Constraints) {
+      // If we are dominated by a constraint
+      if (DT->dominates(F.DominatingBlock, CFI->getParent())) {
+        if (doesFormulateAbsolveOperation(F, BI)) {
+          return true;
+        }
+      }
+    }
+
     // Was not able to remove this branch.
     return false;
   }
