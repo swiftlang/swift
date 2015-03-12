@@ -222,8 +222,10 @@ func test3(o: AnyObject) {
   let x = o as! MyCls
 }
 
-// CHECK: <kw>func</kw> test4(<kw>inout</kw> a: <type>Int</type>) {}
-func test4(inout a: Int) {}
+// CHECK: <kw>func</kw> test4(<kw>inout</kw> a: <type>Int</type>) {{{$}}
+func test4(inout a: Int) {
+  // CHECK: <kw>if</kw> <#kw>#os</#kw> (<kw>OSX</kw> >= <float>10.10</float>, <kw>iOS</kw> >= <float>8.01</float>) {<kw>let</kw> OSX = <str>"iOS"</str>}}{{$}}
+  if #os (OSX >= 10.10, iOS >= 8.01) {let OSX = "iOS"}}
 
 // CHECK: <kw>class</kw> MySubClass : <type>MyCls</type> {
 class MySubClass : MyCls {

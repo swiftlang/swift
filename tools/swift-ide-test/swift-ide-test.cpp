@@ -688,6 +688,7 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
                             bool RunTypeChecker) {
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
+  Invocation.getLangOptions().EnableExperimentalAvailabilityChecking = true;
 
   CompilerInstance CI;
 

@@ -83,7 +83,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 #define KEYWORD(X) case tok::kw_##X: Kind = SyntaxNodeKind::Keyword; break;
 #include "swift/Parse/Tokens.def"
 #undef KEYWORD
-
+      case tok::pound_os: Kind = SyntaxNodeKind::BuildConfigKeyword; break;
       case tok::identifier: Kind = SyntaxNodeKind::Identifier; break;
       case tok::dollarident: Kind = SyntaxNodeKind::DollarIdent; break;
       case tok::integer_literal: Kind = SyntaxNodeKind::Integer; break;
@@ -368,6 +368,14 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
       }
     }
     pushStructureNode(SN, E);
+  } else if (auto *AQE = dyn_cast<AvailabilityQueryExpr>(E)) {
+    SmallVector<std::pair<SourceLoc, int>, 5> PlatformLocs;
+    AQE->getPlatformKeywordLocs(PlatformLocs);
+    std::for_each(PlatformLocs.begin(), PlatformLocs.end(),
+                  [&](std::pair<SourceLoc, int> &Pair) {
+      passNonTokenNode({SyntaxNodeKind::Keyword,
+                      CharSourceRange(Pair.first, Pair.second)});
+    });
   }
 
   return { true, E };
