@@ -243,7 +243,6 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
 /// \brief Devirtualize an apply of a class method.
 ///
 /// \p AI is the apply to devirtualize.
-/// \p Member is the class member to devirtualize.
 /// \p ClassInstance is the operand for the ClassMethodInst or an alternative
 ///    reference (such as downcasted class reference).
 /// \p DCMI is the devirtualization class_method analysis result to be used for
