@@ -38,7 +38,6 @@
 #include "clang/Basic/Module.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Basic/Version.h"
-#include "clang/CodeGen/LLVMModuleProvider.h"
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/Frontend/Utils.h"
 #include "clang/Serialization/ASTReader.h"
@@ -405,8 +404,7 @@ ClangImporter::create(ASTContext &ctx,
                          sourceBuffer.release());
 
   // Create a compiler instance.
-  importer->Impl.Instance.reset(new CompilerInstance(
-    clang::SharedModuleProvider::Create<clang::LLVMModuleProvider>()));
+  importer->Impl.Instance.reset(new CompilerInstance);
   auto &instance = *importer->Impl.Instance;
   instance.setDiagnostics(&*clangDiags);
   instance.setInvocation(&*invocation);
@@ -605,8 +603,7 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
 
   invocation->getPreprocessorOpts().resetNonModularOptions();
 
-  clang::CompilerInstance rewriteInstance(
-    Impl.Instance->getSharedModuleProvider());
+  clang::CompilerInstance rewriteInstance;
   rewriteInstance.setInvocation(&*invocation);
   rewriteInstance.createDiagnostics(new clang::IgnoringDiagConsumer);
 
