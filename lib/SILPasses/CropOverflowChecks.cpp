@@ -165,7 +165,7 @@ public:
       Constraints.clear();
 
       // Notice: we scan the basic block in reverse.
-      for (auto Inst = BB->end(), End = BB->begin(); Inst != End; Inst--) {
+      for (auto Inst = --BB->end(), End = BB->begin(); Inst != End; --Inst) {
         if (auto *CFI = dyn_cast<CondFailInst>(Inst)) {
           // Try to remove the cond_fail based on previous overflow checks.
           if (tryToRemoveCondFail(CFI)) {
