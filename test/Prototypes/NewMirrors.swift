@@ -1,11 +1,11 @@
 // RUN: %target-run-simple-swift
 
-public typealias StructuralElementDescription = (label: String?, value: Any)
+public typealias StructuralChild = (label: String?, value: Any)
 
 // The thing you have to implement
 public protocol StructuralDescriptionType {
   func count() -> Int
-  func descriptionForOffset(offset: Int) -> StructuralElementDescription
+  func childAtOffset(offset: Int) -> StructuralChild
 }
 
 // The thing with the default schema
@@ -41,7 +41,7 @@ public struct RandomAccessStructure<
 
   public func count() -> Int { return numericCast(Swift.count(elements)) }
   
-  public func descriptionForOffset(offset: Int) -> StructuralElementDescription {
+  public func childAtOffset(offset: Int) -> StructuralChild {
     let v = elements[elements.startIndex.advancedBy(numericCast(offset))]
     return (label: nil, value: v)
   }
@@ -90,7 +90,7 @@ public struct BidirectionalStructure<
     }
   }
   
-  public func descriptionForOffset(offset: Int) -> StructuralElementDescription {
+  public func childAtOffset(offset: Int) -> StructuralChild {
     let v = elements[mapIndex(offset)]
     return (label: nil, value: v)
   }
@@ -141,7 +141,7 @@ public struct ForwardStructure<
     }
   }
   
-  public func descriptionForOffset(offset: Int) -> StructuralElementDescription {
+  public func childAtOffset(offset: Int) -> StructuralChild {
     let v = elements[mapIndex(offset)]
     return (label: nil, value: v)
   }
@@ -163,7 +163,7 @@ extension Mirror {
   }
 }
 
-//===--- StructuralDescriptionType for Aggregates -----------------------------===//
+//===--- StructuralDescriptionType for Aggregates -------------------------===//
 public struct LabeledStructure
   : StructuralDescriptionType, DictionaryLiteralConvertible {
   public init(dictionaryLiteral elements: (String, Any)...) {
@@ -176,7 +176,7 @@ public struct LabeledStructure
 
   public func count() -> Int { return elements.count }
   
-  public func descriptionForOffset(offset: Int) -> StructuralElementDescription {
+  public func childAtOffset(offset: Int) -> StructuralChild {
     return (label: elements[offset].0, value: elements[offset].1)
   }
   
@@ -207,7 +207,7 @@ extension Mirror: Printable {
     return "[" + ", ".join(
       (0..<self.structure.count()).map {
       (offset: Int)->String in
-        let d = self.structure.descriptionForOffset(offset)
+        let d = self.structure.childAtOffset(offset)
         let key = d.0 ?? "nil"
         return "\(key): \(toDebugString(d.1))"
       }
@@ -296,7 +296,7 @@ mirrors.test("BidirectionalStructure") {
   // Use these offsets to reconstruct the sentence from the structural
   // description of y
   let recovered = "".join(
-    letterOffsets.map { String( s.descriptionForOffset($0).1 as! Character )})
+    letterOffsets.map { String( s.childAtOffset($0).1 as! Character )})
 
   expectEqual(sentence, recovered)
 }
