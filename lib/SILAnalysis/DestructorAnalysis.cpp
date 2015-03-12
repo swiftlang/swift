@@ -15,6 +15,9 @@ using namespace swift;
 ///  * is a value type that implements the _DestructorSafeContainer protocol and
 ///    whose type parameters are safe types T1...Tn.
 bool DestructorAnalysis::mayStoreToMemoryOnDestruction(SILType T) {
+  // Pointers to types should be stable but lets not rely on this fact.
+  clearTypeCache();
+
   bool IsSafe = isSafeType(T.getSwiftRValueType());
   DEBUG(llvm::dbgs() << " DestructorAnalysis::mayStoreToMemoryOnDestruction is"
                      << (IsSafe ? " false: " : " true: "));
@@ -26,6 +29,10 @@ bool DestructorAnalysis::mayStoreToMemoryOnDestruction(SILType T) {
 bool DestructorAnalysis::cacheResult(CanType Type, bool Result) {
   Cached[Type] = Result;
   return Result;
+}
+
+void DestructorAnalysis::clearTypeCache() {
+  Cached.clear();
 }
 
 bool DestructorAnalysis::isSafeType(Type Ty) {
