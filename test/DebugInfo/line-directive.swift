@@ -14,9 +14,10 @@ func f() {
 // RUN: %target-swift-frontend -primary-file %s -S -g -o - | FileCheck %s
 // CHECK: .file	[[MAIN:.*]] "{{.*}}line-directive.swift"
 // CHECK: .loc	[[MAIN]] 1
-// CHECK: .file	[[ABC:.*]] "{{.*}}abc.swift"
+// CHECK: .file	[[ABC:.*]] "abc.swift"
 // CHECK: .loc	[[ABC]] 42
 // CHECK: .loc	[[MAIN]] 7
 // CHECK: .loc	[[ABC]] 142
-// CHECK: .file	[[DEF:.*]] "{{.*}}def.swift"
+// CHECK: .file	[[DEF:.*]] "def.swift"
 // CHECK: .loc	[[DEF]] 142
+// CHECK: .asciz "{{.*}}test/DebugInfo"
