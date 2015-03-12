@@ -240,9 +240,7 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
   return true;
 }
 
-/// \brief Devirtualize an Apply instruction and a class member obtained
-/// using the class_method instruction into a direct call to a specific
-/// member of a specific class.
+/// \brief Devirtualize an apply of a class method.
 ///
 /// \p AI is the apply to devirtualize.
 /// \p Member is the class member to devirtualize.
