@@ -1608,6 +1608,10 @@ Reflection.test("COpaquePointer/null") {
   expectEqual("(Opaque Value)", child.1.summary)
 }
 
+Reflection.test("StaticString") {
+	expectEqual("Hello", reflect("Hello" as StaticString).summary)
+}
+
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 
 func computeCountLeadingZeroes(var x: Int64) -> Int64 {
