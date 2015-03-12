@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift | FileCheck %s
 
 // XFAIL: linux
 
@@ -40,7 +40,7 @@ printTypeName(E.self) // CHECK-NEXT: [[THIS]].E
 printTypeName(GC<Model>.self) // CHECK-NEXT: [[THIS]].GC<[[THIS]].Model>
 printTypeName(GS<Model>.self) // CHECK-NEXT: [[THIS]].GS<[[THIS]].Model>
 printTypeName(GE<Model>.self) // CHECK-NEXT: [[THIS]].GE<[[THIS]].Model>
-printTypeName(GC2<Model, Model2>.self) // CHECK-NEXT: [[THIS]].GE<[[THIS]].Model, [[THIS]].Model2>
+printTypeName(GC2<Model, Model2>.self) // CHECK-NEXT: [[THIS]].GC2<[[THIS]].Model, [[THIS]].Model2>
 
 printTypeName(P.self) // CHECK-NEXT: [[THIS]].P
 typealias PP2 = protocol<P, P2>
@@ -79,8 +79,15 @@ typealias IF3 = (inout Int -> ()) -> ()
 typealias IF4 = inout (() -> ()) -> ()
 typealias IF5 = (inout Int, Any) -> ()
 
-printTypeName(IF.self) // CHECK-NEXT: inout Int -> ()
-printTypeName(IF2.self) // CHECK-NEXT: inout Int -> inout Int -> ()
-printTypeName(IF3.self) // CHECK-NEXT: (inout Int -> ()) -> ()
-printTypeName(IF4.self) // CHECK-NEXT: inout (() -> ()) -> ()
-printTypeName(IF5.self) // CHECK-NEXT: (inout Int, Any) -> ()
+printTypeName(IF.self) // CHECK-NEXT: inout Swift.Int -> ()
+printTypeName(IF2.self) // CHECK-NEXT: inout Swift.Int -> inout Swift.Int -> ()
+
+// FIXME: this is wrong.  Should be: "(inout Swift.Int -> ()) -> ()"
+// <rdar://problem/20133773> Demangling of function types that include 'inout' is wrong
+printTypeName(IF3.self) // CHECK-NEXT: inout (Swift.Int -> ()) -> ()
+
+// FIXME: this is wrong.  Should be: "inout (() -> ()) -> ()"
+// <rdar://problem/20133773> Demangling of function types that include 'inout' is wrong
+printTypeName(IF4.self) // CHECK-NEXT: (() -> ()) -> ()
+
+printTypeName(IF5.self) // CHECK-NEXT: (inout Swift.Int, protocol<>) -> ()
