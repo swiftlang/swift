@@ -35,7 +35,8 @@ public struct StaticString
     ExtendedGraphemeClusterLiteralConvertible,
     StringLiteralConvertible,
     Printable,
-    DebugPrintable {
+    DebugPrintable,
+	Reflectable {
 
   /// Either a pointer to the start of UTF-8 data, or an integer representation
   /// of a single Unicode scalar.
@@ -224,5 +225,9 @@ public struct StaticString
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return self.stringValue.debugDescription
+  }
+  
+  public func getMirror() -> MirrorType {
+	  return reflect(self.stringValue)
   }
 }
