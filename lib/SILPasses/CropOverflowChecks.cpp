@@ -178,7 +178,7 @@ public:
           continue;
         }
 
-        // We do not optimzie overflow checks across instructions with side
+        // We do not optimize overflow checks across instructions with side
         // effects because we don't want to delay the trap past user-visible
         // changes.
         if (Inst->mayHaveSideEffects()) {
