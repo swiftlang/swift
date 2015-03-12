@@ -1693,7 +1693,7 @@ Type NominalTypeDecl::computeInterfaceType() const {
 
 }
 
-ExtensionRange NominalTypeDecl::getExtensions() {
+void NominalTypeDecl::prepareExtensions() {
   auto &context = Decl::getASTContext();
 
   // If our list of extensions is out of date, update it now.
@@ -1702,7 +1702,10 @@ ExtensionRange NominalTypeDecl::getExtensions() {
     ExtensionGeneration = context.getCurrentGeneration();
     context.loadExtensions(this, previousGeneration);
   }
+}
 
+ExtensionRange NominalTypeDecl::getExtensions() {
+  prepareExtensions();
   return ExtensionRange(ExtensionIterator(FirstExtension), ExtensionIterator());
 }
 

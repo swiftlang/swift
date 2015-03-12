@@ -2672,6 +2672,9 @@ class NominalTypeDecl : public TypeDecl, public DeclContext,
   unsigned HasFailableInits : 1;
   unsigned SearchedForFailableInits : 1;
 
+  /// Prepare to traverse the list of extensions.
+  void prepareExtensions();
+
   /// \brief A lookup table containing all of the members of this type and
   /// its extensions.
   ///
