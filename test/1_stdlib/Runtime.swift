@@ -586,6 +586,10 @@ Runtime.test("getDemangledTypeName") {
   expectEqual("NSObject", _stdlib_getDemangledTypeName(NSObject()))
   expectEqual("a.SomeStruct", _stdlib_getDemangledTypeName(SomeStruct()))
   expectEqual("a.SomeEnum", _stdlib_getDemangledTypeName(SomeEnum()))
+  expectEqual("protocol<>.Protocol", _stdlib_getDemangledTypeName(Any.self))
+  expectEqual("Swift.AnyObject.Protocol", _stdlib_getDemangledTypeName(AnyObject.self))
+  expectEqual("Swift.AnyObject.Type.Protocol", _stdlib_getDemangledTypeName(AnyClass.self))
+  expectEqual("Swift.Optional<Swift.AnyObject>.Type", _stdlib_getDemangledTypeName((AnyObject?).self))
 
   var a: Any = SomeClass()
   expectEqual("a.SomeClass", _stdlib_getDemangledTypeName(a))
@@ -604,6 +608,19 @@ Runtime.test("getDemangledTypeName") {
 
   a = SomeEnum()
   expectEqual("a.SomeEnum", _stdlib_getDemangledTypeName(a))
+
+  a = AnyObject.self
+  expectEqual("Swift.AnyObject.Protocol", _stdlib_getDemangledTypeName(a))
+
+  a = AnyClass.self
+  expectEqual("Swift.AnyObject.Type.Protocol", _stdlib_getDemangledTypeName(a))
+
+  a = (AnyObject?).self
+  expectEqual("Swift.Optional<Swift.AnyObject>.Type",
+    _stdlib_getDemangledTypeName(a))
+
+  a = Any.self
+  expectEqual("protocol<>.Protocol", _stdlib_getDemangledTypeName(a))
 }
 
 Runtime.test("demangleName") {

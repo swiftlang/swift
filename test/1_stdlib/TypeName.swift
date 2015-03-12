@@ -68,6 +68,9 @@ printTypeName(C.Type.self) // CHECK-NEXT: [[THIS]].C.Type
 printTypeName(C.Type.Type.self) // CHECK-NEXT: [[THIS]].C.Type.Type
 printTypeName(Any.Type.self) // CHECK-NEXT: protocol<>.Type
 printTypeName(Any.Protocol.self) // CHECK-NEXT: protocol<>.Protocol
+printTypeName(AnyObject.self) // CHECK-NEXT: {{^}}Swift.AnyObject{{$}}
+printTypeName(AnyClass.self) // CHECK-NEXT: {{^}}Swift.AnyObject.Type{{$}}
+printTypeName((AnyObject?).self) // CHECK-NEXT: {{^}}Swift.Optional<Swift.AnyObject>{{$}}
 
 printTypeName(Void.self) // CHECK-NEXT: ()
 typealias Tup = (Any, F, C)
