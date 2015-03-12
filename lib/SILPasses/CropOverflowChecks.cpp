@@ -34,6 +34,60 @@ class CropOverflowChecksPass : public SILFunctionTransform {
 public:
   CropOverflowChecksPass() {}
 
+  /// This enum represents a relationship between two operands.
+  /// The relationship represented by arithmetic operators represent the
+  /// information that the operation did not trap.
+  ///
+  /// The following code translate (with the correct signedness prefix):
+  ///
+  /// if (x > 2) { x }           -> LT(2, x)
+  /// if (x > 2) {} else { x }   -> LE(x, 2)
+  /// x - 2                      -> Sub(x, 2)
+  /// 2 - x                      -> Sub(2, x)
+  /// 2 * x                      -> Mul(2, x)
+  /// x + y                      -> Add(x, y)
+  enum class ValueRelation {EQ, ULT, ULE, UAdd, USub, UMul,
+                                SLT, SLE, SAdd, SSub, SMul};
+
+  /// This struct represents a constraint on the range of some values in some
+  /// basic blocks in the program.
+  /// For example, it can represent the constraint "X < 2" for some blocks in
+  /// the function.
+  struct Constraint {
+    Constraint(SILBasicBlock *BB, SILValue L, SILValue R, ValueRelation Rel) :
+      DominatingBlock(BB), Left(L), Right(R), Relationship(Rel) {}
+
+    /// The constraint is valid blocks dominated by this block.
+    SILBasicBlock *DominatingBlock;
+    /// The first operand.
+    SILValue Left;
+    /// The second operand.
+    SILValue Right;
+    /// Describes the relationship between the operands.
+    ValueRelation Relationship;
+
+    /// Print the content of the constraint.
+    void dump() {
+      llvm::dbgs()<<"Constraint [" << DominatingBlock <<"]\n";
+      llvm::dbgs()<<"  Relationship:";
+      switch (Relationship) {
+        case ValueRelation::EQ:   llvm::dbgs()<<"Equal\n"; break;
+        case ValueRelation::SLT:  llvm::dbgs()<<"SLT\n"; break;
+        case ValueRelation::ULT:  llvm::dbgs()<<"ULT\n"; break;
+        case ValueRelation::SLE:  llvm::dbgs()<<"SLE\n"; break;
+        case ValueRelation::ULE:  llvm::dbgs()<<"ULE\n"; break;
+        case ValueRelation::SMul: llvm::dbgs()<<"SMul\n"; break;
+        case ValueRelation::SSub: llvm::dbgs()<<"SSub\n"; break;
+        case ValueRelation::SAdd: llvm::dbgs()<<"SAdd\n"; break;
+        case ValueRelation::UMul: llvm::dbgs()<<"UMul\n"; break;
+        case ValueRelation::USub: llvm::dbgs()<<"USub\n"; break;
+        case ValueRelation::UAdd: llvm::dbgs()<<"UAdd\n"; break;
+      }
+      llvm::dbgs()<<"  Left:"; Left->dump();
+      llvm::dbgs()<<"  Right:"; Right->dump();
+    }
+  };
+
   void run() override {
   }
 
