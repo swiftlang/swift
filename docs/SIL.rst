@@ -3095,8 +3095,8 @@ container may use one of several representations:
   the protocol conformances. Metatype existential containers are trivial types.
   The following instructions manipulate metatype existential containers:
 
-  * init_existential_metatype (TBW)
-  * open_existential_metatype (TBW)
+  * `init_existential_metatype`_
+  * `open_existential_metatype`_
 
 - **Boxed existential containers**: The standard library ``ErrorType`` protocol
   uses a size-optimized reference-counted container, which indirectly stores
@@ -3135,8 +3135,9 @@ init_existential_addr
   %1 = init_existential_addr %0 : $*P, $T
   // %0 must be of a $*P address type for non-class protocol or protocol
   //   composition type P
-  // $T must be a type that fulfills protocol(s) P
-  // %1 will be of type $*T
+  // $T must be an AST type that fulfills protocol(s) P
+  // %1 will be of type $*T', where T' is the maximally abstract lowering
+  //    of type T
 
 Partially initializes the memory referenced by ``%0`` with an existential
 container prepared to contain a value of type ``$T``. The result of the
@@ -3188,10 +3189,12 @@ init_existential_ref
 ````````````````````
 ::
 
-  sil-instruction ::= 'init_existential_ref' sil-operand ',' sil-type
+  sil-instruction ::= 'init_existential_ref' sil-operand ':' sil-type ','
+                                             sil-type
 
-  %1 = init_existential_ref %0 : $C, $P
-  // %0 must be of class type $C conforming to protocol(s) $P
+  %1 = init_existential_ref %0 : $C' : $C, $P
+  // %0 must be of class type $C', lowered from AST type $C, conforming to
+  //    protocol(s) $P
   // $P must be a class protocol or protocol composition type
   // %1 will be of type $P
 
@@ -3205,10 +3208,10 @@ open_existential_ref
   sil-instruction ::= 'open_existential_ref' sil-operand 'to' sil-type
 
   %1 = open_existential_ref %0 : $P to $@opened P
-  // %0 must be of a $P type for a class protocol, class protocol composition, or a metatype of a protocol or protocol composition
+  // %0 must be of a $P type for a class protocol or protocol composition
   // $@opened P must be a unique archetype that refers to an opened 
-  // existential type P. 
-  // %1 will be of type $P
+  //   existential type P
+  // %1 will be of type $@opened P
 
 Extracts the class instance reference from a class existential
 container. The protocol conformances associated with this existential
@@ -3216,6 +3219,38 @@ container are associated directly with the archetype ``@opened P``. This
 pointer can be used with any operation on archetypes, such as 
 ``witness_method``. When the operand is of metatype type, the result
 will be the metatype of the opened archetype.
+
+init_existential_metatype
+`````````````````````````
+::
+
+  sil-instruction ::= 'init_existential_metatype' sil-operand ',' sil-type
+
+  %1 = init_existential_metatype $0 : $@<rep> T.Type, $@<rep> P.Type
+  // %0 must be of a metatype type $@<rep> T.Type where T: P
+  // %@<rep> P.Type must be the existential metatype of a protocol or protocol
+  //    composition, with the same metatype representation <rep>
+  // %1 will be of type $@<rep> P.Type
+
+Creates a metatype existential container of type ``$P.Type`` containing the
+conforming metatype of ``$T``.
+
+open_existential_metatype
+`````````````````````````
+::
+
+  sil-instruction ::= 'open_existential_metatype' sil-operand 'to' sil-type
+
+  %1 = open_existential_metatype %0 : $@<rep> P.Type to $@<rep> (@opened P).Type
+  // %0 must be of a $P.Type existential metatype for a protocol or protocol
+  //    composition
+  // $@<rep> (@opened P).Type must be the metatype of a unique archetype that
+  //   refers to an opened existential type P, with the same metatype
+  //   representation <rep>
+  // %1 will be of type $@<rep> (@opened P).Type
+
+Extracts the metatype from an existential metatype. The protocol conformances associated with this existential
+container are associated directly with the archetype ``@opened P``.
 
 Blocks
 ~~~~~~
