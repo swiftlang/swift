@@ -3252,6 +3252,59 @@ open_existential_metatype
 Extracts the metatype from an existential metatype. The protocol conformances associated with this existential
 container are associated directly with the archetype ``@opened P``.
 
+alloc_existential_box
+`````````````````````
+::
+
+  sil-instruction ::= 'alloc_existential_box' sil-type ',' sil-type
+
+  %1 = alloc_existential_box $P, $T
+  // $P must be a protocol or protocol composition type with boxed
+  //   representation
+  // $T must be an AST type that conforms to P
+  // %1#0 will be of type $P
+  // %1#1 will be of type $*T', where T' is the most abstracted lowering of T
+
+Allocates a boxed existential container of type ``$P`` with space to hold a
+value of type ``$T'``. The box is not fully initialized until a valid value
+has been stored into the box. If the box must be deallocated before it is
+fully initialized, ``dealloc_existential_box`` must be used. A fully
+initialized box can be ``retain``-ed and ``release``-d like any
+reference-counted type.  The address ``%0#1`` is dependent on the lifetime of
+the owner reference ``%0#0``.
+
+open_existential_box
+````````````````````
+::
+
+  sil-instruction ::= 'open_existential_box' sil-operand 'to' sil-type
+
+  %1 = open_existential_box %0 : $P to $*@opened P
+  // %0 must be a value of boxed protocol or protocol composition type $P
+  // %@opened P must be the address type of a unique archetype that refers to
+  ///   an opened existential type P
+  // %1 will be of type $*@opened P
+
+Projects the address of the value inside a boxed existential container, and
+uses the enclosed type and protocol conformance metadata to bind the
+opened archetype ``$@opened P``. The result address is dependent on both
+the owning box and the enclosing function; in order to "open" a boxed
+existential that has directly adopted a class reference, temporary scratch 
+space may need to have been allocated.
+
+dealloc_existential_box
+```````````````````````
+::
+
+  sil-instruction ::= 'dealloc_existential_box' sil-operand
+
+  dealloc_existential_box %0 : $P
+  // %0 must be an uninitialized box of boxed existential container type $P
+
+Deallocates a boxed existential container. The value inside the existential
+buffer is not destroyed; either the box must be uninitialized, or the value
+must have been projected out and destroyed beforehand.
+
 Blocks
 ~~~~~~
 
