@@ -1348,9 +1348,9 @@ IRGenDebugInfo::createEnumType(DebugTypeInfo DbgTy, EnumDecl *Decl,
   DITypeCache[DbgTy.getType()] = TH;
 
   auto DITy = DBuilder.createUnionType(
-      Scope, MangledName, File, Line, SizeInBits, AlignInBits, Flags,
+      Scope, Decl->getName().str(), File, Line, SizeInBits, AlignInBits, Flags,
       getEnumElements(DbgTy, Decl, Scope, File, Flags),
-      llvm::dwarf::DW_LANG_Swift);
+      llvm::dwarf::DW_LANG_Swift, MangledName);
 
   FwdDecl->replaceAllUsesWith(DITy);
   llvm::MDNode::deleteTemporary(FwdDecl);

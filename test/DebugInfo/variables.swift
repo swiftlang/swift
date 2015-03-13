@@ -102,8 +102,8 @@ enum TriValue {
   case true_
   case top
 }
-// CHECK-DAG: !MDGlobalVariable(name: "unknown",{{.*}} type: ![[UNIONTYPE:[^,)]+]]
-// CHECK-DAG: ![[UNIONTYPE]] = !MDCompositeType(tag: DW_TAG_union_type, name: "_TtO{{9variables|4main}}8TriValue"
+// CHECK-DAG: !MDGlobalVariable(name: "unknown",{{.*}} type: !"_TtO{{9variables|4main}}8TriValue"
+// CHECK-DAG: !MDCompositeType(tag: DW_TAG_union_type, name: "TriValue", {{.*}}identifier: "_TtO{{9variables|4main}}8TriValue"
 var unknown = TriValue.top
 func println(value: TriValue) {
      switch value {
