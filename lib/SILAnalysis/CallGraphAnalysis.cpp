@@ -220,6 +220,37 @@ void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
   ++NumAppliesWithoutEdges;
 }
 
+void CallGraph::removeEdgesForApply(ApplyInst *AI) {
+  auto *CallerNode = getCallGraphNode(AI->getFunction());
+
+  assert(ApplyToEdgeMap.count(AI) && "Expected apply to be in edge map!");
+  auto *Edge = ApplyToEdgeMap[AI];
+
+  auto &CalleeSet = Edge->getPartialCalleeSet();
+  for (auto *CalleeNode : CalleeSet)
+    CalleeNode->removeCallerEdge(Edge);
+
+  CallerNode->removeCalleeEdge(Edge);
+
+  // Call the destructor for the edge. The memory will be reclaimed
+  // when the call graph is deleted by virtue of the bump pointer
+  // allocator.
+  Edge->~CallGraphEdge();
+
+  ApplyToEdgeMap.erase(AI);
+}
+
+void CallGraph::markCallerEdgesOfCalleesIncomplete(ApplyInst *AI) {
+  auto *Edge = getCallGraphEdge(AI);
+
+  // We are not guaranteed to have an edge for every apply.
+  if (!Edge)
+    return;
+
+  for (auto *Node : Edge->getPartialCalleeSet())
+    Node->markCallerEdgesIncomplete();
+}
+
 void CallGraph::addEdges(SILFunction *F) {
   auto *CallerNode = getCallGraphNode(F);
   assert(CallerNode && "Expected call graph node for function!");

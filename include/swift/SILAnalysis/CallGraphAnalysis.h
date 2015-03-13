@@ -202,9 +202,21 @@ private:
     CalleeEdges.insert(CallSite);
   }
 
+  /// Remove an edge representing a call site within this function.
+  void removeCalleeEdge(CallGraphEdge *CallSite) {
+    assert(CalleeEdges.count(CallSite) && "Expected edge to be in set!");
+    CalleeEdges.erase(CallSite);
+  }
+
   /// Add an edge representing a call site that calls into this function.
   void addCallerEdge(CallGraphEdge *CallerCallSite) {
     CallerEdges.insert(CallerCallSite);
+  }
+
+  /// Remove an edge representing a call site that calls into this function.
+  void removeCallerEdge(CallGraphEdge *CallerCallSite) {
+    assert(CallerEdges.count(CallerCallSite) && "Expected edge to be in set!");
+    CallerEdges.erase(CallerCallSite);
   }
 };
 
@@ -298,6 +310,16 @@ public:
 
     return BottomUpFunctionOrder;
   }
+
+  // Functions for editing an existing call graph.
+
+  void addEdgesForApply(ApplyInst *AI) {
+    addEdgesForApply(AI, getCallGraphNode(AI->getFunction()));
+  }
+
+  void removeEdgesForApply(ApplyInst *AI);
+
+  void markCallerEdgesOfCalleesIncomplete(ApplyInst *AI);
 
   void verify() const;
 
