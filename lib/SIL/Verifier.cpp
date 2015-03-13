@@ -1713,8 +1713,6 @@ public:
 
   void verifyCheckedCast(bool isExact, SILType fromTy, SILType toTy) {
     // Verify common invariants.
-    require(fromTy != toTy || isExact,
-            "can't checked cast to same type");
     require(fromTy.isObject() && toTy.isObject(),
             "value checked cast src and dest must be objects");
 
