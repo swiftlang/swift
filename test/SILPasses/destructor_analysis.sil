@@ -4,11 +4,22 @@ sil_stage canonical
 
 import Builtin
 import Swift
-import SwiftShims
+
+struct ArrayBufferOf {
+  var Ts: Builtin.NativeObject
+}
+
+struct ArrayOf<T> : _DestructorSafeContainer {
+  var Buffer :  ArrayBufferOf
+}
 
 struct Foo {
-  @sil_stored var subFoos: [Foo]
+  @sil_stored var subFoos: ArrayOf<Foo>
   init()
+}
+
+struct MyInt {
+  var v : Builtin.Int32
 }
 
 // We used to crash on this example in DestructorAnalysis because the type 'Foo'
@@ -16,25 +27,19 @@ struct Foo {
 
 // CHECK-LABEL: sil @handle_recursive_types
 
-sil @handle_recursive_types : $@cc(cdecl) @thin (Int32, UnsafeMutablePointer<UnsafeMutablePointer<Int8>>) -> Int32 {
-bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>):
-  %17 = metatype $@thin Array<Foo>.Type           // user: %19
-  // function_ref generic specialization <testcase.Foo> of Swift.Array.init <A>(Swift.Array<A>.Type)() -> Swift.Array<A>
-  %18 = function_ref @array_init : $@thin (@thin Array<Foo>.Type) -> @owned Array<Foo> // user: %19
-  %19 = apply %18(%17) : $@thin (@thin Array<Foo>.Type) -> @owned Array<Foo> // users: %20, %22, %27
-  %20 = struct $Foo (%19 : $Array<Foo>)           // user: %21
-  %22 = struct_extract %19 : $Array<Foo>, #Array._buffer // user: %23
-  %23 = struct_extract %22 : $_ArrayBuffer<Foo>, #_ArrayBuffer._storage // user: %24
-  %24 = struct_extract %23 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCoreType>, #_BridgeStorage.rawValue // user: %26
-  // function_ref generic specialization <testcase.Foo> of Swift.Array._getCount <A>(Swift.Array<A>)() -> Swift.Int
-  %25 = function_ref @array_get_count : $@cc(method) @thin (@owned Array<Foo>) -> Int // user: %27
-  strong_retain %24 : $Builtin.BridgeObject       // id: %26
-  %27 = apply %25(%19) : $@cc(method) @thin (@owned Array<Foo>) -> Int
-  %28 = integer_literal $Builtin.Int32, 0         // user: %29
-  %29 = struct $Int32 (%28 : $Builtin.Int32)      // user: %30
-  return %29 : $Int32                             // id: %30
+sil @handle_recursive_types : $@cc(cdecl) @thin () -> () {
+bb0:
+  %17 = metatype $@thin ArrayOf<Foo>.Type
+  %18 = function_ref @array_init : $@thin (@thin ArrayOf<Foo>.Type) -> @owned ArrayOf<Foo>
+  %19 = apply %18(%17) : $@thin (@thin ArrayOf<Foo>.Type) -> @owned ArrayOf<Foo>
+  %25 = function_ref @array_get_count : $@cc(method) @thin (@owned ArrayOf<Foo>) -> MyInt
+  retain_value %19 : $ArrayOf<Foo>
+  %27 = apply %25(%19) : $@cc(method) @thin (@owned ArrayOf<Foo>) -> MyInt
+  %28 = tuple ()
+  release_value %19 : $ArrayOf<Foo>
+  return %28 : $()
 }
 
-sil [fragile] [semantics "array.init"] @array_init : $@thin (@thin Array<Foo>.Type) -> @owned Array<Foo>
+sil [fragile] [semantics "array.init"] @array_init : $@thin (@thin ArrayOf<Foo>.Type) -> @owned ArrayOf<Foo>
 
-sil [fragile] [semantics "array.get_count"] @array_get_count : $@cc(method) @thin (@owned Array<Foo>) -> Int
+sil [fragile] [semantics "array.get_count"] @array_get_count : $@cc(method) @thin (@owned ArrayOf<Foo>) -> MyInt
