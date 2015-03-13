@@ -1090,7 +1090,7 @@ public:
   }
   void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *AEI) {
     OS << "init_existential_metatype " << getIDAndType(AEI->getOperand())
-       << " : " << AEI->getType();
+       << ", " << AEI->getType();
   }
   void visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *DEI) {
     OS << "deinit_existential_addr " << getIDAndType(DEI->getOperand());

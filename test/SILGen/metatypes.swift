@@ -80,7 +80,7 @@ func generic_metatypes<T>(x: T)
 // CHECK-LABEL: sil hidden @_TF9metatypes30existential_metatype_from_thinFT_PMPS_3Any_ : $@thin () -> @thick Any.Type
 // CHECK:      [[T0:%.*]] = metatype $@thin SomeStruct.Type
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick SomeStruct.Type
-// CHECK-NEXT: [[T2:%.*]] = init_existential_metatype [[T1]] : $@thick SomeStruct.Type : $@thick Any.Type
+// CHECK-NEXT: [[T2:%.*]] = init_existential_metatype [[T1]] : $@thick SomeStruct.Type, $@thick Any.Type
 // CHECK-NEXT: return [[T2]] : $@thick Any.Type
 func existential_metatype_from_thin() -> Any.Type {
   return SomeStruct.self
@@ -93,7 +93,7 @@ func existential_metatype_from_thin() -> Any.Type {
 // CHECK-NEXT: debug_value [[T2]] : $SomeStruct  // let s
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thin SomeStruct.Type
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick SomeStruct.Type
-// CHECK-NEXT: [[T2:%.*]] = init_existential_metatype [[T1]] : $@thick SomeStruct.Type : $@thick Any.Type
+// CHECK-NEXT: [[T2:%.*]] = init_existential_metatype [[T1]] : $@thick SomeStruct.Type, $@thick Any.Type
 // CHECK-NEXT: return [[T2]] : $@thick Any.Type
 func existential_metatype_from_thin_value() -> Any.Type {
   let s = SomeStruct()

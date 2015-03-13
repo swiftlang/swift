@@ -3072,8 +3072,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ArrayRef<ProtocolConformance *> conformances
       = collectExistentialConformances(P, Ty, Val.getType().getSwiftRValueType());
     
-    // FIXME: Conformances in InitExistentialAddrInst is currently not included in
-    // SIL.rst.
     ResultVal = B.createInitExistentialAddr(InstLoc, Val, Ty, LoweredTy,
                                         conformances);
     break;
@@ -3103,7 +3101,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::InitExistentialMetatypeInst: {
     SILType ExistentialTy;
     if (parseTypedValueRef(Val) ||
-        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseSILType(ExistentialTy))
       return true;
     
