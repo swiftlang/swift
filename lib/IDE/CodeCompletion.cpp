@@ -2040,7 +2040,7 @@ public:
 #undef DECL
       }
     }
-    StringRef Description = (TargetName + llvm::Twine(" Attribute")).str();
+    std::string Description = TargetName.str() + " Attribute";
 #define DECL_ATTR(KEYWORD, NAME, ...)                                         \
     if (!DeclAttribute::isUserInaccessible(DAK_##NAME) &&                     \
         !DeclAttribute::isDeclModifier(DAK_##NAME) &&                         \
