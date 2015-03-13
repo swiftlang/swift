@@ -837,7 +837,12 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     SILInliner Inliner(*Caller, *Callee,
                        SILInliner::InlineKind::PerformanceInline,
                        ContextSubs, AI->getSubstitutions());
-    Inliner.inlineFunction(AI, Args);
+    auto Success = Inliner.inlineFunction(AI, Args);
+    (void) Success;
+    // We've already determined we should be able to inline this, so
+    // we expect it to have happened.
+    assert(Success && "Expected inliner to inline this function!");
+    AI->eraseFromParent();
     DA->invalidate(Caller, SILAnalysis::InvalidationKind::CFG);
     LA->invalidate(Caller, SILAnalysis::InvalidationKind::CFG);
     NumFunctionsInlined++;

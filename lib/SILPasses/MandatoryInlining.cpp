@@ -411,6 +411,9 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
         continue;
       }
 
+      // Inlining was successful. Remove the apply.
+      InnerAI->eraseFromParent();
+
       // Reestablish our iterator if it wrapped.
       if (I == ApplyBlock->end())
         I = ApplyBlock->begin();

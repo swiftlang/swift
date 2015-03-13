@@ -23,6 +23,9 @@ using namespace swift;
 /// constructor of SILInliner. It only performs one step of inlining: it does
 /// not recursively inline functions called by the callee.
 ///
+/// It is the responsibility of the caller of this function to delete
+/// the given ApplyInst when inlining is successful.
+///
 /// \returns true on success or false if it is unable to inline the function
 /// (for any reason).
 bool SILInliner::inlineFunction(ApplyInst *AI, ArrayRef<SILValue> Args) {
@@ -106,8 +109,6 @@ bool SILInliner::inlineFunction(ApplyInst *AI, ArrayRef<SILValue> Args) {
     // Replace all uses of the apply instruction with the operands of the
     // return instruction, appropriately mapped.
     SILValue(AI).replaceAllUsesWith(remapValue(RI->getOperand()));
-    // And get rid of the no-longer-needed ApplyInst.
-    AI->eraseFromParent();
     return true;
   }
 
@@ -128,8 +129,6 @@ bool SILInliner::inlineFunction(ApplyInst *AI, ArrayRef<SILValue> Args) {
                                                     AI->getType(0));
   // Replace all uses of the ApplyInst with the new argument.
   SILValue(AI).replaceAllUsesWith(RetArg);
-  // And get rid of the no-longer-needed ApplyInst.
-  AI->eraseFromParent();
 
   // Now iterate over the callee BBs and fix up the terminators.
   getBuilder().setInsertionPoint(CallerBB);
