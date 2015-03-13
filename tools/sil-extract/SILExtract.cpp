@@ -161,9 +161,13 @@ int main(int argc, char **argv) {
   // If it looks like we have an AST, set the source file kind to SIL and the
   // name of the module to the file's name.
   Invocation.addInputBuffer(FileBufOrErr.get().get());
-  bool IsModule = false;
-  if (serialization::isSerializedAST(FileBufOrErr.get()->getBuffer())) {
-    IsModule = true;
+
+  serialization::ExtendedValidationInfo extendedInfo;
+  auto result = serialization::validateSerializedAST(
+      FileBufOrErr.get()->getBuffer(), &extendedInfo);
+  bool HasSerializedAST = result.status == serialization::Status::Valid;
+
+  if (HasSerializedAST) {
     const StringRef Stem = ModuleName.size() ?
                              StringRef(ModuleName) :
                              llvm::sys::path::stem(InputFilename);
@@ -188,14 +192,18 @@ int main(int argc, char **argv) {
 
   // Load the SIL if we have a module. We have to do this after SILParse
   // creating the unfortunate double if statement.
-  if (IsModule) {
+  if (HasSerializedAST) {
     assert(!CI.hasSILModule() &&
            "performSema() should not create a SILModule.");
     CI.setSILModule(SILModule::createEmptyModule(CI.getMainModule(),
                                                  CI.getSILOptions()));
     std::unique_ptr<SerializedSILLoader> SL = SerializedSILLoader::create(
         CI.getASTContext(), CI.getSILModule(), nullptr);
-    SL->getAll();
+
+    if (extendedInfo.isSIB())
+      SL->getAllForModule(CI.getMainModule()->getName());
+    else
+      SL->getAll();
   }
 
   if (!FunctionName.empty())
