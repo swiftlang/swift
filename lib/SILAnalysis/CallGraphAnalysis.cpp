@@ -169,6 +169,17 @@ bool CallGraph::tryGetCalleeSet(SILValue Callee,
   }
 }
 
+static void orderCallees(const CallGraphEdge::CalleeSetType &Callees,
+                         llvm::SmallVectorImpl<CallGraphNode *> &OrderedNodes) {
+  for (auto *Node : Callees)
+    OrderedNodes.push_back(Node);
+
+  std::sort(OrderedNodes.begin(), OrderedNodes.end(),
+            [](CallGraphNode *left, CallGraphNode *right) {
+              return left->getOrdinal() < right->getOrdinal();
+            });
+}
+
 void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
   CallGraphEdge::CalleeSetType CalleeSet;
   bool Complete = false;
@@ -179,7 +190,11 @@ void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
            "Added apply that already has an edge node!\n");
     ApplyToEdgeMap[AI] = Edge;
     CallerNode->addCalleeEdge(Edge);
-    for (auto *CalleeNode : CalleeSet)
+
+    llvm::SmallVector<CallGraphNode *, 4> OrderedNodes;
+    orderCallees(CalleeSet, OrderedNodes);
+
+    for (auto *CalleeNode : OrderedNodes)
       CalleeNode->addCallerEdge(Edge);
 
     // TODO: Compute this from the call graph itself after stripping
@@ -219,17 +234,6 @@ void CallGraph::addEdges(SILFunction *F) {
       }
     }
   }
-}
-
-static void orderCallees(const CallGraphEdge::CalleeSetType &Callees,
-                         llvm::SmallVectorImpl<CallGraphNode *> &OrderedNodes) {
-  for (auto *Node : Callees)
-    OrderedNodes.push_back(Node);
-
-  std::sort(OrderedNodes.begin(), OrderedNodes.end(),
-            [](CallGraphNode *left, CallGraphNode *right) {
-              return left->getOrdinal() < right->getOrdinal();
-            });
 }
 
 /// Finds SCCs in the call graph. Our call graph has an unconventional
