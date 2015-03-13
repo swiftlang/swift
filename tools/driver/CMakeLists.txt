@@ -4,17 +4,15 @@ add_swift_executable(swift
   frontend_main.cpp
   update_main.cpp
   LINK_LIBRARIES
+    swiftIDE
     swiftDriver swiftIRGen swiftSIL swiftSILGen swiftSILPasses
     swiftImmediate
     swiftSerialization
     swiftPrintAsObjC
     swiftFrontend
     swiftClangImporter
-    swiftIDE
     swiftOption
-  COMPONENT_DEPENDS
-    bitreader bitwriter codegen irreader ipo linker mcjit asmparser selectiondag
-    objcarcopts option support ${LLVM_TARGETS_TO_BUILD})
+)
 
 target_link_libraries(swift edit)
 

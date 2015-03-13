@@ -45,8 +45,8 @@ add_swift_library(swiftAST
     clangToolingCore
     clangFrontendTool
     clangFrontend
-    clangCodeGen
     clangDriver
+    clangCodeGen
     clangSerialization
     clangParse
     clangSema
@@ -60,6 +60,7 @@ add_swift_library(swiftAST
     clangBasic
 
   COMPONENT_DEPENDS
+    bitreader bitwriter irreader
     profiledata instrumentation object objcarcopts mc mcparser
     bitreader bitwriter ipo option core support ${LLVM_TARGETS_TO_BUILD}
   )

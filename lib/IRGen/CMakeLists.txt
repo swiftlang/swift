@@ -37,4 +37,5 @@ add_swift_library(swiftIRGen
     # Clang dependencies.
     # FIXME: Clang should really export these in some reasonable manner.
     clangCodeGen
-  COMPONENT_DEPENDS profiledata instrumentation)
+    clangAST
+)

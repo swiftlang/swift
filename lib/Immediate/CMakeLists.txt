@@ -2,6 +2,11 @@ add_swift_library(swiftImmediate
   Helpers.cpp
   Immediate.cpp
   LINK_LIBRARIES
-    swiftFrontend swiftParse swiftIDE swiftSILGen
-    swiftSILPasses swiftIRGen)
+    swiftIDE
+    swiftFrontend
+    swiftSILGen
+    swiftSILPasses
+    swiftIRGen
+  COMPONENT_DEPENDS
+    linker mcjit)
 

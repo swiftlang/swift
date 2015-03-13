@@ -5,8 +5,7 @@ add_swift_executable(sil-opt
     swiftIRGen
     swiftSILGen
     swiftSILPasses
-  COMPONENT_DEPENDS
-    option bitreader bitwriter ipo objcarcopts support ${LLVM_TARGETS_TO_BUILD})
+)
 
 swift_install_in_component(tools
     TARGETS sil-opt
