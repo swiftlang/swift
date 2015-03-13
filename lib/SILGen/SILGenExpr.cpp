@@ -6904,6 +6904,24 @@ RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {
 
 // Evaluate the expression as an lvalue or rvalue, discarding the result.
 void SILGenFunction::emitIgnoredExpr(Expr *E) {
+  // If this is a tuple expression, recursively ignore its elements.
+  // This may let us recursively avoid work.
+  if (auto *TE = dyn_cast<TupleExpr>(E)) {
+    for (auto *elt : TE->getElements())
+      emitIgnoredExpr(elt);
+    return;
+  }
+  
+  // Look through tuple conversions.
+  // TODO: Could look through arbitrary implicit conversions that don't have
+  // side effects.
+  if (auto *CE = dyn_cast<ScalarToTupleExpr>(E)) {
+    emitIgnoredExpr(CE->getSubExpr());
+  }
+  if (auto *CE = dyn_cast<TupleShuffleExpr>(E)) {
+    emitIgnoredExpr(CE->getSubExpr());
+  }
+    
   FullExpr scope(Cleanups, CleanupLocation(E));
   if (!E->getType()->isMaterializable()) {
     // Emit the l-value, but don't perform an access.

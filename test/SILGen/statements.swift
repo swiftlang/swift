@@ -339,3 +339,7 @@ func test_if_break(a : Bool) {
   // CHECK:   return
 }
 
+// rdar://problem/18643692
+func for_loop_multi_iter() {
+  for (var i = 0, x = 0; i < 10; i++, x) { }
+}
