@@ -442,15 +442,3 @@ SILValue swift::ArraySemanticsCall::getArrayPropertyNeedsTypeCheck() {
 
   return SemanticsCall->getArgument(ArgIdx);
 }
-
-bool swift::ArraySemanticsCall::isMayRelease() {
-  auto Kind = getKind();
-  if (Kind == ArrayCallKind::kNone)
-    return true;
-
-  if (Kind <= ArrayCallKind::kGetElementAddress)
-    return getSelfParameterConvention(SemanticsCall) !=
-           ParameterConvention::Direct_Guaranteed;
-
-  return true;
-}
