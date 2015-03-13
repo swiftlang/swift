@@ -4155,7 +4155,7 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(Expr *expr) {
   auto newClosure = new (tc.Context)
                       ClosureExpr(closureExpr->getParams(),
                                   SourceLoc(),
-                                  SourceLoc(),
+                                  closureExpr->getInLoc(),
                                   TypeLoc(),
                                   closureExpr->getDiscriminator(),
                                   cs.DC);
@@ -4163,7 +4163,9 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(Expr *expr) {
   newClosure->setImplicit();
   newClosure->setIsVoidConversionClosure();
   newClosure->setBody(braceStmt, false);
-  
+  if (closureExpr->hasAnonymousClosureVars())
+    newClosure->setHasAnonymousClosureVars();
+
   auto fnType = closureExpr->getType()->getAs<FunctionType>();
   Type inputType = fnType->getInput();
   Type resultType = voidExpr->getType();

@@ -35,5 +35,7 @@ class X {
 }
 
 func captureLists(x: X) {
-  { [unowned x] in x.foo() }()
+  { [unowned x] in x.foo() }();
+  let _: Void = { [unowned x] in x.foo() }()
+  let _: Void = { [weak x] in x?.foo() }()
 }
