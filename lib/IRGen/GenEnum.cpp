@@ -1608,17 +1608,27 @@ namespace {
       // If there are no extra tag bits, or they're set to zero, then we either
       // have a payload, or an empty case represented using an extra inhabitant.
       // Check the extra inhabitant cases if we have any.
-      unsigned payloadBits
-        = getFixedPayloadTypeInfo().getFixedSize().getValueInBits();
+      auto &fpTypeInfo = getFixedPayloadTypeInfo();
+      unsigned payloadBits = fpTypeInfo.getFixedSize().getValueInBits();
       if (extraInhabitantCount > 0) {
         assert(payload && "extra inhabitants with empty payload?!");
-        auto *switchValue =
-          getFixedPayloadTypeInfo().maskFixedExtraInhabitant(IGF, payload);
-        auto *swi = IGF.Builder.CreateSwitch(switchValue, payloadDest);
-        for (unsigned i = 0; i < extraInhabitantCount && elti != eltEnd; ++i) {
-          auto v = getFixedPayloadTypeInfo().getFixedExtraInhabitantValue(
-                                                       IGF.IGM, payloadBits, i);
-          swi->addCase(v, blockForCase(nextCase()));
+        auto *switchValue = fpTypeInfo.maskFixedExtraInhabitant(IGF, payload);
+        
+        // If there is exactly one case, emit a compare and branch, otherwise
+        // emit a switch on the table of values.
+        if (extraInhabitantCount == 1 && elti != eltEnd) {
+          auto cst =
+            fpTypeInfo.getFixedExtraInhabitantValue(IGF.IGM, payloadBits, 0);
+          auto isExtra = IGF.Builder.CreateICmpEQ(switchValue, cst);
+          IGF.Builder.CreateCondBr(isExtra, blockForCase(nextCase()),
+                                   payloadDest);
+        } else {
+          auto *swi = IGF.Builder.CreateSwitch(switchValue, payloadDest);
+          for (auto i = 0U; i < extraInhabitantCount && elti != eltEnd; ++i) {
+            auto v =
+              fpTypeInfo.getFixedExtraInhabitantValue(IGF.IGM, payloadBits, i);
+            swi->addCase(v, blockForCase(nextCase()));
+          }
         }
       }
 

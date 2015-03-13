@@ -30,8 +30,7 @@ bb0(%0 : $Optional<() -> ()>):
   
   // CHECK: [[T0:%.*]] = trunc i128 [[FN]] to i64
   // CHECK: [[T1:%.*]] = zext i64 [[T0]] to i128
-  // CHECK: switch i128 [[T1]],
-  // CHECK:   i128 0, label
+  // CHECK: icmp eq i128 [[T1]], 0
   switch_enum %0 : $Optional<() -> ()>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: bb2
 
   // CHECK: [[T0:%.*]] = trunc i128 [[FN]] to i64

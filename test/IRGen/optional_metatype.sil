@@ -9,17 +9,13 @@ import Swift
 import gizmo
 
 // x86_64-LABEL: define void @optional_objc_metatype(i64)
-// x86_64:         switch {{.*}} [
-// x86_64:           i64 0, label
+// x86_64:         icmp eq i64 %0, 0
 // i386-LABEL:   define void @optional_objc_metatype(i32)
-// i386:           switch {{.*}} [
-// i386:             i32 0, label
+// i386:           icmp eq i32 %0, 0
 // arm64-LABEL:  define void @optional_objc_metatype(i64)
-// arm64:          switch {{.*}} [
-// arm64:            i64 0, label
+// arm64:          icmp eq i64 %0, 0
 // armv7-LABEL:  define void @optional_objc_metatype(i32)
-// armv7:          switch {{.*}} [
-// armv7:            i32 0, label
+// armv7:           icmp eq i32 %0, 0
 
 sil @optional_objc_metatype : $@thin (Optional<@objc_metatype Gizmo.Type>) -> () {
 bb0(%0 : $Optional<@objc_metatype Gizmo.Type>):
@@ -33,17 +29,13 @@ cont:
 }
 
 // x86_64-LABEL: define void @optional_swift_metatype(i64)
-// x86_64:         switch {{.*}} [
-// x86_64:           i64 0, label
+// x86_64:           icmp eq i64 %0, 0
 // i386-LABEL:   define void @optional_swift_metatype(i32)
-// i386:           switch {{.*}} [
-// i386:             i32 0, label
+// i386:             icmp eq i32 %0, 0
 // arm64-LABEL:  define void @optional_swift_metatype(i64)
-// arm64:          switch {{.*}} [
-// arm64:            i64 0, label
+// arm64:            icmp eq i64 %0, 0
 // armv7-LABEL:  define void @optional_swift_metatype(i32)
-// armv7:          switch {{.*}} [
-// armv7:            i32 0, label
+// armv7:            icmp eq i32 %0, 0
 
 sil @optional_swift_metatype : $@thin (Optional<@thick Gizmo.Type>) -> () {
 bb0(%0 : $Optional<@thick Gizmo.Type>):

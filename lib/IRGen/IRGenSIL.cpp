@@ -742,13 +742,10 @@ IRGenSILFunction::~IRGenSILFunction() {
   DEBUG(CurFn->print(llvm::dbgs()));
 }
 
-namespace {
 template<typename ValueVector>
-void emitPHINodesForType(IRGenSILFunction &IGF,
-                         SILType type,
-                         const TypeInfo &ti,
-                         unsigned predecessors,
-                         ValueVector &phis) {
+static void emitPHINodesForType(IRGenSILFunction &IGF, SILType type,
+                                const TypeInfo &ti, unsigned predecessors,
+                                ValueVector &phis) {
   if (type.isAddress()) {
     phis.push_back(IGF.Builder.CreatePHI(ti.getStorageType()->getPointerTo(),
                                          predecessors));
@@ -766,7 +763,6 @@ void emitPHINodesForType(IRGenSILFunction &IGF,
     }
   }
 }
-} // end anonymous namespace
 
 static std::vector<llvm::PHINode*>
 emitPHINodesForBBArgs(IRGenSILFunction &IGF,
