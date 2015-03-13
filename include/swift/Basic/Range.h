@@ -53,6 +53,8 @@ namespace swift {
     Range(const T &begin, const T &end) : Begin(begin), End(end) {}
     T begin() { return Begin; }
     T end() { return End; }
+    const T begin() const { return Begin; }
+    const T end() const { return End; }
     bool empty() const { return Begin == End; }
   };
   

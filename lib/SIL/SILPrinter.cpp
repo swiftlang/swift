@@ -17,6 +17,8 @@
 #include "swift/Strings.h"
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/QuotedString.h"
+#include "swift/SIL/CFG.h"
+#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -29,14 +31,16 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/STLExtras.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormattedStream.h"
+
 
 using namespace swift;
 using namespace demangle_wrappers;
@@ -363,14 +367,15 @@ class SILPrinter : public SILVisitor<SILPrinter> {
   llvm::formatted_raw_ostream OS;
   SILValue subjectValue;
   bool Verbose;
+  bool SortedSIL;
   unsigned LastBufferID;
 
   llvm::DenseMap<const SILBasicBlock *, unsigned> BlocksToIDMap;
 
   llvm::DenseMap<const ValueBase*, unsigned> ValueToIDMap;
 public:
-  SILPrinter(raw_ostream &OS, bool V = false) : OS(OS), Verbose(V),
-                                                LastBufferID(0) {
+  SILPrinter(raw_ostream &OS, bool V = false, bool SortedSIL=false)
+    : OS(OS), Verbose(V), SortedSIL(SortedSIL), LastBufferID(0) {
   }
 
   ID getID(const SILBasicBlock *B);
@@ -382,6 +387,22 @@ public:
   //===--------------------------------------------------------------------===//
   // Big entrypoints.
   void print(const SILFunction *F) {
+    // If we are asked to emit sorted SIL, print out our BBs in RPOT order.
+    if (SortedSIL) {
+      std::vector<SILBasicBlock *> RPOT;
+      auto *UnsafeF = const_cast<SILFunction *>(F);
+      std::copy(po_begin(UnsafeF), po_end(UnsafeF),
+                std::back_inserter(RPOT));
+      std::reverse(RPOT.begin(), RPOT.end());
+      // Initialize IDs so our IDs are in RPOT as well. This is a hack.
+      for (unsigned Index : indices(RPOT))
+        BlocksToIDMap[RPOT[Index]] = Index;
+      interleave(RPOT,
+                 [&](SILBasicBlock *B) { print(B); },
+                 [&] { OS << '\n'; });
+      return;
+    }
+
     interleave(*F,
                [&](const SILBasicBlock &B) { print(&B); },
                [&] { OS << '\n'; });
@@ -1418,7 +1439,8 @@ static void printLinkage(llvm::raw_ostream &OS, SILLinkage linkage,
 }
 
 /// Pretty-print the SILFunction to the designated stream.
-void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
+void SILFunction::print(llvm::raw_ostream &OS, bool Verbose,
+                        bool SortedSIL) const {
   OS << "// " << demangleSymbolAsString(getName()) << '\n';
   OS << "sil ";
   printLinkage(OS, getLinkage(), isDefinition());
@@ -1464,7 +1486,7 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
   
   if (!isExternalDeclaration()) {
     OS << " {\n";
-    SILPrinter(OS, Verbose).print(this);
+    SILPrinter(OS, Verbose, SortedSIL).print(this);
     OS << "}";
   }
   
@@ -1553,7 +1575,7 @@ static void printSILFunctions(llvm::raw_ostream &OS, bool Verbose,
     }
   );
   for (const SILFunction *f : functions)
-    f->print(OS, Verbose);
+    f->print(OS, Verbose, true);
 }
 
 static void printSILVTables(llvm::raw_ostream &OS, bool Verbose,

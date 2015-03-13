@@ -507,7 +507,8 @@ public:
   /// definition.
   ///
   /// \param Verbose In verbose mode, print the SIL locations.
-  void print(raw_ostream &OS, bool Verbose = false) const;
+  void print(raw_ostream &OS, bool Verbose = false,
+             bool SortedSIL = false) const;
 
   /// Pretty-print the SILFunction's name using SIL syntax,
   /// '@function_mangled_name'.
