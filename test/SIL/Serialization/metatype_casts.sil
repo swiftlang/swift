@@ -1,0 +1,34 @@
+// RUN: %target-sil-opt -verify %s -o - | FileCheck %s
+
+// Check that this file can be parsed at all.
+// SIL verifier should not crash on metatypes of metatypes.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class A {}
+
+class B : A {}
+
+// CHECK: sil @test_checked_casts_of_metatypes
+sil @test_checked_casts_of_metatypes : $@thin () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick B.Type.Type
+  checked_cast_br %0 : $@thick B.Type.Type to $@thick A.Type.Type, bb1, bb2
+
+bb1(%2 : $@thick A.Type.Type):
+  %3 = integer_literal $Builtin.Int1, -1
+  br bb3(%3 : $Builtin.Int1)
+
+bb2:
+  %5 = integer_literal $Builtin.Int1, 0
+  br bb3(%5 : $Builtin.Int1)
+
+bb3(%7 : $Builtin.Int1):
+  return %7 : $Builtin.Int1
+}
+
+

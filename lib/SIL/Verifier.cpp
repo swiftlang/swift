@@ -1716,33 +1716,41 @@ public:
     require(fromTy.isObject() && toTy.isObject(),
             "value checked cast src and dest must be objects");
 
+    auto fromCanTy = fromTy.getSwiftRValueType();
+    auto toCanTy = toTy.getSwiftRValueType();
+
     // Peel off metatypes. If two types are checked-cast-able, so are their
     // metatypes.
-    while (fromTy.is<AnyMetatypeType>() && toTy.is<AnyMetatypeType>()) {
-      auto fromMetaty = fromTy.castTo<AnyMetatypeType>();
-      auto toMetaty = toTy.castTo<AnyMetatypeType>();
+    unsigned MetatyLevel = 0;
+    while (isa<AnyMetatypeType>(fromCanTy) && isa<AnyMetatypeType>(toCanTy)) {
+      auto fromMetaty = cast<AnyMetatypeType>(fromCanTy);
+      auto toMetaty = cast<AnyMetatypeType>(toCanTy);
+      
+      // Check representations only for the top-level metatypes as only
+      // those are SIL-lowered.
+      if (!MetatyLevel) {
+        // The representations must match.
+        require(fromMetaty->getRepresentation() == toMetaty->getRepresentation(),
+                "metatype checked cast cannot change metatype representation");
 
-      // The representations must match.
-      require(fromMetaty->getRepresentation() == toMetaty->getRepresentation(),
-              "metatype checked cast cannot change metatype representation");
-      
-      // We can't handle the 'thin' case yet, but it shouldn't really even be
-      // interesting.
-      require(fromMetaty->getRepresentation() != MetatypeRepresentation::Thin,
-              "metatype checked cast cannot check thin metatypes");
-      
-      fromTy = SILType::getPrimitiveObjectType(
-        fromMetaty.getInstanceType());
-      toTy = SILType::getPrimitiveObjectType(
-        toMetaty.getInstanceType());
+        // We can't handle the 'thin' case yet, but it shouldn't really even be
+        // interesting.
+        require(fromMetaty->getRepresentation() != MetatypeRepresentation::Thin,
+                "metatype checked cast cannot check thin metatypes");
+      }
+
+      fromCanTy = fromMetaty.getInstanceType();
+      toCanTy = toMetaty.getInstanceType();
+      MetatyLevel++;
     }
 
     if (isExact) {
-      require(fromTy.getClassOrBoundGenericClass(),
+      require(fromCanTy.getClassOrBoundGenericClass(),
               "downcast operand must be a class type");
-      require(toTy.getClassOrBoundGenericClass(),
+      require(toCanTy.getClassOrBoundGenericClass(),
               "downcast must convert to a class type");
-      require(fromTy.isSuperclassOf(toTy),
+      require(SILType::getPrimitiveObjectType(fromCanTy).
+              isSuperclassOf(SILType::getPrimitiveObjectType(toCanTy)),
               "downcast must convert to a subclass");
     }
   }
