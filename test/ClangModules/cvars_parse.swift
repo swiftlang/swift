@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify %s
 
-// XFAIL: linux
-
 import cvars
 
 func getPI() -> Float {

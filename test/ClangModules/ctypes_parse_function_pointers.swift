@@ -1,7 +1,5 @@
 // RUN: %target-parse-verify-swift %clang-importer-sdk -enable-c-function-pointers
 
-// XFAIL: linux
-
 import ctypes
 
 func testFunctionPointers() {

@@ -5,8 +5,6 @@
 // RUN: echo 'import submodules; println("\(x), \(y)")' | %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse - -I %t
 // RUN: echo 'import submodules; println("\(x), \(y)")' | not %target-swift-frontend -parse - -I %t 2>&1 | FileCheck -check-prefix=MISSING %s
 
-// XFAIL: linux
-
 import typealias ctypes.bits.DWORD
 // MISSING: missing required modules:
 // MISSING-DAG: 'ctypes.bits'

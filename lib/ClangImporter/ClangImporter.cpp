@@ -306,7 +306,13 @@ ClangImporter::create(ASTContext &ctx,
     invocationArgStrs.push_back("-Xclang");
     invocationArgStrs.push_back("-nostdsysteminc");
   } else {
-    invocationArgStrs.push_back("-isysroot");
+    // On Darwin, clang uses -isysroot to specify the include
+    // system root. On other targets, it seems to use --sysroot.
+    if (triple.isOSDarwin()) {
+      invocationArgStrs.push_back("-isysroot");
+    } else {
+      invocationArgStrs.push_back("--sysroot");
+    }
     invocationArgStrs.push_back(searchPathOpts.SDKPath);
   }
 

@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil %s | FileCheck %s
 
-// XFAIL: linux
-
 import ctypes
 struct S {
     let a: Int
