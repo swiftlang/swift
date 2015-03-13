@@ -23,10 +23,14 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
+
+STATISTIC(NumBranchesPromoted, "Number of dead branches promoted to jumps");
+STATISTIC(NumDeletedInsts, "Number of instructions deleted");
 
 namespace {
 
@@ -295,6 +299,8 @@ SILBasicBlock *DCE::nearestUsefulPostDominator(SILBasicBlock *Block) {
 // Replace the given conditional branching instruction with a plain
 // jump (aka unconditional branch) to the destination block.
 void DCE::replaceBranchWithJump(SILInstruction *Inst, SILBasicBlock *Block) {
+  ++NumBranchesPromoted;
+
   assert(Block && "Expected a destination block!");
 
   assert((isa<CondBranchInst>(Inst) ||
@@ -352,9 +358,15 @@ bool DCE::removeDead(SILFunction &F) {
 
       // We want to replace dead terminators with unconditional branches to
       // the nearest post-dominator that has useful instructions.
-      if (isa<TermInst>(Inst))
+      if (isa<TermInst>(Inst)) {
         replaceBranchWithJump(Inst,
                               nearestUsefulPostDominator(Inst->getParent()));
+        Inst->eraseFromParent();
+        Changed = true;
+        continue;
+      }
+
+      ++NumDeletedInsts;
 
       DEBUG(llvm::dbgs() << "Removing dead instruction:\n");
       DEBUG(Inst->dump());
