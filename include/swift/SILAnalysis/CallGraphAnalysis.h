@@ -257,6 +257,9 @@ public:
   CallGraph(SILModule *M, bool completeModule);
   ~CallGraph();
 
+  // Query funtions for getting roots, nodes, and edges from the call
+  // graph.
+
   ArrayRef<CallGraphNode *> getCallGraphRoots() {
     return CallGraphRoots;
   }
@@ -286,6 +289,9 @@ public:
   CallGraphEdge *getCallGraphEdge(ApplyInst *AI) const {
     return const_cast<CallGraph *>(this)->getCallGraphEdge(AI);
   }
+
+  // Functions for getting bottom-up lists of SCCs or functions in the
+  // call graph.
 
   ArrayRef<CallGraphSCC *> getBottomUpSCCOrder() {
     if (BottomUpSCCOrder.empty())
