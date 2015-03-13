@@ -2697,8 +2697,8 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
     switch self {
     case .Native:
       let oldCapacity = native.capacity
-#if _runtime(_ObjC)
       if isUniquelyReferenced() && oldCapacity >= minimumCapacity {
+#if _runtime(_ObjC)
         // Clear the cache of bridged elements.
         switch self {
         case .Native(let owner):
@@ -2706,9 +2706,9 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
         case .Cocoa:
           _sanityCheckFailure("internal error: not backed by native storage")
         }
+#endif
         return (reallocated: false, capacityChanged: false)
       }
-#endif
 
       let oldNativeStorage = native
       let newNativeOwner = NativeStorageOwner(minimumCapacity: minimumCapacity)
