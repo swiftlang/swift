@@ -48,6 +48,8 @@ PROTOCOL(Comparable)
 PROTOCOL(_ErrorType)
 
 PROTOCOL(_ObjectiveCBridgeable)
+PROTOCOL(_NSArrayCoreType)
+PROTOCOL(_NSDictionaryCoreType)
 PROTOCOL(_DestructorSafeContainer)
 
 LITERAL_CONVERTIBLE_PROTOCOL(ArrayLiteralConvertible, array)

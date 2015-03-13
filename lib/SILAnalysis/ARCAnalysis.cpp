@@ -29,11 +29,92 @@ using namespace swift;
 //                             Decrement Analysis
 //===----------------------------------------------------------------------===//
 
+
+/// \brief Test whether this is an Objective C method of a specific protocol.
+static bool isObjCProtocolMethod(WitnessMethodInst *WMI, ProtocolDecl *Protocol,
+                                 StringRef MethodName) {
+
+  // Must be an objc method.
+  auto Member = WMI->getMember();
+  if (!Member.isForeign)
+    return false;
+
+  if (Protocol != WMI->getLookupProtocol())
+    return false;
+
+  auto *Method = Member.getFuncDecl();
+
+  if (!Method || Method->getName().empty())
+    return false;
+
+  if (!Method->getName().str().equals(MethodName))
+     return false;
+
+  return true;
+}
+
+/// \brief Test whether this is an Objective C getter of a specific protocol.
+static bool isObjCProtocolGetter(WitnessMethodInst *WMI, ProtocolDecl *Protocol,
+                                 StringRef VarName) {
+  // Must be an objc method.
+  auto Member = WMI->getMember();
+  if (!Member.isForeign)
+    return false;
+
+  if (Protocol != WMI->getLookupProtocol())
+    return false;
+
+  auto *Method = Member.getFuncDecl();
+
+  if (!Method || !Method->isGetter())
+    return false;
+
+  auto *Storage = Method->getAccessorStorageDecl();
+  if (!Storage || Storage->getName().empty())
+    return false;
+
+  if (!Storage->getName().str().equals(VarName))
+    return false;
+
+  return true;
+}
+
 static bool isKnownToNotDecrementRefCount(FunctionRefInst *FRI) {
    return llvm::StringSwitch<bool>(FRI->getReferencedFunction()->getName())
      .Case("swift_keepAlive", true)
      .StartsWith("_swift_isUniquelyReferenced", true)
      .Default(false);
+}
+
+/// \brief Check whether this is an Objective C method that only has balanced
+/// retain/releases. The method is known not to decrement a reference count
+/// before incrementing it.
+static bool isObjCMethodKnownToNotDecrementRefCount(ApplyInst *AI) {
+  auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee());
+  if (!WMI)
+    return false;
+
+  auto &Ctx = AI->getFunction()->getModule().getASTContext();
+
+  auto *ArrayProtocol = Ctx.getProtocol(KnownProtocolKind::_NSArrayCoreType);
+  // If we don't have the _NSArrayCoreType we will not have an
+  // _NSDictionaryCoreType either.
+  if (!ArrayProtocol)
+    return false;
+
+  if (isObjCProtocolMethod(WMI, ArrayProtocol, "objectAtIndex"))
+    return true;
+  if (isObjCProtocolGetter(WMI, ArrayProtocol, "count"))
+    return true;
+
+  auto *DictionaryProtocol =
+      Ctx.getProtocol(KnownProtocolKind::_NSDictionaryCoreType);
+  if (isObjCProtocolMethod(WMI, DictionaryProtocol, "objectForKey"))
+    return true;
+  if (isObjCProtocolGetter(WMI, DictionaryProtocol, "count"))
+    return true;
+
+  return false;
 }
 
 static bool canApplyDecrementRefCount(OperandValueArrayRef Ops, SILValue Ptr,
@@ -89,6 +170,9 @@ static bool canApplyDecrementRefCount(ApplyInst *AI, SILValue Ptr,
   // count.
   ArraySemanticsCall Call(AI);
   if (Call && !Call.isMayRelease())
+    return false;
+
+  if (isObjCMethodKnownToNotDecrementRefCount(AI))
     return false;
 
   return canApplyDecrementRefCount(AI->getArgumentsWithoutIndirectResult(),
@@ -430,6 +514,9 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
   // semantic callee are balanced.
   ArraySemanticsCall Call(AI);
   if (Call && !Call.isMayRelease())
+    return false;
+
+  if (isObjCMethodKnownToNotDecrementRefCount(AI))
     return false;
 
   // Ok, we have an apply with arguments. Look at the function type and iterate
