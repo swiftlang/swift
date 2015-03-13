@@ -29,12 +29,12 @@ bool DestructorAnalysis::cacheResult(CanType Type, bool Result) {
 }
 
 bool DestructorAnalysis::isSafeType(Type Ty) {
-  CanType Cannonical = Ty.getCanonicalTypeOrNull();
-  if (Cannonical.isNull())
+  CanType Canonical = Ty.getCanonicalTypeOrNull();
+  if (Canonical.isNull())
     return false;
 
   // Don't visit types twice.
-  auto CachedRes = Cached.find(Cannonical);
+  auto CachedRes = Cached.find(Canonical);
   if (CachedRes != Cached.end()) {
     return CachedRes->second;
   }
@@ -43,43 +43,43 @@ bool DestructorAnalysis::isSafeType(Type Ty) {
   // possition it is safe in the absence of another fact that proves otherwise.
   // We will reset this value to the correct value once we return from the
   // recursion below.
-  cacheResult(Cannonical, true);
+  cacheResult(Canonical, true);
 
   // Trivial value types.
-  if (Cannonical->getKind() == TypeKind::BuiltinInteger)
-    return cacheResult(Cannonical, true);
-  if (Cannonical->getKind() == TypeKind::BuiltinFloat)
-    return cacheResult(Cannonical, true);
+  if (Canonical->getKind() == TypeKind::BuiltinInteger)
+    return cacheResult(Canonical, true);
+  if (Canonical->getKind() == TypeKind::BuiltinFloat)
+    return cacheResult(Canonical, true);
 
   // A struct is safe if
   //   * either it implements the _DestructorSafeContainer protocol and
   //     all the type parameters are safe types.
   //   * or all stored properties are safe types.
-  if (auto *Struct = Cannonical->getStructOrBoundGenericStruct()) {
+  if (auto *Struct = Canonical->getStructOrBoundGenericStruct()) {
 
     if (implementsDestructorSafeContainerProtocol(Struct) &&
-        areTypeParametersSafe(Cannonical))
-      return cacheResult(Cannonical, true);
+        areTypeParametersSafe(Canonical))
+      return cacheResult(Canonical, true);
 
     // Check the stored properties.
     for (auto SP : Struct->getStoredProperties())
       if (!isSafeType(SP->getType()))
-        return cacheResult(Cannonical, false);
+        return cacheResult(Canonical, false);
 
-    return cacheResult(Cannonical, true);
+    return cacheResult(Canonical, true);
   }
 
   // A tuple type is safe if its elements are safe.
-  if (auto Tuple = dyn_cast<TupleType>(Cannonical)) {
+  if (auto Tuple = dyn_cast<TupleType>(Canonical)) {
     for (auto &Elt : Tuple->getFields())
       if (!isSafeType(Elt.getType()))
-        return cacheResult(Cannonical, false);
-    return cacheResult(Cannonical, true);
+        return cacheResult(Canonical, false);
+    return cacheResult(Canonical, true);
   }
 
   // TODO: enum types.
 
-  return cacheResult(Cannonical, false);
+  return cacheResult(Canonical, false);
 }
 
 bool DestructorAnalysis::implementsDestructorSafeContainerProtocol(
