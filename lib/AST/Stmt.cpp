@@ -158,6 +158,51 @@ SourceLoc ReturnStmt::getEndLoc() const {
   return (Result ? Result->getEndLoc() : ReturnLoc);
 }
 
+bool LabeledStmt::isPossibleContinueTarget() const {
+  switch (getKind()) {
+#define LABELED_STMT(ID, PARENT)
+#define STMT(ID, PARENT) case StmtKind::ID:
+#include "swift/AST/StmtNodes.def"
+    llvm_unreachable("not a labeled statement");
+
+  // Sema has diagnostics with hard-coded expectations about what
+  // statements return false from this method.
+
+  case StmtKind::If:
+  case StmtKind::Switch:
+    return false;
+
+  case StmtKind::Do:
+  case StmtKind::DoWhile:
+  case StmtKind::For:
+  case StmtKind::ForEach:
+  case StmtKind::While:
+    return true;
+  }
+  llvm_unreachable("statement kind unhandled!");
+}
+
+bool LabeledStmt::requiresLabelOnJump() const {
+  switch (getKind()) {
+#define LABELED_STMT(ID, PARENT)
+#define STMT(ID, PARENT) case StmtKind::ID:
+#include "swift/AST/StmtNodes.def"
+    llvm_unreachable("not a labeled statement");
+
+  case StmtKind::If:
+  case StmtKind::Do:
+    return true;
+
+  case StmtKind::DoWhile:
+  case StmtKind::For:
+  case StmtKind::ForEach:
+  case StmtKind::Switch:
+  case StmtKind::While:
+    return false;
+  }
+  llvm_unreachable("statement kind unhandled!");
+}
+
 SourceRange StmtConditionElement::getSourceRange() const {
   if (auto *E = getCondition())
     return E->getSourceRange();

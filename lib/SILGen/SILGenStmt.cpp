@@ -542,6 +542,36 @@ void SILGenFunction::visitWhileStmt(WhileStmt *S) {
   emitCleanupBlocks(CleanupBlocks, *this);
 }
 
+void SILGenFunction::visitDoStmt(DoStmt *S) {
+  // We don't need to do anything fancy if we don't have a label.
+  // Otherwise, assume we might break or continue.
+  bool hasLabel = (bool) S->getLabelInfo();
+
+  SILBasicBlock *endBB = nullptr;
+  if (hasLabel) {
+    // Create a new basic block and jump into it.
+    SILBasicBlock *loopBB = createBasicBlock();
+    B.emitBlock(loopBB, S);
+
+    // Set the destinations for 'break' and 'continue'.
+    endBB = createBasicBlock();
+    BreakContinueDestStack.push_back(std::make_tuple(
+      S,
+      JumpDest(endBB , getCleanupsDepth(), CleanupLocation(S->getBody())),
+      JumpDest(loopBB, getCleanupsDepth(), CleanupLocation(S->getBody()))
+    ));
+  }
+
+  // Emit the body.
+  visit(S->getBody());
+
+  if (hasLabel) {
+    BreakContinueDestStack.pop_back();
+  }
+  
+  emitOrDeleteBlock(B, endBB, S);
+}
+
 void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
   // Create a new basic block and jump into it.
   SILBasicBlock *LoopBB = createBasicBlock();

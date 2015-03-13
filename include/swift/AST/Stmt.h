@@ -243,20 +243,48 @@ public:
   LabeledStmtInfo getLabelInfo() const { return LabelInfo; }
   void setLabelInfo(LabeledStmtInfo L) { LabelInfo = L; }
 
-  // Switch and If statements are not targets of "continue".
-  bool isPossibleContinueTarget() const {
-    return getKind() != StmtKind::If && getKind() != StmtKind::Switch;
-  }
+  /// Is this statement a valid target of "continue" if labeled?
+  ///
+  /// For the most part, non-looping constructs shouldn't be
+  /// continue-able, but we threw in "do" as a sop.
+  bool isPossibleContinueTarget() const;
 
-  // If statement isn't the target of a non-labeled "break" or "continue".
-  bool requiresLabelOnJump() const {
-    return getKind() == StmtKind::If;
-  }
+  /// Is this statement a valid target of an unlabeled "break" or
+  /// "continue"?
+  ///
+  /// The nice, consistent language rule is that unlabeled "break" and
+  /// "continue" leave the innermost loop.  We have to include
+  /// "switch" (for "break") for consistency with C: Swift doesn't
+  /// require "break" to leave a switch case, but it's still way too
+  /// similar to C's switch to allow different behavior for "break".
+  bool requiresLabelOnJump() const;
 
   static bool classof(const Stmt *S) {
     return S->getKind() >= StmtKind::First_LabeledStmt &&
            S->getKind() <= StmtKind::Last_LabeledStmt;
   }
+};
+
+
+/// DoStmt - do statement, without any trailing clauses.
+class DoStmt : public LabeledStmt {
+  SourceLoc DoLoc;
+  Stmt *Body;
+  
+public:
+  DoStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc,
+         Stmt *body, Optional<bool> implicit = None)
+    : LabeledStmt(StmtKind::Do, getDefaultImplicitFlag(implicit, doLoc),
+                  labelInfo),
+      DoLoc(doLoc), Body(body) {}
+
+  SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(DoLoc); }
+  SourceLoc getEndLoc() const { return Body->getEndLoc(); }
+  
+  Stmt *getBody() const { return Body; }
+  void setBody(Stmt *s) { Body = s; }
+
+  static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Do; }
 };
 
 

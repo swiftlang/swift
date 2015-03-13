@@ -718,6 +718,9 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   void visitDoWhileStmt(DoWhileStmt *S) {
     visit(S->getBody());
   }
+  void visitDoStmt(DoStmt *S) {
+    visit(S->getBody());
+  }
 
   void visitForStmt(ForStmt *S) {
     if (!isReferencePointInRange(S->getSourceRange()))

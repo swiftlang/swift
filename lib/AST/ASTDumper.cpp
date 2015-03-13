@@ -1021,6 +1021,12 @@ public:
     OS << ')';
   }
 
+  void visitDoStmt(DoStmt *S) {
+    OS.indent(Indent) << "(do_stmt\n";
+    printRec(S->getBody());
+    OS << ')';
+  }
+
   void visitWhileStmt(WhileStmt *S) {
     OS.indent(Indent) << "(while_stmt\n";
     for (auto elt : S->getCond())

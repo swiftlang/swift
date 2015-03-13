@@ -1795,6 +1795,11 @@ void PrintAST::visitDoWhileStmt(DoWhileStmt *stmt) {
   // FIXME: print condition
 }
 
+void PrintAST::visitDoStmt(DoStmt *stmt) {
+  Printer << "do ";
+  visit(stmt->getBody());
+}
+
 void PrintAST::visitForStmt(ForStmt *stmt) {
   Printer << "for (";
   // FIXME: print initializer

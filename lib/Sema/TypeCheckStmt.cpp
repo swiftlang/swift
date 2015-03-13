@@ -376,6 +376,14 @@ public:
     
     return ICS;
   }
+
+  Stmt *visitDoStmt(DoStmt *DS) {
+    AddLabeledStmt loopNest(*this, DS);
+    Stmt *S = DS->getBody();
+    if (typeCheckStmt(S)) return 0;
+    DS->setBody(S);
+    return DS;
+  }
   
   Stmt *visitWhileStmt(WhileStmt *WS) {
     StmtCondition C = WS->getCond();
@@ -576,7 +584,8 @@ public:
     if (S->getTargetName().empty()) {
       for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
            I != E; ++I) {
-        // 'break' with no label looks through if.
+        // 'break' with no label looks through non-loop structures
+        // except 'switch'.
         if (!(*I)->requiresLabelOnJump()) {
           Target = *I;
           break;
@@ -616,8 +625,9 @@ public:
     if (S->getTargetName().empty()) {
       for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
            I != E; ++I) {
-        // 'continue' with no label looks through if and switch.
-        if ((*I)->isPossibleContinueTarget()) {
+        // 'continue' with no label ignores non-loop structures.
+        if (!(*I)->requiresLabelOnJump() &&
+            (*I)->isPossibleContinueTarget()) {
           Target = *I;
           break;
         }

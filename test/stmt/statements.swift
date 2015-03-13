@@ -233,12 +233,13 @@ func DoWhileStmt1() {
 }
 
 func DoWhileStmt2() {
-  do // expected-error {{expected '{' after 'do'}} expected-error {{expected 'while' in 'do-while' loop}}
+  do // expected-error {{expected '{' after 'do'}}
 }
 
 func DoWhileStmt3() {
+  // This is just a 'do' statement now.
   do {
-  } // expected-error {{expected 'while' in 'do-while' loop}}
+  }
 }
 
 func DoWhileStmt4() {

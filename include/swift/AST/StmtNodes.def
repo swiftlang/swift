@@ -29,6 +29,11 @@
 #define ABSTRACT_STMT(Id, Parent)
 #endif
 
+/// A subclass of LabeledStmt.  Forwards to STMT by default.
+#ifndef LABELED_STMT
+#define LABELED_STMT(Id, Parent) STMT(Id, Parent)
+#endif
+
 /// A convenience for determining the range of statements.  These will always
 /// appear immediately after the last member.
 #ifndef STMT_RANGE
@@ -38,12 +43,13 @@
 STMT(Brace, Stmt)
 STMT(Return, Stmt)
 ABSTRACT_STMT(Labeled, Stmt)
-  STMT(If, LabeledStmt)
-  STMT(While, LabeledStmt)
-  STMT(DoWhile, LabeledStmt)
-  STMT(For, LabeledStmt)
-  STMT(ForEach, LabeledStmt)
-  STMT(Switch, LabeledStmt)
+  LABELED_STMT(If, LabeledStmt)
+  LABELED_STMT(While, LabeledStmt)
+  LABELED_STMT(Do, LabeledStmt)
+  LABELED_STMT(DoWhile, LabeledStmt)
+  LABELED_STMT(For, LabeledStmt)
+  LABELED_STMT(ForEach, LabeledStmt)
+  LABELED_STMT(Switch, LabeledStmt)
   STMT_RANGE(Labeled, If, Switch)
 STMT(Case, Stmt)
 STMT(Break, Stmt)
@@ -53,5 +59,6 @@ STMT(IfConfig, Stmt)
 STMT(Fail, Stmt)
 
 #undef STMT_RANGE
+#undef LABELED_STMT
 #undef ABSTRACT_STMT
 #undef STMT

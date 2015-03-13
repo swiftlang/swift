@@ -751,8 +751,6 @@ ERROR(expected_lbrace_after_while,stmt_parsing,PointsToFirstBadToken,
 // Do/While Statement
 ERROR(expected_lbrace_after_do,stmt_parsing,PointsToFirstBadToken,
       "expected '{' after 'do'", ())
-ERROR(expected_while_in_dowhile,stmt_parsing,PointsToFirstBadToken,
-      "expected 'while' in 'do-while' loop", ())
 ERROR(expected_expr_do_while,stmt_parsing,PointsToFirstBadToken,
       "expected expression in 'do-while' condition", ())
 

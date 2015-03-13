@@ -489,7 +489,7 @@ ParserResult<Stmt> Parser::parseStmt() {
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     return parseLineDirective();
   case tok::kw_while:  return parseStmtWhile(LabelInfo);
-  case tok::kw_do:     return parseStmtDoWhile(LabelInfo);
+  case tok::kw_do:     return parseStmtDo(LabelInfo);
   case tok::kw_for:    return parseStmtFor(LabelInfo);
   case tok::kw_switch: return parseStmtSwitch(LabelInfo);
   /// 'case' and 'default' are only valid at the top level of a switch.
@@ -1037,40 +1037,46 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
 }
 
 /// 
-///   stmt-do-while:
+///   stmt-do:
+///     (identifier ':')? 'do' stmt-brace
 ///     (identifier ':')? 'do' stmt-brace 'while' expr
-ParserResult<Stmt> Parser::parseStmtDoWhile(LabeledStmtInfo LabelInfo) {
-  SourceLoc DoLoc = consumeToken(tok::kw_do);
+ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
+  SourceLoc doLoc = consumeToken(tok::kw_do);
 
-  ParserStatus Status;
+  ParserStatus status;
 
-  ParserResult<BraceStmt> Body =
+  ParserResult<BraceStmt> body =
       parseBraceItemList(diag::expected_lbrace_after_do);
-  Status |= Body;
-  if (Body.isNull())
-    Body = makeParserResult(
-        Body, BraceStmt::create(Context, DoLoc, {}, PreviousLoc, true));
+  status |= body;
+  if (body.isNull())
+    body = makeParserResult(
+        body, BraceStmt::create(Context, doLoc, {}, PreviousLoc, true));
 
-  SourceLoc WhileLoc;
-  if (parseToken(tok::kw_while, WhileLoc, diag::expected_while_in_dowhile))
-    return nullptr; // FIXME: better recovery
+  SourceLoc whileLoc;
 
-  ParserResult<Expr> Condition;
+  // If we don't see a 'while', this is just the bare 'do' scoping
+  // statement.
+  if (!consumeIf(tok::kw_while, whileLoc)) {
+    return makeParserResult(status,
+                         new (Context) DoStmt(labelInfo, doLoc, body.get()));
+  }
+
+  ParserResult<Expr> condition;
   if (Tok.is(tok::l_brace)) {
-    SourceLoc LBraceLoc = Tok.getLoc();
-    diagnose(WhileLoc, diag::missing_condition_after_while);
-    Condition = makeParserErrorResult(new (Context) ErrorExpr(LBraceLoc));
+    SourceLoc lbraceLoc = Tok.getLoc();
+    diagnose(whileLoc, diag::missing_condition_after_while);
+    condition = makeParserErrorResult(new (Context) ErrorExpr(lbraceLoc));
   } else {
-    Condition = parseExpr(diag::expected_expr_do_while);
-    Status |= Condition;
-    if (Condition.isNull() || Condition.hasCodeCompletion())
-      return makeParserResult<Stmt>(Status, nullptr); // FIXME: better recovery
+    condition = parseExpr(diag::expected_expr_do_while);
+    status |= condition;
+    if (condition.isNull() || condition.hasCodeCompletion())
+      return makeParserResult<Stmt>(status, nullptr); // FIXME: better recovery
   }
 
   return makeParserResult(
-      Status,
-      new (Context) DoWhileStmt(LabelInfo, DoLoc, Condition.get(), WhileLoc,
-                                Body.get()));
+      status,
+      new (Context) DoWhileStmt(labelInfo, doLoc, condition.get(), whileLoc,
+                                body.get()));
 }
 
 ParserResult<Stmt> Parser::parseStmtFor(LabeledStmtInfo LabelInfo) {

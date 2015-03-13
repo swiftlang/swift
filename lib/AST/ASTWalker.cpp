@@ -837,6 +837,15 @@ Stmt *Traversal::visitIfConfigStmt(IfConfigStmt *ICS) {
   return ICS;
 }
 
+Stmt *Traversal::visitDoStmt(DoStmt *DS) {
+  if (Stmt *S2 = doIt(DS->getBody()))
+    DS->setBody(S2);
+  else
+    return nullptr;
+
+  return DS;
+}
+
 Stmt *Traversal::visitWhileStmt(WhileStmt *WS) {
   if (doIt(WS->getCond()))
     return nullptr;
