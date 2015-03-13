@@ -38,6 +38,8 @@ CallGraph::CallGraph(SILModule *Mod, bool completeModule) : M(*Mod) {
   for (auto &F : M)
     addCallGraphNode(&F, NodeOrdinal++);
 
+  EdgeOrdinal = 0;
+
   for (auto &F : M)
     if (F.isDefinition())
       addEdges(&F);
@@ -169,6 +171,17 @@ bool CallGraph::tryGetCalleeSet(SILValue Callee,
   }
 }
 
+static void orderEdges(const llvm::SmallPtrSetImpl<CallGraphEdge *> &Edges,
+                       llvm::SmallVectorImpl<CallGraphEdge *> &OrderedEdges) {
+  for (auto *Edge : Edges)
+    OrderedEdges.push_back(Edge);
+
+  std::sort(OrderedEdges.begin(), OrderedEdges.end(),
+            [](CallGraphEdge *left, CallGraphEdge *right) {
+              return left->getOrdinal() < right->getOrdinal();
+            });
+}
+
 static void orderCallees(const CallGraphEdge::CalleeSetType &Callees,
                          llvm::SmallVectorImpl<CallGraphNode *> &OrderedNodes) {
   for (auto *Node : Callees)
@@ -185,7 +198,8 @@ void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
   bool Complete = false;
 
   if (tryGetCalleeSet(AI->getCallee(), CalleeSet, Complete)) {
-    auto *Edge = new (Allocator) CallGraphEdge(AI, CalleeSet, Complete);
+    auto *Edge = new (Allocator) CallGraphEdge(AI, CalleeSet, Complete,
+                                               EdgeOrdinal++);
     assert(!ApplyToEdgeMap.count(AI) &&
            "Added apply that already has an edge node!\n");
     ApplyToEdgeMap[AI] = Edge;
@@ -271,7 +285,10 @@ public:
 
     DFSStack.insert(Node);
 
-    for (auto *ApplyEdge : Node->getCalleeEdges()) {
+    llvm::SmallVector<CallGraphEdge *, 4> OrderedEdges;
+    orderEdges(Node->getCalleeEdges(), OrderedEdges);
+
+    for (auto *ApplyEdge : OrderedEdges) {
       llvm::SmallVector<CallGraphNode *, 4> OrderedNodes;
       orderCallees(ApplyEdge->getPartialCalleeSet(), OrderedNodes);
 

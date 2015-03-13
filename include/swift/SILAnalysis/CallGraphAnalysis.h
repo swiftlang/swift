@@ -64,13 +64,19 @@ private:
   // This is currently owned by the CallGraphEdge.
   llvm::PointerIntPair<CalleeSetType *, 1> CalleeSet;
 
+  // A unique identifier for this edge based on the order in which it
+  // was created relative to other edges.
+  unsigned Ordinal;
+
 public:
   /// Create a call graph edge for a call site where we will fill in
   /// the set of potentially called functions later.
-  CallGraphEdge(ApplyInst *TheApply, CalleeSetType &KnownCallees, bool Complete)
+  CallGraphEdge(ApplyInst *TheApply, CalleeSetType &KnownCallees, bool Complete,
+                unsigned Ordinal)
     : TheApply(TheApply),
       // FIXME: Do not allocate memory for the singleton callee case.
-      CalleeSet(new CalleeSetType, Complete) {
+      CalleeSet(new CalleeSetType, Complete),
+      Ordinal(Ordinal) {
 
     // TODO: We will probably have many call sites that can share a
     //       callee set so we should optimize allocation and
@@ -109,13 +115,11 @@ public:
   bool isCalleeSetComplete() const {
     return CalleeSet.getInt();
   }
-};
 
-/// A helper method for use with ArrayRefView. Just returns the
-/// ApplyInst of E.
-inline const ApplyInst *getEdgeApplyInst(CallGraphEdge * const &E) {
-  return E->getApply();
-}
+  unsigned getOrdinal() const {
+    return Ordinal;
+  }
+};
 
 class CallGraphNode {
   /// The function represented by this call graph node.
@@ -128,12 +132,12 @@ class CallGraphNode {
   /// this function.
   ///
   /// This is owned by the callgraph itself, not the callgraph node.
-  llvm::SmallVector<CallGraphEdge *, 4> CallerEdges;
+  llvm::SmallPtrSet<CallGraphEdge *, 4> CallerEdges;
 
   /// Edges representing the call sites within this function.
   ///
   /// This is owned by the callgraph itself, not the callgraph node.
-  llvm::SmallVector<CallGraphEdge *, 4> CalleeEdges;
+  llvm::SmallPtrSet<CallGraphEdge *, 4> CalleeEdges;
 
   /// Do we know all the potential callers of this function? We initialize this
   /// to !canHaveIndirectUses(F) optimistically and if we find any use that we
@@ -159,35 +163,20 @@ public:
 
   /// Get the complete set of edges associated with call sites that can call
   /// into this function.
-  ArrayRef<CallGraphEdge *> getCompleteCallerEdges() const {
+  const llvm::SmallPtrSetImpl<CallGraphEdge *> &getCompleteCallerEdges() const {
     assert(isCallerEdgesComplete() &&
            "Attempt to get an incomplete caller set!");
     return CallerEdges;
   }
 
-  // An adaptor that is used to show all of the apply insts which call the
-  // SILFunction of this node.
-  using CallerCallSiteList = ArrayRefView<CallGraphEdge *, const ApplyInst *,
-                                          getEdgeApplyInst>;
-
-  /// Return the set of apply insts that can call into this function.
-  CallerCallSiteList getCompleteCallerEdgesApplies() const {
-    return CallerCallSiteList(getCompleteCallerEdges());
-  }
-
   /// Get the known set of call graph edges that represent possible
   /// calls into this function.
-  ArrayRef<CallGraphEdge *> getPartialCallerEdges() {
+  const llvm::SmallPtrSetImpl<CallGraphEdge *> &getPartialCallerEdges() const {
     return CallerEdges;
   }
 
-  /// Return the known set of apply insts that can call into this function.
-  CallerCallSiteList getPartialCallerEdgesApplies() {
-    return CallerCallSiteList(getPartialCallerEdges());
-  }
-
   /// Get the set of call sites in this function.
-  ArrayRef<CallGraphEdge *> getCalleeEdges() {
+  const llvm::SmallPtrSetImpl<CallGraphEdge *> &getCalleeEdges() const {
     return CalleeEdges;
   }
 
@@ -210,12 +199,12 @@ private:
 
   /// Add an edge representing a call site within this function.
   void addCalleeEdge(CallGraphEdge *CallSite) {
-    CalleeEdges.push_back(CallSite);
+    CalleeEdges.insert(CallSite);
   }
 
   /// Add an edge representing a call site that calls into this function.
   void addCallerEdge(CallGraphEdge *CallerCallSite) {
-    CallerEdges.push_back(CallerCallSite);
+    CallerEdges.insert(CallerCallSite);
   }
 };
 
@@ -252,6 +241,9 @@ class CallGraph {
 
   /// An allocator used by the callgraph.
   llvm::BumpPtrAllocator Allocator;
+
+  /// Ordinal incremented for each edge we add.
+  unsigned EdgeOrdinal;
 
 public:
   CallGraph(SILModule *M, bool completeModule);
