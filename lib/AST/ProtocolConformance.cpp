@@ -1739,13 +1739,6 @@ void NominalTypeDecl::prepareConformanceTable(LazyResolver *resolver) const {
   }
 }
 
-void NominalTypeDecl::registerSynthesizedConformance(
-       ProtocolDecl *protocol,
-       LazyResolver *resolver) {
-  prepareConformanceTable(resolver);
-  ConformanceTable->addSynthesizedConformance(this, protocol);
-}
-
 bool NominalTypeDecl::lookupConformance(
        Module *module, ProtocolDecl *protocol,
        LazyResolver *resolver,

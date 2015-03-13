@@ -2896,9 +2896,6 @@ public:
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
   void getImplicitProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
-  /// Register a synthesized conformance for this nominal type declaration.
-  void registerSynthesizedConformance(ProtocolDecl *protocol,
-                                      LazyResolver *resolver);
 
   /// Look for conformances of this nominal type to the given
   /// protocol.
