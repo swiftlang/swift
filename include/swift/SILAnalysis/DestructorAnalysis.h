@@ -35,8 +35,6 @@ public:
   bool mayStoreToMemoryOnDestruction(SILType T);
 
 protected:
-  /// \brief Clear the cache of type safety results.
-  void clearTypeCache();
   bool cacheResult(CanType Type, bool Result);
   bool isSafeType(Type);
   bool implementsDestructorSafeContainerProtocol(NominalTypeDecl *);
