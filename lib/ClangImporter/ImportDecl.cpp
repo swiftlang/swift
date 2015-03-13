@@ -416,7 +416,7 @@ static StringRef getCommonPluralPrefix(StringRef singular, StringRef plural) {
 /// unknown enum.
 ///
 /// \code
-/// struct NSSomeOptionSet : RawOptionSet {
+/// struct NSSomeOptionSet : RawOptionSetType {
 ///   let rawValue: Raw
 /// }
 /// \endcode
@@ -565,7 +565,7 @@ getOperatorRef(ASTContext &C, Identifier name) {
 
 /// Build the 'allZeros' property for an option set.
 /// \code
-/// struct NSSomeOptionSet : RawOptionSet {
+/// struct NSSomeOptionSet : RawOptionSetType {
 ///   static var allZeros: NSSomeOptionSet {
 ///     return nil
 ///   }
@@ -708,7 +708,7 @@ static ConstructorDecl *makeNilLiteralConformance(StructDecl *optionSetDecl,
 }
 
 // Build the default initializer for an option set.
-// struct NSSomeOptionSet : RawOptionSet {
+// struct NSSomeOptionSet : RawOptionSetType {
 //   var value: RawType
 //   init() {
 //     return 0
@@ -1860,6 +1860,10 @@ namespace {
         auto structDecl = Impl.createDeclWithClangNode<StructDecl>(decl,
           Loc, name, Loc, None, nullptr, dc);
         structDecl->computeType();
+
+        // Note that this is a raw option set type.
+        structDecl->getAttrs().add(
+          new (Impl.SwiftContext) RawOptionSetAttr(true));
         
         // Create a field to store the underlying value.
         auto varName = Impl.SwiftContext.Id_rawValue;
@@ -1897,7 +1901,7 @@ namespace {
                                                  /*wantCtorParamNames=*/true,
                                                  /*wantBody=*/true);
 
-        // Build a delayed RawOptionSet conformance for the type.
+        // Build a delayed RawOptionSetType conformance for the type.
         DelayedProtocolDecl delayedProtocols[] = {
           [&]() {return cxt.getProtocol(KnownProtocolKind::RawOptionSetType);}
         };

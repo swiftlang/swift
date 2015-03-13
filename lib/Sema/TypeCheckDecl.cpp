@@ -4699,6 +4699,7 @@ public:
     UNINTERESTING_ATTR(Infix)
     UNINTERESTING_ATTR(Ownership)
 
+    UNINTERESTING_ATTR(RawOptionSet)
     UNINTERESTING_ATTR(RequiresStoredPropertyInits)
     UNINTERESTING_ATTR(Transparent)
     UNINTERESTING_ATTR(SILStored)
