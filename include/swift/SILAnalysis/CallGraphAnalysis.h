@@ -111,6 +111,12 @@ public:
   }
 };
 
+/// A helper method for use with ArrayRefView. Just returns the
+/// ApplyInst of E.
+inline const ApplyInst *getEdgeApplyInst(CallGraphEdge * const &E) {
+  return E->getApply();
+}
+
 class CallGraphNode {
   /// The function represented by this call graph node.
   SILFunction *Function;
@@ -122,12 +128,12 @@ class CallGraphNode {
   /// this function.
   ///
   /// This is owned by the callgraph itself, not the callgraph node.
-  llvm::SmallPtrSet<CallGraphEdge *, 4> CallerEdges;
+  llvm::SmallVector<CallGraphEdge *, 4> CallerEdges;
 
   /// Edges representing the call sites within this function.
   ///
   /// This is owned by the callgraph itself, not the callgraph node.
-  llvm::SmallPtrSet<CallGraphEdge *, 4> CalleeEdges;
+  llvm::SmallVector<CallGraphEdge *, 4> CalleeEdges;
 
   /// Do we know all the potential callers of this function? We initialize this
   /// to !canHaveIndirectUses(F) optimistically and if we find any use that we
@@ -153,20 +159,35 @@ public:
 
   /// Get the complete set of edges associated with call sites that can call
   /// into this function.
-  const llvm::SmallPtrSetImpl<CallGraphEdge *> &getCompleteCallerEdges() const {
+  ArrayRef<CallGraphEdge *> getCompleteCallerEdges() const {
     assert(isCallerEdgesComplete() &&
            "Attempt to get an incomplete caller set!");
     return CallerEdges;
   }
 
+  // An adaptor that is used to show all of the apply insts which call the
+  // SILFunction of this node.
+  using CallerCallSiteList = ArrayRefView<CallGraphEdge *, const ApplyInst *,
+                                          getEdgeApplyInst>;
+
+  /// Return the set of apply insts that can call into this function.
+  CallerCallSiteList getCompleteCallerEdgesApplies() const {
+    return CallerCallSiteList(getCompleteCallerEdges());
+  }
+
   /// Get the known set of call graph edges that represent possible
   /// calls into this function.
-  const llvm::SmallPtrSetImpl<CallGraphEdge *> &getPartialCallerEdges() const {
+  ArrayRef<CallGraphEdge *> getPartialCallerEdges() {
     return CallerEdges;
   }
 
+  /// Return the known set of apply insts that can call into this function.
+  CallerCallSiteList getPartialCallerEdgesApplies() {
+    return CallerCallSiteList(getPartialCallerEdges());
+  }
+
   /// Get the set of call sites in this function.
-  const llvm::SmallPtrSetImpl<CallGraphEdge *> &getCalleeEdges() const {
+  ArrayRef<CallGraphEdge *> getCalleeEdges() {
     return CalleeEdges;
   }
 
@@ -189,12 +210,12 @@ private:
 
   /// Add an edge representing a call site within this function.
   void addCalleeEdge(CallGraphEdge *CallSite) {
-    CalleeEdges.insert(CallSite);
+    CalleeEdges.push_back(CallSite);
   }
 
   /// Add an edge representing a call site that calls into this function.
   void addCallerEdge(CallGraphEdge *CallerCallSite) {
-    CallerEdges.insert(CallerCallSite);
+    CallerEdges.push_back(CallerCallSite);
   }
 };
 
