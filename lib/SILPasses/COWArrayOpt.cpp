@@ -265,6 +265,7 @@ static bool isRelease(SILInstruction *Inst, SILValue Value,
       }
     }
   }
+  DEBUG(llvm::dbgs() << "      not a matching release " << *Inst);
   return false;
 }
 
@@ -450,6 +451,10 @@ bool COWArrayOpt::isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
     if (isa<RetainValueInst>(II) || isa<StrongRetainInst>(II))
       continue;
 
+    // A side effect free instruction cannot mutate the array.
+    if (!II->mayHaveSideEffects())
+      continue;
+
     // Non mutating array calls are safe.
     if (isNonMutatingArraySemanticCall(II))
       continue;
@@ -472,8 +477,6 @@ bool COWArrayOpt::isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
 
       if (ArrayUserSet.count(II)) // May be an array mutation.
         break;
-    } else if (!II->mayHaveSideEffects()) {
-      continue;
     }
   }
   DEBUG(llvm::dbgs() << "    Skipping Array: retained in loop!\n    "

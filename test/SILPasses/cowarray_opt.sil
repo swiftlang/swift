@@ -1,0 +1,52 @@
+// RUN: %target-sil-opt -cowarray-opt %s | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct ArrayIntBuffer {
+  var storage : Builtin.NativeObject
+}
+
+struct MyArray<T> {
+  var buffer : ArrayIntBuffer
+}
+
+struct MyStruct {
+}
+
+// CHECK-LABEL: sil @cow_should_pair_retain_release
+// CHECK: bb0(
+// CHECK-NOT: br
+// CHECK: [[MM:%.*]] = function_ref @array_make_mutable
+// CHECK-NOT: br
+// CHECK: apply [[MM]]
+// CHECK: br bb1
+// CHECK: bb1:
+// CHECK-NOT: apply
+// CHECK:  cond_br {{.*}}, bb1
+
+sil @cow_should_pair_retain_release : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
+  %2 = load %0 : $*MyArray<MyStruct>
+  br bb1
+
+bb1:
+  retain_value %2 : $MyArray<MyStruct>
+  %3 = load %1 : $*Builtin.Int1
+  %4 = load %0 : $*MyArray<MyStruct>
+  release_value %2 : $MyArray<MyStruct>
+  %5 = function_ref @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%0) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  cond_br %3, bb1, bb2
+
+bb2:
+  %7 = tuple()
+  return %7 : $()
+}
+
+sil public_external [semantics "array.make_mutable"] @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> () {
+bb0(%0: $*MyArray<MyStruct>):
+  unreachable
+}
