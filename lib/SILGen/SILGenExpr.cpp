@@ -6912,16 +6912,10 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
     return;
   }
   
-  // Look through tuple conversions.
   // TODO: Could look through arbitrary implicit conversions that don't have
-  // side effects.
-  if (auto *CE = dyn_cast<ScalarToTupleExpr>(E)) {
-    emitIgnoredExpr(CE->getSubExpr());
-  }
-  if (auto *CE = dyn_cast<TupleShuffleExpr>(E)) {
-    emitIgnoredExpr(CE->getSubExpr());
-  }
-    
+  // side effects, or through tuple shuffles, by emitting ignored default
+  // arguments.
+  
   FullExpr scope(Cleanups, CleanupLocation(E));
   if (!E->getType()->isMaterializable()) {
     // Emit the l-value, but don't perform an access.
