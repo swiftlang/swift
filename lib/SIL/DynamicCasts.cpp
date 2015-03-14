@@ -242,6 +242,11 @@ swift::classifyDynamicCast(Module *M,
     source = sourceMetatype.getInstanceType();
     target = targetMetatype.getInstanceType();
 
+    if (source == target &&
+        targetMetatype.isAnyExistentialType() ==
+            sourceMetatype.isAnyExistentialType())
+      return DynamicCastFeasibility::WillSucceed;
+
     if (targetMetatype.isAnyExistentialType() && isa<ProtocolType>(target)) {
       auto Feasibility = classifyDynamicCastToProtocol(source,
                                                        target,
@@ -320,13 +325,34 @@ swift::classifyDynamicCast(Module *M,
   // FIXME: tuple conversions?
 
   // Check if there might be a bridging conversion.
-  if (source->isBridgeableObjectType()
-      && mayBridgeToObjectiveC(M, target)) {
+  if (source->isBridgeableObjectType() && mayBridgeToObjectiveC(M, target)) {
+    // Try to get the ObjC type which is bridged to target type.
+    assert(!target.isAnyExistentialType());
+    Optional<Type> ObjCTy = M->getASTContext().getBridgedToObjC(
+        M, /*inExpression*/ false, target, nullptr);
+    if (ObjCTy) {
+      // If the bridged ObjC type is known, check if
+      // source type can be casted into it.
+      return classifyDynamicCast(M, source,
+          ObjCTy.getValue().getCanonicalTypeOrNull(),
+          /* isSourceTypeExact */ false, isWholeModuleOpts);
+    }
     return DynamicCastFeasibility::MaySucceed;
   }
   
-  if (target->isBridgeableObjectType()
-      && mayBridgeToObjectiveC(M, source)) {
+  if (target->isBridgeableObjectType() && mayBridgeToObjectiveC(M, source)) {
+    // Try to get the ObjC type which is bridged to source type.
+    assert(!source.isAnyExistentialType());
+    Optional<Type> ObjCTy = M->getASTContext().getBridgedToObjC(
+        M, /*inExpression*/ false, source, nullptr);
+    if (ObjCTy) {
+      // If the bridged ObjC type is known, check if
+      // this type can be casted into target type.
+      return classifyDynamicCast(M,
+          ObjCTy.getValue().getCanonicalTypeOrNull(),
+          target,
+          /* isSourceTypeExact */ false, isWholeModuleOpts);
+    }
     return DynamicCastFeasibility::MaySucceed;
   }
 

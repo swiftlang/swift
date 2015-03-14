@@ -742,14 +742,72 @@ func callFooGeneric<T : PP>(c: T) -> Int {
 
 // Check that the inlined version of callFooGeneric contains only a trap
 // followed by unreachable and no code afterwards
-// CHECK-LABEL: sil @_TF12cast_folding16callForGenericCCFCS_2CCT_
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding16callForGenericCCFCS_2CCT_
 // CHECK: builtin "int_trap"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
+@inline(never)
 public func callForGenericCC(c: CC) {
   callFoo(c)
 }
 
+// Check that compiler understands that this cast always succeeds
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding30testBridgedCastFromObjCtoSwiftFCSo8NSStringSS
+// CHECK-NOT: cast
+// CHECK: function_ref @swift_bridgeNonVerbatimFromObjectiveC
+// CHECK: apply
+// CHECK: return
+@inline(never)
+public func testBridgedCastFromObjCtoSwift(ns: NSString) -> String {
+  return ns as String
+} 
+
+// Check that compiler understands that this cast always succeeds
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding30testBridgedCastFromSwiftToObjCFSSCSo8NSString
+// CHECK-NOT: cast
+// CHECK: function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfSSFT_CSo8NSString
+// CHECK: apply
+// CHECK: return
+@inline(never)
+public func testBridgedCastFromSwiftToObjC(s: String) -> NSString {
+  return s as NSString
+} 
+
+// Check that this cast does not get eliminated, because 
+// the compiler does not statically know if this object
+// is NSNumber can can be converted into Int.
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding35testMayBeBridgedCastFromObjCtoSwiftFPSs9AnyObject_Si
+// CHECK: unconditional_checked_cast_addr
+// CHECK: return
+@inline(never)
+public func testMayBeBridgedCastFromObjCtoSwift(o: AnyObject) -> Int {
+  return o as! Int
+} 
+
+
+public func castObjCToSwift<T>(t: T) -> Int {
+  return t as! Int
+}
+
+// Check that compiler understands that this cast always fails
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding37testFailingBridgedCastFromObjCtoSwiftFCSo8NSStringSi
+// CHECK: builtin "int_trap"
+// CHECK-NEXT: unreachable
+// CHECK-NEXT: }
+@inline(never)
+public func testFailingBridgedCastFromObjCtoSwift(ns: NSString) -> Int {
+  return castObjCToSwift(ns)
+} 
+
+// Check that compiler understands that this cast always fails
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding37testFailingBridgedCastFromSwiftToObjCFSSSi
+// CHECK: builtin "int_trap"
+// CHECK-NEXT: unreachable
+// CHECK-NEXT: }
+@inline(never)
+public func testFailingBridgedCastFromSwiftToObjC(s: String) -> NSInteger {
+  return s as! NSInteger
+} 
 
 println("test0=\(test0())")
 
