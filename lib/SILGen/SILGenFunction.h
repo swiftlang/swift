@@ -205,7 +205,7 @@ public:
   
   std::vector<std::tuple<LabeledStmt*, JumpDest, JumpDest>>
     BreakContinueDestStack;
-  std::vector<PatternMatchContext*> PatternMatchStack;
+  std::vector<PatternMatchContext*> SwitchStack;
   /// Keep track of our current nested scope.
   std::vector<SILDebugScope*> DebugScopeStack;
   SILDebugScope *MainScope = nullptr;

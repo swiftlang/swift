@@ -1894,7 +1894,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   BreakContinueDestStack.push_back(std::make_tuple(S, contDest, JumpDest(S)));
 
   PatternMatchContext switchContext = { emission };
-  PatternMatchStack.push_back(&switchContext);
+  SwitchStack.push_back(&switchContext);
 
   // Emit the subject value. Dispatching will consume it.
   ManagedValue subjectMV = emitRValueAsSingleValue(S->getSubjectExpr());
@@ -1931,7 +1931,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   emission.emitSharedCaseBlocks();
 
   // Bookkeeping.
-  PatternMatchStack.pop_back();
+  SwitchStack.pop_back();
   BreakContinueDestStack.pop_back();
 
   // If the continuation block has no predecessors, this
@@ -1944,8 +1944,8 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
 }
 
 void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
-  assert(!PatternMatchStack.empty() && "fallthrough outside of switch?!");
-  PatternMatchContext *context = PatternMatchStack.back();
+  assert(!SwitchStack.empty() && "fallthrough outside of switch?!");
+  PatternMatchContext *context = SwitchStack.back();
   
   // Get the destination block.
   CaseStmt *caseStmt = S->getFallthroughDest();
