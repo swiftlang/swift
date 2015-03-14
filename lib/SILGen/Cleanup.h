@@ -144,10 +144,6 @@ public:
   /// return from the function.
   void emitCleanupsForReturn(CleanupLocation loc);
   
-  /// Emit active cleanups from the specified point to the top of stack.
-  void emitActiveCleanups(CleanupHandle from, CleanupLocation Loc);
-  
-  
   /// pushCleanup - Push a new cleanup.
   template<class T, class... A>
   T &pushCleanupInState(CleanupState state,
@@ -185,6 +181,10 @@ public:
   /// True if there are any active cleanups in the scope between the two
   /// cleanup handles.
   bool hasAnyActiveCleanups(CleanupsDepth from, CleanupsDepth to);
+
+  /// True if there are any active cleanups in the scope between the specified
+  /// cleanup handle and the current top of stack.
+  bool hasAnyActiveCleanups(CleanupsDepth from);
 };
 
 /// An RAII object that allows the state of a cleanup to be

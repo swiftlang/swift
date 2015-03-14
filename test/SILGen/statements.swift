@@ -238,31 +238,29 @@ func test_break(i : Int) {
 // CHECK-LABEL: sil hidden @_TF10statements13test_if_breakFGSqCS_1C_T_
 func test_if_break(c : C?) {
 label1:
-  // CHECK: cond_br {{.*}}, [[TRUE:bb[0-9]+]], [[FALSE:bb[0-9]+]]
+  // CHECK: switch_enum %0 : $Optional<C>, case #Optional.Some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
   if let x = c {
-// CHECK: [[TRUE]]:
+// CHECK: [[TRUE]]({{.*}} : $C):
 
     // CHECK: apply
     foo()
 
     // CHECK: strong_release
-    // CHECK: br [[BREAK:bb[0-9]+]]
+    // CHECK: br [[FALSE:bb[0-9]+]]
     break label1
     use(x)  // expected-warning {{will never be executed}}
   }
 
   // CHECK: [[FALSE]]:
-  // CHECK: br [[BREAK]]
-  // CHECK: [[BREAK]]:
   // CHECK: return
 }
 
 // CHECK-LABEL: sil hidden @_TF10statements18test_if_else_breakFGSqCS_1C_T_
 func test_if_else_break(c : C?) {
 label2:
-  // CHECK: cond_br {{.*}}, [[TRUE:bb[0-9]+]], [[FALSE:bb[0-9]+]]
+  // CHECK: switch_enum %0 : $Optional<C>, case #Optional.Some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
   if let x = c {
-    // CHECK: [[TRUE]]:
+    // CHECK: [[TRUE]]({{.*}} : $C):
     use(x)
     // CHECK: br [[CONT:bb[0-9]+]]
   } else {
@@ -280,9 +278,9 @@ label2:
 // CHECK-LABEL: sil hidden @_TF10statements23test_if_else_then_breakFTSbGSqCS_1C__T_
 func test_if_else_then_break(a : Bool, c : C?) {
   label3:
-  // CHECK: cond_br {{.*}}, [[TRUE:bb[0-9]+]], [[FALSE:bb[0-9]+]]
+  // CHECK: switch_enum %1 : $Optional<C>, case #Optional.Some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
   if let x = c {
-    // CHECK: [[TRUE]]:
+    // CHECK: [[TRUE]]({{.*}} : $C):
     use(x)
     // CHECK: br [[CONT:bb[0-9]+]]
   } else if a {
@@ -304,7 +302,7 @@ func test_if_else_then_break(a : Bool, c : C?) {
 }
 
 
-// sil hidden @_TF10statements13test_if_breakFSbT_
+// CHECK-LABEL: sil hidden @_TF10statements13test_if_breakFSbT_
 func test_if_break(a : Bool) {
   // CHECK: br [[LOOP:bb[0-9]+]]
   // CHECK: [[LOOP]]:
@@ -326,14 +324,11 @@ func test_if_break(a : Bool) {
 
   // [[IFTRUE]]:
   // CHECK: function_ref statements.foo
-  // CHECK: br [[WHILEBREAK:bb[0-9]+]]
+  // CHECK: br [[OUT]]
 
   // CHECK: [[IFFALSE]]:
   // CHECK: function_ref statements.foo
   // CHECK: br [[LOOP]]
-
-  // CHECK: [[WHILEBREAK]]:
-  // CHECK: br [[OUT]]
 
   // CHECK: [[OUT]]:
   // CHECK:   return

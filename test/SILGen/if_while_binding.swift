@@ -9,16 +9,11 @@ func c(x: String) {}
 
 // CHECK-LABEL: sil hidden @_TF16if_while_binding10if_no_else
 func if_no_else() {
-  // CHECK:   [[OPT_BUF:%.*]] = alloc_stack $Optional<String>
   // CHECK:   [[FOO:%.*]] = function_ref @_TF16if_while_binding3fooFT_GSqSS_
   // CHECK:   [[OPT_RES:%.*]] = apply [[FOO]]()
-  // CHECK:   store [[OPT_RES]] to [[OPT_BUF]]#1
-  // CHECK:   [[HAS_VALUE:%.*]] = select_enum_addr [[OPT_BUF]]#1
-  // CHECK:   cond_br [[HAS_VALUE]], [[YES:bb[0-9]+]], [[CONT:bb[0-9]+]]
+  // CHECK:   switch_enum [[OPT_RES]] : $Optional<String>, case #Optional.Some!enumelt.1: [[YES:bb[0-9]+]], default [[CONT:bb[0-9]+]]
   if let x = foo() {
-  // CHECK: [[YES]]:
-  // CHECK:   [[VAL_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF]]
-  // CHECK:   [[VAL:%.*]] = load [[VAL_BUF]]
+  // CHECK: [[YES]]([[VAL:%[0-9]+]] : $String):
   // CHECK:   [[A:%.*]] = function_ref @_TF16if_while_binding
   // CHECK:   retain_value [[VAL]]
   // CHECK:   apply [[A]]([[VAL]])
@@ -27,21 +22,17 @@ func if_no_else() {
     a(x)
   }
   // CHECK: [[CONT]]:
-  // CHECK:   dealloc_stack [[OPT_BUF]]#0
+  // CHECK-NEXT:   tuple ()
 }
 
 // CHECK-LABEL: sil hidden @_TF16if_while_binding13if_else_chainFT_T_ : $@thin () -> () {
 func if_else_chain() {
-  // CHECK:   [[OPT_BUF:%.*]] = alloc_stack $Optional<String>
   // CHECK:   [[FOO:%.*]] = function_ref @_TF16if_while_binding3foo
   // CHECK:   [[OPT_RES:%.*]] = apply [[FOO]]()
-  // CHECK:   store [[OPT_RES]] to [[OPT_BUF]]#1
-  // CHECK:   [[HAS_VALUE:%.*]] = select_enum_addr [[OPT_BUF]]#1
-  // CHECK:   cond_br [[HAS_VALUE]], [[YESX:bb[0-9]+]], [[NOX:bb[0-9]+]]
+  // CHECK:   switch_enum [[OPT_RES]] : $Optional<String>, case #Optional.Some!enumelt.1: [[YESX:bb[0-9]+]], default [[NOX:bb[0-9]+]]
   if let x = foo() {
-  // CHECK: [[YESX]]:
-  // CHECK:   [[VAL_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF]]
-  // CHECK:   [[VAL:%.*]] = load [[VAL_BUF]]
+  // CHECK: [[YESX]]([[VAL:%[0-9]+]] : $String):
+  // CHECK:   debug_value [[VAL]] : $String  // let x
   // CHECK:   [[A:%.*]] = function_ref @_TF16if_while_binding
   // CHECK:   retain_value [[VAL]]
   // CHECK:   apply [[A]]([[VAL]])
@@ -49,10 +40,9 @@ func if_else_chain() {
   // CHECK:   br [[CONT_X:bb[0-9]+]]
     a(x)
   // CHECK: [[NOX]]:
-  // CHECK:   [[OPT_BUF_2:%.*]] = alloc_stack $Optional<String>
-  // CHECK:   cond_br {{%.*}}, [[YESY:bb[0-9]+]], [[ELSE:bb[0-9]+]]
+  // CHECK:   switch_enum {{.*}} : $Optional<String>, case #Optional.Some!enumelt.1: [[YESY:bb[0-9]+]], default [[ELSE:bb[0-9]+]]
   } else if var y = bar() {
-  // CHECK: [[YESY]]:
+  // CHECK: [[YESY]]([[VAL:%[0-9]+]] : $String):
   // CHECK:   alloc_box $String   // var y
   // CHECK:   br [[CONT_Y:bb[0-9]+]]
     b(y)
@@ -64,35 +54,34 @@ func if_else_chain() {
   }
 
   // CHECK: [[CONT_Y]]:
-  // CHECK:   dealloc_stack [[OPT_BUF_2]]#0
-
+  //   br [[CONT_X]]
   // CHECK: [[CONT_X]]:
-  // CHECK:   dealloc_stack [[OPT_BUF]]#0
 }
 
 // CHECK-LABEL: sil hidden @_TF16if_while_binding10while_loopFT_T_ : $@thin () -> () {
 func while_loop() {
-  // CHECK:   [[OPT_BUF:%.*]] = alloc_stack $Optional<String>
   // CHECK:   br [[LOOP_ENTRY:bb[0-9]+]]
   // CHECK: [[LOOP_ENTRY]]:
-  // CHECK:   [[HAS_VALUE:%.*]] = select_enum_addr [[OPT_BUF]]#1
-  // CHECK:   cond_br [[HAS_VALUE]], [[LOOP_BODY:bb[0-9]+]], [[LOOP_EXIT:bb[0-9]+]]
-
+  
+  // CHECK:   switch_enum {{.*}} : $Optional<String>, case #Optional.Some!enumelt.1: [[LOOP_BODY:bb[0-9]+]], default [[LOOP_EXIT:bb[0-9]+]]
   while let x = foo() {
-  // CHECK: [[LOOP_BODY]]:
-  // CHECK:   cond_br {{%.*}}, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
+  // CHECK: [[LOOP_BODY]]([[X:%[0-9]+]] : $String):
+  // CHECK:   switch_enum {{.*}} : $Optional<String>, case #Optional.Some!enumelt.1: [[YES:bb[0-9]+]], default [[NO:bb[0-9]+]]
     if let y = bar() {
-  // CHECK: [[YES]]:
-  // CHECK-NOT: destroy_addr [[OPT_BUF]]
-  // CHECK:     br [[LOOP_END:bb[0-9]+]]
+  // CHECK: [[YES]]([[Y:%[0-9]+]] : $String):
       a(y)
       break
+      // CHECK: release_value [[Y]]
+      // CHECK: release_value [[X]]
+      // CHECK:     br [[LOOP_EXIT]]
     }
   // CHECK: [[NO]]:
+  // CHECK:   release_value [[X]]
   // CHECK:   br [[LOOP_ENTRY]]
   }
   // CHECK: [[LOOP_EXIT]]:
-  // CHECK:   dealloc_stack [[OPT_BUF]]
+  // CHECK-NEXT:   tuple ()
+  // CHECK-NEXT:   return
 }
 
 // Don't leak alloc_stacks for address-only conditional bindings in 'while'.
@@ -100,12 +89,20 @@ func while_loop() {
 // CHECK-LABEL: sil hidden @_TF16if_while_binding18while_loop_generic
 // CHECK:         br [[COND:bb[0-9]+]]
 // CHECK:       [[COND]]:
-// CHECK:         cond_br {{.*}}, [[LOOP:bb.*]], bb{{.*}}
-// CHECK:       [[LOOP]]:
+// CHECK:         [[OPTBUF:%[0-9]+]] = alloc_stack $Optional<T>
+// CHECK:         switch_enum_addr {{.*}}, case #Optional.Some!enumelt.1: [[LOOPBODY:bb.*]], default [[OUT:bb[0-9]+]]
+// CHECK:       [[LOOPBODY]]:
+// CHECK:         [[ENUMVAL:%.*]] = unchecked_take_enum_data_addr
 // CHECK:         [[X:%.*]] = alloc_stack $T
+// CHECK:         copy_addr [take] [[ENUMVAL]] to [initialization] %8#1
 // CHECK:         destroy_addr [[X]]
 // CHECK:         dealloc_stack [[X]]
 // CHECK:         br [[COND]]
+// CHECK:       [[OUT]]:
+// CHECK:         dealloc_stack [[OPTBUF]]#0
+// CHECK:         br [[DONE:bb[0-9]+]]
+// CHECK:       [[DONE]]:
+// CHECK:         strong_release %0
 func while_loop_generic<T>(source: () -> T?) {
   while let x = source() {
   }
@@ -114,131 +111,117 @@ func while_loop_generic<T>(source: () -> T?) {
 // <rdar://problem/19382942> Improve 'if let' to avoid optional pyramid of doom
 // CHECK-LABEL: sil hidden @_TF16if_while_binding16while_loop_multiFT_T_
 func while_loop_multi() {
-  // CHECK:   [[OPT_BUF1:%.*]] = alloc_stack $Optional<String>
-  // CHECK:   [[OPT_BUF2:%.*]] = alloc_stack $Optional<String>
   // CHECK:   br [[LOOP_ENTRY:bb[0-9]+]]
   // CHECK: [[LOOP_ENTRY]]:
-  // CHECK:   [[HAS_VALUE1:%.*]] = select_enum_addr [[OPT_BUF1]]#1
-  // CHECK:   cond_br [[HAS_VALUE1]], [[CHECKBUF2:bb[0-9]+]], [[LOOP_EXIT0:bb[0-9]+]]
+  // CHECK:         switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[CHECKBUF2:bb.*]], default [[LOOP_EXIT0:bb[0-9]+]]
 
-  // CHECK: [[CHECKBUF2]]:
-  // CHECK:   [[VAL_BUF1:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF1]]#1
-  // CHECK:   debug_value {{.*}} : $String  // let a
-  // CHECK:   [[HAS_VALUE2:%.*]] = select_enum_addr [[OPT_BUF2]]#1
-  // CHECK:   cond_br [[HAS_VALUE2]], [[LOOP_BODY:bb[0-9]+]], [[LOOP_EXIT2a:bb[0-9]+]]
-  // CHECK: [[LOOP_BODY]]:
+  // CHECK: [[CHECKBUF2]]([[A:%[0-9]+]] : $String):
+  // CHECK:   debug_value [[A]] : $String  // let a
+
+  // CHECK:   switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[LOOP_BODY:bb.*]], default [[LOOP_EXIT2a:bb[0-9]+]]
+
+  // CHECK: [[LOOP_BODY]]([[B:%[0-9]+]] : $String):
   while let a = foo(), b = bar() {
-    // CHECK:   [[VAL_BUF2:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF2]]#1
-    // CHECK:   debug_value {{.*}} : $String  // let b
-    // CHECK:   debug_value {{.*}} : $String  // let c
+    // CHECK:   debug_value [[B]] : $String  // let b
+    // CHECK:   debug_value [[A]] : $String  // let c
+    // CHECK:   release_value [[B]]
+    // CHECK:   release_value [[A]]
     // CHECK:   br [[LOOP_ENTRY]]
     let c = a
   }
   // CHECK: [[LOOP_EXIT2a]]:
-  // CHECK: release_value
+  // CHECK: release_value [[A]]
+  // CHECK: br [[LOOP_EXIT0]]
 
   // CHECK: [[LOOP_EXIT0]]:
-  // CHECK:   dealloc_stack [[OPT_BUF2]]#0
-  // CHECK:   dealloc_stack [[OPT_BUF1]]#0
+  // CHECK-NEXT:   tuple ()
+  // CHECK-NEXT:   return
 }
 
 // CHECK-LABEL: sil hidden @_TF16if_while_binding8if_multiFT_T_
 func if_multi() {
-  // CHECK:   [[OPT_BUF1:%.*]] = alloc_stack $Optional<String>
-  // CHECK:   [[OPT_BUF2:%.*]] = alloc_stack $Optional<String>
-  // CHECK:   [[HAS_VALUE1:%.*]] = select_enum_addr [[OPT_BUF1]]#1
-  // CHECK:   cond_br [[HAS_VALUE1]], [[CHECKBUF2:bb[0-9]+]], [[IF_DONE:bb[0-9]+]]
+  // CHECK:   switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[CHECKBUF2:bb.*]], default [[IF_DONE:bb[0-9]+]]
 
-  // CHECK: [[CHECKBUF2]]:
-  // CHECK:   [[VAL_BUF1:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF1]]#1
-  // CHECK:   debug_value {{.*}} : $String  // let a
-  // CHECK:   [[HAS_VALUE2:%.*]] = select_enum_addr [[OPT_BUF2]]#1
-  // CHECK:   cond_br [[HAS_VALUE2]], [[IF_BODY:bb[0-9]+]], [[IF_EXIT1a:bb[0-9]+]]
+  // CHECK: [[CHECKBUF2]]([[A:%[0-9]+]] : $String):
+  // CHECK:   debug_value [[A]] : $String  // let a
+  // CHECK:   switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[IF_BODY:bb.*]], default [[IF_EXIT1a:bb[0-9]+]]
 
-  // CHECK: [[IF_BODY]]:
+  // CHECK: [[IF_BODY]]([[B:%[0-9]+]] : $String):
   if let a = foo(), var b = bar() {
     // CHECK:   alloc_box $String // var b
-    // CHECK:   [[VAL_BUF2:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF2]]#1
     // CHECK:   debug_value {{.*}} : $String  // let c
+    // CHECK:   strong_release
+    // CHECK:   release_value [[A]]
     // CHECK:   br [[IF_DONE]]
     let c = a
   }
   // CHECK: [[IF_EXIT1a]]:
-  // CHECK:   release_value 
+  // CHECK:   release_value [[A]]
   // CHECK:   br [[IF_DONE]]
   
   // CHECK: [[IF_DONE]]:
-  // CHECK:   dealloc_stack [[OPT_BUF2]]#0
-  // CHECK:   dealloc_stack [[OPT_BUF1]]#0
+  // CHECK-NEXT:   tuple ()
+  // CHECK-NEXT:   return
 }
 
 // CHECK-LABEL: sil hidden @_TF16if_while_binding13if_multi_elseFT_T_
 func if_multi_else() {
-  // CHECK:   [[OPT_BUF1:%.*]] = alloc_stack $Optional<String>
-  // CHECK:   [[OPT_BUF2:%.*]] = alloc_stack $Optional<String>
-  // CHECK:   [[HAS_VALUE1:%.*]] = select_enum_addr [[OPT_BUF1]]#1
-  // CHECK:   cond_br [[HAS_VALUE1]], [[CHECKBUF2:bb[0-9]+]], [[ELSE:bb[0-9]+]]
-  // CHECK: [[CHECKBUF2]]:
-  // CHECK:   [[VAL_BUF1:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF1]]#1
-  // CHECK:   debug_value {{.*}} : $String  // let a
-  // CHECK:   [[HAS_VALUE2:%.*]] = select_enum_addr [[OPT_BUF2]]#1
-  // CHECK:   cond_br [[HAS_VALUE2]], [[IF_BODY:bb[0-9]+]], [[IF_EXIT2a:bb[0-9]+]]
-  // CHECK: [[IF_BODY]]:
+  // CHECK:   switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[CHECKBUF2:bb.*]], default [[ELSE:bb[0-9]+]]
+  // CHECK: [[CHECKBUF2]]([[A:%[0-9]+]] : $String):
+  // CHECK:   debug_value [[A]] : $String  // let a
+  // CHECK:   switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[IF_BODY:bb.*]], default [[IF_EXIT1a:bb[0-9]+]]
+  
+  // CHECK: [[IF_BODY]]([[B:%[0-9]+]] : $String):
   if let a = foo(), var b = bar() {
     // CHECK:   alloc_box $String // var b
-    // CHECK:   [[VAL_BUF2:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF2]]#1
     // CHECK:   debug_value {{.*}} : $String  // let c
+    // CHECK:   strong_release
+    // CHECK:   release_value [[A]]
     // CHECK:   br [[IF_DONE:bb[0-9]+]]
     let c = a
   } else {
     let d = 0
-    // CHECK: [[IF_EXIT2a]]:
-    // CHECK:   release_value
+    // CHECK: [[IF_EXIT1a]]:
+    // CHECK:   release_value [[A]]
     // CHECK:   br [[ELSE]]
     // CHECK: [[ELSE]]:
     // CHECK:   debug_value {{.*}} : $Int  // let d
     // CHECK:   br [[IF_DONE]]
  }
   // CHECK: [[IF_DONE]]:
-  // CHECK:   dealloc_stack [[OPT_BUF2]]#0
-  // CHECK:   dealloc_stack [[OPT_BUF1]]#0
+  // CHECK-NEXT:   tuple ()
+  // CHECK-NEXT:   return
 }
 
 // CHECK-LABEL: sil hidden @_TF16if_while_binding14if_multi_whereFT_T_
 func if_multi_where() {
+  // CHECK:   switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[CHECKBUF2:bb.*]], default [[ELSE:bb[0-9]+]]
+  // CHECK: [[CHECKBUF2]]([[A:%[0-9]+]] : $String):
+  // CHECK:   debug_value [[A]] : $String  // let a
+  // CHECK:   switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[CHECK_WHERE:bb.*]], default [[IF_EXIT1a:bb[0-9]+]]
 
-  // CHECK:   [[OPT_BUF1:%.*]] = alloc_stack $Optional<String>
-  // CHECK:   [[OPT_BUF2:%.*]] = alloc_stack $Optional<String>
-  // CHECK:   [[HAS_VALUE1:%.*]] = select_enum_addr [[OPT_BUF1]]#1
-  // CHECK:   cond_br [[HAS_VALUE1]], [[CHECKBUF2:bb[0-9]+]], [[IF_DONE:bb[0-9]+]]
-  // CHECK: [[CHECKBUF2]]:
-  // CHECK:   [[VAL_BUF1:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF1]]#1
-  // CHECK:   debug_value [[AVAL:%[0-9]+]] : $String  // let a
-  // CHECK:   [[HAS_VALUE2:%.*]] = select_enum_addr [[OPT_BUF2]]#1
-  // CHECK:   cond_br [[HAS_VALUE2]], [[CHECK_WHERE:bb[0-9]+]], [[IF_EXIT2a:bb[0-9]+]]
-  // CHECK: [[CHECK_WHERE]]:
+  // CHECK: [[CHECK_WHERE]]([[B:%[0-9]+]] : $String):
   // CHECK:   [[BBOX:%[0-9]+]] = alloc_box $String // var b
-  // CHECK:   [[VAL_BUF2:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF2]]#1
   // CHECK:   function_ref Swift.Bool._getBuiltinLogicValue (Swift.Bool)() -> Builtin.Int1
   // CHECK:   cond_br {{.*}}, [[IF_BODY:bb[0-9]+]], [[IF_EXIT3:bb[0-9]+]]
+  // CHECK: [[IF_EXIT1a]]:
+  // CHECK:   release_value [[A]]
+  // CHECK:   br [[IF_DONE:bb[0-9]+]]
+  // CHECK: [[IF_EXIT3]]:
+  // CHECK:   strong_release [[BBOX]]#0
+  // CHECK:   release_value [[A]]
+  // CHECK:   br [[IF_DONE]]
   if let a = foo(), var b = bar() where a == b {
     // CHECK: [[IF_BODY]]:
     // CHECK:   debug_value [[CVAL:%[0-9]+]] : $String  // let c
     // CHECK:   strong_release [[BBOX]]#0
-    // CHECK:   release_value [[AVAL]]
+    // CHECK:   release_value [[A]]
     // CHECK:   br [[IF_DONE]]
     let c = a
   }
-  // CHECK: [[IF_EXIT3]]:
-  // CHECK:   strong_release [[BBOX]]#0
-  // CHECK:   br [[IF_EXIT2a]]
-  // CHECK: [[IF_EXIT2a]]:
-  // CHECK:   release_value [[AVAL]]
-  // CHECK:   br [[IF_DONE]]
   // CHECK: [[IF_DONE]]:
-  // CHECK:   dealloc_stack [[OPT_BUF2]]#0
-  // CHECK:   dealloc_stack [[OPT_BUF1]]#0
-  // CHECK:   return
+  // CHECK-NEXT:   tuple ()
+  // CHECK-NEXT:   return
 }
 
 
@@ -248,30 +231,27 @@ func if_leading_boolean(a : Int) {
   // Test the boolean condition.
   
   // CHECK: debug_value %0 : $Int  // let a
-  // CHECK:   [[OPT_BUF:%.*]] = alloc_stack $Optional<String>
   // CHECK: [[EQRESULT:%[0-9]+]] = apply {{.*}}(%0, %0) : $@thin (Int, Int) -> Bool
-  // CHECK-NEXT: [[EQRESULTI1:%[0-9]+]] = apply [transparent] %3([[EQRESULT]]) : $@cc(method) @thin (Bool) -> Builtin.Int1
+
+  // CHECK-NEXT: [[EQRESULTI1:%[0-9]+]] = apply [transparent] %2([[EQRESULT]]) : $@cc(method) @thin (Bool) -> Builtin.Int1
   // CHECK-NEXT: cond_br [[EQRESULTI1]], [[CHECKFOO:bb[0-9]+]], [[IFDONE:bb[0-9]+]]
 
   // Call Foo and test for the optional being present.
 // CHECK: [[CHECKFOO]]:
   // CHECK: [[OPTRESULT:%[0-9]+]] = apply {{.*}}() : $@thin () -> @owned Optional<String>
-  // CHECK-NEXT: store [[OPTRESULT]] to [[OPT_BUF]]#1 : $*Optional<String>
-  // CHECK: [[OPT_PRESENT:%[0-9]+]] = select_enum_addr [[OPT_BUF]]#1 : $*Optional<String>,
-  // CHECK-NEXT: cond_br [[OPT_PRESENT]], [[SUCCESS:bb[0-9]+]], [[IFDONE]]
+  
+  // CHECK:   switch_enum [[OPTRESULT]] : $Optional<String>, case #Optional.Some!enumelt.1: [[SUCCESS:bb.*]], default [[IF_DONE:bb[0-9]+]]
 
-// CHECK: [[SUCCESS]]:
-  // CHECK:   [[VAL_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF]]#1
-  // CHECK-NEXT:   [[VAL:%[0-9]+]] = load [[VAL_BUF]] : $*String
-  // CHECK-NEXT:   debug_value [[VAL:%[0-9]+]] : $String  // let b
-  // CHECK-NEXT:   debug_value [[VAL:%[0-9]+]] : $String  // let c
-  // CHECK-NEXT:   release_value [[VAL]]
-  // CHECK-NEXT:   br [[IFDONE:bb[0-9]+]]
+// CHECK: [[SUCCESS]]([[B:%[0-9]+]] : $String):
+  // CHECK-NEXT:   debug_value [[B:%[0-9]+]] : $String  // let b
+  // CHECK-NEXT:   debug_value [[B:%[0-9]+]] : $String  // let c
+  // CHECK-NEXT:   release_value [[B]]
+  // CHECK-NEXT:   br [[IFDONE]]
   if a == a, let b = foo() {
     let c = b
   }
   // CHECK: [[IFDONE]]:
-  // CHECK-NEXT: dealloc_stack [[OPT_BUF]]#0
+  // CHECK-NEXT: tuple ()
 
 }
 

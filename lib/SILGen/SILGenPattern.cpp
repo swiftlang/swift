@@ -421,11 +421,19 @@ class PatternMatchEmission {
   CleanupsDepth PatternMatchStmtDepth;
   llvm::MapVector<CaseStmt*, SILBasicBlock*> SharedCases;
 
+  std::function<void()> CompletionHandler;
+ 
 public:
   PatternMatchEmission(SILGenFunction &SGF, Stmt *S)
     : SGF(SGF), PatternMatchStmt(S),
       PatternMatchStmtDepth(SGF.getCleanupsDepth()) {}
 
+  /// Set a handler to call when a pattern match succeeds, if not using
+  /// CaseStmt's.
+  void setCompletionHandler(std::function<void()> handler) {
+    CompletionHandler = handler;
+  }
+  
   void emitDispatch(ClauseMatrix &matrix, ArgArray args,
                     const FailureHandler &failure);
 
@@ -1019,6 +1027,14 @@ void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
   // Enter the row.
   CaseStmt *caseBlock = clauses[row].getCaseBlock();
 
+  // If the CaseStmt is null, then we're doing custom emission for the condition
+  // of an if/let while/let statement.  Run the handler and we're done.
+  if (caseBlock == nullptr) {
+    CompletionHandler();
+    return;
+  }
+  
+  
   SGF.emitProfilerIncrement(caseBlock);
 
   // Certain case statements can be entered along multiple paths,
@@ -1952,3 +1968,183 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
   JumpDest sharedDest = context->Emission.getSharedCaseBlockDest(caseStmt);
   Cleanups.emitBranchAndCleanups(sharedDest, S);
 }
+
+
+/// Recursively emit the pieces of a condition in an if/while stmt.
+static void
+emitStmtConditionWithBodyRec(Stmt *CondStmt, unsigned CondElement,
+                             JumpDest SuccessDest, JumpDest CondFailDest,
+                             SILGenFunction &gen) {
+  Stmt *Body;
+  StmtCondition Condition;
+  
+  if (auto *If = dyn_cast<IfStmt>(CondStmt)) {
+    Body = If->getThenStmt();
+    Condition = If->getCond();
+  } else {
+    auto *While = cast<WhileStmt>(CondStmt);
+    Body = While->getBody();
+    Condition = While->getCond();
+  }
+  
+  // In the base case, we have already emitted all of the pieces of the
+  // condition.  There is nothing to do except to finally emit the Body, which
+  // will be in the scope of any emitted patterns.
+  if (CondElement == Condition.size()) {
+    gen.emitProfilerIncrement(Body);
+    gen.visit(Body);
+    
+    // Finish the "true part" by cleaning up any temporaries and jumping to the
+    // continuation block.
+    if (gen.B.hasValidInsertionPoint()) {
+      RegularLocation L(Body);
+      L.pointToEnd();
+      gen.Cleanups.emitBranchAndCleanups(SuccessDest, L);
+    }
+    return;
+  }
+
+  // In the recursive case, we emit a condition guard, which is either a boolean
+  // expression or a refutable pattern binding. Handle boolean conditions first.
+  if (auto *expr = Condition[CondElement].getCondition()) {
+    // Evaluate the condition as an i1 value (guaranteed by Sema).
+    SILValue V;
+    {
+      FullExpr Scope(gen.Cleanups, CleanupLocation(expr));
+      V = gen.emitRValue(expr).forwardAsSingleValue(gen, expr);
+    }
+    assert(V.getType().castTo<BuiltinIntegerType>()->isFixedWidth(1) &&
+           "Sema forces conditions to have Builtin.i1 type");
+    
+    // Just branch on the condition.  On failure, we unwind any active cleanups,
+    // on success we fall through to a new block.
+    SILBasicBlock *ContBB = gen.createBasicBlock();
+    SILBasicBlock *FailBB = CondFailDest.getBlock();
+    
+    // If earlier parts of the condition have already emitted cleanups, then
+    // we need to run them on the exit from this boolean condition, and will
+    // need a block to emit the cleanups into.  Otherwise, we can get away with
+    // a direct jump and avoid creating a pointless block.
+    if (gen.Cleanups.hasAnyActiveCleanups(CondFailDest.getDepth()))
+      FailBB = gen.createBasicBlock();
+    
+    gen.B.createCondBranch(expr, V, ContBB, FailBB);
+
+    // Emit cleanups on the failure path if needed.
+    if (FailBB != CondFailDest.getBlock()) {
+      gen.B.emitBlock(FailBB);
+      gen.Cleanups.emitBranchAndCleanups(CondFailDest, CondStmt);
+    }
+
+    // Finally, emit the continue block and keep emitting the rest of the
+    // condition.
+    gen.B.emitBlock(ContBB);
+    return emitStmtConditionWithBodyRec(CondStmt, CondElement+1,
+                                        SuccessDest, CondFailDest, gen);
+  }
+  
+  // Otherwise, we have a pattern initialized by an optional.  Emit the optional
+  // expression and test its presence.
+  auto *PBD = Condition[CondElement].getBinding();
+  
+  PatternMatchEmission emission(gen, CondStmt);
+  
+  // Emit the initializer value being matched against. Dispatching will consume
+  // it.
+  ManagedValue subjectMV = gen.emitRValueAsSingleValue(PBD->getInit());
+  auto subject = ConsumableManagedValue::forOwned(subjectMV);
+  
+  // Add a row for the pattern we want to match against.
+  std::vector<ClauseRow> clauseRows;
+  clauseRows.reserve(1);
+
+  // if-let conditions implicitly have an OptionalSome wrapping the pattern
+  // that is explicitly written.
+  auto OptTy = PBD->getInit()->getType();
+  auto OptKind = OptTy->getNominalOrBoundGenericNominal()
+                      ->classifyAsOptionalType();
+  auto thePattern = new (gen.getASTContext())
+      OptionalSomePattern(PBD->getPattern(), PBD->getPattern()->getEndLoc(),
+                          /*implicit*/true);
+  thePattern->setType(OptTy);
+  thePattern->setElementDecl(gen.getASTContext().getOptionalSomeDecl(OptKind));
+  
+  
+  // FIXME: Refactor ClauseRow ctor to not take a CaseLabelItem.
+  CaseLabelItem CaseItem(/*isdefault*/false, thePattern,
+                         /*WhereLoc*/SourceLoc(), /*where expr*/nullptr);
+  
+  clauseRows.emplace_back(/*caseBlock*/nullptr, &CaseItem);
+  
+  // Set the handler that generates code when the match succeeds.  This simply
+  // continues emission of the rest of the condition.
+  emission.setCompletionHandler([&]{
+    emitStmtConditionWithBodyRec(CondStmt, CondElement+1,
+                                 SuccessDest, CondFailDest, gen);
+  });
+
+  SILBasicBlock *MatchFailureBB = 0;
+  
+  // In the match failure case, we wind back out of the cleanup blocks.
+  auto matchFailure = [&](SILLocation location) {
+    MatchFailureBB = gen.B.getInsertionBB();
+    gen.Cleanups.emitBranchAndCleanups(CondFailDest, CondStmt);
+  };
+  
+  // Finally, emit the pattern binding, and recursively emit the rest of the
+  // condition and the body of the statement.
+  ClauseMatrix clauses(clauseRows);
+  emission.emitDispatch(clauses, subject, matchFailure);
+  assert(!gen.B.hasValidInsertionPoint());
+  
+  
+  // Our match failure case often ends up with a switch_enum (or whatever) to
+  // the match failure block, which is then just a jump to another block.  Check
+  // to see if the match failure block is trivial, and if so, clean it up.
+  if (MatchFailureBB && MatchFailureBB->getNumBBArg() == 0)
+    if (auto *BI = dyn_cast<BranchInst>(&MatchFailureBB->getInstList().front()))
+      if (auto *SinglePred = MatchFailureBB->getSinglePredecessor()) {
+        if (BI->getDestBB()->getNumBBArg() == 0) {
+          for (SILSuccessor &elt : SinglePred->getSuccessors()) {
+            if (elt == MatchFailureBB)
+              elt = BI->getDestBB();
+          }
+          
+          assert(MatchFailureBB->pred_empty() &&
+                 "Didn't remove all predecessors");
+          MatchFailureBB->eraseFromParent();
+        }
+      }
+}
+
+/// Emit the code to evaluate a general StmtCondition, and then a "Body" guarded
+/// by the condition that executes when the condition is true.  This ensures
+/// that bound variables are in scope when the body runs, but are cleaned up
+/// after it is done.
+///
+/// This can produce a number of basic blocks:
+///   1) the insertion point is the block in which all of the predicates
+///      evalute to true and any patterns match and have their buffers
+///      initialized, and the Body has been emitted.  All bound variables are in
+///      scope for the body, and are cleaned up before the insertion point is
+///      done.
+///   2) the returned list of blocks indicates the destruction order for any
+///      contained pattern bindings.  Jumping to the first block in the list
+///      will release all bound values.  The last block in the list will
+///      continue execution after the condition fails and is fully cleaned up.
+///
+void SILGenFunction::emitStmtConditionWithBody(Stmt *S,SILBasicBlock *SuccessBB,
+                                               SILBasicBlock *FailBB) {
+  assert(B.hasValidInsertionPoint() &&
+         "emitting condition at unreachable point");
+  
+  // Enter a scope for pattern variables.
+  Scope trueScope(Cleanups, S);
+  
+  JumpDest SuccessDest(SuccessBB, getCleanupsDepth(), CleanupLocation(S));
+  JumpDest FailDest(FailBB, getCleanupsDepth(), CleanupLocation(S));
+  emitStmtConditionWithBodyRec(S, 0, SuccessDest, FailDest, *this);
+}
+
+
+

@@ -91,6 +91,10 @@ bool CleanupManager::hasAnyActiveCleanups(CleanupsDepth from,
   return ::hasAnyActiveCleanups(Stack.find(from), Stack.find(to));
 }
 
+bool CleanupManager::hasAnyActiveCleanups(CleanupsDepth from) {
+  return ::hasAnyActiveCleanups(Stack.begin(), Stack.find(from));
+}
+
 
 /// emitBranchAndCleanups - Emit a branch to the given jump destination,
 /// threading out through any cleanups we might need to run.  This does not
@@ -110,19 +114,6 @@ void CleanupManager::emitBranchAndCleanups(JumpDest Dest,
 
   B.createBranch(BranchLoc, Dest.getBlock(), Args);
 }
-
-/// Emit active cleanups from the specified point to the top of stack.
-void CleanupManager::emitActiveCleanups(CleanupHandle from,
-                                        CleanupLocation Loc) {
-  assert(Gen.getBuilder().hasValidInsertionPoint() &&
-         "Inserting branch in invalid spot");
-
-  for (auto cleanup = Stack.begin(), e = Stack.find(from);
-       cleanup != e; ++cleanup)
-    if (cleanup->isActive())
-      cleanup->emit(Gen, Loc);
-}
-
 
 void CleanupManager::emitCleanupsForReturn(CleanupLocation Loc) {
   for (auto &cleanup : Stack)

@@ -680,6 +680,9 @@ public:
   // Patterns
   //===--------------------------------------------------------------------===//
 
+  void emitStmtConditionWithBody(Stmt *S, SILBasicBlock *SuccessBB,
+                                 SILBasicBlock *FailBB);
+
   void emitSwitchStmt(SwitchStmt *S);
   void emitSwitchFallthrough(FallthroughStmt *S);
   
