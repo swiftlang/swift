@@ -1608,8 +1608,30 @@ Reflection.test("COpaquePointer/null") {
   expectEqual("(Opaque Value)", child.1.summary)
 }
 
-Reflection.test("StaticString") {
-	expectEqual("Hello", reflect("Hello" as StaticString).summary)
+Reflection.test("StaticString/Mirror") {
+  if true {
+    var output = ""
+    dump("" as StaticString, &output)
+
+    let expected =
+      "- \n"
+
+    expectEqual(expected, output)
+  }
+
+  if true {
+    // U+0061 LATIN SMALL LETTER A
+    // U+304B HIRAGANA LETTER KA
+    // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
+    // U+1F425 FRONT-FACING BABY CHICK
+    var output = ""
+    dump("\u{61}\u{304b}\u{3099}\u{1f425}" as StaticString, &output)
+
+    let expected =
+      "- \u{61}\u{304b}\u{3099}\u{1f425}\n"
+
+    expectEqual(expected, output)
+  }
 }
 
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
