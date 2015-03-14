@@ -26,6 +26,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/DenseMap.h"
 
 namespace llvm {
   class raw_ostream;
@@ -39,6 +40,7 @@ namespace swift {
   class Decl;
   class DeclContext;
   class ExtensionDecl;
+  class Expr;
   class GenericParamList;
   class LazyResolver;
   class LazyMemberLoader;
@@ -403,6 +405,8 @@ public:
 
   void dumpContext() const;
   unsigned printContext(llvm::raw_ostream &OS) const;
+
+  llvm::DenseMap<Expr *, Expr *> getExprParentMap();
   
   // Only allow allocation of DeclContext using the allocator in ASTContext.
   void *operator new(size_t Bytes, ASTContext &C,

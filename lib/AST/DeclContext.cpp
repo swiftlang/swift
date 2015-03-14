@@ -15,6 +15,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -54,6 +55,24 @@ DeclContext::isNominalTypeOrNominalTypeExtensionContext() const {
 ClassDecl *DeclContext::isClassOrClassExtensionContext() const {
   return dyn_cast_or_null<ClassDecl>(
            isNominalTypeOrNominalTypeExtensionContext());
+}
+
+llvm::DenseMap<Expr *, Expr *> DeclContext::getExprParentMap() {
+  llvm::DenseMap<Expr *, Expr *> ParentMap;
+  class Walker : public ASTWalker {
+  public:
+    llvm::DenseMap<Expr *, Expr *> &ParentMap;
+    explicit Walker(llvm::DenseMap<Expr *, Expr *> &parentMap)
+    : ParentMap(parentMap) { }
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override{
+      if (Parent.getAsExpr()) {
+        ParentMap[E] = Parent.getAsExpr();
+      }
+      return { true, E };
+    }
+  } Walker(ParentMap);
+  walkContext(Walker);
+  return ParentMap;
 }
 
 Type DeclContext::getDeclaredTypeOfContext() const {

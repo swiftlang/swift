@@ -2540,7 +2540,19 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::DotExpr: {
     Lookup.setHaveDot(DotLoc);
-    Type ExprType = ParsedExpr->getType();
+    Type OriginalType = ParsedExpr->getType();
+    Type ExprType = OriginalType;
+
+    // If there is no nominal type in the expr, try to find nominal types
+    // in the ancestors of the expr.
+    if (!OriginalType->getAnyNominal()) {
+      auto ParentMap = CurDeclContext->getExprParentMap();
+      while (ParsedExpr && !ParsedExpr->getType()->getAnyNominal()) {
+        ParsedExpr = ParentMap[ParsedExpr];
+      }
+      ExprType = ParsedExpr ? ParsedExpr->getType() : OriginalType;
+    }
+
     if (isDynamicLookup(ExprType))
       Lookup.setIsDynamicLookup();
     Lookup.getValueExprCompletions(ExprType);
