@@ -1,11 +1,11 @@
 // RUN: %target-run-simple-swift
 
-public typealias StructuralChild = (label: String?, value: Any)
+public typealias ReflectedChild = (label: String?, value: Any)
 
 // The thing you have to implement
-public protocol StructuralDescriptionType {
+public protocol ReflectedStructureType {
   func count() -> Int
-  func childAtOffset(offset: Int) -> StructuralChild
+  func childrenInRange(range: Range<Int>) -> Array<ReflectedChild>
 }
 
 // The thing with the default schema
@@ -14,12 +14,12 @@ public struct Mirror {
   case Struct, Class, Enum, Optional, Array, Dictionary, Set
   }
 
-  public init(_ structure: StructuralDescriptionType, schema: Schema? = nil) {
+  public init(_ structure: ReflectedStructureType, schema: Schema? = nil) {
     self.structure = structure
     self.schema = schema
   }
 
-  public let structure: StructuralDescriptionType
+  public let structure: ReflectedStructureType
   public let schema: Schema?
 }
 
@@ -33,7 +33,7 @@ protocol CustomReflectable {
 //===--- Ad-hoc random access collection adapter proof-of-concept ---------===//
 public struct RandomAccessStructure<
   C: CollectionType where C.Index: RandomAccessIndexType
-> : StructuralDescriptionType {
+> : ReflectedStructureType {
 
   public init(_ elements: C) {
     self.elements = elements
@@ -41,7 +41,7 @@ public struct RandomAccessStructure<
 
   public func count() -> Int { return numericCast(Swift.count(elements)) }
   
-  public func childAtOffset(offset: Int) -> StructuralChild {
+  public func childAtOffset(offset: Int) -> ReflectedChild {
     let v = elements[elements.startIndex.advancedBy(numericCast(offset))]
     return (label: nil, value: v)
   }
@@ -61,7 +61,7 @@ extension Mirror {
 // Forward collections left as an exercise for the reader.
 public struct BidirectionalStructure<
   C: CollectionType where C.Index: BidirectionalIndexType
-> : StructuralDescriptionType {
+> : ReflectedStructureType {
 
   public init(_ elements: C) {
     self.elements = elements
@@ -90,7 +90,7 @@ public struct BidirectionalStructure<
     }
   }
   
-  public func childAtOffset(offset: Int) -> StructuralChild {
+  public func childAtOffset(offset: Int) -> ReflectedChild {
     let v = elements[mapIndex(offset)]
     return (label: nil, value: v)
   }
@@ -115,7 +115,7 @@ extension Mirror {
 //===--- Horrible ad-hoc forward collection adapter proof-of-concept. -----===//
 public struct ForwardStructure<
   C: CollectionType where C.Index: ForwardIndexType
-> : StructuralDescriptionType {
+> : ReflectedStructureType {
 
   public init(_ elements: C) {
     self.elements = elements
@@ -141,7 +141,7 @@ public struct ForwardStructure<
     }
   }
   
-  public func childAtOffset(offset: Int) -> StructuralChild {
+  public func childAtOffset(offset: Int) -> ReflectedChild {
     let v = elements[mapIndex(offset)]
     return (label: nil, value: v)
   }
@@ -163,9 +163,9 @@ extension Mirror {
   }
 }
 
-//===--- StructuralDescriptionType for Aggregates -------------------------===//
+//===--- ReflectedStructureType for Aggregates -------------------------===//
 public struct LabeledStructure
-  : StructuralDescriptionType, DictionaryLiteralConvertible {
+  : ReflectedStructureType, DictionaryLiteralConvertible {
   public init(dictionaryLiteral elements: (String, Any)...) {
     self.elements = elements
   }
