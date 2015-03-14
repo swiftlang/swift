@@ -25,6 +25,7 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -135,10 +136,18 @@ class SILCombiner :
   /// is cleared.
   llvm::SmallVector<SILInstruction *, 64> TrackingList;
 
+  /// Cast optimizer
+  CastOptimizer CastOpt;
+
 public:
   SILCombiner(AliasAnalysis *AA, bool removeCondFails)
     : AA(AA), Worklist(), MadeChange(false), RemoveCondFails(removeCondFails),
-      Iteration(0), Builder(0) { }
+      Iteration(0), Builder(0),
+      CastOpt(/* ReplaceInstUsesAction */
+              [&](SILInstruction *I,
+                  ValueBase * V) { replaceInstUsesWith(*I, V); },
+              /* EraseAction */
+              [&](SILInstruction *I) { eraseInstFromFunction(*I); }) { }
 
   bool runOnFunction(SILFunction &F);
 

@@ -135,6 +135,7 @@ namespace {
     bool simplifyBranchBlock(BranchInst *BI);
     bool simplifyCondBrBlock(CondBranchInst *BI);
     bool simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI);
+    bool simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI);
     bool simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI);
     bool simplifySwitchEnumBlock(SwitchEnumInst *SEI);
     bool simplifyUnreachableBlock(UnreachableInst *UI);
@@ -2145,64 +2146,46 @@ bool SimplifyCFG::simplifyUnreachableBlock(UnreachableInst *UI) {
 }
 
 bool SimplifyCFG::simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI) {
-  // [exact] does not perform any cast.
-  // It checks that the types are exactly the same.
-  if (CCBI->isExact())
-    return false;
+  auto SuccessBB = CCBI->getSuccessBB();
+  auto FailureBB = CCBI->getFailureBB();
+  auto ThisBB = CCBI->getParent();
 
-  bool isSourceTypeExact = isa<MetatypeInst>(CCBI->getOperand());
+  CastOptimizer CastOpt(
+      [](SILInstruction *I, ValueBase *V){} /* ReplaceInstUsesAction */,
+      [](SILInstruction *I) {} /* EraseInstAction */,
+      [&]() { /* WillSucceedAction */
+        removeIfDead(FailureBB);
+        addToWorklist(ThisBB);
+      },
+      [&]() { /* WillFailAction */
+        removeIfDead(SuccessBB);
+        addToWorklist(ThisBB);
+      });
 
-  // Check if we can statically predict the outcome of the cast.
-  auto Feasibility = classifyDynamicCast(CCBI->getModule().getSwiftModule(),
-                          CCBI->getOperand().getType().getSwiftRValueType(),
-                          CCBI->getCastType().getSwiftRValueType(),
-                          isSourceTypeExact);
-
-  if (Feasibility == DynamicCastFeasibility::MaySucceed)
-    return false;
-
-  auto *FailureBB = CCBI->getFailureBB();
-  auto *SuccessBB = CCBI->getSuccessBB();
-  auto *ThisBB = CCBI->getParent();
-
-
-  if (Feasibility == DynamicCastFeasibility::WillFail) {
-    SILBuilderWithScope<1> Builder(CCBI);
-    Builder.createBranch(CCBI->getLoc(), FailureBB);
-    CCBI->eraseFromParent();
-    removeIfDead(SuccessBB);
-    addToWorklist(ThisBB);
-    return true;
-  }
-
-  if (Feasibility == DynamicCastFeasibility::WillSucceed) {
-    SILBuilderWithScope<1> Builder(CCBI);
-    SmallVector<SILValue, 1> Args;
-    bool ResultHasNoUse = SuccessBB->getBBArg(0)->use_empty();
-    SILValue CastedValue ;
-    if (CCBI->getOperand().getType() != CCBI->getCastType()) {
-      if (!ResultHasNoUse) {
-        // Replace by unconditional_cast, followed by a branch.
-        CastedValue = Builder.createUnconditionalCheckedCast(
-            CCBI->getLoc(), CCBI->getOperand(), CCBI->getCastType());
-      } else {
-        CastedValue = SILUndef::get(CCBI->getCastType(), CCBI->getModule());
-      }
-    } else {
-      // No need to cast.
-      CastedValue = CCBI->getOperand();
-    }
-    Args.push_back(CastedValue);
-    Builder.createBranch(CCBI->getLoc(), SuccessBB, Args);
-    CCBI->eraseFromParent();
-    removeIfDead(FailureBB);
-    addToWorklist(ThisBB);
-    return true;
-  }
-
-  return false;
+  return CastOpt.simplifyCheckedCastBranchInst(CCBI) != nullptr;
 }
 
+bool
+SimplifyCFG::
+simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI) {
+  auto SuccessBB = CCABI->getSuccessBB();
+  auto FailureBB = CCABI->getFailureBB();
+  auto ThisBB = CCABI->getParent();
+
+  CastOptimizer CastOpt(
+      [](SILInstruction *I, ValueBase *V){} /* ReplaceInstUsesAction */,
+      [](SILInstruction *I) {} /* EraseInstAction */,
+      [&]() { /* WillSucceedAction */
+        removeIfDead(FailureBB);
+        addToWorklist(ThisBB);
+      },
+      [&]() { /* WillFailAction */
+        removeIfDead(SuccessBB);
+        addToWorklist(ThisBB);
+      });
+
+  return CastOpt.simplifyCheckedCastAddrBranchInst(CCABI) != nullptr;
+}
 
 void RemoveUnreachable::visit(SILBasicBlock *BB) {
   if (!Visited.insert(BB).second)
@@ -2269,6 +2252,9 @@ bool SimplifyCFG::simplifyBlocks() {
       break;
     case ValueKind::CheckedCastBranchInst:
       Changed |= simplifyCheckedCastBranchBlock(cast<CheckedCastBranchInst>(TI));
+      break;
+    case ValueKind::CheckedCastAddrBranchInst:
+      Changed |= simplifyCheckedCastAddrBranchBlock(cast<CheckedCastAddrBranchInst>(TI));
       break;
     default:
       break;

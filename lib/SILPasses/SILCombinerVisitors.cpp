@@ -12,7 +12,6 @@
 
 #define DEBUG_TYPE "sil-combine"
 #include "SILCombiner.h"
-#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
@@ -1861,63 +1860,27 @@ visitUnreachableInst(UnreachableInst *UI) {
 SILInstruction *
 SILCombiner::
 visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI) {
-  bool isSourceTypeExact = isa<MetatypeInst>(UCCAI->getSrc());
-
-  // Check if we can statically predict the outcome of the cast.
-  auto Feasibility = classifyDynamicCast(UCCAI->getModule().getSwiftModule(),
-                          UCCAI->getSourceType(),
-                          UCCAI->getTargetType(),
-                          isSourceTypeExact);
-
-  if (Feasibility == DynamicCastFeasibility::WillFail) {
-    // Remove the cast and insert a trap, followed by an
-    // unreachable instruction.
-    SILBuilderWithScope<1> Builder(UCCAI);
-    auto *Trap = Builder.createBuiltinTrap(UCCAI->getLoc());
-    UCCAI->replaceAllUsesWithUndef();
-    eraseInstFromFunction(*UCCAI);
-    Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(Trap)));
-    Builder.createUnreachable(ArtificialUnreachableLocation());
-  }
-
-  return nullptr;
+  return CastOpt.optimizeUnconditionalCheckedCastAddrInst(UCCAI);
 }
 
 SILInstruction *
 SILCombiner::
 visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
-  bool isSourceTypeExact = isa<MetatypeInst>(UCCI->getOperand());
-
-  // Check if we can statically predict the outcome of the cast.
-  auto Feasibility = classifyDynamicCast(UCCI->getModule().getSwiftModule(),
-                          UCCI->getOperand().getType().getSwiftRValueType(),
-                          UCCI->getType().getSwiftRValueType(),
-                          isSourceTypeExact);
-
-  if (Feasibility == DynamicCastFeasibility::WillFail) {
-    // Remove the cast and insert a trap, followed by an
-    // unreachable instruction.
-    SILBuilderWithScope<1> Builder(UCCI);
-    auto *Trap = Builder.createBuiltinTrap(UCCI->getLoc());
-    UCCI->replaceAllUsesWithUndef();
-    eraseInstFromFunction(*UCCI);
-    Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(Trap)));
-    Builder.createUnreachable(ArtificialUnreachableLocation());
+  if (CastOpt.optimizeUnconditionalCheckedCastInst(UCCI))
     return nullptr;
-  }
 
   // FIXME: rename from RemoveCondFails to RemoveRuntimeAsserts.
   if (RemoveCondFails) {
-    SILModule &Mod = UCCI->getModule();
-    SILValue Op = UCCI->getOperand();
-    SILLocation Loc = UCCI->getLoc();
-
-    if (Op.getType().isAddress()) {
+    auto LoweredTargetType = UCCI->getType();
+    auto &Mod = UCCI->getModule();
+    auto Loc = UCCI->getLoc();
+    auto Op = UCCI->getOperand();
+    if (LoweredTargetType.isAddress()) {
       // unconditional_checked_cast -> unchecked_addr_cast
-      return new (Mod) UncheckedAddrCastInst(Loc, Op, UCCI->getType());
-    } else if (Op.getType().isHeapObjectReferenceType()) {
+      return new (Mod) UncheckedAddrCastInst(Loc, Op, LoweredTargetType);
+    } else if (LoweredTargetType.isHeapObjectReferenceType()) {
       // unconditional_checked_cast -> unchecked_ref_cast
-      return new (Mod) UncheckedRefCastInst(Loc, Op, UCCI->getType());
+      return new (Mod) UncheckedRefCastInst(Loc, Op, LoweredTargetType);
     }
   }
 
@@ -2235,249 +2198,11 @@ SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *FLI) {
 
 SILInstruction *
 SILCombiner::visitCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
-
-  // Try to simplify checked_cond_br instructions using existential
-  // metatypes by propagating a concrete type whenever it can be
-  // determined statically.
-
-  // %0 = metatype $A.Type
-  // %1 = init_existential_metatype ..., %0: $A
-  // checked_cond_br %1, ....
-  // ->
-  // %1 = metatype $A.Type
-  // checked_cond_br %1, ....
-  if (auto *IEMI = dyn_cast<InitExistentialMetatypeInst>(CBI->getOperand())) {
-    if (auto *MI = dyn_cast<MetatypeInst>(IEMI->getOperand())) {
-      SILBuilderWithScope<1> B(CBI);
-      B.createCheckedCastBranch(CBI->getLoc(), CBI->isExact(), MI,
-                                CBI->getCastType(),
-                                CBI->getSuccessBB(),
-                                CBI->getFailureBB());
-      CBI->eraseFromParent();
-      return nullptr;
-    }
-  }
-
-  if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(CBI->getOperand())) {
-    // Operand of the existential_metatype instruction.
-    auto Op = EMI->getOperand();
-    auto EmiTy = EMI->getType();
-
-    // %0 = alloc_stack ..
-    // %1 = init_existential_addr %0: $A
-    // %2 = existential_metatype %0, ...
-    // checked_cond_br %2, ....
-    // ->
-    // %1 = metatype $A.Type
-    // checked_cond_br %1, ....
-
-    if (auto *ASI = dyn_cast<AllocStackInst>(Op)) {
-      // Should be in the same BB.
-      if (ASI->getParent() != EMI->getParent())
-        return nullptr;
-      // Check if this alloc_stac is is only initialized once by means of
-      // single init_existential_addr.
-      bool isLegal = true;
-      // init_existental instruction used to initialize this alloc_stack.
-      InitExistentialAddrInst *FoundIEI = nullptr;
-      for (auto Use: ASI->getUses()) {
-        auto *User = Use->getUser();
-        if (isa<ExistentialMetatypeInst>(User) ||
-            isa<DestroyAddrInst>(User) ||
-            isa<DeallocStackInst>(User))
-           continue;
-        if (auto *IEI = dyn_cast<InitExistentialAddrInst>(User)) {
-          if (!FoundIEI) {
-            FoundIEI = IEI;
-            continue;
-          }
-        }
-        isLegal = false;
-        break;
-      }
-
-      if (isLegal && FoundIEI) {
-        // Should be in the same BB.
-        if (FoundIEI->getParent() != EMI->getParent())
-          return nullptr;
-        // Get the type used to initialize the existential.
-        auto LoweredConcreteTy = FoundIEI->getLoweredConcreteType();
-        if (LoweredConcreteTy.isAnyExistentialType())
-          return nullptr;
-        // Get the metatype of this type.
-        auto EMT = dyn_cast<AnyMetatypeType>(EmiTy.getSwiftRValueType());
-        auto *MetaTy = MetatypeType::get(LoweredConcreteTy.getSwiftRValueType(),
-                                         EMT->getRepresentation());
-        auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
-        auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
-        SILBuilderWithScope<1> B(CBI);
-        auto *MI = B.createMetatype(FoundIEI->getLoc(), SILMetaTy);
-
-        B.createCheckedCastBranch(CBI->getLoc(), CBI->isExact(), MI,
-                                  CBI->getCastType(),
-                                  CBI->getSuccessBB(),
-                                  CBI->getFailureBB());
-        CBI->eraseFromParent();
-        return nullptr;
-      }
-    }
-
-    // %0 = alloc_ref $A
-    // %1 = init_existential_ref %0: $A, $...
-    // %2 = existential_metatype ..., %1 :  ...
-    // checked_cond_br %2, ....
-    // ->
-    // %1 = metatype $A.Type
-    // checked_cond_br %1, ....
-    if (auto *FoundIERI = dyn_cast<InitExistentialRefInst>(Op)) {
-      auto *ASRI = dyn_cast<AllocRefInst>(FoundIERI->getOperand());
-      if (!ASRI)
-        return nullptr;
-      // Should be in the same BB.
-      if (ASRI->getParent() != EMI->getParent())
-        return nullptr;
-      // Check if this alloc_stac is is only initialized once by means of
-      // a single initt_existential_ref.
-      bool isLegal = true;
-      for (auto Use: ASRI->getUses()) {
-        auto *User = Use->getUser();
-        if (isa<ExistentialMetatypeInst>(User) || isa<StrongReleaseInst>(User))
-           continue;
-        if (auto *IERI = dyn_cast<InitExistentialRefInst>(User)) {
-          if (IERI == FoundIERI) {
-            continue;
-          }
-        }
-        isLegal = false;
-        break;
-      }
-
-      if (isLegal && FoundIERI) {
-        // Should be in the same BB.
-        if (FoundIERI->getParent() != EMI->getParent())
-          return nullptr;
-        // Get the type used to initialize the existential.
-        auto ConcreteTy = FoundIERI->getFormalConcreteType();
-        if (ConcreteTy.isAnyExistentialType())
-          return nullptr;
-        // Get the SIL metatype of this type.
-        auto EMT = dyn_cast<AnyMetatypeType>(EMI->getType().getSwiftRValueType());
-        auto *MetaTy = MetatypeType::get(ConcreteTy, EMT->getRepresentation());
-        auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
-        auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
-        SILBuilderWithScope<1> B(CBI);
-        auto *MI = B.createMetatype(FoundIERI->getLoc(), SILMetaTy);
-
-        B.createCheckedCastBranch(CBI->getLoc(), CBI->isExact(), MI,
-                                  CBI->getCastType(),
-                                  CBI->getSuccessBB(),
-                                  CBI->getFailureBB());
-        CBI->eraseFromParent();
-        return nullptr;
-      }
-    }
-  }
-
-  return nullptr;
+  return CastOpt.optimizeCheckedCastBranchInst(CBI);
 }
 
 SILInstruction *
 SILCombiner::
 visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
-  // %1 = metatype $A.Type
-  // [%2 = init_existential_metatype %1 ...]
-  // %3 = alloc_stack
-  // store %1 to %3 or store %2 to %3
-  // checked_cast_addr_br %3 to ...
-  // ->
-  // %1 = metatype $A.Type
-  // checked_cast_addr_br %1 to ...
-  if (auto *ASI = dyn_cast<AllocStackInst>(CCABI->getSrc().getDef())) {
-    // Check if the value of this alloc_stack is set only once by a store
-    // instruction, used only by CCABI and then deallocated.
-    bool isLegal = true;
-    StoreInst *Store = nullptr;
-    for (auto Use : ASI->getUses()) {
-      auto *User = Use->getUser();
-      if (isa<DeallocStackInst>(User) || User == CCABI)
-        continue;
-      if (auto *SI = dyn_cast<StoreInst>(User)) {
-        if (!Store) {
-          Store = SI;
-          continue;
-        }
-      }
-      isLegal = false;
-      break;
-    }
-
-    if (isLegal && Store) {
-      // Check what was the value stored in the allocated stack slot.
-      auto Src = Store->getSrc();
-      MetatypeInst *MI = nullptr;
-      if (auto *IEMI = dyn_cast<InitExistentialMetatypeInst>(Src)) {
-        MI = dyn_cast<MetatypeInst>(IEMI->getOperand());
-      }
-
-      if (!MI)
-        MI = dyn_cast<MetatypeInst>(Src);
-
-      if (MI) {
-        SILBuilderWithScope<1> B(CCABI);
-        B.createCheckedCastAddrBranch(CCABI->getLoc(),
-                                  CCABI->getConsumptionKind(),
-                                  MI,
-                                  MI->getType().getSwiftRValueType(),
-                                  CCABI->getDest(),
-                                  CCABI->getTargetType(),
-                                  CCABI->getSuccessBB(),
-                                  CCABI->getFailureBB());
-        CCABI->eraseFromParent();
-        return nullptr;
-      }
-    }
-  }
-
-  // Try to determine the outcome of the cast from a known type
-  // to a protocol type at compile-time.
-  bool isSourceTypeExact = isa<MetatypeInst>(CCABI->getSrc());
-
-  // Check if we can statically predict the outcome of the cast.
-  auto Feasibility = classifyDynamicCast(CCABI->getModule().getSwiftModule(),
-                          CCABI->getSrc().getType().getSwiftRValueType(),
-                          CCABI->getDest().getType().getSwiftRValueType(),
-                          isSourceTypeExact,
-                          CCABI->getModule().isWholeModule());
-
-  if (Feasibility == DynamicCastFeasibility::WillFail) {
-    Builder->createBranch(CCABI->getLoc(), CCABI->getFailureBB());
-    eraseInstFromFunction(*CCABI);
-    return nullptr;
-  }
-
-  if (Feasibility == DynamicCastFeasibility::WillSucceed) {
-    if (CCABI->getSrc().getType() != CCABI->getDest().getType()) {
-      // Replace by unconditional_addr_cast, followed by a branch.
-      // The unconditional_addr_cast can be skipped, if the result of a cast
-      // is not used afterwards.
-      bool isLegal = isa<AllocStackInst>(CCABI->getDest().getDef());
-      for (auto Use : CCABI->getDest().getUses()) {
-        auto *User = Use->getUser();
-        if (isa<DeallocStackInst>(User) || User == CCABI)
-          continue;
-        isLegal = false;
-        break;
-      }
-
-      if (!isLegal)
-        Builder->createUnconditionalCheckedCastAddr(
-            CCABI->getLoc(), CCABI->getConsumptionKind(), CCABI->getSrc(),
-            CCABI->getSourceType(), CCABI->getDest(), CCABI->getTargetType());
-    }
-    Builder->createBranch(CCABI->getLoc(), CCABI->getSuccessBB());
-    eraseInstFromFunction(*CCABI);
-    return nullptr;
-  }
-
-  return nullptr;
+  return CastOpt.optimizeCheckedCastAddrBranchInst(CCABI);
 }
