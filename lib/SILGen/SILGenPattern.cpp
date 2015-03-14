@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "switch-silgen"
+#define DEBUG_TYPE "patternmatch-silgen"
 #include "SILGen.h"
 #include "Scope.h"
 #include "Cleanup.h"
@@ -357,10 +357,10 @@ using SpecializationHandler =
 class ClauseMatrix;
 class ClauseRow;
 
-/// A class controlling the emission of the decision tree for a switch
-/// statement.
+/// A class controlling the emission of the decision tree for a pattern match
+/// statement (switch, if/let, or while/let condition).
 ///
-/// The value cleanup rules during switch emission are complicated
+/// The value cleanup rules during pattern match emission are complicated
 /// because we're trying to allow as much borrowing/forwarding of
 /// values as possible, so that we only need to actually copy/retain
 /// values as late as possible.  This means we end up having to do
@@ -409,18 +409,22 @@ class ClauseRow;
 /// the value should have been passed down as TakeOnSuccess, and the
 /// decision tree is not allowed to destructively modify objects that
 /// are TakeOnSuccess when failure is still a possibility.
-class SwitchEmission {
-  SwitchEmission(const SwitchEmission &) = delete;
-  SwitchEmission &operator=(const SwitchEmission &) = delete;
+class PatternMatchEmission {
+  PatternMatchEmission(const PatternMatchEmission &) = delete;
+  PatternMatchEmission &operator=(const PatternMatchEmission &) = delete;
 
   SILGenFunction &SGF;
-  SwitchStmt *TheSwitch;
-  CleanupsDepth SwitchDepth;
+  
+  /// PatternMatchStmt - The 'switch', 'if', or while that we're emitting this
+  /// pattern match for.
+  Stmt *PatternMatchStmt;
+  CleanupsDepth PatternMatchStmtDepth;
   llvm::MapVector<CaseStmt*, SILBasicBlock*> SharedCases;
 
 public:
-  SwitchEmission(SILGenFunction &SGF, SwitchStmt *S)
-    : SGF(SGF), TheSwitch(S), SwitchDepth(SGF.getCleanupsDepth()) {}
+  PatternMatchEmission(SILGenFunction &SGF, Stmt *S)
+    : SGF(SGF), PatternMatchStmt(S),
+      PatternMatchStmtDepth(SGF.getCleanupsDepth()) {}
 
   void emitDispatch(ClauseMatrix &matrix, ArgArray args,
                     const FailureHandler &failure);
@@ -937,8 +941,8 @@ chooseNecessaryColumn(const ClauseMatrix &matrix, unsigned firstRow) {
 }
 
 /// Recursively emit a decision tree from the given pattern matrix.
-void SwitchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
-                                  const FailureHandler &outerFailure) {
+void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
+                                        const FailureHandler &outerFailure) {
   unsigned firstRow = 0;
   while (true) {
     // If there are no rows remaining, then we fail.
@@ -951,7 +955,7 @@ void SwitchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
     Optional<unsigned> column = chooseNecessaryColumn(clauses, firstRow);
 
     // Emit the subtree in its own scope.
-    ExitableFullExpr scope(SGF, CleanupLocation(TheSwitch));
+    ExitableFullExpr scope(SGF, CleanupLocation(PatternMatchStmt));
     auto innerFailure = [&](SILLocation loc) {
       if (firstRow == clauses.rows()) return outerFailure(loc);
       SGF.Cleanups.emitBranchAndCleanups(scope.getExitDest(), loc);
@@ -985,9 +989,10 @@ void SwitchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
 ///
 /// \param matrixArgs - appropriate for the entire clause matrix, not
 ///   just this one row
-void SwitchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
-                                          ArgArray matrixArgs, unsigned row,
-                                          const FailureHandler &failure) {
+void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
+                                                ArgArray matrixArgs,
+                                                unsigned row,
+                                                const FailureHandler &failure) {
   // Get appropriate arguments.
   ArgForwarder forwarder(SGF, matrixArgs, row + 1 == clauses.rows());
   ArgArray args = forwarder.getForwardedArgs();
@@ -1020,7 +1025,7 @@ void SwitchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
   // either because they have multiple labels or because of
   // fallthrough.  However, in both situations, the case cannot have
   // any bound variables.  If the case binds no variables, just branch
-  // out to the scope of the switch statement.
+  // out to the scope of the pattern match statement.
   if (!caseBlock->hasBoundDecls()) {
     JumpDest sharedDest = getSharedCaseBlockDest(caseBlock);
     SGF.Cleanups.emitBranchAndCleanups(sharedDest, caseBlock);
@@ -1036,8 +1041,9 @@ void SwitchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
 
 /// Bind all the irrefutable patterns in the given row, which is
 /// nothing but wildcard patterns.
-void SwitchEmission::bindRefutablePatterns(const ClauseRow &row, ArgArray args,
-                                           const FailureHandler &failure) {
+void PatternMatchEmission::
+bindRefutablePatterns(const ClauseRow &row, ArgArray args,
+                      const FailureHandler &failure) {
   assert(row.columns() == args.size());
   for (unsigned i = 0, e = args.size(); i != e; ++i) {
     bindRefutablePattern(row[i], args[i], failure);
@@ -1045,9 +1051,9 @@ void SwitchEmission::bindRefutablePatterns(const ClauseRow &row, ArgArray args,
 }
 
 /// Bind a refutable wildcard pattern to a given value.
-void SwitchEmission::bindRefutablePattern(Pattern *pattern,
-                                          ConsumableManagedValue value,
-                                          const FailureHandler &failure) {
+void PatternMatchEmission::bindRefutablePattern(Pattern *pattern,
+                                                ConsumableManagedValue value,
+                                                const FailureHandler &failure) {
   // We use null patterns to mean artificial AnyPatterns.
   if (!pattern) return;
 
@@ -1080,9 +1086,9 @@ void SwitchEmission::bindRefutablePattern(Pattern *pattern,
 }
 
 /// Check whether an expression pattern is satisfied.
-void SwitchEmission::bindExprPattern(ExprPattern *pattern,
-                                     ConsumableManagedValue value,
-                                     const FailureHandler &failure) {
+void PatternMatchEmission::bindExprPattern(ExprPattern *pattern,
+                                           ConsumableManagedValue value,
+                                           const FailureHandler &failure) {
   FullExpr scope(SGF.Cleanups, CleanupLocation(pattern));
   bindVariable(pattern, pattern->getMatchVar(), value,
                pattern->getType()->getCanonicalType(),
@@ -1095,9 +1101,9 @@ void SwitchEmission::bindExprPattern(ExprPattern *pattern,
 ///
 /// Note that forIrrefutableRow can be true even if !row.isIrrefutable()
 /// because we might have already bound all the refutable parts.
-void SwitchEmission::bindIrrefutablePatterns(const ClauseRow &row,
-                                             ArgArray args,
-                                             bool forIrrefutableRow) {
+void PatternMatchEmission::bindIrrefutablePatterns(const ClauseRow &row,
+                                                   ArgArray args,
+                                                   bool forIrrefutableRow) {
   assert(row.columns() == args.size());
   for (unsigned i = 0, e = args.size(); i != e; ++i) {
     bindIrrefutablePattern(row[i], args[i], forIrrefutableRow);
@@ -1105,9 +1111,9 @@ void SwitchEmission::bindIrrefutablePatterns(const ClauseRow &row,
 }
 
 /// Bind an irrefutable wildcard pattern to a given value.
-void SwitchEmission::bindIrrefutablePattern(Pattern *pattern,
-                                            ConsumableManagedValue value,
-                                            bool forIrrefutableRow) {
+void PatternMatchEmission::bindIrrefutablePattern(Pattern *pattern,
+                                                  ConsumableManagedValue value,
+                                                  bool forIrrefutableRow) {
   // We use null patterns to mean artifical AnyPatterns.
   if (!pattern) return;
 
@@ -1144,9 +1150,9 @@ void SwitchEmission::bindIrrefutablePattern(Pattern *pattern,
 }
 
 /// Bind a named pattern to a given value.
-void SwitchEmission::bindNamedPattern(NamedPattern *pattern,
-                                      ConsumableManagedValue value,
-                                      bool forIrrefutableRow) {
+void PatternMatchEmission::bindNamedPattern(NamedPattern *pattern,
+                                            ConsumableManagedValue value,
+                                            bool forIrrefutableRow) {
   bindVariable(pattern, pattern->getDecl(), value,
                pattern->getType()->getCanonicalType(), forIrrefutableRow);
 }
@@ -1162,10 +1168,10 @@ static bool shouldTake(ConsumableManagedValue value, bool isIrrefutable) {
 }
 
 /// Bind a variable into the current scope.
-void SwitchEmission::bindVariable(SILLocation loc, VarDecl *var,
-                                  ConsumableManagedValue value,
-                                  CanType formalValueType,
-                                  bool isIrrefutable) {
+void PatternMatchEmission::bindVariable(SILLocation loc, VarDecl *var,
+                                        ConsumableManagedValue value,
+                                        CanType formalValueType,
+                                        bool isIrrefutable) {
   // Initialize the variable value.
   InitializationPtr init = SGF.emitInitializationForVarDecl(var, Type());
 
@@ -1179,8 +1185,8 @@ void SwitchEmission::bindVariable(SILLocation loc, VarDecl *var,
 
 /// Evaluate a guard expression and, if it returns false, branch to
 /// the given destination.
-void SwitchEmission::emitGuardBranch(SILLocation loc, Expr *guard,
-                                     const FailureHandler &failure) {
+void PatternMatchEmission::emitGuardBranch(SILLocation loc, Expr *guard,
+                                           const FailureHandler &failure) {
   SILBasicBlock *falseBB = SGF.B.splitBlockForFallthrough();
   SILBasicBlock *trueBB = SGF.B.splitBlockForFallthrough();
 
@@ -1203,10 +1209,11 @@ void SwitchEmission::emitGuardBranch(SILLocation loc, Expr *guard,
 ///
 /// \param matrixArgs - appropriate for the entire clause matrix, not
 ///   just these specific rows
-void SwitchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
-                                             ArgArray matrixArgs,
-                                             unsigned &lastRow, unsigned column,
-                                             const FailureHandler &failure) {
+void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
+                                                   ArgArray matrixArgs,
+                                                   unsigned &lastRow,
+                                                   unsigned column,
+                                               const FailureHandler &failure) {
   unsigned firstRow = lastRow;
 
   // Collect the rows to specialize.
@@ -1312,10 +1319,10 @@ emitReabstractedSubobject(SILGenFunction &gen, SILLocation loc,
 /// Perform specialized dispatch for tuples.
 ///
 /// This is simple; all the tuples have the same structure.
-void SwitchEmission::emitTupleDispatch(ArrayRef<RowToSpecialize> rows,
-                                       ConsumableManagedValue src,
-                                       const SpecializationHandler &handleCase,
-                                       const FailureHandler &outerFailure) {
+void PatternMatchEmission::
+emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
+                  const SpecializationHandler &handleCase,
+                  const FailureHandler &outerFailure) {
   auto firstPat = rows[0].Pattern;
   auto sourceType = cast<TupleType>(firstPat->getType()->getCanonicalType());
   SILLocation loc = firstPat;
@@ -1369,10 +1376,11 @@ void SwitchEmission::emitTupleDispatch(ArrayRef<RowToSpecialize> rows,
 }
 
 /// Perform specialized dispatch for a sequence of NominalTypePatterns.
-void SwitchEmission::emitNominalTypeDispatch(ArrayRef<RowToSpecialize> rows,
-                                             ConsumableManagedValue src,
-                                       const SpecializationHandler &handleCase,
-                                       const FailureHandler &outerFailure) {
+void PatternMatchEmission::
+emitNominalTypeDispatch(ArrayRef<RowToSpecialize> rows,
+                        ConsumableManagedValue src,
+                        const SpecializationHandler &handleCase,
+                        const FailureHandler &outerFailure) {
   // First, collect all the properties we'll need to match on.
   // Also remember the first pattern which matched that property.
   llvm::SmallVector<std::pair<VarDecl*, Pattern*>, 4> properties;
@@ -1511,10 +1519,10 @@ emitSerialCastOperand(SILGenFunction &SGF, SILLocation loc,
 }
 
 /// Perform specialized dispatch for a sequence of IsPatterns.
-void SwitchEmission::emitIsaDispatch(ArrayRef<RowToSpecialize> rows,
-                                     ConsumableManagedValue src,
-                                     const SpecializationHandler &handleCase,
-                                     const FailureHandler &failure) {
+void PatternMatchEmission::emitIsaDispatch(ArrayRef<RowToSpecialize> rows,
+                                           ConsumableManagedValue src,
+                                       const SpecializationHandler &handleCase,
+                                           const FailureHandler &failure) {
   // Collect the types to which we're going to cast.
   CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();
 
@@ -1602,10 +1610,11 @@ void SwitchEmission::emitIsaDispatch(ArrayRef<RowToSpecialize> rows,
 
 /// Perform specialized dispatch for a sequence of EnumElementPattern or an
 /// OptionalSomePattern.
-void SwitchEmission::emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
-                                             ConsumableManagedValue src,
-                                       const SpecializationHandler &handleCase,
-                                       const FailureHandler &outerFailure) {
+void PatternMatchEmission::
+emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
+                        ConsumableManagedValue src,
+                        const SpecializationHandler &handleCase,
+                        const FailureHandler &outerFailure) {
 
   CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();
 
@@ -1617,7 +1626,7 @@ void SwitchEmission::emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
 
   SILBasicBlock *curBB = SGF.B.getInsertionBB();
 
-  // Collect the switch cases and specialized rows.
+  // Collect the cases and specialized rows.
   //
   // These vectors are completely parallel, but the switch
   // instructions want only the first information, so we split them up.
@@ -1685,10 +1694,10 @@ void SwitchEmission::emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
 
   assert(caseBBs.size() == caseInfos.size());
 
-  // Emit the switch instruction.
+  // Emit the switch_enum{_addr} instruction.
   bool addressOnlyEnum = src.getType().isAddress();
   SILValue srcValue = src.getFinalManagedValue().forward(SGF);
-  SILLocation loc = TheSwitch;
+  SILLocation loc = PatternMatchStmt;
   loc.setDebugLoc(rows[0].Pattern);
   if (addressOnlyEnum) {
     SGF.B.createSwitchEnumAddr(loc, srcValue, defaultBB, caseBBs);
@@ -1807,17 +1816,17 @@ void SwitchEmission::emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
 }
 
 /// Emit the body of a case statement at the current insertion point.
-void SwitchEmission::emitCaseBody(CaseStmt *caseBlock) {
+void PatternMatchEmission::emitCaseBody(CaseStmt *caseBlock) {
   SGF.visit(caseBlock->getBody());
 
-  // Implicitly break out of the switch statement.
+  // Implicitly break out of the pattern match statement.
   if (SGF.B.hasValidInsertionPoint()) {
-    SGF.emitBreakOutOf(CleanupLocation(caseBlock), TheSwitch);
+    SGF.emitBreakOutOf(CleanupLocation(caseBlock), PatternMatchStmt);
   }
 }
 
 /// Retrieve the jump destination for a shared case block.
-JumpDest SwitchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock) {
+JumpDest PatternMatchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock) {
   assert(!caseBlock->hasBoundDecls() &&
          "getting shared case destination for block with bound vars?");
 
@@ -1833,11 +1842,12 @@ JumpDest SwitchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock) {
     result.first->second = block;
   }
 
-  return JumpDest(block, SwitchDepth, CleanupLocation(TheSwitch));
+  return JumpDest(block, PatternMatchStmtDepth,
+                  CleanupLocation(PatternMatchStmt));
 }
 
 /// Emit all the shared case statements.
-void SwitchEmission::emitSharedCaseBlocks() {
+void PatternMatchEmission::emitSharedCaseBlocks() {
   for (auto &entry: SharedCases) {
     CaseStmt *caseBlock = entry.first;
     SILBasicBlock *caseBB = entry.second;
@@ -1854,18 +1864,18 @@ void SwitchEmission::emitSharedCaseBlocks() {
 
     SGF.B.setInsertionPoint(caseBB);
 
-    assert(SGF.getCleanupsDepth() == SwitchDepth);
+    assert(SGF.getCleanupsDepth() == PatternMatchStmtDepth);
     emitCaseBody(caseBlock);
-    assert(SGF.getCleanupsDepth() == SwitchDepth);
+    assert(SGF.getCleanupsDepth() == PatternMatchStmtDepth);
   }
 }
 
 /// Context info used to emit FallthroughStmts.
 /// Since fallthrough-able case blocks must not bind variables, they are always
 /// emitted in the outermost scope of the switch.
-class Lowering::SwitchContext {
+class Lowering::PatternMatchContext {
 public:
-  SwitchEmission &Emission;
+  PatternMatchEmission &Emission;
 };
 
 void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
@@ -1876,15 +1886,15 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   emitProfilerIncrement(S);
   JumpDest contDest(contBB, Cleanups.getCleanupsDepth(), CleanupLocation(S));
 
-  SwitchEmission emission(*this, S);
+  PatternMatchEmission emission(*this, S);
   Scope switchScope(Cleanups, CleanupLocation(S));
 
   // Enter a break/continue scope.  If we wanted a continue
   // destination, it would probably be out here.
   BreakContinueDestStack.push_back(std::make_tuple(S, contDest, JumpDest(S)));
 
-  SwitchContext switchContext = { emission };
-  SwitchStack.push_back(&switchContext);
+  PatternMatchContext switchContext = { emission };
+  PatternMatchStack.push_back(&switchContext);
 
   // Emit the subject value. Dispatching will consume it.
   ManagedValue subjectMV = emitRValueAsSingleValue(S->getSubjectExpr());
@@ -1921,7 +1931,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   emission.emitSharedCaseBlocks();
 
   // Bookkeeping.
-  SwitchStack.pop_back();
+  PatternMatchStack.pop_back();
   BreakContinueDestStack.pop_back();
 
   // If the continuation block has no predecessors, this
@@ -1934,8 +1944,8 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
 }
 
 void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
-  assert(!SwitchStack.empty() && "fallthrough outside of switch?!");
-  SwitchContext *context = SwitchStack.back();
+  assert(!PatternMatchStack.empty() && "fallthrough outside of switch?!");
+  PatternMatchContext *context = PatternMatchStack.back();
   
   // Get the destination block.
   CaseStmt *caseStmt = S->getFallthroughDest();

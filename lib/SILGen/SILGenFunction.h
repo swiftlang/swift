@@ -156,7 +156,7 @@ public:
   }
 };
 
-class SwitchContext;
+class PatternMatchContext;
 struct LValueWriteback;
 
 /// A thunk action that a vtable thunk needs to perform on its result.
@@ -205,7 +205,7 @@ public:
   
   std::vector<std::tuple<LabeledStmt*, JumpDest, JumpDest>>
     BreakContinueDestStack;
-  std::vector<SwitchContext*> SwitchStack;
+  std::vector<PatternMatchContext*> PatternMatchStack;
   /// Keep track of our current nested scope.
   std::vector<SILDebugScope*> DebugScopeStack;
   SILDebugScope *MainScope = nullptr;
