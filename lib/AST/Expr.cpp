@@ -840,7 +840,6 @@ void AvailabilityQueryExpr::getPlatformKeywordRanges(
         PlatformRanges.push_back(CharSourceRange(Loc, strlen(#X)));            \
         break;
 #include "swift/AST/PlatformKinds.def"
-#undef AVAILABILITY_PLATFORM
     }
   }
 }

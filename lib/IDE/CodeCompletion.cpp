@@ -2037,7 +2037,6 @@ public:
         TargetName = #Id;                                                     \
         break;
 #include "swift/AST/DeclNodes.def"
-#undef DECL
       }
     }
     std::string Description = TargetName.str() + " Attribute";
@@ -2051,7 +2050,6 @@ public:
               addDeclAttrKeyword(#KEYWORD, Description);                      \
     }
 #include "swift/AST/Attr.def"
-#undef DECL_ATTR
   }
 
   void getAttributeDeclParamCompletions(DeclAttrKind AttrKind, int ParamIndex) {
@@ -2061,7 +2059,6 @@ public:
 #define AVAILABILITY_PLATFORM(X, PrettyName)                                  \
         addDeclAttrParamKeyword(#X, "Platform", false);
 #include "swift/AST/PlatformKinds.def"
-#undef AVAILABILITY_PLATFORM
       } else {
         addDeclAttrParamKeyword("unavailable", "", false);
         addDeclAttrParamKeyword("message", "Specify message", true);
@@ -2420,7 +2417,6 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink) {
 
 #define DECL_KEYWORD(kw) AddKeyword(#kw);
 #include "swift/Parse/Tokens.def"
-#undef DECL_KEYWORD
   // Context-sensitive keywords.
   AddKeyword("weak");
   AddKeyword("unowned");
@@ -2450,7 +2446,6 @@ static void addStmtKeywords(CodeCompletionResultSink &Sink) {
 
 #define STMT_KEYWORD(kw) AddKeyword(#kw, StringRef());
 #include "swift/Parse/Tokens.def"
-#undef STMT_KEYWORD
 
   // FIXME: The pedantically correct way to find the type is to resolve the
   // Swift.StringLiteralType type.
