@@ -486,9 +486,9 @@ static SILBasicBlock *splitEdge(TermInst *T, unsigned EdgeIdx,
 /// Split every edge between two basic blocks.
 void swift::splitEdgesFromTo(SILBasicBlock *From, SILBasicBlock *To,
                              DominanceInfo *DT, SILLoopInfo *LI) {
-  for (unsigned EdgeIndex = 0, E = From->getSuccs().size(); EdgeIndex != E;
+  for (unsigned EdgeIndex = 0, E = From->getSuccessors().size(); EdgeIndex != E;
        ++EdgeIndex) {
-    SILBasicBlock *SuccBB = From->getSuccs()[EdgeIndex];
+    SILBasicBlock *SuccBB = From->getSuccessors()[EdgeIndex];
     if (SuccBB != To)
       continue;
     splitEdge(From->getTerminator(), EdgeIndex, DT, LI);
@@ -528,7 +528,7 @@ bool swift::splitAllCriticalEdges(SILFunction &F, bool OnlyNonCondBr,
     if (isa<BranchInst>(It->getTerminator()))
       continue;
 
-    for (unsigned Idx = 0, e = It->getSuccs().size(); Idx != e; ++Idx)
+    for (unsigned Idx = 0, e = It->getSuccessors().size(); Idx != e; ++Idx)
       Changed |=
         (splitCriticalEdge(It->getTerminator(), Idx, DT, LI) != nullptr);
   }

@@ -611,7 +611,7 @@ static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
   // ignoreable trap blocks.
   DEBUG(llvm::dbgs() << "    Sinking " << *I);
   SILBuilderWithScope<> Builder(T, I->getDebugScope());
-  for (auto &Succ : T->getParent()->getSuccs()) {
+  for (auto &Succ : T->getParent()->getSuccessors()) {
     SILBasicBlock *SuccBB = Succ.getBB();
 
     if (isARCInertTrapBB(SuccBB))

@@ -278,7 +278,7 @@ static bool sinkFixLiftime(SILLoop *Loop, DominanceInfo *DomTree,
   for (auto *FLI : FixLifetimeInsts)
     if (DomTree->dominates(FLI->getOperand().getDef()->getParentBB(),
                            Preheader)) {
-      auto Succs = ExitingBB->getSuccs();
+      auto Succs = ExitingBB->getSuccessors();
       for (unsigned EdgeIdx = 0; EdgeIdx <  Succs.size(); ++EdgeIdx) {
         SILBasicBlock *BB = Succs[EdgeIdx];
         if (BB == ExitBB) {

@@ -3005,13 +3005,12 @@ protected:
   TermInst(ValueKind K, SILLocation Loc) : SILInstruction(K, Loc) {}
 public:
 
-  typedef ArrayRef<SILSuccessor> SuccessorListTy;
+  typedef ArrayRef<SILSuccessor> ConstSuccessorListTy;
+  typedef MutableArrayRef<SILSuccessor> SuccessorListTy;
 
   /// The successor basic blocks of this terminator.
   SuccessorListTy getSuccessors();
-
-  /// The successor basic blocks of this terminator.
-  const SuccessorListTy getSuccessors() const {
+  ConstSuccessorListTy getSuccessors() const {
     return const_cast<TermInst*>(this)->getSuccessors();
   }
 
@@ -3118,7 +3117,7 @@ public:
   OperandValueArrayRef getArgs() const { return Operands.asValueArray(); }
 
   SuccessorListTy getSuccessors() {
-    return DestBB;
+    return SuccessorListTy(&DestBB, 1);
   }
 
   unsigned getNumArgs() const { return Operands.size(); }
@@ -3263,8 +3262,8 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   SuccessorListTy getSuccessors() {
-    return ArrayRef<SILSuccessor>{getSuccessorBuf(),
-                                  static_cast<size_t>(NumCases + HasDefault)};
+    return MutableArrayRef<SILSuccessor>{getSuccessorBuf(),
+                           static_cast<size_t>(NumCases + HasDefault)};
   }
 
   unsigned getNumCases() const { return NumCases; }
@@ -3337,8 +3336,8 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   SuccessorListTy getSuccessors() {
-    return ArrayRef<SILSuccessor>{getSuccessorBuf(),
-                                  static_cast<size_t>(NumCases + HasDefault)};
+    return MutableArrayRef<SILSuccessor>{getSuccessorBuf(),
+                           static_cast<size_t>(NumCases + HasDefault)};
   }
 
   unsigned getNumCases() const { return NumCases; }

@@ -2527,7 +2527,7 @@ public:
       return false;
 
     // Recursively check all successors.
-    for (const auto &SuccBB : StartBlock->getSuccs())
+    for (const auto &SuccBB : StartBlock->getSuccessors())
       if (!Visited.insert(SuccBB.getBB()).second)
         if (!isUnreachableAlongAllPathsStartingAt(SuccBB.getBB(), Visited))
           return false;
@@ -2638,7 +2638,7 @@ public:
       if (isa<CondBranchInst>(TI))
         continue;
 
-      for (unsigned Idx = 0, e = BB.getSuccs().size(); Idx != e; ++Idx) {
+      for (unsigned Idx = 0, e = BB.getSuccessors().size(); Idx != e; ++Idx) {
         require(!isCriticalEdgePred(TI, Idx),
                 "non cond_br critical edges not allowed");
       }
@@ -2648,7 +2648,7 @@ public:
   void visitSILBasicBlock(SILBasicBlock *BB) {
     // Make sure that each of the successors/predecessors of this basic block
     // have this basic block in its predecessor/successor list.
-    for (const SILSuccessor &S : BB->getSuccs()) {
+    for (const SILSuccessor &S : BB->getSuccessors()) {
       SILBasicBlock *SuccBB = S.getBB();
       bool FoundSelfInSuccessor = false;
       for (const SILBasicBlock *PredBB : SuccBB->getPreds()) {
@@ -2662,7 +2662,7 @@ public:
 
     for (const SILBasicBlock *PredBB : BB->getPreds()) {
       bool FoundSelfInPredecessor = false;
-      for (const SILSuccessor &S : PredBB->getSuccs()) {
+      for (const SILSuccessor &S : PredBB->getSuccessors()) {
         if (S.getBB() == BB) {
           FoundSelfInPredecessor = true;
           break;

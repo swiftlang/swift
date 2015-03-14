@@ -823,7 +823,7 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
   //
   for (auto *BB : PostOrder->getPostOrder(F)) {
     SmallVector<unsigned, 4> DeadInSuccs;
-    ArrayRef<SILSuccessor> Succs = BB->getSuccs();
+    ArrayRef<SILSuccessor> Succs = BB->getSuccessors();
     if (Succs.size() == 0)
       continue;
 
@@ -847,7 +847,7 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
       if (SuccBB)
         HasChangedCFG = true;
       else
-        SuccBB = BB->getSuccs()[EdgeIdx];
+        SuccBB = BB->getSuccessors()[EdgeIdx];
 
       // We make no attempt to use the best DebugLoc, because in all known
       // cases, we only have one.

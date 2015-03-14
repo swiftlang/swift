@@ -180,22 +180,27 @@ public:
   // Predecessors and Successors
   //===--------------------------------------------------------------------===//
 
-  typedef ArrayRef<SILSuccessor> Successors;
-
+  typedef TermInst::SuccessorListTy SuccessorListTy;
+  typedef TermInst::ConstSuccessorListTy ConstSuccessorListTy;
+  
+  
   /// The successors of a SILBasicBlock are defined either explicitly as
   /// a single successor as the branch targets of the terminator instruction.
-  Successors getSuccs() const {
+  ConstSuccessorListTy getSuccessors() const {
+    return getTerminator()->getSuccessors();
+  }
+  SuccessorListTy getSuccessors() {
     return getTerminator()->getSuccessors();
   }
 
-  typedef Successors::const_iterator const_succ_iterator;
-  typedef Successors::iterator succ_iterator;
+  typedef ConstSuccessorListTy::const_iterator const_succ_iterator;
+  typedef SuccessorListTy::iterator succ_iterator;
 
-  bool succ_empty() const { return getSuccs().empty(); }
-  succ_iterator succ_begin() { return getSuccs().begin(); }
-  succ_iterator succ_end() { return getSuccs().end(); }
-  const_succ_iterator succ_begin() const { return getSuccs().begin(); }
-  const_succ_iterator succ_end() const { return getSuccs().end(); }
+  bool succ_empty() const { return getSuccessors().empty(); }
+  succ_iterator succ_begin() { return getSuccessors().begin(); }
+  succ_iterator succ_end() { return getSuccessors().end(); }
+  const_succ_iterator succ_begin() const { return getSuccessors().begin(); }
+  const_succ_iterator succ_end() const { return getSuccessors().end(); }
 
   SILBasicBlock *getSingleSuccessor() {
     if (succ_empty() || std::next(succ_begin()) != succ_end())

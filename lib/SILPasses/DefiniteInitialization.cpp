@@ -480,7 +480,7 @@ bool LifetimeChecker::isBlockIsReachableFromEntry(SILBasicBlock *BB) {
     // Collect all reachable blocks by walking the successors.
     while (!Worklist.empty()) {
       SILBasicBlock *BB = Worklist.pop_back_val();
-      for (auto &Succ : BB->getSuccs()) {
+      for (auto &Succ : BB->getSuccessors()) {
         if (BlocksReachableFromEntry.insert(Succ).second)
           Worklist.push_back(Succ);
       }

@@ -28,29 +28,29 @@ namespace llvm {
 //===----------------------------------------------------------------------===//
 template <> struct GraphTraits<swift::SILBasicBlock*> {
   typedef swift::SILBasicBlock NodeType;
-  typedef NodeType::Successors::iterator ChildIteratorType;
+  typedef NodeType::SuccessorListTy::iterator ChildIteratorType;
 
   static NodeType *getEntryNode(NodeType *BB) { return BB; }
 
   static ChildIteratorType child_begin(NodeType *N) {
-    return N->getSuccs().begin();
+    return N->getSuccessors().begin();
   }
   static ChildIteratorType child_end(NodeType *N) {
-    return N->getSuccs().end();
+    return N->getSuccessors().end();
   }
 };
 
 template <> struct GraphTraits<const swift::SILBasicBlock*> {
   typedef const swift::SILBasicBlock NodeType;
-  typedef NodeType::Successors::iterator ChildIteratorType;
+  typedef NodeType::ConstSuccessorListTy::iterator ChildIteratorType;
 
   static NodeType *getEntryNode(NodeType *BB) { return BB; }
 
   static ChildIteratorType child_begin(NodeType *N) {
-    return N->getSuccs().begin();
+    return N->getSuccessors().begin();
   }
   static ChildIteratorType child_end(NodeType *N) {
-    return N->getSuccs().end();
+    return N->getSuccessors().end();
   }
 };
 

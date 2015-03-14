@@ -405,7 +405,7 @@ SILCloner<ImplClass>::visitSILBasicBlock(SILBasicBlock* BB) {
   for (auto I = BB->begin(), E = --BB->end(); I != E; ++I)
     asImpl().visit(I);
   // Iterate over successors to do the depth-first search.
-  for (auto &Succ : BB->getSuccs()) {
+  for (auto &Succ : BB->getSuccessors()) {
     auto BBI = BBMap.find(Succ);
     // Only visit a successor that has not already been visisted.
     if (BBI == BBMap.end()) {

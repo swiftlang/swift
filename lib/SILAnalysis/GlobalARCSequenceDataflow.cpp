@@ -742,7 +742,7 @@ swift::ARCSequenceDataflowEvaluator::mergeSuccessors(ARCBBState &BBState,
   auto &BackEdgeSet = BackedgeMap[BB];
 
   // For each successor of BB...
-  ArrayRef<SILSuccessor> Succs = BB->getSuccs();
+  ArrayRef<SILSuccessor> Succs = BB->getSuccessors();
   bool HasAtLeastOneSucc = false;
   for (unsigned i = 0, e = Succs.size(); i != e; ++i) {
     // If it does not have a basic block associated with it...
@@ -833,7 +833,7 @@ void swift::ARCSequenceDataflowEvaluator::init() {
     TopDownBBStates[i].second.init(BB);
     ++i;
 
-    for (auto &Succ : BB->getSuccs())
+    for (auto &Succ : BB->getSuccessors())
       if (SILBasicBlock *SuccBB = Succ.getBB())
         if (VisitedSet.count(SuccBB))
           BackedgeMap[BB].insert(SuccBB);

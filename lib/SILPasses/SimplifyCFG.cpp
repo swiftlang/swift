@@ -1240,7 +1240,7 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
       addBlockToSimplifyCFGWorklist(B);
     }
 
-    for (auto &B : BB->getSuccs()) {
+    for (auto &B : BB->getSuccessors()) {
       addBlockToSimplifyCFGWorklist(B.getBB());
     }
 
@@ -1323,7 +1323,7 @@ bool SimplifyCFG::removeIfDead(SILBasicBlock *BB) {
 
   // Add successor blocks to the worklist since their predecessor list is about
   // to change.
-  for (auto &S : BB->getSuccs())
+  for (auto &S : BB->getSuccessors())
     addToWorklist(S);
 
   removeDeadBlock(BB);
@@ -1696,7 +1696,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
 
     // This can also expose opportunities in the successors of
     // the merged block.
-    for (auto &Succ : BB->getSuccs())
+    for (auto &Succ : BB->getSuccessors())
       addToWorklist(Succ);
 
     if (LoopHeaders.count(DestBB))
@@ -2191,7 +2191,7 @@ void RemoveUnreachable::visit(SILBasicBlock *BB) {
   if (!Visited.insert(BB).second)
     return;
 
-  for (auto &Succ : BB->getSuccs())
+  for (auto &Succ : BB->getSuccessors())
     visit(Succ);
 }
 

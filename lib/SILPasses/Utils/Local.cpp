@@ -643,7 +643,7 @@ bool swift::tryDeleteDeadClosure(SILInstruction *Closure) {
 // Is any successor of BB in the LiveIn set?
 static bool successorHasLiveIn(SILBasicBlock *BB,
                          const llvm::SmallPtrSetImpl<SILBasicBlock *> &LiveIn) {
-  for (auto &Succ : BB->getSuccs())
+  for (auto &Succ : BB->getSuccessors())
     if (LiveIn.count(Succ))
       return true;
 

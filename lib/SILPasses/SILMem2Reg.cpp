@@ -691,7 +691,7 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
       SILBasicBlock *BB = Node->getBlock();
 
       // For all successors of the node:
-      for (auto &Succ : BB->getSuccs()) {
+      for (auto &Succ : BB->getSuccessors()) {
         DomTreeNode *SuccNode = DT->getNode(Succ);
 
         // Skip D-edges (edges that are dom-tree edges).
