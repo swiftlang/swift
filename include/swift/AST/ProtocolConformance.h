@@ -401,12 +401,11 @@ public:
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getType(), getProtocol(), getDeclContext());
+    Profile(ID, getProtocol(), getDeclContext());
   }
 
-  static void Profile(llvm::FoldingSetNodeID &ID, Type type,
-                      ProtocolDecl *protocol, DeclContext *dc) {
-    ID.AddPointer(type->getCanonicalType().getPointer());
+  static void Profile(llvm::FoldingSetNodeID &ID, ProtocolDecl *protocol,
+                      DeclContext *dc) {
     ID.AddPointer(protocol);
     ID.AddPointer(dc);
   }

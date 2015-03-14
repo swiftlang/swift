@@ -1232,7 +1232,7 @@ ASTContext::getConformance(Type conformingType,
                            DeclContext *dc,
                            ProtocolConformanceState state) {
   llvm::FoldingSetNodeID id;
-  NormalProtocolConformance::Profile(id, conformingType, protocol, dc);
+  NormalProtocolConformance::Profile(id, protocol, dc);
 
   // Did we already record the normal conformance?
   void *insertPos;
