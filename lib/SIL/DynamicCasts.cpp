@@ -454,6 +454,10 @@ namespace {
 
       // The only other thing we return WillSucceed for currently is
       // an upcast.
+      // FIXME: Upcasts between existential metatypes are not handled yet.
+      // We should generate for it:
+      // %openedSrcMetatype = open_existential srcMetatype
+      // init_existental dstMetatype, %openedSrcMetatype
       auto &srcTL = getTypeLowering(source.Value.getType());
       SILValue value;
       if (source.isAddress()) {
