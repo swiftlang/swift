@@ -222,7 +222,7 @@ static void addImplicitConformances(
               llvm::SmallSetVector<ProtocolDecl *, 4> &allProtocols) {
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     SmallVector<ProtocolDecl *, 2> protocols;
-    nominal->getImplicitProtocols(&tc, protocols);
+    nominal->getImplicitProtocols(protocols);
     allProtocols.insert(protocols.begin(), protocols.end());
   }
 }
@@ -2489,13 +2489,10 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
     });
 
     if (!literalConvertible) {
-      if (!rawTy->is<ErrorType>()) {
-        TC.diagnose(ED->getInherited().front().getSourceRange().Start,
-                    diag::raw_type_not_literal_convertible,
-                    rawTy);
-        ED->getInherited().front().setInvalidType(TC.Context);
-      }
-
+      TC.diagnose(ED->getInherited().front().getSourceRange().Start,
+                  diag::raw_type_not_literal_convertible,
+                  rawTy);
+      ED->getInherited().front().setInvalidType(TC.Context);
       return;
     }
   }

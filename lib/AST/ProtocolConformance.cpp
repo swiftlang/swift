@@ -808,13 +808,6 @@ public:
                           LazyResolver *resolver,
                           SmallVectorImpl<ProtocolConformance *> &scratch);
 
-  /// Retrieve the protocols that would be implicitly synthesized.
-  /// FIXME: This is a hack, because it's the wrong question to ask. It
-  /// skips over the possibility that there is an explicit conformance
-  /// somewhere.
-  void getImplicitProtocols(NominalTypeDecl *nominal,
-                            SmallVectorImpl<ProtocolDecl *> &protocols);
-
   // Only allow allocation of conformance lookup tables using the
   // allocator in ASTContext or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
@@ -1675,16 +1668,6 @@ void ConformanceLookupTable::getAllConformances(
   // FIXME: sort the conformances in some canonical order?
 }
 
-void ConformanceLookupTable::getImplicitProtocols(
-       NominalTypeDecl *nominal,
-       SmallVectorImpl<ProtocolDecl *> &protocols) {
-  for (auto conformance : AllConformances[nominal]) {
-    if (conformance->getKind() == ConformanceEntryKind::Synthesized) {
-      protocols.push_back(conformance->getProtocol());
-    }
-  }
-}
-
 void ConformanceLookupTable::dump() const {
   dump(llvm::errs());
 }
@@ -1793,12 +1776,6 @@ NominalTypeDecl::getAllConformances(
   return scratch;
 }
 
-void NominalTypeDecl::getImplicitProtocols(
-       LazyResolver *resolver,
-       SmallVectorImpl<ProtocolDecl *> &protocols) {
-  prepareConformanceTable(resolver);
-  ConformanceTable->getImplicitProtocols(this, protocols);
-}
 
 ArrayRef<ProtocolConformance *>
 DeclContext::getLocalConformances(

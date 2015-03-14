@@ -1726,6 +1726,31 @@ void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
   LastExtension = extension;
 }
 
+void NominalTypeDecl::getImplicitProtocols(
+       SmallVectorImpl<ProtocolDecl *> &protocols) {
+  // If this is a class, it conforms to the AnyObject protocol.
+  if (isa<ClassDecl>(this)) {
+    if (auto anyObject
+          = getASTContext().getProtocol(KnownProtocolKind::AnyObject)) {
+      protocols.push_back(anyObject);
+    }
+  }
+  
+  // If this is a simple enum, it conforms to the Hashable and Equatable
+  // protocols.
+  if (auto theEnum = dyn_cast<EnumDecl>(this)) {
+    if (theEnum->isSimpleEnum()) {
+      if (auto equatable = getASTContext().getProtocol(
+                                                 KnownProtocolKind::Equatable))
+        protocols.push_back(equatable);
+        
+      if (auto hashable = getASTContext().getProtocol(
+                                                 KnownProtocolKind::Hashable))
+        protocols.push_back(hashable);
+    }
+  }
+}
+
 OptionalTypeKind NominalTypeDecl::classifyAsOptionalType() const {
   const ASTContext &ctx = getASTContext();
   if (this == ctx.getOptionalDecl()) {
