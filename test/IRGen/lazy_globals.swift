@@ -9,9 +9,9 @@
 
 // CHECK: define internal void @globalinit_[[T]]_func0() {
 // CHECK: entry:
-// CHECK:   store i64 1, i64* getelementptr inbounds (%Si* @_Tv12lazy_globals1xSi, i32 0, i32 0), align 8
-// CHECK:   store i64 2, i64* getelementptr inbounds (%Si* @_Tv12lazy_globals1ySi, i32 0, i32 0), align 8
-// CHECK:   store i64 3, i64* getelementptr inbounds (%Si* @_Tv12lazy_globals1zSi, i32 0, i32 0), align 8
+// CHECK:   store i64 1, i64* getelementptr inbounds (%Si, %Si* @_Tv12lazy_globals1xSi, i32 0, i32 0), align 8
+// CHECK:   store i64 2, i64* getelementptr inbounds (%Si, %Si* @_Tv12lazy_globals1ySi, i32 0, i32 0), align 8
+// CHECK:   store i64 3, i64* getelementptr inbounds (%Si, %Si* @_Tv12lazy_globals1zSi, i32 0, i32 0), align 8
 // CHECK:   ret void
 // CHECK: }
 

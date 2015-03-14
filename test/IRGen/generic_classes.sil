@@ -18,13 +18,13 @@ import gizmo
 // --       0 = class
 // CHECK:   i64 0,
 // --       name
-// CHECK:   i8* getelementptr inbounds ([32 x i8]* [[ROOTGENERIC_NAME]], i64 0, i64 0),
+// CHECK:   i8* getelementptr inbounds ([32 x i8], [32 x i8]* [[ROOTGENERIC_NAME]], i64 0, i64 0),
 // --       num fields
 // CHECK:   i32 3,
 // --       field offset vector offset
 // CHECK:   i32 14,
 // --       field names
-// CHECK:   i8* getelementptr inbounds ([7 x i8]* [[ROOTGENERIC_FIELDS]], i64 0, i64 0),
+// CHECK:   i8* getelementptr inbounds ([7 x i8], [7 x i8]* [[ROOTGENERIC_FIELDS]], i64 0, i64 0),
 // --       generic metadata pattern
 // CHECK:   @_TMPdC15generic_classes11RootGeneric
 // --       generic parameter vector offset
@@ -57,13 +57,13 @@ import gizmo
 // --       0 = class
 // CHECK:   i64 0,
 // --       name
-// CHECK:   i8* getelementptr inbounds ([35 x i8]* [[ROOTNONGENERIC_NAME]], i64 0, i64 0),
+// CHECK:   i8* getelementptr inbounds ([35 x i8], [35 x i8]* [[ROOTNONGENERIC_NAME]], i64 0, i64 0),
 // --       num fields
 // CHECK:   i32 3,
 // --       -- field offset vector offset
 // CHECK:   i32 10,
 // --       field names
-// CHECK:   i8* getelementptr inbounds ([7 x i8]* [[ROOTGENERIC_FIELDS]], i64 0, i64 0),
+// CHECK:   i8* getelementptr inbounds ([7 x i8], [7 x i8]* [[ROOTGENERIC_FIELDS]], i64 0, i64 0),
 // --       no generic metadata pattern
 // CHECK:   %swift.type_pattern* null,
 // --       0 = no generic parameter vector

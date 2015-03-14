@@ -17,7 +17,7 @@ bb0:
   return %0#0 : $Builtin.RawPointer
 }
 // CHECK: define i8* @utf8_literal() {
-// CHECK:   ret i8* getelementptr inbounds ([8 x i8]* [[U8_0]], i64 0, i64 0)
+// CHECK:   ret i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[U8_0]], i64 0, i64 0)
 
 sil @utf8_literal_with_nul : $@thin () -> Builtin.RawPointer {
 bb0:
@@ -25,7 +25,7 @@ bb0:
   return %0#0 : $Builtin.RawPointer
 }
 // CHECK: define i8* @utf8_literal_with_nul() {
-// CHECK:   ret i8* getelementptr inbounds ([5 x i8]* [[U8_1]], i64 0, i64 0)
+// CHECK:   ret i8* getelementptr inbounds ([5 x i8], [5 x i8]* [[U8_1]], i64 0, i64 0)
 
 sil @utf16_literal : $@thin () -> Builtin.RawPointer {
 bb0:

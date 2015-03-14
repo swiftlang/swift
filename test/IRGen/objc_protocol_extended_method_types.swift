@@ -20,40 +20,40 @@ import Foundation
 // CHECK-LABEL: @_PROTOCOL_METHOD_TYPES__TtP35objc_protocol_extended_method_types1P_ = private constant { [16 x i8*] } { [16 x i8*] [
 // -- required instance methods:
 //   -- requiredInstanceMethod
-// CHECK:         i8* getelementptr inbounds ([31 x i8]* [[NSNUMBER]], i64 0, i64 0),
+// CHECK:         i8* getelementptr inbounds ([31 x i8], [31 x i8]* [[NSNUMBER]], i64 0, i64 0),
 //   -- requiredInstanceProperty getter
-// CHECK:         i8* getelementptr inbounds ([24 x i8]* [[NSMUTABLEARRAY_GET]], i64 0, i64 0),
+// CHECK:         i8* getelementptr inbounds ([24 x i8], [24 x i8]* [[NSMUTABLEARRAY_GET]], i64 0, i64 0),
 //   -- requiredInstanceProperty setter
-// CHECK:         i8* getelementptr inbounds ([27 x i8]* [[NSMUTABLEARRAY_SET]], i64 0, i64 0),
+// CHECK:         i8* getelementptr inbounds ([27 x i8], [27 x i8]* [[NSMUTABLEARRAY_SET]], i64 0, i64 0),
 //   -- requiredROInstanceProperty getter
-// CHECK:         i8* getelementptr inbounds ([24 x i8]* [[NSMUTABLEARRAY_GET]], i64 0, i64 0),
+// CHECK:         i8* getelementptr inbounds ([24 x i8], [24 x i8]* [[NSMUTABLEARRAY_GET]], i64 0, i64 0),
 //   -- requiredInstanceMethod2
-// CHECK:         i8* getelementptr inbounds ([31 x i8]* [[NSNUMBER]], i64 0, i64 0),
+// CHECK:         i8* getelementptr inbounds ([31 x i8], [31 x i8]* [[NSNUMBER]], i64 0, i64 0),
 //   -- requiredInstanceProperty2 getter
-// CHECK:         i8* getelementptr inbounds ([24 x i8]* [[NSMUTABLEARRAY_GET]], i64 0, i64 0),
+// CHECK:         i8* getelementptr inbounds ([24 x i8], [24 x i8]* [[NSMUTABLEARRAY_GET]], i64 0, i64 0),
 //   -- requiredInstanceProperty2 setter
-// CHECK:         i8* getelementptr inbounds ([27 x i8]* [[NSMUTABLEARRAY_SET]], i64 0, i64 0),
+// CHECK:         i8* getelementptr inbounds ([27 x i8], [27 x i8]* [[NSMUTABLEARRAY_SET]], i64 0, i64 0),
 //   -- requiredROInstanceProperty2 getter
-// CHECK:         i8* getelementptr inbounds ([24 x i8]* [[NSMUTABLEARRAY_GET]], i64 0, i64 0),
+// CHECK:         i8* getelementptr inbounds ([24 x i8], [24 x i8]* [[NSMUTABLEARRAY_GET]], i64 0, i64 0),
 //   -- subscript getter
-// CHECK:         i8* getelementptr inbounds ([11 x i8]* [[SUBSCRIPT]], i64 0, i64 0),
+// CHECK:         i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SUBSCRIPT]], i64 0, i64 0),
 //   -- init
-// CHECK:         i8* getelementptr inbounds ([8 x i8]* [[INIT]], i64 0, i64 0),
+// CHECK:         i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[INIT]], i64 0, i64 0),
 // -- required class methods:
 //   -- requiredClassMethod
-// CHECK:         i8* getelementptr inbounds ([31 x i8]* [[NSSTRING]], i64 0, i64 0),
+// CHECK:         i8* getelementptr inbounds ([31 x i8], [31 x i8]* [[NSSTRING]], i64 0, i64 0),
 //   -- requiredClassMethod2
-// CHECK:         i8* getelementptr inbounds ([31 x i8]* [[NSSTRING]], i64 0, i64 0),
+// CHECK:         i8* getelementptr inbounds ([31 x i8], [31 x i8]* [[NSSTRING]], i64 0, i64 0),
 // -- optional instance methods:
 //   -- optionalInstanceMethod
-// CHECK:         i8* getelementptr inbounds ([31 x i8]* [[NSOBJECT]], i64 0, i64 0),
+// CHECK:         i8* getelementptr inbounds ([31 x i8], [31 x i8]* [[NSOBJECT]], i64 0, i64 0),
 //   -- optionalInstanceMethod2
-// CHECK:         i8* getelementptr inbounds ([31 x i8]* [[NSOBJECT]], i64 0, i64 0),
+// CHECK:         i8* getelementptr inbounds ([31 x i8], [31 x i8]* [[NSOBJECT]], i64 0, i64 0),
 // -- optional class methods:
 //   -- optionalClassMethod
-// CHECK:         i8* getelementptr inbounds ([28 x i8]* [[NSMUTABLESTRING]], i64 0, i64 0),
+// CHECK:         i8* getelementptr inbounds ([28 x i8], [28 x i8]* [[NSMUTABLESTRING]], i64 0, i64 0),
 //   -- optionalClassMethod2
-// CHECK:         i8* getelementptr inbounds ([28 x i8]* [[NSMUTABLESTRING]], i64 0, i64 0)
+// CHECK:         i8* getelementptr inbounds ([28 x i8], [28 x i8]* [[NSMUTABLESTRING]], i64 0, i64 0)
 // CHECK:       ]
 
 @objc protocol P {

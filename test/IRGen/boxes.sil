@@ -25,11 +25,11 @@ entry:
 }
 
 // CHECK-32-LABEL: define void @fixed_box_alloc_dealloc()
-// CHECK-32:         [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_heapmetadata* @metadata, i32 0, i32 2), i32 16, i32 3)
+// CHECK-32:         [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_heapmetadata, %swift.full_heapmetadata* @metadata, i32 0, i32 2), i32 16, i32 3)
 // CHECK-32:         call void @swift_deallocObject(%swift.refcounted* [[BOX]], i32 16, i32 3)
 
 // CHECK-64-LABEL: define void @fixed_box_alloc_dealloc()
-// CHECK-64:         [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_heapmetadata* @metadata, i32 0, i32 2), i64 24, i64 7)
+// CHECK-64:         [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_heapmetadata, %swift.full_heapmetadata* @metadata, i32 0, i32 2), i64 24, i64 7)
 // CHECK-64:         call void @swift_deallocObject(%swift.refcounted* [[BOX]], i64 24, i64 7)
 sil @fixed_box_alloc_dealloc : $@thin () -> () {
 entry:

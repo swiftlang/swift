@@ -96,7 +96,7 @@ import Builtin
 // CHECK: @_TMnO4enum16DynamicSingleton = constant { {{.*}} i32 } {
 // --       2 = enum
 // CHECK:   [[WORD:i64|i32]] 2,
-// CHECK:   i8* getelementptr inbounds ([25 x i8]* [[DYNAMICSINGLETON_NAME]]
+// CHECK:   i8* getelementptr inbounds ([25 x i8], [25 x i8]* [[DYNAMICSINGLETON_NAME]]
 // --       FIXME
 // CHECK:   i32 0, i32 0, [[WORD]] 0,
 // --       generic parameter vector offset

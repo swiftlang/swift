@@ -17,11 +17,11 @@ declare void @swift_release(%swift.refcounted* nocapture)
 ; rdar://11558546
 define void @release_past_extract() {
 entry:
-  %0 = call { i8*, i64, %swift.refcounted* } @_TNSs6String24convertFromStringLiteralFT3valp_S_(i8* getelementptr inbounds ([3 x i8]* @0, i32 0, i32 0))
+  %0 = call { i8*, i64, %swift.refcounted* } @_TNSs6String24convertFromStringLiteralFT3valp_S_(i8* getelementptr inbounds ([3 x i8], [3 x i8]* @0, i32 0, i32 0))
   %1 = extractvalue { i8*, i64, %swift.refcounted* } %0, 0
   %2 = extractvalue { i8*, i64, %swift.refcounted* } %0, 1
   %3 = extractvalue { i8*, i64, %swift.refcounted* } %0, 2
-  %4 = call { i8*, i64, %swift.refcounted* } @_TNSs6String24convertFromStringLiteralFT3valp_S_(i8* getelementptr inbounds ([3 x i8]* @1, i32 0, i32 0))
+  %4 = call { i8*, i64, %swift.refcounted* } @_TNSs6String24convertFromStringLiteralFT3valp_S_(i8* getelementptr inbounds ([3 x i8], [3 x i8]* @1, i32 0, i32 0))
   %5 = extractvalue { i8*, i64, %swift.refcounted* } %4, 0
   %6 = extractvalue { i8*, i64, %swift.refcounted* } %4, 1
   %7 = extractvalue { i8*, i64, %swift.refcounted* } %4, 2

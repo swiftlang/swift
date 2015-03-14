@@ -31,7 +31,7 @@ import Builtin
 // CHECK: ]
 
 // CHECK: @_TMdO20enum_value_semantics20SinglePayloadTrivial = constant { {{.*}}* } {
-// CHECK:   i8** getelementptr inbounds ([20 x i8*]* @_TWVO20enum_value_semantics20SinglePayloadTrivial, i32 0, i32 0),
+// CHECK:   i8** getelementptr inbounds ([20 x i8*], [20 x i8*]* @_TWVO20enum_value_semantics20SinglePayloadTrivial, i32 0, i32 0),
 // CHECK:   i64 2,
 // CHECK:   {{.*}}* @_TMnO20enum_value_semantics20SinglePayloadTrivial,
 // CHECK:   %swift.type* null
@@ -65,7 +65,7 @@ import Builtin
 // CHECK: ]
 
 // CHECK: @_TMdO20enum_value_semantics23SinglePayloadNontrivial = constant { {{.*}}* } {
-// CHECK:   i8** getelementptr inbounds ([23 x i8*]* @_TWVO20enum_value_semantics23SinglePayloadNontrivial, i32 0, i32 0),
+// CHECK:   i8** getelementptr inbounds ([23 x i8*], [23 x i8*]* @_TWVO20enum_value_semantics23SinglePayloadNontrivial, i32 0, i32 0),
 // CHECK:   i64 2,
 // CHECK:   {{.*}}* @_TMnO20enum_value_semantics23SinglePayloadNontrivial,
 // CHECK:   %swift.type* null
@@ -75,7 +75,7 @@ import Builtin
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @{{[a-z0-9_]+}},
 // CHECK:   i32 48, i16 1, i16 8,
 // CHECK:   [16 x i8*] zeroinitializer,
-// CHECK:   i8** getelementptr inbounds ([20 x i8*]* @_TWVO20enum_value_semantics18GenericFixedLayout, i32 0, i32 0),
+// CHECK:   i8** getelementptr inbounds ([20 x i8*], [20 x i8*]* @_TWVO20enum_value_semantics18GenericFixedLayout, i32 0, i32 0),
 // CHECK:   i64 2,
 // CHECK:   {{.*}}* @_TMnO20enum_value_semantics18GenericFixedLayout,
 // CHECK:   %swift.type* null,

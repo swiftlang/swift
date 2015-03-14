@@ -15,83 +15,83 @@ import Foundation
 // CHECK:   i32 17,
 // CHECK:   [17 x { i8*, i8*, i8* }] [
 // CHECK:     { i8*, i8*, i8* } {
-// CHECK:       i8* getelementptr inbounds ([12 x i8]* @"\01L_selector_data(strRealProp)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([12 x i8], [12 x i8]* @"\01L_selector_data(strRealProp)", i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_TToFC11objc_bridge3Basg11strRealPropSS to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
-// CHECK:       i8* getelementptr inbounds ([16 x i8]* @"\01L_selector_data(setStrRealProp:)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([16 x i8], [16 x i8]* @"\01L_selector_data(setStrRealProp:)", i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_TToFC11objc_bridge3Bass11strRealPropSS to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
-// CHECK:       i8* getelementptr inbounds ([12 x i8]* @"\01L_selector_data(strFakeProp)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([12 x i8], [12 x i8]* @"\01L_selector_data(strFakeProp)", i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_TToFC11objc_bridge3Basg11strFakePropSS to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
-// CHECK:       i8* getelementptr inbounds ([16 x i8]* @"\01L_selector_data(setStrFakeProp:)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([16 x i8], [16 x i8]* @"\01L_selector_data(setStrFakeProp:)", i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_TToFC11objc_bridge3Bass11strFakePropSS to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
-// CHECK:       i8* getelementptr inbounds ([14 x i8]* @"\01L_selector_data(nsstrRealProp)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(nsstrRealProp)", i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_TToFC11objc_bridge3Basg13nsstrRealPropCSo8NSString to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
-// CHECK:       i8* getelementptr inbounds ([18 x i8]* @"\01L_selector_data(setNsstrRealProp:)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([18 x i8], [18 x i8]* @"\01L_selector_data(setNsstrRealProp:)", i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_TToFC11objc_bridge3Bass13nsstrRealPropCSo8NSString to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
-// CHECK:       i8* getelementptr inbounds ([14 x i8]* @"\01L_selector_data(nsstrFakeProp)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(nsstrFakeProp)", i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_TToFC11objc_bridge3Basg13nsstrFakePropCSo8NSString to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
-// CHECK:       i8* getelementptr inbounds ([18 x i8]* @"\01L_selector_data(setNsstrFakeProp:)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([18 x i8], [18 x i8]* @"\01L_selector_data(setNsstrFakeProp:)", i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_TToFC11objc_bridge3Bass13nsstrFakePropCSo8NSString to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
-// CHECK:       i8* getelementptr inbounds ([10 x i8]* @"\01L_selector_data(strResult)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([10 x i8], [10 x i8]* @"\01L_selector_data(strResult)", i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_TToFC11objc_bridge3Bas9strResultfS0_FT_SS to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
-// CHECK:       i8* getelementptr inbounds ([{{[0-9]*}} x i8]* @"\01L_selector_data(strArgWithS:)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([{{[0-9]*}} x i8], [{{[0-9]*}} x i8]* @"\01L_selector_data(strArgWithS:)", i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_TToFC11objc_bridge3Bas6strArgfS0_FT1sSS_T_ to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
-// CHECK:       i8* getelementptr inbounds ([12 x i8]* @"\01L_selector_data(nsstrResult)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([12 x i8], [12 x i8]* @"\01L_selector_data(nsstrResult)", i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_TToFC11objc_bridge3Bas11nsstrResultfS0_FT_CSo8NSString to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
-// CHECK:       i8* getelementptr inbounds ([{{[0-9]+}} x i8]* @"\01L_selector_data(nsstrArgWithS:)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(nsstrArgWithS:)", i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_TToFC11objc_bridge3Bas8nsstrArgfS0_FT1sCSo8NSString_T_ to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } { 
-// CHECK:       i8* getelementptr inbounds ([5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0), 
-// CHECK:       i8* getelementptr inbounds ([8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([5 x i8], [5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0), 
+// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_TToFC11objc_bridge3BascfMS0_FT_S0_ to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } { 
-// CHECK:       i8* getelementptr inbounds ([8 x i8]* @"\01L_selector_data(dealloc)", i64 0, i64 0), 
-// CHECK:       i8* getelementptr inbounds ([11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(dealloc)", i64 0, i64 0), 
+// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*)* @_TToFC11objc_bridge3BasD to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
-// CHECK:       i8* getelementptr inbounds ([11 x i8]* @"\01L_selector_data(acceptSet:)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([11 x i8]* @{{[0-9]+}}, i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @"\01L_selector_data(acceptSet:)", i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @{{[0-9]+}}, i64 0, i64 0),
 // CHECK:       i8* bitcast (void (%3*, i8*, %4*)* @_TToFC11objc_bridge3Bas9acceptSetfS0_FGVSs3SetS0__T_ to i8*)
 // CHECK:     }
 // CHECK:     { i8*, i8*, i8* } { 
-// CHECK:       i8* getelementptr inbounds ([14 x i8]* @"\01L_selector_data(.cxx_destruct)", i64 0, i64 0), 
-// CHECK:       i8* getelementptr inbounds ([3 x i8]* @{{.*}}, i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(.cxx_destruct)", i64 0, i64 0), 
+// CHECK:       i8* getelementptr inbounds ([3 x i8], [3 x i8]* @{{.*}}, i64 0, i64 0),
 // CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*)* @_TToFC11objc_bridge3BasE to i8*)
 // CHECK:     }
 // CHECK:   ]

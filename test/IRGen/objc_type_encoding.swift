@@ -93,8 +93,8 @@ func testArchetype(work: P3) {
 @objc func getRawEnumInGizmo() -> RawEnumInGizmo {
     return InGizmoTwo
   }
-// CHECK: { i8* getelementptr inbounds ([18 x i8]* @"\01L_selector_data(getRawEnumInGizmo)", i64 0, i64 0),
-// CHECK: i8* getelementptr inbounds ([8 x i8]* [[ENUMENCODING]], i64 0, i64 0)
+// CHECK: { i8* getelementptr inbounds ([18 x i8], [18 x i8]* @"\01L_selector_data(getRawEnumInGizmo)", i64 0, i64 0),
+// CHECK: i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENUMENCODING]], i64 0, i64 0)
 
 }
 
@@ -111,4 +111,4 @@ func testArchetype(work: P3) {
 // CHECK: [[ENC1:@.*]] = private unnamed_addr constant [35 x i8] c"v24@0:8@\22<NSFunging><NSRuncing>\2216\00"
 // CHECK: [[ENC2:@.*]] = private unnamed_addr constant [46 x i8] c"v32@0:8@\22Gizmo\2216@?<v@?@\22NSView\22@\22NSSpoon\22>24\00"
 // CHECK: [[ENC3:@.*]] = private unnamed_addr constant [27 x i8] c"v24@0:8@\22MyCustomObject\2216\00"
-// CHECK: @_PROTOCOL_METHOD_TYPES__TtP18objc_type_encoding10MyProtocol_ = private constant { [3 x i8*] } { [3 x i8*] [i8* getelementptr inbounds ([35 x i8]* [[ENC1]], i64 0, i64 0), i8* getelementptr inbounds ([46 x i8]* [[ENC2]], i64 0, i64 0), i8* getelementptr inbounds ([27 x i8]* [[ENC3]], i64 0, i64 0)] }
+// CHECK: @_PROTOCOL_METHOD_TYPES__TtP18objc_type_encoding10MyProtocol_ = private constant { [3 x i8*] } { [3 x i8*] [i8* getelementptr inbounds ([35 x i8], [35 x i8]* [[ENC1]], i64 0, i64 0), i8* getelementptr inbounds ([46 x i8], [46 x i8]* [[ENC2]], i64 0, i64 0), i8* getelementptr inbounds ([27 x i8], [27 x i8]* [[ENC3]], i64 0, i64 0)] }

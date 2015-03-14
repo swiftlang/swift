@@ -13,13 +13,13 @@ import Builtin
 // --       1 = struct
 // CHECK:   i64 1,
 // --       name
-// CHECK:   i8* getelementptr inbounds ([34 x i8]* [[SINGLEDYNAMIC_NAME]], i64 0, i64 0),
+// CHECK:   i8* getelementptr inbounds ([34 x i8], [34 x i8]* [[SINGLEDYNAMIC_NAME]], i64 0, i64 0),
 // --       field count
 // CHECK:   i32 1,
 // --       field offset vector offset
 // CHECK:   i32 3,
 // --       field names
-// CHECK:   i8* getelementptr inbounds ([3 x i8]* [[SINGLEDYNAMIC_FIELDS]], i64 0, i64 0),
+// CHECK:   i8* getelementptr inbounds ([3 x i8], [3 x i8]* [[SINGLEDYNAMIC_FIELDS]], i64 0, i64 0),
 // --       generic metadata pattern
 // CHECK:   @_TMPdV15generic_structs13SingleDynamic
 // --       generic parameter vector offset
@@ -55,13 +55,13 @@ import Builtin
 // --       1 = struct
 // CHECK:   i64 1,
 // --       name
-// CHECK:   i8* getelementptr inbounds ([44 x i8]* [[DYNAMICWITHREQUIREMENTS_NAME]], i64 0, i64 0),
+// CHECK:   i8* getelementptr inbounds ([44 x i8], [44 x i8]* [[DYNAMICWITHREQUIREMENTS_NAME]], i64 0, i64 0),
 // --       field count
 // CHECK:   i32 2,
 // --       field offset vector offset
 // CHECK:   i32 3,
 // --       field names
-// CHECK:   i8* getelementptr inbounds ([5 x i8]* [[DYNAMICWITHREQUIREMENTS_FIELDS]], i64 0, i64 0),
+// CHECK:   i8* getelementptr inbounds ([5 x i8], [5 x i8]* [[DYNAMICWITHREQUIREMENTS_FIELDS]], i64 0, i64 0),
 // --       generic metadata pattern
 // CHECK:   @_TMPdV15generic_structs23DynamicWithRequirements
 // --       generic parameter vector offset

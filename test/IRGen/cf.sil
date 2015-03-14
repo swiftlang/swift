@@ -9,9 +9,9 @@
 
 // CHECK: [[REFRIGERATOR_NAME:@.*]] = private unnamed_addr constant [20 x i8] c"CSo14CCRefrigerator\00"
 
-// CHECK-32: @_TMdCSo14CCRefrigerator = linkonce_odr hidden global { {{.*}} } { i8* getelementptr inbounds ([20 x i8]* [[REFRIGERATOR_NAME]], i32 0, i32 0), [[TYPE]]* null, i32 0, i8** @_TWVBO, i32 16, [[TYPE]]* null, i8* null, i8* null, i8* null }
+// CHECK-32: @_TMdCSo14CCRefrigerator = linkonce_odr hidden global { {{.*}} } { i8* getelementptr inbounds ([20 x i8], [20 x i8]* [[REFRIGERATOR_NAME]], i32 0, i32 0), [[TYPE]]* null, i32 0, i8** @_TWVBO, i32 16, [[TYPE]]* null, i8* null, i8* null, i8* null }
 
-// CHECK-64: @_TMdCSo14CCRefrigerator = linkonce_odr hidden global { {{.*}} } { i8* getelementptr inbounds ([20 x i8]* [[REFRIGERATOR_NAME]], i64 0, i64 0), [[TYPE]]* null, i64 0, i8** @_TWVBO, i64 16, [[TYPE]]* null, i8* null, i8* null, i8* null }
+// CHECK-64: @_TMdCSo14CCRefrigerator = linkonce_odr hidden global { {{.*}} } { i8* getelementptr inbounds ([20 x i8], [20 x i8]* [[REFRIGERATOR_NAME]], i64 0, i64 0), [[TYPE]]* null, i64 0, i8** @_TWVBO, i64 16, [[TYPE]]* null, i8* null, i8* null, i8* null }
 
 sil_stage canonical
 
@@ -35,5 +35,5 @@ bb0(%0 : $CCRefrigerator):
 // CHECK-NEXT: ret void
 
 // CHECK:    define linkonce_odr hidden [[TYPE]]* @_TMaCSo14CCRefrigerator()
-// CHECK-32:    call [[TYPE]]* @swift_getForeignTypeMetadata([[TYPE]]* bitcast (i8* getelementptr inbounds (i8* bitcast ({{.*}}* @_TMdCSo14CCRefrigerator to i8*), i32 16) to [[TYPE]]*))
-// CHECK-64:    call [[TYPE]]* @swift_getForeignTypeMetadata([[TYPE]]* bitcast (i8* getelementptr inbounds (i8* bitcast ({{.*}}* @_TMdCSo14CCRefrigerator to i8*), i64 32) to [[TYPE]]*))
+// CHECK-32:    call [[TYPE]]* @swift_getForeignTypeMetadata([[TYPE]]* bitcast (i8* getelementptr inbounds (i8, i8* bitcast ({{.*}}* @_TMdCSo14CCRefrigerator to i8*), i32 16) to [[TYPE]]*))
+// CHECK-64:    call [[TYPE]]* @swift_getForeignTypeMetadata([[TYPE]]* bitcast (i8* getelementptr inbounds (i8, i8* bitcast ({{.*}}* @_TMdCSo14CCRefrigerator to i8*), i64 32) to [[TYPE]]*))

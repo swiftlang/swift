@@ -21,7 +21,7 @@ sil_vtable X {}
 // CHECK: _INSTANCE_METHODS__TtC19objc_attr_NSManaged10SwiftGizmo = private constant { {{.*}}i32, i32, [2 x { i8*, i8*, i8* }] } { i32 24, i32 2, {{.*}} @"\01L_selector_data(initWithBellsOn:)", {{.*}} @"\01L_selector_data(init)", 
 
 // The property 'x' should show up in the Objective-C metadata.
-// CHECK: @_PROPERTIES__TtC19objc_attr_NSManaged10SwiftGizmo = private constant { {{.*}}i32, i32, [1 x { i8*, i8* }] } { i32 16, i32 1, [1 x { i8*, i8* }] [{ i8*, i8* } { i8* getelementptr inbounds ([2 x i8]* [[X]], i64 0, i64 0),
+// CHECK: @_PROPERTIES__TtC19objc_attr_NSManaged10SwiftGizmo = private constant { {{.*}}i32, i32, [1 x { i8*, i8* }] } { i32 16, i32 1, [1 x { i8*, i8* }] [{ i8*, i8* } { i8* getelementptr inbounds ([2 x i8], [2 x i8]* [[X]], i64 0, i64 0),
 
 // The getter/setter should not show up in the Swift metadata.
 /* FIXME: sil_vtable parser picks the wrong 'init' overload. Both vtable entries

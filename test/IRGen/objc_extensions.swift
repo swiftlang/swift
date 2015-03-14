@@ -20,7 +20,7 @@ import gizmo
 // CHECK:   @_PROTOCOL__TtP15objc_extensions11NewProtocol_
 
 // CHECK-LABEL: @"_CATEGORY_Gizmo_$_objc_extensions" = private constant
-// CHECK:   i8* getelementptr inbounds ([16 x i8]* [[CATEGORY_NAME]], i64 0, i64 0),
+// CHECK:   i8* getelementptr inbounds ([16 x i8], [16 x i8]* [[CATEGORY_NAME]], i64 0, i64 0),
 // CHECK:   %objc_class* @"OBJC_CLASS_$_Gizmo",
 // CHECK:   @"_CATEGORY_INSTANCE_METHODS_Gizmo_$_objc_extensions",
 // CHECK:   @"_CATEGORY_CLASS_METHODS_Gizmo_$_objc_extensions",
@@ -61,7 +61,7 @@ extension Gizmo: NewProtocol {
 // CHECK: [[CATEGORY_NAME_1:@.*]] = private unnamed_addr constant [17 x i8] c"objc_extensions1\00"
 
 // CHECK: @"_CATEGORY_Gizmo_$_objc_extensions1" = private constant
-// CHECK:   i8* getelementptr inbounds ([17 x i8]* [[CATEGORY_NAME_1]], i64 0, i64 0),
+// CHECK:   i8* getelementptr inbounds ([17 x i8], [17 x i8]* [[CATEGORY_NAME_1]], i64 0, i64 0),
 // CHECK:   %objc_class* @"OBJC_CLASS_$_Gizmo",
 // CHECK:   {{.*}} @"_CATEGORY_INSTANCE_METHODS_Gizmo_$_objc_extensions1",
 // CHECK:   {{.*}} @"_CATEGORY_CLASS_METHODS_Gizmo_$_objc_extensions1",
@@ -88,8 +88,8 @@ class Hoozit : NSObject {
 // CHECK:   i32 24,
 // CHECK:   i32 1,
 // CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
-// CHECK:     i8* getelementptr inbounds ([8 x i8]* @"\01L_selector_data(blibble)", i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([8 x i8]* [[STR:@.*]], i64 0, i64 0),
+// CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(blibble)", i64 0, i64 0),
+// CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[STR:@.*]], i64 0, i64 0),
 // CHECK:     i8* bitcast (void ([[OPAQUE:%.*]]*, i8*)* @_TToFC15objc_extensions6Hoozit7blibblefS0_FT_T_ to i8*)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
@@ -98,14 +98,14 @@ class Hoozit : NSObject {
 // CHECK:   i32 24,
 // CHECK:   i32 1,
 // CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
-// CHECK:     i8* getelementptr inbounds ([8 x i8]* @"\01L_selector_data(blobble)", i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([8 x i8]* [[STR]], i64 0, i64 0),
+// CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(blobble)", i64 0, i64 0),
+// CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[STR]], i64 0, i64 0),
 // CHECK:     i8* bitcast (void (i8*, i8*)* @_TToZFC15objc_extensions6Hoozit7blobblefMS0_FT_T_ to i8*)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
 // CHECK: @"_CATEGORY__TtC15objc_extensions6Hoozit_$_objc_extensions" = private constant
-// CHECK:   i8* getelementptr inbounds ([16 x i8]* [[CATEGORY_NAME]], i64 0, i64 0),
+// CHECK:   i8* getelementptr inbounds ([16 x i8], [16 x i8]* [[CATEGORY_NAME]], i64 0, i64 0),
 // CHECK:   %swift.type* getelementptr inbounds ({{.*}} @_TMdC15objc_extensions6Hoozit {{.*}}),
 // CHECK:   {{.*}} @"_CATEGORY_INSTANCE_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions",
 // CHECK:   {{.*}} @"_CATEGORY_CLASS_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions",
@@ -124,8 +124,8 @@ class SwiftOnly { }
 // CHECK:   i32 24,
 // CHECK:   i32 1,
 // CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
-// CHECK:     i8* getelementptr inbounds ([7 x i8]* @"\01L_selector_data(wibble)", i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([8 x i8]* [[STR]], i64 0, i64 0),
+// CHECK:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* @"\01L_selector_data(wibble)", i64 0, i64 0),
+// CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[STR]], i64 0, i64 0),
 // CHECK:     i8* bitcast (void (i8*, i8*)* @_TToFC15objc_extensions9SwiftOnly6wibblefS0_FT_T_ to i8*)
 // CHECK:   }] }, section "__DATA, __objc_const", align 8
 extension SwiftOnly {

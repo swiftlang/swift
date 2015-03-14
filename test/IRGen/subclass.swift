@@ -29,7 +29,7 @@
 // CHECK:   void ([[B]]*)* @_TFC8subclass1BD,
 // CHECK:   i8** @_TWVBo,
 // CHECK:   i64 ptrtoint ([[OBJC_CLASS]]* @_TMmC8subclass1B to i64),
-// CHECK:   [[TYPE]]* getelementptr inbounds ([[FULL_HEAPMETADATA]]* bitcast ([[A_METADATA]]* @_TMdC8subclass1A to [[FULL_HEAPMETADATA]]*), i32 0, i32 2),
+// CHECK:   [[TYPE]]* getelementptr inbounds ([[FULL_HEAPMETADATA]], [[FULL_HEAPMETADATA]]* bitcast ([[A_METADATA]]* @_TMdC8subclass1A to [[FULL_HEAPMETADATA]]*), i32 0, i32 2),
 // CHECK:   [[OPAQUE]]* @_objc_empty_cache,
 // CHECK:   [[OPAQUE]]* {{(@_objc_empty_vtable|null)}},
 // CHECK:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1B to i64), i64 1),

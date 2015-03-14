@@ -44,7 +44,7 @@ bb0(%0 : $ObjCClass):
 
 // CHECK-LABEL: define { i8*, %swift.refcounted* } @indirect_partial_apply(i8*, %swift.refcounted*, i64) {
 // CHECK: entry:
-// CHECK:   [[OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_heapmetadata* @metadata, i32 0, i32 2), i64 40, i64 7)
+// CHECK:   [[OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_heapmetadata, %swift.full_heapmetadata* @metadata, i32 0, i32 2), i64 40, i64 7)
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* [[OBJ]] to [[DATA_TYPE:<{ %swift.refcounted, i64, %swift.refcounted\*, i8\* }>]]*
 // CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]], [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 1
 // CHECK:   store i64 %2, i64* [[X_ADDR]], align 8
@@ -77,7 +77,7 @@ entry(%f : $@callee_owned (Builtin.Word) -> (), %x : $Builtin.Word):
 
 // CHECK-LABEL: define { i8*, %swift.refcounted* } @objc_partial_apply(%C13partial_apply9ObjCClass*) {
 // CHECK: entry:
-// CHECK:   [[OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_heapmetadata* @metadata2, i32 0, i32 2), i64 24, i64 7)
+// CHECK:   [[OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_heapmetadata, %swift.full_heapmetadata* @metadata2, i32 0, i32 2), i64 24, i64 7)
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* [[OBJ]] to [[DATA_TYPE:<{ %swift.refcounted, %C13partial_apply9ObjCClass\* }>]]*
 // CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]], [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 1
 // CHECK:   store %C13partial_apply9ObjCClass* %0, %C13partial_apply9ObjCClass** [[X_ADDR]], align 8
