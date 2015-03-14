@@ -222,107 +222,6 @@ protected:
             Inst->isVolatile()));
   }
 
-  /// Attempt to simplify an unconditional checked cast.
-  void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *inst) {
-    // Grab both the from and to types.
-    SILType sourceType = getOpType(inst->getOperand().getType());
-    SILType targetType = getOpType(inst->getType());
-    SILLocation loc = getOpLocation(inst->getLoc());
-    SILBuilderWithPostProcess<TypeSubstCloner, 16> B(this, inst);
-
-    // The non-addr CheckedCastInsts can currently only be used for
-    // types that don't have abstraction differences, so this is okay.
-    CanType formalSourceType = sourceType.getSwiftRValueType();
-    CanType formalTargetType = targetType.getSwiftRValueType();
-
-    SILValue operand = getOpValue(inst->getOperand());
-    bool isSourceTypeExact = isa<MetatypeInst>(inst->getOperand());
-
-    switch (classifyDynamicCast(SwiftMod, formalSourceType,
-                                formalTargetType, isSourceTypeExact,
-                                inst->getModule().isWholeModule())) {
-    case DynamicCastFeasibility::WillSucceed: {
-      SILValue result =
-        emitSuccessfulScalarUnconditionalCast(B, SwiftMod, loc, operand,
-                                              targetType, formalSourceType,
-                                              formalTargetType);
-      ValueMap.insert({SILValue(inst), result});
-      return;
-    }
-
-    case DynamicCastFeasibility::MaySucceed: {
-      SILValue result =
-        B.createUnconditionalCheckedCast(loc, operand, targetType);
-      ValueMap.insert({SILValue(inst), result});
-      return;
-    }
-
-    // Ok, we have an invalid cast. Insert a trap so we trap at
-    // runtime as the spec for the instruction requires and propagate
-    // undef to all uses.
-    case DynamicCastFeasibility::WillFail:
-      B.createBuiltinTrap(loc);
-      ValueMap.insert({SILValue(inst),
-                       SILValue(SILUndef::get(targetType, inst->getModule()))});
-      addBlockWithUnreachable(B.getInsertionBB());
-      B.createUnreachable(ArtificialUnreachableLocation());
-      return;
-    }
-    llvm_unreachable("bad classification");
-  }
-
-  void visitUnconditionalCheckedCastAddrInst(
-                                     UnconditionalCheckedCastAddrInst *inst) {
-    SILLocation loc = getOpLocation(inst->getLoc());
-    SILValue src = getOpValue(inst->getSrc());
-    SILValue dest = getOpValue(inst->getDest());
-    SILBuilderWithPostProcess<TypeSubstCloner, 16> B(this, inst);
-
-    CanType sourceType = getOpASTType(inst->getSourceType());
-    CanType targetType = getOpASTType(inst->getTargetType());
-
-    switch (classifyDynamicCast(SwiftMod, sourceType, targetType,
-                                /* isSourceTypeExact*/ false,
-                                inst->getModule().isWholeModule())) {
-    case DynamicCastFeasibility::WillSucceed: {
-      emitSuccessfulIndirectUnconditionalCast(B, SwiftMod, loc,
-                                              inst->getConsumptionKind(),
-                                              src, sourceType,
-                                              dest, targetType);
-      return;
-    }
-
-    case DynamicCastFeasibility::MaySucceed: {
-      // TODO: simplify?
-      B.createUnconditionalCheckedCastAddr(loc, inst->getConsumptionKind(),
-                                           src, sourceType,
-                                           dest, targetType);
-      return;
-    }
-
-    // Ok, we have an invalid cast. Insert a trap so we trap at
-    // runtime as the spec for the instruction requires and propagate
-    // undef to all uses.
-    case DynamicCastFeasibility::WillFail: {
-      B.createBuiltinTrap(loc);
-
-      // mem2reg's invariants get unhappy if we don't try to
-      // initialize a loadable result.
-      auto &resultTL = B.getModule().Types.getTypeLowering(dest.getType());
-      if (!resultTL.isAddressOnly()) {
-        auto undef = SILValue(SILUndef::get(dest.getType().getObjectType(),
-                                            B.getModule()));
-        B.createStore(loc, undef, dest);
-      }
-      addBlockWithUnreachable(B.getInsertionBB());
-      B.createUnreachable(ArtificialUnreachableLocation());
-      return;
-    }
-
-    }
-    llvm_unreachable("bad classification");
-  }
-
   /// Attempt to simplify a conditional checked cast.
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *inst) {
     SILLocation loc = getOpLocation(inst->getLoc());
@@ -334,105 +233,24 @@ protected:
     SILBasicBlock *failBB = getOpBasicBlock(inst->getFailureBB());
 
     SILBuilderWithPostProcess<TypeSubstCloner, 16> B(this, inst);
-    switch (classifyDynamicCast(SwiftMod, sourceType, targetType,
-                                /* isSourceTypeExact */ false,
-                                inst->getModule().isWholeModule())) {
-    case DynamicCastFeasibility::WillSucceed: {
-      emitSuccessfulIndirectUnconditionalCast(B, SwiftMod, loc,
-                                              inst->getConsumptionKind(),
-                                              src, sourceType,
-                                              dest, targetType);
-      B.createBranch(loc, succBB);
+
+    // Try to use the scalar cast instruction.
+    if (canUseScalarCheckedCastInstructions(B.getModule(),
+                                            sourceType, targetType)) {
+      emitIndirectConditionalCastWithScalar(B, SwiftMod, loc,
+                                            inst->getConsumptionKind(),
+                                            src, sourceType,
+                                            dest, targetType,
+                                            succBB, failBB);
       return;
     }
 
-    case DynamicCastFeasibility::MaySucceed: {
-      // Try to use the scalar cast instruction.
-      if (canUseScalarCheckedCastInstructions(B.getModule(),
-                                              sourceType, targetType)) {
-        emitIndirectConditionalCastWithScalar(B, SwiftMod, loc,
-                                              inst->getConsumptionKind(),
-                                              src, sourceType,
-                                              dest, targetType,
-                                              succBB, failBB);
-        return;
-      }
-
-      // Otherwise, use the indirect cast.
-      B.createCheckedCastAddrBranch(loc, inst->getConsumptionKind(),
-                                    src, sourceType,
-                                    dest, targetType,
-                                    succBB, failBB);
-      return;
-    }
-
-    case DynamicCastFeasibility::WillFail:
-      if (shouldDestroyOnFailure(inst->getConsumptionKind())) {
-        auto &srcTL = B.getModule().getTypeLowering(src.getType());
-        srcTL.emitDestroyAddress(B, loc, src);
-      }
-      B.createBranch(loc, failBB);
-      return;
-    }    
-  }
-
-  /// Attempt to simplify a conditional checked cast.
-  void visitCheckedCastBranchInst(CheckedCastBranchInst *inst) {
-    // We cannot improve on an exact cast.
-    if (inst->isExact()) {
-      return super::visitCheckedCastBranchInst(inst);
-    }
-
-    // Grab both the from and to types.
-    SILType loweredSourceType = getOpType(inst->getOperand().getType());
-    SILType loweredTargetType = getOpType(inst->getCastType());
-    SILLocation loc = getOpLocation(inst->getLoc());
-    SILBasicBlock *succBB = getOpBasicBlock(inst->getSuccessBB());
-    SILBasicBlock *failBB = getOpBasicBlock(inst->getFailureBB());
-    SILBuilderWithPostProcess<TypeSubstCloner, 16> B(this, inst);
-
-    SILValue operand = getOpValue(inst->getOperand());
-    bool isSourceTypeExact = isa<MetatypeInst>(inst->getOperand());
-
-    // The non-addr CheckedCastInsts can currently only be used for
-    // types that don't have abstraction differences, so this is okay.
-    CanType sourceType = loweredSourceType.getSwiftRValueType();
-    CanType targetType = loweredTargetType.getSwiftRValueType();
-
-    switch (classifyDynamicCast(SwiftMod, sourceType,
-                                targetType, isSourceTypeExact,
-                                inst->getModule().isWholeModule())) {
-    case DynamicCastFeasibility::WillSucceed: {
-      // FIXME: this is a temporary workaround to the fact that
-      // we're still using checked_cast_branch for address-only stuff.
-      if (loweredTargetType.isAddress()) {
-        if (sourceType == targetType) {
-          B.createBranch(loc, succBB, operand);
-          return;
-        }
-        goto maySucceed;
-      }
-
-      SILValue result =
-        emitSuccessfulScalarUnconditionalCast(B, SwiftMod, loc, operand,
-                                              loweredTargetType, sourceType,
-                                              targetType);
-
-      B.createBranch(loc, succBB, result);
-      return;
-    }
-
-    maySucceed:
-    case DynamicCastFeasibility::MaySucceed: {
-      B.createCheckedCastBranch(loc, /*exact*/ false, operand,
-                                loweredTargetType, succBB, failBB);
-      return;
-    }
-
-    case DynamicCastFeasibility::WillFail:
-      B.createBranch(loc, failBB);
-      return;
-    }
+    // Otherwise, use the indirect cast.
+    B.createCheckedCastAddrBranch(loc, inst->getConsumptionKind(),
+                                  src, sourceType,
+                                  dest, targetType,
+                                  succBB, failBB);
+    return;
   }
 
   void visitUpcastInst(UpcastInst *Upcast) {
