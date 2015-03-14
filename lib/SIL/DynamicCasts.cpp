@@ -281,6 +281,27 @@ swift::classifyDynamicCast(Module *M,
       return (getAnyMetatypeDepth(source) == getAnyMetatypeDepth(target)
               ? DynamicCastFeasibility::MaySucceed
               : DynamicCastFeasibility::WillFail);
+
+    // If both metatypes are class metatypes, check if classes can be
+    // casted.
+    if (source.getClassOrBoundGenericClass() &&
+        target.getClassOrBoundGenericClass())
+      return classifyDynamicCast(M, source, target, false, isWholeModuleOpts);
+
+    // Different structs cannot be casted to each other.
+    if (source.getStructOrBoundGenericStruct() &&
+        target.getStructOrBoundGenericStruct() &&
+        source != target)
+      return DynamicCastFeasibility::WillFail;
+
+    // Different enums cannot be casted to each other.
+    if (source.getEnumOrBoundGenericEnum() &&
+        target.getEnumOrBoundGenericEnum() &&
+        source != target)
+      return DynamicCastFeasibility::WillFail;
+
+    // If we don't know any better, assume that the cast may succeed.
+    return DynamicCastFeasibility::MaySucceed;
   }
 
   // Class casts.
