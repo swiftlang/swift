@@ -13,9 +13,11 @@
 #include "swift/SILAnalysis/Analysis.h"
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILUndef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -722,3 +724,485 @@ void LifetimeTracker::computeLifetime() {
 
   LifetimeComputed = true;
 }
+
+//===----------------------------------------------------------------------===//
+//                    Casts Optimization and Simplification
+//===----------------------------------------------------------------------===//
+
+SILInstruction *
+CastOptimizer::
+simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
+  if (auto *I = optimizeCheckedCastAddrBranchInst(Inst))
+    Inst = dyn_cast<CheckedCastAddrBranchInst>(I);
+
+  auto Loc = Inst->getLoc();
+  auto Src = Inst->getSrc();
+  auto Dest = Inst->getDest();
+  auto SourceType = Inst->getSourceType();
+  auto TargetType = Inst->getTargetType();
+  auto *SuccessBB = Inst->getSuccessBB();
+  auto *FailureBB = Inst->getFailureBB();
+  auto &Mod = Inst->getModule();
+
+  SILBuilderWithScope<1> Builder(Inst);
+
+  // Try to determine the outcome of the cast from a known type
+  // to a protocol type at compile-time.
+  bool isSourceTypeExact = isa<MetatypeInst>(Inst->getSrc());
+
+  // Check if we can statically predict the outcome of the cast.
+  auto Feasibility = classifyDynamicCast(Mod.getSwiftModule(),
+                          Src.getType().getSwiftRValueType(),
+                          Dest.getType().getSwiftRValueType(),
+                          isSourceTypeExact,
+                          Mod.isWholeModule());
+
+  if (Feasibility == DynamicCastFeasibility::MaySucceed)
+    return nullptr;
+
+  if (Feasibility == DynamicCastFeasibility::WillFail) {
+    if (shouldDestroyOnFailure(Inst->getConsumptionKind())) {
+      auto &srcTL = Builder.getModule().getTypeLowering(Src.getType());
+      srcTL.emitDestroyAddress(Builder, Loc, Src);
+    }
+    auto NewI = Builder.createBranch(Loc, FailureBB);
+    Inst->eraseFromParent();
+    WillFailAction();
+    return NewI;
+  }
+
+  // Cast will succeed
+
+  // Replace by unconditional_addr_cast, followed by a branch.
+  // The unconditional_addr_cast can be skipped, if the result of a cast
+  // is not used afterwards.
+  bool ResultNotUsed = isa<AllocStackInst>(Dest.getDef());
+  for (auto Use : Dest.getUses()) {
+    auto *User = Use->getUser();
+    if (isa<DeallocStackInst>(User) || User == Inst)
+      continue;
+    ResultNotUsed = false;
+    break;
+  }
+
+  if (!ResultNotUsed) {
+    // emitSuccessfulIndirectUnconditionalCast can handle only
+    // address types currently.
+    if (!Src.getType().isAddress() || !Dest.getType().isAddress())
+      return nullptr;
+
+    // emitSuccessfulIndirectUnconditionalCast cannot handle casts
+    // between metatypes yet.
+    if (isa<AnyMetatypeType>(Src.getType().getSwiftRValueType()) ||
+        isa<AnyMetatypeType>(Dest.getType().getSwiftRValueType()))
+      return nullptr;
+
+    emitSuccessfulIndirectUnconditionalCast(Builder, Mod.getSwiftModule(), Loc,
+                                            Inst->getConsumptionKind(),
+                                            Src, SourceType,
+                                            Dest, TargetType);
+  }
+
+  auto *NewI = Builder.createBranch(Loc, SuccessBB);
+  Inst->eraseFromParent();
+  WillSucceedAction();
+  return NewI;
+}
+
+SILInstruction *
+CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
+  if (Inst->isExact())
+    return nullptr;
+
+  if (auto *I = optimizeCheckedCastBranchInst(Inst))
+    Inst = dyn_cast<CheckedCastBranchInst>(I);
+
+  auto LoweredSourceType = Inst->getOperand().getType();
+  auto LoweredTargetType = Inst->getCastType();
+  auto Loc = Inst->getLoc();
+  auto *SuccessBB = Inst->getSuccessBB();
+  auto *FailureBB = Inst->getFailureBB();
+  auto Op = Inst->getOperand();
+  auto &Mod = Inst->getModule();
+  bool isSourceTypeExact = isa<MetatypeInst>(Op);
+
+
+  // Check if we can statically predict the outcome of the cast.
+  auto Feasibility = classifyDynamicCast(Mod.getSwiftModule(),
+                          LoweredSourceType.getSwiftRValueType(),
+                          LoweredTargetType.getSwiftRValueType(),
+                          isSourceTypeExact);
+
+  if (Feasibility == DynamicCastFeasibility::MaySucceed)
+    return nullptr;
+
+  SILBuilderWithScope<1> Builder(Inst);
+
+  if (Feasibility == DynamicCastFeasibility::WillFail) {
+    auto *NewI = Builder.createBranch(Loc, FailureBB);
+    Inst->eraseFromParent();
+    WillFailAction();
+    return NewI;
+  }
+
+  // Casting will succeed.
+
+  // Replace by unconditional_cast, followed by a branch.
+  // The unconditional_cast can be skipped, if the result of a cast
+  // is not used afterwards.
+  SmallVector<SILValue, 1> Args;
+  bool ResultNotUsed = SuccessBB->getBBArg(0)->use_empty();
+  SILValue CastedValue;
+  if (Op.getType() != LoweredTargetType) {
+    if (!ResultNotUsed) {
+      CastedValue = emitSuccessfulScalarUnconditionalCast(
+          Builder, Mod.getSwiftModule(), Loc, Op, LoweredTargetType,
+          LoweredSourceType.getSwiftRValueType(),
+          LoweredTargetType.getSwiftRValueType());
+    } else {
+      CastedValue = SILUndef::get(LoweredTargetType, Mod);
+    }
+  } else {
+    // No need to cast.
+    CastedValue = Op;
+  }
+
+  Args.push_back(CastedValue);
+  auto *NewI = Builder.createBranch(Loc, SuccessBB, Args);
+  Inst->eraseFromParent();
+  WillSucceedAction();
+  return NewI;
+}
+
+SILInstruction *
+CastOptimizer::
+optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
+  auto Loc = Inst->getLoc();
+  auto Src = Inst->getSrc();
+  auto Dest = Inst->getDest();
+  auto TargetType = Inst->getTargetType();
+  auto *SuccessBB = Inst->getSuccessBB();
+  auto *FailureBB = Inst->getFailureBB();
+
+  // %1 = metatype $A.Type
+  // [%2 = init_existential_metatype %1 ...]
+  // %3 = alloc_stack
+  // store %1 to %3 or store %2 to %3
+  // checked_cast_addr_br %3 to ...
+  // ->
+  // %1 = metatype $A.Type
+  // checked_cast_addr_br %1 to ...
+  if (auto *ASI = dyn_cast<AllocStackInst>(Src.getDef())) {
+    // Check if the value of this alloc_stack is set only once by a store
+    // instruction, used only by CCABI and then deallocated.
+    bool isLegal = true;
+    StoreInst *Store = nullptr;
+    for (auto Use : ASI->getUses()) {
+      auto *User = Use->getUser();
+      if (isa<DeallocStackInst>(User) || User == Inst)
+        continue;
+      if (auto *SI = dyn_cast<StoreInst>(User)) {
+        if (!Store) {
+          Store = SI;
+          continue;
+        }
+      }
+      isLegal = false;
+      break;
+    }
+
+    if (isLegal && Store) {
+      // Check what was the value stored in the allocated stack slot.
+      auto Src = Store->getSrc();
+      MetatypeInst *MI = nullptr;
+      if (auto *IEMI = dyn_cast<InitExistentialMetatypeInst>(Src)) {
+        MI = dyn_cast<MetatypeInst>(IEMI->getOperand());
+      }
+
+      if (!MI)
+        MI = dyn_cast<MetatypeInst>(Src);
+
+      if (MI) {
+        SILBuilderWithScope<1> B(Inst);
+        auto NewI = B.createCheckedCastAddrBranch(Loc,
+                                  Inst->getConsumptionKind(),
+                                  MI,
+                                  MI->getType().getSwiftRValueType(),
+                                  Dest,
+                                  TargetType,
+                                  SuccessBB,
+                                  FailureBB);
+        Inst->eraseFromParent();
+        return NewI;
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+SILInstruction *
+CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
+  if (Inst->isExact())
+    return nullptr;
+
+  auto LoweredTargetType = Inst->getCastType();
+  auto Loc = Inst->getLoc();
+  auto *SuccessBB = Inst->getSuccessBB();
+  auto *FailureBB = Inst->getFailureBB();
+  auto Op = Inst->getOperand();
+
+  // Try to simplify checked_cond_br instructions using existential
+  // metatypes by propagating a concrete type whenever it can be
+  // determined statically.
+
+  // %0 = metatype $A.Type
+  // %1 = init_existential_metatype ..., %0: $A
+  // checked_cond_br %1, ....
+  // ->
+  // %1 = metatype $A.Type
+  // checked_cond_br %1, ....
+  if (auto *IEMI = dyn_cast<InitExistentialMetatypeInst>(Op)) {
+    if (auto *MI = dyn_cast<MetatypeInst>(IEMI->getOperand())) {
+      SILBuilderWithScope<1> B(Inst);
+      auto *NewI = B.createCheckedCastBranch(Loc, /* isExact */ false, MI,
+                                LoweredTargetType,
+                                SuccessBB,
+                                FailureBB);
+      Inst->eraseFromParent();
+      return NewI;
+    }
+  }
+
+  if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(Op)) {
+    // Operand of the existential_metatype instruction.
+    auto Op = EMI->getOperand();
+    auto EmiTy = EMI->getType();
+
+    // %0 = alloc_stack ..
+    // %1 = init_existential_addr %0: $A
+    // %2 = existential_metatype %0, ...
+    // checked_cond_br %2, ....
+    // ->
+    // %1 = metatype $A.Type
+    // checked_cond_br %1, ....
+
+    if (auto *ASI = dyn_cast<AllocStackInst>(Op)) {
+      // Should be in the same BB.
+      if (ASI->getParent() != EMI->getParent())
+        return nullptr;
+      // Check if this alloc_stac is is only initialized once by means of
+      // single init_existential_addr.
+      bool isLegal = true;
+      // init_existental instruction used to initialize this alloc_stack.
+      InitExistentialAddrInst *FoundIEI = nullptr;
+      for (auto Use: ASI->getUses()) {
+        auto *User = Use->getUser();
+        if (isa<ExistentialMetatypeInst>(User) ||
+            isa<DestroyAddrInst>(User) ||
+            isa<DeallocStackInst>(User))
+           continue;
+        if (auto *IEI = dyn_cast<InitExistentialAddrInst>(User)) {
+          if (!FoundIEI) {
+            FoundIEI = IEI;
+            continue;
+          }
+        }
+        isLegal = false;
+        break;
+      }
+
+      if (isLegal && FoundIEI) {
+        // Should be in the same BB.
+        if (FoundIEI->getParent() != EMI->getParent())
+          return nullptr;
+        // Get the type used to initialize the existential.
+        auto LoweredConcreteTy = FoundIEI->getLoweredConcreteType();
+        if (LoweredConcreteTy.isAnyExistentialType())
+          return nullptr;
+        // Get the metatype of this type.
+        auto EMT = dyn_cast<AnyMetatypeType>(EmiTy.getSwiftRValueType());
+        auto *MetaTy = MetatypeType::get(LoweredConcreteTy.getSwiftRValueType(),
+                                         EMT->getRepresentation());
+        auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
+        auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
+        SILBuilderWithScope<1> B(Inst);
+        auto *MI = B.createMetatype(FoundIEI->getLoc(), SILMetaTy);
+
+        auto *NewI = B.createCheckedCastBranch(Loc, /* isExact */ false, MI,
+                                  LoweredTargetType,
+                                  SuccessBB,
+                                  FailureBB);
+        Inst->eraseFromParent();
+        return NewI;
+      }
+    }
+
+    // %0 = alloc_ref $A
+    // %1 = init_existential_ref %0: $A, $...
+    // %2 = existential_metatype ..., %1 :  ...
+    // checked_cond_br %2, ....
+    // ->
+    // %1 = metatype $A.Type
+    // checked_cond_br %1, ....
+    if (auto *FoundIERI = dyn_cast<InitExistentialRefInst>(Op)) {
+      auto *ASRI = dyn_cast<AllocRefInst>(FoundIERI->getOperand());
+      if (!ASRI)
+        return nullptr;
+      // Should be in the same BB.
+      if (ASRI->getParent() != EMI->getParent())
+        return nullptr;
+      // Check if this alloc_stac is is only initialized once by means of
+      // a single initt_existential_ref.
+      bool isLegal = true;
+      for (auto Use: ASRI->getUses()) {
+        auto *User = Use->getUser();
+        if (isa<ExistentialMetatypeInst>(User) || isa<StrongReleaseInst>(User))
+           continue;
+        if (auto *IERI = dyn_cast<InitExistentialRefInst>(User)) {
+          if (IERI == FoundIERI) {
+            continue;
+          }
+        }
+        isLegal = false;
+        break;
+      }
+
+      if (isLegal && FoundIERI) {
+        // Should be in the same BB.
+        if (FoundIERI->getParent() != EMI->getParent())
+          return nullptr;
+        // Get the type used to initialize the existential.
+        auto ConcreteTy = FoundIERI->getFormalConcreteType();
+        if (ConcreteTy.isAnyExistentialType())
+          return nullptr;
+        // Get the SIL metatype of this type.
+        auto EMT = dyn_cast<AnyMetatypeType>(EMI->getType().getSwiftRValueType());
+        auto *MetaTy = MetatypeType::get(ConcreteTy, EMT->getRepresentation());
+        auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
+        auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
+        SILBuilderWithScope<1> B(Inst);
+        auto *MI = B.createMetatype(FoundIERI->getLoc(), SILMetaTy);
+
+        auto *NewI = B.createCheckedCastBranch(Loc, /* isExact */ false, MI,
+                                  LoweredTargetType,
+                                  SuccessBB,
+                                  FailureBB);
+        Inst->eraseFromParent();
+        return NewI;
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+SILInstruction *
+CastOptimizer::
+optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {
+  auto LoweredSourceType = Inst->getOperand().getType();
+  auto LoweredTargetType = Inst->getType();
+  auto Loc = Inst->getLoc();
+  auto Op = Inst->getOperand();
+  auto &Mod = Inst->getModule();
+
+  bool isSourceTypeExact = isa<MetatypeInst>(Op);
+
+  // Check if we can statically predict the outcome of the cast.
+  auto Feasibility = classifyDynamicCast(Mod.getSwiftModule(),
+                          LoweredSourceType.getSwiftRValueType(),
+                          LoweredTargetType.getSwiftRValueType(),
+                          isSourceTypeExact);
+
+  if (Feasibility == DynamicCastFeasibility::WillFail) {
+    // Remove the cast and insert a trap, followed by an
+    // unreachable instruction.
+    SILBuilderWithScope<1> Builder(Inst);
+    auto *Trap = Builder.createBuiltinTrap(Loc);
+    Inst->replaceAllUsesWithUndef();
+    EraseInstAction(Inst);
+    Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(Trap)));
+    Builder.createUnreachable(ArtificialUnreachableLocation());
+    return Trap;
+  }
+
+  if (Feasibility == DynamicCastFeasibility::WillSucceed) {
+    SILBuilderWithScope<1> Builder(Inst);
+
+    auto Result = emitSuccessfulScalarUnconditionalCast(Builder,
+                      Mod.getSwiftModule(), Loc, Op,
+                      LoweredTargetType,
+                      LoweredSourceType.getSwiftRValueType(),
+                      LoweredTargetType.getSwiftRValueType());
+
+    ReplaceInstUsesAction(Inst, Result.getDef());
+    EraseInstAction(Inst);
+    return dyn_cast<SILInstruction>(Result.getDef());
+  }
+
+  return nullptr;
+}
+
+SILInstruction *
+CastOptimizer::
+optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst) {
+  auto Loc = Inst->getLoc();
+  auto Src = Inst->getSrc();
+  auto Dest = Inst->getDest();
+  auto SourceType = Inst->getSourceType();
+  auto TargetType = Inst->getTargetType();
+  auto &Mod = Inst->getModule();
+
+  bool isSourceTypeExact = isa<MetatypeInst>(Src);
+
+  // Check if we can statically predict the outcome of the cast.
+  auto Feasibility = classifyDynamicCast(Mod.getSwiftModule(), SourceType,
+                                         TargetType, isSourceTypeExact);
+
+  if (Feasibility == DynamicCastFeasibility::MaySucceed)
+    return nullptr;
+
+  if (Feasibility == DynamicCastFeasibility::WillFail) {
+    // Remove the cast and insert a trap, followed by an
+    // unreachable instruction.
+    SILBuilderWithScope<1> Builder(Inst);
+    SILInstruction *NewI = Builder.createBuiltinTrap(Loc);
+    // mem2reg's invariants get unhappy if we don't try to
+    // initialize a loadable result.
+    auto DestType = Dest.getType();
+    auto &resultTL = Builder.getModule().Types.getTypeLowering(DestType);
+    if (!resultTL.isAddressOnly()) {
+      auto undef = SILValue(SILUndef::get(DestType.getObjectType(),
+                                          Builder.getModule()));
+      NewI = Builder.createStore(Loc, undef, Dest);
+    }
+    Inst->replaceAllUsesWithUndef();
+    EraseInstAction(Inst);
+    Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(NewI)));
+    Builder.createUnreachable(ArtificialUnreachableLocation());
+  }
+
+  if (Feasibility == DynamicCastFeasibility::WillSucceed) {
+    if (!Src.getType().isExistentialType() &&
+        Dest.getType().isExistentialType())
+      return nullptr;
+
+    // Bridging casts cannot be further simplified.
+    auto TargetIsBridgeable = TargetType->isBridgeableObjectType();
+    auto SourceIsBridgeable = SourceType->isBridgeableObjectType();
+
+    if (TargetIsBridgeable != SourceIsBridgeable)
+      return nullptr;
+
+    SILBuilderWithScope<1> Builder(Inst);
+    emitSuccessfulIndirectUnconditionalCast(Builder, Mod.getSwiftModule(), Loc,
+                                            Inst->getConsumptionKind(),
+                                            Src, SourceType,
+                                            Dest, TargetType);
+    Inst->replaceAllUsesWithUndef();
+    EraseInstAction(Inst);
+  }
+
+  return nullptr;
+}
+

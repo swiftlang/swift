@@ -139,7 +139,58 @@ namespace swift {
     void computeLifetime();
   };
 
+  /// \brief This is a helper class used to optimize casts.
+  class CastOptimizer {
+    // Callback to be called when uses of an instruction should be replaced.
+    std::function<void (SILInstruction *I, ValueBase *V)> ReplaceInstUsesAction;
 
+    // Callback to call when an instruction needs to be erased.
+    std::function<void (SILInstruction *)> EraseInstAction;
+
+    // Callback to call after an optimization was performed based on the fact
+    // that a cast will succeed.
+    std::function<void ()> WillSucceedAction;
+
+    // Callback to call after an optimization was performed based on the fact
+    // that a cast will fail.
+    std::function<void ()> WillFailAction;
+
+  public:
+    CastOptimizer(std::function<void (SILInstruction *I, ValueBase *V)> ReplaceInstUsesAction,
+                  std::function<void (SILInstruction *)> EraseAction = [](SILInstruction*){},
+                  std::function<void ()> WillSucceedAction = [](){},
+                  std::function<void ()> WillFailAction = [](){})
+  : ReplaceInstUsesAction(ReplaceInstUsesAction),
+    EraseInstAction(EraseAction),
+    WillSucceedAction(WillSucceedAction),
+    WillFailAction(WillFailAction) {}
+
+    /// Simplify checked_cast_br. It may change the control flow.
+    SILInstruction *
+    simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst);
+
+    /// Simplify checked_cast_addr_br. It may change the control flow.
+    SILInstruction *
+    simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst);
+
+    /// Optimize checked_cast_br. This cannot change the control flow.
+    SILInstruction *
+    optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst);
+
+    /// Optimize checked_cast_addr__br. This cannot change the control flow.
+    SILInstruction *
+    optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst);
+
+    /// Optimize unconditional_checked_cast.
+    /// This cannot change the control flow.
+    SILInstruction *
+    optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst);
+
+    /// Optimize unconditional_checked_cast_addr.
+    /// This cannot change the control flow.
+    SILInstruction *
+    optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst);
+  };
 
 } // end namespace swift
 
