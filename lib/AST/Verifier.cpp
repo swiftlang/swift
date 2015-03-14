@@ -1562,8 +1562,30 @@ struct ASTNodeBase {};
       if (!normal)
         return;
 
-      // Check that a normal protocol conformance is complete.
+      // Translate the owning declaration into a DeclContext.
+      NominalTypeDecl *nominal = dyn_cast<NominalTypeDecl>(decl);
+      DeclContext *conformingDC;
+      if (nominal) {
+        conformingDC = nominal;
+      } else {
+        auto ext = cast<ExtensionDecl>(decl);
+        conformingDC = ext;
+        nominal = ext->isNominalTypeOrNominalTypeExtensionContext();
+      }
+
       auto proto = conformance->getProtocol();
+      if (normal->getDeclContext() != conformingDC) {
+        Out << "AST verification error: conformance of "
+            << nominal->getName().str() << " to protocol "
+            << proto->getName().str() << " is in the wrong context.\n"
+            << "Owning context:\n";
+        conformingDC->printContext(Out);
+        Out << "Conformance context:\n";
+        normal->getDeclContext()->printContext(Out);
+        abort();
+      }
+
+      // Check that a normal protocol conformance is complete.
       for (auto member : proto->getMembers()) {
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
           if (!normal->hasTypeWitness(assocType)) {

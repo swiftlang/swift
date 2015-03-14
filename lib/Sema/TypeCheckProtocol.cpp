@@ -2879,8 +2879,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   for (auto InheritedProto : Proto->getProtocols()) {
     ProtocolConformance *InheritedConformance = nullptr;
     if (TC.conformsToProtocol(T, InheritedProto, DC, false,
-                              &InheritedConformance, ComplainLoc,
-                              ExplicitConformance)) {
+                              &InheritedConformance, ComplainLoc)) {
       if (!conformance->hasInheritedConformance(InheritedProto))
         conformance->setInheritedConformance(InheritedProto,
                                              InheritedConformance);

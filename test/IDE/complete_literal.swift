@@ -10,13 +10,13 @@
 // LITERAL1-NEXT:     Decl[InstanceVar]/CurrNominal:      bigEndian[#Int#]; name=bigEndian{{$}}
 // LITERAL1-NEXT:     Decl[InstanceVar]/CurrNominal:      littleEndian[#Int#]; name=littleEndian{{$}}
 // LITERAL1-NEXT:     Decl[InstanceVar]/CurrNominal:      byteSwapped[#Int#]; name=byteSwapped{{$}}
+// LITERAL1-NEXT:     Decl[InstanceMethod]/CurrNominal:   toIntMax()[#IntMax#]; name=toIntMax(){{$}}
+// LITERAL1-NEXT:     Decl[InstanceVar]/CurrNominal:      description[#String#]; name=description{{$}}
+// LITERAL1-NEXT:     Decl[InstanceVar]/CurrNominal:      hashValue[#Int#]; name=hashValue{{$}}
 // LITERAL1-NEXT:     Decl[InstanceMethod]/CurrNominal:   successor()[#Int#]; name=successor(){{$}}
 // LITERAL1-NEXT:     Decl[InstanceMethod]/CurrNominal:   predecessor()[#Int#]; name=predecessor(){{$}}
 // LITERAL1-NEXT:     Decl[InstanceMethod]/CurrNominal:   distanceTo({#(other): Int#})[#Distance#]; name=distanceTo(other: Int){{$}}
 // LITERAL1-NEXT:     Decl[InstanceMethod]/CurrNominal:   advancedBy({#(amount): Distance#})[#Int#]; name=advancedBy(amount: Distance){{$}}
-// LITERAL1-NEXT:     Decl[InstanceVar]/CurrNominal:      description[#String#]; name=description{{$}}
-// LITERAL1-NEXT:     Decl[InstanceVar]/CurrNominal:      hashValue[#Int#]; name=hashValue{{$}}
-// LITERAL1-NEXT:     Decl[InstanceMethod]/CurrNominal:   toIntMax()[#IntMax#]; name=toIntMax(){{$}}
 // LITERAL1-NEXT:     Decl[InstanceMethod]/CurrNominal:   getMirror()[#MirrorType#]; name=getMirror(){{$}}
 // LITERAL1-NEXT:     Decl[InstanceMethod]/CurrNominal:   encode()[#[Word]#]; name=encode(){{$}}
 // LITERAL1-NEXT:     End completions
