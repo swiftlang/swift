@@ -57,24 +57,6 @@ ClassDecl *DeclContext::isClassOrClassExtensionContext() const {
            isNominalTypeOrNominalTypeExtensionContext());
 }
 
-llvm::DenseMap<Expr *, Expr *> DeclContext::getExprParentMap() {
-  llvm::DenseMap<Expr *, Expr *> ParentMap;
-  class Walker : public ASTWalker {
-  public:
-    llvm::DenseMap<Expr *, Expr *> &ParentMap;
-    explicit Walker(llvm::DenseMap<Expr *, Expr *> &parentMap)
-    : ParentMap(parentMap) { }
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override{
-      if (Parent.getAsExpr()) {
-        ParentMap[E] = Parent.getAsExpr();
-      }
-      return { true, E };
-    }
-  } Walker(ParentMap);
-  walkContext(Walker);
-  return ParentMap;
-}
-
 Type DeclContext::getDeclaredTypeOfContext() const {
   switch (getContextKind()) {
   case DeclContextKind::Module:

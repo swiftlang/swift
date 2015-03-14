@@ -2493,6 +2493,36 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
   }
 }
 
+namespace  {
+  class NearestExprParentFinder : public ASTWalker {
+    Expr *ChildExpr;
+    llvm::function_ref<bool(Expr*)> Predicate;
+
+  public:
+    llvm::SmallVector<Expr*, 5> Ancestors;
+    Expr *ParentExpr = nullptr;
+    NearestExprParentFinder(Expr* ChildExpr, llvm::function_ref<bool(Expr*)>
+                        Predicate) : ChildExpr(ChildExpr), Predicate(Predicate){}
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (E == ChildExpr) {
+        if (Ancestors.size() != 0)
+          ParentExpr = Ancestors.back();
+        return { false, nullptr };
+      }
+      if (Predicate(E))
+        Ancestors.push_back(E);
+      return { true, E };
+    }
+
+    Expr *walkToExprPost(Expr *E) override {
+      if (Predicate(E))
+        Ancestors.pop_back();
+      return E;
+    }
+  };
+}
+
 void CodeCompletionCallbacksImpl::doneParsing() {
   if (Kind == CompletionKind::None) {
     return;
@@ -2541,11 +2571,13 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     // If there is no nominal type in the expr, try to find nominal types
     // in the ancestors of the expr.
     if (!OriginalType->getAnyNominal()) {
-      auto ParentMap = CurDeclContext->getExprParentMap();
-      while (ParsedExpr && !ParsedExpr->getType()->getAnyNominal()) {
-        ParsedExpr = ParentMap[ParsedExpr];
-      }
-      ExprType = ParsedExpr ? ParsedExpr->getType() : OriginalType;
+      NearestExprParentFinder Walker(ParsedExpr, [&](Expr* E) {
+        return E->getType().getCanonicalTypeOrNull().getPointer() &&
+          E->getType()->getAnyNominal();
+      });
+      CurDeclContext->walkContext(Walker);
+      ExprType = Walker.ParentExpr ? Walker.ParentExpr->getType():
+        OriginalType;
     }
 
     if (isDynamicLookup(ExprType))
