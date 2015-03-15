@@ -761,65 +761,101 @@ Parser::parseConstructorArguments(DeclName &FullName, Pattern *&BodyPattern,
   return status;
 }
 
-/// Parse a pattern.
-///   pattern ::= pattern-atom
-///   pattern ::= pattern-atom ':' type
-///   pattern ::= 'var' pattern
-///   pattern ::= 'let' pattern
-ParserResult<Pattern> Parser::parsePattern() {
-  // If this is a let or var pattern parse it.
-  if (Tok.isAny(tok::kw_let, tok::kw_var))
-    return parsePatternVarOrLet();
-  
-  // First, parse the pattern atom.
-  ParserResult<Pattern> Result = parsePatternAtom();
 
+/// Parse a pattern with an optional type annotation.
+///
+///  typed-pattern ::= pattern (':' type)?
+///
+ParserResult<Pattern> Parser::parseTypedPattern() {
+  auto result = parsePattern();
+  
   // Now parse an optional type annotation.
   if (consumeIf(tok::colon)) {
-    if (Result.isNull()) {
-      // Recover by creating AnyPattern.
-      Result = makeParserErrorResult(new (Context) AnyPattern(PreviousLoc));
-    }
-
+    if (result.isNull())  // Recover by creating AnyPattern.
+      result = makeParserErrorResult(new (Context) AnyPattern(PreviousLoc));
+    
     ParserResult<TypeRepr> Ty = parseType();
     if (Ty.hasCodeCompletion())
       return makeParserCodeCompletionResult<Pattern>();
-
     if (Ty.isNull())
       Ty = makeParserResult(new (Context) ErrorTypeRepr(PreviousLoc));
-
-    Result = makeParserResult(Result,
-        new (Context) TypedPattern(Result.get(), Ty.get()));
+    
+    result = makeParserResult(result,
+                            new (Context) TypedPattern(result.get(), Ty.get()));
   }
-
-  return Result;
+  
+  return result;
 }
 
-ParserResult<Pattern> Parser::parsePatternVarOrLet() {
-  assert(Tok.isAny(tok::kw_let, tok::kw_var) && "expects let or var");
-  bool isLet = Tok.is(tok::kw_let);
-  SourceLoc varLoc = consumeToken();
 
-  // 'var' and 'let' patterns shouldn't nest.
-  if (InVarOrLetPattern == IVOLP_InLet ||
-      InVarOrLetPattern == IVOLP_InVar)
-    diagnose(varLoc, diag::var_pattern_in_var, unsigned(isLet));
 
-  // 'let' isn't valid inside an implicitly immutable context, but var is.
-  if (isLet && InVarOrLetPattern == IVOLP_ImplicitlyImmutable)
-    diagnose(varLoc, diag::let_pattern_in_immutable_context);
-  
-  // In our recursive parse, remember that we're in a var/let pattern.
-  llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-    T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
-
-  ParserResult<Pattern> subPattern = parsePattern();
-  if (subPattern.hasCodeCompletion())
-    return makeParserCodeCompletionResult<Pattern>();
-  if (subPattern.isNull())
+/// Parse a pattern.
+///   pattern ::= identifier
+///   pattern ::= '_'
+///   pattern ::= pattern-tuple
+///   pattern ::= 'var' pattern
+///   pattern ::= 'let' pattern
+///
+ParserResult<Pattern> Parser::parsePattern() {
+  switch (Tok.getKind()) {
+  case tok::l_paren:
+    return parsePatternTuple();
+    
+  case tok::kw__:
+    return makeParserResult(new (Context) AnyPattern(consumeToken(tok::kw__)));
+    
+  case tok::identifier: {
+    Identifier name;
+    SourceLoc loc = consumeIdentifier(&name);
+    bool isLet = InVarOrLetPattern != IVOLP_InVar;
+    return makeParserResult(createBindingFromPattern(loc, name, isLet));
+  }
+    
+  case tok::code_complete:
+    // Just eat the token and return an error status, *not* the code completion
+    // status.  We can not code complete anything here -- we expect an
+    // identifier.
+    consumeToken(tok::code_complete);
     return nullptr;
-  return makeParserResult(new (Context) VarPattern(varLoc, isLet,
-                                                   subPattern.get()));
+    
+  case tok::kw_var:
+  case tok::kw_let: {
+    bool isLet = Tok.is(tok::kw_let);
+    SourceLoc varLoc = consumeToken();
+    
+    // 'var' and 'let' patterns shouldn't nest.
+    if (InVarOrLetPattern == IVOLP_InLet ||
+        InVarOrLetPattern == IVOLP_InVar)
+      diagnose(varLoc, diag::var_pattern_in_var, unsigned(isLet));
+    
+    // 'let' isn't valid inside an implicitly immutable context, but var is.
+    if (isLet && InVarOrLetPattern == IVOLP_ImplicitlyImmutable)
+      diagnose(varLoc, diag::let_pattern_in_immutable_context);
+    
+    // In our recursive parse, remember that we're in a var/let pattern.
+    llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
+    T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
+    
+    ParserResult<Pattern> subPattern = parsePattern();
+    if (subPattern.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Pattern>();
+    if (subPattern.isNull())
+      return nullptr;
+    return makeParserResult(new (Context) VarPattern(varLoc, isLet,
+                                                     subPattern.get()));
+  }
+      
+  default:
+    if (Tok.isKeyword() &&
+        (peekToken().is(tok::colon) || peekToken().is(tok::equal))) {
+      diagnose(Tok, diag::expected_pattern_is_keyword, Tok.getText());
+      SourceLoc Loc = Tok.getLoc();
+      consumeToken();
+      return makeParserErrorResult(new (Context) AnyPattern(Loc));
+    }
+    diagnose(Tok, diag::expected_pattern);
+    return nullptr;
+  }
 }
 
 /// \brief Determine whether this token can start a binding name, whether an
@@ -839,47 +875,6 @@ Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
                                 loc, name, Type(), CurDeclContext);
   }
   return new (Context) NamedPattern(var);
-}
-
-/// Parse a pattern "atom", meaning the part that precedes the
-/// optional type annotation.
-///
-///   pattern-atom ::= identifier
-///   pattern-atom ::= '_'
-///   pattern-atom ::= pattern-tuple
-ParserResult<Pattern> Parser::parsePatternAtom() {
-  switch (Tok.getKind()) {
-  case tok::l_paren:
-    return parsePatternTuple();
-
-  case tok::kw__:
-    return makeParserResult(new (Context) AnyPattern(consumeToken(tok::kw__)));
-
-  case tok::identifier: {
-    Identifier name;
-    SourceLoc loc = consumeIdentifier(&name);
-    bool isLet = InVarOrLetPattern != IVOLP_InVar;
-    return makeParserResult(createBindingFromPattern(loc, name, isLet));
-  }
-
-  case tok::code_complete:
-    // Just eat the token and return an error status, *not* the code completion
-    // status.  We can not code complete anything here -- we expect an
-    // identifier.
-    consumeToken(tok::code_complete);
-    return nullptr;
-
-  default:
-    if (Tok.isKeyword() &&
-        (peekToken().is(tok::colon) || peekToken().is(tok::equal))) {
-      diagnose(Tok, diag::expected_pattern_is_keyword, Tok.getText());
-      SourceLoc Loc = Tok.getLoc();
-      consumeToken();
-      return makeParserErrorResult(new (Context) AnyPattern(Loc));
-    }
-    diagnose(Tok, diag::expected_pattern);
-    return nullptr;
-  }
 }
 
 std::pair<ParserStatus, Optional<TuplePatternElt>>
@@ -1074,45 +1069,53 @@ bool Parser::isOnlyStartOfMatchingPattern() {
   return Tok.isAny(tok::kw_var, tok::kw_let, tok::kw_is);
 }
 
-bool Parser::canParsePattern() {
-  switch (Tok.getKind()) {
-  case tok::kw_let:      ///   pattern ::= 'let' pattern
-  case tok::kw_var:      ///   pattern ::= 'var' pattern
-    consumeToken();
-    return canParsePattern();
-  default:
-    ///   pattern ::= pattern-atom
-    ///   pattern ::= pattern-atom ':' type
-    if (!canParsePatternAtom())
-      return false;
 
-    if (!consumeIf(tok::colon))
-      return true;
-    return canParseType();
-  }
-}
+static bool canParsePatternTuple(Parser &P);
 
-bool Parser::canParsePatternAtom() {
-  switch (Tok.getKind()) {
-  case tok::l_paren: return canParsePatternTuple();
+///   pattern ::= identifier
+///   pattern ::= '_'
+///   pattern ::= pattern-tuple
+///   pattern ::= 'var' pattern
+///   pattern ::= 'let' pattern
+static bool canParsePattern(Parser &P) {
+  switch (P.Tok.getKind()) {
   case tok::identifier:
   case tok::kw__:
-    consumeToken();
+    P.consumeToken();
     return true;
+  case tok::kw_let:
+  case tok::kw_var:
+    P.consumeToken();
+    return canParsePattern(P);
+  case tok::l_paren:
+    return canParsePatternTuple(P);
+
   default:
     return false;
   }
 }
 
 
-bool Parser::canParsePatternTuple() {
-  if (!consumeIf(tok::l_paren)) return false;
+static bool canParsePatternTuple(Parser &P) {
+  if (!P.consumeIf(tok::l_paren)) return false;
 
-  if (Tok.isNot(tok::r_paren)) {
+  if (P.Tok.isNot(tok::r_paren)) {
     do {
-      if (!canParsePattern()) return false;
-    } while (consumeIf(tok::comma));
+      if (!canParsePattern(P)) return false;
+    } while (P.consumeIf(tok::comma));
   }
 
-  return consumeIf(tok::r_paren);
+  return P.consumeIf(tok::r_paren);
 }
+
+///  typed-pattern ::= pattern (':' type)?
+///
+bool Parser::canParseTypedPattern() {
+  if (!canParsePattern(*this)) return false;
+  
+  if (consumeIf(tok::colon))
+    return canParseType();
+  return true;
+}
+
+

@@ -990,12 +990,15 @@ public:
                                          Pattern *&BodyPattern,
                                          DefaultArgumentInfo &defaultArgs);
 
-  ParserResult<Pattern> parsePattern();
-
   /// \brief Determine whether the parser is in a state that can start a
   /// binding name, identifier or the special discard-value binding '_'.
   bool isAtStartOfBindingName();
 
+  
+  ParserResult<Pattern> parseTypedPattern();
+
+  ParserResult<Pattern> parsePattern();
+  
   /// \brief Parse a tuple pattern element.
   ///
   /// \code
@@ -1008,8 +1011,6 @@ public:
   parsePatternTupleElement();
   ParserResult<Pattern> parsePatternTuple();
   ParserResult<Pattern> parsePatternTupleAfterLP(SourceLoc LPLoc);
-  ParserResult<Pattern> parsePatternAtom();
-  ParserResult<Pattern> parsePatternVarOrLet();
   
   Pattern *createBindingFromPattern(SourceLoc loc, Identifier name, bool isLet);
   
@@ -1052,9 +1053,7 @@ public:
   bool canParseTypeAttribute();
   bool canParseGenericArguments();
 
-  bool canParsePatternTuple();
-  bool canParsePatternAtom();
-  bool canParsePattern();
+  bool canParseTypedPattern();
 
   //===--------------------------------------------------------------------===//
   // Expression Parsing

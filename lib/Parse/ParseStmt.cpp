@@ -1140,7 +1140,7 @@ ParserResult<Stmt> Parser::parseStmtFor(LabeledStmtInfo LabelInfo) {
   bool isForEach;
   {
     Parser::BacktrackingScope Backtrack(*this);
-    isForEach = canParsePattern() && Tok.is(tok::kw_in);
+    isForEach = canParseTypedPattern() && Tok.is(tok::kw_in);
   }
   if (isForEach)
     return parseStmtForEach(ForLoc, LabelInfo);
@@ -1389,7 +1389,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
   assert(InVarOrLetPattern == IVOLP_NotInVarOrLet &&
          "for-each loops cannot exist inside other patterns");
   InVarOrLetPattern = IVOLP_ImplicitlyImmutable;
-  ParserResult<Pattern> Pattern = parsePattern();
+  ParserResult<Pattern> Pattern = parseTypedPattern();
   assert(InVarOrLetPattern == IVOLP_ImplicitlyImmutable);
   InVarOrLetPattern = IVOLP_NotInVarOrLet;
   

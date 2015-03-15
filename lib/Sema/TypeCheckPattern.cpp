@@ -549,17 +549,6 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   PartialGenericTypeToArchetypeResolver defaultResolver(*this);
   if (!resolver)
     resolver = &defaultResolver;
-
-  // Verify typed patterns aren't in here.
-  if (!isa<VarPattern>(P) && !isa<TypedPattern>(P) &&
-      (!(options.toRaw() & (TR_ImmediateFunctionInput|TR_FunctionInput)) ||
-       !(isa<TuplePattern>(P) || isa<ParenPattern>(P)))) {
-    P->forEachNode([&](Pattern *Node) {
-      if (auto *TP = dyn_cast<TypedPattern>(Node))
-        diagnose(TP->getLoc(), diag::bad_typed_pattern);
-    });
-  }
-  
   
   TypeResolutionOptions subOptions = options - TR_Variadic;
   switch (P->getKind()) {
