@@ -31,60 +31,63 @@ internal final class _Generator<Base: GeneratorType> : Generator<Base.Element> {
   var base: Base
 }
 
+internal func _typeID(instance: AnyObject) -> Int {
+  return unsafeBitCast(instance.dynamicType, Int.self)
+}
+
 internal final class _ForwardIndexStorage<
   BaseIndex: ForwardIndexType
-> : ForwardIndex._StorageBase {
+> : _ForwardIndexStorageBase {
   internal typealias Super = ForwardIndex._StorageBase
   
-  internal init(_ base: BaseIndex) {
+  init(_ base: BaseIndex) {
     self.base = base
   }
   
-  internal override func successor() -> Super {
+  func successor() -> Super {
     return _ForwardIndexStorage(self.base.successor())
   }
   
-  internal func unsafeUnbox(other: Super) -> BaseIndex {
+  func unsafeUnbox(other: Super) -> BaseIndex {
     return (unsafeDowncast(other) as _ForwardIndexStorage).base
   }
   
-  internal override func equals(other: Super) -> Bool {
+  func equals(other: Super) -> Bool {
     return base == unsafeUnbox(other)
   }
 
-  internal override func _distanceTo(other: Super) -> ForwardIndex.Distance {
+  func _distanceTo(other: Super) -> ForwardIndex.Distance {
     return numericCast(distance(base, unsafeUnbox(other)))
   }
   
-  internal override func _advancedBy(n: ForwardIndex.Distance) -> Super {
+  func _advancedBy(n: ForwardIndex.Distance) -> Super {
     return _ForwardIndexStorage(advance(base, numericCast(n)))
     
   }
-  internal override func _advancedBy(
+  
+  func _advancedBy(
     n: ForwardIndex.Distance, _ limit: Super) -> Super {
     return _ForwardIndexStorage(
       advance(base, numericCast(n), unsafeUnbox(limit)))
   }
-  
+
+  var typeID: Int { return _typeID(self) }
   
   internal // private
   let base: BaseIndex
 }
 
-internal class _ForwardIndexStorageBase {
-  typealias _Self = _ForwardIndexStorageBase
-  typealias Distance = ForwardIndex.Distance
-  
-  final var typeID: Int {
-    return unsafeBitCast(self.dynamicType, Int.self)
-  }
-  
-  internal func successor() -> _Self {_abstract()}
-  internal func equals(other: _Self) -> Bool {_abstract()}
-  internal func _distanceTo(other: _Self) -> Distance {_abstract()}
-  internal func _advancedBy(distance: Distance) -> _Self {_abstract()}
-  internal func _advancedBy(
-    distance: Distance, _ limit: _Self) -> _Self {_abstract()}
+internal protocol _ForwardIndexStorageBase : class {
+  var typeID: Int {get}
+  func successor() -> _ForwardIndexStorageBase
+  func equals(other: _ForwardIndexStorageBase) -> Bool
+  func _distanceTo(
+    other: _ForwardIndexStorageBase) -> ForwardIndex.Distance
+  func _advancedBy(
+    distance: ForwardIndex.Distance) -> _ForwardIndexStorageBase
+  func _advancedBy(
+    distance: ForwardIndex.Distance,
+    _ limit: _ForwardIndexStorageBase) -> _ForwardIndexStorageBase
 }
 
 public struct ForwardIndex : ForwardIndexType {
