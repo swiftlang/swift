@@ -1050,7 +1050,6 @@ public:
   bool canParseTypeComposition();
   bool canParseTypeTupleBody();
   bool canParseTypeAttribute();
-  bool canParseTypeArray();
   bool canParseGenericArguments();
 
   bool canParsePatternTuple();

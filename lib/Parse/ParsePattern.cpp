@@ -1110,27 +1110,9 @@ bool Parser::canParsePatternTuple() {
 
   if (Tok.isNot(tok::r_paren)) {
     do {
-      // The contextual inout marker is part of argument lists.
-      consumeIf(tok::kw_inout);
-
       if (!canParsePattern()) return false;
-
-      // Parse default values. This aren't actually allowed, but we recover
-      // better if we skip over them.
-      if (consumeIf(tok::equal)) {
-        while (Tok.isNot(tok::eof) && Tok.isNot(tok::r_paren) &&
-               Tok.isNot(tok::r_brace) && Tok.isNotEllipsis() &&
-               Tok.isNot(tok::comma) &&
-               !isStartOfDecl()) {
-          skipSingle();
-        }
-      }
-
     } while (consumeIf(tok::comma));
   }
-
-  if (Tok.isEllipsis())
-    consumeToken();
 
   return consumeIf(tok::r_paren);
 }

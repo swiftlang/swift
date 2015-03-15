@@ -1123,27 +1123,28 @@ ParserResult<Stmt> Parser::parseStmtFor(LabeledStmtInfo LabelInfo) {
   // The c-style-for loop and foreach-style-for loop are conflated together into
   // a single keyword, so we have to do some lookahead to resolve what is going
   // on.
-
-  if (Tok.is(tok::l_paren)) {
-    auto SavedPosition = getParserPosition();
-    consumeToken(tok::l_paren);
-    skipUntil(tok::r_paren);
-    bool IsCStyle = peekToken().is(tok::l_brace);
-    backtrackToPosition(SavedPosition);
-    if (IsCStyle)
-      return parseStmtForCStyle(ForLoc, LabelInfo);
-    return parseStmtForEach(ForLoc, LabelInfo);
-  }
-
-  // If we have a leading identifier followed by a ':' or 'in', then this is a
-  // pattern, so it is foreach.
-  //
-  // For error recovery, also parse "for in ..." as foreach.
-  if ((isAtStartOfBindingName() &&
-       (peekToken().is(tok::colon) || peekToken().is(tok::kw_in))) ||
+  
+  // If we have a leading identifier followed by a ':' or 'in', then this is
+  // obviously a for-each loop.  For error recovery, also parse "for in ..." as
+  // foreach.
+  if ((isAtStartOfBindingName() && peekToken().isAny(tok::colon, tok::kw_in)) ||
       Tok.is(tok::kw_in))
     return parseStmtForEach(ForLoc, LabelInfo);
 
+  // If we have "for ;" then this is clearly a c-style for loop.
+  if (Tok.is(tok::semi))
+    return parseStmtForCStyle(ForLoc, LabelInfo);
+
+  // Otherwise, we have to do lookahead.  A for-each loop will start with a
+  // "<pattern> in".  Check for that.
+  bool isForEach;
+  {
+    Parser::BacktrackingScope Backtrack(*this);
+    isForEach = canParsePattern() && Tok.is(tok::kw_in);
+  }
+  if (isForEach)
+    return parseStmtForEach(ForLoc, LabelInfo);
+  
   // Otherwise, this is some sort of c-style for loop.
   return parseStmtForCStyle(ForLoc, LabelInfo);
 }

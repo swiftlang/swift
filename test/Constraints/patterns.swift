@@ -160,7 +160,7 @@ default: break
 }
 
 for (var x) in 0...100 {}
-//for var x in 0...100 {}
+for var x in 0...100 {}  // rdar://20167543
 for (let x) in 0...100 {} // expected-error {{'let' pattern cannot appear nested in an already immutable context}}
 
 var (let y) = 42  // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}

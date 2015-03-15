@@ -44,7 +44,3 @@ typealias FixIt0 = Int[] // expected-error{{array types are now written with the
 typealias FixIt1 = Int[][] // expected-error{{array types are now written with the brackets around the element type}}{{20-20=[}}{{25-26=}}
 // expected-error@-1{{array types are now written with the brackets around the element type}}{{20-20=[}}{{23-24=}}
 
-func fixIt0(n: Int) {
-  let x = X<Int[]>() // expected-error{{array types are now written with the brackets around the element type}}{{13-13=[}}{{16-17=}}
-  var ones = Int[](count: n, repeatedValue: 1) // expected-error{{array types are now written with the brackets around the element type}}{{14-14=[}}{{17-18=}}
-}

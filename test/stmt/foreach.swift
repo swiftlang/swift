@@ -74,7 +74,7 @@ func patterns(gir: GoodRange<Int>, gtr: GoodTupleGeneratorType) {
 
   for (i, _) : (Int, Int) in gtr { sum = sum + i } // expected-error{{'Float' is not convertible to 'Int'}}
 
-  for (i = 7, f) in gtr {} // expected-error{{default argument is only permitted for a non-curried function parameter}}
+  for (i, f) in gtr {}
 }
 
 func slices(i_s: [Int], ias: [[Int]]) {

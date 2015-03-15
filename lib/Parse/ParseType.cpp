@@ -855,16 +855,6 @@ bool Parser::canParseType() {
     return true;
   }
 
-  // Handle legacy arrays.
-  while (!Tok.isAtStartOfLine()) {
-    if (Tok.is(tok::l_square)) {
-      if (!canParseTypeArray())
-        return false;
-    } else {
-      break;
-    }
-  }
-
   return true;
 }
 
@@ -999,22 +989,4 @@ bool Parser::canParseTypeTupleBody() {
 }
 
 
-bool Parser::canParseTypeArray() {
-  assert(Tok.isFollowingLSquare());
-  consumeToken();
-  
-  // Handle the [] production, meaning an array slice.
-  if (Tok.is(tok::r_square)) {
-    consumeToken(tok::r_square);
-    
-    // If we're starting another square-bracket clause, recur.
-    if (Tok.isFollowingLSquare())
-      return canParseTypeArray();
-    
-    return true;
-  }
-  
-  // FIXME: Size expressions!
-  return false;
-}
 
