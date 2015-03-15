@@ -34,6 +34,16 @@ namespace {
   };
 }
 
+static std::string getDiagKindString(llvm::SourceMgr::DiagKind Kind) {
+  switch (Kind) {
+  case llvm::SourceMgr::DK_Error: return "error";
+  case llvm::SourceMgr::DK_Warning: return "warning";
+  case llvm::SourceMgr::DK_Note: return "note";
+  }
+}
+
+
+
 namespace {
   /// This class implements support for -verify mode in the compiler.  It
   /// buffers up diagnostics produced during compilation, then checks them
@@ -256,8 +266,10 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
       auto FoundDiagnosticIter = findDiagnostic(Expected, BufferName);
       if (FoundDiagnosticIter == CapturedDiagnostics.end()) {
         if (!AtLeastOne || MatchCount == 0) {
-          Errors.push_back(std::make_pair(ExpectedStringStart,
-                                          "expected diagnostic not produced"));
+          std::string message =
+            "expected "+getDiagKindString(Expected.Classification) +
+            " not produced";
+          Errors.push_back(std::make_pair(ExpectedStringStart, message));
         }
         break;
       }
@@ -376,8 +388,9 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
     if (CapturedDiagnostics[i].getFilename() != BufferName)
       continue;
 
-    std::string Message = "unexpected diagnostic produced: ";
-    Message += CapturedDiagnostics[i].getMessage();
+    std::string Message =
+      "unexpected "+getDiagKindString(CapturedDiagnostics[i].getKind())+
+      " produced: "+CapturedDiagnostics[i].getMessage().str();
     Errors.push_back(std::make_pair(
                                     CapturedDiagnostics[i].getLoc().getPointer(),
                                     Message));
