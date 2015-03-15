@@ -64,7 +64,7 @@ func _convertConstArrayToPointerArgument<
   FromElement,
   ToPointer: _PointerType
 >(arr: Array<FromElement>) -> (AnyObject?, ToPointer) {
-  let (owner: AnyObject?, raw) = arr._cPointerArgs()
+  let (owner, raw) = arr._cPointerArgs()
   return (owner, ToPointer(raw))
 }
 
@@ -78,6 +78,6 @@ func _convertConstStringToUTF8PointerArgument<
   var utf8 = Array(str.utf8)
   utf8.append(0)
   // Extract the owner and pointer from the array.
-  let (owner: AnyObject?, raw) = utf8._cPointerArgs()
+  let (owner, raw) = utf8._cPointerArgs()
   return (owner, ToPointer(raw))
 }

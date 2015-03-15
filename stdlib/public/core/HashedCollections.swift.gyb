@@ -2753,8 +2753,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
 
 %elif Self == 'Dictionary':
 
-      while let elt? = oldCocoaGenerator.next() {
-        let (key: AnyObject, value: AnyObject) = elt
+      while let (key, value)? = oldCocoaGenerator.next() {
         newNativeStorage.unsafeAddNew(
           key: _forceBridgeFromObjectiveC(key, Key.self),
           value: _forceBridgeFromObjectiveC(value, Value.self))
@@ -2845,7 +2844,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
       let nativeValue = _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
       return nativeValue
 %elif Self == 'Dictionary':
-      var (anyObjectKey: AnyObject, anyObjectValue: AnyObject) =
+      var (anyObjectKey, anyObjectValue) =
           cocoaStorage.assertingGet(i._cocoaIndex)
       let nativeKey = _forceBridgeFromObjectiveC(anyObjectKey, Key.self)
       let nativeValue = _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
@@ -3624,8 +3623,7 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
         return _forceBridgeFromObjectiveC(anyObjectElement, T.self)
       }
 %elif Self == 'Dictionary':
-      if let elt? = cocoaGenerator.next() {
-        let (anyObjectKey: AnyObject, anyObjectValue: AnyObject) = elt
+      if let (anyObjectKey, anyObjectValue)? = cocoaGenerator.next() {
         let nativeKey = _forceBridgeFromObjectiveC(anyObjectKey, Key.self)
         let nativeValue = _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
         return (nativeKey, nativeValue)
