@@ -27,8 +27,8 @@ class SILModule;
 class ClassDecl;
 class ClassHierarchyAnalysis : public SILAnalysis {
 public:
-  typedef llvm::SmallVector<ClassDecl*, 8> ClassList;
-  typedef llvm::SmallPtrSet<ClassDecl *, 32>  ClassSet;
+  typedef llvm::SmallVector<ClassDecl *, 8> ClassList;
+  typedef llvm::SmallPtrSet<ClassDecl *, 32> ClassSet;
 
 
   ClassHierarchyAnalysis(SILModule *Mod) :
@@ -53,13 +53,13 @@ public:
 
   /// Returns a list of the known direct subclasses of a class \p C in
   /// the current module.
-  ClassList& getDirectSubClasses(ClassDecl *C) {
+  ClassList &getDirectSubClasses(ClassDecl *C) {
     return DirectSubclassesCache[C];
   }
 
   /// Returns a list of the known indirect subclasses of a class \p C in
   /// the current module.
-  ClassList& getIndirectSubClasses(ClassDecl *C) {
+  ClassList &getIndirectSubClasses(ClassDecl *C) {
     if (!IndirectSubclassesCache.count(C)) {
       // Lazy initialization
       auto &K = IndirectSubclassesCache[C];
@@ -89,7 +89,7 @@ private:
   void init();
   void getIndirectSubClasses(ClassDecl *Base,
                              ClassDecl *Current,
-                             ClassList& IndirectSubs);
+                             ClassList &IndirectSubs);
   /// The module
   SILModule *M;
 
