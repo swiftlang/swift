@@ -382,6 +382,58 @@ public:
   }
 };
 
+/// This represents the allocation of a heap box for an existential container.
+/// The instruction returns two values.  The first return value is the owner
+/// pointer, which has the existential type.  The second return value
+/// is an address pointing to the contained element. The contained
+/// value is uninitialized.
+class AllocExistentialBoxInst : public AllocationInst {
+  CanType ConcreteType;
+  ArrayRef<ProtocolConformance*> Conformances;
+
+  AllocExistentialBoxInst(SILLocation Loc,
+                          SILType ExistentialType,
+                          CanType ConcreteType,
+                          SILType ConcreteLoweredType,
+                          ArrayRef<ProtocolConformance *> Conformances,
+                          SILFunction *Parent);
+
+public:
+  static AllocExistentialBoxInst *
+  create(SILLocation Loc,
+         SILType ExistentialType,
+         CanType ConcreteType,
+         SILType ConcreteLoweredType,
+         ArrayRef<ProtocolConformance *> Conformances,
+         SILFunction *Parent);
+
+  CanType getFormalConcreteType() const {
+    return ConcreteType;
+  }
+  
+  SILType getExistentialType() const {
+    return getType(0);
+  }
+
+  SILType getLoweredConcreteType() const {
+    return getType(1);
+  }
+
+  ArrayRef<ProtocolConformance*> getConformances() const {
+    return Conformances;
+  }
+  
+  SILValue getExistentialResult() const { return SILValue(this, 0); }
+  SILValue getValueAddressResult() const { return SILValue(this, 1); }
+  
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::AllocExistentialBoxInst;
+  }
+};
+
 /// ApplyInst - Represents the full application of a function value.
 class ApplyInst : public SILInstruction {
   enum {
@@ -2494,27 +2546,29 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty, Member, Volatile) {}
 };
 
-/// OpenExistentialAddrInst - Given the address of an existential, "opens" the
+/// Given the address of an existential, "opens" the
 /// existential by returning a pointer to a fresh archetype T, which also
 /// captures the (dynamic) conformances.
 class OpenExistentialAddrInst
   : public UnaryInstructionBase<ValueKind::OpenExistentialAddrInst>
 {
 public:
-  OpenExistentialAddrInst(SILLocation Loc, SILValue Operand, SILType SelfTy);
+  OpenExistentialAddrInst(SILLocation Loc, SILValue Operand, SILType SelfTy)
+    : UnaryInstructionBase(Loc, Operand, SelfTy) {}
 };
 
-/// OpenExistentialRefInst - Given a class existential, "opens" the
+/// Given a class existential, "opens" the
 /// existential by returning a pointer to a fresh archetype T, which also
 /// captures the (dynamic) conformances.
 class OpenExistentialRefInst
   : public UnaryInstructionBase<ValueKind::OpenExistentialRefInst>
 {
 public:
-  OpenExistentialRefInst(SILLocation Loc, SILValue Operand, SILType Ty);
+  OpenExistentialRefInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
-/// OpenExistentialMetatypeInst - Given an existential metatype,
+/// Given an existential metatype,
 /// "opens" the existential by returning a pointer to a fresh
 /// archetype metatype T.Type, which also captures the (dynamic)
 /// conformances.
@@ -2522,10 +2576,22 @@ class OpenExistentialMetatypeInst
   : public UnaryInstructionBase<ValueKind::OpenExistentialMetatypeInst>
 {
 public:
-  OpenExistentialMetatypeInst(SILLocation loc, SILValue operand, SILType ty);
+  OpenExistentialMetatypeInst(SILLocation loc, SILValue operand, SILType ty)
+    : UnaryInstructionBase(loc, operand, ty) {}
 };
 
-/// InitExistentialAddrInst - Given an address to an uninitialized buffer of
+/// Given a boxed existential container,
+/// "opens" the existential by returning a pointer to a fresh
+/// archetype T, which also captures the (dynamic) conformances.
+class OpenExistentialBoxInst
+  : public UnaryInstructionBase<ValueKind::OpenExistentialBoxInst>
+{
+public:
+  OpenExistentialBoxInst(SILLocation loc, SILValue operand, SILType ty)
+    : UnaryInstructionBase(loc, operand, ty) {}
+};
+
+/// Given an address to an uninitialized buffer of
 /// a protocol type, initializes its existential container to contain a concrete
 /// value of the given type, and returns the address of the uninitialized
 /// concrete value inside the existential container.
@@ -2840,7 +2906,7 @@ public:
     : UnaryInstructionBase(loc, operand) {}
 };
 
-/// DeallocRefInst - Deallocate memory allocated for a reference type
+/// Deallocate memory allocated for a reference type
 /// instance, as might have been created by an AllocRefInst. It is
 /// undefined behavior if the type of the operand does not match the
 /// most derived type of the allocated instance.
@@ -2855,7 +2921,7 @@ public:
     : UnaryInstructionBase(Loc, Operand) {}
 };
 
-/// DeallocValueBufferInst - Deallocate memory allocated for a unsafe
+/// Deallocate memory allocated for a unsafe
 /// value buffer.
 class DeallocValueBufferInst :
   public UnaryInstructionBase<ValueKind::DeallocValueBufferInst,
@@ -2871,16 +2937,17 @@ public:
   SILType getValueType() const { return ValueType; }
 };
 
-/// DeallocBoxInst - Deallocate memory allocated for a boxed value,
-/// as might have been created by an AllocBoxInst. It is undefined
+/// Deallocate memory allocated for a boxed value created by an AllocBoxInst.
+/// It is undefined
 /// behavior if the type of the boxed type does not match the
-/// type of the boxed type of the allocated box.
+/// type the box was allocated for.
 ///
 /// This does not destroy the boxed value instance; it must either be
 /// uninitialized or have been manually destroyed.
 class DeallocBoxInst :
   public UnaryInstructionBase<ValueKind::DeallocBoxInst, DeallocationInst,
-                              /*HAS_RESULT*/ false> {
+                              /*HAS_RESULT*/ false>
+{
   SILType ElementType;
 public:
   DeallocBoxInst(SILLocation loc, SILType elementType, SILValue operand)
@@ -2889,10 +2956,30 @@ public:
   SILType getElementType() const { return ElementType; }
 };
 
-/// DestroyAddrInst - Destroy the value at a memory location according to
+/// Deallocate memory allocated for a boxed existential container created by
+/// AllocExistentialBox. It is undefined behavior if the given concrete type
+/// does not match the concrete type for which the box was allocated.
+///
+/// This does not destroy the boxed value instance; it must either be
+/// uninitialized or have been manually destroyed.
+class DeallocExistentialBoxInst :
+  public UnaryInstructionBase<ValueKind::DeallocExistentialBoxInst,
+                              DeallocationInst,
+                              /*HAS_RESULT*/ false>
+{
+  CanType ConcreteType;
+public:
+  DeallocExistentialBoxInst(SILLocation loc, CanType concreteType,
+                            SILValue operand)
+    : UnaryInstructionBase(loc, operand), ConcreteType(concreteType) {}
+
+  CanType getConcreteType() const { return ConcreteType; }
+};
+
+/// Destroy the value at a memory location according to
 /// its SIL type. This is similar to:
 ///   %1 = load %operand
-///   release %1
+///   release_value %1
 /// but a destroy instruction can be used for types that cannot be loaded,
 /// such as resilient value types.
 class DestroyAddrInst : public UnaryInstructionBase<ValueKind::DestroyAddrInst,
@@ -2904,7 +2991,7 @@ public:
     : UnaryInstructionBase(Loc, Operand) {}
 };
 
-/// ProjectValueBufferInst - Project out the address of the value
+/// Project out the address of the value
 /// stored in the given Builtin.UnsafeValueBuffer.
 class ProjectValueBufferInst :
   public UnaryInstructionBase<ValueKind::ProjectValueBufferInst,

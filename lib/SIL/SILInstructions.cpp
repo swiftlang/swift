@@ -62,8 +62,8 @@ AllocRefInst::AllocRefInst(SILLocation loc, SILType elementType, SILFunction &F,
 }
 
 
-// Allocations always return two results: Builtin.NativeObject & LValue[EltTy]
-static SILTypeList *getAllocType(SILType EltTy, SILFunction &F) {
+// alloc_box returns two results: Builtin.NativeObject & LValue[EltTy]
+static SILTypeList *getAllocBoxType(SILType EltTy, SILFunction &F) {
   const ASTContext &Ctx = F.getModule().getASTContext();
 
   SILType ResTys[] = {
@@ -75,7 +75,8 @@ static SILTypeList *getAllocType(SILType EltTy, SILFunction &F) {
 }
 
 AllocBoxInst::AllocBoxInst(SILLocation Loc, SILType ElementType, SILFunction &F)
-  : AllocationInst(ValueKind::AllocBoxInst, Loc, getAllocType(ElementType, F)) {
+  : AllocationInst(ValueKind::AllocBoxInst, Loc,
+                   getAllocBoxType(ElementType, F)) {
 }
 
 /// getDecl - Return the underlying variable declaration associated with this
@@ -89,6 +90,59 @@ VarDecl *DebugValueInst::getDecl() const {
 }
 VarDecl *DebugValueAddrInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
+}
+
+static SILTypeList *getAllocExistentialBoxType(SILType ExistTy,
+                                               SILType ConcreteTy,
+                                               SILFunction &F) {
+  SILType Tys[] = {
+    ExistTy.getObjectType(),
+    ConcreteTy.getAddressType(),
+  };
+  return F.getModule().getSILTypeList(Tys);
+}
+
+AllocExistentialBoxInst::AllocExistentialBoxInst(SILLocation Loc,
+                                 SILType ExistentialType,
+                                 CanType ConcreteType,
+                                 SILType ConcreteLoweredType,
+                                 ArrayRef<ProtocolConformance *> Conformances,
+                                 SILFunction *Parent)
+  : AllocationInst(ValueKind::AllocExistentialBoxInst, Loc,
+                   getAllocExistentialBoxType(ExistentialType,
+                                              ConcreteLoweredType, *Parent)),
+    ConcreteType(ConcreteType),
+    Conformances(Conformances)
+{
+}
+
+static void declareWitnessTable(SILModule &Mod,
+                                ProtocolConformance *C) {
+  if (!C) return;
+  if (!Mod.lookUpWitnessTable(C, false).first)
+    Mod.createWitnessTableDeclaration(C,
+        TypeConverter::getLinkageForProtocolConformance(
+                                                  C->getRootNormalConformance(),
+                                                  NotForDefinition));
+}
+
+AllocExistentialBoxInst *
+AllocExistentialBoxInst::create(SILLocation Loc,
+                                SILType ExistentialType,
+                                CanType ConcreteType,
+                                SILType ConcreteLoweredType,
+                                ArrayRef<ProtocolConformance *> Conformances,
+                                SILFunction *F) {
+  SILModule &Mod = F->getModule();
+  void *Buffer = Mod.allocate(sizeof(AllocExistentialBoxInst),
+                              alignof(AllocExistentialBoxInst));
+  for (ProtocolConformance *C : Conformances)
+    declareWitnessTable(Mod, C);
+  return ::new (Buffer) AllocExistentialBoxInst(Loc,
+                                                ExistentialType,
+                                                ConcreteType,
+                                                ConcreteLoweredType,
+                                                Conformances, F);
 }
 
 BuiltinInst *BuiltinInst::create(SILLocation Loc, Identifier Name,
@@ -445,23 +499,6 @@ TupleInst::TupleInst(SILLocation Loc, SILType Ty, ArrayRef<SILValue> Elems)
 MetatypeInst::MetatypeInst(SILLocation Loc, SILType Metatype)
   : SILInstruction(ValueKind::MetatypeInst, Loc, Metatype) {}
 
-OpenExistentialAddrInst::OpenExistentialAddrInst(SILLocation Loc,
-                                         SILValue Operand,
-                                         SILType SelfTy)
-  : UnaryInstructionBase(Loc, Operand, SelfTy)
-{}
-
-OpenExistentialRefInst::OpenExistentialRefInst(SILLocation Loc,
-                                               SILValue Operand,
-                                               SILType Ty)
-  : UnaryInstructionBase(Loc, Operand, Ty)
-{}
-
-OpenExistentialMetatypeInst::OpenExistentialMetatypeInst(SILLocation loc,
-                                                         SILValue operand,
-                                                         SILType ty)
-  : UnaryInstructionBase(loc, operand, ty)
-{}
 
 //===----------------------------------------------------------------------===//
 // Instructions representing terminators
@@ -988,16 +1025,6 @@ TypeConverter::getLinkageForProtocolConformance(const NormalProtocolConformance 
     default:
       return (definition ? SILLinkage::Public : SILLinkage::PublicExternal);
   }
-}
-
-static void declareWitnessTable(SILModule &Mod,
-                                ProtocolConformance *C) {
-  if (!C) return;
-  if (!Mod.lookUpWitnessTable(C, false).first)
-    Mod.createWitnessTableDeclaration(C,
-        TypeConverter::getLinkageForProtocolConformance(
-                                                  C->getRootNormalConformance(),
-                                                  NotForDefinition));
 }
 
 /// Create a witness method, creating a witness table declaration if we don't

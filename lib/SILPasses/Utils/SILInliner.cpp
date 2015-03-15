@@ -203,8 +203,6 @@ SILDebugScope *SILInliner::getOrCreateInlineScope(SILInstruction *Orig) {
 
 /// For now just assume that every SIL instruction is one to one with an LLVM
 /// instruction. This is of course very much so not true.
-///
-/// TODO: Fill this out.
 InlineCost swift::instructionInlineCost(SILInstruction &I) {
   switch (I.getKind()) {
     case ValueKind::IntegerLiteralInst:
@@ -290,6 +288,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::ApplyInst:
     case ValueKind::BuiltinInst:
     case ValueKind::AllocBoxInst:
+    case ValueKind::AllocExistentialBoxInst:
     case ValueKind::AllocRefInst:
     case ValueKind::AllocRefDynamicInst:
     case ValueKind::AllocStackInst:
@@ -308,6 +307,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::CopyAddrInst:
     case ValueKind::RetainValueInst:
     case ValueKind::DeallocBoxInst:
+    case ValueKind::DeallocExistentialBoxInst:
     case ValueKind::DeallocRefInst:
     case ValueKind::DeallocStackInst:
     case ValueKind::DeallocValueBufferInst:
@@ -330,6 +330,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::LoadInst:
     case ValueKind::LoadWeakInst:
     case ValueKind::OpenExistentialAddrInst:
+    case ValueKind::OpenExistentialBoxInst:
     case ValueKind::OpenExistentialMetatypeInst:
     case ValueKind::OpenExistentialRefInst:
     case ValueKind::PartialApplyInst:

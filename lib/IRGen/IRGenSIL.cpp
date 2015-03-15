@@ -626,6 +626,16 @@ public:
   void visitInitExistentialRefInst(InitExistentialRefInst *i);
   void visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *i);
   
+  void visitAllocExistentialBoxInst(AllocExistentialBoxInst *i) {
+    llvm_unreachable("tbw");
+  }
+  void visitOpenExistentialBoxInst(OpenExistentialBoxInst *i) {
+    llvm_unreachable("tbw");
+  }
+  void visitDeallocExistentialBoxInst(DeallocExistentialBoxInst *i) {
+    llvm_unreachable("tbw");
+  }
+  
   void visitProjectBlockStorageInst(ProjectBlockStorageInst *i);
   void visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *i);
   

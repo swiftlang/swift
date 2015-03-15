@@ -190,6 +190,10 @@ namespace {
                                       unsigned attrs,
                                       SILType type,
                                       SILValue operand);
+    void writeOneTypeOneOperandLayout(ValueKind valueKind,
+                                      unsigned attrs,
+                                      CanType type,
+                                      SILValue operand);
     void writeOneOperandLayout(ValueKind valueKind,
                                unsigned attrs,
                                SILValue operand);
@@ -378,6 +382,22 @@ void SILSerializer::writeOneTypeOneOperandLayout(ValueKind valueKind,
         operandTypeRef, unsigned(operandType.getCategory()),
         operandRef, operand.getResultNumber());
 }
+void SILSerializer::writeOneTypeOneOperandLayout(ValueKind valueKind,
+                                                 unsigned attrs,
+                                                 CanType type,
+                                                 SILValue operand) {
+  auto typeRef = S.addTypeRef(type);
+  auto operandType = operand.getType();
+  auto operandTypeRef = S.addTypeRef(operandType.getSwiftRValueType());
+  auto operandRef = addValueRef(operand);
+
+  SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneTypeOneOperandLayout::Code],
+        unsigned(valueKind), attrs,
+        typeRef, 0,
+        operandTypeRef, unsigned(operandType.getCategory()),
+        operandRef, operand.getResultNumber());
+}
 
 /// Write an instruction that looks exactly like a conversion: all
 /// important information is encoded in the operand and the result type.
@@ -400,6 +420,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                                        (unsigned)SI.getKind());
     break;
   }
+  case ValueKind::AllocExistentialBoxInst:
   case ValueKind::InitExistentialAddrInst:
   case ValueKind::InitExistentialMetatypeInst:
   case ValueKind::InitExistentialRefInst: {
@@ -433,6 +454,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       conformances = IEMI.getConformances();
       break;
     }
+    case ValueKind::AllocExistentialBoxInst: {
+      auto &AEBI = cast<AllocExistentialBoxInst>(SI);
+      Ty = AEBI.getExistentialType();
+      FormalConcreteType = AEBI.getFormalConcreteType();
+      conformances = AEBI.getConformances();
+      break;
+    }
     }
 
     SmallVector<DeclID, 8> conformancesData;
@@ -448,15 +476,24 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       conformancesData.push_back(typeID);
       conformancesData.push_back(moduleID);
     }
+    
+    TypeID operandType = 0;
+    SILValueCategory operandCategory = SILValueCategory::Object;
+    ValueID operandID = 0;
+    if (operand) {
+      operandType = S.addTypeRef(operand.getType().getSwiftRValueType());
+      operandCategory = operand.getType().getCategory();
+      operandID = addValueRef(operand);
+    }
 
     unsigned abbrCode = SILAbbrCodes[SILInitExistentialLayout::Code];
     SILInitExistentialLayout::emitRecord(Out, ScratchRecord, abbrCode,
        (unsigned)SI.getKind(),
        S.addTypeRef(Ty.getSwiftRValueType()),
        (unsigned)Ty.getCategory(),
-       S.addTypeRef(operand.getType().getSwiftRValueType()),
-       (unsigned)operand.getType().getCategory(),
-       addValueRef(operand),
+       operandType,
+       (unsigned)operandCategory,
+       operandID,
        operand.getResultNumber(),
        S.addTypeRef(FormalConcreteType),
        conformancesData);
@@ -478,6 +515,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto DBI = cast<DeallocBoxInst>(&SI);
     writeOneTypeOneOperandLayout(DBI->getKind(), 0,
                                  DBI->getElementType(),
+                                 DBI->getOperand());
+    break;
+  }
+  case ValueKind::DeallocExistentialBoxInst: {
+    auto DBI = cast<DeallocExistentialBoxInst>(&SI);
+    writeOneTypeOneOperandLayout(DBI->getKind(), 0,
+                                 DBI->getConcreteType(),
                                  DBI->getOperand());
     break;
   }
@@ -962,6 +1006,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::OpenExistentialAddrInst:
   case ValueKind::OpenExistentialRefInst:
   case ValueKind::OpenExistentialMetatypeInst:
+  case ValueKind::OpenExistentialBoxInst:
   case ValueKind::UncheckedRefCastInst:
   case ValueKind::UncheckedAddrCastInst:
   case ValueKind::UncheckedTrivialBitCastInst:

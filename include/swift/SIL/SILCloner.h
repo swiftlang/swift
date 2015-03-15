@@ -512,6 +512,25 @@ SILCloner<ImplClass>::visitAllocBoxInst(AllocBoxInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitAllocExistentialBoxInst(
+                                                AllocExistentialBoxInst *Inst) {
+  auto origExistentialType = Inst->getExistentialType();
+  auto origFormalType = Inst->getFormalConcreteType();
+  
+  auto conformances =
+    getOpConformancesForExistential(origExistentialType.getSwiftRValueType(),
+                                    origFormalType, Inst->getConformances());
+  
+  doPostProcess(Inst,
+    getBuilder().createAllocExistentialBox(getOpLocation(Inst->getLoc()),
+                                getOpType(origExistentialType),
+                                getOpASTType(origFormalType),
+                                getOpType(Inst->getLoweredConcreteType()),
+                                conformances));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitAllocValueBufferInst(AllocValueBufferInst *inst) {
   doPostProcess(inst,
     getBuilder().createAllocValueBuffer(getOpLocation(inst->getLoc()),
@@ -1216,6 +1235,22 @@ visitOpenExistentialRefInst(OpenExistentialRefInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::
+visitOpenExistentialBoxInst(OpenExistentialBoxInst *Inst) {
+  // Create a new archetype for this opened existential type.
+  auto archetypeTy
+    = Inst->getType().getSwiftRValueType()->castTo<ArchetypeType>();
+  OpenedExistentialSubs[archetypeTy] 
+    = ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType());
+
+  doPostProcess(Inst,
+    getBuilder().createOpenExistentialBox(getOpLocation(Inst->getLoc()),
+                                          getOpValue(Inst->getOperand()),
+                                          getOpType(Inst->getType())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitInitExistentialAddrInst(InitExistentialAddrInst *Inst) {
   CanType origFormalType = Inst->getFormalConcreteType();
   auto conformances =
@@ -1393,6 +1428,16 @@ SILCloner<ImplClass>::visitDeallocBoxInst(DeallocBoxInst *Inst) {
     getBuilder().createDeallocBox(getOpLocation(Inst->getLoc()),
                                   getOpType(Inst->getElementType()),
                                   getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitDeallocExistentialBoxInst(
+                                              DeallocExistentialBoxInst *Inst) {
+  doPostProcess(Inst,
+    getBuilder().createDeallocExistentialBox(getOpLocation(Inst->getLoc()),
+                                         getOpASTType(Inst->getConcreteType()),
+                                         getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>

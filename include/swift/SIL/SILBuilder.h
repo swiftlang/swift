@@ -196,6 +196,15 @@ public:
     return insert(new (F.getModule())
                     AllocBoxInst(Loc, ElementType, F));
   }
+  
+  AllocExistentialBoxInst *createAllocExistentialBox(SILLocation Loc,
+                                 SILType ExistentialType,
+                                 CanType ConcreteType,
+                                 SILType ConcreteLoweredType,
+                                 ArrayRef<ProtocolConformance *> Conformances) {
+    return insert(AllocExistentialBoxInst::create(Loc, ExistentialType,
+                          ConcreteType, ConcreteLoweredType, Conformances, &F));
+  }
 
   ApplyInst *createApply(SILLocation Loc, SILValue Fn,
                          SILType SubstFnTy,
@@ -739,6 +748,13 @@ public:
                     OpenExistentialRefInst(Loc, Operand, Ty));
   }
 
+  OpenExistentialBoxInst *createOpenExistentialBox(SILLocation Loc,
+                                                   SILValue Operand,
+                                                   SILType Ty) {
+    return insert(new (F.getModule())
+                    OpenExistentialBoxInst(Loc, Operand, Ty));
+  }
+
   InitExistentialAddrInst *
   createInitExistentialAddr(SILLocation Loc,
                         SILValue Existential,
@@ -885,6 +901,13 @@ public:
   DeallocBoxInst *createDeallocBox(SILLocation loc, SILType eltType,
                                    SILValue operand) {
     return insert(new (F.getModule()) DeallocBoxInst(loc, eltType, operand));
+  }
+  DeallocExistentialBoxInst *createDeallocExistentialBox(SILLocation loc,
+                                                         CanType concreteType,
+                                                         SILValue operand) {
+    return insert(new (F.getModule()) DeallocExistentialBoxInst(loc,
+                                                                concreteType,
+                                                                operand));
   }
   DeallocValueBufferInst *createDeallocValueBuffer(SILLocation loc,
                                                    SILType valueType,

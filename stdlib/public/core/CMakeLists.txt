@@ -41,6 +41,7 @@ set(SWIFTLIB_ESSENTIAL
   Concatenate.swift.gyb
   ContiguousArrayBuffer.swift
   EmptyCollection.swift
+  ErrorType.swift
   Existential.swift
   Filter.swift.gyb
   FixedPoint.swift.gyb

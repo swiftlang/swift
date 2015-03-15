@@ -1053,6 +1053,24 @@ bb0(%0 : $*Beth):
   return undef : $()
 }
 
+struct SomeError: _ErrorType {}
+
+// CHECK-LABEL: sil public_external [fragile] @existential_box : $@thin (SomeError) -> () {
+sil [fragile] @existential_box : $@thin (SomeError) -> () {
+bb0(%0 : $SomeError):
+  // CHECK: %1 = alloc_existential_box $_ErrorType, $SomeError
+  %1 = alloc_existential_box $_ErrorType, $SomeError
+  // CHECK: store %0 to %1#1 : $*SomeError
+  store %0 to %1#1 : $*SomeError
+  // CHECK: %3 = open_existential_box %1#0 : $_ErrorType to $*[[OPENED:@opened\(".*"\)]] _ErrorType
+  %3 = open_existential_box %1#0 : $_ErrorType to $*@opened("01234567-89AB-CDEF-0123-333333333333") _ErrorType
+  // CHECK: destroy_addr %3 : $*[[OPENED]] _ErrorType
+  destroy_addr %3 : $*@opened("01234567-89AB-CDEF-0123-333333333333") _ErrorType
+  // CHECK: dealloc_existential_box %1#0 : $_ErrorType, $SomeError
+  dealloc_existential_box %1#0 : $_ErrorType, $SomeError
+  return undef : $()
+}
+
 // CHECK-LABEL: sil public_external [fragile] @bridge_object : $@thin (@owned Class1, Builtin.Word) -> () {
 // CHECK-NEXT:  bb0([[X:%.*]] : $Class1, [[W:%.*]] : $Builtin.Word):
 // CHECK-NEXT:    [[A:%.*]] = ref_to_bridge_object [[X]] : $Class1, [[W]] : $Builtin.Word
@@ -1265,6 +1283,7 @@ bb0:
   %122 = function_ref @partial_apply_with_closure : $@thin (@owned @callee_owned () -> Bool, @owned String, UnsafePointer<Int8>, Int64) -> ()
   %123 = function_ref @extract_generic_struct : $@thin GenericStruct<Int64> -> Int64
   %128 = function_ref @select_enum : $@thin (@in Beth) -> ()
+  %228 = function_ref @existential_box : $@thin (SomeError) -> ()
   %129 = function_ref @bridge_object : $@thin (@owned Class1, Builtin.Word) -> ()
 
   %119 = tuple ()

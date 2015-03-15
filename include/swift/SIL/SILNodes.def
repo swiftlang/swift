@@ -69,7 +69,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(AllocRefDynamicInst, AllocationInst, None)
     INST(AllocValueBufferInst, AllocationInst, None)
     INST(AllocBoxInst, AllocationInst, None)
-    VALUE_RANGE(AllocationInst, AllocStackInst, AllocBoxInst)
+    INST(AllocExistentialBoxInst, AllocationInst, MayWrite)
+    VALUE_RANGE(AllocationInst, AllocStackInst, AllocExistentialBoxInst)
 
   // Deallocation instructions.
   ABSTRACT_VALUE(DeallocationInst, SILInstruction)
@@ -77,7 +78,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(DeallocRefInst, DeallocationInst, MayHaveSideEffects)
     INST(DeallocValueBufferInst, DeallocationInst, MayHaveSideEffects)
     INST(DeallocBoxInst, DeallocationInst, MayHaveSideEffects)
-    VALUE_RANGE(DeallocationInst, DeallocStackInst, DeallocBoxInst)
+    INST(DeallocExistentialBoxInst, DeallocationInst, MayHaveSideEffects)
+    VALUE_RANGE(DeallocationInst, DeallocStackInst, DeallocExistentialBoxInst)
 
   // Accessing memory
   INST(LoadInst, SILInstruction, MayRead)
@@ -171,6 +173,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(OpenExistentialRefInst, SILInstruction, None)
   INST(InitExistentialMetatypeInst, SILInstruction, None)
   INST(OpenExistentialMetatypeInst, SILInstruction, None)
+  INST(OpenExistentialBoxInst, SILInstruction, MayRead)
 
   // Blocks
   INST(ProjectBlockStorageInst, SILInstruction, None)

@@ -3118,7 +3118,7 @@ more expensive ``alloc_existential_box``::
   bb(%nserror: $NSError):
     // The slow general way to form an ErrorType, allocating a box and
     // storing to its value buffer:
-    %error1 = alloc_existential_box $ErrorType of $NSError
+    %error1 = alloc_existential_box $ErrorType, $NSError
     strong_retain %nserror: $NSError
     store %nserror to %error1#1 : $NSError
 
@@ -3296,14 +3296,17 @@ dealloc_existential_box
 ```````````````````````
 ::
 
-  sil-instruction ::= 'dealloc_existential_box' sil-operand
+  sil-instruction ::= 'dealloc_existential_box' sil-operand, sil-type
 
-  dealloc_existential_box %0 : $P
+  dealloc_existential_box %0 : $P, $T
   // %0 must be an uninitialized box of boxed existential container type $P
+  // $T must be the AST type for which the box was allocated
 
 Deallocates a boxed existential container. The value inside the existential
 buffer is not destroyed; either the box must be uninitialized, or the value
-must have been projected out and destroyed beforehand.
+must have been projected out and destroyed beforehand. It is undefined behavior
+if the concrete type ``$T`` is not the same type for which the box was
+allocated with ``alloc_existential_box``.
 
 Blocks
 ~~~~~~

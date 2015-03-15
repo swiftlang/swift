@@ -762,6 +762,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(OpenExistentialAddr)
   ONEOPERAND_ONETYPE_INST(OpenExistentialRef)
   ONEOPERAND_ONETYPE_INST(OpenExistentialMetatype)
+  ONEOPERAND_ONETYPE_INST(OpenExistentialBox)
   // Conversion instructions.
   ONEOPERAND_ONETYPE_INST(UncheckedRefCast)
   ONEOPERAND_ONETYPE_INST(UncheckedAddrCast)
@@ -789,6 +790,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(ProjectBlockStorage)
 #undef ONEOPERAND_ONETYPE_INST
   
+  case ValueKind::DeallocExistentialBoxInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    ResultVal = Builder.createDeallocExistentialBox(Loc,
+                  MF->getType(TyID)->getCanonicalType(),
+                  getLocalValue(ValID, ValResNum,
+                    getSILType(MF->getType(TyID2),
+                               (SILValueCategory)TyCategory2)));
+    break;
+
+  }
+  
   case ValueKind::RefToBridgeObjectInst: {
     auto RefTy = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
     auto Ref = getLocalValue(ValID, ValResNum, RefTy);
@@ -808,14 +821,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
   case ValueKind::InitExistentialAddrInst:
   case ValueKind::InitExistentialMetatypeInst:
-  case ValueKind::InitExistentialRefInst: {
+  case ValueKind::InitExistentialRefInst:
+  case ValueKind::AllocExistentialBoxInst: {
 
     auto Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
     auto Ty2 = MF->getType(TyID2);
     CanType ConcreteTy;
     if ((ValueKind) OpCode != ValueKind::InitExistentialMetatypeInst)
       ConcreteTy = MF->getType(ConcreteTyID)->getCanonicalType();
-    SILValue operand = getLocalValue(ValID, ValResNum,
+    SILValue operand;
+    if ((ValueKind) OpCode != ValueKind::AllocExistentialBoxInst)
+      operand = getLocalValue(ValID, ValResNum,
                          getSILType(Ty2, (SILValueCategory)TyCategory2));
 
     SmallVector<ProtocolConformance*, 2> conformances;
@@ -847,6 +863,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                          ConcreteTy,
                                          operand,
                                          ctxConformances);
+      break;
+    case ValueKind::AllocExistentialBoxInst:
+      ResultVal = Builder.createAllocExistentialBox(Loc, Ty, ConcreteTy,
+                                  SILType::getPrimitiveAddressType(ConcreteTy),
+                                  ctxConformances);
       break;
     }
     break;

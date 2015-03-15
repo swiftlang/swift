@@ -1210,6 +1210,24 @@ bb0(%0 : $*Beth):
   return undef : $()
 }
 
+struct SomeError: _ErrorType {}
+
+// CHECK-LABEL: sil @existential_box : $@thin (SomeError) -> () {
+sil @existential_box : $@thin (SomeError) -> () {
+bb0(%0 : $SomeError):
+  // CHECK: %1 = alloc_existential_box $_ErrorType, $SomeError
+  %1 = alloc_existential_box $_ErrorType, $SomeError
+  // CHECK: store %0 to %1#1 : $*SomeError
+  store %0 to %1#1 : $*SomeError
+  // CHECK: %3 = open_existential_box %1#0 : $_ErrorType to $*@opened("01234567-89AB-CDEF-0123-333333333333") _ErrorType
+  %3 = open_existential_box %1#0 : $_ErrorType to $*@opened("01234567-89AB-CDEF-0123-333333333333") _ErrorType
+  // CHECK: destroy_addr %3 : $*@opened("01234567-89AB-CDEF-0123-333333333333") _ErrorType
+  destroy_addr %3 : $*@opened("01234567-89AB-CDEF-0123-333333333333") _ErrorType
+  // CHECK: dealloc_existential_box %1#0 : $_ErrorType, $SomeError
+  dealloc_existential_box %1#0 : $_ErrorType, $SomeError
+  return undef : $()
+}
+
 sil @convert_function : $@thin (@thin (AnyObject) -> Optional<AnyObject>) -> (@thin (Optional<AnyObject>) -> AnyObject) {
 entry(%0 : $@thin (AnyObject) -> Optional<AnyObject>):
   %1 = convert_function %0 : $@thin (AnyObject) -> Optional<AnyObject> to $@thin (Optional<AnyObject>) -> AnyObject

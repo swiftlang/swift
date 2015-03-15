@@ -46,6 +46,7 @@ static bool isNoReadBuiltinInst(SILValue V) {
 static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   switch (Inst->getKind()) {
   case ValueKind::AllocBoxInst:
+  case ValueKind::AllocExistentialBoxInst:
   case ValueKind::AllocRefInst:
   case ValueKind::AllocRefDynamicInst:
   case ValueKind::AllocStackInst:
@@ -56,6 +57,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::CopyAddrInst:
   case ValueKind::RetainValueInst:
   case ValueKind::DeallocBoxInst:
+  case ValueKind::DeallocExistentialBoxInst:
   case ValueKind::DeallocRefInst:
   case ValueKind::DeallocStackInst:
   case ValueKind::DeallocValueBufferInst:
@@ -124,6 +126,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::OpenExistentialAddrInst:
   case ValueKind::OpenExistentialMetatypeInst:
   case ValueKind::OpenExistentialRefInst:
+  case ValueKind::OpenExistentialBoxInst:
   case ValueKind::PartialApplyInst:
   case ValueKind::PointerToAddressInst:
   case ValueKind::PointerToThinFunctionInst:

@@ -1157,6 +1157,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   // interfering with opcode recognition.
   Opcode = llvm::StringSwitch<ValueKind>(OpcodeName)
     .Case("alloc_box", ValueKind::AllocBoxInst)
+    .Case("alloc_existential_box", ValueKind::AllocExistentialBoxInst)
     .Case("address_to_pointer", ValueKind::AddressToPointerInst)
     .Case("alloc_stack", ValueKind::AllocStackInst)
     .Case("alloc_ref", ValueKind::AllocRefInst)
@@ -1181,6 +1182,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("copy_addr", ValueKind::CopyAddrInst)
     .Case("copy_block", ValueKind::CopyBlockInst)
     .Case("dealloc_box", ValueKind::DeallocBoxInst)
+    .Case("dealloc_existential_box", ValueKind::DeallocExistentialBoxInst)
     .Case("dealloc_ref", ValueKind::DeallocRefInst)
     .Case("dealloc_stack", ValueKind::DeallocStackInst)
     .Case("dealloc_value_buffer", ValueKind::DeallocValueBufferInst)
@@ -1217,6 +1219,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("objc_protocol", ValueKind::ObjCProtocolInst)
     .Case("objc_to_thick_metatype", ValueKind::ObjCToThickMetatypeInst)
     .Case("open_existential_addr", ValueKind::OpenExistentialAddrInst)
+    .Case("open_existential_box", ValueKind::OpenExistentialBoxInst)
     .Case("open_existential_metatype", ValueKind::OpenExistentialMetatypeInst)
     .Case("open_existential_ref", ValueKind::OpenExistentialRefInst)
     .Case("partial_apply", ValueKind::PartialApplyInst)
@@ -1829,6 +1832,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   }
   case ValueKind::OpenExistentialAddrInst:
+  case ValueKind::OpenExistentialBoxInst:
   case ValueKind::OpenExistentialMetatypeInst:
   case ValueKind::OpenExistentialRefInst: {
     SILType Ty;
@@ -1857,6 +1861,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
     case ValueKind::OpenExistentialRefInst:
       ResultVal = B.createOpenExistentialRef(InstLoc, Val, Ty);
+      break;
+
+    case ValueKind::OpenExistentialBoxInst:
+      ResultVal = B.createOpenExistentialBox(InstLoc, Val, Ty);
       break;
 
     default:
@@ -2303,6 +2311,17 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       ResultVal = B.createDeallocBox(InstLoc, Ty, Val);
       break;
     }
+    break;
+  }
+  case ValueKind::DeallocExistentialBoxInst: {
+    CanType ConcreteTy;
+    if (parseTypedValueRef(Val)
+        || P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
+        || P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$")
+        || parseASTType(ConcreteTy))
+      return true;
+    
+    ResultVal = B.createDeallocExistentialBox(InstLoc, ConcreteTy, Val);
     break;
   }
   case ValueKind::TupleInst: {
@@ -3070,10 +3089,40 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     
     // Collect conformances for the type.
     ArrayRef<ProtocolConformance *> conformances
-      = collectExistentialConformances(P, Ty, Val.getType().getSwiftRValueType());
+      = collectExistentialConformances(P, Ty,
+                                       Val.getType().getSwiftRValueType());
     
     ResultVal = B.createInitExistentialAddr(InstLoc, Val, Ty, LoweredTy,
                                         conformances);
+    break;
+  }
+  case ValueKind::AllocExistentialBoxInst: {
+    SILType ExistentialTy;
+    CanType ConcreteFormalTy;
+    
+    if (parseSILType(ExistentialTy) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
+        parseASTType(ConcreteFormalTy))
+      return true;
+    
+    // Lower the type at the abstraction level of the existential.
+    auto archetype
+      = ArchetypeType::getOpened(ExistentialTy.getSwiftRValueType())
+        ->getCanonicalType();
+    
+    SILType LoweredTy = SILMod.Types.getLoweredType(
+                      Lowering::AbstractionPattern(archetype), ConcreteFormalTy)
+      .getAddressType();
+    
+    // Collect conformances for the type.
+    ArrayRef<ProtocolConformance *> conformances
+      = collectExistentialConformances(P, ConcreteFormalTy,
+                                       ExistentialTy.getSwiftRValueType());
+    
+    ResultVal = B.createAllocExistentialBox(InstLoc, ExistentialTy,
+                                    ConcreteFormalTy, LoweredTy, conformances);
+    
     break;
   }
   case ValueKind::InitExistentialRefInst: {
