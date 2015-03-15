@@ -101,7 +101,7 @@ public func < (lhs: Bit, rhs: Bit) -> Bool {
 
 extension Bit : IntegerArithmeticType {
   static func _withOverflow(v: (Int, overflow: Bool)) -> (Bit, overflow: Bool) {
-    if let b = Bit(rawValue: v.0) {
+    if let b? = Bit(rawValue: v.0) {
       return (b, v.overflow)
     } else {
       return (Bit(rawValue: v.0 % 2)!, true)

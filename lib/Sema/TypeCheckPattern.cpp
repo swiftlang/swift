@@ -21,6 +21,7 @@
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/NameLookup.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include <utility>
 using namespace swift;
 
@@ -164,6 +165,11 @@ class ResolvePattern : public ASTVisitor<ResolvePattern,
 public:
   TypeChecker &TC;
   DeclContext *DC;
+  enum InVarOrLetPattern {
+    IVOLP_Nope,
+    IVOLP_InVar,
+    IVOLP_InLet
+  } insideLetVarPattern = IVOLP_Nope;
   
   ResolvePattern(TypeChecker &TC, DeclContext *DC) : TC(TC), DC(DC) {}
   
@@ -181,14 +187,16 @@ public:
 #undef ALWAYS_RESOLVED_PATTERN
 
   Pattern *visitVarPattern(VarPattern *P) {
-    Pattern *newSub = visit(P->getSubPattern());
-    P->setSubPattern(newSub);
+    // Keep track of the fact that we're inside of a var/let pattern.  This
+    // affects how unqualified identifiers are processed.
+    InVarOrLetPattern Kind = P->isLet() ? IVOLP_InLet : IVOLP_InVar;
+    llvm::SaveAndRestore<InVarOrLetPattern> X(insideLetVarPattern, Kind);
+    P->setSubPattern(visit(P->getSubPattern()));
     return P;
   }
 
   Pattern *visitOptionalSomePattern(OptionalSomePattern *P) {
-    Pattern *newSub = visit(P->getSubPattern());
-    P->setSubPattern(newSub);
+    P->setSubPattern(visit(P->getSubPattern()));
     return P;
   }
 
@@ -354,6 +362,18 @@ public:
                                                nullptr);
   }
   Pattern *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *ude) {
+    // If we're in the context of a var/let pattern, then this is the
+    // declaration of a pattern binding.
+    if (insideLetVarPattern != IVOLP_Nope) {
+      bool isLet = insideLetVarPattern == IVOLP_InLet;
+      VarDecl *var = new (TC.Context) VarDecl(/*static*/ false,
+                                              /*IsLet*/ isLet,
+                                              ude->getLoc(), ude->getName(),
+                                              Type(), DC);
+      return new (TC.Context) NamedPattern(var);
+    }
+    
+    
     // Try looking up an enum element in context.
     EnumElementDecl *referencedElement
       = lookupUnqualifiedEnumMemberElement(TC, DC, ude->getName());
@@ -651,11 +671,19 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     return false;
   }
 
+
+  //--- Refutable patterns.
+  //
+  // Refutable patterns occur when checking the PatternBindingDecls in an if/let
+  // while/let condition.  They always require an initial value, so they always
+  // allow unspecified types.
 #define PATTERN(Id, Parent)
 #define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
 #include "swift/AST/PatternNodes.def"
-    llvm_unreachable("bottom-up type checking of refutable patterns "
-                     "not implemented");
+    assert((options & TR_AllowUnspecifiedTypes) &&
+           "refutable patterns must always be checked in a context where an"
+           " initializer provides an initial value and a type for the pattern");
+    return false;
   }
   llvm_unreachable("bad pattern kind!");
 }

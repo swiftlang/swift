@@ -632,7 +632,7 @@ static void makeOptionSetAllZerosProperty(StructDecl *optionSetDecl,
 
   auto *PatternBinding = new (C) PatternBindingDecl(
       SourceLoc(), StaticSpellingKind::KeywordStatic, SourceLoc(),
-      PropertyPattern, nullptr, /*IsConditional=*/false, optionSetDecl);
+      PropertyPattern, nullptr, optionSetDecl);
   PatternBinding->setImplicit();
   NewDecls.push_back(PatternBinding);
 }
@@ -1724,8 +1724,7 @@ namespace {
 
         auto patternBinding = new (Impl.SwiftContext)
             PatternBindingDecl(SourceLoc(), StaticSpellingKind::None,
-                               SourceLoc(), varPattern, nullptr,
-                               /*conditional*/ false, structDecl);
+                               SourceLoc(), varPattern, nullptr, structDecl);
 
         // Create a constructor to initialize that value from a value of the
         // underlying type.
@@ -1830,8 +1829,7 @@ namespace {
         
         auto rawValueBinding = new (Impl.SwiftContext)
           PatternBindingDecl(SourceLoc(), StaticSpellingKind::None,
-                             SourceLoc(), varPattern, nullptr,
-                             /*conditional*/ false, enumDecl);
+                             SourceLoc(), varPattern, nullptr, enumDecl);
 
         auto rawValueGetter = makeEnumRawValueGetter(enumDecl, rawValue);
 
@@ -1881,8 +1879,7 @@ namespace {
 
         auto patternBinding = new (Impl.SwiftContext)
             PatternBindingDecl(SourceLoc(), StaticSpellingKind::None,
-                               SourceLoc(), varPattern, nullptr,
-                               /*conditional*/ false, structDecl);
+                               SourceLoc(), varPattern, nullptr, structDecl);
         
         // Create a default initializer to get the value with no options set.
         auto defaultConstructor = makeOptionSetDefaultConstructor(structDecl,

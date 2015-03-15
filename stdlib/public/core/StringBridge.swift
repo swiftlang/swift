@@ -140,7 +140,7 @@ extension String {
   @inline(never) @semantics("stdlib_binary_only") // Hide the CF dependency
   public // SPI(Foundation)
   init(_cocoaString: AnyObject) {
-    if let wrapped = _cocoaString as? _NSContiguousString {
+    if let wrapped? = _cocoaString as? _NSContiguousString {
       self._core = wrapped._core
       return
     }
@@ -280,7 +280,7 @@ extension String {
   /// Same as `_bridgeToObjectiveC()`, but located inside the core standard
   /// library.
   public func _stdlib_binary_bridgeToObjectiveCImpl() -> AnyObject {
-    if let ns = _core.cocoaBuffer {
+    if let ns? = _core.cocoaBuffer {
       if CFStringGetLength(ns) == _core.count {
         return ns
       }

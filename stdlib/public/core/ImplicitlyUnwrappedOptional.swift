@@ -73,7 +73,7 @@ public enum ImplicitlyUnwrappedOptional<T>
   /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
     // FIXME: This should probably use _OptionalMirror in both cases.
-    if let value = self {
+    if let value? = self {
       return reflect(value)
     } else {
       return _OptionalMirror(self)
@@ -145,7 +145,7 @@ extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
     inout result: T!?
   ) -> Bool {
     let bridged: T? = Swift._conditionallyBridgeFromObjectiveC(x, T.self)
-    if let value = bridged {
+    if let value? = bridged {
       result = value
     }
 

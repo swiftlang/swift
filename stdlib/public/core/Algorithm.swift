@@ -359,8 +359,8 @@ public func lexicographicalCompare<
   while true {
     var e1_ = g1.next()
     var e2_ = g2.next()
-    if let e1 = e1_ {
-      if let e2 = e2_ {
+    if let e1? = e1_ {
+      if let e2? = e2_ {
         if e1 < e2 {
           return true
         }
@@ -396,8 +396,8 @@ public func lexicographicalCompare<
   while true {
     var e1_ = g1.next()
     var e2_ = g2.next()
-    if let e1 = e1_ {
-      if let e2 = e2_ {
+    if let e1? = e1_ {
+      if let e2? = e2_ {
         if less(e1, e2) {
           return true
         }

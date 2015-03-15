@@ -2058,18 +2058,8 @@ emitStmtConditionWithBodyRec(Stmt *CondStmt, unsigned CondElement,
   ManagedValue subjectMV = gen.emitRValueAsSingleValue(PBD->getInit());
   auto subject = ConsumableManagedValue::forOwned(subjectMV);
   
-  // if-let conditions implicitly have an OptionalSome wrapping the pattern
-  // that is explicitly written.
-  auto OptTy = PBD->getInit()->getType();
-  auto OptKind = OptTy->getNominalOrBoundGenericNominal()
-                      ->classifyAsOptionalType();
-  auto thePattern = new (gen.getASTContext())
-      OptionalSomePattern(PBD->getPattern(), PBD->getPattern()->getEndLoc(),
-                          /*implicit*/true);
-  thePattern->setType(OptTy);
-  thePattern->setElementDecl(gen.getASTContext().getOptionalSomeDecl(OptKind));
-  
-  ClauseRow row(/*caseBlock*/nullptr, thePattern, /*where expr*/nullptr);
+  // Add a row for the pattern we want to match against.
+  ClauseRow row(/*caseBlock*/nullptr, PBD->getPattern(), /*where expr*/nullptr);
   
   // Set the handler that generates code when the match succeeds.  This simply
   // continues emission of the rest of the condition.

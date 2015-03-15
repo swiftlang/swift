@@ -75,9 +75,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
   auto indexBind = new (C) PatternBindingDecl(SourceLoc(),
                                               StaticSpellingKind::None,
                                               SourceLoc(),
-                                              indexPat, nullptr,
-                                              /*conditional*/ false,
-                                              funcDecl);
+                                              indexPat, nullptr, funcDecl);
 
   unsigned index = 0;
   SmallVector<CaseStmt*, 4> cases;
@@ -449,8 +447,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
   
   auto patDecl = new (C) PatternBindingDecl(SourceLoc(),
                               StaticSpellingKind::None,
-                              SourceLoc(), hashValuePat, nullptr,
-                              /*conditional*/false, enumDecl);
+                              SourceLoc(), hashValuePat, nullptr, enumDecl);
   patDecl->setImplicit();
   
   enumDecl->addMember(getterDecl);

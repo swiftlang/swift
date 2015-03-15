@@ -1601,11 +1601,16 @@ namespace {
         return TupleType::get(tupleTypeElts, CS.getASTContext());
       }
       
-      // TODO
+      // Refutable patterns occur when checking the PatternBindingDecls in an
+      // if/let or while/let condition.  They always require an initial value,
+      // so they always allow unspecified types.
 #define PATTERN(Id, Parent)
 #define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
 #include "swift/AST/PatternNodes.def"
-        llvm_unreachable("not implemented");
+        // TODO: we could try harder here, e.g. for enum elements to provide the
+        // enum type.
+        return CS.createTypeVariable(CS.getConstraintLocator(locator),
+                                     /*options=*/0);
       }
 
       llvm_unreachable("Unhandled pattern kind");

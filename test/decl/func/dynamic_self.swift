@@ -261,19 +261,19 @@ extension Y {
   func operationThatOnlyExistsOnY() {}
 }
 func testOptionalSelf(y : Y) {
-  if let clone = y.tryToClone() {
+  if let clone? = y.tryToClone() {
     clone.operationThatOnlyExistsOnY()
   }
 
   // Sanity-checking to make sure that the above succeeding
   // isn't coincidental.
-  if let clone = y.cloneOrFail() { // expected-error {{bound value in a conditional binding must be of Optional type}}
+  if let clone? = y.cloneOrFail() { // expected-error {{optional present pattern cannot match values of type 'Y'}}
     clone.operationThatOnlyExistsOnY()
   }
 
   // Sanity-checking to make sure that the above succeeding
   // isn't coincidental.
-  if let clone = y.cloneAsObjectSlice() {
+  if let clone? = y.cloneAsObjectSlice() {
     clone.operationThatOnlyExistsOnY() // expected-error {{'X' does not have a member named 'operationThatOnlyExistsOnY'}}
   }
 }

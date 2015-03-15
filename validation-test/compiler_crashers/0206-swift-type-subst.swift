@@ -43,7 +43,7 @@ class b: a {
 b
 protocol c : b { func b
 func some<S: SequenceType, T where Optional<T> == S.Generator.Element>(xs : S) -> T? {
-    for (mx :       if let x = mx {
+    for (mx :       if let x? = mx {
      d: f{  ceanTy b {
     clasi() {
     }

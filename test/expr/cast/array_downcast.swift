@@ -58,15 +58,15 @@ func testBridgedDowncastAnyObject(arr: [AnyObject], arrOpt: [AnyObject]?,
                                   arrIUO: [AnyObject]!) {
   var b = B()
 
-  if let bArr = arr as? [B] {
+  if let bArr? = arr as? [B] {
     b = bArr[0]
   }
 
-  if let bArr = arrOpt as? [B] {
+  if let bArr? = arrOpt as? [B] {
     b = bArr[0]
   }
 
-  if let bArr = arrIUO as? [B] {
+  if let bArr? = arrIUO as? [B] {
     b = bArr[0]
   }
 }

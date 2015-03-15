@@ -239,7 +239,7 @@ func test_break(i : Int) {
 func test_if_break(c : C?) {
 label1:
   // CHECK: switch_enum %0 : $Optional<C>, case #Optional.Some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
-  if let x = c {
+  if let x? = c {
 // CHECK: [[TRUE]]({{.*}} : $C):
 
     // CHECK: apply
@@ -259,7 +259,7 @@ label1:
 func test_if_else_break(c : C?) {
 label2:
   // CHECK: switch_enum %0 : $Optional<C>, case #Optional.Some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
-  if let x = c {
+  if let x? = c {
     // CHECK: [[TRUE]]({{.*}} : $C):
     use(x)
     // CHECK: br [[CONT:bb[0-9]+]]
@@ -279,7 +279,7 @@ label2:
 func test_if_else_then_break(a : Bool, c : C?) {
   label3:
   // CHECK: switch_enum %1 : $Optional<C>, case #Optional.Some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
-  if let x = c {
+  if let x? = c {
     // CHECK: [[TRUE]]({{.*}} : $C):
     use(x)
     // CHECK: br [[CONT:bb[0-9]+]]

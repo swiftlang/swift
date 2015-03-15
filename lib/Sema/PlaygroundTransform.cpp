@@ -684,7 +684,6 @@ public:
                                        SourceLoc(),
                                        NP,
                                        MaybeLoadInitExpr,
-                                       false, // is conditional
                                        TypeCheckDC);
     PBD->setImplicit();
 

@@ -3686,12 +3686,10 @@ public:
 
           // If we found both, point at them.
           if (prefixOp) {
-            SourceLoc insertionLoc = FD->getLoc();
-
             TC.diagnose(prefixOp, diag::unary_operator_declaration_here,false)
-              .fixItInsert(insertionLoc, "prefix ");
+              .fixItInsert(FD->getLoc(), "prefix ");
             TC.diagnose(postfixOp, diag::unary_operator_declaration_here, true)
-              .fixItInsert(insertionLoc, "postfix ");
+              .fixItInsert(FD->getLoc(), "postfix ");
           } else {
             // FIXME: Introduce a Fix-It that adds the operator declaration?
           }
@@ -3705,7 +3703,6 @@ public:
         // should be a prefix or a postfix operator.
 
         // Fix the AST and determine the insertion text.
-        SourceLoc insertionLoc = FD->getFuncLoc();
         const char *insertionText;
         auto &C = FD->getASTContext();
         if (postfixOp) {
@@ -3719,9 +3716,9 @@ public:
         }
 
         // Emit diagnostic with the Fix-It.
-        TC.diagnose(insertionLoc, diag::unary_op_missing_prepos_attribute,
+        TC.diagnose(FD->getFuncLoc(), diag::unary_op_missing_prepos_attribute,
                     static_cast<bool>(postfixOp))
-          .fixItInsert(insertionLoc, insertionText);
+          .fixItInsert(FD->getFuncLoc(), insertionText);
         TC.diagnose(op, diag::unary_operator_declaration_here,
                     static_cast<bool>(postfixOp));
       }
@@ -6742,13 +6739,49 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
   }
 }
 
+static bool isPatternSyntacticallyIrrefutable(Pattern *P) {
+  bool foundRefutablePattern = false;
+  P->forEachNode([&](Pattern *Node) {
+    switch (Node->getKind()) {
+#define PATTERN(ID, PARENT) case PatternKind::ID: break;
+#define REFUTABLE_PATTERN(ID, PARENT) \
+   case PatternKind::ID: foundRefutablePattern = true; break;
+#include "swift/AST/PatternNodes.def"
+    }
+  });
+  
+  return !foundRefutablePattern;
+}
+
+
 bool TypeChecker::typeCheckConditionalPatternBinding(PatternBindingDecl *PBD,
                                                      DeclContext *dc) {
+  // Resolve the pattern, which may contain expression nodes that need to be
+  // processed into pattern nodes (since it was parsed as a refutable pattern).
+  if (auto *newPattern = resolvePattern(PBD->getPattern(), dc)) {
+    // Check to verify that the pattern is refutable.  Swift 1.x patterns were
+    // written as irrefutable patterns that implicitly destructured an optional.
+    // detect this case, and produce an error with a fixit that introduces the
+    // missing '?' pattern.
+    if (isPatternSyntacticallyIrrefutable(newPattern)) {
+      diagnose(newPattern->getStartLoc(),
+               diag::conditional_pattern_bind_not_refutable)
+        .fixItInsertAfter(newPattern->getEndLoc(), "?");
+      newPattern = new (Context) OptionalSomePattern(newPattern,
+                                                     newPattern->getEndLoc(),
+                                                     true);
+    }
+    
+    PBD->setPattern(newPattern);
+  } else {
+    PBD->setInvalid();
+  }
+
   validatePatternBindingDecl(*this, PBD);
   if (PBD->isInvalid())
     return true;
   
-  assert(PBD->getInit() && "conditional pattern binding should always have init");
+  assert(PBD->getInit() && "conditional pattern binding should have init!");
   if (!PBD->wasInitChecked()) {
     if (typeCheckBinding(PBD)) {
       PBD->setInvalid();

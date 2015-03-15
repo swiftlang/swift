@@ -730,6 +730,14 @@ ERROR(expected_expr_conditional_where,stmt_parsing,PointsToFirstBadToken,
 ERROR(conditional_var_initializer_required,stmt_parsing,none,
       "variable binding in a condition requires an initializer", ())
 
+WARNING(expected_refutable_pattern_maybe_optional,stmt_parsing,none,
+      "condition requires a refutable pattern match; "
+      "did you mean to match an optional?", ())
+ERROR(refutable_pattern_no_type_annotation,stmt_parsing,none,
+      "type annotation is not permitted in refutable match", ())
+
+
+
 // If Statement
 ERROR(expected_condition_if,stmt_parsing,PointsToFirstBadToken,
       "expected expression, var, or let in 'if' condition", ())

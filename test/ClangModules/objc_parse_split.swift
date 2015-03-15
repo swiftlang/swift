@@ -86,7 +86,7 @@ func instanceMethodsInExtensions(b: B) {
 }
 
 func dynamicLookupMethod(b: AnyObject) {
-  if let m5 = b.method:_:separateExtMethod: {
+  if let m5? = b.method:_:separateExtMethod: {
     m5(1, separateExtMethod: 2.5)
   }
 }

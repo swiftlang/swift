@@ -619,6 +619,27 @@ ParserResult<Stmt> Parser::parseStmtReturn() {
   return makeParserResult(new (Context) ReturnStmt(ReturnLoc, nullptr));
 }
 
+namespace {
+  class CollectVarsAndAddToScope : public ASTWalker {
+  public:
+    Parser &TheParser;
+    SmallVectorImpl<VarDecl*> &Decls;
+    
+    CollectVarsAndAddToScope(Parser &P, SmallVectorImpl<VarDecl*> &Decls)
+    : TheParser(P), Decls(Decls) {}
+    
+    Pattern *walkToPatternPost(Pattern *P) override {
+      // Handle vars.
+      if (auto *Named = dyn_cast<NamedPattern>(P)) {
+        VarDecl *VD = Named->getDecl();
+        Decls.push_back(VD);
+        TheParser.addToScope(VD);
+      }
+      return P;
+    }
+  };
+} // unnamed namespace
+
 /// Parse the condition of an 'if' or 'while'.
 ///
 ///   condition:
@@ -690,14 +711,28 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
   assert(CurDeclContext->isLocalContext() &&
          "conditional binding in non-local context?!");
 
-  // Parse the list of condition-bindings, each of which can have a where.
+  // Parse the list of condition-bindings, each of which can have a 'where'.
   do {
     bool IsLet = Tok.is(tok::kw_let);
     SourceLoc VarLoc = consumeToken();
 
     // Parse the list of name binding's within a let/var clauses.
     do {
-      auto Pattern = parsePattern(IsLet);
+      ParserResult<Pattern> Pattern;
+      
+      // The "if let" construct requires a refutable matching pattern, so parse
+      // it now.
+      //
+      // Swift 1.x supported irrefutable patterns that unwrapped optionals and
+      // allowed type annotations.  We specifically handle the common cases of
+      // "if let x = foo()" and "if let x : AnyObject = foo()" for good QoI and
+      // migration.  These are not valid modern 'if let' sequences: the former
+      // isn't refutable, and the later isn't a valid matching pattern.
+      //
+      if (Tok.is(tok::identifier) && peekToken().isAny(tok::equal, tok::colon))
+        Pattern = parseSwift1IfLetPattern(IsLet, VarLoc);
+      else
+        Pattern = parseMatchingPatternAsLetOrVar(IsLet, VarLoc);
       Status |= Pattern;
       
       if (Pattern.isNull() || Pattern.hasCodeCompletion())
@@ -724,11 +759,15 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
                                                   StaticSpellingKind::None,
                                                   VarLoc, Pattern.get(),
                                                   Init,
-                                                  /*isConditional*/ true,
                                                   /*parent*/CurDeclContext);
       result.push_back(PBD);
-      // Introduce variables to the current scope.
-      addPatternVariablesToScope(Pattern.get());
+      
+      // Add variable bindings from the pattern to the case scope.  We have
+      // to do this with a full AST walk, because the freshly parsed pattern
+      // represents tuples and var patterns as tupleexprs and
+      // unresolved_pattern_expr nodes, instead of as proper pattern nodes.
+      SmallVector<VarDecl *, 4> BoundDecls;
+      Pattern.get()->walk(CollectVarsAndAddToScope(*this, BoundDecls));
 
     } while (Tok.is(tok::comma) && peekToken().isNot(tok::kw_let, tok::kw_var)&&
              consumeIf(tok::comma));
@@ -1476,27 +1515,6 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
       Status, SwitchStmt::create(LabelInfo, SwitchLoc, SubjectExpr.get(),
                                  lBraceLoc, cases, rBraceLoc, Context));
 }
-
-namespace {
-class CollectVarsAndAddToScope : public ASTWalker {
-public:
-  Parser &TheParser;
-  SmallVectorImpl<VarDecl*> &Decls;
-
-  CollectVarsAndAddToScope(Parser &P, SmallVectorImpl<VarDecl*> &Decls)
-      : TheParser(P), Decls(Decls) {}
-
-  Pattern *walkToPatternPost(Pattern *P) override {
-    // Handle vars.
-    if (auto *Named = dyn_cast<NamedPattern>(P)) {
-      VarDecl *VD = Named->getDecl();
-      Decls.push_back(VD);
-      TheParser.addToScope(VD);
-    }
-    return P;
-  }
-};
-} // unnamed namespace
 
 static ParserStatus parseStmtCase(Parser &P, SourceLoc &CaseLoc,
                                   SmallVectorImpl<CaseLabelItem> &LabelItems,

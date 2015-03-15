@@ -105,17 +105,17 @@ func _adHocPrint<T, TargetStream : OutputStreamType>(
 public func print<T, TargetStream : OutputStreamType>(
     value: T, inout target: TargetStream
 ) {
-  if let streamableObject = value as? Streamable {
+  if let streamableObject? = value as? Streamable {
     streamableObject.writeTo(&target)
     return
   }
 
-  if var printableObject = value as? Printable {
+  if var printableObject? = value as? Printable {
     printableObject.description.writeTo(&target)
     return
   }
 
-  if let debugPrintableObject = value as? DebugPrintable {
+  if let debugPrintableObject? = value as? DebugPrintable {
     debugPrintableObject.debugDescription.writeTo(&target)
     return
   }
@@ -231,17 +231,17 @@ public func toDebugString<T>(x: T) -> String {
 public func debugPrint<T, TargetStream : OutputStreamType>(
     value: T, inout target: TargetStream
 ) {
-  if let debugPrintableObject = value as? DebugPrintable {
+  if let debugPrintableObject? = value as? DebugPrintable {
     debugPrintableObject.debugDescription.writeTo(&target)
     return
   }
 
-  if var printableObject = value as? Printable {
+  if var printableObject? = value as? Printable {
     printableObject.description.writeTo(&target)
     return
   }
 
-  if let streamableObject = value as? Streamable {
+  if let streamableObject? = value as? Streamable {
     streamableObject.writeTo(&target)
     return
   }

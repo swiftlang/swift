@@ -236,7 +236,7 @@ static VarDecl *deriveRawRepresentable_raw(TypeChecker &tc,
   auto pbDecl = new (C) PatternBindingDecl(SourceLoc(),
                                            StaticSpellingKind::None,
                                            SourceLoc(), propPat, nullptr,
-                                           /*cond*/ false, enumDecl);
+                                           enumDecl);
   pbDecl->setImplicit();
   
   enumDecl->addMember(getterDecl);

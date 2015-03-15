@@ -99,8 +99,8 @@ class TestObjCKeyTy : NSObject {
   }
 
   override func isEqual(object: AnyObject!) -> Bool {
-    if let other: AnyObject = object {
-      if let otherObjcKey = other as? TestObjCKeyTy {
+    if let other? = object {
+      if let otherObjcKey? = other as? TestObjCKeyTy {
         return self.value == otherObjcKey.value
       }
     }

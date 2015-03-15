@@ -134,8 +134,8 @@ ParserResult<Expr> Parser::parseExprIs() {
 /// parseExprAs
 ///   expr-as:
 ///     'as' type
-///     'as' '?' type
-///     'as' '!' type
+///     'as?' type
+///     'as!' type
 ParserResult<Expr> Parser::parseExprAs() {
   // Parse the 'as'.
   SourceLoc asLoc = consumeToken(tok::kw_as);
@@ -255,8 +255,14 @@ parse_operator:
     }
         
     case tok::equal: {
-      SourceLoc equalsLoc = consumeToken();
+      // If we're parsing an expression as the body of a refutable var/let
+      // pattern, then an assignment doesn't make sense.  In a "if let"
+      // statement the equals is the start of the condition, so don't parse it
+      // as a binary operator.
+      if (InVarOrLetPattern)
+        goto done;
       
+      SourceLoc equalsLoc = consumeToken();
       auto *assign = new (Context) AssignExpr(equalsLoc);
       SequencedExprs.push_back(assign);
       Message = diag::expected_expr_assignment;
@@ -1581,7 +1587,6 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       auto *PBD = new (Context) PatternBindingDecl(/*staticloc*/SourceLoc(),
                                                    StaticSpellingKind::None,
                                                    nameLoc, pattern,initializer,
-                                                   /*isconditional*/false,
                                                    CurDeclContext);
                                                    
       

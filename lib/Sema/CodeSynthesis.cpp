@@ -1307,7 +1307,6 @@ static void synthesizeAddressedMaterializeForSet(FuncDecl *materializeForSet,
                                                     SourceLoc(),
                                                     bindingPattern,
                                                     addressorResult,
-                                                    /*conditional*/ false,
                                                     materializeForSet);
     bindingDecl->setImplicit(IsImplicit);
     body.push_back(bindingDecl);
@@ -1481,8 +1480,7 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
     auto tmpPBD = new (Ctx) PatternBindingDecl(SourceLoc(),
                                                StaticSpellingKind::None,
                                                SourceLoc(),
-                                               tmpPattern, OldValueExpr,
-                                               /*conditional*/ false, Set);
+                                               tmpPattern, OldValueExpr, Set);
     tmpPBD->setImplicit();
     SetterBody.push_back(tmpPBD);
     SetterBody.push_back(OldValue);
@@ -1625,9 +1623,7 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   auto *Tmp1PBD = new (Ctx) PatternBindingDecl(/*StaticLoc*/SourceLoc(),
                                                StaticSpellingKind::None,
                                                /*VarLoc*/SourceLoc(),
-                                               Tmp1PBDPattern, Tmp1Init,
-                                               /*isConditional*/false,
-                                               Get);
+                                               Tmp1PBDPattern, Tmp1Init, Get);
   Body.push_back(Tmp1PBD);
   Body.push_back(Tmp1VD);
 
@@ -1682,7 +1678,6 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
                                                StaticSpellingKind::None,
                                                InitValue->getStartLoc(),
                                                Tmp2PBDPattern, nullptr,
-                                               /*isConditional*/false,
                                                Get);
   Tmp2PBD->setInit(InitValue, /*already type checked*/wasChecked);
   Body.push_back(Tmp2PBD);
@@ -1734,7 +1729,6 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
                                                StaticSpellingKind::None,
                                                /*varloc*/VD->getLoc(),
                                                PBDPattern, /*init*/nullptr,
-                                               /*isConditional*/false,
                                                VD->getDeclContext());
   PBD->setImplicit();
   addMemberToContextIfNeeded(PBD, VD->getDeclContext());

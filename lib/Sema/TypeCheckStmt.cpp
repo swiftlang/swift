@@ -519,8 +519,7 @@ public:
       genPat->setImplicit();
       auto genBinding = new (TC.Context)
           PatternBindingDecl(SourceLoc(), StaticSpellingKind::None,
-                             S->getForLoc(), genPat, getGenerator,
-                             /*conditional*/ false, DC);
+                             S->getForLoc(), genPat, getGenerator, DC);
       genBinding->setImplicit();
       S->setGenerator(genBinding);
     }

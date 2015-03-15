@@ -104,7 +104,7 @@ internal func _parseAsciiAsIntMax(
   let absResultMax = UIntMax(bitPattern: maximum) + (negative ? 1 : 0)
 
   // Parse the result as unsigned
-  if let absResult = _parseAsciiAsUIntMax(absResultText, radix, absResultMax) {
+  if let absResult? = _parseAsciiAsUIntMax(absResultText, radix, absResultMax) {
     return IntMax(bitPattern: negative ? 0 &- absResult : absResult)
   }
   return nil
@@ -122,7 +122,7 @@ extension ${Self} {
   /// "[+-][0-9a-zA-Z]+", or the value it denotes in the given `radix`
   /// is not representable, the result is `nil`.
   public init?(_ text: String, radix: Int = 10) {
-    if let value = _parseAsciiAs${'' if signed else 'U'}IntMax(
+    if let value? = _parseAsciiAs${'' if signed else 'U'}IntMax(
       text.utf16, radix, ${'' if signed else 'U'}IntMax(${Self}.max)) {
       self.init(
         ${'' if Self in (IntMax,UIntMax) else 'truncatingBitPattern:'} value)

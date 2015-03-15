@@ -113,7 +113,7 @@ public func ~> <T : protocol<_Sequence_Type, _ArrayType>>(
   } else {
     var p = UnsafeMutablePointer<T.Generator.Element>(ptr.1)
     var g = source.generate()
-    while let x = g.next() {
+    while let x? = g.next() {
       p++.initialize(x)
     }
   }

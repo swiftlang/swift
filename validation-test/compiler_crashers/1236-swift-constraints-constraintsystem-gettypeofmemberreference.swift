@@ -20,7 +20,7 @@ func a(b: Int = 0) {
 let c = a
 func some<S: SequenceType, T where Optional<T> == S.Generator.Element>(xs : S) -> T? {
 for (mx : T?) in xs {
-if let x = mx {
+if let x? = mx {
 }
 }
 }

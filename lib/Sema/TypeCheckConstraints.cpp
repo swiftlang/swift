@@ -1145,12 +1145,6 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
       InitType = cs.generateConstraints(pattern, Locator);
       if (!InitType)
         return true;
-      
-      // If the pattern binding is conditional, the pattern is bound to the
-      // value inside an Optional on the right-hand side.
-      if (Binding->isConditional()) {
-        InitType = OptionalType::get(InitType);
-      }
 
       // Add a conversion constraint between the types.
       cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
@@ -1167,34 +1161,11 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
       auto &tc = solution.getConstraintSystem().getTypeChecker();
       InitType = solution.simplifyType(tc, InitType);
 
-      // For a conditional expression, the expression should be an optional
-      // prior to coercion.
-      if (Binding->isConditional()) {
-        auto exprType = solution.simplifyType(tc, expr->getType());
-        if (!exprType->getAnyOptionalObjectType()) {
-          // Special-case diagnostics for 'as!' downcasts that should have been
-          // 'as?' conditional downcasts.
-          bool diagnosed = false;
-          if (auto *forced = findForcedDowncast(tc.Context, expr)) {
-            tc.diagnose(forced->getLoc(),
-                        diag::forced_downcast_should_be_conditional,
-                        exprType)
-              .fixItReplace(forced->getExclaimLoc(), "?");
-            diagnosed = true;
-          }
-
-          // If we didn't have a special-case diagnostic, emit a general one.
-          if (!diagnosed) {
-            tc.diagnose(expr->getLoc(),
-                        diag::non_optional_in_conditional_binding);
-          }
-        }
-      }
-      
       // Convert the initializer to the type of the pattern.
       expr = solution.coerceToType(expr, InitType, Locator,
-                                   /*ignoreTopLevelInjection=*/
-                                     Binding->isConditional());
+                                   false
+                                   /*ignoreTopLevelInjection=
+                                     Binding->isConditional()*/);
       if (!expr) {
         return nullptr;
       }
@@ -1206,12 +1177,6 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
       // Apply the solution to the pattern as well.
       Pattern *pattern = Binding->getPattern();
       Type patternType = expr->getType();
-      if (Binding->isConditional()) {
-        patternType = expr->getType()->getAnyOptionalObjectType();
-        assert(patternType
-               && "solution did not find optional type for "
-                  "conditional binding?!");
-      }
       patternType = patternType->getWithoutDefaultArgs(tc.Context);
 
       TypeResolutionOptions options;
@@ -1552,8 +1517,6 @@ bool TypeChecker::typeCheckCondition(StmtCondition &cond, DeclContext *dc) {
       if (r) return true;
     } else {
       auto CB = elt.getBinding();
-      assert(CB && CB->isConditional() &&
-             "non-conditional pattern binding in condition?!");
       if (typeCheckConditionalPatternBinding(CB, dc)) {
         elt = StmtConditionElement();
         return true;

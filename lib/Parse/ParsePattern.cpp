@@ -992,7 +992,12 @@ ParserResult<Pattern> Parser::parseMatchingPatternVarOrLet() {
   assert(Tok.isAny(tok::kw_let, tok::kw_var) && "expects var or let");
   bool isLet = Tok.is(tok::kw_let);
   SourceLoc varLoc = consumeToken();
+  
+  return parseMatchingPatternAsLetOrVar(isLet, varLoc);
+}
 
+ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
+                                                             SourceLoc varLoc) {
   // 'var' and 'let' patterns shouldn't nest.
   if (InVarOrLetPattern)
     diagnose(varLoc, diag::var_pattern_in_var, unsigned(isLet));
@@ -1007,6 +1012,47 @@ ParserResult<Pattern> Parser::parseMatchingPatternVarOrLet() {
   return makeParserResult(new (Context) VarPattern(varLoc, isLet,
                                                    subPattern.get()));
 }
+
+// Swift 1.x supported irrefutable patterns that unwrapped optionals and
+// allowed type annotations.  We specifically handle the common cases of
+// "if let x = foo()" and "if let x : AnyObject = foo()" for good QoI and
+// migration.  These are not valid modern 'if let' sequences: the former
+// isn't refutable, and the later isn't a valid matching pattern.
+//
+ParserResult<Pattern> Parser::
+parseSwift1IfLetPattern(bool isLet, SourceLoc VarLoc) {
+  assert(Tok.is(tok::identifier) && peekToken().isAny(tok::equal, tok::colon) &&
+         "caller didn't check our requirements");
+  
+  Identifier Name;
+  SourceLoc idLoc = consumeIdentifier(&Name);
+
+  // Produce a nice diagnostic - complain about (and rewrite to 'x?').
+  diagnose(idLoc, diag::expected_refutable_pattern_maybe_optional)
+    .fixItInsertAfter(idLoc, "?");
+
+  // If the type annotation is present, parse it and error.
+  SourceLoc ColonLoc;
+  if (consumeIf(tok::colon, ColonLoc)) {
+    auto type = parseType();
+    if (type.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Pattern>();
+    if (type.isNull())
+      return nullptr;
+
+    diagnose(idLoc, diag::refutable_pattern_no_type_annotation)
+      .fixItRemove(SourceRange(ColonLoc, type.get()->getEndLoc()));
+  }
+  
+  // Return a pattern of "let x?".
+  auto result = createBindingFromPattern(idLoc, Name, isLet);
+  result = new (Context) OptionalSomePattern(result, idLoc, true);
+  result = new (Context) VarPattern(VarLoc, isLet, result);
+  
+  return makeParserResult(result);
+}
+
+
 
 // matching-pattern ::= 'is' type
 ParserResult<Pattern> Parser::parseMatchingPatternIs() {

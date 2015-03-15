@@ -327,9 +327,7 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
   PatternBindingDecl *metavarBinding
     = new (Context) PatternBindingDecl(SourceLoc(),
                                        StaticSpellingKind::None,
-                                       E->getStartLoc(), metavarPat, E,
-                                       /*conditional*/ false,
-                                       &SF);
+                                       E->getStartLoc(), metavarPat, E, &SF);
   SF.Decls.push_back(metavarBinding);
 
   // Finally, print the variable's value.
@@ -390,8 +388,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
     = new (Context) PatternBindingDecl(SourceLoc(),
                                        StaticSpellingKind::None,
                                        PBD->getStartLoc(), metavarPat,
-                                       PBD->getInit(), /*conditional*/ false,
-                                       &SF);
+                                       PBD->getInit(), &SF);
 
   auto MVBrace = BraceStmt::create(Context, metavarBinding->getStartLoc(),
                                    ASTNode(metavarBinding),

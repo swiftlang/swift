@@ -212,7 +212,7 @@ public func unsafeDowncast<T: AnyObject>(x: AnyObject) -> T {
 ///   because checking is still performed in debug builds.
 @inline(__always)
 public func unsafeUnwrap<T>(nonEmpty: T?) -> T {
-  if let x = nonEmpty {
+  if let x? = nonEmpty {
     return x
   }
   _debugPreconditionFailure("unsafeUnwrap of nil optional")
@@ -225,7 +225,7 @@ public func unsafeUnwrap<T>(nonEmpty: T?) -> T {
 @inline(__always)
 public // SPI(SwiftExperimental)
 func _unsafeUnwrap<T>(nonEmpty: T?) -> T {
-  if let x = nonEmpty {
+  if let x? = nonEmpty {
     return x
   }
   _sanityCheckFailure("_unsafeUnwrap of nil optional")

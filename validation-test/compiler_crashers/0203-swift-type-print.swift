@@ -84,7 +84,7 @@ f
 e)
 func f<g>()s : S) -> T? {
     for (mx : T?) in xs {
-        if let x = mx {
+        if let x? = mx {
     1 as a=1
 s}
 f

@@ -696,8 +696,8 @@ tests.test("UTF16->String") {
   let v = s.utf16
   for i in indices(v) {
     for j in i..<v.endIndex {      
-      if let si = i.samePositionIn(s) {
-        if let sj = j.samePositionIn(s) {
+      if let si? = i.samePositionIn(s) {
+        if let sj? = j.samePositionIn(s) {
           expectEqual(s[si..<sj], String(v[i..<j])!)
           continue
         }
@@ -712,8 +712,8 @@ tests.test("UTF8->String") {
   let v = s.utf8
   for i in indices(v) {
     for j in i..<v.endIndex {      
-      if let si = i.samePositionIn(s) {
-        if let sj = j.samePositionIn(s) {
+      if let si? = i.samePositionIn(s) {
+        if let sj? = j.samePositionIn(s) {
           expectEqual(s[si..<sj], String(v[i..<j])!)
           continue
         }

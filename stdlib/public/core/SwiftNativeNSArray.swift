@@ -139,7 +139,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
   internal typealias HeapBufferStorage = _HeapBufferStorage<Int, AnyObject>
   
   internal var _heapBufferBridged: HeapBufferStorage? {
-    if let ref: AnyObject =
+    if let ref? =
       _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
       return unsafeBitCast(ref, HeapBufferStorage.self)
     }
@@ -151,7 +151,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
   }
 
   internal func _destroyBridgedStorage(hb: HeapBufferStorage?) {
-    if let bridgedStorage = hb {
+    if let bridgedStorage? = hb {
       let heapBuffer = _HeapBuffer(bridgedStorage)
       let count = heapBuffer.value
       heapBuffer.baseAddress.destroy(count)
@@ -169,7 +169,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
       var buffer: UnsafeBufferPointer<AnyObject>
       
       // If we've already got a buffer of bridged objects, just use it
-      if let bridgedStorage = _heapBufferBridged {
+      if let bridgedStorage? = _heapBufferBridged {
         let heapBuffer = _HeapBuffer(bridgedStorage)
         buffer = UnsafeBufferPointer(
             start: heapBuffer.baseAddress, count: heapBuffer.value)
@@ -177,7 +177,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
 
       // If elements are bridged verbatim, the native buffer is all we
       // need, so return that.
-      else if let buf = _nativeStorage._withVerbatimBridgedUnsafeBuffer(
+      else if let buf? = _nativeStorage._withVerbatimBridgedUnsafeBuffer(
         { $0 }
       ) {
         buffer = buf
@@ -210,7 +210,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
   /// bridging of array elements
   @objc
   internal override var count: Int {
-    if let bridgedStorage = _heapBufferBridged {
+    if let bridgedStorage? = _heapBufferBridged {
       return _HeapBuffer(bridgedStorage).value
     }
 
@@ -232,7 +232,7 @@ internal class _ContiguousArrayStorageBase
   internal override func withUnsafeBufferOfObjects<R>(
     @noescape body: UnsafeBufferPointer<AnyObject> -> R
   ) -> R {
-    if let result = _withVerbatimBridgedUnsafeBuffer(body) {
+    if let result? = _withVerbatimBridgedUnsafeBuffer(body) {
       return result
     }
     _sanityCheckFailure(

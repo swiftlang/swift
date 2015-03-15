@@ -715,24 +715,12 @@ struct ASTNodeBase {};
       auto CB = elt.getBinding();
 
       PrettyStackTraceDecl debugStack("verifying condition binding", CB);
-      if (!CB->isConditional()) {
-        Out << "condition binding is not conditional\n";
-        CB->print(Out);
-        abort();
-      }
       if (!CB->getInit()) {
         Out << "conditional binding does not have initializer\n";
         CB->print(Out);
         abort();
       }
-      auto initOptionalType = CB->getInit()->getType();
-      auto initType = initOptionalType->getAnyOptionalObjectType();
-      if (!initType) {
-        Out << "conditional binding is not of optional type\n";
-        CB->print(Out);
-        abort();
-      }
-      checkSameType(CB->getPattern()->getType(), initType,
+      checkSameType(CB->getPattern()->getType(), CB->getInit()->getType(),
                     "conditional binding type");
     }
     

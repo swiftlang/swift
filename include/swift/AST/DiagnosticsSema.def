@@ -626,6 +626,10 @@ ERROR(pattern_binds_no_variables,sema_tcd,none,
       "%select{property|global variable}0 declaration does not bind any "
       "variables",
       (unsigned))
+ERROR(conditional_pattern_bind_not_refutable,sema_tcd,none,
+      "conditional pattern binding must be refutable; "
+      "did you mean to match an optional?", ())
+
 
 // Generic types
 ERROR(unsupported_generic_nested_in_type,sema_tcd,none,
@@ -1582,12 +1586,6 @@ ERROR(assignment_lhs_is_vardecl,sema_tcs,none,
 
 ERROR(assignment_unresolved_expr,sema_tcs,none,
       "cannot assign to %0 in %1", (Identifier, Identifier))
-
-ERROR(non_optional_in_conditional_binding,sema_tcs,none,
-      "bound value in a conditional binding must be of Optional type", ())
-ERROR(forced_downcast_should_be_conditional,sema_tcs,none,
-      "forced downcast in conditional binding produces non-optional type %0; "
-      "use 'as?' to perform a conditional downcast", (Type))
 
 // ForEach Stmt
 ERROR(sequence_protocol_broken,sema_tcs,none,

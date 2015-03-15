@@ -153,10 +153,10 @@ extension String {
   public init?(_ utf16: UTF16View) {
     let wholeString = String(utf16._core)
     
-    if let start = UTF16Index(
+    if let start? = UTF16Index(
       _offset: utf16._offset
     ).samePositionIn(wholeString) {
-      if let end = UTF16Index(
+      if let end? = UTF16Index(
         _offset: utf16._offset + utf16._length
       ).samePositionIn(wholeString) {
         self = wholeString[start..<end]

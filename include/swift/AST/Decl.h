@@ -299,11 +299,8 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// \brief Whether 'static' or 'class' was used.
     unsigned StaticSpelling : 2;
-
-    /// \brief Whether this pattern binding appears in a conditional statement.
-    unsigned Conditional : 1;
   };
-  enum { NumPatternBindingDeclBits = NumDeclBits + 4 };
+  enum { NumPatternBindingDeclBits = NumDeclBits + 3 };
   static_assert(NumPatternBindingDeclBits <= 32, "fits in an unsigned");
   
   class ValueDeclBitfields {
@@ -1755,7 +1752,6 @@ public:
   PatternBindingDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                      SourceLoc VarLoc,
                      Pattern *Pat, Expr *E,
-                     bool isConditional,
                      DeclContext *Parent)
     : Decl(DeclKind::PatternBinding, Parent),
       StaticLoc(StaticLoc), VarLoc(VarLoc), Pat(nullptr),
@@ -1763,7 +1759,6 @@ public:
     PatternBindingDeclBits.IsStatic = StaticLoc.isValid();
     PatternBindingDeclBits.StaticSpelling =
         static_cast<unsigned>(StaticSpelling);
-    PatternBindingDeclBits.Conditional = isConditional;
     setPattern(Pat);
   }
 
@@ -1786,9 +1781,6 @@ public:
 
   /// Does this binding declare something that requires storage?
   bool hasStorage() const;
-
-  /// Does this binding appear in an 'if' or 'while' condition?
-  bool isConditional() const { return PatternBindingDeclBits.Conditional; }
   
   /// When the pattern binding contains only a single variable with no
   /// destructuring, retrieve that variable.

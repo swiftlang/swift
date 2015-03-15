@@ -75,7 +75,7 @@ public struct SourceLocStack {
 }
 
 func _printStackTrace(stackTrace: SourceLocStack?) {
-  if let s = stackTrace {
+  if let s? = stackTrace {
     println("stacktrace:")
     for i in 0..<s.locs.count {
       let loc = s.locs[s.locs.count - i - 1]
@@ -448,7 +448,7 @@ func _stdlib_installTrapInterceptor()
 
 func _childProcess() {
   _stdlib_installTrapInterceptor()
-  while let line = _stdlib_getline() {
+  while let line? = _stdlib_getline() {
     let parts = line._split(";")
     let testSuiteName = parts[0]
     let testName = parts[1]
@@ -515,7 +515,7 @@ struct _ParentProcess {
     println("\(testSuite.name);\(testName)", &_childStdin)
 
     let currentTest = testSuite._testByName(testName)
-    if let stdinText = currentTest.stdinText {
+    if let stdinText? = currentTest.stdinText {
       print(stdinText, &_childStdin)
     }
     if currentTest.stdinEndsWithEOF {
@@ -554,8 +554,8 @@ struct _ParentProcess {
       }
       if readfds.isset(_childStdout.fd) || errorfds.isset(_childStdout.fd) {
         _childStdout.read()
-        while var line = _childStdout.getline() {
-          if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
+        while var line? = _childStdout.getline() {
+          if let index? = findSubstring(line, _stdlibUnittestStreamPrefix) {
             let controlMessage = line[index..<line.endIndex]._split(";")
             switch controlMessage[1] {
             case "expectCrash":
@@ -581,8 +581,8 @@ struct _ParentProcess {
       }
       if readfds.isset(_childStderr.fd) || errorfds.isset(_childStderr.fd) {
         _childStderr.read()
-        while var line = _childStderr.getline() {
-          if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
+        while var line? = _childStderr.getline() {
+          if let index? = findSubstring(line, _stdlibUnittestStreamPrefix) {
             let controlMessage = line[index..<line.endIndex]._split(";")
             switch controlMessage[1] {
             case "expectCrash":
@@ -637,7 +637,7 @@ struct _ParentProcess {
   }
 
   mutating func run() {
-    if let filter = _filter {
+    if let filter? = _filter {
       println("StdlibUnittest: using filter: \(filter)")
     }
     for testSuite in _allTestSuites {
@@ -646,7 +646,7 @@ struct _ParentProcess {
       var skippedTests = _UnitTestArray<String>()
       for t in testSuite._tests {
         let fullTestName = "\(testSuite.name).\(t.name)"
-        if let filter = _filter {
+        if let filter? = _filter {
           if findSubstring(fullTestName, filter) == nil {
             continue
           }
@@ -840,11 +840,11 @@ public class TestSuite {
   }
 
   func _runTest(testName: String) {
-    if let f = _testSetUpCode {
+    if let f? = _testSetUpCode {
       f()
     }
     _testByName(testName).code()
-    if let f = _testTearDownCode {
+    if let f? = _testTearDownCode {
       f()
     }
   }
@@ -1354,7 +1354,7 @@ public func checkGenerator<
   // Copying a `GeneratorType` is allowed.
   var mutableGen = generator
   var actual: _UnitTestArray<${Element}> = []
-  while let e = mutableGen.next() {
+  while let e? = mutableGen.next() {
     actual.append(e)
   }
   expectEqualSequence(expected, actual, stackTrace: stackTrace.withCurrentLoc())

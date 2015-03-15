@@ -2482,8 +2482,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto binding = createDecl<PatternBindingDecl>(
         SourceLoc(), StaticSpelling.getValue(), SourceLoc(), pattern,
-        /*init=*/nullptr,
-        /*conditional=*/false, getDeclContext(contextID));
+        /*init=*/nullptr, getDeclContext(contextID));
     declOrOffset = binding;
 
     binding->setStatic(isStatic);

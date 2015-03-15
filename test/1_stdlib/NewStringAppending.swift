@@ -16,11 +16,11 @@ func hexAddrVal<T>(x: T) -> String {
 }
 
 func hexAddr(x: AnyObject?) -> String {
-  if let owner: AnyObject = x {
-    if let y = owner as? _StringBuffer._Storage.Storage {
+  if let owner? = x {
+    if let y? = owner as? _StringBuffer._Storage.Storage {
       return ".Native\(hexAddrVal(y))"
     }
-    if let y = owner as? NSString {
+    if let y? = owner as? NSString {
       return ".Cocoa\(hexAddrVal(y))"
     }
     else {
@@ -36,7 +36,7 @@ func repr(x: NSString) -> String {
 
 func repr(x: _StringCore) -> String {
   if x.hasContiguousStorage {
-    if let b = x.nativeBuffer {
+    if let b? = x.nativeBuffer {
     var offset = x.elementWidth == 2
       ? UnsafeMutablePointer(b.start) - x.startUTF16
       : UnsafeMutablePointer(b.start) - x.startASCII
@@ -46,7 +46,7 @@ func repr(x: _StringCore) -> String {
     }
     return "Contiguous(owner: \(hexAddr(x._owner)), count: \(x.count))"
   }
-  else if let b2 = x.cocoaBuffer {
+  else if let b2? = x.cocoaBuffer {
     return "Opaque(buffer: \(hexAddr(b2))[0...\(x.count)])"
   }
   return "?????"

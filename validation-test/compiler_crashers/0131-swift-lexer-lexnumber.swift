@@ -119,7 +119,7 @@ class Foo<T>: NSObject {
 }
 func some<S: SequenceType, T where Optional<T> == S.Generator.Element>(xs : S) -> T? {
     for (mx : T?) in xs {
-        if let x = mx {
+        if let x? = mx {
             return x
         }
     }
