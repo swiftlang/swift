@@ -493,7 +493,9 @@ class ClauseRow {
   friend class ClauseMatrix;
   
   CaseStmt *CaseBlock;
-  CaseLabelItem *CaseLabel;
+  Pattern *CasePattern;
+  Expr *CaseGuardExpr;
+
 
   /// The number of remaining specializations until this row becomes
   /// irrefutable.
@@ -502,10 +504,11 @@ class ClauseRow {
   SmallVector<Pattern*, 4> Columns;
 
 public:
-  ClauseRow(CaseStmt *theCase, CaseLabelItem *caseLabel)
-    : CaseBlock(theCase), CaseLabel(caseLabel) {
-    Columns.push_back(caseLabel->getPattern());
-    if (caseLabel->getGuardExpr())
+  ClauseRow(CaseStmt *theCase, Pattern *CasePattern, Expr *CaseGuardExpr)
+    : CaseBlock(theCase), CasePattern(CasePattern),
+      CaseGuardExpr(CaseGuardExpr) {
+    Columns.push_back(CasePattern);
+    if (CaseGuardExpr)
       NumRemainingSpecializations = AlwaysRefutable;
     else 
       NumRemainingSpecializations = getNumSpecializations(Columns[0]);
@@ -514,9 +517,9 @@ public:
   CaseStmt *getCaseBlock() const {
     return CaseBlock;
   }
-  CaseLabelItem *getCaseLabel() const {
-    return CaseLabel;
-  }
+
+  Pattern *getCasePattern() const { return CasePattern; }
+  Expr *getCaseGuardExpr() const { return CaseGuardExpr; }
 
   ArrayRef<Pattern *> getColumns() const {
     return Columns;
@@ -955,7 +958,7 @@ void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
   while (true) {
     // If there are no rows remaining, then we fail.
     if (firstRow == clauses.rows()) {
-      outerFailure(clauses[clauses.rows() - 1].getCaseLabel()->getPattern());
+      outerFailure(clauses[clauses.rows() - 1].getCasePattern());
       return;
     }
 
@@ -1012,16 +1015,16 @@ void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
   bindRefutablePatterns(clauses[row], args, failure);
 
   // Okay, the rest of the bindings are irrefutable if there isn't a guard.
-  CaseLabelItem *labelItem = clauses[row].getCaseLabel();
-  bool hasGuard = (labelItem->getGuardExpr() != nullptr);
+  Expr *guardExpr = clauses[row].getCaseGuardExpr();
+  bool hasGuard = guardExpr != nullptr;
   assert(!hasGuard || !clauses[row].isIrrefutable());
 
   // Bind the rest of the patterns.
   bindIrrefutablePatterns(clauses[row], args, !hasGuard);
 
   // Emit the guard branch, if it exists.
-  if (Expr *guard = labelItem->getGuardExpr()) {
-    emitGuardBranch(guard, guard, failure);
+  if (guardExpr) {
+    emitGuardBranch(guardExpr, guardExpr, failure);
   }
 
   // Enter the row.
@@ -1922,9 +1925,10 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   std::vector<ClauseRow> clauseRows;
   clauseRows.reserve(S->getCases().size());
   for (auto caseBlock : S->getCases()) {
-    for (const auto &labelItem : caseBlock->getCaseLabelItems()) {
+    for (auto &labelItem : caseBlock->getCaseLabelItems()) {
       clauseRows.emplace_back(caseBlock,
-                              const_cast<CaseLabelItem*>(&labelItem));
+                              const_cast<Pattern*>(labelItem.getPattern()),
+                              const_cast<Expr*>(labelItem.getGuardExpr()));
     }
   }
 
@@ -2069,12 +2073,8 @@ emitStmtConditionWithBodyRec(Stmt *CondStmt, unsigned CondElement,
   thePattern->setType(OptTy);
   thePattern->setElementDecl(gen.getASTContext().getOptionalSomeDecl(OptKind));
   
-  
-  // FIXME: Refactor ClauseRow ctor to not take a CaseLabelItem.
-  CaseLabelItem CaseItem(/*isdefault*/false, thePattern,
-                         /*WhereLoc*/SourceLoc(), /*where expr*/nullptr);
-  
-  clauseRows.emplace_back(/*caseBlock*/nullptr, &CaseItem);
+  clauseRows.emplace_back(/*caseBlock*/nullptr, thePattern,
+                          /*where expr*/nullptr);
   
   // Set the handler that generates code when the match succeeds.  This simply
   // continues emission of the rest of the condition.
