@@ -165,11 +165,6 @@ class ResolvePattern : public ASTVisitor<ResolvePattern,
 public:
   TypeChecker &TC;
   DeclContext *DC;
-  enum InVarOrLetPattern {
-    IVOLP_Nope,
-    IVOLP_InVar,
-    IVOLP_InLet
-  } insideLetVarPattern = IVOLP_Nope;
   
   ResolvePattern(TypeChecker &TC, DeclContext *DC) : TC(TC), DC(DC) {}
   
@@ -189,8 +184,6 @@ public:
   Pattern *visitVarPattern(VarPattern *P) {
     // Keep track of the fact that we're inside of a var/let pattern.  This
     // affects how unqualified identifiers are processed.
-    InVarOrLetPattern Kind = P->isLet() ? IVOLP_InLet : IVOLP_InVar;
-    llvm::SaveAndRestore<InVarOrLetPattern> X(insideLetVarPattern, Kind);
     P->setSubPattern(visit(P->getSubPattern()));
     return P;
   }
@@ -362,18 +355,6 @@ public:
                                                nullptr);
   }
   Pattern *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *ude) {
-    // If we're in the context of a var/let pattern, then this is the
-    // declaration of a pattern binding.
-    if (insideLetVarPattern != IVOLP_Nope) {
-      bool isLet = insideLetVarPattern == IVOLP_InLet;
-      VarDecl *var = new (TC.Context) VarDecl(/*static*/ false,
-                                              /*IsLet*/ isLet,
-                                              ude->getLoc(), ude->getName(),
-                                              Type(), DC);
-      return new (TC.Context) NamedPattern(var);
-    }
-    
-    
     // Try looking up an enum element in context.
     EnumElementDecl *referencedElement
       = lookupUnqualifiedEnumMemberElement(TC, DC, ude->getName());
