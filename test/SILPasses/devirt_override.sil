@@ -51,11 +51,12 @@ bb0:
   %11 = upcast %0 : $MD5 to $Hash
   %21 = unchecked_ref_cast %11 : $Hash to $MD5
   %61 = upcast %21 : $MD5 to $Hash 
-  // CHECK: function_ref @_TFC9hash2_new4Hash6updatefS0_FT3MsgVSs5UInt83CntSi_T_ : $@cc(method) @thin (@owned Hash) -> ()
-  // CHECK: apply {{%[0-9]+}}({{%[0-9]+}}) : $@cc(method) @thin (@owned Hash) -> ()
+  // CHECK-DISABLED: function_ref @_TFC9hash2_new4Hash6updatefS0_FT3MsgVSs5UInt83CntSi_T_ : $@cc(method) @thin (@owned Hash) -> ()
+  // CHECK-DISABLED: apply {{%[0-9]+}}({{%[0-9]+}}) : $@cc(method) @thin (@owned Hash) -> ()
   %62 = class_method %61 : $Hash, #Hash.update!1 : Hash -> () -> () , $@cc(method) @thin (@owned Hash) -> ()
   %135 = apply %62(%61) : $@cc(method) @thin (@owned Hash) -> ()
   %17 = tuple ()
+  // CHECK: return
   return %17 : $()
 }
 
@@ -70,4 +71,67 @@ sil_vtable MD5 {
   #Hash.hash!1: _TFC4test3MD54hashfS0_FT3MsgVSs5UInt8_T_
   #MD5.init!initializer.1: _TFC4test3MD5cfMS0_FT_S0_
   #Hash.update!1: _TFC9hash2_new4Hash6updatefS0_FT3MsgVSs5UInt83CntSi_T_
+}
+
+class C {
+  func doIt()
+}
+
+class D : C {
+  override func doIt()
+}
+
+class E : D {
+  override func doIt()
+}
+
+// CHECK-LABEL: sil @_TFC1b1C4doItfS0_FT_T_
+sil @_TFC1b1C4doItfS0_FT_T_ : $@cc(method) @thin (@owned C) -> () {
+bb0(%0 : $C):
+  strong_release %0 : $C
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @_TFC1b1D4doItfS0_FT_T_
+sil @_TFC1b1D4doItfS0_FT_T_ : $@cc(method) @thin (@owned D) -> () {
+bb0(%0 : $D):
+  strong_release %0 : $D
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK-LABEL: sil @_TFC1b1E4doItfS0_FT_T_
+sil @_TFC1b1E4doItfS0_FT_T_ : $@cc(method) @thin (@owned E) -> () {
+bb0(%0 : $E):
+  strong_release %0 : $E
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK-LABEL: sil @_TF1b3fooFT_T_
+sil @_TF1b3fooFT_T_ : $@thin () -> () {
+bb0:
+  %0 = alloc_ref $E
+  %1 = upcast %0 : $E to $C
+  %2 = unconditional_checked_cast %1 : $C to $D
+  %3 = class_method %2 : $D, #D.doIt!1 : D -> () -> () , $@cc(method) @thin (@owned D) -> ()
+  %4 = apply %3(%2) : $@cc(method) @thin (@owned D) -> ()
+  %5 = tuple ()
+// CHECK: return
+  return %5 : $()
+}
+
+sil_vtable C {
+  #C.doIt!1: _TFC1b1C4doItfS0_FT_T_
+}
+
+sil_vtable D {
+  #C.doIt!1: _TFC1b1D4doItfS0_FT_T_
+}
+
+sil_vtable E {
+  #C.doIt!1: _TFC1b1E4doItfS0_FT_T_
 }

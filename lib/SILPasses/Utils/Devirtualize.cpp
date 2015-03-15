@@ -37,8 +37,8 @@ STATISTIC(NumWitnessDevirt, "Number of witness_method devirtualized");
 /// cannot be determined whether S has a class type or what type that
 /// is.
 static ClassDecl *getClassFromConstructor(SILValue S) {
-  // First strip off casts.
-  S = S.stripCasts();
+  // First strip off upcasts.
+  S = S.stripUpCasts();
 
   // Look for a a static ClassTypes in AllocRefInst or MetatypeInst.
   if (AllocRefInst *ARI = dyn_cast<AllocRefInst>(S))
