@@ -3103,8 +3103,7 @@ static bool existentialConformsToProtocol(TypeChecker &tc, Type type,
 bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
                                      DeclContext *DC, bool InExpression,
                                      ProtocolConformance **Conformance,
-                                     SourceLoc ComplainLoc, 
-                                     Decl *ExplicitConformance) {
+                                     SourceLoc ComplainLoc) {
   if (Conformance)
     *Conformance = nullptr;
   if (!Proto->hasType())
@@ -3178,74 +3177,63 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
       return true;
     }
 
-    // If we're just checking for conformance, we already know the answer.
-    if (!ExplicitConformance) {
-      // If we need to complain, do so.
-      if (ComplainLoc.isValid()) {
-        diagnose(ComplainLoc, diag::type_does_not_conform, T,
-                 Proto->getDeclaredType());
-      } else {
-        recordDependency();
-      }
-
-      return false;
+    // If we need to complain, do so.
+    if (ComplainLoc.isValid()) {
+      diagnose(ComplainLoc, diag::type_does_not_conform, T,
+               Proto->getDeclaredType());
+    } else {
+      recordDependency();
     }
 
-    // For explicit conformance, force the check again.
+    return false;
   }
 
-  // If we're checking for conformance (rather than stating it),
-  // look for the explicit declaration of conformance in the list of protocols.
-  if (!ExplicitConformance) {
-    Module *M = topLevelContext->getParentModule();
-    auto lookupResult = M->lookupConformance(T, Proto, this);
-    switch (lookupResult.getInt()) {
-    case ConformanceKind::Conforms:
-      Context.setConformsTo(canT, Proto, 
-                            ConformanceEntry(lookupResult.getPointer(), true));
+  // Look for the explicit declaration of conformance in the list of protocols.
+  Module *M = topLevelContext->getParentModule();
+  auto lookupResult = M->lookupConformance(T, Proto, this);
+  switch (lookupResult.getInt()) {
+  case ConformanceKind::Conforms:
+    Context.setConformsTo(canT, Proto,
+                          ConformanceEntry(lookupResult.getPointer(), true));
 
-      if (Conformance)
-        *Conformance = lookupResult.getPointer();
-      recordDependency(lookupResult.getPointer());
-      return true;
+    if (Conformance)
+      *Conformance = lookupResult.getPointer();
+    recordDependency(lookupResult.getPointer());
+    return true;
 
-    case ConformanceKind::DoesNotConform:
-      // FIXME: Could try implicit conformance.
-      if (ComplainLoc.isValid()) {
-        diagnose(ComplainLoc, diag::type_does_not_conform,
-                 T, Proto->getDeclaredType());
-      } else {
-        recordDependency();
-      }
-      return false;
-
-    case ConformanceKind::UncheckedConforms:
-      llvm_unreachable("Can't get here!");
+  case ConformanceKind::DoesNotConform:
+    // FIXME: Could try implicit conformance.
+    if (ComplainLoc.isValid()) {
+      diagnose(ComplainLoc, diag::type_does_not_conform,
+               T, Proto->getDeclaredType());
+    } else {
+      recordDependency();
     }
+    return false;
+
+  case ConformanceKind::UncheckedConforms:
+    llvm_unreachable("Can't get here!");
   }
-
-  // Check this protocol's conformance.
-  auto result = checkConformsToProtocol(*this, T, Proto, DC,
-                                        ExplicitConformance, ComplainLoc);
-  assert(result && "Didn't build any protocol conformance");
-  assert(!result->isIncomplete() && "Retrieved incomplete conformance");
-
-  if (Conformance)
-    *Conformance = result;
-  return true;
 }
 
 ProtocolConformance *TypeChecker::resolveConformance(NominalTypeDecl *type,
                                                      ProtocolDecl *protocol,
                                                      ExtensionDecl *ext) {
+  validateDecl(protocol);
+
   auto explicitConformance = ext ? (Decl *)ext : (Decl *)type;
   auto conformanceContext = ext ? (DeclContext *)ext : (DeclContext *)type;
-  ProtocolConformance *conformance = nullptr;
-  bool conforms = conformsToProtocol(type->getDeclaredTypeInContext(), protocol,
-                                     conformanceContext, false, &conformance,
-                                     explicitConformance->getLoc(),
-                                     explicitConformance);
-  return conforms ? conformance : nullptr;
+  Type conformanceType = conformanceContext->getDeclaredTypeInContext();
+
+  CanType canConformanceType = conformanceType->getCanonicalType();
+  if (auto known = Context.getConformsTo(canConformanceType, protocol)) {
+    // Check whether we already know about this conformance.
+    return known->getPointer();
+  }
+
+  return checkConformsToProtocol(*this, conformanceType, protocol,
+                                 conformanceContext, explicitConformance,
+                                 explicitConformance->getLoc());
 }
 
 void TypeChecker::resolveTypeWitness(

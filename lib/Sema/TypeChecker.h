@@ -1090,11 +1090,6 @@ public:
   /// be placed at this location, with notes for each of the protocol
   /// requirements not satisfied.
   ///
-  /// \param ExplicitConformance If non-null, the ExtensionDecl or
-  /// NominalTypeDecl that explicitly declares conformance. If null, an explicit
-  /// conformance will be looked for in the AST, or implicit conformance will
-  /// be checked and diagnosed as a fallback.
-  ///
   /// \returns true if T conforms to the protocol Proto, false otherwise.
   ///
   /// \note If this method returns 'true', it only means that there exists a
@@ -1103,8 +1098,7 @@ public:
   bool conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
                           bool InExpression,
                           ProtocolConformance **Conformance = 0,
-                          SourceLoc ComplainLoc = SourceLoc(),
-                          Decl *ExplicitConformance = nullptr);
+                          SourceLoc ComplainLoc = SourceLoc());
 
   /// Derive an implicit declaration to satisfy a requirement of a derived
   /// protocol conformance.
