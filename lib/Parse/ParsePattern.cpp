@@ -962,6 +962,11 @@ Parser::parsePatternTupleAfterLP(SourceLoc LPLoc) {
                                           EllipsisLoc.isValid(), EllipsisLoc));
 }
 
+
+/// matching-pattern ::= 'is' type
+/// matching-pattern ::= matching-pattern-var
+/// matching-pattern ::= expr
+///
 ParserResult<Pattern> Parser::parseMatchingPattern() {
   // TODO: Since we expect a pattern in this position, we should optimistically
   // parse pattern nodes for productions shared by pattern and expression
@@ -969,13 +974,23 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
   // through the expr parser for ambiguious productions.
 
   // Parse productions that can only be patterns.
-  // matching-pattern ::= matching-pattern-var
-  if (Tok.isAny(tok::kw_var, tok::kw_let))
-    return parseMatchingPatternVarOrLet();
-
+  if (Tok.isAny(tok::kw_var, tok::kw_let)) {
+    assert(Tok.isAny(tok::kw_let, tok::kw_var) && "expects var or let");
+    bool isLet = Tok.is(tok::kw_let);
+    SourceLoc varLoc = consumeToken();
+    
+    return parseMatchingPatternAsLetOrVar(isLet, varLoc);
+  }
+  
   // matching-pattern ::= 'is' type
-  if (Tok.is(tok::kw_is))
-    return parseMatchingPatternIs();
+  if (Tok.is(tok::kw_is)) {
+    SourceLoc isLoc = consumeToken(tok::kw_is);
+    ParserResult<TypeRepr> castType = parseType();
+    if (castType.isNull() || castType.hasCodeCompletion())
+      return nullptr;
+    return makeParserResult(new (Context) IsPattern(isLoc, castType.get(),
+                                                    nullptr));
+  }
 
   // matching-pattern ::= expr
   // Fall back to expression parsing for ambiguous forms. Name lookup will
@@ -987,14 +1002,6 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
     return nullptr;
   
   return makeParserResult(new (Context) ExprPattern(subExpr.get()));
-}
-
-ParserResult<Pattern> Parser::parseMatchingPatternVarOrLet() {
-  assert(Tok.isAny(tok::kw_let, tok::kw_var) && "expects var or let");
-  bool isLet = Tok.is(tok::kw_let);
-  SourceLoc varLoc = consumeToken();
-  
-  return parseMatchingPatternAsLetOrVar(isLet, varLoc);
 }
 
 ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
@@ -1014,6 +1021,7 @@ ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
                                                    subPattern.get()));
 }
 
+
 // Swift 1.x supported irrefutable patterns that unwrapped optionals and
 // allowed type annotations.  We specifically handle the common cases of
 // "if let x = foo()" and "if let x : AnyObject = foo()" for good QoI and
@@ -1027,11 +1035,11 @@ parseSwift1IfLetPattern(bool isLet, SourceLoc VarLoc) {
   
   Identifier Name;
   SourceLoc idLoc = consumeIdentifier(&Name);
-
+  
   // Produce a nice diagnostic - complain about (and rewrite to 'x?').
   diagnose(idLoc, diag::expected_refutable_pattern_maybe_optional)
-    .fixItInsertAfter(idLoc, "?");
-
+  .fixItInsertAfter(idLoc, "?");
+  
   // If the type annotation is present, parse it and error.
   SourceLoc ColonLoc;
   if (consumeIf(tok::colon, ColonLoc)) {
@@ -1040,9 +1048,9 @@ parseSwift1IfLetPattern(bool isLet, SourceLoc VarLoc) {
       return makeParserCodeCompletionResult<Pattern>();
     if (type.isNull())
       return nullptr;
-
+    
     diagnose(idLoc, diag::refutable_pattern_no_type_annotation)
-      .fixItRemove(SourceRange(ColonLoc, type.get()->getEndLoc()));
+    .fixItRemove(SourceRange(ColonLoc, type.get()->getEndLoc()));
   }
   
   // Return a pattern of "let x?".
@@ -1051,18 +1059,6 @@ parseSwift1IfLetPattern(bool isLet, SourceLoc VarLoc) {
   result = new (Context) VarPattern(VarLoc, isLet, result);
   
   return makeParserResult(result);
-}
-
-
-
-// matching-pattern ::= 'is' type
-ParserResult<Pattern> Parser::parseMatchingPatternIs() {
-  SourceLoc isLoc = consumeToken(tok::kw_is);
-  ParserResult<TypeRepr> castType = parseType();
-  if (castType.isNull() || castType.hasCodeCompletion())
-    return nullptr;
-  return makeParserResult(new (Context) IsPattern(isLoc, castType.get(),
-                                                   nullptr));
 }
 
 bool Parser::isOnlyStartOfMatchingPattern() {

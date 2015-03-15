@@ -1018,11 +1018,9 @@ public:
   // Pattern Parsing
 
   ParserResult<Pattern> parseMatchingPattern();
-  ParserResult<Pattern> parseMatchingPatternVarOrLet();
   ParserResult<Pattern> parseMatchingPatternAsLetOrVar(bool isLet,
                                                        SourceLoc VarLoc);
   ParserResult<Pattern> parseSwift1IfLetPattern(bool isLet, SourceLoc VarLoc);
-  ParserResult<Pattern> parseMatchingPatternIs();
   
   /// \brief Determine whether this token can only start a matching pattern
   /// production and not an expression.
