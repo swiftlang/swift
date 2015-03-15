@@ -33,23 +33,10 @@ STATISTIC(NumWitnessDevirt, "Number of witness_method devirtualized");
 //                         Class Method Optimization
 //===----------------------------------------------------------------------===//
 
-/// Return the dynamic class type of the value S, or nullptr if it
-/// cannot be determined whether S has a class type or what type that
-/// is.
-static ClassDecl *getClassFromConstructor(SILValue S) {
-  // First strip off upcasts.
-  S = S.stripUpCasts();
-
-  // Look for a a static ClassTypes in AllocRefInst or MetatypeInst.
-  if (AllocRefInst *ARI = dyn_cast<AllocRefInst>(S))
-    return ARI->getType().getClassOrBoundGenericClass();
-
-  auto *MTI = dyn_cast<MetatypeInst>(S);
-  if (!MTI)
-    return nullptr;
-
-  CanType instTy = MTI->getType().castTo<MetatypeType>().getInstanceType();
-  return instTy.getClassOrBoundGenericClass();
+// Is the value passed in actually an instruction that allows us to infer the
+// correct dynamic type for the value?
+bool isConstructor(SILValue S) {
+  return isa<AllocRefInst>(S) || isa<MetatypeInst>(S);
 }
 
 /// Return bound generic type for the unbound type Superclass,
@@ -158,20 +145,27 @@ getSubstitutionsForSuperclass(SILModule &M, CanSILFunctionType GenCalleeType,
   return AI->getSubstitutions();
 }
 
+static SILFunction *getTargetClassMethod(SILModule &M,
+                                         SILType ClassOrMetatypeType,
+                                         SILDeclRef Member) {
+  if (ClassOrMetatypeType.is<MetatypeType>())
+    ClassOrMetatypeType = ClassOrMetatypeType.getMetatypeInstanceType(M);
+
+  auto *CD = ClassOrMetatypeType.getClassOrBoundGenericClass();
+  return M.lookUpFunctionInVTable(CD, Member);
+}
+
+
 /// \brief Check if it is possible to devirtualize an Apply instruction
 /// and a class member obtained using the class_method instruction into
 /// a direct call to a specific member of a specific class.
 ///
 /// \p AI is the apply to devirtualize.
-/// \p Member is the class member to devirtualize.
-/// \p ClassInstance is the operand for the ClassMethodInst or an alternative
-///    reference (such as downcasted class reference).
-/// \p CD is the class declaration of the class, where the lookup of the member
-///    should be performed.
+/// \p ClassOrMetatypeType is the class type or metatype type we are
+///    devirtualizing for.
 /// return true if it is possible to devirtualize, false - otherwise.
 bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
-                                       SILType ClassInstanceType,
-                                       ClassDecl *CD) {
+                                       SILType ClassOrMetatypeType) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
 
   SILModule &Mod = AI->getModule();
@@ -179,20 +173,17 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
   // Bail if any generic types parameters of the class instance type are
   // unbound.
   // We cannot devirtualize unbound generic calls yet.
-  if (isClassWithUnboundGenericParameters(ClassInstanceType, Mod))
+  if (isClassWithUnboundGenericParameters(ClassOrMetatypeType, Mod))
     return false;
-
-  auto *CMI = cast<ClassMethodInst>(AI->getCallee());
-  auto Member = CMI->getMember();
 
   // First attempt to lookup the origin for our class method. The origin should
   // either be a metatype or an alloc_ref.
-  DEBUG(llvm::dbgs() << "        Origin Type: " << ClassInstanceType);
+  DEBUG(llvm::dbgs() << "        Origin Type: " << ClassOrMetatypeType);
 
-  assert(CD && "Invalid class type");
+  auto *CMI = cast<ClassMethodInst>(AI->getCallee());
 
   // Find the implementation of the member which should be invoked.
-  SILFunction *F = Mod.lookUpFunctionInVTable(CD, Member);
+  auto *F = getTargetClassMethod(Mod, ClassOrMetatypeType, CMI->getMember());
 
   // If we do not find any such function, we have no function to devirtualize
   // to... so bail.
@@ -205,7 +196,7 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
 
   auto Subs = getSubstitutionsForSuperclass(Mod, GenCalleeType,
-                                            ClassInstanceType, AI);
+                                            ClassOrMetatypeType, AI);
 
   // For polymorphic functions, bail if the number of substitutions is
   // not the same as the number of expected generic parameters.
@@ -240,25 +231,22 @@ static SILValue conditionallyCastAddr(SILBuilderWithScope<16> &B,
 /// \brief Devirtualize an apply of a class method.
 ///
 /// \p AI is the apply to devirtualize.
-/// \p ClassInstance is the operand for the ClassMethodInst or an alternative
-///    reference (such as downcasted class reference).
-/// \p CD is the ClassDecl of the type hierarchy we are devirtualizing for.
+/// \p ClassOrMetatype is a class value or metatype value that is the
+///    self parameter of the devirtualized call.
 /// return the new ApplyInst if created one or null.
 ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
-                                          SILValue ClassInstance,
-                                          ClassDecl *CD) {
+                                          SILValue ClassOrMetatype) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
-
-  auto ClassInstanceType = ClassInstance.getType();
 
   SILModule &Mod = AI->getModule();
   auto *CMI = cast<ClassMethodInst>(AI->getCallee());
-  SILFunction *F = Mod.lookUpFunctionInVTable(CD, CMI->getMember());
+  auto ClassOrMetatypeType = ClassOrMetatype.getType();
+  auto *F = getTargetClassMethod(Mod, ClassOrMetatypeType, CMI->getMember());
 
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
 
   auto Subs = getSubstitutionsForSuperclass(Mod, GenCalleeType,
-                                            ClassInstanceType, AI);
+                                            ClassOrMetatypeType, AI);
   auto SubstCalleeType =
     GenCalleeType->substGenericArgs(Mod, Mod.getSwiftModule(), Subs);
 
@@ -279,10 +267,11 @@ ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
   // Add the self argument, upcasting if required because we're
   // calling a base class's method.
   auto SelfParamTy = SubstCalleeType->getSelfParameter().getSILType();
-  if (ClassInstance.getType() == SelfParamTy)
-    NewArgs.push_back(ClassInstance);
+  if (ClassOrMetatypeType == SelfParamTy)
+    NewArgs.push_back(ClassOrMetatype);
   else
-    NewArgs.push_back(B.createUpcast(AI->getLoc(), ClassInstance, SelfParamTy));
+    NewArgs.push_back(B.createUpcast(AI->getLoc(), ClassOrMetatype,
+                                     SelfParamTy));
 
   // If we have a direct return type, make sure we use the subst callee return
   // type. If we have an indirect return type, AI's return type of the empty
@@ -353,11 +342,10 @@ ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
 /// This is a simplified version of devirtualizeClassMethod, which can
 /// be called without the previously prepared DevirtClassMethodInfo.
 ApplyInst *swift::tryDevirtualizeClassMethod(ApplyInst *AI,
-                                             SILValue ClassInstance,
-                                             ClassDecl *CD) {
-  if (!canDevirtualizeClassMethod(AI, ClassInstance.getType(), CD))
+                                             SILValue ClassInstance) {
+  if (!canDevirtualizeClassMethod(AI, ClassInstance.getType()))
     return nullptr;
-  return devirtualizeClassMethod(AI, ClassInstance, CD);
+  return devirtualizeClassMethod(AI, ClassInstance);
 }
 
 
@@ -451,44 +439,50 @@ static ApplyInst *devirtualizeWitnessMethod(ApplyInst *AI,
 //===----------------------------------------------------------------------===//
 
 /// Return the final class decl based on access control information.
-static ClassDecl *getClassFromAccessControl(ClassMethodInst *CMI) {
-  const DeclContext *associatedDC = CMI->getModule().getAssociatedContext();
-  if (!associatedDC) {
-    // Without an associated context, we can't perform any access-based
-    // optimizations.
-    return nullptr;
-  }
+static bool isKnownFinal(SILModule &M, SILDeclRef Member,
+                         SILType ClassOrMetatypeType) {
+  // FIXME: Handle metatypes.
+  if (ClassOrMetatypeType.is<MetatypeType>())
+    return false;
 
-  SILDeclRef Member = CMI->getMember();
+  if (Member.isForeign)
+    return false;
+
+  const DeclContext *AssocDC = M.getAssociatedContext();
+  if (!AssocDC)
+    return false;
+
   FuncDecl *FD = Member.getFuncDecl();
-  SILType ClassType = CMI->getOperand().stripUpCasts().getType();
-  ClassDecl *CD = ClassType.getClassOrBoundGenericClass();
 
-  // Only handle valid non-dynamic non-overridden members.
-  if (!CD || !FD || FD->isInvalid() || FD->isDynamic() || FD->isOverridden())
-    return nullptr;
+  // FIXME: Handle other things like init().
+  if (!FD)
+    return false;
 
   // Only handle members defined within the SILModule's associated context.
-  if (!FD->isChildContextOf(associatedDC))
-    return nullptr;
+  if (!FD->isChildContextOf(AssocDC))
+    return false;
 
-  if (!FD->hasAccessibility())
-    return nullptr;
+  if (FD->isDynamic() || FD->isOverridden())
+    return false;
 
-  // Only consider 'private' members, unless we are in whole-module compilation.
-  switch (FD->getAccessibility()) {
-  case Accessibility::Public:
-    return nullptr;
-  case Accessibility::Internal:
-    if (!CMI->getModule().isWholeModule())
-      return nullptr;
-    break;
-  case Accessibility::Private:
-    break;
-  }
+  auto Access = FD->getAccessibility();
 
-  Type selfTypeInMember = FD->getDeclContext()->getDeclaredTypeInContext();
-  return selfTypeInMember->getClassOrBoundGenericClass();
+  // Publicly accessible functions can be overridden by other modules
+  // unless declared final, in which case we wouldn't have generated
+  // virtual call.
+  if (Access == Accessibility::Public)
+    return false;
+
+  // Private with no known overrides?
+  if (Access == Accessibility::Private)
+    return true;
+
+  assert(Access == Accessibility::Internal &&
+         "Expected all access kinds covered!");
+
+  // Internal with no known overrides? If we have visibility into the
+  // whole module, then we know it is final.
+  return M.isWholeModule();
 }
 
 /// Attempt to devirtualize the given apply if possible, and return a
@@ -522,13 +516,13 @@ ApplyInst *swift::devirtualizeApply(ApplyInst *AI) {
   /// %YY = function_ref @...
   if (auto *CMI = dyn_cast<ClassMethodInst>(AI->getCallee())) {
     // Check if the class member is known to be final.
-    if (ClassDecl *C = getClassFromAccessControl(CMI))
-      return tryDevirtualizeClassMethod(AI, CMI->getOperand(), C);
+    if (isKnownFinal(CMI->getModule(), CMI->getMember(),
+                     CMI->getOperand().getType()))
+      return tryDevirtualizeClassMethod(AI, CMI->getOperand());
 
     // Try to search for the point of construction.
-    if (ClassDecl *C = getClassFromConstructor(CMI->getOperand()))
-      return tryDevirtualizeClassMethod(AI, CMI->getOperand().stripUpCasts(),
-                                        C);
+    if (isConstructor(CMI->getOperand().stripUpCasts()))
+      return tryDevirtualizeClassMethod(AI, CMI->getOperand().stripUpCasts());
   }
 
   return nullptr;

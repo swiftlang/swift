@@ -120,37 +120,13 @@ static ApplyInst *CloneApply(ApplyInst *AI, SILBuilder &Builder) {
   return NAI;
 }
 
-/// Insert monomorphic inline caches for a specific class type \p SubClassTy.
+/// Insert monomorphic inline caches for a specific class or metatype
+/// type \p SubClassTy.
 static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
-                                                SILType SubClassTy) {
-  ClassMethodInst *CMI = cast<ClassMethodInst>(AI->getCallee());
-  SILValue ClassInstance = CMI->getOperand();
-  ClassDecl *CD = SubClassTy.getClassOrBoundGenericClass();
-
-  SILType RealSubClassTy = SubClassTy;
-
-  if (auto *VMTI = dyn_cast<ValueMetatypeInst>(ClassInstance.stripUpCasts())) {
-    if (isa<AnyMetatypeType>(SubClassTy.getSwiftRValueType())) {
-      CD = SubClassTy.getMetatypeInstanceType(AI->getModule())
-               .getClassOrBoundGenericClass();
-    } else {
-      auto InstTy = SubClassTy.getSwiftRValueType();
-      CD = InstTy.getClassOrBoundGenericClass();
-      // Convert instance type to its metatype type.
-      auto EMT = cast<AnyMetatypeType>(VMTI->getType().getSwiftRValueType());
-      auto *MetaTy = MetatypeType::get(InstTy, EMT->getRepresentation());
-      auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
-      RealSubClassTy = SILType::getPrimitiveObjectType(CanMetaTy);
-    }
-  } else {
-    assert(SubClassTy.getClassOrBoundGenericClass() &&
-           "Dest type must be a class type");
-  }
-
+                                                SILType SubType) {
   // Bail if this class_method cannot be devirtualized.
-  if (!canDevirtualizeClassMethod(AI, RealSubClassTy, CD))
+  if (!canDevirtualizeClassMethod(AI, SubType))
     return nullptr;
-
 
   // Create a diamond shaped control flow and a checked_cast_branch
   // instruction that checks the exact type of the object.
@@ -164,7 +140,7 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   SILBasicBlock *Iden = F->createBasicBlock();
   // Virt is the block containing the slow virtual call.
   SILBasicBlock *Virt = F->createBasicBlock();
-  Iden->createBBArg(RealSubClassTy);
+  Iden->createBBArg(SubType);
 
   SILBasicBlock *Continue = Entry->splitBasicBlock(It);
 
@@ -172,13 +148,15 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   // Create the checked_cast_branch instruction that checks at runtime if the
   // class instance is identical to the SILType.
 
+  ClassMethodInst *CMI = cast<ClassMethodInst>(AI->getCallee());
+
   It = Builder.createCheckedCastBranch(AI->getLoc(), /*exact*/ true,
-                                       ClassInstance, RealSubClassTy, Iden,
+                                       CMI->getOperand(), SubType, Iden,
                                        Virt);
 
   SILBuilder VirtBuilder(Virt);
   SILBuilder IdenBuilder(Iden);
-  // This is the class reference downcasted into subclass SubClassTy.
+  // This is the class reference downcasted into subclass SubType.
   SILValue DownCastedClassInstance = Iden->getBBArg(0);
 
   // Try sinking the retain of the class instance into the diamond. This may
@@ -188,8 +166,8 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
     // Try to skip another instruction, in case the class_method came first.
     if (!SRI && It != Entry->begin())
       SRI = dyn_cast<StrongRetainInst>(--It);
-    if (SRI && SRI->getOperand() == ClassInstance) {
-      VirtBuilder.createStrongRetain(SRI->getLoc(), ClassInstance)
+    if (SRI && SRI->getOperand() == CMI->getOperand()) {
+      VirtBuilder.createStrongRetain(SRI->getLoc(), CMI->getOperand())
         ->setDebugScope(SRI->getDebugScope());
       IdenBuilder.createStrongRetain(SRI->getLoc(), DownCastedClassInstance)
         ->setDebugScope(SRI->getDebugScope());
@@ -217,7 +195,7 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   NumInlineCaches++;
 
   // Devirtualize the apply instruction on the identical path.
-  auto *NewAI = devirtualizeClassMethod(IdenAI, DownCastedClassInstance, CD);
+  auto *NewAI = devirtualizeClassMethod(IdenAI, DownCastedClassInstance);
   assert(NewAI && "Expected to be able to devirtualize apply!");
   (void) NewAI;
 
@@ -363,7 +341,7 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
     // try to devirtualize it completely.
     ClassHierarchyAnalysis::ClassList Subs;
     if (isDefaultCaseKnown(CHA, AI, CD, Subs))
-      return bool(tryDevirtualizeClassMethod(AI, SubTypeValue, CD));
+      return bool(tryDevirtualizeClassMethod(AI, SubTypeValue));
 
     DEBUG(llvm::dbgs() << "Inserting monomorphic inline caches for class " <<
           CD->getName() << "\n");
@@ -429,15 +407,24 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
           " and subclass " << S->getName() << "\n");
 
     CanType CanClassType = S->getDeclaredType()->getCanonicalType();
-    SILType InstanceType = SILType::getPrimitiveObjectType(CanClassType);
-    if (!InstanceType.getClassOrBoundGenericClass()) {
+    SILType ClassType = SILType::getPrimitiveObjectType(CanClassType);
+    if (!ClassType.getClassOrBoundGenericClass()) {
       // This subclass cannot be handled. This happens e.g. if it is
       // a generic class.
       NotHandledSubsNum++;
       continue;
     }
 
-    AI = insertMonomorphicInlineCaches(AI, InstanceType);
+    auto ClassOrMetatypeType = ClassType;
+    if (auto EMT = SubType.getAs<AnyMetatypeType>()) {
+      auto InstTy = ClassType.getSwiftRValueType();
+      auto *MetaTy = MetatypeType::get(InstTy, EMT->getRepresentation());
+      auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
+      ClassOrMetatypeType = SILType::getPrimitiveObjectType(CanMetaTy);
+    }
+
+    // Pass the metatype of the subclass.
+    AI = insertMonomorphicInlineCaches(AI, ClassOrMetatypeType);
     if (!AI) {
       NotHandledSubsNum++;
       continue;
@@ -462,7 +449,7 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   // implementation which is not covered by checked_cast_br checks yet.
   // So, it is safe to replace a class_method invocation by
   // a direct call of this remaining implementation.
-  ApplyInst *NewAI = tryDevirtualizeClassMethod(AI, SubTypeValue, CD);
+  ApplyInst *NewAI = tryDevirtualizeClassMethod(AI, SubTypeValue);
   assert(NewAI && "Expected to be able to devirtualize apply!");
   (void) NewAI;
 

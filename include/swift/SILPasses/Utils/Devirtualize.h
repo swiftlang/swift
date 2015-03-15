@@ -33,12 +33,9 @@ namespace swift {
 
 ApplyInst *devirtualizeApply(ApplyInst *AI);
 bool isClassWithUnboundGenericParameters(SILType C, SILModule &M);
-bool canDevirtualizeClassMethod(ApplyInst *AI, SILType ClassInstanceType,
-                                ClassDecl *CD);
-ApplyInst *devirtualizeClassMethod(ApplyInst *AI, SILValue ClassInstance,
-                                   ClassDecl *CD);
-ApplyInst *tryDevirtualizeClassMethod(ApplyInst *AI, SILValue ClassInstance,
-                                      ClassDecl *CD);
+bool canDevirtualizeClassMethod(ApplyInst *AI, SILType ClassInstanceType);
+ApplyInst *devirtualizeClassMethod(ApplyInst *AI, SILValue ClassInstance);
+ApplyInst *tryDevirtualizeClassMethod(ApplyInst *AI, SILValue ClassInstance);
 
 }
 
