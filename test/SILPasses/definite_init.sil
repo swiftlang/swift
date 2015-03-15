@@ -720,13 +720,13 @@ bb0(%0 : $*MyStruct2, %1 : $@thin MyStruct2.Type):
 }
 
 class RootClassWithNontrivialStoredProperties {
-  var x, y: SomeClass
+  var x, y: SomeClass // expected-note {{'self.x' not initialized}}  expected-note 2 {{'self.y' not initialized}}
 
   init()
 }
 
 class DerivedClassWithNontrivialStoredProperties : RootClassWithNontrivialStoredProperties {
-  var a, b: SomeClass
+  var a, b: SomeClass // expected-note {{'self.a' not initialized}} // expected-note 2 {{'self.b' not initialized}}
   override init()
 }
 
@@ -779,6 +779,7 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   store %0 to %4 : $*DerivedClassWithNontrivialStoredProperties
 
   destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties // expected-error{{all stored properties of a class instance must be initialized before returning nil from an initializer}}
+  // expected-note@-1 {{super.init must be called before returning nil}}
   dealloc_stack %1#0 : $*@local_storage DerivedClassWithNontrivialStoredProperties
 
   %13 = tuple ()
@@ -813,6 +814,7 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   assign %8 to %10 : $*SomeClass
 
   destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties // expected-error{{all stored properties of a class instance must be initialized before returning nil from an initializer}}
+  // expected-note@-1 {{super.init must be called before returning nil}}
   dealloc_stack %1#0 : $*@local_storage DerivedClassWithNontrivialStoredProperties
 
   %13 = tuple ()
@@ -831,7 +833,7 @@ bb0(%0 : $RootClassWithNontrivialStoredProperties):
   %2 = alloc_box $RootClassWithNontrivialStoredProperties
   %4 = mark_uninitialized [delegatingself] %2#1 : $*RootClassWithNontrivialStoredProperties
   store %0 to %4 : $*RootClassWithNontrivialStoredProperties
-  strong_release %2#0 : $Builtin.NativeObject  // expected-error {{all stored properties of a class instance must be initialized before returning nil from an initializer}}
+  strong_release %2#0 : $Builtin.NativeObject  // expected-error {{failable convenience initializer must delegate to self.init() before returning nil}}
 
   %13 = tuple ()
   return %13 : $()
@@ -850,7 +852,7 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   %4 = mark_uninitialized [delegatingself] %2#1 : $*DerivedClassWithNontrivialStoredProperties
   store %0 to %4 : $*DerivedClassWithNontrivialStoredProperties
 
-  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties // expected-error{{all stored properties of a class instance must be initialized before returning nil from an initializer}}
+  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties // expected-error{{failable convenience initializer must delegate to self.init() before returning nil}}
   dealloc_stack %2#0 : $*@local_storage DerivedClassWithNontrivialStoredProperties
 
   %13 = tuple ()
