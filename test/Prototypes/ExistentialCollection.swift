@@ -210,10 +210,7 @@ public func ~> <T>(source: ForwardCollection<T>, _:(_Count,()))
   return source._count()
 }
 
-// FIXME: _InitializeTo doesn't have a public init, so outside the
-// standard library we need to create a layout-compatible type and
-// bitcast it.
-internal struct _InitializeToHack {}
+extension _InitializeTo { init() {} }
 
 final internal class ForwardCollectionImpl<Base: CollectionType>
 : ForwardCollection<Base.Generator.Element> {
@@ -245,12 +242,7 @@ final internal class ForwardCollectionImpl<Base: CollectionType>
     // FIXME: can't pass UnsafeMutablePointer<Element>, which would be
     // a dependent struct, pending <rdar://20164041>, thus the pointer
     // cast.
-    base~>(
-      // FIXME: _InitializeTo doesn't have a public init, so outside
-      // the standard library we need to create a layout-compatible
-      // type and bitcast it.
-      unsafeBitCast(_InitializeToHack(), _InitializeTo.self),
-      UnsafeMutablePointer(ptr))
+    base~>(_InitializeTo(), UnsafeMutablePointer(ptr))
   }
 
   //===--- CollectionType ~> operations -----------------------------------===//
