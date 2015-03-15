@@ -19,80 +19,80 @@ internal func _abstract(file: StaticString = __FILE__, line: UWord = __LINE__) {
 public class Generator<T> : GeneratorType {
   public func next() -> T? {_abstract()}
   static public func make<
-    Core: GeneratorType
-  >(core: Core) -> Generator<Core.Element> {
-    return _Generator(core)
+    Base: GeneratorType
+  >(base: Base) -> Generator<Base.Element> {
+    return _Generator(base)
   }
 }
 
-internal final class _Generator<Core: GeneratorType> : Generator<Core.Element> {
-  init(_ core: Core) { self.core = core }
-  override func next() -> Core.Element? { return core.next() }
-  var core: Core
+internal final class _Generator<Base: GeneratorType> : Generator<Base.Element> {
+  init(_ base: Base) { self.base = base }
+  override func next() -> Base.Element? { return base.next() }
+  var base: Base
 }
 
 internal final class _ForwardIndexStorage<
-  CoreIndex: ForwardIndexType
+  BaseIndex: ForwardIndexType
 > : ForwardIndex._StorageBase {
   internal typealias Super = ForwardIndex._StorageBase
   
-  internal init(_ core: CoreIndex) {
-    self.core = core
+  internal init(_ base: BaseIndex) {
+    self.base = base
   }
   
   internal override func successor() -> Super {
-    return _ForwardIndexStorage(self.core.successor())
+    return _ForwardIndexStorage(self.base.successor())
   }
   
-  internal func unsafeUnbox(other: Super) -> CoreIndex {
-    return (unsafeDowncast(other) as _ForwardIndexStorage).core
+  internal func unsafeUnbox(other: Super) -> BaseIndex {
+    return (unsafeDowncast(other) as _ForwardIndexStorage).base
   }
   
   internal override func equals(other: Super) -> Bool {
-    return core == unsafeUnbox(other)
+    return base == unsafeUnbox(other)
   }
 
   internal override func _distanceTo(other: Super) -> ForwardIndex.Distance {
-    return numericCast(distance(core, unsafeUnbox(other)))
+    return numericCast(distance(base, unsafeUnbox(other)))
   }
   
   internal override func _advancedBy(n: ForwardIndex.Distance) -> Super {
-    return _ForwardIndexStorage(advance(core, numericCast(n)))
+    return _ForwardIndexStorage(advance(base, numericCast(n)))
     
   }
   internal override func _advancedBy(
     n: ForwardIndex.Distance, _ limit: Super) -> Super {
     return _ForwardIndexStorage(
-      advance(core, numericCast(n), unsafeUnbox(limit)))
+      advance(base, numericCast(n), unsafeUnbox(limit)))
   }
   
   
   internal // private
-  let core: CoreIndex
+  let base: BaseIndex
 }
 
 internal class _ForwardIndexStorageBase {
-  typealias _StorageBase = _ForwardIndexStorageBase
+  typealias _Self = _ForwardIndexStorageBase
   typealias Distance = ForwardIndex.Distance
   
-    final var typeID: Int {
-      return unsafeBitCast(self.dynamicType, Int.self)
-    }
-    
-    internal func successor() -> _StorageBase {_abstract()}
-    internal func equals(other: _StorageBase) -> Bool {_abstract()}
-    internal func _distanceTo(other: _StorageBase) -> Distance {_abstract()}
-    internal func _advancedBy(distance: Distance) -> _StorageBase {_abstract()}
-    internal func _advancedBy(
-      distance: Distance, _ limit: _StorageBase) -> _StorageBase {_abstract()}
+  final var typeID: Int {
+    return unsafeBitCast(self.dynamicType, Int.self)
   }
+  
+  internal func successor() -> _Self {_abstract()}
+  internal func equals(other: _Self) -> Bool {_abstract()}
+  internal func _distanceTo(other: _Self) -> Distance {_abstract()}
+  internal func _advancedBy(distance: Distance) -> _Self {_abstract()}
+  internal func _advancedBy(
+    distance: Distance, _ limit: _Self) -> _Self {_abstract()}
+}
 
 public struct ForwardIndex : ForwardIndexType {
   public typealias Distance = IntMax
   typealias _StorageBase = _ForwardIndexStorageBase
   
-  public init<CoreIndex: ForwardIndexType>(_ core: CoreIndex) {
-    _storage = _ForwardIndexStorage(core)
+  public init<BaseIndex: ForwardIndexType>(_ base: BaseIndex) {
+    _storage = _ForwardIndexStorage(base)
   }
   
   public func successor() -> ForwardIndex {
@@ -101,7 +101,7 @@ public struct ForwardIndex : ForwardIndexType {
   
   //===--- private --------------------------------------------------------===//
   internal func _unbox<T: ForwardIndexType>() -> T {
-    return (_storage as! _ForwardIndexStorage<T>).core
+    return (_storage as! _ForwardIndexStorage<T>).base
   }
   
   internal var _typeID: Int {
@@ -120,7 +120,7 @@ public func ~> (
 ) -> ForwardIndex.Distance {
   precondition(
     start._typeID == other.1._typeID,
-    "distance: core index types differ.")
+    "distance: base index types differ.")
   return start._storage._distanceTo(other.1._storage)
 }
 
@@ -134,12 +134,12 @@ public func ~> (
   start:ForwardIndex, args : (_Advance, (ForwardIndex.Distance, ForwardIndex))
 ) -> ForwardIndex {
   precondition(
-    start._typeID == args.1.1._typeID, "advance: core index types differ.")
+    start._typeID == args.1.1._typeID, "advance: base index types differ.")
   return ForwardIndex(start._storage._advancedBy(args.1.0, args.1.1._storage))
 }
 
 public func == (lhs: ForwardIndex, rhs: ForwardIndex) -> Bool {
-  precondition(lhs._typeID == rhs._typeID, "core index types differ.")
+  precondition(lhs._typeID == rhs._typeID, "base index types differ.")
   return lhs._storage.equals(rhs._storage)
 }
 
@@ -150,11 +150,11 @@ public class ForwardCollection<T> : CollectionType {
   public func generate() -> Generator<T> {_abstract()}
 
   public static func make<
-    Core: CollectionType where Core.Generator.Element == T
+    Base: CollectionType where Base.Generator.Element == T
   >(
-    core: Core
+    base: Base
   ) -> ForwardCollection<T> {
-    return ForwardCollectionImpl(core)
+    return ForwardCollectionImpl(base)
   }
   //===--- private --------------------------------------------------------===//
   //===--------------------------------------------------------------------===//
@@ -212,18 +212,18 @@ public func ~> <T>(source: ForwardCollection<T>, _:(_Count,()))
 // bitcast it.
 internal struct _InitializeToHack {}
 
-final internal class ForwardCollectionImpl<Core: CollectionType>
-: ForwardCollection<Core.Generator.Element> {
-  internal typealias Element = Core.Generator.Element
+final internal class ForwardCollectionImpl<Base: CollectionType>
+: ForwardCollection<Base.Generator.Element> {
+  internal typealias Element = Base.Generator.Element
   
-  internal init(_ core: Core) { self.core = core }
-  override var startIndex: ForwardIndex { return ForwardIndex(core.startIndex) }
-  override var endIndex: ForwardIndex { return ForwardIndex(core.endIndex) }
+  internal init(_ base: Base) { self.base = base }
+  override var startIndex: ForwardIndex { return ForwardIndex(base.startIndex) }
+  override var endIndex: ForwardIndex { return ForwardIndex(base.endIndex) }
   override subscript(index: ForwardIndex) -> Element {
-    return core[index._unbox()]
+    return base[index._unbox()]
   }
   override func generate() -> Generator<Element> {
-    return Generator<Element>.make(core.generate())
+    return Generator<Element>.make(base.generate())
   }
   //===--- private --------------------------------------------------------===//
   //===--------------------------------------------------------------------===//
@@ -234,7 +234,7 @@ final internal class ForwardCollectionImpl<Core: CollectionType>
   override func _copyToNativeArrayBuffer() -> AnyObject {
     // FIXME: can't return _ContiguousArrayBuffer<T>, which would be a
     // dependent struct, pending <rdar://20164041>
-    return ContiguousArray(core)._buffer.owner
+    return ContiguousArray(base)._buffer.owner
   }
   
   /// Copy a Sequence into an array.
@@ -242,7 +242,7 @@ final internal class ForwardCollectionImpl<Core: CollectionType>
     // FIXME: can't pass UnsafeMutablePointer<Element>, which would be
     // a dependent struct, pending <rdar://20164041>, thus the pointer
     // cast.
-    core~>(
+    base~>(
       // FIXME: _InitializeTo doesn't have a public init, so outside
       // the standard library we need to create a layout-compatible
       // type and bitcast it.
@@ -252,11 +252,11 @@ final internal class ForwardCollectionImpl<Core: CollectionType>
 
   //===--- CollectionType ~> operations -----------------------------------===//
   override internal func _count() -> ForwardIndex.Distance {
-    return numericCast(count(core))
+    return numericCast(count(base))
   }
 
   //===--- stored properties ----------------------------------------------===//
-  internal let core: Core
+  internal let base: Base
 }
 
 //===--- tests ------------------------------------------------------------===//
