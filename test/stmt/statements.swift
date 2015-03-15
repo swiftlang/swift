@@ -127,6 +127,9 @@ func for_loop() {
   // expected-error@+2{{expected an attribute name}}
   // expected-error@+1{{braced block of statements is an unused closure}}
   for @ {}
+
+  // <rdar://problem/17462274> Is increment in for loop optional?
+  for (var i = 0; i < 10; ) {}
 }
 
 break // expected-error {{'break' is only allowed inside a loop}}

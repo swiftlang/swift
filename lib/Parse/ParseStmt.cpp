@@ -1329,7 +1329,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
   if (parseToken(tok::semi, Semi2Loc, diag::expected_semi_for_stmt))
     Status.setIsParseError();
 
-  if (Tok.isNot(tok::l_brace)) {
+  if (Tok.isNot(tok::l_brace, tok::r_paren)) {
     SmallVector<Expr *, 1> ThirdExprs;
 
     // Parse the first expression.
