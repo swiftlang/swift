@@ -78,7 +78,7 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
         // If the protocol contains the member we're looking for, force the
         // conformance to be derived.
         // FIXME: We don't actually need to emit the definitions here.
-        if (conformsToProtocol(nominalDecl->getDeclaredType(), proto, dc,
+        if (conformsToProtocol(nominalDecl->getDeclaredTypeInContext(), proto, dc,
                                isKnownPrivate))
           anyChange = true;
 

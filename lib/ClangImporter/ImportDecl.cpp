@@ -1200,7 +1200,7 @@ namespace {
       Impl.registerExternalDecl(theClass);
 
       SmallVector<ProtocolDecl *, 4> protocols;
-      theClass->getImplicitProtocols(protocols);
+      theClass->getImplicitProtocols(Impl.getTypeResolver(), protocols);
       addObjCProtocolConformances(theClass, protocols);
 
       // Look for bridging attributes on the clang record.  We can
@@ -3829,7 +3829,7 @@ namespace {
       SmallVector<ProtocolDecl *, 4> protocols;
       llvm::SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-        nominal->getImplicitProtocols(protocols);
+        nominal->getImplicitProtocols(Impl.getTypeResolver(), protocols);
         knownProtocols.insert(protocols.begin(), protocols.end());
       }
 
