@@ -2058,10 +2058,6 @@ emitStmtConditionWithBodyRec(Stmt *CondStmt, unsigned CondElement,
   ManagedValue subjectMV = gen.emitRValueAsSingleValue(PBD->getInit());
   auto subject = ConsumableManagedValue::forOwned(subjectMV);
   
-  // Add a row for the pattern we want to match against.
-  std::vector<ClauseRow> clauseRows;
-  clauseRows.reserve(1);
-
   // if-let conditions implicitly have an OptionalSome wrapping the pattern
   // that is explicitly written.
   auto OptTy = PBD->getInit()->getType();
@@ -2073,8 +2069,7 @@ emitStmtConditionWithBodyRec(Stmt *CondStmt, unsigned CondElement,
   thePattern->setType(OptTy);
   thePattern->setElementDecl(gen.getASTContext().getOptionalSomeDecl(OptKind));
   
-  clauseRows.emplace_back(/*caseBlock*/nullptr, thePattern,
-                          /*where expr*/nullptr);
+  ClauseRow row(/*caseBlock*/nullptr, thePattern, /*where expr*/nullptr);
   
   // Set the handler that generates code when the match succeeds.  This simply
   // continues emission of the rest of the condition.
@@ -2093,7 +2088,7 @@ emitStmtConditionWithBodyRec(Stmt *CondStmt, unsigned CondElement,
   
   // Finally, emit the pattern binding, and recursively emit the rest of the
   // condition and the body of the statement.
-  ClauseMatrix clauses(clauseRows);
+  ClauseMatrix clauses(row);
   emission.emitDispatch(clauses, subject, matchFailure);
   assert(!gen.B.hasValidInsertionPoint());
   
