@@ -25,7 +25,7 @@ sil @_TFC4test3MD54hashfS0_FT3MsgVSs5UInt8_T_ : $@cc(method) @thin (@owned MD5) 
 sil @_TFC4test4Hash4hashfS0_FT3MsgVSs5UInt8_T_ : $@cc(method) @thin (@owned Hash) -> ()
 sil @_TFC9hash2_new4Hash6updatefS0_FT3MsgVSs5UInt83CntSi_T_ : $@cc(method) @thin (@owned Hash) -> ()
 
-// CHECK_LABEL: @_TF4test8testHashFT_T_
+// CHECK-LABEL: @_TF4test8testHashFT_T_
 sil @_TF4test8testHashFT_T_ : $@thin () -> () {
 bb0:
   %0 = alloc_ref $MD5
@@ -44,7 +44,7 @@ bb0:
   return %17 : $()
 }
 
-// CHECK_LABEL: @test_unchecked_ref
+// CHECK-LABEL: @test_unchecked_ref
 sil @test_unchecked_ref : $@thin () -> () {
 bb0:
   %0 = alloc_ref $MD5
