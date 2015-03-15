@@ -154,10 +154,15 @@ ERROR(assignment_to_immutable_value,sil_analysis,none,
       "immutable value '%0' may not be assigned to",
       (StringRef))
 
-
+ERROR(self_init_must_be_called_before_failure,sil_analysis,none,
+      "failable convenience initializer must delegate to self.init() before "
+      "returning nil", ())
 ERROR(object_not_fully_initialized_before_failure,sil_analysis,none,
       "all stored properties of a class instance must be initialized before "
       "returning nil from an initializer", ())
+NOTE(must_call_super_init_failable_init,sil_analysis,none,
+      "super.init must be called before returning nil", ())
+
 
 // Control flow diagnostics.
 ERROR(missing_return,sil_analysis,none,

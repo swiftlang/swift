@@ -1283,9 +1283,30 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
   // Right now we don't fully support cleaning up a partially initialized object
   // after a failure.  Handle this by only allowing an early 'return nil' in an
   // initializer after all properties are initialized.
-  if (TheMemory.isClassInitSelf())
-    diagnose(Module, Release->getLoc(),
-             diag::object_not_fully_initialized_before_failure);
+  if (TheMemory.isClassInitSelf()) {
+    // If this is a convenience initializer, report that self.init() must be
+    // called.
+    if (TheMemory.isDelegatingInit()) {
+      diagnose(Module, Release->getLoc(),
+               diag::self_init_must_be_called_before_failure);
+    } else {
+      // Otherwise all members must be initialized (including the base class, if
+      // present).
+      diagnose(Module, Release->getLoc(),
+               diag::object_not_fully_initialized_before_failure);
+      
+      // Note each of the members that isn't initialized.
+      DIMemoryUse Use(Release, DIUseKind::Load, 0, TheMemory.NumElements);
+      noteUninitializedMembers(Use);
+      
+      // If we're tracking the state of super.init (i.e., in a derived class)
+      // then report on failure to call super.init as well.
+      if (TheMemory.isAnyDerivedClassSelf() &&
+          Availability.get(Availability.size()-1) != DIKind::Yes)
+        diagnose(Module, Release->getLoc(),
+                 diag::must_call_super_init_failable_init);
+    }
+  }
 
   // If it is all 'no' then we can handle is specially without conditional code.
   if (Availability.isAllNo()) {

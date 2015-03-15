@@ -42,11 +42,12 @@ struct Struct {
 // TODO: We ought to be able to for native Swift classes.
 
 class RootClass {
-  let x, y: Int
+  let x : Int  // expected-note {{'self.x' not initialized}}
+  let y: Int  // expected-note 2 {{'self.y' not initialized}}
 
   init() { x = 0; y = 0 }
 
-  convenience init?(failBeforeDelegation: Bool) {  // expected-error{{properties of a class instance must be initialized before returning nil}}
+  convenience init?(failBeforeDelegation: Bool) {  // expected-error{{failable convenience initializer must delegate to self.init() before returning nil}}
     if failBeforeDelegation { return nil }
     self.init()
   }
@@ -71,7 +72,8 @@ class RootClass {
     return nil // OK
   }
 
-  convenience init?(failBeforeFailableDelegation: Bool) {  // expected-error{{properties of a class instance must be initialized before returning nil}}
+  convenience init?(failBeforeFailableDelegation: Bool) {
+    // expected-error@-1{{failable convenience initializer must delegate to self.init() before returning nil}}
     if failBeforeFailableDelegation { return nil }
     self.init(failBeforeInitialization: ())
   }
@@ -83,18 +85,22 @@ class RootClass {
 }
 
 class SubClass: RootClass {
-  let z: Int
+  let z: Int   // expected-note {{'self.z' not initialized}}
 
   override init() {
     z = 0
     super.init()
   }
 
-  override init?(failBeforeInitialization: ()) {   // expected-error{{properties of a class instance must be initialized before returning nil}}
+  override init?(failBeforeInitialization: ()) {
+    // expected-error@-1{{properties of a class instance must be initialized before returning nil}}
+    // expected-note@-2{{super.init must be called before returning nil}}
     return nil
   }
 
-  init?(failBeforeSuperInitialization: ()) {  // expected-error{{properties of a class instance must be initialized before returning nil}}
+  init?(failBeforeSuperInitialization: ()) {
+    // expected-error@-1{{properties of a class instance must be initialized before returning nil}}
+    // expected-note@-2{{super.init must be called before returning nil}}
     z = 0
     return nil
   }
@@ -105,7 +111,9 @@ class SubClass: RootClass {
     return nil // OK
   }
 
-  init?(failBeforeFailableSuperInit: Bool) {  // expected-error{{properties of a class instance must be initialized before returning nil}}
+  init?(failBeforeFailableSuperInit: Bool) {
+    // expected-error@-1{{properties of a class instance must be initialized before returning nil}}
+    // expected-note@-2{{super.init must be called before returning nil}}
     z = 0
     if failBeforeFailableSuperInit { return nil }
     super.init(failBeforeInitialization: ())
@@ -117,7 +125,8 @@ class SubClass: RootClass {
     return nil // OK
   }
 
-  convenience init?(failBeforeDelegation: Bool) {  // expected-error{{properties of a class instance must be initialized before returning nil}}
+  convenience init?(failBeforeDelegation: Bool) {
+    // expected-error@-1{{failable convenience initializer must delegate to self.init() before returning nil}}
     if failBeforeDelegation { return nil }
     self.init()
   }
@@ -127,7 +136,8 @@ class SubClass: RootClass {
     return nil // OK
   }
 
-  convenience init?(failBeforeFailableDelegation: Bool) {  // expected-error{{properties of a class instance must be initialized before returning nil}}
+  convenience init?(failBeforeFailableDelegation: Bool) {
+    // expected-error@-1{{failable convenience initializer must delegate to self.init() before returning nil}}
     if failBeforeFailableDelegation { return nil }
     self.init(failBeforeInitialization: ())
   }
