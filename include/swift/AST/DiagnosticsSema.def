@@ -1621,6 +1621,10 @@ ERROR(fallthrough_into_case_with_var_binding,sema_tcs,none,
 // Type Check Patterns
 //------------------------------------------------------------------------------
 
+ERROR(bad_typed_pattern,sema_tcp,none,
+      "typed patterns cannot be nested inside other patterns", ())
+
+
 ERROR(cannot_infer_type_for_pattern,sema_tcp,none,
       "type annotation missing in pattern", ())
 ERROR(pattern_type_mismatch_context,sema_tcp,none,

@@ -550,6 +550,17 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   if (!resolver)
     resolver = &defaultResolver;
 
+  // Verify typed patterns aren't in here.
+  if (!isa<VarPattern>(P) && !isa<TypedPattern>(P) &&
+      (!(options.toRaw() & (TR_ImmediateFunctionInput|TR_FunctionInput)) ||
+       !(isa<TuplePattern>(P) || isa<ParenPattern>(P)))) {
+    P->forEachNode([&](Pattern *Node) {
+      if (auto *TP = dyn_cast<TypedPattern>(Node))
+        diagnose(TP->getLoc(), diag::bad_typed_pattern);
+    });
+  }
+  
+  
   TypeResolutionOptions subOptions = options - TR_Variadic;
   switch (P->getKind()) {
   // Type-check paren patterns by checking the sub-pattern and
@@ -841,9 +852,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
         !(options & TR_EnumerationVariable)) {
       diagnose(NP->getLoc(), diag::type_inferred_to_undesirable_type,
                NP->getDecl()->getName(), type, NP->getDecl()->isLet());
-
-      diagnose(NP->getLoc(), diag::add_explicit_type_annotation_to_silence)
-        .fixItInsertAfter(NP->getLoc(), ": " + type.getString());
+      diagnose(NP->getLoc(), diag::add_explicit_type_annotation_to_silence);
     }
 
     return false;
