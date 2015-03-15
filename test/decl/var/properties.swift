@@ -220,7 +220,7 @@ var x2 { // expected-error{{computed property must have an explicit type}} expec
   }
 }
 
-var (x3: Int) { // expected-error{{getter/setter can only be defined for a single variable}}
+var (x3): X { // expected-error{{getter/setter can only be defined for a single variable}}
   get {
     return _x
   }

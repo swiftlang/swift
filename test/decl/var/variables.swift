@@ -8,8 +8,8 @@ var t7, t8 : Int
 var t9, t10 = 20 // expected-error {{type annotation missing in pattern}}
 var t11, t12 : Int = 20 // expected-error {{type annotation missing in pattern}}
 var t13 = 2.0, t14 : Int
-var (x : Int = 123, // expected-error {{default argument is only permitted for a non-curried function parameter}}
-     y : Int = 456) // expected-error{{default argument is only permitted for a non-curried function parameter}}
+var (x = 123, // expected-error {{default argument is only permitted for a non-curried function parameter}}
+     y = 456) : (Int,Int) // expected-error{{default argument is only permitted for a non-curried function parameter}}
 var bfx : Int, bfy : Int
 
 var _ = 10
@@ -19,11 +19,11 @@ func _(x: Int) {} // expected-error {{expected identifier in function declaratio
 
 var self1 = self1 // expected-error {{variable used within its own initial value}}
 var self2 : Int = self2 // expected-error {{variable used within its own initial value}}
-var (self3 : Int) = self3 // expected-error {{variable used within its own initial value}}
+var (self3) : Int = self3 // expected-error {{variable used within its own initial value}}
 var (self4) : Int = self4 // expected-error {{variable used within its own initial value}}
 var self5 = self5 + self5 // expected-error 2 {{variable used within its own initial value}}
 var self6 = !self6 // expected-error {{variable used within its own initial value}}
-var (self7a : Int, self7b : Int) = (self7b, self7a) // expected-error 2 {{variable used within its own initial value}}
+var (self7a, self7b) = (self7b, self7a) // expected-error 2 {{variable used within its own initial value}}
 
 var self8 = 0
 func testShadowing() {
@@ -47,7 +47,7 @@ var ao2 = ao1
 
 var aot1 : AnyObject.Type
 var aot2 = aot1          // expected-warning {{variable 'aot2' inferred to have type 'AnyObject.Type', which may be unexpected}} \
-                       // expected-note {{add an explicit type annotation to silence this warning}}{{9-9=: AnyObject.Type}}
+                       // expected-note {{add an explicit type annotation to silence this warning}}
 
 
 for item in [AnyObject]() {  // No warning in for-each loop.

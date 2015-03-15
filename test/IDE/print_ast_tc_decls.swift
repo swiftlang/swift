@@ -685,8 +685,8 @@ class d0250_ExplodePattern {
 
   var instanceVar4 = FooStruct()
   var (instanceVar5, instanceVar6) = (FooStruct(), FooStruct())
-  var (instanceVar7, instanceVar8: FooStruct) = (FooStruct(), FooStruct())
-  var (instanceVar9, instanceVar10: FooStruct) : (FooStruct, FooStruct) = (FooStruct(), FooStruct())
+  var (instanceVar7, instanceVar8) = (FooStruct(), FooStruct())
+  var (instanceVar9, instanceVar10) : (FooStruct, FooStruct) = (FooStruct(), FooStruct())
   final var (instanceVar11, instanceVar12) = (FooStruct(), FooStruct())
 // PASS_EXPLODE_PATTERN: {{^}}  var instanceVar4: FooStruct{{$}}
 // PASS_EXPLODE_PATTERN: {{^}}  var instanceVar5: FooStruct{{$}}
@@ -707,8 +707,8 @@ class d0250_ExplodePattern {
 
   let instanceLet4 = FooStruct()
   let (instanceLet5, instanceLet6) = (FooStruct(), FooStruct())
-  let (instanceLet7, instanceLet8: FooStruct) = (FooStruct(), FooStruct())
-  let (instanceLet9, instanceLet10: FooStruct) : (FooStruct, FooStruct) = (FooStruct(), FooStruct())
+  let (instanceLet7, instanceLet8) = (FooStruct(), FooStruct())
+  let (instanceLet9, instanceLet10) : (FooStruct, FooStruct) = (FooStruct(), FooStruct())
 // PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet4: FooStruct{{$}}
 // PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet5: FooStruct{{$}}
 // PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet6: FooStruct{{$}}

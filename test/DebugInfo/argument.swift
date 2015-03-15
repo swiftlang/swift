@@ -16,7 +16,7 @@ func many(a: Int, b: (Int, Int), c: Int) -> Int {
   var i1 = a
 // CHECK-DAG: !MDLocalVariable(tag: DW_TAG_auto_variable, name: "i2",{{.*}} line: [[@LINE+2]]
 // CHECK-DAG: !MDLocalVariable(tag: DW_TAG_auto_variable, name: "i3",{{.*}} line: [[@LINE+1]]
-  var (i2: Int, i3: Int) = b
+  var (i2, i3) : (Int, Int) = b
 // CHECK-DAG: !MDLocalVariable(tag: DW_TAG_auto_variable, name: "i4",{{.*}} line: [[@LINE+1]]
   var i4 = c
   return i1+i2+i3+i4

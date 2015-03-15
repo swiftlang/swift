@@ -1329,7 +1329,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
 
   var pairs = Array<(Int, Int)>()
   for var i = startIndex; i != endIndex; ++i {
-    var (key, value: AnyObject) = d[i]
+    var (key, value) = d[i]
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs += [kv]
   }
@@ -2686,7 +2686,7 @@ DictionaryTestSuite.test("NSDictionaryToDictionaryCoversion") {
   let d: Dictionary = nsd as Dictionary
 
   var pairs = Array<(Int, Int)>()
-  for (key, value: AnyObject) in d {
+  for (key, value) in d {
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }

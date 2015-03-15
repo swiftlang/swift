@@ -54,7 +54,7 @@ func tuple_patterns() {
   // CHECK: store [[E]] to [[EADDR]]
   // CHECK: store [[F]] to [[FADDR]]
   // CHECK: store [[H]] to [[HADDR]]
-  var (e,f,g:(),h) = MRV()
+  var (e,f,g,h) : (Int, Float, (), Double) = MRV()
 
   // CHECK: [[IADDR:%[0-9]+]] = alloc_box $Int
   // CHECK-NOT: alloc_box $Float
@@ -71,7 +71,7 @@ func tuple_patterns() {
   // CHECK: [[J:%[0-9]+]] = tuple_extract {{.*}}, 0
   // CHECK: [[K:%[0-9]+]] = tuple_extract {{.*}}, 2
   // CHECK: store [[J]] to [[JADDR]]
-  var (j,_,k:(),_) = MRV()
+  var (j,_,k,_) : (Int, Float, (), Double) = MRV()
 }
 
 // CHECK-LABEL: sil hidden @_TF5decls16simple_arguments
