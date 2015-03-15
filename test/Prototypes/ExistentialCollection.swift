@@ -35,40 +35,39 @@ internal func _typeID(instance: AnyObject) -> Int {
   return unsafeBitCast(instance.dynamicType, Int.self)
 }
 
-internal final class _ForwardIndexStorage<
+internal final class _ForwardIndexBox<
   BaseIndex: ForwardIndexType
-> : _ForwardIndexStorageBase {
-  internal typealias Super = ForwardIndex._StorageBase
-  
+> : _ForwardIndexBoxType {
   init(_ base: BaseIndex) {
     self.base = base
   }
   
-  func successor() -> Super {
-    return _ForwardIndexStorage(self.base.successor())
+  func successor() -> _ForwardIndexBoxType {
+    return _ForwardIndexBox(self.base.successor())
   }
   
-  func unsafeUnbox(other: Super) -> BaseIndex {
-    return (unsafeDowncast(other) as _ForwardIndexStorage).base
+  func unsafeUnbox(other: _ForwardIndexBoxType) -> BaseIndex {
+    return (unsafeDowncast(other) as _ForwardIndexBox).base
   }
   
-  func equals(other: Super) -> Bool {
+  func equals(other: _ForwardIndexBoxType) -> Bool {
     return base == unsafeUnbox(other)
   }
 
-  func _distanceTo(other: Super) -> ForwardIndex.Distance {
+  func _distanceTo(other: _ForwardIndexBoxType) -> ForwardIndex.Distance {
     return numericCast(distance(base, unsafeUnbox(other)))
   }
   
-  func _advancedBy(n: ForwardIndex.Distance) -> Super {
-    return _ForwardIndexStorage(advance(base, numericCast(n)))
+  func _advancedBy(n: ForwardIndex.Distance) -> _ForwardIndexBoxType {
+    return _ForwardIndexBox(advance(base, numericCast(n)))
     
   }
   
   func _advancedBy(
-    n: ForwardIndex.Distance, _ limit: Super) -> Super {
-    return _ForwardIndexStorage(
-      advance(base, numericCast(n), unsafeUnbox(limit)))
+    n: ForwardIndex.Distance,
+    _ limit: _ForwardIndexBoxType
+  ) -> _ForwardIndexBoxType {
+    return _ForwardIndexBox(advance(base, numericCast(n), unsafeUnbox(limit)))
   }
 
   var typeID: Int { return _typeID(self) }
@@ -77,45 +76,43 @@ internal final class _ForwardIndexStorage<
   let base: BaseIndex
 }
 
-internal protocol _ForwardIndexStorageBase : class {
+internal protocol _ForwardIndexBoxType : class {
   var typeID: Int {get}
-  func successor() -> _ForwardIndexStorageBase
-  func equals(other: _ForwardIndexStorageBase) -> Bool
-  func _distanceTo(
-    other: _ForwardIndexStorageBase) -> ForwardIndex.Distance
-  func _advancedBy(
-    distance: ForwardIndex.Distance) -> _ForwardIndexStorageBase
+  func successor() -> _ForwardIndexBoxType
+  func equals(other: _ForwardIndexBoxType) -> Bool
+  func _distanceTo(other: _ForwardIndexBoxType) -> ForwardIndex.Distance
+  func _advancedBy(distance: ForwardIndex.Distance) -> _ForwardIndexBoxType
   func _advancedBy(
     distance: ForwardIndex.Distance,
-    _ limit: _ForwardIndexStorageBase) -> _ForwardIndexStorageBase
+    _ limit: _ForwardIndexBoxType
+  ) -> _ForwardIndexBoxType
 }
 
 public struct ForwardIndex : ForwardIndexType {
   public typealias Distance = IntMax
-  typealias _StorageBase = _ForwardIndexStorageBase
   
   public init<BaseIndex: ForwardIndexType>(_ base: BaseIndex) {
-    _storage = _ForwardIndexStorage(base)
+    _box = _ForwardIndexBox(base)
   }
   
   public func successor() -> ForwardIndex {
-    return ForwardIndex(_storage.successor())
+    return ForwardIndex(_box.successor())
   }
   
   //===--- private --------------------------------------------------------===//
   internal func _unbox<T: ForwardIndexType>() -> T {
-    return (_storage as! _ForwardIndexStorage<T>).base
+    return (_box as! _ForwardIndexBox<T>).base
   }
   
   internal var _typeID: Int {
-    return _storage.typeID
+    return _box.typeID
   }
   
-  internal init(_ storage: _StorageBase) {
-    self._storage = storage
+  internal init(_ box: _ForwardIndexBoxType) {
+    self._box = box
   }
   
-  internal let _storage: _StorageBase
+  internal let _box: _ForwardIndexBoxType
 }
 
 public func ~> (
@@ -124,13 +121,13 @@ public func ~> (
   precondition(
     start._typeID == other.1._typeID,
     "distance: base index types differ.")
-  return start._storage._distanceTo(other.1._storage)
+  return start._box._distanceTo(other.1._box)
 }
 
 public func ~> (
   start:ForwardIndex, distance : (_Advance, ForwardIndex.Distance)
 ) -> ForwardIndex {
-  return ForwardIndex(start._storage._advancedBy(distance.1))
+  return ForwardIndex(start._box._advancedBy(distance.1))
 }
 
 public func ~> (
@@ -138,12 +135,12 @@ public func ~> (
 ) -> ForwardIndex {
   precondition(
     start._typeID == args.1.1._typeID, "advance: base index types differ.")
-  return ForwardIndex(start._storage._advancedBy(args.1.0, args.1.1._storage))
+  return ForwardIndex(start._box._advancedBy(args.1.0, args.1.1._box))
 }
 
 public func == (lhs: ForwardIndex, rhs: ForwardIndex) -> Bool {
   precondition(lhs._typeID == rhs._typeID, "base index types differ.")
-  return lhs._storage.equals(rhs._storage)
+  return lhs._box.equals(rhs._box)
 }
 
 public class ForwardCollection<T> : CollectionType {
@@ -183,8 +180,7 @@ public class ForwardCollection<T> : CollectionType {
 }
 
 public func ~> <T>(
-  source: ForwardCollection<T>,
-  ptr: (_InitializeTo, UnsafeMutablePointer<T>)
+  source: ForwardCollection<T>, ptr: (_InitializeTo, UnsafeMutablePointer<T>)
 ) {
   // FIXME: can't pass UnsafeMutablePointer<T>, which would be a
   // dependent struct, pending <rdar://20164041>, thus the pointer
