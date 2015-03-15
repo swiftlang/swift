@@ -2946,7 +2946,8 @@ public:
 
     auto dc = SD->getDeclContext();
     bool isInvalid = TC.validateType(SD->getElementTypeLoc(), dc);
-    isInvalid |= TC.typeCheckPattern(SD->getIndices(), dc, None);
+    isInvalid |= TC.typeCheckPattern(SD->getIndices(), dc,
+                                     TR_ImmediateFunctionInput);
 
     if (isInvalid) {
       SD->overwriteType(ErrorType::get(TC.Context));
