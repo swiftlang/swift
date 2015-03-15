@@ -1127,7 +1127,8 @@ ParserResult<Stmt> Parser::parseStmtFor(LabeledStmtInfo LabelInfo) {
   // If we have a leading identifier followed by a ':' or 'in', then this is
   // obviously a for-each loop.  For error recovery, also parse "for in ..." as
   // foreach.
-  if ((isAtStartOfBindingName() && peekToken().isAny(tok::colon, tok::kw_in)) ||
+  if ((Tok.isIdentifierOrUnderscore() &&
+         peekToken().isAny(tok::colon, tok::kw_in)) ||
       Tok.is(tok::kw_in))
     return parseStmtForEach(ForLoc, LabelInfo);
 
@@ -1553,8 +1554,11 @@ static ParserStatus parseStmtCase(Parser &P, SourceLoc &CaseLoc,
       }
     }
 
-    if (CasePattern.isNull())
+    if (CasePattern.isNull()) {
+      llvm::SaveAndRestore<decltype(P.InVarOrLetPattern)>
+      T(P.InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
       CasePattern = P.parseMatchingPattern();
+    }
 
     if (CasePattern.isNull())
       CasePattern =

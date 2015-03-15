@@ -439,7 +439,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
     // If the tuple element starts with "ident :", then
     // the identifier is an element tag, and it is followed by a type
     // annotation.
-    if (isAtStartOfBindingName() && peekToken().is(tok::colon)) {
+    if (Tok.isIdentifierOrUnderscore() && peekToken().is(tok::colon)) {
       // Consume the name
       Identifier name;
       if (!Tok.is(tok::kw__))

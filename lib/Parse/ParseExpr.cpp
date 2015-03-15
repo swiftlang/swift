@@ -95,10 +95,14 @@ static Expr *addTrailingClosureToArgument(ASTContext &context,
 ///
 /// \param isExprBasic Whether we're only parsing an expr-basic.
 ParserResult<Expr> Parser::parseExprImpl(Diag<> Message, bool isExprBasic) {
-  // If we see a let/var/is pattern in expr position, parse it to an
-  // UnresolvedPatternExpr.  Name binding will resolve whether it's in a valid
-  // pattern position.
-  if (isOnlyStartOfMatchingPattern()) {
+  // If we are parsing a refutable pattern, check to see if this is the start
+  // of a let/var/is pattern.  If so, parse it to an UnresolvedPatternExpr and
+  // name binding will perform final validation.
+  //
+  // Only do this if we're parsing a pattern, to improve QoI on malformed
+  // expressions followed by (e.g.) let/var decls.
+  //
+  if (InVarOrLetPattern && isOnlyStartOfMatchingPattern()) {
     ParserResult<Pattern> pattern = parseMatchingPattern();
     if (pattern.hasCodeCompletion())
       return makeParserCodeCompletionResult<Expr>();
@@ -781,11 +785,13 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     // Parse and return this as an UnresolvedPatternExpr around a binding.  This
     // will be resolved (or rejected) by sema when the overall refutable pattern
     // it transformed from an expression into a pattern.
-    if (InVarOrLetPattern) {
+    if (InVarOrLetPattern == IVOLP_ImplicitlyImmutable ||
+        InVarOrLetPattern == IVOLP_InVar ||
+        InVarOrLetPattern == IVOLP_InLet) {
       Identifier name;
       SourceLoc loc = consumeIdentifier(&name);
       auto pattern = createBindingFromPattern(loc, name,
-                                              InVarOrLetPattern == IVOLP_InLet);
+                                              InVarOrLetPattern != IVOLP_InVar);
       Result = makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
       break;
     }
@@ -1062,7 +1068,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         
         // If this is a selector reference, collect the selector pieces.
         bool IsSelector = false;
-        if (Tok.is(tok::colon) && peekToken().isIdentifierOrNone()) {
+        if (Tok.is(tok::colon) && peekToken().isIdentifierOrUnderscore()) {
           BacktrackingScope BS(*this);
 
           consumeToken(); // ':'
@@ -1083,7 +1089,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
             Locs.push_back({SourceLoc(), SourceLoc()});
             ArgumentNames.push_back(Identifier()); 
           }
-          while (Tok.isIdentifierOrNone() && peekToken().is(tok::colon)) {
+          while (Tok.isIdentifierOrUnderscore() && peekToken().is(tok::colon)) {
             Identifier SelName;
             if (Tok.is(tok::identifier))
               SelName = Context.getIdentifier(Tok.getText());
@@ -1441,8 +1447,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
 
   // If we have a leading token that may be part of the closure signature, do a
   // speculative parse to validate it and look for 'in'.
-  if (Tok.is(tok::l_paren) || Tok.isIdentifierOrNone() ||
-      Tok.is(tok::l_square)) {
+  if (Tok.isAny(tok::l_paren, tok::l_square, tok::identifier, tok::kw__)) {
     BacktrackingScope backtrack(*this);
 
     // Skip by a closure capture list if present.
@@ -1469,11 +1474,11 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       }
 
       // Okay, we have a closure signature.
-    } else if (Tok.isIdentifierOrNone()) {
+    } else if (Tok.isIdentifierOrUnderscore()) {
       // Parse identifier (',' identifier)*
       consumeToken();
       while (consumeIf(tok::comma)) {
-        if (Tok.isIdentifierOrNone()) {
+        if (Tok.isIdentifierOrUnderscore()) {
           consumeToken();
           continue;
         }

@@ -3877,6 +3877,8 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       
       // For recovery, see if the user typed something resembling a switch
       // "case" label.
+      llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
+      T(InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
       parseMatchingPattern();
     }
     if (NameIsNotIdentifier) {

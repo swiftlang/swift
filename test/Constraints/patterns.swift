@@ -79,8 +79,8 @@ case is E: // expected-warning {{always fails}}
 }
 
 // Raise an error if pattern productions are used in expressions.
-var b = var a // expected-error{{pattern variable binding cannot appear in an expression}}
-var c = is Int // expected-error{{prefix 'is' pattern cannot appear in an expression}}
+var b = var a // expected-error{{expected initial value after '='}} expected-error {{type annotation missing in pattern}}
+var c = is Int // expected-error{{expected initial value after '='}}
 
 // TODO: Bad recovery in these cases. Although patterns are never valid
 // expr-unary productions, it would be good to parse them anyway for recovery.

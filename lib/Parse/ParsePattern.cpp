@@ -122,8 +122,7 @@ static bool startsParameterName(Parser &parser, bool isClosure) {
     return false;
 
   // If the next token is another identifier, '_', or ':', this is a name.
-  auto nextToken = parser.peekToken();
-  if (nextToken.isIdentifierOrNone() || nextToken.is(tok::colon))
+  if (parser.peekToken().isAny(tok::identifier, tok::kw__, tok::colon))
     return true;
 
   // The identifier could be a name or it could be a type. In a closure, we
@@ -858,12 +857,6 @@ ParserResult<Pattern> Parser::parsePattern() {
   }
 }
 
-/// \brief Determine whether this token can start a binding name, whether an
-/// identifier or the special discard-value binding '_'.
-bool Parser::isAtStartOfBindingName() {
-  return Tok.is(tok::kw__) || (Tok.is(tok::identifier) && !isStartOfDecl());
-}
-
 Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
                                           bool isLet) {
   VarDecl *var;
@@ -1007,8 +1000,13 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
 ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
                                                              SourceLoc varLoc) {
   // 'var' and 'let' patterns shouldn't nest.
-  if (InVarOrLetPattern)
+  if (InVarOrLetPattern == IVOLP_InLet ||
+      InVarOrLetPattern == IVOLP_InVar)
     diagnose(varLoc, diag::var_pattern_in_var, unsigned(isLet));
+  
+  // 'let' isn't valid inside an implicitly immutable context, but var is.
+  if (isLet && InVarOrLetPattern == IVOLP_ImplicitlyImmutable)
+    diagnose(varLoc, diag::let_pattern_in_immutable_context);
 
   // In our recursive parse, remember that we're in a var/let pattern.
   llvm::SaveAndRestore<decltype(InVarOrLetPattern)>

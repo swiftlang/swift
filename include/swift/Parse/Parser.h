@@ -88,6 +88,11 @@ public:
     /// InVarOrLetPattern has this value when not parsing a pattern.
     IVOLP_NotInVarOrLet,
     
+    /// InVarOrLetPattern has this value when we're in a matching pattern, but
+    /// not within a var/let pattern.  In this phase, identifiers are references
+    /// to the enclosing scopes, not a variable binding.
+    IVOLP_InMatchingPattern,
+    
     /// InVarOrLetPattern has this value when parsing a pattern in which bound
     /// variables are implicitly immutable, but allowed to be marked mutable by
     /// using a 'var' pattern.  This happens in for-each loop patterns.
@@ -989,11 +994,6 @@ public:
   ParserStatus parseConstructorArguments(DeclName &FullName,
                                          Pattern *&BodyPattern,
                                          DefaultArgumentInfo &defaultArgs);
-
-  /// \brief Determine whether the parser is in a state that can start a
-  /// binding name, identifier or the special discard-value binding '_'.
-  bool isAtStartOfBindingName();
-
   
   ParserResult<Pattern> parseTypedPattern();
 

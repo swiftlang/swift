@@ -185,8 +185,8 @@ public:
   }
 
   /// True if the token is an identifier or '_'.
-  bool isIdentifierOrNone() const {
-    return is(tok::identifier) || is(tok::kw__);
+  bool isIdentifierOrUnderscore() const {
+    return isAny(tok::identifier, tok::kw__);
   }
 
   /// True if the token is an l_paren token that does not start a new line.
