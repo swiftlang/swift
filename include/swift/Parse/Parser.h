@@ -446,7 +446,7 @@ public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
     if (Diags.isDiagnosticPointsToFirstBadToken(Diag.getID()) &&
         Loc == Tok.getLoc() && Tok.isAtStartOfLine())
-      Loc = Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
+      Loc = getEndOfPreviousLoc();
     return Diags.diagnose(Loc, Diag);
   }
 

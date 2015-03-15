@@ -329,9 +329,7 @@ public:
           .highlight(E->getSourceRange());
         TC.diagnose(ctor->getLoc(), diag::make_init_failable,
                     ctor->getFullName())
-        .fixItInsert(Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
-                                                ctor->getLoc()),
-                     "?");
+          .fixItInsertAfter(ctor->getLoc(), "?");
         RS->setResult(nullptr);
         return RS;
       }

@@ -25,7 +25,6 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeWalker.h"
-#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -581,9 +580,7 @@ void RequirementMatch::addOptionalityFixIts(
 
     case OptionalAdjustmentKind::WillNeverProduceNil:
     case OptionalAdjustmentKind::ConsumesUnhandledNil:
-      diag.fixItInsert(Lexer::getLocForEndOfToken(ctx.SourceMgr,
-                                                  adjustmentLoc),
-                       "?");
+      diag.fixItInsertAfter(adjustmentLoc, "?");
       break;
 
     case OptionalAdjustmentKind::IUOToOptional:

@@ -579,10 +579,9 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
         continue;
     }
     if (!OptionalSep) {
-      SourceLoc InsertLoc = Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
       StringRef Separator = (SeparatorK == tok::comma ? "," : ";");
       diagnose(Tok, diag::expected_separator, Separator)
-        .fixItInsert(InsertLoc, Separator);
+        .fixItInsertAfter(PreviousLoc, Separator);
       Status.setIsParseError();
     }
     // If we haven't made progress, skip ahead

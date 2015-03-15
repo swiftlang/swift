@@ -94,6 +94,15 @@ InFlightDiagnostic &InFlightDiagnostic::highlightChars(SourceLoc Start,
   return *this;
 }
 
+/// \brief Add an insertion fix-it to the currently-active diagnostic.  The
+/// text is inserted immediately *after* the token specified.
+///
+InFlightDiagnostic &InFlightDiagnostic::fixItInsertAfter(SourceLoc L,
+                                                         StringRef Str) {
+  L = Lexer::getLocForEndOfToken(Engine->SourceMgr, L);
+  return fixItInsert(L, Str);
+}
+
 InFlightDiagnostic &InFlightDiagnostic::fixItReplace(SourceRange R,
                                                      StringRef Str) {
   assert(IsActive && "Cannot modify an inactive diagnostic");

@@ -370,6 +370,11 @@ namespace swift {
       return fixItReplaceChars(L, L, Str);
     }
 
+    /// \brief Add an insertion fix-it to the currently-active diagnostic.  The
+    /// text is inserted immediately *after* the token specified.
+    ///
+    InFlightDiagnostic &fixItInsertAfter(SourceLoc L, StringRef);
+
     /// \brief Add a token-based removal fix-it to the currently-active
     /// diagnostic.
     InFlightDiagnostic &fixItRemove(SourceRange R) {

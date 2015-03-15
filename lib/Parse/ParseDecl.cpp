@@ -17,7 +17,6 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/DebuggerClient.h"
@@ -850,11 +849,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
           // If we saw more than one identifier, there's a ':'
           // missing here. Complain and pretend we saw it.
           if (Names.size() > 1) {
-            SourceLoc afterLast
-              = Lexer::getLocForEndOfToken(Context.SourceMgr, 
-                                           NameLocs.back());
             diagnose(Tok, diag::attr_objc_missing_colon)
-              .fixItInsert(afterLast, ":");
+              .fixItInsertAfter(NameLocs.back(), ":");
             sawColon = true;
           }
 
@@ -864,10 +860,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         // If we see another identifier or keyword, complain about
         // the missing colon and keep going.
         if (Tok.is(tok::identifier) || Tok.isKeyword()) {
-          SourceLoc afterLast
-            = Lexer::getLocForEndOfToken(Context.SourceMgr, NameLocs.back());
           diagnose(Tok, diag::attr_objc_missing_colon)
-            .fixItInsert(afterLast, ":");
+            .fixItInsertAfter(NameLocs.back(), ":");
           sawColon = true;
           continue;
         }

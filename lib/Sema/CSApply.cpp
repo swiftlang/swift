@@ -21,7 +21,6 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
-#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -1185,9 +1184,7 @@ namespace {
           tc.diagnose(loc, diag::delegate_chain_nonoptional_to_optional, 
                       !isDelegating, ctor->getFullName());
           tc.diagnose(inCtor->getLoc(), diag::init_propagate_failure)
-            .fixItInsert(Lexer::getLocForEndOfToken(ctx.SourceMgr,
-                                                    inCtor->getLoc()),
-                         "?");
+            .fixItInsertAfter(inCtor->getLoc(), "?");
         }
       }
 
@@ -3155,11 +3152,9 @@ namespace {
         tc.diagnose(exclaimLoc, diag::forced_to_conditional_downcast, 
                     injection->getType()->getAnyOptionalObjectType())
           .fixItReplace(exclaimLoc, "?");
-        auto pastEndLoc = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
-                                                     cast->getEndLoc());
         tc.diagnose(cast->getStartLoc(), diag::silence_inject_forced_downcast)
           .fixItInsert(cast->getStartLoc(), "(")
-          .fixItInsert(pastEndLoc, ")");
+          .fixItInsertAfter(cast->getEndLoc(), ")");
       }
     }
 
@@ -4337,8 +4332,6 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
     // wrapping it in one
     bool needsParens = !expr->canAppendCallParentheses();
 
-    SourceLoc endLoc = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
-                                                  expr->getEndLoc());
     auto insertClosureNote = tc.diagnose(expr->getLoc(),
                                   diag::invalid_function_conversion_closure);
 
@@ -4356,7 +4349,8 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
     if (!hasAnyLabeledParams(toType->castTo<AnyFunctionType>())) {
       insertClosureNote.fixItInsert(expr->getStartLoc(),
                                     needsParens ? "{ (" : "{ ");
-      insertClosureNote.fixItInsert(endLoc, needsParens ? ")($0) }" : "($0) }");
+      insertClosureNote.fixItInsertAfter(expr->getEndLoc(),
+                                         needsParens ? ")($0) }" : "($0) }");
     }
   }
 }
@@ -5190,12 +5184,10 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
             llvm::SmallString<16> str;
             str = ".";
             str += field.getName().str();
-            auto insertLoc = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
-                                                        expr->getEndLoc());
             tc.diagnose(expr->getStartLoc(),
                         diag::extra_named_single_element_tuple,
                         field.getName().str())
-              .fixItInsert(insertLoc, str);
+              .fixItInsertAfter(expr->getEndLoc(), str);
             return true;
           }
         }
@@ -5532,11 +5524,8 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
           type = type->castTo<AnyFunctionType>()->getResult();
         }
         
-        SourceLoc afterAffectedLoc
-          = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
-                                       affected->getEndLoc());
         TC.diagnose(affected->getLoc(), diag::missing_nullary_call, type)
-          .fixItInsert(afterAffectedLoc, "()");
+          .fixItInsertAfter(affected->getEndLoc(), "()");
         diagnosed = true;
         break;
       }
@@ -5555,11 +5544,8 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
       case FixKind::ForceOptional: {
         auto type = solution.simplifyType(TC, affected->getType())
                       ->getRValueObjectType();
-        SourceLoc afterAffectedLoc
-          = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
-                                       affected->getEndLoc());
         TC.diagnose(affected->getLoc(), diag::missing_unwrap_optional, type)
-          .fixItInsert(afterAffectedLoc, "!");
+          .fixItInsertAfter(affected->getEndLoc(), "!");
         diagnosed = true;
         break;
       }
@@ -5569,9 +5555,6 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
                           ->getRValueObjectType();
         Type toType = solution.simplifyType(TC,
                                             fix.first.getTypeArgument(*this));
-        SourceLoc afterAffectedLoc
-          = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
-                                       affected->getEndLoc());
         bool needsParens = exprNeedsParensWhenAddingAs(DC, affected, expr);
         if (TC.isExplicitlyConvertibleTo(fromType, toType, DC)) {
           llvm::SmallString<32> asCastStr;
@@ -5584,7 +5567,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
             diagnosis.fixItInsert(affected->getStartLoc(), "(");
             asCastStr += ")";
           }
-          diagnosis.fixItInsert(afterAffectedLoc, asCastStr);
+          diagnosis.fixItInsertAfter(affected->getEndLoc(), asCastStr);
           diagnosed = true;
         } else if (TC.checkedCastMaySucceed(fromType, toType, DC)) {
           llvm::SmallString<32> asCastStr;
@@ -5597,7 +5580,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
             diagnosis.fixItInsert(affected->getStartLoc(), "(");
             asCastStr += ")";
           }
-          diagnosis.fixItInsert(afterAffectedLoc, asCastStr);
+          diagnosis.fixItInsertAfter(affected->getEndLoc(), asCastStr);
           diagnosed = true;
         }
 
@@ -5639,12 +5622,10 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
           errorExpr = prefixUnaryExpr->getArg();
         }
         
-        auto pastEndLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
-                                                     errorExpr->getEndLoc());
         TC.diagnose(errorExpr->getLoc(),
                        diag::optional_used_as_boolean, errorExpr->getType())
         .fixItInsert(errorExpr->getStartLoc(), "(")
-        .fixItInsert(pastEndLoc, " != nil)");
+        .fixItInsertAfter(errorExpr->getEndLoc(), " != nil)");
         
         diagnosed = true;
         break;
@@ -5679,10 +5660,6 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
         } while (current);
 
         if (fromRawCall) {
-          auto argStartLoc = fromRawCall->getArg()->getStartLoc();
-          argStartLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
-                                                   argStartLoc);
-
           TC.diagnose(fromRawRef->getNameLoc(), 
                       diag::migrate_from_raw_to_init)
             .fixItReplace(SourceRange(fromRawRef->getDotLoc(),

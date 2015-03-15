@@ -21,7 +21,6 @@
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/Parse/Lexer.h"
 #include <utility>
 using namespace swift;
 
@@ -834,10 +833,8 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       diagnose(NP->getLoc(), diag::type_inferred_to_undesirable_type,
                NP->getDecl()->getName(), type, NP->getDecl()->isLet());
 
-      SourceLoc fixItLoc = NP->getLoc();
-      fixItLoc = Lexer::getLocForEndOfToken(Context.SourceMgr, fixItLoc);
       diagnose(NP->getLoc(), diag::add_explicit_type_annotation_to_silence)
-        .fixItInsert(fixItLoc, ": " + type.getString());
+        .fixItInsertAfter(NP->getLoc(), ": " + type.getString());
     }
 
     return false;

@@ -19,7 +19,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/Parse/Lexer.h"
-
 using namespace swift;
 
 //===--------------------------------------------------------------------===//
@@ -251,10 +250,10 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
 
       TC.diagnose(E->getStartLoc(), diag::value_of_metatype_type);
       // Add fixits to insert '()' or '.self'.
-      auto endLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
-                                               E->getEndLoc());
-      TC.diagnose(endLoc, diag::add_parens_to_type).fixItInsert(endLoc, "()");
-      TC.diagnose(endLoc, diag::add_self_to_type).fixItInsert(endLoc, ".self");
+      TC.diagnose(E->getEndLoc(), diag::add_parens_to_type)
+        .fixItInsertAfter(E->getEndLoc(), "()");
+      TC.diagnose(E->getEndLoc(), diag::add_self_to_type)
+        .fixItInsertAfter(E->getEndLoc(), ".self");
     }
   };
 

@@ -17,7 +17,6 @@
 #include "swift/Parse/Parser.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
@@ -2078,9 +2077,8 @@ ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
   ParserStatus Status;
 
   if (Tok.isNot(tok::r_square) && !consumeIf(tok::comma)) {
-    SourceLoc InsertLoc = Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
     diagnose(Tok, diag::expected_separator, ",")
-        .fixItInsert(InsertLoc, ",");
+        .fixItInsertAfter(PreviousLoc, ",");
     Status.setIsParseError();
   }
 

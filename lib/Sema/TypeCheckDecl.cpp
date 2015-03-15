@@ -26,6 +26,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeWalker.h"
@@ -37,7 +38,6 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
-#include "swift/AST/NameLookup.h"
 using namespace swift;
 
 namespace {
@@ -4238,12 +4238,10 @@ public:
           .fixItRemove(sugaredForm->getExclamationLoc());
       }
 
-      auto endLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
-                                               TL.getSourceRange().End);
       TC.diagnose(TL.getSourceRange().Start,
                   diag::override_unnecessary_IUO_silence)
         .fixItInsert(TL.getSourceRange().Start, "(")
-        .fixItInsert(endLoc, ")");
+        .fixItInsertAfter(TL.getSourceRange().End, ")");
     };
 
     auto rawParamPatterns = method->getBodyParamPatterns()[1];
@@ -4304,12 +4302,10 @@ public:
           .fixItReplace(sugaredForm->getExclamationLoc(), "?");
       }
 
-      auto endLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
-                                               resultTL.getSourceRange().End);
       TC.diagnose(resultTL.getSourceRange().Start,
                   diag::override_unnecessary_IUO_silence)
         .fixItInsert(resultTL.getSourceRange().Start, "(")
-        .fixItInsert(endLoc, ")");
+        .fixItInsertAfter(resultTL.getSourceRange().End, ")");
     };
 
     checkResult(methodAsFunc->getBodyResultTypeLoc(), parentTy->getResult());
@@ -6174,9 +6170,8 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
       if (auto defaultValueSuggestion
                  = buildDefaultInitializerString(tc, classDecl, 
                                                  pbd->getPattern())) {
-        SourceLoc afterLoc = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
-                                                        pbd->getEndLoc());
-        diag->fixItInsert(afterLoc, " = " + *defaultValueSuggestion);
+        diag->fixItInsertAfter(pbd->getEndLoc(),
+                               " = " + *defaultValueSuggestion);
       }
     }
   }

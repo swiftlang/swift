@@ -236,8 +236,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     // If the previous statement didn't have a semicolon and this new
     // statement doesn't start a line, complain.
     if (!PreviousHadSemi && !Tok.isAtStartOfLine()) {
-      SourceLoc EndOfPreviousLoc = Lexer::getLocForEndOfToken(SourceMgr,
-                                                              PreviousLoc);
+      SourceLoc EndOfPreviousLoc = getEndOfPreviousLoc();
       diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
         .fixItInsert(EndOfPreviousLoc, ";");
       // FIXME: Add semicolon to the AST?
