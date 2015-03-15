@@ -77,16 +77,6 @@ public func ${op}= <T: _IntegerArithmeticType>(inout lhs: T, rhs: T) {
 // A numeric type that supports abs(x), +x and -x
 //===----------------------------------------------------------------------===//
 
-/// This protocol is an implementation detail of `SignedNumberType`; do
-/// not use it directly.
-///
-/// Its requirements are inherited by `SignedNumberType` and thus must
-/// be satisfied by types conforming to that protocol.
-public protocol _SignedNumberType : Comparable, IntegerLiteralConvertible {
-  /// Return the difference between `lhs` and `rhs`.
-  func - (lhs: Self, rhs: Self) -> Self
-}
-
 // SignedNumberType itself contains only operator requirements having
 // default implementations on the base protocol.
 /// Instances of conforming types can be subtracted, arithmetically
@@ -97,10 +87,13 @@ public protocol _SignedNumberType : Comparable, IntegerLiteralConvertible {
 /// - `x - 0 == x`
 /// - `-x == 0 - x`
 /// - `-(-x) == x`
-public protocol SignedNumberType : _SignedNumberType {
+public protocol SignedNumberType : Comparable, IntegerLiteralConvertible {
   /// Return the result of negating `x`.
   prefix func - (x: Self) -> Self
 
+  /// Return the difference between `lhs` and `rhs`.
+  func - (lhs: Self, rhs: Self) -> Self
+  
   // Do not use this operator directly; call abs(x) instead
   func ~> (_:Self,_:(_Abs, ())) -> Self
 }
@@ -109,13 +102,13 @@ public protocol SignedNumberType : _SignedNumberType {
 // implementation; models of SignedNumberType can provide their own
 // implementations.
 @transparent
-public prefix func - <T : _SignedNumberType>(x: T) -> T {
+public prefix func - <T : SignedNumberType>(x: T) -> T {
   return 0 - x
 }
 
 // Unary +
 @transparent
-public prefix func + <T: _SignedNumberType>(x: T) -> T {
+public prefix func + <T: SignedNumberType>(x: T) -> T {
   return x
 }
 
@@ -127,7 +120,7 @@ internal func _abs<Args>(args: Args) -> (_Abs, Args) {
 
 // Do not use this operator directly; call abs(x) instead
 @transparent
-public func ~> <T : _SignedNumberType>(x:T,_:(_Abs, ())) -> T {
+public func ~> <T : SignedNumberType>(x:T,_:(_Abs, ())) -> T {
   return x < 0 ? -x : x
 }
 
