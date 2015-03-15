@@ -632,6 +632,8 @@ ERROR(non_func_decl_pattern_init,pattern_parsing,none,
 ERROR(var_pattern_in_var,pattern_parsing,none,
       "'%select{var|let}0' cannot appear nested inside another 'var' or "
       "'let' pattern", (unsigned))
+ERROR(let_pattern_in_immutable_context,pattern_parsing,none,
+      "'let' pattern cannot appear nested in an already immutable context", ())
 ERROR(inout_must_have_type,pattern_parsing,none,
       "'inout' arguments must have a type specified", ())
 ERROR(inout_must_appear_before_param,pattern_parsing,none,

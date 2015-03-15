@@ -3362,8 +3362,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     { // In our recursive parse, remember that we're in a var/let pattern.
       llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
         T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
-
-      pattern = parsePattern(isLet);
+      pattern = parsePattern();
     }
     if (pattern.hasCodeCompletion())
       return makeParserCodeCompletionStatus();

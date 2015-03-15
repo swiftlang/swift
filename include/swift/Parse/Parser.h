@@ -63,6 +63,7 @@ namespace swift {
     ActiveConfigBlock
   };
 
+  
 class Parser {
   Parser(const Parser&) = delete;
   void operator=(const Parser&) = delete;
@@ -84,8 +85,22 @@ public:
   std::pair<const DeclContext *, ArrayRef<VarDecl *>> CurVars;
   llvm::SmallPtrSet<Decl *, 2> AlreadyHandledDecls;
   enum {
+    /// InVarOrLetPattern has this value when not parsing a pattern.
     IVOLP_NotInVarOrLet,
+    
+    /// InVarOrLetPattern has this value when parsing a pattern in which bound
+    /// variables are implicitly immutable, but allowed to be marked mutable by
+    /// using a 'var' pattern.  This happens in for-each loop patterns.
+    IVOLP_ImplicitlyImmutable,
+    
+    /// When InVarOrLetPattern has this value, bound variables are mutable, and
+    /// nested let/var patterns are not permitted. This happens when parsing a
+    /// 'var' decl or when parsing inside a 'var' pattern.
     IVOLP_InVar,
+
+    /// When InVarOrLetPattern has this value, bound variables are immutable,and
+    /// nested let/var patterns are not permitted. This happens when parsing a
+    /// 'let' decl or when parsing inside a 'let' pattern.
     IVOLP_InLet
   } InVarOrLetPattern = IVOLP_NotInVarOrLet;
 
@@ -975,7 +990,7 @@ public:
                                          Pattern *&BodyPattern,
                                          DefaultArgumentInfo &defaultArgs);
 
-  ParserResult<Pattern> parsePattern(bool isLet);
+  ParserResult<Pattern> parsePattern();
 
   /// \brief Determine whether the parser is in a state that can start a
   /// binding name, identifier or the special discard-value binding '_'.
@@ -990,10 +1005,10 @@ public:
   ///
   /// \returns The tuple pattern element, if successful.
   std::pair<ParserStatus, Optional<TuplePatternElt>>
-  parsePatternTupleElement(bool isLet);
-  ParserResult<Pattern> parsePatternTuple(bool isLet);
-  ParserResult<Pattern> parsePatternTupleAfterLP(bool isLet, SourceLoc LPLoc);
-  ParserResult<Pattern> parsePatternAtom(bool isLet);
+  parsePatternTupleElement();
+  ParserResult<Pattern> parsePatternTuple();
+  ParserResult<Pattern> parsePatternTupleAfterLP(SourceLoc LPLoc);
+  ParserResult<Pattern> parsePatternAtom();
   ParserResult<Pattern> parsePatternVarOrLet();
   
   Pattern *createBindingFromPattern(SourceLoc loc, Identifier name, bool isLet);

@@ -159,4 +159,13 @@ case x ?? 42: break // match value
 default: break
 }
 
+for (var x) in 0...100 {}
+//for var x in 0...100 {}
+for (let x) in 0...100 {} // expected-error {{'let' pattern cannot appear nested in an already immutable context}}
+
+var (let y) = 42  // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
+let (var z) = 42  // expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}
+
+
+
 

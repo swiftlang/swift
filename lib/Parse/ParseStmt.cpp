@@ -1382,7 +1382,17 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
                                             LabeledStmtInfo LabelInfo) {
   ParserStatus Status;
 
-  ParserResult<Pattern> Pattern = parsePattern(/*isLet*/true);
+  // Change the parser state to know that the pattern we're about to parse is
+  // implicitly mutable.  Bound variables can be changed to mutable explicitly
+  // if desired by using a 'var' pattern.
+  assert(InVarOrLetPattern == IVOLP_NotInVarOrLet &&
+         "for-each loops cannot exist inside other patterns");
+  InVarOrLetPattern = IVOLP_ImplicitlyImmutable;
+  ParserResult<Pattern> Pattern = parsePattern();
+  assert(InVarOrLetPattern == IVOLP_ImplicitlyImmutable);
+  InVarOrLetPattern = IVOLP_NotInVarOrLet;
+  
+  
   if (Pattern.isNull())
     // Recover by creating a "_" pattern.
     Pattern = makeParserErrorResult(new (Context) AnyPattern(SourceLoc()));

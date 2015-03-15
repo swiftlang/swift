@@ -766,13 +766,13 @@ Parser::parseConstructorArguments(DeclName &FullName, Pattern *&BodyPattern,
 ///   pattern ::= pattern-atom ':' type
 ///   pattern ::= 'var' pattern
 ///   pattern ::= 'let' pattern
-ParserResult<Pattern> Parser::parsePattern(bool isLet) {
+ParserResult<Pattern> Parser::parsePattern() {
   // If this is a let or var pattern parse it.
   if (Tok.isAny(tok::kw_let, tok::kw_var))
     return parsePatternVarOrLet();
   
   // First, parse the pattern atom.
-  ParserResult<Pattern> Result = parsePatternAtom(isLet);
+  ParserResult<Pattern> Result = parsePatternAtom();
 
   // Now parse an optional type annotation.
   if (consumeIf(tok::colon)) {
@@ -801,14 +801,19 @@ ParserResult<Pattern> Parser::parsePatternVarOrLet() {
   SourceLoc varLoc = consumeToken();
 
   // 'var' and 'let' patterns shouldn't nest.
-  if (InVarOrLetPattern)
+  if (InVarOrLetPattern == IVOLP_InLet ||
+      InVarOrLetPattern == IVOLP_InVar)
     diagnose(varLoc, diag::var_pattern_in_var, unsigned(isLet));
 
+  // 'let' isn't valid inside an implicitly immutable context, but var is.
+  if (isLet && InVarOrLetPattern == IVOLP_ImplicitlyImmutable)
+    diagnose(varLoc, diag::let_pattern_in_immutable_context);
+  
   // In our recursive parse, remember that we're in a var/let pattern.
   llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
     T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
 
-  ParserResult<Pattern> subPattern = parsePattern(isLet);
+  ParserResult<Pattern> subPattern = parsePattern();
   if (subPattern.hasCodeCompletion())
     return makeParserCodeCompletionResult<Pattern>();
   if (subPattern.isNull())
@@ -842,10 +847,10 @@ Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
 ///   pattern-atom ::= identifier
 ///   pattern-atom ::= '_'
 ///   pattern-atom ::= pattern-tuple
-ParserResult<Pattern> Parser::parsePatternAtom(bool isLet) {
+ParserResult<Pattern> Parser::parsePatternAtom() {
   switch (Tok.getKind()) {
   case tok::l_paren:
-    return parsePatternTuple(isLet);
+    return parsePatternTuple();
 
   case tok::kw__:
     return makeParserResult(new (Context) AnyPattern(consumeToken(tok::kw__)));
@@ -853,6 +858,7 @@ ParserResult<Pattern> Parser::parsePatternAtom(bool isLet) {
   case tok::identifier: {
     Identifier name;
     SourceLoc loc = consumeIdentifier(&name);
+    bool isLet = InVarOrLetPattern != IVOLP_InVar;
     return makeParserResult(createBindingFromPattern(loc, name, isLet));
   }
 
@@ -877,9 +883,9 @@ ParserResult<Pattern> Parser::parsePatternAtom(bool isLet) {
 }
 
 std::pair<ParserStatus, Optional<TuplePatternElt>>
-Parser::parsePatternTupleElement(bool isLet) {
+Parser::parsePatternTupleElement() {
   // Parse the pattern.
-  ParserResult<Pattern>  pattern = parsePattern(isLet);
+  ParserResult<Pattern>  pattern = parsePattern();
   if (pattern.hasCodeCompletion())
     return std::make_pair(makeParserCodeCompletionStatus(), None);
   if (pattern.isNull())
@@ -896,10 +902,10 @@ Parser::parsePatternTupleElement(bool isLet) {
         TuplePatternElt(pattern.get(), nullptr, DefaultArgumentKind::None));
 }
 
-ParserResult<Pattern> Parser::parsePatternTuple(bool isLet) {
+ParserResult<Pattern> Parser::parsePatternTuple() {
   StructureMarkerRAII ParsingPatternTuple(*this, Tok);
   SourceLoc LPLoc = consumeToken(tok::l_paren);
-  return parsePatternTupleAfterLP(isLet, LPLoc);
+  return parsePatternTupleAfterLP(LPLoc);
 }
 
 /// Parse a tuple pattern.  The leading left paren has already been consumed and
@@ -910,7 +916,7 @@ ParserResult<Pattern> Parser::parsePatternTuple(bool isLet) {
 ///   pattern-tuple-body:
 ///     pattern-tuple-element (',' pattern-tuple-body)*
 ParserResult<Pattern>
-Parser::parsePatternTupleAfterLP(bool isLet, SourceLoc LPLoc) {
+Parser::parsePatternTupleAfterLP(SourceLoc LPLoc) {
   SourceLoc RPLoc, EllipsisLoc;
 
   // Parse all the elements.
@@ -922,7 +928,7 @@ Parser::parsePatternTupleAfterLP(bool isLet, SourceLoc LPLoc) {
     // Parse the pattern tuple element.
     ParserStatus EltStatus;
     Optional<TuplePatternElt> elt;
-    std::tie(EltStatus, elt) = parsePatternTupleElement(isLet);
+    std::tie(EltStatus, elt) = parsePatternTupleElement();
     if (EltStatus.hasCodeCompletion())
       return makeParserCodeCompletionStatus();
     if (!elt)
