@@ -675,16 +675,11 @@ public:
 
     VD->setImplicit();
 
-    NamedPattern *NP = new (Context) NamedPattern(VD,
-                                                  true); // implicit
-
+    NamedPattern *NP = new (Context) NamedPattern(VD, /*implicit*/true);
     PatternBindingDecl *PBD =
-      new (Context) PatternBindingDecl(SourceLoc(),
-                                       StaticSpellingKind::None,
-                                       SourceLoc(),
-                                       NP,
-                                       MaybeLoadInitExpr,
-                                       TypeCheckDC);
+      PatternBindingDecl::create(Context, SourceLoc(), StaticSpellingKind::None,
+                                 SourceLoc(), NP, MaybeLoadInitExpr,
+                                 TypeCheckDC);
     PBD->setImplicit();
 
     return std::make_pair(PBD, VD);

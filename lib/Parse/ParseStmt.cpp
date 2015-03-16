@@ -755,11 +755,10 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
         Init = new (Context) ErrorExpr(Tok.getLoc());
       }
     
-      auto PBD = new (Context) PatternBindingDecl(SourceLoc(),
-                                                  StaticSpellingKind::None,
-                                                  VarLoc, Pattern.get(),
-                                                  Init,
-                                                  /*parent*/CurDeclContext);
+      auto PBD = PatternBindingDecl::create(Context, SourceLoc(),
+                                            StaticSpellingKind::None,
+                                            VarLoc, Pattern.get(),
+                                            Init, /*parent*/CurDeclContext);
       result.push_back(PBD);
       
       // Add variable bindings from the pattern to the case scope.  We have

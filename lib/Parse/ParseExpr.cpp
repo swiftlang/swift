@@ -1589,10 +1589,10 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       
       auto pattern = new (Context) NamedPattern(VD, /*implicit*/true);
       
-      auto *PBD = new (Context) PatternBindingDecl(/*staticloc*/SourceLoc(),
-                                                   StaticSpellingKind::None,
-                                                   nameLoc, pattern,initializer,
-                                                   CurDeclContext);
+      auto *PBD = PatternBindingDecl::create(Context, /*staticloc*/SourceLoc(),
+                                             StaticSpellingKind::None,
+                                             nameLoc, pattern, initializer,
+                                             CurDeclContext);
                                                    
       
       

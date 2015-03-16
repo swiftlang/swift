@@ -3387,7 +3387,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     }
 
     // In the normal case, just add PatternBindingDecls to our DeclContext.
-    auto PBD = new (Context) PatternBindingDecl(
+    auto PBD = PatternBindingDecl::create(Context,
         StaticLoc, StaticSpelling, VarLoc, pattern.get(), nullptr,
         CurDeclContext);
 

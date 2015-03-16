@@ -1748,7 +1748,6 @@ class PatternBindingDecl : public Decl {
 
   friend class Decl;
   
-public:
   PatternBindingDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                      SourceLoc VarLoc,
                      Pattern *Pat, Expr *E,
@@ -1761,6 +1760,18 @@ public:
         static_cast<unsigned>(StaticSpelling);
     setPattern(Pat);
   }
+
+public:
+  static PatternBindingDecl *create(ASTContext &Context,
+                                    SourceLoc StaticLoc,
+                                    StaticSpellingKind StaticSpelling,
+                                    SourceLoc VarLoc,
+                                    Pattern *Pat, Expr *E,
+                                    DeclContext *Parent) {
+    return new (Context) PatternBindingDecl(StaticLoc, StaticSpelling, VarLoc,
+                                            Pat, E, Parent);
+  }
+
 
   SourceLoc getStartLoc() const {
     return StaticLoc.isValid() ? StaticLoc : VarLoc;

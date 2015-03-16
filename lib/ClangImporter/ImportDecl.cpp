@@ -630,11 +630,12 @@ static void makeOptionSetAllZerosProperty(StructDecl *optionSetDecl,
       PropertyPattern, TypeLoc::withoutLoc(optionSetType), /*Implicit=*/true);
   PropertyPattern->setType(optionSetType);
 
-  auto *PatternBinding = new (C) PatternBindingDecl(
-      SourceLoc(), StaticSpellingKind::KeywordStatic, SourceLoc(),
-      PropertyPattern, nullptr, optionSetDecl);
-  PatternBinding->setImplicit();
-  NewDecls.push_back(PatternBinding);
+  auto *PBD = PatternBindingDecl::create(C, SourceLoc(),
+                                         StaticSpellingKind::KeywordStatic,
+                                         SourceLoc(), PropertyPattern, nullptr,
+                                         optionSetDecl);
+  PBD->setImplicit();
+  NewDecls.push_back(PBD);
 }
 
 // Build the NilLiteralConvertible conformance:
@@ -1722,9 +1723,10 @@ namespace {
         // Create a pattern binding to describe the variable.
         Pattern *varPattern = createTypedNamedPattern(var);
 
-        auto patternBinding = new (Impl.SwiftContext)
-            PatternBindingDecl(SourceLoc(), StaticSpellingKind::None,
-                               SourceLoc(), varPattern, nullptr, structDecl);
+        auto patternBinding =
+            PatternBindingDecl::create(Impl.SwiftContext, SourceLoc(),
+                                       StaticSpellingKind::None, SourceLoc(),
+                                       varPattern, nullptr, structDecl);
 
         // Create a constructor to initialize that value from a value of the
         // underlying type.
@@ -1827,9 +1829,10 @@ namespace {
         // Create a pattern binding to describe the variable.
         Pattern *varPattern = createTypedNamedPattern(rawValue);
         
-        auto rawValueBinding = new (Impl.SwiftContext)
-          PatternBindingDecl(SourceLoc(), StaticSpellingKind::None,
-                             SourceLoc(), varPattern, nullptr, enumDecl);
+        auto rawValueBinding =
+          PatternBindingDecl::create(Impl.SwiftContext, SourceLoc(),
+                                     StaticSpellingKind::None, SourceLoc(),
+                                     varPattern, nullptr, enumDecl);
 
         auto rawValueGetter = makeEnumRawValueGetter(enumDecl, rawValue);
 
@@ -1877,9 +1880,10 @@ namespace {
         // Create a pattern binding to describe the variable.
         Pattern *varPattern = createTypedNamedPattern(var);
 
-        auto patternBinding = new (Impl.SwiftContext)
-            PatternBindingDecl(SourceLoc(), StaticSpellingKind::None,
-                               SourceLoc(), varPattern, nullptr, structDecl);
+        auto patternBinding =
+            PatternBindingDecl::create(Impl.SwiftContext, SourceLoc(),
+                                       StaticSpellingKind::None, SourceLoc(),
+                                       varPattern, nullptr, structDecl);
         
         // Create a default initializer to get the value with no options set.
         auto defaultConstructor = makeOptionSetDefaultConstructor(structDecl,
