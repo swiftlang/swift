@@ -460,10 +460,10 @@ bb0(%0 : $Int64, %1 : $Int8):
 // CHECK-LABEL: @signed_cmpeq_sub
 // CHECK-NOT: cond_fail
 // CHECK: return
-sil hidden @signed_cmpeq_sub : $@thin (Int) -> () {
-bb0(%0 : $Int):
+sil hidden @signed_cmpeq_sub : $@thin (Int64) -> () {
+bb0(%0 : $Int64):
   %1 = integer_literal $Builtin.Int64, 3          // users: %3, %12
-  %2 = struct_extract %0 : $Int, #Int.value       // users: %3, %7, %12
+  %2 = struct_extract %0 : $Int64, #Int64.value       // users: %3, %7, %12
   %3 = builtin "cmp_ne_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %4
   cond_br %3, bb1, bb2                            // id: %4
 
@@ -491,10 +491,10 @@ bb3:                                              // Preds: bb1 bb2
 // CHECK-LABEL: @unsigned_cmpeq_sub
 // CHECK-NOT: cond_fail
 // CHECK: return
-sil hidden @unsigned_cmpeq_sub : $@thin (UInt) -> () {
-bb0(%0 : $UInt):
+sil hidden @unsigned_cmpeq_sub : $@thin (UInt64) -> () {
+bb0(%0 : $UInt64):
   %1 = integer_literal $Builtin.Int64, 3          // users: %3, %12
-  %2 = struct_extract %0 : $UInt, #UInt.value     // users: %3, %7, %12
+  %2 = struct_extract %0 : $UInt64, #UInt64.value // users: %3, %7, %12
   %3 = builtin "cmp_ne_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %4
   cond_br %3, bb1, bb2                            // id: %4
 
@@ -517,3 +517,4 @@ bb3:                                              // Preds: bb1 bb2
   %16 = tuple ()                                  // user: %17
   return %16 : $()                                // id: %17
 }
+
