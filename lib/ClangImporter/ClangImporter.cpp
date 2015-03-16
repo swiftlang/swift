@@ -1014,9 +1014,9 @@ ClangImporter::Implementation::importName(clang::DeclarationName name,
   StringRef nameStr = name.getAsIdentifierInfo()->getName();
   // Remove the prefix, if any.
   if (!removePrefix.empty()) {
-    assert(nameStr.startswith(removePrefix)
-           && "name doesn't start with given removal prefix");
-    nameStr = nameStr.slice(removePrefix.size(), nameStr.size());
+    if (nameStr.startswith(removePrefix)) {
+      nameStr = nameStr.slice(removePrefix.size(), nameStr.size());
+    }
   }
 
   // Get the Swift identifier.

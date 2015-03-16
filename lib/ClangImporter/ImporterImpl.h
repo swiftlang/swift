@@ -621,7 +621,8 @@ public:
   /// Swift name.
   ///
   /// \param removePrefix The prefix to remove from the Clang name to produce
-  /// the Swift name.
+  /// the Swift name. If the Clang name does not start with this prefix,
+  /// nothing is removed.
   Identifier importName(clang::DeclarationName name, StringRef suffix = "",
                         StringRef removePrefix = "");
 

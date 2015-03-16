@@ -324,11 +324,38 @@ typedef CF_OPTIONS(unsigned long, CFCalendarUnit) {
   kCFCalendarUnitYearForWeekOfYear /*CF_ENUM_AVAILABLE(10_7, 5_0)*/ = (1UL << 14),
 };
 
+// From Foundation
+
 typedef NS_OPTIONS(NSUInteger, NSKeyValueObservingOptions) {
   NSKeyValueObservingOptionNew = 0x01,
   NSKeyValueObservingOptionOld = 0x02,
   NSKeyValueObservingOptionInitial /*NS_ENUM_AVAILABLE(10_5, 2_0)*/ = 0x04,
   NSKeyValueObservingOptionPrior /*NS_ENUM_AVAILABLE(10_5, 2_0)*/ = 0x08
+};
+
+#define NS_CALENDAR_ENUM_DEPRECATED(osx_in, osx_out, ios_in, ios_out, msg) \
+  __attribute__((availability(macosx, introduced=osx_in, deprecated=osx_out, message=msg))) \
+  __attribute__((availability(iphoneos, introduced=ios_in, deprecated=ios_out, message=msg)))
+typedef NS_OPTIONS(NSUInteger, NSCalendarUnit) {
+  NSCalendarUnitEra                = kCFCalendarUnitEra,
+  NSCalendarUnitYear               = kCFCalendarUnitYear,
+  NSCalendarUnitMonth              = kCFCalendarUnitMonth,
+  // snip
+  NSCalendarUnitCalendar           = (1 << 20),
+
+  NSEraCalendarUnit NS_CALENDAR_ENUM_DEPRECATED(10_4, 10_9, 2_0, 7_0, "Use NSCalendarUnitEra instead") = NSCalendarUnitEra,
+  NSYearCalendarUnit NS_CALENDAR_ENUM_DEPRECATED(10_4, 10_9, 2_0, 7_0, "Use NSCalendarUnitYear instead") = NSCalendarUnitYear,
+  NSMonthCalendarUnit NS_CALENDAR_ENUM_DEPRECATED(10_4, 10_9, 2_0, 7_0, "Use NSCalendarUnitMonth instead") = NSCalendarUnitMonth,
+  // snip
+  NSCalendarCalendarUnit NS_CALENDAR_ENUM_DEPRECATED(10_7, 10_9, 4_0, 7_0, "Use NSCalendarUnitCalendar instead") = NSCalendarUnitCalendar,
+};
+
+typedef NS_OPTIONS(NSUInteger, NSCalendarUnitDeprecated) {
+  NSEraCalendarUnitDeprecated NS_CALENDAR_ENUM_DEPRECATED(10_4, 10_9, 2_0, 7_0, "Use NSCalendarUnitEra instead") = NSCalendarUnitEra,
+  NSYearCalendarUnitDeprecated NS_CALENDAR_ENUM_DEPRECATED(10_4, 10_9, 2_0, 7_0, "Use NSCalendarUnitYear instead") = NSCalendarUnitYear,
+  NSMonthCalendarUnitDeprecated NS_CALENDAR_ENUM_DEPRECATED(10_4, 10_9, 2_0, 7_0, "Use NSCalendarUnitMonth instead") = NSCalendarUnitMonth,
+  // snip
+  NSCalendarCalendarUnitDeprecated NS_CALENDAR_ENUM_DEPRECATED(10_7, 10_9, 4_0, 7_0, "Use NSCalendarUnitCalendar instead") = NSCalendarUnitCalendar,
 };
 
 // From CoreBluetooth

@@ -1552,9 +1552,30 @@ namespace {
       if (ec == ecEnd)
         return;
 
+      auto isNonDeprecated = [](const clang::EnumConstantDecl *elem) -> bool {
+        clang::VersionTuple maxVersion{~0U, ~0U, ~0U};
+        switch (elem->getAvailability(nullptr, maxVersion)) {
+        case clang::AR_Available:
+        case clang::AR_NotYetIntroduced:
+          return true;
+        case clang::AR_Deprecated:
+        case clang::AR_Unavailable:
+          return false;
+        }
+      };
+
+      auto firstNonDeprecated = std::find_if(ec, ecEnd, isNonDeprecated);
+      bool hasNonDeprecated = (firstNonDeprecated != ecEnd);
+      if (hasNonDeprecated)
+        ec = firstNonDeprecated;
+
       StringRef commonPrefix = (*ec)->getName();
       bool followedByNonIdentifier = false;
       for (++ec; ec != ecEnd; ++ec) {
+        if (hasNonDeprecated)
+          if (!isNonDeprecated(*ec))
+            continue;
+
         commonPrefix = getCommonWordPrefix(commonPrefix, (*ec)->getName(),
                                            followedByNonIdentifier);
         if (commonPrefix.empty())
