@@ -1527,44 +1527,17 @@ public:
     require(operandType.isObject(),
             "open_existential_ref operand must not be address");
 
-    CanType instanceTy = operandType.getSwiftType();
-    bool isOperandMetatype = false;
-    if (auto metaTy = dyn_cast<AnyMetatypeType>(instanceTy)) {
-      instanceTy = metaTy.getInstanceType();
-      isOperandMetatype = true;
-    }
-
-    require(instanceTy.isExistentialType(),
-            "open_existential_ref must be applied to existential or metatype "
-            "thereof");
-    require(isOperandMetatype || instanceTy->isClassExistentialType(),
-            "open_existential_ref operand must be class existential or "
-            "metatype");
+    require(operandType.canUseExistentialRepresentation(
+                                              ExistentialRepresentation::Class),
+            "open_existential_ref operand must be class existential");
 
     CanType resultInstanceTy = OEI->getType().getSwiftRValueType();
-    if (auto resultMetaTy = dyn_cast<MetatypeType>(resultInstanceTy)) {
-      require(isOperandMetatype, 
-              "open_existential_ref result is a metatype but operand is not");
-      require(resultMetaTy->hasRepresentation(),
-              "open_existential_ref result metatype must have a "
-              "representation");
-      require(operandType.is<ExistentialMetatypeType>(),
-              "open_existential_ref yielding metatype should operate on "
-              "an existential metatype");
-      require(resultMetaTy->getRepresentation() == 
-              operandType.castTo<ExistentialMetatypeType>()->getRepresentation(),
-              "open_existential_ref result and operand metatypes must have the "
-              "same representation");
-              
-      resultInstanceTy = resultMetaTy.getInstanceType();
-    } else {
-      require(!isOperandMetatype, 
-              "open_existential_ref operand is a metatype but result is not");
-    }
+
+    require(OEI->getType().isObject(),
+            "open_existential_ref result must be an address");
 
     require(isOpenedArchetype(resultInstanceTy),
-            "open_existential_ref result must be an opened existential "
-            "archetype or metatype thereof");
+            "open_existential_ref result must be an opened existential");
   }
 
   void checkOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *I) {
