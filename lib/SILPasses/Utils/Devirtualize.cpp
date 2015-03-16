@@ -232,7 +232,7 @@ static SILValue conditionallyCastAddr(SILBuilderWithScope<16> &B,
 ///
 /// \p AI is the apply to devirtualize.
 /// \p ClassOrMetatype is a class value or metatype value that is the
-///    self parameter of the devirtualized call.
+///    self argument of the apply we will devirtualize.
 /// return the new ApplyInst if created one or null.
 ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
                                           SILValue ClassOrMetatype) {
