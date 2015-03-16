@@ -31,8 +31,8 @@ internal final class _Generator<Base: GeneratorType> : Generator<Base.Element> {
   var base: Base
 }
 
-internal func _typeID(instance: AnyObject) -> Int {
-  return unsafeBitCast(instance.dynamicType, Int.self)
+internal func _typeID(instance: AnyObject) -> ObjectIdentifier {
+  return ObjectIdentifier(instance.dynamicType)
 }
 
 internal final class _ForwardIndexBox<
@@ -70,14 +70,14 @@ internal final class _ForwardIndexBox<
     return _ForwardIndexBox(advance(base, numericCast(n), unsafeUnbox(limit)))
   }
 
-  var typeID: Int { return _typeID(self) }
+  var typeID: ObjectIdentifier { return _typeID(self) }
   
   internal // private
   let base: BaseIndex
 }
 
 internal protocol _ForwardIndexBoxType : class {
-  var typeID: Int {get}
+  var typeID: ObjectIdentifier {get}
   func successor() -> _ForwardIndexBoxType
   func equals(other: _ForwardIndexBoxType) -> Bool
   func _distanceTo(other: _ForwardIndexBoxType) -> ForwardIndex.Distance
@@ -104,7 +104,7 @@ public struct ForwardIndex : ForwardIndexType {
     return (_box as! _ForwardIndexBox<T>).base
   }
   
-  internal var _typeID: Int {
+  internal var _typeID: ObjectIdentifier {
     return _box.typeID
   }
   
