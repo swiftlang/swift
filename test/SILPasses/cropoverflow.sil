@@ -457,3 +457,63 @@ bb0(%0 : $Int64, %1 : $Int8):
   return %13 : $()                                // id: %14
 }
 
+// CHECK-LABEL: @signed_cmpeq_sub
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @signed_cmpeq_sub : $@thin (Int) -> () {
+bb0(%0 : $Int):
+  %1 = integer_literal $Builtin.Int64, 3          // users: %3, %12
+  %2 = struct_extract %0 : $Int, #Int.value       // users: %3, %7, %12
+  %3 = builtin "cmp_ne_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %4
+  cond_br %3, bb1, bb2                            // id: %4
+
+bb1:                                              // Preds: bb0
+  %5 = integer_literal $Builtin.Int64, 999        // user: %7
+  %6 = integer_literal $Builtin.Int1, -1          // user: %7
+  %7 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %5 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %8
+  %8 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 1 // user: %9
+  %9 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 1 // user: %9
+  br bb3                                          // id: %10
+
+bb2:                                              // Preds: bb0
+  %11 = integer_literal $Builtin.Int1, -1         // user: %12
+  %12 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %11 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %13
+  %13 = tuple_extract %12 : $(Builtin.Int64, Builtin.Int1), 1 // user: %14
+  cond_fail %13 : $Builtin.Int1                   // id: %14
+  br bb3                                          // id: %15
+
+bb3:                                              // Preds: bb1 bb2
+  %16 = tuple ()                                  // user: %17
+  return %16 : $()                                // id: %17
+}
+
+
+// CHECK-LABEL: @unsigned_cmpeq_sub
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @unsigned_cmpeq_sub : $@thin (Int) -> () {
+bb0(%0 : $UInt):
+  %1 = integer_literal $Builtin.Int64, 3          // users: %3, %12
+  %2 = struct_extract %0 : $UInt, #UInt.value     // users: %3, %7, %12
+  %3 = builtin "cmp_ne_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %4
+  cond_br %3, bb1, bb2                            // id: %4
+
+bb1:                                              // Preds: bb0
+  %5 = integer_literal $Builtin.Int64, 999        // user: %7
+  %6 = integer_literal $Builtin.Int1, -1          // user: %7
+  %7 = builtin "uadd_with_overflow_Int64"(%2 : $Builtin.Int64, %5 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %8
+  %8 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 1 // user: %9
+  %9 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 1 // user: %9
+  br bb3                                          // id: %10
+
+bb2:                                              // Preds: bb0
+  %11 = integer_literal $Builtin.Int1, -1         // user: %12
+  %12 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %11 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %13
+  %13 = tuple_extract %12 : $(Builtin.Int64, Builtin.Int1), 1 // user: %14
+  cond_fail %13 : $Builtin.Int1                   // id: %14
+  br bb3                                          // id: %15
+
+bb3:                                              // Preds: bb1 bb2
+  %16 = tuple ()                                  // user: %17
+  return %16 : $()                                // id: %17
+}

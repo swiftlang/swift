@@ -321,6 +321,21 @@ public:
           }
         }
 
+        if (F.Relationship == ValueRelation::EQ) {
+          SILValue A = BI->getOperand(0);
+          SILValue B = BI->getOperand(1);
+          // A - B, L == R and known that L >= A and R == B.
+          if (knownRelation(F.Right, B, ValueRelation::EQ) &&
+              knownRelation(A, F.Left, ValueRelation::ULE)) {
+            return true;
+          }
+          // Swap L and R because equality is commutative.
+          if (knownRelation(F.Left, B, ValueRelation::EQ) &&
+              knownRelation(A, F.Right, ValueRelation::ULE)) {
+            return true;
+          }
+        }
+
         if (F.Relationship == ValueRelation::USub) {
           // L - R already known to not trap at this point in the program.
           // And the following applies:
@@ -374,6 +389,22 @@ public:
               knownRelation(B, F.Right,  ValueRelation::SLE))
             return true;
         }
+
+        if (F.Relationship == ValueRelation::EQ) {
+          SILValue A = BI->getOperand(0);
+          SILValue B = BI->getOperand(1);
+          // A - B, L == R and known that L >= A and R == B.
+          if (knownRelation(F.Right, B, ValueRelation::EQ) &&
+              knownRelation(A, F.Left, ValueRelation::SLE)) {
+            return true;
+          }
+          // Swap L and R because equality is commutative.
+          if (knownRelation(F.Left, B, ValueRelation::EQ) &&
+              knownRelation(A, F.Right, ValueRelation::SLE)) {
+            return true;
+          }
+        }
+
 
         // A - 1 does not trap if A is greater than some other number.
         if (F.Relationship == ValueRelation::SLT) {
@@ -485,7 +516,7 @@ public:
       default: return;
       case BuiltinValueKind::ICMP_NE:
         if (FalseBB)
-          Constraints.push_back(Constraint(TrueBB, Left, Right,
+          Constraints.push_back(Constraint(FalseBB, Left, Right,
                                      ValueRelation::EQ));
         return;
       case BuiltinValueKind::ICMP_EQ:
