@@ -5359,7 +5359,9 @@ public:
   bool isAssignmentImplicit() const {
     return InfixOperatorDeclBits.IsAssignmentImplicit;
   }
-  
+
+  void collectOperatorKeywordRanges(SmallVectorImpl<CharSourceRange> &Ranges);
+
   /// True if this decl's attributes conflict with those declared by another
   /// operator.
   bool conflictsWith(InfixOperatorDecl *other) {

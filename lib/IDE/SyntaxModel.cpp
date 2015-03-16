@@ -732,6 +732,16 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
         return false;
 
   } else if (auto OperD = dyn_cast<OperatorDecl>(D)) {
+    // If the operator is infix operator, highlight specifiers like
+    // "associativity" or "assignment" as keywords.
+    if (auto IFO = dyn_cast<InfixOperatorDecl>(OperD)) {
+      SmallVector<CharSourceRange, 3> KeywordsRanges;
+      IFO->collectOperatorKeywordRanges(KeywordsRanges);
+      std::for_each(KeywordsRanges.begin(), KeywordsRanges.end(),
+               [&](CharSourceRange Range) {
+        passNonTokenNode({SyntaxNodeKind::Keyword, Range});
+      });
+    }
     if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
           CharSourceRange(OperD->getOperatorLoc(), strlen("operator")) }))
       return false;

@@ -3645,3 +3645,15 @@ SourceRange DestructorDecl::getSourceRange() const {
 
   return { getDestructorLoc(), getBody()->getEndLoc() };
 }
+
+void InfixOperatorDecl::collectOperatorKeywordRanges(SmallVectorImpl
+                                                     <CharSourceRange> &Ranges) {
+  auto AddToRange = [&] (SourceLoc Loc, StringRef Word) {
+    if (Loc.isValid())
+      Ranges.push_back(CharSourceRange(Loc, strlen(Word.data())));
+  };
+  AddToRange(AssociativityLoc, "associativity");
+  AddToRange(AssignmentLoc, "assignment");
+  AddToRange(PrecedenceLoc, "precedence");
+}
+
