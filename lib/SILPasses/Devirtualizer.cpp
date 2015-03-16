@@ -324,17 +324,13 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   if (isClassWithUnboundGenericParameters(SubType, AI->getModule()))
     return false;
 
-  ClassDecl *CD = SubType.getClassOrBoundGenericClass();
+  auto &M = CMI->getModule();
+  auto ClassType = SubType;
+  if (SubType.is<MetatypeType>())
+    ClassType = SubType.getMetatypeInstanceType(M);
 
-  if (auto *VMTI = dyn_cast<ValueMetatypeInst>(SubTypeValue)) {
-    CanType InstTy = VMTI->getType().castTo<MetatypeType>().getInstanceType();
-    CD = InstTy.getClassOrBoundGenericClass();
-    assert(CD && "Non-class type for instance type of class metatype?!");
-  }
-
-  // Check if it is legal to insert inline caches.
-  if (!CD)
-    return false;
+  ClassDecl *CD = ClassType.getClassOrBoundGenericClass();
+  assert(CD && "Expected decl for class type!");
 
   if (!CHA->hasKnownDirectSubclasses(CD)) {
     // If there is only one possible alternative for this method,
