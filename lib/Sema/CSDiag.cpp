@@ -1901,7 +1901,7 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
   // (minus the attribute).
   SmallPtrSet<Type, 3> noEscapeSecondTypes;
   for (auto failure : CS->failures) {
-    if (failure.getLocator()->getAnchor() != expr)
+    if (failure.getLocator() && failure.getLocator()->getAnchor() != expr)
       continue;
 
     if (failure.getKind() == Failure::FunctionNoEscapeMismatch) {

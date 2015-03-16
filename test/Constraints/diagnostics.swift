@@ -90,3 +90,13 @@ infix operator ***~ {
 
 func ***~(Int, String) { }
 i ***~ i // expected-error{{binary operator '***~' cannot be applied to two Int operands}}
+
+// <rdar://problem/20142523>
+// NOTE: This will no longer yield an error once 20142462 is fixed. For now, we
+// just want to make sure it doesn't crash.
+func rdar20142523() {
+  map(0..<10, { x in // expected-error{{cannot find an overload for 'map' that accepts an argument list of type '(Range<Int>, (_) -> _)'}}
+    ()
+    return x
+  })
+}
