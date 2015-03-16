@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
-// XFAIL: linux
 
-// Multiple local decls.
+// Check that we emit all local decls, not just the first one.
 func test1() {
   class a {
     var x, y : Int
@@ -20,7 +19,7 @@ func test1() {
   var _ : a, _ : b
 }
 
-// CHECK: private unnamed_addr constant [2 x i8] c"a\00"
-// CHECK: private unnamed_addr constant [2 x i8] c"b\00"
-
+// Check that we emit nominal type descriptors for all types.
+// CHECK-DAG: @_TMnCF5decls5test1FT_T_L_1a = hidden constant
+// CHECK-DAG: @_TMnCF5decls5test1FT_T_L_1b = hidden constant
 
