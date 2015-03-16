@@ -1099,6 +1099,8 @@ void Remangler::mangleImplConvention(Node *node) {
     Out << 'd'; // only in results
   } else if (text == "@guaranteed") {
     Out << 'g';
+  } else if (text == "@deallocating") {
+    Out << 'e';
   } else if (text == "@in") {
     Out << 'i'; // only in parameters
   } else if (text == "@out") {

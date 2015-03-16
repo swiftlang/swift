@@ -1318,6 +1318,8 @@ void SignatureExpansion::expand(SILParameterInfo param) {
       }
       return;
     }
+    SWIFT_FALLTHROUGH;
+  case ParameterConvention::Direct_Deallocating:
 
     switch (FnType->getAbstractCC()) {
     case AbstractCC::C:
@@ -3107,6 +3109,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   case ParameterConvention::Direct_Guaranteed:
     consumesContext = false;
     break;
+  case ParameterConvention::Direct_Deallocating:
+    llvm_unreachable("callables do not have destructors");
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_Out:
   case ParameterConvention::Indirect_In:
@@ -3180,11 +3184,19 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         break;
       case ParameterConvention::Direct_Guaranteed:
       case ParameterConvention::Direct_Unowned:
-        // Load these parameters directly. We can "take" since the parameter is
-        // +0 and the context will keep the parameter alive for us. If the type
-        // is nontrivial, keep the context alive.
+        // If the type is nontrivial, keep the context alive since the field
+        // depends on the context to not be deallocated.
         if (!fieldTI.isPOD(ResilienceScope::Local))
           dependsOnContextLifetime = true;
+        SWIFT_FALLTHROUGH;
+      case ParameterConvention::Direct_Deallocating:
+        // Load these parameters directly. We can "take" since the parameter is
+        // +0. This can happen due to either:
+        //
+        // 1. The context keeping the parameter alive.
+        // 2. The object being a deallocating object. This means retains and
+        //    releases do not affect the object since we do not support object
+        //    resurrection.
         cast<LoadableTypeInfo>(fieldTI).loadAsTake(subIGF, fieldAddr, param);
         break;
       case ParameterConvention::Direct_Owned:
@@ -3325,6 +3337,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Direct_Guaranteed:
+    case ParameterConvention::Direct_Deallocating:
       argLoweringTy = argType.getSwiftRValueType();
       break;
       
@@ -3455,6 +3468,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       case ParameterConvention::Direct_Unowned:
       case ParameterConvention::Direct_Owned:
       case ParameterConvention::Direct_Guaranteed:
+      case ParameterConvention::Direct_Deallocating:
       case ParameterConvention::Indirect_Inout:
         cast<LoadableTypeInfo>(fieldLayout.getType())
           .initialize(IGF, args, fieldAddr);

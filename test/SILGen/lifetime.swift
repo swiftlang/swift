@@ -458,7 +458,7 @@ class Foo<T> {
   }
 
   // Deallocating destructor for Foo.
-  // CHECK-LABEL: sil hidden @_TFC8lifetime3FooD : $@cc(method) @thin <T> (@owned Foo<T>) -> ()
+  // CHECK-LABEL: sil hidden @_TFC8lifetime3FooD : $@cc(method) @thin <T> (@deallocating Foo<T>) -> ()
   // CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $Foo<T>):
   // CHECK:   [[DESTROYING_REF:%[0-9]+]] = function_ref @_TFC8lifetime3Food : $@cc(method) @thin <τ_0_0> (@owned Foo<τ_0_0>) -> @owned Builtin.NativeObject
   // CHECK-NEXT:   [[RESULT_SELF:%[0-9]+]] = apply [[DESTROYING_REF]]<T>([[SELF]]) : $@cc(method) @thin <τ_0_0> (@owned Foo<τ_0_0>) -> @owned Builtin.NativeObject

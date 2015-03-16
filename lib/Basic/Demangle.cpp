@@ -1979,6 +1979,7 @@ private:
   /// impl-convention ::= 'D'                     // direct, no ownership transfer,
   ///                                             // dependent on self
   /// impl-convention ::= 'g'                     // direct, guaranteed
+  /// impl-convention ::= 'e'                     // direct, deallocating
   /// impl-convention ::= 'i'                     // indirect, ownership transfer
   /// impl-convention ::= 'l'                     // indirect, inout
   /// impl-convention ::= 'o'                     // direct, ownership transfer
@@ -1999,6 +2000,7 @@ private:
     CASE('d',   "@callee_unowned",      "@unowned",      "@unowned")
     CASE('d',   Nothing,                Nothing,         "@unowned_inner_pointer")
     CASE('g',   "@callee_guaranteed",   "@guaranteed",   Nothing)
+    CASE('e',   Nothing,                "@deallocating", Nothing)
     CASE('i',   Nothing,                "@in",           "@out")
     CASE('l',   Nothing,                "@inout",        Nothing)
     CASE('o',   "@callee_owned",        "@owned",        "@owned")

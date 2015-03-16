@@ -161,10 +161,12 @@ public:
   /// Generates code for the given ConstructorDecl and adds
   /// the SILFunction to the current SILModule under the name SILDeclRef(decl).
   void emitConstructor(ConstructorDecl *decl);
+
   /// Generates code for the given class's destructor and adds
   /// the SILFunction to the current SILModule under the name
   /// SILDeclRef(cd, Destructor).
   void emitDestructor(ClassDecl *cd, DestructorDecl *dd);
+
   /// Generates the enum constructor for the given
   /// EnumElementDecl under the name SILDeclRef(decl).
   void emitEnumConstructor(EnumElementDecl *decl);
@@ -287,6 +289,10 @@ public:
   /// Get or create SILGlobalVariable for a given global VarDecl.
   SILGlobalVariable *getSILGlobalVariable(VarDecl *gDecl,
                                           ForDefinition_t forDef);
+
+private:
+  /// Emit the deallocator for a class that uses the objc allocator.
+  void emitObjCAllocatorDestructor(ClassDecl *cd, DestructorDecl *dd);
 };
  
 } // end namespace Lowering

@@ -641,49 +641,54 @@ static bool requiresIVarDestruction(SILGenModule &SGM, ClassDecl *cd) {
   return false;
 }
 
+/// TODO: This needs a better name.
+void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
+                                               DestructorDecl *dd) {
+  // Emit the native deallocating destructor for -dealloc.
+  {
+    SILDeclRef dealloc(dd, SILDeclRef::Kind::Deallocator);
+    SILFunction *f = preEmitFunction(dealloc, dd, dd);
+    PrettyStackTraceSILFunction X("silgen emitDestructor -dealloc", f);
+    SILGenFunction(*this, *f).emitObjCDestructor(dealloc);
+    postEmitFunction(dealloc, f);
+  }
+
+  // Emit the Objective-C -dealloc entry point if it has
+  // something to do beyond messaging the superclass's -dealloc.
+  if (!dd->getBody()->getElements().empty())
+    emitObjCDestructorThunk(dd);
+
+  // Emit the ivar initializer, if needed.
+  if (requiresIVarInitialization(*this, cd)) {
+    SILDeclRef ivarInitializer(cd, SILDeclRef::Kind::IVarInitializer,
+                               SILDeclRef::ConstructAtBestResilienceExpansion,
+                               SILDeclRef::ConstructAtNaturalUncurryLevel,
+                               /*isForeign=*/true);
+    SILFunction *f = preEmitFunction(ivarInitializer, dd, dd);
+    PrettyStackTraceSILFunction X("silgen emitDestructor ivar initializer", f);
+    SILGenFunction(*this, *f).emitIVarInitializer(ivarInitializer);
+    postEmitFunction(ivarInitializer, f);
+  }
+
+  // Emit the ivar destroyer, if needed.
+  if (requiresIVarDestruction(*this, cd)) {
+    SILDeclRef ivarDestroyer(cd, SILDeclRef::Kind::IVarDestroyer,
+                             SILDeclRef::ConstructAtBestResilienceExpansion,
+                             SILDeclRef::ConstructAtNaturalUncurryLevel,
+                             /*isForeign=*/true);
+    SILFunction *f = preEmitFunction(ivarDestroyer, dd, dd);
+    PrettyStackTraceSILFunction X("silgen emitDestructor ivar destroyer", f);
+    SILGenFunction(*this, *f).emitIVarDestroyer(ivarDestroyer);
+    postEmitFunction(ivarDestroyer, f);
+  }
+}
+
 void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   emitAbstractFuncDecl(dd);
 
   // If the class would use the Objective-C allocator, only emit -dealloc.
   if (usesObjCAllocator(cd)) {
-    // Emit the native deallocating destructor for -dealloc.
-    {
-      SILDeclRef dealloc(dd, SILDeclRef::Kind::Deallocator);
-      SILFunction *f = preEmitFunction(dealloc, dd, dd);
-      PrettyStackTraceSILFunction X("silgen emitDestructor -dealloc", f);
-      SILGenFunction(*this, *f).emitObjCDestructor(dealloc);
-      postEmitFunction(dealloc, f);
-    }
-
-    // Emit the Objective-C -dealloc entry point if it has
-    // something to do beyond messaging the superclass's -dealloc.
-    if (!dd->getBody()->getElements().empty())
-      emitObjCDestructorThunk(dd);
-
-    // Emit the ivar initializer, if needed.
-    if (requiresIVarInitialization(*this, cd)) {
-      SILDeclRef ivarInitializer(cd, SILDeclRef::Kind::IVarInitializer,
-                                 SILDeclRef::ConstructAtBestResilienceExpansion,
-                                 SILDeclRef::ConstructAtNaturalUncurryLevel,
-                                 /*isForeign=*/true);
-      SILFunction *f = preEmitFunction(ivarInitializer, dd, dd);
-      PrettyStackTraceSILFunction X("silgen emitDestructor ivar initializer", f);
-      SILGenFunction(*this, *f).emitIVarInitializer(ivarInitializer);
-      postEmitFunction(ivarInitializer, f);
-    }
-
-    // Emit the ivar destroyer, if needed.
-    if (requiresIVarDestruction(*this, cd)) {
-      SILDeclRef ivarDestroyer(cd, SILDeclRef::Kind::IVarDestroyer,
-                               SILDeclRef::ConstructAtBestResilienceExpansion,
-                               SILDeclRef::ConstructAtNaturalUncurryLevel,
-                               /*isForeign=*/true);
-      SILFunction *f = preEmitFunction(ivarDestroyer, dd, dd);
-      PrettyStackTraceSILFunction X("silgen emitDestructor ivar destroyer", f);
-      SILGenFunction(*this, *f).emitIVarDestroyer(ivarDestroyer);
-      postEmitFunction(ivarDestroyer, f);
-    }
-
+    emitObjCAllocatorDestructor(cd, dd);
     return;
   }
 

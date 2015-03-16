@@ -56,6 +56,7 @@ TYPE_ATTR(callee_owned)
 TYPE_ATTR(callee_guaranteed)
 TYPE_ATTR(objc_metatype)
 TYPE_ATTR(opened)
+TYPE_ATTR(deallocating)
 
 // Schema for DECL_ATTR:
 //

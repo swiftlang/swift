@@ -706,6 +706,11 @@ public:
   ManagedValue getManagedValue(SILValue arg, CanType t,
                                  SILParameterInfo parameterInfo) const {
     switch (parameterInfo.getConvention()) {
+    case ParameterConvention::Direct_Deallocating:
+      // If we have a deallocating parameter, it is passed in at +0 and will not
+      // be deallocated since we do not allow for resurrection.
+      return ManagedValue::forUnmanaged(arg);
+
     case ParameterConvention::Direct_Guaranteed:
     case ParameterConvention::Indirect_In_Guaranteed:
       // If we have a guaranteed parameter, it is passed in at +0, and its
@@ -1824,6 +1829,14 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
   for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
     SILType argTy = gen.F.mapTypeIntoContext(inputs[i].getSILType());
     SILValue arg = new(gen.F.getModule()) SILArgument(gen.F.begin(), argTy);
+
+    // If this parameter is deallocating, emit an unmanged rvalue and
+    // continue. The object has the deallocating bit set so retain, release is
+    // irrelevent.
+    if (inputs[i].isDeallocating()) {
+      bridgedArgs.push_back(ManagedValue::forUnmanaged(arg));
+      continue;
+    }
 
     // If the argument is a block, copy it.
     if (argTy.isBlockPointerCompatible()) {

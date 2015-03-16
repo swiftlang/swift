@@ -1143,6 +1143,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   case TAK_owned:
   case TAK_unowned_inner_pointer:
   case TAK_guaranteed:
+  case TAK_deallocating:
   case TAK_autoreleased:
   case TAK_callee_owned:
   case TAK_callee_guaranteed:

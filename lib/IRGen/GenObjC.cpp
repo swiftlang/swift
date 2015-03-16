@@ -778,6 +778,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   bool retainsSelf;
   switch (origMethodType->getParameters().back().getConvention()) {
   case ParameterConvention::Direct_Unowned:
+  case ParameterConvention::Direct_Deallocating:
     retainsSelf = false;
     break;
   case ParameterConvention::Direct_Guaranteed:

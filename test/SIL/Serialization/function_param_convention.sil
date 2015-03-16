@@ -1,0 +1,23 @@
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+// RUN: %target-swift-frontend -parse-sil -disable-func-sig-opts -sil-inline-threshold 0 %S/Inputs/function_param_convention_input.sil -o %t/FunctionInput.swiftmodule -emit-module -parse-as-library -parse-stdlib -module-name FunctionInput -sil-serialize-all -O
+// RUN: %target-sil-opt -I %t -linker -verify %s -o - | FileCheck %s
+
+import Swift
+import FunctionInput
+
+// Make sure we can deserialize a SIL function with these various attributes.
+// CHECK: sil public_external @foo : $@thin (@out X, @in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X, @deallocating X) -> () {
+
+sil @foo : $@thin (@out X, @in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X, @deallocating X) -> ()
+
+sil @foo_caller : $@thin () -> () {
+bb0:
+  %0 = alloc_stack $X
+  %1 = load %0#1 : $*X
+  %2 = function_ref @foo : $@thin (@out X, @in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X, @deallocating X) -> ()
+  apply %2(%0#1, %0#1, %0#1, %0#1, %1, %1, %1, %1) : $@thin (@out X, @in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X, @deallocating X) -> ()
+  dealloc_stack %0#0 : $*@local_storage X
+  %9999 = tuple()
+  return %9999 : $()
+}

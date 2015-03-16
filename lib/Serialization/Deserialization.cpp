@@ -3049,6 +3049,7 @@ Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
   CASE(Direct_Owned)
   CASE(Direct_Unowned)
   CASE(Direct_Guaranteed)
+  CASE(Direct_Deallocating)
 #undef CASE
   }
   return None;

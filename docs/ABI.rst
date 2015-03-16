@@ -959,6 +959,7 @@ which are juxtaposed and terminated with a trailing underscore.
   impl-convention ::= 'D'                     // direct, no ownership transfer,
                                               // dependent on 'self' parameter
   impl-convention ::= 'g'                     // direct, guaranteed
+  impl-convention ::= 'e'                     // direct, deallocating
   impl-convention ::= 'i'                     // indirect, ownership transfer
   impl-convention ::= 'l'                     // indirect, inout
   impl-convention ::= 'G'                     // indirect, guaranteed

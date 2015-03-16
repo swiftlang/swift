@@ -882,6 +882,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     // <impl-convention> ::= 'a'                      // direct, autoreleased
     // <impl-convention> ::= 'd'                      // direct, no ownership transfer
     // <impl-convention> ::= 'g'                      // direct, guaranteed
+    // <impl-convention> ::= 'e'                      // direct, deallocating
     // <impl-convention> ::= 'i'                      // indirect, ownership transfer
     // <impl-convention> ::= 'l'                      // indirect, inout
     // <impl-convention> ::= 'g'                      // direct, guaranteed
@@ -908,6 +909,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
       case ParameterConvention::Direct_Owned: return 'o';
       case ParameterConvention::Direct_Unowned: return 'd';
       case ParameterConvention::Direct_Guaranteed: return 'g';
+      case ParameterConvention::Direct_Deallocating: return 'e';
       }
       llvm_unreachable("bad parameter convention");
     };

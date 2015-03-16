@@ -2566,6 +2566,9 @@ public:
     case ParameterConvention::Direct_Guaranteed:
       Printer << "@callee_guaranteed ";
       return;
+    case ParameterConvention::Direct_Deallocating:
+      // Closures do not have destructors.
+      llvm_unreachable("callee convention cannot be deallocating");
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Out:
     case ParameterConvention::Indirect_Inout:
@@ -2783,6 +2786,7 @@ static StringRef getStringForParameterConvention(ParameterConvention conv) {
   case ParameterConvention::Direct_Owned: return "@owned ";
   case ParameterConvention::Direct_Unowned: return "";
   case ParameterConvention::Direct_Guaranteed: return "@guaranteed ";
+  case ParameterConvention::Direct_Deallocating: return "@deallocating ";
   }
   llvm_unreachable("bad parameter convention");
 }

@@ -1532,6 +1532,8 @@ SILParameterInfo TypeResolver::resolveSILParameter(
     checkFor(TypeAttrKind::TAK_owned, ParameterConvention::Direct_Owned);
     checkFor(TypeAttrKind::TAK_guaranteed,
              ParameterConvention::Direct_Guaranteed);
+    checkFor(TypeAttrKind::TAK_deallocating,
+             ParameterConvention::Direct_Deallocating);
 
     type = resolveAttributedType(attrs, attrRepr->getTypeRepr(), options);
   } else {

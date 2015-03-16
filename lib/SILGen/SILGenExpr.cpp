@@ -1451,6 +1451,12 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
       mv = gen.emitManagedRetain(loc, v);
       break;
 
+    case ParameterConvention::Direct_Deallocating:
+      // We do not need to retain the value since the value is already being
+      // deallocated.
+      mv = ManagedValue::forUnmanaged(v);
+      break;
+
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
@@ -4851,6 +4857,9 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
       case ParameterConvention::Direct_Guaranteed:
       case ParameterConvention::Direct_Unowned:
         mv = emitManagedRetain(fd, arg);
+        break;
+      case ParameterConvention::Direct_Deallocating:
+        mv = ManagedValue::forUnmanaged(arg);
         break;
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Guaranteed:

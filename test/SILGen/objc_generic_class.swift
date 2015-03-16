@@ -14,9 +14,9 @@ import gizmo
 class Generic<T>: NSObject {
   var x: Int = 10
 
-  // CHECK-LABEL: sil hidden @_TFC18objc_generic_class7GenericD : $@cc(method) @thin <T> (@owned Generic<T>) -> () {
+  // CHECK-LABEL: sil hidden @_TFC18objc_generic_class7GenericD : $@cc(method) @thin <T> (@deallocating Generic<T>) -> () {
   // CHECK-NEXT:  bb0({{%.*}} : $Generic<T>):
-  // CHECK-LABEL: sil hidden @_TToFC18objc_generic_class7GenericD : $@cc(objc_method) @thin <T> (Generic<T>) -> () {
+  // CHECK-LABEL: sil hidden @_TToFC18objc_generic_class7GenericD : $@cc(objc_method) @thin <T> (@deallocating Generic<T>) -> () {
   // CHECK-NEXT:  bb0([[SELF:%.*]] : $Generic<T>):
   // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC18objc_generic_class7GenericD
   // CHECK:         apply [[NATIVE]]<T>([[SELF]])
@@ -30,9 +30,9 @@ class Generic<T>: NSObject {
 // CHECK-NOT: sil hidden @_TFC18objc_generic_class7Genericd
 // CHECK-NOT: sil hidden @_TFCSo8NSObjectd
 
-// CHECK-LABEL: sil hidden @_TFC18objc_generic_class11SubGeneric1D : $@cc(method) @thin <U, V> (@owned SubGeneric1<U, V>) -> () {
+// CHECK-LABEL: sil hidden @_TFC18objc_generic_class11SubGeneric1D : $@cc(method) @thin <U, V> (@deallocating SubGeneric1<U, V>) -> () {
 // CHECK-NEXT:  bb0([[SELF:%.*]] : $SubGeneric1<U, V>):
-// CHECK:         [[SUPER_DEALLOC:%.*]] = super_method [[SELF]] : $SubGeneric1<U, V>, #Generic.deinit!deallocator.foreign : <T> Generic<T> -> () , $@cc(objc_method) @thin <τ_0_0> (Generic<τ_0_0>) -> ()
+// CHECK:         [[SUPER_DEALLOC:%.*]] = super_method [[SELF]] : $SubGeneric1<U, V>, #Generic.deinit!deallocator.foreign : <T> Generic<T> -> () , $@cc(objc_method) @thin <τ_0_0> (@deallocating Generic<τ_0_0>) -> ()
 // CHECK:         [[SUPER:%.*]] = upcast [[SELF:%.*]] : $SubGeneric1<U, V> to $Generic<Int>
 // CHECK:         apply [[SUPER_DEALLOC]]<Int>([[SUPER]])
 class SubGeneric1<U, V>: Generic<Int> {

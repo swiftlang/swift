@@ -3978,6 +3978,7 @@ namespace {
       case ParameterConvention::Direct_Owned:
       case ParameterConvention::Direct_Unowned:
       case ParameterConvention::Direct_Guaranteed:
+      case ParameterConvention::Direct_Deallocating:
         // Classes are sources of metadata.
         if (auto classTy = dyn_cast<ClassType>(type)) {
           considerNewSource(SourceKind::ClassPointer, paramIndex,

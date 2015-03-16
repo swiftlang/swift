@@ -34,7 +34,7 @@ bb0(%0 : $foo<T>):
   return %3 : $()                                 // id: %4
 }
 
-sil @_TFC4main3fooD : $@cc(method) @thin <T> (@owned foo<T>) -> ()
+sil @_TFC4main3fooD : $@cc(method) @thin <T> (@deallocating foo<T>) -> ()
 sil @_TFC4main3food : $@cc(method) @thin <T> (@owned foo<T>) -> @owned Builtin.NativeObject
 
 sil_vtable foo {

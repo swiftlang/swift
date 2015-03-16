@@ -51,7 +51,8 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 179; // Last change: attr and known protocol for ErrorType
+const uint16_t VERSION_MINOR = 180; // Last change: Added deallocating
+                                    // parameter convention
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -152,6 +153,7 @@ enum class ParameterConvention : uint8_t {
   Direct_Unowned,
   Direct_Guaranteed,
   Indirect_In_Guaranteed,
+  Direct_Deallocating,
 };
 using ParameterConventionField = BCFixed<3>;
 

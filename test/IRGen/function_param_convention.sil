@@ -1,0 +1,19 @@
+// RUN: %target-swift-frontend -emit-ir %s -module-name Test | FileCheck %s
+
+import Builtin
+
+struct X {
+  init()
+  var x : Builtin.Int32
+}
+
+// Make sure we can irgen a SIL function with various parameter attributes
+// without choking. This is just a basic sanity check.
+
+// CHECK: define void @foo(%V4Test1X* noalias sret, %V4Test1X*, %V4Test1X*, %V4Test1X*, i32, i32, i32, i32) {
+
+sil @foo : $@thin (@out X, @in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X, @deallocating X) -> () {
+bb0(%0 : $*X, %1 : $*X, %2 : $*X, %3 : $*X, %4 : $X, %5 : $X, %6 : $X, %7 : $X):
+  %9999 = tuple()
+  return %9999 : $()  
+}

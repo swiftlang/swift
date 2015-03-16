@@ -22,7 +22,7 @@ class SwiftGizmo : Gizmo {
     super.init()
   }
 
-  // CHECK-LABEL: sil hidden @_TFC12objc_dealloc10SwiftGizmoD : $@cc(method) @thin (@owned SwiftGizmo) -> ()
+  // CHECK-LABEL: sil hidden @_TFC12objc_dealloc10SwiftGizmoD : $@cc(method) @thin (@deallocating SwiftGizmo) -> ()
   deinit {
     // CHECK: bb0([[SELF:%[0-9]+]] : $SwiftGizmo):
     // Call onDestruct()
@@ -34,20 +34,20 @@ class SwiftGizmo : Gizmo {
     // CHECK-NOT: ref_element_addr
 
     // Call super -dealloc.
-    // CHECK:   [[SUPER_DEALLOC:%[0-9]+]] = super_method [[SELF]] : $SwiftGizmo, #Gizmo.deinit!deallocator.foreign : Gizmo -> () , $@cc(objc_method) @thin (Gizmo) -> ()
+    // CHECK:   [[SUPER_DEALLOC:%[0-9]+]] = super_method [[SELF]] : $SwiftGizmo, #Gizmo.deinit!deallocator.foreign : Gizmo -> () , $@cc(objc_method) @thin (@deallocating Gizmo) -> ()
     // CHECK:   [[SUPER:%[0-9]+]] = upcast [[SELF]] : $SwiftGizmo to $Gizmo
-    // CHECK:   [[SUPER_DEALLOC_RESULT:%[0-9]+]] = apply [[SUPER_DEALLOC]]([[SUPER]]) : $@cc(objc_method) @thin (Gizmo) -> ()
+    // CHECK:   [[SUPER_DEALLOC_RESULT:%[0-9]+]] = apply [[SUPER_DEALLOC]]([[SUPER]]) : $@cc(objc_method) @thin (@deallocating Gizmo) -> ()
     // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
     // CHECK:   return [[RESULT]] : $()
   }
 
   // Objective-C deallocation deinit thunk (i.e., -dealloc).
-  // CHECK-LABEL: sil hidden @_TToFC12objc_dealloc10SwiftGizmoD : $@cc(objc_method) @thin (SwiftGizmo) -> ()
+  // CHECK-LABEL: sil hidden @_TToFC12objc_dealloc10SwiftGizmoD : $@cc(objc_method) @thin (@deallocating SwiftGizmo) -> ()
   // CHECK: bb0([[SELF:%[0-9]+]] : $SwiftGizmo):
-  // CHECK:   strong_retain [[SELF]] : $SwiftGizmo
+  // CHECK-NOT:   strong_retain
 
-  // CHECK:   [[GIZMO_DTOR:%[0-9]+]] = function_ref @_TFC12objc_dealloc10SwiftGizmoD : $@cc(method) @thin (@owned SwiftGizmo) -> ()
-  // CHECK:   [[RESULT:%[0-9]+]] = apply [[GIZMO_DTOR]]([[SELF]]) : $@cc(method) @thin (@owned SwiftGizmo) -> ()
+  // CHECK:   [[GIZMO_DTOR:%[0-9]+]] = function_ref @_TFC12objc_dealloc10SwiftGizmoD : $@cc(method) @thin (@deallocating SwiftGizmo) -> ()
+  // CHECK:   [[RESULT:%[0-9]+]] = apply [[GIZMO_DTOR]]([[SELF]]) : $@cc(method) @thin (@deallocating SwiftGizmo) -> ()
   // CHECK:   return [[RESULT]] : $()
 
   // Objective-C IVar initializer (i.e., -.cxx_construct)

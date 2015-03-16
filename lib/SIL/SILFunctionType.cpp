@@ -73,14 +73,15 @@ CanSILFunctionType Lowering::adjustFunctionType(CanSILFunctionType type,
 
 namespace {
 
-  enum class ConventionsKind : uint8_t {
-    Default = 0,
-    DefaultBlock = 1,
-    ObjCMethod = 2,
-    CFunctionType = 3,
-    CFunction = 4,
-    SelectorFamily = 5,
-  };
+enum class ConventionsKind : uint8_t {
+  Default = 0,
+  DefaultBlock = 1,
+  ObjCMethod = 2,
+  CFunctionType = 3,
+  CFunction = 4,
+  SelectorFamily = 5,
+  Deallocator = 6,
+};
 
   class Conventions {
     ConventionsKind kind;
@@ -525,6 +526,54 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
                               M.getASTContext());
 }
 
+//===----------------------------------------------------------------------===//
+//                        Deallocator SILFunctionTypes
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// The convention for general deallocators.
+struct DeallocatorConventions : Conventions {
+  DeallocatorConventions() : Conventions(ConventionsKind::Deallocator) {}
+
+  ParameterConvention getIndirectParameter(unsigned index,
+                                           CanType type) const override {
+    llvm_unreachable("Dealloactors do not have indirect parameters");
+  }
+
+  ParameterConvention getDirectParameter(unsigned index,
+                                         CanType type) const override {
+    llvm_unreachable("Deallocators do not have non-self direct parameters");
+  }
+
+  ParameterConvention getCallee() const override {
+    llvm_unreachable("Deallocators do not have callees");
+  }
+
+  ResultConvention getResult(const TypeLowering &tl) const override {
+    // TODO: Put an unreachable here?
+    return ResultConvention::Owned;
+  }
+
+  ParameterConvention getDirectSelfParameter(CanType type) const override {
+    return ParameterConvention::Direct_Deallocating;
+  }
+
+  ParameterConvention getIndirectSelfParameter(CanType type) const override {
+    llvm_unreachable("Deallocators do not have indirect self parameters");
+  }
+
+  static bool classof(const Conventions *C) {
+    return C->getKind() == ConventionsKind::Deallocator;
+  }
+};
+
+} // end anonymous namespace
+
+//===----------------------------------------------------------------------===//
+//                      Default Convention FunctionTypes
+//===----------------------------------------------------------------------===//
+
 namespace {
   /// The default Swift conventions.
   struct DefaultConventions : Conventions {
@@ -649,7 +698,6 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
     case SILDeclRef::Kind::Func:
     case SILDeclRef::Kind::Allocator:
     case SILDeclRef::Kind::Destroyer:
-    case SILDeclRef::Kind::Deallocator:
     case SILDeclRef::Kind::GlobalAccessor:
     case SILDeclRef::Kind::GlobalGetter:
     case SILDeclRef::Kind::DefaultArgGenerator:
@@ -658,7 +706,9 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
     case SILDeclRef::Kind::EnumElement:
       return getSILFunctionType(M, origType, substType, substInterfaceType,
                             extInfo, DefaultConventions(enableGuaranteedSelf));
-      
+    case SILDeclRef::Kind::Deallocator:
+      return getSILFunctionType(M, origType, substType, substInterfaceType,
+                                extInfo, DeallocatorConventions());
     }
   }
   }
@@ -682,9 +732,9 @@ CanSILFunctionType swift::getNativeSILFunctionType(SILModule &M,
                                     extInfo, SILDeclRef::Kind::Func);
 }
 
-/*****************************************************************************/
-/****************************** Clang imports ********************************/
-/*****************************************************************************/
+//===----------------------------------------------------------------------===//
+//                          Foreign SILFunctionTypes
+//===----------------------------------------------------------------------===//
 
 /// Given nothing but a formal C parameter type that's passed
 /// indirectly, deduce the convention for it.
@@ -950,9 +1000,9 @@ static const clang::Decl *findClangMethod(ValueDecl *method) {
   return nullptr;
 }
 
-/*****************************************************************************/
-/******************************* Selectors ***********************************/
-/*****************************************************************************/
+//===----------------------------------------------------------------------===//
+//                      Selector Family SILFunctionTypes
+//===----------------------------------------------------------------------===//
 
 /// Apply a macro FAMILY(Name, Prefix) to all ObjC selector families.
 #define FOREACH_FAMILY(FAMILY)       \
@@ -1160,6 +1210,12 @@ getUncachedSILFunctionTypeForConstant(SILModule &M, SILDeclRef constant,
                                             substLoweredInterfaceType,
                                             extInfo);
   }
+
+  // If we have a deallocator, return a deallocator convention.
+  if (constant.kind == SILDeclRef::Kind::Deallocator)
+    return getSILFunctionType(M, origLoweredType, substLoweredType,
+                              substLoweredInterfaceType, extInfo,
+                              DeallocatorConventions());
 
   // If the decl belongs to an ObjC method family, use that family's
   // ownership conventions.
@@ -1696,6 +1752,7 @@ namespace {
       case ParameterConvention::Direct_Guaranteed:
         if (isTrivial) return ParameterConvention::Direct_Unowned;
         SWIFT_FALLTHROUGH;
+      case ParameterConvention::Direct_Deallocating:
       case ParameterConvention::Direct_Unowned:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_In:
