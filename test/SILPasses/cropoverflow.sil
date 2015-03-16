@@ -491,7 +491,7 @@ bb3:                                              // Preds: bb1 bb2
 // CHECK-LABEL: @unsigned_cmpeq_sub
 // CHECK-NOT: cond_fail
 // CHECK: return
-sil hidden @unsigned_cmpeq_sub : $@thin (Int) -> () {
+sil hidden @unsigned_cmpeq_sub : $@thin (UInt) -> () {
 bb0(%0 : $UInt):
   %1 = integer_literal $Builtin.Int64, 3          // users: %3, %12
   %2 = struct_extract %0 : $UInt, #UInt.value     // users: %3, %7, %12
