@@ -619,6 +619,8 @@ struct InductionInfo {
   bool isValid() { return Start && End; }
   operator bool() { return isValid(); }
 
+  SILDebugScope *getDebugScope() { return Inc->getDebugScope(); }
+
   SILValue getFirstValue() {
     return Start;
   }
@@ -636,12 +638,10 @@ struct InductionInfo {
       return;
 
     auto Loc = Inc->getLoc();
-    auto Scope = Inc->getDebugScope();
     auto ResultTy = SILType::getBuiltinIntegerType(1, Builder.getASTContext());
     auto *CmpSGE = Builder.createBuiltinBinaryFunction(
         Loc, "cmp_sge", Start.getType(), ResultTy, {Start, End});
-    CmpSGE->setDebugScope(Scope);
-    Builder.createCondFail(Loc, CmpSGE)->setDebugScope(Scope);
+    Builder.createCondFail(Loc, CmpSGE);
     IsOverflowCheckInserted = true;
 
     // We can now remove the cond fail on the increment the above comparison
@@ -1003,7 +1003,8 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   if (IVarsFound)
     for (auto *Arg: Header->getBBArgs())
       if (auto *IV = IndVars[Arg]) {
-        SILBuilderWithScope<> B(Preheader->getTerminator());
+        SILBuilderWithScope<> B(Preheader->getTerminator(),
+                                IV->getDebugScope());
         IV->checkOverflow(B);
       }
 
