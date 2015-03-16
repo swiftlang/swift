@@ -5422,6 +5422,10 @@ static InfixData getInfixData(DeclContext *DC, Expr *E) {
                                                           E->getLoc()))
         return op->getInfixData();
     }
+  } else if (isa<PrefixUnaryExpr>(E)) {
+    return InfixData(IntrinsicPrecedences::PrefixUnaryExpr,
+                     Associativity::Left,
+                     /*assignment*/ false);
   }
   
   return InfixData(IntrinsicPrecedences::MaxPrecedence,
@@ -5454,10 +5458,17 @@ static unsigned char getMinPrecedenceForExpr(DeclContext *DC, Expr *expr,
 }
 
 // Return true if, when replacing "<expr>" with "<expr> as T", parentheses need
+// to be added around <expr> first in order to maintain the correct precedence.
+static bool exprNeedsParensBeforeAddingAs(DeclContext *DC, Expr *expr) {
+  return (getInfixData(DC, expr).getPrecedence() <
+          IntrinsicPrecedences::ExplicitCastExpr);
+}
+
+// Return true if, when replacing "<expr>" with "<expr> as T", parentheses need
 // to be added around the new expression in order to maintain the correct
 // precedence.
-static bool exprNeedsParensWhenAddingAs(DeclContext *DC, Expr *expr,
-                                        Expr *rootExpr) {
+static bool exprNeedsParensAfterAddingAs(DeclContext *DC, Expr *expr,
+                                         Expr *rootExpr) {
   return (IntrinsicPrecedences::ExplicitCastExpr <
           getMinPrecedenceForExpr(DC, expr, rootExpr));
 }
@@ -5544,8 +5555,16 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
       case FixKind::ForceOptional: {
         auto type = solution.simplifyType(TC, affected->getType())
                       ->getRValueObjectType();
-        TC.diagnose(affected->getLoc(), diag::missing_unwrap_optional, type)
-          .fixItInsertAfter(affected->getEndLoc(), "!");
+        auto diag = TC.diagnose(affected->getLoc(),
+                                diag::missing_unwrap_optional, type);
+        bool parensNeeded = (getInfixData(DC, affected).getPrecedence() <
+                             IntrinsicPrecedences::PostfixUnaryExpr);
+        if (parensNeeded) {
+          diag.fixItInsert(affected->getStartLoc(), "(")
+              .fixItInsertAfter(affected->getEndLoc(), ")!");
+        } else {
+          diag.fixItInsertAfter(affected->getEndLoc(), "!");
+        }
         diagnosed = true;
         break;
       }
@@ -5555,35 +5574,42 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
                           ->getRValueObjectType();
         Type toType = solution.simplifyType(TC,
                                             fix.first.getTypeArgument(*this));
-        bool needsParens = exprNeedsParensWhenAddingAs(DC, affected, expr);
-        if (TC.isExplicitlyConvertibleTo(fromType, toType, DC)) {
-          llvm::SmallString<32> asCastStr;
-          asCastStr += " as ";
-          asCastStr += toType.getString();
-          auto diagnosis = TC.diagnose(affected->getLoc(),
-                                       diag::missing_explicit_conversion,
-                                       fromType, toType);
-          if (needsParens) {
-            diagnosis.fixItInsert(affected->getStartLoc(), "(");
-            asCastStr += ")";
-          }
-          diagnosis.fixItInsertAfter(affected->getEndLoc(), asCastStr);
-          diagnosed = true;
-        } else if (TC.checkedCastMaySucceed(fromType, toType, DC)) {
-          llvm::SmallString<32> asCastStr;
-          asCastStr += " as! ";
-          asCastStr += toType.getString();
-          auto diagnosis = TC.diagnose(affected->getLoc(),
-                                       diag::missing_forced_downcast,
-                                       fromType, toType);
-          if (needsParens) {
-            diagnosis.fixItInsert(affected->getStartLoc(), "(");
-            asCastStr += ")";
-          }
-          diagnosis.fixItInsertAfter(affected->getEndLoc(), asCastStr);
-          diagnosed = true;
+        bool useAs = TC.isExplicitlyConvertibleTo(fromType, toType, DC);
+        bool useAsBang = !useAs && TC.checkedCastMaySucceed(fromType, toType,
+                                                            DC);
+        if (!(useAs || useAsBang)) {
+          break;
         }
 
+        bool needsParensInside = exprNeedsParensBeforeAddingAs(DC, affected);
+        bool needsParensOutside = exprNeedsParensAfterAddingAs(DC, affected,
+                                                               expr);
+        llvm::SmallString<2> insertBefore;
+        llvm::SmallString<32> insertAfter;
+        if (needsParensOutside) {
+          insertBefore += "(";
+        }
+        if (needsParensInside) {
+          insertBefore += "(";
+          insertAfter += ")";
+        }
+        if (useAs) {
+          insertAfter += " as ";
+        } else {
+          insertAfter += " as! ";
+        }
+        insertAfter += toType.getString();
+        if (needsParensOutside) {
+          insertAfter += ")";
+        }
+        auto diagID = useAs ? diag::missing_explicit_conversion
+                            : diag::missing_forced_downcast;
+        auto diag = TC.diagnose(affected->getLoc(), diagID, fromType, toType);
+        if (!insertBefore.empty()) {
+          diag.fixItInsert(affected->getStartLoc(), insertBefore);
+        }
+        diag.fixItInsertAfter(affected->getEndLoc(), insertAfter);
+        diagnosed = true;
         break;
       }
 

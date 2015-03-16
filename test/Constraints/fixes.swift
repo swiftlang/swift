@@ -51,7 +51,7 @@ func forgotOptionalBang(a: A, obj: AnyObject) {
   var i: Int = parseInt() // expected-error{{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}}{{26-26=!}}
 
   var a = A(), b = B()
-  b = a as? B  // expected-error{{value of optional type 'B?' not unwrapped; did you mean to use '!' or '?'?}}{{14-14=!}}
+  b = a as? B  // expected-error{{value of optional type 'B?' not unwrapped; did you mean to use '!' or '?'?}}{{7-7=(}}{{14-14=)!}}
 }
 
 func forgotAnyObjectBang(obj: AnyObject) {

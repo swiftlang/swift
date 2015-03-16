@@ -139,6 +139,8 @@ namespace IntrinsicPrecedences {
     IfExpr = 100, // ?:
     AssignExpr = 90, // =
     ExplicitCastExpr = 132, // 'is' and 'as'
+    PrefixUnaryExpr = 254,
+    PostfixUnaryExpr = 255,
     MaxPrecedence = 255
   };
 }

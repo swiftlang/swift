@@ -253,4 +253,7 @@ func rdar20029786(ns: NSString?) {
   var s2 = ns ?? "str" as String as String
 
   let s3: NSString? = "str" as String?
+
+  var s4: String = ns ?? "str" // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}{{20-20=(}}{{31-31=) as String}}
+  var s5: String = (ns ?? "str") as String // fixed version
 }
