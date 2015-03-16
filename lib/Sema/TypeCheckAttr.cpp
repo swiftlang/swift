@@ -314,10 +314,10 @@ void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
   case AbstractStorageDecl::Stored:
     // @NSManaged properties end up being computed; complain if there is
     // an initializer.
-    if (VD->getParentPattern()->hasInit()) {
+    if (VD->getParentInitializer()) {
       TC.diagnose(attr->getLocation(), diag::attr_NSManaged_initial_value)
-        .highlight(VD->getParentPattern()->getInit()->getSourceRange());
-      VD->getParentPattern()->setInit(nullptr, false);
+        .highlight(VD->getParentInitializer()->getSourceRange());
+      VD->getParentPatternBinding()->setInit(nullptr, false);
     }
     // Otherwise, ok.
     break;
@@ -383,11 +383,10 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
 
   // lazy must have an initializer, and the pattern binding must be a simple
   // one.
-  auto *PBD = VD->getParentPattern();
-  if (!PBD->getInit())
+  if (!VD->getParentInitializer())
     return diagnoseAndRemoveAttr(attr, diag::lazy_requires_initializer);
 
-  if (!PBD->getSingleVar())
+  if (!VD->getParentPatternBinding()->getSingleVar())
     return diagnoseAndRemoveAttr(attr, diag::lazy_requires_single_var);
 
   // TODO: we can't currently support lazy properties on non-type-contexts.

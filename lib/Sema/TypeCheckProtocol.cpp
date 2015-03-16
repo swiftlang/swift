@@ -1474,7 +1474,7 @@ diagnoseMatch(TypeChecker &tc, Module *module,
       witnessStartLoc = attrStartLoc;
 
     if (auto varWitness = dyn_cast<VarDecl>(match.Witness)) {
-      if (auto patternBinding = varWitness->getParentPattern())
+      if (auto patternBinding = varWitness->getParentPatternBinding())
         witnessStartLoc = patternBinding->getStartLoc();
     }
     tc.diagnose(match.Witness, diag::protocol_witness_not_objc)

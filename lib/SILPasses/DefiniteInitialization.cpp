@@ -781,10 +781,9 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
       diagnose(Module, InstInfo.Inst->getLoc(),
                diag::immutable_property_already_initialized, PropertyName);
       if (auto *Var = dyn_cast<VarDecl>(VD))
-        if (auto *InitPat = Var->getParentPattern())
-          if (InitPat->hasInit())
-            diagnose(Module, SILLocation(VD),
-                     diag::initial_value_provided_in_let_decl);
+        if (Var->getParentInitializer())
+          diagnose(Module, SILLocation(VD),
+                   diag::initial_value_provided_in_let_decl);
       return;
     }
   }

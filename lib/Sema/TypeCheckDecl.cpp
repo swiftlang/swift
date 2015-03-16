@@ -4035,7 +4035,7 @@ public:
         // checked yet.
         if (isa<SubscriptDecl>(prop))
           TC.validateDecl(prop);
-        else if (auto pat = cast<VarDecl>(prop)->getParentPattern())
+        else if (auto pat = cast<VarDecl>(prop)->getParentPatternBinding())
           validatePatternBindingDecl(TC, pat);
 
         isObjC = prop->isObjC() || prop->isDynamic() ||
@@ -5627,7 +5627,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::Param: {
     auto VD = cast<VarDecl>(D);
     if (!VD->hasType()) {
-      if (PatternBindingDecl *PBD = VD->getParentPattern()) {
+      if (PatternBindingDecl *PBD = VD->getParentPatternBinding()) {
         validatePatternBindingDecl(*this, PBD);
         if (PBD->isInvalid() || !PBD->getPattern()->hasType()) {
           PBD->getPattern()->setType(ErrorType::get(Context));
@@ -5734,7 +5734,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
             }
           }
           if (VD->isStatic()) {
-            auto staticSpelling = VD->getParentPattern()->getStaticSpelling();
+            auto staticSpelling =
+              VD->getParentPatternBinding()->getStaticSpelling();
             if (staticSpelling == StaticSpellingKind::KeywordStatic) {
               auto finalAttr = VD->getAttrs().getAttribute<FinalAttr>();
               if (finalAttr) {
@@ -6341,14 +6342,13 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
         // Initialized 'let' properties have storage, but don't get an argument
         // to the memberwise initializer since they already have an initial
         // value that cannot be overridden.
-        if (var->isLet() && var->getParentPattern() &&
-            var->getParentPattern()->hasInit()) {
+        if (var->isLet() && var->getParentInitializer()) {
           
           // We cannot handle properties like:
           //   let (a,b) = (1,2)
           // for now, just disable implicit init synthesization in structs in
           // this case.
-          auto SP = var->getParentPattern()->getPattern();
+          auto SP = var->getParentPattern();
           if (auto *TP = dyn_cast<TypedPattern>(SP))
             SP = TP->getSubPattern();
           if (!isa<NamedPattern>(SP) && isa<StructDecl>(decl))

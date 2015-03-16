@@ -2948,23 +2948,24 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   auto addr = type.allocateStack(*this,
                                  i->getElementType(),
                                  dbgname);
-  if (IGM.DebugInfo && Decl &&
-      (!Decl->getParentPattern() ||
-       !Decl->getParentPattern()->getPattern()->isImplicit())) {
-    // Discard any inout or lvalue qualifiers. Since the object itself
-    // is stored in the alloca, emitting it as a reference type would
-    // be wrong.
-    auto DbgTy = DebugTypeInfo(Decl,
-                               Decl->getType()->getLValueOrInOutObjectType(),
-                               type);
-    auto Name = Decl->getName().empty() ? "_" : Decl->getName().str();
-    auto DS = i->getDebugScope();
-    if (!DS) DS = CurSILFn->getDebugScope();
-    assert(DS->SILFn == CurSILFn || DS->InlinedCallSite);
-    emitDebugVariableDeclaration(Builder, addr.getAddress().getAddress(),
-                                 DbgTy, DS, Name);
+  if (IGM.DebugInfo && Decl) {
+    auto *Pattern = Decl->getParentPattern();
+    if (!Pattern || !Pattern->isImplicit()) {
+      // Discard any inout or lvalue qualifiers. Since the object itself
+      // is stored in the alloca, emitting it as a reference type would
+      // be wrong.
+      auto DbgTy = DebugTypeInfo(Decl,
+                                 Decl->getType()->getLValueOrInOutObjectType(),
+                                 type);
+      auto Name = Decl->getName().empty() ? "_" : Decl->getName().str();
+      auto DS = i->getDebugScope();
+      if (!DS) DS = CurSILFn->getDebugScope();
+      assert(DS->SILFn == CurSILFn || DS->InlinedCallSite);
+      emitDebugVariableDeclaration(Builder, addr.getAddress().getAddress(),
+                                   DbgTy, DS, Name);
+    }
   }
-
+  
   setLoweredAddress(i->getContainerResult(), addr.getContainer());
   setLoweredAddress(i->getAddressResult(), addr.getAddress());
 }

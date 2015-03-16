@@ -3996,11 +3996,42 @@ public:
   /// Pass a null context to check if it's always settable.
   bool isSettable(DeclContext *UseDC) const;
 
-  PatternBindingDecl *getParentPattern() const {
+  /// Return the parent pattern binding that may provide an initializer for this
+  /// VarDecl.  This returns null if there is none associated with the VarDecl.
+  PatternBindingDecl *getParentPatternBinding() const {
     return ParentPattern.dyn_cast<PatternBindingDecl *>();
   }
-  void setParentPattern(PatternBindingDecl *PBD) {
+  void setParentPatternBinding(PatternBindingDecl *PBD) {
     ParentPattern = PBD;
+  }
+  
+  /// Return the Pattern involved in initializing this VarDecl.  Recall that the
+  /// Pattern may be involved in initializing more than just this one vardecl
+  /// though.  For example, if this is a VarDecl for "x", the pattern may be
+  /// "(x, y)" and the initializer on the PatternBindingDecl may be "(1,2)" or
+  /// "foo()".
+  ///
+  /// If this has no parent pattern binding decl associated, it returns null.
+  ///
+  Pattern *getParentPattern() const {
+    if (auto *PBD = getParentPatternBinding())
+      return PBD->getPattern();
+    return nullptr;
+  }
+
+  /// Return the initializer involved in this VarDecl.  However, Recall that the
+  /// initializer may be involved in initializing more than just this one
+  /// vardecl though.  For example, if this is a VarDecl for "x", the pattern
+  /// may be "(x, y)" and the initializer on the PatternBindingDecl may be
+  /// "(1,2)" or "foo()".
+  ///
+  /// If this has no parent pattern binding decl associated, or if that pattern
+  /// binding has no initial value, this returns null.
+  ///
+  Expr *getParentInitializer() const {
+    if (auto *PBD = getParentPatternBinding())
+      return PBD->getInit();
+    return nullptr;
   }
   
   VarDecl *getOverriddenDecl() const {

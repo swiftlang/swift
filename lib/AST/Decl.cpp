@@ -916,7 +916,7 @@ void PatternBindingDecl::setPattern(Pattern *P) {
   // PatternBindingDecl as their parent.
   if (P)
     P->forEachVariable([&](VarDecl *VD) {
-      VD->setParentPattern(this);
+      VD->setParentPatternBinding(this);
     });
 }
 
@@ -2532,9 +2532,8 @@ bool VarDecl::isSettable(DeclContext *UseDC) const {
   if (isLet()) {
     // If the decl has an explicitly written initializer with a pattern binding,
     // then it isn't settable.
-    if (auto *P = getParentPattern())
-      if (P->hasInit())
-        return false;
+    if (getParentInitializer() != nullptr)
+      return false;
 
     // If the decl has a value bound to it but has no PBD, then it is
     // initialized.

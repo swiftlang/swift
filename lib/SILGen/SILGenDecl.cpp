@@ -332,7 +332,7 @@ public:
 
     assert(!isa<ParamDecl>(vd)
            && "should not bind function params on this path");
-    if (vd->getParentPattern() && !vd->getParentPattern()->hasInit()) {
+    if (vd->getParentPatternBinding() && !vd->getParentInitializer()) {
       // This value is uninitialized (and unbound) if it has a pattern binding
       // decl, with no initializer value.
       assert(!vd->hasNonPatternBindingInit() && "Bound values aren't uninit!");
@@ -626,7 +626,7 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, Type patternType) {
   // If the variable has no initial value, emit a mark_uninitialized instruction
   // so that DI tracks and enforces validity of it.
   bool isUninitialized =
-    vd->getParentPattern() && !vd->getParentPattern()->hasInit();
+    vd->getParentPatternBinding() && !vd->getParentInitializer();
   
   // If this is a global variable, initialize it without allocations or
   // cleanups.

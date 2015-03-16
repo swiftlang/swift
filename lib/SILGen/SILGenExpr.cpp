@@ -3784,14 +3784,14 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
 
       // An initialized 'let' property has a single value specified by the
       // initializer - it doesn't come from an argument.
-      if (!field->isStatic() && field->isLet() && field->getParentPattern() &&
-          field->getParentPattern()->hasInit()) {
-        assert(field->getType()->isEqual(field->getParentPattern()->getInit()
+      if (!field->isStatic() && field->isLet() &&
+          field->getParentInitializer()) {
+        assert(field->getType()->isEqual(field->getParentInitializer()
                                          ->getType()) && "Checked by sema");
         
         // Cleanup after this initialization.
-        FullExpr scope(gen.Cleanups, field->getParentPattern());
-        gen.emitRValue(field->getParentPattern()->getInit())
+        FullExpr scope(gen.Cleanups, field->getParentPatternBinding());
+        gen.emitRValue(field->getParentInitializer())
           .forwardInto(gen, init.get(), Loc);
         continue;
       }
@@ -3816,11 +3816,10 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
 
     // An initialized 'let' property has a single value specified by the
     // initializer - it doesn't come from an argument.
-    if (!field->isStatic() && field->isLet() && field->getParentPattern() &&
-        field->getParentPattern()->hasInit()) {
+    if (!field->isStatic() && field->isLet() && field->getParentInitializer()) {
       // Cleanup after this initialization.
-      FullExpr scope(gen.Cleanups, field->getParentPattern());
-      v = gen.emitRValue(field->getParentPattern()->getInit())
+      FullExpr scope(gen.Cleanups, field->getParentPatternBinding());
+      v = gen.emitRValue(field->getParentInitializer())
              .forwardAsSingleStorageValue(gen, fieldTy, Loc);
     } else {
       assert(elti != eltEnd && "number of args does not match number of fields");

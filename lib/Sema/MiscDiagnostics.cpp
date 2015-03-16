@@ -777,7 +777,7 @@ void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
     attr->setInvalid();
 
   } else if (auto var = dyn_cast<VarDecl>(VD)) {
-    if (auto PBD = var->getParentPattern())
+    if (auto PBD = var->getParentPatternBinding())
       diag.fixItInsert(PBD->getStartLoc(), fixItString);
 
   } else {

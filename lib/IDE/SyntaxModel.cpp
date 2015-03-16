@@ -672,8 +672,8 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       SyntaxStructureNode SN;
       SN.Dcl = D;
       SourceRange SR;
-      if (PatternBindingDecl *PD = VD->getParentPattern())
-        SR = PD->getSourceRange();
+      if (auto *PBD = VD->getParentPatternBinding())
+        SR = PBD->getSourceRange();
       else
         SR = VD->getSourceRange();
       SN.Range = charSourceRangeFromSourceRange(SM, SR);
@@ -689,8 +689,8 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       if (DC->isTypeContext()) {
         if (VD->isStatic()) {
           StaticSpellingKind Spell = StaticSpellingKind::KeywordStatic;
-          if (PatternBindingDecl *PD = VD->getParentPattern())
-            Spell = PD->getStaticSpelling();
+          if (auto *PBD = VD->getParentPatternBinding())
+            Spell = PBD->getStaticSpelling();
           if (Spell == StaticSpellingKind::KeywordClass)
             SN.Kind = SyntaxStructureKind::ClassVariable;
           else

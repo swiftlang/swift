@@ -903,10 +903,9 @@ private:
       // containing pattern binding declaration to make sure that we include
       // any type annotation in the type refinement context range.
       if (auto varDecl = dyn_cast<VarDecl>(storageDecl)) {
-        PatternBindingDecl *patternBindingDecl = varDecl->getParentPattern();
-        if (patternBindingDecl) {
-          return patternBindingDecl->getSourceRange();
-        }
+        auto *PBD = varDecl->getParentPatternBinding();
+        if (PBD)
+          return PBD->getSourceRange();
       }
     }
     
@@ -1508,7 +1507,7 @@ static bool isTypeLevelDeclForAvailabilityFixit(const Decl *D) {
     if (!IsModuleScopeContext)
       return false;
 
-    if (PatternBindingDecl *PBD = VD->getParentPattern()) {
+    if (PatternBindingDecl *PBD = VD->getParentPatternBinding()) {
       return PBD->getDeclContext()->isModuleScopeContext();
     }
   }
@@ -1615,8 +1614,8 @@ static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
   // event, multiple variables can be introduced with a single 'var'),
   // so suggest adding an attribute to the PatterningBindingDecl instead.
   if (auto *VD = dyn_cast<VarDecl>(D)) {
-    assert(VD->getParentPattern());
-    D = VD->getParentPattern();
+    assert(VD->getParentPatternBinding());
+    D = VD->getParentPatternBinding();
   }
 
   SourceLoc InsertLoc = D->getAttrs().getStartLoc(/*forModifiers=*/false);

@@ -1659,9 +1659,9 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   // Take the initializer from the PatternBindingDecl for VD.
   // TODO: This doesn't work with complicated patterns like:
   //   lazy var (a,b) = foo()
-  auto *InitValue = VD->getParentPattern()->getInit();
-  bool wasChecked = VD->getParentPattern()->wasInitChecked();
-  VD->getParentPattern()->setInit(nullptr, true);
+  auto *InitValue = VD->getParentInitializer();
+  bool wasChecked = VD->getParentPatternBinding()->wasInitChecked();
+  VD->getParentPatternBinding()->setInit(nullptr, true);
 
   // Recontextualize any closure declcontexts nested in the initializer to
   // realize that they are in the getter function.
@@ -1886,8 +1886,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       // Initialized 'let' properties have storage, but don't get an argument
       // to the memberwise initializer since they already have an initial
       // value that cannot be overridden.
-      if (var->isLet() && var->getParentPattern() &&
-          var->getParentPattern()->hasInit())
+      if (var->isLet() && var->getParentInitializer())
         continue;
       
       accessLevel = std::min(accessLevel, var->getAccessibility());
