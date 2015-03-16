@@ -786,8 +786,6 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
   return result;
 }
 
-
-
 /// Parse a pattern.
 ///   pattern ::= identifier
 ///   pattern ::= '_'
@@ -955,6 +953,30 @@ Parser::parsePatternTupleAfterLP(SourceLoc LPLoc) {
                                           EllipsisLoc.isValid(), EllipsisLoc));
 }
 
+/// Parse a pattern with an optional type annotation.
+///
+///  typed-pattern ::= mattching-pattern (':' type)?
+///
+ParserResult<Pattern> Parser::parseTypedMatchingPattern() {
+  auto result = parseMatchingPattern();
+  
+  // Now parse an optional type annotation.
+  if (consumeIf(tok::colon)) {
+    if (result.isNull())  // Recover by creating AnyPattern.
+      result = makeParserErrorResult(new (Context) AnyPattern(PreviousLoc));
+    
+    ParserResult<TypeRepr> Ty = parseType();
+    if (Ty.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Pattern>();
+    if (Ty.isNull())
+      Ty = makeParserResult(new (Context) ErrorTypeRepr(PreviousLoc));
+    
+    result = makeParserResult(result,
+                              new (Context) TypedPattern(result.get(), Ty.get()));
+  }
+  
+  return result;
+}
 
 /// matching-pattern ::= 'is' type
 /// matching-pattern ::= matching-pattern-var

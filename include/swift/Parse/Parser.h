@@ -994,9 +994,11 @@ public:
   ParserStatus parseConstructorArguments(DeclName &FullName,
                                          Pattern *&BodyPattern,
                                          DefaultArgumentInfo &defaultArgs);
-  
-  ParserResult<Pattern> parseTypedPattern();
 
+  //===--------------------------------------------------------------------===//
+  // Pattern Parsing
+
+  ParserResult<Pattern> parseTypedPattern();
   ParserResult<Pattern> parsePattern();
   
   /// \brief Parse a tuple pattern element.
@@ -1012,16 +1014,16 @@ public:
   ParserResult<Pattern> parsePatternTuple();
   ParserResult<Pattern> parsePatternTupleAfterLP(SourceLoc LPLoc);
   
-  Pattern *createBindingFromPattern(SourceLoc loc, Identifier name, bool isLet);
-  
-  //===--------------------------------------------------------------------===//
-  // Pattern Parsing
-
+  ParserResult<Pattern> parseTypedMatchingPattern();
   ParserResult<Pattern> parseMatchingPattern();
   ParserResult<Pattern> parseMatchingPatternAsLetOrVar(bool isLet,
                                                        SourceLoc VarLoc);
   ParserResult<Pattern> parseSwift1IfLetPattern(bool isLet, SourceLoc VarLoc);
   
+
+  Pattern *createBindingFromPattern(SourceLoc loc, Identifier name, bool isLet);
+  
+
   /// \brief Determine whether this token can only start a matching pattern
   /// production and not an expression.
   bool isOnlyStartOfMatchingPattern();
