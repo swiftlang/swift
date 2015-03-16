@@ -6490,6 +6490,11 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
     archetypeValue = SGF.B.createOpenExistentialAddr(
                        E, existentialValue.forward(SGF),
                        SGF.getLoweredType(E->getOpaqueValue()->getType()));
+  } else if (existentialValue.getType().is<ExistentialMetatypeType>()) {
+    assert(existentialValue.getValue().getType().isObject());
+    archetypeValue = SGF.B.createOpenExistentialMetatype(
+                       E, existentialValue.forward(SGF),
+                       SGF.getLoweredType(E->getOpaqueValue()->getType()));
   } else {
     assert(existentialValue.getValue().getType().isObject());
     archetypeValue = SGF.B.createOpenExistentialRef(

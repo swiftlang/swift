@@ -193,7 +193,7 @@ func use_initializable_archetype<T: Initializable>(t: T, i: Int) {
 // CHECK: sil hidden @_TF9protocols29use_initializable_existential
 func use_initializable_existential(im: Initializable.Type, i: Int) {
 // CHECK: bb0([[IM:%[0-9]+]] : $@thick Initializable.Type, [[I:%[0-9]+]] : $Int):
-// CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_ref [[IM]] : $@thick Initializable.Type to $@thick @opened([[N:".*"]]) Initializable.Type
+// CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[IM]] : $@thick Initializable.Type to $@thick @opened([[N:".*"]]) Initializable.Type
 // CHECK:   [[TEMP_VALUE:%[0-9]+]] = alloc_stack $Initializable
 // CHECK:   [[TEMP_ADDR:%[0-9]+]] = init_existential_addr [[TEMP_VALUE]]#1 : $*Initializable, $@opened([[N]]) Initializable
 // CHECK:   [[INIT_WITNESS:%[0-9]+]] = witness_method $@opened([[N]]) Initializable, #Initializable.init!allocator.1, [[ARCHETYPE_META]]{{.*}} : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
