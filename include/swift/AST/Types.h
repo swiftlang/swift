@@ -2220,10 +2220,10 @@ END_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
 
 /// Conventions for passing arguments as parameters.
 enum class ParameterConvention {
-  /// This argument is passed indirectly, i.e. by directly passing
-  /// the address of an object in memory.  The callee is responsible
-  /// for destroying the object.  The callee may assume that the
-  /// address does not alias any valid object.
+  /// This argument is passed indirectly, i.e. by directly passing the address
+  /// of an object in memory.  The callee is responsible for destroying the
+  /// object.  The callee may assume that the address does not alias any valid
+  /// object.
   Indirect_In,
 
   /// This argument is passed indirectly, i.e. by directly passing the address
@@ -2231,32 +2231,29 @@ enum class ParameterConvention {
   /// the object.
   Indirect_In_Guaranteed,
 
-  /// This argument is passed indirectly, i.e. by directly passing
-  /// the address of an object in memory.  The object is
-  /// instantaneously valid on entry, and it must be instantaneously
-  /// valid on exit.  The callee may assume that the address does
-  /// not alias any valid object.
+  /// This argument is passed indirectly, i.e. by directly passing the address
+  /// of an object in memory.  The object is instantaneously valid on entry, and
+  /// it must be instantaneously valid on exit.  The callee may assume that the
+  /// address does not alias any valid object.
   Indirect_Inout,
 
-  /// This argument is passed indirectly, i.e. by directly passing
-  /// the address of an uninitialized object in memory.  The callee
-  /// is responsible for leaving an initialized object at this
-  /// address.  The callee may assume that the address does not
-  /// alias any valid object.
+  /// This argument is passed indirectly, i.e. by directly passing the address
+  /// of an uninitialized object in memory.  The callee is responsible for
+  /// leaving an initialized object at this address.  The callee may assume that
+  /// the address does not alias any valid object.
   Indirect_Out,
 
-  /// This argument is passed directly.  Its type is non-trivial,
-  /// and the callee is responsible for destroying it.
+  /// This argument is passed directly.  Its type is non-trivial, and the callee
+  /// is responsible for destroying it.
   Direct_Owned,
 
-  /// This argument is passed directly.  Its type may be trivial, or
-  /// it may simply be that the callee is not responsible for
-  /// destroying it.  Its validity is guaranteed only at the instant
-  /// the call begins.
+  /// This argument is passed directly.  Its type may be trivial, or it may
+  /// simply be that the callee is not responsible for destroying it.  Its
+  /// validity is guaranteed only at the instant the call begins.
   Direct_Unowned,
 
-  /// This argument is passed directly.  Its type is non-trivial, and
-  /// the caller guarantees its validity for the entirety of the call.
+  /// This argument is passed directly.  Its type is non-trivial, and the caller
+  /// guarantees its validity for the entirety of the call.
   Direct_Guaranteed,
 };
 inline bool isIndirectParameter(ParameterConvention conv) {
