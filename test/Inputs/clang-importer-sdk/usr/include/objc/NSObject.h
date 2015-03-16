@@ -119,8 +119,6 @@
 - (signed char)isEqualToDate:(NSDate *)anotherDate;
 @end
 
-NSDate *swift_createDate(void);
-
 @interface NSProxy
 + alloc;
 @end

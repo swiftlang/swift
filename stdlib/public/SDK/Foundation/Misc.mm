@@ -17,7 +17,3 @@
 
 #include <Foundation/Foundation.h>
 
-// FIXME: Just a hack for testing!
-extern "C" NSDate *swift_createDate(void) {
-  return [NSDate date];
-}
