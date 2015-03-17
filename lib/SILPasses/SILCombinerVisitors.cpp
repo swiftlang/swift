@@ -1300,7 +1300,7 @@ static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
     Builder.createReleaseValue(Call->getLoc(), OnX);
 }
 
-/// Remove an application of f_inverse(f(x)) by x.
+/// Replace an application of f_inverse(f(x)) by x.
 bool SILCombiner::optimizeIdentityComposition(ApplyInst *FInverse,
                                               StringRef FInverseName,
                                               StringRef FName) {
