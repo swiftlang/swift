@@ -44,9 +44,10 @@ internal func _typeID(instance: AnyObject) -> ObjectIdentifier {
 
 internal protocol _ForwardIndexBoxType : class {
   var typeID: ObjectIdentifier {get}
-  func successor() -> _ForwardIndexBoxType
+  func successor() -> Self
   func equals(other: _ForwardIndexBoxType) -> Bool
   func _distanceTo(other: _ForwardIndexBoxType) -> ForwardIndex.Distance
+  // FIXME: Can't return Self from _advancedBy pending <rdar://20181253>
   func _advancedBy(distance: ForwardIndex.Distance) -> _ForwardIndexBoxType
   func _advancedBy(
     distance: ForwardIndex.Distance,
@@ -57,12 +58,12 @@ internal protocol _ForwardIndexBoxType : class {
 internal class _ForwardIndexBox<
   BaseIndex: ForwardIndexType
 > : _ForwardIndexBoxType {
-  init(_ base: BaseIndex) {
+  required init(_ base: BaseIndex) {
     self.base = base
   }
   
-  func successor() -> _ForwardIndexBoxType {
-    return _ForwardIndexBox(self.base.successor())
+  func successor() -> Self {
+    return self.dynamicType(self.base.successor())
   }
   
   func unsafeUnbox(other: _ForwardIndexBoxType) -> BaseIndex {
@@ -78,14 +79,14 @@ internal class _ForwardIndexBox<
   }
   
   func _advancedBy(n: ForwardIndex.Distance) -> _ForwardIndexBoxType {
-    return _ForwardIndexBox(advance(base, numericCast(n)))
+    return self.dynamicType(advance(base, numericCast(n)))
   }
   
   func _advancedBy(
     n: ForwardIndex.Distance,
     _ limit: _ForwardIndexBoxType
   ) -> _ForwardIndexBoxType {
-    return _ForwardIndexBox(advance(base, numericCast(n), unsafeUnbox(limit)))
+    return self.dynamicType(advance(base, numericCast(n), unsafeUnbox(limit)))
   }
 
   var typeID: ObjectIdentifier { return _typeID(self) }
@@ -98,21 +99,21 @@ internal class _ForwardIndexBox<
 //===----------------------------------------------------------------------===//
 
 internal protocol _BidirectionalIndexBoxType : _ForwardIndexBoxType {
-  func predecessor() -> _BidirectionalIndexBoxType
+  func predecessor() -> Self
 }
 
 internal final class _BidirectionalIndexBox<
   BaseIndex: BidirectionalIndexType
 > : _ForwardIndexBox<BaseIndex>, _BidirectionalIndexBoxType {
-  override init(_ base: BaseIndex) {
+  required init(_ base: BaseIndex) {
     super.init(base)
   }
   
-  override func successor() -> _ForwardIndexBoxType {
+  override func successor() -> _BidirectionalIndexBox {
     return _BidirectionalIndexBox(self.base.successor())
   }
   
-  func predecessor() -> _BidirectionalIndexBoxType {
+  func predecessor() -> _BidirectionalIndexBox {
     return _BidirectionalIndexBox(self.base.predecessor())
   }
 }
