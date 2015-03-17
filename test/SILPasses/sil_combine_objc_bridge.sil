@@ -1,0 +1,100 @@
+// RUN: %target-sil-opt %s -sil-combine -verify  | FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class AnNSArray {
+}
+
+struct AnArray<T> {
+  @sil_stored var Buffer : Builtin.NativeObject
+}
+
+sil [semantics "convertFromObjectiveC"] @bridgeFromObjectiveC :
+  $@thin <τ_0_0> (@owned AnNSArray) -> @owned AnArray<τ_0_0>
+
+sil [semantics "convertToObjectiveC"] @bridgeToObjectiveC:
+  $@cc(method) @thin <τ_0_0> (@owned AnArray<τ_0_0>) -> @owned AnNSArray
+
+// CHECK-LABEL: sil @bridge_from_to_owned
+// CHECK-NOT: apply
+// CHECK: strong_retain
+// CHECK-NOT: apply
+// CHECK: strong_release
+// CHECK-NOT: apply
+// CHECK: return
+
+sil @bridge_from_to_owned : $@thin (@owned AnNSArray) -> @owned AnNSArray {
+bb0(%0 : $AnNSArray):
+  %1 = function_ref @bridgeFromObjectiveC : $@thin <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
+  %2 = apply %1<AnyObject>(%0) : $@thin <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
+  retain_value %2 : $AnArray<AnyObject>
+  release_value %2 : $AnArray<AnyObject>
+  %3 = function_ref @bridgeToObjectiveC : $@cc(method) @thin <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
+  %4 = apply %3<AnyObject>(%2) : $@cc(method) @thin <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
+  return %4 : $AnNSArray
+}
+
+// CHECK-LABEL: sil @bridge_to_from_owned
+// CHECK-NOT: apply
+// CHECK: retain_value
+// CHECK-NOT: apply
+// CHECK: release_value
+// CHECK-NOT: apply
+// CHECK: return
+
+sil @bridge_to_from_owned : $@thin (@owned AnArray<AnyObject>) -> @owned AnArray<AnyObject>{
+bb0(%0 : $AnArray<AnyObject>):
+  %1 = function_ref @bridgeToObjectiveC : $@cc(method) @thin <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
+  %2 = apply %1<AnyObject>(%0) : $@cc(method) @thin <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
+  strong_retain %2 : $AnNSArray
+  strong_release %2 : $AnNSArray
+  %3 = function_ref @bridgeFromObjectiveC : $@thin <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
+  %4 = apply %3<AnyObject>(%2) : $@thin <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
+  return %4 : $AnArray<AnyObject>
+}
+
+sil [semantics "convertFromObjectiveC"] @bridgeFromObjectiveCGuaranteed :
+  $@thin <τ_0_0> (@guaranteed AnNSArray) -> @owned AnArray<τ_0_0>
+
+sil [semantics "convertToObjectiveC"] @bridgeToObjectiveCGuaranteed:
+  $@cc(method) @thin <τ_0_0> (@guaranteed AnArray<τ_0_0>) -> @owned AnNSArray
+
+// CHECK-LABEL: sil @bridge_from_to_guaranteed
+// CHECK-NOT: apply
+// CHECK: strong_retain
+// CHECK-NOT: apply
+// CHECK: strong_release
+// CHECK-NOT: apply
+// CHECK: return
+
+sil @bridge_from_to_guaranteed : $@thin (@owned AnNSArray) -> @owned AnNSArray {
+bb0(%0 : $AnNSArray):
+  %1 = function_ref @bridgeFromObjectiveCGuaranteed : $@thin <AnyObject> (@guaranteed AnNSArray) -> @owned AnArray<AnyObject>
+  %2 = apply %1<AnyObject>(%0) : $@thin <AnyObject> (@guaranteed AnNSArray) -> @owned AnArray<AnyObject>
+  release_value %0 : $AnNSArray
+  %3 = function_ref @bridgeToObjectiveCGuaranteed : $@cc(method) @thin <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
+  %4 = apply %3<AnyObject>(%2) : $@cc(method) @thin <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
+  release_value %2 : $AnArray<AnyObject>
+  return %4 : $AnNSArray
+}
+
+// CHECK-LABEL: sil @bridge_to_from_guaranteed
+// CHECK-NOT: apply
+// CHECK: retain_value
+// CHECK-NOT: apply
+// CHECK: release_value
+// CHECK-NOT: apply
+// CHECK: return
+
+sil @bridge_to_from_guaranteed : $@thin (@owned AnArray<AnyObject>) -> @owned AnArray<AnyObject>{
+bb0(%0 : $AnArray<AnyObject>):
+  %1 = function_ref @bridgeToObjectiveCGuaranteed : $@cc(method) @thin <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
+  %2 = apply %1<AnyObject>(%0) : $@cc(method) @thin <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
+  release_value %0 : $AnArray<AnyObject>
+  %3 = function_ref @bridgeFromObjectiveCGuaranteed : $@thin <AnyObject> (@guaranteed AnNSArray) -> @owned AnArray<AnyObject>
+  %4 = apply %3<AnyObject>(%2) : $@thin <AnyObject> (@guaranteed AnNSArray) -> @owned AnArray<AnyObject>
+  release_value %2 : $AnNSArray
+  return %4 : $AnArray<AnyObject>
+}

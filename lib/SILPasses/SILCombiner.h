@@ -252,6 +252,9 @@ public:
                                                          WitnessMethodInst *WMI,
                                                          SILValue IE,
                                                          SILType InstanceType);
+  // Optimize an application of f_inverse(f(x)) -> x.
+  bool optimizeIdentityComposition(ApplyInst *FInverse, StringRef FInverseName,
+                                   StringRef FName);
 
 private:
   /// Perform one SILCombine iteration.

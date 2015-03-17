@@ -1228,6 +1228,143 @@ static ApplyInst *optimizeCastThroughThinFuntionPointer(
   return NewApply;
 }
 
+/// \brief Check that all users of the apply are retain/release ignoring one
+/// user.
+static bool
+hasOnlyRetainReleaseUsers(ApplyInst *AI, SILInstruction *IgnoreUser,
+                          SmallVectorImpl<SILInstruction *> &Users) {
+  for (auto *Use : AI->getUses()) {
+    if (Use->getUser() == IgnoreUser)
+      continue;
+
+    if (!isa<RetainValueInst>(Use->getUser()) &&
+        !isa<ReleaseValueInst>(Use->getUser()) &&
+        !isa<StrongRetainInst>(Use->getUser()) &&
+        !isa<StrongReleaseInst>(Use->getUser()))
+      return false;
+
+    Users.push_back(Use->getUser());
+  }
+  return true;
+};
+
+/// \brief We only know how to simulate reference call effects for unary
+/// function calls that take their argument @owned or @guaranteed and return an
+/// @owned value.
+static bool knowHowToEmitReferenceCountInsts(ApplyInst *Call) {
+  if (Call->getNumArguments() != 1)
+    return false;
+
+  FunctionRefInst *FRI = cast<FunctionRefInst>(Call->getCallee());
+  SILFunction *F = FRI->getReferencedFunction();
+  auto FnTy = F->getLoweredFunctionType();
+
+  // Look at the result type.
+  auto ResultInfo = FnTy->getResult();
+  if (ResultInfo.getConvention() != ResultConvention::Owned)
+    return false;
+
+  // Look at the parameter.
+  auto Params = FnTy->getParameters();
+  assert(Params.size() == 1 && "Expect one parameter");
+  auto ParamConv = FnTy->getParameters()[0].getConvention();
+
+  return ParamConv == ParameterConvention::Direct_Owned ||
+         ParamConv == ParameterConvention::Direct_Guaranteed;
+}
+
+/// \brief Add reference counting operations equal to the effect of the call.
+static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
+  FunctionRefInst *FRI = cast<FunctionRefInst>(Call->getCallee());
+  SILFunction *F = FRI->getReferencedFunction();
+  auto FnTy = F->getLoweredFunctionType();
+  auto ResultInfo = FnTy->getResult();
+
+  assert(ResultInfo.getConvention() == ResultConvention::Owned &&
+         "Expect a @owned return");
+  assert(Call->getNumArguments() == 1 && "Expect a unary call");
+
+  // Emit a retain for the @owned return.
+  SILBuilderWithScope<> Builder(Call);
+  Builder.createRetainValue(Call->getLoc(), OnX);
+
+  // Emit a release for the @owned parameter, or none for a @guaranteed
+  // parameter.
+  auto Params = FnTy->getParameters();
+  assert(Params.size() == 1 && "Expect one parameter");
+  auto ParamInfo = FnTy->getParameters()[0].getConvention();
+  assert(ParamInfo == ParameterConvention::Direct_Owned ||
+         ParamInfo == ParameterConvention::Direct_Guaranteed);
+
+  if (ParamInfo == ParameterConvention::Direct_Owned)
+    Builder.createReleaseValue(Call->getLoc(), OnX);
+}
+
+/// Remove an application of f_inverse(f(x)) by x.
+bool SILCombiner::optimizeIdentityComposition(ApplyInst *FInverse,
+                                              StringRef FInverseName,
+                                              StringRef FName) {
+  // Needs to have a known semantics.
+  if (!FInverse->hasSemantics(FInverseName))
+    return false;
+
+  // We need to know how to replace the call by reference counting instructions.
+  if (!knowHowToEmitReferenceCountInsts(FInverse))
+    return false;
+
+  // Need to have a matching 'f'.
+  auto *F = dyn_cast<ApplyInst>(FInverse->getArgument(0));
+  if (!F)
+    return false;
+  if (!F->hasSemantics(FName))
+    return false;
+  if (!knowHowToEmitReferenceCountInsts(F))
+    return false;
+
+  // The types must match.
+  if (F->getArgument(0).getType() != FInverse->getType())
+    return false;
+
+  // Retains, releases of the result of F.
+  SmallVector<SILInstruction *, 16> RetainReleases;
+  if (!hasOnlyRetainReleaseUsers(F, FInverse, RetainReleases))
+    return false;
+
+  // Okay, now we know we can remove the calls.
+  auto X = F->getArgument(0);
+
+  // Redirect f's result's retains/releases to affect x.
+  for (auto *User : RetainReleases) {
+    // X might not be strong_retain/release'able. Replace it by a
+    // retain/release_value on X instead.
+    if (isa<StrongRetainInst>(User)) {
+      SILBuilderWithScope<>(User).createRetainValue(User->getLoc(), X);
+      eraseInstFromFunction(*User);
+      continue;
+    }
+    if (isa<StrongReleaseInst>(User)) {
+      SILBuilderWithScope<>(User).createReleaseValue(User->getLoc(), X);
+      eraseInstFromFunction(*User);
+      continue;
+    }
+    User->setOperand(0, X);
+  }
+
+  // Simulate the reference count effects of the calls before removing
+  // them.
+  emitMatchingRCAdjustmentsForCall(F, X);
+  emitMatchingRCAdjustmentsForCall(FInverse, X);
+
+  // Replace users of f_inverse by x.
+  replaceInstUsesWith(*FInverse, X.getDef());
+
+  // Remove the calls.
+  eraseInstFromFunction(*FInverse);
+  eraseInstFromFunction(*F);
+
+  return true;
+}
+
 SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   // Optimize apply{partial_apply(x,y)}(z) -> apply(z,x,y).
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI->getCallee()))
@@ -1348,6 +1485,14 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
       }
     }
   }
+
+  // Optimize f_inverse(f(x)) -> x.
+  if (optimizeIdentityComposition(AI, "convertFromObjectiveC",
+                                  "convertToObjectiveC"))
+    return nullptr;
+  if (optimizeIdentityComposition(AI, "convertToObjectiveC",
+                                  "convertFromObjectiveC"))
+    return nullptr;
 
   return nullptr;
 }
