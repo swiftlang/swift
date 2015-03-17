@@ -556,7 +556,8 @@ struct DeallocatorConventions : Conventions {
   }
 
   ParameterConvention getDirectSelfParameter(CanType type) const override {
-    return ParameterConvention::Direct_Deallocating;
+    // TODO: Investigate whether or not it is
+    return ParameterConvention::Direct_Owned;
   }
 
   ParameterConvention getIndirectSelfParameter(CanType type) const override {
@@ -1210,12 +1211,6 @@ getUncachedSILFunctionTypeForConstant(SILModule &M, SILDeclRef constant,
                                             substLoweredInterfaceType,
                                             extInfo);
   }
-
-  // If we have a deallocator, return a deallocator convention.
-  if (constant.kind == SILDeclRef::Kind::Deallocator)
-    return getSILFunctionType(M, origLoweredType, substLoweredType,
-                              substLoweredInterfaceType, extInfo,
-                              DeallocatorConventions());
 
   // If the decl belongs to an ObjC method family, use that family's
   // ownership conventions.
