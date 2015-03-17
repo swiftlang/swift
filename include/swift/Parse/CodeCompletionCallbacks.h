@@ -132,7 +132,8 @@ public:
 
   /// Complete at the beginning of member of a nominal decl member -- no tokens
   /// provided by user.
-  virtual void completeNominalMemberBeginning() = 0;
+  virtual void completeNominalMemberBeginning(SmallVectorImpl<StringRef>
+                                              &Keywords) = 0;
 
   /// Complete the keyword in attribute, for instance, @availability.
   virtual void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) = 0;

@@ -803,6 +803,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   bool IsInSil;
   Optional<DeclKind> AttTargetDK;
 
+  SmallVector<StringRef, 3> ParsedKeywords;
+
   /// \brief Set to true when we have delivered code completion results
   /// to the \c Consumer.
   bool DeliveredResults = false;
@@ -908,7 +910,8 @@ public:
   void completeCaseStmtDotPrefix() override;
   void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
-  void completeNominalMemberBeginning() override;
+  void completeNominalMemberBeginning(SmallVectorImpl<StringRef>
+                                      &Keywords) override;
 
   void addKeywords(CodeCompletionResultSink &Sink);
 
@@ -2110,14 +2113,25 @@ class CompletionOverrideLookup : public swift::VisibleDeclConsumer {
   CodeCompletionResultSink &Sink;
   OwnedResolver TypeResolver;
   const DeclContext *CurrDeclContext;
+  SmallVectorImpl<StringRef> &ParsedKeywords;
 
 public:
   CompletionOverrideLookup(CodeCompletionResultSink &Sink,
                            ASTContext &Ctx,
-                           const DeclContext *CurrDeclContext)
-      : Sink(Sink),
-        TypeResolver(createLazyResolver(Ctx)),
-        CurrDeclContext(CurrDeclContext) {}
+                           const DeclContext *CurrDeclContext,
+                           SmallVectorImpl<StringRef> &ParsedKeywords)
+      : Sink(Sink), TypeResolver(createLazyResolver(Ctx)),
+        CurrDeclContext(CurrDeclContext),
+        ParsedKeywords(ParsedKeywords){}
+
+  bool IsKeywordSpecified(StringRef W) {
+    bool Found = false;
+    std::for_each(ParsedKeywords.begin(), ParsedKeywords.end(),
+                  [&](StringRef KW) {
+        Found |= (W.compare(KW) == 0);
+    });
+    return Found;
+  }
 
   void addMethodOverride(const FuncDecl *FD, DeclVisibilityKind Reason) {
     CodeCompletionResultBuilder Builder(
@@ -2160,12 +2174,17 @@ public:
                                    ->getExtendedType()
                                    ->getAnyNominal()
                                    ->getAccessibility();
+    if (!IsKeywordSpecified("private") &&
+        !IsKeywordSpecified("public") &&
+        !IsKeywordSpecified("internal"))
     Builder.addAccessControlKeyword(std::min(
         FD->getAccessibility(), AccessibilityOfContext));
 
-    if (Reason == DeclVisibilityKind::MemberOfSuper)
+    if (Reason == DeclVisibilityKind::MemberOfSuper &&
+        !IsKeywordSpecified("override"))
       Builder.addOverrideKeyword();
-    Builder.addDeclIntroducer(DeclStr.str().substr(0, NameOffset));
+    if (!IsKeywordSpecified("func"))
+      Builder.addDeclIntroducer(DeclStr.str().substr(0, NameOffset));
     Builder.addTextChunk(DeclStr.str().substr(NameOffset));
     Builder.addBraceStmtWithCursor();
   }
@@ -2388,9 +2407,11 @@ void CodeCompletionCallbacksImpl::completeCaseStmtDotPrefix() {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeNominalMemberBeginning() {
+void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
+    SmallVectorImpl<StringRef> &Keywords) {
   assert(!InEnumElementRawValue);
-
+  ParsedKeywords.clear();
+  ParsedKeywords.append(Keywords.begin(), Keywords.end());
   Kind = CompletionKind::NominalMemberBeginning;
   CurDeclContext = P.CurDeclContext;
 }
@@ -2665,7 +2686,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::NominalMemberBeginning: {
     Lookup.discardTypeResolver();
     CompletionOverrideLookup OverrideLookup(CompletionContext.getResultSink(),
-                                            P.Context, CurDeclContext);
+                                            P.Context, CurDeclContext,
+                                            ParsedKeywords);
     OverrideLookup.getOverrideCompletions(SourceLoc());
     break;
   }

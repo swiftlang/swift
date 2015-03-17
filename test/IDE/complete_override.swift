@@ -81,6 +81,12 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=NESTED_NOMINAL < %t.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD1 -code-completion-keywords=false > %t.txt
+// RUN: FileCheck %s -check-prefix=OMIT_KEYWORD1< %t.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD2 -code-completion-keywords=false > %t.txt
+// RUN: FileCheck %s -check-prefix=OMIT_KEYWORD2< %t.txt
+
 @objc
 class TagPA {}
 @objc
@@ -319,3 +325,23 @@ class OuterNominal : ProtocolA {
 }
 // NESTED_NOMINAL: found code completion token
 // NESTED_NOMINAL-NOT: Begin completions
+
+class OmitKW1 : ProtocolA {
+  override#^OMIT_KEYWORD1^#
+}
+
+//OMIT_KEYWORD1:         Begin completions
+//OMIT_KEYWORD1-DAG:     Decl[Constructor]/Super:            init(fromProtocolA: Int) {|}; name=init(fromProtocolA: Int){{$}}
+//OMIT_KEYWORD1-DAG:     Decl[InstanceMethod]/Super:         func protoAFunc() {|}; name=protoAFunc(){{$}}
+//OMIT_KEYWORD1-DAG:     Decl[InstanceMethod]/Super:         func protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
+//OMIT_KEYWORD1-DAG:     Decl[InstanceMethod]/Super:         @noreturn func protoAFuncWithAttr() {|}; name=protoAFuncWithAttr(){{$}}
+
+class OmitKW2 : ProtocolA {
+  override func#^OMIT_KEYWORD2^#
+}
+
+//OMIT_KEYWORD2:         Begin completions
+//OMIT_KEYWORD2-DAG:     Decl[Constructor]/Super:            init(fromProtocolA: Int) {|}; name=init(fromProtocolA: Int){{$}}
+//OMIT_KEYWORD2-DAG:     Decl[InstanceMethod]/Super:         protoAFunc() {|}; name=protoAFunc(){{$}}
+//OMIT_KEYWORD2-DAG:     Decl[InstanceMethod]/Super:         protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
+//OMIT_KEYWORD2-DAG:     Decl[InstanceMethod]/Super:         protoAFuncWithAttr() {|}; name=protoAFuncWithAttr(){{$}}

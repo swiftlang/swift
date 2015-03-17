@@ -1517,7 +1517,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   StaticSpellingKind StaticSpelling = StaticSpellingKind::None;
   ParserResult<Decl> DeclResult;
   ParserStatus Status;
-  
+
   while (1) {
     switch (Tok.getKind()) {
     // Modifiers
@@ -1722,9 +1722,20 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
 
     case tok::code_complete:
       Status = makeParserCodeCompletionStatus();
-      if (CodeCompletion)
-        CodeCompletion->completeNominalMemberBeginning();
-       break;
+      if (CodeCompletion) {
+        // if we need to complete an override, we need to collect which keywords
+        // have already been specified by the developer; so that we do not
+        // duplicate them in code completion strings
+        SmallVector<StringRef, 3> Keywords;
+        backtrackToPosition(ParserPosition(L->getStateForBeginningOfTokenLoc
+          (Lexer::getLocForStartOfLine(SourceMgr, Tok.getLoc())), SourceLoc()));
+        while (!Tok.is(tok::code_complete)) {
+          Keywords.push_back(Tok.getText());
+          consumeToken();
+        }
+        CodeCompletion->completeNominalMemberBeginning(Keywords);
+      }
+      break;
     }
   
     // If we 'break' out of the switch, break out of the loop too.
