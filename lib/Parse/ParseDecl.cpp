@@ -22,6 +22,7 @@
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -3320,17 +3321,6 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
   }
 }
 
-namespace {
-  class DoAtScopeExit {
-    std::function<void()> Fn;
-    DoAtScopeExit(DoAtScopeExit&) = delete;
-  public:
-    DoAtScopeExit(std::function<void()> Fn) : Fn(Fn){}
-    ~DoAtScopeExit() {
-      Fn();
-    }
-  };
-}
 
 /// \brief Parse a 'var' or 'let' declaration, doing no token skipping on error.
 ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
@@ -3382,10 +3372,10 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
   // In var/let decl with multiple patterns, accumulate them all in this list
   // so we can build our singular PatternBindingDecl at the end.
   SmallVector<PatternBindingEntry, 4> PBDEntries;
-  
+
   // No matter what error path we take, make sure the
   // PatternBindingDecl/TopLevel code block are added.
-  DoAtScopeExit X([&]{
+  defer([&]{
     // If we didn't parse any patterns, don't create the pattern binding decl.
     if (PBDEntries.empty())
       return;
