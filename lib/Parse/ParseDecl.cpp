@@ -3106,7 +3106,7 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
       diagnose(accessors.LBLoc, diag::let_cannot_be_addressed_property);
     else
       diagnose(accessors.LBLoc, diag::let_cannot_be_computed_property);
-
+    PrimaryVar->setLet(false);
     Invalid = true;
   }
 
@@ -3203,6 +3203,17 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
     ignoreInvalidAccessor(WillSet);
     ignoreInvalidAccessor(DidSet);
   }
+  
+  // If this decl is invalid, mark any parsed accessors as invalid to avoid
+  // tripping up later invariants.
+  if (invalid) {
+    flagInvalidAccessor(Get);
+    flagInvalidAccessor(Set);
+    flagInvalidAccessor(Addressor);
+    flagInvalidAccessor(MutableAddressor);
+    flagInvalidAccessor(WillSet);
+    flagInvalidAccessor(DidSet);
+  }
 
   // If this is a willSet/didSet observing property, record this and we're done.
   if (WillSet || DidSet) {
@@ -3246,15 +3257,6 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
 
     storage->setObservingAccessors(Get, Set, nullptr);
     return;
-  }
-
-  // If this decl is invalid, mark any parsed accessors as invalid to avoid
-  // tripping up later invariants.
-  if (invalid) {
-    flagInvalidAccessor(Get);
-    flagInvalidAccessor(Set);
-    flagInvalidAccessor(Addressor);
-    flagInvalidAccessor(MutableAddressor);
   }
 
   // If we have addressors, at this point mark it as addressed.
@@ -3307,6 +3309,18 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
   }
 }
 
+namespace {
+  class DoAtScopeExit {
+    std::function<void()> Fn;
+    DoAtScopeExit(DoAtScopeExit&) = delete;
+  public:
+    DoAtScopeExit(std::function<void()> Fn) : Fn(Fn){}
+    ~DoAtScopeExit() {
+      Fn();
+    }
+  };
+}
+
 /// \brief Parse a 'var' or 'let' declaration, doing no token skipping on error.
 ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
                                   DeclAttributes &Attributes,
@@ -3332,31 +3346,75 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
   assert(Tok.getKind() == tok::kw_let || Tok.getKind() == tok::kw_var);
   SourceLoc VarLoc = consumeToken();
 
+  // If this is a var in the top-level of script/repl source file, wrap the
+  // PatternBindingDecl in a TopLevelCodeDecl, since it represents executable
+  // code.  The VarDecl and any accessor decls (for computed properties) go in
+  // CurDeclContext.
+  //
+  TopLevelCodeDecl *topLevelDecl = nullptr;
+  if (allowTopLevelCode() && CurDeclContext->isModuleScopeContext()) {
+    // The body of topLevelDecl will get set later.
+    topLevelDecl = new (Context) TopLevelCodeDecl(CurDeclContext);
+  }
+
+  // If we're not in a local context, we'll need a context to parse initializers
+  // into (should we have one).  This happens for properties and global
+  // variables in libraries.
+  PatternBindingInitializer *initContext = nullptr;
+  bool usedInitContext = false;
   
-  struct AllBindings {
-    Parser &P;
-
-    struct BindingInfo {
-      PatternBindingDecl *Binding;
-      TopLevelCodeDecl *TopLevelCode;
-    };
-    SmallVector<BindingInfo, 4> All;
-
-    AllBindings(Parser &P) : P(P) {}
-    ~AllBindings() {
-      for (auto &info : All) {
-        if (!info.TopLevelCode) continue;
-        auto binding = info.Binding;
-        auto range = binding->getSourceRange();
-        info.TopLevelCode->setBody(BraceStmt::create(P.Context, range.Start,
-                                            ASTNode(binding), range.End, true));
-      }
-    }
-  } Bindings(*this);
-
   bool HasAccessors = false;  // Syntactically has accessor {}'s.
   ParserStatus Status;
 
+  unsigned NumDeclsInResult = Decls.size();
+  
+  // In var/let decl with multiple patterns, accumulate them all in this list
+  // so we can build our singular PatternBindingDecl at the end.
+  SmallVector<PatternBindingEntry, 4> PBDEntries;
+  
+  // No matter what error path we take, make sure the
+  // PatternBindingDecl/TopLevel code block are added.
+  DoAtScopeExit X([&]{
+    // If we didn't parse any patterns, don't create the pattern binding decl.
+    if (PBDEntries.empty())
+      return;
+    
+    // Now that we've parsed all of our patterns, initializers and accessors, we
+    // can finally create our PatternBindingDecl to represent the
+    // pattern/initializer pairs.
+    auto PBD = PatternBindingDecl::create(Context, StaticLoc, StaticSpelling,
+                                          VarLoc, PBDEntries, CurDeclContext);
+    
+    // If we're setting up a TopLevelCodeDecl, configure it by setting up the
+    // body that holds PBD and we're done.  The TopLevelCodeDecl is already set
+    // up in Decls to be returned to caller.
+    if (topLevelDecl) {
+      assert(!initContext &&
+             "Shouldn't need an initcontext: TopLevelCode is a local context!");
+      PBD->setDeclContext(topLevelDecl);
+      auto range = PBD->getSourceRange();
+      topLevelDecl->setBody(BraceStmt::create(Context, range.Start,
+                                              ASTNode(PBD), range.End, true));
+      Decls.insert(Decls.begin()+NumDeclsInResult, topLevelDecl);
+      return;
+    }
+    
+    // If we set up an initialization context for a property or module-level
+    // global, check to see if we needed it and wind it down.
+    if (initContext) {
+      // If we didn't need the context, "destroy" it, which recycles it for
+      // the next user.
+      if (!usedInitContext)
+        Context.destroyPatternBindingContext(initContext);
+      else
+        initContext->setBinding(PBD);
+    }
+    
+    // Otherwise return the PBD in "Decls" to the caller.  We add it at a specific
+    // spot to get it in before any accessors, which SILGen seems to want.
+    Decls.insert(Decls.begin()+NumDeclsInResult, PBD);
+  });
+  
   do {
     ParserResult<Pattern> pattern;
 
@@ -3369,31 +3427,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       return makeParserCodeCompletionStatus();
     if (pattern.isNull())
       return makeParserError();
-
-    // If this is a var in the top-level of script/repl source file, wrap the
-    // PatternBindingDecl in a TopLevelCodeDecl, since it represents executable
-    // code.  The VarDecl and any accessor decls (for computed properties) go in
-    // CurDeclContext.
-    //
-    // Note that, once we've built the TopLevelCodeDecl, we have to be
-    // really cautious not to escape this scope in a way that doesn't
-    // add it as a binding.
-    TopLevelCodeDecl *topLevelDecl = nullptr;
-    Optional<ContextChange> topLevelParser;
-    if (allowTopLevelCode() && CurDeclContext->isModuleScopeContext()) {
-      // The body of topLevelDecl will get set later.
-      topLevelDecl = new (Context) TopLevelCodeDecl(CurDeclContext);
-      topLevelParser.emplace(*this, topLevelDecl,
-                             &State->getTopLevelContext());
-    }
-
-    // In the normal case, just add PatternBindingDecls to our DeclContext.
-    auto PBD = PatternBindingDecl::create(Context,
-        StaticLoc, StaticSpelling, VarLoc, pattern.get(), nullptr,
-        CurDeclContext);
-
-    Bindings.All.push_back({PBD, topLevelDecl});
-
+    
     // Configure all vars with attributes, 'static' and parent pattern.
     pattern.get()->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
@@ -3401,41 +3435,57 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       Decls.push_back(VD);
     });
 
+    // Remember this pattern/init pair for our ultimate PatternBindingDecl. The
+    // Initializer will be added later when/if it is parsed.
+    PBDEntries.push_back({pattern.get(), nullptr});
+    
+    Expr *PatternInit = nullptr;
+    
     // Parse an initializer if present.
     if (Tok.is(tok::equal)) {
       // Record the variables that we're trying to initialize.
       SmallVector<VarDecl *, 4> Vars;
       Vars.append(CurVars.second.begin(), CurVars.second.end());
       pattern.get()->collectVariables(Vars);
-      using RestoreVarsRAII = llvm::SaveAndRestore<decltype(CurVars)>;
-      RestoreVarsRAII RestoreCurVars(CurVars, {CurDeclContext, Vars});
       
-      // Enter an initializer context if we're not in a local context.
-      PatternBindingInitializer *initContext = nullptr;
+      llvm::SaveAndRestore<decltype(CurVars)>
+      RestoreCurVars(CurVars, {CurDeclContext, Vars});
+      
+      
+      // If we have no local context to parse the initial value into, create one
+      // for the PBD we'll eventually create.  This allows us to have reasonable
+      // DeclContexts for any closures that may live inside of initializers.
+      if (!CurDeclContext->isLocalContext() && !topLevelDecl && !initContext)
+        initContext = Context.createPatternBindingContext(CurDeclContext);
+
+      // If we're using a local context (either a TopLevelCodeDecl or a
+      // PatternBindingContext) install it now so that CurDeclContext is set
+      // right when parsing the initializer.
       Optional<ParseFunctionBody> initParser;
-      if (!CurDeclContext->isLocalContext()) {
-        initContext = Context.createPatternBindingContext(PBD);
+      Optional<ContextChange> topLevelParser;
+      if (topLevelDecl)
+        topLevelParser.emplace(*this, topLevelDecl,
+                               &State->getTopLevelContext());
+      if (initContext)
         initParser.emplace(*this, initContext);
-      }
+
       
       SourceLoc EqualLoc = consumeToken(tok::equal);
       ParserResult<Expr> init = parseExpr(diag::expected_init_value);
       
-      // Leave the initializer context.
-      if (initContext) {
-        if (!initParser->hasClosures())
-          Context.destroyPatternBindingContext(initContext);
-        initParser.reset();
-      }
-      assert(!initParser.hasValue());
-
       if (Flags & PD_DisallowInit && init.isNonNull()) {
         diagnose(EqualLoc, diag::disallowed_init);
         init = nullptr;
       }
       
-      PBD->setInit(init.getPtrOrNull(), false);
+      // Remember this init for the PatternBindingDecl.
+      PBDEntries.back().Init = PatternInit = init.getPtrOrNull();
 
+      // If we allocated an initContext and the expression had a closure in it,
+      // we'll need to keep the initContext around.
+      if (initContext)
+        usedInitContext |= initParser->hasClosures();
+      
       // If we are doing second pass of code completion, we don't want to
       // suddenly cut off parsing and throw away the declaration.
       if (init.hasCodeCompletion() && isCodeCompletionFirstPass())
@@ -3443,48 +3493,34 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
 
       if (init.isNull())
         return makeParserError();
+      
     }
     
-    if (topLevelDecl) {
-      Decls.push_back(topLevelDecl);
-    } else {
-      Decls.push_back(PBD);
-    }
-    
-    // We need to revert CurDeclContext before parsing accessors.
-    if (topLevelDecl)
-      topLevelParser.getValue().pop();
-
-
     // If we syntactically match the second decl-var production, with a
     // var-get-set clause, parse the var-get-set clause.
     if (Tok.is(tok::l_brace) && !Flags.contains(PD_InLoop)) {
+      HasAccessors = true;
+      
       if (auto *boundVar = parseDeclVarGetSet(pattern.get(), Flags, StaticLoc,
-                                              PBD->hasInit(), Attributes,
-                                              Decls)) {
-        if (PBD->getInit() && !boundVar->hasStorage()) {
+                                              PatternInit != nullptr,
+                                              Attributes, Decls)) {
+        if (PatternInit && !boundVar->hasStorage()) {
           diagnose(pattern.get()->getLoc(), diag::getset_init)
-            .highlight(PBD->getInit()->getSourceRange());
-          PBD->setInit(nullptr, false);
+            .highlight(PatternInit->getSourceRange());
+          PatternInit = nullptr;
         }
       }
-
-      if (isLet)
-        return makeParserError();
-
-      HasAccessors = true;
     }
-
+    
     // Add all parsed vardecls to this scope.
     addPatternVariablesToScope(pattern.get());
     
     // Propagate back types for simple patterns, like "var A, B : T".
-    if (TypedPattern *TP = dyn_cast<TypedPattern>(PBD->getPattern())) {
-      if (isa<NamedPattern>(TP->getSubPattern()) && !PBD->hasInit()) {
-        for (unsigned i = Bindings.All.size() - 1; i != 0; --i) {
-          PatternBindingDecl *PrevPBD = Bindings.All[i-1].Binding;
-          Pattern *PrevPat = PrevPBD->getPattern();
-          if (!isa<NamedPattern>(PrevPat) || PrevPBD->hasInit())
+    if (TypedPattern *TP = dyn_cast<TypedPattern>(pattern.get())) {
+      if (isa<NamedPattern>(TP->getSubPattern()) && PatternInit == nullptr) {
+        for (unsigned i = PBDEntries.size() - 1; i != 0; --i) {
+          Pattern *PrevPat = PBDEntries[i-1].ThePattern;
+          if (!isa<NamedPattern>(PrevPat) || PBDEntries[i-1].Init)
             break;
           if (HasAccessors) {
             // FIXME -- offer a fixit to explicitly specify the type
@@ -3495,19 +3531,22 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
           TypedPattern *NewTP = new (Context) TypedPattern(PrevPat,
                                                            TP->getTypeLoc());
           NewTP->setPropagatedType();
-          PrevPBD->setPattern(NewTP);
+          PBDEntries[i-1].ThePattern = NewTP;
         }
       }
     }
   } while (consumeIf(tok::comma));
-
+  
   if (HasAccessors) {
-    if (Bindings.All.size() > 1) {
+    if (PBDEntries.size() > 1) {
       diagnose(VarLoc, diag::disallowed_var_multiple_getset);
       Status.setIsParseError();
     }
   }
-
+  
+  // NOTE: At this point, the DoAtScopeExit object is destroyed and the PBD
+  // is added to the program.
+  
   return Status;
 }
 

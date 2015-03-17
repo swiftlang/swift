@@ -543,11 +543,10 @@ public:
         }
       } else if (Decl *D = Element.dyn_cast<Decl*>()) {
         D->walk(CF);
-        if (PatternBindingDecl *PBD = llvm::dyn_cast<PatternBindingDecl>(D)) {
-          if (PBD->hasInit()) {
-            if (VarDecl *VD = PBD->getSingleVar()) {
-              Expr *Log = logVarDecl(VD);
-              if (Log) {
+        if (auto *PBD = llvm::dyn_cast<PatternBindingDecl>(D)) {
+          if (VarDecl *VD = PBD->getSingleVar()) {
+            if (VD->getParentInitializer()) {
+              if (Expr *Log = logVarDecl(VD)) {
                 Elements.insert(Elements.begin() + (EI + 1), Log);
                 ++EI;
               }

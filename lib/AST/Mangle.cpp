@@ -182,9 +182,11 @@ namespace {
 /// least one name, which is probably a reasonable assumption but may
 /// not be adequately enforced.
 static VarDecl *findFirstVariable(PatternBindingDecl *binding) {
-  auto var = FindFirstVariable().visit(binding->getPattern());
-  assert(var && "pattern-binding bound no variables?");
-  return var;
+  for (auto entry : binding->getPatternList()) {
+    auto var = FindFirstVariable().visit(entry.ThePattern);
+    if (var) return var;
+  }
+  llvm_unreachable("pattern-binding bound no variables?");
 }
 
 void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {

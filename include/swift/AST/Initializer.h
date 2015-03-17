@@ -70,16 +70,24 @@ class PatternBindingInitializer : public Initializer {
   PatternBindingDecl *Binding;
 
   friend class ASTContext; // calls reset on unused contexts
-  void reset(PatternBindingDecl *binding) {
+
+  void reset(DeclContext *parent) {
+    setParent(parent);
+    Binding = nullptr;
+  }
+
+public:
+  explicit PatternBindingInitializer(DeclContext *parent)
+    : Initializer(InitializerKind::PatternBinding, parent),
+      Binding(nullptr) {
+  }
+ 
+
+  void setBinding(PatternBindingDecl *binding) {
     setParent(binding->getDeclContext());
     Binding = binding;
   }
-public:
-  explicit PatternBindingInitializer(PatternBindingDecl *binding)
-    : Initializer(InitializerKind::PatternBinding,
-                  binding->getDeclContext()),
-      Binding(binding) {}
-
+  
   PatternBindingDecl *getBinding() const { return Binding; }
 
   static bool classof(const DeclContext *DC) {

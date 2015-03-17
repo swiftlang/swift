@@ -700,7 +700,8 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   void visitIfStmt(IfStmt *S) {
     for (auto entry : S->getCond())
       if (auto *PBD = entry.getBinding())
-        checkPattern(PBD->getPattern(), DeclVisibilityKind::LocalVariable);
+        for (auto entry : PBD->getPatternList())
+          checkPattern(entry.ThePattern, DeclVisibilityKind::LocalVariable);
     visit(S->getThenStmt());
     if (S->getElseStmt())
       visit(S->getElseStmt());
@@ -712,7 +713,8 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   void visitWhileStmt(WhileStmt *S) {
     for (auto entry : S->getCond())
       if (auto *PBD = entry.getBinding())
-        checkPattern(PBD->getPattern(), DeclVisibilityKind::LocalVariable);
+        for (auto entry : PBD->getPatternList())
+          checkPattern(entry.ThePattern, DeclVisibilityKind::LocalVariable);
     visit(S->getBody());
   }
   void visitDoWhileStmt(DoWhileStmt *S) {

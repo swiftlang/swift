@@ -1449,7 +1449,7 @@ static const Decl *relatedDeclForAvailabilityFixit(const Decl *D) {
     // rather than PatternBindingDecls, so we use the VarDecl as the
     // suggested declaration rather than the VarDecl to detect when
     // we want to update vs. add an attribute.
-    if (VarDecl *VD = PBD->getPattern()->getSingleVar()) {
+    if (VarDecl *VD = PBD->getSingleVar()) {
       D = VD;
     }
   } else if (auto *ECD = dyn_cast<EnumCaseDecl>(D)) {

@@ -68,16 +68,18 @@ func ffoo() {}
 for i in 0...5 {}
 // CHECK: <for>for <elem-initexpr>var i = 0, i2 = 1</elem-initexpr>; <elem-expr>i == 0</elem-expr>; <elem-expr>++i</elem-expr> <brace>{}</brace></for>
 for var i = 0, i2 = 1; i == 0; ++i {}
-// CHECK: <for>for <elem-initexpr>i = 0</elem-initexpr>; <elem-expr>i == 0</elem-expr>; <elem-expr>++i</elem-expr> <brace>{}</brace></for>
+// CHECK: <for>for <elem-initexpr>var (i,i2) = (0,0), i3 = 1</elem-initexpr>; <elem-expr>i == 0</elem-expr>; <elem-expr>++i</elem-expr> <brace>{}</brace></for>
+for var (i,i2) = (0,0), i3 = 1; i == 0; ++i {}
+
 for i = 0; i == 0; ++i {}
-// CHECK: <while>while <elem-condexpr>var v = o, z = o where v > z</elem-condexpr> <brace>{}</brace></while>
-while var v = o, z = o where v > z {}
+// CHECK: <while>while <elem-condexpr>var v? = o, z? = o where v > z</elem-condexpr> <brace>{}</brace></while>
+while var v? = o, z? = o where v > z {}
 // CHECK: <while>while <elem-condexpr>v == 0</elem-condexpr> <brace>{}</brace></while>
 while v == 0 {}
 // CHECK: <do-while>do <brace>{}</brace> while <elem-expr>v == 0</elem-expr></do-while>
 do {} while v == 0
-// CHECK: <if>if <elem-condexpr>var v = o, z = o where v > z</elem-condexpr> <brace>{}</brace></if>
-if var v = o, z = o where v > z {}
+// CHECK: <if>if <elem-condexpr>var v? = o, z? = o where v > z</elem-condexpr> <brace>{}</brace></if>
+if var v? = o, z? = o where v > z {}
 
 // CHECK: <switch>switch <elem-expr>v</elem-expr> {
 // CHECK:   <case>case <elem-pattern>1</elem-pattern>: break;</case>

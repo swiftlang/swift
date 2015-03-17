@@ -614,11 +614,13 @@ namespace {
 
     void visitPatternBindingDecl(PatternBindingDecl *PBD) {
       printCommon(PBD, "pattern_binding_decl");
-      OS << '\n';
-      printRec(PBD->getPattern());
-      if (PBD->getInit()) {
+      for (auto entry : PBD->getPatternList()) {
         OS << '\n';
-        printRec(PBD->getInit());
+        printRec(entry.ThePattern);
+        if (entry.Init) {
+          OS << '\n';
+          printRec(entry.Init);
+        }
       }
       OS << ')';
     }

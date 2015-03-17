@@ -1728,48 +1728,56 @@ public:
   iterator begin() const { return first; }
   iterator end() const { return last; }
 };
+  
+  
+/// This represents one entry in a PatternBindingDecl, which are pairs of
+/// Pattern and Initialization expression.  The pattern is always present, but
+/// the initializer can be null if there is none.
+struct PatternBindingEntry {
+  Pattern *ThePattern;
+  Expr *Init;
+  
+  PatternBindingEntry(Pattern *P, Expr *E) : ThePattern(P), Init(E) {}
+};
 
 /// \brief This decl contains a pattern and optional initializer for a set
 /// of one or more VarDecls declared together.
 ///
 /// For example, in
 /// \code
-///   var (a, b) = foo()
+///   var (a, b) = foo(), (c,d) = bar()
 /// \endcode
-/// this contains the pattern "(a, b)" and the intializer "foo()".  The same
-/// applies to simpler declarations like "var a = foo()".
+///
+/// this includes two entries in the pattern list.  The first contains the
+/// pattern "(a, b)" and the initializer "foo()".  The second contains the
+/// pattern "(c, d)" and the initializer "bar()".
+///
 class PatternBindingDecl : public Decl {
   SourceLoc StaticLoc; ///< Location of the 'static/class' keyword, if present.
   SourceLoc VarLoc;    ///< Location of the 'var' keyword.
-  Pattern *Pat;        ///< The pattern this decl binds.
 
-  /// The initializer, and whether it's been type-checked already.
-  llvm::PointerIntPair<Expr *, 1, bool> InitAndChecked;
-
+  bool isInitializerTypeChecked : 1;
+  unsigned numPatternEntries : 31;
   friend class Decl;
   
   PatternBindingDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
-                     SourceLoc VarLoc,
-                     Pattern *Pat, Expr *E,
-                     DeclContext *Parent)
-    : Decl(DeclKind::PatternBinding, Parent),
-      StaticLoc(StaticLoc), VarLoc(VarLoc), Pat(nullptr),
-      InitAndChecked(E, false) {
-    PatternBindingDeclBits.IsStatic = StaticLoc.isValid();
-    PatternBindingDeclBits.StaticSpelling =
-        static_cast<unsigned>(StaticSpelling);
-    setPattern(Pat);
-  }
+                     SourceLoc VarLoc, unsigned NumPatternEntries,
+                     DeclContext *Parent);
 
 public:
-  static PatternBindingDecl *create(ASTContext &Context,
-                                    SourceLoc StaticLoc,
+  static PatternBindingDecl *create(ASTContext &Ctx, SourceLoc StaticLoc,
+                                    StaticSpellingKind StaticSpelling,
+                                    SourceLoc VarLoc,
+                                    ArrayRef<PatternBindingEntry> PatternList,
+                                    DeclContext *Parent);
+
+  static PatternBindingDecl *create(ASTContext &Ctx, SourceLoc StaticLoc,
                                     StaticSpellingKind StaticSpelling,
                                     SourceLoc VarLoc,
                                     Pattern *Pat, Expr *E,
                                     DeclContext *Parent) {
-    return new (Context) PatternBindingDecl(StaticLoc, StaticSpelling, VarLoc,
-                                            Pat, E, Parent);
+    PatternBindingEntry Entry(Pat, E);
+    return create(Ctx, StaticLoc, StaticSpelling, VarLoc, Entry, Parent);
   }
 
 
@@ -1779,16 +1787,43 @@ public:
   SourceLoc getLoc() const { return VarLoc; }
   SourceRange getSourceRange() const;
 
-  Pattern *getPattern() { return Pat; }
-  const Pattern *getPattern() const { return Pat; }
-  void setPattern(Pattern *P);
-
-  bool hasInit() const { return InitAndChecked.getPointer(); }
-  Expr *getInit() const { return InitAndChecked.getPointer(); }
-  bool wasInitChecked() const { return InitAndChecked.getInt(); }
-  void setInit(Expr *expr, bool checked) {
-    InitAndChecked.setPointerAndInt(expr, checked);
+  unsigned getNumPatternEntries() const { return numPatternEntries; }
+  
+  ArrayRef<PatternBindingEntry> getPatternList() const {
+    return const_cast<PatternBindingDecl*>(this)->getMutablePatternList();
   }
+
+  Expr *getInit(unsigned i) const {
+    return getPatternList()[i].Init;
+  }
+  
+  void setInit(unsigned i, Expr *E) {
+    getMutablePatternList()[i].Init = E;
+  }
+
+  Pattern *getPattern(unsigned i) const {
+    return getPatternList()[i].ThePattern;
+  }
+  
+  void setPattern(unsigned i, Pattern *Pat);
+
+  /// Given that this PBD is the parent pattern for the specified VarDecl,
+  /// return the entry of the VarDecl in our PatternList.  For example, in:
+  ///
+  ///   let (a,b) = foo(), (c,d) = bar()
+  ///
+  /// "a" and "b" will have index 0, since they correspond to the first pattern,
+  /// and "c" and "d" will have index 1 since they correspond to the second one.
+  unsigned getPatternEntryIndexForVarDecl(const VarDecl *VD) const;
+  
+  /// Return the PatternEntry (a pattern + initializer pair) for the specified
+  /// VarDecl.
+  PatternBindingEntry getPatternEntryForVarDecl(const VarDecl *VD) const {
+    return getPatternList()[getPatternEntryIndexForVarDecl(VD)];
+  }
+  
+  bool isInitializerChecked() const { return isInitializerTypeChecked; }
+  void setInitializerChecked() { isInitializerTypeChecked = true; }
 
   /// Does this binding declare something that requires storage?
   bool hasStorage() const;
@@ -1810,6 +1845,15 @@ public:
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PatternBinding;
+  }
+  
+private:
+  MutableArrayRef<PatternBindingEntry> getMutablePatternList() {
+    // Pattern entries are tail allocated.
+    return {
+      reinterpret_cast<PatternBindingEntry*>(this + 1),
+      numPatternEntries
+    };
   }
 };
   
@@ -4015,7 +4059,7 @@ public:
   ///
   Pattern *getParentPattern() const {
     if (auto *PBD = getParentPatternBinding())
-      return PBD->getPattern();
+      return PBD->getPatternEntryForVarDecl(this).ThePattern;
     return nullptr;
   }
 
@@ -4030,7 +4074,7 @@ public:
   ///
   Expr *getParentInitializer() const {
     if (auto *PBD = getParentPatternBinding())
-      return PBD->getInit();
+      return PBD->getPatternEntryForVarDecl(this).Init;
     return nullptr;
   }
   

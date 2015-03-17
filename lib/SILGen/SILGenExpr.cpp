@@ -4547,12 +4547,14 @@ void SILGenFunction::emitMemberInitializers(VarDecl *selfDecl,
     auto pbd = dyn_cast<PatternBindingDecl>(member);
     if (!pbd || pbd->isStatic()) continue;
 
-    auto init = pbd->getInit();
-    if (!init) continue;
+    for (auto entry : pbd->getPatternList()) {
+      auto init = entry.Init;
+      if (!init) continue;
 
-    // Cleanup after this initialization.
-    FullExpr scope(Cleanups, pbd->getPattern());
-    emitMemberInit(*this, selfDecl, pbd->getPattern(), emitRValue(init));
+      // Cleanup after this initialization.
+      FullExpr scope(Cleanups, entry.ThePattern);
+      emitMemberInit(*this, selfDecl, entry.ThePattern, emitRValue(init));
+    }
   }
 }
 

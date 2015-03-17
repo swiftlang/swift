@@ -317,7 +317,8 @@ void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
     if (VD->getParentInitializer()) {
       TC.diagnose(attr->getLocation(), diag::attr_NSManaged_initial_value)
         .highlight(VD->getParentInitializer()->getSourceRange());
-      VD->getParentPatternBinding()->setInit(nullptr, false);
+      auto PBD = VD->getParentPatternBinding();
+      PBD->setInit(PBD->getPatternEntryIndexForVarDecl(VD), nullptr);
     }
     // Otherwise, ok.
     break;

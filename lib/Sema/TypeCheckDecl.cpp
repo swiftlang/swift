@@ -1104,25 +1104,30 @@ static bool isDefaultInitializable(TypeRepr *typeRepr) {
 /// or will have a default initializer, without performing any type
 /// checking on it.
 static bool isDefaultInitializable(PatternBindingDecl *pbd) {
-  // If it has an initializer, this is trivially true.
-  if (pbd->hasInit())
-    return true;
-
   // If it is NSManaged or is a lazy variable, it is trivially true.
   if (auto var = pbd->getSingleVar()) {
     if (var->getAttrs().hasAttribute<NSManagedAttr>() ||
         var->getAttrs().hasAttribute<LazyAttr>())
       return true;
   }
+  
+  for (auto entry : pbd->getPatternList()) {
+    // If it has an initializer, this is trivially true.
+    if (entry.Init)
+      continue;
 
-  // If the pattern is typed with optionals, it is true.
-  if (auto typedPattern = dyn_cast<TypedPattern>(pbd->getPattern())) {
-    if (auto typeRepr = typedPattern->getTypeLoc().getTypeRepr()) {
-      return isDefaultInitializable(typeRepr);
+    // If the pattern is typed as optional (or tuples thereof), it is true.
+    if (auto typedPattern = dyn_cast<TypedPattern>(entry.ThePattern)) {
+      if (auto typeRepr = typedPattern->getTypeLoc().getTypeRepr())
+        if (isDefaultInitializable(typeRepr))
+          continue;
     }
-  }
 
-  return false;
+    // Otherwise, we can't default initialize this binding.
+    return false;
+  }
+  
+  return true;
 }
 
 /// Build a default initializer for the given type.
@@ -1265,9 +1270,11 @@ static bool contextAllowsPatternBindingWithoutVariables(DeclContext *dc) {
 
 /// Validate the given pattern binding declaration.
 static void validatePatternBindingDecl(TypeChecker &tc,
-                                       PatternBindingDecl *binding) {
+                                       PatternBindingDecl *binding,
+                                       unsigned entryNumber) {
   // If the pattern already has a type, we're done.
-  if (binding->getPattern()->hasType() || binding->isBeingTypeChecked())
+  if (binding->getPattern(entryNumber)->hasType() ||
+      binding->isBeingTypeChecked())
     return;
   
   binding->setIsBeingTypeChecked();
@@ -1292,27 +1299,27 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   // Check the pattern. PBDs can never affect a function's signature, so pass
   // TR_InExpression.
   TypeResolutionOptions options = TR_InExpression;
-  if (binding->getInit()) {
+  if (binding->getInit(entryNumber)) {
     // If we have an initializer, we can also have unknown types.
     options |= TR_AllowUnspecifiedTypes;
     options |= TR_AllowUnboundGenerics;
   }
-  if (tc.typeCheckPattern(binding->getPattern(),
+  if (tc.typeCheckPattern(binding->getPattern(entryNumber),
                           binding->getDeclContext(),
                           options)) {
-    setBoundVarsTypeError(binding->getPattern(), tc.Context);
+    setBoundVarsTypeError(binding->getPattern(entryNumber), tc.Context);
     binding->setInvalid();
-    binding->getPattern()->setType(ErrorType::get(tc.Context));
+    binding->getPattern(entryNumber)->setType(ErrorType::get(tc.Context));
     goto done;
   }
 
   // If the pattern didn't get a type, it's because we ran into some
   // unknown types along the way. We'll need to check the initializer.
-  if (!binding->getPattern()->hasType()) {
-    if (tc.typeCheckBinding(binding)) {
-      setBoundVarsTypeError(binding->getPattern(), tc.Context);
+  if (!binding->getPattern(entryNumber)->hasType()) {
+    if (tc.typeCheckBinding(binding, entryNumber)) {
+      setBoundVarsTypeError(binding->getPattern(entryNumber), tc.Context);
       binding->setInvalid();
-      binding->getPattern()->setType(ErrorType::get(tc.Context));
+      binding->getPattern(entryNumber)->setType(ErrorType::get(tc.Context));
       goto done;
     }
   }
@@ -1321,14 +1328,14 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   // it must bind at least one variable.
   if (!contextAllowsPatternBindingWithoutVariables(binding->getDeclContext())) {
     llvm::SmallVector<VarDecl*, 2> vars;
-    binding->getPattern()->collectVariables(vars);
+    binding->getPattern(entryNumber)->collectVariables(vars);
     if (vars.empty()) {
       // Selector for error message.
       enum : unsigned {
         Property,
         GlobalVariable,
       };
-      tc.diagnose(binding->getPattern()->getLoc(),
+      tc.diagnose(binding->getPattern(entryNumber)->getLoc(),
                   diag::pattern_binds_no_variables,
                   binding->getDeclContext()->isTypeContext()
                                                    ? Property : GlobalVariable);
@@ -1336,7 +1343,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   }
 
   // If we have any type-adjusting attributes, apply them here.
-  if (binding->getPattern()->hasType())
+  if (binding->getPattern(entryNumber)->hasType())
     if (auto var = binding->getSingleVar())
       tc.checkTypeModifyingDeclAttributes(var);
 
@@ -1345,7 +1352,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   {
     auto dc = binding->getDeclContext();
     if (dc->isGenericContext() && dc->isTypeContext()) {
-      binding->getPattern()->forEachVariable([&](VarDecl *var) {
+      binding->getPattern(entryNumber)->forEachVariable([&](VarDecl *var) {
         var->setInterfaceType(
           tc.getInterfaceTypeFromInternalType(dc, var->getType()));
       });
@@ -1843,7 +1850,8 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     bool isTypeContext = PBD->getDeclContext()->isTypeContext();
 
     llvm::DenseSet<const VarDecl *> seenVars;
-    PBD->getPattern()->forEachNode([&](const Pattern *P) {
+    for (auto entry : PBD->getPatternList())
+    entry.ThePattern->forEachNode([&](const Pattern *P) {
       if (auto *NP = dyn_cast<NamedPattern>(P)) {
         // Only check individual variables if we didn't check an enclosing
         // TypedPattern.
@@ -2816,56 +2824,63 @@ public:
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
-    validatePatternBindingDecl(TC, PBD);
+    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i)
+      validatePatternBindingDecl(TC, PBD, i);
     if (PBD->isInvalid())
       return;
     
-    if (!IsFirstPass) {
-      if (PBD->getInit() && !PBD->wasInitChecked()) {
-        if (TC.typeCheckBinding(PBD)) {
+    if (!IsFirstPass && !PBD->isInitializerChecked()) {
+      bool HadError = false;
+      for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
+        if (PBD->getInit(i) && TC.typeCheckBinding(PBD, i)) {
           PBD->setInvalid();
-          if (!PBD->getPattern()->hasType()) {
-            PBD->getPattern()->setType(ErrorType::get(TC.Context));
-            setBoundVarsTypeError(PBD->getPattern(), TC.Context);
-            return;
+          if (!PBD->getPattern(i)->hasType()) {
+            PBD->getPattern(i)->setType(ErrorType::get(TC.Context));
+            setBoundVarsTypeError(PBD->getPattern(i), TC.Context);
+            HadError = true;
           }
         }
       }
+      if (HadError) return;
     }
 
     TC.checkDeclAttributesEarly(PBD);
 
     if (!IsSecondPass) {
-      // Type check each VarDecl in that his PatternBinding handles.
-      visitBoundVars(PBD->getPattern());
+      for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
+        // Type check each VarDecl in that his PatternBinding handles.
+        visitBoundVars(PBD->getPattern(i));
 
-      // If we have a type but no initializer, check whether the type is
-      // default-initializable. If so, do it.
-      if (PBD->getPattern()->hasType() && !PBD->hasInit() &&
-          PBD->hasStorage() && !PBD->getPattern()->getType()->is<ErrorType>()) {
+        // If we have a type but no initializer, check whether the type is
+        // default-initializable. If so, do it.
+        if (PBD->getPattern(i)->hasType() &&
+            !PBD->getInit(i) &&
+            PBD->hasStorage() &&
+            !PBD->getPattern(i)->getType()->is<ErrorType>()) {
 
-        // If we have a type-adjusting attribute (like ownership), apply it now.
-        if (auto var = PBD->getSingleVar())
-          TC.checkTypeModifyingDeclAttributes(var);
+          // If we have a type-adjusting attribute (like ownership), apply it now.
+          if (auto var = PBD->getSingleVar())
+            TC.checkTypeModifyingDeclAttributes(var);
 
-        // Decide whether we should suppress default initialization.
-        bool suppressDefaultInit = false;
-        PBD->getPattern()->forEachVariable([&](VarDecl *var) {
-          // @NSManaged properties never get default initialized, nor do
-          // debugger variables and immutable properties.
-          if (var->getAttrs().hasAttribute<NSManagedAttr>() ||
-              var->isDebuggerVar() ||
-              var->isLet())
-            suppressDefaultInit = true;
-        });
+          // Decide whether we should suppress default initialization.
+          bool suppressDefaultInit = false;
+          PBD->getPattern(i)->forEachVariable([&](VarDecl *var) {
+            // @NSManaged properties never get default initialized, nor do
+            // debugger variables and immutable properties.
+            if (var->getAttrs().hasAttribute<NSManagedAttr>() ||
+                var->isDebuggerVar() ||
+                var->isLet())
+              suppressDefaultInit = true;
+          });
 
-        if (!suppressDefaultInit) {
-          auto type = PBD->getPattern()->getType();
-          if (auto defaultInit = buildDefaultInitializer(TC, type)) {
-            // If we got a default initializer, install it and re-type-check it
-            // to make sure it is properly coerced to the pattern type.
-            PBD->setInit(defaultInit, /*checked=*/false);
-            TC.typeCheckBinding(PBD);
+          if (!suppressDefaultInit) {
+            auto type = PBD->getPattern(i)->getType();
+            if (auto defaultInit = buildDefaultInitializer(TC, type)) {
+              // If we got a default initializer, install it and re-type-check it
+              // to make sure it is properly coerced to the pattern type.
+              PBD->setInit(i, defaultInit);
+              TC.typeCheckBinding(PBD, i);
+            }
           }
         }
       }
@@ -2878,8 +2893,12 @@ public:
 
     // If this is a declaration without an initializer, reject code if
     // uninitialized vars are not allowed.
-    if (!PBD->hasInit() && !isInSILMode) {
-      PBD->getPattern()->forEachVariable([&](VarDecl *var) {
+    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
+      auto entry = PBD->getPatternList()[i];
+    
+      if (entry.Init || isInSILMode) continue;
+      
+      entry.ThePattern->forEachVariable([&](VarDecl *var) {
         // If the variable has no storage, it never needs an initializer.
         if (!var->hasStorage())
           return;
@@ -3288,7 +3307,8 @@ public:
       // initialized. Diagnose the lack of initial value.
       pbd->setInvalid();
       SmallVector<VarDecl *, 4> vars;
-      pbd->getPattern()->collectVariables(vars);
+      for (auto entry : pbd->getPatternList())
+        entry.ThePattern->collectVariables(vars);
       bool suggestNSManaged = propertiesCanBeNSManaged(cd, vars);
       switch (vars.size()) {
       case 0:
@@ -4035,8 +4055,10 @@ public:
         // checked yet.
         if (isa<SubscriptDecl>(prop))
           TC.validateDecl(prop);
-        else if (auto pat = cast<VarDecl>(prop)->getParentPatternBinding())
-          validatePatternBindingDecl(TC, pat);
+        else if (auto pat = cast<VarDecl>(prop)->getParentPatternBinding()) {
+          for (unsigned i = 0, e = pat->getNumPatternEntries(); i != e; ++i)
+            validatePatternBindingDecl(TC, pat, i);
+        }
 
         isObjC = prop->isObjC() || prop->isDynamic() ||
                  prop->getAttrs().hasAttribute<IBOutletAttr>();
@@ -5628,18 +5650,19 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     auto VD = cast<VarDecl>(D);
     if (!VD->hasType()) {
       if (PatternBindingDecl *PBD = VD->getParentPatternBinding()) {
-        validatePatternBindingDecl(*this, PBD);
-        if (PBD->isInvalid() || !PBD->getPattern()->hasType()) {
-          PBD->getPattern()->setType(ErrorType::get(Context));
-          setBoundVarsTypeError(PBD->getPattern(), Context);
+        for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i)
+          validatePatternBindingDecl(*this, PBD, i);
+        auto parentPattern = VD->getParentPattern();
+        if (PBD->isInvalid() || !parentPattern->hasType()) {
+          parentPattern->setType(ErrorType::get(Context));
+          setBoundVarsTypeError(parentPattern, Context);
           
           // If no type has been set for the initializer, we need to diagnose
           // the failure.
-          if (PBD->getInit() &&
-              !PBD->getInit()->getType()) {
-            diagnose(PBD->getPattern()->getLoc(),
-                     diag::identifier_init_failure,
-                     PBD->getPattern()->getBodyName());
+          if (VD->getParentInitializer() &&
+              !VD->getParentInitializer()->getType()) {
+            diagnose(parentPattern->getLoc(), diag::identifier_init_failure,
+                     parentPattern->getBodyName());
           }
           
           return;
@@ -6116,7 +6139,6 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
   tc.diagnose(classDecl, diag::class_without_init,
               classDecl->getDeclaredType());
 
-  SourceLoc lastLoc;
   for (auto member : classDecl->getMembers()) {
     auto pbd = dyn_cast<PatternBindingDecl>(member);
     if (!pbd)
@@ -6125,53 +6147,42 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
     if (pbd->isStatic() || !pbd->hasStorage() || isDefaultInitializable(pbd) ||
         pbd->isInvalid())
       continue;
+   
+    for (auto entry : pbd->getPatternList()) {
+      if (entry.Init) continue;
+      
+      SmallVector<VarDecl *, 4> vars;
+      entry.ThePattern->collectVariables(vars);
+      if (vars.empty()) continue;
 
-    // FIXME: When we parse "var a, b: Int" we create multiple
-    // PatternBindingDecls, which is convenience elsewhere but
-    // unfortunate here, where it causes us to emit multiple
-    // initializers.
-    if (pbd->getLoc() == lastLoc)
-      continue;
-
-    lastLoc = pbd->getLoc();
-    SmallVector<VarDecl *, 4> vars;
-    pbd->getPattern()->collectVariables(vars);
-    Optional<InFlightDiagnostic> diag;
-    switch (vars.size()) {
-    case 0:
-      break;
-
-    case 1: {
-      diag.emplace(tc.diagnose(vars[0]->getLoc(), diag::note_no_in_class_init_1,
-                               vars[0]->getName()));
-      break;
-    }
-
-    case 2:
-      diag.emplace(tc.diagnose(pbd->getLoc(), diag::note_no_in_class_init_2,
-                               vars[0]->getName(), vars[1]->getName()));
-      break;
-
-    case 3:
-      diag.emplace(tc.diagnose(pbd->getLoc(), diag::note_no_in_class_init_3plus,
-                               vars[0]->getName(), vars[1]->getName(), 
-                               vars[2]->getName(), false));
-      break;
-
-    default:
-      diag.emplace(tc.diagnose(pbd->getLoc(), diag::note_no_in_class_init_3plus,
-                               vars[0]->getName(), vars[1]->getName(), 
-                               vars[2]->getName(), true));
-      break;
-    }
-
-    if (diag) {
-      if (auto defaultValueSuggestion
-                 = buildDefaultInitializerString(tc, classDecl, 
-                                                 pbd->getPattern())) {
-        diag->fixItInsertAfter(pbd->getEndLoc(),
-                               " = " + *defaultValueSuggestion);
+      auto varLoc = vars[0]->getLoc();
+      
+      Optional<InFlightDiagnostic> diag;
+      switch (vars.size()) {
+      case 1:
+        diag.emplace(tc.diagnose(varLoc, diag::note_no_in_class_init_1,
+                                 vars[0]->getName()));
+        break;
+      case 2:
+        diag.emplace(tc.diagnose(varLoc, diag::note_no_in_class_init_2,
+                                 vars[0]->getName(), vars[1]->getName()));
+        break;
+      case 3:
+        diag.emplace(tc.diagnose(varLoc, diag::note_no_in_class_init_3plus,
+                                 vars[0]->getName(), vars[1]->getName(), 
+                                 vars[2]->getName(), false));
+        break;
+      default:
+        diag.emplace(tc.diagnose(varLoc, diag::note_no_in_class_init_3plus,
+                                 vars[0]->getName(), vars[1]->getName(), 
+                                 vars[2]->getName(), true));
+        break;
       }
+
+      if (auto defaultValueSuggestion
+             = buildDefaultInitializerString(tc, classDecl, entry.ThePattern))
+        diag->fixItInsertAfter(entry.ThePattern->getEndLoc(),
+                               " = " + *defaultValueSuggestion);
     }
   }
 }
@@ -6366,20 +6377,22 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     // synthesize an initial value (e.g. for an optional) then we suppress
     // generation of the default initializer.
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
-      if (pbd->hasStorage() && !pbd->isStatic() && !pbd->isImplicit() &&
-          !pbd->hasInit()) {
-        // If we cannot create a default initializer, we cannot make a default
-        // init.
-        if (!isDefaultInitializable(pbd))
-          SuppressDefaultInitializer = true;
+      if (pbd->hasStorage() && !pbd->isStatic() && !pbd->isImplicit())
+        for (auto entry : pbd->getPatternList()) {
+          if (entry.Init) continue;
+          
+          // If we cannot create a default initializer, we cannot make a default
+          // init.
+          if (!isDefaultInitializable(pbd))
+            SuppressDefaultInitializer = true;
 
-        // If one of the bound variables is a let constant, suppress the default
-        // initializer.  Synthesizing an initializer that initializes the
-        // constant to nil isn't useful.
-        pbd->getPattern()->forEachVariable([&](VarDecl *vd) {
-          SuppressDefaultInitializer |= vd->isLet();
-        });
-      }
+          // If one of the bound variables is a let constant, suppress the default
+          // initializer.  Synthesizing an initializer that initializes the
+          // constant to nil isn't useful.
+          entry.ThePattern->forEachVariable([&](VarDecl *vd) {
+            SuppressDefaultInitializer |= vd->isLet();
+          });
+        }
       continue;
     }
   }
@@ -6759,43 +6772,46 @@ bool TypeChecker::typeCheckConditionalPatternBinding(PatternBindingDecl *PBD,
                                                      DeclContext *dc) {
   // Resolve the pattern, which may contain expression nodes that need to be
   // processed into pattern nodes (since it was parsed as a refutable pattern).
-  if (auto *newPattern = resolvePattern(PBD->getPattern(), dc)) {
-    // Check to verify that the pattern is refutable.  Swift 1.x patterns were
-    // written as irrefutable patterns that implicitly destructured an optional.
-    // detect this case, and produce an error with a fixit that introduces the
-    // missing '?' pattern.
-    if (isPatternSyntacticallyIrrefutable(newPattern)) {
-      diagnose(newPattern->getStartLoc(),
-               diag::conditional_pattern_bind_not_refutable)
-        .fixItInsertAfter(newPattern->getEndLoc(), "?");
-      newPattern = new (Context) OptionalSomePattern(newPattern,
-                                                     newPattern->getEndLoc(),
-                                                     true);
-    }
-    
-    PBD->setPattern(newPattern);
-  } else {
-    PBD->setInvalid();
-  }
-
-  validatePatternBindingDecl(*this, PBD);
-  if (PBD->isInvalid())
-    return true;
-  
-  assert(PBD->getInit() && "conditional pattern binding should have init!");
-  if (!PBD->wasInitChecked()) {
-    if (typeCheckBinding(PBD)) {
+  for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
+    if (auto *newPattern = resolvePattern(PBD->getPattern(i), dc)) {
+      // Check to verify that the pattern is refutable.  Swift 1.x patterns were
+      // written as irrefutable patterns that implicitly destructured an optional.
+      // detect this case, and produce an error with a fixit that introduces the
+      // missing '?' pattern.
+      if (isPatternSyntacticallyIrrefutable(newPattern)) {
+        diagnose(newPattern->getStartLoc(),
+                 diag::conditional_pattern_bind_not_refutable)
+          .fixItInsertAfter(newPattern->getEndLoc(), "?");
+        newPattern = new (Context) OptionalSomePattern(newPattern,
+                                                       newPattern->getEndLoc(),
+                                                       true);
+      }
+      
+      PBD->setPattern(i, newPattern);
+    } else {
       PBD->setInvalid();
-      if (!PBD->getPattern()->hasType()) {
-        PBD->getPattern()->setType(ErrorType::get(Context));
-        setBoundVarsTypeError(PBD->getPattern(), Context);
-        return true;
+    }
+  
+    validatePatternBindingDecl(*this, PBD, i);
+    if (PBD->isInvalid())
+      continue;
+  
+    if (!PBD->isInitializerChecked()) {
+      assert(PBD->getInit(i) &&"conditional pattern binding should have init!");
+      if (typeCheckBinding(PBD, i)) {
+        PBD->setInvalid();
+        if (!PBD->getPattern(i)->hasType()) {
+          PBD->getPattern(i)->setType(ErrorType::get(Context));
+          setBoundVarsTypeError(PBD->getPattern(i), Context);
+          continue;
+        }
       }
     }
+    
+    DeclChecker(*this, false, false).visitBoundVars(PBD->getPattern(i));
   }
   
-  DeclChecker(*this, false, false).visitBoundVars(PBD->getPattern());
-  return false;
+  return PBD->isInvalid();
 }
 
 /// Fix the names in the given function to match those in the given target

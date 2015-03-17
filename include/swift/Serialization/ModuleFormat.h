@@ -51,8 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 180; // Last change: Added deallocating
-                                    // parameter convention
+const uint16_t VERSION_MINOR = 181; // Last change: PBD
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -866,7 +865,9 @@ namespace decls_block {
     DeclContextIDField, // context decl
     BCFixed<1>,  // implicit flag
     BCFixed<1>,  // static?
-    StaticSpellingKindField // spelling of 'static' or 'class'
+    StaticSpellingKindField, // spelling of 'static' or 'class'
+    BCVBR<3>    // numpatterns
+
     // The pattern trails the record.
   >;
 

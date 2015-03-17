@@ -1128,12 +1128,16 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
   return false;
 }
 
-bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
+bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding,
+                                   unsigned PatternEntry) {
 
   /// Type checking listener for pattern binding initializers.
   class BindingListener : public ExprTypeCheckListener {
     /// The pattern binding declaration whose initializer we're checking.
     PatternBindingDecl *Binding;
+    
+    /// The entry in the PatternList that we are checking.
+    unsigned PatternEntry;
 
     /// The locator we're using.
     ConstraintLocator *Locator;
@@ -1142,14 +1146,15 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
     Type InitType;
     
   public:
-    explicit BindingListener(PatternBindingDecl *binding) : Binding(binding) { }
+    explicit BindingListener(PatternBindingDecl *binding, unsigned entry)
+      : Binding(binding), PatternEntry(entry) { }
 
     virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
       // Save the locator we're using for the expression.
       Locator = cs.getConstraintLocator(expr);
 
       // Collect constraints from the pattern.
-      auto pattern = Binding->getPattern();
+      auto pattern = Binding->getPattern(PatternEntry);
       InitType = cs.generateConstraints(pattern, Locator);
       if (!InitType)
         return true;
@@ -1159,7 +1164,7 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
                        InitType, Locator);
 
       // The expression has been pre-checked; save it in case we fail later.
-      Binding->setInit(expr, /*checked=*/false);
+      Binding->setInit(PatternEntry, expr);
 
       return false;
     }
@@ -1183,7 +1188,7 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
       expr = tc.coerceToMaterializable(expr);
 
       // Apply the solution to the pattern as well.
-      Pattern *pattern = Binding->getPattern();
+      Pattern *pattern = Binding->getPattern(PatternEntry);
       Type patternType = expr->getType();
       patternType = patternType->getWithoutDefaultArgs(tc.Context);
 
@@ -1194,14 +1199,15 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
                                  patternType, options)) {
         return nullptr;
       }
-      Binding->setPattern(pattern);
-      Binding->setInit(expr, /*checked=*/true);
+      Binding->setPattern(PatternEntry, pattern);
+      Binding->setInit(PatternEntry, expr);
+      Binding->setInitializerChecked();
       return expr;
     }
   };
 
-  BindingListener listener(binding);
-  Expr *init = binding->getInit();
+  BindingListener listener(binding, PatternEntry);
+  Expr *init = binding->getInit(PatternEntry);
   assert(init && "type-checking an uninitialized binding?");
 
   // Enter an initializer context if necessary.
@@ -1215,14 +1221,16 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
 
     // If we didn't find one, create it.
     if (!initContext) {
-      initContext = Context.createPatternBindingContext(binding);
+      initContext = Context.createPatternBindingContext(DC);
+      initContext->setBinding(binding);
       initContextIsNew = true;
     }
     DC = initContext;
   }
   
-  auto contextualType = binding->getPattern()->hasType() ?
-                            binding->getPattern()->getType() :
+  auto pattern = binding->getPattern(PatternEntry);
+  auto contextualType = pattern->hasType() ?
+                            pattern->getType() :
                             Type();
 
   // Type-check the initializer.

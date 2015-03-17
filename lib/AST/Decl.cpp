@@ -869,14 +869,84 @@ void ExtensionDecl::setConformanceLoader(LazyMemberLoader *resolver,
   Conformances.setLoader(resolver, contextData);
 }
 
+
+PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
+                                       StaticSpellingKind StaticSpelling,
+                                       SourceLoc VarLoc,
+                                       unsigned NumPatternEntries,
+                                       DeclContext *Parent)
+  : Decl(DeclKind::PatternBinding, Parent),
+    StaticLoc(StaticLoc), VarLoc(VarLoc),
+    isInitializerTypeChecked(false),
+    numPatternEntries(NumPatternEntries) {
+  PatternBindingDeclBits.IsStatic = StaticLoc.isValid();
+  PatternBindingDeclBits.StaticSpelling =
+       static_cast<unsigned>(StaticSpelling);
+}
+
+PatternBindingDecl *
+PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
+                           StaticSpellingKind StaticSpelling,
+                           SourceLoc VarLoc,
+                           ArrayRef<PatternBindingEntry> PatternList,
+                           DeclContext *Parent) {
+  size_t Size = sizeof(PatternBindingDecl) +
+                PatternList.size() * sizeof(PatternBindingEntry);
+  void *D = allocateMemoryForDecl<PatternBindingDecl>(Ctx, Size,
+                                                            false);
+  auto PBD = ::new (D) PatternBindingDecl(StaticLoc, StaticSpelling, VarLoc,
+                                          PatternList.size(), Parent);
+
+  // Set up the patterns.
+  auto entries = PBD->getMutablePatternList();
+  unsigned elt = 0U-1;
+  for (auto pe : PatternList) {
+    ++elt;
+    auto &newEntry = entries[elt];
+    newEntry = { nullptr, pe.Init };
+    PBD->setPattern(elt, pe.ThePattern);
+  }
+  return PBD;
+}
+
+static bool patternContainsVarDeclBinding(const Pattern *P, const VarDecl *VD) {
+  bool Result = false;
+  P->forEachVariable([&](VarDecl *FoundVD) {
+    Result |= FoundVD == VD;
+  });
+  return Result;
+}
+
+unsigned PatternBindingDecl::getPatternEntryIndexForVarDecl(const VarDecl *VD) const {
+  assert(VD && "Cannot find a null VarDecl");
+  
+  auto List = getPatternList();
+  if (List.size() == 1) {
+    assert(patternContainsVarDeclBinding(List[0].ThePattern, VD) &&
+           "Single entry PatternBindingDecl is set up wrong");
+    return 0;
+  }
+  
+  unsigned Result = 0;
+  for (auto entry : List) {
+    if (patternContainsVarDeclBinding(entry.ThePattern, VD))
+      return Result;
+    ++Result;
+  }
+  
+  assert(0 && "PatternBindingDecl doesn't bind the specified VarDecl!");
+  return ~0U;
+}
+
+
 SourceRange PatternBindingDecl::getSourceRange() const {
   SourceLoc startLoc = getStartLoc();
-  if (auto init = getInit()) {
-    SourceLoc EndLoc = init->getSourceRange().End;
+  if (auto init = getPatternList().back().Init) {
+    SourceLoc EndLoc = init->getEndLoc();
     if (EndLoc.isValid())
       return { startLoc, EndLoc };
   }
-  return { startLoc, Pat->getSourceRange().End };
+  return { startLoc, getPatternList().back().ThePattern->getEndLoc() };
 }
 
 static StaticSpellingKind getCorrectStaticSpellingForDecl(const Decl *D) {
@@ -901,16 +971,18 @@ bool PatternBindingDecl::hasStorage() const {
   // Walk the pattern, to check to see if any of the VarDecls included in it
   // have storage.
   bool HasStorage = false;
-  getPattern()->forEachVariable([&](VarDecl *VD) {
-    if (VD->hasStorage())
-      HasStorage = true;
-  });
+  for (auto entry : getPatternList())
+    entry.ThePattern->forEachVariable([&](VarDecl *VD) {
+      if (VD->hasStorage())
+        HasStorage = true;
+    });
 
   return HasStorage;
 }
 
-void PatternBindingDecl::setPattern(Pattern *P) {
-  Pat = P;
+void PatternBindingDecl::setPattern(unsigned i, Pattern *P) {
+  auto PatternList = getMutablePatternList();
+  PatternList[i].ThePattern = P;
   
   // Make sure that any VarDecl's contained within the pattern know about this
   // PatternBindingDecl as their parent.
@@ -922,7 +994,9 @@ void PatternBindingDecl::setPattern(Pattern *P) {
 
 
 VarDecl *PatternBindingDecl::getSingleVar() const {
-  return getPattern()->getSingleVar();
+  if (getNumPatternEntries() == 1)
+    return getPatternList()[0].ThePattern->getSingleVar();
+  return nullptr;
 }
 
 SourceLoc TopLevelCodeDecl::getStartLoc() const {
@@ -2593,8 +2667,8 @@ SourceRange VarDecl::getSourceRange() const {
 
 SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   Pattern *Pat = nullptr;
-  if (auto PatBind = ParentPattern.dyn_cast<PatternBindingDecl *>())
-    Pat = PatBind->getPattern();
+  if (ParentPattern.is<PatternBindingDecl *>())
+    Pat = getParentPattern();
   else
     Pat = ParentPattern.dyn_cast<Pattern *>();
 

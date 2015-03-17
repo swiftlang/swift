@@ -602,19 +602,23 @@ public:
     auto PrevParent = Walker.Parent;
     Walker.Parent = D;
 
-    if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D)) {      
-      if (Pattern *Pat = doIt(PBD->getPattern()))
-        PBD->setPattern(Pat);
-      else
-        return true;
-      if (Expr *Init = PBD->getInit()) {
-#ifndef NDEBUG
-        PrettyStackTraceDecl debugStack("walking into initializer for", PBD);
-#endif
-        if (Expr *E2 = doIt(Init))
-          PBD->setInit(E2, PBD->wasInitChecked());
+    if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+      unsigned idx = 0U-1;
+      for (auto entry : PBD->getPatternList()) {
+        ++idx;
+        if (Pattern *Pat = doIt(entry.ThePattern))
+          PBD->setPattern(idx, Pat);
         else
           return true;
+        if (entry.Init) {
+#ifndef NDEBUG
+          PrettyStackTraceDecl debugStack("walking into initializer for", PBD);
+#endif
+          if (Expr *E2 = doIt(entry.Init))
+            PBD->setInit(idx, E2);
+          else
+            return true;
+        }
       }
     } else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
 #ifndef NDEBUG
@@ -728,6 +732,8 @@ public:
           return true;
         elt.setCondition(E);
       } else if (auto CB = elt.getBinding()) {
+        doIt(CB);
+#if 0
         // Walk the binding pattern and initializer expression.
         if (auto P = doIt(CB->getPattern()))
           CB->setPattern(P);
@@ -740,6 +746,7 @@ public:
           else
             return true;
         }
+#endif
       }
     }
     

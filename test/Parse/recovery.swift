@@ -452,7 +452,7 @@ func exprPostfix1(x : Int) {
 }
 
 func exprPostfix2() {
-  var x = .42 // expected-error {{expected identifier after '.' expression}}
+  var x = .42 // expected-error {{expected identifier after '.' expression}} expected-error {{type annotation missing in pattern}}
 }
 
 //===--- Recovery for expr-super.

@@ -77,7 +77,9 @@ func testNotInherited1Sub() {
 // inheritance of initializers.
 class NotInherited2 : D { // expected-error{{class 'NotInherited2' has no initializers}}
   var a: Int // expected-note{{stored property 'a' without initial value prevents synthesized initializers}}{{13-13= = 0}}
-  var b, c: Int // expected-note{{stored property 'b' without initial value prevents synthesized initializers}}{{16-16= = 0}}
+  var b: Int // expected-note{{stored property 'b' without initial value prevents synthesized initializers}}{{13-13= = 0}}
+    , c: Int  // expected-note{{stored property 'c' without initial value prevents synthesized initializers}}{{13-13= = 0}}
+  
   var (d, e): (Int, String) // expected-note{{stored properties 'd' and 'e' without initial values prevent synthesized initializers}}{{28-28= = (0, "")}}
   var (f, (g, h)): (Int?, (Float, String)) // expected-note{{stored properties 'f', 'g', and 'h' without initial values prevent synthesized initializers}}{{43-43= = (nil, (0.0, ""))}}
   var (w, i, (j, k)): (Int?, Float, (String, D)) // expected-note{{stored properties 'w', 'i', 'j', and others without initial values prevent synthesized initializers}}

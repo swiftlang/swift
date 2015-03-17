@@ -1175,15 +1175,15 @@ void ValueDecl::setLocalDiscriminator(unsigned index) {
 }
 
 PatternBindingInitializer *
-ASTContext::createPatternBindingContext(PatternBindingDecl *binding) {
+ASTContext::createPatternBindingContext(DeclContext *parent) {
   // Check for an existing context we can re-use.
   if (auto existing = Impl.UnusedPatternBindingContext) {
     Impl.UnusedPatternBindingContext = nullptr;
-    existing->reset(binding);
+    existing->reset(parent);
     return existing;
   }
 
-  return new (*this) PatternBindingInitializer(binding);
+  return new (*this) PatternBindingInitializer(parent);
 }
 void ASTContext::destroyPatternBindingContext(PatternBindingInitializer *DC) {
   // There isn't much value in caching more than one of these.

@@ -2466,13 +2466,19 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     bool isImplicit;
     bool isStatic;
     uint8_t RawStaticSpelling;
+    unsigned numPatterns;
 
     decls_block::PatternBindingLayout::readRecord(scratch, contextID,
                                                   isImplicit,
                                                   isStatic,
-                                                  RawStaticSpelling);
-    Pattern *pattern = maybeReadPattern();
-    assert(pattern);
+                                                  RawStaticSpelling,
+                                                  numPatterns);
+    SmallVector<PatternBindingEntry, 2> patterns;
+    patterns.reserve(numPatterns);
+    for (unsigned i = 0; i != numPatterns; ++i) {
+      patterns.push_back({ maybeReadPattern(), nullptr });
+      assert(patterns.back().ThePattern);
+    }
 
     auto StaticSpelling = getActualStaticSpellingKind(RawStaticSpelling);
     if (!StaticSpelling.hasValue()) {
@@ -2482,8 +2488,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto binding = PatternBindingDecl::create(ctx, SourceLoc(),
                                               StaticSpelling.getValue(),
-                                              SourceLoc(), pattern,
-        /*init=*/nullptr, getDeclContext(contextID));
+                                              SourceLoc(), patterns,
+                                              getDeclContext(contextID));
     binding->setEarlyAttrValidation(true);
     declOrOffset = binding;
 

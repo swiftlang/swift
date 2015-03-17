@@ -715,13 +715,15 @@ struct ASTNodeBase {};
       auto CB = elt.getBinding();
 
       PrettyStackTraceDecl debugStack("verifying condition binding", CB);
-      if (!CB->getInit()) {
-        Out << "conditional binding does not have initializer\n";
-        CB->print(Out);
-        abort();
+      for (auto entry : CB->getPatternList()) {
+        if (!entry.Init) {
+          Out << "conditional binding does not have initializer\n";
+          CB->print(Out);
+          abort();
+        }
+        checkSameType(entry.ThePattern->getType(), entry.Init->getType(),
+                      "conditional binding type");
       }
-      checkSameType(CB->getPattern()->getType(), CB->getInit()->getType(),
-                    "conditional binding type");
     }
     
     void checkCondition(StmtCondition C) {
@@ -1450,11 +1452,12 @@ struct ASTNodeBase {};
 
     void verifyChecked(PatternBindingDecl *binding) {
       // Look at all of the VarDecls being bound.
-      if (auto *P = binding->getPattern())
-        P->forEachVariable([&](VarDecl *VD) {
-          // ParamDecls never get PBD's.
-          assert(!isa<ParamDecl>(VD) && "ParamDecl has a PatternBindingDecl?");
-        });
+      for (auto entry : binding->getPatternList())
+        if (auto *P = entry.ThePattern)
+          P->forEachVariable([&](VarDecl *VD) {
+            // ParamDecls never get PBD's.
+            assert(!isa<ParamDecl>(VD) && "ParamDecl has a PatternBindingDecl?");
+          });
     }
 
     void verifyChecked(AbstractStorageDecl *ASD) {

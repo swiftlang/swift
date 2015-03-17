@@ -1909,10 +1909,13 @@ void Serializer::writeDecl(const Decl *D) {
     PatternBindingLayout::emitRecord(
         Out, ScratchRecord, abbrCode, contextID, binding->isImplicit(),
         binding->isStatic(),
-        uint8_t(getStableStaticSpelling(binding->getStaticSpelling())));
+        uint8_t(getStableStaticSpelling(binding->getStaticSpelling())),
+                                     binding->getNumPatternEntries());
 
-    writePattern(binding->getPattern());
-    // Ignore initializer; external clients don't need to know about it.
+    for (auto entry : binding->getPatternList()) {
+      writePattern(entry.ThePattern);
+      // Ignore initializer; external clients don't need to know about it.
+    }
 
     break;
   }

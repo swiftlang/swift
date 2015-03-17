@@ -469,7 +469,7 @@ public:
   /// like a global or a field.  To reduce memory usage, if the
   /// context goes unused, it should be returned to the ASTContext
   /// with destroyPatternBindingContext.
-  PatternBindingInitializer *createPatternBindingContext(PatternBindingDecl *D);
+  PatternBindingInitializer *createPatternBindingContext(DeclContext *parent);
   void destroyPatternBindingContext(PatternBindingInitializer *DC);
 
   /// Create a context for the initializer of the nth default argument

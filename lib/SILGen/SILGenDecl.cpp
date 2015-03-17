@@ -654,16 +654,18 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, Type patternType) {
 void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
   // Allocate the variables and build up an Initialization over their
   // allocated storage.
-  InitializationPtr initialization =
-    InitializationForPattern(*this).visit(D->getPattern());
+  for (auto entry : D->getPatternList()) {
+    InitializationPtr initialization =
+      InitializationForPattern(*this).visit(entry.ThePattern);
 
-  // If an initial value expression was specified by the decl, emit it into
-  // the initialization. Otherwise, mark it uninitialized for DI to resolve.
-  if (D->getInit()) {
-    FullExpr Scope(Cleanups, CleanupLocation(D->getInit()));
-    emitExprInto(D->getInit(), initialization.get());
-  } else {
-    initialization->finishInitialization(*this);
+    // If an initial value expression was specified by the decl, emit it into
+    // the initialization. Otherwise, mark it uninitialized for DI to resolve.
+    if (auto *Init = entry.Init) {
+      FullExpr Scope(Cleanups, CleanupLocation(Init));
+      emitExprInto(Init, initialization.get());
+    } else {
+      initialization->finishInitialization(*this);
+    }
   }
 }
 
@@ -1410,9 +1412,11 @@ public:
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers for static variables.
-    if (pd->isStatic() && pd->hasInit()) {
-      SGM.emitGlobalInitialization(pd);
-    }
+    if (!pd->isStatic()) return;
+    
+    for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i)
+      if (pd->getInit(i))
+        SGM.emitGlobalInitialization(pd, i);
   }
 
   void visitVarDecl(VarDecl *vd) {
@@ -1605,9 +1609,12 @@ public:
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
-    if (pd->isStatic() && pd->hasInit()) {
-      SGM.emitGlobalInitialization(pd);
-    }
+    // Emit initializers for static variables.
+    if (!pd->isStatic()) return;
+    
+    for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i)
+      if (pd->getInit(i))
+        SGM.emitGlobalInitialization(pd, i);
   }
 
   void visitVarDecl(VarDecl *vd) {
@@ -2053,7 +2060,8 @@ struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
 } // end anonymous namespace
 
 /// Emit a global initialization.
-void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd) {
+void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
+                                            unsigned pbdEntry) {
   // Generic and dynamic static properties require lazy initialization, which
   // isn't implemented yet.
   if (pd->isStatic()) {
@@ -2068,7 +2076,7 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd) {
 
   // Pick one variable of the pattern. Usually it's only one variable, but it
   // can also be something like: var (a, b) = ...
-  Pattern *pattern = pd->getPattern();
+  Pattern *pattern = pd->getPattern(pbdEntry);
   VarDecl *varDecl = nullptr;
   pattern->forEachVariable([&](VarDecl *D) {
     varDecl = D;
@@ -2097,13 +2105,14 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd) {
   Mangler funcMangler(onceFuncStream);
   funcMangler.mangleGlobalInit(varDecl, counter, true);
 
-  SILFunction *onceFunc = emitLazyGlobalInitializer(onceFuncStream.str(), pd);
+  SILFunction *onceFunc = emitLazyGlobalInitializer(onceFuncStream.str(), pd,
+                                                    pbdEntry);
 
   // Generate accessor functions for all of the declared variables, which
   // Builtin.once the lazy global initializer we just generated then return
   // the address of the individual variable.
   GenGlobalAccessors(*this, onceToken, onceFunc)
-    .visit(pd->getPattern());
+    .visit(pd->getPattern(pbdEntry));
 }
 
 namespace {

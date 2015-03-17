@@ -24,6 +24,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "clang/Basic/Module.h"
@@ -1556,6 +1557,10 @@ bool FileUnit::walk(ASTWalker &walker) {
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent,
                                                 getParentModule());
   for (Decl *D : Decls) {
+#ifndef NDEBUG
+    PrettyStackTraceDecl debugStack("walking into decl", D);
+#endif
+    
     if (D->walk(walker))
       return true;
   }
@@ -1566,6 +1571,10 @@ bool SourceFile::walk(ASTWalker &walker) {
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent,
                                                 getParentModule());
   for (Decl *D : Decls) {
+#ifndef NDEBUG
+    PrettyStackTraceDecl debugStack("walking into decl", D);
+#endif
+
     if (D->walk(walker))
       return true;
   }

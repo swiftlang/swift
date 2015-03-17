@@ -2053,13 +2053,19 @@ emitStmtConditionWithBodyRec(Stmt *CondStmt, unsigned CondElement,
   
   PatternMatchEmission emission(gen, CondStmt);
   
+  assert(PBD->getNumPatternEntries() == 1 &&
+         "statement conditionals only have a single entry right now");
+  auto *ThePattern = PBD->getPatternList()[0].ThePattern;
+  auto *Init = PBD->getPatternList()[0].Init;
+  
+  
   // Emit the initializer value being matched against. Dispatching will consume
   // it.
-  ManagedValue subjectMV = gen.emitRValueAsSingleValue(PBD->getInit());
+  ManagedValue subjectMV = gen.emitRValueAsSingleValue(Init);
   auto subject = ConsumableManagedValue::forOwned(subjectMV);
   
   // Add a row for the pattern we want to match against.
-  ClauseRow row(/*caseBlock*/nullptr, PBD->getPattern(), /*where expr*/nullptr);
+  ClauseRow row(/*caseBlock*/nullptr, ThePattern, /*where expr*/nullptr);
   
   // Set the handler that generates code when the match succeeds.  This simply
   // continues emission of the rest of the condition.

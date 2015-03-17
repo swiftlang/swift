@@ -93,7 +93,7 @@ func badTest2() {
   x = Swift // expected-error {{expected module member name after module name}} expected-error {{cannot assign a value of type 'module<Swift>' to a value of type 'Int'}}
 }
 func badTest3() {
-  var x = Swift. // expected-error {{postfix '.' is reserved}} expected-error {{expected member name following '.'}}
+  var x = Swift. // expected-error {{postfix '.' is reserved}} expected-error {{expected member name following '.'}} expected-error {{type annotation missing in pattern}}
 }
 func badTest4() {
   Swift // expected-error {{expected module member name after module name}}

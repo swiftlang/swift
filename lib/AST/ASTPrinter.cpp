@@ -1099,9 +1099,12 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   // variables are immutable, and if so, we print as 'let'.  This allows us to
   // handle the 'let x = 4' case properly at least.
   const VarDecl *anyVar = nullptr;
-  decl->getPattern()->forEachVariable([&](VarDecl *V) {
-    anyVar = V;
-  });
+  for (auto entry : decl->getPatternList()) {
+    entry.ThePattern->forEachVariable([&](VarDecl *V) {
+      anyVar = V;
+    });
+    if (anyVar) break;
+  }
 
   // FIXME: PatternBindingDecls don't have attributes themselves, so just assume
   // the variables all have the same attributes. This isn't exactly true
@@ -1113,9 +1116,18 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   } else {
     Printer << "let ";
   }
-  printPattern(decl->getPattern());
-  if (Options.VarInitializers) {
-    // FIXME: Implement once we can pretty-print expressions.
+  
+  bool isFirst = true;
+  for (auto entry : decl->getPatternList()) {
+    if (isFirst)
+      isFirst = false;
+    else
+      Printer << ", ";
+    
+    printPattern(entry.ThePattern);
+    if (Options.VarInitializers) {
+      // FIXME: Implement once we can pretty-print expressions.
+    }
   }
 }
 
@@ -1916,12 +1928,15 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
 
     // Skip pattern bindings that consist of just one computed variable.
     if (auto pbd = dyn_cast<PatternBindingDecl>(this)) {
-      auto pattern = pbd->getPattern()->getSemanticsProvidingPattern();
-      if (auto named = dyn_cast<NamedPattern>(pattern)) {
-        auto StorageKind = named->getDecl()->getStorageKind();
-        if (StorageKind == VarDecl::Computed ||
-            StorageKind == VarDecl::StoredWithObservers)
-          return false;
+      if (pbd->getPatternList().size() == 1) {
+        auto pattern =
+          pbd->getPatternList()[0].ThePattern->getSemanticsProvidingPattern();
+        if (auto named = dyn_cast<NamedPattern>(pattern)) {
+          auto StorageKind = named->getDecl()->getStorageKind();
+          if (StorageKind == VarDecl::Computed ||
+              StorageKind == VarDecl::StoredWithObservers)
+            return false;
+        }
       }
     }
   }

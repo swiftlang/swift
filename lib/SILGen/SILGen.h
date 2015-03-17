@@ -228,7 +228,8 @@ public:
   /// Emit the lazy initializer function for a global pattern binding
   /// declaration.
   SILFunction *emitLazyGlobalInitializer(StringRef funcName,
-                                         PatternBindingDecl *binding);
+                                         PatternBindingDecl *binding,
+                                         unsigned pbdEntry);
   
   /// Emit the accessor for a global variable or stored static property.
   ///
@@ -258,7 +259,7 @@ public:
   bool requiresObjCSuperDispatch(ValueDecl *vd);
 
   /// Emit a global initialization.
-  void emitGlobalInitialization(PatternBindingDecl *initializer);
+  void emitGlobalInitialization(PatternBindingDecl *initializer, unsigned elt);
   
   /// Known functions for bridging.
   SILDeclRef getStringToNSStringFn();

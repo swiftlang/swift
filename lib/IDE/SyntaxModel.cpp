@@ -418,13 +418,10 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
 
     if (!ForS->getInitializerVarDecls().empty()) {
       auto InitDs = ForS->getInitializerVarDecls();
-      // Initializer decls come with pairs of (VarDecl, PatternBindingDecl).
-      // For the range we use start loc of the first PatternBindingDecl which
-      // includes the var/let' keyword location.
-      assert(InitDs.size() % 2 == 0 && "not var/pattern pairs ?");
-      assert(isa<PatternBindingDecl>(InitDs[1]));
-      SourceRange ElemRange = SourceRange(InitDs[1]->getStartLoc(),
-                                          InitDs.back()->getEndLoc());
+      // Initializer decls come as a PatternBindingDecl followed by VarDecl's
+      // for each pattern set up.  The PBD covers the whole initializer.
+      assert(isa<PatternBindingDecl>(InitDs[0]));
+      SourceRange ElemRange = InitDs[0]->getSourceRange();
       SN.Elements.emplace_back(SyntaxStructureElementKind::InitExpr,
                                charSourceRangeFromSourceRange(SM, ElemRange));
     } else if (ForS->getInitializer()) {

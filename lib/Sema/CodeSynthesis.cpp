@@ -1536,7 +1536,9 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
 
   // Type check the body of the getter and setter.
   TC.typeCheckDecl(Get, true);
+  TC.typeCheckDecl(Get, false);
   TC.typeCheckDecl(Set, true);
+  TC.typeCheckDecl(Set, false);
 }
 
 static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
@@ -1660,8 +1662,9 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   // TODO: This doesn't work with complicated patterns like:
   //   lazy var (a,b) = foo()
   auto *InitValue = VD->getParentInitializer();
-  bool wasChecked = VD->getParentPatternBinding()->wasInitChecked();
-  VD->getParentPatternBinding()->setInit(nullptr, true);
+  auto PBD = VD->getParentPatternBinding();
+  PBD->setInit(PBD->getPatternEntryIndexForVarDecl(VD), nullptr);
+  PBD->setInitializerChecked();
 
   // Recontextualize any closure declcontexts nested in the initializer to
   // realize that they are in the getter function.
@@ -1676,8 +1679,7 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   auto *Tmp2PBD = PatternBindingDecl::create(Ctx, /*StaticLoc*/SourceLoc(),
                                              StaticSpellingKind::None,
                                              InitValue->getStartLoc(),
-                                             Tmp2PBDPattern, nullptr, Get);
-  Tmp2PBD->setInit(InitValue, /*already type checked*/wasChecked);
+                                             Tmp2PBDPattern, InitValue, Get);
   Body.push_back(Tmp2PBD);
   Body.push_back(Tmp2VD);
 

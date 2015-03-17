@@ -619,8 +619,9 @@ static bool requiresIVarInitialization(SILGenModule &SGM, ClassDecl *cd) {
     auto pbd = dyn_cast<PatternBindingDecl>(member);
     if (!pbd) continue;
 
-    if (pbd->getInit())
-      return true;
+    for (auto entry : pbd->getPatternList())
+      if (entry.Init)
+        return true;
   }
 
   return false;
@@ -719,7 +720,8 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg) {
 }
 
 SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
-                                                 PatternBindingDecl *binding) {
+                                                 PatternBindingDecl *binding,
+                                                     unsigned pbdEntry) {
   ASTContext &C = M.getASTContext();
   Type initType = FunctionType::get(
                     TupleType::getEmpty(C), TupleType::getEmpty(C),
@@ -733,11 +735,11 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
                         IsNotBare, IsNotTransparent,
                         makeModuleFragile ? IsFragile : IsNotFragile);
   f->setDebugScope(new (M)
-                   SILDebugScope(RegularLocation(binding->getInit()), *f));
+                   SILDebugScope(RegularLocation(binding->getInit(pbdEntry)),
+                                 *f));
   f->setLocation(binding);
 
-  SILGenFunction(*this, *f)
-    .emitLazyGlobalInitializer(binding);
+  SILGenFunction(*this, *f).emitLazyGlobalInitializer(binding);
 
   f->verify();
 
@@ -890,8 +892,9 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
   }
 
   // Otherwise, emit the initializer for library global variables.
-  if (pd->hasInit())
-    emitGlobalInitialization(pd);
+  for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i)
+    if (pd->getInit(i))
+      emitGlobalInitialization(pd, i);
 }
 
 void SILGenModule::visitVarDecl(VarDecl *vd) {

@@ -342,72 +342,78 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
   // This would just cause a confusing definite initialization error.  Some
   // day we will do some high level analysis of uninitialized variables
   // (rdar://15157729) but until then, output a specialized error.
-  if (!PBD->getInit()) {
-    TC.diagnose(PBD->getStartLoc(), diag::repl_must_be_initialized);
-    return;
-  }
+  unsigned entryIdx = 0U-1;
+  for (auto patternEntry : PBD->getPatternList()) {
+    ++entryIdx;
+    if (!patternEntry.Init) {
+      TC.diagnose(PBD->getStartLoc(), diag::repl_must_be_initialized);
+      continue;
+    }
 
-  llvm::SmallString<16> PatternString;
-  PatternBindingPrintLHS(PatternString).visit(PBD->getPattern());
+    auto pattern = patternEntry.ThePattern;
+    
+    llvm::SmallString<16> PatternString;
+    PatternBindingPrintLHS(PatternString).visit(pattern);
 
-  // If the bound pattern is a single value, use a DeclRefExpr on the underlying
-  // Decl to print it.
-  if (auto *NP = dyn_cast<NamedPattern>(PBD->getPattern()->
-                                           getSemanticsProvidingPattern())) {
-    Expr *E = TC.buildCheckedRefExpr(NP->getDecl(), &SF, PBD->getStartLoc(),
-                                     /*Implicit=*/true);
+    // If the bound pattern is a single value, use a DeclRefExpr on the
+    // underlying Decl to print it.
+    if (auto *NP = dyn_cast<NamedPattern>(pattern->
+                                          getSemanticsProvidingPattern())) {
+      Expr *E = TC.buildCheckedRefExpr(NP->getDecl(), &SF, PBD->getStartLoc(),
+                                       /*Implicit=*/true);
+      generatePrintOfExpression(PatternString, E);
+      continue;
+    }
+
+    // Otherwise, we may not have a way to name all of the pieces of the pattern.
+    // Create a repl metavariable to capture the whole thing so we can reference
+    // it, then assign that into the pattern.  For example, translate:
+    //   var (x, y, _) = foo()
+    // into:
+    //   var r123 = foo()
+    //   var (x, y, _) = r123
+    //   replPrint(r123)
+
+    // Remove PBD from the list of Decls so we can insert before it.
+    auto PBTLCD = cast<TopLevelCodeDecl>(SF.Decls.back());
+    SF.Decls.pop_back();
+
+    // Create the meta-variable, let the typechecker name it.
+    Identifier name = TC.getNextResponseVariableName(SF.getParentModule());
+    VarDecl *vd = new (Context) VarDecl(/*static*/ false, /*IsLet*/true,
+                                        PBD->getStartLoc(), name,
+                                        pattern->getType(), &SF);
+    SF.Decls.push_back(vd);
+    
+
+    // Create a PatternBindingDecl to bind the expression into the decl.
+    Pattern *metavarPat = new (Context) NamedPattern(vd);
+    metavarPat->setType(vd->getType());
+    PatternBindingDecl *metavarBinding
+      = PatternBindingDecl::create(Context, SourceLoc(),
+                                   StaticSpellingKind::None,
+                                   PBD->getStartLoc(), metavarPat,
+                                   patternEntry.Init, &SF);
+    
+    auto MVBrace = BraceStmt::create(Context, metavarBinding->getStartLoc(),
+                                     ASTNode(metavarBinding),
+                                     metavarBinding->getEndLoc());
+    
+    auto *MVTLCD = new (Context) TopLevelCodeDecl(&SF, MVBrace);
+    SF.Decls.push_back(MVTLCD);
+    
+    
+    // Replace the initializer of PBD with a reference to our repl temporary.
+    Expr *E = TC.buildCheckedRefExpr(vd, &SF,
+                                     vd->getStartLoc(), /*Implicit=*/true);
+    E = TC.coerceToMaterializable(E);
+    PBD->setInit(entryIdx, E);
+    SF.Decls.push_back(PBTLCD);
+    
+    // Finally, print out the result, by referring to the repl temp.
+    E = TC.buildCheckedRefExpr(vd, &SF, vd->getStartLoc(), /*Implicit=*/true);
     generatePrintOfExpression(PatternString, E);
-    return;
   }
-
-  // Otherwise, we may not have a way to name all of the pieces of the pattern.
-  // Create a repl metavariable to capture the whole thing so we can reference
-  // it, then assign that into the pattern.  For example, translate:
-  //   var (x, y, _) = foo()
-  // into:
-  //   var r123 = foo()
-  //   var (x, y, _) = r123
-  //   replPrint(r123)
-
-  // Remove PBD from the list of Decls so we can insert before it.
-  auto PBTLCD = cast<TopLevelCodeDecl>(SF.Decls.back());
-  SF.Decls.pop_back();
-
-  // Create the meta-variable, let the typechecker name it.
-  Identifier name = TC.getNextResponseVariableName(SF.getParentModule());
-  VarDecl *vd = new (Context) VarDecl(/*static*/ false, /*IsLet*/true,
-                                      PBD->getStartLoc(), name,
-                                      PBD->getPattern()->getType(), &SF);
-  SF.Decls.push_back(vd);
-
-
-  // Create a PatternBindingDecl to bind the expression into the decl.
-  Pattern *metavarPat = new (Context) NamedPattern(vd);
-  metavarPat->setType(vd->getType());
-  PatternBindingDecl *metavarBinding
-    = PatternBindingDecl::create(Context, SourceLoc(),
-                                 StaticSpellingKind::None,
-                                 PBD->getStartLoc(), metavarPat,
-                                 PBD->getInit(), &SF);
-
-  auto MVBrace = BraceStmt::create(Context, metavarBinding->getStartLoc(),
-                                   ASTNode(metavarBinding),
-                                   metavarBinding->getEndLoc());
-
-  auto *MVTLCD = new (Context) TopLevelCodeDecl(&SF, MVBrace);
-  SF.Decls.push_back(MVTLCD);
-
-
-  // Replace the initializer of PBD with a reference to our repl temporary.
-  Expr *E = TC.buildCheckedRefExpr(vd, &SF,
-                                   vd->getStartLoc(), /*Implicit=*/true);
-  E = TC.coerceToMaterializable(E);
-  PBD->setInit(E, /*checked=*/true);
-  SF.Decls.push_back(PBTLCD);
-
-  // Finally, print out the result, by referring to the repl temp.
-  E = TC.buildCheckedRefExpr(vd, &SF, vd->getStartLoc(), /*Implicit=*/true);
-  generatePrintOfExpression(PatternString, E);
 }
 
 
