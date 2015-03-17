@@ -26,13 +26,12 @@ TEST(EditorPlaceholder, EditorPlaceholders) {
   EXPECT_EQ("Blah", Data.Type);
   EXPECT_EQ("()->Int", Data.TypeForExpansion);
 
-  // Fallback.
-  Text = "<#T##x: Int#>";
+  Text = "<#T##Int#>";
   Data = *parseEditorPlaceholder(Text);
-  EXPECT_EQ(EditorPlaceholderKind::Basic, Data.Kind);
-  EXPECT_EQ("T##x: Int", Data.Display);
-  EXPECT_TRUE(Data.Type.empty());
-  EXPECT_TRUE(Data.TypeForExpansion.empty());
+  EXPECT_EQ(EditorPlaceholderKind::Typed, Data.Kind);
+  EXPECT_EQ("Int", Data.Display);
+  EXPECT_EQ("Int", Data.Type);
+  EXPECT_EQ("Int", Data.TypeForExpansion);
 }
 
 TEST(EditorPlaceholder, InvalidEditorPlaceholders) {

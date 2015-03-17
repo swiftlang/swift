@@ -28,6 +28,7 @@ using namespace llvm;
 //
 // Typed:
 //   'T##' display-string '##' type-string ('##' type-for-expansion-string)?
+//   'T##' display-and-type-string
 //
 // Basic:
 //   display-string
@@ -60,8 +61,9 @@ swift::parseEditorPlaceholder(StringRef PlaceholderText) {
   PlaceholderText = PlaceholderText.drop_front(3);
   size_t Pos = PlaceholderText.find("##");
   if (Pos == StringRef::npos) {
-    // Fallback to basic.
-    return PHDataBasic;
+    PHDataTyped.Display = PHDataTyped.Type = PHDataTyped.TypeForExpansion =
+      PlaceholderText;
+    return PHDataTyped;
   }
   PHDataTyped.Display = PlaceholderText.substr(0, Pos);
 
