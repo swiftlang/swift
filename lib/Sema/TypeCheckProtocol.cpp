@@ -3253,12 +3253,6 @@ void TypeChecker::resolveWitness(const NormalProtocolConformance *conformance,
   checker.resolveSingleWitness(requirement);
 }
 
-void TypeChecker::resolveExistentialConformsToItself(ProtocolDecl *proto) {
-  llvm::SmallPtrSet<ProtocolDecl *, 4> checking;
-  existentialConformsToItself(*this, proto->getDeclaredType(), proto,
-                              SourceLoc(), checking);
-}
-
 ValueDecl *TypeChecker::deriveProtocolRequirement(NominalTypeDecl *TypeDecl,
                                                   ValueDecl *Requirement) {
   auto *protocol = cast<ProtocolDecl>(Requirement->getDeclContext());

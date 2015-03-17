@@ -65,9 +65,6 @@ public:
   virtual void resolveWitness(const NormalProtocolConformance *conformance,
                               ValueDecl *requirement) = 0;
 
-  /// Resolve the "existential conforms to itself" bit for the given protocol.
-  virtual void resolveExistentialConformsToItself(ProtocolDecl *proto) = 0;
-
   /// Resolve a member type.
   ///
   /// \param dc The context in which to resolve the type.

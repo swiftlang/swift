@@ -1242,7 +1242,6 @@ public:
                                   AssociatedTypeDecl *assocType) override;
   virtual void resolveWitness(const NormalProtocolConformance *conformance,
                               ValueDecl *requirement) override;
-  virtual void resolveExistentialConformsToItself(ProtocolDecl *proto) override;
   virtual Type resolveMemberType(DeclContext *dc, Type type,
                                  Identifier name) override;
 

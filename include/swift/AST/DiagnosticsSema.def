@@ -855,11 +855,6 @@ NOTE(protocol_conformance_implied_here,sema_tcd,none,
      "implied protocol conformance %0 here can be made explicit", (Identifier))
 
 // Protocols and existentials
-NOTE(protocol_existential_assoc_type,sema_tcd,none,
-     "associated type %0 prevents protocol from conforming to itself",
-     (Identifier))
-NOTE(protocol_existential_refers_to_this,sema_tcd,none,
-     "%0 requirement refers to 'Self' type", (Identifier))
 ERROR(assoc_type_outside_of_protocol,sema_nb,none,
       "cannot use associated type %0 outside of its protocol", (Identifier))
 

@@ -878,23 +878,14 @@ LookupConformanceResult Module::lookupConformance(Type type,
   if (type->isExistentialType()) {
     // If the protocol doesn't conform to itself, there's no point in looking
     // further.
-    auto known = protocol->existentialConformsToSelf();
-    if (!known && resolver) {
-      resolver->resolveExistentialConformsToItself(protocol);
-      known = protocol->existentialConformsToSelf();
-    }
-
-    // If we know that protocol doesn't conform to itself, we're done.
-    if (known && !*known)
+    if (!protocol->existentialConformsToSelf(resolver))
       return { nullptr, ConformanceKind::DoesNotConform };
 
     // Special-case AnyObject, which may not be in the list of conformances.
     if (protocol->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-      if (type->isClassExistentialType()) {
-        return { nullptr, known ? ConformanceKind::Conforms
-                                : ConformanceKind::UncheckedConforms };
-      }
-      return { nullptr, ConformanceKind::DoesNotConform };
+      return { nullptr, type->isClassExistentialType()
+                          ? ConformanceKind::Conforms
+                          : ConformanceKind::DoesNotConform };
     }
 
     // Look for this protocol within the existential's list of conformances.
@@ -902,9 +893,7 @@ LookupConformanceResult Module::lookupConformance(Type type,
     type->getAnyExistentialTypeProtocols(protocols);
     for (auto ap : protocols) {
       if (ap == protocol || ap->inheritsFrom(protocol)) {
-        return { nullptr,
-                 known? ConformanceKind::Conforms
-                      : ConformanceKind::UncheckedConforms };
+        return { nullptr, ConformanceKind::Conforms };
       }
     }
 

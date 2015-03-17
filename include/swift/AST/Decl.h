@@ -3378,6 +3378,8 @@ class ProtocolDecl : public NominalTypeDecl {
 
   bool requiresClassSlow();
 
+  bool existentialConformsToSelfSlow(LazyResolver *resolver);
+
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
                Identifier Name, MutableArrayRef<TypeLoc> Inherited);
@@ -3420,21 +3422,12 @@ public:
 
   /// Determine whether an existential value conforming to just this protocol
   /// conforms to the protocol itself.
-  ///
-  /// \returns an empty optional if not yet known, true if the existential
-  /// does conform to this protocol, and false otherwise.
-  Optional<bool> existentialConformsToSelf() const {
+  bool existentialConformsToSelf(LazyResolver *resolver) const {
     if (ProtocolDeclBits.ExistentialConformsToSelfValid)
       return ProtocolDeclBits.ExistentialConformsToSelf;
 
-    return None;
-  }
-
-  /// Set whether the existential of this protocol type conforms to this
-  /// protocol.
-  void setExistentialConformsToSelf(bool conforms) {
-    ProtocolDeclBits.ExistentialConformsToSelfValid = true;
-    ProtocolDeclBits.ExistentialConformsToSelf = conforms;
+    return const_cast<ProtocolDecl *>(this)
+             ->existentialConformsToSelfSlow(resolver);
   }
 
   /// If this is known to be a compiler-known protocol, returns the kind.

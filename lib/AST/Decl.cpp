@@ -2206,6 +2206,77 @@ bool ProtocolDecl::requiresClassSlow() {
   return false;
 }
 
+bool ProtocolDecl::existentialConformsToSelfSlow(LazyResolver *resolver) {
+  // Assume for now that the existential conforms to itself; this
+  // prevents circularity issues.
+  ProtocolDeclBits.ExistentialConformsToSelfValid = true;
+  ProtocolDeclBits.ExistentialConformsToSelf = true;
+
+  // Resolve the protocol's type.
+  if (resolver && !hasType())
+    resolver->resolveDeclSignature(this);
+
+  // Check whether this protocol conforms to itself.
+  auto selfType = getSelf()->getArchetype();
+  for (auto member : getMembers()) {
+    if (auto vd = dyn_cast<ValueDecl>(member)) {
+      if (resolver && !vd->hasType())
+        resolver->resolveDeclSignature(vd);
+    }
+
+    if (member->isInvalid())
+      continue;
+
+    // Check for associated types.
+    if (isa<AssociatedTypeDecl>(member)) {
+      // A protocol cannot conform to itself if it has an associated type.
+      ProtocolDeclBits.ExistentialConformsToSelf = false;
+      return false;
+    }
+
+    // For value members, look at their type signatures.
+    auto valueMember = dyn_cast<ValueDecl>(member);
+    if (!valueMember || !valueMember->hasType())
+      continue;
+
+    // Extract the type of the member, ignoring the 'self' parameter and return
+    // type of functions.
+    auto memberTy = valueMember->getType();
+    if (memberTy->is<ErrorType>())
+      continue;
+    if (isa<AbstractFunctionDecl>(valueMember)) {
+      // Drop the 'Self' parameter.
+      memberTy = memberTy->castTo<AnyFunctionType>()->getResult();
+      // Drop the return type. Methods are allowed to return Self.
+      memberTy = memberTy->castTo<AnyFunctionType>()->getInput();
+    }
+
+    // If we find 'Self' anywhere in the member's type, the protocol
+    // does not conform to itself.
+    if (memberTy.findIf([&](Type type) -> bool {
+          // If we found our archetype, return null.
+          if (auto archetype = type->getAs<ArchetypeType>()) {
+            return archetype == selfType;
+          }
+
+          return false;
+        })) {
+      ProtocolDeclBits.ExistentialConformsToSelf = false;
+      return false;
+    }
+  }
+
+  // Check whether any of the inherited protocols fail to conform to
+  // themselves.
+  for (auto proto : getProtocols()) {
+    if (!proto->existentialConformsToSelf(resolver)) {
+      ProtocolDeclBits.ExistentialConformsToSelf = false;
+      return false;
+    }
+  }
+  return true;
+}
+
 GenericTypeParamDecl *ProtocolDecl::getSelf() const {
   return getGenericParams()->getParams().front();
 }
@@ -2893,6 +2964,10 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
         selfTy = self->getDeclaredType();
       else
         selfTy = self->getArchetype();
+
+      // FIXME: Hack for attempts to extend a protocol
+      if (isa<ExtensionDecl>(dc))
+        return ErrorType::get(theMethod->getASTContext());
     }
   }
   
