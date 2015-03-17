@@ -26,7 +26,9 @@ public // @testable
 func _stdlib_binary_CFStringCreateCopy(
   source: _CocoaStringType
 ) -> _CocoaStringType {
-  return unsafeBitCast(CFStringCreateCopy(nil, source), _CocoaStringType.self)
+  let result = CFStringCreateCopy(nil, source)
+  Builtin.release(result)
+  return unsafeBitCast(result, _CocoaStringType.self)
 }
 
 public // @testable
@@ -148,13 +150,13 @@ extension String {
     // Treat it as a CF object because presumably that's what these
     // things tend to be, and CF has a fast path that avoids
     // objc_msgSend
-    let cfValue: _swift_shims_CFStringRef = _cocoaString
+    let cfValue = unsafeBitCast(_cocoaString, _CocoaStringType.self)
 
     // "copy" it into a value to be sure nobody will modify behind
     // our backs.  In practice, when value is already immutable, this
     // just does a retain.
     let cfImmutableValue: _swift_shims_CFStringRef
-      = CFStringCreateCopy(nil, cfValue)
+      = _stdlib_binary_CFStringCreateCopy(cfValue)
 
     let length = CFStringGetLength(cfImmutableValue)
 
