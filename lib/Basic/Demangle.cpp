@@ -1128,6 +1128,7 @@ private:
     if (Mangled.nextIf('E')) {
       NodePointer ext = NodeFactory::create(Node::Kind::Extension);
       NodePointer def_module = demangleModule();
+      if (!def_module) return nullptr;
       NodePointer type = demangleContext();
       ext->addChild(def_module);
       ext->addChild(type);
