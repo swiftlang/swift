@@ -6,7 +6,7 @@
   1.#^LITERAL1^#
 }
 // LITERAL1:          Begin completions, 13 items
-// LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal:      value[#Int64#]; name=value{{$}}
+// LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal:      value[#Int{{64|32}}#]; name=value{{$}}
 // LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal:      bigEndian[#Int#]; name=bigEndian{{$}}
 // LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal:      littleEndian[#Int#]; name=littleEndian{{$}}
 // LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal:      byteSwapped[#Int#]; name=byteSwapped{{$}}
