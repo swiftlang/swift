@@ -13,6 +13,8 @@
 // RUN: %S/../../utils/line-directive %t/out.swift -- %target-build-swift %t/out.swift -o %t/a.out
 // RUN: %S/../../utils/line-directive %t/out.swift -- %target-run %t/a.out
 
+% traversals = ['Forward', 'Bidirectional']
+
 @noreturn
 internal func _abstract(file: StaticString = __FILE__, line: UWord = __LINE__) {
   fatalError("Method must be overridden", file: file, line: line)
@@ -115,9 +117,12 @@ internal final class _BidirectionalIndexBox<
   }
 }
 
+//===--- All Index Protocols ----------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
 extension _InitializeTo { init() {} }
 
-% for Traversal in 'Forward', 'Bidirectional':
+% for Traversal in traversals:
 
 public struct ${Traversal}Index : ${Traversal}IndexType {
   public typealias Distance = IntMax
@@ -179,7 +184,12 @@ public func == (lhs: ${Traversal}Index, rhs: ${Traversal}Index) -> Bool {
   precondition(lhs._typeID == rhs._typeID, "base index types differ.")
   return lhs._box.equals(rhs._box)
 }
+% end
 
+//===--- Collections ------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+% for Traversal in traversals:
 public class ${Traversal}Collection<T> : CollectionType {
   public var startIndex: ${Traversal}Index {_abstract()}
   public var endIndex: ${Traversal}Index {_abstract()}
