@@ -173,11 +173,12 @@ struct _UIViewMirror : MirrorType {
           if let image = maybe_image {
             result = .Some(.View(image))
           }
+
+          _UIViewMirror._views.removeObject(_v)
           
         default: ()
       }
 
-      _UIViewMirror._views.removeObject(_v)
 
       return result
   }
