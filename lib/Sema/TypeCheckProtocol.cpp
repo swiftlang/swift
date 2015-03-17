@@ -2919,231 +2919,10 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   return conformance;
 }
 
-/// \brief Check whether an existential value of the given protocol conforms
-/// to itself.
-///
-/// \param tc The type checker.
-/// \param type The existential type we're checking, used for diagnostics.
-/// \param proto The protocol to test.
-/// \param If we're allowed to complain, the location to use.
-
-/// \returns true if the existential type conforms to itself, false otherwise.
-static bool
-existentialConformsToItself(TypeChecker &tc,
-                            Type type,
-                            ProtocolDecl *proto,
-                            SourceLoc complainLoc,
-                            llvm::SmallPtrSet<ProtocolDecl *, 4> &checking) {
-  // If we already know whether this protocol's existential conforms to itself
-  // use the cached value... unless it's negative and we're supposed to
-  // complain, in which case we fall through.
-  if (auto known = proto->existentialConformsToSelf()) {
-    if (*known || complainLoc.isInvalid())
-      return *known;
-  }
-
-  // Assume for now that it does. This prevents circularity issues.
-  proto->setExistentialConformsToSelf(true);
-
-  // Check that all inherited protocols conform to themselves.
-  for (auto inheritedProto : proto->getProtocols()) {
-    // If we're already checking this protocol, assume it's fine.
-    if (!checking.insert(inheritedProto).second)
-      continue;
-
-    // Check whether the inherited protocol conforms to itself.
-    if (!existentialConformsToItself(tc, type, inheritedProto, complainLoc,
-                                     checking)) {
-      // Recursive call already diagnosed this problem, but tack on a note
-      // to establish the relationship.
-      // FIXME: Poor location information.
-      if (complainLoc.isValid() && *proto->existentialConformsToSelf()) {
-        tc.diagnose(proto,
-                    diag::inherited_protocol_does_not_conform, type,
-                    inheritedProto->getType());
-      }
-
-      proto->setExistentialConformsToSelf(false);
-      return false;
-    }
-  }
-
-  // Check whether this protocol conforms to itself.
-  auto selfType = proto->getSelf()->getArchetype();
-  for (auto member : proto->getMembers()) {
-    
-    // If the protocol in question is already being type-checked, we've entered
-    // this conformance check recursively. Should that be the case, don't
-    // attempt to re-validate any value declarations. The declaration will be
-    // properly validated later on, and we want to avoid an infinite loop.
-    if (!proto->isBeingTypeChecked()) {
-      if (auto vd = dyn_cast<ValueDecl>(member))
-        tc.validateDecl(vd, true);
-    }
-    
-    if (member->isInvalid())
-      continue;
-
-    // Check for associated types.
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-      // A protocol cannot conform to itself if it has an associated type.
-      if (complainLoc.isValid() && *proto->existentialConformsToSelf()) {
-        tc.diagnose(complainLoc, diag::type_does_not_conform, type,
-                    proto->getDeclaredType());
-        tc.diagnose(assocType, diag::protocol_existential_assoc_type,
-                    assocType->getName());
-      }
-      proto->setExistentialConformsToSelf(false);
-      return false;
-    }
-
-    // For value members, look at their type signatures.
-    auto valueMember = dyn_cast<ValueDecl>(member);
-    if (!valueMember || !valueMember->hasType())
-      continue;
-
-    // Extract the type of the member, ignoring the 'self' parameter and return
-    // type of functions.
-    auto memberTy = valueMember->getType();
-    if (memberTy->is<ErrorType>())
-      continue;
-    if (isa<AbstractFunctionDecl>(valueMember)) {
-      // Drop the 'Self' parameter.
-      memberTy = memberTy->castTo<AnyFunctionType>()->getResult();
-      // Drop the return type. Methods are allowed to return Self.
-      memberTy = memberTy->castTo<AnyFunctionType>()->getInput();
-    }
-
-    // "Transform" the type to walk the whole type. If we find 'Self', return
-    // null. Otherwise, make this the identity transform and throw away the
-    // result.
-    if (memberTy.transform([&](Type type) -> Type {
-          // If we found our archetype, return null.
-          if (auto archetype = type->getAs<ArchetypeType>()) {
-            return archetype == selfType? nullptr : type;
-          }
-
-          return type;
-        })) {
-      // We didn't find 'Self'. We're okay.
-      continue;
-    }
-
-    // A protocol cannot conform to itself if any of its value members
-    // refers to 'Self'.
-    if (complainLoc.isValid() && *proto->existentialConformsToSelf()) {
-      tc.diagnose(complainLoc, diag::type_does_not_conform, type,
-                  proto->getDeclaredType());
-      tc.diagnose(valueMember, diag::protocol_existential_refers_to_this,
-                  valueMember->getName());
-    }
-
-    proto->setExistentialConformsToSelf(false);
-    return false;
-  }
-
-  return true;
-}
-
-/// Check whether the given archetype requires conformance to 'protocol',
-/// either explicitly or indirectly through another protocol requirement.
-///
-/// NOTE: This method does not check for the archetype's conformance to a
-/// protocol via any superclass requirement.
-static bool archetypeRequiresProtocol(TypeChecker &tc, Type type,
-                                      ArchetypeType *archetype,
-                                      ProtocolDecl *protocol) {
-  // An archetype that must be a class trivially conforms to AnyObject.
-  if (archetype->requiresClass() &&
-      protocol == tc.Context.getProtocol(KnownProtocolKind::AnyObject))
-    return true;
-
-  for (auto ap : archetype->getConformsTo()) {
-    if (ap == protocol || ap->inheritsFrom(protocol))
-      return true;
-  }
-
-  return false;
-}
-
-/// Check whether the given existential type conforms to the protocol.
-static bool existentialConformsToProtocol(TypeChecker &tc, Type type,
-                                          ProtocolDecl *protocol,
-                                          SourceLoc complainLoc) {
-  SmallVector<ProtocolDecl *, 4> protocols;
-  bool isExistential = type->isExistentialType(protocols);
-  assert(isExistential && "Not existential?");
-  (void)isExistential;
-
-  // An existential that must be a class trivially conforms to AnyObject.
-  if (type->isClassExistentialType() &&
-      protocol == tc.Context.getProtocol(KnownProtocolKind::AnyObject))
-    return true;
-
-  for (auto ap : protocols) {
-    // If this isn't the protocol we're looking for, continue looking.
-    if (ap != protocol && !ap->inheritsFrom(protocol))
-      continue;
-
-    // Check whether this protocol conforms to itself.
-    llvm::SmallPtrSet<ProtocolDecl *, 4> checking;
-    checking.insert(protocol);
-    return existentialConformsToItself(tc, type, ap, complainLoc, checking);
-  }
-
-  // We didn't find the protocol we were looking for.
-  // If we need to complain, do so.
-  if (complainLoc.isValid()) {
-    tc.diagnose(complainLoc, diag::type_does_not_conform, type,
-             protocol->getDeclaredType());
-  }
-  return false;
-}
-
 bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
                                      DeclContext *DC, bool InExpression,
                                      ProtocolConformance **Conformance,
                                      SourceLoc ComplainLoc) {
-  if (Conformance)
-    *Conformance = nullptr;
-  if (!Proto->hasType())
-    validateDecl(Proto);
-
-  // If we have an archetype, check whether this archetype's requirements
-  // include this protocol (or something that inherits from it).
-  if (auto Archetype = T->getAs<ArchetypeType>()) {
-    if (archetypeRequiresProtocol(*this, T, Archetype, Proto)) {
-      return true;
-    }
-  }
-
-  // If we have an existential type, check whether this type includes this
-  // protocol we're looking for (or something that inherits from it).
-  if (T->isExistentialType())
-    return existentialConformsToProtocol(*this, T, Proto, ComplainLoc);
-
-  // Only nominal types and class-bound archetypes conform concretely to
-  // protocols.
-  auto canT = T->getCanonicalType();
-  NominalTypeDecl *nominal = nullptr;
-  if (auto *archetype = canT->getAs<ArchetypeType>()) {
-    if (auto super = archetype->getSuperclass()) {
-      nominal = super->getAnyNominal();
-    }
-  } else {
-    nominal = canT->getAnyNominal();
-  }
-
-  if (!nominal) {
-    // If we need to complain, do so.
-    if (ComplainLoc.isValid()) {
-      diagnose(ComplainLoc, diag::type_does_not_conform, T,
-               Proto->getDeclaredType());
-    }
-
-    return false;
-  }
-
   const DeclContext *topLevelContext = DC->getModuleScopeContext();
   auto recordDependency = [=](ProtocolConformance *conformance = nullptr) {
     // Record that we depend on the type's conformance.
@@ -3162,47 +2941,23 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
           conformance->getDeclContext()->getParentModule())
         return;
 
-    tracker->addUsedNominal(nominal,
-                            DC->isCascadingContextForLookup(InExpression));
+    if (auto nominal = T->getAnyNominal()) {
+      tracker->addUsedNominal(nominal,
+                              DC->isCascadingContextForLookup(InExpression));
+    }
   };
 
-  // Check whether we have already cached an answer to this query.
-  if (auto Known = Context.getConformsTo(canT, Proto)) {
-    // If we conform, set the conformance and return true.
-    if (Known->getInt()) {
-      if (Conformance)
-        *Conformance = Known->getPointer();
-
-      recordDependency(Known->getPointer());
-      return true;
-    }
-
-    // If we need to complain, do so.
-    if (ComplainLoc.isValid()) {
-      diagnose(ComplainLoc, diag::type_does_not_conform, T,
-               Proto->getDeclaredType());
-    } else {
-      recordDependency();
-    }
-
-    return false;
-  }
-
-  // Look for the explicit declaration of conformance in the list of protocols.
+  // Look up conformance in the module.
   Module *M = topLevelContext->getParentModule();
   auto lookupResult = M->lookupConformance(T, Proto, this);
   switch (lookupResult.getInt()) {
   case ConformanceKind::Conforms:
-    Context.setConformsTo(canT, Proto,
-                          ConformanceEntry(lookupResult.getPointer(), true));
-
     if (Conformance)
       *Conformance = lookupResult.getPointer();
     recordDependency(lookupResult.getPointer());
     return true;
 
   case ConformanceKind::DoesNotConform:
-    // FIXME: Could try implicit conformance.
     if (ComplainLoc.isValid()) {
       diagnose(ComplainLoc, diag::type_does_not_conform,
                T, Proto->getDeclaredType());
