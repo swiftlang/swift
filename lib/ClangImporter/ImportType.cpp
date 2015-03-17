@@ -1236,7 +1236,7 @@ static bool isObjCMethodResultAudited(const clang::Decl *decl) {
 }
 
 Type ClangImporter::Implementation::importMethodType(
-       const clang::Decl *clangDecl,
+       const clang::ObjCMethodDecl *clangDecl,
        clang::QualType resultType,
        ArrayRef<const clang::ParmVarDecl *> params,
        bool isVariadic, bool isNoReturn,
@@ -1281,6 +1281,21 @@ Type ClangImporter::Implementation::importMethodType(
                             knownMethod->getReturnTypeInfo());
   } else {
     OptionalityOfReturn = OTK_ImplicitlyUnwrappedOptional;
+
+    // If we have the getter for a property that itself has
+    // nullability, strip the outer nullability off the result type:
+    // we want the property's nullability here.
+    if (clangDecl->isPropertyAccessor()) {
+      if (auto property = clangDecl->findPropertyDecl()) {
+        if (property->getGetterMethodDecl() == clangDecl) {
+          if (auto propertyNullability
+                = property->getType()->getNullability(getClangASTContext())) {
+            (void)clang::AttributedType::stripOuterNullability(resultType);
+            OptionalityOfReturn = translateNullability(*propertyNullability);
+          }
+        }
+      }
+    }
   }
 
   // Import the result type.
@@ -1312,6 +1327,19 @@ Type ClangImporter::Implementation::importMethodType(
     } else if (knownMethod) {
       optionalityOfParam =
         translateNullability(knownMethod->getParamTypeInfo(index));
+    } else if (index == 0 && clangDecl->isPropertyAccessor()) {
+      // If we have the parameter for a setter for a property that has
+      // nullability, strip the outer nullability off the parameter
+      // type: we want the property's nullability here.
+      if (auto property = clangDecl->findPropertyDecl()) {
+        if (property->getSetterMethodDecl() == clangDecl) {
+          if (auto propertyNullability
+                = property->getType()->getNullability(getClangASTContext())) {
+            (void)clang::AttributedType::stripOuterNullability(paramTy);
+            optionalityOfParam = translateNullability(*propertyNullability);
+          }
+        }
+      }
     }
 
     Type swiftParamTy;

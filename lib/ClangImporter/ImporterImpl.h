@@ -925,7 +925,7 @@ public:
   ///
   /// \returns the imported function type, or null if the type cannot be
   /// imported.
-  Type importMethodType(const clang::Decl *clangDecl,
+  Type importMethodType(const clang::ObjCMethodDecl *clangDecl,
                         clang::QualType resultType,
                         ArrayRef<const clang::ParmVarDecl *> params,
                         bool isVariadic, bool isNoReturn,

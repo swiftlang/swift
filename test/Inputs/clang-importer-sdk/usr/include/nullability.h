@@ -22,6 +22,12 @@ extern __nullable id global_id;
 +(nonnull instancetype)someClassWithInt:(int)x;
 +(nullable SomeClass*)someClassWithDouble:(double)x;
 -(nonnull instancetype)returnMe;
+
+@property (null_resettable) NSString *defaultedProperty;
+
+@property (nonnull) NSString *funnyProperty;
+-(nullable NSString *)funnyProperty;
+-(void)setFunnyProperty:(null_unspecified NSString *)value;
 @end
 
 #define NON_NULL_MACRO(...) __attribute__ ((nonnull(__VA_ARGS__)))
