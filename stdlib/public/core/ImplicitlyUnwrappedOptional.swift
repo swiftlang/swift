@@ -54,17 +54,12 @@ public enum ImplicitlyUnwrappedOptional<T>
     }
   }
 
-  /// Returns `f(self)!` iff `self` and `f(self)` are not nil.
+  /// Returns `nil` if `self` is nil, `f(self!)` otherwise.
   public func flatMap<U>(@noescape f: (T) -> ImplicitlyUnwrappedOptional<U>)
     -> ImplicitlyUnwrappedOptional<U> {
     switch self {
     case .Some(let y):
-      switch f(y) {
-      case .Some(let z):
-        return .Some(z)
-      case .None:
-        return .None
-      }
+      return f(y)
     case .None:
       return .None
     }
