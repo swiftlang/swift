@@ -105,3 +105,16 @@ let myDict2 = [1:1]
 
 // CHECK: <for>for <brace>{}</brace></for>
 for {}
+
+// CHECK: <class>class <name><#MyCls#></name> : <inherited><elem-typeref><#OtherClass#></elem-typeref></inherited> {}
+class <#MyCls#> : <#OtherClass#> {}
+
+// CHECK: <ffunc>func <name><#test1#> ()</name> {
+// CHECK:   <foreach>for <elem-id><#name#></elem-id> in <elem-expr><#items#></elem-expr> <brace>{}</brace></foreach>
+// CHECK: }</ffunc>
+func <#test1#> () {
+  for <#name#> in <#items#> {}
+}
+
+// CHECK: <gvar>let <name>myArray</name> = <array>[<elem-expr><#item1#></elem-expr>, <elem-expr><#item2#></elem-expr>]</array></gvar>
+let myArray = [<#item1#>, <#item2#>]
