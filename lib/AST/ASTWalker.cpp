@@ -733,20 +733,6 @@ public:
         elt.setCondition(E);
       } else if (auto CB = elt.getBinding()) {
         doIt(CB);
-#if 0
-        // Walk the binding pattern and initializer expression.
-        if (auto P = doIt(CB->getPattern()))
-          CB->setPattern(P);
-        else
-          return true;
-      
-        if (CB->getInit()) {
-          if (auto E = doIt(CB->getInit()))
-            CB->setInit(E, CB->wasInitChecked());
-          else
-            return true;
-        }
-#endif
       }
     }
     
