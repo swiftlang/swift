@@ -93,6 +93,7 @@ func _convertStringToNSString(string: String) -> NSString {
   return string._bridgeToObjectiveC()
 }
 
+@semantics("convertFromObjectiveC")
 public // COMPILER_INTRINSIC
 func _convertNSStringToString(nsstring: NSString) -> String {
   var result: String?
@@ -156,6 +157,7 @@ extension String : _ObjectiveCBridgeable {
     return NSString.self
   }
 
+  @semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSString {
     // This method should not do anything extra except calling into the
     // implementation inside core.  (These two entry points should be
@@ -200,6 +202,7 @@ extension Int : _ObjectiveCBridgeable {
     return NSNumber.self
   }
 
+  @semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber(integer: self)
   }
@@ -233,6 +236,7 @@ extension UInt : _ObjectiveCBridgeable {
     return NSNumber.self
   }
 
+  @semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
     // FIXME: Need a blacklist for certain methods that should not
     // import NSUInteger as Int.
@@ -267,6 +271,7 @@ extension Float : _ObjectiveCBridgeable {
     return NSNumber.self
   }
 
+  @semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber(float: self)
   }
@@ -300,6 +305,7 @@ extension Double : _ObjectiveCBridgeable {
     return NSNumber.self
   }
 
+  @semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber(double: self)
   }
@@ -334,6 +340,7 @@ extension Bool: _ObjectiveCBridgeable {
     return NSNumber.self
   }
 
+  @semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber(bool: self)
   }
@@ -368,6 +375,7 @@ extension CGFloat : _ObjectiveCBridgeable {
     return NSNumber.self
   }
 
+  @semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
     return self.native._bridgeToObjectiveC()
   }
@@ -433,6 +441,7 @@ extension NSArray : ArrayLiteralConvertible {
 ///
 /// to Objective-C code as a method that accepts an `NSArray`.  This operation
 /// is referred to as a "forced conversion" in ../../../docs/Arrays.rst
+@semantics("convertFromObjectiveC")
 public func _convertNSArrayToArray<T>(source: NSArray) -> [T] {
   var result: [T]?
   Array._forceBridgeFromObjectiveC(source, result: &result)
@@ -471,6 +480,7 @@ extension Array : _ObjectiveCBridgeable {
     return NSArray.self
   }
 
+  @semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSArray {
     return unsafeBitCast(self._buffer._asCocoaArray(), NSArray.self)
   }
@@ -551,6 +561,7 @@ extension Dictionary {
 ///
 /// The cast can fail if bridging fails.  The actual checks and bridging can be
 /// deferred.
+@semantics("convertFromObjectiveC")
 public func _convertNSDictionaryToDictionary<
     Key : Hashable, Value>(d: NSDictionary)
     -> [Key : Value] {
@@ -589,6 +600,7 @@ extension Dictionary : _ObjectiveCBridgeable {
     return NSDictionary.self
   }
 
+  @semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSDictionary {
     return unsafeBitCast(_bridgeToObjectiveCImpl(), NSDictionary.self)
   }
@@ -840,6 +852,7 @@ public func _convertSetToNSSet<T>(s: Set<T>) -> NSSet {
 ///
 /// The cast can fail if bridging fails.  The actual checks and bridging can be
 /// deferred.
+@semantics("convertFromObjectiveC")
 public func _convertNSSetToSet<T: Hashable>(s: NSSet) -> Set<T> {
   var result: Set<T>?
   Set._forceBridgeFromObjectiveC(s, result: &result)
@@ -852,6 +865,7 @@ extension Set : _ObjectiveCBridgeable {
     return NSSet.self
   }
 
+  @semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSSet {
     return unsafeBitCast(_bridgeToObjectiveCImpl(), NSSet.self)
   }
