@@ -3,10 +3,7 @@
 protocol HasSelfRequirements {
   func foo(x: Self)
 
-  // FIXME: Should raise an error here, but checking if the
-  // existential conforms to itself while checking the protocol causes
-  // infinite recursion.
-  func returnsOwnProtocol() -> HasSelfRequirements
+  func returnsOwnProtocol() -> HasSelfRequirements // expected-error{{protocol 'HasSelfRequirements' can only be used as a generic constraint because it has Self or associated type requirements}}
 }
 protocol Bar {
   // init() methods should not prevent use as an existential.

@@ -424,6 +424,12 @@ public:
                     TypeResolutionOptions options = None,
                     GenericTypeResolver *resolver = nullptr);
 
+  /// Check for unsupported protocol types in the given declaration.
+  void checkUnsupportedProtocolType(Decl *decl);
+
+  /// Check for unsupported protocol types in the given statement.
+  void checkUnsupportedProtocolType(Stmt *stmt);
+
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
   /// We pass in a vector of nested GenericParamLists and a vector of
   /// ArchetypeBuilders with the innermost GenericParamList in the beginning

@@ -70,7 +70,7 @@ protocol AsExistentialB {
 }
 
 protocol AsExistentialAssocTypeA {
-  var delegate : AsExistentialAssocTypeB? { get } // expected-error 4{{protocol 'AsExistentialAssocTypeB' can only be used as a generic constraint because it has Self or associated type requirements}}
+  var delegate : AsExistentialAssocTypeB? { get } // expected-error {{protocol 'AsExistentialAssocTypeB' can only be used as a generic constraint because it has Self or associated type requirements}}
 }
 protocol AsExistentialAssocTypeB {
   func aMethod(object : AsExistentialAssocTypeA)

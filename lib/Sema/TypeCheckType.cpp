@@ -19,6 +19,7 @@
 #include "GenericTypeResolver.h"
 
 #include "swift/Strings.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/NameLookup.h"
@@ -970,32 +971,6 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
     Type ty = ErrorType::get(Context);
     Components.back()->setValue(ty);
     return ty;
-  }
-  
-  // Check that this isn't an unsupported protocol type.
-  // Protocols with associated type requirements aren't allowed as types.
-  // They can however appear in inheritance clauses or as global typealiases.
-  if (!(options & TR_InheritanceClause) && !(options & TR_GlobalTypeAlias)) {
-    SmallVector<ProtocolDecl*, 2> protocols;
-    if (result.get<Type>()->isExistentialType(protocols)) {
-      for (auto *proto : protocols) {
-        if (auto known = proto->existentialConformsToSelf()) {
-          if (*known)
-            continue;
-        // We can't check if the protocol conforms to itself while still
-        // checking the protocol declaration.
-        } else if (DC == proto ||
-                   DC->isChildContextOf(proto) ||
-                   conformsToProtocol(proto->getDeclaredType(), proto, DC,
-                                      false)) {
-          continue;
-        }
-        
-        diagnose(Components.back()->getIdLoc(),
-                 diag::unsupported_existential_type,
-                 proto->getName());
-      }
-    }
   }
   
   return result.get<Type>();
@@ -2635,3 +2610,66 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
   }
 }
 
+namespace {
+
+class UnsupportedProtocolVisitor
+  : public TypeReprVisitor<UnsupportedProtocolVisitor>, public ASTWalker
+{
+  TypeChecker &TC;
+
+public:
+  UnsupportedProtocolVisitor(TypeChecker &tc) : TC(tc) { }
+
+  bool walkToTypeReprPre(TypeRepr *T) {
+    visit(T);
+    return true;
+  }
+
+  void visitIdentTypeRepr(IdentTypeRepr *T) {
+    auto type = T->getComponentRange().back()->getBoundType();
+    if (type) {
+      SmallVector<ProtocolDecl*, 2> protocols;
+      if (type->isExistentialType(protocols)) {
+        for (auto *proto : protocols) {
+          if (proto->existentialConformsToSelf(&TC))
+            continue;
+
+          TC.diagnose(T->getComponentRange().back()->getIdLoc(),
+                      diag::unsupported_existential_type,
+                      proto->getName());
+        }
+      }
+    }
+  }
+};
+
+}
+
+void TypeChecker::checkUnsupportedProtocolType(Decl *decl) {
+  if (!decl || decl->isInvalid())
+    return;
+
+  // Global type aliases are okay.
+  if (isa<TypeAliasDecl>(decl) &&
+      decl->getDeclContext()->isModuleScopeContext())
+    return;
+
+  // Non-typealias type declarations are okay.
+  if (isa<TypeDecl>(decl) && !isa<TypeAliasDecl>(decl))
+    return;
+
+  // Extensions are okay.
+  if (isa<ExtensionDecl>(decl))
+    return;
+
+  UnsupportedProtocolVisitor visitor(*this);
+  decl->walk(visitor);
+}
+
+void TypeChecker::checkUnsupportedProtocolType(Stmt *stmt) {
+  if (!stmt)
+    return;
+
+  UnsupportedProtocolVisitor visitor(*this);
+  stmt->walk(visitor);
+}

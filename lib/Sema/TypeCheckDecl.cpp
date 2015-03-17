@@ -2633,6 +2633,11 @@ public:
     if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
       checkRedeclaration(TC, valueDecl);
     }
+
+    if ((IsSecondPass && !IsFirstPass) ||
+        isa<ProtocolDecl>(decl->getDeclContext())) {
+      TC.checkUnsupportedProtocolType(decl);
+    }
   }
 
   //===--------------------------------------------------------------------===//

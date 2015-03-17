@@ -5,9 +5,9 @@
 // Similar to 010-circular-protocol-reference.swift, might be same underlying bug.
 
 protocol A {
-    typealias A = B // expected-error {{protocol 'B' can only be used as a generic constraint because it has Self or associated type requirements}}
+    typealias A = B
 }
 
 protocol B {
-    typealias B = A // expected-error {{protocol 'A' can only be used as a generic constraint because it has Self or associated type requirements}}
+    typealias B = A
 }

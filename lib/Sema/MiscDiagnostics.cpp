@@ -729,6 +729,7 @@ void swift::performExprDiagnostics(TypeChecker &TC, const Expr *E,
 }
 
 void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
+  TC.checkUnsupportedProtocolType(const_cast<Stmt *>(S));
   return diagUnreachableCode(TC, S);
 }
 
