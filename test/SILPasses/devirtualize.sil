@@ -72,3 +72,32 @@ bb0(%0 : $Node):
 sil_vtable Node {
   #Node.index!getter.1: transparent_target
 }
+
+private class B {
+  class func foo() -> Int
+}
+
+private class C : B { }
+
+sil @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si : $@thin (@thick B.Type) -> Int
+
+// CHECK-LABEL: sil private [noinline] @_TF4metaP33_7026FC13D35FB9700BACF693F51A99016callerFMCS_P33_7026FC13D35FB9700BACF693F51A99011CT_
+sil private [noinline] @_TF4metaP33_7026FC13D35FB9700BACF693F51A99016callerFMCS_P33_7026FC13D35FB9700BACF693F51A99011CT_ : $@thin (@thick C.Type) -> () {
+bb0(%0 : $@thick C.Type):
+  %2 = upcast %0 : $@thick C.Type to $@thick B.Type
+  // CHECK-NOT: class_method
+  // CHECK: function_ref @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
+  %3 = class_method %2 : $@thick B.Type, #B.foo!1 : B.Type -> () -> Int , $@thin (@thick B.Type) -> Int
+  %4 = apply %3(%2) : $@thin (@thick B.Type) -> Int
+  %5 = tuple ()
+  // CHECK: return
+  return %5 : $()
+}
+
+sil_vtable B {
+  #B.foo!1: _TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
+}
+
+sil_vtable C {
+  #B.foo!1: _TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
+}

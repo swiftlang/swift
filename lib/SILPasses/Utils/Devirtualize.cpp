@@ -439,12 +439,7 @@ static ApplyInst *devirtualizeWitnessMethod(ApplyInst *AI,
 //===----------------------------------------------------------------------===//
 
 /// Return the final class decl based on access control information.
-static bool isKnownFinal(SILModule &M, SILDeclRef Member,
-                         SILType ClassOrMetatypeType) {
-  // FIXME: Handle metatypes.
-  if (ClassOrMetatypeType.is<MetatypeType>())
-    return false;
-
+static bool isKnownFinal(SILModule &M, SILDeclRef Member) {
   if (Member.isForeign)
     return false;
 
@@ -516,8 +511,7 @@ ApplyInst *swift::devirtualizeApply(ApplyInst *AI) {
   /// %YY = function_ref @...
   if (auto *CMI = dyn_cast<ClassMethodInst>(AI->getCallee())) {
     // Check if the class member is known to be final.
-    if (isKnownFinal(CMI->getModule(), CMI->getMember(),
-                     CMI->getOperand().getType()))
+    if (isKnownFinal(CMI->getModule(), CMI->getMember()))
       return tryDevirtualizeClassMethod(AI, CMI->getOperand());
 
     // Try to search for the point of construction.
