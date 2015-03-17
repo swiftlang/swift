@@ -15,6 +15,7 @@
 #include "DIMemoryUseCollector.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
@@ -905,6 +906,34 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
 }
 
 
+/// Failable enum initializer produce a CFG for the return that looks like this,
+/// where the load is the use of 'self'.  Detect this pattern so we can consider
+/// it a 'return' use of self.
+///
+///   %3 = load %2 : $*Enum
+///   %4 = enum $Optional<Enum>, #Optional.Some!enumelt.1, %3 : $Enum
+///   br bb2(%4 : $Optional<Enum>)                    // id: %5
+/// bb1:
+///   %6 = enum $Optional<Enum>, #Optional.None!enumelt // user: %7
+///   br bb2(%6 : $Optional<Enum>)                    // id: %7
+/// bb2(%8 : $Optional<Enum>):                        // Preds: bb0 bb1
+///   dealloc_stack %1#0 : $*@local_storage Enum      // id: %9
+///   return %8 : $Optional<Enum>                     // id: %10
+///
+static bool isFailableInitReturnUseOfEnum(EnumInst *EI) {
+  // Only allow enums forming an optional.
+  if (!EI->getType().getSwiftRValueType()->getOptionalObjectType())
+    return false;
+
+  if (!EI->hasOneUse()) return false;
+  auto *BI = dyn_cast<BranchInst>(EI->use_begin()->getUser());
+  if (!BI || BI->getNumArgs() != 1) return false;
+
+  auto *TargetArg = BI->getDestBB()->getBBArg(0);
+  if (!TargetArg->hasOneUse()) return false;
+  return isa<ReturnInst>(TargetArg->use_begin()->getUser());
+}
+
 /// handleLoadUseFailure - Check and diagnose various failures when a load use
 /// is not fully initialized.
 ///
@@ -932,7 +961,13 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
         hasReturnUse = true;
         continue;
       }
-      
+
+      if (auto *EI = dyn_cast<EnumInst>(User))
+        if (isFailableInitReturnUseOfEnum(EI)) {
+          hasReturnUse = true;
+          continue;
+        }
+
       hasUnknownUses = true;
       break;
     }

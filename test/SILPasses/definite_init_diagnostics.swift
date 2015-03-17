@@ -1038,5 +1038,12 @@ enum AddressOnlyEnumWithInit<T> {
 }
 
 
+// <rdar://problem/20135113> QoI: enum failable init that doesn't assign to self produces poor error
+enum MyAwesomeEnum {
+  case One, Two
 
+  init?() {
+
+  }// expected-error {{return from enum initializer method without storing to 'self'}}
+}
 
