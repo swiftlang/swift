@@ -4,6 +4,8 @@ class MyClass {
   func foo() { }
 }
 
+var global_cond: Bool = false
+
 func bar(x: Int) {}
 func foo(x: Int, y: Bool) {}
 
@@ -337,4 +339,90 @@ func test_if_break(a : Bool) {
 // rdar://problem/18643692
 func for_loop_multi_iter() {
   for (var i = 0, x = 0; i < 10; i++, x) { }
+}
+
+// CHECK-LABEL: sil hidden @_TF10statements7test_doFT_T_
+func test_do() {
+  // CHECK: [[BAR:%.*]] = function_ref @_TF10statements3barFSiT_
+  // CHECK: integer_literal $Builtin.Int2048, 0
+  // CHECK: apply [[BAR]](
+  bar(0)
+  // CHECK-NOT: br bb
+  do {
+    // CHECK: [[CTOR:%.*]] = function_ref @_TFC10statements7MyClassCfMS0_FT_S0_
+    // CHECK: [[OBJ:%.*]] = apply [[CTOR]](
+    let obj = MyClass()
+
+    // CHECK: [[BAR:%.*]] = function_ref @_TF10statements3barFSiT_
+    // CHECK: integer_literal $Builtin.Int2048, 1
+    // CHECK: apply [[BAR]](
+    bar(1)
+
+    // CHECK-NOT: br bb
+    // CHECK: strong_release [[OBJ]]
+    // CHECK-NOT: br bb
+  }
+
+  // CHECK: [[BAR:%.*]] = function_ref @_TF10statements3barFSiT_
+  // CHECK: integer_literal $Builtin.Int2048, 2
+  // CHECK: apply [[BAR]](
+  bar(2)
+}
+
+// CHECK-LABEL: sil hidden @_TF10statements15test_do_labeledFT_T_
+func test_do_labeled() {
+  // CHECK: [[BAR:%.*]] = function_ref @_TF10statements3barFSiT_
+  // CHECK: integer_literal $Builtin.Int2048, 0
+  // CHECK: apply [[BAR]](
+  bar(0)
+  // CHECK: br bb1
+  // CHECK: bb1:
+  lbl: do {
+    // CHECK: [[CTOR:%.*]] = function_ref @_TFC10statements7MyClassCfMS0_FT_S0_
+    // CHECK: [[OBJ:%.*]] = apply [[CTOR]](
+    let obj = MyClass()
+
+    // CHECK: [[BAR:%.*]] = function_ref @_TF10statements3barFSiT_
+    // CHECK: integer_literal $Builtin.Int2048, 1
+    // CHECK: apply [[BAR]](
+    bar(1)
+
+    // CHECK: [[GLOBAL:%.*]] = function_ref @_TF10statementsau11global_condSb
+    // CHECK: cond_br {{%.*}}, bb2, bb3
+    if (global_cond) {
+      // CHECK: bb2:
+      // CHECK: strong_release [[OBJ]]
+      // CHECK: br bb1
+      continue lbl
+    }
+
+    // CHECK: bb3:
+    // CHECK: [[BAR:%.*]] = function_ref @_TF10statements3barFSiT_
+    // CHECK: integer_literal $Builtin.Int2048, 2
+    // CHECK: apply [[BAR]](
+    bar(2)
+
+    // CHECK: [[GLOBAL:%.*]] = function_ref @_TF10statementsau11global_condSb
+    // CHECK: cond_br {{%.*}}, bb4, bb5
+    if (global_cond) {
+      // CHECK: bb4:
+      // CHECK: strong_release [[OBJ]]
+      // CHECK: br bb6
+      break lbl
+    }
+
+    // CHECK: bb5:
+    // CHECK: [[BAR:%.*]] = function_ref @_TF10statements3barFSiT_
+    // CHECK: integer_literal $Builtin.Int2048, 3
+    // CHECK: apply [[BAR]](
+    bar(3)
+
+    // CHECK: strong_release [[OBJ]]
+    // CHECK: br bb6
+  }
+
+  // CHECK: [[BAR:%.*]] = function_ref @_TF10statements3barFSiT_
+  // CHECK: integer_literal $Builtin.Int2048, 4
+  // CHECK: apply [[BAR]](
+  bar(4)
 }

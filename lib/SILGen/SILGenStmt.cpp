@@ -304,9 +304,8 @@ void SILGenFunction::visitDoStmt(DoStmt *S) {
 
   if (hasLabel) {
     BreakContinueDestStack.pop_back();
+    emitOrDeleteBlock(B, endBB, S);
   }
-  
-  emitOrDeleteBlock(B, endBB, S);
 }
 
 void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
