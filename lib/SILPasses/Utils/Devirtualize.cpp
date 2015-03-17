@@ -453,6 +453,8 @@ static bool isKnownFinal(SILModule &M, SILDeclRef Member) {
   if (!FD)
     return false;
 
+  assert(!FD->isFinal() && "Unexpected indirect call to final method!");
+
   // Only handle members defined within the SILModule's associated context.
   if (!FD->isChildContextOf(AssocDC))
     return false;
