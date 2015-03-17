@@ -72,9 +72,9 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
 
   // If we have a retain value...
   if (isa<RetainValueInst>(I)) {
-    // And our payload has reference semantics, insert a strong_retain onto the
+    // And our payload is refcounted, insert a strong_retain onto the
     // payload.
-    if (UEDITy.hasReferenceSemantics()) {
+    if (UEDITy.isReferenceCounted(Mod)) {
       Builder.createStrongRetain(I->getLoc(), UEDI);
       return;
     }
@@ -90,7 +90,7 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
          "be a release value since enums do not have reference semantics.");
 
   // If our payload has reference semantics, insert the strong release.
-  if (UEDITy.hasReferenceSemantics()) {
+  if (UEDITy.isReferenceCounted(Mod)) {
     Builder.createStrongRelease(I->getLoc(), UEDI);
     return;
   }

@@ -146,7 +146,7 @@ public:
   // Require that the operand is a non-optional reference-counted type.
   void requireReferenceValue(SILValue value, const Twine &valueDescription) {
     require(value.getType().isObject(), valueDescription +" must be an object");
-    require(value.getType().hasReferenceSemantics(),
+    require(value.getType().isReferenceCounted(F.getModule()),
             valueDescription + " must have reference semantics");
   }
   
@@ -1238,8 +1238,6 @@ public:
     SILType operandTy = EI->getOperand().getType();
     require(operandTy.isAddress(),
             "must derive element_addr from address");
-    require(!operandTy.hasReferenceSemantics(),
-            "cannot derive tuple_element_addr from reference type");
     require(EI->getType(0).isAddress(),
             "result of tuple_element_addr must be address");
     require(operandTy.is<TupleType>(),

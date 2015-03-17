@@ -431,8 +431,9 @@ namespace {
   /// A class for loadable types.
   class LoadableTypeLowering : public TypeLowering {
   protected:
-    LoadableTypeLowering(SILType type, IsTrivial_t isTrivial)
-      : TypeLowering(type, isTrivial, IsNotAddressOnly) {}
+    LoadableTypeLowering(SILType type, IsTrivial_t isTrivial,
+                         IsReferenceCounted_t isRefCounted)
+      : TypeLowering(type, isTrivial, IsNotAddressOnly, isRefCounted) {}
 
   public:
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
@@ -458,7 +459,7 @@ namespace {
   class TrivialTypeLowering final : public LoadableTypeLowering {
   public:
     TrivialTypeLowering(SILType type)
-      : LoadableTypeLowering(type, IsTrivial) {}
+      : LoadableTypeLowering(type, IsTrivial, IsNotReferenceCounted) {}
 
     SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc, SILValue addr,
                             IsTake_t isTake) const override {
@@ -501,8 +502,9 @@ namespace {
 
   class NonTrivialLoadableTypeLowering : public LoadableTypeLowering {
   public:
-    NonTrivialLoadableTypeLowering(SILType type)
-      : LoadableTypeLowering(type, IsNotTrivial) {}
+    NonTrivialLoadableTypeLowering(SILType type,
+                                   IsReferenceCounted_t isRefCounted)
+      : LoadableTypeLowering(type, IsNotTrivial, isRefCounted) {}
 
     SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc,
                             SILValue addr, IsTake_t isTake) const override {
@@ -553,7 +555,8 @@ namespace {
     
   public:
     LoadableAggTypeLowering(CanType type)
-      : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type)) {
+      : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type),
+                                       IsNotReferenceCounted) {
     }
 
     ArrayRef<Child> getChildren(SILModule &M) const {
@@ -781,7 +784,8 @@ namespace {
     
   public:
     LoadableEnumTypeLowering(CanType type)
-      : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type))
+      : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type),
+                                       IsNotReferenceCounted)
     {
     }
     
@@ -860,8 +864,8 @@ namespace {
 
   class LeafLoadableTypeLowering : public NonTrivialLoadableTypeLowering {
   public:
-    LeafLoadableTypeLowering(SILType type)
-      : NonTrivialLoadableTypeLowering(type) {}
+    LeafLoadableTypeLowering(SILType type, IsReferenceCounted_t isRefCounted)
+      : NonTrivialLoadableTypeLowering(type, isRefCounted) {}
 
     void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
                               SILValue value,
@@ -880,7 +884,8 @@ namespace {
   /// loadable.
   class ReferenceTypeLowering : public LeafLoadableTypeLowering {
   public:
-    ReferenceTypeLowering(SILType type) : LeafLoadableTypeLowering(type) {}
+    ReferenceTypeLowering(SILType type)
+      : LeafLoadableTypeLowering(type, IsReferenceCounted) {}
 
     void emitRetainValue(SILBuilder &B, SILLocation loc,
                        SILValue value) const override {
@@ -897,7 +902,8 @@ namespace {
   /// A type lowering for @unowned types.
   class UnownedTypeLowering final : public LeafLoadableTypeLowering {
   public:
-    UnownedTypeLowering(SILType type) : LeafLoadableTypeLowering(type) {}
+    UnownedTypeLowering(SILType type)
+      : LeafLoadableTypeLowering(type, IsReferenceCounted) {}
 
     void emitRetainValue(SILBuilder &B, SILLocation loc,
                        SILValue value) const override {
@@ -914,7 +920,8 @@ namespace {
   class AddressOnlyTypeLowering : public TypeLowering {
   public:
     AddressOnlyTypeLowering(SILType type)
-      : TypeLowering(type, IsNotTrivial, IsAddressOnly) {}
+      : TypeLowering(type, IsNotTrivial, IsAddressOnly, IsNotReferenceCounted)
+    {}
 
     void emitCopyInto(SILBuilder &B, SILLocation loc,
                       SILValue src, SILValue dest, IsTake_t isTake,

@@ -91,6 +91,10 @@ class TypeLowering {
 public:
   enum IsTrivial_t : bool { IsNotTrivial, IsTrivial };
   enum IsAddressOnly_t : bool { IsNotAddressOnly, IsAddressOnly };
+  enum IsReferenceCounted_t : bool {
+    IsNotReferenceCounted,
+    IsReferenceCounted
+  };
 
 private:
   /// The SIL type of values with this Swift type.
@@ -99,14 +103,17 @@ private:
   enum : unsigned {
     IsTrivialFlag     = 0x1,
     IsAddressOnlyFlag = 0x2,
+    IsReferenceCountedFlag = 0x4,
   };
   unsigned Flags;
 
 protected:  
   TypeLowering(SILType type, IsTrivial_t isTrivial,
-               IsAddressOnly_t isAddressOnly)
+               IsAddressOnly_t isAddressOnly,
+               IsReferenceCounted_t isRefCounted)
     : LoweredType(type), Flags((isTrivial ? IsTrivialFlag : 0U) | 
-                               (isAddressOnly ? IsAddressOnlyFlag : 0U)) {}
+                               (isAddressOnly ? IsAddressOnlyFlag : 0U) |
+                               (isRefCounted ? IsReferenceCountedFlag : 0U)) {}
 
 public:
   TypeLowering(const TypeLowering &) = delete;
@@ -144,10 +151,16 @@ public:
     return true;
   }
   
-  /// isTrivial - Returns true if the type is trivial, meaning it is a loadable
+  /// Returns true if the type is trivial, meaning it is a loadable
   /// value type with no reference type members that require releasing.
   bool isTrivial() const {
     return Flags & IsTrivialFlag;
+  }
+  
+  /// Returns true if the type is a scalar reference-counted reference, which
+  /// can be retained and released.
+  bool isReferenceCounted() const {
+    return Flags & IsReferenceCountedFlag;
   }
 
   /// getLoweredType - Get the type used to represent values of the Swift type

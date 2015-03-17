@@ -302,10 +302,15 @@ public:
   /// True if the type, or the referenced type of an address type, is trivial.
   bool isTrivial(SILModule &M) const;
 
+  /// True if the type, or the referenced type of an address type, is a
+  /// scalar reference-counted type.
+  bool isReferenceCounted(SILModule &M) const;
+  
   /// Returns true if the referenced type has reference semantics.
   bool hasReferenceSemantics() const {
     return getSwiftRValueType().hasReferenceSemantics();
   }
+  
   /// Returns true if the referenced type is guaranteed to have a
   /// single-retainable-pointer representation.
   bool hasRetainablePointerRepresentation() const {

@@ -310,7 +310,7 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
   }
 
   // ReleaseValueInst of a reference type is a strong_release.
-  if (OperandTy.hasReferenceSemantics())
+  if (OperandTy.isReferenceCounted(RVI->getModule()))
     return new (RVI->getModule()) StrongReleaseInst(RVI->getLoc(), Operand);
 
   // ReleaseValueInst of a trivial type is a no-op.
@@ -342,7 +342,7 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
   }
 
   // RetainValueInst of a reference type is a strong_release.
-  if (OperandTy.hasReferenceSemantics()) {
+  if (OperandTy.isReferenceCounted(RVI->getModule())) {
     return new (RVI->getModule()) StrongRetainInst(RVI->getLoc(), Operand);
   }
 
