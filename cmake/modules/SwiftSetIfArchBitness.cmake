@@ -7,9 +7,7 @@ function(set_if_arch_bitness var_name)
       ${ARGN})
 
   if("${SIA_ARCH}" STREQUAL "i386" OR
-     "${SIA_ARCH}" STREQUAL "armv7" OR
-     "${SIA_ARCH}" STREQUAL "armv7s" OR
-     "${SIA_ARCH}" STREQUAL "armv7k")
+     "${SIA_ARCH}" STREQUAL "armv7")
     set("${var_name}" "${SIA_CASE_32_BIT}" PARENT_SCOPE)
   elseif("${SIA_ARCH}" STREQUAL "x86_64" OR
          "${SIA_ARCH}" STREQUAL "arm64")
