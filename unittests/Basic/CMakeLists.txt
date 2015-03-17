@@ -9,6 +9,7 @@ add_swift_unittest(SwiftBasicTests
   ADTTests.cpp
   ClusteredBitVectorTest.cpp
   Demangle.cpp
+  EditorPlaceholderTest.cpp
   SourceManager.cpp
   TreeScopedHashTableTests.cpp
   StringExtrasTest.cpp
