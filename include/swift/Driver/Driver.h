@@ -245,9 +245,6 @@ public:
   using JobCacheMap =
     llvm::DenseMap<std::pair<const Action *, const ToolChain *>, Job *>;
 
-  /// A callback for registering temporary files.
-  using TemporaryCallback = std::function<void(StringRef)>;
-
   /// Create a Job for the given Action \p A, including creating any necessary
   /// input Jobs.
   ///
@@ -258,14 +255,12 @@ public:
   /// \param TC The tool chain which should be used to create the Job
   /// \param AtTopLevel indicates whether or not this is a top-level Job
   /// \param JobCache maps existing Action/ToolChain pairs to Jobs
-  /// \param tempCallback A callback for registering temporary files
   ///
   /// \returns a Job for the given Action/ToolChain pair
-  Job *buildJobsForAction(const Compilation &C, const Action *A,
+  Job *buildJobsForAction(Compilation &C, const Action *A,
                           const OutputInfo &OI, const OutputFileMap *OFM,
                           const ToolChain &TC, bool AtTopLevel,
-                          JobCacheMap &JobCache,
-                          const TemporaryCallback &tempCallback) const;
+                          JobCacheMap &JobCache) const;
 
   /// Handle any arguments which should be treated before building actions or
   /// binding tools.

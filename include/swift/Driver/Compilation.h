@@ -107,6 +107,9 @@ class Compilation {
   /// of date.
   bool EnableIncrementalBuild;
 
+  /// True if temporary files should not be deleted.
+  bool SaveTemps;
+  
 public:
   Compilation(const Driver &D, const ToolChain &DefaultToolChain,
               DiagnosticEngine &Diags, OutputLevel Level,
@@ -115,7 +118,8 @@ public:
               StringRef ArgsHash,
               unsigned NumberOfParallelCommands = 1,
               bool EnableIncrementalBuild = false,
-              bool SkipTaskExecution = false);
+              bool SkipTaskExecution = false,
+              bool SaveTemps = false);
   ~Compilation();
 
   const Driver &getDriver() const { return TheDriver; }
@@ -126,6 +130,12 @@ public:
   void addJob(Job *J);
   void addTemporaryFile(StringRef file) {
     TempFilePaths.push_back(file.str());
+  }
+
+  bool isTemporaryFile(StringRef file) {
+    // TODO: Use a set instead of a linear search.
+    return std::find(TempFilePaths.begin(), TempFilePaths.end(), file) !=
+             TempFilePaths.end();
   }
 
   const llvm::opt::InputArgList &getInputArgs() const { return *InputArgs; }

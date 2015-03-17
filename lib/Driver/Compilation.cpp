@@ -45,13 +45,15 @@ Compilation::Compilation(const Driver &D, const ToolChain &DefaultToolChain,
                          StringRef ArgsHash,
                          unsigned NumberOfParallelCommands,
                          bool EnableIncrementalBuild,
-                         bool SkipTaskExecution)
+                         bool SkipTaskExecution,
+                         bool SaveTemps)
   : TheDriver(D), DefaultToolChain(DefaultToolChain), Diags(Diags),
     Level(Level), Jobs(new JobList), InputArgs(std::move(InputArgs)),
     TranslatedArgs(std::move(TranslatedArgs)), ArgsHash(ArgsHash),
     NumberOfParallelCommands(NumberOfParallelCommands),
     SkipTaskExecution(SkipTaskExecution),
-    EnableIncrementalBuild(EnableIncrementalBuild) {
+    EnableIncrementalBuild(EnableIncrementalBuild),
+    SaveTemps(SaveTemps) {
 };
 
 using CommandSet = llvm::DenseSet<const Job *>;
@@ -481,11 +483,13 @@ int Compilation::performJobs() {
                            State.UnfinishedCommands, getArgs());
   }
 
-  // FIXME: Do we want to be deleting temporaries even when a child process
-  // crashes?
-  for (auto &path : TempFilePaths) {
-    // Ignore the error code for removing temporary files.
-    (void)llvm::sys::fs::remove(path);
+  if (!SaveTemps) {
+    // FIXME: Do we want to be deleting temporaries even when a child process
+    // crashes?
+    for (auto &path : TempFilePaths) {
+      // Ignore the error code for removing temporary files.
+      (void)llvm::sys::fs::remove(path);
+    }
   }
 
   return result;

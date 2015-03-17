@@ -188,6 +188,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     !ArgList->hasArg(options::OPT_whole_module_optimization) &&
     !ArgList->hasArg(options::OPT_embed_bitcode);
 
+  bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
+
   std::unique_ptr<DerivedArgList> TranslatedArgList(
     translateInputArgs(*ArgList));
 
@@ -286,7 +288,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
                                                  ArgsHash,
                                                  NumberOfParallelCommands,
                                                  Incremental,
-                                                 DriverSkipExecution));
+                                                 DriverSkipExecution,
+                                                 SaveTemps));
 
   buildJobs(Actions, OI, OFM.get(), *C);
 
@@ -1226,19 +1229,14 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
   }
 
   for (const Action *A : Actions) {
-    bool saveTemps = Args.hasArg(options::OPT_save_temps);
     Job *J = buildJobsForAction(C, A, OI, OFM, C.getDefaultToolChain(), true,
-                                JobCache, [&C, saveTemps](StringRef path) {
-      if (saveTemps || path.empty())
-        return;
-      C.addTemporaryFile(path);
-    });
-
+                                JobCache);
     C.addJob(J);
   }
 }
 
-static StringRef getOutputFilename(const JobAction *JA,
+static StringRef getOutputFilename(Compilation &C,
+                                   const JobAction *JA,
                                    const OutputInfo &OI,
                                    const TypeToPathMap *OutputMap,
                                    const llvm::opt::DerivedArgList &Args,
@@ -1323,6 +1321,7 @@ static StringRef getOutputFilename(const JobAction *JA,
                      EC.message());
       return {};
     }
+    C.addTemporaryFile(Buffer.str());
 
     return Buffer.str();
   }
@@ -1353,59 +1352,8 @@ static StringRef getOutputFilename(const JobAction *JA,
   return Buffer.str();
 }
 
-static void
-collectTemporaryFilesForAction(const Action &A, const Job &J,
-                               const OutputInfo &OI, const OutputFileMap *OFM,
-                               std::function<void(StringRef)> callback) {
-  if (isa<MergeModuleJobAction>(A)) {
-    for (const Job *cmd : J.getInputs()) {
-      const CommandOutput &output = cmd->getOutput();
-      const TypeToPathMap *outputMap = nullptr;
-      if (OFM)
-        outputMap = OFM->getOutputMapForInput(output.getBaseInput());
-      if (!outputMap || outputMap->lookup(types::TY_SwiftModuleFile).empty())
-        callback(output.getAnyOutputForType(types::TY_SwiftModuleFile));
-      if (!outputMap || outputMap->lookup(types::TY_SwiftModuleDocFile).empty())
-        callback(output.getAnyOutputForType(types::TY_SwiftModuleDocFile));
-    }
-    return;
-  }
-
-  if (isa<LinkJobAction>(A)) {
-    for (const Job *cmd : J.getInputs()) {
-      const CommandOutput &output = cmd->getOutput();
-      const TypeToPathMap *outputMap = nullptr;
-      if (OFM)
-        outputMap = OFM->getOutputMapForInput(output.getBaseInput());
-
-      switch (output.getPrimaryOutputType()) {
-        case types::TY_Object:
-          if (!outputMap || outputMap->lookup(types::TY_Object).empty())
-            callback(output.getPrimaryOutputFilename());
-          break;
-        case types::TY_SwiftModuleFile:
-          if (!OI.ShouldTreatModuleAsTopLevelOutput) {
-            if (!outputMap ||
-                outputMap->lookup(types::TY_SwiftModuleFile).empty()) {
-              callback(output.getPrimaryOutputFilename());
-            }
-            if (!outputMap ||
-                outputMap->lookup(types::TY_SwiftModuleDocFile).empty()) {
-              callback(output.getAdditionalOutputForType(
-                  types::TY_SwiftModuleDocFile));
-            }
-          }
-          break;
-        default:
-          break;
-      }
-    }
-    return;
-  }
-}
-
-static void addAuxiliaryOutput(CommandOutput &output, types::ID outputType,
-                               const OutputInfo &OI,
+static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
+                               types::ID outputType, const OutputInfo &OI,
                                const TypeToPathMap *outputMap) {
   StringRef outputMapPath;
   if (outputMap) {
@@ -1427,9 +1375,12 @@ static void addAuxiliaryOutput(CommandOutput &output, types::ID outputType,
     else
       path = OI.ModuleName;
 
+    bool isTempFile = C.isTemporaryFile(path);
     llvm::sys::path::replace_extension(path,
                                        types::getTypeTempSuffix(outputType));
     output.setAdditionalOutputForType(outputType, path);
+    if (isTempFile)
+      C.addTemporaryFile(path);
   }
 }
 
@@ -1470,12 +1421,11 @@ handleCompileJobCondition(Job *J,
   J->setCondition(condition);
 }
 
-Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
+Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
                                 const OutputInfo &OI,
                                 const OutputFileMap *OFM,
                                 const ToolChain &TC, bool AtTopLevel,
-                                JobCacheMap &JobCache,
-                                const TemporaryCallback &callback) const {
+                                JobCacheMap &JobCache) const {
   assert(!isa<InputAction>(A) && "unexpected unprocessed input");
 
   // 1. See if we've already got this cached.
@@ -1497,7 +1447,7 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
     } else {
       InputJobs->addJob(buildJobsForAction(C, Input, OI, OFM,
                                            C.getDefaultToolChain(), false,
-                                           JobCache, callback));
+                                           JobCache));
     }
   }
 
@@ -1528,7 +1478,7 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
   }
 
   llvm::SmallString<128> Buf;
-  StringRef OutputFile = getOutputFilename(JA, OI, OutputMap, C.getArgs(),
+  StringRef OutputFile = getOutputFilename(C, JA, OI, OutputMap, C.getArgs(),
                                            AtTopLevel, BaseInput, *InputJobs,
                                            Diags, Buf);
   std::unique_ptr<CommandOutput> Output(new CommandOutput(JA->getType(),
@@ -1578,8 +1528,11 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
       // We're only generating the module as an intermediate, so put it next
       // to the primary output of the compile command.
       llvm::SmallString<128> Path(Output->getPrimaryOutputFilename());
+      bool isTempFile = C.isTemporaryFile(Path);
       llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
       Output->setAdditionalOutputForType(types::ID::TY_SwiftModuleFile, Path);
+      if (isTempFile)
+        C.addTemporaryFile(Path);
     }
   }
 
@@ -1600,16 +1553,19 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
       // Otherwise, put it next to the swiftmodule file.
       llvm::SmallString<128> Path(
           Output->getAnyOutputForType(types::TY_SwiftModuleFile));
+      bool isTempFile = C.isTemporaryFile(Path);
       llvm::sys::path::replace_extension(Path,
                                          SERIALIZED_MODULE_DOC_EXTENSION);
       Output->setAdditionalOutputForType(types::TY_SwiftModuleDocFile, Path);
+      if (isTempFile)
+        C.addTemporaryFile(Path);
     }
   }
 
   if (isa<CompileJobAction>(JA)) {
     // Choose the serialized diagnostics output path.
     if (C.getArgs().hasArg(options::OPT_serialize_diagnostics)) {
-      addAuxiliaryOutput(*Output, types::TY_SerializedDiagnostics, OI,
+      addAuxiliaryOutput(C, *Output, types::TY_SerializedDiagnostics, OI,
                          OutputMap);
 
       // Remove any existing diagnostics files so that clients can detect their
@@ -1622,10 +1578,10 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
 
     // Choose the dependencies file output path.
     if (C.getArgs().hasArg(options::OPT_emit_dependencies)) {
-      addAuxiliaryOutput(*Output, types::TY_Dependencies, OI, OutputMap);
+      addAuxiliaryOutput(C, *Output, types::TY_Dependencies, OI, OutputMap);
     }
     if (C.getIncrementalBuildEnabled()) {
-      addAuxiliaryOutput(*Output, types::TY_SwiftDeps, OI, OutputMap);
+      addAuxiliaryOutput(C, *Output, types::TY_SwiftDeps, OI, OutputMap);
     }
   }
 
@@ -1660,15 +1616,17 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
       else
         Path = OI.ModuleName;
 
+      bool isTempFile = C.isTemporaryFile(Path);
       llvm::sys::path::replace_extension(Path, "h");
       Output->setAdditionalOutputForType(types::TY_ObjCHeader, Path);
+      if (isTempFile)
+        C.addTemporaryFile(Path);
     }
   }
 
   // 5. Construct a Job which produces the right CommandOutput.
   Job *J = T->constructJob(*JA, std::move(InputJobs), std::move(Output),
                            InputActions, C.getArgs(), OI);
-  collectTemporaryFilesForAction(*JA, *J, OI, OFM, callback);
 
   // If we track dependencies for this job, we may be able to avoid running it.
   if (!J->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps).empty()) {
