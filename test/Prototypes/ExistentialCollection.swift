@@ -35,6 +35,18 @@ internal func _typeID(instance: AnyObject) -> ObjectIdentifier {
   return ObjectIdentifier(instance.dynamicType)
 }
 
+internal protocol _ForwardIndexBoxType : class {
+  var typeID: ObjectIdentifier {get}
+  func successor() -> _ForwardIndexBoxType
+  func equals(other: _ForwardIndexBoxType) -> Bool
+  func _distanceTo(other: _ForwardIndexBoxType) -> ForwardIndex.Distance
+  func _advancedBy(distance: ForwardIndex.Distance) -> _ForwardIndexBoxType
+  func _advancedBy(
+    distance: ForwardIndex.Distance,
+    _ limit: _ForwardIndexBoxType
+  ) -> _ForwardIndexBoxType
+}
+
 internal final class _ForwardIndexBox<
   BaseIndex: ForwardIndexType
 > : _ForwardIndexBoxType {
@@ -60,7 +72,6 @@ internal final class _ForwardIndexBox<
   
   func _advancedBy(n: ForwardIndex.Distance) -> _ForwardIndexBoxType {
     return _ForwardIndexBox(advance(base, numericCast(n)))
-    
   }
   
   func _advancedBy(
@@ -74,18 +85,6 @@ internal final class _ForwardIndexBox<
   
   internal // private
   let base: BaseIndex
-}
-
-internal protocol _ForwardIndexBoxType : class {
-  var typeID: ObjectIdentifier {get}
-  func successor() -> _ForwardIndexBoxType
-  func equals(other: _ForwardIndexBoxType) -> Bool
-  func _distanceTo(other: _ForwardIndexBoxType) -> ForwardIndex.Distance
-  func _advancedBy(distance: ForwardIndex.Distance) -> _ForwardIndexBoxType
-  func _advancedBy(
-    distance: ForwardIndex.Distance,
-    _ limit: _ForwardIndexBoxType
-  ) -> _ForwardIndexBoxType
 }
 
 public struct ForwardIndex : ForwardIndexType {
