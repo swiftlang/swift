@@ -1,4 +1,4 @@
-//===--- ExistentialCollection.swift --------------------------------------===//
+//===--- ExistentialCollection.swift.gyb ----------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,7 +9,9 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift
+// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/out.swift
+// RUN: %S/../../utils/line-directive %t/out.swift -- %target-build-swift %t/out.swift -o %t/a.out
+// RUN: %S/../../utils/line-directive %t/out.swift -- %target-run %t/a.out
 
 @noreturn
 internal func _abstract(file: StaticString = __FILE__, line: UWord = __LINE__) {
@@ -35,6 +37,9 @@ internal func _typeID(instance: AnyObject) -> ObjectIdentifier {
   return ObjectIdentifier(instance.dynamicType)
 }
 
+//===--- ForwardIndex -----------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
 internal protocol _ForwardIndexBoxType : class {
   var typeID: ObjectIdentifier {get}
   func successor() -> _ForwardIndexBoxType
@@ -47,7 +52,7 @@ internal protocol _ForwardIndexBoxType : class {
   ) -> _ForwardIndexBoxType
 }
 
-internal final class _ForwardIndexBox<
+internal class _ForwardIndexBox<
   BaseIndex: ForwardIndexType
 > : _ForwardIndexBoxType {
   init(_ base: BaseIndex) {
@@ -87,20 +92,53 @@ internal final class _ForwardIndexBox<
   let base: BaseIndex
 }
 
-public struct ForwardIndex : ForwardIndexType {
+//===--- BidirectionalIndex -----------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+internal protocol _BidirectionalIndexBoxType : _ForwardIndexBoxType {
+  func predecessor() -> _BidirectionalIndexBoxType
+}
+
+internal final class _BidirectionalIndexBox<
+  BaseIndex: BidirectionalIndexType
+> : _ForwardIndexBox<BaseIndex>, _BidirectionalIndexBoxType {
+  override init(_ base: BaseIndex) {
+    super.init(base)
+  }
+  
+  override func successor() -> _ForwardIndexBoxType {
+    return _BidirectionalIndexBox(self.base.successor())
+  }
+  
+  func predecessor() -> _BidirectionalIndexBoxType {
+    return _BidirectionalIndexBox(self.base.predecessor())
+  }
+}
+
+extension _InitializeTo { init() {} }
+
+% for Traversal in 'Forward', 'Bidirectional':
+
+public struct ${Traversal}Index : ${Traversal}IndexType {
   public typealias Distance = IntMax
   
-  public init<BaseIndex: ForwardIndexType>(_ base: BaseIndex) {
-    _box = _ForwardIndexBox(base)
+  public init<BaseIndex: ${Traversal}IndexType>(_ base: BaseIndex) {
+    _box = _${Traversal}IndexBox(base)
   }
   
-  public func successor() -> ForwardIndex {
-    return ForwardIndex(_box.successor())
+  public func successor() -> ${Traversal}Index {
+    return ${Traversal}Index(_box.successor())
   }
+  
+  % if Traversal != 'Forward':
+  public func predecessor() -> ${Traversal}Index {
+    return ${Traversal}Index(_box.predecessor())
+  }
+  % end
   
   //===--- private --------------------------------------------------------===//
-  internal func _unbox<T: ForwardIndexType>() -> T {
-    return (_box as! _ForwardIndexBox<T>).base
+  internal func _unbox<T: ${Traversal}IndexType>() -> T {
+    return (_box as! _${Traversal}IndexBox<T>).base
   }
   
   internal var _typeID: ObjectIdentifier {
@@ -108,15 +146,15 @@ public struct ForwardIndex : ForwardIndexType {
   }
   
   internal init(_ box: _ForwardIndexBoxType) {
-    self._box = box
+    self._box = box${'' if Traversal == 'Forward' else ' as! _%sIndexBoxType' % Traversal}
   }
   
-  internal let _box: _ForwardIndexBoxType
+  internal let _box: _${Traversal}IndexBoxType
 }
 
 public func ~> (
-  start:ForwardIndex, other : (_Distance, ForwardIndex)
-) -> ForwardIndex.Distance {
+  start:${Traversal}Index, other : (_Distance, ${Traversal}Index)
+) -> ${Traversal}Index.Distance {
   precondition(
     start._typeID == other.1._typeID,
     "distance: base index types differ.")
@@ -124,36 +162,37 @@ public func ~> (
 }
 
 public func ~> (
-  start:ForwardIndex, distance : (_Advance, ForwardIndex.Distance)
-) -> ForwardIndex {
-  return ForwardIndex(start._box._advancedBy(distance.1))
+  start:${Traversal}Index, distance : (_Advance, ${Traversal}Index.Distance)
+) -> ${Traversal}Index {
+  return ${Traversal}Index(start._box._advancedBy(distance.1))
 }
 
 public func ~> (
-  start:ForwardIndex, args : (_Advance, (ForwardIndex.Distance, ForwardIndex))
-) -> ForwardIndex {
+  start:${Traversal}Index, args : (_Advance, (${Traversal}Index.Distance, ${Traversal}Index))
+) -> ${Traversal}Index {
   precondition(
     start._typeID == args.1.1._typeID, "advance: base index types differ.")
-  return ForwardIndex(start._box._advancedBy(args.1.0, args.1.1._box))
+  return ${Traversal}Index(start._box._advancedBy(args.1.0, args.1.1._box))
 }
 
-public func == (lhs: ForwardIndex, rhs: ForwardIndex) -> Bool {
+public func == (lhs: ${Traversal}Index, rhs: ${Traversal}Index) -> Bool {
   precondition(lhs._typeID == rhs._typeID, "base index types differ.")
   return lhs._box.equals(rhs._box)
 }
 
-public class ForwardCollection<T> : CollectionType {
-  public var startIndex: ForwardIndex {_abstract()}
-  public var endIndex: ForwardIndex {_abstract()}
-  public subscript(index: ForwardIndex) -> T {_abstract()}
+public class ${Traversal}Collection<T> : CollectionType {
+  public var startIndex: ${Traversal}Index {_abstract()}
+  public var endIndex: ${Traversal}Index {_abstract()}
+  public subscript(index: ${Traversal}Index) -> T {_abstract()}
   public func generate() -> Generator<T> {_abstract()}
 
   public static func make<
-    Base: CollectionType where Base.Generator.Element == T
+    Base: CollectionType
+    where Base.Generator.Element == T ${', Base.Index: %sIndexType' % Traversal if Traversal != 'Forward' else ''}
   >(
     base: Base
-  ) -> ForwardCollection<T> {
-    return ForwardCollectionImpl(base)
+  ) -> ${Traversal}Collection<T> {
+    return ${Traversal}CollectionImpl(base)
   }
   //===--- private --------------------------------------------------------===//
   //===--------------------------------------------------------------------===//
@@ -175,11 +214,11 @@ public class ForwardCollection<T> : CollectionType {
   }
 
   //===--- CollectionType ~> operations -----------------------------------===//
-  internal func _count() -> ForwardIndex.Distance {_abstract()}
+  internal func _count() -> ${Traversal}Index.Distance {_abstract()}
 }
 
 public func ~> <T>(
-  source: ForwardCollection<T>, ptr: (_InitializeTo, UnsafeMutablePointer<T>)
+  source: ${Traversal}Collection<T>, ptr: (_InitializeTo, UnsafeMutablePointer<T>)
 ) {
   // FIXME: can't pass UnsafeMutablePointer<T>, which would be a
   // dependent struct, pending <rdar://20164041>, thus the pointer
@@ -188,33 +227,31 @@ public func ~> <T>(
 }
 
 public func ~> <T>(
-  source: ForwardCollection<T>, _: (_CopyToNativeArrayBuffer,())
+  source: ${Traversal}Collection<T>, _: (_CopyToNativeArrayBuffer,())
 ) -> _ContiguousArrayBuffer<T> {
   
   return unsafeBitCast(
     // FIXME: this call can't return _ContiguousArrayBuffer<T>, which
     // would be a dependent struct, pending <rdar://20164041>.  Thus
     // the cast.
-    source._copyToNativeArrayBuffer(),
-    _ContiguousArrayBuffer<T>.self)
+    source._copyToNativeArrayBuffer(), _ContiguousArrayBuffer<T>.self)
 }
 
-public func ~> <T>(source: ForwardCollection<T>, _:(_Count,()))
-  -> ForwardIndex.Distance
+public func ~> <T>(source: ${Traversal}Collection<T>, _:(_Count,()))
+  -> ${Traversal}Index.Distance
 {
   return source._count()
 }
 
-extension _InitializeTo { init() {} }
-
-final internal class ForwardCollectionImpl<Base: CollectionType>
-: ForwardCollection<Base.Generator.Element> {
+final internal class ${Traversal}CollectionImpl<
+  Base: CollectionType ${'where Base.Index: %sIndexType' % Traversal if Traversal != 'Forward' else ''}
+> : ${Traversal}Collection<Base.Generator.Element> {
   internal typealias Element = Base.Generator.Element
   
   internal init(_ base: Base) { self.base = base }
-  override var startIndex: ForwardIndex { return ForwardIndex(base.startIndex) }
-  override var endIndex: ForwardIndex { return ForwardIndex(base.endIndex) }
-  override subscript(index: ForwardIndex) -> Element {
+  override var startIndex: ${Traversal}Index { return ${Traversal}Index(base.startIndex) }
+  override var endIndex: ${Traversal}Index { return ${Traversal}Index(base.endIndex) }
+  override subscript(index: ${Traversal}Index) -> Element {
     return base[index._unbox()]
   }
   override func generate() -> Generator<Element> {
@@ -241,13 +278,14 @@ final internal class ForwardCollectionImpl<Base: CollectionType>
   }
 
   //===--- CollectionType ~> operations -----------------------------------===//
-  override internal func _count() -> ForwardIndex.Distance {
+  override internal func _count() -> ${Traversal}Index.Distance {
     return numericCast(count(base))
   }
 
   //===--- stored properties ----------------------------------------------===//
   internal let base: Base
 }
+% end
 
 //===--- tests ------------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -259,6 +297,22 @@ tests.test("ForwardCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
   let fc0 = ForwardCollection.make(a0)
   let a1 = ContiguousArray(fc0)
+  expectEqual(a0, a1)
+  for e in a0 {
+    let i = find(fc0, e)
+    expectNotEmpty(i)
+    expectEqual(e, fc0[i!])
+  }
+  for i in indices(fc0) {
+    expectNotEqual(fc0.endIndex, i)
+    expectEqual(1, count(filter(indices(fc0)) {$0 == i}))
+  }
+}
+
+tests.test("BidirectionalCollection") {
+  let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
+  let fc0 = BidirectionalCollection.make(lazy(a0).reverse())
+  let a1 = ContiguousArray(lazy(fc0).reverse())
   expectEqual(a0, a1)
   for e in a0 {
     let i = find(fc0, e)
