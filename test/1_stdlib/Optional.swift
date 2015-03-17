@@ -209,15 +209,16 @@ import Swift
 
 var OptionalTests = TestSuite("Optional")
 
-let half : Int -> Int? =
-  { if $0 % 2 == 0 { return $0 / 2 } else { return .None } }
-
 OptionalTests.test("flatMap") {
-  // FIXME: type inference stops expectEqual from working
-  expectTrue((.None as Int?).flatMap(half) == .None)
-  expectTrue(half(4) == .Some(2))
-  expectTrue(half(4).flatMap(half) == .Some(1))
-  expectTrue(half(4).flatMap(half).flatMap(half) == .None)
+  let half: Int32 -> Int16? =
+    { if $0 % 2 == 0 { return Int16($0 / 2) } else { return .None } }
+
+  expectOptionalEqual(2 as Int16, half(4))
+  expectEmpty(half(3))
+
+  expectEmpty((.None as Int32?).flatMap(half))
+  expectOptionalEqual(2 as Int16, (4 as Int32?).flatMap(half))
+  expectEmpty((3 as Int32?).flatMap(half))
 }
 
 runAllTests()

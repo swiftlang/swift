@@ -42,17 +42,18 @@ import Swift
 
 var ImplicitlyUnwrappedOptionalTests = TestSuite("ImplicitlyUnwrappedOptional")
 
-let half : Int -> Int! =
-  { if $0 % 2 == 0 { return $0 / 2 } else { return .None } }
-
 ImplicitlyUnwrappedOptionalTests.test("flatMap") {
   // FIXME(19798684): can't call map or flatMap on ImplicitlyUnwrappedOptional
-  // expectTrue(ImplicitlyUnwrappedOptional<Int>.None.flatMap(half) ==
-  //   ImplicitlyUnwrappedOptional<Int>.None)
-  // expectTrue(half(4) == ImplicitlyUnwrappedOptional<Int>.Some(2))
-  // expectTrue(half(4).flatMap(half) == ImplicitlyUnwrappedOptional<Int>.Some(1))
-  // expectTrue(half(4).flatMap(half).flatMap(half) ==
-  //   ImplicitlyUnwrappedOptional<Int>.None)
+
+  // let half: Int32 -> Int16! =
+  //   { if $0 % 2 == 0 { return Int16($0 / 2) } else { return .None } }
+
+  // expectOptionalEqual(2 as Int16, half(4))
+  // expectEmpty(half(3))
+
+  // expectEmpty((.None as Int!).flatMap(half))
+  // expectOptionalEqual(2 as Int16, (4 as Int!).flatMap(half))
+  // expectEmpty((3 as Int!).flatMap(half))
 }
 
 runAllTests()
