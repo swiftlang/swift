@@ -16,6 +16,7 @@
 
 #include "swift/Parse/Parser.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/Basic/EditorPlaceholder.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -1372,6 +1373,7 @@ Expr *Parser::parseExprIdentifier() {
   assert(Tok.is(tok::identifier) || Tok.is(tok::kw_self) ||
          Tok.is(tok::kw_Self));
 
+  Token IdentTok = Tok;
   Identifier name;
   SourceLoc loc = consumeIdentifier(&name);
   SmallVector<TypeRepr*, 8> args;
@@ -1406,6 +1408,9 @@ Expr *Parser::parseExprIdentifier() {
   
   Expr *E;
   if (D == 0) {
+    if (name.isEditorPlaceholder())
+      return parseExprEditorPlaceholder(IdentTok, name);
+
     auto refKind = DeclRefKind::Ordinary;
     auto unresolved = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
     unresolved->setSpecialized(hasGenericArgumentList);
@@ -1433,6 +1438,58 @@ Expr *Parser::parseExprIdentifier() {
                                                RAngleLoc);
   }
   return E;
+}
+
+Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
+                                         Identifier PlaceholderId) {
+  assert(PlaceholderTok.is(tok::identifier));
+  assert(PlaceholderId.isEditorPlaceholder());
+
+  auto parseTypeForPlaceholder = [&](TypeLoc &TyLoc, TypeRepr *&ExpansionTyR) {
+    Optional<EditorPlaceholderData> DataOpt =
+      swift::parseEditorPlaceholder(PlaceholderTok.getText());
+    if (!DataOpt)
+      return;
+    StringRef TypeStr = DataOpt->Type;
+    if (TypeStr.empty())
+      return;
+
+    // Ensure that we restore the parser state at exit.
+    ParserPositionRAII PPR(*this);
+
+    auto parseTypeString = [&](StringRef TyStr) -> TypeRepr* {
+      unsigned Offset = TyStr.data() - PlaceholderTok.getText().data();
+      SourceLoc TypeStartLoc = PlaceholderTok.getLoc().getAdvancedLoc(Offset);
+      SourceLoc TypeEndLoc = TypeStartLoc.getAdvancedLoc(TyStr.size());
+
+      Lexer::State StartState = L->getStateForBeginningOfTokenLoc(TypeStartLoc);
+      Lexer::State EndState = L->getStateForBeginningOfTokenLoc(TypeEndLoc);
+
+      // Create a lexer for the type sub-string.
+      Lexer LocalLex(*L, StartState, EndState);
+
+      // Temporarily swap out the parser's current lexer with our new one.
+      llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
+      Tok.setKind(tok::unknown); // we might be at tok::eof now.
+      consumeToken();
+      return parseType().getPtrOrNull();
+    };
+
+    TypeRepr *TyR = parseTypeString(TypeStr);
+    TyLoc = TyR;
+    if (DataOpt->TypeForExpansion == TypeStr) {
+      ExpansionTyR = TyR;
+    } else {
+      ExpansionTyR = parseTypeString(DataOpt->TypeForExpansion);
+    }
+  };
+
+  TypeLoc TyLoc;
+  TypeRepr *ExpansionTyR = nullptr;
+  parseTypeForPlaceholder(TyLoc, ExpansionTyR);
+  return new (Context) EditorPlaceholderExpr(PlaceholderId,
+                                             PlaceholderTok.getLoc(),
+                                             TyLoc, ExpansionTyR);
 }
 
 bool Parser::

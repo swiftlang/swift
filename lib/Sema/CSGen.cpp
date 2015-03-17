@@ -2096,7 +2096,11 @@ namespace {
       expr->setType(BoolType);
       return BoolType;
     }
-    
+
+    Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
+      return E->getType();
+    }
+
   };
 
   /// \brief AST walker that "sanitizes" an expression for the

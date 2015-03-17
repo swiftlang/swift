@@ -3636,6 +3636,38 @@ private:
   }
 };
 
+/// An editor placeholder (<#such as this#>) that occurred in an expression
+/// context. If the placeholder is a typed one (see \c EditorPlaceholderData)
+/// its type string will be typechecked and will be associated with this expr.
+class EditorPlaceholderExpr : public Expr {
+  Identifier Placeholder;
+  SourceLoc Loc;
+  TypeLoc PlaceholderTy;
+  TypeRepr *ExpansionTyR;
+
+public:
+  EditorPlaceholderExpr(Identifier Placeholder, SourceLoc Loc,
+                        TypeLoc PlaceholderTy,
+                        TypeRepr *ExpansionTyR)
+    : Expr(ExprKind::EditorPlaceholder, /*Implicit=*/false),
+      Placeholder(Placeholder), Loc(Loc),
+      PlaceholderTy(PlaceholderTy),
+      ExpansionTyR(ExpansionTyR) {
+  }
+
+  Identifier getPlaceholder() const { return Placeholder; }
+  SourceRange getSourceRange() const { return Loc; }
+  TypeLoc &getTypeLoc() { return PlaceholderTy; }
+  TypeLoc getTypeLoc() const { return PlaceholderTy; }
+
+  /// The TypeRepr to be considered for placeholder expansion.
+  TypeRepr *getTypeForExpansion() const { return ExpansionTyR; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::EditorPlaceholder;
+  }
+};
+
 #undef SWIFT_FORWARD_SOURCE_LOCS_TO
   
 } // end namespace swift

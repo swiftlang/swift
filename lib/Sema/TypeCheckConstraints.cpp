@@ -478,6 +478,14 @@ namespace {
         return { true, BindName(unresolved, DC, TC) };
       }
 
+      if (auto PlaceholderE = dyn_cast<EditorPlaceholderExpr>(expr)) {
+        if (!PlaceholderE->getTypeLoc().isNull()) {
+          if (!TC.validateType(PlaceholderE->getTypeLoc(), DC))
+            expr->setType(PlaceholderE->getTypeLoc().getType());
+        }
+        return { true, expr };
+      }
+
       return { true, expr };
     }
 

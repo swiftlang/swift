@@ -1078,6 +1078,8 @@ public:
   Expr *parseExprStringLiteral();
   
   Expr *parseExprIdentifier();
+  Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
+                                   Identifier PlaceholderId);
 
   /// \brief Parse a closure expression after the opening brace.
   ///

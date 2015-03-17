@@ -1808,6 +1808,18 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
+    printCommon(E, "editor_placeholder_expr") << '\n';
+    auto *TyR = E->getTypeLoc().getTypeRepr();
+    auto *ExpTyR = E->getTypeForExpansion();
+    if (TyR)
+      printRec(TyR);
+    if (ExpTyR && ExpTyR != TyR) {
+      OS << '\n';
+      printRec(ExpTyR);
+    }
+    OS << ')';
+  }
 };
 
 } // end anonymous namespace.

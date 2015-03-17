@@ -376,6 +376,7 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::DefaultValue:
   case ExprKind::UnresolvedPattern:
   case ExprKind::AvailabilityQuery:
+  case ExprKind::EditorPlaceholder:
     return false;
   }
 }

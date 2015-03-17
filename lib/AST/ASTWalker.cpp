@@ -526,6 +526,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
+    return E;
+  }
+
 #define STMT(Id, Parent) Stmt *visit##Id##Stmt(Id##Stmt *S);
 #include "swift/AST/StmtNodes.def"
 

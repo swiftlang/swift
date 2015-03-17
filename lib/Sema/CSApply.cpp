@@ -3115,7 +3115,11 @@ namespace {
     Expr *visitAvailabilityQueryExpr(AvailabilityQueryExpr *expr) {
       return expr;
     }
-    
+
+    Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
+      return E;
+    }
+
     void finalize() {
       // Check that all value type methods were fully applied.
       auto &tc = cs.getTypeChecker();
