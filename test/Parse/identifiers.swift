@@ -22,3 +22,6 @@ func s̈pin̈al_tap̈() {}
 
 // Private-use characters aren't valid in Swift source.
 () // expected-error{{invalid character in source file}}
+
+// Placeholders are recognized as identifiers but with error.
+func <#some name#>() {} // expected-error {{editor placeholder in source file}}

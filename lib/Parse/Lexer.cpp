@@ -1213,6 +1213,28 @@ void Lexer::lexEscapedIdentifier() {
   formToken(tok::backtick, Quote);
 }
 
+void Lexer::tryLexEditorPlaceholder() {
+  assert(CurPtr[-1] == '<' && CurPtr[0] == '#');
+  const char *TokStart = CurPtr-1;
+  for (const char *Ptr = CurPtr+1; Ptr < BufferEnd-1; ++Ptr) {
+    if (*Ptr == '\n')
+      break;
+    if (Ptr[0] == '<' && Ptr[1] == '#')
+      break;
+    if (Ptr[0] == '#' && Ptr[1] == '>') {
+      // Found it. Flag it as error for the rest of the compiler pipeline and
+      // lex it as an identifier.
+      diagnose(TokStart, diag::lex_editor_placeholder);
+      CurPtr = Ptr+2;
+      formToken(tok::identifier, TokStart);
+      return;
+    }
+  }
+
+  // Not a well-formed placeholder.
+  lexOperatorIdentifier();
+}
+
 StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
                                          SmallVectorImpl<char> &TempString) {
   TempString.clear();
@@ -1510,8 +1532,13 @@ Restart:
     if (isLeftBound(TokStart, BufferStart))
       return formToken(tok::question_postfix, TokStart);
     return lexOperatorIdentifier();
-      
-  case '=': case '-': case '+': case '*': case '<': case '>':
+
+  case '<':
+    if (CurPtr[0] == '#')
+      return tryLexEditorPlaceholder();
+    SWIFT_FALLTHROUGH;
+
+  case '=': case '-': case '+': case '*': case '>':
   case '&': case '|': case '^': case '~': case '.':
     return lexOperatorIdentifier();
 

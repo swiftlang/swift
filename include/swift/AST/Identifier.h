@@ -76,6 +76,8 @@ public:
   bool isOperator() const {
     if (empty())
       return false;
+    if (isEditorPlaceholder())
+      return false;
     if ((unsigned char)Pointer[0] < 0x80)
       return isOperatorStartCodePoint((unsigned char)Pointer[0]);
 
@@ -120,6 +122,10 @@ public:
         || (C >= 0xFE00 && C <= 0xFE0F)
         || (C >= 0xFE20 && C <= 0xFE2F)
         || (C >= 0xE0100 && C <= 0xE01EF);
+  }
+
+  bool isEditorPlaceholder() const {
+    return !empty() && Pointer[0] == '<' && Pointer[1] == '#';
   }
   
   void *getAsOpaquePointer() const { return (void *)Pointer; }

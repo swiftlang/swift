@@ -405,6 +405,8 @@ private:
   void lexCharacterLiteral();
   void lexStringLiteral();
   void lexEscapedIdentifier();
+
+  void tryLexEditorPlaceholder();
 };
   
   

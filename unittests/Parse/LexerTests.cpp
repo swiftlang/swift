@@ -27,7 +27,7 @@ public:
 
   std::vector<Token> checkLex(StringRef Source,
                               ArrayRef<tok> ExpectedTokens,
-                              bool KeepComments,
+                              bool KeepComments = false,
                               bool KeepEOF = false) {
     unsigned BufID = SourceMgr.addMemBufferCopy(Source);
 
@@ -348,3 +348,36 @@ TEST_F(LexerTest, NestedSubLexers) {
   ASSERT_EQ("fff5", TokensSub2.back().getText());
 }
 
+TEST_F(LexerTest, TokenizePlaceholder) {
+  const char *Source = "aa <#one#> bb <# two #>";
+  std::vector<tok> ExpectedTokens{
+    tok::identifier, tok::identifier, tok::identifier, tok::identifier
+  };
+  std::vector<Token> Toks = checkLex(Source, ExpectedTokens);
+  EXPECT_EQ("aa", Toks[0].getText());
+  EXPECT_EQ("<#one#>", Toks[1].getText());
+  EXPECT_EQ("bb", Toks[2].getText());
+  EXPECT_EQ("<# two #>", Toks[3].getText());
+}
+
+TEST_F(LexerTest, NoPlaceholder) {
+  auto checkTok = [&](StringRef Source) {
+    unsigned BufID = SourceMgr.addMemBufferCopy(Source);
+    std::vector<Token> Toks = tokenize(LangOpts, SourceMgr, BufID, 0, 0, false);
+    ASSERT_FALSE(Toks.empty());
+    EXPECT_NE(tok::identifier, Toks[0].getKind());
+  };
+  checkTok("<#");
+  checkTok("<#a#");
+  checkTok("<#a\n#>");
+  checkTok("< #a#>");
+}
+
+TEST_F(LexerTest, NestedPlaceholder) {
+  const char *Source = "<#<#aa#>#>";
+  std::vector<tok> ExpectedTokens{
+    tok::oper_prefix, tok::pound, tok::identifier, tok::pound, tok::oper_postfix
+  };
+  std::vector<Token> Toks = checkLex(Source, ExpectedTokens);
+  EXPECT_EQ("<#aa#>", Toks[2].getText());
+}
