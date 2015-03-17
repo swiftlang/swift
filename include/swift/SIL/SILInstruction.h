@@ -627,6 +627,8 @@ public:
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ApplyInst;
   }
+
+  bool hasSemantics(StringRef SemanticsString) const;
 };
 
 /// PartialApplyInst - Represents the creation of a closure object by partial

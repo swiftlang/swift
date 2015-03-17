@@ -206,6 +206,14 @@ ApplyInst *ApplyInst::create(SILLocation Loc, SILValue Callee,
                                  Result, Subs, Args, Transparent);
 }
 
+bool ApplyInst::hasSemantics(StringRef SemanticsString) const {
+  if (auto *FRI = dyn_cast<FunctionRefInst>(getCallee()))
+    if (auto *F = FRI->getReferencedFunction())
+      return F->hasSemanticsString(SemanticsString);
+
+  return false;
+}
+
 PartialApplyInst::PartialApplyInst(SILLocation Loc, SILValue Callee,
                                    SILType SubstCalleeTy,
                                    ArrayRef<Substitution> Subs,
