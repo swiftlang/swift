@@ -811,8 +811,33 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
 
 SILInstruction *
 CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
-  if (Inst->isExact())
+  if (Inst->isExact()) {
+    // Check if the exact dynamic type of the operand can be determined.
+    if (auto *ARI = dyn_cast<AllocRefInst>(Inst->getOperand().stripUpCasts())) {
+      SILBuilderWithScope<1> Builder(Inst);
+      auto Loc = Inst->getLoc();
+      auto *SuccessBB = Inst->getSuccessBB();
+      auto *FailureBB = Inst->getFailureBB();
+
+      if (ARI->getType() == Inst->getCastType()) {
+        // This exact cast will succeed.
+        SmallVector<SILValue, 1> Args;
+        Args.push_back(ARI);
+        auto *NewI = Builder.createBranch(Loc, SuccessBB, Args);
+        Inst->eraseFromParent();
+        WillSucceedAction();
+        return NewI;
+      } else {
+        // This exact cast will fail.
+        auto *NewI = Builder.createBranch(Loc, FailureBB);
+        Inst->eraseFromParent();
+        WillFailAction();
+        return NewI;
+      }
+    }
+
     return nullptr;
+  }
 
   if (auto *I = optimizeCheckedCastBranchInst(Inst))
     Inst = dyn_cast<CheckedCastBranchInst>(I);

@@ -1258,6 +1258,7 @@ bb7(%23 : $Optional<IntEnum>):
 
 
 class B {}
+class E : B {}
 
 // CHECK-LABEL: sil @checked_cast_anyobject_metatypeinst_to_class
 // CHECK: bb0
@@ -1322,3 +1323,57 @@ bb2:
   %2 = tuple()
   return %2 : $()
 }
+
+// CHECK-LABEL: sil @successful_checked_cast_br_on_alloc_ref
+// CHECK: bb0
+// CHECK-NEXT: alloc_ref
+// CHECK-NOT: checked_cast_br
+// CHECK-NOT: bb1
+// CHECK: integer_literal $Builtin.Int32, 1
+// CHECK: strong_release
+// CHECK: return
+sil @successful_checked_cast_br_on_alloc_ref : $() -> Builtin.Int32 {
+bb0:
+  %1 = alloc_ref $B
+  checked_cast_br [exact] %1 : $B to $B, bb1, bb2
+
+bb1(%2 : $B):
+  %3 = integer_literal $Builtin.Int32, 1
+  br bb3 (%3 : $Builtin.Int32)
+
+bb2:
+  %5 = integer_literal $Builtin.Int32, 2
+  br bb3 (%5 : $Builtin.Int32)
+
+bb3 (%10: $Builtin.Int32):
+  strong_release %1 : $B
+  return %10 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil @failing_checked_cast_br_on_alloc_ref
+// CHECK: bb0
+// CHECK-NEXT: alloc_ref
+// CHECK-NOT: checked_cast_br
+// CHECK-NOT: bb1
+// CHECK: integer_literal $Builtin.Int32, 2
+// CHECK: strong_release
+// CHECK: return
+sil @failing_checked_cast_br_on_alloc_ref : $() -> Builtin.Int32 {
+bb0:
+  %1 = alloc_ref $E
+  %2 = upcast %1 : $E to $B
+  checked_cast_br [exact] %2 : $B to $B, bb1, bb2
+
+bb1(%3 : $B):
+  %4 = integer_literal $Builtin.Int32, 1
+  br bb3 (%4 : $Builtin.Int32)
+
+bb2:
+  %5 = integer_literal $Builtin.Int32, 2
+  br bb3 (%5 : $Builtin.Int32)
+
+bb3 (%10: $Builtin.Int32):
+  strong_release %1 : $E
+  return %10 : $Builtin.Int32
+}
+
