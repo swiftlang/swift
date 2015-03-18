@@ -2557,7 +2557,7 @@ namespace  {
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (E == ChildExpr) {
-        if (Ancestors.size() != 0)
+        if (!Ancestors.empty())
           ParentExpr = Ancestors.back();
         return { false, nullptr };
       }
@@ -2623,8 +2623,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     // in the ancestors of the expr.
     if (!OriginalType->getAnyNominal()) {
       NearestExprParentFinder Walker(ParsedExpr, [&](Expr* E) {
-        return E->getType().getCanonicalTypeOrNull().getPointer() &&
-          E->getType()->getAnyNominal();
+        return E->getType() && E->getType()->getAnyNominal();
       });
       CurDeclContext->walkContext(Walker);
       ExprType = Walker.ParentExpr ? Walker.ParentExpr->getType():
