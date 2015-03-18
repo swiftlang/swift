@@ -612,12 +612,6 @@ public:
   /// \returns the previous generation number.
   unsigned bumpGeneration() { return CurrentGeneration++; }
 
-  /// Retrieve the conformance entry for a given type and protocol.
-  Optional<ConformanceEntry> getConformsTo(CanType type, ProtocolDecl *proto);
-
-  /// Set the conformance entry for the given type and protocol.
-  void setConformsTo(CanType type, ProtocolDecl *proto, ConformanceEntry entry);
-
   /// \brief Produce a "normal" conformance for a nominal type.
   NormalProtocolConformance *
   getConformance(Type conformingType,

@@ -1541,7 +1541,8 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
   out << "\n";
 }
 
-Type ArchetypeBuilder::mapTypeIntoContext(DeclContext *dc, Type type) {
+Type ArchetypeBuilder::mapTypeIntoContext(DeclContext *dc, Type type,
+                                         LazyResolver *resolver) {
   // If the type is not dependent, there's nothing to map.
   if (!type->isDependentType())
     return type;
@@ -1549,12 +1550,14 @@ Type ArchetypeBuilder::mapTypeIntoContext(DeclContext *dc, Type type) {
   auto genericParams = dc->getGenericParamsOfContext();
   assert(genericParams && "Missing generic parameters for dependent context");
   
-  return mapTypeIntoContext(dc->getParentModule(), genericParams, type);
+  return mapTypeIntoContext(dc->getParentModule(), genericParams, type,
+                            resolver);
 }
 
 Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
                                           GenericParamList *genericParams,
-                                          Type type) {
+                                          Type type,
+                                          LazyResolver *resolver) {
   // If the type is not dependent, or we have no generic params, there's nothing
   // to map.
   if (!genericParams || !type->isDependentType())
@@ -1592,8 +1595,8 @@ Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
     // Map a dependent member to the corresponding nested archetype.
     if (auto dependentMember = type->getAs<DependentMemberType>()) {
       auto base = mapTypeIntoContext(M, genericParams,
-                                     dependentMember->getBase());
-      return dependentMember->substBaseType(M, base);
+                                     dependentMember->getBase(), resolver);
+      return dependentMember->substBaseType(M, base, resolver);
     }
 
     return type;

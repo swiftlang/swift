@@ -2328,8 +2328,8 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D, bool isObjC) {
         // If we are overriding another method, make sure the
         // selectors line up.
         if (auto baseMethod = method->getOverriddenDecl()) {
-          ObjCSelector baseSelector = baseMethod->getObjCSelector();
-          if (baseSelector != method->getObjCSelector()) {
+          ObjCSelector baseSelector = baseMethod->getObjCSelector(&TC);
+          if (baseSelector != method->getObjCSelector(&TC)) {
             // The selectors differ. If the method's selector was
             // explicitly specified, this is an error. Otherwise, we
             // inherit the selector.
@@ -2360,7 +2360,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D, bool isObjC) {
 
         // Swift does not permit class methods named "load".
         if (!method->isInstanceMember()) {
-          auto selector = method->getObjCSelector();
+          auto selector = method->getObjCSelector(&TC);
           if (selector.getNumArgs() == 0 &&
               selector.getSelectorPieces()[0] == TC.Context.Id_load) {
             auto diagInfo = getObjCMethodDiagInfo(method);
@@ -4446,7 +4446,8 @@ public:
       bool objCMatch = false;
       if (parentDecl->isObjC() && decl->isObjC()) {
         if (method) {
-          if (method->getObjCSelector() == parentMethod->getObjCSelector())
+          if (method->getObjCSelector(&TC)
+                == parentMethod->getObjCSelector(&TC))
             objCMatch = true;
         } else if (auto *parentSubscript =
                      dyn_cast<SubscriptDecl>(parentStorage)) {
@@ -4510,7 +4511,7 @@ public:
       if (objCMatch) {
         if (method) {
           TC.diagnose(decl, diag::override_objc_type_mismatch_method,
-                      method->getObjCSelector(), declTy);
+                      method->getObjCSelector(&TC), declTy);
         } else {
           TC.diagnose(decl, diag::override_objc_type_mismatch_subscript,
                       static_cast<unsigned>(

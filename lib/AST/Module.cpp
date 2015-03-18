@@ -824,28 +824,35 @@ findExplicitConformance(NominalTypeDecl *nominal, ProtocolDecl *protocol,
     return std::make_tuple(nullptr, nullptr, nullptr);
 
   NominalTypeDecl *owningNominal;
-  if (auto ext = dyn_cast<ExtensionDecl>(declaresConformance))
+  DeclContext *conformingContext;
+  if (auto ext = dyn_cast<ExtensionDecl>(declaresConformance)) {
     owningNominal = ext->getExtendedType()->getAnyNominal();
-  else
+    conformingContext = ext;
+  } else {
     owningNominal = cast<NominalTypeDecl>(declaresConformance);
+    conformingContext = owningNominal;
+  }
   assert(owningNominal);
 
-  // If we don't have a nominal conformance, but we do have a resolver, try
-  // to resolve the nominal conformance now.
-  if (!foundConformance && resolver) {
-    foundConformance = resolver->resolveConformance(
+  // If we don't have a nominal conformance built yet, build one now.
+  ASTContext &ctx = nominal->getASTContext();
+  if (!foundConformance) {
+    if (resolver) {
+      foundConformance = resolver->resolveConformance(
                            owningNominal,
                            protocol,
                            dyn_cast<ExtensionDecl>(declaresConformance));
+    } else {
+      Type conformingType = conformingContext->getDeclaredTypeInContext();
+      foundConformance = ctx.getConformance(
+                           conformingType, protocol,
+                           declaresConformance->getLoc(),
+                           conformingContext,
+                           ProtocolConformanceState::Incomplete);
+    }
   }
 
-  // If we have a nominal conformance, we're done.
-  if (foundConformance) {
-    return std::make_tuple(owningNominal, declaresConformance,
-                           foundConformance);
-  }
-
-  return std::make_tuple(nullptr, nullptr, nullptr);
+  return std::make_tuple(owningNominal, declaresConformance, foundConformance);
 }
 
 LookupConformanceResult Module::lookupConformance(Type type,
@@ -902,18 +909,6 @@ LookupConformanceResult Module::lookupConformance(Type type,
     return { nullptr, ConformanceKind::DoesNotConform };
   }
 
-  // Check whether we have already cached an answer to this query.
-  CanType canType = type->getCanonicalType();
-  if (auto entry = ctx.getConformsTo(canType, protocol)) {
-    // If we conform, return the conformance.
-    if (entry->getInt()) {
-      return { entry->getPointer(), ConformanceKind::Conforms };
-    }
-
-    // We don't conform.
-    return { nullptr, ConformanceKind::DoesNotConform };
-  }
-
   // Check for protocol conformance of archetype via superclass requirement.
   if (auto archetype = type->getAs<ArchetypeType>()) {
     if (auto super = archetype->getSuperclass()) {
@@ -926,7 +921,6 @@ LookupConformanceResult Module::lookupConformance(Type type,
       case ConformanceKind::Conforms:
         auto result =
           ctx.getInheritedConformance(type, inheritedConformance.getPointer());
-        ctx.setConformsTo(canType, protocol, ConformanceEntry(result, true));
         return { result, ConformanceKind::Conforms };
       }
     }
@@ -951,7 +945,6 @@ LookupConformanceResult Module::lookupConformance(Type type,
   // If we didn't find an owning nominal, we don't conform. Cache the negative
   // result and return.
   if (!owningNominal) {
-    ctx.setConformsTo(canType, protocol, ConformanceEntry(nullptr, false));
     return { nullptr, ConformanceKind::DoesNotConform };
   }
 
@@ -987,7 +980,6 @@ LookupConformanceResult Module::lookupConformance(Type type,
     // Create the inherited conformance entry.
     auto result
       = ctx.getInheritedConformance(type, inheritedConformance.getPointer());
-    ctx.setConformsTo(canType, protocol, ConformanceEntry(result, true));
     return { result, ConformanceKind::Conforms };
   }
 
@@ -1012,17 +1004,13 @@ LookupConformanceResult Module::lookupConformance(Type type,
                                                         resolver);
 
       // Create the specialized conformance entry.
-      ctx.setConformsTo(canType, protocol, ConformanceEntry(nullptr, false));
       auto result = ctx.getSpecializedConformance(type, nominalConformance,
                                                   substitutions);
-      ctx.setConformsTo(canType, protocol, ConformanceEntry(result, true));
       return { result, ConformanceKind::Conforms };
     }
   }
 
   // Record and return the simple conformance.
-  ctx.setConformsTo(canType, protocol, 
-                    ConformanceEntry(nominalConformance, true));
   return { nominalConformance, ConformanceKind::Conforms };
 }
 

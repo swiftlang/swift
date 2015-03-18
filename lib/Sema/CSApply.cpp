@@ -81,7 +81,7 @@ Type Solution::computeSubstitutions(
     // Drop requirements for parameters that have been constrained away to
     // concrete types.
     auto firstArchetype
-      = ArchetypeBuilder::mapTypeIntoContext(dc, req.getFirstType())
+      = ArchetypeBuilder::mapTypeIntoContext(dc, req.getFirstType(), &tc)
         ->getAs<ArchetypeType>();
     if (!firstArchetype)
       continue;

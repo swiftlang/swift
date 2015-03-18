@@ -2833,11 +2833,12 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                                 ProtocolConformanceState::Incomplete);
 
   // If we're already checking this conformance, just return it.
-  if (conformance->getState() == ProtocolConformanceState::Checking)
+  if (conformance->getState() == ProtocolConformanceState::Checking ||
+      conformance->getState() == ProtocolConformanceState::Complete ||
+      conformance->getState() == ProtocolConformanceState::Invalid)
     return conformance;
 
   // Note that we are checking this conformance now.
-  TC.Context.setConformsTo(canT, Proto, ConformanceEntry(conformance, true));
   conformance->setState(ProtocolConformanceState::Checking);
 
   // If the protocol requires a class, non-classes are a non-starter.

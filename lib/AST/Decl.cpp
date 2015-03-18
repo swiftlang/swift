@@ -2567,7 +2567,8 @@ void AbstractStorageDecl::setInvalidBracesRange(SourceRange BracesRange) {
   GetSetInfo.setPointer(getSetInfo);
 }
 
-ObjCSelector AbstractStorageDecl::getObjCGetterSelector() const {
+ObjCSelector AbstractStorageDecl::getObjCGetterSelector(
+               LazyResolver *resolver) const {
   // If the getter has an @objc attribute with a name, use that.
   if (auto getter = getGetter()) {
     if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>()) {
@@ -2579,7 +2580,7 @@ ObjCSelector AbstractStorageDecl::getObjCGetterSelector() const {
   // Subscripts use a specific selector.
   auto &ctx = getASTContext();
   if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
-    switch (SD->getObjCSubscriptKind(nullptr)) {
+    switch (SD->getObjCSubscriptKind(resolver)) {
     case ObjCSubscriptKind::None:
       llvm_unreachable("Not an Objective-C subscript");
     case ObjCSubscriptKind::Indexed:
@@ -2594,7 +2595,8 @@ ObjCSelector AbstractStorageDecl::getObjCGetterSelector() const {
   return ObjCSelector(ctx, 0, var->getObjCPropertyName());
 }
 
-ObjCSelector AbstractStorageDecl::getObjCSetterSelector() const {
+ObjCSelector AbstractStorageDecl::getObjCSetterSelector(
+               LazyResolver *resolver) const {
   // If the setter has an @objc attribute with a name, use that.
   auto setter = getSetter();
   auto objcAttr = setter ? setter->getAttrs().getAttribute<ObjCAttr>()
@@ -2607,7 +2609,7 @@ ObjCSelector AbstractStorageDecl::getObjCSetterSelector() const {
   // Subscripts use a specific selector.
   auto &ctx = getASTContext();
   if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
-    switch (SD->getObjCSubscriptKind(nullptr)) {
+    switch (SD->getObjCSubscriptKind(resolver)) {
     case ObjCSubscriptKind::None:
       llvm_unreachable("Not an Objective-C subscript");
 
@@ -3179,9 +3181,10 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
   return getNameLoc();
 }
 
-ObjCSelector AbstractFunctionDecl::getObjCSelector() const {
+ObjCSelector AbstractFunctionDecl::getObjCSelector(
+               LazyResolver *resolver) const {
   if (auto func = dyn_cast<FuncDecl>(this))
-    return func->getObjCSelector();
+    return func->getObjCSelector(resolver);
   if (auto ctor = dyn_cast<ConstructorDecl>(this))
     return ctor->getObjCSelector();
   if (auto dtor = dyn_cast<DestructorDecl>(this))
@@ -3441,12 +3444,12 @@ DynamicSelfType *FuncDecl::getDynamicSelfInterface() const {
 }
 
 /// Produce the selector for this "Objective-C method" in the given buffer.
-ObjCSelector FuncDecl::getObjCSelector() const {
+ObjCSelector FuncDecl::getObjCSelector(LazyResolver *resolver) const {
   // For a getter or setter, go through the variable or subscript decl.
   if (isGetterOrSetter()) {
     auto asd = cast<AbstractStorageDecl>(getAccessorStorageDecl());
-    return isGetter() ? asd->getObjCGetterSelector()
-                      : asd->getObjCSetterSelector();
+    return isGetter() ? asd->getObjCGetterSelector(resolver)
+                      : asd->getObjCSetterSelector(resolver);
   }
 
   // If there is an @objc attribute with a name, use that name.

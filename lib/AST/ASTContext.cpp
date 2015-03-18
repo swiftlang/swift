@@ -208,10 +208,6 @@ struct ASTContext::Implementation {
     /// The set of inherited protocol conformances.
     llvm::FoldingSet<InheritedProtocolConformance> InheritedConformances;
 
-    /// ConformsTo - Caches the results of checking whether a given (canonical)
-    /// type conforms to a given protocol.
-    ConformsToMap ConformsTo;
-
     ~Arena() {
       for (auto &conformance : SpecializedConformances)
         conformance.~SpecializedProtocolConformance();
@@ -1206,25 +1202,6 @@ void ASTContext::destroyDefaultArgumentContext(DefaultArgumentInitializer *DC) {
   Impl.UnusedDefaultArgumentContext = DC;
 }
 
-Optional<ConformanceEntry> ASTContext::getConformsTo(CanType type,
-                                                     ProtocolDecl *proto) {
-  auto arena = getArena(type->getRecursiveProperties());
-  auto &conformsTo = Impl.getArena(arena).ConformsTo;
-  auto known = conformsTo.find({type, proto});
-  if (known == conformsTo.end())
-    return None;
-
-  return known->second;
-}
-
-void ASTContext::setConformsTo(CanType type, ProtocolDecl *proto,
-                               ConformanceEntry entry) {
-  assert(!type->is<GenericTypeParamType>());
-  auto arena = getArena(type->getRecursiveProperties());
-  auto &conformsTo = Impl.getArena(arena).ConformsTo;
-  conformsTo[{type, proto}] = entry;
-}
-
 NormalProtocolConformance *
 ASTContext::getConformance(Type conformingType,
                            ProtocolDecl *protocol,
@@ -1360,11 +1337,10 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     // ClassTypes ?
     // UnboundGenericTypes ?
     // BoundGenericTypes ?
-    llvm::capacity_in_bytes(BoundGenericSubstitutions) +
+    llvm::capacity_in_bytes(BoundGenericSubstitutions);
     // NormalConformances ?
     // SpecializedConformances ?
     // InheritedConformances ?
-    llvm::capacity_in_bytes(ConformsTo);
 }
 
 namespace {
@@ -1598,7 +1574,7 @@ bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
 
     // Look for a method that we have overridden in one of our
     // superclasses.
-    auto selector = method->getObjCSelector();
+    auto selector = method->getObjCSelector(nullptr);
     AbstractFunctionDecl *overriddenMethod
       = lookupObjCMethodInType(classDecl->getSuperclass(),
                                selector,

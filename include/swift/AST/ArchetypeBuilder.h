@@ -323,7 +323,8 @@ public:
   ///
   /// \returns the mapped type, which will involve archetypes rather than
   /// dependent types.
-  static Type mapTypeIntoContext(DeclContext *dc, Type type);
+  static Type mapTypeIntoContext(DeclContext *dc, Type type,
+                                 LazyResolver *resolver = nullptr);
   
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
@@ -336,7 +337,8 @@ public:
   /// FIXME: Share the guts of our mapTypeIntoContext implementation with
   static Type mapTypeIntoContext(Module *M,
                                  GenericParamList *genericParams,
-                                 Type type);
+                                 Type type,
+                                 LazyResolver *resolver = nullptr);
 
   // In SILFunction.cpp:
   
