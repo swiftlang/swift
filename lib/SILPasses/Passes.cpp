@@ -272,7 +272,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   if (Module.getOptions().EnableFuncSigOpts)
     PM.add(createFunctionSignatureOpts());
 
-  PM.run();
+  PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
   // Run another iteration of the SSA optimizations to optimize the
