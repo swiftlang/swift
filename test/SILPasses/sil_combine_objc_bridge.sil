@@ -98,3 +98,21 @@ bb0(%0 : $AnArray<AnyObject>):
   release_value %2 : $AnNSArray
   return %4 : $AnArray<AnyObject>
 }
+
+struct Unbridged {
+}
+
+// CHECK-LABEL: sil @failing_bridge_from_to_owned
+// CHECK: apply
+// CHECK: apply
+// CHECK: return
+sil @failing_bridge_from_to_owned : $@thin (@owned AnNSArray) -> @owned AnNSArray {
+bb0(%0 : $AnNSArray):
+  %1 = function_ref @bridgeFromObjectiveC : $@thin <Unbridged> (@owned AnNSArray) -> @owned AnArray<Unbridged>
+  %2 = apply %1<Unbridged>(%0) : $@thin <Unbridged> (@owned AnNSArray) -> @owned AnArray<Unbridged>
+  retain_value %2 : $AnArray<Unbridged>
+  release_value %2 : $AnArray<Unbridged>
+  %3 = function_ref @bridgeToObjectiveC : $@cc(method) @thin <Unbridged> (@owned AnArray<Unbridged>) -> @owned AnNSArray
+  %4 = apply %3<Unbridged>(%2) : $@cc(method) @thin <Unbridged> (@owned AnArray<Unbridged>) -> @owned AnNSArray
+  return %4 : $AnNSArray
+}
