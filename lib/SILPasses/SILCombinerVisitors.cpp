@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-combine"
 #include "SILCombiner.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
@@ -1300,8 +1301,7 @@ static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
     Builder.createReleaseValue(Call->getLoc(), OnX);
 }
 
-static bool isCastTypeKnownToSucceed(SILType Type) {
-  auto Canonical = Type.getSwiftRValueType();
+static bool isTypeBridgable(CanType Canonical, SILModule &Mod) {
   if (Canonical.isNull())
     return false;
 
@@ -1315,20 +1315,28 @@ static bool isCastTypeKnownToSucceed(SILType Type) {
     return false;
 
   auto BGT = dyn_cast<BoundGenericType>(Canonical);
+
+  // If a type is not a bound generic type it is either a:
+  //  * unbound generic type
+  //     in which case it is not bridgable.
+  //  * not a generic type
+  //     in which case it is bridgable if it conforms to the bridgable protocol.
   if (!BGT)
-    return true;
+    return !isa<UnboundGenericType>(Canonical) &&
+           isObjectiveCBridgeable(Mod.getSwiftModule(), Canonical);
 
   // Make sure all type parameters are known to succeed.
   for (auto TP : BGT->getGenericArgs()) {
-    if (auto Canonical = TP.getCanonicalTypeOrNull()) {
-      if (Canonical->canBeClass() != TypeTraitResult::Is)
-        return false;
-    } else return false;
+    if (!isTypeBridgable(TP.getCanonicalTypeOrNull(), Mod))
+      return false;
   }
 
-  // Regular structs are safe. This relies on us only putting
-  // convertToObjectiveC/convertFromObjectiveC on types we know will succeed.
-  return true;
+  // Generic structs are safe if they are bridgable.
+  return isObjectiveCBridgeable(Mod.getSwiftModule(), Canonical);
+}
+
+static bool isCastTypeKnownToSucceed(SILType Type, SILModule &Mod) {
+  return isTypeBridgable(Type.getSwiftRValueType(), Mod);
 }
 
 /// Replace an application of a cast composition f_inverse(f(x)) by x.
@@ -1344,8 +1352,9 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *FInverse,
     return false;
 
   // We need to know that the cast will succeeed.
-  if (!isCastTypeKnownToSucceed(FInverse->getArgument(0).getType()) ||
-      !isCastTypeKnownToSucceed(FInverse->getType()))
+  if (!isCastTypeKnownToSucceed(FInverse->getArgument(0).getType(),
+                                FInverse->getModule()) ||
+      !isCastTypeKnownToSucceed(FInverse->getType(), FInverse->getModule()))
     return false;
 
   // Need to have a matching 'f'.

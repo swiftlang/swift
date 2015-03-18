@@ -7,8 +7,30 @@ import Swift
 class AnNSArray {
 }
 
-struct AnArray<T> {
+struct AnArray<T> : _ObjectiveCBridgeable {
   @sil_stored var Buffer : Builtin.NativeObject
+
+  static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+  static func _getObjectiveCType() -> Any.Type {
+    return AnNSArray.self
+  }
+  func _bridgeToObjectiveC() -> AnNSArray {
+    return AnNSArray()
+  }
+  static func _forceBridgeFromObjectiveC(
+    x: AnNSArray,
+    inout result: AnArray?
+  ) {
+    _preconditionFailure("implement")
+  }
+  static func _conditionallyBridgeFromObjectiveC(
+    x: AnNSArray,
+    inout result: AnArray?
+  ) -> Bool {
+    _preconditionFailure("implement")
+  }
 }
 
 sil [semantics "convertFromObjectiveC"] @bridgeFromObjectiveC :
@@ -114,5 +136,37 @@ bb0(%0 : $AnNSArray):
   release_value %2 : $AnArray<Unbridged>
   %3 = function_ref @bridgeToObjectiveC : $@cc(method) @thin <Unbridged> (@owned AnArray<Unbridged>) -> @owned AnNSArray
   %4 = apply %3<Unbridged>(%2) : $@cc(method) @thin <Unbridged> (@owned AnArray<Unbridged>) -> @owned AnNSArray
+  return %4 : $AnNSArray
+}
+
+// CHECK-LABEL: sil @failing_bridge_from_to_owned_generic
+// CHECK: apply
+// CHECK: apply
+// CHECK: return
+
+sil @failing_bridge_from_to_owned_generic : $@thin <T>(@owned AnNSArray) -> @owned AnNSArray {
+bb0(%0 : $AnNSArray):
+  %1 = function_ref @bridgeFromObjectiveC : $@thin <T2> (@owned AnNSArray) -> @owned AnArray<T2>
+  %2 = apply %1<T>(%0) : $@thin <T2> (@owned AnNSArray) -> @owned AnArray<T2>
+  retain_value %2 : $AnArray<T>
+  release_value %2 : $AnArray<T>
+  %3 = function_ref @bridgeToObjectiveC : $@cc(method) @thin <T2> (@owned AnArray<T2>) -> @owned AnNSArray
+  %4 = apply %3<T>(%2) : $@cc(method) @thin <T> (@owned AnArray<T>) -> @owned AnNSArray
+  return %4 : $AnNSArray
+}
+
+// CHECK-LABEL: sil @failing_bridge_from_to_owned_recursive_type
+// CHECK: apply
+// CHECK: apply
+// CHECK: return
+
+sil @failing_bridge_from_to_owned_recursive_type : $@thin (@owned AnNSArray) -> @owned AnNSArray {
+bb0(%0 : $AnNSArray):
+  %1 = function_ref @bridgeFromObjectiveC : $@thin <T> (@owned AnNSArray) -> @owned AnArray<T>
+  %2 = apply %1<AnArray<Unbridged>>(%0) : $@thin <T> (@owned AnNSArray) -> @owned AnArray<T>
+  retain_value %2 : $AnArray<AnArray<Unbridged>>
+  release_value %2 : $AnArray<AnArray<Unbridged>>
+  %3 = function_ref @bridgeToObjectiveC : $@cc(method) @thin <T> (@owned AnArray<T>) -> @owned AnNSArray
+  %4 = apply %3<AnArray<Unbridged>>(%2) : $@cc(method) @thin <T> (@owned AnArray<T>) -> @owned AnNSArray
   return %4 : $AnNSArray
 }
