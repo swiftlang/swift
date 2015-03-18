@@ -399,6 +399,7 @@ public:
 
 private:
   CodeCompletionString *const CompletionString;
+  StringRef ModuleName;
   StringRef BriefDocComment;
   ArrayRef<StringRef> AssociatedUSRs;
 
@@ -416,17 +417,14 @@ private:
   CodeCompletionResult(SemanticContextKind SemanticContext,
                        unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
-                       const Decl *AssociatedDecl,
-                       bool NotRecommended,
-                       StringRef BriefDocComment,
+                       const Decl *AssociatedDecl, StringRef ModuleName,
+                       bool NotRecommended, StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs)
       : Kind(ResultKind::Declaration),
         SemanticContext(unsigned(SemanticContext)),
-        NotRecommended(NotRecommended),
-        NumBytesToErase(NumBytesToErase),
-        CompletionString(CompletionString),
-        BriefDocComment(BriefDocComment),
-        AssociatedUSRs(AssociatedUSRs) {
+        NotRecommended(NotRecommended), NumBytesToErase(NumBytesToErase),
+        CompletionString(CompletionString), ModuleName(ModuleName),
+        BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs) {
     assert(AssociatedDecl && "should have a decl");
     AssociatedDeclKind = unsigned(getCodeCompletionDeclKind(AssociatedDecl));
     assert(CompletionString);
@@ -456,6 +454,8 @@ public:
     return CompletionString;
   }
 
+  StringRef getModuleName() const { return ModuleName; }
+
   StringRef getBriefDocComment() const {
     return BriefDocComment;
   }
@@ -482,6 +482,10 @@ struct CodeCompletionResultSink {
   std::vector<AllocatorPtr> ForeignAllocators;
 
   std::vector<CodeCompletionResult *> Results;
+
+  /// A single-element cache for module names stored in Allocator, keyed by a
+  /// clang::Module * or swift::Module *.
+  std::pair<void *, StringRef> LastModule;
 
   CodeCompletionResultSink()
       : Allocator(std::make_shared<llvm::BumpPtrAllocator>()) {}

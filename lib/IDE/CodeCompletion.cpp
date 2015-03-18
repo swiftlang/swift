@@ -401,6 +401,19 @@ void CodeCompletionResultBuilder::addChunkWithText(
   addChunkWithTextNoCopy(Kind, copyString(*Sink.Allocator, Text));
 }
 
+void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
+  assert(Kind == CodeCompletionResult::ResultKind::Declaration);
+  AssociatedDecl = D;
+
+  if (auto *ClangD = D->getClangDecl())
+    CurrentModule = ClangD->getOwningModule();
+  // FIXME: macros
+  // FIXME: imported header module
+
+  if (!CurrentModule)
+    CurrentModule = D->getModuleContext();
+}
+
 StringRef CodeCompletionContext::copyString(StringRef Str) {
   return ::copyString(*CurrentResults.Allocator, Str);
 }
@@ -472,10 +485,27 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     } else {
       BriefComment = AssociatedDecl->getBriefComment();
     }
+
+    StringRef ModuleName;
+    if (CurrentModule) {
+      if (Sink.LastModule.first == CurrentModule.getOpaqueValue()) {
+        ModuleName = Sink.LastModule.second;
+      } else {
+        if (auto *C = CurrentModule.dyn_cast<const clang::Module *>()) {
+          ModuleName = copyString(*Sink.Allocator, C->getFullModuleName());
+        } else {
+          ModuleName = copyString(
+              *Sink.Allocator,
+              CurrentModule.get<const swift::Module *>()->getName().str());
+        }
+        Sink.LastModule.first = CurrentModule.getOpaqueValue();
+        Sink.LastModule.second = ModuleName;
+      }
+    }
+
     return new (*Sink.Allocator) CodeCompletionResult(
-        SemanticContext, NumBytesToErase, CCS, AssociatedDecl,
-        /*NotRecommended=*/false,
-        copyString(*Sink.Allocator, BriefComment),
+        SemanticContext, NumBytesToErase, CCS, AssociatedDecl, ModuleName,
+        /*NotRecommended=*/false, copyString(*Sink.Allocator, BriefComment),
         copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl));
   }
 

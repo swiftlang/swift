@@ -18,8 +18,13 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 
+namespace clang {
+class Module;
+}
+
 namespace swift {
 class Decl;
+class Module;
 
 namespace ide {
 
@@ -31,6 +36,8 @@ class CodeCompletionResultBuilder {
   const Decl *AssociatedDecl = nullptr;
   unsigned CurrentNestingLevel = 0;
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;
+  llvm::PointerUnion<const swift::Module *, const clang::Module *>
+      CurrentModule;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -69,10 +76,7 @@ public:
     NumBytesToErase = N;
   }
 
-  void setAssociatedDecl(const Decl *D) {
-    assert(Kind == CodeCompletionResult::ResultKind::Declaration);
-    AssociatedDecl = D;
-  }
+  void setAssociatedDecl(const Decl *D);
 
   void addAccessControlKeyword(Accessibility Access) {
     switch (Access) {
