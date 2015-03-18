@@ -368,7 +368,7 @@ def force_single_frontend_invocation :
   Alias<whole_module_optimization>,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>;
 
-def num_threads : JoinedOrSeparate<["-"], "num-threads">,
+def num_threads : Separate<["-"], "num-threads">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Enable multi-threading and specify number of threads">,
   MetaVarName<"<n>">;

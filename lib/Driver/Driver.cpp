@@ -639,7 +639,6 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     if (StringRef(A->getValue()).getAsInteger(10, OI.numThreads)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
-      return;
     }
   }
 
@@ -1318,8 +1317,8 @@ static StringRef getOutputFilename(Compilation &C,
          "A Job which produces output must have a BaseInput!");
   StringRef BaseName(BaseInput);
   if (isa<MergeModuleJobAction>(JA) ||
-      (OI.CompilerMode == OutputInfo::Mode::SingleCompile
-         && !OI.isMultiThreading()) ||
+      (OI.CompilerMode == OutputInfo::Mode::SingleCompile &&
+       !OI.isMultiThreading()) ||
       JA->getType() == types::TY_Image)
     BaseName = OI.ModuleName;
 
