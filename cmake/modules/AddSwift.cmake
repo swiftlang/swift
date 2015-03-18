@@ -278,9 +278,18 @@ function(_compile_swift_files dependency_target_out_var_name)
     ${ARGN})
 
   # Check arguments.
-  if (NOT IS_ABSOLUTE "${SWIFTFILE_OUTPUT}")
-    message(FATAL_ERROR "OUTPUT should be an absolute path")
+  list(LENGTH SWIFTFILE_OUTPUT num_outputs)
+  list(GET SWIFTFILE_OUTPUT 0 first_output)
+
+  if (${num_outputs} EQUAL 0)
+    message(FATAL_ERROR "OUTPUT must not be empty")
   endif()
+
+  foreach(output ${SWIFTFILE_OUTPUT})
+    if (NOT IS_ABSOLUTE "${output}")
+      message(FATAL_ERROR "OUTPUT should be an absolute path")
+    endif()
+  endforeach()
 
   if(SWIFTFILE_IS_MAIN AND SWIFTFILE_IS_STDLIB)
     message(FATAL_ERROR "Cannot set both IS_MAIN and IS_STDLIB")
@@ -376,9 +385,18 @@ function(_compile_swift_files dependency_target_out_var_name)
 
   list(APPEND swift_flags ${SWIFTFILE_FLAGS})
 
-  get_filename_component(objdir "${SWIFTFILE_OUTPUT}" PATH)
-  set(command_create_dirs
+  set(obj_dirs)
+  foreach(output ${SWIFTFILE_OUTPUT})
+    get_filename_component(objdir "${output}" PATH)
+    list(APPEND obj_dirs "${objdir}")
+  endforeach()
+  list(REMOVE_DUPLICATES obj_dirs)
+
+  set(command_create_dirs)
+  foreach(objdir ${obj_dirs})
+    list(APPEND command_create_dirs
       COMMAND "${CMAKE_COMMAND}" -E make_directory "${objdir}")
+  endforeach()
 
   set(module_file)
   set(module_doc_file)
@@ -390,7 +408,7 @@ function(_compile_swift_files dependency_target_out_var_name)
       list(APPEND swift_flags
           "-module-name" "${module_name}")
     else()
-      get_filename_component(module_name "${SWIFTFILE_OUTPUT}" NAME_WE)
+      get_filename_component(module_name "${first_output}" NAME_WE)
     endif()
     if(SWIFTFILE_MODULE_DIR)
       set(module_dir "${SWIFTFILE_MODULE_DIR}")
@@ -456,6 +474,13 @@ function(_compile_swift_files dependency_target_out_var_name)
     set(swift_compiler_tool_dep "swift")
   endif()
 
+  # If there are more than one output files, we assume that they are specified
+  # otherwise e.g. with an output file map.
+  set(output_option)
+  if (${num_outputs} EQUAL 1)
+    set(output_option "-o" ${first_output})
+  endif()
+
   add_custom_command_target(
       dependency_target
       ${command_create_dirs}
@@ -465,19 +490,19 @@ function(_compile_swift_files dependency_target_out_var_name)
       COMMAND
         "${line_directive_tool}" "${source_files}" --
         "${swift_compiler_tool}" "-c" ${swift_flags}
-        "-o" "${SWIFTFILE_OUTPUT}" "${source_files}"
+        ${output_option} "${source_files}"
       OUTPUT
-        "${SWIFTFILE_OUTPUT}" "${module_file}" "${module_doc_file}"
+        ${SWIFTFILE_OUTPUT} "${module_file}" "${module_doc_file}"
         ${apinote_files}
       DEPENDS
         "${swift_compiler_tool}" ${swift_compiler_tool_dep}
         ${source_files} ${SWIFTFILE_DEPENDS}
         ${swift_ide_test_dependency} ${depends_create_apinotes}
-      COMMENT "Compiling ${SWIFTFILE_OUTPUT}")
+      COMMENT "Compiling ${first_output}")
   set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
 
   # Make sure the build system knows the file is a generated object file.
-  set_source_files_properties("${SWIFTFILE_OUTPUT}"
+  set_source_files_properties(${SWIFTFILE_OUTPUT}
       PROPERTIES
       GENERATED true
       EXTERNAL_OBJECT true
