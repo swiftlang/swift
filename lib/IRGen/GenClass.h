@@ -101,10 +101,6 @@ namespace irgen {
   /// Get the type encoding for an ObjC property.
   void getObjCEncodingForPropertyType(IRGenModule &IGM, Type t, std::string &s);
   
-  /// True if the value is of class type, or of a type that is bridged to class
-  /// type in the ObjC world.
-  bool hasObjCClassRepresentation(IRGenModule &IGM, Type t);
-  
   /// What reference counting mechanism does a class use?
   ReferenceCounting getReferenceCountingForClass(IRGenModule &IGM,
                                                  ClassDecl *theClass);

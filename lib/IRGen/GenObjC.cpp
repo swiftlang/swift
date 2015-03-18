@@ -1011,14 +1011,6 @@ void irgen::getObjCEncodingForPropertyType(IRGenModule &IGM,
     .getObjCEncodingForPropertyType(IGM.getClangType(t->getCanonicalType()), s);
 }
 
-/// True if the value is of class type, or of a type that is bridged to class
-/// type.
-bool irgen::hasObjCClassRepresentation(IRGenModule &IGM, Type t) {
-  return IGM.SILMod->Types.getLoweredBridgedType(t, AbstractCC::ObjCMethod,
-                                                 nullptr)
-    ->getClassOrBoundGenericClass();
-}
-
 static void
 HelperGetObjCEncodingForType(const clang::ASTContext &Context,
                              clang::CanQualType T,
