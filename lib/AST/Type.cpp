@@ -2091,6 +2091,7 @@ static Type getMemberForBaseType(Module *module,
         return Type();
 
       case ProtocolConformanceState::Incomplete:
+      case ProtocolConformanceState::Checking:
       case ProtocolConformanceState::Complete:
         return conformance.getPointer()->getTypeWitness(assocType,
                                                      resolver).getReplacement();

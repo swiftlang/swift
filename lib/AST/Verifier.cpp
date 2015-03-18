@@ -1543,6 +1543,7 @@ struct ASTNodeBase {};
         break;
         
       case ProtocolConformanceState::Incomplete:
+      case ProtocolConformanceState::Checking:
         dumpRef(decl);
         Out << " has a known-incomplete conformance for protocol "
             << conformance->getProtocol()->getName().str() << "\n";

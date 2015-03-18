@@ -2827,22 +2827,18 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     conformingDC = cast<ExtensionDecl>(ExplicitConformance);
 
   // Find or create the conformance for this type.
-  NormalProtocolConformance *conformance;
   auto canT = T->getCanonicalType();
-  auto knownConformance = TC.Context.getConformsTo(canT, Proto);
-  if (knownConformance && knownConformance->getPointer()) {
-    // Get the normal protocol conformance.
-    conformance = cast<NormalProtocolConformance>(
-                    knownConformance->getPointer());
-  } else {
-    // Create and record this conformance.
-    conformance = TC.Context.getConformance(
-                    T, Proto, ComplainLoc,
-                    conformingDC,
-                    ProtocolConformanceState::Incomplete);
+  NormalProtocolConformance *conformance
+    = TC.Context.getConformance(T, Proto, ComplainLoc, conformingDC,
+                                ProtocolConformanceState::Incomplete);
 
-    TC.Context.setConformsTo(canT, Proto, ConformanceEntry(conformance, true));
-  }
+  // If we're already checking this conformance, just return it.
+  if (conformance->getState() == ProtocolConformanceState::Checking)
+    return conformance;
+
+  // Note that we are checking this conformance now.
+  TC.Context.setConformsTo(canT, Proto, ConformanceEntry(conformance, true));
+  conformance->setState(ProtocolConformanceState::Checking);
 
   // If the protocol requires a class, non-classes are a non-starter.
   if (Proto->requiresClass() && !canT->getClassOrBoundGenericClass()) {
@@ -2888,7 +2884,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         if (ComplainLoc.isValid() &&
             knownConformance->getInt() &&
             (knownConformance->getPointer()->getState() ==
-                ProtocolConformanceState::Incomplete)) {
+                ProtocolConformanceState::Checking)) {
               if (!conformance->hasInheritedConformance(InheritedProto)) {
                 conformance->setInheritedConformance(InheritedProto,
                                                      knownConformance->
@@ -2979,13 +2975,6 @@ ProtocolConformance *TypeChecker::resolveConformance(NominalTypeDecl *type,
   auto explicitConformance = ext ? (Decl *)ext : (Decl *)type;
   auto conformanceContext = ext ? (DeclContext *)ext : (DeclContext *)type;
   Type conformanceType = conformanceContext->getDeclaredTypeInContext();
-
-  CanType canConformanceType = conformanceType->getCanonicalType();
-  if (auto known = Context.getConformsTo(canConformanceType, protocol)) {
-    // Check whether we already know about this conformance.
-    return known->getPointer();
-  }
-
   return checkConformsToProtocol(*this, conformanceType, protocol,
                                  conformanceContext, explicitConformance,
                                  explicitConformance->getLoc());
