@@ -1301,42 +1301,12 @@ static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
     Builder.createReleaseValue(Call->getLoc(), OnX);
 }
 
-static bool isTypeBridgable(CanType Canonical, SILModule &Mod) {
-  if (Canonical.isNull())
-    return false;
-
-  // Class types are known to succeed.
-  if (Canonical->canBeClass() == TypeTraitResult::Is)
-    return true;
-
-  // At this point we must have a struct or we don't know whether this will
-  // succeed.
-  if (!Canonical->getStructOrBoundGenericStruct())
-    return false;
-
-  auto BGT = dyn_cast<BoundGenericType>(Canonical);
-
-  // If a type is not a bound generic type it is either a:
-  //  * unbound generic type
-  //     in which case it is not bridgable.
-  //  * not a generic type
-  //     in which case it is bridgable if it conforms to the bridgable protocol.
-  if (!BGT)
-    return !isa<UnboundGenericType>(Canonical) &&
-           isObjectiveCBridgeable(Mod.getSwiftModule(), Canonical);
-
-  // Make sure all type parameters are known to succeed.
-  for (auto TP : BGT->getGenericArgs()) {
-    if (!isTypeBridgable(TP.getCanonicalTypeOrNull(), Mod))
-      return false;
-  }
-
-  // Generic structs are safe if they are bridgable.
-  return isObjectiveCBridgeable(Mod.getSwiftModule(), Canonical);
-}
-
 static bool isCastTypeKnownToSucceed(SILType Type, SILModule &Mod) {
-  return isTypeBridgable(Type.getSwiftRValueType(), Mod);
+  auto *M = Mod.getSwiftModule();
+  return M->getASTContext()
+      .getBridgedToObjC(M, /*inExpression*/ false, Type.getSwiftRValueType(),
+                        nullptr)
+      .hasValue();
 }
 
 /// Replace an application of a cast composition f_inverse(f(x)) by x.
