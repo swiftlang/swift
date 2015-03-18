@@ -368,6 +368,11 @@ def force_single_frontend_invocation :
   Alias<whole_module_optimization>,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>;
 
+def num_threads : JoinedOrSeparate<["-"], "num-threads">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Enable multi-threading and specify number of threads">,
+  MetaVarName<"<n>">;
+
 def Xfrontend : Separate<["-"], "Xfrontend">, Flags<[HelpHidden]>,
   MetaVarName<"<arg>">, HelpText<"Pass <arg> to the Swift frontend">;
 

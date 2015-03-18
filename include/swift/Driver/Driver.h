@@ -96,7 +96,13 @@ public:
 
   /// Whether the compiler picked the current module name, rather than the user.
   bool ModuleNameIsFallback = false;
+  
+  /// The number of threads for multi-threaded compilation.
+  unsigned numThreads = 0;
 
+  /// Returns true if multi-threading is enabled.
+  bool isMultiThreading() const { return numThreads > 0; }
+  
   /// The name of the module which we are building.
   std::string ModuleName;
 

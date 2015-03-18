@@ -635,6 +635,14 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     OI.CompilerOutputType = types::TY_Object;
   }
 
+  if (const Arg *A = Args.getLastArg(options::OPT_num_threads)) {
+    if (StringRef(A->getValue()).getAsInteger(10, OI.numThreads)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return;
+    }
+  }
+
   const Arg *const OutputModeArg = Args.getLastArg(options::OPT_modes_Group);
 
   if (!OutputModeArg) {
@@ -1210,14 +1218,21 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
     unsigned NumOutputs = 0;
     for (const Action *A : Actions) {
       types::ID Type = A->getType();
+      // Only increment NumOutputs if this is an output which must have its
+      // path specified using -o.
+      // (Module outputs can be specified using -module-output-path, or will
+      // be inferred if there are other top-level outputs. dSYM outputs are
+      // based on the image.)
       if (Type != types::TY_Nothing && Type != types::TY_SwiftModuleFile &&
           Type != types::TY_dSYM) {
-        // Only increment NumOutputs if this is an output which must have its
-        // path specified using -o.
-        // (Module outputs can be specified using -module-output-path, or will
-        // be inferred if there are other top-level outputs. dSYM outputs are
-        // based on the image.)
-        ++NumOutputs;
+        // Multi-threading compilation has multiple outputs, except those
+        // outputs which are produced before the llvm passes (e.g. emit-sil).
+        if (OI.isMultiThreading() && isa<CompileJobAction>(A) &&
+            types::isAfterLLVM(A->getType())) {
+          NumOutputs += A->size();
+        } else {
+          ++NumOutputs;
+        }
       }
     }
 
@@ -1303,7 +1318,8 @@ static StringRef getOutputFilename(Compilation &C,
          "A Job which produces output must have a BaseInput!");
   StringRef BaseName(BaseInput);
   if (isa<MergeModuleJobAction>(JA) ||
-      OI.CompilerMode == OutputInfo::Mode::SingleCompile ||
+      (OI.CompilerMode == OutputInfo::Mode::SingleCompile
+         && !OI.isMultiThreading()) ||
       JA->getType() == types::TY_Image)
     BaseName = OI.ModuleName;
 
@@ -1369,7 +1385,7 @@ static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
     // Put the auxiliary output file next to the primary output file.
     llvm::SmallString<128> path;
     if (output.getPrimaryOutputType() != types::TY_Nothing)
-      path = output.getPrimaryOutputFilename();
+      path = output.getPrimaryOutputFilenames()[0];
     else if (!output.getBaseInput().empty())
       path = llvm::sys::path::stem(output.getBaseInput());
     else
@@ -1477,13 +1493,42 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
     }
   }
 
-  llvm::SmallString<128> Buf;
-  StringRef OutputFile = getOutputFilename(C, JA, OI, OutputMap, C.getArgs(),
-                                           AtTopLevel, BaseInput, *InputJobs,
-                                           Diags, Buf);
   std::unique_ptr<CommandOutput> Output(new CommandOutput(JA->getType(),
-                                                          OutputFile,
                                                           BaseInput));
+  llvm::SmallString<128> Buf;
+  StringRef OutputFile;
+
+  if (OI.isMultiThreading() && isa<CompileJobAction>(JA) &&
+      types::isAfterLLVM(JA->getType())) {
+    // Multi-threaded compilation: A single frontend command produces multiple
+    // output file: one for each input files.
+    auto OutputFunc = [&](StringRef Input) {
+      const TypeToPathMap *OMForInput = nullptr;
+      if (OFM)
+        OMForInput = OFM->getOutputMapForInput(Input);
+      
+      OutputFile = getOutputFilename(C, JA, OI, OMForInput, C.getArgs(),
+                                     AtTopLevel, Input, *InputJobs,
+                                     Diags, Buf);
+      Output->addPrimaryOutput(OutputFile);
+    };
+    // Add an output file for each input action.
+    for (Action *A : InputActions) {
+      InputAction *IA = cast<InputAction>(A);
+      OutputFunc(IA->getInputArg().getValue());
+
+    }
+    // Add an output file for each input job.
+    for (Job *job : *InputJobs) {
+      OutputFunc(job->getOutput().getBaseInput());
+    }
+  } else {
+    // The common case: there is a single output file.
+    OutputFile = getOutputFilename(C, JA, OI, OutputMap, C.getArgs(),
+                                   AtTopLevel, BaseInput, *InputJobs,
+                                   Diags, Buf);
+    Output->addPrimaryOutput(OutputFile);
+  }
 
   // Choose the swiftmodule output path.
   if (OI.ShouldGenerateModule && isa<CompileJobAction>(JA) &&
@@ -1527,7 +1572,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
     } else {
       // We're only generating the module as an intermediate, so put it next
       // to the primary output of the compile command.
-      llvm::SmallString<128> Path(Output->getPrimaryOutputFilename());
+      llvm::SmallString<128> Path(Output->getPrimaryOutputFilenames()[0]);
       bool isTempFile = C.isTemporaryFile(Path);
       llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
       Output->setAdditionalOutputForType(types::ID::TY_SwiftModuleFile, Path);
@@ -1610,7 +1655,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
       // and not -emit-module.
       llvm::SmallString<128> Path;
       if (Output->getPrimaryOutputType() != types::TY_Nothing)
-        Path = Output->getPrimaryOutputFilename();
+        Path = Output->getPrimaryOutputFilenames()[0];
       else if (!Output->getBaseInput().empty())
         Path = llvm::sys::path::stem(Output->getBaseInput());
       else
@@ -1656,15 +1701,23 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
       llvm::outs() << ", ";
     interleave(J->getInputs().begin(), J->getInputs().end(),
                [](const Job *Input) {
-                 llvm::outs()
-                   << '"' << Input->getOutput().getPrimaryOutputFilename()
-                   << '"';
+                 auto FileNames = Input->getOutput().getPrimaryOutputFilenames();
+                 interleave(FileNames.begin(), FileNames.end(),
+                            [](const std::string &FileName) {
+                              llvm::outs() << '"' << FileName << '"';
+                            },
+                            [] { llvm::outs() << ", "; });
                },
                [] { llvm::outs() << ", "; });
 
-    llvm::outs() << "], output: {"
-      << types::getTypeName(J->getOutput().getPrimaryOutputType())
-      << ": \"" << J->getOutput().getPrimaryOutputFilename() << '"';
+    llvm::outs() << "], output: {";
+    auto OutputFileNames = J->getOutput().getPrimaryOutputFilenames();
+    StringRef TypeName = types::getTypeName(J->getOutput().getPrimaryOutputType());
+    interleave(OutputFileNames.begin(), OutputFileNames.end(),
+               [TypeName](const std::string &FileName) {
+                 llvm::outs() << TypeName << ": \"" << FileName << '"';
+               },
+               [] { llvm::outs() << ", "; });
 
     types::forAllTypes([J](types::ID Ty) {
       StringRef AdditionalOutput =

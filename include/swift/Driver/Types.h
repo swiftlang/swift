@@ -44,6 +44,11 @@ namespace types {
   /// Returns true if the type represents textual data.
   bool isTextual(ID Id);
 
+  /// Returns true if the type is produced in the compiler after the LLVM passes.
+  /// For those types the compiler produces multiple output files in multi-
+  /// threaded compilation.
+  bool isAfterLLVM(ID Id);
+
   template <typename Fn>
   void forAllTypes(const Fn &fn);
 } // end namespace types

@@ -53,7 +53,7 @@ CommandOutput::getAdditionalOutputForType(types::ID type) const {
 const std::string &
 CommandOutput::getAnyOutputForType(types::ID type) const {
   if (PrimaryOutputType == type)
-    return PrimaryOutputFilename;
+    return PrimaryOutputFilenames[0];
   return getAdditionalOutputForType(type);
 }
 

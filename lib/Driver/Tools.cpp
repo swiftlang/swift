@@ -60,8 +60,11 @@ static void addPrimaryInputsOfType(ArgStringList &Arguments,
                                    types::ID InputType) {
   for (const Job *Cmd : Jobs) {
     auto &outputInfo = Cmd->getOutput();
-    if (outputInfo.getPrimaryOutputType() == InputType)
-      Arguments.push_back(outputInfo.getPrimaryOutputFilename().c_str());
+    if (outputInfo.getPrimaryOutputType() == InputType) {
+      for (const std::string &Output : outputInfo.getPrimaryOutputFilenames()) {
+        Arguments.push_back(Output.c_str());
+      }
+    }
   }
 }
 
@@ -354,10 +357,17 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     Arguments.push_back(ReferenceDependenciesPath.c_str());
   }
 
+  if (OI.numThreads > 0) {
+    Arguments.push_back("-num-threads");
+    Arguments.push_back(Args.MakeArgString(Twine(OI.numThreads)));
+  }
+
   // Add the output file argument if necessary.
   if (Output->getPrimaryOutputType() != types::TY_Nothing) {
-    Arguments.push_back("-o");
-    Arguments.push_back(Output->getPrimaryOutputFilename().c_str());
+    for (const std::string &FileName : Output->getPrimaryOutputFilenames()) {
+      Arguments.push_back("-o");
+      Arguments.push_back(FileName.c_str());
+    }
   }
 
   if (OI.CompilerMode == OutputInfo::Mode::Immediate)

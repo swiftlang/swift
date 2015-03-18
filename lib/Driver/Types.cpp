@@ -93,3 +93,33 @@ bool types::isTextual(ID Id) {
     llvm_unreachable("Invalid type ID.");
   }
 }
+
+bool types::isAfterLLVM(ID Id) {
+  switch (Id) {
+    case types::TY_Assembly:
+    case types::TY_LLVM_IR:
+    case types::TY_LLVM_BC:
+    case types::TY_Object:
+      return true;
+    case types::TY_Swift:
+    case types::TY_SIL:
+    case types::TY_Dependencies:
+    case types::TY_RawSIL:
+    case types::TY_ObjCHeader:
+    case types::TY_AutolinkFile:
+    case types::TY_Image:
+    case types::TY_dSYM:
+    case types::TY_SIB:
+    case types::TY_RawSIB:
+    case types::TY_SwiftModuleFile:
+    case types::TY_SwiftModuleDocFile:
+    case types::TY_SerializedDiagnostics:
+    case types::TY_ClangModuleFile:
+    case types::TY_SwiftDeps:
+    case types::TY_Nothing:
+    case types::TY_Remapping:
+      return false;
+    case types::TY_INVALID:
+      llvm_unreachable("Invalid type ID.");
+  }
+}
