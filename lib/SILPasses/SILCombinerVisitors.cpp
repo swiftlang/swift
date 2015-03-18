@@ -2351,3 +2351,21 @@ SILCombiner::
 visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
   return CastOpt.optimizeCheckedCastAddrBranchInst(CCABI);
 }
+
+SILInstruction *
+SILCombiner::
+visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
+  // %1 = metatype $X.Type
+  // %2 = alloc_ref_dynamic %1 : $X.Type, Y
+  // ->
+  // alloc_ref X
+  if (MetatypeInst *MI = dyn_cast<MetatypeInst>(ARDI->getOperand())) {
+    auto &Mod = ARDI->getModule();
+    auto SILInstanceTy = MI->getType().getMetatypeInstanceType(Mod);
+    auto *ARI = new (Mod) AllocRefInst(
+        ARDI->getLoc(), SILInstanceTy, *ARDI->getFunction(), ARDI->isObjC());
+    ARI->setDebugScope(ARDI->getDebugScope());
+    return ARI;
+  }
+  return nullptr;
+}

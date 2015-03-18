@@ -232,6 +232,7 @@ public:
   SILInstruction *
   visitCheckedCastBranchInst(CheckedCastBranchInst *CBI);
   SILInstruction * visitUnreachableInst(UnreachableInst *UI);
+  SILInstruction * visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI);
 
 
   /// Instruction visitor helpers.

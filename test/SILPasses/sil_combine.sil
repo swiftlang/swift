@@ -2257,3 +2257,17 @@ bb0(%0 : $Builtin.Word, %1 : $Builtin.Word):
   %24 = tuple()
   return %24 : $()
 }
+
+// CHECK-LABEL: sil @alloc_ref_dynamic_with_metatype
+// CHECK: bb0
+// CHECK-NOT: alloc_ref_dynamic
+// CHECK-NEXT: alloc_ref $B
+// CHECK-NEXT: strong_release
+// CHECK: return
+sil @alloc_ref_dynamic_with_metatype : $() -> () {
+  %1 = metatype $@thick B.Type
+  %2 = alloc_ref_dynamic %1 : $@thick B.Type, $B
+  strong_release %2 : $B
+  %4 = tuple()
+  return %4 : $()
+}
