@@ -1336,6 +1336,10 @@ public:
       const DeclContext *ReferenceDC, const UnavailabilityReason &Reason,
       bool ForInout);
 
+  /// Returns true if the declaration context or any of its parents is an
+  /// implicit function.
+  static bool isInsideImplicitFunction(const DeclContext *DC);
+
   /// Emits a diagnostic for a reference to a declaration that is deprecated.
   void diagnoseDeprecated(SourceLoc ReferenceLoc,
                           const DeclContext *ReferenceDC,

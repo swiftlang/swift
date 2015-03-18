@@ -1800,7 +1800,7 @@ void TypeChecker::diagnosePotentialAccessorUnavailability(
                   Reason.getRequiredOSVersionRange(), *this);
 }
 
-static bool isInsideImplicitFunction(const DeclContext *DC) {
+bool TypeChecker::isInsideImplicitFunction(const DeclContext *DC) {
   do {
     auto *AFD = dyn_cast<AbstractFunctionDecl>(DC);
     if (AFD && AFD->isImplicit()) {

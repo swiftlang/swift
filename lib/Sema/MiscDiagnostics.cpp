@@ -478,6 +478,16 @@ static bool diagAvailability(TypeChecker &TC, const ValueDecl *D,
   if (!D)
     return false;
 
+  // Suppress the error if the reference is inside an
+  // implicit function. This avoids spurious errors for synthesized
+  // methods (for example, for nil literal conformances of unavailable
+  // imported enums) but also erroneously allows some references
+  // to unavailable symbols (for example, a synthesized call to
+  // to an unavailable default constructor of a super class).
+  // We need to handle these properly. rdar://problem/20024980 tracks this.
+  if (TypeChecker::isInsideImplicitFunction(DC))
+    return false;
+
   SourceLoc Loc = R.Start;
   if (auto Attr = AvailabilityAttr::isUnavailable(D)) {
     auto Name = D->getFullName();

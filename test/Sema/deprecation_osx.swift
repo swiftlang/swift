@@ -21,7 +21,7 @@ func useClassThatTriggersImportOfDeprecatedEnum() {
   // when importing deprecated enums do not themselves trigger deprecation
   // warnings in the synthesized code.
 
-  let _ = NSClassWithDeprecatedOptionsInMethodSignature.sharedInstance()
+  let _ = NSClassWithOptionsInMethodSignature.sharedInstance()
 }
 
 func directUseShouldStillTriggerDeprecationWarning() {

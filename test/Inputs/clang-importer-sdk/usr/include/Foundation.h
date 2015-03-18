@@ -476,13 +476,27 @@ typedef NS_ENUM(NSUInteger, NSDeprecatedEnum) {
   NSDeprecatedEnumFirst
 } __attribute__((availability(macosx, introduced=10.10, deprecated=10.10, message="Use a different API")));
 
+typedef NS_OPTIONS(NSUInteger, NSExplicitlyUnavailableOptions) {
+  NSExplicitlyUnavailableOptionsNone = 0,
+  NSExplicitlyUnavailableOptionsFirst   = (1 << 0)
+} __attribute__((unavailable));
 
-@interface NSClassWithDeprecatedOptionsInMethodSignature : NSObject
-+ (NSClassWithDeprecatedOptionsInMethodSignature *) sharedInstance;
+typedef NS_OPTIONS(NSUInteger, NSExplicitlyUnavailableOnOSXOptions) {
+  NSExplicitlyUnavailableOnOSXOptionsNone = 0,
+  NSExplicitlyUnavailableOnOSXOptionsFirst   = (1 << 0)
+}  __attribute__((availability(macosx, unavailable, message="Use a different API")));
+
+
+@interface NSClassWithOptionsInMethodSignature : NSObject
++ (NSClassWithOptionsInMethodSignature *) sharedInstance;
 @end
 
-@interface NSClassWithDeprecatedOptionsInMethodSignature (ActuallyUseDeprecatedOptions)
-  - (void)someMethodWithOptions:(NSDeprecatedOptions) options __attribute__((availability(macosx, introduced=10.10, deprecated=10.10, message="Use a different API")));
+@interface NSClassWithOptionsInMethodSignature (ActuallyUseOptions)
+  - (void)someMethodWithDeprecatedOptions:(NSDeprecatedOptions)options __attribute__((availability(macosx, introduced=10.10, deprecated=10.10, message="Use a different API")));
+
+  - (void)someMethodWithUnavailableOptions:(NSExplicitlyUnavailableOptions)options __attribute__((availability(macosx, introduced=10.10, deprecated=10.10, message="Use a different API")));
+
+  - (void)someMethodWithUnavailableOptionsOnOSX:(NSExplicitlyUnavailableOnOSXOptions)options __attribute__((availability(macosx, unavailable, message="Use a different API")));
 @end
 
 @protocol NSWobbling
