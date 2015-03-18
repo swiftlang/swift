@@ -60,13 +60,12 @@ void LangOptions::setTarget(llvm::Triple triple) {
   // Set the "os" target configuration.
   if (Target.isMacOSX())
     addTargetConfigOption("os", "OSX");
-  else if (triple.isiOS()) {
-    addTargetConfigOption("os", "iOS");
-    if (triple.isTvOS())
-      addTargetConfigOption("os", "tvOS");
-  }
+  else if (triple.isTvOS())
+    addTargetConfigOption("os", "tvOS");
   else if (triple.isWatchOS())
     addTargetConfigOption("os", "watchOS");
+  else if (triple.isiOS())
+    addTargetConfigOption("os", "iOS");
   else if (triple.isOSLinux())
     addTargetConfigOption("os", "Linux");
   else
