@@ -155,6 +155,12 @@ public:
       BraceStmtWithCursor,
     };
 
+    static bool chunkStartsNestedGroup(ChunkKind Kind) {
+      return Kind == ChunkKind::CallParameterBegin ||
+             Kind == ChunkKind::GenericParameterBegin ||
+             Kind == ChunkKind::OptionalBegin;
+    }
+
     static bool chunkHasText(ChunkKind Kind) {
       return Kind == ChunkKind::AccessControlKeyword ||
              Kind == ChunkKind::OverrideKeyword ||
@@ -217,6 +223,8 @@ public:
       return ChunkKind(Kind);
     }
 
+    bool is(ChunkKind K) const { return getKind() == K; }
+
     unsigned getNestingLevel() const {
       return NestingLevel;
     }
@@ -230,6 +238,11 @@ public:
     StringRef getText() const {
       assert(hasText());
       return Text;
+    }
+
+    bool endsPreviousNestedGroup(unsigned GroupNestingLevel) const {
+      return NestingLevel < GroupNestingLevel ||
+       (NestingLevel == GroupNestingLevel && chunkStartsNestedGroup(getKind()));
     }
 
     static Chunk createWithText(ChunkKind Kind, unsigned NestingLevel,
