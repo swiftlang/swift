@@ -2271,3 +2271,26 @@ sil @alloc_ref_dynamic_with_metatype : $() -> () {
   %4 = tuple()
   return %4 : $()
 }
+
+// CHECK-LABEL: @alloc_ref_dynamic_after_successful_checked_cast_br
+// CHECK: checked_cast_br
+// CHECK: bb1
+// CHECK-NOT: alloc_ref_dynamic
+// CHECK: alloc_ref $B
+sil @alloc_ref_dynamic_after_successful_checked_cast_br : $(@thick B.Type) -> Builtin.Int32 {
+bb0(%1 : $@thick B.Type):
+  checked_cast_br [exact] %1 : $@thick B.Type to $@thick B.Type, bb1, bb2
+
+bb1(%2 : $@thick B.Type):
+  %3 = alloc_ref_dynamic %2 : $@thick B.Type, $B
+  strong_release %3 : $B
+  %4 = integer_literal $Builtin.Int32, 1
+  br bb3 (%4 : $Builtin.Int32)
+
+bb2:
+  %5 = integer_literal $Builtin.Int32, 2
+  br bb3 (%5 : $Builtin.Int32)
+
+bb3 (%10: $Builtin.Int32):
+  return %10 : $Builtin.Int32
+}

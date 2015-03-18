@@ -2412,5 +2412,26 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     ARI->setDebugScope(ARDI->getDebugScope());
     return ARI;
   }
+
+  // checked_cast_br [exact] $Y.Type to $X.Type, bbSuccess, bbFailure
+  // ...
+  // bbSuccess(%T: $X.Type)
+  // alloc_ref_dynamic %T : $X.Type, $X
+  // ->
+  // alloc_ref $X
+  if (auto *Arg = dyn_cast<SILArgument>(ARDI->getOperand())) {
+    auto *PredBB = ARDI->getParent()->getSinglePredecessor();
+    if (!PredBB)
+      return nullptr;
+    auto *CCBI = dyn_cast<CheckedCastBranchInst>(PredBB->getTerminator());
+    if (CCBI && CCBI->isExact() && ARDI->getParent() == CCBI->getSuccessBB()) {
+      auto &Mod = ARDI->getModule();
+      auto SILInstanceTy = CCBI->getCastType().getMetatypeInstanceType(Mod);
+      auto *ARI = new (Mod) AllocRefInst(
+          ARDI->getLoc(), SILInstanceTy, *ARDI->getFunction(), ARDI->isObjC());
+      ARI->setDebugScope(ARDI->getDebugScope());
+      return ARI;
+    }
+  }
   return nullptr;
 }
