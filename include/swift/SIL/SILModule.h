@@ -370,6 +370,13 @@ public:
   bool linkFunction(SILFunction *Fun,
                     LinkingMode LinkAll=LinkingMode::LinkNormal);
 
+  /// Attempt to link a function by declaration. Returns true if linking
+  /// succeeded, false otherwise.
+  ///
+  /// \return false if the linking failed.
+  bool linkFunction(SILDeclRef Decl,
+                    LinkingMode LinkAll=LinkingMode::LinkNormal);
+
   /// Link in all Witness Tables in the module.
   void linkAllWitnessTables();
 

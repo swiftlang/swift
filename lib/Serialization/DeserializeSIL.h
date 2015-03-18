@@ -92,7 +92,6 @@ namespace swift {
 
     SILFunction *getFuncForReference(StringRef Name, SILType Ty);
     SILFunction *getFuncForReference(StringRef Name);
-    SILFunction *lookupSILFunction(StringRef Name);
     SILVTable *readVTable(serialization::DeclID);
     SILGlobalVariable *getGlobalForReference(StringRef Name);
     SILGlobalVariable *readGlobalVar(StringRef Name);
@@ -105,6 +104,7 @@ public:
       return MF->getAssociatedModule()->getName();
     }
     SILFunction *lookupSILFunction(SILFunction *InFunc);
+    SILFunction *lookupSILFunction(StringRef Name);
     SILVTable *lookupVTable(Identifier Name);
     SILWitnessTable *lookupWitnessTable(SILWitnessTable *wt);
 

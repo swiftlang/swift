@@ -78,6 +78,7 @@ public:
   ~SerializedSILLoader();
 
   SILFunction *lookupSILFunction(SILFunction *Callee);
+  SILFunction *lookupSILFunction(StringRef Name);
   SILVTable *lookupVTable(Identifier Name);
   SILVTable *lookupVTable(const ClassDecl *C) {
     return lookupVTable(C->getName());

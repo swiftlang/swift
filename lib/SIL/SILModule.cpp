@@ -355,6 +355,11 @@ bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode) {
                           ExternalSource).processFunction(Fun);
 }
 
+bool SILModule::linkFunction(SILDeclRef Decl, SILModule::LinkingMode Mode) {
+  return SILLinkerVisitor(*this, getSILLoader(), Mode,
+                          ExternalSource).processDeclRef(Decl);
+}
+
 void SILModule::linkAllWitnessTables() {
   getSILLoader()->getAllWitnessTables();
 }
