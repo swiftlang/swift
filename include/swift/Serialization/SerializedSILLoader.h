@@ -15,6 +15,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
+#include "swift/SIL/SILDeclRef.h"
 #include <memory>
 #include <vector>
 
@@ -78,7 +79,7 @@ public:
   ~SerializedSILLoader();
 
   SILFunction *lookupSILFunction(SILFunction *Callee);
-  SILFunction *lookupSILFunction(StringRef Name);
+  SILFunction *lookupSILFunction(SILDeclRef Decl);
   SILVTable *lookupVTable(Identifier Name);
   SILVTable *lookupVTable(const ClassDecl *C) {
     return lookupVTable(C->getName());
