@@ -36,21 +36,7 @@ CanAnyFunctionType Lowering::adjustFunctionType(CanAnyFunctionType t,
                                           AnyFunctionType::ExtInfo extInfo) {
   if (t->getExtInfo() == extInfo)
     return t;
-
-  if (auto ft = dyn_cast<FunctionType>(t))
-    return CanFunctionType::get(ft.getInput(), ft.getResult(), extInfo);
-
-  if (auto pft = dyn_cast<PolymorphicFunctionType>(t))
-    return CanPolymorphicFunctionType::get(pft.getInput(), pft.getResult(),
-                                           &pft->getGenericParams(),
-                                           extInfo);
-
-  if (auto gft = dyn_cast<GenericFunctionType>(t))
-    return CanGenericFunctionType::get(gft.getGenericSignature(),
-                                       gft.getInput(), gft.getResult(),
-                                       extInfo);
-
-  llvm_unreachable("bad type to pass to adjustFunctionType");
+  return CanAnyFunctionType(t->withExtInfo(extInfo));
 }
 
 /// Adjust a function type to have a slightly different type.
