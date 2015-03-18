@@ -77,6 +77,6 @@ func testCompleteModuleQualified5() {
 #^TOP_LEVEL_1^#
 // TOP_LEVEL_1: Begin completions
 // TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:  testCompleteModuleQualified1()[#Void#]{{; name=.+$}}
-// TOP_LEVEL_1-DAG: Decl[FreeFunction]/OtherModule: visibleImport()[#Void#]{{; name=.+$}}
+// TOP_LEVEL_1-DAG: Decl[FreeFunction]/OtherModule[foo_swift_module]: visibleImport()[#Void#]{{; name=.+$}}
 // TOP_LEVEL_1-DAG: Decl[GlobalVar]/CurrModule:     hiddenImport[#Int#]{{; name=.+$}}
 // TOP_LEVEL_1: End completions

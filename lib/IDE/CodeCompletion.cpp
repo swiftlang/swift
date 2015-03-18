@@ -361,6 +361,8 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
     break;
   case SemanticContextKind::OtherModule:
     Prefix.append("OtherModule");
+    if (!ModuleName.empty())
+      Prefix.append((Twine("[") + ModuleName + "]").str());
     break;
   }
   if (NotRecommended)

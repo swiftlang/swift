@@ -51,83 +51,83 @@ func testSwiftCompletions(foo: SwiftStruct) {
 }
 
 // CLANG_FOO: Begin completions
-// CLANG_FOO-DAG: Decl[Struct]/OtherModule:       FooEnum1[#FooEnum1#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule:    FooEnum1X[#FooEnum1#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[Struct]/OtherModule:       FooEnum2[#FooEnum2#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule:    FooEnum2X[#FooEnum2#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule:    FooEnum2Y[#FooEnum2#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[Struct]/OtherModule:       FooEnum3[#FooEnum3#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule:    FooEnum3X[#FooEnum3#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule:    FooEnum3Y[#FooEnum3#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[Enum]/OtherModule:         FooComparisonResult[#FooComparisonResult#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[Struct]/OtherModule:       FooRuncingOptions[#FooRuncingOptions#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[Struct]/OtherModule:       FooStruct1[#FooStruct1#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[Struct]/OtherModule:       FooStruct2[#FooStruct2#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[TypeAlias]/OtherModule:    FooStructTypedef1[#FooStruct2#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[Struct]/OtherModule:       FooStructTypedef2[#FooStructTypedef2#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[TypeAlias]/OtherModule:    FooTypedef1[#Int32#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule:    fooIntVar[#Int32#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule: fooFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule: fooFunc1AnonymousParam({#Int32#})[#Int32#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule: fooFunc3({#(a): Int32#}, {#(b): Float#}, {#(c): Double#}, {#(d): UnsafeMutablePointer<Int32>#})[#Int32#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule: fooFuncWithBlock({#(blk): ((Float) -> Int32)!##(Float) -> Int32#})[#Void#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule: fooFuncWithComment1()[#Void#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule: fooFuncWithComment2()[#Void#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule: fooFuncWithComment3()[#Void#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule: fooFuncWithComment4()[#Void#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule: fooFuncWithComment5()[#Void#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[Protocol]/OtherModule:     FooProtocolBase[#FooProtocolBase#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[Protocol]/OtherModule:     FooProtocolDerived[#FooProtocolDerived#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[Class]/OtherModule:        FooClassBase[#FooClassBase#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[Class]/OtherModule:        FooClassDerived[#FooClassDerived#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule:    FOO_MACRO_1[#Int32#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule:    FOO_MACRO_2[#Int32#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule:    FOO_MACRO_3[#Int32#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule:    FOO_MACRO_4[#UInt32#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule:    FOO_MACRO_5[#UInt64#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule:    FOO_MACRO_REDEF_1[#Int32#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule:    FOO_MACRO_REDEF_2[#Int32#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule: theLastDeclInFoo()[#Void#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[Struct]/OtherModule[Foo]:       FooEnum1[#FooEnum1#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule[Foo]:    FooEnum1X[#FooEnum1#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[Struct]/OtherModule[Foo]:       FooEnum2[#FooEnum2#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule[Foo]:    FooEnum2X[#FooEnum2#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule[Foo]:    FooEnum2Y[#FooEnum2#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[Struct]/OtherModule[Foo]:       FooEnum3[#FooEnum3#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule[Foo]:    FooEnum3X[#FooEnum3#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule[Foo]:    FooEnum3Y[#FooEnum3#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[Enum]/OtherModule[Foo]:         FooComparisonResult[#FooComparisonResult#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[Struct]/OtherModule[Foo]:       FooRuncingOptions[#FooRuncingOptions#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[Struct]/OtherModule[Foo]:       FooStruct1[#FooStruct1#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[Struct]/OtherModule[Foo]:       FooStruct2[#FooStruct2#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[TypeAlias]/OtherModule[Foo]:    FooStructTypedef1[#FooStruct2#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[Struct]/OtherModule[Foo]:       FooStructTypedef2[#FooStructTypedef2#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[TypeAlias]/OtherModule[Foo]:    FooTypedef1[#Int32#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule[Foo]:    fooIntVar[#Int32#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFunc1AnonymousParam({#Int32#})[#Int32#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFunc3({#(a): Int32#}, {#(b): Float#}, {#(c): Double#}, {#(d): UnsafeMutablePointer<Int32>#})[#Int32#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFuncWithBlock({#(blk): ((Float) -> Int32)!##(Float) -> Int32#})[#Void#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFuncWithComment1()[#Void#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFuncWithComment2()[#Void#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFuncWithComment3()[#Void#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFuncWithComment4()[#Void#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFuncWithComment5()[#Void#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[Protocol]/OtherModule[Foo]:     FooProtocolBase[#FooProtocolBase#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[Protocol]/OtherModule[Foo]:     FooProtocolDerived[#FooProtocolDerived#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[Class]/OtherModule[Foo]:        FooClassBase[#FooClassBase#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[Class]/OtherModule[Foo]:        FooClassDerived[#FooClassDerived#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule[Foo]:    FOO_MACRO_1[#Int32#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule[Foo]:    FOO_MACRO_2[#Int32#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule[Foo]:    FOO_MACRO_3[#Int32#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule[Foo]:    FOO_MACRO_4[#UInt32#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule[Foo]:    FOO_MACRO_5[#UInt64#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule[Foo]:    FOO_MACRO_REDEF_1[#Int32#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule[Foo]:    FOO_MACRO_REDEF_2[#Int32#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: theLastDeclInFoo()[#Void#]{{; name=.+$}}
 // CLANG_FOO: End completions
 
 // CLANG_FOO_SUB: Begin completions
-// CLANG_FOO_SUB-DAG: Decl[FreeFunction]/OtherModule: fooSubFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
-// CLANG_FOO_SUB-DAG: Decl[Struct]/OtherModule:       FooSubEnum1[#FooSubEnum1#]{{; name=.+$}}
-// CLANG_FOO_SUB-DAG: Decl[GlobalVar]/OtherModule:    FooSubEnum1X[#FooSubEnum1#]{{; name=.+$}}
-// CLANG_FOO_SUB-DAG: Decl[GlobalVar]/OtherModule:    FooSubEnum1Y[#FooSubEnum1#]{{; name=.+$}}
-// CLANG_FOO_SUB-DAG: Decl[GlobalVar]/OtherModule:    FooSubUnnamedEnumeratorA1[#Int#]{{; name=.+$}}
+// CLANG_FOO_SUB-DAG: Decl[FreeFunction]/OtherModule[Foo.FooSub]: fooSubFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
+// CLANG_FOO_SUB-DAG: Decl[Struct]/OtherModule[Foo.FooSub]:       FooSubEnum1[#FooSubEnum1#]{{; name=.+$}}
+// CLANG_FOO_SUB-DAG: Decl[GlobalVar]/OtherModule[Foo.FooSub]:    FooSubEnum1X[#FooSubEnum1#]{{; name=.+$}}
+// CLANG_FOO_SUB-DAG: Decl[GlobalVar]/OtherModule[Foo.FooSub]:    FooSubEnum1Y[#FooSubEnum1#]{{; name=.+$}}
+// CLANG_FOO_SUB-DAG: Decl[GlobalVar]/OtherModule[Foo.FooSub]:    FooSubUnnamedEnumeratorA1[#Int#]{{; name=.+$}}
 // CLANG_FOO_SUB: End completions
 
 // CLANG_FOO_HELPER: Begin completions
-// CLANG_FOO_HELPER-DAG: Decl[FreeFunction]/OtherModule: fooHelperFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
-// CLANG_FOO_HELPER-DAG: Decl[GlobalVar]/OtherModule:    FooHelperUnnamedEnumeratorA1[#Int#]{{; name=.+$}}
-// CLANG_FOO_HELPER-DAG: Decl[GlobalVar]/OtherModule:    FooHelperUnnamedEnumeratorA2[#Int#]{{; name=.+$}}
+// CLANG_FOO_HELPER-DAG: Decl[FreeFunction]/OtherModule[FooHelper]: fooHelperFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
+// CLANG_FOO_HELPER-DAG: Decl[GlobalVar]/OtherModule[FooHelper]:    FooHelperUnnamedEnumeratorA1[#Int#]{{; name=.+$}}
+// CLANG_FOO_HELPER-DAG: Decl[GlobalVar]/OtherModule[FooHelper]:    FooHelperUnnamedEnumeratorA2[#Int#]{{; name=.+$}}
 // CLANG_FOO_HELPER: End completions
 
 // CLANG_FOO_HELPER_SUB: Begin completions
-// CLANG_FOO_HELPER_SUB-DAG: Decl[FreeFunction]/OtherModule: fooHelperSubFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
-// CLANG_FOO_HELPER_SUB-DAG: Decl[Struct]/OtherModule:       FooHelperSubEnum1[#FooHelperSubEnum1#]{{; name=.+$}}
-// CLANG_FOO_HELPER_SUB-DAG: Decl[GlobalVar]/OtherModule:    FooHelperSubEnum1X[#FooHelperSubEnum1#]{{; name=.+$}}
-// CLANG_FOO_HELPER_SUB-DAG: Decl[GlobalVar]/OtherModule:    FooHelperSubEnum1Y[#FooHelperSubEnum1#]{{; name=.+$}}
-// CLANG_FOO_HELPER_SUB-DAG: Decl[GlobalVar]/OtherModule:    FooHelperSubUnnamedEnumeratorA1[#Int#]{{; name=.+$}}
+// CLANG_FOO_HELPER_SUB-DAG: Decl[FreeFunction]/OtherModule[FooHelper.FooHelperSub]: fooHelperSubFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
+// CLANG_FOO_HELPER_SUB-DAG: Decl[Struct]/OtherModule[FooHelper.FooHelperSub]:       FooHelperSubEnum1[#FooHelperSubEnum1#]{{; name=.+$}}
+// CLANG_FOO_HELPER_SUB-DAG: Decl[GlobalVar]/OtherModule[FooHelper.FooHelperSub]:    FooHelperSubEnum1X[#FooHelperSubEnum1#]{{; name=.+$}}
+// CLANG_FOO_HELPER_SUB-DAG: Decl[GlobalVar]/OtherModule[FooHelper.FooHelperSub]:    FooHelperSubEnum1Y[#FooHelperSubEnum1#]{{; name=.+$}}
+// CLANG_FOO_HELPER_SUB-DAG: Decl[GlobalVar]/OtherModule[FooHelper.FooHelperSub]:    FooHelperSubUnnamedEnumeratorA1[#Int#]{{; name=.+$}}
 // CLANG_FOO_HELPER_SUB: End completions
 
 // CLANG_BAR: Begin completions
-// CLANG_BAR-DAG: Decl[FreeFunction]/OtherModule: barFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
-// CLANG_BAR-DAG: Decl[Class]/OtherModule:        BarForwardDeclaredClass[#BarForwardDeclaredClass#]{{; name=.+$}}
-// CLANG_BAR-DAG: Decl[Struct]/OtherModule:       BarForwardDeclaredEnum[#BarForwardDeclaredEnum#]{{; name=.+$}}
-// CLANG_BAR-DAG: Decl[GlobalVar]/OtherModule:    BarForwardDeclaredEnumValue[#BarForwardDeclaredEnum#]{{; name=.+$}}
-// CLANG_BAR-DAG: Decl[GlobalVar]/OtherModule:    BAR_MACRO_1[#Int32#]{{; name=.+$}}
-// CLANG_BAR-DAG: Decl[Struct]/OtherModule:       SomeItemSet[#SomeItemSet#]
-// CLANG_BAR-DAG: Decl[TypeAlias]/OtherModule:    SomeEnvironment[#SomeItemSet#]
+// CLANG_BAR-DAG: Decl[FreeFunction]/OtherModule[Bar]: barFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
+// CLANG_BAR-DAG: Decl[Class]/OtherModule[Bar]:        BarForwardDeclaredClass[#BarForwardDeclaredClass#]{{; name=.+$}}
+// CLANG_BAR-DAG: Decl[Struct]/OtherModule[Bar]:       BarForwardDeclaredEnum[#BarForwardDeclaredEnum#]{{; name=.+$}}
+// CLANG_BAR-DAG: Decl[GlobalVar]/OtherModule[Bar]:    BarForwardDeclaredEnumValue[#BarForwardDeclaredEnum#]{{; name=.+$}}
+// CLANG_BAR-DAG: Decl[GlobalVar]/OtherModule[Bar]:    BAR_MACRO_1[#Int32#]{{; name=.+$}}
+// CLANG_BAR-DAG: Decl[Struct]/OtherModule[Bar]:       SomeItemSet[#SomeItemSet#]
+// CLANG_BAR-DAG: Decl[TypeAlias]/OtherModule[Bar]:    SomeEnvironment[#SomeItemSet#]
 // CLANG_BAR: End completions
 
 // CLANG_BOTH_FOO_BAR: Begin completions
-// CLANG_BOTH_FOO_BAR-DAG: Decl[FreeFunction]/OtherModule: redeclaredInMultipleModulesFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
+// CLANG_BOTH_FOO_BAR-DAG: Decl[FreeFunction]/OtherModule[Bar]: redeclaredInMultipleModulesFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
 // CLANG_BOTH_FOO_BAR: End completions
 
 // CLANG_QUAL_FOO_NEGATIVE-NOT: bar
-// CLANG_QUAL_FOO_NEGATIVE-NOT: Bar
+// CLANG_QUAL_FOO_NEGATIVE-NOT: :{{.*}}Bar
 // CLANG_QUAL_FOO_NEGATIVE-NOT: BAR
 
 // CLANG_QUAL_BAR_NEGATIVE-NOT: foo
@@ -147,68 +147,68 @@ func testCompleteModuleQualifiedFoo2() {
 // If the number of results below changes, then you need to add a result to the
 // list below.
 // CLANG_QUAL_FOO_2: Begin completions, 62 items
-// CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule:        .FooClassBase[#FooClassBase#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule:        .FooClassDerived[#FooClassDerived#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule:        .ClassWithInternalProt[#ClassWithInternalProt#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule:       ._InternalStruct[#_InternalStruct#]
-// CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule:        .FooClassPropertyOwnership[#FooClassPropertyOwnership#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: ._internalTopLevelFunc()[#Void#]
-// CLANG_QUAL_FOO_2-DAG: Decl[Enum]/OtherModule:         .FooComparisonResult[#FooComparisonResult#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFunc1AnonymousParam({#Int32#})[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFunc3({#(a): Int32#}, {#(b): Float#}, {#(c): Double#}, {#(d): UnsafeMutablePointer<Int32>#})[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncNoreturn1()[#Void#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncNoreturn2()[#Void#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncWithBlock({#(blk): ((Float) -> Int32)!##(Float) -> Int32#})[#Void#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncWithFunctionPointer({#(fptr): CFunctionPointer<((Float) -> Int32)>#})[#Void#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncWithComment1()[#Void#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncWithComment2()[#Void#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncWithComment3()[#Void#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncWithComment4()[#Void#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncWithComment5()[#Void#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooHelperFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooHelperSubFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooSubFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .redeclaredInMultipleModulesFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .theLastDeclInFoo()[#Void#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .FOO_MACRO_1[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .FOO_MACRO_2[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .FOO_MACRO_3[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .FOO_MACRO_4[#UInt32#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .FOO_MACRO_5[#UInt64#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .FOO_MACRO_REDEF_1[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .FOO_MACRO_REDEF_2[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .FooEnum1X[#FooEnum1#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .FooEnum2X[#FooEnum2#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .FooEnum2Y[#FooEnum2#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .FooEnum3X[#FooEnum3#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .FooEnum3Y[#FooEnum3#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .FooHelperSubEnum1X[#FooHelperSubEnum1#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .FooHelperSubEnum1Y[#FooHelperSubEnum1#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .FooHelperSubUnnamedEnumeratorA1[#Int#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .FooHelperUnnamedEnumeratorA1[#Int#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .FooHelperUnnamedEnumeratorA2[#Int#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .FooSubEnum1X[#FooSubEnum1#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .FooSubEnum1Y[#FooSubEnum1#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .FooSubUnnamedEnumeratorA1[#Int#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule:    .fooIntVar[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[Protocol]/OtherModule:     ._InternalProt[#_InternalProt#]
-// CLANG_QUAL_FOO_2-DAG: Decl[Protocol]/OtherModule:     .FooProtocolBase[#FooProtocolBase#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[Protocol]/OtherModule:     .FooProtocolDerived[#FooProtocolDerived#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule:       .FooEnum1[#FooEnum1#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule:       .FooEnum2[#FooEnum2#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule:       .FooEnum3[#FooEnum3#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule:       .FooHelperSubEnum1[#FooHelperSubEnum1#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule:       .FooRuncingOptions[#FooRuncingOptions#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule:       .FooStruct1[#FooStruct1#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule:       .FooStruct2[#FooStruct2#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule:       .FooStructTypedef2[#FooStructTypedef2#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule:       .FooSubEnum1[#FooSubEnum1#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[TypeAlias]/OtherModule:    .FooStructTypedef1[#FooStruct2#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG:  Decl[Class]/OtherModule:            .FooUnavailableMembers[#FooUnavailableMembers#]
-// CLANG_QUAL_FOO_2-DAG: Decl[TypeAlias]/OtherModule:    .FooTypedef1[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG:   Decl[TypeAlias]/OtherModule:        .FooCFTypeRef[#FooCFType#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG:  Decl[Class]/OtherModule: .FooRepeatedMembers[#FooRepeatedMembers#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule[Foo]:        .FooClassBase[#FooClassBase#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule[Foo]:        .FooClassDerived[#FooClassDerived#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule[Foo]:        .ClassWithInternalProt[#ClassWithInternalProt#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule[Foo]:       ._InternalStruct[#_InternalStruct#]
+// CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule[Foo]:        .FooClassPropertyOwnership[#FooClassPropertyOwnership#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: ._internalTopLevelFunc()[#Void#]
+// CLANG_QUAL_FOO_2-DAG: Decl[Enum]/OtherModule[Foo]:         .FooComparisonResult[#FooComparisonResult#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .fooFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .fooFunc1AnonymousParam({#Int32#})[#Int32#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .fooFunc3({#(a): Int32#}, {#(b): Float#}, {#(c): Double#}, {#(d): UnsafeMutablePointer<Int32>#})[#Int32#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .fooFuncNoreturn1()[#Void#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .fooFuncNoreturn2()[#Void#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .fooFuncWithBlock({#(blk): ((Float) -> Int32)!##(Float) -> Int32#})[#Void#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .fooFuncWithFunctionPointer({#(fptr): CFunctionPointer<((Float) -> Int32)>#})[#Void#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .fooFuncWithComment1()[#Void#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .fooFuncWithComment2()[#Void#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .fooFuncWithComment3()[#Void#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .fooFuncWithComment4()[#Void#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .fooFuncWithComment5()[#Void#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[FooHelper]: .fooHelperFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[FooHelper.FooHelperSub]: .fooHelperSubFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo.FooSub]: .fooSubFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Bar]: .redeclaredInMultipleModulesFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .theLastDeclInFoo()[#Void#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FOO_MACRO_1[#Int32#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FOO_MACRO_2[#Int32#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FOO_MACRO_3[#Int32#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FOO_MACRO_4[#UInt32#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FOO_MACRO_5[#UInt64#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FOO_MACRO_REDEF_1[#Int32#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FOO_MACRO_REDEF_2[#Int32#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FooEnum1X[#FooEnum1#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FooEnum2X[#FooEnum2#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FooEnum2Y[#FooEnum2#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FooEnum3X[#FooEnum3#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FooEnum3Y[#FooEnum3#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[FooHelper.FooHelperSub]: .FooHelperSubEnum1X[#FooHelperSubEnum1#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[FooHelper.FooHelperSub]: .FooHelperSubEnum1Y[#FooHelperSubEnum1#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[FooHelper.FooHelperSub]: .FooHelperSubUnnamedEnumeratorA1[#Int#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[FooHelper]:  .FooHelperUnnamedEnumeratorA1[#Int#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[FooHelper]:  .FooHelperUnnamedEnumeratorA2[#Int#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo.FooSub]: .FooSubEnum1X[#FooSubEnum1#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo.FooSub]: .FooSubEnum1Y[#FooSubEnum1#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo.FooSub]: .FooSubUnnamedEnumeratorA1[#Int#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:     .fooIntVar[#Int32#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[Protocol]/OtherModule[Foo]:      ._InternalProt[#_InternalProt#]
+// CLANG_QUAL_FOO_2-DAG: Decl[Protocol]/OtherModule[Foo]:      .FooProtocolBase[#FooProtocolBase#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[Protocol]/OtherModule[Foo]:      .FooProtocolDerived[#FooProtocolDerived#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule[Foo]:        .FooEnum1[#FooEnum1#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule[Foo]:        .FooEnum2[#FooEnum2#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule[Foo]:        .FooEnum3[#FooEnum3#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule[FooHelper.FooHelperSub]: .FooHelperSubEnum1[#FooHelperSubEnum1#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule[Foo]:        .FooRuncingOptions[#FooRuncingOptions#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule[Foo]:        .FooStruct1[#FooStruct1#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule[Foo]:        .FooStruct2[#FooStruct2#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule[Foo]:        .FooStructTypedef2[#FooStructTypedef2#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule[Foo.FooSub]: .FooSubEnum1[#FooSubEnum1#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[TypeAlias]/OtherModule[Foo]:     .FooStructTypedef1[#FooStruct2#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG:  Decl[Class]/OtherModule[Foo]:        .FooUnavailableMembers[#FooUnavailableMembers#]
+// CLANG_QUAL_FOO_2-DAG: Decl[TypeAlias]/OtherModule[Foo]:     .FooTypedef1[#Int32#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG:   Decl[TypeAlias]/OtherModule[Foo]:   .FooCFTypeRef[#FooCFType#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG:  Decl[Class]/OtherModule[Foo]:        .FooRepeatedMembers[#FooRepeatedMembers#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2: End completions
 }
 

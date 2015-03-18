@@ -5,11 +5,11 @@
 
 func foo() {
   #^TOP^#
-  // CHECK-TOP: Decl[FreeFunction]/OtherModule:     doSomethingInHead({#(arg): Int32#})[#Void#]{{; name=.+$}}
+  // CHECK-TOP: Decl[FreeFunction]/OtherModule[__ObjC]:     doSomethingInHead({#(arg): Int32#})[#Void#]{{; name=.+$}}
 }
 
 func bar() {
   let _: #^TYPE^#
-  // CHECK-TYPE-DAG: Decl[Class]/OtherModule:    SameName[#SameName#]{{; name=.+$}}
-  // CHECK-TYPE-DAG: Decl[Protocol]/OtherModule: SameNameProtocol[#SameNameProtocol#]{{; name=.+$}}
+  // CHECK-TYPE-DAG: Decl[Class]/OtherModule[__ObjC]:    SameName[#SameName#]{{; name=.+$}}
+  // CHECK-TYPE-DAG: Decl[Protocol]/OtherModule[__ObjC]: SameNameProtocol[#SameNameProtocol#]{{; name=.+$}}
 }

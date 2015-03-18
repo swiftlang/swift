@@ -17,7 +17,7 @@ import Foundation
 #^PLAIN_TOP_LEVEL_1^#
 
 // PLAIN_TOP_LEVEL: Begin completions
-// PLAIN_TOP_LEVEL-DAG: Decl[GlobalVar]/OtherModule: NSJapaneseEUCStringEncoding[#UInt#]{{; name=.+$}}
+// PLAIN_TOP_LEVEL-DAG: Decl[GlobalVar]/OtherModule[Foundation]: NSJapaneseEUCStringEncoding[#UInt#]{{; name=.+$}}
 // PLAIN_TOP_LEVEL: End completions
 
 func privateNominalMembers(a: String) {

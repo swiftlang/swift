@@ -13,7 +13,7 @@
 #^PLAIN_TOP_LEVEL_1^#
 
 // PLAIN_TOP_LEVEL: Begin completions
-// PLAIN_TOP_LEVEL-DAG: Decl[Struct]/OtherModule: Array[#Array#]{{; name=.+$}}
+// PLAIN_TOP_LEVEL-DAG: Decl[Struct]/OtherModule[Swift]: Array[#Array#]{{; name=.+$}}
 // PLAIN_TOP_LEVEL: End completions
 
 func privateNominalMembers(a: String) {

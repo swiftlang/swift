@@ -1314,12 +1314,12 @@ func testTypeCheckWithUnsolvedVariables3() {
 func testResolveModules1() {
   Swift#^RESOLVE_MODULES_1^#
 // RESOLVE_MODULES_1: Begin completions
-// RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule:    .Int8[#Int8#]{{; name=.+$}}
-// RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule:    .Int16[#Int16#]{{; name=.+$}}
-// RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule:    .Int32[#Int32#]{{; name=.+$}}
-// RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule:    .Int64[#Int64#]{{; name=.+$}}
-// RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule:    .Bool[#Bool#]{{; name=.+$}}
-// RESOLVE_MODULES_1-DAG: Decl[TypeAlias]/OtherModule: .Float32[#Float#]{{; name=.+$}}
+// RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule[Swift]:    .Int8[#Int8#]{{; name=.+$}}
+// RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule[Swift]:    .Int16[#Int16#]{{; name=.+$}}
+// RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule[Swift]:    .Int32[#Int32#]{{; name=.+$}}
+// RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule[Swift]:    .Int64[#Int64#]{{; name=.+$}}
+// RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule[Swift]:    .Bool[#Bool#]{{; name=.+$}}
+// RESOLVE_MODULES_1-DAG: Decl[TypeAlias]/OtherModule[Swift]: .Float32[#Float#]{{; name=.+$}}
 // RESOLVE_MODULES_1: End completions
 }
 

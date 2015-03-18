@@ -7,11 +7,11 @@
 // A-DAG: Keyword/None: true[#Bool#]{{; name=.+$}}
 // A-DAG: Keyword/None: false[#Bool#]{{; name=.+$}}
 // A-DAG: Keyword/None: nil{{; name=.+$}}
-// A-DAG: Decl[Struct]/OtherModule: Int8[#Int8#]{{; name=.+$}}
-// A-DAG: Decl[Struct]/OtherModule: Int16[#Int16#]{{; name=.+$}}
-// A-DAG: Decl[Struct]/OtherModule: Int32[#Int32#]{{; name=.+$}}
-// A-DAG: Decl[Struct]/OtherModule: Int64[#Int64#]{{; name=.+$}}
-// A-DAG: Decl[Struct]/OtherModule: Bool[#Bool#]{{; name=.+$}}
+// A-DAG: Decl[Struct]/OtherModule[Swift]: Int8[#Int8#]{{; name=.+$}}
+// A-DAG: Decl[Struct]/OtherModule[Swift]: Int16[#Int16#]{{; name=.+$}}
+// A-DAG: Decl[Struct]/OtherModule[Swift]: Int32[#Int32#]{{; name=.+$}}
+// A-DAG: Decl[Struct]/OtherModule[Swift]: Int64[#Int64#]{{; name=.+$}}
+// A-DAG: Decl[Struct]/OtherModule[Swift]: Bool[#Bool#]{{; name=.+$}}
 // A: End completions
 
 // This function just adds more non-comment tokens to ensure that the file is not empty.
