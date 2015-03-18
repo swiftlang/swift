@@ -300,22 +300,36 @@ namespace {
       return asImpl().handleAddressOnly(type);
     }
 
-    // These types are address-only unless they're class-constrained.
-    template <class T> RetTy visitAbstracted(T type) {
+    RetTy visitArchetypeType(CanArchetypeType type) {
       if (type->requiresClass()) {
         return asImpl().handleReference(type);
       } else {
-        return asImpl().handleAddressOnly(type);        
+        return asImpl().handleAddressOnly(type);
       }
     }
-    RetTy visitArchetypeType(CanArchetypeType type) {
-      return visitAbstracted(type);
+
+    RetTy visitExistentialType(CanType type) {
+      switch (SILType::getPrimitiveObjectType(type)
+                .getPreferredExistentialRepresentation()) {
+      case ExistentialRepresentation::None:
+        llvm_unreachable("not an existential type?!");
+      // Opaque existentials are address-only.
+      case ExistentialRepresentation::Opaque:
+        return asImpl().handleAddressOnly(type);
+      // Class-constrained and boxed existentials are refcounted.
+      case ExistentialRepresentation::Class:
+      case ExistentialRepresentation::Boxed:
+        return asImpl().handleReference(type);
+      // Existential metatypes are trivial.
+      case ExistentialRepresentation::Metatype:
+        return asImpl().handleTrivial(type);
+      }
     }
     RetTy visitProtocolType(CanProtocolType type) {
-      return visitAbstracted(type);
+      return visitExistentialType(type);
     }
     RetTy visitProtocolCompositionType(CanProtocolCompositionType type) {
-      return visitAbstracted(type);
+      return visitExistentialType(type);
     }
 
     // Enums depend on their enumerators.

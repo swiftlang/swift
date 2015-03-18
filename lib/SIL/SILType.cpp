@@ -62,10 +62,7 @@ bool SILType::isTrivial(SILModule &M) const {
 }
 
 bool SILType::isReferenceCounted(SILModule &M) const {
-  bool r = M.getTypeLowering(*this).isReferenceCounted();
-  // TODO: Remove this staging assertion when the conditions really do diverge.
-  assert(r == hasReferenceSemantics());
-  return r;
+  return M.getTypeLowering(*this).isReferenceCounted();
 }
 
 std::string SILType::getAsString() const {
