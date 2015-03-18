@@ -40,7 +40,7 @@ ${MirrorDecl} {
         // send that
 #if os(OSX)
         let img = NSImage(data: data)
-#elseif os(iOS)
+#elseif os(iOS) || os(watchOS) || os(tvOS)
         let img = UIImage(data: data)
 #endif
         return .Some(.Sprite(img))

@@ -382,6 +382,44 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
         IOS_SIMULATOR-R  "iOS Release"         IOS_SIMULATOR R "Release")
   endif()
 
+  is_sdk_requested(TVOS swift_build_tvos)
+  if(swift_build_tvos AND ${swift_can_crosscompile_stdlib})
+    configure_sdk_darwin(TVOS "tvOS" "9.0" appletvos tvos tvos "armv7;arm64" TRUE)
+    configure_target_variant(TVOS-DA "tvOS Debug+Asserts"   TVOS DA "Debug+Asserts")
+    configure_target_variant(TVOS-RA "tvOS Release+Asserts" TVOS RA "Release+Asserts")
+    configure_target_variant(TVOS-R  "tvOS Release"         TVOS R "Release")
+  endif()
+
+  is_sdk_requested(TVOS_SIMULATOR swift_build_tvos_simulator)
+  if(swift_build_tvos_simulator AND ${swift_can_crosscompile_stdlib})
+    configure_sdk_darwin(TVOS_SIMULATOR "tvOS Simulator" "9.0" appletvsimulator tvos-simulator tvos "i386;x86_64" FALSE)
+    configure_target_variant(
+      TVOS_SIMULATOR-DA "tvOS Debug+Asserts"   TVOS_SIMULATOR DA "Debug+Asserts")
+    configure_target_variant(
+      TVOS_SIMULATOR-RA "tvOS Release+Asserts" TVOS_SIMULATOR RA "Release+Asserts")
+    configure_target_variant(
+      TVOS_SIMULATOR-R  "tvOS Release"         TVOS_SIMULATOR R "Release")
+  endif()
+
+  is_sdk_requested(WATCHOS swift_build_watchos)
+  if(swift_build_watchos AND ${swift_can_crosscompile_stdlib})
+    configure_sdk_darwin(WATCHOS "watchOS" "2.0" watchos watchos watchos "armv7;arm64" TRUE)
+    configure_target_variant(WATCHOS-DA "watchOS Debug+Asserts"   WATCHOS DA "Debug+Asserts")
+    configure_target_variant(WATCHOS-RA "watchOS Release+Asserts" WATCHOS RA "Release+Asserts")
+    configure_target_variant(WATCHOS-R  "watchOS Release"         WATCHOS R "Release")
+  endif()
+
+  is_sdk_requested(WATCHOS_SIMULATOR swift_build_watchos_simulator)
+  if(swift_build_watchos_simulator AND ${swift_can_crosscompile_stdlib})
+    configure_sdk_darwin(WATCHOS_SIMULATOR "watchOS Simulator" "2.0" watchsimulator watchos-simulator watchos "i386;x86_64" FALSE)
+    configure_target_variant(
+      WATCHOS_SIMULATOR-DA "watchOS Debug+Asserts"   WATCHOS_SIMULATOR DA "Debug+Asserts")
+    configure_target_variant(
+      WATCHOS_SIMULATOR-RA "watchOS Release+Asserts" WATCHOS_SIMULATOR RA "Release+Asserts")
+    configure_target_variant(
+      WATCHOS_SIMULATOR-R  "watchOS Release"         WATCHOS_SIMULATOR R "Release")
+  endif()
+
   # FIXME: guess target variant based on the host.
   # if(SWIFT_HOST_VARIANT MATCHES "^macosx")
   #   set(SWIFT_PRIMARY_VARIANT_GUESS "OSX-R")

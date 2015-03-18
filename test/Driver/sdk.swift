@@ -61,9 +61,19 @@
 
 // RUN: mkdir %t/iPhoneOS7.0.sdk && not %swift_driver -sdk %t/iPhoneOS7.0.sdk -target x86_64-apple-ios7 -### 2>&1 | FileCheck -check-prefix=SDK-TOO-OLD %s
 // RUN: mkdir %t/iPhoneOS7.0.Internal.sdk && not %swift_driver -sdk %t/iPhoneOS7.0.Internal.sdk -target x86_64-apple-ios7 -### 2>&1 | FileCheck -check-prefix=SDK-TOO-OLD %s
+// RUN: mkdir %t/tvOS8.0.sdk && not %swift_driver -sdk %t/tvOS8.0.sdk -target x86_64-apple-tvos9 -### 2>&1 | FileCheck -check-prefix=SDK-TOO-OLD %s
+// RUN: mkdir %t/tvOS8.0.Internal.sdk && not %swift_driver -sdk %t/tvOS8.0.Internal.sdk -target x86_64-apple-tvos9 -### 2>&1 | FileCheck -check-prefix=SDK-TOO-OLD %s
+// RUN: mkdir %t/watchOSOS1.0.sdk && not %swift_driver -sdk %t/watchOSOS1.0.sdk -target x86_64-apple-watchos2 -### 2>&1 | FileCheck -check-prefix=SDK-TOO-OLD %s
+// RUN: mkdir %t/watchOSOS1.0.Internal.sdk && not %swift_driver -sdk %t/watchOSOS1.0.Internal.sdk -target x86_64-apple-watchos2 -### 2>&1 | FileCheck -check-prefix=SDK-TOO-OLD %s
 // RUN: mkdir %t/iPhoneSimulator7.0.sdk && not %swift_driver -sdk %t/iPhoneSimulator7.0.sdk -target x86_64-apple-ios7 -### 2>&1 | FileCheck -check-prefix=SDK-TOO-OLD %s
+// RUN: mkdir %t/AppleTVSimulator8.0.sdk && not %swift_driver -sdk %t/AppleTVSimulator8.0.sdk -target x86_64-apple-tvos9 -### 2>&1 | FileCheck -check-prefix=SDK-TOO-OLD %s
+// RUN: mkdir %t/WatchSimulator1.0.sdk && not %swift_driver -sdk %t/WatchSimulator1.0.sdk -target i386-apple-watchos2 -### 2>&1 | FileCheck -check-prefix=SDK-TOO-OLD %s
 // RUN: mkdir %t/iPhoneOS8.0.sdk && %swift_driver -sdk %t/iPhoneOS8.0.sdk -target x86_64-apple-ios7 -### 2>&1 | FileCheck -check-prefix=SDK-OKAY %s
+// RUN: mkdir %t/tvOS9.0.sdk && %swift_driver -sdk %t/tvOS9.0.sdk -target x86_64-apple-tvos9 -### 2>&1 | FileCheck -check-prefix=SDK-OKAY %s
+// RUN: mkdir %t/watchOS2.0.sdk && %swift_driver -sdk %t/watchOS2.0.sdk -target x86_64-apple-watchos2 -### 2>&1 | FileCheck -check-prefix=SDK-OKAY %s
 // RUN: mkdir %t/iPhoneOS.sdk && %swift_driver -sdk %t/iPhoneOS.sdk -target x86_64-apple-ios7 -### 2>&1 | FileCheck -check-prefix=SDK-OKAY %s
+// RUN: mkdir %t/tvOS.sdk && %swift_driver -sdk %t/tvOS.sdk -target x86_64-apple-tvos9 -### 2>&1 | FileCheck -check-prefix=SDK-OKAY %s
+// RUN: mkdir %t/watchOS.sdk && %swift_driver -sdk %t/watchOS.sdk -target x86_64-apple-watchos2 -### 2>&1 | FileCheck -check-prefix=SDK-OKAY %s
 
 // RUN: mkdir %t/custom-sdk && %swift_driver -sdk %t/custom-sdk -### 2>&1 | FileCheck -check-prefix=SDK-OKAY %s
 

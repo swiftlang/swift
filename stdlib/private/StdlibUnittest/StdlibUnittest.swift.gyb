@@ -14,7 +14,7 @@ import SwiftPrivate
 import SwiftPrivatePthreadExtras
 import SwiftPrivateDarwinExtras
 
-#if os(OSX) || os(iOS)
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
 #elseif os(Linux)
 import Glibc
@@ -939,7 +939,7 @@ public class TestSuite {
   var _testNameToIndex: [String : Int] = [:]
 }
 
-#if os(OSX) || os(iOS)
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 @asmname("swift_stdlib_getSystemVersionPlistProperty")
 func _stdlib_getSystemVersionPlistPropertyImpl(
   propertyName: UnsafePointer<CChar>) -> UnsafePointer<CChar>

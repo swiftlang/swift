@@ -601,8 +601,14 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
   }
 
   assert(Triple.isOSDarwin());
-  bool wantsObjCRuntime =
-    Triple.isiOS() ? Triple.isOSVersionLT(8) : Triple.isMacOSXVersionLT(10, 10);
+  bool wantsObjCRuntime = false;
+  if (Triple.isiOS())
+    wantsObjCRuntime = Triple.isOSVersionLT(8);
+  else if (Triple.isWatchOS())
+    wantsObjCRuntime = Triple.isOSVersionLT(2);
+  else if (Triple.isMacOSX())
+    wantsObjCRuntime = Triple.isMacOSXVersionLT(10, 10);
+
   if (Args.hasFlag(options::OPT_link_objc_runtime,
                    options::OPT_no_link_objc_runtime,
                    /*default=*/wantsObjCRuntime)) {
@@ -663,7 +669,17 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
     llvm::sys::path::remove_filename(LibProfile); // remove platform name
     llvm::sys::path::append(LibProfile, "clang", CLANG_VERSION_STRING);
 
-    StringRef RT = Triple.isiOS() ? "ios" : "osx";
+    StringRef RT;
+    if (Triple.isiOS()) {
+      if (Triple.isTvOS())
+        RT = "tvos";
+      else
+        RT = "ios";
+    }
+    else if (Triple.isWatchOS())
+      RT = "watchos";
+    else
+      RT = "osx";
     llvm::sys::path::append(LibProfile, "lib", "darwin",
                             "libclang_rt.profile_" + RT + ".a");
     Arguments.push_back(Args.MakeArgString(LibProfile));
@@ -677,14 +693,30 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
   Arguments.push_back(Args.MakeArgString(RuntimeLibPath));
 
   // FIXME: Properly handle deployment targets.
-  assert(Triple.isiOS() || Triple.isMacOSX());
+  assert(Triple.isiOS() || Triple.isWatchOS() || Triple.isMacOSX());
   if (Triple.isiOS()) {
-    if (tripleIsiOSSimulator(Triple))
-      Arguments.push_back("-ios_simulator_version_min");
-    else
-      Arguments.push_back("-iphoneos_version_min");
+    bool isiOSSimulator = tripleIsiOSSimulator(Triple);
+    if (Triple.isTvOS()) {
+      if (isiOSSimulator)
+        Arguments.push_back("-tvos_simulator_version_min");
+      else
+        Arguments.push_back("-tvos_version_min");
+    } else {
+      if (isiOSSimulator)
+        Arguments.push_back("-ios_simulator_version_min");
+      else
+        Arguments.push_back("-iphoneos_version_min");
+    }
     unsigned major, minor, micro;
     Triple.getiOSVersion(major, minor, micro);
+    addVersionString(Args, Arguments, major, minor, micro);
+  } else if (Triple.isWatchOS()) {
+    if (tripleIsWatchSimulator(Triple))
+      Arguments.push_back("-watchos_simulator_version_min");
+    else
+      Arguments.push_back("-watchos_version_min");
+    unsigned major, minor, micro;
+    Triple.getOSVersion(major, minor, micro);
     addVersionString(Args, Arguments, major, minor, micro);
   } else {
     Arguments.push_back("-macosx_version_min");

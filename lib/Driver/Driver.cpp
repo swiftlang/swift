@@ -130,9 +130,22 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
         diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
                        "OS X 10.9");
     } else if (triple.isiOS()) {
+      if (triple.isTvOS()) {
+        if (triple.isOSVersionLT(9, 0)) {
+          diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
+                         "tvOS 9.0");
+          return;
+        }
+      }
       if (triple.isOSVersionLT(7))
         diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
                        "iOS 7");
+    } else if (triple.isWatchOS()) {
+      if (triple.isOSVersionLT(2, 0)) {
+          diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
+                         "watchOS 2.0");
+          return;
+      }
     }
   }
 }
@@ -606,12 +619,18 @@ static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
     return version < clang::VersionTuple(10, 10);
 
   } else if (target.isiOS()) {
+    if (target.isTvOS())
+      return sdkPath.find("OS8") != StringRef::npos ||
+        sdkPath.find("Simulator8") != StringRef::npos;
     // iOS SDKs don't always have the version number in the name, but
     // fortunately that started with the first version that supports Swift.
     // Just check for one version before that, just in case.
     return sdkPath.find("OS7") != StringRef::npos ||
       sdkPath.find("Simulator7") != StringRef::npos;
 
+  } else if(target.isWatchOS()) {
+    return sdkPath.find("OS1") != StringRef::npos ||
+        sdkPath.find("Simulator1") != StringRef::npos;
   } else {
     return false;
   }
@@ -1867,6 +1886,8 @@ const ToolChain *Driver::getToolChain(const ArgList &Args,
     case llvm::Triple::Darwin:
     case llvm::Triple::MacOSX:
     case llvm::Triple::IOS:
+    case llvm::Triple::TvOS:
+    case llvm::Triple::WatchOS:
       TC = new toolchains::Darwin(*this, Target);
       break;
 #if defined(SWIFT_ENABLE_TARGET_LINUX)

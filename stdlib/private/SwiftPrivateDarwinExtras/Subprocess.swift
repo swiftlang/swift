@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftPrivate
-#if os(OSX) || os(iOS)
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
 #elseif os(Linux)
 import Glibc
@@ -194,13 +194,13 @@ public func runChild(args: _UnitTestArray<String>)
   return (stdout, stderr, status)
 }
 
-#if os(OSX) || os(iOS)
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 @asmname("_NSGetEnviron")
 func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>>>
 #endif
 
 internal func _getEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>> {
-#if os(OSX) || os(iOS)
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
   return _NSGetEnviron().memory
 #else
   return __environ

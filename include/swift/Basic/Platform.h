@@ -24,6 +24,12 @@ namespace swift {
   /// Returns true if the given triple represents iOS running in a simulator.
   bool tripleIsiOSSimulator(const llvm::Triple &triple);
 
+  /// Returns true if the given triple represents AppleTV running in a simulator.
+  bool tripleIsAppleTVSimulator(const llvm::Triple &triple);
+
+  /// Returns true if the given triple represents watchOS running in a simulator.
+  bool tripleIsWatchSimulator(const llvm::Triple &triple);
+
   /// Returns the platform name for a given target triple.
   ///
   /// For example, the iOS simulator has the name "iphonesimulator", while real

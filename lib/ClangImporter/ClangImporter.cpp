@@ -271,12 +271,26 @@ ClangImporter::create(ASTContext &ctx,
     llvm::raw_string_ostream minVersionOpt{minVersionBuf};
     unsigned major, minor, micro;
     if (triple.isiOS()) {
-      if (swift::tripleIsiOSSimulator(triple))
-        minVersionOpt << "-mios-simulator-version-min=";
-      else
-        minVersionOpt << "-mios-version-min=";
+      bool isiOSSimulator = swift::tripleIsiOSSimulator(triple);
+      if (triple.isTvOS()) {
+        if (isiOSSimulator)
+          minVersionOpt << "-mtvos-simulator-version-min=";
+        else
+          minVersionOpt << "-mtvos-version-min=";
+      } else {
+        if (isiOSSimulator)
+          minVersionOpt << "-mios-simulator-version-min=";
+        else
+          minVersionOpt << "-mios-version-min=";
+      }
 
       triple.getiOSVersion(major, minor, micro);
+    } else if(triple.isWatchOS()) {
+      if (tripleIsWatchSimulator(triple))
+          minVersionOpt << "-mwatchos-simulator-version-min=";
+      else
+          minVersionOpt << "-mwatchos-version-min=";
+      triple.getOSVersion(major, minor, micro);
     } else {
       assert(triple.isMacOSX());
       minVersionOpt << "-mmacosx-version-min=";

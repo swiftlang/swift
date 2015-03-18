@@ -38,7 +38,11 @@ endif()
 include(SwiftDarwin)
 if("${SWIFT_HOST_VARIANT}" STREQUAL "macosx"
    OR "${SWIFT_HOST_VARIANT}" STREQUAL "iphoneos"
-   OR "${SWIFT_HOST_VARIANT}" STREQUAL "iphonesimulator")
+   OR "${SWIFT_HOST_VARIANT}" STREQUAL "iphonesimulator"
+   OR "${SWIFT_HOST_VARIANT}" STREQUAL "appletvos"
+   OR "${SWIFT_HOST_VARIANT}" STREQUAL "appletvsimulator"
+   OR "${SWIFT_HOST_VARIANT}" STREQUAL "watchos"
+   OR "${SWIFT_HOST_VARIANT}" STREQUAL "watchsimulator")
   # Link in CoreFoundation on Darwin.
   find_library(CORE_FOUNDATION NAMES CoreFoundation)
   target_link_libraries(swift ${CORE_FOUNDATION})

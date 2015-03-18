@@ -134,6 +134,8 @@ namespace swift {
         Target.getMacOSXVersion(major, minor, revision);
       } else if (Target.isiOS()) {
         Target.getiOSVersion(major, minor, revision);
+      } else if (Target.isWatchOS()) {
+        Target.getOSVersion(major, minor, revision);
       } else if (Target.isOSLinux() || Target.getTriple().empty()) {
         major = minor = revision = 0;
       } else {

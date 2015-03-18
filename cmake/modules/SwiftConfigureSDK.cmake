@@ -85,10 +85,10 @@ macro(configure_sdk_darwin
   endif()
 
   # Determine the SDK version we found.
-  string(REGEX MATCH "/[A-Za-z]+[0-9]+\\.[0-9]+(\\.Internal)?\\.sdk"
-         SCRATCH ${SWIFT_SDK_${prefix}_PATH})
-  string(REGEX MATCH "[0-9]+\\.[0-9]+"
-         SWIFT_SDK_${prefix}_VERSION ${SCRATCH})
+  execute_process(
+    COMMAND "defaults" "read" "${SWIFT_SDK_${prefix}_PATH}/SDKSettings.plist" "Version"
+      OUTPUT_VARIABLE SWIFT-SDK_${prefix}_VERSION
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
 
   # Set other variables.
   set(SWIFT_SDK_${prefix}_NAME "${name}")

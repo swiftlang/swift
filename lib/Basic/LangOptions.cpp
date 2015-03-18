@@ -60,9 +60,14 @@ void LangOptions::setTarget(llvm::Triple triple) {
   // Set the "os" target configuration.
   if (Target.isMacOSX())
     addTargetConfigOption("os", "OSX");
-  else if (Target.isiOS())
+  else if (triple.isiOS()) {
     addTargetConfigOption("os", "iOS");
-  else if (Target.isOSLinux())
+    if (triple.isTvOS())
+      addTargetConfigOption("os", "tvOS");
+  }
+  else if (triple.isWatchOS())
+    addTargetConfigOption("os", "watchOS");
+  else if (triple.isOSLinux())
     addTargetConfigOption("os", "Linux");
   else
     llvm_unreachable("Unsupported target OS");

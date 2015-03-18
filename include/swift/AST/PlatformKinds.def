@@ -23,8 +23,12 @@
 
 // Reordering these platforms will break serialization.
 AVAILABILITY_PLATFORM(iOS, "iOS")
+AVAILABILITY_PLATFORM(tvOS, "tvOS")
+AVAILABILITY_PLATFORM(watchOS, "watchOS")
 AVAILABILITY_PLATFORM(OSX, "OS X")
 AVAILABILITY_PLATFORM(iOSApplicationExtension, "iOS application extension")
+AVAILABILITY_PLATFORM(tvOSApplicationExtension, "tvOS application extension")
+AVAILABILITY_PLATFORM(watchOSApplicationExtension, "watchOS application extension")
 AVAILABILITY_PLATFORM(OSXApplicationExtension, "OS X application extension")
 
 #undef AVAILABILITY_PLATFORM

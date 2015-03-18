@@ -70,7 +70,12 @@ bool swift::isPlatformActive(PlatformKind Platform, LangOptions &LangOpts) {
       return LangOpts.Target.isMacOSX();
     case PlatformKind::iOS:
     case PlatformKind::iOSApplicationExtension:
+    case PlatformKind::tvOS:
+    case PlatformKind::tvOSApplicationExtension:
       return LangOpts.Target.isiOS();
+    case PlatformKind::watchOS:
+    case PlatformKind::watchOSApplicationExtension:
+      return LangOpts.Target.isWatchOS();
     case PlatformKind::none:
       llvm_unreachable("handled above");
   }

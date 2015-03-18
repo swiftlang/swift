@@ -5,7 +5,11 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
   set(PLATFORM_TARGET_LINK_LIBRARIES)
   if(("${SWIFT_HOST_VARIANT}" STREQUAL "macosx") OR
      ("${SWIFT_HOST_VARIANT}" STREQUAL "iphoneos") OR
-     ("${SWIFT_HOST_VARIANT}" STREQUAL "iphonesimulator"))
+     ("${SWIFT_HOST_VARIANT}" STREQUAL "iphonesimulator") OR
+     ("${SWIFT_HOST_VARIANT}" STREQUAL "appletvos") OR
+     ("${SWIFT_HOST_VARIANT}" STREQUAL "appletvsimulator") OR
+     ("${SWIFT_HOST_VARIANT}" STREQUAL "watchos") OR
+     ("${SWIFT_HOST_VARIANT}" STREQUAL "watchsimulator"))
     find_library(FOUNDATION_LIBRARY Foundation)
     list(APPEND PLATFORM_SOURCES
       weak.mm

@@ -1,8 +1,14 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
 // RUN: %swift -target i386-apple-ios7.0 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s
 // RUN: %swift -target x86_64-apple-ios7.0 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
+// RUN: %swift -target i386-apple-tvos9.0 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s
+// RUN: %swift -target x86_64-apple-tvos9.0 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
+// RUN: %swift -target i386-apple-watchos2.0 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s
 // RUN: %swift -target armv7-apple-ios7.0 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s
 // RUN: %swift -target arm64-apple-ios7.0 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
+// RUN: %swift -target armv7-apple-tvos9.0 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s
+// RUN: %swift -target arm64-apple-tvos9.0 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
+// RUN: %swift -target armv7-apple-watchos2.0 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s
 // RUN: %swift -target x86_64-unknown-linux-gnu -disable-objc-interop -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
 
 // REQUIRES: X86
@@ -92,7 +98,7 @@ func genericMetatype<A>(x: A.Type) {}
 func makeGenericMetatypes() {
   // CHECK: call %swift.type* @_TMaGV17generic_metatypes6OneArgVS_3Foo_() [[NOUNWIND_READNONE:#[0-9]+]]
   genericMetatype(OneArg<Foo>.self)
-  
+
   // CHECK: call %swift.type* @_TMaGV17generic_metatypes7TwoArgsVS_3FooCS_3Bar_() [[NOUNWIND_READNONE]]
   genericMetatype(TwoArgs<Foo, Bar>.self)
 

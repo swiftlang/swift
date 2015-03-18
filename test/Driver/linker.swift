@@ -5,6 +5,12 @@
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1 %s 2>&1 > %t.simple.txt
 // RUN: FileCheck -check-prefix IOS_SIMPLE %s < %t.simple.txt
 
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-tvos9.0 %s 2>&1 > %t.simple.txt
+// RUN: FileCheck -check-prefix tvOS_SIMPLE %s < %t.simple.txt
+
+// RUN: %swiftc_driver -driver-print-jobs -target i386-apple-watchos2.0 %s 2>&1 > %t.simple.txt
+// RUN: FileCheck -check-prefix watchOS_SIMPLE %s < %t.simple.txt
+
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -Ffoo -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
 // RUN: FileCheck -check-prefix LINUX %s < %t.linux.txt
 
@@ -60,6 +66,31 @@
 // IOS_SIMPLE-DAG: -arch x86_64
 // IOS_SIMPLE-DAG: -ios_simulator_version_min 7.1.{{[0-9]+}}
 // IOS_SIMPLE: -o linker
+
+
+// tvOS_SIMPLE: swift
+// tvOS_SIMPLE: -o [[OBJECTFILE:.*]]
+
+// tvOS_SIMPLE: bin/ld{{"? }}
+// tvOS_SIMPLE-DAG: [[OBJECTFILE]]
+// tvOS_SIMPLE-DAG: -L {{[^ ]+/lib/swift/appletvsimulator}}
+// tvOS_SIMPLE-DAG: -lSystem
+// tvOS_SIMPLE-DAG: -arch x86_64
+// tvOS_SIMPLE-DAG: -tvos_simulator_version_min 9.0.{{[0-9]+}}
+// tvOS_SIMPLE: -o linker
+
+
+// watchOS_SIMPLE: swift
+// watchOS_SIMPLE: -o [[OBJECTFILE:.*]]
+
+// watchOS_SIMPLE: bin/ld{{"? }}
+// watchOS_SIMPLE-DAG: [[OBJECTFILE]]
+// watchOS_SIMPLE-DAG: -L {{[^ ]+/lib/swift/watchsimulator}}
+// watchOS_SIMPLE-DAG: -lSystem
+// watchOS_SIMPLE-DAG: -arch i386
+// watchOS_SIMPLE-DAG: -watchos_simulator_version_min 2.0.{{[0-9]+}}
+// watchOS_SIMPLE: -o linker
+
 
 // LINUX: swift
 // LINUX: -o [[OBJECTFILE:.*]]
