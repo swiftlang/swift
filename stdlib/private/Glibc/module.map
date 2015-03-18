@@ -56,16 +56,9 @@ module SwiftGlibc [system] {
       header "/usr/include/fcntl.h"
       export *
     }
-    module sys {
+    module wait {
+      header "/usr/include/wait.h"
       export *
-      module types {
-        header "/usr/include/sys/types.h"
-        export *
-      }
-      module wait {
-        header "/usr/include/sys/wait.h"
-        export *
-      }
     }
     module unistd {
       header "/usr/include/unistd.h"
