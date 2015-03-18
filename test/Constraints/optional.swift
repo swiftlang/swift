@@ -108,3 +108,12 @@ var z: Int? = nil
 z = z ?? 3
 
 var fo: Float? = 3.14159
+
+func voidOptional(handler: () -> ()?) {}
+func testVoidOptional() {
+  let noop: () -> Void = {}
+  voidOptional(noop) // expected-error {{function signature '() -> Void' is not compatible with expected type '() -> ()?'}} expected-note {{use a closure to safely wrap calls to the function}}
+
+  let optNoop: ()? -> ()? = { return $0 }
+  voidOptional(optNoop) // expected-error {{function signature '()? -> ()?' is not compatible with expected type '() -> ()?'}} expected-note {{use a closure to safely wrap calls to the function}}
+}

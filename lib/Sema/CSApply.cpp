@@ -4197,10 +4197,10 @@ static bool areConvertibleTypesABICompatible(CanType lhs, CanType rhs) {
                       [](CanType lhsElem, CanType rhsElem) -> bool {
       return areConvertibleTypesABICompatible(lhsElem, rhsElem);
     });
-  } else if (lhsTuple) {
+  } else if (lhsTuple && lhsTuple->getNumElements() == 1) {
     return areConvertibleTypesABICompatible(lhsTuple.getElementTypes().front(),
                                             rhs);
-  } else if (rhsTuple) {
+  } else if (rhsTuple && rhsTuple->getNumElements() == 1) {
     return areConvertibleTypesABICompatible(lhs,
                                             rhsTuple.getElementTypes().front());
   }
