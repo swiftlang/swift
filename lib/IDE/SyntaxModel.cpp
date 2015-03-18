@@ -734,10 +734,9 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     if (auto IFO = dyn_cast<InfixOperatorDecl>(OperD)) {
       SmallVector<CharSourceRange, 3> KeywordsRanges;
       IFO->collectOperatorKeywordRanges(KeywordsRanges);
-      std::for_each(KeywordsRanges.begin(), KeywordsRanges.end(),
-               [&](CharSourceRange Range) {
+      for (auto &Range : KeywordsRanges) {
         passNonTokenNode({SyntaxNodeKind::Keyword, Range});
-      });
+      };
     }
     if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
           CharSourceRange(OperD->getOperatorLoc(), strlen("operator")) }))

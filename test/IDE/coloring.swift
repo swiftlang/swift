@@ -168,6 +168,18 @@ infix operator *-* { associativity left precedence 140 }
 // CHECK: <kw>func</kw> *-*(l: <type>Int</type>, r: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> l }{{$}}
 func *-*(l: Int, r: Int) -> Int { return l }
 
+// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *-+* { <kw>associativity</kw> left }{{$}}
+infix operator *-+* { associativity left }
+
+// CHECK: <kw>func</kw> *-+*(l: <type>Int</type>, r: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> l }{{$}}
+func *-+*(l: Int, r: Int) -> Int { return l }
+
+// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *--* {}{{$}}
+infix operator *--* {}
+
+// CHECK: <kw>func</kw> *--*(l: <type>Int</type>, r: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> l }{{$}}
+func *--*(l: Int, r: Int) -> Int { return l }
+
 // CHECK: <kw>protocol</kw> Prot2 : <type>Prot</type> {}
 protocol Prot2 : Prot {}
 
