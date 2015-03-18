@@ -1819,11 +1819,12 @@ RValue RValueEmitter::visitCovariantReturnConversionExpr(
 
 namespace {
   /// An Initialization representing the concrete value buffer inside an
-  /// existential container.
-  class ExistentialValueInitialization : public SingleBufferInitialization {
+  /// opaque existential container.
+  class OpaqueExistentialValueInitialization
+    : public SingleBufferInitialization {
     SILValue valueAddr;
   public:
-    ExistentialValueInitialization(SILValue valueAddr)
+    OpaqueExistentialValueInitialization(SILValue valueAddr)
       : valueAddr(valueAddr)
     {}
     
@@ -1834,6 +1835,26 @@ namespace {
     void finishInitialization(SILGenFunction &gen) override {
       // FIXME: Disable the DeinitExistential cleanup and enable the
       // DestroyAddr cleanup for the existential container.
+    }
+  };
+
+  /// An Initialization representing the concrete value buffer inside a
+  /// boxed existential container.
+  class BoxedExistentialValueInitialization
+    : public SingleBufferInitialization {
+    SILValue valueAddr;
+  public:
+    BoxedExistentialValueInitialization(SILValue valueAddr)
+      : valueAddr(valueAddr)
+    {}
+    
+    SILValue getAddressOrNull() const override {
+      return valueAddr;
+    }
+    
+    void finishInitialization(SILGenFunction &gen) override {
+      // FIXME: Disable the DeallocExistentialBox cleanup and enable the
+      // Release cleanup for the existential container.
     }
   };
 }
@@ -1867,6 +1888,54 @@ static RValue emitClassBoundedErasure(SILGenFunction &gen, ErasureExpr *E) {
   return RValue(gen, E, ManagedValue(v, sub.getCleanup()));
 }
 
+static std::pair<ManagedValue, CanArchetypeType>
+emitOpenExistentialForErasure(SILGenFunction &gen,
+                              SILLocation loc,
+                              Expr *subExpr) {
+  Type subType = subExpr->getType();
+  assert(subType->isExistentialType());
+  
+  // If the source value is already of a protocol type, open the existential
+  // container so we can steal its value.
+  // TODO: Have a way to represent this operation in-place. The supertype
+  // should be able to fit in the memory of the subtype existential.
+  ManagedValue subExistential = gen.emitRValueAsSingleValue(subExpr);
+  CanArchetypeType subFormalTy = ArchetypeType::getOpened(subType);
+  SILType subLoweredTy = gen.getLoweredType(subFormalTy);
+  bool isTake = subExistential.hasCleanup();
+  SILValue subPayload;
+  switch (subExistential.getType().getPreferredExistentialRepresentation()) {
+  case ExistentialRepresentation::None:
+    llvm_unreachable("not existential");
+  case ExistentialRepresentation::Metatype:
+    llvm_unreachable("metatype-to-address-only erasure shouldn't happen");
+  case ExistentialRepresentation::Opaque:
+    subPayload = gen.B.createOpenExistentialAddr(loc,
+                                                 subExistential.forward(gen),
+                                                 subLoweredTy);
+    // FIXME: Need deinit_existential_addr cleanup if payload is taken!
+    break;
+  case ExistentialRepresentation::Class:
+    subPayload = gen.B.createOpenExistentialRef(loc,
+                                                subExistential.forward(gen),
+                                                subLoweredTy);
+    break;
+  // We currently don't have any boxed protocol compositions or boxed
+  // protocols that inherit, so this should never occur yet. If that changes,
+  // we would need to open_existential_box here.
+  case ExistentialRepresentation::Boxed:
+    // Can never take from a box; the value might be shared.
+    isTake = false;
+    llvm_unreachable("boxed-to-unboxed existential erasure not implemented");
+  }
+  gen.setArchetypeOpeningSite(subFormalTy, subPayload);
+  ManagedValue subMV = isTake
+    ? gen.emitManagedRValueWithCleanup(subPayload)
+    : ManagedValue::forUnmanaged(subPayload);
+  
+  return {subMV, subFormalTy};
+}
+
 static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
                                      SGFContext C) {
   // FIXME: Need to stage cleanups here. If code fails between
@@ -1881,32 +1950,16 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
   Type subType = E->getSubExpr()->getType();
   
   if (subType->isExistentialType()) {
-    // If the source value is already of a protocol type, open the existential
-    // container so we can steal its value.
-    // TODO: Have a way to represent this operation in-place. The supertype
-    // should be able to fit in the memory of the subtype existential.
-    ManagedValue subExistential = gen.emitRValueAsSingleValue(E->getSubExpr());
-    CanArchetypeType subFormalTy = ArchetypeType::getOpened(subType);
-    SILType subLoweredTy = gen.getLoweredType(subFormalTy);
-    bool isTake = subExistential.hasCleanup();
-    SILValue subPayload;
-    if (subExistential.getValue().getType().isAddress()) {
-      subPayload = gen.B.createOpenExistentialAddr(E, subExistential.forward(gen),
-                                               subLoweredTy);
-    } else {
-      subPayload = gen.B.createOpenExistentialRef(E,subExistential.forward(gen),
-                                                  subLoweredTy);
-    }
-    gen.setArchetypeOpeningSite(subFormalTy, subPayload);
-    ManagedValue subMV = isTake
-      ? gen.emitManagedRValueWithCleanup(subPayload)
-      : ManagedValue::forUnmanaged(subPayload);
-    
+    ManagedValue subMV;
+    CanArchetypeType subFormalTy;
+    std::tie(subMV, subFormalTy)
+       = emitOpenExistentialForErasure(gen, E, E->getSubExpr());
+
     // Set up the destination existential, and forward the payload into it.
     SILValue destAddr = gen.B.createInitExistentialAddr(E, existential,
-                                                subFormalTy->getCanonicalType(),
-                                                subLoweredTy,
-                                                E->getConformances());
+                                                        subFormalTy,
+                                                        subMV.getType(),
+                                                        E->getConformances());
     
     subMV.forwardInto(gen, E, destAddr);
   } else {
@@ -1914,7 +1967,7 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
     // scratch.
     
     // Allocate the concrete value inside the container.
-    auto concreteFormalType = E->getSubExpr()->getType()->getCanonicalType();
+    auto concreteFormalType = subType->getCanonicalType();
     
     auto archetype = ArchetypeType::getOpened(E->getType());
     AbstractionPattern abstractionPattern(archetype);
@@ -1926,7 +1979,8 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
                                 concreteTL.getLoweredType(),
                                 E->getConformances());
     // Initialize the concrete value in-place.
-    InitializationPtr init(new ExistentialValueInitialization(valueAddr));
+    InitializationPtr init(
+                           new OpaqueExistentialValueInitialization(valueAddr));
     ManagedValue mv = gen.emitRValueAsOrig(E->getSubExpr(), abstractionPattern,
                                            concreteTL, SGFContext(init.get()));
     if (!mv.isInContext()) {
@@ -1939,10 +1993,72 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
                 gen.manageBufferForExprResult(existential, existentialTL, C));
 }
 
+static RValue emitBoxedErasure(SILGenFunction &gen, ErasureExpr *E) {
+  // FIXME: Need to stage cleanups here. If code fails between
+  // AllocExistentialBox and initializing the value, clean up using
+  // DeallocExistentialBox.
+  auto &existentialTL = gen.getTypeLowering(E->getType());
+
+  Type subType = E->getSubExpr()->getType();
+  SILValue existential;
+  if (subType->isExistentialType()) {
+    // Open the inner existential and steal its payload into a new box.
+    ManagedValue subMV;
+    CanArchetypeType subFormalTy;
+    std::tie(subMV, subFormalTy)
+      = emitOpenExistentialForErasure(gen, E, E->getSubExpr());
+
+    auto box = gen.B.createAllocExistentialBox(E,
+                                               existentialTL.getLoweredType(),
+                                               subFormalTy, subMV.getType(),
+                                               E->getConformances());
+    existential = box->getExistentialResult();
+    subMV.forwardInto(gen, E, box->getValueAddressResult());
+  } else {
+    // Allocate a box and evaluate the subexpression into it.
+    auto concreteFormalType = subType->getCanonicalType();
+    
+    auto archetype = ArchetypeType::getOpened(E->getType());
+    AbstractionPattern abstractionPattern(archetype);
+    auto &concreteTL = gen.getTypeLowering(abstractionPattern,
+                                           concreteFormalType);
+
+    auto box = gen.B.createAllocExistentialBox(E,
+                                               existentialTL.getLoweredType(),
+                                               concreteFormalType,
+                                               concreteTL.getLoweredType(),
+                                               E->getConformances());
+    existential = box->getExistentialResult();
+    auto valueAddr = box->getValueAddressResult();
+    
+    // Initialize the concrete value in-place.
+    InitializationPtr init(new BoxedExistentialValueInitialization(valueAddr));
+    ManagedValue mv = gen.emitRValueAsOrig(E->getSubExpr(), abstractionPattern,
+                                           concreteTL, SGFContext(init.get()));
+    if (!mv.isInContext()) {
+      mv.forwardInto(gen, E, init->getAddress());
+      init->finishInitialization(gen);
+    }
+  }
+  
+  return RValue(gen, E, gen.emitManagedRValueWithCleanup(existential));
+}
+
 RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
-  if (E->getType()->isClassExistentialType())
+  switch (SILType::getPrimitiveObjectType(E->getType()->getCanonicalType())
+            .getPreferredExistentialRepresentation(E->getSubExpr()->getType())){
+  case ExistentialRepresentation::None:
+    llvm_unreachable("not an existential type");
+  case ExistentialRepresentation::Metatype:
+    llvm_unreachable("metatype erasure should be represented by "
+                     "MetatypeErasureExpr");
+  case ExistentialRepresentation::Class:
     return emitClassBoundedErasure(SGF, E);
-  return emitAddressOnlyErasure(SGF, E, C);
+  case ExistentialRepresentation::Boxed:
+    return emitBoxedErasure(SGF, E);
+  case ExistentialRepresentation::Opaque:
+    return emitAddressOnlyErasure(SGF, E, C);
+  }
 }
 
 /// Given an existential type or metatype, produce the type that
