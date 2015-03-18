@@ -27,7 +27,7 @@ func test_composition_erasure(x: protocol<HairType, _ErrorType>) -> _ErrorType {
 // CHECK:         [[VALUE_ADDR:%.*]] = open_existential_addr [[OLD_EXISTENTIAL:%.*]] : $*protocol<_ErrorType, HairType> to $*[[VALUE_TYPE:@opened\(.*\) protocol<_ErrorType, HairType>]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $_ErrorType, $[[VALUE_TYPE]]
 // CHECK:         copy_addr [take] [[VALUE_ADDR]] to [initialization] [[NEW_EXISTENTIAL]]#1
-// TODO:          deinit_existential_addr [[OLD_EXISTENTIAL]]
+// CHECK:         deinit_existential_addr [[OLD_EXISTENTIAL]]
 // CHECK:         return [[NEW_EXISTENTIAL]]#0
 
 protocol HairClassType: class {}

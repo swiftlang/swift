@@ -1888,6 +1888,21 @@ static RValue emitClassBoundedErasure(SILGenFunction &gen, ErasureExpr *E) {
   return RValue(gen, E, ManagedValue(v, sub.getCleanup()));
 }
 
+namespace {
+  /// A cleanup that deinitializes an opaque existential container
+  /// after its value is taken.
+  class TakeFromExistentialCleanup: public Cleanup {
+    SILValue existentialAddr;
+  public:
+    TakeFromExistentialCleanup(SILValue existentialAddr)
+      : existentialAddr(existentialAddr) {}
+    
+    void emit(SILGenFunction &gen, CleanupLocation l) override {
+      gen.B.createDeinitExistentialAddr(l, existentialAddr);
+    }
+  };
+}
+
 static std::pair<ManagedValue, CanArchetypeType>
 emitOpenExistentialForErasure(SILGenFunction &gen,
                               SILLocation loc,
@@ -1913,7 +1928,12 @@ emitOpenExistentialForErasure(SILGenFunction &gen,
     subPayload = gen.B.createOpenExistentialAddr(loc,
                                                  subExistential.forward(gen),
                                                  subLoweredTy);
-    // FIXME: Need deinit_existential_addr cleanup if payload is taken!
+    // If we're going to take the payload, we need to deinit the leftover
+    // existential shell.
+    if (isTake)
+      gen.Cleanups.pushCleanup<TakeFromExistentialCleanup>(
+                                                     subExistential.getValue());
+
     break;
   case ExistentialRepresentation::Class:
     subPayload = gen.B.createOpenExistentialRef(loc,
@@ -1950,6 +1970,8 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
   Type subType = E->getSubExpr()->getType();
   
   if (subType->isExistentialType()) {
+    FullExpr scope(gen.Cleanups, CleanupLocation(E));
+
     ManagedValue subMV;
     CanArchetypeType subFormalTy;
     std::tie(subMV, subFormalTy)
@@ -2002,6 +2024,8 @@ static RValue emitBoxedErasure(SILGenFunction &gen, ErasureExpr *E) {
   Type subType = E->getSubExpr()->getType();
   SILValue existential;
   if (subType->isExistentialType()) {
+    FullExpr scope(gen.Cleanups, CleanupLocation(E));
+    
     // Open the inner existential and steal its payload into a new box.
     ManagedValue subMV;
     CanArchetypeType subFormalTy;
