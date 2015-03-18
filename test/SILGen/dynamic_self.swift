@@ -75,6 +75,7 @@ func testExistentialDispatch(p: P) {
 // CHECK:   destroy_addr [[P_RESULT]]#1 : $*P
 // CHECK:   destroy_addr [[PCOPY_ADDR]] : $*@opened([[N]]) P
 // CHECK:   dealloc_stack [[P_RESULT]]#0 : $*@local_storage P
+// CHECK:   deinit_existential_addr [[PCOPY]]#1
 // CHECK:   dealloc_stack [[PCOPY]]#0 : $*@local_storage P
 // CHECK:   destroy_addr [[P]] : $*P
   p.f()

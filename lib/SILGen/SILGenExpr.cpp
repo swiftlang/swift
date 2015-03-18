@@ -49,8 +49,8 @@ SILGenFunction::OpaqueValueRAII::~OpaqueValueRAII() {
   // Destroy the value, unless it was both uniquely referenced and consumed.
   auto entry = Self.OpaqueValues.find(OpaqueValue);
   if (Destroy && 
-      (!OpaqueValue->isUniquelyReferenced() || !entry->second.second)) {
-    SILValue &value = entry->second.first;
+      (!entry->second.isUniquelyReferenced || !entry->second.hasBeenConsumed)) {
+    const SILValue &value = entry->second.value;
     auto &lowering = Self.getTypeLowering(value.getType().getSwiftRValueType());
     if (lowering.isTrivial()) {
       // Nothing to do.
@@ -6637,29 +6637,54 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
     = SGF.emitRValueAsSingleValue(E->getExistentialValue());
   
   // Open the existential value into the opened archetype value.
+  // TODO: Nonunique opened existentials need different memory management for
+  // the opened value than what's implemented below.
+  assert(E->getOpaqueValue()->isUniquelyReferenced()
+         && "nonunique opened existential not implemented yet");
+  bool isUnique = E->getOpaqueValue()->isUniquelyReferenced();
   SILValue archetypeValue;
-  if (existentialValue.getValue().getType().isAddress()) {
+  
+  switch (existentialValue.getType().getPreferredExistentialRepresentation()) {
+  case ExistentialRepresentation::Opaque:
+    assert(existentialValue.getValue().getType().isAddress());
     archetypeValue = SGF.B.createOpenExistentialAddr(
                        E, existentialValue.forward(SGF),
                        SGF.getLoweredType(E->getOpaqueValue()->getType()));
-  } else if (existentialValue.getType().is<ExistentialMetatypeType>()) {
+    // Leave a cleanup to deinit the existential container.
+    SGF.Cleanups.pushCleanup<CleanupUsedExistentialContainer>(
+                                                  existentialValue.getValue());
+    break;
+  case ExistentialRepresentation::Metatype:
     assert(existentialValue.getValue().getType().isObject());
     archetypeValue = SGF.B.createOpenExistentialMetatype(
                        E, existentialValue.forward(SGF),
                        SGF.getLoweredType(E->getOpaqueValue()->getType()));
-  } else {
+    break;
+  case ExistentialRepresentation::Class:
     assert(existentialValue.getValue().getType().isObject());
     archetypeValue = SGF.B.createOpenExistentialRef(
                        E, existentialValue.forward(SGF),
                        SGF.getLoweredType(E->getOpaqueValue()->getType()));
+    break;
+  case ExistentialRepresentation::Boxed:
+    assert(existentialValue.getValue().getType().isObject());
+    archetypeValue = SGF.B.createOpenExistentialBox(
+                       E, existentialValue.forward(SGF),
+                       SGF.getLoweredType(E->getOpaqueValue()->getType()));
+    // The boxed value can't be assumed to be uniquely referenced.
+    isUnique = false;
+    break;
+  case ExistentialRepresentation::None:
+    llvm_unreachable("not existential");
   }
   SGF.setArchetypeOpeningSite(CanArchetypeType(E->getOpenedArchetype()),
                               archetypeValue);
   
   // Register the opaque value for the projected existential.
   SILGenFunction::OpaqueValueRAII opaqueValueRAII(SGF, E->getOpaqueValue(), 
-                                                  archetypeValue,
-                                                  /*destroy=*/false);
+                                              archetypeValue,
+                                              /*destroy=*/false,
+                                              /*uniquely referenced=*/isUnique);
 
   return visit(E->getSubExpr(), C);
 }
@@ -6671,15 +6696,16 @@ RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
 
   // If the opaque value is uniquely referenced, we can just return the
   // value with a cleanup. There is no need to retain it separately.
-  if (E->isUniquelyReferenced()) {
-    assert(!entry.second &&"Uniquely-referenced opaque value already consumed");
-    entry.second = true;
-    return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(entry.first));
+  if (entry.isUniquelyReferenced) {
+    assert(!entry.hasBeenConsumed
+           && "Uniquely-referenced opaque value already consumed");
+    entry.hasBeenConsumed = true;
+    return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(entry.value));
   }
 
   // Retain the value.
-  entry.second = true;
-  return RValue(SGF, E, SGF.emitManagedRetain(E, entry.first));
+  entry.hasBeenConsumed = true;
+  return RValue(SGF, E, SGF.emitManagedRetain(E, entry.value));
 }
 
 ProtocolDecl *SILGenFunction::getPointerProtocol() {

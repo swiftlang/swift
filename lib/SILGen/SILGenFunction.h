@@ -319,9 +319,15 @@ public:
   /// to a local constant.
   llvm::DenseMap<SILDeclRef, SILValue> LocalFunctions;
 
+  struct OpaqueValueState {
+    SILValue value;
+    bool isUniquelyReferenced;
+    bool hasBeenConsumed;
+  };
+
   /// Mapping from active opaque value expressions to their values,
   /// along with a bit for each indicating whether it has been consumed yet.
-  llvm::DenseMap<OpaqueValueExpr *, std::pair<SILValue, bool>> OpaqueValues;
+  llvm::DenseMap<OpaqueValueExpr *, OpaqueValueState> OpaqueValues;
 
   /// RAII object that introduces a temporary binding for an opaque value.
   ///
@@ -338,12 +344,17 @@ public:
 
   public:
     OpaqueValueRAII(SILGenFunction &self, OpaqueValueExpr *opaqueValue,
-                    SILValue value, bool destroy)
+                    SILValue value, bool destroy,
+                    bool isUniquelyReferenced)
       : Self(self), OpaqueValue(opaqueValue), Destroy(destroy)
     {
       assert(Self.OpaqueValues.count(OpaqueValue) == 0 &&
              "Opaque value already has a binding");
-      Self.OpaqueValues[OpaqueValue] = std::make_pair(value, false);
+      Self.OpaqueValues[OpaqueValue] = OpaqueValueState{
+        value,
+        isUniquelyReferenced,
+        /*destroy*/ false
+      };
     }
 
     ~OpaqueValueRAII();
