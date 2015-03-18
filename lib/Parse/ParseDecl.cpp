@@ -1728,8 +1728,10 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
         // have already been specified by the developer; so that we do not
         // duplicate them in code completion strings
         SmallVector<StringRef, 3> Keywords;
-        backtrackToPosition(ParserPosition(L->getStateForBeginningOfTokenLoc
-          (Lexer::getLocForStartOfLine(SourceMgr, Tok.getLoc())), SourceLoc()));
+
+        // FIXME: need to handle the case where this line contains multiple decls
+        backtrackToPosition(ParserPosition(L->getStateForBeginningOfTokenLoc(
+          Lexer::getLocForStartOfLine(SourceMgr, Tok.getLoc())), SourceLoc()));
         while (!Tok.is(tok::code_complete)) {
           Keywords.push_back(Tok.getText());
           consumeToken();

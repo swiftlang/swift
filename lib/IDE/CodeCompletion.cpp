@@ -942,8 +942,8 @@ public:
   void completeCaseStmtDotPrefix() override;
   void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
-  void completeNominalMemberBeginning(SmallVectorImpl<StringRef>
-                                      &Keywords) override;
+  void completeNominalMemberBeginning(
+      SmallVectorImpl<StringRef> &Keywords) override;
 
   void addKeywords(CodeCompletionResultSink &Sink);
 
@@ -2156,13 +2156,9 @@ public:
         CurrDeclContext(CurrDeclContext),
         ParsedKeywords(ParsedKeywords){}
 
-  bool IsKeywordSpecified(StringRef W) {
-    bool Found = false;
-    std::for_each(ParsedKeywords.begin(), ParsedKeywords.end(),
-                  [&](StringRef KW) {
-        Found |= (W.compare(KW) == 0);
-    });
-    return Found;
+  bool isKeywordSpecified(StringRef Word) {
+    return std::find(ParsedKeywords.begin(), ParsedKeywords.end(), Word)
+      != ParsedKeywords.end();
   }
 
   void addMethodOverride(const FuncDecl *FD, DeclVisibilityKind Reason) {
@@ -2206,17 +2202,19 @@ public:
                                    ->getExtendedType()
                                    ->getAnyNominal()
                                    ->getAccessibility();
-    if (!IsKeywordSpecified("private") &&
-        !IsKeywordSpecified("public") &&
-        !IsKeywordSpecified("internal"))
-    Builder.addAccessControlKeyword(std::min(
-        FD->getAccessibility(), AccessibilityOfContext));
+    // If the developer has not input "func", we need to add necessary keywords
+    if (!isKeywordSpecified("func")) {
+      if (!isKeywordSpecified("private") &&
+          !isKeywordSpecified("public") &&
+          !isKeywordSpecified("internal"))
+        Builder.addAccessControlKeyword(std::min(FD->getAccessibility(),
+                                                 AccessibilityOfContext));
 
-    if (Reason == DeclVisibilityKind::MemberOfSuper &&
-        !IsKeywordSpecified("override"))
-      Builder.addOverrideKeyword();
-    if (!IsKeywordSpecified("func"))
+      if (Reason == DeclVisibilityKind::MemberOfSuper &&
+          !isKeywordSpecified("override"))
+        Builder.addOverrideKeyword();
       Builder.addDeclIntroducer(DeclStr.str().substr(0, NameOffset));
+    }
     Builder.addTextChunk(DeclStr.str().substr(NameOffset));
     Builder.addBraceStmtWithCursor();
   }

@@ -87,6 +87,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD2 -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=OMIT_KEYWORD2< %t.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD3 -code-completion-keywords=false > %t.txt
+// RUN: FileCheck %s -check-prefix=OMIT_KEYWORD3< %t.txt
+
 @objc
 class TagPA {}
 @objc
@@ -345,3 +348,13 @@ class OmitKW2 : ProtocolA {
 //OMIT_KEYWORD2-DAG:     Decl[InstanceMethod]/Super:         protoAFunc() {|}; name=protoAFunc(){{$}}
 //OMIT_KEYWORD2-DAG:     Decl[InstanceMethod]/Super:         protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
 //OMIT_KEYWORD2-DAG:     Decl[InstanceMethod]/Super:         protoAFuncWithAttr() {|}; name=protoAFuncWithAttr(){{$}}
+
+class OmitKW3 : ProtocolA {
+  func#^OMIT_KEYWORD3^#
+}
+
+//OMIT_KEYWORD3:         Begin completions
+//OMIT_KEYWORD3-DAG:     Decl[Constructor]/Super:            init(fromProtocolA: Int) {|}; name=init(fromProtocolA: Int){{$}}
+//OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFunc() {|}; name=protoAFunc(){{$}}
+//OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
+//OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFuncWithAttr() {|}; name=protoAFuncWithAttr(){{$}}
