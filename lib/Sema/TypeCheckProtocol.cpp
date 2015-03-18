@@ -2877,22 +2877,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         conformance->setInheritedConformance(InheritedProto,
                                              InheritedConformance);
     } else {
-      if (auto knownConformance =
-              TC.Context.getConformsTo(canT, InheritedProto)) {
-        // Check to see if the conformance is in an incomplete state.  If it is,
-        // the inherited protocol has an indirectly recursive requirement.
-        if (ComplainLoc.isValid() &&
-            knownConformance->getInt() &&
-            (knownConformance->getPointer()->getState() ==
-                ProtocolConformanceState::Checking)) {
-              if (!conformance->hasInheritedConformance(InheritedProto)) {
-                conformance->setInheritedConformance(InheritedProto,
-                                                     knownConformance->
-                                                        getPointer());
-              }
-              continue;
-        }
-      }
       // Recursive call already diagnosed this problem, but tack on a note
       // to establish the relationship.
       if (ComplainLoc.isValid()) {
