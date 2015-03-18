@@ -75,6 +75,9 @@ void emitIndirectConditionalCastWithScalar(SILBuilder &B, Module *M,
                                            SILBasicBlock *trueBB,
                                            SILBasicBlock *falseBB);
 
+/// \brief Does the type conform to the _ObjectiveCBridgeable protocol.
+bool isObjectiveCBridgeable(Module *M, CanType Ty);
+
 } // end namespace swift
 
 #endif
