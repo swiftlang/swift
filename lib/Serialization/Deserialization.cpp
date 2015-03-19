@@ -402,6 +402,7 @@ ModuleFile::readReferencedConformance(ProtocolDecl *proto,
 
   SmallVector<ProtocolConformance *, 2> conformances;
   nominal->lookupConformance(owningModule, proto, nullptr, conformances);
+  assert(!conformances.empty() && "Could not find conformance");
   return conformances.front();
 }
 

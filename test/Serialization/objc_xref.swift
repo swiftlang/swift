@@ -1,7 +1,13 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %S/Inputs/def_objc_xref.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -I %t %s -verify
+
+// FIXME: BEGIN -enable-source-import hackaround
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %clang-importer-sdk-path/swift-modules/Foundation.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %clang-importer-sdk-path/swift-modules/AppKit.swift
+// FIXME: END -enable-source-import hackaround
+
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -emit-module -o %t %S/Inputs/def_objc_xref.swift -I %t
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -parse -I %t %s -verify
 
 // REQUIRES: objc_interop
 

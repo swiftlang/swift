@@ -1903,7 +1903,7 @@ void Serializer::writeDecl(const Decl *D) {
       writeGenericParams(ref.GenericParams, DeclTypeAbbrCodes);
 
     writeMembers(extension->getMembers(), isClassExtension);
-    writeConformances(extension->getConformances(), extension,
+    writeConformances(extension->getLocalConformances(nullptr), extension,
                       DeclTypeAbbrCodes);
 
     break;
@@ -2081,7 +2081,7 @@ void Serializer::writeDecl(const Decl *D) {
     writeGenericParams(theStruct->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(theStruct->getGenericRequirements());
     writeMembers(theStruct->getMembers(), false);
-    writeConformances(theStruct->getConformances(), theStruct,
+    writeConformances(theStruct->getLocalConformances(nullptr), theStruct,
                       DeclTypeAbbrCodes);
     break;
   }
@@ -2111,7 +2111,8 @@ void Serializer::writeDecl(const Decl *D) {
     writeGenericParams(theEnum->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(theEnum->getGenericRequirements());
     writeMembers(theEnum->getMembers(), false);
-    writeConformances(theEnum->getConformances(), theEnum, DeclTypeAbbrCodes);
+    writeConformances(theEnum->getLocalConformances(nullptr), theEnum,
+                      DeclTypeAbbrCodes);
     break;
   }
 
@@ -2143,7 +2144,8 @@ void Serializer::writeDecl(const Decl *D) {
     writeGenericParams(theClass->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(theClass->getGenericRequirements());
     writeMembers(theClass->getMembers(), true);
-    writeConformances(theClass->getConformances(), theClass, DeclTypeAbbrCodes);
+    writeConformances(theClass->getLocalConformances(nullptr), theClass,
+                      DeclTypeAbbrCodes);
     break;
   }
 
