@@ -286,7 +286,7 @@ unsigned DeclAttribute::getOptions(DeclAttrKind DK) {
   llvm_unreachable("bad DeclAttrKind");
 }
 
-std::string DeclAttribute::getAttrName() const {
+StringRef DeclAttribute::getAttrName() const {
   switch (getKind()) {
   case DAK_Count:
     llvm_unreachable("getAttrName needs a valid attribute");
@@ -347,9 +347,7 @@ std::string DeclAttribute::getAttrName() const {
   case DAK_ObjCBridged:
     return "<<ObjC bridged>>";
   case DAK_SynthesizedProtocol:
-    return ("<<synthesized protocol"
-      + getProtocolName(cast<SynthesizedProtocolAttr>(this)->getProtocolKind())
-      + ">>").str();
+    return "<<synthesized protocol>>";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
