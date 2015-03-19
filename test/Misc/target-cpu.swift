@@ -11,7 +11,7 @@
 // APPLETVTARGETCPU3: "-target-cpu" "cortex-a8"
 
 // RUN: not %swift -parse -target armv7k-apple-watchos2 -Xcc -### %s 2>&1 | FileCheck -check-prefix=WATCHTARGETCPU1 %s
-// WATCHTARGETCPU1: "-target-cpu" "cortex-a8"
+// WATCHTARGETCPU1: "-target-cpu" "cortex-a7"
 
 // RUN: not %swift -parse -target arm64-apple-watchos2 -Xcc -### %s 2>&1 | FileCheck -check-prefix=WATCHTARGETCPU2 %s
 // WATCHTARGETCPU2: "-target-cpu" "cyclone"
