@@ -71,6 +71,7 @@ public:
   IGNORED_ATTR(Prefix)
   IGNORED_ATTR(RawOptionSet)
   IGNORED_ATTR(RequiresStoredPropertyInits)
+  IGNORED_ATTR(Testable)
 #undef IGNORED_ATTR
 
   void visitAutoClosureAttr(AutoClosureAttr *attr) {
@@ -505,20 +506,34 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
     // common) give a specific helpful error.
     unsigned PossibleDeclKinds = attr->getOptions() & DeclAttribute::OnAnyDecl;
     StringRef OnlyKind;
-    if (PossibleDeclKinds == DeclAttribute::OnVar)
+    switch (PossibleDeclKinds) {
+    case DeclAttribute::OnImport:
+      OnlyKind = "import";
+      break;
+    case DeclAttribute::OnVar:
       OnlyKind = "var";
-    else if (PossibleDeclKinds == DeclAttribute::OnFunc)
+      break;
+    case DeclAttribute::OnFunc:
       OnlyKind = "func";
-    else if (PossibleDeclKinds == DeclAttribute::OnClass)
+      break;
+    case DeclAttribute::OnClass:
       OnlyKind = "class";
-    else if (PossibleDeclKinds == DeclAttribute::OnStruct)
+      break;
+    case DeclAttribute::OnStruct:
       OnlyKind = "struct";
-    else if (PossibleDeclKinds == DeclAttribute::OnConstructor)
+      break;
+    case DeclAttribute::OnConstructor:
       OnlyKind = "init";
-    else if (PossibleDeclKinds == DeclAttribute::OnProtocol)
+      break;
+    case DeclAttribute::OnProtocol:
       OnlyKind = "protocol";
-    else if (PossibleDeclKinds == DeclAttribute::OnParam)
+      break;
+    case DeclAttribute::OnParam:
       OnlyKind = "parameter";
+      break;
+    default:
+      break;
+    }
 
     if (!OnlyKind.empty())
       Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_only_one_decl_kind,
@@ -574,6 +589,7 @@ public:
     IGNORED_ATTR(RawOptionSet)
     IGNORED_ATTR(RequiresStoredPropertyInits)
     IGNORED_ATTR(SILStored)
+    IGNORED_ATTR(Testable)
 #undef IGNORED_ATTR
 
   void visitAvailabilityAttr(AvailabilityAttr *attr);

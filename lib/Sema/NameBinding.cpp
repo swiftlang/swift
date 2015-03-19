@@ -171,6 +171,14 @@ NameBinder::addImport(SmallVectorImpl<std::pair<ImportedModule, bool>> &imports,
     });
   }
 
+  if (auto *testableAttr = ID->getAttrs().getAttribute<TestableAttr>()) {
+    if (!topLevelModule->isTestingEnabled()) {
+      diagnose(ID->getModulePath().front().second, diag::module_not_testable,
+               topLevelModule->Name);
+      testableAttr->setInvalid();
+    }
+  }
+
   if (ID->getImportKind() != ImportKind::Module) {
     // If we're importing a specific decl, validate the import kind.
     using namespace namelookup;

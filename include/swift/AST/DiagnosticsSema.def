@@ -267,6 +267,9 @@ ERROR(imported_decl_is_wrong_kind,sema_nb,none,
 ERROR(ambiguous_decl_in_module,sema_nb,none,
       "ambiguous name %0 in module %1", (Identifier, Identifier))
 
+ERROR(module_not_testable,sema_nb,none,
+      "module %0 was not compiled for testing", (Identifier))
+
 // Operator decls
 ERROR(ambiguous_operator_decls,sema_nb,none,
       "ambiguous operator declarations found for operator", ())

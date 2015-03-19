@@ -272,13 +272,12 @@ private:
   /// The magic __dso_handle variable.
   llvm::PointerIntPair<VarDecl *, 1, bool> DSOHandleAndTestingEnabled;
 
-  Module(Identifier name, ASTContext &ctx, bool testingEnabled);
+  Module(Identifier name, ASTContext &ctx);
 public:
   Identifier getName() const { return Name; }
 
-  static Module *create(Identifier name, ASTContext &ctx,
-                        bool testingEnabled = false) {
-    return new (ctx) Module(name, ctx, testingEnabled);
+  static Module *create(Identifier name, ASTContext &ctx) {
+    return new (ctx) Module(name, ctx);
   }
 
   ArrayRef<FileUnit *> getFiles() {
@@ -311,6 +310,9 @@ public:
   VarDecl *getDSOHandle();
 
   /// Returns true if this module was or is being compiled for testing.
+  void setTestingEnabled(bool enabled = true) {
+    DSOHandleAndTestingEnabled.setInt(enabled);
+  }
   bool isTestingEnabled() const {
     return DSOHandleAndTestingEnabled.getInt();
   }

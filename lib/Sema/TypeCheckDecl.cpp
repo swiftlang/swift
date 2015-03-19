@@ -4754,6 +4754,7 @@ public:
     UNINTERESTING_ATTR(RequiresStoredPropertyInits)
     UNINTERESTING_ATTR(Transparent)
     UNINTERESTING_ATTR(SILStored)
+    UNINTERESTING_ATTR(Testable)
 
 #undef UNINTERESTING_ATTR
 

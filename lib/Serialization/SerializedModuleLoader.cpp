@@ -161,20 +161,20 @@ FileUnit *SerializedModuleLoader::loadAST(
   }
 
   serialization::ExtendedValidationInfo extendedInfo;
-  serialization::validateSerializedAST(moduleInputBuffer.get()->getBuffer(),
-                                       &extendedInfo);
-  bool IsSIB = extendedInfo.isSIB();
-
   std::unique_ptr<ModuleFile> loadedModuleFile;
   serialization::Status err = ModuleFile::load(std::move(moduleInputBuffer),
                                                std::move(moduleDocInputBuffer),
-                                               isFramework, loadedModuleFile);
+                                               isFramework, loadedModuleFile,
+                                               &extendedInfo);
   if (err == serialization::Status::Valid) {
     Ctx.bumpGeneration();
 
     // We've loaded the file. Now try to bring it into the AST.
-    auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile, IsSIB);
+    auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile,
+                                                extendedInfo.isSIB());
     M.addFile(*fileUnit);
+    if (extendedInfo.isTestable())
+      M.setTestingEnabled();
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     err = loadedModuleFile->associateWithFileContext(fileUnit,

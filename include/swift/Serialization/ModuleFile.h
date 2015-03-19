@@ -337,7 +337,7 @@ private:
   /// Constructs an new module and validates it.
   ModuleFile(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
              std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
-             bool isFramework);
+             bool isFramework, serialization::ExtendedValidationInfo *extInfo);
 
 public:
   /// Change the status of the current module. Default argument marks the module
@@ -444,15 +444,17 @@ public:
   /// \param isFramework If true, this is treated as a framework module for
   /// linking purposes.
   /// \param[out] theModule The loaded module.
+  /// \param[out] extInfo Optionally, extra info serialized about the module.
   /// \returns Whether the module was successfully loaded, or what went wrong
   ///          if it was not.
   static Status
   load(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
-       bool isFramework, std::unique_ptr<ModuleFile> &theModule) {
+       bool isFramework, std::unique_ptr<ModuleFile> &theModule,
+       serialization::ExtendedValidationInfo *extInfo = nullptr) {
     theModule.reset(new ModuleFile(std::move(moduleInputBuffer),
                                    std::move(moduleDocInputBuffer),
-                                   isFramework));
+                                   isFramework, extInfo));
     return theModule->getStatus();
   }
 

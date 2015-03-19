@@ -78,9 +78,12 @@ namespace serialization {
   class ExtendedValidationInfo {
     SmallVector<StringRef, 4> ExtraClangImporterOpts;
     StringRef SDKPath;
-    bool IsSIB;
+    struct {
+      unsigned IsSIB : 1;
+      unsigned IsTestable : 1;
+    } Bits;
   public:
-    ExtendedValidationInfo() = default;
+    ExtendedValidationInfo() : Bits() {}
 
     StringRef getSDKPath() const { return SDKPath; }
     void setSDKPath(StringRef path) {
@@ -95,9 +98,13 @@ namespace serialization {
       ExtraClangImporterOpts.push_back(option);
     }
 
-    bool isSIB() const { return IsSIB; }
+    bool isSIB() const { return Bits.IsSIB; }
     void setIsSIB(bool val) {
-        IsSIB = val;
+        Bits.IsSIB = val;
+    }
+    bool isTestable() const { return Bits.IsTestable; }
+    void setIsTestable(bool val) {
+      Bits.IsTestable = val;
     }
   };
 

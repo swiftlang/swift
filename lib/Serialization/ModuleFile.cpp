@@ -106,6 +106,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
       options_block::IsSIBLayout::readRecord(scratch, IsSIB);
       extendedInfo.setIsSIB(IsSIB);
       break;
+    case options_block::IS_TESTABLE:
+      extendedInfo.setIsTestable(true);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -710,7 +713,8 @@ static bool isTargetTooNew(const llvm::Triple &moduleTarget,
 ModuleFile::ModuleFile(
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
-    bool isFramework)
+    bool isFramework,
+    serialization::ExtendedValidationInfo *extInfo)
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
       ModuleInputReader(getStartBytePtr(this->ModuleInputBuffer.get()),
@@ -741,7 +745,7 @@ ModuleFile::ModuleFile(
     case CONTROL_BLOCK_ID: {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
 
-      auto info = validateControlBlock(cursor, scratch, nullptr);
+      auto info = validateControlBlock(cursor, scratch, extInfo);
       if (info.status != Status::Valid) {
         error(info.status);
         return;

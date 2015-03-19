@@ -215,8 +215,9 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
 Module *CompilerInstance::getMainModule() {
   if (!MainModule) {
     Identifier ID = Context->getIdentifier(Invocation.getModuleName());
-    bool enableTesting = Invocation.getFrontendOptions().EnableTesting;
-    MainModule = Module::create(ID, *Context, enableTesting);
+    MainModule = Module::create(ID, *Context);
+    if (Invocation.getFrontendOptions().EnableTesting)
+      MainModule->setTestingEnabled();
   }
   return MainModule;
 }

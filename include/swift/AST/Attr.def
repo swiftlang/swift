@@ -205,6 +205,10 @@ SIMPLE_DECL_ATTR(__raw_option_set, RawOptionSet,
                  OnStruct | NotSerialized | RejectByParser,
                  /* Not serialized */54)
 
+SIMPLE_DECL_ATTR(testable, Testable,
+                 OnImport | NotSerialized | UserInaccessible,
+                 /* Not serialized */ 55)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef SIMPLE_DECL_ATTR

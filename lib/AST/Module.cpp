@@ -334,9 +334,9 @@ void SourceLookupCache::invalidate() {
 // Module Implementation
 //===----------------------------------------------------------------------===//
 
-Module::Module(Identifier name, ASTContext &ctx, bool testingEnabled)
-    : DeclContext(DeclContextKind::Module, nullptr), Ctx(ctx), Name(name),
-      DSOHandleAndTestingEnabled(nullptr, testingEnabled) {
+Module::Module(Identifier name, ASTContext &ctx)
+    : DeclContext(DeclContextKind::Module, nullptr), Ctx(ctx), Name(name)
+{
   ctx.addDestructorCleanup(*this);
 }
 
