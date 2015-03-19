@@ -40,20 +40,16 @@ class LazyResolver {
 public:
   virtual ~LazyResolver();
 
-  /// Resolve the conformance of the given nominal type to the given protocol.
+  /// Completely check the given normal protocol conformance.
   ///
-  /// \param type The nominal type that conforms to the given protocol.
-  ////
-  /// \param protocol The protocol to which the type conforms.
+  /// \param conformance The normal protocol conformance.
   ///
-  /// \param ext If the conforms occurs via an extension, the extension
-  /// declaration.
-  ///
-  /// \returns the protocol conformance, or null if the type does not conform
-  /// to the protocol.
-  virtual ProtocolConformance *resolveConformance(NominalTypeDecl *type,
-                                                  ProtocolDecl *protocol,
-                                                  ExtensionDecl *ext) = 0;
+  /// FIXME: We shouldn't need this as an entry to the lazy resolver, because
+  /// completely checking of conformances is only interesting when we're doing
+  /// complete checking of the declaration context. However, it is needed now
+  /// to maintain the order of checking, because resolveTypeWitness/
+  /// resolveWitness aren't lazy enough.
+  virtual void checkConformance(NormalProtocolConformance *conformance) = 0;
 
   /// Resolve the type witness for the given associated type within the given
   /// protocol conformance.

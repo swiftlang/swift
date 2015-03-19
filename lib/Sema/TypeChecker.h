@@ -1241,15 +1241,13 @@ public:
   ///
   /// Routines that perform lazy resolution as required for AST operations.
   /// @{
-  virtual ProtocolConformance *resolveConformance(NominalTypeDecl *type,
-                                                  ProtocolDecl *protocol,
-                                                  ExtensionDecl *ext) override;
-  virtual void resolveTypeWitness(const NormalProtocolConformance *conformance,
-                                  AssociatedTypeDecl *assocType) override;
-  virtual void resolveWitness(const NormalProtocolConformance *conformance,
-                              ValueDecl *requirement) override;
-  virtual Type resolveMemberType(DeclContext *dc, Type type,
-                                 Identifier name) override;
+  void checkConformance(NormalProtocolConformance *conformance) override;
+  void resolveTypeWitness(const NormalProtocolConformance *conformance,
+                          AssociatedTypeDecl *assocType) override;
+  void resolveWitness(const NormalProtocolConformance *conformance,
+                      ValueDecl *requirement) override;
+  Type resolveMemberType(DeclContext *dc, Type type,
+                         Identifier name) override;
 
   bool isCIntegerType(const DeclContext *DC, Type T);
   bool isRepresentableInObjC(const AbstractFunctionDecl *AFD,

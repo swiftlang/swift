@@ -1640,23 +1640,23 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
     // Form the inherited conformance.
     conformance = ctx.getInheritedConformance(type, inheritedConformance);
   } else {
-    // Create the normal conformance.
-    if (resolver) {
-      conformance = resolver->resolveConformance(
-                      conformingNominal,
-                      protocol,
-                      dyn_cast<ExtensionDecl>(conformingDC));
-    } else {
-      Type conformingType = conformingDC->getDeclaredTypeInContext();
-      SourceLoc conformanceLoc
-        = conformingNominal == conformingDC
-            ? conformingNominal->getLoc()
-            : cast<ExtensionDecl>(conformingDC)->getLoc();
+    // Create or find the normal conformance.
+    Type conformingType = conformingDC->getDeclaredTypeInContext();
+    SourceLoc conformanceLoc
+      = conformingNominal == conformingDC
+          ? conformingNominal->getLoc()
+          : cast<ExtensionDecl>(conformingDC)->getLoc();
 
-      conformance = ctx.getConformance(conformingType, protocol, conformanceLoc,
-                                       conformingDC,
-                                       ProtocolConformanceState::Incomplete);
+    auto normal = ctx.getConformance(conformingType, protocol, conformanceLoc,
+                                     conformingDC,
+                                     ProtocolConformanceState::Incomplete);
+
+    // FIXME: Fully check the conformance. We shouldn't need this.
+    if (resolver) {
+      resolver->checkConformance(normal);
     }
+
+    conformance = normal;
   }
 
   // Record the conformance.

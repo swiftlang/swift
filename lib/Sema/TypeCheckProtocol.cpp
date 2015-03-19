@@ -2816,27 +2816,20 @@ void ConformanceChecker::checkConformance() {
 /// \brief Determine whether the type \c T conforms to the protocol \c Proto,
 /// recording the complete witness table if it does.
 static ProtocolConformance *
-checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
-                        DeclContext *DC,
-                        Decl *ExplicitConformance,
-                        SourceLoc ComplainLoc) {
-  DeclContext *conformingDC;
-  if (auto nominal = dyn_cast<NominalTypeDecl>(ExplicitConformance))
-    conformingDC = nominal;
-  else
-    conformingDC = cast<ExtensionDecl>(ExplicitConformance);
-
-  // Find or create the conformance for this type.
-  auto canT = T->getCanonicalType();
-  NormalProtocolConformance *conformance
-    = TC.Context.getConformance(T, Proto, ComplainLoc, conformingDC,
-                                ProtocolConformanceState::Incomplete);
-
+checkConformsToProtocol(TypeChecker &TC,
+                        NormalProtocolConformance *conformance) {
   // If we're already checking this conformance, just return it.
   if (conformance->getState() == ProtocolConformanceState::Checking ||
       conformance->getState() == ProtocolConformanceState::Complete ||
       conformance->getState() == ProtocolConformanceState::Invalid)
     return conformance;
+
+  // Eit ou5
+  Type T = conformance->getType();
+  auto canT = T->getCanonicalType();
+  DeclContext *DC = conformance->getDeclContext();
+  auto Proto = conformance->getProtocol();
+  SourceLoc ComplainLoc = conformance->getLoc();
 
   // Note that we are checking this conformance now.
   conformance->setState(ProtocolConformanceState::Checking);
@@ -2952,17 +2945,8 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   }
 }
 
-ProtocolConformance *TypeChecker::resolveConformance(NominalTypeDecl *type,
-                                                     ProtocolDecl *protocol,
-                                                     ExtensionDecl *ext) {
-  validateDecl(protocol);
-
-  auto explicitConformance = ext ? (Decl *)ext : (Decl *)type;
-  auto conformanceContext = ext ? (DeclContext *)ext : (DeclContext *)type;
-  Type conformanceType = conformanceContext->getDeclaredTypeInContext();
-  return checkConformsToProtocol(*this, conformanceType, protocol,
-                                 conformanceContext, explicitConformance,
-                                 explicitConformance->getLoc());
+void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
+  checkConformsToProtocol(*this, conformance);
 }
 
 void TypeChecker::resolveTypeWitness(
