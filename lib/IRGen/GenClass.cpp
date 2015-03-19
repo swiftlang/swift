@@ -872,11 +872,9 @@ namespace {
     /// Gather protocol records for all of the explicitly-specified Objective-C
     /// protocol conformances.
     void visitConformances(DeclContext *dc) {
-      SmallVector<ProtocolConformance *, 4> conformances;
       for (auto conformance : dc->getLocalConformances(
                                 nullptr,
-                                ConformanceLookupKind::OnlyExplicit,
-                                conformances)) {
+                                ConformanceLookupKind::OnlyExplicit)) {
         ProtocolDecl *proto = conformance->getProtocol();
         if (!proto->isObjC())
           continue;

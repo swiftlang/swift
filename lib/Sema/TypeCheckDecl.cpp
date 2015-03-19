@@ -2659,13 +2659,11 @@ public:
       tracker = SF->getReferencedNameTracker();
 
     // Check each of the conformances associated with this context.
-    SmallVector<ProtocolConformance *, 4> conformancesScratch;
     SmallVector<ConformanceDiagnostic, 4> diagnostics;
     SmallVector<ProtocolDecl *, 4> protocols;
     SmallVector<ProtocolConformance *, 4> conformances;
     for (auto conformance : D->getLocalConformances(&TC,
                                                     ConformanceLookupKind::All,
-                                                    conformancesScratch,
                                                     &diagnostics)) {
       // Check and record normal conformances.
       if (auto normal = dyn_cast<NormalProtocolConformance>(conformance)) {

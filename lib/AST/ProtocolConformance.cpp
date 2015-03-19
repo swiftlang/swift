@@ -1926,27 +1926,27 @@ void NominalTypeDecl::getImplicitProtocols(
   ConformanceTable->getImplicitProtocols(this, protocols);
 }
 
-ArrayRef<ProtocolConformance *>
+SmallVector<ProtocolConformance *, 2>
 DeclContext::getLocalConformances(
   LazyResolver *resolver,
   ConformanceLookupKind lookupKind,
-  SmallVectorImpl<ProtocolConformance *> &scratch,
   SmallVectorImpl<ConformanceDiagnostic> *diagnostics) const
 {
+  SmallVector<ProtocolConformance *, 2> result;
+
   // Dig out the nominal type.
   NominalTypeDecl *nominal = isNominalTypeOrNominalTypeExtensionContext();
   if (!nominal)
-    return { };
+    return result;
 
   // Update to record all potential conformances.
   nominal->prepareConformanceTable(resolver);
-  scratch.clear();
   nominal->ConformanceTable->lookupConformances(
     nominal, 
     const_cast<DeclContext *>(this),
     resolver,
     lookupKind,
-    scratch,
+    result,
     diagnostics);
-  return scratch;
+  return result;
 }

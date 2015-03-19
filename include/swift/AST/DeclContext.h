@@ -384,18 +384,15 @@ public:
   ///
   /// \param lookupKind The kind of lookup to perform.
   ///
-  /// \param scratch Scratch space to be used to place the resulting
-  /// set of conformances.
-  ///
   /// \param diagnostics If non-null, will be populated with the set of
   /// diagnostics that should be emitted for this declaration context.
   ///
   /// FIXME: This likely makes more sense on IterableDeclContext or
   /// something similar.
-  ArrayRef<ProtocolConformance *>
+  SmallVector<ProtocolConformance *, 2>
   getLocalConformances(LazyResolver *resolver,
-                       ConformanceLookupKind lookupKind,
-                       SmallVectorImpl<ProtocolConformance *> &scratch,
+                       ConformanceLookupKind lookupKind
+                         = ConformanceLookupKind::All,
                        SmallVectorImpl<ConformanceDiagnostic> *diagnostics
                          = nullptr) const;
 
