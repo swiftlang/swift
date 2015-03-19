@@ -2155,17 +2155,6 @@ RValue RValueEmitter::visitMetatypeErasureExpr(MetatypeErasureExpr *E,
 }
 
 namespace {
-  class CleanupUsedExistentialContainer : public Cleanup {
-    SILValue existential;
-  public:
-    CleanupUsedExistentialContainer(SILValue existential)
-      : existential(existential) {}
-    
-    void emit(SILGenFunction &gen, CleanupLocation l) override {
-      gen.B.createDeinitExistentialAddr(l, existential);
-    }
-  };
-
   class CheckedCastEmitter {
     SILGenFunction &SGF;
     SILLocation Loc;
@@ -6651,7 +6640,7 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
                        E, existentialValue.forward(SGF),
                        SGF.getLoweredType(E->getOpaqueValue()->getType()));
     // Leave a cleanup to deinit the existential container.
-    SGF.Cleanups.pushCleanup<CleanupUsedExistentialContainer>(
+    SGF.Cleanups.pushCleanup<TakeFromExistentialCleanup>(
                                                   existentialValue.getValue());
     break;
   case ExistentialRepresentation::Metatype:

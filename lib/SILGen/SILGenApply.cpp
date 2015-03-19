@@ -690,6 +690,21 @@ static ManagedValue maybeEnterCleanupForTransformed(SILGenFunction &gen,
   }
 }
 
+namespace {
+  /// A cleanup that deinitializes an opaque existential container
+  /// after its value is taken.
+  class TakeFromExistentialCleanup: public Cleanup {
+    SILValue existentialAddr;
+  public:
+    TakeFromExistentialCleanup(SILValue existentialAddr)
+      : existentialAddr(existentialAddr) {}
+    
+    void emit(SILGenFunction &gen, CleanupLocation l) override {
+      gen.B.createDeinitExistentialAddr(l, existentialAddr);
+    }
+  };
+}
+
 static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
                                      SILDeclRef constant,
                                      ArgumentSource &selfValue,
@@ -820,6 +835,11 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
                                SILType::getPrimitiveAddressType(openedTy));
     gen.setArchetypeOpeningSite(openedTy, openingSite);
 
+    // Push a cleanup for the existential container if we're going to forward
+    // the contained value.
+    if (existentialVal.hasCleanup())
+      gen.Cleanups.pushCleanup<TakeFromExistentialCleanup>(
+                                                     existentialVal.getValue());
     ManagedValue openedVal =
       maybeEnterCleanupForTransformed(gen, existentialVal, openingSite);
     setSelfValueToAddress(selfLoc, openedVal);

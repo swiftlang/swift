@@ -349,6 +349,9 @@ func calls(var i:Int, var j:Int, var k:Int) {
   // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method!1
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: apply [[PMETHOD]]<[[OPENED]]>([[I]], [[PVALUE]])
+  // CHECK: destroy_addr [[PVALUE]]
+  // CHECK: deinit_existential_addr [[TEMP]]#1
+  // CHECK: dealloc_stack [[TEMP]]#0
   p.method(i)
 
   // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr [[PADDR:%.*]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
