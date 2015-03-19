@@ -1538,6 +1538,24 @@ public:
             "open_existential_ref result must be an opened existential");
   }
 
+  void checkOpenExistentialBoxInst(OpenExistentialBoxInst *OEI) {
+    SILType operandType = OEI->getOperand().getType();
+    require(operandType.isObject(),
+            "open_existential_box operand must not be address");
+
+    require(operandType.canUseExistentialRepresentation(
+                                              ExistentialRepresentation::Boxed),
+            "open_existential_box operand must be boxed existential");
+
+    CanType resultInstanceTy = OEI->getType().getSwiftRValueType();
+
+    require(OEI->getType().isAddress(),
+            "open_existential_box result must be an address");
+
+    require(isOpenedArchetype(resultInstanceTy),
+            "open_existential_box result must be an opened existential");
+  }
+
   void checkOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *I) {
     SILType operandType = I->getOperand().getType();
     require(operandType.isObject(),
@@ -1579,6 +1597,38 @@ public:
             "open_existential_metatype result must be an opened existential "
             "metatype");
   }
+  
+  void checkAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
+    SILType exType = AEBI->getExistentialType();
+    require(exType.isObject(),
+            "alloc_existential_box #0 result should be a value");
+    require(exType.canUseExistentialRepresentation(
+                                             ExistentialRepresentation::Boxed,
+                                             AEBI->getFormalConcreteType()),
+            "alloc_existential_box must be used with a boxed existential "
+            "type");
+    
+    // The lowered type must be the properly-abstracted form of the AST type.
+    auto archetype = ArchetypeType::getOpened(exType.getSwiftRValueType());
+    
+    auto loweredTy = F.getModule().Types.getLoweredType(
+                                Lowering::AbstractionPattern(archetype),
+                                AEBI->getFormalConcreteType())
+                      .getAddressType();
+    
+    requireSameType(loweredTy, AEBI->getLoweredConcreteType(),
+                    "alloc_existential_box #1 result should be the lowered "
+                    "concrete type at the right abstraction level");
+    require(isLoweringOf(AEBI->getLoweredConcreteType(),
+                         AEBI->getFormalConcreteType()),
+        "alloc_existential_box payload must be a lowering of the formal "
+        "concrete type");
+
+    for (ProtocolConformance *C : AEBI->getConformances())
+      // We allow for null conformances.
+      require(!C || AEBI->getModule().lookUpWitnessTable(C, false).first,
+              "Could not find witness table for conformance.");
+  }
 
   void checkInitExistentialAddrInst(InitExistentialAddrInst *AEI) {
     SILType exType = AEI->getOperand().getType();
@@ -1600,7 +1650,7 @@ public:
     
     requireSameType(loweredTy, AEI->getLoweredConcreteType(),
                     "init_existential_addr result type must be the lowered "
-                    "formal type at the right abstraction level");
+                    "concrete type at the right abstraction level");
 
     require(isLoweringOf(AEI->getLoweredConcreteType(),
                          AEI->getFormalConcreteType()),
@@ -1652,6 +1702,16 @@ public:
     require(exType.canUseExistentialRepresentation(
                                        ExistentialRepresentation::Opaque),
             "deinit_existential_addr must be applied to an opaque "
+            "existential");
+  }
+  
+  void checkDeallocExistentialBoxInst(DeallocExistentialBoxInst *DEBI) {
+    SILType exType = DEBI->getOperand().getType();
+    require(exType.isObject(),
+            "dealloc_existential_box must be applied to a value");
+    require(exType.canUseExistentialRepresentation(
+                                       ExistentialRepresentation::Boxed),
+            "dealloc_existential_box must be applied to a boxed "
             "existential");
   }
 
