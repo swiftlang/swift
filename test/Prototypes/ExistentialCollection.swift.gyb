@@ -13,7 +13,7 @@
 // RUN: %S/../../utils/line-directive %t/out.swift -- %target-build-swift -Xfrontend -disable-access-control %t/out.swift -o %t/a.out
 // RUN: %S/../../utils/line-directive %t/out.swift -- %target-run %t/a.out
 
-% traversals = ['Forward', 'Bidirectional']
+% traversals = ['Forward', 'Bidirectional', 'RandomAccess']
 
 @noreturn @inline(never)
 internal func _abstract(file: StaticString = __FILE__, line: UWord = __LINE__) {
@@ -155,7 +155,7 @@ func ~> <Element>(
 
 internal protocol _ForwardIndexBoxType : class {
   var typeID: ObjectIdentifier {get}
-  func successor() -> Self
+  func successor() -> _ForwardIndexBoxType
   func equals(other: _ForwardIndexBoxType) -> Bool
   func _unbox<T: ForwardIndexType>() -> T?
   func _distanceTo(other: _ForwardIndexBoxType) -> AnyForwardIndex.Distance
@@ -174,7 +174,7 @@ internal class _ForwardIndexBox<
     self.base = base
   }
   
-  func successor() -> Self {
+  func successor() -> _ForwardIndexBoxType {
     return self.dynamicType(self.base.successor())
   }
   
@@ -221,22 +221,35 @@ internal class _ForwardIndexBox<
 //===----------------------------------------------------------------------===//
 
 internal protocol _BidirectionalIndexBoxType : _ForwardIndexBoxType {
-  func predecessor() -> Self
+  func predecessor() -> _BidirectionalIndexBoxType
 }
 
-internal final class _BidirectionalIndexBox<
+internal class _BidirectionalIndexBox<
   BaseIndex: BidirectionalIndexType
 > : _ForwardIndexBox<BaseIndex>, _BidirectionalIndexBoxType {
   required init(_ base: BaseIndex) {
     super.init(base)
   }
   
-  override func successor() -> _BidirectionalIndexBox {
-    return _BidirectionalIndexBox(self.base.successor())
+  override func successor() -> _ForwardIndexBoxType {
+    return self.dynamicType(self.base.successor())
   }
   
-  func predecessor() -> _BidirectionalIndexBox {
-    return _BidirectionalIndexBox(self.base.predecessor())
+  func predecessor() -> _BidirectionalIndexBoxType {
+    return self.dynamicType(self.base.predecessor())
+  }
+}
+
+//===--- RandomAccessIndex -----------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+internal protocol _RandomAccessIndexBoxType : _BidirectionalIndexBoxType {}
+
+internal final class _RandomAccessIndexBox<
+  BaseIndex: RandomAccessIndexType
+> : _BidirectionalIndexBox<BaseIndex>, _RandomAccessIndexBoxType {
+  required init(_ base: BaseIndex) {
+    super.init(base)
   }
 }
 
@@ -247,20 +260,30 @@ extension _InitializeTo { init() {} }
 
 % for Traversal in traversals:
 
-public struct Any${Traversal}Index : ${Traversal}IndexType {
+%   Self = 'Any%sIndex' % Traversal
+public struct ${Self} : ${Traversal}IndexType {
   public typealias Distance = IntMax
   
   public init<BaseIndex: ${Traversal}IndexType>(_ base: BaseIndex) {
     _box = _${Traversal}IndexBox(base)
   }
   
-  public func successor() -> Any${Traversal}Index {
-    return Any${Traversal}Index(_box.successor())
+  public func successor() -> ${Self} {
+    return ${Self}(_box.successor())
   }
   
   % if Traversal != 'Forward':
-  public func predecessor() -> Any${Traversal}Index {
-    return Any${Traversal}Index(_box.predecessor())
+  public func predecessor() -> ${Self} {
+    return ${Self}(_box.predecessor())
+  }
+  % end
+  
+  % if Traversal == 'RandomAccess':
+  public func distanceTo(other: ${Self}) -> Distance {
+    return _box._distanceTo(other._box)
+  }
+  public func advancedBy(amount: Distance) -> ${Self} {
+    return ${Self}(_box._advancedBy(amount))
   }
   % end
   
@@ -279,8 +302,8 @@ public struct Any${Traversal}Index : ${Traversal}IndexType {
 }
 
 public func ~> (
-  start:Any${Traversal}Index, other : (_Distance, Any${Traversal}Index)
-) -> Any${Traversal}Index.Distance {
+  start: ${Self}, other : (_Distance, ${Self})
+) -> ${Self}.Distance {
   precondition(
     start._typeID == other.1._typeID,
     "distance: base index types differ.")
@@ -288,21 +311,21 @@ public func ~> (
 }
 
 public func ~> (
-  start:Any${Traversal}Index, distance : (_Advance, Any${Traversal}Index.Distance)
-) -> Any${Traversal}Index {
-  return Any${Traversal}Index(start._box._advancedBy(distance.1))
+  start: ${Self}, distance : (_Advance, ${Self}.Distance)
+) -> ${Self} {
+  return ${Self}(start._box._advancedBy(distance.1))
 }
 
 public func ~> (
-  start:Any${Traversal}Index,
-  args : (_Advance, (Any${Traversal}Index.Distance, Any${Traversal}Index))
-) -> Any${Traversal}Index {
+  start: ${Self},
+  args: (_Advance, (${Self}.Distance, ${Self}))
+) -> ${Self} {
   precondition(
     start._typeID == args.1.1._typeID, "advance: base index types differ.")
-  return Any${Traversal}Index(start._box._advancedBy(args.1.0, args.1.1._box))
+  return ${Self}(start._box._advancedBy(args.1.0, args.1.1._box))
 }
 
-public func == (lhs: Any${Traversal}Index, rhs: Any${Traversal}Index) -> Bool {
+public func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
   precondition(lhs._typeID == rhs._typeID, "base index types differ.")
   return lhs._box.equals(rhs._box)
 }
@@ -404,7 +427,18 @@ tests.test("ForwardCollection") {
 tests.test("BidirectionalCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
   let fc0 = AnyForwardCollection(lazy(a0).reverse())
-  let bc0 = AnyBidirectionalCollection(fc0)!         // upgrade!
+  
+  let bc0_ = AnyBidirectionalCollection(fc0)         // upgrade!
+  expectNotEmpty(bc0_)
+  let bc0 = bc0_!
+  expectTrue(fc0._box === bc0._box)
+
+  let fc1 = AnyForwardCollection(lazy(a0).reverse()) // new collection
+  expectFalse(fc1._box === fc0._box)
+
+  let fc2 = AnyForwardCollection(bc0)                // downgrade
+  expectTrue(fc2._box === bc0._box)
+  
   let a1 = ContiguousArray(lazy(bc0).reverse())
   expectEqual(a0, a1)
   for e in a0 {
@@ -416,6 +450,42 @@ tests.test("BidirectionalCollection") {
     expectNotEqual(bc0.endIndex, i)
     expectEqual(1, count(filter(indices(bc0)) {$0 == i}))
   }
+  
+  // Can't upgrade a non-random-access collection to random access
+  let s0 = "Hello, Woyld"
+  let bc1 = AnyBidirectionalCollection(s0)
+  let fc3 = AnyForwardCollection(bc1)
+  expectTrue(fc3._box === bc1._box)
+  expectEmpty(AnyRandomAccessCollection(bc1))
+  expectEmpty(AnyRandomAccessCollection(fc3))
+}
+
+tests.test("RandomAccessCollection") {
+  let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
+  let fc0 = AnyForwardCollection(lazy(a0).reverse())
+  let rc0_ = AnyRandomAccessCollection(fc0)         // upgrade!
+  expectNotEmpty(rc0_)
+  let rc0 = rc0_!
+  expectTrue(rc0._box === fc0._box)
+
+  let bc1 = AnyBidirectionalCollection(rc0)         // downgrade
+  expectTrue(bc1._box === rc0._box)
+
+  let fc1 = AnyBidirectionalCollection(rc0)         // downgrade
+  expectTrue(fc1._box === rc0._box)
+  
+  let a1 = ContiguousArray(lazy(rc0).reverse())
+  expectEqual(a0, a1)
+  for e in a0 {
+    let i = find(rc0, e)
+    expectNotEmpty(i)
+    expectEqual(e, rc0[i!])
+  }
+  for i in indices(rc0) {
+    expectNotEqual(rc0.endIndex, i)
+    expectEqual(1, count(filter(indices(rc0)) {$0 == i}))
+  }
 }
 
 runAllTests()
+
