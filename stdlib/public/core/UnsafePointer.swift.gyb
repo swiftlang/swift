@@ -110,7 +110,6 @@ public struct ${Self}<T>
   ///
   /// Postcondition: the memory is allocated, but not initialized.
   public static func alloc(num: Int) -> ${Self} {
-    // Don't bother with overflow checking.
     var size = strideof(T.self) * num
     return ${Self}(
       Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(T.self)))
@@ -126,7 +125,6 @@ public struct ${Self}<T>
   ///
   /// Postcondition: the memory has been deallocated.
   public func dealloc(num: Int) {
-    // Overflow checking is actually not required here.
     var size = strideof(T.self) * num
     Builtin.deallocRaw(
       _rawValue, size._builtinWordValue, Builtin.alignof(T.self))
