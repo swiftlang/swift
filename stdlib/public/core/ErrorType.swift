@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 // The protocol for error values that can be thrown.
-// TODO: doc comment
+// TODO: API review
 public protocol _ErrorType {
-  // TODO
+  var domain: String { get }
+  var code: Int { get }
 }

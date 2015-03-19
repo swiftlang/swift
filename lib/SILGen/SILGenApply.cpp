@@ -813,7 +813,13 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
   // Open the existential and project out the value, then update the
   // self value to use the projection.
   SILValue openingSite;
-  if (existentialVal.getType().isClassExistentialType()) {
+  switch (existentialVal.getType().getPreferredExistentialRepresentation()) {
+  case ExistentialRepresentation::None:
+    llvm_unreachable("not existential");
+  case ExistentialRepresentation::Metatype:
+    llvm_unreachable("existential metatypes not handled on this path");
+    
+  case ExistentialRepresentation::Class: {
     // Attach the existential cleanup to the projection so that it gets
     // consumed (or not) when the call is applied to it (or isn't).
     openingSite =
@@ -827,8 +833,9 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
       ArgumentSource(selfLoc, RValue(openedVal, openedTy));
 
     materializeSelfIfNecessary();
-
-  } else {
+    break;
+  }
+  case ExistentialRepresentation::Opaque: {
     assert(existentialVal.getType().isAddress() && "should be address-only");
     openingSite = gen.B.createOpenExistentialAddr(selfLoc,
                                               existentialVal.getValue(),
@@ -843,6 +850,26 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
     ManagedValue openedVal =
       maybeEnterCleanupForTransformed(gen, existentialVal, openingSite);
     setSelfValueToAddress(selfLoc, openedVal);
+    break;
+  }
+  case ExistentialRepresentation::Boxed: {
+    assert(existentialVal.getType().isObject() && "should be loadable");
+    openingSite = gen.B.createOpenExistentialBox(selfLoc,
+                                              existentialVal.getValue(),
+                               SILType::getPrimitiveAddressType(openedTy));
+    gen.setArchetypeOpeningSite(openedTy, openingSite);
+    ManagedValue openedVal = ManagedValue::forUnmanaged(openingSite);
+    // If the box is guaranteed, then that guarantee is good enough to
+    // guarantee the immutable box value. However,
+    // if the argument is consumed, we can't safely consume it out of the box,
+    // because it might be shared. Copy it out if that's the case.
+    if (existentialVal.hasCleanup()) {
+      openedVal = openedVal.copyUnmanaged(gen, selfLoc);
+    }
+    
+    setSelfValueToAddress(selfLoc, openedVal);
+    break;
+  }
   }
 
   remapSelfSubstitutions(gen, substitutions, openedTy);
@@ -3206,10 +3233,15 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
 
   assert(!base.isInContext());
   assert(!base.isLValue() || !base.hasCleanup());
-  SILType baseType = base.getValue().getType();
+  SILType baseType = base.getType();
 
-  // If the base is currently an address, we may have to copy it.
-  if (baseType.isAddress()) {
+  // If the base is a boxed existential, we will open it later.
+  if (baseType.getPreferredExistentialRepresentation()
+        == ExistentialRepresentation::Boxed) {
+    assert(!baseType.isAddress()
+           && "boxed existential should not be an address");
+  } else if (baseType.isAddress()) {
+    // If the base is currently an address, we may have to copy it.
     auto needsLoad = [&] {
       switch (selfParam.getConvention()) {
       // If the accessor wants the value 'inout', always pass the
