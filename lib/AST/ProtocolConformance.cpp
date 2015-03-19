@@ -1450,22 +1450,17 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
     // If the explicit protocol for the left-hand side is implied by
     // the explicit protocol for the right-hand side, the left-hand
     // side supersedes the right-hand side.
-    SmallVector<ProtocolDecl *, 4> rhsProtocols;
-    for (auto rhsProtocol : rhsExplicitProtocol->getAllProtocols(nullptr,
-                                                                 rhsProtocols)){
+    for (auto rhsProtocol : rhsExplicitProtocol->getAllProtocols(nullptr)){
       if (rhsProtocol == lhsExplicitProtocol) {
         diagnoseSuperseded = false;
         return Ordering::Before;
       }
     }
-    rhsProtocols.clear();
 
     // If the explicit protocol for the right-hand side is implied by
     // the explicit protocol for the left-hand side, the right-hand
     // side supersedes the left-hand side.
-    SmallVector<ProtocolDecl *, 4> lhsProtocols;
-    for (auto lhsProtocol : lhsExplicitProtocol->getAllProtocols(nullptr,
-                                                                 lhsProtocols)){
+    for (auto lhsProtocol : lhsExplicitProtocol->getAllProtocols(nullptr)){
       if (lhsProtocol == rhsExplicitProtocol) {
         diagnoseSuperseded = false;
         return Ordering::After;
@@ -1895,28 +1890,25 @@ bool NominalTypeDecl::lookupConformance(
            conformances);
 }
 
-ArrayRef<ProtocolDecl *> NominalTypeDecl::getAllProtocols(
-                           LazyResolver *resolver,
-                           SmallVectorImpl<ProtocolDecl *> &scratch) const {
+SmallVector<ProtocolDecl *, 2> NominalTypeDecl::getAllProtocols(
+                                 LazyResolver *resolver) const {
   prepareConformanceTable(resolver);
-  scratch.clear();
+  SmallVector<ProtocolDecl *, 2> result;
   ConformanceTable->getAllProtocols(const_cast<NominalTypeDecl *>(this),
                                     resolver,
-                                    scratch);
-  return scratch;
+                                    result);
+  return result;
 }
 
-ArrayRef<ProtocolConformance *>
-NominalTypeDecl::getAllConformances(
-  LazyResolver *resolver,
-  SmallVectorImpl<ProtocolConformance *> &scratch) const
+SmallVector<ProtocolConformance *, 2> NominalTypeDecl::getAllConformances(
+                                        LazyResolver *resolver) const
 {
   prepareConformanceTable(resolver);
-  scratch.clear();
+  SmallVector<ProtocolConformance *, 2> result;
   ConformanceTable->getAllConformances(const_cast<NominalTypeDecl *>(this),
                                        resolver,
-                                       scratch);
-  return scratch;
+                                       result);
+  return result;
 }
 
 void NominalTypeDecl::getImplicitProtocols(

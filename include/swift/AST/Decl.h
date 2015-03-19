@@ -2977,18 +2977,11 @@ public:
          SmallVectorImpl<ProtocolConformance *> &conformances) const;
 
   /// Retrieve all of the protocols that this nominal type conforms to.
-  ///
-  /// \param scratch Scratch spaced used to produce the resulting list.
-  ArrayRef<ProtocolDecl *> getAllProtocols(
-                             LazyResolver *resolver,
-                             SmallVectorImpl<ProtocolDecl *> &scratch) const;
+  SmallVector<ProtocolDecl *, 2> getAllProtocols(LazyResolver *resolver) const;
 
   /// Retrieve all of the protocol conformances for this nominal type.
-  ///
-  /// \param scratch Scratch spaced used to produce the resulting list.
-  ArrayRef<ProtocolConformance *>
-  getAllConformances(LazyResolver *resolver,
-                     SmallVectorImpl<ProtocolConformance *> &scratch) const;
+  SmallVector<ProtocolConformance *, 2> getAllConformances(
+                                          LazyResolver *resolver) const;
 
   /// \brief True if the type can implicitly derive a conformance for the given
   /// protocol.
