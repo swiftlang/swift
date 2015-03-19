@@ -774,32 +774,8 @@ public:
   }
 
   std::vector<sma::TypeName> collectProtocolConformances(NominalTypeDecl *NTD) {
-    llvm::SmallPtrSet<ProtocolDecl *, 8> ProtocolsWithConformances;
-    {
-      SmallVector<ProtocolDecl *, 8> Worklist;
-      for (const auto *Conformance : NTD->getConformances()) {
-        assert(Conformance->isComplete());
-        Worklist.push_back(Conformance->getProtocol());
-      }
-      for (const auto *ED : NTD->getExtensions()) {
-        for (const auto *Conformance : ED->getConformances()) {
-          assert(Conformance->isComplete());
-          Worklist.push_back(Conformance->getProtocol());
-        }
-      }
-
-      while (!Worklist.empty()) {
-        auto Proto = Worklist.pop_back_val();
-        if (!ProtocolsWithConformances.insert(Proto).second)
-          continue;
-
-        auto Protocols = Proto->getProtocols();
-        Worklist.append(Protocols.begin(), Protocols.end());
-      }
-    }
-
     std::vector<sma::TypeName> Result;
-    for (auto *PD : ProtocolsWithConformances) {
+    for (const auto *PD : NTD->getAllProtocols(nullptr)) {
       Result.emplace_back(convertToTypeName(PD->getDeclaredType()));
     }
     return Result;
