@@ -835,10 +835,23 @@ ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
 }
 
 SourceRange ExtensionDecl::getExtendedTypeRange() const {
+  if (!getRefComponents().front().IdentType.getTypeRepr())
+    return SourceRange();
+
   SourceRange range;
-  range.Start = getRefComponents().front().IdentTypeR->getIdLoc();
-  // FIXME: Consider generic parameters.
-  range.End = getRefComponents().back().IdentTypeR->getIdLoc();
+  range.Start
+    = getRefComponents().front().IdentType.getTypeRepr()->getStartLoc();
+
+  // If we have generic parameters, use the location of the '>'.
+  if (auto gp = getRefComponents().back().GenericParams) {
+    range.End = gp->getRAngleLoc();
+  }
+
+  // If we don't have a location for '>' or we don't have generic parameters,
+  // use the last identifier location.
+  if (range.End.isInvalid())
+    range.End = getRefComponents().back().IdentType.getTypeRepr()->getEndLoc();
+
   return range;
 }
 

@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 181; // Last change: PBD
+const uint16_t VERSION_MINOR = 182; // Last change: extension ref-components
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -939,8 +939,10 @@ namespace decls_block {
     TypeIDField, // base type
     DeclContextIDField, // context decl
     BCFixed<1>,  // implicit flag
-    BCArray<DeclIDField> // protocols
-    // Trailed by the members record and then conformance info (if any).
+    BCVBR<3>, // # of ref-components
+    BCArray<DeclIDField> // protocols and ref-component types
+    // Trailed by the generic parameter lists, members record, and then
+    // conformance info (if any).
   >;
 
   using DestructorLayout = BCRecordLayout<

@@ -2868,10 +2868,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     TypeID baseID;
     DeclContextID contextID;
     bool isImplicit;
-    ArrayRef<uint64_t> rawProtocolIDs;
+    unsigned numRefComponents;
+    ArrayRef<uint64_t> rawProtocolAndRefTypeIDs;
 
     decls_block::ExtensionLayout::readRecord(scratch, baseID, contextID,
-                                             isImplicit, rawProtocolIDs);
+                                             isImplicit, numRefComponents,
+                                             rawProtocolAndRefTypeIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2881,10 +2883,17 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
+    unsigned numProtocols = rawProtocolAndRefTypeIDs.size() - numRefComponents;
+    SmallVector<ExtensionDecl::RefComponent, 2> refComponents;
+    for (unsigned i = 0; i != numRefComponents; ++i) {
+      Type identType = getType(rawProtocolAndRefTypeIDs[numProtocols + i]);
+      GenericParamList *genericParams = maybeReadGenericParams(DC,
+                                                               DeclTypeCursor);
+      refComponents.push_back({TypeLoc::withoutLoc(identType), genericParams});
+    }
+
     auto nominal = baseTy->getAnyNominal();
-    auto TyR = new (ctx) SimpleIdentTypeRepr(SourceLoc(), nominal->getName());
-    ExtensionDecl::RefComponent component{TyR, nominal->getGenericParams()};
-    auto extension = ExtensionDecl::create(ctx, SourceLoc(), component, { },
+    auto extension = ExtensionDecl::create(ctx, SourceLoc(), refComponents, { },
                                            DC);
     extension->setEarlyAttrValidation();
     declOrOffset = extension;
@@ -2893,11 +2902,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       extension->setImplicit();
     extension->setExtendedType(baseTy);
 
-    auto protocols = ctx.Allocate<ProtocolDecl *>(rawProtocolIDs.size());
-    for_each(protocols, rawProtocolIDs, [this](ProtocolDecl *&p,
-                                               uint64_t rawID) {
-      p = cast<ProtocolDecl>(getDecl(rawID));
-    });
+    auto protocols = ctx.Allocate<ProtocolDecl *>(numProtocols);
+    for (unsigned i = 0; i != numProtocols; ++i) {
+      protocols[i] = cast<ProtocolDecl>(getDecl(rawProtocolAndRefTypeIDs[i]));
+    }
     extension->setProtocols(protocols);
 
     extension->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
@@ -2911,6 +2919,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     // FIXME: Hack because extensions always get the generic parameters of their
     // nominal types.
     extension->setGenericSignature(nominal->getGenericSignature());
+    extension->getRefComponents().back().GenericParams
+      = nominal->getGenericParams();
     break;
   }
 

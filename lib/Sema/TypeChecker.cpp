@@ -199,15 +199,23 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
 
   auto dc = ED->getDeclContext();
 
+  // Local function that invalidates all components of the extension.
+  auto invalidateAllComponents = [&] {
+    for (auto &ref : ED->getRefComponents()) {
+      ref.IdentType.setInvalidType(TC.Context);
+    }
+  };
+
   // Synthesize a type representation for the extended type.
   SmallVector<ComponentIdentTypeRepr *, 2> components;
   for (auto &ref : ED->getRefComponents()) {
-    auto *TyR = ref.IdentTypeR;
+    auto *TyR = cast<SimpleIdentTypeRepr>(ref.IdentType.getTypeRepr());
     // A reference to ".Type" is an attempt to extend the metatype.
     if (TyR->getIdentifier() == TC.Context.Id_Type && !components.empty()) {
       TC.diagnose(TyR->getIdLoc(), diag::extension_metatype);
       ED->setInvalid();
       ED->setExtendedType(ErrorType::get(TC.Context));
+      invalidateAllComponents();
       return;
     }
 
@@ -219,6 +227,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   if (TC.validateType(typeLoc, dc, TR_AllowUnboundGenerics)) {
     ED->setInvalid();
     ED->setExtendedType(ErrorType::get(TC.Context));
+    invalidateAllComponents();
     return;
   }
 
@@ -243,17 +252,18 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
     // We aren't referring to a type declaration, so make sure we don't have
     // generic arguments.
     auto &ref = ED->getRefComponents()[i];
+    auto *tyR = cast<SimpleIdentTypeRepr>(ref.IdentType.getTypeRepr());
+    ref.IdentType.setType(ident->getBoundType());
+
     if (!typeDecl) {
       // FIXME: This diagnostic is awful. It should point at what we did find,
       // e.g., a type, module, etc.
       if (ref.GenericParams) {
-        auto *TyR = ref.IdentTypeR;
-        TC.diagnose(TyR->getIdLoc(),
+        TC.diagnose(tyR->getIdLoc(),
                     diag::extension_generic_params_for_non_generic,
-                    TyR->getIdentifier());
+                    tyR->getIdentifier());
         ref.GenericParams = nullptr;
       }
-
       continue;
     }
 
@@ -267,7 +277,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
     // The extended type is non-generic but the extension has generic
     // parameters. Complain and drop them.
     if (!typeDecl->getGenericParams() && ref.GenericParams) {
-      TC.diagnose(ref.IdentTypeR->getIdLoc(),
+      TC.diagnose(tyR->getIdLoc(),
                   diag::extension_generic_params_for_non_generic_type,
                   typeDecl->getDeclaredType())
         .highlight(ref.GenericParams->getSourceRange());
@@ -286,7 +296,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
     if (ref.GenericParams->size() != typeDecl->getGenericParams()->size()) {
       unsigned numHave = ref.GenericParams->size();
       unsigned numExpected = typeDecl->getGenericParams()->size();
-      TC.diagnose(ref.IdentTypeR->getIdLoc(),
+      TC.diagnose(tyR->getIdLoc(),
                   diag::extension_generic_wrong_number_of_parameters,
                   typeDecl->getDeclaredType(), numHave > numExpected,
                   numHave, numExpected)
@@ -307,6 +317,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
     TC.diagnose(ED, diag::non_nominal_extension, false, extendedTy);
     ED->setInvalid();
     ED->setExtendedType(ErrorType::get(TC.Context));
+    invalidateAllComponents();
     return;
   }
 

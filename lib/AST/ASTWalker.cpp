@@ -654,7 +654,7 @@ public:
 
     } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
       for (auto &Ref : ED->getRefComponents()) {
-        if (TypeRepr *T = Ref.IdentTypeR)
+        if (TypeRepr *T = Ref.IdentType.getTypeRepr())
           if (doIt(T))
             return true;
       }

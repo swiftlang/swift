@@ -1491,8 +1491,10 @@ public:
   /// A single component within the reference to the extended type.
   struct RefComponent {
     /// The type being extended.
-    SimpleIdentTypeRepr *IdentTypeR;
-    
+    ///
+    /// The type representation is always a \c SimpleIdentTypeRepr.
+    TypeLoc IdentType;
+
     /// The generic parameters associated with this name.
     GenericParamList *GenericParams;
   };
