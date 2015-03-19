@@ -226,8 +226,16 @@ public struct ${Self}<T> : _CollectionType, MutableCollectionType, Sliceable, _D
       // When an array was made mutable we know it is a backed by a native array
       // buffer.
       _checkSubscript(index, hoistedIsNativeBuffer: true)
+
+      // We are hiding the access to '_buffer.owner' behind a semantic function
+      // to help the compiler hoist uniqueness checks in the case of class or
+      // objective c existential typed array elements. In the value typed case
+      // the extra call to _getOwner hinders optimization so we perform a check
+      // and select based on the element type below.
       return (_getElementAddress(index),
-              Builtin.tryPin(Builtin.castToNativeObject(_buffer.owner)))
+              Builtin.tryPin(
+                !_isClassOrObjCExistential(Element.self) ?
+                  Builtin.castToNativeObject(_buffer.owner) : _getOwner()))
     }
   }
 #else
@@ -298,6 +306,11 @@ public struct ${Self}<T> : _CollectionType, MutableCollectionType, Sliceable, _D
   @semantics("array.get_capacity")
   func _getCapacity() -> Int {
     return _buffer.capacity
+  }
+
+  @semantics("array.owner")
+  func _getOwner() -> Builtin.NativeObject {
+    return Builtin.castToNativeObject(_buffer.owner)
   }
 
   // Don't inline copyBuffer - this would inline the copy loop into the current

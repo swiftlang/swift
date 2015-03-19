@@ -85,3 +85,15 @@ func test2DArrayLoop(inout A : Array2d) {
     }
   }
 }
+
+class AClass {}
+
+// CHECK-LABEL: COW Array Opts in Func {{.*}}hoistArrayOfClasses{{.*}}
+// CHECK: Hoisting make_mutable
+// CHECK: COW Array Opts
+
+func hoistArrayOfClasses(inout : A[AClass], x: AClass) {
+  for i in 0 ..< A.count {
+    A[i] = x
+  }
+}
