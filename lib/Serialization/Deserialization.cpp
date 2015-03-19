@@ -383,37 +383,6 @@ Pattern *ModuleFile::maybeReadPattern() {
   }
 }
 
-/// Find a (possibly-inherited) conformance for a particular protocol.
-// FIXME: Checking the module is not very resilient. What if the conformance is
-// moved into a re-exported module instead?
-static ProtocolConformance *findConformance(ProtocolDecl *proto,
-                                            const Module *module,
-                                            ProtocolConformance *conformance) {
-  if (!conformance)
-    return nullptr;
-
-  if (conformance->getProtocol() == proto) {
-    if (conformance->getDeclContext()->getParentModule() == module)
-      return conformance;
-    return nullptr;
-  }
-
-  auto &inheritedMap = conformance->getInheritedConformances();
-  auto directIter = inheritedMap.find(proto);
-  if (directIter != inheritedMap.end()) {
-    if (directIter->second->getDeclContext()->getParentModule() == module)
-      return directIter->second;
-    return nullptr;
-  }
-
-  for (auto inheritedEntry : inheritedMap)
-    if (auto result = findConformance(proto, module, inheritedEntry.second))
-      return result;
-
-  return nullptr;
-}
-
-
 ProtocolConformance *
 ModuleFile::readReferencedConformance(ProtocolDecl *proto,
                                       DeclID typeID,
@@ -431,18 +400,9 @@ ModuleFile::readReferencedConformance(ProtocolDecl *proto,
   auto nominal = cast<NominalTypeDecl>(getDecl(typeID));
   Module *owningModule = getModule(moduleID);
 
-  // Search protocols
-  for (auto conformance : nominal->getConformances())
-    if (auto result = findConformance(proto, owningModule, conformance))
-      return result;
-
-  // Search extensions.
-  for (auto ext : nominal->getExtensions())
-    for (auto conformance : ext->getConformances())
-      if (auto result = findConformance(proto, owningModule, conformance))
-        return result;
-
-  llvm_unreachable("Unable to find underlying conformance");
+  SmallVector<ProtocolConformance *, 2> conformances;
+  nominal->lookupConformance(owningModule, proto, nullptr, conformances);
+  return conformances.front();
 }
 
 Optional<ProtocolConformance *>
