@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/out.swift
-// RUN: %S/../../utils/line-directive %t/out.swift -- %target-build-swift %t/out.swift -o %t/a.out
+// RUN: %S/../../utils/line-directive %t/out.swift -- %target-build-swift -Xfrontend -disable-access-control %t/out.swift -o %t/a.out
 // RUN: %S/../../utils/line-directive %t/out.swift -- %target-run %t/a.out
 
 % traversals = ['Forward', 'Bidirectional']
@@ -23,13 +23,10 @@ internal func _abstract(file: StaticString = __FILE__, line: UWord = __LINE__) {
 //===--- Generator --------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-public class AnyGenerator<T> : GeneratorType {
+public class _AnyGeneratorBase {}
+
+public class AnyGenerator<T> : _AnyGeneratorBase, GeneratorType {
   public func next() -> T? {_abstract()}
-  static public func make<
-    Base: GeneratorType
-  >(base: Base) -> AnyGenerator<Base.Element> {
-    return _GeneratorBox(base)
-  }
 }
 
 internal final class _GeneratorBox<
@@ -43,6 +40,68 @@ internal final class _GeneratorBox<
 internal func _typeID(instance: AnyObject) -> ObjectIdentifier {
   return ObjectIdentifier(instance.dynamicType)
 }
+
+//===--- Sequence ---------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+internal class _AnySequenceBox {
+  func generate() -> _AnyGeneratorBase {_abstract()}
+  func _underestimateCount() -> Int  {_abstract()}
+  func _initializeTo(ptr: UnsafeMutablePointer<Void>) {_abstract()}
+  func _copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {_abstract()}
+}
+
+internal class _SequenceBox<S: SequenceType> : _AnySequenceBox {
+  typealias Element = S.Generator.Element
+  
+  init(_ base: S) {
+    self._base = base
+  }
+  
+  override func generate() -> _AnyGeneratorBase {
+    return _GeneratorBox(_base.generate())
+  }
+  override func _underestimateCount() -> Int {
+    return Swift.underestimateCount(_base)
+  }
+  override func _initializeTo(ptr: UnsafeMutablePointer<Void>) {
+    _base~>(_InitializeTo(), UnsafeMutablePointer(ptr))
+  }
+  override func _copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
+    return (_base~>(_CopyToNativeArrayBuffer(), ()))._storage
+  }
+  
+  internal var _base: S
+}
+
+struct AnySequence<T> : SequenceType {
+  typealias Element = T
+  init<S: SequenceType where S.Generator.Element == T>(_ base: S) {
+    _box = _SequenceBox(base)
+  }
+  func generate() -> AnyGenerator<Element> {
+    return unsafeDowncast(_box.generate())
+  }
+  internal let _box: _AnySequenceBox
+}
+
+func ~> <T>(
+  source: AnySequence<T>, _: (_UnderestimateCount, ())
+) -> Int {
+  return source._box._underestimateCount()
+}
+
+func ~> <T>(
+  source: AnySequence<T>, ptr: (_InitializeTo, UnsafeMutablePointer<T>)
+) {
+  source._box._initializeTo(UnsafeMutablePointer(ptr.1))
+}
+
+func ~> <T>(
+  source: AnySequence<T>, _: (_CopyToNativeArrayBuffer,())
+) -> _ContiguousArrayBuffer<T> {
+  return _ContiguousArrayBuffer(source._box._copyToNativeArrayBuffer())
+}
+
 
 //===--- ForwardIndex -----------------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -195,6 +254,12 @@ public func == (lhs: Any${Traversal}Index, rhs: Any${Traversal}Index) -> Bool {
 //===--- Collections ------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
+class _AnyCollectionBox<Element> {
+  var startIndex: _ForwardIndexBoxType {_abstract()}
+  var endIndex: _ForwardIndexBoxType {_abstract()}
+  subscript(_ForwardIndexBoxType) -> Element {_abstract()}
+}
+
 % for Traversal in traversals:
 public class ${Traversal}Collection<T> : CollectionType {
   public var startIndex: Any${Traversal}Index {_abstract()}
@@ -271,7 +336,7 @@ final internal class ${Traversal}CollectionImpl<
     return base[index._unbox()]
   }
   override func generate() -> AnyGenerator<Element> {
-    return AnyGenerator<Element>.make(base.generate())
+    return _GeneratorBox(base.generate())
   }
   //===--- private --------------------------------------------------------===//
   //===--------------------------------------------------------------------===//
@@ -308,6 +373,11 @@ final internal class ${Traversal}CollectionImpl<
 import StdlibUnittest
 
 var tests = TestSuite("ExistentialCollection")
+
+tests.test("Sequence") {
+  let fib = [1, 2, 3, 5, 8, 13, 21]
+  expectEqual(fib, Array(AnySequence(fib)))
+}
 
 tests.test("ForwardCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
