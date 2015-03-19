@@ -272,12 +272,6 @@ private:
   /// The magic __dso_handle variable.
   VarDecl *DSOHandle = nullptr;
 
-  /// Did we complain about multiple main classes yet?
-  bool DiagnosedMultipleMainClasses: 1;
-  
-  /// Did we complain about a main class and a script together yet?
-  bool DiagnosedMainClassWithScript: 1;
-
   Module(Identifier name, ASTContext &ctx);
 public:
   Identifier getName() const { return Name; }

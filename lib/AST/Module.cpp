@@ -335,9 +335,7 @@ void SourceLookupCache::invalidate() {
 //===----------------------------------------------------------------------===//
 
 Module::Module(Identifier name, ASTContext &ctx)
-    : DeclContext(DeclContextKind::Module, nullptr), Ctx(ctx), Name(name),
-      DiagnosedMultipleMainClasses(false),
-      DiagnosedMainClassWithScript(false)
+    : DeclContext(DeclContextKind::Module, nullptr), Ctx(ctx), Name(name)
 {
   ctx.addDestructorCleanup(*this);
 }
