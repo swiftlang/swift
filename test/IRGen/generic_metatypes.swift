@@ -8,7 +8,7 @@
 // RUN: %swift -target arm64-apple-ios7.0 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
 // RUN: %swift -target armv7-apple-tvos9.0 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s
 // RUN: %swift -target arm64-apple-tvos9.0 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
-// RUN: %swift -target armv7-apple-watchos2.0 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s
+// RUN: %swift -target armv7k-apple-watchos2.0 -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s
 // RUN: %swift -target x86_64-unknown-linux-gnu -disable-objc-interop -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
 
 // REQUIRES: X86
