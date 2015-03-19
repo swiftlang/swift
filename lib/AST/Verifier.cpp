@@ -1543,9 +1543,12 @@ struct ASTNodeBase {};
         break;
         
       case ProtocolConformanceState::Incomplete:
+        // Ignore incomplete conformances; we didn't need them.
+        return;
+
       case ProtocolConformanceState::Checking:
         dumpRef(decl);
-        Out << " has a known-incomplete conformance for protocol "
+        Out << " has a protocol conformance that is still being checked "
             << conformance->getProtocol()->getName().str() << "\n";
         abort();
       }
@@ -1622,7 +1625,7 @@ struct ASTNodeBase {};
       verifyProtocolList(nominal, nominal->getProtocols());
 
       // Make sure that the protocol conformances are complete.
-      for (auto conformance : nominal->getConformances()) {
+      for (auto conformance : nominal->getLocalConformances(nullptr)) {
         verifyConformance(nominal, conformance);
       }
 
@@ -1634,7 +1637,7 @@ struct ASTNodeBase {};
       verifyProtocolList(ext, ext->getProtocols());
 
       // Make sure that the protocol conformances are complete.
-      for (auto conformance : ext->getConformances()) {
+      for (auto conformance : ext->getLocalConformances(nullptr)) {
         verifyConformance(ext, conformance);
       }
 
