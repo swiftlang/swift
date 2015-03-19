@@ -132,7 +132,8 @@ extension NSString : A, ZZZ {}
 
 // CHECK-LABEL: @interface RootClass1{{$}}
 // CHECK: @interface RootClass2 <A>{{$}}
-// CHECK: @interface RootClass3 <B>{{$}}
+// FIXME: Would prefer not to print A below.
+// CHECK: @interface RootClass3 <B, A>{{$}}
 @objc class RootClass1 : NotObjC {}
 @objc class RootClass2 : A, NotObjC {}
 @objc class RootClass3 : NotObjC, B {}

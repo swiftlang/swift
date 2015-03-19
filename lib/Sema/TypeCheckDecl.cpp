@@ -2654,57 +2654,34 @@ public:
 
   template<typename NominalOrExtensionDecl>
   void checkExplicitConformance(NominalOrExtensionDecl *D, Type T) {
-    SmallVector<ProtocolConformance *, 4> conformances;
     ReferencedNameTracker *tracker = nullptr;
     if (SourceFile *SF = D->getParentSourceFile())
       tracker = SF->getReferencedNameTracker();
 
-    // Don't force delayed protocols to be created if they haven't already been
-    // resolved.
-    SmallVector<ProtocolDecl *, 4> retainedProtocols;
-    bool droppedAnyProtocol = false;
-    unsigned protoIndex = 0;
-    for (auto proto : D->getProtocols(false)) {
-      ProtocolConformance *conformance = nullptr;
-      // FIXME: Better location info
-      (void)TC.conformsToProtocol(T, proto, D, /*expr=*/false, &conformance,
-                                  D->getStartLoc());
+    // Check each of the conformances associated with this context.
+    SmallVector<ProtocolConformance *, 4> conformancesScratch;
+    SmallVector<ConformanceDiagnostic, 4> diagnostics;
+    SmallVector<ProtocolDecl *, 4> protocols;
+    SmallVector<ProtocolConformance *, 4> conformances;
+    for (auto conformance : D->getLocalConformances(&TC,
+                                                    ConformanceLookupKind::All,
+                                                    conformancesScratch,
+                                                    &diagnostics)) {
+      // Check and record normal conformances.
+      if (auto normal = dyn_cast<NormalProtocolConformance>(conformance)) {
+        TC.checkConformance(normal);
 
-      if (conformance && conformance->getDeclContext() == D) {
-        // This conformance belongs here. Add it.
+        protocols.push_back(conformance->getProtocol());
         conformances.push_back(conformance);
-
-        // If we've dropped protocols, then we need to record the one
-        // we're keeping.
-        if (droppedAnyProtocol)
-          retainedProtocols.push_back(proto);
-      } else if (!droppedAnyProtocol) {
-        // We're dropping this conformance. If we haven't dropped any other
-        // protocols yet, copy those.
-        retainedProtocols.append(D->getProtocols(false).begin(),
-                                 D->getProtocols(false).begin() + protoIndex);
-        droppedAnyProtocol = true;
       }
 
       if (tracker)
-        tracker->addUsedNominal(proto, !isPrivateConformer(D));
-
-      ++protoIndex;
+        tracker->addUsedNominal(conformance->getProtocol(),
+                                !isPrivateConformer(D));
     }
 
-    // If we dropped any protocols, update the protocol list.
-    if (droppedAnyProtocol) {
-      assert(retainedProtocols.size() == conformances.size());
-      D->overrideProtocols(TC.Context.AllocateCopy(retainedProtocols));
-    }
-
+    D->overrideProtocols(TC.Context.AllocateCopy(protocols));
     D->setConformances(TC.Context.AllocateCopy(conformances));
-
-    // Check for any ambiguities or collisions among conformances.
-    SmallVector<ProtocolConformance *, 4> conformancesScratch;
-    SmallVector<ConformanceDiagnostic, 4> diagnostics;
-    (void)D->getLocalConformances(&TC, ConformanceLookupKind::All,
-                                  conformancesScratch, &diagnostics);
 
     // Diagnose any conflicts attributed to this declaration context.
     for (const auto &diag : diagnostics) {

@@ -826,7 +826,7 @@ namespace {
           FirstFieldIndex(firstField),
           NextFieldIndex(firstField)
     {
-      visitConformances(theClass->getProtocols());
+      visitConformances(theClass);
       visitMembers(theClass);
 
       if (Lowering::usesObjCAllocator(theClass)) {
@@ -843,7 +843,7 @@ namespace {
     {
       buildCategoryName(CategoryName);
 
-      visitConformances(theExtension->getProtocols());
+      visitConformances(theExtension);
 
       for (Decl *member : TheExtension->getMembers())
         visit(member);
@@ -859,16 +859,11 @@ namespace {
     ClassDataBuilder(IRGenModule &IGM, ProtocolDecl *theProtocol)
       : IGM(IGM), TheEntity(theProtocol), TheExtension(nullptr)
     {
-      visitConformances(theProtocol->getProtocols());
-
-      for (Decl *member : theProtocol->getMembers())
-        visit(member);
-    }
-    
-    void visitConformances(ArrayRef<ProtocolDecl*> allProtocols) {
-      // Gather protocol records for all of the formal ObjC protocol
-      // conformances.
-      for (ProtocolDecl *p : allProtocols) {
+      // Gather protocol references for all of the explicitly-specified
+      // Objective-C protocol conformances.
+      // FIXME: We can't use visitConformances() because there are no
+      // conformances for protocols to protocols right now.
+      for (ProtocolDecl *p : theProtocol->getProtocols()) {
         if (!p->isObjC())
           continue;
         // Don't emit the magic AnyObject conformance.
@@ -876,8 +871,32 @@ namespace {
           continue;
         Protocols.push_back(buildProtocolRef(p));
       }
+
+      for (Decl *member : theProtocol->getMembers())
+        visit(member);
     }
-    
+
+    /// Gather protocol records for all of the explicitly-specified Objective-C
+    /// protocol conformances.
+    void visitConformances(DeclContext *dc) {
+      SmallVector<ProtocolConformance *, 4> conformances;
+      for (auto conformance : dc->getLocalConformances(
+                                nullptr,
+                                ConformanceLookupKind::OnlyExplicit,
+                                conformances)) {
+        ProtocolDecl *proto = conformance->getProtocol();
+        if (!proto->isObjC())
+          continue;
+
+        // Don't emit the magic AnyObject conformance.
+        if (auto known = proto->getKnownProtocolKind())
+          if (*known == KnownProtocolKind::AnyObject)
+            continue;
+
+        Protocols.push_back(buildProtocolRef(proto));
+      }
+    }
+
     void visitObjCConformance(ProtocolDecl *protocol,
                               ProtocolConformance *conformance) {
       assert(TheExtension &&
