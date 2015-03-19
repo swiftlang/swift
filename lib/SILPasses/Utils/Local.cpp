@@ -766,7 +766,7 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
       srcTL.emitDestroyAddress(Builder, Loc, Src);
     }
     auto NewI = Builder.createBranch(Loc, FailureBB);
-    Inst->eraseFromParent();
+    EraseInstAction(Inst);
     WillFailAction();
     return NewI;
   }
@@ -786,25 +786,35 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
   }
 
   if (!ResultNotUsed) {
+
+    bool useIndirectUnconditionalCastEmitter = true;
+
     // emitSuccessfulIndirectUnconditionalCast can handle only
     // address types currently.
     if (!Src.getType().isAddress() || !Dest.getType().isAddress())
-      return nullptr;
+      useIndirectUnconditionalCastEmitter = false;
 
     // emitSuccessfulIndirectUnconditionalCast cannot handle casts
     // between metatypes yet.
     if (isa<AnyMetatypeType>(Src.getType().getSwiftRValueType()) ||
-        isa<AnyMetatypeType>(Dest.getType().getSwiftRValueType()))
-      return nullptr;
+        isa<AnyMetatypeType>(Dest.getType().getSwiftRValueType())) {
+      useIndirectUnconditionalCastEmitter = false;
+    }
 
-    emitSuccessfulIndirectUnconditionalCast(Builder, Mod.getSwiftModule(), Loc,
-                                            Inst->getConsumptionKind(),
-                                            Src, SourceType,
-                                            Dest, TargetType);
+
+    if (useIndirectUnconditionalCastEmitter) {
+      emitSuccessfulIndirectUnconditionalCast(
+          Builder, Mod.getSwiftModule(), Loc, Inst->getConsumptionKind(), Src,
+          SourceType, Dest, TargetType);
+    } else {
+      // Generate an unconditional cast
+      Builder.createUnconditionalCheckedCastAddr(
+          Loc, Inst->getConsumptionKind(), Src, SourceType, Dest, TargetType);
+    }
   }
 
   auto *NewI = Builder.createBranch(Loc, SuccessBB);
-  Inst->eraseFromParent();
+  EraseInstAction(Inst);
   WillSucceedAction();
   return NewI;
 }
@@ -824,13 +834,13 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
         SmallVector<SILValue, 1> Args;
         Args.push_back(ARI);
         auto *NewI = Builder.createBranch(Loc, SuccessBB, Args);
-        Inst->eraseFromParent();
+        EraseInstAction(Inst);
         WillSucceedAction();
         return NewI;
       } else {
         // This exact cast will fail.
         auto *NewI = Builder.createBranch(Loc, FailureBB);
-        Inst->eraseFromParent();
+        EraseInstAction(Inst);
         WillFailAction();
         return NewI;
       }
@@ -865,12 +875,13 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
 
   if (Feasibility == DynamicCastFeasibility::WillFail) {
     auto *NewI = Builder.createBranch(Loc, FailureBB);
-    Inst->eraseFromParent();
+    EraseInstAction(Inst);
     WillFailAction();
     return NewI;
   }
 
   // Casting will succeed.
+
 
   // Replace by unconditional_cast, followed by a branch.
   // The unconditional_cast can be skipped, if the result of a cast
@@ -880,10 +891,18 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   SILValue CastedValue;
   if (Op.getType() != LoweredTargetType) {
     if (!ResultNotUsed) {
-      CastedValue = emitSuccessfulScalarUnconditionalCast(
-          Builder, Mod.getSwiftModule(), Loc, Op, LoweredTargetType,
-          LoweredSourceType.getSwiftRValueType(),
-          LoweredTargetType.getSwiftRValueType());
+      // emitSuccessfulScalarUnconditionalCast cannot
+      // further simplify casts from/to existentials.
+      if (LoweredTargetType.isAnyExistentialType() ||
+          LoweredSourceType.isAnyExistentialType()) {
+        CastedValue =
+            Builder.createUnconditionalCheckedCast(Loc, Op, LoweredTargetType);
+      } else {
+        CastedValue = emitSuccessfulScalarUnconditionalCast(
+            Builder, Mod.getSwiftModule(), Loc, Op, LoweredTargetType,
+            LoweredSourceType.getSwiftRValueType(),
+            LoweredTargetType.getSwiftRValueType());
+      }
     } else {
       CastedValue = SILUndef::get(LoweredTargetType, Mod);
     }
@@ -894,7 +913,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
 
   Args.push_back(CastedValue);
   auto *NewI = Builder.createBranch(Loc, SuccessBB, Args);
-  Inst->eraseFromParent();
+  EraseInstAction(Inst);
   WillSucceedAction();
   return NewI;
 }
@@ -957,7 +976,7 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
                                   TargetType,
                                   SuccessBB,
                                   FailureBB);
-        Inst->eraseFromParent();
+        EraseInstAction(Inst);
         return NewI;
       }
     }
@@ -994,7 +1013,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
                                 LoweredTargetType,
                                 SuccessBB,
                                 FailureBB);
-      Inst->eraseFromParent();
+      EraseInstAction(Inst);
       return NewI;
     }
   }
@@ -1058,7 +1077,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
                                   LoweredTargetType,
                                   SuccessBB,
                                   FailureBB);
-        Inst->eraseFromParent();
+        EraseInstAction(Inst);
         return NewI;
       }
     }
@@ -1113,7 +1132,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
                                   LoweredTargetType,
                                   SuccessBB,
                                   FailureBB);
-        Inst->eraseFromParent();
+        EraseInstAction(Inst);
         return NewI;
       }
     }
@@ -1205,6 +1224,7 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
     EraseInstAction(Inst);
     Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(NewI)));
     Builder.createUnreachable(ArtificialUnreachableLocation());
+    WillFailAction();
   }
 
   if (Feasibility == DynamicCastFeasibility::WillSucceed) {
@@ -1226,6 +1246,7 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
                                             Dest, TargetType);
     Inst->replaceAllUsesWithUndef();
     EraseInstAction(Inst);
+    WillSucceedAction();
   }
 
   return nullptr;

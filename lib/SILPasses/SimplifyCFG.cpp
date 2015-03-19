@@ -2152,7 +2152,9 @@ bool SimplifyCFG::simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI) {
 
   CastOptimizer CastOpt(
       [](SILInstruction *I, ValueBase *V){} /* ReplaceInstUsesAction */,
-      [](SILInstruction *I) {} /* EraseInstAction */,
+      [](SILInstruction *I) { /* EraseInstAction */
+        I->eraseFromParent();
+      },
       [&]() { /* WillSucceedAction */
         removeIfDead(FailureBB);
         addToWorklist(ThisBB);
@@ -2174,7 +2176,9 @@ simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI) {
 
   CastOptimizer CastOpt(
       [](SILInstruction *I, ValueBase *V){} /* ReplaceInstUsesAction */,
-      [](SILInstruction *I) {} /* EraseInstAction */,
+      [](SILInstruction *I) { /* EraseInstAction */
+        I->eraseFromParent();
+      },
       [&]() { /* WillSucceedAction */
         removeIfDead(FailureBB);
         addToWorklist(ThisBB);
