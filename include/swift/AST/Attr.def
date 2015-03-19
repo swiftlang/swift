@@ -201,9 +201,9 @@ DECL_ATTR(__objc_bridged, ObjCBridged, OnClass | NotSerialized | RejectByParser,
 SIMPLE_DECL_ATTR(NSApplicationMain, NSApplicationMain,
                  OnClass, 52)
 
-SIMPLE_DECL_ATTR(__raw_option_set, RawOptionSet,
-                 OnStruct | NotSerialized | RejectByParser,
-                 /* Not serialized */54)
+DECL_ATTR(__synthesized_protocol, SynthesizedProtocol,
+          OnStruct | OnEnum | OnClass | NotSerialized | RejectByParser,
+          /* Not serialized */54)
 
 SIMPLE_DECL_ATTR(testable, Testable,
                  OnImport | NotSerialized | UserInaccessible,

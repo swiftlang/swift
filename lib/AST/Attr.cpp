@@ -256,6 +256,10 @@ void DeclAttribute::print(ASTPrinter &Printer,
     // Not printed.
     return;
 
+  case DAK_SynthesizedProtocol:
+    // Not printed.
+    return;
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
   }
@@ -342,6 +346,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "<<raw doc comment>>";
   case DAK_ObjCBridged:
     return "<<ObjC bridged>>";
+  case DAK_SynthesizedProtocol:
+    return "<<synthesized protocol>>";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

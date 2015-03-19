@@ -1731,6 +1731,11 @@ namespace {
                                                       delayedProtocols);
         structDecl->setDelayedProtocolDecls(delayedProtoList);
 
+        // Note that this is a raw representable type.
+        structDecl->getAttrs().add(
+          new (Impl.SwiftContext) SynthesizedProtocolAttr(
+                                    KnownProtocolKind::RawRepresentable));
+
         // Create a variable to store the underlying value.
         auto varName = Impl.SwiftContext.Id_rawValue;
         auto var = new (Impl.SwiftContext) VarDecl(/*static*/ false,
@@ -1885,7 +1890,8 @@ namespace {
 
         // Note that this is a raw option set type.
         structDecl->getAttrs().add(
-          new (Impl.SwiftContext) RawOptionSetAttr(true));
+          new (Impl.SwiftContext) SynthesizedProtocolAttr(
+                                    KnownProtocolKind::RawOptionSetType));
         
         // Create a field to store the underlying value.
         auto varName = Impl.SwiftContext.Id_rawValue;

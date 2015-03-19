@@ -20,6 +20,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/UUID.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
 #include "llvm/ADT/SmallVector.h"
@@ -1040,6 +1041,32 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_ObjCBridged;
+  }
+};
+
+/// An attribute that specifies a synthesized conformance of a known
+/// protocol for the declaration to which it appertains.
+///
+/// There is no spelling for this particular attribute in source code;
+/// rather, it is introduced by the Clang importer to indicate
+/// synthesized conformances.
+class SynthesizedProtocolAttr : public DeclAttribute {
+  KnownProtocolKind ProtocolKind;
+
+public:
+  SynthesizedProtocolAttr(KnownProtocolKind protocolKind)
+    : DeclAttribute(DAK_SynthesizedProtocol, SourceLoc(), SourceRange(),
+                    /*Implicit=*/true),
+      ProtocolKind(protocolKind)
+  {
+  }
+
+  /// Retrieve the known protocol kind naming the protocol to be
+  /// synthesized.
+  KnownProtocolKind getProtocolKind() const { return ProtocolKind; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_SynthesizedProtocol;
   }
 };
 

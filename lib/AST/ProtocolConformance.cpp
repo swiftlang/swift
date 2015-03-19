@@ -1837,15 +1837,6 @@ void NominalTypeDecl::prepareConformanceTable(LazyResolver *resolver) const {
                            KnownProtocolKind::AnyObject)) {
       ConformanceTable->addSynthesizedConformance(mutableThis, anyObject);
     }
-  } else if (isa<StructDecl>(this)) {
-    if (getAttrs().hasAttribute<RawOptionSetAttr>()) {
-      // Raw option sets conform to RawOptionSetType.
-      if (auto rawOptionSetType = getASTContext().getProtocol(
-                                    KnownProtocolKind::RawOptionSetType)) {
-        ConformanceTable->addSynthesizedConformance(mutableThis,
-                                                    rawOptionSetType);
-      }
-    }
   } else if (auto theEnum = dyn_cast<EnumDecl>(mutableThis)) {
     if (theEnum->isSimpleEnum()) {
       // Simple enumerations conform to Equatable.
@@ -1869,6 +1860,16 @@ void NominalTypeDecl::prepareConformanceTable(LazyResolver *resolver) const {
                                     KnownProtocolKind::RawRepresentable)) {
         ConformanceTable->addSynthesizedConformance(mutableThis,
                                                     rawRepresentable);
+      }
+    }
+  }
+
+  // Add protocols for any synthesized protocol attributes.
+  for (auto attr : getAttrs()) {
+    if (auto synthesizedProto = dyn_cast<SynthesizedProtocolAttr>(attr)) {
+      if (auto proto = getASTContext().getProtocol(
+                         synthesizedProto->getProtocolKind())) {
+        ConformanceTable->addSynthesizedConformance(mutableThis, proto);
       }
     }
   }

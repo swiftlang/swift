@@ -1217,6 +1217,8 @@ namespace decls_block {
   using SetterAccessibilityDeclAttrLayout =
     BCRecordLayout<SetterAccessibility_DECL_ATTR>;
   using ObjCBridgedDeclAttrLayout = BCRecordLayout<ObjCBridged_DECL_ATTR>;
+  using SynthesizedProtocolDeclAttrLayout
+    = BCRecordLayout<SynthesizedProtocol_DECL_ATTR>;
 
   using InlineDeclAttrLayout = BCRecordLayout<
     Inline_DECL_ATTR,

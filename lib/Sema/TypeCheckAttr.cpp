@@ -69,7 +69,7 @@ public:
   IGNORED_ATTR(Infix)
   IGNORED_ATTR(Postfix)
   IGNORED_ATTR(Prefix)
-  IGNORED_ATTR(RawOptionSet)
+  IGNORED_ATTR(SynthesizedProtocol)
   IGNORED_ATTR(RequiresStoredPropertyInits)
   IGNORED_ATTR(Testable)
 #undef IGNORED_ATTR
@@ -586,7 +586,7 @@ public:
     IGNORED_ATTR(RawDocComment)
     IGNORED_ATTR(Semantics)
     IGNORED_ATTR(Transparent)
-    IGNORED_ATTR(RawOptionSet)
+    IGNORED_ATTR(SynthesizedProtocol)
     IGNORED_ATTR(RequiresStoredPropertyInits)
     IGNORED_ATTR(SILStored)
     IGNORED_ATTR(Testable)
