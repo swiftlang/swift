@@ -392,6 +392,7 @@ final class ClassDNode : IntrusiveDListNode {
 }
 
 struct StructDNode : IntrusiveDListNode { // expected-error{{non-class type 'StructDNode' cannot conform to class protocol 'IntrusiveDListNode'}}
+  // expected-error@-1{{non-class type 'StructDNode' cannot conform to class protocol 'IntrusiveListNode'}}
   var prev : StructDNode
   var next : StructDNode
 }

@@ -717,6 +717,18 @@ class swift::ConformanceLookupTable {
                            ProtocolDecl *protocol,
                            LazyResolver *resolver);
 
+  /// Retrieve the declaration context that provides the
+  /// (non-inherited) conformance described by the given conformance
+  /// entry.
+  DeclContext *getConformingContext(NominalTypeDecl *nominal,
+                                    LazyResolver *resolver,
+                                    ConformanceEntry *entry);
+
+  /// Resolve the given conformance entry to an actual protocol conformance.
+  ProtocolConformance *getConformance(NominalTypeDecl *nominal,
+                                      LazyResolver *resolver,
+                                      ConformanceEntry *entry);
+
   /// Enumerate each of the unhandled contexts (nominal type
   /// declaration or extension) within the given stage.
   ///
@@ -1531,10 +1543,118 @@ bool ConformanceLookupTable::resolveConformances(NominalTypeDecl *nominal,
                   entries.end());
   }
 
-  // FIXME: Assign protocol conformances for any remaining entries
-  // that do not have them.
-
   return anySuperseded;
+}
+
+DeclContext *ConformanceLookupTable::getConformingContext(
+               NominalTypeDecl *nominal,
+               LazyResolver *resolver,
+               ConformanceEntry *entry) {
+  ProtocolDecl *protocol = entry->getProtocol();
+
+  // Dig through the inherited entries to find a non-inherited one.
+  // Handle recursive inheritance.
+  SmallPtrSet<ClassDecl *, 4> visited;
+  while (entry->getKind() == ConformanceEntryKind::Inherited) {
+    // Make sure we have an up-to-date conformance table for the
+    // superclass.
+    auto classDecl = cast<ClassDecl>(nominal);
+    if (!visited.insert(classDecl).second)
+      return nullptr;
+
+    auto superclassDecl
+      = classDecl->getSuperclass()->getClassOrBoundGenericClass();
+
+    if (!classDecl->ConformanceTable->VisitingSuperclass) {
+      llvm::SaveAndRestore<bool> visiting(
+                                   classDecl->ConformanceTable
+                                     ->VisitingSuperclass,
+                                   true);
+
+      superclassDecl->prepareConformanceTable(resolver);
+      superclassDecl->ConformanceTable->resolveConformances(superclassDecl,
+                                                            protocol,
+                                                            resolver);
+    }
+
+    // Grab the superclass entry and continue searching for a
+    // non-inherited conformance.
+    // FIXME: Ambiguity detection and resolution.
+    entry = superclassDecl->ConformanceTable->Conformances[protocol].front();
+    nominal = superclassDecl;
+  }
+
+  return entry->getDeclContext();
+}
+
+ProtocolConformance *ConformanceLookupTable::getConformance(
+                       NominalTypeDecl *nominal,
+                       LazyResolver *resolver,
+                       ConformanceEntry *entry) {
+  // If we already have a conformance, we're done.
+  if (auto conformance = entry->getConformance())
+    return conformance;
+
+  ProtocolDecl *protocol = entry->getProtocol();
+
+  // Determine where the explicit conformance actually lives.
+  // FIXME: This is a hack to ensure that inherited conformances are
+  // always "single step", which is bad for resilience but is assumed
+  // elsewhere in the compiler.
+  DeclContext *conformingDC = getConformingContext(nominal, resolver, entry);
+  if (!conformingDC)
+    return nullptr;
+
+  NominalTypeDecl *conformingNominal
+    = conformingDC->isNominalTypeOrNominalTypeExtensionContext();
+
+  // Form the conformance.
+  Type type = entry->getDeclContext()->getDeclaredTypeInContext();
+  ProtocolConformance *conformance;
+    ASTContext &ctx = nominal->getASTContext();
+  if (entry->getKind() == ConformanceEntryKind::Inherited) {
+    // For an inherited conformance, the conforming nominal type will
+    // be different from the nominal type.
+    assert(conformingNominal != nominal && "Broken inherited conformance");
+
+    // Find the superclass type that matches where the conformance was
+    // declared.
+    Type superclassTy = type->getSuperclass(resolver);
+    while (superclassTy->getAnyNominal() != conformingNominal)
+      superclassTy = superclassTy->getSuperclass(resolver);
+
+    // Look up the inherited conformance.
+    Module *module = entry->getDeclContext()->getParentModule();
+    auto inheritedConformance = module->lookupConformance(superclassTy,
+                                                          protocol,
+                                                          resolver)
+                                  .getPointer();
+
+    // Form the inherited conformance.
+    conformance = ctx.getInheritedConformance(type, inheritedConformance);
+  } else {
+    // Create the normal conformance.
+    if (resolver) {
+      conformance = resolver->resolveConformance(
+                      conformingNominal,
+                      protocol,
+                      dyn_cast<ExtensionDecl>(conformingDC));
+    } else {
+      Type conformingType = conformingDC->getDeclaredTypeInContext();
+      SourceLoc conformanceLoc
+        = conformingNominal == conformingDC
+            ? conformingNominal->getLoc()
+            : cast<ExtensionDecl>(conformingDC)->getLoc();
+
+      conformance = ctx.getConformance(conformingType, protocol, conformanceLoc,
+                                       conformingDC,
+                                       ProtocolConformanceState::Incomplete);
+    }
+  }
+
+  // Record the conformance.
+  entry->Conformance = conformance;
+  return conformance;
 }
 
 void ConformanceLookupTable::addSynthesizedConformance(NominalTypeDecl *nominal,
@@ -1567,9 +1687,8 @@ bool ConformanceLookupTable::lookupConformance(
   // Resolve the conformances for this protocol.
   resolveConformances(nominal, protocol, resolver);
   for (auto entry : Conformances[protocol]) {
-    // FIXME: Eventually, we'll always build the conformance.
-    if (entry->getConformance()) {
-      conformances.push_back(entry->getConformance());
+    if (auto conformance = getConformance(nominal, resolver, entry)) {
+      conformances.push_back(conformance);
     }
   }
   return !conformances.empty();
@@ -1607,9 +1726,9 @@ void ConformanceLookupTable::lookupConformances(
                          entry->getKind() != ConformanceEntryKind::Explicit)
                        return true;
 
-                     // FIXME: Eventually, we'll always have a conformance.
-                     if (entry->getConformance())
-                       conformances.push_back(entry->getConformance());
+                     if (auto conformance = getConformance(nominal, resolver,
+                                                           entry))
+                       conformances.push_back(conformance);
                      return false;
                    }),
     potentialConformances.end());
@@ -1666,9 +1785,8 @@ void ConformanceLookupTable::getAllConformances(
   // Gather all of the protocols.
   for (const auto &conformance : AllConformances) {
     for (auto entry : conformance.second) {
-      // FIXME: Eventually, we'll always have conformances.
-      if (entry->getConformance())
-        scratch.push_back(entry->getConformance());
+      if (auto conformance = getConformance(nominal, resolver, entry))
+        scratch.push_back(conformance);
     }
   }
 
