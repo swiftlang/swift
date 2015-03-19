@@ -325,19 +325,34 @@ class _AnyCollectionBox<Element> : _AnyCollectionBoxBase {
   }
 }
 
-% for Traversal in traversals:
+% for (ti, Traversal) in enumerate(traversals):
 struct Any${Traversal}Collection<Element> : CollectionType {
   typealias Box = _AnyCollectionBox<Element>
 
+%   for SubTraversal in traversals[ti:]:
   init<
     C: CollectionType
-      where C.Index: ${Traversal}IndexType, C.Generator.Element == Element
+      where C.Index: ${SubTraversal}IndexType, C.Generator.Element == Element
   >(_ base: C) {
     self._box = _CollectionBox<C>(
       base,
-      startIndex: _${Traversal}IndexBox(base.startIndex),
-      endIndex: _${Traversal}IndexBox(base.endIndex))
+      startIndex: _${SubTraversal}IndexBox(base.startIndex),
+      endIndex: _${SubTraversal}IndexBox(base.endIndex))
   }
+  init(_ other: Any${SubTraversal}Collection<Element>) {
+    self._box = other._box
+  }
+%   end
+
+%   for SuperTraversal in traversals[:ti]:
+  init?(_ other: Any${SuperTraversal}Collection<Element>) {
+    if !(other._box.startIndex is _${Traversal}IndexBoxType) {
+      return nil
+    }
+    _sanityCheck(other._box.endIndex is _${Traversal}IndexBoxType)
+    self._box = other._box
+  }
+%   end
   
   func generate() -> AnyGenerator<Element> {
     return unsafeDowncast(_box.generate())
@@ -388,17 +403,18 @@ tests.test("ForwardCollection") {
 
 tests.test("BidirectionalCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
-  let fc0 = AnyBidirectionalCollection(lazy(a0).reverse())
-  let a1 = ContiguousArray(lazy(fc0).reverse())
+  let fc0 = AnyForwardCollection(lazy(a0).reverse())
+  let bc0 = AnyBidirectionalCollection(fc0)!         // upgrade!
+  let a1 = ContiguousArray(lazy(bc0).reverse())
   expectEqual(a0, a1)
   for e in a0 {
-    let i = find(fc0, e)
+    let i = find(bc0, e)
     expectNotEmpty(i)
-    expectEqual(e, fc0[i!])
+    expectEqual(e, bc0[i!])
   }
-  for i in indices(fc0) {
-    expectNotEqual(fc0.endIndex, i)
-    expectEqual(1, count(filter(indices(fc0)) {$0 == i}))
+  for i in indices(bc0) {
+    expectNotEqual(bc0.endIndex, i)
+    expectEqual(1, count(filter(indices(bc0)) {$0 == i}))
   }
 }
 
