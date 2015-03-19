@@ -35,8 +35,6 @@ public func distance<T: ForwardIndexType>(start: T, end: T) -> T.Distance {
 /// models `RandomAccessIndexType`, executes in O(1).  Otherwise,
 /// executes in O(`abs(n)`).  If `T` does not model
 /// `BidirectionalIndexType`, requires that `n` is non-negative.
-///
-/// `advance(i, n)` is a synonym for `i++n'
 public func advance<T: ForwardIndexType>(start: T, n: T.Distance) -> T {
   return start~>_advance(n)
 }
