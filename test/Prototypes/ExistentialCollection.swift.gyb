@@ -15,21 +15,26 @@
 
 % traversals = ['Forward', 'Bidirectional']
 
-@noreturn
+@noreturn @inline(never)
 internal func _abstract(file: StaticString = __FILE__, line: UWord = __LINE__) {
   fatalError("Method must be overridden", file: file, line: line)
 }
 
-public class Generator<T> : GeneratorType {
+//===--- Generator --------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+public class AnyGenerator<T> : GeneratorType {
   public func next() -> T? {_abstract()}
   static public func make<
     Base: GeneratorType
-  >(base: Base) -> Generator<Base.Element> {
-    return _Generator(base)
+  >(base: Base) -> AnyGenerator<Base.Element> {
+    return _GeneratorBox(base)
   }
 }
 
-internal final class _Generator<Base: GeneratorType> : Generator<Base.Element> {
+internal final class _GeneratorBox<
+  Base: GeneratorType
+> : AnyGenerator<Base.Element> {
   init(_ base: Base) { self.base = base }
   override func next() -> Base.Element? { return base.next() }
   var base: Base
@@ -46,11 +51,11 @@ internal protocol _ForwardIndexBoxType : class {
   var typeID: ObjectIdentifier {get}
   func successor() -> Self
   func equals(other: _ForwardIndexBoxType) -> Bool
-  func _distanceTo(other: _ForwardIndexBoxType) -> ForwardIndex.Distance
+  func _distanceTo(other: _ForwardIndexBoxType) -> AnyForwardIndex.Distance
   // FIXME: Can't return Self from _advancedBy pending <rdar://20181253>
-  func _advancedBy(distance: ForwardIndex.Distance) -> _ForwardIndexBoxType
+  func _advancedBy(distance: AnyForwardIndex.Distance) -> _ForwardIndexBoxType
   func _advancedBy(
-    distance: ForwardIndex.Distance,
+    distance: AnyForwardIndex.Distance,
     _ limit: _ForwardIndexBoxType
   ) -> _ForwardIndexBoxType
 }
@@ -74,16 +79,16 @@ internal class _ForwardIndexBox<
     return base == unsafeUnbox(other)
   }
 
-  func _distanceTo(other: _ForwardIndexBoxType) -> ForwardIndex.Distance {
+  func _distanceTo(other: _ForwardIndexBoxType) -> AnyForwardIndex.Distance {
     return numericCast(distance(base, unsafeUnbox(other)))
   }
   
-  func _advancedBy(n: ForwardIndex.Distance) -> _ForwardIndexBoxType {
+  func _advancedBy(n: AnyForwardIndex.Distance) -> _ForwardIndexBoxType {
     return self.dynamicType(advance(base, numericCast(n)))
   }
   
   func _advancedBy(
-    n: ForwardIndex.Distance,
+    n: AnyForwardIndex.Distance,
     _ limit: _ForwardIndexBoxType
   ) -> _ForwardIndexBoxType {
     return self.dynamicType(advance(base, numericCast(n), unsafeUnbox(limit)))
@@ -125,20 +130,20 @@ extension _InitializeTo { init() {} }
 
 % for Traversal in traversals:
 
-public struct ${Traversal}Index : ${Traversal}IndexType {
+public struct Any${Traversal}Index : ${Traversal}IndexType {
   public typealias Distance = IntMax
   
   public init<BaseIndex: ${Traversal}IndexType>(_ base: BaseIndex) {
     _box = _${Traversal}IndexBox(base)
   }
   
-  public func successor() -> ${Traversal}Index {
-    return ${Traversal}Index(_box.successor())
+  public func successor() -> Any${Traversal}Index {
+    return Any${Traversal}Index(_box.successor())
   }
   
   % if Traversal != 'Forward':
-  public func predecessor() -> ${Traversal}Index {
-    return ${Traversal}Index(_box.predecessor())
+  public func predecessor() -> Any${Traversal}Index {
+    return Any${Traversal}Index(_box.predecessor())
   }
   % end
   
@@ -159,8 +164,8 @@ public struct ${Traversal}Index : ${Traversal}IndexType {
 }
 
 public func ~> (
-  start:${Traversal}Index, other : (_Distance, ${Traversal}Index)
-) -> ${Traversal}Index.Distance {
+  start:Any${Traversal}Index, other : (_Distance, Any${Traversal}Index)
+) -> Any${Traversal}Index.Distance {
   precondition(
     start._typeID == other.1._typeID,
     "distance: base index types differ.")
@@ -168,20 +173,20 @@ public func ~> (
 }
 
 public func ~> (
-  start:${Traversal}Index, distance : (_Advance, ${Traversal}Index.Distance)
-) -> ${Traversal}Index {
-  return ${Traversal}Index(start._box._advancedBy(distance.1))
+  start:Any${Traversal}Index, distance : (_Advance, Any${Traversal}Index.Distance)
+) -> Any${Traversal}Index {
+  return Any${Traversal}Index(start._box._advancedBy(distance.1))
 }
 
 public func ~> (
-  start:${Traversal}Index, args : (_Advance, (${Traversal}Index.Distance, ${Traversal}Index))
-) -> ${Traversal}Index {
+  start:Any${Traversal}Index, args : (_Advance, (Any${Traversal}Index.Distance, Any${Traversal}Index))
+) -> Any${Traversal}Index {
   precondition(
     start._typeID == args.1.1._typeID, "advance: base index types differ.")
-  return ${Traversal}Index(start._box._advancedBy(args.1.0, args.1.1._box))
+  return Any${Traversal}Index(start._box._advancedBy(args.1.0, args.1.1._box))
 }
 
-public func == (lhs: ${Traversal}Index, rhs: ${Traversal}Index) -> Bool {
+public func == (lhs: Any${Traversal}Index, rhs: Any${Traversal}Index) -> Bool {
   precondition(lhs._typeID == rhs._typeID, "base index types differ.")
   return lhs._box.equals(rhs._box)
 }
@@ -192,10 +197,10 @@ public func == (lhs: ${Traversal}Index, rhs: ${Traversal}Index) -> Bool {
 
 % for Traversal in traversals:
 public class ${Traversal}Collection<T> : CollectionType {
-  public var startIndex: ${Traversal}Index {_abstract()}
-  public var endIndex: ${Traversal}Index {_abstract()}
-  public subscript(index: ${Traversal}Index) -> T {_abstract()}
-  public func generate() -> Generator<T> {_abstract()}
+  public var startIndex: Any${Traversal}Index {_abstract()}
+  public var endIndex: Any${Traversal}Index {_abstract()}
+  public subscript(index: Any${Traversal}Index) -> T {_abstract()}
+  public func generate() -> AnyGenerator<T> {_abstract()}
 
   public static func make<
     Base: CollectionType
@@ -225,7 +230,7 @@ public class ${Traversal}Collection<T> : CollectionType {
   }
 
   //===--- CollectionType ~> operations -----------------------------------===//
-  internal func _count() -> ${Traversal}Index.Distance {_abstract()}
+  internal func _count() -> Any${Traversal}Index.Distance {_abstract()}
 }
 
 public func ~> <T>(
@@ -249,7 +254,7 @@ public func ~> <T>(
 }
 
 public func ~> <T>(source: ${Traversal}Collection<T>, _:(_Count,()))
-  -> ${Traversal}Index.Distance
+  -> Any${Traversal}Index.Distance
 {
   return source._count()
 }
@@ -260,13 +265,13 @@ final internal class ${Traversal}CollectionImpl<
   internal typealias Element = Base.Generator.Element
   
   internal init(_ base: Base) { self.base = base }
-  override var startIndex: ${Traversal}Index { return ${Traversal}Index(base.startIndex) }
-  override var endIndex: ${Traversal}Index { return ${Traversal}Index(base.endIndex) }
-  override subscript(index: ${Traversal}Index) -> Element {
+  override var startIndex: Any${Traversal}Index { return Any${Traversal}Index(base.startIndex) }
+  override var endIndex: Any${Traversal}Index { return Any${Traversal}Index(base.endIndex) }
+  override subscript(index: Any${Traversal}Index) -> Element {
     return base[index._unbox()]
   }
-  override func generate() -> Generator<Element> {
-    return Generator<Element>.make(base.generate())
+  override func generate() -> AnyGenerator<Element> {
+    return AnyGenerator<Element>.make(base.generate())
   }
   //===--- private --------------------------------------------------------===//
   //===--------------------------------------------------------------------===//
@@ -289,7 +294,7 @@ final internal class ${Traversal}CollectionImpl<
   }
 
   //===--- CollectionType ~> operations -----------------------------------===//
-  override internal func _count() -> ${Traversal}Index.Distance {
+  override internal func _count() -> Any${Traversal}Index.Distance {
     return numericCast(count(base))
   }
 
