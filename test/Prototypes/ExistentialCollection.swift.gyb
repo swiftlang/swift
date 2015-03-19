@@ -159,7 +159,7 @@ internal class _ForwardIndexBox<
   let base: BaseIndex
 }
 
-//===--- BidirectionalIndex -----------------------------------------------------===//
+//===--- BidirectionalIndex -----------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
 internal protocol _BidirectionalIndexBoxType : _ForwardIndexBoxType {
@@ -216,7 +216,8 @@ public struct Any${Traversal}Index : ${Traversal}IndexType {
   }
   
   internal init(_ box: _ForwardIndexBoxType) {
-    self._box = box${'' if Traversal == 'Forward' else ' as! _%sIndexBoxType' % Traversal}
+    self._box = box${
+      '' if Traversal == 'Forward' else ' as! _%sIndexBoxType' % Traversal}
   }
   
   internal let _box: _${Traversal}IndexBoxType
@@ -238,7 +239,8 @@ public func ~> (
 }
 
 public func ~> (
-  start:Any${Traversal}Index, args : (_Advance, (Any${Traversal}Index.Distance, Any${Traversal}Index))
+  start:Any${Traversal}Index,
+  args : (_Advance, (Any${Traversal}Index.Distance, Any${Traversal}Index))
 ) -> Any${Traversal}Index {
   precondition(
     start._typeID == args.1.1._typeID, "advance: base index types differ.")
@@ -269,7 +271,8 @@ public class ${Traversal}Collection<T> : CollectionType {
 
   public static func make<
     Base: CollectionType
-    where Base.Generator.Element == T ${', Base.Index: %sIndexType' % Traversal if Traversal != 'Forward' else ''}
+    where Base.Generator.Element == T ${
+    ', Base.Index: %sIndexType' % Traversal if Traversal != 'Forward' else ''}
   >(
     base: Base
   ) -> ${Traversal}Collection<T> {
@@ -299,7 +302,8 @@ public class ${Traversal}Collection<T> : CollectionType {
 }
 
 public func ~> <T>(
-  source: ${Traversal}Collection<T>, ptr: (_InitializeTo, UnsafeMutablePointer<T>)
+  source: ${Traversal}Collection<T>,
+  ptr: (_InitializeTo, UnsafeMutablePointer<T>)
 ) {
   // FIXME: can't pass UnsafeMutablePointer<T>, which would be a
   // dependent struct, pending <rdar://20164041>, thus the pointer
@@ -325,13 +329,19 @@ public func ~> <T>(source: ${Traversal}Collection<T>, _:(_Count,()))
 }
 
 final internal class ${Traversal}CollectionImpl<
-  Base: CollectionType ${'where Base.Index: %sIndexType' % Traversal if Traversal != 'Forward' else ''}
+  Base: CollectionType ${
+    'where Base.Index: %sIndexType' % Traversal 
+    if Traversal != 'Forward' else ''}
 > : ${Traversal}Collection<Base.Generator.Element> {
   internal typealias Element = Base.Generator.Element
   
   internal init(_ base: Base) { self.base = base }
-  override var startIndex: Any${Traversal}Index { return Any${Traversal}Index(base.startIndex) }
-  override var endIndex: Any${Traversal}Index { return Any${Traversal}Index(base.endIndex) }
+  override var startIndex: Any${Traversal}Index {
+    return Any${Traversal}Index(base.startIndex)
+  }
+  override var endIndex: Any${Traversal}Index {
+    return Any${Traversal}Index(base.endIndex)
+  }
   override subscript(index: Any${Traversal}Index) -> Element {
     return base[index._unbox()]
   }
