@@ -401,7 +401,8 @@ namespace options_block {
   enum {
     SDK_PATH = 1,
     XCC,
-    IS_SIB
+    IS_SIB,
+    IS_TESTABLE
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -417,6 +418,10 @@ namespace options_block {
   using IsSIBLayout = BCRecordLayout<
     IS_SIB,
     BCFixed<1> // Is this an intermediate file?
+  >;
+
+  using IsTestableLayout = BCRecordLayout<
+    IS_TESTABLE
   >;
 }
 

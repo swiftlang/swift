@@ -270,14 +270,15 @@ private:
   EntryPointInfoTy EntryPointInfo;
 
   /// The magic __dso_handle variable.
-  VarDecl *DSOHandle = nullptr;
+  llvm::PointerIntPair<VarDecl *, 1, bool> DSOHandleAndTestingEnabled;
 
-  Module(Identifier name, ASTContext &ctx);
+  Module(Identifier name, ASTContext &ctx, bool testingEnabled);
 public:
   Identifier getName() const { return Name; }
 
-  static Module *create(Identifier name, ASTContext &ctx) {
-    return new (ctx) Module(name, ctx);
+  static Module *create(Identifier name, ASTContext &ctx,
+                        bool testingEnabled = false) {
+    return new (ctx) Module(name, ctx, testingEnabled);
   }
 
   ArrayRef<FileUnit *> getFiles() {
@@ -308,6 +309,11 @@ public:
 
   /// Retrieve the magic __dso_handle variable.
   VarDecl *getDSOHandle();
+
+  /// Returns true if this module was or is being compiled for testing.
+  bool isTestingEnabled() const {
+    return DSOHandleAndTestingEnabled.getInt();
+  }
 
   /// Look up a (possibly overloaded) value set at top-level scope
   /// (but with the specified access path, which may come from an import decl)

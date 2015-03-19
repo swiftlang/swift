@@ -180,6 +180,9 @@ def enable_objc_implicit_properties :
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 
+def enable_testing : Flag<["-"], "enable-testing">,
+  HelpText<"Allows this module's internal API to be accessed for testing">;
+
 def import_module : Separate<["-"], "import-module">,
   HelpText<"Implicitly import the specified module">;
 

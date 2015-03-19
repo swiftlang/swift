@@ -334,9 +334,9 @@ void SourceLookupCache::invalidate() {
 // Module Implementation
 //===----------------------------------------------------------------------===//
 
-Module::Module(Identifier name, ASTContext &ctx)
-    : DeclContext(DeclContextKind::Module, nullptr), Ctx(ctx), Name(name)
-{
+Module::Module(Identifier name, ASTContext &ctx, bool testingEnabled)
+    : DeclContext(DeclContextKind::Module, nullptr), Ctx(ctx), Name(name),
+      DSOHandleAndTestingEnabled(nullptr, testingEnabled) {
   ctx.addDestructorCleanup(*this);
 }
 
@@ -395,8 +395,8 @@ DerivedFileUnit &Module::getDerivedFileUnit() const {
 }
 
 VarDecl *Module::getDSOHandle() {
-  if (DSOHandle)
-    return DSOHandle;
+  if (DSOHandleAndTestingEnabled.getPointer())
+    return DSOHandleAndTestingEnabled.getPointer();
 
   auto unsafeMutablePtr = Ctx.getUnsafeMutablePointerDecl();
   if (!unsafeMutablePtr)
@@ -410,15 +410,16 @@ VarDecl *Module::getDSOHandle() {
   }
   
   Type type = BoundGenericType::get(unsafeMutablePtr, Type(), { arg });
-  DSOHandle = new (Ctx) VarDecl(/*IsStatic=*/false, /*IsLet=*/false,
-                                SourceLoc(), 
-                                Ctx.getIdentifier("__dso_handle"),
-                                type, Files[0]);
-  DSOHandle->setImplicit(true);
-  DSOHandle->getAttrs().add(
+  auto handleVar = new (Ctx) VarDecl(/*IsStatic=*/false, /*IsLet=*/false,
+                                     SourceLoc(),
+                                     Ctx.getIdentifier("__dso_handle"),
+                                     type, Files[0]);
+  handleVar->setImplicit(true);
+  handleVar->getAttrs().add(
     new (Ctx) AsmnameAttr("__dso_handle", /*Implicit=*/true));
-  DSOHandle->setAccessibility(Accessibility::Internal);
-  return DSOHandle;
+  handleVar->setAccessibility(Accessibility::Internal);
+  DSOHandleAndTestingEnabled.setPointer(handleVar);
+  return handleVar;
 }
 
 #define FORWARD(name, args) \

@@ -164,6 +164,11 @@ public:
   /// file (as opposed to a module file).
   bool EnableSourceImport = false;
 
+  /// Indicates whether we are compiling for testing.
+  ///
+  /// \see Module::isTestingEnabled
+  bool EnableTesting = false;
+
   /// Indicates that the frontend should emit "verbose" SIL
   /// (if asked to emit SIL).
   bool EmitVerboseSIL = false;

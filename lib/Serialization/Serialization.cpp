@@ -401,6 +401,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, SDK_PATH);
   BLOCK_RECORD(options_block, XCC);
   BLOCK_RECORD(options_block, IS_SIB);
+  BLOCK_RECORD(options_block, IS_TESTABLE);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -538,6 +539,11 @@ void Serializer::writeHeader(const SerializationOptions &options) {
 
       options_block::IsSIBLayout IsSIB(Out);
       IsSIB.emit(ScratchRecord, options.IsSIB);
+
+      if (M->isTestingEnabled()) {
+        options_block::IsTestableLayout IsTestable(Out);
+        IsTestable.emit(ScratchRecord);
+      }
 
       if (options.SerializeOptionsForDebugging) {
         options_block::SDKPathLayout SDKPath(Out);
