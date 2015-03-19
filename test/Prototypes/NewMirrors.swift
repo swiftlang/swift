@@ -1,25 +1,29 @@
 // RUN: %target-run-simple-swift
 
-public typealias ReflectedChild = (label: String?, value: Any)
-
-// The thing you have to implement
-public protocol ReflectedStructureType {
-  func count() -> Int
-  func childAtOffset(Int) -> ReflectedChild
-}
+import SwiftExperimental
 
 // The thing with the default schema
 public struct Mirror {
+  public typealias Child = (label: String?, value: Any)
+  public typealias Structure = AnyForwardCollection<Child>
+  
   public enum Schema {
   case Struct, Class, Enum, Optional, Array, Dictionary, Set
   }
 
-  public init(_ structure: ReflectedStructureType, schema: Schema? = nil) {
+  public init(structure: Structure, schema: Schema? = nil) {
     self.structure = structure
     self.schema = schema
   }
 
-  public let structure: ReflectedStructureType
+  public init<C: CollectionType>(_ unlabeledChildren: C, schema: Schema? = nil) {
+    self.structure = Structure(
+      lazy(unlabeledChildren).map { Child(label: nil, value: $0) }
+    )
+    self.schema = schema
+  }
+
+  public let structure: Structure
   public let schema: Schema?
 }
 
@@ -30,157 +34,29 @@ protocol CustomReflectable {
 //===--- Adapters ---------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-//===--- Ad-hoc random access collection adapter proof-of-concept ---------===//
-public struct RandomAccessStructure<
-  C: CollectionType where C.Index: RandomAccessIndexType
-> : ReflectedStructureType {
-
-  public init(_ elements: C) {
+public struct LabeledStructure<Element>
+  : CollectionType, DictionaryLiteralConvertible {
+  
+  public init(dictionaryLiteral elements: (String, Element)...) {
     self.elements = elements
   }
-
-  public func count() -> Int { return numericCast(Swift.count(elements)) }
   
-  public func childAtOffset(offset: Int) -> ReflectedChild {
-    let v = elements[elements.startIndex.advancedBy(numericCast(offset))]
-    return (label: nil, value: v)
-  }
-  
-  internal let elements: C
-}
-
-extension Mirror {
-  init<
-    C: CollectionType where C.Index : RandomAccessIndexType
-  >(_ structure: C, schema: Schema? = nil) {
-    self.init(RandomAccessStructure(structure), schema: schema)
-  }
-}
-
-//===--- Horrible ad-hoc bidirectional collection proof-of-concept --------===//
-// Forward collections left as an exercise for the reader.
-public struct BidirectionalStructure<
-  C: CollectionType where C.Index: BidirectionalIndexType
-> : ReflectedStructureType {
-
-  public init(_ elements: C) {
-    self.elements = elements
-    storedCount = numericCast(Swift.count(elements)) as Int
-    var (cachedOffset, cachedIndex) = (0, elements.startIndex)
-    self.mapIndex = { [storedCount = self.storedCount]
-      (offset)->C.Index
-    in
-      let result: C.Index
-      let cacheDistance = offset - cachedOffset
-      switch minElement(
-        [offset, abs(cacheDistance), storedCount - offset]
-      ) {
-      case offset:
-        result = advance(elements.startIndex, numericCast(offset))
-      case abs(cacheDistance):
-        result = advance(cachedIndex, numericCast(cacheDistance))
-      case storedCount - offset:
-        result = advance(elements.endIndex, numericCast(offset - storedCount))
-      default:
-        fatalError("unreachable")
-      }
-      cachedOffset = offset
-      cachedIndex = result
-      return result
-    }
-  }
-  
-  public func childAtOffset(offset: Int) -> ReflectedChild {
-    let v = elements[mapIndex(offset)]
-    return (label: nil, value: v)
-  }
-
-  public func count() -> Int {
-    return storedCount
-  }
-  
-  internal let elements: C
-  internal let storedCount: Int
-  internal let mapIndex: (Int)->C.Index
-}
-
-extension Mirror {
-  init<
-    C: CollectionType where C.Index : BidirectionalIndexType
-  >(_ structure: C, schema: Schema? = nil) {
-    self.init(BidirectionalStructure(structure), schema: schema)
-  }
-}
-
-//===--- Horrible ad-hoc forward collection adapter proof-of-concept. -----===//
-public struct ForwardStructure<
-  C: CollectionType where C.Index: ForwardIndexType
-> : ReflectedStructureType {
-
-  public init(_ elements: C) {
-    self.elements = elements
-    storedCount = numericCast(Swift.count(elements)) as Int
-    var (cachedOffset, cachedIndex) = (0, elements.startIndex)
-    self.mapIndex = { [storedCount = self.storedCount]
-      (offset)->C.Index
-    in
-      let result: C.Index
-      let cacheDistance = offset - cachedOffset
-      if offset > cachedOffset {
-        result = advance(cachedIndex, numericCast(offset - cachedOffset))
-      }
-      else if offset == storedCount {
-        result = elements.endIndex
-      }
-      else {
-        result = advance(elements.startIndex, numericCast(offset))
-      }
-      cachedOffset = offset
-      cachedIndex = result
-      return result
-    }
-  }
-  
-  public func childAtOffset(offset: Int) -> ReflectedChild {
-    let v = elements[mapIndex(offset)]
-    return (label: nil, value: v)
-  }
-
-  public func count() -> Int {
-    return storedCount
-  }
-  
-  internal let elements: C
-  internal let storedCount: Int
-  internal let mapIndex: (Int)->C.Index
-}
-
-extension Mirror {
-  init<
-    C: CollectionType where C.Index : ForwardIndexType
-  >(_ structure: C, schema: Schema? = nil) {
-    self.init(ForwardStructure(structure), schema: schema)
-  }
-}
-
-//===--- ReflectedStructureType for Aggregates -------------------------===//
-public struct LabeledStructure
-  : ReflectedStructureType, DictionaryLiteralConvertible {
-  public init(dictionaryLiteral elements: (String, Any)...) {
+  public init(_ elements: [(String, Element)]) {
     self.elements = elements
   }
-
-  internal init(_ elements: [(String, Any)]) {
-    self.elements = elements
+  
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { return elements.endIndex }
+  
+  public subscript(position: Int) -> Mirror.Child {
+    return (label: elements[position].0, value: elements[position].1)
   }
 
-  public func count() -> Int { return elements.count }
-  
-  public func childAtOffset(offset: Int) -> ReflectedChild {
-    return (label: elements[offset].0, value: elements[offset].1)
+  public func generate() -> IndexingGenerator<LabeledStructure> {
+    return IndexingGenerator(self)
   }
   
-  internal let elements: [(String, Any)]
+  internal let elements: [(String, Element)]
 }
 
 extension Mirror : DictionaryLiteralConvertible {
@@ -190,8 +66,10 @@ extension Mirror : DictionaryLiteralConvertible {
     self.init(LabeledStructure(elements))
   }
   
-  public init(_ structure: LabeledStructure, schema: Schema? = nil) {
-    self.structure = structure
+  public init<Element>(
+    _ structure: LabeledStructure<Element>, schema: Schema? = nil
+  ) {
+    self.structure = Structure(structure)
     self.schema = schema
   }
 }
@@ -204,13 +82,9 @@ var mirrors = TestSuite("Mirrors")
 
 extension Mirror: Printable {
   public var description: String {
+    let nil_ = "nil"
     return "[" + ", ".join(
-      (0..<self.structure.count()).map {
-      (offset: Int)->String in
-        let d = self.structure.childAtOffset(offset)
-        let key = d.0 ?? "nil"
-        return "\(key): \(toDebugString(d.1))"
-      }
+      lazy(structure).map { "\($0.0 ?? nil_): \(toDebugString($0.1))" }
     ) + "]"
   }
 }
@@ -256,7 +130,7 @@ mirrors.test("ForwardStructure") {
 
   let w = DoubleYou().reflect()
   expectEqual(.Set, w.schema)
-  expectEqual(count(letters), w.structure.count())
+  expectEqual(count(letters), numericCast(count(w.structure)))
   
   // Because we don't control the order of a Set, we need to do a
   // fancy dance in order to validate the result.
@@ -282,23 +156,6 @@ mirrors.test("BidirectionalStructure") {
   expectEqual(
     "[nil: \"a\", nil: \"b\", nil: \"c\", nil: \"",
     description[description.startIndex..<find(description, "d")!])
-
-  // Now test something that demands jumping around to make sure the
-  // index cache isn't returning bogus results
-  let s = y.structure
-  let sentence = "the quick brown fox jumped over the lazy dog"
-  
-  // Get offsets in letters for each element of sentence
-  let letterOffsets = map(sentence) {
-    [letters = Array(letters)] index in find(letters, index)!
-  }
-
-  // Use these offsets to reconstruct the sentence from the structural
-  // description of y
-  let recovered = "".join(
-    letterOffsets.map { String( s.childAtOffset($0).1 as! Character )})
-
-  expectEqual(sentence, recovered)
 }
 
 mirrors.test("LabeledStructure") {
