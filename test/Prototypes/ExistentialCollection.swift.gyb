@@ -43,19 +43,33 @@ internal func _typeID(instance: AnyObject) -> ObjectIdentifier {
 
 //===--- Sequence ---------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
+
 internal class _AnySequenceBox {
+  // FIXME: can't make _AnySequenceBox generic and return
+  // _AnyGenerator<T> here due to <rdar://20211022>
   func generate() -> _AnyGeneratorBase {_abstract()}
+
   func _underestimateCount() -> Int  {_abstract()}
+  // FIXME: can't traffic in UnsafeMutablePointer<T> and
+  // _ContiguousArrayBuffer<T> here due to <rdar://20164041>
   func _initializeTo(ptr: UnsafeMutablePointer<Void>) {_abstract()}
   func _copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {_abstract()}
 }
 
-internal class _SequenceBox<S: SequenceType> : _AnySequenceBox {
-  typealias Element = S.Generator.Element
-  
-  init(_ base: S) {
-    self._base = base
+internal class _AnyCollectionBoxBase : _AnySequenceBox {
+  init(startIndex: _ForwardIndexBoxType, endIndex: _ForwardIndexBoxType) {
+    self.startIndex = startIndex
+    self.endIndex = endIndex
   }
+  let startIndex: _ForwardIndexBoxType
+  let endIndex: _ForwardIndexBoxType
+}
+
+% for Kind in ['Sequence', 'Collection']:
+// FIXME: can't make this a protocol due to <rdar://20209031>
+internal class _${Kind}Box<S: ${Kind}Type>
+  : _Any${Kind}Box${'<S.Generator.Element>'if Kind == 'Collection' else ''} {
+  typealias Element = S.Generator.Element
   
   override func generate() -> _AnyGeneratorBase {
     return _GeneratorBox(_base.generate())
@@ -69,9 +83,32 @@ internal class _SequenceBox<S: SequenceType> : _AnySequenceBox {
   override func _copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
     return (_base~>(_CopyToNativeArrayBuffer(), ()))._storage
   }
-  
+%   if Kind == 'Collection':
+  override func _count() -> IntMax {
+    return numericCast(_base~>(_Count(), ()))
+  }
+  override subscript(position: _ForwardIndexBoxType) -> Element {
+    if let i? = position._unbox() as S.Index? {
+      return _base[i]
+    }
+    fatalError("Index type mismatch!")
+  }
+  init(
+    _ base: S,
+    startIndex: _ForwardIndexBoxType,
+    endIndex: _ForwardIndexBoxType
+  ) {
+    self._base = base
+    super.init(startIndex: startIndex, endIndex: endIndex)
+  }
+%   else:
+  init(_ base: S) {
+    self._base = base
+  }
+%   end
   internal var _base: S
 }
+% end
 
 struct AnySequence<T> : SequenceType {
   typealias Element = T
@@ -84,24 +121,34 @@ struct AnySequence<T> : SequenceType {
   internal let _box: _AnySequenceBox
 }
 
-func ~> <T>(
-  source: AnySequence<T>, _: (_UnderestimateCount, ())
+% for Kind in ['Sequence'] + [t + 'Collection' for t in traversals]:
+func ~> <Element>(
+  source: Any${Kind}<Element>, _: (_UnderestimateCount, ())
 ) -> Int {
   return source._box._underestimateCount()
 }
 
-func ~> <T>(
-  source: AnySequence<T>, ptr: (_InitializeTo, UnsafeMutablePointer<T>)
+func ~> <Element>(
+  source: Any${Kind}<Element>,
+  ptr: (_InitializeTo, UnsafeMutablePointer<Element>)
 ) {
   source._box._initializeTo(UnsafeMutablePointer(ptr.1))
 }
 
-func ~> <T>(
-  source: AnySequence<T>, _: (_CopyToNativeArrayBuffer,())
-) -> _ContiguousArrayBuffer<T> {
+func ~> <Element>(
+  source: Any${Kind}<Element>, _: (_CopyToNativeArrayBuffer,())
+) -> _ContiguousArrayBuffer<Element> {
   return _ContiguousArrayBuffer(source._box._copyToNativeArrayBuffer())
 }
 
+%  if Kind != 'Sequence':
+func ~> <Element>(
+  source: Any${Kind}<Element>, _: (_Count,())
+) -> IntMax {
+  return source._box._count()
+}
+%  end
+% end
 
 //===--- ForwardIndex -----------------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -110,6 +157,7 @@ internal protocol _ForwardIndexBoxType : class {
   var typeID: ObjectIdentifier {get}
   func successor() -> Self
   func equals(other: _ForwardIndexBoxType) -> Bool
+  func _unbox<T: ForwardIndexType>() -> T?
   func _distanceTo(other: _ForwardIndexBoxType) -> AnyForwardIndex.Distance
   // FIXME: Can't return Self from _advancedBy pending <rdar://20181253>
   func _advancedBy(distance: AnyForwardIndex.Distance) -> _ForwardIndexBoxType
@@ -151,6 +199,16 @@ internal class _ForwardIndexBox<
     _ limit: _ForwardIndexBoxType
   ) -> _ForwardIndexBoxType {
     return self.dynamicType(advance(base, numericCast(n), unsafeUnbox(limit)))
+  }
+
+  func _unbox<T: ForwardIndexType>() -> T? {
+    if T.self is BaseIndex.Type {
+      _sanityCheck(BaseIndex.self is T.Type)
+      // This bit cast is really nothing as we have proven they are
+      // the same type.
+      return unsafeBitCast(base, T.self) 
+    }
+    return nil
   }
 
   var typeID: ObjectIdentifier { return _typeID(self) }
@@ -207,9 +265,6 @@ public struct Any${Traversal}Index : ${Traversal}IndexType {
   % end
   
   //===--- private --------------------------------------------------------===//
-  internal func _unbox<T: ${Traversal}IndexType>() -> T {
-    return (_box as! _${Traversal}IndexBox<T>).base
-  }
   
   internal var _typeID: ObjectIdentifier {
     return _box.typeID
@@ -256,125 +311,51 @@ public func == (lhs: Any${Traversal}Index, rhs: Any${Traversal}Index) -> Bool {
 //===--- Collections ------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-class _AnyCollectionBox<Element> {
-  var startIndex: _ForwardIndexBoxType {_abstract()}
-  var endIndex: _ForwardIndexBoxType {_abstract()}
+class _AnyCollectionBox<Element> : _AnyCollectionBoxBase {
   subscript(_ForwardIndexBoxType) -> Element {_abstract()}
+  func _count() -> IntMax {_abstract()}
+
+  // FIXME: should be inherited, but a known bug prevents it since
+  // this class is generic.
+  override init(
+    startIndex: _ForwardIndexBoxType,
+    endIndex: _ForwardIndexBoxType
+  ) {
+    super.init(startIndex: startIndex, endIndex: endIndex)
+  }
 }
 
 % for Traversal in traversals:
-public class ${Traversal}Collection<T> : CollectionType {
-  public var startIndex: Any${Traversal}Index {_abstract()}
-  public var endIndex: Any${Traversal}Index {_abstract()}
-  public subscript(index: Any${Traversal}Index) -> T {_abstract()}
-  public func generate() -> AnyGenerator<T> {_abstract()}
+struct Any${Traversal}Collection<Element> : CollectionType {
+  typealias Box = _AnyCollectionBox<Element>
 
-  public static func make<
-    Base: CollectionType
-    where Base.Generator.Element == T ${
-    ', Base.Index: %sIndexType' % Traversal if Traversal != 'Forward' else ''}
-  >(
-    base: Base
-  ) -> ${Traversal}Collection<T> {
-    return ${Traversal}CollectionImpl(base)
-  }
-  //===--- private --------------------------------------------------------===//
-  //===--------------------------------------------------------------------===//
-  
-  //===--- SequenceType ~> operations -------------------------------------===//
-  /// Create a native array buffer containing the elements of `self`,
-  /// in the same order.
-  func _copyToNativeArrayBuffer() -> AnyObject {
-    // FIXME: can't return _ContiguousArrayBuffer<T>, which would be a
-    // dependent struct, pending <rdar://20164041>
-    _abstract()
+  init<
+    C: CollectionType
+      where C.Index: ${Traversal}IndexType, C.Generator.Element == Element
+  >(_ base: C) {
+    self._box = _CollectionBox<C>(
+      base,
+      startIndex: _${Traversal}IndexBox(base.startIndex),
+      endIndex: _${Traversal}IndexBox(base.endIndex))
   }
   
-  /// Copy a Sequence into an array.
-  func _initializeTo(UnsafeMutablePointer<Void>) {
-    // FIXME: can't pass UnsafeMutablePointer<T>, which would be a
-    // dependent struct, pending <rdar://20164041>
-    _abstract()
-  }
-
-  //===--- CollectionType ~> operations -----------------------------------===//
-  internal func _count() -> Any${Traversal}Index.Distance {_abstract()}
-}
-
-public func ~> <T>(
-  source: ${Traversal}Collection<T>,
-  ptr: (_InitializeTo, UnsafeMutablePointer<T>)
-) {
-  // FIXME: can't pass UnsafeMutablePointer<T>, which would be a
-  // dependent struct, pending <rdar://20164041>, thus the pointer
-  // cast.
-  source._initializeTo(UnsafeMutablePointer(ptr.1))
-}
-
-public func ~> <T>(
-  source: ${Traversal}Collection<T>, _: (_CopyToNativeArrayBuffer,())
-) -> _ContiguousArrayBuffer<T> {
-  
-  return unsafeBitCast(
-    // FIXME: this call can't return _ContiguousArrayBuffer<T>, which
-    // would be a dependent struct, pending <rdar://20164041>.  Thus
-    // the cast.
-    source._copyToNativeArrayBuffer(), _ContiguousArrayBuffer<T>.self)
-}
-
-public func ~> <T>(source: ${Traversal}Collection<T>, _:(_Count,()))
-  -> Any${Traversal}Index.Distance
-{
-  return source._count()
-}
-
-final internal class ${Traversal}CollectionImpl<
-  Base: CollectionType ${
-    'where Base.Index: %sIndexType' % Traversal 
-    if Traversal != 'Forward' else ''}
-> : ${Traversal}Collection<Base.Generator.Element> {
-  internal typealias Element = Base.Generator.Element
-  
-  internal init(_ base: Base) { self.base = base }
-  override var startIndex: Any${Traversal}Index {
-    return Any${Traversal}Index(base.startIndex)
-  }
-  override var endIndex: Any${Traversal}Index {
-    return Any${Traversal}Index(base.endIndex)
-  }
-  override subscript(index: Any${Traversal}Index) -> Element {
-    return base[index._unbox()]
-  }
-  override func generate() -> AnyGenerator<Element> {
-    return _GeneratorBox(base.generate())
-  }
-  //===--- private --------------------------------------------------------===//
-  //===--------------------------------------------------------------------===//
-
-  //===--- SequenceType ~> operations -------------------------------------===//
-  /// Create a native array buffer containing the elements of `self`,
-  /// in the same order.
-  override func _copyToNativeArrayBuffer() -> AnyObject {
-    // FIXME: can't return _ContiguousArrayBuffer<T>, which would be a
-    // dependent struct, pending <rdar://20164041>
-    return ContiguousArray(base)._buffer.owner
+  func generate() -> AnyGenerator<Element> {
+    return unsafeDowncast(_box.generate())
   }
   
-  /// Copy a Sequence into an array.
-  override func _initializeTo(ptr: UnsafeMutablePointer<Void>) {
-    // FIXME: can't pass UnsafeMutablePointer<Element>, which would be
-    // a dependent struct, pending <rdar://20164041>, thus the pointer
-    // cast.
-    base~>(_InitializeTo(), UnsafeMutablePointer(ptr))
+  var startIndex: Any${Traversal}Index {
+    return Any${Traversal}Index(_box.startIndex)
   }
-
-  //===--- CollectionType ~> operations -----------------------------------===//
-  override internal func _count() -> Any${Traversal}Index.Distance {
-    return numericCast(count(base))
+  
+  var endIndex: Any${Traversal}Index {
+    return Any${Traversal}Index(_box.endIndex)
   }
-
-  //===--- stored properties ----------------------------------------------===//
-  internal let base: Base
+  
+  subscript(position: Any${Traversal}Index) -> Element {
+    return _box[position._box]
+  }
+  
+  let _box: Box
 }
 % end
 
@@ -391,7 +372,7 @@ tests.test("Sequence") {
 
 tests.test("ForwardCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
-  let fc0 = ForwardCollection.make(a0)
+  let fc0 = AnyForwardCollection(a0)
   let a1 = ContiguousArray(fc0)
   expectEqual(a0, a1)
   for e in a0 {
@@ -407,7 +388,7 @@ tests.test("ForwardCollection") {
 
 tests.test("BidirectionalCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
-  let fc0 = BidirectionalCollection.make(lazy(a0).reverse())
+  let fc0 = AnyBidirectionalCollection(lazy(a0).reverse())
   let a1 = ContiguousArray(lazy(fc0).reverse())
   expectEqual(a0, a1)
   for e in a0 {
