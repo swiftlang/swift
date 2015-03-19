@@ -847,13 +847,6 @@ namespace {
 
       for (Decl *member : TheExtension->getMembers())
         visit(member);
-      
-      // ObjC protocol conformances may need to pull method descriptors for
-      // definitions from other contexts into the category.
-      for (unsigned i = 0, size = TheExtension->getProtocols().size();
-           i < size; ++i)
-        visitObjCConformance(TheExtension->getProtocols()[i],
-                             TheExtension->getConformances()[i]);
     }
     
     ClassDataBuilder(IRGenModule &IGM, ProtocolDecl *theProtocol)
@@ -895,28 +888,6 @@ namespace {
 
         Protocols.push_back(buildProtocolRef(proto));
       }
-    }
-
-    void visitObjCConformance(ProtocolDecl *protocol,
-                              ProtocolConformance *conformance) {
-      assert(TheExtension &&
-             "should only consider objc conformances for extensions");
-      if (protocol->isObjC()) {
-        conformance->forEachValueWitness(nullptr,
-                                         [&](ValueDecl *req,
-                                             ConcreteDeclRef witness) {
-          // Missing optional requirement.
-          if (!witness)
-            return;
-
-          ValueDecl *vd = witness.getDecl();
-          if (vd->getDeclContext() != TheExtension && !vd->isObjC())
-            visit(vd);
-        });
-      }
-      
-      for (auto &inherited : conformance->getInheritedConformances())
-        visitObjCConformance(inherited.first, inherited.second);
     }
 
     void buildMetaclassStub() {
