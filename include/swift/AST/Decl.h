@@ -2981,7 +2981,8 @@ public:
 
   /// Retrieve all of the protocol conformances for this nominal type.
   SmallVector<ProtocolConformance *, 2> getAllConformances(
-                                          LazyResolver *resolver) const;
+                                          LazyResolver *resolver,
+                                          bool sorted = false) const;
 
   /// \brief True if the type can implicitly derive a conformance for the given
   /// protocol.

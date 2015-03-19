@@ -1901,13 +1901,49 @@ SmallVector<ProtocolDecl *, 2> NominalTypeDecl::getAllProtocols(
 }
 
 SmallVector<ProtocolConformance *, 2> NominalTypeDecl::getAllConformances(
-                                        LazyResolver *resolver) const
+                                        LazyResolver *resolver,
+                                        bool sorted) const
 {
   prepareConformanceTable(resolver);
   SmallVector<ProtocolConformance *, 2> result;
   ConformanceTable->getAllConformances(const_cast<NominalTypeDecl *>(this),
                                        resolver,
                                        result);
+
+  if (sorted) {
+    // If requested, sort the results.
+    ASTContext &ctx = getASTContext();
+    std::sort(result.begin(), result.end(), [&](ProtocolConformance *lhs,
+                                                ProtocolConformance *rhs) {
+      // If the two conformances are normal conformances with locations,
+      // sort by location.
+      if (auto lhsNormal = dyn_cast<NormalProtocolConformance>(lhs)) {
+        if (auto rhsNormal = dyn_cast<NormalProtocolConformance>(rhs)) {
+          if (lhsNormal->getLoc().isValid() && rhsNormal->getLoc().isValid()) {
+            unsigned lhsBuffer
+              = ctx.SourceMgr.findBufferContainingLoc(lhsNormal->getLoc());
+            unsigned rhsBuffer
+              = ctx.SourceMgr.findBufferContainingLoc(rhsNormal->getLoc());
+
+            // If the buffers are the same, use source location ordering.
+            if (lhsBuffer == rhsBuffer) {
+              return ctx.SourceMgr.isBeforeInBuffer(lhsNormal->getLoc(),
+                                                    rhsNormal->getLoc());
+            }
+
+            // Otherwise, order by buffer identifier.
+            return StringRef(ctx.SourceMgr.getIdentifierForBuffer(lhsBuffer))
+                   < StringRef(ctx.SourceMgr.getIdentifierForBuffer(rhsBuffer));
+          }
+        }
+      }
+
+      // Otherwise, sort by protocol.
+      ProtocolDecl *lhsProto = lhs->getProtocol();
+      ProtocolDecl *rhsProto = rhs->getProtocol();
+      return ProtocolType::compareProtocols(&lhsProto, &rhsProto) < 0;
+    });
+  }
   return result;
 }
 

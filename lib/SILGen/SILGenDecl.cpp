@@ -1373,8 +1373,11 @@ public:
     if (isa<ProtocolDecl>(theType))
       return;
 
-    for (auto *conformance : theType->getConformances())
-      SGM.getWitnessTable(conformance);
+    for (auto *conformance : theType->getAllConformances(nullptr,
+                                                         /*sorted=*/true)) {
+      if (conformance->isComplete())
+        SGM.getWitnessTable(conformance);
+    }
   }
 
   //===--------------------------------------------------------------------===//
