@@ -9,13 +9,17 @@
 
 @availability(#^AVAILABILITY1^#)
 
-// AVAILABILITY1:             Begin completions, 5 items
-// AVAILABILITY1-NEXT:        Keyword/None:                       *[#Platform#]; name=*{{$}}
-// AVAILABILITY1-NEXT:        Keyword/None:                       iOS[#Platform#]; name=iOS{{$}}
-// AVAILABILITY1-NEXT:        Keyword/None:                       OSX[#Platform#]; name=OSX{{$}}
-// AVAILABILITY1-NEXT:        Keyword/None:                       iOSApplicationExtension[#Platform#]; name=iOSApplicationExtension{{$}}
-// AVAILABILITY1-NEXT:        Keyword/None:                       OSXApplicationExtension[#Platform#]; name=OSXApplicationExtension{{$}}
-// AVAILABILITY1-NEXT:        End completions
+// AVAILABILITY1: Begin completions, 9 items
+// AVAILABILITY1-NEXT: Keyword/None:                       *[#Platform#]; name=*{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       iOS[#Platform#]; name=iOS{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       tvOS[#Platform#]; name=tvOS{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       watchOS[#Platform#]; name=watchOS{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       OSX[#Platform#]; name=OSX{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       iOSApplicationExtension[#Platform#]; name=iOSApplicationExtension{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       tvOSApplicationExtension[#Platform#]; name=tvOSApplicationExtension{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       watchOSApplicationExtension[#Platform#]; name=watchOSApplicationExtension{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       OSXApplicationExtension[#Platform#]; name=OSXApplicationExtension{{$}}
+// AVAILABILITY1-NEXT: End completions
 
 @availability(*, #^AVAILABILITY2^#)
 
