@@ -6,6 +6,8 @@ func unavailable_func() {}
 @availability(*, unavailable, message="message")
 func unavailable_func_with_message() {}
 
+@availability(tvOS, unavailable)
+@availability(watchOS, unavailable)
 @availability(iOS, unavailable)
 @availability(OSX, unavailable)
 func unavailable_multiple_platforms() {}
