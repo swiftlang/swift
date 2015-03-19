@@ -9,9 +9,20 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/out.swift
-// RUN: %S/../../utils/line-directive %t/out.swift -- %target-build-swift -Xfrontend -disable-access-control %t/out.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/out.swift -- %target-run %t/a.out
+
+//===--- Definitions needed only while experimental -----------------------===//
+internal typealias _ContiguousArrayStorageBase = AnyObject
+extension _InitializeTo { init() {} }
+extension _CopyToNativeArrayBuffer { init() {} }
+extension _Count { init() {} }
+extension _ContiguousArrayBuffer {
+  var _storage: _ContiguousArrayStorageBase { return owner }
+  init(_ owner: _ContiguousArrayStorageBase) {
+    self = unsafeBitCast(owner, _ContiguousArrayBuffer.self)
+  }
+}
+
+//===----------------------------------------------------------------------===//
 
 % traversals = ['Forward', 'Bidirectional', 'RandomAccess']
 
@@ -110,39 +121,39 @@ internal class _${Kind}Box<S: ${Kind}Type>
 }
 % end
 
-struct AnySequence<T> : SequenceType {
+public struct AnySequence<T> : SequenceType {
   typealias Element = T
-  init<S: SequenceType where S.Generator.Element == T>(_ base: S) {
+  public init<S: SequenceType where S.Generator.Element == T>(_ base: S) {
     _box = _SequenceBox(base)
   }
-  func generate() -> AnyGenerator<Element> {
+  public func generate() -> AnyGenerator<Element> {
     return unsafeDowncast(_box.generate())
   }
   internal let _box: _AnySequenceBox
 }
 
 % for Kind in ['Sequence'] + [t + 'Collection' for t in traversals]:
-func ~> <Element>(
+public func ~> <Element>(
   source: Any${Kind}<Element>, _: (_UnderestimateCount, ())
 ) -> Int {
   return source._box._underestimateCount()
 }
 
-func ~> <Element>(
+public func ~> <Element>(
   source: Any${Kind}<Element>,
   ptr: (_InitializeTo, UnsafeMutablePointer<Element>)
 ) {
   source._box._initializeTo(UnsafeMutablePointer(ptr.1))
 }
 
-func ~> <Element>(
+public func ~> <Element>(
   source: Any${Kind}<Element>, _: (_CopyToNativeArrayBuffer,())
 ) -> _ContiguousArrayBuffer<Element> {
   return _ContiguousArrayBuffer(source._box._copyToNativeArrayBuffer())
 }
 
 %  if Kind != 'Sequence':
-func ~> <Element>(
+public func ~> <Element>(
   source: Any${Kind}<Element>, _: (_Count,())
 ) -> IntMax {
   return source._box._count()
@@ -256,8 +267,6 @@ internal final class _RandomAccessIndexBox<
 //===--- All Index Protocols ----------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-extension _InitializeTo { init() {} }
-
 % for Traversal in traversals:
 
 %   Self = 'Any%sIndex' % Traversal
@@ -348,12 +357,24 @@ class _AnyCollectionBox<Element> : _AnyCollectionBoxBase {
   }
 }
 
+public protocol _AnyCollectionType : CollectionType {
+  var _boxID: ObjectIdentifier {get}
+}
+
+public func === <L: _AnyCollectionType, R: _AnyCollectionType>(lhs: L, rhs: R) -> Bool {
+  return lhs._boxID == rhs._boxID
+}
+
+public func !== <L: _AnyCollectionType, R: _AnyCollectionType>(lhs: L, rhs: R) -> Bool {
+  return lhs._boxID != rhs._boxID
+}
+
 % for (ti, Traversal) in enumerate(traversals):
-struct Any${Traversal}Collection<Element> : CollectionType {
+public struct Any${Traversal}Collection<Element> : _AnyCollectionType {
   typealias Box = _AnyCollectionBox<Element>
 
 %   for SubTraversal in traversals[ti:]:
-  init<
+  public init<
     C: CollectionType
       where C.Index: ${SubTraversal}IndexType, C.Generator.Element == Element
   >(_ base: C) {
@@ -362,13 +383,13 @@ struct Any${Traversal}Collection<Element> : CollectionType {
       startIndex: _${SubTraversal}IndexBox(base.startIndex),
       endIndex: _${SubTraversal}IndexBox(base.endIndex))
   }
-  init(_ other: Any${SubTraversal}Collection<Element>) {
+  public init(_ other: Any${SubTraversal}Collection<Element>) {
     self._box = other._box
   }
 %   end
 
 %   for SuperTraversal in traversals[:ti]:
-  init?(_ other: Any${SuperTraversal}Collection<Element>) {
+  public init?(_ other: Any${SuperTraversal}Collection<Element>) {
     if !(other._box.startIndex is _${Traversal}IndexBoxType) {
       return nil
     }
@@ -377,115 +398,27 @@ struct Any${Traversal}Collection<Element> : CollectionType {
   }
 %   end
   
-  func generate() -> AnyGenerator<Element> {
+  public func generate() -> AnyGenerator<Element> {
     return unsafeDowncast(_box.generate())
   }
   
-  var startIndex: Any${Traversal}Index {
+  public var startIndex: Any${Traversal}Index {
     return Any${Traversal}Index(_box.startIndex)
   }
   
-  var endIndex: Any${Traversal}Index {
+  public var endIndex: Any${Traversal}Index {
     return Any${Traversal}Index(_box.endIndex)
   }
   
-  subscript(position: Any${Traversal}Index) -> Element {
+  public subscript(position: Any${Traversal}Index) -> Element {
     return _box[position._box]
   }
+
+  public var _boxID: ObjectIdentifier {
+    return ObjectIdentifier(_box)
+  }
   
-  let _box: Box
+  internal let _box: Box
 }
 % end
-
-//===--- tests ------------------------------------------------------------===//
-//===----------------------------------------------------------------------===//
-import StdlibUnittest
-
-var tests = TestSuite("ExistentialCollection")
-
-tests.test("Sequence") {
-  let fib = [1, 2, 3, 5, 8, 13, 21]
-  expectEqual(fib, Array(AnySequence(fib)))
-}
-
-tests.test("ForwardCollection") {
-  let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
-  let fc0 = AnyForwardCollection(a0)
-  let a1 = ContiguousArray(fc0)
-  expectEqual(a0, a1)
-  for e in a0 {
-    let i = find(fc0, e)
-    expectNotEmpty(i)
-    expectEqual(e, fc0[i!])
-  }
-  for i in indices(fc0) {
-    expectNotEqual(fc0.endIndex, i)
-    expectEqual(1, count(filter(indices(fc0)) {$0 == i}))
-  }
-}
-
-tests.test("BidirectionalCollection") {
-  let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
-  let fc0 = AnyForwardCollection(lazy(a0).reverse())
-  
-  let bc0_ = AnyBidirectionalCollection(fc0)         // upgrade!
-  expectNotEmpty(bc0_)
-  let bc0 = bc0_!
-  expectTrue(fc0._box === bc0._box)
-
-  let fc1 = AnyForwardCollection(lazy(a0).reverse()) // new collection
-  expectFalse(fc1._box === fc0._box)
-
-  let fc2 = AnyForwardCollection(bc0)                // downgrade
-  expectTrue(fc2._box === bc0._box)
-  
-  let a1 = ContiguousArray(lazy(bc0).reverse())
-  expectEqual(a0, a1)
-  for e in a0 {
-    let i = find(bc0, e)
-    expectNotEmpty(i)
-    expectEqual(e, bc0[i!])
-  }
-  for i in indices(bc0) {
-    expectNotEqual(bc0.endIndex, i)
-    expectEqual(1, count(filter(indices(bc0)) {$0 == i}))
-  }
-  
-  // Can't upgrade a non-random-access collection to random access
-  let s0 = "Hello, Woyld"
-  let bc1 = AnyBidirectionalCollection(s0)
-  let fc3 = AnyForwardCollection(bc1)
-  expectTrue(fc3._box === bc1._box)
-  expectEmpty(AnyRandomAccessCollection(bc1))
-  expectEmpty(AnyRandomAccessCollection(fc3))
-}
-
-tests.test("RandomAccessCollection") {
-  let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
-  let fc0 = AnyForwardCollection(lazy(a0).reverse())
-  let rc0_ = AnyRandomAccessCollection(fc0)         // upgrade!
-  expectNotEmpty(rc0_)
-  let rc0 = rc0_!
-  expectTrue(rc0._box === fc0._box)
-
-  let bc1 = AnyBidirectionalCollection(rc0)         // downgrade
-  expectTrue(bc1._box === rc0._box)
-
-  let fc1 = AnyBidirectionalCollection(rc0)         // downgrade
-  expectTrue(fc1._box === rc0._box)
-  
-  let a1 = ContiguousArray(lazy(rc0).reverse())
-  expectEqual(a0, a1)
-  for e in a0 {
-    let i = find(rc0, e)
-    expectNotEmpty(i)
-    expectEqual(e, rc0[i!])
-  }
-  for i in indices(rc0) {
-    expectNotEqual(rc0.endIndex, i)
-    expectEqual(1, count(filter(indices(rc0)) {$0 == i}))
-  }
-}
-
-runAllTests()
 
