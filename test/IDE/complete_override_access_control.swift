@@ -159,22 +159,19 @@ public class TestPublicDE : ProtocolDPrivate, ProtocolEPublic {
 // FIXME: there should be no duplicates in the results below.
 
 // TEST_PRIVATE_DE: Begin completions, 3 items
-// TEST_PRIVATE_DE-NEXT: Decl[InstanceMethod]/Super: private func colliding() {|}{{; name=.+$}}
-// TEST_PRIVATE_DE-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
-// TEST_PRIVATE_DE-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
-// TEST_PRIVATE_DE-NEXT: End completions
+// TEST_PRIVATE_DE-DAG: Decl[InstanceMethod]/Super: private func colliding() {|}{{; name=.+$}}
+// TEST_PRIVATE_DE-DAG: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_PRIVATE_DE-DAG: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 
 // TEST_INTERNAL_DE: Begin completions, 3 items
-// TEST_INTERNAL_DE-NEXT: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
-// TEST_INTERNAL_DE-NEXT: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
-// TEST_INTERNAL_DE-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
-// TEST_INTERNAL_DE-NEXT: End completions
+// TEST_INTERNAL_DE-DAG: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
+// TEST_INTERNAL_DE-DAG: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_INTERNAL_DE-DAG: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 
 // TEST_PUBLIC_DE: Begin completions, 3 items
-// TEST_PUBLIC_DE-NEXT: Decl[InstanceMethod]/Super: public func colliding() {|}{{; name=.+$}}
-// TEST_PUBLIC_DE-NEXT: Decl[InstanceMethod]/Super: public func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
-// TEST_PUBLIC_DE-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
-// TEST_PUBLIC_DE-NEXT: End completions
+// TEST_PUBLIC_DE-DAG: Decl[InstanceMethod]/Super: public func colliding() {|}{{; name=.+$}}
+// TEST_PUBLIC_DE-DAG: Decl[InstanceMethod]/Super: public func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_PUBLIC_DE-DAG: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 
 private class TestPrivateED : ProtocolEPublic, ProtocolDPrivate {
   #^TEST_PRIVATE_ED^#
@@ -189,22 +186,19 @@ public class TestPublicED : ProtocolEPublic, ProtocolDPrivate {
 // FIXME: there should be no duplicates in the results below.
 
 // TEST_PRIVATE_ED: Begin completions, 3 items
-// TEST_PRIVATE_ED-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
-// TEST_PRIVATE_ED-NEXT: Decl[InstanceMethod]/Super: private func colliding() {|}{{; name=.+$}}
-// TEST_PRIVATE_ED-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
-// TEST_PRIVATE_ED-NEXT: End completions
+// TEST_PRIVATE_ED-DAG: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_PRIVATE_ED-DAG: Decl[InstanceMethod]/Super: private func colliding() {|}{{; name=.+$}}
+// TEST_PRIVATE_ED-DAG: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 
 // TEST_INTERNAL_ED: Begin completions, 3 items
-// TEST_INTERNAL_ED-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
-// TEST_INTERNAL_ED-NEXT: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
-// TEST_INTERNAL_ED-NEXT: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
-// TEST_INTERNAL_ED-NEXT: End completions
+// TEST_INTERNAL_ED-DAG: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_INTERNAL_ED-DAG: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
+// TEST_INTERNAL_ED-DAG: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 
 // TEST_PUBLIC_ED: Begin completions, 3 items
-// TEST_PUBLIC_ED-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
-// TEST_PUBLIC_ED-NEXT: Decl[InstanceMethod]/Super: public func colliding() {|}{{; name=.+$}}
-// TEST_PUBLIC_ED-NEXT: Decl[InstanceMethod]/Super: public func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
-// TEST_PUBLIC_ED-NEXT: End completions
+// TEST_PUBLIC_ED-DAG: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_PUBLIC_ED-DAG: Decl[InstanceMethod]/Super: public func colliding() {|}{{; name=.+$}}
+// TEST_PUBLIC_ED-DAG: Decl[InstanceMethod]/Super: public func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 
 private class TestPrivateEF : ProtocolEPublic, ProtocolFPublic {
   #^TEST_PRIVATE_EF^#
@@ -219,19 +213,16 @@ public class TestPublicEF : ProtocolEPublic, ProtocolFPublic {
 // FIXME: there should be no duplicates in the results below.
 
 // TEST_PRIVATE_EF: Begin completions, 3 items
-// TEST_PRIVATE_EF-NEXT: Decl[InstanceMethod]/Super: private func colliding() {|}{{; name=.+$}}
-// TEST_PRIVATE_EF-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
-// TEST_PRIVATE_EF-NEXT: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
-// TEST_PRIVATE_EF-NEXT: End completions
+// TEST_PRIVATE_EF-DAG: Decl[InstanceMethod]/Super: private func colliding() {|}{{; name=.+$}}
+// TEST_PRIVATE_EF-DAG: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_PRIVATE_EF-DAG: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 
 // TEST_INTERNAL_EF: Begin completions, 3 items
-// TEST_INTERNAL_EF-NEXT: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
-// TEST_INTERNAL_EF-NEXT: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
-// TEST_INTERNAL_EF-NEXT: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
-// TEST_INTERNAL_EF-NEXT: End completions
+// TEST_INTERNAL_EF-DAG: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
+// TEST_INTERNAL_EF-DAG: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_INTERNAL_EF-DAG: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 
 // TEST_PUBLIC_EF: Begin completions, 3 items
-// TEST_PUBLIC_EF-NEXT: Decl[InstanceMethod]/Super: public func colliding() {|}{{; name=.+$}}
-// TEST_PUBLIC_EF-NEXT: Decl[InstanceMethod]/Super: public func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
-// TEST_PUBLIC_EF-NEXT: Decl[InstanceMethod]/Super: public func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
-// TEST_PUBLIC_EF-NEXT: End completions
+// TEST_PUBLIC_EF-DAG: Decl[InstanceMethod]/Super: public func colliding() {|}{{; name=.+$}}
+// TEST_PUBLIC_EF-DAG: Decl[InstanceMethod]/Super: public func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_PUBLIC_EF-DAG: Decl[InstanceMethod]/Super: public func collidingGeneric<T>(x: T) {|}{{; name=.+$}}

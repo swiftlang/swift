@@ -129,7 +129,6 @@ protocol ProtocolB : ProtocolA {
 // WITH_PB-DAG: Decl[Constructor]/Super:    init(fromProtocolA: Int) {|}{{; name=.+$}}
 // WITH_PB-DAG: Decl[InstanceMethod]/Super: func protoAFunc() {|}{{; name=.+$}}
 // WITH_PB-DAG: Decl[InstanceMethod]/Super: @noreturn func protoAFuncWithAttr() {|}{{; name=.+$}}
-// WITH_PB-DAG: Decl[Constructor]/Super:    init(fromProtocolB: Int) {|}{{; name=.+$}}
 // WITH_PB-DAG: Decl[InstanceMethod]/Super: func protoBFunc() {|}{{; name=.+$}}
 // WITH_PB: End completions
 
@@ -287,7 +286,7 @@ extension TestClass_BA_PA_Ext : ProtocolA {
 class TestClass_BA_PB : BaseA, ProtocolB {
   #^CLASS_BA_PB^#
 }
-// CLASS_BA_PB: Begin completions, 11 items
+// CLASS_BA_PB: Begin completions, 10 items
 
 class TestClass_BB : BaseB {
   #^CLASS_BB^#

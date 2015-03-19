@@ -333,51 +333,11 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
   if (!CurrNominal)
     return;
 
-  llvm::SmallPtrSet<ProtocolDecl *, 8> ProtocolsWithConformances;
-  {
-    SmallVector<ProtocolDecl *, 8> Worklist;
-    for (const auto *Conformance : CurrNominal->getConformances()) {
-      if (!Conformance->isComplete())
-        continue;
-      Worklist.push_back(Conformance->getProtocol());
-    }
-    for (const auto *ED : CurrNominal->getExtensions()) {
-      for (const auto *Conformance : ED->getConformances()) {
-        if (!Conformance->isComplete())
-          continue;
-        Worklist.push_back(Conformance->getProtocol());
-      }
-    }
-
-    while (!Worklist.empty()) {
-      auto Proto = Worklist.pop_back_val();
-      if(!ProtocolsWithConformances.insert(Proto).second)
-        continue;
-
-      auto Protocols = Proto->getProtocols();
-      Worklist.append(Protocols.begin(), Protocols.end());
-    }
-  }
-
-  auto TopProtocols = CurrNominal->getProtocols();
-  SmallVector<ProtocolDecl *, 8> Worklist(TopProtocols.begin(),
-                                          TopProtocols.end());
-  for (const auto *ED : CurrNominal->getExtensions()) {
-    auto Protocols = ED->getProtocols();
-    Worklist.append(Protocols.begin(), Protocols.end());
-  }
-
-  while (!Worklist.empty()) {
-    auto Proto = Worklist.pop_back_val();
-    if (!Visited.insert(Proto).second)
-      continue;
-    if (TypeResolver)
-      TypeResolver->resolveDeclSignature(Proto);
+  for (auto Conformance : CurrNominal->getAllConformances(TypeResolver)) {
+    auto Proto = Conformance->getProtocol();
     if (!Proto->isAccessibleFrom(FromContext))
       continue;
 
-    bool ShouldFindNonOptionalValueRequirements =
-        !ProtocolsWithConformances.count(Proto);
     DeclVisibilityKind ReasonForThisProtocol;
     if (Reason == DeclVisibilityKind::MemberOfCurrentNominal)
       ReasonForThisProtocol =
@@ -385,9 +345,14 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
     else
       ReasonForThisProtocol = getReasonForSuper(Reason);
 
+    auto NormalConformance = Conformance->getRootNormalConformance();
     for (auto Member : Proto->getMembers()) {
       if (auto *ATD = dyn_cast<AssociatedTypeDecl>(Member)) {
-        if (areTypeDeclsVisibleInLookupMode(LS)) {
+        // Skip type decls if they aren't visible, or any type that has a
+        // witness. This cuts down on duplicates.
+        if (areTypeDeclsVisibleInLookupMode(LS) &&
+            (!NormalConformance->hasTypeWitness(ATD) ||
+             NormalConformance->usesDefaultDefinition(ATD))) {
           Consumer.foundDecl(ATD, ReasonForThisProtocol);
         }
         continue;
@@ -395,17 +360,15 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
       if (auto *VD = dyn_cast<ValueDecl>(Member)) {
         if (TypeResolver)
           TypeResolver->resolveDeclSignature(VD);
-        // Skip non-optional value requirements from protocols that the type
-        // correctly conforms to.  This is done so that we don't return
-        // duplicate members.
-        if (ShouldFindNonOptionalValueRequirements ||
-            VD->getAttrs().hasAttribute<OptionalAttr>()) {
+        // Skip value requirements that have corresponding witnesses. This cuts
+        // down on duplicates.
+        if (!NormalConformance->hasWitness(VD) ||
+            NormalConformance->usesDefaultDefinition(VD) ||
+            NormalConformance->getWitness(VD, nullptr) == nullptr) {
           Consumer.foundDecl(VD, ReasonForThisProtocol);
         }
       }
     }
-    auto Protocols = Proto->getProtocols();
-    Worklist.append(Protocols.begin(), Protocols.end());
   }
 }
 
