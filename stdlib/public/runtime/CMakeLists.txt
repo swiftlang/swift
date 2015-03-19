@@ -34,6 +34,7 @@ set(swift_runtime_link_libraries)
 if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "OSX")
   set(swift_runtime_objc_sources
       Availability.mm
+      ErrorObject.mm
       SwiftObject.mm
       SwiftNativeNSXXXBase.mm.gyb
       Reflection.mm)
