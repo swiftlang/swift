@@ -1868,16 +1868,6 @@ Address IRGenModule::getAddrOfFieldOffset(VarDecl *var, bool isIndirect,
                                  forDefinition);
 }
 
-static bool protocolExtensionRequiresCategory(ProtocolDecl *protocol,
-                                            ProtocolConformance *conformance) {
-  if (protocol->isObjC())
-    return true;
-  for (auto &inherited : conformance->getInheritedConformances())
-    if (protocolExtensionRequiresCategory(inherited.first, inherited.second))
-      return true;
-  return false;
-}
-
 void IRGenModule::emitNestedTypeDecls(DeclRange members) {
   for (Decl *member : members) {
     switch (member->getKind()) {
@@ -1939,12 +1929,12 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
 
   bool needsCategory = false;
   if (!needsCategory) {
-    for (unsigned i = 0, size = ext->getProtocols().size(); i < size; ++i)
-      if (protocolExtensionRequiresCategory(ext->getProtocols()[i],
-                                            ext->getConformances()[i])) {
+    for (auto conformance : ext->getLocalConformances(nullptr)) {
+      if (conformance->getProtocol()->isObjC()) {
         needsCategory = true;
         break;
       }
+    }
   }
   if (!needsCategory) {
     for (auto member : ext->getMembers()) {
