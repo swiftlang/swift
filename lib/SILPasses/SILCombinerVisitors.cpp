@@ -2389,7 +2389,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
   // alloc_ref_dynamic %T : $X.Type, $X
   // ->
   // alloc_ref $X
-  if (auto *Arg = dyn_cast<SILArgument>(ARDI->getOperand())) {
+  if (isa<SILArgument>(ARDI->getOperand())) {
     auto *PredBB = ARDI->getParent()->getSinglePredecessor();
     if (!PredBB)
       return nullptr;
