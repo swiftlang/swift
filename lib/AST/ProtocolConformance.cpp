@@ -347,9 +347,16 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
       
   case ProtocolConformanceKind::Inherited: {
     // Substitute the base.
-    ProtocolConformance *newBase
-      = cast<InheritedProtocolConformance>(this)->getInheritedConformance()
-        ->subst(module, substType, subs, subMap, conformanceMap);
+    auto inheritedConformance
+      = cast<InheritedProtocolConformance>(this)->getInheritedConformance();
+    ProtocolConformance *newBase;
+    if (inheritedConformance->getType()->isSpecialized()) {
+      newBase = inheritedConformance->subst(module, substType, subs, subMap,
+                                            conformanceMap);
+    } else {
+      newBase = inheritedConformance;
+    }
+
     return module->getASTContext()
       .getInheritedConformance(substType, newBase);
   }

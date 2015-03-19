@@ -1653,6 +1653,10 @@ public:
     Protocols = protocols;
   }
 
+  void overrideProtocols(ArrayRef<ProtocolDecl *> protocols) {
+    Protocols = protocols;
+  }
+
   /// \brief Retrieve the set of protocol conformance mappings for this type.
   ///
   /// Calculated during type-checking.
@@ -2243,6 +2247,11 @@ public:
   void setProtocols(ArrayRef<ProtocolDecl *> protocols) {
     assert((!TypeDeclBits.ProtocolsSet || protocols.empty()) &&
            "protocols already set");
+    TypeDeclBits.ProtocolsSet = true;
+    Protocols = protocols;
+  }
+
+  void overrideProtocols(ArrayRef<ProtocolDecl *> protocols) {
     TypeDeclBits.ProtocolsSet = true;
     Protocols = protocols;
   }

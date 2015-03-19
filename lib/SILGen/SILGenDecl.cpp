@@ -2099,7 +2099,7 @@ public:
 
   SILGenConformance(SILGenModule &SGM, ProtocolConformance *C)
     // We only need to emit witness tables for base NormalProtocolConformances.
-    : SGM(SGM), Conformance(dyn_cast<NormalProtocolConformance>(C)),
+    : SGM(SGM), Conformance(C->getRootNormalConformance()),
       Linkage(SGM.Types.getLinkageForProtocolConformance(Conformance,
                                                          ForDefinition))
   {
@@ -2330,6 +2330,8 @@ public:
 
 SILWitnessTable *
 SILGenModule::getWitnessTable(ProtocolConformance *conformance) {
+  conformance = conformance->getRootNormalConformance();
+
   // If we've already emitted this witness table, return it.
   auto found = emittedWitnessTables.find(conformance);
   if (found != emittedWitnessTables.end())

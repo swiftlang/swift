@@ -719,141 +719,6 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
   return permanentSubs;
 }
 
-/// Retrieve the explicit conformance of the given nominal type declaration
-/// to the given protocol.
-static std::tuple<NominalTypeDecl *, Decl *, ProtocolConformance *>
-findExplicitConformance(NominalTypeDecl *nominal, ProtocolDecl *protocol,
-                        LazyResolver *resolver) {
-  // FIXME: Introduce a cache/lazy lookup structure to make this more efficient?
-
-  using NominalOrConformance =
-    llvm::PointerUnion<NominalTypeDecl *, ProtocolConformance *>;
-
-  if (!nominal->hasType())
-    resolver->resolveDeclSignature(nominal);
-
-  // Walk the nominal type, its extensions, superclasses, and so on.
-  llvm::SmallPtrSet<ProtocolDecl *, 4> visitedProtocols;
-  SmallVector<std::pair<NominalOrConformance, Decl *>, 4> stack;
-  Decl *declaresConformance = nullptr;
-  ProtocolConformance *foundConformance = nullptr;
-
-  // Local function that checks for our protocol in the given array of
-  // protocols.
-  auto isProtocolInList
-    = [&](Decl *currentOwner,
-          ArrayRef<ProtocolDecl *> protocols,
-          ArrayRef<ProtocolConformance *> nominalConformances) -> bool {
-      for (unsigned i = 0, n = protocols.size(); i != n; ++i) {
-        auto testProto = protocols[i];
-        if (testProto == protocol) {
-          declaresConformance = currentOwner;
-          if (i < nominalConformances.size())
-            foundConformance = nominalConformances[i];
-          return true;
-        }
-
-        if (visitedProtocols.insert(testProto).second) {
-          NominalOrConformance next = {};
-          if (i < nominalConformances.size())
-            next = nominalConformances[i];
-          if (next.isNull())
-            next = testProto;
-          stack.push_back({next, currentOwner});
-        }
-      }
-
-      return false;
-    };
-
-  // Walk the stack of types to find a conformance.
-  stack.push_back({nominal, nominal});
-  while (!stack.empty()) {
-    NominalOrConformance current;
-    Decl *currentOwner;
-    std::tie(current, currentOwner) = stack.pop_back_val();
-    assert(!current.isNull());
-
-    if (auto currentNominal = current.dyn_cast<NominalTypeDecl *>()) {
-      // Visit the superclass of a class.
-      if (auto classDecl = dyn_cast<ClassDecl>(currentNominal)) {
-        if (auto superclassTy = classDecl->getSuperclass()) {
-          auto super = superclassTy->getAnyNominal();
-          stack.push_back({super, super});
-        }
-      }
-
-      // Visit the protocols this type conforms to directly.
-      if (isProtocolInList(currentOwner,
-                           currentNominal->getProtocols(),
-                           currentNominal->getConformances()))
-        break;
-
-      // Visit the extensions of this type.
-      for (auto ext : currentNominal->getExtensions()) {
-        if (resolver)
-          resolver->resolveExtension(ext);
-
-        if (isProtocolInList(ext, ext->getProtocols(), ext->getConformances())) {
-          // Break outer loop as well.
-          stack.clear();
-          break;
-        }
-      }
-    } else {
-      auto currentConformance = current.get<ProtocolConformance *>();
-      for (auto inherited : currentConformance->getInheritedConformances()) {
-        if (inherited.first == protocol) {
-          declaresConformance = currentOwner;
-          foundConformance = inherited.second;
-          // Break outer loop as well.
-          stack.clear();
-          break;
-        }
-
-        if (visitedProtocols.insert(inherited.first).second)
-          stack.push_back({inherited.second, currentOwner});
-      }
-    }
-  }
-
-  // If we didn't find the protocol, we don't conform. Cache the negative result
-  // and return.
-  if (!declaresConformance)
-    return std::make_tuple(nullptr, nullptr, nullptr);
-
-  NominalTypeDecl *owningNominal;
-  DeclContext *conformingContext;
-  if (auto ext = dyn_cast<ExtensionDecl>(declaresConformance)) {
-    owningNominal = ext->getExtendedType()->getAnyNominal();
-    conformingContext = ext;
-  } else {
-    owningNominal = cast<NominalTypeDecl>(declaresConformance);
-    conformingContext = owningNominal;
-  }
-  assert(owningNominal);
-
-  // If we don't have a nominal conformance built yet, build one now.
-  ASTContext &ctx = nominal->getASTContext();
-  if (!foundConformance) {
-    if (resolver) {
-      foundConformance = resolver->resolveConformance(
-                           owningNominal,
-                           protocol,
-                           dyn_cast<ExtensionDecl>(declaresConformance));
-    } else {
-      Type conformingType = conformingContext->getDeclaredTypeInContext();
-      foundConformance = ctx.getConformance(
-                           conformingType, protocol,
-                           declaresConformance->getLoc(),
-                           conformingContext,
-                           ProtocolConformanceState::Incomplete);
-    }
-  }
-
-  return std::make_tuple(owningNominal, declaresConformance, foundConformance);
-}
-
 LookupConformanceResult Module::lookupConformance(Type type,
                                                   ProtocolDecl *protocol,
                                                   LazyResolver *resolver) {
@@ -934,31 +799,27 @@ LookupConformanceResult Module::lookupConformance(Type type,
     return { nullptr, ConformanceKind::DoesNotConform };
   }
 
-  // Find the explicit conformance.
-  NominalTypeDecl *owningNominal = nullptr;
-  Decl *declaresConformance = nullptr;
-  ProtocolConformance *nominalConformance = nullptr;
-  std::tie(owningNominal, declaresConformance, nominalConformance)
-    = findExplicitConformance(nominal, protocol, resolver);
-
-  // If we didn't find an owning nominal, we don't conform. Cache the negative
-  // result and return.
-  if (!owningNominal) {
+  // Find the (unspecialized) conformance.
+  SmallVector<ProtocolConformance *, 2> conformances;
+  if (!nominal->lookupConformance(this, protocol, resolver, conformances))
     return { nullptr, ConformanceKind::DoesNotConform };
-  }
 
-  // If we found an owning nominal but didn't have a conformance, this is
-  // an unchecked conformance.
-  if (!nominalConformance) {
-    return { nullptr, ConformanceKind::UncheckedConforms };
-  }
+  // FIXME: Ambiguity resolution.
+  auto conformance = conformances.front();
 
-  // If the nominal type in which we found the conformance is not the same
-  // as the type we asked for, it's an inherited type.
-  if (owningNominal != nominal) {
-    // Find the superclass type
+  // Rebuild inherited conformances based on the root normal conformance.
+  // FIXME: This is a hack to work around our inability ot handle multiple
+  // levels of substitution through inherited conformances elsewhere in the
+  // compiler.
+  if (auto inherited = dyn_cast<InheritedProtocolConformance>(conformance)) {
+    // Dig out the conforming nominal type.
+    auto rootConformance = inherited->getRootNormalConformance();
+    auto conformingNominal
+      = rootConformance->getType()->getClassOrBoundGenericClass();
+
+    // Map up to our superclass's type.
     Type superclassTy = type->getSuperclass(resolver);
-    while (superclassTy->getAnyNominal() != owningNominal)
+    while (superclassTy->getAnyNominal() != conformingNominal)
       superclassTy = superclassTy->getSuperclass(resolver);
 
     // Compute the conformance for the inherited type.
@@ -977,21 +838,15 @@ LookupConformanceResult Module::lookupConformance(Type type,
     }
 
     // Create the inherited conformance entry.
-    auto result
+    conformance
       = ctx.getInheritedConformance(type, inheritedConformance.getPointer());
-    return { result, ConformanceKind::Conforms };
+    return { conformance, ConformanceKind::Conforms };
   }
 
   // If the type is specialized, find the conformance for the generic type.
   if (type->isSpecialized()) {
     // Figure out the type that's explicitly conforming to this protocol.
-    Type explicitConformanceType;
-    if (auto nominal = dyn_cast<NominalTypeDecl>(declaresConformance)) {
-      explicitConformanceType = nominal->getDeclaredTypeInContext();
-    } else {
-      explicitConformanceType = cast<ExtensionDecl>(declaresConformance)
-        ->getExtendedType()->getAnyNominal()->getDeclaredTypeInContext();
-    }
+    Type explicitConformanceType = conformance->getType();
 
     // If the explicit conformance is associated with a type that is different
     // from the type we're checking, retrieve generic conformance.
@@ -1003,14 +858,14 @@ LookupConformanceResult Module::lookupConformance(Type type,
                                                         resolver);
 
       // Create the specialized conformance entry.
-      auto result = ctx.getSpecializedConformance(type, nominalConformance,
+      auto result = ctx.getSpecializedConformance(type, conformance,
                                                   substitutions);
       return { result, ConformanceKind::Conforms };
     }
   }
 
   // Record and return the simple conformance.
-  return { nominalConformance, ConformanceKind::Conforms };
+  return { conformance, ConformanceKind::Conforms };
 }
 
 namespace {

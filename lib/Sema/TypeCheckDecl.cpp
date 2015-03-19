@@ -2695,7 +2695,7 @@ public:
     // If we dropped any protocols, update the protocol list.
     if (droppedAnyProtocol) {
       assert(retainedProtocols.size() == conformances.size());
-      D->setProtocols(TC.Context.AllocateCopy(retainedProtocols));
+      D->overrideProtocols(TC.Context.AllocateCopy(retainedProtocols));
     }
 
     D->setConformances(TC.Context.AllocateCopy(conformances));
