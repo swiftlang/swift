@@ -1053,7 +1053,10 @@ bb0(%0 : $*Beth):
   return undef : $()
 }
 
-struct SomeError: _ErrorType {}
+struct SomeError: _ErrorType {
+  var domain: String { get }
+  var code: Int { get }
+}
 
 // CHECK-LABEL: sil public_external [fragile] @existential_box : $@thin (SomeError) -> () {
 sil [fragile] @existential_box : $@thin (SomeError) -> () {
