@@ -1219,24 +1219,7 @@ public:
     }
 
     DeducedAssociatedTypes Types;
-    SmallVector<ProtocolConformance *, 8> Worklist;
-
-    // Collect conformances from the nominal and its superclasses.
-    const auto *CurrNominal = NTD;
-    while (true) {
-      auto Conformances = CurrNominal->getConformances();
-      Worklist.append(Conformances.begin(), Conformances.end());
-      if (const auto *CD = dyn_cast<ClassDecl>(CurrNominal)) {
-        if (CD->hasSuperclass()) {
-          CurrNominal = CD->getSuperclass()->getAnyNominal();
-          continue;
-        }
-      }
-      break;
-    }
-
-    while (!Worklist.empty()) {
-      auto Conformance = Worklist.pop_back_val();
+    for (auto Conformance : NTD->getAllConformances(TypeResolver.get())) {
       if (!Conformance->isComplete())
         continue;
       Conformance->forEachTypeWitness(TypeResolver.get(),
@@ -1245,8 +1228,6 @@ public:
         Types[ATD] = Subst.getReplacement();
         return false;
       });
-      for (auto It : Conformance->getInheritedConformances())
-        Worklist.push_back(It.second);
     }
 
     auto ItAndInserted = DeducedAssociatedTypeCache.insert({ NTD, Types });
