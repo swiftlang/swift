@@ -551,7 +551,7 @@ public:
   static bool canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK);
 
   /// Returns the source name of the attribute, without the @ or any arguments.
-  StringRef getAttrName() const;
+  std::string getAttrName() const;
 
   /// Given a name like "inline", return the decl attribute ID that corresponds
   /// to it.  Note that this is a many-to-one mapping, and that the identifier
