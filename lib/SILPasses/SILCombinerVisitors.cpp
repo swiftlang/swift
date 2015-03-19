@@ -165,8 +165,18 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   // ...
   // destroy_addr %0#1 : $*LogicValue
   // dealloc_stack %0#0 : $*@local_storage LogicValue
+  //
+
+  // At the same time also look for dead alloc_stack live ranges that are only
+  // copied into.
+  // %0 = alloc_stack
+  // copy_addr %src, %0
+  // destroy_addr %0#1 : $*LogicValue
+  // dealloc_stack %0#0 : $*@local_storage LogicValue
+
   bool LegalUsers = true;
   InitExistentialAddrInst *IEI = nullptr;
+  bool HaveSeenCopyInto = false;
   // Scan all of the uses of the AllocStack and check if it is not used for
   // anything other than the init_existential_addr container.
   for (Operand *Op: AS->getUses()) {
@@ -177,12 +187,27 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
 
     // Make sure there is exactly one init_existential_addr.
     if (auto *I = dyn_cast<InitExistentialAddrInst>(Op->getUser())) {
-      if (IEI) {
+      if (IEI || HaveSeenCopyInto) {
         LegalUsers = false;
         break;
       }
       IEI = I;
       continue;
+    }
+
+    if (auto *CopyAddr = dyn_cast<CopyAddrInst>(Op->getUser())) {
+      if (IEI) {
+        LegalUsers = false;
+        break;
+      }
+      // Copies into the alloc_stack live range are safe.
+      if (CopyAddr->getDest().getDef() == AS) {
+        HaveSeenCopyInto = true;
+        continue;
+      }
+
+      LegalUsers = false;
+      break;
     }
 
     // All other instructions are illegal.
@@ -221,6 +246,36 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
     }
 
     eraseInstFromFunction(*AS);
+    // Restore the insertion point.
+    Builder->setInsertionPoint(OrigInsertionPoint);
+  }
+
+  // Remove a dead live range that is only copied into.
+  if (LegalUsers && HaveSeenCopyInto) {
+    SmallPtrSet<SILInstruction *, 16> ToDelete;
+
+    for (auto *Op : AS->getUses()) {
+      // Replace a copy_addr [take] %src ... by a destroy_addr %src if %src is
+      // no the alloc_stack.
+      // Otherwise, just delete the copy_addr.
+      if (auto *CopyAddr = dyn_cast<CopyAddrInst>(Op->getUser())) {
+        if (CopyAddr->isTakeOfSrc() && CopyAddr->getSrc().getDef() != AS) {
+          Builder->setInsertionPoint(CopyAddr);
+          Builder->createDestroyAddr(CopyAddr->getLoc(), CopyAddr->getSrc())
+              ->setDebugScope(CopyAddr->getDebugScope());
+        }
+      }
+      assert(isa<CopyAddrInst>(Op->getUser()) ||
+             isa<DestroyAddrInst>(Op->getUser()) ||
+             isa<DeallocStackInst>(Op->getUser()) && "Unexpected instruction");
+      ToDelete.insert(Op->getUser());
+    }
+
+    // Erase the 'live-range'
+    for (auto *Inst : ToDelete)
+      eraseInstFromFunction(*Inst);
+    eraseInstFromFunction(*AS);
+
     // Restore the insertion point.
     Builder->setInsertionPoint(OrigInsertionPoint);
   }

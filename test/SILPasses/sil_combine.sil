@@ -2177,12 +2177,9 @@ sil @sil_combine_partial_apply_callee : $@thin (@in Builtin.NativeObject, @inout
 
 // CHECK-LABEL: sil @sil_combine_partial_apply_caller : $@thin (@in Builtin.NativeObject, @inout Builtin.NativeObject, Builtin.NativeObject, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
 // CHECK: bb0([[ARG1:%.*]] : $*Builtin.NativeObject, [[ARG2:%.*]] : $*Builtin.NativeObject, [[ARG3:%.*]] : $Builtin.NativeObject, [[ARG4:%.*]] : $Builtin.NativeObject, [[ARG5:%.*]] : $Builtin.NativeObject):
-// CHECK-NEXT: [[STACK:%.*]] = alloc_stack $Builtin.NativeObject
-// CHECK-NEXT: copy_addr [[ARG1]] to [initialization] [[STACK]]#1
 // CHECK-NEXT: strong_retain [[ARG3]]
 // CHECK-NEXT: strong_retain [[ARG4]]
 // CHECK-NEXT: strong_retain [[ARG5]]
-// CHECK-NEXT: destroy_addr [[STACK]]#1
 // CHECK-NEXT: strong_release [[ARG3]]
 // CHECK-NEXT: strong_release [[ARG4]]
 // CHECK-NEXT: strong_release [[ARG5]]
@@ -2293,4 +2290,52 @@ bb2:
 
 bb3 (%10: $Builtin.Int32):
   return %10 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil @delete_dead_alloc_stack
+// CHECK-NEXT: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @delete_dead_alloc_stack : $(@inout B) -> () {
+bb0(%0 : $*B):
+  %1 = alloc_stack $B
+  copy_addr %0 to [initialization] %1#1 : $*B
+  destroy_addr %1#1 : $*B
+  dealloc_stack %1#0 : $*@local_storage B
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @delete_dead_alloc_stack2
+// CHECK-NEXT: bb0
+// CHECK-NEXT: destroy_addr %0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @delete_dead_alloc_stack2 : $(@in B) -> () {
+bb0(%0 : $*B):
+  %1 = alloc_stack $B
+  copy_addr [take] %0 to [initialization] %1#1 : $*B
+  destroy_addr %1#1 : $*B
+  dealloc_stack %1#0 : $*@local_storage B
+  %2 = tuple()
+  return %2 : $()
+}
+
+sil @use_b : $@thin (@inout B) -> ()
+
+// CHECK-LABEL: sil @dont_delete_dead_alloc_stack
+// CHECK-NEXT: bb0
+// CHECK-NEXT: alloc_stack
+// CHECK-NEXT: copy_addr
+// CHECK: return
+sil @dont_delete_dead_alloc_stack : $(@inout B) -> () {
+bb0(%0 : $*B):
+  %1 = alloc_stack $B
+  copy_addr %0 to [initialization] %1#1 : $*B
+  %2 = function_ref @use_b : $@thin (@inout B) -> ()
+  %3 = apply %2(%1#1) : $@thin (@inout B) -> ()
+  destroy_addr %1#1 : $*B
+  dealloc_stack %1#0 : $*@local_storage B
+  %4 = tuple()
+  return %4 : $()
 }
