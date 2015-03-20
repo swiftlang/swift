@@ -40,6 +40,14 @@ llvm::cl::opt<bool>
     SILViewCFG("sil-view-cfg", llvm::cl::init(false),
                llvm::cl::desc("Enable the sil cfg viewer pass"));
 
+llvm::cl::opt<bool>
+    SILViewGuaranteedCFG("sil-view-guaranteed-cfg", llvm::cl::init(false),
+               llvm::cl::desc("Enable the sil cfg viewer pass after diagnostics"));
+
+llvm::cl::opt<bool>
+    SILViewSILGenCFG("sil-view-silgen-cfg", llvm::cl::init(false),
+               llvm::cl::desc("Enable the sil cfg viewer pass before diagnostics"));
+
 using namespace swift;
 
 // Enumerates the optimization kinds that we do in SIL.
@@ -72,6 +80,13 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
 
   SILPassManager PM(&Module);
   registerAnalysisPasses(PM);
+
+  if (SILViewSILGenCFG) {
+    PM.resetAndRemoveTransformations();
+    PM.add(createCFGPrinter());
+    PM.runOneIteration();
+  }
+
   // If we are asked do debug serialization, instead of running all diagnostic
   // passes, just run mandatory inlining with dead transparent function cleanup
   // disabled.
@@ -99,6 +114,12 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
 
   // Generate diagnostics.
   Module.setStage(SILStage::Canonical);
+
+  if (SILViewGuaranteedCFG) {
+    PM.resetAndRemoveTransformations();
+    PM.add(createCFGPrinter());
+    PM.runOneIteration();
+  }
 
   // If errors were produced during SIL analysis, return true.
   return Ctx.hadError();
