@@ -124,6 +124,8 @@ static unsigned getSizeInBits(llvm::DIType Ty,
   while (Ty.isDerivedType() && !Ty.getSizeInBits()) {
     llvm::DIDerivedType DT(&*Ty);
     Ty = resolve(DT.getTypeDerivedFrom(), Map);
+    if (!Ty)
+      return 0;
   }
   return Ty.getSizeInBits();
 }
