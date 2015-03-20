@@ -62,12 +62,12 @@ func find(substring: String, within domain: String) -> String.Index? {
 mirrors.test("ForwardStructure") {
   struct DoubleYou : CustomReflectable {
     func reflect() -> Mirror {
-      return Mirror(Set(letters), schema: .MembershipContainer)
+      return Mirror(Set(letters), schema: .Set)
     }
   }
 
   let w = DoubleYou().reflect()
-  expectEqual(.MembershipContainer, w.schema)
+  expectEqual(.Set, w.schema)
   expectEqual(count(letters), numericCast(count(w.structure)))
   
   // Because we don't control the order of a Set, we need to do a
@@ -82,13 +82,13 @@ mirrors.test("ForwardStructure") {
 mirrors.test("BidirectionalStructure") {
   struct Why : CustomReflectable {
     func reflect() -> Mirror {
-      return Mirror(letters, schema: .Container)
+      return Mirror(letters, schema: .Collection)
     }
   }
 
   // Test that the basics seem to work
   let y = Why().reflect()
-  expectEqual(.Container, y.schema)
+  expectEqual(.Collection, y.schema)
 
   let description = y.description
   expectEqual(
@@ -110,11 +110,11 @@ mirrors.test("LabeledStructure") {
   struct Zee2 : CustomReflectable {
     func reflect() -> Mirror {
       return Mirror(
-        LabeledStructure(["bark": 1, "bite": 0]), schema: .KeyContainer)
+        LabeledStructure(["bark": 1, "bite": 0]), schema: .Dictionary)
     }
   }
   let z2 = Zee2().reflect()
-  expectEqual(.KeyContainer, z2.schema)
+  expectEqual(.Dictionary, z2.schema)
   expectEqual("[bark: 1, bite: 0]", z2.description)
 }
 

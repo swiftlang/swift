@@ -9,17 +9,31 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// The thing with the default schema
 public struct Mirror {
   public typealias Child = (label: String?, value: Any)
   public typealias Structure = AnyForwardCollection<Child>
   
-  // public enum Schema {
-  // case Struct, Class, Enum, Optional, Array, Dictionary, Set
-  // }
+  public enum Schema {
+  case Struct, Class, Enum, Tuple, Optional, Collection, Dictionary, Set,
+    ObjectiveCObject
 
-  public typealias Schema = MirrorDisposition
-  
+    init?(legacy: MirrorDisposition) {
+      switch legacy {
+      case .Struct: self = .Struct
+      case .Class: self = .Class
+      case .Enum: self = .Enum
+      case .Tuple: self = .Tuple
+      case .Aggregate: return nil
+      case .IndexContainer: self = .Collection
+      case .KeyContainer: self = .Dictionary
+      case .MembershipContainer: self = .Set
+      case .Container: preconditionFailure("unused!")
+      case .Optional: self = .Optional
+      case .ObjCObject: self = .ObjectiveCObject
+      }
+    }
+  }
+
   public init<
     C: CollectionType where C.Generator.Element == Child
   >(structure: C, schema: Schema? = nil) {
@@ -61,7 +75,7 @@ extension Mirror {
   public init(_ oldMirror: MirrorType) {
     self.init(
       structure: LegacyChildren(oldMirror),
-      schema: oldMirror.disposition)
+      schema: Schema(legacy: oldMirror.disposition))
   }
 }
 
