@@ -1607,53 +1607,6 @@ struct LiteralProtocolDescriptorList : ProtocolDescriptorList {
   {}
 };
   
-/// Flag that indicates whether an existential type is class-constrained or not.
-enum class ProtocolClassConstraint : bool {
-  /// The protocol is class-constrained, so only class types can conform to it.
-  Class = false,
-  /// Any type can conform to the protocol.
-  Any = true,
-};
-  
-/// Flags for protocol descriptors.
-class ProtocolDescriptorFlags {
-  typedef uint32_t int_type;
-  enum : int_type {
-    IsSwift           = 1U <<  0U,
-    ClassConstraint   = 1U <<  1U,
-    NeedsWitnessTable = 1U <<  2U,
-    /// Reserved by the ObjC runtime.
-    _ObjC_FixedUp     = 1U << 31U,
-  };
-
-  int_type Data;
-  
-  constexpr ProtocolDescriptorFlags(int_type Data) : Data(Data) {}
-public:
-  constexpr ProtocolDescriptorFlags() : Data(0) {}
-  constexpr ProtocolDescriptorFlags withSwift(bool s) const {
-    return ProtocolDescriptorFlags((Data & ~IsSwift) | (s ? IsSwift : 0));
-  }
-  constexpr ProtocolDescriptorFlags withClassConstraint(
-                                              ProtocolClassConstraint c) const {
-    return ProtocolDescriptorFlags((Data & ~ClassConstraint)
-                                     | (bool(c) ? ClassConstraint : 0));
-  }
-  constexpr ProtocolDescriptorFlags withNeedsWitnessTable(bool n) const {
-    return ProtocolDescriptorFlags((Data & ~NeedsWitnessTable)
-                                     | (n ? NeedsWitnessTable : 0));
-  }
-  
-  /// Was the protocol defined in Swift?
-  bool isSwift() const { return Data & IsSwift; }
-  /// Is the protocol class-constrained?
-  ProtocolClassConstraint getClassConstraint() const {
-    return ProtocolClassConstraint(bool(Data & ClassConstraint));
-  }
-  /// Does the protocol require a witness table for method dispatch?
-  bool needsWitnessTable() const { return Data & NeedsWitnessTable; }
-};
-  
 /// A protocol descriptor. This is not type metadata, but is referenced by
 /// existential type metadata records to describe a protocol constraint.
 /// Its layout is compatible with the Objective-C runtime's 'protocol_t' record
@@ -1690,36 +1643,6 @@ struct ProtocolDescriptor {
       DescriptorSize(sizeof(ProtocolDescriptor)),
       Flags(Flags)
   {}
-};
-  
-/// Flags in an existential type metadata record.
-class ExistentialTypeFlags {
-  typedef size_t int_type;
-  enum : int_type {
-    NumWitnessTablesMask  = 0x7FFFFFFFU,
-    ClassConstraintMask = 0x80000000U,
-  };
-  int_type Data;
-
-  constexpr ExistentialTypeFlags(int_type Data) : Data(Data) {}
-public:
-  constexpr ExistentialTypeFlags() : Data(0) {}
-  constexpr ExistentialTypeFlags withNumWitnessTables(unsigned numTables) const {
-    return ExistentialTypeFlags((Data & ~NumWitnessTablesMask) | numTables);
-  }
-  constexpr ExistentialTypeFlags
-  withClassConstraint(ProtocolClassConstraint c) const {
-    return ExistentialTypeFlags((Data & ~ClassConstraintMask)
-                                  | (bool(c) ? ClassConstraintMask : 0));
-  }
-  
-  unsigned getNumWitnessTables() const {
-    return Data & NumWitnessTablesMask;
-  }
-  
-  ProtocolClassConstraint getClassConstraint() const {
-    return ProtocolClassConstraint(bool(Data & ClassConstraintMask));
-  }
 };
   
 /// A witness table for a protocol. This type is intentionally opaque because

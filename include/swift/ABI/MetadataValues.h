@@ -229,7 +229,123 @@ public:
   
   int_type getValue() const { return Data; }
 };
+
+/// Flag that indicates whether an existential type is class-constrained or not.
+enum class ProtocolClassConstraint : bool {
+  /// The protocol is class-constrained, so only class types can conform to it.
+  Class = false,
+  /// Any type can conform to the protocol.
+  Any = true,
+};
+
+/// Identifiers for protocols with special meaning to the Swift runtime.
+enum class SpecialProtocol: uint8_t {
+  /// Not a special protocol.
+  None = 0,
+  /// The AnyObject protocol.
+  AnyObject = 1,
+  /// The ErrorType protocol.
+  ErrorType = 2,
+};
+
+/// Flags for protocol descriptors.
+class ProtocolDescriptorFlags {
+  typedef uint32_t int_type;
+  enum : int_type {
+    IsSwift           = 1U <<  0U,
+    ClassConstraint   = 1U <<  1U,
+    NeedsWitnessTable = 1U <<  2U,
+
+    SpecialProtocolMask = 0x7F000000U,
+    SpecialProtocolShift = 24,
+    
+    /// Reserved by the ObjC runtime.
+    _ObjC_FixedUp     = 1U << 31U,
+  };
+
+  int_type Data;
   
+  constexpr ProtocolDescriptorFlags(int_type Data) : Data(Data) {}
+public:
+  constexpr ProtocolDescriptorFlags() : Data(0) {}
+  constexpr ProtocolDescriptorFlags withSwift(bool s) const {
+    return ProtocolDescriptorFlags((Data & ~IsSwift) | (s ? IsSwift : 0));
+  }
+  constexpr ProtocolDescriptorFlags withClassConstraint(
+                                              ProtocolClassConstraint c) const {
+    return ProtocolDescriptorFlags((Data & ~ClassConstraint)
+                                     | (bool(c) ? ClassConstraint : 0));
+  }
+  constexpr ProtocolDescriptorFlags withNeedsWitnessTable(bool n) const {
+    return ProtocolDescriptorFlags((Data & ~NeedsWitnessTable)
+                                     | (n ? NeedsWitnessTable : 0));
+  }
+  constexpr ProtocolDescriptorFlags
+  withSpecialProtocol(SpecialProtocol sp) const {
+    return ProtocolDescriptorFlags((Data & ~SpecialProtocolMask)
+                                     | (int_type(sp) << SpecialProtocolShift));
+  }
+  
+  /// Was the protocol defined in Swift?
+  bool isSwift() const { return Data & IsSwift; }
+  /// Is the protocol class-constrained?
+  ProtocolClassConstraint getClassConstraint() const {
+    return ProtocolClassConstraint(bool(Data & ClassConstraint));
+  }
+  /// Does the protocol require a witness table for method dispatch?
+  bool needsWitnessTable() const { return Data & NeedsWitnessTable; }
+  
+  /// Return the identifier if this is a special runtime-known protocol.
+  SpecialProtocol getSpecialProtocol() const {
+    return SpecialProtocol(uint8_t((Data & SpecialProtocolMask)
+                                 >> SpecialProtocolShift));
+  }
+};
+
+/// Flags in an existential type metadata record.
+class ExistentialTypeFlags {
+  typedef size_t int_type;
+  enum : int_type {
+    NumWitnessTablesMask  = 0x00FFFFFFU,
+    ClassConstraintMask   = 0x80000000U,
+    SpecialProtocolMask   = 0x7F000000U,
+    SpecialProtocolShift  = 24U,
+  };
+  int_type Data;
+
+  constexpr ExistentialTypeFlags(int_type Data) : Data(Data) {}
+public:
+  constexpr ExistentialTypeFlags() : Data(0) {}
+  constexpr ExistentialTypeFlags withNumWitnessTables(unsigned numTables) const {
+    return ExistentialTypeFlags((Data & ~NumWitnessTablesMask) | numTables);
+  }
+  constexpr ExistentialTypeFlags
+  withClassConstraint(ProtocolClassConstraint c) const {
+    return ExistentialTypeFlags((Data & ~ClassConstraintMask)
+                                  | (bool(c) ? ClassConstraintMask : 0));
+  }
+  constexpr ExistentialTypeFlags
+  withSpecialProtocol(SpecialProtocol sp) const {
+    return ExistentialTypeFlags((Data & ~SpecialProtocolMask)
+                                  | (int_type(sp) << SpecialProtocolShift));
+  }
+  
+  unsigned getNumWitnessTables() const {
+    return Data & NumWitnessTablesMask;
+  }
+  
+  ProtocolClassConstraint getClassConstraint() const {
+    return ProtocolClassConstraint(bool(Data & ClassConstraintMask));
+  }
+  
+  /// Return whether this existential type represents an uncomposed special
+  /// protocol.
+  SpecialProtocol getSpecialProtocol() const {
+    return SpecialProtocol(uint8_t((Data & SpecialProtocolMask)
+                                     >> SpecialProtocolShift));
+  }
+};
+
 }
 
 #endif
