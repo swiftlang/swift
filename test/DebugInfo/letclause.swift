@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
-// XFAIL: *
 
 // Test debug info for storageless variables.
 struct Symbol {}

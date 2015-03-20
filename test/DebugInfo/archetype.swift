@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
-// XFAIL: *
 
 protocol IntegerArithmeticType {
   static func uncheckedSubtract(lhs: Self, rhs: Self) -> (Self, Bool)
