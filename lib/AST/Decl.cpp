@@ -781,16 +781,19 @@ void NominalTypeDecl::setMemberLoader(LazyMemberLoader *resolver,
   IterableDeclContext::setLoader(resolver, contextData);
 }
 
-ArrayRef<ProtocolConformance*> NominalTypeDecl::getConformances() const {
-  loadAllConformances(this, Conformances);
-  return Conformances.getArray();
-}
-
 void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *resolver,
                                            uint64_t contextData) {
-  assert(!Conformances.isLazy() && "already have a resolver");
-  assert(Conformances.getArray().empty() && "already have conformances");
-  Conformances.setLoader(resolver, contextData);
+  assert(!HaveConformanceLoader &&
+         "Already have a conformance loader");
+  HaveConformanceLoader = true;
+  getASTContext().recordConformanceLoader(this, resolver, contextData);
+}
+
+std::pair<LazyMemberLoader *, uint64_t>
+NominalTypeDecl::takeConformanceLoaderSlow() {
+  assert(HaveConformanceLoader && "no conformance loader?");
+  HaveConformanceLoader = false;
+  return getASTContext().takeConformanceLoader(this);
 }
 
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
@@ -878,7 +881,8 @@ void ExtensionDecl::setConformanceLoader(LazyMemberLoader *resolver,
   getASTContext().recordConformanceLoader(this, resolver, contextData);
 }
 
-std::pair<LazyMemberLoader *, uint64_t> ExtensionDecl::takeConformanceLoaderSlow() {
+std::pair<LazyMemberLoader *, uint64_t>
+ExtensionDecl::takeConformanceLoaderSlow() {
   assert(ExtensionDeclBits.HaveConformanceLoader && "no conformance loader?");
   ExtensionDeclBits.HaveConformanceLoader = false;
   return getASTContext().takeConformanceLoader(this);

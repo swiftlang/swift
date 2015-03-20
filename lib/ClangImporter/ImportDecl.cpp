@@ -3909,11 +3909,12 @@ namespace {
       }
 
       // Set the conformances.
+      // FIXME: This could be lazier.
+      unsigned id = Impl.allocateDelayedConformance(std::move(conformances));
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-        nominal->setConformances(Impl.SwiftContext.AllocateCopy(conformances));
+        nominal->setConformanceLoader(&Impl, id);
       } else {
         auto ext = cast<ExtensionDecl>(decl);
-        unsigned id = Impl.allocateDelayedConformance(std::move(conformances));
         ext->setConformanceLoader(&Impl, id);
       }
     }

@@ -2704,11 +2704,6 @@ class NominalTypeDecl : public TypeDecl, public DeclContext,
   /// default operator definitions derived for protocol conformances.
   ArrayRef<Decl*> DerivedGlobalDecls;
   
-  /// \brief The set of protocol conformance mappings. The element order
-  /// corresponds to the order of Protocols returned by getProtocols().
-  // FIXME: We don't really need this correspondence any more.
-  LazyLoaderArray<ProtocolConformance *> Conformances;
-
   /// \brief The generic signature of this type.
   ///
   /// This is the semantic representation of a generic parameters and the
@@ -2738,12 +2733,25 @@ class NominalTypeDecl : public TypeDecl, public DeclContext,
   unsigned HasFailableInits : 1;
   unsigned SearchedForFailableInits : 1;
 
-  /// Whether the protocol conformance table has added the laoded
-  /// conformances for this nominal type.
-  unsigned AddedLoadedConformances : 1;
+  /// Whether there is an active conformance loader for this
+  /// nominal type.
+  unsigned HaveConformanceLoader : 1;
 
   /// Prepare to traverse the list of extensions.
   void prepareExtensions();
+
+  /// Retrieve the conformance loader (if any), and removing it in the
+  /// same operation. The caller is responsible for loading the
+  /// conformances.
+  std::pair<LazyMemberLoader *, uint64_t> takeConformanceLoader() {
+    if (!HaveConformanceLoader)
+      return { nullptr, 0 };
+
+    return takeConformanceLoaderSlow();
+  }
+
+  /// Slow path for \c takeConformanceLoader().
+  std::pair<LazyMemberLoader *, uint64_t> takeConformanceLoaderSlow();
 
   /// \brief A lookup table containing all of the members of this type and
   /// its extensions.
@@ -2796,26 +2804,14 @@ protected:
     setGenericParams(GenericParams);
     NominalTypeDeclBits.HasDelayedMembers = false;
     NominalTypeDeclBits.AddedImplicitInitializers = false;
-    AddedLoadedConformances = false;
     ExtensionGeneration = 0;
     ValidatingGenericSignature = false;
     SearchedForFailableInits = false;
     HasFailableInits = false;
+    HaveConformanceLoader = false;
   }
 
   friend class ProtocolType;
-
-  /// Determine whether we have already attempted to add any
-  /// loaded protocol conformances to the conformance table.
-  bool addedLoadedConformances() const {
-    return AddedLoadedConformances;
-  }
-
-  /// Note that we have attempted to add loaded protocol conformances
-  /// to the conformance table.
-  void setAddedLoadedConformances() {
-    AddedLoadedConformances = true;
-  }
 
 public:
   using TypeDecl::getASTContext;
@@ -2982,13 +2978,6 @@ public:
   /// the type's explicit members.
   bool derivesProtocolConformance(ProtocolDecl *protocol) const;
 
-  /// \brief Retrieve the set of protocol conformance mappings for this type.
-  ///
-  /// Calculated during type-checking.
-  ArrayRef<ProtocolConformance *> getConformances() const;
-  void setConformances(ArrayRef<ProtocolConformance *> c) {
-    Conformances = c;
-  }
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
 
   using TypeDecl::getDeclaredInterfaceType;

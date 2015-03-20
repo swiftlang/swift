@@ -961,9 +961,12 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       resolver->resolveDeclSignature(nominal);
 
     // If we have conformances we can load, do so.
-    if (!nominal->addedLoadedConformances()) {
-      nominal->setAddedLoadedConformances();
-      loadAllConformances(nominal, nominal, nominal->getConformances());
+    // FIXME: This could be more lazy.
+    auto loader = nominal->takeConformanceLoader();
+    if (loader.first) {
+      SmallVector<ProtocolConformance *, 2> conformances;
+      loader.first->loadAllConformances(nominal, loader.second, conformances);
+      loadAllConformances(nominal, nominal, conformances);
     }
 
     nominalFunc(nominal);

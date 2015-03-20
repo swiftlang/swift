@@ -519,14 +519,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
       cast<AbstractTypeParamDecl>(decl)->setSuperclass(superclassTy);
     }
   }
-
-  // For protocol decls, fill in null conformances.
-  // FIXME: This shouldn't really be necessary, but for now the conformances
-  // array is supposed to have a 1-to-1 mapping with the protocols array.
-  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
-    auto nulls = Context.Allocate<ProtocolConformance *>(allProtocols.size());
-    proto->setConformances(nulls);
-  }
 }
 
 /// Retrieve the set of protocols the given protocol inherits.
@@ -569,7 +561,6 @@ static ArrayRef<EnumDecl *> getInheritedForCycleCheck(TypeChecker &tc,
 // FIXME: Just remove the problematic inheritance?
 static void breakInheritanceCycle(ProtocolDecl *proto) {
   proto->setProtocols({ });
-  proto->setConformances({ });
 }
 
 /// Break the inheritance cycle for a class by removing its superclass.
@@ -2661,7 +2652,6 @@ public:
     // Check each of the conformances associated with this context.
     SmallVector<ConformanceDiagnostic, 4> diagnostics;
     SmallVector<ProtocolDecl *, 4> protocols;
-    SmallVector<ProtocolConformance *, 4> conformances;
     for (auto conformance : D->getLocalConformances(&TC,
                                                     ConformanceLookupKind::All,
                                                     &diagnostics)) {
@@ -2670,7 +2660,6 @@ public:
         TC.checkConformance(normal);
 
         protocols.push_back(conformance->getProtocol());
-        conformances.push_back(conformance);
       }
 
       if (tracker)
@@ -2679,12 +2668,6 @@ public:
     }
 
     D->overrideProtocols(TC.Context.AllocateCopy(protocols));
-
-    // Set conformances on the nominal type. Nobody should need this.
-    // FIXME: This code shall be deleted.
-    if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
-      nominal->setConformances(TC.Context.AllocateCopy(conformances));
-    }
 
     // Diagnose any conflicts attributed to this declaration context.
     for (const auto &diag : diagnostics) {
