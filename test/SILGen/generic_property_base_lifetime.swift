@@ -48,15 +48,24 @@ func setIntPropGeneric<T: ProtocolA>(a: T) {
 }
 
 // CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime21getIntPropExistentialFPS_9ProtocolB_Si
-// CHECK:         [[PROJECTION:%.*]] = open_existential_addr %0
+// CHECK:         [[STACK:%[0-9]+]] = alloc_stack $ProtocolB
+// CHECK:         copy_addr %0 to [initialization] [[STACK]]#1
+// CHECK:         [[PROJECTION:%.*]] = open_existential_addr [[STACK]]#1
 // CHECK:         apply {{%.*}}([[PROJECTION]])
+// CHECK:         destroy_addr [[PROJECTION]]
+// CHECK:         deinit_existential_addr [[STACK]]#1
+// CHECK:         dealloc_stack [[STACK]]#0
 // CHECK:         destroy_addr %0
 func getIntPropExistential(a: ProtocolB) -> Int {
   return a.intProp
 }
 
 // CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17getIntPropGenericUS_9ProtocolB__FQ_Si
-// CHECK:         apply {{%.*}}<T>(%0)
+// CHECK:         [[STACK:%[0-9]+]] = alloc_stack $T
+// CHECK:         copy_addr %0 to [initialization] [[STACK]]#1
+// CHECK:         apply {{%.*}}<T>([[STACK]]#1)
+// CHECK:         destroy_addr [[STACK]]#1
+// CHECK:         dealloc_stack [[STACK]]#0
 // CHECK:         destroy_addr %0
 func getIntPropGeneric<T: ProtocolB>(a: T) -> Int {
   return a.intProp

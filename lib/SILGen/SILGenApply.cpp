@@ -1668,6 +1668,21 @@ static SILValue emitRawApply(SILGenFunction &gen,
   SILValue result = gen.B.createApply(loc, fnValue, calleeType,
                                       resultType, subs, argValues,
                                       transparent);
+
+  // Given any guaranteed arguments that are not being passed at +0, insert the
+  // decrement here instead of at the end of scope. Guaranteed just means that
+  // we guarantee the lifetime of the object for the duration of the call.
+  for (auto i : indices(args)) {
+    if (!inputTypes[i].isGuaranteed() || args[i].isPlusZeroRValueOrTrivial())
+      continue;
+    SILValue argValue = args[i].forward(gen);
+    SILType argType = argValue.getType();
+    if (!argType.isAddress())
+      gen.getTypeLowering(argType).emitDestroyRValue(gen.B, loc, argValue);
+    else
+      gen.getTypeLowering(argType).emitDestroyAddress(gen.B, loc, argValue);
+  }
+
   return result;
 }
 
@@ -3247,13 +3262,13 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
       // If the accessor wants the value 'inout', always pass the
       // address we were given.  This is semantically required.
       case ParameterConvention::Indirect_Inout:
-      case ParameterConvention::Indirect_In_Guaranteed:
         return false;
 
       // If the accessor wants the value 'in', we have to copy if the
       // base isn't a temporary.  We aren't allowed to pass aliased
       // memory to 'in', and we have pass at +1.
       case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Guaranteed:
         // TODO: We shouldn't be able to get an lvalue here, but the AST
         // sometimes produces an inout base for non-mutating accessors.
         // rdar://problem/19782170

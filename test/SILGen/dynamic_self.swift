@@ -72,8 +72,8 @@ func testExistentialDispatch(p: P) {
 // CHECK:   [[P_RESULT_ADDR:%[0-9]+]] = init_existential_addr [[P_RESULT]]#1 : $*P, $@opened([[N]]) P
 // CHECK:   [[P_F_METHOD:%[0-9]+]] = witness_method $@opened([[N]]) P, #P.f!1, [[PCOPY_ADDR]]{{.*}} : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @in_guaranteed τ_0_0) -> ()
 // CHECK:   apply [[P_F_METHOD]]<@opened([[N]]) P>([[P_RESULT_ADDR]], [[PCOPY_ADDR]]) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @in_guaranteed τ_0_0) -> ()
-// CHECK:   destroy_addr [[P_RESULT]]#1 : $*P
 // CHECK:   destroy_addr [[PCOPY_ADDR]] : $*@opened([[N]]) P
+// CHECK:   destroy_addr [[P_RESULT]]#1 : $*P
 // CHECK:   dealloc_stack [[P_RESULT]]#0 : $*@local_storage P
 // CHECK:   deinit_existential_addr [[PCOPY]]#1
 // CHECK:   dealloc_stack [[PCOPY]]#0 : $*@local_storage P
