@@ -80,17 +80,32 @@ public:
       DEBUG(llvm::dbgs() << "\n");
     }
 
+    // Invalidate the analysis of caller functions.
+    for (auto *AI : DevirtualizedCalls) {
+      invalidateAnalysis(AI->getFunction(),
+                         SILAnalysis::InvalidationKind::CallGraph);
+    }
+
     if (Changed) {
+      bool Specialized = false;
+
       // Try to specialize the devirtualized calls.
       auto GS = GenericSpecializer(getModule());
 
       // Try to specialize the newly devirtualized calls.
       if (GS.specialize(DevirtualizedCalls)) {
+        Specialized = true;
         DEBUG(llvm::dbgs() << "Specialized some generic functions\n");
       }
 
+
+      if (Specialized) {
+        // We've specialized some functions and created new ones, so invalidate
+        // the world.
+        invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
+      }
+
       PM->scheduleAnotherIteration();
-      invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
     }
   }
 
