@@ -209,12 +209,15 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
   set(LLVM_MAIN_INCLUDE_DIR "${LLVM_MAIN_SRC_DIR}/include")
   set(CLANG_MAIN_INCLUDE_DIR "${CLANG_MAIN_SRC_DIR}/include")
   set(LLVM_BINARY_DIR ${CMAKE_BINARY_DIR})
+  set(CMARK_MAIN_INCLUDE_DIR "${${product}_PATH_TO_CMARK_SOURCE}/src")
 
   set(CMAKE_INCLUDE_CURRENT_DIR ON)
   include_directories("${PATH_TO_LLVM_BUILD}/include"
                       "${LLVM_MAIN_INCLUDE_DIR}"
                       "${CLANG_BUILD_INCLUDE_DIR}"
-                      "${CLANG_MAIN_INCLUDE_DIR}")
+                      "${CLANG_MAIN_INCLUDE_DIR}"
+                      "${CMARK_MAIN_INCLUDE_DIR}"
+                      "${${product}_PATH_TO_CMARK_BUILD}/src")
   link_directories(
       "${LLVM_LIBRARY_DIR}"
       # FIXME: if we want to support separate Clang builds and mix different

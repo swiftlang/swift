@@ -73,6 +73,7 @@ By default, updates your checkouts of Swift, SourceKit and LLDB.""")
     update_working_copy(
         os.path.join(SWIFT_SOURCE_ROOT, "swift", "benchmark", "PerfTestSuite"))
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "SourceKit"))
+    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "cmark"))
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "lldb"))
 
     return 0
