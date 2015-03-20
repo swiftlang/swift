@@ -38,7 +38,7 @@ namespace swift {
       All,           // Invalidate everything.
     };
 
-    /// The class hierarchy
+    /// A list of the known analysis.
     enum class AnalysisKind {
       CompleteFuncs,
       CallGraph,
