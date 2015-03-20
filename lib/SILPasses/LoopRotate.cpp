@@ -574,14 +574,11 @@ class LoopRotation : public SILFunctionTransform {
 
     if (Changed) {
       // We preserve loop info and the dominator tree.
-      auto PreservedDT = DA->preserveDomAnalysis(F);
-      auto PreservedLI = LA->preserveAnalysis(F);
-
-      PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::CFG);
-
-      // Update domtree and loop info.
-      DA->updateAnalysis(F, std::move(PreservedDT));
-      LA->updateAnalysis(F, std::move(PreservedLI));
+      DA->lockInvalidation();
+      LA->lockInvalidation();
+      PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::All);
+      DA->unlockInvalidation();
+      LA->unlockInvalidation();
     }
   }
 };
