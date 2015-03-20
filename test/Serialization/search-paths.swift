@@ -13,6 +13,9 @@
 // RUN: %target-swift-frontend -emit-module -o %t -I %t/secret -F %t/Frameworks -parse-as-library %S/Inputs/has_xref.swift -serialize-debugging-options
 // RUN: %target-swift-frontend %s -parse -I %t
 
+// RUN: %target-swift-frontend -emit-module -o %t -I %t/secret -F %t/Frameworks -parse-as-library %S/Inputs/has_xref.swift -application-extension
+// RUN: %target-swift-frontend %s -parse -I %t
+
 // XFAIL: linux
 
 import has_xref // expected-error {{missing required modules: 'has_alias', 'struct_with_operators'}}

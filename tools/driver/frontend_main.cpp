@@ -462,7 +462,8 @@ static bool performCompile(CompilerInstance &Instance,
   // be externally consumed.
   bool moduleIsPublic =
       !Instance.getMainModule()->hasEntryPoint() &&
-      opts.ImplicitObjCHeaderPath.empty();
+      opts.ImplicitObjCHeaderPath.empty() &&
+      !Context.LangOpts.EnableAppExtensionRestrictions;
 
   // We've just been told to perform a parse, so we can return now.
   if (Action == FrontendOptions::Parse) {
