@@ -4381,22 +4381,15 @@ namespace {
     }
     
     void addFlags() {
-      // enum : uint32_t {
-      //   IsSwift           = 1U <<  0U,
-      unsigned flags = 1;
+      auto flags = ProtocolDescriptorFlags()
+        .withSwift(true)
+        .withClassConstraint(Protocol->requiresClass()
+                               ? ProtocolClassConstraint::Class
+                               : ProtocolClassConstraint::Any)
+        .withNeedsWitnessTable(requiresProtocolWitnessTable(Protocol));
       
-      //   ClassConstraint   = 1U <<  1U,
-      // Set if the protocol is *not* class constrained.
-      if (!Protocol->requiresClass())
-        flags |= (1U << 1U);
-      
-      //   NeedsWitnessTable = 1U <<  2U,
-      if (requiresProtocolWitnessTable(Protocol))
-        flags |= (1U << 2U);
-
-      // };
-      
-      Fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, flags));
+      Fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty,
+                                              flags.getIntValue()));
     }
 
     void addValueWitnessTable() {

@@ -300,6 +300,10 @@ public:
     return SpecialProtocol(uint8_t((Data & SpecialProtocolMask)
                                  >> SpecialProtocolShift));
   }
+  
+  int_type getIntValue() const {
+    return Data;
+  }
 };
 
 /// Flags in an existential type metadata record.
@@ -343,6 +347,10 @@ public:
   SpecialProtocol getSpecialProtocol() const {
     return SpecialProtocol(uint8_t((Data & SpecialProtocolMask)
                                      >> SpecialProtocolShift));
+  }
+  
+  int_type getIntValue() const {
+    return Data;
   }
 };
 
