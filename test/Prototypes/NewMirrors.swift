@@ -7,16 +7,22 @@ public struct Mirror {
   public typealias Child = (label: String?, value: Any)
   public typealias Structure = AnyForwardCollection<Child>
   
-  public enum Schema {
-  case Struct, Class, Enum, Optional, Array, Dictionary, Set
-  }
+  // public enum Schema {
+  // case Struct, Class, Enum, Optional, Array, Dictionary, Set
+  // }
 
-  public init(structure: Structure, schema: Schema? = nil) {
-    self.structure = structure
+  public typealias Schema = MirrorDisposition
+  
+  public init<
+    C: CollectionType where C.Generator.Element == Child
+  >(structure: C, schema: Schema? = nil) {
+    self.structure = Structure(structure)
     self.schema = schema
   }
 
-  public init<C: CollectionType>(_ unlabeledChildren: C, schema: Schema? = nil) {
+  public init<
+    C: CollectionType
+  >(_ unlabeledChildren: C, schema: Schema? = nil) {
     self.structure = Structure(
       lazy(unlabeledChildren).map { Child(label: nil, value: $0) }
     )
@@ -27,8 +33,105 @@ public struct Mirror {
   public let schema: Schema?
 }
 
-protocol CustomReflectable {
+
+extension Mirror {
+  internal struct LegacyChildren : CollectionType {
+    init(_ oldMirror: MirrorType) {
+      self._oldMirror = oldMirror
+    }
+    var startIndex: Int { return 0 }
+    var endIndex: Int { return _oldMirror.count }
+    subscript(position: Int) -> Child {
+      let (label, childMirror) = _oldMirror[position]
+      return (label: label, value: childMirror.value)
+    }
+    func generate() -> IndexingGenerator<LegacyChildren> {
+      return IndexingGenerator(self)
+    }
+    internal let _oldMirror: MirrorType
+  }
+  
+  public init(_ oldMirror: MirrorType) {
+    self.init(
+      structure: LegacyChildren(oldMirror),
+      schema: oldMirror.disposition)
+  }
+}
+
+public protocol CustomReflectable {
   func reflect() -> Mirror
+}
+
+func reflect(x: Any) -> Mirror {
+  if let customized? = x as? CustomReflectable {
+    return customized.reflect()
+  }
+  else {
+    return Mirror(Swift.reflect(x))
+  }
+}
+
+//===--- Addressing -------------------------------------------------------===//
+public protocol MirrorPathType {}
+extension IntMax : MirrorPathType {}
+extension Int : MirrorPathType {}
+extension String : MirrorPathType {}
+
+enum MirrorPathElement {
+case Offset(IntMax)
+case Label(String)
+  init(_ x: MirrorPathType) {
+    switch x {
+    case let a as IntMax:
+      self = .Offset(a)
+    case let a as Int:
+      self = .Offset(IntMax(a))
+    case let a as String:
+      self = .Label(a)
+    default:
+      _preconditionFailure("unknown MirrorPathType")
+    }
+  }
+}
+
+/// Returns the first index `i` in `indices(domain)` such that
+/// `predicate(domain[i])` is `true``, or `nil` if
+/// `predicate(domain[i])` is `false` for all `i`.
+///
+/// Complexity: O(\ `count(domain)`\ )
+public func find<
+  C: CollectionType
+>(domain: C, predicate: (C.Generator.Element)->Bool) -> C.Index? {
+  for i in indices(domain) {
+    if predicate(domain[i]) {
+      return i
+    }
+  }
+  return nil
+}
+
+extension Mirror {
+  struct _Dummy : CustomReflectable {
+    var mirror: Mirror
+    func reflect() -> Mirror { return mirror }
+  }
+  
+  func address(first: MirrorPathType, _ rest: MirrorPathType...) -> Any? {
+    var result: Any = _Dummy(mirror: self)
+    for e in [first] + rest {
+      let structure = reflect(result).structure
+      let position: Structure.Index
+      switch MirrorPathElement(e) {
+      case .Offset(let n):
+        position = advance(structure.startIndex, n, structure.endIndex)
+      case .Label(let l):
+        position = find(structure) { $0.label == l } ?? structure.endIndex
+      }
+      if position == structure.endIndex { return nil }
+      result = structure[position].value
+    }
+    return result
+  }
 }
 
 //===--- Adapters ---------------------------------------------------------===//
@@ -39,6 +142,13 @@ public struct LabeledStructure<Element>
   
   public init(dictionaryLiteral elements: (String, Element)...) {
     self.elements = elements
+  }
+
+  /// Construct a copy of `other`
+  ///
+  /// exists primarily so a Dictionary literal can be passed as an argument
+  public init(_ other: LabeledStructure) {
+    self.elements = other.elements
   }
   
   public init(_ elements: [(String, Element)]) {
@@ -124,12 +234,12 @@ func find(substring: String, within domain: String) -> String.Index? {
 mirrors.test("ForwardStructure") {
   struct DoubleYou : CustomReflectable {
     func reflect() -> Mirror {
-      return Mirror(Set(letters), schema: .Set)
+      return Mirror(Set(letters), schema: .MembershipContainer)
     }
   }
 
   let w = DoubleYou().reflect()
-  expectEqual(.Set, w.schema)
+  expectEqual(.MembershipContainer, w.schema)
   expectEqual(count(letters), numericCast(count(w.structure)))
   
   // Because we don't control the order of a Set, we need to do a
@@ -144,13 +254,13 @@ mirrors.test("ForwardStructure") {
 mirrors.test("BidirectionalStructure") {
   struct Why : CustomReflectable {
     func reflect() -> Mirror {
-      return Mirror(letters, schema: .Array)
+      return Mirror(letters, schema: .Container)
     }
   }
 
   // Test that the basics seem to work
   let y = Why().reflect()
-  expectEqual(.Array, y.schema)
+  expectEqual(.Container, y.schema)
 
   let description = y.description
   expectEqual(
@@ -172,13 +282,60 @@ mirrors.test("LabeledStructure") {
   struct Zee2 : CustomReflectable {
     func reflect() -> Mirror {
       return Mirror(
-        ["bark": 1, "bite": 0] as LabeledStructure, schema: .Dictionary)
+        LabeledStructure(["bark": 1, "bite": 0]), schema: .KeyContainer)
     }
   }
   let z2 = Zee2().reflect()
-  expectEqual(.Dictionary, z2.schema)
+  expectEqual(.KeyContainer, z2.schema)
   expectEqual("[bark: 1, bite: 0]", z2.description)
 }
 
+mirrors.test("Legacy") {
+  let m = reflect([1, 2, 3])
+  let x0: [Mirror.Child] = [
+    (label: "[0]", value: 1),
+    (label: "[1]", value: 2),
+    (label: "[2]", value: 3)
+  ]
+  expectFalse(
+    contains(zip(x0, m.structure)) {
+      $0.0.label != $0.1.label || $0.0.value as! Int != $0.1.value as! Int
+    })
+}
 
+mirrors.test("Addressing") {
+  let m0 = reflect([1, 2, 3])
+  expectEqual(1, m0.address(0) as? Int)
+  expectEqual(1, m0.address("[0]") as? Int)
+  expectEqual(2, m0.address(1) as? Int)
+  expectEqual(2, m0.address("[1]") as? Int)
+  expectEqual(3, m0.address(2) as? Int)
+  expectEqual(3, m0.address("[2]") as? Int)
+  
+  let m1 = reflect((a: ["one", "two", "three"], b: 4))
+  let ott0 = m1.address(0) as? [String]
+  expectNotEmpty(ott0)
+  let ott1 = m1.address(".0") as? [String]
+  expectNotEmpty(ott1)
+  if ott0 != nil && ott1 != nil {
+    expectEqualSequence(ott0!, ott1!)
+  }
+  expectEqual(4, m1.address(1) as? Int)
+  expectEqual(4, m1.address(".1") as? Int)
+  expectEqual("one", m1.address(0, 0) as? String)
+  expectEqual("two", m1.address(0, 1) as? String)
+  expectEqual("three", m1.address(0, 2) as? String)
+  expectEqual("one", m1.address(".0", 0) as? String)
+  expectEqual("two", m1.address(0, "[1]") as? String)
+  expectEqual("three", m1.address(".0", "[2]") as? String)
+  
+  let x = [
+    (a: ["one", "two", "three"], b: 4),
+    (a: ["five"], b: 6),
+    (a: [], b: 7)]
+
+  let m = reflect(x)
+  let two = m.address(0, ".0", 1)
+  expectEqual("two", two as? String)
+}
 runAllTests()
