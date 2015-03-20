@@ -6,6 +6,7 @@ add_swift_library(swiftSwiftExperimental SHARED IS_STDLIB
   ExistentialCollection.swift.gyb
   InputStream.swift
   IntegerParsing.swift.gyb
+  Mirror.swift
 
   SWIFT_COMPILE_FLAGS -Xfrontend -sil-serialize-all
   INSTALL_IN_COMPONENT stdlib-experimental)
