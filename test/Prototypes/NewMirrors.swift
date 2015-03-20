@@ -77,23 +77,6 @@ extension IntMax : MirrorPathType {}
 extension Int : MirrorPathType {}
 extension String : MirrorPathType {}
 
-enum MirrorPathElement {
-case Offset(IntMax)
-case Label(String)
-  init(_ x: MirrorPathType) {
-    switch x {
-    case let a as IntMax:
-      self = .Offset(a)
-    case let a as Int:
-      self = .Offset(IntMax(a))
-    case let a as String:
-      self = .Label(a)
-    default:
-      _preconditionFailure("unknown MirrorPathType")
-    }
-  }
-}
-
 /// Returns the first index `i` in `indices(domain)` such that
 /// `predicate(domain[i])` is `true``, or `nil` if
 /// `predicate(domain[i])` is `false` for all `i`.
@@ -121,11 +104,15 @@ extension Mirror {
     for e in [first] + rest {
       let structure = reflect(result).structure
       let position: Structure.Index
-      switch MirrorPathElement(e) {
-      case .Offset(let n):
-        position = advance(structure.startIndex, n, structure.endIndex)
-      case .Label(let l):
-        position = find(structure) { $0.label == l } ?? structure.endIndex
+      if let label? = e as? String {
+        position = find(structure) { $0.label == label } ?? structure.endIndex
+      }
+      else if let offset? = (e as? Int).map({ IntMax($0) }) ?? (e as? IntMax) {
+        position = advance(structure.startIndex, offset, structure.endIndex)
+      }
+      else {
+        _preconditionFailure(
+          "Someone added a conformance to MirrorPathType; that privilege is reserved to the standard library")
       }
       if position == structure.endIndex { return nil }
       result = structure[position].value
@@ -347,4 +334,13 @@ mirrors.test("Addressing") {
   expectEqual(0, m.descendant(1, 1, "bite") as? Int)
   expectEmpty(m.descendant(1, 1, "bork"))
 }
+
+mirrors.test("Invalid Path Type") {
+  struct X : MirrorPathType {}
+  let m = reflect([1, 2, 3])
+  expectEqual(1, m.descendant(0) as? Int)
+  expectCrashLater()
+  m.descendant(X())
+}
+
 runAllTests()
