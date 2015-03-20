@@ -36,10 +36,10 @@ namespace swift {
     SILModule *Mod;
 
     /// The list of transformations to run.
-    llvm::SmallVector<SILTransform*, 8> Transformations;
+    llvm::SmallVector<SILTransform*, 16> Transformations;
 
     /// A list of registered analysis.
-    llvm::SmallVector<SILAnalysis*, 4> Analysis;
+    llvm::SmallVector<SILAnalysis*, 16> Analysis;
 
     // Name of the current optimization stage for diagnostics.
     std::string StageName;
