@@ -94,14 +94,17 @@ namespace swift {
     ///  \brief Broadcast the invalidation of the module to all analysis.
     void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
       for (auto AP : Analysis)
-        AP->invalidate(K);
+        if (!AP->isLocked())
+          AP->invalidate(K);
     }
 
     /// \brief Broadcast the invalidation of the function to all analysis.
     void invalidateAnalysis(SILFunction *F,
                             SILAnalysis::InvalidationKind K) {
+      // Invalidate the analysis (unless they are locked)
       for (auto AP : Analysis)
-        AP->invalidate(F, K);
+        if (!AP->isLocked())
+          AP->invalidate(F, K);
     }
 
     /// \brief Reset the state of the pass manager and remove all transformation

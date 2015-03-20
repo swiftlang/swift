@@ -176,6 +176,13 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
 }
 
 void SILPassManager::runOneIteration() {
+  // Verify that all analysis were properly unlocked.
+  for (auto A : Analysis) {
+    assert(!A->isLocked() &&
+           "Deleting a locked analysis. Did we forget to unlock ?");
+    (void)A;
+  }
+
   const SILOptions &Options = getOptions();
 
   DEBUG(llvm::dbgs() << "*** Optimizing the module (" << StageName
@@ -308,8 +315,11 @@ SILPassManager::~SILPassManager() {
     delete T;
 
   // delete the analyis.
-  for (auto A : Analysis)
+  for (auto A : Analysis) {
+    assert(!A->isLocked() &&
+           "Deleting a locked analysis. Did we forget to unlock ?");
     delete A;
+  }
 }
 
 /// \brief Reset the state of the pass manager and remove all transformation
