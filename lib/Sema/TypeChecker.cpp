@@ -1782,7 +1782,7 @@ void TypeChecker::diagnosePotentialUnavailability(
     return;
   }
 
-  diagnose(ReferenceRange.Start, diag::availability_decl_only_version_greater,
+  diagnose(ReferenceRange.Start, diag::availability_decl_only_version_newer,
            Name, prettyPlatformString(targetPlatform(Context.LangOpts)),
            Reason.getRequiredOSVersionRange().getLowerEndpoint());
 
@@ -1799,8 +1799,8 @@ void TypeChecker::diagnosePotentialAccessorUnavailability(
   AbstractStorageDecl *ASD = Accessor->getAccessorStorageDecl();
   DeclName Name = ASD->getFullName();
 
-  auto &diag = ForInout ? diag::availability_inout_accessor_only_version_greater
-                        : diag::availability_accessor_only_version_greater;
+  auto &diag = ForInout ? diag::availability_inout_accessor_only_version_newer
+                        : diag::availability_accessor_only_version_newer;
 
   diagnose(ReferenceRange.Start, diag,
            static_cast<unsigned>(Accessor->getAccessorKind()), Name,

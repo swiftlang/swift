@@ -187,7 +187,7 @@ class ClassWithUnavailableInitializer {
   required init(_ v: Int) {  }
   
   convenience init(s: String) {
-    self.init(5) // expected-error {{'init' is only available on OS X version 10.10 or greater}}
+    self.init(5) // expected-error {{'init' is only available on OS X 10.10 or newer}}
         // expected-note@-1 {{add @availability attribute to enclosing declaration}}
         // expected-note@-2 {{add @availability attribute to enclosing type}}
         // expected-note@-3 {{guard with version check}}
@@ -195,7 +195,7 @@ class ClassWithUnavailableInitializer {
 }
 
 func callUnavailableInitializer() {
-  ClassWithUnavailableInitializer(5) // expected-error {{'init' is only available on OS X version 10.10 or greater}}
+  ClassWithUnavailableInitializer(5) // expected-error {{'init' is only available on OS X 10.10 or newer}}
       // expected-note@-1 {{add @availability attribute to enclosing function}}
       // expected-note@-2 {{guard with version check}}
 }

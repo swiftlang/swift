@@ -25,11 +25,11 @@ func useClassThatTriggersImportOfDeprecatedEnum() {
 }
 
 func directUseShouldStillTriggerDeprecationWarning() {
-  let _ = NSDeprecatedOptions.First // expected-warning {{'NSDeprecatedOptions' was deprecated in OS X version 10.10: Use a different API}}
-  let _ = NSDeprecatedEnum.First    // expected-warning {{'NSDeprecatedEnum' was deprecated in OS X version 10.10: Use a different API}}
+  let _ = NSDeprecatedOptions.First // expected-warning {{'NSDeprecatedOptions' was deprecated in OS X 10.10: Use a different API}}
+  let _ = NSDeprecatedEnum.First    // expected-warning {{'NSDeprecatedEnum' was deprecated in OS X 10.10: Use a different API}}
 }
 
-func useInSignature(options: NSDeprecatedOptions) { // expected-warning {{'NSDeprecatedOptions' was deprecated in OS X version 10.10: Use a different API}}
+func useInSignature(options: NSDeprecatedOptions) { // expected-warning {{'NSDeprecatedOptions' was deprecated in OS X 10.10: Use a different API}}
 }
 
 

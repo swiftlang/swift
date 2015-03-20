@@ -1947,15 +1947,15 @@ NOTE(availability_marked_unavailable, sema_avail, none,
   "%0 has been explicitly marked unavailable here", (DeclName))
 
 NOTE(availability_obsoleted, sema_avail, none,
-     "%0 was obsoleted in %1 version %2",
+     "%0 was obsoleted in %1 %2",
     (DeclName, StringRef, clang::VersionTuple))
 
 WARNING(availability_deprecated, sema_avail, none,
-        "%0 was deprecated in %1 version %2",
+        "%0 was deprecated in %1 %2",
         (DeclName, StringRef, clang::VersionTuple))
 
 WARNING(availability_deprecated_msg, sema_avail, none,
-        "%0 was deprecated in %1 version %2: %3",
+        "%0 was deprecated in %1 %2: %3",
         (DeclName, StringRef, clang::VersionTuple, StringRef))
 
 ERROR(availability_decl_more_than_enclosing, sema_avail, none,
@@ -1964,8 +1964,8 @@ ERROR(availability_decl_more_than_enclosing, sema_avail, none,
 NOTE(availability_decl_more_than_enclosing_enclosing_here, sema_avail, none,
      "enclosing scope here", ())
 
-ERROR(availability_decl_only_version_greater, sema_avail, none,
-      "%0 is only available on %1 version %2 or greater",
+ERROR(availability_decl_only_version_newer, sema_avail, none,
+      "%0 is only available on %1 %2 or newer",
       (DeclName, StringRef, clang::VersionTuple))
 
 NOTE(availability_guard_with_version_check, sema_avail, none,
@@ -1976,14 +1976,14 @@ NOTE(availability_add_attribute, sema_avail, none,
      "%select{declaration|type|function|property|extension|enum case}0",
      (unsigned))
 
-ERROR(availability_accessor_only_version_greater, sema_avail, none,
-      "%select{getter|setter}0 for %1 is only available on %2 version %3"
-      " or greater",
+ERROR(availability_accessor_only_version_newer, sema_avail, none,
+      "%select{getter|setter}0 for %1 is only available on %2 %3"
+      " or newer",
       (/*AccessorKind*/unsigned, DeclName, StringRef, clang::VersionTuple))
 
-ERROR(availability_inout_accessor_only_version_greater, sema_avail, none,
+ERROR(availability_inout_accessor_only_version_newer, sema_avail, none,
       "cannot pass as inout because %select{getter|setter}0 for %1 is only "
-      "available on %2 version %3 or greater",
+      "available on %2 %3 or newer",
       (/*AccessorKind*/unsigned, DeclName, StringRef, clang::VersionTuple))
 
 ERROR(availability_query_repeated_platform, sema_avail, none,

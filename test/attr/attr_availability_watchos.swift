@@ -3,21 +3,21 @@
 @availability(watchOS, introduced=1.0, deprecated=2.0, obsoleted=3.0,
               message="you don't want to do that anyway")
 func doSomething() { }
-// expected-note @-1{{'doSomething()' was obsoleted in watchOS version 3.0}}
+// expected-note @-1{{'doSomething()' was obsoleted in watchOS 3.0}}
 
 doSomething() // expected-error{{'doSomething()' is unavailable: you don't want to do that anyway}}
 
 // Preservation of major.minor.micro
 @availability(watchOS, introduced=1.0, deprecated=2.0, obsoleted=2.1.3)
 func doSomethingElse() { }
-// expected-note @-1{{'doSomethingElse()' was obsoleted in watchOS version 2.1.3}}
+// expected-note @-1{{'doSomethingElse()' was obsoleted in watchOS 2.1.3}}
 
 doSomethingElse() // expected-error{{'doSomethingElse()' is unavailable}}
 
 // Preservation of minor-only version
 @availability(watchOS, introduced=1.0, deprecated=1.5, obsoleted=2)
 func doSomethingReallyOld() { }
-// expected-note @-1{{'doSomethingReallyOld()' was obsoleted in watchOS version 2}}
+// expected-note @-1{{'doSomethingReallyOld()' was obsoleted in watchOS 2}}
 
 doSomethingReallyOld() // expected-error{{'doSomethingReallyOld()' is unavailable}}
 
@@ -27,19 +27,19 @@ doSomethingReallyOld() // expected-error{{'doSomethingReallyOld()' is unavailabl
               message="Use another function")
 func deprecatedFunctionWithMessage() { }
 
-deprecatedFunctionWithMessage() // expected-warning{{'deprecatedFunctionWithMessage()' was deprecated in watchOS version 2.0: Use another function}}
+deprecatedFunctionWithMessage() // expected-warning{{'deprecatedFunctionWithMessage()' was deprecated in watchOS 2.0: Use another function}}
 
 
 @availability(watchOS, introduced=1.0, deprecated=2.0)
 func deprecatedFunctionWithoutMessage() { }
 
-deprecatedFunctionWithoutMessage() // expected-warning{{'deprecatedFunctionWithoutMessage()' was deprecated in watchOS version 2.0}}
+deprecatedFunctionWithoutMessage() // expected-warning{{'deprecatedFunctionWithoutMessage()' was deprecated in watchOS 2.0}}
 
 @availability(watchOS, introduced=1.0, deprecated=2.0,
               message="Use BetterClass instead")
 class DeprecatedClass { }
 
-func functionWithDeprecatedParameter(p: DeprecatedClass) { } // expected-warning{{'DeprecatedClass' was deprecated in watchOS version 2.0: Use BetterClass instead}}
+func functionWithDeprecatedParameter(p: DeprecatedClass) { } // expected-warning{{'DeprecatedClass' was deprecated in watchOS 2.0: Use BetterClass instead}}
 
 @availability(watchOS, introduced=2.0, deprecated=4.0,
               message="Use BetterClass instead")
