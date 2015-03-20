@@ -163,6 +163,10 @@ struct ASTContext::Implementation {
   /// Missing entries implicitly have value 0.
   llvm::DenseMap<const ValueDecl *, unsigned> LocalDiscriminators;
 
+  /// Conformance loaders for declarations that have them.
+  llvm::DenseMap<Decl *, std::pair<LazyMemberLoader *, uint64_t>>
+    ConformanceLoaders;
+
   /// \brief A cached unused pattern-binding initializer context.
   PatternBindingInitializer *UnusedPatternBindingContext = nullptr;
 
@@ -1270,6 +1274,21 @@ ASTContext::getInheritedConformance(Type type, ProtocolConformance *inherited) {
   // Build a new normal protocol conformance.
   auto result = new (*this, arena) InheritedProtocolConformance(type, inherited);
   inheritedConformances.InsertNode(result, insertPos);
+  return result;
+}
+
+void ASTContext::recordConformanceLoader(Decl *decl, LazyMemberLoader *resolver,
+                                         uint64_t contextData) {
+  assert(Impl.ConformanceLoaders.count(decl) == 0 &&
+         "already recorded conformance loader");
+  Impl.ConformanceLoaders[decl] = { resolver, contextData };
+}
+
+std::pair<LazyMemberLoader *, uint64_t> ASTContext::takeConformanceLoader(
+                                          Decl *decl) {
+  auto known = Impl.ConformanceLoaders.find(decl);
+  auto result = known->second;
+  Impl.ConformanceLoaders.erase(known);
   return result;
 }
 

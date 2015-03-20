@@ -807,7 +807,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
   ExtensionDeclBits.CheckedInheritanceClause = false;
   ExtensionDeclBits.DefaultAccessLevel = 0;
   ExtensionDeclBits.NumRefComponents = refComponents.size();
-  ExtensionDeclBits.AddedLoadedConformances = false;
+  ExtensionDeclBits.HaveConformanceLoader = false;
 
   std::copy(refComponents.begin(), refComponents.end(),
             getRefComponents().data());
@@ -870,18 +870,19 @@ void ExtensionDecl::setMemberLoader(LazyMemberLoader *resolver,
   IterableDeclContext::setLoader(resolver, contextData);
 }
 
-ArrayRef<ProtocolConformance*> ExtensionDecl::getConformances() const {
-  loadAllConformances(this, Conformances);
-  return Conformances.getArray();
-}
-
 void ExtensionDecl::setConformanceLoader(LazyMemberLoader *resolver,
                                          uint64_t contextData) {
-  assert(!Conformances.isLazy() && "already have a resolver");
-  assert(Conformances.getArray().empty() && "already have conformances");
-  Conformances.setLoader(resolver, contextData);
+  assert(!ExtensionDeclBits.HaveConformanceLoader && 
+         "Already have a conformance loader");
+  ExtensionDeclBits.HaveConformanceLoader = true;
+  getASTContext().recordConformanceLoader(this, resolver, contextData);
 }
 
+std::pair<LazyMemberLoader *, uint64_t> ExtensionDecl::takeConformanceLoaderSlow() {
+  assert(ExtensionDeclBits.HaveConformanceLoader && "no conformance loader?");
+  ExtensionDeclBits.HaveConformanceLoader = false;
+  return getASTContext().takeConformanceLoader(this);
+}
 
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,

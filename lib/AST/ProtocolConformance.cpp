@@ -982,10 +982,12 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       resolver->resolveExtension(next);
 
     // If we have conformances we can load, do so.
-    // FIXME: We should do this more lazily.
-    if (!next->addedLoadedConformances()) {
-      next->setAddedLoadedConformances();
-      loadAllConformances(nominal, next, next->getConformances());
+    // FIXME: This could be more lazy.
+    auto loader = next->takeConformanceLoader();
+    if (loader.first) {
+      SmallVector<ProtocolConformance *, 2> conformances;
+      loader.first->loadAllConformances(next, loader.second, conformances);
+      loadAllConformances(nominal, next, conformances);
     }
 
     extensionFunc(next);

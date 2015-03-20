@@ -660,6 +660,14 @@ public:
   Optional<ArrayRef<Substitution>>
         getSubstitutions(BoundGenericType *Bound) const;
 
+  /// Record a conformance loader and its context data for the given
+  /// declaration.
+  void recordConformanceLoader(Decl *decl, LazyMemberLoader *resolver,
+                               uint64_t contextData);
+
+  /// Take the conformance loader and context data for the given declaration.
+  std::pair<LazyMemberLoader *, uint64_t> takeConformanceLoader(Decl *decl);
+
   /// \brief Returns memory usage of this ASTContext.
   size_t getTotalMemory() const;
   

@@ -2679,7 +2679,12 @@ public:
     }
 
     D->overrideProtocols(TC.Context.AllocateCopy(protocols));
-    D->setConformances(TC.Context.AllocateCopy(conformances));
+
+    // Set conformances on the nominal type. Nobody should need this.
+    // FIXME: This code shall be deleted.
+    if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
+      nominal->setConformances(TC.Context.AllocateCopy(conformances));
+    }
 
     // Diagnose any conflicts attributed to this declaration context.
     for (const auto &diag : diagnostics) {

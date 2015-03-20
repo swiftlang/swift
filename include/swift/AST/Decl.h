@@ -582,9 +582,9 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     unsigned DefaultAccessLevel : 2;
 
-    /// Whether the protocol conformance table has added the laoded
-    /// conformances for this nominal type.
-    unsigned AddedLoadedConformances : 1;
+    /// Whether there is an active conformance loader for this
+    /// extension.
+    unsigned HaveConformanceLoader : 1;
 
     /// The number of ref-components following the ExtensionDecl.
     unsigned NumRefComponents : 8;
@@ -1520,10 +1520,6 @@ private:
 
   /// \brief The set of protocols to which this extension conforms.
   ArrayRef<ProtocolDecl *> Protocols;
-  
-  /// \brief The set of protocol conformance mappings. The element order
-  /// corresponds to the order of Protocols.
-  LazyLoaderArray<ProtocolConformance *> Conformances;
 
   /// \brief The next extension in the linked list of extensions.
   ///
@@ -1545,17 +1541,18 @@ private:
                 MutableArrayRef<TypeLoc> inherited,
                 DeclContext *parent);
 
-  /// Determine whether we have already attempted to add any
-  /// loaded protocol conformances to the conformance table.
-  bool addedLoadedConformances() const {
-    return ExtensionDeclBits.AddedLoadedConformances;
+  /// Retrieve the conformance loader (if any), and removing it in the
+  /// same operation. The caller is responsible for loading the
+  /// conformances.
+  std::pair<LazyMemberLoader *, uint64_t> takeConformanceLoader() {
+    if (!ExtensionDeclBits.HaveConformanceLoader)
+      return { nullptr, 0 };
+
+    return takeConformanceLoaderSlow();
   }
 
-  /// Note that we have attempted to add loaded protocol conformances
-  /// to the conformance table.
-  void setAddedLoadedConformances() {
-    ExtensionDeclBits.AddedLoadedConformances = true;
-  }
+  /// Slow path for \c takeConformanceLoader().
+  std::pair<LazyMemberLoader *, uint64_t> takeConformanceLoaderSlow();
 
 public:
   using Decl::getASTContext;
@@ -1659,13 +1656,6 @@ public:
     Protocols = protocols;
   }
 
-  /// \brief Retrieve the set of protocol conformance mappings for this type.
-  ///
-  /// Calculated during type-checking.
-  ArrayRef<ProtocolConformance *> getConformances() const;
-  void setConformances(ArrayRef<ProtocolConformance *> c) {
-    Conformances = c;
-  }
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
 
   DeclRange getMembers(bool forceDelayedMembers = true) const;

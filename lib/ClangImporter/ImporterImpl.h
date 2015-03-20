@@ -514,6 +514,14 @@ private:
 
   unsigned NumCurrentImportingEntities = 0;
 
+  /// Mapping from delayed conformance IDs to the set of delayed
+  /// protocol conformances.
+  llvm::DenseMap<unsigned, SmallVector<ProtocolConformance *, 4>>
+    DelayedConformances;
+
+  /// The next delayed conformance ID to use with \c DelayedConformances.
+  unsigned NextDelayedConformanceID = 0;
+
   void startedImportingEntity();
   void finishedImportingEntity();
   void finishPendingActions();
@@ -955,9 +963,32 @@ public:
     typeResolver = newResolver;
   }
 
+  /// Allocate a new delayed conformance ID with the given set of
+  /// conformances.
+  unsigned allocateDelayedConformance(
+             SmallVector<ProtocolConformance *, 4> &&conformances) {
+    unsigned id = NextDelayedConformanceID++;
+    DelayedConformances[id] = std::move(conformances);
+    return id;
+  }
+
+  /// Take the delayed conformances associated with the given id.
+  SmallVector<ProtocolConformance *, 4> takeDelayedConformance(unsigned id) {
+    auto conformances = DelayedConformances.find(id);
+    SmallVector<ProtocolConformance *, 4> result
+      = std::move(conformances->second);
+    DelayedConformances.erase(conformances);
+    return std::move(result);
+  }
+
   virtual void
   loadAllMembers(Decl *D, uint64_t unused,
                  bool *hasMissingRequiredMembers) override;
+
+  void
+  loadAllConformances(
+    const Decl *D, uint64_t contextData,
+    SmallVectorImpl<ProtocolConformance *> &Conformances) override;
 
   template <typename DeclTy, typename ...Targs>
   DeclTy *createDeclWithClangNode(ClangNode ClangN, Targs &&... Args) {

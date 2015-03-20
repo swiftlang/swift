@@ -3892,8 +3892,8 @@ namespace {
         return;
 
       // Synthesize trivial conformances for each of the protocols.
-      MutableArrayRef<ProtocolConformance *> allConformances
-        = Impl.SwiftContext.Allocate<ProtocolConformance *>(allProtocols.size());
+      SmallVector<ProtocolConformance *, 4> conformances;
+;
       auto dc = decl->getInnermostDeclContext();
       auto &ctx = Impl.SwiftContext;
       for (unsigned i = 0, n = allProtocols.size(); i != n; ++i) {
@@ -3905,15 +3905,16 @@ namespace {
                                dc,
                                ProtocolConformanceState::Incomplete);
         Impl.scheduleFinishProtocolConformance(conformance);
-        allConformances[i] = conformance;
+        conformances.push_back(conformance);
       }
 
       // Set the conformances.
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-        nominal->setConformances(allConformances);
+        nominal->setConformances(Impl.SwiftContext.AllocateCopy(conformances));
       } else {
         auto ext = cast<ExtensionDecl>(decl);
-        ext->setConformances(allConformances);        
+        unsigned id = Impl.allocateDelayedConformance(std::move(conformances));
+        ext->setConformanceLoader(&Impl, id);
       }
     }
 
@@ -5834,6 +5835,12 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t unused,
     IDC->addMember(member);
   }
 
+}
+
+void ClangImporter::Implementation::loadAllConformances(
+       const Decl *D, uint64_t contextData,
+       SmallVectorImpl<ProtocolConformance *> &Conformances) {
+  Conformances = takeDelayedConformance(contextData);
 }
 
 Optional<MappedTypeNameKind>
