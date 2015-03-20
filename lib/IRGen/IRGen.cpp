@@ -514,6 +514,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   IRGenModuleDispatcher dispatcher;
   
   auto OutputIter = Opts.OutputFilenames.begin();
+  bool IGMcreated = false;
   
   // Create an IRGenModule for each source file.
   for (auto *File : M->getFiles()) {
@@ -542,8 +543,14 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
                                        ModuleName, *DataLayout, Triple,
                                        TargetMachine, SILMod, *OutputIter++);
     dispatcher.addGenModule(nextSF, IGM);
+    IGMcreated = true;
 
     initLLVMModule(*IGM);
+  }
+  
+  if (!IGMcreated) {
+    M->Ctx.Diags.diagnose(SourceLoc(), diag::no_input_files_for_mt);
+    return;
   }
 
   // Emit the module contents.
