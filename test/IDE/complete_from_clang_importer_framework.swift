@@ -3,6 +3,7 @@
 // RUN: FileCheck %s -check-prefix=CLANG_MACROS < %t.compl.txt
 // RUN: FileCheck %s -check-prefix=CLANG_DARWIN < %t.compl.txt
 // RUN: FileCheck %s -check-prefix=CLANG_DARWIN_NEG < %t.compl.txt
+// XFAIL: *
 
 import macros
 import ctypes

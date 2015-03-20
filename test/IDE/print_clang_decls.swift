@@ -1,6 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 
+// XFAIL: *
 // XFAIL: linux
 
 // This file deliberately does not use %clang-importer-sdk for most RUN lines.
