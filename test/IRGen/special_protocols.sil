@@ -1,0 +1,16 @@
+// RUN: %target-swift-frontend %s -emit-ir -parse-stdlib -module-name Swift | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+
+@objc protocol AnyObject: class {}
+// CHECK-LABEL: @_PROTOCOL__TtPSs9AnyObject_ = private constant
+// --                 0x0100_0001: special protocol 01, class, no witness, swift
+// CHECK:         i32 16777217, i8* null }
+
+protocol _ErrorType {}
+// CHECK-LABEL: @_TMpSs10_ErrorType = constant %swift.protocol {
+// --                 0x0200_0007: special protocol 02, non-class, witness, swift
+// CHECK:         i32 33554439 }
+
+protocol PlainOldProtocol {}
+// CHECK-LABEL: @_TMpSs16PlainOldProtocol = constant %swift.protocol {
+// --                 0x0000_0007: no special protocol, non-class, witness, swift
+// CHECK:         i32 7 }

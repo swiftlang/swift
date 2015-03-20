@@ -33,6 +33,7 @@ namespace swift {
   struct SILDeclRef;
   class SILType;
   class VarDecl;
+  enum class SpecialProtocol : uint8_t;
   
 namespace irgen {
   class AbstractCallee;
@@ -256,6 +257,9 @@ namespace irgen {
 
   /// Determine how the given type metadata should be accessed.
   TypeMetadataAccessStrategy getTypeMetadataAccessStrategy(CanType type);
+  
+  /// Get the runtime identifier for a special protocol, if any.
+  SpecialProtocol getSpecialProtocolID(ProtocolDecl *P);
   
 } // end namespace irgen
 } // end namespace swift

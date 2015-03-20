@@ -17,6 +17,7 @@
 #include "GenClass.h"
 
 #include "swift/ABI/Class.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -1000,9 +1001,13 @@ namespace {
       size += 8; // 'size' and 'flags' fields that haven't been added yet.
       fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, size));
       //   uint32_t flags;
-      //   1 = Swift
-      unsigned swiftFlag = getProtocol()->hasClangNode() ? 0 : 1;
-      fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, swiftFlag));
+      auto flags = ProtocolDescriptorFlags()
+        .withSwift(!getProtocol()->hasClangNode())
+        .withClassConstraint(ProtocolClassConstraint::Class)
+        .withNeedsWitnessTable(false)
+        .withSpecialProtocol(getSpecialProtocolID(getProtocol()));
+      
+      fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, flags.getIntValue()));
       
       // const char ** extendedMethodTypes;
       fields.push_back(buildOptExtendedMethodTypes());

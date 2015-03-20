@@ -4286,6 +4286,51 @@ irgen::emitForeignTypeMetadataInitializer(IRGenModule &IGM, CanType type,
 
 // Protocols
 
+/// Get the runtime identifier for a special protocol, if any.
+SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
+  auto known = P->getKnownProtocolKind();
+  if (!known)
+    return SpecialProtocol::None;
+  switch (*known) {
+  case KnownProtocolKind::AnyObject:
+    return SpecialProtocol::AnyObject;
+  case KnownProtocolKind::_ErrorType:
+    return SpecialProtocol::ErrorType;
+    
+  // The other known protocols aren't special at runtime.
+  case KnownProtocolKind::SequenceType:
+  case KnownProtocolKind::GeneratorType:
+  case KnownProtocolKind::BooleanType:
+  case KnownProtocolKind::RawRepresentable:
+  case KnownProtocolKind::RawOptionSetType:
+  case KnownProtocolKind::Equatable:
+  case KnownProtocolKind::Hashable:
+  case KnownProtocolKind::Comparable:
+  case KnownProtocolKind::_ObjectiveCBridgeable:
+  case KnownProtocolKind::_DestructorSafeContainer:
+  case KnownProtocolKind::ArrayLiteralConvertible:
+  case KnownProtocolKind::BooleanLiteralConvertible:
+  case KnownProtocolKind::CharacterLiteralConvertible:
+  case KnownProtocolKind::DictionaryLiteralConvertible:
+  case KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible:
+  case KnownProtocolKind::FloatLiteralConvertible:
+  case KnownProtocolKind::IntegerLiteralConvertible:
+  case KnownProtocolKind::StringInterpolationConvertible:
+  case KnownProtocolKind::StringLiteralConvertible:
+  case KnownProtocolKind::NilLiteralConvertible:
+  case KnownProtocolKind::UnicodeScalarLiteralConvertible:
+  case KnownProtocolKind::_BuiltinBooleanLiteralConvertible:
+  case KnownProtocolKind::_BuiltinCharacterLiteralConvertible:
+  case KnownProtocolKind::_BuiltinExtendedGraphemeClusterLiteralConvertible:
+  case KnownProtocolKind::_BuiltinFloatLiteralConvertible:
+  case KnownProtocolKind::_BuiltinIntegerLiteralConvertible:
+  case KnownProtocolKind::_BuiltinStringLiteralConvertible:
+  case KnownProtocolKind::_BuiltinUTF16StringLiteralConvertible:
+  case KnownProtocolKind::_BuiltinUnicodeScalarLiteralConvertible:
+    return SpecialProtocol::None;
+  }
+}
+
 namespace {
   class ProtocolDescriptorBuilder {
     IRGenModule &IGM;
@@ -4386,7 +4431,8 @@ namespace {
         .withClassConstraint(Protocol->requiresClass()
                                ? ProtocolClassConstraint::Class
                                : ProtocolClassConstraint::Any)
-        .withNeedsWitnessTable(requiresProtocolWitnessTable(Protocol));
+        .withNeedsWitnessTable(requiresProtocolWitnessTable(Protocol))
+        .withSpecialProtocol(getSpecialProtocolID(Protocol));
       
       Fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty,
                                               flags.getIntValue()));
