@@ -106,9 +106,17 @@ namespace swift {
   protected:
     SILModule *getModule() { return M; }
 
+    /// Invalidate all of functions in the module, using invalidation
+    /// information \p K.
     void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
       PM->invalidateAnalysis(K);
     }
+
+    /// Invalidate only the function \p F, using invalidation information \p K.
+    void invalidateAnalysis(SILFunction *F, SILAnalysis::InvalidationKind K) {
+      PM->invalidateAnalysis(F, K);
+    }
+
   };
 
 } // end namespace swift
