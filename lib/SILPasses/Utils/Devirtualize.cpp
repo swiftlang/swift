@@ -356,8 +356,8 @@ ApplyInst *swift::tryDevirtualizeClassMethod(ApplyInst *AI,
 /// Generate a new apply of a function_ref to replace an apply of a
 /// witness_method when we've determined the actual function we'll end
 /// up calling.
-static ApplyInst *devirtualizeWitness(ApplyInst *AI, SILFunction *F,
-                                      ArrayRef<Substitution> Subs) {
+static ApplyInst *devirtualizeWitnessMethod(ApplyInst *AI, SILFunction *F,
+                                            ArrayRef<Substitution> Subs) {
   // We know the witness thunk and the corresponding set of substitutions
   // required to invoke the protocol method at this point.
   auto &Module = AI->getModule();
@@ -409,8 +409,15 @@ static ApplyInst *devirtualizeWitness(ApplyInst *AI, SILFunction *F,
   auto *SAI = Builder.createApply(Loc, FRI, SubstCalleeSILType,
                                   ResultSILType, NewSubstList, Arguments,
                                  FRI->getReferencedFunction()->isTransparent());
+
+  auto *WMI = cast<WitnessMethodInst>(AI->getCallee());
+
   AI->replaceAllUsesWith(SAI);
   AI->eraseFromParent();
+
+  if (WMI->use_empty())
+    WMI->eraseFromParent();
+
   NumWitnessDevirt++;
   return SAI;
 }
@@ -418,11 +425,12 @@ static ApplyInst *devirtualizeWitness(ApplyInst *AI, SILFunction *F,
 /// In the cases where we can statically determine the function that
 /// we'll call to, replace an apply of a witness_method with an apply
 /// of a function_ref, returning the new apply.
-static ApplyInst *devirtualizeWitnessMethod(ApplyInst *AI,
-                                            WitnessMethodInst *WMI) {
+static ApplyInst *tryDevirtualizeWitnessMethod(ApplyInst *AI) {
   SILFunction *F;
   ArrayRef<Substitution> Subs;
   SILWitnessTable *WT;
+
+  auto *WMI = cast<WitnessMethodInst>(AI->getCallee());
 
   std::tie(F, WT, Subs) =
     AI->getModule().lookUpFunctionInWitnessTable(WMI->getConformance(),
@@ -431,7 +439,7 @@ static ApplyInst *devirtualizeWitnessMethod(ApplyInst *AI,
   if (!F)
     return nullptr;
 
-  return devirtualizeWitness(AI, F, Subs);
+  return devirtualizeWitnessMethod(AI, F, Subs);
 }
 
 //===----------------------------------------------------------------------===//
@@ -492,8 +500,8 @@ ApplyInst *swift::devirtualizeApply(ApplyInst *AI) {
   //   %8 = witness_method $Optional<UInt16>, #LogicValue.boolValue!getter.1
   //   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
   //
-  if (auto *AMI = dyn_cast<WitnessMethodInst>(AI->getCallee()))
-    return devirtualizeWitnessMethod(AI, AMI);
+  if (isa<WitnessMethodInst>(AI->getCallee()))
+    return tryDevirtualizeWitnessMethod(AI);
 
   /// Optimize a class_method and alloc_ref pair into a direct function
   /// reference:
