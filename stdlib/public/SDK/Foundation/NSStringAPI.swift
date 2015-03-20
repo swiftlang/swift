@@ -164,7 +164,8 @@ extension String {
   public static func localizedStringWithFormat(
     format: String, _ arguments: CVarArgType...
   ) -> String {
-    return String(format: format, arguments: arguments)
+    return String(format: format, locale: NSLocale.currentLocale(),
+      arguments: arguments)
   }
 
   // + (NSString *)pathWithComponents:(NSArray *)components
