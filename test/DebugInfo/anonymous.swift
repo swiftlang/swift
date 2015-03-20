@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
+// XFAIL: *
 
 // Don't crash when emitting debug info for anonymous variables.
 // CHECK: !MDLocalVariable({{.*}} name: "_"

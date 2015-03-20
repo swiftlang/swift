@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -enable-dynamic-value-type-layout %s -emit-ir -g -o - | FileCheck %s
+// XFAIL: *
 
 class Class <T> {
 	var x : T

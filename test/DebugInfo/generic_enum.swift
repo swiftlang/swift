@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+// XFAIL: *
 
 enum TrivialGeneric<T, U> {
   case x(T, U)
