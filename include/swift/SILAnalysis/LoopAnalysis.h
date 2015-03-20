@@ -69,24 +69,6 @@ public:
   // returns a cached result if available.
   SILLoopInfo *getLoopInfo(SILFunction *F);
 
-  /// Update the loop information with the passed analysis info.
-  /// Takes ownership of the analysis info.
-  void updateAnalysis(SILFunction *F, std::unique_ptr<SILLoopInfo> Info) {
-    if (LoopInfos.count(F)) {
-      assert(LoopInfos[F] != Info.get());
-      delete LoopInfos[F];
-    }
-    LoopInfos[F] = Info.release();
-  }
-
-  /// Release ownership of the dominance information for the function. The
-  /// returned unique_ptr takes ownership of the object.
-  std::unique_ptr<SILLoopInfo> preserveAnalysis(SILFunction *F) {
-    assert(LoopInfos.count(F));
-    std::unique_ptr<SILLoopInfo> Info(LoopInfos[F]);
-    LoopInfos.erase(F);
-    return Info;
-  }
 };
 
 } // end namespace swift
