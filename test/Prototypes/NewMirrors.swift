@@ -116,7 +116,7 @@ extension Mirror {
     func reflect() -> Mirror { return mirror }
   }
   
-  func address(first: MirrorPathType, _ rest: MirrorPathType...) -> Any? {
+  func descendant(first: MirrorPathType, _ rest: MirrorPathType...) -> Any? {
     var result: Any = _Dummy(mirror: self)
     for e in [first] + rest {
       let structure = reflect(result).structure
@@ -305,37 +305,46 @@ mirrors.test("Legacy") {
 
 mirrors.test("Addressing") {
   let m0 = reflect([1, 2, 3])
-  expectEqual(1, m0.address(0) as? Int)
-  expectEqual(1, m0.address("[0]") as? Int)
-  expectEqual(2, m0.address(1) as? Int)
-  expectEqual(2, m0.address("[1]") as? Int)
-  expectEqual(3, m0.address(2) as? Int)
-  expectEqual(3, m0.address("[2]") as? Int)
+  expectEqual(1, m0.descendant(0) as? Int)
+  expectEqual(1, m0.descendant("[0]") as? Int)
+  expectEqual(2, m0.descendant(1) as? Int)
+  expectEqual(2, m0.descendant("[1]") as? Int)
+  expectEqual(3, m0.descendant(2) as? Int)
+  expectEqual(3, m0.descendant("[2]") as? Int)
   
   let m1 = reflect((a: ["one", "two", "three"], b: 4))
-  let ott0 = m1.address(0) as? [String]
+  let ott0 = m1.descendant(0) as? [String]
   expectNotEmpty(ott0)
-  let ott1 = m1.address(".0") as? [String]
+  let ott1 = m1.descendant(".0") as? [String]
   expectNotEmpty(ott1)
   if ott0 != nil && ott1 != nil {
     expectEqualSequence(ott0!, ott1!)
   }
-  expectEqual(4, m1.address(1) as? Int)
-  expectEqual(4, m1.address(".1") as? Int)
-  expectEqual("one", m1.address(0, 0) as? String)
-  expectEqual("two", m1.address(0, 1) as? String)
-  expectEqual("three", m1.address(0, 2) as? String)
-  expectEqual("one", m1.address(".0", 0) as? String)
-  expectEqual("two", m1.address(0, "[1]") as? String)
-  expectEqual("three", m1.address(".0", "[2]") as? String)
+  expectEqual(4, m1.descendant(1) as? Int)
+  expectEqual(4, m1.descendant(".1") as? Int)
+  expectEqual("one", m1.descendant(0, 0) as? String)
+  expectEqual("two", m1.descendant(0, 1) as? String)
+  expectEqual("three", m1.descendant(0, 2) as? String)
+  expectEqual("one", m1.descendant(".0", 0) as? String)
+  expectEqual("two", m1.descendant(0, "[1]") as? String)
+  expectEqual("three", m1.descendant(".0", "[2]") as? String)
+
+  struct Zee : CustomReflectable {
+    func reflect() -> Mirror {
+      return ["bark": 1, "bite": 0]
+    }
+  }
   
   let x = [
-    (a: ["one", "two", "three"], b: 4),
-    (a: ["five"], b: 6),
-    (a: [], b: 7)]
+    (a: ["one", "two", "three"], b: Zee()),
+    (a: ["five"], b: Zee()),
+    (a: [], b: Zee())]
 
   let m = reflect(x)
-  let two = m.address(0, ".0", 1)
+  let two = m.descendant(0, ".0", 1)
   expectEqual("two", two as? String)
+  expectEqual(1, m.descendant(1, 1, "bark") as? Int)
+  expectEqual(0, m.descendant(1, 1, "bite") as? Int)
+  expectEmpty(m.descendant(1, 1, "bork"))
 }
 runAllTests()
