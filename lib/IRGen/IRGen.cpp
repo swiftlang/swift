@@ -534,6 +534,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     // There must be an output filename for each source file.
     // We ignore additional output filenames.
     if (OutputIter == Opts.OutputFilenames.end()) {
+      // TODO: Check this already at argument parsing.
       M->Ctx.Diags.diagnose(SourceLoc(), diag::too_few_output_filenames);
       return;
     }
@@ -549,6 +550,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   }
   
   if (!IGMcreated) {
+    // TODO: Check this already at argument parsing.
     M->Ctx.Diags.diagnose(SourceLoc(), diag::no_input_files_for_mt);
     return;
   }
