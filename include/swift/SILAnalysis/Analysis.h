@@ -45,7 +45,6 @@ namespace swift {
       Dominance,
       Alias,
       LoopInfo,
-      ColdBlocks,
       IVAnalysis,
       PostOrder,
       ClassHierarchyAnalysis,
@@ -57,16 +56,30 @@ namespace swift {
     /// Stores the kind of derived class.
     const AnalysisKind Kind;
 
+    /// A lock that prevents the invalidation of this analysis. When this
+    /// variable is set to True then the PassManager should not invalidate
+    /// this analysis.
+    bool invalidationLock;
+
   public:
 
     /// Returns the kind of derived class.
     AnalysisKind getKind() const { return Kind; }
 
     /// C'tor.
-    SILAnalysis(AnalysisKind K) : Kind(K) {}
+    SILAnalysis(AnalysisKind K) : Kind(K), invalidationLock(false) {}
 
     /// D'tor.
     virtual ~SILAnalysis() {}
+
+    /// Lock the analysis. This means that invalidation messages are ignored.
+    void lockInvalidation() {invalidationLock = true; }
+
+    /// Unlock the analysis. This means that invalidation messages are handled.
+    void unlockInvalidation() {invalidationLock = false; }
+
+    /// Return True if this analysis is locked and should not be invalidated.
+    bool isLocked() { return invalidationLock; }
 
     /// Invalidate all information in this analysis.
     virtual void invalidate(InvalidationKind K) {}
