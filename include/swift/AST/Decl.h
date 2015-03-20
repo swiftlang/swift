@@ -826,7 +826,7 @@ public:
     return getClangNodeImpl().getAsMacro();
   }
 
-  bool isPrivateStdlibDecl() const;
+  bool isPrivateStdlibDecl(bool whitelistProtocols=true) const;
 
   /// Whether this declaration is weak-imported.
   bool isWeakImported(Module *fromModule) const;

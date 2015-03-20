@@ -6,8 +6,12 @@
 // RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_1 < %t.members.txt
 // RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_PROTOCOL_MEMBERS_1 > %t.protocol.members.txt
+// RUN: FileCheck %s -check-prefix=PRIVATE_PROTOCOL_MEMBERS_1 < %t.protocol.members.txt
+// RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.protocol.members.txt
+
 // NO_STDLIB_PRIVATE: Begin completions
-// NO_STDLIB_PRIVATE-NOT: Decl[FreeFunction]{{[^:]*}}: _
+// NO_STDLIB_PRIVATE-NOT: Decl[{{.*}}]{{[^:]*}}: _
 // NO_STDLIB_PRIVATE: End completions
 
 #^PLAIN_TOP_LEVEL_1^#
@@ -23,3 +27,12 @@ func privateNominalMembers(a: String) {
 // PRIVATE_NOMINAL_MEMBERS_1: Begin completions
 // PRIVATE_NOMINAL_MEMBERS_1-DAG: Decl[InstanceVar]/CurrNominal: startIndex[#String.Index#]{{; name=.+$}}
 // PRIVATE_NOMINAL_MEMBERS_1: End completions
+
+func privateProtocolMembers(a: CollectionType) {
+  a.#^PRIVATE_PROTOCOL_MEMBERS_1^#
+}
+
+// PRIVATE_PROTOCOL_MEMBERS_1: Begin completions
+// PRIVATE_PROTOCOL_MEMBERS_1-DAG: Decl[InstanceVar]/Super: startIndex[#Self.Index#]
+
+// PRIVATE_PROTOCOL_MEMBERS_1: End completions

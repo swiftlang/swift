@@ -337,7 +337,7 @@ bool Decl::isTransparent() const {
   return false;
 }
 
-bool Decl::isPrivateStdlibDecl() const {
+bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
   const Decl *D = this;
   if (auto ExtD = dyn_cast<ExtensionDecl>(D))
     return ExtD->getExtendedType().isPrivateStdlibType();
@@ -361,9 +361,11 @@ bool Decl::isPrivateStdlibDecl() const {
       return true;
   }
 
-  // Whitelist protocols and protocol requirements.
   if (auto PD = dyn_cast<ProtocolDecl>(D)) {
-    return PD->getNameStr().startswith("_Builtin");
+    if (PD->getNameStr().startswith("_Builtin"))
+      return true;
+    if (whitelistProtocols)
+      return false;
   }
   if (isa<ProtocolDecl>(D->getDeclContext()))
     return false;
