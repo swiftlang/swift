@@ -9,31 +9,58 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
+/// Representation of the sub-structure and optional "schema" of any
+/// arbitrary instance.
+///
+/// Describes the parts---such as stored properties, collection
+/// elements, tuple elements, active enumeration cases---that make up
+/// any given instance.  May also supply a "schema" property that
+/// suggests how this structure might be interpreted.
+///
+/// Mirrors are used by playgrounds and the debugger.
 public struct Mirror {
+  /// An element of the reflected instance's structure.  The optional
+  /// `label` may be used when appropriate, e.g. to represent the name
+  /// of a stored property or of an active `enum` case, and will be
+  /// used for lookup when `String`\ s are passed to the `descendant`
+  /// method.
   public typealias Child = (label: String?, value: Any)
+
+  /// The type used to represent sub-structure.
+  ///
+  /// Depending on your needs, you may find it useful to "upgrade"
+  /// instances of this type to `AnyBidirectionalCollection` or
+  /// `AnyRandomAccessCollection`.  For example, to display the last
+  /// 20 children of a mirror if they can be accessed efficiently, you
+  /// might write::
+  ///
+  ///   if let b? = AnyBidirectionalCollection(someMirror.children) {
+  ///     for i in advance(b.endIndex, -20, b.startIndex)..<b.endIndex {
+  ///        println(b[i])
+  ///     }
+  ///   }
   public typealias Children = AnyForwardCollection<Child>
-  
+
+  /// A suggestion of how a `Mirror`\ 's is to be interpreted.
+  ///
+  /// Playgrounds and the debugger will show a representation similar
+  /// to the one used for instances of the kind indicated by the
+  /// `Schema` case name when the `Mirror` is used for display.
   public enum Schema {
   case Struct, Class, Enum, Tuple, Optional, Collection, Dictionary, Set,
     ObjectiveCObject
-
-    internal init?(legacy: MirrorDisposition) {
-      switch legacy {
-      case .Struct: self = .Struct
-      case .Class: self = .Class
-      case .Enum: self = .Enum
-      case .Tuple: self = .Tuple
-      case .Aggregate: return nil
-      case .IndexContainer: self = .Collection
-      case .KeyContainer: self = .Dictionary
-      case .MembershipContainer: self = .Set
-      case .Container: preconditionFailure("unused!")
-      case .Optional: self = .Optional
-      case .ObjCObject: self = .ObjectiveCObject
-      }
-    }
   }
 
+  /// Initialize with the given collection of `children` and optional
+  /// `schema`.
+  ///
+  /// The traversal protocol modeled by `children`\ 's indices
+  /// (`ForwardIndexType`, `BidirectionalIndexType`, or
+  /// `RandomAccessIndexType`) is captured so that the resulting
+  /// `Mirror`\ 's `children` may be upgraded later.  See the failable
+  /// initializers of `AnyBidirectionalCollection` and
+  /// `AnyRandomAccessCollection` for details.
   public init<
     C: CollectionType where C.Generator.Element == Child
   >(children: C, schema: Schema? = nil) {
@@ -41,6 +68,24 @@ public struct Mirror {
     self.schema = schema
   }
 
+  /// Initialize with the given collection of child instances, each
+  /// with a `nil` `label`, and optional `schema`.
+  ///
+  /// This initializer is especially useful for the mirrors of
+  /// collections, e.g.::
+  ///
+  ///   extension MyArray : CustomReflectable {
+  ///     func customReflect() -> Mirror 
+  ///       return Mirror(unlabelledChildren: self, .Collection)
+  ///     }
+  ///   }
+  ///
+  /// The traversal protocol modeled by `children`\ 's indices
+  /// (`ForwardIndexType`, `BidirectionalIndexType`, or
+  /// `RandomAccessIndexType`) is captured so that the resulting
+  /// `Mirror`\ 's `children` may be upgraded later.  See the failable
+  /// initializers of `AnyBidirectionalCollection` and
+  /// `AnyRandomAccessCollection` for details.
   public init<
     C: CollectionType
   >(unlabeledChildren: C, schema: Schema? = nil) {
@@ -50,42 +95,27 @@ public struct Mirror {
     self.schema = schema
   }
 
+  /// A collection of `Child` elements describing the structure of the
+  /// reflected instance.
   public let children: Children
+
+  /// Suggests a display representation for the reflected instance.
   public let schema: Schema?
 }
 
-
-extension Mirror {
-  internal struct LegacyChildren : CollectionType {
-    init(_ oldMirror: MirrorType) {
-      self._oldMirror = oldMirror
-    }
-    var startIndex: Int { return 0 }
-    var endIndex: Int { return _oldMirror.count }
-    subscript(position: Int) -> Child {
-      let (label, childMirror) = _oldMirror[position]
-      return (label: label, value: childMirror.value)
-    }
-    func generate() -> IndexingGenerator<LegacyChildren> {
-      return IndexingGenerator(self)
-    }
-    internal let _oldMirror: MirrorType
-  }
-  
-  public init(_ oldMirror: MirrorType) {
-    self.init(
-      children: LegacyChildren(oldMirror),
-      schema: Schema(legacy: oldMirror.disposition))
-  }
-}
-
+/// A type that explicitly supplies its own Mirror.
+///
+/// Instances of any type can be `reflect`\ 'ed upon, but if you are
+/// not satisfied with the `Mirror` supplied for your type by default,
+/// conform to `CustomReflectable` and you can provide your own
+/// `Mirror`
 public protocol CustomReflectable {
-  func reflect() -> Mirror
+  func customReflect() -> Mirror
 }
 
 public func reflect(x: Any) -> Mirror {
   if let customized? = x as? CustomReflectable {
-    return customized.reflect()
+    return customized.customReflect()
   }
   else {
     return Mirror(Swift.reflect(x))
@@ -117,7 +147,7 @@ public func find<
 extension Mirror {
   struct _Dummy : CustomReflectable {
     var mirror: Mirror
-    func reflect() -> Mirror { return mirror }
+    func customReflect() -> Mirror { return mirror }
   }
   
   public func descendant(
@@ -146,6 +176,66 @@ extension Mirror {
 
 //===--- Adapters ---------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
+
+extension Mirror {
+  //
+  public init<Element>(
+    children: DictionaryLiteral<String, Element>,
+    schema: Schema? = nil
+  ) {
+    self.children = Children(
+      lazy(children).map { Child(label: $0.0, value: $0.1) }
+    )
+    self.schema = schema
+  }
+}
+
+//===--- Legacy MirrorType Support ----------------------------------------===//
+extension Mirror.Schema {
+  internal init?(legacy: MirrorDisposition) {
+    switch legacy {
+    case .Struct: self = .Struct
+    case .Class: self = .Class
+    case .Enum: self = .Enum
+    case .Tuple: self = .Tuple
+    case .Aggregate: return nil
+    case .IndexContainer: self = .Collection
+    case .KeyContainer: self = .Dictionary
+    case .MembershipContainer: self = .Set
+    case .Container: preconditionFailure("unused!")
+    case .Optional: self = .Optional
+    case .ObjCObject: self = .ObjectiveCObject
+    }
+  }
+}
+
+extension Mirror {
+  internal struct LegacyChildren : CollectionType {
+    init(_ oldMirror: MirrorType) {
+      self._oldMirror = oldMirror
+    }
+    var startIndex: Int { return 0 }
+    var endIndex: Int { return _oldMirror.count }
+    subscript(position: Int) -> Child {
+      let (label, childMirror) = _oldMirror[position]
+      return (label: label, value: childMirror.value)
+    }
+    func generate() -> IndexingGenerator<LegacyChildren> {
+      return IndexingGenerator(self)
+    }
+    internal let _oldMirror: MirrorType
+  }
+  
+  public init(_ oldMirror: MirrorType) {
+    self.init(
+      children: LegacyChildren(oldMirror),
+      schema: Schema(legacy: oldMirror.disposition))
+  }
+}
+
+//===--- General Utilities ------------------------------------------------===//
+// having nothing really to do with Mirrors.  These should be
+// separately reviewed.
 
 public struct DictionaryLiteral<Key, Value>
   : CollectionType, DictionaryLiteralConvertible {
@@ -178,19 +268,4 @@ public struct DictionaryLiteral<Key, Value>
   }
   
   internal let elements: [(Key, Value)]
-}
-
-extension Mirror {
-  typealias Key = String
-  typealias Value = Any
-  
-  public init<Element>(
-    children: DictionaryLiteral<String, Element>,
-    schema: Schema? = nil
-  ) {
-    self.children = Children(
-      lazy(children).map { Child(label: $0.0, value: $0.1) }
-    )
-    self.schema = schema
-  }
 }

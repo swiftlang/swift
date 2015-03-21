@@ -29,12 +29,12 @@ extension Mirror: Printable {
 
 mirrors.test("RandomAccessStructure") {
   struct Eggs : CustomReflectable {
-    func reflect() -> Mirror {
+    func customReflect() -> Mirror {
       return Mirror(unlabeledChildren: ["aay", "bee", "cee"])
     }
   }
 
-  let x = Eggs().reflect()
+  let x = Eggs().customReflect()
   
   expectEqual("[nil: \"aay\", nil: \"bee\", nil: \"cee\"]", x.description)
 }
@@ -61,12 +61,12 @@ func find(substring: String, within domain: String) -> String.Index? {
 
 mirrors.test("ForwardStructure") {
   struct DoubleYou : CustomReflectable {
-    func reflect() -> Mirror {
+    func customReflect() -> Mirror {
       return Mirror(unlabeledChildren: Set(letters), schema: .Set)
     }
   }
 
-  let w = DoubleYou().reflect()
+  let w = DoubleYou().customReflect()
   expectEqual(.Set, w.schema)
   expectEqual(count(letters), numericCast(count(w.children)))
   
@@ -81,13 +81,13 @@ mirrors.test("ForwardStructure") {
 
 mirrors.test("BidirectionalStructure") {
   struct Why : CustomReflectable {
-    func reflect() -> Mirror {
+    func customReflect() -> Mirror {
       return Mirror(unlabeledChildren: letters, schema: .Collection)
     }
   }
 
   // Test that the basics seem to work
-  let y = Why().reflect()
+  let y = Why().customReflect()
   expectEqual(.Collection, y.schema)
 
   let description = y.description
@@ -98,22 +98,22 @@ mirrors.test("BidirectionalStructure") {
 
 mirrors.test("LabeledStructure") {
   struct Zee : CustomReflectable {
-    func reflect() -> Mirror {
+    func customReflect() -> Mirror {
       return Mirror(children: ["bark": 1, "bite": 0])
     }
   }
 
-  let z = Zee().reflect()
+  let z = Zee().customReflect()
   expectEqual("[bark: 1, bite: 0]", z.description)
   expectEmpty(z.schema)
 
   struct Zee2 : CustomReflectable {
-    func reflect() -> Mirror {
+    func customReflect() -> Mirror {
       return Mirror(
         children: ["bark": 1, "bite": 0], schema: .Dictionary)
     }
   }
-  let z2 = Zee2().reflect()
+  let z2 = Zee2().customReflect()
   expectEqual(.Dictionary, z2.schema)
   expectEqual("[bark: 1, bite: 0]", z2.description)
 }
@@ -158,7 +158,7 @@ mirrors.test("Addressing") {
   expectEqual("three", m1.descendant(".0", "[2]") as? String)
 
   struct Zee : CustomReflectable {
-    func reflect() -> Mirror {
+    func customReflect() -> Mirror {
       return Mirror(children: ["bark": 1, "bite": 0])
     }
   }
